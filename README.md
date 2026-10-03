@@ -43,6 +43,17 @@ cp apps/storefront/.env.local.example apps/storefront/.env.local
 | `pnpm check` | Biome lint + format check (`pnpm format:fix` to format) |
 | `pnpm --filter @tattoo-drip/types generate` | Regenerate API types after editing `openapi.yaml` |
 
+## Working with AI agents
+
+Each area has its own `AGENTS.md` (read by Claude Code, Codex and Cursor), and Claude Code gets per-area skills and settings in `<area>/.claude/`. Start the agent in the area you're working on so it loads only that area's context:
+
+```bash
+cd apps/platform && claude      # or apps/storefront, or packages
+claude --add-dir ../storefront  # one-off access to a sibling area
+```
+
+Start at the repository root only for changes that span areas. Skills live in `.agents/skills/` and are symlinked into each area's `.claude/skills/`.
+
 ## Deployment
 
 - **Storefront:** Vercel, with the project's Root Directory set to `apps/storefront`.

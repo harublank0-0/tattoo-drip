@@ -1,0 +1,35 @@
+## Platform
+
+AdonisJS 7 app that owns all data, business rules and the REST API. The dashboard is Inertia + React inside it.
+
+- **Stack:** Lucid ORM on PostgreSQL, VineJS validators, session auth (`@adonisjs/auth`), Tuyau, Inertia + React (SSR entry exists in `inertia/ssr.tsx` but is disabled in `config/inertia.ts`), Japa tests.
+- **Styling:** plain CSS with design tokens in `inertia/css/app.css`. There is no Tailwind or shadcn here.
+
+## Layout
+
+- `app/controllers`, `app/models`, `app/validators`, `app/transformers`, `app/middleware`, `app/exceptions`
+- `start/routes.ts` (routes reference controllers through `#generated/controllers`), `start/kernel.ts` (middleware), `start/env.ts`
+- `config/`, `database/migrations/`
+- `inertia/pages`, `inertia/layouts`, `inertia/components`
+- `tests/unit`, `tests/functional`, `tests/browser` (suites are defined in `adonisrc.ts`)
+
+Import with the subpath aliases from `package.json` (`#controllers/*`, `#models/*`, `#services/*`, `#validators/*`, …), never with long relative paths.
+
+## Rules
+
+- Each backend module owns its models and services; other modules call its services instead of querying its tables. Inertia controllers, API controllers and jobs stay thin and call the same services. See the module table in `docs/architecture.md`.
+- The tenant always comes from the URL (`/t/:slug/…` for the dashboard, `/api/v1/tenants/:slug/…` for the API). Services scope every query by tenant; never trust a tenant ID from a request body. Every tenant-owned endpoint needs a test proving tenant A can't reach tenant B's data.
+- The REST API implements the contract in `packages/types/openapi.yaml`. Change the contract first, regenerate the types, then implement.
+- `database/schema.ts` and `.adonisjs/` are generated. Change the schema with a new migration, never by editing an existing migration that has been run.
+
+## Commands
+
+Run from `apps/platform`:
+
+- `pnpm dev` (`node ace serve --hmr`, port 3333)
+- `node ace test` (add `--files` or a suite name to narrow it)
+- `node ace make:controller|model|migration|validator|… <name>` to scaffold
+- `node ace migration:run`
+- `pnpm typecheck` (server and `inertia/`)
+
+Relevant docs: `docs/architecture.md`, `docs/data-model.md`, `docs/requirements.md`.

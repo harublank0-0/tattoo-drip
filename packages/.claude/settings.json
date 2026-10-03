@@ -1,0 +1,6 @@
+{
+	"permissions": {
+		"additionalDirectories": ["../docs", "../.agents/skills"],
+		"deny": ["Read(./types/src/openapi.gen.ts)"]
+	}
+}

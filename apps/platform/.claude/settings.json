@@ -1,0 +1,10 @@
+{
+	"permissions": {
+		"additionalDirectories": [
+			"../../packages/types",
+			"../../docs",
+			"../../.agents/skills"
+		],
+		"deny": ["Read(./.adonisjs/**/*)", "Read(./**/.env)", "Read(./build/**/*)"]
+	}
+}

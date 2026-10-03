@@ -1,0 +1,14 @@
+{
+	"permissions": {
+		"additionalDirectories": [
+			"../../packages",
+			"../../docs",
+			"../../.agents/skills"
+		],
+		"deny": [
+			"Read(./src/routeTree.gen.ts)",
+			"Read(./.env.local)",
+			"Read(./.output/**/*)"
+		]
+	}
+}
