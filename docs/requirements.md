@@ -1,6 +1,6 @@
 # Requirements
 
-What the MVP (5-studio pilot) and V1 (paid launch) must do, and the rules they follow. The gates between them are in the [roadmap](roadmap.md); the how is in [architecture](architecture.md).
+What the MVP (pilot with a design-partner studio) and V1 (paid launch) must do, and the rules they follow. The gates between them are in the [roadmap](roadmap.md); the how is in [architecture](architecture.md).
 
 ## MVP: the inquiry-to-deposit loop
 
