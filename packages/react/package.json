@@ -1,0 +1,41 @@
+{
+	"name": "@tattoo-drip/react",
+	"version": "0.0.0",
+	"description": "React hooks for the Tattoo Drip SDK, built on TanStack Query",
+	"private": true,
+	"license": "UNLICENSED",
+	"type": "module",
+	"sideEffects": false,
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"files": [
+		"dist"
+	],
+	"publishConfig": {
+		"exports": {
+			".": {
+				"types": "./dist/index.d.ts",
+				"import": "./dist/index.js"
+			}
+		}
+	},
+	"scripts": {
+		"build": "tsc",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@tattoo-drip/sdk": "workspace:*",
+		"@tattoo-drip/types": "workspace:*"
+	},
+	"peerDependencies": {
+		"@tanstack/react-query": "^5.0.0",
+		"react": "^18.0.0 || ^19.0.0"
+	},
+	"devDependencies": {
+		"@tanstack/react-query": "^5.103.1",
+		"@types/react": "^19.2.0",
+		"react": "^19.2.0",
+		"typescript": "^6.0.2"
+	}
+}

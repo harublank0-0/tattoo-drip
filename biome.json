@@ -1,19 +1,22 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.4.5/schema.json",
 	"vcs": {
-		"enabled": false,
+		"enabled": true,
 		"clientKind": "git",
-		"useIgnoreFile": false
+		"useIgnoreFile": true
 	},
 	"files": {
-		"ignoreUnknown": false,
+		"ignoreUnknown": true,
 		"includes": [
-			"**/src/**/*",
-			"**/.vscode/**/*",
-			"**/index.html",
-			"**/vite.config.ts",
-			"!**/src/routeTree.gen.ts",
-			"!**/src/styles.css"
+			"**",
+			"!**/routeTree.gen.ts",
+			"!**/styles.css",
+			"!**/src/generated",
+			"!**/.adonisjs",
+			"!**/inertia/css",
+			"!**/openapi.gen.ts",
+			"!**/.agents",
+			"!**/skills-lock.json"
 		]
 	},
 	"formatter": {
@@ -30,6 +33,9 @@
 	"javascript": {
 		"formatter": {
 			"quoteStyle": "double"
+		},
+		"parser": {
+			"unsafeParameterDecoratorsEnabled": true
 		}
 	}
 }

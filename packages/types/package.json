@@ -1,0 +1,33 @@
+{
+	"name": "@tattoo-drip/types",
+	"version": "0.0.0",
+	"description": "Types for the Tattoo Drip public API, generated from openapi.yaml",
+	"private": true,
+	"license": "UNLICENSED",
+	"type": "module",
+	"sideEffects": false,
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"files": [
+		"dist",
+		"openapi.yaml"
+	],
+	"publishConfig": {
+		"exports": {
+			".": {
+				"types": "./dist/index.d.ts",
+				"import": "./dist/index.js"
+			}
+		}
+	},
+	"scripts": {
+		"generate": "openapi-typescript openapi.yaml -o src/openapi.gen.ts",
+		"build": "tsc",
+		"typecheck": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"openapi-typescript": "^7.13.0",
+		"typescript": "^6.0.2"
+	}
+}

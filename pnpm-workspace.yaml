@@ -1,8 +1,23 @@
+packages:
+  - apps/*
+  - packages/*
+
 allowBuilds:
   '@google/genai': true
   '@prisma/engines': true
   '@sentry/cli': true
+  '@swc/core': true
   core-js: true
   esbuild: true
   prisma: true
   protobufjs: true
+
+# Fresh AdonisJS releases pinned by the starter kit
+minimumReleaseAgeExclude:
+  - '@adonisjs/inertia@5.0.0-next.2'
+  - '@adonisjs/vite@6.0.0-next.3'
+  - '@adonisjs/assembler@8.5.2'
+  - '@adonisjs/core@7.5.2'
+  - '@adonisjs/http-server@9.3.1'
+  - '@poppinss/utils@7.1.1'
+  - lucide-react@1.48.0

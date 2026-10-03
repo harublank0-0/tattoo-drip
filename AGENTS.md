@@ -1,3 +1,13 @@
+## Repo layout
+
+pnpm monorepo. Read `docs/` (start with `docs/product.md`) before feature work.
+
+- `apps/platform`: AdonisJS + Inertia + React. Dashboard, REST API, all business rules and data.
+- `apps/storefront`: TanStack Start hosted storefront. Talks to the platform only through `@tattoo-drip/sdk`.
+- `packages/types`: `openapi.yaml` is the public API contract. Run `pnpm --filter @tattoo-drip/types generate` after editing it.
+- `packages/sdk`, `packages/react`: the public SDK. No framework, AdonisJS or app imports in `sdk`.
+- Biome formats and lints everything (`pnpm check`). Do not add ESLint or Prettier.
+
 <!-- intent-skills:start -->
 ## Skill Loading
 

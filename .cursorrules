@@ -2,7 +2,7 @@ We use Sentry for watching for errors in our deployed application, as well as fo
 
 ## Error collection
 
-Error collection is automatic and configured in `src/router.tsx`.
+Error collection is automatic and configured in `apps/storefront/src/router.tsx`.
 
 ## Instrumentation
 
@@ -22,7 +22,7 @@ Sentry.startSpan({ name: 'Requesting all the pokemon' }, async () => {
 ```
 # shadcn instructions
 
-Use the latest version of Shadcn to install new components, like this command to add a button component:
+Use the latest version of Shadcn to install new components, run from `apps/storefront`, like this command to add a button component:
 
 ```bash
 pnpm dlx shadcn@latest add button

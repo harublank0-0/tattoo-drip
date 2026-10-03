@@ -1,0 +1,449 @@
+openapi: 3.1.0
+info:
+  title: Tattoo Drip public API
+  version: 1.0.0-draft
+  description: |
+    Public storefront API. This document is the source of truth for
+    `@tattoo-drip/types` and `@tattoo-drip/sdk`. Changes within v1 must be additive.
+servers:
+  - url: https://api.example.com/api/v1
+security:
+  - {}
+  - serverKey: []
+
+paths:
+  /styles:
+    get:
+      operationId: listStyles
+      summary: Platform-wide tattoo styles
+      responses:
+        "200":
+          description: Styles
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/TattooStyle" } }
+
+  /placements:
+    get:
+      operationId: listPlacements
+      summary: Platform-wide body placements
+      responses:
+        "200":
+          description: Placements
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/BodyPlacement" } }
+
+  /tenants/{tenant}:
+    parameters:
+      - $ref: "#/components/parameters/Tenant"
+    get:
+      operationId: getStudio
+      summary: Public profile and storefront configuration of a tenant
+      responses:
+        "200":
+          description: Studio
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Studio" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /tenants/{tenant}/artists:
+    parameters:
+      - $ref: "#/components/parameters/Tenant"
+    get:
+      operationId: listArtists
+      summary: Visible artists of a tenant
+      responses:
+        "200":
+          description: Artists
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/Artist" } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /tenants/{tenant}/artists/{artist}:
+    parameters:
+      - $ref: "#/components/parameters/Tenant"
+      - name: artist
+        in: path
+        required: true
+        description: Artist slug
+        schema: { type: string }
+    get:
+      operationId: getArtist
+      summary: One artist by slug
+      responses:
+        "200":
+          description: Artist
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Artist" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /tenants/{tenant}/services:
+    parameters:
+      - $ref: "#/components/parameters/Tenant"
+    get:
+      operationId: listServices
+      summary: Bookable services of a tenant
+      parameters:
+        - name: artistId
+          in: query
+          description: Only services this artist offers
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Services
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/Service" } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /tenants/{tenant}/portfolio:
+    parameters:
+      - $ref: "#/components/parameters/Tenant"
+    get:
+      operationId: listPortfolio
+      summary: Portfolio projects, newest first
+      parameters:
+        - name: artistId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: style
+          in: query
+          description: Style slug
+          schema: { type: string }
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 24 }
+      responses:
+        "200":
+          description: A page of projects
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, nextCursor]
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/PortfolioProject" } }
+                  nextCursor: { type: [string, "null"] }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /tenants/{tenant}/availability:
+    parameters:
+      - $ref: "#/components/parameters/Tenant"
+    get:
+      operationId: listAvailability
+      summary: Bookable slots for an artist and service
+      description: Slots are computed, never stored. The range is clamped to the tenant's minimum notice and booking horizon.
+      parameters:
+        - name: artistId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: serviceId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: from
+          in: query
+          description: First day (in the tenant's timezone)
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          description: Last day, inclusive (in the tenant's timezone)
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: Slots
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/Slot" } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /tenants/{tenant}/bookings:
+    parameters:
+      - $ref: "#/components/parameters/Tenant"
+    post:
+      operationId: createBooking
+      summary: Submit a booking request (guest, no account)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [booking]
+              properties:
+                booking: { $ref: "#/components/schemas/BookingRequestInput" }
+                referenceImages:
+                  type: array
+                  maxItems: 5
+                  items: { type: string, format: binary }
+                challengeToken:
+                  type: string
+                  description: Bot-challenge token. Required for browser submissions.
+            encoding:
+              booking:
+                contentType: application/json
+      responses:
+        "201":
+          description: Request received
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/BookingReceipt" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+components:
+  securitySchemes:
+    serverKey:
+      type: http
+      scheme: bearer
+      description: Secret server key. Only sets rate-limit identity; grants no extra data access. Never use in a browser.
+
+  parameters:
+    Tenant:
+      name: tenant
+      in: path
+      required: true
+      description: Tenant slug (also its subdomain). Old slugs resolve as aliases.
+      schema: { type: string }
+
+  responses:
+    NotFound:
+      description: Unknown tenant or resource
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    ValidationError:
+      description: Invalid input
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    RateLimited:
+      description: Too many requests
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string, examples: [not_found, validation_failed, rate_limited, slot_unavailable] }
+            message: { type: string }
+            fields:
+              type: object
+              description: Field path → messages, for validation errors
+              additionalProperties: { type: array, items: { type: string } }
+
+    TattooStyle:
+      type: object
+      required: [slug, name]
+      properties:
+        slug: { type: string, examples: [fine-line] }
+        name: { type: string, examples: [Fine Line] }
+
+    BodyPlacement:
+      type: object
+      required: [slug, name]
+      properties:
+        slug: { type: string, examples: [forearm] }
+        name: { type: string, examples: [Forearm] }
+
+    Image:
+      type: object
+      required: [url, width, height]
+      properties:
+        url: { type: string, format: uri }
+        width: { type: integer }
+        height: { type: integer }
+        alt: { type: [string, "null"] }
+
+    Money:
+      type: object
+      required: [amount, currency]
+      properties:
+        amount: { type: integer, description: Minor units (cents) }
+        currency: { type: string, description: ISO 4217 code, examples: [USD] }
+
+    SocialLink:
+      type: object
+      required: [platform, url]
+      properties:
+        platform: { type: string, examples: [instagram] }
+        url: { type: string, format: uri }
+
+    StorefrontSection:
+      type: object
+      required: [type, props]
+      properties:
+        type: { type: string, examples: [hero, portfolio, services] }
+        props: { type: object, additionalProperties: true }
+
+    StorefrontConfiguration:
+      type: object
+      required: [theme, branding, sections]
+      properties:
+        theme: { type: string, examples: [classic] }
+        branding:
+          type: object
+          properties:
+            logo: { oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }] }
+            heroImage: { oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }] }
+            colors:
+              type: object
+              additionalProperties: { type: string }
+              examples: [{ primary: "#111111" }]
+            font: { type: [string, "null"] }
+        sections:
+          type: array
+          items: { $ref: "#/components/schemas/StorefrontSection" }
+
+    Studio:
+      type: object
+      required: [id, slug, type, name, timezone, socialLinks, contact, storefront]
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        type: { type: string, enum: [studio, independent] }
+        name: { type: string }
+        description: { type: [string, "null"] }
+        timezone: { type: string, description: IANA timezone, examples: [Asia/Kathmandu] }
+        contact:
+          type: object
+          required: [email]
+          properties:
+            email: { type: string, format: email }
+            phone: { type: [string, "null"] }
+            address: { type: [string, "null"] }
+        socialLinks:
+          type: array
+          items: { $ref: "#/components/schemas/SocialLink" }
+        storefront: { $ref: "#/components/schemas/StorefrontConfiguration" }
+
+    Artist:
+      type: object
+      required: [id, slug, name, acceptingRequests, serviceIds]
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        bio: { type: [string, "null"] }
+        photo: { oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }] }
+        acceptingRequests: { type: boolean }
+        closedMessage:
+          type: [string, "null"]
+          description: Shown instead of the booking form when not accepting requests
+        serviceIds:
+          type: array
+          items: { type: string, format: uuid }
+
+    Service:
+      type: object
+      required: [id, name, durationMinutes]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: [string, "null"] }
+        durationMinutes: { type: integer, description: Estimated duration }
+        startingPrice:
+          oneOf: [{ $ref: "#/components/schemas/Money" }, { type: "null" }]
+
+    PortfolioProject:
+      type: object
+      required: [id, artistId, title, images]
+      properties:
+        id: { type: string, format: uuid }
+        artistId: { type: string, format: uuid }
+        title: { type: string }
+        description: { type: [string, "null"] }
+        style: { type: [string, "null"], description: Style slug }
+        placement: { type: [string, "null"], description: Placement slug }
+        completedOn: { type: [string, "null"], format: date }
+        images:
+          type: array
+          items: { $ref: "#/components/schemas/Image" }
+
+    Slot:
+      type: object
+      required: [startsAt, endsAt]
+      properties:
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+
+    BookingRequestInput:
+      type: object
+      required: [artistId, serviceId, startsAt, customer, tattoo]
+      properties:
+        artistId: { type: string, format: uuid }
+        serviceId: { type: string, format: uuid }
+        startsAt: { type: string, format: date-time, description: Must be a bookable slot }
+        customer:
+          type: object
+          required: [name, email]
+          properties:
+            name: { type: string, minLength: 2 }
+            email: { type: string, format: email }
+            phone: { type: string }
+        tattoo:
+          type: object
+          required: [idea]
+          properties:
+            idea: { type: string, minLength: 20 }
+            style: { type: string, description: Style slug }
+            placement: { type: string, description: Placement slug }
+            size: { type: string, examples: [10 cm] }
+            budget: { type: string }
+        notes: { type: string }
+
+    BookingReceipt:
+      type: object
+      required: [id, status]
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [requested] }
