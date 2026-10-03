@@ -136,6 +136,6 @@ In the MVP the studio page has one layout, generated from the profile and artist
 ## Current state
 
 - **`apps/platform`** is the AdonisJS 7 React starter, switched to PostgreSQL, with its pages rebuilt on Tailwind CSS v4 and shadcn/ui (stock zinc theme, light and dark). It has session auth with signup, login and dashboard pages. The users migration has not been run yet.
-- **`apps/storefront`** is the single-artist prototype. It still uses mock data. Booking is an in-dialog inquiry form (TanStack Form with a Zod schema) that only simulates sending until the inquiries API exists. It still contains better-auth and Supabase. Those get removed once the API exists.
+- **`apps/storefront`** is the single-artist prototype. It still uses mock data. Booking is an in-dialog inquiry form (TanStack Form with a Zod schema) that only simulates sending until the inquiries API exists. The prototype's Prisma, better-auth and Supabase code has been removed.
 - **UI:** both apps use Tailwind CSS v4 and shadcn/ui with the same `components.json` settings, each with its own theme. A shared design system for both is planned and will replace the per-app themes.
 - **`packages/*`** hold a working SDK against a draft `openapi.yaml`. That draft still describes the old booking flow (`bookings.create`, `availability`) and must move to inquiries (tracked in Linear). The API endpoints themselves are not built yet.

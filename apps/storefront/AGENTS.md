@@ -4,7 +4,8 @@ TanStack Start app for the hosted studio page. It has no database: real data com
 
 - **Stack:** TanStack Start + Router (file routes in `src/routes`), TanStack Query, TanStack Form, React 19, Tailwind CSS v4 (`src/styles.css`), shadcn components in `src/components/ui`, t3 env validation in `src/env.ts`.
 - **Imports:** use the `#/` alias for `src/` (`#/components/ui/button`, `#/lib/utils`).
-- **Prototype leftovers:** better-auth (`src/lib/auth*.ts`, `src/routes/api/auth`), Supabase (`src/utils/supabase.ts`) and the unused `@tanstack/ai*` packages are slated for removal. Don't build on them.
+- **Prototype leftovers:** the unused `@tanstack/ai*` packages are slated for removal. Don't build on them.
+- **No auth or data layer here:** the storefront has no auth, database or Supabase client. Customer data goes to the platform API through the SDK.
 
 ## shadcn
 
