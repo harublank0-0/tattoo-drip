@@ -2,13 +2,21 @@
 
 TanStack Start app for the hosted studio page. It has no database: real data comes from the platform through `@tattoo-drip/react` / `@tattoo-drip/sdk` (`packages/`). Until the API exists, pages read mock data from `src/data/mock`.
 
-- **Stack:** TanStack Start + Router (file routes in `src/routes`), TanStack Query, React 19, Tailwind CSS v4 (`src/styles.css`), shadcn components in `src/components/ui`, t3 env validation in `src/env.ts`.
+- **Stack:** TanStack Start + Router (file routes in `src/routes`), TanStack Query, TanStack Form, React 19, Tailwind CSS v4 (`src/styles.css`), shadcn components in `src/components/ui`, t3 env validation in `src/env.ts`.
 - **Imports:** use the `#/` alias for `src/` (`#/components/ui/button`, `#/lib/utils`).
 - **Prototype leftovers:** better-auth (`src/lib/auth*.ts`, `src/routes/api/auth`), Supabase (`src/utils/supabase.ts`) and the unused `@tanstack/ai*` packages are slated for removal. Don't build on them.
 
 ## shadcn
 
-Add components from `apps/storefront` with `pnpm dlx shadcn@latest add <component>`, then run `pnpm format:fix` from the root. The CLI imports `cn` from the `cn` package (shadcn's clsx + tailwind-merge replacement); older components still use `#/lib/utils`.
+Add components from `apps/storefront` with `pnpm dlx shadcn@latest add <component>`, then run `pnpm format:fix` from the root. The CLI imports `cn` from the `cn` package (shadcn's clsx + tailwind-merge replacement); older components (`dialog`, `sheet`) still use `#/lib/utils`.
+
+Never run `shadcn add form`: `src/components/ui/form.tsx` is our TanStack Form toolkit, and the CLI would overwrite it with shadcn's react-hook-form version.
+
+## Forms
+
+- Build forms with `useAppForm` from `#/components/ui/form` (TanStack Form composition) and render fields with `<form.AppField name="…">`, using `field.TextField`, `field.TextareaField` or `field.SelectField`. Add new field types to `form.tsx` rather than wiring inputs by hand. `src/features/home/booking-form.tsx` is the reference.
+- Pass Zod schemas straight to `validators` (TanStack Form 1.x reads Standard Schema; there are no adapters). For "validate on submit, then on change", use `validationLogic: revalidateLogic({ mode: "submit", modeAfterSubmission: "change" })` with `validators: { onDynamic: schema }`.
+- No skill covers TanStack Form 1.x: the skills.sh `tanstack-form` skill targets the pre-1.0 adapter API. Go by the installed package's types and shadcn's TanStack Form guide.
 
 ## Sentry
 

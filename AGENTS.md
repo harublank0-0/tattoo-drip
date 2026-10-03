@@ -6,6 +6,8 @@ pnpm monorepo. Each area has its own `AGENTS.md` with its stack and commands. St
 - `apps/storefront`: TanStack Start hosted storefront.
 - `packages/types`, `packages/sdk`, `packages/react`: the API contract and the public SDK.
 
+Both apps build UI with Tailwind CSS v4 and shadcn/ui using the same `components.json` settings (new-york, Radix, lucide, zinc). Each app keeps its own `components/ui` and theme until a shared design system replaces them.
+
 ## Boundaries
 
 - The platform owns all data. The storefront has no database and talks to the platform only through `@tattoo-drip/sdk` / `@tattoo-drip/react`.

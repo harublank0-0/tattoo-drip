@@ -8,7 +8,8 @@ AdonisJS 7 app that owns all data, business rules and the REST API. The dashboar
 ## UI conventions
 
 - Build UI from shadcn components in `inertia/components/ui` and semantic tokens (`bg-background`, `text-muted-foreground`); don't add custom CSS classes. Use `cn` from the `cn` package.
-- Add components from `apps/platform` with `pnpm dlx shadcn@latest add <component>`, then run `pnpm format:fix` from the root. Don't hand-edit generated components; Biome relaxes a few lint rules for `**/components/ui/**` instead.
+- Add components from `apps/platform` with `pnpm dlx shadcn@latest add <component>`, then run `pnpm format:fix` from the root. Don't edit generated components just to satisfy Biome; it relaxes a few lint rules for `**/components/ui/**`.
+- Forms post with `Form` from `@adonisjs/inertia/react` and are validated server-side with VineJS. Lay fields out with shadcn's `FieldGroup` / `Field` / `FieldLabel` / `FieldError`, setting `data-invalid` on `Field` and `aria-invalid` on the control (see `inertia/pages/auth/login.tsx`).
 - Dark mode follows `data-theme` on `<html>`, rendered from the `app_theme` cookie, and Tailwind's `dark:` variant is keyed to it. Use `useTheme` from `~/hooks/use-theme`, not `next-themes`.
 - Import frontend code with the `~/` alias (`~/components/ui/button`).
 
@@ -17,7 +18,7 @@ AdonisJS 7 app that owns all data, business rules and the REST API. The dashboar
 - `app/controllers`, `app/models`, `app/validators`, `app/transformers`, `app/middleware`, `app/exceptions`
 - `start/routes.ts` (routes reference controllers through `#generated/controllers`), `start/kernel.ts` (middleware), `start/env.ts`
 - `config/`, `database/migrations/`
-- `inertia/pages`, `inertia/layouts`, `inertia/components`
+- `inertia/pages`, `inertia/layouts`, `inertia/components` (shadcn components in `inertia/components/ui`), `inertia/hooks`, `inertia/css/app.css` (Tailwind entry and theme tokens)
 - `tests/unit`, `tests/functional`, `tests/browser` (suites are defined in `adonisrc.ts`)
 
 Import with the subpath aliases from `package.json` (`#controllers/*`, `#models/*`, `#services/*`, `#validators/*`, …), never with long relative paths.
