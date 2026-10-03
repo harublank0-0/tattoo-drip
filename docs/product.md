@@ -1,33 +1,50 @@
 # Product
 
-> Start here, then read [requirements](requirements.md) → [architecture](architecture.md) → [data-model](data-model.md) → [sdk](sdk.md) → [roadmap](roadmap.md).
+> Start here, then read [requirements](requirements.md) → [architecture](architecture.md) → [data-model](data-model.md) → [sdk](sdk.md) → [roadmap](roadmap.md). The evidence behind these decisions is in the [market research](https://claude.ai/code/artifact/aa122abc-254a-4204-a5eb-0b4aaa463cab) (October 2026).
 
-A multi-tenant SaaS for tattoo businesses. Each business is a **tenant** and gets three things:
+Tattoo Drip is **the booking desk for custom tattoo studios**, starting in Nepal, where global tattoo tools can't take local payments. It turns a WhatsApp or Instagram message into a quoted, deposit-paid tattoo project, and keeps the studio's public page up to date.
 
-- a **dashboard** to run the business
-- a **public storefront** where customers browse work and request bookings
-- a **public API + SDK**, so the storefront can be replaced with a custom one
+The long-term goal is still to be the studio's operating system and digital platform. We earn that one gate at a time (see [roadmap](roadmap.md)).
+
+## Why this, why Nepal first
+
+- Every Nepali studio we checked books request-first: the customer sends an idea, the studio replies, and the slot is confirmed by hand.
+- Foreign tattoo tools (InkDesk, Venue, InkQuarters, Tattoo Studio Pro…) already run inquiry → quote → deposit → sessions. But their deposits run on Stripe, which doesn't operate in Nepal. Nepal pays by Fonepay QR, eSewa and Khalti.
+- The local option, NEXSalon, is generic salon software. Our edge is the tattoo workflow **plus** local money, local channels and a Nepal-sized price.
+- Nepal alone is small. It is the lab; other markets that Stripe doesn't serve come next.
 
 ## Users
 
 | User | Needs |
 |---|---|
-| Studio owner | Run a multi-artist studio: profiles, portfolios, services, calendars, requests and a website |
-| Independent artist | The same tools for a one-person business |
-| Studio artist | Their own portfolio, availability and bookings |
-| Customer | Browse work and request a tattoo without an account |
-| Developer | Build a custom storefront or app on the platform |
+| Studio owner | One place for every inquiry, quotes, deposits that are actually tracked, a schedule per artist |
+| Independent artist | The same, for a one-person business |
+| Studio artist | See their own projects and sessions on the phone |
+| Customer, local or tourist | Send an idea and references easily, know the price and deposit, get a confirmed slot |
+| Agency or developer | Build a custom site on Tattoo Drip (later, V2) |
 
 ## Problems it solves
 
-- Requests arrive through DMs and email, often missing the idea, placement, size or references.
-- Generic booking tools assume fixed prices and instant confirmation. Tattoo work needs a review first.
-- Studios need a portfolio and a calendar for each artist.
-- Studios want a good website without having to build one.
+- Inquiry details are scattered across WhatsApp, Instagram, Viber and phone, and often incomplete.
+- Deposits are paid by QR and proven with a screenshot, then matched by hand.
+- Quotes happen in conversation, and customers drift away while waiting.
+- Multi-session pieces are tracked from memory: sessions, hours, what's still owed.
+- Customer history lives in apps the studio doesn't control. The September 2025 social media ban cut it off overnight.
+- Studio websites are stale and disconnected from bookings.
+
+## How a tattoo is sold
+
+A tattoo is a **project**, not an appointment:
+
+```text
+inquiry → review → quote → deposit → session(s) → completed → healing check
+```
+
+Flash, piercing and walk-ins skip the quote. Details are in [requirements](requirements.md#project-rules) and [data-model](data-model.md).
 
 ## Tenants
 
-A tenant is either a **studio** (several artists) or an **independent artist** (one). Both use the same platform and the same features. One person can belong to several tenants, with a different role in each:
+A tenant is either a **studio** (several artists) or an **independent artist** (one). Both use the same model; a solo artist simply gets a shorter onboarding. One person can belong to several tenants, with a different role in each:
 
 ```text
 John
@@ -36,42 +53,37 @@ John
   Owner  → John's Independent Tattoo
 ```
 
-A tenant (the business) and an artist (a person's public profile) are separate concepts.
-
 ## Product areas
 
-- **Dashboard:** profile, team and artists, portfolio, services, calendar, availability, bookings, customers, storefront and branding, settings.
-- **Storefront:** a public site for each tenant at `blackneedle.platform.com`, with artists (`/artists/john`), portfolio, services and booking requests.
-- **Developer platform:** the REST API and the SDK are product features. The hosted storefront is built on them. Others will be able to build Next.js, Astro, Vue or mobile clients on the same API.
+- **Dashboard:** a mobile-first, installable web app. It holds the inquiry inbox, projects, clients, the artist calendar, artists and settings, including the studio's payment QR codes.
+- **Studio page:** `{slug}.platform.com`. In the MVP: the profile, artists, an Instagram link and the intake form. In V1: a full site with portfolio, flash and themes.
+- **Developer platform:** the API is used by our own studio page first. The public SDK opens in V2, and only if agencies ask for it.
 
 ## Storefront customization levels
 
-These are three separate levels, not stages of one feature:
-
-| Level | What the tenant does | When |
+| Level | What the studio does | When |
 |---|---|---|
-| 1. Hosted theme | Picks a theme and sets the logo, colors, fonts, hero image, description, social links and visible sections | V1 |
-| 2. Page builder | Arranges blocks visually | Future |
-| 3. Custom storefront | Builds their own frontend on the API/SDK | API/SDK in V1; open to external developers later |
+| 1. Hosted page | Nothing: the page is generated from data already in the dashboard. Themes and branding arrive in V1 | MVP, V1 |
+| 2. Page builder | Arranges blocks visually | Not planned until paying studios ask for it |
+| 3. Custom storefront | An agency builds a site on the API and SDK | V2, for agencies |
 
 ## Core journeys
 
-**Set up a studio:**
-1. Sign up, create the tenant and pick a subdomain.
-2. Invite artists, or create their profiles first and let artists claim them when they join.
-3. Add services and portfolio projects, then set availability.
-4. Choose a theme. The storefront is live.
+**Set up a studio**
+1. Sign up, create the tenant, pick a subdomain.
+2. Add artists and upload the studio's Fonepay, eSewa or Khalti QR codes.
+3. Put the intake link in the Instagram bio and send it in WhatsApp replies.
 
-An independent artist follows the same steps as both owner and only artist.
+**Request a tattoo (customer):** open the link from Instagram or a chat, then send the idea, references, placement, size, preferred dates, preferred artist and a phone number. The studio replies on WhatsApp or Viber.
 
-**Request a tattoo:** the customer browses, then picks a service, an artist and an open time. They describe the idea, upload references, add contact details and submit without an account. Emails confirm that the request arrived and what the studio decided. Replies go straight to the studio.
+**Quote and deposit (studio)**
+1. Review the inquiry and accept it, which creates a project, or decline it.
+2. Send a quote with a deposit. The client gets a deposit page with the studio's QR code.
+3. The client pays and uploads proof, and staff mark it verified.
+4. Book the first session. Further sessions are booked one at a time, and the balance due is tracked.
 
-**Review a request:** the studio gets an email about the request.
-- If the requested time works, they approve and confirm in one step.
-- If not, they approve and agree a time first, or reject the request.
+**Walk-in, phone or DM booking:** staff create the project and session directly at the desk.
 
-A confirmed request becomes an appointment. After the session, it's marked completed or no-show. Bookings made by phone, walk-in or DM are added by hand, so online availability stays correct.
+**After the session:** mark it completed or no-show. When the last session is done, the project moves to a healing check (touch-up, healed photo).
 
 **Work across tenants:** a user switches tenants in the dashboard. Tenant data never mixes.
-
-**Custom storefront (later):** a developer installs the SDK, points it at a tenant and builds their own site.

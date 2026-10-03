@@ -1,52 +1,48 @@
 # Roadmap
 
-There are no dates here. Order and scope only. Scope and rules are in [requirements](requirements.md).
+There are no dates here. Each phase starts only after the previous gate is passed. The evidence is in the [market research](https://claude.ai/code/artifact/aa122abc-254a-4204-a5eb-0b4aaa463cab), and the scope is in [requirements](requirements.md).
 
-## MVP / V1
+```text
+Validation ──► MVP pilot ──gate 1──► V1 paid launch ──gate 2──► V2 expand
+```
 
-Each milestone is an epic in the tracker. The order is rough, and some milestones overlap.
+## 0. Validation (runs before and alongside the MVP build)
 
-| # | Milestone | Scope |
-|---|---|---|
-| 0 | Monorepo & tooling | Workspace, Biome, CI. *Workspace done.* |
-| 1 | Foundation | Auth hardening, tenants, memberships, invites, roles, tenant context, row-level security, slugs |
-| 2 | Business content | Artists, portfolio, services, style and placement lists, image uploads |
-| 3 | Public API & SDK | `/api/v1` endpoints from `openapi.yaml`, contract tests, SDK and React adapter |
-| 4 | Hosted storefront | Prototype moved onto the SDK, subdomain tenants, themes and customization |
-| 5 | Scheduling | Availability, exceptions, slots, calendar, manual appointments |
-| 6 | Bookings & emails | Guest requests, approval flow, customers, emails, abuse protection, data deletion |
-| 7 | Launch readiness | Hosting, deploys, monitoring, backups, security review |
+- 12 interviews with studio owners and artists: 8 in Kathmandu, 2 in Lalitpur, 2 in Pokhara
+- A NEXSalon demo and price, a day shadowing two studios, and a click-through prototype of the intake link and deposit page
+- Talks with Khalti and a Fonepay aggregator; legal checks on Nepal Rastra Bank rules and the Individual Privacy Act 2075
+- Recruit 5 pilot studios for a concierge setup
 
-V1 is done when a studio and an independent artist can each sign up, publish a storefront, receive requests and confirm appointments, with no way to reach another tenant's data.
+## MVP: prove the inquiry-to-deposit loop
 
-## Post-MVP
+The loop: intake link, inquiry inbox and project board, quote with deposit and QR proof, sessions with the balance due, clients matched by phone, studio page, installable mobile web app. It runs on the foundation already planned: auth, tenancy, row-level security, the API and hosting.
 
-These are ordered by V1 feedback:
+**Gate 1:** within 6 weeks, at least 3 of the 5 pilot studios receive most new custom inquiries through the link and record every deposit in Tattoo Drip, and 3 prepay. If studios keep quoting in chat, narrow the wedge to a deposit-and-schedule tool.
 
-- **Notifications:** reminders, SMS, editable templates
-- **Custom domains:** `blackneedle.com`
-- **Customer accounts:** self-service cancel and reschedule
-- **Payments and deposits:** a deposit between `approved` and `confirmed`
-- **Integrations:** Google Calendar sync
-- **Themes:** more themes and options
-- **Analytics**
-- **Staff:** roles and finer permissions
-- **Booking:** "any available artist" bookings, multi-session pieces
-- **Flash designs:** fixed-price, directly bookable
-- **Billing:** one paid plan per tenant, then tiers
-- **Security:** two-factor auth
+## V1: solid enough to pay for
 
-## Future
+- Automatic deposit confirmation (Khalti, or Fonepay through an aggregator)
+- Flash and bookable consultation and piercing slots (availability and slot engine)
+- SMS reminders, aftercare and healing-check messages
+- Studio site with portfolio, flash, themes and a custom domain
+- Tourist mode, reports, client data deletion, security review
 
-- **Page builder:** customization level 2, extending `StorefrontConfiguration.sections`
-- **Developer portal:** publishable and secret keys, API docs from the spec, npm release, official support for custom storefronts (level 3)
-- **Webhooks**
-- **SDK adapters:** more frameworks
-- **Plugins:** integrations, maybe a marketplace
-- **Mobile clients:** built on `@tattoo-drip/sdk`
-- **Direct messaging**
-- **Reviews**
+**Gate 2:** 20+ paying studios who stay past 3 months.
 
-## Not planned
+## V2: expand beyond the desk
 
-- **GraphQL:** REST covers current needs.
+Only where interviews show pain:
+
+- Guest artists and payouts, and multi-location
+- Consent forms (after legal review)
+- Chat-app integrations, if the links prove insufficient
+- Public API and SDK for agencies
+- A second market that Stripe doesn't serve (for example Sri Lanka or Bangladesh)
+
+## Later, maybe never
+
+Page builder, marketplace, AI design tools, customer accounts, POS and inventory, native apps, loyalty and reviews, GraphQL.
+
+## In Linear
+
+The team is `tattoo-drip` (TAT). Every issue carries a **Stage** label (`MVP`, `V1` or `V2`); filter by it to see what's in scope now. Validation work lives in the project **R · Validation & pilot**.
