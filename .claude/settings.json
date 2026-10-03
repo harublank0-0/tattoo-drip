@@ -8,9 +8,9 @@
 			"Read(./apps/platform/.adonisjs/**/*)",
 			"Read(./apps/storefront/src/routeTree.gen.ts)",
 			"Read(./packages/types/src/openapi.gen.ts)",
-			"Read(./**/build/**/*)",
-			"Read(./**/.output/**/*)",
-			"Read(./**/dist/**/*)"
+			"Read(./apps/platform/build/**/*)",
+			"Read(./apps/storefront/.output/**/*)",
+			"Read(./packages/*/dist/**/*)"
 		]
 	}
 }
