@@ -1,6 +1,6 @@
 # Roadmap
 
-There are no dates here. Each phase starts only after the previous gate is passed. The evidence is in the [market research](https://claude.ai/code/artifact/aa122abc-254a-4204-a5eb-0b4aaa463cab), and the scope is in [requirements](requirements.md).
+There are no dates here. Each phase starts only after the previous gate is passed. The evidence is in the [market research](research.md), and the scope is in [requirements](requirements.md).
 
 ```text
 Validation ──► MVP pilot ──gate 1──► V1 paid launch ──gate 2──► V2 expand

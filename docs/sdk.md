@@ -1,6 +1,6 @@
 # SDK
 
-For now the SDK is an **internal** product: our studio page uses it against the public API, which keeps that API honest. It becomes a developer product (npm release, keys, docs) in V2, and only if agencies ask to build on Tattoo Drip. The research found very few studios with custom sites, and tattoo.dev already offers a headless tattoo API in beta.
+For now the SDK is an **internal** product: our studio page uses it against the public API, which keeps that API honest. It becomes a developer product (npm release, keys, docs) in V2, and only if agencies ask to build on Tattoo Drip. The [research](research.md) found very few studios with custom sites, and tattoo.dev already offers a headless tattoo API in beta.
 
 The architecture doesn't change: anything our studio page can do, a custom storefront will be able to do too.
 

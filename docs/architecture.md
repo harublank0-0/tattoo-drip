@@ -126,7 +126,7 @@ Isolation has several layers:
 
 - **MVP:** studios upload their own Fonepay, eSewa and Khalti QR codes. Customers pay the studio directly and upload proof, and staff verify it. Tattoo Drip never holds money.
 - **V1:** automatic confirmation through Khalti ePayment (start the payment on the server, then confirm it with a lookup), or a dynamic Fonepay QR through an aggregator. A direct Fonepay integration costs each merchant NPR 25,000; aggregators charge per transaction. Decide after the partner talks, and get legal advice on Nepal Rastra Bank rules before collecting money on a studio's behalf.
-- **Messaging:** one-tap `wa.me` and `viber://` links with prefilled text. There is no WhatsApp Business, Instagram or Viber Business API: each needs approval and costs money per message or per month, and the research found no evidence that the links aren't enough.
+- **Messaging:** one-tap `wa.me` and `viber://` links with prefilled text. There is no WhatsApp Business, Instagram or Viber Business API: each needs approval and costs money per message or per month, and the [research](research.md) found no evidence that the links aren't enough.
 - **Dashboard:** an installable, mobile-first web app (PWA) built with Inertia and React. Native apps are not planned.
 
 ## Storefront themes

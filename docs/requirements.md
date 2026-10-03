@@ -117,7 +117,7 @@ shortcuts:   flash or walk-in → booked     in_progress → booked (next sessio
 
 ## Not yet
 
-Each of these waits for a gate or for evidence. The [roadmap](roadmap.md) says when, and the research says why.
+Each of these waits for a gate or for evidence. The [roadmap](roadmap.md) says when, and the [research](research.md) says why.
 
 - Page builder
 - Public SDK and developer portal

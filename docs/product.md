@@ -1,6 +1,6 @@
 # Product
 
-> Start here, then read [requirements](requirements.md) → [architecture](architecture.md) → [data-model](data-model.md) → [sdk](sdk.md) → [roadmap](roadmap.md). The evidence behind these decisions is in the [market research](https://claude.ai/code/artifact/aa122abc-254a-4204-a5eb-0b4aaa463cab) (October 2026).
+> Start here, then read [requirements](requirements.md) → [architecture](architecture.md) → [data-model](data-model.md) → [sdk](sdk.md) → [roadmap](roadmap.md). The evidence behind these decisions is in the [market research](research.md) (October 2026).
 
 Tattoo Drip is **the booking desk for custom tattoo studios**, starting in Nepal, where global tattoo tools can't take local payments. It turns a WhatsApp or Instagram message into a quoted, deposit-paid tattoo project, and keeps the studio's public page up to date.
 
