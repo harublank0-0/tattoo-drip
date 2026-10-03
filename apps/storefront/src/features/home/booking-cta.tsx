@@ -1,7 +1,19 @@
 import { artist } from "#/data/mock/artist";
 import { BookingDialog } from "./booking-dialog";
+import {
+	type AvailabilityStatus,
+	availabilityLabels,
+	availabilityStyles,
+} from "./types";
 
 export function BookingCta() {
+	const status = artist.availability as AvailabilityStatus;
+	const style = availabilityStyles[status];
+	const label =
+		status === "available"
+			? availabilityLabels.available
+			: availabilityLabels[status](artist.availabilityDetails);
+
 	return (
 		<section
 			id="booking"
@@ -18,18 +30,20 @@ export function BookingCta() {
 					<em className="font-normal">in mind?</em>
 				</h2>
 				<p className="mx-auto mt-8 max-w-sm text-sm leading-[1.9] text-muted-foreground">
-					Tell me what you’re thinking,
+					Tell me what you're thinking,
 					<br />
-					and let’s turn it into something permanent.
+					and let's turn it into something permanent.
 				</p>
 				<div className="mt-9">
 					<BookingDialog />
 				</div>
-				<p className="mt-7 inline-flex items-center gap-2.5 text-[10px] tracking-wide text-muted-foreground">
-					<span className="size-1.5 rounded-full bg-accent" />
-					{artist.acceptingBookings
-						? "Currently accepting bookings"
-						: "Bookings reopening soon"}
+				<p className="mt-7 inline-flex items-center gap-2.5 text-[10px] tracking-wide">
+					<span
+						className={`inline-flex items-center gap-2 px-3 py-1 border rounded-sm ${style}`}
+					>
+						<span className="size-1.5 rounded-full bg-current" />
+						{label}
+					</span>
 				</p>
 			</div>
 		</section>

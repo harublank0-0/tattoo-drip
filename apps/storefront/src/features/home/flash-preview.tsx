@@ -1,5 +1,4 @@
-import { ArrowRight, ArrowUpRight } from "lucide-react";
-import { Button } from "#/components/ui/button";
+import { ArrowRight } from "lucide-react";
 import {
 	Dialog,
 	DialogContent,
@@ -8,10 +7,21 @@ import {
 	DialogTitle,
 	DialogTrigger,
 } from "#/components/ui/dialog";
-import { bookingEmailHref } from "#/data/mock/artist";
 import { type FlashPiece, flash, formatFlashPrice } from "#/data/mock/flash";
+import { BookingDialog } from "./booking-dialog";
 
 function FlashDetails({ piece }: { piece: FlashPiece }) {
+	const initialData = {
+		source: "flash" as const,
+		flashPieceId: piece.id,
+		flashPieceTitle: piece.title,
+		flashPiecePrice: piece.price,
+		style: "Flash",
+		placement: "To be discussed",
+		size: piece.size,
+		tattooIdea: `Interested in flash piece: ${piece.title} — ${formatFlashPrice(piece)}`,
+	};
+
 	return (
 		<div className="flex flex-col gap-5">
 			<img
@@ -32,12 +42,7 @@ function FlashDetails({ piece }: { piece: FlashPiece }) {
 					{piece.description}
 				</p>
 			</div>
-			<Button asChild variant="outline">
-				<a href={bookingEmailHref(`Flash enquiry: ${piece.title}`)}>
-					Enquire about this piece
-					<ArrowUpRight data-icon="inline-end" aria-hidden="true" />
-				</a>
-			</Button>
+			<BookingDialog variant="outline" initialData={initialData} />
 		</div>
 	);
 }

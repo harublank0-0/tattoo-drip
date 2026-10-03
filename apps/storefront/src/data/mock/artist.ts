@@ -1,3 +1,5 @@
+export type AvailabilityStatus = "available" | "limited" | "packed" | "closed";
+
 export interface Artist {
 	id: string;
 	name: string;
@@ -8,7 +10,12 @@ export interface Artist {
 	email: string;
 	portrait: string;
 	heroImage: string;
-	acceptingBookings: boolean;
+	availability: AvailabilityStatus;
+	availabilityDetails: string;
+	bookingWindow: {
+		opensAt: string;
+		closesAt: string | null;
+	};
 	statement: string;
 	biography: string[];
 }
@@ -23,14 +30,16 @@ export const artist: Artist = {
 	email: "hello@surajtattoo.example",
 	portrait: "/images/tattoos/tattoo-header.jpg",
 	heroImage: "/images/tattoos/hero.jpg",
-	acceptingBookings: true,
+	availability: "limited",
+	availabilityDetails: "3 slots left for October",
+	bookingWindow: { opensAt: "2026-10-01", closesAt: "2026-12-31" },
 	statement:
 		"Custom tattoo work rooted in bold linework, detail, and personal storytelling.",
 	biography: [
 		"My work focuses on strong composition, expressive linework, and designs that feel personal to the person wearing them.",
-		"Whether you arrive with a fully formed idea or only the beginning of one, we’ll build the piece together.",
+		"Whether you arrive with a fully formed idea or only the beginning of one, we'll build the piece together.",
 		"I grew up sketching the carved windows, temple details, and everyday rhythms of Kathmandu. Those early studies still shape the way I think about balance, pattern, and the space a line leaves behind.",
-		"Today, I work from a quiet, appointment-only studio. Every session starts with time to talk, refine the drawing, and find a placement that moves naturally with your body. Thoughtful work takes time, and I’m happy to give it that.",
+		"Today, I work from a quiet, appointment-only studio. Every session starts with time to talk, refine the drawing, and find a placement that moves naturally with your body. Thoughtful work takes time, and I'm happy to give it that.",
 	],
 };
 
