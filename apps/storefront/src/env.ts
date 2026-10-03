@@ -4,9 +4,6 @@ import { z } from "zod";
 export const env = createEnv({
 	server: {
 		SERVER_URL: z.string().url().optional(),
-		VITTE_SUPABASE_URL: z.string().url(),
-
-		VITTE_SUPABASE_KEY: z.string().url(),
 	},
 
 	/**
@@ -39,6 +36,4 @@ export const env = createEnv({
 	 * explicitly specify this option as true.
 	 */
 	emptyStringAsUndefined: true,
-
-	// SUPABASE ***
 });

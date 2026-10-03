@@ -19,7 +19,6 @@ import { Route as PortfolioSlugRouteImport } from './routes/portfolio/$slug'
 import { Route as AdminBookingsIndexRouteImport } from './routes/admin/bookings/index'
 import { Route as AdminFlastIndexRouteImport } from './routes/admin/flast/index'
 import { Route as AdminPortfolioIndexRouteImport } from './routes/admin/portfolio/index'
-import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -71,11 +70,6 @@ const AdminPortfolioIndexRoute = AdminPortfolioIndexRouteImport.update({
   path: '/admin/portfolio/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
-  id: '/api/auth/$',
-  path: '/api/auth/$',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -85,7 +79,6 @@ export interface FileRoutesByFullPath {
   '/booking/': typeof BookingIndexRoute
   '/flash/': typeof FlashIndexRoute
   '/portfolio/': typeof PortfolioIndexRoute
-  '/api/auth/$': typeof ApiAuthSplatRoute
   '/admin/bookings/': typeof AdminBookingsIndexRoute
   '/admin/flast/': typeof AdminFlastIndexRoute
   '/admin/portfolio/': typeof AdminPortfolioIndexRoute
@@ -98,7 +91,6 @@ export interface FileRoutesByTo {
   '/booking': typeof BookingIndexRoute
   '/flash': typeof FlashIndexRoute
   '/portfolio': typeof PortfolioIndexRoute
-  '/api/auth/$': typeof ApiAuthSplatRoute
   '/admin/bookings': typeof AdminBookingsIndexRoute
   '/admin/flast': typeof AdminFlastIndexRoute
   '/admin/portfolio': typeof AdminPortfolioIndexRoute
@@ -112,7 +104,6 @@ export interface FileRoutesById {
   '/booking/': typeof BookingIndexRoute
   '/flash/': typeof FlashIndexRoute
   '/portfolio/': typeof PortfolioIndexRoute
-  '/api/auth/$': typeof ApiAuthSplatRoute
   '/admin/bookings/': typeof AdminBookingsIndexRoute
   '/admin/flast/': typeof AdminFlastIndexRoute
   '/admin/portfolio/': typeof AdminPortfolioIndexRoute
@@ -127,7 +118,6 @@ export interface FileRouteTypes {
     | '/booking/'
     | '/flash/'
     | '/portfolio/'
-    | '/api/auth/$'
     | '/admin/bookings/'
     | '/admin/flast/'
     | '/admin/portfolio/'
@@ -140,7 +130,6 @@ export interface FileRouteTypes {
     | '/booking'
     | '/flash'
     | '/portfolio'
-    | '/api/auth/$'
     | '/admin/bookings'
     | '/admin/flast'
     | '/admin/portfolio'
@@ -153,7 +142,6 @@ export interface FileRouteTypes {
     | '/booking/'
     | '/flash/'
     | '/portfolio/'
-    | '/api/auth/$'
     | '/admin/bookings/'
     | '/admin/flast/'
     | '/admin/portfolio/'
@@ -167,7 +155,6 @@ export interface RootRouteChildren {
   BookingIndexRoute: typeof BookingIndexRoute
   FlashIndexRoute: typeof FlashIndexRoute
   PortfolioIndexRoute: typeof PortfolioIndexRoute
-  ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   AdminBookingsIndexRoute: typeof AdminBookingsIndexRoute
   AdminFlastIndexRoute: typeof AdminFlastIndexRoute
   AdminPortfolioIndexRoute: typeof AdminPortfolioIndexRoute
@@ -245,13 +232,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPortfolioIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/auth/$': {
-      id: '/api/auth/$'
-      path: '/api/auth/$'
-      fullPath: '/api/auth/$'
-      preLoaderRoute: typeof ApiAuthSplatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -263,7 +243,6 @@ const rootRouteChildren: RootRouteChildren = {
   BookingIndexRoute: BookingIndexRoute,
   FlashIndexRoute: FlashIndexRoute,
   PortfolioIndexRoute: PortfolioIndexRoute,
-  ApiAuthSplatRoute: ApiAuthSplatRoute,
   AdminBookingsIndexRoute: AdminBookingsIndexRoute,
   AdminFlastIndexRoute: AdminFlastIndexRoute,
   AdminPortfolioIndexRoute: AdminPortfolioIndexRoute,
