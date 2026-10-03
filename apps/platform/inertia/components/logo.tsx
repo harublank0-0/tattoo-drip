@@ -5,7 +5,7 @@ export default function Logo({ size = 26 }: { size?: number }) {
 		<Link
 			route="home"
 			aria-label="AdonisJS"
-			style={{ display: "inline-flex", color: "var(--ink)" }}
+			className="inline-flex text-foreground"
 		>
 			<svg
 				width={size}

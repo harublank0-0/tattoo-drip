@@ -15,14 +15,16 @@ export default function Section({
 	children: ReactNode;
 }) {
 	return (
-		<section className="section">
+		<section className="flex flex-col gap-4 [section+&]:mt-6 [section+&]:border-t [section+&]:pt-6">
 			{(title || description) && (
-				<header className="section__header">
-					{title && <h2 className="section__title">{title}</h2>}
-					{description && <p className="section__description">{description}</p>}
+				<header className="flex flex-col gap-1">
+					{title && <h2 className="text-sm font-semibold">{title}</h2>}
+					{description && (
+						<p className="text-sm text-muted-foreground">{description}</p>
+					)}
 				</header>
 			)}
-			<div className="section__body">{children}</div>
+			<div>{children}</div>
 		</section>
 	);
 }

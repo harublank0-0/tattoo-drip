@@ -3,7 +3,14 @@
 AdonisJS 7 app that owns all data, business rules and the REST API. The dashboard is Inertia + React inside it.
 
 - **Stack:** Lucid ORM on PostgreSQL, VineJS validators, session auth (`@adonisjs/auth`), Tuyau, Inertia + React (SSR entry exists in `inertia/ssr.tsx` but is disabled in `config/inertia.ts`), Japa tests.
-- **Styling:** plain CSS with design tokens in `inertia/css/app.css`. There is no Tailwind or shadcn here.
+- **UI:** Tailwind CSS v4 and shadcn/ui (new-york style, Radix, lucide icons; same `components.json` settings as the storefront). Theme tokens are shadcn's stock zinc palette in `inertia/css/app.css` until the shared design system replaces them.
+
+## UI conventions
+
+- Build UI from shadcn components in `inertia/components/ui` and semantic tokens (`bg-background`, `text-muted-foreground`); don't add custom CSS classes. Use `cn` from the `cn` package.
+- Add components from `apps/platform` with `pnpm dlx shadcn@latest add <component>`, then run `pnpm format:fix` from the root. Don't hand-edit generated components; Biome relaxes a few lint rules for `**/components/ui/**` instead.
+- Dark mode follows `data-theme` on `<html>`, rendered from the `app_theme` cookie, and Tailwind's `dark:` variant is keyed to it. Use `useTheme` from `~/hooks/use-theme`, not `next-themes`.
+- Import frontend code with the `~/` alias (`~/components/ui/button`).
 
 ## Layout
 

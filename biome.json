@@ -30,6 +30,17 @@
 			"recommended": true
 		}
 	},
+	"overrides": [
+		{
+			"includes": ["**/components/ui/**"],
+			"linter": {
+				"rules": {
+					"a11y": { "useSemanticElements": "off" },
+					"suspicious": { "noArrayIndexKey": "off", "noDoubleEquals": "off" }
+				}
+			}
+		}
+	],
 	"javascript": {
 		"formatter": {
 			"quoteStyle": "double"

@@ -3,7 +3,12 @@
 	"compilerOptions": {
 		"rootDir": "./",
 		"jsx": "react",
-		"outDir": "./build"
+		"outDir": "./build",
+		// Mirrors the `~/` alias in inertia/tsconfig.json so the shadcn CLI,
+		// which reads this file, resolves the paths in components.json.
+		"paths": {
+			"~/*": ["./inertia/*"]
+		}
 	},
 	"references": [{ "path": "./tsconfig.inertia.json" }]
 }

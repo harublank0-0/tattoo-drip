@@ -1,104 +1,98 @@
 import { Form, Link } from "@adonisjs/inertia/react";
+import { Button } from "~/components/ui/button";
+import {
+	Field,
+	FieldError,
+	FieldGroup,
+	FieldLabel,
+} from "~/components/ui/field";
+import { Input } from "~/components/ui/input";
 import AuthLayout from "~/layouts/auth";
 
 export default function Signup() {
 	return (
 		<>
-			<h1 className="auth__title">Create your account</h1>
-			<p className="auth__sub">Start building with the starter kit.</p>
+			<div className="flex flex-col gap-1">
+				<h1 className="text-2xl font-semibold tracking-tight">
+					Create your account
+				</h1>
+				<p className="text-sm text-muted-foreground">
+					Start building with the starter kit.
+				</p>
+			</div>
 
 			<Form route="new_account.store">
 				{({ errors, processing }) => (
-					<div className="auth__form">
-						<div className="field">
-							<label className="field__label" htmlFor="fullName">
-								Full name
-							</label>
-							<input
+					<FieldGroup>
+						<Field data-invalid={!!errors.fullName}>
+							<FieldLabel htmlFor="fullName">Full name</FieldLabel>
+							<Input
 								id="fullName"
 								name="fullName"
 								type="text"
-								className="field__input"
 								autoComplete="name"
 								placeholder="Ada Lovelace"
-								aria-invalid={errors.fullName ? "true" : "false"}
+								aria-invalid={!!errors.fullName}
 							/>
-							{errors.fullName && (
-								<span className="field__error">{errors.fullName}</span>
-							)}
-						</div>
+							{errors.fullName && <FieldError>{errors.fullName}</FieldError>}
+						</Field>
 
-						<div className="field">
-							<label className="field__label" htmlFor="email">
-								Email
-							</label>
-							<input
+						<Field data-invalid={!!errors.email}>
+							<FieldLabel htmlFor="email">Email</FieldLabel>
+							<Input
 								id="email"
 								name="email"
 								type="email"
-								className="field__input"
 								autoComplete="email"
 								placeholder="you@example.com"
-								aria-invalid={errors.email ? "true" : "false"}
+								aria-invalid={!!errors.email}
 							/>
-							{errors.email && (
-								<span className="field__error">{errors.email}</span>
-							)}
-						</div>
+							{errors.email && <FieldError>{errors.email}</FieldError>}
+						</Field>
 
-						<div className="field">
-							<label className="field__label" htmlFor="password">
-								Password
-							</label>
-							<input
+						<Field data-invalid={!!errors.password}>
+							<FieldLabel htmlFor="password">Password</FieldLabel>
+							<Input
 								id="password"
 								name="password"
 								type="password"
-								className="field__input"
 								autoComplete="new-password"
 								placeholder="••••••••"
-								aria-invalid={errors.password ? "true" : "false"}
+								aria-invalid={!!errors.password}
 							/>
-							{errors.password && (
-								<span className="field__error">{errors.password}</span>
-							)}
-						</div>
+							{errors.password && <FieldError>{errors.password}</FieldError>}
+						</Field>
 
-						<div className="field">
-							<label className="field__label" htmlFor="passwordConfirmation">
+						<Field data-invalid={!!errors.passwordConfirmation}>
+							<FieldLabel htmlFor="passwordConfirmation">
 								Confirm password
-							</label>
-							<input
+							</FieldLabel>
+							<Input
 								id="passwordConfirmation"
 								name="passwordConfirmation"
 								type="password"
-								className="field__input"
 								autoComplete="new-password"
 								placeholder="••••••••"
-								aria-invalid={errors.passwordConfirmation ? "true" : "false"}
+								aria-invalid={!!errors.passwordConfirmation}
 							/>
 							{errors.passwordConfirmation && (
-								<span className="field__error">
-									{errors.passwordConfirmation}
-								</span>
+								<FieldError>{errors.passwordConfirmation}</FieldError>
 							)}
-						</div>
+						</Field>
 
-						<button
-							type="submit"
-							className="btn btn--primary btn--block"
-							disabled={processing}
-							style={{ marginTop: 4 }}
-						>
+						<Button type="submit" disabled={processing}>
 							{processing ? "One moment…" : "Create account"}
-						</button>
-					</div>
+						</Button>
+					</FieldGroup>
 				)}
 			</Form>
 
-			<p className="auth__foot">
+			<p className="text-center text-sm text-muted-foreground">
 				Already have an account?{" "}
-				<Link route="session.create" className="il">
+				<Link
+					route="session.create"
+					className="text-foreground underline underline-offset-4"
+				>
 					Sign in
 				</Link>
 			</p>

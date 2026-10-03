@@ -1,8 +1,12 @@
 import { router, usePage } from "@inertiajs/react";
-import { CircleAlert, CircleCheck } from "lucide-react";
 import { useEffect } from "react";
-import { Toaster, toast } from "sonner";
+import { toast } from "sonner";
+import { Toaster } from "~/components/ui/sonner";
 
+/**
+ * Shows the session's flash `success` / `error` message as a toast, and
+ * dismisses it when the next visit starts.
+ */
 export default function FlashToasts() {
 	const { flash } = usePage();
 
@@ -15,14 +19,5 @@ export default function FlashToasts() {
 		if (flash.success) toast.success(flash.success, { id: "flash" });
 	}, [flash]);
 
-	return (
-		<Toaster
-			position="top-center"
-			toastOptions={{ unstyled: true }}
-			icons={{
-				success: <CircleCheck size={18} strokeWidth={1.8} />,
-				error: <CircleAlert size={18} strokeWidth={1.8} />,
-			}}
-		/>
-	);
+	return <Toaster position="top-center" />;
 }

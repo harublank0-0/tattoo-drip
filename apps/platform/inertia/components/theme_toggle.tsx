@@ -1,40 +1,27 @@
-import { usePage } from "@inertiajs/react";
 import { Moon, Sun } from "lucide-react";
-import { useState } from "react";
+import { Button } from "~/components/ui/button";
+import { useTheme } from "~/hooks/use-theme";
 
-const COOKIE = "app_theme";
-const ONE_YEAR = 60 * 60 * 24 * 365;
-
+/**
+ * Switches between light and dark. Shows the icon of the theme it switches
+ * to: a moon in light mode, a sun in dark mode.
+ */
 export default function ThemeToggle() {
-	const page = usePage();
-	const [theme, setTheme] = useState<"light" | "dark">(
-		page.props.preferences?.theme ?? "light",
-	);
-
-	const toggle = () => {
-		const next = theme === "dark" ? "light" : "dark";
-		setTheme(next);
-		document.documentElement.setAttribute("data-theme", next);
-		document.cookie = `${COOKIE}=${next}; path=/; max-age=${ONE_YEAR}; samesite=lax`;
-	};
-
+	const { theme, setTheme } = useTheme();
 	const isDark = theme === "dark";
+	const label = isDark ? "Switch to light theme" : "Switch to dark theme";
+
 	return (
-		<button
+		<Button
 			type="button"
-			className="iconbtn"
-			onClick={toggle}
-			aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
-			title={isDark ? "Switch to light theme" : "Switch to dark theme"}
+			variant="ghost"
+			size="icon-sm"
+			onClick={() => setTheme(isDark ? "light" : "dark")}
+			aria-label={label}
+			title={label}
 		>
-			<Sun
-				size={16}
-				className={`themetoggle__icon ${isDark ? "themetoggle__icon--on" : ""}`}
-			/>
-			<Moon
-				size={16}
-				className={`themetoggle__icon ${isDark ? "" : "themetoggle__icon--on"}`}
-			/>
-		</button>
+			<Sun className="scale-0 rotate-90 transition-transform dark:scale-100 dark:rotate-0" />
+			<Moon className="absolute scale-100 rotate-0 transition-transform dark:scale-0 dark:-rotate-90" />
+		</Button>
 	);
 }
