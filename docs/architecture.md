@@ -136,5 +136,5 @@ In the MVP the studio page has one layout, generated from the profile and artist
 ## Current state
 
 - **`apps/platform`** is the AdonisJS 7 React starter, switched to PostgreSQL. It has session auth with signup, login and dashboard pages. The users migration has not been run yet.
-- **`apps/storefront`** is the single-artist prototype, moved unchanged. It still uses mock data and still contains Prisma, better-auth and Supabase. Those get removed once the API exists.
+- **`apps/storefront`** is the single-artist prototype, moved unchanged. It still uses mock data and still contains better-auth and Supabase. Those get removed once the API exists.
 - **`packages/*`** hold a working SDK against a draft `openapi.yaml`. That draft still describes the old booking flow (`bookings.create`, `availability`) and must move to inquiries (tracked in Linear). The API endpoints themselves are not built yet.

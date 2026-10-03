@@ -12,5 +12,4 @@ build
 .vinxi
 __unconfig*
 todos.json
-prisma/generated
 *.tsbuildinfo

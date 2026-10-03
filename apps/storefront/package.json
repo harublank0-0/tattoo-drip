@@ -11,20 +11,12 @@
 		"build": "vite build && cp instrument.server.mjs .output/server",
 		"preview": "vite preview",
 		"typecheck": "tsc --noEmit",
-		"db:generate": "dotenv -e .env.local -- prisma generate",
-		"db:push": "dotenv -e .env.local -- prisma db push",
-		"db:migrate": "dotenv -e .env.local -- prisma migrate dev",
-		"db:studio": "dotenv -e .env.local -- prisma studio",
-		"db:seed": "dotenv -e .env.local -- prisma db seed",
-		"db:validate": "dotenv -e .env.local -- prisma validate",
 		"start": "node --import ./.output/server/instrument.server.mjs .output/server/index.mjs"
 	},
 	"dependencies": {
 		"@fontsource/cormorant-garamond": "^5.3.0",
 		"@fontsource/manrope": "^5.3.0",
 		"@posthog/react": "^1.7.0",
-		"@prisma/adapter-pg": "^7.4.2",
-		"@prisma/client": "^7.4.2",
 		"@sentry/tanstackstart-react": "^10.67.0",
 		"@supabase/supabase-js": "^2.116.0",
 		"@t3-oss/env-core": "^0.13.10",
@@ -53,7 +45,6 @@
 		"lucide-react": "^0.577.0",
 		"nitro": "3.0.260610-beta",
 		"posthog-js": "^1.358.1",
-		"prisma": "^7.4.2",
 		"radix-ui": "^1.6.7",
 		"react": "^19.2.0",
 		"react-dom": "^19.2.0",
@@ -75,7 +66,6 @@
 		"@vitejs/plugin-react": "^6.0.1",
 		"babel-plugin-react-compiler": "^1.0.0",
 		"dotenv-cli": "^11.0.0",
-		"tsx": "^4.21.0",
 		"typescript": "^6.0.2",
 		"vite": "^8.0.0"
 	}

@@ -6,11 +6,7 @@
 	"includeExamples": false,
 	"tailwind": true,
 	"projectPreset": "default",
-	"addOnOptions": {
-		"prisma": {
-			"database": "postgres"
-		}
-	},
+	"addOnOptions": {},
 	"git": true,
 	"install": true,
 	"intent": true,
@@ -20,7 +16,6 @@
 	"chosenAddOns": [
 		"biome",
 		"nitro",
-		"prisma",
 		"ai",
 		"compiler",
 		"shadcn",

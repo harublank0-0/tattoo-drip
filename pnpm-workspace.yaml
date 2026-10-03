@@ -4,12 +4,10 @@ packages:
 
 allowBuilds:
   '@google/genai': true
-  '@prisma/engines': true
   '@sentry/cli': true
   '@swc/core': true
   core-js: true
   esbuild: true
-  prisma: true
   protobufjs: true
 
 # Fresh AdonisJS releases pinned by the starter kit
