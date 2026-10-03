@@ -8,7 +8,7 @@ TanStack Start app for the hosted studio page. It has no database: real data com
 
 ## shadcn
 
-Add components from `apps/storefront` with `pnpm dlx shadcn@latest add <component>`. Generated components must import `cn` from `#/lib/utils`, and then get formatted by Biome.
+Add components from `apps/storefront` with `pnpm dlx shadcn@latest add <component>`, then run `pnpm format:fix` from the root. The CLI imports `cn` from the `cn` package (shadcn's clsx + tailwind-merge replacement); older components still use `#/lib/utils`.
 
 ## Sentry
 
