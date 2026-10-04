@@ -21,8 +21,6 @@ export default class VerifyEmailMail extends BaseMail {
 		this.message
 			.to(this.user.email)
 			.htmlView("identity::emails/verify_email", data)
-			// The text template prints values raw ({{{ }}}): escaping would
-			// show `&amp;` in the URL.
 			.textView("identity::emails/verify_email_text", data);
 	}
 }
