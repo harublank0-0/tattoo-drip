@@ -51,8 +51,9 @@ jobs:
 
       - run: pnpm typecheck
 
-      # `node ace` boots the app, which validates its env, so build, migrate
-      # and test all need a .env. The defaults match the Postgres service.
+      # Ace commands that boot the app, such as `migration:run` and `test`,
+      # validate its env, so they need a .env. The defaults match the
+      # Postgres service.
       - name: Prepare platform .env
         working-directory: apps/platform
         run: |
