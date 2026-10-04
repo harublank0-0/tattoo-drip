@@ -20,6 +20,7 @@
 		"#models/*": "./app/models/*.js",
 		"#mails/*": "./app/mails/*.js",
 		"#services/*": "./app/services/*.js",
+		"#modules/*": "./app/modules/*.js",
 		"#listeners/*": "./app/listeners/*.js",
 		"#events/*": "./app/events/*.js",
 		"#generated/*": "./.adonisjs/server/*.js",
