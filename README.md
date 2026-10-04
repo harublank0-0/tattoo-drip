@@ -18,12 +18,12 @@ Packages are consumed from source inside the workspace, so there's no build step
 
 ## Setup
 
-Requires Node 24+, pnpm and Docker (or Podman).
+Requires Node 24+, pnpm, and Podman with podman-compose.
 
 ```bash
 pnpm install
-pnpm services:up                         # Postgres, Redis, Mailpit (or: pnpm podman:up)
-docker compose exec postgres createdb -U postgres tattoo_drip
+pnpm podman:up                           # Postgres 18, Redis, Mailpit
+podman-compose exec postgres createdb -U postgres tattoo_drip
 
 cp apps/platform/.env.example apps/platform/.env
 pnpm --filter @tattoo-drip/platform exec node ace generate:key
