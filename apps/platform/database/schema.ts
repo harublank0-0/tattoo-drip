@@ -24,7 +24,7 @@ export class UserSchema extends BaseModel {
 	@column()
 	declare fullName: string | null;
 	@column({ isPrimary: true })
-	declare id: number;
+	declare id: string;
 	@column({ serializeAs: null })
 	declare password: string;
 	@column.dateTime({ autoCreate: true, autoUpdate: true })

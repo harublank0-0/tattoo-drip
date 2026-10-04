@@ -15,7 +15,6 @@
 		"lint": "biome lint",
 		"check": "biome check",
 		"prepare": "husky",
-		"services:up": "docker compose up -d",
 		"podman:up": "PODMAN_COMPOSE_PROVIDER=podman-compose podman compose up -d"
 	},
 	"devDependencies": {
