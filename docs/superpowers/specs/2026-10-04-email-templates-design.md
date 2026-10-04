@@ -86,8 +86,8 @@ Manual check, not committed: send one email to Mailpit from `node ace repl`, loo
 
 Scoped `platform`, with `Refs: TAT-6`:
 
-1. Layout, button, plumbing (`#modules/*`, `metaFiles`, `start/view.ts`) and docs.
-2. `VerifyEmailMail`, its templates and its test.
+1. Layout and button components, with a render test.
+2. Module plumbing (`#modules/*`, `metaFiles`, `start/view.ts`), `VerifyEmailMail`, its templates, its test and the docs. The plumbing ships with the first module because nothing can exercise it before one exists.
 
 ## Out of scope
 
