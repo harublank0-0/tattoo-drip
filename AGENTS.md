@@ -29,6 +29,7 @@ Read only the doc the task needs, not the whole folder:
 - pnpm only. Run package scripts with `pnpm --filter <name> <script>` or from the package directory. For dependency questions use `pnpm why` / `pnpm list`, not the lockfile.
 - Biome formats and lints everything (`pnpm check`, `pnpm format:fix`). Do not add ESLint or Prettier.
 - Commits follow Conventional Commits, enforced by commitlint (`config-conventional`). Scope with the area: `platform`, `storefront`, `types`, `sdk`, `react`. Pre-commit runs Biome on staged files; pre-push runs `pnpm check` and `pnpm typecheck`.
+- CI (`.github/workflows/ci.yml`) runs on every PR to `main` and every push to it: install, `pnpm check`, `pnpm typecheck`, `pnpm build`, platform migrations on Postgres 18, then `pnpm test`. It fails if a migration changes `apps/platform/database/schema.ts` and the regenerated file isn't committed.
 
 ## Generated files
 

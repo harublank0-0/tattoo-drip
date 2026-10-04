@@ -43,6 +43,8 @@ cp apps/storefront/.env.local.example apps/storefront/.env.local
 | `pnpm check` | Biome lint + format check (`pnpm format:fix` to format) |
 | `pnpm --filter @tattoo-drip/types generate` | Regenerate API types after editing `openapi.yaml` |
 
+CI runs the same checks, plus the build, the platform migrations on Postgres 18 and the tests, on every pull request to `main` (`.github/workflows/ci.yml`).
+
 ## Working with AI agents
 
 Each area has its own `AGENTS.md` (read by Claude Code, Codex and Cursor), and Claude Code gets per-area skills and settings in `<area>/.claude/`. Start the agent in the area you're working on so it loads only that area's context:
