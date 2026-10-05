@@ -16,6 +16,7 @@ AdonisJS 7 app that owns all data, business rules and the REST API. The dashboar
 ## Layout
 
 - `app/controllers`, `app/models`, `app/validators`, `app/transformers`, `app/middleware`, `app/exceptions`
+- `app/modules/<module>/`: one folder per backend module from `docs/architecture.md`, owning its `models/`, `services/`, `controllers/`, `validators/` and `emails/`. Import with `#modules/*`. New module code goes here; code still in the flat `app/*` folders moves when its module is built. Controllers and transformers stay in `app/controllers` and `app/transformers` for now: `indexEntities` in `adonisrc.ts` only scans those folders to generate `#generated/*`, so it has to be pointed at the module folders first.
 - `start/routes.ts` (routes reference controllers through `#generated/controllers`), `start/kernel.ts` (middleware), `start/env.ts`
 - `config/`, `database/migrations/`
 - `inertia/pages`, `inertia/layouts`, `inertia/components` (shadcn components in `inertia/components/ui`), `inertia/hooks`, `inertia/css/app.css` (Tailwind entry and theme tokens)
@@ -30,6 +31,14 @@ Import with the subpath aliases from `package.json` (`#controllers/*`, `#models/
 - The REST API implements the contract in `packages/types/openapi.yaml`. Change the contract first, regenerate the types, then implement.
 - `database/schema.ts` and `.adonisjs/` are generated. Change the schema with a new migration, never by editing an existing migration that has been run.
 - Migrations follow `database/README.md`: UUIDv7 primary keys (`defaultTo(this.raw("uuidv7()"))`), `timestamptz` UTC instants, and `tenant_id` on every tenant-owned table.
+
+## Emails
+
+- Emails are Edge templates with inline styles and table layout: no `<style>` blocks, CSS inliner or MJML.
+- Shared parts are components in `resources/views/components/email/`. Wrap every email in `@email.layout({ title, preheader })` and use `@!email.button({ href, text })` for calls to action.
+- Each email is a `BaseMail` class in `app/modules/<module>/emails/`, next to an HTML template and a `_text` template. HTML templates print with `{{ }}`; text templates print with `{{{ }}}` so URLs keep their `&`. Guard optional values: Edge prints `undefined` and `null` literally.
+- Mail classes never set `from`; `config/mail.ts` always sends from the platform's domain.
+- A module with templates needs one `edge.mount("<module>", …)` line in `start/view.ts`; its templates are then `<module>::emails/<name>`. `metaFiles` in `adonisrc.ts` copies `app/modules/**/*.edge` into the build.
 
 ## Commands
 

@@ -40,7 +40,7 @@ packages/react     @tattoo-drip/react: TanStack Query hooks
 
 ## Backend modules
 
-Each module owns its models and services. Other modules call its services instead of querying its tables. Inertia controllers, API controllers and jobs stay thin and call the **same** services, so every rule lives in one place.
+Each module owns its models and services. Other modules call its services instead of querying its tables. Inertia controllers, API controllers and jobs stay thin and call the **same** services, so every rule lives in one place. In `apps/platform`, each module is a folder in `app/modules/<module>/` (see `apps/platform/AGENTS.md`).
 
 | Module | Owns | Stage |
 |---|---|---|

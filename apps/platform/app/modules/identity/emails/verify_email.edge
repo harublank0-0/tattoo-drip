@@ -1,0 +1,12 @@
+@email.layout({ title: 'Verify your email', preheader: 'Confirm your email address to finish setting up your Tattoo Drip account.' })
+  <p style="margin: 0 0 16px;">Hi {{ user.fullName || 'there' }},</p>
+  <p style="margin: 0;">Confirm your email address to finish setting up your Tattoo Drip account.</p>
+  @!email.button({ href: verifyUrl, text: 'Verify email' })
+  <p style="margin: 0 0 16px; font-size: 14px; line-height: 20px; color: #71717a;">
+    If the button doesn't work, copy this link into your browser:<br />
+    <a href="{{ verifyUrl }}" style="color: #18181b; word-break: break-all;">{{ verifyUrl }}</a>
+  </p>
+  <p style="margin: 0; font-size: 14px; line-height: 20px; color: #71717a;">
+    If you didn't create an account, you can ignore this email.
+  </p>
+@end
