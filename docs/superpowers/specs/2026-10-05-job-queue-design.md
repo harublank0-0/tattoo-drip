@@ -36,14 +36,17 @@ Risk: `@adonisjs/queue` is 0.6.2 and `@boringnode/queue` 0.6.0, so breaking chan
 
 `podman-compose` 1.3.0 resolves `${VAR}` inside a service from that service's own `environment:` when the service defines `VAR`. Because the compose file has `POSTGRES_USER: ${POSTGRES_USER:-postgres}`, Postgres receives the literal text `${POSTGRES_USER:-postgres}` and crash-loops on `initdb`.
 
-Fix: the `postgres` service uses literal values that match `.env.example`:
+Fix: the `postgres` service reads the platform's own `DB_*` names, which don't collide with the keys it defines, and `pnpm podman:up` passes `--env-file apps/platform/.env`. One file then configures both the container and the app.
 
-- `POSTGRES_USER: postgres`
-- `POSTGRES_PASSWORD: postgres`
-- `POSTGRES_DB: tattoo_drip`
-- healthcheck `pg_isready -U postgres -d tattoo_drip`
+- `POSTGRES_USER: ${DB_USER:-postgres}`
+- `POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}`
+- `POSTGRES_DB: ${DB_DATABASE:-tattoo_drip}`
+- port `${DB_PORT:-5432}:5432`
+- healthcheck `pg_isready -U ${DB_USER:-postgres} -d ${DB_DATABASE:-tattoo_drip}`
 
-`POSTGRES_DB: tattoo_drip` creates the dev database on first start, so the README's `createdb` step goes away. The ports keep their `${…:-…}` form, which resolves correctly.
+Checked with podman-compose 1.3.0: these expand from the env file, and when the file doesn't exist yet (a fresh clone) they fall back to the defaults, which match `.env.example`. `POSTGRES_DB` creates the dev database on first start, so the README's `createdb` step goes away.
+
+The compose file is for local development only: CI starts its own Postgres in `ci.yml`, and production uses a managed Postgres. The `POSTGRES_*` values only apply when the data volume is first created; changing `DB_PASSWORD` later needs `podman-compose down -v`, which deletes local data.
 
 ### Packages and configuration
 
