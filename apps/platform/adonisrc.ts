@@ -31,6 +31,7 @@ export default defineConfig({
 		() => import("@adonisjs/session/commands"),
 		() => import("@adonisjs/inertia/commands"),
 		() => import("@adonisjs/mail/commands"),
+		() => import("@adonisjs/queue/commands"),
 	],
 
 	/*
@@ -61,6 +62,7 @@ export default defineConfig({
 		() => import("@adonisjs/auth/auth_provider"),
 		() => import("#providers/api_provider"),
 		() => import("@adonisjs/mail/mail_provider"),
+		() => import("@adonisjs/queue/queue_provider"),
 	],
 
 	/*

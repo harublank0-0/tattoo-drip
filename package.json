@@ -7,6 +7,7 @@
 		"dev": "pnpm --parallel --filter \"./apps/*\" dev",
 		"dev:platform": "pnpm --filter @tattoo-drip/platform dev",
 		"dev:storefront": "pnpm --filter @tattoo-drip/storefront dev",
+		"worker": "pnpm --filter @tattoo-drip/platform worker",
 		"build": "pnpm -r build",
 		"typecheck": "pnpm -r typecheck",
 		"test": "pnpm -r --if-present test",
