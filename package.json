@@ -15,7 +15,7 @@
 		"lint": "biome lint",
 		"check": "biome check",
 		"prepare": "husky",
-		"podman:up": "PODMAN_COMPOSE_PROVIDER=podman-compose podman compose up -d"
+		"podman:up": "PODMAN_COMPOSE_PROVIDER=podman-compose podman compose --env-file apps/platform/.env up"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.5",

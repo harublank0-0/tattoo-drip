@@ -22,15 +22,20 @@ Requires Node 24+, pnpm, and Podman with podman-compose.
 
 ```bash
 pnpm install
-pnpm podman:up                           # Postgres 18, Redis, Mailpit
-podman-compose exec postgres createdb -U postgres tattoo_drip
-
 cp apps/platform/.env.example apps/platform/.env
 pnpm --filter @tattoo-drip/platform exec node ace generate:key
-pnpm --filter @tattoo-drip/platform exec node ace migration:run
-
 cp apps/storefront/.env.local.example apps/storefront/.env.local
+
+pnpm podman:up                           # Postgres 18, Redis, Mailpit (foreground)
 ```
+
+Then, in a second terminal:
+
+```bash
+pnpm --filter @tattoo-drip/platform exec node ace migration:run
+```
+
+`pnpm podman:up` runs in the foreground and streams the services' logs; `Ctrl+C` stops them, and `pnpm podman:up -d` runs them in the background instead. It reads `DB_USER`, `DB_PASSWORD`, `DB_DATABASE` and `DB_PORT` from `apps/platform/.env`, so the container and the app always agree, and Postgres creates the database on first start. Postgres only applies these values when its data volume is first created: after changing them, recreate it with `podman-compose down -v` (this deletes local data).
 
 ## Commands
 
