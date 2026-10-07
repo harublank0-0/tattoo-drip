@@ -1,8 +1,12 @@
+import { authApiClient } from "@adonisjs/auth/plugins/api_client";
 import { authBrowserClient } from "@adonisjs/auth/plugins/browser_client";
 import app from "@adonisjs/core/services/app";
 import testUtils from "@adonisjs/core/services/test_utils";
 import { dbAssertions } from "@adonisjs/lucid/plugins/db";
+import { sessionApiClient } from "@adonisjs/session/plugins/api_client";
 import { sessionBrowserClient } from "@adonisjs/session/plugins/browser_client";
+import { shieldApiClient } from "@adonisjs/shield/plugins/api_client";
+import { apiClient } from "@japa/api-client";
 import { assert } from "@japa/assert";
 import { browserClient } from "@japa/browser-client";
 import { pluginAdonisJS } from "@japa/plugin-adonisjs";
@@ -18,8 +22,14 @@ import type { Config } from "@japa/runner/types";
  */
 export const plugins: Config["plugins"] = [
 	assert(),
+	// HTTP requests against the test server: client.get("/login"), plus
+	// .withCsrfToken(), .withSession() and .loginAs(user) from the plugins below.
+	apiClient(),
 	pluginAdonisJS(app),
 	dbAssertions(app),
+	sessionApiClient(app),
+	shieldApiClient(),
+	authApiClient(app),
 	browserClient({ runInSuites: ["browser"] }),
 	sessionBrowserClient(app),
 	authBrowserClient(app),
