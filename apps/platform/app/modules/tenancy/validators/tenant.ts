@@ -1,4 +1,4 @@
-import vine from "@vinejs/vine";
+import vine, { SimpleMessagesProvider } from "@vinejs/vine";
 import type { FieldContext } from "@vinejs/vine/types";
 import { IANAZone } from "luxon";
 import { TENANT_TYPES } from "#modules/tenancy/models/tenant";
@@ -53,3 +53,16 @@ export const createTenantValidator = vine.create({
 		.unique({ table: "tenants", column: "slug" }),
 	timezone: vine.string().trim().use(ianaTimezone()),
 });
+
+/**
+ * The page calls the slug "your address", so the errors do too.
+ */
+createTenantValidator.messagesProvider = new SimpleMessagesProvider(
+	{
+		// Lucid's unique rule reports as "database.unique".
+		"slug.database.unique": "This address is already taken. Try another one.",
+		"slug.regex":
+			"Use 3 to 63 lowercase letters, numbers and hyphens, not starting or ending with a hyphen.",
+	},
+	{ name: "business name", slug: "address", timezone: "time zone" },
+);

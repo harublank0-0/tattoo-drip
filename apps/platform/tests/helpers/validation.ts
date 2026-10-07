@@ -7,7 +7,11 @@ import type { ApiResponse } from "@japa/api-client";
  * session plugin's own `assertHasValidationError` still reads `errors`, so
  * it never sees them.
  */
-export function assertValidationError(response: ApiResponse, field: string) {
+export function assertValidationError(
+	response: ApiResponse,
+	field: string,
+	message?: string,
+) {
 	const errors = response.flashMessage("inputErrorsBag") ?? {};
 	if (!response.assert) {
 		throw new Error("assertValidationError needs the @japa/assert plugin");
@@ -17,4 +21,7 @@ export function assertValidationError(response: ApiResponse, field: string) {
 		field,
 		`expected a validation error on "${field}", got ${JSON.stringify(errors)}`,
 	);
+	if (message !== undefined) {
+		response.assert.include(errors[field], message);
+	}
 }

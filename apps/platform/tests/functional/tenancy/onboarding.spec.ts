@@ -99,7 +99,11 @@ test.group("Onboarding", (group) => {
 			.loginAs(user)
 			.redirects(0);
 
-		assertValidationError(response, "slug");
+		assertValidationError(
+			response,
+			"slug",
+			"This address is already taken. Try another one.",
+		);
 	});
 });
 
