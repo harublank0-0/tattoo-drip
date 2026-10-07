@@ -39,13 +39,27 @@ Import with the subpath aliases from `package.json` (`#controllers/*`, `#models/
 - Each email is a `BaseMail` class in `app/modules/<module>/emails/`, next to an HTML template and a `_text` template. HTML templates print with `{{ }}`; text templates print with `{{{ }}}` so URLs keep their `&`. Guard optional values: Edge prints `undefined` and `null` literally.
 - Mail classes never set `from`; `config/mail.ts` always sends from the platform's domain.
 - A module with templates needs one `edge.mount("<module>", …)` line in `start/view.ts`; its templates are then `<module>::emails/<name>`. `metaFiles` in `adonisrc.ts` copies `app/modules/**/*.edge` into the build.
+- Send with `mail.sendLater(...)`: the messenger in `start/mail.ts` queues a `SendMailJob` that the worker sends. Use `mail.send(...)` only inside a job. An email that must go out only if a transaction commits is sent from a domain job queued with `dispatchInTransaction`.
+- Template data is stored as JSON until the worker renders it: templates see serialized fields only (`user.fullName` works; getters and methods don't, and dates become strings). Pass plain values for anything computed.
+- In development, run `pnpm worker` next to `pnpm dev`, or queued emails never reach Mailpit.
+
+## Jobs
+
+- `@adonisjs/queue` with the `database` driver: jobs are rows in `queue_jobs` in the app's own Postgres, run by a separate worker (`pnpm worker`, i.e. `node ace queue:work`). It doesn't reload on code changes; restart it after editing a job.
+- Shared plumbing such as `SendMailJob` lives in `app/jobs/` (`#jobs/*`). Domain jobs live in `app/modules/<module>/jobs/`. The worker loads every file in those folders as a job, so put nothing else there.
+- Defaults in `config/queue.ts`: 3 retries with exponential backoff (5s up to 5m); completed jobs are deleted, failed jobs stay 7 days with their error. Delivery is at-least-once: a worker stopped mid-job reruns it, so make jobs safe to repeat. A job's `failed()` hook runs once retries are used up; log identifying fields under named keys (`err` for the error), never whole objects or secrets.
+- Queue a job that belongs to a database write with `dispatchInTransaction(Job.dispatch(payload), trx)` from `#services/queue`, so it commits or rolls back with the data.
+- Jobs that touch tenant-owned data carry `tenantId` in their payload. TAT-28 runs them in tenant context.
+- `@adonisjs/queue` (0.6.2) and `@boringnode/queue` (0.6.0) are pinned to exact versions and must be upgraded together; check `pnpm why @boringnode/queue` shows one version.
+- Tests: fake the queue with `queue.fake()` and assert with `fake.assertPushed(Job, { payload })`; run a job directly with `new Job()`, `$hydrate(payload, context)` and `execute()`. Restore fakes in `group.each.teardown`.
 
 ## Commands
 
 Run from `apps/platform`:
 
 - `pnpm dev` (`node ace serve --hmr`, port 3333)
-- `node ace test` (add `--files` or a suite name to narrow it)
+- `pnpm worker` (`node ace queue:work`, runs queued jobs and emails)
+- `node ace test` (add `--files` or a suite name to narrow it). The functional suite needs the local Postgres running and migrated; its tests run inside `testUtils.db().wrapInGlobalTransaction()` so they leave no data behind.
 - `node ace make:controller|model|migration|validator|… <name>` to scaffold
 - `node ace migration:run`
 - `pnpm typecheck` (server and `inertia/`)

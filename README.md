@@ -43,6 +43,7 @@ pnpm --filter @tattoo-drip/platform exec node ace migration:run
 |---|---|
 | `pnpm dev` | Run platform (port 3333) and storefront (port 3000) |
 | `pnpm dev:platform` / `pnpm dev:storefront` | Run one app |
+| `pnpm worker` | Run the platform's job worker (queued jobs and emails) |
 | `pnpm build` | Build every package and app |
 | `pnpm typecheck` | Typecheck every package and app |
 | `pnpm check` | Biome lint + format check (`pnpm format:fix` to format) |
