@@ -58,7 +58,7 @@ Models `Tenant` and `TenantMembership` live in `app/modules/tenancy/models/` and
 
 - `createTenant(owner: User, input: { type, name, slug, timezone }): Promise<Tenant>` creates the tenant and the owner membership in one transaction. A unique violation on the slug (a race between two signups) becomes a `SlugTakenError`.
 - `tenantsFor(user: User): Promise<{ tenant: Tenant; role }[]>` lists the user's tenants, oldest membership first.
-- `assertKeepsAnOwner(trx, tenantId, change: { remove: membershipId } | { demote: membershipId })` throws `LastOwnerError` if the change would leave the tenant with no owner. It locks the tenant's owner rows (`FOR UPDATE`), so two owners removing each other at once can't both succeed. The caller runs it inside the same transaction as the change.
+- `assertKeepsAnOwner(trx, tenantId, leavingId)` throws `LastOwnerError` if the membership `leavingId` stopping being an owner (removed, or demoted to artist) would leave the tenant with no owner. Removing and demoting are the same check, so it takes the membership id alone. It locks the tenant's owner rows (`FOR UPDATE`), so two owners removing each other at once can't both succeed. The caller runs it inside the same transaction as the change.
 
 ## Validation
 
