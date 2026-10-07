@@ -40,7 +40,4 @@ export default await Env.create(new URL("../", import.meta.url), {
 	SMTP_PORT: Env.schema.number(),
 	SMTP_USERNAME: Env.schema.string.optional(),
 	SMTP_PASSWORD: Env.schema.string.optional(),
-
-	//  Variables for configuring @adonisjs/queue
-	QUEUE_DRIVER: Env.schema.enum.optional(["database", "sync"] as const),
 });

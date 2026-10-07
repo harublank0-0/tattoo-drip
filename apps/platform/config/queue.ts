@@ -1,14 +1,18 @@
 import { defineConfig, drivers, exponentialBackoff } from "@adonisjs/queue";
-import env from "#start/env";
 
 export default defineConfig({
-	default: env.get("QUEUE_DRIVER", "database"),
+	/**
+	 * The only driver: jobs are rows in queue_jobs in the app's own
+	 * Postgres, run by the worker. (No sync driver: it would run jobs
+	 * inside the request, before a transaction commits and without the
+	 * JSON round trip the worker does.)
+	 */
+	default: "database",
 
 	adapters: {
 		database: drivers.database({
 			connectionName: "pg",
 		}),
-		sync: drivers.sync(),
 	},
 
 	worker: {

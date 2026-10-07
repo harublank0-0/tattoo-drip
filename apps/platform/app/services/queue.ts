@@ -14,9 +14,9 @@ type Dispatcher = {
  *
  *   await dispatchInTransaction(AlertStaffJob.dispatch(payload).toQueue("alerts"), trx)
  *
- * Only the database adapter can join a transaction. With the sync driver,
- * or a faked queue in tests, the job is dispatched normally. The helper
- * picks the adapter, so don't call `.with()` on the dispatcher yourself.
+ * With a faked queue in tests, the job is dispatched to the fake instead.
+ * The helper picks the adapter, so don't call `.with()` on the dispatcher
+ * yourself.
  */
 export function dispatchInTransaction(
 	dispatcher: Dispatcher,
