@@ -26,6 +26,7 @@ Import with the subpath aliases from `package.json` (`#controllers/*`, `#models/
 
 ## Rules
 
+- Controllers and services that use `@inject()` must import their dependencies as values, not `import type`: the container reads the class from decorator metadata at runtime. Biome's `useImportType` fix gets this wrong, so mark those imports with `// biome-ignore lint/style/useImportType: @inject() reads the class at runtime`.
 - Each backend module owns its models and services; other modules call its services instead of querying its tables. Inertia controllers, API controllers and jobs stay thin and call the same services. See the module table in `docs/architecture.md`.
 - The tenant always comes from the URL (`/t/:slug/…` for the dashboard, `/api/v1/tenants/:slug/…` for the API). Services scope every query by tenant; never trust a tenant ID from a request body. Every tenant-owned endpoint needs a test proving tenant A can't reach tenant B's data.
 - The REST API implements the contract in `packages/types/openapi.yaml`. Change the contract first, regenerate the types, then implement.
@@ -63,7 +64,8 @@ Run from `apps/platform`:
 
 - `pnpm dev` (`node ace serve --hmr`, port 3333)
 - `pnpm worker` (`node ace queue:work`, runs queued jobs and emails)
-- `node ace test` (add `--files` or a suite name to narrow it). The functional suite needs the local Postgres running and migrated; its tests run inside `testUtils.db().wrapInGlobalTransaction()` so they leave no data behind.
+- `node ace test` (add `--files` or a suite name to narrow it). The functional suite needs the local Postgres running and migrated; its tests run inside `testUtils.db().wrapInGlobalTransaction()` (Lucid 22's name; `withGlobalTransaction` is deprecated) so they leave no data behind. HTTP tests use `client` with `.loginAs(user)` and `.withCsrfToken()`; check form errors with `assertValidationError(response, field)` from `#tests/helpers/validation`, because Adonis 7 flashes them under `inputErrorsBag` and the session plugin's `assertHasValidationError` reads `errors`.
+- `node ace codegen` after adding or renaming routes, pages or controllers: it regenerates the committed `.adonisjs/` types (route names, pages, controllers) that `pnpm typecheck` reads. Commit the result.
 - `node ace make:controller|model|migration|validator|… <name>` to scaffold
 - `node ace migration:run`
 - `pnpm typecheck` (server and `inertia/`)

@@ -13,4 +13,8 @@ export interface ApiDefinition {
     destroy: typeof routes['session.destroy']
   }
   dashboard: typeof routes['dashboard']
+  onboarding: {
+    create: typeof routes['onboarding.create']
+    store: typeof routes['onboarding.store']
+  }
 }
