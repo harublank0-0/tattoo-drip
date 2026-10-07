@@ -50,7 +50,13 @@ Left to the tickets that own them:
 
 Unique `(tenant_id, user_id)`.
 
-Models `Tenant` and `TenantMembership` live in `app/modules/tenancy/models/` and extend the generated schema classes. `User` gets no tenancy relation: Identity doesn't import Tenancy's tables, so other code asks `TenancyService`.
+Both tables also have a nullable `deleted_at timestamptz` (soft delete, decided 2026-10-07). `tenants.slug` stays a plain unique index, so a deleted tenant's subdomain is never reused. Membership uniqueness is a partial unique index on `(tenant_id, user_id) WHERE deleted_at IS NULL`, so a removed member can be added back; `tenant_id` and `user_id` get plain indexes.
+
+## Soft delete
+
+A `withSoftDeletes` Lucid mixin (`app/models/mixins/soft_deletes.ts`) adds `softDelete(trx?)` and `restore(trx?)`. Find, fetch and paginate hooks make model queries skip deleted rows; `Model.withTrashed()` and `Model.onlyTrashed()` opt out. The hooks don't reach `whereHas` subqueries or raw queries, so those filter `deleted_at` themselves. The community `adonis-lucid-soft-deletes` package wasn't used: it supports only Lucid 21 and Adonis 6. Soft delete covers business records; users (personal-data deletion must really erase), payments (never deleted) and queue tables don't use it.
+
+Models `Tenant` and `TenantMembership` live in `app/modules/tenancy/models/` and extend the generated schema classes, composed with `withSoftDeletes`. `User` gets no tenancy relation: Identity doesn't import Tenancy's tables, so other code asks `TenancyService`.
 
 ## TenancyService
 

@@ -103,6 +103,7 @@ export class QueueScheduleSchema extends BaseModel {
 export class TenantMembershipSchema extends BaseModel {
 	static $columns = [
 		"createdAt",
+		"deletedAt",
 		"id",
 		"role",
 		"tenantId",
@@ -112,6 +113,8 @@ export class TenantMembershipSchema extends BaseModel {
 	$columns = TenantMembershipSchema.$columns;
 	@column.dateTime({ autoCreate: true })
 	declare createdAt: DateTime;
+	@column.dateTime()
+	declare deletedAt: DateTime | null;
 	@column({ isPrimary: true })
 	declare id: string;
 	@column()
@@ -127,6 +130,7 @@ export class TenantMembershipSchema extends BaseModel {
 export class TenantSchema extends BaseModel {
 	static $columns = [
 		"createdAt",
+		"deletedAt",
 		"id",
 		"name",
 		"slug",
@@ -137,6 +141,8 @@ export class TenantSchema extends BaseModel {
 	$columns = TenantSchema.$columns;
 	@column.dateTime({ autoCreate: true })
 	declare createdAt: DateTime;
+	@column.dateTime()
+	declare deletedAt: DateTime | null;
 	@column({ isPrimary: true })
 	declare id: string;
 	@column()

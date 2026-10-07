@@ -30,7 +30,9 @@ Import with the subpath aliases from `package.json` (`#controllers/*`, `#models/
 - The tenant always comes from the URL (`/t/:slug/…` for the dashboard, `/api/v1/tenants/:slug/…` for the API). Services scope every query by tenant; never trust a tenant ID from a request body. Every tenant-owned endpoint needs a test proving tenant A can't reach tenant B's data.
 - The REST API implements the contract in `packages/types/openapi.yaml`. Change the contract first, regenerate the types, then implement.
 - `database/schema.ts` and `.adonisjs/` are generated. Change the schema with a new migration, never by editing an existing migration that has been run.
-- Migrations follow `database/README.md`: UUIDv7 primary keys (`defaultTo(this.raw("uuidv7()"))`), `timestamptz` UTC instants, and `tenant_id` on every tenant-owned table.
+- Migrations follow `database/README.md`: UUIDv7 primary keys (`defaultTo(this.raw("uuidv7()"))`), `timestamptz` UTC instants, `tenant_id` on every tenant-owned table, and `deleted_at` on business records.
+- Soft delete: models of business records use `compose(XSchema, withSoftDeletes)` from `#models/mixins/soft_deletes`. Delete with `record.softDelete(trx?)`, undo with `restore()`; model queries skip deleted rows unless they start from `Model.withTrashed()` or `Model.onlyTrashed()`. The hooks don't reach `whereHas` subqueries or raw `db.from(...)` queries, so add `whereNull("<table>.deleted_at")` there. Soft-deleting a parent soft-deletes its children in the same transaction (the database's `ON DELETE CASCADE` only covers real purges).
+- Tenancy: the `tenancy` module (`app/modules/tenancy/`) owns tenants and memberships. Other modules read them through `TenancyService` (`#modules/tenancy/services/tenancy_service`): `createTenant`, `tenantsFor`, and `assertKeepsAnOwner`, which every remove or demote of a member must call inside its transaction.
 
 ## Emails
 

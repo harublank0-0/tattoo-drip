@@ -14,11 +14,14 @@ export default class extends BaseSchema {
 			table.enum("type", ["studio", "independent"]).notNullable();
 			table.string("name", 120).notNullable();
 			// Also the subdomain, so it follows DNS label rules (3-63 chars).
+			// Unique across deleted tenants too: a deleted studio's subdomain
+			// is never handed to someone else.
 			table.string("slug", 63).notNullable().unique();
 			table.string("timezone", 64).notNullable().defaultTo("Asia/Kathmandu");
 
 			table.timestamp("created_at", { useTz: true }).notNullable();
 			table.timestamp("updated_at", { useTz: true }).nullable();
+			table.timestamp("deleted_at", { useTz: true }).nullable();
 		});
 	}
 

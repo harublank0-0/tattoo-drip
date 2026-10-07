@@ -43,13 +43,16 @@ export default class TenancyService {
 	}
 
 	/**
-	 * The user's tenants with their role in each, oldest membership first.
+	 * The user's live tenants with their role in each, oldest membership
+	 * first. Deleted memberships and deleted tenants are left out.
 	 */
 	async tenantsFor(
 		user: User,
 	): Promise<{ tenant: Tenant; role: MembershipRole }[]> {
 		const memberships = await TenantMembership.query()
 			.where("user_id", user.id)
+			// The soft-delete hooks don't reach this subquery, so filter here.
+			.whereHas("tenant", (tenant) => tenant.whereNull("tenants.deleted_at"))
 			.preload("tenant")
 			.orderBy("created_at", "asc")
 			.orderBy("id", "asc");
