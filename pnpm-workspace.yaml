@@ -19,3 +19,9 @@ minimumReleaseAgeExclude:
   - '@adonisjs/http-server@9.3.1'
   - '@poppinss/utils@7.1.1'
   - lucide-react@1.48.0
+
+# @adonisjs/queue and the platform both import @boringnode/queue; a second
+# copy breaks transactional dispatch, so force one version (see
+# apps/platform/AGENTS.md, Jobs). Bump it together with @adonisjs/queue.
+overrides:
+  '@boringnode/queue': 0.6.0
