@@ -44,7 +44,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
 			title="Studio settings"
 			description="Your studio's public details and how clients pay you."
 		>
-			<div className="grid items-start gap-4 md:grid-cols-[240px_minmax(0,1fr)] md:gap-6">
+			<div className="grid grid-cols-1 items-start gap-4 md:grid-cols-[240px_minmax(0,1fr)] md:gap-6">
 				<nav
 					className="flex gap-1 overflow-x-auto md:flex-col"
 					aria-label="Settings"

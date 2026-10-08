@@ -215,7 +215,8 @@ function MethodRow({
 					<Banknote />
 				</div>
 			)}
-			<div className="flex min-w-0 flex-1 flex-col gap-1">
+			{/* min-w-40: on narrow screens the actions wrap below instead. */}
+			<div className="flex min-w-40 flex-1 flex-col gap-1">
 				<div className="flex flex-wrap items-center gap-2">
 					<span className="font-medium">{method.label}</span>
 					<Badge variant="secondary">{kindCopy(method.kind).name}</Badge>
@@ -227,7 +228,7 @@ function MethodRow({
 					<p className="truncate text-sm text-muted-foreground">{details}</p>
 				)}
 			</div>
-			<div className="flex items-center gap-1">
+			<div className="ml-auto flex items-center gap-1">
 				<Button
 					variant="ghost"
 					size="icon"
