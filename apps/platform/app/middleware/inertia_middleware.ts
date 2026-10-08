@@ -1,10 +1,11 @@
 import type { HttpContext } from "@adonisjs/core/http";
 import type { NextFn } from "@adonisjs/core/types/http";
 import BaseInertiaMiddleware from "@adonisjs/inertia/inertia_middleware";
+import TenancyService from "#modules/tenancy/services/tenancy_service";
 import UserTransformer from "#transformers/user_transformer";
 
 export default class InertiaMiddleware extends BaseInertiaMiddleware {
-	share(ctx: HttpContext) {
+	async share(ctx: HttpContext) {
 		/**
 		 * The share method is called everytime an Inertia page is rendered. In
 		 * certain cases, a page may get rendered before the session middleware
@@ -13,7 +14,7 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 		 * In that case, we must always assume that HttpContext is not fully hydrated
 		 * with all the properties
 		 */
-		const { auth, request } = ctx as Partial<HttpContext>;
+		const { auth, request, tenant, membership } = ctx as Partial<HttpContext>;
 
 		const theme: "light" | "dark" =
 			request?.plainCookie("app_theme", {
@@ -31,6 +32,34 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 				auth?.user ? UserTransformer.transform(auth.user) : undefined,
 			),
 			preferences: ctx.inertia.always({ theme }),
+			/**
+			 * Set on /t/:tenant pages by the tenant middleware, which runs
+			 * before the page renders; undefined everywhere else.
+			 */
+			tenant: ctx.inertia.always(
+				tenant && membership
+					? {
+							name: tenant.name,
+							slug: tenant.slug,
+							type: tenant.type,
+							role: membership.role,
+						}
+					: undefined,
+			),
+			/**
+			 * The tenant switcher's list: only this user's live tenants.
+			 */
+			tenants: ctx.inertia.always(
+				tenant && auth?.user
+					? (await new TenancyService().tenantsFor(auth.user)).map(
+							({ tenant, role }) => ({
+								name: tenant.name,
+								slug: tenant.slug,
+								role,
+							}),
+						)
+					: undefined,
+			),
 		};
 	}
 

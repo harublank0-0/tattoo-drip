@@ -1,27 +1,43 @@
 import { Form } from "@adonisjs/inertia/react";
+import { usePage } from "@inertiajs/react";
 import { cn } from "cn";
 import { House, LogOut } from "lucide-react";
 import type { ReactNode } from "react";
 import FlashToasts from "~/components/flash_toasts";
 import Logo from "~/components/logo";
 import NavLink, { type NavItem } from "~/components/nav_link";
+import TenantSwitcher from "~/components/tenant_switcher";
 import ThemeToggle from "~/components/theme_toggle";
 import { Button, buttonVariants } from "~/components/ui/button";
 
 /**
- * Top-level app navigation. Add an entry here for every new area of your
- * app, and it shows up in the navigation bar with its active state handled.
+ * Navigation inside a tenant. Add an entry here for every new area of the
+ * dashboard; links point at the current tenant (/t/:tenant/...).
  */
-const nav: NavItem[] = [
-	{ label: "Dashboard", route: "dashboard", icon: House },
-];
+function tenantNav(tenantSlug: string): NavItem[] {
+	return [
+		{
+			label: "Dashboard",
+			route: "tenant.dashboard",
+			params: { tenant: tenantSlug },
+			exact: true,
+			icon: House,
+		},
+	];
+}
 
 export default function AppLayout({ children }: { children: ReactNode }) {
+	const { tenant } = usePage().props;
+	const nav = tenant ? tenantNav(tenant.slug) : [];
+
 	return (
 		<div className="flex min-h-svh flex-col">
 			<header className="border-b bg-background">
 				<div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-8">
-					<Logo size={28} />
+					<div className="flex min-w-0 items-center gap-3">
+						<Logo size={28} />
+						<TenantSwitcher />
+					</div>
 					<div className="flex items-center gap-2">
 						<ThemeToggle />
 						<Form route="session.destroy">
@@ -33,10 +49,12 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 					</div>
 				</div>
 				<nav className="mx-auto flex w-full max-w-6xl gap-1 px-2 pb-2 sm:px-6">
-					{nav.map(({ label, route, icon: Icon }) => (
+					{nav.map(({ label, route, params, exact, icon: Icon }) => (
 						<NavLink
 							key={label}
 							route={route}
+							params={params}
+							exact={exact}
 							className={cn(
 								buttonVariants({ variant: "ghost", size: "sm" }),
 								"text-muted-foreground aria-[current=page]:bg-accent aria-[current=page]:text-accent-foreground",

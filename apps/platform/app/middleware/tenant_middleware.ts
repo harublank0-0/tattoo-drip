@@ -26,7 +26,8 @@ declare module "@adonisjs/core/http" {
  * or deleting a tenant takes effect immediately. Anything else is the same
  * 404 as an unknown URL, so a URL never reveals that a tenant exists.
  *
- * Use after the auth middleware on the /t/:tenant route group.
+ * Use after the auth middleware on the /t/:tenant route group. The Inertia
+ * middleware shares `tenant` and `tenants` with the page from ctx.
  */
 @inject()
 export default class TenantMiddleware {
@@ -45,22 +46,6 @@ export default class TenantMiddleware {
 		ctx.tenant = found.tenant;
 		ctx.membership = found.membership;
 		ctx.session.put(LAST_TENANT_KEY, found.tenant.slug);
-
-		ctx.inertia.share({
-			tenant: {
-				name: found.tenant.name,
-				slug: found.tenant.slug,
-				type: found.tenant.type,
-				role: found.membership.role,
-			},
-			// The switcher list: only this user's live tenants.
-			tenants: async () =>
-				(await this.tenancy.tenantsFor(user)).map(({ tenant, role }) => ({
-					name: tenant.name,
-					slug: tenant.slug,
-					role,
-				})),
-		});
 
 		return next();
 	}
