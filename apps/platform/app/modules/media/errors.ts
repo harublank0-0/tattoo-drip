@@ -7,8 +7,8 @@ export const IMAGE_SIZE_MESSAGE =
  * user: show it as a field error, like SlugTakenError.
  */
 export class InvalidImageError extends Error {
-	constructor(message: string = IMAGE_FORMAT_MESSAGE) {
-		super(message);
+	constructor(message: string = IMAGE_FORMAT_MESSAGE, options?: ErrorOptions) {
+		super(message, options);
 		this.name = "InvalidImageError";
 	}
 }

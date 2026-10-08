@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import app from "@adonisjs/core/services/app";
 import drive from "@adonisjs/drive/services/main";
 import { test } from "@japa/runner";
 import { InvalidImageError } from "#modules/media/errors";
 import ImageService from "#modules/media/services/image_service";
+import env from "#start/env";
 import { testImages } from "#tests/helpers/images";
 
 const images = new ImageService();
@@ -13,11 +14,21 @@ const tenant = { id: "0199c0de-0000-7000-8000-000000000001" };
 const V4 =
 	"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
 
-/** What the body parser hands over: the upload written to a temp file. */
+/**
+ * What the body parser hands over: the upload written to a temp file.
+ * Kept under tmp/storage, which the test hooks clear.
+ */
 async function upload(data: Buffer) {
-	const tmpPath = app.tmpPath(`upload-${randomUUID()}`);
+	await mkdir(app.tmpPath("storage/uploads"), { recursive: true });
+	const tmpPath = app.tmpPath("storage/uploads", randomUUID());
 	await writeFile(tmpPath, data);
 	return { tmpPath };
+}
+
+/** Image URLs are absolute (APP_URL) so other origins can show them. */
+function pathOf(url: string) {
+	const { pathname, search } = new URL(url);
+	return pathname + search;
 }
 
 test.group("ImageService", () => {
@@ -77,8 +88,8 @@ test.group("ImageService", () => {
 
 		const url = await images.url("payment_qr", stored.key);
 
-		assert.equal(url, `/uploads/${stored.key}`);
-		const response = await client.get(url);
+		assert.equal(url, `${env.get("APP_URL")}/uploads/${stored.key}`);
+		const response = await client.get(pathOf(url));
 		response.assertStatus(200);
 		assert.match(response.header("content-type") ?? "", /^image\/png/);
 	});
@@ -94,8 +105,9 @@ test.group("ImageService", () => {
 
 		const url = await images.url("payment_proof", stored.key);
 
+		assert.isTrue(url.startsWith(`${env.get("APP_URL")}/files/${stored.key}?`));
 		assert.include(url, "signature=");
-		(await client.get(url)).assertStatus(200);
+		(await client.get(pathOf(url))).assertStatus(200);
 		(await client.get(`/files/${stored.key}`)).assertStatus(401);
 	});
 

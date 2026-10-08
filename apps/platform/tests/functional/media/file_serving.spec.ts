@@ -76,14 +76,14 @@ test.group("File serving", () => {
 
 		const response = await client.get("/uploads/tests/d.txt");
 
-		assert.notEqual(response.status(), 200);
+		response.assertStatus(404);
 		assert.notInclude(response.text(), "secret");
 	});
 
 	test("an encoded ../ can't escape the disk", async ({ client, assert }) => {
 		const response = await client.get("/uploads/..%2F..%2Fpackage.json");
 
-		assert.notEqual(response.status(), 200);
+		response.assertStatus(404);
 		assert.notInclude(response.text(), "@tattoo-drip/platform");
 	});
 });

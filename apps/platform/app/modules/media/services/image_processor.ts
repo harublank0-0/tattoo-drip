@@ -1,3 +1,4 @@
+import logger from "@adonisjs/core/services/logger";
 import sharp from "sharp";
 import {
 	IMAGE_FORMAT_MESSAGE,
@@ -58,6 +59,9 @@ function sniff(input: Buffer): "jpeg" | "png" | "webp" | null {
 export async function processImage(input: Buffer): Promise<ProcessedImage> {
 	const detected = sniff(input);
 	if (!detected) throw new InvalidImageError(IMAGE_FORMAT_MESSAGE);
+	if ((await pixelCount(input)) > MAX_INPUT_PIXELS) {
+		throw new InvalidImageError(IMAGE_SIZE_MESSAGE);
+	}
 
 	try {
 		// Inside the try: sharp's constructor can throw too (e.g. empty input).
@@ -86,10 +90,24 @@ export async function processImage(input: Buffer): Promise<ProcessedImage> {
 			height: info.height,
 		};
 	} catch (error) {
-		const tooLarge =
-			error instanceof Error && error.message.includes("pixel limit");
-		throw new InvalidImageError(
-			tooLarge ? IMAGE_SIZE_MESSAGE : IMAGE_FORMAT_MESSAGE,
-		);
+		// Usually a broken file, but also any server-side sharp failure, so
+		// keep the cause and log it.
+		logger.warn({ err: error }, "image could not be processed");
+		throw new InvalidImageError(IMAGE_FORMAT_MESSAGE, { cause: error });
+	}
+}
+
+/**
+ * Width × height from the image header, read without decoding the pixels.
+ * Unreadable headers count as 0 here and fail in the decode instead.
+ */
+async function pixelCount(input: Buffer): Promise<number> {
+	try {
+		const { width = 0, height = 0 } = await sharp(input, {
+			limitInputPixels: false,
+		}).metadata();
+		return width * height;
+	} catch {
+		return 0;
 	}
 }

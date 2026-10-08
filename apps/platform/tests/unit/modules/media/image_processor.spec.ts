@@ -97,6 +97,20 @@ test.group("processImage", () => {
 			assert.equal(error.message, IMAGE_FORMAT_MESSAGE);
 		});
 
+	test("keeps sharp's error as the cause, so failures can be traced", async ({
+		assert,
+	}) => {
+		const png = await testImages.png();
+
+		const error = await processImage(png.subarray(0, png.length - 40)).catch(
+			(e) => e,
+		);
+
+		assert.instanceOf(error, InvalidImageError);
+		assert.instanceOf(error.cause, Error);
+		assert.notEqual(error.cause.message, error.message);
+	});
+
 	test("rejects an image over 40 megapixels with its own message", async ({
 		assert,
 	}) => {

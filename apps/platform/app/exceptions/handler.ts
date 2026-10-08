@@ -1,4 +1,8 @@
-import { ExceptionHandler, type HttpContext } from "@adonisjs/core/http";
+import {
+	ExceptionHandler,
+	errors,
+	type HttpContext,
+} from "@adonisjs/core/http";
 import app from "@adonisjs/core/services/app";
 import type {
 	StatusPageRange,
@@ -33,6 +37,12 @@ export default class HttpExceptionHandler extends ExceptionHandler {
 	 * response to the client
 	 */
 	async handle(error: unknown, ctx: HttpContext) {
+		if (isPathTraversal(error)) {
+			return super.handle(
+				new errors.E_ROUTE_NOT_FOUND([ctx.request.method(), ctx.request.url()]),
+				ctx,
+			);
+		}
 		return super.handle(error, ctx);
 	}
 
@@ -43,6 +53,19 @@ export default class HttpExceptionHandler extends ExceptionHandler {
 	 * @note You should not attempt to send a response from this method.
 	 */
 	async report(error: unknown, ctx: HttpContext) {
+		if (isPathTraversal(error)) return;
 		return super.report(error, ctx);
 	}
+}
+
+/**
+ * A `..` in a file URL (/uploads, /files). Drive refuses the key; answer
+ * like any unknown URL instead of with a logged 500.
+ */
+function isPathTraversal(error: unknown) {
+	return (
+		error instanceof Error &&
+		"code" in error &&
+		error.code === "E_PATH_TRAVERSAL_DETECTED"
+	);
 }
