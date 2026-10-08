@@ -1,3 +1,6 @@
+import { randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import app from "@adonisjs/core/services/app";
 import sharp from "sharp";
 
 type Rgba = { r: number; g: number; b: number; alpha?: number };
@@ -42,3 +45,14 @@ export const testImages = {
 			})
 			.toBuffer(),
 };
+
+/**
+ * What the body parser hands a service: the upload written to a temp file,
+ * under tmp/storage, which the test hooks clear.
+ */
+export async function uploadOf(data: Buffer) {
+	await mkdir(app.tmpPath("storage/uploads"), { recursive: true });
+	const tmpPath = app.tmpPath("storage/uploads", randomUUID());
+	await writeFile(tmpPath, data);
+	return { tmpPath };
+}
