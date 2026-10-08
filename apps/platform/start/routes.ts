@@ -62,6 +62,13 @@ router
 					.get("payments/new", [controllers.PaymentMethods, "create"])
 					.as("tenant.settings.payments.create");
 				router
+					.post("payments", [controllers.PaymentMethods, "store"])
+					.as("tenant.settings.payments.store");
+				router
+					.put("payments/:id", [controllers.PaymentMethods, "update"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.settings.payments.update");
+				router
 					.get("payments/:id/edit", [controllers.PaymentMethods, "edit"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.settings.payments.edit");

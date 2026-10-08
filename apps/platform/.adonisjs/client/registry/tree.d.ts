@@ -28,6 +28,8 @@ export interface ApiDefinition {
       }
       payments: typeof routes['tenant.settings.payments'] & {
         create: typeof routes['tenant.settings.payments.create']
+        store: typeof routes['tenant.settings.payments.store']
+        update: typeof routes['tenant.settings.payments.update']
         edit: typeof routes['tenant.settings.payments.edit']
         move: typeof routes['tenant.settings.payments.move']
         destroy: typeof routes['tenant.settings.payments.destroy']

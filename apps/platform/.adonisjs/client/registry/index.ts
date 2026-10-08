@@ -90,6 +90,18 @@ const routes = {
     tokens: [{"old":"/t/:tenant/settings/payments/new","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/payments/new","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/payments/new","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/payments/new","type":0,"val":"payments","end":""},{"old":"/t/:tenant/settings/payments/new","type":0,"val":"new","end":""}],
     types: placeholder as Registry['tenant.settings.payments.create']['types'],
   },
+  'tenant.settings.payments.store': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/settings/payments',
+    tokens: [{"old":"/t/:tenant/settings/payments","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/payments","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/payments","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/payments","type":0,"val":"payments","end":""}],
+    types: placeholder as Registry['tenant.settings.payments.store']['types'],
+  },
+  'tenant.settings.payments.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/settings/payments/:id',
+    tokens: [{"old":"/t/:tenant/settings/payments/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/payments/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/payments/:id","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/payments/:id","type":0,"val":"payments","end":""},{"old":"/t/:tenant/settings/payments/:id","type":1,"val":"id","end":""}],
+    types: placeholder as Registry['tenant.settings.payments.update']['types'],
+  },
   'tenant.settings.payments.edit': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/settings/payments/:id/edit',
