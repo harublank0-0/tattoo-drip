@@ -1,6 +1,7 @@
+import router from "@adonisjs/core/services/router";
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
-import { LAST_TENANT_KEY } from "#middleware/tenant_middleware";
+import { LAST_TENANT_KEY, tenantContext } from "#middleware/tenant_middleware";
 import User from "#models/user";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
@@ -128,6 +129,32 @@ test.group("Tenant routes", (group) => {
 
 		response.assertStatus(404);
 	});
+
+	test("every /t/:tenant route runs auth, then the tenant check", ({
+		assert,
+	}) => {
+		const routes = Object.values(router.toJSON())
+			.flat()
+			.filter(({ pattern }) => /^\/t\/:tenant(\/|$)/.test(pattern));
+		assert.isNotEmpty(routes);
+
+		for (const route of routes) {
+			const names = [...route.middleware.all()].map((entry) =>
+				typeof entry === "function" ? undefined : entry.name,
+			);
+			assert.include(names, "tenant", route.pattern);
+			assert.isBelow(names.indexOf("auth"), names.indexOf("tenant"));
+			assert.notEqual(names.indexOf("auth"), -1, route.pattern);
+		}
+	});
+
+	test("tenantContext fails loudly outside a tenant route", async ({
+		assert,
+	}) => {
+		const ctx = await testUtils.createHttpContext();
+
+		assert.throws(() => tenantContext(ctx), /tenant middleware/);
+	});
 });
 
 test.group("Dashboard landing", (group) => {
@@ -204,5 +231,33 @@ test.group("Dashboard landing", (group) => {
 		const response = await client.get("/t/black-needle").loginAs(owner);
 
 		response.assertSession(LAST_TENANT_KEY, "black-needle");
+	});
+
+	test("logging out forgets the last tenant", async ({ client }) => {
+		const owner = await makeUser("owner@example.com");
+
+		const response = await client
+			.post("/logout")
+			.withSession({ [LAST_TENANT_KEY]: "black-needle" })
+			.loginAs(owner)
+			.withCsrfToken()
+			.redirects(0);
+
+		response.assertSessionMissing(LAST_TENANT_KEY);
+	});
+
+	test("logging in forgets the last tenant of the browser's previous user", async ({
+		client,
+	}) => {
+		await makeUser("owner@example.com");
+
+		const response = await client
+			.post("/login")
+			.form({ email: "owner@example.com", password: "secret-password" })
+			.withSession({ [LAST_TENANT_KEY]: "red-ink" })
+			.withCsrfToken()
+			.redirects(0);
+
+		response.assertSessionMissing(LAST_TENANT_KEY);
 	});
 });

@@ -38,7 +38,7 @@ export default function NavLink({
 }) {
 	const { url } = usePage();
 	const href = urlFor(route, params);
-	const path = url.split("?")[0];
+	const path = url.split("?")[0].replace(/(.)\/+$/, "$1");
 	const isActive = exact
 		? path === href
 		: path === href || path.startsWith(`${href}/`);

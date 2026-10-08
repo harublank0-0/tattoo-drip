@@ -22,6 +22,13 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 				encoded: false,
 			}) ?? "light";
 
+		const tenants =
+			tenant && auth?.user
+				? await (await ctx.containerResolver.make(TenancyService)).tenantsFor(
+						auth.user,
+					)
+				: undefined;
+
 		/**
 		 * Data shared with all Inertia pages. Make sure you are using
 		 * transformers for rich data-types like Models.
@@ -50,15 +57,11 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 			 * The tenant switcher's list: only this user's live tenants.
 			 */
 			tenants: ctx.inertia.always(
-				tenant && auth?.user
-					? (await new TenancyService().tenantsFor(auth.user)).map(
-							({ tenant, role }) => ({
-								name: tenant.name,
-								slug: tenant.slug,
-								role,
-							}),
-						)
-					: undefined,
+				tenants?.map(({ tenant, role }) => ({
+					name: tenant.name,
+					slug: tenant.slug,
+					role,
+				})),
 			),
 		};
 	}

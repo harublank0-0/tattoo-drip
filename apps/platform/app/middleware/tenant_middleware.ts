@@ -13,10 +13,13 @@ export const LAST_TENANT_KEY = "last_tenant_slug";
 
 declare module "@adonisjs/core/http" {
 	interface HttpContext {
-		/** The tenant from the URL, set by the tenant middleware. */
-		tenant: Tenant;
+		/**
+		 * The tenant from the URL. Only set on /t/:tenant routes; read it
+		 * with tenantContext(ctx).
+		 */
+		tenant?: Tenant;
 		/** The signed-in user's membership in `tenant`. */
-		membership: TenantMembership;
+		membership?: TenantMembership;
 	}
 }
 
@@ -45,8 +48,28 @@ export default class TenantMiddleware {
 
 		ctx.tenant = found.tenant;
 		ctx.membership = found.membership;
-		ctx.session.put(LAST_TENANT_KEY, found.tenant.slug);
+		if (ctx.session.get(LAST_TENANT_KEY) !== found.tenant.slug) {
+			ctx.session.put(LAST_TENANT_KEY, found.tenant.slug);
+		}
 
 		return next();
 	}
+}
+
+/**
+ * The tenant and membership the tenant middleware resolved for this
+ * request. Throws if the route isn't in the /t/:tenant group, so a tenant
+ * page that forgot the middleware fails loudly instead of running without
+ * a tenant.
+ */
+export function tenantContext(ctx: HttpContext): {
+	tenant: Tenant;
+	membership: TenantMembership;
+} {
+	if (!ctx.tenant || !ctx.membership) {
+		throw new Error(
+			"No tenant on this request: the route must be in the /t/:tenant group with the tenant middleware",
+		);
+	}
+	return { tenant: ctx.tenant, membership: ctx.membership };
 }

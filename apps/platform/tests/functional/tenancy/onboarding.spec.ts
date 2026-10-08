@@ -186,7 +186,9 @@ test.group("Where users land", (group) => {
 		response.assertHeader("location", "/onboarding");
 	});
 
-	test("login without a tenant lands on onboarding", async ({ client }) => {
+	test("login without a tenant also goes to /dashboard, which sends it to onboarding", async ({
+		client,
+	}) => {
 		await makeUser();
 
 		const response = await client
@@ -196,7 +198,7 @@ test.group("Where users land", (group) => {
 			.redirects(0);
 
 		response.assertStatus(302);
-		response.assertHeader("location", "/onboarding");
+		response.assertHeader("location", "/dashboard");
 	});
 
 	test("login with a tenant lands on the dashboard", async ({ client }) => {

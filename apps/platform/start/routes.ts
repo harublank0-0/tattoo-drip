@@ -25,7 +25,8 @@ router
 
 /**
  * Pages of one tenant. The tenant middleware checks the user's membership
- * on every request and 404s anyone else; read the tenant from ctx.tenant.
+ * on every request and 404s anyone else; read the tenant with
+ * tenantContext(ctx). Every tenant route goes in this group (a test checks).
  */
 router
 	.group(() => {

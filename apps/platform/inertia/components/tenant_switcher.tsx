@@ -1,4 +1,5 @@
 import { Link } from "@adonisjs/inertia/react";
+import type { SharedProps } from "@adonisjs/inertia/types";
 import { usePage } from "@inertiajs/react";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { urlFor } from "~/client";
@@ -11,7 +12,9 @@ import {
 	DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 
-const ROLE_LABELS: Record<string, string> = {
+type Role = NonNullable<SharedProps["tenant"]>["role"];
+
+const ROLE_LABELS: Record<Role, string> = {
 	owner: "Owner",
 	artist: "Artist",
 };
@@ -48,7 +51,7 @@ export default function TenantSwitcher() {
 							<span className="flex min-w-0 flex-1 flex-col">
 								<span className="truncate">{item.name}</span>
 								<span className="text-xs text-muted-foreground">
-									{ROLE_LABELS[item.role] ?? item.role}
+									{ROLE_LABELS[item.role]}
 								</span>
 							</span>
 							{item.slug === tenant.slug && <Check />}
