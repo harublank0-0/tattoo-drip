@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import type { MultipartFile } from "@adonisjs/core/bodyparser";
 import logger from "@adonisjs/core/services/logger";
 import drive from "@adonisjs/drive/services/main";
@@ -37,7 +37,10 @@ export default class ImageService {
 		if (!file.tmpPath) {
 			throw new Error("The upload has no tmpPath; was it already moved?");
 		}
-		const image = await processImage(await readFile(file.tmpPath));
+		const input = await readFile(file.tmpPath);
+		// The raw upload still has its EXIF and GPS; don't leave it in tmp.
+		await rm(file.tmpPath, { force: true });
+		const image = await processImage(input);
 		const extension = image.format === "png" ? "png" : "jpg";
 		const key = `tenants/${tenant.id}/${purpose}/${randomUUID()}.${extension}`;
 		await diskFor(purpose).put(key, image.data, {

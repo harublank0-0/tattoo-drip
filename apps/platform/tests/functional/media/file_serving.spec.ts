@@ -13,6 +13,15 @@ test.group("File serving", () => {
 		assert.isTrue(existsSync(app.tmpPath("storage/public/tests/where.txt")));
 	});
 
+	test("the default disk is private, so a stray write isn't published", async ({
+		assert,
+	}) => {
+		await drive.use().put("tests/default.txt", "x");
+
+		assert.isTrue(await drive.use("private").exists("tests/default.txt"));
+		assert.isFalse(await drive.use("public").exists("tests/default.txt"));
+	});
+
 	test("a public file is served", async ({ client }) => {
 		await drive.use("public").put("tests/a.txt", "hello");
 

@@ -16,7 +16,8 @@ const root = (disk: string) =>
 	app.inTest ? app.tmpPath("storage", disk) : app.makePath("storage", disk);
 
 const driveConfig = defineConfig({
-	default: "public",
+	/** Private by default: a write that forgets its disk is never published. */
+	default: "private",
 	services: {
 		public: services.fs({
 			location: root("public"),

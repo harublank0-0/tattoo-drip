@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import app from "@adonisjs/core/services/app";
 import drive from "@adonisjs/drive/services/main";
@@ -109,6 +110,21 @@ test.group("ImageService", () => {
 		assert.include(url, "signature=");
 		(await client.get(pathOf(url))).assertStatus(200);
 		(await client.get(`/files/${stored.key}`)).assertStatus(401);
+	});
+
+	test("removes the raw upload, which still has its metadata", async ({
+		assert,
+	}) => {
+		const accepted = await upload(await testImages.phonePhoto());
+		const rejected = await upload(Buffer.from("hello"));
+
+		await images.store(accepted, { tenant, purpose: "payment_proof" });
+		await images
+			.store(rejected, { tenant, purpose: "payment_proof" })
+			.catch(() => {});
+
+		assert.isFalse(existsSync(accepted.tmpPath));
+		assert.isFalse(existsSync(rejected.tmpPath));
 	});
 
 	test("rejects an upload that isn't an image", async ({ assert }) => {
