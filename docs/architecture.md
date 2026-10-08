@@ -108,7 +108,9 @@ Isolation has several layers:
 
 ## Files, scale, hosting
 
-- **Uploads** always go through the API. Images are re-encoded, which strips EXIF data and GPS location, converts HEIC and rejects disguised files. The worker resizes them.
+- **Uploads** always go through the API. Images are re-encoded, which strips EXIF data and GPS location and rejects disguised files. The worker resizes them.
+  - Built so far (TAT-21 core): re-encoding happens in the request, and images over 2048 px are scaled down there. Resized variants in the worker come when an image needs them (artist photos, portfolio).
+  - HEIC is rejected for now: sharp's prebuilt binaries can't decode it, and iPhone browsers usually upload JPEG. TAT-51 adds a decoder if reference images need one.
 - **Image visibility:** portfolio images are public behind a CDN. Reference images are private and served through short-lived signed URLs, issued only after a membership check.
 - **Caching:** public reads and storefront pages use short `Cache-Control` TTLs with `stale-while-revalidate` behind a CDN. Slots have the shortest TTL.
 - **Rate limits** apply per IP and per tenant. The storefront's server-side rendering calls the API with a secret **server key**. The key only stops the storefront server from counting as one client, and grants no extra data.
