@@ -21,9 +21,7 @@ test.group("Auth access", (group) => {
 		response.assertHeader("location", "/login");
 	});
 
-	test("lets a signed-in user with a tenant open the dashboard", async ({
-		client,
-	}) => {
+	test("sends a signed-in user with a tenant on to it", async ({ client }) => {
 		const user = await User.create({
 			email: "ink@example.com",
 			password: "secret-password",
@@ -35,9 +33,10 @@ test.group("Auth access", (group) => {
 			timezone: "Asia/Kathmandu",
 		});
 
-		const response = await client.get("/dashboard").loginAs(user);
+		const response = await client.get("/dashboard").loginAs(user).redirects(0);
 
-		response.assertStatus(200);
+		response.assertStatus(302);
+		response.assertHeader("location", "/t/black-needle");
 	});
 
 	test("sends a signed-in user without a tenant to onboarding", async ({
