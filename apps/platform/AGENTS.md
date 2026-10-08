@@ -26,11 +26,14 @@ Import with the subpath aliases from `package.json` (`#controllers/*`, `#models/
 
 ## Rules
 
+- Controllers and services that use `@inject()` must import their dependencies as values, not `import type`: the container reads the class from decorator metadata at runtime. Biome's `useImportType` fix gets this wrong, so mark those imports with `// biome-ignore lint/style/useImportType: @inject() reads the class at runtime`.
 - Each backend module owns its models and services; other modules call its services instead of querying its tables. Inertia controllers, API controllers and jobs stay thin and call the same services. See the module table in `docs/architecture.md`.
 - The tenant always comes from the URL (`/t/:slug/…` for the dashboard, `/api/v1/tenants/:slug/…` for the API). Services scope every query by tenant; never trust a tenant ID from a request body. Every tenant-owned endpoint needs a test proving tenant A can't reach tenant B's data.
 - The REST API implements the contract in `packages/types/openapi.yaml`. Change the contract first, regenerate the types, then implement.
 - `database/schema.ts` and `.adonisjs/` are generated. Change the schema with a new migration, never by editing an existing migration that has been run.
-- Migrations follow `database/README.md`: UUIDv7 primary keys (`defaultTo(this.raw("uuidv7()"))`), `timestamptz` UTC instants, and `tenant_id` on every tenant-owned table.
+- Migrations follow `database/README.md`: UUIDv7 primary keys (`defaultTo(this.raw("uuidv7()"))`), `timestamptz` UTC instants, `tenant_id` on every tenant-owned table, and `deleted_at` on business records.
+- Soft delete: models of business records use `compose(XSchema, withSoftDeletes)` from `#models/mixins/soft_deletes`. Delete with `record.softDelete(trx?)`, undo with `restore()`; model queries skip deleted rows unless they start from `Model.withTrashed()` or `Model.onlyTrashed()`. The hooks don't reach `whereHas` subqueries or raw `db.from(...)` queries, so add `whereNull("<table>.deleted_at")` there. The hooks append `deleted_at IS NULL` to the end of the query, so a top-level `.orWhere(...)` would let deleted rows through (`a OR (b AND deleted_at IS NULL)`): group your own conditions in `.where((q) => q.where(a).orWhere(b))`. Update queries skip the hooks too; filter `deleted_at` yourself there. Soft-deleting a parent soft-deletes its children in the same transaction (the database's `ON DELETE CASCADE` only covers real purges).
+- Tenancy: the `tenancy` module (`app/modules/tenancy/`) owns tenants and memberships. Other modules read them through `TenancyService` (`#modules/tenancy/services/tenancy_service`): `createTenant`, `tenantsFor`, `hasTenant` (one cheap yes/no query), and `assertKeepsAnOwner`, which every remove or demote of a member must call inside its transaction. New users create their first tenant at `/onboarding`: signup always lands there, and login lands there while `hasTenant(user)` is false. Pages that need a tenant use the `onboarded` middleware after `auth`, which sends tenant-less users to onboarding. Onboarding itself sends users who already have a tenant to `/dashboard` (one tenant per account until TAT-25's switcher). Soft-deleting a tenant (`tenant.softDelete(trx?)`) also soft-deletes its live memberships.
 
 ## Emails
 
@@ -61,7 +64,8 @@ Run from `apps/platform`:
 
 - `pnpm dev` (`node ace serve --hmr`, port 3333)
 - `pnpm worker` (`node ace queue:work`, runs queued jobs and emails)
-- `node ace test` (add `--files` or a suite name to narrow it). The functional suite needs the local Postgres running and migrated; its tests run inside `testUtils.db().wrapInGlobalTransaction()` so they leave no data behind.
+- `node ace test` (add `--files` or a suite name to narrow it). The functional suite needs the local Postgres running and migrated; its tests run inside `testUtils.db().wrapInGlobalTransaction()` (Lucid 22's name; `withGlobalTransaction` is deprecated) so they leave no data behind. HTTP tests use `client` with `.loginAs(user)` and `.withCsrfToken()`; check form errors with `assertValidationError(response, field)` from `#tests/helpers/validation`, because Adonis 7 flashes them under `inputErrorsBag` and the session plugin's `assertHasValidationError` reads `errors`.
+- `node ace codegen` after adding or renaming routes, pages or controllers: it regenerates the committed `.adonisjs/` types (route names, pages, controllers) that `pnpm typecheck` reads. Commit the result.
 - `node ace make:controller|model|migration|validator|… <name>` to scaffold
 - `node ace migration:run`
 - `pnpm typecheck` (server and `inertia/`)

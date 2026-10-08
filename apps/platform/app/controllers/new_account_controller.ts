@@ -13,6 +13,7 @@ export default class NewAccountController {
 		const user = await User.create({ fullName, email, password });
 
 		await auth.use("web").login(user);
-		response.redirect().toRoute("dashboard");
+		// A new account has no tenant yet.
+		response.redirect().toRoute("onboarding.create");
 	}
 }

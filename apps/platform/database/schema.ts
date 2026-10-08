@@ -100,6 +100,63 @@ export class QueueScheduleSchema extends BaseModel {
 	declare toDate: DateTime | null;
 }
 
+export class TenantMembershipSchema extends BaseModel {
+	static $columns = [
+		"createdAt",
+		"deletedAt",
+		"id",
+		"role",
+		"tenantId",
+		"updatedAt",
+		"userId",
+	] as const;
+	$columns = TenantMembershipSchema.$columns;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.dateTime()
+	declare deletedAt: DateTime | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare role: string;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+	@column()
+	declare userId: string;
+}
+
+export class TenantSchema extends BaseModel {
+	static $columns = [
+		"createdAt",
+		"deletedAt",
+		"id",
+		"name",
+		"slug",
+		"timezone",
+		"type",
+		"updatedAt",
+	] as const;
+	$columns = TenantSchema.$columns;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.dateTime()
+	declare deletedAt: DateTime | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare name: string;
+	@column()
+	declare slug: string;
+	@column()
+	declare timezone: string;
+	@column()
+	declare type: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
 export class UserSchema extends BaseModel {
 	static $columns = [
 		"createdAt",
