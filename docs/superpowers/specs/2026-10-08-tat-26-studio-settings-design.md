@@ -23,7 +23,7 @@ A tenant's owners can edit the studio's public profile, set a default deposit pe
 | Column | Type | Rule |
 |---|---|---|
 | `intro` | varchar(1000), null | |
-| `contact_phone` | varchar(32), null | digits, spaces, `+` and `-` |
+| `contact_phone` | varchar(16), null | E.164 (`database/README.md`): typed as people write it (`98-1234-5678`, `01 4123456`, `+1 415 555 0100`), stored as `+9779812345678`; no country code means +977 |
 | `contact_email` | varchar(254), null | email |
 | `address` | varchar(300), null | |
 | `instagram_url`, `facebook_url`, `tiktok_url`, `website_url` | varchar(500), null | https URL |
@@ -114,7 +114,7 @@ All routes are under `/t/:tenant`, guarded by `auth`, then `tenant`, then `role(
 | `DELETE settings/payments/:id` | `PaymentMethodsController.destroy` | back, with a success flash |
 
 - The create and update routes take multipart (the QR). The body parser already accepts multipart on `PUT`.
-- Validators check the input's shape only: lengths, enums, https URLs, phone characters, 0–100 (whole numbers), and `qr: imageFile().optional()`. The update validator adds `remove_qr` (boolean) and has no `kind`. No validator has `tenant_id`.
+- Validators check the input's shape only: lengths, enums, https URLs, the phone number, 0–100 (whole numbers), and `qr: imageFile().optional()`. The update validator adds `removeQr` (boolean) and has no `kind`. No validator has `tenant_id`. Form fields are camelCase (`contactPhone`, `showOnDepositPage`), like `fullName` on signup.
 
 **`SettingsLayout`**
 - Its heading becomes "Studio settings".
@@ -169,7 +169,7 @@ Test-first. Functional tests run inside `wrapInGlobalTransaction()`; images come
 - Profile:
   - valid input saves
   - a non-canonical timezone spelling is stored canonically
-  - `http://` social links, bad phone characters and an intro over 1000 characters give field errors
+  - a local phone number is stored in E.164; `http://` social links, a phone number that can't be one and an intro over 1000 characters give field errors
   - `slug`, `type` and `tenant_id` in the body are ignored
 - Deposits: 0 and 100 save; 101 and 12.5 fail; an empty value clears the default.
 
