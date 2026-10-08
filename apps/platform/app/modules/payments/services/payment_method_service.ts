@@ -150,7 +150,6 @@ export default class PaymentMethodService {
 				qrImageKey: newKey,
 			});
 			await db.transaction(async (trx) => {
-				// biome-ignore lint/correctness/useHookAtTopLevel: Lucid's useTransaction, not a React hook.
 				await method.useTransaction(trx).save();
 			});
 		} catch (error) {
