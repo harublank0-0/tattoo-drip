@@ -15,6 +15,32 @@ export type NewTenant = {
 };
 
 /**
+ * The studio's public profile. Slug and type are not part of it: the slug
+ * changes with aliases (TAT-24), the type never.
+ */
+export type TenantProfile = {
+	name: string;
+	timezone: string;
+	intro: string | null;
+	contactPhone: string | null;
+	contactEmail: string | null;
+	address: string | null;
+	instagramUrl: string | null;
+	facebookUrl: string | null;
+	tiktokUrl: string | null;
+	websiteUrl: string | null;
+};
+
+/**
+ * Defaults for the deposit page (TAT-65). A null percentage means the
+ * artist sets the deposit on each quote.
+ */
+export type DepositSettings = {
+	defaultDepositPercent: number | null;
+	depositPolicy: string | null;
+};
+
+/**
  * The way other modules read and change tenants and memberships.
  */
 export default class TenancyService {
@@ -40,6 +66,27 @@ export default class TenancyService {
 			}
 			throw error;
 		}
+	}
+
+	/**
+	 * Saves the studio's public profile. Null clears a field.
+	 */
+	async updateProfile(tenant: Tenant, input: TenantProfile): Promise<Tenant> {
+		tenant.merge(input);
+		await tenant.save();
+		return tenant;
+	}
+
+	/**
+	 * Saves the deposit defaults shown on the deposit page.
+	 */
+	async updateDepositSettings(
+		tenant: Tenant,
+		input: DepositSettings,
+	): Promise<Tenant> {
+		tenant.merge(input);
+		await tenant.save();
+		return tenant;
 	}
 
 	/**

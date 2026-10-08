@@ -129,32 +129,62 @@ export class TenantMembershipSchema extends BaseModel {
 
 export class TenantSchema extends BaseModel {
 	static $columns = [
+		"address",
+		"contactEmail",
+		"contactPhone",
 		"createdAt",
+		"defaultDepositPercent",
 		"deletedAt",
+		"depositPolicy",
+		"facebookUrl",
 		"id",
+		"instagramUrl",
+		"intro",
 		"name",
 		"slug",
+		"tiktokUrl",
 		"timezone",
 		"type",
 		"updatedAt",
+		"websiteUrl",
 	] as const;
 	$columns = TenantSchema.$columns;
+	@column()
+	declare address: string | null;
+	@column()
+	declare contactEmail: string | null;
+	@column()
+	declare contactPhone: string | null;
 	@column.dateTime({ autoCreate: true })
 	declare createdAt: DateTime;
+	@column()
+	declare defaultDepositPercent: number | null;
 	@column.dateTime()
 	declare deletedAt: DateTime | null;
+	@column()
+	declare depositPolicy: string | null;
+	@column()
+	declare facebookUrl: string | null;
 	@column({ isPrimary: true })
 	declare id: string;
+	@column()
+	declare instagramUrl: string | null;
+	@column()
+	declare intro: string | null;
 	@column()
 	declare name: string;
 	@column()
 	declare slug: string;
+	@column()
+	declare tiktokUrl: string | null;
 	@column()
 	declare timezone: string;
 	@column()
 	declare type: string;
 	@column.dateTime({ autoCreate: true, autoUpdate: true })
 	declare updatedAt: DateTime | null;
+	@column()
+	declare websiteUrl: string | null;
 }
 
 export class UserSchema extends BaseModel {
