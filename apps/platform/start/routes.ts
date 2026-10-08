@@ -25,7 +25,11 @@ router
 
 router
 	.group(() => {
-		router.on("/dashboard").renderInertia("dashboard", {}).as("dashboard");
+		router
+			.on("/dashboard")
+			.renderInertia("dashboard", {})
+			.as("dashboard")
+			.use(middleware.onboarded());
 		router.post("logout", [controllers.Session, "destroy"]);
 
 		router.get("onboarding", [controllers.Onboarding, "create"]);

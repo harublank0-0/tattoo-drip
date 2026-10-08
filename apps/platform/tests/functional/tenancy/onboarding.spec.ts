@@ -105,6 +105,66 @@ test.group("Onboarding", (group) => {
 			"This address is already taken. Try another one.",
 		);
 	});
+
+	for (const [typed, stored] of [
+		["asia/KATHMANDU", "Asia/Kathmandu"],
+		["Asia/Katmandu", "Asia/Kathmandu"],
+		["US/Eastern", "America/New_York"],
+	] as const) {
+		test(`stores time zone "${typed}" as "${stored}"`, async ({
+			client,
+			assert,
+		}) => {
+			const user = await makeUser();
+
+			await client
+				.post("/onboarding")
+				.form({ ...validTenant, timezone: typed })
+				.withCsrfToken()
+				.loginAs(user)
+				.redirects(0);
+
+			const tenant = await Tenant.findByOrFail("slug", validTenant.slug);
+			assert.equal(tenant.timezone, stored);
+		});
+	}
+
+	test("sends a user who already has a tenant to the dashboard", async ({
+		client,
+	}) => {
+		const user = await makeUser();
+		await new TenancyService().createTenant(user, {
+			...validTenant,
+			type: "studio",
+		});
+
+		const response = await client.get("/onboarding").loginAs(user).redirects(0);
+
+		response.assertStatus(302);
+		response.assertHeader("location", "/dashboard");
+	});
+
+	test("won't create a second tenant for a user who has one", async ({
+		client,
+		assert,
+	}) => {
+		const user = await makeUser();
+		await new TenancyService().createTenant(user, {
+			...validTenant,
+			type: "studio",
+		});
+
+		const response = await client
+			.post("/onboarding")
+			.form({ ...validTenant, slug: "second-shop" })
+			.withCsrfToken()
+			.loginAs(user)
+			.redirects(0);
+
+		response.assertStatus(302);
+		response.assertHeader("location", "/dashboard");
+		assert.isNull(await Tenant.findBy("slug", "second-shop"));
+	});
 });
 
 test.group("Where users land", (group) => {

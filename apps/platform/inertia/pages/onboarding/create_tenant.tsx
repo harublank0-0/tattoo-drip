@@ -23,20 +23,21 @@ import {
 } from "~/components/ui/select";
 import AuthLayout from "~/layouts/auth";
 
-const TENANT_TYPES = [
-	{
-		value: "studio",
+/**
+ * Wording for each tenant type. The values themselves come from the
+ * server, so a new type still shows up (with its raw value) until it's
+ * given copy here.
+ */
+const TYPE_COPY: Record<string, { title: string; description: string }> = {
+	studio: {
 		title: "Studio",
 		description: "A shop with one or more artists.",
 	},
-	{
-		value: "independent",
+	independent: {
 		title: "Independent artist",
 		description: "Just you, working on your own.",
 	},
-] as const;
-
-const DEFAULT_TIMEZONE = "Asia/Kathmandu";
+};
 
 /**
  * Turns a business name into a subdomain-safe slug: lowercase letters,
@@ -53,7 +54,15 @@ function slugify(name: string) {
 		.replace(/-+$/, "");
 }
 
-export default function CreateTenant({ timezones }: { timezones: string[] }) {
+export default function CreateTenant({
+	tenantTypes,
+	timezones,
+	defaultTimezone,
+}: {
+	tenantTypes: string[];
+	timezones: string[];
+	defaultTimezone: string;
+}) {
 	const [name, setName] = useState("");
 	const [slug, setSlug] = useState("");
 	// The slug follows the name until the user edits it themselves.
@@ -96,22 +105,30 @@ export default function CreateTenant({ timezones }: { timezones: string[] }) {
 							<FieldLegend variant="label">
 								What are you setting up?
 							</FieldLegend>
-							<RadioGroup name="type" defaultValue="studio">
-								{TENANT_TYPES.map((type) => (
-									<FieldLabel key={type.value} htmlFor={`type-${type.value}`}>
-										<Field orientation="horizontal">
-											<FieldContent>
-												<FieldTitle>{type.title}</FieldTitle>
-												<FieldDescription>{type.description}</FieldDescription>
-											</FieldContent>
-											<RadioGroupItem
-												value={type.value}
-												id={`type-${type.value}`}
-												aria-invalid={!!errors.type}
-											/>
-										</Field>
-									</FieldLabel>
-								))}
+							<RadioGroup name="type" defaultValue={tenantTypes[0]}>
+								{tenantTypes.map((value) => {
+									const type = {
+										value,
+										...(TYPE_COPY[value] ?? { title: value, description: "" }),
+									};
+									return (
+										<FieldLabel key={type.value} htmlFor={`type-${type.value}`}>
+											<Field orientation="horizontal">
+												<FieldContent>
+													<FieldTitle>{type.title}</FieldTitle>
+													<FieldDescription>
+														{type.description}
+													</FieldDescription>
+												</FieldContent>
+												<RadioGroupItem
+													value={type.value}
+													id={`type-${type.value}`}
+													aria-invalid={!!errors.type}
+												/>
+											</Field>
+										</FieldLabel>
+									);
+								})}
 							</RadioGroup>
 							{errors.type && <FieldError>{errors.type}</FieldError>}
 						</FieldSet>
@@ -146,7 +163,7 @@ export default function CreateTenant({ timezones }: { timezones: string[] }) {
 
 						<Field data-invalid={!!errors.timezone}>
 							<FieldLabel htmlFor="timezone">Time zone</FieldLabel>
-							<Select name="timezone" defaultValue={DEFAULT_TIMEZONE}>
+							<Select name="timezone" defaultValue={defaultTimezone}>
 								<SelectTrigger
 									id="timezone"
 									className="w-full"

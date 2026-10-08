@@ -23,14 +23,32 @@ export const TIMEZONES = Intl.supportedValuesOf("timeZone")
 	.sort();
 
 /**
- * Accepts any IANA zone the runtime knows, under its old or current name,
- * so "Asia/Kathmandu" passes even though Intl's own list omits it.
+ * The canonical current name for any spelling Intl accepts: any case,
+ * old names and aliases ("asia/KATHMANDU", "Asia/Katmandu" and
+ * "Asia/Kathmandu" all give "Asia/Kathmandu"; "US/Eastern" gives
+ * "America/New_York"). Undefined if the zone is unknown.
+ */
+function canonicalTimezone(value: string): string | undefined {
+	if (!IANAZone.isValidZone(value)) return undefined;
+	const resolved = new Intl.DateTimeFormat("en", {
+		timeZone: value,
+	}).resolvedOptions().timeZone;
+	return CURRENT_NAMES[resolved] ?? resolved;
+}
+
+/**
+ * Accepts any spelling of a zone in TIMEZONES and stores its canonical
+ * name, so the select can show it again and zones compare equal.
  */
 const ianaTimezone = vine.createRule(
 	(value: unknown, _, field: FieldContext) => {
-		if (typeof value !== "string" || !IANAZone.isValidZone(value)) {
+		const zone =
+			typeof value === "string" ? canonicalTimezone(value) : undefined;
+		if (!zone || !TIMEZONES.includes(zone)) {
 			field.report("The selected timezone is invalid", "timezone", field);
+			return;
 		}
+		field.mutate(zone, field);
 	},
 );
 

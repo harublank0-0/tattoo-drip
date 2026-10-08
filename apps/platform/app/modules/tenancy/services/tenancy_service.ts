@@ -64,17 +64,46 @@ export default class TenancyService {
 	}
 
 	/**
+	 * Whether the user belongs to at least one live tenant. One cheap query;
+	 * use it instead of tenantsFor when only the yes/no matters.
+	 */
+	async hasTenant(user: User): Promise<boolean> {
+		const membership = await TenantMembership.query()
+			.where("user_id", user.id)
+			// The soft-delete hooks don't reach this subquery, so filter here.
+			.whereHas("tenant", (tenant) => tenant.whereNull("tenants.deleted_at"))
+			.select("id")
+			.first();
+
+		return membership !== null;
+	}
+
+	/**
 	 * Throws LastOwnerError if the membership `leavingId` stopping being an
 	 * owner (removed, or demoted to artist) would leave the tenant with no
 	 * owner. Call it inside the same transaction as that change: it locks
 	 * the owner rows, so two owners removing each other at once can't both
 	 * succeed.
+	 *
+	 * Throws a plain Error if `leavingId` isn't a live membership of the
+	 * tenant: that's a caller bug, and passing it would let the real last
+	 * owner be removed.
 	 */
 	async assertKeepsAnOwner(
 		trx: TransactionClientContract,
 		tenantId: string,
 		leavingId: string,
 	): Promise<void> {
+		const leaving = await TenantMembership.query({ client: trx })
+			.where("id", leavingId)
+			.where("tenant_id", tenantId)
+			.first();
+		if (!leaving) {
+			throw new Error(
+				`Membership ${leavingId} is not a live membership of tenant ${tenantId}`,
+			);
+		}
+
 		const owners = await TenantMembership.query({ client: trx })
 			.where("tenant_id", tenantId)
 			.where("role", "owner")

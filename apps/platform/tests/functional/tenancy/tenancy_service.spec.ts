@@ -90,6 +90,30 @@ test.group("TenancyService.tenantsFor", (group) => {
 	});
 });
 
+test.group("TenancyService.hasTenant", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("is true with a live tenant, false without one", async ({ assert }) => {
+		const withTenant = await makeUser("with@example.com");
+		const without = await makeUser("without@example.com");
+		await tenancy.createTenant(withTenant, studio("black-needle"));
+
+		assert.isTrue(await tenancy.hasTenant(withTenant));
+		assert.isFalse(await tenancy.hasTenant(without));
+	});
+
+	test("is false once the user's only tenant is deleted", async ({
+		assert,
+	}) => {
+		const user = await makeUser("owner@example.com");
+		const tenant = await tenancy.createTenant(user, studio("black-needle"));
+
+		await tenant.softDelete();
+
+		assert.isFalse(await tenancy.hasTenant(user));
+	});
+});
+
 test.group("TenancyService.assertKeepsAnOwner", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 
@@ -129,6 +153,28 @@ test.group("TenancyService.assertKeepsAnOwner", (group) => {
 			db.transaction((trx) =>
 				tenancy.assertKeepsAnOwner(trx, tenant.id, membership.id),
 			),
+		);
+	});
+
+	test("rejects a membership id from another tenant", async ({ assert }) => {
+		const { tenant } = await ownerAndTenant();
+		const stranger = await makeUser("stranger@example.com");
+		const otherTenant = await tenancy.createTenant(
+			stranger,
+			studio("other-ink"),
+		);
+		const otherMembership = await TenantMembership.query()
+			.where("tenant_id", otherTenant.id)
+			.firstOrFail();
+
+		// A caller bug: the id doesn't belong to this tenant. The guard must
+		// not wave the change through.
+		await assert.rejects(
+			() =>
+				db.transaction((trx) =>
+					tenancy.assertKeepsAnOwner(trx, tenant.id, otherMembership.id),
+				),
+			/not a live membership/,
 		);
 	});
 

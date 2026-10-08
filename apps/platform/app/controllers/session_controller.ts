@@ -18,10 +18,13 @@ export default class SessionController {
 		const user = await User.verifyCredentials(email, password);
 
 		await auth.use("web").login(user);
-		const tenants = await this.tenancy.tenantsFor(user);
 		response
 			.redirect()
-			.toRoute(tenants.length === 0 ? "onboarding.create" : "dashboard");
+			.toRoute(
+				(await this.tenancy.hasTenant(user))
+					? "dashboard"
+					: "onboarding.create",
+			);
 	}
 
 	async destroy({ auth, response }: HttpContext) {

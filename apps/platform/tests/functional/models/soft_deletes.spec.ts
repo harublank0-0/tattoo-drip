@@ -93,6 +93,48 @@ test.group("Soft deletes", (group) => {
 		);
 	});
 
+	test("soft-deleting a tenant soft-deletes its memberships too", async ({
+		assert,
+	}) => {
+		const { tenant } = await ownerWithTenant();
+
+		await tenant.softDelete();
+
+		const live = await TenantMembership.query().where("tenant_id", tenant.id);
+		const all = await TenantMembership.withTrashed().where(
+			"tenant_id",
+			tenant.id,
+		);
+		assert.lengthOf(live, 0);
+		assert.lengthOf(all, 1);
+		assert.isNotNull(all[0].deletedAt);
+	});
+
+	test("deleting a tenant keeps when earlier members were removed", async ({
+		assert,
+	}) => {
+		const { tenant } = await ownerWithTenant();
+		const artistUser = await User.create({
+			email: "artist@example.com",
+			password: "secret-password",
+		});
+		const artist = await TenantMembership.create({
+			tenantId: tenant.id,
+			userId: artistUser.id,
+			role: "artist",
+		});
+		await artist.softDelete();
+		const removedAt = artist.deletedAt?.toMillis();
+
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		await tenant.softDelete();
+
+		const reloaded = await TenantMembership.withTrashed()
+			.where("id", artist.id)
+			.firstOrFail();
+		assert.equal(reloaded.deletedAt?.toMillis(), removedAt);
+	});
+
 	test("tenantsFor skips deleted memberships and deleted tenants", async ({
 		assert,
 	}) => {
