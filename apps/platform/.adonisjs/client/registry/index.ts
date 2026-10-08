@@ -72,6 +72,42 @@ const routes = {
     tokens: [{"old":"/t/:tenant/settings/profile","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/profile","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/profile","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/profile","type":0,"val":"profile","end":""}],
     types: placeholder as Registry['tenant.settings.profile.update']['types'],
   },
+  'tenant.settings.payments': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/settings/payments',
+    tokens: [{"old":"/t/:tenant/settings/payments","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/payments","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/payments","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/payments","type":0,"val":"payments","end":""}],
+    types: placeholder as Registry['tenant.settings.payments']['types'],
+  },
+  'tenant.settings.deposits.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/settings/deposits',
+    tokens: [{"old":"/t/:tenant/settings/deposits","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/deposits","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/deposits","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/deposits","type":0,"val":"deposits","end":""}],
+    types: placeholder as Registry['tenant.settings.deposits.update']['types'],
+  },
+  'tenant.settings.payments.create': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/settings/payments/new',
+    tokens: [{"old":"/t/:tenant/settings/payments/new","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/payments/new","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/payments/new","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/payments/new","type":0,"val":"payments","end":""},{"old":"/t/:tenant/settings/payments/new","type":0,"val":"new","end":""}],
+    types: placeholder as Registry['tenant.settings.payments.create']['types'],
+  },
+  'tenant.settings.payments.edit': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/settings/payments/:id/edit',
+    tokens: [{"old":"/t/:tenant/settings/payments/:id/edit","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/payments/:id/edit","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/payments/:id/edit","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/payments/:id/edit","type":0,"val":"payments","end":""},{"old":"/t/:tenant/settings/payments/:id/edit","type":1,"val":"id","end":""},{"old":"/t/:tenant/settings/payments/:id/edit","type":0,"val":"edit","end":""}],
+    types: placeholder as Registry['tenant.settings.payments.edit']['types'],
+  },
+  'tenant.settings.payments.move': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/settings/payments/:id/move',
+    tokens: [{"old":"/t/:tenant/settings/payments/:id/move","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/payments/:id/move","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/payments/:id/move","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/payments/:id/move","type":0,"val":"payments","end":""},{"old":"/t/:tenant/settings/payments/:id/move","type":1,"val":"id","end":""},{"old":"/t/:tenant/settings/payments/:id/move","type":0,"val":"move","end":""}],
+    types: placeholder as Registry['tenant.settings.payments.move']['types'],
+  },
+  'tenant.settings.payments.destroy': {
+    methods: ["DELETE"],
+    pattern: '/t/:tenant/settings/payments/:id',
+    tokens: [{"old":"/t/:tenant/settings/payments/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/payments/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/payments/:id","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/payments/:id","type":0,"val":"payments","end":""},{"old":"/t/:tenant/settings/payments/:id","type":1,"val":"id","end":""}],
+    types: placeholder as Registry['tenant.settings.payments.destroy']['types'],
+  },
   'dashboard': {
     methods: ["GET","HEAD"],
     pattern: '/dashboard',

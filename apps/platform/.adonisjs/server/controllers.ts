@@ -5,8 +5,10 @@
 
 export const controllers = {
   Dashboard: () => import('#controllers/dashboard_controller'),
+  DepositSettings: () => import('#controllers/deposit_settings_controller'),
   NewAccount: () => import('#controllers/new_account_controller'),
   Onboarding: () => import('#controllers/onboarding_controller'),
+  PaymentMethods: () => import('#controllers/payment_methods_controller'),
   Session: () => import('#controllers/session_controller'),
   StudioProfile: () => import('#controllers/studio_profile_controller'),
 }

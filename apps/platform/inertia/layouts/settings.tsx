@@ -1,6 +1,6 @@
 import { usePage } from "@inertiajs/react";
 import { cn } from "cn";
-import { Store } from "lucide-react";
+import { Store, Wallet } from "lucide-react";
 import type { ReactNode } from "react";
 import NavLink, { type NavItem } from "~/components/nav_link";
 import Page from "~/components/page";
@@ -19,6 +19,12 @@ function settingsNav(tenantSlug: string): NavItem[] {
 			route: "tenant.settings.profile",
 			params,
 			icon: Store,
+		},
+		{
+			label: "Payments",
+			route: "tenant.settings.payments",
+			params,
+			icon: Wallet,
 		},
 	];
 }

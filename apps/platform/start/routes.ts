@@ -52,6 +52,27 @@ router
 				router
 					.put("profile", [controllers.StudioProfile, "update"])
 					.as("tenant.settings.profile.update");
+				router
+					.get("payments", [controllers.PaymentMethods, "index"])
+					.as("tenant.settings.payments");
+				router
+					.put("deposits", [controllers.DepositSettings, "update"])
+					.as("tenant.settings.deposits.update");
+				router
+					.get("payments/new", [controllers.PaymentMethods, "create"])
+					.as("tenant.settings.payments.create");
+				router
+					.get("payments/:id/edit", [controllers.PaymentMethods, "edit"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.settings.payments.edit");
+				router
+					.post("payments/:id/move", [controllers.PaymentMethods, "move"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.settings.payments.move");
+				router
+					.delete("payments/:id", [controllers.PaymentMethods, "destroy"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.settings.payments.destroy");
 			})
 			.prefix("/settings")
 			.use(middleware.role({ allow: ["owner"] }));

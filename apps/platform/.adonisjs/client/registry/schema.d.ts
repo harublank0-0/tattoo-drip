@@ -139,6 +139,78 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/studio_profile_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
+  'tenant.settings.payments': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/settings/payments'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/payment_methods_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/payment_methods_controller').default['index']>>>
+    }
+  }
+  'tenant.settings.deposits.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/settings/deposits'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/tenancy/validators/tenant').updateDepositSettingsValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/tenancy/validators/tenant').updateDepositSettingsValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/deposit_settings_controller').default['update']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/deposit_settings_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.settings.payments.create': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/settings/payments/new'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/payment_methods_controller').default['create']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/payment_methods_controller').default['create']>>>
+    }
+  }
+  'tenant.settings.payments.edit': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/settings/payments/:id/edit'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/payment_methods_controller').default['edit']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/payment_methods_controller').default['edit']>>>
+    }
+  }
+  'tenant.settings.payments.move': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/settings/payments/:id/move'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/payments/validators/payment_method').movePaymentMethodValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/payments/validators/payment_method').movePaymentMethodValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/payment_methods_controller').default['move']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/payment_methods_controller').default['move']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.settings.payments.destroy': {
+    methods: ["DELETE"]
+    pattern: '/t/:tenant/settings/payments/:id'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/payment_methods_controller').default['destroy']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/payment_methods_controller').default['destroy']>>>
+    }
+  }
   'dashboard': {
     methods: ["GET","HEAD"]
     pattern: '/dashboard'

@@ -26,6 +26,15 @@ export interface ApiDefinition {
       profile: typeof routes['tenant.settings.profile'] & {
         update: typeof routes['tenant.settings.profile.update']
       }
+      payments: typeof routes['tenant.settings.payments'] & {
+        create: typeof routes['tenant.settings.payments.create']
+        edit: typeof routes['tenant.settings.payments.edit']
+        move: typeof routes['tenant.settings.payments.move']
+        destroy: typeof routes['tenant.settings.payments.destroy']
+      }
+      deposits: {
+        update: typeof routes['tenant.settings.deposits.update']
+      }
     }
   }
   dashboard: typeof routes['dashboard']
