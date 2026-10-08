@@ -19,9 +19,13 @@ const CURRENT_NAMES: Record<string, string> = {
 /**
  * Time zones offered in the onboarding select, with current IANA names.
  */
-export const TIMEZONES = Intl.supportedValuesOf("timeZone")
-	.map((zone) => CURRENT_NAMES[zone] ?? zone)
-	.sort();
+export const TIMEZONES = [
+	...Intl.supportedValuesOf("timeZone").map(
+		(zone) => CURRENT_NAMES[zone] ?? zone,
+	),
+	// Intl leaves UTC out of its list, but it is a valid zone to keep.
+	"UTC",
+].sort();
 
 /**
  * The canonical current name for any spelling Intl accepts: any case,

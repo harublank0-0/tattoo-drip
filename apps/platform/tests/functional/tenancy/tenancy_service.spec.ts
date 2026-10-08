@@ -2,6 +2,7 @@ import testUtils from "@adonisjs/core/services/test_utils";
 import db from "@adonisjs/lucid/services/db";
 import { test } from "@japa/runner";
 import User from "#models/user";
+import PaymentMethod from "#modules/payments/models/payment_method";
 import { LastOwnerError, SlugTakenError } from "#modules/tenancy/errors";
 import Tenant from "#modules/tenancy/models/tenant";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
@@ -118,6 +119,28 @@ test.group("TenancyService.membershipFor", (group) => {
 
 		await tenant.softDelete();
 		assert.isNull(await tenancy.membershipFor(owner, "black-needle"));
+	});
+
+	test("soft-deleting a tenant soft-deletes its payment methods", async ({
+		assert,
+	}) => {
+		const owner = await makeUser("owner@example.com");
+		const tenant = await tenancy.createTenant(owner, studio("black-needle"));
+		await PaymentMethod.create({
+			tenantId: tenant.id,
+			kind: "cash",
+			label: "Cash",
+			showOnDepositPage: false,
+			position: 0,
+		});
+
+		await tenant.softDelete();
+
+		assert.isEmpty(await PaymentMethod.query().where("tenant_id", tenant.id));
+		assert.lengthOf(
+			await PaymentMethod.onlyTrashed().where("tenant_id", tenant.id),
+			1,
+		);
 	});
 
 	test("returns null once the membership is removed", async ({ assert }) => {

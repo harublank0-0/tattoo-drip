@@ -142,15 +142,24 @@ export default class PaymentMethodService {
 			? await this.images.store(input.qr, { tenant, purpose: QR })
 			: undefined;
 		const newKey = qr?.key ?? (keepsQr ? oldKey : null);
+		let saved: PaymentMethod;
 		try {
-			method.merge({
-				label: input.label,
-				...details,
-				showOnDepositPage,
-				qrImageKey: newKey,
-			});
-			await db.transaction(async (trx) => {
-				await method.useTransaction(trx).save();
+			// Lock the live row first: a delete that landed since the form
+			// loaded makes this a 404 instead of editing a deleted method.
+			saved = await db.transaction(async (trx) => {
+				const live = await PaymentMethod.query({ client: trx })
+					.where("tenant_id", tenant.id)
+					.where("id", method.id)
+					.forUpdate()
+					.firstOrFail();
+				live.merge({
+					label: input.label,
+					...details,
+					showOnDepositPage,
+					qrImageKey: newKey,
+				});
+				await live.save();
+				return live;
 			});
 		} catch (error) {
 			if (qr) await this.images.delete(QR, qr.key);
@@ -158,7 +167,7 @@ export default class PaymentMethodService {
 		}
 
 		if (oldKey && oldKey !== newKey) await this.images.delete(QR, oldKey);
-		return method;
+		return saved;
 	}
 
 	/**

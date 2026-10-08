@@ -68,6 +68,29 @@ test.group("PaymentMethodService files", (group) => {
 		assert.isFalse(method.showOnDepositPage);
 	});
 
+	test("update of a method deleted meanwhile is a 404 and drops the new QR", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+		const { images, methods } = makeService();
+		const method = await methods.create(tenant, {
+			kind: "cash",
+			label: "Cash",
+		});
+		const stale = await methods.findFor(tenant, method.id);
+		await methods.delete(tenant, method);
+
+		await assert.rejects(() =>
+			methods.update(tenant, stale, { label: "Cash 2" }),
+		);
+		assert.isEmpty(images.keys);
+		assert.equal(
+			(await PaymentMethod.withTrashed().where("id", method.id).firstOrFail())
+				.label,
+			"Cash",
+		);
+	});
+
 	test("create checks the rules before storing anything", async ({
 		assert,
 	}) => {
