@@ -23,6 +23,17 @@ router
 	})
 	.use(middleware.guest());
 
+/**
+ * Pages of one tenant. The tenant middleware checks the user's membership
+ * on every request and 404s anyone else; read the tenant from ctx.tenant.
+ */
+router
+	.group(() => {
+		router.on("/").renderInertia("dashboard", {}).as("tenant.dashboard");
+	})
+	.prefix("/t/:tenant")
+	.use([middleware.auth(), middleware.tenant()]);
+
 router
 	.group(() => {
 		router

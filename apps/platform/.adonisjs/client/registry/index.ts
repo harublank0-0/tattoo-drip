@@ -36,6 +36,12 @@ const routes = {
     tokens: [{"old":"/login","type":0,"val":"login","end":""}],
     types: placeholder as Registry['session.store']['types'],
   },
+  'tenant.dashboard': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant',
+    tokens: [{"old":"/t/:tenant","type":0,"val":"t","end":""},{"old":"/t/:tenant","type":1,"val":"tenant","end":""}],
+    types: placeholder as Registry['tenant.dashboard']['types'],
+  },
   'dashboard': {
     methods: ["GET","HEAD"],
     pattern: '/dashboard',

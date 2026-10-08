@@ -64,6 +64,28 @@ export default class TenancyService {
 	}
 
 	/**
+	 * The user's live membership in the live tenant with this exact slug,
+	 * with that tenant, or null. Null covers every reason not to let them
+	 * in (unknown slug, deleted tenant, not a member, removed member) so
+	 * callers can't tell the cases apart and neither can the client.
+	 */
+	async membershipFor(
+		user: User,
+		slug: string,
+	): Promise<{ tenant: Tenant; membership: TenantMembership } | null> {
+		const membership = await TenantMembership.query()
+			.where("user_id", user.id)
+			// The soft-delete hooks don't reach this subquery, so filter here.
+			.whereHas("tenant", (tenant) =>
+				tenant.where("tenants.slug", slug).whereNull("tenants.deleted_at"),
+			)
+			.preload("tenant")
+			.first();
+
+		return membership ? { tenant: membership.tenant, membership } : null;
+	}
+
+	/**
 	 * Whether the user belongs to at least one live tenant. One cheap query;
 	 * use it instead of tenantsFor when only the yes/no matters.
 	 */

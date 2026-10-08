@@ -90,6 +90,50 @@ test.group("TenancyService.tenantsFor", (group) => {
 	});
 });
 
+test.group("TenancyService.membershipFor", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("returns the tenant and membership for a member", async ({ assert }) => {
+		const owner = await makeUser("owner@example.com");
+		const tenant = await tenancy.createTenant(owner, studio("black-needle"));
+
+		const found = await tenancy.membershipFor(owner, "black-needle");
+
+		assert.equal(found?.tenant.id, tenant.id);
+		assert.equal(found?.membership.userId, owner.id);
+		assert.equal(found?.membership.role, "owner");
+	});
+
+	test("returns null for every non-member case", async ({ assert }) => {
+		const owner = await makeUser("owner@example.com");
+		const tenant = await tenancy.createTenant(owner, studio("black-needle"));
+		const stranger = await makeUser("stranger@example.com");
+		await tenancy.createTenant(stranger, studio("red-ink"));
+
+		assert.isNull(await tenancy.membershipFor(stranger, "black-needle"));
+		assert.isNull(await tenancy.membershipFor(owner, "no-such-studio"));
+		assert.isNull(await tenancy.membershipFor(owner, "Black-Needle"));
+
+		await tenant.softDelete();
+		assert.isNull(await tenancy.membershipFor(owner, "black-needle"));
+	});
+
+	test("returns null once the membership is removed", async ({ assert }) => {
+		const owner = await makeUser("owner@example.com");
+		const tenant = await tenancy.createTenant(owner, studio("black-needle"));
+		const artistUser = await makeUser("artist@example.com");
+		const artist = await TenantMembership.create({
+			tenantId: tenant.id,
+			userId: artistUser.id,
+			role: "artist",
+		});
+
+		await artist.softDelete();
+
+		assert.isNull(await tenancy.membershipFor(artistUser, "black-needle"));
+	});
+});
+
 test.group("TenancyService.hasTenant", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 
