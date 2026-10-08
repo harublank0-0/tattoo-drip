@@ -7,6 +7,51 @@
 import { BaseModel, column } from "@adonisjs/lucid/orm";
 import type { DateTime } from "luxon";
 
+export class PaymentMethodSchema extends BaseModel {
+	static $columns = [
+		"accountName",
+		"accountNumber",
+		"bankName",
+		"createdAt",
+		"deletedAt",
+		"id",
+		"kind",
+		"label",
+		"position",
+		"qrImageKey",
+		"showOnDepositPage",
+		"tenantId",
+		"updatedAt",
+	] as const;
+	$columns = PaymentMethodSchema.$columns;
+	@column()
+	declare accountName: string | null;
+	@column()
+	declare accountNumber: string | null;
+	@column()
+	declare bankName: string | null;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.dateTime()
+	declare deletedAt: DateTime | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare kind: string;
+	@column()
+	declare label: string;
+	@column()
+	declare position: number;
+	@column()
+	declare qrImageKey: string | null;
+	@column()
+	declare showOnDepositPage: boolean;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
 export class QueueJobSchema extends BaseModel {
 	static $columns = [
 		"acquiredAt",
