@@ -28,5 +28,13 @@ export default defineConfig({
 		watch: {
 			ignored: ["**/storage/**", "**/tmp/**"],
 		},
+		/**
+		 * The dev server serves files from the app folder. Keep Vite's
+		 * defaults and add uploaded files: private ones must only be
+		 * reachable through signed /files URLs.
+		 */
+		fs: {
+			deny: [".env", ".env.*", "*.{crt,pem}", "**/.git/**", "**/storage/**"],
+		},
 	},
 });

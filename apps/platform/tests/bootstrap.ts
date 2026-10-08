@@ -1,3 +1,4 @@
+import { rm } from "node:fs/promises";
 import { authApiClient } from "@adonisjs/auth/plugins/api_client";
 import { authBrowserClient } from "@adonisjs/auth/plugins/browser_client";
 import app from "@adonisjs/core/services/app";
@@ -45,9 +46,16 @@ export const plugins: Config["plugins"] = [
  * The setup functions are executed before all the tests
  * The teardown functions are executed after all the tests
  */
+/**
+ * Files written to the Drive disks during tests (tmp/storage, see
+ * config/drive.ts), removed before and after the run.
+ */
+const clearTestStorage = () =>
+	rm(app.tmpPath("storage"), { recursive: true, force: true });
+
 export const runnerHooks: Required<Pick<Config, "setup" | "teardown">> = {
-	setup: [],
-	teardown: [],
+	setup: [clearTestStorage],
+	teardown: [clearTestStorage],
 };
 
 /**
