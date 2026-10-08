@@ -54,6 +54,24 @@ const routes = {
     tokens: [{"old":"/t/:tenant","type":0,"val":"t","end":""},{"old":"/t/:tenant","type":1,"val":"tenant","end":""}],
     types: placeholder as Registry['tenant.dashboard']['types'],
   },
+  'tenant.settings': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/settings',
+    tokens: [{"old":"/t/:tenant/settings","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings","type":0,"val":"settings","end":""}],
+    types: placeholder as Registry['tenant.settings']['types'],
+  },
+  'tenant.settings.profile': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/settings/profile',
+    tokens: [{"old":"/t/:tenant/settings/profile","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/profile","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/profile","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/profile","type":0,"val":"profile","end":""}],
+    types: placeholder as Registry['tenant.settings.profile']['types'],
+  },
+  'tenant.settings.profile.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/settings/profile',
+    tokens: [{"old":"/t/:tenant/settings/profile","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/profile","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/profile","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/profile","type":0,"val":"profile","end":""}],
+    types: placeholder as Registry['tenant.settings.profile.update']['types'],
+  },
   'dashboard': {
     methods: ["GET","HEAD"],
     pattern: '/dashboard',

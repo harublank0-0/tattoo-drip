@@ -22,6 +22,11 @@ export interface ApiDefinition {
   }
   tenant: {
     dashboard: typeof routes['tenant.dashboard']
+    settings: typeof routes['tenant.settings'] & {
+      profile: typeof routes['tenant.settings.profile'] & {
+        update: typeof routes['tenant.settings.profile.update']
+      }
+    }
   }
   dashboard: typeof routes['dashboard']
   onboarding: {

@@ -12,6 +12,9 @@ export type ScannedRoutes = {
     'session.create': { paramsTuple?: []; params?: {} }
     'session.store': { paramsTuple?: []; params?: {} }
     'tenant.dashboard': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.profile': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.profile.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'dashboard': { paramsTuple?: []; params?: {} }
     'session.destroy': { paramsTuple?: []; params?: {} }
     'onboarding.create': { paramsTuple?: []; params?: {} }
@@ -24,6 +27,8 @@ export type ScannedRoutes = {
     'new_account.create': { paramsTuple?: []; params?: {} }
     'session.create': { paramsTuple?: []; params?: {} }
     'tenant.dashboard': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.profile': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'dashboard': { paramsTuple?: []; params?: {} }
     'onboarding.create': { paramsTuple?: []; params?: {} }
   }
@@ -34,6 +39,8 @@ export type ScannedRoutes = {
     'new_account.create': { paramsTuple?: []; params?: {} }
     'session.create': { paramsTuple?: []; params?: {} }
     'tenant.dashboard': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.profile': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'dashboard': { paramsTuple?: []; params?: {} }
     'onboarding.create': { paramsTuple?: []; params?: {} }
   }
@@ -42,6 +49,9 @@ export type ScannedRoutes = {
     'session.store': { paramsTuple?: []; params?: {} }
     'session.destroy': { paramsTuple?: []; params?: {} }
     'onboarding.store': { paramsTuple?: []; params?: {} }
+  }
+  PUT: {
+    'tenant.settings.profile.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
   }
 }
 declare module '@adonisjs/core/types/http' {

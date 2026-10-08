@@ -31,6 +31,30 @@ router
 router
 	.group(() => {
 		router.on("/").renderInertia("dashboard", {}).as("tenant.dashboard");
+
+		/**
+		 * Studio settings, owners only: artists get the same 404 as an
+		 * unknown URL. Every settings route goes in this group (a test
+		 * checks).
+		 */
+		router
+			.group(() => {
+				router
+					.get("/", ({ params, response }) =>
+						response
+							.redirect()
+							.toRoute("tenant.settings.profile", { tenant: params.tenant }),
+					)
+					.as("tenant.settings");
+				router
+					.get("profile", [controllers.StudioProfile, "show"])
+					.as("tenant.settings.profile");
+				router
+					.put("profile", [controllers.StudioProfile, "update"])
+					.as("tenant.settings.profile.update");
+			})
+			.prefix("/settings")
+			.use(middleware.role({ allow: ["owner"] }));
 	})
 	.prefix("/t/:tenant")
 	.use([middleware.auth(), middleware.tenant()]);
