@@ -4,6 +4,9 @@ build
 tmp/*
 !tmp/.gitkeep
 
+# Uploaded files (local Drive disks, see config/drive.ts)
+storage
+
 # Secrets
 .env
 .env.local
