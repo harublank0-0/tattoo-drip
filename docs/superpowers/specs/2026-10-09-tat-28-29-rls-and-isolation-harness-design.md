@@ -25,6 +25,7 @@ The tenant settings (`app.tenant_id`, `app.user_id`) are set by trusted app code
 | The `users` table | Stays outside RLS | Login, the session guard and signup read it before any context exists. A separate "auth" connection can't work: tests use one global transaction per connection, so foreign-key checks across connections break. Hardening is a follow-up. |
 | Slug uniqueness check | Drop the Vine `.unique` rule on `tenants.slug` and rely on the unique index | The rule runs a raw query with no context and would silently never find a conflict. |
 | Tests | Run as the app role everywhere | A missing context must fail in tests the way it fails in production. |
+| `FORCE ROW LEVEL SECURITY` | No: `ENABLE` only, plus an ownership guard | With `FORCE`, a backfill run by a non-superuser owner updates zero rows, silently, in production only. The guard checks the real invariant: the app role never gets owner powers. |
 
 ## Roles and connections
 
@@ -34,59 +35,61 @@ The tenant settings (`app.tenant_id`, `app.user_id`) are set by trusted app code
 | App (`tattoo_drip_app`) | The web server, the worker and the tests | `LOGIN NOSUPERUSER NOBYPASSRLS`, DML grants only |
 
 - `DB_USER` / `DB_PASSWORD` are the **app** role and feed the default `pg` connection.
-- New `DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD` feed a second Lucid connection, `owner`. Migrations run with `--connection=owner` (a `migrate` script in the platform package wraps it). Making the app role the default means forgetting the flag fails with a permission error. Making the owner the default would silently bypass RLS.
-- One idempotent SQL script (`apps/platform/database/setup_roles.sql`) creates the app role. The compose init directory, the CI workflow and a one-time manual step for existing dev databases all run it. Role creation stays out of migrations because it is infrastructure and needs privileges a production owner role may not have.
-- The grants migration gives the app role `USAGE` on the schema and `SELECT, INSERT, UPDATE, DELETE` on all tables and sequences. It also sets `ALTER DEFAULT PRIVILEGES` for the owner, so future tables are covered. The role name comes from `DB_USER`.
-- All tenant-owned tables get `FORCE ROW LEVEL SECURITY`. That covers a non-superuser owner connecting to the same database.
-- **Boot guard.** The web server and the worker check `pg_roles` for the connected role on startup and refuse to start if it is a superuser or has `BYPASSRLS`. A test runs the same check, so the suite itself proves it runs as the restricted role.
+- New `DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD` feed a second Lucid connection, `owner`, with the same `migrations` and `schemaGeneration` settings as `pg`, so `database/schema.ts` and the CI schema check stay unchanged. Migrations run with `--connection=owner` (a `migrate` script in the platform package wraps it). Making the app role the default means forgetting the flag fails with a permission error. Making the owner the default would silently bypass RLS.
+- `.env.example` defaults become `DB_USER=tattoo_drip_app` and `DB_MIGRATION_USER=postgres`.
+- `apps/platform/database/setup_roles.sql` runs once per database, by an admin. It creates the app role if missing and grants it `USAGE` on the schema and `SELECT, INSERT, UPDATE, DELETE` on all existing tables. It also sets `ALTER DEFAULT PRIVILEGES FOR ROLE <owner>`, so tables the owner creates later are granted too. The two role names are psql variables. The compose init directory, the CI workflow and a one-time manual step for existing dev databases all run it. Role creation and grants stay out of migrations because they are infrastructure and need privileges a production owner role may not have. Migrations stay free of role names and env reads.
+- Tables get `ENABLE ROW LEVEL SECURITY`, not `FORCE`. The owner keeps bypassing RLS, so data migrations behave the same in dev (owner is a superuser) and on a managed Postgres (owner usually is not).
+- **Boot guard.** The web server, the worker and the test runner refuse to start unless the connected role is not a superuser, has no `BYPASSRLS`, owns no table in `public`, and is not a member of a role that does. Membership inherits ownership, and owners bypass RLS. Other ace commands (codegen, build, migrations) skip the check. A test runs the same check, so the suite itself proves it runs as the restricted role.
 
 ## Request context
 
 New module `app/services/db_context.ts` (`#services/db_context`):
 
-- `withDbContext({ userId?, tenantId? }, fn)` runs `fn` with those settings in the ambient transaction. It saves the previous values and restores them in `finally`, so nothing leaks, including inside the tests' global transaction.
+- `withDbContext({ userId?, tenantId? }, fn)` opens its own transaction, or a savepoint inside the ambient one, sets the settings there and runs `fn`. If `fn` throws, the savepoint rolls back and Postgres reverts the settings itself. Nothing runs inside the aborted transaction, so the original error surfaces. If `fn` succeeds, the savepoint is released and the previous values are set again, so nothing leaks into the rest of the transaction, including the tests' global transaction. Values not passed are inherited from the outer context.
 - An `AsyncLocalStorage` holds `{ trx, userId?, tenantId? }`.
 - `withTransaction(fn)` opens a **savepoint** when an ambient transaction exists, else a normal transaction. The five existing `db.transaction` call sites move to it (`TenancyService.createTenant`, three in `PaymentMethodService`, `Tenant.softDelete`). A failed statement, such as a unique violation, aborts only the savepoint, so the request can still re-render a form with errors.
 - `dbClient()` returns the ambient transaction, or `db` outside a request. Raw queries that need context use it.
-- A small provider installs an adapter on `BaseModel.$adapter` that overrides `modelClient` and `modelConstructorClient` to return the ambient transaction when one exists. Every model query, preload, `whereHas` and relation then runs inside the request transaction. An explicit `{ client }` still wins.
+- A small provider installs an adapter on `BaseModel.$adapter` that overrides `modelConstructorClient`. When an ambient transaction exists on the same connection, it is returned in place of any plain (non-transaction) client. Instances loaded outside a context (`auth.user` is one) store the plain pool client in `$options.client`, so honoring plain clients would let them bypass the request transaction. An explicit transaction client still wins, and models on another connection (`owner`) are untouched. `modelClient` already prefers `$trx`, which Lucid sets for instances loaded inside a transaction and clears when it commits.
 - Settings are written with `select set_config('app.tenant_id', $1, true)`: the same as `SET LOCAL`, but it accepts bind parameters. The `true` makes it transaction-local.
 
 ### Middleware
 
 - New `dbContext` named middleware, used right after `auth` on every authenticated group (`/dashboard`, `/onboarding`, `/t/:tenant`). It opens the transaction and sets `app.user_id` from the session user. It commits when the response succeeds and rolls back when anything throws. Public routes (login, signup) get no transaction, since they only touch `users`.
 - The tenant middleware runs inside that transaction. It resolves the membership under user context, so a stranger still gets the same 404, then sets `app.tenant_id` and continues. It throws if `dbContext` did not run, like `tenantContext(ctx)` does outside the group.
-- `createTenant` generates the new id with `select uuidv7()`, sets it as the context for the insert and restores the previous context after.
+- `createTenant` generates the new id with `select uuidv7()` and runs the inserts inside `withDbContext({ tenantId })`.
+- Production status pages render in the exception handler after the request transaction has rolled back. When no ambient context exists, `InertiaMiddleware.share()` wraps its `tenantsFor` read in its own `withDbContext({ userId, tenantId })`, so a 404 inside a tenant page still shows the switcher.
 - The existing "every tenant route has the tenant middleware" test also asserts `dbContext` is present.
 
 ## Policies
 
-Two `STABLE` SQL functions, `app_tenant_id()` and `app_user_id()`, return `nullif(current_setting('app.…', true), '')::uuid`. Unset or empty gives `NULL`, so every comparison fails and no rows return (fail closed). Policies call them as `(select app_tenant_id())`, which Postgres evaluates once per statement, not per row. All policies are `TO` the app role.
+Two `STABLE` SQL functions, `app_tenant_id()` and `app_user_id()`, return `nullif(current_setting('app.…', true), '')::uuid`. Unset or empty gives `NULL`, so every comparison fails and no rows return (fail closed). Policies call them as `(select app_tenant_id())`, which Postgres evaluates once per statement, not per row. Policies use the default `TO PUBLIC`. The owner bypasses them as owner, and superusers always do.
 
 | Table | Command | Rule |
 |---|---|---|
 | Tenant-owned tables (`payment_methods`, all future ones) | all | `tenant_id = (select app_tenant_id())`, same expression as the write check |
 | `tenant_memberships` | select | `tenant_id = app_tenant_id() or user_id = app_user_id()` |
 | `tenant_memberships` | insert, update, delete | `tenant_id = app_tenant_id()` |
-| `tenants` | select | `id = app_tenant_id()` or `id in (select tenant_id from tenant_memberships where user_id = app_user_id())` |
+| `tenants` | select | `id = app_tenant_id()` or `id in (select tenant_id from tenant_memberships where user_id = app_user_id() and deleted_at is null)` |
 | `tenants` | insert, update | `id = app_tenant_id()` |
 | `tenants` | delete | no policy (deletes are soft updates) |
 
-The `tenants` subquery goes through the membership policy, which does not read `tenants`, so there is no recursion. Soft-delete filtering stays in app code.
+The `tenants` subquery goes through the membership policy, which does not read `tenants`, so there is no recursion. It skips removed memberships, so a removed member loses the database-level view of the studio too. Other soft-delete filtering stays in app code.
+
+RLS does not decide who may create a tenant: any signed-in user can, by setting the new id as context. Onboarding's app-level check stays the gate.
 
 ## Migration helpers
 
 In a shared migrations helper module (location chosen in the plan):
 
-- `enableTenantRls(table)` runs `ENABLE` and `FORCE ROW LEVEL SECURITY`, creates the standard `tenant_isolation` policy and adds `UNIQUE (tenant_id, id)`.
+- `enableTenantRls(table)` runs `ENABLE ROW LEVEL SECURITY`, creates the standard `tenant_isolation` policy and adds `UNIQUE (tenant_id, id)`.
 - `tenantReference(table, column, parent)` builds a composite foreign key `(tenant_id, column) → parent(tenant_id, id)`.
 
 No foreign key between tenant-owned tables exists yet, because `payment_methods` only points at `tenants`. So this work delivers the helpers, applies `enableTenantRls` to `payment_methods`, adds the unique key and bespoke policies to `tenant_memberships`, and adds the bespoke policies to `tenants`. TAT-36 and TAT-37 are the first users of `tenantReference`.
 
 ## Jobs
 
-`executionWrapper` in `config/queue.ts` reads `tenantId` from the job payload (the TAT-7 convention) and runs the job through `withTransaction` and `withDbContext({ tenantId })`. It commits on success and rolls back on failure.
+`executionWrapper` in `config/queue.ts` reads `tenantId` from the job payload (`AcquiredJob.payload`, the TAT-7 convention). A job with a `tenantId` runs inside `withDbContext({ tenantId })`, its own transaction, and commits or rolls back with it. A job without one, like `SendMailJob`, runs as today, with no transaction, so an SMTP call never holds a connection. Any tenant table it touches returns nothing. The wrapper imports `#services/db_context` lazily, since `config/queue.ts` loads before providers boot.
 
-- Jobs without a `tenantId` (`SendMailJob`) run with no context and fail closed.
 - A `tenantId` that is present but malformed fails the job. It never runs unscoped.
 - `queue_jobs` is not tenant-owned and gets plain grants.
 
@@ -107,15 +110,15 @@ Under `apps/platform/tests/`:
 - With no context, the same select returns zero rows while other tenants have data.
 - An insert with B's `tenant_id` under context A fails the policy check.
 - Update and delete on B's rows under context A affect zero rows.
-- The memberships and tenants policies: listing my tenants works under user context, resolving a slug works, and a stranger's slug returns nothing.
-- Settings don't leak: after `withDbContext` returns, the previous values are back.
-- The connected role is not a superuser and has no `BYPASSRLS`.
+- The memberships and tenants policies: listing my tenants works under user context, resolving a slug works, a stranger's slug returns nothing, and a removed member no longer sees the tenant.
+- Settings don't leak: after `withDbContext` returns, the previous values are back, and after it throws, the original error surfaces.
+- The connected role passes the boot guard: not a superuser, no `BYPASSRLS`, owns no table and is not a member of a role that does.
 
 ### Catalog guard
 
 One test queries the catalog:
 
-- Every table in `public` is either RLS-forced with at least one policy, or on a named exemption list with a reason (`users`, the queue tables and the migration bookkeeping tables).
+- Every table in `public` either has RLS enabled with at least one policy, or is on a named exemption list with a reason (`users`, the queue tables and the migration bookkeeping tables).
 - Every table with a `tenant_id` column has `UNIQUE (tenant_id, id)`.
 - Every foreign key between two tenant-owned tables includes `tenant_id`.
 
@@ -123,7 +126,7 @@ A new table that forgets the helper fails CI, and adding to the exemption list i
 
 ### Job tests
 
-- A job with a `tenantId` sees its tenant's rows. One without sees none.
+- A job with a `tenantId` sees its tenant's rows. One without sees none and runs without a transaction.
 - A throw rolls back its writes.
 - Context does not leak into the next job.
 - A malformed `tenantId` fails the job.
@@ -131,18 +134,18 @@ A new table that forgets the helper fails CI, and adding to the exemption list i
 ## Changes outside the new code
 
 - `createTenantValidator`: remove `.unique({ table: "tenants", column: "slug" })` and the `slug.database.unique` message. `SlugTakenError` in `OnboardingController` uses one message: "This address is already taken. Try another one." The existing unique-index catch is now the only check.
-- `config/database.ts`: add the `owner` connection. `start/env.ts` and `.env.example`: add `DB_MIGRATION_USER` and `DB_MIGRATION_PASSWORD`.
-- `docker-compose.yml`: mount the role script. `.github/workflows/ci.yml`: create the role, migrate as the owner, test as the app role.
-- Docs: `architecture.md` (RLS is no longer planned), `database/README.md` (roles, helper, the guard), `backend.md` (context, `withTransaction`, `dbClient()`, why raw `db` queries and Vine's `unique` and `exists` rules see nothing in a request), `testing.md` (harness), `jobs-and-email.md` (replace "TAT-28 runs them in tenant context"), the root README (env vars and the one-time role setup for an existing dev database) and the platform `AGENTS.md` constraint line.
+- `config/database.ts`: add the `owner` connection. `start/env.ts` and `.env.example`: add `DB_MIGRATION_USER` and `DB_MIGRATION_PASSWORD`, with the new defaults above.
+- `docker-compose.yml`: mount the role script. `.github/workflows/ci.yml`: run `setup_roles.sql` before migrating, migrate with `pnpm migrate`, test as the app role.
+- Docs: `architecture.md` (RLS is no longer planned), `database/README.md` (roles, helper, the guard), `backend.md` (context, `withTransaction`, `dbClient()`, why raw `db` queries and Vine's `unique` and `exists` rules see nothing in a request), `testing.md` (harness, and `pnpm migrate` in place of `node ace migration:run`), `jobs-and-email.md` (replace "TAT-28 runs them in tenant context"), the root README (env vars and the one-time role setup for an existing dev database), the root `AGENTS.md` generated-files section (`pnpm migrate`) and the platform `AGENTS.md` constraint line.
 
 ## Open risks, checked first in the plan
 
-Each of these changes the design if it fails. The fallback is in brackets.
+Each unverified item changes the design if it fails. The fallback is in brackets.
 
-1. The Lucid adapter hook covers `preload`, `whereHas` and relation queries. [Fall back to a base-model `query()` override.]
-2. `AsyncLocalStorage` survives the Adonis middleware chain and the Inertia render, including lazily resolved props, before the transaction commits. [Resolve props inside the controller, or bind the transaction to the HTTP context.]
-3. `@adonisjs/queue` 0.6.2 honors `executionWrapper` for worker-run jobs. [Wrap in a base job class `execute`.]
-4. Nested savepoints inside the test global transaction restore the settings cleanly. [Reset explicitly with `set_config(…, '', true)` in `finally`.]
+1. Relations and preloads from an instance loaded inside a context reuse its `$trx`, and the adapter rule covers instances loaded outside one. Checked first with a test. [Fall back to a base-model `query()` override.]
+2. Verified: `inertia.render` resolves props, including `share()`, before the controller returns (`@adonisjs/inertia` 5.0.1), so normal renders run inside the transaction. Only status pages run after it, which is handled above.
+3. `@boringnode/queue`'s worker calls `QueueManager.getExecutionWrapper()`. Confirm with a worker-run test that `@adonisjs/queue` 0.6.2 passes the config key through. [Fall back to a base job class wrapping `execute`.]
+4. Verified: inside the tests' global transaction, `db.connection()` returns the global transaction, so `db.transaction()` becomes a savepoint and the request flow nests correctly. The leak test checks the settings behavior.
 
 ## Known costs and not in scope
 
