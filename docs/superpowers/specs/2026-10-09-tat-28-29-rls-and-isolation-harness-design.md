@@ -26,6 +26,8 @@ The tenant settings (`app.tenant_id`, `app.user_id`) are set by trusted app code
 | Slug uniqueness check | Drop the Vine `.unique` rule on `tenants.slug` and rely on the unique index | The rule runs a raw query with no context and would silently never find a conflict. |
 | Tests | Run as the app role everywhere | A missing context must fail in tests the way it fails in production. |
 | `FORCE ROW LEVEL SECURITY` | No: `ENABLE` only, plus an ownership guard | With `FORCE`, a backfill run by a non-superuser owner updates zero rows, silently, in production only. The guard checks the real invariant: the app role never gets owner powers. |
+| How a failed request rolls back | The exception handler signals it, not `next()` | Adonis turns a controller's exception into a response before the upstream middleware resumes, so `await next()` never rejects. A middleware that waited for a throw would commit failed requests. |
+| How a failed job rolls back | A `TenantJob` base class wraps `execute()`; no `executionWrapper` | The worker catches the job's error inside the callback a wrapper receives, so a wrapper can't see the failure, and the worker acknowledges the job before a wrapper could commit. |
 
 ## Roles and connections
 
@@ -49,16 +51,18 @@ New module `app/services/db_context.ts` (`#services/db_context`):
 - An `AsyncLocalStorage` holds `{ trx, userId?, tenantId? }`.
 - `withTransaction(fn)` opens a **savepoint** when an ambient transaction exists, else a normal transaction. The five existing `db.transaction` call sites move to it (`TenancyService.createTenant`, three in `PaymentMethodService`, `Tenant.softDelete`). A failed statement, such as a unique violation, aborts only the savepoint, so the request can still re-render a form with errors.
 - `dbClient()` returns the ambient transaction, or `db` outside a request. Raw queries that need context use it.
+- `abortRequestTransaction()` rolls back the request transaction and detaches it from the `AsyncLocalStorage` store, so later code in the same request runs with no ambient transaction. It does nothing outside a request. The exception handler calls it; see *Middleware*.
 - A small provider installs an adapter on `BaseModel.$adapter` that overrides `modelConstructorClient`. When an ambient transaction exists on the same connection, it is returned in place of any plain (non-transaction) client. Instances loaded outside a context (`auth.user` is one) store the plain pool client in `$options.client`, so honoring plain clients would let them bypass the request transaction. An explicit transaction client still wins, and models on another connection (`owner`) are untouched. `modelClient` already prefers `$trx`, which Lucid sets for instances loaded inside a transaction and clears when it commits.
 - Settings are written with `select set_config('app.tenant_id', $1, true)`: the same as `SET LOCAL`, but it accepts bind parameters. The `true` makes it transaction-local.
 
 ### Middleware
 
-- New `dbContext` named middleware, used right after `auth` on every authenticated group (`/dashboard`, `/onboarding`, `/t/:tenant`). It opens the transaction and sets `app.user_id` from the session user. It commits when the response succeeds and rolls back when anything throws. Public routes (login, signup) get no transaction, since they only touch `users`.
+- New `dbContext` named middleware, used right after `auth` on every authenticated group (`/dashboard`, `/onboarding`, `/t/:tenant`). It opens a transaction, keeps it in the store with `app.user_id` set from the session user, and runs `next()`. Then it commits, unless `abortRequestTransaction()` already rolled the transaction back. It does not wait for `next()` to throw. Adonis's route middleware runner handles a downstream exception (the controller's, a validation error, a 404) before the upstream `await next()` resumes (`@poppinss/middleware` 3.2.7, `invokeWithErrorManagement`), so `next()` resolves even when the request failed. An error the middleware itself throws still rolls back. Public routes (login, signup) get no transaction, since they only touch `users`.
 - The tenant middleware runs inside that transaction. It resolves the membership under user context, so a stranger still gets the same 404, then sets `app.tenant_id` and continues. It throws if `dbContext` did not run, like `tenantContext(ctx)` does outside the group.
 - `createTenant` generates the new id with `select uuidv7()` and runs the inserts inside `withDbContext({ tenantId })`.
-- Production status pages render in the exception handler after the request transaction has rolled back. When no ambient context exists, `InertiaMiddleware.share()` wraps its `tenantsFor` read in its own `withDbContext({ userId, tenantId })`, so a 404 inside a tenant page still shows the switcher.
+- **Exception handler.** `HttpExceptionHandler.handle()` calls `abortRequestTransaction()` before it renders anything. Any exception, including a validation redirect or a 404, rolls the request back, so earlier writes never commit after a failure. The page then renders with no ambient transaction, which also avoids queries running inside an aborted transaction after an uncaught SQL error. Because of that, `InertiaMiddleware.share()` wraps its `tenantsFor` read in its own `withDbContext({ userId, tenantId })` when no ambient context exists, so an error page inside a tenant still shows the switcher.
 - The existing "every tenant route has the tenant middleware" test also asserts `dbContext` is present.
+- Tests drive the real HTTP pipeline: a request that writes and then throws an application error, and one that writes and then hits an uncaught SQL error, must both leave nothing behind and still render the error page. A successful request commits.
 
 ## Policies
 
@@ -88,10 +92,15 @@ No foreign key between tenant-owned tables exists yet, because `payment_methods`
 
 ## Jobs
 
-`executionWrapper` in `config/queue.ts` reads `tenantId` from the job payload (`AcquiredJob.payload`, the TAT-7 convention). A job with a `tenantId` runs inside `withDbContext({ tenantId })`, its own transaction, and commits or rolls back with it. A job without one, like `SendMailJob`, runs as today, with no transaction, so an SMTP call never holds a connection. Any tenant table it touches returns nothing. The wrapper imports `#services/db_context` lazily, since `config/queue.ts` loads before providers boot.
+`executionWrapper` is not used. The worker's callback catches a job's error and handles retry or failure inside itself, then resolves normally, and it acknowledges the job before any wrapper could commit (`@boringnode/queue` 0.6.0, the `run` closure in `build/index.js`). A wrapper would commit failed attempts, repeat their writes on retry, and acknowledge a job whose commit later fails.
 
-- A `tenantId` that is present but malformed fails the job. It never runs unscoped.
+Instead, `app/jobs/tenant_job.ts` (`#jobs/tenant_job`) defines `TenantJob`, a base class whose `execute()` reads `tenantId` from the payload (the TAT-7 convention) and runs the subclass's `handle()` inside `withDbContext({ tenantId })`. It returns only after the transaction has committed or rolled back. A throw rolls back and propagates to the worker, which then retries or fails the job outside the transaction. The worker acknowledges only after the commit.
+
+- Jobs that touch tenant data extend `TenantJob`. A job with no `tenantId`, like `SendMailJob`, extends the plain `Job`, runs with no transaction (an SMTP call never holds a connection) and sees nothing from any tenant table.
+- A `TenantJob` whose payload has a missing or malformed `tenantId` fails. It never runs unscoped.
+- A guard test lists every job class under `app/jobs` and `app/modules/*/jobs`. Each must extend `TenantJob` or be on a named allowlist with a reason (`SendMailJob`).
 - `queue_jobs` is not tenant-owned and gets plain grants.
+- The TAT-28 ticket text says "through the queue `executionWrapper` in `config/queue.ts`". Update the ticket to match.
 
 ## TAT-29: isolation harness
 
@@ -126,26 +135,32 @@ A new table that forgets the helper fails CI, and adding to the exemption list i
 
 ### Job tests
 
-- A job with a `tenantId` sees its tenant's rows. One without sees none and runs without a transaction.
-- A throw rolls back its writes.
+These run through the real worker, not by calling `execute()` directly:
+
+- A `TenantJob` with a `tenantId` sees its tenant's rows. A plain job without one sees none and runs without a transaction.
+- A job that writes and then throws leaves no rows after each attempt, and the retry does not see the earlier writes.
+- The job is acknowledged only after its writes are committed.
 - Context does not leak into the next job.
-- A malformed `tenantId` fails the job.
+- A missing or malformed `tenantId` fails a `TenantJob`.
+- The job-class guard fails for a new job class that is neither a `TenantJob` nor allowlisted.
 
 ## Changes outside the new code
 
 - `createTenantValidator`: remove `.unique({ table: "tenants", column: "slug" })` and the `slug.database.unique` message. `SlugTakenError` in `OnboardingController` uses one message: "This address is already taken. Try another one." The existing unique-index catch is now the only check.
+- `app/exceptions/handler.ts`: call `abortRequestTransaction()` first in `handle()`. New `app/jobs/tenant_job.ts` with `TenantJob`.
 - `config/database.ts`: add the `owner` connection. `start/env.ts` and `.env.example`: add `DB_MIGRATION_USER` and `DB_MIGRATION_PASSWORD`, with the new defaults above.
 - `docker-compose.yml`: mount the role script. `.github/workflows/ci.yml`: run `setup_roles.sql` before migrating, migrate with `pnpm migrate`, test as the app role.
-- Docs: `architecture.md` (RLS is no longer planned), `database/README.md` (roles, helper, the guard), `backend.md` (context, `withTransaction`, `dbClient()`, why raw `db` queries and Vine's `unique` and `exists` rules see nothing in a request), `testing.md` (harness, and `pnpm migrate` in place of `node ace migration:run`), `jobs-and-email.md` (replace "TAT-28 runs them in tenant context"), the root README (env vars and the one-time role setup for an existing dev database), the root `AGENTS.md` generated-files section (`pnpm migrate`) and the platform `AGENTS.md` constraint line.
+- Docs: `architecture.md` (RLS is no longer planned), `database/README.md` (roles, helper, the guard), `backend.md` (context, `withTransaction`, `dbClient()`, why raw `db` queries and Vine's `unique` and `exists` rules see nothing in a request), `testing.md` (harness, and `pnpm migrate` in place of `node ace migration:run`), `jobs-and-email.md` (replace "TAT-28 runs them in tenant context" with the `TenantJob` rule), the root README (env vars and the one-time role setup for an existing dev database), the root `AGENTS.md` generated-files section (`pnpm migrate`) and the platform `AGENTS.md` constraint line.
 
 ## Open risks, checked first in the plan
 
 Each unverified item changes the design if it fails. The fallback is in brackets.
 
 1. Relations and preloads from an instance loaded inside a context reuse its `$trx`, and the adapter rule covers instances loaded outside one. Checked first with a test. [Fall back to a base-model `query()` override.]
-2. Verified: `inertia.render` resolves props, including `share()`, before the controller returns (`@adonisjs/inertia` 5.0.1), so normal renders run inside the transaction. Only status pages run after it, which is handled above.
-3. `@boringnode/queue`'s worker calls `QueueManager.getExecutionWrapper()`. Confirm with a worker-run test that `@adonisjs/queue` 0.6.2 passes the config key through. [Fall back to a base job class wrapping `execute`.]
+2. Verified: `inertia.render` resolves props, including `share()`, before the controller returns (`@adonisjs/inertia` 5.0.1), so normal renders run inside the transaction. Error pages are the exception: they render after `abortRequestTransaction()` has detached it, which the exception-handler bullet handles.
+3. Verified: the worker's callback swallows job errors, so job transactions live inside `execute()` (`TenantJob`), not in `executionWrapper`. A worker-run test pins the behavior: an attempt that throws leaves no writes.
 4. Verified: inside the tests' global transaction, `db.connection()` returns the global transaction, so `db.transaction()` becomes a savepoint and the request flow nests correctly. The leak test checks the settings behavior.
+5. Verified: with an error handler registered, `next()` resolves after a downstream exception, so rollback is signaled by the exception handler. To confirm with a real-request test: the `AsyncLocalStorage` store is still present when the exception handler runs (its `.catch` is attached inside the middleware's `next()` call). [If the store is missing there, also keep the transaction on `ctx` and have the handler read it from `ctx`.]
 
 ## Known costs and not in scope
 
