@@ -2,9 +2,12 @@ import testUtils from "@adonisjs/core/services/test_utils";
 import db from "@adonisjs/lucid/services/db";
 import { test } from "@japa/runner";
 import User from "#models/user";
+import PaymentMethod from "#modules/payments/models/payment_method";
 import { LastOwnerError, SlugTakenError } from "#modules/tenancy/errors";
+import Tenant from "#modules/tenancy/models/tenant";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
+import { studioWithOwner } from "#tests/helpers/tenants";
 
 const tenancy = new TenancyService();
 
@@ -116,6 +119,28 @@ test.group("TenancyService.membershipFor", (group) => {
 
 		await tenant.softDelete();
 		assert.isNull(await tenancy.membershipFor(owner, "black-needle"));
+	});
+
+	test("soft-deleting a tenant soft-deletes its payment methods", async ({
+		assert,
+	}) => {
+		const owner = await makeUser("owner@example.com");
+		const tenant = await tenancy.createTenant(owner, studio("black-needle"));
+		await PaymentMethod.create({
+			tenantId: tenant.id,
+			kind: "cash",
+			label: "Cash",
+			showOnDepositPage: false,
+			position: 0,
+		});
+
+		await tenant.softDelete();
+
+		assert.isEmpty(await PaymentMethod.query().where("tenant_id", tenant.id));
+		assert.lengthOf(
+			await PaymentMethod.onlyTrashed().where("tenant_id", tenant.id),
+			1,
+		);
 	});
 
 	test("returns null once the membership is removed", async ({ assert }) => {
@@ -235,6 +260,90 @@ test.group("TenancyService.assertKeepsAnOwner", (group) => {
 			db.transaction((trx) =>
 				tenancy.assertKeepsAnOwner(trx, tenant.id, artist.id),
 			),
+		);
+	});
+});
+
+const profile = {
+	name: "Black Needle Tattoo",
+	timezone: "Asia/Kathmandu",
+	intro: "Fine-line and blackwork in Thamel.",
+	contactPhone: "+9779812345678",
+	contactEmail: "hello@blackneedle.example",
+	address: "Thamel, Kathmandu",
+	instagramUrl: "https://instagram.com/blackneedle",
+	facebookUrl: null,
+	tiktokUrl: null,
+	websiteUrl: "https://blackneedle.example",
+};
+
+test.group("TenancyService profile and deposits", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("updateProfile saves every profile field and keeps slug and type", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await new TenancyService().updateProfile(tenant, profile);
+
+		const saved = await Tenant.findOrFail(tenant.id);
+		for (const [key, value] of Object.entries(profile)) {
+			assert.deepEqual(saved[key as keyof typeof profile], value, key);
+		}
+		assert.equal(saved.slug, "black-needle");
+		assert.equal(saved.type, "studio");
+	});
+
+	test("updateProfile with nulls clears the fields", async ({ assert }) => {
+		const { tenant } = await studioWithOwner();
+		await tenancy.updateProfile(tenant, profile);
+
+		await tenancy.updateProfile(tenant, {
+			...profile,
+			intro: null,
+			contactPhone: null,
+			instagramUrl: null,
+		});
+
+		const saved = await Tenant.findOrFail(tenant.id);
+		assert.isNull(saved.intro);
+		assert.isNull(saved.contactPhone);
+		assert.isNull(saved.instagramUrl);
+	});
+
+	test("updateDepositSettings saves and clears the default", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await tenancy.updateDepositSettings(tenant, {
+			defaultDepositPercent: 30,
+			depositPolicy: "Deposits hold your date.",
+		});
+		let saved = await Tenant.findOrFail(tenant.id);
+		assert.equal(saved.defaultDepositPercent, 30);
+		assert.equal(saved.depositPolicy, "Deposits hold your date.");
+
+		await tenancy.updateDepositSettings(tenant, {
+			defaultDepositPercent: null,
+			depositPolicy: null,
+		});
+		saved = await Tenant.findOrFail(tenant.id);
+		assert.isNull(saved.defaultDepositPercent);
+		assert.isNull(saved.depositPolicy);
+	});
+
+	test("the database refuses a deposit over 100%", async ({ assert }) => {
+		const { tenant } = await studioWithOwner();
+
+		await assert.rejects(
+			() =>
+				tenancy.updateDepositSettings(tenant, {
+					defaultDepositPercent: 101,
+					depositPolicy: null,
+				}),
+			/tenants_default_deposit_percent_range/,
 		);
 	});
 });

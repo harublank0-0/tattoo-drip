@@ -1,7 +1,7 @@
 import { Form } from "@adonisjs/inertia/react";
 import { usePage } from "@inertiajs/react";
 import { cn } from "cn";
-import { House, LogOut } from "lucide-react";
+import { House, LogOut, Settings } from "lucide-react";
 import type { ReactNode } from "react";
 import FlashToasts from "~/components/flash_toasts";
 import Logo from "~/components/logo";
@@ -14,21 +14,32 @@ import { Button, buttonVariants } from "~/components/ui/button";
  * Navigation inside a tenant. Add an entry here for every new area of the
  * dashboard; links point at the current tenant (/t/:tenant/...).
  */
-function tenantNav(tenantSlug: string): NavItem[] {
-	return [
+function tenantNav(tenant: { slug: string; role: string }): NavItem[] {
+	const params = { tenant: tenant.slug };
+	const items: NavItem[] = [
 		{
 			label: "Dashboard",
 			route: "tenant.dashboard",
-			params: { tenant: tenantSlug },
+			params,
 			exact: true,
 			icon: House,
 		},
 	];
+	// Owners only; the server 404s anyone else.
+	if (tenant.role === "owner") {
+		items.push({
+			label: "Settings",
+			route: "tenant.settings",
+			params,
+			icon: Settings,
+		});
+	}
+	return items;
 }
 
 export default function AppLayout({ children }: { children: ReactNode }) {
 	const { tenant } = usePage().props;
-	const nav = tenant ? tenantNav(tenant.slug) : [];
+	const nav = tenant ? tenantNav(tenant) : [];
 
 	return (
 		<div className="flex min-h-svh flex-col">

@@ -31,6 +31,58 @@ router
 router
 	.group(() => {
 		router.on("/").renderInertia("dashboard", {}).as("tenant.dashboard");
+
+		/**
+		 * Studio settings, owners only: artists get the same 404 as an
+		 * unknown URL. Every settings route goes in this group (a test
+		 * checks).
+		 */
+		router
+			.group(() => {
+				router
+					.get("/", ({ params, response }) =>
+						response
+							.redirect()
+							.toRoute("tenant.settings.profile", { tenant: params.tenant }),
+					)
+					.as("tenant.settings");
+				router
+					.get("profile", [controllers.StudioProfile, "show"])
+					.as("tenant.settings.profile");
+				router
+					.put("profile", [controllers.StudioProfile, "update"])
+					.as("tenant.settings.profile.update");
+				router
+					.get("payments", [controllers.PaymentMethods, "index"])
+					.as("tenant.settings.payments");
+				router
+					.put("deposits", [controllers.DepositSettings, "update"])
+					.as("tenant.settings.deposits.update");
+				router
+					.get("payments/new", [controllers.PaymentMethods, "create"])
+					.as("tenant.settings.payments.create");
+				router
+					.post("payments", [controllers.PaymentMethods, "store"])
+					.as("tenant.settings.payments.store");
+				router
+					.put("payments/:id", [controllers.PaymentMethods, "update"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.settings.payments.update");
+				router
+					.get("payments/:id/edit", [controllers.PaymentMethods, "edit"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.settings.payments.edit");
+				router
+					.post("payments/:id/move", [controllers.PaymentMethods, "move"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.settings.payments.move");
+				router
+					.delete("payments/:id", [controllers.PaymentMethods, "destroy"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.settings.payments.destroy");
+			})
+			.prefix("/settings")
+			.use(middleware.role({ allow: ["owner"] }));
 	})
 	.prefix("/t/:tenant")
 	.use([middleware.auth(), middleware.tenant()]);

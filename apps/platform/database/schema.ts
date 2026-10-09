@@ -7,6 +7,51 @@
 import { BaseModel, column } from "@adonisjs/lucid/orm";
 import type { DateTime } from "luxon";
 
+export class PaymentMethodSchema extends BaseModel {
+	static $columns = [
+		"accountName",
+		"accountNumber",
+		"bankName",
+		"createdAt",
+		"deletedAt",
+		"id",
+		"kind",
+		"label",
+		"position",
+		"qrImageKey",
+		"showOnDepositPage",
+		"tenantId",
+		"updatedAt",
+	] as const;
+	$columns = PaymentMethodSchema.$columns;
+	@column()
+	declare accountName: string | null;
+	@column()
+	declare accountNumber: string | null;
+	@column()
+	declare bankName: string | null;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.dateTime()
+	declare deletedAt: DateTime | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare kind: string;
+	@column()
+	declare label: string;
+	@column()
+	declare position: number;
+	@column()
+	declare qrImageKey: string | null;
+	@column()
+	declare showOnDepositPage: boolean;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
 export class QueueJobSchema extends BaseModel {
 	static $columns = [
 		"acquiredAt",
@@ -129,32 +174,62 @@ export class TenantMembershipSchema extends BaseModel {
 
 export class TenantSchema extends BaseModel {
 	static $columns = [
+		"address",
+		"contactEmail",
+		"contactPhone",
 		"createdAt",
+		"defaultDepositPercent",
 		"deletedAt",
+		"depositPolicy",
+		"facebookUrl",
 		"id",
+		"instagramUrl",
+		"intro",
 		"name",
 		"slug",
+		"tiktokUrl",
 		"timezone",
 		"type",
 		"updatedAt",
+		"websiteUrl",
 	] as const;
 	$columns = TenantSchema.$columns;
+	@column()
+	declare address: string | null;
+	@column()
+	declare contactEmail: string | null;
+	@column()
+	declare contactPhone: string | null;
 	@column.dateTime({ autoCreate: true })
 	declare createdAt: DateTime;
+	@column()
+	declare defaultDepositPercent: number | null;
 	@column.dateTime()
 	declare deletedAt: DateTime | null;
+	@column()
+	declare depositPolicy: string | null;
+	@column()
+	declare facebookUrl: string | null;
 	@column({ isPrimary: true })
 	declare id: string;
+	@column()
+	declare instagramUrl: string | null;
+	@column()
+	declare intro: string | null;
 	@column()
 	declare name: string;
 	@column()
 	declare slug: string;
+	@column()
+	declare tiktokUrl: string | null;
 	@column()
 	declare timezone: string;
 	@column()
 	declare type: string;
 	@column.dateTime({ autoCreate: true, autoUpdate: true })
 	declare updatedAt: DateTime | null;
+	@column()
+	declare websiteUrl: string | null;
 }
 
 export class UserSchema extends BaseModel {
