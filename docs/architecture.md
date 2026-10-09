@@ -40,7 +40,7 @@ packages/react     @tattoo-drip/react: TanStack Query hooks
 
 ## Backend modules
 
-Each module owns its models and services. Other modules call its services instead of querying its tables. Inertia controllers, API controllers and jobs stay thin and call the **same** services, so every rule lives in one place. In `apps/platform`, each module is a folder in `app/modules/<module>/` (see `apps/platform/AGENTS.md`).
+Each module owns its models and services. Other modules call its services instead of querying its tables. Inertia controllers, API controllers and jobs stay thin and call the **same** services, so every rule lives in one place. In `apps/platform`, each module is a folder in `app/modules/<module>/` (see [platform backend conventions](../apps/platform/docs/backend.md)).
 
 | Module | Owns | Stage |
 |---|---|---|
@@ -137,7 +137,6 @@ In the MVP the studio page has one layout, generated from the profile and artist
 
 ## Current state
 
-- **`apps/platform`** is the AdonisJS 7 React starter, switched to PostgreSQL, with its pages rebuilt on Tailwind CSS v4 and shadcn/ui (stock zinc theme, light and dark). It has session auth with signup, login and dashboard pages. The users migration has not been run yet.
-- **`apps/storefront`** is the single-artist prototype. It still uses mock data. Booking is an in-dialog inquiry form (TanStack Form with a Zod schema) that only simulates sending until the inquiries API exists. The prototype's Prisma, better-auth and Supabase code has been removed.
-- **UI:** both apps use Tailwind CSS v4 and shadcn/ui with the same `components.json` settings, each with its own theme. A shared design system for both is planned and will replace the per-app themes.
-- **`packages/*`** hold a working SDK against a draft `openapi.yaml`. That draft still describes the old booking flow (`bookings.create`, `availability`) and must move to inquiries (tracked in Linear). The API endpoints themselves are not built yet.
+This document describes the intended architecture, including planned features. Determine implemented behavior from the affected modules, routes, migrations and tests; local migration status comes from the target database. Row-level security above is planned; see [database conventions](../apps/platform/database/README.md).
+
+The contract's booking-to-inquiry transition is documented in [SDK: Public API by stage](sdk.md#public-api-by-stage). Use the [roadmap](roadmap.md) for release gates and [documentation index](README.md) for implementation guidance. Dated specs/plans retain the decision history.

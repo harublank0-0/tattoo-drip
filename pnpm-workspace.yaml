@@ -22,6 +22,6 @@ minimumReleaseAgeExclude:
 
 # @adonisjs/queue and the platform both import @boringnode/queue; a second
 # copy breaks transactional dispatch, so force one version (see
-# apps/platform/AGENTS.md, Jobs). Bump it together with @adonisjs/queue.
+# apps/platform/docs/jobs-and-email.md, Jobs). Bump it together with @adonisjs/queue.
 overrides:
   '@boringnode/queue': 0.6.0

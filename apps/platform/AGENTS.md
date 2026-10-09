@@ -1,77 +1,24 @@
-## Platform
+# Platform
 
-AdonisJS 7 app that owns all data, business rules and the REST API. The dashboard is Inertia + React inside it.
+AdonisJS 7 owns all data, business rules and REST API; the dashboard uses Inertia + React. Lucid/PostgreSQL, VineJS, session auth, Tuyau and Japa.
 
-- **Stack:** Lucid ORM on PostgreSQL, VineJS validators, session auth (`@adonisjs/auth`), Tuyau, Inertia + React (SSR entry exists in `inertia/ssr.tsx` but is disabled in `config/inertia.ts`), Japa tests.
-- **UI:** Tailwind CSS v4 and shadcn/ui (new-york style, Radix, lucide icons; same `components.json` settings as the storefront). Theme tokens are shadcn's stock zinc palette in `inertia/css/app.css` until the shared design system replaces them.
+Map: `app/modules/<module>/` owns domain code; `app/controllers` and `app/transformers` remain flat until `adonisrc.ts` indexing supports module folders. Routes/middleware: `start/`; settings: `config/`; migrations: `database/`; dashboard: `inertia/`; tests: `tests/{unit,functional,browser}`. Use server subpath aliases from `package.json` (`#modules/*`, `#models/*`, etc.) and frontend `~/`.
 
-## UI conventions
+## Read before changing the matching area
 
-- Build UI from shadcn components in `inertia/components/ui` and semantic tokens (`bg-background`, `text-muted-foreground`); don't add custom CSS classes. Use `cn` from the `cn` package.
-- Add components from `apps/platform` with `pnpm dlx shadcn@latest add <component>`, then run `pnpm format:fix` from the root. Don't edit generated components just to satisfy Biome; it relaxes a few lint rules for `**/components/ui/**`.
-- Forms post with `Form` from `@adonisjs/inertia/react` and are validated server-side with VineJS. Lay fields out with shadcn's `FieldGroup` / `Field` / `FieldLabel` / `FieldError`, setting `data-invalid` on `Field` and `aria-invalid` on the control (see `inertia/pages/auth/login.tsx`).
-- Dark mode follows `data-theme` on `<html>`, rendered from the `app_theme` cookie, and Tailwind's `dark:` variant is keyed to it. Use `useTheme` from `~/hooks/use-theme`, not `next-themes`.
-- Import frontend code with the `~/` alias (`~/components/ui/button`).
+- Backend, services, tenancy, soft deletes, media or payments: [backend conventions](docs/backend.md); before schema/migration edits also read [database conventions](database/README.md).
+- Dashboard components, forms or theme: [UI conventions](docs/ui.md).
+- Queues, workers or mail: [jobs and email](docs/jobs-and-email.md).
+- Tests, routes/pages/controllers or generated types: [testing and code generation](docs/testing.md).
+- Cross-project design or product rules: choose the relevant document from the [documentation index](../../docs/README.md).
 
-## Layout
+## Essential constraints
 
-- `app/controllers`, `app/models`, `app/validators`, `app/transformers`, `app/middleware`, `app/exceptions`
-- `app/modules/<module>/`: one folder per backend module from `docs/architecture.md`, owning its `models/`, `services/`, `controllers/`, `validators/` and `emails/`. Import with `#modules/*`. New module code goes here; code still in the flat `app/*` folders moves when its module is built. Controllers and transformers stay in `app/controllers` and `app/transformers` for now: `indexEntities` in `adonisrc.ts` only scans those folders to generate `#generated/*`, so it has to be pointed at the module folders first.
-- `start/routes.ts` (routes reference controllers through `#generated/controllers`), `start/kernel.ts` (middleware), `start/env.ts`
-- `config/`, `database/migrations/`
-- `inertia/pages`, `inertia/layouts`, `inertia/components` (shadcn components in `inertia/components/ui`), `inertia/hooks`, `inertia/css/app.css` (Tailwind entry and theme tokens)
-- `tests/unit`, `tests/functional`, `tests/browser` (suites are defined in `adonisrc.ts`)
+- Modules own their models/services. Other modules call services; controllers and jobs stay thin.
+- Tenant identity comes from the URL (`/t/:tenant/…`, `/api/v1/tenants/:slug/…`), never body/query/headers. Scope every query by tenant; every tenant endpoint needs a cross-tenant isolation test. Tenant routes require auth + tenant middleware; settings also require owner checks.
+- `@inject()` dependencies must be value imports: runtime decorator metadata needs the class. Preserve the `useImportType` suppression described in backend guidance.
+- Change `packages/types/openapi.yaml` before REST implementation and regenerate types. Never edit `database/schema.ts` or `.adonisjs/`; add new migrations instead of changing any that ran. Run `node ace codegen` after route/page/controller changes, then typecheck; keep regenerated files with the change.
 
-Import with the subpath aliases from `package.json` (`#controllers/*`, `#models/*`, `#services/*`, `#validators/*`, …), never with long relative paths.
+## Commands (from apps/platform)
 
-## Rules
-
-- Controllers and services that use `@inject()` must import their dependencies as values, not `import type`: the container reads the class from decorator metadata at runtime. Biome's `useImportType` fix gets this wrong, so mark those imports with `// biome-ignore lint/style/useImportType: @inject() reads the class at runtime`.
-- Each backend module owns its models and services; other modules call its services instead of querying its tables. Inertia controllers, API controllers and jobs stay thin and call the same services. See the module table in `docs/architecture.md`.
-- The tenant always comes from the URL (`/t/:slug/…` for the dashboard, `/api/v1/tenants/:slug/…` for the API). Services scope every query by tenant; never trust a tenant ID from a request body. Every tenant-owned endpoint needs a test proving tenant A can't reach tenant B's data.
-- The REST API implements the contract in `packages/types/openapi.yaml`. Change the contract first, regenerate the types, then implement.
-- `database/schema.ts` and `.adonisjs/` are generated. Change the schema with a new migration, never by editing an existing migration that has been run.
-- Migrations follow `database/README.md`: UUIDv7 primary keys (`defaultTo(this.raw("uuidv7()"))`), `timestamptz` UTC instants, `tenant_id` on every tenant-owned table, and `deleted_at` on business records.
-- Soft delete: models of business records use `compose(XSchema, withSoftDeletes)` from `#models/mixins/soft_deletes`. Delete with `record.softDelete(trx?)`, undo with `restore()`; model queries skip deleted rows unless they start from `Model.withTrashed()` or `Model.onlyTrashed()`. The hooks don't reach `whereHas` subqueries or raw `db.from(...)` queries, so add `whereNull("<table>.deleted_at")` there. The hooks append `deleted_at IS NULL` to the end of the query, so a top-level `.orWhere(...)` would let deleted rows through (`a OR (b AND deleted_at IS NULL)`): group your own conditions in `.where((q) => q.where(a).orWhere(b))`. Update queries skip the hooks too; filter `deleted_at` yourself there. Soft-deleting a parent soft-deletes its children in the same transaction (the database's `ON DELETE CASCADE` only covers real purges).
-- Tenancy: the `tenancy` module (`app/modules/tenancy/`) owns tenants and memberships. Other modules read them through `TenancyService` (`#modules/tenancy/services/tenancy_service`): `createTenant`, `tenantsFor`, `hasTenant` (one cheap yes/no query), and `assertKeepsAnOwner`, which every remove or demote of a member must call inside its transaction. New users create their first tenant at `/onboarding` (only while they have none: one tenant per account for now). Login, signup and onboarding land on `/dashboard`, which redirects to the tenant the user opened last, else their oldest, else `/onboarding`. Login and logout forget the last tenant (`LAST_TENANT_KEY`), so a shared browser doesn't carry it over. Soft-deleting a tenant (`tenant.softDelete(trx?)`) also soft-deletes its live memberships.
-- Tenant pages live in the `/t/:tenant` route group with `[middleware.auth(), middleware.tenant()]`. The tenant middleware calls `TenancyService.membershipFor(user, slug)` on every request (never cache it) and turns `null` into the same 404 as an unknown URL, never a 403, so a URL doesn't reveal that a tenant exists. Every tenant route goes in that group; a test fails for a `/t/:tenant` route without the middleware. Read the result with `tenantContext(ctx)` from `#middleware/tenant_middleware`, which returns `{ tenant, membership }` and throws outside the group (`ctx.tenant` is optional for that reason; the role is `membership.role`). Limit a route to some roles with `middleware.role({ allow: ["owner"] })` after `tenant()`: other members get the same 404. Studio settings (`/t/:tenant/settings/…`) are owners only. They go in the nested settings group, and a test fails for a settings route without the role check. `:id` route params use `.where("id", router.matchers.uuid())`, so a malformed id is a 404 rather than a database error. Controllers pass the tenant to services explicitly; never read a tenant id from the body, query string or headers, and keep `tenant_id` out of validators. Every page gets the `tenant` and `tenants` props from `InertiaMiddleware.share()`; nav items for tenant pages pass `params: { tenant: slug }`.
-- Images: the `media` module (`app/modules/media/`) owns uploads. Every upload field uses `imageFile()` (`#modules/media/validators/image_file`: 10 MB; jpg, jpeg, png, webp), and every upload is stored with `ImageService.store(file, { tenant, purpose })` (`#modules/media/services/image_service`), never written to a disk directly. `store()` checks the real format by its first bytes, rejects images over 40 MP, applies the EXIF orientation, fits the image in 2048 px and re-encodes it with no metadata; anything else throws `InvalidImageError`, whose message is meant for the user (show it as a field error). The purpose (`IMAGE_PURPOSES`) decides the disk: add one per new kind of image, public only if anyone may see it. The owning record keeps the returned key in a column (e.g. `qr_image_key`). If saving the record fails, call `delete(purpose, key)` in the `catch`; when replacing an image, delete the old key after the transaction commits. Soft-deleted records keep their files. `url(purpose, key)` gives the public URL, or a 5-minute signed URL for a private purpose: load the owning record scoped to the tenant first, which is the access check. Drive disks (`config/drive.ts`): `public` served at `/uploads`, `private` at `/files` (signed only). Files live in `storage/` in dev and `tmp/storage/` in tests (cleared each run); production moves to R2 (TAT-27).
-- Payments: the `payments` module (`app/modules/payments/`) owns payment methods. Read and change them through `PaymentMethodService` (`#modules/payments/services/payment_method_service`): `list(tenant)`, `findFor(tenant, id)` (throws a 404 for an unknown, deleted or other tenant's id), `create`, `update`, `move` and `delete`. The rules for each kind (which details it needs, QR or not, deposit page or not) live in `checkPaymentMethod` (`#modules/payments/rules`). Validators check only the shape. The service throws `PaymentMethodRuleError`; controllers turn it into field errors. eSewa and Khalti wallet IDs are stored in `account_number`. The deposit page (TAT-65) shows `list(tenant)` filtered to `showOnDepositPage`, with the tenant's `defaultDepositPercent` and `depositPolicy`.
-- Phone numbers: validate with `phoneNumber()` from `#validators/phone`, which stores E.164 (+977 when no country code is given).
-
-## Emails
-
-- Emails are Edge templates with inline styles and table layout: no `<style>` blocks, CSS inliner or MJML.
-- Shared parts are components in `resources/views/components/email/`. Wrap every email in `@email.layout({ title, preheader })` and use `@!email.button({ href, text })` for calls to action.
-- Each email is a `BaseMail` class in `app/modules/<module>/emails/`, next to an HTML template and a `_text` template. HTML templates print with `{{ }}`; text templates print with `{{{ }}}` so URLs keep their `&`. Guard optional values: Edge prints `undefined` and `null` literally.
-- Mail classes never set `from`; `config/mail.ts` always sends from the platform's domain.
-- A module with templates needs one `edge.mount("<module>", …)` line in `start/view.ts`; its templates are then `<module>::emails/<name>`. `metaFiles` in `adonisrc.ts` copies `app/modules/**/*.edge` into the build.
-- Send with `mail.sendLater(...)`: the messenger in `start/mail.ts` queues a `SendMailJob` that the worker sends. Use `mail.send(...)` only inside a job. An email that must go out only if a transaction commits is sent from a domain job queued with `dispatchInTransaction`.
-- Template data is stored as JSON until the worker renders it: templates see serialized fields only (`user.fullName` works; getters and methods don't, and dates become strings). Pass plain values for anything computed.
-- Queued mail can't carry `Buffer` or stream attachments; they don't survive JSON. Attach by file `path` or URL, or build the email inside a job and use `mail.send`.
-- In development, run `pnpm worker` next to `pnpm dev`, or queued emails never reach Mailpit.
-
-## Jobs
-
-- `@adonisjs/queue` with the `database` driver: jobs are rows in `queue_jobs` in the app's own Postgres, run by a separate worker (`pnpm worker`, i.e. `node ace queue:work`). It doesn't reload on code changes; restart it after editing a job.
-- Shared plumbing such as `SendMailJob` lives in `app/jobs/` (`#jobs/*`). Domain jobs live in `app/modules/<module>/jobs/`. The worker loads every file in those folders as a job, so put nothing else there.
-- Defaults in `config/queue.ts`: 3 retries with exponential backoff (5s up to 5m); completed jobs are deleted, failed jobs stay 7 days with their error. Retries must be the top-level `retry` key: a `retry` inside `defaultJobOptions` is silently ignored (`tests/unit/jobs/queue_config.spec.ts` pins this). `SendMailJob` keeps failed rows for 1 day only, because its payload holds links that work like passwords. Delivery is at-least-once: a worker stopped mid-job reruns it, so make jobs safe to repeat. A job's `failed()` hook runs once retries are used up; log identifying fields under named keys (`err` for the error), never whole objects or secrets.
-- Queue a job that belongs to a database write with `dispatchInTransaction(Job.dispatch(payload), trx)` from `#services/queue`, so it commits or rolls back with the data. Don't call `.with()` on that dispatcher; the helper picks the adapter, and it throws if two copies of `@boringnode/queue` are installed.
-- Jobs that touch tenant-owned data carry `tenantId` in their payload. TAT-28 runs them in tenant context.
-- `@adonisjs/queue` (0.6.2) and `@boringnode/queue` (0.6.0) are pinned to exact versions, and `overrides` in `pnpm-workspace.yaml` forces a single copy of `@boringnode/queue`. Upgrade all three together, then check `pnpm why @boringnode/queue` shows one version.
-- The only driver is `database`; there is no `sync` driver, because it would run jobs inside the request, before a transaction commits and without the JSON round trip.
-- Tests: fake the queue with `queue.fake()` and assert with `fake.assertPushed(Job, { payload })`; run a job directly with `new Job()`, `$hydrate(payload, context)` and `execute()`. Restore fakes in `group.each.teardown`.
-
-## Commands
-
-Run from `apps/platform`:
-
-- `pnpm dev` (`node ace serve --hmr`, port 3333)
-- `pnpm worker` (`node ace queue:work`, runs queued jobs and emails)
-- `node ace test` (add `--files` or a suite name to narrow it). The functional suite needs the local Postgres running and migrated; its tests run inside `testUtils.db().wrapInGlobalTransaction()` (Lucid 22's name; `withGlobalTransaction` is deprecated) so they leave no data behind. HTTP tests use `client` with `.loginAs(user)` and `.withCsrfToken()`; check form errors with `assertValidationError(response, field)` from `#tests/helpers/validation`, because Adonis 7 flashes them under `inputErrorsBag` and the session plugin's `assertHasValidationError` reads `errors`.
-- `node ace codegen` after adding or renaming routes, pages or controllers: it regenerates the committed `.adonisjs/` types (route names, pages, controllers) that `pnpm typecheck` reads. Commit the result.
-- `node ace make:controller|model|migration|validator|… <name>` to scaffold
-- `node ace migration:run`
-- `pnpm typecheck` (server and `inertia/`)
-
-Relevant docs: `docs/architecture.md`, `docs/data-model.md`, `docs/requirements.md`.
+`pnpm dev` (3333), `pnpm worker` (queued jobs/mail; restart after job edits), `pnpm typecheck`, `pnpm test functional --files=<filename>` (narrow tests). Functional tests require migrated PostgreSQL and valid app env; see testing guidance for setup and other suites.

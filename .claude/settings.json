@@ -1,16 +1,9 @@
 {
 	"permissions": {
-		"deny": [
-			"Read(./pnpm-lock.yaml)",
-			"Read(./conventional_commit_guide.md)",
-			"Read(./**/.env)",
-			"Read(./**/.env.local)",
-			"Read(./apps/platform/.adonisjs/**/*)",
-			"Read(./apps/storefront/src/routeTree.gen.ts)",
-			"Read(./packages/types/src/openapi.gen.ts)",
-			"Read(./apps/platform/build/**/*)",
-			"Read(./apps/storefront/.output/**/*)",
-			"Read(./packages/*/dist/**/*)"
-		]
+		"deny": ["Read(./**/.env)", "Read(./**/.env.local)"]
+	},
+	"statusLine": {
+		"type": "command",
+		"command": "node \"$(git rev-parse --show-toplevel)/.claude/statusline.mjs\""
 	}
 }

@@ -1,15 +1,15 @@
 ## Packages
 
-The public API contract and SDK. Apps consume these from source inside the workspace, so there is no build step during development.
+Public API contract and SDK, consumed from source in the workspace; no development build step.
 
-- **`types` (`@tattoo-drip/types`):** `openapi.yaml` is the public API contract. After editing it, run `pnpm --filter @tattoo-drip/types generate`. `src/openapi.gen.ts` is generated; never edit it. `src/index.ts` re-exports friendly type names.
-- **`sdk` (`@tattoo-drip/sdk`):** framework-independent API client (`src/client.ts`, `src/errors.ts`). Depends only on `@tattoo-drip/types`. No React, AdonisJS or app imports.
-- **`react` (`@tattoo-drip/react`):** TanStack Query provider, query keys and hooks on top of the SDK (`src/provider.tsx`, `src/queries.ts`, `src/hooks.ts`).
+- `types`: `openapi.yaml` is canonical; `src/index.ts` re-exports friendly names. Generation command is in [root instructions](../AGENTS.md).
+- `sdk`: framework-independent client (`src/client.ts`, `src/errors.ts`); depends only on `@tattoo-drip/types`.
+- `react`: TanStack Query provider, keys and hooks (`src/provider.tsx`, `src/queries.ts`, `src/hooks.ts`) on the SDK.
 
 ## Rules
 
 - Change the contract first, then the SDK, then the hooks, so all three stay in step.
-- The draft contract still describes the old booking flow (`bookings.create`, availability). It must move to inquiries; see `docs/sdk.md` and the "Current state" section of `docs/architecture.md`.
+- Before API changes, read [SDK guidance](../docs/sdk.md#public-api-by-stage): the booking draft must move to inquiries. Read [architecture](../docs/architecture.md) for tenancy/module design.
 - Typecheck each package with `pnpm --filter @tattoo-drip/<name> typecheck`.
 
-Relevant docs: `docs/sdk.md`, `docs/architecture.md`.
+No test scripts here; root `pnpm test` does not cover SDK/hooks. Validate changed behavior explicitly.

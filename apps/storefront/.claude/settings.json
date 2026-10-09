@@ -5,10 +5,10 @@
 			"../../docs",
 			"../../.agents/skills"
 		],
-		"deny": [
-			"Read(./src/routeTree.gen.ts)",
-			"Read(./.env.local)",
-			"Read(./.output/**/*)"
-		]
+		"deny": ["Read(./.env.local)"]
+	},
+	"statusLine": {
+		"type": "command",
+		"command": "node \"$(git rev-parse --show-toplevel)/.claude/statusline.mjs\""
 	}
 }
