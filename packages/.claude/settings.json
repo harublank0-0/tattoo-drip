@@ -1,6 +1,9 @@
 {
 	"permissions": {
-		"additionalDirectories": ["../docs", "../.agents/skills"],
-		"deny": ["Read(./types/src/openapi.gen.ts)"]
+		"additionalDirectories": ["../docs", "../.agents/skills"]
+	},
+	"statusLine": {
+		"type": "command",
+		"command": "node \"$(git rev-parse --show-toplevel)/.claude/statusline.mjs\""
 	}
 }

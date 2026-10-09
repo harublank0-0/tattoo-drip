@@ -13,3 +13,4 @@ build
 __unconfig*
 todos.json
 *.tsbuildinfo
+.claude/task-notes/

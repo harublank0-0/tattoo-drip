@@ -5,6 +5,10 @@
 			"../../docs",
 			"../../.agents/skills"
 		],
-		"deny": ["Read(./.adonisjs/**/*)", "Read(./**/.env)", "Read(./build/**/*)"]
+		"deny": ["Read(./**/.env)"]
+	},
+	"statusLine": {
+		"type": "command",
+		"command": "node \"$(git rev-parse --show-toplevel)/.claude/statusline.mjs\""
 	}
 }
