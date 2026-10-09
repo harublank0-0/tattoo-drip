@@ -167,6 +167,29 @@ test.group("PaymentMethodService files", (group) => {
 		assert.isTrue(await exists(key));
 	});
 
+	test("a label edit from a stale form keeps the QR another edit stored", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+		const { methods } = makeService();
+		const method = await methods.create(tenant, {
+			kind: "fonepay",
+			label: "Fonepay",
+			qr: await qr(),
+		});
+		const stale = await methods.findFor(tenant, method.id);
+
+		await methods.update(tenant, method, { label: "Fonepay", qr: await qr() });
+		const replaced =
+			(await PaymentMethod.findOrFail(method.id)).qrImageKey ?? "";
+		await methods.update(tenant, stale, { label: "Fonepay (Nabil)" });
+
+		const saved = await PaymentMethod.findOrFail(method.id);
+		assert.equal(saved.label, "Fonepay (Nabil)");
+		assert.equal(saved.qrImageKey, replaced);
+		assert.isTrue(await exists(replaced));
+	});
+
 	test("replacing a QR deletes the old file", async ({ assert }) => {
 		const { tenant } = await studioWithOwner();
 		const { methods } = makeService();

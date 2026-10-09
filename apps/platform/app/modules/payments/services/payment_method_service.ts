@@ -129,38 +129,49 @@ export default class PaymentMethodService {
 		assertOwnedBy(tenant, method);
 		const details = kindDetails(method.kind, input);
 		const showOnDepositPage = input.showOnDepositPage ?? false;
-		const oldKey = method.qrImageKey;
-		const keepsQr = !!oldKey && !input.qr && !input.removeQr;
+		// Fail fast on the form's copy, before storing anything. The locked
+		// row below decides for real.
 		assertRules({
 			kind: method.kind,
 			...details,
-			hasQr: !!input.qr || keepsQr,
+			hasQr: !!input.qr || (!!method.qrImageKey && !input.removeQr),
 			showOnDepositPage,
 		});
 
 		const qr = input.qr
 			? await this.images.store(input.qr, { tenant, purpose: QR })
 			: undefined;
-		const newKey = qr?.key ?? (keepsQr ? oldKey : null);
 		let saved: PaymentMethod;
+		let oldKey: string | null;
+		let newKey: string | null;
 		try {
 			// Lock the live row first: a delete that landed since the form
-			// loaded makes this a 404 instead of editing a deleted method.
-			saved = await db.transaction(async (trx) => {
+			// loaded makes this a 404, and a QR changed by another edit is
+			// read from the row, not from the form's copy.
+			({ saved, oldKey, newKey } = await db.transaction(async (trx) => {
 				const live = await PaymentMethod.query({ client: trx })
 					.where("tenant_id", tenant.id)
 					.where("id", method.id)
 					.forUpdate()
 					.firstOrFail();
+				const previous = live.qrImageKey;
+				const keepsQr = !!previous && !input.qr && !input.removeQr;
+				assertRules({
+					kind: live.kind,
+					...details,
+					hasQr: !!input.qr || keepsQr,
+					showOnDepositPage,
+				});
+				const next = qr?.key ?? (keepsQr ? previous : null);
 				live.merge({
 					label: input.label,
 					...details,
 					showOnDepositPage,
-					qrImageKey: newKey,
+					qrImageKey: next,
 				});
 				await live.save();
-				return live;
-			});
+				return { saved: live, oldKey: previous, newKey: next };
+			}));
 		} catch (error) {
 			if (qr) await this.images.delete(QR, qr.key);
 			throw error;

@@ -77,9 +77,11 @@ export default class PaymentMethodsController {
 		const method = await this.methods.findFor(tenant, ctx.params.id);
 		const input = await ctx.request.validateUsing(updatePaymentMethodValidator);
 
-		await asFieldErrors(() => this.methods.update(tenant, method, input));
+		const saved = await asFieldErrors(() =>
+			this.methods.update(tenant, method, input),
+		);
 
-		ctx.session.flash("success", `"${method.label}" saved.`);
+		ctx.session.flash("success", `"${saved.label}" saved.`);
 		return ctx.response
 			.redirect()
 			.toRoute("tenant.settings.payments", { tenant: tenant.slug });
