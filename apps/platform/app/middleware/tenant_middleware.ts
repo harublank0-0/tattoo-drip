@@ -5,6 +5,7 @@ import type Tenant from "#modules/tenancy/models/tenant";
 import type TenantMembership from "#modules/tenancy/models/tenant_membership";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import TenancyService from "#modules/tenancy/services/tenancy_service";
+import { setRequestContext } from "#services/db_context";
 
 /**
  * Session key for the tenant the user opened last; /dashboard returns there.
@@ -29,8 +30,8 @@ declare module "@adonisjs/core/http" {
  * or deleting a tenant takes effect immediately. Anything else is the same
  * 404 as an unknown URL, so a URL never reveals that a tenant exists.
  *
- * Use after the auth middleware on the /t/:tenant route group. The Inertia
- * middleware shares `tenant` and `tenants` with the page from ctx.
+ * Use after `auth` and `dbContext` on the /t/:tenant route group. The
+ * Inertia middleware shares `tenant` and `tenants` with the page from ctx.
  */
 @inject()
 export default class TenantMiddleware {
@@ -48,6 +49,8 @@ export default class TenantMiddleware {
 
 		ctx.tenant = found.tenant;
 		ctx.membership = found.membership;
+		// Throws if the dbContext middleware did not run before this one.
+		await setRequestContext({ tenantId: found.tenant.id });
 		if (ctx.session.get(LAST_TENANT_KEY) !== found.tenant.slug) {
 			ctx.session.put(LAST_TENANT_KEY, found.tenant.slug);
 		}

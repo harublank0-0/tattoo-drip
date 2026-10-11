@@ -85,7 +85,7 @@ router
 			.use(middleware.role({ allow: ["owner"] }));
 	})
 	.prefix("/t/:tenant")
-	.use([middleware.auth(), middleware.tenant()]);
+	.use([middleware.auth(), middleware.dbContext(), middleware.tenant()]);
 
 router
 	.group(() => {
@@ -95,4 +95,4 @@ router
 		router.get("onboarding", [controllers.Onboarding, "create"]);
 		router.post("onboarding", [controllers.Onboarding, "store"]);
 	})
-	.use(middleware.auth());
+	.use([middleware.auth(), middleware.dbContext()]);

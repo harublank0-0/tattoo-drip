@@ -130,7 +130,7 @@ test.group("Tenant routes", (group) => {
 		response.assertStatus(404);
 	});
 
-	test("every /t/:tenant route runs auth, then the tenant check", ({
+	test("every /t/:tenant route runs auth, then the request transaction, then the tenant check", ({
 		assert,
 	}) => {
 		const routes = Object.values(router.toJSON())
@@ -145,6 +145,9 @@ test.group("Tenant routes", (group) => {
 			assert.include(names, "tenant", route.pattern);
 			assert.isBelow(names.indexOf("auth"), names.indexOf("tenant"));
 			assert.notEqual(names.indexOf("auth"), -1, route.pattern);
+			const dbContext = names.indexOf("dbContext");
+			assert.isAbove(dbContext, names.indexOf("auth"), route.pattern);
+			assert.isBelow(dbContext, names.indexOf("tenant"), route.pattern);
 		}
 	});
 
@@ -164,6 +167,9 @@ test.group("Tenant routes", (group) => {
 			const auth = names.indexOf("auth");
 			const tenant = names.indexOf("tenant");
 			const role = names.indexOf("role");
+			const dbContext = names.indexOf("dbContext");
+			assert.isAbove(dbContext, auth, route.pattern);
+			assert.isBelow(dbContext, tenant, route.pattern);
 			assert.isAtLeast(auth, 0, route.pattern);
 			assert.isAbove(tenant, auth, route.pattern);
 			assert.isAbove(role, tenant, route.pattern);

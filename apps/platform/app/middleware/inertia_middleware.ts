@@ -1,7 +1,9 @@
 import type { HttpContext } from "@adonisjs/core/http";
 import type { NextFn } from "@adonisjs/core/types/http";
 import BaseInertiaMiddleware from "@adonisjs/inertia/inertia_middleware";
+import type User from "#models/user";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
+import { ensureDbContext } from "#services/db_context";
 import UserTransformer from "#transformers/user_transformer";
 
 export default class InertiaMiddleware extends BaseInertiaMiddleware {
@@ -24,8 +26,12 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 
 		const tenants =
 			tenant && auth?.user
-				? await (await ctx.containerResolver.make(TenancyService)).tenantsFor(
-						auth.user,
+				? await ensureDbContext(
+						{ userId: auth.user.id, tenantId: tenant.id },
+						async () =>
+							(await ctx.containerResolver.make(TenancyService)).tenantsFor(
+								auth.user as User,
+							),
 					)
 				: undefined;
 

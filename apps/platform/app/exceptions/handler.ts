@@ -8,6 +8,7 @@ import type {
 	StatusPageRange,
 	StatusPageRenderer,
 } from "@adonisjs/core/types/http";
+import { abortRequestTransaction } from "#services/db_context";
 
 export default class HttpExceptionHandler extends ExceptionHandler {
 	/**
@@ -37,6 +38,10 @@ export default class HttpExceptionHandler extends ExceptionHandler {
 	 * response to the client
 	 */
 	async handle(error: unknown, ctx: HttpContext) {
+		// Any exception rolls the request back before anything renders, so
+		// earlier writes never commit after a failure, and the error page
+		// runs with no ambient transaction.
+		await abortRequestTransaction();
 		if (isPathTraversal(error)) {
 			return super.handle(
 				new errors.E_ROUTE_NOT_FOUND([ctx.request.method(), ctx.request.url()]),

@@ -64,6 +64,9 @@ export const runnerHooks: Required<Pick<Config, "setup" | "teardown">> = {
  */
 export const configureSuite: Config["configureSuite"] = (suite) => {
 	if (["browser", "functional", "e2e"].includes(suite.name)) {
-		return suite.setup(() => testUtils.httpServer().start());
+		return suite.setup(async () => {
+			await import("#tests/support/test_routes");
+			return testUtils.httpServer().start();
+		});
 	}
 };
