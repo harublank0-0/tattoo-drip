@@ -30,6 +30,19 @@ function studio(slug: string) {
 	};
 }
 
+/**
+ * Deletes the tenant row only and leaves its memberships live: the state the
+ * services' deleted-tenant filters defend against. Tenant.softDelete cascades
+ * to the memberships, which would hide them before those filters are reached.
+ */
+function stampDeleted(tenant: Tenant) {
+	return inTenant(tenant, () =>
+		dbClient().rawQuery("update tenants set deleted_at = now() where id = ?", [
+			tenant.id,
+		]),
+	);
+}
+
 test.group("TenancyService.createTenant", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 
@@ -124,15 +137,41 @@ test.group("TenancyService.tenantsFor", (group) => {
 		);
 		await tenancy.createTenant(ben, studio("ben-only"));
 
-		const result = await inUser(ada, () => tenancy.tenantsFor(ada));
+		// From inside ben-ink: ben's owner membership is visible there, so only
+		// the service's own user filter keeps it out of ada's list.
+		const result = await inTenantAs(other, ada, () => tenancy.tenantsFor(ada));
+		// What /dashboard runs: as the user, with no tenant.
+		const onDashboard = await inUser(ada, () => tenancy.tenantsFor(ada));
 
-		assert.deepEqual(
-			result.map(({ tenant, role }) => [tenant.slug, role]),
-			[
-				[own.slug, "owner"],
-				[other.slug, "artist"],
-			],
-		);
+		const expected = [
+			[own.slug, "owner"],
+			[other.slug, "artist"],
+		];
+		for (const list of [result, onDashboard]) {
+			assert.deepEqual(
+				list.map(({ tenant, role }) => [tenant.slug, role]),
+				expected,
+			);
+		}
+	});
+
+	test("skips a deleted tenant whose membership is still live", async ({
+		assert,
+	}) => {
+		const user = await makeUser("ada@example.com");
+		const deleted = await tenancy.createTenant(user, studio("black-needle"));
+		await tenancy.createTenant(user, studio("kept-ink"));
+		const slugs = async () =>
+			(await inTenantAs(deleted, user, () => tenancy.tenantsFor(user))).map(
+				({ tenant }) => tenant.slug,
+			);
+		assert.deepEqual(await slugs(), ["black-needle", "kept-ink"]);
+
+		await stampDeleted(deleted);
+
+		// Inside the deleted tenant, where it and the user's live membership are
+		// both visible to row-level security: the service must hide it.
+		assert.deepEqual(await slugs(), ["kept-ink"]);
 	});
 });
 
@@ -228,6 +267,22 @@ test.group("TenancyService.membershipFor", (group) => {
 			),
 		);
 	});
+
+	test("returns null for a deleted tenant whose membership is still live", async ({
+		assert,
+	}) => {
+		const owner = await makeUser("owner@example.com");
+		const tenant = await tenancy.createTenant(owner, studio("black-needle"));
+		const find = () =>
+			inTenantAs(tenant, owner, () =>
+				tenancy.membershipFor(owner, "black-needle"),
+			);
+		assert.isNotNull(await find());
+
+		await stampDeleted(tenant);
+
+		assert.isNull(await find());
+	});
 });
 
 test.group("TenancyService.hasTenant", (group) => {
@@ -236,12 +291,19 @@ test.group("TenancyService.hasTenant", (group) => {
 	test("is true with a live tenant, false without one", async ({ assert }) => {
 		const withTenant = await makeUser("with@example.com");
 		const without = await makeUser("without@example.com");
-		await tenancy.createTenant(withTenant, studio("black-needle"));
+		const tenant = await tenancy.createTenant(
+			withTenant,
+			studio("black-needle"),
+		);
 
 		assert.isTrue(
 			await inUser(withTenant, () => tenancy.hasTenant(withTenant)),
 		);
-		assert.isFalse(await inUser(without, () => tenancy.hasTenant(without)));
+		// Inside the studio: the owner's membership is visible there, so only
+		// the service's own user filter keeps it from counting for `without`.
+		assert.isFalse(
+			await inTenantAs(tenant, without, () => tenancy.hasTenant(without)),
+		);
 	});
 
 	test("is false once the user's only tenant is deleted", async ({
@@ -257,6 +319,19 @@ test.group("TenancyService.hasTenant", (group) => {
 		assert.isFalse(
 			await inTenantAs(tenant, user, () => tenancy.hasTenant(user)),
 		);
+	});
+
+	test("is false for a deleted tenant whose membership is still live", async ({
+		assert,
+	}) => {
+		const user = await makeUser("owner@example.com");
+		const tenant = await tenancy.createTenant(user, studio("black-needle"));
+		const has = () => inTenantAs(tenant, user, () => tenancy.hasTenant(user));
+		assert.isTrue(await has());
+
+		await stampDeleted(tenant);
+
+		assert.isFalse(await has());
 	});
 });
 

@@ -404,9 +404,11 @@ test.group("PaymentMethodService lists and order", (group) => {
 			);
 		});
 		// Inside red-ink, where its method is visible to row-level security:
-		// asking for it through black-needle must still find nothing.
+		// asking for black-needle's list or for it by id must still find nothing.
 		await inTenant(redInk, async () => {
 			assert.equal((await methods.findFor(redInk, theirs.id)).id, theirs.id);
+			assert.deepEqual(labels(await methods.list(redInk)), ["Theirs"]);
+			assert.deepEqual(labels(await methods.list(blackNeedle)), []);
 			await assert.rejects(
 				() => methods.findFor(blackNeedle, theirs.id),
 				/Row not found/,

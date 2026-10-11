@@ -4,7 +4,7 @@ import User from "#models/user";
 import Tenant from "#modules/tenancy/models/tenant";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
-import { inTenant, inUser } from "#tests/helpers/tenants";
+import { inTenant, inTenantAs } from "#tests/helpers/tenants";
 
 const tenancy = new TenancyService();
 
@@ -192,8 +192,12 @@ test.group("Soft deletes", (group) => {
 		});
 		await inTenant(second, () => second.softDelete());
 
-		// What /dashboard runs: as the user, with no tenant.
-		const result = await inUser(owner, () => tenancy.tenantsFor(owner));
+		// From inside the studio the owner was removed from: the removed
+		// membership and its live tenant are both visible there, so only the
+		// membership soft-delete scope keeps the studio out of the list.
+		const result = await inTenantAs(removedFrom, owner, () =>
+			tenancy.tenantsFor(owner),
+		);
 
 		assert.deepEqual(
 			result.map(({ tenant }) => tenant.slug),
