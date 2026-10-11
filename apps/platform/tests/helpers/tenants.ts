@@ -2,6 +2,7 @@ import User from "#models/user";
 import type Tenant from "#modules/tenancy/models/tenant";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
+import { withDbContext } from "#services/db_context";
 
 /**
  * A fresh studio and its owner. The owner's email comes from the slug, so
@@ -35,4 +36,12 @@ export async function artistIn(tenant: Tenant, email = "artist@example.com") {
 		role: "artist",
 	});
 	return user;
+}
+
+/**
+ * Runs `fn` in `tenant`'s context, so row-level security lets its rows
+ * through. Use it for any direct model read or write in a test.
+ */
+export function inTenant<T>(tenant: { id: string }, fn: () => Promise<T>) {
+	return withDbContext({ tenantId: tenant.id }, () => fn());
 }
