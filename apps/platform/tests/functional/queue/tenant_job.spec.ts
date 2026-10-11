@@ -1,6 +1,7 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import db from "@adonisjs/lucid/services/db";
 import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
+import { Job } from "@adonisjs/queue";
 import type { JobOptions } from "@adonisjs/queue/types";
 import { test } from "@japa/runner";
 import PaymentMethod from "#modules/payments/models/payment_method";
@@ -14,9 +15,19 @@ type Payload = { tenantId: string; label: string; fail?: boolean };
 
 const seen: { tenant: string | null; before: number }[] = [];
 const atCommit: boolean[] = [];
+const probed: { tenant: string | null; user: string | null }[] = [];
 
 async function queueRowExists(jobId: string) {
 	return Boolean(await db.from("queue_jobs").where("id", jobId).first());
+}
+
+/**
+ * A failed job's row stays in queue_jobs (config/queue.ts keeps it for 7
+ * days) with its status and the error message.
+ */
+async function queueRow(jobId: string) {
+	const row = await db.from("queue_jobs").where("id", jobId).first();
+	return row as { status: string; error: string | null } | null;
 }
 
 class WriteJob extends TenantJob<Payload> {
@@ -53,6 +64,24 @@ class WriteJob extends TenantJob<Payload> {
 	}
 }
 
+/**
+ * A plain job, outside TenantJob: it records the database settings it runs
+ * with, so a test can see what an earlier job left behind.
+ */
+class ProbeJob extends Job<{ label: string }> {
+	static options: JobOptions = { retry: { maxRetries: 0 } };
+
+	async execute() {
+		const { rows } = await dbClient().rawQuery(
+			"select current_setting('app.tenant_id', true) as tenant_id, current_setting('app.user_id', true) as user_id",
+		);
+		probed.push({
+			tenant: rows[0].tenant_id || null,
+			user: rows[0].user_id || null,
+		});
+	}
+}
+
 const trx = () => db.connection() as TransactionClientContract;
 const labelCount = (tenant: { id: string }, label: string) =>
 	inTenant(tenant, async () => {
@@ -67,7 +96,9 @@ test.group("TenantJob", (group) => {
 	group.each.setup(() => {
 		seen.length = 0;
 		atCommit.length = 0;
+		probed.length = 0;
 		registerJob(WriteJob);
+		registerJob(ProbeJob);
 	});
 
 	test("runs the handler in the payload's tenant context and commits", async ({
@@ -124,34 +155,33 @@ test.group("TenantJob", (group) => {
 	});
 
 	test("context does not leak into the next job", async ({ assert }) => {
-		const { tenant: first } = await studioWithOwner("first-shop", "First Shop");
-		const { tenant: second } = await studioWithOwner(
-			"second-shop",
-			"Second Shop",
-		);
+		const { tenant } = await studioWithOwner();
+		// Priority 1 runs before the probe's default 5, whatever the timestamps.
 		await dispatchInTransaction(
-			WriteJob.dispatch({ tenantId: first.id, label: "one" }),
+			WriteJob.dispatch({ tenantId: tenant.id, label: "one" }).priority(1),
 			trx(),
 		);
-		await dispatchInTransaction(
-			WriteJob.dispatch({ tenantId: second.id, label: "two" }),
-			trx(),
-		);
+		await dispatchInTransaction(ProbeJob.dispatch({ label: "probe" }), trx());
 
 		await processQueued();
 
-		assert.sameMembers(
-			seen.map(({ tenant }) => tenant),
-			[first.id, second.id],
+		assert.deepEqual(
+			seen.map(({ tenant: seenTenant }) => seenTenant),
+			[tenant.id],
+			"the tenant job ran in its tenant's context",
 		);
-		assert.equal(await labelCount(first, "one"), 1);
-		assert.equal(await labelCount(second, "two"), 1);
+		assert.equal(await labelCount(tenant, "one"), 1);
+		assert.deepEqual(
+			probed,
+			[{ tenant: null, user: null }],
+			"the next job ran with no tenant and no user",
+		);
 	});
 
 	test("a malformed tenantId fails the job before the handler runs", async ({
 		assert,
 	}) => {
-		await dispatchInTransaction(
+		const { jobId } = await dispatchInTransaction(
 			WriteJob.dispatch({ tenantId: "not-a-uuid", label: "never" }),
 			trx(),
 		);
@@ -159,5 +189,24 @@ test.group("TenantJob", (group) => {
 		await processQueued();
 
 		assert.lengthOf(seen, 0);
+		const row = await queueRow(jobId);
+		assert.equal(row?.status, "failed");
+		assert.match(row?.error ?? "", /needs a valid tenantId/);
+	});
+
+	test("a payload without a tenantId fails the job before the handler runs", async ({
+		assert,
+	}) => {
+		const { jobId } = await dispatchInTransaction(
+			WriteJob.dispatch({ label: "never" } as unknown as Payload),
+			trx(),
+		);
+
+		await processQueued();
+
+		assert.lengthOf(seen, 0);
+		const row = await queueRow(jobId);
+		assert.equal(row?.status, "failed");
+		assert.match(row?.error ?? "", /needs a valid tenantId/);
 	});
 });

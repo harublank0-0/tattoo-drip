@@ -19,6 +19,30 @@ async function resolveAdapters(config: QueueConfig) {
 }
 
 /**
+ * The adapters the app builds at boot, built again. A test's global
+ * transaction is hidden while they are resolved: `db.connection()` returns
+ * it, and `drivers.database` would capture its client, tying the app's
+ * queue to a transaction that ends with the test. Every later test in the
+ * process would then fail with "Transaction query already complete".
+ */
+async function resolveAppAdapters(config: QueueConfig) {
+	const open = new Map(db.connectionGlobalTransactions);
+	db.connectionGlobalTransactions.clear();
+	try {
+		return await resolveAdapters(config);
+	} finally {
+		for (const [name, trx] of open)
+			db.connectionGlobalTransactions.set(name, trx);
+	}
+}
+
+/**
+ * Each job takes two cycles (started, completed), plus the idle one that
+ * ends the drain. Far more than a test queues.
+ */
+const MAX_CYCLES = 100;
+
+/**
  * Makes a job class defined in a test findable by the worker.
  */
 export function registerJob(JobClass: {
@@ -64,15 +88,25 @@ export async function processQueued(queues: string[] = ["default"]) {
 	} as never);
 
 	try {
-		let cycle = await worker.processCycle(queues);
-		while (cycle && cycle.type !== "idle") {
-			cycle = await worker.processCycle(queues);
+		for (let cycle = 0; cycle < MAX_CYCLES; cycle++) {
+			const result = await worker.processCycle(queues);
+			if (!result || result.type === "idle") return;
+			// The worker turns any failure of its own (polling, stalled-job check)
+			// into an error cycle and carries on. A test wants to see it, and
+			// polling again would only repeat it.
+			if (result.type === "error") throw result.error;
 		}
-		await worker.stop();
+		throw new Error(
+			`processQueued: the queue was still busy after ${MAX_CYCLES} cycles (a job that keeps re-queuing itself?)`,
+		);
 	} finally {
-		await QueueManager.init({
-			...base,
-			adapters: await resolveAdapters(config),
-		} as never);
+		try {
+			await worker.stop();
+		} finally {
+			await QueueManager.init({
+				...base,
+				adapters: await resolveAppAdapters(config),
+			} as never);
+		}
 	}
 }
