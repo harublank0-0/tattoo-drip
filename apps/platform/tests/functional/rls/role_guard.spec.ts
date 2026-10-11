@@ -68,14 +68,23 @@ test.group("assertRestrictedDbRole", (group) => {
 });
 
 /**
- * Boots a real process. The process has to end by itself, hence the timeout:
- * one that keeps running comes back as `killed`, which is a failure.
+ * Boots a real process. It has to end by itself within `timeout`; one that
+ * keeps running is killed and comes back as `killed`, which is a failure.
+ * SIGKILL, not execFile's default SIGTERM: a warmup app (codegen) handles
+ * SIGTERM with app.terminate(), which skips provider shutdown there, so a
+ * hung one would ignore it, keep the promise pending until Japa's timeout and
+ * outlive the test run.
  */
-async function boot(args: string[], overrides: Record<string, string>) {
+async function boot(
+	args: string[],
+	overrides: Record<string, string>,
+	timeout = 30_000,
+) {
 	try {
 		const { stdout, stderr } = await run("node", args, {
 			cwd: app.makePath(),
-			timeout: 30_000,
+			timeout,
+			killSignal: "SIGKILL",
 			env: {
 				...process.env,
 				PORT: String(env.get("PORT") + 1),
@@ -135,9 +144,12 @@ test.group("boot guard", () => {
 	test("codegen does not run the guard or need the database", async ({
 		assert,
 	}) => {
-		const { exitCode, killed, output } = await boot(["ace.js", "codegen"], {
-			DB_PORT: "55999",
-		});
+		// Codegen takes a couple of seconds: a hung one fails the test in 15.
+		const { exitCode, killed, output } = await boot(
+			["ace.js", "codegen"],
+			{ DB_PORT: "55999" },
+			15_000,
+		);
 
 		assert.isFalse(killed);
 		assert.notMatch(output, /ECONNREFUSED/);
