@@ -1,6 +1,5 @@
 import { inject } from "@adonisjs/core";
 import type { MultipartFile } from "@adonisjs/core/bodyparser";
-import db from "@adonisjs/lucid/services/db";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
 import { PaymentMethodRuleError } from "#modules/payments/errors";
@@ -13,6 +12,11 @@ import {
 	type PaymentMethodState,
 } from "#modules/payments/rules";
 import type Tenant from "#modules/tenancy/models/tenant";
+import {
+	afterCommit,
+	afterRollback,
+	withTransaction,
+} from "#services/db_context";
 
 type Upload = Pick<MultipartFile, "tmpPath">;
 type TenantRef = Pick<Tenant, "id">;
@@ -85,41 +89,43 @@ export default class PaymentMethodService {
 			showOnDepositPage,
 		});
 
-		const qr = input.qr
-			? await this.images.store(input.qr, { tenant, purpose: QR })
-			: undefined;
-		try {
-			return await db.transaction(async (trx) => {
-				const last = await trx
-					.from("payment_methods")
-					.where("tenant_id", tenant.id)
-					.whereNull("deleted_at")
-					.max("position as max")
-					.first();
-				return PaymentMethod.create(
-					{
-						tenantId: tenant.id,
-						kind: input.kind,
-						label: input.label,
-						...details,
-						showOnDepositPage,
-						qrImageKey: qr?.key ?? null,
-						// The first method gets 0. Ties from two adds at once are
-						// harmless: move() renumbers.
-						position: (last?.max ?? -1) + 1,
-					},
-					{ client: trx },
-				);
-			});
-		} catch (error) {
-			if (qr) await this.images.delete(QR, qr.key);
-			throw error;
-		}
+		return withTransaction(async (trx) => {
+			// Stored inside the transaction: if it cannot open, nothing was
+			// stored. The cleanup is registered right after the store resolves,
+			// with no await in between, so no failure can fall between the two.
+			// If this level rolls back, or the request fails later, no row will
+			// point at the file. The cost: outside a request, the image is
+			// processed with a transaction open.
+			const qr = input.qr
+				? await this.images.store(input.qr, { tenant, purpose: QR })
+				: undefined;
+			if (qr) afterRollback(() => this.images.delete(QR, qr.key));
+			const last = await trx
+				.from("payment_methods")
+				.where("tenant_id", tenant.id)
+				.whereNull("deleted_at")
+				.max("position as max")
+				.first();
+			return PaymentMethod.create(
+				{
+					tenantId: tenant.id,
+					kind: input.kind,
+					label: input.label,
+					...details,
+					showOnDepositPage,
+					qrImageKey: qr?.key ?? null,
+					// The first method gets 0. Ties from two adds at once are
+					// harmless: move() renumbers.
+					position: (last?.max ?? -1) + 1,
+				},
+				{ client: trx },
+			);
+		});
 	}
 
 	/**
 	 * Saves an edit. A new `qr` replaces the stored one; `removeQr` drops
-	 * it. The old file is deleted once the row is saved.
+	 * it. The old file is deleted once the outermost transaction commits.
 	 */
 	async update(
 		tenant: TenantRef,
@@ -138,47 +144,45 @@ export default class PaymentMethodService {
 			showOnDepositPage,
 		});
 
-		const qr = input.qr
-			? await this.images.store(input.qr, { tenant, purpose: QR })
-			: undefined;
-		let saved: PaymentMethod;
-		let oldKey: string | null;
-		let newKey: string | null;
-		try {
-			// Lock the live row first: a delete that landed since the form
+		return withTransaction(async (trx) => {
+			// Stored inside the transaction, as in create(): nothing is stored
+			// if it cannot open, and the cleanup is registered right after the
+			// store resolves. It comes before the row lock below, so the lock is
+			// not held while the image is processed.
+			const qr = input.qr
+				? await this.images.store(input.qr, { tenant, purpose: QR })
+				: undefined;
+			if (qr) afterRollback(() => this.images.delete(QR, qr.key));
+			// Lock the live row: a delete that landed since the form
 			// loaded makes this a 404, and a QR changed by another edit is
 			// read from the row, not from the form's copy.
-			({ saved, oldKey, newKey } = await db.transaction(async (trx) => {
-				const live = await PaymentMethod.query({ client: trx })
-					.where("tenant_id", tenant.id)
-					.where("id", method.id)
-					.forUpdate()
-					.firstOrFail();
-				const previous = live.qrImageKey;
-				const keepsQr = !!previous && !input.qr && !input.removeQr;
-				assertRules({
-					kind: live.kind,
-					...details,
-					hasQr: !!input.qr || keepsQr,
-					showOnDepositPage,
-				});
-				const next = qr?.key ?? (keepsQr ? previous : null);
-				live.merge({
-					label: input.label,
-					...details,
-					showOnDepositPage,
-					qrImageKey: next,
-				});
-				await live.save();
-				return { saved: live, oldKey: previous, newKey: next };
-			}));
-		} catch (error) {
-			if (qr) await this.images.delete(QR, qr.key);
-			throw error;
-		}
-
-		if (oldKey && oldKey !== newKey) await this.images.delete(QR, oldKey);
-		return saved;
+			const live = await PaymentMethod.query({ client: trx })
+				.where("tenant_id", tenant.id)
+				.where("id", method.id)
+				.forUpdate()
+				.firstOrFail();
+			const previous = live.qrImageKey;
+			const keepsQr = !!previous && !input.qr && !input.removeQr;
+			assertRules({
+				kind: live.kind,
+				...details,
+				hasQr: !!input.qr || keepsQr,
+				showOnDepositPage,
+			});
+			const next = qr?.key ?? (keepsQr ? previous : null);
+			live.merge({
+				label: input.label,
+				...details,
+				showOnDepositPage,
+				qrImageKey: next,
+			});
+			await live.save();
+			// The replaced file goes only once the change is committed for good.
+			if (previous && previous !== next) {
+				afterCommit(() => this.images.delete(QR, previous));
+			}
+			return live;
+		});
 	}
 
 	/**
@@ -191,7 +195,7 @@ export default class PaymentMethodService {
 		method: PaymentMethod,
 		direction: "up" | "down",
 	): Promise<void> {
-		await db.transaction(async (trx) => {
+		await withTransaction(async (trx) => {
 			const methods = await PaymentMethod.query({ client: trx })
 				.where("tenant_id", tenant.id)
 				.orderBy("position", "asc")

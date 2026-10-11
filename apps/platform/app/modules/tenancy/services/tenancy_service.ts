@@ -1,4 +1,3 @@
-import db from "@adonisjs/lucid/services/db";
 import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
 import type User from "#models/user";
 import { LastOwnerError, SlugTakenError } from "#modules/tenancy/errors";
@@ -6,6 +5,7 @@ import Tenant, { type TenantType } from "#modules/tenancy/models/tenant";
 import TenantMembership, {
 	type MembershipRole,
 } from "#modules/tenancy/models/tenant_membership";
+import { dbClient, withDbContext } from "#services/db_context";
 
 export type NewTenant = {
 	type: TenantType;
@@ -50,8 +50,12 @@ export default class TenancyService {
 	 */
 	async createTenant(owner: User, input: NewTenant): Promise<Tenant> {
 		try {
-			return await db.transaction(async (trx) => {
-				const tenant = await Tenant.create(input, { client: trx });
+			// The id comes first so the inserts run in the new tenant's context:
+			// row-level security only lets a tenant row in for its own id.
+			const { rows } = await dbClient().rawQuery("select uuidv7() as id");
+			const id: string = rows[0].id;
+			return await withDbContext({ tenantId: id }, async (trx) => {
+				const tenant = await Tenant.create({ id, ...input }, { client: trx });
 				await TenantMembership.create(
 					{ tenantId: tenant.id, userId: owner.id, role: "owner" },
 					{ client: trx },
@@ -59,8 +63,8 @@ export default class TenancyService {
 				return tenant;
 			});
 		} catch (error) {
-			// Validation checks the slug first; this catches a signup that
-			// took the same slug in between.
+			// The unique index is the only slug check; a taken slug (a deleted
+			// tenant's included) and a racing signup both land here.
 			if (isUniqueViolation(error, "tenants_slug_unique")) {
 				throw new SlugTakenError(input.slug);
 			}

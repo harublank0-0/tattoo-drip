@@ -30,6 +30,8 @@ export default await Env.create(new URL("../", import.meta.url), {
 	DB_PORT: Env.schema.number(),
 	DB_USER: Env.schema.string(),
 	DB_PASSWORD: Env.schema.string.optional(),
+	DB_MIGRATION_USER: Env.schema.string(),
+	DB_MIGRATION_PASSWORD: Env.schema.string.optional(),
 	DB_DATABASE: Env.schema.string(),
 
 	// Mail (Mailpit in development; any provider's SMTP endpoint in production)

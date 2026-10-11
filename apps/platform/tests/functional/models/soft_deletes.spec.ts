@@ -4,6 +4,7 @@ import User from "#models/user";
 import Tenant from "#modules/tenancy/models/tenant";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
+import { inTenant, inTenantAs } from "#tests/helpers/tenants";
 
 const tenancy = new TenancyService();
 
@@ -29,11 +30,18 @@ test.group("Soft deletes", (group) => {
 	}) => {
 		const { tenant } = await ownerWithTenant();
 
-		await tenant.softDelete();
+		await inTenant(tenant, async () => {
+			await tenant.softDelete();
 
-		assert.isNotNull(tenant.deletedAt);
-		assert.isNull(await Tenant.find(tenant.id));
-		assert.isNull(await Tenant.query().where("id", tenant.id).first());
+			assert.isNotNull(tenant.deletedAt);
+			assert.isNull(await Tenant.find(tenant.id));
+			assert.isNull(await Tenant.query().where("id", tenant.id).first());
+			// The row is still visible to this context: only the soft-delete
+			// filter hides it, so the checks above do not pass for lack of access.
+			assert.isNotNull(
+				await Tenant.withTrashed().where("id", tenant.id).first(),
+			);
+		});
 	});
 
 	test("withTrashed includes deleted rows; onlyTrashed returns only them", async ({
@@ -41,55 +49,75 @@ test.group("Soft deletes", (group) => {
 	}) => {
 		const { tenant: deleted } = await ownerWithTenant("gone-ink");
 		const { tenant: live } = await ownerWithTenant("live-ink");
-		await deleted.softDelete();
+		await inTenant(deleted, () => deleted.softDelete());
 
-		const all = await Tenant.withTrashed().whereIn("id", [deleted.id, live.id]);
-		const trashed = await Tenant.onlyTrashed().whereIn("id", [
-			deleted.id,
-			live.id,
-		]);
-
-		assert.sameMembers(
-			all.map((tenant) => tenant.id),
-			[deleted.id, live.id],
-		);
-		assert.deepEqual(
-			trashed.map((tenant) => tenant.id),
-			[deleted.id],
-		);
+		// One tenant is visible per context, so each is read in its own.
+		await inTenant(deleted, async () => {
+			const all = await Tenant.withTrashed().where("id", deleted.id);
+			const trashed = await Tenant.onlyTrashed().where("id", deleted.id);
+			assert.deepEqual(
+				all.map((tenant) => tenant.id),
+				[deleted.id],
+			);
+			assert.deepEqual(
+				trashed.map((tenant) => tenant.id),
+				[deleted.id],
+			);
+		});
+		await inTenant(live, async () => {
+			const all = await Tenant.withTrashed().where("id", live.id);
+			const trashed = await Tenant.onlyTrashed().where("id", live.id);
+			assert.deepEqual(
+				all.map((tenant) => tenant.id),
+				[live.id],
+				"visible to this context",
+			);
+			assert.lengthOf(trashed, 0, "but not deleted, so not in onlyTrashed");
+		});
 	});
 
 	test("restore brings a deleted row back", async ({ assert }) => {
 		const { tenant } = await ownerWithTenant();
-		await tenant.softDelete();
 
-		await tenant.restore();
+		await inTenant(tenant, async () => {
+			await tenant.softDelete();
 
-		assert.isNull(tenant.deletedAt);
-		assert.isNotNull(await Tenant.find(tenant.id));
+			await tenant.restore();
+
+			assert.isNull(tenant.deletedAt);
+			assert.isNotNull(await Tenant.find(tenant.id));
+		});
 	});
 
 	test("a removed member can be added back, but never twice at once", async ({
 		assert,
 	}) => {
 		const { owner, tenant } = await ownerWithTenant();
-		const membership = await TenantMembership.query()
-			.where("tenant_id", tenant.id)
-			.firstOrFail();
+		await inTenant(tenant, async () => {
+			const membership = await TenantMembership.query()
+				.where("tenant_id", tenant.id)
+				.firstOrFail();
 
-		await membership.softDelete();
-		await TenantMembership.create({
-			tenantId: tenant.id,
-			userId: owner.id,
-			role: "artist",
-		});
-
-		await assert.rejects(() =>
-			TenantMembership.create({
+			await membership.softDelete();
+			await TenantMembership.create({
 				tenantId: tenant.id,
 				userId: owner.id,
-				role: "owner",
-			}),
+				role: "artist",
+			});
+		});
+
+		// Its own context, so the failed insert rolls back only itself. The
+		// message check keeps a policy refusal from passing for the unique index.
+		await assert.rejects(
+			() =>
+				inTenant(tenant, () =>
+					TenantMembership.create({
+						tenantId: tenant.id,
+						userId: owner.id,
+						role: "owner",
+					}),
+				),
+			/duplicate key value violates unique constraint/,
 		);
 	});
 
@@ -98,16 +126,18 @@ test.group("Soft deletes", (group) => {
 	}) => {
 		const { tenant } = await ownerWithTenant();
 
-		await tenant.softDelete();
+		await inTenant(tenant, async () => {
+			await tenant.softDelete();
 
-		const live = await TenantMembership.query().where("tenant_id", tenant.id);
-		const all = await TenantMembership.withTrashed().where(
-			"tenant_id",
-			tenant.id,
-		);
-		assert.lengthOf(live, 0);
-		assert.lengthOf(all, 1);
-		assert.isNotNull(all[0].deletedAt);
+			const live = await TenantMembership.query().where("tenant_id", tenant.id);
+			const all = await TenantMembership.withTrashed().where(
+				"tenant_id",
+				tenant.id,
+			);
+			assert.lengthOf(live, 0);
+			assert.lengthOf(all, 1);
+			assert.isNotNull(all[0].deletedAt);
+		});
 	});
 
 	test("deleting a tenant keeps when earlier members were removed", async ({
@@ -118,21 +148,24 @@ test.group("Soft deletes", (group) => {
 			email: "artist@example.com",
 			password: "secret-password",
 		});
-		const artist = await TenantMembership.create({
-			tenantId: tenant.id,
-			userId: artistUser.id,
-			role: "artist",
+
+		await inTenant(tenant, async () => {
+			const artist = await TenantMembership.create({
+				tenantId: tenant.id,
+				userId: artistUser.id,
+				role: "artist",
+			});
+			await artist.softDelete();
+			const removedAt = artist.deletedAt?.toMillis();
+
+			await new Promise((resolve) => setTimeout(resolve, 20));
+			await tenant.softDelete();
+
+			const reloaded = await TenantMembership.withTrashed()
+				.where("id", artist.id)
+				.firstOrFail();
+			assert.equal(reloaded.deletedAt?.toMillis(), removedAt);
 		});
-		await artist.softDelete();
-		const removedAt = artist.deletedAt?.toMillis();
-
-		await new Promise((resolve) => setTimeout(resolve, 20));
-		await tenant.softDelete();
-
-		const reloaded = await TenantMembership.withTrashed()
-			.where("id", artist.id)
-			.firstOrFail();
-		assert.equal(reloaded.deletedAt?.toMillis(), removedAt);
 	});
 
 	test("tenantsFor skips deleted memberships and deleted tenants", async ({
@@ -151,13 +184,20 @@ test.group("Soft deletes", (group) => {
 			slug: "kept",
 			timezone: "Asia/Kathmandu",
 		});
-		const membership = await TenantMembership.query()
-			.where("tenant_id", removedFrom.id)
-			.firstOrFail();
-		await membership.softDelete();
-		await second.softDelete();
+		await inTenant(removedFrom, async () => {
+			const membership = await TenantMembership.query()
+				.where("tenant_id", removedFrom.id)
+				.firstOrFail();
+			await membership.softDelete();
+		});
+		await inTenant(second, () => second.softDelete());
 
-		const result = await tenancy.tenantsFor(owner);
+		// From inside the studio the owner was removed from: the removed
+		// membership and its live tenant are both visible there, so only the
+		// membership soft-delete scope keeps the studio out of the list.
+		const result = await inTenantAs(removedFrom, owner, () =>
+			tenancy.tenantsFor(owner),
+		);
 
 		assert.deepEqual(
 			result.map(({ tenant }) => tenant.slug),

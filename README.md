@@ -32,10 +32,18 @@ pnpm podman:up                           # Postgres 18, Redis, Mailpit (foregrou
 Then, in a second terminal:
 
 ```bash
-pnpm --filter @tattoo-drip/platform exec node ace migration:run
+pnpm --filter @tattoo-drip/platform migrate
 ```
 
-`pnpm podman:up` runs in the foreground and streams the services' logs; `Ctrl+C` stops them, and `pnpm podman:up -d` runs them in the background instead. It reads `DB_USER`, `DB_PASSWORD`, `DB_DATABASE` and `DB_PORT` from `apps/platform/.env`, so the container and the app always agree, and Postgres creates the database on first start. Postgres only applies these values when its data volume is first created: after changing them, recreate it with `podman-compose down -v` (this deletes local data).
+`pnpm podman:up` runs in the foreground and streams the services' logs; `Ctrl+C` stops them, and `pnpm podman:up -d` runs them in the background instead. It reads `DB_MIGRATION_USER`, `DB_MIGRATION_PASSWORD`, `DB_USER`, `DB_PASSWORD`, `DB_DATABASE` and `DB_PORT` from `apps/platform/.env`, so the container and the app always agree, and Postgres creates the database on first start. Postgres only applies these values when its data volume is first created: after changing them, recreate it with `podman-compose down -v` (this deletes local data).
+
+The database has two roles. `DB_MIGRATION_USER` (the owner, `postgres` by default) owns the tables and runs migrations; `DB_USER` (`tattoo_drip_app`) is the restricted role the app connects as, and row-level security applies to it, not to the owner. A new volume gets the app role from `docker/postgres/init`. For an existing dev database, create it once, then copy the new `DB_*` lines from `apps/platform/.env.example` into your `.env`:
+
+    PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d tattoo_drip -v ON_ERROR_STOP=1 \
+      -v app_user=tattoo_drip_app -v app_password=tattoo_drip_app -v owner_user=postgres \
+      -f apps/platform/database/setup_roles.sql
+
+An existing checkout must update `apps/platform/.env` from `.env.example` before `pnpm dev`, `pnpm test` or the platform's `pnpm migrate` work: `DB_USER` / `DB_PASSWORD` become the app role, and `DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD` are new. The server and the test runner refuse to boot as a role that bypasses row-level security. More in [database conventions](apps/platform/database/README.md#row-level-security).
 
 ## Commands
 

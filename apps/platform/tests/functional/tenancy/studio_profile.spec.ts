@@ -1,7 +1,7 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import Tenant from "#modules/tenancy/models/tenant";
-import { artistIn, studioWithOwner } from "#tests/helpers/tenants";
+import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 import { assertValidationError } from "#tests/helpers/validation";
 
 /**
@@ -68,7 +68,10 @@ test.group("Studio settings access", (group) => {
 			const response = await request.withCsrfToken().loginAs(artist);
 			response.assertStatus(404);
 		}
-		assert.equal((await Tenant.findOrFail(tenant.id)).name, "Black Needle");
+		assert.equal(
+			(await inTenant(tenant, () => Tenant.findOrFail(tenant.id))).name,
+			"Black Needle",
+		);
 	});
 });
 
@@ -91,7 +94,7 @@ test.group("Saving the studio profile", (group) => {
 		response.assertStatus(302);
 		response.assertHeader("location", "/t/black-needle/settings/profile");
 		response.assertFlashMessage("success", "Profile saved.");
-		const saved = await Tenant.findOrFail(tenant.id);
+		const saved = await inTenant(tenant, () => Tenant.findOrFail(tenant.id));
 		assert.equal(saved.name, "Black Needle Tattoo");
 		assert.equal(saved.contactPhone, "+9779812345678");
 		assert.equal(saved.instagramUrl, "https://instagram.com/blackneedle");
@@ -111,7 +114,7 @@ test.group("Saving the studio profile", (group) => {
 			.withCsrfToken()
 			.loginAs(owner);
 
-		const saved = await Tenant.findOrFail(tenant.id);
+		const saved = await inTenant(tenant, () => Tenant.findOrFail(tenant.id));
 		assert.isNull(saved.intro);
 		assert.isNull(saved.instagramUrl);
 	});
@@ -145,7 +148,7 @@ test.group("Saving the studio profile", (group) => {
 			.withCsrfToken()
 			.loginAs(owner);
 
-		const saved = await Tenant.findOrFail(tenant.id);
+		const saved = await inTenant(tenant, () => Tenant.findOrFail(tenant.id));
 		assert.equal(saved.slug, "black-needle");
 		assert.equal(saved.type, "studio");
 	});

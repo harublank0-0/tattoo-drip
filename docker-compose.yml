@@ -3,15 +3,21 @@ services:
     image: docker.io/library/postgres:18-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      # The cluster is bootstrapped by the owner. The app role is created by
+      # the init script, from DB_USER and DB_PASSWORD.
+      POSTGRES_USER: ${DB_MIGRATION_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_MIGRATION_PASSWORD:-postgres}
       POSTGRES_DB: ${DB_DATABASE:-tattoo_drip}
+      APP_DB_USER: ${DB_USER:-tattoo_drip_app}
+      APP_DB_PASSWORD: ${DB_PASSWORD:-tattoo_drip_app}
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+      - ./apps/platform/database/setup_roles.sql:/opt/setup_roles.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_DATABASE:-tattoo_drip}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_MIGRATION_USER:-postgres} -d ${DB_DATABASE:-tattoo_drip}"]
       interval: 5s
       timeout: 5s
       retries: 5
