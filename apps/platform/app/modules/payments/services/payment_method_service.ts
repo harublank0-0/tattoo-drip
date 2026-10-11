@@ -89,12 +89,16 @@ export default class PaymentMethodService {
 			showOnDepositPage,
 		});
 
-		const qr = input.qr
-			? await this.images.store(input.qr, { tenant, purpose: QR })
-			: undefined;
 		return withTransaction(async (trx) => {
-			// The file is already stored. If this level rolls back, or the
-			// request fails later, no row will point at it.
+			// Stored inside the transaction: if it cannot open, nothing was
+			// stored. The cleanup is registered right after the store resolves,
+			// with no await in between, so no failure can fall between the two.
+			// If this level rolls back, or the request fails later, no row will
+			// point at the file. The cost: outside a request, the image is
+			// processed with a transaction open.
+			const qr = input.qr
+				? await this.images.store(input.qr, { tenant, purpose: QR })
+				: undefined;
 			if (qr) afterRollback(() => this.images.delete(QR, qr.key));
 			const last = await trx
 				.from("payment_methods")
@@ -140,14 +144,16 @@ export default class PaymentMethodService {
 			showOnDepositPage,
 		});
 
-		const qr = input.qr
-			? await this.images.store(input.qr, { tenant, purpose: QR })
-			: undefined;
 		return withTransaction(async (trx) => {
-			// The file is already stored. If this level rolls back, or the
-			// request fails later, no row will point at it.
+			// Stored inside the transaction, as in create(): nothing is stored
+			// if it cannot open, and the cleanup is registered right after the
+			// store resolves. It comes before the row lock below, so the lock is
+			// not held while the image is processed.
+			const qr = input.qr
+				? await this.images.store(input.qr, { tenant, purpose: QR })
+				: undefined;
 			if (qr) afterRollback(() => this.images.delete(QR, qr.key));
-			// Lock the live row first: a delete that landed since the form
+			// Lock the live row: a delete that landed since the form
 			// loaded makes this a 404, and a QR changed by another edit is
 			// read from the row, not from the form's copy.
 			const live = await PaymentMethod.query({ client: trx })
