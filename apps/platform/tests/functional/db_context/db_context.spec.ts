@@ -370,8 +370,9 @@ test.group("Model adapter", (group) => {
 			assert.strictEqual(TenantMembership.query().client, trx);
 
 			const [membership] = await TenantMembership.query().preload("tenant");
-			// Lucid keeps a transaction client on `$trx`; `$options` only holds the
-			// connection name.
+			// Lucid records a transaction client on `$trx`. The query builder hands
+			// `{ client, connection }` to the instance, but the `$options` setter
+			// keeps only the connection name, so `$options.client` is never it.
 			assert.strictEqual(membership.$trx, trx);
 			assert.strictEqual(membership.tenant.$trx, trx);
 		});
