@@ -1,5 +1,5 @@
 -- Creates the restricted app role and grants it what it needs. Run once per
--- database, as the owner (or any role that may create roles), before the
+-- database, as a superuser (see database/README.md, Operations), before the
 -- first `pnpm migrate`. Safe to run again: it always puts the role back to
 -- a login role with no special powers.
 --
