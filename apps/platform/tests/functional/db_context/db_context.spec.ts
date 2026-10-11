@@ -19,6 +19,7 @@ import { studioWithOwner } from "#tests/helpers/tenants";
 
 const USER = "00000000-0000-4000-8000-000000000001";
 const TENANT = "00000000-0000-4000-8000-000000000002";
+const OTHER_TENANT = "00000000-0000-4000-8000-000000000003";
 
 async function setting(name: "app.user_id" | "app.tenant_id") {
 	const { rows } = await dbClient().rawQuery(
@@ -82,6 +83,72 @@ test.group("db_context settings", (group) => {
 			);
 			const { rows } = await dbClient().rawQuery("select 1 as ok");
 			assert.equal(rows[0].ok, 1);
+		});
+	});
+
+	test("sequential contexts under one parent each inherit the parent's values, not each other's", async ({
+		assert,
+	}) => {
+		await withDbContext({ tenantId: TENANT }, async () => {
+			await withDbContext(
+				{ userId: USER, tenantId: OTHER_TENANT },
+				async () => {
+					assert.equal(await setting("app.user_id"), USER);
+					assert.equal(await setting("app.tenant_id"), OTHER_TENANT);
+				},
+			);
+
+			await withDbContext({}, async () => {
+				assert.isNull(await setting("app.user_id"));
+				assert.equal(await setting("app.tenant_id"), TENANT);
+			});
+
+			assert.isNull(await setting("app.user_id"));
+			assert.equal(await setting("app.tenant_id"), TENANT);
+		});
+	});
+
+	test("overlapping contexts under one parent are refused and leave the parent's settings alone", async ({
+		assert,
+	}) => {
+		await withDbContext({ userId: USER, tenantId: TENANT }, async () => {
+			const results = await Promise.allSettled([
+				withDbContext({ tenantId: OTHER_TENANT }, async () =>
+					setting("app.tenant_id"),
+				),
+				withDbContext({}, async () => setting("app.tenant_id")),
+			]);
+
+			assert.equal(results[0].status, "fulfilled");
+			assert.equal(
+				(results[0] as PromiseFulfilledResult<string | null>).value,
+				OTHER_TENANT,
+			);
+			assert.equal(results[1].status, "rejected");
+			assert.match(
+				String((results[1] as PromiseRejectedResult).reason),
+				/Overlapping withDbContext calls in one transaction/,
+			);
+
+			assert.equal(await setting("app.user_id"), USER);
+			assert.equal(await setting("app.tenant_id"), TENANT);
+		});
+	});
+
+	test("a context can start again once the previous one has finished", async ({
+		assert,
+	}) => {
+		await withDbContext({ tenantId: TENANT }, async () => {
+			await assert.rejects(
+				() =>
+					withDbContext({ tenantId: OTHER_TENANT }, async () => {
+						throw new Error("first fails");
+					}),
+				"first fails",
+			);
+			await withDbContext({ userId: USER }, async () => {
+				assert.equal(await setting("app.tenant_id"), TENANT);
+			});
 		});
 	});
 
@@ -204,6 +271,56 @@ test.group("db_context request transaction", (group) => {
 		assert.deepEqual(calls, ["commit"]);
 		assert.isNull(await setting("app.user_id"));
 		assert.isNull(await setting("app.tenant_id"));
+	});
+
+	test("values set at the request level reach the wrappers started after", async ({
+		assert,
+	}) => {
+		await runInRequestTransaction({}, async () => {
+			await setRequestContext({ userId: USER });
+			await setRequestContext({ tenantId: TENANT });
+
+			await withDbContext({}, async () => {
+				assert.equal(await setting("app.user_id"), USER);
+				assert.equal(await setting("app.tenant_id"), TENANT);
+			});
+
+			await withTransaction(async () => {
+				await withDbContext({ userId: OTHER_TENANT }, async () => {
+					assert.equal(await setting("app.user_id"), OTHER_TENANT);
+					assert.equal(await setting("app.tenant_id"), TENANT);
+				});
+			});
+
+			assert.equal(await setting("app.user_id"), USER);
+			assert.equal(await setting("app.tenant_id"), TENANT);
+		});
+	});
+
+	test("setRequestContext inside a nested wrapper throws and changes nothing", async ({
+		assert,
+	}) => {
+		await runInRequestTransaction({ userId: USER }, async () => {
+			await withDbContext({}, async () => {
+				await assert.rejects(
+					() => setRequestContext({ tenantId: TENANT }),
+					/setRequestContext.*outermost/,
+				);
+				assert.isNull(await setting("app.tenant_id"));
+			});
+
+			await withTransaction(async () => {
+				await assert.rejects(
+					() => setRequestContext({ tenantId: TENANT }),
+					/setRequestContext.*outermost/,
+				);
+			});
+
+			await withDbContext({}, async () => {
+				assert.isNull(await setting("app.tenant_id"));
+			});
+			assert.isNull(await setting("app.tenant_id"));
+		});
 	});
 
 	test("abortRequestTransaction rolls back, runs rollback callbacks, detaches, and is idempotent", async ({

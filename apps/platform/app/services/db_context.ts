@@ -24,13 +24,12 @@ class Level {
 }
 
 /**
- * State shared by every level of one outermost transaction.
+ * State shared by every level of one outermost transaction. The effective
+ * settings are not here: they differ per level (see Store).
  */
 type Root = {
 	trx: TransactionClientContract;
 	level: Level;
-	userId?: string;
-	tenantId?: string;
 	/** True once abortRequestTransaction() rolled the root back. */
 	detached: boolean;
 };
@@ -40,6 +39,15 @@ type Store = {
 	/** The innermost transaction client: a savepoint inside nested levels. */
 	client: TransactionClientContract;
 	level: Level;
+	/**
+	 * The settings in force at this level. Each wrapper builds its child's
+	 * values from its parent's, so concurrent branches cannot overwrite each
+	 * other through shared state. Only the outermost level's values change
+	 * after creation (setRequestContext).
+	 */
+	values: DbContextValues;
+	/** withDbContext calls running directly under this level. */
+	openContexts: number;
 };
 
 const storage = new AsyncLocalStorage<Store>();
@@ -116,10 +124,17 @@ async function openRoot<T>(
 
 	try {
 		const result = await base.transaction(async (trx) => {
-			const root: Root = { trx, level, detached: false, ...values };
+			const root: Root = { trx, level, detached: false };
 			state.root = root;
 			await applySettings(trx, values);
-			return storage.run({ root, client: trx, level }, () => fn(trx));
+			const store: Store = {
+				root,
+				client: trx,
+				level,
+				values: { userId: values.userId, tenantId: values.tenantId },
+				openContexts: 0,
+			};
+			return storage.run(store, () => fn(trx));
 		});
 		if (!state.root?.detached) {
 			if (outer) await applySettings(base, outer);
@@ -133,21 +148,27 @@ async function openRoot<T>(
 }
 
 /**
- * Runs `fn` in a savepoint when a transaction is already open, else in a
- * new one. A failure rolls back only this level.
+ * Runs `fn` in a savepoint under `parent`, with `values` in force for the
+ * level. A failure rolls back only this level.
  */
-export async function withTransaction<T>(
+async function runInSavepoint<T>(
+	parent: Store,
+	values: DbContextValues,
 	fn: (trx: TransactionClientContract) => Promise<T>,
 ): Promise<T> {
-	const parent = active();
-	if (!parent) return openRoot({}, fn);
-
 	const level = new Level();
 	let result: T;
 	try {
 		result = await parent.client.transaction(async (savepoint) =>
-			storage.run({ root: parent.root, client: savepoint, level }, () =>
-				fn(savepoint),
+			storage.run(
+				{
+					root: parent.root,
+					client: savepoint,
+					level,
+					values,
+					openContexts: 0,
+				},
+				() => fn(savepoint),
 			),
 		);
 	} catch (error) {
@@ -160,11 +181,29 @@ export async function withTransaction<T>(
 }
 
 /**
+ * Runs `fn` in a savepoint when a transaction is already open, else in a
+ * new one. A failure rolls back only this level. The settings stay as they
+ * are, so siblings may run side by side.
+ */
+export async function withTransaction<T>(
+	fn: (trx: TransactionClientContract) => Promise<T>,
+): Promise<T> {
+	const parent = active();
+	if (!parent) return openRoot({}, fn);
+
+	return runInSavepoint(parent, { ...parent.values }, fn);
+}
+
+/**
  * Runs `fn` with these settings in its own transaction, or a savepoint
- * inside the open one. Values not passed are inherited. A failure rolls
- * the savepoint back, so Postgres reverts the settings and the original
- * error surfaces. On success the previous values are set again, so
- * nothing leaks into the rest of the transaction.
+ * inside the open one. Values not passed are inherited from the level it
+ * was called from. A failure rolls the savepoint back, so Postgres reverts
+ * the settings and the original error surfaces. On success the caller's
+ * values are set again, so nothing leaks into the rest of the transaction.
+ *
+ * Settings belong to the connection, so two of these cannot overlap under
+ * one parent (a `Promise.all` of them): the second throws instead of
+ * silently running with, or leaving behind, the first one's values.
  */
 export async function withDbContext<T>(
 	values: DbContextValues,
@@ -173,22 +212,27 @@ export async function withDbContext<T>(
 	const parent = active();
 	if (!parent) return openRoot(values, fn);
 
-	const { root } = parent;
-	const previous = { userId: root.userId, tenantId: root.tenantId };
+	if (parent.openContexts > 0) {
+		throw new Error(
+			"Overlapping withDbContext calls in one transaction: await one before starting the next (the database settings are per connection)",
+		);
+	}
+
 	const next = {
-		userId: values.userId ?? previous.userId,
-		tenantId: values.tenantId ?? previous.tenantId,
+		userId: values.userId ?? parent.values.userId,
+		tenantId: values.tenantId ?? parent.values.tenantId,
 	};
+	parent.openContexts += 1;
 	try {
-		const result = await withTransaction(async (trx) => {
-			Object.assign(root, next);
+		const result = await runInSavepoint(parent, next, async (trx) => {
 			await applySettings(trx, next);
 			return fn(trx);
 		});
-		if (!root.detached) await applySettings(parent.client, previous);
+		if (!parent.root.detached)
+			await applySettings(parent.client, parent.values);
 		return result;
 	} finally {
-		Object.assign(root, previous);
+		parent.openContexts -= 1;
 	}
 }
 
@@ -220,16 +264,22 @@ export function runInRequestTransaction<T>(
 /**
  * Sets values for the rest of the open outermost transaction (the tenant
  * middleware uses it once the tenant is known). They stay set until the
- * transaction ends.
+ * transaction ends, and wrappers started afterwards inherit them. Only the
+ * outermost level may call it: inside a nested wrapper the values would
+ * apply to a savepoint that is about to be released.
  */
 export async function setRequestContext(
 	values: DbContextValues,
 ): Promise<void> {
 	const store = activeOrThrow("setRequestContext");
-	const { root } = store;
-	if (values.userId !== undefined) root.userId = values.userId;
-	if (values.tenantId !== undefined) root.tenantId = values.tenantId;
-	await applySettings(store.client, root);
+	if (store.client !== store.root.trx) {
+		throw new Error(
+			"setRequestContext must be called from the outermost level of the request transaction, not inside withDbContext or withTransaction",
+		);
+	}
+	if (values.userId !== undefined) store.values.userId = values.userId;
+	if (values.tenantId !== undefined) store.values.tenantId = values.tenantId;
+	await applySettings(store.client, store.values);
 }
 
 /**
