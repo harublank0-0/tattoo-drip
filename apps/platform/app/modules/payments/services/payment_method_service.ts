@@ -1,6 +1,5 @@
 import { inject } from "@adonisjs/core";
 import type { MultipartFile } from "@adonisjs/core/bodyparser";
-import db from "@adonisjs/lucid/services/db";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
 import { PaymentMethodRuleError } from "#modules/payments/errors";
@@ -13,6 +12,7 @@ import {
 	type PaymentMethodState,
 } from "#modules/payments/rules";
 import type Tenant from "#modules/tenancy/models/tenant";
+import { withTransaction } from "#services/db_context";
 
 type Upload = Pick<MultipartFile, "tmpPath">;
 type TenantRef = Pick<Tenant, "id">;
@@ -89,7 +89,7 @@ export default class PaymentMethodService {
 			? await this.images.store(input.qr, { tenant, purpose: QR })
 			: undefined;
 		try {
-			return await db.transaction(async (trx) => {
+			return await withTransaction(async (trx) => {
 				const last = await trx
 					.from("payment_methods")
 					.where("tenant_id", tenant.id)
@@ -148,7 +148,7 @@ export default class PaymentMethodService {
 			// Lock the live row first: a delete that landed since the form
 			// loaded makes this a 404, and a QR changed by another edit is
 			// read from the row, not from the form's copy.
-			({ saved, oldKey, newKey } = await db.transaction(async (trx) => {
+			({ saved, oldKey, newKey } = await withTransaction(async (trx) => {
 				const live = await PaymentMethod.query({ client: trx })
 					.where("tenant_id", tenant.id)
 					.where("id", method.id)
@@ -191,7 +191,7 @@ export default class PaymentMethodService {
 		method: PaymentMethod,
 		direction: "up" | "down",
 	): Promise<void> {
-		await db.transaction(async (trx) => {
+		await withTransaction(async (trx) => {
 			const methods = await PaymentMethod.query({ client: trx })
 				.where("tenant_id", tenant.id)
 				.orderBy("position", "asc")

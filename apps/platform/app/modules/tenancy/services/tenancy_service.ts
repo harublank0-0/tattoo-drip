@@ -1,4 +1,3 @@
-import db from "@adonisjs/lucid/services/db";
 import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
 import type User from "#models/user";
 import { LastOwnerError, SlugTakenError } from "#modules/tenancy/errors";
@@ -6,6 +5,7 @@ import Tenant, { type TenantType } from "#modules/tenancy/models/tenant";
 import TenantMembership, {
 	type MembershipRole,
 } from "#modules/tenancy/models/tenant_membership";
+import { withTransaction } from "#services/db_context";
 
 export type NewTenant = {
 	type: TenantType;
@@ -50,7 +50,7 @@ export default class TenancyService {
 	 */
 	async createTenant(owner: User, input: NewTenant): Promise<Tenant> {
 		try {
-			return await db.transaction(async (trx) => {
+			return await withTransaction(async (trx) => {
 				const tenant = await Tenant.create(input, { client: trx });
 				await TenantMembership.create(
 					{ tenantId: tenant.id, userId: owner.id, role: "owner" },
