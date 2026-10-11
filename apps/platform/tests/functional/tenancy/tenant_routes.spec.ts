@@ -6,6 +6,7 @@ import User from "#models/user";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { inTenant } from "#tests/helpers/tenants";
+import { EXEMPT_ROUTES, isolationCases } from "#tests/isolation/cases";
 
 const tenancy = new TenancyService();
 
@@ -184,6 +185,38 @@ test.group("Tenant routes", (group) => {
 				route.pattern,
 			);
 		}
+	});
+
+	test("every /t/:tenant route has an isolation case or a written exemption", ({
+		assert,
+	}) => {
+		const routes = Object.values(router.toJSON())
+			.flat()
+			.filter(({ pattern }) => /^\/t\/:tenant(\/|$)/.test(pattern));
+		assert.isNotEmpty(routes);
+
+		const keys = new Set(
+			routes.flatMap(({ pattern, methods }) =>
+				methods
+					.filter((method) => method !== "HEAD")
+					.map((method) => `${method} ${pattern}`),
+			),
+		);
+		const covered = new Set([
+			...isolationCases.map(({ method, pattern }) => `${method} ${pattern}`),
+			...Object.keys(EXEMPT_ROUTES),
+		]);
+
+		assert.deepEqual(
+			[...keys].filter((key) => !covered.has(key)),
+			[],
+			"add a case to tests/isolation/cases.ts, or an exemption with a reason",
+		);
+		assert.deepEqual(
+			[...covered].filter((key) => !keys.has(key)),
+			[],
+			"cases or exemptions for routes that no longer exist",
+		);
 	});
 
 	test("tenantContext fails loudly outside a tenant route", async ({

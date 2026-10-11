@@ -70,3 +70,11 @@ router
 router
 	.get("/t/:tenant/__test/db/settings", settings)
 	.use([middleware.auth(), middleware.dbContext(), middleware.tenant()]);
+
+/**
+ * A route that answers any signed-in user whatever the slug: the leak the
+ * isolation harness must report (tests/functional/isolation/harness.spec.ts).
+ */
+router
+	.get("/__test/leak/:tenant", ({ response }) => response.ok({ leaked: true }))
+	.use(middleware.auth());

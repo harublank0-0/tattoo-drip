@@ -1,4 +1,6 @@
 import User from "#models/user";
+import ImageService from "#modules/media/services/image_service";
+import PaymentMethodService from "#modules/payments/services/payment_method_service";
 import type Tenant from "#modules/tenancy/models/tenant";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
@@ -65,4 +67,39 @@ export function inTenantAs<T>(
 	fn: () => Promise<T>,
 ) {
 	return withDbContext({ tenantId: tenant.id, userId: user.id }, () => fn());
+}
+
+const paymentMethods = new PaymentMethodService(new ImageService());
+
+async function studio(slug: string, name: string) {
+	const { owner, tenant } = await studioWithOwner(slug, name);
+	const artist = await artistIn(tenant, `artist@${slug}.example`);
+	const paymentMethod = await inTenant(tenant, async () => {
+		const first = await paymentMethods.create(tenant, {
+			kind: "cash",
+			label: `${name} cash`,
+		});
+		// A second one, so moving the first changes the list: with only one
+		// a "move" is a no-op even when it leaks.
+		await paymentMethods.create(tenant, {
+			kind: "cash",
+			label: `${name} tips`,
+		});
+		return first;
+	});
+	return { tenant, owner, artist, paymentMethod };
+}
+
+export type Studio = Awaited<ReturnType<typeof studio>>;
+
+/**
+ * Two studios, each with an owner, an artist and two payment methods
+ * (`paymentMethod` is the first). Later tickets add seed data for their own
+ * tables here, so every isolation case sees it.
+ */
+export async function twoStudios() {
+	return {
+		a: await studio("studio-a", "Studio A"),
+		b: await studio("studio-b", "Studio B"),
+	};
 }
