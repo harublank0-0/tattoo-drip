@@ -59,13 +59,21 @@ export default class DbContextProvider {
 	}
 
 	/**
-	 * Refuses to serve or test as a role that bypasses RLS. This is start(),
-	 * not ready(): the HTTP server and the test run begin between the two,
-	 * and a ready() refusal would leave the server listening. The worker is
-	 * guarded by the hook boot() registers. Other ace commands (codegen,
-	 * build, migrations) skip it: migrations run as the owner on purpose.
+	 * Refuses to serve, work or test as a role that bypasses RLS: the web
+	 * server (`node ace serve`, bin/server.ts) and the test runner are guarded
+	 * here, the worker (`queue:work`) by the hook boot() registers. This is
+	 * start(), not ready(): the HTTP server and the test run begin between the
+	 * two, and a ready() refusal would leave the server listening.
+	 *
+	 * Exempt: `node ace codegen`, which warms the app up in the web environment
+	 * in "warmup" mode (it never starts, and skips provider shutdown, so a
+	 * pooled connection would keep it alive), and every other ace command
+	 * (build, list:routes, ...) because they run in the console environment.
+	 * Migrations run as the owner on purpose. A "warmup" app cannot serve or
+	 * run tests: Application.start() throws for it.
 	 */
 	async start() {
+		if (this.app.getMode() !== "run") return;
 		const environment = this.app.getEnvironment();
 		if (environment === "web" || environment === "test")
 			await this.assertRole();

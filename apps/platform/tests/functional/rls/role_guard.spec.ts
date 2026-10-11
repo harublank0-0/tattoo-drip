@@ -68,37 +68,48 @@ test.group("assertRestrictedDbRole", (group) => {
 });
 
 /**
- * Boots a real process as the owner role. The guard has to end it by itself,
- * hence the timeout: a process that keeps running is a failure.
+ * Boots a real process. The process has to end by itself, hence the timeout:
+ * one that keeps running comes back as `killed`, which is a failure.
  */
-async function bootAsOwner(args: string[]) {
+async function boot(args: string[], overrides: Record<string, string>) {
 	try {
-		await run("node", args, {
+		const { stdout, stderr } = await run("node", args, {
 			cwd: app.makePath(),
 			timeout: 30_000,
 			env: {
 				...process.env,
 				PORT: String(env.get("PORT") + 1),
-				DB_USER: env.get("DB_MIGRATION_USER"),
-				DB_PASSWORD: env.get("DB_MIGRATION_PASSWORD") ?? "",
+				...overrides,
 			},
 		});
+		return { exitCode: 0, killed: false, output: `${stdout}\n${stderr}` };
 	} catch (error) {
-		const { killed, stdout, stderr } = error as {
+		const { code, killed, stdout, stderr } = error as {
+			code: number | string;
 			killed: boolean;
 			stdout: string;
 			stderr: string;
 		};
-		return { killed, output: `${stdout}\n${stderr}` };
+		return { exitCode: code, killed, output: `${stdout}\n${stderr}` };
 	}
-	throw new Error("the process exited cleanly");
+}
+
+function bootAsOwner(args: string[]) {
+	return boot(args, {
+		DB_USER: env.get("DB_MIGRATION_USER"),
+		DB_PASSWORD: env.get("DB_MIGRATION_PASSWORD") ?? "",
+	});
 }
 
 test.group("boot guard", () => {
 	test("the worker refuses to start as the owner role", async ({ assert }) => {
-		const { killed, output } = await bootAsOwner(["ace.js", "queue:work"]);
+		const { exitCode, killed, output } = await bootAsOwner([
+			"ace.js",
+			"queue:work",
+		]);
 
 		assert.isFalse(killed);
+		assert.equal(exitCode, 1);
 		assert.match(output, /is a superuser/);
 		assert.notMatch(output, /Starting worker/);
 	}).timeout(40_000);
@@ -106,14 +117,31 @@ test.group("boot guard", () => {
 	test("the web server refuses to listen as the owner role", async ({
 		assert,
 	}) => {
-		const { killed, output } = await bootAsOwner([
+		const { exitCode, killed, output } = await bootAsOwner([
 			"--import",
 			"@poppinss/ts-exec",
 			"bin/server.ts",
 		]);
 
 		assert.isFalse(killed);
+		assert.equal(exitCode, 1);
 		assert.match(output, /is a superuser/);
 		assert.notMatch(output, /started HTTP server/);
+	}).timeout(40_000);
+
+	// Codegen warms the app up in the web environment but never runs it, and
+	// it is a documented step after route changes: it must not need the
+	// database, nor hang on the connection the guard would have opened.
+	test("codegen does not run the guard or need the database", async ({
+		assert,
+	}) => {
+		const { exitCode, killed, output } = await boot(["ace.js", "codegen"], {
+			DB_PORT: "55999",
+		});
+
+		assert.isFalse(killed);
+		assert.notMatch(output, /ECONNREFUSED/);
+		assert.equal(exitCode, 0);
+		assert.match(output, /Codegen files generated/);
 	}).timeout(40_000);
 });
