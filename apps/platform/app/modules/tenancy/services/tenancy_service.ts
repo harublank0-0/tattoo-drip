@@ -5,7 +5,7 @@ import Tenant, { type TenantType } from "#modules/tenancy/models/tenant";
 import TenantMembership, {
 	type MembershipRole,
 } from "#modules/tenancy/models/tenant_membership";
-import { withTransaction } from "#services/db_context";
+import { dbClient, withDbContext } from "#services/db_context";
 
 export type NewTenant = {
 	type: TenantType;
@@ -50,8 +50,12 @@ export default class TenancyService {
 	 */
 	async createTenant(owner: User, input: NewTenant): Promise<Tenant> {
 		try {
-			return await withTransaction(async (trx) => {
-				const tenant = await Tenant.create(input, { client: trx });
+			// The id comes first so the inserts run in the new tenant's context:
+			// row-level security only lets a tenant row in for its own id.
+			const { rows } = await dbClient().rawQuery("select uuidv7() as id");
+			const id: string = rows[0].id;
+			return await withDbContext({ tenantId: id }, async (trx) => {
+				const tenant = await Tenant.create({ id, ...input }, { client: trx });
 				await TenantMembership.create(
 					{ tenantId: tenant.id, userId: owner.id, role: "owner" },
 					{ client: trx },

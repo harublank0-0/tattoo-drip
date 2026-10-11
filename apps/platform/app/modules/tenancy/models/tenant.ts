@@ -1,6 +1,5 @@
 import { compose } from "@adonisjs/core/helpers";
 import { hasMany } from "@adonisjs/lucid/orm";
-import db from "@adonisjs/lucid/services/db";
 import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
 import type { HasMany } from "@adonisjs/lucid/types/relations";
 import { DateTime } from "luxon";
@@ -8,6 +7,7 @@ import { TenantSchema } from "#database/schema";
 import { withSoftDeletes } from "#models/mixins/soft_deletes";
 import PaymentMethod from "#modules/payments/models/payment_method";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
+import { withTransaction } from "#services/db_context";
 
 export const TENANT_TYPES = ["studio", "independent"] as const;
 export type TenantType = (typeof TENANT_TYPES)[number];
@@ -48,6 +48,6 @@ export default class Tenant extends compose(TenantSchema, withSoftDeletes) {
 		};
 
 		if (trx) await run(trx);
-		else await db.transaction(run);
+		else await withTransaction(run);
 	}
 }

@@ -7,6 +7,7 @@ import { LastOwnerError, SlugTakenError } from "#modules/tenancy/errors";
 import Tenant from "#modules/tenancy/models/tenant";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
+import { dbClient, withDbContext } from "#services/db_context";
 import { studioWithOwner } from "#tests/helpers/tenants";
 
 const tenancy = new TenancyService();
@@ -61,6 +62,40 @@ test.group("TenancyService.createTenant", (group) => {
 			second.id,
 		);
 		assert.lengthOf(secondMemberships, 0);
+	});
+
+	test("a taken slug leaves the surrounding transaction usable and restores the context", async ({
+		assert,
+	}) => {
+		const first = await makeUser("first@example.com");
+		await tenancy.createTenant(first, studio("black-needle"));
+		const second = await makeUser("second@example.com");
+
+		await withDbContext({ userId: second.id }, async () => {
+			await assert.rejects(
+				() => tenancy.createTenant(second, studio("black-needle")),
+				SlugTakenError,
+			);
+
+			const { rows } = await dbClient().rawQuery(
+				"select current_setting('app.tenant_id', true) as tenant_id",
+			);
+			assert.notOk(rows[0].tenant_id);
+		});
+	});
+
+	test("the tenant is stored under the id the model is given", async ({
+		assert,
+	}) => {
+		const { rows } = await db.rawQuery("select uuidv7() as id");
+		const id: string = rows[0].id;
+
+		// createTenant relies on this: its inserts run in the context of an id
+		// chosen before the row exists, so the row must be stored under it.
+		const tenant = await Tenant.create({ id, ...studio("black-needle") });
+
+		assert.equal(tenant.id, id);
+		assert.equal((await Tenant.findOrFail(id)).slug, "black-needle");
 	});
 });
 

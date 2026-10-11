@@ -12,7 +12,11 @@ import {
 	type PaymentMethodState,
 } from "#modules/payments/rules";
 import type Tenant from "#modules/tenancy/models/tenant";
-import { withTransaction } from "#services/db_context";
+import {
+	afterCommit,
+	afterRollback,
+	withTransaction,
+} from "#services/db_context";
 
 type Upload = Pick<MultipartFile, "tmpPath">;
 type TenantRef = Pick<Tenant, "id">;
@@ -88,38 +92,36 @@ export default class PaymentMethodService {
 		const qr = input.qr
 			? await this.images.store(input.qr, { tenant, purpose: QR })
 			: undefined;
-		try {
-			return await withTransaction(async (trx) => {
-				const last = await trx
-					.from("payment_methods")
-					.where("tenant_id", tenant.id)
-					.whereNull("deleted_at")
-					.max("position as max")
-					.first();
-				return PaymentMethod.create(
-					{
-						tenantId: tenant.id,
-						kind: input.kind,
-						label: input.label,
-						...details,
-						showOnDepositPage,
-						qrImageKey: qr?.key ?? null,
-						// The first method gets 0. Ties from two adds at once are
-						// harmless: move() renumbers.
-						position: (last?.max ?? -1) + 1,
-					},
-					{ client: trx },
-				);
-			});
-		} catch (error) {
-			if (qr) await this.images.delete(QR, qr.key);
-			throw error;
-		}
+		return withTransaction(async (trx) => {
+			// The file is already stored. If this level rolls back, or the
+			// request fails later, no row will point at it.
+			if (qr) afterRollback(() => this.images.delete(QR, qr.key));
+			const last = await trx
+				.from("payment_methods")
+				.where("tenant_id", tenant.id)
+				.whereNull("deleted_at")
+				.max("position as max")
+				.first();
+			return PaymentMethod.create(
+				{
+					tenantId: tenant.id,
+					kind: input.kind,
+					label: input.label,
+					...details,
+					showOnDepositPage,
+					qrImageKey: qr?.key ?? null,
+					// The first method gets 0. Ties from two adds at once are
+					// harmless: move() renumbers.
+					position: (last?.max ?? -1) + 1,
+				},
+				{ client: trx },
+			);
+		});
 	}
 
 	/**
 	 * Saves an edit. A new `qr` replaces the stored one; `removeQr` drops
-	 * it. The old file is deleted once the row is saved.
+	 * it. The old file is deleted once the outermost transaction commits.
 	 */
 	async update(
 		tenant: TenantRef,
@@ -141,44 +143,40 @@ export default class PaymentMethodService {
 		const qr = input.qr
 			? await this.images.store(input.qr, { tenant, purpose: QR })
 			: undefined;
-		let saved: PaymentMethod;
-		let oldKey: string | null;
-		let newKey: string | null;
-		try {
+		return withTransaction(async (trx) => {
+			// The file is already stored. If this level rolls back, or the
+			// request fails later, no row will point at it.
+			if (qr) afterRollback(() => this.images.delete(QR, qr.key));
 			// Lock the live row first: a delete that landed since the form
 			// loaded makes this a 404, and a QR changed by another edit is
 			// read from the row, not from the form's copy.
-			({ saved, oldKey, newKey } = await withTransaction(async (trx) => {
-				const live = await PaymentMethod.query({ client: trx })
-					.where("tenant_id", tenant.id)
-					.where("id", method.id)
-					.forUpdate()
-					.firstOrFail();
-				const previous = live.qrImageKey;
-				const keepsQr = !!previous && !input.qr && !input.removeQr;
-				assertRules({
-					kind: live.kind,
-					...details,
-					hasQr: !!input.qr || keepsQr,
-					showOnDepositPage,
-				});
-				const next = qr?.key ?? (keepsQr ? previous : null);
-				live.merge({
-					label: input.label,
-					...details,
-					showOnDepositPage,
-					qrImageKey: next,
-				});
-				await live.save();
-				return { saved: live, oldKey: previous, newKey: next };
-			}));
-		} catch (error) {
-			if (qr) await this.images.delete(QR, qr.key);
-			throw error;
-		}
-
-		if (oldKey && oldKey !== newKey) await this.images.delete(QR, oldKey);
-		return saved;
+			const live = await PaymentMethod.query({ client: trx })
+				.where("tenant_id", tenant.id)
+				.where("id", method.id)
+				.forUpdate()
+				.firstOrFail();
+			const previous = live.qrImageKey;
+			const keepsQr = !!previous && !input.qr && !input.removeQr;
+			assertRules({
+				kind: live.kind,
+				...details,
+				hasQr: !!input.qr || keepsQr,
+				showOnDepositPage,
+			});
+			const next = qr?.key ?? (keepsQr ? previous : null);
+			live.merge({
+				label: input.label,
+				...details,
+				showOnDepositPage,
+				qrImageKey: next,
+			});
+			await live.save();
+			// The replaced file goes only once the change is committed for good.
+			if (previous && previous !== next) {
+				afterCommit(() => this.images.delete(QR, previous));
+			}
+			return live;
+		});
 	}
 
 	/**
