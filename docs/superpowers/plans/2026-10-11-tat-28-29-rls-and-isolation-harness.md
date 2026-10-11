@@ -378,7 +378,7 @@ test.group("Model adapter", (group) => {
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run (from `apps/platform`): `PORT=3402 node ace test functional --files=db_context.spec`
+Run (from `apps/platform`): `PORT=3402 node ace test functional --files=db_context.spec.ts`
 Expected: FAIL, the spec cannot resolve `#services/db_context`.
 
 - [ ] **Step 3: Write the context module**
@@ -737,7 +737,7 @@ In `apps/platform/adonisrc.ts`, add the provider right after the Lucid one:
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
-Run: `PORT=3402 node ace test functional --files=db_context.spec`
+Run: `PORT=3402 node ace test functional --files=db_context.spec.ts`
 Expected: all tests PASS. If `membership.$options?.client` is not the transaction, the adapter is not covering preloads: stop and use the fallback in the spec's open risks (override `query()` on a shared base model).
 
 - [ ] **Step 6: Typecheck and commit**
@@ -959,7 +959,7 @@ test.group("Request transaction", (group) => {
 
 - [ ] **Step 3: Run the tests to verify they fail**
 
-Run: `PORT=3402 node ace test functional --files=request_transaction.spec`
+Run: `PORT=3402 node ace test functional --files=request_transaction.spec.ts`
 Expected: FAIL, `middleware.dbContext is not a function` while loading `tests/support/test_routes.ts`.
 
 - [ ] **Step 4: Add the middleware and register it**
@@ -1087,7 +1087,7 @@ In the settings-routes test, add inside its loop, after `const role = …`:
 
 - [ ] **Step 8: Run the new tests, then the whole functional suite**
 
-Run: `PORT=3402 node ace test functional --files=request_transaction.spec`
+Run: `PORT=3402 node ace test functional --files=request_transaction.spec.ts`
 Expected: PASS. If the two rollback tests fail because the rows are still there, the `AsyncLocalStorage` store is missing when the handler runs (spec open risk 5): in `DbContextMiddleware`, also store the transaction on `ctx` (`ctx.dbRoot`) and have the handler read it from `ctx` instead.
 
 Run: `PORT=3402 node ace test functional`
@@ -1245,7 +1245,7 @@ In `apps/platform/tests/functional/tenancy/tenancy_service.spec.ts`, add imports
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `PORT=3402 node ace test functional --files=qr_cleanup.spec`
+Run: `PORT=3402 node ace test functional --files=qr_cleanup.spec.ts`
 Expected: FAIL. The "old file is not deleted yet" assertion fails, because `update` deletes the old file as soon as its own savepoint returns.
 
 - [ ] **Step 3: Move the services to `withTransaction`**
@@ -1365,7 +1365,7 @@ In `apps/platform/app/modules/tenancy/services/tenancy_service.ts`: remove `impo
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `PORT=3402 node ace test functional --files=qr_cleanup.spec` then `PORT=3402 node ace test functional --files=tenancy_service.spec` then `PORT=3402 node ace test functional --files=payment_method`
+Run: `PORT=3402 node ace test functional --files=qr_cleanup.spec.ts` then `PORT=3402 node ace test functional --files=tenancy_service.spec.ts` then `PORT=3402 node ace test functional --files=payment_method`
 Expected: PASS everywhere. If `Tenant.create({ id, ... })` ignores the id (the created tenant's id differs from the generated one), set it explicitly with `const tenant = new Tenant(); tenant.merge({ ...input }); tenant.id = id; await tenant.useTransaction(trx).save();` and rerun.
 
 - [ ] **Step 5: Typecheck and commit**
@@ -1721,7 +1721,7 @@ test.group("Job classes", () => {
 
 - [ ] **Step 3: Run the tests to verify they fail**
 
-Run: `PORT=3402 node ace test functional --files=tenant_job.spec`
+Run: `PORT=3402 node ace test functional --files=tenant_job.spec.ts`
 Expected: FAIL, cannot resolve `#services/tenant_job`.
 
 - [ ] **Step 4: Write `TenantJob`**
@@ -1767,7 +1767,7 @@ export default abstract class TenantJob<
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
-Run: `PORT=3402 node ace test functional --files=tenant_job.spec` then `PORT=3402 node ace test unit --files=job_classes.spec`
+Run: `PORT=3402 node ace test functional --files=tenant_job.spec.ts` then `PORT=3402 node ace test unit --files=job_classes.spec.ts`
 Expected: PASS. If `processQueued` throws while constructing the `Worker` or the restore `QueueManager.init`, read the error: the config shape is the one `node ace queue:work` builds (`node_modules/@adonisjs/queue/build/commands/queue_work.js`); mirror it exactly. Then run the whole functional suite (`PORT=3402 node ace test functional`) to confirm the queue tests that follow still pass, which proves the restore works.
 
 - [ ] **Step 6: Amend the spec for the new path**
@@ -2124,7 +2124,7 @@ Expected: no errors; `\du` in psql lists `tattoo_drip_app` without Superuser.
 
 - [ ] **Step 5: Run the new tests to verify they fail**
 
-Run: `PORT=3402 node ace test functional --files=role_guard.spec`
+Run: `PORT=3402 node ace test functional --files=role_guard.spec.ts`
 Expected: FAIL, cannot resolve `#services/db_role_guard`. (`setup_roles.spec` should already PASS; it only needs the script and the `owner` connection.)
 
 - [ ] **Step 6: Write the guard and wire it into the boot**
@@ -2197,7 +2197,7 @@ In `apps/platform/providers/db_context_provider.ts` add the import `import { ass
 Run: `PORT=3402 node ace test functional`
 Expected: all PASS, now connected as `tattoo_drip_app`. (Policies are not enabled yet, so only grants matter.)
 
-Check the guard refuses the owner: `DB_USER=postgres DB_PASSWORD=postgres PORT=3402 node ace test unit --files=job_classes.spec`
+Check the guard refuses the owner: `DB_USER=postgres DB_PASSWORD=postgres PORT=3402 node ace test unit --files=job_classes.spec.ts`
 Expected: FAIL at startup with `Database role "postgres" is a superuser`. Check the worker path the same way: `DB_USER=postgres DB_PASSWORD=postgres timeout 20 node ace queue:work`
 Expected: exits within seconds with the same message (the guard recognizes `queue:work`). Confirm migrations still work: `pnpm migrate` prints `Already up to date`.
 
@@ -2279,7 +2279,7 @@ Expected: `postgres` has `Superuser`; `tattoo_drip_app` does not.
 ```bash
 cd apps/platform
 DB_PORT=55432 pnpm migrate
-DB_PORT=55432 PORT=3402 node ace test functional --files=role_guard.spec
+DB_PORT=55432 PORT=3402 node ace test functional --files=role_guard.spec.ts
 ```
 
 Expected: migrations apply; guard tests PASS on the fresh cluster. Clean up: `cd ../.. && PODMAN_COMPOSE_PROVIDER=podman-compose podman compose -p rlscheck --env-file apps/platform/.env down -v`.
@@ -2307,7 +2307,7 @@ Once policies are on, the Vine `.unique({ table: "tenants" })` rule runs a raw q
 
 - [ ] **Step 1: Confirm the baseline passes**
 
-Run: `PORT=3402 node ace test functional --files=onboarding.spec`
+Run: `PORT=3402 node ace test functional --files=onboarding.spec.ts`
 Expected: PASS (the validator rule produces the message today).
 
 - [ ] **Step 2: Remove the validator rule and its message**
@@ -2326,7 +2326,7 @@ and delete the `"slug.database.unique"` line from the `SimpleMessagesProvider` m
 
 - [ ] **Step 3: Run the test to verify it fails**
 
-Run: `PORT=3402 node ace test functional --files=onboarding.spec`
+Run: `PORT=3402 node ace test functional --files=onboarding.spec.ts`
 Expected: FAIL in `rejects a slug that's already taken`: the field shows "This address was just taken. Try another one." instead of "This address is already taken. Try another one."
 
 - [ ] **Step 4: Use one message in the controller**
@@ -2349,7 +2349,7 @@ In `apps/platform/app/controllers/onboarding_controller.ts`, in `store()` replac
 
 - [ ] **Step 5: Run the tests to verify they pass, then commit**
 
-Run: `PORT=3402 node ace test functional --files=onboarding.spec` then `PORT=3402 node ace test functional --files=tenancy_service.spec`
+Run: `PORT=3402 node ace test functional --files=onboarding.spec.ts` then `PORT=3402 node ace test functional --files=tenancy_service.spec.ts`
 Expected: PASS.
 
 ```bash
@@ -2493,7 +2493,7 @@ export function tenantReference(
 }
 ```
 
-Run: `PORT=3402 node ace test unit --files=tenant_rls.spec`
+Run: `PORT=3402 node ace test unit --files=tenant_rls.spec.ts`
 Expected: PASS (the helpers are plain functions). If `.toQuery()` quotes differently, adjust only the regex.
 
 - [ ] **Step 2: Write the failing policy tests**
@@ -2918,7 +2918,7 @@ class PlainReadJob extends Job<{ label: string }> {
 
 - [ ] **Step 3: Run the new tests to verify they fail**
 
-Run: `PORT=3402 node ace test functional --files=policies.spec` and `PORT=3402 node ace test functional --files=catalog_guard.spec`
+Run: `PORT=3402 node ace test functional --files=policies.spec.ts` and `PORT=3402 node ace test functional --files=catalog_guard.spec.ts`
 Expected: FAIL. With no policies, "no context" returns rows, inserts for other tenants succeed, and the catalog guard reports `payment_methods`, `tenant_memberships` and `tenants` as unprotected.
 
 - [ ] **Step 4: Write the migration**
@@ -3003,7 +3003,7 @@ Expected: the migration runs; `database/schema.ts` is regenerated. Then `pnpm ex
 
 - [ ] **Step 5: Run the policy tests to verify they pass**
 
-Run: `PORT=3402 node ace test functional --files=policies.spec`, then `--files=catalog_guard.spec`, then `PORT=3402 node ace test unit --files=tenant_rls.spec`
+Run: `PORT=3402 node ace test functional --files=policies.spec.ts`, then `--files=catalog_guard.spec.ts`, then `PORT=3402 node ace test unit --files=tenant_rls.spec.ts`
 Expected: PASS. If the "moves a row" test reports a unique-violation error instead of `row-level security` for `tenants.id`, the check order differs on this Postgres version: assert `/row-level security|duplicate key/` for that table only and note it in the commit message.
 
 - [ ] **Step 6: Update the tenant helpers, then sweep the specs the policies broke**
@@ -3343,7 +3343,7 @@ router
 	.use(middleware.auth());
 ```
 
-Run: `PORT=3402 node ace test functional --files=harness.spec`
+Run: `PORT=3402 node ace test functional --files=harness.spec.ts`
 Expected: FAIL, cannot resolve `#tests/helpers/isolation`.
 
 - [ ] **Step 4: Write the helper**
@@ -3430,7 +3430,7 @@ export async function assertCrossTenantIsolation(
 
 - [ ] **Step 5: Run the harness tests to verify they pass**
 
-Run: `PORT=3402 node ace test functional --files=harness.spec` then `PORT=3402 node ace test functional --files=cross_tenant.spec`
+Run: `PORT=3402 node ace test functional --files=harness.spec.ts` then `PORT=3402 node ace test functional --files=cross_tenant.spec.ts`
 Expected: PASS. If a positive control reports 303 instead of 302 for a write, change that case's `ownStatus` type to include `303` and set it; if a control reports 422, the case's body is invalid for that validator: fix the body, not the helper.
 
 - [ ] **Step 6: Add the route-coverage guard**
@@ -3471,7 +3471,7 @@ In `apps/platform/tests/functional/tenancy/tenant_routes.spec.ts` add the import
 	});
 ```
 
-Run: `PORT=3402 node ace test functional --files=tenant_routes.spec`
+Run: `PORT=3402 node ace test functional --files=tenant_routes.spec.ts`
 Expected: PASS. (To see it bite, temporarily delete one case: the test names the uncovered route. Restore it.)
 
 - [ ] **Step 7: Add the PR template**
