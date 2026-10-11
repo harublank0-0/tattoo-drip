@@ -53,9 +53,44 @@ export const plugins: Config["plugins"] = [
 const clearTestStorage = () =>
 	rm(app.tmpPath("storage"), { recursive: true, force: true });
 
+/**
+ * A test's request runs in a savepoint on the test's one connection, so a
+ * query that escapes the request transaction (db.from, db.rawQuery,
+ * db.transaction, Vine's unique and exists rules) still sees the request's
+ * tenant settings and passes. In production it takes a second pooled
+ * connection with no settings, sees nothing, and needs two pool slots per
+ * request. Make it fail here too: while a request or job transaction is open,
+ * asking the db service for the primary connection throws. Other connections
+ * (`owner`) and calls outside any transaction are untouched, and so are the
+ * models, `dbClient()` and `withTransaction`, which never ask for it.
+ */
+let removeTripwire: (() => void) | undefined;
+
+async function installDbTripwire() {
+	const { currentClient } = await import("#services/db_context");
+	const db = await app.container.make("lucid.db");
+	const original = db.connection.bind(db);
+	const guarded: typeof db.connection = (connection, options) => {
+		if (
+			(connection === undefined || connection === db.primaryConnectionName) &&
+			currentClient()
+		) {
+			throw new Error(
+				"db.connection() called inside a request/job transaction: use withTransaction/dbClient()/models; in production this opens a second connection without the tenant settings",
+			);
+		}
+		return original(connection, options);
+	};
+	db.connection = guarded;
+	removeTripwire = () => {
+		// Drops the own property, so the class's method shows through again.
+		delete (db as Partial<typeof db>).connection;
+	};
+}
+
 export const runnerHooks: Required<Pick<Config, "setup" | "teardown">> = {
-	setup: [clearTestStorage],
-	teardown: [clearTestStorage],
+	setup: [clearTestStorage, installDbTripwire],
+	teardown: [clearTestStorage, () => removeTripwire?.()],
 };
 
 /**

@@ -1,5 +1,6 @@
 import type { HttpContext } from "@adonisjs/core/http";
 import router from "@adonisjs/core/services/router";
+import db from "@adonisjs/lucid/services/db";
 import { errors } from "@vinejs/vine";
 import User from "#models/user";
 import PaymentMethod from "#modules/payments/models/payment_method";
@@ -65,6 +66,12 @@ router
 			]);
 		});
 		router.get("settings", settings);
+		// A handler that reaches the database through the db service instead of
+		// the request's transaction (tests/functional/db_context/escaped_queries.spec.ts).
+		router.get("escaped", async ({ response }) => {
+			await db.rawQuery("select 1");
+			return response.noContent();
+		});
 	})
 	.prefix("/__test/db")
 	.use([middleware.auth(), middleware.dbContext()]);

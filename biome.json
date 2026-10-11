@@ -32,6 +32,26 @@
 	},
 	"overrides": [
 		{
+			"includes": [
+				"apps/platform/app/**",
+				"!apps/platform/app/services/db_context.ts"
+			],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"paths": {
+									"@adonisjs/lucid/services/db": "A query through the db service runs on a second pooled connection in production, outside the request transaction and its tenant settings (tests will not show it: the request is a savepoint on the test's one connection). Use a model, dbClient() or withTransaction() from #services/db_context."
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		{
 			"includes": ["**/components/ui/**"],
 			"linter": {
 				"rules": {
