@@ -63,8 +63,8 @@ export default class TenancyService {
 				return tenant;
 			});
 		} catch (error) {
-			// Validation checks the slug first; this catches a signup that
-			// took the same slug in between.
+			// The unique index is the only slug check; a taken slug (a deleted
+			// tenant's included) and a racing signup both land here.
 			if (isUniqueViolation(error, "tenants_slug_unique")) {
 				throw new SlugTakenError(input.slug);
 			}
