@@ -42,12 +42,13 @@ export default class OnboardingController {
 		try {
 			await this.tenancy.createTenant(user, input);
 		} catch (error) {
-			// Validation saw the slug free, but another signup took it since.
+			// The unique index rejected the slug (a deleted tenant's slug stays
+			// reserved), or another signup took it since the form loaded.
 			if (error instanceof SlugTakenError) {
 				throw new errors.E_VALIDATION_ERROR([
 					{
 						field: "slug",
-						message: "This address was just taken. Try another one.",
+						message: "This address is already taken. Try another one.",
 						rule: "unique",
 					},
 				]);

@@ -67,13 +67,11 @@ const SLUG = /^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/;
 export const createTenantValidator = vine.create({
 	name: vine.string().trim().minLength(2).maxLength(120),
 	type: vine.enum(TENANT_TYPES),
-	slug: vine
-		.string()
-		.trim()
-		.toLowerCase()
-		.regex(SLUG)
-		// Checks deleted tenants too: their slugs stay reserved.
-		.unique({ table: "tenants", column: "slug" }),
+	// Taken slugs, deleted tenants' included, are rejected by the unique index
+	// and surfaced by TenancyService.createTenant as SlugTakenError. A raw
+	// `.unique()` query here would only see the user's own tenants once
+	// row-level security is on.
+	slug: vine.string().trim().toLowerCase().regex(SLUG),
 	timezone: vine.string().trim().use(ianaTimezone()),
 });
 
@@ -82,8 +80,6 @@ export const createTenantValidator = vine.create({
  */
 createTenantValidator.messagesProvider = new SimpleMessagesProvider(
 	{
-		// Lucid's unique rule reports as "database.unique".
-		"slug.database.unique": "This address is already taken. Try another one.",
 		"slug.regex":
 			"Use 3 to 63 lowercase letters, numbers and hyphens, not starting or ending with a hyphen.",
 	},
