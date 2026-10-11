@@ -6,6 +6,7 @@ import type {
 	ModelAdapterOptions,
 } from "@adonisjs/lucid/types/model";
 import { currentClient } from "#services/db_context";
+import { assertRestrictedDbRole } from "#services/db_role_guard";
 
 /**
  * Lucid's adapter, except that inside a request or job transaction every
@@ -44,5 +45,41 @@ export default class DbContextProvider {
 	async boot() {
 		const db = await this.app.container.make("lucid.db");
 		BaseModel.$adapter = new ContextAdapter(db);
+
+		// Ace starts the app before it knows which command runs (and
+		// bin/console.ts has already consumed process.argv), so the worker is
+		// recognized once its command has loaded. That is still before the
+		// command is created, so a refusal ends the process like a failed boot.
+		if (this.app.getEnvironment() === "console") {
+			const ace = await this.app.container.make("ace");
+			ace.loaded(async (command) => {
+				if (command.commandName === "queue:work") await this.assertRole();
+			});
+		}
+	}
+
+	/**
+	 * Refuses to serve or test as a role that bypasses RLS. This is start(),
+	 * not ready(): the HTTP server and the test run begin between the two,
+	 * and a ready() refusal would leave the server listening. The worker is
+	 * guarded by the hook boot() registers. Other ace commands (codegen,
+	 * build, migrations) skip it: migrations run as the owner on purpose.
+	 */
+	async start() {
+		const environment = this.app.getEnvironment();
+		if (environment === "web" || environment === "test")
+			await this.assertRole();
+	}
+
+	private async assertRole() {
+		const db = await this.app.container.make("lucid.db");
+		try {
+			await assertRestrictedDbRole(db.connection());
+		} catch (error) {
+			// A refusal ends in an error, not a clean shutdown, and the open
+			// pool and dev tooling would keep the process alive.
+			await this.app.terminate();
+			throw error;
+		}
 	}
 }

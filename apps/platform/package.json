@@ -12,6 +12,8 @@
 		"build": "node ace build",
 		"dev": "node ace serve --hmr",
 		"worker": "node ace queue:work",
+		"migrate": "node ace migration:run --connection=owner",
+		"migrate:rollback": "node ace migration:rollback --connection=owner",
 		"test": "node ace test",
 		"typecheck": "tsc --noEmit && tsc --noEmit --project inertia/tsconfig.json"
 	},

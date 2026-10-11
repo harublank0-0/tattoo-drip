@@ -62,11 +62,21 @@ jobs:
 
       - run: pnpm build
 
+      # The app connects as a restricted role; migrations run as the owner.
+      - name: Create the app database role
+        working-directory: apps/platform
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h 127.0.0.1 -U postgres -d tattoo_drip -v ON_ERROR_STOP=1 \
+            -v app_user=tattoo_drip_app -v app_password=tattoo_drip_app -v owner_user=postgres \
+            -f database/setup_roles.sql
+
       # Applies every migration to Postgres 18. The generator rewrites
       # database/schema.ts, so fail if that differs from the committed file.
       - name: Run migrations
         working-directory: apps/platform
-        run: node ace migration:run
+        run: pnpm migrate
 
       - name: Check generated schema is committed
         run: |

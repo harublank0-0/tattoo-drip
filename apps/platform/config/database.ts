@@ -38,6 +38,30 @@ const dbConfig = defineConfig({
 			},
 			debug: app.inDev,
 		},
+
+		/**
+		 * The owner role: owns the tables and runs migrations (pnpm migrate).
+		 * Never the default connection, or RLS would silently not apply.
+		 */
+		owner: {
+			client: "pg",
+			connection: {
+				host: env.get("DB_HOST"),
+				port: env.get("DB_PORT"),
+				user: env.get("DB_MIGRATION_USER"),
+				password: env.get("DB_MIGRATION_PASSWORD"),
+				database: env.get("DB_DATABASE"),
+			},
+			migrations: {
+				naturalSort: true,
+				paths: ["database/migrations"],
+			},
+			schemaGeneration: {
+				enabled: true,
+				rulesPaths: ["./database/schema_rules.js"],
+			},
+			debug: app.inDev,
+		},
 	},
 });
 

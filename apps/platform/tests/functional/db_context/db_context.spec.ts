@@ -406,4 +406,16 @@ test.group("Model adapter", (group) => {
 			);
 		});
 	});
+
+	test("a model on another connection keeps its own client", async ({
+		assert,
+	}) => {
+		await withDbContext({}, async (trx) => {
+			const other = BaseModel.$adapter.modelConstructorClient(Tenant, {
+				connection: "owner",
+			});
+			assert.notStrictEqual(other, trx);
+			assert.equal(other.connectionName, "owner");
+		});
+	});
 });
