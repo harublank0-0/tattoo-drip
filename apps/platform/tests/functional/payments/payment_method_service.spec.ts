@@ -6,7 +6,7 @@ import { PaymentMethodRuleError } from "#modules/payments/errors";
 import PaymentMethod from "#modules/payments/models/payment_method";
 import PaymentMethodService from "#modules/payments/services/payment_method_service";
 import { testImages, uploadOf } from "#tests/helpers/images";
-import { studioWithOwner } from "#tests/helpers/tenants";
+import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
 /**
  * ImageService that remembers every key it stored, so a test can check
@@ -53,11 +53,13 @@ test.group("PaymentMethodService files", (group) => {
 		const { tenant } = await studioWithOwner();
 		const { methods } = makeService();
 
-		const method = await methods.create(tenant, {
-			kind: "fonepay",
-			label: "Fonepay",
-			qr: await qr(),
-		});
+		const method = await inTenant(tenant, async () =>
+			methods.create(tenant, {
+				kind: "fonepay",
+				label: "Fonepay",
+				qr: await qr(),
+			}),
+		);
 
 		assert.match(
 			method.qrImageKey ?? "",
@@ -73,20 +75,33 @@ test.group("PaymentMethodService files", (group) => {
 	}) => {
 		const { tenant } = await studioWithOwner();
 		const { images, methods } = makeService();
-		const method = await methods.create(tenant, {
-			kind: "cash",
-			label: "Cash",
-		});
-		const stale = await methods.findFor(tenant, method.id);
-		await methods.delete(tenant, method);
+		const method = await inTenant(tenant, () =>
+			methods.create(tenant, {
+				kind: "cash",
+				label: "Cash",
+			}),
+		);
+		const stale = await inTenant(tenant, () =>
+			methods.findFor(tenant, method.id),
+		);
+		await inTenant(tenant, () => methods.delete(tenant, method));
 
-		await assert.rejects(() =>
-			methods.update(tenant, stale, { label: "Cash 2" }),
+		// In the tenant's context, which still sees the deleted row: the
+		// service is what refuses it (a 404).
+		await assert.rejects(
+			() =>
+				inTenant(tenant, () =>
+					methods.update(tenant, stale, { label: "Cash 2" }),
+				),
+			/Row not found/,
 		);
 		assert.isEmpty(images.keys);
 		assert.equal(
-			(await PaymentMethod.withTrashed().where("id", method.id).firstOrFail())
-				.label,
+			(
+				await inTenant(tenant, () =>
+					PaymentMethod.withTrashed().where("id", method.id).firstOrFail(),
+				)
+			).label,
 			"Cash",
 		);
 	});
@@ -121,13 +136,18 @@ test.group("PaymentMethodService files", (group) => {
 		const { images, methods } = makeService();
 		const upload = await qr();
 
-		// Over the column's 80 characters: Postgres rejects the insert.
-		await assert.rejects(() =>
-			methods.create(tenant, {
-				kind: "fonepay",
-				label: "x".repeat(81),
-				qr: upload,
-			}),
+		// Over the column's 80 characters: Postgres rejects the insert (the
+		// message check keeps a policy refusal from passing for it).
+		await assert.rejects(
+			() =>
+				inTenant(tenant, () =>
+					methods.create(tenant, {
+						kind: "fonepay",
+						label: "x".repeat(81),
+						qr: upload,
+					}),
+				),
+			/value too long/,
 		);
 
 		assert.lengthOf(images.keys, 1);
@@ -138,12 +158,14 @@ test.group("PaymentMethodService files", (group) => {
 		const { tenant } = await studioWithOwner();
 		const { methods } = makeService();
 
-		const method = await methods.create(tenant, {
-			kind: "esewa",
-			label: "eSewa",
-			accountNumber: "9812345678",
-			bankName: "Nabil Bank",
-		});
+		const method = await inTenant(tenant, () =>
+			methods.create(tenant, {
+				kind: "esewa",
+				label: "eSewa",
+				accountNumber: "9812345678",
+				bankName: "Nabil Bank",
+			}),
+		);
 
 		assert.equal(method.accountNumber, "9812345678");
 		assert.isNull(method.bankName);
@@ -152,16 +174,22 @@ test.group("PaymentMethodService files", (group) => {
 	test("an edit without a new upload keeps the QR", async ({ assert }) => {
 		const { tenant } = await studioWithOwner();
 		const { methods } = makeService();
-		const method = await methods.create(tenant, {
-			kind: "fonepay",
-			label: "Fonepay",
-			qr: await qr(),
-		});
+		const method = await inTenant(tenant, async () =>
+			methods.create(tenant, {
+				kind: "fonepay",
+				label: "Fonepay",
+				qr: await qr(),
+			}),
+		);
 		const key = method.qrImageKey ?? "";
 
-		await methods.update(tenant, method, { label: "Fonepay (Nabil)" });
+		await inTenant(tenant, () =>
+			methods.update(tenant, method, { label: "Fonepay (Nabil)" }),
+		);
 
-		const saved = await PaymentMethod.findOrFail(method.id);
+		const saved = await inTenant(tenant, () =>
+			PaymentMethod.findOrFail(method.id),
+		);
 		assert.equal(saved.label, "Fonepay (Nabil)");
 		assert.equal(saved.qrImageKey, key);
 		assert.isTrue(await exists(key));
@@ -172,19 +200,30 @@ test.group("PaymentMethodService files", (group) => {
 	}) => {
 		const { tenant } = await studioWithOwner();
 		const { methods } = makeService();
-		const method = await methods.create(tenant, {
-			kind: "fonepay",
-			label: "Fonepay",
-			qr: await qr(),
-		});
-		const stale = await methods.findFor(tenant, method.id);
+		const method = await inTenant(tenant, async () =>
+			methods.create(tenant, {
+				kind: "fonepay",
+				label: "Fonepay",
+				qr: await qr(),
+			}),
+		);
+		const stale = await inTenant(tenant, () =>
+			methods.findFor(tenant, method.id),
+		);
 
-		await methods.update(tenant, method, { label: "Fonepay", qr: await qr() });
+		await inTenant(tenant, async () =>
+			methods.update(tenant, method, { label: "Fonepay", qr: await qr() }),
+		);
 		const replaced =
-			(await PaymentMethod.findOrFail(method.id)).qrImageKey ?? "";
-		await methods.update(tenant, stale, { label: "Fonepay (Nabil)" });
+			(await inTenant(tenant, () => PaymentMethod.findOrFail(method.id)))
+				.qrImageKey ?? "";
+		await inTenant(tenant, () =>
+			methods.update(tenant, stale, { label: "Fonepay (Nabil)" }),
+		);
 
-		const saved = await PaymentMethod.findOrFail(method.id);
+		const saved = await inTenant(tenant, () =>
+			PaymentMethod.findOrFail(method.id),
+		);
 		assert.equal(saved.label, "Fonepay (Nabil)");
 		assert.equal(saved.qrImageKey, replaced);
 		assert.isTrue(await exists(replaced));
@@ -193,16 +232,22 @@ test.group("PaymentMethodService files", (group) => {
 	test("replacing a QR deletes the old file", async ({ assert }) => {
 		const { tenant } = await studioWithOwner();
 		const { methods } = makeService();
-		const method = await methods.create(tenant, {
-			kind: "fonepay",
-			label: "Fonepay",
-			qr: await qr(),
-		});
+		const method = await inTenant(tenant, async () =>
+			methods.create(tenant, {
+				kind: "fonepay",
+				label: "Fonepay",
+				qr: await qr(),
+			}),
+		);
 		const oldKey = method.qrImageKey ?? "";
 
-		await methods.update(tenant, method, { label: "Fonepay", qr: await qr() });
+		await inTenant(tenant, async () =>
+			methods.update(tenant, method, { label: "Fonepay", qr: await qr() }),
+		);
 
-		const saved = await PaymentMethod.findOrFail(method.id);
+		const saved = await inTenant(tenant, () =>
+			PaymentMethod.findOrFail(method.id),
+		);
 		assert.notEqual(saved.qrImageKey, oldKey);
 		assert.isTrue(await exists(saved.qrImageKey ?? ""));
 		assert.isFalse(await exists(oldKey));
@@ -217,16 +262,22 @@ test.group("PaymentMethodService files", (group) => {
 			accountName: "Black Needle",
 			accountNumber: "0123456789",
 		};
-		const method = await methods.create(tenant, {
-			kind: "bank",
-			...bank,
-			qr: await qr(),
-		});
+		const method = await inTenant(tenant, async () =>
+			methods.create(tenant, {
+				kind: "bank",
+				...bank,
+				qr: await qr(),
+			}),
+		);
 		const key = method.qrImageKey ?? "";
 
-		await methods.update(tenant, method, { ...bank, removeQr: true });
+		await inTenant(tenant, () =>
+			methods.update(tenant, method, { ...bank, removeQr: true }),
+		);
 
-		const saved = await PaymentMethod.findOrFail(method.id);
+		const saved = await inTenant(tenant, () =>
+			PaymentMethod.findOrFail(method.id),
+		);
 		assert.isNull(saved.qrImageKey);
 		assert.isFalse(await exists(key));
 	});
@@ -236,21 +287,27 @@ test.group("PaymentMethodService files", (group) => {
 	}) => {
 		const { tenant } = await studioWithOwner();
 		const { methods } = makeService();
-		const method = await methods.create(tenant, {
-			kind: "fonepay",
-			label: "Fonepay",
-			qr: await qr(),
-		});
+		const method = await inTenant(tenant, async () =>
+			methods.create(tenant, {
+				kind: "fonepay",
+				label: "Fonepay",
+				qr: await qr(),
+			}),
+		);
 		const key = method.qrImageKey ?? "";
 
 		assert.deepEqual(
 			await violationsOf(() =>
-				methods.update(tenant, method, { label: "Fonepay", removeQr: true }),
+				inTenant(tenant, () =>
+					methods.update(tenant, method, { label: "Fonepay", removeQr: true }),
+				),
 			),
 			["qr"],
 		);
 
-		const saved = await PaymentMethod.findOrFail(method.id);
+		const saved = await inTenant(tenant, () =>
+			PaymentMethod.findOrFail(method.id),
+		);
 		assert.equal(saved.qrImageKey, key);
 		assert.isTrue(await exists(key));
 	});
@@ -260,37 +317,57 @@ test.group("PaymentMethodService files", (group) => {
 	}) => {
 		const { tenant } = await studioWithOwner();
 		const { images, methods } = makeService();
-		const method = await methods.create(tenant, {
-			kind: "fonepay",
-			label: "Fonepay",
-			qr: await qr(),
-		});
+		const method = await inTenant(tenant, async () =>
+			methods.create(tenant, {
+				kind: "fonepay",
+				label: "Fonepay",
+				qr: await qr(),
+			}),
+		);
 		const oldKey = method.qrImageKey ?? "";
 		const upload = await qr();
 
-		await assert.rejects(() =>
-			methods.update(tenant, method, { label: "x".repeat(81), qr: upload }),
+		// Over the column's 80 characters (not a policy refusal).
+		await assert.rejects(
+			() =>
+				inTenant(tenant, () =>
+					methods.update(tenant, method, {
+						label: "x".repeat(81),
+						qr: upload,
+					}),
+				),
+			/value too long/,
 		);
 
 		const newKey = images.keys[1];
 		assert.isFalse(await exists(newKey));
 		assert.isTrue(await exists(oldKey));
-		const saved = await PaymentMethod.findOrFail(method.id);
+		const saved = await inTenant(tenant, () =>
+			PaymentMethod.findOrFail(method.id),
+		);
 		assert.equal(saved.qrImageKey, oldKey);
 	});
 
 	test("soft delete keeps the file", async ({ assert }) => {
 		const { tenant } = await studioWithOwner();
 		const { methods } = makeService();
-		const method = await methods.create(tenant, {
-			kind: "fonepay",
-			label: "Fonepay",
-			qr: await qr(),
+		const method = await inTenant(tenant, async () =>
+			methods.create(tenant, {
+				kind: "fonepay",
+				label: "Fonepay",
+				qr: await qr(),
+			}),
+		);
+
+		await inTenant(tenant, () => methods.delete(tenant, method));
+
+		// Same context: the row is visible to it, only the soft delete hides it.
+		await inTenant(tenant, async () => {
+			assert.isNull(await PaymentMethod.find(method.id));
+			assert.isNotNull(
+				await PaymentMethod.withTrashed().where("id", method.id).first(),
+			);
 		});
-
-		await methods.delete(tenant, method);
-
-		assert.isNull(await PaymentMethod.find(method.id));
 		assert.isTrue(await exists(method.qrImageKey ?? ""));
 	});
 });
@@ -306,67 +383,95 @@ test.group("PaymentMethodService lists and order", (group) => {
 		const { tenant: blackNeedle } = await studioWithOwner("black-needle");
 		const { tenant: redInk } = await studioWithOwner("red-ink", "Red Ink");
 		const { methods } = makeService();
-		const kept = await methods.create(blackNeedle, cash("Kept"));
-		const deleted = await methods.create(blackNeedle, cash("Deleted"));
-		const theirs = await methods.create(redInk, cash("Theirs"));
-		await methods.delete(blackNeedle, deleted);
+		const kept = await inTenant(blackNeedle, () =>
+			methods.create(blackNeedle, cash("Kept")),
+		);
+		const deleted = await inTenant(blackNeedle, () =>
+			methods.create(blackNeedle, cash("Deleted")),
+		);
+		const theirs = await inTenant(redInk, () =>
+			methods.create(redInk, cash("Theirs")),
+		);
+		await inTenant(blackNeedle, () => methods.delete(blackNeedle, deleted));
 
-		assert.deepEqual(labels(await methods.list(blackNeedle)), ["Kept"]);
-		assert.equal((await methods.findFor(blackNeedle, kept.id)).id, kept.id);
-		await assert.rejects(() => methods.findFor(blackNeedle, theirs.id));
-		await assert.rejects(() => methods.findFor(blackNeedle, deleted.id));
+		await inTenant(blackNeedle, async () => {
+			assert.deepEqual(labels(await methods.list(blackNeedle)), ["Kept"]);
+			assert.equal((await methods.findFor(blackNeedle, kept.id)).id, kept.id);
+			// Visible to this context, hidden only by the soft delete.
+			await assert.rejects(
+				() => methods.findFor(blackNeedle, deleted.id),
+				/Row not found/,
+			);
+		});
+		// Inside red-ink, where its method is visible to row-level security:
+		// asking for it through black-needle must still find nothing.
+		await inTenant(redInk, async () => {
+			assert.equal((await methods.findFor(redInk, theirs.id)).id, theirs.id);
+			await assert.rejects(
+				() => methods.findFor(blackNeedle, theirs.id),
+				/Row not found/,
+			);
+		});
 	});
 
 	test("a new method goes last", async ({ assert }) => {
 		const { tenant } = await studioWithOwner();
 		const { methods } = makeService();
 
-		await methods.create(tenant, cash("A"));
-		await methods.create(tenant, cash("B"));
-		await methods.create(tenant, cash("C"));
+		await inTenant(tenant, async () => {
+			await methods.create(tenant, cash("A"));
+			await methods.create(tenant, cash("B"));
+			await methods.create(tenant, cash("C"));
 
-		assert.deepEqual(labels(await methods.list(tenant)), ["A", "B", "C"]);
+			assert.deepEqual(labels(await methods.list(tenant)), ["A", "B", "C"]);
+		});
 	});
 
 	test("move swaps with the nearest live neighbour", async ({ assert }) => {
 		const { tenant } = await studioWithOwner();
 		const { methods } = makeService();
-		await methods.create(tenant, cash("A"));
-		const b = await methods.create(tenant, cash("B"));
-		const c = await methods.create(tenant, cash("C"));
-		await methods.delete(tenant, b);
+		await inTenant(tenant, async () => {
+			await methods.create(tenant, cash("A"));
+			const b = await methods.create(tenant, cash("B"));
+			const c = await methods.create(tenant, cash("C"));
+			await methods.delete(tenant, b);
 
-		await methods.move(tenant, c, "up");
-		assert.deepEqual(labels(await methods.list(tenant)), ["C", "A"]);
+			await methods.move(tenant, c, "up");
+			assert.deepEqual(labels(await methods.list(tenant)), ["C", "A"]);
 
-		await methods.move(tenant, await methods.findFor(tenant, c.id), "down");
-		assert.deepEqual(labels(await methods.list(tenant)), ["A", "C"]);
+			await methods.move(tenant, await methods.findFor(tenant, c.id), "down");
+			assert.deepEqual(labels(await methods.list(tenant)), ["A", "C"]);
+		});
 	});
 
 	test("moving past either end changes nothing", async ({ assert }) => {
 		const { tenant } = await studioWithOwner();
 		const { methods } = makeService();
-		const a = await methods.create(tenant, cash("A"));
-		const b = await methods.create(tenant, cash("B"));
+		await inTenant(tenant, async () => {
+			const a = await methods.create(tenant, cash("A"));
+			const b = await methods.create(tenant, cash("B"));
 
-		await methods.move(tenant, a, "up");
-		await methods.move(tenant, b, "down");
+			await methods.move(tenant, a, "up");
+			await methods.move(tenant, b, "down");
 
-		assert.deepEqual(labels(await methods.list(tenant)), ["A", "B"]);
+			assert.deepEqual(labels(await methods.list(tenant)), ["A", "B"]);
+		});
 	});
 
 	test("methods that share a position still move", async ({ assert }) => {
 		const { tenant } = await studioWithOwner();
 		const { methods } = makeService();
-		await methods.create(tenant, cash("A"));
-		const b = await methods.create(tenant, cash("B"));
-		// Two adds at the same moment can get the same position.
-		await PaymentMethod.query()
-			.where("tenant_id", tenant.id)
-			.update({ position: 5 });
+		await inTenant(tenant, async () => {
+			await methods.create(tenant, cash("A"));
+			const b = await methods.create(tenant, cash("B"));
+			// Two adds at the same moment can get the same position.
+			await PaymentMethod.query()
+				.where("tenant_id", tenant.id)
+				.update({ position: 5 });
 
-		await methods.move(tenant, b, "up");
+			await methods.move(tenant, b, "up");
 
-		assert.deepEqual(labels(await methods.list(tenant)), ["B", "A"]);
+			assert.deepEqual(labels(await methods.list(tenant)), ["B", "A"]);
+		});
 	});
 });

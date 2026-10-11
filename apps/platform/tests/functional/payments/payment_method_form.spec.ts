@@ -5,7 +5,7 @@ import ImageService from "#modules/media/services/image_service";
 import PaymentMethod from "#modules/payments/models/payment_method";
 import PaymentMethodService from "#modules/payments/services/payment_method_service";
 import { testImages, uploadOf } from "#tests/helpers/images";
-import { artistIn, studioWithOwner } from "#tests/helpers/tenants";
+import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 import { assertValidationError } from "#tests/helpers/validation";
 
 const methods = new PaymentMethodService(new ImageService());
@@ -53,7 +53,7 @@ test.group("Adding a payment method", (group) => {
 
 		response.assertHeader("location", base);
 		response.assertFlashMessage("success", '"Fonepay" added.');
-		const [method] = await methods.list(tenant);
+		const [method] = await inTenant(tenant, () => methods.list(tenant));
 		assert.equal(method.kind, "fonepay");
 		assert.isTrue(method.showOnDepositPage);
 		assert.isTrue(await drive.use("public").exists(method.qrImageKey ?? ""));
@@ -74,7 +74,8 @@ test.group("Adding a payment method", (group) => {
 			.redirects(0);
 
 		assertValidationError(response, "qr");
-		assert.isEmpty(await methods.list(tenant));
+		// In the tenant's context: a created method would show here.
+		assert.isEmpty(await inTenant(tenant, () => methods.list(tenant)));
 	});
 
 	test("Fonepay without a QR code comes back as a field error", async ({
@@ -115,7 +116,9 @@ test.group("Editing a payment method", (group) => {
 
 	test("the form shows the method", async ({ client, assert }) => {
 		const { owner, tenant } = await studioWithOwner();
-		const method = await methods.create(tenant, { kind: "bank", ...bank });
+		const method = await inTenant(tenant, () =>
+			methods.create(tenant, { kind: "bank", ...bank }),
+		);
 
 		const response = await client
 			.get(`${base}/${method.id}/edit`)
@@ -132,11 +135,13 @@ test.group("Editing a payment method", (group) => {
 		assert,
 	}) => {
 		const { owner, tenant } = await studioWithOwner();
-		const method = await methods.create(tenant, {
-			kind: "fonepay",
-			label: "Fonepay",
-			qr: await uploadOf(await testImages.png()),
-		});
+		const method = await inTenant(tenant, async () =>
+			methods.create(tenant, {
+				kind: "fonepay",
+				label: "Fonepay",
+				qr: await uploadOf(await testImages.png()),
+			}),
+		);
 
 		const response = await client
 			.put(`${base}/${method.id}`)
@@ -146,18 +151,22 @@ test.group("Editing a payment method", (group) => {
 			.redirects(0);
 
 		response.assertHeader("location", base);
-		const saved = await PaymentMethod.findOrFail(method.id);
+		const saved = await inTenant(tenant, () =>
+			PaymentMethod.findOrFail(method.id),
+		);
 		assert.equal(saved.label, "Fonepay (Nabil)");
 		assert.equal(saved.qrImageKey, method.qrImageKey);
 	});
 
 	test("an owner removes a bank QR", async ({ client, assert }) => {
 		const { owner, tenant } = await studioWithOwner();
-		const method = await methods.create(tenant, {
-			kind: "bank",
-			...bank,
-			qr: await uploadOf(await testImages.png()),
-		});
+		const method = await inTenant(tenant, async () =>
+			methods.create(tenant, {
+				kind: "bank",
+				...bank,
+				qr: await uploadOf(await testImages.png()),
+			}),
+		);
 
 		await client
 			.put(`${base}/${method.id}`)
@@ -165,16 +174,20 @@ test.group("Editing a payment method", (group) => {
 			.withCsrfToken()
 			.loginAs(owner);
 
-		const saved = await PaymentMethod.findOrFail(method.id);
+		const saved = await inTenant(tenant, () =>
+			PaymentMethod.findOrFail(method.id),
+		);
 		assert.isNull(saved.qrImageKey);
 	});
 
 	test("a kind in the body is ignored", async ({ client, assert }) => {
 		const { owner, tenant } = await studioWithOwner();
-		const method = await methods.create(tenant, {
-			kind: "cash",
-			label: "Cash",
-		});
+		const method = await inTenant(tenant, () =>
+			methods.create(tenant, {
+				kind: "cash",
+				label: "Cash",
+			}),
+		);
 
 		await client
 			.put(`${base}/${method.id}`)
@@ -182,7 +195,10 @@ test.group("Editing a payment method", (group) => {
 			.withCsrfToken()
 			.loginAs(owner);
 
-		assert.equal((await PaymentMethod.findOrFail(method.id)).kind, "cash");
+		assert.equal(
+			(await inTenant(tenant, () => PaymentMethod.findOrFail(method.id))).kind,
+			"cash",
+		);
 	});
 });
 
@@ -195,10 +211,12 @@ test.group("Payment method form access", (group) => {
 	}) => {
 		const { tenant } = await studioWithOwner();
 		const artist = await artistIn(tenant);
-		const method = await methods.create(tenant, {
-			kind: "cash",
-			label: "Cash",
-		});
+		const method = await inTenant(tenant, () =>
+			methods.create(tenant, {
+				kind: "cash",
+				label: "Cash",
+			}),
+		);
 
 		for (const request of [
 			client.get(`${base}/new`),
@@ -210,7 +228,9 @@ test.group("Payment method form access", (group) => {
 			response.assertStatus(404);
 		}
 		assert.deepEqual(
-			(await methods.list(tenant)).map(({ label }) => label),
+			(await inTenant(tenant, () => methods.list(tenant))).map(
+				({ label }) => label,
+			),
 			["Cash"],
 		);
 	});
@@ -221,10 +241,12 @@ test.group("Payment method form access", (group) => {
 	}) => {
 		const { tenant: blackNeedle } = await studioWithOwner("black-needle");
 		const { owner: redInkOwner } = await studioWithOwner("red-ink", "Red Ink");
-		const method = await methods.create(blackNeedle, {
-			kind: "cash",
-			label: "Cash",
-		});
+		const method = await inTenant(blackNeedle, () =>
+			methods.create(blackNeedle, {
+				kind: "cash",
+				label: "Cash",
+			}),
+		);
 
 		for (const request of [
 			client.get(`/t/red-ink/settings/payments/${method.id}/edit`),
@@ -235,16 +257,22 @@ test.group("Payment method form access", (group) => {
 			const response = await request.withCsrfToken().loginAs(redInkOwner);
 			response.assertStatus(404);
 		}
-		assert.equal((await PaymentMethod.findOrFail(method.id)).label, "Cash");
+		assert.equal(
+			(await inTenant(blackNeedle, () => PaymentMethod.findOrFail(method.id)))
+				.label,
+			"Cash",
+		);
 	});
 
 	test("a deleted method gets 404 on edit and update", async ({ client }) => {
 		const { owner, tenant } = await studioWithOwner();
-		const method = await methods.create(tenant, {
-			kind: "cash",
-			label: "Cash",
-		});
-		await methods.delete(tenant, method);
+		const method = await inTenant(tenant, () =>
+			methods.create(tenant, {
+				kind: "cash",
+				label: "Cash",
+			}),
+		);
+		await inTenant(tenant, () => methods.delete(tenant, method));
 
 		for (const request of [
 			client.get(`${base}/${method.id}/edit`),

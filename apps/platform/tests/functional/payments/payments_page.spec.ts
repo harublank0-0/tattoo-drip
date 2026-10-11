@@ -5,7 +5,7 @@ import PaymentMethod from "#modules/payments/models/payment_method";
 import PaymentMethodService from "#modules/payments/services/payment_method_service";
 import Tenant from "#modules/tenancy/models/tenant";
 import { testImages, uploadOf } from "#tests/helpers/images";
-import { artistIn, studioWithOwner } from "#tests/helpers/tenants";
+import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 import { assertValidationError } from "#tests/helpers/validation";
 
 const methods = new PaymentMethodService(new ImageService());
@@ -20,13 +20,15 @@ test.group("Payments page", (group) => {
 		assert,
 	}) => {
 		const { owner, tenant } = await studioWithOwner();
-		await methods.create(tenant, {
-			kind: "fonepay",
-			label: "Fonepay",
-			showOnDepositPage: true,
-			qr: await uploadOf(await testImages.png()),
+		await inTenant(tenant, async () => {
+			await methods.create(tenant, {
+				kind: "fonepay",
+				label: "Fonepay",
+				showOnDepositPage: true,
+				qr: await uploadOf(await testImages.png()),
+			});
+			await methods.create(tenant, cash("Cash"));
 		});
-		await methods.create(tenant, cash("Cash"));
 
 		const response = await client
 			.get("/t/black-needle/settings/payments")
@@ -64,7 +66,7 @@ test.group("Payments page", (group) => {
 
 		response.assertHeader("location", "/t/black-needle/settings/payments");
 		response.assertFlashMessage("success", "Deposit settings saved.");
-		const saved = await Tenant.findOrFail(tenant.id);
+		const saved = await inTenant(tenant, () => Tenant.findOrFail(tenant.id));
 		assert.equal(saved.defaultDepositPercent, 30);
 		assert.equal(saved.depositPolicy, "Holds your date.");
 	});
@@ -90,8 +92,10 @@ test.group("Payments page", (group) => {
 
 	test("an owner moves a method up", async ({ client, assert }) => {
 		const { owner, tenant } = await studioWithOwner();
-		await methods.create(tenant, cash("A"));
-		const b = await methods.create(tenant, cash("B"));
+		const b = await inTenant(tenant, async () => {
+			await methods.create(tenant, cash("A"));
+			return methods.create(tenant, cash("B"));
+		});
 
 		const response = await client
 			.post(`/t/black-needle/settings/payments/${b.id}/move`)
@@ -101,12 +105,17 @@ test.group("Payments page", (group) => {
 			.redirects(0);
 
 		response.assertHeader("location", "/t/black-needle/settings/payments");
-		assert.deepEqual(labels(await methods.list(tenant)), ["B", "A"]);
+		assert.deepEqual(
+			labels(await inTenant(tenant, () => methods.list(tenant))),
+			["B", "A"],
+		);
 	});
 
 	test("an owner deletes a method", async ({ client, assert }) => {
 		const { owner, tenant } = await studioWithOwner();
-		const method = await methods.create(tenant, cash("Cash"));
+		const method = await inTenant(tenant, () =>
+			methods.create(tenant, cash("Cash")),
+		);
 
 		const response = await client
 			.delete(`/t/black-needle/settings/payments/${method.id}`)
@@ -115,11 +124,15 @@ test.group("Payments page", (group) => {
 			.redirects(0);
 
 		response.assertFlashMessage("success", '"Cash" deleted.');
-		assert.isEmpty(await methods.list(tenant));
-		const deleted = await PaymentMethod.withTrashed()
-			.where("id", method.id)
-			.firstOrFail();
-		assert.isNotNull(deleted.deletedAt);
+		// Same context for both: the deleted row is visible to it, so the empty
+		// list is the soft delete's doing.
+		await inTenant(tenant, async () => {
+			assert.isEmpty(await methods.list(tenant));
+			const deleted = await PaymentMethod.withTrashed()
+				.where("id", method.id)
+				.firstOrFail();
+			assert.isNotNull(deleted.deletedAt);
+		});
 	});
 });
 
@@ -132,7 +145,9 @@ test.group("Payments page access", (group) => {
 	}) => {
 		const { tenant } = await studioWithOwner();
 		const artist = await artistIn(tenant);
-		const method = await methods.create(tenant, cash("Cash"));
+		const method = await inTenant(tenant, () =>
+			methods.create(tenant, cash("Cash")),
+		);
 		const base = "/t/black-needle/settings";
 
 		for (const request of [
@@ -146,8 +161,10 @@ test.group("Payments page access", (group) => {
 			const response = await request.withCsrfToken().loginAs(artist);
 			response.assertStatus(404);
 		}
-		assert.deepEqual(labels(await methods.list(tenant)), ["Cash"]);
-		assert.isNull((await Tenant.findOrFail(tenant.id)).defaultDepositPercent);
+		await inTenant(tenant, async () => {
+			assert.deepEqual(labels(await methods.list(tenant)), ["Cash"]);
+			assert.isNull((await Tenant.findOrFail(tenant.id)).defaultDepositPercent);
+		});
 	});
 
 	test("another tenant's owner gets 404 on a method, which stays as it was", async ({
@@ -156,8 +173,10 @@ test.group("Payments page access", (group) => {
 	}) => {
 		const { tenant: blackNeedle } = await studioWithOwner("black-needle");
 		const { owner: redInkOwner } = await studioWithOwner("red-ink", "Red Ink");
-		await methods.create(blackNeedle, cash("A"));
-		const b = await methods.create(blackNeedle, cash("B"));
+		const b = await inTenant(blackNeedle, async () => {
+			await methods.create(blackNeedle, cash("A"));
+			return methods.create(blackNeedle, cash("B"));
+		});
 
 		for (const request of [
 			client
@@ -168,13 +187,18 @@ test.group("Payments page access", (group) => {
 			const response = await request.withCsrfToken().loginAs(redInkOwner);
 			response.assertStatus(404);
 		}
-		assert.deepEqual(labels(await methods.list(blackNeedle)), ["A", "B"]);
+		assert.deepEqual(
+			labels(await inTenant(blackNeedle, () => methods.list(blackNeedle))),
+			["A", "B"],
+		);
 	});
 
 	test("a deleted method gets 404", async ({ client }) => {
 		const { owner, tenant } = await studioWithOwner();
-		const method = await methods.create(tenant, cash("Cash"));
-		await methods.delete(tenant, method);
+		const method = await inTenant(tenant, () =>
+			methods.create(tenant, cash("Cash")),
+		);
+		await inTenant(tenant, () => methods.delete(tenant, method));
 
 		for (const request of [
 			client

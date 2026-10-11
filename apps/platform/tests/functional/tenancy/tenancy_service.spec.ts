@@ -7,8 +7,13 @@ import { LastOwnerError, SlugTakenError } from "#modules/tenancy/errors";
 import Tenant from "#modules/tenancy/models/tenant";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
-import { dbClient, withDbContext } from "#services/db_context";
-import { studioWithOwner } from "#tests/helpers/tenants";
+import { dbClient, withDbContext, withTransaction } from "#services/db_context";
+import {
+	inTenant,
+	inTenantAs,
+	inUser,
+	studioWithOwner,
+} from "#tests/helpers/tenants";
 
 const tenancy = new TenancyService();
 
@@ -35,9 +40,8 @@ test.group("TenancyService.createTenant", (group) => {
 
 		assert.equal(tenant.slug, "black-needle");
 		assert.equal(tenant.type, "studio");
-		const memberships = await TenantMembership.query().where(
-			"tenant_id",
-			tenant.id,
+		const memberships = await inTenant(tenant, () =>
+			TenantMembership.query().where("tenant_id", tenant.id),
 		);
 		assert.lengthOf(memberships, 1);
 		assert.equal(memberships[0].userId, owner.id);
@@ -57,9 +61,9 @@ test.group("TenancyService.createTenant", (group) => {
 			SlugTakenError,
 		);
 
-		const secondMemberships = await TenantMembership.query().where(
-			"user_id",
-			second.id,
+		// As the user: their own membership would show here had it been created.
+		const secondMemberships = await inUser(second, () =>
+			TenantMembership.query().where("user_id", second.id),
 		);
 		assert.lengthOf(secondMemberships, 0);
 	});
@@ -92,10 +96,12 @@ test.group("TenancyService.createTenant", (group) => {
 
 		// createTenant relies on this: its inserts run in the context of an id
 		// chosen before the row exists, so the row must be stored under it.
-		const tenant = await Tenant.create({ id, ...studio("black-needle") });
+		await inTenant({ id }, async () => {
+			const tenant = await Tenant.create({ id, ...studio("black-needle") });
 
-		assert.equal(tenant.id, id);
-		assert.equal((await Tenant.findOrFail(id)).slug, "black-needle");
+			assert.equal(tenant.id, id);
+			assert.equal((await Tenant.findOrFail(id)).slug, "black-needle");
+		});
 	});
 });
 
@@ -109,14 +115,16 @@ test.group("TenancyService.tenantsFor", (group) => {
 		const ben = await makeUser("ben@example.com");
 		const own = await tenancy.createTenant(ada, studio("ada-ink"));
 		const other = await tenancy.createTenant(ben, studio("ben-ink"));
-		await TenantMembership.create({
-			tenantId: other.id,
-			userId: ada.id,
-			role: "artist",
-		});
+		await inTenant(other, () =>
+			TenantMembership.create({
+				tenantId: other.id,
+				userId: ada.id,
+				role: "artist",
+			}),
+		);
 		await tenancy.createTenant(ben, studio("ben-only"));
 
-		const result = await tenancy.tenantsFor(ada);
+		const result = await inUser(ada, () => tenancy.tenantsFor(ada));
 
 		assert.deepEqual(
 			result.map(({ tenant, role }) => [tenant.slug, role]),
@@ -135,7 +143,9 @@ test.group("TenancyService.membershipFor", (group) => {
 		const owner = await makeUser("owner@example.com");
 		const tenant = await tenancy.createTenant(owner, studio("black-needle"));
 
-		const found = await tenancy.membershipFor(owner, "black-needle");
+		const found = await inUser(owner, () =>
+			tenancy.membershipFor(owner, "black-needle"),
+		);
 
 		assert.equal(found?.tenant.id, tenant.id);
 		assert.equal(found?.membership.userId, owner.id);
@@ -148,12 +158,29 @@ test.group("TenancyService.membershipFor", (group) => {
 		const stranger = await makeUser("stranger@example.com");
 		await tenancy.createTenant(stranger, studio("red-ink"));
 
-		assert.isNull(await tenancy.membershipFor(stranger, "black-needle"));
-		assert.isNull(await tenancy.membershipFor(owner, "no-such-studio"));
-		assert.isNull(await tenancy.membershipFor(owner, "Black-Needle"));
+		// Row-level security alone hides the studio from a stranger, so look
+		// from inside it: the owner's membership is visible there, and only the
+		// service's own user filter keeps the stranger out.
+		assert.isNull(
+			await inTenantAs(tenant, stranger, () =>
+				tenancy.membershipFor(stranger, "black-needle"),
+			),
+		);
+		assert.isNull(
+			await inUser(owner, () => tenancy.membershipFor(owner, "no-such-studio")),
+		);
+		assert.isNull(
+			await inUser(owner, () => tenancy.membershipFor(owner, "Black-Needle")),
+		);
 
-		await tenant.softDelete();
-		assert.isNull(await tenancy.membershipFor(owner, "black-needle"));
+		await inTenant(tenant, () => tenant.softDelete());
+		// The deleted tenant and the owner's membership are still visible to
+		// the tenant context; the service must be the one to hide them.
+		assert.isNull(
+			await inTenantAs(tenant, owner, () =>
+				tenancy.membershipFor(owner, "black-needle"),
+			),
+		);
 	});
 
 	test("soft-deleting a tenant soft-deletes its payment methods", async ({
@@ -161,36 +188,45 @@ test.group("TenancyService.membershipFor", (group) => {
 	}) => {
 		const owner = await makeUser("owner@example.com");
 		const tenant = await tenancy.createTenant(owner, studio("black-needle"));
-		await PaymentMethod.create({
-			tenantId: tenant.id,
-			kind: "cash",
-			label: "Cash",
-			showOnDepositPage: false,
-			position: 0,
+		await inTenant(tenant, async () => {
+			await PaymentMethod.create({
+				tenantId: tenant.id,
+				kind: "cash",
+				label: "Cash",
+				showOnDepositPage: false,
+				position: 0,
+			});
+
+			await tenant.softDelete();
+
+			assert.isEmpty(await PaymentMethod.query().where("tenant_id", tenant.id));
+			assert.lengthOf(
+				await PaymentMethod.onlyTrashed().where("tenant_id", tenant.id),
+				1,
+			);
 		});
-
-		await tenant.softDelete();
-
-		assert.isEmpty(await PaymentMethod.query().where("tenant_id", tenant.id));
-		assert.lengthOf(
-			await PaymentMethod.onlyTrashed().where("tenant_id", tenant.id),
-			1,
-		);
 	});
 
 	test("returns null once the membership is removed", async ({ assert }) => {
 		const owner = await makeUser("owner@example.com");
 		const tenant = await tenancy.createTenant(owner, studio("black-needle"));
 		const artistUser = await makeUser("artist@example.com");
-		const artist = await TenantMembership.create({
-			tenantId: tenant.id,
-			userId: artistUser.id,
-			role: "artist",
+		await inTenant(tenant, async () => {
+			const artist = await TenantMembership.create({
+				tenantId: tenant.id,
+				userId: artistUser.id,
+				role: "artist",
+			});
+			await artist.softDelete();
 		});
 
-		await artist.softDelete();
-
-		assert.isNull(await tenancy.membershipFor(artistUser, "black-needle"));
+		// As the artist inside the studio, where the removed membership is
+		// still visible to row-level security: the service must hide it.
+		assert.isNull(
+			await inTenantAs(tenant, artistUser, () =>
+				tenancy.membershipFor(artistUser, "black-needle"),
+			),
+		);
 	});
 });
 
@@ -202,8 +238,10 @@ test.group("TenancyService.hasTenant", (group) => {
 		const without = await makeUser("without@example.com");
 		await tenancy.createTenant(withTenant, studio("black-needle"));
 
-		assert.isTrue(await tenancy.hasTenant(withTenant));
-		assert.isFalse(await tenancy.hasTenant(without));
+		assert.isTrue(
+			await inUser(withTenant, () => tenancy.hasTenant(withTenant)),
+		);
+		assert.isFalse(await inUser(without, () => tenancy.hasTenant(without)));
 	});
 
 	test("is false once the user's only tenant is deleted", async ({
@@ -212,9 +250,13 @@ test.group("TenancyService.hasTenant", (group) => {
 		const user = await makeUser("owner@example.com");
 		const tenant = await tenancy.createTenant(user, studio("black-needle"));
 
-		await tenant.softDelete();
+		await inTenant(tenant, () => tenant.softDelete());
 
-		assert.isFalse(await tenancy.hasTenant(user));
+		// Inside the studio, where its rows are still visible to row-level
+		// security: the service must be the one to hide the deleted tenant.
+		assert.isFalse(
+			await inTenantAs(tenant, user, () => tenancy.hasTenant(user)),
+		);
 	});
 });
 
@@ -224,9 +266,9 @@ test.group("TenancyService.assertKeepsAnOwner", (group) => {
 	async function ownerAndTenant() {
 		const owner = await makeUser("owner@example.com");
 		const tenant = await tenancy.createTenant(owner, studio("black-needle"));
-		const membership = await TenantMembership.query()
-			.where("tenant_id", tenant.id)
-			.firstOrFail();
+		const membership = await inTenant(tenant, () =>
+			TenantMembership.query().where("tenant_id", tenant.id).firstOrFail(),
+		);
 		return { tenant, membership };
 	}
 
@@ -235,8 +277,10 @@ test.group("TenancyService.assertKeepsAnOwner", (group) => {
 
 		await assert.rejects(
 			() =>
-				db.transaction((trx) =>
-					tenancy.assertKeepsAnOwner(trx, tenant.id, membership.id),
+				inTenant(tenant, () =>
+					withTransaction((trx) =>
+						tenancy.assertKeepsAnOwner(trx, tenant.id, membership.id),
+					),
 				),
 			LastOwnerError,
 		);
@@ -247,15 +291,19 @@ test.group("TenancyService.assertKeepsAnOwner", (group) => {
 	}) => {
 		const { tenant, membership } = await ownerAndTenant();
 		const second = await makeUser("second@example.com");
-		await TenantMembership.create({
-			tenantId: tenant.id,
-			userId: second.id,
-			role: "owner",
-		});
+		await inTenant(tenant, () =>
+			TenantMembership.create({
+				tenantId: tenant.id,
+				userId: second.id,
+				role: "owner",
+			}),
+		);
 
 		await assert.doesNotReject(() =>
-			db.transaction((trx) =>
-				tenancy.assertKeepsAnOwner(trx, tenant.id, membership.id),
+			inTenant(tenant, () =>
+				withTransaction((trx) =>
+					tenancy.assertKeepsAnOwner(trx, tenant.id, membership.id),
+				),
 			),
 		);
 	});
@@ -267,16 +315,20 @@ test.group("TenancyService.assertKeepsAnOwner", (group) => {
 			stranger,
 			studio("other-ink"),
 		);
-		const otherMembership = await TenantMembership.query()
-			.where("tenant_id", otherTenant.id)
-			.firstOrFail();
+		const otherMembership = await inTenant(otherTenant, () =>
+			TenantMembership.query().where("tenant_id", otherTenant.id).firstOrFail(),
+		);
 
 		// A caller bug: the id doesn't belong to this tenant. The guard must
-		// not wave the change through.
+		// not wave the change through. The stranger's own membership is visible
+		// to row-level security here (it is theirs), so the guard's tenant
+		// filter is what rejects it.
 		await assert.rejects(
 			() =>
-				db.transaction((trx) =>
-					tenancy.assertKeepsAnOwner(trx, tenant.id, otherMembership.id),
+				inTenantAs(tenant, stranger, () =>
+					withTransaction((trx) =>
+						tenancy.assertKeepsAnOwner(trx, tenant.id, otherMembership.id),
+					),
 				),
 			/not a live membership/,
 		);
@@ -285,15 +337,19 @@ test.group("TenancyService.assertKeepsAnOwner", (group) => {
 	test("allows losing an artist", async ({ assert }) => {
 		const { tenant } = await ownerAndTenant();
 		const artistUser = await makeUser("artist@example.com");
-		const artist = await TenantMembership.create({
-			tenantId: tenant.id,
-			userId: artistUser.id,
-			role: "artist",
-		});
+		const artist = await inTenant(tenant, () =>
+			TenantMembership.create({
+				tenantId: tenant.id,
+				userId: artistUser.id,
+				role: "artist",
+			}),
+		);
 
 		await assert.doesNotReject(() =>
-			db.transaction((trx) =>
-				tenancy.assertKeepsAnOwner(trx, tenant.id, artist.id),
+			inTenant(tenant, () =>
+				withTransaction((trx) =>
+					tenancy.assertKeepsAnOwner(trx, tenant.id, artist.id),
+				),
 			),
 		);
 	});
@@ -320,9 +376,11 @@ test.group("TenancyService profile and deposits", (group) => {
 	}) => {
 		const { tenant } = await studioWithOwner();
 
-		await new TenancyService().updateProfile(tenant, profile);
+		await inTenant(tenant, () =>
+			new TenancyService().updateProfile(tenant, profile),
+		);
 
-		const saved = await Tenant.findOrFail(tenant.id);
+		const saved = await inTenant(tenant, () => Tenant.findOrFail(tenant.id));
 		for (const [key, value] of Object.entries(profile)) {
 			assert.deepEqual(saved[key as keyof typeof profile], value, key);
 		}
@@ -332,16 +390,18 @@ test.group("TenancyService profile and deposits", (group) => {
 
 	test("updateProfile with nulls clears the fields", async ({ assert }) => {
 		const { tenant } = await studioWithOwner();
-		await tenancy.updateProfile(tenant, profile);
+		await inTenant(tenant, () => tenancy.updateProfile(tenant, profile));
 
-		await tenancy.updateProfile(tenant, {
-			...profile,
-			intro: null,
-			contactPhone: null,
-			instagramUrl: null,
-		});
+		await inTenant(tenant, () =>
+			tenancy.updateProfile(tenant, {
+				...profile,
+				intro: null,
+				contactPhone: null,
+				instagramUrl: null,
+			}),
+		);
 
-		const saved = await Tenant.findOrFail(tenant.id);
+		const saved = await inTenant(tenant, () => Tenant.findOrFail(tenant.id));
 		assert.isNull(saved.intro);
 		assert.isNull(saved.contactPhone);
 		assert.isNull(saved.instagramUrl);
@@ -352,19 +412,23 @@ test.group("TenancyService profile and deposits", (group) => {
 	}) => {
 		const { tenant } = await studioWithOwner();
 
-		await tenancy.updateDepositSettings(tenant, {
-			defaultDepositPercent: 30,
-			depositPolicy: "Deposits hold your date.",
-		});
-		let saved = await Tenant.findOrFail(tenant.id);
+		await inTenant(tenant, () =>
+			tenancy.updateDepositSettings(tenant, {
+				defaultDepositPercent: 30,
+				depositPolicy: "Deposits hold your date.",
+			}),
+		);
+		let saved = await inTenant(tenant, () => Tenant.findOrFail(tenant.id));
 		assert.equal(saved.defaultDepositPercent, 30);
 		assert.equal(saved.depositPolicy, "Deposits hold your date.");
 
-		await tenancy.updateDepositSettings(tenant, {
-			defaultDepositPercent: null,
-			depositPolicy: null,
-		});
-		saved = await Tenant.findOrFail(tenant.id);
+		await inTenant(tenant, () =>
+			tenancy.updateDepositSettings(tenant, {
+				defaultDepositPercent: null,
+				depositPolicy: null,
+			}),
+		);
+		saved = await inTenant(tenant, () => Tenant.findOrFail(tenant.id));
 		assert.isNull(saved.defaultDepositPercent);
 		assert.isNull(saved.depositPolicy);
 	});
@@ -372,12 +436,17 @@ test.group("TenancyService profile and deposits", (group) => {
 	test("the database refuses a deposit over 100%", async ({ assert }) => {
 		const { tenant } = await studioWithOwner();
 
+		// In the tenant's context, so the update reaches the row and the check
+		// constraint is what refuses it (without it the policy would hide the
+		// row and nothing would be thrown).
 		await assert.rejects(
 			() =>
-				tenancy.updateDepositSettings(tenant, {
-					defaultDepositPercent: 101,
-					depositPolicy: null,
-				}),
+				inTenant(tenant, () =>
+					tenancy.updateDepositSettings(tenant, {
+						defaultDepositPercent: 101,
+						depositPolicy: null,
+					}),
+				),
 			/tenants_default_deposit_percent_range/,
 		);
 	});

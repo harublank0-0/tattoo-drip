@@ -16,6 +16,7 @@ type Payload = { tenantId: string; label: string; fail?: boolean };
 const seen: { tenant: string | null; before: number }[] = [];
 const atCommit: boolean[] = [];
 const probed: { tenant: string | null; user: string | null }[] = [];
+const plainSaw: number[] = [];
 
 async function queueRowExists(jobId: string) {
 	return Boolean(await db.from("queue_jobs").where("id", jobId).first());
@@ -82,6 +83,19 @@ class ProbeJob extends Job<{ label: string }> {
 	}
 }
 
+/**
+ * A plain job reading tenant rows: outside TenantJob it has no tenant
+ * context, so row-level security must hide them.
+ */
+class PlainReadJob extends Job<{ label: string }> {
+	static options: JobOptions = { retry: { maxRetries: 0 } };
+
+	async execute() {
+		const rows = await PaymentMethod.query().where("label", this.payload.label);
+		plainSaw.push(rows.length);
+	}
+}
+
 const trx = () => db.connection() as TransactionClientContract;
 const labelCount = (tenant: { id: string }, label: string) =>
 	inTenant(tenant, async () => {
@@ -97,8 +111,10 @@ test.group("TenantJob", (group) => {
 		seen.length = 0;
 		atCommit.length = 0;
 		probed.length = 0;
+		plainSaw.length = 0;
 		registerJob(WriteJob);
 		registerJob(ProbeJob);
+		registerJob(PlainReadJob);
 	});
 
 	test("runs the handler in the payload's tenant context and commits", async ({
@@ -208,5 +224,70 @@ test.group("TenantJob", (group) => {
 		const row = await queueRow(jobId);
 		assert.equal(row?.status, "failed");
 		assert.match(row?.error ?? "", /needs a valid tenantId/);
+	});
+
+	test("a TenantJob sees its tenant's rows and not another tenant's", async ({
+		assert,
+	}) => {
+		const { tenant: first } = await studioWithOwner("first-shop", "First Shop");
+		const { tenant: second } = await studioWithOwner(
+			"second-shop",
+			"Second Shop",
+		);
+		await inTenant(first, () =>
+			PaymentMethod.create({
+				tenantId: first.id,
+				kind: "cash",
+				label: "shared label",
+				position: 0,
+			}),
+		);
+		await dispatchInTransaction(
+			WriteJob.dispatch({ tenantId: first.id, label: "shared label" }),
+			trx(),
+		);
+		await dispatchInTransaction(
+			WriteJob.dispatch({ tenantId: second.id, label: "shared label" }),
+			trx(),
+		);
+
+		await processQueued();
+
+		// Jobs run in queue order, so key the counts by tenant.
+		const sawBefore = new Map(
+			seen.map(({ tenant, before }) => [tenant, before]),
+		);
+		assert.equal(
+			sawBefore.get(first.id),
+			1,
+			"first tenant's job sees its own row",
+		);
+		assert.equal(
+			sawBefore.get(second.id),
+			0,
+			"second tenant's job does not see first's",
+		);
+	});
+
+	test("a plain job outside any tenant sees no tenant rows", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+		await inTenant(tenant, () =>
+			PaymentMethod.create({
+				tenantId: tenant.id,
+				kind: "cash",
+				label: "invisible",
+				position: 0,
+			}),
+		);
+		await dispatchInTransaction(
+			PlainReadJob.dispatch({ label: "invisible" }),
+			trx(),
+		);
+
+		await processQueued();
+
+		assert.deepEqual(plainSaw, [0]);
 	});
 });

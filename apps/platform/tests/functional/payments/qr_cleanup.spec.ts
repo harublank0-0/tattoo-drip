@@ -6,7 +6,7 @@ import PaymentMethod from "#modules/payments/models/payment_method";
 import PaymentMethodService from "#modules/payments/services/payment_method_service";
 import { withDbContext } from "#services/db_context";
 import { testImages, uploadOf } from "#tests/helpers/images";
-import { studioWithOwner } from "#tests/helpers/tenants";
+import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
 const methods = new PaymentMethodService(new ImageService());
 const qr = async () => uploadOf(await testImages.png());
@@ -19,11 +19,13 @@ test.group("QR file cleanup follows the real commit", (group) => {
 		assert,
 	}) => {
 		const { tenant } = await studioWithOwner();
-		const method = await methods.create(tenant, {
-			kind: "fonepay",
-			label: "Fonepay",
-			qr: await qr(),
-		});
+		const method = await inTenant(tenant, async () =>
+			methods.create(tenant, {
+				kind: "fonepay",
+				label: "Fonepay",
+				qr: await qr(),
+			}),
+		);
 		const oldKey = method.qrImageKey ?? "";
 		let newKey = "";
 
@@ -44,7 +46,9 @@ test.group("QR file cleanup follows the real commit", (group) => {
 
 		assert.isTrue(await exists(oldKey));
 		assert.isFalse(await exists(newKey));
-		const row = await PaymentMethod.findOrFail(method.id);
+		const row = await inTenant(tenant, () =>
+			PaymentMethod.findOrFail(method.id),
+		);
 		assert.equal(row.qrImageKey, oldKey);
 	});
 
@@ -52,11 +56,13 @@ test.group("QR file cleanup follows the real commit", (group) => {
 		assert,
 	}) => {
 		const { tenant } = await studioWithOwner();
-		const method = await methods.create(tenant, {
-			kind: "fonepay",
-			label: "Fonepay",
-			qr: await qr(),
-		});
+		const method = await inTenant(tenant, async () =>
+			methods.create(tenant, {
+				kind: "fonepay",
+				label: "Fonepay",
+				qr: await qr(),
+			}),
+		);
 		const oldKey = method.qrImageKey ?? "";
 
 		await withDbContext({ tenantId: tenant.id }, async () => {

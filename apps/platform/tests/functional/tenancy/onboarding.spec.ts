@@ -4,6 +4,7 @@ import User from "#models/user";
 import Tenant from "#modules/tenancy/models/tenant";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
+import { inTenant, inUser } from "#tests/helpers/tenants";
 import { assertValidationError } from "#tests/helpers/validation";
 
 const PASSWORD = "secret-password";
@@ -52,11 +53,13 @@ test.group("Onboarding", (group) => {
 
 		response.assertStatus(302);
 		response.assertHeader("location", "/dashboard");
-		const tenant = await Tenant.findByOrFail("slug", "black-needle");
+		const tenant = await inUser(user, () =>
+			Tenant.findByOrFail("slug", "black-needle"),
+		);
 		assert.equal(tenant.name, "Black Needle");
-		const membership = await TenantMembership.query()
-			.where("tenant_id", tenant.id)
-			.firstOrFail();
+		const membership = await inTenant(tenant, () =>
+			TenantMembership.query().where("tenant_id", tenant.id).firstOrFail(),
+		);
 		assert.equal(membership.userId, user.id);
 		assert.equal(membership.role, "owner");
 	});
@@ -80,7 +83,10 @@ test.group("Onboarding", (group) => {
 				.redirects(0);
 
 			assertValidationError(response, field);
-			assert.isNull(await Tenant.findBy("slug", validTenant.slug));
+			// As the user: the tenant would show here had it been created.
+			assert.isNull(
+				await inUser(user, () => Tenant.findBy("slug", validTenant.slug)),
+			);
 		});
 	}
 
@@ -124,7 +130,9 @@ test.group("Onboarding", (group) => {
 				.loginAs(user)
 				.redirects(0);
 
-			const tenant = await Tenant.findByOrFail("slug", validTenant.slug);
+			const tenant = await inUser(user, () =>
+				Tenant.findByOrFail("slug", validTenant.slug),
+			);
 			assert.equal(tenant.timezone, stored);
 		});
 	}
@@ -163,7 +171,10 @@ test.group("Onboarding", (group) => {
 
 		response.assertStatus(302);
 		response.assertHeader("location", "/dashboard");
-		assert.isNull(await Tenant.findBy("slug", "second-shop"));
+		// As the user: the tenant would show here had it been created.
+		assert.isNull(
+			await inUser(user, () => Tenant.findBy("slug", "second-shop")),
+		);
 	});
 });
 

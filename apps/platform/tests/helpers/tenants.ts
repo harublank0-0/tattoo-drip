@@ -30,11 +30,13 @@ export async function studioWithOwner(
  */
 export async function artistIn(tenant: Tenant, email = "artist@example.com") {
 	const user = await User.create({ email, password: "secret-password" });
-	await TenantMembership.create({
-		tenantId: tenant.id,
-		userId: user.id,
-		role: "artist",
-	});
+	await inTenant(tenant, () =>
+		TenantMembership.create({
+			tenantId: tenant.id,
+			userId: user.id,
+			role: "artist",
+		}),
+	);
 	return user;
 }
 
@@ -44,4 +46,23 @@ export async function artistIn(tenant: Tenant, email = "artist@example.com") {
  */
 export function inTenant<T>(tenant: { id: string }, fn: () => Promise<T>) {
 	return withDbContext({ tenantId: tenant.id }, () => fn());
+}
+
+/**
+ * Runs `fn` as `user` with no tenant: what a signed-in user sees on
+ * /dashboard (their own studios and memberships).
+ */
+export function inUser<T>(user: { id: string }, fn: () => Promise<T>) {
+	return withDbContext({ userId: user.id }, () => fn());
+}
+
+/**
+ * Runs `fn` as `user` inside `tenant`: what a member sees on a tenant page.
+ */
+export function inTenantAs<T>(
+	tenant: { id: string },
+	user: { id: string },
+	fn: () => Promise<T>,
+) {
+	return withDbContext({ tenantId: tenant.id, userId: user.id }, () => fn());
 }

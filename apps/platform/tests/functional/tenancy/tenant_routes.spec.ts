@@ -5,6 +5,7 @@ import { LAST_TENANT_KEY, tenantContext } from "#middleware/tenant_middleware";
 import User from "#models/user";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
+import { inTenant } from "#tests/helpers/tenants";
 
 const tenancy = new TenancyService();
 
@@ -30,11 +31,13 @@ test.group("Tenant routes", (group) => {
 			other,
 			studio("red-ink", "Red Ink"),
 		);
-		await TenantMembership.create({
-			tenantId: otherTenant.id,
-			userId: owner.id,
-			role: "artist",
-		});
+		await inTenant(otherTenant, () =>
+			TenantMembership.create({
+				tenantId: otherTenant.id,
+				userId: owner.id,
+				role: "artist",
+			}),
+		);
 
 		const response = await client
 			.get("/t/black-needle")
@@ -107,14 +110,16 @@ test.group("Tenant routes", (group) => {
 		const owner = await makeUser("owner@example.com");
 		const tenant = await tenancy.createTenant(owner, studio("black-needle"));
 		const artistUser = await makeUser("artist@example.com");
-		const artist = await TenantMembership.create({
-			tenantId: tenant.id,
-			userId: artistUser.id,
-			role: "artist",
-		});
+		const artist = await inTenant(tenant, () =>
+			TenantMembership.create({
+				tenantId: tenant.id,
+				userId: artistUser.id,
+				role: "artist",
+			}),
+		);
 		(await client.get("/t/black-needle").loginAs(artistUser)).assertStatus(200);
 
-		await artist.softDelete();
+		await inTenant(tenant, () => artist.softDelete());
 
 		const response = await client.get("/t/black-needle").loginAs(artistUser);
 		response.assertStatus(404);
@@ -123,7 +128,7 @@ test.group("Tenant routes", (group) => {
 	test("a deleted tenant gets 404", async ({ client }) => {
 		const owner = await makeUser("owner@example.com");
 		const tenant = await tenancy.createTenant(owner, studio("black-needle"));
-		await tenant.softDelete();
+		await inTenant(tenant, () => tenant.softDelete());
 
 		const response = await client.get("/t/black-needle").loginAs(owner);
 
@@ -217,11 +222,13 @@ test.group("Dashboard landing", (group) => {
 		await tenancy.createTenant(owner, studio("black-needle"));
 		const other = await makeUser("other@example.com");
 		const redInk = await tenancy.createTenant(other, studio("red-ink"));
-		await TenantMembership.create({
-			tenantId: redInk.id,
-			userId: owner.id,
-			role: "artist",
-		});
+		await inTenant(redInk, () =>
+			TenantMembership.create({
+				tenantId: redInk.id,
+				userId: owner.id,
+				role: "artist",
+			}),
+		);
 
 		const response = await client
 			.get("/dashboard")
@@ -239,12 +246,14 @@ test.group("Dashboard landing", (group) => {
 		await tenancy.createTenant(owner, studio("black-needle"));
 		const other = await makeUser("other@example.com");
 		const redInk = await tenancy.createTenant(other, studio("red-ink"));
-		const removed = await TenantMembership.create({
-			tenantId: redInk.id,
-			userId: owner.id,
-			role: "artist",
+		await inTenant(redInk, async () => {
+			const removed = await TenantMembership.create({
+				tenantId: redInk.id,
+				userId: owner.id,
+				role: "artist",
+			});
+			await removed.softDelete();
 		});
-		await removed.softDelete();
 
 		const response = await client
 			.get("/dashboard")
