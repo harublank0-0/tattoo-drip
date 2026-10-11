@@ -3,7 +3,7 @@ import { test } from "@japa/runner";
 import { assertCrossTenantIsolation } from "#tests/helpers/isolation";
 import { twoStudios } from "#tests/helpers/tenants";
 import { type IsolationCase, isolationCases } from "#tests/isolation/cases";
-import { idorOwners } from "#tests/support/test_routes";
+import { collateralTargets, idorOwners } from "#tests/support/test_routes";
 
 function caseFor(method: IsolationCase["method"], pattern: string) {
 	const found = isolationCases.find(
@@ -15,7 +15,10 @@ function caseFor(method: IsolationCase["method"], pattern: string) {
 
 test.group("Isolation harness catches what it should", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
-	group.each.teardown(() => idorOwners.clear());
+	group.each.teardown(() => {
+		idorOwners.clear();
+		collateralTargets.clear();
+	});
 
 	test("a route that answers a foreign studio's slug is reported", async ({
 		client,
@@ -67,6 +70,32 @@ test.group("Isolation harness catches what it should", (group) => {
 		await assert.rejects(
 			async () => assertCrossTenantIsolation(client, assert, studios, idor),
 			/expected 200 to equal 404/,
+		);
+	});
+
+	test("a valid request of studio A that also writes to studio B is reported", async ({
+		client,
+		assert,
+	}) => {
+		const studios = await twoStudios();
+		const { a, b } = studios;
+		collateralTargets.set(a.tenant.id, {
+			tenantId: b.tenant.id,
+			methodId: b.paymentMethod.id,
+		});
+		const collateral: IsolationCase = {
+			method: "DELETE",
+			pattern: "/__test/collateral/:tenant/payment-methods/:id",
+			resource: "paymentMethod",
+			actor: "owner",
+			ownStatus: 200,
+			snapshot: caseFor("DELETE", "/t/:tenant/settings/payments/:id").snapshot,
+		};
+
+		await assert.rejects(
+			async () =>
+				assertCrossTenantIsolation(client, assert, studios, collateral),
+			/A's own valid request changed studio B/,
 		);
 	});
 
@@ -123,15 +152,17 @@ test.group("Isolation harness catches what it should", (group) => {
 		assert,
 	}) => {
 		const profile = caseFor("GET", "/t/:tenant/settings/profile");
+		// The first two reads (before the control, right after it) agree; the
+		// third, after the attack, differs.
 		let reads = 0;
 
 		await assert.rejects(
 			async () =>
 				assertCrossTenantIsolation(client, assert, await twoStudios(), {
 					...profile,
-					snapshot: async () => ++reads,
+					snapshot: async () => (++reads > 2 ? "moved" : "steady"),
 				}),
-			/changed studio B/,
+			/GET \/t\/studio-b\/settings\/profile changed studio B/,
 		);
 	});
 

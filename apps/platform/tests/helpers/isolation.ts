@@ -53,9 +53,11 @@ function send(
  * invalid body would fail for other reasons and the attacks would pass
  * vacuously. For a write, the control must also change A's snapshot: a
  * snapshot that cannot see the write would make "unchanged" below mean
- * nothing. Then the attacks, as the same actor: B's slug in the URL, and
- * (for routes with an :id) A's slug with B's resource id. Each must be a
- * 404, and B's snapshot must be unchanged afterwards.
+ * nothing. B's snapshot is taken before the control and must be unchanged
+ * right after it: A's own valid request may not touch B. Then the attacks,
+ * as the same actor: B's slug in the URL, and (for routes with an :id) A's
+ * slug with B's resource id. Each must be a 404, and B's snapshot must be
+ * unchanged afterwards.
  */
 export async function assertCrossTenantIsolation(
 	client: ApiClient,
@@ -67,6 +69,9 @@ export async function assertCrossTenantIsolation(
 	const body = isolationCase.body?.(a);
 	const writes = isolationCase.method !== "GET";
 
+	// B's baseline is taken before anything is sent: a handler that also
+	// writes to B on A's own valid request must not get to define "unchanged".
+	const before = await isolationCase.snapshot(b);
 	const ownBefore = writes ? await isolationCase.snapshot(a) : undefined;
 	const control = await send(
 		client,
@@ -76,6 +81,11 @@ export async function assertCrossTenantIsolation(
 		body,
 	);
 	control.assertStatus(isolationCase.ownStatus);
+	assert.deepEqual(
+		await isolationCase.snapshot(b),
+		before,
+		`${isolationCase.method} ${isolationCase.pattern}: A's own valid request changed studio B`,
+	);
 	if (writes) {
 		assert.notDeepEqual(
 			await isolationCase.snapshot(a),
@@ -89,7 +99,6 @@ export async function assertCrossTenantIsolation(
 		attacks.push(urlFor(isolationCase, a, b));
 	}
 
-	const before = await isolationCase.snapshot(b);
 	for (const url of attacks) {
 		const response = await send(client, isolationCase, url, actor, body);
 		response.assertStatus(404);

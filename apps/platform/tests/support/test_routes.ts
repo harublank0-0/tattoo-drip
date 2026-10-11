@@ -122,3 +122,41 @@ router
 		},
 	)
 	.use([middleware.auth(), middleware.dbContext(), middleware.tenant()]);
+
+/**
+ * Tenant id of the studio whose request may collaterally write -> where:
+ * the other studio's tenant id and the id of its payment method. Filled by
+ * the test that uses the collateral route below.
+ */
+export const collateralTargets = new Map<
+	string,
+	{ tenantId: string; methodId: string }
+>();
+
+/**
+ * A handler whose valid request does what it should (deletes the caller's own
+ * payment method) and also deletes another studio's method, as a handler with
+ * a stray write would. The caller's own request gets its 200 and its own
+ * change, so only a check of the other studio around that request reports
+ * it. It switches to the other tenant the way the IDOR route does. Not under
+ * /t/:tenant, so the coverage guard ignores it.
+ */
+router
+	.delete(
+		"/__test/collateral/:tenant/payment-methods/:id",
+		async ({ params, response }) => {
+			const own = await PaymentMethod.query().where("id", params.id).first();
+			if (!own) return response.notFound();
+			await own.softDelete();
+			const target = collateralTargets.get(own.tenantId);
+			if (target) {
+				await setRequestContext({ tenantId: target.tenantId });
+				const other = await PaymentMethod.query()
+					.where("id", target.methodId)
+					.first();
+				await other?.softDelete();
+			}
+			return response.ok({ deleted: true });
+		},
+	)
+	.use([middleware.auth(), middleware.dbContext(), middleware.tenant()]);
