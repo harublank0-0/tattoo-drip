@@ -7,11 +7,23 @@ import { inTenant, type Studio } from "#tests/helpers/tenants";
  * A's actor against studio B; the route-coverage guard in
  * tenant_routes.spec.ts fails for a route that has neither an entry here
  * nor an exemption with a reason.
+ *
+ * The limit: with row-level security on, a service query that forgot its
+ * tenant filter still gives a 404 here (RLS alone hides the row), so this
+ * table proves the system as a whole. The app-level filters are covered by
+ * the service specs that run from the OTHER tenant's context (inTenantAs),
+ * e.g. payment_method_service.spec.ts "list and findFor only see the
+ * tenant's live methods".
  */
 export type IsolationCase = {
 	method: "GET" | "POST" | "PUT" | "DELETE";
 	/** The route as the router prints it, e.g. /t/:tenant/settings/payments/:id */
 	pattern: string;
+	/**
+	 * The seeded resource (a key of Studio) that the route's :id refers to.
+	 * Required for a pattern with an :id; the helper throws without it.
+	 */
+	resource?: "paymentMethod";
 	/** Who sends the request. Every settings route is owner-only. */
 	actor: "owner" | "artist";
 	/** A valid body for writes, built for the studio sending it. */
@@ -128,6 +140,7 @@ export const isolationCases: IsolationCase[] = [
 	{
 		method: "PUT",
 		pattern: "/t/:tenant/settings/payments/:id",
+		resource: "paymentMethod",
 		actor: "owner",
 		body: () => ({ label: "Renamed" }),
 		ownStatus: 302,
@@ -136,6 +149,7 @@ export const isolationCases: IsolationCase[] = [
 	{
 		method: "GET",
 		pattern: "/t/:tenant/settings/payments/:id/edit",
+		resource: "paymentMethod",
 		actor: "owner",
 		ownStatus: 200,
 		snapshot: methodRows,
@@ -143,6 +157,7 @@ export const isolationCases: IsolationCase[] = [
 	{
 		method: "POST",
 		pattern: "/t/:tenant/settings/payments/:id/move",
+		resource: "paymentMethod",
 		actor: "owner",
 		body: () => ({ direction: "down" }),
 		ownStatus: 302,
@@ -151,6 +166,7 @@ export const isolationCases: IsolationCase[] = [
 	{
 		method: "DELETE",
 		pattern: "/t/:tenant/settings/payments/:id",
+		resource: "paymentMethod",
 		actor: "owner",
 		ownStatus: 302,
 		snapshot: methodRows,

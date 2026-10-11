@@ -4,10 +4,29 @@ import type User from "#models/user";
 import type { Studio } from "#tests/helpers/tenants";
 import type { IsolationCase } from "#tests/isolation/cases";
 
-function urlFor(pattern: string, studio: Studio, resourceOwner?: Studio) {
-	return pattern
-		.replace(":tenant", studio.tenant.slug)
-		.replace(":id", resourceOwner?.paymentMethod.id ?? "");
+/** Whole path segments only: ":identity" or ":idx" are not the :id. */
+const TENANT_SEGMENT = /:tenant(?=\/|$)/;
+const ID_SEGMENT = /:id(?=\/|$)/;
+
+/**
+ * The case's URL for `studio`'s slug. A route with an :id gets the id of
+ * `resourceOwner`'s seeded resource that the case names (`resource`); a
+ * case that leaves it out is a mistake in the table, so fail loudly instead
+ * of guessing.
+ */
+function urlFor(
+	{ method, pattern, resource }: IsolationCase,
+	studio: Studio,
+	resourceOwner: Studio,
+) {
+	const url = pattern.replace(TENANT_SEGMENT, studio.tenant.slug);
+	if (!ID_SEGMENT.test(pattern)) return url;
+	if (!resource) {
+		throw new Error(
+			`${method} ${pattern} has an :id but its isolation case names no \`resource\``,
+		);
+	}
+	return url.replace(ID_SEGMENT, resourceOwner[resource].id);
 }
 
 function send(
@@ -52,7 +71,7 @@ export async function assertCrossTenantIsolation(
 	const control = await send(
 		client,
 		isolationCase,
-		urlFor(isolationCase.pattern, a, a),
+		urlFor(isolationCase, a, a),
 		actor,
 		body,
 	);
@@ -65,9 +84,9 @@ export async function assertCrossTenantIsolation(
 		);
 	}
 
-	const attacks = [urlFor(isolationCase.pattern, b, b)];
-	if (isolationCase.pattern.includes(":id")) {
-		attacks.push(urlFor(isolationCase.pattern, a, b));
+	const attacks = [urlFor(isolationCase, b, b)];
+	if (ID_SEGMENT.test(isolationCase.pattern)) {
+		attacks.push(urlFor(isolationCase, a, b));
 	}
 
 	const before = await isolationCase.snapshot(b);

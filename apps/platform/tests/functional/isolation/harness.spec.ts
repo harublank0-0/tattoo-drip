@@ -3,6 +3,7 @@ import { test } from "@japa/runner";
 import { assertCrossTenantIsolation } from "#tests/helpers/isolation";
 import { twoStudios } from "#tests/helpers/tenants";
 import { type IsolationCase, isolationCases } from "#tests/isolation/cases";
+import { idorOwners } from "#tests/support/test_routes";
 
 function caseFor(method: IsolationCase["method"], pattern: string) {
 	const found = isolationCases.find(
@@ -14,6 +15,7 @@ function caseFor(method: IsolationCase["method"], pattern: string) {
 
 test.group("Isolation harness catches what it should", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+	group.each.teardown(() => idorOwners.clear());
 
 	test("a route that answers a foreign studio's slug is reported", async ({
 		client,
@@ -31,6 +33,56 @@ test.group("Isolation harness catches what it should", (group) => {
 			async () =>
 				assertCrossTenantIsolation(client, assert, await twoStudios(), leaky),
 			/expected 200 to equal 404/,
+		);
+	});
+
+	test("a route that trusts another studio's :id under the caller's own slug is reported", async ({
+		client,
+		assert,
+	}) => {
+		const studios = await twoStudios();
+		const { a, b } = studios;
+		idorOwners.set(a.paymentMethod.id, a.tenant.id);
+		idorOwners.set(b.paymentMethod.id, b.tenant.id);
+		const idor: IsolationCase = {
+			method: "DELETE",
+			pattern: "/__test/idor/:tenant/payment-methods/:id",
+			resource: "paymentMethod",
+			actor: "owner",
+			ownStatus: 200,
+			snapshot: caseFor("DELETE", "/t/:tenant/settings/payments/:id").snapshot,
+		};
+
+		// The route checks the slug, so the first attack gets its 404 and only
+		// the second attack (A's slug, B's id) can report the leak.
+		const wrongSlug = await client
+			.delete(
+				`/__test/idor/${b.tenant.slug}/payment-methods/${b.paymentMethod.id}`,
+			)
+			.withCsrfToken()
+			.loginAs(a.owner)
+			.redirects(0);
+		wrongSlug.assertStatus(404);
+
+		await assert.rejects(
+			async () => assertCrossTenantIsolation(client, assert, studios, idor),
+			/expected 200 to equal 404/,
+		);
+	});
+
+	test("a case with an :id and no resource is refused instead of guessing one", async ({
+		client,
+		assert,
+	}) => {
+		const remove = caseFor("DELETE", "/t/:tenant/settings/payments/:id");
+
+		await assert.rejects(
+			async () =>
+				assertCrossTenantIsolation(client, assert, await twoStudios(), {
+					...remove,
+					resource: undefined,
+				}),
+			/has an :id but its isolation case names no `resource`/,
 		);
 	});
 

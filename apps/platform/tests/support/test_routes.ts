@@ -2,7 +2,13 @@ import type { HttpContext } from "@adonisjs/core/http";
 import router from "@adonisjs/core/services/router";
 import { errors } from "@vinejs/vine";
 import User from "#models/user";
-import { afterCommit, afterRollback, dbClient } from "#services/db_context";
+import PaymentMethod from "#modules/payments/models/payment_method";
+import {
+	afterCommit,
+	afterRollback,
+	dbClient,
+	setRequestContext,
+} from "#services/db_context";
 import { middleware } from "#start/kernel";
 
 /**
@@ -78,3 +84,34 @@ router
 router
 	.get("/__test/leak/:tenant", ({ response }) => response.ok({ leaked: true }))
 	.use(middleware.auth());
+
+/**
+ * Payment-method id -> id of the tenant that owns it, filled by the test that
+ * uses the IDOR route below. Under row-level security a handler cannot find
+ * another tenant's row from a request that is not in that tenant's context, so
+ * this stands in for the lookup a buggy handler would make.
+ */
+export const idorOwners = new Map<string, string>();
+
+/**
+ * A handler that checks the slug (auth, request transaction and the tenant
+ * middleware, so the caller must be a member of :tenant) but then trusts the
+ * :id: it switches the request to the tenant that owns the id and deletes the
+ * method. That is the IDOR leak (A's slug with B's id) the isolation harness's
+ * second attack must report; a slug-only leak like /__test/leak/:tenant is
+ * caught by the first. Not under /t/:tenant, so the coverage guard ignores it.
+ */
+router
+	.delete(
+		"/__test/idor/:tenant/payment-methods/:id",
+		async ({ params, response }) => {
+			const owner = idorOwners.get(params.id);
+			if (!owner) return response.notFound();
+			await setRequestContext({ tenantId: owner });
+			const method = await PaymentMethod.query().where("id", params.id).first();
+			if (!method) return response.notFound();
+			await method.softDelete();
+			return response.ok({ deleted: true });
+		},
+	)
+	.use([middleware.auth(), middleware.dbContext(), middleware.tenant()]);
