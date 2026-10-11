@@ -137,6 +137,6 @@ In the MVP the studio page has one layout, generated from the profile and artist
 
 ## Current state
 
-This document describes the intended architecture, including planned features. Determine implemented behavior from the affected modules, routes, migrations and tests; local migration status comes from the target database. Row-level security above is planned; see [database conventions](../apps/platform/database/README.md).
+This document describes the intended architecture, including planned features. Determine implemented behavior from the affected modules, routes, migrations and tests; local migration status comes from the target database. Row-level security is implemented; see [database conventions](../apps/platform/database/README.md) and [backend development](../apps/platform/docs/backend.md).
 
 The contract's booking-to-inquiry transition is documented in [SDK: Public API by stage](sdk.md#public-api-by-stage). Use the [roadmap](roadmap.md) for release gates and [documentation index](README.md) for implementation guidance. Dated specs/plans retain the decision history.

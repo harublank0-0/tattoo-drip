@@ -25,7 +25,7 @@ Never edit these; regenerate them instead:
 
 - `packages/types/src/openapi.gen.ts`: `pnpm --filter @tattoo-drip/types generate` after editing `openapi.yaml`
 - `apps/storefront/src/routeTree.gen.ts`: `pnpm --filter @tattoo-drip/storefront generate-routes` (also its dev server).
-- Platform `database/schema.ts`: new migration, then `node ace migration:run` in platform. `.adonisjs/`: `node ace codegen` after route/page/controller changes; include generated changes.
+- Platform `database/schema.ts`: new migration, then `pnpm migrate` in platform (migrations run as the owner role). `.adonisjs/`: `node ace codegen` after route/page/controller changes; include generated changes.
 
 ## Task guidance
 
