@@ -254,6 +254,12 @@ function ArtistFields({
 				</Field>
 			)}
 
+			{!canLink && errors.linkToMe && (
+				<Field data-invalid>
+					<FieldError>{errors.linkToMe}</FieldError>
+				</Field>
+			)}
+
 			<div className="flex gap-2">
 				<Button type="submit" disabled={processing}>
 					{processing ? "Saving…" : artist ? "Save" : "Add artist"}
