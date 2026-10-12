@@ -83,6 +83,36 @@ router
 			})
 			.prefix("/settings")
 			.use(middleware.role({ allow: ["owner"] }));
+
+		/**
+		 * Artist profiles, owners only for now: artists get the same 404 as
+		 * an unknown URL. TAT-30 opens this area to artists by changing the
+		 * allow list. Every artists route goes in this group (a test checks).
+		 */
+		router
+			.group(() => {
+				router.get("/", [controllers.Artists, "index"]).as("tenant.artists");
+				router
+					.get("new", [controllers.Artists, "create"])
+					.as("tenant.artists.create");
+				router
+					.post("/", [controllers.Artists, "store"])
+					.as("tenant.artists.store");
+				router
+					.get(":id/edit", [controllers.Artists, "edit"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.artists.edit");
+				router
+					.put(":id", [controllers.Artists, "update"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.artists.update");
+				router
+					.delete(":id", [controllers.Artists, "destroy"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.artists.destroy");
+			})
+			.prefix("/artists")
+			.use(middleware.role({ allow: ["owner"] }));
 	})
 	.prefix("/t/:tenant")
 	.use([middleware.auth(), middleware.dbContext(), middleware.tenant()]);

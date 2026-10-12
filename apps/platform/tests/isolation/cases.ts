@@ -1,3 +1,4 @@
+import Artist from "#modules/artists/models/artist";
 import PaymentMethod from "#modules/payments/models/payment_method";
 import Tenant from "#modules/tenancy/models/tenant";
 import { inTenant, type Studio } from "#tests/helpers/tenants";
@@ -23,7 +24,7 @@ export type IsolationCase = {
 	 * The seeded resource (a key of Studio) that the route's :id refers to.
 	 * Required for a pattern with an :id; the helper throws without it.
 	 */
-	resource?: "paymentMethod";
+	resource?: "paymentMethod" | "artistProfile";
 	/** Who sends the request. Every settings route is owner-only. */
 	actor: "owner" | "artist";
 	/** A valid body for writes, built for the studio sending it. */
@@ -59,6 +60,17 @@ const methodRows = (target: Studio) =>
 				.orderBy("position")
 				.orderBy("id")
 		).map((method) => method.serialize()),
+	);
+
+// Deleted rows included, so an unauthorized soft delete shows.
+const artistRows = (target: Studio) =>
+	inTenant(target.tenant, async () =>
+		(
+			await Artist.withTrashed()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("slug")
+				.orderBy("id")
+		).map((artist) => artist.serialize()),
 	);
 
 const profileBody = (own: Studio) => ({
@@ -170,5 +182,55 @@ export const isolationCases: IsolationCase[] = [
 		actor: "owner",
 		ownStatus: 302,
 		snapshot: methodRows,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/artists",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: artistRows,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/artists/new",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: none,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/artists",
+		actor: "owner",
+		body: () => ({ name: "Another artist", slug: "another-artist" }),
+		ownStatus: 302,
+		snapshot: artistRows,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/artists/:id/edit",
+		resource: "artistProfile",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: artistRows,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/artists/:id",
+		resource: "artistProfile",
+		actor: "owner",
+		body: (own) => ({
+			name: "Renamed artist",
+			slug: own.artistProfile.slug,
+		}),
+		ownStatus: 302,
+		snapshot: artistRows,
+	},
+	{
+		method: "DELETE",
+		pattern: "/t/:tenant/artists/:id",
+		resource: "artistProfile",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: artistRows,
 	},
 ];

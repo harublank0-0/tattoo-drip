@@ -235,6 +235,78 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/payment_methods_controller').default['destroy']>>>
     }
   }
+  'tenant.artists': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/artists'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['index']>>>
+    }
+  }
+  'tenant.artists.create': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/artists/new'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['create']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['create']>>>
+    }
+  }
+  'tenant.artists.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/artists'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/artists/validators/artist').createArtistValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/artists/validators/artist').createArtistValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['store']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['store']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.artists.edit': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/artists/:id/edit'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['edit']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['edit']>>>
+    }
+  }
+  'tenant.artists.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/artists/:id'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/artists/validators/artist').updateArtistValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/artists/validators/artist').updateArtistValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['update']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.artists.destroy': {
+    methods: ["DELETE"]
+    pattern: '/t/:tenant/artists/:id'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['destroy']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['destroy']>>>
+    }
+  }
   'dashboard': {
     methods: ["GET","HEAD"]
     pattern: '/dashboard'

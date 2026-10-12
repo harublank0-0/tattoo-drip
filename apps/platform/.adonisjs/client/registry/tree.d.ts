@@ -38,6 +38,13 @@ export interface ApiDefinition {
         update: typeof routes['tenant.settings.deposits.update']
       }
     }
+    artists: typeof routes['tenant.artists'] & {
+      create: typeof routes['tenant.artists.create']
+      store: typeof routes['tenant.artists.store']
+      edit: typeof routes['tenant.artists.edit']
+      update: typeof routes['tenant.artists.update']
+      destroy: typeof routes['tenant.artists.destroy']
+    }
   }
   dashboard: typeof routes['dashboard']
   onboarding: {
