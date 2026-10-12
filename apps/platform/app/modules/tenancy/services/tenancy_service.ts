@@ -6,6 +6,7 @@ import TenantMembership, {
 	type MembershipRole,
 } from "#modules/tenancy/models/tenant_membership";
 import { dbClient, withDbContext } from "#services/db_context";
+import { isUniqueViolation } from "#services/db_errors";
 
 export type NewTenant = {
 	type: TenantType;
@@ -187,15 +188,4 @@ export default class TenancyService {
 			throw new LastOwnerError(tenantId);
 		}
 	}
-}
-
-function isUniqueViolation(error: unknown, constraint: string): boolean {
-	return (
-		typeof error === "object" &&
-		error !== null &&
-		"code" in error &&
-		error.code === "23505" &&
-		"constraint" in error &&
-		error.constraint === constraint
-	);
 }

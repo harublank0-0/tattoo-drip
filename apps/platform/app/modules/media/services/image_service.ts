@@ -13,6 +13,7 @@ import type Tenant from "#modules/tenancy/models/tenant";
 export const IMAGE_PURPOSES = {
 	payment_qr: { visibility: "public" }, // TAT-26
 	payment_proof: { visibility: "private" }, // TAT-65
+	artist_photo: { visibility: "public" }, // TAT-31
 } as const;
 
 export type ImagePurpose = keyof typeof IMAGE_PURPOSES;

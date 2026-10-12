@@ -1,0 +1,282 @@
+import testUtils from "@adonisjs/core/services/test_utils";
+import { test } from "@japa/runner";
+import User from "#models/user";
+import {
+	ArtistProfileExistsError,
+	ArtistSlugTakenError,
+} from "#modules/artists/errors";
+import Artist from "#modules/artists/models/artist";
+import ArtistService, {
+	type ArtistInput,
+} from "#modules/artists/services/artist_service";
+import ImageService from "#modules/media/services/image_service";
+import { dbClient, withDbContext } from "#services/db_context";
+import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
+
+const artists = new ArtistService(new ImageService());
+
+const input = (over: Partial<ArtistInput> = {}): ArtistInput => ({
+	name: "Sita Rai",
+	slug: "sita",
+	bio: null,
+	visible: true,
+	acceptingInquiries: true,
+	closedMessage: null,
+	linkToMe: false,
+	...over,
+});
+
+const names = (list: Artist[]) => list.map(({ name }) => name);
+
+test.group("ArtistService profiles", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("create stores the profile, unlinked by default", async ({ assert }) => {
+		const { tenant, owner } = await studioWithOwner();
+
+		const artist = await inTenant(tenant, () =>
+			artists.create(tenant, input({ bio: "Fine line work" }), owner),
+		);
+
+		assert.equal(artist.tenantId, tenant.id);
+		assert.equal(artist.name, "Sita Rai");
+		assert.equal(artist.slug, "sita");
+		assert.equal(artist.bio, "Fine line work");
+		assert.isTrue(artist.visible);
+		assert.isTrue(artist.acceptingInquiries);
+		assert.isNull(artist.userId);
+		assert.isNull(artist.photoKey);
+	});
+
+	test("linkToMe links the profile to the acting member", async ({
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+
+		const artist = await inTenant(tenant, () =>
+			artists.create(tenant, input({ linkToMe: true }), owner),
+		);
+
+		assert.equal(artist.userId, owner.id);
+	});
+
+	test("a second profile for the same member is refused, and the request stays usable", async ({
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+
+		await withDbContext({ tenantId: tenant.id }, async () => {
+			await artists.create(tenant, input({ linkToMe: true }), owner);
+			await assert.rejects(
+				() =>
+					artists.create(
+						tenant,
+						input({ slug: "second", linkToMe: true }),
+						owner,
+					),
+				ArtistProfileExistsError,
+			);
+			const { rows } = await dbClient().rawQuery("select 1 as ok");
+			assert.equal(rows[0].ok, 1);
+		});
+	});
+
+	test("a taken slug is refused, the request stays usable, and a deleted profile frees its slug", async ({
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+
+		await withDbContext({ tenantId: tenant.id }, async () => {
+			const first = await artists.create(tenant, input(), owner);
+			await assert.rejects(
+				() => artists.create(tenant, input({ name: "Other" }), owner),
+				ArtistSlugTakenError,
+			);
+			assert.deepEqual(names(await artists.list(tenant)), ["Sita Rai"]);
+
+			await artists.delete(tenant, await artists.findFor(tenant, first.id));
+			await artists.create(tenant, input({ name: "Again" }), owner);
+			assert.deepEqual(names(await artists.list(tenant)), ["Again"]);
+		});
+	});
+
+	test("two tenants can use the same slug", async () => {
+		const { tenant: a, owner: ownerA } = await studioWithOwner(
+			"studio-a",
+			"Studio A",
+		);
+		const { tenant: b, owner: ownerB } = await studioWithOwner(
+			"studio-b",
+			"Studio B",
+		);
+
+		await inTenant(a, () => artists.create(a, input(), ownerA));
+		await inTenant(b, () => artists.create(b, input(), ownerB));
+	});
+
+	test("update changes the profile and refuses a slug another artist uses", async ({
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+		const first = await inTenant(tenant, () =>
+			artists.create(tenant, input(), owner),
+		);
+		await inTenant(tenant, () =>
+			artists.create(tenant, input({ name: "Bea", slug: "bea" }), owner),
+		);
+
+		await inTenant(tenant, async () => {
+			const saved = await artists.update(
+				tenant,
+				first,
+				input({
+					name: "Sita R.",
+					slug: "sita-r",
+					bio: "New bio",
+					visible: false,
+					acceptingInquiries: false,
+					closedMessage: "Back in May",
+				}),
+				owner,
+			);
+			assert.equal(saved.name, "Sita R.");
+			assert.equal(saved.slug, "sita-r");
+			assert.equal(saved.bio, "New bio");
+			assert.isFalse(saved.visible);
+			assert.isFalse(saved.acceptingInquiries);
+			assert.equal(saved.closedMessage, "Back in May");
+
+			await assert.rejects(
+				() => artists.update(tenant, first, input({ slug: "bea" }), owner),
+				ArtistSlugTakenError,
+			);
+			assert.equal((await artists.findFor(tenant, first.id)).slug, "sita-r");
+		});
+	});
+
+	test("unchecking 'this is my profile' unlinks only the acting member", async ({
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+		const mine = await inTenant(tenant, () =>
+			artists.create(tenant, input({ linkToMe: true }), owner),
+		);
+
+		const unlinked = await inTenant(tenant, () =>
+			artists.update(tenant, mine, input({ linkToMe: false }), owner),
+		);
+
+		assert.isNull(unlinked.userId);
+	});
+
+	test("linkToMe never takes over, and an edit never unlinks, another user's profile", async ({
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+		const other = await User.create({
+			email: "other@example.com",
+			password: "secret-password",
+		});
+		const artist = await inTenant(tenant, async () => {
+			const created = await artists.create(tenant, input(), owner);
+			await Artist.query()
+				.where("id", created.id)
+				.update({ user_id: other.id });
+			return created;
+		});
+
+		await inTenant(tenant, async () => {
+			const claimed = await artists.update(
+				tenant,
+				artist,
+				input({ linkToMe: true }),
+				owner,
+			);
+			assert.equal(claimed.userId, other.id);
+			const edited = await artists.update(
+				tenant,
+				artist,
+				input({ linkToMe: false }),
+				owner,
+			);
+			assert.equal(edited.userId, other.id);
+		});
+	});
+
+	test("list is ordered by name, ignoring case", async ({ assert }) => {
+		const { tenant, owner } = await studioWithOwner();
+		await inTenant(tenant, async () => {
+			await artists.create(tenant, input({ name: "bea", slug: "bea" }), owner);
+			await artists.create(tenant, input({ name: "Ada", slug: "ada" }), owner);
+			await artists.create(
+				tenant,
+				input({ name: "Carl", slug: "carl" }),
+				owner,
+			);
+
+			assert.deepEqual(names(await artists.list(tenant)), [
+				"Ada",
+				"bea",
+				"Carl",
+			]);
+		});
+	});
+
+	test("delete is a soft delete: the profile leaves the list and findFor", async ({
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+		const artist = await inTenant(tenant, () =>
+			artists.create(tenant, input(), owner),
+		);
+
+		await inTenant(tenant, () => artists.delete(tenant, artist));
+
+		await inTenant(tenant, async () => {
+			assert.lengthOf(await artists.list(tenant), 0);
+			await assert.rejects(
+				() => artists.findFor(tenant, artist.id),
+				/Row not found/,
+			);
+			assert.lengthOf(
+				await Artist.onlyTrashed().where("tenant_id", tenant.id),
+				1,
+			);
+		});
+	});
+
+	test("list and findFor only see the tenant's own live artists", async ({
+		assert,
+	}) => {
+		const { tenant: a, owner: ownerA } = await studioWithOwner(
+			"studio-a",
+			"Studio A",
+		);
+		const { tenant: b } = await studioWithOwner("studio-b", "Studio B");
+		const mine = await inTenant(a, () => artists.create(a, input(), ownerA));
+
+		// A's context lets row-level security show A's row, so only the
+		// service's own tenant filter can hide it from B's lookups.
+		await withDbContext({ tenantId: a.id }, async () => {
+			await assert.rejects(() => artists.findFor(b, mine.id), /Row not found/);
+			assert.lengthOf(await artists.list(b), 0);
+			assert.lengthOf(await artists.list(a), 1);
+		});
+	});
+
+	test("createOwnerProfile makes a visible, accepting profile from the tenant's name and slug", async ({
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+
+		const artist = await inTenant(tenant, () =>
+			artists.createOwnerProfile(tenant, owner),
+		);
+
+		assert.equal(artist.name, tenant.name);
+		assert.equal(artist.slug, tenant.slug);
+		assert.equal(artist.userId, owner.id);
+		assert.isTrue(artist.visible);
+		assert.isTrue(artist.acceptingInquiries);
+	});
+});
