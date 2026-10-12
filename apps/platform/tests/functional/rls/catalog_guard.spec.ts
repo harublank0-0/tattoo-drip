@@ -19,6 +19,7 @@ const EXEMPT: Record<string, string> = {
 const EXPECTED_POLICIES: Record<string, string[]> = {
 	artists: ["tenant_isolation:ALL"],
 	clients: ["tenant_isolation:ALL"],
+	inquiries: ["tenant_isolation:ALL"],
 	payment_methods: ["tenant_isolation:ALL"],
 	tenant_memberships: [
 		"tenant_memberships_delete:DELETE",

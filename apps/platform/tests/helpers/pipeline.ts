@@ -1,4 +1,6 @@
+import Artist from "#modules/artists/models/artist";
 import Client from "#modules/clients/models/client";
+import Inquiry from "#modules/inquiries/models/inquiry";
 
 type TenantRef = { id: string };
 
@@ -23,6 +25,57 @@ export function makeClient(tenant: TenantRef, over: ClientOver = {}) {
 		tenantId: tenant.id,
 		name: `Client ${next()}`,
 		phone: nextPhone(),
+		...over,
+	});
+}
+
+/**
+ * An artist profile (the pipeline tables link to it). Call it inside
+ * `inTenant(tenant, …)`; slugs are unique per tenant.
+ */
+export function makeArtist(tenant: TenantRef, slug = "sita") {
+	return Artist.create({ tenantId: tenant.id, name: "Sita", slug });
+}
+
+type InquiryOver = Partial<
+	Pick<
+		Inquiry,
+		| "idea"
+		| "placement"
+		| "approximateSize"
+		| "preferredDates"
+		| "preferredArtistId"
+		| "budget"
+		| "sourceChannel"
+		| "contactName"
+		| "contactPhone"
+		| "contactEmail"
+		| "status"
+		| "decidedAt"
+		| "anonymizedAt"
+	>
+>;
+
+/**
+ * A new inquiry from `client`, with the client's contact as its snapshot.
+ */
+export function makeInquiry(
+	tenant: TenantRef,
+	client: Client,
+	over: InquiryOver = {},
+) {
+	return Inquiry.create({
+		tenantId: tenant.id,
+		clientId: client.id,
+		idea: "A small fine-line moth",
+		placement: "Forearm",
+		approximateSize: "8 cm",
+		preferredDates: "Any weekday in November",
+		sourceChannel: "instagram",
+		contactName: client.name,
+		contactPhone: client.phone,
+		contactEmail: client.email,
+		status: "new",
 		...over,
 	});
 }

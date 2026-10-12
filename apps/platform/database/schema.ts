@@ -94,6 +94,69 @@ export class ClientSchema extends BaseModel {
 	declare updatedAt: DateTime | null;
 }
 
+export class InquirySchema extends BaseModel {
+	static $columns = [
+		"anonymizedAt",
+		"approximateSize",
+		"budget",
+		"clientId",
+		"contactEmail",
+		"contactName",
+		"contactPhone",
+		"createdAt",
+		"decidedAt",
+		"deletedAt",
+		"id",
+		"idea",
+		"placement",
+		"preferredArtistId",
+		"preferredDates",
+		"sourceChannel",
+		"status",
+		"tenantId",
+		"updatedAt",
+	] as const;
+	$columns = InquirySchema.$columns;
+	@column.dateTime()
+	declare anonymizedAt: DateTime | null;
+	@column()
+	declare approximateSize: string;
+	@column()
+	declare budget: string | null;
+	@column()
+	declare clientId: string;
+	@column()
+	declare contactEmail: string | null;
+	@column()
+	declare contactName: string;
+	@column()
+	declare contactPhone: string | null;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.dateTime()
+	declare decidedAt: DateTime | null;
+	@column.dateTime()
+	declare deletedAt: DateTime | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare idea: string;
+	@column()
+	declare placement: string;
+	@column()
+	declare preferredArtistId: string | null;
+	@column()
+	declare preferredDates: string;
+	@column()
+	declare sourceChannel: string;
+	@column()
+	declare status: string;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
 export class PaymentMethodSchema extends BaseModel {
 	static $columns = [
 		"accountName",
