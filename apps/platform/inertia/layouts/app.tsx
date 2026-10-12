@@ -1,7 +1,7 @@
 import { Form } from "@adonisjs/inertia/react";
 import { usePage } from "@inertiajs/react";
 import { cn } from "cn";
-import { House, LogOut, Settings } from "lucide-react";
+import { House, LogOut, Settings, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import FlashToasts from "~/components/flash_toasts";
 import Logo from "~/components/logo";
@@ -27,12 +27,20 @@ function tenantNav(tenant: { slug: string; role: string }): NavItem[] {
 	];
 	// Owners only; the server 404s anyone else.
 	if (tenant.role === "owner") {
-		items.push({
-			label: "Settings",
-			route: "tenant.settings",
-			params,
-			icon: Settings,
-		});
+		items.push(
+			{
+				label: "Artists",
+				route: "tenant.artists",
+				params,
+				icon: Users,
+			},
+			{
+				label: "Settings",
+				route: "tenant.settings",
+				params,
+				icon: Settings,
+			},
+		);
 	}
 	return items;
 }

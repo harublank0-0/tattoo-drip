@@ -22,6 +22,7 @@ import {
 	SelectValue,
 } from "~/components/ui/select";
 import AuthLayout from "~/layouts/auth";
+import { slugify } from "~/lib/slugify";
 
 /**
  * Wording for each tenant type. The values themselves come from the
@@ -38,21 +39,6 @@ const TYPE_COPY: Record<string, { title: string; description: string }> = {
 		description: "Just you, working on your own.",
 	},
 };
-
-/**
- * Turns a business name into a subdomain-safe slug: lowercase letters,
- * digits and single hyphens, at most 63 characters.
- */
-function slugify(name: string) {
-	return name
-		.normalize("NFKD")
-		.replace(/[̀-ͯ]/g, "")
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-+|-+$/g, "")
-		.slice(0, 63)
-		.replace(/-+$/, "");
-}
 
 export default function CreateTenant({
 	tenantTypes,
