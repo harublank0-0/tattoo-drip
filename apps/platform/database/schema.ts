@@ -295,6 +295,45 @@ export class QueueScheduleSchema extends BaseModel {
 	declare toDate: DateTime | null;
 }
 
+export class ReferenceImageSchema extends BaseModel {
+	static $columns = [
+		"createdAt",
+		"deletedAt",
+		"height",
+		"id",
+		"imageKey",
+		"inquiryId",
+		"position",
+		"projectId",
+		"tenantId",
+		"updatedAt",
+		"width",
+	] as const;
+	$columns = ReferenceImageSchema.$columns;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.dateTime()
+	declare deletedAt: DateTime | null;
+	@column()
+	declare height: number;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare imageKey: string;
+	@column()
+	declare inquiryId: string | null;
+	@column()
+	declare position: number;
+	@column()
+	declare projectId: string | null;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+	@column()
+	declare width: number;
+}
+
 export class TattooProjectSchema extends BaseModel {
 	static $columns = [
 		"artistId",

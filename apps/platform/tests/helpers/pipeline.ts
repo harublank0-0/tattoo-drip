@@ -1,6 +1,8 @@
+import { randomUUID } from "node:crypto";
 import Artist from "#modules/artists/models/artist";
 import Client from "#modules/clients/models/client";
 import Inquiry from "#modules/inquiries/models/inquiry";
+import ReferenceImage from "#modules/inquiries/models/reference_image";
 import TattooProject from "#modules/projects/models/tattoo_project";
 
 type TenantRef = { id: string };
@@ -101,6 +103,31 @@ export function makeProject(
 		clientId: client.id,
 		brief: "A small fine-line moth on the forearm",
 		status: "reviewing",
+		...over,
+	});
+}
+
+type ReferenceImageOver = Partial<
+	Pick<
+		ReferenceImage,
+		"inquiryId" | "projectId" | "imageKey" | "width" | "height" | "position"
+	>
+>;
+
+/**
+ * A reference image. Pass `inquiryId` and/or `projectId`: with neither the
+ * database refuses it, which a test relies on.
+ */
+export function makeReferenceImage(
+	tenant: TenantRef,
+	over: ReferenceImageOver = {},
+) {
+	return ReferenceImage.create({
+		tenantId: tenant.id,
+		imageKey: `tenants/${tenant.id}/reference_image/${randomUUID()}.webp`,
+		width: 800,
+		height: 600,
+		position: 0,
 		...over,
 	});
 }

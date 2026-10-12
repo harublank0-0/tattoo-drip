@@ -14,6 +14,7 @@ export const IMAGE_PURPOSES = {
 	payment_qr: { visibility: "public" }, // TAT-26
 	payment_proof: { visibility: "private" }, // TAT-65
 	artist_photo: { visibility: "public" }, // TAT-31
+	reference_image: { visibility: "private" }, // TAT-37
 } as const;
 
 export type ImagePurpose = keyof typeof IMAGE_PURPOSES;
