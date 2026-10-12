@@ -58,6 +58,42 @@ export class ArtistSchema extends BaseModel {
 	declare visible: boolean;
 }
 
+export class ClientSchema extends BaseModel {
+	static $columns = [
+		"anonymizedAt",
+		"createdAt",
+		"deletedAt",
+		"email",
+		"id",
+		"name",
+		"notes",
+		"phone",
+		"tenantId",
+		"updatedAt",
+	] as const;
+	$columns = ClientSchema.$columns;
+	@column.dateTime()
+	declare anonymizedAt: DateTime | null;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.dateTime()
+	declare deletedAt: DateTime | null;
+	@column()
+	declare email: string | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare name: string;
+	@column()
+	declare notes: string | null;
+	@column()
+	declare phone: string | null;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
 export class PaymentMethodSchema extends BaseModel {
 	static $columns = [
 		"accountName",
