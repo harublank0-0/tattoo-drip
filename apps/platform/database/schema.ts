@@ -295,6 +295,51 @@ export class QueueScheduleSchema extends BaseModel {
 	declare toDate: DateTime | null;
 }
 
+export class QuoteSchema extends BaseModel {
+	static $columns = [
+		"createdAt",
+		"currency",
+		"depositAmount",
+		"estimatedMinutes",
+		"expiresAt",
+		"fixedPrice",
+		"hourlyRate",
+		"id",
+		"kind",
+		"projectId",
+		"tenantId",
+		"updatedAt",
+		"version",
+	] as const;
+	$columns = QuoteSchema.$columns;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column()
+	declare currency: string;
+	@column()
+	declare depositAmount: number;
+	@column()
+	declare estimatedMinutes: number | null;
+	@column.dateTime()
+	declare expiresAt: DateTime;
+	@column()
+	declare fixedPrice: number | null;
+	@column()
+	declare hourlyRate: number | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare kind: string;
+	@column()
+	declare projectId: string;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+	@column()
+	declare version: number;
+}
+
 export class ReferenceImageSchema extends BaseModel {
 	static $columns = [
 		"createdAt",

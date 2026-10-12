@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
+import { DateTime } from "luxon";
 import Artist from "#modules/artists/models/artist";
 import Client from "#modules/clients/models/client";
 import Inquiry from "#modules/inquiries/models/inquiry";
 import ReferenceImage from "#modules/inquiries/models/reference_image";
+import Quote from "#modules/projects/models/quote";
 import TattooProject from "#modules/projects/models/tattoo_project";
 
 type TenantRef = { id: string };
@@ -128,6 +130,43 @@ export function makeReferenceImage(
 		width: 800,
 		height: 600,
 		position: 0,
+		...over,
+	});
+}
+
+type QuoteOver = Partial<
+	Pick<
+		Quote,
+		| "version"
+		| "kind"
+		| "fixedPrice"
+		| "hourlyRate"
+		| "estimatedMinutes"
+		| "depositAmount"
+		| "currency"
+		| "expiresAt"
+	>
+>;
+
+/**
+ * A fixed-price quote (NPR 15,000 with a NPR 3,000 deposit, in paisa) valid
+ * for two weeks. For an hourly one pass `kind: "hourly"`, `fixedPrice: null`,
+ * `hourlyRate` and `estimatedMinutes`.
+ */
+export function makeQuote(
+	tenant: TenantRef,
+	project: TattooProject,
+	over: QuoteOver = {},
+) {
+	return Quote.create({
+		tenantId: tenant.id,
+		projectId: project.id,
+		version: 1,
+		kind: "fixed",
+		fixedPrice: 1_500_000,
+		depositAmount: 300_000,
+		currency: "NPR",
+		expiresAt: DateTime.utc().plus({ days: 14 }),
 		...over,
 	});
 }
