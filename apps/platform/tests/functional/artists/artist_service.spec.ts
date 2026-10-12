@@ -264,6 +264,90 @@ test.group("ArtistService profiles", (group) => {
 		});
 	});
 
+	test("update and delete refuse another tenant's artist and leave it unchanged", async ({
+		assert,
+	}) => {
+		const { tenant: a, owner: ownerA } = await studioWithOwner(
+			"studio-a",
+			"Studio A",
+		);
+		const { tenant: b, owner: ownerB } = await studioWithOwner(
+			"studio-b",
+			"Studio B",
+		);
+		const mine = await inTenant(a, () => artists.create(a, input(), ownerA));
+
+		// A's context lets row-level security show and change A's row, so only
+		// the service's own tenant check can refuse B's calls.
+		await withDbContext({ tenantId: a.id }, async () => {
+			await assert.rejects(
+				() => artists.update(b, mine, input({ name: "Hijacked" }), ownerB),
+				/belongs to another tenant/,
+			);
+			await assert.rejects(
+				() => artists.delete(b, mine),
+				/belongs to another tenant/,
+			);
+
+			const row = await Artist.withTrashed().where("id", mine.id).firstOrFail();
+			assert.equal(row.name, "Sita Rai");
+			assert.equal(row.slug, "sita");
+			assert.isNull(row.deletedAt);
+		});
+	});
+
+	test("update's row lock only finds the tenant's own artist", async ({
+		assert,
+	}) => {
+		const { tenant: a, owner: ownerA } = await studioWithOwner(
+			"studio-a",
+			"Studio A",
+		);
+		const { tenant: b, owner: ownerB } = await studioWithOwner(
+			"studio-b",
+			"Studio B",
+		);
+		const mine = await inTenant(a, () => artists.create(a, input(), ownerA));
+
+		await withDbContext({ tenantId: a.id }, async () => {
+			// A's row, but claiming to be B's: the ownership check passes, so
+			// only the tenant filter on the locked query can refuse the update.
+			const forged = await Artist.findOrFail(mine.id);
+			forged.tenantId = b.id;
+
+			await assert.rejects(
+				() => artists.update(b, forged, input({ name: "Hijacked" }), ownerB),
+				/Row not found/,
+			);
+
+			const row = await Artist.withTrashed().where("id", mine.id).firstOrFail();
+			assert.equal(row.tenantId, a.id);
+			assert.equal(row.name, "Sita Rai");
+			assert.equal(row.slug, "sita");
+			assert.isNull(row.deletedAt);
+		});
+	});
+
+	test("create cannot add an artist to another tenant", async ({ assert }) => {
+		const { tenant: a } = await studioWithOwner("studio-a", "Studio A");
+		const { tenant: b, owner: ownerB } = await studioWithOwner(
+			"studio-b",
+			"Studio B",
+		);
+
+		// The insert says tenant B while the session is tenant A: only
+		// row-level security can refuse it.
+		await withDbContext({ tenantId: a.id }, async () => {
+			await assert.rejects(
+				() => artists.create(b, input(), ownerB),
+				/row-level security/,
+			);
+			assert.lengthOf(await artists.list(a), 0);
+		});
+
+		assert.lengthOf(await inTenant(b, () => artists.list(b)), 0);
+	});
+
 	test("createOwnerProfile makes a visible, accepting profile from the tenant's name and slug", async ({
 		assert,
 	}) => {
