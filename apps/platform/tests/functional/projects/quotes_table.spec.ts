@@ -143,6 +143,59 @@ test.group("quotes table", (group) => {
 		});
 	});
 
+	test("a long hourly quote is checked without overflowing: the rate times the minutes exceeds the integer range", async ({
+		assert,
+	}) => {
+		const { a, mine } = await twoTenants();
+		// NPR 10,000 an hour for 40 hours: the product, 2,400,000,000, is past
+		// 2,147,483,647, and the total is 40,000,000 paisa.
+		const longJob = (over: Record<string, unknown>) =>
+			newQuote(
+				a.id,
+				mine.id,
+				hourly({ hourly_rate: 1_000_000, estimated_minutes: 2_400, ...over }),
+			);
+
+		await withDbContext({ tenantId: a.id }, async (trx) => {
+			await insertRow(trx, "quotes", longJob({ deposit_amount: 40_000_000 }));
+			await assert.rejects(
+				() =>
+					withTransaction((inner) =>
+						insertRow(
+							inner,
+							"quotes",
+							longJob({ version: 2, deposit_amount: 40_000_001 }),
+						),
+					),
+				/quotes_deposit_within_total/,
+			);
+		});
+	});
+
+	test("an hourly total rounds half up, away from zero: 1.5 paisa is 2", async ({
+		assert,
+	}) => {
+		const { a, mine } = await twoTenants();
+		// 1 paisa an hour for 90 minutes is 1.5 paisa.
+		const tiny = (over: Record<string, unknown>) =>
+			newQuote(
+				a.id,
+				mine.id,
+				hourly({ hourly_rate: 1, estimated_minutes: 90, ...over }),
+			);
+
+		await withDbContext({ tenantId: a.id }, async (trx) => {
+			await insertRow(trx, "quotes", tiny({ deposit_amount: 2 }));
+			await assert.rejects(
+				() =>
+					withTransaction((inner) =>
+						insertRow(inner, "quotes", tiny({ version: 2, deposit_amount: 3 })),
+					),
+				/quotes_deposit_within_total/,
+			);
+		});
+	});
+
 	test("a project's versions are unique, and another project can reuse them", async ({
 		assert,
 	}) => {

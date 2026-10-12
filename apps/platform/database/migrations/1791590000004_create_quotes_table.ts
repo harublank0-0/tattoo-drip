@@ -60,8 +60,10 @@ export default class extends BaseSchema {
 		);
 		// The deposit never exceeds the total: the price, or the rate for the
 		// estimated minutes (rounded half away from zero, like Postgres' round).
+		// The product is taken as bigint: two int4 columns multiply in int4 and
+		// overflow past 2,147,483,647 (NPR 10,000 an hour for 40 hours does).
 		this.schema.raw(
-			"alter table quotes add constraint quotes_deposit_within_total check (deposit_amount <= coalesce(fixed_price, round(hourly_rate * estimated_minutes / 60.0)))",
+			"alter table quotes add constraint quotes_deposit_within_total check (deposit_amount <= coalesce(fixed_price, round(hourly_rate::bigint * estimated_minutes / 60.0)))",
 		);
 		for (const sql of enableTenantRls(this.tableName)) this.schema.raw(sql);
 	}
