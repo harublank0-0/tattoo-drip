@@ -159,6 +159,42 @@ test.group("ArtistService photo", (group) => {
 		assert.equal(row.photoKey, oldKey);
 	});
 
+	test("a later failure after removePhoto keeps the old photo file and the row's photo", async ({
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+		const { artists } = makeService();
+		const artist = await inTenant(tenant, async () =>
+			artists.create(tenant, input({ photo: await photo() }), owner),
+		);
+		const oldKey = artist.photoKey ?? "";
+
+		await assert.rejects(
+			() =>
+				withDbContext({ tenantId: tenant.id }, async () => {
+					const saved = await artists.update(
+						tenant,
+						artist,
+						input({ removePhoto: true }),
+						owner,
+					);
+					assert.isNull(saved.photoKey);
+					assert.isTrue(
+						await exists(oldKey),
+						"the old photo stays until the commit",
+					);
+					throw new Error("later failure");
+				}),
+			"later failure",
+		);
+
+		assert.isTrue(await exists(oldKey));
+		const row = await inTenant(tenant, () => Artist.findOrFail(artist.id));
+		assert.equal(row.photoKey, oldKey);
+		assert.equal(row.photoWidth, 300);
+		assert.equal(row.photoHeight, 200);
+	});
+
 	test("removePhoto clears the three columns and deletes the file after the commit", async ({
 		assert,
 	}) => {

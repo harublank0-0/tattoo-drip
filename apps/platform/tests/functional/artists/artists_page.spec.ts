@@ -139,6 +139,11 @@ test.group("Artists page access", (group) => {
 			client
 				.put(`/t/red-ink/artists/${artist.id}`)
 				.fields({ name: "Mine", slug: "mine" }),
+			// An invalid body is still a 404, not a validation redirect: the
+			// artist is loaded before the body is validated.
+			client
+				.put(`/t/red-ink/artists/${artist.id}`)
+				.fields({ name: "", slug: "-" }),
 			client.delete(`/t/red-ink/artists/${artist.id}`),
 		]) {
 			const response = await request.withCsrfToken().loginAs(redInkOwner);
@@ -163,6 +168,7 @@ test.group("Artists page access", (group) => {
 		for (const request of [
 			client.get(`${base}/${artist.id}/edit`),
 			client.put(`${base}/${artist.id}`).fields({ name: "Back", slug: "back" }),
+			client.put(`${base}/${artist.id}`).fields({ name: "", slug: "-" }),
 			client.delete(`${base}/${artist.id}`),
 		]) {
 			const response = await request.withCsrfToken().loginAs(owner);
@@ -177,6 +183,9 @@ test.group("Artists page access", (group) => {
 
 		for (const request of [
 			client.get(`${base}/not-a-uuid/edit`),
+			client
+				.put(`${base}/not-a-uuid`)
+				.fields({ name: "Sneaky", slug: "sneaky" }),
 			client.delete(`${base}/not-a-uuid`),
 		]) {
 			const response = await request.withCsrfToken().loginAs(owner);

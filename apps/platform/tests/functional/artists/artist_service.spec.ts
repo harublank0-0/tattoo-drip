@@ -169,6 +169,67 @@ test.group("ArtistService profiles", (group) => {
 		assert.isNull(unlinked.userId);
 	});
 
+	test("an edit with linkToMe links an unlinked profile to the acting member", async ({
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+		const unlinked = await inTenant(tenant, () =>
+			artists.create(tenant, input(), owner),
+		);
+		assert.isNull(unlinked.userId);
+
+		await inTenant(tenant, async () => {
+			const linked = await artists.update(
+				tenant,
+				unlinked,
+				input({ linkToMe: true }),
+				owner,
+			);
+			assert.equal(linked.userId, owner.id);
+
+			const fresh = await artists.findFor(tenant, unlinked.id);
+			assert.equal(fresh.userId, owner.id);
+		});
+	});
+
+	test("linking a second profile on edit is refused, leaves it unlinked, and the request stays usable", async ({
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+
+		await withDbContext({ tenantId: tenant.id }, async () => {
+			const mine = await artists.create(
+				tenant,
+				input({ linkToMe: true }),
+				owner,
+			);
+			const loose = await artists.create(
+				tenant,
+				input({ name: "Loose", slug: "loose" }),
+				owner,
+			);
+
+			await assert.rejects(
+				() =>
+					artists.update(
+						tenant,
+						loose,
+						input({ name: "Changed", slug: "changed", linkToMe: true }),
+						owner,
+					),
+				ArtistProfileExistsError,
+			);
+
+			const fresh = await artists.findFor(tenant, loose.id);
+			assert.isNull(fresh.userId);
+			assert.equal(fresh.name, "Loose");
+			assert.equal(fresh.slug, "loose");
+			assert.equal((await artists.findFor(tenant, mine.id)).userId, owner.id);
+			const { rows } = await dbClient().rawQuery("select 1 as ok");
+			assert.equal(rows[0].ok, 1);
+		});
+	});
+
 	test("linkToMe never takes over, and an edit never unlinks, another user's profile", async ({
 		assert,
 	}) => {

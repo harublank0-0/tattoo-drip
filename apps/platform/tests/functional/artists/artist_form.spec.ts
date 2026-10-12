@@ -283,6 +283,78 @@ test.group("Editing an artist", (group) => {
 		assert.isFalse((await edit(loose.id)).canLink);
 	});
 
+	test("an unlinked profile offers the link while the owner has no profile", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const loose = await inTenant(tenant, () =>
+			artists.create(tenant, input(), owner),
+		);
+
+		const response = await client
+			.get(`${base}/${loose.id}/edit`)
+			.withInertia()
+			.loginAs(owner);
+
+		assert.isTrue(response.inertiaProps.canLink);
+		assert.isFalse(response.inertiaProps.artist.isMine);
+	});
+
+	test("an owner links an existing profile to themselves from the edit form", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const loose = await inTenant(tenant, () =>
+			artists.create(tenant, input(), owner),
+		);
+
+		const response = await client
+			.put(`${base}/${loose.id}`)
+			.fields({ name: "Sita Rai", slug: "sita", linkToMe: "on" })
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		response.assertHeader("location", base);
+		const [saved] = await listOf(tenant);
+		assert.equal(saved.userId, owner.id);
+		const edit = await client
+			.get(`${base}/${loose.id}/edit`)
+			.withInertia()
+			.loginAs(owner);
+		assert.isTrue(edit.inertiaProps.artist.isMine);
+	});
+
+	test("linking a second profile from the edit form comes back as a field error on linkToMe and changes nothing", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const loose = await inTenant(tenant, async () => {
+			await artists.create(
+				tenant,
+				input({ name: "Mine", slug: "mine", linkToMe: true }),
+				owner,
+			);
+			return artists.create(tenant, input(), owner);
+		});
+
+		const response = await client
+			.put(`${base}/${loose.id}`)
+			.fields({ name: "Renamed", slug: "renamed", linkToMe: "on" })
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		assertValidationError(response, "linkToMe", "You already have a profile.");
+		const saved = await inTenant(tenant, () => Artist.findOrFail(loose.id));
+		assert.isNull(saved.userId);
+		assert.equal(saved.name, "Sita Rai");
+		assert.equal(saved.slug, "sita");
+	});
+
 	test("saving changes the fields and keeps the photo", async ({
 		client,
 		assert,
