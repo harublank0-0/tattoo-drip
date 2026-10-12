@@ -209,3 +209,25 @@ export function makePayment(
 		...over,
 	});
 }
+
+/**
+ * One of everything in `tenant`: a client with an accepted inquiry that
+ * became a project, the inquiry's reference image (attached to the project
+ * too), a fixed quote and a submitted payment. Call it inside
+ * `inTenant(tenant, …)`.
+ */
+export async function seedPipeline(tenant: TenantRef) {
+	const client = await makeClient(tenant);
+	const inquiry = await makeInquiry(tenant, client, {
+		status: "accepted",
+		decidedAt: DateTime.utc(),
+	});
+	const project = await makeProject(tenant, client, { inquiryId: inquiry.id });
+	const referenceImage = await makeReferenceImage(tenant, {
+		inquiryId: inquiry.id,
+		projectId: project.id,
+	});
+	const quote = await makeQuote(tenant, project);
+	const payment = await makePayment(tenant, project);
+	return { client, inquiry, project, referenceImage, quote, payment };
+}

@@ -4,13 +4,20 @@ import { test } from "@japa/runner";
 import User from "#models/user";
 import Artist from "#modules/artists/models/artist";
 import ArtistService from "#modules/artists/services/artist_service";
+import Client from "#modules/clients/models/client";
+import Inquiry from "#modules/inquiries/models/inquiry";
+import ReferenceImage from "#modules/inquiries/models/reference_image";
 import ImageService from "#modules/media/services/image_service";
+import Payment from "#modules/payments/models/payment";
 import PaymentMethod from "#modules/payments/models/payment_method";
+import Quote from "#modules/projects/models/quote";
+import TattooProject from "#modules/projects/models/tattoo_project";
 import { LastOwnerError, SlugTakenError } from "#modules/tenancy/errors";
 import Tenant from "#modules/tenancy/models/tenant";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { dbClient, withDbContext, withTransaction } from "#services/db_context";
+import { makeClient, seedPipeline } from "#tests/helpers/pipeline";
 import {
 	inTenant,
 	inTenantAs,
@@ -354,6 +361,74 @@ test.group("TenancyService.membershipFor", (group) => {
 			assert.equal(
 				trashed.find(({ id }) => id === removed.id)?.deletedAt?.toMillis(),
 				removedAt,
+			);
+		});
+	});
+
+	test("soft-deleting a tenant soft-deletes its clients, inquiries, projects and reference images, and leaves quotes, payments and other tenants alone", async ({
+		assert,
+	}) => {
+		const owner = await makeUser("owner@example.com");
+		const tenant = await tenancy.createTenant(owner, studio("black-needle"));
+		const rival = await makeUser("rival@example.com");
+		const other = await tenancy.createTenant(rival, studio("red-ink"));
+		await inTenant(other, () => seedPipeline(other));
+
+		await inTenant(tenant, async () => {
+			await seedPipeline(tenant);
+			// A client removed earlier keeps its original deleted_at.
+			const removed = await makeClient(tenant);
+			await removed.softDelete();
+			const removedAt = (
+				await Client.withTrashed().where("id", removed.id).firstOrFail()
+			).deletedAt?.toMillis();
+
+			await tenant.softDelete();
+
+			assert.isEmpty(await Client.query().where("tenant_id", tenant.id));
+			assert.isEmpty(await Inquiry.query().where("tenant_id", tenant.id));
+			assert.isEmpty(await TattooProject.query().where("tenant_id", tenant.id));
+			assert.isEmpty(
+				await ReferenceImage.query().where("tenant_id", tenant.id),
+			);
+			const trashedClients = await Client.onlyTrashed().where(
+				"tenant_id",
+				tenant.id,
+			);
+			assert.lengthOf(trashedClients, 2);
+			assert.equal(
+				trashedClients
+					.find(({ id }) => id === removed.id)
+					?.deletedAt?.toMillis(),
+				removedAt,
+			);
+			assert.lengthOf(
+				await Inquiry.onlyTrashed().where("tenant_id", tenant.id),
+				1,
+			);
+			assert.lengthOf(
+				await TattooProject.onlyTrashed().where("tenant_id", tenant.id),
+				1,
+			);
+			assert.lengthOf(
+				await ReferenceImage.onlyTrashed().where("tenant_id", tenant.id),
+				1,
+			);
+			// No deleted_at on these: they stay, hidden with their project.
+			assert.lengthOf(await Quote.query().where("tenant_id", tenant.id), 1);
+			assert.lengthOf(await Payment.query().where("tenant_id", tenant.id), 1);
+		});
+
+		await inTenant(other, async () => {
+			assert.lengthOf(await Client.query().where("tenant_id", other.id), 1);
+			assert.lengthOf(await Inquiry.query().where("tenant_id", other.id), 1);
+			assert.lengthOf(
+				await TattooProject.query().where("tenant_id", other.id),
+				1,
+			);
+			assert.lengthOf(
+				await ReferenceImage.query().where("tenant_id", other.id),
+				1,
 			);
 		});
 	});
