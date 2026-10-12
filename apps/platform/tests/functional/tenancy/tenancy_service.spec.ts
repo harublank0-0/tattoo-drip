@@ -2,6 +2,9 @@ import testUtils from "@adonisjs/core/services/test_utils";
 import db from "@adonisjs/lucid/services/db";
 import { test } from "@japa/runner";
 import User from "#models/user";
+import Artist from "#modules/artists/models/artist";
+import ArtistService from "#modules/artists/services/artist_service";
+import ImageService from "#modules/media/services/image_service";
 import PaymentMethod from "#modules/payments/models/payment_method";
 import { LastOwnerError, SlugTakenError } from "#modules/tenancy/errors";
 import Tenant from "#modules/tenancy/models/tenant";
@@ -114,6 +117,74 @@ test.group("TenancyService.createTenant", (group) => {
 
 			assert.equal(tenant.id, id);
 			assert.equal((await Tenant.findOrFail(id)).slug, "black-needle");
+		});
+	});
+
+	test("an independent artist gets a visible profile named after the tenant, linked to them", async ({
+		assert,
+	}) => {
+		const owner = await makeUser("owner@example.com");
+
+		const tenant = await tenancy.createTenant(owner, {
+			...studio("sita-rai"),
+			type: "independent",
+			name: "Sita Rai",
+		});
+
+		const profiles = await inTenant(tenant, () =>
+			Artist.query().where("tenant_id", tenant.id),
+		);
+		assert.lengthOf(profiles, 1);
+		assert.equal(profiles[0].name, "Sita Rai");
+		assert.equal(profiles[0].slug, "sita-rai");
+		assert.equal(profiles[0].userId, owner.id);
+		assert.isTrue(profiles[0].visible);
+		assert.isTrue(profiles[0].acceptingInquiries);
+	});
+
+	test("a studio gets no automatic profile", async ({ assert }) => {
+		const owner = await makeUser("owner@example.com");
+
+		const tenant = await tenancy.createTenant(owner, studio("black-needle"));
+
+		assert.isEmpty(
+			await inTenant(tenant, () =>
+				Artist.query().where("tenant_id", tenant.id),
+			),
+		);
+	});
+
+	test("a failing profile step rolls the tenant, its owner and the profile back", async ({
+		assert,
+	}) => {
+		const owner = await makeUser("owner@example.com");
+		const real = new ArtistService(new ImageService());
+		let tenantId = "";
+		// Inserts the profile for real, then fails: all of it must roll back.
+		const failing = new TenancyService({
+			createOwnerProfile: async (tenant, member) => {
+				tenantId = tenant.id;
+				await real.createOwnerProfile(tenant, member);
+				throw new Error("profile failed");
+			},
+		});
+
+		await assert.rejects(
+			() =>
+				failing.createTenant(owner, {
+					...studio("sita-rai"),
+					type: "independent",
+				}),
+			"profile failed",
+		);
+
+		assert.isNotEmpty(tenantId, "the profile step ran");
+		await inTenant({ id: tenantId }, async () => {
+			assert.isNull(await Tenant.find(tenantId));
+			assert.isEmpty(
+				await TenantMembership.query().where("tenant_id", tenantId),
+			);
+			assert.isEmpty(await Artist.query().where("tenant_id", tenantId));
 		});
 	});
 });
@@ -242,6 +313,47 @@ test.group("TenancyService.membershipFor", (group) => {
 			assert.lengthOf(
 				await PaymentMethod.onlyTrashed().where("tenant_id", tenant.id),
 				1,
+			);
+		});
+	});
+
+	test("soft-deleting a tenant soft-deletes its artists and keeps an earlier delete as it was", async ({
+		assert,
+	}) => {
+		const owner = await makeUser("owner@example.com");
+		const tenant = await tenancy.createTenant(owner, {
+			...studio("sita-rai"),
+			type: "independent",
+		});
+		const artists = new ArtistService(new ImageService());
+
+		await inTenant(tenant, async () => {
+			const removed = await artists.create(
+				tenant,
+				{
+					name: "Old",
+					slug: "old",
+					bio: null,
+					visible: true,
+					acceptingInquiries: true,
+					closedMessage: null,
+					linkToMe: false,
+				},
+				owner,
+			);
+			await artists.delete(tenant, removed);
+			const removedAt = (
+				await Artist.withTrashed().where("id", removed.id).firstOrFail()
+			).deletedAt?.toMillis();
+
+			await tenant.softDelete();
+
+			assert.isEmpty(await Artist.query().where("tenant_id", tenant.id));
+			const trashed = await Artist.onlyTrashed().where("tenant_id", tenant.id);
+			assert.lengthOf(trashed, 2, "the automatic profile and the removed one");
+			assert.equal(
+				trashed.find(({ id }) => id === removed.id)?.deletedAt?.toMillis(),
+				removedAt,
 			);
 		});
 	});

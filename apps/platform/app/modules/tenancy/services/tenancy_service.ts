@@ -1,5 +1,7 @@
 import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
 import type User from "#models/user";
+import ArtistService from "#modules/artists/services/artist_service";
+import ImageService from "#modules/media/services/image_service";
 import { LastOwnerError, SlugTakenError } from "#modules/tenancy/errors";
 import Tenant, { type TenantType } from "#modules/tenancy/models/tenant";
 import TenantMembership, {
@@ -46,8 +48,20 @@ export type DepositSettings = {
  */
 export default class TenancyService {
 	/**
-	 * Creates a tenant with `owner` as its first owner, in one transaction,
-	 * so a tenant never exists without an owner.
+	 * `artists` is only replaceable so a test can make the profile step
+	 * fail; everything else uses the default.
+	 */
+	constructor(
+		private artists: Pick<
+			ArtistService,
+			"createOwnerProfile"
+		> = new ArtistService(new ImageService()),
+	) {}
+
+	/**
+	 * Creates a tenant with `owner` as its first owner and, for an
+	 * independent artist, their profile, in one transaction, so a tenant
+	 * never exists without an owner.
 	 */
 	async createTenant(owner: User, input: NewTenant): Promise<Tenant> {
 		try {
@@ -61,6 +75,11 @@ export default class TenancyService {
 					{ tenantId: tenant.id, userId: owner.id, role: "owner" },
 					{ client: trx },
 				);
+				// An independent artist is the tenant's only artist, so their
+				// profile comes with it, in the same transaction.
+				if (input.type === "independent") {
+					await this.artists.createOwnerProfile(tenant, owner);
+				}
 				return tenant;
 			});
 		} catch (error) {
