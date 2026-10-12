@@ -206,7 +206,7 @@ test.group("inquiries table", (group) => {
 						withTransaction((inner) =>
 							updateRow(inner, "inquiries", id, { [column]: value }),
 						),
-					new RegExp(`inquiries_guard: ${column} cannot change`),
+					new RegExp(`inquiries_guard_update: ${column} cannot change`),
 				);
 			}
 		});
@@ -273,14 +273,14 @@ test.group("inquiries table", (group) => {
 							anonymized_at: new Date("2020-01-01"),
 						}),
 					),
-				/inquiries_guard: anonymized_at cannot change/,
+				/inquiries_guard_update: anonymized_at cannot change/,
 			);
 			await assert.rejects(
 				() =>
 					withTransaction((inner) =>
 						updateRow(inner, "inquiries", id, { source_channel: "google" }),
 					),
-				/inquiries_guard: source_channel cannot change/,
+				/inquiries_guard_update: source_channel cannot change/,
 			);
 		});
 	});
@@ -294,7 +294,7 @@ test.group("inquiries table", (group) => {
 				return newInquiry(tenant.id, client.id);
 			},
 			// The guard trigger fires before the policy's WITH CHECK and names the column.
-			/inquiries_guard: tenant_id cannot change/,
+			/inquiries_guard_update: tenant_id cannot change/,
 		);
 	});
 });

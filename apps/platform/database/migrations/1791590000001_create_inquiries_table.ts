@@ -86,7 +86,7 @@ declare
 	changed text;
 begin
 	if old.anonymized_at is not null and new.anonymized_at is distinct from old.anonymized_at then
-		raise exception 'inquiries_guard: anonymized_at cannot change';
+		raise exception 'inquiries_guard_update: anonymized_at cannot change';
 	end if;
 	if new.anonymized_at is not null then
 		free := free || scrub;
@@ -96,7 +96,7 @@ begin
 		where n.key <> all (free) and n.value is distinct from (to_jsonb(old) -> n.key)
 		limit 1;
 	if changed is not null then
-		raise exception 'inquiries_guard: % cannot change', changed;
+		raise exception 'inquiries_guard_update: % cannot change', changed;
 	end if;
 	return new;
 end
