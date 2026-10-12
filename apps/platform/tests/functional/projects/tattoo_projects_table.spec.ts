@@ -91,6 +91,10 @@ test.group("tattoo_projects table", (group) => {
 		assert,
 	}) => {
 		const { a, mine } = await twoTenants();
+		// mine.client also owns mine.inquiry, whose own client key would refuse the
+		// delete too. This client has a project and nothing else, so only the
+		// project's client key can be what refuses.
+		const projectOnlyClient = await inTenant(a, () => makeClient(a));
 
 		await withDbContext({ tenantId: a.id }, async (trx) => {
 			await insertRow(
@@ -101,12 +105,16 @@ test.group("tattoo_projects table", (group) => {
 					inquiry_id: mine.inquiry.id,
 				}),
 			);
+			await insertRow(
+				trx,
+				"tattoo_projects",
+				newProject(a.id, projectOnlyClient.id),
+			);
 			for (const [table, id, constraint] of [
-				// The client is also the inquiry's client, so either key may be named.
 				[
 					"clients",
-					mine.client.id,
-					/(inquiries|tattoo_projects)_tenant_id_client_id_foreign/,
+					projectOnlyClient.id,
+					/tattoo_projects_tenant_id_client_id_foreign/,
 				],
 				[
 					"artists",
