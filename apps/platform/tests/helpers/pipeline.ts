@@ -1,6 +1,7 @@
 import Artist from "#modules/artists/models/artist";
 import Client from "#modules/clients/models/client";
 import Inquiry from "#modules/inquiries/models/inquiry";
+import TattooProject from "#modules/projects/models/tattoo_project";
 
 type TenantRef = { id: string };
 
@@ -76,6 +77,30 @@ export function makeInquiry(
 		contactPhone: client.phone,
 		contactEmail: client.email,
 		status: "new",
+		...over,
+	});
+}
+
+type ProjectOver = Partial<
+	Pick<
+		TattooProject,
+		"artistId" | "inquiryId" | "brief" | "notes" | "status" | "lastContactedAt"
+	>
+>;
+
+/**
+ * A project for `client`. Pass `inquiryId` for one accepted from an inquiry.
+ */
+export function makeProject(
+	tenant: TenantRef,
+	client: Client,
+	over: ProjectOver = {},
+) {
+	return TattooProject.create({
+		tenantId: tenant.id,
+		clientId: client.id,
+		brief: "A small fine-line moth on the forearm",
+		status: "reviewing",
 		...over,
 	});
 }

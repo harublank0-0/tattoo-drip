@@ -295,6 +295,48 @@ export class QueueScheduleSchema extends BaseModel {
 	declare toDate: DateTime | null;
 }
 
+export class TattooProjectSchema extends BaseModel {
+	static $columns = [
+		"artistId",
+		"brief",
+		"clientId",
+		"createdAt",
+		"deletedAt",
+		"id",
+		"inquiryId",
+		"lastContactedAt",
+		"notes",
+		"status",
+		"tenantId",
+		"updatedAt",
+	] as const;
+	$columns = TattooProjectSchema.$columns;
+	@column()
+	declare artistId: string | null;
+	@column()
+	declare brief: string;
+	@column()
+	declare clientId: string;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.dateTime()
+	declare deletedAt: DateTime | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare inquiryId: string | null;
+	@column.dateTime()
+	declare lastContactedAt: DateTime | null;
+	@column()
+	declare notes: string | null;
+	@column()
+	declare status: string;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
 export class TenantMembershipSchema extends BaseModel {
 	static $columns = [
 		"createdAt",
