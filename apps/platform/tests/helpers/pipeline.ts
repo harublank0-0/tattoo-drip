@@ -4,6 +4,7 @@ import Artist from "#modules/artists/models/artist";
 import Client from "#modules/clients/models/client";
 import Inquiry from "#modules/inquiries/models/inquiry";
 import ReferenceImage from "#modules/inquiries/models/reference_image";
+import Payment from "#modules/payments/models/payment";
 import Quote from "#modules/projects/models/quote";
 import TattooProject from "#modules/projects/models/tattoo_project";
 
@@ -167,6 +168,44 @@ export function makeQuote(
 		depositAmount: 300_000,
 		currency: "NPR",
 		expiresAt: DateTime.utc().plus({ days: 14 }),
+		...over,
+	});
+}
+
+type PaymentOver = Partial<
+	Pick<
+		Payment,
+		| "kind"
+		| "amount"
+		| "currency"
+		| "method"
+		| "proofImageKey"
+		| "proofImageWidth"
+		| "proofImageHeight"
+		| "status"
+		| "verifiedByUserId"
+		| "verifiedAt"
+	>
+>;
+
+/**
+ * A submitted cash deposit of NPR 3,000 (300,000 paisa). To make a decided
+ * payment pass `status`, `verifiedAt` and `verifiedByUserId` together: the
+ * database checks they agree.
+ */
+export function makePayment(
+	tenant: TenantRef,
+	project: TattooProject,
+	over: PaymentOver = {},
+) {
+	return Payment.create({
+		tenantId: tenant.id,
+		projectId: project.id,
+		kind: "deposit",
+		amount: 300_000,
+		currency: "NPR",
+		method: "cash",
+		status: "submitted",
 		...over,
 	});
 }

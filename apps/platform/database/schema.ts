@@ -202,6 +202,57 @@ export class PaymentMethodSchema extends BaseModel {
 	declare updatedAt: DateTime | null;
 }
 
+export class PaymentSchema extends BaseModel {
+	static $columns = [
+		"amount",
+		"createdAt",
+		"currency",
+		"id",
+		"kind",
+		"method",
+		"projectId",
+		"proofImageHeight",
+		"proofImageKey",
+		"proofImageWidth",
+		"status",
+		"tenantId",
+		"updatedAt",
+		"verifiedAt",
+		"verifiedByUserId",
+	] as const;
+	$columns = PaymentSchema.$columns;
+	@column()
+	declare amount: number;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column()
+	declare currency: string;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare kind: string;
+	@column()
+	declare method: string;
+	@column()
+	declare projectId: string;
+	@column()
+	declare proofImageHeight: number | null;
+	@column()
+	declare proofImageKey: string | null;
+	@column()
+	declare proofImageWidth: number | null;
+	@column()
+	declare status: string;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+	@column.dateTime()
+	declare verifiedAt: DateTime | null;
+	@column()
+	declare verifiedByUserId: string | null;
+}
+
 export class QueueJobSchema extends BaseModel {
 	static $columns = [
 		"acquiredAt",
