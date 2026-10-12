@@ -157,35 +157,39 @@ test.group("Tenant routes", (group) => {
 		}
 	});
 
-	test("every settings route runs auth, then the tenant check, then owners only", ({
-		assert,
-	}) => {
-		const routes = Object.values(router.toJSON())
-			.flat()
-			.filter(({ pattern }) => /^\/t\/:tenant\/settings(\/|$)/.test(pattern));
-		assert.isNotEmpty(routes);
+	for (const area of ["settings", "artists"]) {
+		test(`every ${area} route runs auth, then the tenant check, then owners only`, ({
+			assert,
+		}) => {
+			const routes = Object.values(router.toJSON())
+				.flat()
+				.filter(({ pattern }) =>
+					new RegExp(`^/t/:tenant/${area}(/|$)`).test(pattern),
+				);
+			assert.isNotEmpty(routes);
 
-		for (const route of routes) {
-			const entries = [...route.middleware.all()].map((entry) =>
-				typeof entry === "function" ? undefined : entry,
-			);
-			const names = entries.map((entry) => entry?.name);
-			const auth = names.indexOf("auth");
-			const tenant = names.indexOf("tenant");
-			const role = names.indexOf("role");
-			const dbContext = names.indexOf("dbContext");
-			assert.isAbove(dbContext, auth, route.pattern);
-			assert.isBelow(dbContext, tenant, route.pattern);
-			assert.isAtLeast(auth, 0, route.pattern);
-			assert.isAbove(tenant, auth, route.pattern);
-			assert.isAbove(role, tenant, route.pattern);
-			assert.deepEqual(
-				entries[role]?.args,
-				{ allow: ["owner"] },
-				route.pattern,
-			);
-		}
-	});
+			for (const route of routes) {
+				const entries = [...route.middleware.all()].map((entry) =>
+					typeof entry === "function" ? undefined : entry,
+				);
+				const names = entries.map((entry) => entry?.name);
+				const auth = names.indexOf("auth");
+				const tenant = names.indexOf("tenant");
+				const role = names.indexOf("role");
+				const dbContext = names.indexOf("dbContext");
+				assert.isAbove(dbContext, auth, route.pattern);
+				assert.isBelow(dbContext, tenant, route.pattern);
+				assert.isAtLeast(auth, 0, route.pattern);
+				assert.isAbove(tenant, auth, route.pattern);
+				assert.isAbove(role, tenant, route.pattern);
+				assert.deepEqual(
+					entries[role]?.args,
+					{ allow: ["owner"] },
+					route.pattern,
+				);
+			}
+		});
+	}
 
 	test("every /t/:tenant route has an isolation case or a written exemption", ({
 		assert,

@@ -4,47 +4,18 @@ import { test } from "@japa/runner";
 import ImageService from "#modules/media/services/image_service";
 import PaymentMethod from "#modules/payments/models/payment_method";
 import PaymentMethodService from "#modules/payments/services/payment_method_service";
-import { currentClient, withDbContext } from "#services/db_context";
-import { testImages, uploadOf } from "#tests/helpers/images";
+import { withDbContext } from "#services/db_context";
+import {
+	RecordingImageService,
+	testImages,
+	uploadOf,
+} from "#tests/helpers/images";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
-
-/**
- * ImageService that remembers every key it stored, so a test can check that
- * no stored file is left behind.
- */
-class RecordingImageService extends ImageService {
-	keys: string[] = [];
-
-	override async store(...args: Parameters<ImageService["store"]>) {
-		const stored = await super.store(...args);
-		this.keys.push(stored.key);
-		return stored;
-	}
-}
+import { whereNoSavepointOpens } from "#tests/helpers/transactions";
 
 const methods = new PaymentMethodService(new ImageService());
 const qr = async () => uploadOf(await testImages.png());
 const exists = (key: string) => drive.use("public").exists(key);
-
-/**
- * Runs `work` inside an open request-like transaction in which opening the
- * next level (the savepoint a service's withTransaction needs) fails with
- * "cannot open", as a lost database connection would.
- */
-function whereNoSavepointOpens<T>(tenantId: string, work: () => Promise<T>) {
-	return withDbContext({ tenantId }, async () => {
-		const client = currentClient();
-		if (!client) throw new Error("expected an open transaction");
-		const original = client.transaction;
-		client.transaction = (() =>
-			Promise.reject(new Error("cannot open"))) as unknown as typeof original;
-		try {
-			return await work();
-		} finally {
-			client.transaction = original;
-		}
-	});
-}
 
 test.group("QR file cleanup follows the real commit", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());

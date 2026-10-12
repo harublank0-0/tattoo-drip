@@ -1,0 +1,137 @@
+import { Link } from "@adonisjs/inertia/react";
+import { router } from "@inertiajs/react";
+import { Pencil, Plus, Trash2, User, Users } from "lucide-react";
+import { urlFor } from "~/client";
+import type { ArtistProps } from "~/components/artists";
+import Page from "~/components/page";
+import { Badge } from "~/components/ui/badge";
+import { Button, buttonVariants } from "~/components/ui/button";
+import {
+	Empty,
+	EmptyContent,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "~/components/ui/empty";
+import { useTenant } from "~/hooks/use-tenant";
+import AppLayout from "~/layouts/app";
+
+export default function Artists({ artists }: { artists: ArtistProps[] }) {
+	const tenant = useTenant();
+	const params = { tenant: tenant.slug };
+	const add = (
+		<Link
+			route="tenant.artists.create"
+			routeParams={params}
+			className={buttonVariants()}
+		>
+			<Plus data-icon="inline-start" />
+			Add an artist
+		</Link>
+	);
+
+	return (
+		<Page
+			title="Artists"
+			description="The artists clients can book. A hidden artist doesn't show anywhere public."
+			actions={artists.length > 0 ? add : undefined}
+		>
+			{artists.length === 0 ? (
+				<Empty className="border">
+					<EmptyHeader>
+						<EmptyMedia variant="icon">
+							<Users />
+						</EmptyMedia>
+						<EmptyTitle>No artists yet</EmptyTitle>
+						<EmptyDescription>
+							Add the artists who work here, each with their own photo, bio and
+							link.
+						</EmptyDescription>
+					</EmptyHeader>
+					<EmptyContent>{add}</EmptyContent>
+				</Empty>
+			) : (
+				<div className="flex flex-col gap-3">
+					{artists.map((artist) => (
+						<ArtistRow
+							key={artist.id}
+							artist={artist}
+							tenantSlug={tenant.slug}
+						/>
+					))}
+				</div>
+			)}
+		</Page>
+	);
+}
+
+function ArtistRow({
+	artist,
+	tenantSlug,
+}: {
+	artist: ArtistProps;
+	tenantSlug: string;
+}) {
+	const params = { tenant: tenantSlug, id: artist.id };
+
+	const remove = () => {
+		if (
+			window.confirm(
+				`Delete "${artist.name}"? Their link stops working and clients won't see them.`,
+			)
+		) {
+			router.delete(urlFor("tenant.artists.destroy", params), {
+				preserveScroll: true,
+			});
+		}
+	};
+
+	return (
+		<div className="flex flex-wrap items-center gap-4 rounded-lg border bg-card p-3">
+			{artist.photoUrl ? (
+				<img
+					src={artist.photoUrl}
+					alt={artist.name}
+					className="size-16 rounded-md border object-cover"
+				/>
+			) : (
+				<div className="flex size-16 items-center justify-center rounded-md border bg-muted text-muted-foreground">
+					<User />
+				</div>
+			)}
+			{/* min-w-40: on narrow screens the actions wrap below instead. */}
+			<div className="flex min-w-40 flex-1 flex-col gap-1">
+				<div className="flex flex-wrap items-center gap-2">
+					<span className="font-medium">{artist.name}</span>
+					{artist.isMine && <Badge>You</Badge>}
+					{!artist.visible && <Badge variant="secondary">Hidden</Badge>}
+					{!artist.acceptingInquiries && (
+						<Badge variant="outline">Not accepting inquiries</Badge>
+					)}
+				</div>
+				<p className="truncate text-sm text-muted-foreground">/{artist.slug}</p>
+			</div>
+			<div className="ml-auto flex items-center gap-1">
+				<Link
+					route="tenant.artists.edit"
+					routeParams={params}
+					aria-label={`Edit ${artist.name}`}
+					className={buttonVariants({ variant: "ghost", size: "icon" })}
+				>
+					<Pencil />
+				</Link>
+				<Button
+					variant="ghost"
+					size="icon"
+					aria-label={`Delete ${artist.name}`}
+					onClick={remove}
+				>
+					<Trash2 />
+				</Button>
+			</div>
+		</div>
+	);
+}
+
+Artists.layout = [AppLayout];

@@ -120,6 +120,42 @@ const routes = {
     tokens: [{"old":"/t/:tenant/settings/payments/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/payments/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/payments/:id","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/payments/:id","type":0,"val":"payments","end":""},{"old":"/t/:tenant/settings/payments/:id","type":1,"val":"id","end":""}],
     types: placeholder as Registry['tenant.settings.payments.destroy']['types'],
   },
+  'tenant.artists': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/artists',
+    tokens: [{"old":"/t/:tenant/artists","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists","type":0,"val":"artists","end":""}],
+    types: placeholder as Registry['tenant.artists']['types'],
+  },
+  'tenant.artists.create': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/artists/new',
+    tokens: [{"old":"/t/:tenant/artists/new","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/new","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/new","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/new","type":0,"val":"new","end":""}],
+    types: placeholder as Registry['tenant.artists.create']['types'],
+  },
+  'tenant.artists.store': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/artists',
+    tokens: [{"old":"/t/:tenant/artists","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists","type":0,"val":"artists","end":""}],
+    types: placeholder as Registry['tenant.artists.store']['types'],
+  },
+  'tenant.artists.edit': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/artists/:id/edit',
+    tokens: [{"old":"/t/:tenant/artists/:id/edit","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/:id/edit","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/:id/edit","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/:id/edit","type":1,"val":"id","end":""},{"old":"/t/:tenant/artists/:id/edit","type":0,"val":"edit","end":""}],
+    types: placeholder as Registry['tenant.artists.edit']['types'],
+  },
+  'tenant.artists.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/artists/:id',
+    tokens: [{"old":"/t/:tenant/artists/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/:id","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/:id","type":1,"val":"id","end":""}],
+    types: placeholder as Registry['tenant.artists.update']['types'],
+  },
+  'tenant.artists.destroy': {
+    methods: ["DELETE"],
+    pattern: '/t/:tenant/artists/:id',
+    tokens: [{"old":"/t/:tenant/artists/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/:id","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/:id","type":1,"val":"id","end":""}],
+    types: placeholder as Registry['tenant.artists.destroy']['types'],
+  },
   'dashboard': {
     methods: ["GET","HEAD"],
     pattern: '/dashboard',

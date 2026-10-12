@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import app from "@adonisjs/core/services/app";
 import sharp from "sharp";
+import ImageService from "#modules/media/services/image_service";
 
 type Rgba = { r: number; g: number; b: number; alpha?: number };
 
@@ -55,4 +56,18 @@ export async function uploadOf(data: Buffer) {
 	const tmpPath = app.tmpPath("storage/uploads", randomUUID());
 	await writeFile(tmpPath, data);
 	return { tmpPath };
+}
+
+/**
+ * ImageService that remembers every key it stored, so a test can check that
+ * no stored file is left behind.
+ */
+export class RecordingImageService extends ImageService {
+	keys: string[] = [];
+
+	override async store(...args: Parameters<ImageService["store"]>) {
+		const stored = await super.store(...args);
+		this.keys.push(stored.key);
+		return stored;
+	}
 }

@@ -1,6 +1,7 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import User from "#models/user";
+import Artist from "#modules/artists/models/artist";
 import Tenant from "#modules/tenancy/models/tenant";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
@@ -62,6 +63,50 @@ test.group("Onboarding", (group) => {
 		);
 		assert.equal(membership.userId, user.id);
 		assert.equal(membership.role, "owner");
+	});
+
+	test("an independent artist's new tenant comes with their profile", async ({
+		client,
+		assert,
+	}) => {
+		const user = await makeUser();
+
+		await client
+			.post("/onboarding")
+			.form({ ...validTenant, type: "independent" })
+			.withCsrfToken()
+			.loginAs(user)
+			.redirects(0);
+
+		const tenant = await inUser(user, () =>
+			Tenant.findByOrFail("slug", "black-needle"),
+		);
+		const profiles = await inTenant(tenant, () =>
+			Artist.query().where("tenant_id", tenant.id),
+		);
+		assert.lengthOf(profiles, 1);
+		assert.equal(profiles[0].name, "Black Needle");
+		assert.equal(profiles[0].userId, user.id);
+	});
+
+	test("a studio's new tenant has no profile", async ({ client, assert }) => {
+		const user = await makeUser();
+
+		await client
+			.post("/onboarding")
+			.form(validTenant)
+			.withCsrfToken()
+			.loginAs(user)
+			.redirects(0);
+
+		const tenant = await inUser(user, () =>
+			Tenant.findByOrFail("slug", "black-needle"),
+		);
+		assert.isEmpty(
+			await inTenant(tenant, () =>
+				Artist.query().where("tenant_id", tenant.id),
+			),
+		);
 	});
 
 	for (const [field, value] of [

@@ -4,6 +4,7 @@
  */
 
 export const controllers = {
+  Artists: () => import('#controllers/artists_controller'),
   Dashboard: () => import('#controllers/dashboard_controller'),
   DepositSettings: () => import('#controllers/deposit_settings_controller'),
   NewAccount: () => import('#controllers/new_account_controller'),

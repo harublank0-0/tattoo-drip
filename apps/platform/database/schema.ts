@@ -7,6 +7,57 @@
 import { BaseModel, column } from "@adonisjs/lucid/orm";
 import type { DateTime } from "luxon";
 
+export class ArtistSchema extends BaseModel {
+	static $columns = [
+		"acceptingInquiries",
+		"bio",
+		"closedMessage",
+		"createdAt",
+		"deletedAt",
+		"id",
+		"name",
+		"photoHeight",
+		"photoKey",
+		"photoWidth",
+		"slug",
+		"tenantId",
+		"updatedAt",
+		"userId",
+		"visible",
+	] as const;
+	$columns = ArtistSchema.$columns;
+	@column()
+	declare acceptingInquiries: boolean;
+	@column()
+	declare bio: string | null;
+	@column()
+	declare closedMessage: string | null;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.dateTime()
+	declare deletedAt: DateTime | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare name: string;
+	@column()
+	declare photoHeight: number | null;
+	@column()
+	declare photoKey: string | null;
+	@column()
+	declare photoWidth: number | null;
+	@column()
+	declare slug: string;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+	@column()
+	declare userId: string | null;
+	@column()
+	declare visible: boolean;
+}
+
 export class PaymentMethodSchema extends BaseModel {
 	static $columns = [
 		"accountName",
