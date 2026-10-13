@@ -237,7 +237,7 @@ test.group("inquiries table", (group) => {
 		});
 	});
 
-	test("the contact snapshot and free text can be scrubbed only in the update that sets anonymized_at, which then never changes", async ({
+	test("the contact snapshot and free text can be scrubbed once anonymized_at is set, which then never changes", async ({
 		assert,
 	}) => {
 		const { a, clientA } = await twoTenants();
@@ -281,6 +281,20 @@ test.group("inquiries table", (group) => {
 						updateRow(inner, "inquiries", id, { source_channel: "google" }),
 					),
 				/inquiries_guard_update: source_channel cannot change/,
+			);
+
+			// Clearing it is refused too. This inquiry kept its phone, so the
+			// inquiries_contact_phone_unless_anonymized check is not what stops it.
+			const kept = idOf(
+				await insertRow(trx, "inquiries", newInquiry(a.id, clientA.id)),
+			);
+			await updateRow(trx, "inquiries", kept, { anonymized_at: new Date() });
+			await assert.rejects(
+				() =>
+					withTransaction((inner) =>
+						updateRow(inner, "inquiries", kept, { anonymized_at: null }),
+					),
+				/inquiries_guard_update: anonymized_at cannot change/,
 			);
 		});
 	});

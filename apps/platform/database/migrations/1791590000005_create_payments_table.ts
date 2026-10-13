@@ -77,8 +77,10 @@ export default class extends BaseSchema {
 		);
 		for (const sql of enableTenantRls(this.tableName)) this.schema.raw(sql);
 
+		// search_path is pinned so a session cannot shadow the built-ins this body
+		// calls (to_jsonb, jsonb_each); keep the pin in any replacement function.
 		this.schema.raw(`
-create function payments_guard() returns trigger language plpgsql as $$
+create function payments_guard() returns trigger language plpgsql set search_path = pg_catalog, pg_temp as $$
 declare
 	free text[] := array['status', 'verified_by_user_id', 'verified_at', 'updated_at', 'proof_image_key', 'proof_image_width', 'proof_image_height'];
 	changed text;

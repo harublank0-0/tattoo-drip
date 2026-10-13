@@ -15,10 +15,12 @@ export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
 /**
  * Money received for a project. Append-only, enforced by a database trigger:
- * never edited (except the decision: `status`, `verifiedByUserId`,
- * `verifiedAt`), never deleted, and a decided payment (verified or rejected)
- * is final. A refund is a negative `refund` payment; a mistaken verification
- * is reversed with a `correction`. Amounts are signed integer paisa.
+ * never edited or deleted, except that its decision (`status`,
+ * `verifiedByUserId`, `verifiedAt`) is recorded once, `updatedAt` moves and
+ * its proof can be cleared (privacy deletion). A decided payment (verified or
+ * rejected) is final. A refund is a negative `refund` payment; a mistaken
+ * verification is reversed with a `correction`. Amounts are signed integer
+ * paisa.
  */
 export default class Payment extends PaymentSchema {
 	declare kind: PaymentKind;
