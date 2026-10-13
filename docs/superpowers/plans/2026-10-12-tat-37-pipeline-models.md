@@ -2991,7 +2991,8 @@ begin
 		raise exception 'payments_guard: proof can only be cleared';
 	end if;
 	-- A decided payment is final. The one change allowed is the verifier
-	-- becoming null, which is what deleting the verifier's account does.
+	-- becoming null once the verifier's account is gone, which is what deleting
+	-- that account does (the ON DELETE SET NULL action).
 	if old.status <> 'submitted' then
 		if new.status is distinct from old.status then
 			raise exception 'payments_guard: status cannot change';
