@@ -414,7 +414,7 @@ test.group("TenancyService.membershipFor", (group) => {
 				await ReferenceImage.onlyTrashed().where("tenant_id", tenant.id),
 				1,
 			);
-			// No deleted_at on these: they stay, hidden with their project.
+			// No deleted_at on these, so they stay (and remain readable) after the cascade.
 			assert.lengthOf(await Quote.query().where("tenant_id", tenant.id), 1);
 			assert.lengthOf(await Payment.query().where("tenant_id", tenant.id), 1);
 		});

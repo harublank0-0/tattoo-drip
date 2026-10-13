@@ -25,10 +25,11 @@ export const DEFAULT_TIMEZONE = "Asia/Kathmandu";
 
 /**
  * Models that are soft-deleted with their tenant: each has `tenant_id` and
- * `deleted_at`. Quotes and payments have no `deleted_at` and are left alone;
- * they are hidden with their project. A function, not a constant:
- * TenantMembership imports this file, so reading the class while the module
- * loads fails whenever the membership model is imported first.
+ * `deleted_at`. Quotes and payments have no `deleted_at` and are left alone:
+ * they are not hidden and stay readable by direct queries, so list them
+ * through a live project. A function, not a constant: TenantMembership
+ * imports this file, so reading the class while the module loads fails
+ * whenever the membership model is imported first.
  */
 const cascade = (): LucidModel[] => [
 	TenantMembership,
