@@ -81,7 +81,7 @@ This is the most important rule in the system.
 A project is the sale of one tattoo (or one piercing). Custom work is never booked until its deposit is verified, unless the quote sets the deposit to zero.
 
 ```text
-inquiry → reviewing → quoted → deposit_pending → booked → in_progress → completed → healing_check
+Inquiry (a record, not a status) → reviewing → quoted → deposit_pending → booked → in_progress → completed → healing_check
 
 side exits:  reviewing → declined     quoted ⇄ on_hold     deposit_pending → cancelled
 shortcuts:   flash or walk-in → booked     in_progress → booked (next session)
@@ -89,7 +89,7 @@ shortcuts:   flash or walk-in → booked     in_progress → booked (next sessio
 
 | Status | Meaning |
 |---|---|
-| `inquiry` | Submitted, not yet looked at |
+| `inquiry` | Not a project status: the submitted Inquiry (status `new`) before it is accepted; accepting it creates a project in `reviewing` |
 | `reviewing` | The studio is checking fit; a consultation session may happen here |
 | `declined` | The studio turned it down |
 | `quoted` | A quote has been sent |
