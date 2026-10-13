@@ -58,6 +58,105 @@ export class ArtistSchema extends BaseModel {
 	declare visible: boolean;
 }
 
+export class ClientSchema extends BaseModel {
+	static $columns = [
+		"anonymizedAt",
+		"createdAt",
+		"deletedAt",
+		"email",
+		"id",
+		"name",
+		"notes",
+		"phone",
+		"tenantId",
+		"updatedAt",
+	] as const;
+	$columns = ClientSchema.$columns;
+	@column.dateTime()
+	declare anonymizedAt: DateTime | null;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.dateTime()
+	declare deletedAt: DateTime | null;
+	@column()
+	declare email: string | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare name: string;
+	@column()
+	declare notes: string | null;
+	@column()
+	declare phone: string | null;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
+export class InquirySchema extends BaseModel {
+	static $columns = [
+		"anonymizedAt",
+		"approximateSize",
+		"budget",
+		"clientId",
+		"contactEmail",
+		"contactName",
+		"contactPhone",
+		"createdAt",
+		"decidedAt",
+		"deletedAt",
+		"id",
+		"idea",
+		"placement",
+		"preferredArtistId",
+		"preferredDates",
+		"sourceChannel",
+		"status",
+		"tenantId",
+		"updatedAt",
+	] as const;
+	$columns = InquirySchema.$columns;
+	@column.dateTime()
+	declare anonymizedAt: DateTime | null;
+	@column()
+	declare approximateSize: string;
+	@column()
+	declare budget: string | null;
+	@column()
+	declare clientId: string;
+	@column()
+	declare contactEmail: string | null;
+	@column()
+	declare contactName: string;
+	@column()
+	declare contactPhone: string | null;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.dateTime()
+	declare decidedAt: DateTime | null;
+	@column.dateTime()
+	declare deletedAt: DateTime | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare idea: string;
+	@column()
+	declare placement: string;
+	@column()
+	declare preferredArtistId: string | null;
+	@column()
+	declare preferredDates: string;
+	@column()
+	declare sourceChannel: string;
+	@column()
+	declare status: string;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
 export class PaymentMethodSchema extends BaseModel {
 	static $columns = [
 		"accountName",
@@ -101,6 +200,57 @@ export class PaymentMethodSchema extends BaseModel {
 	declare tenantId: string;
 	@column.dateTime({ autoCreate: true, autoUpdate: true })
 	declare updatedAt: DateTime | null;
+}
+
+export class PaymentSchema extends BaseModel {
+	static $columns = [
+		"amount",
+		"createdAt",
+		"currency",
+		"id",
+		"kind",
+		"method",
+		"projectId",
+		"proofImageHeight",
+		"proofImageKey",
+		"proofImageWidth",
+		"status",
+		"tenantId",
+		"updatedAt",
+		"verifiedAt",
+		"verifiedByUserId",
+	] as const;
+	$columns = PaymentSchema.$columns;
+	@column()
+	declare amount: number;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column()
+	declare currency: string;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare kind: string;
+	@column()
+	declare method: string;
+	@column()
+	declare projectId: string;
+	@column()
+	declare proofImageHeight: number | null;
+	@column()
+	declare proofImageKey: string | null;
+	@column()
+	declare proofImageWidth: number | null;
+	@column()
+	declare status: string;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+	@column.dateTime()
+	declare verifiedAt: DateTime | null;
+	@column()
+	declare verifiedByUserId: string | null;
 }
 
 export class QueueJobSchema extends BaseModel {
@@ -194,6 +344,132 @@ export class QueueScheduleSchema extends BaseModel {
 	declare timezone: string;
 	@column.dateTime()
 	declare toDate: DateTime | null;
+}
+
+export class QuoteSchema extends BaseModel {
+	static $columns = [
+		"createdAt",
+		"currency",
+		"depositAmount",
+		"estimatedMinutes",
+		"expiresAt",
+		"fixedPrice",
+		"hourlyRate",
+		"id",
+		"kind",
+		"projectId",
+		"tenantId",
+		"updatedAt",
+		"version",
+	] as const;
+	$columns = QuoteSchema.$columns;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column()
+	declare currency: string;
+	@column()
+	declare depositAmount: number;
+	@column()
+	declare estimatedMinutes: number | null;
+	@column.dateTime()
+	declare expiresAt: DateTime;
+	@column()
+	declare fixedPrice: number | null;
+	@column()
+	declare hourlyRate: number | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare kind: string;
+	@column()
+	declare projectId: string;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+	@column()
+	declare version: number;
+}
+
+export class ReferenceImageSchema extends BaseModel {
+	static $columns = [
+		"createdAt",
+		"deletedAt",
+		"height",
+		"id",
+		"imageKey",
+		"inquiryId",
+		"position",
+		"projectId",
+		"tenantId",
+		"updatedAt",
+		"width",
+	] as const;
+	$columns = ReferenceImageSchema.$columns;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.dateTime()
+	declare deletedAt: DateTime | null;
+	@column()
+	declare height: number;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare imageKey: string;
+	@column()
+	declare inquiryId: string | null;
+	@column()
+	declare position: number;
+	@column()
+	declare projectId: string | null;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+	@column()
+	declare width: number;
+}
+
+export class TattooProjectSchema extends BaseModel {
+	static $columns = [
+		"artistId",
+		"brief",
+		"clientId",
+		"createdAt",
+		"deletedAt",
+		"id",
+		"inquiryId",
+		"lastContactedAt",
+		"notes",
+		"status",
+		"tenantId",
+		"updatedAt",
+	] as const;
+	$columns = TattooProjectSchema.$columns;
+	@column()
+	declare artistId: string | null;
+	@column()
+	declare brief: string;
+	@column()
+	declare clientId: string;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.dateTime()
+	declare deletedAt: DateTime | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare inquiryId: string | null;
+	@column.dateTime()
+	declare lastContactedAt: DateTime | null;
+	@column()
+	declare notes: string | null;
+	@column()
+	declare status: string;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
 }
 
 export class TenantMembershipSchema extends BaseModel {

@@ -18,7 +18,13 @@ const EXEMPT: Record<string, string> = {
 /** The exact policies each protected table has, as "name:COMMAND". */
 const EXPECTED_POLICIES: Record<string, string[]> = {
 	artists: ["tenant_isolation:ALL"],
+	clients: ["tenant_isolation:ALL"],
+	inquiries: ["tenant_isolation:ALL"],
 	payment_methods: ["tenant_isolation:ALL"],
+	payments: ["tenant_isolation:ALL"],
+	quotes: ["tenant_isolation:ALL"],
+	reference_images: ["tenant_isolation:ALL"],
+	tattoo_projects: ["tenant_isolation:ALL"],
 	tenant_memberships: [
 		"tenant_memberships_delete:DELETE",
 		"tenant_memberships_insert:INSERT",
