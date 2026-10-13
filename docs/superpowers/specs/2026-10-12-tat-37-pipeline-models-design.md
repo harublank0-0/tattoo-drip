@@ -118,7 +118,7 @@ All six have `id`, `tenant_id` (references `tenants`, cascade, indexed), `create
 | `expires_at` | timestamptz, not null | |
 
 - Unique `quotes_project_version_unique` on `(project_id, version)`: versions are never reused.
-- Checks: `quotes_version_positive` (`version >= 1`), `quotes_kind_columns` (`fixed` has a price and no rate or minutes; `hourly` has a rate and minutes and no price), `quotes_amounts_positive` (price, rate and minutes > 0; deposit ≥ 0), `quotes_deposit_within_total` (`deposit_amount <= coalesce(fixed_price, round(hourly_rate * estimated_minutes / 60.0))`).
+- Checks: `quotes_version_positive` (`version >= 1`), `quotes_kind_columns` (`fixed` has a price and no rate or minutes; `hourly` has a rate and minutes and no price), `quotes_amounts_positive` (price, rate and minutes > 0; deposit ≥ 0), `quotes_deposit_within_total` (`deposit_amount <= coalesce(fixed_price, round(hourly_rate::bigint * estimated_minutes / 60.0))`).
 - A revision is a new row with the next `version`; the current quote is the highest version of the project, so there is no flag to drift and no deletion that could resurrect an older version. By convention (no trigger) the price, deposit and expiry columns never change after insert. `sent_at` is left to TAT-64, and whether a quote has expired is computed from `expires_at`.
 
 ### `payments` (module `payments`; no `deleted_at`)

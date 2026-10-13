@@ -15,6 +15,16 @@
 1. Three shared test helpers are added: `tests/helpers/sql.ts` (raw-SQL `sql`, `insertRow`, `updateRow`), `tests/helpers/rls.ts` (`assertRowLevelSecurity`, one proof used by all six table specs) and `tests/helpers/pipeline.ts` (model factories plus `seedPipeline`). The spec only names `pipeline.ts`.
 2. The spec's "RLS isolation" test list is implemented once, in `assertRowLevelSecurity`; on `inquiries` and `payments` it asserts the trigger's message for the "move a row" case, as the spec requires.
 
+## Corrections made while executing
+
+The plan text above was corrected after the work to match what shipped; the differences were found by the per-task reviews:
+
+1. **`quotes_deposit_within_total` computes in bigint** (`round(hourly_rate::bigint * estimated_minutes / 60.0)`). The first version multiplied two int4 columns and raised `integer out of range` for a legitimate quote (NPR 10,000 an hour for 40 hours). Tests pin 40,000,000 accepted and 40,000,001 rejected, and the half-up rounding.
+2. **The inquiries guard names its trigger in its messages** (`inquiries_guard_update: <column> cannot change`), as the spec's convention says; the first version said `inquiries_guard:`.
+3. **`Tenant.softDelete` reads its cascade list through a function**, not a module constant: `tenant_membership.ts` imports `tenant.ts`, so a constant read while the module loads crashed whenever the membership model loaded first.
+4. **Each "cannot be hard-deleted" test leg is refused by a row that only that foreign key references**, and each new composite key's `NO ACTION` is proven by a temporary `CASCADE` mutation (a Task 3 review found a leg masked by a second key).
+5. Lucid leaves unset nullable columns `undefined` after `create()`, so tests that assert `isNull` on a fresh model `refresh()` it first.
+
 ## Global Constraints
 
 - PostgreSQL 18. Primary keys are `uuidv7()`; instants are `timestamptz`; enums are `table.enum` string columns (check constraints); money is integer paisa plus `currency varchar(3)` default `NPR`.
@@ -790,7 +800,7 @@ test.group("inquiries table", (group) => {
 						withTransaction((inner) =>
 							updateRow(inner, "inquiries", id, { [column]: value }),
 						),
-					new RegExp(`inquiries_guard: ${column} cannot change`),
+					new RegExp(`inquiries_guard_update: ${column} cannot change`),
 				);
 			}
 		});
@@ -852,14 +862,14 @@ test.group("inquiries table", (group) => {
 							anonymized_at: new Date("2020-01-01"),
 						}),
 					),
-				/inquiries_guard: anonymized_at cannot change/,
+				/inquiries_guard_update: anonymized_at cannot change/,
 			);
 			await assert.rejects(
 				() =>
 					withTransaction((inner) =>
 						updateRow(inner, "inquiries", id, { source_channel: "google" }),
 					),
-				/inquiries_guard: source_channel cannot change/,
+				/inquiries_guard_update: source_channel cannot change/,
 			);
 		});
 	});
@@ -873,7 +883,7 @@ test.group("inquiries table", (group) => {
 				return newInquiry(tenant.id, client.id);
 			},
 			// The guard trigger fires before the policy's WITH CHECK and names the column.
-			/inquiries_guard: tenant_id cannot change/,
+			/inquiries_guard_update: tenant_id cannot change/,
 		);
 	});
 });
@@ -1034,7 +1044,7 @@ declare
 	changed text;
 begin
 	if old.anonymized_at is not null and new.anonymized_at is distinct from old.anonymized_at then
-		raise exception 'inquiries_guard: anonymized_at cannot change';
+		raise exception 'inquiries_guard_update: anonymized_at cannot change';
 	end if;
 	if new.anonymized_at is not null then
 		free := free || scrub;
@@ -1044,7 +1054,7 @@ begin
 		where n.key <> all (free) and n.value is distinct from (to_jsonb(old) -> n.key)
 		limit 1;
 	if changed is not null then
-		raise exception 'inquiries_guard: % cannot change', changed;
+		raise exception 'inquiries_guard_update: % cannot change', changed;
 	end if;
 	return new;
 end
@@ -2313,7 +2323,7 @@ export default class extends BaseSchema {
 		// The deposit never exceeds the total: the price, or the rate for the
 		// estimated minutes (rounded half away from zero, like Postgres' round).
 		this.schema.raw(
-			"alter table quotes add constraint quotes_deposit_within_total check (deposit_amount <= coalesce(fixed_price, round(hourly_rate * estimated_minutes / 60.0)))",
+			"alter table quotes add constraint quotes_deposit_within_total check (deposit_amount <= coalesce(fixed_price, round(hourly_rate::bigint * estimated_minutes / 60.0)))",
 		);
 		for (const sql of enableTenantRls(this.tableName)) this.schema.raw(sql);
 	}
