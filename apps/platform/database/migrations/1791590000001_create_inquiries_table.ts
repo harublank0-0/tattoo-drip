@@ -8,8 +8,9 @@ import {
 /**
  * What a person asked a studio for, as submitted (TAT-37). The guard
  * trigger makes it a frozen record: only the decision can change, and the
- * contact snapshot and free text can be scrubbed when `anonymized_at` is
- * set (TAT-42). Everything else is frozen, including any column added later.
+ * contact snapshot and free text can be scrubbed only in the update that
+ * first sets `anonymized_at` (TAT-42), after which they are frozen again.
+ * Everything else is frozen, including any column added later.
  */
 export default class extends BaseSchema {
 	protected tableName = "inquiries";
@@ -90,7 +91,8 @@ begin
 	if old.anonymized_at is not null and new.anonymized_at is distinct from old.anonymized_at then
 		raise exception 'inquiries_guard_update: anonymized_at cannot change';
 	end if;
-	if new.anonymized_at is not null then
+	-- The scrub columns are free only in the update that first sets the marker.
+	if old.anonymized_at is null and new.anonymized_at is not null then
 		free := free || scrub;
 	end if;
 	select n.key into changed

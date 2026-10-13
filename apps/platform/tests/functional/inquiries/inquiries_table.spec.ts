@@ -237,7 +237,7 @@ test.group("inquiries table", (group) => {
 		});
 	});
 
-	test("the contact snapshot and free text can be scrubbed once anonymized_at is set, which then never changes", async ({
+	test("the contact snapshot and free text can be scrubbed only in the update that first sets anonymized_at, which then never changes, and they are frozen afterwards", async ({
 		assert,
 	}) => {
 		const { a, clientA } = await twoTenants();
@@ -283,8 +283,31 @@ test.group("inquiries table", (group) => {
 				/inquiries_guard_update: source_channel cannot change/,
 			);
 
-			// Clearing it is refused too. This inquiry kept its phone, so the
-			// inquiries_contact_phone_unless_anonymized check is not what stops it.
+			// The scrub was a one-shot: personal data cannot be written back.
+			const restored: [string, unknown][] = [
+				["contact_name", "Sita"],
+				["contact_phone", PHONE],
+				["contact_email", "s@x.com"],
+				["idea", "A small moth"],
+				["placement", "Forearm"],
+				["approximate_size", "8 cm"],
+				["preferred_dates", "November"],
+				["budget", "5k"],
+			];
+			for (const [column, value] of restored) {
+				await assert.rejects(
+					() =>
+						withTransaction((inner) =>
+							updateRow(inner, "inquiries", id, { [column]: value }),
+						),
+					new RegExp(`inquiries_guard_update: ${column} cannot change`),
+				);
+			}
+
+			// Setting the marker alone is the transition and is allowed; the scrub
+			// columns are frozen from then on. This inquiry kept its phone, so the
+			// inquiries_contact_phone_unless_anonymized check is not what stops
+			// clearing the marker.
 			const kept = idOf(
 				await insertRow(trx, "inquiries", newInquiry(a.id, clientA.id)),
 			);
@@ -295,6 +318,13 @@ test.group("inquiries table", (group) => {
 						updateRow(inner, "inquiries", kept, { anonymized_at: null }),
 					),
 				/inquiries_guard_update: anonymized_at cannot change/,
+			);
+			await assert.rejects(
+				() =>
+					withTransaction((inner) =>
+						updateRow(inner, "inquiries", kept, { idea: "[removed]" }),
+					),
+				/inquiries_guard_update: idea cannot change/,
 			);
 		});
 	});

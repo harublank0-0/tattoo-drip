@@ -18,7 +18,8 @@ export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
  * never edited or deleted, except that its decision (`status`,
  * `verifiedByUserId`, `verifiedAt`) is recorded once, `updatedAt` moves and
  * its proof can be cleared (privacy deletion). A decided payment (verified or
- * rejected) is final. A refund is a negative `refund` payment; a mistaken
+ * rejected) is final; its verifier becomes null only when that user's account
+ * is deleted. A refund is a negative `refund` payment; a mistaken
  * verification is reversed with a `correction`. Amounts are signed integer
  * paisa.
  */

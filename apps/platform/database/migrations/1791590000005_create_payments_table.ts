@@ -9,8 +9,9 @@ import {
  * The ledger of money received (TAT-37). Append-only: the guard trigger
  * rejects every DELETE and freezes every column except the decision
  * (`status`, `verified_by_user_id`, `verified_at`), `updated_at` and the
- * proof, which can only be cleared (TAT-42). A decided payment is final.
- * There is no `deleted_at`.
+ * proof, which can only be cleared (TAT-42). A decided payment is final; its
+ * verifier can only become null once that user's account is gone (the
+ * `ON DELETE SET NULL` action). There is no `deleted_at`.
  */
 export default class extends BaseSchema {
 	protected tableName = "payments";
@@ -102,7 +103,10 @@ begin
 		raise exception 'payments_guard: proof can only be cleared';
 	end if;
 	-- A decided payment is final. The one change allowed is the verifier
-	-- becoming null, which is what deleting the verifier's account does.
+	-- becoming null, and only once that user row is gone: ON DELETE SET NULL
+	-- runs after the delete, so the row is invisible to it, while an ordinary
+	-- UPDATE with the account still there would erase who decided. The table is
+	-- schema-qualified because the search_path is pinned.
 	if old.status <> 'submitted' then
 		if new.status is distinct from old.status then
 			raise exception 'payments_guard: status cannot change';
@@ -110,7 +114,9 @@ begin
 		if new.verified_at is distinct from old.verified_at then
 			raise exception 'payments_guard: verified_at cannot change';
 		end if;
-		if new.verified_by_user_id is distinct from old.verified_by_user_id and new.verified_by_user_id is not null then
+		if new.verified_by_user_id is distinct from old.verified_by_user_id
+			and (new.verified_by_user_id is not null
+				or exists (select 1 from public.users where id = old.verified_by_user_id)) then
 			raise exception 'payments_guard: verified_by_user_id cannot change';
 		end if;
 	end if;

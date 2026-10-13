@@ -307,6 +307,34 @@ test.group("payments table", (group) => {
 		});
 	});
 
+	// Clearing the verifier by hand is refused while the account exists: only
+	// the account's deletion (ON DELETE SET NULL) may do it.
+	for (const status of ["verified", "rejected"] as const) {
+		test(`the verifier of a ${status} payment cannot be cleared by hand while the account exists`, async ({
+			assert,
+		}) => {
+			const { a, mine, owner } = await twoTenants();
+
+			await withDbContext({ tenantId: a.id }, async (trx) => {
+				const id = idOf(
+					await insertRow(
+						trx,
+						"payments",
+						newPayment(a.id, mine.id, verified(owner.id, { status })),
+					),
+				);
+
+				await assert.rejects(
+					() =>
+						withTransaction((inner) =>
+							updateRow(inner, "payments", id, { verified_by_user_id: null }),
+						),
+					/payments_guard: verified_by_user_id cannot change/,
+				);
+			});
+		});
+	}
+
 	test("the proof can be cleared but never replaced", async ({ assert }) => {
 		const { a, mine } = await twoTenants();
 		const proof = {
@@ -371,6 +399,70 @@ test.group("payments table", (group) => {
 			assert.equal(rows[0].status, "verified");
 			assert.isNull(rows[0].verified_by_user_id);
 		});
+	});
+
+	test("deleting a user who decided payments in two studios clears the verifier on all of them", async ({
+		assert,
+	}) => {
+		const { a, b, mine, theirs } = await twoTenants();
+		const verifier = await User.create({
+			email: "verifier@example.com",
+			password: "secret-password",
+		});
+
+		const accepted = await withDbContext({ tenantId: a.id }, async (trx) =>
+			idOf(
+				await insertRow(
+					trx,
+					"payments",
+					newPayment(a.id, mine.id, verified(verifier.id)),
+				),
+			),
+		);
+		const turnedDown = await withDbContext({ tenantId: a.id }, async (trx) =>
+			idOf(
+				await insertRow(
+					trx,
+					"payments",
+					newPayment(
+						a.id,
+						mine.id,
+						verified(verifier.id, { status: "rejected" }),
+					),
+				),
+			),
+		);
+		const elsewhere = await withDbContext({ tenantId: b.id }, async (trx) =>
+			idOf(
+				await insertRow(
+					trx,
+					"payments",
+					newPayment(b.id, theirs.id, verified(verifier.id)),
+				),
+			),
+		);
+
+		await withDbContext({ tenantId: a.id }, (trx) =>
+			trx.rawQuery("delete from users where id = ?", [verifier.id]),
+		);
+
+		const decided = async (
+			tenant: { id: string },
+			id: string,
+			status: string,
+		) =>
+			withDbContext({ tenantId: tenant.id }, async (trx) => {
+				const { rows } = await trx.rawQuery(
+					"select status, verified_at, verified_by_user_id from payments where id = ?",
+					[id],
+				);
+				assert.equal(rows[0].status, status);
+				assert.isNotNull(rows[0].verified_at);
+				assert.isNull(rows[0].verified_by_user_id);
+			});
+		await decided(a, accepted, "verified");
+		await decided(a, turnedDown, "rejected");
+		await decided(b, elsewhere, "verified");
 	});
 
 	test("row-level security", async ({ assert }) => {
