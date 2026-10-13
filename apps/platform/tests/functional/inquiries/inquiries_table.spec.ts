@@ -329,6 +329,73 @@ test.group("inquiries table", (group) => {
 		});
 	});
 
+	test("a frozen column cannot change in the update that sets anonymized_at", async ({
+		assert,
+	}) => {
+		const { a, clientA } = await twoTenants();
+		const otherClient = await inTenant(a, () => makeClient(a));
+		const attempts: [string, Record<string, unknown>][] = [
+			["source_channel", { idea: "[removed]", source_channel: "google" }],
+			["client_id", { client_id: otherClient.id }],
+			["created_at", { created_at: new Date("2020-01-01") }],
+		];
+
+		await withDbContext({ tenantId: a.id }, async (trx) => {
+			const id = idOf(
+				await insertRow(trx, "inquiries", newInquiry(a.id, clientA.id)),
+			);
+
+			for (const [column, set] of attempts) {
+				await assert.rejects(
+					() =>
+						withTransaction((inner) =>
+							updateRow(inner, "inquiries", id, {
+								...set,
+								anonymized_at: new Date(),
+							}),
+						),
+					new RegExp(`inquiries_guard_update: ${column} cannot change`),
+				);
+			}
+		});
+	});
+
+	test("after anonymization the decision, deletion and updated_at are still free to change", async ({
+		assert,
+	}) => {
+		const { a, clientA } = await twoTenants();
+
+		await withDbContext({ tenantId: a.id }, async (trx) => {
+			const id = idOf(
+				await insertRow(trx, "inquiries", newInquiry(a.id, clientA.id)),
+			);
+			await updateRow(trx, "inquiries", id, { anonymized_at: new Date() });
+
+			// A decision after anonymization (TAT-46) and a tenant soft delete
+			// (which updates deleted_at on every live inquiry) must still work.
+			await updateRow(trx, "inquiries", id, {
+				status: "accepted",
+				decided_at: new Date(),
+			});
+			await updateRow(trx, "inquiries", id, {
+				status: "declined",
+				decided_at: new Date(),
+			});
+			await updateRow(trx, "inquiries", id, { updated_at: new Date() });
+			await updateRow(trx, "inquiries", id, { deleted_at: new Date() });
+			await updateRow(trx, "inquiries", id, { deleted_at: null });
+
+			const { rows } = await trx.rawQuery(
+				"select status, decided_at, deleted_at, anonymized_at from inquiries where id = ?",
+				[id],
+			);
+			assert.equal(rows[0].status, "declined");
+			assert.isNotNull(rows[0].decided_at);
+			assert.isNull(rows[0].deleted_at);
+			assert.isNotNull(rows[0].anonymized_at);
+		});
+	});
+
 	test("row-level security", async ({ assert }) => {
 		await assertRowLevelSecurity(
 			assert,

@@ -307,6 +307,76 @@ test.group("payments table", (group) => {
 		});
 	});
 
+	test("a decided payment can still be updated when the verifier is left alone", async ({
+		assert,
+	}) => {
+		const { a, mine, owner } = await twoTenants();
+		const proof = {
+			proof_image_key: "k.webp",
+			proof_image_width: 800,
+			proof_image_height: 600,
+		};
+
+		await withDbContext({ tenantId: a.id }, async (trx) => {
+			for (const status of ["verified", "rejected"]) {
+				const id = idOf(
+					await insertRow(
+						trx,
+						"payments",
+						newPayment(a.id, mine.id, verified(owner.id, { status, ...proof })),
+					),
+				);
+
+				await updateRow(trx, "payments", id, { updated_at: new Date() });
+				// Writing the verifier's own id back is no change.
+				await updateRow(trx, "payments", id, {
+					verified_by_user_id: owner.id,
+				});
+				// The privacy deletion's proof clear on a decided payment.
+				await updateRow(trx, "payments", id, {
+					proof_image_key: null,
+					proof_image_width: null,
+					proof_image_height: null,
+				});
+
+				const { rows } = await trx.rawQuery(
+					"select status, verified_by_user_id, proof_image_key from payments where id = ?",
+					[id],
+				);
+				assert.equal(rows[0].status, status);
+				assert.equal(rows[0].verified_by_user_id, owner.id);
+				assert.isNull(rows[0].proof_image_key);
+			}
+		});
+	});
+
+	test("a desk-decided payment cannot gain a verifier afterwards", async ({
+		assert,
+	}) => {
+		const { a, mine, owner } = await twoTenants();
+
+		await withDbContext({ tenantId: a.id }, async (trx) => {
+			const id = idOf(
+				await insertRow(
+					trx,
+					"payments",
+					newPayment(a.id, mine.id, {
+						status: "verified",
+						verified_at: new Date(),
+					}),
+				),
+			);
+
+			await assert.rejects(
+				() =>
+					withTransaction((inner) =>
+						updateRow(inner, "payments", id, { verified_by_user_id: owner.id }),
+					),
+				/payments_guard: verified_by_user_id cannot change/,
+			);
+		});
+	});
+
 	// Clearing the verifier by hand is refused while the account exists: only
 	// the account's deletion (ON DELETE SET NULL) may do it.
 	for (const status of ["verified", "rejected"] as const) {
