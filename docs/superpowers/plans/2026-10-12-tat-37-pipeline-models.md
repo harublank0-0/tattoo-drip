@@ -49,7 +49,7 @@ Failure modes the spec implies but that no obvious test reaches; each has a test
 2. Deleting a user whose account verified a decided payment still works and nulls `verified_by_user_id` (the trigger carve-out), and a decided payment's status cannot change (Task 6).
 3. A link through a nullable column is still checked when set and skipped when null: `preferred_artist_id`, `artist_id`, `inquiry_id`, `project_id` (Tasks 2 to 4).
 4. Anonymization: the contact snapshot and free-text fields are frozen until `anonymized_at` is set, may be scrubbed in that update, and `anonymized_at` never changes afterwards; several anonymized clients (null phones) can coexist in a tenant (Tasks 1 and 2).
-5. A soft-deleted client frees its phone for a returning client, and a soft-deleted inquiry frees its project slot; `Tenant.softDelete` leaves quotes and payments alone and never touches another tenant's rows (Tasks 1, 3 and 7).
+5. A soft-deleted client frees its phone for a returning client, and a soft-deleted project frees its inquiry for a new project; `Tenant.softDelete` leaves quotes and payments alone and never touches another tenant's rows (Tasks 1, 3 and 7).
 
 ---
 
@@ -3146,7 +3146,7 @@ Add next to the artists cascade test ("soft-deleting a tenant soft-deletes its a
 				await ReferenceImage.onlyTrashed().where("tenant_id", tenant.id),
 				1,
 			);
-			// No deleted_at on these: they stay, hidden with their project.
+			// No deleted_at on these, so they stay (and remain readable) after the cascade.
 			assert.lengthOf(await Quote.query().where("tenant_id", tenant.id), 1);
 			assert.lengthOf(await Payment.query().where("tenant_id", tenant.id), 1);
 		});
@@ -3217,7 +3217,7 @@ Add above the class:
 /**
  * Models that are soft-deleted with their tenant: each has `tenant_id` and
  * `deleted_at`. Quotes and payments have no `deleted_at` and are left alone;
- * they are hidden with their project.
+ * they stay readable by direct queries, so list them through a live project.
  */
 const CASCADE: LucidModel[] = [
 	TenantMembership,
