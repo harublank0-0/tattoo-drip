@@ -15,7 +15,7 @@ It is the data layer only. It has no routes, pages, services or API. TAT-51 (int
 |---|---|---|
 | Scope | Data layer only: tables, models, constraints, triggers, seeds, tests, docs. No services | The later tickets define their own rules; guessing their API shapes here is waste. Tests and seeds create rows through the models |
 | Payments append-only | A database trigger | The ticket and the data model say a payment is never edited or deleted. A buggy service or a manual query must not be able to rewrite the books |
-| Inquiry immutability | A database trigger, with a privacy exception: while `anonymized_at` is set (TAT-42), the contact snapshot and the free-text fields may be scrubbed | "Immutable record of what was submitted" should be true in the database too, without blocking the legal deletion path |
+| Inquiry immutability | A database trigger, with a privacy exception: the contact snapshot and the free-text fields may be scrubbed only in the one update that first sets `anonymized_at` (TAT-42), and are frozen again afterwards | "Immutable record of what was submitted" should be true in the database too, without blocking the legal deletion path |
 | A decided payment | Final: `status` can change only from `submitted` | Keeps the history honest and matches "never edited" |
 | Reversing a mistaken verification | A fifth payment kind, `correction` (a non-zero amount of either sign), plus a new payment if a different amount was received. `refund` means only money actually handed back | Payments can never be relabelled, so a reversal booked as a refund would inflate refund totals and the V1 "deposits collected" report forever |
 
@@ -70,7 +70,7 @@ All six have `id`, `tenant_id` (references `tenants`, cascade, indexed), `create
 - Indexes: `(tenant_id, status, created_at)` for the inbox, `(tenant_id, client_id)`, `(tenant_id, preferred_artist_id)`.
 - **Trigger `inquiries_guard_update`** (BEFORE UPDATE, `FOR EACH ROW`), allow-list:
   - Always free: `status`, `decided_at`, `deleted_at`, `updated_at`, and `anonymized_at` (which may go from null to a value once; once set it never changes).
-  - Free only when the new row has `anonymized_at` set: `contact_name`, `contact_phone`, `contact_email`, `idea`, `placement`, `approximate_size`, `preferred_dates`, `budget`. These are what TAT-42 scrubs; the free-text fields can hold personal data too.
+  - Free only in the one update that sets `anonymized_at` from null to a value (the scrub values themselves are not validated; that is TAT-42's design, and a later re-scrub needs the trigger disabled around it): `contact_name`, `contact_phone`, `contact_email`, `idea`, `placement`, `approximate_size`, `preferred_dates`, `budget`. These are what TAT-42 scrubs; the free-text fields can hold personal data too.
   - Everything else is frozen: `id`, `tenant_id`, `client_id`, `preferred_artist_id`, `source_channel`, `created_at`.
 
 ### `tattoo_projects` (module `projects`)
@@ -142,7 +142,7 @@ All six have `id`, `tenant_id` (references `tenants`, cascade, indexed), `create
 - **Trigger `payments_guard`** (BEFORE UPDATE OR DELETE, `FOR EACH ROW`), allow-list:
   - Rejects every DELETE (the function raises; returning null would silently skip the delete).
   - Free on UPDATE: `status`, `verified_by_user_id`, `verified_at`, `updated_at`, and the proof columns, which may only be cleared (all three to null, for TAT-42), never set to a new value. Everything else is frozen: `id`, `tenant_id`, `project_id`, `kind`, `amount`, `currency`, `method`, `created_at`.
-  - `status` may change only from `submitted`. On a decided payment `verified_at` cannot change and `verified_by_user_id` may only become null, so the `SET NULL` from deleting an account keeps working.
+  - `status` may change only from `submitted`. On a decided payment `verified_at` cannot change and `verified_by_user_id` may only become null, and only once the verifier's `users` row no longer exists, so the `SET NULL` from deleting an account keeps working but nobody can erase the attribution by hand.
 - **Correcting a submitted payment's amount** (TAT-65): the amount is frozen from the first insert, so if the customer paid a different amount than shown, staff reject the payment and record a new one; the new row may reuse the proof key. A proof file is therefore deleted only when no other payment references its key.
 - Balance due (the current quote's total minus verified payments) is computed elsewhere and is not part of this ticket.
 

@@ -23,7 +23,8 @@ The plan text above was corrected after the work to match what shipped; the diff
 2. **The inquiries guard names its trigger in its messages** (`inquiries_guard_update: <column> cannot change`), as the spec's convention says; the first version said `inquiries_guard:`.
 3. **`Tenant.softDelete` reads its cascade list through a function**, not a module constant: `tenant_membership.ts` imports `tenant.ts`, so a constant read while the module loads crashed whenever the membership model loaded first.
 4. **Each "cannot be hard-deleted" test leg is refused by a row that only that foreign key references**, and each new composite key's `NO ACTION` is proven by a temporary `CASCADE` mutation (a Task 3 review found a leg masked by a second key).
-5. Lucid leaves unset nullable columns `undefined` after `create()`, so tests that assert `isNull` on a fresh model `refresh()` it first.
+5. **The inquiry scrub is one-shot, and a decided payment's verifier can only be cleared once the account is gone** (found by the Codex security review): the scrub columns are free only in the update that first sets `anonymized_at`, and `verified_by_user_id` may become null only when no `public.users` row with that id exists. The guard functions also pin `search_path = pg_catalog, pg_temp`.
+6. Lucid leaves unset nullable columns `undefined` after `create()`, so tests that assert `isNull` on a fresh model `refresh()` it first.
 
 ## Global Constraints
 
@@ -1046,7 +1047,7 @@ begin
 	if old.anonymized_at is not null and new.anonymized_at is distinct from old.anonymized_at then
 		raise exception 'inquiries_guard_update: anonymized_at cannot change';
 	end if;
-	if new.anonymized_at is not null then
+	if old.anonymized_at is null and new.anonymized_at is not null then
 		free := free || scrub;
 	end if;
 	select n.key into changed
@@ -2998,7 +2999,9 @@ begin
 		if new.verified_at is distinct from old.verified_at then
 			raise exception 'payments_guard: verified_at cannot change';
 		end if;
-		if new.verified_by_user_id is distinct from old.verified_by_user_id and new.verified_by_user_id is not null then
+		if new.verified_by_user_id is distinct from old.verified_by_user_id
+				and (new.verified_by_user_id is not null
+					or exists (select 1 from public.users where id = old.verified_by_user_id)) then
 			raise exception 'payments_guard: verified_by_user_id cannot change';
 		end if;
 	end if;
