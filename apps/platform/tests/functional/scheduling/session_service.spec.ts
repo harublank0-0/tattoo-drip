@@ -4,6 +4,7 @@ import { test } from "@japa/runner";
 import { DateTime } from "luxon";
 import ArtistService from "#modules/artists/services/artist_service";
 import ImageService from "#modules/media/services/image_service";
+import DepositService from "#modules/payments/services/deposit_service";
 import TattooProject, {
 	PROJECT_STATUSES,
 	type ProjectStatus,
@@ -19,10 +20,29 @@ import SessionService, {
 	type NewSession,
 } from "#modules/scheduling/services/session_service";
 import { dbClient } from "#services/db_context";
-import { makeArtist, makeClient, makeProject } from "#tests/helpers/pipeline";
+import {
+	makeArtist,
+	makeClient,
+	makePayment,
+	makeProject,
+	makeQuote,
+	makeSession,
+} from "#tests/helpers/pipeline";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
-const sessions = new SessionService(new ArtistService(new ImageService()));
+const sessions = new SessionService(
+	new ArtistService(new ImageService()),
+	new DepositService(),
+);
+
+const statusOf = async (project: { id: string }) =>
+	(await TattooProject.findOrFail(project.id)).status;
+
+/** Decided as verified: the database wants a decision time with the status. */
+const verified = () => ({
+	status: "verified" as const,
+	verifiedAt: DateTime.utc(),
+});
 
 /** 2 November 2026 at `hour`:`minute` UTC. */
 const at = (hour: number, minute = 0) =>
@@ -435,6 +455,305 @@ test.group("SessionService reads and tenant scoping", (group) => {
 					/belongs to another tenant/,
 				);
 			});
+		});
+	});
+});
+
+test.group("SessionService project moves", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("a tattoo session books a deposit_pending project only when the deposit is settled", async ({
+		assert,
+	}) => {
+		const { tenant, client, sita } = await setup();
+		const cases = [
+			{
+				name: "no quote",
+				deposit: null,
+				paid: "none",
+				expected: "deposit_pending",
+			},
+			{ name: "a zero deposit", deposit: 0, paid: "none", expected: "booked" },
+			{
+				name: "an unpaid deposit",
+				deposit: 300_000,
+				paid: "none",
+				expected: "deposit_pending",
+			},
+			{
+				name: "a submitted payment",
+				deposit: 300_000,
+				paid: "submitted",
+				expected: "deposit_pending",
+			},
+			{
+				name: "a verified payment",
+				deposit: 300_000,
+				paid: "verified",
+				expected: "booked",
+			},
+		] as const;
+
+		await inTenant(tenant, async () => {
+			for (const [index, c] of cases.entries()) {
+				const project = await makeProject(tenant, client, {
+					status: "deposit_pending",
+				});
+				if (c.deposit !== null) {
+					await makeQuote(tenant, project, { depositAmount: c.deposit });
+				}
+				if (c.paid === "submitted") await makePayment(tenant, project);
+				if (c.paid === "verified") {
+					await makePayment(tenant, project, verified());
+				}
+
+				await sessions.schedule(
+					tenant,
+					project,
+					slot(sita, 8 + index, 9 + index),
+				);
+
+				assert.equal(await statusOf(project), c.expected, c.name);
+			}
+		});
+	});
+
+	test("a consultation or touch-up never moves the project; the next tattoo session re-books an in_progress one", async ({
+		assert,
+	}) => {
+		const { tenant, client, sita } = await setup();
+
+		await inTenant(tenant, async () => {
+			const settled = await makeProject(tenant, client, {
+				status: "deposit_pending",
+			});
+			await makeQuote(tenant, settled, { depositAmount: 0 });
+			await sessions.schedule(
+				tenant,
+				settled,
+				slot(sita, 8, 9, "consultation"),
+			);
+			await sessions.schedule(tenant, settled, slot(sita, 9, 10, "touch_up"));
+			assert.equal(await statusOf(settled), "deposit_pending");
+
+			const working = await makeProject(tenant, client, {
+				status: "in_progress",
+			});
+			await sessions.schedule(tenant, working, slot(sita, 10, 11, "touch_up"));
+			assert.equal(await statusOf(working), "in_progress");
+			await sessions.schedule(tenant, working, slot(sita, 11, 12));
+			assert.equal(await statusOf(working), "booked");
+		});
+	});
+
+	test("a session can hold the date while the deposit is unpaid; settleBooking books it once the deposit is verified, and only once", async ({
+		assert,
+	}) => {
+		const { tenant, client, sita } = await setup();
+
+		await inTenant(tenant, async () => {
+			const project = await makeProject(tenant, client, {
+				status: "deposit_pending",
+			});
+			await makeQuote(tenant, project);
+			await sessions.schedule(tenant, project, slot(sita, 10, 12));
+			assert.equal(await statusOf(project), "deposit_pending");
+			assert.isFalse(await sessions.settleBooking(tenant, project));
+
+			await makePayment(tenant, project, verified());
+			assert.isTrue(await sessions.settleBooking(tenant, project));
+			assert.equal(await statusOf(project), "booked");
+			assert.isFalse(await sessions.settleBooking(tenant, project));
+			assert.equal(await statusOf(project), "booked");
+		});
+	});
+
+	test("settleBooking needs a scheduled tattoo session and a deposit_pending project", async ({
+		assert,
+	}) => {
+		const { tenant, client, sita } = await setup();
+
+		await inTenant(tenant, async () => {
+			const project = await makeProject(tenant, client, {
+				status: "deposit_pending",
+			});
+			await makeQuote(tenant, project, { depositAmount: 0 });
+			assert.isFalse(await sessions.settleBooking(tenant, project), "none");
+
+			await makeSession(tenant, project, sita, {
+				kind: "consultation",
+				startsAt: at(8),
+				endsAt: at(9),
+			});
+			await makeSession(tenant, project, sita, {
+				kind: "touch_up",
+				startsAt: at(9),
+				endsAt: at(10),
+			});
+			await makeSession(tenant, project, sita, {
+				status: "cancelled",
+				startsAt: at(10),
+				endsAt: at(11),
+			});
+			await makeSession(tenant, project, sita, {
+				status: "completed",
+				startsAt: at(11),
+				endsAt: at(12),
+			});
+			assert.isFalse(
+				await sessions.settleBooking(tenant, project),
+				"consultation, touch-up, cancelled and completed sessions do not count",
+			);
+			assert.equal(await statusOf(project), "deposit_pending");
+
+			await makeSession(tenant, project, sita, {
+				startsAt: at(12),
+				endsAt: at(13),
+			});
+			assert.isTrue(await sessions.settleBooking(tenant, project));
+			assert.equal(await statusOf(project), "booked");
+
+			const reviewing = await makeProject(tenant, client, {
+				status: "reviewing",
+			});
+			await makeQuote(tenant, reviewing, { depositAmount: 0 });
+			await makeSession(tenant, reviewing, sita, {
+				startsAt: at(14),
+				endsAt: at(15),
+			});
+			assert.isFalse(await sessions.settleBooking(tenant, reviewing));
+			assert.equal(await statusOf(reviewing), "reviewing");
+		});
+	});
+
+	test("completing a tattoo session starts the work; nothing else moves a project", async ({
+		assert,
+	}) => {
+		const { tenant, client, sita } = await setup();
+		const cases = [
+			{
+				status: "booked",
+				kind: "tattoo",
+				action: "complete",
+				expected: "in_progress",
+			},
+			{
+				status: "booked",
+				kind: "consultation",
+				action: "complete",
+				expected: "booked",
+			},
+			{
+				status: "booked",
+				kind: "touch_up",
+				action: "complete",
+				expected: "booked",
+			},
+			{
+				status: "in_progress",
+				kind: "tattoo",
+				action: "complete",
+				expected: "in_progress",
+			},
+			{
+				status: "deposit_pending",
+				kind: "tattoo",
+				action: "complete",
+				expected: "deposit_pending",
+			},
+			{
+				status: "booked",
+				kind: "tattoo",
+				action: "markNoShow",
+				expected: "booked",
+			},
+			{
+				status: "booked",
+				kind: "tattoo",
+				action: "cancel",
+				expected: "booked",
+			},
+		] as const;
+
+		await inTenant(tenant, async () => {
+			for (const [index, c] of cases.entries()) {
+				const project = await makeProject(tenant, client, { status: c.status });
+				const session = await makeSession(tenant, project, sita, {
+					kind: c.kind,
+					startsAt: at(index * 2),
+					endsAt: at(index * 2 + 1),
+				});
+
+				await sessions[c.action](tenant, session);
+
+				assert.equal(
+					await statusOf(project),
+					c.expected,
+					`${c.status} + ${c.kind} ${c.action}`,
+				);
+			}
+		});
+	});
+
+	test("rescheduling changes no status, and cancelling the last session leaves the project booked", async ({
+		assert,
+	}) => {
+		const { tenant, project, sita } = await setup("booked");
+
+		await inTenant(tenant, async () => {
+			const session = await sessions.schedule(
+				tenant,
+				project,
+				slot(sita, 10, 12),
+			);
+			await sessions.reschedule(tenant, session, {
+				startsAt: at(14),
+				endsAt: at(16),
+			});
+			assert.equal(await statusOf(project), "booked");
+
+			await sessions.cancel(tenant, session);
+			assert.equal(await statusOf(project), "booked");
+			assert.isEmpty(
+				(await sessions.listForProject(tenant, project)).filter(
+					({ status }) => status === "scheduled",
+				),
+			);
+		});
+	});
+
+	test("completing a session twice does not push the project twice", async ({
+		assert,
+	}) => {
+		const { tenant, project, sita } = await setup("booked");
+
+		await inTenant(tenant, async () => {
+			const first = await sessions.schedule(tenant, project, slot(sita, 8, 9));
+			await sessions.complete(tenant, first);
+			assert.equal(await statusOf(project), "in_progress");
+
+			// The next session books it again.
+			await sessions.schedule(tenant, project, slot(sita, 10, 11));
+			assert.equal(await statusOf(project), "booked");
+
+			// A second click on the first session's button, with the stale copy.
+			assert.equal(
+				await ruleOf(() => sessions.complete(tenant, first)),
+				"not_scheduled",
+			);
+			assert.equal(await statusOf(project), "booked");
+		});
+	});
+
+	test("settleBooking refuses another tenant's project", async ({ assert }) => {
+		const { project } = await setup("deposit_pending");
+		const { tenant: other } = await studioWithOwner("studio-b", "Studio B");
+
+		await inTenant(other, async () => {
+			await assert.rejects(
+				() => sessions.settleBooking(other, project),
+				/belongs to another tenant/,
+			);
 		});
 	});
 });

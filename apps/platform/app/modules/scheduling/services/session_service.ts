@@ -3,6 +3,8 @@ import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
 import type { DateTime } from "luxon";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import DepositService from "#modules/payments/services/deposit_service";
 import TattooProject, {
 	type ProjectStatus,
 } from "#modules/projects/models/tattoo_project";
@@ -40,7 +42,10 @@ const CLOSED: ProjectStatus[] = ["declined", "cancelled"];
  */
 @inject()
 export default class SessionService {
-	constructor(private artists: ArtistService) {}
+	constructor(
+		private artists: ArtistService,
+		private deposits: DepositService,
+	) {}
 
 	/**
 	 * The tenant's live session with this id. An unknown id, a deleted
@@ -92,7 +97,7 @@ export default class SessionService {
 					live.artistId = artist.id;
 					await live.save();
 				}
-				return ProjectSession.create(
+				const session = await ProjectSession.create(
 					{
 						tenantId: tenant.id,
 						projectId: live.id,
@@ -106,6 +111,11 @@ export default class SessionService {
 					},
 					{ client: trx },
 				);
+				if (input.kind === "tattoo") {
+					if (live.status === "in_progress") await setStatus(live, "booked");
+					else await this.moveToBooked(tenant, live);
+				}
+				return session;
 			});
 		} catch (error) {
 			rethrowOverlap(error);
@@ -158,13 +168,68 @@ export default class SessionService {
 	): Promise<ProjectSession> {
 		assertSessionOf(tenant, session);
 		return withTransaction(async (trx) => {
-			await lockProject(trx, tenant, session.projectId);
+			const project = await lockProject(trx, tenant, session.projectId);
 			const live = await lockScheduled(trx, tenant, session.id);
 			live.status = to;
 			await live.save();
+			if (
+				to === "completed" &&
+				live.kind === "tattoo" &&
+				project.status === "booked"
+			) {
+				await setStatus(project, "in_progress");
+			}
 			return live;
 		});
 	}
+
+	/**
+	 * Moves a `deposit_pending` project to `booked` when it has a scheduled
+	 * tattoo session and its deposit is settled. Returns whether it moved.
+	 * `schedule` calls it; so does whatever verifies a deposit (TAT-65), so
+	 * the move happens at the later of the two events. Calling it again, or
+	 * for a project in another status, changes nothing.
+	 */
+	async settleBooking(
+		tenant: TenantRef,
+		project: TattooProject,
+	): Promise<boolean> {
+		assertProjectOf(tenant, project);
+		return withTransaction(async (trx) => {
+			const live = await lockProject(trx, tenant, project.id);
+			return this.moveToBooked(tenant, live);
+		});
+	}
+
+	/**
+	 * The `deposit_pending` to `booked` rule. The caller holds the project's
+	 * row lock and passes the live row.
+	 */
+	private async moveToBooked(
+		tenant: TenantRef,
+		project: TattooProject,
+	): Promise<boolean> {
+		if (project.status !== "deposit_pending") return false;
+		const tattoo = await ProjectSession.query()
+			.where("tenant_id", tenant.id)
+			.where("project_id", project.id)
+			.where("kind", "tattoo")
+			.where("status", "scheduled")
+			.first();
+		if (!tattoo) return false;
+		if (!(await this.deposits.isSettled(tenant, project))) return false;
+		await setStatus(project, "booked");
+		return true;
+	}
+}
+
+/**
+ * Changes a locked project's status. The row came from `lockProject`, so it
+ * saves in the same transaction.
+ */
+async function setStatus(project: TattooProject, status: ProjectStatus) {
+	project.status = status;
+	await project.save();
 }
 
 /**
