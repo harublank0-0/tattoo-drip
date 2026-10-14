@@ -9,6 +9,7 @@ import TattooProject, {
 	PROJECT_STATUSES,
 	type ProjectStatus,
 } from "#modules/projects/models/tattoo_project";
+import QuoteService from "#modules/projects/services/quote_service";
 import {
 	SessionOverlapError,
 	SessionRuleError,
@@ -32,7 +33,7 @@ import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
 const sessions = new SessionService(
 	new ArtistService(new ImageService()),
-	new DepositService(),
+	new DepositService(new QuoteService()),
 );
 
 const statusOf = async (project: { id: string }) =>

@@ -1,6 +1,8 @@
+import { inject } from "@adonisjs/core";
 import Payment from "#modules/payments/models/payment";
-import Quote from "#modules/projects/models/quote";
 import type TattooProject from "#modules/projects/models/tattoo_project";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import QuoteService from "#modules/projects/services/quote_service";
 import type Tenant from "#modules/tenancy/models/tenant";
 
 type TenantRef = Pick<Tenant, "id">;
@@ -15,12 +17,13 @@ const COUNTED_KINDS = ["deposit", "correction"];
 
 /**
  * Whether a project's deposit is covered. Read-only; TAT-65 (the deposit page
- * and proofs) will own this class and grow it.
- *
- * It reads the `Quote` model directly because there is no quote service yet:
- * TAT-64 adds one, and this should call it then.
+ * and proofs) will own this class and grow it. The current quote comes from
+ * QuoteService.
  */
+@inject()
 export default class DepositService {
+	constructor(private quotes: QuoteService) {}
+
 	/**
 	 * True when the project's current quote (its highest version) asks for no
 	 * deposit, or the verified deposits and corrections in the quote's currency
@@ -30,11 +33,7 @@ export default class DepositService {
 	 * payments, so there is no int8 `sum()` string to parse.
 	 */
 	async isSettled(tenant: TenantRef, project: ProjectRef): Promise<boolean> {
-		const quote = await Quote.query()
-			.where("tenant_id", tenant.id)
-			.where("project_id", project.id)
-			.orderBy("version", "desc")
-			.first();
+		const quote = await this.quotes.current(tenant, project);
 		if (!quote) return false;
 		if (quote.depositAmount === 0) return true;
 

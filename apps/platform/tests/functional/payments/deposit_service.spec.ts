@@ -2,6 +2,7 @@ import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
 import DepositService from "#modules/payments/services/deposit_service";
+import QuoteService from "#modules/projects/services/quote_service";
 import {
 	makeClient,
 	makePayment,
@@ -10,7 +11,7 @@ import {
 } from "#tests/helpers/pipeline";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
-const deposits = new DepositService();
+const deposits = new DepositService(new QuoteService());
 
 /** Decided as verified: the database wants a decision time with the status. */
 const verified = () => ({
