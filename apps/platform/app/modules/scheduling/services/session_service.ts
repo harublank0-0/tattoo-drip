@@ -103,14 +103,14 @@ export default class SessionService {
 						projectId: live.id,
 						artistId: artist.id,
 						kind: input.kind,
-						// Lucid does not read the column default back after an insert, so
-						// state it: the session we return must carry its status.
-						status: "scheduled",
 						startsAt: input.startsAt,
 						endsAt: input.endsAt,
 					},
 					{ client: trx },
 				);
+				// Lucid reads nothing back after an insert: load the column default
+				// and the generated `active`, so the session we return is true.
+				await session.refresh();
 				if (input.kind === "tattoo") {
 					if (live.status === "in_progress") await setStatus(live, "booked");
 					else await this.moveToBooked(tenant, live);
@@ -139,6 +139,9 @@ export default class SessionService {
 				const live = await lockScheduled(trx, tenant, session.id);
 				live.merge({ startsAt: times.startsAt, endsAt: times.endsAt });
 				await live.save();
+				// Lucid reads nothing back after an update either; `active` is the
+				// database's to compute.
+				await live.refresh();
 				return live;
 			});
 		} catch (error) {
@@ -172,6 +175,8 @@ export default class SessionService {
 			const live = await lockScheduled(trx, tenant, session.id);
 			live.status = to;
 			await live.save();
+			// The status change flips the generated `active`: read it back.
+			await live.refresh();
 			if (
 				to === "completed" &&
 				live.kind === "tattoo" &&

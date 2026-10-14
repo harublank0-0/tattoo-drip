@@ -397,6 +397,46 @@ test.group(
 	},
 );
 
+test.group("SessionService returned sessions", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("the sessions it returns carry the database's active flag", async ({
+		assert,
+	}) => {
+		const { tenant, project, sita } = await setup();
+
+		await inTenant(tenant, async () => {
+			const created = await sessions.schedule(
+				tenant,
+				project,
+				slot(sita, 8, 9),
+			);
+			assert.isTrue(created.active, "scheduled");
+
+			const moved = await sessions.reschedule(tenant, created, {
+				startsAt: at(8, 30),
+				endsAt: at(9, 30),
+			});
+			assert.isTrue(moved.active, "rescheduled");
+
+			const done = await sessions.complete(tenant, created);
+			assert.isTrue(done.active, "a completed session still blocks");
+
+			const missed = await sessions.markNoShow(
+				tenant,
+				await sessions.schedule(tenant, project, slot(sita, 10, 11)),
+			);
+			assert.isFalse(missed.active, "no-show");
+
+			const cancelled = await sessions.cancel(
+				tenant,
+				await sessions.schedule(tenant, project, slot(sita, 12, 13)),
+			);
+			assert.isFalse(cancelled.active, "cancelled");
+		});
+	});
+});
+
 test.group("SessionService reads and tenant scoping", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 
