@@ -7,6 +7,7 @@ import ReferenceImage from "#modules/inquiries/models/reference_image";
 import Payment from "#modules/payments/models/payment";
 import Quote from "#modules/projects/models/quote";
 import TattooProject from "#modules/projects/models/tattoo_project";
+import ProjectSession from "#modules/scheduling/models/project_session";
 
 type TenantRef = { id: string };
 
@@ -230,4 +231,31 @@ export async function seedPipeline(tenant: TenantRef) {
 	const quote = await makeQuote(tenant, project);
 	const payment = await makePayment(tenant, project);
 	return { client, inquiry, project, referenceImage, quote, payment };
+}
+
+type SessionOver = Partial<
+	Pick<ProjectSession, "kind" | "startsAt" | "endsAt" | "status">
+>;
+
+/**
+ * A scheduled tattoo session for `artist` in `project`, two hours long from
+ * 10:00 UTC on 2 November 2026. The database refuses two active sessions of
+ * one artist that overlap, so pass `startsAt` and `endsAt` for a second one.
+ */
+export function makeSession(
+	tenant: TenantRef,
+	project: TattooProject,
+	artist: Artist,
+	over: SessionOver = {},
+) {
+	return ProjectSession.create({
+		tenantId: tenant.id,
+		projectId: project.id,
+		artistId: artist.id,
+		kind: "tattoo",
+		startsAt: DateTime.utc(2026, 11, 2, 10),
+		endsAt: DateTime.utc(2026, 11, 2, 12),
+		status: "scheduled",
+		...over,
+	});
 }

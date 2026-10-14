@@ -12,12 +12,18 @@ import Payment from "#modules/payments/models/payment";
 import PaymentMethod from "#modules/payments/models/payment_method";
 import Quote from "#modules/projects/models/quote";
 import TattooProject from "#modules/projects/models/tattoo_project";
+import ProjectSession from "#modules/scheduling/models/project_session";
 import { LastOwnerError, SlugTakenError } from "#modules/tenancy/errors";
 import Tenant from "#modules/tenancy/models/tenant";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { dbClient, withDbContext, withTransaction } from "#services/db_context";
-import { makeClient, seedPipeline } from "#tests/helpers/pipeline";
+import {
+	makeArtist,
+	makeClient,
+	makeSession,
+	seedPipeline,
+} from "#tests/helpers/pipeline";
 import {
 	inTenant,
 	inTenantAs,
@@ -365,17 +371,21 @@ test.group("TenancyService.membershipFor", (group) => {
 		});
 	});
 
-	test("soft-deleting a tenant soft-deletes its clients, inquiries, projects and reference images, and leaves quotes, payments and other tenants alone", async ({
+	test("soft-deleting a tenant soft-deletes its clients, inquiries, projects, reference images and sessions, and leaves quotes, payments and other tenants alone", async ({
 		assert,
 	}) => {
 		const owner = await makeUser("owner@example.com");
 		const tenant = await tenancy.createTenant(owner, studio("black-needle"));
 		const rival = await makeUser("rival@example.com");
 		const other = await tenancy.createTenant(rival, studio("red-ink"));
-		await inTenant(other, () => seedPipeline(other));
+		await inTenant(other, async () => {
+			const seeded = await seedPipeline(other);
+			await makeSession(other, seeded.project, await makeArtist(other));
+		});
 
 		await inTenant(tenant, async () => {
-			await seedPipeline(tenant);
+			const seeded = await seedPipeline(tenant);
+			await makeSession(tenant, seeded.project, await makeArtist(tenant));
 			// A client removed earlier keeps its original deleted_at.
 			const removed = await makeClient(tenant);
 			await removed.softDelete();
@@ -414,6 +424,13 @@ test.group("TenancyService.membershipFor", (group) => {
 				await ReferenceImage.onlyTrashed().where("tenant_id", tenant.id),
 				1,
 			);
+			assert.isEmpty(
+				await ProjectSession.query().where("tenant_id", tenant.id),
+			);
+			assert.lengthOf(
+				await ProjectSession.onlyTrashed().where("tenant_id", tenant.id),
+				1,
+			);
 			// No deleted_at on these, so they stay (and remain readable) after the cascade.
 			assert.lengthOf(await Quote.query().where("tenant_id", tenant.id), 1);
 			assert.lengthOf(await Payment.query().where("tenant_id", tenant.id), 1);
@@ -428,6 +445,10 @@ test.group("TenancyService.membershipFor", (group) => {
 			);
 			assert.lengthOf(
 				await ReferenceImage.query().where("tenant_id", other.id),
+				1,
+			);
+			assert.lengthOf(
+				await ProjectSession.query().where("tenant_id", other.id),
 				1,
 			);
 		});

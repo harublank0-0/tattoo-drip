@@ -22,6 +22,7 @@ const EXPECTED_POLICIES: Record<string, string[]> = {
 	inquiries: ["tenant_isolation:ALL"],
 	payment_methods: ["tenant_isolation:ALL"],
 	payments: ["tenant_isolation:ALL"],
+	project_sessions: ["tenant_isolation:ALL"],
 	quotes: ["tenant_isolation:ALL"],
 	reference_images: ["tenant_isolation:ALL"],
 	tattoo_projects: ["tenant_isolation:ALL"],

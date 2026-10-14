@@ -1,5 +1,5 @@
 import { test } from "@japa/runner";
-import { isUniqueViolation } from "#services/db_errors";
+import { isExclusionViolation, isUniqueViolation } from "#services/db_errors";
 
 test.group("isUniqueViolation", () => {
 	test("matches a 23505 error for the named constraint", ({ assert }) => {
@@ -21,5 +21,30 @@ test.group("isUniqueViolation", () => {
 		);
 		assert.isFalse(isUniqueViolation(null, "mine"));
 		assert.isFalse(isUniqueViolation("23505", "mine"));
+	});
+});
+
+test.group("isExclusionViolation", () => {
+	test("matches a 23P01 error for the named constraint", ({ assert }) => {
+		const error = {
+			code: "23P01",
+			constraint: "project_sessions_artist_no_overlap",
+		};
+		assert.isTrue(
+			isExclusionViolation(error, "project_sessions_artist_no_overlap"),
+		);
+	});
+
+	test("does not match another constraint, another code or a non-error", ({
+		assert,
+	}) => {
+		assert.isFalse(
+			isExclusionViolation({ code: "23P01", constraint: "other" }, "mine"),
+		);
+		assert.isFalse(
+			isExclusionViolation({ code: "23505", constraint: "mine" }, "mine"),
+		);
+		assert.isFalse(isExclusionViolation(null, "mine"));
+		assert.isFalse(isExclusionViolation("23P01", "mine"));
 	});
 });

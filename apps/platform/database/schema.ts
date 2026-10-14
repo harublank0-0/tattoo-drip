@@ -253,6 +253,48 @@ export class PaymentSchema extends BaseModel {
 	declare verifiedByUserId: string | null;
 }
 
+export class ProjectSessionSchema extends BaseModel {
+	static $columns = [
+		"active",
+		"artistId",
+		"createdAt",
+		"deletedAt",
+		"endsAt",
+		"id",
+		"kind",
+		"projectId",
+		"startsAt",
+		"status",
+		"tenantId",
+		"updatedAt",
+	] as const;
+	$columns = ProjectSessionSchema.$columns;
+	@column()
+	declare active: boolean | null;
+	@column()
+	declare artistId: string;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.dateTime()
+	declare deletedAt: DateTime | null;
+	@column.dateTime()
+	declare endsAt: DateTime;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare kind: string;
+	@column()
+	declare projectId: string;
+	@column.dateTime()
+	declare startsAt: DateTime;
+	@column()
+	declare status: string;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
 export class QueueJobSchema extends BaseModel {
 	static $columns = [
 		"acquiredAt",
