@@ -109,6 +109,35 @@ test.group("DepositService.isSettled", (group) => {
 		});
 	});
 
+	test("only payments in the quote's currency count", async ({ assert }) => {
+		const { tenant } = await studioWithOwner();
+		const project = await projectIn(tenant);
+
+		await inTenant(tenant, async () => {
+			// A USD 100 deposit (10,000 cents); NPR 3,000 is 300,000 paisa, a bigger
+			// number that is not worth USD 100.
+			await makeQuote(tenant, project, {
+				currency: "USD",
+				depositAmount: 10_000,
+			});
+			await makePayment(tenant, project, verified());
+			assert.isFalse(
+				await deposits.isSettled(tenant, project),
+				"NPR paisa do not pay a USD quote",
+			);
+
+			await makePayment(tenant, project, {
+				amount: 10_000,
+				currency: "USD",
+				...verified(),
+			});
+			assert.isTrue(
+				await deposits.isSettled(tenant, project),
+				"a USD payment does",
+			);
+		});
+	});
+
 	test("the current quote is the highest version", async ({ assert }) => {
 		const { tenant } = await studioWithOwner();
 		const project = await projectIn(tenant);

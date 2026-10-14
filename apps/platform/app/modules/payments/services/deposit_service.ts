@@ -23,10 +23,11 @@ const COUNTED_KINDS = ["deposit", "correction"];
 export default class DepositService {
 	/**
 	 * True when the project's current quote (its highest version) asks for no
-	 * deposit, or the verified deposits and corrections reach the amount. A
-	 * project with no quote is not settled. Payments are summed here, not in
-	 * SQL: each amount is an int4 and a project has a handful of payments, so
-	 * there is no int8 `sum()` string to parse.
+	 * deposit, or the verified deposits and corrections in the quote's currency
+	 * reach the amount (another currency is not converted, so it does not
+	 * count). A project with no quote is not settled. Payments are summed here,
+	 * not in SQL: each amount is an int4 and a project has a handful of
+	 * payments, so there is no int8 `sum()` string to parse.
 	 */
 	async isSettled(tenant: TenantRef, project: ProjectRef): Promise<boolean> {
 		const quote = await Quote.query()
@@ -41,6 +42,7 @@ export default class DepositService {
 			.where("tenant_id", tenant.id)
 			.where("project_id", project.id)
 			.where("status", "verified")
+			.where("currency", quote.currency)
 			.whereIn("kind", COUNTED_KINDS);
 		const paid = payments.reduce((sum, { amount }) => sum + amount, 0);
 		return paid >= quote.depositAmount;
