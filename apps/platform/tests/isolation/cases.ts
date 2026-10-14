@@ -1,5 +1,7 @@
 import Artist from "#modules/artists/models/artist";
 import PaymentMethod from "#modules/payments/models/payment_method";
+import Quote from "#modules/projects/models/quote";
+import TattooProject from "#modules/projects/models/tattoo_project";
 import Tenant from "#modules/tenancy/models/tenant";
 import { inTenant, type Studio } from "#tests/helpers/tenants";
 
@@ -24,7 +26,7 @@ export type IsolationCase = {
 	 * The seeded resource (a key of Studio) that the route's :id refers to.
 	 * Required for a pattern with an :id; the helper throws without it.
 	 */
-	resource?: "paymentMethod" | "artistProfile";
+	resource?: "paymentMethod" | "artistProfile" | "project" | "quotedProject";
 	/** Who sends the request. Every settings route is owner-only. */
 	actor: "owner" | "artist";
 	/** A valid body for writes, built for the studio sending it. */
@@ -72,6 +74,19 @@ const artistRows = (target: Studio) =>
 				.orderBy("id")
 		).map((artist) => artist.serialize()),
 	);
+
+// Projects with their status, deleted ones included, and every quote.
+const projectRows = (target: Studio) =>
+	inTenant(target.tenant, async () => ({
+		projects: (
+			await TattooProject.withTrashed()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("id")
+		).map((project) => project.serialize()),
+		quotes: (
+			await Quote.query().where("tenant_id", target.tenant.id).orderBy("id")
+		).map((quote) => quote.serialize()),
+	}));
 
 const profileBody = (own: Studio) => ({
 	name: `${own.tenant.name} renamed`,
@@ -232,5 +247,13 @@ export const isolationCases: IsolationCase[] = [
 		actor: "owner",
 		ownStatus: 302,
 		snapshot: artistRows,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/projects/:id",
+		resource: "project",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: projectRows,
 	},
 ];

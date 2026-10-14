@@ -45,6 +45,9 @@ export interface ApiDefinition {
       update: typeof routes['tenant.artists.update']
       destroy: typeof routes['tenant.artists.destroy']
     }
+    projects: {
+      show: typeof routes['tenant.projects.show']
+    }
   }
   dashboard: typeof routes['dashboard']
   onboarding: {

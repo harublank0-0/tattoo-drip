@@ -307,6 +307,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['destroy']>>>
     }
   }
+  'tenant.projects.show': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/projects/:id'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/projects_controller').default['show']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/projects_controller').default['show']>>>
+    }
+  }
   'dashboard': {
     methods: ["GET","HEAD"]
     pattern: '/dashboard'
