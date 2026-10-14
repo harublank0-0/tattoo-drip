@@ -1,8 +1,18 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import type { Assert } from "@japa/assert";
 import { test } from "@japa/runner";
+import { DateTime } from "luxon";
+import ProjectSession, {
+	SESSION_KINDS,
+	SESSION_STATUSES,
+} from "#modules/scheduling/models/project_session";
 import { withDbContext, withTransaction } from "#services/db_context";
-import { makeArtist, makeClient, makeProject } from "#tests/helpers/pipeline";
+import {
+	makeArtist,
+	makeClient,
+	makeProject,
+	makeSession,
+} from "#tests/helpers/pipeline";
 import { assertRowLevelSecurity } from "#tests/helpers/rls";
 import { idOf, insertRow, updateRow } from "#tests/helpers/sql";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
@@ -330,6 +340,69 @@ test.group("project_sessions table", (group) => {
 				};
 			});
 			return newSession(tenant.id, project.id, sita.id, at(10), at(12));
+		});
+	});
+});
+
+test.group("ProjectSession model", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("keeps its columns and lists its allowed values", async ({ assert }) => {
+		const { tenant } = await studioWithOwner();
+		const { project, sita } = await parentsIn(tenant);
+
+		await inTenant(tenant, async () => {
+			const session = await makeSession(tenant, project, sita);
+			// Lucid leaves columns the database fills in undefined until reloaded.
+			await session.refresh();
+			assert.equal(session.tenantId, tenant.id);
+			assert.equal(session.projectId, project.id);
+			assert.equal(session.artistId, sita.id);
+			assert.equal(session.kind, "tattoo");
+			assert.equal(session.status, "scheduled");
+			assert.equal(
+				session.startsAt.toMillis(),
+				DateTime.utc(2026, 11, 2, 10).toMillis(),
+			);
+			assert.equal(
+				session.endsAt.toMillis(),
+				DateTime.utc(2026, 11, 2, 12).toMillis(),
+			);
+			assert.isTrue(session.active);
+			assert.isNull(session.deletedAt);
+		});
+		assert.deepEqual(
+			[...SESSION_KINDS],
+			["consultation", "tattoo", "touch_up"],
+		);
+		assert.deepEqual(
+			[...SESSION_STATUSES],
+			["scheduled", "completed", "no_show", "cancelled"],
+		);
+	});
+
+	test("a soft delete frees the artist's time and a restore needs it free", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+		const { project, sita } = await parentsIn(tenant);
+
+		await inTenant(tenant, async () => {
+			const first = await makeSession(tenant, project, sita);
+			await first.softDelete();
+
+			assert.isNull(await ProjectSession.find(first.id));
+			const trashed = await ProjectSession.withTrashed()
+				.where("id", first.id)
+				.firstOrFail();
+			assert.isFalse(trashed.active);
+
+			// The same time is free again.
+			await makeSession(tenant, project, sita);
+			await assert.rejects(
+				() => withTransaction((trx) => first.restore(trx)),
+				OVERLAP,
+			);
 		});
 	});
 });
