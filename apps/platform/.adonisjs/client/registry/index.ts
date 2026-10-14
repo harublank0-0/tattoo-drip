@@ -162,6 +162,18 @@ const routes = {
     tokens: [{"old":"/t/:tenant/projects/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/projects/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/projects/:id","type":0,"val":"projects","end":""},{"old":"/t/:tenant/projects/:id","type":1,"val":"id","end":""}],
     types: placeholder as Registry['tenant.projects.show']['types'],
   },
+  'tenant.projects.quotes.store': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/projects/:id/quotes',
+    tokens: [{"old":"/t/:tenant/projects/:id/quotes","type":0,"val":"t","end":""},{"old":"/t/:tenant/projects/:id/quotes","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/projects/:id/quotes","type":0,"val":"projects","end":""},{"old":"/t/:tenant/projects/:id/quotes","type":1,"val":"id","end":""},{"old":"/t/:tenant/projects/:id/quotes","type":0,"val":"quotes","end":""}],
+    types: placeholder as Registry['tenant.projects.quotes.store']['types'],
+  },
+  'tenant.projects.quotes.accept': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/projects/:id/quotes/accept',
+    tokens: [{"old":"/t/:tenant/projects/:id/quotes/accept","type":0,"val":"t","end":""},{"old":"/t/:tenant/projects/:id/quotes/accept","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/projects/:id/quotes/accept","type":0,"val":"projects","end":""},{"old":"/t/:tenant/projects/:id/quotes/accept","type":1,"val":"id","end":""},{"old":"/t/:tenant/projects/:id/quotes/accept","type":0,"val":"quotes","end":""},{"old":"/t/:tenant/projects/:id/quotes/accept","type":0,"val":"accept","end":""}],
+    types: placeholder as Registry['tenant.projects.quotes.accept']['types'],
+  },
   'dashboard': {
     methods: ["GET","HEAD"],
     pattern: '/dashboard',

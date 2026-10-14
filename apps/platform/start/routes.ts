@@ -125,6 +125,14 @@ router
 					.get(":id", [controllers.Projects, "show"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.projects.show");
+				router
+					.post(":id/quotes", [controllers.Quotes, "store"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.projects.quotes.store");
+				router
+					.post(":id/quotes/accept", [controllers.Quotes, "accept"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.projects.quotes.accept");
 			})
 			.prefix("/projects")
 			.use(middleware.role({ allow: ["owner", "artist"] }));

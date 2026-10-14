@@ -1,3 +1,4 @@
+import { DateTime } from "luxon";
 import Artist from "#modules/artists/models/artist";
 import PaymentMethod from "#modules/payments/models/payment_method";
 import Quote from "#modules/projects/models/quote";
@@ -254,6 +255,33 @@ export const isolationCases: IsolationCase[] = [
 		resource: "project",
 		actor: "owner",
 		ownStatus: 200,
+		snapshot: projectRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/projects/:id/quotes",
+		resource: "project",
+		actor: "owner",
+		body: () => ({
+			kind: "fixed",
+			fixedPrice: "20000",
+			depositAmount: "5000",
+			// The test studios' timezone.
+			expiresOn: DateTime.now()
+				.setZone("Asia/Kathmandu")
+				.plus({ days: 14 })
+				.toFormat("yyyy-MM-dd"),
+		}),
+		ownStatus: 302,
+		snapshot: projectRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/projects/:id/quotes/accept",
+		resource: "quotedProject",
+		actor: "owner",
+		body: (own) => ({ quoteId: own.quotedQuote.id }),
+		ownStatus: 302,
 		snapshot: projectRows,
 	},
 ];
