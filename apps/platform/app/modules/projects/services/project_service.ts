@@ -1,19 +1,26 @@
 import { inject } from "@adonisjs/core";
+import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import DepositService from "#modules/payments/services/deposit_service";
+import { QuoteRuleError } from "#modules/projects/errors";
+import ExpireQuoteJob from "#modules/projects/jobs/expire_quote_job";
+import type Quote from "#modules/projects/models/quote";
 import TattooProject, {
 	type ProjectStatus,
 } from "#modules/projects/models/tattoo_project";
-import { isExpired } from "#modules/projects/quotes";
+import { isExpired, QUOTABLE_STATUSES } from "#modules/projects/quotes";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
-import QuoteService from "#modules/projects/services/quote_service";
+import QuoteService, {
+	type NewQuote,
+} from "#modules/projects/services/quote_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import SessionService from "#modules/scheduling/services/session_service";
 import type Tenant from "#modules/tenancy/models/tenant";
 import type TenantMembership from "#modules/tenancy/models/tenant_membership";
 import { withTransaction } from "#services/db_context";
+import { dispatchInTransaction } from "#services/queue";
 
 type TenantRef = Pick<Tenant, "id">;
 
@@ -58,6 +65,41 @@ export default class ProjectService {
 			else query.whereRaw("false");
 		}
 		return query.firstOrFail();
+	}
+
+	/**
+	 * Issues the project's next quote version. There are no drafts: saving is
+	 * sending. Allowed while the project is `reviewing`, `quoted`, `on_hold`
+	 * or `deposit_pending` (else QuoteRuleError "project_closed"), and only
+	 * for a quote that has not expired yet ("expired"). The project becomes
+	 * `quoted`, so a revision after the client accepted must be accepted
+	 * again. Queues ExpireQuoteJob for the quote's expiry in the same
+	 * transaction, so a rolled-back save leaves no job.
+	 */
+	async issueQuote(
+		tenant: TenantRef,
+		project: TattooProject,
+		input: NewQuote,
+	): Promise<Quote> {
+		assertProjectOf(tenant, project);
+		if (isExpired(input)) throw new QuoteRuleError("expired");
+		return withTransaction(async (trx) => {
+			const live = await lockProject(trx, tenant, project.id);
+			if (!QUOTABLE_STATUSES.includes(live.status)) {
+				throw new QuoteRuleError("project_closed");
+			}
+			const quote = await this.quotes.create(trx, tenant, live, input);
+			await setStatus(live, "quoted");
+			await dispatchInTransaction(
+				ExpireQuoteJob.dispatch({
+					tenantId: tenant.id,
+					projectId: live.id,
+					quoteId: quote.id,
+				}).in(Math.max(0, quote.expiresAt.toMillis() - Date.now())),
+				trx,
+			);
+			return quote;
+		});
 	}
 
 	/**
@@ -121,4 +163,28 @@ export default class ProjectService {
 async function setStatus(project: TattooProject, status: ProjectStatus) {
 	project.status = status;
 	await project.save();
+}
+
+/**
+ * Locks the live project row. A deleted or other tenant's project is a 404.
+ */
+function lockProject(
+	trx: TransactionClientContract,
+	tenant: TenantRef,
+	id: string,
+) {
+	return TattooProject.query({ client: trx })
+		.where("tenant_id", tenant.id)
+		.where("id", id)
+		.forUpdate()
+		.firstOrFail();
+}
+
+/**
+ * A caller bug, not a user error: projects come from the tenant's own reads.
+ */
+function assertProjectOf(tenant: TenantRef, project: TattooProject) {
+	if (project.tenantId !== tenant.id) {
+		throw new Error(`Project ${project.id} belongs to another tenant`);
+	}
 }

@@ -1,16 +1,23 @@
 import { randomUUID } from "node:crypto";
 import testUtils from "@adonisjs/core/services/test_utils";
+import db from "@adonisjs/lucid/services/db";
+import queue from "@adonisjs/queue/services/main";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
 import ArtistService from "#modules/artists/services/artist_service";
 import ImageService from "#modules/media/services/image_service";
 import DepositService from "#modules/payments/services/deposit_service";
+import { QuoteRuleError } from "#modules/projects/errors";
+import ExpireQuoteJob from "#modules/projects/jobs/expire_quote_job";
 import TattooProject, {
 	type ProjectStatus,
 } from "#modules/projects/models/tattoo_project";
 import ProjectService from "#modules/projects/services/project_service";
-import QuoteService from "#modules/projects/services/quote_service";
+import QuoteService, {
+	type NewQuote,
+} from "#modules/projects/services/quote_service";
 import SessionService from "#modules/scheduling/services/session_service";
+import { withTransaction } from "#services/db_context";
 import {
 	makeArtist,
 	makeClient,
@@ -47,6 +54,27 @@ async function expiredQuote(
 	});
 	return { project, quote };
 }
+
+const fixed = (expiresAt = DateTime.utc().plus({ days: 14 })): NewQuote => ({
+	kind: "fixed",
+	fixedPrice: 1_500_000,
+	depositAmount: 300_000,
+	expiresAt,
+});
+
+/** The QuoteRuleError reason `work` throws, or null if it succeeds. */
+async function reasonOf(work: () => Promise<unknown>) {
+	try {
+		await work();
+		return null;
+	} catch (error) {
+		if (error instanceof QuoteRuleError) return error.reason;
+		throw error;
+	}
+}
+
+const queuedJobs = async () =>
+	Number((await db.from("queue_jobs").count("* as n"))[0].n);
 
 test.group("ProjectService.findFor", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
@@ -287,5 +315,139 @@ test.group("ProjectService.expireQuote", (group) => {
 				await projects.expireQuote(tenant, gone.project.id, gone.quote.id),
 			);
 		});
+	});
+});
+
+test.group("ProjectService.issueQuote", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+	group.each.teardown(() => queue.restore());
+
+	test("the first quote is version 1 and the project becomes quoted", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const project = await makeProject(tenant, await makeClient(tenant));
+			const quote = await projects.issueQuote(tenant, project, fixed());
+
+			assert.equal(quote.version, 1);
+			assert.equal(await statusOf(project), "quoted");
+		});
+	});
+
+	test("every quotable status takes a revision and becomes quoted", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			for (const status of [
+				"reviewing",
+				"quoted",
+				"on_hold",
+				"deposit_pending",
+			] as const) {
+				const project = await makeProject(tenant, await makeClient(tenant), {
+					status,
+				});
+				await makeQuote(tenant, project);
+				const quote = await projects.issueQuote(tenant, project, fixed());
+
+				assert.equal(quote.version, 2, status);
+				assert.equal(await statusOf(project), "quoted", status);
+			}
+		});
+	});
+
+	test("a project past deposit_pending cannot be quoted", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			for (const status of [
+				"booked",
+				"in_progress",
+				"completed",
+				"healing_check",
+				"declined",
+				"cancelled",
+			] as const) {
+				const project = await makeProject(tenant, await makeClient(tenant), {
+					status,
+				});
+				assert.equal(
+					await reasonOf(() => projects.issueQuote(tenant, project, fixed())),
+					"project_closed",
+					status,
+				);
+				assert.isNull(await quotes.current(tenant, project), status);
+				assert.equal(await statusOf(project), status);
+			}
+		});
+	});
+
+	test("a quote that is already expired is refused", async ({ assert }) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const project = await makeProject(tenant, await makeClient(tenant));
+			assert.equal(
+				await reasonOf(() =>
+					projects.issueQuote(
+						tenant,
+						project,
+						fixed(DateTime.utc().minus({ minutes: 1 })),
+					),
+				),
+				"expired",
+			);
+			assert.equal(await statusOf(project), "reviewing");
+		});
+	});
+
+	test("queues ExpireQuoteJob to run when the quote expires", async ({
+		assert,
+	}) => {
+		const fake = queue.fake();
+		const { tenant } = await studioWithOwner();
+
+		const quote = await inTenant(tenant, async () => {
+			const project = await makeProject(tenant, await makeClient(tenant));
+			return projects.issueQuote(tenant, project, fixed());
+		});
+
+		const expected = quote.expiresAt.toMillis() - Date.now();
+		fake.assertPushed(ExpireQuoteJob, {
+			payload: {
+				tenantId: tenant.id,
+				projectId: quote.projectId,
+				quoteId: quote.id,
+			},
+			delay: (delay) =>
+				delay !== undefined && Math.abs(delay - expected) < 60_000,
+		});
+		assert.isAbove(expected, 0);
+	});
+
+	test("a rolled-back save leaves no quote and no job", async ({ assert }) => {
+		const { tenant } = await studioWithOwner();
+		const before = await queuedJobs();
+
+		await inTenant(tenant, async () => {
+			const project = await makeProject(tenant, await makeClient(tenant));
+			await assert.rejects(
+				() =>
+					withTransaction(async () => {
+						await projects.issueQuote(tenant, project, fixed());
+						throw new Error("roll back");
+					}),
+				"roll back",
+			);
+			assert.isNull(await quotes.current(tenant, project));
+			assert.equal(await statusOf(project), "reviewing");
+		});
+		assert.equal(await queuedJobs(), before);
 	});
 });
