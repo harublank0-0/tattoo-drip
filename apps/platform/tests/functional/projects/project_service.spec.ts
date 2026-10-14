@@ -451,3 +451,123 @@ test.group("ProjectService.issueQuote", (group) => {
 		assert.equal(await queuedJobs(), before);
 	});
 });
+
+test.group("ProjectService.acceptQuote", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	/** A quoted project whose current quote is still valid. */
+	async function quoted(tenant: TenantRef, depositAmount = 300_000) {
+		const project = await makeProject(tenant, await makeClient(tenant), {
+			status: "quoted",
+		});
+		const quote = await makeQuote(tenant, project, { depositAmount });
+		return { project, quote };
+	}
+
+	test("moves a quoted project to deposit_pending", async ({ assert }) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const { project, quote } = await quoted(tenant);
+			assert.equal(
+				await projects.acceptQuote(tenant, project, quote.id),
+				"deposit_pending",
+			);
+			assert.equal(await statusOf(project), "deposit_pending");
+		});
+	});
+
+	test("books at once when the deposit is zero and a tattoo session is held", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const { project, quote } = await quoted(tenant, 0);
+			await makeSession(tenant, project, await makeArtist(tenant));
+
+			assert.equal(
+				await projects.acceptQuote(tenant, project, quote.id),
+				"booked",
+			);
+			assert.equal(await statusOf(project), "booked");
+		});
+	});
+
+	test("waits for a session even when the deposit is already paid", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const { project, quote } = await quoted(tenant);
+			await makePayment(tenant, project, {
+				status: "verified",
+				verifiedAt: DateTime.utc(),
+			});
+			assert.equal(
+				await projects.acceptQuote(tenant, project, quote.id),
+				"deposit_pending",
+			);
+		});
+	});
+
+	test("only a quoted project accepts", async ({ assert }) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			for (const status of [
+				"reviewing",
+				"on_hold",
+				"deposit_pending",
+			] as const) {
+				const project = await makeProject(tenant, await makeClient(tenant), {
+					status,
+				});
+				const quote = await makeQuote(tenant, project);
+				assert.equal(
+					await reasonOf(() => projects.acceptQuote(tenant, project, quote.id)),
+					"not_quoted",
+					status,
+				);
+				assert.equal(await statusOf(project), status);
+			}
+		});
+	});
+
+	test("refuses a quote that was revised since the page loaded", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const { project, quote: shown } = await quoted(tenant);
+			await makeQuote(tenant, project, { version: 2 });
+
+			assert.equal(
+				await reasonOf(() => projects.acceptQuote(tenant, project, shown.id)),
+				"quote_changed",
+			);
+			assert.equal(
+				await reasonOf(() =>
+					projects.acceptQuote(tenant, project, randomUUID()),
+				),
+				"quote_changed",
+			);
+			assert.equal(await statusOf(project), "quoted");
+		});
+	});
+
+	test("refuses an expired quote", async ({ assert }) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const { project, quote } = await expiredQuote(tenant, "quoted");
+			assert.equal(
+				await reasonOf(() => projects.acceptQuote(tenant, project, quote.id)),
+				"expired",
+			);
+			assert.equal(await statusOf(project), "quoted");
+		});
+	});
+});

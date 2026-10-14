@@ -103,6 +103,36 @@ export default class ProjectService {
 	}
 
 	/**
+	 * The client accepted the quote they were shown (`quoteId`): the project
+	 * moves from `quoted` to `deposit_pending`, then settleBooking books it at
+	 * once if the deposit is already settled (or zero) and a tattoo session
+	 * is scheduled. QuoteRuleError "not_quoted" outside `quoted`,
+	 * "quote_changed" when `quoteId` is no longer the current quote (revised
+	 * since the page loaded), "expired" once its expiry has passed. Returns
+	 * the project's new status.
+	 */
+	async acceptQuote(
+		tenant: TenantRef,
+		project: TattooProject,
+		quoteId: string,
+	): Promise<ProjectStatus> {
+		assertProjectOf(tenant, project);
+		return withTransaction(async (trx) => {
+			const live = await lockProject(trx, tenant, project.id);
+			if (live.status !== "quoted") throw new QuoteRuleError("not_quoted");
+			const quote = await this.quotes.current(tenant, live);
+			if (!quote || quote.id !== quoteId) {
+				throw new QuoteRuleError("quote_changed");
+			}
+			if (isExpired(quote)) throw new QuoteRuleError("expired");
+
+			await setStatus(live, "deposit_pending");
+			const booked = await this.sessions.settleBooking(tenant, live);
+			return booked ? "booked" : "deposit_pending";
+		});
+	}
+
+	/**
 	 * What ExpireQuoteJob does once a quote's expiry passes. Cancels the
 	 * project if `quoteId` is still its current quote, that quote has
 	 * expired, and the client never accepted it (`quoted`, `on_hold`) or
