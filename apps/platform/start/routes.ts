@@ -136,6 +136,22 @@ router
 					.post(":id/quotes/accept", [controllers.Quotes, "accept"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.projects.quotes.accept");
+				router
+					.post(":id/moves", [controllers.ProjectChanges, "move"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.projects.moves.store");
+				router
+					.put(":id/notes", [controllers.ProjectChanges, "notes"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.projects.notes.update");
+				router
+					.post(":id/contacted", [controllers.ProjectChanges, "contacted"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.projects.contacted.store");
+				router
+					.put(":id/artist", [controllers.ProjectChanges, "artist"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.projects.artist.update");
 			})
 			.prefix("/projects")
 			.use(middleware.role({ allow: ["owner", "artist"] }));
