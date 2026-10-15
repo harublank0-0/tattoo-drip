@@ -74,6 +74,24 @@ export default class SessionService {
 	}
 
 	/**
+	 * The ids among `projectIds` that have a `scheduled` tattoo session: the
+	 * projects board flags a booked project that has none.
+	 */
+	async projectsWithScheduledTattoo(
+		tenant: TenantRef,
+		projectIds: string[],
+	): Promise<Set<string>> {
+		if (projectIds.length === 0) return new Set();
+		const rows = await ProjectSession.query()
+			.where("tenant_id", tenant.id)
+			.whereIn("project_id", projectIds)
+			.where("kind", "tattoo")
+			.where("status", "scheduled")
+			.select("project_id");
+		return new Set(rows.map(({ projectId }) => projectId));
+	}
+
+	/**
 	 * Adds a `scheduled` session. A declined or cancelled project refuses
 	 * (SessionRuleError "project_closed"); a project without an artist gets
 	 * this session's artist. Throws SessionOverlapError when the artist is
