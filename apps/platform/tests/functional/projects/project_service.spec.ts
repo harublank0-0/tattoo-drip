@@ -788,3 +788,115 @@ test.group("ProjectService.move", (group) => {
 		});
 	});
 });
+
+test.group("ProjectService artist, notes and contact", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	const reload = (project: TattooProject) =>
+		TattooProject.findOrFail(project.id);
+
+	test("an owner assigns and unassigns an artist; sessions keep theirs", async ({
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+		const member = { userId: owner.id, role: "owner" as const };
+
+		await inTenant(tenant, async () => {
+			const asha = await makeArtist(tenant, "asha");
+			const ram = await makeArtist(tenant, "ram");
+			const project = await makeProject(tenant, await makeClient(tenant), {
+				artistId: asha.id,
+			});
+			const session = await makeSession(tenant, project, asha);
+
+			await projects.assignArtist(tenant, member, project, ram.id);
+			assert.equal((await reload(project)).artistId, ram.id);
+			await session.refresh();
+			assert.equal(session.artistId, asha.id);
+
+			await projects.assignArtist(tenant, member, project, null);
+			assert.isNull((await reload(project)).artistId);
+		});
+	});
+
+	test("an artist member can't assign artists", async ({ assert }) => {
+		const { tenant } = await studioWithOwner();
+		const user = await artistIn(tenant, "asha@example.com");
+
+		await inTenant(tenant, async () => {
+			const mine = await makeArtist(tenant, "asha");
+			mine.userId = user.id;
+			await mine.save();
+			const project = await makeProject(tenant, await makeClient(tenant), {
+				artistId: mine.id,
+			});
+
+			await assert.rejects(
+				() =>
+					projects.assignArtist(
+						tenant,
+						{ userId: user.id, role: "artist" },
+						project,
+						null,
+					),
+				/Row not found/,
+			);
+			assert.equal((await reload(project)).artistId, mine.id);
+		});
+	});
+
+	test("an unknown, deleted or other tenant's artist can't be assigned", async ({
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner("studio-a", "Studio A");
+		const { tenant: other } = await studioWithOwner("studio-b", "Studio B");
+		const member = { userId: owner.id, role: "owner" as const };
+		const theirs = await inTenant(other, () => makeArtist(other, "theirs"));
+
+		await inTenant(tenant, async () => {
+			const gone = await makeArtist(tenant, "gone");
+			await gone.softDelete();
+			const project = await makeProject(tenant, await makeClient(tenant));
+
+			for (const artistId of [randomUUID(), gone.id, theirs.id]) {
+				await assert.rejects(
+					() => projects.assignArtist(tenant, member, project, artistId),
+					/Row not found/,
+				);
+			}
+			assert.isNull((await reload(project)).artistId);
+		});
+	});
+
+	test("notes are trimmed, and empty notes clear", async ({ assert }) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const project = await makeProject(tenant, await makeClient(tenant));
+
+			await projects.updateNotes(tenant, project, "  Prefers mornings.  ");
+			assert.equal((await reload(project)).notes, "Prefers mornings.");
+
+			await projects.updateNotes(tenant, project, "   ");
+			assert.isNull((await reload(project)).notes);
+
+			await projects.updateNotes(tenant, project, "Again");
+			await projects.updateNotes(tenant, project, null);
+			assert.isNull((await reload(project)).notes);
+		});
+	});
+
+	test("markContacted records the time", async ({ assert }) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const project = await makeProject(tenant, await makeClient(tenant));
+			const before = DateTime.now().minus({ seconds: 1 });
+
+			await projects.markContacted(tenant, project);
+			const at = (await reload(project)).lastContactedAt;
+			assert.isNotNull(at);
+			assert.isTrue((at as DateTime) >= before);
+		});
+	});
+});

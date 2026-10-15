@@ -1,5 +1,7 @@
 import { inject } from "@adonisjs/core";
+import { errors as lucidErrors } from "@adonisjs/lucid";
 import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
+import { DateTime } from "luxon";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -201,6 +203,63 @@ export default class ProjectService {
 			}
 			await setStatus(live, rule.to);
 			return rule.to;
+		});
+	}
+
+	/**
+	 * Assigns the project's artist, or none (`artistId` null). Owners only:
+	 * anyone else gets E_ROW_NOT_FOUND (a 404, like another artist's
+	 * project). The artist must be one of the tenant's live profiles
+	 * (ArtistService.findFor, a 404 otherwise). The project's sessions keep
+	 * their own artist.
+	 */
+	async assignArtist(
+		tenant: TenantRef,
+		member: Member,
+		project: TattooProject,
+		artistId: string | null,
+	): Promise<void> {
+		assertProjectOf(tenant, project);
+		if (member.role !== "owner") {
+			throw new lucidErrors.E_ROW_NOT_FOUND(TattooProject);
+		}
+		const artist =
+			artistId === null ? null : await this.artists.findFor(tenant, artistId);
+		await withTransaction(async (trx) => {
+			const live = await lockProject(trx, tenant, project.id);
+			live.artistId = artist?.id ?? null;
+			await live.save();
+		});
+	}
+
+	/** Replaces the project's notes; blank notes clear them. */
+	async updateNotes(
+		tenant: TenantRef,
+		project: TattooProject,
+		notes: string | null,
+	): Promise<void> {
+		assertProjectOf(tenant, project);
+		const text = notes?.trim() || null;
+		await withTransaction(async (trx) => {
+			const live = await lockProject(trx, tenant, project.id);
+			live.notes = text;
+			await live.save();
+		});
+	}
+
+	/**
+	 * Records that the client was contacted now: the chat links call it as
+	 * they open, and staff tap "Mark contacted" after a call or a visit.
+	 */
+	async markContacted(
+		tenant: TenantRef,
+		project: TattooProject,
+	): Promise<void> {
+		assertProjectOf(tenant, project);
+		await withTransaction(async (trx) => {
+			const live = await lockProject(trx, tenant, project.id);
+			live.lastContactedAt = DateTime.now();
+			await live.save();
 		});
 	}
 
