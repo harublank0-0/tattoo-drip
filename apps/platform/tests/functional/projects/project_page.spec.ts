@@ -7,6 +7,7 @@ import {
 	makeClient,
 	makeProject,
 	makeQuote,
+	makeSession,
 } from "#tests/helpers/pipeline";
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
@@ -197,5 +198,83 @@ test.group("Project page", (group) => {
 
 		const other = await client.get(page(project.id)).withInertia().loginAs(ram);
 		other.assertStatus(404);
+	});
+});
+
+test.group("Project page: lifecycle props", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("an owner gets the moves, notes, contact text and artist choices", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const { project, asha } = await inTenant(tenant, async () => {
+			const asha = await makeArtist(tenant, "asha");
+			await makeArtist(tenant, "bina");
+			const project = await makeProject(tenant, await makeClient(tenant), {
+				status: "quoted",
+				artistId: asha.id,
+				notes: "Prefers mornings.",
+				lastContactedAt: DateTime.now().minus({ days: 1 }),
+			});
+			await makeSession(tenant, project, asha, { kind: "consultation" });
+			return { project, asha };
+		});
+
+		const props = (
+			await client.get(page(project.id)).withInertia().loginAs(owner)
+		).inertiaProps;
+
+		assert.deepEqual(props.moves, ["hold", "withdraw"]);
+		assert.equal(props.scheduledSessionCount, 1);
+		assert.isFalse(props.bookedWithoutSession);
+		assert.equal(props.notes, "Prefers mornings.");
+		assert.equal(props.contactedText, "contacted yesterday");
+		assert.equal(props.assignment.artistId, asha.id);
+		assert.lengthOf(props.assignment.choices, 2);
+		assert.deepInclude(props.assignment.choices, { id: asha.id, name: "Sita" });
+	});
+
+	test("a booked project without a tattoo session carries the warning", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const project = await inTenant(tenant, async () =>
+			makeProject(tenant, await makeClient(tenant), { status: "booked" }),
+		);
+
+		const props = (
+			await client.get(page(project.id)).withInertia().loginAs(owner)
+		).inertiaProps;
+
+		assert.isTrue(props.bookedWithoutSession);
+		assert.deepEqual(props.moves, []);
+		assert.equal(props.contactedText, "never contacted");
+	});
+
+	test("an artist sees the moves but gets no artist choices", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+		const asha = await artistIn(tenant, "asha@example.com");
+		const project = await inTenant(tenant, async () => {
+			const profile = await makeArtist(tenant, "asha");
+			profile.userId = asha.id;
+			await profile.save();
+			return makeProject(tenant, await makeClient(tenant), {
+				status: "reviewing",
+				artistId: profile.id,
+			});
+		});
+
+		const props = (
+			await client.get(page(project.id)).withInertia().loginAs(asha)
+		).inertiaProps;
+
+		assert.deepEqual(props.moves, ["decline", "withdraw"]);
+		assert.isNull(props.assignment);
 	});
 });

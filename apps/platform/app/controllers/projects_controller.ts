@@ -10,6 +10,7 @@ import { contactedText } from "#modules/projects/contact";
 import type Quote from "#modules/projects/models/quote";
 import {
 	ACTIVE_STATUSES,
+	allowedMoves,
 	CLOSED_STATUSES,
 	toProjectFilter,
 } from "#modules/projects/moves";
@@ -108,11 +109,13 @@ export default class ProjectsController {
 			ctx.params.id,
 		);
 		const client = await this.clients.find(tenant, project.clientId);
+		const artists = await this.artists.list(tenant);
 		const artist = project.artistId
-			? (await this.artists.list(tenant)).find(
-					({ id }) => id === project.artistId,
-				)
+			? artists.find(({ id }) => id === project.artistId)
 			: undefined;
+		const scheduled = (
+			await this.sessions.listForProject(tenant, project)
+		).filter(({ status }) => status === "scheduled");
 		const versions = await this.quotes.history(tenant, project);
 		const current = versions.at(0) ?? null;
 		const live = current && !isExpired(current) ? current : null;
@@ -143,6 +146,20 @@ export default class ProjectsController {
 				minDate: today.toFormat("yyyy-MM-dd"),
 				maxDate: today.plus({ years: 1 }).toFormat("yyyy-MM-dd"),
 			},
+			moves: allowedMoves(project.status),
+			scheduledSessionCount: scheduled.length,
+			bookedWithoutSession:
+				project.status === "booked" &&
+				!scheduled.some(({ kind }) => kind === "tattoo"),
+			notes: project.notes,
+			contactedText: contactedText(project.lastContactedAt, timezone),
+			assignment:
+				membership.role === "owner"
+					? {
+							artistId: project.artistId,
+							choices: artists.map(({ id, name }) => ({ id, name })),
+						}
+					: null,
 		});
 	}
 }

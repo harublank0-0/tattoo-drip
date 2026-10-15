@@ -20,6 +20,16 @@ export type QuoteProps = {
 	depositAmount: number;
 };
 
+export type ManualMoveName = "hold" | "resume" | "decline" | "withdraw";
+
+/** What each move's button says. */
+export const MOVE_LABELS: Record<ManualMoveName, string> = {
+	hold: "Put on hold",
+	resume: "Resume",
+	decline: "Decline",
+	withdraw: "Client withdrew",
+};
+
 export type ProjectPageProps = {
 	project: {
 		id: string;
@@ -42,6 +52,19 @@ export type ProjectPageProps = {
 		minDate: string;
 		maxDate: string;
 	};
+	/** The manual moves this project can make now, in table order. */
+	moves: ManualMoveName[];
+	/** How many sessions a withdrawal would cancel. */
+	scheduledSessionCount: number;
+	/** Booked, but no tattoo session is scheduled. */
+	bookedWithoutSession: boolean;
+	notes: string | null;
+	contactedText: string;
+	/** Owners only: the project's artist and the studio's artists. */
+	assignment: {
+		artistId: string | null;
+		choices: { id: string; name: string }[];
+	} | null;
 };
 
 export const STATUS_LABELS: Record<string, string> = {
