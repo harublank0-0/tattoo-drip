@@ -1105,3 +1105,123 @@ test.group("ProjectService.list and countByStatus", (group) => {
 		});
 	});
 });
+
+test.group("ProjectService.move: sessions and deposits", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("a decline cancels the scheduled sessions and keeps the others", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const project = await makeProject(tenant, await makeClient(tenant), {
+				status: "reviewing",
+			});
+			const artist = await makeArtist(tenant);
+			const consult = await makeSession(tenant, project, artist, {
+				kind: "consultation",
+			});
+			const done = await makeSession(tenant, project, artist, {
+				kind: "consultation",
+				status: "completed",
+				startsAt: DateTime.utc(2026, 10, 1, 10),
+				endsAt: DateTime.utc(2026, 10, 1, 11),
+			});
+
+			assert.equal(await projects.move(tenant, project, "decline"), "declined");
+			await consult.refresh();
+			await done.refresh();
+			assert.equal(consult.status, "cancelled");
+			assert.equal(done.status, "completed");
+		});
+	});
+
+	test("a withdrawal is refused while any verified deposit money is held", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const client = await makeClient(tenant);
+			// Fully paid with no session yet; paid, then revised back to quoted
+			// or on hold; and only partly paid: all hold the client's money.
+			for (const [status, paid] of [
+				["deposit_pending", 300_000],
+				["quoted", 300_000],
+				["on_hold", 300_000],
+				["deposit_pending", 100_000],
+			] as const) {
+				const project = await makeProject(tenant, client, { status });
+				await makeQuote(tenant, project);
+				await makePayment(tenant, project, {
+					amount: paid,
+					status: "verified",
+					verifiedAt: DateTime.utc(),
+				});
+				const label = `${status}, ${paid} paid`;
+				assert.equal(
+					await refusalOf(() => projects.move(tenant, project, "withdraw")),
+					"deposit_paid",
+					label,
+				);
+				assert.equal(await statusOf(project), status, label);
+			}
+		});
+	});
+
+	test("a withdrawal still works when no deposit money is held", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const client = await makeClient(tenant);
+			const unpaid = await makeProject(tenant, client, {
+				status: "deposit_pending",
+			});
+			await makeQuote(tenant, unpaid);
+			const submitted = await makeProject(tenant, client, {
+				status: "deposit_pending",
+			});
+			await makeQuote(tenant, submitted);
+			// Proof uploaded but not verified yet: no money is held.
+			await makePayment(tenant, submitted, { status: "submitted" });
+			const zero = await makeProject(tenant, client, { status: "quoted" });
+			await makeQuote(tenant, zero, { depositAmount: 0 });
+
+			for (const project of [unpaid, submitted, zero]) {
+				assert.equal(
+					await projects.move(tenant, project, "withdraw"),
+					"cancelled",
+				);
+			}
+		});
+	});
+
+	test("a reversed payment no longer holds money", async ({ assert }) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const project = await makeProject(tenant, await makeClient(tenant), {
+				status: "deposit_pending",
+			});
+			await makeQuote(tenant, project);
+			await makePayment(tenant, project, {
+				status: "verified",
+				verifiedAt: DateTime.utc(),
+			});
+			await makePayment(tenant, project, {
+				kind: "correction",
+				amount: -300_000,
+				status: "verified",
+				verifiedAt: DateTime.utc(),
+			});
+
+			assert.equal(
+				await projects.move(tenant, project, "withdraw"),
+				"cancelled",
+			);
+		});
+	});
+});

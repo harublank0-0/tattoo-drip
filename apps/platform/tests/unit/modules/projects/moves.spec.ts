@@ -20,7 +20,7 @@ test.group("Manual moves", () => {
 		assert.deepEqual(MANUAL_MOVES, {
 			hold: { from: ["quoted"], to: "on_hold", cancelsSessions: false },
 			resume: { from: ["on_hold"], to: "quoted", cancelsSessions: false },
-			decline: { from: ["reviewing"], to: "declined", cancelsSessions: false },
+			decline: { from: ["reviewing"], to: "declined", cancelsSessions: true },
 			withdraw: {
 				from: ["reviewing", "quoted", "on_hold", "deposit_pending"],
 				to: "cancelled",

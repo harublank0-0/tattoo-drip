@@ -239,8 +239,12 @@ export default class ProjectService {
 	 * A manual move (TAT-46): hold, resume, decline or the client withdrew.
 	 * The project's live status must be one the moves table allows, else
 	 * ProjectRuleError "move_not_allowed" (a stale page, or another tab got
-	 * there first). A withdrawal cancels the project's scheduled sessions
-	 * first, so the artist's time is free. Returns the new status.
+	 * there first). A client withdrawing is refused as "deposit_paid" while
+	 * the project holds verified deposit money: closing it would hide the
+	 * client's money, and recording what happens to it (kept, moved,
+	 * refunded) is TAT-66's. Declining and withdrawing cancel the project's
+	 * scheduled sessions first, so the artist's time is free. Returns the new
+	 * status.
 	 */
 	async move(
 		tenant: TenantRef,
@@ -254,12 +258,32 @@ export default class ProjectService {
 			if (!rule.from.includes(live.status)) {
 				throw new ProjectRuleError("move_not_allowed");
 			}
+			if (move === "withdraw" && (await this.depositHeld(tenant, live))) {
+				throw new ProjectRuleError("deposit_paid");
+			}
 			if (rule.cancelsSessions) {
 				await this.cancelScheduledSessions(tenant, live);
 			}
 			await setStatus(live, rule.to);
 			return rule.to;
 		});
+	}
+
+	/**
+	 * Whether the project holds verified deposit money: the current quote's
+	 * deposit payments, net of reversals, are above zero in the quote's
+	 * currency. A project with no quote holds none. The projects page uses
+	 * it to hide the withdraw move; `move` enforces it.
+	 */
+	async depositHeld(
+		tenant: TenantRef,
+		project: Pick<TattooProject, "id">,
+	): Promise<boolean> {
+		const quote = await this.quotes.current(tenant, project);
+		if (!quote) return false;
+		return (
+			(await this.deposits.verifiedPaid(tenant, project, quote.currency)) > 0
+		);
 	}
 
 	/**

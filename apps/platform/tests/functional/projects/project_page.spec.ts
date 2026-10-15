@@ -5,6 +5,7 @@ import { expiresAtFor, todayIn } from "#modules/projects/quotes";
 import {
 	makeArtist,
 	makeClient,
+	makePayment,
 	makeProject,
 	makeQuote,
 	makeSession,
@@ -276,5 +277,72 @@ test.group("Project page: lifecycle props", (group) => {
 
 		assert.deepEqual(props.moves, ["decline", "withdraw"]);
 		assert.isNull(props.assignment);
+	});
+});
+
+test.group("Project page: message and withdraw guards", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	/** A project in `status` with a live quote, for a client with a phone. */
+	async function withLiveQuote(
+		tenant: { id: string },
+		status: "quoted" | "on_hold" | "deposit_pending" | "cancelled",
+	) {
+		return inTenant(tenant, async () => {
+			const project = await makeProject(tenant, await makeClient(tenant), {
+				status,
+			});
+			await makeQuote(tenant, project);
+			return project;
+		});
+	}
+
+	test("only a quoted or on-hold project offers the quote message", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const offered = async (
+			status: "quoted" | "on_hold" | "deposit_pending" | "cancelled",
+		) => {
+			const project = await withLiveQuote(tenant, status);
+			const props = (
+				await client.get(page(project.id)).withInertia().loginAs(owner)
+			).inertiaProps;
+			return props.message !== null;
+		};
+
+		assert.isTrue(await offered("quoted"));
+		assert.isTrue(await offered("on_hold"));
+		// Accepted, or withdrawn with the quote still valid: nothing to resend.
+		assert.isFalse(await offered("deposit_pending"));
+		assert.isFalse(await offered("cancelled"));
+	});
+
+	test("withdrawing is hidden and flagged while deposit money is held", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const paid = await withLiveQuote(tenant, "deposit_pending");
+		await inTenant(tenant, () =>
+			makePayment(tenant, paid, {
+				status: "verified",
+				verifiedAt: DateTime.utc(),
+			}),
+		);
+		const unpaid = await withLiveQuote(tenant, "deposit_pending");
+
+		const heldProps = (
+			await client.get(page(paid.id)).withInertia().loginAs(owner)
+		).inertiaProps;
+		assert.deepEqual(heldProps.moves, []);
+		assert.isTrue(heldProps.withdrawBlocked);
+
+		const freeProps = (
+			await client.get(page(unpaid.id)).withInertia().loginAs(owner)
+		).inertiaProps;
+		assert.deepEqual(freeProps.moves, ["withdraw"]);
+		assert.isFalse(freeProps.withdrawBlocked);
 	});
 });

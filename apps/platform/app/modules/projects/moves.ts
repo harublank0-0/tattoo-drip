@@ -26,13 +26,15 @@ export type MoveRule = {
 /**
  * The manual moves, from the project rules in docs/requirements.md:
  * quoted ⇄ on_hold, reviewing → declined, and a client withdrawing before
- * booking. Withdrawing after booking waits for TAT-66, which records what
- * happens to the deposit.
+ * booking. Declining and withdrawing cancel the scheduled sessions, so the
+ * artist's time is free. Withdrawing after booking, or while the project
+ * holds deposit money, waits for TAT-66, which records what happens to the
+ * deposit (ProjectService.move refuses it as `deposit_paid`).
  */
 export const MANUAL_MOVES: Record<ManualMove, MoveRule> = {
 	hold: { from: ["quoted"], to: "on_hold", cancelsSessions: false },
 	resume: { from: ["on_hold"], to: "quoted", cancelsSessions: false },
-	decline: { from: ["reviewing"], to: "declined", cancelsSessions: false },
+	decline: { from: ["reviewing"], to: "declined", cancelsSessions: true },
 	withdraw: {
 		from: ["reviewing", "quoted", "on_hold", "deposit_pending"],
 		to: "cancelled",

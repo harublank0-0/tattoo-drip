@@ -62,6 +62,7 @@ export default function ProjectShow({
 	message,
 	form,
 	moves,
+	withdrawBlocked,
 	scheduledSessionCount,
 	bookedWithoutSession,
 	notes,
@@ -105,6 +106,13 @@ export default function ProjectShow({
 								moves={moves}
 								scheduledSessionCount={scheduledSessionCount}
 							/>
+						)}
+						{withdrawBlocked && (
+							<p className="text-sm text-muted-foreground">
+								The client&apos;s deposit is held, so this project can&apos;t be
+								closed as withdrawn yet: recording what happens to a deposit
+								(kept, moved or refunded) comes with payments.
+							</p>
 						)}
 						{assignment && (
 							<ArtistField projectId={project.id} assignment={assignment} />
@@ -491,7 +499,10 @@ function ContactLine({ text, onMark }: { text: string; onMark: () => void }) {
 
 /** Moves that close a project ask first. */
 const CONFIRM: Partial<Record<ManualMoveName, (sessions: number) => string>> = {
-	decline: () => "Decline this project? It moves to Closed.",
+	decline: (sessions) =>
+		sessions > 0
+			? `Decline this project? It moves to Closed and cancels ${sessions} scheduled session${sessions === 1 ? "" : "s"}.`
+			: "Decline this project? It moves to Closed.",
 	withdraw: (sessions) =>
 		sessions > 0
 			? `Mark that the client withdrew? This cancels the project and ${sessions} scheduled session${sessions === 1 ? "" : "s"}.`

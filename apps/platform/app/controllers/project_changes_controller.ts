@@ -1,7 +1,10 @@
 import { inject } from "@adonisjs/core";
 import type { HttpContext } from "@adonisjs/core/http";
 import { tenantContext } from "#middleware/tenant_middleware";
-import { ProjectRuleError } from "#modules/projects/errors";
+import {
+	ProjectRuleError,
+	type ProjectRuleReason,
+} from "#modules/projects/errors";
 import type TattooProject from "#modules/projects/models/tattoo_project";
 import type { ManualMove } from "#modules/projects/moves";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -18,6 +21,14 @@ const MOVE_DONE: Record<ManualMove, string> = {
 	resume: "Back to quoted.",
 	decline: "Project declined.",
 	withdraw: "Client withdrew: project cancelled.",
+};
+
+/** What a refused move tells the user. */
+const RULE_MESSAGES: Record<ProjectRuleReason, string> = {
+	move_not_allowed:
+		"This project can't make that change in its current status.",
+	deposit_paid:
+		"The client's deposit is held, so this project can't be closed here yet. Recording what happens to a deposit comes with payments.",
 };
 
 /**
@@ -43,10 +54,7 @@ export default class ProjectChangesController {
 			ctx.session.flash("success", MOVE_DONE[move]);
 		} catch (error) {
 			if (!(error instanceof ProjectRuleError)) throw error;
-			ctx.session.flash(
-				"error",
-				"This project can't make that change in its current status.",
-			);
+			ctx.session.flash("error", RULE_MESSAGES[error.reason]);
 		}
 		return backTo(ctx, tenant, project);
 	}

@@ -116,6 +116,7 @@ export default class ProjectsController {
 		const scheduled = (
 			await this.sessions.listForProject(tenant, project)
 		).filter(({ status }) => status === "scheduled");
+		const depositHeld = await this.projects.depositHeld(tenant, project);
 		const versions = await this.quotes.history(tenant, project);
 		const current = versions.at(0) ?? null;
 		const live = current && !isExpired(current) ? current : null;
@@ -134,8 +135,12 @@ export default class ProjectsController {
 			history: versions.slice(1).map((quote) => quoteProps(quote, timezone)),
 			canQuote: QUOTABLE_STATUSES.includes(project.status),
 			canAccept: project.status === "quoted" && live !== null,
+			// Only while the client's answer is awaited: not after acceptance, and
+			// not for a project that was declined or withdrawn.
 			message:
-				live && client?.phone
+				live &&
+				client?.phone &&
+				(project.status === "quoted" || project.status === "on_hold")
 					? messageProps(live, client.name, client.phone, tenant.name, timezone)
 					: null,
 			form: {
@@ -146,7 +151,13 @@ export default class ProjectsController {
 				minDate: today.toFormat("yyyy-MM-dd"),
 				maxDate: today.plus({ years: 1 }).toFormat("yyyy-MM-dd"),
 			},
-			moves: allowedMoves(project.status),
+			// Withdrawing is hidden while the project holds deposit money (the
+			// server refuses it too); the page says why.
+			moves: allowedMoves(project.status).filter(
+				(move) => !(move === "withdraw" && depositHeld),
+			),
+			withdrawBlocked:
+				depositHeld && allowedMoves(project.status).includes("withdraw"),
 			scheduledSessionCount: scheduled.length,
 			bookedWithoutSession:
 				project.status === "booked" &&

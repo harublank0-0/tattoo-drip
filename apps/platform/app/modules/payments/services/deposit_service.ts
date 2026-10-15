@@ -37,13 +37,27 @@ export default class DepositService {
 		if (!quote) return false;
 		if (quote.depositAmount === 0) return true;
 
+		const paid = await this.verifiedPaid(tenant, project, quote.currency);
+		return paid >= quote.depositAmount;
+	}
+
+	/**
+	 * The deposit money the project holds in `currency`, in minor units: its
+	 * verified deposit and correction payments, summed (a reversal subtracts).
+	 * Unverified payments and other kinds don't count. Summed here, not in
+	 * SQL, for the same reason as isSettled.
+	 */
+	async verifiedPaid(
+		tenant: TenantRef,
+		project: ProjectRef,
+		currency: string,
+	): Promise<number> {
 		const payments = await Payment.query()
 			.where("tenant_id", tenant.id)
 			.where("project_id", project.id)
 			.where("status", "verified")
-			.where("currency", quote.currency)
+			.where("currency", currency)
 			.whereIn("kind", COUNTED_KINDS);
-		const paid = payments.reduce((sum, { amount }) => sum + amount, 0);
-		return paid >= quote.depositAmount;
+		return payments.reduce((sum, { amount }) => sum + amount, 0);
 	}
 }
