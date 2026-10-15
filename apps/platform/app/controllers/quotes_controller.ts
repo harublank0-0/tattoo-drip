@@ -38,7 +38,12 @@ export default class QuotesController {
 		const input = toQuoteInput(form, tenant.timezone);
 
 		await flashRuleErrors(ctx, async () => {
-			const quote = await this.projects.issueQuote(tenant, project, input);
+			const quote = await this.projects.issueQuote(
+				tenant,
+				project,
+				input,
+				form.baseQuoteId ?? null,
+			);
 			ctx.session.flash(
 				"success",
 				quote.version === 1

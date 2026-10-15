@@ -89,11 +89,12 @@ test.group("Issuing a quote", (group) => {
 	}) => {
 		const { owner, tenant } = await studioWithOwner();
 		const project = await projectIn(tenant, "deposit_pending");
-		await inTenant(tenant, () => makeQuote(tenant, project));
+		const shown = await inTenant(tenant, () => makeQuote(tenant, project));
 
 		const response = await client
 			.post(quotesUrl(project.id))
 			.form({
+				baseQuoteId: shown.id,
 				kind: "hourly",
 				hourlyRate: "3000",
 				estimatedHours: "4.5",
@@ -114,6 +115,33 @@ test.group("Issuing a quote", (group) => {
 			depositAmount: 0,
 		});
 		assert.equal((await reload(tenant, project)).status, "quoted");
+	});
+
+	test("a form that showed an older version is refused and stores nothing", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const project = await projectIn(tenant, "quoted");
+		const shown = await inTenant(tenant, async () => {
+			const shown = await makeQuote(tenant, project);
+			await makeQuote(tenant, project, { version: 2 });
+			return shown;
+		});
+
+		const response = await client
+			.post(quotesUrl(project.id))
+			.form(fixedForm({ baseQuoteId: shown.id }))
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		response.assertHeader("location", pageUrl(project.id));
+		response.assertFlashMessage(
+			"error",
+			"The quote changed: check the new version.",
+		);
+		assert.lengthOf(await versions(tenant, project), 2);
 	});
 
 	test("bad input comes back as field errors and stores nothing", async ({
@@ -305,7 +333,7 @@ test.group("Quotes and artists", (group) => {
 
 		const own = await client
 			.post(quotesUrl(project.id))
-			.form(fixedForm())
+			.form(fixedForm({ baseQuoteId: quote.id }))
 			.withCsrfToken()
 			.loginAs(asha)
 			.redirects(0);

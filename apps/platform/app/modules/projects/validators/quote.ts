@@ -9,9 +9,12 @@ import type { NewQuote } from "#modules/projects/services/quote_service";
  * The quote form's shape, in the form's units: whole rupees, hours and the
  * last valid day (yyyy-MM-dd, the studio's local date). Empty fields arrive
  * as null. What depends on the kind, the total or the studio's timezone is
- * checked by toQuoteInput.
+ * checked by toQuoteInput. `baseQuoteId` is the quote the form was showing
+ * (null for a first quote): ProjectService.issueQuote refuses the save when
+ * it is no longer the current one.
  */
 export const quoteValidator = vine.create({
+	baseQuoteId: vine.string().uuid().nullable().optional(),
 	kind: vine.enum(QUOTE_KINDS),
 	fixedPrice: vine
 		.number()

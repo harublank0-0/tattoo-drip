@@ -272,6 +272,9 @@ function QuoteForm({
 		>
 			{({ errors, processing }) => (
 				<FieldGroup>
+					{/* The quote this form was built from: the server refuses the save
+					    if someone revised it meanwhile. Empty for a first quote. */}
+					<input type="hidden" name="baseQuoteId" value={quote?.id ?? ""} />
 					<FieldSet data-invalid={!!errors.kind}>
 						<FieldLegend variant="label">Pricing</FieldLegend>
 						<RadioGroup

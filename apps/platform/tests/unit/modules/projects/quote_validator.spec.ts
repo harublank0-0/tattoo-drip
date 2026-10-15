@@ -68,6 +68,32 @@ test.group("quoteValidator", () => {
 		);
 	});
 
+	test("takes the quote the form showed, or none for a first quote", async ({
+		assert,
+	}) => {
+		const shown = "0192f7a0-6c3e-7a5b-8c1d-2e4f60718293";
+		assert.deepEqual(
+			await problems(() =>
+				quoteValidator.validate(body({ baseQuoteId: shown })),
+			),
+			{},
+		);
+		assert.deepEqual(
+			await problems(() =>
+				quoteValidator.validate(body({ baseQuoteId: null })),
+			),
+			{},
+		);
+		assert.deepEqual(
+			Object.keys(
+				await problems(() =>
+					quoteValidator.validate(body({ baseQuoteId: "not-an-id" })),
+				),
+			),
+			["baseQuoteId"],
+		);
+	});
+
 	test("rejects separators, decimals and out-of-range rupees", async ({
 		assert,
 	}) => {

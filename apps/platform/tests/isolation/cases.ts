@@ -262,7 +262,9 @@ export const isolationCases: IsolationCase[] = [
 		pattern: "/t/:tenant/projects/:id/quotes",
 		resource: "project",
 		actor: "owner",
-		body: () => ({
+		body: (own) => ({
+			// The pipeline's project already has this quote.
+			baseQuoteId: own.pipeline.quote.id,
 			kind: "fixed",
 			fixedPrice: "20000",
 			depositAmount: "5000",

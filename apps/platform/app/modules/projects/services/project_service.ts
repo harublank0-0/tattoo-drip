@@ -71,15 +71,20 @@ export default class ProjectService {
 	 * Issues the project's next quote version. There are no drafts: saving is
 	 * sending. Allowed while the project is `reviewing`, `quoted`, `on_hold`
 	 * or `deposit_pending` (else QuoteRuleError "project_closed"), and only
-	 * for a quote that has not expired yet ("expired"). The project becomes
-	 * `quoted`, so a revision after the client accepted must be accepted
-	 * again. Queues ExpireQuoteJob for the quote's expiry in the same
-	 * transaction, so a rolled-back save leaves no job.
+	 * for a quote that has not expired yet ("expired", checked again once the
+	 * lock is held: waiting for it can outlast the expiry). `baseQuoteId` is
+	 * the quote the form was showing (null when it showed none): when the
+	 * project's current quote is a different one, someone else revised first
+	 * and saving this form would resurrect stale terms ("quote_changed"). The
+	 * project becomes `quoted`, so a revision after the client accepted must
+	 * be accepted again. Queues ExpireQuoteJob for the quote's expiry in the
+	 * same transaction, so a rolled-back save leaves no job.
 	 */
 	async issueQuote(
 		tenant: TenantRef,
 		project: TattooProject,
 		input: NewQuote,
+		baseQuoteId: string | null,
 	): Promise<Quote> {
 		assertProjectOf(tenant, project);
 		if (isExpired(input)) throw new QuoteRuleError("expired");
@@ -88,6 +93,11 @@ export default class ProjectService {
 			if (!QUOTABLE_STATUSES.includes(live.status)) {
 				throw new QuoteRuleError("project_closed");
 			}
+			const current = await this.quotes.current(tenant, live);
+			if ((current?.id ?? null) !== baseQuoteId) {
+				throw new QuoteRuleError("quote_changed");
+			}
+			if (isExpired(input)) throw new QuoteRuleError("expired");
 			const quote = await this.quotes.create(trx, tenant, live, input);
 			await setStatus(live, "quoted");
 			await dispatchInTransaction(
@@ -137,10 +147,12 @@ export default class ProjectService {
 	 * project if `quoteId` is still its current quote, that quote has
 	 * expired, and the client never accepted it (`quoted`, `on_hold`) or
 	 * accepted but never paid (`deposit_pending` with the deposit not
-	 * settled). The project's scheduled sessions are cancelled first, so the
-	 * artist's time is free. Anything else, a missing or deleted project
-	 * included, changes nothing: the job is safe to repeat, and the jobs of
-	 * revised quotes do nothing. Returns whether it cancelled.
+	 * settled). A deposit that was paid is never cancelled by expiry, not
+	 * even on a `quoted` project that was revised after the client paid. The
+	 * project's scheduled sessions are cancelled first, so the artist's time
+	 * is free. Anything else, a missing or deleted project included, changes
+	 * nothing: the job is safe to repeat, and the jobs of revised quotes do
+	 * nothing. Returns whether it cancelled.
 	 */
 	async expireQuote(
 		tenant: TenantRef,
@@ -156,7 +168,7 @@ export default class ProjectService {
 			if (!project) return false;
 			const quote = await this.quotes.current(tenant, project);
 			if (!quote || quote.id !== quoteId || !isExpired(quote)) return false;
-			if (!(await this.expiryCancels(tenant, project))) return false;
+			if (!(await this.expiryCancels(tenant, project, quote))) return false;
 
 			for (const session of await this.sessions.listForProject(
 				tenant,
@@ -171,13 +183,23 @@ export default class ProjectService {
 		});
 	}
 
-	/** Whether an expired quote cancels a project in its current status. */
+	/**
+	 * Whether the expired `quote` cancels a project in its current status. A
+	 * `quoted` or `on_hold` project is cancelled unless its (non-zero)
+	 * deposit was paid: it can hold a payment when staff revised the quote
+	 * after the client paid. A zero deposit is "settled" by definition, so it
+	 * doesn't spare a quote nobody accepted.
+	 */
 	private async expiryCancels(
 		tenant: TenantRef,
 		project: TattooProject,
+		quote: Quote,
 	): Promise<boolean> {
 		if (project.status === "quoted" || project.status === "on_hold") {
-			return true;
+			return (
+				quote.depositAmount === 0 ||
+				!(await this.deposits.isSettled(tenant, project))
+			);
 		}
 		if (project.status === "deposit_pending") {
 			return !(await this.deposits.isSettled(tenant, project));

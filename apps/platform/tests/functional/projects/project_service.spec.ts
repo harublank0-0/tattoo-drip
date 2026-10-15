@@ -3,7 +3,7 @@ import testUtils from "@adonisjs/core/services/test_utils";
 import db from "@adonisjs/lucid/services/db";
 import queue from "@adonisjs/queue/services/main";
 import { test } from "@japa/runner";
-import { DateTime } from "luxon";
+import { DateTime, Settings } from "luxon";
 import ArtistService from "#modules/artists/services/artist_service";
 import ImageService from "#modules/media/services/image_service";
 import DepositService from "#modules/payments/services/deposit_service";
@@ -214,6 +214,40 @@ test.group("ProjectService.expireQuote", (group) => {
 		});
 	});
 
+	test("spares a quoted or on-hold project whose deposit was already paid", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			for (const status of ["quoted", "on_hold"] as const) {
+				// Paid, then revised: the project went back from deposit_pending.
+				const { project, quote } = await expiredQuote(tenant, status);
+				await makePayment(tenant, project, {
+					status: "verified",
+					verifiedAt: DateTime.utc(),
+				});
+				assert.isFalse(
+					await projects.expireQuote(tenant, project.id, quote.id),
+					status,
+				);
+				assert.equal(await statusOf(project), status, status);
+			}
+		});
+	});
+
+	test("still cancels a quoted project with a zero deposit that nobody accepted", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const { project, quote } = await expiredQuote(tenant, "quoted", 0);
+			assert.isTrue(await projects.expireQuote(tenant, project.id, quote.id));
+			assert.equal(await statusOf(project), "cancelled");
+		});
+	});
+
 	test("leaves every other status alone", async ({ assert }) => {
 		const { tenant } = await studioWithOwner();
 
@@ -329,7 +363,7 @@ test.group("ProjectService.issueQuote", (group) => {
 
 		await inTenant(tenant, async () => {
 			const project = await makeProject(tenant, await makeClient(tenant));
-			const quote = await projects.issueQuote(tenant, project, fixed());
+			const quote = await projects.issueQuote(tenant, project, fixed(), null);
 
 			assert.equal(quote.version, 1);
 			assert.equal(await statusOf(project), "quoted");
@@ -351,8 +385,13 @@ test.group("ProjectService.issueQuote", (group) => {
 				const project = await makeProject(tenant, await makeClient(tenant), {
 					status,
 				});
-				await makeQuote(tenant, project);
-				const quote = await projects.issueQuote(tenant, project, fixed());
+				const shown = await makeQuote(tenant, project);
+				const quote = await projects.issueQuote(
+					tenant,
+					project,
+					fixed(),
+					shown.id,
+				);
 
 				assert.equal(quote.version, 2, status);
 				assert.equal(await statusOf(project), "quoted", status);
@@ -378,7 +417,9 @@ test.group("ProjectService.issueQuote", (group) => {
 					status,
 				});
 				assert.equal(
-					await reasonOf(() => projects.issueQuote(tenant, project, fixed())),
+					await reasonOf(() =>
+						projects.issueQuote(tenant, project, fixed(), null),
+					),
 					"project_closed",
 					status,
 				);
@@ -399,11 +440,96 @@ test.group("ProjectService.issueQuote", (group) => {
 						tenant,
 						project,
 						fixed(DateTime.utc().minus({ minutes: 1 })),
+						null,
 					),
 				),
 				"expired",
 			);
 			assert.equal(await statusOf(project), "reviewing");
+		});
+	});
+
+	test("a quote that expired while waiting for the project lock is refused", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const project = await makeProject(tenant, await makeClient(tenant));
+			const start = DateTime.utc();
+			const input = fixed(start.plus({ seconds: 30 }));
+
+			// A clock that runs a minute on every reading: the quote is still valid
+			// at the first check and long expired once the lock is held.
+			const realNow = Settings.now;
+			let tick = start.toMillis();
+			Settings.now = () => {
+				const reading = tick;
+				tick += 60_000;
+				return reading;
+			};
+			let reason: string | null = null;
+			try {
+				reason = await reasonOf(() =>
+					projects.issueQuote(tenant, project, input, null),
+				);
+			} finally {
+				Settings.now = realNow;
+			}
+
+			assert.equal(reason, "expired");
+			assert.isNull(await quotes.current(tenant, project));
+			assert.equal(await statusOf(project), "reviewing");
+		});
+	});
+
+	test("a revision based on a superseded quote is refused", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const project = await makeProject(tenant, await makeClient(tenant), {
+				status: "quoted",
+			});
+			const shown = await makeQuote(tenant, project);
+			await makeQuote(tenant, project, { version: 2 });
+
+			// The page showed v1 but v2 exists now; and a form that showed no
+			// quote at all is just as stale.
+			assert.equal(
+				await reasonOf(() =>
+					projects.issueQuote(tenant, project, fixed(), shown.id),
+				),
+				"quote_changed",
+			);
+			assert.equal(
+				await reasonOf(() =>
+					projects.issueQuote(tenant, project, fixed(), null),
+				),
+				"quote_changed",
+			);
+			assert.lengthOf(await quotes.history(tenant, project), 2);
+			assert.equal(await statusOf(project), "quoted");
+		});
+	});
+
+	test("the second of two first quotes is refused", async ({ assert }) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const project = await makeProject(tenant, await makeClient(tenant));
+			assert.equal(
+				(await projects.issueQuote(tenant, project, fixed(), null)).version,
+				1,
+			);
+			assert.equal(
+				await reasonOf(() =>
+					projects.issueQuote(tenant, project, fixed(), null),
+				),
+				"quote_changed",
+			);
+			assert.lengthOf(await quotes.history(tenant, project), 1);
 		});
 	});
 
@@ -415,7 +541,7 @@ test.group("ProjectService.issueQuote", (group) => {
 
 		const quote = await inTenant(tenant, async () => {
 			const project = await makeProject(tenant, await makeClient(tenant));
-			return projects.issueQuote(tenant, project, fixed());
+			return projects.issueQuote(tenant, project, fixed(), null);
 		});
 
 		const expected = quote.expiresAt.toMillis() - Date.now();
@@ -440,7 +566,7 @@ test.group("ProjectService.issueQuote", (group) => {
 			await assert.rejects(
 				() =>
 					withTransaction(async () => {
-						await projects.issueQuote(tenant, project, fixed());
+						await projects.issueQuote(tenant, project, fixed(), null);
 						throw new Error("roll back");
 					}),
 				"roll back",
