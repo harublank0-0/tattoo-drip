@@ -156,6 +156,12 @@ const routes = {
     tokens: [{"old":"/t/:tenant/artists/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/:id","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/:id","type":1,"val":"id","end":""}],
     types: placeholder as Registry['tenant.artists.destroy']['types'],
   },
+  'tenant.projects.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/projects',
+    tokens: [{"old":"/t/:tenant/projects","type":0,"val":"t","end":""},{"old":"/t/:tenant/projects","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/projects","type":0,"val":"projects","end":""}],
+    types: placeholder as Registry['tenant.projects.index']['types'],
+  },
   'tenant.projects.show': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/projects/:id',

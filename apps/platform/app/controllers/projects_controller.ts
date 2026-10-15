@@ -6,7 +6,13 @@ import { tenantContext } from "#middleware/tenant_middleware";
 import ArtistService from "#modules/artists/services/artist_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ClientService from "#modules/clients/services/client_service";
+import { contactedText } from "#modules/projects/contact";
 import type Quote from "#modules/projects/models/quote";
+import {
+	ACTIVE_STATUSES,
+	CLOSED_STATUSES,
+	toProjectFilter,
+} from "#modules/projects/moves";
 import {
 	chatLinks,
 	formatDay,
@@ -23,6 +29,8 @@ import {
 import ProjectService from "#modules/projects/services/project_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import QuoteService from "#modules/projects/services/quote_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import SessionService from "#modules/scheduling/services/session_service";
 
 /** How long a new quote is valid by default, in days. */
 const DEFAULT_VALID_DAYS = 14;
@@ -39,7 +47,58 @@ export default class ProjectsController {
 		private quotes: QuoteService,
 		private clients: ClientService,
 		private artists: ArtistService,
+		private sessions: SessionService,
 	) {}
+
+	async index(ctx: HttpContext) {
+		const { tenant, membership } = tenantContext(ctx);
+		const query = ctx.request.qs();
+		const filter = toProjectFilter(query.status);
+		const page = Math.max(1, Number.parseInt(String(query.page ?? 1), 10) || 1);
+
+		const { projects, total, lastPage } = await this.projects.list(
+			tenant,
+			membership,
+			filter,
+			page,
+		);
+		const counts = await this.projects.countByStatus(tenant, membership);
+		const clients = await this.clients.findMany(
+			tenant,
+			projects.map(({ clientId }) => clientId),
+		);
+		const artists = await this.artists.list(tenant);
+		const withSession = await this.sessions.projectsWithScheduledTattoo(
+			tenant,
+			projects.map(({ id }) => id),
+		);
+		const clientName = new Map(clients.map(({ id, name }) => [id, name]));
+		const artistName = new Map(artists.map(({ id, name }) => [id, name]));
+		const sum = (statuses: readonly (keyof typeof counts)[]) =>
+			statuses.reduce((total, status) => total + (counts[status] ?? 0), 0);
+
+		return ctx.inertia.render("projects/index", {
+			filter,
+			counts: {
+				active: sum(ACTIVE_STATUSES),
+				closed: sum(CLOSED_STATUSES),
+				byStatus: Object.fromEntries(
+					ACTIVE_STATUSES.map((status) => [status, counts[status] ?? 0]),
+				),
+			},
+			projects: projects.map((project) => ({
+				id: project.id,
+				clientName: clientName.get(project.clientId) ?? null,
+				artistName: project.artistId
+					? (artistName.get(project.artistId) ?? null)
+					: null,
+				status: project.status,
+				contactedText: contactedText(project.lastContactedAt, tenant.timezone),
+				noSession: project.status === "booked" && !withSession.has(project.id),
+			})),
+			page: { current: page, last: lastPage, total },
+		});
+	}
 
 	async show(ctx: HttpContext) {
 		const { tenant, membership } = tenantContext(ctx);

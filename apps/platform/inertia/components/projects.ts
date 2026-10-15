@@ -75,3 +75,33 @@ export function suggestedDeposit(
 	if (!percent || !(total > 0)) return 0;
 	return Math.min(Math.floor(total), Math.round((total * percent) / 100));
 }
+
+/** One row of the projects list. */
+export type ProjectRow = {
+	id: string;
+	clientName: string | null;
+	artistName: string | null;
+	status: string;
+	contactedText: string;
+	/** Booked, but no tattoo session is scheduled. */
+	noSession: boolean;
+};
+
+export type ProjectListProps = {
+	/** "active", "closed" or one status. */
+	filter: string;
+	counts: { active: number; closed: number; byStatus: Record<string, number> };
+	projects: ProjectRow[];
+	page: { current: number; last: number; total: number };
+};
+
+/** The single-status filter chips, in lifecycle order. */
+export const ACTIVE_FILTERS = [
+	"reviewing",
+	"quoted",
+	"on_hold",
+	"deposit_pending",
+	"booked",
+	"in_progress",
+	"healing_check",
+] as const;

@@ -122,6 +122,9 @@ router
 		router
 			.group(() => {
 				router
+					.get("/", [controllers.Projects, "index"])
+					.as("tenant.projects.index");
+				router
 					.get(":id", [controllers.Projects, "show"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.projects.show");

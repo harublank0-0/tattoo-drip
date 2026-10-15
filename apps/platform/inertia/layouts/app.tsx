@@ -1,7 +1,7 @@
 import { Form } from "@adonisjs/inertia/react";
 import { usePage } from "@inertiajs/react";
 import { cn } from "cn";
-import { House, LogOut, Settings, Users } from "lucide-react";
+import { ClipboardList, House, LogOut, Settings, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import FlashToasts from "~/components/flash_toasts";
 import Logo from "~/components/logo";
@@ -23,6 +23,12 @@ function tenantNav(tenant: { slug: string; role: string }): NavItem[] {
 			params,
 			exact: true,
 			icon: House,
+		},
+		{
+			label: "Projects",
+			route: "tenant.projects.index",
+			params,
+			icon: ClipboardList,
 		},
 	];
 	// Owners only; the server 404s anyone else.

@@ -46,6 +46,7 @@ export interface ApiDefinition {
       destroy: typeof routes['tenant.artists.destroy']
     }
     projects: {
+      index: typeof routes['tenant.projects.index']
       show: typeof routes['tenant.projects.show']
       quotes: {
         store: typeof routes['tenant.projects.quotes.store']
