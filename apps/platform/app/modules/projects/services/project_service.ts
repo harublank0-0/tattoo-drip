@@ -42,9 +42,10 @@ export const PROJECTS_PER_PAGE = 25;
 type ProjectQuery = ReturnType<typeof TattooProject.query>;
 
 /**
- * The way to find a tenant's projects and move them through the quote steps
- * of their lifecycle (TAT-64): issue, accept and expire. TAT-46 adds the
- * rest (hold, decline, notes). Every write locks the project row first, the
+ * The way to find and list a tenant's projects and move them through their
+ * lifecycle: the quote steps (TAT-64: issue, accept and expire) and the
+ * manual moves (TAT-46: hold, resume, decline, withdraw), plus the artist,
+ * notes and contact time. Every write locks the project row first, the
  * same order as SessionService, so a concurrent accept, revision, expiry or
  * session change serializes on that row.
  */
