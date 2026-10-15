@@ -307,6 +307,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['destroy']>>>
     }
   }
+  'tenant.projects.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/projects'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/projects_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/projects_controller').default['index']>>>
+    }
+  }
   'tenant.projects.show': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/projects/:id'
@@ -341,6 +353,54 @@ export interface Registry {
       query: ExtractQuery<InferInput<(typeof import('#modules/projects/validators/quote').acceptQuoteValidator)>>
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/quotes_controller').default['accept']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/quotes_controller').default['accept']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.projects.moves.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/projects/:id/moves'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/projects/validators/project').moveValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/projects/validators/project').moveValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/project_changes_controller').default['move']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/project_changes_controller').default['move']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.projects.notes.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/projects/:id/notes'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/projects/validators/project').notesValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/projects/validators/project').notesValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/project_changes_controller').default['notes']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/project_changes_controller').default['notes']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.projects.contacted.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/projects/:id/contacted'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/project_changes_controller').default['contacted']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/project_changes_controller').default['contacted']>>>
+    }
+  }
+  'tenant.projects.artist.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/projects/:id/artist'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/projects/validators/project').artistValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/projects/validators/project').artistValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/project_changes_controller').default['artist']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/project_changes_controller').default['artist']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
   'dashboard': {

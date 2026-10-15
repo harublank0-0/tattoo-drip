@@ -1,15 +1,24 @@
 import { inject } from "@adonisjs/core";
+import { errors as lucidErrors } from "@adonisjs/lucid";
 import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
+import { DateTime } from "luxon";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import DepositService from "#modules/payments/services/deposit_service";
-import { QuoteRuleError } from "#modules/projects/errors";
+import { ProjectRuleError, QuoteRuleError } from "#modules/projects/errors";
 import ExpireQuoteJob from "#modules/projects/jobs/expire_quote_job";
 import type Quote from "#modules/projects/models/quote";
 import TattooProject, {
 	type ProjectStatus,
 } from "#modules/projects/models/tattoo_project";
+import {
+	ACTIVE_STATUSES,
+	CLOSED_STATUSES,
+	MANUAL_MOVES,
+	type ManualMove,
+	type ProjectFilter,
+} from "#modules/projects/moves";
 import { isExpired, QUOTABLE_STATUSES } from "#modules/projects/quotes";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import QuoteService, {
@@ -27,10 +36,16 @@ type TenantRef = Pick<Tenant, "id">;
 /** Who is asking: their user and their role in the tenant. */
 export type Member = Pick<TenantMembership, "userId" | "role">;
 
+/** Projects per page on the projects list. */
+export const PROJECTS_PER_PAGE = 25;
+
+type ProjectQuery = ReturnType<typeof TattooProject.query>;
+
 /**
- * The way to find a tenant's projects and move them through the quote steps
- * of their lifecycle (TAT-64): issue, accept and expire. TAT-46 adds the
- * rest (hold, decline, notes). Every write locks the project row first, the
+ * The way to find and list a tenant's projects and move them through their
+ * lifecycle: the quote steps (TAT-64: issue, accept and expire) and the
+ * manual moves (TAT-46: hold, resume, decline, withdraw), plus the artist,
+ * notes and contact time. Every write locks the project row first, the
  * same order as SessionService, so a concurrent accept, revision, expiry or
  * session change serializes on that row.
  */
@@ -54,17 +69,61 @@ export default class ProjectService {
 		member: Member,
 		id: string,
 	): Promise<TattooProject> {
-		const query = TattooProject.query()
-			.where("tenant_id", tenant.id)
-			.where("id", id);
-		if (member.role !== "owner") {
-			const profiles = await this.artists.list(tenant);
-			const mine = profiles.find(({ userId }) => userId === member.userId);
-			// No profile of their own: no project is theirs.
-			if (mine) query.where("artist_id", mine.id);
-			else query.whereRaw("false");
-		}
+		const query = TattooProject.query().where("id", id);
+		await this.scopeTo(query, tenant, member);
 		return query.firstOrFail();
+	}
+
+	/**
+	 * A page of the projects `member` may see (the `findFor` rule), for the
+	 * Active view, the Closed view or one status. Active and single-status
+	 * views sort for follow-up: never contacted first, then the longest
+	 * since contact; the Closed view sorts the most recently changed first.
+	 */
+	async list(
+		tenant: TenantRef,
+		member: Member,
+		filter: ProjectFilter,
+		page: number,
+	): Promise<{ projects: TattooProject[]; total: number; lastPage: number }> {
+		const query = TattooProject.query();
+		await this.scopeTo(query, tenant, member);
+		if (filter === "active") query.whereIn("status", [...ACTIVE_STATUSES]);
+		else if (filter === "closed") query.whereIn("status", [...CLOSED_STATUSES]);
+		else query.where("status", filter);
+
+		if (filter === "closed") {
+			query
+				.orderByRaw("coalesce(updated_at, created_at) desc")
+				.orderBy("id", "desc");
+		} else {
+			query
+				.orderByRaw("last_contacted_at asc nulls first")
+				.orderBy("created_at", "asc")
+				.orderBy("id", "asc");
+		}
+		const result = await query.paginate(page, PROJECTS_PER_PAGE);
+		return {
+			projects: result.all(),
+			total: result.total,
+			lastPage: result.lastPage,
+		};
+	}
+
+	/** How many live projects `member` may see, per status. */
+	async countByStatus(
+		tenant: TenantRef,
+		member: Member,
+	): Promise<Partial<Record<ProjectStatus, number>>> {
+		const query = TattooProject.query();
+		await this.scopeTo(query, tenant, member);
+		const rows = await query
+			.select("status")
+			.count("* as total")
+			.groupBy("status");
+		return Object.fromEntries(
+			rows.map((row) => [row.status, Number(row.$extras.total)]),
+		);
 	}
 
 	/**
@@ -82,6 +141,7 @@ export default class ProjectService {
 	 */
 	async issueQuote(
 		tenant: TenantRef,
+		member: Member,
 		project: TattooProject,
 		input: NewQuote,
 		baseQuoteId: string | null,
@@ -89,7 +149,7 @@ export default class ProjectService {
 		assertProjectOf(tenant, project);
 		if (isExpired(input)) throw new QuoteRuleError("expired");
 		return withTransaction(async (trx) => {
-			const live = await lockProject(trx, tenant, project.id);
+			const live = await this.lockFor(trx, tenant, member, project.id);
 			if (!QUOTABLE_STATUSES.includes(live.status)) {
 				throw new QuoteRuleError("project_closed");
 			}
@@ -123,12 +183,13 @@ export default class ProjectService {
 	 */
 	async acceptQuote(
 		tenant: TenantRef,
+		member: Member,
 		project: TattooProject,
 		quoteId: string,
 	): Promise<ProjectStatus> {
 		assertProjectOf(tenant, project);
 		return withTransaction(async (trx) => {
-			const live = await lockProject(trx, tenant, project.id);
+			const live = await this.lockFor(trx, tenant, member, project.id);
 			if (live.status !== "quoted") throw new QuoteRuleError("not_quoted");
 			const quote = await this.quotes.current(tenant, live);
 			if (!quote || quote.id !== quoteId) {
@@ -170,16 +231,120 @@ export default class ProjectService {
 			if (!quote || quote.id !== quoteId || !isExpired(quote)) return false;
 			if (!(await this.expiryCancels(tenant, project, quote))) return false;
 
-			for (const session of await this.sessions.listForProject(
-				tenant,
-				project,
-			)) {
-				if (session.status === "scheduled") {
-					await this.sessions.cancel(tenant, session);
-				}
-			}
+			await this.cancelScheduledSessions(tenant, project);
 			await setStatus(project, "cancelled");
 			return true;
+		});
+	}
+
+	/**
+	 * A manual move (TAT-46): hold, resume, decline or the client withdrew.
+	 * The project's live status must be one the moves table allows, else
+	 * ProjectRuleError "move_not_allowed" (a stale page, or another tab got
+	 * there first). A client withdrawing is refused as "deposit_paid" while
+	 * the project holds verified deposit money: closing it would hide the
+	 * client's money, and recording what happens to it (kept, moved,
+	 * refunded) is TAT-66's. Declining and withdrawing cancel the project's
+	 * scheduled sessions first, so the artist's time is free. Returns the new
+	 * status.
+	 */
+	async move(
+		tenant: TenantRef,
+		member: Member,
+		project: TattooProject,
+		move: ManualMove,
+	): Promise<ProjectStatus> {
+		assertProjectOf(tenant, project);
+		const rule = MANUAL_MOVES[move];
+		return withTransaction(async (trx) => {
+			const live = await this.lockFor(trx, tenant, member, project.id);
+			if (!rule.from.includes(live.status)) {
+				throw new ProjectRuleError("move_not_allowed");
+			}
+			if (move === "withdraw" && (await this.depositHeld(tenant, live))) {
+				throw new ProjectRuleError("deposit_paid");
+			}
+			if (rule.cancelsSessions) {
+				await this.cancelScheduledSessions(tenant, live);
+			}
+			await setStatus(live, rule.to);
+			return rule.to;
+		});
+	}
+
+	/**
+	 * Whether the project holds verified deposit money: the current quote's
+	 * deposit payments, net of reversals, are above zero in the quote's
+	 * currency. A project with no quote holds none. The projects page uses
+	 * it to hide the withdraw move; `move` enforces it.
+	 */
+	async depositHeld(
+		tenant: TenantRef,
+		project: Pick<TattooProject, "id">,
+	): Promise<boolean> {
+		const quote = await this.quotes.current(tenant, project);
+		if (!quote) return false;
+		return (
+			(await this.deposits.verifiedPaid(tenant, project, quote.currency)) > 0
+		);
+	}
+
+	/**
+	 * Assigns the project's artist, or none (`artistId` null). Owners only:
+	 * anyone else gets E_ROW_NOT_FOUND (a 404, like another artist's
+	 * project). The artist must be one of the tenant's live profiles
+	 * (ArtistService.findFor, a 404 otherwise). The project's sessions keep
+	 * their own artist.
+	 */
+	async assignArtist(
+		tenant: TenantRef,
+		member: Member,
+		project: TattooProject,
+		artistId: string | null,
+	): Promise<void> {
+		assertProjectOf(tenant, project);
+		if (member.role !== "owner") {
+			throw new lucidErrors.E_ROW_NOT_FOUND(TattooProject);
+		}
+		const artist =
+			artistId === null ? null : await this.artists.findFor(tenant, artistId);
+		await withTransaction(async (trx) => {
+			const live = await this.lockFor(trx, tenant, member, project.id);
+			live.artistId = artist?.id ?? null;
+			await live.save();
+		});
+	}
+
+	/** Replaces the project's notes; blank notes clear them. */
+	async updateNotes(
+		tenant: TenantRef,
+		member: Member,
+		project: TattooProject,
+		notes: string | null,
+	): Promise<void> {
+		assertProjectOf(tenant, project);
+		const text = notes?.trim() || null;
+		await withTransaction(async (trx) => {
+			const live = await this.lockFor(trx, tenant, member, project.id);
+			live.notes = text;
+			await live.save();
+		});
+	}
+
+	/**
+	 * Records that the client was contacted now: the chat links call it as
+	 * they open, and staff tap "Mark contacted" after a call or a visit.
+	 */
+	async markContacted(
+		tenant: TenantRef,
+		member: Member,
+		project: TattooProject,
+	): Promise<void> {
+		assertProjectOf(tenant, project);
+		await withTransaction(async (trx) => {
+			const live = await this.lockFor(trx, tenant, member, project.id);
+			live.lastContactedAt = DateTime.now();
+			await live.save();
 		});
 	}
 
@@ -205,6 +370,64 @@ export default class ProjectService {
 			return !(await this.deposits.isSettled(tenant, project));
 		}
 		return false;
+	}
+
+	/**
+	 * Locks the live project and re-checks, under the lock, that `member` may
+	 * still act on it. `findFor` authorized the caller before the lock, and a
+	 * request that waited for the lock (an owner reassigning the project, say)
+	 * would otherwise write to a project that is no longer theirs: a
+	 * non-owner needs the project assigned to their own live artist profile
+	 * now, else E_ROW_NOT_FOUND (a 404).
+	 */
+	private async lockFor(
+		trx: TransactionClientContract,
+		tenant: TenantRef,
+		member: Member,
+		id: string,
+	): Promise<TattooProject> {
+		const live = await lockProject(trx, tenant, id);
+		if (member.role !== "owner") {
+			const profiles = await this.artists.list(tenant);
+			const mine = profiles.find(({ userId }) => userId === member.userId);
+			if (!mine || live.artistId !== mine.id) {
+				throw new lucidErrors.E_ROW_NOT_FOUND(TattooProject);
+			}
+		}
+		return live;
+	}
+
+	/**
+	 * Narrows a projects query to the tenant and to what `member` may see:
+	 * everything for an owner, else only the projects assigned to their own
+	 * live artist profile (none without one).
+	 */
+	private async scopeTo(
+		query: ProjectQuery,
+		tenant: TenantRef,
+		member: Member,
+	): Promise<void> {
+		query.where("tenant_id", tenant.id);
+		if (member.role === "owner") return;
+		const profiles = await this.artists.list(tenant);
+		const mine = profiles.find(({ userId }) => userId === member.userId);
+		if (mine) query.where("artist_id", mine.id);
+		else query.whereRaw("false");
+	}
+
+	/**
+	 * Cancels the project's scheduled sessions; completed, no-show and
+	 * cancelled ones are history and stay. The caller holds the project lock.
+	 */
+	private async cancelScheduledSessions(
+		tenant: TenantRef,
+		project: TattooProject,
+	): Promise<void> {
+		for (const session of await this.sessions.listForProject(tenant, project)) {
+			if (session.status === "scheduled") {
+				await this.sessions.cancel(tenant, session);
+			}
+		}
 	}
 }
 

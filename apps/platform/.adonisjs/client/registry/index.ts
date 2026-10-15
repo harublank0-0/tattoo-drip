@@ -156,6 +156,12 @@ const routes = {
     tokens: [{"old":"/t/:tenant/artists/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/:id","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/:id","type":1,"val":"id","end":""}],
     types: placeholder as Registry['tenant.artists.destroy']['types'],
   },
+  'tenant.projects.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/projects',
+    tokens: [{"old":"/t/:tenant/projects","type":0,"val":"t","end":""},{"old":"/t/:tenant/projects","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/projects","type":0,"val":"projects","end":""}],
+    types: placeholder as Registry['tenant.projects.index']['types'],
+  },
   'tenant.projects.show': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/projects/:id',
@@ -173,6 +179,30 @@ const routes = {
     pattern: '/t/:tenant/projects/:id/quotes/accept',
     tokens: [{"old":"/t/:tenant/projects/:id/quotes/accept","type":0,"val":"t","end":""},{"old":"/t/:tenant/projects/:id/quotes/accept","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/projects/:id/quotes/accept","type":0,"val":"projects","end":""},{"old":"/t/:tenant/projects/:id/quotes/accept","type":1,"val":"id","end":""},{"old":"/t/:tenant/projects/:id/quotes/accept","type":0,"val":"quotes","end":""},{"old":"/t/:tenant/projects/:id/quotes/accept","type":0,"val":"accept","end":""}],
     types: placeholder as Registry['tenant.projects.quotes.accept']['types'],
+  },
+  'tenant.projects.moves.store': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/projects/:id/moves',
+    tokens: [{"old":"/t/:tenant/projects/:id/moves","type":0,"val":"t","end":""},{"old":"/t/:tenant/projects/:id/moves","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/projects/:id/moves","type":0,"val":"projects","end":""},{"old":"/t/:tenant/projects/:id/moves","type":1,"val":"id","end":""},{"old":"/t/:tenant/projects/:id/moves","type":0,"val":"moves","end":""}],
+    types: placeholder as Registry['tenant.projects.moves.store']['types'],
+  },
+  'tenant.projects.notes.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/projects/:id/notes',
+    tokens: [{"old":"/t/:tenant/projects/:id/notes","type":0,"val":"t","end":""},{"old":"/t/:tenant/projects/:id/notes","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/projects/:id/notes","type":0,"val":"projects","end":""},{"old":"/t/:tenant/projects/:id/notes","type":1,"val":"id","end":""},{"old":"/t/:tenant/projects/:id/notes","type":0,"val":"notes","end":""}],
+    types: placeholder as Registry['tenant.projects.notes.update']['types'],
+  },
+  'tenant.projects.contacted.store': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/projects/:id/contacted',
+    tokens: [{"old":"/t/:tenant/projects/:id/contacted","type":0,"val":"t","end":""},{"old":"/t/:tenant/projects/:id/contacted","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/projects/:id/contacted","type":0,"val":"projects","end":""},{"old":"/t/:tenant/projects/:id/contacted","type":1,"val":"id","end":""},{"old":"/t/:tenant/projects/:id/contacted","type":0,"val":"contacted","end":""}],
+    types: placeholder as Registry['tenant.projects.contacted.store']['types'],
+  },
+  'tenant.projects.artist.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/projects/:id/artist',
+    tokens: [{"old":"/t/:tenant/projects/:id/artist","type":0,"val":"t","end":""},{"old":"/t/:tenant/projects/:id/artist","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/projects/:id/artist","type":0,"val":"projects","end":""},{"old":"/t/:tenant/projects/:id/artist","type":1,"val":"id","end":""},{"old":"/t/:tenant/projects/:id/artist","type":0,"val":"artist","end":""}],
+    types: placeholder as Registry['tenant.projects.artist.update']['types'],
   },
   'dashboard': {
     methods: ["GET","HEAD"],

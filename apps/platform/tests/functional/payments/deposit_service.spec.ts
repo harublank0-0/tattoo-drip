@@ -171,3 +171,40 @@ test.group("DepositService.isSettled", (group) => {
 		assert.isFalse(await inTenant(b, () => deposits.isSettled(b, project)));
 	});
 });
+
+test.group("DepositService.verifiedPaid", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("sums the verified deposits and corrections in the currency", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+		const project = await projectIn(tenant);
+
+		await inTenant(tenant, async () => {
+			assert.equal(await deposits.verifiedPaid(tenant, project, "NPR"), 0);
+
+			await makePayment(tenant, project, { amount: 100_000, ...verified() });
+			await makePayment(tenant, project, { amount: 50_000, ...verified() });
+			await makePayment(tenant, project, {
+				kind: "correction",
+				amount: -20_000,
+				...verified(),
+			});
+			// Not counted: unverified, another currency, other kinds.
+			await makePayment(tenant, project, { amount: 900_000 });
+			await makePayment(tenant, project, {
+				amount: 10_000,
+				currency: "USD",
+				...verified(),
+			});
+			await makePayment(tenant, project, { kind: "session", ...verified() });
+
+			assert.equal(
+				await deposits.verifiedPaid(tenant, project, "NPR"),
+				130_000,
+			);
+			assert.equal(await deposits.verifiedPaid(tenant, project, "USD"), 10_000);
+		});
+	});
+});

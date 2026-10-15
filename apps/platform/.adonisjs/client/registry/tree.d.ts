@@ -46,10 +46,23 @@ export interface ApiDefinition {
       destroy: typeof routes['tenant.artists.destroy']
     }
     projects: {
+      index: typeof routes['tenant.projects.index']
       show: typeof routes['tenant.projects.show']
       quotes: {
         store: typeof routes['tenant.projects.quotes.store']
         accept: typeof routes['tenant.projects.quotes.accept']
+      }
+      moves: {
+        store: typeof routes['tenant.projects.moves.store']
+      }
+      notes: {
+        update: typeof routes['tenant.projects.notes.update']
+      }
+      contacted: {
+        store: typeof routes['tenant.projects.contacted.store']
+      }
+      artist: {
+        update: typeof routes['tenant.projects.artist.update']
       }
     }
   }

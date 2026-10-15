@@ -6,7 +6,14 @@ import { tenantContext } from "#middleware/tenant_middleware";
 import ArtistService from "#modules/artists/services/artist_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ClientService from "#modules/clients/services/client_service";
+import { contactedText } from "#modules/projects/contact";
 import type Quote from "#modules/projects/models/quote";
+import {
+	ACTIVE_STATUSES,
+	allowedMoves,
+	CLOSED_STATUSES,
+	toProjectFilter,
+} from "#modules/projects/moves";
 import {
 	chatLinks,
 	formatDay,
@@ -23,6 +30,8 @@ import {
 import ProjectService from "#modules/projects/services/project_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import QuoteService from "#modules/projects/services/quote_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import SessionService from "#modules/scheduling/services/session_service";
 
 /** How long a new quote is valid by default, in days. */
 const DEFAULT_VALID_DAYS = 14;
@@ -39,7 +48,58 @@ export default class ProjectsController {
 		private quotes: QuoteService,
 		private clients: ClientService,
 		private artists: ArtistService,
+		private sessions: SessionService,
 	) {}
+
+	async index(ctx: HttpContext) {
+		const { tenant, membership } = tenantContext(ctx);
+		const query = ctx.request.qs();
+		const filter = toProjectFilter(query.status);
+		const page = Math.max(1, Number.parseInt(String(query.page ?? 1), 10) || 1);
+
+		const { projects, total, lastPage } = await this.projects.list(
+			tenant,
+			membership,
+			filter,
+			page,
+		);
+		const counts = await this.projects.countByStatus(tenant, membership);
+		const clients = await this.clients.findMany(
+			tenant,
+			projects.map(({ clientId }) => clientId),
+		);
+		const artists = await this.artists.list(tenant);
+		const withSession = await this.sessions.projectsWithScheduledTattoo(
+			tenant,
+			projects.map(({ id }) => id),
+		);
+		const clientName = new Map(clients.map(({ id, name }) => [id, name]));
+		const artistName = new Map(artists.map(({ id, name }) => [id, name]));
+		const sum = (statuses: readonly (keyof typeof counts)[]) =>
+			statuses.reduce((total, status) => total + (counts[status] ?? 0), 0);
+
+		return ctx.inertia.render("projects/index", {
+			filter,
+			counts: {
+				active: sum(ACTIVE_STATUSES),
+				closed: sum(CLOSED_STATUSES),
+				byStatus: Object.fromEntries(
+					ACTIVE_STATUSES.map((status) => [status, counts[status] ?? 0]),
+				),
+			},
+			projects: projects.map((project) => ({
+				id: project.id,
+				clientName: clientName.get(project.clientId) ?? null,
+				artistName: project.artistId
+					? (artistName.get(project.artistId) ?? null)
+					: null,
+				status: project.status,
+				contactedText: contactedText(project.lastContactedAt, tenant.timezone),
+				noSession: project.status === "booked" && !withSession.has(project.id),
+			})),
+			page: { current: page, last: lastPage, total },
+		});
+	}
 
 	async show(ctx: HttpContext) {
 		const { tenant, membership } = tenantContext(ctx);
@@ -49,11 +109,14 @@ export default class ProjectsController {
 			ctx.params.id,
 		);
 		const client = await this.clients.find(tenant, project.clientId);
+		const artists = await this.artists.list(tenant);
 		const artist = project.artistId
-			? (await this.artists.list(tenant)).find(
-					({ id }) => id === project.artistId,
-				)
+			? artists.find(({ id }) => id === project.artistId)
 			: undefined;
+		const scheduled = (
+			await this.sessions.listForProject(tenant, project)
+		).filter(({ status }) => status === "scheduled");
+		const depositHeld = await this.projects.depositHeld(tenant, project);
 		const versions = await this.quotes.history(tenant, project);
 		const current = versions.at(0) ?? null;
 		const live = current && !isExpired(current) ? current : null;
@@ -72,8 +135,12 @@ export default class ProjectsController {
 			history: versions.slice(1).map((quote) => quoteProps(quote, timezone)),
 			canQuote: QUOTABLE_STATUSES.includes(project.status),
 			canAccept: project.status === "quoted" && live !== null,
+			// Only while the client's answer is awaited: not after acceptance, and
+			// not for a project that was declined or withdrawn.
 			message:
-				live && client?.phone
+				live &&
+				client?.phone &&
+				(project.status === "quoted" || project.status === "on_hold")
 					? messageProps(live, client.name, client.phone, tenant.name, timezone)
 					: null,
 			form: {
@@ -84,6 +151,26 @@ export default class ProjectsController {
 				minDate: today.toFormat("yyyy-MM-dd"),
 				maxDate: today.plus({ years: 1 }).toFormat("yyyy-MM-dd"),
 			},
+			// Withdrawing is hidden while the project holds deposit money (the
+			// server refuses it too); the page says why.
+			moves: allowedMoves(project.status).filter(
+				(move) => !(move === "withdraw" && depositHeld),
+			),
+			withdrawBlocked:
+				depositHeld && allowedMoves(project.status).includes("withdraw"),
+			scheduledSessionCount: scheduled.length,
+			bookedWithoutSession:
+				project.status === "booked" &&
+				!scheduled.some(({ kind }) => kind === "tattoo"),
+			notes: project.notes,
+			contactedText: contactedText(project.lastContactedAt, timezone),
+			assignment:
+				membership.role === "owner"
+					? {
+							artistId: project.artistId,
+							choices: artists.map(({ id, name }) => ({ id, name })),
+						}
+					: null,
 		});
 	}
 }

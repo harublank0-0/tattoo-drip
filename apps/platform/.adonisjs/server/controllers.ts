@@ -10,6 +10,7 @@ export const controllers = {
   NewAccount: () => import('#controllers/new_account_controller'),
   Onboarding: () => import('#controllers/onboarding_controller'),
   PaymentMethods: () => import('#controllers/payment_methods_controller'),
+  ProjectChanges: () => import('#controllers/project_changes_controller'),
   Projects: () => import('#controllers/projects_controller'),
   Quotes: () => import('#controllers/quotes_controller'),
   Session: () => import('#controllers/session_controller'),

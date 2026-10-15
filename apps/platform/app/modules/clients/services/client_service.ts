@@ -12,4 +12,13 @@ export default class ClientService {
 	async find(tenant: TenantRef, id: string): Promise<Client | null> {
 		return Client.query().where("tenant_id", tenant.id).where("id", id).first();
 	}
+
+	/**
+	 * The tenant's live clients among `ids`, in no particular order (a page
+	 * of the projects list looks up its client names in one query).
+	 */
+	async findMany(tenant: TenantRef, ids: string[]): Promise<Client[]> {
+		if (ids.length === 0) return [];
+		return Client.query().where("tenant_id", tenant.id).whereIn("id", ids);
+	}
 }

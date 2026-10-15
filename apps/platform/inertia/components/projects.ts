@@ -20,6 +20,16 @@ export type QuoteProps = {
 	depositAmount: number;
 };
 
+export type ManualMoveName = "hold" | "resume" | "decline" | "withdraw";
+
+/** What each move's button says. */
+export const MOVE_LABELS: Record<ManualMoveName, string> = {
+	hold: "Put on hold",
+	resume: "Resume",
+	decline: "Decline",
+	withdraw: "Client withdrew",
+};
+
 export type ProjectPageProps = {
 	project: {
 		id: string;
@@ -42,6 +52,21 @@ export type ProjectPageProps = {
 		minDate: string;
 		maxDate: string;
 	};
+	/** The manual moves this project can make now, in table order. */
+	moves: ManualMoveName[];
+	/** Withdrawing would be allowed, but the project holds deposit money. */
+	withdrawBlocked: boolean;
+	/** How many sessions a withdrawal would cancel. */
+	scheduledSessionCount: number;
+	/** Booked, but no tattoo session is scheduled. */
+	bookedWithoutSession: boolean;
+	notes: string | null;
+	contactedText: string;
+	/** Owners only: the project's artist and the studio's artists. */
+	assignment: {
+		artistId: string | null;
+		choices: { id: string; name: string }[];
+	} | null;
 };
 
 export const STATUS_LABELS: Record<string, string> = {
@@ -75,3 +100,33 @@ export function suggestedDeposit(
 	if (!percent || !(total > 0)) return 0;
 	return Math.min(Math.floor(total), Math.round((total * percent) / 100));
 }
+
+/** One row of the projects list. */
+export type ProjectRow = {
+	id: string;
+	clientName: string | null;
+	artistName: string | null;
+	status: string;
+	contactedText: string;
+	/** Booked, but no tattoo session is scheduled. */
+	noSession: boolean;
+};
+
+export type ProjectListProps = {
+	/** "active", "closed" or one status. */
+	filter: string;
+	counts: { active: number; closed: number; byStatus: Record<string, number> };
+	projects: ProjectRow[];
+	page: { current: number; last: number; total: number };
+};
+
+/** The single-status filter chips, in lifecycle order. */
+export const ACTIVE_FILTERS = [
+	"reviewing",
+	"quoted",
+	"on_hold",
+	"deposit_pending",
+	"booked",
+	"in_progress",
+	"healing_check",
+] as const;

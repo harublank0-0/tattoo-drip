@@ -25,3 +25,27 @@ export class QuoteRuleError extends Error {
 		this.name = "QuoteRuleError";
 	}
 }
+
+export const PROJECT_RULE_REASONS = [
+	"move_not_allowed",
+	"deposit_paid",
+] as const;
+export type ProjectRuleReason = (typeof PROJECT_RULE_REASONS)[number];
+
+const PROJECT_MESSAGES: Record<ProjectRuleReason, string> = {
+	move_not_allowed: "The project's status does not allow that move",
+	deposit_paid:
+		"The client's deposit is held: recording what happens to it comes with payments",
+};
+
+/**
+ * A project lifecycle rule was broken; `reason` says which. Thrown after the
+ * failed savepoint has rolled back. The message is for developers; show
+ * your own to the user.
+ */
+export class ProjectRuleError extends Error {
+	constructor(readonly reason: ProjectRuleReason) {
+		super(PROJECT_MESSAGES[reason]);
+		this.name = "ProjectRuleError";
+	}
+}

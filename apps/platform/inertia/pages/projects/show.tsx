@@ -1,9 +1,13 @@
 import { Form } from "@adonisjs/inertia/react";
+import { router } from "@inertiajs/react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { urlFor } from "~/client";
 import Page from "~/components/page";
 import {
 	formatRupees,
+	type ManualMoveName,
+	MOVE_LABELS,
 	type ProjectPageProps,
 	type QuoteProps,
 	STATUS_LABELS,
@@ -25,6 +29,7 @@ import {
 } from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
+import { Textarea } from "~/components/ui/textarea";
 import { useTenant } from "~/hooks/use-tenant";
 import AppLayout from "~/layouts/app";
 
@@ -56,7 +61,24 @@ export default function ProjectShow({
 	canAccept,
 	message,
 	form,
+	moves,
+	withdrawBlocked,
+	scheduledSessionCount,
+	bookedWithoutSession,
+	notes,
+	contactedText,
+	assignment,
 }: ProjectPageProps) {
+	const tenant = useTenant();
+	const params = { tenant: tenant.slug, id: project.id };
+	// The chat links and "Copy message" record the contact in the background.
+	const markContacted = () =>
+		router.post(
+			urlFor("tenant.projects.contacted.store", params),
+			{},
+			{ preserveScroll: true, preserveState: true },
+		);
+
 	return (
 		<Page
 			title={project.clientName ?? "Project"}
@@ -65,12 +87,36 @@ export default function ProjectShow({
 			}
 		>
 			<div className="flex max-w-2xl flex-col gap-6">
+				{bookedWithoutSession && (
+					<output className="block rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm">
+						This project is booked, but no tattoo session is scheduled.
+					</output>
+				)}
+
 				<Card>
 					<CardContent className="flex flex-col gap-3">
 						<Badge variant="secondary">
 							{STATUS_LABELS[project.status] ?? project.status}
 						</Badge>
 						<p className="text-sm whitespace-pre-line">{project.brief}</p>
+						<ContactLine text={contactedText} onMark={markContacted} />
+						{moves.length > 0 && (
+							<MoveButtons
+								projectId={project.id}
+								moves={moves}
+								scheduledSessionCount={scheduledSessionCount}
+							/>
+						)}
+						{withdrawBlocked && (
+							<p className="text-sm text-muted-foreground">
+								The client&apos;s deposit is held, so this project can&apos;t be
+								closed as withdrawn yet: recording what happens to a deposit
+								(kept, moved or refunded) comes with payments.
+							</p>
+						)}
+						{assignment && (
+							<ArtistField projectId={project.id} assignment={assignment} />
+						)}
 					</CardContent>
 				</Card>
 
@@ -84,10 +130,21 @@ export default function ProjectShow({
 						) : (
 							<p className="text-sm text-muted-foreground">No quote yet.</p>
 						)}
-						{message && <ChatMessage message={message} />}
+						{message && (
+							<ChatMessage message={message} onSent={markContacted} />
+						)}
 						{canAccept && quote && (
 							<AcceptQuote projectId={project.id} quoteId={quote.id} />
 						)}
+					</CardContent>
+				</Card>
+
+				<Card>
+					<CardHeader>
+						<CardTitle>Notes</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<NotesForm projectId={project.id} notes={notes} />
 					</CardContent>
 				</Card>
 
@@ -168,12 +225,17 @@ function QuoteSummary({ quote }: { quote: QuoteProps }) {
  */
 function ChatMessage({
 	message,
+	onSent,
 }: {
 	message: NonNullable<ProjectPageProps["message"]>;
+	onSent: () => void;
 }) {
 	const copy = () => {
 		navigator.clipboard.writeText(message.text).then(
-			() => toast.success("Message copied."),
+			() => {
+				toast.success("Message copied.");
+				onSent();
+			},
 			() => toast.error("Couldn't copy: select the text instead."),
 		);
 	};
@@ -186,12 +248,14 @@ function ChatMessage({
 					href={message.whatsappUrl}
 					target="_blank"
 					rel="noreferrer"
+					onClick={onSent}
 					className={buttonVariants({ variant: "outline", size: "sm" })}
 				>
 					Send on WhatsApp
 				</a>
 				<a
 					href={message.viberUrl}
+					onClick={onSent}
 					className={buttonVariants({ variant: "outline", size: "sm" })}
 				>
 					Open Viber chat
@@ -417,6 +481,150 @@ function QuoteForm({
 						</Button>
 					</div>
 				</FieldGroup>
+			)}
+		</Form>
+	);
+}
+
+function ContactLine({ text, onMark }: { text: string; onMark: () => void }) {
+	return (
+		<div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+			<span className="text-muted-foreground">{text}</span>
+			<Button type="button" variant="outline" size="sm" onClick={onMark}>
+				Mark contacted
+			</Button>
+		</div>
+	);
+}
+
+/** Moves that close a project ask first. */
+const CONFIRM: Partial<Record<ManualMoveName, (sessions: number) => string>> = {
+	decline: (sessions) =>
+		sessions > 0
+			? `Decline this project? It moves to Closed and cancels ${sessions} scheduled session${sessions === 1 ? "" : "s"}.`
+			: "Decline this project? It moves to Closed.",
+	withdraw: (sessions) =>
+		sessions > 0
+			? `Mark that the client withdrew? This cancels the project and ${sessions} scheduled session${sessions === 1 ? "" : "s"}.`
+			: "Mark that the client withdrew? This cancels the project.",
+};
+
+function MoveButtons({
+	projectId,
+	moves,
+	scheduledSessionCount,
+}: {
+	projectId: string;
+	moves: ManualMoveName[];
+	scheduledSessionCount: number;
+}) {
+	const tenant = useTenant();
+	const send = (move: ManualMoveName) => {
+		const question = CONFIRM[move]?.(scheduledSessionCount);
+		if (question && !window.confirm(question)) return;
+		router.post(
+			urlFor("tenant.projects.moves.store", {
+				tenant: tenant.slug,
+				id: projectId,
+			}),
+			{ move },
+			{ preserveScroll: true },
+		);
+	};
+
+	return (
+		<div className="flex flex-wrap gap-2">
+			{moves.map((move) => (
+				<Button
+					key={move}
+					type="button"
+					size="sm"
+					variant={CONFIRM[move] ? "outline" : "secondary"}
+					onClick={() => send(move)}
+				>
+					{MOVE_LABELS[move]}
+				</Button>
+			))}
+		</div>
+	);
+}
+
+function ArtistField({
+	projectId,
+	assignment,
+}: {
+	projectId: string;
+	assignment: NonNullable<ProjectPageProps["assignment"]>;
+}) {
+	const tenant = useTenant();
+
+	return (
+		<Form
+			route="tenant.projects.artist.update"
+			routeParams={{ tenant: tenant.slug, id: projectId }}
+			options={{ preserveScroll: true }}
+		>
+			{({ errors, processing }) => (
+				<Field data-invalid={!!errors.artistId}>
+					<FieldLabel htmlFor="artistId">Artist</FieldLabel>
+					<div className="flex gap-2">
+						<select
+							id="artistId"
+							name="artistId"
+							defaultValue={assignment.artistId ?? ""}
+							aria-invalid={!!errors.artistId}
+							className="h-9 min-w-0 flex-1 rounded-md border bg-transparent px-3 text-sm"
+						>
+							<option value="">No artist</option>
+							{assignment.choices.map(({ id, name }) => (
+								<option key={id} value={id}>
+									{name}
+								</option>
+							))}
+						</select>
+						<Button type="submit" size="sm" disabled={processing}>
+							Save
+						</Button>
+					</div>
+					{errors.artistId && <FieldError>{errors.artistId}</FieldError>}
+				</Field>
+			)}
+		</Form>
+	);
+}
+
+function NotesForm({
+	projectId,
+	notes,
+}: {
+	projectId: string;
+	notes: string | null;
+}) {
+	const tenant = useTenant();
+
+	return (
+		<Form
+			route="tenant.projects.notes.update"
+			routeParams={{ tenant: tenant.slug, id: projectId }}
+			options={{ preserveScroll: true }}
+		>
+			{({ errors, processing }) => (
+				<Field data-invalid={!!errors.notes}>
+					<Textarea
+						name="notes"
+						rows={4}
+						maxLength={4000}
+						defaultValue={notes ?? ""}
+						aria-label="Notes"
+						aria-invalid={!!errors.notes}
+					/>
+					{errors.notes && <FieldError>{errors.notes}</FieldError>}
+					<div>
+						<Button type="submit" size="sm" disabled={processing}>
+							{processing ? "Saving…" : "Save notes"}
+						</Button>
+					</div>
+				</Field>
 			)}
 		</Form>
 	);
