@@ -141,6 +141,7 @@ export default class ProjectService {
 	 */
 	async issueQuote(
 		tenant: TenantRef,
+		member: Member,
 		project: TattooProject,
 		input: NewQuote,
 		baseQuoteId: string | null,
@@ -148,7 +149,7 @@ export default class ProjectService {
 		assertProjectOf(tenant, project);
 		if (isExpired(input)) throw new QuoteRuleError("expired");
 		return withTransaction(async (trx) => {
-			const live = await lockProject(trx, tenant, project.id);
+			const live = await this.lockFor(trx, tenant, member, project.id);
 			if (!QUOTABLE_STATUSES.includes(live.status)) {
 				throw new QuoteRuleError("project_closed");
 			}
@@ -182,12 +183,13 @@ export default class ProjectService {
 	 */
 	async acceptQuote(
 		tenant: TenantRef,
+		member: Member,
 		project: TattooProject,
 		quoteId: string,
 	): Promise<ProjectStatus> {
 		assertProjectOf(tenant, project);
 		return withTransaction(async (trx) => {
-			const live = await lockProject(trx, tenant, project.id);
+			const live = await this.lockFor(trx, tenant, member, project.id);
 			if (live.status !== "quoted") throw new QuoteRuleError("not_quoted");
 			const quote = await this.quotes.current(tenant, live);
 			if (!quote || quote.id !== quoteId) {
@@ -248,13 +250,14 @@ export default class ProjectService {
 	 */
 	async move(
 		tenant: TenantRef,
+		member: Member,
 		project: TattooProject,
 		move: ManualMove,
 	): Promise<ProjectStatus> {
 		assertProjectOf(tenant, project);
 		const rule = MANUAL_MOVES[move];
 		return withTransaction(async (trx) => {
-			const live = await lockProject(trx, tenant, project.id);
+			const live = await this.lockFor(trx, tenant, member, project.id);
 			if (!rule.from.includes(live.status)) {
 				throw new ProjectRuleError("move_not_allowed");
 			}
@@ -306,7 +309,7 @@ export default class ProjectService {
 		const artist =
 			artistId === null ? null : await this.artists.findFor(tenant, artistId);
 		await withTransaction(async (trx) => {
-			const live = await lockProject(trx, tenant, project.id);
+			const live = await this.lockFor(trx, tenant, member, project.id);
 			live.artistId = artist?.id ?? null;
 			await live.save();
 		});
@@ -315,13 +318,14 @@ export default class ProjectService {
 	/** Replaces the project's notes; blank notes clear them. */
 	async updateNotes(
 		tenant: TenantRef,
+		member: Member,
 		project: TattooProject,
 		notes: string | null,
 	): Promise<void> {
 		assertProjectOf(tenant, project);
 		const text = notes?.trim() || null;
 		await withTransaction(async (trx) => {
-			const live = await lockProject(trx, tenant, project.id);
+			const live = await this.lockFor(trx, tenant, member, project.id);
 			live.notes = text;
 			await live.save();
 		});
@@ -333,11 +337,12 @@ export default class ProjectService {
 	 */
 	async markContacted(
 		tenant: TenantRef,
+		member: Member,
 		project: TattooProject,
 	): Promise<void> {
 		assertProjectOf(tenant, project);
 		await withTransaction(async (trx) => {
-			const live = await lockProject(trx, tenant, project.id);
+			const live = await this.lockFor(trx, tenant, member, project.id);
 			live.lastContactedAt = DateTime.now();
 			await live.save();
 		});
@@ -365,6 +370,31 @@ export default class ProjectService {
 			return !(await this.deposits.isSettled(tenant, project));
 		}
 		return false;
+	}
+
+	/**
+	 * Locks the live project and re-checks, under the lock, that `member` may
+	 * still act on it. `findFor` authorized the caller before the lock, and a
+	 * request that waited for the lock (an owner reassigning the project, say)
+	 * would otherwise write to a project that is no longer theirs: a
+	 * non-owner needs the project assigned to their own live artist profile
+	 * now, else E_ROW_NOT_FOUND (a 404).
+	 */
+	private async lockFor(
+		trx: TransactionClientContract,
+		tenant: TenantRef,
+		member: Member,
+		id: string,
+	): Promise<TattooProject> {
+		const live = await lockProject(trx, tenant, id);
+		if (member.role !== "owner") {
+			const profiles = await this.artists.list(tenant);
+			const mine = profiles.find(({ userId }) => userId === member.userId);
+			if (!mine || live.artistId !== mine.id) {
+				throw new lucidErrors.E_ROW_NOT_FOUND(TattooProject);
+			}
+		}
+		return live;
 	}
 
 	/**

@@ -40,6 +40,9 @@ const projects = new ProjectService(artists, quotes, deposits, sessions);
 
 type TenantRef = { id: string };
 
+/** An owner: the service never reads the user for owners, so any id will do. */
+const OWNER = { userId: randomUUID(), role: "owner" as const };
+
 const statusOf = async (project: TattooProject) =>
 	(await TattooProject.findOrFail(project.id)).status;
 
@@ -392,7 +395,13 @@ test.group("ProjectService.issueQuote", (group) => {
 
 		await inTenant(tenant, async () => {
 			const project = await makeProject(tenant, await makeClient(tenant));
-			const quote = await projects.issueQuote(tenant, project, fixed(), null);
+			const quote = await projects.issueQuote(
+				tenant,
+				OWNER,
+				project,
+				fixed(),
+				null,
+			);
 
 			assert.equal(quote.version, 1);
 			assert.equal(await statusOf(project), "quoted");
@@ -417,6 +426,7 @@ test.group("ProjectService.issueQuote", (group) => {
 				const shown = await makeQuote(tenant, project);
 				const quote = await projects.issueQuote(
 					tenant,
+					OWNER,
 					project,
 					fixed(),
 					shown.id,
@@ -447,7 +457,7 @@ test.group("ProjectService.issueQuote", (group) => {
 				});
 				assert.equal(
 					await reasonOf(() =>
-						projects.issueQuote(tenant, project, fixed(), null),
+						projects.issueQuote(tenant, OWNER, project, fixed(), null),
 					),
 					"project_closed",
 					status,
@@ -467,6 +477,7 @@ test.group("ProjectService.issueQuote", (group) => {
 				await reasonOf(() =>
 					projects.issueQuote(
 						tenant,
+						OWNER,
 						project,
 						fixed(DateTime.utc().minus({ minutes: 1 })),
 						null,
@@ -500,7 +511,7 @@ test.group("ProjectService.issueQuote", (group) => {
 			let reason: string | null = null;
 			try {
 				reason = await reasonOf(() =>
-					projects.issueQuote(tenant, project, input, null),
+					projects.issueQuote(tenant, OWNER, project, input, null),
 				);
 			} finally {
 				Settings.now = realNow;
@@ -528,13 +539,13 @@ test.group("ProjectService.issueQuote", (group) => {
 			// quote at all is just as stale.
 			assert.equal(
 				await reasonOf(() =>
-					projects.issueQuote(tenant, project, fixed(), shown.id),
+					projects.issueQuote(tenant, OWNER, project, fixed(), shown.id),
 				),
 				"quote_changed",
 			);
 			assert.equal(
 				await reasonOf(() =>
-					projects.issueQuote(tenant, project, fixed(), null),
+					projects.issueQuote(tenant, OWNER, project, fixed(), null),
 				),
 				"quote_changed",
 			);
@@ -549,12 +560,13 @@ test.group("ProjectService.issueQuote", (group) => {
 		await inTenant(tenant, async () => {
 			const project = await makeProject(tenant, await makeClient(tenant));
 			assert.equal(
-				(await projects.issueQuote(tenant, project, fixed(), null)).version,
+				(await projects.issueQuote(tenant, OWNER, project, fixed(), null))
+					.version,
 				1,
 			);
 			assert.equal(
 				await reasonOf(() =>
-					projects.issueQuote(tenant, project, fixed(), null),
+					projects.issueQuote(tenant, OWNER, project, fixed(), null),
 				),
 				"quote_changed",
 			);
@@ -570,7 +582,7 @@ test.group("ProjectService.issueQuote", (group) => {
 
 		const quote = await inTenant(tenant, async () => {
 			const project = await makeProject(tenant, await makeClient(tenant));
-			return projects.issueQuote(tenant, project, fixed(), null);
+			return projects.issueQuote(tenant, OWNER, project, fixed(), null);
 		});
 
 		const expected = quote.expiresAt.toMillis() - Date.now();
@@ -595,7 +607,7 @@ test.group("ProjectService.issueQuote", (group) => {
 			await assert.rejects(
 				() =>
 					withTransaction(async () => {
-						await projects.issueQuote(tenant, project, fixed(), null);
+						await projects.issueQuote(tenant, OWNER, project, fixed(), null);
 						throw new Error("roll back");
 					}),
 				"roll back",
@@ -625,7 +637,7 @@ test.group("ProjectService.acceptQuote", (group) => {
 		await inTenant(tenant, async () => {
 			const { project, quote } = await quoted(tenant);
 			assert.equal(
-				await projects.acceptQuote(tenant, project, quote.id),
+				await projects.acceptQuote(tenant, OWNER, project, quote.id),
 				"deposit_pending",
 			);
 			assert.equal(await statusOf(project), "deposit_pending");
@@ -642,7 +654,7 @@ test.group("ProjectService.acceptQuote", (group) => {
 			await makeSession(tenant, project, await makeArtist(tenant));
 
 			assert.equal(
-				await projects.acceptQuote(tenant, project, quote.id),
+				await projects.acceptQuote(tenant, OWNER, project, quote.id),
 				"booked",
 			);
 			assert.equal(await statusOf(project), "booked");
@@ -661,7 +673,7 @@ test.group("ProjectService.acceptQuote", (group) => {
 				verifiedAt: DateTime.utc(),
 			});
 			assert.equal(
-				await projects.acceptQuote(tenant, project, quote.id),
+				await projects.acceptQuote(tenant, OWNER, project, quote.id),
 				"deposit_pending",
 			);
 		});
@@ -681,7 +693,9 @@ test.group("ProjectService.acceptQuote", (group) => {
 				});
 				const quote = await makeQuote(tenant, project);
 				assert.equal(
-					await reasonOf(() => projects.acceptQuote(tenant, project, quote.id)),
+					await reasonOf(() =>
+						projects.acceptQuote(tenant, OWNER, project, quote.id),
+					),
 					"not_quoted",
 					status,
 				);
@@ -700,12 +714,14 @@ test.group("ProjectService.acceptQuote", (group) => {
 			await makeQuote(tenant, project, { version: 2 });
 
 			assert.equal(
-				await reasonOf(() => projects.acceptQuote(tenant, project, shown.id)),
+				await reasonOf(() =>
+					projects.acceptQuote(tenant, OWNER, project, shown.id),
+				),
 				"quote_changed",
 			);
 			assert.equal(
 				await reasonOf(() =>
-					projects.acceptQuote(tenant, project, randomUUID()),
+					projects.acceptQuote(tenant, OWNER, project, randomUUID()),
 				),
 				"quote_changed",
 			);
@@ -719,7 +735,9 @@ test.group("ProjectService.acceptQuote", (group) => {
 		await inTenant(tenant, async () => {
 			const { project, quote } = await expiredQuote(tenant, "quoted");
 			assert.equal(
-				await reasonOf(() => projects.acceptQuote(tenant, project, quote.id)),
+				await reasonOf(() =>
+					projects.acceptQuote(tenant, OWNER, project, quote.id),
+				),
 				"expired",
 			);
 			assert.equal(await statusOf(project), "quoted");
@@ -743,14 +761,16 @@ test.group("ProjectService.move", (group) => {
 					const label = `${move} from ${status}`;
 					if (EXPECTED_FROM[move].includes(status)) {
 						assert.equal(
-							await projects.move(tenant, project, move),
+							await projects.move(tenant, OWNER, project, move),
 							EXPECTED_TO[move],
 							label,
 						);
 						assert.equal(await statusOf(project), EXPECTED_TO[move], label);
 					} else {
 						assert.equal(
-							await refusalOf(() => projects.move(tenant, project, move)),
+							await refusalOf(() =>
+								projects.move(tenant, OWNER, project, move),
+							),
 							"move_not_allowed",
 							label,
 						);
@@ -780,7 +800,7 @@ test.group("ProjectService.move", (group) => {
 			});
 
 			assert.equal(
-				await projects.move(tenant, project, "withdraw"),
+				await projects.move(tenant, OWNER, project, "withdraw"),
 				"cancelled",
 			);
 			await held.refresh();
@@ -876,14 +896,19 @@ test.group("ProjectService artist, notes and contact", (group) => {
 		await inTenant(tenant, async () => {
 			const project = await makeProject(tenant, await makeClient(tenant));
 
-			await projects.updateNotes(tenant, project, "  Prefers mornings.  ");
+			await projects.updateNotes(
+				tenant,
+				OWNER,
+				project,
+				"  Prefers mornings.  ",
+			);
 			assert.equal((await reload(project)).notes, "Prefers mornings.");
 
-			await projects.updateNotes(tenant, project, "   ");
+			await projects.updateNotes(tenant, OWNER, project, "   ");
 			assert.isNull((await reload(project)).notes);
 
-			await projects.updateNotes(tenant, project, "Again");
-			await projects.updateNotes(tenant, project, null);
+			await projects.updateNotes(tenant, OWNER, project, "Again");
+			await projects.updateNotes(tenant, OWNER, project, null);
 			assert.isNull((await reload(project)).notes);
 		});
 	});
@@ -895,7 +920,7 @@ test.group("ProjectService artist, notes and contact", (group) => {
 			const project = await makeProject(tenant, await makeClient(tenant));
 			const before = DateTime.now().minus({ seconds: 1 });
 
-			await projects.markContacted(tenant, project);
+			await projects.markContacted(tenant, OWNER, project);
 			const at = (await reload(project)).lastContactedAt;
 			assert.isNotNull(at);
 			assert.isTrue((at as DateTime) >= before);
@@ -1129,7 +1154,10 @@ test.group("ProjectService.move: sessions and deposits", (group) => {
 				endsAt: DateTime.utc(2026, 10, 1, 11),
 			});
 
-			assert.equal(await projects.move(tenant, project, "decline"), "declined");
+			assert.equal(
+				await projects.move(tenant, OWNER, project, "decline"),
+				"declined",
+			);
 			await consult.refresh();
 			await done.refresh();
 			assert.equal(consult.status, "cancelled");
@@ -1161,7 +1189,9 @@ test.group("ProjectService.move: sessions and deposits", (group) => {
 				});
 				const label = `${status}, ${paid} paid`;
 				assert.equal(
-					await refusalOf(() => projects.move(tenant, project, "withdraw")),
+					await refusalOf(() =>
+						projects.move(tenant, OWNER, project, "withdraw"),
+					),
 					"deposit_paid",
 					label,
 				);
@@ -1192,7 +1222,7 @@ test.group("ProjectService.move: sessions and deposits", (group) => {
 
 			for (const project of [unpaid, submitted, zero]) {
 				assert.equal(
-					await projects.move(tenant, project, "withdraw"),
+					await projects.move(tenant, OWNER, project, "withdraw"),
 					"cancelled",
 				);
 			}
@@ -1219,9 +1249,96 @@ test.group("ProjectService.move: sessions and deposits", (group) => {
 			});
 
 			assert.equal(
-				await projects.move(tenant, project, "withdraw"),
+				await projects.move(tenant, OWNER, project, "withdraw"),
 				"cancelled",
 			);
 		});
 	});
 });
+
+test.group(
+	"ProjectService: authorization is rechecked under the lock",
+	(group) => {
+		group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+		test("an artist can't act on a project reassigned after they loaded it", async ({
+			assert,
+		}) => {
+			const { tenant, owner } = await studioWithOwner();
+			const asha = await artistIn(tenant, "asha@example.com");
+			const ashaMember = { userId: asha.id, role: "artist" as const };
+			const ownerMember = { userId: owner.id, role: "owner" as const };
+
+			await inTenant(tenant, async () => {
+				const mine = await makeArtist(tenant, "asha");
+				mine.userId = asha.id;
+				await mine.save();
+				const bina = await makeArtist(tenant, "bina");
+				const project = await makeProject(tenant, await makeClient(tenant), {
+					artistId: mine.id,
+					status: "quoted",
+				});
+				const quote = await makeQuote(tenant, project);
+
+				// Asha's request loaded the project, then waited while the owner
+				// reassigned it: the sequential equivalent is a stale project object.
+				const stale = await projects.findFor(tenant, ashaMember, project.id);
+				await projects.assignArtist(tenant, ownerMember, project, bina.id);
+
+				const refused = [
+					() => projects.move(tenant, ashaMember, stale, "hold"),
+					() => projects.updateNotes(tenant, ashaMember, stale, "mine now"),
+					() => projects.markContacted(tenant, ashaMember, stale),
+					() =>
+						projects.issueQuote(tenant, ashaMember, stale, fixed(), quote.id),
+					() => projects.acceptQuote(tenant, ashaMember, stale, quote.id),
+				];
+				for (const act of refused) {
+					await assert.rejects(act, /Row not found/);
+				}
+				const live = await TattooProject.findOrFail(project.id);
+				assert.equal(live.status, "quoted");
+				assert.isNull(live.notes);
+				assert.isNull(live.lastContactedAt);
+				assert.equal(live.artistId, bina.id);
+				assert.lengthOf(await quotes.history(tenant, project), 1);
+			});
+		});
+
+		test("an artist whose profile was deleted can't act; the assigned artist and owners can", async ({
+			assert,
+		}) => {
+			const { tenant } = await studioWithOwner();
+			const asha = await artistIn(tenant, "asha@example.com");
+			const ashaMember = { userId: asha.id, role: "artist" as const };
+
+			await inTenant(tenant, async () => {
+				const mine = await makeArtist(tenant, "asha");
+				mine.userId = asha.id;
+				await mine.save();
+				const project = await makeProject(tenant, await makeClient(tenant), {
+					artistId: mine.id,
+					status: "quoted",
+				});
+
+				// Still assigned to them: they can act.
+				assert.equal(
+					await projects.move(tenant, ashaMember, project, "hold"),
+					"on_hold",
+				);
+				// An owner always can.
+				assert.equal(
+					await projects.move(tenant, OWNER, project, "resume"),
+					"quoted",
+				);
+
+				await mine.softDelete();
+				await assert.rejects(
+					() => projects.move(tenant, ashaMember, project, "hold"),
+					/Row not found/,
+				);
+				assert.equal(await statusOf(project), "quoted");
+			});
+		});
+	},
+);

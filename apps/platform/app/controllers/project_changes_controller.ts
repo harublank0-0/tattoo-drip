@@ -50,7 +50,7 @@ export default class ProjectChangesController {
 		);
 		const { move } = await ctx.request.validateUsing(moveValidator);
 		try {
-			await this.projects.move(tenant, project, move);
+			await this.projects.move(tenant, membership, project, move);
 			ctx.session.flash("success", MOVE_DONE[move]);
 		} catch (error) {
 			if (!(error instanceof ProjectRuleError)) throw error;
@@ -67,7 +67,7 @@ export default class ProjectChangesController {
 			ctx.params.id,
 		);
 		const { notes } = await ctx.request.validateUsing(notesValidator);
-		await this.projects.updateNotes(tenant, project, notes);
+		await this.projects.updateNotes(tenant, membership, project, notes);
 		ctx.session.flash("success", "Notes saved.");
 		return backTo(ctx, tenant, project);
 	}
@@ -79,7 +79,7 @@ export default class ProjectChangesController {
 			membership,
 			ctx.params.id,
 		);
-		await this.projects.markContacted(tenant, project);
+		await this.projects.markContacted(tenant, membership, project);
 		ctx.session.flash("success", "Marked as contacted.");
 		return backTo(ctx, tenant, project);
 	}

@@ -40,6 +40,7 @@ export default class QuotesController {
 		await flashRuleErrors(ctx, async () => {
 			const quote = await this.projects.issueQuote(
 				tenant,
+				membership,
 				project,
 				input,
 				form.baseQuoteId ?? null,
@@ -66,7 +67,12 @@ export default class QuotesController {
 		const { quoteId } = await ctx.request.validateUsing(acceptQuoteValidator);
 
 		await flashRuleErrors(ctx, async () => {
-			const status = await this.projects.acceptQuote(tenant, project, quoteId);
+			const status = await this.projects.acceptQuote(
+				tenant,
+				membership,
+				project,
+				quoteId,
+			);
 			ctx.session.flash(
 				"success",
 				status === "booked"
