@@ -101,7 +101,8 @@ shortcuts:   flash or walk-in → booked     in_progress → booked (next sessio
 | `completed` | The last session is done and the balance is paid |
 | `healing_check` | Follow-up for a touch-up or healed photo |
 
-- A quote's expiry moves an unpaid project to `cancelled`.
+- Issuing a quote moves the project to `quoted`; staff mark it accepted when the client agrees, which moves it to `deposit_pending`. A quote can be revised (a new version) until the project is `booked`, and a revision moves a `deposit_pending` project back to `quoted`.
+- A quote's expiry moves a project that was never accepted (`quoted`, `on_hold`) or never paid (`deposit_pending` with the deposit not settled) to `cancelled`, and cancels its scheduled sessions. A deposit that was already paid is never cancelled by expiry, even when staff revised the quote afterwards.
 - Sessions block the artist's time, and the database rejects overlaps. Each session is `scheduled`, `completed`, `no_show` or `cancelled`; rescheduling changes its time.
 - Each studio writes its own deposit policy, which the deposit page shows. Tattoo Drip records what happened to a deposit (kept, moved to a new date, refunded) but doesn't impose a rule.
 - Payments are never edited or deleted. A refund is a new payment with a negative amount.

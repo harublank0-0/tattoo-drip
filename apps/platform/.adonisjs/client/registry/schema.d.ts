@@ -307,6 +307,42 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['destroy']>>>
     }
   }
+  'tenant.projects.show': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/projects/:id'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/projects_controller').default['show']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/projects_controller').default['show']>>>
+    }
+  }
+  'tenant.projects.quotes.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/projects/:id/quotes'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/projects/validators/quote').quoteValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/projects/validators/quote').quoteValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/quotes_controller').default['store']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/quotes_controller').default['store']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.projects.quotes.accept': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/projects/:id/quotes/accept'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/projects/validators/quote').acceptQuoteValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/projects/validators/quote').acceptQuoteValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/quotes_controller').default['accept']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/quotes_controller').default['accept']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
   'dashboard': {
     methods: ["GET","HEAD"]
     pattern: '/dashboard'

@@ -19,7 +19,9 @@ export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 /**
  * The sale of one tattoo: a client, an optional artist, the brief and a
  * lifecycle status. There is no `inquiry` status: the inquiry is its own
- * record. The transition rules arrive with TAT-46. `softDelete()` does not
+ * record. The quote moves (to `quoted`, `deposit_pending`, and `cancelled` on
+ * expiry) live in ProjectService (TAT-64); the rest arrive with TAT-46.
+ * `softDelete()` does not
  * cascade to the project's reference images yet (only `Tenant.softDelete`
  * does); do not call it elsewhere before TAT-46 defines the lifecycle.
  */

@@ -6,7 +6,7 @@ import type Tenant from "#modules/tenancy/models/tenant";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { withDbContext } from "#services/db_context";
-import { seedPipeline } from "#tests/helpers/pipeline";
+import { makeProject, makeQuote, seedPipeline } from "#tests/helpers/pipeline";
 
 /**
  * A fresh studio and its owner. The owner's email comes from the slug, so
@@ -107,7 +107,25 @@ async function studio(slug: string, name: string) {
 		),
 	);
 	const pipeline = await inTenant(tenant, () => seedPipeline(tenant));
-	return { tenant, owner, artist, paymentMethod, artistProfile, pipeline };
+	// A second project waiting for the client's answer, for the accept route.
+	const quoted = await inTenant(tenant, async () => {
+		const project = await makeProject(tenant, pipeline.client, {
+			status: "quoted",
+		});
+		return { project, quote: await makeQuote(tenant, project) };
+	});
+	return {
+		tenant,
+		owner,
+		artist,
+		paymentMethod,
+		artistProfile,
+		pipeline,
+		// The :id resources of the project routes' isolation cases.
+		project: pipeline.project,
+		quotedProject: quoted.project,
+		quotedQuote: quoted.quote,
+	};
 }
 
 export type Studio = Awaited<ReturnType<typeof studio>>;
@@ -116,7 +134,8 @@ export type Studio = Awaited<ReturnType<typeof studio>>;
  * Two studios, each with an owner, an artist, two payment methods
  * (`paymentMethod` is the first), an artist profile (`artistProfile`) and one
  * of each pipeline record (`pipeline`: client, accepted inquiry, project,
- * reference image, quote and a submitted payment). Later tickets add seed data
+ * reference image, quote and a submitted payment), plus a quoted project
+ * (`quotedProject`, `quotedQuote`); `project` is the pipeline's project. Later tickets add seed data
  * for their own tables here, so every isolation case sees it.
  */
 export async function twoStudios() {

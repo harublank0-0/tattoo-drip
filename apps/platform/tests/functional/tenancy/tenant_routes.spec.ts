@@ -157,8 +157,12 @@ test.group("Tenant routes", (group) => {
 		}
 	});
 
-	for (const area of ["settings", "artists"]) {
-		test(`every ${area} route runs auth, then the tenant check, then owners only`, ({
+	for (const { area, allow } of [
+		{ area: "settings", allow: ["owner"] },
+		{ area: "artists", allow: ["owner"] },
+		{ area: "projects", allow: ["owner", "artist"] },
+	]) {
+		test(`every ${area} route runs auth, then the tenant check, then the role check (${allow.join(", ")})`, ({
 			assert,
 		}) => {
 			const routes = Object.values(router.toJSON())
@@ -182,11 +186,7 @@ test.group("Tenant routes", (group) => {
 				assert.isAtLeast(auth, 0, route.pattern);
 				assert.isAbove(tenant, auth, route.pattern);
 				assert.isAbove(role, tenant, route.pattern);
-				assert.deepEqual(
-					entries[role]?.args,
-					{ allow: ["owner"] },
-					route.pattern,
-				);
+				assert.deepEqual(entries[role]?.args, { allow }, route.pattern);
 			}
 		});
 	}

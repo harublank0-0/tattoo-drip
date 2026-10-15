@@ -113,6 +113,29 @@ router
 			})
 			.prefix("/artists")
 			.use(middleware.role({ allow: ["owner"] }));
+
+		/**
+		 * Projects: owners, and the artist assigned to the project
+		 * (ProjectService.findFor gives anyone else a 404). Every projects
+		 * route goes in this group (a test checks).
+		 */
+		router
+			.group(() => {
+				router
+					.get(":id", [controllers.Projects, "show"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.projects.show");
+				router
+					.post(":id/quotes", [controllers.Quotes, "store"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.projects.quotes.store");
+				router
+					.post(":id/quotes/accept", [controllers.Quotes, "accept"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.projects.quotes.accept");
+			})
+			.prefix("/projects")
+			.use(middleware.role({ allow: ["owner", "artist"] }));
 	})
 	.prefix("/t/:tenant")
 	.use([middleware.auth(), middleware.dbContext(), middleware.tenant()]);
