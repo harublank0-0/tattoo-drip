@@ -7,11 +7,13 @@ import { DateTime, Settings } from "luxon";
 import ArtistService from "#modules/artists/services/artist_service";
 import ImageService from "#modules/media/services/image_service";
 import DepositService from "#modules/payments/services/deposit_service";
-import { QuoteRuleError } from "#modules/projects/errors";
+import { ProjectRuleError, QuoteRuleError } from "#modules/projects/errors";
 import ExpireQuoteJob from "#modules/projects/jobs/expire_quote_job";
 import TattooProject, {
+	PROJECT_STATUSES,
 	type ProjectStatus,
 } from "#modules/projects/models/tattoo_project";
+import { MANUAL_MOVE_NAMES, type ManualMove } from "#modules/projects/moves";
 import ProjectService from "#modules/projects/services/project_service";
 import QuoteService, {
 	type NewQuote,
@@ -75,6 +77,31 @@ async function reasonOf(work: () => Promise<unknown>) {
 
 const queuedJobs = async () =>
 	Number((await db.from("queue_jobs").count("* as n"))[0].n);
+
+/** The ProjectRuleError reason `work` throws, or null if it succeeds. */
+async function refusalOf(work: () => Promise<unknown>) {
+	try {
+		await work();
+		return null;
+	} catch (error) {
+		if (error instanceof ProjectRuleError) return error.reason;
+		throw error;
+	}
+}
+
+/** The project rules' manual moves, written out apart from moves.ts. */
+const EXPECTED_FROM: Record<ManualMove, ProjectStatus[]> = {
+	hold: ["quoted"],
+	resume: ["on_hold"],
+	decline: ["reviewing"],
+	withdraw: ["reviewing", "quoted", "on_hold", "deposit_pending"],
+};
+const EXPECTED_TO: Record<ManualMove, ProjectStatus> = {
+	hold: "on_hold",
+	resume: "quoted",
+	decline: "declined",
+	withdraw: "cancelled",
+};
 
 test.group("ProjectService.findFor", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
@@ -694,6 +721,70 @@ test.group("ProjectService.acceptQuote", (group) => {
 				"expired",
 			);
 			assert.equal(await statusOf(project), "quoted");
+		});
+	});
+});
+
+test.group("ProjectService.move", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("every manual move works from exactly its allowed statuses", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const client = await makeClient(tenant);
+			for (const move of MANUAL_MOVE_NAMES) {
+				for (const status of PROJECT_STATUSES) {
+					const project = await makeProject(tenant, client, { status });
+					const label = `${move} from ${status}`;
+					if (EXPECTED_FROM[move].includes(status)) {
+						assert.equal(
+							await projects.move(tenant, project, move),
+							EXPECTED_TO[move],
+							label,
+						);
+						assert.equal(await statusOf(project), EXPECTED_TO[move], label);
+					} else {
+						assert.equal(
+							await refusalOf(() => projects.move(tenant, project, move)),
+							"move_not_allowed",
+							label,
+						);
+						assert.equal(await statusOf(project), status, label);
+					}
+				}
+			}
+		});
+	});
+
+	test("a withdrawal cancels the scheduled sessions and keeps the others", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const project = await makeProject(tenant, await makeClient(tenant), {
+				status: "deposit_pending",
+			});
+			const artist = await makeArtist(tenant);
+			const held = await makeSession(tenant, project, artist);
+			const done = await makeSession(tenant, project, artist, {
+				kind: "consultation",
+				status: "completed",
+				startsAt: DateTime.utc(2026, 10, 1, 10),
+				endsAt: DateTime.utc(2026, 10, 1, 11),
+			});
+
+			assert.equal(
+				await projects.move(tenant, project, "withdraw"),
+				"cancelled",
+			);
+			await held.refresh();
+			await done.refresh();
+			assert.equal(held.status, "cancelled");
+			assert.equal(done.status, "completed");
 		});
 	});
 });

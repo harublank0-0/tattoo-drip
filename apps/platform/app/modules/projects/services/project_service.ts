@@ -4,12 +4,13 @@ import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
 import ArtistService from "#modules/artists/services/artist_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import DepositService from "#modules/payments/services/deposit_service";
-import { QuoteRuleError } from "#modules/projects/errors";
+import { ProjectRuleError, QuoteRuleError } from "#modules/projects/errors";
 import ExpireQuoteJob from "#modules/projects/jobs/expire_quote_job";
 import type Quote from "#modules/projects/models/quote";
 import TattooProject, {
 	type ProjectStatus,
 } from "#modules/projects/models/tattoo_project";
+import { MANUAL_MOVES, type ManualMove } from "#modules/projects/moves";
 import { isExpired, QUOTABLE_STATUSES } from "#modules/projects/quotes";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import QuoteService, {
@@ -170,16 +171,36 @@ export default class ProjectService {
 			if (!quote || quote.id !== quoteId || !isExpired(quote)) return false;
 			if (!(await this.expiryCancels(tenant, project, quote))) return false;
 
-			for (const session of await this.sessions.listForProject(
-				tenant,
-				project,
-			)) {
-				if (session.status === "scheduled") {
-					await this.sessions.cancel(tenant, session);
-				}
-			}
+			await this.cancelScheduledSessions(tenant, project);
 			await setStatus(project, "cancelled");
 			return true;
+		});
+	}
+
+	/**
+	 * A manual move (TAT-46): hold, resume, decline or the client withdrew.
+	 * The project's live status must be one the moves table allows, else
+	 * ProjectRuleError "move_not_allowed" (a stale page, or another tab got
+	 * there first). A withdrawal cancels the project's scheduled sessions
+	 * first, so the artist's time is free. Returns the new status.
+	 */
+	async move(
+		tenant: TenantRef,
+		project: TattooProject,
+		move: ManualMove,
+	): Promise<ProjectStatus> {
+		assertProjectOf(tenant, project);
+		const rule = MANUAL_MOVES[move];
+		return withTransaction(async (trx) => {
+			const live = await lockProject(trx, tenant, project.id);
+			if (!rule.from.includes(live.status)) {
+				throw new ProjectRuleError("move_not_allowed");
+			}
+			if (rule.cancelsSessions) {
+				await this.cancelScheduledSessions(tenant, live);
+			}
+			await setStatus(live, rule.to);
+			return rule.to;
 		});
 	}
 
@@ -205,6 +226,21 @@ export default class ProjectService {
 			return !(await this.deposits.isSettled(tenant, project));
 		}
 		return false;
+	}
+
+	/**
+	 * Cancels the project's scheduled sessions; completed, no-show and
+	 * cancelled ones are history and stay. The caller holds the project lock.
+	 */
+	private async cancelScheduledSessions(
+		tenant: TenantRef,
+		project: TattooProject,
+	): Promise<void> {
+		for (const session of await this.sessions.listForProject(tenant, project)) {
+			if (session.status === "scheduled") {
+				await this.sessions.cancel(tenant, session);
+			}
+		}
 	}
 }
 
