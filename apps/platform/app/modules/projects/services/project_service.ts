@@ -12,7 +12,13 @@ import type Quote from "#modules/projects/models/quote";
 import TattooProject, {
 	type ProjectStatus,
 } from "#modules/projects/models/tattoo_project";
-import { MANUAL_MOVES, type ManualMove } from "#modules/projects/moves";
+import {
+	ACTIVE_STATUSES,
+	CLOSED_STATUSES,
+	MANUAL_MOVES,
+	type ManualMove,
+	type ProjectFilter,
+} from "#modules/projects/moves";
 import { isExpired, QUOTABLE_STATUSES } from "#modules/projects/quotes";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import QuoteService, {
@@ -29,6 +35,11 @@ type TenantRef = Pick<Tenant, "id">;
 
 /** Who is asking: their user and their role in the tenant. */
 export type Member = Pick<TenantMembership, "userId" | "role">;
+
+/** Projects per page on the projects list. */
+export const PROJECTS_PER_PAGE = 25;
+
+type ProjectQuery = ReturnType<typeof TattooProject.query>;
 
 /**
  * The way to find a tenant's projects and move them through the quote steps
@@ -57,17 +68,61 @@ export default class ProjectService {
 		member: Member,
 		id: string,
 	): Promise<TattooProject> {
-		const query = TattooProject.query()
-			.where("tenant_id", tenant.id)
-			.where("id", id);
-		if (member.role !== "owner") {
-			const profiles = await this.artists.list(tenant);
-			const mine = profiles.find(({ userId }) => userId === member.userId);
-			// No profile of their own: no project is theirs.
-			if (mine) query.where("artist_id", mine.id);
-			else query.whereRaw("false");
-		}
+		const query = TattooProject.query().where("id", id);
+		await this.scopeTo(query, tenant, member);
 		return query.firstOrFail();
+	}
+
+	/**
+	 * A page of the projects `member` may see (the `findFor` rule), for the
+	 * Active view, the Closed view or one status. Active and single-status
+	 * views sort for follow-up: never contacted first, then the longest
+	 * since contact; the Closed view sorts the most recently changed first.
+	 */
+	async list(
+		tenant: TenantRef,
+		member: Member,
+		filter: ProjectFilter,
+		page: number,
+	): Promise<{ projects: TattooProject[]; total: number; lastPage: number }> {
+		const query = TattooProject.query();
+		await this.scopeTo(query, tenant, member);
+		if (filter === "active") query.whereIn("status", [...ACTIVE_STATUSES]);
+		else if (filter === "closed") query.whereIn("status", [...CLOSED_STATUSES]);
+		else query.where("status", filter);
+
+		if (filter === "closed") {
+			query
+				.orderByRaw("coalesce(updated_at, created_at) desc")
+				.orderBy("id", "desc");
+		} else {
+			query
+				.orderByRaw("last_contacted_at asc nulls first")
+				.orderBy("created_at", "asc")
+				.orderBy("id", "asc");
+		}
+		const result = await query.paginate(page, PROJECTS_PER_PAGE);
+		return {
+			projects: result.all(),
+			total: result.total,
+			lastPage: result.lastPage,
+		};
+	}
+
+	/** How many live projects `member` may see, per status. */
+	async countByStatus(
+		tenant: TenantRef,
+		member: Member,
+	): Promise<Partial<Record<ProjectStatus, number>>> {
+		const query = TattooProject.query();
+		await this.scopeTo(query, tenant, member);
+		const rows = await query
+			.select("status")
+			.count("* as total")
+			.groupBy("status");
+		return Object.fromEntries(
+			rows.map((row) => [row.status, Number(row.$extras.total)]),
+		);
 	}
 
 	/**
@@ -285,6 +340,24 @@ export default class ProjectService {
 			return !(await this.deposits.isSettled(tenant, project));
 		}
 		return false;
+	}
+
+	/**
+	 * Narrows a projects query to the tenant and to what `member` may see:
+	 * everything for an owner, else only the projects assigned to their own
+	 * live artist profile (none without one).
+	 */
+	private async scopeTo(
+		query: ProjectQuery,
+		tenant: TenantRef,
+		member: Member,
+	): Promise<void> {
+		query.where("tenant_id", tenant.id);
+		if (member.role === "owner") return;
+		const profiles = await this.artists.list(tenant);
+		const mine = profiles.find(({ userId }) => userId === member.userId);
+		if (mine) query.where("artist_id", mine.id);
+		else query.whereRaw("false");
 	}
 
 	/**

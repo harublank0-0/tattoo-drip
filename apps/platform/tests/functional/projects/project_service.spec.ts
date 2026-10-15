@@ -14,7 +14,9 @@ import TattooProject, {
 	type ProjectStatus,
 } from "#modules/projects/models/tattoo_project";
 import { MANUAL_MOVE_NAMES, type ManualMove } from "#modules/projects/moves";
-import ProjectService from "#modules/projects/services/project_service";
+import ProjectService, {
+	PROJECTS_PER_PAGE,
+} from "#modules/projects/services/project_service";
 import QuoteService, {
 	type NewQuote,
 } from "#modules/projects/services/quote_service";
@@ -897,6 +899,209 @@ test.group("ProjectService artist, notes and contact", (group) => {
 			const at = (await reload(project)).lastContactedAt;
 			assert.isNotNull(at);
 			assert.isTrue((at as DateTime) >= before);
+		});
+	});
+});
+
+test.group("ProjectService.list and countByStatus", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	const briefsOf = (list: TattooProject[]) => list.map(({ brief }) => brief);
+
+	/** One project per status, each with its status as its brief. */
+	async function oneOfEach(tenant: TenantRef) {
+		const client = await makeClient(tenant);
+		for (const status of PROJECT_STATUSES) {
+			await makeProject(tenant, client, { status, brief: status });
+		}
+	}
+
+	test("filters by active, closed or one status", async ({ assert }) => {
+		const { tenant, owner } = await studioWithOwner();
+		const member = { userId: owner.id, role: "owner" as const };
+
+		await inTenant(tenant, async () => {
+			await oneOfEach(tenant);
+
+			const active = await projects.list(tenant, member, "active", 1);
+			assert.sameMembers(briefsOf(active.projects), [
+				"reviewing",
+				"quoted",
+				"on_hold",
+				"deposit_pending",
+				"booked",
+				"in_progress",
+				"healing_check",
+			]);
+			const closed = await projects.list(tenant, member, "closed", 1);
+			assert.sameMembers(briefsOf(closed.projects), [
+				"declined",
+				"cancelled",
+				"completed",
+			]);
+			const quoted = await projects.list(tenant, member, "quoted", 1);
+			assert.deepEqual(briefsOf(quoted.projects), ["quoted"]);
+		});
+	});
+
+	test("active sorts for follow-up; closed sorts newest first", async ({
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+		const member = { userId: owner.id, role: "owner" as const };
+
+		await inTenant(tenant, async () => {
+			const client = await makeClient(tenant);
+			await makeProject(tenant, client, {
+				brief: "1 day ago",
+				lastContactedAt: DateTime.utc().minus({ days: 1 }),
+			});
+			await makeProject(tenant, client, { brief: "never, first" });
+			await makeProject(tenant, client, {
+				brief: "5 days ago",
+				lastContactedAt: DateTime.utc().minus({ days: 5 }),
+			});
+			await makeProject(tenant, client, { brief: "never, second" });
+
+			const active = await projects.list(tenant, member, "active", 1);
+			assert.deepEqual(briefsOf(active.projects), [
+				"never, first",
+				"never, second",
+				"5 days ago",
+				"1 day ago",
+			]);
+
+			const old = await makeProject(tenant, client, {
+				status: "declined",
+				brief: "closed long ago",
+			});
+			const recent = await makeProject(tenant, client, {
+				status: "cancelled",
+				brief: "closed recently",
+			});
+			await TattooProject.query()
+				.where("id", old.id)
+				.update({ updated_at: DateTime.utc().minus({ days: 10 }).toISO() });
+			await TattooProject.query()
+				.where("id", recent.id)
+				.update({ updated_at: DateTime.utc().minus({ days: 1 }).toISO() });
+
+			const closed = await projects.list(tenant, member, "closed", 1);
+			assert.deepEqual(briefsOf(closed.projects), [
+				"closed recently",
+				"closed long ago",
+			]);
+		});
+	});
+
+	test("pages of 25", async ({ assert }) => {
+		const { tenant, owner } = await studioWithOwner();
+		const member = { userId: owner.id, role: "owner" as const };
+
+		await inTenant(tenant, async () => {
+			const client = await makeClient(tenant);
+			for (let i = 0; i < PROJECTS_PER_PAGE + 1; i++) {
+				await makeProject(tenant, client);
+			}
+
+			const first = await projects.list(tenant, member, "active", 1);
+			assert.lengthOf(first.projects, PROJECTS_PER_PAGE);
+			assert.equal(first.total, PROJECTS_PER_PAGE + 1);
+			assert.equal(first.lastPage, 2);
+			assert.lengthOf(
+				(await projects.list(tenant, member, "active", 2)).projects,
+				1,
+			);
+			assert.lengthOf(
+				(await projects.list(tenant, member, "active", 99)).projects,
+				0,
+			);
+		});
+	});
+
+	test("an artist lists and counts only their own projects", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+		const user = await artistIn(tenant, "asha@example.com");
+		const stranger = await artistIn(tenant, "ram@example.com");
+
+		await inTenant(tenant, async () => {
+			const mine = await makeArtist(tenant, "asha");
+			mine.userId = user.id;
+			await mine.save();
+			const client = await makeClient(tenant);
+			await makeProject(tenant, client, { artistId: mine.id, brief: "mine" });
+			await makeProject(tenant, client, {
+				artistId: mine.id,
+				status: "quoted",
+				brief: "mine quoted",
+			});
+			await makeProject(tenant, client, { brief: "unassigned" });
+
+			const asha = { userId: user.id, role: "artist" as const };
+			assert.sameMembers(
+				briefsOf((await projects.list(tenant, asha, "active", 1)).projects),
+				["mine", "mine quoted"],
+			);
+			assert.deepEqual(await projects.countByStatus(tenant, asha), {
+				reviewing: 1,
+				quoted: 1,
+			});
+
+			// No profile of their own: nothing.
+			const ram = { userId: stranger.id, role: "artist" as const };
+			assert.lengthOf(
+				(await projects.list(tenant, ram, "active", 1)).projects,
+				0,
+			);
+			assert.deepEqual(await projects.countByStatus(tenant, ram), {});
+
+			// Their profile deleted: nothing either.
+			await mine.softDelete();
+			assert.lengthOf(
+				(await projects.list(tenant, asha, "active", 1)).projects,
+				0,
+			);
+		});
+	});
+
+	test("an owner counts every live project by status", async ({ assert }) => {
+		const { tenant, owner } = await studioWithOwner();
+		const member = { userId: owner.id, role: "owner" as const };
+
+		await inTenant(tenant, async () => {
+			await oneOfEach(tenant);
+			await makeProject(tenant, await makeClient(tenant), {
+				status: "quoted",
+			});
+			const gone = await makeProject(tenant, await makeClient(tenant), {
+				status: "quoted",
+			});
+			await gone.softDelete();
+
+			const counts = await projects.countByStatus(tenant, member);
+			assert.equal(counts.quoted, 2, "the deleted one is not counted");
+			assert.equal(counts.reviewing, 1);
+			assert.equal(counts.completed, 1);
+		});
+	});
+
+	test("another tenant lists and counts nothing", async ({ assert }) => {
+		const { tenant: a } = await studioWithOwner("studio-a", "Studio A");
+		const { tenant: b, owner: ownerB } = await studioWithOwner(
+			"studio-b",
+			"Studio B",
+		);
+		await inTenant(a, () => oneOfEach(a));
+		const member = { userId: ownerB.id, role: "owner" as const };
+
+		await inTenant(b, async () => {
+			assert.lengthOf(
+				(await projects.list(b, member, "active", 1)).projects,
+				0,
+			);
+			assert.deepEqual(await projects.countByStatus(b, member), {});
 		});
 	});
 });
