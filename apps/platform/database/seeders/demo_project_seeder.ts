@@ -19,6 +19,10 @@ export default class DemoProjectSeeder extends BaseSeeder {
 
 	async run() {
 		const client = this.client;
+		// Writes pass `{ connection }`, not `{ client }`: a model instance keeps
+		// only a transaction client, so a plain `{ client }` would silently
+		// write as the app role and fail row-level security. Queries
+		// (`Model.query({ client })`) do honor the client.
 		for (const tenant of await Tenant.query({ client })) {
 			const existing = await TattooProject.query({ client })
 				.where("tenant_id", tenant.id)
@@ -32,7 +36,7 @@ export default class DemoProjectSeeder extends BaseSeeder {
 						brief: "Demo: a small fine-line moth on the forearm",
 						status: "reviewing",
 					},
-					{ client },
+					{ connection: client.connectionName },
 				));
 			logger.info(`/t/${tenant.slug}/projects/${project.id}`);
 		}
@@ -48,7 +52,7 @@ async function demoClient(tenant: Tenant, client: DemoProjectSeeder["client"]) {
 		found ??
 		Client.create(
 			{ tenantId: tenant.id, name: "Demo Client", phone: DEMO_PHONE },
-			{ client },
+			{ connection: client.connectionName },
 		)
 	);
 }

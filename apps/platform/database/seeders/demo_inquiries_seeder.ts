@@ -62,6 +62,10 @@ export default class DemoInquiriesSeeder extends BaseSeeder {
 
 	async run() {
 		const client = this.client;
+		// Writes pass `{ connection }`, not `{ client }`: a model instance keeps
+		// only a transaction client, so a plain `{ client }` would silently
+		// write as the app role and fail row-level security. Queries
+		// (`Model.query({ client })`) do honor the client.
 		const images = new ImageService();
 		for (const tenant of await Tenant.query({ client })) {
 			const existing = await Inquiry.query({ client })
@@ -80,7 +84,7 @@ export default class DemoInquiriesSeeder extends BaseSeeder {
 							.first()) ??
 						(await Client.create(
 							{ tenantId: tenant.id, name: demo.name, phone: demo.phone },
-							{ client },
+							{ connection: client.connectionName },
 						));
 					const inquiry = await Inquiry.create(
 						{
@@ -98,7 +102,7 @@ export default class DemoInquiriesSeeder extends BaseSeeder {
 							contactEmail: null,
 							status: "new",
 						},
-						{ client },
+						{ connection: client.connectionName },
 					);
 					for (const [position, [r, g, b]] of demo.colours.entries()) {
 						const bytes = await sharp({
@@ -124,7 +128,7 @@ export default class DemoInquiriesSeeder extends BaseSeeder {
 								height: stored.height,
 								position,
 							},
-							{ client },
+							{ connection: client.connectionName },
 						);
 					}
 				}
