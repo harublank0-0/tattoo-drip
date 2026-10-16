@@ -127,6 +127,44 @@ export default class ProjectService {
 	}
 
 	/**
+	 * A `reviewing` project for an accepted inquiry. InquiryService.accept
+	 * calls it inside its own transaction, holding the inquiry's lock; the
+	 * artist was already checked there. The project is new, so there is
+	 * nothing to lock.
+	 */
+	async createFromInquiry(
+		tenant: TenantRef,
+		input: {
+			clientId: string;
+			inquiryId: string;
+			brief: string;
+			artistId: string | null;
+		},
+	): Promise<TattooProject> {
+		return TattooProject.create({
+			tenantId: tenant.id,
+			clientId: input.clientId,
+			inquiryId: input.inquiryId,
+			brief: input.brief,
+			artistId: input.artistId,
+			status: "reviewing",
+		});
+	}
+
+	/** The live projects made from these inquiries, by inquiry id. */
+	async projectIdsForInquiries(
+		tenant: TenantRef,
+		inquiryIds: string[],
+	): Promise<Map<string, string>> {
+		if (inquiryIds.length === 0) return new Map();
+		const rows = await TattooProject.query()
+			.where("tenant_id", tenant.id)
+			.whereIn("inquiry_id", inquiryIds)
+			.select("id", "inquiry_id");
+		return new Map(rows.map((row) => [row.inquiryId as string, row.id]));
+	}
+
+	/**
 	 * Issues the project's next quote version. There are no drafts: saving is
 	 * sending. Allowed while the project is `reviewing`, `quoted`, `on_hold`
 	 * or `deposit_pending` (else QuoteRuleError "project_closed"), and only

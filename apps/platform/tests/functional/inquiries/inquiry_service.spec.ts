@@ -2,10 +2,21 @@ import { randomUUID } from "node:crypto";
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
+import ArtistService from "#modules/artists/services/artist_service";
+import { InquiryRuleError } from "#modules/inquiries/errors";
+import Inquiry from "#modules/inquiries/models/inquiry";
+import ReferenceImage from "#modules/inquiries/models/reference_image";
 import InquiryService, {
 	INQUIRIES_PER_PAGE,
 } from "#modules/inquiries/services/inquiry_service";
+import ImageService from "#modules/media/services/image_service";
+import DepositService from "#modules/payments/services/deposit_service";
+import TattooProject from "#modules/projects/models/tattoo_project";
+import ProjectService from "#modules/projects/services/project_service";
+import QuoteService from "#modules/projects/services/quote_service";
+import SessionService from "#modules/scheduling/services/session_service";
 import {
+	makeArtist,
 	makeClient,
 	makeInquiry,
 	makeProject,
@@ -13,7 +24,16 @@ import {
 } from "#tests/helpers/pipeline";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
-const inquiries = new InquiryService();
+const artists = new ArtistService(new ImageService());
+const quotes = new QuoteService();
+const deposits = new DepositService(quotes);
+const projects = new ProjectService(
+	artists,
+	quotes,
+	deposits,
+	new SessionService(artists, deposits),
+);
+const inquiries = new InquiryService(artists, projects);
 
 type TenantRef = { id: string };
 
@@ -175,6 +195,185 @@ test.group("InquiryService reads", (group) => {
 			assert.lengthOf((await inquiries.listNew(b, 1)).inquiries, 0);
 			assert.equal(await inquiries.countNew(b), 0);
 			assert.isNull(await inquiries.find(b, inquiry.id));
+		});
+	});
+});
+
+/** The InquiryRuleError reason `work` throws, or null if it succeeds. */
+async function reasonOf(work: () => Promise<unknown>) {
+	try {
+		await work();
+		return null;
+	} catch (error) {
+		if (error instanceof InquiryRuleError) return error.reason;
+		throw error;
+	}
+}
+
+test.group("InquiryService accept and decline", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("accepting creates the project, moves the live images and decides", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const artist = await makeArtist(tenant);
+			const inquiry = await inquiryIn(tenant, { idea: "A koi on the calf" });
+			const other = await inquiryIn(tenant);
+			const kept = await makeReferenceImage(tenant, { inquiryId: inquiry.id });
+			const gone = await makeReferenceImage(tenant, {
+				inquiryId: inquiry.id,
+				position: 1,
+			});
+			await gone.softDelete();
+			const theirs = await makeReferenceImage(tenant, { inquiryId: other.id });
+
+			const project = await inquiries.accept(tenant, inquiry, artist.id);
+
+			const created = await TattooProject.findOrFail(project.id);
+			assert.deepEqual(
+				[
+					created.status,
+					created.clientId,
+					created.inquiryId,
+					created.brief,
+					created.artistId,
+				],
+				[
+					"reviewing",
+					inquiry.clientId,
+					inquiry.id,
+					"A koi on the calf",
+					artist.id,
+				],
+			);
+			const decided = await Inquiry.findOrFail(inquiry.id);
+			assert.equal(decided.status, "accepted");
+			assert.isNotNull(decided.decidedAt);
+			const moved = await ReferenceImage.findOrFail(kept.id);
+			assert.equal(moved.projectId, project.id);
+			assert.equal(moved.inquiryId, inquiry.id);
+			const stillGone = await ReferenceImage.withTrashed()
+				.where("id", gone.id)
+				.firstOrFail();
+			assert.isNull(stillGone.projectId);
+			assert.isNull((await ReferenceImage.findOrFail(theirs.id)).projectId);
+		});
+	});
+
+	test("accepting with no artist leaves the project unassigned", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const project = await inquiries.accept(
+				tenant,
+				await inquiryIn(tenant),
+				null,
+			);
+			assert.isNull((await TattooProject.findOrFail(project.id)).artistId);
+		});
+	});
+
+	test("a deleted or another tenant's artist is refused and nothing changes", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("studio-a", "Studio A");
+		const { tenant: other } = await studioWithOwner("studio-b", "Studio B");
+		const theirs = await inTenant(other, () => makeArtist(other, "theirs"));
+
+		await inTenant(tenant, async () => {
+			const gone = await makeArtist(tenant, "gone");
+			await gone.softDelete();
+			const inquiry = await inquiryIn(tenant);
+
+			for (const artistId of [gone.id, theirs.id, randomUUID()]) {
+				assert.equal(
+					await reasonOf(() => inquiries.accept(tenant, inquiry, artistId)),
+					"artist_unavailable",
+				);
+			}
+			assert.equal((await Inquiry.findOrFail(inquiry.id)).status, "new");
+			assert.lengthOf(
+				await TattooProject.query().where("inquiry_id", inquiry.id),
+				0,
+			);
+		});
+	});
+
+	test("an inquiry is decided once: accepting or declining again is refused", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const accepted = await inquiryIn(tenant);
+			await inquiries.accept(tenant, accepted, null);
+			assert.equal(
+				await reasonOf(() => inquiries.accept(tenant, accepted, null)),
+				"already_decided",
+			);
+			assert.equal(
+				await reasonOf(() => inquiries.decline(tenant, accepted)),
+				"already_decided",
+			);
+			assert.lengthOf(
+				await TattooProject.query().where("inquiry_id", accepted.id),
+				1,
+			);
+		});
+	});
+
+	test("declining decides the inquiry and creates nothing", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const inquiry = await inquiryIn(tenant);
+			await inquiries.decline(tenant, inquiry);
+
+			const decided = await Inquiry.findOrFail(inquiry.id);
+			assert.equal(decided.status, "declined");
+			assert.isNotNull(decided.decidedAt);
+			assert.equal(
+				await reasonOf(() => inquiries.accept(tenant, inquiry, null)),
+				"already_decided",
+			);
+			assert.lengthOf(
+				await TattooProject.query().where("inquiry_id", inquiry.id),
+				0,
+			);
+		});
+	});
+
+	test("projectIdsForInquiries maps accepted inquiries to their projects", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("studio-a", "Studio A");
+		const { tenant: b } = await studioWithOwner("studio-b", "Studio B");
+
+		const { inquiry, project } = await inTenant(tenant, async () => {
+			const inquiry = await inquiryIn(tenant);
+			return {
+				inquiry,
+				project: await inquiries.accept(tenant, inquiry, null),
+			};
+		});
+
+		await inTenant(tenant, async () => {
+			const map = await projects.projectIdsForInquiries(tenant, [inquiry.id]);
+			assert.equal(map.get(inquiry.id), project.id);
+			assert.equal((await projects.projectIdsForInquiries(tenant, [])).size, 0);
+		});
+		await inTenant(b, async () => {
+			assert.equal(
+				(await projects.projectIdsForInquiries(b, [inquiry.id])).size,
+				0,
+			);
 		});
 	});
 });
