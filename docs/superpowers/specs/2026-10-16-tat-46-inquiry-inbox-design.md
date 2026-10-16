@@ -71,7 +71,7 @@ A new `/t/:tenant/inbox` group: auth, dbContext, tenant, `role({ allow: ["owner"
 
 ## Demo data
 
-The development seeder (`database/seeders/demo_project_seeder.ts`, `pnpm seed:dev`, owner role) also gives each tenant without inquiries three `new` ones: three demo clients (fixed demo phones, reused on a second run), one inquiry naming the tenant's first artist (if any), one with a budget. Each gets 1–2 generated solid-colour JPEGs stored through a new media helper, `ImageService.storeBytes(tenant, purpose, bytes)` (the same processing, key layout and private disk as uploads), and `ReferenceImage` rows. It prints the inbox path.
+A new development seeder (`database/seeders/demo_inquiries_seeder.ts`, run by `pnpm seed:dev` next to the demo project seeder, owner role) gives each tenant without inquiries three `new` ones: three demo clients (fixed demo phones, reused on a second run), one inquiry naming the tenant's first artist (if any), one with a budget. Each gets 1–2 generated solid-colour JPEGs stored through a new media helper, `ImageService.storeBytes(bytes, { tenant, purpose })` (the same processing, key layout and private disk as uploads, and the same arguments as `store`), and `ReferenceImage` rows. It prints the inbox path.
 
 ## Tests
 
