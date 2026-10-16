@@ -45,6 +45,10 @@ export interface ApiDefinition {
       update: typeof routes['tenant.artists.update']
       destroy: typeof routes['tenant.artists.destroy']
     }
+    inbox: {
+      index: typeof routes['tenant.inbox.index']
+      show: typeof routes['tenant.inbox.show']
+    }
     projects: {
       index: typeof routes['tenant.projects.index']
       show: typeof routes['tenant.projects.show']

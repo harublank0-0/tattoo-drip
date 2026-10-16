@@ -1,0 +1,90 @@
+import { Link } from "@inertiajs/react";
+import { urlFor } from "~/client";
+import { type InquiryPageProps, SOURCE_LABELS } from "~/components/inquiries";
+import Page from "~/components/page";
+import ReferenceGrid from "~/components/references";
+import { Badge } from "~/components/ui/badge";
+import { buttonVariants } from "~/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { useTenant } from "~/hooks/use-tenant";
+import AppLayout from "~/layouts/app";
+
+/** One inquiry, exactly as the client sent it (TAT-46). Owners only. */
+export default function InquiryShow({
+	inquiry,
+	references,
+	projectId,
+}: InquiryPageProps) {
+	const tenant = useTenant();
+	const details: [string, string | null][] = [
+		["Placement", inquiry.placement],
+		["Approximate size", inquiry.approximateSize],
+		["Preferred dates", inquiry.preferredDates],
+		["Preferred artist", inquiry.preferredArtistName ?? "Any artist"],
+		["Budget", inquiry.budget],
+		[
+			"Found the studio through",
+			SOURCE_LABELS[inquiry.source] ?? inquiry.source,
+		],
+		["Phone", inquiry.contactPhone],
+		["Email", inquiry.contactEmail],
+	];
+
+	return (
+		<Page title={inquiry.contactName} description={inquiry.receivedText}>
+			<div className="flex max-w-2xl flex-col gap-6">
+				{inquiry.status !== "new" && (
+					<Card>
+						<CardContent className="flex flex-wrap items-center justify-between gap-3 text-sm">
+							<span className="flex items-center gap-2">
+								<Badge variant="secondary">
+									{inquiry.status === "accepted" ? "Accepted" : "Declined"}
+								</Badge>
+								{inquiry.decidedOn}
+							</span>
+							{projectId && (
+								<Link
+									href={urlFor("tenant.projects.show", {
+										tenant: tenant.slug,
+										id: projectId,
+									})}
+									className={buttonVariants({ variant: "outline", size: "sm" })}
+								>
+									View project
+								</Link>
+							)}
+						</CardContent>
+					</Card>
+				)}
+
+				<Card>
+					<CardHeader>
+						<CardTitle>Idea</CardTitle>
+					</CardHeader>
+					<CardContent className="flex flex-col gap-4">
+						<p className="text-sm whitespace-pre-line">{inquiry.idea}</p>
+						<dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+							{details.map(([label, value]) => (
+								<div key={label} className="contents">
+									<dt className="text-muted-foreground">{label}</dt>
+									<dd>{value ?? "—"}</dd>
+								</div>
+							))}
+						</dl>
+					</CardContent>
+				</Card>
+
+				<Card>
+					<CardHeader>
+						<CardTitle>References</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<ReferenceGrid references={references} />
+					</CardContent>
+				</Card>
+			</div>
+		</Page>
+	);
+}
+
+InquiryShow.layout = [AppLayout];

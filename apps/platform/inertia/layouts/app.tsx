@@ -1,7 +1,14 @@
 import { Form } from "@adonisjs/inertia/react";
 import { usePage } from "@inertiajs/react";
 import { cn } from "cn";
-import { ClipboardList, House, LogOut, Settings, Users } from "lucide-react";
+import {
+	ClipboardList,
+	House,
+	Inbox,
+	LogOut,
+	Settings,
+	Users,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import FlashToasts from "~/components/flash_toasts";
 import Logo from "~/components/logo";
@@ -14,9 +21,14 @@ import { Button, buttonVariants } from "~/components/ui/button";
  * Navigation inside a tenant. Add an entry here for every new area of the
  * dashboard; links point at the current tenant (/t/:tenant/...).
  */
-function tenantNav(tenant: { slug: string; role: string }): NavItem[] {
+function tenantNav(
+	tenant: { slug: string; role: string },
+	inboxCount: number | null,
+): NavItem[] {
 	const params = { tenant: tenant.slug };
-	const items: NavItem[] = [
+	const owner = tenant.role === "owner";
+	// Inbox, Artists and Settings are owners only; the server 404s anyone else.
+	const items: (NavItem | false)[] = [
 		{
 			label: "Dashboard",
 			route: "tenant.dashboard",
@@ -24,36 +36,38 @@ function tenantNav(tenant: { slug: string; role: string }): NavItem[] {
 			exact: true,
 			icon: House,
 		},
+		owner && {
+			label: "Inbox",
+			route: "tenant.inbox.index",
+			params,
+			icon: Inbox,
+			badge: inboxCount ?? undefined,
+		},
 		{
 			label: "Projects",
 			route: "tenant.projects.index",
 			params,
 			icon: ClipboardList,
 		},
+		owner && {
+			label: "Artists",
+			route: "tenant.artists",
+			params,
+			icon: Users,
+		},
+		owner && {
+			label: "Settings",
+			route: "tenant.settings",
+			params,
+			icon: Settings,
+		},
 	];
-	// Owners only; the server 404s anyone else.
-	if (tenant.role === "owner") {
-		items.push(
-			{
-				label: "Artists",
-				route: "tenant.artists",
-				params,
-				icon: Users,
-			},
-			{
-				label: "Settings",
-				route: "tenant.settings",
-				params,
-				icon: Settings,
-			},
-		);
-	}
-	return items;
+	return items.filter((item): item is NavItem => item !== false);
 }
 
 export default function AppLayout({ children }: { children: ReactNode }) {
-	const { tenant } = usePage().props;
-	const nav = tenant ? tenantNav(tenant) : [];
+	const { tenant, inboxCount } = usePage().props;
+	const nav = tenant ? tenantNav(tenant, inboxCount) : [];
 
 	return (
 		<div className="flex min-h-svh flex-col">

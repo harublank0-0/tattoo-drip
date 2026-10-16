@@ -1,0 +1,124 @@
+import { Link } from "@inertiajs/react";
+import { urlFor } from "~/client";
+import type { InboxListProps } from "~/components/inquiries";
+import Page from "~/components/page";
+import { Badge } from "~/components/ui/badge";
+import { buttonVariants } from "~/components/ui/button";
+import { useTenant } from "~/hooks/use-tenant";
+import AppLayout from "~/layouts/app";
+
+/**
+ * The inquiry inbox (TAT-46): new inquiries waiting for a decision, oldest
+ * first, and the decided ones. Owners only.
+ */
+export default function InboxIndex({
+	view,
+	newCount,
+	inquiries,
+	page,
+}: InboxListProps) {
+	const tenant = useTenant();
+	const base = urlFor("tenant.inbox.index", { tenant: tenant.slug });
+	const href = (tab: string, pageNumber = 1) =>
+		`${base}?view=${tab}${pageNumber > 1 ? `&page=${pageNumber}` : ""}`;
+	const tabs = [
+		{ value: "new", label: `New (${newCount})` },
+		{ value: "decided", label: "Decided" },
+	];
+
+	return (
+		<Page title="Inbox">
+			<nav aria-label="Inbox views" className="flex gap-2">
+				{tabs.map((tab) => (
+					<Link
+						key={tab.value}
+						href={href(tab.value)}
+						aria-current={tab.value === view ? "page" : undefined}
+						className={buttonVariants({
+							variant: tab.value === view ? "default" : "outline",
+							size: "sm",
+						})}
+					>
+						{tab.label}
+					</Link>
+				))}
+			</nav>
+
+			{inquiries.length === 0 ? (
+				<p className="text-sm text-muted-foreground">
+					{view === "new"
+						? "No new inquiries. They arrive here from the studio page."
+						: "Nothing decided yet."}
+				</p>
+			) : (
+				<ul className="flex flex-col divide-y rounded-md border">
+					{inquiries.map((inquiry) => (
+						<li key={inquiry.id}>
+							<Link
+								href={urlFor("tenant.inbox.show", {
+									tenant: tenant.slug,
+									id: inquiry.id,
+								})}
+								className="flex flex-col gap-1 px-4 py-3 hover:bg-muted/50"
+							>
+								<span className="flex flex-wrap items-center justify-between gap-2">
+									<span className="font-medium">{inquiry.contactName}</span>
+									{view === "new" ? (
+										<span className="text-sm text-muted-foreground">
+											{inquiry.receivedText}
+										</span>
+									) : (
+										<span className="flex items-center gap-2 text-sm">
+											<Badge
+												variant={
+													inquiry.status === "accepted"
+														? "secondary"
+														: "outline"
+												}
+											>
+												{inquiry.status === "accepted"
+													? "Accepted"
+													: "Declined"}
+											</Badge>
+											<span className="text-muted-foreground">
+												{inquiry.decidedOn}
+											</span>
+										</span>
+									)}
+								</span>
+								{view === "new" && (
+									<>
+										<span className="line-clamp-2 text-sm">{inquiry.idea}</span>
+										<span className="text-sm text-muted-foreground">
+											{inquiry.placement} · {inquiry.approximateSize} ·{" "}
+											{inquiry.preferredArtistName ?? "any artist"}
+											{inquiry.references > 0 &&
+												` · ${inquiry.references} reference${inquiry.references === 1 ? "" : "s"}`}
+										</span>
+									</>
+								)}
+							</Link>
+						</li>
+					))}
+				</ul>
+			)}
+
+			{page.last > 1 && (
+				<nav aria-label="Pages" className="flex justify-between text-sm">
+					{page.current > 1 ? (
+						<Link href={href(view, page.current - 1)}>Previous</Link>
+					) : (
+						<span />
+					)}
+					{page.current < page.last ? (
+						<Link href={href(view, page.current + 1)}>Next</Link>
+					) : (
+						<span />
+					)}
+				</nav>
+			)}
+		</Page>
+	);
+}
+
+InboxIndex.layout = [AppLayout];

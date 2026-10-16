@@ -1,5 +1,7 @@
 import { DateTime } from "luxon";
 import Artist from "#modules/artists/models/artist";
+import Inquiry from "#modules/inquiries/models/inquiry";
+import ReferenceImage from "#modules/inquiries/models/reference_image";
 import PaymentMethod from "#modules/payments/models/payment_method";
 import Quote from "#modules/projects/models/quote";
 import TattooProject from "#modules/projects/models/tattoo_project";
@@ -27,7 +29,12 @@ export type IsolationCase = {
 	 * The seeded resource (a key of Studio) that the route's :id refers to.
 	 * Required for a pattern with an :id; the helper throws without it.
 	 */
-	resource?: "paymentMethod" | "artistProfile" | "project" | "quotedProject";
+	resource?:
+		| "paymentMethod"
+		| "artistProfile"
+		| "project"
+		| "quotedProject"
+		| "newInquiry";
 	/** Who sends the request. Every settings route is owner-only. */
 	actor: "owner" | "artist";
 	/** A valid body for writes, built for the studio sending it. */
@@ -87,6 +94,27 @@ const projectRows = (target: Studio) =>
 		quotes: (
 			await Quote.query().where("tenant_id", target.tenant.id).orderBy("id")
 		).map((quote) => quote.serialize()),
+	}));
+
+// Inquiries, projects and reference images, deleted ones included: what
+// accepting or declining an inquiry could change.
+const inboxRows = (target: Studio) =>
+	inTenant(target.tenant, async () => ({
+		inquiries: (
+			await Inquiry.withTrashed()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("id")
+		).map((inquiry) => inquiry.serialize()),
+		projects: (
+			await TattooProject.withTrashed()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("id")
+		).map((project) => project.serialize()),
+		images: (
+			await ReferenceImage.withTrashed()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("id")
+		).map((image) => image.serialize()),
 	}));
 
 const profileBody = (own: Studio) => ({
@@ -327,5 +355,20 @@ export const isolationCases: IsolationCase[] = [
 		body: (own) => ({ artistId: own.artistProfile.id }),
 		ownStatus: 302,
 		snapshot: projectRows,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/inbox",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: inboxRows,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/inbox/:id",
+		resource: "newInquiry",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: inboxRows,
 	},
 ];
