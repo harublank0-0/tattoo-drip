@@ -1,23 +1,34 @@
 import { DateTime } from "luxon";
 
 /**
- * When the client was last contacted, for people: "contacted today",
- * "contacted yesterday", "contacted 3 days ago" or "never contacted",
- * counting calendar days in the studio's timezone.
+ * How long ago `at` was, for people: "today", "yesterday" or "N days ago",
+ * counting calendar days in the studio's timezone (a slightly fast clock
+ * still says today).
  */
-export function contactedText(
-	at: DateTime | null,
+export function daysAgoText(
+	at: DateTime,
 	timezone: string,
 	now: DateTime = DateTime.now(),
 ): string {
-	if (!at) return "never contacted";
 	const days = Math.round(
 		now
 			.setZone(timezone)
 			.startOf("day")
 			.diff(at.setZone(timezone).startOf("day"), "days").days,
 	);
-	if (days <= 0) return "contacted today";
-	if (days === 1) return "contacted yesterday";
-	return `contacted ${days} days ago`;
+	if (days <= 0) return "today";
+	if (days === 1) return "yesterday";
+	return `${days} days ago`;
+}
+
+/**
+ * When the client was last contacted, for people: "contacted today",
+ * "contacted yesterday", "contacted 3 days ago" or "never contacted".
+ */
+export function contactedText(
+	at: DateTime | null,
+	timezone: string,
+	now: DateTime = DateTime.now(),
+): string {
+	return at ? `contacted ${daysAgoText(at, timezone, now)}` : "never contacted";
 }

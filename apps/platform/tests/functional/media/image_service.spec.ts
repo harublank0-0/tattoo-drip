@@ -150,3 +150,22 @@ test.group("ImageService", () => {
 		await images.delete("payment_qr", stored.key);
 	});
 });
+
+test.group("ImageService.storeBytes", () => {
+	test("stores bytes like an upload: processed, private, under tenant and purpose", async ({
+		assert,
+	}) => {
+		const stored = await images.storeBytes(await testImages.jpeg(), {
+			tenant,
+			purpose: "reference_image",
+		});
+
+		assert.match(
+			stored.key,
+			new RegExp(`^tenants/${tenant.id}/reference_image/${V4}\\.jpg$`),
+		);
+		assert.deepEqual([stored.width, stored.height], [300, 200]);
+		assert.isTrue(await drive.use("private").exists(stored.key));
+		assert.isFalse(await drive.use("public").exists(stored.key));
+	});
+});

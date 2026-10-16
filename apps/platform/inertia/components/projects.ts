@@ -1,3 +1,5 @@
+import type { ReferenceProps } from "~/components/inquiries";
+
 /**
  * One quote version as the project page gets it. The amounts in the form's
  * units (rupees, hours) prefill a revision.
@@ -66,6 +68,15 @@ export type ProjectPageProps = {
 	assignment: {
 		artistId: string | null;
 		choices: { id: string; name: string }[];
+	} | null;
+	/** For a project made from an inquiry: what the client asked for. */
+	request: {
+		placement: string;
+		approximateSize: string;
+		preferredDates: string;
+		budget: string | null;
+		source: string;
+		references: ReferenceProps[];
 	} | null;
 };
 

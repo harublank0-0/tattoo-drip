@@ -3,6 +3,7 @@ import { router } from "@inertiajs/react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { urlFor } from "~/client";
+import { SOURCE_LABELS } from "~/components/inquiries";
 import Page from "~/components/page";
 import {
 	formatRupees,
@@ -13,6 +14,7 @@ import {
 	STATUS_LABELS,
 	suggestedDeposit,
 } from "~/components/projects";
+import ReferenceGrid from "~/components/references";
 import { Badge } from "~/components/ui/badge";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -68,6 +70,7 @@ export default function ProjectShow({
 	notes,
 	contactedText,
 	assignment,
+	request,
 }: ProjectPageProps) {
 	const tenant = useTenant();
 	const params = { tenant: tenant.slug, id: project.id };
@@ -119,6 +122,37 @@ export default function ProjectShow({
 						)}
 					</CardContent>
 				</Card>
+
+				{request && (
+					<Card>
+						<CardHeader>
+							<CardTitle>Request</CardTitle>
+						</CardHeader>
+						<CardContent className="flex flex-col gap-4">
+							<dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+								<dt className="text-muted-foreground">Placement</dt>
+								<dd className="min-w-0 break-words">{request.placement}</dd>
+								<dt className="text-muted-foreground">Approximate size</dt>
+								<dd className="min-w-0 break-words">
+									{request.approximateSize}
+								</dd>
+								<dt className="text-muted-foreground">Preferred dates</dt>
+								<dd className="min-w-0 break-words">
+									{request.preferredDates}
+								</dd>
+								<dt className="text-muted-foreground">Budget</dt>
+								<dd className="min-w-0 break-words">{request.budget ?? "—"}</dd>
+								<dt className="text-muted-foreground">
+									Found the studio through
+								</dt>
+								<dd className="min-w-0 break-words">
+									{SOURCE_LABELS[request.source] ?? request.source}
+								</dd>
+							</dl>
+							<ReferenceGrid references={request.references} />
+						</CardContent>
+					</Card>
+				)}
 
 				<Card>
 					<CardHeader>

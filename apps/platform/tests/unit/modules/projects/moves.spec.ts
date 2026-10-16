@@ -1,6 +1,6 @@
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
-import { contactedText } from "#modules/projects/contact";
+import { contactedText, daysAgoText } from "#modules/projects/contact";
 import {
 	PROJECT_STATUSES,
 	type ProjectStatus,
@@ -114,5 +114,21 @@ test.group("contactedText", () => {
 		const at = DateTime.fromISO("2026-10-14T20:00:00Z");
 		assert.equal(contactedText(at, KTM, now), "contacted today");
 		assert.equal(contactedText(at, "UTC", now), "contacted yesterday");
+	});
+});
+
+test.group("daysAgoText", () => {
+	const now = DateTime.fromISO("2026-10-15T10:00:00", { zone: KTM });
+
+	test("counts calendar days, a future time counting as today", ({
+		assert,
+	}) => {
+		assert.equal(daysAgoText(now.set({ hour: 1 }), KTM, now), "today");
+		assert.equal(daysAgoText(now.plus({ hours: 2 }), KTM, now), "today");
+		assert.equal(
+			daysAgoText(now.minus({ days: 1 }).set({ hour: 23 }), KTM, now),
+			"yesterday",
+		);
+		assert.equal(daysAgoText(now.minus({ days: 6 }), KTM, now), "6 days ago");
 	});
 });

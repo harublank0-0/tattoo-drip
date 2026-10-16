@@ -115,6 +115,32 @@ router
 			.use(middleware.role({ allow: ["owner"] }));
 
 		/**
+		 * The inquiry inbox: owners only (reference images are private to
+		 * owners until a project is assigned). Every inbox route goes in this
+		 * group (a test checks).
+		 */
+		router
+			.group(() => {
+				router
+					.get("/", [controllers.Inquiries, "index"])
+					.as("tenant.inbox.index");
+				router
+					.get(":id", [controllers.Inquiries, "show"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.inbox.show");
+				router
+					.post(":id/accept", [controllers.Inquiries, "accept"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.inbox.accept");
+				router
+					.post(":id/decline", [controllers.Inquiries, "decline"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.inbox.decline");
+			})
+			.prefix("/inbox")
+			.use(middleware.role({ allow: ["owner"] }));
+
+		/**
 		 * Projects: owners, and the artist assigned to the project
 		 * (ProjectService.findFor gives anyone else a 404). Every projects
 		 * route goes in this group (a test checks).

@@ -5,9 +5,11 @@ import { expiresAtFor, todayIn } from "#modules/projects/quotes";
 import {
 	makeArtist,
 	makeClient,
+	makeInquiry,
 	makePayment,
 	makeProject,
 	makeQuote,
+	makeReferenceImage,
 	makeSession,
 } from "#tests/helpers/pipeline";
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
@@ -344,5 +346,90 @@ test.group("Project page: message and withdraw guards", (group) => {
 		).inertiaProps;
 		assert.deepEqual(freeProps.moves, ["withdraw"]);
 		assert.isFalse(freeProps.withdrawBlocked);
+	});
+});
+
+test.group("Project page: the original request", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("a project from an inquiry shows the request and its references", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const project = await inTenant(tenant, async () => {
+			const customer = await makeClient(tenant);
+			const inquiry = await makeInquiry(tenant, customer, {
+				status: "accepted",
+				decidedAt: DateTime.utc(),
+				budget: "NPR 20,000",
+			});
+			const project = await makeProject(tenant, customer, {
+				inquiryId: inquiry.id,
+			});
+			await makeReferenceImage(tenant, {
+				inquiryId: inquiry.id,
+				projectId: project.id,
+			});
+			return project;
+		});
+
+		const props = (
+			await client.get(page(project.id)).withInertia().loginAs(owner)
+		).inertiaProps;
+
+		assert.deepInclude(props.request, {
+			placement: "Forearm",
+			approximateSize: "8 cm",
+			preferredDates: "Any weekday in November",
+			budget: "NPR 20,000",
+			source: "instagram",
+		});
+		assert.lengthOf(props.request.references, 1);
+		assert.include(props.request.references[0].url, "reference_image/");
+	});
+
+	test("a project made directly has no request", async ({ client, assert }) => {
+		const { owner, tenant } = await studioWithOwner();
+		const project = await inTenant(tenant, async () =>
+			makeProject(tenant, await makeClient(tenant)),
+		);
+
+		const props = (
+			await client.get(page(project.id)).withInertia().loginAs(owner)
+		).inertiaProps;
+		assert.isNull(props.request);
+	});
+
+	test("the assigned artist sees the request and references too", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+		const asha = await artistIn(tenant, "asha@example.com");
+		const project = await inTenant(tenant, async () => {
+			const profile = await makeArtist(tenant, "asha");
+			profile.userId = asha.id;
+			await profile.save();
+			const customer = await makeClient(tenant);
+			const inquiry = await makeInquiry(tenant, customer, {
+				status: "accepted",
+				decidedAt: DateTime.utc(),
+			});
+			const project = await makeProject(tenant, customer, {
+				inquiryId: inquiry.id,
+				artistId: profile.id,
+			});
+			await makeReferenceImage(tenant, {
+				inquiryId: inquiry.id,
+				projectId: project.id,
+			});
+			return project;
+		});
+
+		const props = (
+			await client.get(page(project.id)).withInertia().loginAs(asha)
+		).inertiaProps;
+		assert.lengthOf(props.request.references, 1);
 	});
 });

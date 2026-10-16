@@ -6,6 +6,10 @@ import { tenantContext } from "#middleware/tenant_middleware";
 import ArtistService from "#modules/artists/services/artist_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ClientService from "#modules/clients/services/client_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import InquiryService from "#modules/inquiries/services/inquiry_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import ImageService from "#modules/media/services/image_service";
 import { contactedText } from "#modules/projects/contact";
 import type Quote from "#modules/projects/models/quote";
 import {
@@ -49,6 +53,8 @@ export default class ProjectsController {
 		private clients: ClientService,
 		private artists: ArtistService,
 		private sessions: SessionService,
+		private inquiries: InquiryService,
+		private images: ImageService,
 	) {}
 
 	async index(ctx: HttpContext) {
@@ -123,6 +129,29 @@ export default class ProjectsController {
 		const { timezone } = tenant;
 		const today = DateTime.fromISO(todayIn(timezone), { zone: "utc" });
 
+		const inquiry = project.inquiryId
+			? await this.inquiries.find(tenant, project.inquiryId)
+			: null;
+		const request = inquiry
+			? {
+					placement: inquiry.placement,
+					approximateSize: inquiry.approximateSize,
+					preferredDates: inquiry.preferredDates,
+					budget: inquiry.budget,
+					source: inquiry.sourceChannel,
+					references: await Promise.all(
+						(
+							await this.inquiries.images(tenant, { projectId: project.id })
+						).map(async (image) => ({
+							id: image.id,
+							url: await this.images.url("reference_image", image.imageKey),
+							width: image.width,
+							height: image.height,
+						})),
+					),
+				}
+			: null;
+
 		return ctx.inertia.render("projects/show", {
 			project: {
 				id: project.id,
@@ -171,6 +200,7 @@ export default class ProjectsController {
 							choices: artists.map(({ id, name }) => ({ id, name })),
 						}
 					: null,
+			request,
 		});
 	}
 }

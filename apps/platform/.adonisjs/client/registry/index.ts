@@ -156,6 +156,30 @@ const routes = {
     tokens: [{"old":"/t/:tenant/artists/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/:id","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/:id","type":1,"val":"id","end":""}],
     types: placeholder as Registry['tenant.artists.destroy']['types'],
   },
+  'tenant.inbox.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/inbox',
+    tokens: [{"old":"/t/:tenant/inbox","type":0,"val":"t","end":""},{"old":"/t/:tenant/inbox","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inbox","type":0,"val":"inbox","end":""}],
+    types: placeholder as Registry['tenant.inbox.index']['types'],
+  },
+  'tenant.inbox.show': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/inbox/:id',
+    tokens: [{"old":"/t/:tenant/inbox/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/inbox/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inbox/:id","type":0,"val":"inbox","end":""},{"old":"/t/:tenant/inbox/:id","type":1,"val":"id","end":""}],
+    types: placeholder as Registry['tenant.inbox.show']['types'],
+  },
+  'tenant.inbox.accept': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/inbox/:id/accept',
+    tokens: [{"old":"/t/:tenant/inbox/:id/accept","type":0,"val":"t","end":""},{"old":"/t/:tenant/inbox/:id/accept","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inbox/:id/accept","type":0,"val":"inbox","end":""},{"old":"/t/:tenant/inbox/:id/accept","type":1,"val":"id","end":""},{"old":"/t/:tenant/inbox/:id/accept","type":0,"val":"accept","end":""}],
+    types: placeholder as Registry['tenant.inbox.accept']['types'],
+  },
+  'tenant.inbox.decline': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/inbox/:id/decline',
+    tokens: [{"old":"/t/:tenant/inbox/:id/decline","type":0,"val":"t","end":""},{"old":"/t/:tenant/inbox/:id/decline","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inbox/:id/decline","type":0,"val":"inbox","end":""},{"old":"/t/:tenant/inbox/:id/decline","type":1,"val":"id","end":""},{"old":"/t/:tenant/inbox/:id/decline","type":0,"val":"decline","end":""}],
+    types: placeholder as Registry['tenant.inbox.decline']['types'],
+  },
   'tenant.projects.index': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/projects',
