@@ -15,6 +15,8 @@ export type NavItem = {
 	/** Only active on the route itself, not on nested URLs. */
 	exact?: boolean;
 	icon?: LucideIcon;
+	/** A count shown next to the label, e.g. new inquiries. */
+	badge?: number;
 };
 
 /**

@@ -74,7 +74,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 					</div>
 				</div>
 				<nav className="mx-auto flex w-full max-w-6xl gap-1 px-2 pb-2 sm:px-6">
-					{nav.map(({ label, route, params, exact, icon: Icon }) => (
+					{nav.map(({ label, route, params, exact, icon: Icon, badge }) => (
 						<NavLink
 							key={label}
 							route={route}
@@ -87,6 +87,11 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 						>
 							{Icon && <Icon data-icon="inline-start" />}
 							{label}
+							{badge ? (
+								<span className="rounded-full bg-primary px-1.5 text-xs text-primary-foreground tabular-nums">
+									{badge}
+								</span>
+							) : null}
 						</NavLink>
 					))}
 				</nav>

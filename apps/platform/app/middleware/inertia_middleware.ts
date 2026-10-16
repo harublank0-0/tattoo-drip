@@ -2,6 +2,7 @@ import type { HttpContext } from "@adonisjs/core/http";
 import type { NextFn } from "@adonisjs/core/types/http";
 import BaseInertiaMiddleware from "@adonisjs/inertia/inertia_middleware";
 import type User from "#models/user";
+import InquiryService from "#modules/inquiries/services/inquiry_service";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { ensureDbContext } from "#services/db_context";
 import UserTransformer from "#transformers/user_transformer";
@@ -34,6 +35,18 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 							),
 					)
 				: undefined;
+
+		// The Inbox badge: owners only, the inbox is theirs.
+		const inboxCount =
+			tenant && membership?.role === "owner" && auth?.user
+				? await ensureDbContext(
+						{ userId: auth.user.id, tenantId: tenant.id },
+						async () =>
+							(await ctx.containerResolver.make(InquiryService)).countNew(
+								tenant,
+							),
+					)
+				: null;
 
 		/**
 		 * Data shared with all Inertia pages. Make sure you are using
@@ -69,6 +82,8 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 					role,
 				})),
 			),
+			/** New inquiries waiting in the inbox; null unless an owner is on a tenant page. */
+			inboxCount: ctx.inertia.always(inboxCount),
 		};
 	}
 
