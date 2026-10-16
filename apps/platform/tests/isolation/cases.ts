@@ -371,4 +371,21 @@ export const isolationCases: IsolationCase[] = [
 		ownStatus: 200,
 		snapshot: inboxRows,
 	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/inbox/:id/accept",
+		resource: "newInquiry",
+		actor: "owner",
+		body: () => ({ artistId: "" }),
+		ownStatus: 302,
+		snapshot: inboxRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/inbox/:id/decline",
+		resource: "newInquiry",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: inboxRows,
+	},
 ];

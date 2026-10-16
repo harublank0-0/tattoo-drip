@@ -1,6 +1,8 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
+import Inquiry from "#modules/inquiries/models/inquiry";
+import TattooProject from "#modules/projects/models/tattoo_project";
 import {
 	makeArtist,
 	makeClient,
@@ -9,6 +11,7 @@ import {
 	makeReferenceImage,
 } from "#tests/helpers/pipeline";
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
+import { assertValidationError } from "#tests/helpers/validation";
 
 test.group("Inbox badge", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
@@ -228,5 +231,165 @@ test.group("Inbox pages", (group) => {
 			const response = await client.get(url).withInertia().loginAs(artist);
 			response.assertStatus(404);
 		}
+	});
+});
+
+test.group("Deciding an inquiry", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	const statusOf = (tenant: { id: string }, id: string) =>
+		inTenant(tenant, async () => (await Inquiry.findOrFail(id)).status);
+
+	test("accepting creates the project and lands on it", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const { inquiry, artist } = await inTenant(tenant, async () => {
+			const artist = await makeArtist(tenant);
+			const inquiry = await makeInquiry(tenant, await makeClient(tenant));
+			return { inquiry, artist };
+		});
+
+		const response = await client
+			.post(inbox(`/${inquiry.id}/accept`))
+			.form({ artistId: artist.id })
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		const project = await inTenant(tenant, () =>
+			TattooProject.query().where("inquiry_id", inquiry.id).firstOrFail(),
+		);
+		response.assertHeader("location", `/t/black-needle/projects/${project.id}`);
+		response.assertFlashMessage(
+			"success",
+			"Inquiry accepted: project created.",
+		);
+		assert.equal(project.artistId, artist.id);
+		assert.equal(await statusOf(tenant, inquiry.id), "accepted");
+	});
+
+	test("declining closes the inquiry and returns to the inbox", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const inquiry = await inTenant(tenant, async () =>
+			makeInquiry(tenant, await makeClient(tenant)),
+		);
+
+		const response = await client
+			.post(inbox(`/${inquiry.id}/decline`))
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		response.assertHeader("location", "/t/black-needle/inbox");
+		response.assertFlashMessage("success", "Inquiry declined.");
+		assert.equal(await statusOf(tenant, inquiry.id), "declined");
+	});
+
+	test("a stale page accepting a declined inquiry gets a flash, no project", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const inquiry = await inTenant(tenant, async () =>
+			makeInquiry(tenant, await makeClient(tenant), {
+				status: "declined",
+				decidedAt: DateTime.utc(),
+			}),
+		);
+
+		const response = await client
+			.post(inbox(`/${inquiry.id}/accept`))
+			.form({ artistId: "" })
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		response.assertHeader("location", `/t/black-needle/inbox/${inquiry.id}`);
+		response.assertFlashMessage("error", "This inquiry was already decided.");
+		assert.lengthOf(
+			await inTenant(tenant, () =>
+				TattooProject.query().where("inquiry_id", inquiry.id),
+			),
+			0,
+		);
+	});
+
+	test("declining a decided inquiry gets the same flash", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const inquiry = await inTenant(tenant, async () =>
+			makeInquiry(tenant, await makeClient(tenant), {
+				status: "accepted",
+				decidedAt: DateTime.utc(),
+			}),
+		);
+
+		const response = await client
+			.post(inbox(`/${inquiry.id}/decline`))
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		response.assertHeader("location", `/t/black-needle/inbox/${inquiry.id}`);
+		response.assertFlashMessage("error", "This inquiry was already decided.");
+		assert.equal(await statusOf(tenant, inquiry.id), "accepted");
+	});
+
+	test("a removed artist is a field error and nothing changes", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const { inquiry, gone } = await inTenant(tenant, async () => {
+			const gone = await makeArtist(tenant);
+			await gone.softDelete();
+			return {
+				inquiry: await makeInquiry(tenant, await makeClient(tenant)),
+				gone,
+			};
+		});
+
+		const response = await client
+			.post(inbox(`/${inquiry.id}/accept`))
+			.form({ artistId: gone.id })
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		assertValidationError(
+			response,
+			"artistId",
+			"Choose an artist from the list.",
+		);
+		assert.equal(await statusOf(tenant, inquiry.id), "new");
+	});
+
+	test("artists get a 404 on accept and decline", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+		const artist = await artistIn(tenant);
+		const inquiry = await inTenant(tenant, async () =>
+			makeInquiry(tenant, await makeClient(tenant)),
+		);
+
+		for (const action of ["accept", "decline"]) {
+			const response = await client
+				.post(inbox(`/${inquiry.id}/${action}`))
+				.form({ artistId: "" })
+				.withCsrfToken()
+				.loginAs(artist)
+				.redirects(0);
+			response.assertStatus(404);
+		}
+		assert.equal(await statusOf(tenant, inquiry.id), "new");
 	});
 });

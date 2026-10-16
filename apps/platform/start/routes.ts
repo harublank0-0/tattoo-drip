@@ -128,6 +128,14 @@ router
 					.get(":id", [controllers.Inquiries, "show"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.inbox.show");
+				router
+					.post(":id/accept", [controllers.Inquiries, "accept"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.inbox.accept");
+				router
+					.post(":id/decline", [controllers.Inquiries, "decline"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.inbox.decline");
 			})
 			.prefix("/inbox")
 			.use(middleware.role({ allow: ["owner"] }));

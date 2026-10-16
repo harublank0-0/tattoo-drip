@@ -331,6 +331,30 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inquiries_controller').default['show']>>>
     }
   }
+  'tenant.inbox.accept': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/inbox/:id/accept'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/inquiries/validators/inquiry').acceptInquiryValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/inquiries/validators/inquiry').acceptInquiryValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/inquiries_controller').default['accept']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inquiries_controller').default['accept']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.inbox.decline': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/inbox/:id/decline'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/inquiries_controller').default['decline']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inquiries_controller').default['decline']>>>
+    }
+  }
   'tenant.projects.index': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/projects'

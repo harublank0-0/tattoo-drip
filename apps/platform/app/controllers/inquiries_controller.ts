@@ -1,11 +1,14 @@
 import { inject } from "@adonisjs/core";
 import type { HttpContext } from "@adonisjs/core/http";
+import { errors } from "@vinejs/vine";
 import { tenantContext } from "#middleware/tenant_middleware";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
+import { InquiryRuleError } from "#modules/inquiries/errors";
 import type Inquiry from "#modules/inquiries/models/inquiry";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import InquiryService from "#modules/inquiries/services/inquiry_service";
+import { acceptInquiryValidator } from "#modules/inquiries/validators/inquiry";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
 import { daysAgoText } from "#modules/projects/contact";
@@ -123,11 +126,66 @@ export default class InquiriesController {
 		});
 	}
 
+	async accept(ctx: HttpContext) {
+		const { tenant } = tenantContext(ctx);
+		const inquiry = await this.inquiries.findFor(tenant, ctx.params.id);
+		const { artistId } = await ctx.request.validateUsing(
+			acceptInquiryValidator,
+		);
+		try {
+			const project = await this.inquiries.accept(tenant, inquiry, artistId);
+			ctx.session.flash("success", "Inquiry accepted: project created.");
+			return ctx.response.redirect().toRoute("tenant.projects.show", {
+				tenant: tenant.slug,
+				id: project.id,
+			});
+		} catch (error) {
+			if (!(error instanceof InquiryRuleError)) throw error;
+			if (error.reason === "artist_unavailable") {
+				throw new errors.E_VALIDATION_ERROR([
+					{
+						field: "artistId",
+						message: "Choose an artist from the list.",
+						rule: "exists",
+					},
+				]);
+			}
+			return alreadyDecided(ctx, tenant, inquiry);
+		}
+	}
+
+	async decline(ctx: HttpContext) {
+		const { tenant } = tenantContext(ctx);
+		const inquiry = await this.inquiries.findFor(tenant, ctx.params.id);
+		try {
+			await this.inquiries.decline(tenant, inquiry);
+			ctx.session.flash("success", "Inquiry declined.");
+			return ctx.response
+				.redirect()
+				.toRoute("tenant.inbox.index", { tenant: tenant.slug });
+		} catch (error) {
+			if (!(error instanceof InquiryRuleError)) throw error;
+			return alreadyDecided(ctx, tenant, inquiry);
+		}
+	}
+
 	/** The tenant's live artists' names, by id. */
 	private async artistNames(tenant: { id: string }) {
 		const artists = await this.artists.list(tenant);
 		return new Map(artists.map(({ id, name }) => [id, name]));
 	}
+}
+
+/** A stale page: someone decided it first. Back to the inquiry's page. */
+function alreadyDecided(
+	ctx: HttpContext,
+	tenant: { slug: string },
+	inquiry: Inquiry,
+) {
+	ctx.session.flash("error", "This inquiry was already decided.");
+	return ctx.response
+		.redirect()
+		.toRoute("tenant.inbox.show", { tenant: tenant.slug, id: inquiry.id });
 }
 
 function receivedText(inquiry: Inquiry, timezone: string) {
