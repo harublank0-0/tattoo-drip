@@ -53,13 +53,16 @@ export default function InboxIndex({
 			) : (
 				<ul className="flex flex-col divide-y rounded-md border">
 					{inquiries.map((inquiry) => (
-						<li key={inquiry.id}>
+						<li
+							key={inquiry.id}
+							className="flex items-center gap-2 pr-4 hover:bg-muted/50"
+						>
 							<Link
 								href={urlFor("tenant.inbox.show", {
 									tenant: tenant.slug,
 									id: inquiry.id,
 								})}
-								className="flex flex-col gap-1 px-4 py-3 hover:bg-muted/50"
+								className="flex min-w-0 flex-1 flex-col gap-1 px-4 py-3"
 							>
 								<span className="flex flex-wrap items-center justify-between gap-2">
 									<span className="font-medium">{inquiry.contactName}</span>
@@ -98,6 +101,17 @@ export default function InboxIndex({
 									</>
 								)}
 							</Link>
+							{view === "decided" && inquiry.projectId && (
+								<Link
+									href={urlFor("tenant.projects.show", {
+										tenant: tenant.slug,
+										id: inquiry.projectId,
+									})}
+									className={buttonVariants({ variant: "outline", size: "sm" })}
+								>
+									View project
+								</Link>
+							)}
 						</li>
 					))}
 				</ul>

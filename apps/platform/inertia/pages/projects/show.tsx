@@ -131,17 +131,23 @@ export default function ProjectShow({
 						<CardContent className="flex flex-col gap-4">
 							<dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
 								<dt className="text-muted-foreground">Placement</dt>
-								<dd>{request.placement}</dd>
+								<dd className="min-w-0 break-words">{request.placement}</dd>
 								<dt className="text-muted-foreground">Approximate size</dt>
-								<dd>{request.approximateSize}</dd>
+								<dd className="min-w-0 break-words">
+									{request.approximateSize}
+								</dd>
 								<dt className="text-muted-foreground">Preferred dates</dt>
-								<dd>{request.preferredDates}</dd>
+								<dd className="min-w-0 break-words">
+									{request.preferredDates}
+								</dd>
 								<dt className="text-muted-foreground">Budget</dt>
-								<dd>{request.budget ?? "—"}</dd>
+								<dd className="min-w-0 break-words">{request.budget ?? "—"}</dd>
 								<dt className="text-muted-foreground">
 									Found the studio through
 								</dt>
-								<dd>{SOURCE_LABELS[request.source] ?? request.source}</dd>
+								<dd className="min-w-0 break-words">
+									{SOURCE_LABELS[request.source] ?? request.source}
+								</dd>
 							</dl>
 							<ReferenceGrid references={request.references} />
 						</CardContent>

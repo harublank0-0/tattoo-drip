@@ -87,7 +87,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 						</Form>
 					</div>
 				</div>
-				<nav className="mx-auto flex w-full max-w-6xl gap-1 px-2 pb-2 sm:px-6">
+				<nav className="mx-auto flex w-full max-w-6xl gap-1 overflow-x-auto px-2 pb-2 sm:px-6">
 					{nav.map(({ label, route, params, exact, icon: Icon, badge }) => (
 						<NavLink
 							key={label}
