@@ -42,7 +42,18 @@ export default class ImageService {
 		const input = await readFile(file.tmpPath);
 		// The raw upload still has its EXIF and GPS; don't leave it in tmp.
 		await rm(file.tmpPath, { force: true });
-		const image = await processImage(input);
+		return this.storeBytes(input, { tenant, purpose });
+	}
+
+	/**
+	 * Like `store`, for bytes already in memory (the development seeder's
+	 * generated images): the same checks, re-encoding, key layout and disk.
+	 */
+	async storeBytes(
+		bytes: Buffer,
+		{ tenant, purpose }: { tenant: Pick<Tenant, "id">; purpose: ImagePurpose },
+	): Promise<StoredImage> {
+		const image = await processImage(bytes);
 		const extension = image.format === "png" ? "png" : "jpg";
 		const key = `tenants/${tenant.id}/${purpose}/${randomUUID()}.${extension}`;
 		await diskFor(purpose).put(key, image.data, {
