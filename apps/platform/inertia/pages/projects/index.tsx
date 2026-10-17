@@ -41,7 +41,7 @@ export default function ProjectsIndex({
 			actions={
 				<Link
 					href={urlFor("tenant.projects.create", { tenant: tenant.slug })}
-					className={buttonVariants({ size: "sm" })}
+					className={buttonVariants({ className: "h-11" })}
 				>
 					Book session
 				</Link>

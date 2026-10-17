@@ -1,4 +1,5 @@
 import { Form, Link } from "@adonisjs/inertia/react";
+import { cn } from "cn";
 import { useState } from "react";
 import { urlFor } from "~/client";
 import type { BookingLookup, BookingPageProps } from "~/components/bookings";
@@ -27,6 +28,9 @@ type Invalid = Extract<BookingLookup, { state: "invalid" }>;
 type Looked = Extract<BookingLookup, { state: "found" | "new" }>;
 type Errors = Partial<Record<string, string>>;
 type PriceKind = "none" | "fixed" | "hourly";
+
+/** docs/ui.md: touch targets are at least 44px (h-11), up from shadcn's 36px. */
+const TARGET = "h-11";
 
 const PRICE_KINDS: { value: PriceKind; title: string; description: string }[] =
 	[
@@ -96,7 +100,7 @@ function NoArtist({ isOwner }: { isOwner: boolean }) {
 					<Link
 						route="tenant.artists.create"
 						routeParams={{ tenant: tenant.slug }}
-						className={buttonVariants()}
+						className={buttonVariants({ className: TARGET })}
 					>
 						Add an artist
 					</Link>
@@ -133,9 +137,11 @@ function PhoneLookup({ invalid }: { invalid: Invalid | null }) {
 								defaultValue={invalid?.typed ?? ""}
 								aria-invalid={!!invalid}
 								aria-describedby={invalid ? "phone-error" : "phone-hint"}
-								className="flex-1"
+								className={cn("flex-1", TARGET)}
 							/>
-							<Button type="submit">Find client</Button>
+							<Button type="submit" className={TARGET}>
+								Find client
+							</Button>
 						</div>
 						{invalid ? (
 							<FieldError id="phone-error">{invalid.message}</FieldError>
@@ -184,13 +190,16 @@ function BookingForm({
 						errors={errors}
 					/>
 					<div className="flex flex-wrap items-center gap-2">
-						<Button type="submit" disabled={processing}>
+						<Button type="submit" disabled={processing} className={TARGET}>
 							{processing ? "Saving…" : "Book session"}
 						</Button>
 						<Link
 							route="tenant.projects.index"
 							routeParams={{ tenant: tenant.slug }}
-							className={buttonVariants({ variant: "ghost" })}
+							className={buttonVariants({
+								variant: "ghost",
+								className: TARGET,
+							})}
 						>
 							Cancel
 						</Link>
@@ -257,6 +266,7 @@ function ClientCard({
 									required
 									aria-invalid={!!errors.name}
 									aria-describedby={errorId("name", errors)}
+									className={TARGET}
 								/>
 								{errors.name && (
 									<FieldError id="name-error">{errors.name}</FieldError>
@@ -271,6 +281,7 @@ function ClientCard({
 									maxLength={254}
 									aria-invalid={!!errors.email}
 									aria-describedby={errorId("email", errors)}
+									className={TARGET}
 								/>
 								{errors.email && (
 									<FieldError id="email-error">{errors.email}</FieldError>
@@ -283,7 +294,10 @@ function ClientCard({
 							route="tenant.projects.create"
 							routeParams={{ tenant: tenant.slug }}
 							aria-describedby={problem ? "client-error" : undefined}
-							className={buttonVariants({ variant: "outline", size: "sm" })}
+							className={buttonVariants({
+								variant: "outline",
+								className: TARGET,
+							})}
 						>
 							Change number
 						</Link>
@@ -291,7 +305,10 @@ function ClientCard({
 							<Link
 								route="tenant.clients.show"
 								routeParams={{ tenant: tenant.slug, id: lookup.client.id }}
-								className={buttonVariants({ variant: "outline", size: "sm" })}
+								className={buttonVariants({
+									variant: "outline",
+									className: TARGET,
+								})}
 							>
 								View client
 							</Link>
@@ -347,7 +364,10 @@ function SessionCard({
 								defaultValue={artists.length === 1 ? artists[0].id : ""}
 								aria-invalid={!!errors.artistId}
 								aria-describedby={errorId("artistId", errors)}
-								className="h-9 w-full min-w-0 rounded-md border bg-transparent px-3 text-sm"
+								className={cn(
+									"w-full min-w-0 rounded-md border bg-transparent px-3 text-sm",
+									TARGET,
+								)}
 							>
 								{artists.length > 1 && (
 									<option value="" disabled>
@@ -378,6 +398,7 @@ function SessionCard({
 								defaultValue={dates.today}
 								aria-invalid={!!errors.date}
 								aria-describedby={errorId("date", errors)}
+								className={TARGET}
 							/>
 							{errors.date && (
 								<FieldError id="date-error">{errors.date}</FieldError>
@@ -392,6 +413,7 @@ function SessionCard({
 								required
 								aria-invalid={!!errors.startTime}
 								aria-describedby={errorId("startTime", errors)}
+								className={TARGET}
 							/>
 							{errors.startTime && (
 								<FieldError id="startTime-error">{errors.startTime}</FieldError>
@@ -410,6 +432,7 @@ function SessionCard({
 								step={0.25}
 								aria-invalid={!!errors.hours}
 								aria-describedby={errors.hours ? "hours-error" : "hours-hint"}
+								className={TARGET}
 							/>
 							{errors.hours ? (
 								<FieldError id="hours-error">{errors.hours}</FieldError>
@@ -505,6 +528,7 @@ function PriceCard({
 								step={1}
 								aria-invalid={!!errors.fixedPrice}
 								aria-describedby={errorId("fixedPrice", errors)}
+								className={TARGET}
 							/>
 							{errors.fixedPrice && (
 								<FieldError id="fixedPrice-error">
@@ -529,6 +553,7 @@ function PriceCard({
 									step={1}
 									aria-invalid={!!errors.hourlyRate}
 									aria-describedby={errorId("hourlyRate", errors)}
+									className={TARGET}
 								/>
 								{errors.hourlyRate && (
 									<FieldError id="hourlyRate-error">
@@ -550,6 +575,7 @@ function PriceCard({
 									step={0.25}
 									aria-invalid={!!errors.estimatedHours}
 									aria-describedby={errorId("estimatedHours", errors)}
+									className={TARGET}
 								/>
 								{errors.estimatedHours && (
 									<FieldError id="estimatedHours-error">
