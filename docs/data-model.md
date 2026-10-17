@@ -41,7 +41,8 @@ Every entity except `User` belongs to a `Tenant`; most of those lines are left o
 | Entity | Responsibility |
 |---|---|
 | **User** | A person who can log in, with a verified email |
-| **Tenant** | A `studio` or `independent` business: name, slug (old slugs kept as aliases), profile (contact phone and email, address, social links), timezone, default deposit percentage, deposit policy text |
+| **Tenant** | A `studio` or `independent` business: name, slug (every slug it has held is a `TenantSlug`), profile (contact phone and email, address, social links), timezone, default deposit percentage, deposit policy text |
+| **TenantSlug** | Every slug a tenant has held, its current one included. One namespace for the whole platform: a slug is never given to another tenant. Written by a database trigger; the app never changes or deletes one |
 | **TenantMembership** | One role (`owner` or `artist`) for one user in one tenant |
 | **TenantInvitation** | Email, role, an optional artist profile to claim, and a hashed single-use token that expires after 7 days |
 | **Artist** | A public profile in one tenant (name, slug, bio, photo, visible, accepting inquiries plus a message), optionally linked to a `User` |
