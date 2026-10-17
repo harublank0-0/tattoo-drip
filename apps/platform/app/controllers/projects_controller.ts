@@ -20,6 +20,7 @@ import {
 	toProjectFilter,
 } from "#modules/projects/moves";
 import {
+	BOOKED_STATUSES,
 	formatDay,
 	formatMoney,
 	isExpired,
@@ -36,6 +37,7 @@ import ProjectService from "#modules/projects/services/project_service";
 import QuoteService from "#modules/projects/services/quote_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import SessionService from "#modules/scheduling/services/session_service";
+import { sessionTimeText } from "#modules/scheduling/times";
 
 /** How long a new quote is valid by default, in days. */
 const DEFAULT_VALID_DAYS = 14;
@@ -119,9 +121,8 @@ export default class ProjectsController {
 		const artist = project.artistId
 			? artists.find(({ id }) => id === project.artistId)
 			: undefined;
-		const scheduled = (
-			await this.sessions.listForProject(tenant, project)
-		).filter(({ status }) => status === "scheduled");
+		const sessions = await this.sessions.listForProject(tenant, project);
+		const scheduled = sessions.filter(({ status }) => status === "scheduled");
 		const depositHeld = await this.projects.depositHeld(tenant, project);
 		const versions = await this.quotes.history(tenant, project);
 		const current = versions.at(0) ?? null;
@@ -162,6 +163,8 @@ export default class ProjectsController {
 			},
 			quote: current ? quoteProps(current, timezone) : null,
 			history: versions.slice(1).map((quote) => quoteProps(quote, timezone)),
+			// From booked on, the quote's expiry no longer means anything.
+			quoteExpiryShown: !BOOKED_STATUSES.includes(project.status),
 			canQuote: QUOTABLE_STATUSES.includes(project.status),
 			canAccept: project.status === "quoted" && live !== null,
 			// Only while the client's answer is awaited: not after acceptance, and
@@ -191,6 +194,14 @@ export default class ProjectsController {
 			bookedWithoutSession:
 				project.status === "booked" &&
 				!scheduled.some(({ kind }) => kind === "tattoo"),
+			sessions: sessions.map((session) => ({
+				id: session.id,
+				whenText: sessionTimeText(session.startsAt, session.endsAt, timezone),
+				kind: session.kind,
+				status: session.status,
+				artistName:
+					artists.find(({ id }) => id === session.artistId)?.name ?? null,
+			})),
 			notes: project.notes,
 			contactedText: contactedText(project.lastContactedAt, timezone),
 			assignment:

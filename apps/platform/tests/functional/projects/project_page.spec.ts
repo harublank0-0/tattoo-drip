@@ -202,6 +202,83 @@ test.group("Project page", (group) => {
 		const other = await client.get(page(project.id)).withInertia().loginAs(ram);
 		other.assertStatus(404);
 	});
+
+	test("the page lists the project's sessions with their time, kind and artist", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const project = await inTenant(tenant, async () => {
+			const sita = await makeArtist(tenant);
+			const project = await makeProject(tenant, await makeClient(tenant), {
+				status: "booked",
+				artistId: sita.id,
+			});
+			// 10:00 UTC on 2 Nov is 15:45 in Kathmandu.
+			await makeSession(tenant, project, sita);
+			await makeSession(tenant, project, sita, {
+				kind: "touch_up",
+				status: "cancelled",
+				startsAt: DateTime.utc(2026, 12, 1, 4, 15),
+				endsAt: DateTime.utc(2026, 12, 1, 5, 15),
+			});
+			return project;
+		});
+
+		const props = (
+			await client.get(page(project.id)).withInertia().loginAs(owner)
+		).inertiaProps;
+
+		assert.deepEqual(
+			props.sessions.map(({ id: _id, ...rest }: { id: string }) => rest),
+			[
+				{
+					whenText: "Mon 2 Nov 2026, 15:45–17:45",
+					kind: "tattoo",
+					status: "scheduled",
+					artistName: "Sita",
+				},
+				{
+					whenText: "Tue 1 Dec 2026, 10:00–11:00",
+					kind: "touch_up",
+					status: "cancelled",
+					artistName: "Sita",
+				},
+			],
+		);
+	});
+
+	test("the quote's expiry shows until the project is booked", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const expected = {
+			quoted: true,
+			cancelled: true,
+			booked: false,
+			in_progress: false,
+		} as const;
+		const projects = await inTenant(tenant, async () => {
+			const made: Record<string, string> = {};
+			for (const status of Object.keys(expected) as (keyof typeof expected)[]) {
+				const project = await makeProject(tenant, await makeClient(tenant), {
+					status,
+				});
+				await makeQuote(tenant, project);
+				made[status] = project.id;
+			}
+			return made;
+		});
+
+		for (const [status, shown] of Object.entries(expected)) {
+			const props = (
+				await client.get(page(projects[status])).withInertia().loginAs(owner)
+			).inertiaProps;
+			assert.equal(props.quoteExpiryShown, shown, status);
+			assert.deepEqual(props.sessions, [], status);
+		}
+	});
 });
 
 test.group("Project page: lifecycle props", (group) => {

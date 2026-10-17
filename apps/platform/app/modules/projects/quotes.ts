@@ -13,6 +13,19 @@ export const QUOTABLE_STATUSES: readonly ProjectStatus[] = [
 	"deposit_pending",
 ];
 
+/**
+ * Booked or later: the quote is settled, so its expiry no longer cancels
+ * anything (expireQuote and the sweep act only on quoted, on_hold and
+ * deposit_pending, and a project never goes back to them from here). The
+ * project page stops showing it.
+ */
+export const BOOKED_STATUSES: readonly ProjectStatus[] = [
+	"booked",
+	"in_progress",
+	"completed",
+	"healing_check",
+];
+
 /** What a quote's total is made of. */
 export type QuoteAmounts = Pick<
 	Quote,

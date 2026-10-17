@@ -11,6 +11,8 @@ import {
 	MOVE_LABELS,
 	type ProjectPageProps,
 	type QuoteProps,
+	SESSION_KIND_LABELS,
+	SESSION_STATUS_LABELS,
 	STATUS_LABELS,
 	suggestedDeposit,
 } from "~/components/projects";
@@ -67,6 +69,8 @@ export default function ProjectShow({
 	withdrawBlocked,
 	scheduledSessionCount,
 	bookedWithoutSession,
+	quoteExpiryShown,
+	sessions,
 	notes,
 	contactedText,
 	assignment,
@@ -135,6 +139,41 @@ export default function ProjectShow({
 					</CardContent>
 				</Card>
 
+				<Card>
+					<CardHeader>
+						<CardTitle>Sessions</CardTitle>
+					</CardHeader>
+					<CardContent>
+						{sessions.length === 0 ? (
+							<p className="text-sm text-muted-foreground">No sessions yet.</p>
+						) : (
+							<ul className="flex flex-col divide-y text-sm">
+								{sessions.map((session) => (
+									<li
+										key={session.id}
+										className="flex flex-wrap items-center justify-between gap-2 py-2"
+									>
+										<span className="flex flex-col gap-0.5">
+											<span>{session.whenText}</span>
+											<span className="text-muted-foreground">
+												{SESSION_KIND_LABELS[session.kind] ?? session.kind} with{" "}
+												{session.artistName ?? "Unknown artist"}
+											</span>
+										</span>
+										<Badge
+											variant={
+												session.status === "scheduled" ? "secondary" : "outline"
+											}
+										>
+											{SESSION_STATUS_LABELS[session.status] ?? session.status}
+										</Badge>
+									</li>
+								))}
+							</ul>
+						)}
+					</CardContent>
+				</Card>
+
 				{request && (
 					<Card>
 						<CardHeader>
@@ -172,7 +211,7 @@ export default function ProjectShow({
 					</CardHeader>
 					<CardContent className="flex flex-col gap-4">
 						{quote ? (
-							<QuoteSummary quote={quote} />
+							<QuoteSummary quote={quote} showExpiry={quoteExpiryShown} />
 						) : (
 							<p className="text-sm text-muted-foreground">No quote yet.</p>
 						)}
@@ -242,7 +281,13 @@ export default function ProjectShow({
 	);
 }
 
-function QuoteSummary({ quote }: { quote: QuoteProps }) {
+function QuoteSummary({
+	quote,
+	showExpiry,
+}: {
+	quote: QuoteProps;
+	showExpiry: boolean;
+}) {
 	return (
 		<dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
 			<dt className="text-muted-foreground">Version</dt>
@@ -254,11 +299,15 @@ function QuoteSummary({ quote }: { quote: QuoteProps }) {
 			</dd>
 			<dt className="text-muted-foreground">Deposit</dt>
 			<dd>{quote.depositText}</dd>
-			<dt className="text-muted-foreground">Valid until</dt>
-			<dd className="flex items-center gap-2">
-				{quote.validUntilText}
-				{quote.expired && <Badge variant="destructive">Expired</Badge>}
-			</dd>
+			{showExpiry && (
+				<>
+					<dt className="text-muted-foreground">Valid until</dt>
+					<dd className="flex items-center gap-2">
+						{quote.validUntilText}
+						{quote.expired && <Badge variant="destructive">Expired</Badge>}
+					</dd>
+				</>
+			)}
 			<dt className="text-muted-foreground">Issued</dt>
 			<dd>{quote.issuedText}</dd>
 		</dl>
