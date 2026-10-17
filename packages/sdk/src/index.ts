@@ -3,6 +3,7 @@ export {
 	type CreateInquiryInput,
 	createTattooClient,
 	type RequestOptions,
+	type SubmitDepositProofInput,
 	type TattooClient,
 	type TattooClientOptions,
 } from "./client.js";

@@ -2,6 +2,8 @@ import type {
 	ApiError,
 	Artist,
 	BodyPlacement,
+	DepositPage,
+	DepositPaymentMethod,
 	InquiryInput,
 	InquiryReceipt,
 	ListAvailabilityQuery,
@@ -56,6 +58,16 @@ export interface CreateInquiryInput extends InquiryInput {
 	referenceImages?: Blob[];
 	/** Bot-challenge token (TAT-55); the API ignores it until then. */
 	challengeToken?: string;
+}
+
+/** A deposit proof: the screenshot, how the client paid, and the `deposit.due` the page showed. */
+export interface SubmitDepositProofInput {
+	/** A JPEG, PNG or WebP of 10 MB at most. */
+	proof: Blob;
+	/** One of the page's `paymentMethods` kinds. */
+	method: DepositPaymentMethod["kind"];
+	/** The page's `deposit.due`, in paisa. */
+	expectedAmount: number;
 }
 
 type Query = Record<string, string | number | undefined>;
@@ -192,6 +204,44 @@ export function createTattooClient(options: TattooClientOptions) {
 
 				const body = await request<{ data: InquiryReceipt }>(
 					`${tenantRoot}/inquiries`,
+					// No Content-Type: fetch sets multipart's boundary itself.
+					{ method: "POST", body: form },
+					{ ...call, timeoutMs: call.timeoutMs ?? UPLOAD_TIMEOUT_MS },
+				);
+				return body.data;
+			},
+		},
+		deposits: {
+			/**
+			 * The deposit page of a link's token (the fragment of the link the
+			 * studio sent). A link that doesn't work is a 404 TattooApiError
+			 * (`not_found`).
+			 */
+			get: (token: string, call?: RequestOptions) =>
+				getData<DepositPage>(
+					`${tenantRoot}/deposits/${encodeURIComponent(token)}`,
+					call,
+				),
+			/**
+			 * Sends the payment screenshot as one multipart request and returns
+			 * the page as it now is (`submitted`). Waits up to 2 minutes (an
+			 * upload) unless `call.timeoutMs` says otherwise. Fails with a
+			 * TattooApiError such as `validation_failed` (fields `proof`,
+			 * `method`, `expectedAmount`), `deposit_not_due`, `deposit_changed`,
+			 * `payload_too_large` or `rate_limited`.
+			 */
+			submitProof: async (
+				token: string,
+				input: SubmitDepositProofInput,
+				call: RequestOptions = {},
+			) => {
+				const form = new FormData();
+				form.set("method", input.method);
+				form.set("expectedAmount", String(input.expectedAmount));
+				form.append("proof", input.proof);
+
+				const body = await request<{ data: DepositPage }>(
+					`${tenantRoot}/deposits/${encodeURIComponent(token)}`,
 					// No Content-Type: fetch sets multipart's boundary itself.
 					{ method: "POST", body: form },
 					{ ...call, timeoutMs: call.timeoutMs ?? UPLOAD_TIMEOUT_MS },

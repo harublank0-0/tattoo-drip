@@ -416,3 +416,136 @@ describe("inquiries.create", () => {
 		assert.equal((error as Error).name, "AbortError");
 	});
 });
+
+describe("deposits", () => {
+	const TOKEN = "T".repeat(43);
+	const PAGE = {
+		studio: { name: "Black Needle" },
+		project: { brief: "A fine-line moth", artistName: null },
+		deposit: {
+			amount: 300_000,
+			amountText: "NPR 3,000",
+			due: 300_000,
+			dueText: "NPR 3,000",
+			currency: "NPR",
+			payBy: "2026-11-01",
+			payByText: "1 Nov 2026",
+		},
+		referenceCode: "7K3M9Q",
+		state: "due",
+		lastProofRejected: false,
+		proofSubmittedAt: null,
+		paymentMethods: [],
+		depositPolicy: null,
+	};
+	const proof = () =>
+		new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], { type: "image/png" });
+
+	test("get reads the token's page under the tenant, without cookies", async () => {
+		const { calls, fetch } = fakeFetch(() => json(200, { data: PAGE }));
+
+		const page = await client(fetch).deposits.get(TOKEN);
+
+		assert.deepEqual(page, PAGE);
+		assert.equal(
+			calls[0].url,
+			`https://api.example.com/api/v1/tenants/api-needle-32/deposits/${TOKEN}`,
+		);
+		assert.equal(calls[0].init.credentials, "omit");
+	});
+
+	test("get encodes the token", async () => {
+		const { calls, fetch } = fakeFetch(() => json(200, { data: PAGE }));
+
+		await client(fetch).deposits.get("a/b?c");
+
+		assert.match(calls[0].url, /\/deposits\/a%2Fb%3Fc$/);
+	});
+
+	test("a link that doesn't work is a 404 TattooApiError", async () => {
+		const { fetch } = fakeFetch(() =>
+			json(404, { error: { code: "not_found", message: "Not found." } }),
+		);
+
+		const error = await rejection(client(fetch).deposits.get(TOKEN));
+
+		assert.ok(error instanceof TattooApiError);
+		assert.equal(error.status, 404);
+		assert.equal(error.code, "not_found");
+	});
+
+	test("submitProof posts one multipart form and returns the new page", async () => {
+		const submitted = { ...PAGE, state: "submitted" };
+		const { calls, fetch } = fakeFetch(() => json(201, { data: submitted }));
+
+		const page = await client(fetch).deposits.submitProof(TOKEN, {
+			proof: proof(),
+			method: "esewa",
+			expectedAmount: 300_000,
+		});
+
+		assert.deepEqual(page, submitted);
+		assert.equal(calls[0].init.method, "POST");
+		assert.equal(
+			calls[0].url,
+			`https://api.example.com/api/v1/tenants/api-needle-32/deposits/${TOKEN}`,
+		);
+		const headers = new Headers(calls[0].init.headers);
+		assert.equal(
+			headers.has("content-type"),
+			false,
+			"fetch sets the multipart boundary",
+		);
+		const form = calls[0].init.body as FormData;
+		assert.deepEqual([...form.keys()].sort(), [
+			"expectedAmount",
+			"method",
+			"proof",
+		]);
+		assert.equal(form.get("method"), "esewa");
+		assert.equal(form.get("expectedAmount"), "300000");
+		assert.equal((form.get("proof") as File).type, "image/png");
+	});
+
+	test("a stale amount is a TattooApiError with deposit_changed", async () => {
+		const { fetch } = fakeFetch(() =>
+			json(409, {
+				error: {
+					code: "deposit_changed",
+					message:
+						"The deposit amount changed. Check the new amount before you upload.",
+				},
+			}),
+		);
+
+		const error = await rejection(
+			client(fetch).deposits.submitProof(TOKEN, {
+				proof: proof(),
+				method: "esewa",
+				expectedAmount: 250_000,
+			}),
+		);
+
+		assert.ok(error instanceof TattooApiError);
+		assert.equal(error.status, 409);
+		assert.equal(error.code, "deposit_changed");
+	});
+
+	test("an upload waits longer than the client's timeout", {
+		timeout: 2000,
+	}, async () => {
+		const { fetch } = fakeFetch(
+			() =>
+				new Promise<Response>((resolve) =>
+					setTimeout(() => resolve(json(201, { data: PAGE })), 60),
+				),
+		);
+
+		const page = await client(fetch, { timeoutMs: 20 }).deposits.submitProof(
+			TOKEN,
+			{ proof: proof(), method: "esewa", expectedAmount: 300_000 },
+		);
+
+		assert.deepEqual(page, PAGE);
+	});
+});
