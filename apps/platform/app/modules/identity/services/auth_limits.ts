@@ -1,3 +1,4 @@
+import type { Limiter, LimiterResponse } from "@adonisjs/limiter";
 import limiter from "@adonisjs/limiter/services/main";
 import { clientAddress, digest } from "#services/rate_limits";
 
@@ -30,14 +31,25 @@ export function loginEmailKey(email: string) {
 }
 
 /**
+ * A refund is skipped when fewer than this many seconds were left in the
+ * window the attempt was counted in, because the window may be over by the
+ * time the credential check ends.
+ */
+const REFUND_SLACK_SECONDS = 3;
+
+/**
  * Runs `verify` (the credential check) unless this address or this email is
  * over its login limit. Over the limit, it throws E_TOO_MANY_REQUESTS
  * without checking the password. The address is counted first, so a refused
  * address never adds to the email's count. Both counts are taken before
  * `verify` runs, so parallel guesses can't all pass a check first. A sign-in
- * gives the address its attempt back and clears the email's failures. Any
- * email is counted, registered or not, so a lockout reveals nothing about
- * accounts.
+ * gives back the two points it took and nothing more: failures already
+ * counted for the email stay, because an email can be shared by look-alike
+ * accounts (users.email is case-sensitive) and one account's sign-in must not
+ * wipe another's count. A point is given back only while the window it was
+ * taken in is still open, so a slow check can't erase failures of the next
+ * window. Any email is counted, registered or not, so a lockout reveals
+ * nothing about accounts.
  */
 export async function throttleLogin<T>(
 	ip: string,
@@ -50,9 +62,28 @@ export async function throttleLogin<T>(
 	const ipKey = loginIpKey(ip);
 	const emailKey = loginEmailKey(email);
 
-	await perIp.consume(ipKey);
-	await perEmail.consume(emailKey);
+	const countedAt = Date.now();
+	const ipWindow = await perIp.consume(ipKey);
+	const emailWindow = await perEmail.consume(emailKey);
 	const result = await verify();
-	await Promise.all([perIp.decrement(ipKey), perEmail.delete(emailKey)]);
+	await Promise.all([
+		giveBack(perIp, ipKey, countedAt, ipWindow),
+		giveBack(perEmail, emailKey, countedAt, emailWindow),
+	]);
 	return result;
+}
+
+/**
+ * Takes back one point, only if the window it was counted in is surely still
+ * open. `availableIn` is rounded up to whole seconds and the limiter can't
+ * refund into a named window, so this errs on the side of keeping the point.
+ */
+async function giveBack(
+	counter: Limiter,
+	key: string,
+	countedAt: number,
+	window: LimiterResponse,
+) {
+	const openForMs = (window.availableIn - REFUND_SLACK_SECONDS) * 1000;
+	if (Date.now() - countedAt < openForMs) await counter.decrement(key);
 }

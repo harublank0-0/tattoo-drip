@@ -28,7 +28,7 @@ Read from `@adonisjs/limiter` 3.0.1 (latest, for `@adonisjs/core` 7) and `rate-l
 | Login, per email (any address) | failed attempts | 25 | 15 min |
 | Signup, per client address | every request | 10 | 1 hour |
 
-**A lockout** refuses further attempts with that address or email until its window ends: at most 15 minutes (login) or 1 hour (signup) after the first counted attempt. The right password is refused too, unchecked. Nothing is stored on the user and no email is sent. A sign-in clears the email's failures and gives the address its attempt back.
+**A lockout** refuses further attempts with that address or email until its window ends: at most 15 minutes (login) or 1 hour (signup) after the first counted attempt. The right password is refused too, unchecked. Nothing is stored on the user and no email is sent. A sign-in gives back the two attempts it took and clears nothing else (see Review amendments).
 
 ## Changes
 
@@ -49,7 +49,7 @@ Read from `@adonisjs/limiter` 3.0.1 (latest, for `@adonisjs/core` 7) and `rate-l
 | `apps/platform/tests/functional/rls/catalog_guard.spec.ts` | `rate_limits` in `EXEMPT` |
 | Docs | `docs/backend.md` "Rate limits", `docs/testing.md` paragraph, `database/README.md` convention exception and production checklist item (all under `apps/platform`) |
 
-`throttleLogin`: consume the address, then the email, then run `verify`. On success, `decrement` the address and `delete` the email key; a failure keeps both points. A refused address never reaches the email count.
+`throttleLogin`: consume the address, then the email, then run `verify`. On success, `decrement` both keys, but only while the window each point was taken in is surely open; a failure keeps both points. A refused address never reaches the email count.
 
 ## Rulings
 
@@ -63,16 +63,25 @@ Read from `@adonisjs/limiter` 3.0.1 (latest, for `@adonisjs/core` 7) and `rate-l
 8. **Proxies keep the framework default (`trustProxy` = loopback).** `X-Forwarded-For` counts only when the direct peer is loopback (a proxy on the same host), so a client can't spoof its address. Behind a proxy elsewhere (a platform load balancer), every visitor would share the proxy's address. A production checklist item says to set `trustProxy` to that proxy's addresses, never `true`. A unit test pins the default. Rejected: `trustProxy: true`, which is spoofable; an env var now, with no deploy target yet.
 9. **Tests use the memory store, emptied before every test; one spec covers Postgres.** `app.inTest` picks memory. `tests/bootstrap.ts` taps every functional/browser group and test with `limiter.clear(["memory"])`, so no test inherits another's counts. Only `["memory"]`: a plain `clear()` would also truncate Postgres once the store spec has created a database limiter. Tests set the address with `X-Forwarded-For`, which loopback peers may send. `rate_limit_store.spec.ts` runs the Postgres store with no global transaction: the store keeps the client it was first created with, and inside `wrapInGlobalTransaction` that would be one test's transaction. The rest of the suite stays green because it signs in with `loginAs` (no `POST /login`); only 4 existing tests post to `/login` or `/signup`, with correct passwords. Rejected: a `LIMITER_STORE` env var, a new variable for everyone's `.env` that could put production on memory by mistake; the database store in every test, which has the capture problem and costs a query per test.
 
+## Review amendments
+
+Found by the Codex review after the first implementation. They change how two rulings are carried out, not what they decide.
+
+- **Ruling 2, refunds stay inside their window.** `decrement` hits whatever window is current, so a success whose password check ended after its window did would erase failures of the next window (up to 10 extra guesses per boundary, which also breaks ruling 3's arithmetic). `throttleLogin` now refunds a point only if more than `availableIn - 3` seconds of the window are left when the check ends; otherwise the point stays (the user loses one attempt, never the limit). The limiter has no refund into a named window, so this is a guard, not an atomic fix.
+- **Ruling 5, a sign-in no longer clears the email count.** `users.email` is unique case-sensitively and credentials are looked up exactly, so `INK@example.com` and `ink@example.com` can be two accounts that share one lower-cased key. Clearing that key on success let an attacker register the look-alike, sign into it between guesses, and reset the victim's count. A sign-in now refunds its own point only. Rejected: keying by the exact email (reverses ruling 5's shared count); canonicalising emails at signup (a migration with data cleanup, out of scope: deferred, see the PR text). The shared count stays, since if emails are later made case-insensitive the key is already right. TAT-18's completed reset may still clear the count, because it proves control of the mailbox; it must key by the account's stored email.
+
 ## Tests
 
 - Unit `tests/unit/services/rate_limits.spec.ts`: `clientAddress` (IPv4 and IPv4-mapped forms, one /64 for several spellings, another /64, a zone id, a non-address); `digest` (43 base64url characters, stable, keyed, unlike plain SHA-256, fixed length for a 254-character input); `tryAgainMessage` (0 → 1 minute, 61 → 2 minutes, 3600 → 60 minutes); `http.trustProxy` trusts `127.0.0.1` and `::1`, not public or private LAN peers.
 - Unit `tests/unit/modules/identity/auth_limits.spec.ts`: the email limit is above twice the address limit over the same window, and the keys are digests (no email or address inside, case and spaces ignored, IPv4-mapped = IPv4, one key per IPv6 /64).
+- Unit `auth_limits.spec.ts`, refunds: a success whose credential check outlasts its window leaves the new window's counts alone (fake clock).
 - Functional `tests/functional/auth/rate_limit_store.spec.ts`: as the app role, the Postgres store counts, refuses the third request with `E_TOO_MANY_REQUESTS`, writes one row to `rate_limits`, reports `availableIn` within the window, and deletes the key.
 - Functional `tests/functional/auth/rate_limits.spec.ts`:
   - 10 failures from one address: the 11th, even with the right password, goes back to `/login` with the 15-minute message; a fake address put in front of the real one in `X-Forwarded-For` doesn't help; as JSON it is a 429 with `Retry-After`; another address still signs in.
   - 15 parallel wrong passwords from one address: exactly 10 are checked, 5 are refused.
   - 25 failures for one email from three addresses (case varied): the 26th from a fourth address is refused even with the right password; another account signs in from that address.
-  - A sign-in after 3 failures leaves the address at 3 and clears the email.
+  - A sign-in after 3 failures leaves the address and the email at 3.
+  - A sign-in to a look-alike account (`INK@` next to `ink@`) doesn't reset `ink@`'s count: after 24 failures, the 25th guess is checked and the 26th refused.
   - An unknown email is counted like a registered one.
   - Counts don't carry over to the next test.
   - 10 signup requests (invalid bodies) from one address: the 11th, valid, goes back to `/signup` with the 60-minute message and creates no user; another address signs up.
@@ -95,4 +104,4 @@ Password reset and email verification (TAT-18); API and intake rate limits; CAPT
 
 ## Verification
 
-`PORT=3402 node ace test` passes with 17 new tests; `pnpm check`, `pnpm typecheck` and `pnpm build` are clean; `node ace codegen` changes nothing; the browser pass above.
+`PORT=3402 node ace test` passes with 19 new tests; `pnpm check`, `pnpm typecheck` and `pnpm build` are clean; `node ace codegen` changes nothing; the browser pass above.

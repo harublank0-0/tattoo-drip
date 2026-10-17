@@ -130,7 +130,7 @@ test.group("Login rate limits", (group) => {
 		otherAccount.assertHeader("location", "/dashboard");
 	});
 
-	test("a sign-in gives the address its attempt back and clears the email's failures", async ({
+	test("a sign-in gives back its own attempts and leaves earlier failures counted", async ({
 		client,
 		assert,
 	}) => {
@@ -143,8 +143,38 @@ test.group("Login rate limits", (group) => {
 		signedIn.assertHeader("location", "/dashboard");
 
 		const address = await perIp().get(loginIpKey("203.0.113.21"));
+		const email = await perEmail().get(loginEmailKey(EMAIL));
 		assert.equal(address?.consumed, 3);
-		assert.isNull(await perEmail().get(loginEmailKey(EMAIL)));
+		assert.equal(email?.consumed, 3);
+	});
+
+	test("signing in to a look-alike account doesn't reset another account's count", async ({
+		client,
+	}) => {
+		// Emails are case-sensitive: INK@ is a separate account that shares
+		// ink@'s count. Its owner signing in must not wipe the failures.
+		await makeUser();
+		await makeUser("INK@example.com");
+		for (const ip of ["203.0.113.61", "203.0.113.62", "203.0.113.63"]) {
+			for (let i = 0; i < 8; i++) {
+				const failed = await login(client, ip, "wrong-password");
+				failed.assertFlashMessage("error", WRONG);
+			}
+		}
+
+		const own = await login(
+			client,
+			"203.0.113.64",
+			PASSWORD,
+			"INK@example.com",
+		);
+		own.assertHeader("location", "/dashboard");
+
+		// 24 failures stand: the 25th guess is checked, the 26th is refused.
+		const checked = await login(client, "203.0.113.65", "wrong-password");
+		checked.assertFlashMessage("error", WRONG);
+		const refused = await login(client, "203.0.113.65", "wrong-password");
+		refused.assertFlashMessage("error", LOCKED);
 	});
 
 	test("an unknown email is counted like a registered one", async ({

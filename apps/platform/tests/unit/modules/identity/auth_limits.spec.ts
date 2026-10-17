@@ -1,8 +1,11 @@
+import { mock } from "node:test";
+import limiter from "@adonisjs/limiter/services/main";
 import { test } from "@japa/runner";
 import {
 	AUTH_LIMITS,
 	loginEmailKey,
 	loginIpKey,
+	throttleLogin,
 } from "#modules/identity/services/auth_limits";
 
 test.group("Auth limits", () => {
@@ -34,5 +37,40 @@ test.group("Auth limits", () => {
 			loginIpKey("2001:db8:1:2::1"),
 			loginIpKey("2001:db8:1:3::1"),
 		);
+	});
+});
+
+test.group("Auth limits: refunds", (group) => {
+	group.each.setup(() => limiter.clear(["memory"]));
+	group.each.teardown(() => mock.timers.reset());
+
+	test("a refund that lands after its window ended leaves the new window alone", async ({
+		assert,
+	}) => {
+		const ip = "203.0.113.70";
+		const email = "ink@example.com";
+		mock.timers.enable({ apis: ["Date"], now: Date.now() });
+
+		const user = await throttleLogin(ip, email, async () => {
+			// A slow credential check: its window ends, a new one opens and
+			// takes five failures, then the check succeeds.
+			mock.timers.tick(16 * 60 * 1000);
+			for (let i = 0; i < 5; i++) {
+				await throttleLogin(ip, email, async () => {
+					throw new Error("wrong password");
+				}).catch(() => {});
+			}
+			return "user";
+		});
+
+		assert.equal(user, "user");
+		const address = await limiter
+			.use({ ...AUTH_LIMITS.loginPerIp })
+			.get(loginIpKey(ip));
+		const account = await limiter
+			.use({ ...AUTH_LIMITS.loginPerEmail })
+			.get(loginEmailKey(email));
+		assert.equal(address?.consumed, 5);
+		assert.equal(account?.consumed, 5);
 	});
 });
