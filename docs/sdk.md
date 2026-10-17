@@ -73,7 +73,7 @@ const { data: artists } = useArtists();
 const createInquiry = useCreateInquiry();
 ```
 
-`useCreateInquiry()` never retries: a retry after a timeout could send the inquiry twice.
+`useCreateInquiry()` never retries, even when the app's `QueryClient` retries mutations by default: its options (`tattooMutations.createInquiry(client)`) set `retry: false`, because a retry after a timeout could send the inquiry twice.
 
 For SSR prefetching in route loaders, use `tattooQueries.*` with `queryClient.ensureQueryData(tattooQueries.artists(client))`. The query options forward TanStack Query's `signal`, so a query nobody needs any more cancels its request.
 

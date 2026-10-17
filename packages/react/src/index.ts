@@ -14,4 +14,4 @@ export {
 	type TattooProviderProps,
 	useTattooClient,
 } from "./provider.js";
-export { tattooKeys, tattooQueries } from "./queries.js";
+export { tattooKeys, tattooMutations, tattooQueries } from "./queries.js";
