@@ -11,6 +11,8 @@ const EXEMPT: Record<string, string> = {
 		"global identity, read before any context exists (login, session, signup)",
 	queue_jobs: "queue storage, not tenant-owned",
 	queue_schedules: "queue storage, not tenant-owned",
+	rate_limits:
+		"rate-limit counters keyed by HMAC digests (TAT-8), not tenant-owned",
 	adonis_schema: "migration bookkeeping",
 	adonis_schema_versions: "migration bookkeeping",
 };
