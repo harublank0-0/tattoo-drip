@@ -5,7 +5,7 @@ import { createInertiaApp, type ResolvedComponent } from "@inertiajs/react";
 import { createRoot } from "react-dom/client";
 import { client } from "./client";
 
-const appName = import.meta.env.VITE_APP_NAME || "AdonisJS";
+const appName = import.meta.env.VITE_APP_NAME || "Tattoo Drip";
 
 createInertiaApp({
 	title: (title) => (title ? `${title} - ${appName}` : appName),
