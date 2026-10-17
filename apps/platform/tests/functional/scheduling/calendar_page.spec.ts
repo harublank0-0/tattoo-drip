@@ -406,16 +406,27 @@ test.group("Calendar page", (group) => {
 				await makeClient(tenant, { name: "Nima" }),
 				{ artistId: profile.id, status: "booked" },
 			);
+			// Sita's project, with a client and brief of its own to look for.
+			const hers = await makeProject(
+				tenant,
+				await makeClient(tenant, { name: "Hidden Client" }),
+				{
+					artistId: sita.id,
+					status: "booked",
+					brief: "Sita's private dragon design",
+				},
+			);
 			// Sita's own session: not on Asha's calendar.
 			await makeSession(tenant, project, sita);
 			return {
 				nimas,
+				hers,
 				own: await makeSession(tenant, nimas, profile, {
 					startsAt: at("2026-11-02", "10:00"),
 					endsAt: at("2026-11-02", "11:00"),
 				}),
 				// Booked with Asha, then the project went to Sita: the time stays Asha's.
-				reassigned: await makeSession(tenant, project, profile, {
+				reassigned: await makeSession(tenant, hers, profile, {
 					startsAt: at("2026-11-02", "12:00"),
 					endsAt: at("2026-11-02", "13:00"),
 				}),
@@ -441,6 +452,17 @@ test.group("Calendar page", (group) => {
 				[rows.reassigned.id, null],
 			],
 		);
+		// Nothing of Sita's project is anywhere in the page, not only in the row.
+		const page = JSON.stringify(props);
+		for (const hidden of [
+			rows.hers.id,
+			"Hidden Client",
+			"private dragon",
+			project.id,
+			"Maya",
+		]) {
+			assert.notInclude(page, hidden);
+		}
 		const own = await client
 			.get(calendarUrl(`?artist=${profile.id}`))
 			.withInertia()
@@ -470,6 +492,10 @@ test.group("Calendar page", (group) => {
 		assert.equal(response.inertiaProps.scope, "unlinked");
 		assert.isNull(response.inertiaProps.artistFilter);
 		assert.deepEqual(response.inertiaProps.days[0].sessions, []);
+		// Sita's session is in the database, and nothing of it is in the page.
+		const page = JSON.stringify(response.inertiaProps);
+		assert.notInclude(page, project.id);
+		assert.notInclude(page, "Maya");
 		const other = await client
 			.get(calendarUrl(`?artist=${sita.id}`))
 			.withInertia()
