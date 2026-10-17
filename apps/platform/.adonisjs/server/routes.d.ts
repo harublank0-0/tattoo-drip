@@ -37,6 +37,8 @@ export type ScannedRoutes = {
     'tenant.clients.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.clients.edit': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.clients.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.projects.create': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.projects.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.projects.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.projects.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.projects.quotes.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
@@ -70,6 +72,7 @@ export type ScannedRoutes = {
     'tenant.clients.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.clients.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.clients.edit': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.projects.create': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.projects.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.projects.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'dashboard': { paramsTuple?: []; params?: {} }
@@ -95,6 +98,7 @@ export type ScannedRoutes = {
     'tenant.clients.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.clients.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.clients.edit': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.projects.create': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.projects.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.projects.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'dashboard': { paramsTuple?: []; params?: {} }
@@ -108,6 +112,7 @@ export type ScannedRoutes = {
     'tenant.artists.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.inbox.accept': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inbox.decline': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.projects.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.projects.quotes.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.projects.quotes.accept': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.projects.moves.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }

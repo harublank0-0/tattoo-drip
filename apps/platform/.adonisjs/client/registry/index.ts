@@ -204,6 +204,18 @@ const routes = {
     tokens: [{"old":"/t/:tenant/clients/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/clients/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/clients/:id","type":0,"val":"clients","end":""},{"old":"/t/:tenant/clients/:id","type":1,"val":"id","end":""}],
     types: placeholder as Registry['tenant.clients.update']['types'],
   },
+  'tenant.projects.create': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/projects/new',
+    tokens: [{"old":"/t/:tenant/projects/new","type":0,"val":"t","end":""},{"old":"/t/:tenant/projects/new","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/projects/new","type":0,"val":"projects","end":""},{"old":"/t/:tenant/projects/new","type":0,"val":"new","end":""}],
+    types: placeholder as Registry['tenant.projects.create']['types'],
+  },
+  'tenant.projects.store': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/projects',
+    tokens: [{"old":"/t/:tenant/projects","type":0,"val":"t","end":""},{"old":"/t/:tenant/projects","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/projects","type":0,"val":"projects","end":""}],
+    types: placeholder as Registry['tenant.projects.store']['types'],
+  },
   'tenant.projects.index': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/projects',
