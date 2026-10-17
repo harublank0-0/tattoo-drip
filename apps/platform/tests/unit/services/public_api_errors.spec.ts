@@ -47,16 +47,13 @@ test.group("apiErrorFor", () => {
 		});
 	});
 
-	test("an ApiException keeps its status, code, message and fields", ({
+	test("an ApiException keeps its status, code and message, without fields", ({
 		assert,
 	}) => {
 		const error = new ApiException(
 			409,
 			"too_many_open_inquiries",
 			"This studio already has your request.",
-			{
-				"client.phone": ["Already open"],
-			},
 		);
 
 		assert.deepEqual(apiErrorFor(error), {
@@ -65,11 +62,37 @@ test.group("apiErrorFor", () => {
 				error: {
 					code: "too_many_open_inquiries",
 					message: "This studio already has your request.",
-					fields: { "client.phone": ["Already open"] },
 				},
 			},
 			headers: {},
 		});
+	});
+
+	test("only a validation_failed ApiException carries fields", ({ assert }) => {
+		const fields = { "client.phone": ["Already open"] };
+
+		assert.deepEqual(
+			apiErrorFor(
+				new ApiException(422, "validation_failed", "Check the fields.", fields),
+			),
+			{
+				status: 422,
+				body: {
+					error: {
+						code: "validation_failed",
+						message: "Check the fields.",
+						fields,
+					},
+				},
+				headers: {},
+			},
+		);
+		assert.throws(
+			() =>
+				// @ts-expect-error fields are refused for any other code
+				new ApiException(409, "too_many_open_inquiries", "Open.", fields),
+			/cannot carry fields/,
+		);
 	});
 
 	test("ApiException.notFound is a 404 even when other methods match", ({

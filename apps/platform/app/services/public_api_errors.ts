@@ -28,8 +28,17 @@ const CODE_BY_STATUS: Partial<Record<number, ApiErrorCode>> = {
  * An error a public endpoint answers with on purpose: a shared code, or the
  * endpoint's own (such as `too_many_open_inquiries`, listed in
  * openapi.yaml). Its message is shown to people: keep it plain and safe.
+ * `fields` (field path to messages) belongs to `validation_failed` only, as
+ * the contract says; any other code with fields is refused at construction.
  */
 export class ApiException extends Error {
+	constructor(
+		status: number,
+		code: "validation_failed",
+		message: string,
+		fields: Record<string, string[]>,
+	);
+	constructor(status: number, code: string, message: string);
 	constructor(
 		readonly status: number,
 		readonly code: string,
@@ -38,6 +47,11 @@ export class ApiException extends Error {
 	) {
 		super(message);
 		this.name = "ApiException";
+		if (fields && code !== "validation_failed") {
+			throw new TypeError(
+				`ApiException "${code}" cannot carry fields: only validation_failed does`,
+			);
+		}
 	}
 
 	/** The 404 of an unknown tenant or record: one answer for every reason. */
