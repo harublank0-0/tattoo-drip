@@ -32,7 +32,7 @@ Inquiries, clients, quotes and payments are never readable through the public AP
 
 ## Core SDK
 
-The core SDK targets one API version (`v1`) and one tenant per client. It has typed inputs and outputs, typed errors (`TattooApiError` with `status`, `code` and `fields`), no caching or UI state, and no business rules.
+The core SDK targets one API version (`v1`) and one tenant per client. It has typed inputs and outputs, typed errors (`TattooApiError` with `status`, `code`, `message`, `fields` and `retryAfter`), no caching or UI state, and no business rules. Every call sends `Accept: application/json` and no cookies (`credentials: "omit"`), gives up after `timeoutMs` (10 seconds by default) with code `timeout`, and takes `{ signal }` to cancel, after which it rejects with the signal's `AbortError`. A response that never arrived is status 0 with `timeout` or `network_error`; a 2xx without `{ data }` is `invalid_response`.
 
 ```ts
 import { createTattooClient, isTattooApiError } from "@tattoo-drip/sdk";
@@ -71,7 +71,7 @@ const { data: artists } = useArtists();
 const createInquiry = useCreateInquiry();
 ```
 
-For SSR prefetching in route loaders, use `tattooQueries.*` with `queryClient.ensureQueryData(tattooQueries.artists(client))`.
+For SSR prefetching in route loaders, use `tattooQueries.*` with `queryClient.ensureQueryData(tattooQueries.artists(client))`. The query options forward TanStack Query's `signal`, so a query nobody needs any more cancels its request.
 
 ## Studio page = external storefront
 
@@ -92,6 +92,9 @@ The SDK throws if it is given a key in a browser.
 ## Contract, keys, stability
 
 - **Contract:** `packages/types/openapi.yaml` is the source of truth. After editing it, run `pnpm --filter @tattoo-drip/types generate`. Contract tests (V1) check that real responses match it.
+- **Envelopes and codes:** `{ data }` on success; `{ error: { code, message, fields? } }` on failure. Shared codes: `bad_request`, `not_found`, `method_not_allowed`, `payload_too_large`, `unsupported_media_type`, `validation_failed` (with `fields`), `rate_limited` (with `Retry-After`), `internal_error`; an endpoint may add its own, listed in `openapi.yaml`. Branch on `code`, never on `message`.
+- **Tenants and old slugs:** the path slug is matched exactly. An old slug answers reads like the current one, and `studio.get()` returns the current `slug` (the studio page redirects with it); a write under an old slug is a 404.
+- **Stateless, CORS, caching:** no cookies or sessions; CORS allows any origin without credentials. Cacheable reads send `Cache-Control: public, max-age=60, stale-while-revalidate=600` and an `ETag`; everything else is `no-store`.
 - **Versioning:** within `/api/v1`, changes are additive only. Breaking changes mean `/api/v2` and a new SDK major version. Until V2 opens the SDK to others, the draft may still change freely.
 - **Lists:** responses are wrapped in `{ data }`, so pagination metadata can be added without breaking clients.
 - **Keys:** anonymous public endpoints plus the studio page's server key. Publishable and secret keys come with V2.

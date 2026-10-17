@@ -12,7 +12,7 @@ Select guidance for the current task. Follow ordinary links when needed; this in
 | API contract, SDK boundaries, React adapter | [SDK](sdk.md) |
 | Phase scope and release gates | [Roadmap](roadmap.md) |
 | Market evidence, only when requested | [Research](research.md) |
-| Platform services, controllers, tenancy, database conventions | [Backend development](../apps/platform/docs/backend.md) |
+| Platform services, controllers, tenancy, public API, database conventions | [Backend development](../apps/platform/docs/backend.md) |
 | Platform React, Inertia, forms, shadcn and styling | [Platform UI](../apps/platform/docs/ui.md) |
 | Queue dispatch, worker, retries, scheduled jobs, email templates | [Jobs and email](../apps/platform/docs/jobs-and-email.md) |
 | Platform test setup, narrowing tests, recurring pitfalls | [Platform testing](../apps/platform/docs/testing.md) |
