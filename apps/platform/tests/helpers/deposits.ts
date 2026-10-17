@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import ArtistService from "#modules/artists/services/artist_service";
 import ImageService from "#modules/media/services/image_service";
 import DepositLinkService from "#modules/payments/services/deposit_link_service";
+import DepositPageService from "#modules/payments/services/deposit_page_service";
 import DepositService from "#modules/payments/services/deposit_service";
 import PaymentMethodService from "#modules/payments/services/payment_method_service";
 import ProjectService from "#modules/projects/services/project_service";
@@ -30,7 +31,16 @@ export function depositServices(images: ImageService = new ImageService()) {
 	);
 	const methods = new PaymentMethodService(images);
 	const links = new DepositLinkService(projects, quotes, deposits, methods);
-	return { images, artists, quotes, deposits, projects, methods, links };
+	const pages = new DepositPageService(
+		links,
+		projects,
+		quotes,
+		deposits,
+		methods,
+		artists,
+		images,
+	);
+	return { images, artists, quotes, deposits, projects, methods, links, pages };
 }
 
 /**
