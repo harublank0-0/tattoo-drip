@@ -14,3 +14,19 @@ Read before changing dashboard components, forms, styling or SSR. Dashboard UI l
 - Forms post with `Form` from `@adonisjs/inertia/react` and are validated server-side with VineJS. Lay fields out with shadcn's `FieldGroup` / `Field` / `FieldLabel` / `FieldError`, setting `data-invalid` on `Field` and `aria-invalid` on the control (see `inertia/pages/auth/login.tsx`).
 - Dark mode follows `data-theme` on `<html>`, rendered from the `app_theme` cookie, and Tailwind's `dark:` variant is keyed to it. Use `useTheme` from `~/hooks/use-theme`, not `next-themes`.
 - Import frontend code with the `~/` alias (`~/components/ui/button`).
+
+## App shell
+
+- `AppLayout` is the shell for every tenant page (TAT-67). Below Tailwind's `lg` (1024px): a top bar (studio switcher, account menu) and a bottom tab bar; from `lg`: a left sidebar. Both render `navItems` from `inertia/components/shell/nav_items.ts`, which is plain data and unit-tested: add a new area there (and its icon in `nav_icons.ts`), not in the layout. The tab bar only shows with two or more destinations; `also` lists other path prefixes that make an item current (Settings covers `/artists`).
+- The page under the tab bar is padded by the bar's height plus `env(safe-area-inset-bottom)`; anything fixed to the bottom of a page must clear it too.
+- Installable: `public/manifest.webmanifest`, icons in `public/icons/` generated from `resources/brand/mark.svg` by `node scripts/generate_icons.ts` (commit the outputs), and `public/sw.js`. The service worker caches only hashed `/assets/*` build files and the offline page; it never stores pages, Inertia responses, `/files` or `/uploads`. Bump its `CACHE` name to drop everything an older version stored. It registers only in production builds.
+
+## Phones and slow connections
+
+Check every page against these:
+
+- Lists are paginated (25 per page) and props carry only what the screen shows.
+- Images in lists and grids are lazy-loaded thumbnails, never the full-size file.
+- Forms disable their button and say "Saving…" while a request is in flight.
+- Optimistic UI only for reversible single-field changes (notes, "Mark contacted"); never for money, quotes, status moves, or accepting and declining.
+- Touch targets are at least 44px, and nothing is wider than 375px.

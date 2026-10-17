@@ -60,6 +60,8 @@ An existing checkout must update `apps/platform/.env` from `.env.example` before
 
 Narrow work with `pnpm --filter @tattoo-drip/<area> typecheck` and [platform test guidance](apps/platform/docs/testing.md). Functional tests need migrated PostgreSQL; boot commands need the platform environment. Storefront and public packages currently have no test scripts, so root tests do not validate their behavior.
 
+To try the installed dashboard app locally, build the platform and run the built server (the service worker is off in development): `pnpm --filter @tattoo-drip/platform build`, then `NODE_ENV=production node bin/server.js` from `apps/platform/build` with the platform's environment variables set (for example by copying `apps/platform/.env` into `build/`). Open it in Chrome on `http://localhost` and install it from the address bar (browsers only offer installation on HTTPS or `localhost`, so a phone needs an HTTPS tunnel; on iPhone: Share → Add to Home Screen). In DevTools → Network, "Offline" then a reload shows the offline page.
+
 CI runs install, `pnpm check`, `pnpm typecheck`, `pnpm build`, platform migrations on PostgreSQL 18 and `pnpm test`, on PRs and pushes to `main` (`.github/workflows/ci.yml`). It checks that regenerated `apps/platform/database/schema.ts` is included. Pre-commit runs Biome on staged files; pre-push runs check/typecheck. Commitlint enforces Conventional Commits; use area scopes (`platform`, `storefront`, `types`, `sdk`, `react`).
 
 ## Working with AI agents
