@@ -1,4 +1,5 @@
 import type {
+	ApiError,
 	Artist,
 	BodyPlacement,
 	BookingReceipt,
@@ -15,6 +16,7 @@ import type {
 import { TattooApiError } from "./errors.js";
 
 const API_VERSION = "v1";
+const DEFAULT_TIMEOUT_MS = 10_000;
 
 export interface TattooClientOptions {
 	/** API origin, e.g. `https://api.example.com`. The SDK appends `/api/v1`. */
@@ -28,6 +30,17 @@ export interface TattooClientOptions {
 	key?: string;
 	/** Custom fetch for tests, edge runtimes or request forwarding. */
 	fetch?: typeof fetch;
+	/**
+	 * Milliseconds before a call gives up with a `timeout` TattooApiError.
+	 * Defaults to 10 000.
+	 */
+	timeoutMs?: number;
+}
+
+/** Options for one call. */
+export interface RequestOptions {
+	/** Cancels the call; it then rejects with the signal's reason (an `AbortError`). */
+	signal?: AbortSignal;
 }
 
 export interface CreateBookingInput extends BookingRequestInput {
@@ -39,6 +52,8 @@ export interface CreateBookingInput extends BookingRequestInput {
 
 type Query = Record<string, string | number | undefined>;
 
+type ResponseBody = { data?: unknown; error?: Partial<ApiError> };
+
 export type TattooClient = ReturnType<typeof createTattooClient>;
 
 export function createTattooClient(options: TattooClientOptions) {
@@ -49,18 +64,56 @@ export function createTattooClient(options: TattooClientOptions) {
 	}
 
 	const fetchImpl = options.fetch ?? globalThis.fetch;
+	const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 	const apiRoot = `${options.baseUrl.replace(/\/+$/, "")}/api/${API_VERSION}`;
 	const tenantRoot = `${apiRoot}/tenants/${encodeURIComponent(options.tenant)}`;
 
-	async function request<T>(url: string, init: RequestInit = {}): Promise<T> {
+	async function request<T>(
+		url: string,
+		init: RequestInit = {},
+		{ signal }: RequestOptions = {},
+	): Promise<T> {
 		const headers = new Headers(init.headers);
 		headers.set("Accept", "application/json");
 		if (options.key) headers.set("Authorization", `Bearer ${options.key}`);
 
-		const response = await fetchImpl(url, { ...init, headers });
-		const body = await readJson(response);
+		const timeout = AbortSignal.timeout(timeoutMs);
+		let response: Response;
+		let body: ResponseBody | undefined;
+		try {
+			response = await fetchImpl(url, {
+				...init,
+				headers,
+				// The API is stateless and cookieless: never send cookies to it.
+				credentials: "omit",
+				signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+			});
+			body = await readJson(response);
+		} catch (error) {
+			// The caller cancelled: let its AbortError through (TanStack Query
+			// expects it).
+			if (signal?.aborted) throw signal.reason;
+			if (timeout.aborted) {
+				throw new TattooApiError(0, {
+					code: "timeout",
+					message: "The Tattoo Drip API did not answer in time.",
+				});
+			}
+			throw new TattooApiError(
+				0,
+				{
+					code: "network_error",
+					message: "The Tattoo Drip API could not be reached.",
+				},
+				{ cause: error },
+			);
+		}
 
-		if (!response.ok) throw new TattooApiError(response.status, body?.error);
+		if (!response.ok) {
+			throw new TattooApiError(response.status, body?.error, {
+				retryAfter: retryAfterOf(response),
+			});
+		}
 		if (!body || !("data" in body)) {
 			throw new TattooApiError(response.status, {
 				code: "invalid_response",
@@ -70,8 +123,8 @@ export function createTattooClient(options: TattooClientOptions) {
 		return body as T;
 	}
 
-	async function getData<T>(url: string): Promise<T> {
-		return (await request<{ data: T }>(url)).data;
+	async function getData<T>(url: string, call?: RequestOptions): Promise<T> {
+		return (await request<{ data: T }>(url, {}, call)).data;
 	}
 
 	return {
@@ -79,24 +132,32 @@ export function createTattooClient(options: TattooClientOptions) {
 		tenant: options.tenant,
 
 		studio: {
-			get: () => getData<Studio>(tenantRoot),
+			get: (call?: RequestOptions) => getData<Studio>(tenantRoot, call),
 		},
 		artists: {
-			list: () => getData<Artist[]>(`${tenantRoot}/artists`),
-			get: (slug: string) =>
-				getData<Artist>(`${tenantRoot}/artists/${encodeURIComponent(slug)}`),
+			list: (call?: RequestOptions) =>
+				getData<Artist[]>(`${tenantRoot}/artists`, call),
+			get: (slug: string, call?: RequestOptions) =>
+				getData<Artist>(
+					`${tenantRoot}/artists/${encodeURIComponent(slug)}`,
+					call,
+				),
 		},
 		services: {
-			list: (query?: ListServicesQuery) =>
-				getData<Service[]>(withQuery(`${tenantRoot}/services`, query)),
+			list: (query?: ListServicesQuery, call?: RequestOptions) =>
+				getData<Service[]>(withQuery(`${tenantRoot}/services`, query), call),
 		},
 		portfolio: {
-			list: (query?: ListPortfolioQuery) =>
-				request<PortfolioPage>(withQuery(`${tenantRoot}/portfolio`, query)),
+			list: (query?: ListPortfolioQuery, call?: RequestOptions) =>
+				request<PortfolioPage>(
+					withQuery(`${tenantRoot}/portfolio`, query),
+					{},
+					call,
+				),
 		},
 		availability: {
-			list: (query: ListAvailabilityQuery) =>
-				getData<Slot[]>(withQuery(`${tenantRoot}/availability`, query)),
+			list: (query: ListAvailabilityQuery, call?: RequestOptions) =>
+				getData<Slot[]>(withQuery(`${tenantRoot}/availability`, query), call),
 		},
 		bookings: {
 			create: async (input: CreateBookingInput) => {
@@ -118,10 +179,12 @@ export function createTattooClient(options: TattooClientOptions) {
 
 		/** Platform-wide reference lists (not tenant-scoped). */
 		styles: {
-			list: () => getData<TattooStyle[]>(`${apiRoot}/styles`),
+			list: (call?: RequestOptions) =>
+				getData<TattooStyle[]>(`${apiRoot}/styles`, call),
 		},
 		placements: {
-			list: () => getData<BodyPlacement[]>(`${apiRoot}/placements`),
+			list: (call?: RequestOptions) =>
+				getData<BodyPlacement[]>(`${apiRoot}/placements`, call),
 		},
 	};
 }
@@ -136,15 +199,25 @@ function withQuery(url: string, query?: Query): string {
 	return search ? `${url}?${search}` : url;
 }
 
-async function readJson(
-	response: Response,
-): Promise<{ data?: unknown; error?: TattooApiErrorBody } | undefined> {
+/**
+ * The JSON body, or undefined when there is none or it isn't JSON. Reading
+ * the body can still fail (a timeout or a dropped connection): that throws.
+ */
+async function readJson(response: Response): Promise<ResponseBody | undefined> {
 	if (!response.headers.get("content-type")?.includes("json")) return undefined;
+	const text = await response.text();
 	try {
-		return await response.json();
+		return JSON.parse(text);
 	} catch {
 		return undefined;
 	}
 }
 
-type TattooApiErrorBody = ConstructorParameters<typeof TattooApiError>[1];
+/** `Retry-After` in seconds, when the API sent it as a number. */
+function retryAfterOf(response: Response): number | undefined {
+	const seconds = Number.parseInt(
+		response.headers.get("retry-after") ?? "",
+		10,
+	);
+	return Number.isFinite(seconds) && seconds >= 0 ? seconds : undefined;
+}
