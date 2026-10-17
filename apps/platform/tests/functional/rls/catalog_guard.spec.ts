@@ -41,6 +41,16 @@ const EXPECTED_POLICIES: Record<string, string[]> = {
 	],
 };
 
+/**
+ * SECURITY DEFINER functions, and why. They run as their owner, which
+ * bypasses row-level security, so each one is a conscious edit: ids only,
+ * a pinned search_path and no EXECUTE for PUBLIC (database/README.md).
+ */
+const DEFINER_FUNCTIONS: Record<string, string> = {
+	expired_quote_candidates:
+		"lists (tenant_id, project_id, quote_id) of expired current quotes for the expiry sweep (TAT-83)",
+};
+
 async function rows<T>(query: string) {
 	const result = await dbClient().rawQuery(query);
 	return result.rows as T[];
@@ -184,5 +194,36 @@ test.group("Catalog guard", () => {
 			.filter(({ cols }) => !cols.includes("tenant_id"))
 			.map(({ child, parent }) => `${child} -> ${parent}`);
 		assert.deepEqual(loose, [], "use tenantReference() in the migration");
+	});
+
+	test("every SECURITY DEFINER function is listed, pins search_path and is closed to PUBLIC", async ({
+		assert,
+	}) => {
+		const definers = await rows<{
+			proname: string;
+			proconfig: string[] | null;
+			public_can_run: boolean;
+		}>(
+			`select p.proname, p.proconfig,
+			        has_function_privilege('public', p.oid, 'execute') as public_can_run
+			 from pg_proc p
+			 where p.pronamespace = 'public'::regnamespace and p.prosecdef
+			   and not exists (
+			     select 1 from pg_depend d
+			     where d.classid = 'pg_proc'::regclass and d.objid = p.oid and d.deptype = 'e'
+			   )
+			 order by p.proname`,
+		);
+
+		assert.deepEqual(
+			definers,
+			Object.keys(DEFINER_FUNCTIONS)
+				.sort()
+				.map((proname) => ({
+					proname,
+					proconfig: ["search_path=pg_catalog, pg_temp"],
+					public_can_run: false,
+				})),
+		);
 	});
 });
