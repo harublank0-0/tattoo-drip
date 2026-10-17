@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { MultipartFile } from "@adonisjs/core/bodyparser";
+import { Exception } from "@adonisjs/core/exceptions";
 import type { HttpContext } from "@adonisjs/core/http";
 import config from "@adonisjs/core/services/config";
 import logger from "@adonisjs/core/services/logger";
@@ -46,7 +47,7 @@ const BUILT_IN_NAMES = [
  * handler runs, after publicTenant has answered 404 for an unknown slug
  * (TAT-32, ruling 16; TAT-51). Same limits as the parser's (`limit`,
  * `fieldsLimit`). A part that fails is deleted, and the call rejects with
- * the parser's error (413, 400). Pair it
+ * the parser's error (413, 400); a client that hangs up is a 400 too. Pair it
  * with `discardUploads` in a `finally`. Call it only when `request.bodyType`
  * is "multipart".
  */
@@ -78,7 +79,30 @@ export async function receiveUploads(request: Request): Promise<void> {
 	for (const name of [...BUILT_IN_NAMES, "*"]) {
 		request.multipart.onFile(name, { deferValidations: true }, handler);
 	}
-	await request.multipart.process();
+	try {
+		await request.multipart.process();
+	} catch (error) {
+		throw clientHungUp(error)
+			? new Exception("Request aborted", {
+					status: 400,
+					code: "E_REQUEST_ABORTED",
+				})
+			: error;
+	}
+}
+
+/**
+ * The parser's own error when the client closed the connection mid-body: a
+ * plain Error with no status (the JSON parser's equivalent is a 400).
+ */
+function clientHungUp(error: unknown): boolean {
+	if (!(error instanceof Error)) return false;
+	const code = "code" in error ? error.code : undefined;
+	return (
+		error.message === "Request aborted" ||
+		code === "ECONNRESET" ||
+		code === "ECONNABORTED"
+	);
 }
 
 /** A new temp file path, named as config/bodyparser.ts says (the OS temp folder by default). */

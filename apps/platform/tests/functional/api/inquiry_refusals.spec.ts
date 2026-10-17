@@ -1,4 +1,5 @@
 import net from "node:net";
+import { ExceptionHandler } from "@adonisjs/core/http";
 import testUtils from "@adonisjs/core/services/test_utils";
 import type { ApiClient } from "@japa/api-client";
 import type { Assert } from "@japa/assert";
@@ -335,6 +336,40 @@ test.group("Public API: POST /inquiries temp uploads", (group) => {
 			"the half-sent upload to be removed",
 		);
 		assert.deepEqual(await newTempUploads(before), []);
+	});
+
+	test("a client that hangs up mid-upload is not a server error", async ({
+		assert,
+	}) => {
+		await studioWithOwner(SLUG);
+		const reported: unknown[] = [];
+		const original = ExceptionHandler.prototype.report;
+		ExceptionHandler.prototype.report = async function (...args) {
+			reported.push(args[0]);
+			return original.apply(this, args);
+		};
+		try {
+			const before = await tempUploads();
+			const socket = await startUpload();
+			await until(
+				async () => (await newTempUploads(before)).length === 1,
+				"the upload to start",
+			);
+			socket.destroy();
+			await until(
+				async () => (await newTempUploads(before)).length === 0,
+				"the upload to be removed",
+			);
+			await settle();
+		} finally {
+			ExceptionHandler.prototype.report = original;
+		}
+
+		assert.deepEqual(
+			reported.map((error) => String(error)),
+			[],
+			"nothing reached the error log",
+		);
 	});
 
 	test("a file part cut off mid-way is bad_request and leaves no temp file", async ({
