@@ -238,6 +238,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tenants/{tenant}/deposits/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+                /**
+                 * @description The deposit link's secret: the fragment of the link the studio sent
+                 *     (`https://<studio>/deposit#<token>`). A bearer secret: never log it
+                 *     or send it to analytics.
+                 */
+                token: components["parameters"]["DepositToken"];
+            };
+            cookie?: never;
+        };
+        /**
+         * A project's deposit page, through its link
+         * @description What the client's deposit page shows: the studio, the project's
+         *     brief, the deposit, the reference code to write in the payment
+         *     remark, the studio's payment methods (only while the deposit is
+         *     due) and its deposit policy. Never cached. Every link that doesn't
+         *     work (unknown, replaced, expired, another studio's, or its project
+         *     gone) is the same 404. Rate-limited per address and per link.
+         */
+        get: operations["getDeposit"];
+        put?: never;
+        /**
+         * Send a screenshot of the deposit payment
+         * @description One `multipart/form-data` request: the screenshot (`proof`, a JPEG,
+         *     PNG or WebP of 10 MB at most), how the client paid (`method`, one of
+         *     the page's `paymentMethods` kinds) and the amount the page showed
+         *     (`expectedAmount`, its `deposit.due`). The API keeps the image
+         *     privately, records a payment for the studio to check, and answers
+         *     with the page as it now is (`submitted`). One screenshot waits at a
+         *     time. Under an old slug it is a 404. Rate-limited per address and
+         *     per link.
+         *
+         *     Own codes (409): `deposit_not_due` (the page's state isn't `due`, for
+         *     example a screenshot already waits; reload the page) and
+         *     `deposit_changed` (`expectedAmount` isn't what is due now; reload
+         *     the page).
+         */
+        post: operations["submitDepositProof"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -252,11 +307,13 @@ export interface components {
                  *     `rate_limited` (429, with `Retry-After`), `internal_error`
                  *     (500). Endpoint codes: `artist_not_accepting`,
                  *     `studio_not_accepting`, `too_many_open_inquiries` (409,
-                 *     `createInquiry`). Treat an unknown code by its HTTP status.
+                 *     `createInquiry`), `deposit_not_due`, `deposit_changed` (409,
+                 *     `submitDepositProof`). Treat an unknown code by its HTTP status.
                  * @example not_found
                  * @example validation_failed
                  * @example rate_limited
                  * @example too_many_open_inquiries
+                 * @example deposit_changed
                  */
                 code: string;
                 /** @description A sentence for people. Never parse it. */
@@ -453,6 +510,89 @@ export interface components {
              */
             id: string;
         };
+        /**
+         * @description What the deposit page says: `due` (pay, then send a screenshot),
+         *     `submitted` (a screenshot waits for the studio), `paid` (nothing
+         *     left to pay), `updating` (the studio is changing the quote),
+         *     `expired` (the quote expired) or `cancelled`.
+         * @enum {string}
+         */
+        DepositState: "due" | "submitted" | "paid" | "updating" | "expired" | "cancelled";
+        DepositPaymentMethod: {
+            /** @enum {string} */
+            kind: "fonepay" | "esewa" | "khalti" | "bank";
+            /** @example eSewa */
+            label: string;
+            /**
+             * Format: uri
+             * @description The studio's QR code, a public image.
+             */
+            qrImageUrl: string | null;
+            accountName: string | null;
+            /** @description The bank account number, or the eSewa or Khalti ID. */
+            accountNumber: string | null;
+            bankName: string | null;
+        };
+        DepositPage: {
+            studio: {
+                name: string;
+            };
+            project: {
+                brief: string;
+                artistName: string | null;
+            };
+            deposit: {
+                /** @description The current quote's deposit, in paisa. */
+                amount: number;
+                /** @example NPR 3,000 */
+                amountText: string;
+                /** @description What is still to pay, in paisa. Send it back as `expectedAmount`. */
+                due: number;
+                /** @example NPR 3,000 */
+                dueText: string;
+                /** @example NPR */
+                currency: string;
+                /**
+                 * Format: date
+                 * @description The quote's last valid day, in the studio's timezone.
+                 */
+                payBy: string;
+                /** @example 28 Oct 2026 */
+                payByText: string;
+            };
+            /**
+             * @description What the client writes in the payment remark.
+             * @example 7K3M9Q
+             */
+            referenceCode: string;
+            state: components["schemas"]["DepositState"];
+            /** @description In `due`, the studio couldn't confirm the last screenshot. */
+            lastProofRejected: boolean;
+            /**
+             * Format: date-time
+             * @description When the screenshot that waits was sent.
+             */
+            proofSubmittedAt: string | null;
+            /** @description The studio's payment methods, only in `due`; empty otherwise. */
+            paymentMethods: components["schemas"]["DepositPaymentMethod"][];
+            /** @description The studio's own words about deposits. */
+            depositPolicy: string | null;
+        };
+        /** @description The multipart body of `submitDepositProof` */
+        DepositProofForm: {
+            /**
+             * Format: binary
+             * @description The payment screenshot (JPEG, PNG or WebP, 10 MB at most). Its metadata is removed, and only the studio sees it.
+             */
+            proof: string;
+            /**
+             * @description How the client paid, one of the page's `paymentMethods` kinds.
+             * @enum {string}
+             */
+            method: "fonepay" | "esewa" | "khalti" | "bank";
+            /** @description The `deposit.due` the page showed, in paisa. */
+            expectedAmount: number;
+        };
     };
     responses: {
         /** @description The `If-None-Match` tag still matches; no body */
@@ -510,6 +650,12 @@ export interface components {
          *     an old slug is a 404, so writes must use the current slug.
          */
         Tenant: string;
+        /**
+         * @description The deposit link's secret: the fragment of the link the studio sent
+         *     (`https://<studio>/deposit#<token>`). A bearer secret: never log it
+         *     or send it to analytics.
+         */
+        DepositToken: string;
     };
     requestBodies: never;
     headers: {
@@ -814,6 +960,103 @@ export interface operations {
             400: components["responses"]["Error"];
             404: components["responses"]["NotFound"];
             /** @description The studio takes no such inquiry now (`artist_not_accepting`, `studio_not_accepting`, `too_many_open_inquiries`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            413: components["responses"]["Error"];
+            415: components["responses"]["Error"];
+            422: components["responses"]["ValidationError"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getDeposit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+                /**
+                 * @description The deposit link's secret: the fragment of the link the studio sent
+                 *     (`https://<studio>/deposit#<token>`). A bearer secret: never log it
+                 *     or send it to analytics.
+                 */
+                token: components["parameters"]["DepositToken"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The deposit page */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["DepositPage"];
+                    };
+                };
+            };
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    submitDepositProof: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+                /**
+                 * @description The deposit link's secret: the fragment of the link the studio sent
+                 *     (`https://<studio>/deposit#<token>`). A bearer secret: never log it
+                 *     or send it to analytics.
+                 */
+                token: components["parameters"]["DepositToken"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["DepositProofForm"];
+            };
+        };
+        responses: {
+            /** @description Received. The studio checks it and confirms on WhatsApp or Viber. */
+            201: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["DepositPage"];
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["NotFound"];
+            /** @description The page can't take a screenshot now (`deposit_not_due`, `deposit_changed`) */
             409: {
                 headers: {
                     [name: string]: unknown;
