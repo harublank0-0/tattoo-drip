@@ -264,6 +264,12 @@ const routes = {
     tokens: [{"old":"/t/:tenant/projects/:id/artist","type":0,"val":"t","end":""},{"old":"/t/:tenant/projects/:id/artist","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/projects/:id/artist","type":0,"val":"projects","end":""},{"old":"/t/:tenant/projects/:id/artist","type":1,"val":"id","end":""},{"old":"/t/:tenant/projects/:id/artist","type":0,"val":"artist","end":""}],
     types: placeholder as Registry['tenant.projects.artist.update']['types'],
   },
+  'tenant.calendar.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/calendar',
+    tokens: [{"old":"/t/:tenant/calendar","type":0,"val":"t","end":""},{"old":"/t/:tenant/calendar","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/calendar","type":0,"val":"calendar","end":""}],
+    types: placeholder as Registry['tenant.calendar.index']['types'],
+  },
   'dashboard': {
     methods: ["GET","HEAD"],
     pattern: '/dashboard',

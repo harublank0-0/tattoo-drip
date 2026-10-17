@@ -25,7 +25,7 @@ Read before changing dashboard components, forms, styling or SSR. Dashboard UI l
 
 Check every page against these:
 
-- Lists are paginated (25 per page) and props carry only what the screen shows.
+- Open-ended lists are paginated (25 per page); a view bounded by a range (the calendar's day or week) lists the whole range instead. Props carry only what the screen shows.
 - Images in lists and grids are lazy-loaded thumbnails, never the full-size file.
 - Forms disable their button and say "Saving…" while a request is in flight.
 - Optimistic UI only for reversible single-field changes (notes, "Mark contacted"); never for money, quotes, status moves, or accepting and declining.

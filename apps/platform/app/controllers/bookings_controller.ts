@@ -16,6 +16,7 @@ import {
 	bookingValidator,
 	toBookingInput,
 } from "#modules/projects/validators/booking";
+import { toCalendarDate } from "#modules/scheduling/calendar";
 import { SessionOverlapError } from "#modules/scheduling/errors";
 import { sessionTimeText } from "#modules/scheduling/times";
 import type Tenant from "#modules/tenancy/models/tenant";
@@ -51,13 +52,20 @@ export default class BookingsController {
 		const typed =
 			typeof phone === "string" ? phone.trim().slice(0, MAX_TYPED) : "";
 		const today = todayIn(tenant.timezone);
+		const max = lastBookableDay(today);
+		// The calendar's "Book session" sends the day it shows (TAT-50).
+		const wanted = toCalendarDate(ctx.request.qs().date, today);
 
 		return ctx.inertia.render("projects/new", {
 			// A member who can't book gets the "not linked" card, not a client's name.
 			lookup: artists.length ? await this.lookup(tenant, typed) : null,
 			artists: artists.map(({ id, name }) => ({ id, name })),
 			isOwner: membership.role === "owner",
-			dates: { today, max: lastBookableDay(today) },
+			dates: {
+				today,
+				max,
+				initial: wanted >= today && wanted <= max ? wanted : today,
+			},
 		});
 	}
 

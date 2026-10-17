@@ -28,6 +28,13 @@ export type NewSession = SessionTimes & {
 	kind: SessionKind;
 };
 
+/** A calendar window: half-open [from, to), one artist or (null) all. */
+export type SessionWindow = {
+	from: DateTime;
+	to: DateTime;
+	artistId: string | null;
+};
+
 const OVERLAP = "project_sessions_artist_no_overlap";
 
 /** Projects that take no new sessions. */
@@ -71,6 +78,28 @@ export default class SessionService {
 			.where("project_id", project.id)
 			.orderBy("starts_at", "asc")
 			.orderBy("id", "asc");
+	}
+
+	/**
+	 * The tenant's active sessions (scheduled or completed, not deleted) that
+	 * take time in the half-open window, earliest first: the calendar
+	 * (TAT-50). The overlap is the no-overlap constraint's own expression, so
+	 * its gist index (artist, time range, where active) serves one artist's
+	 * window; no other index was added.
+	 */
+	async listInRange(
+		tenant: TenantRef,
+		{ from, to, artistId }: SessionWindow,
+	): Promise<ProjectSession[]> {
+		const query = ProjectSession.query()
+			.where("tenant_id", tenant.id)
+			.where("active", true)
+			.whereRaw(
+				"tstzrange(starts_at, ends_at) && tstzrange(?::timestamptz, ?::timestamptz)",
+				[from.toJSDate(), to.toJSDate()],
+			);
+		if (artistId !== null) query.where("artist_id", artistId);
+		return query.orderBy("starts_at", "asc").orderBy("id", "asc");
 	}
 
 	/**

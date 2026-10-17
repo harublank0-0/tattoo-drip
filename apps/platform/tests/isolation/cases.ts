@@ -490,4 +490,11 @@ export const isolationCases: IsolationCase[] = [
 		ownStatus: 302,
 		snapshot: clientRows,
 	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/calendar",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: none,
+	},
 ];

@@ -51,6 +51,10 @@ const PRICE_KINDS: { value: PriceKind; title: string; description: string }[] =
 const errorId = (name: string, errors: Errors) =>
 	errors[name] ? `${name}-error` : undefined;
 
+/** The day to carry through the lookup: only one the calendar chose. */
+const carriedDate = (dates: BookingPageProps["dates"]) =>
+	dates.initial === dates.today ? null : dates.initial;
+
 /**
  * Books a walk-in, phone or DM client in one step (TAT-43): look the phone
  * up, then the client, the session and an optional price. The project
@@ -71,7 +75,7 @@ export default function BookingNew({
 				{artists.length === 0 ? (
 					<NoArtist isOwner={isOwner} />
 				) : lookup === null || lookup.state === "invalid" ? (
-					<PhoneLookup invalid={lookup} />
+					<PhoneLookup invalid={lookup} date={carriedDate(dates)} />
 				) : (
 					<BookingForm
 						lookup={lookup}
@@ -111,7 +115,13 @@ function NoArtist({ isOwner }: { isOwner: boolean }) {
 }
 
 /** Step 1: a plain GET form, like the clients search; it reloads with ?phone=. */
-function PhoneLookup({ invalid }: { invalid: Invalid | null }) {
+function PhoneLookup({
+	invalid,
+	date,
+}: {
+	invalid: Invalid | null;
+	date: string | null;
+}) {
 	const tenant = useTenant();
 
 	return (
@@ -124,6 +134,7 @@ function PhoneLookup({ invalid }: { invalid: Invalid | null }) {
 					method="get"
 					action={urlFor("tenant.projects.create", { tenant: tenant.slug })}
 				>
+					{date && <input type="hidden" name="date" value={date} />}
 					<Field data-invalid={!!invalid}>
 						<FieldLabel htmlFor="phone">Client&apos;s phone</FieldLabel>
 						<div className="flex gap-2">
@@ -177,7 +188,12 @@ function BookingForm({
 		<Form route="tenant.projects.store" routeParams={{ tenant: tenant.slug }}>
 			{({ errors, processing }) => (
 				<div className="flex flex-col gap-6">
-					<ClientCard lookup={lookup} isOwner={isOwner} errors={errors} />
+					<ClientCard
+						lookup={lookup}
+						isOwner={isOwner}
+						errors={errors}
+						date={carriedDate(dates)}
+					/>
 					<SessionCard
 						artists={artists}
 						isOwner={isOwner}
@@ -214,10 +230,12 @@ function ClientCard({
 	lookup,
 	isOwner,
 	errors,
+	date,
 }: {
 	lookup: Looked;
 	isOwner: boolean;
 	errors: Errors;
+	date: string | null;
 }) {
 	const tenant = useTenant();
 	const problem = errors.clientId ?? errors.phone;
@@ -291,8 +309,7 @@ function ClientCard({
 					)}
 					<div className="flex flex-wrap gap-2">
 						<Link
-							route="tenant.projects.create"
-							routeParams={{ tenant: tenant.slug }}
+							href={`${urlFor("tenant.projects.create", { tenant: tenant.slug })}${date ? `?date=${date}` : ""}`}
 							aria-describedby={problem ? "client-error" : undefined}
 							className={buttonVariants({
 								variant: "outline",
@@ -395,7 +412,7 @@ function SessionCard({
 								required
 								min={dates.today}
 								max={dates.max}
-								defaultValue={dates.today}
+								defaultValue={dates.initial}
 								aria-invalid={!!errors.date}
 								aria-describedby={errorId("date", errors)}
 								className={TARGET}

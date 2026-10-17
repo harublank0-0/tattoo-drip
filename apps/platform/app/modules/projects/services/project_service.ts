@@ -75,6 +75,22 @@ export default class ProjectService {
 	}
 
 	/**
+	 * The live projects among `ids` that `member` may open (the `findFor`
+	 * rule), in no particular order: the calendar shows a session's client
+	 * and brief only for these (TAT-50).
+	 */
+	async findManyFor(
+		tenant: TenantRef,
+		member: Member,
+		ids: string[],
+	): Promise<TattooProject[]> {
+		if (ids.length === 0) return [];
+		const query = TattooProject.query().whereIn("id", ids);
+		await this.scopeTo(query, tenant, member);
+		return query;
+	}
+
+	/**
 	 * A page of the projects `member` may see (the `findFor` rule), for the
 	 * Active view, the Closed view or one status. Active and single-status
 	 * views sort for follow-up: never contacted first, then the longest

@@ -47,6 +47,7 @@ export type ScannedRoutes = {
     'tenant.projects.notes.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.projects.contacted.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.projects.artist.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.calendar.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'dashboard': { paramsTuple?: []; params?: {} }
     'session.destroy': { paramsTuple?: []; params?: {} }
     'onboarding.create': { paramsTuple?: []; params?: {} }
@@ -75,6 +76,7 @@ export type ScannedRoutes = {
     'tenant.projects.create': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.projects.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.projects.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.calendar.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'dashboard': { paramsTuple?: []; params?: {} }
     'onboarding.create': { paramsTuple?: []; params?: {} }
   }
@@ -101,6 +103,7 @@ export type ScannedRoutes = {
     'tenant.projects.create': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.projects.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.projects.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.calendar.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'dashboard': { paramsTuple?: []; params?: {} }
     'onboarding.create': { paramsTuple?: []; params?: {} }
   }

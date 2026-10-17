@@ -1,10 +1,9 @@
 /**
  * The dashboard's main destinations (TAT-67): one list, rendered as the
  * phone's bottom tab bar and the desktop sidebar. Plain data with no
- * imports, so the unit tests can load it. Calendar (TAT-50) and Clients
- * (TAT-41) each become one more entry here.
+ * imports, so the unit tests can load it. A new area is one more entry here.
  */
-export type NavKey = "inbox" | "projects" | "clients" | "settings";
+export type NavKey = "inbox" | "projects" | "calendar" | "clients" | "settings";
 
 export type ShellNavItem = {
 	key: NavKey;
@@ -12,6 +11,7 @@ export type ShellNavItem = {
 	route:
 		| "tenant.inbox.index"
 		| "tenant.projects.index"
+		| "tenant.calendar.index"
 		| "tenant.clients.index"
 		| "tenant.settings";
 	/** New inquiries on the Inbox; absent unless above zero. */
@@ -21,9 +21,9 @@ export type ShellNavItem = {
 };
 
 /**
- * What `tenant`'s member sees: owners get Inbox, Projects, Clients and Settings
- * (the artist pages count as Settings); artists get Projects. The server
- * 404s the rest anyway.
+ * What `tenant`'s member sees: owners get Inbox, Projects, Calendar, Clients
+ * and Settings (the artist pages count as Settings); artists get Projects and
+ * Calendar. The server 404s the rest anyway.
  */
 export function navItems(
 	tenant: { slug: string; role: string },
@@ -43,6 +43,11 @@ export function navItems(
 		key: "projects",
 		label: "Projects",
 		route: "tenant.projects.index",
+	});
+	items.push({
+		key: "calendar",
+		label: "Calendar",
+		route: "tenant.calendar.index",
 	});
 	if (owner) {
 		items.push(
