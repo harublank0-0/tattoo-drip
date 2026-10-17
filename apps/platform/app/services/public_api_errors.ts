@@ -2,60 +2,14 @@ import { type HttpContext, errors as httpErrors } from "@adonisjs/core/http";
 import router from "@adonisjs/core/services/router";
 import { errors as limiterErrors } from "@adonisjs/limiter";
 import { errors as vineErrors } from "@vinejs/vine";
-import { setApiHeaders } from "#services/public_api";
+import {
+	API_ERRORS,
+	type ApiErrorCode,
+	type ErrorKind,
+	setApiHeaders,
+} from "#services/public_api";
 
-/** The codes every public endpoint shares (openapi.yaml, ErrorResponse). */
-export type ApiErrorCode =
-	| "bad_request"
-	| "not_found"
-	| "method_not_allowed"
-	| "payload_too_large"
-	| "unsupported_media_type"
-	| "validation_failed"
-	| "rate_limited"
-	| "internal_error";
-
-type ErrorKind = { status: number; code: string; message: string };
-
-/** Each shared code with its status and its one message for people. */
-export const API_ERRORS: Record<ApiErrorCode, ErrorKind> = {
-	bad_request: {
-		status: 400,
-		code: "bad_request",
-		message: "The request could not be read.",
-	},
-	not_found: { status: 404, code: "not_found", message: "Not found." },
-	method_not_allowed: {
-		status: 405,
-		code: "method_not_allowed",
-		message: "This method is not allowed here.",
-	},
-	payload_too_large: {
-		status: 413,
-		code: "payload_too_large",
-		message: "The request is too large.",
-	},
-	unsupported_media_type: {
-		status: 415,
-		code: "unsupported_media_type",
-		message: "This content type or encoding is not supported.",
-	},
-	validation_failed: {
-		status: 422,
-		code: "validation_failed",
-		message: "Some fields are invalid.",
-	},
-	rate_limited: {
-		status: 429,
-		code: "rate_limited",
-		message: "Too many requests. Try again later.",
-	},
-	internal_error: {
-		status: 500,
-		code: "internal_error",
-		message: "Something went wrong. Try again later.",
-	},
-};
+export { API_ERRORS, type ApiErrorCode };
 
 /**
  * Shared codes for framework errors that carry a 4xx status. 422 is not

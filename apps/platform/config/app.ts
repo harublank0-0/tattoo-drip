@@ -1,5 +1,6 @@
 import { defineConfig } from "@adonisjs/core/http";
 import app from "@adonisjs/core/services/app";
+import { onBadUrl } from "#services/public_api";
 import env from "#start/env";
 
 /**
@@ -25,6 +26,12 @@ export const http = defineConfig({
 	 * submitting with POST.
 	 */
 	allowMethodSpoofing: false,
+
+	/**
+	 * A URL that cannot be decoded is refused before any middleware runs;
+	 * the public API (/api) answers it with its error envelope (TAT-32).
+	 */
+	onBadUrl,
 
 	/**
 	 * Enabling async local storage will let you access HTTP context

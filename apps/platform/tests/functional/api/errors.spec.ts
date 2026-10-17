@@ -24,6 +24,50 @@ test.group("Public API: errors", () => {
 		}
 	});
 
+	test("a malformed percent-encoded API path is bad_request in the envelope, readable cross-origin", async ({
+		client,
+		assert,
+	}) => {
+		for (const url of [
+			"/api/v1/%",
+			"/api/v1/%E0%A4",
+			"/api/v1/tenants/%C0%80/__test/db",
+			"/api/%",
+		]) {
+			const response = await client
+				.get(url)
+				.header("origin", "https://api-needle-32.tattoodrip.com");
+
+			assertApiError(response, 400, "bad_request");
+			assert.deepEqual(
+				response.body(),
+				{
+					error: {
+						code: "bad_request",
+						message: "The request could not be read.",
+					},
+				},
+				url,
+			);
+			assert.match(
+				response.header("content-type") ?? "",
+				/^application\/json/,
+				url,
+			);
+		}
+	});
+
+	test("a malformed percent-encoded dashboard path keeps the framework's plain 400", async ({
+		client,
+		assert,
+	}) => {
+		const response = await client.get("/%");
+
+		response.assertStatus(400);
+		assert.equal(response.text(), "Bad Request");
+		assert.isUndefined(response.header("access-control-allow-origin"));
+	});
+
 	test("a dashboard URL still gets the dashboard's 404, not the envelope", async ({
 		client,
 		assert,

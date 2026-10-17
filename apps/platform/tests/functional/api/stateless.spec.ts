@@ -54,6 +54,15 @@ test.group("Public API: stateless and cookieless", (group) => {
 		assertApiHeaders(response);
 	});
 
+	test("a malformed percent-encoded path sets no cookie, even with a dashboard session", async ({
+		client,
+	}) => {
+		const user = await signedIn();
+		for (const url of ["/api/v1/%", "/api/v1/tenants/%C0%80"]) {
+			assertNoCookies(await client.get(url).loginAs(user));
+		}
+	});
+
 	test("the dashboard still gets its session and CSRF cookies", async ({
 		client,
 		assert,
