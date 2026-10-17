@@ -21,6 +21,10 @@ export default await Env.create(new URL("../", import.meta.url), {
 	// App
 	APP_KEY: Env.schema.secret(),
 	APP_URL: Env.schema.string({ format: "url", tld: false }),
+	// The studio pages' origin with {tenant} for the slug, e.g.
+	// https://{tenant}.example.com: deposit links are built from it (TAT-65).
+	// Unset: http://{tenant}.localhost:3000 (TAT-12's dev host).
+	STOREFRONT_URL: Env.schema.string.optional(),
 
 	// Session
 	SESSION_DRIVER: Env.schema.enum(["cookie", "memory", "database"] as const),
