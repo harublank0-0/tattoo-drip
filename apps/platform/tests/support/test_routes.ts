@@ -1,7 +1,8 @@
 import type { HttpContext } from "@adonisjs/core/http";
 import router from "@adonisjs/core/services/router";
+import { LimiterResponse, errors as limiterErrors } from "@adonisjs/limiter";
 import db from "@adonisjs/lucid/services/db";
-import { errors } from "@vinejs/vine";
+import vine, { errors } from "@vinejs/vine";
 import User from "#models/user";
 import PaymentMethod from "#modules/payments/models/payment_method";
 import {
@@ -160,3 +161,38 @@ router
 		},
 	)
 	.use([middleware.auth(), middleware.dbContext(), middleware.tenant()]);
+
+/**
+ * Public API routes for the API tests (TAT-32), outside any tenant: they
+ * exercise the stateless stack and the error envelope before a real
+ * endpoint needs them. Each answers with { data } or throws one kind of
+ * error.
+ */
+export const echoValidator = vine.create({
+	label: vine.string().trim().minLength(1).maxLength(20),
+});
+
+router
+	.group(() => {
+		router.get("ok", () => ({ data: { ok: true } }));
+		router.post("echo", async ({ request }) => ({
+			data: await request.validateUsing(echoValidator),
+		}));
+		router.get("throws", () => {
+			throw new Error(
+				"connection refused at 10.0.0.5:5432 for tattoo_drip_app",
+			);
+		});
+		router.get("throttled", () => {
+			throw new limiterErrors.E_TOO_MANY_REQUESTS(
+				new LimiterResponse({
+					limit: 10,
+					remaining: 0,
+					consumed: 11,
+					availableIn: 42,
+				}),
+			);
+		});
+	})
+	.prefix("/api/v1/__test")
+	.use(middleware.publicApi());
