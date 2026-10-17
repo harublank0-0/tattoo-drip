@@ -36,6 +36,7 @@ What the MVP (pilot with a design-partner studio) and V1 (paid launch) must do, 
 - [ ] Mark a session completed, no-show or cancelled, or move it to another time
 - [ ] Walk-ins and phone or DM bookings: create the project and the session directly
 - A direct booking looks the client up by phone first and never changes a returning client's details. The project starts Booked with its tattoo session, an optional price and no deposit step; the price can't be changed after booking. Owners book for any artist, artists only for themselves.
+- The calendar shows active sessions (scheduled or completed) by the studio's local day, a day or a Sunday-to-Saturday week at a time, each opening its project. Owners see the whole studio or one artist; artists see their own sessions, and one on a project that isn't theirs shows only its time and kind.
 
 **Clients**
 - [ ] One client per phone number per tenant, with the history of their projects, references and payments
