@@ -8,7 +8,9 @@ import type {
 	StatusPageRange,
 	StatusPageRenderer,
 } from "@adonisjs/core/types/http";
+import { errors as limiterErrors } from "@adonisjs/limiter";
 import { abortRequestTransaction } from "#services/db_context";
+import { tryAgainMessage } from "#services/rate_limits";
 
 export default class HttpExceptionHandler extends ExceptionHandler {
 	/**
@@ -48,6 +50,9 @@ export default class HttpExceptionHandler extends ExceptionHandler {
 				ctx,
 			);
 		}
+		if (error instanceof limiterErrors.E_TOO_MANY_REQUESTS && wantsPage(ctx)) {
+			return backWithThrottleMessage(error, ctx);
+		}
 		return super.handle(error, ctx);
 	}
 
@@ -73,4 +78,36 @@ function isPathTraversal(error: unknown) {
 		"code" in error &&
 		error.code === "E_PATH_TRAVERSAL_DETECTED"
 	);
+}
+
+/**
+ * A browser or Inertia request (HTML, or no Accept header) with a session,
+ * as opposed to a JSON client.
+ */
+function wantsPage(ctx: HttpContext) {
+	const type = ctx.request.accepts([
+		"html",
+		"application/vnd.api+json",
+		"json",
+	]);
+	return (type === "html" || type === null) && Boolean(ctx.session);
+}
+
+/**
+ * A form that hit a rate limit (TAT-8) goes back to its page with the error
+ * toast, like a wrong password does, keeping what was typed except
+ * passwords. JSON clients keep the limiter's own 429 with Retry-After.
+ */
+function backWithThrottleMessage(
+	error: InstanceType<typeof limiterErrors.E_TOO_MANY_REQUESTS>,
+	ctx: HttpContext,
+) {
+	ctx.session.flashExcept([
+		"_csrf",
+		"_method",
+		"password",
+		"passwordConfirmation",
+	]);
+	ctx.session.flash("error", tryAgainMessage(error.response.availableIn));
+	ctx.response.redirect().back();
 }

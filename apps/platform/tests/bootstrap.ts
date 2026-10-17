@@ -4,6 +4,7 @@ import { authBrowserClient } from "@adonisjs/auth/plugins/browser_client";
 import app from "@adonisjs/core/services/app";
 import testUtils from "@adonisjs/core/services/test_utils";
 import { inertiaApiClient } from "@adonisjs/inertia/plugins/api_client";
+import limiter from "@adonisjs/limiter/services/main";
 import { dbAssertions } from "@adonisjs/lucid/plugins/db";
 import { sessionApiClient } from "@adonisjs/session/plugins/api_client";
 import { sessionBrowserClient } from "@adonisjs/session/plugins/browser_client";
@@ -88,6 +89,14 @@ async function installDbTripwire() {
 	};
 }
 
+/**
+ * Rate limits use the memory store in tests (config/limiter.ts). It is
+ * emptied before every test, so one test's attempts never refuse another's.
+ * Only the memory store: clearing the database store would TRUNCATE
+ * rate_limits, which the app role may not do.
+ */
+const resetRateLimits = () => limiter.clear(["memory"]);
+
 export const runnerHooks: Required<Pick<Config, "setup" | "teardown">> = {
 	setup: [clearTestStorage, installDbTripwire],
 	teardown: [clearTestStorage, () => removeTripwire?.()],
@@ -99,6 +108,10 @@ export const runnerHooks: Required<Pick<Config, "setup" | "teardown">> = {
  */
 export const configureSuite: Config["configureSuite"] = (suite) => {
 	if (["browser", "functional", "e2e"].includes(suite.name)) {
+		suite.onGroup((group) =>
+			group.tap((groupTest) => groupTest.setup(resetRateLimits)),
+		);
+		suite.onTest((suiteTest) => suiteTest.setup(resetRateLimits));
 		return suite.setup(async () => {
 			await import("#tests/support/test_routes");
 			return testUtils.httpServer().start();
