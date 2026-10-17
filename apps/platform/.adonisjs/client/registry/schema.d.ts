@@ -403,6 +403,30 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/clients_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
+  'tenant.projects.create': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/projects/new'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/bookings_controller').default['create']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/bookings_controller').default['create']>>>
+    }
+  }
+  'tenant.projects.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/projects'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/projects/validators/booking').bookingValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/projects/validators/booking').bookingValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/bookings_controller').default['store']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/bookings_controller').default['store']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
   'tenant.projects.index': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/projects'

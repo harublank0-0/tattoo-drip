@@ -11,6 +11,10 @@ const NEPALI_NATIONAL = /^\d{8,10}$/;
 /** Country code 977 typed without "+": 11-13 digits, longer than any national number. */
 const NEPALI_WITH_CODE = /^977\d{8,10}$/;
 
+/** What the phone rule says about a number it can't read. */
+export const PHONE_MESSAGE =
+	"Enter a phone number, like 9812345678 or +977 1 4123456.";
+
 /**
  * A phone number in E.164 form ("+9779812345678"), or undefined if it
  * can't be one. Spaces, dashes, dots and brackets are dropped; "00" starts
@@ -43,11 +47,7 @@ export const phoneNumber = vine.createRule(
 	(value: unknown, _, field: FieldContext) => {
 		const phone = typeof value === "string" ? normalizePhone(value) : undefined;
 		if (!phone) {
-			field.report(
-				"Enter a phone number, like 9812345678 or +977 1 4123456.",
-				"phoneNumber",
-				field,
-			);
+			field.report(PHONE_MESSAGE, "phoneNumber", field);
 			return;
 		}
 		field.mutate(phone, field);

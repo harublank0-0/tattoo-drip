@@ -72,6 +72,14 @@ export default function ClientShow({
 								Edit details
 							</Link>
 						)}
+						{client.phone && !client.anonymized && (
+							<Link
+								href={`${urlFor("tenant.projects.create", { tenant: tenant.slug })}?phone=${encodeURIComponent(client.phone)}`}
+								className={buttonVariants({ variant: "outline" })}
+							>
+								Book session
+							</Link>
+						)}
 					</div>
 				)}
 

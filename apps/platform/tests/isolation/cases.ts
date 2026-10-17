@@ -6,6 +6,7 @@ import ReferenceImage from "#modules/inquiries/models/reference_image";
 import PaymentMethod from "#modules/payments/models/payment_method";
 import Quote from "#modules/projects/models/quote";
 import TattooProject from "#modules/projects/models/tattoo_project";
+import ProjectSession from "#modules/scheduling/models/project_session";
 import Tenant from "#modules/tenancy/models/tenant";
 import { inTenant, type Studio } from "#tests/helpers/tenants";
 
@@ -128,6 +129,30 @@ const clientRows = (target: Studio) =>
 				.orderBy("id")
 		).map((client) => client.serialize()),
 	);
+
+// What a booking can create: projects, quotes, sessions and clients,
+// deleted ones included.
+const bookingRows = (target: Studio) =>
+	inTenant(target.tenant, async () => ({
+		projects: (
+			await TattooProject.withTrashed()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("id")
+		).map((project) => project.serialize()),
+		quotes: (
+			await Quote.query().where("tenant_id", target.tenant.id).orderBy("id")
+		).map((quote) => quote.serialize()),
+		sessions: (
+			await ProjectSession.withTrashed()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("id")
+		).map((session) => session.serialize()),
+		clients: (
+			await Client.withTrashed()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("id")
+		).map((client) => client.serialize()),
+	}));
 
 const profileBody = (own: Studio) => ({
 	name: `${own.tenant.name} renamed`,
@@ -332,6 +357,34 @@ export const isolationCases: IsolationCase[] = [
 		actor: "owner",
 		ownStatus: 200,
 		snapshot: projectRows,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/projects/new",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: none,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/projects",
+		actor: "owner",
+		body: (own) => ({
+			clientId: own.client.id,
+			artistId: own.artistProfile.id,
+			// The test studios' timezone; a month out, so the artist is free.
+			date: DateTime.now()
+				.setZone("Asia/Kathmandu")
+				.plus({ days: 30 })
+				.toFormat("yyyy-MM-dd"),
+			startTime: "10:00",
+			hours: "2",
+			brief: "Walk-in: a small rose",
+			priceKind: "fixed",
+			fixedPrice: "5000",
+		}),
+		ownStatus: 302,
+		snapshot: bookingRows,
 	},
 	{
 		method: "POST",

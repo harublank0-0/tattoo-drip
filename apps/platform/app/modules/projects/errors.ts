@@ -49,3 +49,26 @@ export class ProjectRuleError extends Error {
 		this.name = "ProjectRuleError";
 	}
 }
+
+export const BOOKING_RULE_REASONS = [
+	"artist_unavailable",
+	"client_unavailable",
+] as const;
+export type BookingRuleReason = (typeof BOOKING_RULE_REASONS)[number];
+
+const BOOKING_MESSAGES: Record<BookingRuleReason, string> = {
+	artist_unavailable:
+		"The member may not book this artist: owners book the tenant's live artists, an artist only their own live profile",
+	client_unavailable: "The client's details were deleted; they can't be booked",
+};
+
+/**
+ * A direct booking (TAT-43) was refused; `reason` says which rule. Nothing
+ * was saved. The message is for developers; show your own to the user.
+ */
+export class BookingRuleError extends Error {
+	constructor(readonly reason: BookingRuleReason) {
+		super(BOOKING_MESSAGES[reason]);
+		this.name = "BookingRuleError";
+	}
+}

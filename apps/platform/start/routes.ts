@@ -173,11 +173,19 @@ router
 
 		/**
 		 * Projects: owners, and the artist assigned to the project
-		 * (ProjectService.findFor gives anyone else a 404). Every projects
-		 * route goes in this group (a test checks).
+		 * (ProjectService.findFor gives anyone else a 404). Booking a session
+		 * (new, store) is open to both; BookingService decides which artists a
+		 * member may book. Every projects route goes in this group (a test
+		 * checks).
 		 */
 		router
 			.group(() => {
+				router
+					.get("new", [controllers.Bookings, "create"])
+					.as("tenant.projects.create");
+				router
+					.post("/", [controllers.Bookings, "store"])
+					.as("tenant.projects.store");
 				router
 					.get("/", [controllers.Projects, "index"])
 					.as("tenant.projects.index");

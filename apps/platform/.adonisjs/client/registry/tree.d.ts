@@ -58,6 +58,8 @@ export interface ApiDefinition {
       update: typeof routes['tenant.clients.update']
     }
     projects: {
+      create: typeof routes['tenant.projects.create']
+      store: typeof routes['tenant.projects.store']
       index: typeof routes['tenant.projects.index']
       show: typeof routes['tenant.projects.show']
       quotes: {

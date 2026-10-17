@@ -62,6 +62,10 @@ export type ProjectPageProps = {
 	scheduledSessionCount: number;
 	/** Booked, but no tattoo session is scheduled. */
 	bookedWithoutSession: boolean;
+	/** Whether the quote summary shows "Valid until" and Expired: false from booked on. */
+	quoteExpiryShown: boolean;
+	/** The project's live sessions, earliest first. */
+	sessions: SessionRow[];
 	notes: string | null;
 	contactedText: string;
 	/** Owners only: the project's artist and the studio's artists. */
@@ -143,3 +147,27 @@ export const ACTIVE_FILTERS = [
 	"in_progress",
 	"healing_check",
 ] as const;
+
+/** One session on the project page. */
+export type SessionRow = {
+	id: string;
+	/** "Sun 18 Oct 2026, 14:00–17:00", in the studio's timezone. */
+	whenText: string;
+	kind: string;
+	status: string;
+	/** Null when the artist's profile was deleted. */
+	artistName: string | null;
+};
+
+export const SESSION_KIND_LABELS: Record<string, string> = {
+	consultation: "Consultation",
+	tattoo: "Tattoo",
+	touch_up: "Touch-up",
+};
+
+export const SESSION_STATUS_LABELS: Record<string, string> = {
+	scheduled: "Scheduled",
+	completed: "Completed",
+	no_show: "No-show",
+	cancelled: "Cancelled",
+};

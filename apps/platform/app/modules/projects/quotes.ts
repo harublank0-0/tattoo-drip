@@ -13,6 +13,19 @@ export const QUOTABLE_STATUSES: readonly ProjectStatus[] = [
 	"deposit_pending",
 ];
 
+/**
+ * Booked or later: the quote is settled, so its expiry no longer cancels
+ * anything (expireQuote and the sweep act only on quoted, on_hold and
+ * deposit_pending, and a project never goes back to them from here). The
+ * project page stops showing it.
+ */
+export const BOOKED_STATUSES: readonly ProjectStatus[] = [
+	"booked",
+	"in_progress",
+	"completed",
+	"healing_check",
+];
+
 /** What a quote's total is made of. */
 export type QuoteAmounts = Pick<
 	Quote,
@@ -95,6 +108,17 @@ export function todayIn(
 	now: DateTime = DateTime.now(),
 ): string {
 	return now.setZone(timezone).toFormat("yyyy-MM-dd");
+}
+
+/**
+ * The latest day (yyyy-MM-dd) a session can be booked: the same date a year
+ * after `today` (yyyy-MM-dd). The booking page's `max` and the validator's
+ * refusal both come from here, so they cannot drift apart.
+ */
+export function lastBookableDay(today: string): string {
+	return DateTime.fromISO(today, { zone: "utc" })
+		.plus({ years: 1 })
+		.toFormat("yyyy-MM-dd");
 }
 
 /** A yyyy-MM-dd date for people: "28 Oct 2026". */

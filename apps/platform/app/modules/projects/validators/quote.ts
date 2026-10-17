@@ -5,6 +5,48 @@ import { QUOTE_KINDS } from "#modules/projects/models/quote";
 import { expiresAtFor, todayIn } from "#modules/projects/quotes";
 import type { NewQuote } from "#modules/projects/services/quote_service";
 
+const PRICE = "Enter whole rupees from 1 to 1,00,00,000.";
+const RATE = "Enter whole rupees from 1 to 1,00,000 an hour.";
+const HOURS = "Enter hours from 0.25 to 100.";
+const DEPOSIT = "Enter the deposit in whole rupees (0 for none).";
+const EXPIRY = "Pick the last day the quote is valid.";
+
+/**
+ * The price fields the quote form and the booking form (TAT-43) share, in
+ * the form's units: whole rupees and hours; empty fields arrive as null.
+ * The caps keep rate × hours far below 2^53 (see toQuoteInput). A function,
+ * so each validator gets its own schema objects.
+ */
+export function priceFields() {
+	return {
+		fixedPrice: vine
+			.number()
+			.withoutDecimals()
+			.range([1, 10_000_000])
+			.nullable()
+			.optional(),
+		hourlyRate: vine
+			.number()
+			.withoutDecimals()
+			.range([1, 100_000])
+			.nullable()
+			.optional(),
+		estimatedHours: vine.number().range([0.25, 100]).nullable().optional(),
+	};
+}
+
+/** The messages for priceFields(). */
+export const PRICE_MESSAGES = {
+	"fixedPrice.number": PRICE,
+	"fixedPrice.withoutDecimals": PRICE,
+	"fixedPrice.range": PRICE,
+	"hourlyRate.number": RATE,
+	"hourlyRate.withoutDecimals": RATE,
+	"hourlyRate.range": RATE,
+	"estimatedHours.number": HOURS,
+	"estimatedHours.range": HOURS,
+};
+
 /**
  * The quote form's shape, in the form's units: whole rupees, hours and the
  * last valid day (yyyy-MM-dd, the studio's local date). Empty fields arrive
@@ -16,42 +58,17 @@ import type { NewQuote } from "#modules/projects/services/quote_service";
 export const quoteValidator = vine.create({
 	baseQuoteId: vine.string().uuid().nullable().optional(),
 	kind: vine.enum(QUOTE_KINDS),
-	fixedPrice: vine
-		.number()
-		.withoutDecimals()
-		.range([1, 10_000_000])
-		.nullable()
-		.optional(),
-	hourlyRate: vine
-		.number()
-		.withoutDecimals()
-		.range([1, 100_000])
-		.nullable()
-		.optional(),
-	estimatedHours: vine.number().range([0.25, 100]).nullable().optional(),
+	...priceFields(),
 	depositAmount: vine.number().withoutDecimals().min(0),
 	expiresOn: vine.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 
 export type QuoteForm = Infer<typeof quoteValidator>;
 
-const PRICE = "Enter whole rupees from 1 to 1,00,00,000.";
-const RATE = "Enter whole rupees from 1 to 1,00,000 an hour.";
-const HOURS = "Enter hours from 0.25 to 100.";
-const DEPOSIT = "Enter the deposit in whole rupees (0 for none).";
-const EXPIRY = "Pick the last day the quote is valid.";
-
 quoteValidator.messagesProvider = new SimpleMessagesProvider({
 	"kind.required": "Choose fixed or hourly.",
 	"kind.enum": "Choose fixed or hourly.",
-	"fixedPrice.number": PRICE,
-	"fixedPrice.withoutDecimals": PRICE,
-	"fixedPrice.range": PRICE,
-	"hourlyRate.number": RATE,
-	"hourlyRate.withoutDecimals": RATE,
-	"hourlyRate.range": RATE,
-	"estimatedHours.number": HOURS,
-	"estimatedHours.range": HOURS,
+	...PRICE_MESSAGES,
 	"depositAmount.required": DEPOSIT,
 	"depositAmount.number": DEPOSIT,
 	"depositAmount.withoutDecimals": DEPOSIT,

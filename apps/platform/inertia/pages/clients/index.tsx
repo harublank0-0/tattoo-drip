@@ -50,7 +50,7 @@ export default function ClientsIndex({
 				<p className="text-sm text-muted-foreground">
 					{search
 						? `No clients match "${search}".`
-						: "No clients yet. They appear when an inquiry arrives."}
+						: "No clients yet. They appear when an inquiry arrives or you book a session."}
 				</p>
 			) : (
 				<ul className="flex flex-col divide-y rounded-md border bg-card">
