@@ -31,49 +31,53 @@ export const tattooKeys = {
 /**
  * Query options for each resource. Use them with `useQuery`, or with
  * `queryClient.ensureQueryData` in route loaders to prefetch during SSR.
+ * Each forwards TanStack Query's `signal`, so a query nobody needs any more
+ * cancels its request.
  */
 export const tattooQueries = {
 	studio: (client: TattooClient) =>
 		queryOptions({
 			queryKey: tattooKeys.studio(client.tenant),
-			queryFn: () => client.studio.get(),
+			queryFn: ({ signal }) => client.studio.get({ signal }),
 		}),
 	artists: (client: TattooClient) =>
 		queryOptions({
 			queryKey: tattooKeys.artists(client.tenant),
-			queryFn: () => client.artists.list(),
+			queryFn: ({ signal }) => client.artists.list({ signal }),
 		}),
 	artist: (client: TattooClient, slug: string) =>
 		queryOptions({
 			queryKey: tattooKeys.artist(client.tenant, slug),
-			queryFn: () => client.artists.get(slug),
+			queryFn: ({ signal }) => client.artists.get(slug, { signal }),
 		}),
 	services: (client: TattooClient, query?: ListServicesQuery) =>
 		queryOptions({
 			queryKey: tattooKeys.services(client.tenant, query),
-			queryFn: () => client.services.list(query),
+			queryFn: ({ signal }) => client.services.list(query, { signal }),
 		}),
 	portfolio: (client: TattooClient, query?: ListPortfolioQuery) =>
 		queryOptions({
 			queryKey: tattooKeys.portfolio(client.tenant, query),
-			queryFn: () => client.portfolio.list(query),
+			queryFn: ({ signal }) => client.portfolio.list(query, { signal }),
 		}),
 	availability: (client: TattooClient, query: ListAvailabilityQuery | null) =>
 		queryOptions({
 			queryKey: tattooKeys.availability(client.tenant, query),
-			queryFn: query ? () => client.availability.list(query) : skipToken,
+			queryFn: query
+				? ({ signal }) => client.availability.list(query, { signal })
+				: skipToken,
 			staleTime: 30_000,
 		}),
 	styles: (client: TattooClient) =>
 		queryOptions({
 			queryKey: tattooKeys.styles(),
-			queryFn: () => client.styles.list(),
+			queryFn: ({ signal }) => client.styles.list({ signal }),
 			staleTime: Number.POSITIVE_INFINITY,
 		}),
 	placements: (client: TattooClient) =>
 		queryOptions({
 			queryKey: tattooKeys.placements(),
-			queryFn: () => client.placements.list(),
+			queryFn: ({ signal }) => client.placements.list({ signal }),
 			staleTime: Number.POSITIVE_INFINITY,
 		}),
 };
