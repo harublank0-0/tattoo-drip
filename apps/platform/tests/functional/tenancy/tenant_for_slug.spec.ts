@@ -56,13 +56,16 @@ test.group("tenant_for_slug()", (group) => {
 	}) => {
 		const { tenant } = await studioWithOwner("api-legacy-32");
 		// Old data has such slugs (TAT-24 ruling 4); the trigger registers it.
+		// A double hyphen, with a name only this test uses: the unique index is
+		// platform-wide and the dev database may hold a studio called a--b.
 		await inTenant(tenant, () =>
-			dbClient().rawQuery("update tenants set slug = 'a--b' where id = ?", [
-				tenant.id,
-			]),
+			dbClient().rawQuery(
+				"update tenants set slug = 'api--legacy-32' where id = ?",
+				[tenant.id],
+			),
 		);
 
-		assert.equal(await lookup("a--b"), tenant.id);
+		assert.equal(await lookup("api--legacy-32"), tenant.id);
 	});
 
 	test("gives null for an unknown slug, another case, a pattern, an empty string or null", async ({

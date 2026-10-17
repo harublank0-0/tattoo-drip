@@ -9,6 +9,7 @@ import {
 	assertApiError,
 	assertNoCookies,
 } from "#tests/helpers/api";
+import { sql } from "#tests/helpers/sql";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
 const tenancy = new TenancyService();
@@ -58,12 +59,24 @@ test.group("Public API: the tenant from the path", (group) => {
 
 	test("grandfathered slugs that the new rules refuse still resolve", async ({
 		client,
+		assert,
 	}) => {
+		// The registry's unique index is platform-wide and shared with the dev
+		// database, so these slugs have the shapes TAT-24 ruling 4 keeps (digits
+		// only, a double hyphen, punycode) under names only this test uses. The
+		// reserved word has no such variant: it must be www itself, so the test
+		// stops with a clear message if a committed studio already holds it.
+		const taken = await sql({}, "select public.tenant_for_slug('www') as id");
+		assert.isNull(
+			taken.rows[0].id,
+			"a committed dev studio holds the slug www; rename it to run this test",
+		);
+
 		for (const [index, slug] of [
-			"12345",
-			"a--b",
+			"32032",
+			"api--legacy-32",
+			"xn--api-legacy-32",
 			"www",
-			"xn--80ak6aa92e",
 		].entries()) {
 			const { tenant } = await studioWithOwner(`api-legacy-32-${index}`);
 			// Old data has such slugs (TAT-24 ruling 4); the trigger registers it.
