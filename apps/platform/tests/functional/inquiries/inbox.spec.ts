@@ -180,6 +180,7 @@ test.group("Inbox pages", (group) => {
 			source: "instagram",
 			preferredArtistName: "Sita",
 		});
+		assert.isString(props.inquiry.clientId);
 		assert.lengthOf(props.references, 1);
 		assert.include(props.references[0].url, "reference_image/");
 		assert.match(props.references[0].url, /signature=/);

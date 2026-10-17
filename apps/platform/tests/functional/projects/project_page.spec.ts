@@ -433,3 +433,35 @@ test.group("Project page: the original request", (group) => {
 		assert.lengthOf(props.request.references, 1);
 	});
 });
+
+test.group("Project page: the client link", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("owners get the client's id; the assigned artist gets null", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const asha = await artistIn(tenant, "asha@example.com");
+		const { project, customer } = await inTenant(tenant, async () => {
+			const profile = await makeArtist(tenant, "asha");
+			profile.userId = asha.id;
+			await profile.save();
+			const customer = await makeClient(tenant);
+			const project = await makeProject(tenant, customer, {
+				artistId: profile.id,
+			});
+			return { project, customer };
+		});
+
+		const ownerProps = (
+			await client.get(page(project.id)).withInertia().loginAs(owner)
+		).inertiaProps;
+		assert.equal(ownerProps.clientId, customer.id);
+
+		const artistProps = (
+			await client.get(page(project.id)).withInertia().loginAs(asha)
+		).inertiaProps;
+		assert.isNull(artistProps.clientId);
+	});
+});

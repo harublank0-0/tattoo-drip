@@ -201,6 +201,8 @@ export default class ProjectsController {
 						}
 					: null,
 			request,
+			// Owners only: the clients pages are theirs.
+			clientId: membership.role === "owner" ? project.clientId : null,
 		});
 	}
 }

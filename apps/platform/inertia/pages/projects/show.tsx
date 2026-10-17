@@ -1,4 +1,4 @@
-import { Form } from "@adonisjs/inertia/react";
+import { Form, Link } from "@adonisjs/inertia/react";
 import { router } from "@inertiajs/react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -71,6 +71,7 @@ export default function ProjectShow({
 	contactedText,
 	assignment,
 	request,
+	clientId,
 }: ProjectPageProps) {
 	const tenant = useTenant();
 	const params = { tenant: tenant.slug, id: project.id };
@@ -87,6 +88,17 @@ export default function ProjectShow({
 			title={project.clientName ?? "Project"}
 			description={
 				project.artistName ? `With ${project.artistName}` : "No artist yet"
+			}
+			actions={
+				clientId ? (
+					<Link
+						route="tenant.clients.show"
+						routeParams={{ tenant: tenant.slug, id: clientId }}
+						className={buttonVariants({ variant: "outline", size: "sm" })}
+					>
+						View client
+					</Link>
+				) : undefined
 			}
 		>
 			<div className="flex max-w-2xl flex-col gap-6">

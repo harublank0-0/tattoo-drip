@@ -93,6 +93,7 @@ export default class InquiriesController {
 		return ctx.inertia.render("inquiries/show", {
 			inquiry: {
 				id: inquiry.id,
+				clientId: inquiry.clientId,
 				status: inquiry.status,
 				contactName: inquiry.contactName,
 				contactPhone: inquiry.contactPhone,
