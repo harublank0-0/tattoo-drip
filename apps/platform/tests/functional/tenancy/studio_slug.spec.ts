@@ -10,6 +10,7 @@ import { assertValidationError } from "#tests/helpers/validation";
 const tenancy = new TenancyService();
 const FORMAT =
 	"Use 3 to 63 lowercase letters, numbers and single hyphens, with at least one letter. Don't start or end with a hyphen.";
+const RESERVED = "This address is reserved. Try another one.";
 const TAKEN = "This address is already taken. Try another one.";
 
 /** The stored slug and every slug the tenant holds. */
@@ -145,6 +146,43 @@ test.group("Changing the web address", (group) => {
 		);
 		assert.equal((await stored(tenant)).slug, `ink-${MAX_TENANT_SLUGS}`);
 	});
+
+	// Ruling 4 keeps slugs from before the rules; ruling 8 lets an owner switch
+	// back to an own old slug only if it still passes them, because a reserved
+	// name must not come back through Settings.
+	for (const [slug, message] of [
+		["a--b", FORMAT],
+		["12345", FORMAT],
+		["www", RESERVED],
+	] as const) {
+		test(`a kept "${slug}" still redirects but can't be switched back to`, async ({
+			client,
+			assert,
+		}) => {
+			const { owner, tenant } = await studioWithOwner(slug);
+			await inTenant(tenant, () => tenancy.changeSlug(tenant, "ab-studio"));
+
+			const old = await client
+				.get(`/t/${slug}/settings/profile`)
+				.loginAs(owner)
+				.redirects(0);
+			old.assertStatus(302);
+			old.assertHeader("location", "/t/ab-studio/settings/profile");
+
+			const response = await client
+				.put("/t/ab-studio/settings/slug")
+				.form({ slug })
+				.withCsrfToken()
+				.loginAs(owner)
+				.redirects(0);
+
+			assertValidationError(response, "slug", message);
+			assert.deepEqual(await stored(tenant), {
+				slug: "ab-studio",
+				slugs: [slug, "ab-studio"].sort(),
+			});
+		});
+	}
 
 	test("an artist gets 404 and the address stays", async ({
 		client,
