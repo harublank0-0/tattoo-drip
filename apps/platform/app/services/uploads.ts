@@ -1,7 +1,55 @@
+import { randomUUID } from "node:crypto";
+import { createWriteStream } from "node:fs";
 import { rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { isAbsolute, join } from "node:path";
+import { pipeline } from "node:stream/promises";
 import { MultipartFile } from "@adonisjs/core/bodyparser";
 import type { HttpContext } from "@adonisjs/core/http";
+import config from "@adonisjs/core/services/config";
 import logger from "@adonisjs/core/services/logger";
+
+/**
+ * Reads the multipart body of a public API upload route into temp files and
+ * fields (`request.files()`, `request.all()`), as the body parser does for
+ * the dashboard, but only now: the route is in `multipart.processManually`
+ * (config/bodyparser.ts), so the parser leaves its body alone until the
+ * handler runs, after publicTenant has answered 404 for an unknown slug
+ * (TAT-32, ruling 16; TAT-51). Same limits as the parser's (`limit`,
+ * `fieldsLimit`). A part that fails is deleted, and the call rejects with
+ * the parser's error (413, 400). Pair it with `discardUploads` in a
+ * `finally`. Call it only when `request.bodyType` is "multipart".
+ */
+export async function receiveUploads(
+	request: HttpContext["request"],
+): Promise<void> {
+	request.multipart.onFile(
+		"*",
+		{ deferValidations: true },
+		async (part, reporter) => {
+			const tmpPath = newTmpPath();
+			try {
+				part.pause();
+				part.on("data", reporter);
+				await pipeline(part, createWriteStream(tmpPath));
+				return { tmpPath };
+			} catch (error) {
+				await rm(tmpPath, { force: true }).catch(() => {});
+				request.multipart.abort(error);
+			}
+		},
+	);
+	await request.multipart.process();
+}
+
+/** A new temp file path, named as config/bodyparser.ts says (the OS temp folder by default). */
+function newTmpPath(): string {
+	const { tmpFileName } = config.get<{
+		multipart: { tmpFileName?: () => string };
+	}>("bodyparser").multipart;
+	const name = tmpFileName?.() ?? randomUUID();
+	return isAbsolute(name) ? name : join(tmpdir(), name);
+}
 
 /**
  * Deletes the temp file of every upload in the request that nothing stored

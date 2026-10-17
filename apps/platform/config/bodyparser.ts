@@ -61,9 +61,13 @@ const bodyParserConfig = defineConfig({
 		convertEmptyStringsToNull: true,
 
 		/**
-		 * Routes where multipart processing is handled manually.
+		 * Routes where multipart processing is handled manually: the parser
+		 * does not read their body, the handler does (receiveUploads in
+		 * #services/uploads). Every public API route that takes a body goes
+		 * here (a test checks), so no upload is written to disk before the
+		 * tenant is known (TAT-32 ruling 16, TAT-51).
 		 */
-		processManually: [],
+		processManually: ["/api/v1/tenants/:tenant/inquiries"],
 
 		/**
 		 * Maximum accepted payload size for multipart requests.

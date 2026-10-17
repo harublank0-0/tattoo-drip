@@ -273,6 +273,11 @@ router
 					.get("/", [controllers.PublicStudio, "show"])
 					.use(middleware.publicCache())
 					.as("api.v1.studio");
+				// TAT-55 adds its bot-challenge and honeypot middleware here
+				// (.use(...), after publicTenant). POST stays no-store.
+				router
+					.post("/inquiries", [controllers.PublicInquiries, "store"])
+					.as("api.v1.inquiries.store");
 			})
 			.prefix("/tenants/:tenant")
 			.use(middleware.publicTenant());

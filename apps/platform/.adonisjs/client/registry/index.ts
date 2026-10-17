@@ -306,6 +306,12 @@ const routes = {
     tokens: [{"old":"/api/v1/tenants/:tenant","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant","type":1,"val":"tenant","end":""}],
     types: placeholder as Registry['api.v1.studio']['types'],
   },
+  'api.v1.inquiries.store': {
+    methods: ["POST"],
+    pattern: '/api/v1/tenants/:tenant/inquiries',
+    tokens: [{"old":"/api/v1/tenants/:tenant/inquiries","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/inquiries","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/inquiries","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/inquiries","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/inquiries","type":0,"val":"inquiries","end":""}],
+    types: placeholder as Registry['api.v1.inquiries.store']['types'],
+  },
 } as const satisfies Record<string, AdonisEndpoint>
 
 export { routes }

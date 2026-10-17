@@ -1,4 +1,5 @@
 import Tenant from "#modules/tenancy/models/tenant";
+import { intakeFields, intakeRows } from "#tests/helpers/intake";
 import { inTenant, type Studio } from "#tests/helpers/tenants";
 
 /**
@@ -15,6 +16,8 @@ export type PublicIsolationCase = {
 	pattern: string;
 	/** A valid body for writes, built for the studio sending it. */
 	body?: (own: Studio) => Record<string, unknown>;
+	/** How `body` is sent: JSON (the default) or multipart form fields. */
+	encoding?: "json" | "multipart";
 	/** The status of A's own request: the positive control. */
 	ownStatus: 200 | 201;
 	/** Strings A's own answer must contain, so an empty answer can't pass. */
@@ -35,5 +38,20 @@ export const publicIsolationCases: PublicIsolationCase[] = [
 		ownStatus: 200,
 		ownMarkers: (own) => [own.tenant.slug, own.tenant.name],
 		snapshot: tenantRow,
+	},
+	{
+		method: "POST",
+		pattern: "/api/v1/tenants/:tenant/inquiries",
+		encoding: "multipart",
+		// A's own artist and a returning client of A's: B must stay as it was.
+		body: (own) =>
+			intakeFields({
+				preferredArtistId: own.artistProfile.id,
+				contactPhone: own.client.phone ?? "",
+			}),
+		ownStatus: 201,
+		// The answer is only the new inquiry's id; inquiries.spec.ts checks it landed in A.
+		ownMarkers: () => [],
+		snapshot: intakeRows,
 	},
 ];
