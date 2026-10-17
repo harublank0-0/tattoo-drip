@@ -94,6 +94,39 @@ export class ClientSchema extends BaseModel {
 	declare updatedAt: DateTime | null;
 }
 
+export class DepositLinkSchema extends BaseModel {
+	static $columns = [
+		"createdAt",
+		"expiresAt",
+		"id",
+		"projectId",
+		"referenceCode",
+		"tenantId",
+		"tokenHash",
+		"tokenNonce",
+		"updatedAt",
+	] as const;
+	$columns = DepositLinkSchema.$columns;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.dateTime()
+	declare expiresAt: DateTime;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare projectId: string;
+	@column()
+	declare referenceCode: string;
+	@column()
+	declare tenantId: string;
+	@column()
+	declare tokenHash: string;
+	@column()
+	declare tokenNonce: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
 export class InquirySchema extends BaseModel {
 	static $columns = [
 		"anonymizedAt",
