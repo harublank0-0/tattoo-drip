@@ -139,6 +139,8 @@ async function studio(slug: string, name: string) {
 		quotedQuote: quoted.quote,
 		// The :id resource of the inbox routes' isolation cases.
 		newInquiry,
+		// The :id resource of the clients routes' isolation cases.
+		client: pipeline.client,
 	};
 }
 

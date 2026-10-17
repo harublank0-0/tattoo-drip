@@ -180,6 +180,12 @@ const routes = {
     tokens: [{"old":"/t/:tenant/inbox/:id/decline","type":0,"val":"t","end":""},{"old":"/t/:tenant/inbox/:id/decline","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inbox/:id/decline","type":0,"val":"inbox","end":""},{"old":"/t/:tenant/inbox/:id/decline","type":1,"val":"id","end":""},{"old":"/t/:tenant/inbox/:id/decline","type":0,"val":"decline","end":""}],
     types: placeholder as Registry['tenant.inbox.decline']['types'],
   },
+  'tenant.clients.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/clients',
+    tokens: [{"old":"/t/:tenant/clients","type":0,"val":"t","end":""},{"old":"/t/:tenant/clients","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/clients","type":0,"val":"clients","end":""}],
+    types: placeholder as Registry['tenant.clients.index']['types'],
+  },
   'tenant.projects.index': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/projects',

@@ -51,6 +51,9 @@ export interface ApiDefinition {
       accept: typeof routes['tenant.inbox.accept']
       decline: typeof routes['tenant.inbox.decline']
     }
+    clients: {
+      index: typeof routes['tenant.clients.index']
+    }
     projects: {
       index: typeof routes['tenant.projects.index']
       show: typeof routes['tenant.projects.show']

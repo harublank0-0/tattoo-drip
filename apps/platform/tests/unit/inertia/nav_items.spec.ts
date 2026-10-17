@@ -32,7 +32,7 @@ test.group("navItems", () => {
 	}) => {
 		assert.deepEqual(
 			navItems(owner, 0).map(({ key }) => key),
-			["inbox", "projects", "settings"],
+			["inbox", "projects", "clients", "settings"],
 		);
 		assert.deepEqual(
 			navItems(artist, null).map(({ key }) => key),

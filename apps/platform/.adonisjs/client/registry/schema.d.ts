@@ -355,6 +355,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inquiries_controller').default['decline']>>>
     }
   }
+  'tenant.clients.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/clients'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/clients_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/clients_controller').default['index']>>>
+    }
+  }
   'tenant.projects.index': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/projects'

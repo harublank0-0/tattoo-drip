@@ -143,6 +143,20 @@ router
 			.use(middleware.role({ allow: ["owner"] }));
 
 		/**
+		 * Clients: owners only (the role table gives artists their assigned
+		 * projects, not the studio's client list). Every clients route goes
+		 * in this group (a test checks).
+		 */
+		router
+			.group(() => {
+				router
+					.get("/", [controllers.Clients, "index"])
+					.as("tenant.clients.index");
+			})
+			.prefix("/clients")
+			.use(middleware.role({ allow: ["owner"] }));
+
+		/**
 		 * Projects: owners, and the artist assigned to the project
 		 * (ProjectService.findFor gives anyone else a 404). Every projects
 		 * route goes in this group (a test checks).
