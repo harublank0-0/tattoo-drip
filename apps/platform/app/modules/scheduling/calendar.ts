@@ -51,9 +51,15 @@ export function shiftDate(
 	return iso(plain(date).plus({ days: steps * (view === "week" ? 7 : 1) }));
 }
 
+/** The first of the instants a local time can mean (one, unless the clocks pass it twice). */
+const earliest = (at: DateTime) => at.getPossibleOffsets()[0] ?? at;
+
 /**
  * A local day of the studio as instants, half-open: from its midnight to
- * the next. 23 or 25 hours long on a clock-change day.
+ * the next. 23 or 25 hours long on a clock-change day. A midnight the
+ * clocks pass twice (Havana, the Azores) is its first occurrence, like a
+ * booked time (`localDateTime`): Luxon would pick one by the zone's offset
+ * today, which leaves an hour between two days.
  */
 export function dayBounds(
 	day: string,
@@ -61,8 +67,8 @@ export function dayBounds(
 ): { from: DateTime; to: DateTime } {
 	const start = DateTime.fromISO(day, { zone: timezone });
 	return {
-		from: start.startOf("day"),
-		to: start.plus({ days: 1 }).startOf("day"),
+		from: earliest(start.startOf("day")),
+		to: earliest(start.plus({ days: 1 }).startOf("day")),
 	};
 }
 

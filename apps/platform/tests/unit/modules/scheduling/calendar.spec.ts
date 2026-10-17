@@ -1,5 +1,5 @@
 import { test } from "@japa/runner";
-import { DateTime } from "luxon";
+import { DateTime, Settings } from "luxon";
 import {
 	briefPreview,
 	calendarDays,
@@ -12,9 +12,12 @@ import {
 	toCalendarDate,
 	toCalendarView,
 } from "#modules/scheduling/calendar";
+import { localDateTime } from "#modules/scheduling/times";
 
 const KTM = "Asia/Kathmandu";
 const NY = "America/New_York";
+const HAVANA = "America/Havana";
+const AZORES = "Atlantic/Azores";
 const TODAY = "2026-10-17";
 
 /** `time` on `day` in `zone`. */
@@ -105,6 +108,61 @@ test.group("dayBounds and overlapsDay", () => {
 		assert.equal(utcIso(spring.from), "2026-03-08T05:00:00.000Z");
 		assert.equal(utcIso(spring.to), "2026-03-09T04:00:00.000Z");
 	});
+
+	// Havana and the Azores pass their local midnight twice on the night the
+	// clocks go back. Luxon settles a repeated time by the zone's offset at
+	// `Settings.now`, so these run under a clock before and one after the change.
+	for (const [clock, now] of [
+		["before the clocks go back", "2026-10-10T12:00:00Z"],
+		["after the clocks go back", "2026-11-05T12:00:00Z"],
+	] as const) {
+		for (const [zone, day, first, last] of [
+			[
+				HAVANA,
+				"2026-11-01",
+				"2026-11-01T04:00:00.000Z",
+				"2026-11-02T05:00:00.000Z",
+			],
+			[
+				AZORES,
+				"2026-10-25",
+				"2026-10-25T00:00:00.000Z",
+				"2026-10-26T01:00:00.000Z",
+			],
+		] as const) {
+			test(`a day with a repeated midnight starts at the first one, in ${zone} (${clock})`, ({
+				assert,
+				cleanup,
+			}) => {
+				const realNow = Settings.now;
+				cleanup(() => {
+					Settings.now = realNow;
+				});
+				const frozen = new Date(now).getTime();
+				Settings.now = () => frozen;
+
+				const { from, to } = dayBounds(day, zone);
+				assert.equal(utcIso(from), first);
+				assert.equal(utcIso(to), last);
+				assert.equal(to.diff(from, "hours").hours, 25);
+				// No hour belongs to no day, or to two.
+				const before = shiftDate("day", day, -1);
+				const after = shiftDate("day", day, 1);
+				assert.equal(dayBounds(before, zone).to.toMillis(), from.toMillis());
+				assert.equal(dayBounds(after, zone).from.toMillis(), to.toMillis());
+
+				// A session in the repeated hour, as booking stores it (the first time).
+				const startsAt = localDateTime(day, "00:15", zone);
+				const endsAt = localDateTime(day, "00:45", zone);
+				assert.exists(startsAt);
+				assert.exists(endsAt);
+				if (!startsAt || !endsAt) return;
+				assert.isTrue(overlapsDay(startsAt, endsAt, day, zone));
+				assert.isFalse(overlapsDay(startsAt, endsAt, before, zone));
+				assert.isFalse(overlapsDay(startsAt, endsAt, after, zone));
+			});
+		}
+	}
 
 	test("a session belongs to every local day it takes time from", ({
 		assert,
