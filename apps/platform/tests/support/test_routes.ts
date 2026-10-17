@@ -224,3 +224,19 @@ router
 	})
 	.prefix("/api/v1/tenants/:tenant/__test")
 	.use([middleware.publicApi(), middleware.publicTenant()]);
+
+/**
+ * Tenant id -> another studio's name, filled by the public isolation
+ * self-test: a public route that answers one studio's path with another
+ * studio's data, the leak the public harness must report.
+ */
+export const publicLeaks = new Map<string, string>();
+
+router
+	.get("/api/v1/tenants/:tenant/__test/leak", (ctx) => {
+		const { tenant } = publicTenantContext(ctx);
+		return {
+			data: { slug: tenant.slug, other: publicLeaks.get(tenant.id) ?? null },
+		};
+	})
+	.use([middleware.publicApi(), middleware.publicTenant()]);
