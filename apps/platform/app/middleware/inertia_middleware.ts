@@ -1,10 +1,12 @@
 import type { HttpContext } from "@adonisjs/core/http";
+import app from "@adonisjs/core/services/app";
 import type { NextFn } from "@adonisjs/core/types/http";
 import BaseInertiaMiddleware from "@adonisjs/inertia/inertia_middleware";
 import type User from "#models/user";
 import InquiryService from "#modules/inquiries/services/inquiry_service";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { ensureDbContext } from "#services/db_context";
+import { encryptsHistory } from "#services/history_encryption";
 import UserTransformer from "#transformers/user_transformer";
 
 export default class InertiaMiddleware extends BaseInertiaMiddleware {
@@ -103,6 +105,12 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 
 	async handle(ctx: HttpContext, next: NextFn) {
 		await this.init(ctx);
+
+		// config/inertia.ts encrypts history; a plain-HTTP visit from another
+		// device in development can't (see encryptsHistory).
+		if (!encryptsHistory(ctx.request, app.inProduction)) {
+			ctx.inertia.encryptHistory(false);
+		}
 
 		const output = await next();
 		this.dispose(ctx);

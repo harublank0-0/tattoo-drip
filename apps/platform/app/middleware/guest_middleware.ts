@@ -27,6 +27,14 @@ export default class GuestMiddleware {
 			}
 		}
 
+		/**
+		 * Nobody is signed in here (login, signup), so clear the tab's page
+		 * history: Back can't decrypt the previous user's pages and asks the
+		 * server again (TAT-82). Logout and an expired session redirect here.
+		 * Inertia sends the flag only with a rendered page, so logout itself,
+		 * a redirect, can't clear it.
+		 */
+		ctx.inertia.clearHistory();
 		return next();
 	}
 }
