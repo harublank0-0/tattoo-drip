@@ -194,6 +194,29 @@ router
 				}),
 			);
 		});
+		// Cacheable reads (publicCache) whose body is hard to serialize.
+		router
+			.get("cached/ok", () => ({ data: { ok: true } }))
+			.use(middleware.publicCache());
+		router
+			.get("cached/bigint", () => ({ data: { amount: 10n } }))
+			.use(middleware.publicCache());
+		router
+			.get("cached/getter", () => ({
+				data: {
+					get name(): string {
+						throw new Error("secret detail 10.0.0.5");
+					},
+				},
+			}))
+			.use(middleware.publicCache());
+		router
+			.get("cached/circular", () => {
+				const data: Record<string, unknown> = { name: "loop" };
+				data.self = data;
+				return { data };
+			})
+			.use(middleware.publicCache());
 	})
 	.prefix("/api/v1/__test")
 	.use(middleware.publicApi());

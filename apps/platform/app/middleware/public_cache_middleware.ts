@@ -32,9 +32,39 @@ export default class PublicCacheMiddleware {
 		) {
 			return;
 		}
+		// Serialize before marking anything cacheable: the framework serializes
+		// when it writes the response, and a failure there would send a plain
+		// 500 that still carries the public headers. A throw here reaches the
+		// exception handler instead (internal_error, no-store).
+		const body = serialized(content[0]);
 		ctx.response.header("Cache-Control", publicCacheControl(options));
 		// The same body again, with an ETag: when Adonis writes it, a matching
 		// If-None-Match becomes a 304.
-		ctx.response.send(content[0], true);
+		if (body === undefined) {
+			ctx.response.send(content[0], true);
+			return;
+		}
+		ctx.response.header("Content-Type", "application/json; charset=utf-8");
+		ctx.response.send(body, true);
 	}
+}
+
+/**
+ * The JSON text of an object or array body (what the framework would send,
+ * with bigints as strings like its own serializer; a circular body fails
+ * rather than being cut short), or undefined for text, buffers and the rest.
+ */
+function serialized(content: unknown): string | undefined {
+	if (
+		typeof content !== "object" ||
+		content === null ||
+		content instanceof Uint8Array ||
+		content instanceof Date ||
+		content instanceof RegExp
+	) {
+		return undefined;
+	}
+	return JSON.stringify(content, (_key, value) =>
+		typeof value === "bigint" ? value.toString() : value,
+	);
 }
