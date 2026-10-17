@@ -8,10 +8,8 @@ import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { MAX_TENANT_SLUGS } from "#modules/tenancy/slugs";
 import { changeSlugValidator } from "#modules/tenancy/validators/tenant";
 
-function slugError(message: string) {
-	return new errors.E_VALIDATION_ERROR([
-		{ field: "slug", message, rule: "slug" },
-	]);
+function slugError(message: string, rule: string) {
+	return new errors.E_VALIDATION_ERROR([{ field: "slug", message, rule }]);
 }
 
 /**
@@ -32,11 +30,15 @@ export default class StudioSlugController {
 			changed = await this.tenancy.changeSlug(tenant, slug);
 		} catch (error) {
 			if (error instanceof SlugTakenError) {
-				throw slugError("This address is already taken. Try another one.");
+				throw slugError(
+					"This address is already taken. Try another one.",
+					"unique",
+				);
 			}
 			if (error instanceof SlugLimitError) {
 				throw slugError(
 					`Your studio has used ${MAX_TENANT_SLUGS} addresses, the most allowed. You can still switch back to an earlier one.`,
+					"slug_limit",
 				);
 			}
 			throw error;
