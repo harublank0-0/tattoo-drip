@@ -1,3 +1,5 @@
+import { mock } from "node:test";
+import logger from "@adonisjs/core/services/logger";
 import testUtils from "@adonisjs/core/services/test_utils";
 import db from "@adonisjs/lucid/services/db";
 import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
@@ -53,8 +55,8 @@ const statusIn = (tenant: TenantRef, project: TattooProject) =>
 		async () => (await TattooProject.findOrFail(project.id)).status,
 	);
 
-/** Runs the sweep the way the worker does, without the queue. */
-async function runSweep() {
+/** A sweep job as the worker hands it out, without the queue. */
+function hydratedSweep() {
 	const job = new SweepExpiredQuotesJob();
 	job.$hydrate(
 		{},
@@ -68,8 +70,11 @@ async function runSweep() {
 			stalledCount: 0,
 		},
 	);
-	await job.execute();
+	return job;
 }
+
+/** Runs the sweep the way the worker does, without the queue. */
+const runSweep = () => hydratedSweep().execute();
 
 test.group("SweepExpiredQuotesJob", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
@@ -157,5 +162,24 @@ test.group("SweepExpiredQuotesJob", (group) => {
 		assert.equal(await statusIn(b.tenant, missedB.project), "cancelled");
 		assert.equal(await statusIn(a.tenant, paid.project), "deposit_pending");
 		assert.equal(await statusIn(c.tenant, foreign.project), "quoted");
+	});
+
+	test("logs when it has used up its retries", async ({ assert }) => {
+		const logged = mock.method(logger, "error", () => {});
+		try {
+			const error = new Error(
+				"permission denied for function expired_quote_candidates",
+			);
+
+			await hydratedSweep().failed(error);
+
+			assert.equal(logged.mock.callCount(), 1);
+			assert.deepEqual(logged.mock.calls[0].arguments, [
+				{ err: error, jobId: "sweep-spec" },
+				"Sweeping expired quotes failed.",
+			]);
+		} finally {
+			logged.mock.restore();
+		}
 	});
 });

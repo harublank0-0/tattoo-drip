@@ -1,3 +1,4 @@
+import logger from "@adonisjs/core/services/logger";
 import { Job } from "@adonisjs/queue";
 import ExpireQuoteJob from "#modules/projects/jobs/expire_quote_job";
 import { dbClient } from "#services/db_context";
@@ -34,5 +35,17 @@ export default class SweepExpiredQuotesJob extends Job<Record<string, never>> {
 				quoteId: row.quote_id,
 			}).run();
 		}
+	}
+
+	/**
+	 * Runs once the retries are used up. The sweep is the safety net itself,
+	 * so a sweep that keeps failing (a function missing, or no EXECUTE for
+	 * the runtime role) must not be silent.
+	 */
+	async failed(error: Error): Promise<void> {
+		logger.error(
+			{ err: error, jobId: this.context.jobId },
+			"Sweeping expired quotes failed.",
+		);
 	}
 }
