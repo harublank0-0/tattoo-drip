@@ -6,6 +6,7 @@
 export const controllers = {
   Artists: () => import('#controllers/artists_controller'),
   Bookings: () => import('#controllers/bookings_controller'),
+  Calendar: () => import('#controllers/calendar_controller'),
   Clients: () => import('#controllers/clients_controller'),
   Dashboard: () => import('#controllers/dashboard_controller'),
   DepositSettings: () => import('#controllers/deposit_settings_controller'),

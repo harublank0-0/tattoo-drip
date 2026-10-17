@@ -220,6 +220,20 @@ router
 			})
 			.prefix("/projects")
 			.use(middleware.role({ allow: ["owner", "artist"] }));
+
+		/**
+		 * The calendar: owners (the whole studio or one artist) and artists
+		 * (their own sessions); CalendarService decides what each member
+		 * sees. Every calendar route goes in this group (a test checks).
+		 */
+		router
+			.group(() => {
+				router
+					.get("/", [controllers.Calendar, "index"])
+					.as("tenant.calendar.index");
+			})
+			.prefix("/calendar")
+			.use(middleware.role({ allow: ["owner", "artist"] }));
 	})
 	.prefix("/t/:tenant")
 	.use([middleware.auth(), middleware.dbContext(), middleware.tenant()]);

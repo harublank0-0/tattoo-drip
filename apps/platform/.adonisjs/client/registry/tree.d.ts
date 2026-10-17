@@ -79,6 +79,9 @@ export interface ApiDefinition {
         update: typeof routes['tenant.projects.artist.update']
       }
     }
+    calendar: {
+      index: typeof routes['tenant.calendar.index']
+    }
   }
   dashboard: typeof routes['dashboard']
   onboarding: {
