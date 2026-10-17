@@ -223,3 +223,57 @@ test.group("apiErrorFor", () => {
 		}
 	});
 });
+
+test.group("ApiException.of", () => {
+	test("an endpoint's code comes with its status and its one message", ({
+		assert,
+	}) => {
+		const cases = [
+			[
+				"artist_not_accepting",
+				"This artist isn't taking new requests right now. Choose another artist, or none.",
+			],
+			[
+				"studio_not_accepting",
+				"This studio isn't taking new requests right now.",
+			],
+			[
+				"too_many_open_inquiries",
+				"You already have requests waiting with this studio. They will reply on WhatsApp or Viber.",
+			],
+		] as const;
+
+		for (const [code, message] of cases) {
+			assert.deepEqual(
+				apiErrorFor(ApiException.of(code)),
+				{ status: 409, body: { error: { code, message } }, headers: {} },
+				code,
+			);
+		}
+	});
+
+	test("a shared code works the same, with fields", ({ assert }) => {
+		const error = ApiException.of("validation_failed", {
+			preferredArtistId: ["Choose an artist from the list, or none."],
+		});
+
+		assert.deepEqual(apiErrorFor(error), {
+			status: 422,
+			body: {
+				error: {
+					code: "validation_failed",
+					message: "Some fields are invalid.",
+					fields: {
+						preferredArtistId: ["Choose an artist from the list, or none."],
+					},
+				},
+			},
+			headers: {},
+		});
+		assert.deepEqual(apiErrorFor(ApiException.of("not_found")), {
+			status: 404,
+			body: { error: { code: "not_found", message: "Not found." } },
+			headers: {},
+		});
+	});
+});

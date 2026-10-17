@@ -43,7 +43,10 @@ export function setApiHeaders(response: HttpContext["response"]) {
 	}
 }
 
-/** The codes every public endpoint shares (openapi.yaml, ErrorResponse). */
+/**
+ * Every code the public API answers with (openapi.yaml, ErrorResponse): the
+ * shared ones, then each endpoint's own.
+ */
 export type ApiErrorCode =
 	| "bad_request"
 	| "not_found"
@@ -52,11 +55,15 @@ export type ApiErrorCode =
 	| "unsupported_media_type"
 	| "validation_failed"
 	| "rate_limited"
-	| "internal_error";
+	| "internal_error"
+	// createInquiry (TAT-51)
+	| "artist_not_accepting"
+	| "studio_not_accepting"
+	| "too_many_open_inquiries";
 
 export type ErrorKind = { status: number; code: string; message: string };
 
-/** Each shared code with its status and its one message for people. */
+/** Each code with its status and its one message for people. */
 export const API_ERRORS: Record<ApiErrorCode, ErrorKind> = {
 	bad_request: {
 		status: 400,
@@ -93,6 +100,23 @@ export const API_ERRORS: Record<ApiErrorCode, ErrorKind> = {
 		status: 500,
 		code: "internal_error",
 		message: "Something went wrong. Try again later.",
+	},
+	artist_not_accepting: {
+		status: 409,
+		code: "artist_not_accepting",
+		message:
+			"This artist isn't taking new requests right now. Choose another artist, or none.",
+	},
+	studio_not_accepting: {
+		status: 409,
+		code: "studio_not_accepting",
+		message: "This studio isn't taking new requests right now.",
+	},
+	too_many_open_inquiries: {
+		status: 409,
+		code: "too_many_open_inquiries",
+		message:
+			"You already have requests waiting with this studio. They will reply on WhatsApp or Viber.",
 	},
 };
 
