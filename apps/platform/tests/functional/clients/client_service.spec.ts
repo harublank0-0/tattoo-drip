@@ -262,3 +262,60 @@ test.group("ClientService finds and updates", (group) => {
 		});
 	});
 });
+
+test.group("ClientService.create", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("adds a client; an empty email becomes null and there are no notes", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const maya = await clients.create(tenant, {
+				name: "Maya Gurung",
+				phone: "+9779812345678",
+				email: "",
+			});
+			assert.include((await Client.findOrFail(maya.id)).serialize(), {
+				tenantId: tenant.id,
+				name: "Maya Gurung",
+				phone: "+9779812345678",
+				email: null,
+				notes: null,
+				anonymizedAt: null,
+			});
+		});
+	});
+
+	test("a number another live client has is refused and the transaction goes on; another studio may have it", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+		const { tenant: other } = await studioWithOwner("studio-b", "Studio B");
+
+		await inTenant(tenant, async () => {
+			await makeClient(tenant, { name: "Ram Thapa", phone: "+9779812345678" });
+			assert.equal(
+				await reasonOf(() =>
+					clients.create(tenant, {
+						name: "Maya Gurung",
+						phone: "+9779812345678",
+						email: null,
+					}),
+				),
+				"phone_taken",
+			);
+			// The refusal rolled back only its savepoint: this query still runs.
+			assert.lengthOf(await Client.query().where("phone", "+9779812345678"), 1);
+		});
+		await inTenant(other, async () => {
+			const there = await clients.create(other, {
+				name: "Maya Gurung",
+				phone: "+9779812345678",
+				email: null,
+			});
+			assert.equal(there.tenantId, other.id);
+		});
+	});
+});

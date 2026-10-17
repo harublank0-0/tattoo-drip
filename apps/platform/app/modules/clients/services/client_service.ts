@@ -31,8 +31,15 @@ export type ClientInput = {
 	notes: string | null;
 };
 
+/** A new client (a booking at the desk, TAT-43): the phone already in E.164. */
+export type NewClient = {
+	name: string;
+	phone: string;
+	email: string | null;
+};
+
 /**
- * The way to find, list and edit a tenant's clients (TAT-37, TAT-41).
+ * The way to find, list, add and edit a tenant's clients (TAT-37, TAT-41, TAT-43).
  * Every call is scoped to the tenant; the clients pages are owners only.
  * Intake (TAT-51) matches by phone with `findByPhone` and never changes a
  * client: only an owner's edit does.
@@ -66,6 +73,34 @@ export default class ClientService {
 			.where("tenant_id", tenant.id)
 			.where("phone", phone)
 			.first();
+	}
+
+	/**
+	 * Adds a client (a booking at the desk, TAT-43), in its own savepoint. A
+	 * phone another live client of the tenant has is refused ("phone_taken")
+	 * by the unique index, caught after the savepoint rolled back, so the
+	 * request stays usable. An empty email becomes null; there are no notes.
+	 */
+	async create(tenant: TenantRef, input: NewClient): Promise<Client> {
+		try {
+			return await withTransaction((trx) =>
+				Client.create(
+					{
+						tenantId: tenant.id,
+						name: input.name,
+						phone: input.phone,
+						email: input.email || null,
+						notes: null,
+					},
+					{ client: trx },
+				),
+			);
+		} catch (error) {
+			if (isUniqueViolation(error, PHONE_INDEX)) {
+				throw new ClientRuleError("phone_taken");
+			}
+			throw error;
+		}
 	}
 
 	/**
