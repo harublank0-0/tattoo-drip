@@ -16,6 +16,8 @@ Ace commands that boot the app validate its environment. Prepare the platform `.
 
 Functional tests run inside `testUtils.db().wrapInGlobalTransaction()` (Lucid 22's name; `withGlobalTransaction` is deprecated), so they leave no data behind. HTTP tests use `client` with `.loginAs(user)` and `.withCsrfToken()`. Check form errors with `assertValidationError(response, field)` from `#tests/helpers/validation`: Adonis 7 flashes them under `inputErrorsBag`, while the session plugin's `assertHasValidationError` reads `errors`.
 
+Rate limits (TAT-8) use the memory store under test (`config/limiter.ts`). `tests/bootstrap.ts` empties it before every functional and browser test, so counts never carry over. Test requests come from loopback, which is trusted as a proxy, so `.header("x-forwarded-for", "203.0.113.1")` picks the client address. `rate_limit_store.spec.ts` covers the Postgres store outside a global transaction. The store keeps the client it was created with, so never call `limiter.use("database", …)` inside `wrapInGlobalTransaction`.
+
 Storage written to `tmp/storage/` is cleared before and after test runs by `tests/bootstrap.ts`. Queue fake and direct execution conventions are in [jobs and email](jobs-and-email.md#jobs).
 
 ## Generated files and scaffolding

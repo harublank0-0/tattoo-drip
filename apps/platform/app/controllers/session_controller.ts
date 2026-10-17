@@ -1,6 +1,7 @@
 import type { HttpContext } from "@adonisjs/core/http";
 import { LAST_TENANT_KEY } from "#middleware/tenant_middleware";
 import User from "#models/user";
+import { throttleLogin } from "#modules/identity/services/auth_limits";
 import { loginValidator } from "#validators/user";
 
 export default class SessionController {
@@ -11,11 +12,14 @@ export default class SessionController {
 	/**
 	 * /dashboard picks where the user lands. Login and logout forget the
 	 * last tenant, so a shared browser never carries one user's choice over
-	 * to the next.
+	 * to the next. Too many failures from this address or for this email
+	 * refuse the attempt before the password is checked (TAT-8).
 	 */
 	async store({ request, auth, session, response }: HttpContext) {
 		const { email, password } = await request.validateUsing(loginValidator);
-		const user = await User.verifyCredentials(email, password);
+		const user = await throttleLogin(request.ip(), email, () =>
+			User.verifyCredentials(email, password),
+		);
 
 		await auth.use("web").login(user);
 		session.forget(LAST_TENANT_KEY);
