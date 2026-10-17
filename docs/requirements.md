@@ -16,8 +16,9 @@ What the MVP (pilot with a design-partner studio) and V1 (paid launch) must do, 
 
 **Intake**
 - [ ] A public intake form on the studio page, plus a per-artist link
-- [ ] The form asks for: idea, up to 5 reference images (10 MB each; JPEG, PNG, WebP or HEIC), placement, approximate size, preferred dates, preferred artist (optional), name, phone (required; used for WhatsApp or Viber), email (optional), budget (optional), and how they found the studio
+- [ ] The form asks for: idea, up to 5 reference images (JPEG, PNG or WebP, 10 MB each and 20 MB together; phones convert HEIC photos when the form asks for these), placement, approximate size, preferred dates, preferred artist (optional), name, phone (required; used for WhatsApp or Viber), email (optional), budget (optional), and how they found the studio
 - [ ] After submitting, the customer is told the studio will reply on WhatsApp or Viber
+- An inquiry finds the studio's client by phone, or creates one; a returning client's details never change, and the inquiry keeps what was sent. A phone number has at most 3 open (unanswered) inquiries per studio. An artist who isn't accepting inquiries can't be chosen, and a studio whose visible artists are all closed takes none.
 
 **Inquiries and projects**
 - [ ] An inbox of new inquiries; accept one (creating a project) or decline it

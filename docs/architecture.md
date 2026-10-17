@@ -94,7 +94,7 @@ Isolation has several layers:
 1. The studio page maps `blackneedle.platform.com` to the `blackneedle` slug and loads the profile and artists through the SDK.
 2. The browser sends the inquiry, reference images and bot-challenge token **directly to the API** as one multipart request. Going direct avoids storefront body-size limits, lets rate limits see the real IP, and leaves no orphaned uploads.
 3. The API checks the challenge and limits and processes the images. The Inquiries module matches or creates the client by phone and saves the inquiry as `new`.
-4. A job alerts the studio's staff by email and in the app.
+4. A job alerts the studio's staff by email and in the app (queued with the inquiry since TAT-51; the alerts themselves are TAT-52).
 
 **Deposit (customer → studio)**
 1. Staff accept the inquiry, which creates a project, and send a quote through a one-tap WhatsApp or Viber message; the project moves to `quoted`. When the client agrees, staff mark the quote accepted: the project moves to `deposit_pending`, and a deposit page link goes out the same way. A quote that expires first cancels the project.
@@ -110,7 +110,7 @@ Isolation has several layers:
 
 - **Uploads** always go through the API. Images are re-encoded, which strips EXIF data and GPS location and rejects disguised files. The worker resizes them.
   - Built so far (TAT-21 core): re-encoding happens in the request, and images over 2048 px are scaled down there. Resized variants in the worker come when an image needs them (artist photos, portfolio).
-  - HEIC is rejected for now: sharp's prebuilt binaries can't decode it, and iPhone browsers usually upload JPEG. TAT-51 adds a decoder if reference images need one.
+  - HEIC is not decoded (TAT-51): the intake form asks for JPEG, PNG or WebP, which iPhones convert their photos to, and a HEVC decoder would mean a custom libvips build or a WASM decoder running on hostile input.
 - **Image visibility:** portfolio images are public behind a CDN. Reference images are private and served through short-lived signed URLs, issued only after a membership check.
 - **Caching:** public reads that opt in send `Cache-Control: public, max-age=60, stale-while-revalidate=600` with an ETag behind a CDN; storefront pages use short TTLs too, and slots will have the shortest. Errors and writes are `no-store`.
 - **Rate limits** apply per IP and per tenant. The storefront's server-side rendering calls the API with a secret **server key**. The key only stops the storefront server from counting as one client, and grants no extra data.
@@ -139,4 +139,4 @@ In the MVP the studio page has one layout, generated from the profile and artist
 
 This document describes the intended architecture, including planned features. Determine implemented behavior from the affected modules, routes, migrations and tests; local migration status comes from the target database. Row-level security is implemented; see [database conventions](../apps/platform/database/README.md) and [backend development](../apps/platform/docs/backend.md).
 
-The contract's booking-to-inquiry transition is documented in [SDK: Public API by stage](sdk.md#public-api-by-stage). Use the [roadmap](roadmap.md) for release gates and [documentation index](README.md) for implementation guidance. Dated specs/plans retain the decision history.
+What each stage of the contract exposes is in [SDK: Public API by stage](sdk.md#public-api-by-stage); V1 operations are tagged `V1` in `openapi.yaml`. Use the [roadmap](roadmap.md) for release gates and [documentation index](README.md) for implementation guidance. Dated specs/plans retain the decision history.
