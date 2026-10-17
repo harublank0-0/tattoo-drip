@@ -99,8 +99,8 @@ export interface Registry {
       paramsTuple: [ParamValue]
       params: { tenant: ParamValue }
       query: {}
-      response: unknown
-      errorResponse: unknown
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/dashboard_controller').default['tenantHome']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/dashboard_controller').default['tenantHome']>>>
     }
   }
   'tenant.settings': {

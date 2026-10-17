@@ -46,7 +46,7 @@ test.group("Tenant routes", (group) => {
 			.loginAs(owner);
 
 		response.assertStatus(200);
-		response.assertInertiaComponent("dashboard");
+		response.assertInertiaComponent("inquiries/index");
 		assert.deepEqual(response.inertiaProps.tenant, {
 			name: "Black Needle",
 			slug: "black-needle",
@@ -64,6 +64,35 @@ test.group("Tenant routes", (group) => {
 
 		response.assertStatus(302);
 		response.assertHeader("location", "/login");
+	});
+
+	test("the studio's address opens the member's work list", async ({
+		client,
+	}) => {
+		const owner = await makeUser("owner@example.com");
+		const tenant = await tenancy.createTenant(owner, studio("black-needle"));
+		const artistUser = await makeUser("artist@example.com");
+		await inTenant(tenant, () =>
+			TenantMembership.create({
+				tenantId: tenant.id,
+				userId: artistUser.id,
+				role: "artist",
+			}),
+		);
+
+		const ownerResponse = await client
+			.get("/t/black-needle")
+			.loginAs(owner)
+			.redirects(0);
+		ownerResponse.assertStatus(302);
+		ownerResponse.assertHeader("location", "/t/black-needle/inbox");
+
+		const artistResponse = await client
+			.get("/t/black-needle")
+			.loginAs(artistUser)
+			.redirects(0);
+		artistResponse.assertStatus(302);
+		artistResponse.assertHeader("location", "/t/black-needle/projects");
 	});
 
 	test("a member of another tenant gets 404", async ({ client }) => {

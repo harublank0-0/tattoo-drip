@@ -30,7 +30,9 @@ router
  */
 router
 	.group(() => {
-		router.on("/").renderInertia("dashboard", {}).as("tenant.dashboard");
+		router
+			.get("/", [controllers.Dashboard, "tenantHome"])
+			.as("tenant.dashboard");
 
 		/**
 		 * Studio settings, owners only: artists get the same 404 as an

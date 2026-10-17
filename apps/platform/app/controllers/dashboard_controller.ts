@@ -1,6 +1,6 @@
 import { inject } from "@adonisjs/core";
 import type { HttpContext } from "@adonisjs/core/http";
-import { LAST_TENANT_KEY } from "#middleware/tenant_middleware";
+import { LAST_TENANT_KEY, tenantContext } from "#middleware/tenant_middleware";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 
@@ -26,5 +26,22 @@ export default class DashboardController {
 		return response
 			.redirect()
 			.toRoute("tenant.dashboard", { tenant: tenant.slug });
+	}
+
+	/**
+	 * /t/:tenant: the member's work list. Owners land on the inbox, artists
+	 * on their projects (the inbox is owners only). The studio switcher and
+	 * /dashboard link here, so everyone lands on what they work through.
+	 */
+	async tenantHome(ctx: HttpContext) {
+		const { tenant, membership } = tenantContext(ctx);
+		return ctx.response
+			.redirect()
+			.toRoute(
+				membership.role === "owner"
+					? "tenant.inbox.index"
+					: "tenant.projects.index",
+				{ tenant: tenant.slug },
+			);
 	}
 }

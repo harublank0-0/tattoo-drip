@@ -135,7 +135,7 @@ export const isolationCases: IsolationCase[] = [
 		method: "GET",
 		pattern: "/t/:tenant",
 		actor: "owner",
-		ownStatus: 200,
+		ownStatus: 302,
 		snapshot: none,
 	},
 	{
