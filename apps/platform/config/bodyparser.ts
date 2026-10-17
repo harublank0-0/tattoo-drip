@@ -1,4 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { defineConfig } from "@adonisjs/core/bodyparser";
+import app from "@adonisjs/core/services/app";
 
 const bodyParserConfig = defineConfig({
 	/**
@@ -67,6 +69,15 @@ const bodyParserConfig = defineConfig({
 		 * Maximum accepted payload size for multipart requests.
 		 */
 		limit: "20mb",
+
+		/**
+		 * Tests keep uploads in tmp/storage/uploads (made and cleared by
+		 * tests/bootstrap.ts), so a test can check that a request left no temp
+		 * file behind (TAT-51). Elsewhere they go to the OS temp folder.
+		 */
+		...(app.inTest
+			? { tmpFileName: () => app.tmpPath("storage", "uploads", randomUUID()) }
+			: {}),
 
 		/**
 		 * Content types handled by the multipart parser.
