@@ -15,6 +15,7 @@ import TattooProject, {
 } from "#modules/projects/models/tattoo_project";
 import { MANUAL_MOVE_NAMES, type ManualMove } from "#modules/projects/moves";
 import ProjectService, {
+	type Member,
 	PROJECTS_PER_PAGE,
 } from "#modules/projects/services/project_service";
 import QuoteService, {
@@ -185,6 +186,79 @@ test.group("ProjectService.findFor", (group) => {
 				() =>
 					projects.findFor(b, { userId: ownerB.id, role: "owner" }, project.id),
 				/Row not found/,
+			);
+		});
+	});
+});
+
+test.group("ProjectService.findManyFor", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("owners get the live projects among the ids; artists only those assigned to them", async ({
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+		const user = await artistIn(tenant, "asha@example.com");
+		const stranger = await artistIn(tenant, "ram@example.com");
+
+		await inTenant(tenant, async () => {
+			const mine = await makeArtist(tenant, "asha");
+			mine.userId = user.id;
+			await mine.save();
+			const other = await makeArtist(tenant, "sita");
+			const client = await makeClient(tenant);
+			const assigned = await makeProject(tenant, client, { artistId: mine.id });
+			const elsewhere = await makeProject(tenant, client, {
+				artistId: other.id,
+			});
+			const deleted = await makeProject(tenant, client, { artistId: mine.id });
+			await deleted.softDelete();
+			const ids = [assigned.id, elsewhere.id, deleted.id, randomUUID()];
+			const found = async (member: Member) =>
+				(await projects.findManyFor(tenant, member, ids))
+					.map(({ id }) => id)
+					.sort();
+
+			assert.deepEqual(
+				await found({ userId: owner.id, role: "owner" }),
+				[assigned.id, elsewhere.id].sort(),
+			);
+			assert.deepEqual(await found({ userId: user.id, role: "artist" }), [
+				assigned.id,
+			]);
+			// No profile of their own: nothing.
+			assert.deepEqual(
+				await found({ userId: stranger.id, role: "artist" }),
+				[],
+			);
+			assert.deepEqual(
+				await projects.findManyFor(
+					tenant,
+					{ userId: owner.id, role: "owner" },
+					[],
+				),
+				[],
+			);
+		});
+	});
+
+	test("another tenant's projects are never found", async ({ assert }) => {
+		const { tenant: a } = await studioWithOwner("studio-a", "Studio A");
+		const { tenant: b, owner: ownerB } = await studioWithOwner(
+			"studio-b",
+			"Studio B",
+		);
+		const theirs = await inTenant(b, async () =>
+			makeProject(b, await makeClient(b)),
+		);
+
+		await inTenant(b, async () => {
+			// Visible to row-level security here, but asked for as studio A's.
+			assert.deepEqual(
+				await projects.findManyFor(a, { userId: ownerB.id, role: "owner" }, [
+					theirs.id,
+				]),
+				[],
 			);
 		});
 	});
