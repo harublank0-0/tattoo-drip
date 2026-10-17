@@ -194,7 +194,8 @@ function Toolbar({
 			aria-label="Calendar"
 			className="flex flex-wrap items-center justify-between gap-2"
 		>
-			<div className="inline-flex overflow-hidden rounded-md border bg-background">
+			{/* No overflow-hidden: it would clip the links' focus rings. */}
+			<div className="inline-flex rounded-md border bg-background">
 				{(["day", "week"] as const).map((option) => (
 					<Link
 						key={option}
@@ -204,7 +205,7 @@ function Toolbar({
 							buttonVariants({
 								variant: option === view ? "secondary" : "ghost",
 							}),
-							"min-h-11 rounded-none px-4 aria-[current=page]:font-semibold",
+							"relative min-h-11 rounded-none px-4 first:rounded-l-sm last:rounded-r-sm focus-visible:z-10 aria-[current=page]:font-semibold",
 						)}
 					>
 						{option === "day" ? "Day" : "Week"}
