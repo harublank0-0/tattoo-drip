@@ -1,4 +1,6 @@
+import net from "node:net";
 import testUtils from "@adonisjs/core/services/test_utils";
+import type { ApiClient } from "@japa/api-client";
 import type { Assert } from "@japa/assert";
 import { test } from "@japa/runner";
 import Artist from "#modules/artists/models/artist";
@@ -7,6 +9,7 @@ import Inquiry from "#modules/inquiries/models/inquiry";
 import { ARTIST_MESSAGE } from "#modules/inquiries/validators/intake";
 import { IMAGE_FORMAT_MESSAGE } from "#modules/media/errors";
 import { API_ERRORS } from "#services/public_api_errors";
+import env from "#start/env";
 import { assertApiError } from "#tests/helpers/api";
 import { testImages } from "#tests/helpers/images";
 import {
@@ -258,5 +261,204 @@ test.group("Public API: POST /inquiries refusals", (group) => {
 		);
 
 		assertApiError(response, 413, "payload_too_large");
+	});
+});
+
+const BOUNDARY = "td51";
+const FILE_BYTES = "A".repeat(200_000);
+
+/** One file part of a hand-written multipart body (the bytes need not be an image: only the temp file matters here). */
+const filePart = (name: string, bytes = FILE_BYTES) =>
+	`--${BOUNDARY}\r\nContent-Disposition: form-data; name="${name}"; filename="a.png"\r\nContent-Type: image/png\r\n\r\n${bytes}\r\n`;
+
+/** POST a hand-written multipart body: what no browser or SDK would send. */
+const postRaw = (client: ApiClient, body: string) =>
+	client
+		.post(`/api/v1/tenants/${SLUG}/inquiries`)
+		.unsafeJson(body)
+		.type(`multipart/form-data; boundary=${BOUNDARY}`);
+
+/** A moment for a write stream that is still closing when the response is out. */
+const settle = () => new Promise((resolve) => setTimeout(resolve, 300));
+
+/** Polls until `check` holds (a cleanup that runs after the client is gone). */
+async function until(check: () => Promise<boolean>, what: string) {
+	for (let i = 0; i < 100; i++) {
+		if (await check()) return;
+		await new Promise((resolve) => setTimeout(resolve, 30));
+	}
+	throw new Error(`Timed out waiting for ${what}`);
+}
+
+/** A raw connection to the test server that starts an upload and never finishes it. */
+function startUpload(): Promise<net.Socket> {
+	return new Promise((resolve, reject) => {
+		const socket = net.connect(
+			{ host: env.get("HOST"), port: env.get("PORT") },
+			() => {
+				socket.write(
+					[
+						`POST /api/v1/tenants/${SLUG}/inquiries HTTP/1.1`,
+						`Host: ${env.get("HOST")}`,
+						`Content-Type: multipart/form-data; boundary=${BOUNDARY}`,
+						"Content-Length: 5000000",
+						"Connection: close",
+						"",
+						filePart("referenceImages").slice(0, -2),
+					].join("\r\n"),
+				);
+				resolve(socket);
+			},
+		);
+		socket.on("error", reject);
+	});
+}
+
+test.group("Public API: POST /inquiries temp uploads", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("a half-sent upload is in the uploads folder while the request is open, and gone when the client hangs up", async ({
+		assert,
+	}) => {
+		await studioWithOwner(SLUG);
+		const before = await tempUploads();
+
+		const socket = await startUpload();
+		await until(
+			async () => (await newTempUploads(before)).length === 1,
+			"the half-sent upload to reach tmp/storage/uploads",
+		);
+		socket.destroy();
+
+		await until(
+			async () => (await newTempUploads(before)).length === 0,
+			"the half-sent upload to be removed",
+		);
+		assert.deepEqual(await newTempUploads(before), []);
+	});
+
+	test("a file part cut off mid-way is bad_request and leaves no temp file", async ({
+		client,
+		assert,
+	}) => {
+		await studioWithOwner(SLUG);
+		const before = await tempUploads();
+
+		const response = await postRaw(
+			client,
+			filePart("referenceImages").slice(0, -2),
+		);
+		await settle();
+
+		assertApiError(response, 400, "bad_request");
+		assert.deepEqual(await newTempUploads(before), []);
+	});
+
+	test("a good file part followed by a malformed one leaves no temp file", async ({
+		client,
+		assert,
+	}) => {
+		await studioWithOwner(SLUG);
+		const before = await tempUploads();
+
+		const response = await postRaw(
+			client,
+			`${filePart("referenceImages")}--${BOUNDARY}\r\n!!bad header\r\n\r\n--${BOUNDARY}--\r\n`,
+		);
+		await settle();
+
+		assertApiError(response, 400, "bad_request");
+		assert.deepEqual(await newTempUploads(before), []);
+	});
+
+	test("a good file part followed by a cut-off one leaves no temp file", async ({
+		client,
+		assert,
+	}) => {
+		await studioWithOwner(SLUG);
+		const before = await tempUploads();
+
+		const response = await postRaw(
+			client,
+			`${filePart("referenceImages")}${filePart("referenceImages").slice(0, -2)}`,
+		);
+		await settle();
+
+		assertApiError(response, 400, "bad_request");
+		assert.deepEqual(await newTempUploads(before), []);
+	});
+
+	test("file parts named like nested fields leave no temp file, and the inquiry is still taken", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner(SLUG);
+		const before = await tempUploads();
+
+		for (const [first, second] of [
+			["junk", "junk.extra"],
+			["x.__proto__.y", "x.y"],
+			["referenceImages", "referenceImages.extra"],
+		]) {
+			const request = postInquiry(client, SLUG, intakeFields());
+			for (const name of [first, second]) {
+				request.file(name, Buffer.from(FILE_BYTES), {
+					filename: "a.png",
+					contentType: "image/png",
+				});
+			}
+			const response = await request;
+			await settle();
+
+			assert.oneOf(response.status(), [201, 422], `${first} + ${second}`);
+			assert.deepEqual(
+				await newTempUploads(before),
+				[],
+				`${first} + ${second}`,
+			);
+		}
+		assert.isAbove(
+			(await inTenant(tenant, () => Inquiry.query())).length,
+			0,
+			"a stray file field does not stop the inquiry",
+		);
+	});
+
+	test("a file part named like an Object method cannot crash the parser", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner(SLUG);
+		const before = await tempUploads();
+
+		let phone = 9812345600;
+		for (const name of [
+			"constructor",
+			"toString",
+			"hasOwnProperty",
+			"valueOf",
+			"__proto__",
+			"__defineGetter__",
+			"handler",
+			"options",
+			"constructor[0]",
+		]) {
+			// One phone may have 3 open inquiries, so each request has its own.
+			const request = postInquiry(
+				client,
+				SLUG,
+				intakeFields({ contactPhone: String(phone++) }),
+			);
+			request.file(name, Buffer.from(FILE_BYTES), {
+				filename: "a.png",
+				contentType: "image/png",
+			});
+			const response = await request;
+			await settle();
+
+			assert.equal(response.status(), 201, name);
+			assert.deepEqual(await newTempUploads(before), [], name);
+		}
+		assert.lengthOf(await inTenant(tenant, () => Inquiry.query()), 9);
 	});
 });

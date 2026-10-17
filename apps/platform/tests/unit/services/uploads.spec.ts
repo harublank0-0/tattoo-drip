@@ -39,6 +39,25 @@ test.group("discardUploads", () => {
 		for (const path of paths) assert.isFalse(existsSync(path), path);
 	});
 
+	test("deletes a file nested in another file's properties, and survives a loop", async ({
+		assert,
+	}) => {
+		// A field named `junk.extra` after `junk` is stored on the first file.
+		const [outerPath, innerPath] = [
+			(await uploadOf(Buffer.from("x"))).tmpPath,
+			(await uploadOf(Buffer.from("x"))).tmpPath,
+		];
+		const outer = fileAt(outerPath);
+		const loop: Record<string, unknown> = {};
+		loop.self = loop;
+		Object.assign(outer, { extra: fileAt(innerPath), loop });
+
+		await discardUploads(requestWith(() => ({ junk: outer })));
+
+		assert.isFalse(existsSync(outerPath));
+		assert.isFalse(existsSync(innerPath));
+	});
+
 	test("a file already gone, or no body parser at all, is fine", async () => {
 		await discardUploads(
 			requestWith(() => ({ gone: fileAt("/nonexistent/td51-upload") })),
