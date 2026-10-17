@@ -54,7 +54,8 @@ export default class BookingsController {
 		const today = todayIn(tenant.timezone);
 
 		return ctx.inertia.render("projects/new", {
-			lookup: await this.lookup(tenant, typed),
+			// A member who can't book gets the "not linked" card, not a client's name.
+			lookup: artists.length ? await this.lookup(tenant, typed) : null,
 			artists: artists.map(({ id, name }) => ({ id, name })),
 			isOwner: membership.role === "owner",
 			dates: {

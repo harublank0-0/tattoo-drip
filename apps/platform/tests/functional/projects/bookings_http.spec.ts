@@ -102,6 +102,8 @@ test.group("Booking page", (group) => {
 	}) => {
 		const { owner, tenant } = await studioWithOwner();
 		const { tenant: other } = await studioWithOwner("studio-b", "Studio B");
+		// The lookup is part of the booking form, so it needs an artist to book.
+		await inTenant(tenant, () => makeArtist(tenant));
 		const maya = await inTenant(tenant, () =>
 			makeClient(tenant, {
 				name: "Maya Gurung",
@@ -157,6 +159,63 @@ test.group("Booking page", (group) => {
 		const none = (await client.get(newUrl()).withInertia().loginAs(stranger))
 			.inertiaProps;
 		assert.deepEqual(none.artists, []);
+	});
+
+	test("an artist's lookup shows the client's name only; owners are told apart by isOwner", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const maya = await inTenant(tenant, () =>
+			makeClient(tenant, {
+				name: "Maya Gurung",
+				phone: "+9779812345678",
+				email: "maya@example.com",
+				notes: "Allergic to latex",
+			}),
+		);
+		const { user } = await linkedArtist(tenant);
+		const found = {
+			state: "found",
+			phone: "+9779812345678",
+			client: { id: maya.id, name: "Maya Gurung" },
+		};
+
+		// Nothing but the id (for the form) and the name: no email, no notes.
+		const asArtist = (
+			await client.get(newUrl("9812345678")).withInertia().loginAs(user)
+		).inertiaProps;
+		assert.deepEqual(asArtist.lookup, found);
+		assert.isFalse(asArtist.isOwner);
+		assert.notInclude(JSON.stringify(asArtist), "maya@example.com");
+		assert.notInclude(JSON.stringify(asArtist), "latex");
+
+		// Owners get the same lookup; isOwner is what shows them "View client".
+		const asOwner = (
+			await client.get(newUrl("9812345678")).withInertia().loginAs(owner)
+		).inertiaProps;
+		assert.deepEqual(asOwner.lookup, found);
+		assert.isTrue(asOwner.isOwner);
+	});
+
+	test("an artist without a profile cannot look a number up", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+		await inTenant(tenant, () =>
+			makeClient(tenant, { name: "Maya Gurung", phone: "+9779812345678" }),
+		);
+		const stranger = await artistIn(tenant, "ram@example.com");
+
+		const props = (
+			await client.get(newUrl("9812345678")).withInertia().loginAs(stranger)
+		).inertiaProps;
+
+		// They see the "not linked" card, and the client's id and name stay home.
+		assert.deepEqual(props.artists, []);
+		assert.isNull(props.lookup);
+		assert.notInclude(JSON.stringify(props), "Maya");
 	});
 });
 
