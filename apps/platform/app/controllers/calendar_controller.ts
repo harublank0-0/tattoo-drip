@@ -64,7 +64,10 @@ export default class CalendarController {
 							artists: artists.map(({ id, name }) => ({ id, name })),
 						}
 					: null,
-			canBook: membership.role === "owner" || scope.kind === "artist",
+			// An owner needs an artist to book with: with none, the page says to add one.
+			canBook:
+				(membership.role === "owner" && artists.length > 0) ||
+				scope.kind === "artist",
 			days: days.map((day) => ({
 				date: day,
 				label: dayLabel(day),

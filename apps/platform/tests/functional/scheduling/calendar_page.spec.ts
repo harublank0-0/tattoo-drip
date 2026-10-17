@@ -518,4 +518,24 @@ test.group("Calendar page", (group) => {
 		assert.isTrue(await canBook(user));
 		assert.isFalse(await canBook(unlinked));
 	});
+
+	test("Book session is left out for an owner whose studio has no artist yet", async ({
+		client,
+		assert,
+	}) => {
+		// The page already says to add an artist first: no button beside that line.
+		const { owner } = await studioWithOwner();
+
+		const response = await client
+			.get(calendarUrl())
+			.withInertia()
+			.loginAs(owner);
+
+		response.assertStatus(200);
+		assert.isFalse(response.inertiaProps.canBook);
+		assert.deepEqual(response.inertiaProps.artistFilter, {
+			selected: null,
+			artists: [],
+		});
+	});
 });
