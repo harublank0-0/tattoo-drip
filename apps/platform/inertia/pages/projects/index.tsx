@@ -36,7 +36,17 @@ export default function ProjectsIndex({
 	];
 
 	return (
-		<Page title="Projects">
+		<Page
+			title="Projects"
+			actions={
+				<Link
+					href={urlFor("tenant.projects.create", { tenant: tenant.slug })}
+					className={buttonVariants({ size: "sm" })}
+				>
+					Book session
+				</Link>
+			}
+		>
 			<nav aria-label="Filter projects" className="flex flex-wrap gap-2">
 				{chips.map((chip) => (
 					<Link
