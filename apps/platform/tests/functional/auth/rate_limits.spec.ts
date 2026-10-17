@@ -183,3 +183,44 @@ test.group("Rate limits between tests", () => {
 		assert.isNull(await perIp().get(loginIpKey("203.0.113.41")));
 	});
 });
+
+test.group("Signup rate limit", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("refuses an address after 10 signup attempts", async ({
+		client,
+		assert,
+	}) => {
+		const signup = (ip: string, body: Record<string, string>) =>
+			client
+				.post("/signup")
+				.header("x-forwarded-for", ip)
+				.header("referer", "/signup")
+				.form(body)
+				.withCsrfToken()
+				.redirects(0);
+		const valid = {
+			fullName: "Ada Ink",
+			email: "ada@example.com",
+			password: PASSWORD,
+			passwordConfirmation: PASSWORD,
+		};
+
+		// Invalid bodies count too: every request does.
+		for (let i = 0; i < 10; i++) {
+			const invalid = await signup("203.0.113.51", {});
+			invalid.assertHeader("location", "/signup");
+		}
+
+		const refused = await signup("203.0.113.51", valid);
+		refused.assertHeader("location", "/signup");
+		refused.assertFlashMessage(
+			"error",
+			"Too many attempts. Try again in 60 minutes.",
+		);
+		assert.isNull(await User.findBy("email", "ada@example.com"));
+
+		const elsewhere = await signup("203.0.113.52", valid);
+		elsewhere.assertHeader("location", "/onboarding");
+	});
+});
