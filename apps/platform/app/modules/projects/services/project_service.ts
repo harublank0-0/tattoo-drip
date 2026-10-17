@@ -165,6 +165,55 @@ export default class ProjectService {
 	}
 
 	/**
+	 * The client's live projects, newest first (the client profile, TAT-41).
+	 * The clients pages are owners only, so there is no member scoping here.
+	 */
+	async forClient(
+		tenant: TenantRef,
+		clientId: string,
+	): Promise<TattooProject[]> {
+		return TattooProject.query()
+			.where("tenant_id", tenant.id)
+			.where("client_id", clientId)
+			.orderBy("created_at", "desc")
+			.orderBy("id", "desc");
+	}
+
+	/** How many live projects each of these clients has. */
+	async countsForClients(
+		tenant: TenantRef,
+		clientIds: string[],
+	): Promise<Map<string, number>> {
+		if (clientIds.length === 0) return new Map();
+		const rows = await TattooProject.query()
+			.where("tenant_id", tenant.id)
+			.whereIn("client_id", clientIds)
+			.select("client_id")
+			.count("* as total")
+			.groupBy("client_id");
+		return new Map(
+			rows.map((row) => [row.clientId, Number(row.$extras.total)]),
+		);
+	}
+
+	/** When each of these clients' live projects last changed. */
+	async lastChangeForClients(
+		tenant: TenantRef,
+		clientIds: string[],
+	): Promise<Map<string, DateTime>> {
+		if (clientIds.length === 0) return new Map();
+		const rows = await TattooProject.query()
+			.where("tenant_id", tenant.id)
+			.whereIn("client_id", clientIds)
+			.select("client_id")
+			.max("updated_at as latest")
+			.groupBy("client_id");
+		return new Map(
+			rows.map((row) => [row.clientId, toDateTime(row.$extras.latest)]),
+		);
+	}
+
+	/**
 	 * Issues the project's next quote version. There are no drafts: saving is
 	 * sending. Allowed while the project is `reviewing`, `quoted`, `on_hold`
 	 * or `deposit_pending` (else QuoteRuleError "project_closed"), and only
@@ -500,4 +549,11 @@ function assertProjectOf(tenant: TenantRef, project: TattooProject) {
 	if (project.tenantId !== tenant.id) {
 		throw new Error(`Project ${project.id} belongs to another tenant`);
 	}
+}
+
+/** An aggregate's timestamp, as node-pg returns it (a Date), as a DateTime. */
+function toDateTime(value: Date | string): DateTime {
+	return value instanceof Date
+		? DateTime.fromJSDate(value)
+		: DateTime.fromISO(value);
 }

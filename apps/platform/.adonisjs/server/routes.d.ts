@@ -33,6 +33,10 @@ export type ScannedRoutes = {
     'tenant.inbox.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inbox.accept': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inbox.decline': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.clients.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.clients.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.clients.edit': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.clients.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.projects.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.projects.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.projects.quotes.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
@@ -63,6 +67,9 @@ export type ScannedRoutes = {
     'tenant.artists.edit': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inbox.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.inbox.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.clients.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.clients.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.clients.edit': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.projects.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.projects.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'dashboard': { paramsTuple?: []; params?: {} }
@@ -85,6 +92,9 @@ export type ScannedRoutes = {
     'tenant.artists.edit': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inbox.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.inbox.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.clients.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.clients.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.clients.edit': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.projects.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.projects.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'dashboard': { paramsTuple?: []; params?: {} }
@@ -110,6 +120,7 @@ export type ScannedRoutes = {
     'tenant.settings.deposits.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.clients.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.projects.notes.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.projects.artist.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
   }

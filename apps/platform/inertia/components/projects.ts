@@ -78,6 +78,8 @@ export type ProjectPageProps = {
 		source: string;
 		references: ReferenceProps[];
 	} | null;
+	/** The client's id for the "View client" link; null unless an owner. */
+	clientId: string | null;
 };
 
 export const STATUS_LABELS: Record<string, string> = {

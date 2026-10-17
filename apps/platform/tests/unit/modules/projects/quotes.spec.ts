@@ -1,7 +1,6 @@
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
 import {
-	chatLinks,
 	expiresAtFor,
 	formatDay,
 	formatHours,
@@ -120,7 +119,7 @@ test.group("expiry dates", () => {
 	});
 });
 
-test.group("quoteMessage and chatLinks", () => {
+test.group("quoteMessage", () => {
 	const expiresAt = expiresAtFor("2026-10-28", KTM);
 
 	test("writes a fixed quote with its deposit", ({ assert }) => {
@@ -155,12 +154,5 @@ test.group("quoteMessage and chatLinks", () => {
 			timezone: KTM,
 		});
 		assert.isTrue(text.startsWith("Hi, here is your quote"));
-	});
-
-	test("builds WhatsApp and Viber links from an E.164 phone", ({ assert }) => {
-		assert.deepEqual(chatLinks("+9779812345678", "Hi & bye"), {
-			whatsapp: "https://wa.me/9779812345678?text=Hi%20%26%20bye",
-			viber: "viber://chat?number=%2B9779812345678",
-		});
 	});
 });

@@ -1,5 +1,6 @@
 import { DateTime } from "luxon";
 import Artist from "#modules/artists/models/artist";
+import Client from "#modules/clients/models/client";
 import Inquiry from "#modules/inquiries/models/inquiry";
 import ReferenceImage from "#modules/inquiries/models/reference_image";
 import PaymentMethod from "#modules/payments/models/payment_method";
@@ -34,7 +35,8 @@ export type IsolationCase = {
 		| "artistProfile"
 		| "project"
 		| "quotedProject"
-		| "newInquiry";
+		| "newInquiry"
+		| "client";
 	/** Who sends the request. Every settings route is owner-only. */
 	actor: "owner" | "artist";
 	/** A valid body for writes, built for the studio sending it. */
@@ -116,6 +118,16 @@ const inboxRows = (target: Studio) =>
 				.orderBy("id")
 		).map((image) => image.serialize()),
 	}));
+
+// Clients, deleted ones included: what editing a client could change.
+const clientRows = (target: Studio) =>
+	inTenant(target.tenant, async () =>
+		(
+			await Client.withTrashed()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("id")
+		).map((client) => client.serialize()),
+	);
 
 const profileBody = (own: Studio) => ({
 	name: `${own.tenant.name} renamed`,
@@ -387,5 +399,42 @@ export const isolationCases: IsolationCase[] = [
 		actor: "owner",
 		ownStatus: 302,
 		snapshot: inboxRows,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/clients",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: clientRows,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/clients/:id",
+		resource: "client",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: clientRows,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/clients/:id/edit",
+		resource: "client",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: clientRows,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/clients/:id",
+		resource: "client",
+		actor: "owner",
+		body: (own) => ({
+			name: "Renamed client",
+			phone: own.client.phone ?? "",
+			email: "",
+			notes: "",
+		}),
+		ownStatus: 302,
+		snapshot: clientRows,
 	},
 ];

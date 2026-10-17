@@ -4,12 +4,16 @@
  * imports, so the unit tests can load it. Calendar (TAT-50) and Clients
  * (TAT-41) each become one more entry here.
  */
-export type NavKey = "inbox" | "projects" | "settings";
+export type NavKey = "inbox" | "projects" | "clients" | "settings";
 
 export type ShellNavItem = {
 	key: NavKey;
 	label: string;
-	route: "tenant.inbox.index" | "tenant.projects.index" | "tenant.settings";
+	route:
+		| "tenant.inbox.index"
+		| "tenant.projects.index"
+		| "tenant.clients.index"
+		| "tenant.settings";
 	/** New inquiries on the Inbox; absent unless above zero. */
 	badge?: number;
 	/** Other path prefixes that also make this item current. */
@@ -17,7 +21,7 @@ export type ShellNavItem = {
 };
 
 /**
- * What `tenant`'s member sees: owners get Inbox, Projects and Settings
+ * What `tenant`'s member sees: owners get Inbox, Projects, Clients and Settings
  * (the artist pages count as Settings); artists get Projects. The server
  * 404s the rest anyway.
  */
@@ -41,12 +45,19 @@ export function navItems(
 		route: "tenant.projects.index",
 	});
 	if (owner) {
-		items.push({
-			key: "settings",
-			label: "Settings",
-			route: "tenant.settings",
-			also: [`/t/${tenant.slug}/artists`],
-		});
+		items.push(
+			{
+				key: "clients",
+				label: "Clients",
+				route: "tenant.clients.index",
+			},
+			{
+				key: "settings",
+				label: "Settings",
+				route: "tenant.settings",
+				also: [`/t/${tenant.slug}/artists`],
+			},
+		);
 	}
 	return items;
 }

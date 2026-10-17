@@ -38,6 +38,7 @@ What the MVP (pilot with a design-partner studio) and V1 (paid launch) must do, 
 
 **Clients**
 - [ ] One client per phone number per tenant, with the history of their projects, references and payments
+- The client list and profiles are for owners. Owners can edit a client's name, phone, email and notes; what a client submits through the form never changes their record.
 
 **Notifications, page and app**
 - [ ] Staff are alerted to new inquiries by email and in the app. No automatic customer messages in the MVP; replies go through the one-tap chat links

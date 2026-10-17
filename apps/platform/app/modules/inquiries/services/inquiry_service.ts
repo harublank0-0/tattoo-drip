@@ -124,6 +124,55 @@ export default class InquiryService {
 		);
 	}
 
+	/** The client's live inquiries, newest first (the client profile). */
+	async forClient(tenant: TenantRef, clientId: string): Promise<Inquiry[]> {
+		return Inquiry.query()
+			.where("tenant_id", tenant.id)
+			.where("client_id", clientId)
+			.orderBy("created_at", "desc")
+			.orderBy("id", "desc");
+	}
+
+	/** When each of these clients last sent an inquiry. */
+	async latestForClients(
+		tenant: TenantRef,
+		clientIds: string[],
+	): Promise<Map<string, DateTime>> {
+		if (clientIds.length === 0) return new Map();
+		const rows = await Inquiry.query()
+			.where("tenant_id", tenant.id)
+			.whereIn("client_id", clientIds)
+			.select("client_id")
+			.max("created_at as latest")
+			.groupBy("client_id");
+		return new Map(
+			rows.map((row) => [row.clientId, toDateTime(row.$extras.latest)]),
+		);
+	}
+
+	/**
+	 * The live reference images on any of these inquiries or projects, each
+	 * once (an accepted inquiry's images carry both ids), by inquiry, then
+	 * project, then position. Load the client scoped to the tenant first:
+	 * that is the access check for these private images.
+	 */
+	async imagesFor(
+		tenant: TenantRef,
+		{ inquiryIds, projectIds }: { inquiryIds: string[]; projectIds: string[] },
+	): Promise<ReferenceImage[]> {
+		if (inquiryIds.length === 0 && projectIds.length === 0) return [];
+		return ReferenceImage.query()
+			.where("tenant_id", tenant.id)
+			.where((group) => {
+				if (inquiryIds.length > 0) group.whereIn("inquiry_id", inquiryIds);
+				if (projectIds.length > 0) group.orWhereIn("project_id", projectIds);
+			})
+			.orderBy("inquiry_id", "asc")
+			.orderBy("project_id", "asc")
+			.orderBy("position", "asc")
+			.orderBy("id", "asc");
+	}
+
 	/**
 	 * Accepts a new inquiry: a `reviewing` project for its client, with the
 	 * idea as the brief and `artistId` (or none) as the artist; the
@@ -213,4 +262,11 @@ function assertInquiryOf(tenant: TenantRef, inquiry: Inquiry) {
 	if (inquiry.tenantId !== tenant.id) {
 		throw new Error(`Inquiry ${inquiry.id} belongs to another tenant`);
 	}
+}
+
+/** An aggregate's timestamp, as node-pg returns it (a Date), as a DateTime. */
+function toDateTime(value: Date | string): DateTime {
+	return value instanceof Date
+		? DateTime.fromJSDate(value)
+		: DateTime.fromISO(value);
 }

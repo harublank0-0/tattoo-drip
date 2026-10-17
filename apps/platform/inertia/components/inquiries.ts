@@ -34,6 +34,7 @@ export type ReferenceProps = {
 export type InquiryPageProps = {
 	inquiry: {
 		id: string;
+		clientId: string;
 		status: string;
 		contactName: string;
 		contactPhone: string | null;

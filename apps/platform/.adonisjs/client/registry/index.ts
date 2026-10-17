@@ -180,6 +180,30 @@ const routes = {
     tokens: [{"old":"/t/:tenant/inbox/:id/decline","type":0,"val":"t","end":""},{"old":"/t/:tenant/inbox/:id/decline","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inbox/:id/decline","type":0,"val":"inbox","end":""},{"old":"/t/:tenant/inbox/:id/decline","type":1,"val":"id","end":""},{"old":"/t/:tenant/inbox/:id/decline","type":0,"val":"decline","end":""}],
     types: placeholder as Registry['tenant.inbox.decline']['types'],
   },
+  'tenant.clients.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/clients',
+    tokens: [{"old":"/t/:tenant/clients","type":0,"val":"t","end":""},{"old":"/t/:tenant/clients","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/clients","type":0,"val":"clients","end":""}],
+    types: placeholder as Registry['tenant.clients.index']['types'],
+  },
+  'tenant.clients.show': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/clients/:id',
+    tokens: [{"old":"/t/:tenant/clients/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/clients/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/clients/:id","type":0,"val":"clients","end":""},{"old":"/t/:tenant/clients/:id","type":1,"val":"id","end":""}],
+    types: placeholder as Registry['tenant.clients.show']['types'],
+  },
+  'tenant.clients.edit': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/clients/:id/edit',
+    tokens: [{"old":"/t/:tenant/clients/:id/edit","type":0,"val":"t","end":""},{"old":"/t/:tenant/clients/:id/edit","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/clients/:id/edit","type":0,"val":"clients","end":""},{"old":"/t/:tenant/clients/:id/edit","type":1,"val":"id","end":""},{"old":"/t/:tenant/clients/:id/edit","type":0,"val":"edit","end":""}],
+    types: placeholder as Registry['tenant.clients.edit']['types'],
+  },
+  'tenant.clients.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/clients/:id',
+    tokens: [{"old":"/t/:tenant/clients/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/clients/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/clients/:id","type":0,"val":"clients","end":""},{"old":"/t/:tenant/clients/:id","type":1,"val":"id","end":""}],
+    types: placeholder as Registry['tenant.clients.update']['types'],
+  },
   'tenant.projects.index': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/projects',

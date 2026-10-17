@@ -34,7 +34,21 @@ export default function InquiryShow({
 	];
 
 	return (
-		<Page title={inquiry.contactName} description={inquiry.receivedText}>
+		<Page
+			title={inquiry.contactName}
+			description={inquiry.receivedText}
+			actions={
+				<Link
+					href={urlFor("tenant.clients.show", {
+						tenant: tenant.slug,
+						id: inquiry.clientId,
+					})}
+					className={buttonVariants({ variant: "outline", size: "sm" })}
+				>
+					View client
+				</Link>
+			}
+		>
 			<div className="flex max-w-2xl flex-col gap-6">
 				{accept && (
 					<Card>
