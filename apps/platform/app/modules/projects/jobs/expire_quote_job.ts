@@ -8,7 +8,9 @@ type Payload = { tenantId: string; projectId: string; quoteId: string };
  * Runs once a quote's expiry passes: ProjectService.issueQuote queues it in
  * the issuing transaction, delayed until `expires_at`. ProjectService
  * .expireQuote re-checks everything under the project lock, so the old jobs
- * of revised quotes, a repeat run and a deleted project all do nothing.
+ * of revised quotes, a repeat run and a deleted project all do nothing. A
+ * run that comes early (this worker's clock behind the issuer's) queues the
+ * job again for the rest of the time.
  */
 export default class ExpireQuoteJob extends TenantJob<Payload> {
 	protected async handle() {

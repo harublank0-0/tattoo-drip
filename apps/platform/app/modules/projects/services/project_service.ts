@@ -247,14 +247,7 @@ export default class ProjectService {
 			if (isExpired(input)) throw new QuoteRuleError("expired");
 			const quote = await this.quotes.create(trx, tenant, live, input);
 			await setStatus(live, "quoted");
-			await dispatchInTransaction(
-				ExpireQuoteJob.dispatch({
-					tenantId: tenant.id,
-					projectId: live.id,
-					quoteId: quote.id,
-				}).in(Math.max(0, quote.expiresAt.toMillis() - Date.now())),
-				trx,
-			);
+			await queueExpiry(trx, tenant, quote);
 			return quote;
 		});
 	}
@@ -298,9 +291,11 @@ export default class ProjectService {
 	 * settled). A deposit that was paid is never cancelled by expiry, not
 	 * even on a `quoted` project that was revised after the client paid. The
 	 * project's scheduled sessions are cancelled first, so the artist's time
-	 * is free. Anything else, a missing or deleted project included, changes
-	 * nothing: the job is safe to repeat, and the jobs of revised quotes do
-	 * nothing. Returns whether it cancelled.
+	 * is free. A run before the current quote's expiry (this process's clock
+	 * behind the one that queued the job) queues the job again for the rest
+	 * of the time. Anything else, a missing or deleted project included,
+	 * changes nothing: the job is safe to repeat, and the jobs of revised
+	 * quotes do nothing. Returns whether it cancelled.
 	 */
 	async expireQuote(
 		tenant: TenantRef,
@@ -315,7 +310,14 @@ export default class ProjectService {
 				.first();
 			if (!project) return false;
 			const quote = await this.quotes.current(tenant, project);
-			if (!quote || quote.id !== quoteId || !isExpired(quote)) return false;
+			if (!quote || quote.id !== quoteId) return false;
+			if (!isExpired(quote)) {
+				// Early: this clock is behind the one that queued the job (skew
+				// between hosts, or a clock stepped back). Run again at the expiry
+				// instead of finishing.
+				await queueExpiry(trx, tenant, quote);
+				return false;
+			}
 			if (!(await this.expiryCancels(tenant, project, quote))) return false;
 
 			await this.cancelScheduledSessions(tenant, project);
@@ -525,6 +527,26 @@ export default class ProjectService {
 async function setStatus(project: TattooProject, status: ProjectStatus) {
 	project.status = status;
 	await project.save();
+}
+
+/**
+ * Queues ExpireQuoteJob in `trx` for the moment `quote` expires on this
+ * process's clock (the one isExpired reads), so the job exists only if the
+ * transaction commits.
+ */
+function queueExpiry(
+	trx: TransactionClientContract,
+	tenant: TenantRef,
+	quote: Quote,
+) {
+	return dispatchInTransaction(
+		ExpireQuoteJob.dispatch({
+			tenantId: tenant.id,
+			projectId: quote.projectId,
+			quoteId: quote.id,
+		}).in(Math.max(0, quote.expiresAt.toMillis() - DateTime.now().toMillis())),
+		trx,
+	);
 }
 
 /**
