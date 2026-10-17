@@ -139,6 +139,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/studio_profile_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
+  'tenant.settings.slug.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/settings/slug'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/tenancy/validators/tenant').changeSlugValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/tenancy/validators/tenant').changeSlugValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/studio_slug_controller').default['update']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/studio_slug_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
   'tenant.settings.payments': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/settings/payments'

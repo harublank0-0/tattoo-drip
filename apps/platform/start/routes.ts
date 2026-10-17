@@ -58,6 +58,9 @@ router
 					.put("profile", [controllers.StudioProfile, "update"])
 					.as("tenant.settings.profile.update");
 				router
+					.put("slug", [controllers.StudioSlug, "update"])
+					.as("tenant.settings.slug.update");
+				router
 					.get("payments", [controllers.PaymentMethods, "index"])
 					.as("tenant.settings.payments");
 				router

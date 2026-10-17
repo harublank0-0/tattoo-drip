@@ -72,6 +72,12 @@ const routes = {
     tokens: [{"old":"/t/:tenant/settings/profile","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/profile","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/profile","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/profile","type":0,"val":"profile","end":""}],
     types: placeholder as Registry['tenant.settings.profile.update']['types'],
   },
+  'tenant.settings.slug.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/settings/slug',
+    tokens: [{"old":"/t/:tenant/settings/slug","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/slug","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/slug","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/slug","type":0,"val":"slug","end":""}],
+    types: placeholder as Registry['tenant.settings.slug.update']['types'],
+  },
   'tenant.settings.payments': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/settings/payments',
