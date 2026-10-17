@@ -142,7 +142,8 @@ export default function CreateTenant({
 								</span>
 							</div>
 							<FieldDescription id="slug-preview">
-								Lowercase letters, numbers and hyphens, 3 to 63 characters.
+								Lowercase letters, numbers and single hyphens, 3 to 63
+								characters.
 							</FieldDescription>
 							{errors.slug && <FieldError>{errors.slug}</FieldError>}
 						</Field>
