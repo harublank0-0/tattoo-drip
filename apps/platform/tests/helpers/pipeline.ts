@@ -259,3 +259,19 @@ export function makeSession(
 		...over,
 	});
 }
+
+/**
+ * How many live clients, projects, quotes and sessions `tenant` has: a
+ * refused booking must leave every count as it was. Call it inside
+ * `inTenant(tenant, …)`, or the counts are 0 whatever happened.
+ */
+export async function pipelineCounts(tenant: TenantRef) {
+	return {
+		clients: (await Client.query().where("tenant_id", tenant.id)).length,
+		projects: (await TattooProject.query().where("tenant_id", tenant.id))
+			.length,
+		quotes: (await Quote.query().where("tenant_id", tenant.id)).length,
+		sessions: (await ProjectSession.query().where("tenant_id", tenant.id))
+			.length,
+	};
+}
