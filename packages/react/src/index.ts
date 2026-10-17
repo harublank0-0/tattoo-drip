@@ -2,7 +2,7 @@ export {
 	useArtist,
 	useArtists,
 	useAvailability,
-	useCreateBooking,
+	useCreateInquiry,
 	usePlacements,
 	usePortfolio,
 	useServices,

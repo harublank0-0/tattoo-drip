@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
-	CreateBookingInput,
+	CreateInquiryInput,
 	ListAvailabilityQuery,
 	ListPortfolioQuery,
 	ListServicesQuery,
@@ -42,12 +42,13 @@ export function usePlacements() {
 }
 
 /**
- * Submits a booking request. Pending requests never hold a slot, so no
- * cached availability needs invalidating afterwards.
+ * Sends an inquiry with its reference images (`client.inquiries.create`).
+ * Never retried: a retry after a timeout could send it twice. Nothing
+ * cached changes, so nothing is invalidated.
  */
-export function useCreateBooking() {
+export function useCreateInquiry() {
 	const client = useTattooClient();
 	return useMutation({
-		mutationFn: (input: CreateBookingInput) => client.bookings.create(input),
+		mutationFn: (input: CreateInquiryInput) => client.inquiries.create(input),
 	});
 }
