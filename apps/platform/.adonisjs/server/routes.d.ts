@@ -53,6 +53,7 @@ export type ScannedRoutes = {
     'session.destroy': { paramsTuple?: []; params?: {} }
     'onboarding.create': { paramsTuple?: []; params?: {} }
     'onboarding.store': { paramsTuple?: []; params?: {} }
+    'api.v1.studio': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
   }
   GET: {
     'drive.public.serve': { paramsTuple: [...ParamValue[]]; params: {'*': ParamValue[]} }
@@ -80,6 +81,7 @@ export type ScannedRoutes = {
     'tenant.calendar.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'dashboard': { paramsTuple?: []; params?: {} }
     'onboarding.create': { paramsTuple?: []; params?: {} }
+    'api.v1.studio': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
   }
   HEAD: {
     'drive.public.serve': { paramsTuple: [...ParamValue[]]; params: {'*': ParamValue[]} }
@@ -107,6 +109,7 @@ export type ScannedRoutes = {
     'tenant.calendar.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'dashboard': { paramsTuple?: []; params?: {} }
     'onboarding.create': { paramsTuple?: []; params?: {} }
+    'api.v1.studio': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
   }
   POST: {
     'new_account.store': { paramsTuple?: []; params?: {} }

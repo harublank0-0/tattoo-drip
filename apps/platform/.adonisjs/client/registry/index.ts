@@ -300,6 +300,12 @@ const routes = {
     tokens: [{"old":"/onboarding","type":0,"val":"onboarding","end":""}],
     types: placeholder as Registry['onboarding.store']['types'],
   },
+  'api.v1.studio': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/tenants/:tenant',
+    tokens: [{"old":"/api/v1/tenants/:tenant","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant","type":1,"val":"tenant","end":""}],
+    types: placeholder as Registry['api.v1.studio']['types'],
+  },
 } as const satisfies Record<string, AdonisEndpoint>
 
 export { routes }

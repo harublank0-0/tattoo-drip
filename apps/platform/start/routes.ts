@@ -250,3 +250,32 @@ router
 		router.post("onboarding", [controllers.Onboarding, "store"]);
 	})
 	.use([middleware.auth(), middleware.dbContext()]);
+
+/**
+ * The public API (TAT-32): stateless and cookieless (the session, CSRF,
+ * auth and Inertia middleware skip /api), CORS open without credentials,
+ * { data } and { error } envelopes (#services/public_api_errors). Every /api
+ * route goes in this group and runs publicApi first (a test checks). Cache
+ * a read with middleware.publicCache(); everything else is no-store. TAT-38
+ * adds its rate limits to these `use` lists.
+ */
+router
+	.group(() => {
+		/**
+		 * One tenant's public data. The tenant is the path's slug, current or
+		 * old, matched exactly; handlers run in its database context. Every
+		 * route here needs a case in tests/isolation/public_cases.ts (a test
+		 * checks).
+		 */
+		router
+			.group(() => {
+				router
+					.get("/", [controllers.PublicStudio, "show"])
+					.use(middleware.publicCache())
+					.as("api.v1.studio");
+			})
+			.prefix("/tenants/:tenant")
+			.use(middleware.publicTenant());
+	})
+	.prefix("/api/v1")
+	.use(middleware.publicApi());
