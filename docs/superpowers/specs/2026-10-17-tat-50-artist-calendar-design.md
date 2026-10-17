@@ -133,6 +133,16 @@ Editing, completing, cancelling or moving sessions; drag and drop; free slots or
 
 Sunday as the first day of the week; the day view as the default; owners starting on the whole studio; the Calendar tab after Projects; "Not assigned to you" and "Project not available"; a 100-character brief preview; no date picker; the Now marker's minute updates.
 
+## Review amendments
+
+Found in review (a Fable whole-branch review and Codex code and security reviews), after the rulings were final; each narrows a ruling without reopening it:
+
+- **Ruling 1:** `?date=` is a real day from 1900 to 2100; any other value is today. A week at `9999-12-28` reaches "10000-01-01", which Luxon cannot read, and the range handed to the database was an Invalid Date (a 500).
+- **Ruling 5:** a midnight the clocks pass twice (Havana, the Azores) is its first occurrence, as `localDateTime` stores a booked time. Luxon's own choice depended on the date the page was opened and left an hour between two days.
+- **Ruling 7:** a repeated `?artist=a&artist=b` is a malformed artist and a 404, not "all artists".
+- **Ruling 12:** "today" is the browser's clock in the studio's timezone, not only the server's date at load, so a tab left open past midnight moves the Today badge, the Today link and the Now marker together.
+- **Ruling 14:** "Book session" shows for an owner only when the studio has an artist; the page's own line says to add one first.
+
 ## Verification
 
 `PORT=3402 node ace test` passes; `pnpm check`, `pnpm typecheck`, `pnpm build` and `node ace codegen` are clean; the browser pass above. Then the whole-branch review and the Codex code and security reviews before the PR.
