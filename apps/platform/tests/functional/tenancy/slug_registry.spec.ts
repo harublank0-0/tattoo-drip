@@ -4,6 +4,7 @@ import { test } from "@japa/runner";
 import User from "#models/user";
 import { SlugTakenError } from "#modules/tenancy/errors";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
+import { STORED_SLUG } from "#modules/tenancy/slugs";
 import { type DbContextValues, withDbContext } from "#services/db_context";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
@@ -208,5 +209,19 @@ test.group("Slug registry", (group) => {
 			/tenant_slugs_slug_format/,
 		);
 		assert.deepEqual(await slugsOf(tenant), ["black-needle"]);
+	});
+
+	test("STORED_SLUG is the shape the registry's CHECK enforces", async ({
+		assert,
+	}) => {
+		// The public API pre-filters path slugs with STORED_SLUG, so it must
+		// not drift from the constraint that decides what can be stored.
+		const { rows } = await sql(
+			{},
+			"select pg_get_constraintdef(oid) as definition from pg_constraint where conname = 'tenant_slugs_slug_format'",
+		);
+
+		assert.lengthOf(rows, 1);
+		assert.include(rows[0].definition, STORED_SLUG.source);
 	});
 });

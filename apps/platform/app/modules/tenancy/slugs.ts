@@ -2,8 +2,9 @@
  * Rules for a tenant slug (TAT-24). A slug is also the tenant's subdomain,
  * so it is a lowercase DNS label, and it shares one namespace with the
  * platform's own hosts and pages. Onboarding and the settings page check new
- * slugs with checkSlug; the public API (TAT-32) uses the same rules. Never
- * copy RESERVED_SLUGS elsewhere.
+ * slugs with checkSlug. A slug taken from a path (the public API, TAT-32) is
+ * looked up, not chosen: it is pre-filtered with STORED_SLUG, because slugs
+ * from before these rules stay valid. Never copy RESERVED_SLUGS elsewhere.
  */
 
 /**
@@ -202,8 +203,16 @@ const BRAND = "tattoodrip";
 /** What may be typed: ASCII letters in any case, digits and hyphens. */
 const TYPED = /^[A-Za-z0-9-]+$/;
 
-/** A DNS label: 3 to 63 characters, no hyphen at either end. */
-const SHAPE = /^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/;
+/**
+ * The shape every stored slug has: a DNS label of 3 to 63 lowercase
+ * characters, no hyphen at either end. It is what the registry's CHECK
+ * (`tenant_slugs_slug_format`) enforces, and nothing more: slugs from before
+ * TAT-24 keep their old rules (`12345`, `a--b` and now-reserved words are
+ * stored and must stay reachable). Use it to reject a slug taken from a path
+ * before a lookup (a 404 without a query); never to accept a slug someone
+ * chose, which is checkSlug's job.
+ */
+export const STORED_SLUG = /^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/;
 
 export type SlugProblem = "format" | "reserved";
 
@@ -222,7 +231,7 @@ export type SlugCheck =
 export function checkSlug(input: string): SlugCheck {
 	if (!TYPED.test(input)) return { ok: false, problem: "format" };
 	const slug = input.toLowerCase();
-	if (!SHAPE.test(slug) || slug.includes("--") || !/[a-z]/.test(slug)) {
+	if (!STORED_SLUG.test(slug) || slug.includes("--") || !/[a-z]/.test(slug)) {
 		return { ok: false, problem: "format" };
 	}
 	if (RESERVED_SLUGS.has(slug) || slug.replaceAll("-", "").includes(BRAND)) {

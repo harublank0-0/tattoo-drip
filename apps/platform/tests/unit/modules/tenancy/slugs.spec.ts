@@ -3,6 +3,7 @@ import { ARTIST_SLUG } from "#modules/artists/validators/artist";
 import {
 	checkSlug,
 	RESERVED_SLUGS,
+	STORED_SLUG,
 	withTenantSlug,
 } from "#modules/tenancy/slugs";
 
@@ -154,12 +155,59 @@ test.group("checkSlug", () => {
 	});
 });
 
+test.group("STORED_SLUG", () => {
+	test("matches the slugs stored before the new rules, which stay reachable", ({
+		assert,
+	}) => {
+		for (const slug of [
+			"12345",
+			"a--b",
+			"black--needle",
+			"xn--80ak6aa92e",
+			"www",
+			"tattoo-drip",
+			"abc",
+			"x".repeat(63),
+		]) {
+			assert.match(slug, STORED_SLUG, slug);
+		}
+		// These could not be chosen today, so checkSlug is the wrong filter for
+		// a path.
+		for (const slug of ["12345", "a--b", "xn--80ak6aa92e", "www"]) {
+			assert.isFalse(checkSlug(slug).ok, slug);
+		}
+	});
+
+	test("refuses what can never be stored", ({ assert }) => {
+		for (const input of [
+			"",
+			"ab",
+			"x".repeat(64),
+			"-abc",
+			"abc-",
+			"Black-Needle",
+			"a_b",
+			"a.b",
+			"a b",
+			"abc\n",
+			"bläck",
+			"\u212Aat", // Kelvin sign
+		]) {
+			assert.notMatch(input, STORED_SLUG, JSON.stringify(input));
+		}
+	});
+
+	test("every slug checkSlug accepts matches it", ({ assert }) => {
+		for (const slug of VALID) assert.match(slug, STORED_SLUG, slug);
+	});
+});
+
 test.group("RESERVED_SLUGS", () => {
 	test("every entry is lowercase and would otherwise be a valid slug", ({
 		assert,
 	}) => {
 		for (const name of RESERVED_SLUGS) {
-			assert.match(name, /^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/, name);
+			assert.match(name, STORED_SLUG, name);
 			assert.notInclude(name, "--", name);
 			assert.match(name, /[a-z]/, name);
 		}
