@@ -12,6 +12,8 @@ import type Tenant from "#modules/tenancy/models/tenant";
 import {
 	makeArtist,
 	makeClient,
+	makeProject,
+	makeSession,
 	pipelineCounts,
 } from "#tests/helpers/pipeline";
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
@@ -376,5 +378,170 @@ test.group("Booking a session", (group) => {
 		response.assertStatus(404);
 		assert.deepEqual(await countsIn(tenant), before);
 		assert.deepEqual(await countsIn(other), otherBefore);
+	});
+});
+
+test.group("Refused bookings", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("a busy artist: the start time gets the error and nothing is saved, the second of two identical forms included", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const day = dayFromNow(4);
+		const sita = await inTenant(tenant, async () => {
+			const sita = await makeArtist(tenant);
+			const busy = await makeProject(tenant, await makeClient(tenant), {
+				status: "booked",
+				artistId: sita.id,
+			});
+			await makeSession(tenant, busy, sita, {
+				startsAt: at(day, "15:00"),
+				endsAt: at(day, "18:00"),
+			});
+			return sita;
+		});
+		const send = (over: Record<string, string>) =>
+			client
+				.post(bookUrl)
+				.form(newClientForm(sita.id, { date: day, ...over }))
+				.withCsrfToken()
+				.loginAs(owner)
+				.redirects(0);
+		const before = await countsIn(tenant);
+
+		// 14:00 to 16:00 runs into the 15:00 session.
+		const busy = await send({ startTime: "14:00", hours: "2" });
+		assertValidationError(
+			busy,
+			"startTime",
+			"Sita already has a session at that time. Pick another time.",
+		);
+		assert.deepEqual(await countsIn(tenant), before);
+
+		// The same free slot sent twice (a double tap): one booking only.
+		const first = await send({ startTime: "10:00", hours: "2" });
+		first.assertStatus(302);
+		// Another new client, with a number nextPhone() never makes.
+		const twice = await send({
+			startTime: "10:00",
+			hours: "2",
+			phone: "+9779851234567",
+			name: "Someone Else",
+		});
+		assertValidationError(
+			twice,
+			"startTime",
+			"Sita already has a session at that time. Pick another time.",
+		);
+		const after = await countsIn(tenant);
+		assert.equal(after.projects, before.projects + 1);
+		assert.equal(after.clients, before.clients + 1);
+	});
+
+	test("a number added meanwhile: the phone error names its client", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const sita = await inTenant(tenant, async () => {
+			await makeClient(tenant, { name: "Ram Thapa", phone: "+9779812345678" });
+			return makeArtist(tenant);
+		});
+		const before = await countsIn(tenant);
+
+		const response = await client
+			.post(bookUrl)
+			.form(newClientForm(sita.id))
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		assertValidationError(
+			response,
+			"phone",
+			"This number now belongs to Ram Thapa. Check the client and book again.",
+		);
+		assert.deepEqual(await countsIn(tenant), before);
+	});
+
+	test("an artist can't book someone else; an owner can't book a deleted or another studio's artist", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const { tenant: other } = await studioWithOwner("studio-b", "Studio B");
+		const { user } = await linkedArtist(tenant);
+		const { sita, gone } = await inTenant(tenant, async () => {
+			const sita = await makeArtist(tenant);
+			const gone = await Artist.create({
+				tenantId: tenant.id,
+				name: "Gone",
+				slug: "gone",
+			});
+			await gone.softDelete();
+			return { sita, gone };
+		});
+		const elsewhere = await inTenant(other, () => makeArtist(other));
+		const before = await countsIn(tenant);
+		const otherBefore = await countsIn(other);
+
+		for (const [actor, artistId] of [
+			[user, sita.id],
+			[owner, gone.id],
+			[owner, elsewhere.id],
+		] as const) {
+			const response = await client
+				.post(bookUrl)
+				.form(newClientForm(artistId))
+				.withCsrfToken()
+				.loginAs(actor)
+				.redirects(0);
+			assertValidationError(
+				response,
+				"artistId",
+				"Choose an artist from the list.",
+			);
+		}
+		assert.deepEqual(await countsIn(tenant), before);
+		assert.deepEqual(await countsIn(other), otherBefore);
+	});
+
+	test("a client whose details were deleted goes back to the lookup", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const { sita, anonymous } = await inTenant(tenant, async () => ({
+			sita: await makeArtist(tenant),
+			anonymous: await makeClient(tenant, {
+				phone: null,
+				anonymizedAt: DateTime.now(),
+			}),
+		}));
+		const before = await countsIn(tenant);
+
+		const response = await client
+			.post(bookUrl)
+			.form({
+				clientId: anonymous.id,
+				artistId: sita.id,
+				date: dayFromNow(3),
+				startTime: "14:00",
+				hours: "2",
+				brief: "A rose",
+				priceKind: "none",
+			})
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		response.assertHeader("location", newUrl());
+		response.assertFlashMessage(
+			"error",
+			"This client's details were deleted. Look the number up again.",
+		);
+		assert.deepEqual(await countsIn(tenant), before);
 	});
 });

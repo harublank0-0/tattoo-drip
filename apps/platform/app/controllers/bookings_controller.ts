@@ -1,16 +1,23 @@
 import { inject } from "@adonisjs/core";
 import type { HttpContext } from "@adonisjs/core/http";
+import { errors } from "@vinejs/vine";
 import { DateTime } from "luxon";
 import { tenantContext } from "#middleware/tenant_middleware";
+import { ClientRuleError } from "#modules/clients/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ClientService from "#modules/clients/services/client_service";
+import { BookingRuleError } from "#modules/projects/errors";
 import { todayIn } from "#modules/projects/quotes";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
-import BookingService from "#modules/projects/services/booking_service";
+import BookingService, {
+	type Booking,
+	type DirectBooking,
+} from "#modules/projects/services/booking_service";
 import {
 	bookingValidator,
 	toBookingInput,
 } from "#modules/projects/validators/booking";
+import { SessionOverlapError } from "#modules/scheduling/errors";
 import { sessionTimeText } from "#modules/scheduling/times";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { normalizePhone, PHONE_MESSAGE } from "#validators/phone";
@@ -63,11 +70,13 @@ export default class BookingsController {
 		const { tenant, membership } = tenantContext(ctx);
 		const form = await ctx.request.validateUsing(bookingValidator);
 		const booking = toBookingInput(form, tenant.timezone);
-		const { project, session, client, artist } = await this.bookings.book(
-			tenant,
-			membership,
-			booking,
-		);
+		let booked: Booking;
+		try {
+			booked = await this.bookings.book(tenant, membership, booking);
+		} catch (error) {
+			return this.refuse(ctx, error, booking);
+		}
+		const { project, session, client, artist } = booked;
 
 		ctx.session.flash(
 			"success",
@@ -76,6 +85,62 @@ export default class BookingsController {
 		return ctx.response
 			.redirect()
 			.toRoute("tenant.projects.show", { tenant: tenant.slug, id: project.id });
+	}
+
+	/**
+	 * What the page shows for a refused booking: a field error, or back to
+	 * the lookup for a client whose details were deleted. The booking's
+	 * savepoint was already rolled back, so these reads are safe and nothing
+	 * was saved. Anything else (another studio's client: a 404) goes on up.
+	 */
+	private async refuse(
+		ctx: HttpContext,
+		error: unknown,
+		booking: DirectBooking,
+	) {
+		const { tenant, membership } = tenantContext(ctx);
+		if (error instanceof SessionOverlapError) {
+			const artist = (
+				await this.bookings.bookableArtists(tenant, membership)
+			).find(({ id }) => id === booking.artistId);
+			throw fieldError(
+				"startTime",
+				`${artist?.name ?? "The artist"} already has a session at that time. Pick another time.`,
+				"overlap",
+			);
+		}
+		if (
+			error instanceof ClientRuleError &&
+			error.reason === "phone_taken" &&
+			booking.client.kind === "new"
+		) {
+			const holder = await this.clients.findByPhone(
+				tenant,
+				booking.client.phone,
+			);
+			throw fieldError(
+				"phone",
+				`This number now belongs to ${holder?.name ?? "another client"}. Check the client and book again.`,
+				"unique",
+			);
+		}
+		if (error instanceof BookingRuleError) {
+			if (error.reason === "artist_unavailable") {
+				throw fieldError(
+					"artistId",
+					"Choose an artist from the list.",
+					"exists",
+				);
+			}
+			ctx.session.flash(
+				"error",
+				"This client's details were deleted. Look the number up again.",
+			);
+			return ctx.response
+				.redirect()
+				.toRoute("tenant.projects.create", { tenant: tenant.slug });
+		}
+		throw error;
 	}
 
 	/**
@@ -94,4 +159,9 @@ export default class BookingsController {
 			? { state: "found", phone, client: { id: client.id, name: client.name } }
 			: { state: "new", phone };
 	}
+}
+
+/** A field error shown next to `field`, like the validator's own. */
+function fieldError(field: string, message: string, rule: string) {
+	return new errors.E_VALIDATION_ERROR([{ field, message, rule }]);
 }
