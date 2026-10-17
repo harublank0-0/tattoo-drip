@@ -1,5 +1,5 @@
 import { test } from "@japa/runner";
-import { DateTime } from "luxon";
+import { DateTime, Settings } from "luxon";
 import { localDateTime, sessionTimeText } from "#modules/scheduling/times";
 
 const KTM = "Asia/Kathmandu";
@@ -21,13 +21,35 @@ test.group("localDateTime", () => {
 		assert.isNull(localDateTime("2026-02-30", "10:00", KTM));
 	});
 
-	test("a time the clocks pass twice is the first one", ({ assert }) => {
-		// 1 November 2026: New York's clocks go back from 02:00 to 01:00.
-		assert.equal(
-			localDateTime("2026-11-01", "01:30", NY)?.toISO(),
-			"2026-11-01T01:30:00.000-04:00",
-		);
-	});
+	// Luxon guesses a repeated or skipped hour from the zone's offset at
+	// `Settings.now`, so these run under a winter and a summer clock.
+	for (const [season, now] of [
+		["winter", "2027-01-15T12:00:00Z"],
+		["summer", "2026-07-15T12:00:00Z"],
+	] as const) {
+		test(`a time the clocks pass twice is the first one (${season} clock)`, ({
+			assert,
+			cleanup,
+		}) => {
+			const realNow = Settings.now;
+			cleanup(() => {
+				Settings.now = realNow;
+			});
+			const frozen = new Date(now).getTime();
+			Settings.now = () => frozen;
+			// 1 November 2026: New York's clocks go back from 02:00 to 01:00.
+			assert.equal(
+				localDateTime("2026-11-01", "01:30", NY)?.toUTC().toISO(),
+				"2026-11-01T05:30:00.000Z",
+			);
+			// The hour after the fold is normal time, and the gap stays refused.
+			assert.equal(
+				localDateTime("2026-11-01", "02:30", NY)?.toUTC().toISO(),
+				"2026-11-01T07:30:00.000Z",
+			);
+			assert.isNull(localDateTime("2027-03-14", "02:30", NY));
+		});
+	}
 });
 
 test.group("sessionTimeText", () => {

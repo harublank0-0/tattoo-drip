@@ -14,7 +14,11 @@ export function localDateTime(
 	const local = `${date}T${time}`;
 	const instant = DateTime.fromISO(local, { zone: timezone });
 	if (!instant.isValid) return null;
-	return instant.toFormat("yyyy-MM-dd'T'HH:mm") === local ? instant : null;
+	if (instant.toFormat("yyyy-MM-dd'T'HH:mm") !== local) return null;
+	// Luxon settles a repeated hour by the zone's offset at `Settings.now`, so
+	// the first occurrence is picked here, whatever season the booking is made in.
+	const [first] = instant.getPossibleOffsets();
+	return first ?? instant;
 }
 
 /**
