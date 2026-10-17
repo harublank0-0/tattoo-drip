@@ -63,11 +63,10 @@ export default function ClientShow({
 						)}
 						{!client.anonymized && (
 							<Link
-								// Task 6 adds tenant.clients.edit; until then the path is built.
-								href={`${urlFor("tenant.clients.show", {
+								href={urlFor("tenant.clients.edit", {
 									tenant: tenant.slug,
 									id: client.id,
-								})}/edit`}
+								})}
 								className={buttonVariants()}
 							>
 								Edit details

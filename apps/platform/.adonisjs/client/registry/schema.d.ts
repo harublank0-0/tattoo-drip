@@ -379,6 +379,30 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/clients_controller').default['show']>>>
     }
   }
+  'tenant.clients.edit': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/clients/:id/edit'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/clients_controller').default['edit']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/clients_controller').default['edit']>>>
+    }
+  }
+  'tenant.clients.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/clients/:id'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/clients/validators/client').updateClientValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/clients/validators/client').updateClientValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/clients_controller').default['update']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/clients_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
   'tenant.projects.index': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/projects'

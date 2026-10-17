@@ -1,12 +1,16 @@
 import { inject } from "@adonisjs/core";
 import type { HttpContext } from "@adonisjs/core/http";
+import { errors } from "@vinejs/vine";
 import type { DateTime } from "luxon";
 import { tenantContext } from "#middleware/tenant_middleware";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
 import { chatLinks, telLink } from "#modules/clients/contact_links";
+import { ClientRuleError } from "#modules/clients/errors";
+import type Client from "#modules/clients/models/client";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ClientService from "#modules/clients/services/client_service";
+import { updateClientValidator } from "#modules/clients/validators/client";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import InquiryService from "#modules/inquiries/services/inquiry_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -125,6 +129,48 @@ export default class ClientsController {
 			),
 		});
 	}
+
+	async edit(ctx: HttpContext) {
+		const { tenant } = tenantContext(ctx);
+		const client = await this.clients.findFor(tenant, ctx.params.id);
+		if (client.anonymizedAt) return refuseAnonymized(ctx, tenant, client);
+
+		return ctx.inertia.render("clients/edit", {
+			client: {
+				id: client.id,
+				name: client.name,
+				phone: client.phone ?? "",
+				email: client.email,
+				notes: client.notes,
+			},
+		});
+	}
+
+	async update(ctx: HttpContext) {
+		const { tenant } = tenantContext(ctx);
+		const client = await this.clients.findFor(tenant, ctx.params.id);
+		const input = await ctx.request.validateUsing(updateClientValidator);
+		try {
+			await this.clients.update(tenant, client, input);
+		} catch (error) {
+			if (!(error instanceof ClientRuleError)) throw error;
+			if (error.reason === "anonymized") {
+				return refuseAnonymized(ctx, tenant, client);
+			}
+			const holder = await this.clients.findByPhone(tenant, input.phone);
+			throw new errors.E_VALIDATION_ERROR([
+				{
+					field: "phone",
+					message: `Another client already has this number: ${holder?.name ?? "another client"}.`,
+					rule: "unique",
+				},
+			]);
+		}
+		ctx.session.flash("success", "Client updated.");
+		return ctx.response
+			.redirect()
+			.toRoute("tenant.clients.show", { tenant: tenant.slug, id: client.id });
+	}
 }
 
 /** The latest of these times (the first one is always set). */
@@ -133,4 +179,19 @@ function latest(times: [DateTime, ...(DateTime | undefined)[]]): DateTime {
 		(max, time) => (time && time > max ? time : max),
 		times[0],
 	);
+}
+
+/** Back to the profile: a client whose details were deleted stays deleted. */
+function refuseAnonymized(
+	ctx: HttpContext,
+	tenant: { slug: string },
+	client: Client,
+) {
+	ctx.session.flash(
+		"error",
+		"This client's details were deleted and can't be edited.",
+	);
+	return ctx.response
+		.redirect()
+		.toRoute("tenant.clients.show", { tenant: tenant.slug, id: client.id });
 }

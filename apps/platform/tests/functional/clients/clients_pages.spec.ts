@@ -1,6 +1,8 @@
 import testUtils from "@adonisjs/core/services/test_utils";
+import type { ApiClient } from "@japa/api-client";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
+import Client from "#modules/clients/models/client";
 import {
 	makeArtist,
 	makeClient,
@@ -9,6 +11,7 @@ import {
 	makeReferenceImage,
 } from "#tests/helpers/pipeline";
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
+import { assertValidationError } from "#tests/helpers/validation";
 
 const clientsUrl = (path = "") => `/t/black-needle/clients${path}`;
 
@@ -217,5 +220,161 @@ test.group("Client profile", (group) => {
 			.withInertia()
 			.loginAs(artist);
 		response.assertStatus(404);
+	});
+});
+
+test.group("Editing a client", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	const save = (http: ApiClient, id: string, form: Record<string, string>) =>
+		http
+			.put(clientsUrl(`/${id}`))
+			.form(form)
+			.withCsrfToken();
+
+	test("the edit page shows the current details", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const sita = await inTenant(tenant, () =>
+			makeClient(tenant, { name: "Sita", phone: "+9779812345678" }),
+		);
+
+		const response = await client
+			.get(clientsUrl(`/${sita.id}/edit`))
+			.withInertia()
+			.loginAs(owner);
+
+		response.assertStatus(200);
+		response.assertInertiaComponent("clients/edit");
+		assert.deepInclude(response.inertiaProps.client, {
+			id: sita.id,
+			name: "Sita",
+			phone: "+9779812345678",
+		});
+	});
+
+	test("saving normalizes the phone and returns to the profile", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const sita = await inTenant(tenant, () => makeClient(tenant));
+
+		const response = await save(client, sita.id, {
+			name: "  Sita Rai ",
+			phone: "9812345678",
+			email: "",
+			notes: "Prefers evenings.",
+		})
+			.loginAs(owner)
+			.redirects(0);
+
+		response.assertHeader("location", clientsUrl(`/${sita.id}`));
+		response.assertFlashMessage("success", "Client updated.");
+		const saved = await inTenant(tenant, () => Client.findOrFail(sita.id));
+		assert.deepEqual(
+			[saved.name, saved.phone, saved.email, saved.notes],
+			["Sita Rai", "+9779812345678", null, "Prefers evenings."],
+		);
+	});
+
+	test("another client's number is a field error naming them", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const sita = await inTenant(tenant, async () => {
+			await makeClient(tenant, { name: "Ram Thapa", phone: "+9779801112223" });
+			return makeClient(tenant, { name: "Sita" });
+		});
+
+		const response = await save(client, sita.id, {
+			name: "Sita",
+			phone: "+9779801112223",
+			email: "",
+			notes: "",
+		})
+			.loginAs(owner)
+			.redirects(0);
+
+		assertValidationError(
+			response,
+			"phone",
+			"Another client already has this number: Ram Thapa.",
+		);
+		const saved = await inTenant(tenant, () => Client.findOrFail(sita.id));
+		assert.notEqual(saved.phone, "+9779801112223");
+	});
+
+	test("an invalid email is a field error", async ({ client }) => {
+		const { owner, tenant } = await studioWithOwner();
+		const sita = await inTenant(tenant, () => makeClient(tenant));
+
+		const response = await save(client, sita.id, {
+			name: "Sita",
+			phone: "9812345678",
+			email: "not-an-email",
+			notes: "",
+		})
+			.loginAs(owner)
+			.redirects(0);
+
+		assertValidationError(response, "email");
+	});
+
+	test("an anonymized client can't be edited", async ({ client }) => {
+		const { owner, tenant } = await studioWithOwner();
+		const gone = await inTenant(tenant, () =>
+			makeClient(tenant, { phone: null, anonymizedAt: DateTime.utc() }),
+		);
+
+		const page = await client
+			.get(clientsUrl(`/${gone.id}/edit`))
+			.loginAs(owner)
+			.redirects(0);
+		page.assertHeader("location", clientsUrl(`/${gone.id}`));
+		page.assertFlashMessage(
+			"error",
+			"This client's details were deleted and can't be edited.",
+		);
+
+		const put = await save(client, gone.id, {
+			name: "Back",
+			phone: "9812345678",
+			email: "",
+			notes: "",
+		})
+			.loginAs(owner)
+			.redirects(0);
+		put.assertHeader("location", clientsUrl(`/${gone.id}`));
+		put.assertFlashMessage(
+			"error",
+			"This client's details were deleted and can't be edited.",
+		);
+	});
+
+	test("artists get a 404 on edit and save", async ({ client }) => {
+		const { tenant } = await studioWithOwner();
+		const artist = await artistIn(tenant);
+		const sita = await inTenant(tenant, () => makeClient(tenant));
+
+		(
+			await client
+				.get(clientsUrl(`/${sita.id}/edit`))
+				.withInertia()
+				.loginAs(artist)
+		).assertStatus(404);
+		(
+			await save(client, sita.id, {
+				name: "X",
+				phone: "9812345678",
+				email: "",
+				notes: "",
+			})
+				.loginAs(artist)
+				.redirects(0)
+		).assertStatus(404);
 	});
 });

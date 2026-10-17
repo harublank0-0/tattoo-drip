@@ -192,6 +192,18 @@ const routes = {
     tokens: [{"old":"/t/:tenant/clients/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/clients/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/clients/:id","type":0,"val":"clients","end":""},{"old":"/t/:tenant/clients/:id","type":1,"val":"id","end":""}],
     types: placeholder as Registry['tenant.clients.show']['types'],
   },
+  'tenant.clients.edit': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/clients/:id/edit',
+    tokens: [{"old":"/t/:tenant/clients/:id/edit","type":0,"val":"t","end":""},{"old":"/t/:tenant/clients/:id/edit","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/clients/:id/edit","type":0,"val":"clients","end":""},{"old":"/t/:tenant/clients/:id/edit","type":1,"val":"id","end":""},{"old":"/t/:tenant/clients/:id/edit","type":0,"val":"edit","end":""}],
+    types: placeholder as Registry['tenant.clients.edit']['types'],
+  },
+  'tenant.clients.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/clients/:id',
+    tokens: [{"old":"/t/:tenant/clients/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/clients/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/clients/:id","type":0,"val":"clients","end":""},{"old":"/t/:tenant/clients/:id","type":1,"val":"id","end":""}],
+    types: placeholder as Registry['tenant.clients.update']['types'],
+  },
   'tenant.projects.index': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/projects',

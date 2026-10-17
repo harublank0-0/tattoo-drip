@@ -156,6 +156,14 @@ router
 					.get(":id", [controllers.Clients, "show"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.clients.show");
+				router
+					.get(":id/edit", [controllers.Clients, "edit"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.clients.edit");
+				router
+					.put(":id", [controllers.Clients, "update"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.clients.update");
 			})
 			.prefix("/clients")
 			.use(middleware.role({ allow: ["owner"] }));

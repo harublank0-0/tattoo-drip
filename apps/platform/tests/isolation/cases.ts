@@ -415,4 +415,26 @@ export const isolationCases: IsolationCase[] = [
 		ownStatus: 200,
 		snapshot: clientRows,
 	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/clients/:id/edit",
+		resource: "client",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: clientRows,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/clients/:id",
+		resource: "client",
+		actor: "owner",
+		body: (own) => ({
+			name: "Renamed client",
+			phone: own.client.phone ?? "",
+			email: "",
+			notes: "",
+		}),
+		ownStatus: 302,
+		snapshot: clientRows,
+	},
 ];
