@@ -67,6 +67,19 @@ export default class ArtistService {
 	}
 
 	/**
+	 * The tenant's live, visible profiles, by name, ignoring case: the
+	 * artists a studio page shows and an inquiry may name (TAT-51), open or
+	 * closed for inquiries.
+	 */
+	async listVisible(tenant: TenantRef): Promise<Artist[]> {
+		return Artist.query()
+			.where("tenant_id", tenant.id)
+			.where("visible", true)
+			.orderByRaw("lower(name) asc")
+			.orderBy("id", "asc");
+	}
+
+	/**
 	 * The tenant's live profile with this id. An unknown id, a deleted
 	 * profile and another tenant's profile all throw E_ROW_NOT_FOUND (a 404),
 	 * so callers can't tell them apart.

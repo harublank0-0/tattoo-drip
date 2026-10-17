@@ -425,3 +425,51 @@ test.group("ArtistService profiles", (group) => {
 		assert.isTrue(artist.acceptingInquiries);
 	});
 });
+
+test.group("ArtistService.listVisible", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("lists the live, visible profiles by name, closed ones included", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("visible-needle-51");
+
+		const listed = await inTenant(tenant, async () => {
+			await Artist.create({
+				tenantId: tenant.id,
+				name: "zara",
+				slug: "zara",
+				acceptingInquiries: false,
+			});
+			await Artist.create({ tenantId: tenant.id, name: "Bina", slug: "bina" });
+			await Artist.create({
+				tenantId: tenant.id,
+				name: "Hidden",
+				slug: "hidden",
+				visible: false,
+			});
+			const gone = await Artist.create({
+				tenantId: tenant.id,
+				name: "Gone",
+				slug: "gone",
+			});
+			await gone.softDelete();
+			return names(await artists.listVisible(tenant));
+		});
+
+		assert.deepEqual(listed, ["Bina", "zara"]);
+	});
+
+	test("another studio's context sees none of them", async ({ assert }) => {
+		const { tenant } = await studioWithOwner("visible-a-51");
+		const other = await studioWithOwner("visible-b-51");
+		await inTenant(tenant, () =>
+			Artist.create({ tenantId: tenant.id, name: "Bina", slug: "bina" }),
+		);
+
+		assert.lengthOf(
+			await inTenant(other.tenant, () => artists.listVisible(tenant)),
+			0,
+		);
+	});
+});
