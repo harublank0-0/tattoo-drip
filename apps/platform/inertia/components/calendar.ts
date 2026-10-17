@@ -51,6 +51,8 @@ export type CalendarPageProps = {
 		selected: string | null;
 		artists: { id: string; name: string }[];
 	} | null;
+	/** Whether "Book session" shows: owners, and artists with a profile. */
+	canBook: boolean;
 	days: CalendarDay[];
 };
 

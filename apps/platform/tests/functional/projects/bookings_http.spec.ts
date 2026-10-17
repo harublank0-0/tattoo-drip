@@ -93,6 +93,7 @@ test.group("Booking page", (group) => {
 			max: DateTime.fromISO(dayFromNow(0))
 				.plus({ years: 1 })
 				.toFormat("yyyy-MM-dd"),
+			initial: dayFromNow(0),
 		});
 	});
 
@@ -216,6 +217,42 @@ test.group("Booking page", (group) => {
 		assert.deepEqual(props.artists, []);
 		assert.isNull(props.lookup);
 		assert.notInclude(JSON.stringify(props), "Maya");
+	});
+
+	test("?date= sets the session day when it is bookable, else today", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		await inTenant(tenant, () => makeArtist(tenant));
+		const initial = async (query: string) =>
+			(
+				await client
+					.get(`/t/black-needle/projects/new${query}`)
+					.withInertia()
+					.loginAs(owner)
+			).inertiaProps.dates.initial;
+		const today = dayFromNow(0);
+		const lastDay = DateTime.fromISO(today)
+			.plus({ years: 1 })
+			.toFormat("yyyy-MM-dd");
+
+		assert.equal(await initial(`?date=${dayFromNow(3)}`), dayFromNow(3));
+		assert.equal(await initial(`?date=${lastDay}`), lastDay);
+		// The phone lookup keeps it.
+		assert.equal(
+			await initial(`?phone=9812345678&date=${dayFromNow(3)}`),
+			dayFromNow(3),
+		);
+		for (const date of [
+			dayFromNow(-1),
+			DateTime.fromISO(lastDay).plus({ days: 1 }).toFormat("yyyy-MM-dd"),
+			"2026-02-30",
+			"soon",
+		]) {
+			assert.equal(await initial(`?date=${date}`), today, date);
+		}
+		assert.equal(await initial(""), today);
 	});
 });
 

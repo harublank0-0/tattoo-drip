@@ -66,6 +66,7 @@ export default class CalendarController {
 							artists: artists.map(({ id, name }) => ({ id, name })),
 						}
 					: null,
+			canBook: membership.role === "owner" || scope.kind === "artist",
 			days: days.map((day) => ({
 				date: day,
 				label: dayLabel(day),

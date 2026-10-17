@@ -1,6 +1,7 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
+import type User from "#models/user";
 import Artist from "#modules/artists/models/artist";
 import { todayIn } from "#modules/projects/quotes";
 import type Tenant from "#modules/tenancy/models/tenant";
@@ -436,5 +437,21 @@ test.group("Calendar page", (group) => {
 			.withInertia()
 			.loginAs(user);
 		other.assertStatus(404);
+	});
+
+	test("Book session shows for owners and for artists with a profile", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studio();
+		const { user } = await linkedArtist(tenant);
+		const unlinked = await artistIn(tenant, "ram@example.com");
+		const canBook = async (member: User) =>
+			(await client.get(calendarUrl()).withInertia().loginAs(member))
+				.inertiaProps.canBook;
+
+		assert.isTrue(await canBook(owner));
+		assert.isTrue(await canBook(user));
+		assert.isFalse(await canBook(unlinked));
 	});
 });

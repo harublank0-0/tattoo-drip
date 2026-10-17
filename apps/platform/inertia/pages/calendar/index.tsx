@@ -49,6 +49,7 @@ export default function CalendarIndex({
 	next,
 	scope,
 	artistFilter,
+	canBook,
 	days,
 }: CalendarPageProps) {
 	const tenant = useTenant();
@@ -88,7 +89,20 @@ export default function CalendarIndex({
 	);
 
 	return (
-		<Page title="Calendar" description={isOwner ? undefined : "Your sessions"}>
+		<Page
+			title="Calendar"
+			description={isOwner ? undefined : "Your sessions"}
+			actions={
+				canBook ? (
+					<Link
+						href={`${urlFor("tenant.projects.create", { tenant: tenant.slug })}?date=${date}`}
+						className={cn(buttonVariants(), "h-11")}
+					>
+						Book session
+					</Link>
+				) : undefined
+			}
+		>
 			<div className="flex max-w-3xl flex-col gap-6">
 				<Toolbar
 					view={view}
