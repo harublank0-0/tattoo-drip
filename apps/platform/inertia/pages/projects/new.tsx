@@ -237,7 +237,7 @@ function ClientCard({
 							<Badge variant="outline">New client</Badge>
 						)}
 					</div>
-					{problem && <FieldError>{problem}</FieldError>}
+					{problem && <FieldError id="client-error">{problem}</FieldError>}
 					{lookup.state === "found" ? (
 						<>
 							<input type="hidden" name="clientId" value={lookup.client.id} />
@@ -282,6 +282,7 @@ function ClientCard({
 						<Link
 							route="tenant.projects.create"
 							routeParams={{ tenant: tenant.slug }}
+							aria-describedby={problem ? "client-error" : undefined}
 							className={buttonVariants({ variant: "outline", size: "sm" })}
 						>
 							Change number
@@ -324,11 +325,17 @@ function SessionCard({
 			<CardContent>
 				<FieldGroup>
 					{own ? (
-						<Field data-invalid={!!errors.artistId}>
-							<FieldTitle>Artist</FieldTitle>
+						<Field
+							data-invalid={!!errors.artistId}
+							aria-labelledby="artist-title"
+							aria-describedby={errorId("artistId", errors)}
+						>
+							<FieldTitle id="artist-title">Artist</FieldTitle>
 							<p className="text-sm">{own.name} (you)</p>
 							<input type="hidden" name="artistId" value={own.id} />
-							{errors.artistId && <FieldError>{errors.artistId}</FieldError>}
+							{errors.artistId && (
+								<FieldError id="artistId-error">{errors.artistId}</FieldError>
+							)}
 						</Field>
 					) : (
 						<Field data-invalid={!!errors.artistId}>
@@ -460,6 +467,8 @@ function PriceCard({
 						<RadioGroup
 							name="priceKind"
 							value={priceKind}
+							aria-invalid={!!errors.priceKind}
+							aria-describedby={errorId("priceKind", errors)}
 							onValueChange={(value) =>
 								onChange(
 									value === "fixed" || value === "hourly" ? value : "none",
@@ -478,7 +487,9 @@ function PriceCard({
 								</FieldLabel>
 							))}
 						</RadioGroup>
-						{errors.priceKind && <FieldError>{errors.priceKind}</FieldError>}
+						{errors.priceKind && (
+							<FieldError id="priceKind-error">{errors.priceKind}</FieldError>
+						)}
 					</FieldSet>
 
 					{priceKind === "fixed" && (
