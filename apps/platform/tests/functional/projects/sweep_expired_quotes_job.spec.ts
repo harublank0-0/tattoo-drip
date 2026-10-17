@@ -20,6 +20,7 @@ import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
 import { processQueued, registerJob } from "#tests/helpers/worker";
 
 type TenantRef = { id: string };
+type ExpirePayload = { tenantId: string; projectId: string; quoteId: string };
 
 /** The test's global transaction, which the test worker reads. */
 const trx = () => db.connection() as TransactionClientContract;
@@ -72,7 +73,6 @@ async function runSweep() {
 
 test.group("SweepExpiredQuotesJob", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
-	group.each.setup(() => registerJob(SweepExpiredQuotesJob));
 	group.each.setup(() => registerJob(ExpireQuoteJob));
 	group.each.teardown(() => queue.restore());
 
@@ -115,19 +115,47 @@ test.group("SweepExpiredQuotesJob", (group) => {
 			const project = await makeProject(a.tenant, await makeClient(a.tenant), {
 				status: "deposit_pending",
 			});
-			await makeQuote(a.tenant, project, { expiresAt: hourAgo() });
+			const quote = await makeQuote(a.tenant, project, {
+				expiresAt: hourAgo(),
+			});
 			await makePayment(a.tenant, project, {
 				status: "verified",
 				verifiedAt: DateTime.utc(),
 			});
-			return project;
+			return { project, quote };
 		});
+		// A studio outside the test: its missed expiries are candidates too, the
+		// way the dev database's rows are, and must not run here.
+		const c = await studioWithOwner("studio-c", "Studio C");
+		const foreign = await projectWithQuote(c.tenant, "quoted");
 
-		await dispatchInTransaction(SweepExpiredQuotesJob.dispatch({}), trx());
+		// The sweep lists every committed candidate, the dev database's included,
+		// and the worker would run a job for each (and stop after 100 cycles).
+		// So run the sweep against the fake queue, keep the jobs of this test's
+		// studios, and send only those through the worker.
+		const fake = queue.fake();
+		await runSweep();
+		const mine = fake
+			.getPushedJobs()
+			.map(({ job }) => job)
+			.filter(({ name }) => name === ExpireQuoteJob.name)
+			.map(({ payload }) => payload as ExpirePayload)
+			.filter(({ tenantId }) => [a.tenant.id, b.tenant.id].includes(tenantId));
+		queue.restore();
+		assert.sameDeepMembers(mine, [
+			payloadOf(a.tenant, missedA),
+			payloadOf(b.tenant, missedB),
+			payloadOf(a.tenant, paid),
+		]);
+
+		for (const payload of mine) {
+			await dispatchInTransaction(ExpireQuoteJob.dispatch(payload), trx());
+		}
 		await processQueued();
 
 		assert.equal(await statusIn(a.tenant, missedA.project), "cancelled");
 		assert.equal(await statusIn(b.tenant, missedB.project), "cancelled");
-		assert.equal(await statusIn(a.tenant, paid), "deposit_pending");
+		assert.equal(await statusIn(a.tenant, paid.project), "deposit_pending");
+		assert.equal(await statusIn(c.tenant, foreign.project), "quoted");
 	});
 });
