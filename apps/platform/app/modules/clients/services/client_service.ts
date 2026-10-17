@@ -9,12 +9,17 @@ type TenantRef = Pick<Tenant, "id">;
 /** Clients per page on the clients list. */
 export const CLIENTS_PER_PAGE = 25;
 
+/** The furthest page ever asked of the database (a typed-in huge number is not an offset). */
+const MAX_PAGE = 100_000;
+
 /** The partial unique index: one live client per phone per tenant. */
 const PHONE_INDEX = "clients_tenant_phone_live_unique";
 
 export type ClientPage = {
 	clients: Client[];
 	total: number;
+	/** The page these clients are from: the one asked for, kept within the pages that exist. */
+	page: number;
 	lastPage: number;
 };
 
@@ -67,12 +72,35 @@ export default class ClientService {
 	 * Live clients, newest first, 25 per page. A search matches part of the
 	 * name in any case (literally: `%` and `_` are not wildcards) or, with
 	 * at least 3 digits in it, part of the phone's digits however the
-	 * number was typed ("981-234", "+977 981…").
+	 * number was typed ("981-234", "+977 981…"). A page past the last one
+	 * (a bookmark after clients were deleted, a typed-in number) gives the
+	 * last page instead of an empty one.
 	 */
 	async list(
 		tenant: TenantRef,
 		{ search, page }: { search: string; page: number },
 	): Promise<ClientPage> {
+		const wanted = Math.min(Math.max(1, Math.trunc(page) || 1), MAX_PAGE);
+		const find = (at: number) =>
+			this.searchQuery(tenant, search)
+				.orderBy("created_at", "desc")
+				.orderBy("id", "desc")
+				.paginate(at, CLIENTS_PER_PAGE);
+
+		let result = await find(wanted);
+		if (wanted > result.lastPage && result.total > 0) {
+			result = await find(result.lastPage);
+		}
+		return {
+			clients: result.all(),
+			total: result.total,
+			page: Math.max(1, Math.min(wanted, result.lastPage)),
+			lastPage: result.lastPage,
+		};
+	}
+
+	/** The tenant's live clients, narrowed by the search (see `list`). */
+	private searchQuery(tenant: TenantRef, search: string) {
 		const query = Client.query().where("tenant_id", tenant.id);
 		const term = search.trim();
 		if (term) {
@@ -86,15 +114,7 @@ export default class ClientService {
 				}
 			});
 		}
-		const result = await query
-			.orderBy("created_at", "desc")
-			.orderBy("id", "desc")
-			.paginate(page, CLIENTS_PER_PAGE);
-		return {
-			clients: result.all(),
-			total: result.total,
-			lastPage: result.lastPage,
-		};
+		return query;
 	}
 
 	/**

@@ -57,6 +57,33 @@ test.group("Clients list", (group) => {
 		assert.equal(props.clients[0].projects, 0);
 	});
 
+	test("a page past the end shows the last page; a garbage page number shows the first", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		await inTenant(tenant, async () => {
+			for (let i = 0; i < 26; i++) {
+				await makeClient(tenant, { name: `Client ${i}` });
+			}
+		});
+
+		const at = async (query: string) =>
+			client.get(clientsUrl(query)).withInertia().loginAs(owner);
+
+		const past = await at("?page=9");
+		past.assertStatus(200);
+		assert.equal(past.inertiaProps.page.current, 2);
+		assert.lengthOf(past.inertiaProps.clients, 1);
+
+		const garbage = await at("?page=abc");
+		assert.equal(garbage.inertiaProps.page.current, 1);
+
+		const absurd = await at("?page=99999999999999999999");
+		absurd.assertStatus(200);
+		assert.equal(absurd.inertiaProps.page.current, 2);
+	});
+
 	test("?q= searches by name or phone", async ({ client, assert }) => {
 		const { owner, tenant } = await studioWithOwner();
 		await inTenant(tenant, async () => {

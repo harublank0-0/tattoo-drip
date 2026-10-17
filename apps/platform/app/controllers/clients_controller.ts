@@ -42,10 +42,12 @@ export default class ClientsController {
 		const search = typeof query.q === "string" ? query.q.trim() : "";
 		const page = Math.max(1, Number.parseInt(String(query.page ?? 1), 10) || 1);
 
-		const { clients, total, lastPage } = await this.clients.list(tenant, {
-			search,
-			page,
-		});
+		const {
+			clients,
+			total,
+			page: current,
+			lastPage,
+		} = await this.clients.list(tenant, { search, page });
 		const ids = clients.map(({ id }) => id);
 		const counts = await this.projects.countsForClients(tenant, ids);
 		const projectChanges = await this.projects.lastChangeForClients(
@@ -70,7 +72,7 @@ export default class ClientsController {
 					tenant.timezone,
 				),
 			})),
-			page: { current: page, last: lastPage, total },
+			page: { current, last: lastPage, total },
 		});
 	}
 

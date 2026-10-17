@@ -52,6 +52,35 @@ test.group("ClientService.list", (group) => {
 		});
 	});
 
+	test("a page past the end gives the last page; an absurd page number still works", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			for (let i = 0; i < CLIENTS_PER_PAGE + 1; i++) {
+				await makeClient(tenant, { name: `Client ${i}` });
+			}
+
+			const first = await clients.list(tenant, { search: "", page: 1 });
+			assert.equal(first.page, 1);
+
+			const past = await clients.list(tenant, { search: "", page: 9 });
+			assert.equal(past.page, 2);
+			assert.lengthOf(past.clients, 1);
+
+			const absurd = await clients.list(tenant, { search: "", page: 1e20 });
+			assert.equal(absurd.page, 2);
+			assert.lengthOf(absurd.clients, 1);
+
+			const none = await clients.list(tenant, {
+				search: "nobody-at-all",
+				page: 4,
+			});
+			assert.deepEqual([none.clients.length, none.total, none.page], [0, 0, 1]);
+		});
+	});
+
 	test("searches part of a name in any case, literally", async ({ assert }) => {
 		const { tenant } = await studioWithOwner();
 
