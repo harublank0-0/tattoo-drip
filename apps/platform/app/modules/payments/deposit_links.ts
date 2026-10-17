@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomBytes, randomInt } from "node:crypto";
+import type { DepositLinkRuleReason } from "#modules/payments/errors";
 import env from "#start/env";
 
 /** How long a deposit link works after it is made or replaced (TAT-65). */
@@ -95,3 +96,13 @@ export function depositMessage({
 	const greeting = firstName ? `Hi ${firstName}` : "Hi";
 	return `${greeting}, please pay your deposit of ${dueText} to ${studioName}. Write ${referenceCode} in the payment remark, then send a screenshot of the payment on this page:\n${url}`;
 }
+
+/** Why an owner can't make a deposit link now: the project page and its flash say it. */
+export const DEPOSIT_LINK_PROBLEMS: Record<DepositLinkRuleReason, string> = {
+	not_deposit_pending:
+		"A deposit link can only be made while the project waits for its deposit.",
+	quote_expired: "The quote has expired: revise it first.",
+	nothing_due: "Nothing is left to pay on this deposit.",
+	no_payment_methods:
+		"Show a payment method on the deposit page first (Settings, Payments).",
+};

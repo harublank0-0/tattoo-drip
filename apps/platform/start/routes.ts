@@ -220,6 +220,11 @@ router
 					.put(":id/artist", [controllers.ProjectChanges, "artist"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.projects.artist.update");
+				// Owners only: DepositLinkService gives anyone else a 404 (TAT-65).
+				router
+					.post(":id/deposit-link", [controllers.DepositLinks, "store"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.projects.deposit_link.store");
 			})
 			.prefix("/projects")
 			.use(middleware.role({ allow: ["owner", "artist"] }));

@@ -9,6 +9,7 @@ export const controllers = {
   Calendar: () => import('#controllers/calendar_controller'),
   Clients: () => import('#controllers/clients_controller'),
   Dashboard: () => import('#controllers/dashboard_controller'),
+  DepositLinks: () => import('#controllers/deposit_links_controller'),
   DepositSettings: () => import('#controllers/deposit_settings_controller'),
   Inquiries: () => import('#controllers/inquiries_controller'),
   NewAccount: () => import('#controllers/new_account_controller'),

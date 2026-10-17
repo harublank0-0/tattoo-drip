@@ -81,6 +81,9 @@ export interface ApiDefinition {
       artist: {
         update: typeof routes['tenant.projects.artist.update']
       }
+      depositLink: {
+        store: typeof routes['tenant.projects.deposit_link.store']
+      }
     }
     calendar: {
       index: typeof routes['tenant.calendar.index']

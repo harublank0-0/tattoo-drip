@@ -535,6 +535,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/project_changes_controller').default['artist']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
+  'tenant.projects.deposit_link.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/projects/:id/deposit-link'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/deposit_links_controller').default['store']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/deposit_links_controller').default['store']>>>
+    }
+  }
   'tenant.calendar.index': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/calendar'

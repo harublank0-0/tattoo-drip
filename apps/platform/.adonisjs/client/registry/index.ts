@@ -270,6 +270,12 @@ const routes = {
     tokens: [{"old":"/t/:tenant/projects/:id/artist","type":0,"val":"t","end":""},{"old":"/t/:tenant/projects/:id/artist","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/projects/:id/artist","type":0,"val":"projects","end":""},{"old":"/t/:tenant/projects/:id/artist","type":1,"val":"id","end":""},{"old":"/t/:tenant/projects/:id/artist","type":0,"val":"artist","end":""}],
     types: placeholder as Registry['tenant.projects.artist.update']['types'],
   },
+  'tenant.projects.deposit_link.store': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/projects/:id/deposit-link',
+    tokens: [{"old":"/t/:tenant/projects/:id/deposit-link","type":0,"val":"t","end":""},{"old":"/t/:tenant/projects/:id/deposit-link","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/projects/:id/deposit-link","type":0,"val":"projects","end":""},{"old":"/t/:tenant/projects/:id/deposit-link","type":1,"val":"id","end":""},{"old":"/t/:tenant/projects/:id/deposit-link","type":0,"val":"deposit-link","end":""}],
+    types: placeholder as Registry['tenant.projects.deposit_link.store']['types'],
+  },
   'tenant.calendar.index': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/calendar',
