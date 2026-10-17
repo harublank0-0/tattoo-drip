@@ -5,12 +5,16 @@ import type Tenant from "#modules/tenancy/models/tenant";
 import type TenantMembership from "#modules/tenancy/models/tenant_membership";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import TenancyService from "#modules/tenancy/services/tenancy_service";
+import { withTenantSlug } from "#modules/tenancy/slugs";
 import { setRequestContext } from "#services/db_context";
 
 /**
  * Session key for the tenant the user opened last; /dashboard returns there.
  */
 export const LAST_TENANT_KEY = "last_tenant_slug";
+
+/** Methods that may follow an old slug to the current one. */
+const READS = new Set(["GET", "HEAD"]);
 
 declare module "@adonisjs/core/http" {
 	interface HttpContext {
@@ -27,8 +31,12 @@ declare module "@adonisjs/core/http" {
 /**
  * Resolves `:tenant` from the URL and checks the signed-in user's live
  * membership in it, on every request (no caching), so removing a member
- * or deleting a tenant takes effect immediately. Anything else is the same
- * 404 as an unknown URL, so a URL never reveals that a tenant exists.
+ * or deleting a tenant takes effect immediately. An old slug of one of the
+ * user's tenants (TAT-24) sends a GET or HEAD to the same URL under the
+ * current slug with a 302 (not 301: the studio can switch back, and a
+ * cached permanent redirect would then loop). Anything else, a write on an
+ * old slug included, is the same 404 as an unknown URL, so a URL never
+ * reveals that a tenant exists.
  *
  * Use after `auth` and `dbContext` on the /t/:tenant route group. The
  * Inertia middleware shares `tenant` and `tenants` with the page from ctx.
@@ -39,8 +47,20 @@ export default class TenantMiddleware {
 
 	async handle(ctx: HttpContext, next: NextFn) {
 		const user = ctx.auth.getUserOrFail();
-		const found = await this.tenancy.membershipFor(user, ctx.params.tenant);
+		const slug = ctx.params.tenant;
+		const found = await this.tenancy.membershipFor(user, slug);
 		if (!found) {
+			if (READS.has(ctx.request.method())) {
+				const current = await this.tenancy.currentSlugFor(user, slug);
+				if (current) {
+					// The URL already carries the query string; the app forwards it
+					// on every redirect (config/app.ts), so switch that off.
+					return ctx.response
+						.redirect()
+						.withQs(false)
+						.toPath(withTenantSlug(ctx.request.url(true), current));
+				}
+			}
 			throw new errors.E_ROUTE_NOT_FOUND([
 				ctx.request.method(),
 				ctx.request.url(),

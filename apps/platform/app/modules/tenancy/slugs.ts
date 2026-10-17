@@ -230,3 +230,18 @@ export function checkSlug(input: string): SlugCheck {
 	}
 	return { ok: true, slug };
 }
+
+/** `/t/` and the tenant segment at the start of a dashboard URL. */
+const TENANT_PREFIX = /^\/t\/[^/?#]+/;
+
+/**
+ * The same dashboard URL under another slug: `/t/<old>/rest?query` becomes
+ * `/t/<slug>/rest?query`. Throws for anything else, so a redirect built
+ * from it always stays on this site and never points at itself.
+ */
+export function withTenantSlug(url: string, slug: string): string {
+	if (!TENANT_PREFIX.test(url)) {
+		throw new Error(`Not a /t/:tenant URL: ${url}`);
+	}
+	return url.replace(TENANT_PREFIX, () => `/t/${slug}`);
+}

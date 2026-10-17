@@ -1,6 +1,10 @@
 import { test } from "@japa/runner";
 import { ARTIST_SLUG } from "#modules/artists/validators/artist";
-import { checkSlug, RESERVED_SLUGS } from "#modules/tenancy/slugs";
+import {
+	checkSlug,
+	RESERVED_SLUGS,
+	withTenantSlug,
+} from "#modules/tenancy/slugs";
 
 const VALID = [
 	"abc",
@@ -170,5 +174,34 @@ test.group("RESERVED_SLUGS", () => {
 	test("a valid tenant slug is always a valid artist slug", ({ assert }) => {
 		// An independent artist's own profile starts with the tenant's slug.
 		for (const slug of VALID) assert.match(slug, ARTIST_SLUG, slug);
+	});
+});
+
+test.group("withTenantSlug", () => {
+	test("swaps only the tenant segment and keeps the path and the query", ({
+		assert,
+	}) => {
+		assert.equal(withTenantSlug("/t/old", "new"), "/t/new");
+		assert.equal(withTenantSlug("/t/old/", "new"), "/t/new/");
+		assert.equal(withTenantSlug("/t/old?x=1", "new"), "/t/new?x=1");
+		assert.equal(
+			withTenantSlug("/t/old/projects/abc?status=closed", "new"),
+			"/t/new/projects/abc?status=closed",
+		);
+		assert.equal(withTenantSlug("/t/old/t/old", "new"), "/t/new/t/old");
+	});
+
+	test("keeps a doubled slash inside the path", ({ assert }) => {
+		// Still a path on this site: it starts with /t/new.
+		assert.equal(
+			withTenantSlug("/t/old//evil.example", "new"),
+			"/t/new//evil.example",
+		);
+	});
+
+	test("throws for a URL outside /t/", ({ assert }) => {
+		assert.throws(() => withTenantSlug("/dashboard", "new"), /\/t\//);
+		assert.throws(() => withTenantSlug("//evil.example/t/old", "new"), /\/t\//);
+		assert.throws(() => withTenantSlug("/t/", "new"), /\/t\//);
 	});
 });
