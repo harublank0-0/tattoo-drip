@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
 	ListAvailabilityQuery,
 	ListPortfolioQuery,
@@ -49,4 +49,22 @@ export function usePlacements() {
  */
 export function useCreateInquiry() {
 	return useMutation(tattooMutations.createInquiry(useTattooClient()));
+}
+
+/** A deposit page by its link's token (the fragment of the link the studio sent). */
+export function useDeposit(token: string) {
+	return useQuery(tattooQueries.deposit(useTattooClient(), token));
+}
+
+/**
+ * Sends the payment screenshot (`client.deposits.submitProof`). Never
+ * retried, like `useCreateInquiry`; on success `useDeposit(token)` shows the
+ * answer (`submitted`).
+ */
+export function useSubmitDepositProof(token: string) {
+	const client = useTattooClient();
+	const queryClient = useQueryClient();
+	return useMutation(
+		tattooMutations.submitDepositProof(client, queryClient, token),
+	);
 }
