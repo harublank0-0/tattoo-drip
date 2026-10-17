@@ -1,6 +1,6 @@
 import { usePage } from "@inertiajs/react";
 import { cn } from "cn";
-import { Store, Wallet } from "lucide-react";
+import { Store, Users, Wallet } from "lucide-react";
 import type { ReactNode } from "react";
 import NavLink, { type NavItem } from "~/components/nav_link";
 import Page from "~/components/page";
@@ -26,6 +26,12 @@ function settingsNav(tenantSlug: string): NavItem[] {
 			params,
 			icon: Wallet,
 		},
+		{
+			label: "Artists",
+			route: "tenant.artists",
+			params,
+			icon: Users,
+		},
 	];
 }
 
@@ -42,7 +48,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
 	return (
 		<Page
 			title="Studio settings"
-			description="Your studio's public details and how clients pay you."
+			description="Your studio's public details, its artists, and how clients pay you."
 		>
 			<div className="grid grid-cols-1 items-start gap-4 md:grid-cols-[240px_minmax(0,1fr)] md:gap-6">
 				<nav

@@ -3,7 +3,7 @@ import { router } from "@inertiajs/react";
 import { Pencil, Plus, Trash2, User, Users } from "lucide-react";
 import { urlFor } from "~/client";
 import type { ArtistProps } from "~/components/artists";
-import Page from "~/components/page";
+import Section from "~/components/section";
 import { Badge } from "~/components/ui/badge";
 import { Button, buttonVariants } from "~/components/ui/button";
 import {
@@ -16,6 +16,7 @@ import {
 } from "~/components/ui/empty";
 import { useTenant } from "~/hooks/use-tenant";
 import AppLayout from "~/layouts/app";
+import SettingsLayout from "~/layouts/settings";
 
 export default function Artists({ artists }: { artists: ArtistProps[] }) {
 	const tenant = useTenant();
@@ -32,10 +33,9 @@ export default function Artists({ artists }: { artists: ArtistProps[] }) {
 	);
 
 	return (
-		<Page
+		<Section
 			title="Artists"
 			description="The artists clients can book. A hidden artist doesn't show anywhere public."
-			actions={artists.length > 0 ? add : undefined}
 		>
 			{artists.length === 0 ? (
 				<Empty className="border">
@@ -53,6 +53,7 @@ export default function Artists({ artists }: { artists: ArtistProps[] }) {
 				</Empty>
 			) : (
 				<div className="flex flex-col gap-3">
+					<div>{add}</div>
 					{artists.map((artist) => (
 						<ArtistRow
 							key={artist.id}
@@ -62,7 +63,7 @@ export default function Artists({ artists }: { artists: ArtistProps[] }) {
 					))}
 				</div>
 			)}
-		</Page>
+		</Section>
 	);
 }
 
@@ -134,4 +135,4 @@ function ArtistRow({
 	);
 }
 
-Artists.layout = [AppLayout];
+Artists.layout = [AppLayout, SettingsLayout];

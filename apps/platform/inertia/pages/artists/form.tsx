@@ -1,9 +1,8 @@
 import { Form, Link } from "@adonisjs/inertia/react";
 import { useState } from "react";
 import type { ArtistProps } from "~/components/artists";
-import Page from "~/components/page";
+import Section from "~/components/section";
 import { Button, buttonVariants } from "~/components/ui/button";
-import { Card, CardContent } from "~/components/ui/card";
 import { Checkbox } from "~/components/ui/checkbox";
 import {
 	Field,
@@ -17,6 +16,7 @@ import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { useTenant } from "~/hooks/use-tenant";
 import AppLayout from "~/layouts/app";
+import SettingsLayout from "~/layouts/settings";
 import { slugify } from "~/lib/slugify";
 
 type Errors = Partial<Record<string, string>>;
@@ -36,40 +36,36 @@ export default function ArtistForm({
 	const params = { tenant: tenant.slug };
 
 	return (
-		<Page title={artist ? "Edit artist" : "Add an artist"}>
-			<Card className="max-w-2xl">
-				<CardContent>
-					{artist ? (
-						<Form
-							route="tenant.artists.update"
-							routeParams={{ ...params, id: artist.id }}
-						>
-							{({ errors, processing }) => (
-								<ArtistFields
-									artist={artist}
-									canLink={canLink}
-									errors={errors}
-									processing={processing}
-									tenantSlug={tenant.slug}
-								/>
-							)}
-						</Form>
-					) : (
-						<Form route="tenant.artists.store" routeParams={params}>
-							{({ errors, processing }) => (
-								<ArtistFields
-									artist={null}
-									canLink={canLink}
-									errors={errors}
-									processing={processing}
-									tenantSlug={tenant.slug}
-								/>
-							)}
-						</Form>
+		<Section title={artist ? "Edit artist" : "Add an artist"}>
+			{artist ? (
+				<Form
+					route="tenant.artists.update"
+					routeParams={{ ...params, id: artist.id }}
+				>
+					{({ errors, processing }) => (
+						<ArtistFields
+							artist={artist}
+							canLink={canLink}
+							errors={errors}
+							processing={processing}
+							tenantSlug={tenant.slug}
+						/>
 					)}
-				</CardContent>
-			</Card>
-		</Page>
+				</Form>
+			) : (
+				<Form route="tenant.artists.store" routeParams={params}>
+					{({ errors, processing }) => (
+						<ArtistFields
+							artist={null}
+							canLink={canLink}
+							errors={errors}
+							processing={processing}
+							tenantSlug={tenant.slug}
+						/>
+					)}
+				</Form>
+			)}
+		</Section>
 	);
 }
 
@@ -276,4 +272,4 @@ function ArtistFields({
 	);
 }
 
-ArtistForm.layout = [AppLayout];
+ArtistForm.layout = [AppLayout, SettingsLayout];
