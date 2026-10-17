@@ -5,6 +5,24 @@ info:
   description: |
     Public storefront API. This document is the source of truth for
     `@tattoo-drip/types` and `@tattoo-drip/sdk`. Changes within v1 must be additive.
+
+    Conventions for every endpoint (TAT-32):
+
+    - **Stateless and cookieless.** No session and no CSRF token; no
+      response ever sets a cookie.
+    - **CORS** is open to any origin without credentials:
+      `Access-Control-Allow-Origin: *` on every response, for GET, HEAD and
+      POST with the `Accept` and `Content-Type` request headers. `Retry-After`
+      is readable.
+    - **Tenant from the path.** Tenant endpoints live under
+      `/tenants/{tenant}`; the slug is matched exactly, never case-folded.
+    - **Envelopes.** A success body is `{ "data": … }`; an error body is
+      `{ "error": { "code", "message", "fields"? } }` (`ErrorResponse`). A
+      path that exists answers other methods with 405 and `Allow`.
+    - **Caching.** Reads that say so send
+      `Cache-Control: public, max-age=60, stale-while-revalidate=600` and an
+      `ETag` (`If-None-Match` gets a 304). Everything else, errors included,
+      is `Cache-Control: no-store`.
 servers:
   - url: https://api.example.com/api/v1
 security:
@@ -47,18 +65,25 @@ paths:
       - $ref: "#/components/parameters/Tenant"
     get:
       operationId: getStudio
-      summary: Public profile and storefront configuration of a tenant
+      summary: Public profile of a tenant
+      description: Cacheable. Under an old slug it answers like under the current one, and `slug` is the current slug.
       responses:
         "200":
           description: Studio
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            ETag: { $ref: "#/components/headers/ETag" }
           content:
             application/json:
               schema:
                 type: object
                 required: [data]
+                additionalProperties: false
                 properties:
                   data: { $ref: "#/components/schemas/Studio" }
+        "304": { $ref: "#/components/responses/NotModified" }
         "404": { $ref: "#/components/responses/NotFound" }
+        default: { $ref: "#/components/responses/Error" }
 
   /tenants/{tenant}/artists:
     parameters:
@@ -245,22 +270,53 @@ components:
       name: tenant
       in: path
       required: true
-      description: Tenant slug (also its subdomain). Old slugs resolve as aliases.
+      description: |
+        Tenant slug (also its subdomain), matched exactly: never case-folded.
+        A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+        and the tenant resource names the current one. Any other method under
+        an old slug is a 404, so writes must use the current slug.
+      schema:
+        type: string
+        minLength: 3
+        maxLength: 63
+        pattern: "^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$"
+
+  headers:
+    CacheControl:
+      description: "`public, max-age=60, stale-while-revalidate=600` on a cacheable read; `no-store` on everything else."
       schema: { type: string }
+    ETag:
+      description: Strong entity tag of the body. Send it back as `If-None-Match` to get a 304 while it still matches.
+      schema: { type: string }
+    RetryAfter:
+      description: Seconds until another request may succeed.
+      schema: { type: integer, minimum: 0 }
 
   responses:
+    NotModified:
+      description: The `If-None-Match` tag still matches; no body
+      headers:
+        Cache-Control: { $ref: "#/components/headers/CacheControl" }
+        ETag: { $ref: "#/components/headers/ETag" }
     NotFound:
-      description: Unknown tenant or resource
+      description: Unknown tenant or resource, or a write under an old slug (`not_found`)
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorResponse" }
     ValidationError:
-      description: Invalid input
+      description: Invalid input (`validation_failed`, with `fields`)
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorResponse" }
     RateLimited:
-      description: Too many requests
+      description: Too many requests (`rate_limited`)
+      headers:
+        Retry-After: { $ref: "#/components/headers/RetryAfter" }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    Error:
+      description: Any other error, with one of the codes `ErrorResponse` lists
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -269,16 +325,30 @@ components:
     ErrorResponse:
       type: object
       required: [error]
+      additionalProperties: false
       properties:
         error:
           type: object
           required: [code, message]
+          additionalProperties: false
           properties:
-            code: { type: string, examples: [not_found, validation_failed, rate_limited, slot_unavailable] }
-            message: { type: string }
+            code:
+              type: string
+              description: |
+                Stable and machine-readable. Shared codes: `bad_request` (400,
+                an unreadable body), `not_found` (404), `method_not_allowed`
+                (405), `payload_too_large` (413), `unsupported_media_type`
+                (415), `validation_failed` (422, with `fields`),
+                `rate_limited` (429, with `Retry-After`), `internal_error`
+                (500). An endpoint may add codes of its own and lists them.
+                Treat an unknown code by its HTTP status.
+              examples: [not_found, validation_failed, rate_limited, slot_unavailable]
+            message:
+              type: string
+              description: A sentence for people. Never parse it.
             fields:
               type: object
-              description: Field path → messages, for validation errors
+              description: Field path (dot-separated, e.g. `client.phone` or `referenceImages.0`) → messages. Only on `validation_failed`.
               additionalProperties: { type: array, items: { type: string } }
 
     TattooStyle:
@@ -346,12 +416,17 @@ components:
 
     Studio:
       type: object
-      required: [id, slug, type, name, timezone, socialLinks, contact, storefront]
+      description: |
+        A tenant's public profile. TAT-32 sends `slug` and `name`; the other
+        properties are the draft that TAT-44 implements and makes required.
+      required: [slug, name]
       properties:
-        id: { type: string, format: uuid }
-        slug: { type: string }
-        type: { type: string, enum: [studio, independent] }
+        slug:
+          type: string
+          description: The current slug, also when the request used an old one
         name: { type: string }
+        id: { type: string, format: uuid }
+        type: { type: string, enum: [studio, independent] }
         description: { type: [string, "null"] }
         timezone: { type: string, description: IANA timezone, examples: [Asia/Kathmandu] }
         contact:

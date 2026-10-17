@@ -43,12 +43,20 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
-                /** @description Tenant slug (also its subdomain). Old slugs resolve as aliases. */
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
                 tenant: components["parameters"]["Tenant"];
             };
             cookie?: never;
         };
-        /** Public profile and storefront configuration of a tenant */
+        /**
+         * Public profile of a tenant
+         * @description Cacheable. Under an old slug it answers like under the current one, and `slug` is the current slug.
+         */
         get: operations["getStudio"];
         put?: never;
         post?: never;
@@ -63,7 +71,12 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
-                /** @description Tenant slug (also its subdomain). Old slugs resolve as aliases. */
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
                 tenant: components["parameters"]["Tenant"];
             };
             cookie?: never;
@@ -83,7 +96,12 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
-                /** @description Tenant slug (also its subdomain). Old slugs resolve as aliases. */
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
                 tenant: components["parameters"]["Tenant"];
                 /** @description Artist slug */
                 artist: string;
@@ -105,7 +123,12 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
-                /** @description Tenant slug (also its subdomain). Old slugs resolve as aliases. */
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
                 tenant: components["parameters"]["Tenant"];
             };
             cookie?: never;
@@ -125,7 +148,12 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
-                /** @description Tenant slug (also its subdomain). Old slugs resolve as aliases. */
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
                 tenant: components["parameters"]["Tenant"];
             };
             cookie?: never;
@@ -145,7 +173,12 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
-                /** @description Tenant slug (also its subdomain). Old slugs resolve as aliases. */
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
                 tenant: components["parameters"]["Tenant"];
             };
             cookie?: never;
@@ -168,7 +201,12 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
-                /** @description Tenant slug (also its subdomain). Old slugs resolve as aliases. */
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
                 tenant: components["parameters"]["Tenant"];
             };
             cookie?: never;
@@ -190,14 +228,22 @@ export interface components {
         ErrorResponse: {
             error: {
                 /**
+                 * @description Stable and machine-readable. Shared codes: `bad_request` (400,
+                 *     an unreadable body), `not_found` (404), `method_not_allowed`
+                 *     (405), `payload_too_large` (413), `unsupported_media_type`
+                 *     (415), `validation_failed` (422, with `fields`),
+                 *     `rate_limited` (429, with `Retry-After`), `internal_error`
+                 *     (500). An endpoint may add codes of its own and lists them.
+                 *     Treat an unknown code by its HTTP status.
                  * @example not_found
                  * @example validation_failed
                  * @example rate_limited
                  * @example slot_unavailable
                  */
                 code: string;
+                /** @description A sentence for people. Never parse it. */
                 message: string;
-                /** @description Field path → messages, for validation errors */
+                /** @description Field path (dot-separated, e.g. `client.phone` or `referenceImages.0`) → messages. Only on `validation_failed`. */
                 fields?: {
                     [key: string]: string[];
                 };
@@ -266,27 +312,32 @@ export interface components {
             };
             sections: components["schemas"]["StorefrontSection"][];
         };
+        /**
+         * @description A tenant's public profile. TAT-32 sends `slug` and `name`; the other
+         *     properties are the draft that TAT-44 implements and makes required.
+         */
         Studio: {
-            /** Format: uuid */
-            id: string;
+            /** @description The current slug, also when the request used an old one */
             slug: string;
-            /** @enum {string} */
-            type: "studio" | "independent";
             name: string;
+            /** Format: uuid */
+            id?: string;
+            /** @enum {string} */
+            type?: "studio" | "independent";
             description?: string | null;
             /**
              * @description IANA timezone
              * @example Asia/Kathmandu
              */
-            timezone: string;
-            contact: {
+            timezone?: string;
+            contact?: {
                 /** Format: email */
                 email: string;
                 phone?: string | null;
                 address?: string | null;
             };
-            socialLinks: components["schemas"]["SocialLink"][];
-            storefront: components["schemas"]["StorefrontConfiguration"];
+            socialLinks?: components["schemas"]["SocialLink"][];
+            storefront?: components["schemas"]["StorefrontConfiguration"];
         };
         Artist: {
             /** Format: uuid */
@@ -366,7 +417,16 @@ export interface components {
         };
     };
     responses: {
-        /** @description Unknown tenant or resource */
+        /** @description The `If-None-Match` tag still matches; no body */
+        NotModified: {
+            headers: {
+                "Cache-Control": components["headers"]["CacheControl"];
+                ETag: components["headers"]["ETag"];
+                [name: string]: unknown;
+            };
+            content?: never;
+        };
+        /** @description Unknown tenant or resource, or a write under an old slug (`not_found`) */
         NotFound: {
             headers: {
                 [name: string]: unknown;
@@ -375,7 +435,7 @@ export interface components {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
-        /** @description Invalid input */
+        /** @description Invalid input (`validation_failed`, with `fields`) */
         ValidationError: {
             headers: {
                 [name: string]: unknown;
@@ -384,8 +444,18 @@ export interface components {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
-        /** @description Too many requests */
+        /** @description Too many requests (`rate_limited`) */
         RateLimited: {
+            headers: {
+                "Retry-After": components["headers"]["RetryAfter"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description Any other error, with one of the codes `ErrorResponse` lists */
+        Error: {
             headers: {
                 [name: string]: unknown;
             };
@@ -395,11 +465,23 @@ export interface components {
         };
     };
     parameters: {
-        /** @description Tenant slug (also its subdomain). Old slugs resolve as aliases. */
+        /**
+         * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+         *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+         *     and the tenant resource names the current one. Any other method under
+         *     an old slug is a 404, so writes must use the current slug.
+         */
         Tenant: string;
     };
     requestBodies: never;
-    headers: never;
+    headers: {
+        /** @description `public, max-age=60, stale-while-revalidate=600` on a cacheable read; `no-store` on everything else. */
+        CacheControl: string;
+        /** @description Strong entity tag of the body. Send it back as `If-None-Match` to get a 304 while it still matches. */
+        ETag: string;
+        /** @description Seconds until another request may succeed. */
+        RetryAfter: number;
+    };
     pathItems: never;
 }
 export type $defs = Record<string, never>;
@@ -453,7 +535,12 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Tenant slug (also its subdomain). Old slugs resolve as aliases. */
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
                 tenant: components["parameters"]["Tenant"];
             };
             cookie?: never;
@@ -463,6 +550,8 @@ export interface operations {
             /** @description Studio */
             200: {
                 headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -471,7 +560,9 @@ export interface operations {
                     };
                 };
             };
+            304: components["responses"]["NotModified"];
             404: components["responses"]["NotFound"];
+            default: components["responses"]["Error"];
         };
     };
     listArtists: {
@@ -479,7 +570,12 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Tenant slug (also its subdomain). Old slugs resolve as aliases. */
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
                 tenant: components["parameters"]["Tenant"];
             };
             cookie?: never;
@@ -505,7 +601,12 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Tenant slug (also its subdomain). Old slugs resolve as aliases. */
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
                 tenant: components["parameters"]["Tenant"];
                 /** @description Artist slug */
                 artist: string;
@@ -536,7 +637,12 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description Tenant slug (also its subdomain). Old slugs resolve as aliases. */
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
                 tenant: components["parameters"]["Tenant"];
             };
             cookie?: never;
@@ -568,7 +674,12 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description Tenant slug (also its subdomain). Old slugs resolve as aliases. */
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
                 tenant: components["parameters"]["Tenant"];
             };
             cookie?: never;
@@ -602,7 +713,12 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description Tenant slug (also its subdomain). Old slugs resolve as aliases. */
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
                 tenant: components["parameters"]["Tenant"];
             };
             cookie?: never;
@@ -629,7 +745,12 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Tenant slug (also its subdomain). Old slugs resolve as aliases. */
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
                 tenant: components["parameters"]["Tenant"];
             };
             cookie?: never;
