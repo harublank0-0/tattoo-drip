@@ -56,15 +56,28 @@ self.addEventListener("fetch", (event) => {
 	// network untouched.
 });
 
-/** A hashed build file never changes, so a stored copy is always right. */
+/**
+ * A hashed build file never changes, so a stored copy is always right.
+ * The cache is only a speed-up: if it cannot be read or written (a full
+ * disk, blocked storage), the page still gets the file from the network.
+ */
 async function fromCacheOrNetwork(request) {
-	const cache = await caches.open(CACHE);
-	const stored = await cache.match(request);
-	if (stored) return stored;
+	let cache;
+	try {
+		cache = await caches.open(CACHE);
+		const stored = await cache.match(request);
+		if (stored) return stored;
+	} catch {
+		// Fall through to the network.
+	}
 	const response = await fetch(request);
-	if (response.ok) {
-		await cache.put(request, response.clone());
-		await trim(cache);
+	if (response.ok && cache) {
+		try {
+			await cache.put(request, response.clone());
+			await trim(cache);
+		} catch {
+			// Best effort: a failing cache must not lose a good response.
+		}
 	}
 	return response;
 }
