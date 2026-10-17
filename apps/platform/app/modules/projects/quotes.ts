@@ -131,19 +131,3 @@ export function quoteMessage({
 	const until = formatDay(validUntil(quote.expiresAt, timezone));
 	return `${greeting}, here is your quote from ${studioName}: ${price}. ${deposit} Valid until ${until}. Reply here to confirm.`;
 }
-
-/**
- * Links that open a chat with `phone` (E.164). WhatsApp prefills `text`;
- * Viber's chat link takes no text, so staff paste it (the page's Copy
- * button).
- */
-export function chatLinks(
-	phone: string,
-	text: string,
-): { whatsapp: string; viber: string } {
-	const digits = phone.replace(/\D/g, "");
-	return {
-		whatsapp: `https://wa.me/${digits}?text=${encodeURIComponent(text)}`,
-		viber: `viber://chat?number=%2B${digits}`,
-	};
-}

@@ -4,6 +4,7 @@ import { DateTime } from "luxon";
 import { tenantContext } from "#middleware/tenant_middleware";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
+import { chatLinks } from "#modules/clients/contact_links";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ClientService from "#modules/clients/services/client_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -19,7 +20,6 @@ import {
 	toProjectFilter,
 } from "#modules/projects/moves";
 import {
-	chatLinks,
 	formatDay,
 	formatMoney,
 	isExpired,
