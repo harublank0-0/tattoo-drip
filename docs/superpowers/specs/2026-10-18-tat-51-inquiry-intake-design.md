@@ -79,3 +79,11 @@ TAT-42 (anonymizing must null `clients.phone`, so intake makes a fresh client), 
 ## Verification
 
 `pnpm --filter @tattoo-drip/types generate` and `node ace codegen` leave no diff; the full platform suite, the SDK tests, `pnpm check`, `pnpm typecheck` and `pnpm build` pass. Then the whole-branch review and the Codex code and security reviews.
+
+## Build amendments
+
+Found while building on TAT-32's final tip (f64ce19); the rulings above are otherwise as built.
+
+- **Ruling 10 changed: the route reads its own multipart body.** TAT-32's ruling 16 (added after this spec) says a route that takes uploads must keep multipart out of the body parser's auto-processing, because auto-processing streams every file to disk before `publicTenant` can answer 404. So `/api/v1/tenants/:tenant/inquiries` is in `multipart.processManually` (`config/bodyparser.ts`) and the controller calls `receiveUploads(request)` (`#services/uploads`: `onFile` plus `process()`, the parser's own limits and errors, a failed part deleted at once) once the tenant is known. `discardUploads` stays in the controller's `finally`; the exception-handler hook is not needed, since nothing is written before the controller. `api_routes.spec.ts` fails for any non-GET API route outside `processManually`. Cost: the request holds its pooled connection and transaction while the upload streams, as it already did while an image waits for a decode slot (ruling 11), so TAT-38's limits must land before any public deploy. Rejected earlier (own streaming code) and now accepted because the alternative breaks TAT-32's rule.
+- **Tests run on the Node version in `.nvmrc` (24.3.0).** On Node 26.9 `@poppinss/multiparty` 3.0.0 stalls on any text field over about 130 KB (the parser's backpressure never drains: no error, no response), which also hangs the bodyparser's own auto-processing; the "2 MB of text is 413" test is the one that shows it.
+- **NUL in a field** is refused by a small VineJS rule (`noNul`), not a regex (Biome's `noControlCharactersInRegex`).
