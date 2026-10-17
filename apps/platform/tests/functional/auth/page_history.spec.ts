@@ -36,4 +36,22 @@ test.group("Page history", (group) => {
 		onboarding.assertInertiaComponent("onboarding/create_tenant");
 		assert.isTrue(onboarding.body().encryptHistory);
 	});
+
+	test("in development, plain HTTP from another device isn't encrypted", async ({
+		client,
+		assert,
+	}) => {
+		const lan = await client
+			.get("/login")
+			.header("host", "192.168.1.20:3402")
+			.withInertia();
+		const loopback = await client
+			.get("/login")
+			.header("host", "127.0.0.1:3402")
+			.withInertia();
+
+		lan.assertInertiaComponent("auth/login");
+		assert.notProperty(lan.body(), "encryptHistory");
+		assert.isTrue(loopback.body().encryptHistory);
+	});
 });
