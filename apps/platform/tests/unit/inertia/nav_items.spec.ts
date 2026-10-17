@@ -27,16 +27,20 @@ const owner = { slug: "bnt", role: "owner" };
 const artist = { slug: "bnt", role: "artist" };
 
 test.group("navItems", () => {
-	test("owners get Inbox, Projects and Settings; artists get Projects", ({
+	test("owners get Inbox, Projects, Calendar, Clients and Settings; artists get Projects and Calendar", ({
 		assert,
 	}) => {
 		assert.deepEqual(
 			navItems(owner, 0).map(({ key }) => key),
-			["inbox", "projects", "clients", "settings"],
+			["inbox", "projects", "calendar", "clients", "settings"],
 		);
 		assert.deepEqual(
 			navItems(artist, null).map(({ key }) => key),
-			["projects"],
+			["projects", "calendar"],
+		);
+		assert.deepEqual(
+			navItems(artist, null).find(({ key }) => key === "calendar"),
+			{ key: "calendar", label: "Calendar", route: "tenant.calendar.index" },
 		);
 	});
 
@@ -57,7 +61,9 @@ test.group("navItems", () => {
 
 	test("the tab bar needs two or more destinations", ({ assert }) => {
 		assert.isTrue(showTabBar(navItems(owner, 0)));
-		assert.isFalse(showTabBar(navItems(artist, 0)));
+		// Calendar is the artists' second destination (TAT-50): their bar shows.
+		assert.isTrue(showTabBar(navItems(artist, 0)));
+		assert.isFalse(showTabBar(navItems(artist, 0).slice(0, 1)));
 	});
 });
 
