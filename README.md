@@ -80,3 +80,4 @@ Use `/td-work <goal>` for a scoped implementation task and `/td-handoff <task>` 
 
 - **Storefront:** Vercel, with the project's Root Directory set to `apps/storefront`.
 - **Platform:** a Node container (`node ace build`, then `node bin/server.js` in `build/`).
+- **Deposit links:** set `STOREFRONT_URL` on the platform to the studio pages' origin with `{tenant}` for the slug (e.g. `https://{tenant}.example.com`); deposit links are built from it (TAT-65). Unset, the panel builds links on the dev host `http://{tenant}.localhost:3000`, which no client can open: set it before an owner sends the first link.
