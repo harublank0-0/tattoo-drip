@@ -1,6 +1,6 @@
 export type * from "@tattoo-drip/types";
 export {
-	type CreateBookingInput,
+	type CreateInquiryInput,
 	createTattooClient,
 	type RequestOptions,
 	type TattooClient,
