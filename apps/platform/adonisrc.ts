@@ -82,6 +82,10 @@ export default defineConfig({
 		() => import("#start/validator"),
 		() => import("#start/view"),
 		() => import("#start/mail"),
+		{
+			file: () => import("#start/scheduler"),
+			environment: ["web"],
+		},
 	],
 
 	/*
