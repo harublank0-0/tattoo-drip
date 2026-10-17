@@ -54,4 +54,47 @@ test.group("Page history", (group) => {
 		assert.notProperty(lan.body(), "encryptHistory");
 		assert.isTrue(loopback.body().encryptHistory);
 	});
+
+	test("the login and signup pages clear history", async ({
+		client,
+		assert,
+	}) => {
+		const login = await client.get("/login").withInertia();
+		const signup = await client.get("/signup").withInertia();
+
+		login.assertInertiaComponent("auth/login");
+		assert.isTrue(login.body().clearHistory);
+		signup.assertInertiaComponent("auth/signup");
+		assert.isTrue(signup.body().clearHistory);
+	});
+
+	test("logging out lands on the login page, which clears history", async ({
+		client,
+		assert,
+	}) => {
+		const user = await makeUser();
+
+		const logout = await client
+			.post("/logout")
+			.withCsrfToken()
+			.loginAs(user)
+			.redirects(0);
+
+		logout.assertStatus(302);
+		logout.assertHeader("location", "/login");
+		const login = await client.get("/login").withInertia();
+		assert.isTrue(login.body().clearHistory);
+	});
+
+	test("signed-in pages don't clear history", async ({ client, assert }) => {
+		const user = await makeUser();
+
+		const onboarding = await client
+			.get("/onboarding")
+			.withInertia()
+			.loginAs(user);
+
+		onboarding.assertInertiaComponent("onboarding/create_tenant");
+		assert.notProperty(onboarding.body(), "clearHistory");
+	});
 });
