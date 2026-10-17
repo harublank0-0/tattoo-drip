@@ -14,6 +14,7 @@ import PaymentMethod from "#modules/payments/models/payment_method";
 import TattooProject from "#modules/projects/models/tattoo_project";
 import ProjectSession from "#modules/scheduling/models/project_session";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
+import TenantSlug from "#modules/tenancy/models/tenant_slug";
 import { withTransaction } from "#services/db_context";
 
 export const TENANT_TYPES = ["studio", "independent"] as const;
@@ -52,6 +53,10 @@ export default class Tenant extends compose(TenantSchema, withSoftDeletes) {
 
 	@hasMany(() => TenantMembership)
 	declare memberships: HasMany<typeof TenantMembership>;
+
+	/** Every slug the tenant has held, its current one included. */
+	@hasMany(() => TenantSlug)
+	declare slugs: HasMany<typeof TenantSlug>;
 
 	/**
 	 * Soft-deletes the tenant and, in the same transaction, its live

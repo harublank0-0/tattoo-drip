@@ -2,12 +2,18 @@ import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
 import type User from "#models/user";
 import ArtistService from "#modules/artists/services/artist_service";
 import ImageService from "#modules/media/services/image_service";
-import { LastOwnerError, SlugTakenError } from "#modules/tenancy/errors";
+import {
+	LastOwnerError,
+	SlugLimitError,
+	SlugTakenError,
+} from "#modules/tenancy/errors";
 import Tenant, { type TenantType } from "#modules/tenancy/models/tenant";
 import TenantMembership, {
 	type MembershipRole,
 } from "#modules/tenancy/models/tenant_membership";
-import { dbClient, withDbContext } from "#services/db_context";
+import TenantSlug from "#modules/tenancy/models/tenant_slug";
+import { MAX_TENANT_SLUGS } from "#modules/tenancy/slugs";
+import { dbClient, withDbContext, withTransaction } from "#services/db_context";
 import { isUniqueViolation } from "#services/db_errors";
 
 /**
@@ -123,6 +129,69 @@ export default class TenancyService {
 		tenant.merge(input);
 		await tenant.save();
 		return tenant;
+	}
+
+	/**
+	 * Moves the tenant to `slug`, which has passed checkSlug (the validators
+	 * check it). The database keeps every slug the tenant has held as its own
+	 * (tenant_slugs), so old links keep resolving and no other tenant can
+	 * take them; switching back to an old slug reserves nothing new. Throws
+	 * SlugTakenError when another tenant holds the slug, now or before, and
+	 * SlugLimitError when the tenant already holds MAX_TENANT_SLUGS and
+	 * `slug` is not one of them. Call it in the tenant's context. Returns the
+	 * stored tenant; the caller's copy is not updated.
+	 */
+	async changeSlug(tenant: Tenant, slug: string): Promise<Tenant> {
+		try {
+			return await withTransaction(async (trx) => {
+				// The lock makes two renames of one tenant run one after the
+				// other, so both can't pass the limit; the comparison uses the
+				// stored slug, not the caller's copy.
+				const live = await Tenant.query({ client: trx })
+					.where("id", tenant.id)
+					.forUpdate()
+					.firstOrFail();
+				if (live.slug === slug) return live;
+
+				const held = await TenantSlug.query({ client: trx })
+					.where("tenant_id", tenant.id)
+					.select("slug");
+				const ownOldSlug = held.some((row) => row.slug === slug);
+				if (!ownOldSlug && held.length >= MAX_TENANT_SLUGS) {
+					throw new SlugLimitError(tenant.id);
+				}
+
+				// The tenants_register_slug trigger registers a new slug.
+				live.slug = slug;
+				await live.save();
+				return live;
+			});
+		} catch (error) {
+			if (isSlugTaken(error)) throw new SlugTakenError(slug);
+			throw error;
+		}
+	}
+
+	/**
+	 * The current slug of the user's live tenant that once had this exact
+	 * slug (an old link), or null. Null also covers its current slug
+	 * (nothing to redirect), an unknown slug, another tenant's old slug, a
+	 * removed member and a deleted tenant, as in membershipFor.
+	 */
+	async currentSlugFor(user: User, slug: string): Promise<string | null> {
+		const membership = await TenantMembership.query()
+			.where("user_id", user.id)
+			// The soft-delete hooks don't reach this subquery, so filter here.
+			.whereHas("tenant", (tenant) =>
+				tenant
+					.whereNull("tenants.deleted_at")
+					.whereHas("slugs", (slugs) => slugs.where("tenant_slugs.slug", slug)),
+			)
+			.preload("tenant")
+			.first();
+
+		const current = membership?.tenant.slug;
+		return current && current !== slug ? current : null;
 	}
 
 	/**
