@@ -29,7 +29,9 @@ export default function TenantSwitcher() {
 	if (!tenant) return null;
 
 	if (!tenants || tenants.length < 2) {
-		return <span className="truncate text-sm font-medium">{tenant.name}</span>;
+		return (
+			<span className="block truncate text-sm font-medium">{tenant.name}</span>
+		);
 	}
 
 	return (

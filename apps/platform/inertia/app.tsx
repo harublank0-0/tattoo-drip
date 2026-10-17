@@ -5,7 +5,7 @@ import { createInertiaApp, type ResolvedComponent } from "@inertiajs/react";
 import { createRoot } from "react-dom/client";
 import { client } from "./client";
 
-const appName = import.meta.env.VITE_APP_NAME || "AdonisJS";
+const appName = import.meta.env.VITE_APP_NAME || "Tattoo Drip";
 
 createInertiaApp({
 	title: (title) => (title ? `${title} - ${appName}` : appName),
@@ -27,3 +27,11 @@ createInertiaApp({
 		color: "#4B5563",
 	},
 });
+
+// The installed app's service worker (TAT-67): production builds only, so
+// it never caches anything around Vite's dev server.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+	window.addEventListener("load", () => {
+		navigator.serviceWorker.register("/sw.js").catch(() => {});
+	});
+}
