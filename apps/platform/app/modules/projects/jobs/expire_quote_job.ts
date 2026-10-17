@@ -10,7 +10,8 @@ type Payload = { tenantId: string; projectId: string; quoteId: string };
  * .expireQuote re-checks everything under the project lock, so the old jobs
  * of revised quotes, a repeat run and a deleted project all do nothing. A
  * run that comes early (this worker's clock behind the issuer's) queues the
- * job again for the rest of the time.
+ * job again for the rest of the time; one that used up its retries or never
+ * ran is queued again by SweepExpiredQuotesJob.
  */
 export default class ExpireQuoteJob extends TenantJob<Payload> {
 	protected async handle() {

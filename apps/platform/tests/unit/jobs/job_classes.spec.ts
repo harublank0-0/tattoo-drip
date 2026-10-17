@@ -10,6 +10,8 @@ import { jobsOutsideTenantScope } from "#tests/helpers/jobs";
  */
 const ALLOWLIST = {
 	SendMailJob: "sends one email; reads and writes no tenant table",
+	SweepExpiredQuotesJob:
+		"reads only ids from expired_quote_candidates() and queues one ExpireQuoteJob (a TenantJob) per row; reads and writes no tenant table itself",
 };
 
 async function jobClasses() {
