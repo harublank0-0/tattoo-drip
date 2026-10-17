@@ -10,6 +10,17 @@ import TenantMembership, {
 import { dbClient, withDbContext } from "#services/db_context";
 import { isUniqueViolation } from "#services/db_errors";
 
+/**
+ * A slug is taken when it is another tenant's current slug or any slug a
+ * tenant ever held (tenant_slugs, TAT-24).
+ */
+function isSlugTaken(error: unknown): boolean {
+	return (
+		isUniqueViolation(error, "tenants_slug_unique") ||
+		isUniqueViolation(error, "tenant_slugs_slug_unique")
+	);
+}
+
 export type NewTenant = {
 	type: TenantType;
 	name: string;
@@ -19,7 +30,7 @@ export type NewTenant = {
 
 /**
  * The studio's public profile. Slug and type are not part of it: the slug
- * changes with aliases (TAT-24), the type never.
+ * changes through changeSlug, the type never.
  */
 export type TenantProfile = {
 	name: string;
@@ -83,9 +94,10 @@ export default class TenancyService {
 				return tenant;
 			});
 		} catch (error) {
-			// The unique index is the only slug check; a taken slug (a deleted
-			// tenant's included) and a racing signup both land here.
-			if (isUniqueViolation(error, "tenants_slug_unique")) {
+			// The unique indexes are the only slug check; a taken slug (any
+			// tenant's old slug, a deleted tenant's included) and a racing signup
+			// both land here.
+			if (isSlugTaken(error)) {
 				throw new SlugTakenError(input.slug);
 			}
 			throw error;

@@ -36,6 +36,7 @@ const EXPECTED_POLICIES: Record<string, string[]> = {
 		"tenant_memberships_select:SELECT",
 		"tenant_memberships_update:UPDATE",
 	],
+	tenant_slugs: ["tenant_slugs_insert:INSERT", "tenant_slugs_select:SELECT"],
 	tenants: [
 		"tenants_insert:INSERT",
 		"tenants_select:SELECT",
