@@ -1,5 +1,6 @@
 import logger from "@adonisjs/core/services/logger";
 import sharp from "sharp";
+import { limitConcurrency } from "#modules/media/concurrency";
 import {
 	IMAGE_FORMAT_MESSAGE,
 	IMAGE_SIZE_MESSAGE,
@@ -10,6 +11,18 @@ import {
 export const MAX_INPUT_PIXELS = 40_000_000;
 /** Stored images fit in this square; smaller ones are never enlarged. */
 export const MAX_DIMENSION = 2048;
+/**
+ * Images decoded at once in this process. Each can hold about 160 MB (40 MP
+ * at 4 bytes a pixel), and anyone can upload references (TAT-51), so the
+ * rest wait their turn.
+ */
+export const MAX_CONCURRENT_DECODES = 2;
+
+const decodeSlot = limitConcurrency(MAX_CONCURRENT_DECODES);
+
+// Keep no decoded image between calls: an upload's memory goes back as soon
+// as it is processed.
+sharp.cache(false);
 
 export type ProcessedImage = {
 	data: Buffer;
@@ -54,11 +67,20 @@ function sniff(input: Buffer): "jpeg" | "png" | "webp" | null {
  * - re-encodes it with no metadata (EXIF, GPS, camera data, thumbnails)
  *
  * PNG stays PNG, so QR codes stay sharp; everything else becomes JPEG.
- * Throws InvalidImageError for anything it can't accept.
+ * Throws InvalidImageError for anything it can't accept. At most
+ * MAX_CONCURRENT_DECODES run at once; the format check comes before the wait.
  */
 export async function processImage(input: Buffer): Promise<ProcessedImage> {
 	const detected = sniff(input);
 	if (!detected) throw new InvalidImageError(IMAGE_FORMAT_MESSAGE);
+	return decodeSlot(() => decode(input, detected));
+}
+
+/** processImage's work once the format is known and a slot is free. */
+async function decode(
+	input: Buffer,
+	detected: "jpeg" | "png" | "webp",
+): Promise<ProcessedImage> {
 	if ((await pixelCount(input)) > MAX_INPUT_PIXELS) {
 		throw new InvalidImageError(IMAGE_SIZE_MESSAGE);
 	}
