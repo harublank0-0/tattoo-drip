@@ -631,4 +631,28 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_inquiries_controller').default['store']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
+  'api.v1.deposits.show': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/tenants/:tenant/deposits/:token'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; token: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_deposits_controller').default['show']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_deposits_controller').default['show']>>>
+    }
+  }
+  'api.v1.deposits.store': {
+    methods: ["POST"]
+    pattern: '/api/v1/tenants/:tenant/deposits/:token'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/payments/validators/deposit_proof').depositProofValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; token: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/payments/validators/deposit_proof').depositProofValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_deposits_controller').default['store']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_deposits_controller').default['store']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
 }

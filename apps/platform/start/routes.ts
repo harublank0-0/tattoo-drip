@@ -9,6 +9,7 @@
 
 import router from "@adonisjs/core/services/router";
 import { controllers } from "#generated/controllers";
+import { DEPOSIT_TOKEN } from "#modules/payments/deposit_links";
 import { middleware } from "#start/kernel";
 import { throttleSignup } from "#start/limiter";
 
@@ -283,6 +284,19 @@ router
 				router
 					.post("/inquiries", [controllers.PublicInquiries, "store"])
 					.as("api.v1.inquiries.store");
+				// The deposit page through a link's token (TAT-65): 43 base64url
+				// characters, anything else is the router's 404 without a query.
+				// Rate-limited per address and per token; never cached.
+				router
+					.get("/deposits/:token", [controllers.PublicDeposits, "show"])
+					.where("token", DEPOSIT_TOKEN)
+					.use(middleware.depositThrottle())
+					.as("api.v1.deposits.show");
+				router
+					.post("/deposits/:token", [controllers.PublicDeposits, "store"])
+					.where("token", DEPOSIT_TOKEN)
+					.use(middleware.depositThrottle())
+					.as("api.v1.deposits.store");
 			})
 			.prefix("/tenants/:tenant")
 			.use(middleware.publicTenant());

@@ -100,6 +100,10 @@ export interface ApiDefinition {
       inquiries: {
         store: typeof routes['api.v1.inquiries.store']
       }
+      deposits: {
+        show: typeof routes['api.v1.deposits.show']
+        store: typeof routes['api.v1.deposits.store']
+      }
     }
   }
 }

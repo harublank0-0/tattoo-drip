@@ -18,7 +18,10 @@ const PUBLIC_ONLY = ["publicApi", "publicTenant", "publicCache"];
  * uses middleware.publicCache() or is listed here: a conscious edit (the
  * deposit page, TAT-65, belongs here).
  */
-const UNCACHED_GET_ROUTES: Record<string, string> = {};
+const UNCACHED_GET_ROUTES: Record<string, string> = {
+	"/api/v1/tenants/:tenant/deposits/:token":
+		"A private deposit page behind a bearer link: never cached (TAT-65).",
+};
 
 const isApi = (pattern: string) =>
 	pattern === "/api" || pattern.startsWith("/api/");

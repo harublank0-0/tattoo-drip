@@ -318,6 +318,18 @@ const routes = {
     tokens: [{"old":"/api/v1/tenants/:tenant/inquiries","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/inquiries","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/inquiries","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/inquiries","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/inquiries","type":0,"val":"inquiries","end":""}],
     types: placeholder as Registry['api.v1.inquiries.store']['types'],
   },
+  'api.v1.deposits.show': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/tenants/:tenant/deposits/:token',
+    tokens: [{"old":"/api/v1/tenants/:tenant/deposits/:token","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/deposits/:token","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/deposits/:token","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/deposits/:token","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/deposits/:token","type":0,"val":"deposits","end":""},{"old":"/api/v1/tenants/:tenant/deposits/:token","type":1,"val":"token","end":""}],
+    types: placeholder as Registry['api.v1.deposits.show']['types'],
+  },
+  'api.v1.deposits.store': {
+    methods: ["POST"],
+    pattern: '/api/v1/tenants/:tenant/deposits/:token',
+    tokens: [{"old":"/api/v1/tenants/:tenant/deposits/:token","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/deposits/:token","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/deposits/:token","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/deposits/:token","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/deposits/:token","type":0,"val":"deposits","end":""},{"old":"/api/v1/tenants/:tenant/deposits/:token","type":1,"val":"token","end":""}],
+    types: placeholder as Registry['api.v1.deposits.store']['types'],
+  },
 } as const satisfies Record<string, AdonisEndpoint>
 
 export { routes }

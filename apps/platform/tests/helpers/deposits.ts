@@ -1,4 +1,7 @@
 import { randomUUID } from "node:crypto";
+import { readdir } from "node:fs/promises";
+import app from "@adonisjs/core/services/app";
+import type { ApiClient } from "@japa/api-client";
 import ArtistService from "#modules/artists/services/artist_service";
 import ImageService from "#modules/media/services/image_service";
 import DepositLinkService from "#modules/payments/services/deposit_link_service";
@@ -8,6 +11,7 @@ import PaymentMethodService from "#modules/payments/services/payment_method_serv
 import ProjectService from "#modules/projects/services/project_service";
 import QuoteService from "#modules/projects/services/quote_service";
 import SessionService from "#modules/scheduling/services/session_service";
+import { testImages } from "#tests/helpers/images";
 import { makeClient, makeProject, makeQuote } from "#tests/helpers/pipeline";
 
 type TenantRef = { id: string };
@@ -74,4 +78,53 @@ export async function depositReady(
 		project,
 		quote: await makeQuote(tenant, project, quote),
 	};
+}
+
+export type ProofPart = {
+	field: string;
+	name: string;
+	type: string;
+	data: Buffer;
+};
+
+/** A small PNG payment screenshot (300 × 200), as the `proof` part. */
+export async function proofPart(name = "receipt.png"): Promise<ProofPart> {
+	return {
+		field: "proof",
+		name,
+		type: "image/png",
+		data: await testImages.png(),
+	};
+}
+
+/** The deposit page's API path. */
+export const depositPath = (slug: string, token: string) =>
+	`/api/v1/tenants/${slug}/deposits/${token}`;
+
+/**
+ * POST a proof as multipart: the fields, then each part. Not sent yet, so a
+ * test can add headers before awaiting it.
+ */
+export function postProof(
+	client: ApiClient,
+	slug: string,
+	token: string,
+	fields: Record<string, string>,
+	parts: ProofPart[] = [],
+) {
+	const request = client.post(depositPath(slug, token)).fields(fields);
+	for (const part of parts) {
+		request.file(part.field, part.data, {
+			filename: part.name,
+			contentType: part.type,
+		});
+	}
+	return request;
+}
+
+/** The payment proofs stored for `tenant` on the private test disk. */
+export function storedProofs(tenant: { id: string }): Promise<string[]> {
+	return readdir(
+		app.tmpPath("storage", "private", "tenants", tenant.id, "payment_proof"),
+	).catch(() => [] as string[]);
 }

@@ -17,6 +17,7 @@ export const controllers = {
   PaymentMethods: () => import('#controllers/payment_methods_controller'),
   ProjectChanges: () => import('#controllers/project_changes_controller'),
   Projects: () => import('#controllers/projects_controller'),
+  PublicDeposits: () => import('#controllers/public_deposits_controller'),
   PublicInquiries: () => import('#controllers/public_inquiries_controller'),
   PublicStudio: () => import('#controllers/public_studio_controller'),
   Quotes: () => import('#controllers/quotes_controller'),
