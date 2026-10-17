@@ -1,11 +1,16 @@
 import { cn } from "cn";
 
-/** The count on a destination, e.g. new inquiries; read out as "3 new". */
+/**
+ * The count on a destination, e.g. new inquiries; read out as "3 new", or
+ * with `label` ("2 to check").
+ */
 export default function NavBadge({
 	count,
+	label = "new",
 	className,
 }: {
 	count: number;
+	label?: string;
 	className?: string;
 }) {
 	return (
@@ -16,7 +21,7 @@ export default function NavBadge({
 			)}
 		>
 			{count}
-			<span className="sr-only"> new</span>
+			<span className="sr-only"> {label}</span>
 		</span>
 	);
 }

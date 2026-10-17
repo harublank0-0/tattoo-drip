@@ -39,7 +39,9 @@ export default function SideNav({
 						>
 							<Icon data-icon="inline-start" />
 							<span className="flex-1 text-left">{item.label}</span>
-							{item.badge ? <NavBadge count={item.badge} /> : null}
+							{item.badge ? (
+								<NavBadge count={item.badge} label={item.badgeLabel} />
+							) : null}
 						</NavLink>
 					);
 				})}

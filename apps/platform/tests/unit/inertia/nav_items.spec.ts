@@ -7,12 +7,14 @@ type Item = {
 	label: string;
 	route: string;
 	badge?: number;
+	badgeLabel?: string;
 	also?: string[];
 };
 type NavModule = {
 	navItems(
 		tenant: { slug: string; role: string },
 		inboxCount: number | null,
+		proofCount?: number | null,
 	): Item[];
 	showTabBar(items: Item[]): boolean;
 	isCurrentPath(
@@ -52,6 +54,26 @@ test.group("navItems", () => {
 		assert.notProperty(inbox(0), "badge");
 		assert.notProperty(inbox(null), "badge");
 		assert.isTrue(navItems(artist, 5).every((item) => !("badge" in item)));
+	});
+
+	test("the Projects badge counts deposit proofs to check, for owners only", ({
+		assert,
+	}) => {
+		const projects = (role: string, count: number | null) =>
+			navItems({ slug: "bnt", role }, 0, count).find(
+				({ key }) => key === "projects",
+			);
+
+		assert.deepEqual(projects("owner", 2), {
+			key: "projects",
+			label: "Projects",
+			route: "tenant.projects.index",
+			badge: 2,
+			badgeLabel: "to check",
+		});
+		assert.notProperty(projects("owner", 0), "badge");
+		assert.notProperty(projects("owner", null), "badge");
+		assert.notProperty(projects("artist", 4), "badge");
 	});
 
 	test("Settings also covers the artist pages of this studio", ({ assert }) => {

@@ -15,8 +15,8 @@ import TopBar from "~/components/shell/top_bar";
  * areas there.
  */
 export default function AppLayout({ children }: { children: ReactNode }) {
-	const { tenant, inboxCount } = usePage().props;
-	const items = tenant ? navItems(tenant, inboxCount) : [];
+	const { tenant, inboxCount, proofCount } = usePage().props;
+	const items = tenant ? navItems(tenant, inboxCount, proofCount) : [];
 	const tabs = showTabBar(items);
 
 	return (
