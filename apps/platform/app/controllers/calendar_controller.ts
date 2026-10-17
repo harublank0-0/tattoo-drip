@@ -1,5 +1,6 @@
 import { inject } from "@adonisjs/core";
 import type { HttpContext } from "@adonisjs/core/http";
+import { errors as lucidErrors } from "@adonisjs/lucid";
 import { tenantContext } from "#middleware/tenant_middleware";
 import { todayIn } from "#modules/projects/quotes";
 import {
@@ -35,10 +36,7 @@ export default class CalendarController {
 		const today = todayIn(timezone);
 		const view = toCalendarView(query.view);
 		const date = toCalendarDate(query.date, today);
-		const artistId =
-			typeof query.artist === "string" && query.artist !== ""
-				? query.artist
-				: null;
+		const artistId = artistParam(query.artist);
 		const days = calendarDays(view, date);
 		const { scope, artists, entries } = await this.calendar.load(
 			tenant,
@@ -78,6 +76,17 @@ export default class CalendarController {
 			})),
 		});
 	}
+}
+
+/**
+ * `?artist=`: no artist when absent or empty, else one id. A repeated
+ * parameter (an array) names no artist, so it is a 404 like any malformed id
+ * rather than a calendar the link does not name.
+ */
+function artistParam(value: unknown): string | null {
+	if (value === undefined || value === "") return null;
+	if (typeof value !== "string") throw new lucidErrors.E_ROW_NOT_FOUND();
+	return value;
 }
 
 /** One session as a row on `day`: times on that day, a preview of the brief. */

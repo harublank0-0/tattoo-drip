@@ -254,17 +254,16 @@ test.group("Calendar page", (group) => {
 		);
 	});
 
-	test("an unknown view or date is today's day view; a repeated or empty artist is the whole studio", async ({
+	test("an unknown view or date is today's day view; an empty artist is the whole studio", async ({
 		client,
 		assert,
 	}) => {
-		const { owner, ram, sita } = await studio();
+		const { owner } = await studio();
 		const today = todayIn(KTM);
 
 		for (const query of [
 			"?view=month&date=2026-02-30",
 			"?view=week&view=day&date=soon",
-			`?artist=${ram.id}&artist=${sita.id}`,
 			"?artist=",
 		]) {
 			const response = await client
@@ -371,6 +370,26 @@ test.group("Calendar page", (group) => {
 				.get(calendarUrl(`?artist=${id}`))
 				.withInertia()
 				.loginAs(owner);
+			response.assertStatus(404);
+		}
+	});
+
+	test("a repeated artist names no artist: a 404 for owners and artists, even for one's own id", async ({
+		client,
+	}) => {
+		const { owner, tenant, ram, sita } = await studio();
+		const { user, profile } = await linkedArtist(tenant);
+
+		for (const [member, query] of [
+			[owner, `?artist=${ram.id}&artist=${sita.id}`],
+			[owner, `?artist=${ram.id}&artist=${ram.id}`],
+			[user, `?artist=${profile.id}&artist=${profile.id}`],
+			[user, `?artist=${profile.id}&artist=${sita.id}`],
+		] as const) {
+			const response = await client
+				.get(calendarUrl(query))
+				.withInertia()
+				.loginAs(member);
 			response.assertStatus(404);
 		}
 	});
