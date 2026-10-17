@@ -3,10 +3,16 @@ import type { HttpContext } from "@adonisjs/core/http";
 import type { DateTime } from "luxon";
 import { tenantContext } from "#middleware/tenant_middleware";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import ArtistService from "#modules/artists/services/artist_service";
+import { chatLinks, telLink } from "#modules/clients/contact_links";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ClientService from "#modules/clients/services/client_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import InquiryService from "#modules/inquiries/services/inquiry_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import ImageService from "#modules/media/services/image_service";
 import { daysAgoText } from "#modules/projects/contact";
+import { formatDay } from "#modules/projects/quotes";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ProjectService from "#modules/projects/services/project_service";
 
@@ -22,6 +28,8 @@ export default class ClientsController {
 		private clients: ClientService,
 		private projects: ProjectService,
 		private inquiries: InquiryService,
+		private artists: ArtistService,
+		private images: ImageService,
 	) {}
 
 	async index(ctx: HttpContext) {
@@ -59,6 +67,62 @@ export default class ClientsController {
 				),
 			})),
 			page: { current: page, last: lastPage, total },
+		});
+	}
+
+	async show(ctx: HttpContext) {
+		const { tenant } = tenantContext(ctx);
+		const client = await this.clients.findFor(tenant, ctx.params.id);
+		const projects = await this.projects.forClient(tenant, client.id);
+		const inquiries = await this.inquiries.forClient(tenant, client.id);
+		const images = await this.inquiries.imagesFor(tenant, {
+			inquiryIds: inquiries.map(({ id }) => id),
+			projectIds: projects.map(({ id }) => id),
+		});
+		const artistName = new Map(
+			(await this.artists.list(tenant)).map(({ id, name }) => [id, name]),
+		);
+		const anonymized = client.anonymizedAt !== null;
+		const day = (time: DateTime) =>
+			formatDay(time.setZone(tenant.timezone).toFormat("yyyy-MM-dd"));
+
+		return ctx.inertia.render("clients/show", {
+			client: {
+				id: client.id,
+				name: client.name,
+				phone: anonymized ? null : client.phone,
+				email: anonymized ? null : client.email,
+				notes: anonymized ? null : client.notes,
+				anonymized,
+				sinceText: day(client.createdAt),
+			},
+			links:
+				client.phone && !anonymized
+					? { ...chatLinks(client.phone), call: telLink(client.phone) }
+					: null,
+			projects: projects.map((project) => ({
+				id: project.id,
+				brief: project.brief,
+				status: project.status,
+				artistName: project.artistId
+					? (artistName.get(project.artistId) ?? null)
+					: null,
+				createdText: day(project.createdAt),
+			})),
+			inquiries: inquiries.map((inquiry) => ({
+				id: inquiry.id,
+				idea: inquiry.idea,
+				status: inquiry.status,
+				receivedText: day(inquiry.createdAt),
+			})),
+			references: await Promise.all(
+				images.map(async (image) => ({
+					id: image.id,
+					url: await this.images.url("reference_image", image.imageKey),
+					width: image.width,
+					height: image.height,
+				})),
+			),
 		});
 	}
 }

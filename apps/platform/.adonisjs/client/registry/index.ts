@@ -186,6 +186,12 @@ const routes = {
     tokens: [{"old":"/t/:tenant/clients","type":0,"val":"t","end":""},{"old":"/t/:tenant/clients","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/clients","type":0,"val":"clients","end":""}],
     types: placeholder as Registry['tenant.clients.index']['types'],
   },
+  'tenant.clients.show': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/clients/:id',
+    tokens: [{"old":"/t/:tenant/clients/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/clients/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/clients/:id","type":0,"val":"clients","end":""},{"old":"/t/:tenant/clients/:id","type":1,"val":"id","end":""}],
+    types: placeholder as Registry['tenant.clients.show']['types'],
+  },
   'tenant.projects.index': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/projects',

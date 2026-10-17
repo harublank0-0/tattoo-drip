@@ -53,6 +53,7 @@ export interface ApiDefinition {
     }
     clients: {
       index: typeof routes['tenant.clients.index']
+      show: typeof routes['tenant.clients.show']
     }
     projects: {
       index: typeof routes['tenant.projects.index']

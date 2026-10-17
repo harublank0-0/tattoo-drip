@@ -57,8 +57,10 @@ export default function ClientsIndex({
 					{clients.map((row) => (
 						<li key={row.id}>
 							<Link
-								// Task 5 adds tenant.clients.show; until then the path is built.
-								href={`${base}/${row.id}`}
+								href={urlFor("tenant.clients.show", {
+									tenant: tenant.slug,
+									id: row.id,
+								})}
 								className="flex min-h-11 flex-col gap-0.5 px-4 py-3 hover:bg-muted/50"
 							>
 								<span className="font-medium">{row.name}</span>

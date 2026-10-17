@@ -152,6 +152,10 @@ router
 				router
 					.get("/", [controllers.Clients, "index"])
 					.as("tenant.clients.index");
+				router
+					.get(":id", [controllers.Clients, "show"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.clients.show");
 			})
 			.prefix("/clients")
 			.use(middleware.role({ allow: ["owner"] }));
