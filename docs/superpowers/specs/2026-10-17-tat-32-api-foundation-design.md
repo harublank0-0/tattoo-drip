@@ -87,6 +87,17 @@ Group: `/api/v1` with `publicApi`, inside it `/tenants/:tenant` with `publicTena
 
 Rate limits and the server key (TAT-38), bot challenge (TAT-55), studio and artist reads (TAT-44), inquiries and the draft's move (TAT-51 / TAT-68), subdomains (TAT-12), SDK wiring in the storefront (TAT-23), React hook tests (TAT-11), schema-validating contract tests (TAT-47). Before any public deploy: TAT-38 (each API request holds a pooled connection for its length, like the dashboard) and TAT-55.
 
+## Review amendments
+
+Found in review (a Fable whole-branch review and Codex code and security reviews), after the rulings were final; each narrows a ruling without reopening it:
+
+- **Ruling 6:** the bodyparser is a `router.use` middleware, so it runs before `publicTenant`. "Before its body is validated or anything runs" holds for validators, handlers and writes, not for the parser: a body that cannot be read is a 400, 413 or 415 under any slug (an old slug, a current one, an unknown one and a shapeless one answer alike, so it is no oracle). A test pins it. The parser cannot be moved after `publicTenant` without holding a pooled connection and an open transaction during a slow upload (ruling 7).
+- **Ruling 16:** the group `use` lists run after the bodyparser, so TAT-38's per-IP limit there does not protect it. A limit that must refuse a request before its body is read goes in `server.use` or `router.use`, guarded by `isApiRequest(ctx)`. Routes that accept uploads (TAT-51, TAT-65) must keep multipart out of the bodyparser's auto-processing (`multipart.autoProcess` as a list of routes, or `processManually` and `request.multipart.process()` in the handler after the tenant and the limits), because auto-processing streams every file to the temp directory, which the parser never cleans, before the tenant 404 or a 429 can happen.
+- **Ruling 8:** every error under `/api` is the envelope, including a URL the server cannot decode (`/api/v1/%`), which `onBadUrl` in `config/app.ts` now answers with `bad_request` and the API headers. `ApiException` carries `fields` for `validation_failed` only, as the contract says.
+- **Ruling 11:** `publicCache` serializes an object body before it sets `public` headers, so a body that cannot be serialized is an `internal_error` with `no-store` and not a cacheable plain-text 500 (a circular body is an error too, not cut short).
+- **Deferred, not changed:** the request transaction opens before the slug lookup, so a probe of an unknown slug costs a `BEGIN` and a rollback (TAT-38's limiter bounds probing, ruling 16); `Access-Control-Expose-Headers` is sent only with an `Origin` (nothing exposed is on a cacheable 200 yet; a header exposed on one must be set in `setApiHeaders`).
+- **Rejected:** allowing `If-None-Match` or exposing `ETag` in CORS (ruling 10 fixes the allowed request headers and the exposed header; browsers revalidate through their HTTP cache without a preflight).
+
 ## Verification
 
 `pnpm --filter @tattoo-drip/types generate` leaves no diff after the contract task; `node ace codegen` leaves no diff; the full platform suite, the SDK tests, `pnpm check`, `pnpm typecheck` and `pnpm build` pass; the migration rolls back and re-applies. Then the whole-branch review and the Codex code and security reviews.
