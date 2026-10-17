@@ -107,11 +107,13 @@ test.group("BookingService.book", (group) => {
 				quote: { kind: "fixed", fixedPrice: 1_500_000 },
 			});
 
+			const before = DateTime.now();
 			const { project, session, client, artist } = await bookings.book(
 				tenant,
 				OWNER,
 				input,
 			);
+			const after = DateTime.now();
 
 			assert.equal(artist.id, sita.id);
 			assert.include((await Client.findOrFail(client.id)).serialize(), {
@@ -128,7 +130,13 @@ test.group("BookingService.book", (group) => {
 				status: "booked",
 				brief: "A small rose on the left wrist",
 			});
+			// Staff just spoke with the client: "contacted" is now, not never.
 			assert.isNotNull(saved.lastContactedAt);
+			assert.isAtLeast(
+				saved.lastContactedAt?.toMillis() ?? 0,
+				before.toMillis(),
+			);
+			assert.isAtMost(saved.lastContactedAt?.toMillis() ?? 0, after.toMillis());
 			assert.include(session.serialize(), {
 				projectId: project.id,
 				artistId: sita.id,
@@ -244,7 +252,10 @@ test.group("BookingService.book", (group) => {
 			// These queries run, so only the booking's savepoint was rolled back.
 			assert.deepEqual(await pipelineCounts(tenant), before);
 			assert.isNull(
-				await Client.query().where("phone", "+9779812345678").first(),
+				await Client.query()
+					.where("tenant_id", tenant.id)
+					.where("phone", "+9779812345678")
+					.first(),
 			);
 		});
 	});

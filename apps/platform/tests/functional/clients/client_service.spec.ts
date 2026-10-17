@@ -307,7 +307,12 @@ test.group("ClientService.create", (group) => {
 				"phone_taken",
 			);
 			// The refusal rolled back only its savepoint: this query still runs.
-			assert.lengthOf(await Client.query().where("phone", "+9779812345678"), 1);
+			assert.lengthOf(
+				await Client.query()
+					.where("tenant_id", tenant.id)
+					.where("phone", "+9779812345678"),
+				1,
+			);
 		});
 		await inTenant(other, async () => {
 			const there = await clients.create(other, {
