@@ -196,7 +196,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/tenants/{tenant}/bookings": {
+    "/tenants/{tenant}/inquiries": {
         parameters: {
             query?: never;
             header?: never;
@@ -213,8 +213,25 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Submit a booking request (guest, no account) */
-        post: operations["createBooking"];
+        /**
+         * Send the studio an inquiry, with reference images
+         * @description No account needed. One `multipart/form-data` request with the fields
+         *     and up to 5 reference images (JPEG, PNG or WebP, 10 MB each and
+         *     20 MB for the whole request); any other body is a 415. The studio
+         *     finds the person by phone; the answer is the same whether or not it
+         *     knew the number, and says nothing but the new inquiry's id. Never
+         *     cached. Under an old slug it is a 404: send it to the current slug,
+         *     which `getStudio` names.
+         *
+         *     Own codes (409): `artist_not_accepting` (the chosen artist takes no
+         *     new inquiries), `studio_not_accepting` (no artist chosen, and every
+         *     artist of the studio is closed), `too_many_open_inquiries` (this
+         *     phone number already has 3 inquiries the studio hasn't answered).
+         *     An unknown or hidden `preferredArtistId` is `validation_failed` on
+         *     `preferredArtistId`; an image that isn't a JPEG, PNG or WebP is
+         *     `validation_failed` on `referenceImages.<index>`.
+         */
+        post: operations["createInquiry"];
         delete?: never;
         options?: never;
         head?: never;
@@ -233,17 +250,18 @@ export interface components {
                  *     (405), `payload_too_large` (413), `unsupported_media_type`
                  *     (415), `validation_failed` (422, with `fields`),
                  *     `rate_limited` (429, with `Retry-After`), `internal_error`
-                 *     (500). An endpoint may add codes of its own and lists them.
-                 *     Treat an unknown code by its HTTP status.
+                 *     (500). Endpoint codes: `artist_not_accepting`,
+                 *     `studio_not_accepting`, `too_many_open_inquiries` (409,
+                 *     `createInquiry`). Treat an unknown code by its HTTP status.
                  * @example not_found
                  * @example validation_failed
                  * @example rate_limited
-                 * @example slot_unavailable
+                 * @example too_many_open_inquiries
                  */
                 code: string;
                 /** @description A sentence for people. Never parse it. */
                 message: string;
-                /** @description Field path (dot-separated, e.g. `client.phone` or `referenceImages.0`) → messages. Only on `validation_failed`. */
+                /** @description Field path (dot-separated, e.g. `contactPhone` or `referenceImages.0`) → messages. Only on `validation_failed`. */
                 fields?: {
                     [key: string]: string[];
                 };
@@ -381,39 +399,59 @@ export interface components {
             /** Format: date-time */
             endsAt: string;
         };
-        BookingRequestInput: {
-            /** Format: uuid */
-            artistId: string;
-            /** Format: uuid */
-            serviceId: string;
+        /**
+         * @description How the person found the studio
+         * @enum {string}
+         */
+        SourceChannel: "instagram" | "facebook" | "tiktok" | "google" | "friend" | "other";
+        /**
+         * @description An inquiry's text fields, kept exactly as sent (trimmed). The
+         *     lengths are the most the API takes. Leave an optional field out, or
+         *     empty, for none.
+         */
+        InquiryInput: {
+            /** @example A fine-line peony with two leaves */
+            idea: string;
+            /** @example Left forearm */
+            placement: string;
+            /** @example About 10 cm */
+            approximateSize: string;
+            /** @example Any weekday in November */
+            preferredDates: string;
             /**
-             * Format: date-time
-             * @description Must be a bookable slot
+             * Format: uuid
+             * @description A visible artist of this studio who takes inquiries. Leave it out for any artist.
              */
-            startsAt: string;
-            customer: {
-                name: string;
-                /** Format: email */
-                email: string;
-                phone?: string;
-            };
-            tattoo: {
-                idea: string;
-                /** @description Style slug */
-                style?: string;
-                /** @description Placement slug */
-                placement?: string;
-                /** @example 10 cm */
-                size?: string;
-                budget?: string;
-            };
-            notes?: string;
+            preferredArtistId?: string | null;
+            /**
+             * @description Free text
+             * @example NPR 15000
+             */
+            budget?: string | null;
+            sourceChannel: components["schemas"]["SourceChannel"];
+            contactName: string;
+            /**
+             * @description The person's WhatsApp or Viber number, as typed. A number without a country code is read as Nepali; it is stored in E.164.
+             * @example 9812345678
+             * @example +977 981-234-5678
+             */
+            contactPhone: string;
+            /** Format: email */
+            contactEmail?: string | null;
         };
-        BookingReceipt: {
-            /** Format: uuid */
+        /** @description The multipart body of `createInquiry` */
+        InquiryForm: components["schemas"]["InquiryInput"] & {
+            /** @description Up to 5 JPEG, PNG or WebP images, 10 MB each and 20 MB together, each its own `referenceImages` part. Their metadata (EXIF, GPS) is removed, and only the studio sees them. */
+            referenceImages?: string[];
+            /** @description Bot-challenge token. The intake form will need it (TAT-55); the API ignores it until then. */
+            challengeToken?: string;
+        };
+        InquiryReceipt: {
+            /**
+             * Format: uuid
+             * @description The new inquiry. Nothing in the public API reads it back.
+             */
             id: string;
-            /** @enum {string} */
-            status: "requested";
         };
     };
     responses: {
@@ -740,7 +778,7 @@ export interface operations {
             422: components["responses"]["ValidationError"];
         };
     };
-    createBooking: {
+    createInquiry: {
         parameters: {
             query?: never;
             header?: never;
@@ -757,29 +795,38 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "multipart/form-data": {
-                    booking: components["schemas"]["BookingRequestInput"];
-                    referenceImages?: string[];
-                    /** @description Bot-challenge token. Required for browser submissions. */
-                    challengeToken?: string;
-                };
+                "multipart/form-data": components["schemas"]["InquiryForm"];
             };
         };
         responses: {
-            /** @description Request received */
+            /** @description Received. The studio replies on WhatsApp or Viber. */
             201: {
                 headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        data: components["schemas"]["BookingReceipt"];
+                        data: components["schemas"]["InquiryReceipt"];
                     };
                 };
             };
+            400: components["responses"]["Error"];
             404: components["responses"]["NotFound"];
+            /** @description The studio takes no such inquiry now (`artist_not_accepting`, `studio_not_accepting`, `too_many_open_inquiries`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            413: components["responses"]["Error"];
+            415: components["responses"]["Error"];
             422: components["responses"]["ValidationError"];
             429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
         };
     };
 }

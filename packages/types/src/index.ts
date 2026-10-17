@@ -17,8 +17,9 @@ export type Artist = Schemas["Artist"];
 export type Service = Schemas["Service"];
 export type PortfolioProject = Schemas["PortfolioProject"];
 export type Slot = Schemas["Slot"];
-export type BookingRequestInput = Schemas["BookingRequestInput"];
-export type BookingReceipt = Schemas["BookingReceipt"];
+export type SourceChannel = Schemas["SourceChannel"];
+export type InquiryInput = Schemas["InquiryInput"];
+export type InquiryReceipt = Schemas["InquiryReceipt"];
 
 export type ListServicesQuery = NonNullable<
 	operations["listServices"]["parameters"]["query"]
