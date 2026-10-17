@@ -1,6 +1,7 @@
 /**
- * The calendar page's props (TAT-50) and where its Now marker goes. Plain
- * types and one function with no imports, so the unit tests can load it.
+ * The calendar page's props (TAT-50), where its Now marker goes and what day
+ * it is. Plain types and two functions with no imports, so the unit tests can
+ * load it.
  */
 
 export type CalendarView = "day" | "week";
@@ -35,7 +36,7 @@ export type CalendarPageProps = {
 	view: CalendarView;
 	/** yyyy-MM-dd: the day shown, or a day of the week shown. */
 	date: string;
-	/** yyyy-MM-dd: today in the studio's timezone. */
+	/** yyyy-MM-dd: today in the studio's timezone when the page loaded. */
 	today: string;
 	/** The studio's timezone, for the Now marker's time. */
 	timezone: string;
@@ -66,4 +67,21 @@ export function nowIndex(
 ): number {
 	const index = sessions.findIndex(({ startsAt }) => startsAt > now);
 	return index === -1 ? sessions.length : index;
+}
+
+/**
+ * The studio's date (yyyy-MM-dd) at `now`. The page moves it with the clock
+ * so a tab left open past the studio's midnight still knows which day is
+ * today; the server's `today` prop is only the date at load.
+ */
+export function studioDate(now: number, timezone: string): string {
+	const parts = new Intl.DateTimeFormat("en-CA", {
+		timeZone: timezone,
+		year: "numeric",
+		month: "2-digit",
+		day: "2-digit",
+	}).formatToParts(now);
+	const part = (type: string) =>
+		parts.find((entry) => entry.type === type)?.value;
+	return `${part("year")}-${part("month")}-${part("day")}`;
 }

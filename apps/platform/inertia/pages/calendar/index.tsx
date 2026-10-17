@@ -9,6 +9,7 @@ import {
 	type CalendarSession,
 	type CalendarView,
 	nowIndex,
+	studioDate,
 } from "~/components/calendar";
 import Page from "~/components/page";
 import {
@@ -42,7 +43,6 @@ function useNow(): number {
 export default function CalendarIndex({
 	view,
 	date,
-	today,
 	timezone,
 	rangeText,
 	previous,
@@ -54,6 +54,8 @@ export default function CalendarIndex({
 }: CalendarPageProps) {
 	const tenant = useTenant();
 	const now = useNow();
+	// Moves with the clock: the `today` prop is only the studio's date at load.
+	const today = studioDate(now, timezone);
 	const isOwner = tenant.role === "owner";
 	const base = urlFor("tenant.calendar.index", { tenant: tenant.slug });
 	const hrefFor: HrefFor = (change) => {
