@@ -83,3 +83,40 @@ test.group("processQueued gives up instead of hanging", (group) => {
 		await assert.rejects(() => processQueued(), /still busy after \d+ cycles/);
 	});
 });
+
+class ScheduledJob extends Job<Record<string, never>> {
+	static options: JobOptions = { retry: { maxRetries: 0 } };
+	static runs = 0;
+
+	async execute() {
+		ScheduledJob.runs += 1;
+	}
+}
+
+/**
+ * Locally the dev server and the tests share one database, and the dev
+ * server writes its schedules there (start/scheduler.ts). The worker claims
+ * due schedules on every cycle, so without care a test would run them.
+ */
+test.group("processQueued ignores persisted schedules", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+	group.each.setup(() => registerJob(ScheduledJob));
+
+	test("a due schedule in queue_schedules does not run", async ({ assert }) => {
+		await db.table("queue_schedules").insert({
+			id: "process-queued-spec",
+			name: "ScheduledJob",
+			payload: "{}",
+			every_ms: 60_000,
+			timezone: "UTC",
+			status: "active",
+			run_count: 0,
+			next_run_at: new Date(Date.now() - 60_000),
+			created_at: new Date(),
+		});
+
+		await processQueued();
+
+		assert.equal(ScheduledJob.runs, 0);
+	});
+});

@@ -61,6 +61,9 @@ export function registerJob(JobClass: {
  * it sees jobs the test queued inside it. Starting a worker re-initializes
  * the process-wide QueueManager, so the app's own queue state is put back
  * afterwards for the tests that follow.
+ *
+ * Persisted schedules never run here: they are deleted inside the test's
+ * transaction first.
  */
 export async function processQueued(queues: string[] = ["default"]) {
 	const config = app.config.get<QueueConfig>("queue");
@@ -70,6 +73,11 @@ export async function processQueued(queues: string[] = ["default"]) {
 			"processQueued needs the test's global transaction: call testUtils.db().wrapInGlobalTransaction() in a setup hook",
 		);
 	}
+	// Locally the tests share the dev database, where the dev server keeps
+	// its schedules (start/scheduler.ts), and the worker claims due ones on
+	// every cycle. A test runs only what it queued. Deleted inside the test's
+	// transaction, so the rows are back once it rolls back.
+	await client.from("queue_schedules").delete();
 	const logger = await app.container.make("logger");
 	const base = {
 		...config,

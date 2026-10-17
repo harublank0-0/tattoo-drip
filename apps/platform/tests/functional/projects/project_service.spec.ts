@@ -192,6 +192,7 @@ test.group("ProjectService.findFor", (group) => {
 
 test.group("ProjectService.expireQuote", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+	group.each.teardown(() => queue.restore());
 
 	test("cancels a quoted or on-hold project once its current quote expired", async ({
 		assert,
@@ -303,9 +304,10 @@ test.group("ProjectService.expireQuote", (group) => {
 		});
 	});
 
-	test("ignores a quote that has not expired or is no longer current", async ({
+	test("queues an early run again, and ignores a quote that is no longer current", async ({
 		assert,
 	}) => {
+		const fake = queue.fake();
 		const { tenant } = await studioWithOwner();
 
 		await inTenant(tenant, async () => {
@@ -316,9 +318,19 @@ test.group("ProjectService.expireQuote", (group) => {
 				expiresAt: DateTime.utc().plus({ days: 1 }),
 			});
 			assert.isFalse(await projects.expireQuote(tenant, project.id, live.id));
+			const expected = live.expiresAt.toMillis() - Date.now();
+			fake.assertPushed(ExpireQuoteJob, {
+				payload: {
+					tenantId: tenant.id,
+					projectId: project.id,
+					quoteId: live.id,
+				},
+				delay: (delay) =>
+					delay !== undefined && Math.abs(delay - expected) < 60_000,
+			});
 
 			// v1's job runs after v2 replaced it; v2 has expired too, but v2's own
-			// job decides that.
+			// job decides that. Nothing is queued for v1.
 			const revised = await makeProject(tenant, await makeClient(tenant), {
 				status: "quoted",
 			});
@@ -331,6 +343,7 @@ test.group("ProjectService.expireQuote", (group) => {
 				expiresAt: DateTime.utc().minus({ hours: 1 }),
 			});
 			assert.isFalse(await projects.expireQuote(tenant, revised.id, v1.id));
+			fake.assertPushedCount(1);
 
 			assert.equal(await statusOf(project), "quoted");
 			assert.equal(await statusOf(revised), "quoted");

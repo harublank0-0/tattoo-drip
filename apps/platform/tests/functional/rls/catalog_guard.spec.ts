@@ -1,3 +1,5 @@
+import db from "@adonisjs/lucid/services/db";
+import type { QueryClientContract } from "@adonisjs/lucid/types/database";
 import { test } from "@japa/runner";
 import { dbClient } from "#services/db_context";
 
@@ -41,9 +43,45 @@ const EXPECTED_POLICIES: Record<string, string[]> = {
 	],
 };
 
+/**
+ * SECURITY DEFINER functions, and why. They run as their owner, which
+ * bypasses row-level security, so each one is a conscious edit: ids only,
+ * a pinned search_path and no EXECUTE for PUBLIC (database/README.md).
+ */
+const DEFINER_FUNCTIONS: Record<string, string> = {
+	"public.expired_quote_candidates":
+		"lists (tenant_id, project_id, quote_id) of expired current quotes for the expiry sweep (TAT-83)",
+};
+
 async function rows<T>(query: string) {
 	const result = await dbClient().rawQuery(query);
 	return result.rows as T[];
+}
+
+/**
+ * The SECURITY DEFINER functions the app owns, in any schema but the
+ * system's, as "schema.name" with the settings the guard checks. A function
+ * an extension owns is not the app's.
+ */
+async function definerFunctions(client: QueryClientContract = dbClient()) {
+	const result = await client.rawQuery(
+		`select n.nspname || '.' || p.proname as name, p.proconfig,
+		        has_function_privilege('public', p.oid, 'execute') as public_can_run
+		 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+		 where p.prosecdef
+		   and n.nspname not in ('pg_catalog', 'information_schema')
+		   and n.nspname !~ '^pg_(toast|temp)'
+		   and not exists (
+		     select 1 from pg_depend d
+		     where d.classid = 'pg_proc'::regclass and d.objid = p.oid and d.deptype = 'e'
+		   )
+		 order by n.nspname collate "C", p.proname collate "C"`,
+	);
+	return result.rows as {
+		name: string;
+		proconfig: string[] | null;
+		public_can_run: boolean;
+	}[];
 }
 
 test.group("Catalog guard", () => {
@@ -184,5 +222,47 @@ test.group("Catalog guard", () => {
 			.filter(({ cols }) => !cols.includes("tenant_id"))
 			.map(({ child, parent }) => `${child} -> ${parent}`);
 		assert.deepEqual(loose, [], "use tenantReference() in the migration");
+	});
+
+	test("every SECURITY DEFINER function is listed, pins search_path and is closed to PUBLIC", async ({
+		assert,
+	}) => {
+		assert.deepEqual(
+			await definerFunctions(),
+			Object.keys(DEFINER_FUNCTIONS)
+				.sort()
+				.map((name) => ({
+					name,
+					proconfig: ["search_path=pg_catalog, pg_temp"],
+					public_can_run: false,
+				})),
+		);
+	});
+
+	test("the definer guard also sees a function outside public", async ({
+		assert,
+	}) => {
+		// DDL is transactional: the schema and function exist only until the
+		// rollback, and only on this connection.
+		const probe = await db.connection("owner").transaction();
+		let names: string[];
+		try {
+			await probe.rawQuery("create schema td_probe_definer");
+			await probe.rawQuery(
+				"create function td_probe_definer.leak() returns int language sql security definer as 'select 1'",
+			);
+			names = (await definerFunctions(probe)).map(({ name }) => name);
+		} finally {
+			await probe.rollback();
+		}
+
+		assert.include(names, "td_probe_definer.leak");
+		assert.include(names, "public.expired_quote_candidates");
+		assert.deepEqual(
+			await rows(
+				"select 1 from pg_namespace where nspname = 'td_probe_definer'",
+			),
+			[],
+		);
 	});
 });
