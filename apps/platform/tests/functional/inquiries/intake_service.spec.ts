@@ -109,9 +109,21 @@ const rowsIn = (tenant: TenantRef) =>
 
 const exists = (key: string) => drive.use("private").exists(key);
 
-/** Rows in the queue table, committed or in the test's transaction. */
-const queuedJobs = async () =>
-	Number((await db.from("queue_jobs").count("* as total"))[0].total);
+/**
+ * This studio's rows in the queue table, committed or in the test's
+ * transaction. Not the whole table: the dev database is shared, and a running
+ * worker adds and removes other jobs. A job's `data` holds its payload, so the
+ * studio's own (per-test) id finds its jobs.
+ */
+const queuedJobs = async (tenant: TenantRef) =>
+	Number(
+		(
+			await db
+				.from("queue_jobs")
+				.where("data", "like", `%${tenant.id}%`)
+				.count("* as total")
+		)[0].total,
+	);
 
 test.group("IntakeService.submit", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
@@ -490,7 +502,7 @@ test.group("IntakeService.submit", (group) => {
 	}) => {
 		const { tenant } = await studioWithOwner("intake-later-51");
 		const { intake, images } = makeIntake();
-		const before = await queuedJobs();
+		const before = await queuedJobs(tenant);
 
 		await assert.rejects(
 			() =>
@@ -507,10 +519,10 @@ test.group("IntakeService.submit", (group) => {
 		assert.lengthOf(images.keys, 1);
 		assert.isFalse(await exists(images.keys[0]));
 		assert.lengthOf((await rowsIn(tenant)).inquiries, 0);
-		assert.equal(await queuedJobs(), before);
+		assert.equal(await queuedJobs(tenant), before);
 
 		// The positive control: a submit that commits leaves its job.
 		await inTenant(tenant, () => intake.submit(tenant, submission()));
-		assert.equal(await queuedJobs(), before + 1);
+		assert.equal(await queuedJobs(tenant), before + 1);
 	});
 });
