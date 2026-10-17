@@ -95,7 +95,7 @@ test.group("Public API: the tenant from the path", (group) => {
 		head.assertStatus(200);
 	});
 
-	test("a write under the current slug runs; under an old slug it is a 404, even with an invalid body", async ({
+	test("a write under the current slug runs; under an old slug it is a 404, even with a body that fails validation", async ({
 		client,
 		assert,
 	}) => {
@@ -119,6 +119,35 @@ test.group("Public API: the tenant from the path", (group) => {
 			assert.deepEqual(response.body(), {
 				error: { code: "not_found", message: "Not found." },
 			});
+		}
+	});
+
+	test("an unreadable body is the same 400 under an old, an unknown or a shapeless slug: the parser runs before the tenant check", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("api-needle-32");
+		await changeSlug(tenant, "api-red-32");
+
+		// Body parsing happens before publicTenant (the bodyparser is in
+		// router.use), so a body that cannot be read is a 400 whatever the
+		// slug. That is not an oracle: the old slug and an unknown one answer
+		// alike. The alias 404 comes before validators, handlers and writes.
+		for (const unreadable of ['{"label":', '"just a string"']) {
+			const bodies = [];
+			for (const slug of [
+				"api-red-32",
+				"api-needle-32",
+				"no-such-studio-td32",
+				"Api-Needle-32",
+			]) {
+				const response = await client
+					.post(`/api/v1/tenants/${slug}/__test/echo`)
+					.unsafeJson(unreadable);
+				assertApiError(response, 400, "bad_request");
+				bodies.push(response.body());
+			}
+			for (const body of bodies) assert.deepEqual(body, bodies[0], unreadable);
 		}
 	});
 
