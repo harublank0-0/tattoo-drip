@@ -55,4 +55,5 @@ export const middleware = router.named({
 	tenant: () => import("#middleware/tenant_middleware"),
 	role: () => import("#middleware/role_middleware"),
 	publicApi: () => import("#middleware/public_api_middleware"),
+	publicTenant: () => import("#middleware/public_tenant_middleware"),
 });

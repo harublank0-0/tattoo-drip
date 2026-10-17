@@ -3,6 +3,7 @@ import router from "@adonisjs/core/services/router";
 import { LimiterResponse, errors as limiterErrors } from "@adonisjs/limiter";
 import db from "@adonisjs/lucid/services/db";
 import vine, { errors } from "@vinejs/vine";
+import { publicTenantContext } from "#middleware/public_tenant_middleware";
 import User from "#models/user";
 import PaymentMethod from "#modules/payments/models/payment_method";
 import {
@@ -196,3 +197,30 @@ router
 	})
 	.prefix("/api/v1/__test")
 	.use(middleware.publicApi());
+
+/**
+ * Public API routes under a tenant (TAT-32): `db` echoes what the request
+ * runs as (its settings and the tenants RLS lets it see), `echo` is a write
+ * that changes nothing, for old-slug writes.
+ */
+router
+	.group(() => {
+		router.get("db", async (ctx) => {
+			const { rows } = await dbClient().rawQuery(
+				`select current_setting('app.user_id', true) as user_id,
+				        current_setting('app.tenant_id', true) as tenant_id,
+				        coalesce((select json_agg(id order by id) from tenants), '[]'::json) as visible_tenant_ids`,
+			);
+			return {
+				data: { ...rows[0], tenantSlug: publicTenantContext(ctx).tenant.slug },
+			};
+		});
+		router.post("echo", async (ctx) => ({
+			data: {
+				slug: publicTenantContext(ctx).tenant.slug,
+				...(await ctx.request.validateUsing(echoValidator)),
+			},
+		}));
+	})
+	.prefix("/api/v1/tenants/:tenant/__test")
+	.use([middleware.publicApi(), middleware.publicTenant()]);
