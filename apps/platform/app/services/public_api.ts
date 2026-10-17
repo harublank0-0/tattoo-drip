@@ -59,7 +59,10 @@ export type ApiErrorCode =
 	// createInquiry (TAT-51)
 	| "artist_not_accepting"
 	| "studio_not_accepting"
-	| "too_many_open_inquiries";
+	| "too_many_open_inquiries"
+	// submitDepositProof (TAT-65)
+	| "deposit_not_due"
+	| "deposit_changed";
 
 export type ErrorKind = { status: number; code: string; message: string };
 
@@ -117,6 +120,18 @@ export const API_ERRORS: Record<ApiErrorCode, ErrorKind> = {
 		code: "too_many_open_inquiries",
 		message:
 			"You already have requests waiting with this studio. They will reply on WhatsApp or Viber.",
+	},
+	deposit_not_due: {
+		status: 409,
+		code: "deposit_not_due",
+		message:
+			"This deposit can't be paid here right now. Reload the page to see why.",
+	},
+	deposit_changed: {
+		status: 409,
+		code: "deposit_changed",
+		message:
+			"The deposit amount changed. Check the new amount before you upload.",
 	},
 };
 
