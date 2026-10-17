@@ -6,6 +6,7 @@ import {
 	formatHours,
 	formatMoney,
 	isExpired,
+	lastBookableDay,
 	priceText,
 	quoteMessage,
 	quoteTotal,
@@ -103,6 +104,12 @@ test.group("expiry dates", () => {
 		const now = DateTime.fromISO("2026-10-14T20:00:00Z");
 		assert.equal(todayIn(KTM, now), "2026-10-15");
 		assert.equal(todayIn("UTC", now), "2026-10-14");
+	});
+
+	test("the last bookable day is the same date a year on", ({ assert }) => {
+		assert.equal(lastBookableDay("2026-10-17"), "2027-10-17");
+		// 29 February has no next-year twin: the last day of February.
+		assert.equal(lastBookableDay("2028-02-29"), "2029-02-28");
 	});
 
 	test("a quote is expired from its expires_at on", ({ assert }) => {

@@ -1,13 +1,12 @@
 import { inject } from "@adonisjs/core";
 import type { HttpContext } from "@adonisjs/core/http";
 import { errors } from "@vinejs/vine";
-import { DateTime } from "luxon";
 import { tenantContext } from "#middleware/tenant_middleware";
 import { ClientRuleError } from "#modules/clients/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ClientService from "#modules/clients/services/client_service";
 import { BookingRuleError } from "#modules/projects/errors";
-import { todayIn } from "#modules/projects/quotes";
+import { lastBookableDay, todayIn } from "#modules/projects/quotes";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import BookingService, {
 	type Booking,
@@ -58,12 +57,7 @@ export default class BookingsController {
 			lookup: artists.length ? await this.lookup(tenant, typed) : null,
 			artists: artists.map(({ id, name }) => ({ id, name })),
 			isOwner: membership.role === "owner",
-			dates: {
-				today,
-				max: DateTime.fromISO(today, { zone: "utc" })
-					.plus({ years: 1 })
-					.toFormat("yyyy-MM-dd"),
-			},
+			dates: { today, max: lastBookableDay(today) },
 		});
 	}
 

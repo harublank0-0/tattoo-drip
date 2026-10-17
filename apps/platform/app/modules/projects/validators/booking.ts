@@ -1,7 +1,7 @@
 import vine, { errors, SimpleMessagesProvider } from "@vinejs/vine";
 import type { Infer } from "@vinejs/vine/types";
 import { DateTime } from "luxon";
-import { todayIn } from "#modules/projects/quotes";
+import { lastBookableDay, todayIn } from "#modules/projects/quotes";
 import type {
 	BookingClient,
 	DirectBooking,
@@ -145,9 +145,7 @@ function startOf(
 	fail: Fail,
 ): DateTime | null {
 	const today = todayIn(timezone, now);
-	const last = DateTime.fromISO(today, { zone: "utc" })
-		.plus({ years: 1 })
-		.toFormat("yyyy-MM-dd");
+	const last = lastBookableDay(today);
 	const real = DateTime.fromISO(form.date, { zone: "utc" }).isValid;
 	if (!real || form.date < today || form.date > last) {
 		fail("date", DAY, "range");

@@ -110,6 +110,17 @@ export function todayIn(
 	return now.setZone(timezone).toFormat("yyyy-MM-dd");
 }
 
+/**
+ * The latest day (yyyy-MM-dd) a session can be booked: the same date a year
+ * after `today` (yyyy-MM-dd). The booking page's `max` and the validator's
+ * refusal both come from here, so they cannot drift apart.
+ */
+export function lastBookableDay(today: string): string {
+	return DateTime.fromISO(today, { zone: "utc" })
+		.plus({ years: 1 })
+		.toFormat("yyyy-MM-dd");
+}
+
 /** A yyyy-MM-dd date for people: "28 Oct 2026". */
 export function formatDay(date: string): string {
 	return DateTime.fromISO(date, { locale: "en-GB" }).toFormat("d LLL yyyy");
