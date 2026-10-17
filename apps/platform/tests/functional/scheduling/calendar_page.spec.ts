@@ -280,6 +280,25 @@ test.group("Calendar page", (group) => {
 		}
 	});
 
+	test("a date at the ends of the year range is today, not an error", async ({
+		client,
+		assert,
+	}) => {
+		const { owner } = await studio();
+		const today = todayIn(KTM);
+
+		for (const date of ["9999-12-28", "9999-12-31", "0000-01-03"]) {
+			for (const view of ["week", "day"]) {
+				const response = await client
+					.get(calendarUrl(`?view=${view}&date=${date}`))
+					.withInertia()
+					.loginAs(owner);
+				response.assertStatus(200);
+				assert.include(response.inertiaProps, { view, date: today }, date);
+			}
+		}
+	});
+
 	test("an owner can show one artist's sessions", async ({
 		client,
 		assert,

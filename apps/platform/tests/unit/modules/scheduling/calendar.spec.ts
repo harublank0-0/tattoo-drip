@@ -50,6 +50,32 @@ test.group("calendar query values", () => {
 			assert.equal(toCalendarDate(value, TODAY), TODAY, String(value));
 		}
 	});
+
+	test("years 1900 to 2100 only, so a week never leaves four-digit years", ({
+		assert,
+	}) => {
+		for (const value of ["1900-01-01", "2100-12-31"]) {
+			assert.equal(toCalendarDate(value, TODAY), value, value);
+		}
+		for (const value of [
+			"0000-01-03",
+			"1899-12-31",
+			"2101-01-01",
+			"9999-12-28",
+			"9999-12-31",
+		]) {
+			assert.equal(toCalendarDate(value, TODAY), TODAY, value);
+		}
+		// The weeks around the accepted ends are made of real days.
+		for (const date of ["1900-01-01", "2100-12-31"]) {
+			for (const day of calendarDays("week", date)) {
+				const { from, to } = dayBounds(day, KTM);
+				assert.isTrue(from.isValid && to.isValid, day);
+				assert.isTrue(dayLabel(day) !== "Invalid DateTime", day);
+			}
+			assert.notInclude(rangeText(calendarDays("week", date)), "Invalid");
+		}
+	});
 });
 
 test.group("calendarDays and shiftDate", () => {

@@ -14,6 +14,13 @@ export const BRIEF_PREVIEW_LENGTH = 100;
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+/**
+ * The years `?date=` may name. A week reaches into the year on either side,
+ * and "10000-01-01" is no date Luxon reads, so the ends keep a margin.
+ */
+const FIRST_YEAR = 1900;
+const LAST_YEAR = 2100;
+
 const plain = (date: string) =>
 	DateTime.fromISO(date, { zone: "utc", locale: "en-GB" });
 const iso = (date: DateTime) => date.toFormat("yyyy-MM-dd");
@@ -23,10 +30,11 @@ export function toCalendarView(value: unknown): CalendarView {
 	return value === "week" ? "week" : "day";
 }
 
-/** `?date=`: a real yyyy-MM-dd date, else `today`. */
+/** `?date=`: a real yyyy-MM-dd date from 1900 to 2100, else `today`. */
 export function toCalendarDate(value: unknown, today: string): string {
 	if (typeof value !== "string" || !DATE.test(value)) return today;
-	return DateTime.fromFormat(value, "yyyy-MM-dd", { zone: "utc" }).isValid
+	const date = DateTime.fromFormat(value, "yyyy-MM-dd", { zone: "utc" });
+	return date.isValid && date.year >= FIRST_YEAR && date.year <= LAST_YEAR
 		? value
 		: today;
 }
