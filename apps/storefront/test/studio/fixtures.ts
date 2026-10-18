@@ -1,0 +1,60 @@
+import type { Artist, Studio } from "@tattoo-drip/sdk";
+
+/** Shared by the studio page tests: whole TAT-44 objects. */
+
+export const ORIGIN = "https://black-needle-48.tattoodrip.com";
+
+export const STUDIO: Studio = {
+	slug: "black-needle-48",
+	name: "Black Needle",
+	type: "studio",
+	intro: "Fine line and blackwork in Thamel.\r\nWalk-ins on Sundays.",
+	timezone: "Asia/Kathmandu",
+	contact: {
+		phone: "+9779812345678",
+		email: "hello@black-needle.example",
+		address: "Thamel Marg\nKathmandu",
+	},
+	socialLinks: [
+		{ platform: "instagram", url: "https://instagram.com/blackneedle" },
+		{ platform: "facebook", url: "https://facebook.com/blackneedle" },
+		{ platform: "tiktok", url: "https://www.tiktok.com/@blackneedle" },
+		{ platform: "website", url: "https://black-needle.example" },
+	],
+	acceptingInquiries: true,
+};
+
+/** A studio that set nothing but its name. */
+export const EMPTY_STUDIO: Studio = {
+	...STUDIO,
+	intro: null,
+	contact: { phone: null, email: null, address: null },
+	socialLinks: [],
+};
+
+/** Every visible artist closed. */
+export const CLOSED_STUDIO: Studio = { ...STUDIO, acceptingInquiries: false };
+
+export const SITA_PHOTO_URL =
+	"https://api.example.com/uploads/tenants/t/artist_photo/sita.jpg";
+
+export const SITA: Artist = {
+	id: "0199f000-0000-7000-8000-000000000048",
+	slug: "sita",
+	name: "Sita Rai",
+	bio: "Fine line florals.\nBooks a month ahead.",
+	photo: { url: SITA_PHOTO_URL, width: 1200, height: 1500 },
+	acceptingInquiries: true,
+	closedMessage: null,
+};
+
+/** Closed, no photo, a Devanagari name. */
+export const ARJUN: Artist = {
+	id: "0199f000-0000-7000-8000-000000000049",
+	slug: "arjun",
+	name: "अर्जुन थापा",
+	bio: null,
+	photo: null,
+	acceptingInquiries: false,
+	closedMessage: "Books open in March.",
+};
