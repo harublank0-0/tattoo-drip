@@ -43,9 +43,32 @@ test.group("Public API: CORS", () => {
 		response.assertHeader("access-control-allow-methods", "GET,HEAD,POST");
 		response.assertHeader(
 			"access-control-allow-headers",
-			"accept,content-type",
+			"accept,content-type,x-challenge-token",
 		);
 		response.assertHeader("access-control-max-age", "600");
+		assert.isUndefined(response.header("access-control-allow-credentials"));
+		assertNoCookies(response);
+	});
+
+	test("a write's preflight may name the bot-challenge token header (TAT-55)", async ({
+		client,
+		assert,
+	}) => {
+		const response = await client
+			.options("/api/v1/__test/echo")
+			.header("origin", ORIGIN)
+			.header("access-control-request-method", "POST")
+			.header(
+				"access-control-request-headers",
+				"content-type,x-challenge-token",
+			);
+
+		response.assertStatus(204);
+		response.assertHeader("access-control-allow-origin", "*");
+		response.assertHeader(
+			"access-control-allow-headers",
+			"accept,content-type,x-challenge-token",
+		);
 		assert.isUndefined(response.header("access-control-allow-credentials"));
 		assertNoCookies(response);
 	});

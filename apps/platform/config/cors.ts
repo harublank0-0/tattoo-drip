@@ -17,17 +17,19 @@ const corsConfig = defineConfig({
 	methods: ["GET", "HEAD", "POST"],
 
 	/**
-	 * JSON writes preflight for Content-Type. Authorization (the server key,
-	 * TAT-38) is server-side only, so browsers may not send it.
+	 * JSON writes preflight for Content-Type, and the intake for its
+	 * bot-challenge token (TAT-55), which rides in a header so the API checks
+	 * it before it reads the upload. Authorization (the server key, TAT-38)
+	 * is server-side only, so browsers may not send it.
 	 */
-	headers: ["accept", "content-type"],
+	headers: ["accept", "content-type", "x-challenge-token"],
 
 	/** So the studio page can say when to try again after a 429. */
 	exposeHeaders: ["retry-after"],
 
 	credentials: false,
 
-	/** Only JSON writes preflight; a CORS fix reaches browsers in 10 minutes. */
+	/** JSON writes and the intake preflight; a CORS fix reaches browsers in 10 minutes. */
 	maxAge: 600,
 });
 
