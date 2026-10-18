@@ -329,7 +329,9 @@ export function ContactLine({
 	if (links.length === 0) return null;
 	return (
 		<p className="deposit-contact">
-			<Fill template={copy.contact} values={{ studio: studioName }} />
+			<span>
+				<Fill template={copy.contact} values={{ studio: studioName }} />
+			</span>
 			{links.map((link) => (
 				<a
 					key={link.href}
