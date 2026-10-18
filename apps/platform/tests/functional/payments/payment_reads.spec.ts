@@ -64,7 +64,7 @@ test.group("PaymentService reads", (group) => {
 		);
 	});
 
-	test("listFlags: a screenshot to check, and a closed project's deposit to settle", async ({
+	test("listFlags: a screenshot to check, a closed project's deposit to settle, and an expired quote the studio decided on late", async ({
 		assert,
 	}) => {
 		const { owner, tenant } = await studioWithOwner(
@@ -99,7 +99,42 @@ test.group("PaymentService reads", (group) => {
 				amount: -300_000,
 				...verified(),
 			});
-			return { waiting, closed, settled, open, refunded };
+			// An expired quote the studio decided on late, so the sweep spares it...
+			const lapsed = await makeProject(tenant, client, {
+				status: "deposit_pending",
+			});
+			await makeQuote(tenant, lapsed, {
+				expiresAt: DateTime.utc().minus({ hours: 1 }),
+			});
+			await makePayment(tenant, lapsed, {
+				status: "rejected",
+				verifiedAt: DateTime.utc(),
+			});
+			// ...one the sweep is about to cancel, and one still within its expiry.
+			const unpaid = await makeProject(tenant, client, {
+				status: "deposit_pending",
+			});
+			await makeQuote(tenant, unpaid, {
+				expiresAt: DateTime.utc().minus({ hours: 1 }),
+			});
+			const fresh = await makeProject(tenant, client, {
+				status: "deposit_pending",
+			});
+			await makeQuote(tenant, fresh);
+			await makePayment(tenant, fresh, {
+				status: "rejected",
+				verifiedAt: DateTime.utc(),
+			});
+			return {
+				waiting,
+				closed,
+				settled,
+				open,
+				refunded,
+				lapsed,
+				unpaid,
+				fresh,
+			};
 		});
 		await inTenant(tenant, () =>
 			payments.recordOutcome(tenant, ownerMember(owner), projects.settled, {
@@ -115,23 +150,35 @@ test.group("PaymentService reads", (group) => {
 		assert.deepEqual(flags.get(projects.waiting.id), {
 			proofWaiting: true,
 			depositToSettle: false,
+			quoteLapsed: false,
 		});
 		assert.deepEqual(flags.get(projects.closed.id), {
 			proofWaiting: false,
 			depositToSettle: true,
+			quoteLapsed: false,
 		});
 		assert.deepEqual(flags.get(projects.settled.id), {
 			proofWaiting: false,
 			depositToSettle: false,
+			quoteLapsed: false,
 		});
 		assert.deepEqual(flags.get(projects.open.id), {
 			proofWaiting: false,
 			depositToSettle: false,
+			quoteLapsed: false,
 		});
+		assert.deepEqual(flags.get(projects.lapsed.id), {
+			proofWaiting: false,
+			depositToSettle: false,
+			quoteLapsed: true,
+		});
+		assert.isFalse(flags.get(projects.unpaid.id)?.quoteLapsed);
+		assert.isFalse(flags.get(projects.fresh.id)?.quoteLapsed);
 		// The deposit was given back at the desk before the project closed.
 		assert.deepEqual(flags.get(projects.refunded.id), {
 			proofWaiting: false,
 			depositToSettle: false,
+			quoteLapsed: false,
 		});
 	});
 

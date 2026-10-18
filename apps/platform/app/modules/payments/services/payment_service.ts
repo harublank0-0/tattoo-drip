@@ -7,6 +7,7 @@ import { PaymentRuleError } from "#modules/payments/errors";
 import {
 	type Balance,
 	balanceOf,
+	decidedLate,
 	depositMoney,
 	settleableDeposit,
 } from "#modules/payments/ledger";
@@ -58,6 +59,13 @@ export type ProjectMoney = {
 	outcome: DepositOutcome | null;
 	/** Closed (CLOSED_FOR_OUTCOME), still holding deposit money, and no outcome yet. */
 	outcomeNeeded: boolean;
+};
+
+/** What the owners' projects list flags on one project (PaymentService.listFlags). */
+export type ListFlags = {
+	proofWaiting: boolean;
+	depositToSettle: boolean;
+	quoteLapsed: boolean;
 };
 
 /** A verified payment and what it did to its project. */
@@ -228,13 +236,17 @@ export default class PaymentService {
 
 	/**
 	 * The owners' flags on the projects list: a deposit screenshot waits
-	 * (`proofWaiting`), or a closed project still holds deposit money
-	 * (settleableDeposit) with no outcome recorded (`depositToSettle`).
+	 * (`proofWaiting`), a closed project still holds deposit money
+	 * (settleableDeposit) with no outcome recorded (`depositToSettle`), or a
+	 * deposit_pending project's quote has expired but the studio's late
+	 * decision on the deposit spares it from the sweep (`quoteLapsed`): it
+	 * waits for the owner to revise the quote, take the rest at the desk or
+	 * withdraw.
 	 */
 	async listFlags(
 		tenant: TenantRef,
 		projects: Pick<TattooProject, "id" | "status">[],
-	): Promise<Map<string, { proofWaiting: boolean; depositToSettle: boolean }>> {
+	): Promise<Map<string, ListFlags>> {
 		const ids = projects.map(({ id }) => id);
 		const rows =
 			ids.length === 0
@@ -256,13 +268,14 @@ export default class PaymentService {
 						)
 						.whereNull("session_id");
 		const settled = new Set(outcomes.map(({ projectId }) => projectId));
-		const flags = new Map<
-			string,
-			{ proofWaiting: boolean; depositToSettle: boolean }
-		>();
+		const flags = new Map<string, ListFlags>();
 		for (const project of projects) {
 			const own = rows.filter(({ projectId }) => projectId === project.id);
+			const proofWaiting = own.some(
+				({ kind, status }) => kind === "deposit" && status === "submitted",
+			);
 			let depositToSettle = false;
+			let quoteLapsed = false;
 			if (
 				CLOSED_FOR_OUTCOME.includes(project.status) &&
 				!settled.has(project.id)
@@ -270,12 +283,14 @@ export default class PaymentService {
 				const quote = await this.quotes.current(tenant, project);
 				depositToSettle = settleableDeposit(own, quote?.currency ?? "NPR") > 0;
 			}
-			flags.set(project.id, {
-				proofWaiting: own.some(
-					({ kind, status }) => kind === "deposit" && status === "submitted",
-				),
-				depositToSettle,
-			});
+			if (project.status === "deposit_pending" && !proofWaiting) {
+				const quote = await this.quotes.current(tenant, project);
+				quoteLapsed =
+					quote !== null &&
+					isExpired(quote) &&
+					decidedLate(own, quote.expiresAt);
+			}
+			flags.set(project.id, { proofWaiting, depositToSettle, quoteLapsed });
 		}
 		return flags;
 	}

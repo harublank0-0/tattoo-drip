@@ -87,13 +87,13 @@ test.group("The Payments card on the project page", (group) => {
 		assert.equal(card.balance.state, "due");
 	});
 
-	test("the projects list flags, for owners, a screenshot to check and a deposit to settle", async ({
+	test("the projects list flags, for owners, a screenshot to check, a deposit to settle and an expired quote", async ({
 		client,
 		assert,
 	}) => {
 		const { owner, tenant } = await studioWithOwner(SLUG, "Black Needle");
 		const artist = await artistIn(tenant, `artist@${SLUG}.example`);
-		const { waiting, closed } = await inTenant(tenant, async () => {
+		const { waiting, closed, lapsed } = await inTenant(tenant, async () => {
 			const { project: pending } = await depositReady(tenant);
 			await proofFor(tenant, pending);
 			// The artist is assigned to it, so their list has the row too.
@@ -110,7 +110,18 @@ test.group("The Payments card on the project page", (group) => {
 				status: "verified",
 				verifiedAt: DateTime.utc(),
 			});
-			return { waiting: pending, closed: cancelled };
+			// An expired quote the studio rejected a screenshot on late: spared.
+			const lapsed = await makeProject(tenant, await makeClient(tenant), {
+				status: "deposit_pending",
+			});
+			await makeQuote(tenant, lapsed, {
+				expiresAt: DateTime.utc().minus({ hours: 1 }),
+			});
+			await makePayment(tenant, lapsed, {
+				status: "rejected",
+				verifiedAt: DateTime.utc(),
+			});
+			return { waiting: pending, closed: cancelled, lapsed };
 		});
 		const rows = async (status: string, user = owner) =>
 			(
@@ -123,17 +134,21 @@ test.group("The Payments card on the project page", (group) => {
 		const active = await rows("active");
 		assert.deepInclude(
 			active.find(({ id }: { id: string }) => id === waiting.id),
-			{ proofWaiting: true, depositToSettle: false },
+			{ proofWaiting: true, depositToSettle: false, quoteLapsed: false },
+		);
+		assert.deepInclude(
+			active.find(({ id }: { id: string }) => id === lapsed.id),
+			{ proofWaiting: false, depositToSettle: false, quoteLapsed: true },
 		);
 		const closedRows = await rows("closed");
 		assert.deepInclude(
 			closedRows.find(({ id }: { id: string }) => id === closed.id),
-			{ proofWaiting: false, depositToSettle: true },
+			{ proofWaiting: false, depositToSettle: true, quoteLapsed: false },
 		);
 		const artistRows = await rows("active", artist);
 		assert.deepInclude(
 			artistRows.find(({ id }: { id: string }) => id === waiting.id),
-			{ proofWaiting: false, depositToSettle: false },
+			{ proofWaiting: false, depositToSettle: false, quoteLapsed: false },
 		);
 	});
 });

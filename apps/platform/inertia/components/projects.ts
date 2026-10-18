@@ -160,6 +160,8 @@ export type ProjectRow = {
 	proofWaiting: boolean;
 	/** Owners: a closed project holds deposit money with no outcome recorded. */
 	depositToSettle: boolean;
+	/** Owners: the quote expired but a late decision on the deposit spares the project; revise, take the rest or withdraw. */
+	quoteLapsed: boolean;
 };
 
 export type ProjectListProps = {

@@ -87,6 +87,9 @@ export default function ProjectsIndex({
 										{project.depositToSettle && (
 											<Badge variant="outline">deposit to settle</Badge>
 										)}
+										{project.quoteLapsed && (
+											<Badge variant="outline">quote expired</Badge>
+										)}
 										{project.noSession && (
 											<Badge variant="destructive">no session</Badge>
 										)}

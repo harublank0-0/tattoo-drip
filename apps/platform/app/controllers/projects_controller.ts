@@ -23,7 +23,9 @@ import DepositLinkService from "#modules/payments/services/deposit_link_service"
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import DepositService from "#modules/payments/services/deposit_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
-import PaymentService from "#modules/payments/services/payment_service";
+import PaymentService, {
+	type ListFlags,
+} from "#modules/payments/services/payment_service";
 import { contactedText } from "#modules/projects/contact";
 import type Quote from "#modules/projects/models/quote";
 import type TattooProject from "#modules/projects/models/tattoo_project";
@@ -105,10 +107,7 @@ export default class ProjectsController {
 		const flags =
 			membership.role === "owner"
 				? await this.payments.listFlags(tenant, projects)
-				: new Map<
-						string,
-						{ proofWaiting: boolean; depositToSettle: boolean }
-					>();
+				: new Map<string, ListFlags>();
 		const clientName = new Map(clients.map(({ id, name }) => [id, name]));
 		const artistName = new Map(artists.map(({ id, name }) => [id, name]));
 		const sum = (statuses: readonly (keyof typeof counts)[]) =>
@@ -134,6 +133,7 @@ export default class ProjectsController {
 				noSession: project.status === "booked" && !withSession.has(project.id),
 				proofWaiting: flags.get(project.id)?.proofWaiting ?? false,
 				depositToSettle: flags.get(project.id)?.depositToSettle ?? false,
+				quoteLapsed: flags.get(project.id)?.quoteLapsed ?? false,
 			})),
 			page: { current: page, last: lastPage, total },
 		});
