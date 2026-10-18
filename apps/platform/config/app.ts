@@ -1,5 +1,6 @@
 import { defineConfig } from "@adonisjs/core/http";
 import app from "@adonisjs/core/services/app";
+import { cookieAttributes } from "#services/cookie_policy";
 import { onBadUrl } from "#services/public_api";
 import env from "#start/env";
 
@@ -85,39 +86,14 @@ export const http = defineConfig({
 	},
 
 	/**
-	 * Manage cookies configuration. The settings for the session id cookie are
-	 * defined inside the "config/session.ts" file.
+	 * Defaults for every cookie the app sets (TAT-9, #services/cookie_policy):
+	 * host-only (never a Domain), on `/`, HttpOnly, SameSite=Lax, Secure in
+	 * production. Shield's XSRF-TOKEN (made readable by the page), the auth
+	 * guard's remember_web clearing and every clearCookie use them; the
+	 * session cookie's own options are in config/session.ts.
 	 */
 	cookie: {
-		/**
-		 * Restrict the cookie to a specific domain.
-		 * Keep empty to use the current host.
-		 */
-		domain: "",
-
-		/**
-		 * Restrict the cookie to a URL path. '/' means all routes.
-		 */
-		path: "/",
-
-		/**
-		 * Default lifetime for cookies managed by the HTTP layer.
-		 */
+		...cookieAttributes(app.inProduction),
 		maxAge: "2h",
-
-		/**
-		 * Prevent JavaScript access to the cookie in the browser.
-		 */
-		httpOnly: true,
-
-		/**
-		 * Send cookies only over HTTPS in production.
-		 */
-		secure: app.inProduction,
-
-		/**
-		 * Cross-site policy for cookie sending.
-		 */
-		sameSite: "lax",
 	},
 });

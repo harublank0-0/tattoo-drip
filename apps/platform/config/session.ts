@@ -1,5 +1,6 @@
 import app from "@adonisjs/core/services/app";
 import { defineConfig, stores } from "@adonisjs/session";
+import { cookieAttributes, sessionCookieName } from "#services/cookie_policy";
 import env from "#start/env";
 
 const sessionConfig = defineConfig({
@@ -9,9 +10,10 @@ const sessionConfig = defineConfig({
 	enabled: true,
 
 	/**
-	 * Cookie name storing the session identifier.
+	 * `__Host-td-session` in production, `td-session` in development and
+	 * tests (TAT-9, #services/cookie_policy).
 	 */
-	cookieName: "adonis-session",
+	cookieName: sessionCookieName(app.inProduction),
 
 	/**
 	 * When set to true, the session id cookie will be deleted
@@ -26,30 +28,11 @@ const sessionConfig = defineConfig({
 	age: "2h",
 
 	/**
-	 * Configuration for session cookie and the
-	 * cookie store.
+	 * Host-only (never a Domain), on `/`, HttpOnly, SameSite=Lax, and Secure
+	 * in production (#services/cookie_policy). The cookie store's data
+	 * cookie, named by the session id, gets the same options.
 	 */
-	cookie: {
-		/**
-		 * Restrict the cookie to a URL path. '/' means all routes.
-		 */
-		path: "/",
-
-		/**
-		 * Prevent JavaScript access to the cookie in the browser.
-		 */
-		httpOnly: true,
-
-		/**
-		 * Send cookies only over HTTPS in production.
-		 */
-		secure: app.inProduction,
-
-		/**
-		 * Cross-site policy for cookie sending.
-		 */
-		sameSite: "lax",
-	},
+	cookie: cookieAttributes(app.inProduction),
 
 	/**
 	 * The store to use. Make sure to validate the environment
