@@ -853,6 +853,7 @@ export interface operations {
             };
             304: components["responses"]["NotModified"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
             default: components["responses"]["Error"];
         };
     };
@@ -888,6 +889,7 @@ export interface operations {
             };
             304: components["responses"]["NotModified"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
             default: components["responses"]["Error"];
         };
     };
@@ -928,6 +930,7 @@ export interface operations {
             };
             304: components["responses"]["NotModified"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
             default: components["responses"]["Error"];
         };
     };
