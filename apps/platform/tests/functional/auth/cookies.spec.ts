@@ -7,7 +7,13 @@ import User from "#models/user";
 import { cookieAttributes, sessionCookieName } from "#services/cookie_policy";
 import { parseSetCookie, setCookieLines } from "#tests/helpers/cookies";
 
-const SESSION = sessionCookieName(app.inProduction);
+/**
+ * Japa runs with NODE_ENV=test, so everything here is the development half
+ * of the policy: `td-session`, and no Secure (plain http). Production's
+ * name, Secure and lines come from the real config files in a process of
+ * its own: production_boot.spec.ts.
+ */
+const SESSION = sessionCookieName(false);
 
 /**
  * Every cookie the dashboard sets (TAT-9 spec, ruling 3). A new one fails
@@ -35,10 +41,9 @@ function assertPolicy(assert: Assert, header: unknown): string[] {
 		);
 		assert.include(attributes, "path=/", name);
 		assert.include(attributes, "samesite=lax", name);
-		assert.equal(
+		assert.isFalse(
 			attributes.includes("secure"),
-			app.inProduction,
-			`${name}: Secure exactly in production`,
+			`${name}: no Secure over the tests' plain http`,
 		);
 		assert.equal(
 			attributes.includes("httponly"),
@@ -52,7 +57,7 @@ function assertPolicy(assert: Assert, header: unknown): string[] {
 test.group("Dashboard cookies (TAT-9)", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 
-	test("every cookie the dashboard sets is host-only, on /, SameSite=Lax, and Secure only in production", async ({
+	test("every cookie the dashboard sets is host-only, on /, SameSite=Lax and, over the tests' http, not Secure", async ({
 		client,
 		assert,
 	}) => {
@@ -99,22 +104,19 @@ test.group("Dashboard cookies (TAT-9)", (group) => {
 	test("the resolved session and cookie configs follow the policy and name no domain", async ({
 		assert,
 	}) => {
+		assert.isFalse(app.inProduction, "the suite runs as NODE_ENV=test");
 		const session = await configProvider.resolve<{
 			cookieName: string;
 			cookie: Record<string, unknown>;
 		}>(app, app.config.get("session"));
 		assert.equal(session?.cookieName, SESSION);
-		assert.containSubset(session?.cookie, {
-			...cookieAttributes(app.inProduction),
-		});
+		assert.containSubset(session?.cookie, { ...cookieAttributes(false) });
 		assert.notProperty(session?.cookie, "domain");
 
 		const http = app.config.get<{ cookie: Record<string, unknown> }>(
 			"app.http",
 		);
-		assert.containSubset(http.cookie, {
-			...cookieAttributes(app.inProduction),
-		});
+		assert.containSubset(http.cookie, { ...cookieAttributes(false) });
 		assert.notProperty(http.cookie, "domain");
 	});
 
