@@ -77,21 +77,22 @@ const createInquiry = useCreateInquiry();
 
 `useCreateInquiry()` never retries, even when the app's `QueryClient` retries mutations by default: its options (`tattooMutations.createInquiry(client)`) set `retry: false`, because a retry after a timeout could send the inquiry twice.
 
-For SSR prefetching in route loaders, use `tattooQueries.*` with `queryClient.ensureQueryData(tattooQueries.artists(client))`. The query options forward TanStack Query's `signal`, so a query nobody needs any more cancels its request.
+For SSR prefetching in route loaders, use `tattooQueries.*` with `queryClient.query({ ...tattooQueries.artists(client), staleTime: "static" })`: cached data, else one fetch (TanStack Query 5.104 deprecates `ensureQueryData` for this). The query options forward TanStack Query's `signal`, so a query nobody needs any more cancels its request. The options set no `staleTime` except where a resource needs one: the deposit page is always stale (`staleTime: 0`), so a focus refetches it whatever the app's default.
 
 ## Studio page = external storefront
 
 The studio page gets **no special access**. It uses the same endpoints and packages. If it needs something the API doesn't expose, the fix is to add it to the API. The only differences:
 
 - The tenant comes from the host on each request: the storefront's tenant middleware confirms it with `studio.get()` and redirects old slugs ([tenants and hosts](../apps/storefront/docs/development.md#tenants-and-hosts)).
-- Server-side rendering sends a secret server key, used only for rate limiting.
+- Server-side rendering sends a secret server key (`STOREFRONT_SERVER_KEY`, as `Authorization: Bearer`), used only for rate limiting; the platform checks it from TAT-38.
 - Inquiries go from the browser straight to the API.
 
 ```ts
-// apps/storefront, server side (TAT-23): the tenant middleware has already
-// confirmed the studio and redirected old slugs
-const { slug } = requestStudio();
-const client = createTattooClient({ baseUrl: API_URL, tenant: slug, key: env.STOREFRONT_SERVER_KEY });
+// apps/storefront (TAT-23, src/api/): a QueryClient and a client per server request and per tab
+// Server: the studio the tenant middleware confirmed, and the server key when set
+const serverClient = createTattooClient({ baseUrl: API_URL, tenant: requestStudio().slug, key: STOREFRONT_SERVER_KEY, timeoutMs: 5_000 });
+// Browser: only { apiUrl, tenant } crosses, in the router's dehydrated state; no key
+const browserClient = createTattooClient({ baseUrl: connection.apiUrl, tenant: connection.tenant });
 ```
 
 The SDK throws if it is given a key in a browser.
