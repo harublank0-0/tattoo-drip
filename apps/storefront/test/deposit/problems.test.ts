@@ -166,6 +166,11 @@ describe("describeProofError", () => {
 			[api(415, "unsupported_media_type"), notice("cut-off")],
 			[api(503, "service_busy", { retryAfter: 5 }), notice("busy")],
 			[api(500, "internal_error"), notice("server")],
+			// A proxy's 502 or 504 is an uncertain outcome too, but ruling 17 reads the
+			// page again only for the answers it lists: these stay the generic notice,
+			// and a second Send is safe (the API answers it 409 deposit_not_due).
+			[api(502, "unknown_error"), notice("server")],
+			[api(504, "unknown_error"), notice("server")],
 			[api(200, "invalid_response"), notice("server")],
 			[new TypeError("x"), notice("server")],
 		];
@@ -179,6 +184,9 @@ describe("describeProofError", () => {
 			api(0, "timeout"),
 			api(0, "network_error"),
 			api(408, "request_timeout"),
+			// A proxy's own 408 has no envelope: no code, or the SDK's fallback.
+			api(408, "unknown_error"),
+			new TattooApiError(408),
 		]) {
 			assert.deepEqual(describeProofError(error), notice("offline", true));
 		}

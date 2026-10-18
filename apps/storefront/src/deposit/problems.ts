@@ -148,7 +148,12 @@ export function describeProofError(error: unknown): ProofProblem {
 		case "service_busy":
 			return notice("busy");
 	}
-	// A response without the API's envelope (a proxy's 404, 409, 413 or 429).
+	// A response without the API's envelope (a proxy's 404, 408, 409, 413 or
+	// 429). A proxy's 502 or 504 on a slow upload is as uncertain as a 408, but
+	// ruling 17 reads the page again only for the answers it lists, so those stay
+	// the generic notice: a second Send is safe, the API answers it 409
+	// deposit_not_due and the page is read again then.
+	if (error.status === 408) return notice("offline", { refetch: true });
 	if (error.status === 404) return notice("gone", { refetch: true });
 	if (error.status === 409) return notice("not-due", { refetch: true });
 	if (error.status === 413) return TOO_LARGE;
