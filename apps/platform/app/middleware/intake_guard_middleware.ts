@@ -4,6 +4,7 @@ import type { NextFn } from "@adonisjs/core/types/http";
 import { publicTenantContext } from "#middleware/public_tenant_middleware";
 import { countIntake, intakeLimitKeys } from "#modules/inquiries/intake_limits";
 import { storefrontTemplate } from "#modules/payments/deposit_links";
+import { callerIp } from "#services/api_caller";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import BotChallenge, {
 	CHALLENGE_ACTIONS,
@@ -21,11 +22,13 @@ import { studioHostname } from "#services/storefront_url";
  * challenge_unavailable; no call for a missing one), then counts the studio,
  * only for a passed challenge (429). The route reads its multipart body
  * itself (the body parser reads none: multipart.autoProcess is false), so a
- * refusal here writes nothing to disk. The global body parser still reads a JSON, urlencoded or text/*
- * body (1 MB at most) before any route middleware: such a request is
- * parsed first and then refused here or by the controller's 415 (TAT-32
- * ruling 6; TAT-38 bounds that). The honeypot and the phone count need the
- * body: the controller does them.
+ * refusal here writes nothing to disk. The global body parser still reads a
+ * JSON, urlencoded or text/* body (1 MB at most) before any route
+ * middleware: such a request is parsed first and then refused here or by
+ * the controller's 415 (TAT-32 ruling 6; the gate counts it first, TAT-38).
+ * The honeypot and the phone count need the body: the controller does them.
+ * The address is the caller's (`callerIp`: the storefront's visitor with a
+ * valid server key, TAT-38).
  */
 @inject()
 export default class IntakeGuardMiddleware {
@@ -33,7 +36,7 @@ export default class IntakeGuardMiddleware {
 
 	async handle(ctx: HttpContext, next: NextFn) {
 		const { tenant } = publicTenantContext(ctx);
-		const keys = intakeLimitKeys(tenant.id, ctx.request.ip());
+		const keys = intakeLimitKeys(tenant.id, callerIp(ctx));
 		await countIntake("perAddress", keys.perAddress);
 
 		const outcome = await this.challenge.verify(

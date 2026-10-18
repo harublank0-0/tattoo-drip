@@ -1,10 +1,24 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import limiter from "@adonisjs/limiter/services/main";
 import { test } from "@japa/runner";
+import {
+	INTAKE_LIMITS,
+	intakeLimitKeys,
+} from "#modules/inquiries/intake_limits";
+import {
+	DEPOSIT_LIMITS,
+	depositLimitKeys,
+} from "#modules/payments/deposit_limits";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { apiLimitFor } from "#services/api_limits";
 import { assertApiError } from "#tests/helpers/api";
 import { fillApiLimit, testServerKeys } from "#tests/helpers/api_limits";
+import {
+	depositPath,
+	depositReady,
+	depositServices,
+	OWNER,
+} from "#tests/helpers/deposits";
 import { intakeFields, postInquiry } from "#tests/helpers/intake";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
@@ -106,3 +120,49 @@ test.group("Public API limits: per studio", (group) => {
 		).assertStatus(201);
 	});
 });
+
+test.group(
+	"Public API limits: route throttles count the caller's address",
+	(group) => {
+		group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+		const services = depositServices();
+		const VISITOR = "198.51.100.30";
+
+		test("a keyed deposit read counts under its visitor", async ({
+			client,
+		}) => {
+			const { tenant } = await studioWithOwner(A);
+			const ready = await inTenant(tenant, () => depositReady(tenant));
+			const { token } = await inTenant(tenant, () =>
+				services.links.issue(tenant, OWNER, ready.project),
+			);
+			const key = depositLimitKeys("read", VISITOR, token).perAddress;
+			await limiter
+				.use({ ...DEPOSIT_LIMITS.read.perAddress })
+				.increment(key, DEPOSIT_LIMITS.read.perAddress.requests);
+			const keyed = (visitor: string) =>
+				client
+					.get(depositPath(A, token))
+					.header("authorization", `Bearer ${ONE}`)
+					.header("x-visitor-ip", visitor);
+
+			assertApiError(await keyed(VISITOR), 429, "rate_limited");
+			(await keyed("198.51.100.31")).assertStatus(200);
+		});
+
+		test("a keyed intake counts under its visitor", async ({ client }) => {
+			const { tenant } = await studioWithOwner(A);
+			const key = intakeLimitKeys(tenant.id, VISITOR).perAddress;
+			await limiter
+				.use({ ...INTAKE_LIMITS.perAddress })
+				.increment(key, INTAKE_LIMITS.perAddress.requests);
+			const keyed = (visitor: string) =>
+				postInquiry(client, A, intakeFields())
+					.header("authorization", `Bearer ${ONE}`)
+					.header("x-visitor-ip", visitor);
+
+			assertApiError(await keyed(VISITOR), 429, "rate_limited");
+			(await keyed("198.51.100.32")).assertStatus(201);
+		});
+	},
+);
