@@ -1,0 +1,117 @@
+import { inject } from "@adonisjs/core";
+import { studioTakesInquiries } from "#modules/artists/accepting";
+import type Artist from "#modules/artists/models/artist";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import ArtistService from "#modules/artists/services/artist_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import ImageService from "#modules/media/services/image_service";
+import type Tenant from "#modules/tenancy/models/tenant";
+import type { TenantProfile } from "#modules/tenancy/services/tenancy_service";
+
+/**
+ * What getStudio may read of a tenant: the profile its owners were told is
+ * shown on the studio page (TenantProfile), its current slug and its type.
+ * Never the deposit settings, which the settings page says the deposit page
+ * shows.
+ */
+export type StudioProfile = TenantProfile & Pick<Tenant, "slug" | "type">;
+
+/** The public Studio before formatting (openapi.yaml, Studio). */
+export type StudioPage = {
+	profile: StudioProfile;
+	/** studioTakesInquiries over the visible artists: intake's own rule. */
+	acceptingInquiries: boolean;
+};
+
+export type ShownPhoto = { url: string; width: number; height: number };
+
+/** A visible artist as the public API shows it (openapi.yaml, Artist). */
+export type ShownArtist = Pick<
+	Artist,
+	"id" | "slug" | "name" | "bio" | "acceptingInquiries" | "closedMessage"
+> & { photo: ShownPhoto | null };
+
+const PHOTO = "artist_photo";
+
+/**
+ * The studio page's public reads (TAT-44): the studio's profile and its
+ * visible artists, for the tenant the publicTenant middleware resolved (its
+ * row is already loaded, so the profile costs no query). Each read is one
+ * query (ArtistService.listVisible or findVisibleBySlug); photo URLs are
+ * built without I/O. Only the fields the contract lists leave here.
+ */
+@inject()
+export default class StudioPageService {
+	constructor(
+		private artists: ArtistService,
+		private images: ImageService,
+	) {}
+
+	async studio(tenant: Tenant): Promise<StudioPage> {
+		const visible = await this.artists.listVisible(tenant);
+		return {
+			profile: profileOf(tenant),
+			acceptingInquiries: studioTakesInquiries(visible),
+		};
+	}
+
+	/** The visible artists, by name (ArtistService.listVisible's order). */
+	async visibleArtists(tenant: Tenant): Promise<ShownArtist[]> {
+		const visible = await this.artists.listVisible(tenant);
+		return Promise.all(visible.map((artist) => this.shown(tenant, artist)));
+	}
+
+	/** One visible artist by exact slug; null for a hidden, deleted or unknown one (the API's 404). */
+	async visibleArtist(
+		tenant: Tenant,
+		slug: string,
+	): Promise<ShownArtist | null> {
+		const artist = await this.artists.findVisibleBySlug(tenant, slug);
+		return artist ? this.shown(tenant, artist) : null;
+	}
+
+	private async shown(tenant: Tenant, artist: Artist): Promise<ShownArtist> {
+		return {
+			id: artist.id,
+			slug: artist.slug,
+			name: artist.name,
+			bio: artist.bio,
+			acceptingInquiries: artist.acceptingInquiries,
+			// The form says the message shows while inquiries are off: an old
+			// one kept after reopening never leaks.
+			closedMessage: artist.acceptingInquiries ? null : artist.closedMessage,
+			photo: await this.photoOf(tenant, artist),
+		};
+	}
+
+	private async photoOf(
+		tenant: Tenant,
+		artist: Artist,
+	): Promise<ShownPhoto | null> {
+		const { photoKey, photoWidth, photoHeight } = artist;
+		if (!photoKey || photoWidth === null || photoHeight === null) return null;
+		return {
+			url: await this.images.url(PHOTO, photoKey, tenant),
+			width: photoWidth,
+			height: photoHeight,
+		};
+	}
+}
+
+/** The tenant's public profile, field by field: nothing else of the row. */
+function profileOf(tenant: Tenant): StudioProfile {
+	return {
+		slug: tenant.slug,
+		type: tenant.type,
+		name: tenant.name,
+		timezone: tenant.timezone,
+		intro: tenant.intro,
+		contactPhone: tenant.contactPhone,
+		contactEmail: tenant.contactEmail,
+		address: tenant.address,
+		instagramUrl: tenant.instagramUrl,
+		facebookUrl: tenant.facebookUrl,
+		tiktokUrl: tenant.tiktokUrl,
+		websiteUrl: tenant.websiteUrl,
+	};
+}
