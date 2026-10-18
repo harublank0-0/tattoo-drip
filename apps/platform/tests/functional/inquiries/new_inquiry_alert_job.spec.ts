@@ -2,9 +2,11 @@ import { randomUUID } from "node:crypto";
 import { mock } from "node:test";
 import logger from "@adonisjs/core/services/logger";
 import testUtils from "@adonisjs/core/services/test_utils";
+import queue from "@adonisjs/queue/services/main";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
 import NewInquiryAlertJob from "#modules/inquiries/jobs/new_inquiry_alert_job";
+import StaffAlert from "#modules/notifications/models/staff_alert";
 import { makeClient, makeInquiry } from "#tests/helpers/pipeline";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
@@ -35,6 +37,7 @@ async function run(payload: { tenantId: string; inquiryId: string }) {
 
 test.group("NewInquiryAlertJob", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+	group.each.teardown(() => queue.restore());
 
 	test("logs a new inquiry's ids, and no contact details", async ({
 		assert,
@@ -73,5 +76,30 @@ test.group("NewInquiryAlertJob", (group) => {
 				inquiryId,
 			);
 		}
+	});
+
+	test("alerts the studio's owner through AlertService, once however often it runs", async ({
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("alert-job-52");
+		const inquiry = await inTenant(tenant, async () =>
+			makeInquiry(tenant, await makeClient(tenant)),
+		);
+		const fake = queue.fake();
+
+		await run({ tenantId: tenant.id, inquiryId: inquiry.id });
+		await run({ tenantId: tenant.id, inquiryId: inquiry.id });
+
+		const rows = await inTenant(tenant, () =>
+			StaffAlert.query().where("inquiry_id", inquiry.id),
+		);
+		assert.deepEqual(
+			rows.map(({ userId }) => userId),
+			[owner.id],
+		);
+		assert.lengthOf(
+			fake.getPushedJobs().filter(({ job }) => job.name === "SendMailJob"),
+			1,
+		);
 	});
 });

@@ -1,5 +1,5 @@
 import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
-import type User from "#models/user";
+import User from "#models/user";
 import ArtistService from "#modules/artists/services/artist_service";
 import ImageService from "#modules/media/services/image_service";
 import {
@@ -58,6 +58,14 @@ export type TenantProfile = {
 export type DepositSettings = {
 	defaultDepositPercent: number | null;
 	depositPolicy: string | null;
+};
+
+/** A live member and their account's address: who an alert can reach (TAT-52). */
+export type TenantMember = {
+	userId: string;
+	role: MembershipRole;
+	email: string;
+	fullName: string | null;
 };
 
 /**
@@ -265,6 +273,41 @@ export default class TenancyService {
 			.first();
 
 		return membership !== null;
+	}
+
+	/** The live tenant with this id, or null: what a job, which carries only the id, reads (TAT-52). */
+	async find(tenantId: string): Promise<Tenant | null> {
+		return Tenant.query().where("id", tenantId).first();
+	}
+
+	/**
+	 * The tenant's live members with their account's email and name, oldest
+	 * membership first: the people a staff alert can reach (TAT-52).
+	 */
+	async members(tenant: { id: string }): Promise<TenantMember[]> {
+		const memberships = await TenantMembership.query()
+			.where("tenant_id", tenant.id)
+			.orderBy("created_at", "asc")
+			.orderBy("id", "asc");
+		if (memberships.length === 0) return [];
+		const users = await User.query().whereIn(
+			"id",
+			memberships.map(({ userId }) => userId),
+		);
+		const byId = new Map(users.map((user) => [user.id, user]));
+		return memberships.flatMap((membership) => {
+			const user = byId.get(membership.userId);
+			return user
+				? [
+						{
+							userId: user.id,
+							role: membership.role,
+							email: user.email,
+							fullName: user.fullName,
+						},
+					]
+				: [];
+		});
 	}
 
 	/**

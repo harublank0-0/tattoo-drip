@@ -1,5 +1,7 @@
+import app from "@adonisjs/core/services/app";
 import logger from "@adonisjs/core/services/logger";
 import Inquiry from "#modules/inquiries/models/inquiry";
+import AlertService from "#modules/notifications/services/alert_service";
 import TenantJob from "#services/tenant_job";
 
 type Payload = { tenantId: string; inquiryId: string };
@@ -7,9 +9,10 @@ type Payload = { tenantId: string; inquiryId: string };
 /**
  * Alerts a studio's staff to a new inquiry. IntakeService.submit (TAT-51)
  * queues it in the inquiry's transaction, so it exists exactly when the
- * inquiry does. For now it only logs the two ids: TAT-52 sends the owners'
- * and the preferred artist's email and in-app alerts from here. Safe to
- * repeat; an inquiry that is gone or already decided needs no alert.
+ * inquiry does. It logs the two ids, then AlertService.newInquiry alerts
+ * the owners and the preferred artist's member in the dashboard and by
+ * email (TAT-52), once each however often the job runs. An inquiry that is
+ * gone or already decided needs no alert.
  */
 export default class NewInquiryAlertJob extends TenantJob<Payload> {
 	protected async handle() {
@@ -20,6 +23,8 @@ export default class NewInquiryAlertJob extends TenantJob<Payload> {
 			.first();
 		if (!inquiry || inquiry.status !== "new") return;
 		logger.info({ tenantId, inquiryId }, "New inquiry received.");
+		const alerts = await app.container.make(AlertService);
+		await alerts.newInquiry({ id: tenantId }, inquiry);
 	}
 
 	async failed(error: Error): Promise<void> {
