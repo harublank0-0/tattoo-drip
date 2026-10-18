@@ -9,7 +9,8 @@ import {
 	depositMoney,
 } from "#modules/payments/ledger";
 import DepositOutcome from "#modules/payments/models/deposit_outcome";
-import Payment from "#modules/payments/models/payment";
+import Payment, { type DeskKind } from "#modules/payments/models/payment";
+import type { PaymentMethodKind } from "#modules/payments/models/payment_method";
 import type Quote from "#modules/projects/models/quote";
 import TattooProject, {
 	type ProjectStatus,
@@ -25,6 +26,7 @@ import QuoteService from "#modules/projects/services/quote_service";
 import SessionService from "#modules/scheduling/services/session_service";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { withTransaction } from "#services/db_context";
+import { isUniqueViolation } from "#services/db_errors";
 
 type TenantRef = Pick<Tenant, "id">;
 
@@ -63,6 +65,28 @@ export type Recorded = {
 
 /** A rejected screenshot, and whether the deposit page now asks for a new one. */
 export type Rejected = { payment: Payment; asksAgain: boolean };
+
+/** Money taken at the desk, in stored units (paisa > 0). */
+export type DeskPayment = {
+	kind: DeskKind;
+	method: PaymentMethodKind;
+	amount: number;
+	note: string | null;
+};
+
+/** Money given back, in stored units (paisa > 0; stored negative). */
+export type RefundInput = {
+	method: PaymentMethodKind;
+	amount: number;
+	note: string | null;
+};
+
+/** A reversal, the payment it reverses, and what is due of the deposit afterwards. */
+export type Reversal = {
+	correction: Payment;
+	reversed: Payment;
+	depositDue: number;
+};
 
 /**
  * The payments of a tenant's projects (TAT-66): the owners' decisions on
@@ -212,6 +236,158 @@ export default class PaymentService {
 	}
 
 	/**
+	 * Records money taken at the desk (cash, bank or a QR app), verified at
+	 * once by the recording owner, in the current quote's currency (NPR
+	 * without a quote). A deposit only while the project is deposit_pending
+	 * ("deposit_not_pending"); session and balance payments in any status but
+	 * declined ("project_declined"). Overpaying is allowed. A deposit then
+	 * goes through settleBooking, as a verified screenshot does.
+	 */
+	async record(
+		tenant: TenantRef,
+		member: Member,
+		project: TattooProject,
+		input: DeskPayment,
+	): Promise<Recorded> {
+		assertOwner(member);
+		assertProjectOf(tenant, project);
+		return withTransaction(async (trx) => {
+			const live = await this.lockProject(trx, tenant, project.id);
+			if (input.kind === "deposit" && live.status !== "deposit_pending") {
+				throw new PaymentRuleError("deposit_not_pending");
+			}
+			if (live.status === "declined") {
+				throw new PaymentRuleError("project_declined");
+			}
+			const quote = await this.quotes.current(tenant, live);
+			const payment = await Payment.create(
+				{
+					tenantId: tenant.id,
+					projectId: live.id,
+					kind: input.kind,
+					amount: input.amount,
+					currency: quote?.currency ?? "NPR",
+					method: input.method,
+					status: "verified",
+					verifiedAt: DateTime.utc(),
+					verifiedByUserId: member.userId,
+					note: clean(input.note),
+				},
+				{ client: trx },
+			);
+			// Lucid reads nothing back after an insert: the columns left unset
+			// (proof, correction target) would be undefined, not null.
+			await payment.refresh();
+			return this.afterPayment(tenant, live, payment);
+		});
+	}
+
+	/**
+	 * Records money given back: a negative `refund`, verified at once, up to
+	 * what the project holds (its net verified payments in its currency;
+	 * PaymentRuleError "refund_too_large" with that limit). On a closed
+	 * project still waiting for its deposit outcome the outcome comes first
+	 * ("outcome_first"), so a refund is never recorded twice. A refund
+	 * doesn't touch the deposit: booking is unaffected.
+	 */
+	async refund(
+		tenant: TenantRef,
+		member: Member,
+		project: TattooProject,
+		input: RefundInput,
+	): Promise<Payment> {
+		assertOwner(member);
+		assertProjectOf(tenant, project);
+		return withTransaction(async (trx) => {
+			const live = await this.lockProject(trx, tenant, project.id);
+			const money = await this.forProject(tenant, live);
+			if (money.outcomeNeeded) throw new PaymentRuleError("outcome_first");
+			const held = Number(money.balance.paid);
+			if (input.amount > held) {
+				throw new PaymentRuleError("refund_too_large", Math.max(0, held));
+			}
+			const payment = await Payment.create(
+				{
+					tenantId: tenant.id,
+					projectId: live.id,
+					kind: "refund",
+					amount: -input.amount,
+					currency: money.balance.currency,
+					method: input.method,
+					status: "verified",
+					verifiedAt: DateTime.utc(),
+					verifiedByUserId: member.userId,
+					note: clean(input.note),
+				},
+				{ client: trx },
+			);
+			await payment.refresh();
+			return payment;
+		});
+	}
+
+	/**
+	 * Reverses a verified payment recorded by mistake (the money never
+	 * arrived, or the entry was wrong): a `correction` of minus its amount,
+	 * in its currency and method, naming it, verified at once. Only a
+	 * verified payment that isn't itself a correction ("not_reversible"), and
+	 * only once ("already_reversed": the check under the payment's lock, and
+	 * the unique index if two requests pass it together). The project's
+	 * status never changes; a reversed deposit is simply due again.
+	 */
+	async reverse(
+		tenant: TenantRef,
+		member: Member,
+		payment: Payment,
+		note: string | null,
+	): Promise<Reversal> {
+		assertOwner(member);
+		assertPaymentOf(tenant, payment);
+		return withTransaction(async (trx) => {
+			const project = await this.lockProject(trx, tenant, payment.projectId);
+			const live = await lockPayment(trx, tenant, payment.id);
+			if (live.status !== "verified" || live.kind === "correction") {
+				throw new PaymentRuleError("not_reversible");
+			}
+			const existing = await Payment.query({ client: trx })
+				.where("tenant_id", tenant.id)
+				.where("corrects_payment_id", live.id)
+				.first();
+			if (existing) throw new PaymentRuleError("already_reversed");
+			let correction: Payment;
+			try {
+				correction = await withTransaction(async (inner) => {
+					const created = await Payment.create(
+						{
+							tenantId: tenant.id,
+							projectId: live.projectId,
+							kind: "correction",
+							amount: -live.amount,
+							currency: live.currency,
+							method: live.method,
+							correctsPaymentId: live.id,
+							status: "verified",
+							verifiedAt: DateTime.utc(),
+							verifiedByUserId: member.userId,
+							note: clean(note),
+						},
+						{ client: inner },
+					);
+					await created.refresh();
+					return created;
+				});
+			} catch (error) {
+				if (isUniqueViolation(error, "payments_corrects_payment_id_unique")) {
+					throw new PaymentRuleError("already_reversed");
+				}
+				throw error;
+			}
+			const { depositDue } = await this.forProject(tenant, project);
+			return { correction, reversed: live, depositDue };
+		});
+	}
+
+	/**
 	 * After a payment is verified or recorded: a deposit goes through
 	 * settleBooking. Returns whether that booked the project, its status and
 	 * what is still due of the deposit.
@@ -280,5 +456,14 @@ function clean(note: string | null | undefined): string | null {
 function assertPaymentOf(tenant: TenantRef, payment: Payment) {
 	if (payment.tenantId !== tenant.id) {
 		throw new Error(`Payment ${payment.id} belongs to another tenant`);
+	}
+}
+
+/**
+ * A caller bug, not a user error: projects come from the tenant's own reads.
+ */
+function assertProjectOf(tenant: TenantRef, project: TattooProject) {
+	if (project.tenantId !== tenant.id) {
+		throw new Error(`Project ${project.id} belongs to another tenant`);
 	}
 }
