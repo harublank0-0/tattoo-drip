@@ -105,6 +105,8 @@ describe("the copy", () => {
 		for (const problem of PHOTO_PROBLEMS) {
 			assert.match(copy.photos.problems[problem], /\{name\}/, problem);
 		}
+		// Too big by bytes or by pixels: the text names neither limit.
+		assert.doesNotMatch(copy.photos.problems["too-big"], /50 MB|megapixel/i);
 	});
 
 	test("says a send stopped because a photo couldn't be prepared", () => {

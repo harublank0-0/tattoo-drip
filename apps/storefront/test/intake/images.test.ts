@@ -3,12 +3,16 @@ import { describe, test } from "node:test";
 import {
 	ACCEPT,
 	classifySource,
+	DECODE_TIMEOUT_MS,
 	type DecodedImage,
+	ENCODE_TIMEOUT_MS,
 	type EncodeRequest,
 	fitWithin,
 	type ImageCodec,
 	MAX_REFERENCES,
+	MAX_SOURCE_PIXELS,
 	prepareReference,
+	type Timer,
 } from "../../src/intake/images.ts";
 
 const MIB = 1024 * 1024;
@@ -23,8 +27,8 @@ interface FakeOptions {
 	height?: number;
 	/** What each encode returns, in bytes, in order. */
 	sizes?: number[];
-	decode?: "fail" | "empty";
-	encode?: "fail";
+	decode?: "fail" | "empty" | "never";
+	encode?: "fail" | "never";
 }
 
 /** A codec that decodes to the size it is told and encodes blobs of chosen sizes. */
@@ -36,6 +40,7 @@ function fakeCodec(options: FakeOptions = {}) {
 		async decode() {
 			decoded += 1;
 			if (options.decode === "fail") throw new Error("can't decode");
+			if (options.decode === "never") return new Promise<FakeImage>(() => {});
 			const empty = options.decode === "empty";
 			const image: FakeImage = {
 				width: empty ? 0 : (options.width ?? 4032),
@@ -51,6 +56,7 @@ function fakeCodec(options: FakeOptions = {}) {
 		async encode(_image, request) {
 			encoded.push(request);
 			if (options.encode === "fail") throw new Error("no canvas");
+			if (options.encode === "never") return new Promise<Blob>(() => {});
 			const size = options.sizes?.[encoded.length - 1] ?? 400_000;
 			return new Blob([new Uint8Array(size)], { type: "image/jpeg" });
 		},
@@ -63,6 +69,67 @@ function picked(name = "IMG_0042.JPG", type = "image/jpeg", size = 3_000_000) {
 	const file = new File([new Uint8Array(8)], name, { type });
 	Object.defineProperty(file, "size", { value: size });
 	return file;
+}
+
+/** A timer that runs only when told to, and records what was asked of it. */
+function fakeTimer() {
+	const timers: Array<{ run: () => void; ms: number; cancelled: boolean }> = [];
+	const timer: Timer = (run, ms) => {
+		const entry = { run, ms, cancelled: false };
+		timers.push(entry);
+		return () => {
+			entry.cancelled = true;
+		};
+	};
+	return { timers, timer };
+}
+
+/** Lets the work in flight run until `ready` (a few event-loop turns at most). */
+async function until(ready: () => boolean): Promise<void> {
+	for (let turn = 0; turn < 50 && !ready(); turn += 1) {
+		await new Promise((done) => setImmediate(done));
+	}
+}
+
+/** A picked PNG that is only its header: the size it declares, never the pixels. */
+function pngOf(width: number, height: number, name = "declared.png") {
+	const word = (value: number) => [
+		(value >>> 24) & 0xff,
+		(value >>> 16) & 0xff,
+		(value >>> 8) & 0xff,
+		value & 0xff,
+	];
+	return new File(
+		[
+			Uint8Array.from([
+				0x89,
+				0x50,
+				0x4e,
+				0x47,
+				0x0d,
+				0x0a,
+				0x1a,
+				0x0a,
+				0,
+				0,
+				0,
+				13,
+				0x49,
+				0x48,
+				0x44,
+				0x52,
+				...word(width),
+				...word(height),
+				8,
+				6,
+				0,
+				0,
+				0,
+			]),
+		],
+		name,
+		{ type: "image/png" },
+	);
 }
 
 describe("the picker", () => {
@@ -305,5 +372,127 @@ describe("prepareReference", () => {
 		assert.ok(result.ok);
 		assert.notEqual(result.file, original);
 		assert.notEqual(result.file.name, original.name);
+	});
+});
+
+describe("a photo that declares too many pixels", () => {
+	test("is refused before any decode: 16000 x 16000 is a gigabyte of pixels", async () => {
+		const { codec, decodedCount } = fakeCodec();
+
+		assert.equal(MAX_SOURCE_PIXELS, 100_000_000);
+		assert.deepEqual(await prepareReference(pngOf(16000, 16000), codec), {
+			ok: false,
+			problem: "too-big",
+		});
+		assert.equal(decodedCount(), 0);
+	});
+
+	test("takes exactly 100 megapixels, and refuses one row more", async () => {
+		const exact = fakeCodec();
+		assert.equal(
+			(await prepareReference(pngOf(10000, 10000), exact.codec)).ok,
+			true,
+		);
+		assert.equal(exact.decodedCount(), 1);
+
+		const over = fakeCodec();
+		assert.deepEqual(await prepareReference(pngOf(10000, 10001), over.codec), {
+			ok: false,
+			problem: "too-big",
+		});
+		assert.equal(over.decodedCount(), 0);
+	});
+
+	test("a normal phone photo goes on to the decoder, and so does a file whose header can't be read", async () => {
+		const normal = fakeCodec();
+		assert.equal(
+			(await prepareReference(pngOf(4032, 3024), normal.codec)).ok,
+			true,
+		);
+		assert.equal(normal.decodedCount(), 1);
+
+		const unknown = fakeCodec();
+		assert.equal((await prepareReference(picked(), unknown.codec)).ok, true);
+		assert.equal(unknown.decodedCount(), 1);
+	});
+});
+
+describe("a photo that takes too long", () => {
+	test("a decode that never settles ends as unreadable after 20 s, so the tray is freed", async () => {
+		const { codec } = fakeCodec({ decode: "never" });
+		const { timers, timer } = fakeTimer();
+		const result = prepareReference(picked(), codec, { timer });
+
+		await until(() => timers.length > 0);
+		assert.equal(DECODE_TIMEOUT_MS, 20_000);
+		assert.equal(timers[0].ms, DECODE_TIMEOUT_MS);
+		timers[0].run();
+
+		assert.deepEqual(await result, { ok: false, problem: "unreadable" });
+	});
+
+	test("a HEIC that never decodes is unreadable too, not 'a HEIC this browser can't convert'", async () => {
+		const { codec } = fakeCodec({ decode: "never" });
+		const { timers, timer } = fakeTimer();
+		const result = prepareReference(picked("IMG_1.HEIC", "image/heic"), codec, {
+			timer,
+		});
+
+		await until(() => timers.length > 0);
+		timers[0].run();
+
+		assert.deepEqual(await result, { ok: false, problem: "unreadable" });
+	});
+
+	test("an image that decodes after the timeout is released, not leaked", async () => {
+		const late: FakeImage = {
+			width: 4000,
+			height: 3000,
+			closed: false,
+			close: () => {
+				late.closed = true;
+			},
+		};
+		let arrive: (image: FakeImage) => void = () => {};
+		const codec: ImageCodec<FakeImage> = {
+			decode: () =>
+				new Promise<FakeImage>((done) => {
+					arrive = done;
+				}),
+			encode: async () => new Blob([new Uint8Array(10)]),
+		};
+		const { timers, timer } = fakeTimer();
+		const result = prepareReference(picked(), codec, { timer });
+
+		await until(() => timers.length > 0);
+		timers[0].run();
+		assert.equal((await result).ok, false);
+		arrive(late);
+		await until(() => late.closed);
+
+		assert.equal(late.closed, true);
+	});
+
+	test("an encode that never settles ends as unreadable after 20 s, and the image is released", async () => {
+		const { codec, images } = fakeCodec({ encode: "never" });
+		const { timers, timer } = fakeTimer();
+		const result = prepareReference(picked(), codec, { timer });
+
+		await until(() => timers.length > 1);
+		assert.equal(ENCODE_TIMEOUT_MS, 20_000);
+		assert.equal(timers[1].ms, ENCODE_TIMEOUT_MS);
+		timers[1].run();
+
+		assert.deepEqual(await result, { ok: false, problem: "unreadable" });
+		assert.equal(images[0].closed, true);
+	});
+
+	test("a photo that makes it leaves no timer running", async () => {
+		const { codec } = fakeCodec({ sizes: [2 * MIB, 0.5 * MIB] });
+		const { timers, timer } = fakeTimer();
+
+		assert.equal((await prepareReference(picked(), codec, { timer })).ok, true);
+		assert.equal(timers.length, 3, "one decode and two encodes");
+		assert.ok(timers.every((entry) => entry.cancelled));
 	});
 });

@@ -1,4 +1,5 @@
 import type { PhotoProblem } from "./copy.ts";
+import { readImageSize } from "./image-size.ts";
 
 /*
  * Reference photos, prepared in the browser before the upload (TAT-57, spec
@@ -16,6 +17,12 @@ export const MAX_REFERENCES = 5;
 const MIB = 1024 * 1024;
 /** Picked files over this are refused before decoding (memory on low-end phones). */
 export const MAX_SOURCE_BYTES = 50 * MIB;
+/** Picked files declaring more pixels than this are refused before decoding (a decoded pixel is 4 bytes). */
+export const MAX_SOURCE_PIXELS = 100_000_000;
+/** A decode that takes longer than this is given up on, so one stuck photo can't hold the tray. */
+export const DECODE_TIMEOUT_MS = 20_000;
+/** An encode (one canvas to one JPEG) likewise. */
+export const ENCODE_TIMEOUT_MS = 20_000;
 /** A prepared photo at most this big is done. */
 export const TARGET_BYTES = MIB;
 /** A prepared photo over this is refused: five of them stay under the API's 20 MB. */
@@ -52,6 +59,14 @@ export interface ImageCodec<Image extends DecodedImage = DecodedImage> {
 	decode(source: Blob): Promise<Image>;
 	/** Draws the image at the requested size on the background and encodes it. */
 	encode(image: Image, request: EncodeRequest): Promise<Blob>;
+}
+
+/** Runs `run` after `ms`; returns a function that cancels it. */
+export type Timer = (run: () => void, ms: number) => () => void;
+
+export interface PrepareOptions {
+	/** The clock for the timeouts: the page's timers, or a fake in tests. */
+	readonly timer?: Timer;
 }
 
 export type SourceKind = "supported" | "heic" | "unsupported";
@@ -111,19 +126,60 @@ export function fitWithin(
 	};
 }
 
+const pageTimer: Timer = (run, ms) => {
+	const handle = setTimeout(run, ms);
+	return () => clearTimeout(handle);
+};
+
+class TimedOut extends Error {}
+
+/** `work`'s answer, or a TimedOut rejection after `ms`; the timer never outlives the work. */
+function within<T>(work: Promise<T>, ms: number, timer: Timer): Promise<T> {
+	return new Promise<T>((resolve, reject) => {
+		const cancel = timer(() => reject(new TimedOut()), ms);
+		work.then(
+			(value) => {
+				cancel();
+				resolve(value);
+			},
+			(error: unknown) => {
+				cancel();
+				reject(error);
+			},
+		);
+	});
+}
+
 /** One picked file as the JPEG the form sends, or why it can't be. */
 export async function prepareReference<Image extends DecodedImage>(
 	source: File,
 	codec: ImageCodec<Image>,
+	options: PrepareOptions = {},
 ): Promise<PreparedReference> {
+	const timer = options.timer ?? pageTimer;
 	const kind = classifySource(source);
 	if (kind === "unsupported") return { ok: false, problem: "unsupported" };
 	if (source.size > MAX_SOURCE_BYTES) return { ok: false, problem: "too-big" };
+	// The header says how many pixels the decoder would have to hold; a few
+	// hundred KB can declare a gigabyte. Refused before anything is decoded.
+	const declared = await readImageSize(source);
+	if (declared && declared.width * declared.height > MAX_SOURCE_PIXELS) {
+		return { ok: false, problem: "too-big" };
+	}
 
 	let image: Image;
+	const decoding = codec.decode(source);
 	try {
-		image = await codec.decode(source);
-	} catch {
+		image = await within(decoding, DECODE_TIMEOUT_MS, timer);
+	} catch (error) {
+		if (error instanceof TimedOut) {
+			// Not waited for any more, but freed if it ever arrives.
+			decoding.then(
+				(late) => late.close(),
+				() => undefined,
+			);
+			return { ok: false, problem: "unreadable" };
+		}
 		return { ok: false, problem: kind === "heic" ? "heic" : "unreadable" };
 	}
 
@@ -134,12 +190,16 @@ export async function prepareReference<Image extends DecodedImage>(
 		let best: { blob: Blob; width: number; height: number } | null = null;
 		for (const step of ENCODE_STEPS) {
 			const size = fitWithin(image.width, image.height, step.edge);
-			const blob = await codec.encode(image, {
-				...size,
-				quality: step.quality,
-				type: PREPARED_TYPE,
-				background: BACKGROUND,
-			});
+			const blob = await within(
+				codec.encode(image, {
+					...size,
+					quality: step.quality,
+					type: PREPARED_TYPE,
+					background: BACKGROUND,
+				}),
+				ENCODE_TIMEOUT_MS,
+				timer,
+			);
 			best = { blob, ...size };
 			if (blob.size <= TARGET_BYTES) break;
 		}

@@ -99,7 +99,7 @@ const photoProblems: Readonly<Record<PhotoProblem, string>> = {
 		"{name} isn't a photo this form can use. Add a JPEG, PNG or WebP image.",
 	heic: "{name} is a HEIC photo, which this browser can't convert. Add a screenshot of it or a JPEG copy instead.",
 	"too-big":
-		"{name} is too big to prepare (over 50 MB). Add a smaller copy or a screenshot.",
+		"{name} is too big to prepare. Add a smaller copy or a screenshot.",
 	unreadable:
 		"{name} couldn't be opened. Try another photo, or a screenshot of it.",
 	"too-heavy":

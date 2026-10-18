@@ -11,7 +11,12 @@ interface BrowserImage extends DecodedImage {
 	readonly drawable: CanvasImageSource;
 }
 
-/** createImageBitmap applies EXIF orientation; an <img> is the fallback for browsers whose bitmap can't. */
+/**
+ * createImageBitmap applies EXIF orientation; an <img> is the fallback for
+ * browsers whose bitmap can't. Both decode at full size, so prepareReference
+ * refuses a file declaring over MAX_SOURCE_PIXELS before it gets here: a
+ * hostile size is never decoded once, let alone twice.
+ */
 async function decode(source: Blob): Promise<BrowserImage> {
 	try {
 		const bitmap = await createImageBitmap(source, {
