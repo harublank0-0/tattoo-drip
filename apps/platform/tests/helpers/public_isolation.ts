@@ -76,8 +76,9 @@ async function send(
 /**
  * Proves a public route under studio A's path never reads or writes studio
  * B. A route with parameters besides :tenant first gets B's own values
- * under A's slug, which must be the 404 and leave B as it was. Then the
- * positive control: A's own request gives ownStatus and mentions A
+ * under A's slug and then A's own values under B's slug (a route can fail
+ * one direction only), each of which must be the 404 and leave the studio
+ * whose values they were as it was. Then the positive control: A's own request gives ownStatus and mentions A
  * (ownMarkers), so an empty or failing answer can't pass; it must mention
  * none of B's markers, and B's snapshot must be unchanged.
  */
@@ -88,6 +89,7 @@ export async function assertPublicIsolation(
 	isolationCase: PublicIsolationCase,
 ) {
 	const before = await isolationCase.snapshot(b);
+	const beforeA = await isolationCase.snapshot(a);
 
 	if (isolationCase.params) {
 		const attack = await send(
@@ -102,6 +104,21 @@ export async function assertPublicIsolation(
 			await isolationCase.snapshot(b),
 			before,
 			`${isolationCase.method} ${isolationCase.pattern} with B's values under A's slug changed studio B`,
+		);
+
+		const mirror = await send(
+			client,
+			isolationCase,
+			urlFor(isolationCase, b, isolationCase.params(a)),
+			b,
+		);
+		const label = `${isolationCase.method} ${isolationCase.pattern} with A's values under B's slug`;
+		assert.equal(mirror.status(), 404, `${label} must be the 404`);
+		assert.equal(mirror.body().error?.code, "not_found", label);
+		assert.deepEqual(
+			await isolationCase.snapshot(a),
+			beforeA,
+			`${label} changed studio A`,
 		);
 	}
 

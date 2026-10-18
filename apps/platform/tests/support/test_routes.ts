@@ -12,6 +12,7 @@ import {
 	dbClient,
 	setRequestContext,
 } from "#services/db_context";
+import { ApiException } from "#services/public_api_errors";
 import { middleware } from "#start/kernel";
 
 /**
@@ -261,5 +262,21 @@ router
 		return {
 			data: { slug: tenant.slug, other: publicLeaks.get(tenant.id) ?? null },
 		};
+	})
+	.use([middleware.publicApi(), middleware.publicTenant()]);
+
+/**
+ * Tokens a public route accepts under any studio's slug, filled by the
+ * public isolation self-test: a route with a parameter besides :tenant that
+ * forgets to scope it, so a token answers under the wrong slug. Other
+ * tokens are the 404.
+ */
+export const publicTokenLeaks = new Set<string>();
+
+router
+	.get("/api/v1/tenants/:tenant/__test/token/:token", (ctx) => {
+		const { tenant } = publicTenantContext(ctx);
+		if (!publicTokenLeaks.has(ctx.params.token)) throw ApiException.notFound();
+		return { data: { slug: tenant.slug } };
 	})
 	.use([middleware.publicApi(), middleware.publicTenant()]);
