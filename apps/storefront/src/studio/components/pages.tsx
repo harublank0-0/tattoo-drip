@@ -128,15 +128,35 @@ export function NotFoundPage() {
 /** One of the page's own paths: "/…", never "//…" or "/\\…". */
 const OWN_PATH = /^\/(?![/\\])/;
 
-/** A page whose data failed to load. Never shows the error itself. */
-export function ErrorPage({ retryHref }: { retryHref: string }) {
+/**
+ * A page whose data failed to load. Never shows the error itself. "Try again"
+ * is a link to the same path, without any fragment (a deposit link's token
+ * lives there, and nothing may copy it into markup); where the browser can,
+ * `reload` runs instead, which keeps the address as it is, fragment and all.
+ */
+export function ErrorPage({
+	retryHref,
+	reload,
+}: {
+	retryHref: string;
+	reload?: () => void;
+}) {
+	const href = OWN_PATH.test(retryHref) ? retryHref.split("#", 1)[0] : "/";
 	return (
 		<main className="page status-page">
 			<h1 className="section-title">This page can't load right now</h1>
 			<p>Please try again in a minute.</p>
 			<a
 				className="text-link"
-				href={OWN_PATH.test(retryHref) ? retryHref : "/"}
+				href={href}
+				onClick={
+					reload
+						? (event) => {
+								event.preventDefault();
+								reload();
+							}
+						: undefined
+				}
 			>
 				Try again
 			</a>
@@ -144,8 +164,8 @@ export function ErrorPage({ retryHref }: { retryHref: string }) {
 	);
 }
 
-/** The router's error component: "Try again" reloads the same address. */
+/** The router's error component: "Try again" loads the same address again. */
 export function RouteErrorPage() {
 	const href = useLocation({ select: (location) => location.href });
-	return <ErrorPage retryHref={href} />;
+	return <ErrorPage retryHref={href} reload={() => window.location.reload()} />;
 }
