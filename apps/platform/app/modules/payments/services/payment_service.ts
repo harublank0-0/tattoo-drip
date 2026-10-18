@@ -2,6 +2,7 @@ import { inject } from "@adonisjs/core";
 import { errors as lucidErrors } from "@adonisjs/lucid";
 import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
 import { DateTime } from "luxon";
+import User from "#models/user";
 import { PaymentRuleError } from "#modules/payments/errors";
 import {
 	type Balance,
@@ -169,6 +170,109 @@ export default class PaymentService {
 				depositHeld > 0 &&
 				outcome === null,
 		};
+	}
+
+	/** The payments of these projects (the client profile), newest first. */
+	async forProjects(
+		tenant: TenantRef,
+		projectIds: string[],
+	): Promise<Payment[]> {
+		if (projectIds.length === 0) return [];
+		return Payment.query()
+			.where("tenant_id", tenant.id)
+			.whereIn("project_id", projectIds)
+			.orderBy("created_at", "desc")
+			.orderBy("id", "desc");
+	}
+
+	/** Each project's balance (balanceOf over its current quote and payments). */
+	async balancesFor(
+		tenant: TenantRef,
+		projects: Pick<TattooProject, "id">[],
+	): Promise<Map<string, Balance>> {
+		const all = await this.forProjects(
+			tenant,
+			projects.map(({ id }) => id),
+		);
+		const balances = new Map<string, Balance>();
+		for (const project of projects) {
+			const quote = await this.quotes.current(tenant, project);
+			balances.set(
+				project.id,
+				balanceOf(
+					quote,
+					all.filter(({ projectId }) => projectId === project.id),
+				),
+			);
+		}
+		return balances;
+	}
+
+	/**
+	 * The owners' flags on the projects list: a deposit screenshot waits
+	 * (`proofWaiting`), or a closed project holds deposit money with no
+	 * outcome recorded (`depositToSettle`).
+	 */
+	async listFlags(
+		tenant: TenantRef,
+		projects: Pick<TattooProject, "id" | "status">[],
+	): Promise<Map<string, { proofWaiting: boolean; depositToSettle: boolean }>> {
+		const ids = projects.map(({ id }) => id);
+		const rows =
+			ids.length === 0
+				? []
+				: await Payment.query()
+						.where("tenant_id", tenant.id)
+						.whereIn("project_id", ids)
+						.whereIn("kind", ["deposit", "correction"]);
+		const closed = projects.filter(({ status }) =>
+			CLOSED_FOR_OUTCOME.includes(status),
+		);
+		const outcomes =
+			closed.length === 0
+				? []
+				: await DepositOutcome.query()
+						.where("tenant_id", tenant.id)
+						.whereIn(
+							"project_id",
+							closed.map(({ id }) => id),
+						)
+						.whereNull("session_id");
+		const settled = new Set(outcomes.map(({ projectId }) => projectId));
+		const flags = new Map<
+			string,
+			{ proofWaiting: boolean; depositToSettle: boolean }
+		>();
+		for (const project of projects) {
+			const own = rows.filter(({ projectId }) => projectId === project.id);
+			let depositToSettle = false;
+			if (
+				CLOSED_FOR_OUTCOME.includes(project.status) &&
+				!settled.has(project.id)
+			) {
+				const quote = await this.quotes.current(tenant, project);
+				depositToSettle = depositMoney(own, quote?.currency ?? "NPR") > 0;
+			}
+			flags.set(project.id, {
+				proofWaiting: own.some(
+					({ kind, status }) => kind === "deposit" && status === "submitted",
+				),
+				depositToSettle,
+			});
+		}
+		return flags;
+	}
+
+	/**
+	 * Who decided or recorded, for the page: each user's full name, else
+	 * their email. Users are global identity with no module service, so this
+	 * reads them by id; unknown ids (deleted accounts) are left out.
+	 */
+	async memberNames(userIds: (string | null)[]): Promise<Map<string, string>> {
+		const ids = [...new Set(userIds.filter((id): id is string => id !== null))];
+		if (ids.length === 0) return new Map();
+		const users = await User.query().whereIn("id", ids);
+		return new Map(users.map((user) => [user.id, user.fullName ?? user.email]));
 	}
 
 	/**
