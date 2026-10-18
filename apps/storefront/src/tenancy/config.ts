@@ -10,6 +10,12 @@ export interface StorefrontConfig {
 	baseHost: string;
 	/** ":3000" when STOREFRONT_URL names a port other than its scheme's default, else "". */
 	port: string;
+	/**
+	 * STOREFRONT_SERVER_KEY, only when set: the secret the server sends with
+	 * its API calls (Authorization: Bearer), for rate limiting only. The
+	 * platform checks it from TAT-38. Never sent to a browser.
+	 */
+	serverKey?: string;
 }
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -23,26 +29,34 @@ const STOREFRONT_URL_RULE =
 const STOREFRONT_URL_SHAPE =
 	/^(https?):\/\/\{tenant\}\.([^/?#:@]+)(?::(\d{1,5}))?\/?$/;
 
+const SERVER_KEY_RULE =
+	"32 to 256 letters, digits or -._~+/ characters, then optional = padding, e.g. the output of openssl rand -base64 32";
+
+/** RFC 7235 token68, the characters a Bearer token may hold, at least 32 of them. */
+const SERVER_KEY_SHAPE = /^[A-Za-z0-9._~+/-]{32,256}=*$/;
+
 const DEFAULT_PORTS = { "http:": 80, "https:": 443 } as const;
 
 const LOOPBACK_HOSTS = ["localhost", "127.0.0.1", "[::1]"];
 
 /**
  * Reads API_URL and STOREFRONT_URL (the platform's setting of the same name
- * and value, TAT-65). Throws one error naming every bad variable and its
- * rule, never a value, so a secret added later can't end up in a log.
+ * and value, TAT-65), and STOREFRONT_SERVER_KEY when set (TAT-23). Throws one
+ * error naming every bad variable and its rule, never a value, so a secret
+ * can't end up in a log.
  */
 export function parseStorefrontConfig(env: Env): StorefrontConfig {
 	const problems: string[] = [];
 	const apiUrl = readApiUrl(env.API_URL?.trim(), problems);
 	const site = readStorefrontUrl(env.STOREFRONT_URL?.trim(), problems);
-	if (!apiUrl || !site) {
+	const serverKey = readServerKey(env.STOREFRONT_SERVER_KEY?.trim(), problems);
+	if (!apiUrl || !site || problems.length > 0) {
 		const list = problems.map((problem) => `- ${problem}`).join("\n");
 		throw new Error(
 			`The storefront's settings are invalid (see apps/storefront/.env.local.example):\n${list}`,
 		);
 	}
-	return { apiUrl, ...site };
+	return { apiUrl, ...site, ...(serverKey ? { serverKey } : {}) };
 }
 
 /**
@@ -122,6 +136,19 @@ function readStorefrontUrl(
 			? ""
 			: `:${portNumber}`;
 	return { protocol, baseHost, port };
+}
+
+/** Optional until the platform checks it (TAT-38); refused when set but malformed. */
+function readServerKey(
+	value: string | undefined,
+	problems: string[],
+): string | undefined {
+	if (!value) return undefined;
+	if (!SERVER_KEY_SHAPE.test(value)) {
+		problems.push(problem("STOREFRONT_SERVER_KEY", value, SERVER_KEY_RULE));
+		return undefined;
+	}
+	return value;
 }
 
 function parseUrl(value: string): URL | undefined {
