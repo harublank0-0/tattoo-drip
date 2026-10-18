@@ -116,6 +116,24 @@ async function studio(slug: string, name: string) {
 			owner,
 		),
 	);
+	// A visible artist who takes no inquiries, with a slug only this studio
+	// has, for the public artist route (TAT-44): with both studios' "sita",
+	// B's slug under A's path would answer A's own artist.
+	const closedArtist = await inTenant(tenant, () =>
+		artists.create(
+			tenant,
+			{
+				name: `${name} Mira`,
+				slug: `${slug}-mira`,
+				bio: null,
+				visible: true,
+				acceptingInquiries: false,
+				closedMessage: `${name} Mira is booked until March.`,
+				linkToMe: false,
+			},
+			owner,
+		),
+	);
 	const pipeline = await inTenant(tenant, () => seedPipeline(tenant));
 	// A second project waiting for the client's answer, for the accept route.
 	const quoted = await inTenant(tenant, async () => {
@@ -188,6 +206,7 @@ async function studio(slug: string, name: string) {
 		artist,
 		paymentMethod,
 		artistProfile,
+		closedArtist,
 		pipeline,
 		// The :id resources of the project routes' isolation cases.
 		project: pipeline.project,
@@ -216,7 +235,7 @@ export type Studio = Awaited<ReturnType<typeof studio>>;
 
 /**
  * Two studios, each with an owner, an artist, two payment methods
- * (`paymentMethod` is the first), an artist profile (`artistProfile`) and one
+ * (`paymentMethod` is the first), an artist profile (`artistProfile`), a visible artist who takes no inquiries with a slug only that studio has (`closedArtist`, `<slug>-mira`) and one
  * of each pipeline record (`pipeline`: client, accepted inquiry, project,
  * reference image, quote and a submitted payment), plus a quoted project
  * (`quotedProject`, `quotedQuote`), a new inquiry with a reference image (`newInquiry`) and a deposit_pending project with its deposit link (`depositProject`, `depositToken`, `depositReferenceCode`) and the eSewa method its page shows (`depositMethod`); `project` is the pipeline's project; a project booked without a price (`pricelessProject`), a booked project holding a verified deposit (`paidProject`, `verifiedPayment`) and a cancelled one holding a deposit without an outcome (`closedPaidProject`); `payment` is the pipeline's submitted payment. Later tickets add seed data
