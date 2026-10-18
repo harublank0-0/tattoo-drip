@@ -36,6 +36,12 @@ const routes = {
     tokens: [{"old":"/signup","type":0,"val":"signup","end":""}],
     types: placeholder as Registry['new_account.store']['types'],
   },
+  'new_account.sent': {
+    methods: ["GET","HEAD"],
+    pattern: '/signup/sent',
+    tokens: [{"old":"/signup/sent","type":0,"val":"signup","end":""},{"old":"/signup/sent","type":0,"val":"sent","end":""}],
+    types: placeholder as Registry['new_account.sent']['types'],
+  },
   'session.create': {
     methods: ["GET","HEAD"],
     pattern: '/login',

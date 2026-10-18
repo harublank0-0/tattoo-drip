@@ -263,7 +263,9 @@ test.group("Onboarding", (group) => {
 test.group("Where users land", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 
-	test("signup lands on onboarding", async ({ client }) => {
+	test("signup lands on the check-your-email page, signed out (TAT-18)", async ({
+		client,
+	}) => {
 		const response = await client
 			.post("/signup")
 			.form({
@@ -276,7 +278,8 @@ test.group("Where users land", (group) => {
 			.redirects(0);
 
 		response.assertStatus(302);
-		response.assertHeader("location", "/onboarding");
+		response.assertHeader("location", "/signup/sent");
+		response.assertSessionMissing("auth_web");
 	});
 
 	test("login without a tenant also goes to /dashboard, which sends it to onboarding", async ({

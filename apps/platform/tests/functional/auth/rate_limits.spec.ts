@@ -258,6 +258,6 @@ test.group("Signup rate limit", (group) => {
 		assert.isNull(await User.findBy("email", "ada@example.com"));
 
 		const elsewhere = await signup("203.0.113.52", valid);
-		elsewhere.assertHeader("location", "/onboarding");
+		elsewhere.assertHeader("location", "/signup/sent");
 	});
 });

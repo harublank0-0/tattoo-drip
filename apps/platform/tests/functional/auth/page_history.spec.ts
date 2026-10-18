@@ -61,6 +61,7 @@ test.group("Page history", (group) => {
 			["/signup", "auth/signup"],
 			["/forgot-password", "auth/forgot_password"],
 			["/forgot-password/sent", "auth/check_email"],
+			["/signup/sent", "auth/check_email"],
 			["/reset-password", "auth/reset_password"],
 		] as const) {
 			const page = await client.get(path).withInertia();

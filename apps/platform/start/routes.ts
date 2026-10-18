@@ -18,6 +18,7 @@ import {
 	throttleResetEmail,
 	throttleResetRequest,
 	throttleSignup,
+	throttleSignupEmail,
 } from "#start/limiter";
 
 router.on("/").renderInertia("home", {}).as("home");
@@ -25,9 +26,14 @@ router.on("/").renderInertia("home", {}).as("home");
 router
 	.group(() => {
 		router.get("signup", [controllers.NewAccount, "create"]);
+		// Every signup counts per client address, then per address named
+		// (TAT-8, TAT-18); a taken address gets the same answer as a new one.
 		router
 			.post("signup", [controllers.NewAccount, "store"])
-			.use(throttleSignup);
+			.use([throttleSignup, throttleSignupEmail]);
+		router
+			.get("signup/sent", [controllers.NewAccount, "sent"])
+			.as("new_account.sent");
 
 		router.get("login", [controllers.Session, "create"]);
 		router.post("login", [controllers.Session, "store"]);

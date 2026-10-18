@@ -19,10 +19,13 @@ const accountEmail = () => email().transform(canonicalEmail);
  * The "passwordConfirmation" field is declared explicitly, so that it is part
  * of the request body type shared with the frontend. Otherwise the signup form
  * has no way to know about the errors reported for this field.
+ *
+ * No unique rule on the email (TAT-18): the answer must never tell whether
+ * an address has an account. AccountService.signUp handles a taken one.
  */
 export const signupValidator = vine.create({
-	fullName: vine.string().nullable(),
-	email: email().unique({ table: "users", column: "email" }),
+	fullName: vine.string().trim().maxLength(255).nullable(),
+	email: accountEmail(),
 	password: password(),
 	passwordConfirmation: password().sameAs("password"),
 });

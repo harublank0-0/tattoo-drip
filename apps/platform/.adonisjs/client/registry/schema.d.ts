@@ -67,6 +67,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/new_account_controller').default['store']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
+  'new_account.sent': {
+    methods: ["GET","HEAD"]
+    pattern: '/signup/sent'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/new_account_controller').default['sent']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/new_account_controller').default['sent']>>>
+    }
+  }
   'session.create': {
     methods: ["GET","HEAD"]
     pattern: '/login'

@@ -9,6 +9,7 @@ export type ScannedRoutes = {
     'home': { paramsTuple?: []; params?: {} }
     'new_account.create': { paramsTuple?: []; params?: {} }
     'new_account.store': { paramsTuple?: []; params?: {} }
+    'new_account.sent': { paramsTuple?: []; params?: {} }
     'session.create': { paramsTuple?: []; params?: {} }
     'session.store': { paramsTuple?: []; params?: {} }
     'password_reset.create': { paramsTuple?: []; params?: {} }
@@ -88,6 +89,7 @@ export type ScannedRoutes = {
     'drive.private.serve': { paramsTuple: [...ParamValue[]]; params: {'*': ParamValue[]} }
     'home': { paramsTuple?: []; params?: {} }
     'new_account.create': { paramsTuple?: []; params?: {} }
+    'new_account.sent': { paramsTuple?: []; params?: {} }
     'session.create': { paramsTuple?: []; params?: {} }
     'password_reset.create': { paramsTuple?: []; params?: {} }
     'password_reset.sent': { paramsTuple?: []; params?: {} }
@@ -125,6 +127,7 @@ export type ScannedRoutes = {
     'drive.private.serve': { paramsTuple: [...ParamValue[]]; params: {'*': ParamValue[]} }
     'home': { paramsTuple?: []; params?: {} }
     'new_account.create': { paramsTuple?: []; params?: {} }
+    'new_account.sent': { paramsTuple?: []; params?: {} }
     'session.create': { paramsTuple?: []; params?: {} }
     'password_reset.create': { paramsTuple?: []; params?: {} }
     'password_reset.sent': { paramsTuple?: []; params?: {} }

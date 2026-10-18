@@ -14,6 +14,7 @@ export interface ApiDefinition {
   newAccount: {
     create: typeof routes['new_account.create']
     store: typeof routes['new_account.store']
+    sent: typeof routes['new_account.sent']
   }
   session: {
     create: typeof routes['session.create']
