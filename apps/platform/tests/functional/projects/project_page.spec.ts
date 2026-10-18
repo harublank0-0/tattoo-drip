@@ -1,7 +1,9 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
+import { chatLinks } from "#modules/clients/contact_links";
 import { expiresAtFor, todayIn } from "#modules/projects/quotes";
+import { sessionTimeText } from "#modules/scheduling/times";
 import {
 	makeArtist,
 	makeClient,
@@ -801,5 +803,111 @@ test.group("Project page: scheduling (TAT-85)", (group) => {
 			).inertiaProps;
 			assert.isNull(props.scheduling, project.status);
 		}
+	});
+});
+
+test.group("Project page: Message the client (TAT-52)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("a project under review offers the received message and the plain links", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const project = await inTenant(tenant, async () =>
+			makeProject(
+				tenant,
+				await makeClient(tenant, { name: "Sita Rai", phone: "+9779812345678" }),
+			),
+		);
+
+		const props = (
+			await client.get(page(project.id)).withInertia().loginAs(owner)
+		).inertiaProps;
+
+		const text =
+			"Hi Sita, thank you for your tattoo inquiry to Black Needle. We have your idea and will reply here soon.";
+		assert.deepEqual(props.contact, {
+			whatsappUrl: "https://wa.me/9779812345678",
+			viberUrl: "viber://chat?number=%2B9779812345678",
+			callUrl: "tel:+9779812345678",
+		});
+		assert.deepEqual(props.messages, [
+			{
+				kind: "inquiry_received",
+				label: "Inquiry received",
+				text,
+				whatsappUrl: chatLinks("+9779812345678", text).whatsapp,
+				viberUrl: "viber://chat?number=%2B9779812345678",
+			},
+		]);
+		assert.equal(props.messageKind, "inquiry_received");
+	});
+
+	test("a project at work names its next session, and a finished one adds aftercare", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const start = DateTime.now().plus({ days: 3 }).startOf("hour");
+		const done = DateTime.now().minus({ days: 2 }).startOf("hour");
+		const project = await inTenant(tenant, async () => {
+			const artist = await makeArtist(tenant);
+			const project = await makeProject(
+				tenant,
+				await makeClient(tenant, { name: "Ram Thapa" }),
+				{ status: "in_progress", artistId: artist.id },
+			);
+			await makeSession(tenant, project, artist, {
+				status: "completed",
+				startsAt: done,
+				endsAt: done.plus({ hours: 2 }),
+			});
+			await makeSession(tenant, project, artist, {
+				startsAt: start,
+				endsAt: start.plus({ hours: 2 }),
+			});
+			return project;
+		});
+
+		const props = (
+			await client.get(page(project.id)).withInertia().loginAs(owner)
+		).inertiaProps;
+
+		assert.deepEqual(
+			props.messages.map(({ kind }: { kind: string }) => kind),
+			["booking_confirmation", "session_reminder", "aftercare"],
+		);
+		assert.equal(props.messageKind, "aftercare");
+		const when = sessionTimeText(start, start.plus({ hours: 2 }), KTM);
+		assert.equal(
+			props.messages[0].text,
+			`Hi Ram, your session at Black Needle is booked for ${when} with Sita. Reply here if you need to change it.`,
+		);
+		assert.match(
+			props.messages[2].text,
+			/^Hi Ram, thank you for your tattoo at Black Needle!/,
+		);
+	});
+
+	test("without a phone there is nothing to tap", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const project = await inTenant(tenant, async () =>
+			makeProject(
+				tenant,
+				await makeClient(tenant, { phone: null, anonymizedAt: DateTime.utc() }),
+			),
+		);
+
+		const props = (
+			await client.get(page(project.id)).withInertia().loginAs(owner)
+		).inertiaProps;
+
+		assert.isNull(props.contact);
+		assert.deepEqual(props.messages, []);
+		assert.isNull(props.messageKind);
 	});
 });

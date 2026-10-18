@@ -1,4 +1,9 @@
 import type { ReferenceProps } from "~/components/inquiries";
+import type {
+	CardMessageProps,
+	ContactLinksProps,
+	MessageKindName,
+} from "~/components/messages";
 import type { PaymentsCardProps } from "~/components/payments";
 
 /**
@@ -58,6 +63,12 @@ export type ProjectPageProps = {
 	canSetPrice: boolean;
 	/** The chat message for the current quote, when it can be sent. */
 	message: ChatMessageProps | null;
+	/** One-tap links to the client without a message; null without a phone (TAT-52). */
+	contact: ContactLinksProps | null;
+	/** The messages the "Message the client" card offers now (TAT-52). */
+	messages: CardMessageProps[];
+	/** The message the card starts on. */
+	messageKind: MessageKindName | null;
 	form: {
 		depositPercent: number | null;
 		defaultValidUntil: string;
