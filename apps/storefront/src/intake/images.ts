@@ -2,11 +2,14 @@ import type { PhotoProblem } from "./copy.ts";
 import { readImageSize } from "./image-size.ts";
 
 /*
- * Reference photos, prepared in the browser before the upload (TAT-57, spec
- * ruling 5): each one decoded once, shrunk and re-encoded as a JPEG, so an
- * upload on a slow connection stays small and no EXIF or GPS data leaves the
- * phone. The decoder and the canvas sit behind ImageCodec: browser-codec.ts
- * in the page, a fake in test/intake/images.test.ts.
+ * Images picked in the browser, prepared before the upload (TAT-57, spec
+ * ruling 5; TAT-65b): each one decoded once, shrunk and re-encoded as a
+ * JPEG, so an upload on a slow connection stays small and no EXIF or GPS
+ * data leaves the phone. An EncodeProfile says how far to shrink: the
+ * intake form's reference photos (REFERENCE_PROFILE) and the deposit page's
+ * payment screenshot (src/deposit/proof.ts) share every bound and timeout.
+ * The decoder and the canvas sit behind ImageCodec: browser-codec.ts in the
+ * page, fakes in the tests.
  */
 
 /** The picker's types: with exactly these, iOS hands over a JPEG for a HEIC photo. */
@@ -38,6 +41,29 @@ export const PREPARED_TYPE = "image/jpeg";
 export const PREPARED_NAME = "reference.jpg";
 /** JPEG has no transparency: transparent pixels become white, not black. */
 export const BACKGROUND = "#ffffff";
+
+/**
+ * How a picked image is re-encoded: `steps` tried in order until one gives
+ * at most `targetBytes`; over `maxBytes` after the last, it is refused; the
+ * sent file is named `name`, never the picked file's own name.
+ */
+export interface EncodeProfile {
+	readonly steps: readonly {
+		readonly edge: number;
+		readonly quality: number;
+	}[];
+	readonly targetBytes: number;
+	readonly maxBytes: number;
+	readonly name: string;
+}
+
+/** The intake form's reference photos (TAT-57). */
+export const REFERENCE_PROFILE: EncodeProfile = {
+	steps: ENCODE_STEPS,
+	targetBytes: TARGET_BYTES,
+	maxBytes: MAX_PREPARED_BYTES,
+	name: PREPARED_NAME,
+};
 
 export interface DecodedImage {
 	readonly width: number;
@@ -150,10 +176,20 @@ function within<T>(work: Promise<T>, ms: number, timer: Timer): Promise<T> {
 	});
 }
 
-/** One picked file as the JPEG the form sends, or why it can't be. */
-export async function prepareReference<Image extends DecodedImage>(
+/** One picked reference photo as the JPEG the intake form sends, or why it can't be. */
+export function prepareReference<Image extends DecodedImage>(
 	source: File,
 	codec: ImageCodec<Image>,
+	options: PrepareOptions = {},
+): Promise<PreparedReference> {
+	return prepareImage(source, codec, REFERENCE_PROFILE, options);
+}
+
+/** One picked image as a JPEG shrunk as `profile` says, or why it can't be. */
+export async function prepareImage<Image extends DecodedImage>(
+	source: File,
+	codec: ImageCodec<Image>,
+	profile: EncodeProfile,
 	options: PrepareOptions = {},
 ): Promise<PreparedReference> {
 	const timer = options.timer ?? pageTimer;
@@ -188,7 +224,7 @@ export async function prepareReference<Image extends DecodedImage>(
 			return { ok: false, problem: "unreadable" };
 		}
 		let best: { blob: Blob; width: number; height: number } | null = null;
-		for (const step of ENCODE_STEPS) {
+		for (const step of profile.steps) {
 			const size = fitWithin(image.width, image.height, step.edge);
 			const blob = await within(
 				codec.encode(image, {
@@ -201,14 +237,14 @@ export async function prepareReference<Image extends DecodedImage>(
 				timer,
 			);
 			best = { blob, ...size };
-			if (blob.size <= TARGET_BYTES) break;
+			if (blob.size <= profile.targetBytes) break;
 		}
-		if (!best || best.blob.size > MAX_PREPARED_BYTES) {
+		if (!best || best.blob.size > profile.maxBytes) {
 			return { ok: false, problem: "too-heavy" };
 		}
 		return {
 			ok: true,
-			file: new File([best.blob], PREPARED_NAME, { type: PREPARED_TYPE }),
+			file: new File([best.blob], profile.name, { type: PREPARED_TYPE }),
 			width: best.width,
 			height: best.height,
 		};
