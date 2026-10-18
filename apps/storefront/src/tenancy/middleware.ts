@@ -19,7 +19,12 @@ export const tenantMiddleware = createMiddleware().server(
 			config: storefrontConfig(),
 		});
 		if (outcome.type === "respond") return outcome.response;
-		return next({ context: { studio: outcome.studio } });
+		return next({
+			context: {
+				studio: outcome.studio,
+				visitorAddress: outcome.visitorAddress,
+			},
+		});
 	},
 );
 
@@ -36,3 +41,16 @@ export const requestStudio = createServerOnlyFn((): Studio => {
 	>;
 	return context.studio;
 });
+
+/**
+ * This request's visitor address, on the server only: TAT-23's per-request
+ * client sends it with the key (TAT-38). Undefined without a key.
+ */
+export const requestVisitorAddress = createServerOnlyFn(
+	(): string | undefined => {
+		const context = getGlobalStartContext() as NonNullable<
+			ReturnType<typeof getGlobalStartContext>
+		>;
+		return context.visitorAddress;
+	},
+);

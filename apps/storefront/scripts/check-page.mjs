@@ -3,7 +3,8 @@
 // STOREFRONT_SERVER_KEY, and checks what a visitor and the log can see
 // (TAT-23, spec ruling 8; the studio page since TAT-48): the page carries the
 // studio's name, the API's origin and its own origin but never the key, the
-// API got one keyed lookup and one keyed artists read per page, a failed
+// API got one keyed lookup and one keyed artists read per page, each with
+// the visitor's address (X-Visitor-IP, TAT-38), a failed
 // read is an error page inside the document (never a not-found, never
 // cached) and a failed lookup is a 503. Run `pnpm build` first, then
 // `pnpm check:page`. It opens two local ports (picked for it) and takes about
@@ -17,6 +18,9 @@ import { join, resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const SERVER = join(root, ".output/server/index.mjs");
 const CANARY = "canary-key-0123456789abcdefghijklmnopqrstuv";
+// The visitor the stand-in API must receive on every keyed call (TAT-38):
+// sent as X-Forwarded-For, as Vercel's edge does.
+const VISITOR = "203.0.113.7";
 // Cloudflare's always-pass test site key: public by design, so the page
 // must carry it (production refuses to start without one, TAT-57).
 const SITE_KEY = "1x00000000000000000000AA";
@@ -69,6 +73,7 @@ const api = http.createServer((request, response) => {
 		url: request.url,
 		authorization: request.headers.authorization ?? null,
 		cookie: request.headers.cookie ?? null,
+		visitor: request.headers["x-visitor-ip"] ?? null,
 	});
 	const send = (status, body) => {
 		response.writeHead(status, { "content-type": "application/json" });
@@ -123,7 +128,10 @@ function get(path = "/") {
 					host: "127.0.0.1",
 					port: storefrontPort,
 					path,
-					headers: { host: `${SLUG}.localhost:${storefrontPort}` },
+					headers: {
+						host: `${SLUG}.localhost:${storefrontPort}`,
+						"x-forwarded-for": VISITOR,
+					},
 				},
 				(response) => {
 					let body = "";
@@ -214,9 +222,11 @@ try {
 			apiLog[1].url === `/api/v1/tenants/${SLUG}/artists` &&
 			apiLog.every(
 				(call) =>
-					call.authorization === `Bearer ${CANARY}` && call.cookie === null,
+					call.authorization === `Bearer ${CANARY}` &&
+					call.visitor === VISITOR &&
+					call.cookie === null,
 			),
-		`The page made ${apiLog.length} API calls instead of one keyed, cookie-less lookup and one artists read.`,
+		`The page made ${apiLog.length} API calls instead of one keyed, cookie-less lookup and one artists read, each carrying the visitor's address.`,
 	);
 
 	// An artist's page asks the API once more for the same list, never for the artist.
@@ -323,5 +333,5 @@ if (problems.length > 0) {
 	process.exit(1);
 }
 console.log(
-	"Page check passed: the key is in no page, header or log line; one keyed lookup and one artists read per page; a failed read is an uncached error page, a failed lookup a 503; the public site key is in the page.",
+	"Page check passed: the key is in no page, header or log line; one keyed lookup and one artists read per page, each carrying the visitor's address; a failed read is an uncached error page, a failed lookup a 503; the public site key is in the page.",
 );

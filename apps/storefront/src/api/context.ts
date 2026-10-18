@@ -7,6 +7,7 @@ import {
 } from "@tattoo-drip/sdk";
 import type { StorefrontConfig } from "../tenancy/config.ts";
 import { STORED_SLUG } from "../tenancy/host.ts";
+import { withVisitorAddress } from "../tenancy/visitor.ts";
 import {
 	createStorefrontQueryClient,
 	type QueryEnvironment,
@@ -87,24 +88,27 @@ export interface ServerConnectOptions {
 	config: Pick<StorefrontConfig, "apiUrl" | "serverKey">;
 	/** The studio the tenant middleware confirmed (TAT-12's requestStudio()). */
 	studio: Studio;
+	/** The visitor's address (requestVisitorAddress()), sent as X-Visitor-IP with the key only (TAT-38). */
+	visitorAddress?: string | undefined;
 	/** For tests. */
 	fetch?: typeof fetch;
 }
 
 /**
  * Connects a server render's client: API_URL, the confirmed studio's slug,
- * and the server key when set (sent as Authorization: Bearer).
+ * and the server key when set (sent as Authorization: Bearer) and, with the
+ * key, the visitor's address (X-Visitor-IP).
  */
 export function connectServer(
 	api: ApiContext,
-	{ config, studio, fetch }: ServerConnectOptions,
+	{ config, studio, fetch, visitorAddress }: ServerConnectOptions,
 ): void {
 	const client = createTattooClient({
 		baseUrl: config.apiUrl,
 		tenant: studio.slug,
 		key: config.serverKey,
 		timeoutMs: SERVER_TIMEOUT_MS,
-		fetch,
+		fetch: config.serverKey ? withVisitorAddress(fetch, visitorAddress) : fetch,
 	});
 	api.tattoo.connect({ apiUrl: config.apiUrl, tenant: studio.slug }, client);
 }

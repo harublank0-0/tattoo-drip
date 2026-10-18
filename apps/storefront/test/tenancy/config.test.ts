@@ -209,6 +209,33 @@ describe("STOREFRONT_SERVER_KEY", () => {
 		assert.match(message, /API_URL is not set/);
 		assert.match(message, /STOREFRONT_SERVER_KEY is invalid/);
 	});
+
+	test("is required with NODE_ENV=production, without echoing anything", () => {
+		const message = failure({ ...PROD, NODE_ENV: "production" });
+		assert.match(
+			message,
+			/STOREFRONT_SERVER_KEY is not set: set it to 32 to 256 letters/,
+		);
+		assert.equal(
+			parseStorefrontConfig({
+				...PROD,
+				NODE_ENV: "production",
+				STOREFRONT_SERVER_KEY: KEY,
+				TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
+			}).serverKey,
+			KEY,
+		);
+	});
+
+	test("stays optional in development and tests", () => {
+		for (const NODE_ENV of ["development", "test", undefined]) {
+			assert.equal(
+				"serverKey" in parseStorefrontConfig({ ...PROD, NODE_ENV }),
+				false,
+				String(NODE_ENV),
+			);
+		}
+	});
 });
 
 describe("TURNSTILE_SITE_KEY", () => {
@@ -240,6 +267,7 @@ describe("TURNSTILE_SITE_KEY", () => {
 			parseStorefrontConfig({
 				...PROD,
 				NODE_ENV: "production",
+				STOREFRONT_SERVER_KEY: "test-server-key-0123456789abcdefghijklmnop",
 				TURNSTILE_SITE_KEY: KEY,
 			}).challengeSiteKey,
 			KEY,
@@ -263,6 +291,7 @@ describe("TURNSTILE_SITE_KEY", () => {
 		const message = failure({ NODE_ENV: "production" });
 		assert.match(message, /API_URL is not set/);
 		assert.match(message, /STOREFRONT_URL is not set/);
+		assert.match(message, /STOREFRONT_SERVER_KEY is not set/);
 		assert.match(message, /TURNSTILE_SITE_KEY is not set/);
 	});
 });
