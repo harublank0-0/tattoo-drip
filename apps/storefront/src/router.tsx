@@ -32,8 +32,6 @@ export function getRouter() {
 		routeTree,
 		context: { queryClient: api.queryClient, tattoo: api.tattoo, site },
 		scrollRestoration: true,
-		defaultPreload: "intent",
-		defaultPreloadStaleTime: 0,
 		defaultNotFoundComponent: NotFoundPage,
 		defaultErrorComponent: RouteErrorPage,
 		dehydrate: (): Dehydrated => ({
