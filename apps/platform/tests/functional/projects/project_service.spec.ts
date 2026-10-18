@@ -313,7 +313,7 @@ test.group("ProjectService.expireQuote", (group) => {
 			const paid = await expiredQuote(tenant, "deposit_pending");
 			await makePayment(tenant, paid.project, {
 				status: "verified",
-				verifiedAt: DateTime.utc(),
+				verifiedAt: paid.quote.expiresAt.minus({ hours: 1 }),
 			});
 			assert.isFalse(
 				await projects.expireQuote(tenant, paid.project.id, paid.quote.id),
@@ -339,7 +339,7 @@ test.group("ProjectService.expireQuote", (group) => {
 				const { project, quote } = await expiredQuote(tenant, status);
 				await makePayment(tenant, project, {
 					status: "verified",
-					verifiedAt: DateTime.utc(),
+					verifiedAt: quote.expiresAt.minus({ hours: 1 }),
 				});
 				assert.isFalse(
 					await projects.expireQuote(tenant, project.id, quote.id),
@@ -440,6 +440,38 @@ test.group("ProjectService.expireQuote", (group) => {
 			assert.isTrue(
 				await projects.expireQuote(tenant, early.project.id, early.quote.id),
 			);
+		});
+	});
+
+	test("a part of the deposit verified or recorded after the expiry spares a deposit_pending project; one taken before it still cancels", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const partial = (project: TattooProject, at: DateTime) =>
+				makePayment(tenant, project, {
+					amount: 100_000,
+					status: "verified",
+					verifiedAt: at,
+				});
+			const late = await expiredQuote(tenant, "deposit_pending");
+			await partial(late.project, DateTime.utc());
+			const early = await expiredQuote(tenant, "deposit_pending");
+			await partial(early.project, early.quote.expiresAt.minus({ hours: 1 }));
+
+			assert.isFalse(
+				await projects.expireQuote(tenant, late.project.id, late.quote.id),
+			);
+			assert.isFalse(
+				await projects.expireQuote(tenant, late.project.id, late.quote.id),
+				"and on every later run",
+			);
+			assert.equal(await statusOf(late.project), "deposit_pending");
+			assert.isTrue(
+				await projects.expireQuote(tenant, early.project.id, early.quote.id),
+			);
+			assert.equal(await statusOf(early.project), "cancelled");
 		});
 	});
 

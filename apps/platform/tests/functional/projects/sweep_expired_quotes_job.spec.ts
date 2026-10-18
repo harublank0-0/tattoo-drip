@@ -164,14 +164,21 @@ test.group("SweepExpiredQuotesJob", (group) => {
 		assert.equal(await statusIn(c.tenant, foreign.project), "quoted");
 	});
 
-	test("through the worker, spares a waiting screenshot and a deposit reversed after the expiry", async ({
+	test("through the worker, spares a waiting screenshot, a deposit reversed after the expiry and a part of the deposit taken after it", async ({
 		assert,
 	}) => {
 		const a = await studioWithOwner("sweep-late-66", "Late");
 		const waiting = await projectWithQuote(a.tenant, "deposit_pending");
 		const reversed = await projectWithQuote(a.tenant, "deposit_pending");
+		const partlyPaid = await projectWithQuote(a.tenant, "deposit_pending");
 		const unpaid = await projectWithQuote(a.tenant, "deposit_pending");
 		await inTenant(a.tenant, async () => {
+			// NPR 1,000 of the NPR 3,000 deposit, recorded after the expiry.
+			await makePayment(a.tenant, partlyPaid.project, {
+				amount: 100_000,
+				status: "verified",
+				verifiedAt: DateTime.utc(),
+			});
 			await makePayment(a.tenant, waiting.project);
 			const deposit = await makePayment(a.tenant, reversed.project, {
 				status: "verified",
@@ -198,6 +205,7 @@ test.group("SweepExpiredQuotesJob", (group) => {
 		assert.sameDeepMembers(mine, [
 			payloadOf(a.tenant, waiting),
 			payloadOf(a.tenant, reversed),
+			payloadOf(a.tenant, partlyPaid),
 			payloadOf(a.tenant, unpaid),
 		]);
 
@@ -208,6 +216,10 @@ test.group("SweepExpiredQuotesJob", (group) => {
 
 		assert.equal(await statusIn(a.tenant, waiting.project), "deposit_pending");
 		assert.equal(await statusIn(a.tenant, reversed.project), "deposit_pending");
+		assert.equal(
+			await statusIn(a.tenant, partlyPaid.project),
+			"deposit_pending",
+		);
 		assert.equal(await statusIn(a.tenant, unpaid.project), "cancelled");
 	});
 

@@ -5,7 +5,11 @@ import { PaymentRuleError } from "#modules/payments/errors";
 import Payment from "#modules/payments/models/payment";
 import type TattooProject from "#modules/projects/models/tattoo_project";
 import { PROJECT_STATUSES } from "#modules/projects/models/tattoo_project";
-import { ownerMember, paymentServices } from "#tests/helpers/payments";
+import {
+	ownerMember,
+	paymentServices,
+	proofFor,
+} from "#tests/helpers/payments";
 import {
 	makeArtist,
 	makeClient,
@@ -16,7 +20,7 @@ import {
 } from "#tests/helpers/pipeline";
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
-const { payments } = paymentServices();
+const { payments, projects } = paymentServices();
 
 async function reasonOf(work: () => Promise<unknown>) {
 	try {
@@ -116,6 +120,49 @@ test.group("PaymentService.record", (group) => {
 
 		assert.isTrue(result.booked);
 		assert.equal(result.status, "booked");
+	});
+
+	test("a part of the deposit recorded or verified after the quote expired keeps the sweep from cancelling the project", async ({
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("late-pay-66", "Late");
+		const expired = () =>
+			inTenant(tenant, async () => {
+				const project = await makeProject(tenant, await makeClient(tenant), {
+					status: "deposit_pending",
+				});
+				const quote = await makeQuote(tenant, project, {
+					expiresAt: DateTime.utc().minus({ hours: 1 }),
+				});
+				return { project, quote };
+			});
+		const desk = await expired();
+		const screenshot = await expired();
+		const unpaid = await expired();
+		const member = ownerMember(owner);
+		const proof = await inTenant(tenant, () =>
+			proofFor(tenant, screenshot.project, { amount: 100_000 }),
+		);
+
+		await inTenant(tenant, () =>
+			payments.record(tenant, member, desk.project, cash("deposit", 100_000)),
+		);
+		await inTenant(tenant, () => payments.verify(tenant, member, proof, null));
+
+		for (const { project, quote } of [desk, screenshot]) {
+			assert.isFalse(
+				await inTenant(tenant, () =>
+					projects.expireQuote(tenant, project.id, quote.id),
+				),
+			);
+			await inTenant(tenant, () => project.refresh());
+			assert.equal(project.status, "deposit_pending");
+		}
+		assert.isTrue(
+			await inTenant(tenant, () =>
+				projects.expireQuote(tenant, unpaid.project.id, unpaid.quote.id),
+			),
+		);
 	});
 
 	test("a deposit only while the project waits for it; session and balance in any status but declined", async ({

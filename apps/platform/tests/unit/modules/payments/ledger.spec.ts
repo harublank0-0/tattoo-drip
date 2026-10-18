@@ -332,10 +332,26 @@ test.group("decidedLate", () => {
 		assert.isFalse(decidedLate([refund, reverse(refund, after)], expiry));
 	});
 
-	test("a verification after the expiry is not a late decision (the deposit is paid)", ({
+	test("a deposit verified or recorded at or after the expiry is late too; one before it isn't", ({
 		assert,
 	}) => {
-		assert.isFalse(decidedLate([pay({ verifiedAt: after })], expiry));
+		assert.isTrue(decidedLate([pay({ verifiedAt: after })], expiry));
+		assert.isTrue(decidedLate([pay({ verifiedAt: expiry })], expiry));
+		assert.isFalse(decidedLate([pay({ verifiedAt: before })], expiry));
+	});
+
+	test("only decisions about the deposit count: a session payment, a balance payment or a refund after the expiry don't", ({
+		assert,
+	}) => {
+		for (const kind of ["session", "balance"] as const) {
+			assert.isFalse(decidedLate([pay({ kind, verifiedAt: after })], expiry));
+		}
+		assert.isFalse(
+			decidedLate(
+				[pay({ kind: "refund", amount: -100_000, verifiedAt: after })],
+				expiry,
+			),
+		);
 	});
 });
 

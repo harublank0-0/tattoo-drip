@@ -116,12 +116,17 @@ export function balanceOf(
 
 /**
  * Whether the studio's decision on the deposit came late for a quote that
- * expires at `expiresAt`: a deposit screenshot still waits for it, or it
- * rejected a deposit screenshot or reversed a deposit at or after the
- * expiry. ProjectService.expireQuote then spares the project, so whether
- * the sweep cancels it never depends on how late the owner decided
- * (TAT-66). A rejection or reversal before the expiry is not late: the
- * client had time to pay.
+ * expires at `expiresAt`, so that ProjectService.expireQuote spares the
+ * project and the owner who decided chooses what happens next (revise,
+ * take the rest at the desk, or withdraw): a deposit screenshot still waits
+ * for a decision, or the studio decided on the deposit at or after the
+ * expiry, by the decision's `verified_at`: rejected a screenshot, verified
+ * one or recorded a deposit at the desk (money taken after the expiry), or
+ * reversed a deposit. Whether the sweep cancels a project therefore never
+ * depends on how late the owner decided or when the sweep runs (TAT-66). A
+ * decision made before the expiry is not late: the client had time to pay,
+ * and the expiry acts as usual. Session payments, balance payments and
+ * refunds are not decisions about the deposit.
  */
 export function decidedLate(
 	payments: readonly LedgerPayment[],
@@ -135,10 +140,8 @@ export function decidedLate(
 		payment.verifiedAt !== null && payment.verifiedAt.toMillis() >= at;
 	return payments.some(
 		(payment) =>
-			(payment.kind === "deposit" && payment.status === "submitted") ||
 			(payment.kind === "deposit" &&
-				payment.status === "rejected" &&
-				decidedAfter(payment)) ||
+				(payment.status === "submitted" || decidedAfter(payment))) ||
 			(payment.kind === "correction" &&
 				payment.status === "verified" &&
 				payment.correctsPaymentId !== null &&

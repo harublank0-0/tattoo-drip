@@ -101,3 +101,10 @@ TAT-72 records gateway deposits through a `PaymentService` write that takes no m
 ## Verification
 
 `node ace codegen` leaves no diff; both migrations roll back and re-apply with no `schema.ts` diff; the full platform suite, `pnpm check`, `pnpm typecheck` and `pnpm build` pass. Then the whole-branch review and the Codex code and security reviews.
+
+## Review amendments
+
+Made after the Codex and Fable reviews of the finished branch. They change wording of rulings above; where they differ, this section wins.
+
+- **Ruling 5 (expiry and late decisions): any decision on the deposit made at or after the expiry spares the project, not only a rejection or a reversal.** `decidedLate` also counts a deposit verified or recorded at the desk at or after the current quote's expiry (by its `verified_at`). Before: a partial deposit the owner recorded an hour after the expiry did not spare the project, and the next sweep run (within 5 minutes) cancelled it holding verified money. Now the owner who took the money chooses what happens next, as for a late rejection or reversal. A deposit taken before the expiry acts as before (a settled deposit is never cancelled; an unsettled one is cancelled by the expiry), session, balance and refund payments are not decisions about the deposit, and a revision's new expiry starts the comparison again. Rejected alternative: leaving the sweep to cancel, which is the outcome ruling 5 set out to avoid.
+

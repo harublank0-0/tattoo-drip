@@ -382,10 +382,10 @@ export default class ProjectService {
 	 * accepted but never paid (`deposit_pending` with the deposit not
 	 * settled). A deposit that was paid is never cancelled by expiry, not
 	 * even on a `quoted` project that was revised after the client paid. Nor
-	 * is a project whose deposit screenshot waits, or whose screenshot the
-	 * studio rejected or deposit it reversed after the expiry (TAT-66): the
-	 * owner who decided late chooses what happens next, so a later sweep run
-	 * changes nothing. The
+	 * is a project whose deposit screenshot waits, or whose deposit the
+	 * studio verified, recorded, rejected or reversed after the expiry
+	 * (TAT-66): the owner who decided late chooses what happens next, so a
+	 * later sweep run changes nothing. The
 	 * project's scheduled sessions are cancelled first, so the artist's time
 	 * is free. A run before the current quote's expiry (this process's clock
 	 * behind the one that queued the job) queues the job again for the rest
@@ -534,9 +534,9 @@ export default class ProjectService {
 	 * Whether the expired `quote` cancels a project in its current status.
 	 * Only `quoted`, `on_hold` and `deposit_pending` projects can be
 	 * cancelled, and none whose deposit decision is owed or came late
-	 * (DepositService.expirySpared: a screenshot waits, or the studio rejected
-	 * one or reversed a deposit after the expiry; TAT-66): the owner decides
-	 * what happens next. A `quoted` or `on_hold` project is then cancelled
+	 * (DepositService.expirySpared: a screenshot waits, or the studio verified,
+	 * recorded, rejected or reversed a deposit after the expiry; TAT-66): the
+	 * owner decides what happens next. A `quoted` or `on_hold` project is then cancelled
 	 * unless its (non-zero) deposit was paid: it can hold a payment when staff
 	 * revised the quote after the client paid. A zero deposit is "settled" by
 	 * definition, so it doesn't spare a quote nobody accepted.

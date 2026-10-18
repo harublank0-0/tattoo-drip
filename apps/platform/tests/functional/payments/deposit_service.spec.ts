@@ -279,7 +279,7 @@ test.group(
 test.group("DepositService.expirySpared", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 
-	test("a waiting screenshot, a late rejection or a late reversal spares; nothing else does", async ({
+	test("a waiting screenshot, or a deposit verified, rejected or reversed after the expiry, spares; nothing else does", async ({
 		assert,
 	}) => {
 		const { tenant } = await studioWithOwner();
@@ -294,7 +294,18 @@ test.group("DepositService.expirySpared", (group) => {
 		const earlyNo = await projectIn(tenant);
 		const reversedLate = await projectIn(tenant);
 		const plain = await projectIn(tenant);
+		const takenLate = await projectIn(tenant);
+		const takenEarly = await projectIn(tenant);
 		await inTenant(tenant, async () => {
+			await makePayment(tenant, takenLate, {
+				amount: 100_000,
+				...verified(),
+			});
+			await makePayment(tenant, takenEarly, {
+				amount: 100_000,
+				status: "verified",
+				verifiedAt: expiresAt.minus({ hours: 1 }),
+			});
 			await makePayment(tenant, waiting);
 			await makePayment(tenant, lateNo, {
 				status: "rejected",
@@ -322,6 +333,8 @@ test.group("DepositService.expirySpared", (group) => {
 		assert.isFalse(await spared(earlyNo), "rejected before the expiry");
 		assert.isTrue(await spared(reversedLate), "reversed after the expiry");
 		assert.isFalse(await spared(plain), "nothing about the deposit");
+		assert.isTrue(await spared(takenLate), "verified or recorded after");
+		assert.isFalse(await spared(takenEarly), "verified before the expiry");
 	});
 
 	test("another studio's context sees none of it", async ({ assert }) => {

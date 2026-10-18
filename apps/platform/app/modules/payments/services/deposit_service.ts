@@ -72,9 +72,9 @@ export default class DepositService {
 	/**
 	 * Whether `quote`'s expiry must spare the project because the studio's
 	 * decision on its deposit is still owed or came late: a deposit
-	 * screenshot waits, or a deposit screenshot was rejected or a deposit
-	 * reversed at or after the expiry (decidedLate). ProjectService's expiry
-	 * rule asks it first (TAT-66).
+	 * screenshot waits, or a deposit was verified, recorded at the desk,
+	 * rejected or reversed at or after the expiry (decidedLate).
+	 * ProjectService's expiry rule asks it first (TAT-66).
 	 */
 	async expirySpared(
 		tenant: TenantRef,
