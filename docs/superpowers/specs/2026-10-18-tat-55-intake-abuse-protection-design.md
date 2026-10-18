@@ -57,7 +57,7 @@ The branch was designed on 715b827 (designs only). Built after a rebase onto the
 | `challengeToken` removed | `intakeValidator` |
 | Header, codes, `website` | `packages/types/openapi.yaml`, regenerated |
 | Header and honeypot, two constants | `packages/sdk/src/client.ts`, `index.ts` |
-| `useChallenge`, `siteverify`, `verdict` | `tests/helpers/challenge.ts` |
+| `enableChallenge`, `siteverify`, `verdict` | `tests/helpers/challenge.ts` |
 
 ## For TAT-57 (what the form sends)
 
@@ -69,7 +69,7 @@ The plan lists every case. In short: `checkChallengeSecret` (required in product
 
 ## Docs
 
-`apps/platform/docs/backend.md` (the Public API CORS line, the intake bullet's slots become the real checks, a Rate limits bullet, a bot-challenge bullet), `apps/platform/docs/testing.md` (`useChallenge`, the empty secret in `.env.test`), `apps/platform/database/README.md` (production checklist: the secret, outbound HTTPS to Cloudflare, `trustProxy` and the intake limits, the 3 s in the pooled-connection bullet), `README.md` (deployment: the secret and how to get the keys), `docs/sdk.md` (the example, the codes, what a browser form sends), `docs/architecture.md` (the token in a header, checked before the body). `docs/requirements.md` has no box for this: the abuse line is a rule and already true; the intake-form box waits for TAT-57. `docs/README.md` anchors don't change.
+`apps/platform/docs/backend.md` (the Public API CORS line, the intake bullet's slots become the real checks, a Rate limits bullet, a bot-challenge bullet), `apps/platform/docs/testing.md` (`enableChallenge`, the empty secret in `.env.test`), `apps/platform/database/README.md` (production checklist: the secret, outbound HTTPS to Cloudflare, `trustProxy` and the intake limits, the 3 s in the pooled-connection bullet), `README.md` (deployment: the secret and how to get the keys), `docs/sdk.md` (the example, the codes, what a browser form sends), `docs/architecture.md` (the token in a header, checked before the body). `docs/requirements.md` has no box for this: the abuse line is a rule and already true; the intake-form box waits for TAT-57. `docs/README.md` anchors don't change.
 
 ## Not in this ticket; before any public deploy
 

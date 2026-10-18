@@ -54,7 +54,7 @@ export function verdict(slug: string, over: Record<string, unknown> = {}) {
  * checked as in production. Undo it in teardown with
  * `app.container.restore(BotChallenge)`.
  */
-export function useChallenge(
+export function enableChallenge(
 	fake: Siteverify,
 	options: { timeoutMs?: number } = {},
 ) {

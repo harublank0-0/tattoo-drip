@@ -6,7 +6,7 @@ import { INTAKE_LIMITS } from "#modules/inquiries/intake_limits";
 import BotChallenge from "#services/bot_challenge";
 import { API_ERRORS } from "#services/public_api_errors";
 import { assertApiError } from "#tests/helpers/api";
-import { siteverify, useChallenge, verdict } from "#tests/helpers/challenge";
+import { enableChallenge, siteverify, verdict } from "#tests/helpers/challenge";
 import {
 	intakeFields,
 	intakeRows,
@@ -54,7 +54,7 @@ test.group("Public API: the intake's honeypot", (group) => {
 		assert,
 	}) => {
 		const { tenant } = await studioWithOwner(SLUG);
-		useChallenge(siteverify(() => verdict(SLUG)));
+		enableChallenge(siteverify(() => verdict(SLUG)));
 		const before = await tempUploads();
 		const rows = await intakeRows({ tenant });
 
@@ -78,7 +78,7 @@ test.group("Public API: the intake's honeypot", (group) => {
 
 	test("an empty or blank honeypot is a person's", async ({ client }) => {
 		await studioWithOwner(SLUG);
-		useChallenge(siteverify(() => verdict(SLUG)));
+		enableChallenge(siteverify(() => verdict(SLUG)));
 
 		for (const website of ["", "   "]) {
 			(
@@ -191,7 +191,7 @@ test.group("Public API: the intake's phone limit", (group) => {
 			const maya = await makeClient(tenant, { phone: "+9779812345678" });
 			for (let i = 0; i < 3; i++) await makeInquiry(tenant, maya);
 		});
-		useChallenge(siteverify(() => verdict(SLUG)));
+		enableChallenge(siteverify(() => verdict(SLUG)));
 
 		assertApiError(
 			await postInquiry(client, SLUG, intakeFields()).header(

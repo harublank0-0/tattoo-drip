@@ -8,9 +8,9 @@ import BotChallenge from "#services/bot_challenge";
 import { API_ERRORS } from "#services/public_api_errors";
 import { assertApiError } from "#tests/helpers/api";
 import {
+	enableChallenge,
 	siteverify,
 	TEST_SECRET,
-	useChallenge,
 	verdict,
 } from "#tests/helpers/challenge";
 import {
@@ -73,7 +73,7 @@ test.group("Public API: the intake's bot challenge", (group) => {
 	}) => {
 		const { tenant } = await studioWithOwner(SLUG);
 		const fake = siteverify(() => verdict(SLUG));
-		useChallenge(fake);
+		enableChallenge(fake);
 
 		const response = await send(client, SLUG, {
 			token: TOKEN,
@@ -93,7 +93,7 @@ test.group("Public API: the intake's bot challenge", (group) => {
 	}) => {
 		const { tenant } = await studioWithOwner(SLUG);
 		const fake = siteverify(() => verdict(SLUG));
-		useChallenge(fake);
+		enableChallenge(fake);
 		const before = await tempUploads();
 		const rows = await intakeRows({ tenant });
 
@@ -116,7 +116,7 @@ test.group("Public API: the intake's bot challenge", (group) => {
 	}) => {
 		await studioWithOwner(SLUG);
 		const fake = siteverify(() => verdict(SLUG));
-		useChallenge(fake);
+		enableChallenge(fake);
 
 		const response = await send(client, SLUG, {
 			fields: { ...intakeFields(), challengeToken: TOKEN },
@@ -148,8 +148,7 @@ test.group("Public API: the intake's bot challenge", (group) => {
 		};
 
 		for (const [why, answer] of Object.entries(answers)) {
-			// biome-ignore lint/correctness/useHookAtTopLevel: a test helper named use*, not a React hook
-			useChallenge(siteverify(answer));
+			enableChallenge(siteverify(answer));
 			const response = await send(client, SLUG, {
 				token: TOKEN,
 				uploads: [await png()],
@@ -192,8 +191,7 @@ test.group("Public API: the intake's bot challenge", (group) => {
 		};
 
 		for (const [why, answer] of Object.entries(answers)) {
-			// biome-ignore lint/correctness/useHookAtTopLevel: a test helper named use*, not a React hook
-			useChallenge(siteverify(answer), { timeoutMs: 50 });
+			enableChallenge(siteverify(answer), { timeoutMs: 50 });
 			const response = await send(client, SLUG, { token: TOKEN });
 			assertApiError(response, 503, "challenge_unavailable");
 			assert.equal(
@@ -214,7 +212,7 @@ test.group("Public API: the intake's bot challenge", (group) => {
 			new TenancyService().changeSlug(tenant, "intake-new-55"),
 		);
 		const fake = siteverify(() => verdict("intake-new-55"));
-		useChallenge(fake);
+		enableChallenge(fake);
 
 		for (let i = 0; i < INTAKE_LIMITS.perAddress.requests; i++) {
 			assertApiError(
@@ -245,7 +243,7 @@ test.group("Public API: the intake's address and studio limits", (group) => {
 	}) => {
 		const { tenant } = await studioWithOwner(SLUG);
 		const fake = siteverify(() => verdict(SLUG));
-		useChallenge(fake);
+		enableChallenge(fake);
 		for (let i = 0; i < INTAKE_LIMITS.perAddress.requests; i++) {
 			assertApiError(await send(client, SLUG), 403, "challenge_failed");
 		}
@@ -273,7 +271,7 @@ test.group("Public API: the intake's address and studio limits", (group) => {
 	}) => {
 		await studioWithOwner(SLUG);
 		await studioWithOwner(OTHER);
-		useChallenge(siteverify(() => verdict(SLUG)));
+		enableChallenge(siteverify(() => verdict(SLUG)));
 		for (let i = 0; i < INTAKE_LIMITS.perAddress.requests; i++) {
 			assertApiError(await send(client, SLUG), 403, "challenge_failed");
 		}
@@ -283,7 +281,7 @@ test.group("Public API: the intake's address and studio limits", (group) => {
 			"rate_limited",
 		);
 
-		useChallenge(siteverify(() => verdict(OTHER)));
+		enableChallenge(siteverify(() => verdict(OTHER)));
 		(await send(client, OTHER, { token: TOKEN })).assertStatus(201);
 	});
 
@@ -293,7 +291,7 @@ test.group("Public API: the intake's address and studio limits", (group) => {
 	}) => {
 		const { tenant } = await studioWithOwner(SLUG);
 		await studioWithOwner(OTHER);
-		useChallenge(siteverify(() => verdict(SLUG)));
+		enableChallenge(siteverify(() => verdict(SLUG)));
 		for (let i = 0; i < 5; i++) {
 			assertApiError(
 				await send(client, SLUG, { ip: `192.0.2.${i}` }),
@@ -318,7 +316,7 @@ test.group("Public API: the intake's address and studio limits", (group) => {
 		assertApiError(refused, 429, "rate_limited");
 		assert.match(refused.header("retry-after") ?? "", /^\d+$/);
 		assert.deepEqual(await intakeRows({ tenant }), rows);
-		useChallenge(siteverify(() => verdict(OTHER)));
+		enableChallenge(siteverify(() => verdict(OTHER)));
 		(
 			await send(client, OTHER, { token: TOKEN, ip: "203.0.113.200" })
 		).assertStatus(201);
