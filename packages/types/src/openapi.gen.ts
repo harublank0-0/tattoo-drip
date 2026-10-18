@@ -332,7 +332,9 @@ export interface components {
                  *     (405), `payload_too_large` (413), `unsupported_media_type`
                  *     (415), `validation_failed` (422, with `fields`),
                  *     `rate_limited` (429, with `Retry-After`), `internal_error`
-                 *     (500). Endpoint codes: `artist_not_accepting`,
+                 *     (500), `request_timeout` (408, an upload that took too long)
+                 *     and `service_busy` (503, with `Retry-After`: too many uploads
+                 *     in progress, or no database connection free). Endpoint codes: `artist_not_accepting`,
                  *     `studio_not_accepting`, `too_many_open_inquiries` (409),
                  *     `challenge_failed` (403) and `challenge_unavailable` (503),
                  *     all `createInquiry`; `deposit_not_due`, `deposit_changed`
@@ -341,6 +343,7 @@ export interface components {
                  * @example not_found
                  * @example validation_failed
                  * @example rate_limited
+                 * @example service_busy
                  * @example too_many_open_inquiries
                  * @example challenge_failed
                  * @example deposit_changed
@@ -1099,6 +1102,7 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+            408: components["responses"]["Error"];
             /** @description The studio takes no such inquiry now (`artist_not_accepting`, `studio_not_accepting`, `too_many_open_inquiries`) */
             409: {
                 headers: {
@@ -1112,7 +1116,7 @@ export interface operations {
             415: components["responses"]["Error"];
             422: components["responses"]["ValidationError"];
             429: components["responses"]["RateLimited"];
-            /** @description The bot challenge could not be checked (`challenge_unavailable`). Try again in a minute. */
+            /** @description The bot challenge could not be checked (`challenge_unavailable`), or the API is busy (`service_busy`, with `Retry-After`). Try again in a minute. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -1205,6 +1209,7 @@ export interface operations {
             };
             400: components["responses"]["Error"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["Error"];
             /** @description The page can't take a screenshot now (`deposit_not_due`, `deposit_changed`) */
             409: {
                 headers: {
@@ -1218,6 +1223,15 @@ export interface operations {
             415: components["responses"]["Error"];
             422: components["responses"]["ValidationError"];
             429: components["responses"]["RateLimited"];
+            /** @description The API is busy (`service_busy`, with `Retry-After`). Try again in a moment. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             default: components["responses"]["Error"];
         };
     };

@@ -10,7 +10,11 @@ import { apiLimitFor } from "#services/api_limits";
 import { assertApiError } from "#tests/helpers/api";
 import { fillApiLimit, testServerKeys } from "#tests/helpers/api_limits";
 import { intakeFields, png, postInquiry } from "#tests/helpers/intake";
-import { rawRequest, readResponse } from "#tests/helpers/raw_http";
+import {
+	closedWithin,
+	rawRequest,
+	readResponse,
+} from "#tests/helpers/raw_http";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
 import { newTempUploads, tempUploads } from "#tests/helpers/uploads";
 
@@ -325,5 +329,28 @@ test.group("Public API limits: the gate", (group) => {
 			"Too many attempts. Try again in 60 minutes.",
 		);
 		assert.isNull(await User.findBy("email", "ada38@example.com"));
+	});
+
+	test("an early refusal closes the connection instead of reading the rest", async ({
+		assert,
+	}) => {
+		await fillApiLimit("callerWrites", {
+			kind: "anonymous",
+			ip: "203.0.113.52",
+		});
+		const socket = await rawRequest([
+			"POST /api/v1/__test/echo HTTP/1.1",
+			"Content-Type: application/json",
+			"Content-Length: 100000",
+			"X-Forwarded-For: 203.0.113.52",
+		]);
+		try {
+			const response = await readResponse(socket, 2000);
+			assert.equal(response.status, 429);
+			assert.equal(response.headers.connection, "close");
+			assert.isTrue(await closedWithin(socket, 1000));
+		} finally {
+			socket.destroy();
+		}
 	});
 });

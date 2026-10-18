@@ -3,7 +3,11 @@ import { errors as httpErrors } from "@adonisjs/core/http";
 import { LimiterResponse, errors as limiterErrors } from "@adonisjs/limiter";
 import { test } from "@japa/runner";
 import { errors as vineErrors } from "@vinejs/vine";
-import { ApiException, apiErrorFor } from "#services/public_api_errors";
+import {
+	ApiException,
+	apiErrorFor,
+	apiErrorIsReported,
+} from "#services/public_api_errors";
 
 const SECRET = "connection refused at 10.0.0.5:5432 for tattoo_drip_app";
 
@@ -327,5 +331,53 @@ test.group("The challenge codes", () => {
 				code,
 			);
 		}
+	});
+});
+
+test.group("Busy and slow (TAT-38)", () => {
+	test("a pool with no free connection in time is service_busy, retried after 10 s, and reported", ({
+		assert,
+	}) => {
+		const error = Object.assign(
+			new Error(
+				"Knex: Timeout acquiring a connection. The pool is probably full.",
+			),
+			{ name: "KnexTimeoutError" },
+		);
+		const { status, body, headers } = apiErrorFor(error);
+		assert.equal(status, 503);
+		assert.equal(body.error.code, "service_busy");
+		assert.notInclude(body.error.message, "Knex");
+		assert.equal(headers["Retry-After"], "10");
+		assert.isTrue(apiErrorIsReported(error));
+	});
+
+	test("retryLater carries Retry-After; a busy refusal is not reported", ({
+		assert,
+	}) => {
+		const limited = apiErrorFor(ApiException.retryLater("rate_limited", 10));
+		assert.equal(limited.status, 429);
+		assert.equal(limited.body.error.code, "rate_limited");
+		assert.equal(limited.headers["Retry-After"], "10");
+
+		const busy = ApiException.retryLater("service_busy", 10);
+		assert.equal(apiErrorFor(busy).status, 503);
+		assert.equal(apiErrorFor(busy).headers["Retry-After"], "10");
+		assert.isFalse(apiErrorIsReported(busy));
+		assert.isFalse(apiErrorIsReported(ApiException.notFound()));
+		assert.isTrue(apiErrorIsReported(ApiException.of("challenge_unavailable")));
+		assert.isTrue(apiErrorIsReported(new Error(SECRET)));
+		assert.deepEqual(apiErrorFor(ApiException.of("service_busy")).headers, {});
+	});
+
+	test("a 408 is request_timeout", ({ assert }) => {
+		const { status, body } = apiErrorFor(
+			new Exception("Request timeout", {
+				status: 408,
+				code: "E_REQUEST_TIMEOUT",
+			}),
+		);
+		assert.equal(status, 408);
+		assert.equal(body.error.code, "request_timeout");
 	});
 });
