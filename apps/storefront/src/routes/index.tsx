@@ -12,23 +12,9 @@ import { Specialties } from "#/features/home/specialties";
 export const Route = createFileRoute("/")({
 	component: Home,
 	head: () => ({
-		meta: [
-			{
-				name: "description",
-				content:
-					"Independent tattoo artist Suraj Rana in Kathmandu, Nepal. Explore custom blackwork, fine line, ornamental tattoos, and original flash.",
-			},
-			{
-				property: "og:title",
-				content: "Sangi Tattoo Studio — Kathmandu, Nepal",
-			},
-			{
-				property: "og:description",
-				content:
-					"Thoughtful tattoo work. Made with intention. Worn for a lifetime.",
-			},
-			{ property: "og:type", content: "website" },
-		],
+		// No title, description or og:title/og:description: the mock studio's
+		// would show on every studio's link preview. TAT-48 sets them per page.
+		meta: [{ property: "og:type", content: "website" }],
 	}),
 });
 
