@@ -2,6 +2,10 @@ import { randomUUID } from "node:crypto";
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
+import {
+	REFUSE_APPLY_OVER_CORRECTIONS,
+	REFUSE_ROLLBACK_OVER_CORRECTIONS,
+} from "#database/migrations/1791660000000_add_corrections_and_notes_to_payments";
 import User from "#models/user";
 import Payment, {
 	PAYMENT_KINDS,
@@ -661,6 +665,46 @@ test.group("Payment model", (group) => {
 						}),
 					),
 				/payments_guard: corrects_payment_id cannot change/,
+			);
+		});
+	});
+
+	test("the corrections migration refuses, with a clear message, to apply or roll back over corrections", async ({
+		assert,
+	}) => {
+		const { a, mine } = await twoTenants();
+
+		await withDbContext({ tenantId: a.id }, async (trx) => {
+			// No correction yet: both checks pass silently.
+			await trx.rawQuery(REFUSE_APPLY_OVER_CORRECTIONS);
+			await trx.rawQuery(REFUSE_ROLLBACK_OVER_CORRECTIONS);
+
+			const deposit = idOf(
+				await insertRow(trx, "payments", newPayment(a.id, mine.id)),
+			);
+			await insertRow(
+				trx,
+				"payments",
+				newPayment(a.id, mine.id, {
+					kind: "correction",
+					amount: -300_000,
+					corrects_payment_id: deposit,
+				}),
+			);
+
+			await assert.rejects(
+				() =>
+					withTransaction((inner) =>
+						inner.rawQuery(REFUSE_APPLY_OVER_CORRECTIONS),
+					),
+				/correction rows that name no payment/,
+			);
+			await assert.rejects(
+				() =>
+					withTransaction((inner) =>
+						inner.rawQuery(REFUSE_ROLLBACK_OVER_CORRECTIONS),
+					),
+				/rolling back would drop the payments the reversals name/,
 			);
 		});
 	});

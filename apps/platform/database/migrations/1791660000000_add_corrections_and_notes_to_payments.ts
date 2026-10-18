@@ -104,16 +104,53 @@ end
 $$`;
 
 /**
+ * Run first by up(): before TAT-66 a `correction` named no payment, and
+ * nothing in the product inserted one (only tests did), so a database that
+ * has one cannot get the "a correction names its payment" rule. Applying
+ * stops here, with the whole migration rolled back, instead of failing later
+ * on `payments_correction_target`. At this point every correction is one
+ * without a target, because the column is new.
+ */
+export const REFUSE_APPLY_OVER_CORRECTIONS = `
+do $$
+begin
+	if exists (select 1 from payments where kind = 'correction') then
+		raise exception 'payments holds correction rows that name no payment, which TAT-66 requires: delete them as the owner role (alter table payments disable trigger payments_guard around the delete) or reset the development database, then migrate again';
+	end if;
+end
+$$`;
+
+/**
+ * Run first by down(): the old schema has nowhere to keep which payment a
+ * correction reverses, so rolling back over a reversal would drop the link
+ * and leave a correction that up() then refuses. The ledger is never rolled
+ * back once it holds reversals: reset the development database instead.
+ */
+export const REFUSE_ROLLBACK_OVER_CORRECTIONS = `
+do $$
+begin
+	if exists (select 1 from payments where kind = 'correction') then
+		raise exception 'payments holds reversals: rolling back would drop the payments the reversals name (corrects_payment_id) and the migration could not be applied again; reset the development database instead';
+	end if;
+end
+$$`;
+
+/**
  * Corrections and notes on the ledger (TAT-66). A correction names the
  * payment it reverses: same tenant and project (the composite key), never
  * itself, at most once (the unique index). Only a correction names one. A
  * payment can carry a staff note (payments_guard decides when it may
  * change). The guard's trigger stays bound; only its function is replaced.
+ *
+ * Both directions refuse to run over existing corrections (see the two
+ * statements above): up() because they have no target to give, down()
+ * because it would drop the targets of reversals.
  */
 export default class extends BaseSchema {
 	protected tableName = "payments";
 
 	async up() {
+		this.schema.raw(REFUSE_APPLY_OVER_CORRECTIONS);
 		this.schema.alterTable(this.tableName, (table) => {
 			table.uuid("corrects_payment_id").nullable();
 			table.string("note", 500).nullable();
@@ -133,6 +170,7 @@ export default class extends BaseSchema {
 	}
 
 	async down() {
+		this.schema.raw(REFUSE_ROLLBACK_OVER_CORRECTIONS);
 		for (const statement of [
 			GUARD_TAT_37,
 			"alter table payments drop constraint payments_correction_not_itself",
