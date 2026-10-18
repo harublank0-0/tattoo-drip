@@ -186,6 +186,8 @@ type PaymentOver = Partial<
 		| "status"
 		| "verifiedByUserId"
 		| "verifiedAt"
+		| "correctsPaymentId"
+		| "note"
 	>
 >;
 

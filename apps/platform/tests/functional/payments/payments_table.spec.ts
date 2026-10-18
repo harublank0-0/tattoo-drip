@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
@@ -122,14 +123,22 @@ test.group("payments table", (group) => {
 			["correction", 0, false],
 		];
 
-		await withDbContext({ tenantId: a.id }, async () => {
+		await withDbContext({ tenantId: a.id }, async (trx) => {
 			for (const [kind, amount, allowed] of cases) {
+				const target =
+					kind === "correction"
+						? {
+								corrects_payment_id: idOf(
+									await insertRow(trx, "payments", newPayment(a.id, mine.id)),
+								),
+							}
+						: {};
 				const insert = () =>
 					withTransaction((inner) =>
 						insertRow(
 							inner,
 							"payments",
-							newPayment(a.id, mine.id, { kind, amount }),
+							newPayment(a.id, mine.id, { kind, amount, ...target }),
 						),
 					);
 				if (allowed) await insert();
@@ -598,6 +607,120 @@ test.group("Payment model", (group) => {
 		});
 	});
 
+	test("a correction names a payment of its own project, once, and only a correction does", async ({
+		assert,
+	}) => {
+		const { a, b, mine, other, theirs } = await twoTenants();
+		const theirPayment = await withDbContext({ tenantId: b.id }, async (trx) =>
+			idOf(await insertRow(trx, "payments", newPayment(b.id, theirs.id))),
+		);
+		const correction = (corrects: string | null, over = {}) =>
+			newPayment(a.id, mine.id, {
+				kind: "correction",
+				amount: -300_000,
+				corrects_payment_id: corrects,
+				...over,
+			});
+		const rejects = (values: Record<string, unknown>, message: RegExp) =>
+			assert.rejects(
+				() => withTransaction((inner) => insertRow(inner, "payments", values)),
+				message,
+			);
+
+		await withDbContext({ tenantId: a.id }, async (trx) => {
+			const deposit = idOf(
+				await insertRow(trx, "payments", newPayment(a.id, mine.id)),
+			);
+			const elsewhere = idOf(
+				await insertRow(trx, "payments", newPayment(a.id, other.id)),
+			);
+
+			await rejects(correction(null), /payments_correction_target/);
+			await rejects(
+				newPayment(a.id, mine.id, { corrects_payment_id: deposit }),
+				/payments_correction_target/,
+			);
+			await rejects(correction(elsewhere), /payments_corrects_payment_foreign/);
+			await rejects(
+				correction(theirPayment),
+				/payments_corrects_payment_foreign/,
+			);
+			const self = randomUUID();
+			await rejects(
+				correction(self, { id: self }),
+				/payments_correction_not_itself/,
+			);
+
+			const first = idOf(await insertRow(trx, "payments", correction(deposit)));
+			await rejects(correction(deposit), /payments_corrects_payment_id_unique/);
+			await assert.rejects(
+				() =>
+					withTransaction((inner) =>
+						updateRow(inner, "payments", first, {
+							corrects_payment_id: elsewhere,
+						}),
+					),
+				/payments_guard: corrects_payment_id cannot change/,
+			);
+		});
+	});
+
+	test("a note is written at insert or with the decision, and afterwards only cleared", async ({
+		assert,
+	}) => {
+		const { a, mine, owner } = await twoTenants();
+		const rejects = (id: string, set: Record<string, unknown>) =>
+			assert.rejects(
+				() => withTransaction((inner) => updateRow(inner, "payments", id, set)),
+				/payments_guard: note cannot change/,
+			);
+
+		await withDbContext({ tenantId: a.id }, async (trx) => {
+			// A desk payment: recorded verified, with its note.
+			const desk = idOf(
+				await insertRow(
+					trx,
+					"payments",
+					newPayment(a.id, mine.id, {
+						...verified(owner.id),
+						note: "Paid by her brother",
+					}),
+				),
+			);
+			await rejects(desk, { note: "Something else" });
+			await updateRow(trx, "payments", desk, { note: null });
+
+			// A screenshot: no note until it is decided, then frozen.
+			const proof = idOf(
+				await insertRow(trx, "payments", newPayment(a.id, mine.id)),
+			);
+			await rejects(proof, { note: "Before deciding" });
+			await updateRow(
+				trx,
+				"payments",
+				proof,
+				verified(owner.id, {
+					status: "rejected",
+					note: "Not on the statement",
+				}),
+			);
+			await rejects(proof, { note: "Changed my mind" });
+			await updateRow(trx, "payments", proof, { note: null });
+
+			await assert.rejects(
+				() =>
+					withTransaction((inner) =>
+						insertRow(
+							inner,
+							"payments",
+							newPayment(a.id, mine.id, { note: "x".repeat(501) }),
+						),
+					),
+				/value too long/,
+			);
+		});
+	});
+
 	test("every kind, status and method in the model is accepted by the database", async ({
 		assert,
 	}) => {
@@ -605,11 +728,14 @@ test.group("Payment model", (group) => {
 
 		await inTenant(tenant, async () => {
 			const project = await makeProject(tenant, await makeClient(tenant));
+			// A correction names the payment it reverses.
+			const corrected = await makePayment(tenant, project);
 			for (const kind of PAYMENT_KINDS) {
 				const negative = kind === "refund" || kind === "correction";
 				await makePayment(tenant, project, {
 					kind,
 					amount: negative ? -100_000 : 100_000,
+					...(kind === "correction" ? { correctsPaymentId: corrected.id } : {}),
 				});
 			}
 			for (const status of PAYMENT_STATUSES) {
@@ -630,7 +756,8 @@ test.group("Payment model", (group) => {
 			}
 			assert.lengthOf(
 				await Payment.query().where("tenant_id", tenant.id),
-				PAYMENT_KINDS.length +
+				1 +
+					PAYMENT_KINDS.length +
 					PAYMENT_STATUSES.length +
 					PAYMENT_METHOD_KINDS.length,
 			);

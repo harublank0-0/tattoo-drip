@@ -1324,13 +1324,14 @@ test.group("ProjectService.move: sessions and deposits", (group) => {
 				status: "deposit_pending",
 			});
 			await makeQuote(tenant, project);
-			await makePayment(tenant, project, {
+			const deposit = await makePayment(tenant, project, {
 				status: "verified",
 				verifiedAt: DateTime.utc(),
 			});
 			await makePayment(tenant, project, {
 				kind: "correction",
 				amount: -300_000,
+				correctsPaymentId: deposit.id,
 				status: "verified",
 				verifiedAt: DateTime.utc(),
 			});

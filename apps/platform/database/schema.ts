@@ -238,11 +238,13 @@ export class PaymentMethodSchema extends BaseModel {
 export class PaymentSchema extends BaseModel {
 	static $columns = [
 		"amount",
+		"correctsPaymentId",
 		"createdAt",
 		"currency",
 		"id",
 		"kind",
 		"method",
+		"note",
 		"projectId",
 		"proofImageHeight",
 		"proofImageKey",
@@ -256,6 +258,8 @@ export class PaymentSchema extends BaseModel {
 	$columns = PaymentSchema.$columns;
 	@column()
 	declare amount: number;
+	@column()
+	declare correctsPaymentId: string | null;
 	@column.dateTime({ autoCreate: true })
 	declare createdAt: DateTime;
 	@column()
@@ -266,6 +270,8 @@ export class PaymentSchema extends BaseModel {
 	declare kind: string;
 	@column()
 	declare method: string;
+	@column()
+	declare note: string | null;
 	@column()
 	declare projectId: string;
 	@column()

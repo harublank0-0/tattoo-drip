@@ -95,12 +95,13 @@ test.group("DepositService.isSettled", (group) => {
 				"session and balance payments are not the deposit",
 			);
 
-			await makePayment(tenant, project, verified());
+			const deposit = await makePayment(tenant, project, verified());
 			assert.isTrue(await deposits.isSettled(tenant, project), "deposit");
 
 			await makePayment(tenant, project, {
 				kind: "correction",
 				amount: -300_000,
+				correctsPaymentId: deposit.id,
 				...verified(),
 			});
 			assert.isFalse(
@@ -185,10 +186,14 @@ test.group("DepositService.verifiedPaid", (group) => {
 			assert.equal(await deposits.verifiedPaid(tenant, project, "NPR"), 0);
 
 			await makePayment(tenant, project, { amount: 100_000, ...verified() });
-			await makePayment(tenant, project, { amount: 50_000, ...verified() });
+			const second = await makePayment(tenant, project, {
+				amount: 50_000,
+				...verified(),
+			});
 			await makePayment(tenant, project, {
 				kind: "correction",
 				amount: -20_000,
+				correctsPaymentId: second.id,
 				...verified(),
 			});
 			// Not counted: unverified, another currency, other kinds.
