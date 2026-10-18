@@ -1,0 +1,12 @@
+@email.layout({ title: 'You already have an account', preheader: 'Sign in, or choose a new password.' })
+  <p style="margin: 0 0 16px;">Hello,</p>
+  <p style="margin: 0;">Someone tried to create a Tattoo Drip account with this email address, but it already has one. If it was you, sign in instead:</p>
+  @!email.button({ href: signInUrl, text: 'Sign in' })
+  <p style="margin: 0 0 16px;">Forgot your password? Choose a new one with this link. It works for 1 hour:</p>
+  <p style="margin: 0 0 16px; font-size: 14px; line-height: 20px;">
+    <a href="{{ resetUrl }}" style="color: #18181b; word-break: break-all;">{{ resetUrl }}</a>
+  </p>
+  <p style="margin: 0; font-size: 14px; line-height: 20px; color: #71717a;">
+    If it wasn't you, ignore this email: your account hasn't changed.
+  </p>
+@end
