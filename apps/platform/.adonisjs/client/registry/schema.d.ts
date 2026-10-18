@@ -391,6 +391,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inquiries_controller').default['decline']>>>
     }
   }
+  'tenant.inbox.contacted.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/inbox/:id/contacted'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/notifications/validators/contact').contactValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/notifications/validators/contact').contactValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/inquiries_controller').default['contacted']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inquiries_controller').default['contacted']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
   'tenant.clients.index': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/clients'
@@ -551,12 +563,12 @@ export interface Registry {
     methods: ["POST"]
     pattern: '/t/:tenant/projects/:id/contacted'
     types: {
-      body: {}
+      body: ExtractBody<InferInput<(typeof import('#modules/notifications/validators/contact').contactValidator)>>
       paramsTuple: [ParamValue, ParamValue]
       params: { tenant: ParamValue; id: ParamValue }
-      query: {}
+      query: ExtractQuery<InferInput<(typeof import('#modules/notifications/validators/contact').contactValidator)>>
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/project_changes_controller').default['contacted']>>>
-      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/project_changes_controller').default['contacted']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/project_changes_controller').default['contacted']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
   'tenant.projects.artist.update': {

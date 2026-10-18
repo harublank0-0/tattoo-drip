@@ -28,7 +28,7 @@ import DepositService from "#modules/payments/services/deposit_service";
 import PaymentService, {
 	type ListFlags,
 } from "#modules/payments/services/payment_service";
-import { contactedText } from "#modules/projects/contact";
+import { lastContactText } from "#modules/projects/contact";
 import type Quote from "#modules/projects/models/quote";
 import type TattooProject from "#modules/projects/models/tattoo_project";
 import {
@@ -145,7 +145,14 @@ export default class ProjectsController {
 					? (artistName.get(project.artistId) ?? null)
 					: null,
 				status: project.status,
-				contactedText: contactedText(project.lastContactedAt, tenant.timezone),
+				contactedText: lastContactText(
+					project.lastContactedAt,
+					tenant.timezone,
+					{
+						channel: project.lastContactChannel,
+						kind: project.lastContactKind,
+					},
+				),
 				noSession: project.status === "booked" && !withSession.has(project.id),
 				proofWaiting: flags.get(project.id)?.proofWaiting ?? false,
 				depositToSettle: flags.get(project.id)?.depositToSettle ?? false,
@@ -348,7 +355,10 @@ export default class ProjectsController {
 						}
 					: null,
 			notes: project.notes,
-			contactedText: contactedText(project.lastContactedAt, timezone),
+			contactedText: lastContactText(project.lastContactedAt, timezone, {
+				channel: project.lastContactChannel,
+				kind: project.lastContactKind,
+			}),
 			assignment:
 				membership.role === "owner"
 					? {

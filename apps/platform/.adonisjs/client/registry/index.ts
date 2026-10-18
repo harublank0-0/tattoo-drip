@@ -198,6 +198,12 @@ const routes = {
     tokens: [{"old":"/t/:tenant/inbox/:id/decline","type":0,"val":"t","end":""},{"old":"/t/:tenant/inbox/:id/decline","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inbox/:id/decline","type":0,"val":"inbox","end":""},{"old":"/t/:tenant/inbox/:id/decline","type":1,"val":"id","end":""},{"old":"/t/:tenant/inbox/:id/decline","type":0,"val":"decline","end":""}],
     types: placeholder as Registry['tenant.inbox.decline']['types'],
   },
+  'tenant.inbox.contacted.store': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/inbox/:id/contacted',
+    tokens: [{"old":"/t/:tenant/inbox/:id/contacted","type":0,"val":"t","end":""},{"old":"/t/:tenant/inbox/:id/contacted","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inbox/:id/contacted","type":0,"val":"inbox","end":""},{"old":"/t/:tenant/inbox/:id/contacted","type":1,"val":"id","end":""},{"old":"/t/:tenant/inbox/:id/contacted","type":0,"val":"contacted","end":""}],
+    types: placeholder as Registry['tenant.inbox.contacted.store']['types'],
+  },
   'tenant.clients.index': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/clients',

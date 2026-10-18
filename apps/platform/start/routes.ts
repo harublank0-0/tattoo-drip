@@ -154,6 +154,11 @@ router
 					.post(":id/decline", [controllers.Inquiries, "decline"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.inbox.decline");
+				// The inquiry page's chat links record the contact (TAT-52).
+				router
+					.post(":id/contacted", [controllers.Inquiries, "contacted"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.inbox.contacted.store");
 			})
 			.prefix("/inbox")
 			.use(middleware.role({ allow: ["owner"] }));

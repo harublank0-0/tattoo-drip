@@ -1,4 +1,9 @@
 import { DateTime } from "luxon";
+import {
+	CHANNEL_TEXT,
+	type ContactVia,
+	MESSAGE_LABELS,
+} from "#modules/notifications/messages";
 
 /**
  * How long ago `at` was, for people: "today", "yesterday" or "N days ago",
@@ -31,4 +36,21 @@ export function contactedText(
 	now: DateTime = DateTime.now(),
 ): string {
 	return at ? `contacted ${daysAgoText(at, timezone, now)}` : "never contacted";
+}
+
+/**
+ * The last contact for people (TAT-52): contactedText plus the channel and
+ * the message, "contacted today on WhatsApp (Quote)"; "contacted today" for
+ * "Mark contacted"; "never contacted" without a time.
+ */
+export function lastContactText(
+	at: DateTime | null,
+	timezone: string,
+	via: ContactVia,
+	now: DateTime = DateTime.now(),
+): string {
+	if (!at) return "never contacted";
+	const channel = via.channel ? ` ${CHANNEL_TEXT[via.channel]}` : "";
+	const kind = via.kind ? ` (${MESSAGE_LABELS[via.kind]})` : "";
+	return `${contactedText(at, timezone, now)}${channel}${kind}`;
 }

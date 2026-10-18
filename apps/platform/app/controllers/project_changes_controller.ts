@@ -2,6 +2,10 @@ import { inject } from "@adonisjs/core";
 import type { HttpContext } from "@adonisjs/core/http";
 import { tenantContext } from "#middleware/tenant_middleware";
 import {
+	contactValidator,
+	toContactVia,
+} from "#modules/notifications/validators/contact";
+import {
 	ProjectRuleError,
 	type ProjectRuleReason,
 } from "#modules/projects/errors";
@@ -85,7 +89,8 @@ export default class ProjectChangesController {
 			membership,
 			ctx.params.id,
 		);
-		await this.projects.markContacted(tenant, membership, project);
+		const via = toContactVia(await ctx.request.validateUsing(contactValidator));
+		await this.projects.markContacted(tenant, membership, project, via);
 		ctx.session.flash("success", "Marked as contacted.");
 		return backTo(ctx, tenant, project);
 	}

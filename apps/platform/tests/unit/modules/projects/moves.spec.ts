@@ -1,6 +1,11 @@
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
-import { contactedText, daysAgoText } from "#modules/projects/contact";
+import { NO_VIA } from "#modules/notifications/messages";
+import {
+	contactedText,
+	daysAgoText,
+	lastContactText,
+} from "#modules/projects/contact";
 import {
 	PROJECT_STATUSES,
 	type ProjectStatus,
@@ -137,5 +142,46 @@ test.group("daysAgoText", () => {
 			"yesterday",
 		);
 		assert.equal(daysAgoText(now.minus({ days: 6 }), KTM, now), "6 days ago");
+	});
+});
+
+test.group("lastContactText", () => {
+	// 10:00 on 15 Oct in Kathmandu (UTC+5:45).
+	const now = DateTime.fromISO("2026-10-15T10:00:00", { zone: KTM });
+
+	test("adds the channel and the message to the day", ({ assert }) => {
+		const earlier = now.set({ hour: 9 });
+		assert.equal(
+			lastContactText(
+				earlier,
+				KTM,
+				{ channel: "whatsapp", kind: "quote" },
+				now,
+			),
+			"contacted today on WhatsApp (Quote)",
+		);
+		assert.equal(
+			lastContactText(
+				now.minus({ days: 2 }),
+				KTM,
+				{ channel: "copy", kind: "deposit_link" },
+				now,
+			),
+			"contacted 2 days ago with a copied message (Deposit link)",
+		);
+		assert.equal(
+			lastContactText(
+				now.minus({ days: 1 }),
+				KTM,
+				{ channel: "call", kind: null },
+				now,
+			),
+			"contacted yesterday by phone",
+		);
+		assert.equal(lastContactText(earlier, KTM, NO_VIA, now), "contacted today");
+		assert.equal(
+			lastContactText(null, KTM, { channel: "viber", kind: "aftercare" }, now),
+			"never contacted",
+		);
 	});
 });

@@ -11,6 +11,10 @@ import InquiryService from "#modules/inquiries/services/inquiry_service";
 import { acceptInquiryValidator } from "#modules/inquiries/validators/inquiry";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
+import {
+	contactValidator,
+	toContactVia,
+} from "#modules/notifications/validators/contact";
 import { daysAgoText } from "#modules/projects/contact";
 import { formatDay } from "#modules/projects/quotes";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -168,6 +172,18 @@ export default class InquiriesController {
 			if (!(error instanceof InquiryRuleError)) throw error;
 			return alreadyDecided(ctx, tenant, inquiry);
 		}
+	}
+
+	/** The inquiry page's chat links record the contact in the background (TAT-52). */
+	async contacted(ctx: HttpContext) {
+		const { tenant } = tenantContext(ctx);
+		const inquiry = await this.inquiries.findFor(tenant, ctx.params.id);
+		const via = toContactVia(await ctx.request.validateUsing(contactValidator));
+		await this.inquiries.markContacted(tenant, inquiry, via);
+		ctx.session.flash("success", "Marked as contacted.");
+		return ctx.response
+			.redirect()
+			.toRoute("tenant.inbox.show", { tenant: tenant.slug, id: inquiry.id });
 	}
 
 	/** The tenant's live artists' names, by id. */

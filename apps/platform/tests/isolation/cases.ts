@@ -723,4 +723,13 @@ export const isolationCases: IsolationCase[] = [
 		ownStatus: 302,
 		snapshot: templateRows,
 	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/inbox/:id/contacted",
+		resource: "newInquiry",
+		actor: "owner",
+		body: () => ({ channel: "whatsapp", kind: "inquiry_received" }),
+		ownStatus: 302,
+		snapshot: inboxRows,
+	},
 ];

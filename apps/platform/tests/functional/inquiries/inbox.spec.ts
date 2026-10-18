@@ -394,3 +394,37 @@ test.group("Deciding an inquiry", (group) => {
 		assert.equal(await statusOf(tenant, inquiry.id), "new");
 	});
 });
+
+test.group("Inbox contact (TAT-52)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("the inquiry's chat links record the contact; artists get a 404", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const artist = await artistIn(tenant);
+		const inquiry = await inTenant(tenant, async () =>
+			makeInquiry(tenant, await makeClient(tenant)),
+		);
+		const send = (user: typeof owner) =>
+			client
+				.post(inbox(`/${inquiry.id}/contacted`))
+				.form({ channel: "whatsapp", kind: "inquiry_received" })
+				.withCsrfToken()
+				.loginAs(user)
+				.redirects(0);
+		const reload = () => inTenant(tenant, () => Inquiry.findOrFail(inquiry.id));
+
+		(await send(artist)).assertStatus(404);
+		assert.isNull((await reload()).lastContactedAt);
+
+		const response = await send(owner);
+		response.assertStatus(302);
+		response.assertHeader("location", inbox(`/${inquiry.id}`));
+		response.assertFlashMessage("success", "Marked as contacted.");
+		const live = await reload();
+		assert.equal(live.lastContactChannel, "whatsapp");
+		assert.equal(live.lastContactKind, "inquiry_received");
+	});
+});
