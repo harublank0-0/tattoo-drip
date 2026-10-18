@@ -42,7 +42,13 @@ test.group("Multipart part names from Object.prototype", (group) => {
 		};
 	});
 
-	for (const path of ["/login", "/signup"]) {
+	for (const path of [
+		"/login",
+		"/signup",
+		"/forgot-password",
+		"/reset-password",
+		"/verify-email",
+	]) {
 		test(`a signed-out multipart body to ${path} is refused unread, and the server goes on`, async ({
 			client,
 			assert,

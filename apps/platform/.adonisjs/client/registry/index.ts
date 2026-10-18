@@ -420,6 +420,24 @@ const routes = {
     tokens: [{"old":"/t/:tenant/alerts/:id/open","type":0,"val":"t","end":""},{"old":"/t/:tenant/alerts/:id/open","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/alerts/:id/open","type":0,"val":"alerts","end":""},{"old":"/t/:tenant/alerts/:id/open","type":1,"val":"id","end":""},{"old":"/t/:tenant/alerts/:id/open","type":0,"val":"open","end":""}],
     types: placeholder as Registry['tenant.alerts.open']['types'],
   },
+  'email_verification.link': {
+    methods: ["GET","HEAD"],
+    pattern: '/verify-email/:token',
+    tokens: [{"old":"/verify-email/:token","type":0,"val":"verify-email","end":""},{"old":"/verify-email/:token","type":1,"val":"token","end":""}],
+    types: placeholder as Registry['email_verification.link']['types'],
+  },
+  'email_verification.show': {
+    methods: ["GET","HEAD"],
+    pattern: '/verify-email',
+    tokens: [{"old":"/verify-email","type":0,"val":"verify-email","end":""}],
+    types: placeholder as Registry['email_verification.show']['types'],
+  },
+  'email_verification.confirm': {
+    methods: ["POST"],
+    pattern: '/verify-email',
+    tokens: [{"old":"/verify-email","type":0,"val":"verify-email","end":""}],
+    types: placeholder as Registry['email_verification.confirm']['types'],
+  },
   'dashboard': {
     methods: ["GET","HEAD"],
     pattern: '/dashboard',
@@ -431,6 +449,18 @@ const routes = {
     pattern: '/logout',
     tokens: [{"old":"/logout","type":0,"val":"logout","end":""}],
     types: placeholder as Registry['session.destroy']['types'],
+  },
+  'email_verification.notice': {
+    methods: ["GET","HEAD"],
+    pattern: '/confirm-email',
+    tokens: [{"old":"/confirm-email","type":0,"val":"confirm-email","end":""}],
+    types: placeholder as Registry['email_verification.notice']['types'],
+  },
+  'email_verification.resend': {
+    methods: ["POST"],
+    pattern: '/confirm-email',
+    tokens: [{"old":"/confirm-email","type":0,"val":"confirm-email","end":""}],
+    types: placeholder as Registry['email_verification.resend']['types'],
   },
   'onboarding.create': {
     methods: ["GET","HEAD"],

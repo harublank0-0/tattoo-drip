@@ -1,5 +1,6 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
+import { DateTime } from "luxon";
 import User from "#models/user";
 
 /**
@@ -8,8 +9,13 @@ import User from "#models/user";
  */
 const LOCAL = "localhost:3402";
 
+/** A confirmed account: /onboarding is a signed-in page it may open (TAT-18). */
 function makeUser() {
-	return User.create({ email: "ink@example.com", password: "secret-password" });
+	return User.create({
+		email: "ink@example.com",
+		password: "secret-password",
+		emailVerifiedAt: DateTime.now(),
+	});
 }
 
 test.group("Page history", (group) => {
@@ -87,6 +93,27 @@ test.group("Page history", (group) => {
 		logout.assertHeader("location", "/login");
 		const login = await client.get("/login").withInertia();
 		assert.isTrue(login.body().clearHistory);
+	});
+
+	test("the confirmation pages don't clear history: they sign nobody in or out", async ({
+		client,
+		assert,
+	}) => {
+		const user = await User.create({
+			email: "new@history-18.example",
+			password: "secret-password",
+		});
+
+		const verify = await client.get("/verify-email").withInertia();
+		verify.assertInertiaComponent("auth/verify_email");
+		assert.notProperty(verify.body(), "clearHistory");
+
+		const notice = await client
+			.get("/confirm-email")
+			.withInertia()
+			.loginAs(user);
+		notice.assertInertiaComponent("auth/confirm_email");
+		assert.notProperty(notice.body(), "clearHistory");
 	});
 
 	test("signed-in pages don't clear history", async ({ client, assert }) => {

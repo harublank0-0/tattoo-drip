@@ -133,6 +133,13 @@ export interface ApiDefinition {
       open: typeof routes['tenant.alerts.open']
     }
   }
+  emailVerification: {
+    link: typeof routes['email_verification.link']
+    show: typeof routes['email_verification.show']
+    confirm: typeof routes['email_verification.confirm']
+    notice: typeof routes['email_verification.notice']
+    resend: typeof routes['email_verification.resend']
+  }
   dashboard: typeof routes['dashboard']
   onboarding: {
     create: typeof routes['onboarding.create']

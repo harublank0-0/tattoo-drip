@@ -1,5 +1,6 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
+import { DateTime } from "luxon";
 import User from "#models/user";
 import Artist from "#modules/artists/models/artist";
 import Tenant from "#modules/tenancy/models/tenant";
@@ -11,8 +12,13 @@ import { assertValidationError } from "#tests/helpers/validation";
 
 const PASSWORD = "secret-password";
 
+/** Creating a tenant needs a confirmed address (TAT-18). */
 function makeUser(email = "ink@example.com") {
-	return User.create({ email, password: PASSWORD });
+	return User.create({
+		email,
+		password: PASSWORD,
+		emailVerifiedAt: DateTime.now(),
+	});
 }
 
 const validTenant = {

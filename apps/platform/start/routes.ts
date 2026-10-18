@@ -19,6 +19,8 @@ import {
 	throttleResetRequest,
 	throttleSignup,
 	throttleSignupEmail,
+	throttleVerifyCooldown,
+	throttleVerifyResend,
 } from "#start/limiter";
 
 router.on("/").renderInertia("home", {}).as("home");
@@ -390,13 +392,46 @@ router
 	.prefix("/t/:tenant")
 	.use([middleware.auth(), middleware.dbContext(), middleware.tenant()]);
 
+/**
+ * Email confirmation links (TAT-18): open to guests and to whoever is signed
+ * in (the link proves the mailbox and signs nobody in), so in no group. The
+ * link's GET and the POST count per client address.
+ */
+router
+	.get("verify-email/:token", [controllers.EmailVerification, "link"])
+	.where("token", ACCOUNT_TOKEN)
+	.use(throttleAccountLinks)
+	.as("email_verification.link");
+router
+	.get("verify-email", [controllers.EmailVerification, "show"])
+	.as("email_verification.show");
+router
+	.post("verify-email", [controllers.EmailVerification, "confirm"])
+	.use(throttleAccountLinks)
+	.as("email_verification.confirm");
+
 router
 	.group(() => {
 		router.get("dashboard", [controllers.Dashboard, "show"]).as("dashboard");
 		router.post("logout", [controllers.Session, "destroy"]);
 
-		router.get("onboarding", [controllers.Onboarding, "create"]);
-		router.post("onboarding", [controllers.Onboarding, "store"]);
+		// The unconfirmed account's own page (TAT-18): where verifiedEmail
+		// sends it, and "Send a new link" (one a minute, five an hour).
+		router
+			.get("confirm-email", [controllers.EmailVerification, "notice"])
+			.as("email_verification.notice");
+		router
+			.post("confirm-email", [controllers.EmailVerification, "resend"])
+			.use([throttleVerifyCooldown, throttleVerifyResend])
+			.as("email_verification.resend");
+
+		// Creating a tenant needs a confirmed address (TAT-18).
+		router
+			.get("onboarding", [controllers.Onboarding, "create"])
+			.use(middleware.verifiedEmail());
+		router
+			.post("onboarding", [controllers.Onboarding, "store"])
+			.use(middleware.verifiedEmail());
 	})
 	.use([middleware.auth(), middleware.dbContext()]);
 
