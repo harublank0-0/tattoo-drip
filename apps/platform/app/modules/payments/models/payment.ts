@@ -13,6 +13,10 @@ export type PaymentKind = (typeof PAYMENT_KINDS)[number];
 export const PAYMENT_STATUSES = ["submitted", "verified", "rejected"] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
+/** What staff record at the desk (TAT-66); refunds and reversals have their own forms. */
+export const DESK_KINDS = ["deposit", "session", "balance"] as const;
+export type DeskKind = (typeof DESK_KINDS)[number];
+
 /**
  * Money received for a project. Append-only, enforced by a database trigger:
  * never edited or deleted, except that its decision (`status`,
