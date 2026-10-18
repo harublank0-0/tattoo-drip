@@ -40,3 +40,26 @@ export function sessionTimeText(
 	}
 	return `${day(start)}, ${time(start)} – ${day(end)}, ${time(end)}`;
 }
+
+/**
+ * The move form's starting values for a session (TAT-85), in the studio's
+ * timezone: its local day (today when that day can't be chosen: it has
+ * passed, or is more than a year ahead), its local start time and its
+ * length in hours. `today` and `last` are the form's first and last day
+ * (yyyy-MM-dd).
+ */
+export function sessionFormValues(
+	startsAt: DateTime,
+	endsAt: DateTime,
+	timezone: string,
+	today: string,
+	last: string,
+): { date: string; startTime: string; hours: number } {
+	const start = startsAt.setZone(timezone);
+	const date = start.toFormat("yyyy-MM-dd");
+	return {
+		date: date >= today && date <= last ? date : today,
+		startTime: start.toFormat("HH:mm"),
+		hours: endsAt.diff(startsAt, "minutes").minutes / 60,
+	};
+}
