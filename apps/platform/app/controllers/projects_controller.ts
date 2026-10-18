@@ -49,6 +49,8 @@ import {
 	validUntil,
 } from "#modules/projects/quotes";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import BookingService from "#modules/projects/services/booking_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ProjectService from "#modules/projects/services/project_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import QuoteService from "#modules/projects/services/quote_service";
@@ -57,6 +59,10 @@ import {
 	outcomeRefusal,
 	outcomesFor,
 } from "#modules/scheduling/outcomes";
+import {
+	scheduleRefusal,
+	schedulingHint,
+} from "#modules/scheduling/schedule_rules";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import SessionService from "#modules/scheduling/services/session_service";
 import { sessionFormValues, sessionTimeText } from "#modules/scheduling/times";
@@ -84,6 +90,7 @@ export default class ProjectsController {
 		private depositLinks: DepositLinkService,
 		private deposits: DepositService,
 		private payments: PaymentService,
+		private bookings: BookingService,
 	) {}
 
 	async index(ctx: HttpContext) {
@@ -233,6 +240,19 @@ export default class ProjectsController {
 			? await this.depositLinks.forProject(tenant, project)
 			: null;
 
+		// Scheduling a session here (TAT-85 part 2): whom this member may
+		// schedule, the default, and what a tattoo session would do.
+		const bookable = await this.bookings.bookableArtists(tenant, membership);
+		const depositDue =
+			project.status === "deposit_pending" && current
+				? await this.deposits.remaining(tenant, project, current)
+				: 0;
+		const defaultArtistId = bookable.some(({ id }) => id === project.artistId)
+			? project.artistId
+			: bookable.length === 1
+				? (bookable[0]?.id ?? null)
+				: null;
+
 		return ctx.inertia.render("projects/show", {
 			project: {
 				id: project.id,
@@ -302,6 +322,15 @@ export default class ProjectsController {
 				};
 			}),
 			sessionDates: { today: todayText, max: lastBookable },
+			scheduling:
+				scheduleRefusal(project.status) === null && bookable.length > 0
+					? {
+							artists: bookable.map(({ id, name }) => ({ id, name })),
+							artistId: defaultArtistId,
+							artistFixed: membership.role !== "owner",
+							hint: schedulingHint(project.status, depositDue),
+						}
+					: null,
 			notes: project.notes,
 			contactedText: contactedText(project.lastContactedAt, timezone),
 			assignment:

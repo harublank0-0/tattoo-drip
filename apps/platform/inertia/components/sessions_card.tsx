@@ -3,6 +3,7 @@ import { router } from "@inertiajs/react";
 import { useEffect, useId, useRef, useState } from "react";
 import { urlFor } from "~/client";
 import {
+	type ProjectPageProps,
 	SESSION_KIND_LABELS,
 	SESSION_STATUS_LABELS,
 	type SessionRow,
@@ -35,24 +36,34 @@ type Dates = { today: string; max: string };
 
 /**
  * The project's sessions and what staff record on them (TAT-85): done,
- * no-show or cancelled behind an inline confirmation, and a form to move a
- * session. Which buttons a row shows is the server's (the member may change
- * it, and it has started). One panel is open at a time; after a successful
- * save focus moves to the card's heading, so a screen reader lands on the
- * updated list.
+ * no-show or cancelled behind an inline confirmation, a form to move a
+ * session, and (part 2) a form to schedule a new one. Which buttons show is
+ * the server's. One panel is open at a time; after a successful save focus
+ * moves to the card's heading, so a screen reader lands on the updated list.
  */
 export default function SessionsCard({
+	projectId,
 	sessions,
 	dates,
+	scheduling,
 }: {
+	projectId: string;
 	sessions: SessionRow[];
 	dates: Dates;
+	scheduling: ProjectPageProps["scheduling"];
 }) {
 	const heading = useRef<HTMLHeadingElement>(null);
+	const scheduleButton = useRef<HTMLButtonElement>(null);
 	const [open, setOpen] = useState<Open>(null);
+	const [scheduleOpen, setScheduleOpen] = useState(false);
 	const done = () => {
 		setOpen(null);
+		setScheduleOpen(false);
 		heading.current?.focus();
+	};
+	const closeSchedule = () => {
+		setScheduleOpen(false);
+		scheduleButton.current?.focus();
 	};
 
 	return (
@@ -64,7 +75,7 @@ export default function SessionsCard({
 					</h2>
 				</CardTitle>
 			</CardHeader>
-			<CardContent>
+			<CardContent className="flex flex-col gap-4">
 				{sessions.length === 0 ? (
 					<p className="text-sm text-muted-foreground">No sessions yet.</p>
 				) : (
@@ -75,12 +86,43 @@ export default function SessionsCard({
 								session={session}
 								dates={dates}
 								open={open?.sessionId === session.id ? open.action : null}
-								onOpen={(action) => setOpen({ sessionId: session.id, action })}
+								onOpen={(action) => {
+									setScheduleOpen(false);
+									setOpen({ sessionId: session.id, action });
+								}}
 								onClose={() => setOpen(null)}
 								onDone={done}
 							/>
 						))}
 					</ul>
+				)}
+				{scheduling && (
+					<div className="flex flex-col gap-3 text-sm">
+						<div>
+							<Button
+								ref={scheduleButton}
+								type="button"
+								variant="outline"
+								className="h-11"
+								aria-expanded={scheduleOpen}
+								onClick={() => {
+									setOpen(null);
+									setScheduleOpen(true);
+								}}
+							>
+								Schedule a session
+							</Button>
+						</div>
+						{scheduleOpen && (
+							<ScheduleForm
+								projectId={projectId}
+								scheduling={scheduling}
+								dates={dates}
+								onCancel={closeSchedule}
+								onDone={done}
+							/>
+						)}
+					</div>
 				)}
 			</CardContent>
 		</Card>
@@ -371,6 +413,203 @@ function MoveForm({
 							onClick={onCancel}
 						>
 							Keep this time
+						</Button>
+					</div>
+				</fieldset>
+			)}
+		</Form>
+	);
+}
+
+/**
+ * A new session on the project (TAT-85 part 2): kind, artist (fixed for an
+ * artist member), date, start and length, with the server's hint about
+ * what a tattoo session does to the project. Focus starts on Kind; Escape
+ * closes the form. After a refused save it stays open with what was typed.
+ */
+function ScheduleForm({
+	projectId,
+	scheduling,
+	dates,
+	onCancel,
+	onDone,
+}: {
+	projectId: string;
+	scheduling: NonNullable<ProjectPageProps["scheduling"]>;
+	dates: Dates;
+	onCancel: () => void;
+	onDone: () => void;
+}) {
+	const tenant = useTenant();
+	const id = useId();
+	const kind = useRef<HTMLSelectElement>(null);
+	useEffect(() => {
+		kind.current?.focus();
+	}, []);
+	const field = (name: string) => `${id}-${name}`;
+	const fixed = scheduling.artistFixed ? scheduling.artists[0] : undefined;
+	const select =
+		"h-11 w-full min-w-0 rounded-md border bg-transparent px-3 text-sm";
+
+	return (
+		<Form
+			route="tenant.projects.sessions.store"
+			routeParams={{ tenant: tenant.slug, id: projectId }}
+			options={{ preserveScroll: true }}
+			onSuccess={onDone}
+		>
+			{({ errors, processing }) => (
+				<fieldset
+					className="min-w-0 rounded-md bg-muted/50 p-3"
+					onKeyDown={(event) => {
+						if (event.key === "Escape") onCancel();
+					}}
+				>
+					<legend className="sr-only">Schedule a session</legend>
+					<div className="grid gap-4 sm:grid-cols-2">
+						<Field data-invalid={!!errors.sessionKind}>
+							<FieldLabel htmlFor={field("kind")}>Kind</FieldLabel>
+							<select
+								ref={kind}
+								id={field("kind")}
+								name="sessionKind"
+								defaultValue="tattoo"
+								aria-invalid={!!errors.sessionKind}
+								aria-describedby={
+									errors.sessionKind ? field("kind-error") : undefined
+								}
+								className={select}
+							>
+								<option value="tattoo">Tattoo</option>
+								<option value="consultation">Consultation</option>
+								<option value="touch_up">Touch-up</option>
+							</select>
+							{errors.sessionKind && (
+								<FieldError id={field("kind-error")}>
+									{errors.sessionKind}
+								</FieldError>
+							)}
+						</Field>
+						{fixed ? (
+							<div className="flex flex-col gap-2">
+								<span className="font-medium">Artist</span>
+								<span>{fixed.name} (you)</span>
+								<input type="hidden" name="sessionArtistId" value={fixed.id} />
+							</div>
+						) : (
+							<Field data-invalid={!!errors.sessionArtistId}>
+								<FieldLabel htmlFor={field("artist")}>Artist</FieldLabel>
+								<select
+									id={field("artist")}
+									name="sessionArtistId"
+									required
+									defaultValue={scheduling.artistId ?? ""}
+									aria-invalid={!!errors.sessionArtistId}
+									aria-describedby={
+										errors.sessionArtistId ? field("artist-error") : undefined
+									}
+									className={select}
+								>
+									{scheduling.artistId === null && (
+										<option value="" disabled>
+											Choose an artist
+										</option>
+									)}
+									{scheduling.artists.map(({ id: artistId, name }) => (
+										<option key={artistId} value={artistId}>
+											{name}
+										</option>
+									))}
+								</select>
+								{errors.sessionArtistId && (
+									<FieldError id={field("artist-error")}>
+										{errors.sessionArtistId}
+									</FieldError>
+								)}
+							</Field>
+						)}
+					</div>
+					<div className="mt-4 grid gap-4 sm:grid-cols-3">
+						<Field data-invalid={!!errors.date}>
+							<FieldLabel htmlFor={field("date")}>Date</FieldLabel>
+							<Input
+								id={field("date")}
+								name="date"
+								type="date"
+								required
+								min={dates.today}
+								max={dates.max}
+								defaultValue={dates.today}
+								aria-invalid={!!errors.date}
+								aria-describedby={errors.date ? field("date-error") : undefined}
+								className="h-11"
+							/>
+							{errors.date && (
+								<FieldError id={field("date-error")}>{errors.date}</FieldError>
+							)}
+						</Field>
+						<Field data-invalid={!!errors.startTime}>
+							<FieldLabel htmlFor={field("startTime")}>Start time</FieldLabel>
+							<Input
+								id={field("startTime")}
+								name="startTime"
+								type="time"
+								required
+								aria-invalid={!!errors.startTime}
+								aria-describedby={
+									errors.startTime ? field("startTime-error") : undefined
+								}
+								className="h-11"
+							/>
+							{errors.startTime && (
+								<FieldError id={field("startTime-error")}>
+									{errors.startTime}
+								</FieldError>
+							)}
+						</Field>
+						<Field data-invalid={!!errors.hours}>
+							<FieldLabel htmlFor={field("hours")}>Length (hours)</FieldLabel>
+							<Input
+								id={field("hours")}
+								name="hours"
+								type="number"
+								inputMode="decimal"
+								required
+								min={0.25}
+								max={12}
+								step={0.25}
+								aria-invalid={!!errors.hours}
+								aria-describedby={
+									errors.hours ? field("hours-error") : field("hours-hint")
+								}
+								className="h-11"
+							/>
+							{errors.hours ? (
+								<FieldError id={field("hours-error")}>
+									{errors.hours}
+								</FieldError>
+							) : (
+								<FieldDescription id={field("hours-hint")}>
+									In quarter hours: 2.5 for two and a half.
+								</FieldDescription>
+							)}
+						</Field>
+					</div>
+					{scheduling.hint && (
+						<p className="mt-4 text-muted-foreground">{scheduling.hint}</p>
+					)}
+					<div className="mt-4 flex flex-wrap gap-2">
+						<Button type="submit" className="h-11" disabled={processing}>
+							{processing ? "Saving…" : "Schedule session"}
+						</Button>
+						<Button
+							type="button"
+							variant="ghost"
+							className="h-11"
+							disabled={processing}
+							onClick={onCancel}
+						>
+							Close
 						</Button>
 					</div>
 				</fieldset>

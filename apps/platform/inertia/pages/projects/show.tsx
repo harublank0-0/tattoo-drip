@@ -75,6 +75,7 @@ export default function ProjectShow({
 	quoteExpiryShown,
 	sessions,
 	sessionDates,
+	scheduling,
 	notes,
 	contactedText,
 	assignment,
@@ -145,7 +146,12 @@ export default function ProjectShow({
 					</CardContent>
 				</Card>
 
-				<SessionsCard sessions={sessions} dates={sessionDates} />
+				<SessionsCard
+					projectId={project.id}
+					sessions={sessions}
+					dates={sessionDates}
+					scheduling={scheduling}
+				/>
 
 				{request && (
 					<Card>

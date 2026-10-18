@@ -78,6 +78,18 @@ export type ProjectPageProps = {
 	sessions: SessionRow[];
 	/** The move form's first and last day, yyyy-MM-dd in the studio's timezone (TAT-85). */
 	sessionDates: { today: string; max: string };
+	/**
+	 * Scheduling a session on this project (TAT-85): the artists this member
+	 * may choose, the default, whether it is fixed (an artist schedules only
+	 * themselves) and what a tattoo session would do; null when the project
+	 * takes no new sessions or the member has no artist to schedule with.
+	 */
+	scheduling: {
+		artists: { id: string; name: string }[];
+		artistId: string | null;
+		artistFixed: boolean;
+		hint: string | null;
+	} | null;
 	notes: string | null;
 	contactedText: string;
 	/** Owners only: the project's artist and the studio's artists. */

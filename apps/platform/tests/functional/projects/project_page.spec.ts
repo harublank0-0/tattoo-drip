@@ -693,3 +693,81 @@ test.group("Project page: session actions (TAT-85)", (group) => {
 		assert.isNull(row(theirs.id).move);
 	});
 });
+
+test.group("Project page: scheduling (TAT-85)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("an owner gets every artist, the project's as the default, and what the deposit still needs", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const { project, sita, anu } = await inTenant(tenant, async () => {
+			const sita = await makeArtist(tenant, "sita");
+			const anu = await makeArtist(tenant, "anu");
+			const project = await makeProject(tenant, await makeClient(tenant), {
+				status: "deposit_pending",
+				artistId: sita.id,
+			});
+			await makeQuote(tenant, project);
+			return { project, sita, anu };
+		});
+
+		const { scheduling } = (
+			await client.get(page(project.id)).withInertia().loginAs(owner)
+		).inertiaProps;
+
+		assert.sameMembers(
+			scheduling.artists.map(({ id }: { id: string }) => id),
+			[sita.id, anu.id],
+		);
+		assert.equal(scheduling.artistId, sita.id);
+		assert.isFalse(scheduling.artistFixed);
+		assert.equal(
+			scheduling.hint,
+			"A tattoo session holds the date. The project is booked once the deposit is paid: NPR 3,000 still due.",
+		);
+	});
+
+	test("an artist schedules only themselves; a finished or closed project offers nothing", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const asha = await artistIn(tenant, "asha@example.com");
+		const { booked, finished, closed, sita } = await inTenant(
+			tenant,
+			async () => {
+				const sita = await makeArtist(tenant, "sita");
+				sita.userId = asha.id;
+				await sita.save();
+				await makeArtist(tenant, "anu");
+				const customer = await makeClient(tenant);
+				const project = (status: "booked" | "completed" | "cancelled") =>
+					makeProject(tenant, customer, { status, artistId: sita.id });
+				return {
+					sita,
+					booked: await project("booked"),
+					finished: await project("completed"),
+					closed: await project("cancelled"),
+				};
+			},
+		);
+
+		const mine = (await client.get(page(booked.id)).withInertia().loginAs(asha))
+			.inertiaProps;
+		assert.deepEqual(mine.scheduling, {
+			artists: [{ id: sita.id, name: "Sita" }],
+			artistId: sita.id,
+			artistFixed: true,
+			hint: null,
+		});
+
+		for (const project of [finished, closed]) {
+			const props = (
+				await client.get(page(project.id)).withInertia().loginAs(owner)
+			).inertiaProps;
+			assert.isNull(props.scheduling, project.status);
+		}
+	});
+});
