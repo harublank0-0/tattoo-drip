@@ -58,4 +58,5 @@ export const middleware = router.named({
 	publicTenant: () => import("#middleware/public_tenant_middleware"),
 	publicCache: () => import("#middleware/public_cache_middleware"),
 	depositThrottle: () => import("#middleware/deposit_throttle_middleware"),
+	intakeGuard: () => import("#middleware/intake_guard_middleware"),
 });
