@@ -34,12 +34,14 @@ What the MVP (pilot with a design-partner studio) and V1 (paid launch) must do, 
 - Owners verify or reject a screenshot next to the amount the deposit page asked for and the reference code; a different amount is rejected and recorded at the desk. A mistaken verification or entry is reversed, never edited. When a project closes holding a deposit, the owner records whether the studio kept or refunded it. The assigned artist sees the balance and the payments, never a screenshot.
 
 **Sessions**
-- [ ] Sessions of kind consultation, tattoo or touch-up, each for one artist and inside a project
+- [x] Sessions of kind consultation, tattoo or touch-up, each for one artist and inside a project
 - [ ] A day and week calendar per artist; overlapping sessions are impossible
-- [ ] Mark a session completed, no-show or cancelled, or move it to another time
+- [x] Mark a session completed, no-show or cancelled, or move it to another time
 - [ ] Walk-ins and phone or DM bookings: create the project and the session directly
 - A direct booking looks the client up by phone first and never changes a returning client's details. The project starts Booked with its tattoo session, an optional price and no deposit step; the price can't be changed after booking. Owners book for any artist, artists only for themselves.
 - The calendar shows active sessions (scheduled or completed) by the studio's local day, a day or a Sunday-to-Saturday week at a time, each opening its project. Owners see the whole studio or one artist; artists see their own sessions, and one on a project that isn't theirs shows only its time and kind.
+- On the project page staff mark a scheduled session done or a no-show once it has started (also days later) and cancel it any time; an outcome is final. Moving a session changes its time, from today to a year ahead with the same artist, and an overlap is refused. Owners change any session, artists their own sessions on their own projects.
+- Staff schedule more sessions on an open project from its page (from review to in progress; not on a finished or closed one), from today to a year ahead. A tattoo session books a project waiting for its deposit as soon as the deposit is settled, so the deposit and the session can come in either order; before the quote is accepted it holds the date. Owners schedule any artist, artists only themselves on their own projects.
 
 **Clients**
 - [x] One client per phone number per tenant, with the history of their projects, references and payments
@@ -112,7 +114,7 @@ shortcuts:   flash or walk-in → booked     in_progress → booked (next sessio
 - Staff move a project by hand only along the side exits: put a quoted project on hold and resume it, decline a project under review, or record that the client withdrew (from `reviewing`, `quoted`, `on_hold`, `deposit_pending`, `booked` or `in_progress`). Declining and withdrawing cancel the project's scheduled sessions. A client can be recorded as withdrawn until the work is done (up to `in_progress`); when the project holds deposit money, the owner records whether the studio keeps it or refunds it (moving it to a new date comes with session outcomes).
 - The inquiry inbox is for owners. Accepting an inquiry creates a project under review, with the artist the owner picks, and its reference images follow the project (its assigned artist can then see them). Declining is final.
 - A quote's expiry moves a project that was never accepted (`quoted`, `on_hold`) or never paid (`deposit_pending` with the deposit not settled) to `cancelled`, and cancels its scheduled sessions. It spares a project while a deposit screenshot waits for the studio, and once the studio rejects a screenshot or reverses a deposit after the quote expired: the studio decides what happens next. A deposit that was already paid is never cancelled by expiry, even when staff revised the quote afterwards.
-- Sessions block the artist's time, and the database rejects overlaps. Each session is `scheduled`, `completed`, `no_show` or `cancelled`; rescheduling changes its time.
+- Sessions block the artist's time, and the database rejects overlaps. Each session is `scheduled`, `completed`, `no_show` or `cancelled`; rescheduling changes its time. A tattoo session is marked completed only once its project is booked. A booked project moves to `in_progress` once a tattoo session is completed and none is still scheduled, and back to `booked` when the next one is scheduled.
 - Each studio writes its own deposit policy, which the deposit page shows. Tattoo Drip records what happened to a deposit (kept, moved to a new date, refunded) but doesn't impose a rule.
 - Payments are never edited or deleted. A refund is a new payment with a negative amount.
 - Balance due = quoted total (or hours × rate) − verified payments.
