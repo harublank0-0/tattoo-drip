@@ -94,17 +94,27 @@ export default class DepositPageService {
 	) {}
 
 	/**
-	 * The page of `token`: the live link, its live project and the current
-	 * quote, else DepositPageNotFoundError. A link is only made for a quoted
-	 * project and quotes are never deleted, so a missing quote is a dead
-	 * link too. Payment methods come only while the deposit is due.
+	 * The page of `token`: the live link, the project's current quote and
+	 * its live project, else DepositPageNotFoundError. A link is only made
+	 * for a quoted project and quotes are never deleted, so a missing quote
+	 * is a dead link too. Payment methods come only while the deposit is due.
+	 *
+	 * The quote is read before the project, on purpose. The reads are
+	 * separate statements, and a revision commits its new quote and the
+	 * status `quoted` together: read the quote first and a revision between
+	 * the two reads gives the old quote with `quoted` (the page says
+	 * `updating`, no methods); read the project first and it would give
+	 * `deposit_pending` with the unaccepted new quote (`due`, with methods).
 	 */
 	async show(tenant: DepositStudio, token: string): Promise<DepositPage> {
 		const link = await this.links.resolve(tenant, token);
-		const project = link
-			? await this.projects.findLive(tenant, link.projectId)
+		const quote = link
+			? await this.quotes.current(tenant, { id: link.projectId })
 			: null;
-		const quote = project ? await this.quotes.current(tenant, project) : null;
+		const project =
+			link && quote
+				? await this.projects.findLive(tenant, link.projectId)
+				: null;
 		if (!link || !project || !quote) throw new DepositPageNotFoundError();
 
 		const due = await this.deposits.remaining(tenant, project, quote);

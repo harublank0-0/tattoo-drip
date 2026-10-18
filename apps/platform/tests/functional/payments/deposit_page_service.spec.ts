@@ -16,6 +16,8 @@ import DepositPageService, {
 	type DepositStudio,
 	type ProofSubmission,
 } from "#modules/payments/services/deposit_page_service";
+import ProjectService from "#modules/projects/services/project_service";
+import SessionService from "#modules/scheduling/services/session_service";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { withDbContext } from "#services/db_context";
 import { depositReady, depositServices, OWNER } from "#tests/helpers/deposits";
@@ -260,6 +262,67 @@ test.group("DepositPageService.show", (group) => {
 
 		assert.equal(page.state, "due");
 		assert.isTrue(page.lastProofRejected);
+	});
+
+	test("a quote revised while the page is read never shows as due with the revised terms", async ({
+		assert,
+	}) => {
+		const base = depositServices();
+		const { tenant, project, quote, token } = await studioWithDeposit(
+			"page-revising-65",
+			base,
+		);
+		// Commits a revision right after the project is read, the moment a
+		// read of the project followed by a read of the quote would straddle.
+		class RevisingProjects extends ProjectService {
+			revise?: () => Promise<unknown>;
+
+			override async findLive(...args: Parameters<ProjectService["findLive"]>) {
+				const live = await super.findLive(...args);
+				await this.revise?.();
+				return live;
+			}
+		}
+		const projects = new RevisingProjects(
+			base.artists,
+			base.quotes,
+			base.deposits,
+			new SessionService(base.artists, base.deposits),
+		);
+		const pages = new DepositPageService(
+			base.links,
+			projects,
+			base.quotes,
+			base.deposits,
+			base.methods,
+			base.artists,
+			base.images,
+		);
+		queue.fake();
+		try {
+			projects.revise = () =>
+				base.projects.issueQuote(
+					tenant,
+					OWNER,
+					project,
+					{
+						kind: "fixed",
+						fixedPrice: 2_000_000,
+						depositAmount: 500_000,
+						expiresAt: DateTime.utc().plus({ days: 14 }),
+					},
+					quote.id,
+				);
+
+			const page = await inTenant(tenant, () => pages.show(tenant, token));
+
+			assert.isTrue(
+				page.state !== "due" || page.quote.id === quote.id,
+				`the page says ${page.state} with a quote that is not the one the client accepted`,
+			);
+		} finally {
+			queue.restore();
+		}
 	});
 
 	test("a dead link is DepositPageNotFoundError: unknown, replaced, expired, deleted project, another studio's", async ({
