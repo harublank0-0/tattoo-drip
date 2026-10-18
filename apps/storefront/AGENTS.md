@@ -2,7 +2,7 @@
 
 TanStack Start + Router + Query + Form, React 19, Tailwind v4 and shadcn/ui. File routes: `src/routes`; UI: `src/components/ui`; imports: `#/` maps to `src/`.
 
-The platform/data boundaries are in [root instructions](../../AGENTS.md). Pages still use `src/data/mock` until TAT-48 builds the studio page; real data comes only through `@tattoo-drip/react` and the router context's `tattoo.client` ([API and data](docs/development.md#api-and-data)). Do not introduce a storefront auth/database layer.
+The platform/data boundaries are in [root instructions](../../AGENTS.md). Pages show only API data, through `@tattoo-drip/react` and the router context's `tattoo.client` ([API and data](docs/development.md#api-and-data)); the studio page is `src/studio/` ([studio page](docs/development.md#studio-page)). Do not introduce a storefront auth/database layer, analytics or third-party scripts.
 
 Before UI/forms, server-function or TanStack integration changes, read the relevant section of [development guidance](docs/development.md). Never run `shadcn add form`: `src/components/ui/form.tsx` is the custom TanStack Form toolkit. Preserve Sentry server-function instrumentation.
 
