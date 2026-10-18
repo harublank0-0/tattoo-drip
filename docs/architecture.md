@@ -84,8 +84,8 @@ Isolation has several layers:
 
 ## Domains, sessions, auth
 
-- Storefronts run on `{slug}.platform.com`. The dashboard (`app.`) and the API (`api.`) run on a **separate** registrable domain, so tenant subdomains can never read or set dashboard cookies.
-- The dashboard session cookie is host-only (`__Host-`), `HttpOnly`, `Secure` and `SameSite=Lax`, with CSRF protection on.
+- Studio pages run on `{slug}.<studio domain>` (later also a studio's own domain, TAT-79). The dashboard (`app.`) and the API (`api.`) run on a **separate** registrable domain, so no studio page is ever same-site with the dashboard and none can read or set its cookies. With `NODE_ENV=production` the platform refuses to start when `APP_URL` is not https, or sits on, under or above the studio pages' domain (`STOREFRONT_URL`); a sibling under a shared parent can't be detected and is a checklist item.
+- The dashboard session cookie is `__Host-td-session` in production: host-only (no `Domain`), `Path=/`, `HttpOnly`, `Secure` and `SameSite=Lax`. Development and tests use `td-session` without `Secure`, since they run over plain http. CSRF protection (Shield) is on for every dashboard write; its `XSRF-TOKEN` cookie keeps the name Shield and Inertia use, and a token is valid only with its own session.
 - The public API is stateless and cookieless. CORS is open on its public endpoints, without credentials.
 - Auth uses AdonisJS's session guard: email and password, email verification, password reset and rate-limited login.
 

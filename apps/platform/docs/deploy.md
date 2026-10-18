@@ -7,7 +7,7 @@ Read before a deploy or when changing production settings. The hosting itself is
 ### Platform settings
 
 - `NODE_ENV=production`. With it, the web server, the worker and every `ace` command refuse to start without `STOREFRONT_URL`, `TURNSTILE_SECRET_KEY`, `STOREFRONT_SERVER_KEYS` and `TRUST_PROXY` (`start/env.ts`).
-- `APP_KEY` (`node ace generate:key`; rotating it ends every session, deposit link and rate-limit count). `APP_URL`: the platform's public https origin (public upload URLs and emails use it).
+- `APP_KEY` (`node ace generate:key`; rotating it ends every session, deposit link and rate-limit count). `APP_URL`: the platform's public https origin (public upload URLs and emails use it), on a domain of its own, apart from the studio pages' ([below](#dashboard-cookies-and-domains)).
 - `STOREFRONT_URL`: the studio pages' origin with `{tenant}` for the slug, e.g. `https://{tenant}.example.com` (deposit links).
 - `TURNSTILE_SECRET_KEY` (the bot challenge, TAT-55), with outbound HTTPS to `challenges.cloudflare.com` allowed.
 - `STOREFRONT_SERVER_KEYS`: the storefront's key ([below](#the-storefronts-server-key)).
@@ -69,3 +69,16 @@ Known and accepted for the pilot. The owner gets no signal for any of them (429s
 - `curl -sI https://<api>/api/v1/tenants/<slug>` answers 200 with `Cache-Control: public…` and no `X-RateLimit-*` header.
 - Run the storefront's `pnpm check:page` against the production build before the first deploy (TAT-13).
 - Still required before any public deploy: object storage (TAT-27: the local disks must never deploy) and the storefront deposit page (TAT-65b). The intake form (TAT-57) must be merged too.
+
+## Dashboard cookies and domains
+
+The dashboard's session cookie is `__Host-td-session`: host-only, `Secure`, `HttpOnly` and `SameSite=Lax` (TAT-9), so no studio page can read, set or replace it. These settings keep it that way.
+
+- Two registrable domains, bought separately: one for the platform (the dashboard on `app.<platform>`, the API on `api.<platform>` or the same host) and one for the studio pages (the storefront's apex and `*.<studios>`). Never the dashboard or the API under the studio domain, the studio pages under the platform's, or both under one parent you own (`app.example.com` with `{tenant}.sites.example.com` passes the boot check but shares `example.com`). Two names under a public suffix such as `com.np` are separate; check a doubtful parent at publicsuffix.org.
+- `APP_URL` is the dashboard's https origin. With `NODE_ENV=production` the web server, the worker and every `ace` command that boots the app refuse to start when it is http, or on, under or above `STOREFRONT_URL`'s domain.
+- `SESSION_DRIVER=cookie`: `memory` loses every session on restart and between processes, and `database` needs a `sessions` table this app doesn't have. `APP_KEY` signs and encrypts the session and CSRF cookies: rotating it signs everyone out.
+- The storefront's `API_URL` is on the platform's domain (`api.<platform>` or `APP_URL`'s host), never on a studio domain.
+- The proxy terminates TLS for the platform's hosts and redirects http to https: the app never redirects, and over plain http the browser drops the `Secure` cookie, so every sign-in would end on "Invalid or expired CSRF token". Shield sends HSTS (180 days). The cookies need no `TRUST_PROXY`: the app writes `Secure` whatever protocol it sees.
+- DNS: the studio domain's apex and wildcard go to Vercel only (TAT-13); the platform's names go to the platform. No wildcard on the platform's domain.
+- Custom studio domains (TAT-79) are never the platform's hosts or on its domain.
+- After the first deploy: sign in at `https://app.<platform>`; in DevTools, Application, Cookies, `__Host-td-session` shows Secure, HttpOnly, SameSite Lax and no Domain; `curl -sI http://app.<platform>/login` answers a redirect to https.
