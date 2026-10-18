@@ -12,8 +12,8 @@ info:
       response ever sets a cookie.
     - **CORS** is open to any origin without credentials:
       `Access-Control-Allow-Origin: *` on every response, for GET, HEAD and
-      POST with the `Accept` and `Content-Type` request headers. `Retry-After`
-      is readable.
+      POST with the `Accept`, `Content-Type` and `X-Challenge-Token` request
+      headers. `Retry-After` is readable.
     - **Tenant from the path.** Tenant endpoints live under
       `/tenants/{tenant}`; the slug is matched exactly, never case-folded.
     - **Envelopes.** A success body is `{ "data": … }`; an error body is
@@ -263,6 +263,8 @@ paths:
       operationId: createInquiry
       tags: [MVP]
       summary: Send the studio an inquiry, with reference images
+      parameters:
+        - $ref: "#/components/parameters/ChallengeToken"
       description: |
         No account needed. One `multipart/form-data` request with the fields
         and up to 5 reference images (JPEG, PNG or WebP, 10 MB each and
@@ -279,6 +281,14 @@ paths:
         An unknown or hidden `preferredArtistId` is `validation_failed` on
         `preferredArtistId`; an image that isn't a JPEG, PNG or WebP is
         `validation_failed` on `referenceImages.<index>`.
+
+        Abuse protection (TAT-55): send the bot-challenge token in
+        `X-Challenge-Token` and leave the honeypot field `website` out. A
+        missing, invalid, expired or reused token, or a filled `website`, is
+        403 `challenge_failed`; when the API can't check the token it is 503
+        `challenge_unavailable`. Requests are rate-limited per address, per
+        studio and per phone number (429 `rate_limited` with `Retry-After`,
+        up to a day for one phone number).
       requestBody:
         required: true
         content:
@@ -301,6 +311,11 @@ paths:
                 properties:
                   data: { $ref: "#/components/schemas/InquiryReceipt" }
         "400": { $ref: "#/components/responses/Error" }
+        "403":
+          description: The bot challenge failed (`challenge_failed`). Get a new token and send again.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409":
           description: The studio takes no such inquiry now (`artist_not_accepting`, `studio_not_accepting`, `too_many_open_inquiries`)
@@ -311,6 +326,11 @@ paths:
         "415": { $ref: "#/components/responses/Error" }
         "422": { $ref: "#/components/responses/ValidationError" }
         "429": { $ref: "#/components/responses/RateLimited" }
+        "503":
+          description: The bot challenge could not be checked (`challenge_unavailable`). Try again in a minute.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
         default: { $ref: "#/components/responses/Error" }
 
   /tenants/{tenant}/deposits/{token}:
@@ -429,6 +449,18 @@ components:
       schema:
         type: string
         pattern: "^[A-Za-z0-9_-]{43}$"
+    ChallengeToken:
+      name: X-Challenge-Token
+      in: header
+      required: true
+      description: |
+        The bot-challenge token the studio page's Cloudflare Turnstile widget
+        made for this submission, rendered with action `inquiry`. Single-use:
+        get a new one for every request, also after a refusal. Missing,
+        invalid, expired, already used, or made on another page or for
+        another form: 403 `challenge_failed`. A local development server
+        without the challenge set up ignores it.
+      schema: { type: string, minLength: 1, maxLength: 2048 }
     ArtistSlug:
       name: artist
       in: path
@@ -502,10 +534,12 @@ components:
                 (415), `validation_failed` (422, with `fields`),
                 `rate_limited` (429, with `Retry-After`), `internal_error`
                 (500). Endpoint codes: `artist_not_accepting`,
-                `studio_not_accepting`, `too_many_open_inquiries` (409,
-                `createInquiry`), `deposit_not_due`, `deposit_changed` (409,
-                `submitDepositProof`). Treat an unknown code by its HTTP status.
-              examples: [not_found, validation_failed, rate_limited, too_many_open_inquiries, deposit_changed]
+                `studio_not_accepting`, `too_many_open_inquiries` (409),
+                `challenge_failed` (403) and `challenge_unavailable` (503),
+                all `createInquiry`; `deposit_not_due`, `deposit_changed`
+                (409, `submitDepositProof`). Treat an unknown code by its HTTP
+                status.
+              examples: [not_found, validation_failed, rate_limited, too_many_open_inquiries, challenge_failed, deposit_changed]
             message:
               type: string
               description: A sentence for people. Never parse it.
@@ -772,10 +806,10 @@ components:
               maxItems: 5
               description: Up to 5 JPEG, PNG or WebP images, 10 MB each and 20 MB together, each its own `referenceImages` part. Their metadata (EXIF, GPS) is removed, and only the studio sees them.
               items: { type: string, format: binary }
-            challengeToken:
+            website:
               type: string
-              maxLength: 2048
-              description: Bot-challenge token. The intake form will need it (TAT-55); the API ignores it until then.
+              maxLength: 0
+              description: A honeypot that people never see. Leave it out or empty; any other value is refused as `challenge_failed`. (The bot-challenge token goes in the `X-Challenge-Token` header; a `challengeToken` field is ignored.)
 
     InquiryReceipt:
       type: object

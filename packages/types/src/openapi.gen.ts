@@ -249,6 +249,14 @@ export interface paths {
          *     An unknown or hidden `preferredArtistId` is `validation_failed` on
          *     `preferredArtistId`; an image that isn't a JPEG, PNG or WebP is
          *     `validation_failed` on `referenceImages.<index>`.
+         *
+         *     Abuse protection (TAT-55): send the bot-challenge token in
+         *     `X-Challenge-Token` and leave the honeypot field `website` out. A
+         *     missing, invalid, expired or reused token, or a filled `website`, is
+         *     403 `challenge_failed`; when the API can't check the token it is 503
+         *     `challenge_unavailable`. Requests are rate-limited per address, per
+         *     studio and per phone number (429 `rate_limited` with `Retry-After`,
+         *     up to a day for one phone number).
          */
         post: operations["createInquiry"];
         delete?: never;
@@ -325,13 +333,16 @@ export interface components {
                  *     (415), `validation_failed` (422, with `fields`),
                  *     `rate_limited` (429, with `Retry-After`), `internal_error`
                  *     (500). Endpoint codes: `artist_not_accepting`,
-                 *     `studio_not_accepting`, `too_many_open_inquiries` (409,
-                 *     `createInquiry`), `deposit_not_due`, `deposit_changed` (409,
-                 *     `submitDepositProof`). Treat an unknown code by its HTTP status.
+                 *     `studio_not_accepting`, `too_many_open_inquiries` (409),
+                 *     `challenge_failed` (403) and `challenge_unavailable` (503),
+                 *     all `createInquiry`; `deposit_not_due`, `deposit_changed`
+                 *     (409, `submitDepositProof`). Treat an unknown code by its HTTP
+                 *     status.
                  * @example not_found
                  * @example validation_failed
                  * @example rate_limited
                  * @example too_many_open_inquiries
+                 * @example challenge_failed
                  * @example deposit_changed
                  */
                 code: string;
@@ -582,8 +593,8 @@ export interface components {
         InquiryForm: components["schemas"]["InquiryInput"] & {
             /** @description Up to 5 JPEG, PNG or WebP images, 10 MB each and 20 MB together, each its own `referenceImages` part. Their metadata (EXIF, GPS) is removed, and only the studio sees them. */
             referenceImages?: string[];
-            /** @description Bot-challenge token. The intake form will need it (TAT-55); the API ignores it until then. */
-            challengeToken?: string;
+            /** @description A honeypot that people never see. Leave it out or empty; any other value is refused as `challenge_failed`. (The bot-challenge token goes in the `X-Challenge-Token` header; a `challengeToken` field is ignored.) */
+            website?: string;
         };
         InquiryReceipt: {
             /**
@@ -738,6 +749,15 @@ export interface components {
          *     or send it to analytics.
          */
         DepositToken: string;
+        /**
+         * @description The bot-challenge token the studio page's Cloudflare Turnstile widget
+         *     made for this submission, rendered with action `inquiry`. Single-use:
+         *     get a new one for every request, also after a refusal. Missing,
+         *     invalid, expired, already used, or made on another page or for
+         *     another form: 403 `challenge_failed`. A local development server
+         *     without the challenge set up ignores it.
+         */
+        ChallengeToken: string;
         /**
          * @description The artist's slug, matched exactly: never case-folded. An artist's
          *     old slug is not kept: after a change it is a 404.
@@ -1025,7 +1045,17 @@ export interface operations {
     createInquiry: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /**
+                 * @description The bot-challenge token the studio page's Cloudflare Turnstile widget
+                 *     made for this submission, rendered with action `inquiry`. Single-use:
+                 *     get a new one for every request, also after a refusal. Missing,
+                 *     invalid, expired, already used, or made on another page or for
+                 *     another form: 403 `challenge_failed`. A local development server
+                 *     without the challenge set up ignores it.
+                 */
+                "X-Challenge-Token": components["parameters"]["ChallengeToken"];
+            };
             path: {
                 /**
                  * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
@@ -1056,6 +1086,15 @@ export interface operations {
                 };
             };
             400: components["responses"]["Error"];
+            /** @description The bot challenge failed (`challenge_failed`). Get a new token and send again. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             404: components["responses"]["NotFound"];
             /** @description The studio takes no such inquiry now (`artist_not_accepting`, `studio_not_accepting`, `too_many_open_inquiries`) */
             409: {
@@ -1070,6 +1109,15 @@ export interface operations {
             415: components["responses"]["Error"];
             422: components["responses"]["ValidationError"];
             429: components["responses"]["RateLimited"];
+            /** @description The bot challenge could not be checked (`challenge_unavailable`). Try again in a minute. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             default: components["responses"]["Error"];
         };
     };
