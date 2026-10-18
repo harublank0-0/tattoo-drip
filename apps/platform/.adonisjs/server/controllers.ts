@@ -15,6 +15,7 @@ export const controllers = {
   NewAccount: () => import('#controllers/new_account_controller'),
   Onboarding: () => import('#controllers/onboarding_controller'),
   PaymentMethods: () => import('#controllers/payment_methods_controller'),
+  Payments: () => import('#controllers/payments_controller'),
   ProjectChanges: () => import('#controllers/project_changes_controller'),
   Projects: () => import('#controllers/projects_controller'),
   PublicDeposits: () => import('#controllers/public_deposits_controller'),

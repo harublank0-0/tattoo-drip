@@ -1,3 +1,4 @@
+import { DateTime } from "luxon";
 import User from "#models/user";
 import ArtistService from "#modules/artists/services/artist_service";
 import ImageService from "#modules/media/services/image_service";
@@ -9,6 +10,7 @@ import { withDbContext } from "#services/db_context";
 import { depositServices } from "#tests/helpers/deposits";
 import {
 	makeInquiry,
+	makePayment,
 	makeProject,
 	makeQuote,
 	makeReferenceImage,
@@ -132,6 +134,33 @@ async function studio(slug: string, name: string) {
 	const pricelessProject = await inTenant(tenant, () =>
 		makeProject(tenant, pipeline.client, { status: "booked" }),
 	);
+	// The payment routes (TAT-66): a booked project holding a verified
+	// deposit (refund, reverse), and a cancelled one whose deposit still
+	// needs its outcome.
+	const paid = await inTenant(tenant, async () => {
+		const project = await makeProject(tenant, pipeline.client, {
+			status: "booked",
+		});
+		await makeQuote(tenant, project);
+		const payment = await makePayment(tenant, project, {
+			status: "verified",
+			verifiedAt: DateTime.utc(),
+			verifiedByUserId: owner.id,
+		});
+		return { project, payment };
+	});
+	const closedPaidProject = await inTenant(tenant, async () => {
+		const project = await makeProject(tenant, pipeline.client, {
+			status: "cancelled",
+		});
+		await makeQuote(tenant, project);
+		await makePayment(tenant, project, {
+			status: "verified",
+			verifiedAt: DateTime.utc(),
+			verifiedByUserId: owner.id,
+		});
+		return project;
+	});
 	// A deposit_pending project with its deposit link, and the eSewa method
 	// the deposit page shows, for the deposit routes (TAT-65).
 	const deposit = await inTenant(tenant, async () => {
@@ -165,6 +194,11 @@ async function studio(slug: string, name: string) {
 		quotedProject: quoted.project,
 		quotedQuote: quoted.quote,
 		pricelessProject,
+		// The payment routes' :id resources (TAT-66).
+		payment: pipeline.payment,
+		paidProject: paid.project,
+		verifiedPayment: paid.payment,
+		closedPaidProject,
 		// The :id resource of the inbox routes' isolation cases.
 		newInquiry,
 		// The :id resource of the clients routes' isolation cases.
@@ -185,7 +219,7 @@ export type Studio = Awaited<ReturnType<typeof studio>>;
  * (`paymentMethod` is the first), an artist profile (`artistProfile`) and one
  * of each pipeline record (`pipeline`: client, accepted inquiry, project,
  * reference image, quote and a submitted payment), plus a quoted project
- * (`quotedProject`, `quotedQuote`), a new inquiry with a reference image (`newInquiry`) and a deposit_pending project with its deposit link (`depositProject`, `depositToken`, `depositReferenceCode`) and the eSewa method its page shows (`depositMethod`); `project` is the pipeline's project. Later tickets add seed data
+ * (`quotedProject`, `quotedQuote`), a new inquiry with a reference image (`newInquiry`) and a deposit_pending project with its deposit link (`depositProject`, `depositToken`, `depositReferenceCode`) and the eSewa method its page shows (`depositMethod`); `project` is the pipeline's project; a project booked without a price (`pricelessProject`), a booked project holding a verified deposit (`paidProject`, `verifiedPayment`) and a cancelled one holding a deposit without an outcome (`closedPaidProject`); `payment` is the pipeline's submitted payment. Later tickets add seed data
  * for their own tables here, so every isolation case sees it.
  */
 export async function twoStudios() {
