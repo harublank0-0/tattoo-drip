@@ -1,5 +1,4 @@
 import { mock } from "node:test";
-import logger from "@adonisjs/core/services/logger";
 import testUtils from "@adonisjs/core/services/test_utils";
 import limiter from "@adonisjs/limiter/services/main";
 import { test } from "@japa/runner";
@@ -10,6 +9,7 @@ import { apiLimitFor } from "#services/api_limits";
 import { assertApiError } from "#tests/helpers/api";
 import { fillApiLimit, testServerKeys } from "#tests/helpers/api_limits";
 import { intakeFields, png, postInquiry } from "#tests/helpers/intake";
+import { captureLogs } from "#tests/helpers/logs";
 import {
 	closedWithin,
 	rawRequest,
@@ -21,6 +21,16 @@ import { newTempUploads, tempUploads } from "#tests/helpers/uploads";
 const SLUG = "limits-38";
 const studio = `/api/v1/tenants/${SLUG}`;
 const [ONE, TWO] = testServerKeys();
+/**
+ * Everything logged at any level, the one debug line Lucid writes inside the
+ * tests' global transaction aside: it is the harness's, not the app's.
+ */
+const appLogs = (logs: ReturnType<typeof captureLogs>) =>
+	logs
+		.everything()
+		.filter(
+			(call) => call[1] !== "using pre-existing global transaction connection",
+		);
 const settle = () => new Promise((resolve) => setTimeout(resolve, 300));
 
 test.group("Public API limits: the gate", (group) => {
@@ -134,29 +144,30 @@ test.group("Public API limits: the gate", (group) => {
 		assert,
 	}) => {
 		await studioWithOwner(SLUG);
-		const warn = mock.method(logger, "warn", () => {});
-		const unknown = `Bearer ${"q".repeat(43)}`;
+		const logs = captureLogs();
+		try {
+			const unknown = `Bearer ${"q".repeat(43)}`;
 
-		(await client.get(studio).header("authorization", unknown)).assertStatus(
-			200,
-		);
-		(await client.get(studio).header("authorization", unknown)).assertStatus(
-			200,
-		);
-		(
-			await client
-				.get(studio)
-				.header("authorization", `Bearer ${"a".repeat(10_000)}`)
-		).assertStatus(200);
+			(await client.get(studio).header("authorization", unknown)).assertStatus(
+				200,
+			);
+			(await client.get(studio).header("authorization", unknown)).assertStatus(
+				200,
+			);
+			(
+				await client
+					.get(studio)
+					.header("authorization", `Bearer ${"a".repeat(10_000)}`)
+			).assertStatus(200);
 
-		assert.deepEqual(
-			warn.mock.calls.map((call) => call.arguments),
-			[[CALLER_WARNINGS.unknownKey]],
-		);
-		const logged = JSON.stringify(
-			warn.mock.calls.map((call) => call.arguments),
-		);
-		assert.notInclude(logged, "qqqq");
+			// Every level, `log()` and child loggers: only the one fixed warning.
+			assert.deepEqual(appLogs(logs), [[CALLER_WARNINGS.unknownKey]]);
+			const logged = JSON.stringify(appLogs(logs));
+			assert.notInclude(logged, "qqqq");
+			assert.notInclude(logged, "aaaa");
+		} finally {
+			logs.restore();
+		}
 	});
 
 	test("a keyed call without a usable visitor spends the shared budget, and is warned about once", async ({
@@ -164,7 +175,7 @@ test.group("Public API limits: the gate", (group) => {
 		assert,
 	}) => {
 		await studioWithOwner(SLUG);
-		const warn = mock.method(logger, "warn", () => {});
+		const logs = captureLogs();
 		const { key, budget } = apiLimitFor("callerReads", {
 			kind: "storefront",
 			ip: null,
@@ -191,10 +202,9 @@ test.group("Public API limits: the gate", (group) => {
 				.header("authorization", `Bearer ${ONE}`)
 				.header("x-visitor-ip", "203.0.113.47")
 		).assertStatus(200);
-		assert.deepEqual(
-			warn.mock.calls.map((call) => call.arguments),
-			[[CALLER_WARNINGS.noVisitor]],
-		);
+		// Every level: only the one fixed warning, and no key in it.
+		assert.deepEqual(appLogs(logs), [[CALLER_WARNINGS.noVisitor]]);
+		assert.notInclude(JSON.stringify(appLogs(logs)), ONE);
 	});
 
 	test("a cacheable 200 carries no per-caller header", async ({
