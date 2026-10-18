@@ -10,7 +10,7 @@ import {
 	type BookingSchema,
 	bookingSchema,
 	styleOptions,
-} from "./types";
+} from "./booking-schema";
 
 interface BookingFormProps {
 	initialData?: Partial<BookingFormData>;
@@ -18,6 +18,11 @@ interface BookingFormProps {
 	className?: string;
 }
 
+/**
+ * The prototype's booking form, kept unmounted as TAT-57's starting point
+ * and the TanStack Form reference (docs/development.md#forms). TAT-57
+ * rebuilds it as the intake form inside the studio page's #inquiry section.
+ */
 export function BookingForm({
 	initialData,
 	onSubmit,
