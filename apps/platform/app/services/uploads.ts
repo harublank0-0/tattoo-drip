@@ -41,11 +41,12 @@ const BUILT_IN_NAMES = [
 
 /**
  * Reads the multipart body of a public API upload route into temp files and
- * fields (`request.files()`, `request.all()`), as the body parser does for
- * the dashboard, but only now: the route is in `multipart.processManually`
- * (config/bodyparser.ts), so the parser leaves its body alone until the
+ * fields (`request.files()`, `request.all()`), for a public API upload route
+ * (in its handler) and a signed-in dashboard request (WebMultipartMiddleware).
+ * The body parser reads no multipart body itself (`multipart.autoProcess:
+ * false`, config/bodyparser.ts), so a public body is left alone until the
  * handler runs, after publicTenant has answered 404 for an unknown slug
- * (TAT-32, ruling 16; TAT-51). Same limits as the parser's (`limit`,
+ * (TAT-32, ruling 16; TAT-51; TAT-38). Same limits as the parser's (`limit`,
  * `fieldsLimit`). A part that fails is deleted, and the call rejects with
  * the parser's error (413, 400); a client that hangs up is a 400 too. Pair it
  * with `discardUploads` in a `finally`. Call it only when `request.bodyType`
@@ -116,8 +117,8 @@ function newTmpPath(): string {
 
 /**
  * Deletes the temp file of every upload in the request that nothing stored
- * (ImageService.store deletes the ones it reads). The body parser writes
- * each uploaded file to a temp file and nothing else removes the ones that
+ * (ImageService.store deletes the ones it reads). `receiveUploads` writes
+ * each uploaded file to a temp file, and nothing else removes the ones that
  * aren't stored, so on the public API, where anyone can upload, a route that
  * takes uploads ends with this in a `finally` (TAT-51). It first waits (at
  * most 30 s) for file handlers that are still closing their files, such as

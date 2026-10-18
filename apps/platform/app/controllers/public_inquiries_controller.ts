@@ -37,7 +37,8 @@ export default class PublicInquiriesController {
 				throw ApiException.of("unsupported_media_type");
 			}
 			// The tenant is known (publicTenant ran), so only now does the body
-			// go to disk (the route is in multipart.processManually).
+			// go to disk (the body parser reads no multipart body itself:
+			// multipart.autoProcess is false).
 			await receiveUploads(request);
 			// A filled honeypot is refused like a failed challenge (TAT-55),
 			// before validation, so no field error names the trap. It is read from

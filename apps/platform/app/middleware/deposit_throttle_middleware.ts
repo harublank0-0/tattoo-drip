@@ -13,9 +13,9 @@ import { READ_METHODS } from "#services/public_api";
  * (GET and HEAD as reads, anything else as a proof upload), 404s and
  * refusals included. Over either limit it throws E_TOO_MANY_REQUESTS, which
  * the API answers as 429 `rate_limited` with Retry-After. Runs after
- * publicTenant and before the handler reads the body (the upload route is
- * in multipart.processManually), so a refused upload never reaches the
- * disk. The counts live on the limiter's own connection, so a request that
+ * publicTenant and before the handler reads the body (the body parser
+ * reads no multipart body itself: multipart.autoProcess is false), so a
+ * refused upload never reaches the disk. The counts live on the limiter's own connection, so a request that
  * fails later still counts.
  */
 export default class DepositThrottleMiddleware {

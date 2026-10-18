@@ -123,26 +123,10 @@ test.group("Public API routes", () => {
 		);
 	});
 
-	test("no API route lets the body parser write a multipart body before the tenant is known", ({
-		assert,
-	}) => {
-		const writes = allRoutes().filter(
-			({ pattern, methods }) =>
-				isApi(pattern) &&
-				!isTestOnly(pattern) &&
-				methods.some((method) => !["GET", "HEAD"].includes(method)),
-		);
-		assert.isNotEmpty(writes);
-
-		assert.deepEqual(
-			writes
-				.map(({ pattern }) => pattern)
-				.filter(
-					(pattern) =>
-						!bodyParserConfig.multipart.processManually.includes(pattern),
-				),
-			[],
-			"list the route in multipart.processManually (config/bodyparser.ts) and read its body with receiveUploads, after publicTenant (TAT-32 ruling 16)",
+	test("the body parser reads no multipart body itself", ({ assert }) => {
+		assert.isFalse(
+			bodyParserConfig.multipart.autoProcess,
+			"multipart.autoProcess must stay false (TAT-38 ruling 16): routes read uploads with receiveUploads (#services/uploads)",
 		);
 	});
 

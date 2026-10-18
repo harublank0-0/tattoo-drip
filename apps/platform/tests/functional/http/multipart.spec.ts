@@ -124,4 +124,49 @@ test.group("Multipart part names from Object.prototype", (group) => {
 		assert.deepEqual(rejections, []);
 		assert.deepEqual(await newTempUploads(before), []);
 	});
+
+	test("a signed-in dashboard upload is stored and leaves no temp file", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner(SLUG);
+		const before = await tempUploads();
+
+		const response = await client
+			.post(`/t/${SLUG}/artists`)
+			.fields({ name: "Sita Rai", slug: "sita" })
+			.file("photo", await testImages.png(), { filename: "p.png" })
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+		await settle();
+
+		response.assertStatus(302);
+		const [artist] = await inTenant(tenant, () => Artist.query());
+		assert.isNotNull(artist.photoKey);
+		assert.deepEqual(await newTempUploads(before), []);
+	});
+
+	test("a signed-in upload that fails mid-body leaves no temp file", async ({
+		client,
+		assert,
+	}) => {
+		const { owner } = await studioWithOwner(SLUG);
+		const before = await tempUploads();
+
+		const truncated = await client
+			.post(`/t/${SLUG}/artists`)
+			.unsafeJson(
+				'--td38\r\nContent-Disposition: form-data; name="photo"; filename="p.png"\r\nContent-Type: image/png\r\n\r\nAAAA\r\n--td38\r\nContent-Disposition: form-data; name="name"\r\n\r\nSita',
+			)
+			.type("multipart/form-data; boundary=td38")
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+		await settle();
+
+		truncated.assertStatus(400);
+		assert.deepEqual(await newTempUploads(before), []);
+		assert.deepEqual(rejections, []);
+	});
 });

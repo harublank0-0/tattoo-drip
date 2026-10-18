@@ -42,6 +42,9 @@ router.use([
 	() => import("#middleware/web_shield_middleware"),
 	() => import("@adonisjs/auth/initialize_auth_middleware"),
 	() => import("#middleware/silent_auth_middleware"),
+	// Reads a signed-in dashboard request's multipart body; the parser reads
+	// none itself (TAT-38).
+	() => import("#middleware/web_multipart_middleware"),
 ]);
 
 /**
