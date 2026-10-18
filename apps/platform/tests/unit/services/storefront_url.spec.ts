@@ -2,6 +2,7 @@ import { test } from "@japa/runner";
 import {
 	checkStorefrontUrl,
 	pointsAtThisMachine,
+	studioHostname,
 } from "#services/storefront_url";
 
 const KEY = "STOREFRONT_URL";
@@ -67,6 +68,28 @@ test.group("pointsAtThisMachine", () => {
 		assert.isFalse(pointsAtThisMachine("https://{tenant}.example.com"));
 		assert.isFalse(
 			pointsAtThisMachine("https://{tenant}.localhost.example.com"),
+		);
+	});
+});
+
+test.group("studioHostname", () => {
+	test("is the studio page's host, lower case, without port or path", ({
+		assert,
+	}) => {
+		assert.equal(
+			studioHostname("https://{tenant}.example.com", "black-needle"),
+			"black-needle.example.com",
+		);
+		assert.equal(
+			studioHostname("http://{tenant}.localhost:3000", "intake-guard-55"),
+			"intake-guard-55.localhost",
+		);
+		assert.equal(
+			studioHostname(
+				"https://{tenant}.Studios.Example.com:8443/ignored",
+				"intake-guard-55",
+			),
+			"intake-guard-55.studios.example.com",
 		);
 	});
 });
