@@ -1,4 +1,5 @@
 import type { ReferenceProps } from "~/components/inquiries";
+import type { PaymentsCardProps } from "~/components/payments";
 
 /**
  * One quote version as the project page gets it. The amounts in the form's
@@ -110,6 +111,8 @@ export type ProjectPageProps = {
 		/** Links open on this machine (the dev host), so no client can use them. */
 		devHost: boolean;
 	} | null;
+	/** The Payments card (TAT-66): owners get the screenshots and the forms, the assigned artist the list. */
+	payments: PaymentsCardProps;
 };
 
 export const STATUS_LABELS: Record<string, string> = {
@@ -153,6 +156,10 @@ export type ProjectRow = {
 	contactedText: string;
 	/** Booked, but no tattoo session is scheduled. */
 	noSession: boolean;
+	/** Owners: a deposit screenshot waits for a decision. */
+	proofWaiting: boolean;
+	/** Owners: a closed project holds deposit money with no outcome recorded. */
+	depositToSettle: boolean;
 };
 
 export type ProjectListProps = {

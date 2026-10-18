@@ -17,10 +17,13 @@ import {
 	depositMessage,
 	storefrontTemplate,
 } from "#modules/payments/deposit_links";
+import { paymentsCard } from "#modules/payments/payments_card";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import DepositLinkService from "#modules/payments/services/deposit_link_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import DepositService from "#modules/payments/services/deposit_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import PaymentService from "#modules/payments/services/payment_service";
 import { contactedText } from "#modules/projects/contact";
 import type Quote from "#modules/projects/models/quote";
 import type TattooProject from "#modules/projects/models/tattoo_project";
@@ -72,6 +75,7 @@ export default class ProjectsController {
 		private images: ImageService,
 		private depositLinks: DepositLinkService,
 		private deposits: DepositService,
+		private payments: PaymentService,
 	) {}
 
 	async index(ctx: HttpContext) {
@@ -96,6 +100,15 @@ export default class ProjectsController {
 			tenant,
 			projects.map(({ id }) => id),
 		);
+		// Owners' flags: a screenshot to check, a closed project's deposit to
+		// settle (TAT-66). The Projects badge counts the first.
+		const flags =
+			membership.role === "owner"
+				? await this.payments.listFlags(tenant, projects)
+				: new Map<
+						string,
+						{ proofWaiting: boolean; depositToSettle: boolean }
+					>();
 		const clientName = new Map(clients.map(({ id, name }) => [id, name]));
 		const artistName = new Map(artists.map(({ id, name }) => [id, name]));
 		const sum = (statuses: readonly (keyof typeof counts)[]) =>
@@ -119,6 +132,8 @@ export default class ProjectsController {
 				status: project.status,
 				contactedText: contactedText(project.lastContactedAt, tenant.timezone),
 				noSession: project.status === "booked" && !withSession.has(project.id),
+				proofWaiting: flags.get(project.id)?.proofWaiting ?? false,
+				depositToSettle: flags.get(project.id)?.depositToSettle ?? false,
 			})),
 			page: { current: page, last: lastPage, total },
 		});
@@ -172,6 +187,33 @@ export default class ProjectsController {
 						})),
 					),
 				}
+			: null;
+
+		// The Payments card (TAT-66). Screenshot URLs are signed for owners
+		// only, after the tenant-scoped project and payment reads.
+		const money = await this.payments.forProject(tenant, project);
+		const isOwner = membership.role === "owner";
+		const proofUrls = new Map<string, string>();
+		if (isOwner) {
+			for (const payment of money.payments) {
+				if (payment.proofImageKey) {
+					proofUrls.set(
+						payment.id,
+						await this.images.url(
+							"payment_proof",
+							payment.proofImageKey,
+							tenant,
+						),
+					);
+				}
+			}
+		}
+		const names = await this.payments.memberNames([
+			...money.payments.map(({ verifiedByUserId }) => verifiedByUserId),
+			money.outcome?.recordedByUserId ?? null,
+		]);
+		const depositLink = isOwner
+			? await this.depositLinks.forProject(tenant, project)
 			: null;
 
 		return ctx.inertia.render("projects/show", {
@@ -238,6 +280,15 @@ export default class ProjectsController {
 				membership.role === "owner" && project.status === "deposit_pending"
 					? await this.depositPanel(tenant, project, client)
 					: null,
+			payments: paymentsCard({
+				money,
+				status: project.status,
+				isOwner,
+				timezone,
+				names,
+				proofUrls,
+				referenceCode: depositLink?.referenceCode ?? null,
+			}),
 		});
 	}
 
