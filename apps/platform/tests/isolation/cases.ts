@@ -727,7 +727,8 @@ export const isolationCases: IsolationCase[] = [
 		method: "PUT",
 		pattern: "/t/:tenant/settings/messages",
 		actor: "owner",
-		// Every default but the quote: A's control stores one row.
+		// Every default but the quote: A's control stores the quote and drops
+		// its seeded aftercare text.
 		body: () => ({
 			...DEFAULT_TEMPLATES,
 			quote: "Hi {client_name}, your quote: {price}.",

@@ -2,6 +2,7 @@ import { DateTime } from "luxon";
 import User from "#models/user";
 import ArtistService from "#modules/artists/services/artist_service";
 import ImageService from "#modules/media/services/image_service";
+import MessageTemplate from "#modules/notifications/models/message_template";
 import StaffAlert from "#modules/notifications/models/staff_alert";
 import PaymentMethodService from "#modules/payments/services/payment_method_service";
 import type Tenant from "#modules/tenancy/models/tenant";
@@ -160,6 +161,16 @@ async function studio(slug: string, name: string) {
 			inquiryId: newInquiry.id,
 		}),
 	);
+	// The studio's own aftercare text, so the settings page's isolation
+	// snapshot reads a real row: a studio that never edited its messages has
+	// none (TAT-52).
+	const messageTemplate = await inTenant(tenant, () =>
+		MessageTemplate.create({
+			tenantId: tenant.id,
+			kind: "aftercare",
+			body: `Hi {client_name}, thank you for choosing ${name}. Take care of it!`,
+		}),
+	);
 	// A project booked directly with no price, for the price route (TAT-66).
 	const pricelessProject = await inTenant(tenant, () =>
 		makeProject(tenant, pipeline.client, { status: "booked" }),
@@ -248,6 +259,9 @@ async function studio(slug: string, name: string) {
 		newInquiry,
 		// The :id resource of the alerts routes' isolation cases (TAT-52).
 		alert,
+		// The studio's own aftercare text (TAT-52): the messages settings
+		// routes' snapshot.
+		messageTemplate,
 		// The :id resource of the clients routes' isolation cases.
 		client: pipeline.client,
 		// The deposit routes' resources (TAT-65): the project for the
@@ -269,7 +283,7 @@ export type Studio = Awaited<ReturnType<typeof studio>>;
  * (`paymentMethod` is the first), an artist profile (`artistProfile`), a visible artist who takes no inquiries with a slug only that studio has (`closedArtist`, `<slug>-mira`) and one
  * of each pipeline record (`pipeline`: client, accepted inquiry, project,
  * reference image, quote and a submitted payment), plus a quoted project
- * (`quotedProject`, `quotedQuote`), a new inquiry with a reference image (`newInquiry`) and a deposit_pending project with its deposit link (`depositProject`, `depositToken`, `depositReferenceCode`) and the eSewa method its page shows (`depositMethod`); `project` is the pipeline's project; a project booked without a price (`pricelessProject`), a booked project holding a verified deposit (`paidProject`, `verifiedPayment`) and a cancelled one holding a deposit without an outcome (`closedPaidProject`); `payment` is the pipeline's submitted payment. A booked project assigned to `artistProfile` with a scheduled tattoo session 60 days out (`sessionProject`, `session`) is the session routes' resource (TAT-85); an unread alert of the owner about the new inquiry (`alert`) is the alerts routes' (TAT-52). Later tickets add seed data
+ * (`quotedProject`, `quotedQuote`), a new inquiry with a reference image (`newInquiry`) and a deposit_pending project with its deposit link (`depositProject`, `depositToken`, `depositReferenceCode`) and the eSewa method its page shows (`depositMethod`); `project` is the pipeline's project; a project booked without a price (`pricelessProject`), a booked project holding a verified deposit (`paidProject`, `verifiedPayment`) and a cancelled one holding a deposit without an outcome (`closedPaidProject`); `payment` is the pipeline's submitted payment. A booked project assigned to `artistProfile` with a scheduled tattoo session 60 days out (`sessionProject`, `session`) is the session routes' resource (TAT-85); an unread alert of the owner about the new inquiry (`alert`) is the alerts routes' (TAT-52), and the studio's own aftercare text (`messageTemplate`) is what the messages settings routes' snapshot reads. Later tickets add seed data
  * for their own tables here, so every isolation case sees it.
  */
 export async function twoStudios() {
