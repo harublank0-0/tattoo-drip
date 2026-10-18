@@ -541,6 +541,22 @@ components:
         height: { type: integer, minimum: 1 }
         alt: { type: [string, "null"] }
 
+    Photo:
+      type: object
+      description: |
+        An artist's photo (TAT-44): an `Image` without `alt`, so every
+        property is always there. The page builds the `alt` text from the
+        artist's name.
+      required: [url, width, height]
+      additionalProperties: false
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Public and absolute.
+        width: { type: integer, minimum: 1 }
+        height: { type: integer, minimum: 1 }
+
     Money:
       type: object
       required: [amount, currency]
@@ -669,7 +685,7 @@ components:
         bio: { type: [string, "null"], maxLength: 1000 }
         photo:
           description: At most 2048 px on its longer side, or null
-          oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }]
+          oneOf: [{ $ref: "#/components/schemas/Photo" }, { type: "null" }]
         acceptingInquiries:
           type: boolean
           description: |

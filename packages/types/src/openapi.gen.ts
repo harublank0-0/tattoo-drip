@@ -365,6 +365,20 @@ export interface components {
             height: number;
             alt?: string | null;
         };
+        /**
+         * @description An artist's photo (TAT-44): an `Image` without `alt`, so every
+         *     property is always there. The page builds the `alt` text from the
+         *     artist's name.
+         */
+        Photo: {
+            /**
+             * Format: uri
+             * @description Public and absolute.
+             */
+            url: string;
+            width: number;
+            height: number;
+        };
         Money: {
             /** @description Minor units (cents) */
             amount: number;
@@ -485,7 +499,7 @@ export interface components {
             name: string;
             bio: string | null;
             /** @description At most 2048 px on its longer side, or null */
-            photo: components["schemas"]["Image"] | null;
+            photo: components["schemas"]["Photo"] | null;
             /**
              * @description False while the artist's books are closed: an inquiry naming
              *     them is the 409 `artist_not_accepting`.
