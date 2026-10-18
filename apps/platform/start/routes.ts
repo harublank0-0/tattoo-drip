@@ -205,6 +205,11 @@ router
 					.post(":id/quotes/accept", [controllers.Quotes, "accept"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.projects.quotes.accept");
+				// A direct booking's price, once (TAT-66).
+				router
+					.post(":id/price", [controllers.Quotes, "price"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.projects.price.store");
 				router
 					.post(":id/moves", [controllers.ProjectChanges, "move"])
 					.where("id", router.matchers.uuid())

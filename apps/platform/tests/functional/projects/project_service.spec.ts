@@ -943,6 +943,99 @@ test.group("ProjectService.acceptQuote", (group) => {
 	});
 });
 
+test.group("ProjectService.setPrice", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("a booked project without a quote gets version 1: fixed, no deposit, status unchanged, no job", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+		const jobsBefore = await queuedJobs();
+
+		await inTenant(tenant, async () => {
+			for (const status of [
+				"booked",
+				"in_progress",
+				"completed",
+				"healing_check",
+			] as const) {
+				const project = await makeProject(tenant, await makeClient(tenant), {
+					status,
+				});
+				const quote = await projects.setPrice(tenant, OWNER, project, 800_000);
+				assert.deepEqual(
+					[quote.version, quote.kind, quote.fixedPrice, quote.depositAmount],
+					[1, "fixed", 800_000, 0],
+					status,
+				);
+				assert.equal(await statusOf(project), status);
+			}
+		});
+		assert.equal(await queuedJobs(), jobsBefore, "no ExpireQuoteJob");
+	});
+
+	test("a project that has a quote, or isn't booked yet, is refused", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const client = await makeClient(tenant);
+			const priced = await makeProject(tenant, client, { status: "booked" });
+			await makeQuote(tenant, priced);
+			const early = await makeProject(tenant, client, { status: "quoted" });
+			const closed = await makeProject(tenant, client, { status: "cancelled" });
+
+			for (const project of [priced, early, closed]) {
+				assert.equal(
+					await reasonOf(() =>
+						projects.setPrice(tenant, OWNER, project, 800_000),
+					),
+					"price_locked",
+					project.status,
+				);
+			}
+			assert.lengthOf(await quotes.history(tenant, priced), 1);
+		});
+	});
+
+	test("the assigned artist may set it; another artist gets a 404", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+		const asha = await artistIn(tenant, "asha@example.com");
+		const ravi = await artistIn(tenant, "ravi@example.com");
+
+		await inTenant(tenant, async () => {
+			const profile = await makeArtist(tenant, "asha");
+			profile.userId = asha.id;
+			await profile.save();
+			const project = await makeProject(tenant, await makeClient(tenant), {
+				status: "booked",
+				artistId: profile.id,
+			});
+
+			await assert.rejects(
+				() =>
+					projects.setPrice(
+						tenant,
+						{ userId: ravi.id, role: "artist" },
+						project,
+						800_000,
+					),
+				/Row not found/,
+			);
+			const quote = await projects.setPrice(
+				tenant,
+				{ userId: asha.id, role: "artist" },
+				project,
+				800_000,
+			);
+			assert.equal(quote.version, 1);
+		});
+	});
+});
+
 test.group("ProjectService.move", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 

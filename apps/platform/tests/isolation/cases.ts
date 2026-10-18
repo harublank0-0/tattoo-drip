@@ -38,6 +38,7 @@ export type IsolationCase = {
 		| "artistProfile"
 		| "project"
 		| "quotedProject"
+		| "pricelessProject"
 		| "depositProject"
 		| "newInquiry"
 		| "client";
@@ -380,6 +381,15 @@ export const isolationCases: IsolationCase[] = [
 		resource: "quotedProject",
 		actor: "owner",
 		body: (own) => ({ quoteId: own.quotedQuote.id }),
+		ownStatus: 302,
+		snapshot: projectRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/projects/:id/price",
+		resource: "pricelessProject",
+		actor: "owner",
+		body: () => ({ fixedPrice: "8000" }),
 		ownStatus: 302,
 		snapshot: projectRows,
 	},

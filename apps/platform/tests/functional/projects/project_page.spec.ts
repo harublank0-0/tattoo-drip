@@ -171,12 +171,23 @@ test.group("Project page", (group) => {
 		assert.deepEqual(first.history, []);
 		assert.isTrue(first.canQuote);
 		assert.isFalse(first.canAccept);
+		assert.isFalse(first.canSetPrice);
 
 		const later = (
 			await client.get(page(booked.id)).withInertia().loginAs(owner)
 		).inertiaProps;
 		assert.isFalse(later.canQuote);
 		assert.isFalse(later.canAccept);
+		assert.isFalse(later.canSetPrice);
+
+		// A booked project with no quote can get its price once (TAT-66).
+		const priceless = await inTenant(tenant, async () =>
+			makeProject(tenant, await makeClient(tenant), { status: "booked" }),
+		);
+		const pricelessProps = (
+			await client.get(page(priceless.id)).withInertia().loginAs(owner)
+		).inertiaProps;
+		assert.isTrue(pricelessProps.canSetPrice);
 	});
 
 	test("the assigned artist sees the page; another artist gets a 404", async ({

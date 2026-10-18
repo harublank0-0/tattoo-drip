@@ -246,6 +246,12 @@ const routes = {
     tokens: [{"old":"/t/:tenant/projects/:id/quotes/accept","type":0,"val":"t","end":""},{"old":"/t/:tenant/projects/:id/quotes/accept","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/projects/:id/quotes/accept","type":0,"val":"projects","end":""},{"old":"/t/:tenant/projects/:id/quotes/accept","type":1,"val":"id","end":""},{"old":"/t/:tenant/projects/:id/quotes/accept","type":0,"val":"quotes","end":""},{"old":"/t/:tenant/projects/:id/quotes/accept","type":0,"val":"accept","end":""}],
     types: placeholder as Registry['tenant.projects.quotes.accept']['types'],
   },
+  'tenant.projects.price.store': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/projects/:id/price',
+    tokens: [{"old":"/t/:tenant/projects/:id/price","type":0,"val":"t","end":""},{"old":"/t/:tenant/projects/:id/price","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/projects/:id/price","type":0,"val":"projects","end":""},{"old":"/t/:tenant/projects/:id/price","type":1,"val":"id","end":""},{"old":"/t/:tenant/projects/:id/price","type":0,"val":"price","end":""}],
+    types: placeholder as Registry['tenant.projects.price.store']['types'],
+  },
   'tenant.projects.moves.store': {
     methods: ["POST"],
     pattern: '/t/:tenant/projects/:id/moves',

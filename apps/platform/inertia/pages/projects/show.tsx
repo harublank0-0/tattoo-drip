@@ -64,6 +64,7 @@ export default function ProjectShow({
 	history,
 	canQuote,
 	canAccept,
+	canSetPrice,
 	message,
 	form,
 	moves,
@@ -208,6 +209,8 @@ export default function ProjectShow({
 					<CardContent className="flex flex-col gap-4">
 						{quote ? (
 							<QuoteSummary quote={quote} showExpiry={quoteExpiryShown} />
+						) : canSetPrice ? (
+							<PriceForm projectId={project.id} />
 						) : (
 							<p className="text-sm text-muted-foreground">No quote yet.</p>
 						)}
@@ -516,6 +519,62 @@ function AcceptQuote({
 						Tap when the client agrees. The project then waits for the deposit.
 					</p>
 				</div>
+			)}
+		</Form>
+	);
+}
+
+/**
+ * The price of a project booked without one (TAT-66): set once, behind a
+ * confirm, because quotes are locked from booked on.
+ */
+function PriceForm({ projectId }: { projectId: string }) {
+	const tenant = useTenant();
+	const [price, setPrice] = useState("");
+
+	return (
+		<Form
+			route="tenant.projects.price.store"
+			routeParams={{ tenant: tenant.slug, id: projectId }}
+			options={{ preserveScroll: true }}
+			onBefore={() =>
+				window.confirm(
+					`Set the price to ${formatRupees(Number(price))}? It can't be changed afterwards.`,
+				)
+			}
+		>
+			{({ errors, processing }) => (
+				<FieldGroup>
+					<p className="text-sm text-muted-foreground">
+						No price was set at booking. Set it once you know it: it can&apos;t
+						be changed afterwards.
+					</p>
+					<Field data-invalid={!!errors.fixedPrice}>
+						<FieldLabel htmlFor="finalPrice">Price (NPR)</FieldLabel>
+						<Input
+							id="finalPrice"
+							name="fixedPrice"
+							type="number"
+							inputMode="numeric"
+							min={1}
+							step={1}
+							value={price}
+							onChange={(event) => setPrice(event.target.value)}
+							aria-invalid={!!errors.fixedPrice}
+							aria-describedby={
+								errors.fixedPrice ? "finalPrice-error" : undefined
+							}
+						/>
+						{errors.fixedPrice && (
+							<FieldError id="finalPrice-error">{errors.fixedPrice}</FieldError>
+						)}
+					</Field>
+					<div>
+						<Button type="submit" className="h-11" disabled={processing}>
+							{processing ? "Saving…" : "Set price"}
+						</Button>
+					</div>
+				</FieldGroup>
 			)}
 		</Form>
 	);

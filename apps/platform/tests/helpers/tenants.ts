@@ -128,6 +128,10 @@ async function studio(slug: string, name: string) {
 		await makeReferenceImage(tenant, { inquiryId: inquiry.id });
 		return inquiry;
 	});
+	// A project booked directly with no price, for the price route (TAT-66).
+	const pricelessProject = await inTenant(tenant, () =>
+		makeProject(tenant, pipeline.client, { status: "booked" }),
+	);
 	// A deposit_pending project with its deposit link, and the eSewa method
 	// the deposit page shows, for the deposit routes (TAT-65).
 	const deposit = await inTenant(tenant, async () => {
@@ -160,6 +164,7 @@ async function studio(slug: string, name: string) {
 		project: pipeline.project,
 		quotedProject: quoted.project,
 		quotedQuote: quoted.quote,
+		pricelessProject,
 		// The :id resource of the inbox routes' isolation cases.
 		newInquiry,
 		// The :id resource of the clients routes' isolation cases.

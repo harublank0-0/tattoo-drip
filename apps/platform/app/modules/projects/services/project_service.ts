@@ -19,7 +19,13 @@ import {
 	type ManualMove,
 	type ProjectFilter,
 } from "#modules/projects/moves";
-import { isExpired, QUOTABLE_STATUSES } from "#modules/projects/quotes";
+import {
+	BOOKED_STATUSES,
+	expiresAtFor,
+	isExpired,
+	QUOTABLE_STATUSES,
+	todayIn,
+} from "#modules/projects/quotes";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import QuoteService, {
 	type NewQuote,
@@ -333,6 +339,39 @@ export default class ProjectService {
 			await setStatus(live, "deposit_pending");
 			const booked = await this.sessions.settleBooking(tenant, live);
 			return booked ? "booked" : "deposit_pending";
+		});
+	}
+
+	/**
+	 * Records the price of a project booked without one (TAT-43's direct
+	 * booking): quote version 1, fixed, no deposit, valid through today in
+	 * the studio's timezone. Only for a booked-or-later project with no quote
+	 * (QuoteRuleError "price_locked" otherwise, checked under the lock), so
+	 * quotes stay locked once a project is booked: the price is set once. No
+	 * status change and no ExpireQuoteJob (expiry never acts from booked on).
+	 * Owners and the assigned artist, as for quotes.
+	 */
+	async setPrice(
+		tenant: Pick<Tenant, "id" | "timezone">,
+		member: Member,
+		project: TattooProject,
+		fixedPrice: number,
+	): Promise<Quote> {
+		assertProjectOf(tenant, project);
+		return withTransaction(async (trx) => {
+			const live = await this.lockFor(trx, tenant, member, project.id);
+			if (
+				!BOOKED_STATUSES.includes(live.status) ||
+				(await this.quotes.current(tenant, live))
+			) {
+				throw new QuoteRuleError("price_locked");
+			}
+			return this.quotes.create(trx, tenant, live, {
+				kind: "fixed",
+				fixedPrice,
+				depositAmount: 0,
+				expiresAt: expiresAtFor(todayIn(tenant.timezone), tenant.timezone),
+			});
 		});
 	}
 

@@ -53,6 +53,8 @@ export type ProjectPageProps = {
 	history: QuoteProps[];
 	canQuote: boolean;
 	canAccept: boolean;
+	/** Booked without a price: the Quote card offers "Set price" once. */
+	canSetPrice: boolean;
 	/** The chat message for the current quote, when it can be sent. */
 	message: ChatMessageProps | null;
 	form: {

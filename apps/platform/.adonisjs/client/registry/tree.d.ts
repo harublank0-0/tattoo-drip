@@ -69,6 +69,9 @@ export interface ApiDefinition {
         store: typeof routes['tenant.projects.quotes.store']
         accept: typeof routes['tenant.projects.quotes.accept']
       }
+      price: {
+        store: typeof routes['tenant.projects.price.store']
+      }
       moves: {
         store: typeof routes['tenant.projects.moves.store']
       }

@@ -184,6 +184,8 @@ export default class ProjectsController {
 			quoteExpiryShown: !BOOKED_STATUSES.includes(project.status),
 			canQuote: QUOTABLE_STATUSES.includes(project.status),
 			canAccept: project.status === "quoted" && live !== null,
+			// A booking made without a price can get one once (TAT-66).
+			canSetPrice: BOOKED_STATUSES.includes(project.status) && current === null,
 			// Only while the client's answer is awaited: not after acceptance, and
 			// not for a project that was declined or withdrawn.
 			message:

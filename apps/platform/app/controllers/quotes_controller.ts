@@ -6,6 +6,7 @@ import { QuoteRuleError, type QuoteRuleReason } from "#modules/projects/errors";
 import ProjectService from "#modules/projects/services/project_service";
 import {
 	acceptQuoteValidator,
+	priceValidator,
 	quoteValidator,
 	toQuoteInput,
 } from "#modules/projects/validators/quote";
@@ -16,6 +17,7 @@ const RULE_MESSAGES: Record<QuoteRuleReason, string> = {
 	not_quoted: "This project is not waiting for the client's answer.",
 	quote_changed: "The quote changed: check the new version.",
 	expired: "This quote has expired: revise it first.",
+	price_locked: "This project already has a price, or isn't booked yet.",
 };
 
 /**
@@ -79,6 +81,29 @@ export default class QuotesController {
 					? "Accepted and booked."
 					: "Accepted: waiting for the deposit.",
 			);
+		});
+		return ctx.response
+			.redirect()
+			.toRoute("tenant.projects.show", { tenant: tenant.slug, id: project.id });
+	}
+
+	async price(ctx: HttpContext) {
+		const { tenant, membership } = tenantContext(ctx);
+		const project = await this.projects.findFor(
+			tenant,
+			membership,
+			ctx.params.id,
+		);
+		const { fixedPrice } = await ctx.request.validateUsing(priceValidator);
+
+		await flashRuleErrors(ctx, async () => {
+			await this.projects.setPrice(
+				tenant,
+				membership,
+				project,
+				fixedPrice * 100,
+			);
+			ctx.session.flash("success", "Price set.");
 		});
 		return ctx.response
 			.redirect()

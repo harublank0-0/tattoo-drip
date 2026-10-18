@@ -487,6 +487,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/quotes_controller').default['accept']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
+  'tenant.projects.price.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/projects/:id/price'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/projects/validators/quote').priceValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/projects/validators/quote').priceValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/quotes_controller').default['price']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/quotes_controller').default['price']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
   'tenant.projects.moves.store': {
     methods: ["POST"]
     pattern: '/t/:tenant/projects/:id/moves'

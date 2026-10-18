@@ -3,6 +3,7 @@ export const QUOTE_RULE_REASONS = [
 	"not_quoted",
 	"quote_changed",
 	"expired",
+	"price_locked",
 ] as const;
 export type QuoteRuleReason = (typeof QUOTE_RULE_REASONS)[number];
 
@@ -12,6 +13,8 @@ const MESSAGES: Record<QuoteRuleReason, string> = {
 	not_quoted: "Only a quoted project can accept its quote",
 	quote_changed: "The quote is no longer the project's current quote",
 	expired: "The quote has expired",
+	price_locked:
+		"Only a booked project without a quote can get its price this way",
 };
 
 /**
