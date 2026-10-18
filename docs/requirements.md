@@ -27,7 +27,7 @@ What the MVP (pilot with a design-partner studio) and V1 (paid launch) must do, 
 
 **Quotes and payments**
 - [ ] Quote: a fixed price, or an hourly rate with estimated hours, plus a deposit amount (which may be zero) and an expiry; quotes can be revised
-- [ ] Deposit page per project: amount, the studio's QR codes and a reference code; the client uploads proof of payment
+- [x] Deposit page per project: amount, the studio's QR codes and a reference code; the client uploads proof of payment
 - An owner makes a project's deposit link while its deposit is due; it works for 30 days and can be replaced at once (the old link stops working, the reference code stays). The page shows the studio, the project's brief, the deposit, the studio's deposit-page methods, a 6-character reference code for the payment remark and the deposit policy, and takes one screenshot at a time, which owners are alerted to.
 - [x] Staff verify or reject the proof; cash and bank payments can be recorded at the desk
 - [x] Payments are deposits, session payments, balance payments or refunds; the balance due is computed
@@ -128,6 +128,7 @@ shortcuts:   flash or walk-in → booked     in_progress → booked (next sessio
 - Hidden artists don't appear, and a hidden or deleted artist's page is a not-found page. The page shows what the dashboard says it shows (the profile, the visible artists with their photos and closed messages), never deposit policies, payment details, members or anything about clients, inquiries or payments.
 - Each visible artist has a link of their own, `/artists/<slug>`, that asks for them by name; a hidden, unknown or renamed artist shows the not-found page.
 - The page shows only what the public API returns, always as text, and loads no analytics or third-party scripts (the intake form's bot challenge, Cloudflare Turnstile, is the one exception, loaded only once someone starts filling the form in).
+- The deposit page (`/deposit#<token>`) is the one page that shows a project's deposit, the studio's deposit-page payment methods and its deposit policy, to whoever holds the link: never cached or indexed, sending no Referer, and the token, in the link's fragment, never reaches the studio page's server or anything but the API.
 
 ## Not yet
 

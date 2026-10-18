@@ -99,7 +99,7 @@ Isolation has several layers:
 
 **Deposit (customer → studio)**
 1. Staff accept the inquiry, which creates a project, and send a quote through a one-tap WhatsApp or Viber message; the project moves to `quoted`. When the client agrees, staff mark the quote accepted: the project moves to `deposit_pending`, and an owner sends the deposit page link the same way (`https://<studio>/deposit#<token>`, 30 days). A quote that expires first cancels the project.
-2. The client pays with the studio's own QR code and uploads proof on the deposit page, which records a `submitted` payment and alerts the owners.
+2. The client pays with the studio's own QR code and uploads proof on the deposit page, which records a `submitted` payment and alerts the owners. The page reads the token from the link's fragment in the browser only (the studio page's server never sees it) and re-encodes the screenshot as a JPEG first (at most 2048 px, no EXIF).
 3. An owner verifies the proof in the dashboard, next to the amount asked and the reference code, and the project moves to `booked` when a session is scheduled; money taken at the desk, refunds and reversals are recorded the same way, and the balance due is computed from them. **No money passes through Tattoo Drip in the MVP**, so no payment licence is needed.
 
 **Dashboard action**
