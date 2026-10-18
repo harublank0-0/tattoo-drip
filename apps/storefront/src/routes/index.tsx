@@ -13,7 +13,6 @@ export const Route = createFileRoute("/")({
 	component: Home,
 	head: () => ({
 		meta: [
-			{ title: "Sangi Tattoo Studio — Custom Tattoos in Kathmandu" },
 			{
 				name: "description",
 				content:
