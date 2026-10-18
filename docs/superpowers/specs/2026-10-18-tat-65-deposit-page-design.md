@@ -92,3 +92,14 @@ Verification, rejection, desk payments, balance and corrections (TAT-66); generi
 ## Verification
 
 `pnpm --filter @tattoo-drip/types generate` and `node ace codegen` leave no diff; the migration rolls back and re-applies; the full platform suite, the SDK and React tests, `pnpm check`, `pnpm typecheck` and `pnpm build` pass. Then the whole-branch review and the Codex code and security reviews.
+
+## Amendments from the whole-branch and Codex reviews
+
+Rulings stay as written; these change how three of them are built, found after the build.
+
+- **Ruling 3 (token).** The token comes from `HMAC-SHA256(HKDF(APP_KEY, info "tattoo-drip deposit-link token key v1"), nonce)`, not from the raw `APP_KEY` with a message prefix, so `digest()` (rate-limit keys) and `tokenFor` never share a key. And "rotating APP_KEY kills every link" now holds on the public page too: `resolve` finds the row by hash and then requires that the row's nonce still derives the stored hash (`liveToken`, shared with the owner's panel). No link had shipped, so the derivation change kills nothing.
+- **Ruling 9 (URL).** `STOREFRONT_URL` is checked at boot (an http(s) URL with `{tenant}` in the host) and is required when `NODE_ENV=production`; in development and tests it stays optional with the dev host, and the owner's card warns while links point at a loopback host. "Works until" shows the last day the link works (the day before the expiry instant, like `validUntil`), and "New link" asks for confirmation only while the old link works.
+- **Ruling 12 (limits).** The limiter's database store uses its own `limiter` connection (same role, at most 4 connections): the throttle counts inside `publicTenant`'s transaction, which holds a `pg` connection, and a counter on the same pool let concurrent requests starve each other. The order (address first, after `publicTenant`) is unchanged.
+- **Ruling 5 (state).** `DepositPageService.show` reads the quote before the project, so a revision that commits between the two reads gives `updating`, never `due` with an unaccepted quote.
+- **Ruling 14 (isolation).** For `params` the harness also sends A's values under B's slug.
+- **Before any public deploy.** Add: scrub `/api/v1/tenants/*/deposits/*` from proxy, CDN and APM logs (the token is in the path); `trustProxy` also protects the deposit limits (20 uploads per hour per address, platform-wide when every visitor shares one).
