@@ -13,15 +13,19 @@ import { ApiException } from "#services/public_api_errors";
 import { studioHostname } from "#services/storefront_url";
 
 /**
- * The intake's checks before its body is read (TAT-55), on
+ * The intake's checks before its multipart body is read (TAT-55), on
  * api.v1.inquiries.store after publicTenant: an unknown or old slug was
  * already the 404, so nothing here counts it or asks Cloudflare. Counts the
  * client address at this studio (429), asks Cloudflare about the
  * X-Challenge-Token header's token (403 challenge_failed, 503
  * challenge_unavailable; no call for a missing one), then counts the studio,
- * only for a passed challenge (429). The route reads its body itself
- * (multipart.processManually), so a refusal here writes nothing to disk.
- * The honeypot and the phone count need the body: the controller does them.
+ * only for a passed challenge (429). The route reads its multipart body
+ * itself (multipart.processManually), so a refusal here writes nothing to
+ * disk. The global body parser still reads a JSON, urlencoded or text/*
+ * body (1 MB at most) before any route middleware: such a request is
+ * parsed first and then refused here or by the controller's 415 (TAT-32
+ * ruling 6; TAT-38 bounds that). The honeypot and the phone count need the
+ * body: the controller does them.
  */
 @inject()
 export default class IntakeGuardMiddleware {

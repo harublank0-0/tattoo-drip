@@ -334,8 +334,8 @@ router
 					.use(middleware.publicCache())
 					.as("api.v1.artists.show");
 				// The intake (TAT-51). intakeGuard counts the address, checks the
-				// bot challenge and counts the studio before the body is read
-				// (TAT-55); the controller does the honeypot and the phone count.
+				// bot challenge and counts the studio before its multipart body is
+				// read (TAT-55); the controller does the honeypot and the phone count.
 				// POST stays no-store.
 				router
 					.post("/inquiries", [controllers.PublicInquiries, "store"])
