@@ -22,7 +22,10 @@ export function siteverify(
 	) => Response | Promise<Response>,
 ): Siteverify {
 	const calls: SiteverifyCall[] = [];
-	const fetch = async (_input: RequestInfo | URL, init: RequestInit = {}) => {
+	const fetch = async (
+		_input: string | URL | Request,
+		init: RequestInit = {},
+	) => {
 		const form = new URLSearchParams(String(init.body));
 		calls.push({ form });
 		return answer(form, init.signal as AbortSignal);

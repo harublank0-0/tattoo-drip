@@ -17,7 +17,10 @@ type Call = { url: string; init: RequestInit; form: URLSearchParams };
 /** A fetch that records each call (with its form) and answers with `answer`. */
 function fakeFetch(answer: (call: Call) => Response | Promise<Response>) {
 	const calls: Call[] = [];
-	const fetch = async (input: RequestInfo | URL, init: RequestInit = {}) => {
+	const fetch = async (
+		input: string | URL | Request,
+		init: RequestInit = {},
+	) => {
 		const call = {
 			url: String(input),
 			init,
