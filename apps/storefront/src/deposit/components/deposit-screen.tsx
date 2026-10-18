@@ -8,7 +8,7 @@ import {
 	useSyncExternalStore,
 } from "react";
 import type { DepositShell } from "../loader.ts";
-import { isGone, screenFor } from "../problems.ts";
+import { isGone, screenFor, sentGone } from "../problems.ts";
 import { readDepositToken } from "../token.ts";
 import {
 	depositContact,
@@ -82,10 +82,13 @@ export function DepositLoaded({
 }) {
 	const query = useDeposit(token);
 	const { refetch } = query;
+	// When a send was answered 404 (ms): the page is dead until a read succeeds after it.
+	const [goneAt, setGoneAt] = useState<number | null>(null);
 	const screen = screenFor({
 		data: query.data,
 		error: query.error,
 		fetchStatus: query.fetchStatus,
+		sendGone: sentGone(goneAt, query.dataUpdatedAt),
 	});
 	const view = screen.kind === "page" ? depositView(screen.page) : null;
 	const shown = view ? view.state : screen.kind;
@@ -101,6 +104,10 @@ export function DepositLoaded({
 	}, [refetch]);
 
 	const leftDue = useCallback(() => setMoveFocus(true), []);
+	const gone = useCallback(() => {
+		setGoneAt(Date.now());
+		setMoveFocus(true);
+	}, []);
 
 	// After the client's own Send, once the page shows its new state (or the
 	// dead link), focus goes to that message (TAT-65: "focus moves to its
@@ -149,6 +156,7 @@ export function DepositLoaded({
 								studioName={shell.studioName}
 								reread={reread}
 								onLeftDue={leftDue}
+								onGone={gone}
 							/>
 						) : null
 					}

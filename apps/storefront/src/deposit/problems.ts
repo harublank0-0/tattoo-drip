@@ -1,4 +1,8 @@
-import { type DepositPage, isTattooApiError } from "@tattoo-drip/sdk";
+import {
+	type DepositPage,
+	type DepositState,
+	isTattooApiError,
+} from "@tattoo-drip/sdk";
 import { fill } from "../intake/copy.ts";
 import { copy, type ProofNoticeCode } from "./copy.ts";
 
@@ -36,14 +40,16 @@ export type ReadStatus = "fetching" | "paused" | "idle";
  * other failed refresh keeps the data. A first read that is paused for lack
  * of a connection never fails, so it would show the skeleton for ever: it
  * says to check the connection instead, and the read resumes by itself when
- * the phone is back online.
+ * the phone is back online. A send the API answered 404 (`sendGone`) is the
+ * same proof that the link is dead, whatever the read after it does.
  */
 export function screenFor(query: {
 	readonly data: DepositPage | undefined;
 	readonly error: unknown;
 	readonly fetchStatus?: ReadStatus;
+	readonly sendGone?: boolean;
 }): Screen {
-	if (query.error && isGone(query.error)) {
+	if (query.sendGone || (query.error && isGone(query.error))) {
 		return { kind: "problem", problem: "dead" };
 	}
 	if (query.data) return { kind: "page", page: query.data };
@@ -54,6 +60,30 @@ export function screenFor(query: {
 		return { kind: "problem", problem: "failed" };
 	}
 	return { kind: "loading" };
+}
+
+/**
+ * Whether a send's 404 (answered at `goneAt`, in ms) still stands: until a
+ * read succeeds after it, which shows the page again if the link works.
+ */
+export function sentGone(
+	goneAt: number | null,
+	dataUpdatedAt: number,
+): boolean {
+	return goneAt !== null && dataUpdatedAt <= goneAt;
+}
+
+/**
+ * After a refusal that read the page again: whether focus goes to the page's
+ * new message. Not when it is still due or couldn't be read, nor for the
+ * dead link a send's 404 already showed (and focused).
+ */
+export function focusAfterReread(
+	code: ProofNoticeCode,
+	next: DepositState | "gone" | "failed",
+): boolean {
+	if (next === "due" || next === "failed") return false;
+	return !(next === "gone" && code === "gone");
 }
 
 export type ProofProblem =

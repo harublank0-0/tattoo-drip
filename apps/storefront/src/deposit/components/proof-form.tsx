@@ -8,6 +8,7 @@ import { copy, type DepositMethodKind } from "../copy.ts";
 import {
 	describeProofError,
 	firstMessage,
+	focusAfterReread,
 	type ProofProblem,
 	summaryItems,
 	validateProofForm,
@@ -40,6 +41,8 @@ export interface ProofFormProps {
 	reread(): Promise<DepositState | "gone" | "failed">;
 	/** The page left `due` (sent, or changed under the form): the screen moves focus to its message. */
 	onLeftDue(): void;
+	/** The API answered the send 404: the link is dead, whatever the next read says. */
+	onGone(): void;
 }
 
 /**
@@ -55,6 +58,7 @@ export function ProofForm({
 	studioName,
 	reread,
 	onLeftDue,
+	onGone,
 }: ProofFormProps) {
 	const submit = useSubmitDepositProof(token);
 	const [proof, dispatch] = useReducer(proofReducer, NO_PROOF);
@@ -160,9 +164,12 @@ export function ProofForm({
 			// acted, the link died): when it left `due`, the screen takes focus to
 			// its new message. This form is gone by then; the callback is not.
 			void reread().then((next) => {
-				if (next !== "due" && next !== "failed") onLeftDue();
+				if (focusAfterReread(problem.code, next)) onLeftDue();
 			});
 		}
+		// A 404 on the send is as good as one on a read: the link is dead, and the
+		// payment details go even if the read above can't be made.
+		if (problem.code === "gone") onGone();
 	}
 
 	function pick(file: File): void {

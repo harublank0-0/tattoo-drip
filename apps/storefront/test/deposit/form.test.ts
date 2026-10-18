@@ -54,6 +54,7 @@ const formHtml = (view = depositView(PAGE)) =>
 			studioName: "Black Needle",
 			reread: async () => "due" as const,
 			onLeftDue: () => undefined,
+			onGone: () => undefined,
 		}),
 	);
 

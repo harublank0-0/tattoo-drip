@@ -6,9 +6,11 @@ import {
 	describeLoadError,
 	describeProofError,
 	firstMessage,
+	focusAfterReread,
 	formatWait,
 	type ProofProblem,
 	screenFor,
+	sentGone,
 	summaryItems,
 	validateProofForm,
 } from "../../src/deposit/problems.ts";
@@ -97,6 +99,31 @@ describe("loading the page", () => {
 		);
 	});
 
+	test("a send answered 404 replaces the page too, whatever a follow-up read does", () => {
+		for (const error of [
+			null,
+			api(0, "network_error"),
+			api(503, "service_busy"),
+		]) {
+			assert.deepEqual(screenFor({ data: PAGE, error, sendGone: true }), {
+				kind: "problem",
+				problem: "dead",
+			});
+		}
+		assert.deepEqual(screenFor({ data: PAGE, error: null, sendGone: false }), {
+			kind: "page",
+			page: PAGE,
+		});
+	});
+
+	test("the send's 404 stands until a read succeeds after it", () => {
+		assert.equal(sentGone(null, 5_000), false);
+		assert.equal(sentGone(5_000, 0), true);
+		assert.equal(sentGone(5_000, 4_999), true);
+		assert.equal(sentGone(5_000, 5_000), true);
+		assert.equal(sentGone(5_000, 5_001), false);
+	});
+
 	test("a failed first read says why", () => {
 		assert.deepEqual(
 			screenFor({ data: undefined, error: api(429, "rate_limited") }),
@@ -106,6 +133,18 @@ describe("loading the page", () => {
 			screenFor({ data: undefined, error: api(500, "internal_error") }),
 			{ kind: "problem", problem: "failed" },
 		);
+	});
+});
+
+describe("focusAfterReread", () => {
+	test("moves focus to the page's new message, unless it stays due, couldn't be read, or is the dead link the send already showed", () => {
+		assert.equal(focusAfterReread("changed", "due"), false);
+		assert.equal(focusAfterReread("offline", "failed"), false);
+		assert.equal(focusAfterReread("offline", "submitted"), true);
+		assert.equal(focusAfterReread("not-due", "paid"), true);
+		assert.equal(focusAfterReread("not-due", "gone"), true);
+		assert.equal(focusAfterReread("gone", "gone"), false);
+		assert.equal(focusAfterReread("gone", "submitted"), true);
 	});
 });
 
