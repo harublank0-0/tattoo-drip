@@ -5,17 +5,23 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { nitro } from "nitro/vite";
 import { defineConfig } from "vite";
+import { parseStorefrontConfig } from "./src/tenancy/config.ts";
 
-const config = defineConfig({
-	resolve: { tsconfigPaths: true },
-	plugins: [
-		devtools(),
-		nitro({ rollupConfig: { external: [/^@sentry\//] } }),
-		tailwindcss(),
-		tanstackStart(),
-		viteReact(),
-		babel({ presets: [reactCompilerPreset()] }),
-	],
+const config = defineConfig(({ command }) => {
+	// The dev server refuses to start without API_URL and STOREFRONT_URL
+	// (TAT-12). Builds don't read them: they are runtime settings.
+	if (command === "serve") parseStorefrontConfig(process.env);
+	return {
+		resolve: { tsconfigPaths: true },
+		plugins: [
+			devtools(),
+			nitro({ rollupConfig: { external: [/^@sentry\//] } }),
+			tailwindcss(),
+			tanstackStart(),
+			viteReact(),
+			babel({ presets: [reactCompilerPreset()] }),
+		],
+	};
 });
 
 export default config;
