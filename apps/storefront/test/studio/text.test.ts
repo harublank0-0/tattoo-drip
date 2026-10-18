@@ -26,7 +26,10 @@ describe("cleanText", () => {
 	});
 
 	test("drops control characters but keeps tabs, joiners and Devanagari", () => {
-		assert.equal(cleanText("a\u0000b\u0007c\u001bd\te‍f क्ष"), "abcd\te‍f क्ष");
+		assert.equal(
+			cleanText("a\u0000b\u0007c\u001bd\te\u200df क्ष"),
+			"abcd\te\u200df क्ष",
+		);
 	});
 
 	test("blank or missing text is null", () => {

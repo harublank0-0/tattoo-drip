@@ -1,0 +1,162 @@
+import { trimDescription } from "./text.ts";
+import type { ArtistPhoto, ArtistView, StudioView } from "./view-model.ts";
+
+/**
+ * Each page's head (TAT-48): title, description, canonical URL, Open Graph
+ * and, on the studio page, minimal JSON-LD of what the page shows.
+ */
+
+export interface PageSeo {
+	readonly title: string;
+	readonly description: string;
+	/** Absolute, from the site origin (src/site/). */
+	readonly canonical: string;
+	readonly type: "website" | "profile";
+	readonly siteName: string;
+	readonly image: ArtistPhoto | null;
+	readonly jsonLd: Record<string, unknown> | null;
+}
+
+export type HeadMeta =
+	| { title: string }
+	| { name: string; content: string }
+	| { property: string; content: string };
+
+/** The shape a route's `head` returns. */
+export interface HeadTags {
+	meta: HeadMeta[];
+	links: { rel: string; href: string }[];
+	scripts: { type: string; children: string }[];
+}
+
+export function studioPageSeo(
+	studio: StudioView,
+	artists: readonly ArtistView[],
+	origin: string,
+): PageSeo {
+	const canonical = `${origin}/`;
+	const description = studio.intro
+		? trimDescription(studio.intro)
+		: studio.type === "independent"
+			? `${studio.name}, independent tattoo artist. Send an inquiry.`
+			: `${studio.name}, tattoo studio. See the artists and send an inquiry.`;
+	// A studio's only artist is the studio's face; among several, no one is.
+	const image = artists.length === 1 ? artists[0].photo : null;
+	return {
+		title: studio.name,
+		description,
+		canonical,
+		type: "website",
+		siteName: studio.name,
+		image,
+		jsonLd: studioJsonLd(studio, canonical, description, image),
+	};
+}
+
+export function artistPageSeo(
+	studio: StudioView,
+	artist: ArtistView,
+	origin: string,
+): PageSeo {
+	const sameName = artist.name === studio.name;
+	const description = artist.bio
+		? trimDescription(artist.bio)
+		: sameName
+			? `${artist.name} is a tattoo artist. Send an inquiry.`
+			: `${artist.name} is a tattoo artist at ${studio.name}. Send an inquiry.`;
+	return {
+		title: sameName ? artist.name : `${artist.name} at ${studio.name}`,
+		description,
+		canonical: `${origin}${artist.pageHref}`,
+		type: "profile",
+		siteName: studio.name,
+		image: artist.photo,
+		jsonLd: null,
+	};
+}
+
+/** schema.org TattooParlor with only the public fields the page shows. */
+export function studioJsonLd(
+	studio: StudioView,
+	canonical: string,
+	description: string,
+	image: ArtistPhoto | null,
+): Record<string, unknown> {
+	return {
+		"@context": "https://schema.org",
+		"@type": "TattooParlor",
+		name: studio.name,
+		url: canonical,
+		description,
+		...(studio.phone ? { telephone: studio.phone } : {}),
+		...(studio.email ? { email: studio.email } : {}),
+		...(studio.address
+			? { address: studio.address.text.replace(/\n+/g, ", ") }
+			: {}),
+		...(studio.socialUrls.length > 0 ? { sameAs: [...studio.socialUrls] } : {}),
+		...(image ? { image: image.src } : {}),
+	};
+}
+
+const SCRIPT_ESCAPES: Record<string, string> = {
+	"<": "\\u003c",
+	">": "\\u003e",
+	"&": "\\u0026",
+	"\u2028": "\\u2028",
+	"\u2029": "\\u2029",
+};
+
+/**
+ * JSON for a `<script type="application/ld+json">`. The router inserts head
+ * script children as raw HTML, so nothing here may close the element: the
+ * characters that could are written as JSON escapes (still the same JSON).
+ */
+export function serializeJsonLd(value: unknown): string {
+	return JSON.stringify(value).replace(
+		/[<>&\u2028\u2029]/g,
+		(character) => SCRIPT_ESCAPES[character] ?? character,
+	);
+}
+
+export function headTags(seo: PageSeo): HeadTags {
+	const meta: HeadMeta[] = [
+		{ title: seo.title },
+		{ name: "description", content: seo.description },
+		{ property: "og:type", content: seo.type },
+		{ property: "og:site_name", content: seo.siteName },
+		{ property: "og:title", content: seo.title },
+		{ property: "og:description", content: seo.description },
+		{ property: "og:url", content: seo.canonical },
+	];
+	if (seo.image) {
+		meta.push(
+			{ property: "og:image", content: seo.image.src },
+			{ property: "og:image:width", content: String(seo.image.width) },
+			{ property: "og:image:height", content: String(seo.image.height) },
+			{ property: "og:image:alt", content: seo.image.alt },
+		);
+	}
+	meta.push({
+		name: "twitter:card",
+		content: seo.image ? "summary_large_image" : "summary",
+	});
+	return {
+		meta,
+		links: [{ rel: "canonical", href: seo.canonical }],
+		scripts: seo.jsonLd
+			? [{ type: "application/ld+json", children: serializeJsonLd(seo.jsonLd) }]
+			: [],
+	};
+}
+
+/** The head of a page that failed: `notFound`, or anything else (an error). */
+export function statusHead(status: string): HeadTags {
+	return {
+		meta: [
+			{ title: status === "notFound" ? "Page not found" : "Please try again" },
+			{ name: "robots", content: "noindex" },
+		],
+		links: [],
+		scripts: [],
+	};
+}
