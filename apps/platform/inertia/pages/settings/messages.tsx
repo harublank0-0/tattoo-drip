@@ -70,7 +70,6 @@ export default function Messages({
 											id={id}
 											name={message.kind}
 											rows={6}
-											maxLength={1000}
 											value={text}
 											onChange={(event) =>
 												setText(message.kind, event.target.value)
