@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { MutationObserver, QueryClient } from "@tanstack/react-query";
+import {
+	MutationObserver,
+	QueryClient,
+	QueryObserver,
+} from "@tanstack/react-query";
 import { createTattooClient, TattooApiError } from "@tattoo-drip/sdk";
 import type { DepositPage } from "@tattoo-drip/types";
 import { tattooKeys, tattooMutations, tattooQueries } from "../src/queries.js";
@@ -46,6 +50,23 @@ function clientAnswering(status: number, body: unknown) {
 }
 
 describe("tattooQueries.deposit", () => {
+	test("it is stale at once whatever the app's staleTime, so a mount or focus refetches it", async () => {
+		const { calls, client } = clientAnswering(200, { data: PAGE });
+		const queryClient = new QueryClient({
+			defaultOptions: { queries: { staleTime: 60_000 } },
+		});
+		const options = tattooQueries.deposit(client, TOKEN);
+		await queryClient.query(options);
+
+		const observer = new QueryObserver(queryClient, options);
+		const unsubscribe = observer.subscribe(() => undefined);
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		unsubscribe();
+
+		assert.equal(options.staleTime, 0);
+		assert.equal(calls.length, 2);
+	});
+
 	test("its key starts with the tenant and ends with the token", () => {
 		const { client } = clientAnswering(200, { data: PAGE });
 		const key = ["tattoo-drip", "tenant", TENANT, "deposit", TOKEN];
