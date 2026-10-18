@@ -28,6 +28,13 @@ export const http = defineConfig({
 	allowMethodSpoofing: false,
 
 	/**
+	 * The proxies whose X-Forwarded-For request.ip() believes (TRUST_PROXY,
+	 * required in production; loopback in development and tests). Never
+	 * every address: any client could then choose its own (TAT-38).
+	 */
+	trustProxy: env.get("TRUST_PROXY") ?? "loopback",
+
+	/**
 	 * A URL that cannot be decoded is refused before any middleware runs;
 	 * the public API (/api) answers it with its error envelope (TAT-32).
 	 */
