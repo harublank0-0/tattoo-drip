@@ -289,6 +289,17 @@ function OutcomePanel({
 }
 
 /**
+ * After a refused save: the submit button was disabled while saving, which
+ * drops keyboard focus to the page (and Escape stops working), so focus goes
+ * to the first field that needs fixing.
+ */
+function focusFirstInvalid(fieldset: HTMLFieldSetElement | null) {
+	setTimeout(() => {
+		fieldset?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+	}, 0);
+}
+
+/**
  * The new time: the booking form's three fields, prefilled with the
  * session's own. Focus starts on Date; Escape closes the form. After a
  * refused save it stays open with what was typed and the errors under
@@ -312,6 +323,7 @@ function MoveForm({
 	const tenant = useTenant();
 	const id = useId();
 	const date = useRef<HTMLInputElement>(null);
+	const fieldset = useRef<HTMLFieldSetElement>(null);
 	useEffect(() => {
 		date.current?.focus();
 	}, []);
@@ -323,9 +335,11 @@ function MoveForm({
 			routeParams={{ tenant: tenant.slug, id: sessionId }}
 			options={{ preserveScroll: true }}
 			onSuccess={onDone}
+			onError={() => focusFirstInvalid(fieldset.current)}
 		>
 			{({ errors, processing }) => (
 				<fieldset
+					ref={fieldset}
 					className="min-w-0 rounded-md bg-muted/50 p-3"
 					onKeyDown={(event) => {
 						if (event.key === "Escape") onCancel();
@@ -443,6 +457,7 @@ function ScheduleForm({
 	const tenant = useTenant();
 	const id = useId();
 	const kind = useRef<HTMLSelectElement>(null);
+	const fieldset = useRef<HTMLFieldSetElement>(null);
 	useEffect(() => {
 		kind.current?.focus();
 	}, []);
@@ -457,9 +472,11 @@ function ScheduleForm({
 			routeParams={{ tenant: tenant.slug, id: projectId }}
 			options={{ preserveScroll: true }}
 			onSuccess={onDone}
+			onError={() => focusFirstInvalid(fieldset.current)}
 		>
 			{({ errors, processing }) => (
 				<fieldset
+					ref={fieldset}
 					className="min-w-0 rounded-md bg-muted/50 p-3"
 					onKeyDown={(event) => {
 						if (event.key === "Escape") onCancel();
