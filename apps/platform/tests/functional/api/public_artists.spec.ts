@@ -215,16 +215,17 @@ test.group("GET /api/v1/tenants/:tenant/artists (listArtists)", (group) => {
 	}) => {
 		await studioWithOwner("api-405-44");
 
-		assertApiError(
-			await client.get("/api/v1/tenants/no-such-studio-td44/artists"),
-			404,
-			"not_found",
+		const unknown = await client.get(
+			"/api/v1/tenants/no-such-studio-td44/artists",
 		);
+		assertApiError(unknown, 404, "not_found");
+		unknown.assertHeader("cache-control", "no-store");
 		const post = await client
 			.post("/api/v1/tenants/api-405-44/artists")
 			.json({});
 		assertApiError(post, 405, "method_not_allowed");
 		post.assertHeader("allow", "GET, HEAD");
+		post.assertHeader("cache-control", "no-store");
 	});
 });
 
@@ -253,8 +254,9 @@ test.group(
 			response.assertHeader("cache-control", CACHED);
 		});
 
-		test("a hidden, deleted, unknown, malformed or differently cased slug is the same 404", async ({
+		test("a hidden, deleted, unknown, malformed or differently cased slug is the same 404: same body, same headers", async ({
 			client,
+			assert,
 		}) => {
 			const { owner, tenant } = await studioWithOwner("api-missing-44");
 			await addArtist(tenant, owner, { name: "Zara", slug: "zara" });
@@ -267,6 +269,25 @@ test.group(
 				tenant,
 				await addArtist(tenant, owner, { name: "Gone", slug: "gone" }),
 			);
+
+			// "hidden" reaches the handler (its 404 is ApiException.notFound());
+			// "ZARA" never leaves the router's matcher. Each answer must be the
+			// handler's, byte for byte: body and headers, not only status and code.
+			const missing = async (slug: string) =>
+				client.get(`/api/v1/tenants/api-missing-44/artists/${slug}`);
+			const handlerLevel = await missing("hidden");
+			assertApiError(handlerLevel, 404, "not_found");
+			handlerLevel.assertHeader("cache-control", "no-store");
+			const bodyOf404 = handlerLevel.body();
+			const headersOf404 = (response: Awaited<ReturnType<typeof missing>>) => ({
+				"cache-control": response.header("cache-control"),
+				"content-type": response.header("content-type"),
+				"x-content-type-options": response.header("x-content-type-options"),
+				"access-control-allow-origin": response.header(
+					"access-control-allow-origin",
+				),
+				etag: response.header("etag"),
+			});
 
 			for (const slug of [
 				"hidden",
@@ -281,10 +302,13 @@ test.group(
 				"zara%20",
 				"zara.json",
 			]) {
-				assertApiError(
-					await client.get(`/api/v1/tenants/api-missing-44/artists/${slug}`),
-					404,
-					"not_found",
+				const response = await missing(slug);
+				assertApiError(response, 404, "not_found");
+				assert.deepEqual(response.body(), bodyOf404, `${slug}: the body`);
+				assert.deepEqual(
+					headersOf404(response),
+					headersOf404(handlerLevel),
+					`${slug}: the headers`,
 				);
 			}
 		});
@@ -382,6 +406,7 @@ test.group(
 
 			assertApiError(post, 405, "method_not_allowed");
 			post.assertHeader("allow", "GET, HEAD");
+			post.assertHeader("cache-control", "no-store");
 		});
 	},
 );

@@ -10,15 +10,27 @@ import { addArtist } from "#tests/helpers/artists";
 import { testImages, uploadOf } from "#tests/helpers/images";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
-/** Counts listVisible calls, so a test sees the artists read once per call. */
+/**
+ * Counts the artist reads, so a test sees one query per call: `reads` for
+ * listVisible (the studio and the list), `slugReads` for findVisibleBySlug
+ * (one artist).
+ */
 class CountingArtists extends ArtistService {
 	reads = 0;
+	slugReads = 0;
 
 	override async listVisible(
 		...args: Parameters<ArtistService["listVisible"]>
 	) {
 		this.reads++;
 		return super.listVisible(...args);
+	}
+
+	override async findVisibleBySlug(
+		...args: Parameters<ArtistService["findVisibleBySlug"]>
+	) {
+		this.slugReads++;
+		return super.findVisibleBySlug(...args);
 	}
 }
 
@@ -82,16 +94,29 @@ test.group("StudioPageService.studio", (group) => {
 		assert.isTrue(await accepting());
 	});
 
-	test("reads the artists once per call", async ({ assert }) => {
+	test("makes one artist query per call: studio, list and one artist", async ({
+		assert,
+	}) => {
 		const { owner, tenant } = await studioWithOwner("page-once-44");
 		await addArtist(tenant, owner);
 		await addArtist(tenant, owner, { name: "Bina", slug: "bina" });
 		const counting = new CountingArtists(images);
 
 		await inTenant(tenant, () => pagesWith(counting).studio(tenant));
-		await inTenant(tenant, () => pagesWith(counting).visibleArtists(tenant));
+		assert.deepEqual([counting.reads, counting.slugReads], [1, 0]);
 
-		assert.equal(counting.reads, 2);
+		await inTenant(tenant, () => pagesWith(counting).visibleArtists(tenant));
+		assert.deepEqual([counting.reads, counting.slugReads], [2, 0]);
+
+		await inTenant(tenant, () =>
+			pagesWith(counting).visibleArtist(tenant, "bina"),
+		);
+		assert.deepEqual([counting.reads, counting.slugReads], [2, 1]);
+
+		await inTenant(tenant, () =>
+			pagesWith(counting).visibleArtist(tenant, "nobody"),
+		);
+		assert.deepEqual([counting.reads, counting.slugReads], [2, 2]);
 	});
 });
 
