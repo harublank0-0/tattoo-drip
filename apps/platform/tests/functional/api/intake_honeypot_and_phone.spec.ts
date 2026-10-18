@@ -103,6 +103,27 @@ test.group("Public API: the intake's honeypot", (group) => {
 		assertApiError(response, 403, "challenge_failed");
 	});
 
+	test("the honeypot is the form field only: a query parameter of that name neither fills it nor hides a filled one", async ({
+		client,
+	}) => {
+		await studioWithOwner(SLUG);
+
+		(
+			await postInquiry(client, SLUG, intakeFields()).qs({
+				website: "https://spam.example",
+			})
+		).assertStatus(201);
+		assertApiError(
+			await postInquiry(
+				client,
+				SLUG,
+				intakeFields({ website: "https://spam.example" }),
+			).qs({ website: "" }),
+			403,
+			"challenge_failed",
+		);
+	});
+
 	test("with the challenge off the honeypot still refuses, and a challengeToken field is dropped", async ({
 		client,
 	}) => {

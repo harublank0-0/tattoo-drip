@@ -40,8 +40,11 @@ export default class PublicInquiriesController {
 			// go to disk (the route is in multipart.processManually).
 			await receiveUploads(request);
 			// A filled honeypot is refused like a failed challenge (TAT-55),
-			// before validation, so no field error names the trap.
-			if (honeypotFilled(request.input(HONEYPOT_FIELD))) {
+			// before validation, so no field error names the trap. It is read from
+			// the body only: request.input() merges the query string over the body,
+			// so a query parameter of that name would fill it, and an empty one
+			// would hide a filled field.
+			if (honeypotFilled(request.body()[HONEYPOT_FIELD])) {
 				throw ApiException.of("challenge_failed");
 			}
 			const submission = await request.validateUsing(intakeValidator, {
