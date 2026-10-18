@@ -22,13 +22,15 @@ export default function ChatMessage({
 	onSent: (channel: ContactChannelName) => void;
 }) {
 	const copy = () => {
-		navigator.clipboard.writeText(message.text).then(
-			() => {
-				toast.success("Message copied.");
-				onSent("copy");
-			},
-			() => toast.error("Couldn't copy: select the text instead."),
-		);
+		const failed = () => toast.error("Couldn't copy: select the text instead.");
+		// No clipboard outside a secure context (a phone on the LAN opening
+		// http://192.168.x.x): the same refusal as a rejected write, and no
+		// contact is recorded.
+		if (!navigator.clipboard) return failed();
+		navigator.clipboard.writeText(message.text).then(() => {
+			toast.success("Message copied.");
+			onSent("copy");
+		}, failed);
 	};
 
 	return (
