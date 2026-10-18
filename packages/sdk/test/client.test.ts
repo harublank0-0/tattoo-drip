@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
+	type Artist,
 	type CreateInquiryInput,
 	createTattooClient,
+	type Studio,
 	TattooApiError,
 } from "../src/index.js";
 
@@ -593,5 +595,82 @@ describe("deposits", () => {
 		);
 
 		assert.deepEqual(page, PAGE);
+	});
+});
+
+describe("studio and artists", () => {
+	const STUDIO: Studio = {
+		slug: "api-needle-32",
+		name: "Black Needle",
+		type: "studio",
+		intro: "Fine line and blackwork.",
+		timezone: "Asia/Kathmandu",
+		contact: {
+			phone: "+9779812345678",
+			email: "hello@black-needle.example",
+			address: "Thamel Marg\nKathmandu",
+		},
+		socialLinks: [
+			{ platform: "instagram", url: "https://instagram.com/blackneedle" },
+		],
+		acceptingInquiries: true,
+	};
+	const ARTIST: Artist = {
+		id: "0199f000-0000-7000-8000-000000000044",
+		slug: "sita",
+		name: "Sita Rai",
+		bio: null,
+		photo: {
+			url: "https://api.example.com/uploads/tenants/t/artist_photo/p.png",
+			width: 300,
+			height: 200,
+		},
+		acceptingInquiries: false,
+		closedMessage: "Books open in March.",
+	};
+
+	test("studio.get returns the whole profile", async () => {
+		const { calls, fetch } = fakeFetch(() => json(200, { data: STUDIO }));
+
+		assert.deepEqual(await client(fetch).studio.get(), STUDIO);
+		assert.equal(
+			calls[0].url,
+			"https://api.example.com/api/v1/tenants/api-needle-32",
+		);
+	});
+
+	test("artists.list reads the tenant's artists and unwraps the list", async () => {
+		const { calls, fetch } = fakeFetch(() => json(200, { data: [ARTIST] }));
+
+		assert.deepEqual(await client(fetch).artists.list(), [ARTIST]);
+		assert.equal(
+			calls[0].url,
+			"https://api.example.com/api/v1/tenants/api-needle-32/artists",
+		);
+		assert.equal(calls[0].init.credentials, "omit");
+	});
+
+	test("artists.get reads one artist by its slug, encoded", async () => {
+		const { calls, fetch } = fakeFetch(() => json(200, { data: ARTIST }));
+
+		assert.deepEqual(await client(fetch).artists.get("sita"), ARTIST);
+		assert.equal(
+			calls[0].url,
+			"https://api.example.com/api/v1/tenants/api-needle-32/artists/sita",
+		);
+		await client(fetch).artists.get("a/b c");
+		assert.match(calls[1].url, /\/artists\/a%2Fb%20c$/);
+	});
+
+	test("an artist that isn't there is a 404 TattooApiError", async () => {
+		const { fetch } = fakeFetch(() =>
+			json(404, { error: { code: "not_found", message: "Not found." } }),
+		);
+
+		const error = await rejection(client(fetch).artists.get("nobody"));
+
+		assert.ok(error instanceof TattooApiError);
+		assert.equal(error.status, 404);
+		assert.equal(error.code, "not_found");
 	});
 });

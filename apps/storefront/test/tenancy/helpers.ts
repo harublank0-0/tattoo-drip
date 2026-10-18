@@ -1,3 +1,5 @@
+import type { Studio } from "@tattoo-drip/sdk";
+
 /** Fakes shared by the tenancy tests, in the style of the SDK's own tests. */
 
 export type Call = { url: string; init: RequestInit };
@@ -30,4 +32,18 @@ export function hangUntilAborted({ init }: Call): Promise<Response> {
 			once: true,
 		});
 	});
+}
+
+/** A whole Studio (TAT-44's contract) where only the slug and the name matter. */
+export function studioOf(slug: string, name: string): Studio {
+	return {
+		slug,
+		name,
+		type: "studio",
+		intro: null,
+		timezone: "Asia/Kathmandu",
+		contact: { phone: null, email: null, address: null },
+		socialLinks: [],
+		acceptingInquiries: true,
+	};
 }

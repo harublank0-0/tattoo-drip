@@ -74,8 +74,14 @@ paths:
     get:
       operationId: getStudio
       tags: [MVP]
-      summary: Public profile of a tenant
-      description: Cacheable. Under an old slug it answers like under the current one, and `slug` is the current slug.
+      summary: The studio's public profile
+      description: |
+        What the studio page shows about the studio: its name, intro,
+        contact details, links, timezone and whether it takes inquiries
+        (TAT-44). Never its deposit policy, payment details, members or
+        anything about clients, inquiries or payments. Cacheable. Under an
+        old slug it answers like under the current one, and `slug` is the
+        current slug.
       responses:
         "200":
           description: Studio
@@ -100,42 +106,59 @@ paths:
     get:
       operationId: listArtists
       tags: [MVP]
-      summary: Visible artists of a tenant
+      summary: The studio's visible artists
+      description: |
+        Every visible artist, by name (ignoring case); hidden and deleted
+        artists never appear, and a studio with no visible artist answers
+        an empty list. Cacheable. Under an old slug it answers like under
+        the current one.
       responses:
         "200":
           description: Artists
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            ETag: { $ref: "#/components/headers/ETag" }
           content:
             application/json:
               schema:
                 type: object
                 required: [data]
+                additionalProperties: false
                 properties:
                   data: { type: array, items: { $ref: "#/components/schemas/Artist" } }
+        "304": { $ref: "#/components/responses/NotModified" }
         "404": { $ref: "#/components/responses/NotFound" }
+        default: { $ref: "#/components/responses/Error" }
 
   /tenants/{tenant}/artists/{artist}:
     parameters:
       - $ref: "#/components/parameters/Tenant"
-      - name: artist
-        in: path
-        required: true
-        description: Artist slug
-        schema: { type: string }
+      - $ref: "#/components/parameters/ArtistSlug"
     get:
       operationId: getArtist
       tags: [MVP]
-      summary: One artist by slug
+      summary: One visible artist, by slug
+      description: |
+        A hidden, deleted or unknown artist, another studio's, and an
+        artist's old slug are the same 404 (`not_found`). Cacheable. Under
+        an old studio slug it answers like under the current one.
       responses:
         "200":
           description: Artist
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            ETag: { $ref: "#/components/headers/ETag" }
           content:
             application/json:
               schema:
                 type: object
                 required: [data]
+                additionalProperties: false
                 properties:
                   data: { $ref: "#/components/schemas/Artist" }
+        "304": { $ref: "#/components/responses/NotModified" }
         "404": { $ref: "#/components/responses/NotFound" }
+        default: { $ref: "#/components/responses/Error" }
 
   /tenants/{tenant}/services:
     parameters:
@@ -406,6 +429,18 @@ components:
       schema:
         type: string
         pattern: "^[A-Za-z0-9_-]{43}$"
+    ArtistSlug:
+      name: artist
+      in: path
+      required: true
+      description: |
+        The artist's slug, matched exactly: never case-folded. An artist's
+        old slug is not kept: after a change it is a 404.
+      schema:
+        type: string
+        minLength: 2
+        maxLength: 63
+        pattern: "^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$"
 
   headers:
     CacheControl:
@@ -496,10 +531,14 @@ components:
     Image:
       type: object
       required: [url, width, height]
+      additionalProperties: false
       properties:
-        url: { type: string, format: uri }
-        width: { type: integer }
-        height: { type: integer }
+        url:
+          type: string
+          format: uri
+          description: Public and absolute.
+        width: { type: integer, minimum: 1 }
+        height: { type: integer, minimum: 1 }
         alt: { type: [string, "null"] }
 
     Money:
@@ -512,11 +551,21 @@ components:
     SocialLink:
       type: object
       required: [platform, url]
+      additionalProperties: false
       properties:
-        platform: { type: string, examples: [instagram] }
-        url: { type: string, format: uri }
+        platform:
+          type: string
+          description: |
+            `instagram`, `facebook`, `tiktok` or `website` today. Show any
+            other value as a plain link.
+          examples: [instagram]
+        url:
+          type: string
+          format: uri
+          description: An https URL.
 
     StorefrontSection:
+      description: V1 (TAT-54). Not served yet.
       type: object
       required: [type, props]
       properties:
@@ -524,6 +573,9 @@ components:
         props: { type: object, additionalProperties: true }
 
     StorefrontConfiguration:
+      description: |
+        V1 (TAT-54). Not served yet: `Studio` gains it as `storefront` with
+        themes and branding.
       type: object
       required: [theme, branding, sections]
       properties:
@@ -545,46 +597,88 @@ components:
     Studio:
       type: object
       description: |
-        A tenant's public profile. TAT-32 sends `slug` and `name`; the other
-        properties are the draft that TAT-44 implements and makes required.
-      required: [slug, name]
+        A tenant's public profile (TAT-44): what its owners were told the
+        studio page shows. Every property is always there; an empty one is
+        `null` or `[]`. All text is plain text: render it as text, never as
+        HTML.
+      required: [slug, name, type, intro, timezone, contact, socialLinks, acceptingInquiries]
+      additionalProperties: false
       properties:
         slug:
           type: string
           description: The current slug, also when the request used an old one
-        name: { type: string }
-        id: { type: string, format: uuid }
-        type: { type: string, enum: [studio, independent] }
-        description: { type: [string, "null"] }
-        timezone: { type: string, description: IANA timezone, examples: [Asia/Kathmandu] }
+        name: { type: string, maxLength: 120 }
+        type:
+          type: string
+          enum: [studio, independent]
+          description: |
+            `independent` is one artist working alone; their own profile is
+            the studio's one artist.
+        intro: { type: [string, "null"], maxLength: 1000 }
+        timezone:
+          type: string
+          description: The IANA timezone of the studio's dates and times
+          examples: [Asia/Kathmandu]
         contact:
           type: object
-          required: [email]
+          required: [phone, email, address]
+          additionalProperties: false
           properties:
-            email: { type: string, format: email }
-            phone: { type: [string, "null"] }
-            address: { type: [string, "null"] }
+            phone:
+              type: [string, "null"]
+              description: E.164
+              examples: ["+9779812345678"]
+            email:
+              type: [string, "null"]
+              format: email
+              description: The studio's contact email
+            address:
+              type: [string, "null"]
+              maxLength: 300
+              description: Free text; keep its line breaks
         socialLinks:
           type: array
+          description: |
+            The links the studio set, in this order: instagram, facebook,
+            tiktok, website. Only https links.
           items: { $ref: "#/components/schemas/SocialLink" }
-        storefront: { $ref: "#/components/schemas/StorefrontConfiguration" }
+        acceptingInquiries:
+          type: boolean
+          description: |
+            Whether `createInquiry` takes an inquiry that names no artist.
+            False only when every visible artist is closed (that inquiry
+            would be the 409 `studio_not_accepting`); a studio with no
+            visible artist takes general inquiries.
 
     Artist:
       type: object
-      required: [id, slug, name, acceptingRequests, serviceIds]
+      description: |
+        A visible artist of the studio (TAT-44). Every property is always
+        there. All text is plain text: render it as text.
+      required: [id, slug, name, bio, photo, acceptingInquiries, closedMessage]
+      additionalProperties: false
       properties:
-        id: { type: string, format: uuid }
-        slug: { type: string }
-        name: { type: string }
-        bio: { type: [string, "null"] }
-        photo: { oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }] }
-        acceptingRequests: { type: boolean }
+        id:
+          type: string
+          format: uuid
+          description: What `createInquiry` takes as `preferredArtistId`
+        slug:
+          type: string
+          description: The artist's own link within the studio (`getArtist`)
+        name: { type: string, maxLength: 120 }
+        bio: { type: [string, "null"], maxLength: 1000 }
+        photo:
+          description: At most 2048 px on its longer side, or null
+          oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }]
+        acceptingInquiries:
+          type: boolean
+          description: |
+            False while the artist's books are closed: an inquiry naming
+            them is the 409 `artist_not_accepting`.
         closedMessage:
           type: [string, "null"]
-          description: Shown instead of the booking form when not accepting requests
-        serviceIds:
-          type: array
-          items: { type: string, format: uuid }
+          maxLength: 300
+          description: The artist's words to show instead of the inquiry form; null while they accept inquiries
 
     Service:
       type: object
