@@ -38,7 +38,9 @@ export function InquirySection({
 						</p>
 						{state.studioOpen ? (
 							<a className="text-link" href="/#inquiry">
-								Send <bdi>{state.studioName}</bdi> a general inquiry
+								<span>
+									Send <bdi>{state.studioName}</bdi> a general inquiry
+								</span>
 							</a>
 						) : null}
 					</>

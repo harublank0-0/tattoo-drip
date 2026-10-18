@@ -72,7 +72,9 @@ function ArtistEntry({
 				{askLink ? (
 					<div className="actions">
 						<a className="action action-secondary" href={artist.inquiryHref}>
-							Ask for <bdi>{artist.name}</bdi>
+							<span>
+								Ask for <bdi>{artist.name}</bdi>
+							</span>
 						</a>
 					</div>
 				) : null}

@@ -61,6 +61,14 @@ function assertSafePage(html: string) {
 			assert.match(anchor, / rel="noopener noreferrer"/, anchor);
 		}
 	}
+	// Links are flex containers: text next to a <bdi> would become two flex
+	// items and lose the space between them ("Ask forSita Rai"), so a link's
+	// mixed content goes in one <span>.
+	assert.doesNotMatch(
+		html,
+		/<a [^>]*>[^<]+<(?!\/a>)/,
+		"text beside an element in a link",
+	);
 	assert.doesNotMatch(html, / target=/);
 	assert.doesNotMatch(html, / style=/);
 	assert.doesNotMatch(html, /javascript:/i);

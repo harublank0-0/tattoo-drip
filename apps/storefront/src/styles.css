@@ -177,6 +177,7 @@
 @media (min-width: 48rem) {
   .roster { grid-template-columns: repeat(auto-fill, minmax(min(100%, 26rem), 1fr)); column-gap: 3rem; }
   .artist { grid-template-columns: 9rem minmax(0, 1fr); }
+  .artist-no-photo { grid-template-columns: minmax(0, 1fr); }
   .artist .artist-photo { grid-row: 1 / span 2; }
   .artist-body { grid-column: 2; }
   .artist-no-photo .artist-body { grid-column: 1; }
