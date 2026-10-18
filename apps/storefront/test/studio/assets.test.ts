@@ -64,18 +64,74 @@ describe("route imports of built assets", () => {
 	});
 });
 
-// PENDING (TAT-48 font follow-up, needs the user's permission to download
-// @fontsource/eczar@5.3.0 from npm): once the three woff2 files and OFL.txt
-// are vendored in src/assets/fonts/eczar/, replace this todo with tests that
-// pin: three @font-face blocks (latin, latin-ext, devanagari) with
-// font-display: optional; only the Latin file is preloaded (a ?url import in
-// routes/__root.tsx); OFL.txt sits next to the files; each woff2 is under
-// 150 KB.
 describe("the vendored Eczar files", () => {
-	test(
-		"are declared with font-display: optional and the Latin file is preloaded",
-		{
-			todo: "pending the user's permission to download @fontsource/eczar",
-		},
+	const css = readFileSync(new URL("styles.css", SRC), "utf8");
+	const root = readFileSync(new URL("routes/__root.tsx", SRC), "utf8");
+	const SUBSETS = ["latin", "latin-ext", "devanagari"] as const;
+	const faces = Array.from(
+		css.matchAll(/@font-face\s*\{([^}]*)\}/g),
+		(m) => m[1],
 	);
+
+	test("three @font-face blocks, one per subset, bold, font-display: optional", () => {
+		assert.equal(faces.length, SUBSETS.length);
+		for (const subset of SUBSETS) {
+			const block = faces.find((face) =>
+				face.includes(`eczar-${subset}-700-normal.woff2`),
+			);
+			assert.ok(block, `no @font-face for the ${subset} subset`);
+			assert.match(block, /font-family:\s*'Eczar'/);
+			assert.match(block, /font-weight:\s*700/);
+			assert.match(block, /font-display:\s*optional/);
+			assert.match(block, /format\('woff2'\)/);
+			assert.match(block, /unicode-range:\s*U\+/);
+		}
+	});
+
+	test("each subset covers its own characters", () => {
+		const range = (subset: string) =>
+			faces.find((face) => face.includes(`eczar-${subset}-700-normal`)) ?? "";
+		assert.match(range("devanagari"), /U\+0900-097F/);
+		assert.match(range("latin"), /U\+0000-00FF/);
+		assert.match(range("latin-ext"), /U\+0100-02BA/);
+	});
+
+	test("every file exists, is a woff2 and is small", () => {
+		for (const subset of SUBSETS) {
+			const file = new URL(
+				`assets/fonts/eczar/eczar-${subset}-700-normal.woff2`,
+				SRC,
+			);
+			assert.ok(existsSync(file), `${subset} file is missing`);
+			const bytes = readFileSync(file);
+			assert.equal(bytes.subarray(0, 4).toString("latin1"), "wOF2", subset);
+			assert.ok(
+				bytes.length < 150 * 1024,
+				`${subset} is ${bytes.length} bytes`,
+			);
+		}
+	});
+
+	test("the SIL Open Font License sits next to the files", () => {
+		const licence = readFileSync(
+			new URL("assets/fonts/eczar/OFL.txt", SRC),
+			"utf8",
+		);
+		assert.match(licence, /SIL OPEN FONT LICENSE Version 1\.1/i);
+		assert.match(licence, /Eczar Project Authors/);
+	});
+
+	test("only the Latin file is preloaded, as a CORS-anonymous font", () => {
+		const preloads = Array.from(root.matchAll(/rel:\s*"preload"/g));
+		assert.equal(preloads.length, 1);
+		assert.match(
+			root,
+			/import eczarLatin from "\.\.\/assets\/fonts\/eczar\/eczar-latin-700-normal\.woff2\?url"/,
+		);
+		assert.match(root, /href:\s*eczarLatin/);
+		assert.match(root, /as:\s*"font"/);
+		assert.match(root, /type:\s*"font\/woff2"/);
+		assert.match(root, /crossOrigin:\s*"anonymous"/);
+		assert.doesNotMatch(root, /eczar-(latin-ext|devanagari)/);
+	});
 });

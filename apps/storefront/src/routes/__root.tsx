@@ -9,6 +9,7 @@ import { TattooProvider } from "@tattoo-drip/react";
 
 import type { ApiContext } from "../api/context.ts";
 import { loadStudio } from "../api/loaders.ts";
+import eczarLatin from "../assets/fonts/eczar/eczar-latin-700-normal.woff2?url";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import type { SiteContext } from "../site/context.ts";
 import appCss from "../styles.css?url";
@@ -31,6 +32,15 @@ export const Route = createRootRouteWithContext<ApiContext & SiteContext>()({
 			},
 		],
 		links: [
+			// Only the Latin subset is preloaded; the others load when a page
+			// holds their characters (font-display: optional, src/styles.css).
+			{
+				rel: "preload",
+				href: eczarLatin,
+				as: "font",
+				type: "font/woff2",
+				crossOrigin: "anonymous",
+			},
 			{
 				rel: "stylesheet",
 				href: appCss,
