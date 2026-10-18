@@ -2,8 +2,9 @@ import { Form } from "@adonisjs/inertia/react";
 import { Link } from "@inertiajs/react";
 import { cn } from "cn";
 import { urlFor } from "~/client";
+import { emptyAlertsText } from "~/components/alerts";
 import Page from "~/components/page";
-import { Button } from "~/components/ui/button";
+import { Button, buttonVariants } from "~/components/ui/button";
 import { useTenant } from "~/hooks/use-tenant";
 import AppLayout from "~/layouts/app";
 
@@ -49,7 +50,7 @@ export default function AlertsIndex({
 								className="h-11"
 								disabled={processing}
 							>
-								{processing ? "Saving…" : "Mark all as read"}
+								{processing ? "Marking…" : "Mark all as read"}
 							</Button>
 						)}
 					</Form>
@@ -58,7 +59,7 @@ export default function AlertsIndex({
 		>
 			{alerts.length === 0 ? (
 				<p className="text-sm text-muted-foreground">
-					No alerts yet. New inquiries show up here.
+					{emptyAlertsText(page.total)}
 				</p>
 			) : (
 				<ul className="flex max-w-2xl flex-col divide-y rounded-md border">
@@ -100,15 +101,25 @@ export default function AlertsIndex({
 				</ul>
 			)}
 
-			{page.last > 1 && (
-				<nav aria-label="Pages" className="flex justify-between text-sm">
+			{(page.last > 1 || page.current > 1) && (
+				<nav aria-label="Pages" className="flex justify-between gap-3 text-sm">
 					{page.current > 1 ? (
-						<Link href={href(page.current - 1)}>Previous</Link>
+						<Link
+							href={href(page.current - 1)}
+							className={cn(buttonVariants({ variant: "outline" }), "h-11")}
+						>
+							Previous
+						</Link>
 					) : (
 						<span />
 					)}
 					{page.current < page.last ? (
-						<Link href={href(page.current + 1)}>Next</Link>
+						<Link
+							href={href(page.current + 1)}
+							className={cn(buttonVariants({ variant: "outline" }), "h-11")}
+						>
+							Next
+						</Link>
 					) : (
 						<span />
 					)}

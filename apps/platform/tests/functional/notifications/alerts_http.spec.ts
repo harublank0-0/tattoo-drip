@@ -68,6 +68,23 @@ test.group("Alerts", (group) => {
 		assert.deepEqual(props.page, { current: 1, last: 1, total: 2 });
 	});
 
+	test("a page past the last one is empty but still reports the total", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		await alertFor(tenant, owner.id);
+		await alertFor(tenant, owner.id);
+
+		const props = (
+			await client.get(alertsPage("?page=9")).withInertia().loginAs(owner)
+		).inertiaProps;
+
+		// The page says "No alerts on this page." from a total above 0.
+		assert.deepEqual(props.alerts, []);
+		assert.deepEqual(props.page, { current: 9, last: 1, total: 2 });
+	});
+
 	test("opening an owner's alert marks it read once and opens its inquiry", async ({
 		client,
 		assert,
