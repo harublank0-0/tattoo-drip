@@ -10,13 +10,6 @@ import {
 	FieldSet,
 } from "./field.tsx";
 import { Input } from "./input.tsx";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "./select.tsx";
 import { Textarea } from "./textarea.tsx";
 
 /*
@@ -31,6 +24,10 @@ import { Textarea } from "./textarea.tsx";
  * to its control by aria-describedby and not announced on its own: the
  * form shows and focuses an error summary instead. Imports are relative
  * with extensions, so node tests can load this file.
+ *
+ * There is no SelectField: it pulled Radix Select into the intake form's
+ * chunk (about 28 KB gzipped on a slow phone) and nothing used it once the
+ * prototype's form went. Add one (from ./select.tsx) when a form needs it.
  */
 
 const CONTROL_TEXT = "text-[1.0625rem] md:text-[1.0625rem]";
@@ -178,52 +175,6 @@ function TextareaField({
 	);
 }
 
-type SelectFieldProps = FieldShellProps & {
-	options: readonly { value: string; label: string }[];
-	placeholder?: string;
-	disabled?: boolean;
-};
-
-/** An empty value shows the placeholder; Radix doesn't allow empty items. */
-function SelectField({
-	label,
-	description,
-	options,
-	placeholder,
-	disabled,
-}: SelectFieldProps) {
-	const field = useFieldContext<string | undefined>();
-	const control = useControlProps(Boolean(description));
-
-	return (
-		<FieldShell
-			label={label}
-			description={description}
-			isInvalid={control.isInvalid}
-		>
-			<Select
-				name={field.name}
-				value={field.state.value ?? ""}
-				onValueChange={field.handleChange}
-				disabled={disabled}
-			>
-				<SelectTrigger {...control.props} className={cn("h-12", CONTROL_TEXT)}>
-					<SelectValue placeholder={placeholder} />
-				</SelectTrigger>
-				<SelectContent>
-					{options
-						.filter((option) => option.value !== "")
-						.map((option) => (
-							<SelectItem key={option.value} value={option.value}>
-								{option.label}
-							</SelectItem>
-						))}
-				</SelectContent>
-			</Select>
-		</FieldShell>
-	);
-}
-
 type ChoiceFieldProps = {
 	legend: ReactNode;
 	description?: ReactNode;
@@ -312,7 +263,7 @@ function ChoiceField({
 const { useAppForm, withForm } = createFormHook({
 	fieldContext,
 	formContext,
-	fieldComponents: { TextField, TextareaField, SelectField, ChoiceField },
+	fieldComponents: { TextField, TextareaField, ChoiceField },
 	formComponents: {},
 });
 
