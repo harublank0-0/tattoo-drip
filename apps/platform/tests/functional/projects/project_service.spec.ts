@@ -100,7 +100,14 @@ const EXPECTED_FROM: Record<ManualMove, ProjectStatus[]> = {
 	hold: ["quoted"],
 	resume: ["on_hold"],
 	decline: ["reviewing"],
-	withdraw: ["reviewing", "quoted", "on_hold", "deposit_pending"],
+	withdraw: [
+		"reviewing",
+		"quoted",
+		"on_hold",
+		"deposit_pending",
+		"booked",
+		"in_progress",
+	],
 };
 const EXPECTED_TO: Record<ManualMove, ProjectStatus> = {
 	hold: "on_hold",
@@ -1356,37 +1363,32 @@ test.group("ProjectService.move: sessions and deposits", (group) => {
 		});
 	});
 
-	test("a withdrawal is refused while any verified deposit money is held", async ({
+	test("a withdrawal closes a project that holds deposit money, booked and in progress ones too", async ({
 		assert,
 	}) => {
 		const { tenant } = await studioWithOwner();
 
 		await inTenant(tenant, async () => {
 			const client = await makeClient(tenant);
-			// Fully paid with no session yet; paid, then revised back to quoted
-			// or on hold; and only partly paid: all hold the client's money.
-			for (const [status, paid] of [
-				["deposit_pending", 300_000],
-				["quoted", 300_000],
-				["on_hold", 300_000],
-				["deposit_pending", 100_000],
+			for (const status of [
+				"deposit_pending",
+				"quoted",
+				"on_hold",
+				"booked",
+				"in_progress",
 			] as const) {
 				const project = await makeProject(tenant, client, { status });
 				await makeQuote(tenant, project);
 				await makePayment(tenant, project, {
-					amount: paid,
 					status: "verified",
 					verifiedAt: DateTime.utc(),
 				});
-				const label = `${status}, ${paid} paid`;
 				assert.equal(
-					await refusalOf(() =>
-						projects.move(tenant, OWNER, project, "withdraw"),
-					),
-					"deposit_paid",
-					label,
+					await projects.move(tenant, OWNER, project, "withdraw"),
+					"cancelled",
+					status,
 				);
-				assert.equal(await statusOf(project), status, label);
+				assert.isTrue(await projects.depositHeld(tenant, project), status);
 			}
 		});
 	});

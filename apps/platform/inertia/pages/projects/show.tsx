@@ -67,7 +67,7 @@ export default function ProjectShow({
 	message,
 	form,
 	moves,
-	withdrawBlocked,
+	depositHeldText,
 	scheduledSessionCount,
 	bookedWithoutSession,
 	quoteExpiryShown,
@@ -126,14 +126,8 @@ export default function ProjectShow({
 								projectId={project.id}
 								moves={moves}
 								scheduledSessionCount={scheduledSessionCount}
+								depositHeldText={depositHeldText}
 							/>
-						)}
-						{withdrawBlocked && (
-							<p className="text-sm text-muted-foreground">
-								The client&apos;s deposit is held, so this project can&apos;t be
-								closed as withdrawn yet: recording what happens to a deposit
-								(kept, moved or refunded) comes with payments.
-							</p>
 						)}
 						{assignment && (
 							<ArtistField projectId={project.id} assignment={assignment} />
@@ -728,29 +722,38 @@ function ContactLine({ text, onMark }: { text: string; onMark: () => void }) {
 }
 
 /** Moves that close a project ask first. */
-const CONFIRM: Partial<Record<ManualMoveName, (sessions: number) => string>> = {
+const CONFIRM: Partial<
+	Record<ManualMoveName, (sessions: number, deposit: string | null) => string>
+> = {
 	decline: (sessions) =>
 		sessions > 0
 			? `Decline this project? It moves to Closed and cancels ${sessions} scheduled session${sessions === 1 ? "" : "s"}.`
 			: "Decline this project? It moves to Closed.",
-	withdraw: (sessions) =>
-		sessions > 0
-			? `Mark that the client withdrew? This cancels the project and ${sessions} scheduled session${sessions === 1 ? "" : "s"}.`
-			: "Mark that the client withdrew? This cancels the project.",
+	withdraw: (sessions, deposit) => {
+		const base =
+			sessions > 0
+				? `Mark that the client withdrew? This cancels the project and ${sessions} scheduled session${sessions === 1 ? "" : "s"}.`
+				: "Mark that the client withdrew? This cancels the project.";
+		return deposit
+			? `${base} The client's deposit of ${deposit} stays recorded: you then record whether the studio keeps it or refunds it.`
+			: base;
+	},
 };
 
 function MoveButtons({
 	projectId,
 	moves,
 	scheduledSessionCount,
+	depositHeldText,
 }: {
 	projectId: string;
 	moves: ManualMoveName[];
 	scheduledSessionCount: number;
+	depositHeldText: string | null;
 }) {
 	const tenant = useTenant();
 	const send = (move: ManualMoveName) => {
-		const question = CONFIRM[move]?.(scheduledSessionCount);
+		const question = CONFIRM[move]?.(scheduledSessionCount, depositHeldText);
 		if (question && !window.confirm(question)) return;
 		router.post(
 			urlFor("tenant.projects.moves.store", {

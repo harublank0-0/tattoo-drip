@@ -8,7 +8,9 @@ import ProjectSession from "#modules/scheduling/models/project_session";
 import {
 	makeArtist,
 	makeClient,
+	makePayment,
 	makeProject,
+	makeQuote,
 	makeSession,
 } from "#tests/helpers/pipeline";
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
@@ -111,6 +113,34 @@ test.group("Project moves", (group) => {
 			ProjectSession.findOrFail(session.id),
 		);
 		assert.equal(live.status, "cancelled");
+	});
+
+	test("withdrawing a project that holds a deposit asks for its outcome", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const project = await projectIn(tenant, "booked");
+		await inTenant(tenant, async () => {
+			await makeQuote(tenant, project);
+			await makePayment(tenant, project, {
+				status: "verified",
+				verifiedAt: DateTime.utc(),
+			});
+		});
+
+		const response = await client
+			.post(url(project.id, "/moves"))
+			.form({ move: "withdraw" })
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		response.assertFlashMessage(
+			"success",
+			"Client withdrew: project cancelled. Record what happened to the deposit under Payments.",
+		);
+		assert.equal((await reload(tenant, project)).status, "cancelled");
 	});
 });
 

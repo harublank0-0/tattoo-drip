@@ -138,9 +138,11 @@ export default class ProjectsController {
 			: undefined;
 		const sessions = await this.sessions.listForProject(tenant, project);
 		const scheduled = sessions.filter(({ status }) => status === "scheduled");
-		const depositHeld = await this.projects.depositHeld(tenant, project);
 		const versions = await this.quotes.history(tenant, project);
 		const current = versions.at(0) ?? null;
+		const held = current
+			? await this.deposits.verifiedPaid(tenant, project, current.currency)
+			: 0;
 		const live = current && !isExpired(current) ? current : null;
 		const { timezone } = tenant;
 		const today = DateTime.fromISO(todayIn(timezone), { zone: "utc" });
@@ -198,13 +200,9 @@ export default class ProjectsController {
 				minDate: today.toFormat("yyyy-MM-dd"),
 				maxDate: today.plus({ years: 1 }).toFormat("yyyy-MM-dd"),
 			},
-			// Withdrawing is hidden while the project holds deposit money (the
-			// server refuses it too); the page says why.
-			moves: allowedMoves(project.status).filter(
-				(move) => !(move === "withdraw" && depositHeld),
-			),
-			withdrawBlocked:
-				depositHeld && allowedMoves(project.status).includes("withdraw"),
+			moves: allowedMoves(project.status),
+			// The withdraw confirm names the deposit the project holds (TAT-66).
+			depositHeldText: held > 0 ? formatMoney(held) : null,
 			scheduledSessionCount: scheduled.length,
 			bookedWithoutSession:
 				project.status === "booked" &&

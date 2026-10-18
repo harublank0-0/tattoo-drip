@@ -330,7 +330,8 @@ test.group("Project page: lifecycle props", (group) => {
 		).inertiaProps;
 
 		assert.isTrue(props.bookedWithoutSession);
-		assert.deepEqual(props.moves, []);
+		// A client can still withdraw from a booked project (TAT-66).
+		assert.deepEqual(props.moves, ["withdraw"]);
 		assert.equal(props.contactedText, "never contacted");
 	});
 
@@ -398,7 +399,7 @@ test.group("Project page: message and withdraw guards", (group) => {
 		assert.isFalse(await offered("cancelled"));
 	});
 
-	test("withdrawing is hidden and flagged while deposit money is held", async ({
+	test("withdrawing stays offered, and the page names the deposit it holds", async ({
 		client,
 		assert,
 	}) => {
@@ -415,14 +416,15 @@ test.group("Project page: message and withdraw guards", (group) => {
 		const heldProps = (
 			await client.get(page(paid.id)).withInertia().loginAs(owner)
 		).inertiaProps;
-		assert.deepEqual(heldProps.moves, []);
-		assert.isTrue(heldProps.withdrawBlocked);
+		assert.deepEqual(heldProps.moves, ["withdraw"]);
+		assert.equal(heldProps.depositHeldText, "NPR 3,000");
+		assert.notProperty(heldProps, "withdrawBlocked");
 
 		const freeProps = (
 			await client.get(page(unpaid.id)).withInertia().loginAs(owner)
 		).inertiaProps;
 		assert.deepEqual(freeProps.moves, ["withdraw"]);
-		assert.isFalse(freeProps.withdrawBlocked);
+		assert.isNull(freeProps.depositHeldText);
 	});
 });
 

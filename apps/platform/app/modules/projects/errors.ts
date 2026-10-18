@@ -26,16 +26,11 @@ export class QuoteRuleError extends Error {
 	}
 }
 
-export const PROJECT_RULE_REASONS = [
-	"move_not_allowed",
-	"deposit_paid",
-] as const;
+export const PROJECT_RULE_REASONS = ["move_not_allowed"] as const;
 export type ProjectRuleReason = (typeof PROJECT_RULE_REASONS)[number];
 
 const PROJECT_MESSAGES: Record<ProjectRuleReason, string> = {
 	move_not_allowed: "The project's status does not allow that move",
-	deposit_paid:
-		"The client's deposit is held: recording what happens to it comes with payments",
 };
 
 /**

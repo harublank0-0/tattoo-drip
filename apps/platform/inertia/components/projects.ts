@@ -63,8 +63,8 @@ export type ProjectPageProps = {
 	};
 	/** The manual moves this project can make now, in table order. */
 	moves: ManualMoveName[];
-	/** Withdrawing would be allowed, but the project holds deposit money. */
-	withdrawBlocked: boolean;
+	/** The deposit money the project holds ("NPR 3,000"), for the withdraw confirm; null when none. */
+	depositHeldText: string | null;
 	/** How many sessions a withdrawal would cancel. */
 	scheduledSessionCount: number;
 	/** Booked, but no tattoo session is scheduled. */
