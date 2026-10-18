@@ -2,7 +2,11 @@ import { Exception } from "@adonisjs/core/exceptions";
 import type { HttpContext } from "@adonisjs/core/http";
 import type { NextFn } from "@adonisjs/core/types/http";
 import { isApiRequest } from "#services/public_api";
-import { discardUploads, receiveUploads } from "#services/uploads";
+import {
+	discardUploads,
+	receiveUploads,
+	WEB_UPLOAD_DEADLINE_MS,
+} from "#services/uploads";
 
 /**
  * Reads the multipart body of a dashboard request (TAT-38 ruling 16). The
@@ -32,7 +36,7 @@ export default class WebMultipartMiddleware {
 			});
 		}
 		try {
-			await receiveUploads(ctx.request);
+			await receiveUploads(ctx.request, { deadlineMs: WEB_UPLOAD_DEADLINE_MS });
 			return await next();
 		} finally {
 			await discardUploads(ctx.request);

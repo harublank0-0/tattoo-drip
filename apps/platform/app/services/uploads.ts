@@ -3,6 +3,7 @@ import { createWriteStream } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
+import type { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { MultipartFile } from "@adonisjs/core/bodyparser";
 import { Exception } from "@adonisjs/core/exceptions";
@@ -18,9 +19,19 @@ type Request = HttpContext["request"];
  * from the parser's file map, which lacks a file whose handler has not
  * finished and any file with an odd field name.
  */
-type Received = { paths: Set<string>; running: Set<Promise<unknown>> };
+type Received = {
+	paths: Set<string>;
+	running: Set<Promise<unknown>>;
+	parts: Set<Readable>;
+};
 
 const received = new WeakMap<object, Received>();
+
+/** How long a public API upload may take to arrive (TAT-38): TAT-57 sends at most about 5 MB. */
+export const UPLOAD_DEADLINE_MS = 90_000;
+
+/** A dashboard upload's: it holds no database connection while it arrives. */
+export const WEB_UPLOAD_DEADLINE_MS = 120_000;
 
 /** How long `discardUploads` waits for a file handler that has not settled. */
 const HANDLER_WAIT_MS = 30_000;
@@ -48,12 +59,21 @@ const BUILT_IN_NAMES = [
  * handler runs, after publicTenant has answered 404 for an unknown slug
  * (TAT-32, ruling 16; TAT-51; TAT-38). Same limits as the parser's (`limit`,
  * `fieldsLimit`). A part that fails is deleted, and the call rejects with
- * the parser's error (413, 400); a client that hangs up is a 400 too. Pair it
- * with `discardUploads` in a `finally`. Call it only when `request.bodyType`
- * is "multipart".
+ * the parser's error (413, 400); a client that hangs up is a 400 too. The
+ * body must arrive within `deadlineMs` (90 s by default), or the call
+ * rejects with a 408 `E_REQUEST_TIMEOUT` (TAT-38). Pair it with
+ * `discardUploads` in a `finally`. Call it only when `request.bodyType` is
+ * "multipart".
  */
-export async function receiveUploads(request: Request): Promise<void> {
-	const state: Received = { paths: new Set(), running: new Set() };
+export async function receiveUploads(
+	request: Request,
+	{ deadlineMs = UPLOAD_DEADLINE_MS }: { deadlineMs?: number } = {},
+): Promise<void> {
+	const state: Received = {
+		paths: new Set(),
+		running: new Set(),
+		parts: new Set(),
+	};
 	received.set(request, state);
 
 	const handler = (
@@ -64,6 +84,7 @@ export async function receiveUploads(request: Request): Promise<void> {
 		state.paths.add(tmpPath);
 		const running = (async () => {
 			try {
+				state.parts.add(part);
 				part.pause();
 				part.on("data", reporter);
 				await pipeline(part, createWriteStream(tmpPath));
@@ -71,6 +92,8 @@ export async function receiveUploads(request: Request): Promise<void> {
 			} catch (error) {
 				await rm(tmpPath, { force: true }).catch(() => {});
 				request.multipart.abort(error);
+			} finally {
+				state.parts.delete(part);
 			}
 		})();
 		state.running.add(running);
@@ -80,15 +103,32 @@ export async function receiveUploads(request: Request): Promise<void> {
 	for (const name of [...BUILT_IN_NAMES, "*"]) {
 		request.multipart.onFile(name, { deferValidations: true }, handler);
 	}
+	// The whole body must arrive within the deadline: a client that trickles
+	// it would otherwise hold the request, and on the API its pooled
+	// connection, for as long as it likes. Destroying the parts lets their
+	// file handlers settle at once, so discardUploads doesn't wait for them.
+	let timedOut = false;
+	const timeout = new Exception("Request timeout", {
+		status: 408,
+		code: "E_REQUEST_TIMEOUT",
+	});
+	const timer = setTimeout(() => {
+		timedOut = true;
+		for (const part of state.parts) part.destroy(timeout);
+		request.multipart.abort(timeout);
+	}, deadlineMs);
 	try {
 		await request.multipart.process();
 	} catch (error) {
+		if (timedOut) throw timeout;
 		throw clientHungUp(error)
 			? new Exception("Request aborted", {
 					status: 400,
 					code: "E_REQUEST_ABORTED",
 				})
 			: error;
+	} finally {
+		clearTimeout(timer);
 	}
 }
 

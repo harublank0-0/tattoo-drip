@@ -2,7 +2,12 @@ import { existsSync } from "node:fs";
 import { MultipartFile } from "@adonisjs/core/bodyparser";
 import type { HttpContext } from "@adonisjs/core/http";
 import { test } from "@japa/runner";
-import { discardUploads } from "#services/uploads";
+import { http } from "#config/app";
+import {
+	discardUploads,
+	UPLOAD_DEADLINE_MS,
+	WEB_UPLOAD_DEADLINE_MS,
+} from "#services/uploads";
 import { uploadOf } from "#tests/helpers/images";
 
 /** A parsed upload whose temp file is `tmpPath`, or one already moved (none). */
@@ -69,5 +74,15 @@ test.group("discardUploads", () => {
 				);
 			}),
 		);
+	});
+});
+
+test.group("Upload deadlines (TAT-38)", () => {
+	test("90 s on the API, 120 s on the dashboard, within Node's request timeout", ({
+		assert,
+	}) => {
+		assert.equal(UPLOAD_DEADLINE_MS, 90_000);
+		assert.equal(WEB_UPLOAD_DEADLINE_MS, 120_000);
+		assert.isAtMost(WEB_UPLOAD_DEADLINE_MS, http.requestTimeout ?? 0);
 	});
 });
