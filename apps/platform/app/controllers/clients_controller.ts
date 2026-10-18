@@ -15,16 +15,21 @@ import { updateClientValidator } from "#modules/clients/validators/client";
 import InquiryService from "#modules/inquiries/services/inquiry_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
+import { formatSignedMoney } from "#modules/payments/ledger";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import PaymentService, {
+	CLOSED_FOR_OUTCOME,
+} from "#modules/payments/services/payment_service";
 import { daysAgoText } from "#modules/projects/contact";
-import { formatDay } from "#modules/projects/quotes";
+import { formatDay, formatMoney } from "#modules/projects/quotes";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ProjectService from "#modules/projects/services/project_service";
 
 /**
  * The clients pages (TAT-41): owners only (the route group's role check).
  * Every :id loads through ClientService.findFor, so another tenant's or a
- * deleted client is a 404. The history comes from the projects and
- * inquiries services; this controller reads no table itself.
+ * deleted client is a 404. The history comes from the projects, inquiries
+ * and payments services; this controller reads no table itself.
  */
 @inject()
 export default class ClientsController {
@@ -34,6 +39,7 @@ export default class ClientsController {
 		private inquiries: InquiryService,
 		private artists: ArtistService,
 		private images: ImageService,
+		private payments: PaymentService,
 	) {}
 
 	async index(ctx: HttpContext) {
@@ -88,6 +94,22 @@ export default class ClientsController {
 		const artistName = new Map(
 			(await this.artists.list(tenant)).map(({ id, name }) => [id, name]),
 		);
+		// Payments (TAT-66), through PaymentService: the clients module reads
+		// no payments itself. The balance due counts open projects only.
+		const paid = await this.payments.forProjects(
+			tenant,
+			projects.map(({ id }) => id),
+		);
+		const balances = await this.payments.balancesFor(tenant, projects);
+		const owed = projects
+			.filter(({ status }) => !CLOSED_FOR_OUTCOME.includes(status))
+			.reduce((sum, { id }) => {
+				const balance = balances.get(id);
+				return balance?.due && balance.due > 0n && balance.currency === "NPR"
+					? sum + balance.due
+					: sum;
+			}, 0n);
+		const briefs = new Map(projects.map(({ id, brief }) => [id, brief]));
 		const anonymized = client.anonymizedAt !== null;
 		const day = (time: DateTime) =>
 			formatDay(time.setZone(tenant.timezone).toFormat("yyyy-MM-dd"));
@@ -129,6 +151,18 @@ export default class ClientsController {
 					height: image.height,
 				})),
 			),
+			payments: {
+				balanceDueText: owed > 0n ? formatMoney(owed) : null,
+				rows: paid.map((payment) => ({
+					id: payment.id,
+					projectId: payment.projectId,
+					projectBrief: briefs.get(payment.projectId) ?? "",
+					kind: payment.kind,
+					amountText: formatSignedMoney(payment.amount),
+					status: payment.status,
+					dateText: day(payment.createdAt),
+				})),
+			},
 		});
 	}
 

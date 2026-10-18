@@ -1,4 +1,5 @@
 import type { ReferenceProps } from "~/components/inquiries";
+import type { PaymentRowProps } from "~/components/payments";
 
 /** One row of the clients list. */
 export type ClientRow = {
@@ -46,4 +47,17 @@ export type ClientPageProps = {
 		receivedText: string;
 	}[];
 	references: ReferenceProps[];
+	/** Payments on the client's projects, newest first, and what their open projects still owe (TAT-66). */
+	payments: {
+		balanceDueText: string | null;
+		rows: {
+			id: string;
+			projectId: string;
+			projectBrief: string;
+			kind: PaymentRowProps["kind"];
+			amountText: string;
+			status: PaymentRowProps["status"];
+			dateText: string;
+		}[];
+	};
 };
