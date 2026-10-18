@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import type { CreateInquiryInput, InquiryReceipt } from "@tattoo-drip/sdk";
+import { MutationObserver, onlineManager } from "@tanstack/react-query";
+import { tattooMutations } from "@tattoo-drip/react";
+import {
+	type CreateInquiryInput,
+	createTattooClient,
+	type InquiryReceipt,
+} from "@tattoo-drip/sdk";
+import { createStorefrontQueryClient } from "../../src/api/query-client.ts";
 import type { ChallengeResult } from "../../src/intake/challenge.ts";
+import { describeSubmitError } from "../../src/intake/problems.ts";
 import {
 	createSubmitter,
 	type SubmitPhase,
@@ -123,5 +131,60 @@ describe("createSubmitter", () => {
 		await submit(input);
 
 		assert.deepEqual(input, INPUT);
+	});
+});
+
+describe("a send while the browser is offline", () => {
+	test("fails at once into the offline notice, and the widget is reset", async () => {
+		// The real mutation (useCreateInquiry's options) in the storefront's real
+		// QueryClient, with the browser offline after the token was taken.
+		const queryClient = createStorefrontQueryClient("browser");
+		const client = createTattooClient({
+			baseUrl: "http://api.test",
+			tenant: "black-needle-57",
+			fetch: () => Promise.reject(new TypeError("Failed to fetch")),
+		});
+		const mutation = new MutationObserver(
+			queryClient,
+			tattooMutations.createInquiry(client),
+		);
+		const events: string[] = [];
+		const submit = createSubmitter({
+			challenge: {
+				token: async () => {
+					events.push("token");
+					return { ok: true, token: "tok-57" };
+				},
+				reset: () => events.push("reset"),
+			},
+			send: (input) => {
+				events.push("send");
+				return mutation.mutate(input);
+			},
+			onPhase: () => {},
+		});
+
+		onlineManager.setOnline(false);
+		try {
+			const result = await Promise.race([
+				submit(INPUT),
+				new Promise<"still waiting">((done) =>
+					setImmediate(() => setImmediate(() => done("still waiting"))),
+				),
+			]);
+
+			assert.notEqual(result, "still waiting", "the send was paused");
+			assert.equal((result as { kind: string }).kind, "failed");
+			const problem = describeSubmitError(
+				(result as { error: unknown }).error,
+				{ sentArtistId: null, artistName: () => null },
+			);
+			assert.equal(problem.kind, "notice");
+			assert.equal(problem.kind === "notice" && problem.code, "offline");
+			assert.equal(problem.kind === "notice" && problem.retry, true);
+			assert.deepEqual(events, ["token", "send", "reset"]);
+		} finally {
+			onlineManager.setOnline(true);
+		}
 	});
 });

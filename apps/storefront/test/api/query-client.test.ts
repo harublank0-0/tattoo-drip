@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { dehydrate } from "@tanstack/react-query";
-import { TattooApiError } from "@tattoo-drip/sdk";
+import {
+	dehydrate,
+	MutationObserver,
+	onlineManager,
+} from "@tanstack/react-query";
+import { tattooMutations } from "@tattoo-drip/react";
+import { createTattooClient, TattooApiError } from "@tattoo-drip/sdk";
 import {
 	createStorefrontQueryClient,
 	MAX_RETRIES,
@@ -94,6 +99,55 @@ describe("createStorefrontQueryClient", () => {
 			createStorefrontQueryClient("browser").getDefaultOptions().queries;
 		assert.equal(browser?.retry, shouldRetry);
 		assert.equal(browser?.retryDelay, retryDelay);
+	});
+
+	test("never makes a write wait for a network, on either side", () => {
+		for (const environment of ["server", "browser"] as const) {
+			const mutations =
+				createStorefrontQueryClient(environment).getDefaultOptions().mutations;
+			assert.equal(mutations?.networkMode, "always", environment);
+		}
+	});
+
+	test("an inquiry sent while the browser is offline fails at once, as a network error", async () => {
+		const queryClient = createStorefrontQueryClient("browser");
+		const client = createTattooClient({
+			baseUrl: "http://api.test",
+			tenant: "black-needle-57",
+			fetch: () => Promise.reject(new TypeError("Failed to fetch")),
+		});
+		const send = new MutationObserver(
+			queryClient,
+			tattooMutations.createInquiry(client),
+		);
+
+		onlineManager.setOnline(false);
+		try {
+			const outcome = await Promise.race([
+				send
+					.mutate({
+						idea: "A peony",
+						placement: "Forearm",
+						approximateSize: "10 cm",
+						preferredDates: "November",
+						sourceChannel: "instagram",
+						contactName: "Asha",
+						contactPhone: "9812345678",
+					})
+					.then(
+						() => "sent",
+						(error: unknown) => error,
+					),
+				new Promise((done) =>
+					setImmediate(() => setImmediate(() => done("still waiting"))),
+				),
+			]);
+
+			assert.ok(outcome instanceof TattooApiError, String(outcome));
+			assert.equal(outcome.code, "network_error");
+		} finally {
+			onlineManager.setOnline(true);
+		}
 	});
 
 	test("is a new client each time", () => {
