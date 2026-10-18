@@ -299,6 +299,17 @@ test.group("BookingService.book", (group) => {
 			);
 			assert.deepEqual(await bookings.bookableArtists(tenant, ramMember), []);
 
+			// The project page filters the list it already loaded: the same rule,
+			// with no second query (bookableFrom is what bookableArtists applies).
+			const all = await bookings.bookableArtists(tenant, OWNER);
+			for (const member of [OWNER, ashaMember, ramMember]) {
+				assert.deepEqual(
+					bookings.bookableFrom(all, member).map(({ id }) => id),
+					(await bookings.bookableArtists(tenant, member)).map(({ id }) => id),
+				);
+			}
+			assert.deepEqual(bookings.bookableFrom(all, ramMember), []);
+
 			const booked = await bookings.book(tenant, ashaMember, booking(own.id));
 			assert.equal(booked.project.artistId, own.id);
 

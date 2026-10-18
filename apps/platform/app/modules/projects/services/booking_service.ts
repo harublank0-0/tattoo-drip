@@ -68,9 +68,17 @@ export default class BookingService {
 		tenant: Pick<Tenant, "id">,
 		member: Member,
 	): Promise<Artist[]> {
-		const all = await this.artists.list(tenant);
-		if (member.role === "owner") return all;
-		return all.filter(({ userId }) => userId === member.userId);
+		return this.bookableFrom(await this.artists.list(tenant), member);
+	}
+
+	/**
+	 * bookableArtists' rule applied to a list the caller already loaded
+	 * (`ArtistService.list`: the tenant's live artists), so a page that has
+	 * the list needn't read it again (the project page, TAT-85).
+	 */
+	bookableFrom(artists: Artist[], member: Member): Artist[] {
+		if (member.role === "owner") return artists;
+		return artists.filter(({ userId }) => userId === member.userId);
 	}
 
 	/**
