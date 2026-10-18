@@ -11,7 +11,13 @@ const NAMED = new Set(Object.keys(middleware));
 const WEB_ONLY = ["auth", "guest", "dbContext", "tenant", "role"];
 
 /** Middleware only API routes may run. */
-const PUBLIC_ONLY = ["publicApi", "publicTenant", "publicCache", "intakeGuard"];
+const PUBLIC_ONLY = [
+	"publicApi",
+	"publicTenant",
+	"publicCache",
+	"intakeGuard",
+	"apiLimit",
+];
 
 /**
  * API GET routes that are not cacheable, and why. A new GET route either
@@ -67,6 +73,23 @@ test.group("Public API routes", () => {
 			assert.isAbove(
 				named.indexOf("publicTenant"),
 				named.indexOf("publicApi"),
+				pattern,
+			);
+		}
+	});
+
+	test("every tenant route counts the studio's reads right after publicTenant", ({
+		assert,
+	}) => {
+		const routes = allRoutes().filter(
+			({ pattern }) => isTenantApi(pattern) && !isTestOnly(pattern),
+		);
+		assert.isNotEmpty(routes);
+
+		for (const { pattern, named } of routes) {
+			assert.equal(
+				named[named.indexOf("publicTenant") + 1],
+				"apiLimit",
 				pattern,
 			);
 		}
