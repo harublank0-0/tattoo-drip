@@ -1,3 +1,4 @@
+import http, { type IncomingHttpHeaders } from "node:http";
 import app from "@adonisjs/core/services/app";
 import testUtils from "@adonisjs/core/services/test_utils";
 import type { ApiClient } from "@japa/api-client";
@@ -6,6 +7,7 @@ import { INTAKE_LIMITS } from "#modules/inquiries/intake_limits";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import BotChallenge from "#services/bot_challenge";
 import { API_ERRORS } from "#services/public_api_errors";
+import env from "#start/env";
 import { assertApiError } from "#tests/helpers/api";
 import {
 	enableChallenge,
@@ -322,3 +324,128 @@ test.group("Public API: the intake's address and studio limits", (group) => {
 		).assertStatus(201);
 	});
 });
+
+const BOUNDARY = "td55";
+/** What the raw requests claim to send: far more than they ever do. */
+const DECLARED_BYTES = 5_000_000;
+
+/** What the server answered a request whose body was never finished. */
+type EarlyAnswer = {
+	status: number;
+	headers: IncomingHttpHeaders;
+	// biome-ignore lint/suspicious/noExplicitAny: a test reads whatever JSON came back
+	body: any;
+};
+
+/**
+ * Sends an intake's headers and only the first bytes of its upload, then
+ * waits for the answer without sending the rest. The server can only answer
+ * now if nothing waits for the body: a check that runs after the body is
+ * read would sit here until the deadline.
+ */
+function intakeBeforeItsBody(
+	slug: string,
+	headers: Record<string, string>,
+): Promise<EarlyAnswer> {
+	return new Promise((resolve, reject) => {
+		const request = http.request({
+			host: env.get("HOST"),
+			port: env.get("PORT"),
+			method: "POST",
+			path: `/api/v1/tenants/${slug}/inquiries`,
+			headers: {
+				"content-type": `multipart/form-data; boundary=${BOUNDARY}`,
+				"content-length": String(DECLARED_BYTES),
+				connection: "close",
+				...headers,
+			},
+		});
+		let settled = false;
+		const finish = (done: () => void) => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(deadline);
+			request.destroy();
+			done();
+		};
+		const deadline = setTimeout(
+			() =>
+				finish(() =>
+					reject(
+						new Error(
+							"No answer while the upload was still unsent: the checks wait for the body",
+						),
+					),
+				),
+			3000,
+		);
+		request.on("error", (error) => finish(() => reject(error)));
+		request.on("response", (response) => {
+			const chunks: Buffer[] = [];
+			response.on("data", (chunk: Buffer) => chunks.push(chunk));
+			response.on("end", () =>
+				finish(() =>
+					resolve({
+						status: response.statusCode ?? 0,
+						headers: response.headers,
+						body: JSON.parse(Buffer.concat(chunks).toString("utf8")),
+					}),
+				),
+			);
+		});
+		request.flushHeaders();
+		request.write(
+			`--${BOUNDARY}\r\nContent-Disposition: form-data; name="referenceImages"; filename="a.png"\r\nContent-Type: image/png\r\n\r\nAAAA`,
+		);
+	});
+}
+
+test.group(
+	"Public API: the intake's checks run before its body is read",
+	(group) => {
+		group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+		group.each.teardown(() => app.container.restore(BotChallenge));
+
+		test("no token is 403 challenge_failed while the upload is still unsent", async ({
+			assert,
+		}) => {
+			await studioWithOwner(SLUG);
+			const fake = siteverify(() => verdict(SLUG));
+			enableChallenge(fake);
+			const before = await tempUploads();
+
+			const answer = await intakeBeforeItsBody(SLUG, {
+				"x-forwarded-for": IP,
+			});
+
+			assert.equal(answer.status, 403);
+			assert.equal(answer.body.error.code, "challenge_failed");
+			assert.lengthOf(fake.calls, 0);
+			assert.deepEqual(await newTempUploads(before), []);
+		});
+
+		test(`the try after ${INTAKE_LIMITS.perAddress.requests} from one address is 429 while the upload is still unsent, token or not`, async ({
+			client,
+			assert,
+		}) => {
+			await studioWithOwner(SLUG);
+			const fake = siteverify(() => verdict(SLUG));
+			enableChallenge(fake);
+			for (let i = 0; i < INTAKE_LIMITS.perAddress.requests; i++) {
+				assertApiError(await send(client, SLUG), 403, "challenge_failed");
+			}
+			const before = await tempUploads();
+
+			const answer = await intakeBeforeItsBody(SLUG, {
+				"x-forwarded-for": IP,
+				"x-challenge-token": TOKEN,
+			});
+
+			assert.equal(answer.status, 429);
+			assert.equal(answer.body.error.code, "rate_limited");
+			assert.match(String(answer.headers["retry-after"]), /^\d+$/);
+			assert.lengthOf(fake.calls, 0);
+			assert.deepEqual(await newTempUploads(before), []);
+		});
+	},
+);
