@@ -291,7 +291,6 @@ export function ProofForm({
 								label: copy.form.kinds[kind],
 							}))}
 							required
-							disabled={sending}
 						/>
 					)}
 				</form.AppField>

@@ -79,3 +79,9 @@ test("the route reads no URL itself, and the router never keys storage by href",
 	const router = readFileSync(new URL("router.tsx", SRC), "utf8");
 	assert.match(router, /getScrollRestorationKey: scrollRestorationKey/);
 });
+
+test("no control is natively disabled: a focused one would drop focus to the body (use aria-disabled and ignore the input)", () => {
+	for (const file of depositFiles()) {
+		assert.doesNotMatch(read(file), /(?<![-\w])disabled=/, file);
+	}
+});
