@@ -124,6 +124,27 @@ export function LoadProblemView({
 	);
 }
 
+/**
+ * The state message's polite live region (spec ruling 18): a change that
+ * arrives on its own (the tab regains focus and the studio has decided) is
+ * announced. `quiet` while the client's own Send is on its way: the message
+ * then takes focus, which announces it, and a live region would say it a
+ * second time. Empty, it takes no space but stays in the accessibility tree.
+ */
+export function StateRegion({
+	quiet = false,
+	children,
+}: {
+	quiet?: boolean;
+	children?: ReactNode;
+}) {
+	return (
+		<div className="deposit-live" aria-live={quiet ? "off" : "polite"}>
+			{children}
+		</div>
+	);
+}
+
 /** The brief (folded when long, spec ruling 10) and the artist. */
 export function DepositIntro({ view }: { view: DepositView }) {
 	if (!view.brief && !view.artistName) return null;

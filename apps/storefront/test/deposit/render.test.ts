@@ -11,6 +11,7 @@ import {
 	DueView,
 	LoadProblemView,
 	StateMessage,
+	StateRegion,
 } from "../../src/deposit/components/deposit-page.tsx";
 import {
 	ProofNoticeView,
@@ -153,6 +154,24 @@ describe("the frame", () => {
 			/<p class="deposit-send-status" aria-live="polite">Loading your deposit…<\/p>/,
 		);
 		assert.equal(tags(running, "button").length, 1);
+	});
+});
+
+describe("the state region", () => {
+	test("a polite live region, empty until there is a message; quiet while focus is about to move to the message", () => {
+		const message = createElement("p", null, "Your deposit is paid.");
+		assert.equal(
+			render(createElement(StateRegion, null)),
+			'<div class="deposit-live" aria-live="polite"></div>',
+		);
+		assert.equal(
+			render(createElement(StateRegion, null, message)),
+			'<div class="deposit-live" aria-live="polite"><p>Your deposit is paid.</p></div>',
+		);
+		assert.equal(
+			render(createElement(StateRegion, { quiet: true }, message)),
+			'<div class="deposit-live" aria-live="off"><p>Your deposit is paid.</p></div>',
+		);
 	});
 });
 

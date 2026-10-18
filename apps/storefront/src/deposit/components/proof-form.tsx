@@ -43,6 +43,11 @@ export interface ProofFormProps {
 	onLeftDue(): void;
 	/** The API answered the send 404: the link is dead, whatever the next read says. */
 	onGone(): void;
+	/**
+	 * A Send starts (true: if the page leaves `due`, focus goes to its message
+	 * and the live region stays quiet) or ends with the page still due (false).
+	 */
+	onSending(active: boolean): void;
 }
 
 /**
@@ -59,6 +64,7 @@ export function ProofForm({
 	reread,
 	onLeftDue,
 	onGone,
+	onSending,
 }: ProofFormProps) {
 	const submit = useSubmitDepositProof(token);
 	const [proof, dispatch] = useReducer(proofReducer, NO_PROOF);
@@ -120,6 +126,7 @@ export function ProofForm({
 			return;
 		}
 		inFlight.current = true;
+		onSending(true);
 		setNotice(null);
 		setShowSummary(false);
 		setProofError(null);
@@ -153,6 +160,7 @@ export function ProofForm({
 			if (proofMessage) setProofError(proofMessage);
 			setShowSummary(true);
 			setFocusSummary(true);
+			onSending(false);
 			return;
 		}
 		if (problem.waitSeconds !== null) {
@@ -165,7 +173,10 @@ export function ProofForm({
 			// its new message. This form is gone by then; the callback is not.
 			void reread().then((next) => {
 				if (focusAfterReread(problem.code, next)) onLeftDue();
+				else onSending(false);
 			});
+		} else {
+			onSending(false);
 		}
 		// A 404 on the send is as good as one on a read: the link is dead, and the
 		// payment details go even if the read above can't be made.

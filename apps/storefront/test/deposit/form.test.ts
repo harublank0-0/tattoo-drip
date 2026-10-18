@@ -55,6 +55,7 @@ const formHtml = (view = depositView(PAGE)) =>
 			reread: async () => "due" as const,
 			onLeftDue: () => undefined,
 			onGone: () => undefined,
+			onSending: () => undefined,
 		}),
 	);
 

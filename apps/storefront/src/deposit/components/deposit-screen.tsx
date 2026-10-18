@@ -24,6 +24,7 @@ import {
 	DueView,
 	LoadProblemView,
 	StateMessage,
+	StateRegion,
 } from "./deposit-page.tsx";
 import { ProofForm } from "./proof-form.tsx";
 
@@ -110,6 +111,9 @@ export function DepositLoaded({
 	}, [refetch]);
 
 	const leftDue = useCallback(() => setMoveFocus(true), []);
+	// The client's own Send starts (it may move the page off `due`, and focus to
+	// its message), or ends with the page still due.
+	const sending = useCallback((active: boolean) => setMoveFocus(active), []);
 	const gone = useCallback(() => {
 		setGoneAt(Date.now());
 		setMoveFocus(true);
@@ -117,7 +121,8 @@ export function DepositLoaded({
 
 	// After the client's own Send, once the page shows its new state (or the
 	// dead link), focus goes to that message (TAT-65: "focus moves to its
-	// message"). Never on load: nothing takes focus by itself.
+	// message"). Never on load: nothing takes focus by itself. Until it does,
+	// the live region is quiet, so the message isn't announced twice.
 	useEffect(() => {
 		if (!moveFocus || shown === "due" || shown === "loading") return;
 		setMoveFocus(false);
@@ -127,7 +132,7 @@ export function DepositLoaded({
 	return (
 		<>
 			{view ? <DepositIntro view={view} /> : null}
-			<div className="deposit-live" aria-live="polite">
+			<StateRegion quiet={moveFocus}>
 				{view && view.state !== "due" ? (
 					<StateMessage
 						ref={messageRef}
@@ -136,7 +141,7 @@ export function DepositLoaded({
 						received={formatReceived(view.proofSubmittedAt, shell.timezone)}
 					/>
 				) : null}
-			</div>
+			</StateRegion>
 			{screen.kind === "loading" ? (
 				<DepositLoading studioName={shell.studioName} />
 			) : null}
@@ -167,6 +172,7 @@ export function DepositLoaded({
 								reread={reread}
 								onLeftDue={leftDue}
 								onGone={gone}
+								onSending={sending}
 							/>
 						) : null
 					}
