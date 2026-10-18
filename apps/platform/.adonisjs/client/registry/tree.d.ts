@@ -84,6 +84,9 @@ export interface ApiDefinition {
       artist: {
         update: typeof routes['tenant.projects.artist.update']
       }
+      sessions: {
+        store: typeof routes['tenant.projects.sessions.store']
+      }
       depositLink: {
         store: typeof routes['tenant.projects.deposit_link.store']
       }

@@ -547,6 +547,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/project_changes_controller').default['artist']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
+  'tenant.projects.sessions.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/projects/:id/sessions'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/scheduling/validators/session').scheduleValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/scheduling/validators/session').scheduleValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/project_sessions_controller').default['store']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/project_sessions_controller').default['store']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
   'tenant.projects.deposit_link.store': {
     methods: ["POST"]
     pattern: '/t/:tenant/projects/:id/deposit-link'

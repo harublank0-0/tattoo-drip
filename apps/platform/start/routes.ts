@@ -227,6 +227,12 @@ router
 					.put(":id/artist", [controllers.ProjectChanges, "artist"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.projects.artist.update");
+				// A session on this project (TAT-85): owners, and the assigned
+				// artist with their own profile (SessionService.scheduleFor).
+				router
+					.post(":id/sessions", [controllers.ProjectSessions, "store"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.projects.sessions.store");
 				// Owners only: DepositLinkService gives anyone else a 404 (TAT-65).
 				router
 					.post(":id/deposit-link", [controllers.DepositLinks, "store"])

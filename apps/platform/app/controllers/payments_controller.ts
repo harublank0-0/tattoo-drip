@@ -206,7 +206,7 @@ function bookingNote({
 	if (status !== "deposit_pending") return "";
 	return depositDue > 0
 		? ` ${formatMoney(depositDue)} of the deposit is still due.`
-		: " Schedule a tattoo session to book the project.";
+		: " Schedule a tattoo session under Sessions to book the project.";
 }
 
 /**

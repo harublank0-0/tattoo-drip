@@ -47,6 +47,7 @@ export type IsolationCase = {
 		| "closedPaidProject"
 		| "depositProject"
 		| "session"
+		| "sessionProject"
 		| "newInquiry"
 		| "client";
 	/** Who sends the request. Every settings route is owner-only. */
@@ -666,6 +667,25 @@ export const isolationCases: IsolationCase[] = [
 				.plus({ days: 61 })
 				.toFormat("yyyy-MM-dd"),
 			startTime: "13:00",
+			hours: "2",
+		}),
+		ownStatus: 302,
+		snapshot: sessionRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/projects/:id/sessions",
+		resource: "sessionProject",
+		actor: "owner",
+		// The studio's own artist, two days after its seeded session.
+		body: (own) => ({
+			sessionKind: "tattoo",
+			sessionArtistId: own.artistProfile.id,
+			date: DateTime.now()
+				.setZone("Asia/Kathmandu")
+				.plus({ days: 62 })
+				.toFormat("yyyy-MM-dd"),
+			startTime: "10:00",
 			hours: "2",
 		}),
 		ownStatus: 302,
