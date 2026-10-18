@@ -729,6 +729,38 @@ test.group("Project page: scheduling (TAT-85)", (group) => {
 		);
 	});
 
+	test("the hint follows what the booking rule will do: a settled deposit books, a missing quote does not", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const { noQuote, settled } = await inTenant(tenant, async () => {
+			const sita = await makeArtist(tenant, "sita");
+			const customer = await makeClient(tenant);
+			const project = () =>
+				makeProject(tenant, customer, {
+					status: "deposit_pending",
+					artistId: sita.id,
+				});
+			const settled = await project();
+			await makeQuote(tenant, settled, { depositAmount: 0 });
+			return { noQuote: await project(), settled };
+		});
+		const hint = async (id: string) =>
+			(await client.get(page(id)).withInertia().loginAs(owner)).inertiaProps
+				.scheduling.hint;
+
+		// DepositService.isSettled: a zero deposit is settled, no quote is not.
+		assert.equal(
+			await hint(settled.id),
+			"Scheduling a tattoo session books the project.",
+		);
+		assert.equal(
+			await hint(noQuote.id),
+			"A tattoo session holds the date. The project is booked once its deposit is settled.",
+		);
+	});
+
 	test("an artist schedules only themselves; a finished or closed project offers nothing", async ({
 		client,
 		assert,

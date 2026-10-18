@@ -64,15 +64,26 @@ export function scheduledNote({
 	return "";
 }
 
-/** The schedule form's hint: what a tattoo session will do to the project. */
+/**
+ * The schedule form's hint: what a tattoo session will do to the project.
+ * For `deposit_pending` it reads the booking rule's own inputs
+ * (DepositService.isSettled): `hasQuote` is whether the project has a quote
+ * and `depositDue` what is left of its deposit. A project with no quote is
+ * not settled, so the session would not book it; scheduledNote says the
+ * same in the flash.
+ */
 export function schedulingHint(
 	status: ProjectStatus,
 	depositDue: number,
+	hasQuote: boolean,
 ): string | null {
 	if (BEFORE_ACCEPTANCE.includes(status)) {
 		return "A tattoo session holds the date. The project is booked once the client accepts the quote and the deposit is settled.";
 	}
 	if (status === "deposit_pending") {
+		if (!hasQuote) {
+			return "A tattoo session holds the date. The project is booked once its deposit is settled.";
+		}
 		return depositDue > 0
 			? `A tattoo session holds the date. The project is booked once the deposit is paid: ${formatMoney(depositDue)} still due.`
 			: "Scheduling a tattoo session books the project.";

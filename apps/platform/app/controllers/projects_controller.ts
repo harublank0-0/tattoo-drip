@@ -328,7 +328,11 @@ export default class ProjectsController {
 							artists: bookable.map(({ id, name }) => ({ id, name })),
 							artistId: defaultArtistId,
 							artistFixed: membership.role !== "owner",
-							hint: schedulingHint(project.status, depositDue),
+							hint: schedulingHint(
+								project.status,
+								depositDue,
+								current !== null,
+							),
 						}
 					: null,
 			notes: project.notes,

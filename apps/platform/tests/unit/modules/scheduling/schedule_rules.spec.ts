@@ -93,23 +93,51 @@ test.group("schedulingHint", () => {
 	test("says what a tattoo session will do to the project", ({ assert }) => {
 		for (const status of BEFORE_ACCEPTANCE) {
 			assert.equal(
-				schedulingHint(status, 0),
+				schedulingHint(status, 0, true),
 				"A tattoo session holds the date. The project is booked once the client accepts the quote and the deposit is settled.",
 				status,
 			);
 		}
 		assert.equal(
-			schedulingHint("deposit_pending", 100_000),
+			schedulingHint("deposit_pending", 100_000, true),
 			"A tattoo session holds the date. The project is booked once the deposit is paid: NPR 1,000 still due.",
 		);
 		assert.equal(
-			schedulingHint("deposit_pending", 0),
-			"Scheduling a tattoo session books the project.",
-		);
-		assert.equal(
-			schedulingHint("in_progress", 0),
+			schedulingHint("in_progress", 0, true),
 			"Scheduling the next tattoo session books the project again.",
 		);
-		assert.isNull(schedulingHint("booked", 0));
+		assert.isNull(schedulingHint("booked", 0, true));
+	});
+
+	test("a deposit_pending project whose deposit is settled says scheduling books it", ({
+		assert,
+	}) => {
+		assert.equal(
+			schedulingHint("deposit_pending", 0, true),
+			"Scheduling a tattoo session books the project.",
+		);
+	});
+
+	test("a deposit_pending project with no quote is not settled, so the hint doesn't promise a booking", ({
+		assert,
+	}) => {
+		// DepositService.isSettled is false without a quote, so scheduling leaves
+		// the project deposit_pending, and scheduledNote says so: the hint says
+		// the same.
+		const hint = schedulingHint("deposit_pending", 0, false);
+		assert.equal(
+			hint,
+			"A tattoo session holds the date. The project is booked once its deposit is settled.",
+		);
+		assert.notInclude(hint ?? "", "books the project");
+		assert.include(
+			scheduledNote({
+				kind: "tattoo",
+				booked: false,
+				projectStatus: "deposit_pending",
+				depositDue: 0,
+			}),
+			"booked once its deposit is settled",
+		);
 	});
 });
