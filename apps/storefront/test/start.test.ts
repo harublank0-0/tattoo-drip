@@ -82,11 +82,12 @@ describe("startInstance", () => {
 	});
 
 	test("checks only server functions: a link from another site still opens a page", async () => {
-		for (const headers of [
+		const requests: Record<string, string>[] = [
 			{ "sec-fetch-site": "cross-site" },
 			{ origin: "https://evil.example" },
 			{},
-		]) {
+		];
+		for (const headers of requests) {
 			assert.equal(
 				await csrfOutcome("router", headers),
 				"next",
