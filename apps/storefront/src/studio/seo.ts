@@ -1,3 +1,4 @@
+import { rootRouteId } from "@tanstack/react-router";
 import { trimDescription } from "./text.ts";
 import type { ArtistPhoto, ArtistView, StudioView } from "./view-model.ts";
 
@@ -159,4 +160,32 @@ export function statusHead(status: string): HeadTags {
 		links: [],
 		scripts: [],
 	};
+}
+
+/**
+ * The root route's title and robots tags (src/routes/__root.tsx). A page
+ * route sets its own head and wins over this one; this is what a path no page
+ * route matches (the prototype's /flash, /admin/*) and a failed studio read
+ * show: the not-found or error head, noindex, never the studio's name as the
+ * title of a page that isn't the studio's page. Otherwise the studio's name,
+ * the title of a page that sets none. (A root loader's `notFound()` leaves
+ * the match's status "success" and sets its `_notFound` flag, so the flag is
+ * read too.)
+ */
+export function rootMeta({
+	loaderData,
+	match,
+	matches,
+}: {
+	loaderData: { name: string } | undefined;
+	match: { status: string; _notFound?: boolean };
+	matches: readonly { routeId: string }[];
+}): HeadMeta[] {
+	const pageMatched = matches.some(
+		(candidate) => candidate.routeId !== rootRouteId,
+	);
+	if (!pageMatched || match._notFound) return statusHead("notFound").meta;
+	return loaderData
+		? [{ title: loaderData.name }]
+		: statusHead(match.status).meta;
 }

@@ -12,13 +12,14 @@ import { loadStudio } from "../api/loaders.ts";
 import eczarLatin from "../assets/fonts/eczar/eczar-latin-700-normal.woff2?url";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import type { SiteContext } from "../site/context.ts";
+import { rootMeta } from "../studio/seo.ts";
 import appCss from "../styles.css?url";
 
 export const Route = createRootRouteWithContext<ApiContext & SiteContext>()({
 	// Every page needs its studio: on the server from the cache the tenant
 	// middleware filled, after that from the API (TAT-23).
 	loader: ({ context }) => loadStudio(context),
-	head: ({ loaderData }) => ({
+	head: ({ loaderData, match, matches }) => ({
 		meta: [
 			{
 				charSet: "utf-8",
@@ -27,9 +28,9 @@ export const Route = createRootRouteWithContext<ApiContext & SiteContext>()({
 				name: "viewport",
 				content: "width=device-width, initial-scale=1",
 			},
-			{
-				title: loaderData?.name ?? "Tattoo Drip",
-			},
+			// The studio's name for a page that sets no title; the not-found or
+			// error head (noindex) for a path no page matches (src/studio/seo.ts).
+			...rootMeta({ loaderData, match, matches }),
 		],
 		links: [
 			// Only the Latin subset is preloaded; the others load when a page
