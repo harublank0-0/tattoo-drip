@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import Artist from "#modules/artists/models/artist";
@@ -66,6 +67,35 @@ test.group("Multipart part names from Object.prototype", (group) => {
 			(await client.get(path)).assertStatus(200);
 		});
 	}
+
+	test("a signed-out multipart PUT or POST to a dashboard route is a 415 and its body is never read", async ({
+		client,
+		assert,
+	}) => {
+		// Bigger than the 20 MB limit: had the body been read it would be a 413.
+		const big = Buffer.alloc(21 * 1024 * 1024, 1);
+		const before = await tempUploads();
+
+		const put = await client
+			.put(`/t/${SLUG}/artists/${randomUUID()}`)
+			.field("name", "Sita")
+			.file("photo", big, { filename: "big.png", contentType: "image/png" })
+			.withCsrfToken()
+			.redirects(0)
+			.timeout(20000);
+		const post = await client
+			.post(`/t/${SLUG}/artists`)
+			.field("name", "Sita")
+			.file("photo", big, { filename: "big.png", contentType: "image/png" })
+			.withCsrfToken()
+			.redirects(0)
+			.timeout(20000);
+		await settle();
+
+		put.assertStatus(415);
+		post.assertStatus(415);
+		assert.deepEqual(await newTempUploads(before), []);
+	});
 
 	test("a signed-in dashboard form with such parts gets its normal answer and leaves no temp file", async ({
 		client,
