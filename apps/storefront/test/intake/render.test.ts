@@ -174,6 +174,24 @@ describe("the intake form", () => {
 		assert.equal(attr(control(html, "idea"), "maxlength"), undefined);
 	});
 
+	test("what a person writes lays out in its own direction; a number and an address stay as they are", () => {
+		const html = formHtml();
+
+		for (const id of [
+			"idea",
+			"placement",
+			"approximateSize",
+			"preferredDates",
+			"budget",
+			"contactName",
+		]) {
+			assert.equal(attr(control(html, id), "dir"), "auto", id);
+		}
+		for (const id of ["contactPhone", "contactEmail"]) {
+			assert.equal(attr(control(html, id), "dir"), undefined, id);
+		}
+	});
+
 	test("the honeypot is out of sight, not out of the page", () => {
 		const html = formHtml();
 		const trap =

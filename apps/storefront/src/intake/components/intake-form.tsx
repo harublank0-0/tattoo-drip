@@ -414,6 +414,7 @@ export function IntakeForm({
 							label={copy.fields.idea.label}
 							description={copy.fields.idea.hint}
 							rows={5}
+							dir="auto"
 							required
 							aria-required="true"
 						/>
@@ -446,6 +447,7 @@ export function IntakeForm({
 								label={copy.fields.placement.label}
 								description={copy.fields.placement.hint}
 								maxLength={INTAKE_LIMITS.placement}
+								dir="auto"
 								required
 								aria-required="true"
 							/>
@@ -457,6 +459,7 @@ export function IntakeForm({
 								label={copy.fields.approximateSize.label}
 								description={copy.fields.approximateSize.hint}
 								maxLength={INTAKE_LIMITS.approximateSize}
+								dir="auto"
 								required
 								aria-required="true"
 							/>
@@ -469,6 +472,7 @@ export function IntakeForm({
 							label={copy.fields.preferredDates.label}
 							description={copy.fields.preferredDates.hint}
 							maxLength={INTAKE_LIMITS.preferredDates}
+							dir="auto"
 							required
 							aria-required="true"
 						/>
@@ -496,6 +500,7 @@ export function IntakeForm({
 							label={copy.fields.budget.label}
 							description={copy.fields.budget.hint}
 							maxLength={INTAKE_LIMITS.budget}
+							dir="auto"
 						/>
 					)}
 				</form.AppField>
@@ -528,6 +533,7 @@ export function IntakeForm({
 							label={copy.fields.contactName.label}
 							autoComplete="name"
 							maxLength={INTAKE_LIMITS.contactName}
+							dir="auto"
 							required
 							aria-required="true"
 						/>
