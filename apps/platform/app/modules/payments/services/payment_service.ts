@@ -124,6 +124,16 @@ export default class PaymentService {
 	) {}
 
 	/**
+	 * Owners only: anyone else gets E_ROW_NOT_FOUND (a 404). The controllers
+	 * call it before they validate a body, so who may act is decided first and
+	 * an artist gets the same 404 whatever they post. Every method below
+	 * checks again.
+	 */
+	requireOwner(member: Member): void {
+		assertOwner(member);
+	}
+
+	/**
 	 * The tenant's payment with this id, for an owner. Anyone else, an
 	 * unknown id and another tenant's payment are E_ROW_NOT_FOUND (a 404).
 	 * The routes then load its project through ProjectService.findFor, so a

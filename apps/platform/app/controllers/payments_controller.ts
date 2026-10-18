@@ -44,8 +44,9 @@ const PAYMENT_RULE_MESSAGES: Record<
  * The owners' payment actions on the project page (TAT-66). A payment's :id
  * loads through PaymentService.findFor (owners only, scoped to the tenant)
  * and its project through ProjectService.findFor; a project's :id loads
- * through ProjectService.findFor and PaymentService refuses anyone but an
- * owner. Another tenant's payment or project, a deleted project and an
+ * through ProjectService.findFor, after `requireOwner` has refused anyone
+ * but an owner (before the body is validated, so an artist always gets the
+ * 404). Another tenant's payment or project, a deleted project and an
  * artist all get a 404. Every action goes back to the project page.
  */
 @inject()
@@ -114,6 +115,7 @@ export default class PaymentsController {
 
 	async store(ctx: HttpContext) {
 		const { tenant, membership } = tenantContext(ctx);
+		this.payments.requireOwner(membership);
 		const project = await this.projects.findFor(
 			tenant,
 			membership,
@@ -134,6 +136,7 @@ export default class PaymentsController {
 
 	async refund(ctx: HttpContext) {
 		const { tenant, membership } = tenantContext(ctx);
+		this.payments.requireOwner(membership);
 		const project = await this.projects.findFor(
 			tenant,
 			membership,
@@ -153,6 +156,7 @@ export default class PaymentsController {
 
 	async outcome(ctx: HttpContext) {
 		const { tenant, membership } = tenantContext(ctx);
+		this.payments.requireOwner(membership);
 		const project = await this.projects.findFor(
 			tenant,
 			membership,

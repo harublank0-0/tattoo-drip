@@ -511,6 +511,11 @@ test.group(
 				],
 				[`${page(project.id)}/refunds`, { method: "cash", amount: "1" }],
 				[`${page(closed.project.id)}/deposit-outcome`, { outcome: "kept" }],
+				// A bad body is a 404 too: who may act is decided before the
+				// body is read, so an artist never gets field errors.
+				[`${page(project.id)}/payments`, {}],
+				[`${page(project.id)}/refunds`, {}],
+				[`${page(closed.project.id)}/deposit-outcome`, {}],
 			] as const) {
 				(await post(client, asha, url, form)).assertStatus(404);
 			}
