@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { errors } from "@adonisjs/limiter";
 import limiter from "@adonisjs/limiter/services/main";
+import db from "@adonisjs/lucid/services/db";
 import { test } from "@japa/runner";
 import { dbClient } from "#services/db_context";
 
@@ -41,5 +42,47 @@ test.group("Rate limit store", (group) => {
 		await store().delete(key);
 		assert.isNull(await store().get(key));
 		await store().consume(key);
+	});
+
+	test("counts while every connection of the request pool is held, as a public request's limiter does", async ({
+		assert,
+	}) => {
+		// A public deposit request holds a pool connection in its transaction
+		// when depositThrottle consumes. If the store drew from that same pool,
+		// enough concurrent requests would each wait for a second connection
+		// that never frees up (until the 60 s acquire timeout).
+		const { pool } = db.connection().getWriteClient().client;
+		const held = await Promise.all(
+			Array.from({ length: pool.max }, () => db.transaction()),
+		);
+		let timer: NodeJS.Timeout | undefined;
+		try {
+			const outcome = await Promise.race([
+				store()
+					.consume(key)
+					.then(() => "counted"),
+				new Promise<string>((resolve) => {
+					timer = setTimeout(() => resolve("waited for a connection"), 3000);
+				}),
+			]);
+			assert.equal(outcome, "counted");
+		} finally {
+			clearTimeout(timer);
+			await Promise.all(held.map((trx) => trx.rollback()));
+		}
+	});
+
+	test("the limiter has a connection of its own: the app role, a small bounded pool", ({
+		assert,
+	}) => {
+		const own = db.manager.get("limiter")?.config;
+		const main = db.manager.get(db.primaryConnectionName)?.config;
+
+		assert.exists(own, "config/database.ts registers a `limiter` connection");
+		assert.deepEqual(own?.connection, main?.connection);
+		const pool = own?.pool;
+		assert.isAtLeast(pool?.max ?? 0, 2);
+		assert.isAtMost(pool?.max ?? 99, 5);
+		assert.equal(pool?.min, 0);
 	});
 });
