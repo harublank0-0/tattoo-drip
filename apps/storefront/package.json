@@ -38,6 +38,7 @@
 		"@tanstack/react-start": "latest",
 		"@tanstack/react-store": "latest",
 		"@tanstack/store": "latest",
+		"@tattoo-drip/react": "workspace:*",
 		"@tattoo-drip/sdk": "workspace:*",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
