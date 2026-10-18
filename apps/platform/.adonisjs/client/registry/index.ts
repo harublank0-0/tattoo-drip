@@ -354,6 +354,18 @@ const routes = {
     tokens: [{"old":"/api/v1/tenants/:tenant","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant","type":1,"val":"tenant","end":""}],
     types: placeholder as Registry['api.v1.studio']['types'],
   },
+  'api.v1.artists.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/tenants/:tenant/artists',
+    tokens: [{"old":"/api/v1/tenants/:tenant/artists","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/artists","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/artists","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/artists","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/artists","type":0,"val":"artists","end":""}],
+    types: placeholder as Registry['api.v1.artists.index']['types'],
+  },
+  'api.v1.artists.show': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/tenants/:tenant/artists/:artist',
+    tokens: [{"old":"/api/v1/tenants/:tenant/artists/:artist","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/artists/:artist","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/artists/:artist","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/artists/:artist","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/artists/:artist","type":0,"val":"artists","end":""},{"old":"/api/v1/tenants/:tenant/artists/:artist","type":1,"val":"artist","end":""}],
+    types: placeholder as Registry['api.v1.artists.show']['types'],
+  },
   'api.v1.inquiries.store': {
     methods: ["POST"],
     pattern: '/api/v1/tenants/:tenant/inquiries',

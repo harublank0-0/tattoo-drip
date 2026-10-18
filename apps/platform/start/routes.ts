@@ -9,6 +9,7 @@
 
 import router from "@adonisjs/core/services/router";
 import { controllers } from "#generated/controllers";
+import { ARTIST_SLUG } from "#modules/artists/validators/artist";
 import { DEPOSIT_TOKEN } from "#modules/payments/deposit_links";
 import { middleware } from "#start/kernel";
 import { throttleSignup } from "#start/limiter";
@@ -320,6 +321,18 @@ router
 					.get("/", [controllers.PublicStudio, "show"])
 					.use(middleware.publicCache())
 					.as("api.v1.studio");
+				// The studio's visible artists (TAT-44). A slug of the wrong shape
+				// (uppercase, a dot, one character) is the router's 404 without a
+				// query; hidden and deleted artists are the handler's 404.
+				router
+					.get("/artists", [controllers.PublicArtists, "index"])
+					.use(middleware.publicCache())
+					.as("api.v1.artists.index");
+				router
+					.get("/artists/:artist", [controllers.PublicArtists, "show"])
+					.where("artist", ARTIST_SLUG)
+					.use(middleware.publicCache())
+					.as("api.v1.artists.show");
 				// TAT-55 adds its bot-challenge and honeypot middleware here
 				// (.use(...), after publicTenant). POST stays no-store.
 				router

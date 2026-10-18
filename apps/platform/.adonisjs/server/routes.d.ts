@@ -62,6 +62,8 @@ export type ScannedRoutes = {
     'onboarding.create': { paramsTuple?: []; params?: {} }
     'onboarding.store': { paramsTuple?: []; params?: {} }
     'api.v1.studio': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.artists.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.artists.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'artist': ParamValue} }
     'api.v1.inquiries.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.deposits.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'token': ParamValue} }
     'api.v1.deposits.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'token': ParamValue} }
@@ -93,6 +95,8 @@ export type ScannedRoutes = {
     'dashboard': { paramsTuple?: []; params?: {} }
     'onboarding.create': { paramsTuple?: []; params?: {} }
     'api.v1.studio': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.artists.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.artists.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'artist': ParamValue} }
     'api.v1.deposits.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'token': ParamValue} }
   }
   HEAD: {
@@ -122,6 +126,8 @@ export type ScannedRoutes = {
     'dashboard': { paramsTuple?: []; params?: {} }
     'onboarding.create': { paramsTuple?: []; params?: {} }
     'api.v1.studio': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.artists.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.artists.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'artist': ParamValue} }
     'api.v1.deposits.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'token': ParamValue} }
   }
   POST: {
