@@ -135,6 +135,7 @@ function BalanceBlock({
 			? "No price yet. Set it in the Quote card."
 			: "No price yet.",
 		closed: `Holds ${balance.amountText}`,
+		over_refunded: `Refunded ${balance.amountText} more than it received.`,
 	}[balance.state];
 	const total = balance.totalText
 		? balance.totalNote

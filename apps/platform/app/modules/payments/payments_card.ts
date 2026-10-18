@@ -46,7 +46,13 @@ export type PendingProofProps = {
 	dueNowText: string | null;
 };
 
-export type BalanceState = "due" | "paid" | "overpaid" | "no_price" | "closed";
+export type BalanceState =
+	| "due"
+	| "paid"
+	| "overpaid"
+	| "no_price"
+	| "closed"
+	| "over_refunded";
 
 export type PaymentsCardProps = {
 	balance: {
@@ -189,7 +195,9 @@ export function paymentsCard({
 	const closed = CLOSED_FOR_OUTCOME.includes(status);
 	const due = balance.due;
 	const state: BalanceState = closed
-		? "closed"
+		? balance.paid < 0n
+			? "over_refunded"
+			: "closed"
 		: due === null
 			? "no_price"
 			: due > 0n
@@ -199,12 +207,14 @@ export function paymentsCard({
 					: "paid";
 	const amountText =
 		state === "closed"
-			? formatSignedMoney(balance.paid)
-			: state === "due" && due !== null
-				? formatMoney(due)
-				: state === "overpaid" && due !== null
-					? formatMoney(-due)
-					: null;
+			? formatMoney(balance.paid)
+			: state === "over_refunded"
+				? formatMoney(-balance.paid)
+				: state === "due" && due !== null
+					? formatMoney(due)
+					: state === "overpaid" && due !== null
+						? formatMoney(-due)
+						: null;
 
 	const refundable = !money.outcomeNeeded && balance.paid > 0n;
 	return {
@@ -254,8 +264,8 @@ export function paymentsCard({
 			needed:
 				isOwner && money.outcomeNeeded
 					? {
-							held: money.depositHeld / 100,
-							heldText: formatMoney(money.depositHeld),
+							held: money.depositSettleable / 100,
+							heldText: formatMoney(money.depositSettleable),
 						}
 					: null,
 			recorded: money.outcome

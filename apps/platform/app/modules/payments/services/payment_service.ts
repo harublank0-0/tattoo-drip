@@ -8,6 +8,7 @@ import {
 	type Balance,
 	balanceOf,
 	depositMoney,
+	settleableDeposit,
 } from "#modules/payments/ledger";
 import DepositOutcome from "#modules/payments/models/deposit_outcome";
 import Payment, { type DeskKind } from "#modules/payments/models/payment";
@@ -46,11 +47,16 @@ export type ProjectMoney = {
 	balance: Balance;
 	/** The deposit money held, in the balance's currency (depositMoney). */
 	depositHeld: number;
+	/**
+	 * The part of it a closed project's outcome is about: what the project
+	 * still holds of the deposit (settleableDeposit), after any refund.
+	 */
+	depositSettleable: number;
 	/** What is left to pay of the current quote's deposit, in paisa: 0 when covered or none. */
 	depositDue: number;
 	/** The outcome recorded when the project closed, or null. */
 	outcome: DepositOutcome | null;
-	/** Closed (CLOSED_FOR_OUTCOME), holding deposit money, and no outcome yet. */
+	/** Closed (CLOSED_FOR_OUTCOME), still holding deposit money, and no outcome yet. */
 	outcomeNeeded: boolean;
 };
 
@@ -153,6 +159,7 @@ export default class PaymentService {
 			.orderBy("id", "desc");
 		const balance = balanceOf(quote, payments);
 		const depositHeld = depositMoney(payments, balance.currency);
+		const depositSettleable = settleableDeposit(payments, balance.currency);
 		const outcome = await DepositOutcome.query()
 			.where("tenant_id", tenant.id)
 			.where("project_id", project.id)
@@ -163,11 +170,12 @@ export default class PaymentService {
 			payments,
 			balance,
 			depositHeld,
+			depositSettleable,
 			depositDue: quote ? Math.max(0, quote.depositAmount - depositHeld) : 0,
 			outcome,
 			outcomeNeeded:
 				CLOSED_FOR_OUTCOME.includes(project.status) &&
-				depositHeld > 0 &&
+				depositSettleable > 0 &&
 				outcome === null,
 		};
 	}
@@ -210,8 +218,8 @@ export default class PaymentService {
 
 	/**
 	 * The owners' flags on the projects list: a deposit screenshot waits
-	 * (`proofWaiting`), or a closed project holds deposit money with no
-	 * outcome recorded (`depositToSettle`).
+	 * (`proofWaiting`), or a closed project still holds deposit money
+	 * (settleableDeposit) with no outcome recorded (`depositToSettle`).
 	 */
 	async listFlags(
 		tenant: TenantRef,
@@ -223,8 +231,7 @@ export default class PaymentService {
 				? []
 				: await Payment.query()
 						.where("tenant_id", tenant.id)
-						.whereIn("project_id", ids)
-						.whereIn("kind", ["deposit", "correction"]);
+						.whereIn("project_id", ids);
 		const closed = projects.filter(({ status }) =>
 			CLOSED_FOR_OUTCOME.includes(status),
 		);
@@ -251,7 +258,7 @@ export default class PaymentService {
 				!settled.has(project.id)
 			) {
 				const quote = await this.quotes.current(tenant, project);
-				depositToSettle = depositMoney(own, quote?.currency ?? "NPR") > 0;
+				depositToSettle = settleableDeposit(own, quote?.currency ?? "NPR") > 0;
 			}
 			flags.set(project.id, {
 				proofWaiting: own.some(
@@ -503,13 +510,14 @@ export default class PaymentService {
 
 	/**
 	 * Records what happened to the deposit of a closed project (cancelled or
-	 * declined) that holds deposit money and has no outcome yet, else
-	 * PaymentRuleError "no_outcome_needed". `kept`: the studio keeps it.
-	 * `refunded`: a refund payment of `amount` (up to the deposit held,
-	 * "refund_too_large" with that limit; the rest is kept), named by the
-	 * outcome, in the same transaction. The outcome's amount is the deposit
-	 * money held. The app only records the studio's decision; its deposit
-	 * policy is its own.
+	 * declined) that still holds deposit money and has no outcome yet, else
+	 * PaymentRuleError "no_outcome_needed" (a deposit already refunded at the
+	 * desk needs none). `kept`: the studio keeps it. `refunded`: a refund
+	 * payment of `amount` (up to the deposit the project still holds,
+	 * settleableDeposit; "refund_too_large" with that limit; the rest is
+	 * kept), named by the outcome, in the same transaction. The outcome's
+	 * amount is that deposit money. The app only records the studio's
+	 * decision; its deposit policy is its own.
 	 */
 	async recordOutcome(
 		tenant: TenantRef,
@@ -526,8 +534,11 @@ export default class PaymentService {
 			const note = clean(input.note);
 			let refundPaymentId: string | null = null;
 			if (input.outcome === "refunded") {
-				if (input.amount > money.depositHeld) {
-					throw new PaymentRuleError("refund_too_large", money.depositHeld);
+				if (input.amount > money.depositSettleable) {
+					throw new PaymentRuleError(
+						"refund_too_large",
+						money.depositSettleable,
+					);
 				}
 				const refund = await Payment.create(
 					{
@@ -554,7 +565,7 @@ export default class PaymentService {
 							projectId: live.id,
 							sessionId: null,
 							outcome: input.outcome,
-							amount: money.depositHeld,
+							amount: money.depositSettleable,
 							currency: money.balance.currency,
 							refundPaymentId,
 							note,

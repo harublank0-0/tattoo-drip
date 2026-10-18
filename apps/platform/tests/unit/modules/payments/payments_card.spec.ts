@@ -1,6 +1,10 @@
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
-import { balanceOf, depositMoney } from "#modules/payments/ledger";
+import {
+	balanceOf,
+	depositMoney,
+	settleableDeposit,
+} from "#modules/payments/ledger";
 import type DepositOutcome from "#modules/payments/models/deposit_outcome";
 import type Payment from "#modules/payments/models/payment";
 import { paymentsCard } from "#modules/payments/payments_card";
@@ -55,15 +59,19 @@ function money(
 ): ProjectMoney {
 	const balance = balanceOf(current, payments);
 	const depositHeld = depositMoney(payments, balance.currency);
+	const depositSettleable = settleableDeposit(payments, balance.currency);
 	return {
 		quote: current,
 		payments,
 		balance,
 		depositHeld,
+		depositSettleable,
 		depositDue: current ? Math.max(0, current.depositAmount - depositHeld) : 0,
 		outcome,
 		outcomeNeeded:
-			["cancelled", "declined"].includes(status) && depositHeld > 0 && !outcome,
+			["cancelled", "declined"].includes(status) &&
+			depositSettleable > 0 &&
+			!outcome,
 	};
 }
 
@@ -205,6 +213,21 @@ test.group("paymentsCard", () => {
 			state(money([payment()], quote(), "cancelled"), "cancelled"),
 			["closed", "NPR 3,000"],
 		);
+		// Refunded beyond what it received: no "Holds −NPR x".
+		const refunded = (amount: number) =>
+			money(
+				[payment(), payment({ kind: "refund", amount: -amount })],
+				quote(),
+				"cancelled",
+			);
+		assert.deepEqual(state(refunded(300_000), "cancelled"), [
+			"closed",
+			"NPR 0",
+		]);
+		assert.deepEqual(state(refunded(450_000), "cancelled"), [
+			"over_refunded",
+			"NPR 1,500",
+		]);
 		const hourly = card(
 			money(
 				[],
@@ -284,6 +307,30 @@ test.group("paymentsCard", () => {
 			heldText: "NPR 3,000",
 		});
 		assert.isNull(owner.actions?.refundMax ?? null, "the outcome comes first");
+
+		// Part of the deposit went back before the close: the form is about the rest.
+		const partly = card(
+			money(
+				[payment(), payment({ kind: "refund", amount: -200_000 })],
+				quote(),
+				"cancelled",
+			),
+			"cancelled",
+		);
+		assert.deepEqual(partly.outcome.needed, {
+			held: 1000,
+			heldText: "NPR 1,000",
+		});
+		// All of it went back: nothing to record, and the refund form is not blocked.
+		const none = card(
+			money(
+				[payment(), payment({ kind: "refund", amount: -300_000 })],
+				quote(),
+				"cancelled",
+			),
+			"cancelled",
+		);
+		assert.isNull(none.outcome.needed);
 
 		const shot = payment({
 			proofImageKey: "k",

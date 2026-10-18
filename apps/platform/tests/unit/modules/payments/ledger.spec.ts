@@ -7,6 +7,7 @@ import {
 	formatSignedMoney,
 	type LedgerPayment,
 	netPaid,
+	settleableDeposit,
 } from "#modules/payments/ledger";
 
 let next = 0;
@@ -200,6 +201,86 @@ test.group("balanceOf", () => {
 		assert.equal(balanceOf(hourly(90, 1), []).total, 2n);
 		assert.equal(balanceOf(hourly(30, 1), []).total, 1n);
 		assert.equal(balanceOf(hourly(20, 1), []).total, 0n);
+	});
+});
+
+test.group("settleableDeposit", () => {
+	test("the deposit money the project still holds: the smaller of the deposit and what it holds", ({
+		assert,
+	}) => {
+		assert.equal(settleableDeposit([pay()], "NPR"), 300_000);
+		// A session payment is not deposit money, however much was paid.
+		assert.equal(
+			settleableDeposit(
+				[pay(), pay({ kind: "session", amount: 500_000 })],
+				"NPR",
+			),
+			300_000,
+		);
+		// A refund before the close lowers what is held, not the deposit.
+		assert.equal(
+			settleableDeposit(
+				[pay(), pay({ kind: "refund", amount: -200_000 })],
+				"NPR",
+			),
+			100_000,
+		);
+	});
+
+	test("a deposit already refunded in full, or refunded beyond it, leaves nothing to settle", ({
+		assert,
+	}) => {
+		assert.equal(
+			settleableDeposit(
+				[pay(), pay({ kind: "refund", amount: -300_000 })],
+				"NPR",
+			),
+			0,
+		);
+		assert.equal(
+			settleableDeposit(
+				[
+					pay(),
+					pay({ kind: "refund", amount: -300_000 }),
+					pay({ kind: "refund", amount: -300_000 }),
+				],
+				"NPR",
+			),
+			0,
+		);
+		assert.equal(settleableDeposit([], "NPR"), 0);
+	});
+
+	test("another currency and waiting payments are left out", ({ assert }) => {
+		assert.equal(
+			settleableDeposit(
+				[
+					pay({ currency: "USD" }),
+					pay({ status: "submitted", verifiedAt: null }),
+				],
+				"NPR",
+			),
+			0,
+		);
+	});
+
+	test("a reversed refund gives its money back to the deposit, a reversed deposit takes it away", ({
+		assert,
+	}) => {
+		const deposit = pay();
+		const refund = pay({ kind: "refund", amount: -300_000 });
+		const reverse = (target: LedgerPayment) =>
+			pay({
+				kind: "correction",
+				amount: -target.amount,
+				correctsPaymentId: target.id,
+			});
+
+		assert.equal(
+			settleableDeposit([deposit, refund, reverse(refund)], "NPR"),
+			300_000,
+		);
+		assert.equal(settleableDeposit([deposit, reverse(deposit)], "NPR"), 0);
 	});
 });
 

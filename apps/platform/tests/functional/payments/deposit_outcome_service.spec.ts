@@ -170,6 +170,154 @@ test.group("PaymentService.recordOutcome", (group) => {
 		assert.equal(await record(twice), "no_outcome_needed");
 	});
 
+	test("a deposit refunded in full before the close needs no outcome, and can't be refunded again", async ({
+		assert,
+	}) => {
+		const { tenant, member, project } = await closed("refunded-first-66");
+		await inTenant(tenant, () =>
+			makePayment(tenant, project, {
+				kind: "refund",
+				amount: -300_000,
+				status: "verified",
+				verifiedAt: DateTime.utc(),
+			}),
+		);
+
+		const money = await inTenant(tenant, () =>
+			payments.forProject(tenant, project),
+		);
+		assert.equal(money.depositHeld, 300_000);
+		assert.equal(money.depositSettleable, 0);
+		assert.isFalse(money.outcomeNeeded);
+		for (const input of [
+			{ outcome: "kept", note: null },
+			{ outcome: "refunded", amount: 300_000, method: "cash", note: null },
+		] as const) {
+			assert.equal(
+				await reasonOf(() =>
+					inTenant(tenant, () =>
+						payments.recordOutcome(tenant, member, project, input),
+					),
+				),
+				"no_outcome_needed",
+			);
+		}
+		await inTenant(tenant, async () => {
+			assert.lengthOf(
+				await DepositOutcome.query().where("project_id", project.id),
+				0,
+			);
+			assert.lengthOf(
+				await Payment.query()
+					.where("project_id", project.id)
+					.where("kind", "refund"),
+				1,
+			);
+		});
+	});
+
+	test("after a part was refunded, the outcome covers only what the project still holds", async ({
+		assert,
+	}) => {
+		const { tenant, member, project } = await closed("partial-first-66");
+		await inTenant(tenant, () =>
+			makePayment(tenant, project, {
+				kind: "refund",
+				amount: -200_000,
+				status: "verified",
+				verifiedAt: DateTime.utc(),
+			}),
+		);
+
+		const money = await inTenant(tenant, () =>
+			payments.forProject(tenant, project),
+		);
+		assert.deepInclude(money, {
+			depositHeld: 300_000,
+			depositSettleable: 100_000,
+			outcomeNeeded: true,
+		});
+		try {
+			await inTenant(tenant, () =>
+				payments.recordOutcome(tenant, member, project, {
+					outcome: "refunded",
+					amount: 100_001,
+					method: "cash",
+					note: null,
+				}),
+			);
+			assert.fail("refunding more than the project holds must be refused");
+		} catch (error) {
+			assert.instanceOf(error, PaymentRuleError);
+			assert.equal((error as PaymentRuleError).reason, "refund_too_large");
+			assert.equal((error as PaymentRuleError).limit, 100_000);
+		}
+
+		const outcome = await inTenant(tenant, () =>
+			payments.recordOutcome(tenant, member, project, {
+				outcome: "refunded",
+				amount: 100_000,
+				method: "cash",
+				note: null,
+			}),
+		);
+		assert.deepEqual([outcome.outcome, outcome.amount], ["refunded", 100_000]);
+		const after = await inTenant(tenant, () =>
+			payments.forProject(tenant, project),
+		);
+		assert.equal(after.balance.paid, 0n);
+	});
+
+	test("kept after a part was refunded records what is held, not the whole deposit", async ({
+		assert,
+	}) => {
+		const { tenant, member, project } = await closed("kept-partial-66");
+		await inTenant(tenant, () =>
+			makePayment(tenant, project, {
+				kind: "refund",
+				amount: -200_000,
+				status: "verified",
+				verifiedAt: DateTime.utc(),
+			}),
+		);
+
+		const outcome = await inTenant(tenant, () =>
+			payments.recordOutcome(tenant, member, project, {
+				outcome: "kept",
+				note: null,
+			}),
+		);
+
+		assert.equal(outcome.amount, 100_000);
+	});
+
+	test("payments that are not deposit money are never offered back through the outcome", async ({
+		assert,
+	}) => {
+		const { tenant, member, project } = await closed("session-money-66");
+		await inTenant(tenant, () =>
+			makePayment(tenant, project, {
+				kind: "session",
+				amount: 500_000,
+				status: "verified",
+				verifiedAt: DateTime.utc(),
+			}),
+		);
+
+		const refuse = (amount: number) =>
+			inTenant(tenant, () =>
+				payments.recordOutcome(tenant, member, project, {
+					outcome: "refunded",
+					amount,
+					method: "cash",
+					note: null,
+				}),
+			);
+		assert.equal(await reasonOf(() => refuse(300_001)), "refund_too_large");
+		const outcome = await refuse(300_000);
+		assert.equal(outcome.amount, 300_000);
+	});
+
 	test("after the outcome a plain refund works again", async ({ assert }) => {
 		const { tenant, member, project } = await closed("after-66");
 		await inTenant(tenant, () =>

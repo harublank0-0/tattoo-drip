@@ -89,7 +89,17 @@ test.group("PaymentService reads", (group) => {
 			const open = await makeProject(tenant, client, { status: "booked" });
 			await makeQuote(tenant, open);
 			await makePayment(tenant, open, verified());
-			return { waiting, closed, settled, open };
+			const refunded = await makeProject(tenant, client, {
+				status: "cancelled",
+			});
+			await makeQuote(tenant, refunded);
+			await makePayment(tenant, refunded, verified());
+			await makePayment(tenant, refunded, {
+				kind: "refund",
+				amount: -300_000,
+				...verified(),
+			});
+			return { waiting, closed, settled, open, refunded };
 		});
 		await inTenant(tenant, () =>
 			payments.recordOutcome(tenant, ownerMember(owner), projects.settled, {
@@ -115,6 +125,11 @@ test.group("PaymentService reads", (group) => {
 			depositToSettle: false,
 		});
 		assert.deepEqual(flags.get(projects.open.id), {
+			proofWaiting: false,
+			depositToSettle: false,
+		});
+		// The deposit was given back at the desk before the project closed.
+		assert.deepEqual(flags.get(projects.refunded.id), {
 			proofWaiting: false,
 			depositToSettle: false,
 		});

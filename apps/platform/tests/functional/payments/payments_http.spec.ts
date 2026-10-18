@@ -413,6 +413,76 @@ test.group(
 			);
 		});
 
+		test("a closed project that still needs its outcome refuses a plain refund with a flash", async ({
+			client,
+		}) => {
+			const { owner, tenant } = await studioWithOwner(SLUG, "Black Needle");
+			const { project } = await holding(tenant, "cancelled");
+
+			(
+				await post(client, owner, `${page(project.id)}/refunds`, {
+					method: "cash",
+					amount: "1000",
+				})
+			).assertFlashMessage(
+				"error",
+				"Record what happened to the deposit first.",
+			);
+		});
+
+		test("a deposit given back at the desk before the project closed can't be refunded again through the outcome", async ({
+			client,
+			assert,
+		}) => {
+			const { owner, tenant } = await studioWithOwner(SLUG, "Black Needle");
+			const whole = await holding(tenant, "booked");
+			const part = await holding(tenant, "booked");
+			for (const [mine, amount] of [
+				[whole.project, "3000"],
+				[part.project, "2000"],
+			] as const) {
+				(
+					await post(client, owner, `${page(mine.id)}/refunds`, {
+						method: "cash",
+						amount,
+					})
+				).assertFlashMessage("success", "Refund recorded.");
+				await inTenant(tenant, async () => {
+					mine.status = "cancelled";
+					await mine.save();
+				});
+			}
+
+			(
+				await post(client, owner, `${page(whole.project.id)}/deposit-outcome`, {
+					outcome: "refunded",
+					amount: "3000",
+					method: "cash",
+				})
+			).assertFlashMessage(
+				"error",
+				"There's no deposit outcome to record for this project.",
+			);
+			assertValidationError(
+				await post(client, owner, `${page(part.project.id)}/deposit-outcome`, {
+					outcome: "refunded",
+					amount: "1500",
+					method: "cash",
+				}),
+				"amount",
+				"You can refund at most NPR 1,000.",
+			);
+			const refunds = await inTenant(tenant, () =>
+				Payment.query()
+					.whereIn("project_id", [whole.project.id, part.project.id])
+					.where("kind", "refund"),
+			);
+			assert.sameMembers(
+				refunds.map(({ amount }) => amount),
+				[-300_000, -200_000],
+			);
+		});
+
 		test("the assigned artist gets a 404 on every payment write", async ({
 			client,
 			assert,

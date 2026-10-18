@@ -31,7 +31,13 @@ export type PendingProofProps = {
 	/** The deposit due now, when it differs from what was asked. */
 	dueNowText: string | null;
 };
-export type BalanceState = "due" | "paid" | "overpaid" | "no_price" | "closed";
+export type BalanceState =
+	| "due"
+	| "paid"
+	| "overpaid"
+	| "no_price"
+	| "closed"
+	| "over_refunded";
 export type PaymentsCardProps = {
 	balance: {
 		totalText: string | null;
@@ -39,7 +45,7 @@ export type PaymentsCardProps = {
 		totalNote: string | null;
 		paidText: string;
 		state: BalanceState;
-		/** due: what is due; overpaid: by how much; closed: what it holds; else null. */
+		/** due: what is due; overpaid: by how much; closed: what it holds; over_refunded: by how much; else null. */
 		amountText: string | null;
 	};
 	/** When the current quote asks for a deposit. */
@@ -66,7 +72,7 @@ export type PaymentsCardProps = {
 		refundMaxText: string | null;
 	} | null;
 	outcome: {
-		/** Owners only: the project closed holding deposit money and nothing is recorded. */
+		/** Owners only: the project closed still holding deposit money (after any refund) and nothing is recorded. */
 		needed: { held: number; heldText: string } | null;
 		recorded: {
 			text: string;

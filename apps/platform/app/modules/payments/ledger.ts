@@ -68,6 +68,26 @@ export function netPaid(
 		.reduce((sum, { amount }) => sum + BigInt(amount), 0n);
 }
 
+/**
+ * The deposit money still waiting for the studio's decision when a project
+ * closes: the smaller of the deposit money in `currency` and what the
+ * project holds (netPaid), never below zero. A refund at the desk before the
+ * close does not lower the deposit (booking is unaffected, ruling 9) but
+ * does lower what the studio can keep or give back, so a deposit already
+ * refunded needs no outcome and can't be refunded twice. Payments that are
+ * not deposit money (session payments, balance payments) are never part of
+ * it.
+ */
+export function settleableDeposit(
+	payments: readonly LedgerPayment[],
+	currency: string,
+): number {
+	const deposit = BigInt(depositMoney(payments, currency));
+	const held = netPaid(payments, currency);
+	const smaller = deposit < held ? deposit : held;
+	return smaller > 0n ? Number(smaller) : 0;
+}
+
 /** A project's money: its total (null without a price), what it holds and the balance due. */
 export type Balance = {
 	currency: string;
