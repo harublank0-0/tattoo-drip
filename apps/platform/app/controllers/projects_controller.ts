@@ -40,6 +40,7 @@ import {
 	formatDay,
 	formatMoney,
 	isExpired,
+	lastBookableDay,
 	priceText,
 	QUOTABLE_STATUSES,
 	quoteMessage,
@@ -51,9 +52,14 @@ import {
 import ProjectService from "#modules/projects/services/project_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import QuoteService from "#modules/projects/services/quote_service";
+import {
+	mayChangeSession,
+	outcomeRefusal,
+	outcomesFor,
+} from "#modules/scheduling/outcomes";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import SessionService from "#modules/scheduling/services/session_service";
-import { sessionTimeText } from "#modules/scheduling/times";
+import { sessionFormValues, sessionTimeText } from "#modules/scheduling/times";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { pointsAtThisMachine } from "#services/storefront_url";
 
@@ -162,6 +168,17 @@ export default class ProjectsController {
 		const { timezone } = tenant;
 		const today = DateTime.fromISO(todayIn(timezone), { zone: "utc" });
 
+		// What this member may record on each session and the move form's
+		// days (TAT-85). SessionService checks again under its locks.
+		const now = DateTime.now();
+		const todayText = todayIn(timezone);
+		const lastBookable = lastBookableDay(todayText);
+		const ownArtistId =
+			membership.role === "owner"
+				? null
+				: (artists.find(({ userId }) => userId === membership.userId)?.id ??
+					null);
+
 		const inquiry = project.inquiryId
 			? await this.inquiries.find(tenant, project.inquiryId)
 			: null;
@@ -255,14 +272,36 @@ export default class ProjectsController {
 			bookedWithoutSession:
 				project.status === "booked" &&
 				!scheduled.some(({ kind }) => kind === "tattoo"),
-			sessions: sessions.map((session) => ({
-				id: session.id,
-				whenText: sessionTimeText(session.startsAt, session.endsAt, timezone),
-				kind: session.kind,
-				status: session.status,
-				artistName:
-					artists.find(({ id }) => id === session.artistId)?.name ?? null,
-			})),
+			sessions: sessions.map((session) => {
+				const changeable =
+					session.status === "scheduled" &&
+					mayChangeSession(membership, ownArtistId, session, project);
+				return {
+					id: session.id,
+					whenText: sessionTimeText(session.startsAt, session.endsAt, timezone),
+					kind: session.kind,
+					status: session.status,
+					artistName:
+						artists.find(({ id }) => id === session.artistId)?.name ?? null,
+					outcomes: changeable ? outcomesFor(session, project.status, now) : [],
+					// A started tattoo session whose project isn't booked yet: the
+					// card explains why Done isn't offered.
+					awaitingBooking:
+						changeable &&
+						outcomeRefusal(session, project.status, "completed", now) ===
+							"not_booked",
+					move: changeable
+						? sessionFormValues(
+								session.startsAt,
+								session.endsAt,
+								timezone,
+								todayText,
+								lastBookable,
+							)
+						: null,
+				};
+			}),
+			sessionDates: { today: todayText, max: lastBookable },
 			notes: project.notes,
 			contactedText: contactedText(project.lastContactedAt, timezone),
 			assignment:
