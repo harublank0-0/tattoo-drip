@@ -1,6 +1,7 @@
 import { inject } from "@adonisjs/core";
 import type { MultipartFile } from "@adonisjs/core/bodyparser";
 import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
+import { studioTakesInquiries } from "#modules/artists/accepting";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -136,7 +137,7 @@ export default class IntakeService {
 			}
 			return;
 		}
-		if (visible.length > 0 && visible.every((a) => !a.acceptingInquiries)) {
+		if (!studioTakesInquiries(visible)) {
 			throw new InquiryRuleError("studio_not_accepting");
 		}
 	}
