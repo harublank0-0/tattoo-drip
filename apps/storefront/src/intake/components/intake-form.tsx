@@ -14,6 +14,7 @@ import { browserChallengeHost } from "../challenge-host.ts";
 import { copy } from "../copy.ts";
 import { prepareReference } from "../images.ts";
 import {
+	afterBlockEnds,
 	describeChallengeFailure,
 	describeSubmitError,
 	unexpectedProblem,
@@ -341,7 +342,10 @@ export function IntakeForm({
 	useEffect(() => {
 		if (blockedUntil === null) return;
 		const timer = window.setTimeout(
-			() => setBlockedUntil(null),
+			() => {
+				setBlockedUntil(null);
+				setNotice(afterBlockEnds);
+			},
 			Math.max(0, blockedUntil - Date.now()),
 		);
 		return () => window.clearTimeout(timer);

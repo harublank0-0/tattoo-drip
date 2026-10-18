@@ -122,6 +122,13 @@ export function describeSubmitError(
 	return notice("server", { retry: true, contact: true });
 }
 
+/** The notice once the wait a rate limit asked for is over: that notice goes, any other stays. */
+export function afterBlockEnds<Shown extends { readonly code: NoticeCode }>(
+	shown: Shown | null,
+): Shown | null {
+	return shown?.code === "rate-limited" ? null : shown;
+}
+
 /** What the form says when something it didn't expect threw: try again, or message the studio. */
 export function unexpectedProblem(): Extract<
 	SubmitProblem,

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { TattooApiError } from "@tattoo-drip/sdk";
 import {
+	afterBlockEnds,
 	describeChallengeFailure,
 	describeSubmitError,
 	formatWait,
@@ -319,5 +320,26 @@ describe("unexpectedProblem", () => {
 			unexpectedProblem(),
 			notice("server", { retry: true, contact: true }),
 		);
+	});
+});
+
+describe("afterBlockEnds", () => {
+	test("takes the rate-limit notice away once its wait is over", () => {
+		const limited = describeSubmitError(
+			apiError(429, "rate_limited", { retryAfter: 1200 }),
+			CONTEXT,
+		);
+		assert.equal(limited.kind, "notice");
+		assert.equal(
+			afterBlockEnds(limited.kind === "notice" ? limited : null),
+			null,
+		);
+	});
+
+	test("leaves every other notice, and no notice, as it is", () => {
+		const other = describeSubmitError(apiError(500, "internal_error"), CONTEXT);
+		assert.equal(other.kind, "notice");
+		if (other.kind === "notice") assert.equal(afterBlockEnds(other), other);
+		assert.equal(afterBlockEnds(null), null);
 	});
 });
