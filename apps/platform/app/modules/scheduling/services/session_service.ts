@@ -1,6 +1,7 @@
 import { inject } from "@adonisjs/core";
+import { errors as lucidErrors } from "@adonisjs/lucid";
 import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
-import type { DateTime } from "luxon";
+import { DateTime } from "luxon";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -8,14 +9,19 @@ import DepositService from "#modules/payments/services/deposit_service";
 import TattooProject, {
 	type ProjectStatus,
 } from "#modules/projects/models/tattoo_project";
+import type { Member } from "#modules/projects/services/project_service";
 import {
 	SessionOverlapError,
 	SessionRuleError,
 } from "#modules/scheduling/errors";
 import ProjectSession, {
 	type SessionKind,
-	type SessionStatus,
 } from "#modules/scheduling/models/project_session";
+import {
+	mayChangeSession,
+	outcomeRefusal,
+	type SessionOutcome,
+} from "#modules/scheduling/outcomes";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { withTransaction } from "#services/db_context";
 import { isExclusionViolation } from "#services/db_errors";
@@ -35,6 +41,19 @@ export type SessionWindow = {
 	artistId: string | null;
 };
 
+/**
+ * What recording an outcome did (TAT-85): the session as stored, the
+ * project's status afterwards, and whether the outcome moved the project.
+ */
+export type Recorded = {
+	session: ProjectSession;
+	projectStatus: ProjectStatus;
+	projectMoved: boolean;
+};
+
+/** A member recording an outcome, and the clock to judge its start by (tests pass one). */
+type Actor = { member: Member; now?: DateTime };
+
 const OVERLAP = "project_sessions_artist_no_overlap";
 
 /** Projects that take no new sessions. */
@@ -46,6 +65,9 @@ const CLOSED: ProjectStatus[] = ["declined", "cancelled"];
  * project row and then the session row, always in that order. Overlaps are
  * settled by the database: the exclusion constraint raises, and the error
  * becomes SessionOverlapError after the failed savepoint has rolled back.
+ * Members record outcomes and move sessions through findChangeable,
+ * recordOutcome and move (TAT-85), which check mayChangeSession; complete,
+ * markNoShow, cancel and reschedule are the system's calls.
  */
 @inject()
 export default class SessionService {
@@ -63,6 +85,29 @@ export default class SessionService {
 			.where("tenant_id", tenant.id)
 			.where("id", id)
 			.firstOrFail();
+	}
+
+	/**
+	 * The live session with this id if `member` may change it (TAT-85):
+	 * owners any session of a live project; an artist only a session with
+	 * their own linked live profile, on a project assigned to that profile
+	 * (mayChangeSession). Anything else, another tenant's id, a deleted
+	 * session and a session of a deleted project included, throws
+	 * E_ROW_NOT_FOUND (a 404). Controllers call it before reading the form;
+	 * recordOutcome and move check again under the row locks.
+	 */
+	async findChangeable(
+		tenant: TenantRef,
+		member: Member,
+		id: string,
+	): Promise<ProjectSession> {
+		const session = await this.findFor(tenant, id);
+		const project = await TattooProject.query()
+			.where("tenant_id", tenant.id)
+			.where("id", session.projectId)
+			.firstOrFail();
+		await this.assertMayChange(tenant, member, project, session);
+		return session;
 	}
 
 	/**
@@ -171,68 +216,74 @@ export default class SessionService {
 
 	/**
 	 * Moves a scheduled session to another time (the same artist; another
-	 * artist is cancel plus schedule).
+	 * artist is cancel plus schedule). The system's call: no member check.
 	 */
-	async reschedule(
+	reschedule(
 		tenant: TenantRef,
 		session: ProjectSession,
 		times: SessionTimes,
 	): Promise<ProjectSession> {
-		assertRange(times);
-		assertSessionOf(tenant, session);
-		try {
-			return await withTransaction(async (trx) => {
-				await lockProject(trx, tenant, session.projectId);
-				const live = await lockScheduled(trx, tenant, session.id);
-				live.merge({ startsAt: times.startsAt, endsAt: times.endsAt });
-				await live.save();
-				// Lucid reads nothing back after an update either; `active` is the
-				// database's to compute.
-				await live.refresh();
-				return live;
-			});
-		} catch (error) {
-			rethrowOverlap(error);
-		}
+		return this.changeTime(tenant, session, times, null);
+	}
+
+	/**
+	 * reschedule for a member (TAT-85): under the row locks `member` must
+	 * still be allowed to change the session (mayChangeSession, a 404
+	 * otherwise); then the time changes. SessionOverlapError when the artist
+	 * is busy, after the savepoint rolled back; SessionRuleError
+	 * "not_scheduled" once the session has an outcome. The project's status
+	 * never changes.
+	 */
+	move(
+		tenant: TenantRef,
+		member: Member,
+		session: ProjectSession,
+		times: SessionTimes,
+	): Promise<ProjectSession> {
+		return this.changeTime(tenant, session, times, member);
 	}
 
 	/** `scheduled` to `completed`. The time it occupied stays blocked. */
-	complete(tenant: TenantRef, session: ProjectSession) {
-		return this.finish(tenant, session, "completed");
+	async complete(
+		tenant: TenantRef,
+		session: ProjectSession,
+	): Promise<ProjectSession> {
+		return (await this.finish(tenant, session, "completed", null)).session;
 	}
 
 	/** `scheduled` to `no_show`. The time is free again. */
-	markNoShow(tenant: TenantRef, session: ProjectSession) {
-		return this.finish(tenant, session, "no_show");
+	async markNoShow(
+		tenant: TenantRef,
+		session: ProjectSession,
+	): Promise<ProjectSession> {
+		return (await this.finish(tenant, session, "no_show", null)).session;
 	}
 
 	/** `scheduled` to `cancelled`. The time is free again. */
-	cancel(tenant: TenantRef, session: ProjectSession) {
-		return this.finish(tenant, session, "cancelled");
-	}
-
-	private async finish(
+	async cancel(
 		tenant: TenantRef,
 		session: ProjectSession,
-		to: Exclude<SessionStatus, "scheduled">,
 	): Promise<ProjectSession> {
-		assertSessionOf(tenant, session);
-		return withTransaction(async (trx) => {
-			const project = await lockProject(trx, tenant, session.projectId);
-			const live = await lockScheduled(trx, tenant, session.id);
-			live.status = to;
-			await live.save();
-			// The status change flips the generated `active`: read it back.
-			await live.refresh();
-			if (
-				to === "completed" &&
-				live.kind === "tattoo" &&
-				project.status === "booked"
-			) {
-				await setStatus(project, "in_progress");
-			}
-			return live;
-		});
+		return (await this.finish(tenant, session, "cancelled", null)).session;
+	}
+
+	/**
+	 * Records what happened to a scheduled session, for a member (TAT-85).
+	 * Under the row locks `member` must still be allowed to change it (a 404
+	 * otherwise); then outcomeRefusal decides: SessionRuleError
+	 * "not_scheduled" once it has an outcome, "not_started" before its start
+	 * (the server's clock, read after the locks), "not_booked" for tattoo
+	 * work on a project that isn't booked yet. A tattoo session's outcome
+	 * then applies the work rule (followTattooWork).
+	 */
+	recordOutcome(
+		tenant: TenantRef,
+		member: Member,
+		session: ProjectSession,
+		outcome: SessionOutcome,
+		now?: DateTime,
+	): Promise<Recorded> {
+		return this.finish(tenant, session, outcome, { member, now });
 	}
 
 	/**
@@ -251,6 +302,126 @@ export default class SessionService {
 			const live = await lockProject(trx, tenant, project.id);
 			return this.moveToBooked(tenant, live);
 		});
+	}
+
+	/**
+	 * A new time for a scheduled session, under the project's lock and then
+	 * the session's; with a member, mayChangeSession is checked first.
+	 */
+	private async changeTime(
+		tenant: TenantRef,
+		session: ProjectSession,
+		times: SessionTimes,
+		member: Member | null,
+	): Promise<ProjectSession> {
+		assertRange(times);
+		assertSessionOf(tenant, session);
+		try {
+			return await withTransaction(async (trx) => {
+				const project = await lockProject(trx, tenant, session.projectId);
+				const live = await lockSession(trx, tenant, session.id);
+				if (member) await this.assertMayChange(tenant, member, project, live);
+				assertScheduled(live);
+				live.merge({ startsAt: times.startsAt, endsAt: times.endsAt });
+				await live.save();
+				// Lucid reads nothing back after an update either; `active` is the
+				// database's to compute.
+				await live.refresh();
+				return live;
+			});
+		} catch (error) {
+			rethrowOverlap(error);
+		}
+	}
+
+	/**
+	 * Sets a scheduled session's outcome, under the project's lock and then
+	 * the session's. With an actor (recordOutcome) the member check and the
+	 * outcome rules come first; without one it is the system's call. An
+	 * outcome on a tattoo session then applies the work rule.
+	 */
+	private async finish(
+		tenant: TenantRef,
+		session: ProjectSession,
+		to: SessionOutcome,
+		actor: Actor | null,
+	): Promise<Recorded> {
+		assertSessionOf(tenant, session);
+		return withTransaction(async (trx) => {
+			const project = await lockProject(trx, tenant, session.projectId);
+			const live = await lockSession(trx, tenant, session.id);
+			if (actor) {
+				await this.assertMayChange(tenant, actor.member, project, live);
+				// The clock is read once the locks are held: waiting for them can
+				// outlast a start time.
+				const refusal = outcomeRefusal(
+					live,
+					project.status,
+					to,
+					actor.now ?? DateTime.now(),
+				);
+				if (refusal) throw new SessionRuleError(refusal);
+			}
+			assertScheduled(live);
+			live.status = to;
+			await live.save();
+			// The status change flips the generated `active`: read it back.
+			await live.refresh();
+			const before = project.status;
+			if (live.kind === "tattoo") await this.followTattooWork(tenant, project);
+			return {
+				session: live,
+				projectStatus: project.status,
+				projectMoved: project.status !== before,
+			};
+		});
+	}
+
+	/**
+	 * The work rule (TAT-85): a booked project whose tattoo work has started
+	 * (a completed tattoo session) and has no tattoo session still scheduled
+	 * is in progress. With another tattoo session scheduled it stays booked,
+	 * the status scheduling that session gives it anyway (the in_progress to
+	 * booked shortcut), so the status doesn't depend on the order things
+	 * happened in. A booked project with no completed tattoo session (its
+	 * only one was missed or cancelled) stays booked, and the projects list
+	 * flags it. The caller holds the project's lock and passes the live row.
+	 */
+	private async followTattooWork(
+		tenant: TenantRef,
+		project: TattooProject,
+	): Promise<void> {
+		if (project.status !== "booked") return;
+		const tattoo = () =>
+			ProjectSession.query()
+				.where("tenant_id", tenant.id)
+				.where("project_id", project.id)
+				.where("kind", "tattoo");
+		if (await tattoo().where("status", "scheduled").first()) return;
+		if (await tattoo().where("status", "completed").first()) {
+			await setStatus(project, "in_progress");
+		}
+	}
+
+	/**
+	 * mayChangeSession for `member`; an artist's own profile is the live one
+	 * linked to their account. E_ROW_NOT_FOUND (a 404) when they may not.
+	 */
+	private async assertMayChange(
+		tenant: TenantRef,
+		member: Member,
+		project: Pick<TattooProject, "artistId">,
+		session: Pick<ProjectSession, "artistId">,
+	): Promise<void> {
+		const own =
+			member.role === "owner"
+				? null
+				: ((await this.artists.list(tenant)).find(
+						({ userId }) => userId === member.userId,
+					)?.id ?? null);
+		if (!mayChangeSession(member, own, session, project)) {
+			throw new lucidErrors.E_ROW_NOT_FOUND(ProjectSession);
+		}
 	}
 
 	/**
@@ -309,23 +480,26 @@ function lockProject(
 }
 
 /**
- * Locks the live session row and checks it is still `scheduled`: the copy a
- * caller holds can be stale, the row decides.
+ * Locks the live session row. The copy a caller holds can be stale: the
+ * locked row decides.
  */
-async function lockScheduled(
+function lockSession(
 	trx: TransactionClientContract,
 	tenant: TenantRef,
 	id: string,
 ) {
-	const session = await ProjectSession.query({ client: trx })
+	return ProjectSession.query({ client: trx })
 		.where("tenant_id", tenant.id)
 		.where("id", id)
 		.forUpdate()
 		.firstOrFail();
+}
+
+/** Only a scheduled session changes; the other statuses are final. */
+function assertScheduled(session: ProjectSession) {
 	if (session.status !== "scheduled") {
 		throw new SessionRuleError("not_scheduled");
 	}
-	return session;
 }
 
 /**

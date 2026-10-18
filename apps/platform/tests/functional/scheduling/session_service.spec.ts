@@ -798,3 +798,85 @@ test.group("SessionService project moves", (group) => {
 		});
 	});
 });
+
+test.group("SessionService tattoo work (TAT-85)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("a booked project stays booked while another tattoo session is scheduled", async ({
+		assert,
+	}) => {
+		const { tenant, project, sita } = await setup("booked");
+
+		await inTenant(tenant, async () => {
+			const first = await sessions.schedule(tenant, project, slot(sita, 8, 10));
+			const second = await sessions.schedule(
+				tenant,
+				project,
+				slot(sita, 12, 14),
+			);
+			await sessions.complete(tenant, first);
+			assert.equal(await statusOf(project), "booked");
+			await sessions.complete(tenant, second);
+			assert.equal(await statusOf(project), "in_progress");
+		});
+	});
+
+	test("once the work started, cancelling or missing the next tattoo session puts the project back in progress", async ({
+		assert,
+	}) => {
+		const { tenant, client, sita } = await setup();
+
+		await inTenant(tenant, async () => {
+			for (const [index, action] of (
+				["cancel", "markNoShow"] as const
+			).entries()) {
+				const base = index * 6;
+				const project = await makeProject(tenant, client, { status: "booked" });
+				await sessions.complete(
+					tenant,
+					await sessions.schedule(tenant, project, slot(sita, base, base + 1)),
+				);
+				assert.equal(await statusOf(project), "in_progress", action);
+				const next = await sessions.schedule(
+					tenant,
+					project,
+					slot(sita, base + 2, base + 3),
+				);
+				assert.equal(await statusOf(project), "booked", action);
+				await sessions[action](tenant, next);
+				assert.equal(await statusOf(project), "in_progress", action);
+			}
+		});
+	});
+
+	test("a missed or cancelled first tattoo session, a consultation and a touch-up leave a booked project booked", async ({
+		assert,
+	}) => {
+		const { tenant, client, sita } = await setup();
+
+		await inTenant(tenant, async () => {
+			const project = await makeProject(tenant, client, { status: "booked" });
+			await sessions.complete(
+				tenant,
+				await sessions.schedule(
+					tenant,
+					project,
+					slot(sita, 8, 9, "consultation"),
+				),
+			);
+			await sessions.complete(
+				tenant,
+				await sessions.schedule(tenant, project, slot(sita, 9, 10, "touch_up")),
+			);
+			await sessions.markNoShow(
+				tenant,
+				await sessions.schedule(tenant, project, slot(sita, 10, 11)),
+			);
+			await sessions.cancel(
+				tenant,
+				await sessions.schedule(tenant, project, slot(sita, 11, 12)),
+			);
+			assert.equal(await statusOf(project), "booked");
+		});
+	});
+});
