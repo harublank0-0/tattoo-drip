@@ -187,6 +187,42 @@ describe("the studio page", () => {
 		assert.match(html, /&lt;\/h1&gt;&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
 		assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
 	});
+
+	test("bidi overrides and a byte order mark reach neither the page, the head nor a prefilled message", () => {
+		const hostile = {
+			...STUDIO,
+			name: "﻿Black ‮Needle‬",
+			intro: "Walk-ins ⁧welcome⁩ on Sundays.",
+		};
+		const artists = [{ ...SITA, name: "Sita ‮Rai", bio: "‭Fine line" }];
+		const data = studioPageData(hostile, artists, ORIGIN);
+		const html = studioHtml(hostile, artists);
+		const page = artistPageData(hostile, artists, "sita", ORIGIN);
+		assert.ok(page);
+
+		const carried = [
+			html,
+			renderToStaticMarkup(createElement(ArtistPage, { data: page })),
+			JSON.stringify(data),
+			JSON.stringify(page),
+			...hrefs(html).map((href) => decodeURIComponent(href)),
+		].join("\n");
+		assert.doesNotMatch(carried, /[‪-‮⁦-⁩﻿]/u);
+		assert.equal(data.studio.name, "Black Needle");
+		assert.match(data.seo.title, /^Black Needle$/);
+		assert.match(html, /<h1[^>]*>Black Needle<\/h1>/);
+	});
+
+	test("joiners survive in names and bios: a Devanagari conjunct and an emoji family", () => {
+		const conjunct = "क्‍ष";
+		const family = "👨‍👩‍👧";
+		const html = studioHtml({ ...STUDIO, name: `Ink ${conjunct}` }, [
+			{ ...SITA, bio: `Family ${family}` },
+		]);
+
+		assert.ok(html.includes(`Ink ${conjunct}`));
+		assert.ok(html.includes(`Family ${family}`));
+	});
 });
 
 describe("the artist page", () => {

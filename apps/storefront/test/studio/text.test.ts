@@ -32,6 +32,32 @@ describe("cleanText", () => {
 		);
 	});
 
+	test("drops bidi overrides, embeddings, isolates and the byte order mark", () => {
+		// A right-to-left override would mirror the rest of the page's text.
+		assert.equal(cleanText("Black ‮Needle‬ Ink"), "Black Needle Ink");
+		for (const mark of ["‪", "‫", "‬", "‭", "‮", "⁦", "⁧", "⁨", "⁩", "﻿"]) {
+			assert.equal(
+				cleanText(`a${mark}b`),
+				"ab",
+				`U+${mark.codePointAt(0)?.toString(16)}`,
+			);
+		}
+		assert.equal(cleanText("﻿Sita"), "Sita");
+		assert.equal(cleanLine("‮Sita⁩ ⁦Rai"), "Sita Rai");
+	});
+
+	test("keeps the joiners Devanagari and emoji need, and the harmless direction marks", () => {
+		// क्‍ष with a zero width joiner and a zero width non-joiner in Devanagari
+		const conjunct = "क्‍ष";
+		const nonJoined = "क्‌ष";
+		const family = "👨‍👩‍👧";
+		assert.equal(cleanText(conjunct), conjunct);
+		assert.equal(cleanText(nonJoined), nonJoined);
+		assert.equal(cleanText(family), family);
+		assert.equal(cleanLine(`${family} ${conjunct}`), `${family} ${conjunct}`);
+		assert.equal(cleanText("a‎b‏c"), "a‎b‏c");
+	});
+
 	test("blank or missing text is null", () => {
 		for (const value of ["", "  \n\t ", null, undefined]) {
 			assert.equal(cleanText(value), null, JSON.stringify(value));
