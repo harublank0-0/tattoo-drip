@@ -1,5 +1,6 @@
 import { inject } from "@adonisjs/core";
 import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
+import { DateTime } from "luxon";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
 import type Inquiry from "#modules/inquiries/models/inquiry";
@@ -10,6 +11,7 @@ import {
 	inquiryRecipients,
 } from "#modules/notifications/alerts";
 import NewInquiryMail from "#modules/notifications/emails/new_inquiry_mail";
+import StaffAlert from "#modules/notifications/models/staff_alert";
 import type Tenant from "#modules/tenancy/models/tenant";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import TenancyService from "#modules/tenancy/services/tenancy_service";
@@ -25,6 +27,12 @@ export const ALERTS_PER_PAGE = 25;
 export type AlertOptions = {
 	/** Queue the emails; ALERT_EMAILS by default (unset is on). */
 	emails?: boolean;
+};
+
+export type AlertPage = {
+	alerts: StaffAlert[];
+	total: number;
+	lastPage: number;
 };
 
 /**
@@ -98,6 +106,66 @@ export default class AlertService {
 			}
 			return alerted.map(({ userId }) => userId);
 		});
+	}
+
+	/** The member's alerts in this studio, newest first, 25 a page. */
+	async list(
+		tenant: TenantRef,
+		userId: string,
+		page: number,
+	): Promise<AlertPage> {
+		const result = await StaffAlert.query()
+			.where("tenant_id", tenant.id)
+			.where("user_id", userId)
+			.orderBy("created_at", "desc")
+			.orderBy("id", "desc")
+			.paginate(page, ALERTS_PER_PAGE);
+		return {
+			alerts: result.all(),
+			total: result.total,
+			lastPage: result.lastPage,
+		};
+	}
+
+	/** How many of the member's alerts here are unread: the shell's count. */
+	async unreadCount(tenant: TenantRef, userId: string): Promise<number> {
+		const [row] = await StaffAlert.query()
+			.where("tenant_id", tenant.id)
+			.where("user_id", userId)
+			.whereNull("read_at")
+			.count("* as total");
+		return Number(row.$extras.total);
+	}
+
+	/**
+	 * The member's own alert, marked read (once: its first read time stays).
+	 * Another member's, another studio's or an unknown id is E_ROW_NOT_FOUND
+	 * (a 404).
+	 */
+	async open(
+		tenant: TenantRef,
+		userId: string,
+		id: string,
+	): Promise<StaffAlert> {
+		const alert = await StaffAlert.query()
+			.where("tenant_id", tenant.id)
+			.where("user_id", userId)
+			.where("id", id)
+			.firstOrFail();
+		if (alert.readAt === null) {
+			alert.readAt = DateTime.now();
+			await alert.save();
+		}
+		return alert;
+	}
+
+	/** Marks every unread alert of the member in this studio read. */
+	async markAllRead(tenant: TenantRef, userId: string): Promise<void> {
+		await StaffAlert.query()
+			.where("tenant_id", tenant.id)
+			.where("user_id", userId)
+			.whereNull("read_at")
+			.update({ read_at: DateTime.now().toJSDate() });
 	}
 }
 

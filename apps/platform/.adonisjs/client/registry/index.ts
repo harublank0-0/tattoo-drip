@@ -360,6 +360,24 @@ const routes = {
     tokens: [{"old":"/t/:tenant/calendar","type":0,"val":"t","end":""},{"old":"/t/:tenant/calendar","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/calendar","type":0,"val":"calendar","end":""}],
     types: placeholder as Registry['tenant.calendar.index']['types'],
   },
+  'tenant.alerts.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/alerts',
+    tokens: [{"old":"/t/:tenant/alerts","type":0,"val":"t","end":""},{"old":"/t/:tenant/alerts","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/alerts","type":0,"val":"alerts","end":""}],
+    types: placeholder as Registry['tenant.alerts.index']['types'],
+  },
+  'tenant.alerts.read': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/alerts/read',
+    tokens: [{"old":"/t/:tenant/alerts/read","type":0,"val":"t","end":""},{"old":"/t/:tenant/alerts/read","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/alerts/read","type":0,"val":"alerts","end":""},{"old":"/t/:tenant/alerts/read","type":0,"val":"read","end":""}],
+    types: placeholder as Registry['tenant.alerts.read']['types'],
+  },
+  'tenant.alerts.open': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/alerts/:id/open',
+    tokens: [{"old":"/t/:tenant/alerts/:id/open","type":0,"val":"t","end":""},{"old":"/t/:tenant/alerts/:id/open","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/alerts/:id/open","type":0,"val":"alerts","end":""},{"old":"/t/:tenant/alerts/:id/open","type":1,"val":"id","end":""},{"old":"/t/:tenant/alerts/:id/open","type":0,"val":"open","end":""}],
+    types: placeholder as Registry['tenant.alerts.open']['types'],
+  },
   'dashboard': {
     methods: ["GET","HEAD"],
     pattern: '/dashboard',

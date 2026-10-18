@@ -118,6 +118,11 @@ export interface ApiDefinition {
     calendar: {
       index: typeof routes['tenant.calendar.index']
     }
+    alerts: {
+      index: typeof routes['tenant.alerts.index']
+      read: typeof routes['tenant.alerts.read']
+      open: typeof routes['tenant.alerts.open']
+    }
   }
   dashboard: typeof routes['dashboard']
   onboarding: {

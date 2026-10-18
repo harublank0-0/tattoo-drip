@@ -1,6 +1,7 @@
 import { cn } from "cn";
 import NavLink from "~/components/nav_link";
 import AccountMenu from "~/components/shell/account_menu";
+import AlertsLink from "~/components/shell/alerts_link";
 import NavBadge from "~/components/shell/nav_badge";
 import { NAV_ICONS } from "~/components/shell/nav_icons";
 import type { ShellNavItem } from "~/components/shell/nav_items";
@@ -46,7 +47,8 @@ export default function SideNav({
 					);
 				})}
 			</nav>
-			<div className="mt-auto">
+			<div className="mt-auto flex flex-col gap-1">
+				<AlertsLink variant="row" />
 				<AccountMenu showName />
 			</div>
 		</aside>

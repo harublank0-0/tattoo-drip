@@ -324,6 +324,27 @@ router
 			})
 			.prefix("/calendar")
 			.use(middleware.role({ allow: ["owner", "artist"] }));
+
+		/**
+		 * Each member's own alerts (TAT-52): owners and artists; AlertService
+		 * scopes every read and write to the member. Every alerts route goes
+		 * in this group (a test checks).
+		 */
+		router
+			.group(() => {
+				router
+					.get("/", [controllers.Alerts, "index"])
+					.as("tenant.alerts.index");
+				router
+					.post("read", [controllers.Alerts, "readAll"])
+					.as("tenant.alerts.read");
+				router
+					.post(":id/open", [controllers.Alerts, "open"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.alerts.open");
+			})
+			.prefix("/alerts")
+			.use(middleware.role({ allow: ["owner", "artist"] }));
 	})
 	.prefix("/t/:tenant")
 	.use([middleware.auth(), middleware.dbContext(), middleware.tenant()]);
