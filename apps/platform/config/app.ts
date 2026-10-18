@@ -35,6 +35,13 @@ export const http = defineConfig({
 	trustProxy: env.get("TRUST_PROXY") ?? "loopback",
 
 	/**
+	 * Node drops a request whose whole body hasn't arrived within 120 s
+	 * (its default is 300 s): the backstop behind the reverse proxy's
+	 * timeouts and the uploads' own deadline (TAT-38).
+	 */
+	requestTimeout: 120_000,
+
+	/**
 	 * A URL that cannot be decoded is refused before any middleware runs;
 	 * the public API (/api) answers it with its error envelope (TAT-32).
 	 */

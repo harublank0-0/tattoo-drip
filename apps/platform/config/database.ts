@@ -1,5 +1,6 @@
 import app from "@adonisjs/core/services/app";
 import { defineConfig } from "@adonisjs/lucid";
+import { LIMITER_POOL, pgPoolFor } from "#services/db_pool";
 import env from "#start/env";
 
 const dbConfig = defineConfig({
@@ -11,6 +12,7 @@ const dbConfig = defineConfig({
 	connections: {
 		/**
 		 * PostgreSQL connection. Local defaults match the root docker-compose.yml.
+		 * Its pool is sized per process (#services/db_pool, TAT-38).
 		 */
 		pg: {
 			client: "pg",
@@ -21,6 +23,7 @@ const dbConfig = defineConfig({
 				password: env.get("DB_PASSWORD"),
 				database: env.get("DB_DATABASE"),
 			},
+			pool: pgPoolFor(app.getEnvironment()),
 			migrations: {
 				/**
 				 * Sort migration files naturally by filename.
@@ -55,7 +58,7 @@ const dbConfig = defineConfig({
 				password: env.get("DB_PASSWORD"),
 				database: env.get("DB_DATABASE"),
 			},
-			pool: { min: 0, max: 4 },
+			pool: { ...LIMITER_POOL },
 		},
 
 		/**
