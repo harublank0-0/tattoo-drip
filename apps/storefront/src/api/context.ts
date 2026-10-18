@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { tattooQueries } from "@tattoo-drip/react";
+import { tattooKeys, tattooQueries } from "@tattoo-drip/react";
 import {
 	createTattooClient,
 	type Studio,
@@ -129,6 +129,14 @@ export function dehydrateApi(api: ApiContext): DehydratedApi {
 /**
  * The router's hydrate: connects the browser's client from the connection
  * the server sent. No key; the SDK never sends cookies.
+ *
+ * Also keeps the studio in the cache for as long as the page lives. Every
+ * page's root loader reads it, but nothing observes it, and a browser drops
+ * an unobserved query after 5 minutes: the next navigation would fetch it
+ * again, and a failure would replace the page with the root error. A query
+ * takes its defaults when it is built, so this comes before the cache is
+ * hydrated (a gcTime passed to the loader's query() would not reach a query
+ * that already exists).
  */
 export function hydrateApi(
 	api: ApiContext,
@@ -136,6 +144,9 @@ export function hydrateApi(
 	options: { fetch?: typeof fetch } = {},
 ): void {
 	const connection = parseConnection(dehydrated?.tattoo);
+	api.queryClient.setQueryDefaults(tattooKeys.studio(connection.tenant), {
+		gcTime: Number.POSITIVE_INFINITY,
+	});
 	api.tattoo.connect(
 		connection,
 		createTattooClient({

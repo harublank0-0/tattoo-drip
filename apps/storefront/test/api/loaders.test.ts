@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
+import { dehydrate, environmentManager, hydrate } from "@tanstack/react-query";
 import { isNotFound } from "@tanstack/react-router";
 import { tattooKeys } from "@tattoo-drip/react";
 import { type Studio, TattooApiError } from "@tattoo-drip/sdk";
 import {
 	connectServer,
 	createApiContext,
+	dehydrateApi,
+	hydrateApi,
 	seedStudio,
 } from "../../src/api/context.ts";
 import { loadStudio, rethrowAsNotFound } from "../../src/api/loaders.ts";
@@ -81,6 +84,34 @@ describe("loadStudio", () => {
 			);
 			assert.equal(calls.length, 1);
 		}
+	});
+});
+
+describe("loadStudio in the browser", () => {
+	test("keeps the studio the server sent for as long as the page lives", async (t) => {
+		// As in a browser, where an unused query is dropped after 5 minutes.
+		environmentManager.setIsServer(() => false);
+		t.after(() => environmentManager.setIsServer(() => true));
+		t.mock.timers.enable({ apis: ["setTimeout"] });
+
+		const server = fakeFetch(() => json(200, { data: STUDIO }));
+		const serverSide = serverApi(server.fetch);
+		seedStudio(serverSide, STUDIO);
+		const page = JSON.parse(
+			JSON.stringify({
+				router: dehydrateApi(serverSide),
+				queries: dehydrate(serverSide.queryClient),
+			}),
+		);
+		const browser = fakeFetch(() => json(200, { data: STUDIO }));
+		const browserSide = createApiContext("browser");
+		hydrateApi(browserSide, page.router, { fetch: browser.fetch });
+		hydrate(browserSide.queryClient, page.queries);
+
+		t.mock.timers.tick(30 * 60_000);
+
+		assert.deepEqual(await loadStudio(browserSide), STUDIO);
+		assert.equal(browser.calls.length, 0);
 	});
 });
 
