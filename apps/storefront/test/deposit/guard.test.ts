@@ -55,6 +55,42 @@ test("only the screen reads the fragment", () => {
 	);
 });
 
+/**
+ * Every module a source file pulls in, however it asks: `from "x"`, a bare
+ * `import "x"`, a dynamic `import("x")` and `require("x")`. A specifier that
+ * isn't a plain string comes back as "<computed>", which no list allows.
+ */
+function importsOf(text: string): string[] {
+	const specifiers: string[] = [];
+	for (const pattern of [
+		/\bfrom\s+["']([^"']+)["']/g,
+		/\bimport\s+["']([^"']+)["']/g,
+		/\b(?:import|require)\(\s*["'`]([^"'`]+)["'`]\s*\)/g,
+	]) {
+		for (const match of text.matchAll(pattern)) specifiers.push(match[1]);
+	}
+	for (const match of text.matchAll(/\b(?:import|require)\(\s*([^\s"'`)])/g)) {
+		specifiers.push(`<computed:${match[1]}>`);
+	}
+	return specifiers;
+}
+
+test("the import guard sees every way to pull a module in", () => {
+	assert.deepEqual(importsOf("import { a } from \"x\";\nimport b from 'y';"), [
+		"x",
+		"y",
+	]);
+	assert.deepEqual(importsOf('import "side-effect";'), ["side-effect"]);
+	assert.deepEqual(importsOf('const m = await import("posthog-js");'), [
+		"posthog-js",
+	]);
+	assert.deepEqual(importsOf("const m = await import(`lazy`);"), ["lazy"]);
+	assert.deepEqual(importsOf('const f = require("fs");'), ["fs"]);
+	assert.deepEqual(importsOf('import x = require("old");'), ["old"]);
+	assert.deepEqual(importsOf("await import(name)"), ["<computed:n>"]);
+	assert.deepEqual(importsOf("const { a } = props; // no import here"), []);
+});
+
 test("imports only the page's own modules, React, the SDK, its hooks, the form kit and icons", () => {
 	const allowed = new Set([
 		"react",
@@ -64,10 +100,10 @@ test("imports only the page's own modules, React, the SDK, its hooks, the form k
 		"lucide-react",
 	]);
 	for (const file of depositFiles()) {
-		for (const match of read(file).matchAll(/from "([^"]+)"/g)) {
+		for (const specifier of importsOf(read(file))) {
 			assert.ok(
-				match[1].startsWith(".") || allowed.has(match[1]),
-				`${file} imports ${match[1]}`,
+				specifier.startsWith(".") || allowed.has(specifier),
+				`${file} imports ${specifier}`,
 			);
 		}
 	}
