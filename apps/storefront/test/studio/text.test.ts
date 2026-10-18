@@ -34,23 +34,34 @@ describe("cleanText", () => {
 
 	test("drops bidi overrides, embeddings, isolates and the byte order mark", () => {
 		// A right-to-left override would mirror the rest of the page's text.
-		assert.equal(cleanText("Black ‮Needle‬ Ink"), "Black Needle Ink");
-		for (const mark of ["‪", "‫", "‬", "‭", "‮", "⁦", "⁧", "⁨", "⁩", "﻿"]) {
+		assert.equal(cleanText("Black \u202eNeedle\u202c Ink"), "Black Needle Ink");
+		for (const mark of [
+			"\u202a",
+			"\u202b",
+			"\u202c",
+			"\u202d",
+			"\u202e",
+			"\u2066",
+			"\u2067",
+			"\u2068",
+			"\u2069",
+			"\ufeff",
+		]) {
 			assert.equal(
 				cleanText(`a${mark}b`),
 				"ab",
 				`U+${mark.codePointAt(0)?.toString(16)}`,
 			);
 		}
-		assert.equal(cleanText("﻿Sita"), "Sita");
-		assert.equal(cleanLine("‮Sita⁩ ⁦Rai"), "Sita Rai");
+		assert.equal(cleanText("\ufeffSita"), "Sita");
+		assert.equal(cleanLine("\u202eSita\u2069 \u2066Rai"), "Sita Rai");
 	});
 
 	test("keeps the joiners Devanagari and emoji need, and the harmless direction marks", () => {
-		// क्‍ष with a zero width joiner and a zero width non-joiner in Devanagari
-		const conjunct = "क्‍ष";
-		const nonJoined = "क्‌ष";
-		const family = "👨‍👩‍👧";
+		// Devanagari "kssa": ka, virama, ZWJ or ZWNJ, ssa; and an emoji family joined by ZWJ.
+		const conjunct = "क्\u200dष";
+		const nonJoined = "क्\u200cष";
+		const family = "👨\u200d👩\u200d👧";
 		assert.equal(cleanText(conjunct), conjunct);
 		assert.equal(cleanText(nonJoined), nonJoined);
 		assert.equal(cleanText(family), family);
@@ -105,7 +116,7 @@ describe("trimDescription", () => {
 	});
 
 	test("never splits an emoji or an accent, even without spaces", () => {
-		const family = "👨‍👩‍👧";
+		const family = "👨\u200d👩\u200d👧";
 		assert.equal(
 			trimDescription(family.repeat(200)),
 			`${family.repeat(DESCRIPTION_MAX - 1)}…`,
