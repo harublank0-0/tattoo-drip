@@ -37,6 +37,7 @@ const OUTCOME_REFUSED: Record<SessionRuleReason, string> = {
 		"This project isn't booked yet, so its tattoo session can't be marked done.",
 	project_closed: "This session can't be changed.",
 	invalid_range: "This session can't be changed.",
+	project_finished: "This session can't be changed.",
 };
 
 /**

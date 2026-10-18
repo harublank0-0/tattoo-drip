@@ -23,6 +23,7 @@ import {
 	outcomeRefusal,
 	type SessionOutcome,
 } from "#modules/scheduling/outcomes";
+import { scheduleRefusal } from "#modules/scheduling/schedule_rules";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { withTransaction } from "#services/db_context";
 import { isExclusionViolation } from "#services/db_errors";
@@ -50,6 +51,16 @@ export type Recorded = {
 	session: ProjectSession;
 	projectStatus: ProjectStatus;
 	projectMoved: boolean;
+};
+
+/**
+ * What scheduling did (TAT-85 part 2): the session, the project's status
+ * afterwards, and whether this call booked the project.
+ */
+export type Scheduled = {
+	session: ProjectSession;
+	projectStatus: ProjectStatus;
+	booked: boolean;
 };
 
 /** Sessions per status, every status present (0 when none). */
@@ -215,52 +226,38 @@ export default class SessionService {
 	}
 
 	/**
-	 * Adds a `scheduled` session. A declined or cancelled project refuses
-	 * (SessionRuleError "project_closed"); a project without an artist gets
-	 * this session's artist. Throws SessionOverlapError when the artist is
-	 * busy, and E_ROW_NOT_FOUND for an unknown or deleted artist or project.
+	 * Adds a `scheduled` session: the system's call (TAT-43's booking). A
+	 * declined or cancelled project refuses (SessionRuleError
+	 * "project_closed"); a project without an artist gets this session's
+	 * artist. Throws SessionOverlapError when the artist is busy, and
+	 * E_ROW_NOT_FOUND for an unknown or deleted artist or project.
 	 */
 	async schedule(
 		tenant: TenantRef,
 		project: TattooProject,
 		input: NewSession,
 	): Promise<ProjectSession> {
-		assertRange(input);
-		assertProjectOf(tenant, project);
-		const artist = await this.artists.findFor(tenant, input.artistId);
-		try {
-			return await withTransaction(async (trx) => {
-				const live = await lockProject(trx, tenant, project.id);
-				if (CLOSED.includes(live.status)) {
-					throw new SessionRuleError("project_closed");
-				}
-				if (!live.artistId) {
-					live.artistId = artist.id;
-					await live.save();
-				}
-				const session = await ProjectSession.create(
-					{
-						tenantId: tenant.id,
-						projectId: live.id,
-						artistId: artist.id,
-						kind: input.kind,
-						startsAt: input.startsAt,
-						endsAt: input.endsAt,
-					},
-					{ client: trx },
-				);
-				// Lucid reads nothing back after an insert: load the column default
-				// and the generated `active`, so the session we return is true.
-				await session.refresh();
-				if (input.kind === "tattoo") {
-					if (live.status === "in_progress") await setStatus(live, "booked");
-					else await this.moveToBooked(tenant, live);
-				}
-				return session;
-			});
-		} catch (error) {
-			rethrowOverlap(error);
-		}
+		return (await this.add(tenant, project, input, null)).session;
+	}
+
+	/**
+	 * schedule for a member, from the project page (TAT-85 part 2). Under the
+	 * project's lock `member` must be allowed the new session
+	 * (mayChangeSession: owners any; an artist only with their own profile
+	 * on a project assigned to it; E_ROW_NOT_FOUND otherwise), and the
+	 * project must take new sessions (scheduleRefusal: SessionRuleError
+	 * "project_closed" or "project_finished"). A tattoo session then books
+	 * the project when it can, in the same transaction: in_progress to
+	 * booked, or deposit_pending to booked once the deposit is settled
+	 * (moveToBooked). SessionOverlapError after the savepoint rolled back.
+	 */
+	scheduleFor(
+		tenant: TenantRef,
+		member: Member,
+		project: TattooProject,
+		input: NewSession,
+	): Promise<Scheduled> {
+		return this.add(tenant, project, input, member);
 	}
 
 	/**
@@ -351,6 +348,66 @@ export default class SessionService {
 			const live = await lockProject(trx, tenant, project.id);
 			return this.moveToBooked(tenant, live);
 		});
+	}
+
+	/**
+	 * Inserts a scheduled session under the project's lock: schedule's body
+	 * (member null: only declined and cancelled projects refuse) and
+	 * scheduleFor's (the member check, then scheduleRefusal).
+	 */
+	private async add(
+		tenant: TenantRef,
+		project: TattooProject,
+		input: NewSession,
+		member: Member | null,
+	): Promise<Scheduled> {
+		assertRange(input);
+		assertProjectOf(tenant, project);
+		const artist = await this.artists.findFor(tenant, input.artistId);
+		try {
+			return await withTransaction(async (trx) => {
+				const live = await lockProject(trx, tenant, project.id);
+				if (member) {
+					await this.assertMayChange(tenant, member, live, {
+						artistId: artist.id,
+					});
+					const refusal = scheduleRefusal(live.status);
+					if (refusal) throw new SessionRuleError(refusal);
+				} else if (CLOSED.includes(live.status)) {
+					throw new SessionRuleError("project_closed");
+				}
+				if (!live.artistId) {
+					live.artistId = artist.id;
+					await live.save();
+				}
+				const session = await ProjectSession.create(
+					{
+						tenantId: tenant.id,
+						projectId: live.id,
+						artistId: artist.id,
+						kind: input.kind,
+						startsAt: input.startsAt,
+						endsAt: input.endsAt,
+					},
+					{ client: trx },
+				);
+				// Lucid reads nothing back after an insert: load the column default
+				// and the generated `active`, so the session we return is true.
+				await session.refresh();
+				const before = live.status;
+				if (input.kind === "tattoo") {
+					if (live.status === "in_progress") await setStatus(live, "booked");
+					else await this.moveToBooked(tenant, live);
+				}
+				return {
+					session,
+					projectStatus: live.status,
+					booked: before !== "booked" && live.status === "booked",
+				};
+			});
+		} catch (error) {
+			rethrowOverlap(error);
+		}
 	}
 
 	/**

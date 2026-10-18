@@ -4,7 +4,9 @@ import { DateTime } from "luxon";
 import {
 	outcomeValidator,
 	type SessionTimeForm,
+	scheduleValidator,
 	sessionTimeValidator,
+	toNewSession,
 	toSessionTimes,
 } from "#modules/scheduling/validators/session";
 
@@ -162,5 +164,72 @@ test.group("toSessionTimes", () => {
 		);
 		const short = toSessionTimes(form({ hours: 0.25 }), KTM, NOW);
 		assert.equal(short.endsAt.diff(short.startsAt, "minutes").minutes, 15);
+	});
+});
+
+test.group("scheduleValidator and toNewSession", () => {
+	const ARTIST_ID = "0195f3a0-0000-7000-8000-000000000002";
+
+	test("the schedule form's shape, with its own field names", async ({
+		assert,
+	}) => {
+		assert.deepEqual(
+			await scheduleValidator.validate({
+				sessionKind: "consultation",
+				sessionArtistId: ARTIST_ID,
+				date: "2026-10-20",
+				startTime: "14:00",
+				hours: "1",
+			}),
+			{
+				sessionKind: "consultation",
+				sessionArtistId: ARTIST_ID,
+				date: "2026-10-20",
+				startTime: "14:00",
+				hours: 1,
+			},
+		);
+		assert.deepEqual(
+			await problems(() =>
+				scheduleValidator.validate({
+					sessionKind: "flash",
+					sessionArtistId: "sita",
+					date: "2026-10-20",
+					startTime: "14:00",
+					hours: "1",
+				}),
+			),
+			{
+				sessionKind: "Choose tattoo, consultation or touch-up.",
+				sessionArtistId: "Choose an artist from the list.",
+			},
+		);
+	});
+
+	test("a new session from the form, by the shared time rules", async ({
+		assert,
+	}) => {
+		const session = toNewSession(
+			{ sessionKind: "tattoo", sessionArtistId: ARTIST_ID, ...form() },
+			KTM,
+			NOW,
+		);
+		assert.deepEqual([session.kind, session.artistId], ["tattoo", ARTIST_ID]);
+		assert.equal(session.startsAt.toUTC().toISO(), "2026-10-20T08:15:00.000Z");
+		assert.equal(session.endsAt.toUTC().toISO(), "2026-10-20T11:15:00.000Z");
+		assert.deepEqual(
+			await problems(() =>
+				toNewSession(
+					{
+						sessionKind: "tattoo",
+						sessionArtistId: ARTIST_ID,
+						...form({ date: "2026-10-14" }),
+					},
+					KTM,
+					NOW,
+				),
+			),
+			{ date: DAY },
+		);
 	});
 });

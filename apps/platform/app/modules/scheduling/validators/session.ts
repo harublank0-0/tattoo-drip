@@ -1,8 +1,13 @@
 import vine, { errors, SimpleMessagesProvider } from "@vinejs/vine";
+import type { Infer } from "@vinejs/vine/types";
 import { DateTime } from "luxon";
 import { lastBookableDay, todayIn } from "#modules/projects/quotes";
+import { SESSION_KINDS } from "#modules/scheduling/models/project_session";
 import { SESSION_OUTCOMES } from "#modules/scheduling/outcomes";
-import type { SessionTimes } from "#modules/scheduling/services/session_service";
+import type {
+	NewSession,
+	SessionTimes,
+} from "#modules/scheduling/services/session_service";
 import { localDateTime } from "#modules/scheduling/times";
 
 const DAY = "Pick a date from today to a year from now.";
@@ -115,3 +120,50 @@ outcomeValidator.messagesProvider = new SimpleMessagesProvider({
 	"status.required": OUTCOME,
 	"status.enum": OUTCOME,
 });
+
+const KIND = "Choose tattoo, consultation or touch-up.";
+const ARTIST = "Choose an artist from the list.";
+
+/**
+ * The schedule form (TAT-85 part 2): the kind, the artist and the time.
+ * The fields are `sessionKind` and `sessionArtistId` because the project
+ * page's quote, payment and assignment forms own `kind` and `artistId`,
+ * and a page shares one error bag.
+ */
+export const scheduleValidator = vine.create({
+	sessionKind: vine.enum(SESSION_KINDS),
+	sessionArtistId: vine.string().uuid(),
+	...sessionTimeFields(),
+});
+scheduleValidator.messagesProvider = new SimpleMessagesProvider({
+	"sessionKind.required": KIND,
+	"sessionKind.enum": KIND,
+	"sessionArtistId.required": ARTIST,
+	"sessionArtistId.uuid": ARTIST,
+	...SESSION_TIME_MESSAGES,
+});
+
+export type ScheduleForm = Infer<typeof scheduleValidator>;
+
+/**
+ * SessionService.scheduleFor's input from the validated schedule form.
+ * Throws E_VALIDATION_ERROR, shown next to the field, for what
+ * readSessionTimes refuses (a past day included, as for a new booking).
+ */
+export function toNewSession(
+	form: ScheduleForm,
+	timezone: string,
+	now: DateTime = DateTime.now(),
+): NewSession {
+	const problems: { field: string; message: string; rule: string }[] = [];
+	const times = readSessionTimes(
+		form,
+		timezone,
+		now,
+		(field, message, rule) => {
+			problems.push({ field, message, rule });
+		},
+	);
+	if (!times) throw new errors.E_VALIDATION_ERROR(problems);
+	return { artistId: form.sessionArtistId, kind: form.sessionKind, ...times };
+}

@@ -4,6 +4,7 @@ export const SESSION_RULE_REASONS = [
 	"invalid_range",
 	"not_started",
 	"not_booked",
+	"project_finished",
 ] as const;
 export type SessionRuleReason = (typeof SESSION_RULE_REASONS)[number];
 
@@ -15,6 +16,7 @@ const MESSAGES: Record<SessionRuleReason, string> = {
 		"Only a session that has started can be marked completed or no-show",
 	not_booked:
 		"A tattoo session can be marked completed only once its project is booked",
+	project_finished: "A completed project takes no new sessions",
 };
 
 /**
