@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, test } from "node:test";
+import type { Studio } from "@tattoo-drip/sdk";
 import {
 	ARTIST_SLUG,
 	artistViewModels,
@@ -112,6 +113,22 @@ describe("studioViewModel", () => {
 			"Independent tattoo artist",
 		);
 		assert.equal(studioViewModel(CLOSED_STUDIO).accepting, false);
+	});
+
+	test("an unknown tenant type is a studio, even one named like an object's own key", () => {
+		// A lookup that trusts the enum would return Object.prototype's members,
+		// and React can't render a function or an object as text.
+		for (const type of [
+			"constructor",
+			"__proto__",
+			"toString",
+			"hasOwnProperty",
+			"something-new",
+		]) {
+			const view = studioViewModel({ ...STUDIO, type } as unknown as Studio);
+			assert.equal(view.typeLabel, "Tattoo studio", type);
+			assert.equal(typeof view.typeLabel, "string", type);
+		}
 	});
 });
 

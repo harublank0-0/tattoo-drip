@@ -145,7 +145,9 @@ export function studioViewModel(studio: Studio): StudioView {
 		slug: studio.slug,
 		name,
 		type: studio.type,
-		typeLabel: TYPE_LABELS[studio.type] ?? TYPE_LABELS.studio,
+		typeLabel: Object.hasOwn(TYPE_LABELS, studio.type)
+			? TYPE_LABELS[studio.type]
+			: TYPE_LABELS.studio,
 		intro: cleanText(studio.intro),
 		accepting: studio.acceptingInquiries === true,
 		phone,
