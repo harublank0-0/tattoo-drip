@@ -473,3 +473,76 @@ test.group("ArtistService.listVisible", (group) => {
 		);
 	});
 });
+
+test.group("ArtistService.findVisibleBySlug", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("finds a live, visible profile by its exact slug, open or closed", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("slug-needle-44");
+
+		const found = await inTenant(tenant, async () => {
+			await Artist.create({
+				tenantId: tenant.id,
+				name: "Zara",
+				slug: "zara",
+				acceptingInquiries: false,
+			});
+			return artists.findVisibleBySlug(tenant, "zara");
+		});
+
+		assert.equal(found?.name, "Zara");
+	});
+
+	test("a hidden, deleted, unknown or differently cased slug is null", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("slug-missing-44");
+
+		const results = await inTenant(tenant, async () => {
+			await Artist.create({ tenantId: tenant.id, name: "Bina", slug: "bina" });
+			await Artist.create({
+				tenantId: tenant.id,
+				name: "Hidden",
+				slug: "hidden",
+				visible: false,
+			});
+			const gone = await Artist.create({
+				tenantId: tenant.id,
+				name: "Gone",
+				slug: "gone",
+			});
+			await gone.softDelete();
+			const found: (Artist | null)[] = [];
+			for (const slug of ["hidden", "gone", "nobody", "Bina", "bina "]) {
+				found.push(await artists.findVisibleBySlug(tenant, slug));
+			}
+			return found;
+		});
+
+		assert.deepEqual(results, [null, null, null, null, null]);
+	});
+
+	test("filters by the tenant it is given, not only by row-level security", async ({
+		assert,
+	}) => {
+		const a = await studioWithOwner("slug-a-44");
+		const b = await studioWithOwner("slug-b-44");
+		await inTenant(b.tenant, () =>
+			Artist.create({ tenantId: b.tenant.id, name: "Only B", slug: "only-b" }),
+		);
+
+		// In B's context RLS would show B's row: only the tenant filter hides it.
+		assert.isNull(
+			await inTenant(b.tenant, () =>
+				artists.findVisibleBySlug(a.tenant, "only-b"),
+			),
+		);
+		assert.isNull(
+			await inTenant(a.tenant, () =>
+				artists.findVisibleBySlug(a.tenant, "only-b"),
+			),
+		);
+	});
+});
