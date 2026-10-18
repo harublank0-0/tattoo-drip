@@ -148,16 +148,20 @@ test.group("Login rate limits", (group) => {
 		assert.equal(email?.consumed, 3);
 	});
 
-	test("signing in to a look-alike account doesn't reset another account's count", async ({
+	test("an address typed in another case is the same account, and shares its count", async ({
 		client,
 	}) => {
-		// Emails are case-sensitive: INK@ is a separate account that shares
-		// ink@'s count. Its owner signing in must not wipe the failures.
+		// Emails are canonical (TAT-18): INK@ is ink@, so it signs in to the
+		// same account and its failures count against the same address.
 		await makeUser();
-		await makeUser("INK@example.com");
-		for (const ip of ["203.0.113.61", "203.0.113.62", "203.0.113.63"]) {
-			for (let i = 0; i < 8; i++) {
-				const failed = await login(client, ip, "wrong-password");
+		for (const ip of ["203.0.113.61", "203.0.113.62"]) {
+			for (let i = 0; i < 10; i++) {
+				const failed = await login(
+					client,
+					ip,
+					"wrong-password",
+					"INK@Example.com",
+				);
 				failed.assertFlashMessage("error", WRONG);
 			}
 		}
@@ -166,13 +170,16 @@ test.group("Login rate limits", (group) => {
 			client,
 			"203.0.113.64",
 			PASSWORD,
-			"INK@example.com",
+			" Ink@EXAMPLE.com ",
 		);
 		own.assertHeader("location", "/dashboard");
 
-		// 24 failures stand: the 25th guess is checked, the 26th is refused.
-		const checked = await login(client, "203.0.113.65", "wrong-password");
-		checked.assertFlashMessage("error", WRONG);
+		// 20 failures stand (the sign-in gave back only its own point): five
+		// more are checked, the next is refused.
+		for (let i = 0; i < 5; i++) {
+			const checked = await login(client, "203.0.113.65", "wrong-password");
+			checked.assertFlashMessage("error", WRONG);
+		}
 		const refused = await login(client, "203.0.113.65", "wrong-password");
 		refused.assertFlashMessage("error", LOCKED);
 	});

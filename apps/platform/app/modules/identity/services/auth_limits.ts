@@ -44,12 +44,12 @@ const REFUND_SLACK_SECONDS = 3;
  * address never adds to the email's count. Both counts are taken before
  * `verify` runs, so parallel guesses can't all pass a check first. A sign-in
  * gives back the two points it took and nothing more: failures already
- * counted for the email stay, because an email can be shared by look-alike
- * accounts (users.email is case-sensitive) and one account's sign-in must not
- * wipe another's count. A point is given back only while the window it was
- * taken in is still open, so a slow check can't erase failures of the next
- * window. Any email is counted, registered or not, so a lockout reveals
- * nothing about accounts.
+ * counted for the email stay, since a sign-in proves the password, not who
+ * made the earlier guesses (emails are canonical since TAT-18, so there are
+ * no look-alike accounts any more). A point is given back only while the
+ * window it was taken in is still open, so a slow check can't erase
+ * failures of the next window. Any email is counted, registered or not, so
+ * a lockout reveals nothing about accounts.
  */
 export async function throttleLogin<T>(
 	ip: string,

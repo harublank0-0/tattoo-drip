@@ -7,6 +7,33 @@
 import { BaseModel, column } from "@adonisjs/lucid/orm";
 import type { DateTime } from "luxon";
 
+export class AccountTokenSchema extends BaseModel {
+	static $columns = [
+		"createdAt",
+		"email",
+		"expiresAt",
+		"id",
+		"purpose",
+		"tokenHash",
+		"userId",
+	] as const;
+	$columns = AccountTokenSchema.$columns;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column()
+	declare email: string;
+	@column.dateTime()
+	declare expiresAt: DateTime;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare purpose: string;
+	@column()
+	declare tokenHash: string;
+	@column()
+	declare userId: string;
+}
+
 export class ArtistSchema extends BaseModel {
 	static $columns = [
 		"acceptingInquiries",
@@ -776,9 +803,11 @@ export class UserSchema extends BaseModel {
 	static $columns = [
 		"createdAt",
 		"email",
+		"emailVerifiedAt",
 		"fullName",
 		"id",
 		"password",
+		"sessionVersion",
 		"updatedAt",
 	] as const;
 	$columns = UserSchema.$columns;
@@ -786,12 +815,16 @@ export class UserSchema extends BaseModel {
 	declare createdAt: DateTime;
 	@column()
 	declare email: string;
+	@column.dateTime()
+	declare emailVerifiedAt: DateTime | null;
 	@column()
 	declare fullName: string | null;
 	@column({ isPrimary: true })
 	declare id: string;
 	@column({ serializeAs: null })
 	declare password: string;
+	@column()
+	declare sessionVersion: number;
 	@column.dateTime({ autoCreate: true, autoUpdate: true })
 	declare updatedAt: DateTime | null;
 }
