@@ -7,7 +7,9 @@ type OpenInquiry = Extract<InquiryState, { kind: "open" }>;
  * The #inquiry section (TAT-48): the intake form's mount point. TAT-57
  * renders its form in place of <InquiryFallback> (the `open` branch), with
  * `state.preferredArtist` pre-selected and only `state.artists` to choose
- * from, and keeps the closed branches as they are.
+ * from, and keeps the closed branches as they are. The section keeps its id
+ * (`inquiry`) and label (`inquiry-title`) in every state; its heading says
+ * "Inquiries" while closed, so it doesn't invite above a refusal.
  */
 export function InquirySection({
 	state,
@@ -18,8 +20,9 @@ export function InquirySection({
 }) {
 	return (
 		<section id="inquiry" className="section" aria-labelledby="inquiry-title">
+			{/* An invitation only while the section offers one. */}
 			<h2 id="inquiry-title" className="section-title">
-				Send an inquiry
+				{state.kind === "open" ? "Send an inquiry" : "Inquiries"}
 			</h2>
 			<div className="stack measure">
 				{state.kind === "open" ? (

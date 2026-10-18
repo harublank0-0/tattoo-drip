@@ -163,6 +163,23 @@ describe("the studio page", () => {
 		);
 	});
 
+	test("the inquiry section is headed by what it holds: an invitation only while open", () => {
+		const heading = (html: string) =>
+			html.match(/<h2 id="inquiry-title"[^>]*>([^<]*)<\/h2>/)?.[1];
+
+		assert.equal(heading(studioHtml()), "Send an inquiry");
+		// Closed, the heading must not invite while the text below refuses.
+		const closed = studioHtml(CLOSED_STUDIO, [ARJUN]);
+		assert.equal(heading(closed), "Inquiries");
+		assert.doesNotMatch(closed, /Send an inquiry/);
+		// TAT-57 mounts on this id and label either way.
+		assert.equal(count(closed, / id="inquiry"/g), 1);
+		assert.match(
+			closed,
+			/<section id="inquiry"[^>]* aria-labelledby="inquiry-title"/,
+		);
+	});
+
 	test("hostile text stays text and hostile links never render", () => {
 		const html = studioHtml(
 			{
@@ -267,6 +284,16 @@ describe("the artist page", () => {
 		assert.ok(links.includes("/#inquiry"));
 		assert.ok(!links.includes("#inquiry"));
 		assert.match(html, /Books open in March\./);
+		// The section refuses, so its heading doesn't invite.
+		assert.match(html, /<h2 id="inquiry-title"[^>]*>Inquiries<\/h2>/);
+		assert.doesNotMatch(html, /Send an inquiry/);
+	});
+
+	test("an open artist's page invites in the section's heading", () => {
+		assert.match(
+			artistHtml("sita"),
+			/<h2 id="inquiry-title"[^>]*>Send an inquiry<\/h2>/,
+		);
 	});
 });
 
