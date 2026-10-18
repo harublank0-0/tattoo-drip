@@ -13,7 +13,11 @@ import { Challenge, TURNSTILE_PRIVACY_URL } from "../challenge.ts";
 import { browserChallengeHost } from "../challenge-host.ts";
 import { copy } from "../copy.ts";
 import { prepareReference } from "../images.ts";
-import { describeChallengeFailure, describeSubmitError } from "../problems.ts";
+import {
+	describeChallengeFailure,
+	describeSubmitError,
+	unexpectedProblem,
+} from "../problems.ts";
 import {
 	canAdd,
 	EMPTY_REFERENCES,
@@ -240,6 +244,11 @@ export function IntakeForm({
 				setBlockedUntil(Date.now() + problem.waitSeconds * 1000);
 			}
 			setNotice(problem);
+			setFocus("notice");
+		} catch {
+			// Something unexpected threw (the submitter already reset the widget):
+			// say so, with every answer and photo kept, instead of going quiet.
+			setNotice(unexpectedProblem());
 			setFocus("notice");
 		} finally {
 			setPhase("idle");

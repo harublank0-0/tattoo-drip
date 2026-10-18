@@ -8,6 +8,7 @@ import {
 	noticeValues,
 	type ProblemContext,
 	type SubmitProblem,
+	unexpectedProblem,
 } from "../../src/intake/problems.ts";
 
 const SITA_ID = "0199f000-0000-7000-8000-000000000048";
@@ -263,6 +264,60 @@ describe("noticeValues", () => {
 				studio: "Black Needle",
 				wait: "20 minutes",
 			},
+		);
+	});
+});
+
+describe("an answer that isn't shaped as the contract says", () => {
+	/** A validation_failed whose `fields` holds whatever it is told. */
+	const withFields = (fields: unknown) =>
+		apiError(422, "validation_failed", {
+			fields: fields as Record<string, string[]>,
+		});
+
+	test("a field's message that isn't a list is used if it is text, else ignored", () => {
+		assert.deepEqual(
+			describeSubmitError(
+				withFields({
+					idea: "Too long.",
+					placement: ["Say where."],
+					budget: 42,
+					contactName: null,
+					referenceImages: { 0: "nope" },
+				}),
+				CONTEXT,
+			),
+			{
+				kind: "fields",
+				fields: { idea: "Too long.", placement: "Say where." },
+				photos: {},
+				photosError: null,
+			},
+		);
+	});
+
+	test("when nothing in it can be placed, it is the 'some answers weren't accepted' notice", () => {
+		for (const fields of [
+			{ idea: 7 },
+			{ nothing: ["on this form"] },
+			{ referenceImages: 42 },
+			[],
+			"idea",
+		]) {
+			assert.deepEqual(
+				describeSubmitError(withFields(fields), CONTEXT),
+				notice("invalid"),
+				JSON.stringify(fields),
+			);
+		}
+	});
+});
+
+describe("unexpectedProblem", () => {
+	test("is the generic notice: try again, or message the studio", () => {
+		assert.deepEqual(
+			unexpectedProblem(),
+			notice("server", { retry: true, contact: true }),
 		);
 	});
 });

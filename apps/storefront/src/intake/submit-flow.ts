@@ -36,9 +36,15 @@ export function createSubmitter(
 			let challengeToken: string | undefined;
 			if (deps.challenge) {
 				deps.onPhase("checking");
-				const result = await deps.challenge.token();
+				let result: ChallengeResult;
+				try {
+					result = await deps.challenge.token();
+				} catch {
+					// A widget that threw is a check that didn't finish, not a dead form.
+					result = { ok: false, reason: "blocked" };
+				}
 				if (!result.ok) {
-					deps.challenge.reset();
+					resetQuietly(deps.challenge);
 					return { kind: "challenge", reason: result.reason };
 				}
 				challengeToken = result.token;
@@ -50,10 +56,19 @@ export function createSubmitter(
 			} catch (error) {
 				return { kind: "failed", error };
 			} finally {
-				deps.challenge?.reset();
+				resetQuietly(deps.challenge);
 			}
 		} finally {
 			running = false;
 		}
 	};
+}
+
+/** A reset that fails (the widget is gone) must not hide how the attempt ended. */
+function resetQuietly(challenge: SubmitDeps["challenge"]): void {
+	try {
+		challenge?.reset();
+	} catch {
+		// Nothing left to reset; the next attempt renders a new widget.
+	}
 }

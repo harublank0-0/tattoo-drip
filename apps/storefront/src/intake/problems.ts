@@ -122,6 +122,21 @@ export function describeSubmitError(
 	return notice("server", { retry: true, contact: true });
 }
 
+/** What the form says when something it didn't expect threw: try again, or message the studio. */
+export function unexpectedProblem(): Extract<
+	SubmitProblem,
+	{ kind: "notice" }
+> {
+	return {
+		kind: "notice",
+		code: "server",
+		retry: true,
+		contact: true,
+		reload: false,
+		waitSeconds: null,
+	};
+}
+
 export function describeChallengeFailure(
 	reason: ChallengeFailure,
 ): SubmitProblem {
@@ -135,15 +150,16 @@ export function describeChallengeFailure(
 	}
 }
 
-function fieldProblem(apiFields: Record<string, string[]>): SubmitProblem {
+function fieldProblem(apiFields: unknown): SubmitProblem {
 	const fields: FieldErrors = {};
 	const photos: Record<number, string> = {};
 	let photosError: string | null = null;
-	for (const [key, messages] of Object.entries(apiFields)) {
-		const message = messages
-			.find((each) => typeof each === "string" && each.trim() !== "")
-			?.trim()
-			.slice(0, MAX_MESSAGE);
+	const entries =
+		typeof apiFields === "object" && apiFields !== null
+			? Object.entries(apiFields)
+			: [];
+	for (const [key, value] of entries) {
+		const message = firstMessage(value);
 		if (!message) continue;
 		const photo = PHOTO_KEY.exec(key);
 		if (FIELDS.has(key)) {
@@ -161,6 +177,15 @@ function fieldProblem(apiFields: Record<string, string[]>): SubmitProblem {
 	return placed
 		? { kind: "fields", fields, photos, photosError }
 		: notice("invalid");
+}
+
+/** A field's first message as text: the contract says a list, but a lone string counts and anything else is ignored. */
+function firstMessage(value: unknown): string | undefined {
+	const messages: readonly unknown[] = Array.isArray(value) ? value : [value];
+	const text = messages.find(
+		(each): each is string => typeof each === "string" && each.trim() !== "",
+	);
+	return text?.trim().slice(0, MAX_MESSAGE);
 }
 
 /** "a minute", "20 minutes", "an hour", "24 hours": rounded up. */

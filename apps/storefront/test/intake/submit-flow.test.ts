@@ -125,6 +125,70 @@ describe("createSubmitter", () => {
 		assert.equal(sent.length, 2);
 	});
 
+	test("a check that throws is a blocked check: no send, the widget reset", async () => {
+		const events: string[] = [];
+		const phases: SubmitPhase[] = [];
+		const submit = createSubmitter({
+			challenge: {
+				token: () => Promise.reject(new TypeError("render is not a function")),
+				reset: () => events.push("reset"),
+			},
+			send: async () => {
+				events.push("send");
+				return RECEIPT;
+			},
+			onPhase: (phase) => phases.push(phase),
+		});
+
+		assert.deepEqual(await submit(INPUT), {
+			kind: "challenge",
+			reason: "blocked",
+		});
+		assert.deepEqual(events, ["reset"]);
+		assert.deepEqual(phases, ["checking"]);
+		assert.deepEqual(
+			await submit(INPUT),
+			{ kind: "challenge", reason: "blocked" },
+			"free to try again",
+		);
+	});
+
+	test("a widget that throws when reset doesn't hide the answer", async () => {
+		const failure = new Error("refused");
+		for (const [send, expected] of [
+			[async () => RECEIPT, { kind: "sent", receipt: RECEIPT }],
+			[() => Promise.reject(failure), { kind: "failed", error: failure }],
+		] as const) {
+			const submit = createSubmitter({
+				challenge: {
+					token: async () => ({ ok: true, token: "tok-57" }),
+					reset: () => {
+						throw new Error("the widget is gone");
+					},
+				},
+				send,
+				onPhase: () => {},
+			});
+
+			assert.deepEqual(await submit(INPUT), expected);
+		}
+
+		const noToken = createSubmitter({
+			challenge: {
+				token: async () => ({ ok: false, reason: "expired" }),
+				reset: () => {
+					throw new Error("the widget is gone");
+				},
+			},
+			send: async () => RECEIPT,
+			onPhase: () => {},
+		});
+		assert.deepEqual(await noToken(INPUT), {
+			kind: "challenge",
+			reason: "expired",
+		});
+	});
+
 	test("never changes the input it was given", async () => {
 		const { submit } = setup();
 		const input = { ...INPUT };
