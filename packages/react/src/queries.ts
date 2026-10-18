@@ -46,6 +46,7 @@ export const tattooKeys = {
  * one fetch: TanStack Query 5.104's replacement for `ensureQueryData`).
  * Each forwards TanStack Query's `signal`, so a query nobody needs any more
  * cancels its request.
+ * `studio`, `artists` and `artist` set no `staleTime` or `retry`: the app's defaults decide (TAT-44).
  */
 export const tattooQueries = {
 	studio: (client: TattooClient) =>
