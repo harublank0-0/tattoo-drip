@@ -123,7 +123,7 @@ test.group("GET /api/v1/tenants/:tenant/artists (listArtists)", (group) => {
 		assertApiData(await client.get("/api/v1/tenants/api-empty-44/artists"), []);
 	});
 
-	test("an independent artist's studio lists their own profile, at the studio's slug", async ({
+	test("an independent artist's studio lists their own profile, at the slug the studio had when it was created; a rename does not move it", async ({
 		client,
 		assert,
 	}) => {
@@ -131,7 +131,7 @@ test.group("GET /api/v1/tenants/:tenant/artists (listArtists)", (group) => {
 			email: "owner@api-solo-artists-44.example",
 			password: "secret-password",
 		});
-		await tenancy.createTenant(owner, {
+		const tenant = await tenancy.createTenant(owner, {
 			type: "independent",
 			name: "Solo Ink",
 			slug: "api-solo-artists-44",
@@ -149,6 +149,28 @@ test.group("GET /api/v1/tenants/:tenant/artists (listArtists)", (group) => {
 		assert.lengthOf(list.body().data, 1);
 		assert.equal(list.body().data[0].name, "Solo Ink");
 		assertApiData(one, list.body().data[0]);
+
+		// The profile copied the studio's slug once. After a rename the studio
+		// has a new slug but the profile keeps its own, and nothing aliases it.
+		await changeSlug(tenant, "api-solo-renamed-44");
+
+		const renamedList = await client.get(
+			"/api/v1/tenants/api-solo-renamed-44/artists",
+		);
+		assertApiData(renamedList, list.body().data);
+		assertApiData(
+			await client.get(
+				"/api/v1/tenants/api-solo-renamed-44/artists/api-solo-artists-44",
+			),
+			list.body().data[0],
+		);
+		assertApiError(
+			await client.get(
+				"/api/v1/tenants/api-solo-renamed-44/artists/api-solo-renamed-44",
+			),
+			404,
+			"not_found",
+		);
 	});
 
 	test("is cacheable: public, an ETag and a 304; HEAD the same", async ({
