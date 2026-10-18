@@ -10,6 +10,7 @@
 */
 
 import { Env } from "@adonisjs/core/env";
+import { checkStorefrontUrl } from "#services/storefront_url";
 
 export default await Env.create(new URL("../", import.meta.url), {
 	// Node
@@ -23,8 +24,10 @@ export default await Env.create(new URL("../", import.meta.url), {
 	APP_URL: Env.schema.string({ format: "url", tld: false }),
 	// The studio pages' origin with {tenant} for the slug, e.g.
 	// https://{tenant}.example.com: deposit links are built from it (TAT-65).
-	// Unset: http://{tenant}.localhost:3000 (TAT-12's dev host).
-	STOREFRONT_URL: Env.schema.string.optional(),
+	// Required in production; unset in development and tests it is
+	// http://{tenant}.localhost:3000 (TAT-12's dev host).
+	STOREFRONT_URL: (key: string, value?: string) =>
+		checkStorefrontUrl(key, value, process.env.NODE_ENV === "production"),
 
 	// Session
 	SESSION_DRIVER: Env.schema.enum(["cookie", "memory", "database"] as const),

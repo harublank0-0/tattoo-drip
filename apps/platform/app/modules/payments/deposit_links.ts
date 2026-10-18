@@ -74,6 +74,11 @@ export function newReferenceCode(): string {
 	return code;
 }
 
+/** The template deposit links are built from: STOREFRONT_URL, else the dev host. */
+export function storefrontTemplate(): string {
+	return env.get("STOREFRONT_URL") ?? DEV_STOREFRONT_URL;
+}
+
 /**
  * The public deposit page of `slug`'s link: the origin of `template`
  * (STOREFRONT_URL) with the slug for `{tenant}`, then `/deposit#<token>`.
@@ -83,7 +88,7 @@ export function newReferenceCode(): string {
 export function depositPageUrl(
 	slug: string,
 	token: string,
-	template: string = env.get("STOREFRONT_URL") ?? DEV_STOREFRONT_URL,
+	template: string = storefrontTemplate(),
 ): string {
 	if (!template.includes("{tenant}")) {
 		throw new Error(

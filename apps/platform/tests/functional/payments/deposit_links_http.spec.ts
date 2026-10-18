@@ -7,6 +7,7 @@ import { chatLinks } from "#modules/clients/contact_links";
 import { depositPageUrl, tokenFor } from "#modules/payments/deposit_links";
 import DepositLink from "#modules/payments/models/deposit_link";
 import { formatDay } from "#modules/projects/quotes";
+import env from "#start/env";
 import { depositReady, depositServices } from "#tests/helpers/deposits";
 import { makeArtist, makePayment } from "#tests/helpers/pipeline";
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
@@ -62,7 +63,27 @@ test.group("The deposit link on the project page", (group) => {
 			problem: null,
 			message: null,
 			proofReceivedText: null,
+			devHost: true,
 		});
+	});
+
+	test("the panel warns while links point at this machine (the dev host) and stops when STOREFRONT_URL names a real host", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, project } = await ready();
+		const before = env.get("STOREFRONT_URL");
+		assert.isTrue(
+			(await panelFor(client, owner, project.id)).devHost,
+			".env.test points at the dev host",
+		);
+
+		env.set("STOREFRONT_URL", "https://{tenant}.example.com");
+		try {
+			assert.isFalse((await panelFor(client, owner, project.id)).devHost);
+		} finally {
+			env.set("STOREFRONT_URL", before ?? "http://{tenant}.localhost:3000");
+		}
 	});
 
 	test("an owner makes the link; the page shows it, the code, its last day and the chat message", async ({

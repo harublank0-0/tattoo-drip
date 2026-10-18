@@ -15,6 +15,7 @@ import ImageService from "#modules/media/services/image_service";
 import {
 	DEPOSIT_LINK_PROBLEMS,
 	depositMessage,
+	storefrontTemplate,
 } from "#modules/payments/deposit_links";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import DepositLinkService from "#modules/payments/services/deposit_link_service";
@@ -49,6 +50,7 @@ import QuoteService from "#modules/projects/services/quote_service";
 import SessionService from "#modules/scheduling/services/session_service";
 import { sessionTimeText } from "#modules/scheduling/times";
 import type Tenant from "#modules/tenancy/models/tenant";
+import { pointsAtThisMachine } from "#services/storefront_url";
 
 /** How long a new quote is valid by default, in days. */
 const DEFAULT_VALID_DAYS = 14;
@@ -238,8 +240,9 @@ export default class ProjectsController {
 	/**
 	 * The deposit panel (TAT-65): the project's link, rebuilt from its nonce
 	 * (`url` null once it no longer works), why a link can't be made now,
-	 * the chat message that sends it (with a working link and a phone), and
-	 * the day a screenshot came, while one waits.
+	 * the chat message that sends it (with a working link and a phone), the
+	 * day a screenshot came, while one waits, and whether links point at this
+	 * machine (the dev host).
 	 */
 	private async depositPanel(
 		tenant: Tenant,
@@ -279,6 +282,8 @@ export default class ProjectsController {
 						)
 					: null,
 			proofReceivedText: pending ? day(pending.createdAt) : null,
+			// Links that open on this machine reach no client: the card warns.
+			devHost: pointsAtThisMachine(storefrontTemplate()),
 		};
 	}
 }

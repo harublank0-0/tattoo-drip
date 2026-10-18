@@ -389,7 +389,7 @@ function DepositCard({
 }) {
 	const tenant = useTenant();
 	const [busy, setBusy] = useState(false);
-	const { link, problem, message, proofReceivedText } = deposit;
+	const { link, problem, message, proofReceivedText, devHost } = deposit;
 
 	const issue = () => {
 		if (
@@ -426,6 +426,13 @@ function DepositCard({
 				<CardTitle>Deposit</CardTitle>
 			</CardHeader>
 			<CardContent className="flex flex-col gap-4">
+				{devHost && (
+					<p className="rounded-md border border-destructive p-3 text-sm">
+						<strong>Warning:</strong> deposit links point at this computer, so a
+						client can't open them. Set STOREFRONT_URL to your studio pages'
+						address (for example https://{"{tenant}"}.example.com) and restart.
+					</p>
+				)}
 				{proofReceivedText && (
 					<output className="block rounded-md border p-3 text-sm">
 						Payment screenshot received {proofReceivedText}.
