@@ -75,6 +75,9 @@ export function checkAppOrigin(
 		return;
 	}
 	const appHost = bare(origin.hostname);
+	// No studio domain (a one-label studio host such as `https://{tenant}`)
+	// means nothing to share with APP_URL: skipped on purpose, and for
+	// checkStorefrontUrl to judge.
 	const studios = studioDomain(storefrontTemplate);
 	if (studios && (within(appHost, studios) || within(studios, appHost))) {
 		throw new Error(

@@ -123,6 +123,20 @@ test.group("APP_URL at boot (TAT-9)", () => {
 		);
 	});
 
+	test("a one-label studio host has no domain to share with APP_URL, so nothing is compared", ({
+		assert,
+	}) => {
+		// https://{tenant} gives hosts such as studio-one: no label in common,
+		// so there is no studio domain, and a multi-label dashboard host can
+		// be neither on, under nor above a bare name. Whether such a
+		// STOREFRONT_URL is any use is checkStorefrontUrl's question, not this
+		// check's.
+		assert.equal(studioDomain("https://{tenant}"), "");
+		assert.doesNotThrow(() =>
+			checkAppOrigin("https://app.example.com", "https://{tenant}", true),
+		);
+	});
+
 	test("studioDomain is the labels every studio host shares", ({ assert }) => {
 		assert.equal(studioDomain("https://{tenant}.example.com"), "example.com");
 		assert.equal(
