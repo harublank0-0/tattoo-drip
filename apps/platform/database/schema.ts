@@ -183,6 +183,9 @@ export class InquirySchema extends BaseModel {
 		"deletedAt",
 		"id",
 		"idea",
+		"lastContactChannel",
+		"lastContactKind",
+		"lastContactedAt",
 		"placement",
 		"preferredArtistId",
 		"preferredDates",
@@ -217,6 +220,12 @@ export class InquirySchema extends BaseModel {
 	@column()
 	declare idea: string;
 	@column()
+	declare lastContactChannel: string | null;
+	@column()
+	declare lastContactKind: string | null;
+	@column.dateTime()
+	declare lastContactedAt: DateTime | null;
+	@column()
 	declare placement: string;
 	@column()
 	declare preferredArtistId: string | null;
@@ -226,6 +235,30 @@ export class InquirySchema extends BaseModel {
 	declare sourceChannel: string;
 	@column()
 	declare status: string;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
+export class MessageTemplateSchema extends BaseModel {
+	static $columns = [
+		"body",
+		"createdAt",
+		"id",
+		"kind",
+		"tenantId",
+		"updatedAt",
+	] as const;
+	$columns = MessageTemplateSchema.$columns;
+	@column()
+	declare body: string;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare kind: string;
 	@column()
 	declare tenantId: string;
 	@column.dateTime({ autoCreate: true, autoUpdate: true })
@@ -564,6 +597,33 @@ export class ReferenceImageSchema extends BaseModel {
 	declare width: number;
 }
 
+export class StaffAlertSchema extends BaseModel {
+	static $columns = [
+		"createdAt",
+		"id",
+		"inquiryId",
+		"kind",
+		"readAt",
+		"tenantId",
+		"userId",
+	] as const;
+	$columns = StaffAlertSchema.$columns;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare inquiryId: string | null;
+	@column()
+	declare kind: string;
+	@column.dateTime()
+	declare readAt: DateTime | null;
+	@column()
+	declare tenantId: string;
+	@column()
+	declare userId: string;
+}
+
 export class TattooProjectSchema extends BaseModel {
 	static $columns = [
 		"artistId",
@@ -573,6 +633,8 @@ export class TattooProjectSchema extends BaseModel {
 		"deletedAt",
 		"id",
 		"inquiryId",
+		"lastContactChannel",
+		"lastContactKind",
 		"lastContactedAt",
 		"notes",
 		"status",
@@ -594,6 +656,10 @@ export class TattooProjectSchema extends BaseModel {
 	declare id: string;
 	@column()
 	declare inquiryId: string | null;
+	@column()
+	declare lastContactChannel: string | null;
+	@column()
+	declare lastContactKind: string | null;
 	@column.dateTime()
 	declare lastContactedAt: DateTime | null;
 	@column()

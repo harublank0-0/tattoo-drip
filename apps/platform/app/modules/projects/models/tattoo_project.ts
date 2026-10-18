@@ -1,6 +1,10 @@
 import { compose } from "@adonisjs/core/helpers";
 import { TattooProjectSchema } from "#database/schema";
 import { withSoftDeletes } from "#models/mixins/soft_deletes";
+import type {
+	ContactChannel,
+	MessageKind,
+} from "#modules/notifications/messages";
 
 export const PROJECT_STATUSES = [
 	"reviewing",
@@ -31,4 +35,6 @@ export default class TattooProject extends compose(
 	withSoftDeletes,
 ) {
 	declare status: ProjectStatus;
+	declare lastContactChannel: ContactChannel | null;
+	declare lastContactKind: MessageKind | null;
 }
