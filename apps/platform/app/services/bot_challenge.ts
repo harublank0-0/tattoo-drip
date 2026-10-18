@@ -91,6 +91,8 @@ export default class BotChallenge {
 					secret: this.#secret.release(),
 					response: token,
 				}),
+				// A redirect would send the secret again to wherever it points.
+				redirect: "error",
 				signal: AbortSignal.timeout(this.#timeoutMs),
 			});
 		} catch (error) {

@@ -241,6 +241,33 @@ test.group("BotChallenge", () => {
 		}
 	});
 
+	test("a redirect from siteverify is never followed, so the secret goes nowhere else", async ({
+		assert,
+	}) => {
+		const logs = captureLogs();
+		try {
+			// What fetch does: with redirect "error" a 3xx rejects; otherwise it
+			// would POST the form again to the Location.
+			const { calls, fetch } = fakeFetch(({ init }) =>
+				init.redirect === "error"
+					? Promise.reject(new TypeError("fetch failed"))
+					: new Response(null, {
+							status: 307,
+							headers: { location: "https://elsewhere.example/steal" },
+						}),
+			);
+
+			assert.equal(
+				await challenge(fetch).verify(TOKEN, EXPECTED),
+				"unavailable",
+			);
+			assert.lengthOf(calls, 1);
+			assert.equal(calls[0].init.redirect, "error");
+		} finally {
+			logs.restore();
+		}
+	});
+
 	test("Cloudflare's own error is unavailable, and a refused secret is logged as an error", async ({
 		assert,
 	}) => {
