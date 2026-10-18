@@ -28,7 +28,11 @@ export const tenantMiddleware = createMiddleware().server(
  * server functions. TAT-23 builds its per-request SDK client from it.
  */
 export const requestStudio = createServerOnlyFn((): Studio => {
-	const context = getGlobalStartContext();
-	if (!context) throw new Error("requestStudio() runs on the server only");
+	// On the server Start's own getGlobalStartContext() throws when the
+	// middleware has not run yet; its `undefined` is the browser stub, and
+	// createServerOnlyFn throws in the browser before this body.
+	const context = getGlobalStartContext() as NonNullable<
+		ReturnType<typeof getGlobalStartContext>
+	>;
 	return context.studio;
 });
