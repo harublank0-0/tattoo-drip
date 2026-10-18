@@ -2,6 +2,7 @@ import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
 import { type DehydratedApi, dehydrateApi, hydrateApi } from "./api/context.ts";
 import { createRequestApi } from "./api/request.ts";
+import { scrollRestorationKey } from "./deposit/token.ts";
 import { routeTree } from "./routeTree.gen";
 import {
 	type DehydratedSite,
@@ -32,6 +33,8 @@ export function getRouter() {
 		routeTree,
 		context: { queryClient: api.queryClient, tattoo: api.tattoo, site },
 		scrollRestoration: true,
+		// Never the href: a deposit link's token is in its fragment (TAT-65b).
+		getScrollRestorationKey: scrollRestorationKey,
 		defaultNotFoundComponent: NotFoundPage,
 		defaultErrorComponent: RouteErrorPage,
 		dehydrate: (): Dehydrated => ({
