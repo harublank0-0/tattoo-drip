@@ -126,6 +126,18 @@ const routes = {
     tokens: [{"old":"/t/:tenant/settings/payments/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/payments/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/payments/:id","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/payments/:id","type":0,"val":"payments","end":""},{"old":"/t/:tenant/settings/payments/:id","type":1,"val":"id","end":""}],
     types: placeholder as Registry['tenant.settings.payments.destroy']['types'],
   },
+  'tenant.settings.messages': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/settings/messages',
+    tokens: [{"old":"/t/:tenant/settings/messages","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/messages","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/messages","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/messages","type":0,"val":"messages","end":""}],
+    types: placeholder as Registry['tenant.settings.messages']['types'],
+  },
+  'tenant.settings.messages.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/settings/messages',
+    tokens: [{"old":"/t/:tenant/settings/messages","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/messages","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/messages","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/messages","type":0,"val":"messages","end":""}],
+    types: placeholder as Registry['tenant.settings.messages.update']['types'],
+  },
   'tenant.artists': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/artists',

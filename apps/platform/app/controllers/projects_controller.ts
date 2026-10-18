@@ -12,6 +12,8 @@ import ClientService from "#modules/clients/services/client_service";
 import InquiryService from "#modules/inquiries/services/inquiry_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import MessageTemplateService from "#modules/notifications/services/message_template_service";
 import {
 	DEPOSIT_LINK_PROBLEMS,
 	depositMessage,
@@ -91,6 +93,7 @@ export default class ProjectsController {
 		private deposits: DepositService,
 		private payments: PaymentService,
 		private bookings: BookingService,
+		private templates: MessageTemplateService,
 	) {}
 
 	async index(ctx: HttpContext) {
@@ -173,6 +176,8 @@ export default class ProjectsController {
 			: 0;
 		const live = current && !isExpired(current) ? current : null;
 		const { timezone } = tenant;
+		// The studio's own chat texts, else the defaults (TAT-52).
+		const texts = await this.templates.textsFor(tenant);
 		const today = DateTime.fromISO(todayIn(timezone), { zone: "utc" });
 
 		// What this member may record on each session and the move form's
@@ -275,7 +280,14 @@ export default class ProjectsController {
 				live &&
 				client?.phone &&
 				(project.status === "quoted" || project.status === "on_hold")
-					? messageProps(live, client.name, client.phone, tenant.name, timezone)
+					? messageProps(
+							live,
+							client.name,
+							client.phone,
+							tenant.name,
+							timezone,
+							texts.quote,
+						)
 					: null,
 			form: {
 				depositPercent: tenant.defaultDepositPercent,
@@ -446,16 +458,17 @@ function quoteProps(quote: Quote, timezone: string) {
 	};
 }
 
-/** The chat message for a live quote, and the links that send it. */
+/** The chat message for a live quote, in the studio's text, and the links that send it. */
 function messageProps(
 	quote: Quote,
 	clientName: string,
 	phone: string,
 	studioName: string,
 	timezone: string,
+	template: string,
 ) {
 	return chatMessage(
-		quoteMessage({ clientName, studioName, quote, timezone }),
+		quoteMessage({ clientName, studioName, quote, timezone }, template),
 		phone,
 	);
 }

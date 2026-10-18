@@ -90,6 +90,14 @@ router
 					.delete("payments/:id", [controllers.PaymentMethods, "destroy"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.settings.payments.destroy");
+				// The studio's chat messages (TAT-52). The kind is a body field
+				// per message, never a path segment.
+				router
+					.get("messages", [controllers.MessageTemplates, "show"])
+					.as("tenant.settings.messages");
+				router
+					.put("messages", [controllers.MessageTemplates, "update"])
+					.as("tenant.settings.messages.update");
 			})
 			.prefix("/settings")
 			.use(middleware.role({ allow: ["owner"] }));

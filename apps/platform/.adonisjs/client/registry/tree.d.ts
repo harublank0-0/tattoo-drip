@@ -40,6 +40,9 @@ export interface ApiDefinition {
       deposits: {
         update: typeof routes['tenant.settings.deposits.update']
       }
+      messages: typeof routes['tenant.settings.messages'] & {
+        update: typeof routes['tenant.settings.messages.update']
+      }
     }
     artists: typeof routes['tenant.artists'] & {
       create: typeof routes['tenant.artists.create']

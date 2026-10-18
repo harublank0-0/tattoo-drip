@@ -247,6 +247,30 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/payment_methods_controller').default['destroy']>>>
     }
   }
+  'tenant.settings.messages': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/settings/messages'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/message_templates_controller').default['show']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/message_templates_controller').default['show']>>>
+    }
+  }
+  'tenant.settings.messages.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/settings/messages'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/notifications/validators/message_templates').messageTemplatesValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/notifications/validators/message_templates').messageTemplatesValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/message_templates_controller').default['update']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/message_templates_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
   'tenant.artists': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/artists'

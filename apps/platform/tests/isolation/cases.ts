@@ -3,6 +3,8 @@ import Artist from "#modules/artists/models/artist";
 import Client from "#modules/clients/models/client";
 import Inquiry from "#modules/inquiries/models/inquiry";
 import ReferenceImage from "#modules/inquiries/models/reference_image";
+import { DEFAULT_TEMPLATES } from "#modules/notifications/messages";
+import MessageTemplate from "#modules/notifications/models/message_template";
 import DepositLink from "#modules/payments/models/deposit_link";
 import DepositOutcome from "#modules/payments/models/deposit_outcome";
 import Payment from "#modules/payments/models/payment";
@@ -234,6 +236,17 @@ const tenantSlugRows = (target: Studio) =>
 				.orderBy("slug")
 		).map((row) => row.serialize()),
 	}));
+
+// The studio's own message texts (TAT-52): what saving the messages could
+// change.
+const templateRows = (target: Studio) =>
+	inTenant(target.tenant, async () =>
+		(
+			await MessageTemplate.query()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("kind")
+		).map((row) => row.serialize()),
+	);
 
 export const isolationCases: IsolationCase[] = [
 	{
@@ -690,5 +703,24 @@ export const isolationCases: IsolationCase[] = [
 		}),
 		ownStatus: 302,
 		snapshot: sessionRows,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/settings/messages",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: templateRows,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/settings/messages",
+		actor: "owner",
+		// Every default but the quote: A's control stores one row.
+		body: () => ({
+			...DEFAULT_TEMPLATES,
+			quote: "Hi {client_name}, your quote: {price}.",
+		}),
+		ownStatus: 302,
+		snapshot: templateRows,
 	},
 ];
