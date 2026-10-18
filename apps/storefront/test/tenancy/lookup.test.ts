@@ -6,8 +6,22 @@ import { fakeFetch, hangUntilAborted, json } from "./helpers.ts";
 const API = "http://api.test";
 const studio = { slug: "blackneedle", name: "Black Needle" };
 const notFound = { error: { code: "not_found", message: "Not found." } };
+const KEY = "test-server-key-0123456789abcdefghijklmnop";
 
 describe("lookUpTenant", () => {
+	test("sends the server key as a bearer token, and no Authorization without one", async () => {
+		const { calls, fetch } = fakeFetch(() => json(200, { data: studio }));
+
+		await lookUpTenant("blackneedle", { apiUrl: API, key: KEY, fetch });
+		await lookUpTenant("blackneedle", { apiUrl: API, fetch });
+
+		assert.equal(
+			new Headers(calls[0].init.headers).get("authorization"),
+			`Bearer ${KEY}`,
+		);
+		assert.equal(new Headers(calls[1].init.headers).get("authorization"), null);
+	});
+
 	test("asks getStudio for the slug, without cookies", async () => {
 		const { calls, fetch } = fakeFetch(() => json(200, { data: studio }));
 
