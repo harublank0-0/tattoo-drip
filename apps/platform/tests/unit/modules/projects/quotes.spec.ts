@@ -162,4 +162,34 @@ test.group("quoteMessage", () => {
 		});
 		assert.isTrue(text.startsWith("Hi, here is your quote"));
 	});
+
+	test("a studio's own text gets the same values", ({ assert }) => {
+		assert.equal(
+			quoteMessage(
+				{
+					clientName: "Sita Rai",
+					studioName: "Ink House",
+					quote: { ...fixed, depositAmount: 300_000, expiresAt },
+					timezone: KTM,
+				},
+				"Namaste {client_name} ji! {studio_name}: {price}. {deposit_note} Until {valid_until}.",
+			),
+			"Namaste Sita ji! Ink House: NPR 15,000. Deposit: NPR 3,000. Until 28 Oct 2026.",
+		);
+	});
+
+	test("a client's name is never read as a placeholder", ({ assert }) => {
+		const text = quoteMessage({
+			clientName: "{price} Rai",
+			studioName: "Ink House",
+			quote: { ...fixed, depositAmount: 0, expiresAt },
+			timezone: KTM,
+		});
+		assert.isTrue(
+			text.startsWith(
+				"Hi {price}, here is your quote from Ink House: NPR 15,000.",
+			),
+			text,
+		);
+	});
 });
