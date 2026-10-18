@@ -6,6 +6,7 @@ import {
 	formatBytes,
 	hasPhotoErrors,
 	isPreparing,
+	lostPhotos,
 	nextToPrepare,
 	type ReferencesAction,
 	type ReferencesState,
@@ -155,6 +156,60 @@ describe("preparing photos one at a time", () => {
 				.workingId,
 			null,
 		);
+	});
+});
+
+describe("photos lost while a send waits", () => {
+	test("a photo refused during the wait is lost, and the others are not", () => {
+		const waiting = run(pick("IMG_1.HEIC", "b"));
+		const after = [
+			{ type: "started", id: "id-IMG_1.HEIC" },
+			{ type: "refused", id: "id-IMG_1.HEIC", problem: "heic" },
+			{ type: "started", id: "id-b" },
+			{ type: "prepared", id: "id-b", file: jpeg(5) },
+		] satisfies ReferencesAction[];
+		const settled = after.reduce(referencesReducer, waiting);
+
+		assert.deepEqual(
+			lostPhotos(waiting, settled).map((item) => item.name),
+			["IMG_1.HEIC"],
+		);
+		assert.deepEqual(settled.notices, [{ kind: "heic", name: "IMG_1.HEIC" }]);
+	});
+
+	test("photos that all got prepared, or were added later, are not lost", () => {
+		const waiting = run(pick("a", "b"));
+		const prepared = [
+			{ type: "started", id: "id-a" },
+			{ type: "prepared", id: "id-a", file: jpeg(5) },
+			{ type: "started", id: "id-b" },
+			{ type: "prepared", id: "id-b", file: jpeg(5) },
+		] satisfies ReferencesAction[];
+		const settled = prepared.reduce(referencesReducer, waiting);
+
+		assert.deepEqual(lostPhotos(waiting, settled), []);
+		assert.deepEqual(
+			lostPhotos(waiting, referencesReducer(settled, pick("c"))),
+			[],
+		);
+		assert.deepEqual(lostPhotos(EMPTY_REFERENCES, EMPTY_REFERENCES), []);
+	});
+
+	test("a photo that was already refused before the wait is not counted again", () => {
+		const before = run(
+			pick("a", "b"),
+			{ type: "started", id: "id-a" },
+			{ type: "refused", id: "id-a", problem: "unreadable" },
+		);
+		const after = run(
+			pick("a", "b"),
+			{ type: "started", id: "id-a" },
+			{ type: "refused", id: "id-a", problem: "unreadable" },
+			{ type: "started", id: "id-b" },
+			{ type: "prepared", id: "id-b", file: jpeg(5) },
+		);
+
+		assert.deepEqual(lostPhotos(before, after), []);
 	});
 });
 

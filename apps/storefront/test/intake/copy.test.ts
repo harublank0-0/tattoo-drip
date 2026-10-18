@@ -107,6 +107,12 @@ describe("the copy", () => {
 		}
 	});
 
+	test("says a send stopped because a photo couldn't be prepared", () => {
+		assert.match(copy.photos.stopped, /couldn't be prepared/);
+		assert.match(copy.photos.stopped, /wasn't sent/);
+		assert.match(copy.photos.stopped, /send again/);
+	});
+
 	test("labels every source channel, in the contract's order", () => {
 		assert.deepEqual(Object.keys(copy.channels), [
 			"instagram",

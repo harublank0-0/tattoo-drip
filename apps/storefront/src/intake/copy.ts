@@ -195,6 +195,8 @@ export const copy = {
 			"This photo wasn't accepted: {message} Remove it, then send again.",
 		itemError: "Reference photo {index}: {message}",
 		fixPhotos: "Remove the photo marked with a problem.",
+		stopped:
+			"A photo couldn't be prepared, so your inquiry wasn't sent yet. Read the message under the photos, then send again.",
 	},
 	honeypot: "Leave this empty",
 	send: "Send inquiry",

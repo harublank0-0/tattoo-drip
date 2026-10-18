@@ -7,13 +7,18 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
 	IntakeForm,
 	type IntakeFormProps,
+	summaryItems,
 } from "../../src/intake/components/intake-form.tsx";
 import {
 	IntakeSent,
 	statusText,
 } from "../../src/intake/components/notices.tsx";
 import { ReferencePicker } from "../../src/intake/components/reference-picker.tsx";
-import type { ReferencesState } from "../../src/intake/references.ts";
+import { copy } from "../../src/intake/copy.ts";
+import {
+	EMPTY_REFERENCES,
+	type ReferencesState,
+} from "../../src/intake/references.ts";
 import { isAllowedHref } from "../../src/studio/links.ts";
 import { renderWithProviders } from "./providers.tsx";
 
@@ -510,5 +515,38 @@ describe("statusText", () => {
 			statusText("sending", true, 3, 2_202_009),
 			"Still sending. On a slow connection this can take up to 2 minutes; keep this page open.",
 		);
+	});
+});
+
+describe("the error summary's items", () => {
+	const items = (photosStopped: boolean, references = EMPTY_REFERENCES) =>
+		summaryItems({}, references, "Black Needle", photosStopped);
+
+	test("has none when nothing is wrong", () => {
+		assert.deepEqual(items(false), []);
+	});
+
+	test("says a send stopped for a photo, and links to the photo picker", () => {
+		const [item, ...rest] = items(true);
+
+		assert.equal(rest.length, 0);
+		assert.equal(item.target, "references-input");
+		assert.equal(item.message, copy.photos.stopped);
+	});
+
+	test("links to the tray itself when it is full and has no picker", () => {
+		const full: ReferencesState = {
+			...EMPTY_REFERENCES,
+			items: Array.from({ length: 5 }, (_, index) => ({
+				id: `photo-${index}`,
+				name: `p${index}.jpg`,
+				status: "ready" as const,
+				source: null,
+				file: new File([new Uint8Array(3)], "reference.jpg"),
+				error: null,
+			})),
+		};
+
+		assert.equal(items(true, full)[0].target, "references");
 	});
 });

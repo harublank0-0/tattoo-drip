@@ -153,6 +153,19 @@ export function nextToPrepare(
 		: undefined;
 }
 
+/**
+ * The photos `before` held that `after` no longer does. While a send waits
+ * for the tray the person can't remove photos, so a photo that vanished was
+ * refused: the send must stop and say so, not go without it.
+ */
+export function lostPhotos(
+	before: ReferencesState,
+	after: ReferencesState,
+): readonly ReferenceItem[] {
+	const kept = new Set(after.items.map((item) => item.id));
+	return before.items.filter((item) => !kept.has(item.id));
+}
+
 /** Whether a send must wait for photos. */
 export function isPreparing(state: ReferencesState): boolean {
 	return (

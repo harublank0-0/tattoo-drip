@@ -19,6 +19,7 @@ import {
 	EMPTY_REFERENCES,
 	hasPhotoErrors,
 	isPreparing,
+	lostPhotos,
 	nextToPrepare,
 	type ReferencesState,
 	readyItems,
@@ -98,6 +99,8 @@ export function IntakeForm({
 	const [slow, setSlow] = useState(false);
 	const [notice, setNotice] = useState<NoticeProblem | null>(null);
 	const [showSummary, setShowSummary] = useState(false);
+	/** A photo was refused while Send waited, so nothing was sent. */
+	const [photosStopped, setPhotosStopped] = useState(false);
 	const [blockedUntil, setBlockedUntil] = useState<number | null>(null);
 	const [sentTo, setSentTo] = useState<string | null>(null);
 	const [focus, setFocus] = useState<"summary" | "notice" | "sent" | null>(
@@ -171,14 +174,25 @@ export function IntakeForm({
 		try {
 			setNotice(null);
 			setShowSummary(false);
+			setPhotosStopped(false);
 			if (hasPhotoErrors(latest.current)) {
 				setShowSummary(true);
 				setFocus("summary");
 				return;
 			}
 			if (isPreparing(latest.current)) {
+				const asked = latest.current;
 				setPhase("preparing");
 				await new Promise<void>((done) => photoWaiters.current.push(done));
+				// A photo refused meanwhile is not sent without a word: stop, say so,
+				// and keep its message (in the tray) in view. The person can't remove
+				// photos while Send waits, so a photo that vanished was refused.
+				if (lostPhotos(asked, latest.current).length > 0) {
+					setPhotosStopped(true);
+					setShowSummary(true);
+					setFocus("summary");
+					return;
+				}
 			}
 			const sent = readyItems(latest.current);
 			const result = await submit(
@@ -363,7 +377,12 @@ export function IntakeForm({
 
 			<form.Subscribe selector={(formState) => formState.fieldMeta}>
 				{(fieldMeta) => {
-					const items = summaryItems(fieldMeta, references, studioName);
+					const items = summaryItems(
+						fieldMeta,
+						references,
+						studioName,
+						photosStopped,
+					);
 					return showSummary && items.length > 0 ? (
 						<ErrorSummary ref={summaryRef} items={items} />
 					) : null;
@@ -396,16 +415,20 @@ export function IntakeForm({
 					previews={previews}
 					studioName={studioName}
 					disabled={busy}
-					onPick={(files) =>
+					onPick={(files) => {
+						setPhotosStopped(false);
 						dispatch({
 							type: "picked",
 							files: files.map((file) => ({
 								id: `photo-${nextPhotoId.current++}`,
 								file,
 							})),
-						})
-					}
-					onRemove={(id) => dispatch({ type: "removed", id })}
+						});
+					}}
+					onRemove={(id) => {
+						setPhotosStopped(false);
+						dispatch({ type: "removed", id });
+					}}
 				/>
 				<div className="intake-pair">
 					<form.AppField name="placement">
@@ -587,10 +610,11 @@ type FieldMetaMap = Readonly<
 >;
 
 /** Each field's first error, in the form's order, then the photos' (after the idea). */
-function summaryItems(
+export function summaryItems(
 	fieldMeta: FieldMetaMap,
 	references: ReferencesState,
 	studioName: string,
+	photosStopped = false,
 ): SummaryItem[] {
 	const items: SummaryItem[] = [];
 	for (const field of FIELD_ORDER) {
@@ -607,11 +631,13 @@ function summaryItems(
 				message,
 			});
 		}
-		if (field === "idea" && hasPhotoErrors(references)) {
+		if (field === "idea" && (hasPhotoErrors(references) || photosStopped)) {
 			items.push({
 				target: canAdd(references) ? "references-input" : "references",
 				label: copy.photos.legend,
-				message: references.error ?? copy.photos.fixPhotos,
+				message: hasPhotoErrors(references)
+					? (references.error ?? copy.photos.fixPhotos)
+					: copy.photos.stopped,
 			});
 		}
 	}
