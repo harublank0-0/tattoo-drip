@@ -93,7 +93,7 @@ Isolation has several layers:
 
 **Intake (customer → API)**
 1. The studio page maps `blackneedle.platform.com` to the `blackneedle` slug and loads the profile and artists through the SDK.
-2. The browser sends the inquiry and reference images **directly to the API** as one multipart request, with the bot-challenge token in a header. Going direct avoids storefront body-size limits, lets rate limits see the real IP, and leaves no orphaned uploads.
+2. The browser sends the inquiry and reference images **directly to the API** as one multipart request, with the bot-challenge token in a header. Going direct avoids storefront body-size limits, lets rate limits see the real IP, and leaves no orphaned uploads. The studio page first re-encodes the photos as JPEG in the browser (at most 1600 px), so uploads stay small on slow connections and no EXIF or GPS data leaves the phone.
 3. Before it reads the multipart body, the API counts the address, checks the challenge and counts the studio; then it refuses a filled honeypot, validates, counts the phone and processes the images. The Inquiries module matches or creates the client by phone and saves the inquiry as `new`.
 4. A job alerts the studio's staff by email and in the app (queued with the inquiry since TAT-51; the alerts themselves are TAT-52).
 
