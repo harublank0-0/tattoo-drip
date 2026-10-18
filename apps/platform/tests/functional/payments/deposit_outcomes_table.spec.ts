@@ -1,6 +1,7 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import User from "#models/user";
+import DepositOutcome from "#modules/payments/models/deposit_outcome";
 import { withDbContext, withTransaction } from "#services/db_context";
 import {
 	makeArtist,
@@ -95,6 +96,28 @@ test.group("deposit_outcomes table", (group) => {
 				/deposit_outcomes_session_foreign/,
 			);
 		});
+	});
+
+	test("the amount is a bigint: deposits can sum past int4, and it reads back as a number", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("outcome-big-66", "Big");
+		const { project } = await seeded(tenant);
+
+		await withDbContext({ tenantId: tenant.id }, () =>
+			withTransaction((inner) =>
+				insertRow(
+					inner,
+					"deposit_outcomes",
+					outcome(tenant.id, project.id, { amount: 3_000_000_000 }),
+				),
+			),
+		);
+
+		const stored = await inTenant(tenant, () =>
+			DepositOutcome.query().where("project_id", project.id).firstOrFail(),
+		);
+		assert.strictEqual(stored.amount, 3_000_000_000);
 	});
 
 	test("refunded goes with its refund, moved with a session, and the amount is positive", async ({

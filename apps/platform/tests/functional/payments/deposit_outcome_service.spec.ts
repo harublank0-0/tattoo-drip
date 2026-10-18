@@ -318,6 +318,52 @@ test.group("PaymentService.recordOutcome", (group) => {
 		assert.equal(outcome.amount, 300_000);
 	});
 
+	test("deposits that sum past int4 can still be kept or refunded", async ({
+		assert,
+	}) => {
+		const kept = await closed("big-kept-66", "cancelled", 0);
+		const refunded = await closed("big-refunded-66", "cancelled", 0);
+		for (const { tenant, project } of [kept, refunded]) {
+			await inTenant(tenant, async () => {
+				for (let i = 0; i < 3; i += 1) {
+					await makePayment(tenant, project, {
+						amount: 1_000_000_000,
+						status: "verified",
+						verifiedAt: DateTime.utc(),
+					});
+				}
+			});
+		}
+
+		const keptOutcome = await inTenant(kept.tenant, () =>
+			payments.recordOutcome(kept.tenant, kept.member, kept.project, {
+				outcome: "kept",
+				note: null,
+			}),
+		);
+		const refundedOutcome = await inTenant(refunded.tenant, () =>
+			payments.recordOutcome(
+				refunded.tenant,
+				refunded.member,
+				refunded.project,
+				{
+					outcome: "refunded",
+					amount: 1_000_000_000,
+					method: "cash",
+					note: null,
+				},
+			),
+		);
+
+		assert.strictEqual(keptOutcome.amount, 3_000_000_000);
+		assert.strictEqual(refundedOutcome.amount, 3_000_000_000);
+		const money = await inTenant(refunded.tenant, () =>
+			payments.forProject(refunded.tenant, refunded.project),
+		);
+		assert.strictEqual(money.outcome?.amount, 3_000_000_000);
+		assert.equal(money.balance.paid, 2_000_000_000n);
+	});
+
 	test("after the outcome a plain refund works again", async ({ assert }) => {
 		const { tenant, member, project } = await closed("after-66");
 		await inTenant(tenant, () =>

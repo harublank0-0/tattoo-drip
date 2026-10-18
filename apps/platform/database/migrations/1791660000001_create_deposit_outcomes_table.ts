@@ -35,8 +35,12 @@ export default class extends BaseSchema {
 			table.uuid("project_id").notNullable();
 			table.uuid("session_id").nullable();
 			table.enum("outcome", ["kept", "moved", "refunded"]).notNullable();
-			// Paisa: the deposit money held when the outcome was recorded.
-			table.integer("amount").notNullable();
+			// Paisa: the deposit money held when the outcome was recorded. A
+			// bigint: it is a sum of deposits (desk deposits can pile up while a
+			// project waits for a session), which passes int4 where each payment
+			// does not. node-pg returns int8 as a string; DepositOutcome reads it
+			// as a number.
+			table.bigInteger("amount").notNullable();
 			table.string("currency", 3).notNullable().defaultTo("NPR");
 			table.uuid("refund_payment_id").nullable();
 			table.string("note", 500).nullable();

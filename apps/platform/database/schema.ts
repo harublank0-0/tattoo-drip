@@ -144,7 +144,7 @@ export class DepositOutcomeSchema extends BaseModel {
 	] as const;
 	$columns = DepositOutcomeSchema.$columns;
 	@column()
-	declare amount: number;
+	declare amount: bigint | number;
 	@column.dateTime({ autoCreate: true })
 	declare createdAt: DateTime;
 	@column()
