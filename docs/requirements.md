@@ -5,8 +5,10 @@ What the MVP (pilot with a design-partner studio) and V1 (paid launch) must do, 
 ## MVP: the inquiry-to-deposit loop
 
 **Accounts and tenants**
-- [ ] Sign up with email and password, verify the email, log in and out, reset the password
-- [ ] Create a `studio` or `independent` tenant (needs a verified email), with a unique slug that is also its subdomain
+- [x] Sign up with email and password, verify the email, log in and out, reset the password
+- Signup always answers "Check your email": a new address gets a confirmation link (24 hours), a registered one an email saying it already has an account; the page never tells which. Email addresses are case-insensitive. A reset link works once, for an hour, signs every device out and emails the account that its password changed; asking for one never tells whether an address has an account.
+- [x] Create a `studio` or `independent` tenant (needs a verified email), with a unique slug that is also its subdomain
+- Accounts that existed before email confirmation keep every studio they belong to; any account confirms its address before it creates a tenant (or, with invitations, joins one).
 - [ ] Invite members as `owner` or `artist`; revoke invites; remove members; switch between tenants
 - [x] Tenant profile: name, contact phone and email, address, social links, timezone
 - [ ] Payment settings: upload the studio's QR codes (Fonepay, eSewa, Khalti, bank) and a default deposit percentage

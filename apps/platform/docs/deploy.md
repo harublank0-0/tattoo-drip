@@ -15,6 +15,13 @@ Read before a deploy or when changing production settings. The hosting itself is
 - `DB_USER` / `DB_PASSWORD` are the app role. `DB_MIGRATION_PASSWORD` belongs only in the migration step's environment.
 - Mail (TAT-52): new inquiries email the studio's owners and the asked-for artist from the worker. `MAIL_FROM_ADDRESS` must be on the platform's own sending domain with SPF, DKIM and DMARC (TAT-20), and `SMTP_*` a provider allowed to send for it. Until then set `ALERT_EMAILS=false`: the alerts reach the dashboard only, and every process logs one warning at boot. With mail on and SMTP failing, each email fails after 3 retries with one "Sending email failed." log line; the dashboard alerts don't depend on it.
 
+### Account email
+
+- Signup, email confirmation and password reset (TAT-18) need working mail: `MAIL_FROM_ADDRESS` on the platform's sending domain with SPF, DKIM and DMARC (TAT-20), `SMTP_*` a provider allowed to send for it, `APP_URL` the dashboard's public https origin (the links point there), and a running worker. `ALERT_EMAILS=false` doesn't stop these emails.
+- Until mail reaches inboxes, a new account can sign in but can't create a studio. Confirm a pilot's account by hand with `node build/ace.js account:verify <email>` once you have checked who is asking (in person or by phone: it skips the proof the link gives). It prints no token, id or link.
+- A send that fails retries 3 times, then logs one "Sending email failed." line with the recipient and the subject, never the link. The account is untouched; the person asks for a new link ("Send a new link", or a new reset request).
+- Every signed-in session signs out once after this release: sessions now carry the account's session version.
+
 ### Storefront settings (Vercel, TAT-13)
 
 - `API_URL`: the API's public https origin (browsers call it too). `STOREFRONT_URL`, `TURNSTILE_SITE_KEY`, and `STOREFRONT_SERVER_KEY`: one of the platform's keys. With `NODE_ENV=production` a missing key makes every page a 500 that names the variable.
@@ -34,6 +41,7 @@ Values for nginx; set the equivalent on the host's proxy.
 - `client_max_body_size 21m` (the parser's 20 MB plus multipart overhead), `client_header_timeout 15s`, `client_body_timeout 30s` (between two reads), `send_timeout 30s`, `proxy_read_timeout 130s` (above the app's 120 s dashboard upload deadline, so its 408 reaches the client), and `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for`.
 - Keep-alive: the app closes an idle connection after 5 s (Node's default). Keep the proxy's upstream keep-alive below that, or raise `keepAliveTimeout` in `config/app.ts` above the proxy's.
 - No access log for the deposit paths, `/api/v1/tenants/<slug>/deposits/<token>` (GET and POST), and no APM URL capture there: the path holds a deposit link's token for 30 days. In nginx that is a regex location with the same `proxy_pass` and headers as the API's: `location ~ ^/api/v1/tenants/[^/]+/deposits/ { access_log off; ... }`. A prefix location written with a glob, `location /api/v1/tenants/*/deposits/*`, matches nothing (nginx reads the `*` literally), so the tokens would stay in the log; after changing it, send one request and check that it is not logged. Keep `/files` request URLs (signed) out of logs too.
+- No access log for the account links either: `GET /reset-password/<token>` and `GET /verify-email/<token>` carry a single-use token for up to an hour or a day. In nginx: `location ~ ^/(reset-password|verify-email)/ { access_log off; ... }` with the same `proxy_pass` and headers as the dashboard's. The pages they open have no token in their URL.
 - What the app does itself (TAT-38): every API request counts per caller before its body is read, reads per studio too; at most 4 API writes at once per process (2 per address); an upload must arrive within 90 s (120 s on the dashboard); Node drops a request not fully received after 120 s, but it checks only every 30 s (`connectionsCheckingInterval`), so the drop lands between 120 and about 150 s; the 90 s and 120 s upload deadlines are the app's own timers and are exact.
 
 ### Database
@@ -66,6 +74,7 @@ Known and accepted for the pilot. The owner gets no signal for any of them (429s
 
 ### After the first deploy
 
+- Sign up with an address you own: "Confirm your email address" arrives (spam folder included), its link opens the confirmation page, and confirming lets you set up a studio. "Forgot your password?" sends "Choose a new password"; finishing the reset signs out your other browser.
 - Open a studio page, then check the API log: no "server key this API does not accept" and no "no usable X-Visitor-IP" warning (either means the key or the visitor's address isn't reaching the API).
 - `curl -sI https://<api>/api/v1/tenants/<slug>` answers 200 with `Cache-Control: public…` and no `X-RateLimit-*` header.
 - Open a deposit link (a project's "Copy link") on a phone, sent by WhatsApp or Viber (Instagram and Facebook rewrite outgoing links through their own redirect, which carries the whole URL, fragment included, to Meta), then check the storefront's and the CDN's request logs: `/deposit` appears without its `#` fragment, and the API proxy's access log has no `/deposits/` line.
