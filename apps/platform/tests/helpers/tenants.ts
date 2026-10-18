@@ -14,6 +14,7 @@ import {
 	makeProject,
 	makeQuote,
 	makeReferenceImage,
+	makeSession,
 	seedPipeline,
 } from "#tests/helpers/pipeline";
 
@@ -200,6 +201,20 @@ async function studio(slug: string, name: string) {
 		);
 		return { method, project, link, token };
 	});
+	// A scheduled tattoo session on a booked project, for the session routes
+	// (TAT-85): 60 days out, clear of the booking case's day (30 days out).
+	const scheduled = await inTenant(tenant, async () => {
+		const project = await makeProject(tenant, pipeline.client, {
+			status: "booked",
+			artistId: artistProfile.id,
+		});
+		const startsAt = DateTime.now().plus({ days: 60 }).startOf("hour");
+		const session = await makeSession(tenant, project, artistProfile, {
+			startsAt,
+			endsAt: startsAt.plus({ hours: 2 }),
+		});
+		return { project, session };
+	});
 	return {
 		tenant,
 		owner,
@@ -228,6 +243,9 @@ async function studio(slug: string, name: string) {
 		depositProject: deposit.project,
 		depositToken: deposit.token,
 		depositReferenceCode: deposit.link.referenceCode,
+		// The session routes' :id resource (TAT-85) and its project.
+		sessionProject: scheduled.project,
+		session: scheduled.session,
 	};
 }
 
@@ -238,7 +256,7 @@ export type Studio = Awaited<ReturnType<typeof studio>>;
  * (`paymentMethod` is the first), an artist profile (`artistProfile`), a visible artist who takes no inquiries with a slug only that studio has (`closedArtist`, `<slug>-mira`) and one
  * of each pipeline record (`pipeline`: client, accepted inquiry, project,
  * reference image, quote and a submitted payment), plus a quoted project
- * (`quotedProject`, `quotedQuote`), a new inquiry with a reference image (`newInquiry`) and a deposit_pending project with its deposit link (`depositProject`, `depositToken`, `depositReferenceCode`) and the eSewa method its page shows (`depositMethod`); `project` is the pipeline's project; a project booked without a price (`pricelessProject`), a booked project holding a verified deposit (`paidProject`, `verifiedPayment`) and a cancelled one holding a deposit without an outcome (`closedPaidProject`); `payment` is the pipeline's submitted payment. Later tickets add seed data
+ * (`quotedProject`, `quotedQuote`), a new inquiry with a reference image (`newInquiry`) and a deposit_pending project with its deposit link (`depositProject`, `depositToken`, `depositReferenceCode`) and the eSewa method its page shows (`depositMethod`); `project` is the pipeline's project; a project booked without a price (`pricelessProject`), a booked project holding a verified deposit (`paidProject`, `verifiedPayment`) and a cancelled one holding a deposit without an outcome (`closedPaidProject`); `payment` is the pipeline's submitted payment. A booked project assigned to `artistProfile` with a scheduled tattoo session 60 days out (`sessionProject`, `session`) is the session routes' resource (TAT-85). Later tickets add seed data
  * for their own tables here, so every isolation case sees it.
  */
 export async function twoStudios() {

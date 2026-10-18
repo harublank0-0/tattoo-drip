@@ -102,6 +102,10 @@ export interface ApiDefinition {
       reject: typeof routes['tenant.payments.reject']
       reverse: typeof routes['tenant.payments.reverse']
     }
+    sessions: {
+      outcome: typeof routes['tenant.sessions.outcome']
+      move: typeof routes['tenant.sessions.move']
+    }
     calendar: {
       index: typeof routes['tenant.calendar.index']
     }

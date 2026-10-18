@@ -273,6 +273,26 @@ router
 			.use(middleware.role({ allow: ["owner"] }));
 
 		/**
+		 * One session's outcome and time (TAT-85): owners any session, an
+		 * artist only their own on a project assigned to them
+		 * (SessionService.findChangeable gives anyone else a 404). Every
+		 * sessions route goes in this group (a test checks).
+		 */
+		router
+			.group(() => {
+				router
+					.post(":id/outcome", [controllers.ProjectSessions, "outcome"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.sessions.outcome");
+				router
+					.post(":id/move", [controllers.ProjectSessions, "move"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.sessions.move");
+			})
+			.prefix("/sessions")
+			.use(middleware.role({ allow: ["owner", "artist"] }));
+
+		/**
 		 * The calendar: owners (the whole studio or one artist) and artists
 		 * (their own sessions); CalendarService decides what each member
 		 * sees. Every calendar route goes in this group (a test checks).

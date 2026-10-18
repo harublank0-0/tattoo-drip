@@ -631,6 +631,30 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/payments_controller').default['reverse']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
+  'tenant.sessions.outcome': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/sessions/:id/outcome'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/scheduling/validators/session').outcomeValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/scheduling/validators/session').outcomeValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/project_sessions_controller').default['outcome']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/project_sessions_controller').default['outcome']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.sessions.move': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/sessions/:id/move'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/scheduling/validators/session').sessionTimeValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/scheduling/validators/session').sessionTimeValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/project_sessions_controller').default['move']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/project_sessions_controller').default['move']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
   'tenant.calendar.index': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/calendar'

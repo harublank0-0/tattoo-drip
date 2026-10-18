@@ -46,6 +46,7 @@ export type IsolationCase = {
 		| "paidProject"
 		| "closedPaidProject"
 		| "depositProject"
+		| "session"
 		| "newInquiry"
 		| "client";
 	/** Who sends the request. Every settings route is owner-only. */
@@ -130,6 +131,22 @@ const paymentRows = (target: Studio) =>
 				.where("tenant_id", target.tenant.id)
 				.orderBy("id")
 		).map((outcome) => outcome.serialize()),
+		projects: (
+			await TattooProject.withTrashed()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("id")
+		).map(({ id, status }) => ({ id, status })),
+	}));
+
+// Sessions, deleted ones included, and the projects' statuses: what the
+// session routes could change (TAT-85).
+const sessionRows = (target: Studio) =>
+	inTenant(target.tenant, async () => ({
+		sessions: (
+			await ProjectSession.withTrashed()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("id")
+		).map((session) => session.serialize()),
 		projects: (
 			await TattooProject.withTrashed()
 				.where("tenant_id", target.tenant.id)
@@ -626,5 +643,32 @@ export const isolationCases: IsolationCase[] = [
 		actor: "owner",
 		ownStatus: 200,
 		snapshot: none,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/sessions/:id/outcome",
+		resource: "session",
+		actor: "owner",
+		// Cancelling needs no start time, so the session 60 days out takes it.
+		body: () => ({ status: "cancelled" }),
+		ownStatus: 302,
+		snapshot: sessionRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/sessions/:id/move",
+		resource: "session",
+		actor: "owner",
+		// The test studios' timezone; a day after the seeded session.
+		body: () => ({
+			date: DateTime.now()
+				.setZone("Asia/Kathmandu")
+				.plus({ days: 61 })
+				.toFormat("yyyy-MM-dd"),
+			startTime: "13:00",
+			hours: "2",
+		}),
+		ownStatus: 302,
+		snapshot: sessionRows,
 	},
 ];

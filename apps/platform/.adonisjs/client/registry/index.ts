@@ -318,6 +318,18 @@ const routes = {
     tokens: [{"old":"/t/:tenant/payments/:id/reverse","type":0,"val":"t","end":""},{"old":"/t/:tenant/payments/:id/reverse","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/payments/:id/reverse","type":0,"val":"payments","end":""},{"old":"/t/:tenant/payments/:id/reverse","type":1,"val":"id","end":""},{"old":"/t/:tenant/payments/:id/reverse","type":0,"val":"reverse","end":""}],
     types: placeholder as Registry['tenant.payments.reverse']['types'],
   },
+  'tenant.sessions.outcome': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/sessions/:id/outcome',
+    tokens: [{"old":"/t/:tenant/sessions/:id/outcome","type":0,"val":"t","end":""},{"old":"/t/:tenant/sessions/:id/outcome","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/sessions/:id/outcome","type":0,"val":"sessions","end":""},{"old":"/t/:tenant/sessions/:id/outcome","type":1,"val":"id","end":""},{"old":"/t/:tenant/sessions/:id/outcome","type":0,"val":"outcome","end":""}],
+    types: placeholder as Registry['tenant.sessions.outcome']['types'],
+  },
+  'tenant.sessions.move': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/sessions/:id/move',
+    tokens: [{"old":"/t/:tenant/sessions/:id/move","type":0,"val":"t","end":""},{"old":"/t/:tenant/sessions/:id/move","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/sessions/:id/move","type":0,"val":"sessions","end":""},{"old":"/t/:tenant/sessions/:id/move","type":1,"val":"id","end":""},{"old":"/t/:tenant/sessions/:id/move","type":0,"val":"move","end":""}],
+    types: placeholder as Registry['tenant.sessions.move']['types'],
+  },
   'tenant.calendar.index': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/calendar',
