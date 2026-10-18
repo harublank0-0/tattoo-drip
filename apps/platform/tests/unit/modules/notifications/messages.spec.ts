@@ -132,6 +132,28 @@ test.group("templateProblem", () => {
 		);
 	});
 
+	test("a brace that is not part of a placeholder is refused", ({ assert }) => {
+		const stray =
+			"Remove the stray { or }: every brace must be part of a placeholder such as {client_name}.";
+		for (const text of [
+			"Hi {client_name",
+			"Hi {client_name}}",
+			"Hi {{client_name}}",
+			"Hi client_name}",
+			"Hi {",
+		]) {
+			assert.equal(templateProblem("aftercare", text), stray, text);
+		}
+		// A complete wrong placeholder keeps its own message.
+		assert.match(
+			templateProblem("aftercare", "Hi {price}") ?? "",
+			/can't be used here/,
+		);
+		assert.isNull(
+			templateProblem("aftercare", "Hi {client_name}, {studio_name} (ok)"),
+		);
+	});
+
 	test("the deposit link message keeps its link", ({ assert }) => {
 		assert.equal(
 			templateProblem("deposit_link", "Hi {client_name}, pay {amount}."),

@@ -205,6 +205,11 @@ export function templateProblem(
 			return `${braced} can't be used here. This message can use ${list}.`;
 		}
 	}
+	// An unbalanced brace ("{client_name", "{{client_name}}") would reach the
+	// client as typed: refuse what is left once the complete pairs are gone.
+	if (/[{}]/.test(body.replace(BRACED, ""))) {
+		return "Remove the stray { or }: every brace must be part of a placeholder such as {client_name}.";
+	}
 	if (kind === "deposit_link" && !body.includes("{deposit_link}")) {
 		return "Keep {deposit_link}: it is the link the client pays on.";
 	}
