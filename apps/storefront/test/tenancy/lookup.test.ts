@@ -108,6 +108,69 @@ describe("lookUpTenant", () => {
 		}
 	});
 
+	test("a 200 whose JSON is a bare string, number or boolean is unavailable, never a throw", async () => {
+		for (const raw of ['"text"', "5", "true"]) {
+			const { fetch } = fakeFetch(
+				() =>
+					new Response(raw, {
+						status: 200,
+						headers: { "content-type": "application/json" },
+					}),
+			);
+
+			const lookup = await lookUpTenant("blackneedle", { apiUrl: API, fetch });
+
+			assert.equal(lookup.type, "unavailable", raw);
+			assert.equal(
+				lookup.type === "unavailable" && lookup.code,
+				"invalid_response",
+				raw,
+			);
+		}
+	});
+
+	test("an error that isn't the SDK's is unavailable and its message stays out of the result", async () => {
+		const response = {
+			headers: new Headers({ "content-type": "application/json" }),
+			text: async () => "{}",
+			get ok(): boolean {
+				throw new Error("upstream said: secret text");
+			},
+		};
+		const { fetch } = fakeFetch(() => response as unknown as Response);
+
+		const lookup = await lookUpTenant("blackneedle", { apiUrl: API, fetch });
+
+		assert.deepEqual(lookup, {
+			type: "unavailable",
+			status: 0,
+			code: "invalid_response",
+		});
+	});
+
+	test("the API's error code is kept only as a short lowercase token", async () => {
+		for (const [sent, kept] of [
+			["internal_error", "internal_error"],
+			["a".repeat(64), "a".repeat(64)],
+			["a".repeat(65), "unknown_error"],
+			["Has Space", "unknown_error"],
+			["UPPER", "unknown_error"],
+			["line\nbreak", "unknown_error"],
+			["", "unknown_error"],
+			[5, "unknown_error"],
+		] as const) {
+			const { fetch } = fakeFetch(() =>
+				json(503, { error: { code: sent, message: "No." } }),
+			);
+
+			assert.deepEqual(
+				await lookUpTenant("blackneedle", { apiUrl: API, fetch }),
+				{ type: "unavailable", status: 503, code: kept },
+				JSON.stringify(sent),
+			);
+		}
+	});
+
 	test("an API that doesn't answer in time is unavailable", async () => {
 		const { fetch } = fakeFetch(hangUntilAborted);
 

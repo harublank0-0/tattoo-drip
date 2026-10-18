@@ -269,6 +269,37 @@ describe("handleTenantRequest", () => {
 		]);
 	});
 
+	test("a 200 whose JSON is a bare string is a 503 page and one log line without the API's text", async () => {
+		const logged: unknown[] = [];
+		const { fetch } = fakeFetch(
+			() =>
+				new Response('"secret upstream text"', {
+					status: 200,
+					headers: { "content-type": "application/json" },
+				}),
+		);
+		const response = responseOf(
+			await handleTenantRequest(
+				request("blackneedle.tattoodrip.com"),
+				deps(fetch, { log: (...entry) => logged.push(entry) }),
+			),
+		);
+		assert.equal(response.status, 503);
+		assert.equal(response.headers.get("cache-control"), "no-store");
+		assert.equal(response.headers.get("retry-after"), "30");
+		assert.ok(!(await response.text()).includes("secret upstream text"));
+		assert.equal(logged.length, 1);
+		const [message, details] = logged[0] as [
+			string,
+			{ slug: string; status: number; code: string },
+		];
+		assert.equal(message, "Studio lookup failed");
+		assert.deepEqual(Object.keys(details).sort(), ["code", "slug", "status"]);
+		assert.equal(details.slug, "blackneedle");
+		assert.equal(details.code, "invalid_response");
+		assert.ok(!JSON.stringify(logged).includes("secret upstream text"));
+	});
+
 	test("an API_URL that points at another server is a 503, not a missing studio", async () => {
 		const { fetch } = fakeFetch(
 			() =>
