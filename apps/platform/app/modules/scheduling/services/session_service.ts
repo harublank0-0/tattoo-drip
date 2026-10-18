@@ -16,6 +16,7 @@ import {
 } from "#modules/scheduling/errors";
 import ProjectSession, {
 	type SessionKind,
+	type SessionStatus,
 } from "#modules/scheduling/models/project_session";
 import {
 	mayChangeSession,
@@ -50,6 +51,22 @@ export type Recorded = {
 	projectStatus: ProjectStatus;
 	projectMoved: boolean;
 };
+
+/** Sessions per status, every status present (0 when none). */
+export type StatusCounts = Record<SessionStatus, number>;
+
+/** countByStatus's answer: the studio's counts, and each artist's who has a session in the window. */
+export type SessionCounts = {
+	studio: StatusCounts;
+	byArtist: Map<string, StatusCounts>;
+};
+
+const noCounts = (): StatusCounts => ({
+	scheduled: 0,
+	completed: 0,
+	no_show: 0,
+	cancelled: 0,
+});
 
 /** A member recording an outcome, and the clock to judge its start by (tests pass one). */
 type Actor = { member: Member; now?: DateTime };
@@ -163,6 +180,38 @@ export default class SessionService {
 			.where("status", "scheduled")
 			.select("project_id");
 		return new Set(rows.map(({ projectId }) => projectId));
+	}
+
+	/**
+	 * How many of the tenant's live sessions start in the half-open window
+	 * [from, to), per status, for the studio and per artist: the pilot's
+	 * no-show rate (TAT-70) and the no-show report (TAT-76). Counted by
+	 * `starts_at`, so a session recorded late counts in the period it was
+	 * booked for; one grouped query, served by the (tenant_id, starts_at)
+	 * index. The rate is no_show / (completed + no_show), the caller's.
+	 */
+	async countByStatus(
+		tenant: TenantRef,
+		{ from, to }: { from: DateTime; to: DateTime },
+	): Promise<SessionCounts> {
+		const rows = await ProjectSession.query()
+			.where("tenant_id", tenant.id)
+			.where("starts_at", ">=", from.toJSDate())
+			.where("starts_at", "<", to.toJSDate())
+			.select("artist_id", "status")
+			.count("* as total")
+			.groupBy("artist_id", "status");
+		const studio = noCounts();
+		const byArtist = new Map<string, StatusCounts>();
+		for (const row of rows) {
+			// count(*) is int8, which node-pg returns as a string.
+			const total = Number(row.$extras.total);
+			studio[row.status] += total;
+			const artist = byArtist.get(row.artistId) ?? noCounts();
+			artist[row.status] += total;
+			byArtist.set(row.artistId, artist);
+		}
+		return { studio, byArtist };
 	}
 
 	/**
