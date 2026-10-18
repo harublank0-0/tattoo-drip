@@ -266,6 +266,52 @@ describe("a token per attempt", () => {
 		assert.deepEqual(await result, { ok: true, token: "fresh" });
 	});
 
+	test("the same callback arriving twice settles the attempt once", async () => {
+		const { challenge, options } = await ready();
+		const first = challenge.token();
+		await tick();
+		const { callback } = options();
+		callback("once");
+		callback("once");
+
+		assert.deepEqual(await first, { ok: true, token: "once" });
+
+		challenge.reset();
+		const next = challenge.token();
+		const state = await Promise.race([next, tick().then(() => "waiting")]);
+		assert.equal(state, "waiting", "the repeat didn't answer the next attempt");
+	});
+
+	test("a spent token arriving again, after a reset, never answers the new attempt", async () => {
+		const { challenge, options } = await ready();
+		const first = challenge.token();
+		await tick();
+		const { callback } = options();
+		callback("spent");
+		assert.deepEqual(await first, { ok: true, token: "spent" });
+
+		challenge.reset();
+		const second = challenge.token();
+		await tick();
+		callback("spent");
+		const state = await Promise.race([second, tick().then(() => "waiting")]);
+		assert.equal(state, "waiting", "a used token must not be sent twice");
+
+		callback("fresh");
+		assert.deepEqual(await second, { ok: true, token: "fresh" });
+	});
+
+	test("a token that came while nothing waited is not spent: the next attempt may use it", async () => {
+		const { challenge, options } = await ready();
+		const { callback } = options();
+		callback("early");
+		const result = challenge.token();
+		await tick();
+		callback("early");
+
+		assert.deepEqual(await result, { ok: true, token: "early" });
+	});
+
 	test("dispose removes the widget and ends a waiting attempt", async () => {
 		const { challenge, calls } = await ready();
 		const result = challenge.token();

@@ -21,6 +21,9 @@ export const SCRIPT_TIMEOUT_MS = 20_000;
 /** How long a send waits for a token while no checkbox is showing. */
 export const TOKEN_TIMEOUT_MS = 30_000;
 
+/** How many used tokens are remembered (a repeat arrives right after the first, if at all). */
+const SPENT_TOKENS_KEPT = 4;
+
 export interface TurnstileRenderOptions {
 	sitekey: string;
 	action: string;
@@ -82,6 +85,8 @@ export class Challenge {
 	#container: HTMLElement | null = null;
 	#widget: string | null = null;
 	#attempt: Attempt | null = null;
+	/** The last tokens handed to an attempt: a repeat of one is never handed out again. */
+	#spent: string[] = [];
 
 	/** `onInteractive` hears when Cloudflare shows its checkbox, and when that ends. */
 	constructor(
@@ -201,7 +206,7 @@ export class Challenge {
 			"refresh-expired": "manual",
 			"response-field": false,
 			"feedback-enabled": false,
-			callback: (token) => this.#settle({ ok: true, token }),
+			callback: (token) => this.#accept(token),
 			"error-callback": () => {
 				this.#settle({ ok: false, reason: "blocked" });
 				return true;
@@ -232,6 +237,13 @@ export class Challenge {
 			() => this.#settle({ ok: false, reason: "blocked" }),
 			TOKEN_TIMEOUT_MS,
 		);
+	}
+
+	/** A token from Cloudflare: for the attempt waiting, once. A repeat of one already used is ignored (it is spent). */
+	#accept(token: string): void {
+		if (this.#spent.includes(token) || !this.#attempt) return;
+		this.#spent = [...this.#spent, token].slice(-SPENT_TOKENS_KEPT);
+		this.#settle({ ok: true, token });
 	}
 
 	#settle(result: ChallengeResult): void {
