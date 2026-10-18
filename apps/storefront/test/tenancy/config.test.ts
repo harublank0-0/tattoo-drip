@@ -165,7 +165,13 @@ describe("STOREFRONT_SERVER_KEY", () => {
 	});
 
 	test("reads a key of token68 characters, trimmed", () => {
-		for (const key of [KEY, `${"q".repeat(43)}=`, "a".repeat(256)]) {
+		for (const key of [
+			KEY,
+			"a".repeat(32),
+			`${"q".repeat(43)}=`,
+			"a".repeat(256),
+			`${"a".repeat(256)}==`,
+		]) {
 			assert.equal(
 				parseStorefrontConfig({ ...PROD, STOREFRONT_SERVER_KEY: ` ${key}\n` })
 					.serverKey,
@@ -183,9 +189,16 @@ describe("STOREFRONT_SERVER_KEY", () => {
 			`${"a".repeat(32)}é`,
 			`${"a".repeat(16)}=${"b".repeat(16)}`,
 			`${"a".repeat(32)}"`,
+			`${"a".repeat(32)}===`,
+			`${"a".repeat(256)}${"=".repeat(50)}`,
 		]) {
 			const message = failure({ ...PROD, STOREFRONT_SERVER_KEY: key });
 			assert.match(message, /STOREFRONT_SERVER_KEY is invalid/, key);
+			assert.match(
+				message,
+				/32 to 256 letters, digits or .* at most two =/,
+				key,
+			);
 			assert.doesNotMatch(message, /API_URL is|STOREFRONT_URL is/, key);
 			assert.ok(!message.includes(key), key);
 		}

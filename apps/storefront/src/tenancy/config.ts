@@ -30,10 +30,10 @@ const STOREFRONT_URL_SHAPE =
 	/^(https?):\/\/\{tenant\}\.([^/?#:@]+)(?::(\d{1,5}))?\/?$/;
 
 const SERVER_KEY_RULE =
-	"32 to 256 letters, digits or -._~+/ characters, then optional = padding, e.g. the output of openssl rand -base64 32";
+	"32 to 256 letters, digits or -._~+/ characters, then at most two = of padding, e.g. the output of openssl rand -base64 32";
 
-/** RFC 7235 token68, the characters a Bearer token may hold, at least 32 of them. */
-const SERVER_KEY_SHAPE = /^[A-Za-z0-9._~+/-]{32,256}=*$/;
+/** RFC 7235 token68, the characters a Bearer token may hold: 32 to 256 of them, then base64's padding. */
+const SERVER_KEY_SHAPE = /^[A-Za-z0-9._~+/-]{32,256}={0,2}$/;
 
 const DEFAULT_PORTS = { "http:": 80, "https:": 443 } as const;
 
