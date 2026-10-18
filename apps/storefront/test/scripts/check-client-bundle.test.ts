@@ -54,7 +54,8 @@ describe("check-client-bundle", () => {
 			"API_URL",
 			"process.env",
 			"Studio lookup failed",
-			"s-maxage=60",
+			"Studio not found",
+			"handleTenantRequest",
 		];
 		for (const name of names) {
 			for (const file of [
@@ -72,6 +73,15 @@ describe("check-client-bundle", () => {
 				assert.ok(out.includes(name), out);
 			}
 		}
+	});
+
+	test("lets a route's cache header through: page routes set s-maxage in code the browser also gets", () => {
+		const { code, out } = check(
+			bundle({
+				"assets/index-abc.js": `${SDK_TEXT}; h = "public, max-age=0, s-maxage=60";`,
+			}),
+		);
+		assert.equal(code, 0, out);
 	});
 
 	test("never prints what surrounds a match", () => {

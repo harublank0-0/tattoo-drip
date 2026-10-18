@@ -10,7 +10,8 @@ import { extname, join, relative, resolve } from "node:path";
 /**
  * Text that exists only in server code: the settings and the key, the tenant
  * middleware and its pages and log line. Each is in the server output of the
- * current build, and none is in the browser's.
+ * current build, and none is in the browser's. No cache header (s-maxage) is
+ * listed: page routes set theirs in code the browser bundle also holds.
  */
 const SERVER_ONLY = [
 	"STOREFRONT_SERVER_KEY",
@@ -27,7 +28,6 @@ const SERVER_ONLY = [
 	"Studio lookup failed",
 	"Studio not found",
 	"The storefront's settings",
-	"s-maxage=60",
 ];
 
 /**
