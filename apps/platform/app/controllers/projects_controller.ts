@@ -264,7 +264,8 @@ export default class ProjectsController {
 				? {
 						url,
 						referenceCode: link.referenceCode,
-						expiresText: day(link.expiresAt),
+						// The last day it works: the day before the instant it expires.
+						expiresText: formatDay(validUntil(link.expiresAt, tenant.timezone)),
 					}
 				: null,
 			problem: problem ? DEPOSIT_LINK_PROBLEMS[problem] : null,

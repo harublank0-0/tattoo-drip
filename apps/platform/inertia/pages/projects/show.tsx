@@ -393,7 +393,7 @@ function DepositCard({
 
 	const issue = () => {
 		if (
-			link &&
+			link?.url &&
 			!window.confirm(
 				"Make a new link? The link you sent before stops working.",
 			)

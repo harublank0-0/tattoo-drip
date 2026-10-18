@@ -6,7 +6,7 @@ import type User from "#models/user";
 import { chatLinks } from "#modules/clients/contact_links";
 import { depositPageUrl, tokenFor } from "#modules/payments/deposit_links";
 import DepositLink from "#modules/payments/models/deposit_link";
-import { formatDay } from "#modules/projects/quotes";
+import { formatDay, validUntil } from "#modules/projects/quotes";
 import env from "#start/env";
 import { depositReady, depositServices } from "#tests/helpers/deposits";
 import { makeArtist, makePayment } from "#tests/helpers/pipeline";
@@ -108,7 +108,7 @@ test.group("The deposit link on the project page", (group) => {
 		assert.equal(panel.link.referenceCode, link?.referenceCode);
 		assert.equal(
 			panel.link.expiresText,
-			formatDay(link?.expiresAt.setZone(KTM).toFormat("yyyy-MM-dd") ?? ""),
+			formatDay(validUntil(link?.expiresAt ?? DateTime.now(), KTM)),
 		);
 		assert.isNull(panel.problem);
 		const text = `Hi Sita, please pay your deposit of NPR 3,000 to Black Needle. Write ${link?.referenceCode} in the payment remark, then send a screenshot of the payment on this page:\n${url}`;
@@ -118,6 +118,35 @@ test.group("The deposit link on the project page", (group) => {
 			whatsappUrl: chat.whatsapp,
 			viberUrl: chat.viber,
 		});
+	});
+
+	test("'Works until' is the last day the link works: a link that ends at midnight works until the day before", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant, project } = await ready();
+		await makeLink(client, owner, project.id);
+		const link = await linkOf(tenant, project.id);
+		const midnight = DateTime.now()
+			.setZone(KTM)
+			.plus({ days: 20 })
+			.startOf("day");
+
+		for (const [expiresAt, lastDay] of [
+			[midnight, midnight.minus({ days: 1 })],
+			[midnight.plus({ hours: 14, minutes: 32 }), midnight],
+			[midnight.plus({ days: 1 }).minus({ milliseconds: 1 }), midnight],
+		] as const) {
+			await inTenant(tenant, async () => {
+				link?.merge({ expiresAt });
+				await link?.save();
+			});
+			assert.equal(
+				(await panelFor(client, owner, project.id)).link.expiresText,
+				formatDay(lastDay.toFormat("yyyy-MM-dd")),
+				expiresAt.toISO() ?? "",
+			);
+		}
 	});
 
 	test("New link replaces it: another URL, the same code, and the old token is dead", async ({
