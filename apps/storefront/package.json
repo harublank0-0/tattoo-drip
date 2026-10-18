@@ -11,6 +11,7 @@
 		"build": "vite build && cp instrument.server.mjs .output/server",
 		"preview": "vite preview",
 		"typecheck": "tsc --noEmit",
+		"test": "node --import tsx --test \"test/**/*.test.ts\"",
 		"start": "node --import ./.output/server/instrument.server.mjs .output/server/index.mjs"
 	},
 	"dependencies": {
@@ -66,6 +67,7 @@
 		"@vitejs/plugin-react": "^6.0.1",
 		"babel-plugin-react-compiler": "^1.0.0",
 		"dotenv-cli": "^11.0.0",
+		"tsx": "^4.23.12",
 		"typescript": "^6.0.2",
 		"vite": "^8.0.0"
 	}
