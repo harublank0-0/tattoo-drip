@@ -23,7 +23,8 @@ What the MVP (pilot with a design-partner studio) and V1 (paid launch) must do, 
 **Inquiries and projects**
 - [ ] An inbox of new inquiries; accept one (creating a project) or decline it
 - [ ] A project board following the [project lifecycle](#project-rules), with notes and a "last contacted" time
-- [ ] One tap opens the client's WhatsApp or Viber with a prefilled message: received, quote, deposit link, booking confirmation, reminder, aftercare
+- [x] One tap opens the client's WhatsApp or Viber with a prefilled message: received, quote, deposit link, booking confirmation, reminder, aftercare
+- Each studio writes its six messages once (Settings, Messages), with placeholders such as `{client_name}` and `{session_time}`, or keeps the defaults; nothing is sent automatically. The links open the client's stored number; Viber can't carry text, so the message is copied and pasted. Every tap records when the client was last contacted, on which channel and with which message, on the inquiry or the project; an accepted inquiry's last contact carries to its project.
 
 **Quotes and payments**
 - [ ] Quote: a fixed price, or an hourly rate with estimated hours, plus a deposit amount (which may be zero) and an expiry; quotes can be revised
@@ -48,7 +49,8 @@ What the MVP (pilot with a design-partner studio) and V1 (paid launch) must do, 
 - The client list and profiles are for owners. Owners can edit a client's name, phone, email and notes; what a client submits through the form never changes their record.
 
 **Notifications, page and app**
-- [ ] Staff are alerted to new inquiries by email and in the app. No automatic customer messages in the MVP; replies go through the one-tap chat links
+- [x] Staff are alerted to new inquiries by email and in the app. No automatic customer messages in the MVP; replies go through the one-tap chat links
+- A new inquiry alerts each owner, and the artist the client asked for when that profile is linked to a member, once each: an email (the client's first name and the start of the idea, never the phone; owners get a link to the inquiry) and an alert under the dashboard's bell. Email can be switched off for the whole platform until its sending domain exists.
 - [x] Studio page at `{slug}.platform.com`: profile, artists, Instagram link, intake form
 - [ ] The dashboard is mobile-first and installable as a web app
 - [ ] Pilot metrics: share of inquiries arriving through the link, time from inquiry to verified deposit, session no-shows
