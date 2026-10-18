@@ -1,4 +1,10 @@
-import { createHash, createHmac, randomBytes, randomInt } from "node:crypto";
+import {
+	createHash,
+	createHmac,
+	hkdfSync,
+	randomBytes,
+	randomInt,
+} from "node:crypto";
 import type { DepositLinkRuleReason } from "#modules/payments/errors";
 import env from "#start/env";
 
@@ -27,15 +33,31 @@ export function newTokenNonce(): string {
 }
 
 /**
- * A link's token, derived from its nonce with APP_KEY, so the owner's page
- * can show the link again at any time while the database holds no token.
- * Rotating APP_KEY changes every token: the stored hashes stop matching and
- * every link stops working.
+ * The key tokens are derived with: HKDF of APP_KEY with a label of its own,
+ * so tokenFor never shares the raw APP_KEY with `digest()` (rate-limit keys)
+ * or anything else that HMACs with it. Rotating APP_KEY changes it.
+ */
+function tokenKey(): Buffer {
+	return Buffer.from(
+		hkdfSync(
+			"sha256",
+			env.get("APP_KEY").release(),
+			"",
+			"tattoo-drip deposit-link token key v1",
+			32,
+		),
+	);
+}
+
+/**
+ * A link's token, derived from its nonce with a key made from APP_KEY, so
+ * the owner's page can show the link again at any time while the database
+ * holds no token. Rotating APP_KEY changes every token: the nonce no longer
+ * derives the stored hash (DepositLinkService.liveToken) and every link
+ * stops working.
  */
 export function tokenFor(nonce: string): string {
-	return createHmac("sha256", env.get("APP_KEY").release())
-		.update(`deposit-link:v1:${nonce}`)
-		.digest("base64url");
+	return createHmac("sha256", tokenKey()).update(nonce).digest("base64url");
 }
 
 /** What a token is looked up by: its SHA-256 in hex. */

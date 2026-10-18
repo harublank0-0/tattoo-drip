@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, createHmac, hkdfSync } from "node:crypto";
 import { test } from "@japa/runner";
 import {
 	DEPOSIT_TOKEN,
@@ -11,6 +11,8 @@ import {
 	REFERENCE_ALPHABET,
 	tokenFor,
 } from "#modules/payments/deposit_links";
+import { digest } from "#services/rate_limits";
+import env from "#start/env";
 
 const TOKEN = "T".repeat(43);
 
@@ -32,6 +34,31 @@ test.group("deposit link tokens", () => {
 		assert.equal(tokenFor(nonce), token);
 		assert.notEqual(tokenFor(newTokenNonce()), token);
 		assert.notInclude(token, nonce, "the token doesn't show its nonce");
+	});
+
+	test("the token comes from a key of its own: HKDF of APP_KEY, not the raw key digest() uses", ({
+		assert,
+	}) => {
+		const nonce = newTokenNonce();
+		const appKey = env.get("APP_KEY").release();
+		const linkKey = Buffer.from(
+			hkdfSync(
+				"sha256",
+				appKey,
+				"",
+				"tattoo-drip deposit-link token key v1",
+				32,
+			),
+		);
+
+		assert.equal(
+			tokenFor(nonce),
+			createHmac("sha256", linkKey).update(nonce).digest("base64url"),
+		);
+		// digest() keys with the raw APP_KEY, so no input given to it may
+		// ever produce a token.
+		assert.notEqual(tokenFor(nonce), digest(nonce));
+		assert.notEqual(tokenFor(nonce), digest(`deposit-link:v1:${nonce}`));
 	});
 
 	test("the hash is the token's SHA-256 in hex", ({ assert }) => {
