@@ -1,6 +1,6 @@
 import { fill } from "../intake/copy.ts";
 import type { HeadMeta, HeadTags } from "../studio/seo.ts";
-import { copy } from "./copy.ts";
+import { headCopy } from "./head-copy.ts";
 
 /*
  * The deposit page's head and headers (TAT-65b, spec ruling 6): never
@@ -18,10 +18,12 @@ export const DEPOSIT_PAGE_HEADERS: Readonly<Record<string, string>> = {
 
 export function depositHead(studioName: string | null): HeadTags {
 	const values = { studio: studioName ?? "" };
-	const title = studioName ? fill(copy.titleWithStudio, values) : copy.title;
+	const title = studioName
+		? fill(headCopy.titleWithStudio, values)
+		: headCopy.title;
 	const description = studioName
-		? fill(copy.descriptionWithStudio, values)
-		: copy.description;
+		? fill(headCopy.descriptionWithStudio, values)
+		: headCopy.description;
 	const meta: HeadMeta[] = [
 		{ title },
 		{ name: "description", content: description },

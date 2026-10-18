@@ -1,5 +1,6 @@
 import type { DepositPaymentMethod } from "@tattoo-drip/sdk";
 import type { PhotoProblem } from "../intake/copy.ts";
+import { headCopy } from "./head-copy.ts";
 
 /*
  * Every word the deposit page shows (TAT-65b), in English. Templates hold
@@ -99,11 +100,8 @@ const notices: Readonly<Record<ProofNoticeCode, NoticeText>> = {
 };
 
 export const copy = {
-	title: "Pay your deposit",
-	titleWithStudio: "Pay your deposit · {studio}",
-	description: "Pay your deposit, then send a screenshot of the payment.",
-	descriptionWithStudio:
-		"Pay your deposit to {studio}, then send a screenshot of the payment.",
+	// title, titleWithStudio, description, descriptionWithStudio: head-copy.ts
+	...headCopy,
 	heading: "Pay your deposit to {studio}",
 	withArtist: "with {artist}",
 	briefSummary: "Your tattoo idea",

@@ -85,3 +85,16 @@ test("no control is natively disabled: a focused one would drop focus to the bod
 		assert.doesNotMatch(read(file), /(?<![-\w])disabled=/, file);
 	}
 });
+
+test("the head (seo.ts) imports only the head strings, never the page's copy: the route's head runs in the entry chunk of every page", () => {
+	const imports = Array.from(
+		read("seo.ts").matchAll(/from "([^"]+)"/g),
+		(match) => match[1],
+	).sort();
+	assert.deepEqual(imports, [
+		"../intake/copy.ts",
+		"../studio/seo.ts",
+		"./head-copy.ts",
+	]);
+	assert.doesNotMatch(read("head-copy.ts"), /\bimport\b/);
+});

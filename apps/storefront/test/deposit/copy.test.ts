@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { copy, PROOF_NOTICE_CODES } from "../../src/deposit/copy.ts";
+import { headCopy } from "../../src/deposit/head-copy.ts";
 import { PHOTO_PROBLEMS } from "../../src/intake/copy.ts";
 
 /** The placeholders the page fills somewhere. */
@@ -139,5 +140,19 @@ describe("the deposit page's copy", () => {
 	test("says the studio is paid directly, never Tattoo Drip", () => {
 		assert.match(copy.footer, /\{studio\} directly/);
 		assert.match(copy.footer, /never handles your money/);
+	});
+});
+
+describe("the head strings", () => {
+	test("live in head-copy.ts, which copy.ts carries whole", () => {
+		for (const key of Object.keys(headCopy) as Array<keyof typeof headCopy>) {
+			assert.equal(copy[key], headCopy[key], key);
+		}
+		assert.deepEqual(Object.keys(headCopy).sort(), [
+			"description",
+			"descriptionWithStudio",
+			"title",
+			"titleWithStudio",
+		]);
 	});
 });
