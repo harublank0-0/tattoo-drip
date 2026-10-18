@@ -273,17 +273,23 @@ function withQuery(url: string, query?: Query): string {
 }
 
 /**
- * The JSON body, or undefined when there is none or it isn't JSON. Reading
- * the body can still fail (a timeout or a dropped connection): that throws.
+ * The JSON body, or undefined when there is none, it isn't JSON or it isn't an
+ * object (a bare string, number, boolean, null or array is no envelope, and
+ * `"data" in body` would throw on it). Reading the body can still fail (a
+ * timeout or a dropped connection): that throws.
  */
 async function readJson(response: Response): Promise<ResponseBody | undefined> {
 	if (!response.headers.get("content-type")?.includes("json")) return undefined;
 	const text = await response.text();
+	let parsed: unknown;
 	try {
-		return JSON.parse(text);
+		parsed = JSON.parse(text);
 	} catch {
 		return undefined;
 	}
+	return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+		? (parsed as ResponseBody)
+		: undefined;
 }
 
 /** `Retry-After` in seconds, when the API sent it as a number. */
