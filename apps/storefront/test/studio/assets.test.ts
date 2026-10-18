@@ -46,6 +46,37 @@ describe("the stylesheet's files", () => {
 	});
 });
 
+/** The declarations of the rule whose selector list is exactly `selector`. */
+function ruleBody(css: string, selector: string): string {
+	const bare = css.replace(/\/\*[\s\S]*?\*\//g, "");
+	for (const match of bare.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+		if (match[1].trim() === selector) return match[2];
+	}
+	return "";
+}
+
+describe("text the studio typed", () => {
+	const css = readFileSync(new URL("styles.css", SRC), "utf8");
+
+	// A long name, a long host name or an unbroken string has no space to wrap
+	// at: without `overflow-wrap: anywhere` it widens the page past 375 px.
+	test("every element that holds it can wrap anywhere (a long link label can't widen the page)", () => {
+		for (const selector of [
+			"h1, h2, h3",
+			".user-text",
+			".action",
+			".link-chip",
+			".site-bar a",
+		]) {
+			assert.match(
+				ruleBody(css, selector),
+				/overflow-wrap:\s*anywhere/,
+				selector,
+			);
+		}
+	});
+});
+
 describe("route imports of built assets", () => {
 	test("every ?url import in src/ names a file that exists", () => {
 		const files = readdirSync(SRC, { recursive: true })

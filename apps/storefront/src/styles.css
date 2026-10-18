@@ -166,7 +166,7 @@
 
   .contact { display: grid; gap: 1.25rem; font-style: normal; }
   .links { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
-  .link-chip { display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0.25rem 0.875rem; border: 1px solid var(--line-strong); border-radius: var(--radius); color: var(--ink); text-decoration: none; transition: border-color 150ms ease, color 150ms ease; }
+  .link-chip { display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0.25rem 0.875rem; border: 1px solid var(--line-strong); border-radius: var(--radius); color: var(--ink); text-decoration: none; overflow-wrap: anywhere; transition: border-color 150ms ease, color 150ms ease; }
   .link-chip:hover { border-color: var(--stencil); color: var(--stencil); }
   .street { display: grid; justify-items: start; gap: 0.25rem; }
   .text-link { display: inline-flex; align-items: center; min-height: 2.75rem; color: var(--stencil); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.2em; }
