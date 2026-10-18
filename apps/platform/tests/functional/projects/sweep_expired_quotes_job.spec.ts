@@ -164,6 +164,53 @@ test.group("SweepExpiredQuotesJob", (group) => {
 		assert.equal(await statusIn(c.tenant, foreign.project), "quoted");
 	});
 
+	test("through the worker, spares a waiting screenshot and a deposit reversed after the expiry", async ({
+		assert,
+	}) => {
+		const a = await studioWithOwner("sweep-late-66", "Late");
+		const waiting = await projectWithQuote(a.tenant, "deposit_pending");
+		const reversed = await projectWithQuote(a.tenant, "deposit_pending");
+		const unpaid = await projectWithQuote(a.tenant, "deposit_pending");
+		await inTenant(a.tenant, async () => {
+			await makePayment(a.tenant, waiting.project);
+			const deposit = await makePayment(a.tenant, reversed.project, {
+				status: "verified",
+				verifiedAt: DateTime.utc().minus({ hours: 2 }),
+			});
+			await makePayment(a.tenant, reversed.project, {
+				kind: "correction",
+				amount: -300_000,
+				correctsPaymentId: deposit.id,
+				status: "verified",
+				verifiedAt: DateTime.utc(),
+			});
+		});
+
+		const fake = queue.fake();
+		await runSweep();
+		const mine = fake
+			.getPushedJobs()
+			.map(({ job }) => job)
+			.filter(({ name }) => name === ExpireQuoteJob.name)
+			.map(({ payload }) => payload as ExpirePayload)
+			.filter(({ tenantId }) => tenantId === a.tenant.id);
+		queue.restore();
+		assert.sameDeepMembers(mine, [
+			payloadOf(a.tenant, waiting),
+			payloadOf(a.tenant, reversed),
+			payloadOf(a.tenant, unpaid),
+		]);
+
+		for (const payload of mine) {
+			await dispatchInTransaction(ExpireQuoteJob.dispatch(payload), trx());
+		}
+		await processQueued();
+
+		assert.equal(await statusIn(a.tenant, waiting.project), "deposit_pending");
+		assert.equal(await statusIn(a.tenant, reversed.project), "deposit_pending");
+		assert.equal(await statusIn(a.tenant, unpaid.project), "cancelled");
+	});
+
 	test("logs when it has used up its retries", async ({ assert }) => {
 		const logged = mock.method(logger, "error", () => {});
 		try {

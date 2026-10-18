@@ -355,6 +355,110 @@ test.group("ProjectService.expireQuote", (group) => {
 		});
 	});
 
+	test("spares a project while a deposit screenshot waits, on every run", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const { project, quote } = await expiredQuote(tenant, "deposit_pending");
+			await makePayment(tenant, project);
+
+			assert.isFalse(await projects.expireQuote(tenant, project.id, quote.id));
+			assert.isFalse(await projects.expireQuote(tenant, project.id, quote.id));
+			assert.equal(await statusOf(project), "deposit_pending");
+		});
+	});
+
+	test("spares it once the studio rejects the screenshot after the expiry; an earlier rejection still cancels", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const late = await expiredQuote(tenant, "deposit_pending");
+			await makePayment(tenant, late.project, {
+				status: "rejected",
+				verifiedAt: DateTime.utc(),
+			});
+			const early = await expiredQuote(tenant, "deposit_pending");
+			await makePayment(tenant, early.project, {
+				status: "rejected",
+				verifiedAt: early.quote.expiresAt.minus({ hours: 1 }),
+			});
+
+			assert.isFalse(
+				await projects.expireQuote(tenant, late.project.id, late.quote.id),
+			);
+			assert.equal(await statusOf(late.project), "deposit_pending");
+			assert.isTrue(
+				await projects.expireQuote(tenant, early.project.id, early.quote.id),
+			);
+			assert.equal(await statusOf(early.project), "cancelled");
+		});
+	});
+
+	test("a deposit reversed after the expiry spares a deposit_pending or quoted project; one reversed before doesn't", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const reverse = async (project: TattooProject, at: DateTime) => {
+				const deposit = await makePayment(tenant, project, {
+					status: "verified",
+					verifiedAt: at.minus({ hours: 1 }),
+				});
+				await makePayment(tenant, project, {
+					kind: "correction",
+					amount: -300_000,
+					correctsPaymentId: deposit.id,
+					status: "verified",
+					verifiedAt: at,
+				});
+			};
+			const pending = await expiredQuote(tenant, "deposit_pending");
+			await reverse(pending.project, DateTime.utc());
+			const revised = await expiredQuote(tenant, "quoted");
+			await reverse(revised.project, DateTime.utc());
+			const early = await expiredQuote(tenant, "deposit_pending");
+			await reverse(early.project, early.quote.expiresAt.minus({ minutes: 5 }));
+
+			for (const { project, quote } of [pending, revised]) {
+				assert.isFalse(
+					await projects.expireQuote(tenant, project.id, quote.id),
+				);
+				assert.notEqual(await statusOf(project), "cancelled");
+			}
+			assert.isTrue(
+				await projects.expireQuote(tenant, early.project.id, early.quote.id),
+			);
+		});
+	});
+
+	test("after a late decision, a revision's own expiry cancels as usual", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const { project } = await expiredQuote(tenant, "deposit_pending");
+			// Rejected 50 minutes ago: after v1 expired (an hour ago), before
+			// v2 expired (10 minutes ago).
+			await makePayment(tenant, project, {
+				status: "rejected",
+				verifiedAt: DateTime.utc().minus({ minutes: 50 }),
+			});
+			const v2 = await makeQuote(tenant, project, {
+				version: 2,
+				expiresAt: DateTime.utc().minus({ minutes: 10 }),
+			});
+
+			assert.isTrue(await projects.expireQuote(tenant, project.id, v2.id));
+			assert.equal(await statusOf(project), "cancelled");
+		});
+	});
+
 	test("leaves every other status alone", async ({ assert }) => {
 		const { tenant } = await studioWithOwner();
 

@@ -39,6 +39,13 @@ export type Member = Pick<TenantMembership, "userId" | "role">;
 /** Projects per page on the projects list. */
 export const PROJECTS_PER_PAGE = 25;
 
+/** The statuses a quote's expiry can cancel. */
+const EXPIRING_STATUSES: readonly ProjectStatus[] = [
+	"quoted",
+	"on_hold",
+	"deposit_pending",
+];
+
 type ProjectQuery = ReturnType<typeof TattooProject.query>;
 
 /**
@@ -335,7 +342,11 @@ export default class ProjectService {
 	 * expired, and the client never accepted it (`quoted`, `on_hold`) or
 	 * accepted but never paid (`deposit_pending` with the deposit not
 	 * settled). A deposit that was paid is never cancelled by expiry, not
-	 * even on a `quoted` project that was revised after the client paid. The
+	 * even on a `quoted` project that was revised after the client paid. Nor
+	 * is a project whose deposit screenshot waits, or whose screenshot the
+	 * studio rejected or deposit it reversed after the expiry (TAT-66): the
+	 * owner who decided late chooses what happens next, so a later sweep run
+	 * changes nothing. The
 	 * project's scheduled sessions are cancelled first, so the artist's time
 	 * is free. A run before the current quote's expiry (this process's clock
 	 * behind the one that queued the job) queues the job again for the rest
@@ -484,27 +495,30 @@ export default class ProjectService {
 	}
 
 	/**
-	 * Whether the expired `quote` cancels a project in its current status. A
-	 * `quoted` or `on_hold` project is cancelled unless its (non-zero)
-	 * deposit was paid: it can hold a payment when staff revised the quote
-	 * after the client paid. A zero deposit is "settled" by definition, so it
-	 * doesn't spare a quote nobody accepted.
+	 * Whether the expired `quote` cancels a project in its current status.
+	 * Only `quoted`, `on_hold` and `deposit_pending` projects can be
+	 * cancelled, and none whose deposit decision is owed or came late
+	 * (DepositService.expirySpared: a screenshot waits, or the studio rejected
+	 * one or reversed a deposit after the expiry; TAT-66): the owner decides
+	 * what happens next. A `quoted` or `on_hold` project is then cancelled
+	 * unless its (non-zero) deposit was paid: it can hold a payment when staff
+	 * revised the quote after the client paid. A zero deposit is "settled" by
+	 * definition, so it doesn't spare a quote nobody accepted.
 	 */
 	private async expiryCancels(
 		tenant: TenantRef,
 		project: TattooProject,
 		quote: Quote,
 	): Promise<boolean> {
-		if (project.status === "quoted" || project.status === "on_hold") {
-			return (
-				quote.depositAmount === 0 ||
-				!(await this.deposits.isSettled(tenant, project))
-			);
-		}
+		if (!EXPIRING_STATUSES.includes(project.status)) return false;
+		if (await this.deposits.expirySpared(tenant, project, quote)) return false;
 		if (project.status === "deposit_pending") {
 			return !(await this.deposits.isSettled(tenant, project));
 		}
-		return false;
+		return (
+			quote.depositAmount === 0 ||
+			!(await this.deposits.isSettled(tenant, project))
+		);
 	}
 
 	/**
