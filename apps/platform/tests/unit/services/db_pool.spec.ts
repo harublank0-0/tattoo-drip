@@ -2,6 +2,7 @@ import { test } from "@japa/runner";
 import { http } from "#config/app";
 import dbConfig from "#config/database";
 import { LIMITER_POOL, pgPoolFor } from "#services/db_pool";
+import { WRITE_CONCURRENCY } from "#services/write_slots";
 
 test.group("Database pools (TAT-38)", () => {
 	test("the web server's pool is explicit, with a short wait; ace's is smaller", ({
@@ -35,5 +36,13 @@ test.group("Database pools (TAT-38)", () => {
 
 	test("Node's own request timeout is the backstop: 120 s", ({ assert }) => {
 		assert.equal(http.requestTimeout, 120_000);
+	});
+});
+
+test.group("Database pools and write slots", () => {
+	test("public writes leave at least 4 connections to everything else", ({
+		assert,
+	}) => {
+		assert.isAtLeast(pgPoolFor("web").max - WRITE_CONCURRENCY.perProcess, 4);
 	});
 });

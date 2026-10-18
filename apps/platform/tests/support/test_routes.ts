@@ -181,6 +181,15 @@ router
 		router.post("echo", async ({ request }) => ({
 			data: await request.validateUsing(echoValidator),
 		}));
+		// Holds a write slot while its body arrives (TAT-38's slot tests).
+		router.post("hold", async ({ request }) => {
+			try {
+				await receiveUploads(request, { deadlineMs: 10_000 });
+				return { data: { ok: true } };
+			} finally {
+				await discardUploads(request);
+			}
+		});
 		router.get("throws", () => {
 			throw new Error(
 				"connection refused at 10.0.0.5:5432 for tattoo_drip_app",
