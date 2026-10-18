@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { urlFor } from "~/client";
 import { SOURCE_LABELS } from "~/components/inquiries";
 import Page from "~/components/page";
+import PaymentsCard from "~/components/payments_card";
 import {
 	type ChatMessageProps,
 	formatRupees,
@@ -65,6 +66,7 @@ export default function ProjectShow({
 	canQuote,
 	canAccept,
 	canSetPrice,
+	payments,
 	message,
 	form,
 	moves,
@@ -129,6 +131,13 @@ export default function ProjectShow({
 								scheduledSessionCount={scheduledSessionCount}
 								depositHeldText={depositHeldText}
 							/>
+						)}
+						{payments.outcome.needed && (
+							<p className="text-sm">
+								<a href="#payments" className="underline underline-offset-4">
+									Record what happened to the deposit under Payments.
+								</a>
+							</p>
 						)}
 						{assignment && (
 							<ArtistField projectId={project.id} assignment={assignment} />
@@ -230,6 +239,12 @@ export default function ProjectShow({
 						onSent={markContacted}
 					/>
 				)}
+
+				<PaymentsCard
+					projectId={project.id}
+					payments={payments}
+					canSetPrice={canSetPrice}
+				/>
 
 				<Card>
 					<CardHeader>
@@ -432,7 +447,11 @@ function DepositCard({
 				)}
 				{proofReceivedText && (
 					<output className="block rounded-md border p-3 text-sm">
-						Payment screenshot received {proofReceivedText}.
+						Payment screenshot received {proofReceivedText}:{" "}
+						<a href="#payments" className="underline underline-offset-4">
+							check it under Payments
+						</a>
+						.
 					</output>
 				)}
 				{link?.url ? (

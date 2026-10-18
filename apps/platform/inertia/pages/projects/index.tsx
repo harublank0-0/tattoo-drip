@@ -83,6 +83,10 @@ export default function ProjectsIndex({
 										{project.clientName ?? "Unknown client"}
 									</span>
 									<span className="flex items-center gap-2">
+										{project.proofWaiting && <Badge>screenshot to check</Badge>}
+										{project.depositToSettle && (
+											<Badge variant="outline">deposit to settle</Badge>
+										)}
 										{project.noSession && (
 											<Badge variant="destructive">no session</Badge>
 										)}
