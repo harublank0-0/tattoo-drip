@@ -71,29 +71,54 @@ export function DepositLoading({ studioName }: { studioName: string }) {
 	);
 }
 
-/** A link that doesn't work, a rate limit, or a read that failed (TAT-65's words). */
+/**
+ * A link that doesn't work, a rate limit, or a read that failed (TAT-65's
+ * words). While Try again runs (`retrying`) the message and the button stay,
+ * so focus isn't lost; the button is `aria-disabled` and a polite status says
+ * what is happening. `failures` changes with every failed read, so a repeated
+ * failure is a new alert and is announced again.
+ */
 export function LoadProblemView({
 	problem,
 	onRetry,
+	retrying = false,
+	failures = 0,
 	ref,
 }: {
 	problem: LoadProblem;
 	onRetry?: () => void;
+	retrying?: boolean;
+	failures?: number;
 	ref?: Ref<HTMLParagraphElement>;
 }) {
+	const retryable = problem === "failed" && onRetry;
 	return (
 		<div className="deposit-state">
-			<p ref={ref} className="deposit-state-title" role="alert" tabIndex={-1}>
+			<p
+				key={failures}
+				ref={ref}
+				className="deposit-state-title"
+				role="alert"
+				tabIndex={-1}
+			>
 				{copy.load[problem]}
 			</p>
-			{problem === "failed" && onRetry ? (
-				<button
-					type="button"
-					className="action action-secondary"
-					onClick={onRetry}
-				>
-					{copy.load.retry}
-				</button>
+			{retryable ? (
+				<>
+					<button
+						type="button"
+						className="action action-secondary"
+						aria-disabled={retrying ? true : undefined}
+						onClick={() => {
+							if (!retrying) onRetry();
+						}}
+					>
+						{retrying ? copy.load.retrying : copy.load.retry}
+					</button>
+					<p className="deposit-send-status" aria-live="polite">
+						{retrying ? copy.loading : ""}
+					</p>
+				</>
 			) : null}
 		</div>
 	);

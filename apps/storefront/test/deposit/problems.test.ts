@@ -9,6 +9,7 @@ import {
 	focusAfterReread,
 	formatWait,
 	type ProofProblem,
+	retryScreen,
 	screenFor,
 	sentGone,
 	summaryItems,
@@ -97,6 +98,24 @@ describe("loading the page", () => {
 			screenFor({ data: PAGE, error: null, fetchStatus: "paused" }),
 			{ kind: "page", page: PAGE },
 		);
+	});
+
+	test("while Try again runs, the failed message stays instead of the skeleton", () => {
+		// TanStack Query clears the error of a read with no data when it starts again.
+		assert.deepEqual(retryScreen({ kind: "loading" }, true), {
+			kind: "problem",
+			problem: "failed",
+		});
+		assert.deepEqual(retryScreen({ kind: "loading" }, false), {
+			kind: "loading",
+		});
+		for (const screen of [
+			{ kind: "page", page: PAGE },
+			{ kind: "problem", problem: "dead" },
+			{ kind: "problem", problem: "failed" },
+		] as const) {
+			assert.deepEqual(retryScreen(screen, true), screen);
+		}
 	});
 
 	test("a send answered 404 replaces the page too, whatever a follow-up read does", () => {

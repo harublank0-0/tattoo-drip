@@ -347,7 +347,7 @@
   .deposit-summary-link { min-block-size: 2.75rem; padding: 0; border: 0; background: none; color: var(--stencil); text-align: start; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.2em; cursor: pointer; }
   .deposit-submit { display: grid; gap: 0.75rem; inline-size: 100%; }
   .deposit-submit .action { inline-size: 100%; }
-  .deposit-submit .action[aria-disabled='true'] { cursor: progress; opacity: 0.75; }
+  .deposit-submit .action[aria-disabled='true'], .deposit-state .action[aria-disabled='true'] { cursor: progress; opacity: 0.75; }
   .deposit-progress { position: relative; block-size: 2px; overflow: hidden; background: var(--stencil-wash); }
   .deposit-progress::before { content: ''; position: absolute; inset-block: 0; inline-size: 30%; background: var(--stencil); animation: intake-trace 1.4s ease-in-out infinite; }
   .deposit-contact { display: flex; flex-wrap: wrap; align-items: center; gap: 0 0.75rem; color: var(--ink-muted); font-size: 0.9375rem; }

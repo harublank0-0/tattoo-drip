@@ -8,7 +8,7 @@ import {
 	useSyncExternalStore,
 } from "react";
 import type { DepositShell } from "../loader.ts";
-import { isGone, screenFor, sentGone } from "../problems.ts";
+import { isGone, retryScreen, screenFor, sentGone } from "../problems.ts";
 import { readDepositToken } from "../token.ts";
 import {
 	depositContact,
@@ -84,12 +84,18 @@ export function DepositLoaded({
 	const { refetch } = query;
 	// When a send was answered 404 (ms): the page is dead until a read succeeds after it.
 	const [goneAt, setGoneAt] = useState<number | null>(null);
-	const screen = screenFor({
-		data: query.data,
-		error: query.error,
-		fetchStatus: query.fetchStatus,
-		sendGone: sentGone(goneAt, query.dataUpdatedAt),
-	});
+	// Try again is running (a read that can't start offline waits for the phone
+	// to come back online, and so does this).
+	const [retrying, setRetrying] = useState(false);
+	const screen = retryScreen(
+		screenFor({
+			data: query.data,
+			error: query.error,
+			fetchStatus: query.fetchStatus,
+			sendGone: sentGone(goneAt, query.dataUpdatedAt),
+		}),
+		retrying,
+	);
 	const view = screen.kind === "page" ? depositView(screen.page) : null;
 	const shown = view ? view.state : screen.kind;
 	const [moveFocus, setMoveFocus] = useState(false);
@@ -138,8 +144,12 @@ export function DepositLoaded({
 				<LoadProblemView
 					ref={messageRef}
 					problem={screen.problem}
+					retrying={retrying}
+					failures={query.errorUpdateCount}
 					onRetry={() => {
-						void refetch();
+						setRetrying(true);
+						const done = () => setRetrying(false);
+						void refetch().then(done, done);
 					}}
 				/>
 			) : null}

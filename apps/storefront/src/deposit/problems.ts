@@ -63,6 +63,18 @@ export function screenFor(query: {
 }
 
 /**
+ * While "Try again" runs the failed message stays on screen: TanStack Query
+ * clears a read's error (and its skeleton-less "problem") when a read with no
+ * data starts again, which would remove the button the client just pressed
+ * and drop their focus.
+ */
+export function retryScreen(screen: Screen, retrying: boolean): Screen {
+	return retrying && screen.kind === "loading"
+		? { kind: "problem", problem: "failed" }
+		: screen;
+}
+
+/**
  * Whether a send's 404 (answered at `goneAt`, in ms) still stands: until a
  * read succeeds after it, which shows the page again if the link works.
  */

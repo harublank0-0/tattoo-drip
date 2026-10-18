@@ -132,6 +132,28 @@ describe("the frame", () => {
 		assert.equal(attr(tags(failed, "button")[0], "type"), "button");
 		assert.match(textOf(failed), /Try again/);
 	});
+
+	test("while Try again runs, the message and its button stay and it says so once", () => {
+		const props = { problem: "failed", onRetry: () => undefined } as const;
+		const idle = render(createElement(LoadProblemView, props));
+		assert.equal(attr(tags(idle, "button")[0], "aria-disabled"), undefined);
+		assert.match(
+			idle,
+			/<p class="deposit-send-status" aria-live="polite"><\/p>/,
+		);
+
+		const running = render(
+			createElement(LoadProblemView, { ...props, retrying: true }),
+		);
+		assert.match(running, /<p[^>]*role="alert"/);
+		assert.equal(attr(tags(running, "button")[0], "aria-disabled"), "true");
+		assert.match(running, />Trying again…<\/button>/);
+		assert.match(
+			running,
+			/<p class="deposit-send-status" aria-live="polite">Loading your deposit…<\/p>/,
+		);
+		assert.equal(tags(running, "button").length, 1);
+	});
 });
 
 describe("the intro", () => {

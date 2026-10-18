@@ -193,6 +193,7 @@ export const copy = {
 		"rate-limited": "Too many tries. Wait a few minutes, then reload the page.",
 		failed: "We couldn't load your deposit. Check your connection.",
 		retry: "Try again",
+		retrying: "Trying again…",
 	},
 	copied: "Copied",
 	copyFailed: "Couldn't copy. Press and hold the text to copy it.",
