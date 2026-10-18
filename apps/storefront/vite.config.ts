@@ -7,10 +7,11 @@ import { nitro } from "nitro/vite";
 import { defineConfig } from "vite";
 import { parseStorefrontConfig } from "./src/tenancy/config.ts";
 
-const config = defineConfig(({ command }) => {
+const config = defineConfig(({ command, isPreview }) => {
 	// The dev server refuses to start without API_URL and STOREFRONT_URL
-	// (TAT-12). Builds don't read them: they are runtime settings.
-	if (command === "serve") parseStorefrontConfig(process.env);
+	// (TAT-12). Builds and `vite preview` (which reports "serve" too, but
+	// doesn't load .env.local) don't read them: they are runtime settings.
+	if (command === "serve" && !isPreview) parseStorefrontConfig(process.env);
 	return {
 		resolve: { tsconfigPaths: true },
 		plugins: [
