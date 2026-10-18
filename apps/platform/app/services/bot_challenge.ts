@@ -25,7 +25,10 @@ export type ChallengeOutcome = "passed" | "failed" | "unavailable";
 export type ChallengeExpectation = { hostname: string; action: string };
 
 export type BotChallengeOptions = {
-	/** Unset: the check is off (development and tests; production requires it). */
+	/**
+	 * Left out: TURNSTILE_SECRET_KEY. Explicitly `undefined`: the check is off
+	 * (the setting is optional in development and tests; production requires it).
+	 */
 	secret?: Secret<string>;
 	fetch?: typeof globalThis.fetch;
 	timeoutMs?: number;
@@ -65,10 +68,13 @@ export default class BotChallenge {
 	readonly #timeoutMs: number;
 	readonly #strict: boolean;
 
-	constructor(
-		options: BotChallengeOptions = { secret: env.get("TURNSTILE_SECRET_KEY") },
-	) {
-		this.#secret = options.secret;
+	constructor(options: BotChallengeOptions = {}) {
+		// Only an explicit `secret: undefined` turns the check off: options
+		// that leave the secret out (a longer timeout, say) still read the
+		// environment's, so no caller switches the production check off by
+		// accident.
+		this.#secret =
+			"secret" in options ? options.secret : env.get("TURNSTILE_SECRET_KEY");
 		this.#fetch = options.fetch ?? globalThis.fetch;
 		this.#timeoutMs = options.timeoutMs ?? CHALLENGE_TIMEOUT_MS;
 		this.#strict = options.strict ?? app.inProduction;

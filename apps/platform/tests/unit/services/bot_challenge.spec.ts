@@ -6,6 +6,7 @@ import BotChallenge, {
 	CHALLENGE_ACTIONS,
 	SITEVERIFY_URL,
 } from "#services/bot_challenge";
+import env from "#start/env";
 
 const SECRET = "0x4AAAAAAAunit-secret-55";
 const TOKEN = "0.unit-token-55";
@@ -96,6 +97,35 @@ test.group("BotChallenge", () => {
 			await new BotChallenge().verify(undefined, EXPECTED),
 			"passed",
 		);
+	});
+
+	test("options without a secret still read the environment's: only an explicit undefined turns the check off", async ({
+		assert,
+	}) => {
+		const read = env.get.bind(env);
+		const get = mock.method(env, "get", ((key: string, ...rest: unknown[]) =>
+			key === "TURNSTILE_SECRET_KEY"
+				? new Secret("env-secret-55")
+				: // biome-ignore lint/suspicious/noExplicitAny: forwards env.get's own overloads
+					(read as any)(key, ...rest)) as typeof env.get);
+		try {
+			const { calls, fetch } = fakeFetch(() => verdict());
+			const withOptions = new BotChallenge({ fetch, timeoutMs: 1000 });
+
+			assert.equal(await withOptions.verify(undefined, EXPECTED), "failed");
+			assert.equal(await withOptions.verify(TOKEN, EXPECTED), "passed");
+			assert.lengthOf(calls, 1);
+			assert.equal(calls[0].form.get("secret"), "env-secret-55");
+			assert.equal(
+				await new BotChallenge({ secret: undefined, fetch }).verify(
+					undefined,
+					EXPECTED,
+				),
+				"passed",
+			);
+		} finally {
+			get.mock.restore();
+		}
 	});
 
 	test("sends the secret and the token, form-encoded, to siteverify, and nothing else", async ({
