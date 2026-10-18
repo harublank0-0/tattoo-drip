@@ -17,6 +17,9 @@ import { join, resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const SERVER = join(root, ".output/server/index.mjs");
 const CANARY = "canary-key-0123456789abcdefghijklmnopqrstuv";
+// Cloudflare's always-pass test site key: public by design, so the page
+// must carry it (production refuses to start without one, TAT-57).
+const SITE_KEY = "1x00000000000000000000AA";
 const API_DETAIL = "api-internal-detail-must-not-leak";
 const SLUG = "canary-ink";
 const STUDIO_NAME = "Canary Ink <Studio>";
@@ -102,6 +105,7 @@ const child = spawn(process.execPath, [SERVER], {
 		API_URL: `http://localhost:${apiPort}`,
 		STOREFRONT_URL: `http://{tenant}.localhost:${storefrontPort}`,
 		STOREFRONT_SERVER_KEY: CANARY,
+		TURNSTILE_SITE_KEY: SITE_KEY,
 	},
 });
 child.stdout.on("data", (chunk) => {
@@ -172,6 +176,10 @@ try {
 			page.body,
 		),
 		"The page does not carry the API's origin and the studio's slug.",
+	);
+	expect(
+		page.body.includes(`challengeSiteKey:"${SITE_KEY}"`),
+		"The page does not carry the public Turnstile site key.",
 	);
 	expect(
 		page.body.includes(
@@ -315,5 +323,5 @@ if (problems.length > 0) {
 	process.exit(1);
 }
 console.log(
-	"Page check passed: the key is in no page, header or log line; one keyed lookup and one artists read per page; a failed read is an uncached error page, a failed lookup a 503.",
+	"Page check passed: the key is in no page, header or log line; one keyed lookup and one artists read per page; a failed read is an uncached error page, a failed lookup a 503; the public site key is in the page.",
 );

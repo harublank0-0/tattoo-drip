@@ -210,3 +210,59 @@ describe("STOREFRONT_SERVER_KEY", () => {
 		assert.match(message, /STOREFRONT_SERVER_KEY is invalid/);
 	});
 });
+
+describe("TURNSTILE_SITE_KEY", () => {
+	const KEY = "1x00000000000000000000AA";
+
+	test("is optional outside production: without one the config has no challengeSiteKey", () => {
+		for (const env of [
+			PROD,
+			{ ...PROD, NODE_ENV: "development" },
+			{ ...PROD, NODE_ENV: "test" },
+		]) {
+			assert.equal("challengeSiteKey" in parseStorefrontConfig(env), false);
+		}
+	});
+
+	test("reads a key, trimmed", () => {
+		assert.equal(
+			parseStorefrontConfig({ ...PROD, TURNSTILE_SITE_KEY: ` ${KEY}\n` })
+				.challengeSiteKey,
+			KEY,
+		);
+	});
+
+	test("is required in production", () => {
+		const message = failure({ ...PROD, NODE_ENV: "production" });
+		assert.match(message, /TURNSTILE_SITE_KEY is not set/);
+		assert.match(message, /Turnstile/);
+		assert.equal(
+			parseStorefrontConfig({
+				...PROD,
+				NODE_ENV: "production",
+				TURNSTILE_SITE_KEY: KEY,
+			}).challengeSiteKey,
+			KEY,
+		);
+	});
+
+	test("refuses a malformed key without echoing it", () => {
+		for (const key of [
+			"shortkey1",
+			"has spaces in it 0123",
+			"<script>alert(1)</script>",
+			"k".repeat(101),
+		]) {
+			const message = failure({ ...PROD, TURNSTILE_SITE_KEY: key });
+			assert.match(message, /TURNSTILE_SITE_KEY is invalid/, key);
+			assert.ok(!message.includes(key), key);
+		}
+	});
+
+	test("is reported with the other settings' problems", () => {
+		const message = failure({ NODE_ENV: "production" });
+		assert.match(message, /API_URL is not set/);
+		assert.match(message, /STOREFRONT_URL is not set/);
+		assert.match(message, /TURNSTILE_SITE_KEY is not set/);
+	});
+});

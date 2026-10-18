@@ -1,3 +1,4 @@
+import { CHALLENGE_SITE_KEY_SHAPE } from "../site/context.ts";
 import { isDnsName, STORED_SLUG } from "./host.ts";
 
 /** The storefront's server-only settings (TAT-12), from process.env. */
@@ -16,6 +17,12 @@ export interface StorefrontConfig {
 	 * platform checks it from TAT-38. Never sent to a browser.
 	 */
 	serverKey?: string;
+	/**
+	 * TURNSTILE_SITE_KEY, only when set: the public site key of the studio
+	 * pages' Cloudflare Turnstile widget (the intake form's bot check, TAT-57).
+	 * Required when NODE_ENV is production; sent to every visitor.
+	 */
+	challengeSiteKey?: string;
 }
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -35,6 +42,9 @@ const SERVER_KEY_RULE =
 /** RFC 7235 token68, the characters a Bearer token may hold: 32 to 256 of them, then base64's padding. */
 const SERVER_KEY_SHAPE = /^[A-Za-z0-9._~+/-]{32,256}={0,2}$/;
 
+const SITE_KEY_RULE =
+	"the site key of the studio pages' Cloudflare Turnstile widget (Cloudflare dashboard, Turnstile): 10 to 100 letters, digits, - or _. Production needs it; in development leave it unset, or use Cloudflare's test key 1x00000000000000000000AA";
+
 const DEFAULT_PORTS = { "http:": 80, "https:": 443 } as const;
 
 const LOOPBACK_HOSTS = ["localhost", "127.0.0.1", "[::1]"];
@@ -50,13 +60,23 @@ export function parseStorefrontConfig(env: Env): StorefrontConfig {
 	const apiUrl = readApiUrl(env.API_URL?.trim(), problems);
 	const site = readStorefrontUrl(env.STOREFRONT_URL?.trim(), problems);
 	const serverKey = readServerKey(env.STOREFRONT_SERVER_KEY?.trim(), problems);
+	const challengeSiteKey = readChallengeSiteKey(
+		env.TURNSTILE_SITE_KEY?.trim(),
+		env.NODE_ENV === "production",
+		problems,
+	);
 	if (!apiUrl || !site || problems.length > 0) {
 		const list = problems.map((problem) => `- ${problem}`).join("\n");
 		throw new Error(
 			`The storefront's settings are invalid (see apps/storefront/.env.local.example):\n${list}`,
 		);
 	}
-	return { apiUrl, ...site, ...(serverKey ? { serverKey } : {}) };
+	return {
+		apiUrl,
+		...site,
+		...(serverKey ? { serverKey } : {}),
+		...(challengeSiteKey ? { challengeSiteKey } : {}),
+	};
 }
 
 /**
@@ -146,6 +166,25 @@ function readServerKey(
 	if (!value) return undefined;
 	if (!SERVER_KEY_SHAPE.test(value)) {
 		problems.push(problem("STOREFRONT_SERVER_KEY", value, SERVER_KEY_RULE));
+		return undefined;
+	}
+	return value;
+}
+
+/** Required in production (every inquiry needs a token there); refused when malformed. */
+function readChallengeSiteKey(
+	value: string | undefined,
+	production: boolean,
+	problems: string[],
+): string | undefined {
+	if (!value) {
+		if (production) {
+			problems.push(problem("TURNSTILE_SITE_KEY", value, SITE_KEY_RULE));
+		}
+		return undefined;
+	}
+	if (!CHALLENGE_SITE_KEY_SHAPE.test(value)) {
+		problems.push(problem("TURNSTILE_SITE_KEY", value, SITE_KEY_RULE));
 		return undefined;
 	}
 	return value;
