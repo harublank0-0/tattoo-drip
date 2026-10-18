@@ -9,11 +9,11 @@ import { TattooProvider } from "@tattoo-drip/react";
 
 import type { ApiContext } from "../api/context.ts";
 import { loadStudio } from "../api/loaders.ts";
-import PostHogProvider from "../integrations/posthog/provider";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
+import type { SiteContext } from "../site/context.ts";
 import appCss from "../styles.css?url";
 
-export const Route = createRootRouteWithContext<ApiContext>()({
+export const Route = createRootRouteWithContext<ApiContext & SiteContext>()({
 	// Every page needs its studio: on the server from the cache the tenant
 	// middleware filled, after that from the API (TAT-23).
 	loader: ({ context }) => loadStudio(context),
@@ -35,6 +35,11 @@ export const Route = createRootRouteWithContext<ApiContext>()({
 				rel: "stylesheet",
 				href: appCss,
 			},
+			// No favicon until branding (TAT-56): this stops the /favicon.ico request.
+			{
+				rel: "icon",
+				href: "data:,",
+			},
 		],
 	}),
 	shellComponent: RootDocument,
@@ -50,26 +55,35 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 		<html lang="en">
 			<head>
 				<HeadContent />
+				{/* The router's head keeps one meta per name, so the two theme colours are written here. */}
+				<meta
+					name="theme-color"
+					content="#f5f6f8"
+					media="(prefers-color-scheme: light)"
+				/>
+				<meta
+					name="theme-color"
+					content="#14121d"
+					media="(prefers-color-scheme: dark)"
+				/>
 			</head>
 			<body>
 				<TattooProvider client={tattoo.client}>
-					<PostHogProvider>
-						{children}
-						{import.meta.env.DEV ? (
-							<TanStackDevtools
-								config={{
-									position: "bottom-right",
-								}}
-								plugins={[
-									{
-										name: "Tanstack Router",
-										render: <TanStackRouterDevtoolsPanel />,
-									},
-									TanStackQueryDevtools,
-								]}
-							/>
-						) : null}
-					</PostHogProvider>
+					{children}
+					{import.meta.env.DEV ? (
+						<TanStackDevtools
+							config={{
+								position: "bottom-right",
+							}}
+							plugins={[
+								{
+									name: "Tanstack Router",
+									render: <TanStackRouterDevtoolsPanel />,
+								},
+								TanStackQueryDevtools,
+							]}
+						/>
+					) : null}
 				</TattooProvider>
 				<Scripts />
 			</body>
