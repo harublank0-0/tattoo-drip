@@ -4,6 +4,8 @@ import {
 	type Artist,
 	type CreateInquiryInput,
 	createTattooClient,
+	INQUIRY_CHALLENGE_ACTION,
+	INQUIRY_HONEYPOT_FIELD,
 	type Studio,
 	TattooApiError,
 } from "../src/index.js";
@@ -310,7 +312,7 @@ describe("inquiries.create", () => {
 		contactPhone: "9812345678",
 	} satisfies CreateInquiryInput;
 
-	test("posts one multipart form to the tenant's inquiries, without cookies", async () => {
+	test("posts one multipart form to the tenant's inquiries, the token in a header, without cookies", async () => {
 		const { calls, fetch } = fakeFetch(() => json(201, { data: { id: ID } }));
 		const front = new File([new Uint8Array([0xff, 0xd8, 0xff])], "front.jpg", {
 			type: "image/jpeg",
@@ -345,7 +347,6 @@ describe("inquiries.create", () => {
 		const form = calls[0].init.body as FormData;
 		assert.deepEqual([...new Set(form.keys())].sort(), [
 			"approximateSize",
-			"challengeToken",
 			"contactName",
 			"contactPhone",
 			"idea",
@@ -356,7 +357,8 @@ describe("inquiries.create", () => {
 			"sourceChannel",
 		]);
 		assert.equal(form.get("contactPhone"), "9812345678");
-		assert.equal(form.get("challengeToken"), "token-51");
+		assert.equal(headers.get("x-challenge-token"), "token-51");
+		assert.equal(form.has("challengeToken"), false);
 		const images = form.getAll("referenceImages") as File[];
 		assert.deepEqual(
 			images.map(({ name, type }) => [name, type]),
@@ -375,6 +377,11 @@ describe("inquiries.create", () => {
 		const form = calls[0].init.body as FormData;
 		assert.equal(form.has("referenceImages"), false);
 		assert.equal(form.has("challengeToken"), false);
+		assert.equal(form.has(INQUIRY_HONEYPOT_FIELD), false);
+		assert.equal(
+			new Headers(calls[0].init.headers).has("x-challenge-token"),
+			false,
+		);
 		assert.equal(form.get("idea"), "Fine-line peony");
 	});
 
@@ -462,6 +469,68 @@ describe("inquiries.create", () => {
 
 		assert.ok(!(error instanceof TattooApiError));
 		assert.equal((error as Error).name, "AbortError");
+	});
+
+	test("the honeypot goes as the website field, only when it holds something", async () => {
+		const { calls, fetch } = fakeFetch(() => json(201, { data: { id: ID } }));
+
+		await client(fetch).inquiries.create({ ...input, honeypot: "" });
+		await client(fetch).inquiries.create({
+			...input,
+			honeypot: "https://spam.example",
+		});
+
+		const [empty, filled] = calls.map((call) => call.init.body as FormData);
+		assert.equal(empty.has(INQUIRY_HONEYPOT_FIELD), false);
+		assert.equal(filled.get(INQUIRY_HONEYPOT_FIELD), "https://spam.example");
+		assert.equal(filled.has("honeypot"), false);
+	});
+
+	test("a refused or unchecked challenge is a TattooApiError with its code, never retried", async () => {
+		const failed = fakeFetch(() =>
+			json(403, {
+				error: {
+					code: "challenge_failed",
+					message:
+						"We couldn't confirm this request came from a person. Please try again.",
+				},
+			}),
+		);
+		const unavailable = fakeFetch(() =>
+			json(503, {
+				error: {
+					code: "challenge_unavailable",
+					message: "We couldn't run the security check. Try again in a minute.",
+				},
+			}),
+		);
+
+		const refused = await rejection(
+			client(failed.fetch).inquiries.create({
+				...input,
+				challengeToken: "spent",
+			}),
+		);
+		const unchecked = await rejection(
+			client(unavailable.fetch).inquiries.create({
+				...input,
+				challengeToken: "t",
+			}),
+		);
+
+		assert.ok(refused instanceof TattooApiError);
+		assert.equal(refused.status, 403);
+		assert.equal(refused.code, "challenge_failed");
+		assert.ok(unchecked instanceof TattooApiError);
+		assert.equal(unchecked.status, 503);
+		assert.equal(unchecked.code, "challenge_unavailable");
+		assert.equal(failed.calls.length, 1);
+		assert.equal(unavailable.calls.length, 1);
+	});
+
+	test("names the widget's action and the honeypot field for the form", () => {
+		assert.equal(INQUIRY_CHALLENGE_ACTION, "inquiry");
+		assert.equal(INQUIRY_HONEYPOT_FIELD, "website");
 	});
 });
 
