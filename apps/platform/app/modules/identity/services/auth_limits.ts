@@ -3,10 +3,10 @@ import limiter from "@adonisjs/limiter/services/main";
 import { clientAddress, digest } from "#services/rate_limits";
 
 /**
- * The auth rate limits (TAT-8), by name. Each window is fixed: it starts
- * with the first counted attempt, and a lockout ends when it does (no extra
- * block). Password reset (TAT-18) adds its own entries here and a named
- * middleware in start/limiter.ts.
+ * The auth rate limits (TAT-8, TAT-18), by name. Each window is fixed: it
+ * starts with the first counted attempt, and a lockout ends when it does
+ * (no extra block). The request limits are `limiter.define` middleware in
+ * start/limiter.ts; login counts failures in throttleLogin below.
  */
 export const AUTH_LIMITS = {
 	/** Login attempts from one client address that didn't sign in. */
@@ -19,15 +19,55 @@ export const AUTH_LIMITS = {
 	loginPerEmail: { requests: 25, duration: "15 mins" },
 	/** Every signup request from one client address. */
 	signup: { requests: 10, duration: "1 hour" },
+	/**
+	 * Signups naming one email address, from any client address (TAT-18):
+	 * each one emails that address (a confirmation link, or "you already
+	 * have an account").
+	 */
+	signupPerEmail: { requests: 3, duration: "1 hour" },
+	/** Password reset requests from one client address (TAT-18). */
+	resetPerIp: { requests: 10, duration: "1 hour" },
+	/**
+	 * Password reset requests naming one email address, registered or not,
+	 * from any client address: the emails one mailbox can get, and the
+	 * guesses about one address.
+	 */
+	resetPerEmail: { requests: 3, duration: "1 hour" },
+	/** Opening or using a reset or confirmation link, from one client address. */
+	accountLinksPerIp: { requests: 30, duration: "15 mins" },
+	/** "Send a new link": one a minute per account... */
+	verifyResendCooldown: { requests: 1, duration: "1 min" },
+	/** ...and five an hour. */
+	verifyResendPerUser: { requests: 5, duration: "1 hour" },
 } as const;
 
 export function loginIpKey(ip: string) {
 	return `login_ip_${digest(clientAddress(ip))}`;
 }
 
-/** Case and surrounding spaces don't make a separate count. */
+/**
+ * An email address's part of a count key: a digest, so the table holds no
+ * address; case and surrounding spaces don't make a separate count.
+ */
+export function emailCountKey(email: string) {
+	return digest(email.trim().toLowerCase());
+}
+
 export function loginEmailKey(email: string) {
-	return `login_email_${digest(email.trim().toLowerCase())}`;
+	return `login_email_${emailCountKey(email)}`;
+}
+
+/**
+ * Forgets the failed logins counted for an account's address (TAT-18): a
+ * completed password reset proves the mailbox, so someone else's guesses no
+ * longer keep its owner out. Pass the address the account has STORED (the
+ * reset knows the account, never a typed address). The client addresses'
+ * counts stay: one address's attempts span many accounts.
+ */
+export async function clearLoginFailures(storedEmail: string) {
+	await limiter
+		.use({ ...AUTH_LIMITS.loginPerEmail })
+		.delete(loginEmailKey(storedEmail));
 }
 
 /**
