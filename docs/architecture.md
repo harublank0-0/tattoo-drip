@@ -53,7 +53,7 @@ Each module owns its models and services. Other modules call its services instea
 | Payments | Payment methods (studio QR codes), deposit pages, proofs, verification, balance. Gateways in V1 | MVP |
 | Scheduling | Sessions, artist calendar, no-overlap. Availability, exceptions and slots in V1 | MVP |
 | Notifications | Staff alerts (MVP), click-to-chat templates (MVP), SMS reminders (V1) | MVP |
-| Storefront | Studio page configuration. Themes in V1 | MVP |
+| Storefront | The studio page's public reads: the profile and the visible artists (TAT-44). Configuration and themes in V1 | MVP |
 | Catalog | Services, flash, style and placement lists | V1 |
 | Portfolio | Portfolio items and images | V1 |
 
