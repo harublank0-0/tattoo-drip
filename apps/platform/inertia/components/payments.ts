@@ -82,6 +82,27 @@ export type PaymentsCardProps = {
 	};
 };
 
+/**
+ * The key of the Record payment form. The form keeps what the owner picked
+ * and typed in its own state, which a refresh of the page props would not
+ * touch; when the choices change (a deposit books the project and "Deposit"
+ * goes away, a payment lands and the amounts to suggest move) the key
+ * changes, so the form starts again with the new choices. Validation errors
+ * leave the props alone, so they keep what was typed.
+ */
+export function recordFormKey(
+	actions: Pick<
+		NonNullable<PaymentsCardProps["actions"]>,
+		"recordKinds" | "depositDue" | "balanceDue"
+	>,
+): string {
+	return [
+		actions.recordKinds.join(","),
+		actions.depositDue ?? "",
+		actions.balanceDue ?? "",
+	].join("|");
+}
+
 export type MethodKind = PaymentRowProps["method"];
 export type DeskKindName = "deposit" | "session" | "balance";
 

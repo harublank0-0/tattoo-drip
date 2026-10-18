@@ -12,6 +12,7 @@ import {
 	type PaymentRowProps,
 	type PaymentsCardProps,
 	type PendingProofProps,
+	recordFormKey,
 } from "~/components/payments";
 import { formatRupees } from "~/components/projects";
 import { Badge } from "~/components/ui/badge";
@@ -105,6 +106,7 @@ export default function PaymentsCard({
 				<PaymentList rows={rows} onDone={done} />
 				{actions && actions.recordKinds.length > 0 && (
 					<RecordPaymentForm
+						key={recordFormKey(actions)}
 						projectId={projectId}
 						actions={actions}
 						onDone={done}
