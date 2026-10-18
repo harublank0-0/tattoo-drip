@@ -1,6 +1,7 @@
 import { usePage } from "@inertiajs/react";
 import { cn } from "cn";
 import { Bell } from "lucide-react";
+import { alertsLabel } from "~/components/alerts";
 import NavLink from "~/components/nav_link";
 import NavBadge from "~/components/shell/nav_badge";
 import { buttonVariants } from "~/components/ui/button";
@@ -22,19 +23,21 @@ export default function AlertsLink({ variant }: { variant: "icon" | "row" }) {
 			<NavLink
 				route="tenant.alerts.index"
 				params={params}
+				label={alertsLabel(count)}
 				className={cn(
 					buttonVariants({ variant: "ghost", size: "icon" }),
 					"relative size-11 rounded-full aria-[current=page]:bg-accent",
 				)}
 			>
 				<Bell aria-hidden="true" />
-				<span className="sr-only">Alerts</span>
 				{count > 0 && (
-					<NavBadge
-						count={count}
-						label="unread"
-						className="absolute top-1 right-0.5"
-					/>
+					<span aria-hidden="true">
+						<NavBadge
+							count={count}
+							label="unread"
+							className="absolute top-1 right-0.5"
+						/>
+					</span>
 				)}
 			</NavLink>
 		);
@@ -44,6 +47,7 @@ export default function AlertsLink({ variant }: { variant: "icon" | "row" }) {
 		<NavLink
 			route="tenant.alerts.index"
 			params={params}
+			label={alertsLabel(count)}
 			className={cn(
 				buttonVariants({ variant: "ghost" }),
 				"w-full justify-start text-muted-foreground aria-[current=page]:bg-accent aria-[current=page]:text-accent-foreground",
@@ -51,7 +55,11 @@ export default function AlertsLink({ variant }: { variant: "icon" | "row" }) {
 		>
 			<Bell data-icon="inline-start" />
 			<span className="flex-1 text-left">Alerts</span>
-			{count > 0 && <NavBadge count={count} label="unread" />}
+			{count > 0 && (
+				<span aria-hidden="true">
+					<NavBadge count={count} label="unread" />
+				</span>
+			)}
 		</NavLink>
 	);
 }
