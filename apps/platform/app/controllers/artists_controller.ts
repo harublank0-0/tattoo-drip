@@ -19,6 +19,7 @@ import {
 import { InvalidImageError } from "#modules/media/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
+import type Tenant from "#modules/tenancy/models/tenant";
 
 /**
  * The studio's artist profiles, managed by its owners. Every :id loads
@@ -38,7 +39,7 @@ export default class ArtistsController {
 
 		return ctx.inertia.render("artists/index", {
 			artists: await Promise.all(
-				list.map((artist) => this.toProps(artist, userId)),
+				list.map((artist) => this.toProps(tenant, artist, userId)),
 			),
 		});
 	}
@@ -79,7 +80,7 @@ export default class ArtistsController {
 			(artist.userId === null && !(await this.hasProfile(tenant, userId)));
 
 		return ctx.inertia.render("artists/form", {
-			artist: await this.toProps(artist, userId),
+			artist: await this.toProps(tenant, artist, userId),
 			canLink,
 		});
 	}
@@ -125,14 +126,14 @@ export default class ArtistsController {
 	 * What the pages get for one artist, with the photo's public URL. Not the
 	 * row: the tenant and the linked user's id stay on the server.
 	 */
-	private async toProps(artist: Artist, userId: string) {
+	private async toProps(tenant: Tenant, artist: Artist, userId: string) {
 		return {
 			id: artist.id,
 			name: artist.name,
 			slug: artist.slug,
 			bio: artist.bio,
 			photoUrl: artist.photoKey
-				? await this.images.url("artist_photo", artist.photoKey)
+				? await this.images.url("artist_photo", artist.photoKey, tenant)
 				: null,
 			visible: artist.visible,
 			acceptingInquiries: artist.acceptingInquiries,

@@ -162,7 +162,11 @@ export default class ProjectsController {
 							await this.inquiries.images(tenant, { projectId: project.id })
 						).map(async (image) => ({
 							id: image.id,
-							url: await this.images.url("reference_image", image.imageKey),
+							url: await this.images.url(
+								"reference_image",
+								image.imageKey,
+								tenant,
+							),
 							width: image.width,
 							height: image.height,
 						})),

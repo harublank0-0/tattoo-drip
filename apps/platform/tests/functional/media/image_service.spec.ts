@@ -87,7 +87,7 @@ test.group("ImageService", () => {
 			purpose: "payment_qr",
 		});
 
-		const url = await images.url("payment_qr", stored.key);
+		const url = await images.url("payment_qr", stored.key, tenant);
 
 		assert.equal(url, `${env.get("APP_URL")}/uploads/${stored.key}`);
 		const response = await client.get(pathOf(url));
@@ -104,12 +104,56 @@ test.group("ImageService", () => {
 			purpose: "payment_proof",
 		});
 
-		const url = await images.url("payment_proof", stored.key);
+		const url = await images.url("payment_proof", stored.key, tenant);
 
 		assert.isTrue(url.startsWith(`${env.get("APP_URL")}/files/${stored.key}?`));
 		assert.include(url, "signature=");
-		(await client.get(pathOf(url))).assertStatus(200);
+		const served = await client.get(pathOf(url));
+		served.assertStatus(200);
+		// Proofs and references are never kept by a browser or a proxy.
+		served.assertHeader("cache-control", "private, no-store");
 		(await client.get(`/files/${stored.key}`)).assertStatus(401);
+	});
+
+	test("url refuses a key of another tenant or another purpose", async ({
+		assert,
+	}) => {
+		const stored = await images.store(await upload(await testImages.jpeg()), {
+			tenant,
+			purpose: "payment_proof",
+		});
+		const other = { id: "0199c0de-0000-7000-8000-000000000002" };
+
+		await assert.rejects(
+			() => images.url("payment_proof", stored.key, other),
+			/another tenant or purpose/,
+		);
+		await assert.rejects(
+			() => images.url("reference_image", stored.key, tenant),
+			/another tenant or purpose/,
+		);
+		await assert.rejects(
+			() =>
+				images.url(
+					"payment_proof",
+					`tenants/${tenant.id}/payment_proof/../reference_image/x.webp`,
+					tenant,
+				),
+			/another tenant or purpose/,
+		);
+	});
+
+	test("the Cache-Control is part of the signature: dropping it is a 401", async ({
+		client,
+	}) => {
+		const stored = await images.store(await upload(await testImages.jpeg()), {
+			tenant,
+			purpose: "payment_proof",
+		});
+		const url = new URL(await images.url("payment_proof", stored.key, tenant));
+		url.searchParams.delete("cacheControl");
+
+		(await client.get(`${url.pathname}${url.search}`)).assertStatus(401);
 	});
 
 	test("removes the raw upload, which still has its metadata", async ({

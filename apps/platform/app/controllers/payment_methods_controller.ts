@@ -15,6 +15,7 @@ import {
 	movePaymentMethodValidator,
 	updatePaymentMethodValidator,
 } from "#modules/payments/validators/payment_method";
+import type Tenant from "#modules/tenancy/models/tenant";
 
 /**
  * The studio's payment methods, managed by its owners. Every :id loads
@@ -36,7 +37,9 @@ export default class PaymentMethodsController {
 				defaultDepositPercent: tenant.defaultDepositPercent,
 				depositPolicy: tenant.depositPolicy,
 			},
-			methods: await Promise.all(methods.map((method) => this.toProps(method))),
+			methods: await Promise.all(
+				methods.map((method) => this.toProps(tenant, method)),
+			),
 		});
 	}
 
@@ -67,7 +70,7 @@ export default class PaymentMethodsController {
 
 		return ctx.inertia.render("settings/payment_method_form", {
 			kinds: [...PAYMENT_METHOD_KINDS],
-			method: await this.toProps(method),
+			method: await this.toProps(tenant, method),
 		});
 	}
 
@@ -116,7 +119,7 @@ export default class PaymentMethodsController {
 	/**
 	 * What the pages get for one method, with its QR's public URL.
 	 */
-	private async toProps(method: PaymentMethod) {
+	private async toProps(tenant: Tenant, method: PaymentMethod) {
 		return {
 			id: method.id,
 			kind: method.kind,
@@ -126,7 +129,7 @@ export default class PaymentMethodsController {
 			bankName: method.bankName,
 			showOnDepositPage: method.showOnDepositPage,
 			qrUrl: method.qrImageKey
-				? await this.images.url("payment_qr", method.qrImageKey)
+				? await this.images.url("payment_qr", method.qrImageKey, tenant)
 				: null,
 		};
 	}

@@ -22,6 +22,13 @@ export type StoredImage = { key: string; width: number; height: number };
 
 const SIGNED_URL_TTL = "5 minutes";
 
+/**
+ * What a browser or proxy may do with a private image: show it, never keep
+ * it. Signed into the URL (the drive's /files route sends it as
+ * Cache-Control), so it can't be stripped.
+ */
+export const PRIVATE_CACHE_CONTROL = "private, no-store";
+
 const diskFor = (purpose: ImagePurpose) =>
 	drive.use(IMAGE_PURPOSES[purpose].visibility);
 
@@ -64,13 +71,32 @@ export default class ImageService {
 
 	/**
 	 * The URL to show an image. Private purposes get a signed URL valid for
-	 * 5 minutes. Load the owning record scoped to the tenant first: that
-	 * load is the access check.
+	 * 5 minutes that answers with `Cache-Control: private, no-store`. Load
+	 * the owning record scoped to the tenant first: that load is the access
+	 * check. As defence in depth the key must be one this tenant stored for
+	 * this purpose (`tenants/<id>/<purpose>/`), else this throws: a caller
+	 * bug, never a user error. Signed URLs are bearer tokens: keep them out of
+	 * emails, jobs and logs.
 	 */
-	async url(purpose: ImagePurpose, key: string): Promise<string> {
+	async url(
+		purpose: ImagePurpose,
+		key: string,
+		tenant: Pick<Tenant, "id">,
+	): Promise<string> {
+		if (
+			!key.startsWith(`tenants/${tenant.id}/${purpose}/`) ||
+			key.includes("..")
+		) {
+			throw new Error(
+				`url() was given a key of another tenant or purpose (${purpose})`,
+			);
+		}
 		const disk = diskFor(purpose);
 		return IMAGE_PURPOSES[purpose].visibility === "private"
-			? disk.getSignedUrl(key, { expiresIn: SIGNED_URL_TTL })
+			? disk.getSignedUrl(key, {
+					expiresIn: SIGNED_URL_TTL,
+					cacheControl: PRIVATE_CACHE_CONTROL,
+				})
 			: disk.getUrl(key);
 	}
 
