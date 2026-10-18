@@ -43,6 +43,19 @@ export const REFERENCE_TRIES = 5;
 const CODE_TAKEN = "deposit_links_tenant_id_reference_code_unique";
 
 /**
+ * The link's token while the link works, else null: not expired, and the
+ * row's nonce still derives the token whose hash is stored. Rotating
+ * APP_KEY changes what tokenFor gives, so the derivation stops matching
+ * and every link dies, for the public page (resolve) and the owner's panel
+ * (forProject) alike. Both sides of the comparison come from the server.
+ */
+function liveToken(link: DepositLink): string | null {
+	if (link.expiresAt.toMillis() <= DateTime.now().toMillis()) return null;
+	const token = tokenFor(link.tokenNonce);
+	return hashToken(token) === link.tokenHash ? token : null;
+}
+
+/**
  * Deposit links (TAT-65): one per project, the bearer link to its public
  * deposit page. Owners make or replace a link; the public API resolves a
  * token to its link. The token is derived from the row's nonce (tokenFor)
@@ -123,18 +136,17 @@ export default class DepositLinkService {
 
 	/**
 	 * The link of `token` in this tenant while it works, else null: unknown,
-	 * replaced, expired and another tenant's tokens are all null. Looked up
-	 * by the token's hash, never the token.
+	 * replaced, expired, another tenant's and tokens an earlier APP_KEY made
+	 * are all null. Looked up by the token's hash, never the token; then the
+	 * row's nonce must still derive that hash (liveToken), because a token
+	 * handed out before an APP_KEY rotation still hashes to the stored value.
 	 */
 	async resolve(tenant: TenantRef, token: string): Promise<DepositLink | null> {
 		const link = await DepositLink.query()
 			.where("tenant_id", tenant.id)
 			.where("token_hash", hashToken(token))
 			.first();
-		if (!link || link.expiresAt.toMillis() <= DateTime.now().toMillis()) {
-			return null;
-		}
-		return link;
+		return link && liveToken(link) ? link : null;
 	}
 
 	/**
@@ -156,14 +168,11 @@ export default class DepositLinkService {
 			.where("project_id", project.id)
 			.first();
 		if (!link) return null;
-		const token = tokenFor(link.tokenNonce);
-		const works =
-			hashToken(token) === link.tokenHash &&
-			link.expiresAt.toMillis() > DateTime.now().toMillis();
+		const token = liveToken(link);
 		return {
 			referenceCode: link.referenceCode,
 			expiresAt: link.expiresAt,
-			url: works ? depositPageUrl(tenant.slug, token) : null,
+			url: token ? depositPageUrl(tenant.slug, token) : null,
 		};
 	}
 

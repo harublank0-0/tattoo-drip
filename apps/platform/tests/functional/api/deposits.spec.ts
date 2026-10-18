@@ -126,6 +126,26 @@ test.group("Public API: GET /deposits/:token", (group) => {
 			assertApiError(await client.get(path), 404, "not_found");
 		}
 	});
+
+	test("a token the current APP_KEY no longer derives is the same 404 (rotation kills links)", async ({
+		client,
+	}) => {
+		const { tenant, link, token } = await deposit();
+		(await client.get(depositPath(SLUG, token))).assertStatus(200);
+
+		// What a rotated APP_KEY does: the nonce no longer gives this token,
+		// while the stored hash still matches it.
+		await inTenant(tenant, async () => {
+			link.tokenNonce = newTokenNonce();
+			await link.save();
+		});
+
+		assertApiError(
+			await client.get(depositPath(SLUG, token)),
+			404,
+			"not_found",
+		);
+	});
 });
 
 test.group("Public API: POST /deposits/:token", (group) => {
@@ -245,6 +265,28 @@ test.group("Public API: POST /deposits/:token", (group) => {
 				JSON.stringify(fields),
 			);
 		}
+
+		assert.lengthOf(await paymentsOf(tenant, project.id), 0);
+		assert.lengthOf(await storedProofs(tenant), 0);
+		assert.deepEqual(await newTempUploads(before), []);
+	});
+
+	test("a token the current APP_KEY no longer derives gets the 404 on upload: no row, no file, no temp upload", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, project, link, token } = await deposit();
+		await inTenant(tenant, async () => {
+			link.tokenNonce = newTokenNonce();
+			await link.save();
+		});
+		const before = await tempUploads();
+
+		assertApiError(
+			await postProof(client, SLUG, token, PROOF, [await proofPart()]),
+			404,
+			"not_found",
+		);
 
 		assert.lengthOf(await paymentsOf(tenant, project.id), 0);
 		assert.lengthOf(await storedProofs(tenant), 0);

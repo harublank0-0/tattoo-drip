@@ -266,6 +266,38 @@ test.group("DepositLinkService.resolve and forProject", (group) => {
 		assert.isNull(await resolve(mine.token));
 	});
 
+	test("resolve finds nothing once the nonce no longer derives the token (a rotated APP_KEY kills the link for the public too)", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("links-rotated-65");
+		const { project } = await inTenant(tenant, () => depositReady(tenant));
+		const { link, token } = await inTenant(tenant, () =>
+			links.issue(tenant, OWNER, project),
+		);
+		assert.equal(
+			(await inTenant(tenant, () => links.resolve(tenant, token)))?.id,
+			link.id,
+		);
+
+		// A new APP_KEY changes what tokenFor gives for the same nonce; the
+		// stored hash still matches the token that was handed out. Swapping
+		// the nonce changes the derivation the same way.
+		await inTenant(tenant, async () => {
+			link.tokenNonce = newTokenNonce();
+			await link.save();
+		});
+
+		assert.equal(
+			link.tokenHash,
+			hashToken(token),
+			"the old hash still matches",
+		);
+		assert.isNull(await inTenant(tenant, () => links.resolve(tenant, token)));
+		assert.isNull(
+			(await inTenant(tenant, () => links.forProject(tenant, project)))?.url,
+		);
+	});
+
 	test("forProject rebuilds the URL; it is null once the link expired or its hash stopped matching", async ({
 		assert,
 	}) => {
