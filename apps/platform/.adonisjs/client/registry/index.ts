@@ -48,6 +48,42 @@ const routes = {
     tokens: [{"old":"/login","type":0,"val":"login","end":""}],
     types: placeholder as Registry['session.store']['types'],
   },
+  'password_reset.create': {
+    methods: ["GET","HEAD"],
+    pattern: '/forgot-password',
+    tokens: [{"old":"/forgot-password","type":0,"val":"forgot-password","end":""}],
+    types: placeholder as Registry['password_reset.create']['types'],
+  },
+  'password_reset.store': {
+    methods: ["POST"],
+    pattern: '/forgot-password',
+    tokens: [{"old":"/forgot-password","type":0,"val":"forgot-password","end":""}],
+    types: placeholder as Registry['password_reset.store']['types'],
+  },
+  'password_reset.sent': {
+    methods: ["GET","HEAD"],
+    pattern: '/forgot-password/sent',
+    tokens: [{"old":"/forgot-password/sent","type":0,"val":"forgot-password","end":""},{"old":"/forgot-password/sent","type":0,"val":"sent","end":""}],
+    types: placeholder as Registry['password_reset.sent']['types'],
+  },
+  'password_reset.link': {
+    methods: ["GET","HEAD"],
+    pattern: '/reset-password/:token',
+    tokens: [{"old":"/reset-password/:token","type":0,"val":"reset-password","end":""},{"old":"/reset-password/:token","type":1,"val":"token","end":""}],
+    types: placeholder as Registry['password_reset.link']['types'],
+  },
+  'password_reset.edit': {
+    methods: ["GET","HEAD"],
+    pattern: '/reset-password',
+    tokens: [{"old":"/reset-password","type":0,"val":"reset-password","end":""}],
+    types: placeholder as Registry['password_reset.edit']['types'],
+  },
+  'password_reset.update': {
+    methods: ["POST"],
+    pattern: '/reset-password',
+    tokens: [{"old":"/reset-password","type":0,"val":"reset-password","end":""}],
+    types: placeholder as Registry['password_reset.update']['types'],
+  },
   'tenant.dashboard': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant',

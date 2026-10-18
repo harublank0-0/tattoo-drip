@@ -16,6 +16,7 @@ export const controllers = {
   MessageTemplates: () => import('#controllers/message_templates_controller'),
   NewAccount: () => import('#controllers/new_account_controller'),
   Onboarding: () => import('#controllers/onboarding_controller'),
+  PasswordReset: () => import('#controllers/password_reset_controller'),
   PaymentMethods: () => import('#controllers/payment_methods_controller'),
   Payments: () => import('#controllers/payments_controller'),
   ProjectChanges: () => import('#controllers/project_changes_controller'),

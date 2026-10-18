@@ -15,7 +15,10 @@ declare module '@adonisjs/inertia/types' {
     'alerts/index': ExtractProps<(typeof import('../../inertia/pages/alerts/index.tsx'))['default']>
     'artists/form': ExtractProps<(typeof import('../../inertia/pages/artists/form.tsx'))['default']>
     'artists/index': ExtractProps<(typeof import('../../inertia/pages/artists/index.tsx'))['default']>
+    'auth/check_email': ExtractProps<(typeof import('../../inertia/pages/auth/check_email.tsx'))['default']>
+    'auth/forgot_password': ExtractProps<(typeof import('../../inertia/pages/auth/forgot_password.tsx'))['default']>
     'auth/login': ExtractProps<(typeof import('../../inertia/pages/auth/login.tsx'))['default']>
+    'auth/reset_password': ExtractProps<(typeof import('../../inertia/pages/auth/reset_password.tsx'))['default']>
     'auth/signup': ExtractProps<(typeof import('../../inertia/pages/auth/signup.tsx'))['default']>
     'calendar/index': ExtractProps<(typeof import('../../inertia/pages/calendar/index.tsx'))['default']>
     'clients/edit': ExtractProps<(typeof import('../../inertia/pages/clients/edit.tsx'))['default']>

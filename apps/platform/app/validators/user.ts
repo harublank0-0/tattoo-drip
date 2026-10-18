@@ -35,3 +35,17 @@ export const loginValidator = vine.create({
 	email: accountEmail(),
 	password: vine.string(),
 });
+
+/**
+ * Asking for a password reset link (TAT-18): the address in its canonical
+ * form, registered or not.
+ */
+export const passwordResetRequestValidator = vine.create({
+	email: accountEmail(),
+});
+
+/** A new password from a reset link: signup's rules, never weaker (TAT-18). */
+export const newPasswordValidator = vine.create({
+	password: password(),
+	passwordConfirmation: password().sameAs("password"),
+});

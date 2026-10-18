@@ -55,17 +55,19 @@ test.group("Page history", (group) => {
 		assert.isTrue(loopback.body().encryptHistory);
 	});
 
-	test("the login and signup pages clear history", async ({
-		client,
-		assert,
-	}) => {
-		const login = await client.get("/login").withInertia();
-		const signup = await client.get("/signup").withInertia();
+	test("every guest page clears history", async ({ client, assert }) => {
+		for (const [path, component] of [
+			["/login", "auth/login"],
+			["/signup", "auth/signup"],
+			["/forgot-password", "auth/forgot_password"],
+			["/forgot-password/sent", "auth/check_email"],
+			["/reset-password", "auth/reset_password"],
+		] as const) {
+			const page = await client.get(path).withInertia();
 
-		login.assertInertiaComponent("auth/login");
-		assert.isTrue(login.body().clearHistory);
-		signup.assertInertiaComponent("auth/signup");
-		assert.isTrue(signup.body().clearHistory);
+			page.assertInertiaComponent(component);
+			assert.isTrue(page.body().clearHistory, path);
+		}
 	});
 
 	test("logging out lands on the login page, which clears history", async ({

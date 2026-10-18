@@ -11,9 +11,11 @@ import type { NextFn } from "@adonisjs/core/types/http";
  */
 export default class GuestMiddleware {
 	/**
-	 * The URL to redirect to when user is logged-in
+	 * Where a signed-in visitor of a guest page goes: their studio, through
+	 * /dashboard (TAT-18; it was the starter kit's home page). A reset link
+	 * opened while signed in stays valid for its hour.
 	 */
-	redirectTo = "/";
+	redirectTo = "/dashboard";
 
 	async handle(
 		ctx: HttpContext,

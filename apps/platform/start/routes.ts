@@ -10,9 +10,15 @@
 import router from "@adonisjs/core/services/router";
 import { controllers } from "#generated/controllers";
 import { ARTIST_SLUG } from "#modules/artists/validators/artist";
+import { ACCOUNT_TOKEN } from "#modules/identity/account_tokens";
 import { DEPOSIT_TOKEN } from "#modules/payments/deposit_links";
 import { middleware } from "#start/kernel";
-import { throttleSignup } from "#start/limiter";
+import {
+	throttleAccountLinks,
+	throttleResetEmail,
+	throttleResetRequest,
+	throttleSignup,
+} from "#start/limiter";
 
 router.on("/").renderInertia("home", {}).as("home");
 
@@ -25,6 +31,35 @@ router
 
 		router.get("login", [controllers.Session, "create"]);
 		router.post("login", [controllers.Session, "store"]);
+
+		/**
+		 * Password reset (TAT-18). Asking for a link counts per client
+		 * address, then per address named; the link and the new password
+		 * count per client address. The link's token lives in the session,
+		 * never in a page's URL.
+		 */
+		router
+			.get("forgot-password", [controllers.PasswordReset, "create"])
+			.as("password_reset.create");
+		router
+			.post("forgot-password", [controllers.PasswordReset, "store"])
+			.use([throttleResetRequest, throttleResetEmail])
+			.as("password_reset.store");
+		router
+			.get("forgot-password/sent", [controllers.PasswordReset, "sent"])
+			.as("password_reset.sent");
+		router
+			.get("reset-password/:token", [controllers.PasswordReset, "link"])
+			.where("token", ACCOUNT_TOKEN)
+			.use(throttleAccountLinks)
+			.as("password_reset.link");
+		router
+			.get("reset-password", [controllers.PasswordReset, "edit"])
+			.as("password_reset.edit");
+		router
+			.post("reset-password", [controllers.PasswordReset, "update"])
+			.use(throttleAccountLinks)
+			.as("password_reset.update");
 	})
 	.use(middleware.guest());
 

@@ -14,9 +14,7 @@ export default function Login() {
 		<>
 			<div className="flex flex-col gap-1">
 				<h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
-				<p className="text-sm text-muted-foreground">
-					Sign in to continue building.
-				</p>
+				<p className="text-sm text-muted-foreground">Sign in to your studio.</p>
 			</div>
 
 			<Form route="session.store">
@@ -30,6 +28,7 @@ export default function Login() {
 								type="email"
 								autoComplete="username"
 								placeholder="you@example.com"
+								className="h-11"
 								aria-invalid={!!errors.email}
 							/>
 							{errors.email && <FieldError>{errors.email}</FieldError>}
@@ -43,27 +42,36 @@ export default function Login() {
 								type="password"
 								autoComplete="current-password"
 								placeholder="••••••••"
+								className="h-11"
 								aria-invalid={!!errors.password}
 							/>
 							{errors.password && <FieldError>{errors.password}</FieldError>}
 						</Field>
 
-						<Button type="submit" disabled={processing}>
+						<Button type="submit" className="h-11" disabled={processing}>
 							{processing ? "One moment…" : "Sign in"}
 						</Button>
 					</FieldGroup>
 				)}
 			</Form>
 
-			<p className="text-center text-sm text-muted-foreground">
-				New here?{" "}
+			<div className="flex flex-col items-center text-sm text-muted-foreground">
 				<Link
-					route="new_account.create"
-					className="text-foreground underline underline-offset-4"
+					route="password_reset.create"
+					className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-foreground"
 				>
-					Create an account
+					Forgot your password?
 				</Link>
-			</p>
+				<p>
+					New here?{" "}
+					<Link
+						route="new_account.create"
+						className="text-foreground underline underline-offset-4"
+					>
+						Create an account
+					</Link>
+				</p>
+			</div>
 		</>
 	);
 }

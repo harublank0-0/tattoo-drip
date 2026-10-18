@@ -20,6 +20,14 @@ export interface ApiDefinition {
     store: typeof routes['session.store']
     destroy: typeof routes['session.destroy']
   }
+  passwordReset: {
+    create: typeof routes['password_reset.create']
+    store: typeof routes['password_reset.store']
+    sent: typeof routes['password_reset.sent']
+    link: typeof routes['password_reset.link']
+    edit: typeof routes['password_reset.edit']
+    update: typeof routes['password_reset.update']
+  }
   tenant: {
     dashboard: typeof routes['tenant.dashboard']
     settings: typeof routes['tenant.settings'] & {

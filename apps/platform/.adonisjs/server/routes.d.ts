@@ -11,6 +11,12 @@ export type ScannedRoutes = {
     'new_account.store': { paramsTuple?: []; params?: {} }
     'session.create': { paramsTuple?: []; params?: {} }
     'session.store': { paramsTuple?: []; params?: {} }
+    'password_reset.create': { paramsTuple?: []; params?: {} }
+    'password_reset.store': { paramsTuple?: []; params?: {} }
+    'password_reset.sent': { paramsTuple?: []; params?: {} }
+    'password_reset.link': { paramsTuple: [ParamValue]; params: {'token': ParamValue} }
+    'password_reset.edit': { paramsTuple?: []; params?: {} }
+    'password_reset.update': { paramsTuple?: []; params?: {} }
     'tenant.dashboard': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.profile': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -83,6 +89,10 @@ export type ScannedRoutes = {
     'home': { paramsTuple?: []; params?: {} }
     'new_account.create': { paramsTuple?: []; params?: {} }
     'session.create': { paramsTuple?: []; params?: {} }
+    'password_reset.create': { paramsTuple?: []; params?: {} }
+    'password_reset.sent': { paramsTuple?: []; params?: {} }
+    'password_reset.link': { paramsTuple: [ParamValue]; params: {'token': ParamValue} }
+    'password_reset.edit': { paramsTuple?: []; params?: {} }
     'tenant.dashboard': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.profile': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -116,6 +126,10 @@ export type ScannedRoutes = {
     'home': { paramsTuple?: []; params?: {} }
     'new_account.create': { paramsTuple?: []; params?: {} }
     'session.create': { paramsTuple?: []; params?: {} }
+    'password_reset.create': { paramsTuple?: []; params?: {} }
+    'password_reset.sent': { paramsTuple?: []; params?: {} }
+    'password_reset.link': { paramsTuple: [ParamValue]; params: {'token': ParamValue} }
+    'password_reset.edit': { paramsTuple?: []; params?: {} }
     'tenant.dashboard': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.profile': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -146,6 +160,8 @@ export type ScannedRoutes = {
   POST: {
     'new_account.store': { paramsTuple?: []; params?: {} }
     'session.store': { paramsTuple?: []; params?: {} }
+    'password_reset.store': { paramsTuple?: []; params?: {} }
+    'password_reset.update': { paramsTuple?: []; params?: {} }
     'tenant.settings.payments.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.move': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
