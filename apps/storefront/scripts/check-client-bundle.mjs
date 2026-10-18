@@ -24,6 +24,10 @@ const SERVER_ONLY = [
 	"API_URL",
 	"serverKey",
 	"requestStudio",
+	// The visitor's address as the tenant middleware read it (TAT-38); the
+	// pure helpers in tenancy/visitor.ts (withVisitorAddress) are shared with
+	// the browser's code on purpose and are not listed.
+	"requestVisitorAddress",
 	"storefrontConfig",
 	"parseStorefrontConfig",
 	"tenantMiddleware",
