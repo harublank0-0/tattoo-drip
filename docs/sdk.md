@@ -83,14 +83,15 @@ For SSR prefetching in route loaders, use `tattooQueries.*` with `queryClient.en
 
 The studio page gets **no special access**. It uses the same endpoints and packages. If it needs something the API doesn't expose, the fix is to add it to the API. The only differences:
 
-- The tenant comes from the subdomain on each request.
+- The tenant comes from the host on each request: the storefront's tenant middleware confirms it with `studio.get()` and redirects old slugs ([tenants and hosts](../apps/storefront/docs/development.md#tenants-and-hosts)).
 - Server-side rendering sends a secret server key, used only for rate limiting.
 - Inquiries go from the browser straight to the API.
 
 ```ts
-// apps/storefront, server side
-const tenant = new URL(request.url).hostname.split(".")[0];
-const client = createTattooClient({ baseUrl: API_URL, tenant, key: env.STOREFRONT_SERVER_KEY });
+// apps/storefront, server side (TAT-23): the tenant middleware has already
+// confirmed the studio and redirected old slugs
+const { slug } = requestStudio();
+const client = createTattooClient({ baseUrl: API_URL, tenant: slug, key: env.STOREFRONT_SERVER_KEY });
 ```
 
 The SDK throws if it is given a key in a browser.
