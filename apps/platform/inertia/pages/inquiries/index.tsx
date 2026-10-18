@@ -98,6 +98,11 @@ export default function InboxIndex({
 											{inquiry.references > 0 &&
 												` · ${inquiry.references} reference${inquiry.references === 1 ? "" : "s"}`}
 										</span>
+										{inquiry.contactedText && (
+											<span className="text-sm text-muted-foreground">
+												{inquiry.contactedText}
+											</span>
+										)}
 									</>
 								)}
 							</Link>

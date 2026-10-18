@@ -2,6 +2,8 @@ import { Form } from "@adonisjs/inertia/react";
 import { Link, router } from "@inertiajs/react";
 import { urlFor } from "~/client";
 import { type InquiryPageProps, SOURCE_LABELS } from "~/components/inquiries";
+import MessageCard from "~/components/message_card";
+import type { ContactVia } from "~/components/messages";
 import Page from "~/components/page";
 import ReferenceGrid from "~/components/references";
 import { Badge } from "~/components/ui/badge";
@@ -17,8 +19,21 @@ export default function InquiryShow({
 	references,
 	accept,
 	projectId,
+	contact,
+	message,
+	contactedText,
 }: InquiryPageProps) {
 	const tenant = useTenant();
+	// The chat links record the contact in the background (TAT-52).
+	const markContacted = (via: ContactVia = {}) =>
+		router.post(
+			urlFor("tenant.inbox.contacted.store", {
+				tenant: tenant.slug,
+				id: inquiry.id,
+			}),
+			via,
+			{ preserveScroll: true, preserveState: true },
+		);
 	const details: [string, string | null][] = [
 		["Placement", inquiry.placement],
 		["Approximate size", inquiry.approximateSize],
@@ -102,6 +117,14 @@ export default function InquiryShow({
 						</dl>
 					</CardContent>
 				</Card>
+
+				<MessageCard
+					contact={contact}
+					messages={message ? [message] : []}
+					initialKind={message?.kind ?? null}
+					onContact={markContacted}
+					footer={contactedText}
+				/>
 
 				<Card>
 					<CardHeader>

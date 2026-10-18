@@ -1,3 +1,8 @@
+import type {
+	CardMessageProps,
+	ContactLinksProps,
+} from "~/components/messages";
+
 /** One row of the inbox. */
 export type InquiryRow = {
 	id: string;
@@ -14,6 +19,8 @@ export type InquiryRow = {
 	decidedOn: string | null;
 	/** The project an accepted inquiry became. */
 	projectId: string | null;
+	/** The last contact ("contacted today on WhatsApp (Inquiry received)"); null when never (TAT-52). */
+	contactedText: string | null;
 };
 
 export type InboxListProps = {
@@ -56,6 +63,11 @@ export type InquiryPageProps = {
 		choices: { id: string; name: string }[];
 	} | null;
 	projectId: string | null;
+	/** One-tap links to the client without a message; null without a phone (TAT-52). */
+	contact: ContactLinksProps | null;
+	/** The "received" message while the inquiry is new. */
+	message: CardMessageProps | null;
+	contactedText: string;
 };
 
 /** How the client found the studio, for people. */

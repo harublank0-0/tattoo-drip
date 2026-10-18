@@ -4,6 +4,8 @@ import { errors } from "@vinejs/vine";
 import { tenantContext } from "#middleware/tenant_middleware";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import ClientService from "#modules/clients/services/client_service";
 import { InquiryRuleError } from "#modules/inquiries/errors";
 import type Inquiry from "#modules/inquiries/models/inquiry";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -11,11 +13,19 @@ import InquiryService from "#modules/inquiries/services/inquiry_service";
 import { acceptInquiryValidator } from "#modules/inquiries/validators/inquiry";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
+import { chatMessage, contactLinks } from "#modules/notifications/chat";
+import {
+	firstName,
+	MESSAGE_LABELS,
+	renderMessage,
+} from "#modules/notifications/messages";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import MessageTemplateService from "#modules/notifications/services/message_template_service";
 import {
 	contactValidator,
 	toContactVia,
 } from "#modules/notifications/validators/contact";
-import { daysAgoText } from "#modules/projects/contact";
+import { daysAgoText, lastContactText } from "#modules/projects/contact";
 import { formatDay } from "#modules/projects/quotes";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ProjectService from "#modules/projects/services/project_service";
@@ -32,6 +42,8 @@ export default class InquiriesController {
 		private projects: ProjectService,
 		private artists: ArtistService,
 		private images: ImageService,
+		private clients: ClientService,
+		private templates: MessageTemplateService,
 	) {}
 
 	async index(ctx: HttpContext) {
@@ -72,6 +84,13 @@ export default class InquiriesController {
 				status: inquiry.status,
 				decidedOn: decidedOn(inquiry, tenant.timezone),
 				projectId: projectIds.get(inquiry.id) ?? null,
+				// The last contact (TAT-52): a new inquiry staff already answered.
+				contactedText: inquiry.lastContactedAt
+					? lastContactText(inquiry.lastContactedAt, tenant.timezone, {
+							channel: inquiry.lastContactChannel,
+							kind: inquiry.lastContactKind,
+						})
+					: null,
 			})),
 			page: { current: page, last: lastPage, total },
 		});
@@ -93,6 +112,13 @@ export default class InquiriesController {
 						await this.projects.projectIdsForInquiries(tenant, [inquiry.id])
 					).get(inquiry.id) ?? null)
 				: null;
+
+		// "Message the client" (TAT-52): the client's stored phone (an owner
+		// may have corrected it since), and while the inquiry is new the
+		// "received" message, greeting the name it was sent with.
+		const client = await this.clients.find(tenant, inquiry.clientId);
+		const phone = client?.phone ?? null;
+		const texts = await this.templates.textsFor(tenant);
 
 		return ctx.inertia.render("inquiries/show", {
 			inquiry: {
@@ -128,6 +154,25 @@ export default class InquiriesController {
 						}
 					: null,
 			projectId,
+			contact: phone ? contactLinks(phone) : null,
+			message:
+				phone && inquiry.status === "new"
+					? {
+							kind: "inquiry_received" as const,
+							label: MESSAGE_LABELS.inquiry_received,
+							...chatMessage(
+								renderMessage("inquiry_received", texts.inquiry_received, {
+									client_name: firstName(inquiry.contactName),
+									studio_name: tenant.name,
+								}),
+								phone,
+							),
+						}
+					: null,
+			contactedText: lastContactText(inquiry.lastContactedAt, tenant.timezone, {
+				channel: inquiry.lastContactChannel,
+				kind: inquiry.lastContactKind,
+			}),
 		});
 	}
 
