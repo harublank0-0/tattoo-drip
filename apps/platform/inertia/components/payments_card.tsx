@@ -230,8 +230,8 @@ function PendingProof({
 			</div>
 			{proof.dueNowText && (
 				<p className="text-sm">
-					The deposit due is now {proof.dueNowText}: the quote changed after
-					this was sent.
+					The deposit due is now {proof.dueNowText}: the quote or the payments
+					received changed after this was sent.
 				</p>
 			)}
 			<div className="flex flex-wrap gap-2">

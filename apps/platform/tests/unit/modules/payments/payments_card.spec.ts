@@ -146,6 +146,25 @@ test.group("paymentsCard", () => {
 		assert.equal(props.pending[0].dueNowText, "NPR 4,000");
 	});
 
+	test("a screenshot waiting while a part of the deposit came in at the desk says what is due now", ({
+		assert,
+	}) => {
+		const proof = payment({
+			status: "submitted",
+			verifiedAt: null,
+			verifiedByUserId: null,
+		});
+		const desk = payment({ amount: 100_000 });
+		const props = card(
+			money([proof, desk], quote(), "deposit_pending"),
+			"deposit_pending",
+		);
+		// The quote is unchanged (NPR 3,000): the amount due moved because
+		// NPR 1,000 was received, which the screen's sentence must not blame
+		// on a quote change.
+		assert.equal(props.pending[0].dueNowText, "NPR 2,000");
+	});
+
 	test("rows say who decided and how; reversals point both ways", ({
 		assert,
 	}) => {
