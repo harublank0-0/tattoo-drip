@@ -9,6 +9,11 @@ import {
 const BASE = "tattoodrip.com";
 const DEV = "localhost";
 const long = (length: number) => "a".repeat(length);
+/** A DNS name of exactly `length` characters: 63-character labels, no empty label. */
+const nameOfLength = (length: number) =>
+	Array.from({ length: 5 }, () => long(63))
+		.join(".")
+		.slice(0, length);
 
 describe("tenantFromHost", () => {
 	const tenants: Array<[host: string, base: string, slug: string]> = [
@@ -73,6 +78,20 @@ describe("tenantFromHost", () => {
 		["bläckneedle.tattoodrip.com", BASE], // non-ASCII
 		["\u212Aelvin.tattoodrip.com", BASE], // the Kelvin sign U+212A lowercases to "k"
 		[`${long(300)}.tattoodrip.com`, BASE],
+		// Characters that could change what a later parser reads: each is refused
+		// before any lowercasing or splitting, and must stay refused.
+		["evil.test#.tattoodrip.com", BASE], // a fragment
+		["evil.test?.tattoodrip.com", BASE], // a query
+		["blackneedle%2etattoodrip.com", BASE], // a percent-encoded dot
+		["blackneedle.tattoodrip.com%00", BASE],
+		["blackneedle.tattoodrip.com, evil.test", BASE], // two Host headers, joined
+		["evil.test, blackneedle.tattoodrip.com", BASE],
+		["blackneedle.tattoodrip.com;evil.test", BASE],
+		["blackneedle.tattoodrip.com\tevil.test", BASE], // a tab
+		["blackneedle.tattoodrip.com\u0000", BASE], // a NUL
+		["blackneedle.tattoodrip.com\r\nX-Evil: 1", BASE], // header injection
+		["blackneedle.tattoodrip.com\\@evil.test", BASE], // a backslash
+		[nameOfLength(254), BASE], // one character over the DNS limit
 	];
 	for (const [host, base] of nothing) {
 		test(`${JSON.stringify(host)} is no studio`, () => {
@@ -91,6 +110,8 @@ describe("tenantFromHost", () => {
 		],
 		["eviltattoodrip.com", BASE, "eviltattoodrip.com"],
 		["blackneedle.tattoodrip.com", DEV, "blackneedle.tattoodrip.com"],
+		// The longest DNS name, 253 characters, is still a name.
+		[nameOfLength(253), BASE, nameOfLength(253)],
 	];
 	for (const [host, base, hostname] of foreign) {
 		test(`${host} is outside ${base}`, () => {
@@ -120,9 +141,16 @@ describe("isDnsName", () => {
 			"",
 			`${long(64)}.com`,
 			`${long(60)}.`.repeat(5).slice(0, -1),
+			nameOfLength(254),
 		]) {
 			assert.ok(!isDnsName(name), name);
 		}
+	});
+
+	test("the limit is 253 characters in all", () => {
+		assert.equal(nameOfLength(253).length, 253);
+		assert.ok(isDnsName(nameOfLength(253)));
+		assert.ok(!isDnsName(nameOfLength(254)));
 	});
 });
 
