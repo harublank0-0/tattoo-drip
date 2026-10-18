@@ -125,7 +125,9 @@ describe("what a page carries", () => {
 		);
 	});
 
-	test("a pending query that fails later sends no error message", async () => {
+	test("a pending query that fails later sends no error message", async (t) => {
+		// Query's development build logs that it redacted the error: expected.
+		t.mock.method(console, "error", () => undefined);
 		const queryClient = createStorefrontQueryClient("server");
 		let fail: (error: unknown) => void = () => undefined;
 		void queryClient
