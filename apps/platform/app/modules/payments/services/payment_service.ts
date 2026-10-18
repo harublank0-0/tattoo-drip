@@ -88,6 +88,16 @@ export type Reversal = {
 	depositDue: number;
 };
 
+/** What the studio decided about a closed project's deposit (TAT-85 adds sessions and `moved`). */
+export type OutcomeInput =
+	| { outcome: "kept"; note: string | null }
+	| {
+			outcome: "refunded";
+			amount: number;
+			method: PaymentMethodKind;
+			note: string | null;
+	  };
+
 /**
  * The payments of a tenant's projects (TAT-66): the owners' decisions on
  * screenshots, money taken at the desk, refunds, reversals and deposit
@@ -384,6 +394,77 @@ export default class PaymentService {
 			}
 			const { depositDue } = await this.forProject(tenant, project);
 			return { correction, reversed: live, depositDue };
+		});
+	}
+
+	/**
+	 * Records what happened to the deposit of a closed project (cancelled or
+	 * declined) that holds deposit money and has no outcome yet, else
+	 * PaymentRuleError "no_outcome_needed". `kept`: the studio keeps it.
+	 * `refunded`: a refund payment of `amount` (up to the deposit held,
+	 * "refund_too_large" with that limit; the rest is kept), named by the
+	 * outcome, in the same transaction. The outcome's amount is the deposit
+	 * money held. The app only records the studio's decision; its deposit
+	 * policy is its own.
+	 */
+	async recordOutcome(
+		tenant: TenantRef,
+		member: Member,
+		project: TattooProject,
+		input: OutcomeInput,
+	): Promise<DepositOutcome> {
+		assertOwner(member);
+		assertProjectOf(tenant, project);
+		return withTransaction(async (trx) => {
+			const live = await this.lockProject(trx, tenant, project.id);
+			const money = await this.forProject(tenant, live);
+			if (!money.outcomeNeeded) throw new PaymentRuleError("no_outcome_needed");
+			const note = clean(input.note);
+			let refundPaymentId: string | null = null;
+			if (input.outcome === "refunded") {
+				if (input.amount > money.depositHeld) {
+					throw new PaymentRuleError("refund_too_large", money.depositHeld);
+				}
+				const refund = await Payment.create(
+					{
+						tenantId: tenant.id,
+						projectId: live.id,
+						kind: "refund",
+						amount: -input.amount,
+						currency: money.balance.currency,
+						method: input.method,
+						status: "verified",
+						verifiedAt: DateTime.utc(),
+						verifiedByUserId: member.userId,
+						note,
+					},
+					{ client: trx },
+				);
+				refundPaymentId = refund.id;
+			}
+			try {
+				return await withTransaction((inner) =>
+					DepositOutcome.create(
+						{
+							tenantId: tenant.id,
+							projectId: live.id,
+							sessionId: null,
+							outcome: input.outcome,
+							amount: money.depositHeld,
+							currency: money.balance.currency,
+							refundPaymentId,
+							note,
+							recordedByUserId: member.userId,
+						},
+						{ client: inner },
+					),
+				);
+			} catch (error) {
+				if (isUniqueViolation(error, "deposit_outcomes_project_close_unique")) {
+					throw new PaymentRuleError("no_outcome_needed");
+				}
+				throw error;
+			}
 		});
 	}
 
