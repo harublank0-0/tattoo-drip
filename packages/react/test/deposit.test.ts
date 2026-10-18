@@ -151,4 +151,46 @@ describe("tattooMutations.submitDepositProof", () => {
 			undefined,
 		);
 	});
+
+	test("a deposit read still in flight when the upload is answered doesn't overwrite the answer", async () => {
+		// A focus refetch started before the upload landed on the server and
+		// is answered with the page as it was, after the upload's answer.
+		const answered: DepositPage = { ...PAGE, state: "submitted" };
+		let releaseRead = () => {};
+		const readGate = new Promise<void>((resolve) => {
+			releaseRead = resolve;
+		});
+		const fetch = (async (
+			_input: RequestInfo | URL,
+			init: RequestInit = {},
+		) => {
+			const isRead = (init.method ?? "GET") === "GET";
+			if (isRead) await readGate;
+			return new Response(JSON.stringify({ data: isRead ? PAGE : answered }), {
+				status: isRead ? 200 : 201,
+				headers: { "content-type": "application/json" },
+			});
+		}) as typeof globalThis.fetch;
+		const client = createTattooClient({
+			baseUrl: "https://api.example.com",
+			tenant: TENANT,
+			fetch,
+		});
+		const queryClient = new QueryClient();
+		const read = queryClient
+			.fetchQuery(tattooQueries.deposit(client, TOKEN))
+			.catch(() => undefined);
+
+		await new MutationObserver(
+			queryClient,
+			tattooMutations.submitDepositProof(client, queryClient, TOKEN),
+		).mutate(input);
+		releaseRead();
+		await read;
+
+		assert.deepEqual(
+			queryClient.getQueryData(tattooKeys.deposit(TENANT, TOKEN)),
+			answered,
+		);
+	});
 });

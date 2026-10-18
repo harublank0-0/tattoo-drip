@@ -126,6 +126,8 @@ export const tattooMutations = {
 	 * Sends a deposit proof. Never retried: a retry after a timeout could
 	 * send it twice (the API answers a second one with `deposit_not_due`).
 	 * The answer, the page in `submitted`, replaces the cached deposit page.
+	 * A read still in flight is cancelled first: it was asked before the
+	 * upload landed and would otherwise answer `due` over the top of it.
 	 */
 	submitDepositProof: (
 		client: TattooClient,
@@ -136,11 +138,10 @@ export const tattooMutations = {
 			mutationFn: (input: SubmitDepositProofInput) =>
 				client.deposits.submitProof(token, input),
 			retry: false,
-			onSuccess: (page: DepositPage) => {
-				queryClient.setQueryData(
-					tattooKeys.deposit(client.tenant, token),
-					page,
-				);
+			onSuccess: async (page: DepositPage) => {
+				const queryKey = tattooKeys.deposit(client.tenant, token);
+				await queryClient.cancelQueries({ queryKey });
+				queryClient.setQueryData(queryKey, page);
 			},
 		}),
 };
