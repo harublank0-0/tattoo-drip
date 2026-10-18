@@ -6,7 +6,8 @@
 // API got one keyed lookup and one keyed artists read per page, each with
 // the visitor's address (X-Visitor-IP, TAT-38), a failed
 // read is an error page inside the document (never a not-found, never
-// cached) and a failed lookup is a 503. Run `pnpm build` first, then
+// cached) and a failed lookup is a 503. The deposit page (TAT-65b) is its
+// shell only: one lookup, no-store, no Referer, noindex. Run `pnpm build` first, then
 // `pnpm check:page`. It opens two local ports (picked for it) and takes about
 // ten seconds, so CI doesn't run it: run it before a release (TAT-13).
 import { spawn } from "node:child_process";
@@ -248,6 +249,43 @@ try {
 		"An artist's page asked the API for more than the lookup and the list.",
 	);
 
+	// The deposit page (TAT-65b): the server renders its shell from the cached
+	// lookup alone. The token is in the fragment, so the server never sees one
+	// and asks the API for nothing else. Never stored, never indexed, no Referer.
+	apiLog.length = 0;
+	page = await get("/deposit");
+	expect(
+		page.status === 200 &&
+			page.body.includes(
+				"<title>Pay your deposit · Canary Ink &lt;Studio&gt;</title>",
+			),
+		`/deposit is ${page.status}, or lacks its own title.`,
+	);
+	expect(
+		page.cacheControl === "no-store",
+		`/deposit's Cache-Control is "${page.cacheControl}", not no-store.`,
+	);
+	expect(
+		page.headers.includes('"referrer-policy":"no-referrer"') &&
+			page.headers.includes('"x-robots-tag":"noindex, nofollow"'),
+		"/deposit does not send Referrer-Policy: no-referrer and X-Robots-Tag: noindex, nofollow.",
+	);
+	expect(
+		/<meta name="robots" content="noindex, nofollow"\/?>/.test(page.body) &&
+			/<meta name="referrer" content="no-referrer"\/?>/.test(page.body),
+		"/deposit lacks its robots or referrer meta.",
+	);
+	expect(
+		page.body.includes('aria-busy="true"') &&
+			page.body.includes("https://wa.me/9779812345678") &&
+			!page.body.includes("/deposits/"),
+		"/deposit does not render its loading shell with the studio's WhatsApp link, or names the deposit API.",
+	);
+	expect(
+		apiLog.length === 1 && apiLog[0].url === `/api/v1/tenants/${SLUG}`,
+		`/deposit asked the API for ${apiLog.map((call) => call.url).join(", ")} instead of the lookup alone.`,
+	);
+
 	// Unknown, hidden or malformed artists and unknown paths are the same not-found.
 	for (const path of ["/artists/nobody", "/artists/Sita", "/flash"]) {
 		apiLog.length = 0;
@@ -333,5 +371,5 @@ if (problems.length > 0) {
 	process.exit(1);
 }
 console.log(
-	"Page check passed: the key is in no page, header or log line; one keyed lookup and one artists read per page, each carrying the visitor's address; a failed read is an uncached error page, a failed lookup a 503; the public site key is in the page.",
+	"Page check passed: the key is in no page, header or log line; one keyed lookup and one artists read per page, each carrying the visitor's address; a failed read is an uncached error page, a failed lookup a 503; the deposit page is an uncached, unindexed shell from the lookup alone; the public site key is in the page.",
 );

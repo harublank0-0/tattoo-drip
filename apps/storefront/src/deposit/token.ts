@@ -22,7 +22,7 @@ export function readDepositToken(hash: string): string | null {
 
 /**
  * The router's scroll-restoration key (src/router.tsx). The router keeps
- * scroll positions in sessionStorage under this key, and its default falls
+ * scroll positions in the tab's session storage under this key, and its default falls
  * back to the whole href, fragment and all, for a history entry without a
  * key of its own. This falls back to the path, so a deposit token can never
  * reach storage.
