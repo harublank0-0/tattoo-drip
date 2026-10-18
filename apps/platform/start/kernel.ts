@@ -35,6 +35,8 @@ server.use([
  * requests with a registered route.
  */
 router.use([
+	// The public API's per-caller limits, before any body is read (TAT-38).
+	() => import("#middleware/public_gate_middleware"),
 	() => import("@adonisjs/core/bodyparser_middleware"),
 	// The session and shield (CSRF) skip the public API, which is stateless
 	// and cookieless (TAT-32).
