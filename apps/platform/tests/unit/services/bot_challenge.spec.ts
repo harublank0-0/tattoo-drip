@@ -68,16 +68,54 @@ function hangUntilAborted({ init }: Call): Promise<Response> {
 	});
 }
 
-/** Silences warn and error and keeps what they were given. */
+const LEVELS = [
+	"trace",
+	"debug",
+	"info",
+	"warn",
+	"error",
+	"fatal",
+	"silent",
+] as const;
+
+/**
+ * Silences every log level, `log()` itself and the child and named loggers
+ * (they answer with the silenced logger), and keeps what each was given.
+ */
 function captureLogs() {
-	const warn = mock.method(logger, "warn", () => {});
-	const error = mock.method(logger, "error", () => {});
+	const fields = logger as unknown as Record<
+		string,
+		(...args: unknown[]) => unknown
+	>;
+	const levels = LEVELS.map((level) => ({
+		level,
+		spy: mock.method(fields, level, () => {}),
+	}));
+	const log = mock.method(fields, "log", () => {});
+	const child = mock.method(fields, "child", () => logger);
+	const use = mock.method(fields, "use", () => logger);
+	const at = (...wanted: (typeof LEVELS)[number][]) =>
+		levels
+			.filter(({ level }) => wanted.includes(level))
+			.flatMap(({ spy }) => spy.mock.calls.map((call) => call.arguments));
 	return {
-		warnings: () => warn.mock.calls.map((call) => call.arguments),
-		errors: () => error.mock.calls.map((call) => call.arguments),
+		warnings: () => at("warn"),
+		errors: () => at("error"),
+		/** Everything logged at any level, however it was called. */
+		everything: () => [
+			...at(...LEVELS),
+			...log.mock.calls.map((call) => call.arguments),
+		],
+		/** Anything but warn and error: the verifier only ever logs those two. */
+		quiet: () => [
+			...at("trace", "debug", "info", "fatal", "silent"),
+			...log.mock.calls.map((call) => call.arguments),
+		],
 		restore: () => {
-			warn.mock.restore();
-			error.mock.restore();
+			for (const { spy } of levels) spy.mock.restore();
+			log.mock.restore();
+			child.mock.restore();
+			use.mock.restore();
 		},
 	};
 }
@@ -348,7 +386,8 @@ test.group("BotChallenge", () => {
 			]) {
 				await challenge(fakeFetch(answer).fetch).verify(TOKEN, EXPECTED);
 			}
-			const logged = JSON.stringify([...logs.warnings(), ...logs.errors()]);
+			const logged = JSON.stringify(logs.everything());
+			assert.deepEqual(logs.quiet(), []);
 			assert.notInclude(logged, TOKEN);
 			assert.notInclude(logged, SECRET);
 			assert.notInclude(logged, BODY);
