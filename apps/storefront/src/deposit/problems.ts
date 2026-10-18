@@ -27,14 +27,21 @@ export type Screen =
 	| { readonly kind: "problem"; readonly problem: LoadProblem }
 	| { readonly kind: "page"; readonly page: DepositPage };
 
+/** TanStack Query's `fetchStatus`: "paused" is a read that can't start while the browser is offline. */
+export type ReadStatus = "fetching" | "paused" | "idle";
+
 /**
  * What the screen shows for the query's state. A 404 wins over data already
  * shown (a replaced or expired link must stop showing payment details); any
- * other failed refresh keeps the data.
+ * other failed refresh keeps the data. A first read that is paused for lack
+ * of a connection never fails, so it would show the skeleton for ever: it
+ * says to check the connection instead, and the read resumes by itself when
+ * the phone is back online.
  */
 export function screenFor(query: {
 	readonly data: DepositPage | undefined;
 	readonly error: unknown;
+	readonly fetchStatus?: ReadStatus;
 }): Screen {
 	if (query.error && isGone(query.error)) {
 		return { kind: "problem", problem: "dead" };
@@ -42,6 +49,9 @@ export function screenFor(query: {
 	if (query.data) return { kind: "page", page: query.data };
 	if (query.error) {
 		return { kind: "problem", problem: describeLoadError(query.error) };
+	}
+	if (query.fetchStatus === "paused") {
+		return { kind: "problem", problem: "failed" };
 	}
 	return { kind: "loading" };
 }

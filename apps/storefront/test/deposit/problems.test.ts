@@ -78,6 +78,25 @@ describe("loading the page", () => {
 		}
 	});
 
+	test("a read that can't start offline says to check the connection, not a skeleton for ever", () => {
+		assert.deepEqual(
+			screenFor({ data: undefined, error: null, fetchStatus: "paused" }),
+			{ kind: "problem", problem: "failed" },
+		);
+		// Only a first read with nothing yet: a running read is still loading, and a
+		// paused refresh keeps the page shown.
+		for (const fetchStatus of ["fetching", "idle"] as const) {
+			assert.deepEqual(
+				screenFor({ data: undefined, error: null, fetchStatus }),
+				{ kind: "loading" },
+			);
+		}
+		assert.deepEqual(
+			screenFor({ data: PAGE, error: null, fetchStatus: "paused" }),
+			{ kind: "page", page: PAGE },
+		);
+	});
+
 	test("a failed first read says why", () => {
 		assert.deepEqual(
 			screenFor({ data: undefined, error: api(429, "rate_limited") }),

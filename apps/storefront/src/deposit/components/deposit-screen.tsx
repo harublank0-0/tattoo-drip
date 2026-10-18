@@ -72,7 +72,8 @@ export function DepositScreen({ shell }: { shell: DepositShell }) {
 	);
 }
 
-function DepositLoaded({
+/** Exported for the render tests; the screen is its only user. */
+export function DepositLoaded({
 	token,
 	shell,
 }: {
@@ -81,7 +82,11 @@ function DepositLoaded({
 }) {
 	const query = useDeposit(token);
 	const { refetch } = query;
-	const screen = screenFor({ data: query.data, error: query.error });
+	const screen = screenFor({
+		data: query.data,
+		error: query.error,
+		fetchStatus: query.fetchStatus,
+	});
 	const view = screen.kind === "page" ? depositView(screen.page) : null;
 	const shown = view ? view.state : screen.kind;
 	const [moveFocus, setMoveFocus] = useState(false);
