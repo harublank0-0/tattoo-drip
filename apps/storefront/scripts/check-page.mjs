@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 // Runs the built storefront against a stand-in API with a canary
 // STOREFRONT_SERVER_KEY, and checks what a visitor and the log can see
-// (TAT-23, spec ruling 8): the page carries the studio's name and the API's
-// origin but never the key, the API got one keyed call per page, and an API
-// failure is a 503, never a not-found. Run `pnpm build` first, then
+// (TAT-23, spec ruling 8; the studio page since TAT-48): the page carries the
+// studio's name, the API's origin and its own origin but never the key, the
+// API got one keyed lookup and one keyed artists read per page, a failed
+// read is an error page inside the document (never a not-found, never
+// cached) and a failed lookup is a 503. Run `pnpm build` first, then
 // `pnpm check:page`. It opens two local ports (picked for it) and takes about
 // ten seconds, so CI doesn't run it: run it before a release (TAT-13).
 import { spawn } from "node:child_process";
@@ -18,6 +20,27 @@ const CANARY = "canary-key-0123456789abcdefghijklmnopqrstuv";
 const API_DETAIL = "api-internal-detail-must-not-leak";
 const SLUG = "canary-ink";
 const STUDIO_NAME = "Canary Ink <Studio>";
+const STUDIO = {
+	slug: SLUG,
+	name: STUDIO_NAME,
+	type: "studio",
+	intro: "Fine line.\nWalk-ins on Sundays.",
+	timezone: "Asia/Kathmandu",
+	contact: { phone: "+9779812345678", email: null, address: null },
+	socialLinks: [],
+	acceptingInquiries: true,
+};
+const ARTISTS = [
+	{
+		id: "0199f000-0000-7000-8000-000000000048",
+		slug: "sita",
+		name: "Sita Rai",
+		bio: null,
+		photo: null,
+		acceptingInquiries: true,
+		closedMessage: null,
+	},
+];
 
 if (!existsSync(SERVER)) {
 	console.error("There is no build to run. Run pnpm build first.");
@@ -34,7 +57,8 @@ const freePort = () =>
 		});
 	});
 
-// The stand-in API: answers the studio lookup as `mode` says, and keeps a log.
+// The stand-in API: answers the studio lookup and the artists read as `mode`
+// says ("artists-5xx" fails only the artists read), and keeps a log.
 let mode = "ok";
 const apiLog = [];
 const api = http.createServer((request, response) => {
@@ -51,8 +75,15 @@ const api = http.createServer((request, response) => {
 	if (mode === "5xx") {
 		return send(500, { error: { code: "internal", message: API_DETAIL } });
 	}
-	if (mode === "ok" && request.url === `/api/v1/tenants/${SLUG}`) {
-		return send(200, { data: { slug: SLUG, name: STUDIO_NAME } });
+	if (mode === "ok" || mode === "artists-5xx") {
+		if (request.url === `/api/v1/tenants/${SLUG}`) {
+			return send(200, { data: STUDIO });
+		}
+		if (request.url === `/api/v1/tenants/${SLUG}/artists`) {
+			return mode === "ok"
+				? send(200, { data: ARTISTS })
+				: send(500, { error: { code: "internal", message: API_DETAIL } });
+		}
 	}
 	return send(404, { error: { code: "not_found", message: "Not found." } });
 });
@@ -80,14 +111,14 @@ child.stderr.on("data", (chunk) => {
 	output += chunk;
 });
 
-function get() {
+function get(path = "/") {
 	return new Promise((done, reject) => {
 		http
 			.get(
 				{
 					host: "127.0.0.1",
 					port: storefrontPort,
-					path: "/",
+					path,
 					headers: { host: `${SLUG}.localhost:${storefrontPort}` },
 				},
 				(response) => {
@@ -143,15 +174,105 @@ try {
 		"The page does not carry the API's origin and the studio's slug.",
 	);
 	expect(
+		page.body.includes(
+			`rel="canonical" href="http://${SLUG}.localhost:${storefrontPort}/"`,
+		) &&
+			page.body.includes(`origin:"http://${SLUG}.localhost:${storefrontPort}"`),
+		"The page does not carry its own origin from STOREFRONT_URL (canonical link and router state).",
+	);
+	expect(
+		page.cacheControl ===
+			"public, max-age=0, s-maxage=60, stale-while-revalidate=600",
+		`A studio page's Cache-Control is "${page.cacheControl}".`,
+	);
+	expect(
+		page.body.includes("application/ld+json") &&
+			!page.body.includes("<Studio>") &&
+			page.body.includes("\\u003cStudio\\u003e"),
+		"The JSON-LD is missing, or the studio's name reaches the page unescaped.",
+	);
+	expect(
+		page.body.includes("Sita Rai") &&
+			page.body.includes("https://wa.me/9779812345678"),
+		"The page does not show the artist and the studio's WhatsApp link.",
+	);
+	expect(
 		!page.body.includes(CANARY) && !page.headers.includes(CANARY),
 		"THE SERVER KEY IS IN THE PAGE OR ITS HEADERS.",
 	);
 	expect(
-		apiLog.length === 1 &&
+		apiLog.length === 2 &&
 			apiLog[0].url === `/api/v1/tenants/${SLUG}` &&
-			apiLog[0].authorization === `Bearer ${CANARY}` &&
-			apiLog[0].cookie === null,
-		`The page made ${apiLog.length} API calls instead of one keyed, cookie-less lookup.`,
+			apiLog[1].url === `/api/v1/tenants/${SLUG}/artists` &&
+			apiLog.every(
+				(call) =>
+					call.authorization === `Bearer ${CANARY}` && call.cookie === null,
+			),
+		`The page made ${apiLog.length} API calls instead of one keyed, cookie-less lookup and one artists read.`,
+	);
+
+	// An artist's page asks the API once more for the same list, never for the artist.
+	apiLog.length = 0;
+	page = await get("/artists/sita");
+	expect(
+		page.status === 200 &&
+			page.body.includes(
+				"<title>Sita Rai at Canary Ink &lt;Studio&gt;</title>",
+			) &&
+			page.body.includes(
+				`href="http://${SLUG}.localhost:${storefrontPort}/artists/sita"`,
+			),
+		"An artist's page is not 200 with its own title and canonical link.",
+	);
+	expect(
+		apiLog.map((call) => call.url).join(",") ===
+			`/api/v1/tenants/${SLUG},/api/v1/tenants/${SLUG}/artists`,
+		"An artist's page asked the API for more than the lookup and the list.",
+	);
+
+	// Unknown, hidden or malformed artists and unknown paths are the same not-found.
+	for (const path of ["/artists/nobody", "/artists/Sita", "/flash"]) {
+		apiLog.length = 0;
+		page = await get(path);
+		expect(page.status === 404, `${path} is ${page.status}, not 404.`);
+		// A matched route answers its own header; an unmatched path gets none of ours.
+		const wantedCache =
+			path === "/flash" ? undefined : "public, max-age=0, s-maxage=60";
+		expect(
+			page.cacheControl === wantedCache,
+			`${path}: Cache-Control is "${page.cacheControl}".`,
+		);
+		expect(
+			page.body.includes("Page not found") && page.body.includes("<html"),
+			`${path}: the not-found page is missing or has no document around it.`,
+		);
+		if (path !== "/artists/nobody") {
+			expect(
+				apiLog.every((call) => !call.url.endsWith("/artists")),
+				`${path} asked the API for the artists list.`,
+			);
+		}
+	}
+
+	// The studio is known but the artists read fails: an error page inside the
+	// document, never a not-found, never stored. (The router's state carries the
+	// failed match's error message, which is the API's public envelope text, so
+	// only the key is checked here, not that text.)
+	mode = "artists-5xx";
+	page = await get();
+	expect(
+		page.status === 500 && page.cacheControl === "no-store",
+		`A failed artists read is ${page.status} with Cache-Control "${page.cacheControl}", not 500 and no-store.`,
+	);
+	expect(
+		page.body.includes("<html") &&
+			page.body.includes("This page can&#x27;t load right now") &&
+			!page.body.includes("Page not found"),
+		"A failed artists read is not an error page inside the document.",
+	);
+	expect(
+		!page.body.includes(CANARY) && !page.headers.includes(CANARY),
+		"A failed artists read shows the server key.",
 	);
 
 	for (const [name, wanted] of [
@@ -194,5 +315,5 @@ if (problems.length > 0) {
 	process.exit(1);
 }
 console.log(
-	"Page check passed: the key is in no page, header or log line; one keyed lookup per page; API failures are 503s.",
+	"Page check passed: the key is in no page, header or log line; one keyed lookup and one artists read per page; a failed read is an uncached error page, a failed lookup a 503.",
 );

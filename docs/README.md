@@ -16,7 +16,7 @@ Select guidance for the current task. Follow ordinary links when needed; this in
 | Platform React, Inertia, forms, shadcn and styling | [Platform UI](../apps/platform/docs/ui.md) |
 | Queue dispatch, worker, retries, scheduled jobs, email templates | [Jobs and email](../apps/platform/docs/jobs-and-email.md) |
 | Platform test setup, narrowing tests, recurring pitfalls | [Platform testing](../apps/platform/docs/testing.md) |
-| Storefront forms, routing, API data and prefetching, monitoring, tenants and hosts | [Storefront development](../apps/storefront/docs/development.md) |
+| Storefront forms, routing, API data and prefetching, the studio page, monitoring, tenants and hosts | [Storefront development](../apps/storefront/docs/development.md) |
 | Repository exploration, Claude loading behavior, sessions and memory | [Agent workflow](agent-workflow.md) |
 | Maintaining this instruction setup and checking context sizes | [Agent context audit](agent-context-audit.md) |
 

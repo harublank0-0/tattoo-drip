@@ -237,6 +237,79 @@ describe("hydration", () => {
 	});
 });
 
+describe("what the browser keeps", () => {
+	/** A server render that read the studio and its artists, as the studio page does. */
+	async function pageWithArtists() {
+		const server = fakeFetch(({ url }) =>
+			url.endsWith("/artists")
+				? json(200, { data: [] })
+				: json(200, { data: STUDIO_A }),
+		);
+		const serverSide = serverApi(STUDIO_A, server.fetch);
+		seedStudio(serverSide, STUDIO_A);
+		await serverSide.queryClient.query({
+			...tattooQueries.artists(serverSide.tattoo.client),
+			staleTime: "static",
+		});
+		return JSON.parse(
+			JSON.stringify({
+				router: dehydrateApi(serverSide),
+				queries: dehydrate(serverSide.queryClient),
+			}),
+		);
+	}
+
+	test("the studio and artists queries live as long as the page, other tenants' do not", () => {
+		const browser = createApiContext("browser");
+		hydrateApi(browser, { tattoo: { apiUrl: API, tenant: "studio-a" } });
+		const defaults = (key: readonly unknown[]) =>
+			browser.queryClient.getQueryDefaults(key).gcTime;
+
+		assert.equal(defaults(tattooKeys.studio("studio-a")), Infinity);
+		assert.equal(defaults(tattooKeys.artists("studio-a")), Infinity);
+		// An artist's own query sits under the artists key.
+		assert.equal(defaults(tattooKeys.artist("studio-a", "sita")), Infinity);
+		assert.equal(defaults(tattooKeys.artists("studio-b")), undefined);
+		assert.equal(defaults(tattooKeys.services("studio-a")), undefined);
+	});
+
+	test("a page left open for hours still answers a repeat navigation from the cache", async (t) => {
+		// Nothing observes the loaders' queries, and a browser drops such a
+		// query after 5 minutes. Node looks like a server (never drops), so
+		// the browser's default is set here; timers are mocked before anything
+		// is hydrated, so the drop timers are the mocked ones.
+		t.mock.timers.enable({ apis: ["setTimeout"] });
+		const page = await pageWithArtists();
+		const browser = fakeFetch(() => json(200, { data: [] }));
+		const browserSide = createApiContext("browser");
+		const defaultOptions = browserSide.queryClient.getDefaultOptions();
+		browserSide.queryClient.setDefaultOptions({
+			...defaultOptions,
+			queries: { ...defaultOptions.queries, gcTime: 5 * 60_000 },
+		});
+		hydrateApi(browserSide, page.router, { fetch: browser.fetch });
+		hydrate(browserSide.queryClient, page.queries);
+
+		t.mock.timers.tick(60 * 60_000);
+
+		const client = browserSide.tattoo.client;
+		const studio = await browserSide.queryClient.query({
+			...tattooQueries.studio(client),
+			staleTime: "static",
+		});
+		const artists = await browserSide.queryClient.query({
+			...tattooQueries.artists(client),
+			staleTime: "static",
+		});
+		assert.deepEqual(studio, STUDIO_A);
+		assert.deepEqual(artists, []);
+		assert.deepEqual(
+			browser.calls.map((call) => call.url),
+			[],
+		);
+	});
+});
+
 describe("two requests at once", () => {
 	test("never share a QueryClient, a client or cached data", async () => {
 		let releaseA: () => void = () => undefined;
