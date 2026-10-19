@@ -8,11 +8,12 @@ import Tenant from "#modules/tenancy/models/tenant";
 const DEMO_PHONE = "+9779800000001";
 
 /**
- * Development only: gives every tenant without a project a demo client and
- * a `reviewing` project, and prints each project page's path, so the quote
- * builder can be tried before TAT-46 lets staff create projects. Run it as
- * the owner role, which row-level security does not apply to:
- * `pnpm seed:dev`.
+ * Development only: gives every tenant a demo client and a `reviewing`
+ * project for it, whatever else the tenant already has, and prints each
+ * project page's path, so the quote builder can be tried without creating
+ * one by hand. A tenant whose demo client already has a project is skipped,
+ * so a second run adds nothing. Run it as the owner role, which row-level
+ * security does not apply to: `pnpm seed:dev`.
  */
 export default class DemoProjectSeeder extends BaseSeeder {
 	static environment = ["development"];
@@ -24,15 +25,17 @@ export default class DemoProjectSeeder extends BaseSeeder {
 		// write as the app role and fail row-level security. Queries
 		// (`Model.query({ client })`) do honor the client.
 		for (const tenant of await Tenant.query({ client })) {
+			const demo = await demoClient(tenant, client);
 			const existing = await TattooProject.query({ client })
 				.where("tenant_id", tenant.id)
+				.where("client_id", demo.id)
 				.first();
 			const project =
 				existing ??
 				(await TattooProject.create(
 					{
 						tenantId: tenant.id,
-						clientId: (await demoClient(tenant, client)).id,
+						clientId: demo.id,
 						brief: "Demo: a small fine-line moth on the forearm",
 						status: "reviewing",
 					},
