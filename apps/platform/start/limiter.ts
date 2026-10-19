@@ -30,7 +30,8 @@ function perAddress(ctx: HttpContext, limit: Limit) {
 }
 
 /**
- * Every request naming one email address, registered or not (TAT-18). A
+ * Every request naming one email address, registered or not (TAT-18),
+ * counted per typed address (`+tags` and dots are different addresses). A
  * request that names none isn't counted here: validation refuses it, and
  * the client address's limit already counted it.
  */

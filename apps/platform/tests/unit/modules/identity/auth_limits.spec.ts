@@ -91,6 +91,30 @@ test.group("Auth limits: account emails (TAT-18)", (group) => {
 		assert.equal(loginEmailKey("ink@example.com"), `login_email_${key}`);
 	});
 
+	test("the key follows canonicalEmail: ASCII case folds, other letters keep theirs", ({
+		assert,
+	}) => {
+		// Two accounts whose addresses differ only in non-ASCII case are two
+		// accounts (ruling 8), so they must not share a count.
+		assert.notEqual(
+			emailCountKey("Éva@example.com"),
+			emailCountKey("éva@example.com"),
+		);
+		assert.notEqual(
+			emailCountKey("bob@Éxample.com"),
+			emailCountKey("bob@éxample.com"),
+		);
+		assert.equal(
+			emailCountKey("EVA@example.com"),
+			emailCountKey("eva@example.com"),
+		);
+		// Typed whitespace of any kind is cleaned first, as the validator does.
+		assert.equal(
+			emailCountKey(" \tEva@Example.com\n"),
+			emailCountKey("eva@example.com"),
+		);
+	});
+
 	test("a completed reset clears the login failures of the stored address, and nothing else", async ({
 		assert,
 	}) => {

@@ -257,6 +257,31 @@ test.group("AccountService (TAT-18)", (group) => {
 		assert.isNull(await perEmail.get(loginEmailKey(user.email)));
 	});
 
+	test("a reset doesn't clear the login failures of an address that differs only in non-ASCII case", async ({
+		assert,
+	}) => {
+		// Canonical addresses keep non-ASCII case, so these are two accounts.
+		const upper = await User.create({
+			email: "Éva@lookalike-18.example",
+			password: PASSWORD,
+		});
+		const lower = await User.create({
+			email: "éva@lookalike-18.example",
+			password: PASSWORD,
+		});
+		const perEmail = limiter.use({ ...AUTH_LIMITS.loginPerEmail });
+		await perEmail.increment(loginEmailKey(upper.email), 7);
+		await perEmail.increment(loginEmailKey(lower.email), 9);
+
+		await accounts.resetPassword(
+			await tokens.issue(upper, "reset_password"),
+			"a-new-password",
+		);
+
+		assert.isNull(await perEmail.get(loginEmailKey(upper.email)));
+		assert.equal((await perEmail.get(loginEmailKey(lower.email)))?.consumed, 9);
+	});
+
 	test("an expired token, a confirmation token or an altered one resets nothing", async ({
 		assert,
 	}) => {

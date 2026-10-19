@@ -1,5 +1,6 @@
 import type { Limiter, LimiterResponse } from "@adonisjs/limiter";
 import limiter from "@adonisjs/limiter/services/main";
+import { typedEmail } from "#modules/identity/email_address";
 import { clientAddress, digest } from "#services/rate_limits";
 
 /**
@@ -22,15 +23,18 @@ export const AUTH_LIMITS = {
 	/**
 	 * Signups naming one email address, from any client address (TAT-18):
 	 * each one emails that address (a confirmation link, or "you already
-	 * have an account").
+	 * have an account"). Per typed address: `+tags` and dots make different
+	 * addresses (ruling 8), so the cap on mail to one mailbox is the 10
+	 * signups per client address per hour above, not this.
 	 */
 	signupPerEmail: { requests: 3, duration: "1 hour" },
 	/** Password reset requests from one client address (TAT-18). */
 	resetPerIp: { requests: 10, duration: "1 hour" },
 	/**
 	 * Password reset requests naming one email address, registered or not,
-	 * from any client address: the emails one mailbox can get, and the
-	 * guesses about one address.
+	 * from any client address: the emails one typed address can get, and the
+	 * guesses about it. Only a registered address is mailed, so `+tag`
+	 * variants of a mailbox send nothing unless an account uses them.
 	 */
 	resetPerEmail: { requests: 3, duration: "1 hour" },
 	/** Opening or using a reset or confirmation link, from one client address. */
@@ -47,10 +51,14 @@ export function loginIpKey(ip: string) {
 
 /**
  * An email address's part of a count key: a digest, so the table holds no
- * address; case and surrounding spaces don't make a separate count.
+ * address. It is the digest of the address as an account stores it
+ * (`typedEmail`: surrounding whitespace dropped, A to Z lower-cased), so two
+ * typings of one account share a count and two accounts never do. Don't
+ * lower-case with toLowerCase(): it also folds non-ASCII letters, which
+ * canonical addresses keep apart (`Éva@` and `éva@` are two accounts).
  */
 export function emailCountKey(email: string) {
-	return digest(email.trim().toLowerCase());
+	return digest(typedEmail(email));
 }
 
 export function loginEmailKey(email: string) {
@@ -85,11 +93,11 @@ const REFUND_SLACK_SECONDS = 3;
  * `verify` runs, so parallel guesses can't all pass a check first. A sign-in
  * gives back the two points it took and nothing more: failures already
  * counted for the email stay, since a sign-in proves the password, not who
- * made the earlier guesses (emails are canonical since TAT-18, so there are
- * no look-alike accounts any more). A point is given back only while the
- * window it was taken in is still open, so a slow check can't erase
- * failures of the next window. Any email is counted, registered or not, so
- * a lockout reveals nothing about accounts.
+ * made the earlier guesses (emails are canonical since TAT-18, so case
+ * variants of an ASCII address are one account and one count). A point is
+ * given back only while the window it was taken in is still open, so a slow
+ * check can't erase failures of the next window. Any email is counted,
+ * registered or not, so a lockout reveals nothing about accounts.
  */
 export async function throttleLogin<T>(
 	ip: string,
