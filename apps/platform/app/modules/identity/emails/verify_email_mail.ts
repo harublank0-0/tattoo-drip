@@ -1,26 +1,30 @@
 import { BaseMail } from "@adonisjs/mail";
-import type User from "#models/user";
+
+/** What the email shows: plain values, because queued mail is JSON until the worker renders it. */
+export type VerifyEmailMailData = {
+	to: string;
+	/** The confirmation link: APP_URL/verify-email/<token>. */
+	url: string;
+};
 
 /**
- * Asks a new user to confirm their email address. The caller makes and
- * signs `verifyUrl`; this mail only renders it.
+ * Asks a person to confirm the address of their account (TAT-18). It prints
+ * nothing the signup form took, not even the name: the form is open to
+ * anyone, and the email goes to whatever address they typed. The subject
+ * holds no link, since SendMailJob.failed() logs it.
  */
 export default class VerifyEmailMail extends BaseMail {
-	subject = "Verify your email";
+	subject = "Confirm your email address";
 
-	constructor(
-		private user: User,
-		private verifyUrl: string,
-	) {
+	constructor(private data: VerifyEmailMailData) {
 		super();
 	}
 
 	prepare() {
-		const data = { user: this.user, verifyUrl: this.verifyUrl };
-
+		const view = { url: this.data.url };
 		this.message
-			.to(this.user.email)
-			.htmlView("identity::emails/verify_email", data)
-			.textView("identity::emails/verify_email_text", data);
+			.to(this.data.to)
+			.htmlView("identity::emails/verify_email", view)
+			.textView("identity::emails/verify_email_text", view);
 	}
 }

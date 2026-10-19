@@ -3,6 +3,8 @@ import limiter from "@adonisjs/limiter/services/main";
 import { test } from "@japa/runner";
 import {
 	AUTH_LIMITS,
+	clearLoginFailures,
+	emailCountKey,
 	loginEmailKey,
 	loginIpKey,
 	throttleLogin,
@@ -72,5 +74,63 @@ test.group("Auth limits: refunds", (group) => {
 			.get(loginEmailKey(email));
 		assert.equal(address?.consumed, 5);
 		assert.equal(account?.consumed, 5);
+	});
+});
+
+test.group("Auth limits: account emails (TAT-18)", (group) => {
+	group.each.setup(() => limiter.clear(["memory"]));
+
+	test("an address's count ignores case and spaces and holds only a digest", ({
+		assert,
+	}) => {
+		const key = emailCountKey(" Ink@Example.com ");
+
+		assert.match(key, /^[A-Za-z0-9_-]{43}$/);
+		assert.notInclude(key, "example");
+		assert.equal(key, emailCountKey("ink@example.com"));
+		assert.equal(loginEmailKey("ink@example.com"), `login_email_${key}`);
+	});
+
+	test("the key follows canonicalEmail: ASCII case folds, other letters keep theirs", ({
+		assert,
+	}) => {
+		// Two accounts whose addresses differ only in non-ASCII case are two
+		// accounts (ruling 8), so they must not share a count.
+		assert.notEqual(
+			emailCountKey("Éva@example.com"),
+			emailCountKey("éva@example.com"),
+		);
+		assert.notEqual(
+			emailCountKey("bob@Éxample.com"),
+			emailCountKey("bob@éxample.com"),
+		);
+		assert.equal(
+			emailCountKey("EVA@example.com"),
+			emailCountKey("eva@example.com"),
+		);
+		// Typed whitespace of any kind is cleaned first, as the validator does.
+		assert.equal(
+			emailCountKey(" \tEva@Example.com\n"),
+			emailCountKey("eva@example.com"),
+		);
+	});
+
+	test("a completed reset clears the login failures of the stored address, and nothing else", async ({
+		assert,
+	}) => {
+		const perEmail = limiter.use({ ...AUTH_LIMITS.loginPerEmail });
+		const perIp = limiter.use({ ...AUTH_LIMITS.loginPerIp });
+		await perEmail.increment(loginEmailKey("ink@example.com"), 5);
+		await perEmail.increment(loginEmailKey("other@example.com"), 2);
+		await perIp.increment(loginIpKey("203.0.113.80"), 4);
+
+		await clearLoginFailures("ink@example.com");
+
+		assert.isNull(await perEmail.get(loginEmailKey("ink@example.com")));
+		assert.equal(
+			(await perEmail.get(loginEmailKey("other@example.com")))?.consumed,
+			2,
+		);
+		assert.equal((await perIp.get(loginIpKey("203.0.113.80")))?.consumed, 4);
 	});
 });

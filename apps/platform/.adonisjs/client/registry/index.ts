@@ -36,6 +36,12 @@ const routes = {
     tokens: [{"old":"/signup","type":0,"val":"signup","end":""}],
     types: placeholder as Registry['new_account.store']['types'],
   },
+  'new_account.sent': {
+    methods: ["GET","HEAD"],
+    pattern: '/signup/sent',
+    tokens: [{"old":"/signup/sent","type":0,"val":"signup","end":""},{"old":"/signup/sent","type":0,"val":"sent","end":""}],
+    types: placeholder as Registry['new_account.sent']['types'],
+  },
   'session.create': {
     methods: ["GET","HEAD"],
     pattern: '/login',
@@ -47,6 +53,42 @@ const routes = {
     pattern: '/login',
     tokens: [{"old":"/login","type":0,"val":"login","end":""}],
     types: placeholder as Registry['session.store']['types'],
+  },
+  'password_reset.create': {
+    methods: ["GET","HEAD"],
+    pattern: '/forgot-password',
+    tokens: [{"old":"/forgot-password","type":0,"val":"forgot-password","end":""}],
+    types: placeholder as Registry['password_reset.create']['types'],
+  },
+  'password_reset.store': {
+    methods: ["POST"],
+    pattern: '/forgot-password',
+    tokens: [{"old":"/forgot-password","type":0,"val":"forgot-password","end":""}],
+    types: placeholder as Registry['password_reset.store']['types'],
+  },
+  'password_reset.sent': {
+    methods: ["GET","HEAD"],
+    pattern: '/forgot-password/sent',
+    tokens: [{"old":"/forgot-password/sent","type":0,"val":"forgot-password","end":""},{"old":"/forgot-password/sent","type":0,"val":"sent","end":""}],
+    types: placeholder as Registry['password_reset.sent']['types'],
+  },
+  'password_reset.link': {
+    methods: ["GET","HEAD"],
+    pattern: '/reset-password/:token',
+    tokens: [{"old":"/reset-password/:token","type":0,"val":"reset-password","end":""},{"old":"/reset-password/:token","type":1,"val":"token","end":""}],
+    types: placeholder as Registry['password_reset.link']['types'],
+  },
+  'password_reset.edit': {
+    methods: ["GET","HEAD"],
+    pattern: '/reset-password',
+    tokens: [{"old":"/reset-password","type":0,"val":"reset-password","end":""}],
+    types: placeholder as Registry['password_reset.edit']['types'],
+  },
+  'password_reset.update': {
+    methods: ["POST"],
+    pattern: '/reset-password',
+    tokens: [{"old":"/reset-password","type":0,"val":"reset-password","end":""}],
+    types: placeholder as Registry['password_reset.update']['types'],
   },
   'tenant.dashboard': {
     methods: ["GET","HEAD"],
@@ -378,6 +420,24 @@ const routes = {
     tokens: [{"old":"/t/:tenant/alerts/:id/open","type":0,"val":"t","end":""},{"old":"/t/:tenant/alerts/:id/open","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/alerts/:id/open","type":0,"val":"alerts","end":""},{"old":"/t/:tenant/alerts/:id/open","type":1,"val":"id","end":""},{"old":"/t/:tenant/alerts/:id/open","type":0,"val":"open","end":""}],
     types: placeholder as Registry['tenant.alerts.open']['types'],
   },
+  'email_verification.link': {
+    methods: ["GET","HEAD"],
+    pattern: '/verify-email/:token',
+    tokens: [{"old":"/verify-email/:token","type":0,"val":"verify-email","end":""},{"old":"/verify-email/:token","type":1,"val":"token","end":""}],
+    types: placeholder as Registry['email_verification.link']['types'],
+  },
+  'email_verification.show': {
+    methods: ["GET","HEAD"],
+    pattern: '/verify-email',
+    tokens: [{"old":"/verify-email","type":0,"val":"verify-email","end":""}],
+    types: placeholder as Registry['email_verification.show']['types'],
+  },
+  'email_verification.confirm': {
+    methods: ["POST"],
+    pattern: '/verify-email',
+    tokens: [{"old":"/verify-email","type":0,"val":"verify-email","end":""}],
+    types: placeholder as Registry['email_verification.confirm']['types'],
+  },
   'dashboard': {
     methods: ["GET","HEAD"],
     pattern: '/dashboard',
@@ -389,6 +449,18 @@ const routes = {
     pattern: '/logout',
     tokens: [{"old":"/logout","type":0,"val":"logout","end":""}],
     types: placeholder as Registry['session.destroy']['types'],
+  },
+  'email_verification.notice': {
+    methods: ["GET","HEAD"],
+    pattern: '/confirm-email',
+    tokens: [{"old":"/confirm-email","type":0,"val":"confirm-email","end":""}],
+    types: placeholder as Registry['email_verification.notice']['types'],
+  },
+  'email_verification.resend': {
+    methods: ["POST"],
+    pattern: '/confirm-email',
+    tokens: [{"old":"/confirm-email","type":0,"val":"confirm-email","end":""}],
+    types: placeholder as Registry['email_verification.resend']['types'],
   },
   'onboarding.create': {
     methods: ["GET","HEAD"],

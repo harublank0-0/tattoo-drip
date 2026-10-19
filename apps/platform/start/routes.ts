@@ -10,21 +10,64 @@
 import router from "@adonisjs/core/services/router";
 import { controllers } from "#generated/controllers";
 import { ARTIST_SLUG } from "#modules/artists/validators/artist";
+import { ACCOUNT_TOKEN } from "#modules/identity/account_tokens";
 import { DEPOSIT_TOKEN } from "#modules/payments/deposit_links";
 import { middleware } from "#start/kernel";
-import { throttleSignup } from "#start/limiter";
+import {
+	throttleAccountLinks,
+	throttleResetEmail,
+	throttleResetRequest,
+	throttleSignup,
+	throttleSignupEmail,
+	throttleVerifyCooldown,
+	throttleVerifyResend,
+} from "#start/limiter";
 
 router.on("/").renderInertia("home", {}).as("home");
 
 router
 	.group(() => {
 		router.get("signup", [controllers.NewAccount, "create"]);
+		// Every signup counts per client address, then per address named
+		// (TAT-8, TAT-18); a taken address gets the same answer as a new one.
 		router
 			.post("signup", [controllers.NewAccount, "store"])
-			.use(throttleSignup);
+			.use([throttleSignup, throttleSignupEmail]);
+		router
+			.get("signup/sent", [controllers.NewAccount, "sent"])
+			.as("new_account.sent");
 
 		router.get("login", [controllers.Session, "create"]);
 		router.post("login", [controllers.Session, "store"]);
+
+		/**
+		 * Password reset (TAT-18). Asking for a link counts per client
+		 * address, then per address named; the link and the new password
+		 * count per client address. The link's token lives in the session,
+		 * never in a page's URL.
+		 */
+		router
+			.get("forgot-password", [controllers.PasswordReset, "create"])
+			.as("password_reset.create");
+		router
+			.post("forgot-password", [controllers.PasswordReset, "store"])
+			.use([throttleResetRequest, throttleResetEmail])
+			.as("password_reset.store");
+		router
+			.get("forgot-password/sent", [controllers.PasswordReset, "sent"])
+			.as("password_reset.sent");
+		router
+			.get("reset-password/:token", [controllers.PasswordReset, "link"])
+			.where("token", ACCOUNT_TOKEN)
+			.use(throttleAccountLinks)
+			.as("password_reset.link");
+		router
+			.get("reset-password", [controllers.PasswordReset, "edit"])
+			.as("password_reset.edit");
+		router
+			.post("reset-password", [controllers.PasswordReset, "update"])
+			.use(throttleAccountLinks)
+			.as("password_reset.update");
 	})
 	.use(middleware.guest());
 
@@ -349,13 +392,46 @@ router
 	.prefix("/t/:tenant")
 	.use([middleware.auth(), middleware.dbContext(), middleware.tenant()]);
 
+/**
+ * Email confirmation links (TAT-18): open to guests and to whoever is signed
+ * in (the link proves the mailbox and signs nobody in), so in no group. The
+ * link's GET and the POST count per client address.
+ */
+router
+	.get("verify-email/:token", [controllers.EmailVerification, "link"])
+	.where("token", ACCOUNT_TOKEN)
+	.use(throttleAccountLinks)
+	.as("email_verification.link");
+router
+	.get("verify-email", [controllers.EmailVerification, "show"])
+	.as("email_verification.show");
+router
+	.post("verify-email", [controllers.EmailVerification, "confirm"])
+	.use(throttleAccountLinks)
+	.as("email_verification.confirm");
+
 router
 	.group(() => {
 		router.get("dashboard", [controllers.Dashboard, "show"]).as("dashboard");
 		router.post("logout", [controllers.Session, "destroy"]);
 
-		router.get("onboarding", [controllers.Onboarding, "create"]);
-		router.post("onboarding", [controllers.Onboarding, "store"]);
+		// The unconfirmed account's own page (TAT-18): where verifiedEmail
+		// sends it, and "Send a new link" (one a minute, five an hour).
+		router
+			.get("confirm-email", [controllers.EmailVerification, "notice"])
+			.as("email_verification.notice");
+		router
+			.post("confirm-email", [controllers.EmailVerification, "resend"])
+			.use([throttleVerifyCooldown, throttleVerifyResend])
+			.as("email_verification.resend");
+
+		// Creating a tenant needs a confirmed address (TAT-18).
+		router
+			.get("onboarding", [controllers.Onboarding, "create"])
+			.use(middleware.verifiedEmail());
+		router
+			.post("onboarding", [controllers.Onboarding, "store"])
+			.use(middleware.verifiedEmail());
 	})
 	.use([middleware.auth(), middleware.dbContext()]);
 

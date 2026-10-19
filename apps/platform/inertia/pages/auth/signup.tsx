@@ -2,6 +2,7 @@ import { Form, Link } from "@adonisjs/inertia/react";
 import { Button } from "~/components/ui/button";
 import {
 	Field,
+	FieldDescription,
 	FieldError,
 	FieldGroup,
 	FieldLabel,
@@ -17,7 +18,7 @@ export default function Signup() {
 					Create your account
 				</h1>
 				<p className="text-sm text-muted-foreground">
-					Start building with the starter kit.
+					Set up your studio in a few minutes.
 				</p>
 			</div>
 
@@ -32,6 +33,7 @@ export default function Signup() {
 								type="text"
 								autoComplete="name"
 								placeholder="Ada Lovelace"
+								className="h-11"
 								aria-invalid={!!errors.fullName}
 							/>
 							{errors.fullName && <FieldError>{errors.fullName}</FieldError>}
@@ -45,6 +47,7 @@ export default function Signup() {
 								type="email"
 								autoComplete="email"
 								placeholder="you@example.com"
+								className="h-11"
 								aria-invalid={!!errors.email}
 							/>
 							{errors.email && <FieldError>{errors.email}</FieldError>}
@@ -58,8 +61,13 @@ export default function Signup() {
 								type="password"
 								autoComplete="new-password"
 								placeholder="••••••••"
+								className="h-11"
 								aria-invalid={!!errors.password}
+								aria-describedby="password-rules"
 							/>
+							<FieldDescription id="password-rules">
+								8 to 32 characters.
+							</FieldDescription>
 							{errors.password && <FieldError>{errors.password}</FieldError>}
 						</Field>
 
@@ -73,6 +81,7 @@ export default function Signup() {
 								type="password"
 								autoComplete="new-password"
 								placeholder="••••••••"
+								className="h-11"
 								aria-invalid={!!errors.passwordConfirmation}
 							/>
 							{errors.passwordConfirmation && (
@@ -80,18 +89,18 @@ export default function Signup() {
 							)}
 						</Field>
 
-						<Button type="submit" disabled={processing}>
+						<Button type="submit" className="h-11" disabled={processing}>
 							{processing ? "One moment…" : "Create account"}
 						</Button>
 					</FieldGroup>
 				)}
 			</Form>
 
-			<p className="text-center text-sm text-muted-foreground">
-				Already have an account?{" "}
+			<p className="flex items-center justify-center gap-1 text-sm text-muted-foreground">
+				Already have an account?
 				<Link
 					route="session.create"
-					className="text-foreground underline underline-offset-4"
+					className="inline-flex min-h-11 items-center text-foreground underline underline-offset-4"
 				>
 					Sign in
 				</Link>

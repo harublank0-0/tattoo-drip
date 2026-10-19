@@ -7,6 +7,7 @@ import OfflineBar from "~/components/shell/offline_bar";
 import SideNav from "~/components/shell/side_nav";
 import TabBar from "~/components/shell/tab_bar";
 import TopBar from "~/components/shell/top_bar";
+import VerifyEmailBar from "~/components/shell/verify_email_bar";
 
 /**
  * The dashboard shell (TAT-67) for every tenant page. Below 1024px: a top
@@ -25,6 +26,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 			<div className="flex min-w-0 flex-1 flex-col">
 				<TopBar />
 				<OfflineBar />
+				<VerifyEmailBar />
 				<main
 					className={cn(
 						"flex flex-1 bg-muted/40 pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]",

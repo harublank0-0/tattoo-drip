@@ -15,6 +15,8 @@ const EXEMPT: Record<string, string> = {
 	queue_schedules: "queue storage, not tenant-owned",
 	rate_limits:
 		"rate-limit counters keyed by HMAC digests (TAT-8), not tenant-owned",
+	account_tokens:
+		"single-use account links (TAT-18): SHA-256 digests only, read before any context exists by a link anyone may open, not tenant-owned",
 	adonis_schema: "migration bookkeeping",
 	adonis_schema_versions: "migration bookkeeping",
 };

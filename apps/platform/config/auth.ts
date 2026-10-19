@@ -1,10 +1,11 @@
 import { defineConfig } from "@adonisjs/auth";
-import { sessionGuard, sessionUserProvider } from "@adonisjs/auth/session";
+import { sessionGuard } from "@adonisjs/auth/session";
 import type {
 	Authenticators,
 	InferAuthEvents,
 	InferAuthenticators,
 } from "@adonisjs/auth/types";
+import { SessionVersionUserProvider } from "#modules/identity/session_user_provider";
 
 const authConfig = defineConfig({
 	/**
@@ -22,7 +23,11 @@ const authConfig = defineConfig({
 			 */
 			useRememberMeTokens: false,
 
-			provider: sessionUserProvider({
+			/**
+			 * The session stores the user's id with the account's session
+			 * version, so a password reset signs every session out (TAT-18).
+			 */
+			provider: new SessionVersionUserProvider({
 				model: () => import("#models/user"),
 			}),
 		}),

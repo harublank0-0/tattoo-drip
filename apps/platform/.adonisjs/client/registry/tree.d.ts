@@ -14,11 +14,20 @@ export interface ApiDefinition {
   newAccount: {
     create: typeof routes['new_account.create']
     store: typeof routes['new_account.store']
+    sent: typeof routes['new_account.sent']
   }
   session: {
     create: typeof routes['session.create']
     store: typeof routes['session.store']
     destroy: typeof routes['session.destroy']
+  }
+  passwordReset: {
+    create: typeof routes['password_reset.create']
+    store: typeof routes['password_reset.store']
+    sent: typeof routes['password_reset.sent']
+    link: typeof routes['password_reset.link']
+    edit: typeof routes['password_reset.edit']
+    update: typeof routes['password_reset.update']
   }
   tenant: {
     dashboard: typeof routes['tenant.dashboard']
@@ -123,6 +132,13 @@ export interface ApiDefinition {
       read: typeof routes['tenant.alerts.read']
       open: typeof routes['tenant.alerts.open']
     }
+  }
+  emailVerification: {
+    link: typeof routes['email_verification.link']
+    show: typeof routes['email_verification.show']
+    confirm: typeof routes['email_verification.confirm']
+    notice: typeof routes['email_verification.notice']
+    resend: typeof routes['email_verification.resend']
   }
   dashboard: typeof routes['dashboard']
   onboarding: {
