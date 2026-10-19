@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import type { Artist, Studio } from "@tattoo-drip/sdk";
-import { createElement } from "react";
+import {
+	createElement,
+	isValidElement,
+	type ReactElement,
+	type ReactNode,
+} from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
 	ArtistPage,
@@ -19,6 +24,18 @@ import {
 	SITA,
 	STUDIO,
 } from "./fixtures.ts";
+
+/** The first element of `type` in a component's returned tree (the component is called, not rendered). */
+function findElement(node: ReactNode, type: string): ReactElement | undefined {
+	if (!isValidElement(node)) return undefined;
+	if (node.type === type) return node;
+	const children = (node.props as { children?: ReactNode }).children;
+	for (const child of Array.isArray(children) ? children : [children]) {
+		const found = findElement(child, type);
+		if (found) return found;
+	}
+	return undefined;
+}
 
 function studioHtml(
 	studio: Studio = STUDIO,
@@ -317,6 +334,39 @@ describe("the status pages", () => {
 			/<h1[^>]*>This page can(&#x27;|')t load right now<\/h1>/,
 		);
 		assert.deepEqual(hrefs(html), ["/artists/sita"]);
+	});
+
+	test("an address with a fragment is offered without it: a deposit link's token lives there", () => {
+		const html = renderToStaticMarkup(
+			createElement(ErrorPage, {
+				retryHref: "/deposit?x=1#tat65b-browser-pass-token-0123456789abcdefg",
+			}),
+		);
+
+		assert.deepEqual(hrefs(html), ["/deposit?x=1"]);
+		assert.doesNotMatch(html, /tat65b-browser-pass-token|href="[^"]*#/);
+	});
+
+	test("Try again reloads the page when the browser can, keeping the fragment", () => {
+		let reloads = 0;
+		let prevented = 0;
+		const tree = ErrorPage({
+			retryHref: "/deposit",
+			reload: () => {
+				reloads += 1;
+			},
+		});
+		const link = findElement(tree, "a");
+		assert.ok(link, "an anchor");
+		(
+			link.props as { onClick(event: { preventDefault(): void }): void }
+		).onClick({
+			preventDefault: () => {
+				prevented += 1;
+			},
+		});
+		assert.equal(prevented, 1);
+		assert.equal(reloads, 1);
 	});
 
 	test("an address that isn't one of the page's own paths is not offered", () => {

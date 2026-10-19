@@ -67,8 +67,9 @@ Known and accepted for the pilot. The owner gets no signal for any of them (429s
 
 - Open a studio page, then check the API log: no "server key this API does not accept" and no "no usable X-Visitor-IP" warning (either means the key or the visitor's address isn't reaching the API).
 - `curl -sI https://<api>/api/v1/tenants/<slug>` answers 200 with `Cache-Control: public…` and no `X-RateLimit-*` header.
+- Open a deposit link (a project's "Copy link") on a phone, sent by WhatsApp or Viber (Instagram and Facebook rewrite outgoing links through their own redirect, which carries the whole URL, fragment included, to Meta), then check the storefront's and the CDN's request logs: `/deposit` appears without its `#` fragment, and the API proxy's access log has no `/deposits/` line.
 - Run the storefront's `pnpm check:page` against the production build before the first deploy (TAT-13).
-- Still required before any public deploy: object storage (TAT-27: the local disks must never deploy) and the storefront deposit page (TAT-65b). The intake form (TAT-57) must be merged too.
+- Still required before any public deploy: object storage (TAT-27: the local disks must never deploy). The intake form (TAT-57) and the deposit page (TAT-65b) must be merged too.
 
 ## Dashboard cookies and domains
 

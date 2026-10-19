@@ -2,7 +2,7 @@
 
 TanStack Start + Router + Query + Form, React 19, Tailwind v4 and shadcn/ui. File routes: `src/routes`; UI: `src/components/ui`; imports: `#/` maps to `src/`.
 
-The platform/data boundaries are in [root instructions](../../AGENTS.md). Pages show only API data, through `@tattoo-drip/react` and the router context's `tattoo.client` ([API and data](docs/development.md#api-and-data)); the studio page is `src/studio/` ([studio page](docs/development.md#studio-page)). Do not introduce a storefront auth/database layer, analytics or third-party scripts (the intake form's Cloudflare Turnstile is the one exception: [intake form](docs/development.md#intake-form)).
+The platform/data boundaries are in [root instructions](../../AGENTS.md). Pages show only API data, through `@tattoo-drip/react` and the router context's `tattoo.client` ([API and data](docs/development.md#api-and-data)); the studio page is `src/studio/` ([studio page](docs/development.md#studio-page)), the deposit page `src/deposit/` ([deposit page](docs/development.md#deposit-page)). Do not introduce a storefront auth/database layer, analytics or third-party scripts (the intake form's Cloudflare Turnstile is the one exception: [intake form](docs/development.md#intake-form)).
 
 Before UI/forms, server-function or TanStack integration changes, read the relevant section of [development guidance](docs/development.md). Never run `shadcn add form`: `src/components/ui/form.tsx` is the custom TanStack Form toolkit. Preserve Sentry server-function instrumentation.
 
