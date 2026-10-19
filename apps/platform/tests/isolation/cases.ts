@@ -8,6 +8,7 @@ import Quote from "#modules/projects/models/quote";
 import TattooProject from "#modules/projects/models/tattoo_project";
 import ProjectSession from "#modules/scheduling/models/project_session";
 import Tenant from "#modules/tenancy/models/tenant";
+import TenantSlug from "#modules/tenancy/models/tenant_slug";
 import { inTenant, type Studio } from "#tests/helpers/tenants";
 
 /**
@@ -167,6 +168,18 @@ const profileBody = (own: Studio) => ({
 	websiteUrl: "",
 });
 
+// The tenant row and every slug it holds: what changing the address could
+// change.
+const tenantSlugRows = (target: Studio) =>
+	inTenant(target.tenant, async () => ({
+		tenant: (await Tenant.findOrFail(target.tenant.id)).serialize(),
+		slugs: (
+			await TenantSlug.query()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("slug")
+		).map((row) => row.serialize()),
+	}));
+
 export const isolationCases: IsolationCase[] = [
 	{
 		method: "GET",
@@ -214,6 +227,14 @@ export const isolationCases: IsolationCase[] = [
 		}),
 		ownStatus: 302,
 		snapshot: tenantRow,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/settings/slug",
+		actor: "owner",
+		body: (own) => ({ slug: `${own.tenant.slug}-renamed` }),
+		ownStatus: 302,
+		snapshot: tenantSlugRows,
 	},
 	{
 		method: "GET",

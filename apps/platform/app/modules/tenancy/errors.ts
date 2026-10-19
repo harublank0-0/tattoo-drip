@@ -19,3 +19,15 @@ export class LastOwnerError extends Error {
 		this.name = "LastOwnerError";
 	}
 }
+
+/**
+ * The tenant already holds MAX_TENANT_SLUGS slugs and asked for a new one.
+ * Switching back to one of its own old slugs is still allowed. Show it as
+ * a field error on `slug`.
+ */
+export class SlugLimitError extends Error {
+	constructor(readonly tenantId: string) {
+		super(`Tenant ${tenantId} holds the most slugs allowed`);
+		this.name = "SlugLimitError";
+	}
+}

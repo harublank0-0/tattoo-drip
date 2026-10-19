@@ -15,6 +15,7 @@ export type ScannedRoutes = {
     'tenant.settings': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.profile': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.profile.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.slug.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.deposits.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.create': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -125,6 +126,7 @@ export type ScannedRoutes = {
   }
   PUT: {
     'tenant.settings.profile.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.slug.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.deposits.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }

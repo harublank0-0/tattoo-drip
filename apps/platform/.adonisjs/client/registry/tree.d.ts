@@ -26,6 +26,9 @@ export interface ApiDefinition {
       profile: typeof routes['tenant.settings.profile'] & {
         update: typeof routes['tenant.settings.profile.update']
       }
+      slug: {
+        update: typeof routes['tenant.settings.slug.update']
+      }
       payments: typeof routes['tenant.settings.payments'] & {
         create: typeof routes['tenant.settings.payments.create']
         store: typeof routes['tenant.settings.payments.store']

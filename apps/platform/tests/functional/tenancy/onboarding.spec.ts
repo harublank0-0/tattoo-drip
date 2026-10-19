@@ -5,6 +5,7 @@ import Artist from "#modules/artists/models/artist";
 import Tenant from "#modules/tenancy/models/tenant";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
+import { dbClient } from "#services/db_context";
 import { inTenant, inUser } from "#tests/helpers/tenants";
 import { assertValidationError } from "#tests/helpers/validation";
 
@@ -113,6 +114,12 @@ test.group("Onboarding", (group) => {
 		["slug", "not a slug!"],
 		["slug", "ab"],
 		["slug", "-black-needle"],
+		["slug", "black--needle"],
+		["slug", "xn--black-needle"],
+		["slug", "12345"],
+		["slug", "www"],
+		["slug", "Admin"],
+		["slug", "Kat"],
 		["timezone", "Mars/Olympus_Mons"],
 		["type", "agency"],
 		["name", ""],
@@ -154,6 +161,36 @@ test.group("Onboarding", (group) => {
 			response,
 			"slug",
 			"This address is already taken. Try another one.",
+		);
+	});
+
+	test("rejects another studio's old slug", async ({ client, assert }) => {
+		const someone = await makeUser("someone@example.com");
+		const tenant = await new TenancyService().createTenant(someone, {
+			...validTenant,
+			type: "studio",
+		});
+		await inTenant(tenant, () =>
+			dbClient().rawQuery("update tenants set slug = 'red-ink' where id = ?", [
+				tenant.id,
+			]),
+		);
+		const user = await makeUser();
+
+		const response = await client
+			.post("/onboarding")
+			.form(validTenant)
+			.withCsrfToken()
+			.loginAs(user)
+			.redirects(0);
+
+		assertValidationError(
+			response,
+			"slug",
+			"This address is already taken. Try another one.",
+		);
+		assert.isFalse(
+			await inUser(user, () => new TenancyService().hasTenant(user)),
 		);
 	});
 

@@ -2,6 +2,7 @@ import vine, { SimpleMessagesProvider } from "@vinejs/vine";
 import type { FieldContext } from "@vinejs/vine/types";
 import { IANAZone } from "luxon";
 import { TENANT_TYPES } from "#modules/tenancy/models/tenant";
+import { checkSlug } from "#modules/tenancy/slugs";
 import { phoneNumber } from "#validators/phone";
 
 /**
@@ -57,21 +58,37 @@ const ianaTimezone = vine.createRule(
 	},
 );
 
+const SLUG_MESSAGES = {
+	format:
+		"Use 3 to 63 lowercase letters, numbers and single hyphens, with at least one letter. Don't start or end with a hyphen.",
+	reserved: "This address is reserved. Try another one.",
+} as const;
+
 /**
- * A slug is also the tenant's subdomain, so it follows DNS label rules:
- * 3-63 lowercase letters, digits and hyphens, not starting or ending with
- * a hyphen. Reserved names arrive with TAT-24.
+ * A slug a person chose (TAT-24): checkSlug decides, and the field keeps
+ * the stored form. Taken slugs, every old slug of every tenant included,
+ * are rejected by the database (tenant_slugs) and surfaced by
+ * TenancyService as SlugTakenError: a query here would only see the user's
+ * own tenants under row-level security.
  */
-const SLUG = /^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/;
+const tenantSlug = vine.createRule((value: unknown, _, field: FieldContext) => {
+	if (typeof value !== "string") return;
+	const checked = checkSlug(value);
+	if (!checked.ok) {
+		field.report(
+			SLUG_MESSAGES[checked.problem],
+			`slug_${checked.problem}`,
+			field,
+		);
+		return;
+	}
+	field.mutate(checked.slug, field);
+});
 
 export const createTenantValidator = vine.create({
 	name: vine.string().trim().minLength(2).maxLength(120),
 	type: vine.enum(TENANT_TYPES),
-	// Taken slugs, deleted tenants' included, are rejected by the unique index
-	// and surfaced by TenancyService.createTenant as SlugTakenError. A raw
-	// `.unique()` query here would only see the user's own tenants once
-	// row-level security is on.
-	slug: vine.string().trim().toLowerCase().regex(SLUG),
+	slug: vine.string().trim().use(tenantSlug()),
 	timezone: vine.string().trim().use(ianaTimezone()),
 });
 
@@ -79,11 +96,20 @@ export const createTenantValidator = vine.create({
  * The page calls the slug "your address", so the errors do too.
  */
 createTenantValidator.messagesProvider = new SimpleMessagesProvider(
-	{
-		"slug.regex":
-			"Use 3 to 63 lowercase letters, numbers and hyphens, not starting or ending with a hyphen.",
-	},
+	{},
 	{ name: "business name", slug: "address", timezone: "time zone" },
+);
+
+/**
+ * The web address form in the studio settings.
+ */
+export const changeSlugValidator = vine.create({
+	slug: vine.string().trim().use(tenantSlug()),
+});
+
+changeSlugValidator.messagesProvider = new SimpleMessagesProvider(
+	{},
+	{ slug: "address" },
 );
 
 /**

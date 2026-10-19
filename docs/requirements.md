@@ -77,7 +77,7 @@ This is the most important rule in the system.
 
 - Invites are tied to one email, single-use, and expire in 7 days. Only a signed-in user with that verified email can accept one, and an invite can be linked to an existing artist profile for the new member to claim.
 - A tenant always has at least one owner. A removed member's artist profile stays with the tenant, unlinked.
-- Slugs are unique and avoid reserved names (`www`, `api`, `app`, `admin`…). An old slug stays with its tenant as a redirect.
+- Slugs are lowercase DNS labels (3 to 63 letters, digits and single hyphens, with at least one letter), unique across the platform, and avoid reserved names (`www`, `api`, `app`, `admin`…) and the platform's own name. Owners can change the slug in Settings, up to 5 slugs per tenant in total. An old slug stays with its tenant for good and redirects to the current one; no other tenant can ever take it.
 
 ## Project rules
 

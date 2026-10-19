@@ -19,4 +19,5 @@ export const controllers = {
   Quotes: () => import('#controllers/quotes_controller'),
   Session: () => import('#controllers/session_controller'),
   StudioProfile: () => import('#controllers/studio_profile_controller'),
+  StudioSlug: () => import('#controllers/studio_slug_controller'),
 }

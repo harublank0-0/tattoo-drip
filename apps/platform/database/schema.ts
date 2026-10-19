@@ -552,6 +552,19 @@ export class TenantMembershipSchema extends BaseModel {
 	declare userId: string;
 }
 
+export class TenantSlugSchema extends BaseModel {
+	static $columns = ["createdAt", "id", "slug", "tenantId"] as const;
+	$columns = TenantSlugSchema.$columns;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare slug: string;
+	@column()
+	declare tenantId: string;
+}
+
 export class TenantSchema extends BaseModel {
 	static $columns = [
 		"address",
