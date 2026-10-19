@@ -6,6 +6,7 @@ import { urlFor } from "~/client";
 import { SOURCE_LABELS } from "~/components/inquiries";
 import Page from "~/components/page";
 import {
+	type ChatMessageProps,
 	formatRupees,
 	type ManualMoveName,
 	MOVE_LABELS,
@@ -76,6 +77,7 @@ export default function ProjectShow({
 	assignment,
 	request,
 	clientId,
+	deposit,
 }: ProjectPageProps) {
 	const tenant = useTenant();
 	const params = { tenant: tenant.slug, id: project.id };
@@ -224,6 +226,14 @@ export default function ProjectShow({
 					</CardContent>
 				</Card>
 
+				{deposit && (
+					<DepositCard
+						projectId={project.id}
+						deposit={deposit}
+						onSent={markContacted}
+					/>
+				)}
+
 				<Card>
 					<CardHeader>
 						<CardTitle>Notes</CardTitle>
@@ -322,7 +332,7 @@ function ChatMessage({
 	message,
 	onSent,
 }: {
-	message: NonNullable<ProjectPageProps["message"]>;
+	message: ChatMessageProps;
 	onSent: () => void;
 }) {
 	const copy = () => {
@@ -360,6 +370,131 @@ function ChatMessage({
 				</Button>
 			</div>
 		</div>
+	);
+}
+
+/**
+ * The deposit link, for owners while the project waits for its deposit
+ * (TAT-65): copy it or send it in a chat, read the reference code, replace
+ * a leaked or expired link, and see when a screenshot came.
+ */
+function DepositCard({
+	projectId,
+	deposit,
+	onSent,
+}: {
+	projectId: string;
+	deposit: NonNullable<ProjectPageProps["deposit"]>;
+	onSent: () => void;
+}) {
+	const tenant = useTenant();
+	const [busy, setBusy] = useState(false);
+	const { link, problem, message, proofReceivedText, devHost } = deposit;
+
+	const issue = () => {
+		if (
+			link?.url &&
+			!window.confirm(
+				"Make a new link? The link you sent before stops working.",
+			)
+		) {
+			return;
+		}
+		router.post(
+			urlFor("tenant.projects.deposit_link.store", {
+				tenant: tenant.slug,
+				id: projectId,
+			}),
+			{},
+			{
+				preserveScroll: true,
+				onStart: () => setBusy(true),
+				onFinish: () => setBusy(false),
+			},
+		);
+	};
+	const copy = (url: string) => {
+		navigator.clipboard.writeText(url).then(
+			() => toast.success("Link copied."),
+			() => toast.error("Couldn't copy: select the link instead."),
+		);
+	};
+
+	return (
+		<Card>
+			<CardHeader>
+				<CardTitle>Deposit</CardTitle>
+			</CardHeader>
+			<CardContent className="flex flex-col gap-4">
+				{devHost && (
+					<p className="rounded-md border border-destructive p-3 text-sm">
+						<strong>Warning:</strong> deposit links point at this computer, so a
+						client can't open them. Set STOREFRONT_URL to your studio pages'
+						address (for example https://{"{tenant}"}.example.com) and restart.
+					</p>
+				)}
+				{proofReceivedText && (
+					<output className="block rounded-md border p-3 text-sm">
+						Payment screenshot received {proofReceivedText}.
+					</output>
+				)}
+				{link?.url ? (
+					<>
+						<Field>
+							<FieldLabel htmlFor="deposit-link">Deposit link</FieldLabel>
+							<div className="flex gap-2">
+								<Input
+									id="deposit-link"
+									readOnly
+									value={link.url}
+									onFocus={(event) => event.currentTarget.select()}
+									className="min-w-0 flex-1"
+								/>
+								<Button
+									type="button"
+									variant="outline"
+									onClick={() => copy(link.url ?? "")}
+								>
+									Copy link
+								</Button>
+							</div>
+							<FieldDescription>
+								Works until {link.expiresText}. The client pays with your QR
+								codes and sends a screenshot there.
+							</FieldDescription>
+						</Field>
+						<dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+							<dt className="text-muted-foreground">Reference code</dt>
+							<dd className="font-mono tracking-widest">
+								{link.referenceCode}
+							</dd>
+						</dl>
+						{message && <ChatMessage message={message} onSent={onSent} />}
+					</>
+				) : (
+					<p className="text-sm text-muted-foreground">
+						{link
+							? `The link you sent no longer works. Make a new one: the reference code stays ${link.referenceCode}.`
+							: "Make a link where the client pays the deposit with your QR codes and sends a screenshot."}
+					</p>
+				)}
+				{problem ? (
+					<p className="text-sm text-muted-foreground">{problem}</p>
+				) : (
+					<div>
+						<Button
+							type="button"
+							size="sm"
+							variant={link?.url ? "outline" : "default"}
+							disabled={busy}
+							onClick={issue}
+						>
+							{busy ? "Saving…" : link ? "New link" : "Make deposit link"}
+						</Button>
+					</div>
+				)}
+			</CardContent>
+		</Card>
 	);
 }
 

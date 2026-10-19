@@ -91,6 +91,36 @@ export default class ProjectService {
 	}
 
 	/**
+	 * The tenant's live project with this id, for code that acts for no
+	 * member (the public deposit page, TAT-65), or null for an unknown,
+	 * deleted or other tenant's id. Never use it to answer a member: findFor
+	 * applies their role.
+	 */
+	async findLive(tenant: TenantRef, id: string): Promise<TattooProject | null> {
+		return TattooProject.query()
+			.where("tenant_id", tenant.id)
+			.where("id", id)
+			.first();
+	}
+
+	/**
+	 * findLive with the row locked until `trx` ends: the lock every project
+	 * write takes first, so a deposit proof serializes with an accept, a
+	 * revision, an expiry or a verification of the same project.
+	 */
+	async lockLive(
+		trx: TransactionClientContract,
+		tenant: TenantRef,
+		id: string,
+	): Promise<TattooProject | null> {
+		return TattooProject.query({ client: trx })
+			.where("tenant_id", tenant.id)
+			.where("id", id)
+			.forUpdate()
+			.first();
+	}
+
+	/**
 	 * A page of the projects `member` may see (the `findFor` rule), for the
 	 * Active view, the Closed view or one status. Active and single-status
 	 * views sort for follow-up: never contacted first, then the longest

@@ -32,6 +32,13 @@ export const MOVE_LABELS: Record<ManualMoveName, string> = {
 	withdraw: "Client withdrew",
 };
 
+/** A chat message and its one-tap links (WhatsApp prefilled; Viber's link takes no text). */
+export type ChatMessageProps = {
+	text: string;
+	whatsappUrl: string;
+	viberUrl: string;
+};
+
 export type ProjectPageProps = {
 	project: {
 		id: string;
@@ -47,7 +54,7 @@ export type ProjectPageProps = {
 	canQuote: boolean;
 	canAccept: boolean;
 	/** The chat message for the current quote, when it can be sent. */
-	message: { text: string; whatsappUrl: string; viberUrl: string } | null;
+	message: ChatMessageProps | null;
 	form: {
 		depositPercent: number | null;
 		defaultValidUntil: string;
@@ -84,6 +91,23 @@ export type ProjectPageProps = {
 	} | null;
 	/** The client's id for the "View client" link; null unless an owner. */
 	clientId: string | null;
+	/**
+	 * Owners only, while the project waits for its deposit (TAT-65): the
+	 * link (`url` null once it no longer works), why one can't be made now,
+	 * the chat message that sends it, and the day a screenshot came.
+	 */
+	deposit: {
+		link: {
+			url: string | null;
+			referenceCode: string;
+			expiresText: string;
+		} | null;
+		problem: string | null;
+		message: ChatMessageProps | null;
+		proofReceivedText: string | null;
+		/** Links open on this machine (the dev host), so no client can use them. */
+		devHost: boolean;
+	} | null;
 };
 
 export const STATUS_LABELS: Record<string, string> = {

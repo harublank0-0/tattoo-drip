@@ -14,8 +14,10 @@ export type ShellNavItem = {
 		| "tenant.calendar.index"
 		| "tenant.clients.index"
 		| "tenant.settings";
-	/** New inquiries on the Inbox; absent unless above zero. */
+	/** A count on the item (new inquiries, proofs to check); absent unless above zero. */
 	badge?: number;
+	/** What the badge counts, read by screen readers after the number: "new" when absent. */
+	badgeLabel?: string;
 	/** Other path prefixes that also make this item current. */
 	also?: string[];
 };
@@ -23,11 +25,12 @@ export type ShellNavItem = {
 /**
  * What `tenant`'s member sees: owners get Inbox, Projects, Calendar, Clients
  * and Settings (the artist pages count as Settings); artists get Projects and
- * Calendar. The server 404s the rest anyway.
+ * Calendar. Owners also see on Projects how many deposit proofs wait (TAT-65). The server 404s the rest anyway.
  */
 export function navItems(
 	tenant: { slug: string; role: string },
 	inboxCount: number | null,
+	proofCount: number | null = null,
 ): ShellNavItem[] {
 	const owner = tenant.role === "owner";
 	const items: ShellNavItem[] = [];
@@ -43,6 +46,9 @@ export function navItems(
 		key: "projects",
 		label: "Projects",
 		route: "tenant.projects.index",
+		...(owner && proofCount && proofCount > 0
+			? { badge: proofCount, badgeLabel: "to check" }
+			: {}),
 	});
 	items.push({
 		key: "calendar",

@@ -36,6 +36,7 @@ export default function TabBar({
 									{item.badge ? (
 										<NavBadge
 											count={item.badge}
+											label={item.badgeLabel}
 											className="absolute -top-2 left-3.5"
 										/>
 									) : null}

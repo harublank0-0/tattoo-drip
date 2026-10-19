@@ -277,3 +277,28 @@ test.group("ApiException.of", () => {
 		});
 	});
 });
+
+test.group("The deposit codes", () => {
+	test("deposit_not_due and deposit_changed are 409s with their one message", ({
+		assert,
+	}) => {
+		const cases = [
+			[
+				"deposit_not_due",
+				"This deposit can't be paid here right now. Reload the page to see why.",
+			],
+			[
+				"deposit_changed",
+				"The deposit amount changed. Check the new amount before you upload.",
+			],
+		] as const;
+
+		for (const [code, message] of cases) {
+			assert.deepEqual(
+				apiErrorFor(ApiException.of(code)),
+				{ status: 409, body: { error: { code, message } }, headers: {} },
+				code,
+			);
+		}
+	});
+});

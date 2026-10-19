@@ -6,6 +6,7 @@ import type Tenant from "#modules/tenancy/models/tenant";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { withDbContext } from "#services/db_context";
+import { depositServices } from "#tests/helpers/deposits";
 import {
 	makeInquiry,
 	makeProject,
@@ -79,6 +80,7 @@ export function inTenantAs<T>(
 
 const paymentMethods = new PaymentMethodService(new ImageService());
 const artists = new ArtistService(new ImageService());
+const depositLinks = depositServices().links;
 
 async function studio(slug: string, name: string) {
 	const { owner, tenant } = await studioWithOwner(slug, name);
@@ -126,6 +128,27 @@ async function studio(slug: string, name: string) {
 		await makeReferenceImage(tenant, { inquiryId: inquiry.id });
 		return inquiry;
 	});
+	// A deposit_pending project with its deposit link, and the eSewa method
+	// the deposit page shows, for the deposit routes (TAT-65).
+	const deposit = await inTenant(tenant, async () => {
+		const method = await paymentMethods.create(tenant, {
+			kind: "esewa",
+			label: `${name} eSewa`,
+			accountNumber: "9801234567",
+			accountName: name,
+			showOnDepositPage: true,
+		});
+		const project = await makeProject(tenant, pipeline.client, {
+			status: "deposit_pending",
+		});
+		await makeQuote(tenant, project);
+		const { link, token } = await depositLinks.issue(
+			tenant,
+			{ userId: owner.id, role: "owner" },
+			project,
+		);
+		return { method, project, link, token };
+	});
 	return {
 		tenant,
 		owner,
@@ -141,6 +164,12 @@ async function studio(slug: string, name: string) {
 		newInquiry,
 		// The :id resource of the clients routes' isolation cases.
 		client: pipeline.client,
+		// The deposit routes' resources (TAT-65): the project for the
+		// dashboard's :id, the raw token and the code for the public API.
+		depositMethod: deposit.method,
+		depositProject: deposit.project,
+		depositToken: deposit.token,
+		depositReferenceCode: deposit.link.referenceCode,
 	};
 }
 
@@ -151,7 +180,7 @@ export type Studio = Awaited<ReturnType<typeof studio>>;
  * (`paymentMethod` is the first), an artist profile (`artistProfile`) and one
  * of each pipeline record (`pipeline`: client, accepted inquiry, project,
  * reference image, quote and a submitted payment), plus a quoted project
- * (`quotedProject`, `quotedQuote`) and a new inquiry with a reference image (`newInquiry`); `project` is the pipeline's project. Later tickets add seed data
+ * (`quotedProject`, `quotedQuote`), a new inquiry with a reference image (`newInquiry`) and a deposit_pending project with its deposit link (`depositProject`, `depositToken`, `depositReferenceCode`) and the eSewa method its page shows (`depositMethod`); `project` is the pipeline's project. Later tickets add seed data
  * for their own tables here, so every isolation case sees it.
  */
 export async function twoStudios() {

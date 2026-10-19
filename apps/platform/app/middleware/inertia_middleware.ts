@@ -4,6 +4,7 @@ import type { NextFn } from "@adonisjs/core/types/http";
 import BaseInertiaMiddleware from "@adonisjs/inertia/inertia_middleware";
 import type User from "#models/user";
 import InquiryService from "#modules/inquiries/services/inquiry_service";
+import DepositService from "#modules/payments/services/deposit_service";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { ensureDbContext } from "#services/db_context";
 import { encryptsHistory } from "#services/history_encryption";
@@ -51,6 +52,18 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 					)
 				: null;
 
+		// The Projects badge: deposit proofs waiting for an owner (TAT-65).
+		const proofCount =
+			tenant && membership?.role === "owner" && auth?.user
+				? await ensureDbContext(
+						{ userId: auth.user.id, tenantId: tenant.id },
+						async () =>
+							(
+								await ctx.containerResolver.make(DepositService)
+							).countPendingProofs(tenant),
+					)
+				: null;
+
 		/**
 		 * Data shared with all Inertia pages. Make sure you are using
 		 * transformers for rich data-types like Models.
@@ -87,6 +100,8 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 			),
 			/** New inquiries waiting in the inbox; null unless an owner is on a tenant page. */
 			inboxCount: ctx.inertia.always(inboxCount),
+			/** Deposit proofs waiting for an owner; null unless an owner is on a tenant page. */
+			proofCount: ctx.inertia.always(proofCount),
 		};
 	}
 

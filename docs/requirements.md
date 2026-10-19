@@ -28,6 +28,7 @@ What the MVP (pilot with a design-partner studio) and V1 (paid launch) must do, 
 **Quotes and payments**
 - [ ] Quote: a fixed price, or an hourly rate with estimated hours, plus a deposit amount (which may be zero) and an expiry; quotes can be revised
 - [ ] Deposit page per project: amount, the studio's QR codes and a reference code; the client uploads proof of payment
+- An owner makes a project's deposit link while its deposit is due; it works for 30 days and can be replaced at once (the old link stops working, the reference code stays). The page shows the studio, the project's brief, the deposit, the studio's deposit-page methods, a 6-character reference code for the payment remark and the deposit policy, and takes one screenshot at a time, which owners are alerted to.
 - [ ] Staff verify or reject the proof; cash and bank payments can be recorded at the desk
 - [ ] Payments are deposits, session payments, balance payments or refunds; the balance due is computed
 

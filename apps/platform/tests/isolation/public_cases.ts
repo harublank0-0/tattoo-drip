@@ -1,4 +1,7 @@
+import DepositLink from "#modules/payments/models/deposit_link";
+import Payment from "#modules/payments/models/payment";
 import Tenant from "#modules/tenancy/models/tenant";
+import { type ProofPart, proofPart } from "#tests/helpers/deposits";
 import { intakeFields, intakeRows } from "#tests/helpers/intake";
 import { inTenant, type Studio } from "#tests/helpers/tenants";
 
@@ -18,6 +21,15 @@ export type PublicIsolationCase = {
 	body?: (own: Studio) => Record<string, unknown>;
 	/** How `body` is sent: JSON (the default) or multipart form fields. */
 	encoding?: "json" | "multipart";
+	/**
+	 * Values for the pattern's parameters other than :tenant, built for one
+	 * studio (TAT-65: a deposit link's token). With them, the harness also
+	 * sends B's values under A's slug, which must be the 404 and leave B as
+	 * it was.
+	 */
+	params?: (studio: Studio) => Record<string, string>;
+	/** File parts of a multipart write, built for the studio sending it (TAT-65: the proof). */
+	files?: (own: Studio) => Promise<ProofPart[]>;
 	/** The status of A's own request: the positive control. */
 	ownStatus: 200 | 201;
 	/** Strings A's own answer must contain, so an empty answer can't pass. */
@@ -30,6 +42,16 @@ const tenantRow = (target: Studio) =>
 	inTenant(target.tenant, async () =>
 		(await Tenant.findOrFail(target.tenant.id)).serialize(),
 	);
+
+const depositRows = (target: Studio) =>
+	inTenant(target.tenant, async () => ({
+		links: (await DepositLink.query().orderBy("id")).map((row) =>
+			row.serialize(),
+		),
+		payments: (await Payment.query().orderBy("id")).map((row) =>
+			row.serialize(),
+		),
+	}));
 
 export const publicIsolationCases: PublicIsolationCase[] = [
 	{
@@ -53,5 +75,25 @@ export const publicIsolationCases: PublicIsolationCase[] = [
 		// The answer is only the new inquiry's id; inquiries.spec.ts checks it landed in A.
 		ownMarkers: () => [],
 		snapshot: intakeRows,
+	},
+	{
+		method: "GET",
+		pattern: "/api/v1/tenants/:tenant/deposits/:token",
+		params: (studio) => ({ token: studio.depositToken }),
+		ownStatus: 200,
+		ownMarkers: (own) => [own.tenant.name, own.depositReferenceCode],
+		snapshot: depositRows,
+	},
+	{
+		method: "POST",
+		pattern: "/api/v1/tenants/:tenant/deposits/:token",
+		params: (studio) => ({ token: studio.depositToken }),
+		encoding: "multipart",
+		body: () => ({ method: "esewa", expectedAmount: "300000" }),
+		files: async () => [await proofPart()],
+		ownStatus: 201,
+		// The answer is the page in `submitted`, with A's reference code.
+		ownMarkers: (own) => [own.depositReferenceCode],
+		snapshot: depositRows,
 	},
 ];

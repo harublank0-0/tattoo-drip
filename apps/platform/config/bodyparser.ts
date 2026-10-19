@@ -67,7 +67,10 @@ const bodyParserConfig = defineConfig({
 		 * here (a test checks), so no upload is written to disk before the
 		 * tenant is known (TAT-32 ruling 16, TAT-51).
 		 */
-		processManually: ["/api/v1/tenants/:tenant/inquiries"],
+		processManually: [
+			"/api/v1/tenants/:tenant/inquiries",
+			"/api/v1/tenants/:tenant/deposits/:token",
+		],
 
 		/**
 		 * Maximum accepted payload size for multipart requests.

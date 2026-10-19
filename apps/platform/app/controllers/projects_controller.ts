@@ -5,14 +5,25 @@ import { tenantContext } from "#middleware/tenant_middleware";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
 import { chatLinks } from "#modules/clients/contact_links";
+import type Client from "#modules/clients/models/client";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ClientService from "#modules/clients/services/client_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import InquiryService from "#modules/inquiries/services/inquiry_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
+import {
+	DEPOSIT_LINK_PROBLEMS,
+	depositMessage,
+	storefrontTemplate,
+} from "#modules/payments/deposit_links";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import DepositLinkService from "#modules/payments/services/deposit_link_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import DepositService from "#modules/payments/services/deposit_service";
 import { contactedText } from "#modules/projects/contact";
 import type Quote from "#modules/projects/models/quote";
+import type TattooProject from "#modules/projects/models/tattoo_project";
 import {
 	ACTIVE_STATUSES,
 	allowedMoves,
@@ -38,6 +49,8 @@ import QuoteService from "#modules/projects/services/quote_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import SessionService from "#modules/scheduling/services/session_service";
 import { sessionTimeText } from "#modules/scheduling/times";
+import type Tenant from "#modules/tenancy/models/tenant";
+import { pointsAtThisMachine } from "#services/storefront_url";
 
 /** How long a new quote is valid by default, in days. */
 const DEFAULT_VALID_DAYS = 14;
@@ -57,6 +70,8 @@ export default class ProjectsController {
 		private sessions: SessionService,
 		private inquiries: InquiryService,
 		private images: ImageService,
+		private depositLinks: DepositLinkService,
+		private deposits: DepositService,
 	) {}
 
 	async index(ctx: HttpContext) {
@@ -214,7 +229,63 @@ export default class ProjectsController {
 			request,
 			// Owners only: the clients pages are theirs.
 			clientId: membership.role === "owner" ? project.clientId : null,
+			// Owners only, while the project waits for its deposit (TAT-65).
+			deposit:
+				membership.role === "owner" && project.status === "deposit_pending"
+					? await this.depositPanel(tenant, project, client)
+					: null,
 		});
+	}
+
+	/**
+	 * The deposit panel (TAT-65): the project's link, rebuilt from its nonce
+	 * (`url` null once it no longer works), why a link can't be made now,
+	 * the chat message that sends it (with a working link and a phone), the
+	 * day a screenshot came, while one waits, and whether links point at this
+	 * machine (the dev host).
+	 */
+	private async depositPanel(
+		tenant: Tenant,
+		project: TattooProject,
+		client: Pick<Client, "name" | "phone"> | null,
+	) {
+		const day = (at: DateTime) =>
+			formatDay(at.setZone(tenant.timezone).toFormat("yyyy-MM-dd"));
+		const link = await this.depositLinks.forProject(tenant, project);
+		const problem = await this.depositLinks.issueProblem(tenant, project);
+		const quote = await this.quotes.current(tenant, project);
+		const due = quote
+			? await this.deposits.remaining(tenant, project, quote)
+			: 0;
+		const pending = await this.deposits.pendingProof(tenant, project);
+		const url = link?.url ?? null;
+		return {
+			link: link
+				? {
+						url,
+						referenceCode: link.referenceCode,
+						// The last day it works: the day before the instant it expires.
+						expiresText: formatDay(validUntil(link.expiresAt, tenant.timezone)),
+					}
+				: null,
+			problem: problem ? DEPOSIT_LINK_PROBLEMS[problem] : null,
+			message:
+				link && url && client?.phone
+					? chatMessage(
+							depositMessage({
+								clientName: client.name,
+								studioName: tenant.name,
+								dueText: formatMoney(due),
+								referenceCode: link.referenceCode,
+								url,
+							}),
+							client.phone,
+						)
+					: null,
+			proofReceivedText: pending ? day(pending.createdAt) : null,
+			// Links that open on this machine reach no client: the card warns.
+			devHost: pointsAtThisMachine(storefrontTemplate()),
+		};
 	}
 }
 
@@ -256,7 +327,14 @@ function messageProps(
 	studioName: string,
 	timezone: string,
 ) {
-	const text = quoteMessage({ clientName, studioName, quote, timezone });
+	return chatMessage(
+		quoteMessage({ clientName, studioName, quote, timezone }),
+		phone,
+	);
+}
+
+/** A chat message and the links that send it: WhatsApp prefilled, Viber to paste. */
+function chatMessage(text: string, phone: string) {
 	const links = chatLinks(phone, text);
 	return { text, whatsappUrl: links.whatsapp, viberUrl: links.viber };
 }

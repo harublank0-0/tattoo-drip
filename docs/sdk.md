@@ -22,11 +22,13 @@ Dependencies only point toward the API.
 
 | Stage | Resources |
 |---|---|
-| MVP | `studio.get` (profile, studio page config), `artists.list` and `artists.get`, `inquiries.create` |
+| MVP | `studio.get` (profile, studio page config), `artists.list` and `artists.get`, `inquiries.create`, `deposits.get`, `deposits.submitProof` |
 | V1 | `portfolio`, `services`, `flash`, `availability` (slots for instant booking), `styles`, `placements` |
 | V2 | Keys for external developers, webhooks if agencies need them |
 
 Inquiries, clients, quotes and payments are never readable through the public API. The deposit page is the one exception: it reads a single project's deposit details through an unguessable link token.
+
+The deposit page reads `client.deposits.get(token)` and sends the screenshot with `client.deposits.submitProof(token, { proof, method, expectedAmount })`, where `expectedAmount` is the page's `deposit.due` (React: `useDeposit(token)`, `useSubmitDepositProof(token)`). The token is the fragment of the link the studio sent (`https://<studio>/deposit#<token>`): a bearer secret that must stay out of logs and analytics. Every link that doesn't work is a 404; a state that takes no screenshot is `deposit_not_due` and a stale amount `deposit_changed` (both 409: refetch the page). Both calls are never cached and rate-limited per address and per link.
 
 ## Core SDK
 
@@ -96,7 +98,7 @@ The SDK throws if it is given a key in a browser.
 ## Contract, keys, stability
 
 - **Contract:** `packages/types/openapi.yaml` is the source of truth. After editing it, run `pnpm --filter @tattoo-drip/types generate`. Contract tests (V1) check that real responses match it.
-- **Envelopes and codes:** `{ data }` on success; `{ error: { code, message, fields? } }` on failure. Shared codes: `bad_request`, `not_found`, `method_not_allowed`, `payload_too_large`, `unsupported_media_type`, `validation_failed` (with `fields`), `rate_limited` (with `Retry-After`), `internal_error`; `createInquiry` adds `artist_not_accepting`, `studio_not_accepting` and `too_many_open_inquiries` (409); every code is listed in `openapi.yaml`. Branch on `code`, never on `message`.
+- **Envelopes and codes:** `{ data }` on success; `{ error: { code, message, fields? } }` on failure. Shared codes: `bad_request`, `not_found`, `method_not_allowed`, `payload_too_large`, `unsupported_media_type`, `validation_failed` (with `fields`), `rate_limited` (with `Retry-After`), `internal_error`; `createInquiry` adds `artist_not_accepting`, `studio_not_accepting` and `too_many_open_inquiries` (409); `submitDepositProof` adds `deposit_not_due` and `deposit_changed` (409); every code is listed in `openapi.yaml`. Branch on `code`, never on `message`.
 - **Tenants and old slugs:** the path slug is matched exactly. An old slug answers reads like the current one, and `studio.get()` returns the current `slug` (the studio page redirects with it); a write under an old slug is a 404.
 - **Stateless, CORS, caching:** no cookies or sessions; CORS allows any origin without credentials. Cacheable reads send `Cache-Control: public, max-age=60, stale-while-revalidate=600` and an `ETag`; everything else is `no-store`.
 - **Versioning:** within `/api/v1`, changes are additive only. Breaking changes mean `/api/v2` and a new SDK major version. Until V2 opens the SDK to others, the draft may still change freely.

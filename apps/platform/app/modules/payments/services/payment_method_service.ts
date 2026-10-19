@@ -61,6 +61,20 @@ export default class PaymentMethodService {
 	}
 
 	/**
+	 * The live methods the studio shows on the deposit page (TAT-65), in the
+	 * owner's order. Cash never shows: checkPaymentMethod forbids it, and it
+	 * is filtered here too.
+	 */
+	async listForDepositPage(tenant: TenantRef): Promise<PaymentMethod[]> {
+		return PaymentMethod.query()
+			.where("tenant_id", tenant.id)
+			.where("show_on_deposit_page", true)
+			.whereNot("kind", "cash")
+			.orderBy("position", "asc")
+			.orderBy("id", "asc");
+	}
+
+	/**
 	 * The tenant's live method with this id. An unknown id, a deleted method
 	 * and another tenant's method all throw E_ROW_NOT_FOUND (a 404), so
 	 * callers can't tell them apart.

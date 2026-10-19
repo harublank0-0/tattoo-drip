@@ -3,6 +3,7 @@ import Artist from "#modules/artists/models/artist";
 import Client from "#modules/clients/models/client";
 import Inquiry from "#modules/inquiries/models/inquiry";
 import ReferenceImage from "#modules/inquiries/models/reference_image";
+import DepositLink from "#modules/payments/models/deposit_link";
 import PaymentMethod from "#modules/payments/models/payment_method";
 import Quote from "#modules/projects/models/quote";
 import TattooProject from "#modules/projects/models/tattoo_project";
@@ -37,6 +38,7 @@ export type IsolationCase = {
 		| "artistProfile"
 		| "project"
 		| "quotedProject"
+		| "depositProject"
 		| "newInquiry"
 		| "client";
 	/** Who sends the request. Every settings route is owner-only. */
@@ -85,6 +87,15 @@ const artistRows = (target: Studio) =>
 				.orderBy("slug")
 				.orderBy("id")
 		).map((artist) => artist.serialize()),
+	);
+
+const depositLinkRows = (target: Studio) =>
+	inTenant(target.tenant, async () =>
+		(
+			await DepositLink.query()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("id")
+		).map((link) => link.serialize()),
 	);
 
 // Projects with their status, deleted ones included, and every quote.
@@ -441,6 +452,15 @@ export const isolationCases: IsolationCase[] = [
 		body: (own) => ({ artistId: own.artistProfile.id }),
 		ownStatus: 302,
 		snapshot: projectRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/projects/:id/deposit-link",
+		resource: "depositProject",
+		actor: "owner",
+		ownStatus: 302,
+		// A new link replaces the nonce, hash and expiry: A's snapshot changes.
+		snapshot: depositLinkRows,
 	},
 	{
 		method: "GET",

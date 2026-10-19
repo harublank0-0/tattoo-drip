@@ -180,6 +180,7 @@ test.group("Isolation harness catches what it should", (group) => {
 			"GET",
 			"/t/:tenant/settings/payments",
 		).snapshot(b)) as unknown[];
-		assert.lengthOf(methods, 2);
+		// Two cash methods, and the eSewa method the deposit page shows (TAT-65).
+		assert.lengthOf(methods, 3);
 	});
 });

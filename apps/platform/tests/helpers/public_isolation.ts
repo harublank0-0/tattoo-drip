@@ -20,29 +20,67 @@ export function publicMarkers(studio: Studio): string[] {
 		studio.client.id,
 		studio.project.id,
 		studio.newInquiry.id,
+		studio.depositProject.id,
+		studio.depositReferenceCode,
 	];
 }
 
+/** Whole path segments only: ":tokens" is not ":token". */
+const segment = (name: string) => new RegExp(`:${name}(?=/|$)`);
+
 /**
- * The case's URL under `studio`'s slug. Routes with more parameters than
- * :tenant need the harness to grow an attack with B's values under A's slug
- * (TAT-44's /artists/:artist will); until then they are refused.
+ * The case's URL under `slugOwner`'s slug, with `params` for the pattern's
+ * other parameters. A parameter left without a value is a mistake in the
+ * case table, so it fails loudly.
  */
-function urlFor({ pattern }: PublicIsolationCase, studio: Studio) {
-	const url = pattern.replace(/:tenant(?=\/|$)/, studio.tenant.slug);
+function urlFor(
+	{ pattern }: PublicIsolationCase,
+	slugOwner: Studio,
+	params: Record<string, string> = {},
+) {
+	let url = pattern.replace(segment("tenant"), slugOwner.tenant.slug);
+	for (const [name, value] of Object.entries(params)) {
+		url = url.replace(segment(name), encodeURIComponent(value));
+	}
 	if (/\/:/.test(url)) {
 		throw new Error(
-			`${pattern}: the public harness only handles :tenant so far`,
+			`${pattern}: give the case \`params\` for every parameter but :tenant`,
 		);
 	}
 	return url;
 }
 
+/** Sends the case's request to `url` with `own`'s body and files. */
+async function send(
+	client: ApiClient,
+	isolationCase: PublicIsolationCase,
+	url: string,
+	own: Studio,
+) {
+	const request = client.request(url, isolationCase.method);
+	const body = isolationCase.body?.(own);
+	if (isolationCase.encoding === "multipart") {
+		if (body) request.fields(body as Record<string, string>);
+		for (const part of (await isolationCase.files?.(own)) ?? []) {
+			request.file(part.field, part.data, {
+				filename: part.name,
+				contentType: part.type,
+			});
+		}
+	} else if (body) {
+		request.json(body);
+	}
+	return request.redirects(0);
+}
+
 /**
  * Proves a public route under studio A's path never reads or writes studio
- * B. The positive control: A's own request gives ownStatus and mentions A
- * (ownMarkers), so an empty or failing answer can't pass. Then the answer
- * must mention none of B's markers, and B's snapshot must be unchanged.
+ * B. A route with parameters besides :tenant first gets B's own values
+ * under A's slug and then A's own values under B's slug (a route can fail
+ * one direction only), each of which must be the 404 and leave the studio
+ * whose values they were as it was. Then the positive control: A's own request gives ownStatus and mentions A
+ * (ownMarkers), so an empty or failing answer can't pass; it must mention
+ * none of B's markers, and B's snapshot must be unchanged.
  */
 export async function assertPublicIsolation(
 	client: ApiClient,
@@ -51,18 +89,45 @@ export async function assertPublicIsolation(
 	isolationCase: PublicIsolationCase,
 ) {
 	const before = await isolationCase.snapshot(b);
+	const beforeA = await isolationCase.snapshot(a);
 
-	const request = client.request(
-		urlFor(isolationCase, a),
-		isolationCase.method,
-	);
-	const body = isolationCase.body?.(a);
-	if (body && isolationCase.encoding === "multipart") {
-		request.fields(body as Record<string, string>);
-	} else if (body) {
-		request.json(body);
+	if (isolationCase.params) {
+		const attack = await send(
+			client,
+			isolationCase,
+			urlFor(isolationCase, a, isolationCase.params(b)),
+			a,
+		);
+		attack.assertStatus(404);
+		assert.equal(attack.body().error?.code, "not_found");
+		assert.deepEqual(
+			await isolationCase.snapshot(b),
+			before,
+			`${isolationCase.method} ${isolationCase.pattern} with B's values under A's slug changed studio B`,
+		);
+
+		const mirror = await send(
+			client,
+			isolationCase,
+			urlFor(isolationCase, b, isolationCase.params(a)),
+			b,
+		);
+		const label = `${isolationCase.method} ${isolationCase.pattern} with A's values under B's slug`;
+		assert.equal(mirror.status(), 404, `${label} must be the 404`);
+		assert.equal(mirror.body().error?.code, "not_found", label);
+		assert.deepEqual(
+			await isolationCase.snapshot(a),
+			beforeA,
+			`${label} changed studio A`,
+		);
 	}
-	const response = await request.redirects(0);
+
+	const response = await send(
+		client,
+		isolationCase,
+		urlFor(isolationCase, a, isolationCase.params?.(a)),
+		a,
+	);
 
 	response.assertStatus(isolationCase.ownStatus);
 	const text = JSON.stringify(response.body());

@@ -20,6 +20,10 @@ export type Slot = Schemas["Slot"];
 export type SourceChannel = Schemas["SourceChannel"];
 export type InquiryInput = Schemas["InquiryInput"];
 export type InquiryReceipt = Schemas["InquiryReceipt"];
+export type DepositState = Schemas["DepositState"];
+export type DepositPaymentMethod = Schemas["DepositPaymentMethod"];
+export type DepositPage = Schemas["DepositPage"];
+export type DepositProofForm = Schemas["DepositProofForm"];
 
 export type ListServicesQuery = NonNullable<
 	operations["listServices"]["parameters"]["query"]

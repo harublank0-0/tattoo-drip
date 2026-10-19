@@ -290,6 +290,89 @@ paths:
         "429": { $ref: "#/components/responses/RateLimited" }
         default: { $ref: "#/components/responses/Error" }
 
+  /tenants/{tenant}/deposits/{token}:
+    parameters:
+      - $ref: "#/components/parameters/Tenant"
+      - $ref: "#/components/parameters/DepositToken"
+    get:
+      operationId: getDeposit
+      tags: [MVP]
+      summary: A project's deposit page, through its link
+      description: |
+        What the client's deposit page shows: the studio, the project's
+        brief, the deposit, the reference code to write in the payment
+        remark, the studio's payment methods (only while the deposit is
+        due) and its deposit policy. Never cached. Every link that doesn't
+        work (unknown, replaced, expired, another studio's, or its project
+        gone) is the same 404. Rate-limited per address and per link.
+      responses:
+        "200":
+          description: The deposit page
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data: { $ref: "#/components/schemas/DepositPage" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      operationId: submitDepositProof
+      tags: [MVP]
+      summary: Send a screenshot of the deposit payment
+      description: |
+        One `multipart/form-data` request: the screenshot (`proof`, a JPEG,
+        PNG or WebP of 10 MB at most), how the client paid (`method`, one of
+        the page's `paymentMethods` kinds) and the amount the page showed
+        (`expectedAmount`, its `deposit.due`). The API keeps the image
+        privately, records a payment for the studio to check, and answers
+        with the page as it now is (`submitted`). One screenshot waits at a
+        time. Under an old slug it is a 404. Rate-limited per address and
+        per link.
+
+        Own codes (409): `deposit_not_due` (the page's state isn't `due`, for
+        example a screenshot already waits; reload the page) and
+        `deposit_changed` (`expectedAmount` isn't what is due now; reload
+        the page).
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/DepositProofForm" }
+            encoding:
+              proof:
+                contentType: image/jpeg, image/png, image/webp
+      responses:
+        "201":
+          description: Received. The studio checks it and confirms on WhatsApp or Viber.
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data: { $ref: "#/components/schemas/DepositPage" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: The page can't take a screenshot now (`deposit_not_due`, `deposit_changed`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "413": { $ref: "#/components/responses/Error" }
+        "415": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
 components:
   securitySchemes:
     serverKey:
@@ -312,6 +395,17 @@ components:
         minLength: 3
         maxLength: 63
         pattern: "^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$"
+    DepositToken:
+      name: token
+      in: path
+      required: true
+      description: |
+        The deposit link's secret: the fragment of the link the studio sent
+        (`https://<studio>/deposit#<token>`). A bearer secret: never log it
+        or send it to analytics.
+      schema:
+        type: string
+        pattern: "^[A-Za-z0-9_-]{43}$"
 
   headers:
     CacheControl:
@@ -374,8 +468,9 @@ components:
                 `rate_limited` (429, with `Retry-After`), `internal_error`
                 (500). Endpoint codes: `artist_not_accepting`,
                 `studio_not_accepting`, `too_many_open_inquiries` (409,
-                `createInquiry`). Treat an unknown code by its HTTP status.
-              examples: [not_found, validation_failed, rate_limited, too_many_open_inquiries]
+                `createInquiry`), `deposit_not_due`, `deposit_changed` (409,
+                `submitDepositProof`). Treat an unknown code by its HTTP status.
+              examples: [not_found, validation_failed, rate_limited, too_many_open_inquiries, deposit_changed]
             message:
               type: string
               description: A sentence for people. Never parse it.
@@ -578,3 +673,109 @@ components:
       additionalProperties: false
       properties:
         id: { type: string, format: uuid, description: The new inquiry. Nothing in the public API reads it back. }
+
+    DepositState:
+      type: string
+      description: |
+        What the deposit page says: `due` (pay, then send a screenshot),
+        `submitted` (a screenshot waits for the studio), `paid` (nothing
+        left to pay), `updating` (the studio is changing the quote),
+        `expired` (the quote expired) or `cancelled`.
+      enum: [due, submitted, paid, updating, expired, cancelled]
+
+    DepositPaymentMethod:
+      type: object
+      required: [kind, label, qrImageUrl, accountName, accountNumber, bankName]
+      additionalProperties: false
+      properties:
+        kind:
+          type: string
+          enum: [fonepay, esewa, khalti, bank]
+        label: { type: string, examples: [eSewa] }
+        qrImageUrl:
+          type: [string, "null"]
+          format: uri
+          description: The studio's QR code, a public image.
+        accountName: { type: [string, "null"] }
+        accountNumber:
+          type: [string, "null"]
+          description: The bank account number, or the eSewa or Khalti ID.
+        bankName: { type: [string, "null"] }
+
+    DepositPage:
+      type: object
+      required: [studio, project, deposit, referenceCode, state, lastProofRejected, proofSubmittedAt, paymentMethods, depositPolicy]
+      additionalProperties: false
+      properties:
+        studio:
+          type: object
+          required: [name]
+          additionalProperties: false
+          properties:
+            name: { type: string }
+        project:
+          type: object
+          required: [brief, artistName]
+          additionalProperties: false
+          properties:
+            brief: { type: string }
+            artistName: { type: [string, "null"] }
+        deposit:
+          type: object
+          required: [amount, amountText, due, dueText, currency, payBy, payByText]
+          additionalProperties: false
+          properties:
+            amount:
+              type: integer
+              minimum: 0
+              description: The current quote's deposit, in paisa.
+            amountText: { type: string, examples: ["NPR 3,000"] }
+            due:
+              type: integer
+              minimum: 0
+              description: What is still to pay, in paisa. Send it back as `expectedAmount`.
+            dueText: { type: string, examples: ["NPR 3,000"] }
+            currency: { type: string, examples: [NPR] }
+            payBy:
+              type: string
+              format: date
+              description: The quote's last valid day, in the studio's timezone.
+            payByText: { type: string, examples: ["28 Oct 2026"] }
+        referenceCode:
+          type: string
+          pattern: "^[2-9ABCDEFGHJKMNPQRSTVWXYZ]{6}$"
+          description: What the client writes in the payment remark.
+          examples: [7K3M9Q]
+        state: { $ref: "#/components/schemas/DepositState" }
+        lastProofRejected:
+          type: boolean
+          description: In `due`, the studio couldn't confirm the last screenshot.
+        proofSubmittedAt:
+          type: [string, "null"]
+          format: date-time
+          description: When the screenshot that waits was sent.
+        paymentMethods:
+          type: array
+          description: The studio's payment methods, only in `due`; empty otherwise.
+          items: { $ref: "#/components/schemas/DepositPaymentMethod" }
+        depositPolicy:
+          type: [string, "null"]
+          description: The studio's own words about deposits.
+
+    DepositProofForm:
+      type: object
+      description: The multipart body of `submitDepositProof`
+      required: [proof, method, expectedAmount]
+      properties:
+        proof:
+          type: string
+          format: binary
+          description: The payment screenshot (JPEG, PNG or WebP, 10 MB at most). Its metadata is removed, and only the studio sees it.
+        method:
+          type: string
+          enum: [fonepay, esewa, khalti, bank]
+          description: How the client paid, one of the page's `paymentMethods` kinds.
+        expectedAmount:
+          type: integer
+          minimum: 1
+          description: The `deposit.due` the page showed, in paisa.

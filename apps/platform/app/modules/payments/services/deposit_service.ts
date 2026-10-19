@@ -1,5 +1,8 @@
 import { inject } from "@adonisjs/core";
+import type { StoredImage } from "#modules/media/services/image_service";
 import Payment from "#modules/payments/models/payment";
+import type { PaymentMethodKind } from "#modules/payments/models/payment_method";
+import type Quote from "#modules/projects/models/quote";
 import type TattooProject from "#modules/projects/models/tattoo_project";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import QuoteService from "#modules/projects/services/quote_service";
@@ -16,9 +19,10 @@ type ProjectRef = Pick<TattooProject, "id">;
 const COUNTED_KINDS = ["deposit", "correction"];
 
 /**
- * Whether a project's deposit is covered. Read-only; TAT-65 (the deposit page
- * and proofs) will own this class and grow it. The current quote comes from
- * QuoteService.
+ * A project's deposit: whether it is covered, what is left to pay, and the
+ * proofs clients send from the deposit page (TAT-65 owns this class). The
+ * current quote comes from QuoteService. Only payments in the quote's
+ * currency count; another currency is not converted.
  */
 @inject()
 export default class DepositService {
@@ -59,5 +63,107 @@ export default class DepositService {
 			.where("currency", currency)
 			.whereIn("kind", COUNTED_KINDS);
 		return payments.reduce((sum, { amount }) => sum + amount, 0);
+	}
+
+	/**
+	 * What is left to pay of `quote`'s deposit, in minor units: the deposit
+	 * minus the verified deposit money in the quote's currency, never below
+	 * zero. Zero means nothing is due (a zero deposit too), as in isSettled.
+	 */
+	async remaining(
+		tenant: TenantRef,
+		project: ProjectRef,
+		quote: Pick<Quote, "depositAmount" | "currency">,
+	): Promise<number> {
+		const paid = await this.verifiedPaid(tenant, project, quote.currency);
+		return Math.max(0, quote.depositAmount - paid);
+	}
+
+	/**
+	 * The project's newest deposit proof waiting for the studio (a
+	 * `submitted` deposit payment), or null. The deposit page takes one at a
+	 * time, so there is at most one from it.
+	 */
+	async pendingProof(
+		tenant: TenantRef,
+		project: ProjectRef,
+	): Promise<Payment | null> {
+		return Payment.query()
+			.where("tenant_id", tenant.id)
+			.where("project_id", project.id)
+			.where("kind", "deposit")
+			.where("status", "submitted")
+			.orderBy("created_at", "desc")
+			.orderBy("id", "desc")
+			.first();
+	}
+
+	/**
+	 * Whether the studio's latest decision on one of the project's deposit
+	 * payments was a rejection: the deposit page then asks for a new
+	 * screenshot.
+	 */
+	async lastDecisionRejected(
+		tenant: TenantRef,
+		project: ProjectRef,
+	): Promise<boolean> {
+		const last = await Payment.query()
+			.where("tenant_id", tenant.id)
+			.where("project_id", project.id)
+			.where("kind", "deposit")
+			.whereNot("status", "submitted")
+			.orderBy("verified_at", "desc")
+			.orderBy("id", "desc")
+			.first();
+		return last?.status === "rejected";
+	}
+
+	/**
+	 * How many deposit proofs wait for the studio: the Projects badge
+	 * (TAT-65). Payments have no soft delete and nothing deletes projects
+	 * from the dashboard yet, so every waiting deposit payment counts (TAT-42
+	 * defines the cascade).
+	 */
+	async countPendingProofs(tenant: TenantRef): Promise<number> {
+		const [row] = await Payment.query()
+			.where("tenant_id", tenant.id)
+			.where("kind", "deposit")
+			.where("status", "submitted")
+			.count("* as total");
+		return Number(row.$extras.total);
+	}
+
+	/**
+	 * Records the proof a client sent from the deposit page: a `submitted`
+	 * deposit payment of `amount` with its stored image, in one INSERT (a
+	 * payment's proof can never be set afterwards: payments_guard). Call it
+	 * inside the transaction that stored the image.
+	 */
+	async recordProof(
+		tenant: TenantRef,
+		project: ProjectRef,
+		input: {
+			amount: number;
+			currency: string;
+			method: PaymentMethodKind;
+			proof: StoredImage;
+		},
+	): Promise<Payment> {
+		const payment = await Payment.create({
+			tenantId: tenant.id,
+			projectId: project.id,
+			kind: "deposit",
+			amount: input.amount,
+			currency: input.currency,
+			method: input.method,
+			proofImageKey: input.proof.key,
+			proofImageWidth: input.proof.width,
+			proofImageHeight: input.proof.height,
+			status: "submitted",
+		});
+		// Lucid reads nothing back after an insert: the caller gets the row as
+		// the database has it (the decision columns null, the timestamps set).
+		await payment.refresh();
+		return payment;
 	}
 }

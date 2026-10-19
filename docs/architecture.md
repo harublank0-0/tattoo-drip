@@ -97,8 +97,8 @@ Isolation has several layers:
 4. A job alerts the studio's staff by email and in the app (queued with the inquiry since TAT-51; the alerts themselves are TAT-52).
 
 **Deposit (customer → studio)**
-1. Staff accept the inquiry, which creates a project, and send a quote through a one-tap WhatsApp or Viber message; the project moves to `quoted`. When the client agrees, staff mark the quote accepted: the project moves to `deposit_pending`, and a deposit page link goes out the same way. A quote that expires first cancels the project.
-2. The client pays with the studio's own QR code and uploads proof on the deposit page.
+1. Staff accept the inquiry, which creates a project, and send a quote through a one-tap WhatsApp or Viber message; the project moves to `quoted`. When the client agrees, staff mark the quote accepted: the project moves to `deposit_pending`, and an owner sends the deposit page link the same way (`https://<studio>/deposit#<token>`, 30 days). A quote that expires first cancels the project.
+2. The client pays with the studio's own QR code and uploads proof on the deposit page, which records a `submitted` payment and alerts the owners.
 3. An owner verifies the proof in the dashboard, and the project moves to `booked` when a session is scheduled. **No money passes through Tattoo Drip in the MVP**, so no payment licence is needed.
 
 **Dashboard action**
