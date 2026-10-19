@@ -30,6 +30,16 @@ export const SESSION_TOKEN_KEYS: Record<TokenPurpose, string> = {
 	reset_password: "reset_password_token",
 };
 
+/**
+ * Drops every staged link token from a session. Sign-in and sign-out call it:
+ * regenerating the session id keeps its data, so without this a link opened
+ * before a sign-out would still open its form for the next visitor of a
+ * shared browser.
+ */
+export function forgetStagedTokens(session: { forget(key: string): void }) {
+	for (const key of Object.values(SESSION_TOKEN_KEYS)) session.forget(key);
+}
+
 /** The flash that carries the typed address to the "Check your email" page. */
 export const SENT_TO_FLASH = "sentTo";
 
