@@ -1,6 +1,8 @@
+import app from "@adonisjs/core/services/app";
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import User from "#models/user";
+import { sessionCookieName } from "#services/cookie_policy";
 import {
 	assertApiData,
 	assertApiHeaders,
@@ -71,7 +73,7 @@ test.group("Public API: stateless and cookieless", (group) => {
 
 		response.assertStatus(200);
 		const cookies = String(response.headers()["set-cookie"]);
-		assert.include(cookies, "adonis-session=");
+		assert.include(cookies, `${sessionCookieName(app.inProduction)}=`);
 		assert.include(cookies, "XSRF-TOKEN=");
 	});
 });

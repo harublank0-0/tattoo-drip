@@ -10,12 +10,13 @@
 */
 
 import { Env } from "@adonisjs/core/env";
+import { checkAppOrigin } from "#services/app_origin";
 import { checkChallengeSecret } from "#services/challenge_secret";
 import { checkServerKeys } from "#services/server_keys";
 import { checkStorefrontUrl } from "#services/storefront_url";
 import { checkTrustProxy } from "#services/trust_proxy";
 
-export default await Env.create(new URL("../", import.meta.url), {
+const env = await Env.create(new URL("../", import.meta.url), {
 	// Node
 	NODE_ENV: Env.schema.enum(["development", "production", "test"] as const),
 	PORT: Env.schema.number(),
@@ -67,3 +68,14 @@ export default await Env.create(new URL("../", import.meta.url), {
 	SMTP_USERNAME: Env.schema.string.optional(),
 	SMTP_PASSWORD: Env.schema.string.optional(),
 });
+
+// In production the dashboard's origin is https and off the studio pages'
+// domain (TAT-9): its __Host- session cookie needs both. Checked once both
+// settings are read, since it compares them.
+checkAppOrigin(
+	env.get("APP_URL"),
+	env.get("STOREFRONT_URL"),
+	env.get("NODE_ENV") === "production",
+);
+
+export default env;
