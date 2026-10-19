@@ -12,6 +12,7 @@ type ExtractProps<T> =
 
 declare module '@adonisjs/inertia/types' {
   export interface InertiaPages {
+    'alerts/index': ExtractProps<(typeof import('../../inertia/pages/alerts/index.tsx'))['default']>
     'artists/form': ExtractProps<(typeof import('../../inertia/pages/artists/form.tsx'))['default']>
     'artists/index': ExtractProps<(typeof import('../../inertia/pages/artists/index.tsx'))['default']>
     'auth/login': ExtractProps<(typeof import('../../inertia/pages/auth/login.tsx'))['default']>
@@ -29,6 +30,7 @@ declare module '@adonisjs/inertia/types' {
     'projects/index': ExtractProps<(typeof import('../../inertia/pages/projects/index.tsx'))['default']>
     'projects/new': ExtractProps<(typeof import('../../inertia/pages/projects/new.tsx'))['default']>
     'projects/show': ExtractProps<(typeof import('../../inertia/pages/projects/show.tsx'))['default']>
+    'settings/messages': ExtractProps<(typeof import('../../inertia/pages/settings/messages.tsx'))['default']>
     'settings/payment_method_form': ExtractProps<(typeof import('../../inertia/pages/settings/payment_method_form.tsx'))['default']>
     'settings/payments': ExtractProps<(typeof import('../../inertia/pages/settings/payments.tsx'))['default']>
     'settings/profile': ExtractProps<(typeof import('../../inertia/pages/settings/profile.tsx'))['default']>

@@ -4,7 +4,6 @@ import { DateTime } from "luxon";
 import { tenantContext } from "#middleware/tenant_middleware";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
-import { chatLinks } from "#modules/clients/contact_links";
 import type Client from "#modules/clients/models/client";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ClientService from "#modules/clients/services/client_service";
@@ -12,6 +11,15 @@ import ClientService from "#modules/clients/services/client_service";
 import InquiryService from "#modules/inquiries/services/inquiry_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
+import { chatMessage, contactLinks } from "#modules/notifications/chat";
+import { MESSAGE_LABELS, renderMessage } from "#modules/notifications/messages";
+import {
+	cardKinds,
+	cardValues,
+	defaultCardKind,
+} from "#modules/notifications/project_messages";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import MessageTemplateService from "#modules/notifications/services/message_template_service";
 import {
 	DEPOSIT_LINK_PROBLEMS,
 	depositMessage,
@@ -26,7 +34,7 @@ import DepositService from "#modules/payments/services/deposit_service";
 import PaymentService, {
 	type ListFlags,
 } from "#modules/payments/services/payment_service";
-import { contactedText } from "#modules/projects/contact";
+import { lastContactText } from "#modules/projects/contact";
 import type Quote from "#modules/projects/models/quote";
 import type TattooProject from "#modules/projects/models/tattoo_project";
 import {
@@ -91,6 +99,7 @@ export default class ProjectsController {
 		private deposits: DepositService,
 		private payments: PaymentService,
 		private bookings: BookingService,
+		private templates: MessageTemplateService,
 	) {}
 
 	async index(ctx: HttpContext) {
@@ -142,7 +151,14 @@ export default class ProjectsController {
 					? (artistName.get(project.artistId) ?? null)
 					: null,
 				status: project.status,
-				contactedText: contactedText(project.lastContactedAt, tenant.timezone),
+				contactedText: lastContactText(
+					project.lastContactedAt,
+					tenant.timezone,
+					{
+						channel: project.lastContactChannel,
+						kind: project.lastContactKind,
+					},
+				),
 				noSession: project.status === "booked" && !withSession.has(project.id),
 				proofWaiting: flags.get(project.id)?.proofWaiting ?? false,
 				depositToSettle: flags.get(project.id)?.depositToSettle ?? false,
@@ -173,6 +189,8 @@ export default class ProjectsController {
 			: 0;
 		const live = current && !isExpired(current) ? current : null;
 		const { timezone } = tenant;
+		// The studio's own chat texts, else the defaults (TAT-52).
+		const texts = await this.templates.textsFor(tenant);
 		const today = DateTime.fromISO(todayIn(timezone), { zone: "utc" });
 
 		// What this member may record on each session and the move form's
@@ -253,6 +271,38 @@ export default class ProjectsController {
 				? (bookable[0]?.id ?? null)
 				: null;
 
+		// "Message the client" (TAT-52): one-tap links for a client with a
+		// phone, and the messages this project offers now. The confirmation
+		// and the reminder name the next session still to come.
+		const phone = client?.phone ?? null;
+		const upcoming =
+			scheduled.find(({ startsAt }) => startsAt.toMillis() > now.toMillis()) ??
+			null;
+		const cardMessages = cardKinds({
+			status: project.status,
+			upcomingSession: upcoming !== null,
+			finishedWork: sessions.some(
+				({ status, kind }) => status === "completed" && kind !== "consultation",
+			),
+		});
+		const facts = {
+			clientName: client?.name ?? "",
+			studioName: tenant.name,
+			studioAddress: tenant.address,
+			projectArtistName: artist?.name ?? null,
+			session: upcoming
+				? {
+						whenText: sessionTimeText(
+							upcoming.startsAt,
+							upcoming.endsAt,
+							timezone,
+						),
+						artistName:
+							artists.find(({ id }) => id === upcoming.artistId)?.name ?? null,
+					}
+				: null,
+		};
+
 		return ctx.inertia.render("projects/show", {
 			project: {
 				id: project.id,
@@ -275,8 +325,27 @@ export default class ProjectsController {
 				live &&
 				client?.phone &&
 				(project.status === "quoted" || project.status === "on_hold")
-					? messageProps(live, client.name, client.phone, tenant.name, timezone)
+					? messageProps(
+							live,
+							client.name,
+							client.phone,
+							tenant.name,
+							timezone,
+							texts.quote,
+						)
 					: null,
+			contact: phone ? contactLinks(phone) : null,
+			messages: phone
+				? cardMessages.map((kind) => ({
+						kind,
+						label: MESSAGE_LABELS[kind],
+						...chatMessage(
+							renderMessage(kind, texts[kind], cardValues(kind, facts)),
+							phone,
+						),
+					}))
+				: [],
+			messageKind: phone ? defaultCardKind(project.status, cardMessages) : null,
 			form: {
 				depositPercent: tenant.defaultDepositPercent,
 				defaultValidUntil: today
@@ -336,7 +405,10 @@ export default class ProjectsController {
 						}
 					: null,
 			notes: project.notes,
-			contactedText: contactedText(project.lastContactedAt, timezone),
+			contactedText: lastContactText(project.lastContactedAt, timezone, {
+				channel: project.lastContactChannel,
+				kind: project.lastContactKind,
+			}),
 			assignment:
 				membership.role === "owner"
 					? {
@@ -350,7 +422,7 @@ export default class ProjectsController {
 			// Owners only, while the project waits for its deposit (TAT-65).
 			deposit:
 				membership.role === "owner" && project.status === "deposit_pending"
-					? await this.depositPanel(tenant, project, client)
+					? await this.depositPanel(tenant, project, client, texts.deposit_link)
 					: null,
 			payments: paymentsCard({
 				money,
@@ -375,6 +447,7 @@ export default class ProjectsController {
 		tenant: Tenant,
 		project: TattooProject,
 		client: Pick<Client, "name" | "phone"> | null,
+		depositTemplate: string,
 	) {
 		const day = (at: DateTime) =>
 			formatDay(at.setZone(tenant.timezone).toFormat("yyyy-MM-dd"));
@@ -399,13 +472,16 @@ export default class ProjectsController {
 			message:
 				link && url && client?.phone
 					? chatMessage(
-							depositMessage({
-								clientName: client.name,
-								studioName: tenant.name,
-								dueText: formatMoney(due),
-								referenceCode: link.referenceCode,
-								url,
-							}),
+							depositMessage(
+								{
+									clientName: client.name,
+									studioName: tenant.name,
+									dueText: formatMoney(due),
+									referenceCode: link.referenceCode,
+									url,
+								},
+								depositTemplate,
+							),
 							client.phone,
 						)
 					: null,
@@ -446,22 +522,17 @@ function quoteProps(quote: Quote, timezone: string) {
 	};
 }
 
-/** The chat message for a live quote, and the links that send it. */
+/** The chat message for a live quote, in the studio's text, and the links that send it. */
 function messageProps(
 	quote: Quote,
 	clientName: string,
 	phone: string,
 	studioName: string,
 	timezone: string,
+	template: string,
 ) {
 	return chatMessage(
-		quoteMessage({ clientName, studioName, quote, timezone }),
+		quoteMessage({ clientName, studioName, quote, timezone }, template),
 		phone,
 	);
-}
-
-/** A chat message and the links that send it: WhatsApp prefilled, Viber to paste. */
-function chatMessage(text: string, phone: string) {
-	const links = chatLinks(phone, text);
-	return { text, whatsappUrl: links.whatsapp, viberUrl: links.viber };
 }

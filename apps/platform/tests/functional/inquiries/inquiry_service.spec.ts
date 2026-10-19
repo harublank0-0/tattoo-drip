@@ -10,6 +10,7 @@ import InquiryService, {
 	INQUIRIES_PER_PAGE,
 } from "#modules/inquiries/services/inquiry_service";
 import ImageService from "#modules/media/services/image_service";
+import { NO_VIA } from "#modules/notifications/messages";
 import DepositService from "#modules/payments/services/deposit_service";
 import TattooProject from "#modules/projects/models/tattoo_project";
 import ProjectService from "#modules/projects/services/project_service";
@@ -374,6 +375,61 @@ test.group("InquiryService accept and decline", (group) => {
 				(await projects.projectIdsForInquiries(b, [inquiry.id])).size,
 				0,
 			);
+		});
+	});
+});
+
+test.group("InquiryService contact (TAT-52)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("markContacted records the contact on the inquiry; a deleted one is a 404", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const inquiry = await inquiryIn(tenant);
+			await inquiries.markContacted(tenant, inquiry, {
+				channel: "viber",
+				kind: "inquiry_received",
+			});
+			const live = await Inquiry.findOrFail(inquiry.id);
+			assert.isNotNull(live.lastContactedAt);
+			assert.equal(live.lastContactChannel, "viber");
+			assert.equal(live.lastContactKind, "inquiry_received");
+			assert.equal(live.idea, inquiry.idea);
+
+			const gone = await inquiryIn(tenant);
+			await gone.softDelete();
+			await assert.rejects(
+				() => inquiries.markContacted(tenant, gone, NO_VIA),
+				/Row not found/,
+			);
+		});
+	});
+
+	test("accepting carries the inquiry's last contact to its project", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const inquiry = await inquiryIn(tenant);
+			await inquiries.markContacted(tenant, inquiry, {
+				channel: "whatsapp",
+				kind: "inquiry_received",
+			});
+			const contacted = await Inquiry.findOrFail(inquiry.id);
+
+			const project = await inquiries.accept(tenant, contacted, null);
+
+			const created = await TattooProject.findOrFail(project.id);
+			assert.equal(
+				created.lastContactedAt?.toMillis(),
+				contacted.lastContactedAt?.toMillis(),
+			);
+			assert.equal(created.lastContactChannel, "whatsapp");
+			assert.equal(created.lastContactKind, "inquiry_received");
 		});
 	});
 });

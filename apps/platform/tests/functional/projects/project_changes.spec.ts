@@ -192,6 +192,57 @@ test.group("Project notes, contact and artist", (group) => {
 		assert.isTrue(at !== null && at >= before);
 	});
 
+	test("a chat link records its channel and message; Mark contacted records the time only", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const project = await projectIn(tenant);
+		const send = (body: Record<string, string>) =>
+			client
+				.post(url(project.id, "/contacted"))
+				.form(body)
+				.withCsrfToken()
+				.loginAs(owner)
+				.redirects(0);
+
+		(await send({ channel: "whatsapp", kind: "quote" })).assertFlashMessage(
+			"success",
+			"Marked as contacted.",
+		);
+		let live = await reload(tenant, project);
+		assert.equal(live.lastContactChannel, "whatsapp");
+		assert.equal(live.lastContactKind, "quote");
+
+		await send({});
+		live = await reload(tenant, project);
+		assert.isNotNull(live.lastContactedAt);
+		assert.isNull(live.lastContactChannel);
+		assert.isNull(live.lastContactKind);
+	});
+
+	test("a channel or message the page doesn't send is refused and nothing is recorded", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const project = await projectIn(tenant);
+
+		for (const [field, value] of [
+			["channel", "sms"],
+			["kind", "hello"],
+		] as const) {
+			const response = await client
+				.post(url(project.id, "/contacted"))
+				.form({ [field]: value })
+				.withCsrfToken()
+				.loginAs(owner)
+				.redirects(0);
+			assertValidationError(response, field);
+		}
+		assert.isNull((await reload(tenant, project)).lastContactedAt);
+	});
+
 	test("an owner assigns and removes the artist", async ({
 		client,
 		assert,

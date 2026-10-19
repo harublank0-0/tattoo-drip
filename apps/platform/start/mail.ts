@@ -8,9 +8,11 @@
 |
 */
 
+import logger from "@adonisjs/core/services/logger";
 import mail from "@adonisjs/mail/services/main";
 import type { MailersList } from "@adonisjs/mail/types";
 import SendMailJob from "#jobs/send_mail_job";
+import env from "#start/env";
 
 mail.setMessenger((mailer) => ({
 	queue: (mailMessage, sendConfig) =>
@@ -22,3 +24,10 @@ mail.setMessenger((mailer) => ({
 			sendConfig,
 		}).run(),
 }));
+
+// Said once per process, at boot: alerts still reach the dashboard (TAT-52).
+if (env.get("ALERT_EMAILS") === false) {
+	logger.warn(
+		"Staff alert emails are off (ALERT_EMAILS=false): new inquiries alert the dashboard only.",
+	);
+}

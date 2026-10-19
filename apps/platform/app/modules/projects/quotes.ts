@@ -1,4 +1,9 @@
 import { DateTime } from "luxon";
+import {
+	DEFAULT_TEMPLATES,
+	firstName,
+	renderMessage,
+} from "#modules/notifications/messages";
 import type Quote from "#modules/projects/models/quote";
 import type { ProjectStatus } from "#modules/projects/models/tattoo_project";
 
@@ -134,24 +139,23 @@ export type QuoteMessageInput = {
 };
 
 /**
- * The quote as a chat message to the client, in English. TAT-52 turns the
- * one-tap messages into editable templates.
+ * The quote as a chat message to the client: the studio's own text
+ * (`template`, Settings, Messages; TAT-52), or the default, which is
+ * TAT-64's original message word for word.
  */
-export function quoteMessage({
-	clientName,
-	studioName,
-	quote,
-	timezone,
-}: QuoteMessageInput): string {
-	const firstName = clientName.trim().split(/\s+/)[0];
-	const greeting = firstName ? `Hi ${firstName}` : "Hi";
+export function quoteMessage(
+	{ clientName, studioName, quote, timezone }: QuoteMessageInput,
+	template: string = DEFAULT_TEMPLATES.quote,
+): string {
 	const total = formatMoney(quoteTotal(quote));
-	const price =
-		quote.kind === "fixed" ? total : `${priceText(quote)} ≈ ${total}`;
-	const deposit =
-		quote.depositAmount === 0
-			? "No deposit needed."
-			: `Deposit: ${formatMoney(quote.depositAmount)}.`;
-	const until = formatDay(validUntil(quote.expiresAt, timezone));
-	return `${greeting}, here is your quote from ${studioName}: ${price}. ${deposit} Valid until ${until}. Reply here to confirm.`;
+	return renderMessage("quote", template, {
+		client_name: firstName(clientName),
+		studio_name: studioName,
+		price: quote.kind === "fixed" ? total : `${priceText(quote)} ≈ ${total}`,
+		deposit_note:
+			quote.depositAmount === 0
+				? "No deposit needed."
+				: `Deposit: ${formatMoney(quote.depositAmount)}.`,
+		valid_until: formatDay(validUntil(quote.expiresAt, timezone)),
+	});
 }

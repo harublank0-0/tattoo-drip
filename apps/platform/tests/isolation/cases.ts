@@ -3,6 +3,9 @@ import Artist from "#modules/artists/models/artist";
 import Client from "#modules/clients/models/client";
 import Inquiry from "#modules/inquiries/models/inquiry";
 import ReferenceImage from "#modules/inquiries/models/reference_image";
+import { DEFAULT_TEMPLATES } from "#modules/notifications/messages";
+import MessageTemplate from "#modules/notifications/models/message_template";
+import StaffAlert from "#modules/notifications/models/staff_alert";
 import DepositLink from "#modules/payments/models/deposit_link";
 import DepositOutcome from "#modules/payments/models/deposit_outcome";
 import Payment from "#modules/payments/models/payment";
@@ -49,7 +52,8 @@ export type IsolationCase = {
 		| "session"
 		| "sessionProject"
 		| "newInquiry"
-		| "client";
+		| "client"
+		| "alert";
 	/** Who sends the request. Every settings route is owner-only. */
 	actor: "owner" | "artist";
 	/** A valid body for writes, built for the studio sending it. */
@@ -234,6 +238,27 @@ const tenantSlugRows = (target: Studio) =>
 				.orderBy("slug")
 		).map((row) => row.serialize()),
 	}));
+
+// The studio's own message texts (TAT-52): what saving the messages could
+// change.
+const templateRows = (target: Studio) =>
+	inTenant(target.tenant, async () =>
+		(
+			await MessageTemplate.query()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("kind")
+		).map((row) => row.serialize()),
+	);
+
+// Every member's alerts (TAT-52): what reading or opening one could change.
+const alertRows = (target: Studio) =>
+	inTenant(target.tenant, async () =>
+		(
+			await StaffAlert.query()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("id")
+		).map((alert) => alert.serialize()),
+	);
 
 export const isolationCases: IsolationCase[] = [
 	{
@@ -690,5 +715,56 @@ export const isolationCases: IsolationCase[] = [
 		}),
 		ownStatus: 302,
 		snapshot: sessionRows,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/settings/messages",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: templateRows,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/settings/messages",
+		actor: "owner",
+		// Every default but the quote: A's control stores the quote and drops
+		// its seeded aftercare text.
+		body: () => ({
+			...DEFAULT_TEMPLATES,
+			quote: "Hi {client_name}, your quote: {price}.",
+		}),
+		ownStatus: 302,
+		snapshot: templateRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/inbox/:id/contacted",
+		resource: "newInquiry",
+		actor: "owner",
+		body: () => ({ channel: "whatsapp", kind: "inquiry_received" }),
+		ownStatus: 302,
+		snapshot: inboxRows,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/alerts",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: alertRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/alerts/read",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: alertRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/alerts/:id/open",
+		resource: "alert",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: alertRows,
 	},
 ];

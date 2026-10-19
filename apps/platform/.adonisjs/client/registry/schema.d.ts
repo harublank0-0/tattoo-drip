@@ -247,6 +247,30 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/payment_methods_controller').default['destroy']>>>
     }
   }
+  'tenant.settings.messages': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/settings/messages'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/message_templates_controller').default['show']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/message_templates_controller').default['show']>>>
+    }
+  }
+  'tenant.settings.messages.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/settings/messages'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/notifications/validators/message_templates').messageTemplatesValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/notifications/validators/message_templates').messageTemplatesValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/message_templates_controller').default['update']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/message_templates_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
   'tenant.artists': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/artists'
@@ -365,6 +389,18 @@ export interface Registry {
       query: {}
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/inquiries_controller').default['decline']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inquiries_controller').default['decline']>>>
+    }
+  }
+  'tenant.inbox.contacted.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/inbox/:id/contacted'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/notifications/validators/contact').contactValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/notifications/validators/contact').contactValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/inquiries_controller').default['contacted']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inquiries_controller').default['contacted']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
   'tenant.clients.index': {
@@ -527,12 +563,12 @@ export interface Registry {
     methods: ["POST"]
     pattern: '/t/:tenant/projects/:id/contacted'
     types: {
-      body: {}
+      body: ExtractBody<InferInput<(typeof import('#modules/notifications/validators/contact').contactValidator)>>
       paramsTuple: [ParamValue, ParamValue]
       params: { tenant: ParamValue; id: ParamValue }
-      query: {}
+      query: ExtractQuery<InferInput<(typeof import('#modules/notifications/validators/contact').contactValidator)>>
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/project_changes_controller').default['contacted']>>>
-      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/project_changes_controller').default['contacted']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/project_changes_controller').default['contacted']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
   'tenant.projects.artist.update': {
@@ -677,6 +713,42 @@ export interface Registry {
       query: {}
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/calendar_controller').default['index']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/calendar_controller').default['index']>>>
+    }
+  }
+  'tenant.alerts.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/alerts'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/alerts_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/alerts_controller').default['index']>>>
+    }
+  }
+  'tenant.alerts.read': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/alerts/read'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/alerts_controller').default['readAll']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/alerts_controller').default['readAll']>>>
+    }
+  }
+  'tenant.alerts.open': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/alerts/:id/open'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/alerts_controller').default['open']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/alerts_controller').default['open']>>>
     }
   }
   'dashboard': {

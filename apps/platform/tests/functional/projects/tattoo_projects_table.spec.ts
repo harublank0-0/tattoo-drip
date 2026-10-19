@@ -156,6 +156,48 @@ test.group("tattoo_projects table", (group) => {
 		});
 	});
 
+	test("a last contact's channel and message take listed values and need its time", async ({
+		assert,
+	}) => {
+		const { a, mine } = await twoTenants();
+		const rejects = (over: Record<string, unknown>, message: RegExp) =>
+			assert.rejects(
+				() =>
+					withTransaction((inner) =>
+						insertRow(
+							inner,
+							"tattoo_projects",
+							newProject(a.id, mine.client.id, over),
+						),
+					),
+				message,
+			);
+
+		await withDbContext({ tenantId: a.id }, async (trx) => {
+			await rejects(
+				{ last_contacted_at: new Date(), last_contact_channel: "sms" },
+				/tattoo_projects_last_contact_channel_check/,
+			);
+			await rejects(
+				{ last_contacted_at: new Date(), last_contact_kind: "hello" },
+				/tattoo_projects_last_contact_kind_check/,
+			);
+			await rejects(
+				{ last_contact_kind: "quote" },
+				/tattoo_projects_last_contact_needs_time/,
+			);
+			await insertRow(
+				trx,
+				"tattoo_projects",
+				newProject(a.id, mine.client.id, {
+					last_contacted_at: new Date(),
+					last_contact_channel: "copy",
+					last_contact_kind: "deposit_link",
+				}),
+			);
+		});
+	});
+
 	test("an inquiry becomes at most one live project; deleting the project frees it; projects without an inquiry are unlimited", async ({
 		assert,
 	}) => {

@@ -40,6 +40,9 @@ export interface ApiDefinition {
       deposits: {
         update: typeof routes['tenant.settings.deposits.update']
       }
+      messages: typeof routes['tenant.settings.messages'] & {
+        update: typeof routes['tenant.settings.messages.update']
+      }
     }
     artists: typeof routes['tenant.artists'] & {
       create: typeof routes['tenant.artists.create']
@@ -53,6 +56,9 @@ export interface ApiDefinition {
       show: typeof routes['tenant.inbox.show']
       accept: typeof routes['tenant.inbox.accept']
       decline: typeof routes['tenant.inbox.decline']
+      contacted: {
+        store: typeof routes['tenant.inbox.contacted.store']
+      }
     }
     clients: {
       index: typeof routes['tenant.clients.index']
@@ -111,6 +117,11 @@ export interface ApiDefinition {
     }
     calendar: {
       index: typeof routes['tenant.calendar.index']
+    }
+    alerts: {
+      index: typeof routes['tenant.alerts.index']
+      read: typeof routes['tenant.alerts.read']
+      open: typeof routes['tenant.alerts.open']
     }
   }
   dashboard: typeof routes['dashboard']

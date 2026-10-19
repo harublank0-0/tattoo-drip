@@ -195,6 +195,7 @@ test.group("Tenant routes", (group) => {
 		{ area: "projects", allow: ["owner", "artist"] },
 		{ area: "calendar", allow: ["owner", "artist"] },
 		{ area: "sessions", allow: ["owner", "artist"] },
+		{ area: "alerts", allow: ["owner", "artist"] },
 	]) {
 		test(`every ${area} route runs auth, then the tenant check, then the role check (${allow.join(", ")})`, ({
 			assert,

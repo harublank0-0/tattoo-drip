@@ -1,6 +1,7 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
+import { chatLinks } from "#modules/clients/contact_links";
 import Inquiry from "#modules/inquiries/models/inquiry";
 import TattooProject from "#modules/projects/models/tattoo_project";
 import {
@@ -392,5 +393,118 @@ test.group("Deciding an inquiry", (group) => {
 			response.assertStatus(404);
 		}
 		assert.equal(await statusOf(tenant, inquiry.id), "new");
+	});
+});
+
+test.group("Inbox contact (TAT-52)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("the inquiry's chat links record the contact; artists get a 404", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const artist = await artistIn(tenant);
+		const inquiry = await inTenant(tenant, async () =>
+			makeInquiry(tenant, await makeClient(tenant)),
+		);
+		const send = (user: typeof owner) =>
+			client
+				.post(inbox(`/${inquiry.id}/contacted`))
+				.form({ channel: "whatsapp", kind: "inquiry_received" })
+				.withCsrfToken()
+				.loginAs(user)
+				.redirects(0);
+		const reload = () => inTenant(tenant, () => Inquiry.findOrFail(inquiry.id));
+
+		(await send(artist)).assertStatus(404);
+		assert.isNull((await reload()).lastContactedAt);
+
+		const response = await send(owner);
+		response.assertStatus(302);
+		response.assertHeader("location", inbox(`/${inquiry.id}`));
+		response.assertFlashMessage("success", "Marked as contacted.");
+		const live = await reload();
+		assert.equal(live.lastContactChannel, "whatsapp");
+		assert.equal(live.lastContactKind, "inquiry_received");
+	});
+
+	test("a new inquiry's page offers the received message to the client's phone", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const inquiry = await inTenant(tenant, async () =>
+			makeInquiry(
+				tenant,
+				await makeClient(tenant, { name: "Sita Rai", phone: "+9779812345678" }),
+			),
+		);
+
+		const props = (
+			await client
+				.get(inbox(`/${inquiry.id}`))
+				.withInertia()
+				.loginAs(owner)
+		).inertiaProps;
+
+		const text =
+			"Hi Sita, thank you for your tattoo inquiry to Black Needle. We have your idea and will reply here soon.";
+		assert.deepEqual(props.message, {
+			kind: "inquiry_received",
+			label: "Inquiry received",
+			text,
+			whatsappUrl: chatLinks("+9779812345678", text).whatsapp,
+			viberUrl: "viber://chat?number=%2B9779812345678",
+		});
+		assert.deepEqual(props.contact, {
+			whatsappUrl: "https://wa.me/9779812345678",
+			viberUrl: "viber://chat?number=%2B9779812345678",
+			callUrl: "tel:+9779812345678",
+		});
+		assert.equal(props.contactedText, "never contacted");
+	});
+
+	test("the inbox shows the last contact; a decided inquiry keeps only the plain links", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const { fresh, quiet, declined } = await inTenant(tenant, async () => {
+			const customer = await makeClient(tenant);
+			return {
+				fresh: await makeInquiry(tenant, customer),
+				quiet: await makeInquiry(tenant, customer),
+				declined: await makeInquiry(tenant, customer, {
+					status: "declined",
+					decidedAt: DateTime.utc(),
+				}),
+			};
+		});
+		await client
+			.post(inbox(`/${fresh.id}/contacted`))
+			.form({ channel: "whatsapp", kind: "inquiry_received" })
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		const rows = (await client.get(inbox()).withInertia().loginAs(owner))
+			.inertiaProps.inquiries;
+		const row = (id: string) =>
+			rows.find((candidate: { id: string }) => candidate.id === id);
+		assert.equal(
+			row(fresh.id).contactedText,
+			"contacted today on WhatsApp (Inquiry received)",
+		);
+		assert.isNull(row(quiet.id).contactedText);
+
+		const shown = (
+			await client
+				.get(inbox(`/${declined.id}`))
+				.withInertia()
+				.loginAs(owner)
+		).inertiaProps;
+		assert.isNull(shown.message);
+		assert.isNotNull(shown.contact);
 	});
 });

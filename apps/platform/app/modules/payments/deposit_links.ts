@@ -5,6 +5,11 @@ import {
 	randomBytes,
 	randomInt,
 } from "node:crypto";
+import {
+	DEFAULT_TEMPLATES,
+	firstName,
+	renderMessage,
+} from "#modules/notifications/messages";
 import type { DepositLinkRuleReason } from "#modules/payments/errors";
 import env from "#start/env";
 
@@ -108,20 +113,22 @@ export type DepositMessageInput = {
 };
 
 /**
- * The deposit link as a chat message to the client, in English, the link
- * last and on its own line so every chat app makes it tappable. TAT-52
- * turns the one-tap messages into editable templates.
+ * The deposit link as a chat message to the client: the studio's own text
+ * (`template`, which must keep {deposit_link}; TAT-52), or the default,
+ * TAT-65's original message with the link last and on its own line so
+ * every chat app makes it tappable.
  */
-export function depositMessage({
-	clientName,
-	studioName,
-	dueText,
-	referenceCode,
-	url,
-}: DepositMessageInput): string {
-	const firstName = clientName.trim().split(/\s+/)[0];
-	const greeting = firstName ? `Hi ${firstName}` : "Hi";
-	return `${greeting}, please pay your deposit of ${dueText} to ${studioName}. Write ${referenceCode} in the payment remark, then send a screenshot of the payment on this page:\n${url}`;
+export function depositMessage(
+	{ clientName, studioName, dueText, referenceCode, url }: DepositMessageInput,
+	template: string = DEFAULT_TEMPLATES.deposit_link,
+): string {
+	return renderMessage("deposit_link", template, {
+		client_name: firstName(clientName),
+		studio_name: studioName,
+		amount: dueText,
+		reference_code: referenceCode,
+		deposit_link: url,
+	});
 }
 
 /** Why an owner can't make a deposit link now: the project page and its flash say it. */

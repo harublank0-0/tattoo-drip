@@ -3,11 +3,13 @@ import { router } from "@inertiajs/react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { urlFor } from "~/client";
+import ChatMessage from "~/components/chat_message";
 import { SOURCE_LABELS } from "~/components/inquiries";
+import MessageCard from "~/components/message_card";
+import type { ContactChannelName, ContactVia } from "~/components/messages";
 import Page from "~/components/page";
 import PaymentsCard from "~/components/payments_card";
 import {
-	type ChatMessageProps,
 	formatRupees,
 	type ManualMoveName,
 	MOVE_LABELS,
@@ -67,6 +69,9 @@ export default function ProjectShow({
 	canSetPrice,
 	payments,
 	message,
+	contact,
+	messages,
+	messageKind,
 	form,
 	moves,
 	depositHeldText,
@@ -85,13 +90,13 @@ export default function ProjectShow({
 }: ProjectPageProps) {
 	const tenant = useTenant();
 	const params = { tenant: tenant.slug, id: project.id };
-	// The chat links and "Copy message" record the contact in the background.
-	const markContacted = () =>
-		router.post(
-			urlFor("tenant.projects.contacted.store", params),
-			{},
-			{ preserveScroll: true, preserveState: true },
-		);
+	// Every chat link, Call and "Copy message" record the contact in the
+	// background (TAT-46), with the channel and the message (TAT-52).
+	const markContacted = (via: ContactVia = {}) =>
+		router.post(urlFor("tenant.projects.contacted.store", params), via, {
+			preserveScroll: true,
+			preserveState: true,
+		});
 
 	return (
 		<Page
@@ -124,7 +129,7 @@ export default function ProjectShow({
 							{STATUS_LABELS[project.status] ?? project.status}
 						</Badge>
 						<p className="text-sm whitespace-pre-line">{project.brief}</p>
-						<ContactLine text={contactedText} onMark={markContacted} />
+						<ContactLine text={contactedText} onMark={() => markContacted()} />
 						{moves.length > 0 && (
 							<MoveButtons
 								projectId={project.id}
@@ -145,6 +150,13 @@ export default function ProjectShow({
 						)}
 					</CardContent>
 				</Card>
+
+				<MessageCard
+					contact={contact}
+					messages={messages}
+					initialKind={messageKind}
+					onContact={markContacted}
+				/>
 
 				<SessionsCard
 					projectId={project.id}
@@ -197,7 +209,10 @@ export default function ProjectShow({
 							<p className="text-sm text-muted-foreground">No quote yet.</p>
 						)}
 						{message && (
-							<ChatMessage message={message} onSent={markContacted} />
+							<ChatMessage
+								message={message}
+								onSent={(channel) => markContacted({ channel, kind: "quote" })}
+							/>
 						)}
 						{canAccept && quote && (
 							<AcceptQuote projectId={project.id} quoteId={quote.id} />
@@ -209,7 +224,9 @@ export default function ProjectShow({
 					<DepositCard
 						projectId={project.id}
 						deposit={deposit}
-						onSent={markContacted}
+						onSent={(channel) =>
+							markContacted({ channel, kind: "deposit_link" })
+						}
 					/>
 				)}
 
@@ -310,55 +327,6 @@ function QuoteSummary({
 }
 
 /**
- * The quote as a chat message: WhatsApp opens with it filled in; Viber's
- * link can't carry text, so staff copy it and paste.
- */
-function ChatMessage({
-	message,
-	onSent,
-}: {
-	message: ChatMessageProps;
-	onSent: () => void;
-}) {
-	const copy = () => {
-		navigator.clipboard.writeText(message.text).then(
-			() => {
-				toast.success("Message copied.");
-				onSent();
-			},
-			() => toast.error("Couldn't copy: select the text instead."),
-		);
-	};
-
-	return (
-		<div className="flex flex-col gap-3 rounded-md border p-3">
-			<p className="text-sm whitespace-pre-line">{message.text}</p>
-			<div className="flex flex-wrap gap-2">
-				<a
-					href={message.whatsappUrl}
-					target="_blank"
-					rel="noreferrer"
-					onClick={onSent}
-					className={buttonVariants({ variant: "outline", size: "sm" })}
-				>
-					Send on WhatsApp
-				</a>
-				<a
-					href={message.viberUrl}
-					onClick={onSent}
-					className={buttonVariants({ variant: "outline", size: "sm" })}
-				>
-					Open Viber chat
-				</a>
-				<Button type="button" variant="ghost" size="sm" onClick={copy}>
-					Copy message
-				</Button>
-			</div>
-		</div>
-	);
-}
-
-/**
  * The deposit link, for owners while the project waits for its deposit
  * (TAT-65): copy it or send it in a chat, read the reference code, replace
  * a leaked or expired link, and see when a screenshot came.
@@ -370,7 +338,7 @@ function DepositCard({
 }: {
 	projectId: string;
 	deposit: NonNullable<ProjectPageProps["deposit"]>;
-	onSent: () => void;
+	onSent: (channel: ContactChannelName) => void;
 }) {
 	const tenant = useTenant();
 	const [busy, setBusy] = useState(false);

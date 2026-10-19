@@ -4,6 +4,7 @@ import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
 import { DateTime } from "luxon";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
+import { type ContactVia, NO_VIA } from "#modules/notifications/messages";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import DepositService from "#modules/payments/services/deposit_service";
 import { ProjectRuleError, QuoteRuleError } from "#modules/projects/errors";
@@ -189,7 +190,8 @@ export default class ProjectService {
 	 * A `reviewing` project for an accepted inquiry. InquiryService.accept
 	 * calls it inside its own transaction, holding the inquiry's lock; the
 	 * artist was already checked there. The project is new, so there is
-	 * nothing to lock.
+	 * nothing to lock. It starts from the inquiry's last contact (TAT-52), so
+	 * the "received" message staff sent shows on the project too.
 	 */
 	async createFromInquiry(
 		tenant: TenantRef,
@@ -198,6 +200,7 @@ export default class ProjectService {
 			inquiryId: string;
 			brief: string;
 			artistId: string | null;
+			lastContact?: { at: DateTime | null } & ContactVia;
 		},
 	): Promise<TattooProject> {
 		return TattooProject.create({
@@ -207,6 +210,9 @@ export default class ProjectService {
 			brief: input.brief,
 			artistId: input.artistId,
 			status: "reviewing",
+			lastContactedAt: input.lastContact?.at ?? null,
+			lastContactChannel: input.lastContact?.channel ?? null,
+			lastContactKind: input.lastContact?.kind ?? null,
 		});
 	}
 
@@ -515,17 +521,21 @@ export default class ProjectService {
 
 	/**
 	 * Records that the client was contacted now: the chat links call it as
-	 * they open, and staff tap "Mark contacted" after a call or a visit.
+	 * they open, with the channel and the message (TAT-52), and staff tap
+	 * "Mark contacted" after a call or a visit (`NO_VIA`).
 	 */
 	async markContacted(
 		tenant: TenantRef,
 		member: Member,
 		project: TattooProject,
+		via: ContactVia = NO_VIA,
 	): Promise<void> {
 		assertProjectOf(tenant, project);
 		await withTransaction(async (trx) => {
 			const live = await this.lockFor(trx, tenant, member, project.id);
 			live.lastContactedAt = DateTime.now();
+			live.lastContactChannel = via.channel;
+			live.lastContactKind = via.kind;
 			await live.save();
 		});
 	}

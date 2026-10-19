@@ -31,6 +31,7 @@ export default function NavLink({
 	params,
 	exact = false,
 	also,
+	label,
 	className,
 	children,
 }: {
@@ -39,6 +40,8 @@ export default function NavLink({
 	exact?: boolean;
 	/** Other path prefixes that also make the link current. */
 	also?: string[];
+	/** The link's accessible name when its content isn't enough (the bell, TAT-52). */
+	label?: string;
 	className?: string;
 	children: ReactNode;
 }) {
@@ -51,6 +54,7 @@ export default function NavLink({
 			href={href}
 			className={className}
 			aria-current={isActive ? "page" : undefined}
+			aria-label={label}
 		>
 			{children}
 		</Link>

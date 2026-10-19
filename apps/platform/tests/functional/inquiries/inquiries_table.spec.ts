@@ -237,6 +237,74 @@ test.group("inquiries table", (group) => {
 		});
 	});
 
+	test("the last contact is free to change; everything submitted stays frozen", async ({
+		assert,
+	}) => {
+		const { a, clientA } = await twoTenants();
+
+		await withDbContext({ tenantId: a.id }, async (trx) => {
+			const id = idOf(
+				await insertRow(trx, "inquiries", newInquiry(a.id, clientA.id)),
+			);
+
+			await updateRow(trx, "inquiries", id, {
+				last_contacted_at: new Date(),
+				last_contact_channel: "whatsapp",
+				last_contact_kind: "inquiry_received",
+			});
+			await updateRow(trx, "inquiries", id, {
+				last_contacted_at: new Date(),
+				last_contact_channel: null,
+				last_contact_kind: null,
+			});
+			const { rows } = await trx.rawQuery(
+				"select last_contacted_at, last_contact_channel from inquiries where id = ?",
+				[id],
+			);
+			assert.isNotNull(rows[0].last_contacted_at);
+			assert.isNull(rows[0].last_contact_channel);
+			await assert.rejects(
+				() =>
+					withTransaction((inner) =>
+						updateRow(inner, "inquiries", id, {
+							last_contacted_at: new Date(),
+							idea: "Another idea",
+						}),
+					),
+				/inquiries_guard_update: idea cannot change/,
+			);
+		});
+	});
+
+	test("a last contact's channel and message take listed values and need its time", async ({
+		assert,
+	}) => {
+		const { a, clientA } = await twoTenants();
+		const rejects = (over: Record<string, unknown>, message: RegExp) =>
+			assert.rejects(
+				() =>
+					withTransaction((inner) =>
+						insertRow(inner, "inquiries", newInquiry(a.id, clientA.id, over)),
+					),
+				message,
+			);
+
+		await withDbContext({ tenantId: a.id }, async () => {
+			await rejects(
+				{ last_contacted_at: new Date(), last_contact_channel: "sms" },
+				/inquiries_last_contact_channel_check/,
+			);
+			await rejects(
+				{ last_contacted_at: new Date(), last_contact_kind: "hello" },
+				/inquiries_last_contact_kind_check/,
+			);
+			await rejects(
+				{ last_contact_channel: "viber" },
+				/inquiries_last_contact_needs_time/,
+			);
+		});
+	});
+
 	test("the contact snapshot and free text can be scrubbed only in the update that first sets anonymized_at, which then never changes, and they are frozen afterwards", async ({
 		assert,
 	}) => {

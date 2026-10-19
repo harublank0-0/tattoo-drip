@@ -126,6 +126,18 @@ const routes = {
     tokens: [{"old":"/t/:tenant/settings/payments/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/payments/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/payments/:id","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/payments/:id","type":0,"val":"payments","end":""},{"old":"/t/:tenant/settings/payments/:id","type":1,"val":"id","end":""}],
     types: placeholder as Registry['tenant.settings.payments.destroy']['types'],
   },
+  'tenant.settings.messages': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/settings/messages',
+    tokens: [{"old":"/t/:tenant/settings/messages","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/messages","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/messages","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/messages","type":0,"val":"messages","end":""}],
+    types: placeholder as Registry['tenant.settings.messages']['types'],
+  },
+  'tenant.settings.messages.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/settings/messages',
+    tokens: [{"old":"/t/:tenant/settings/messages","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/messages","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/messages","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/messages","type":0,"val":"messages","end":""}],
+    types: placeholder as Registry['tenant.settings.messages.update']['types'],
+  },
   'tenant.artists': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/artists',
@@ -185,6 +197,12 @@ const routes = {
     pattern: '/t/:tenant/inbox/:id/decline',
     tokens: [{"old":"/t/:tenant/inbox/:id/decline","type":0,"val":"t","end":""},{"old":"/t/:tenant/inbox/:id/decline","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inbox/:id/decline","type":0,"val":"inbox","end":""},{"old":"/t/:tenant/inbox/:id/decline","type":1,"val":"id","end":""},{"old":"/t/:tenant/inbox/:id/decline","type":0,"val":"decline","end":""}],
     types: placeholder as Registry['tenant.inbox.decline']['types'],
+  },
+  'tenant.inbox.contacted.store': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/inbox/:id/contacted',
+    tokens: [{"old":"/t/:tenant/inbox/:id/contacted","type":0,"val":"t","end":""},{"old":"/t/:tenant/inbox/:id/contacted","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inbox/:id/contacted","type":0,"val":"inbox","end":""},{"old":"/t/:tenant/inbox/:id/contacted","type":1,"val":"id","end":""},{"old":"/t/:tenant/inbox/:id/contacted","type":0,"val":"contacted","end":""}],
+    types: placeholder as Registry['tenant.inbox.contacted.store']['types'],
   },
   'tenant.clients.index': {
     methods: ["GET","HEAD"],
@@ -341,6 +359,24 @@ const routes = {
     pattern: '/t/:tenant/calendar',
     tokens: [{"old":"/t/:tenant/calendar","type":0,"val":"t","end":""},{"old":"/t/:tenant/calendar","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/calendar","type":0,"val":"calendar","end":""}],
     types: placeholder as Registry['tenant.calendar.index']['types'],
+  },
+  'tenant.alerts.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/alerts',
+    tokens: [{"old":"/t/:tenant/alerts","type":0,"val":"t","end":""},{"old":"/t/:tenant/alerts","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/alerts","type":0,"val":"alerts","end":""}],
+    types: placeholder as Registry['tenant.alerts.index']['types'],
+  },
+  'tenant.alerts.read': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/alerts/read',
+    tokens: [{"old":"/t/:tenant/alerts/read","type":0,"val":"t","end":""},{"old":"/t/:tenant/alerts/read","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/alerts/read","type":0,"val":"alerts","end":""},{"old":"/t/:tenant/alerts/read","type":0,"val":"read","end":""}],
+    types: placeholder as Registry['tenant.alerts.read']['types'],
+  },
+  'tenant.alerts.open': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/alerts/:id/open',
+    tokens: [{"old":"/t/:tenant/alerts/:id/open","type":0,"val":"t","end":""},{"old":"/t/:tenant/alerts/:id/open","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/alerts/:id/open","type":0,"val":"alerts","end":""},{"old":"/t/:tenant/alerts/:id/open","type":1,"val":"id","end":""},{"old":"/t/:tenant/alerts/:id/open","type":0,"val":"open","end":""}],
+    types: placeholder as Registry['tenant.alerts.open']['types'],
   },
   'dashboard': {
     methods: ["GET","HEAD"],

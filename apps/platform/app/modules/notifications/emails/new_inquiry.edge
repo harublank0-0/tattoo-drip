@@ -1,0 +1,13 @@
+@email.layout({ title: 'New inquiry', preheader: 'A new tattoo inquiry is waiting.' })
+  <p style="margin: 0 0 16px;">Hi {{ recipientName || 'there' }},</p>
+  <p style="margin: 0 0 16px;">{{ intro }}</p>
+  <p style="margin: 0 0 16px; padding: 12px 16px; border-left: 3px solid #e4e4e7; color: #3f3f46;">{{ excerpt }}</p>
+  @if(url)
+    @!email.button({ href: url, text: 'Open the inquiry' })
+  @else
+    <p style="margin: 0 0 16px;">An owner of {{ studioName }} will review it in the inbox.</p>
+  @end
+  <p style="margin: 0; font-size: 14px; line-height: 20px; color: #71717a;">
+    You get these emails as a member of {{ studioName }} on Tattoo Drip.
+  </p>
+@end

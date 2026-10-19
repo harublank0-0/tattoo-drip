@@ -161,4 +161,14 @@ test.group("depositMessage", () => {
 			/^Hi, please pay/,
 		);
 	});
+
+	test("a studio's own text, with the link exactly as given", ({ assert }) => {
+		assert.equal(
+			depositMessage(
+				input,
+				"{client_name}: {amount} to {studio_name}, code {reference_code}. {deposit_link}",
+			),
+			`Sita: NPR 3,000 to Black Needle, code 7K3M9Q. https://black-needle.tattoodrip.app/deposit#${TOKEN}`,
+		);
+	});
 });

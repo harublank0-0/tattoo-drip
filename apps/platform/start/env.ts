@@ -67,6 +67,9 @@ const env = await Env.create(new URL("../", import.meta.url), {
 	SMTP_PORT: Env.schema.number(),
 	SMTP_USERNAME: Env.schema.string.optional(),
 	SMTP_PASSWORD: Env.schema.string.optional(),
+	// Staff alert emails (TAT-52): unset or true sends them; false keeps the
+	// alerts in the dashboard only (until the sending domain exists, TAT-20).
+	ALERT_EMAILS: Env.schema.boolean.optional(),
 });
 
 // In production the dashboard's origin is https and off the studio pages'

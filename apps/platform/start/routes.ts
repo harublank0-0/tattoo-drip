@@ -90,6 +90,14 @@ router
 					.delete("payments/:id", [controllers.PaymentMethods, "destroy"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.settings.payments.destroy");
+				// The studio's chat messages (TAT-52). The kind is a body field
+				// per message, never a path segment.
+				router
+					.get("messages", [controllers.MessageTemplates, "show"])
+					.as("tenant.settings.messages");
+				router
+					.put("messages", [controllers.MessageTemplates, "update"])
+					.as("tenant.settings.messages.update");
 			})
 			.prefix("/settings")
 			.use(middleware.role({ allow: ["owner"] }));
@@ -146,6 +154,11 @@ router
 					.post(":id/decline", [controllers.Inquiries, "decline"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.inbox.decline");
+				// The inquiry page's chat links record the contact (TAT-52).
+				router
+					.post(":id/contacted", [controllers.Inquiries, "contacted"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.inbox.contacted.store");
 			})
 			.prefix("/inbox")
 			.use(middleware.role({ allow: ["owner"] }));
@@ -310,6 +323,27 @@ router
 					.as("tenant.calendar.index");
 			})
 			.prefix("/calendar")
+			.use(middleware.role({ allow: ["owner", "artist"] }));
+
+		/**
+		 * Each member's own alerts (TAT-52): owners and artists; AlertService
+		 * scopes every read and write to the member. Every alerts route goes
+		 * in this group (a test checks).
+		 */
+		router
+			.group(() => {
+				router
+					.get("/", [controllers.Alerts, "index"])
+					.as("tenant.alerts.index");
+				router
+					.post("read", [controllers.Alerts, "readAll"])
+					.as("tenant.alerts.read");
+				router
+					.post(":id/open", [controllers.Alerts, "open"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.alerts.open");
+			})
+			.prefix("/alerts")
 			.use(middleware.role({ allow: ["owner", "artist"] }));
 	})
 	.prefix("/t/:tenant")

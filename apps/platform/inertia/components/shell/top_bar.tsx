@@ -1,4 +1,5 @@
 import AccountMenu from "~/components/shell/account_menu";
+import AlertsLink from "~/components/shell/alerts_link";
 import TenantSwitcher from "~/components/tenant_switcher";
 
 /** The phone top bar (below 1024px): the studio, and the account menu. */
@@ -9,7 +10,10 @@ export default function TopBar() {
 				<div className="min-w-0">
 					<TenantSwitcher />
 				</div>
-				<AccountMenu />
+				<div className="flex items-center gap-1">
+					<AlertsLink variant="icon" />
+					<AccountMenu />
+				</div>
 			</div>
 		</header>
 	);

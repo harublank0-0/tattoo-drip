@@ -7,6 +7,7 @@ import ArtistService from "#modules/artists/services/artist_service";
 import { InquiryRuleError } from "#modules/inquiries/errors";
 import Inquiry from "#modules/inquiries/models/inquiry";
 import ReferenceImage from "#modules/inquiries/models/reference_image";
+import type { ContactVia } from "#modules/notifications/messages";
 import type TattooProject from "#modules/projects/models/tattoo_project";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ProjectService from "#modules/projects/services/project_service";
@@ -198,6 +199,11 @@ export default class InquiryService {
 				inquiryId: live.id,
 				brief: live.idea,
 				artistId,
+				lastContact: {
+					at: live.lastContactedAt,
+					channel: live.lastContactChannel,
+					kind: live.lastContactKind,
+				},
 			});
 			// The soft-delete scope is a fetch hook, which an update query
 			// skips: leave deleted images out by hand.
@@ -218,6 +224,28 @@ export default class InquiryService {
 			const live = await lockInquiry(trx, tenant, inquiry.id);
 			if (live.status !== "new") throw new InquiryRuleError("already_decided");
 			await decide(live, "declined");
+		});
+	}
+
+	/**
+	 * Records that the client was contacted about this inquiry now (TAT-52):
+	 * the inquiry page's chat links, with the channel and the message. These
+	 * three columns are the only ones besides the decision that the guard
+	 * trigger lets change. Any status (a decided inquiry's plain links record
+	 * too). A deleted or another tenant's inquiry is E_ROW_NOT_FOUND.
+	 */
+	async markContacted(
+		tenant: TenantRef,
+		inquiry: Inquiry,
+		via: ContactVia,
+	): Promise<void> {
+		assertInquiryOf(tenant, inquiry);
+		await withTransaction(async (trx) => {
+			const live = await lockInquiry(trx, tenant, inquiry.id);
+			live.lastContactedAt = DateTime.now();
+			live.lastContactChannel = via.channel;
+			live.lastContactKind = via.kind;
+			await live.save();
 		});
 	}
 

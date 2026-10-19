@@ -95,7 +95,7 @@ Isolation has several layers:
 1. The studio page maps `blackneedle.platform.com` to the `blackneedle` slug and loads the profile and artists through the SDK.
 2. The browser sends the inquiry and reference images **directly to the API** as one multipart request, with the bot-challenge token in a header. Going direct avoids storefront body-size limits, lets rate limits see the real IP, and leaves no orphaned uploads. The studio page first re-encodes the photos as JPEG in the browser (at most 1600 px), so uploads stay small on slow connections and no EXIF or GPS data leaves the phone.
 3. Before it reads the multipart body, the API counts the address, checks the challenge and counts the studio; then it refuses a filled honeypot, validates, counts the phone and processes the images. The Inquiries module matches or creates the client by phone and saves the inquiry as `new`.
-4. A job alerts the studio's staff by email and in the app (queued with the inquiry since TAT-51; the alerts themselves are TAT-52).
+4. A job, queued with the inquiry, alerts the studio's owners and the artist the client asked for, once each, by email and in the dashboard (TAT-52).
 
 **Deposit (customer → studio)**
 1. Staff accept the inquiry, which creates a project, and send a quote through a one-tap WhatsApp or Viber message; the project moves to `quoted`. When the client agrees, staff mark the quote accepted: the project moves to `deposit_pending`, and an owner sends the deposit page link the same way (`https://<studio>/deposit#<token>`, 30 days). A quote that expires first cancels the project.

@@ -12,3 +12,4 @@ import app from "@adonisjs/core/services/app";
 import edge from "edge.js";
 
 edge.mount("identity", app.makePath("app/modules/identity"));
+edge.mount("notifications", app.makePath("app/modules/notifications"));
