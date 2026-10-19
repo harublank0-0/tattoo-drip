@@ -100,7 +100,14 @@ const EXPECTED_FROM: Record<ManualMove, ProjectStatus[]> = {
 	hold: ["quoted"],
 	resume: ["on_hold"],
 	decline: ["reviewing"],
-	withdraw: ["reviewing", "quoted", "on_hold", "deposit_pending"],
+	withdraw: [
+		"reviewing",
+		"quoted",
+		"on_hold",
+		"deposit_pending",
+		"booked",
+		"in_progress",
+	],
 };
 const EXPECTED_TO: Record<ManualMove, ProjectStatus> = {
 	hold: "on_hold",
@@ -306,7 +313,7 @@ test.group("ProjectService.expireQuote", (group) => {
 			const paid = await expiredQuote(tenant, "deposit_pending");
 			await makePayment(tenant, paid.project, {
 				status: "verified",
-				verifiedAt: DateTime.utc(),
+				verifiedAt: paid.quote.expiresAt.minus({ hours: 1 }),
 			});
 			assert.isFalse(
 				await projects.expireQuote(tenant, paid.project.id, paid.quote.id),
@@ -332,7 +339,7 @@ test.group("ProjectService.expireQuote", (group) => {
 				const { project, quote } = await expiredQuote(tenant, status);
 				await makePayment(tenant, project, {
 					status: "verified",
-					verifiedAt: DateTime.utc(),
+					verifiedAt: quote.expiresAt.minus({ hours: 1 }),
 				});
 				assert.isFalse(
 					await projects.expireQuote(tenant, project.id, quote.id),
@@ -351,6 +358,142 @@ test.group("ProjectService.expireQuote", (group) => {
 		await inTenant(tenant, async () => {
 			const { project, quote } = await expiredQuote(tenant, "quoted", 0);
 			assert.isTrue(await projects.expireQuote(tenant, project.id, quote.id));
+			assert.equal(await statusOf(project), "cancelled");
+		});
+	});
+
+	test("spares a project while a deposit screenshot waits, on every run", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const { project, quote } = await expiredQuote(tenant, "deposit_pending");
+			await makePayment(tenant, project);
+
+			assert.isFalse(await projects.expireQuote(tenant, project.id, quote.id));
+			assert.isFalse(await projects.expireQuote(tenant, project.id, quote.id));
+			assert.equal(await statusOf(project), "deposit_pending");
+		});
+	});
+
+	test("spares it once the studio rejects the screenshot after the expiry; an earlier rejection still cancels", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const late = await expiredQuote(tenant, "deposit_pending");
+			await makePayment(tenant, late.project, {
+				status: "rejected",
+				verifiedAt: DateTime.utc(),
+			});
+			const early = await expiredQuote(tenant, "deposit_pending");
+			await makePayment(tenant, early.project, {
+				status: "rejected",
+				verifiedAt: early.quote.expiresAt.minus({ hours: 1 }),
+			});
+
+			assert.isFalse(
+				await projects.expireQuote(tenant, late.project.id, late.quote.id),
+			);
+			assert.equal(await statusOf(late.project), "deposit_pending");
+			assert.isTrue(
+				await projects.expireQuote(tenant, early.project.id, early.quote.id),
+			);
+			assert.equal(await statusOf(early.project), "cancelled");
+		});
+	});
+
+	test("a deposit reversed after the expiry spares a deposit_pending or quoted project; one reversed before doesn't", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const reverse = async (project: TattooProject, at: DateTime) => {
+				const deposit = await makePayment(tenant, project, {
+					status: "verified",
+					verifiedAt: at.minus({ hours: 1 }),
+				});
+				await makePayment(tenant, project, {
+					kind: "correction",
+					amount: -300_000,
+					correctsPaymentId: deposit.id,
+					status: "verified",
+					verifiedAt: at,
+				});
+			};
+			const pending = await expiredQuote(tenant, "deposit_pending");
+			await reverse(pending.project, DateTime.utc());
+			const revised = await expiredQuote(tenant, "quoted");
+			await reverse(revised.project, DateTime.utc());
+			const early = await expiredQuote(tenant, "deposit_pending");
+			await reverse(early.project, early.quote.expiresAt.minus({ minutes: 5 }));
+
+			for (const { project, quote } of [pending, revised]) {
+				assert.isFalse(
+					await projects.expireQuote(tenant, project.id, quote.id),
+				);
+				assert.notEqual(await statusOf(project), "cancelled");
+			}
+			assert.isTrue(
+				await projects.expireQuote(tenant, early.project.id, early.quote.id),
+			);
+		});
+	});
+
+	test("a part of the deposit verified or recorded after the expiry spares a deposit_pending project; one taken before it still cancels", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const partial = (project: TattooProject, at: DateTime) =>
+				makePayment(tenant, project, {
+					amount: 100_000,
+					status: "verified",
+					verifiedAt: at,
+				});
+			const late = await expiredQuote(tenant, "deposit_pending");
+			await partial(late.project, DateTime.utc());
+			const early = await expiredQuote(tenant, "deposit_pending");
+			await partial(early.project, early.quote.expiresAt.minus({ hours: 1 }));
+
+			assert.isFalse(
+				await projects.expireQuote(tenant, late.project.id, late.quote.id),
+			);
+			assert.isFalse(
+				await projects.expireQuote(tenant, late.project.id, late.quote.id),
+				"and on every later run",
+			);
+			assert.equal(await statusOf(late.project), "deposit_pending");
+			assert.isTrue(
+				await projects.expireQuote(tenant, early.project.id, early.quote.id),
+			);
+			assert.equal(await statusOf(early.project), "cancelled");
+		});
+	});
+
+	test("after a late decision, a revision's own expiry cancels as usual", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const { project } = await expiredQuote(tenant, "deposit_pending");
+			// Rejected 50 minutes ago: after v1 expired (an hour ago), before
+			// v2 expired (10 minutes ago).
+			await makePayment(tenant, project, {
+				status: "rejected",
+				verifiedAt: DateTime.utc().minus({ minutes: 50 }),
+			});
+			const v2 = await makeQuote(tenant, project, {
+				version: 2,
+				expiresAt: DateTime.utc().minus({ minutes: 10 }),
+			});
+
+			assert.isTrue(await projects.expireQuote(tenant, project.id, v2.id));
 			assert.equal(await statusOf(project), "cancelled");
 		});
 	});
@@ -832,6 +975,99 @@ test.group("ProjectService.acceptQuote", (group) => {
 	});
 });
 
+test.group("ProjectService.setPrice", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("a booked project without a quote gets version 1: fixed, no deposit, status unchanged, no job", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+		const jobsBefore = await queuedJobs();
+
+		await inTenant(tenant, async () => {
+			for (const status of [
+				"booked",
+				"in_progress",
+				"completed",
+				"healing_check",
+			] as const) {
+				const project = await makeProject(tenant, await makeClient(tenant), {
+					status,
+				});
+				const quote = await projects.setPrice(tenant, OWNER, project, 800_000);
+				assert.deepEqual(
+					[quote.version, quote.kind, quote.fixedPrice, quote.depositAmount],
+					[1, "fixed", 800_000, 0],
+					status,
+				);
+				assert.equal(await statusOf(project), status);
+			}
+		});
+		assert.equal(await queuedJobs(), jobsBefore, "no ExpireQuoteJob");
+	});
+
+	test("a project that has a quote, or isn't booked yet, is refused", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const client = await makeClient(tenant);
+			const priced = await makeProject(tenant, client, { status: "booked" });
+			await makeQuote(tenant, priced);
+			const early = await makeProject(tenant, client, { status: "quoted" });
+			const closed = await makeProject(tenant, client, { status: "cancelled" });
+
+			for (const project of [priced, early, closed]) {
+				assert.equal(
+					await reasonOf(() =>
+						projects.setPrice(tenant, OWNER, project, 800_000),
+					),
+					"price_locked",
+					project.status,
+				);
+			}
+			assert.lengthOf(await quotes.history(tenant, priced), 1);
+		});
+	});
+
+	test("the assigned artist may set it; another artist gets a 404", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+		const asha = await artistIn(tenant, "asha@example.com");
+		const ravi = await artistIn(tenant, "ravi@example.com");
+
+		await inTenant(tenant, async () => {
+			const profile = await makeArtist(tenant, "asha");
+			profile.userId = asha.id;
+			await profile.save();
+			const project = await makeProject(tenant, await makeClient(tenant), {
+				status: "booked",
+				artistId: profile.id,
+			});
+
+			await assert.rejects(
+				() =>
+					projects.setPrice(
+						tenant,
+						{ userId: ravi.id, role: "artist" },
+						project,
+						800_000,
+					),
+				/Row not found/,
+			);
+			const quote = await projects.setPrice(
+				tenant,
+				{ userId: asha.id, role: "artist" },
+				project,
+				800_000,
+			);
+			assert.equal(quote.version, 1);
+		});
+	});
+});
+
 test.group("ProjectService.move", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 
@@ -1252,37 +1488,32 @@ test.group("ProjectService.move: sessions and deposits", (group) => {
 		});
 	});
 
-	test("a withdrawal is refused while any verified deposit money is held", async ({
+	test("a withdrawal closes a project that holds deposit money, booked and in progress ones too", async ({
 		assert,
 	}) => {
 		const { tenant } = await studioWithOwner();
 
 		await inTenant(tenant, async () => {
 			const client = await makeClient(tenant);
-			// Fully paid with no session yet; paid, then revised back to quoted
-			// or on hold; and only partly paid: all hold the client's money.
-			for (const [status, paid] of [
-				["deposit_pending", 300_000],
-				["quoted", 300_000],
-				["on_hold", 300_000],
-				["deposit_pending", 100_000],
+			for (const status of [
+				"deposit_pending",
+				"quoted",
+				"on_hold",
+				"booked",
+				"in_progress",
 			] as const) {
 				const project = await makeProject(tenant, client, { status });
 				await makeQuote(tenant, project);
 				await makePayment(tenant, project, {
-					amount: paid,
 					status: "verified",
 					verifiedAt: DateTime.utc(),
 				});
-				const label = `${status}, ${paid} paid`;
 				assert.equal(
-					await refusalOf(() =>
-						projects.move(tenant, OWNER, project, "withdraw"),
-					),
-					"deposit_paid",
-					label,
+					await projects.move(tenant, OWNER, project, "withdraw"),
+					"cancelled",
+					status,
 				);
-				assert.equal(await statusOf(project), status, label);
+				assert.isTrue(await projects.depositHeld(tenant, project), status);
 			}
 		});
 	});
@@ -1324,13 +1555,14 @@ test.group("ProjectService.move: sessions and deposits", (group) => {
 				status: "deposit_pending",
 			});
 			await makeQuote(tenant, project);
-			await makePayment(tenant, project, {
+			const deposit = await makePayment(tenant, project, {
 				status: "verified",
 				verifiedAt: DateTime.utc(),
 			});
 			await makePayment(tenant, project, {
 				kind: "correction",
 				amount: -300_000,
+				correctsPaymentId: deposit.id,
 				status: "verified",
 				verifiedAt: DateTime.utc(),
 			});

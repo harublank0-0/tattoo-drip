@@ -487,6 +487,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/quotes_controller').default['accept']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
+  'tenant.projects.price.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/projects/:id/price'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/projects/validators/quote').priceValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/projects/validators/quote').priceValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/quotes_controller').default['price']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/quotes_controller').default['price']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
   'tenant.projects.moves.store': {
     methods: ["POST"]
     pattern: '/t/:tenant/projects/:id/moves'
@@ -545,6 +557,78 @@ export interface Registry {
       query: {}
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/deposit_links_controller').default['store']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/deposit_links_controller').default['store']>>>
+    }
+  }
+  'tenant.projects.payments.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/projects/:id/payments'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/payments/validators/payment').deskPaymentValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/payments/validators/payment').deskPaymentValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/payments_controller').default['store']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/payments_controller').default['store']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.projects.refunds.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/projects/:id/refunds'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/payments/validators/payment').refundValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/payments/validators/payment').refundValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/payments_controller').default['refund']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/payments_controller').default['refund']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.projects.deposit_outcome.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/projects/:id/deposit-outcome'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/payments/validators/payment').outcomeValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/payments/validators/payment').outcomeValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/payments_controller').default['outcome']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/payments_controller').default['outcome']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.payments.verify': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/payments/:id/verify'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/payments/validators/payment').decisionValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/payments/validators/payment').decisionValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/payments_controller').default['verify']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/payments_controller').default['verify']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.payments.reject': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/payments/:id/reject'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/payments/validators/payment').decisionValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/payments/validators/payment').decisionValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/payments_controller').default['reject']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/payments_controller').default['reject']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.payments.reverse': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/payments/:id/reverse'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/payments/validators/payment').decisionValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/payments/validators/payment').decisionValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/payments_controller').default['reverse']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/payments_controller').default['reverse']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
   'tenant.calendar.index': {

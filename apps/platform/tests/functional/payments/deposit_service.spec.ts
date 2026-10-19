@@ -95,12 +95,13 @@ test.group("DepositService.isSettled", (group) => {
 				"session and balance payments are not the deposit",
 			);
 
-			await makePayment(tenant, project, verified());
+			const deposit = await makePayment(tenant, project, verified());
 			assert.isTrue(await deposits.isSettled(tenant, project), "deposit");
 
 			await makePayment(tenant, project, {
 				kind: "correction",
 				amount: -300_000,
+				correctsPaymentId: deposit.id,
 				...verified(),
 			});
 			assert.isFalse(
@@ -185,10 +186,14 @@ test.group("DepositService.verifiedPaid", (group) => {
 			assert.equal(await deposits.verifiedPaid(tenant, project, "NPR"), 0);
 
 			await makePayment(tenant, project, { amount: 100_000, ...verified() });
-			await makePayment(tenant, project, { amount: 50_000, ...verified() });
+			const second = await makePayment(tenant, project, {
+				amount: 50_000,
+				...verified(),
+			});
 			await makePayment(tenant, project, {
 				kind: "correction",
 				amount: -20_000,
+				correctsPaymentId: second.id,
 				...verified(),
 			});
 			// Not counted: unverified, another currency, other kinds.
@@ -206,5 +211,142 @@ test.group("DepositService.verifiedPaid", (group) => {
 			);
 			assert.equal(await deposits.verifiedPaid(tenant, project, "USD"), 10_000);
 		});
+	});
+});
+
+test.group(
+	"DepositService: corrections count only for deposits (TAT-66)",
+	(group) => {
+		group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+		test("the refund-and-reversal case does not settle a bigger deposit", async ({
+			assert,
+		}) => {
+			const { tenant } = await studioWithOwner();
+			const project = await projectIn(tenant);
+
+			await inTenant(tenant, async () => {
+				// The quote asks NPR 6,000; the client paid NPR 3,000. A refund was
+				// recorded by mistake and then reversed: the studio holds NPR 3,000.
+				await makeQuote(tenant, project, { depositAmount: 600_000 });
+				await makePayment(tenant, project, verified());
+				const refund = await makePayment(tenant, project, {
+					kind: "refund",
+					amount: -300_000,
+					...verified(),
+				});
+				await makePayment(tenant, project, {
+					kind: "correction",
+					amount: 300_000,
+					correctsPaymentId: refund.id,
+					...verified(),
+				});
+
+				assert.equal(
+					await deposits.verifiedPaid(tenant, project, "NPR"),
+					300_000,
+				);
+				assert.isFalse(await deposits.isSettled(tenant, project));
+			});
+		});
+
+		test("reversing a session payment doesn't touch the deposit", async ({
+			assert,
+		}) => {
+			const { tenant } = await studioWithOwner();
+			const project = await projectIn(tenant);
+
+			await inTenant(tenant, async () => {
+				await makeQuote(tenant, project);
+				await makePayment(tenant, project, verified());
+				const session = await makePayment(tenant, project, {
+					kind: "session",
+					...verified(),
+				});
+				await makePayment(tenant, project, {
+					kind: "correction",
+					amount: -300_000,
+					correctsPaymentId: session.id,
+					...verified(),
+				});
+
+				assert.isTrue(await deposits.isSettled(tenant, project));
+			});
+		});
+	},
+);
+
+test.group("DepositService.expirySpared", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("a waiting screenshot, or a deposit verified, rejected or reversed after the expiry, spares; nothing else does", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+		const expiresAt = DateTime.utc().minus({ hours: 1 });
+		const spared = (project: { id: string }) =>
+			inTenant(tenant, () =>
+				deposits.expirySpared(tenant, project, { expiresAt }),
+			);
+
+		const waiting = await projectIn(tenant);
+		const lateNo = await projectIn(tenant);
+		const earlyNo = await projectIn(tenant);
+		const reversedLate = await projectIn(tenant);
+		const plain = await projectIn(tenant);
+		const takenLate = await projectIn(tenant);
+		const takenEarly = await projectIn(tenant);
+		await inTenant(tenant, async () => {
+			await makePayment(tenant, takenLate, {
+				amount: 100_000,
+				...verified(),
+			});
+			await makePayment(tenant, takenEarly, {
+				amount: 100_000,
+				status: "verified",
+				verifiedAt: expiresAt.minus({ hours: 1 }),
+			});
+			await makePayment(tenant, waiting);
+			await makePayment(tenant, lateNo, {
+				status: "rejected",
+				verifiedAt: DateTime.utc(),
+			});
+			await makePayment(tenant, earlyNo, {
+				status: "rejected",
+				verifiedAt: expiresAt.minus({ hours: 1 }),
+			});
+			const deposit = await makePayment(tenant, reversedLate, {
+				status: "verified",
+				verifiedAt: expiresAt.minus({ hours: 2 }),
+			});
+			await makePayment(tenant, reversedLate, {
+				kind: "correction",
+				amount: -300_000,
+				correctsPaymentId: deposit.id,
+				...verified(),
+			});
+			await makePayment(tenant, plain, { kind: "session", ...verified() });
+		});
+
+		assert.isTrue(await spared(waiting), "a screenshot waits");
+		assert.isTrue(await spared(lateNo), "rejected after the expiry");
+		assert.isFalse(await spared(earlyNo), "rejected before the expiry");
+		assert.isTrue(await spared(reversedLate), "reversed after the expiry");
+		assert.isFalse(await spared(plain), "nothing about the deposit");
+		assert.isTrue(await spared(takenLate), "verified or recorded after");
+		assert.isFalse(await spared(takenEarly), "verified before the expiry");
+	});
+
+	test("another studio's context sees none of it", async ({ assert }) => {
+		const { tenant: a } = await studioWithOwner("spared-a-66", "A");
+		const { tenant: b } = await studioWithOwner("spared-b-66", "B");
+		const project = await projectIn(a);
+		await inTenant(a, () => makePayment(a, project));
+
+		assert.isFalse(
+			await inTenant(b, () =>
+				deposits.expirySpared(a, project, { expiresAt: DateTime.utc() }),
+			),
+		);
 	});
 });

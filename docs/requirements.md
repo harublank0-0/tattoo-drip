@@ -29,8 +29,9 @@ What the MVP (pilot with a design-partner studio) and V1 (paid launch) must do, 
 - [ ] Quote: a fixed price, or an hourly rate with estimated hours, plus a deposit amount (which may be zero) and an expiry; quotes can be revised
 - [ ] Deposit page per project: amount, the studio's QR codes and a reference code; the client uploads proof of payment
 - An owner makes a project's deposit link while its deposit is due; it works for 30 days and can be replaced at once (the old link stops working, the reference code stays). The page shows the studio, the project's brief, the deposit, the studio's deposit-page methods, a 6-character reference code for the payment remark and the deposit policy, and takes one screenshot at a time, which owners are alerted to.
-- [ ] Staff verify or reject the proof; cash and bank payments can be recorded at the desk
-- [ ] Payments are deposits, session payments, balance payments or refunds; the balance due is computed
+- [x] Staff verify or reject the proof; cash and bank payments can be recorded at the desk
+- [x] Payments are deposits, session payments, balance payments or refunds; the balance due is computed
+- Owners verify or reject a screenshot next to the amount the deposit page asked for and the reference code; a different amount is rejected and recorded at the desk. A mistaken verification or entry is reversed, never edited. When a project closes holding a deposit, the owner records whether the studio kept or refunded it. The assigned artist sees the balance and the payments, never a screenshot.
 
 **Sessions**
 - [ ] Sessions of kind consultation, tattoo or touch-up, each for one artist and inside a project
@@ -41,7 +42,7 @@ What the MVP (pilot with a design-partner studio) and V1 (paid launch) must do, 
 - The calendar shows active sessions (scheduled or completed) by the studio's local day, a day or a Sunday-to-Saturday week at a time, each opening its project. Owners see the whole studio or one artist; artists see their own sessions, and one on a project that isn't theirs shows only its time and kind.
 
 **Clients**
-- [ ] One client per phone number per tenant, with the history of their projects, references and payments
+- [x] One client per phone number per tenant, with the history of their projects, references and payments
 - The client list and profiles are for owners. Owners can edit a client's name, phone, email and notes; what a client submits through the form never changes their record.
 
 **Notifications, page and app**
@@ -75,7 +76,7 @@ This is the most important rule in the system.
 | Role | Can do |
 |---|---|
 | `owner` | Everything in the tenant, including verifying payments |
-| `artist` | Their own profile, plus the projects and sessions assigned to them |
+| `artist` | Their own profile, plus the projects and sessions assigned to them (with those projects' payments and balance, read-only) |
 
 - Invites are tied to one email, single-use, and expire in 7 days. Only a signed-in user with that verified email can accept one, and an invite can be linked to an existing artist profile for the new member to claim.
 - A tenant always has at least one owner. A removed member's artist profile stays with the tenant, unlinked.
@@ -107,14 +108,14 @@ shortcuts:   flash or walk-in → booked     in_progress → booked (next sessio
 | `healing_check` | Follow-up for a touch-up or healed photo |
 
 - Issuing a quote moves the project to `quoted`; staff mark it accepted when the client agrees, which moves it to `deposit_pending`. A quote can be revised (a new version) until the project is `booked`, and a revision moves a `deposit_pending` project back to `quoted`.
-- Staff move a project by hand only along the side exits: put a quoted project on hold and resume it, decline a project under review, or record that the client withdrew (from `reviewing`, `quoted`, `on_hold` or `deposit_pending`). Declining and withdrawing cancel the project's scheduled sessions. A client can't be recorded as withdrawn while the project holds verified deposit money, or once it is booked: closing it comes with recording what happens to the deposit (kept, moved or refunded).
+- Staff move a project by hand only along the side exits: put a quoted project on hold and resume it, decline a project under review, or record that the client withdrew (from `reviewing`, `quoted`, `on_hold`, `deposit_pending`, `booked` or `in_progress`). Declining and withdrawing cancel the project's scheduled sessions. A client can be recorded as withdrawn until the work is done (up to `in_progress`); when the project holds deposit money, the owner records whether the studio keeps it or refunds it (moving it to a new date comes with session outcomes).
 - The inquiry inbox is for owners. Accepting an inquiry creates a project under review, with the artist the owner picks, and its reference images follow the project (its assigned artist can then see them). Declining is final.
-- A quote's expiry moves a project that was never accepted (`quoted`, `on_hold`) or never paid (`deposit_pending` with the deposit not settled) to `cancelled`, and cancels its scheduled sessions. A deposit that was already paid is never cancelled by expiry, even when staff revised the quote afterwards.
+- A quote's expiry moves a project that was never accepted (`quoted`, `on_hold`) or never paid (`deposit_pending` with the deposit not settled) to `cancelled`, and cancels its scheduled sessions. It spares a project while a deposit screenshot waits for the studio, and once the studio rejects a screenshot or reverses a deposit after the quote expired: the studio decides what happens next. A deposit that was already paid is never cancelled by expiry, even when staff revised the quote afterwards.
 - Sessions block the artist's time, and the database rejects overlaps. Each session is `scheduled`, `completed`, `no_show` or `cancelled`; rescheduling changes its time.
 - Each studio writes its own deposit policy, which the deposit page shows. Tattoo Drip records what happened to a deposit (kept, moved to a new date, refunded) but doesn't impose a rule.
 - Payments are never edited or deleted. A refund is a new payment with a negative amount.
 - Balance due = quoted total (or hours × rate) − verified payments.
-- Payment proofs and reference images are private. Only owners, and the artist assigned to the project, can see them.
+- Payment proofs and reference images are private. Only owners see payment proofs; owners and the artist assigned to the project see reference images.
 - **Abuse protection on the intake form:** an invisible bot challenge, a honeypot, rate limits per IP, phone and tenant, and at most 3 open inquiries per phone number per tenant.
 
 ## Studio page rules

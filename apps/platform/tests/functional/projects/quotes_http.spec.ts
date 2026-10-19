@@ -340,3 +340,59 @@ test.group("Quotes and artists", (group) => {
 		own.assertFlashMessage("success", "Quote revised (version 2).");
 	});
 });
+
+test.group("Setting a direct booking's price", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	const priceUrl = (id: string) => `/t/black-needle/projects/${id}/price`;
+
+	test("an owner sets it once; the second time is refused", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const project = await projectIn(tenant, "booked");
+		const post = (fixedPrice: string) =>
+			client
+				.post(priceUrl(project.id))
+				.form({ fixedPrice })
+				.withCsrfToken()
+				.loginAs(owner)
+				.redirects(0);
+
+		const first = await post("8000");
+		first.assertHeader("location", pageUrl(project.id));
+		first.assertFlashMessage("success", "Price set.");
+		const second = await post("9000");
+		second.assertFlashMessage(
+			"error",
+			"This project already has a price, or isn't booked yet.",
+		);
+		const all = await versions(tenant, project);
+		assert.deepEqual(
+			all.map(({ fixedPrice }) => fixedPrice),
+			[800_000],
+		);
+	});
+
+	test("a price outside 1 to 1,00,00,000 whole rupees is a field error", async ({
+		client,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const project = await projectIn(tenant, "booked");
+
+		for (const fixedPrice of ["0", "12.5", "100000001", ""]) {
+			const response = await client
+				.post(priceUrl(project.id))
+				.form({ fixedPrice })
+				.withCsrfToken()
+				.loginAs(owner)
+				.redirects(0);
+			assertValidationError(
+				response,
+				"fixedPrice",
+				"Enter whole rupees from 1 to 1,00,00,000.",
+			);
+		}
+	});
+});

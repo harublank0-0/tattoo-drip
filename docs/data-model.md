@@ -18,6 +18,7 @@ erDiagram
   TattooProject ||--o{ Quote : has
   TattooProject ||--o{ Payment : has
   TattooProject ||--o{ Session : has
+  TattooProject ||--o{ DepositOutcome : records
   Artist ||--o{ Session : works
   TattooProject ||--o{ ReferenceImage : has
   Tenant ||--|| StorefrontConfiguration : has
@@ -51,12 +52,13 @@ Every entity except `User` belongs to a `Tenant`; most of those lines are left o
 | **Inquiry** | The first contact, exactly as submitted: idea, placement, approximate size, preferred dates, preferred artist, budget, source channel, contact snapshot. Status `new`, `accepted` or `declined`, with the time of the decision. The submitted fields never change (a database trigger); only the privacy deletion can scrub the contact snapshot and free text, and only in the one update that first marks the inquiry anonymized (frozen again afterwards) |
 | **TattooProject** | The sale: client, artist, brief, status (see [project rules](requirements.md#project-rules)), last-contacted time, notes. Created when an inquiry is accepted, or directly for a walk-in |
 | **Quote** | Fixed price, or hourly rate with estimated time (whole minutes); deposit amount (may be zero, never above the total); expiry. A revision is a new row with the next version, the current quote is the highest, and history is never deleted. There are no drafts: saving issues the next version, so `created_at` is when it was sent. Quotes have no trigger: that and "price, deposit and expiry never change after insert" are conventions, and the only database protection is the `NO ACTION` key from a quote to its project |
-| **Payment** | Kind (`deposit`, `session`, `balance`, `refund`, `correction`), amount, method (a kind: `fonepay`, `esewa`, `khalti`, `bank` or `cash`), proof image, status (`submitted`, `verified`, `rejected`), who verified it and when. Never edited or deleted (a database trigger), except that its decision (status, verifier, decision time) is recorded once, `updated_at` moves and its proof can be cleared (privacy deletion): a refund is a negative payment, a `correction` reverses a mistaken verification, and once verified or rejected a payment is final (its verifier can become empty only when that user's account is deleted) |
+| **Payment** | Kind (`deposit`, `session`, `balance`, `refund`, `correction`), amount, method (a kind: `fonepay`, `esewa`, `khalti`, `bank` or `cash`), proof image, status (`submitted`, `verified`, `rejected`), who verified it and when, the payment it corrects (a `correction` only, same project, at most one correction per payment), a staff note. Never edited or deleted (a database trigger), except that its decision (status, verifier, decision time) is recorded once, `updated_at` moves and its proof can be cleared (privacy deletion): a refund is a negative payment, a `correction` reverses a mistaken verification, and once verified or rejected a payment is final (its verifier can become empty only when that user's account is deleted) |
+| **DepositOutcome** | What happened to a deposit: kept, moved to a new date (with the missed or cancelled session) or refunded (with its refund payment), the deposit money the project still held then (a bigint, after any refund), who recorded it, a note. One per project close and one per session; recorded once, never changed. The studio's policy decides; the app only records |
 | **Session** | A time block for one artist inside a project (table `project_sessions`): kind (`consultation`, `tattoo`, `touch_up`), start and end, status (`scheduled`, `completed`, `no_show`, `cancelled`). The database prevents overlapping active sessions for the same artist: a session is active while it is `scheduled` or `completed` and not deleted, and the time is a half-open range, so back-to-back sessions are fine. `completed`, `no_show` and `cancelled` are final |
 | **ReferenceImage** | An image from the client, attached to the inquiry and then to its project. Private |
 | **StorefrontConfiguration** | One per tenant. In the MVP: which artists show and the intro text. Theme and branding come in V1 |
 
-- **Balance due** = the current quote's total (or hours × rate) − verified payments. It is computed, never stored.
+- **Balance due** = the current quote's total (or hours × rate) − verified payments in the quote's currency (refunds and reversals are signed). It is computed, never stored; a project booked without a price has none until its price is set.
 - **Inquiry vs project:** the inquiry is an immutable record of what was asked; the project is what the studio manages. Declined inquiries never become projects.
 - **One person in two studios:** one `User`, two memberships and two `Artist` profiles. Clients and projects never cross tenants.
 

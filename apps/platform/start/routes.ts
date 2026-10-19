@@ -205,6 +205,11 @@ router
 					.post(":id/quotes/accept", [controllers.Quotes, "accept"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.projects.quotes.accept");
+				// A direct booking's price, once (TAT-66).
+				router
+					.post(":id/price", [controllers.Quotes, "price"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.projects.price.store");
 				router
 					.post(":id/moves", [controllers.ProjectChanges, "move"])
 					.where("id", router.matchers.uuid())
@@ -226,9 +231,45 @@ router
 					.post(":id/deposit-link", [controllers.DepositLinks, "store"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.projects.deposit_link.store");
+				// Owners only: PaymentService gives anyone else a 404 (TAT-66).
+				router
+					.post(":id/payments", [controllers.Payments, "store"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.projects.payments.store");
+				router
+					.post(":id/refunds", [controllers.Payments, "refund"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.projects.refunds.store");
+				router
+					.post(":id/deposit-outcome", [controllers.Payments, "outcome"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.projects.deposit_outcome.store");
 			})
 			.prefix("/projects")
 			.use(middleware.role({ allow: ["owner", "artist"] }));
+
+		/**
+		 * Decisions on one payment (TAT-66): owners only, and
+		 * PaymentService.findFor checks again. Every payments route goes in
+		 * this group (a test checks).
+		 */
+		router
+			.group(() => {
+				router
+					.post(":id/verify", [controllers.Payments, "verify"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.payments.verify");
+				router
+					.post(":id/reject", [controllers.Payments, "reject"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.payments.reject");
+				router
+					.post(":id/reverse", [controllers.Payments, "reverse"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.payments.reverse");
+			})
+			.prefix("/payments")
+			.use(middleware.role({ allow: ["owner"] }));
 
 		/**
 		 * The calendar: owners (the whole studio or one artist) and artists

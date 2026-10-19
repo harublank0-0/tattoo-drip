@@ -191,6 +191,7 @@ test.group("Tenant routes", (group) => {
 		{ area: "artists", allow: ["owner"] },
 		{ area: "inbox", allow: ["owner"] },
 		{ area: "clients", allow: ["owner"] },
+		{ area: "payments", allow: ["owner"] },
 		{ area: "projects", allow: ["owner", "artist"] },
 		{ area: "calendar", allow: ["owner", "artist"] },
 	]) {

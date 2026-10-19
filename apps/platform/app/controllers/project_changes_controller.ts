@@ -27,8 +27,6 @@ const MOVE_DONE: Record<ManualMove, string> = {
 const RULE_MESSAGES: Record<ProjectRuleReason, string> = {
 	move_not_allowed:
 		"This project can't make that change in its current status.",
-	deposit_paid:
-		"The client's deposit is held, so this project can't be closed here yet. Recording what happens to a deposit comes with payments.",
 };
 
 /**
@@ -51,7 +49,15 @@ export default class ProjectChangesController {
 		const { move } = await ctx.request.validateUsing(moveValidator);
 		try {
 			await this.projects.move(tenant, membership, project, move);
-			ctx.session.flash("success", MOVE_DONE[move]);
+			const outcomeNext =
+				move === "withdraw" &&
+				(await this.projects.depositHeld(tenant, project));
+			ctx.session.flash(
+				"success",
+				outcomeNext
+					? `${MOVE_DONE[move]} Record what happened to the deposit under Payments.`
+					: MOVE_DONE[move],
+			);
 		} catch (error) {
 			if (!(error instanceof ProjectRuleError)) throw error;
 			ctx.session.flash("error", RULE_MESSAGES[error.reason]);

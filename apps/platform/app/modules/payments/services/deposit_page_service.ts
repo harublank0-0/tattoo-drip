@@ -229,7 +229,7 @@ export default class DepositPageService {
 				accountNumber: method.accountNumber,
 				bankName: method.bankName,
 				qrImageUrl: method.qrImageKey
-					? await this.images.url("payment_qr", method.qrImageKey)
+					? await this.images.url("payment_qr", method.qrImageKey, tenant)
 					: null,
 			})),
 		);

@@ -19,7 +19,13 @@ import {
 	type ManualMove,
 	type ProjectFilter,
 } from "#modules/projects/moves";
-import { isExpired, QUOTABLE_STATUSES } from "#modules/projects/quotes";
+import {
+	BOOKED_STATUSES,
+	expiresAtFor,
+	isExpired,
+	QUOTABLE_STATUSES,
+	todayIn,
+} from "#modules/projects/quotes";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import QuoteService, {
 	type NewQuote,
@@ -38,6 +44,13 @@ export type Member = Pick<TenantMembership, "userId" | "role">;
 
 /** Projects per page on the projects list. */
 export const PROJECTS_PER_PAGE = 25;
+
+/** The statuses a quote's expiry can cancel. */
+const EXPIRING_STATUSES: readonly ProjectStatus[] = [
+	"quoted",
+	"on_hold",
+	"deposit_pending",
+];
 
 type ProjectQuery = ReturnType<typeof TattooProject.query>;
 
@@ -330,12 +343,49 @@ export default class ProjectService {
 	}
 
 	/**
+	 * Records the price of a project booked without one (TAT-43's direct
+	 * booking): quote version 1, fixed, no deposit, valid through today in
+	 * the studio's timezone. Only for a booked-or-later project with no quote
+	 * (QuoteRuleError "price_locked" otherwise, checked under the lock), so
+	 * quotes stay locked once a project is booked: the price is set once. No
+	 * status change and no ExpireQuoteJob (expiry never acts from booked on).
+	 * Owners and the assigned artist, as for quotes.
+	 */
+	async setPrice(
+		tenant: Pick<Tenant, "id" | "timezone">,
+		member: Member,
+		project: TattooProject,
+		fixedPrice: number,
+	): Promise<Quote> {
+		assertProjectOf(tenant, project);
+		return withTransaction(async (trx) => {
+			const live = await this.lockFor(trx, tenant, member, project.id);
+			if (
+				!BOOKED_STATUSES.includes(live.status) ||
+				(await this.quotes.current(tenant, live))
+			) {
+				throw new QuoteRuleError("price_locked");
+			}
+			return this.quotes.create(trx, tenant, live, {
+				kind: "fixed",
+				fixedPrice,
+				depositAmount: 0,
+				expiresAt: expiresAtFor(todayIn(tenant.timezone), tenant.timezone),
+			});
+		});
+	}
+
+	/**
 	 * What ExpireQuoteJob does once a quote's expiry passes. Cancels the
 	 * project if `quoteId` is still its current quote, that quote has
 	 * expired, and the client never accepted it (`quoted`, `on_hold`) or
 	 * accepted but never paid (`deposit_pending` with the deposit not
 	 * settled). A deposit that was paid is never cancelled by expiry, not
-	 * even on a `quoted` project that was revised after the client paid. The
+	 * even on a `quoted` project that was revised after the client paid. Nor
+	 * is a project whose deposit screenshot waits, or whose deposit the
+	 * studio verified, recorded, rejected or reversed after the expiry
+	 * (TAT-66): the owner who decided late chooses what happens next, so a
+	 * later sweep run changes nothing. The
 	 * project's scheduled sessions are cancelled first, so the artist's time
 	 * is free. A run before the current quote's expiry (this process's clock
 	 * behind the one that queued the job) queues the job again for the rest
@@ -376,10 +426,10 @@ export default class ProjectService {
 	 * A manual move (TAT-46): hold, resume, decline or the client withdrew.
 	 * The project's live status must be one the moves table allows, else
 	 * ProjectRuleError "move_not_allowed" (a stale page, or another tab got
-	 * there first). A client withdrawing is refused as "deposit_paid" while
-	 * the project holds verified deposit money: closing it would hide the
-	 * client's money, and recording what happens to it (kept, moved,
-	 * refunded) is TAT-66's. Declining and withdrawing cancel the project's
+	 * there first). A client may withdraw while the project holds deposit
+	 * money: the owner then records the deposit's outcome
+	 * (PaymentService.recordOutcome, TAT-66). Declining and withdrawing cancel
+	 * the project's
 	 * scheduled sessions first, so the artist's time is free. Returns the new
 	 * status.
 	 */
@@ -396,9 +446,6 @@ export default class ProjectService {
 			if (!rule.from.includes(live.status)) {
 				throw new ProjectRuleError("move_not_allowed");
 			}
-			if (move === "withdraw" && (await this.depositHeld(tenant, live))) {
-				throw new ProjectRuleError("deposit_paid");
-			}
 			if (rule.cancelsSessions) {
 				await this.cancelScheduledSessions(tenant, live);
 			}
@@ -410,8 +457,8 @@ export default class ProjectService {
 	/**
 	 * Whether the project holds verified deposit money: the current quote's
 	 * deposit payments, net of reversals, are above zero in the quote's
-	 * currency. A project with no quote holds none. The projects page uses
-	 * it to hide the withdraw move; `move` enforces it.
+	 * currency. A project with no quote holds none. The withdraw flash asks
+	 * for the deposit's outcome when it is true.
 	 */
 	async depositHeld(
 		tenant: TenantRef,
@@ -484,27 +531,30 @@ export default class ProjectService {
 	}
 
 	/**
-	 * Whether the expired `quote` cancels a project in its current status. A
-	 * `quoted` or `on_hold` project is cancelled unless its (non-zero)
-	 * deposit was paid: it can hold a payment when staff revised the quote
-	 * after the client paid. A zero deposit is "settled" by definition, so it
-	 * doesn't spare a quote nobody accepted.
+	 * Whether the expired `quote` cancels a project in its current status.
+	 * Only `quoted`, `on_hold` and `deposit_pending` projects can be
+	 * cancelled, and none whose deposit decision is owed or came late
+	 * (DepositService.expirySpared: a screenshot waits, or the studio verified,
+	 * recorded, rejected or reversed a deposit after the expiry; TAT-66): the
+	 * owner decides what happens next. A `quoted` or `on_hold` project is then cancelled
+	 * unless its (non-zero) deposit was paid: it can hold a payment when staff
+	 * revised the quote after the client paid. A zero deposit is "settled" by
+	 * definition, so it doesn't spare a quote nobody accepted.
 	 */
 	private async expiryCancels(
 		tenant: TenantRef,
 		project: TattooProject,
 		quote: Quote,
 	): Promise<boolean> {
-		if (project.status === "quoted" || project.status === "on_hold") {
-			return (
-				quote.depositAmount === 0 ||
-				!(await this.deposits.isSettled(tenant, project))
-			);
-		}
+		if (!EXPIRING_STATUSES.includes(project.status)) return false;
+		if (await this.deposits.expirySpared(tenant, project, quote)) return false;
 		if (project.status === "deposit_pending") {
 			return !(await this.deposits.isSettled(tenant, project));
 		}
-		return false;
+		return (
+			quote.depositAmount === 0 ||
+			!(await this.deposits.isSettled(tenant, project))
+		);
 	}
 
 	/**

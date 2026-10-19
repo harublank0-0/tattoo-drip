@@ -127,6 +127,48 @@ export class DepositLinkSchema extends BaseModel {
 	declare updatedAt: DateTime | null;
 }
 
+export class DepositOutcomeSchema extends BaseModel {
+	static $columns = [
+		"amount",
+		"createdAt",
+		"currency",
+		"id",
+		"note",
+		"outcome",
+		"projectId",
+		"recordedByUserId",
+		"refundPaymentId",
+		"sessionId",
+		"tenantId",
+		"updatedAt",
+	] as const;
+	$columns = DepositOutcomeSchema.$columns;
+	@column()
+	declare amount: bigint | number;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column()
+	declare currency: string;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare note: string | null;
+	@column()
+	declare outcome: string;
+	@column()
+	declare projectId: string;
+	@column()
+	declare recordedByUserId: string | null;
+	@column()
+	declare refundPaymentId: string | null;
+	@column()
+	declare sessionId: string | null;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
 export class InquirySchema extends BaseModel {
 	static $columns = [
 		"anonymizedAt",
@@ -238,11 +280,13 @@ export class PaymentMethodSchema extends BaseModel {
 export class PaymentSchema extends BaseModel {
 	static $columns = [
 		"amount",
+		"correctsPaymentId",
 		"createdAt",
 		"currency",
 		"id",
 		"kind",
 		"method",
+		"note",
 		"projectId",
 		"proofImageHeight",
 		"proofImageKey",
@@ -256,6 +300,8 @@ export class PaymentSchema extends BaseModel {
 	$columns = PaymentSchema.$columns;
 	@column()
 	declare amount: number;
+	@column()
+	declare correctsPaymentId: string | null;
 	@column.dateTime({ autoCreate: true })
 	declare createdAt: DateTime;
 	@column()
@@ -266,6 +312,8 @@ export class PaymentSchema extends BaseModel {
 	declare kind: string;
 	@column()
 	declare method: string;
+	@column()
+	declare note: string | null;
 	@column()
 	declare projectId: string;
 	@column()

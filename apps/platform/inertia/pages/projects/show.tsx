@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { urlFor } from "~/client";
 import { SOURCE_LABELS } from "~/components/inquiries";
 import Page from "~/components/page";
+import PaymentsCard from "~/components/payments_card";
 import {
 	type ChatMessageProps,
 	formatRupees,
@@ -64,10 +65,12 @@ export default function ProjectShow({
 	history,
 	canQuote,
 	canAccept,
+	canSetPrice,
+	payments,
 	message,
 	form,
 	moves,
-	withdrawBlocked,
+	depositHeldText,
 	scheduledSessionCount,
 	bookedWithoutSession,
 	quoteExpiryShown,
@@ -126,13 +129,14 @@ export default function ProjectShow({
 								projectId={project.id}
 								moves={moves}
 								scheduledSessionCount={scheduledSessionCount}
+								depositHeldText={depositHeldText}
 							/>
 						)}
-						{withdrawBlocked && (
-							<p className="text-sm text-muted-foreground">
-								The client&apos;s deposit is held, so this project can&apos;t be
-								closed as withdrawn yet: recording what happens to a deposit
-								(kept, moved or refunded) comes with payments.
+						{payments.outcome.needed && (
+							<p className="text-sm">
+								<a href="#payments" className="underline underline-offset-4">
+									Record what happened to the deposit under Payments.
+								</a>
 							</p>
 						)}
 						{assignment && (
@@ -214,6 +218,8 @@ export default function ProjectShow({
 					<CardContent className="flex flex-col gap-4">
 						{quote ? (
 							<QuoteSummary quote={quote} showExpiry={quoteExpiryShown} />
+						) : canSetPrice ? (
+							<PriceForm projectId={project.id} />
 						) : (
 							<p className="text-sm text-muted-foreground">No quote yet.</p>
 						)}
@@ -233,6 +239,12 @@ export default function ProjectShow({
 						onSent={markContacted}
 					/>
 				)}
+
+				<PaymentsCard
+					projectId={project.id}
+					payments={payments}
+					canSetPrice={canSetPrice}
+				/>
 
 				<Card>
 					<CardHeader>
@@ -435,7 +447,11 @@ function DepositCard({
 				)}
 				{proofReceivedText && (
 					<output className="block rounded-md border p-3 text-sm">
-						Payment screenshot received {proofReceivedText}.
+						Payment screenshot received {proofReceivedText}:{" "}
+						<a href="#payments" className="underline underline-offset-4">
+							check it under Payments
+						</a>
+						.
 					</output>
 				)}
 				{link?.url ? (
@@ -522,6 +538,62 @@ function AcceptQuote({
 						Tap when the client agrees. The project then waits for the deposit.
 					</p>
 				</div>
+			)}
+		</Form>
+	);
+}
+
+/**
+ * The price of a project booked without one (TAT-66): set once, behind a
+ * confirm, because quotes are locked from booked on.
+ */
+function PriceForm({ projectId }: { projectId: string }) {
+	const tenant = useTenant();
+	const [price, setPrice] = useState("");
+
+	return (
+		<Form
+			route="tenant.projects.price.store"
+			routeParams={{ tenant: tenant.slug, id: projectId }}
+			options={{ preserveScroll: true }}
+			onBefore={() =>
+				window.confirm(
+					`Set the price to ${formatRupees(Number(price))}? It can't be changed afterwards.`,
+				)
+			}
+		>
+			{({ errors, processing }) => (
+				<FieldGroup>
+					<p className="text-sm text-muted-foreground">
+						No price was set at booking. Set it once you know it: it can&apos;t
+						be changed afterwards.
+					</p>
+					<Field data-invalid={!!errors.fixedPrice}>
+						<FieldLabel htmlFor="finalPrice">Price (NPR)</FieldLabel>
+						<Input
+							id="finalPrice"
+							name="fixedPrice"
+							type="number"
+							inputMode="numeric"
+							min={1}
+							step={1}
+							value={price}
+							onChange={(event) => setPrice(event.target.value)}
+							aria-invalid={!!errors.fixedPrice}
+							aria-describedby={
+								errors.fixedPrice ? "finalPrice-error" : undefined
+							}
+						/>
+						{errors.fixedPrice && (
+							<FieldError id="finalPrice-error">{errors.fixedPrice}</FieldError>
+						)}
+					</Field>
+					<div>
+						<Button type="submit" className="h-11" disabled={processing}>
+							{processing ? "Saving…" : "Set price"}
+						</Button>
+					</div>
+				</FieldGroup>
 			)}
 		</Form>
 	);
@@ -728,29 +800,38 @@ function ContactLine({ text, onMark }: { text: string; onMark: () => void }) {
 }
 
 /** Moves that close a project ask first. */
-const CONFIRM: Partial<Record<ManualMoveName, (sessions: number) => string>> = {
+const CONFIRM: Partial<
+	Record<ManualMoveName, (sessions: number, deposit: string | null) => string>
+> = {
 	decline: (sessions) =>
 		sessions > 0
 			? `Decline this project? It moves to Closed and cancels ${sessions} scheduled session${sessions === 1 ? "" : "s"}.`
 			: "Decline this project? It moves to Closed.",
-	withdraw: (sessions) =>
-		sessions > 0
-			? `Mark that the client withdrew? This cancels the project and ${sessions} scheduled session${sessions === 1 ? "" : "s"}.`
-			: "Mark that the client withdrew? This cancels the project.",
+	withdraw: (sessions, deposit) => {
+		const base =
+			sessions > 0
+				? `Mark that the client withdrew? This cancels the project and ${sessions} scheduled session${sessions === 1 ? "" : "s"}.`
+				: "Mark that the client withdrew? This cancels the project.";
+		return deposit
+			? `${base} The client's deposit of ${deposit} stays recorded: you then record whether the studio keeps it or refunds it.`
+			: base;
+	},
 };
 
 function MoveButtons({
 	projectId,
 	moves,
 	scheduledSessionCount,
+	depositHeldText,
 }: {
 	projectId: string;
 	moves: ManualMoveName[];
 	scheduledSessionCount: number;
+	depositHeldText: string | null;
 }) {
 	const tenant = useTenant();
 	const send = (move: ManualMoveName) => {
-		const question = CONFIRM[move]?.(scheduledSessionCount);
+		const question = CONFIRM[move]?.(scheduledSessionCount, depositHeldText);
 		if (question && !window.confirm(question)) return;
 		router.post(
 			urlFor("tenant.projects.moves.store", {

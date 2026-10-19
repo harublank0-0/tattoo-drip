@@ -111,7 +111,7 @@ export default class InquiriesController {
 			references: await Promise.all(
 				images.map(async (image) => ({
 					id: image.id,
-					url: await this.images.url("reference_image", image.imageKey),
+					url: await this.images.url("reference_image", image.imageKey, tenant),
 					width: image.width,
 					height: image.height,
 				})),

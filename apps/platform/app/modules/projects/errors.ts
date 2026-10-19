@@ -3,6 +3,7 @@ export const QUOTE_RULE_REASONS = [
 	"not_quoted",
 	"quote_changed",
 	"expired",
+	"price_locked",
 ] as const;
 export type QuoteRuleReason = (typeof QUOTE_RULE_REASONS)[number];
 
@@ -12,6 +13,8 @@ const MESSAGES: Record<QuoteRuleReason, string> = {
 	not_quoted: "Only a quoted project can accept its quote",
 	quote_changed: "The quote is no longer the project's current quote",
 	expired: "The quote has expired",
+	price_locked:
+		"Only a booked project without a quote can get its price this way",
 };
 
 /**
@@ -26,16 +29,11 @@ export class QuoteRuleError extends Error {
 	}
 }
 
-export const PROJECT_RULE_REASONS = [
-	"move_not_allowed",
-	"deposit_paid",
-] as const;
+export const PROJECT_RULE_REASONS = ["move_not_allowed"] as const;
 export type ProjectRuleReason = (typeof PROJECT_RULE_REASONS)[number];
 
 const PROJECT_MESSAGES: Record<ProjectRuleReason, string> = {
 	move_not_allowed: "The project's status does not allow that move",
-	deposit_paid:
-		"The client's deposit is held: recording what happens to it comes with payments",
 };
 
 /**

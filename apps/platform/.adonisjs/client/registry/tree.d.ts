@@ -69,6 +69,9 @@ export interface ApiDefinition {
         store: typeof routes['tenant.projects.quotes.store']
         accept: typeof routes['tenant.projects.quotes.accept']
       }
+      price: {
+        store: typeof routes['tenant.projects.price.store']
+      }
       moves: {
         store: typeof routes['tenant.projects.moves.store']
       }
@@ -84,6 +87,20 @@ export interface ApiDefinition {
       depositLink: {
         store: typeof routes['tenant.projects.deposit_link.store']
       }
+      payments: {
+        store: typeof routes['tenant.projects.payments.store']
+      }
+      refunds: {
+        store: typeof routes['tenant.projects.refunds.store']
+      }
+      depositOutcome: {
+        store: typeof routes['tenant.projects.deposit_outcome.store']
+      }
+    }
+    payments: {
+      verify: typeof routes['tenant.payments.verify']
+      reject: typeof routes['tenant.payments.reject']
+      reverse: typeof routes['tenant.payments.reverse']
     }
     calendar: {
       index: typeof routes['tenant.calendar.index']

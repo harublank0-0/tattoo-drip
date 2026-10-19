@@ -4,6 +4,8 @@ import Client from "#modules/clients/models/client";
 import Inquiry from "#modules/inquiries/models/inquiry";
 import ReferenceImage from "#modules/inquiries/models/reference_image";
 import DepositLink from "#modules/payments/models/deposit_link";
+import DepositOutcome from "#modules/payments/models/deposit_outcome";
+import Payment from "#modules/payments/models/payment";
 import PaymentMethod from "#modules/payments/models/payment_method";
 import Quote from "#modules/projects/models/quote";
 import TattooProject from "#modules/projects/models/tattoo_project";
@@ -38,6 +40,11 @@ export type IsolationCase = {
 		| "artistProfile"
 		| "project"
 		| "quotedProject"
+		| "pricelessProject"
+		| "payment"
+		| "verifiedPayment"
+		| "paidProject"
+		| "closedPaidProject"
 		| "depositProject"
 		| "newInquiry"
 		| "client";
@@ -109,6 +116,25 @@ const projectRows = (target: Studio) =>
 		quotes: (
 			await Quote.query().where("tenant_id", target.tenant.id).orderBy("id")
 		).map((quote) => quote.serialize()),
+	}));
+
+// Payments, deposit outcomes and the projects' statuses: what the payment
+// routes could change.
+const paymentRows = (target: Studio) =>
+	inTenant(target.tenant, async () => ({
+		payments: (
+			await Payment.query().where("tenant_id", target.tenant.id).orderBy("id")
+		).map((payment) => payment.serialize()),
+		outcomes: (
+			await DepositOutcome.query()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("id")
+		).map((outcome) => outcome.serialize()),
+		projects: (
+			await TattooProject.withTrashed()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("id")
+		).map(({ id, status }) => ({ id, status })),
 	}));
 
 // Inquiries, projects and reference images, deleted ones included: what
@@ -382,6 +408,69 @@ export const isolationCases: IsolationCase[] = [
 		body: (own) => ({ quoteId: own.quotedQuote.id }),
 		ownStatus: 302,
 		snapshot: projectRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/projects/:id/price",
+		resource: "pricelessProject",
+		actor: "owner",
+		body: () => ({ fixedPrice: "8000" }),
+		ownStatus: 302,
+		snapshot: projectRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/projects/:id/payments",
+		resource: "project",
+		actor: "owner",
+		body: () => ({ kind: "session", method: "cash", amount: "2000" }),
+		ownStatus: 302,
+		snapshot: paymentRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/projects/:id/refunds",
+		resource: "paidProject",
+		actor: "owner",
+		body: () => ({ method: "cash", amount: "1000" }),
+		ownStatus: 302,
+		snapshot: paymentRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/projects/:id/deposit-outcome",
+		resource: "closedPaidProject",
+		actor: "owner",
+		body: () => ({ outcome: "kept" }),
+		ownStatus: 302,
+		snapshot: paymentRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/payments/:id/verify",
+		resource: "payment",
+		actor: "owner",
+		body: () => ({ note: "On the statement" }),
+		ownStatus: 302,
+		snapshot: paymentRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/payments/:id/reject",
+		resource: "payment",
+		actor: "owner",
+		body: () => ({ note: "Not on the statement" }),
+		ownStatus: 302,
+		snapshot: paymentRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/payments/:id/reverse",
+		resource: "verifiedPayment",
+		actor: "owner",
+		body: () => ({ note: "Never arrived" }),
+		ownStatus: 302,
+		snapshot: paymentRows,
 	},
 	{
 		method: "GET",

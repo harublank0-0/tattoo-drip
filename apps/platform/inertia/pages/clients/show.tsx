@@ -2,6 +2,7 @@ import { Link } from "@inertiajs/react";
 import { urlFor } from "~/client";
 import type { ClientPageProps } from "~/components/clients";
 import Page from "~/components/page";
+import { KIND_LABELS, PAYMENT_STATUS_LABELS } from "~/components/payments";
 import { STATUS_LABELS } from "~/components/projects";
 import ReferenceGrid from "~/components/references";
 import { Badge } from "~/components/ui/badge";
@@ -23,6 +24,7 @@ export default function ClientShow({
 	projects,
 	inquiries,
 	references,
+	payments,
 }: ClientPageProps) {
 	const tenant = useTenant();
 	const contact = [client.phone, client.email].filter(Boolean).join(" · ");
@@ -125,6 +127,55 @@ export default function ClientShow({
 												{project.createdText}
 											</span>
 										</Link>
+									</li>
+								))}
+							</ul>
+						)}
+					</CardContent>
+				</Card>
+
+				<Card>
+					<CardHeader>
+						<CardTitle>Payments</CardTitle>
+					</CardHeader>
+					<CardContent className="flex flex-col gap-3">
+						<p className="text-base font-semibold">
+							{payments.balanceDueText
+								? `Balance due ${payments.balanceDueText}`
+								: "Nothing due"}
+						</p>
+						{payments.rows.length === 0 ? (
+							<p className="text-sm text-muted-foreground">No payments yet.</p>
+						) : (
+							<ul className="flex flex-col divide-y text-sm">
+								{payments.rows.map((row) => (
+									<li key={row.id} className="flex flex-col gap-1 py-2">
+										<span className="flex flex-wrap items-center justify-between gap-2">
+											<span className="font-medium">
+												{KIND_LABELS[row.kind]} {row.amountText}
+											</span>
+											<Badge
+												variant={
+													row.status === "verified" ? "secondary" : "outline"
+												}
+											>
+												{PAYMENT_STATUS_LABELS[row.status]}
+											</Badge>
+										</span>
+										<span className="text-muted-foreground">
+											{row.dateText} ·{" "}
+											<Link
+												href={urlFor("tenant.projects.show", {
+													tenant: tenant.slug,
+													id: row.projectId,
+												})}
+												className="underline underline-offset-4"
+											>
+												<span className="line-clamp-1 break-words">
+													{row.projectBrief}
+												</span>
+											</Link>
+										</span>
 									</li>
 								))}
 							</ul>

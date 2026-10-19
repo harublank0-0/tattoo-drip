@@ -246,6 +246,12 @@ const routes = {
     tokens: [{"old":"/t/:tenant/projects/:id/quotes/accept","type":0,"val":"t","end":""},{"old":"/t/:tenant/projects/:id/quotes/accept","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/projects/:id/quotes/accept","type":0,"val":"projects","end":""},{"old":"/t/:tenant/projects/:id/quotes/accept","type":1,"val":"id","end":""},{"old":"/t/:tenant/projects/:id/quotes/accept","type":0,"val":"quotes","end":""},{"old":"/t/:tenant/projects/:id/quotes/accept","type":0,"val":"accept","end":""}],
     types: placeholder as Registry['tenant.projects.quotes.accept']['types'],
   },
+  'tenant.projects.price.store': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/projects/:id/price',
+    tokens: [{"old":"/t/:tenant/projects/:id/price","type":0,"val":"t","end":""},{"old":"/t/:tenant/projects/:id/price","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/projects/:id/price","type":0,"val":"projects","end":""},{"old":"/t/:tenant/projects/:id/price","type":1,"val":"id","end":""},{"old":"/t/:tenant/projects/:id/price","type":0,"val":"price","end":""}],
+    types: placeholder as Registry['tenant.projects.price.store']['types'],
+  },
   'tenant.projects.moves.store': {
     methods: ["POST"],
     pattern: '/t/:tenant/projects/:id/moves',
@@ -275,6 +281,42 @@ const routes = {
     pattern: '/t/:tenant/projects/:id/deposit-link',
     tokens: [{"old":"/t/:tenant/projects/:id/deposit-link","type":0,"val":"t","end":""},{"old":"/t/:tenant/projects/:id/deposit-link","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/projects/:id/deposit-link","type":0,"val":"projects","end":""},{"old":"/t/:tenant/projects/:id/deposit-link","type":1,"val":"id","end":""},{"old":"/t/:tenant/projects/:id/deposit-link","type":0,"val":"deposit-link","end":""}],
     types: placeholder as Registry['tenant.projects.deposit_link.store']['types'],
+  },
+  'tenant.projects.payments.store': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/projects/:id/payments',
+    tokens: [{"old":"/t/:tenant/projects/:id/payments","type":0,"val":"t","end":""},{"old":"/t/:tenant/projects/:id/payments","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/projects/:id/payments","type":0,"val":"projects","end":""},{"old":"/t/:tenant/projects/:id/payments","type":1,"val":"id","end":""},{"old":"/t/:tenant/projects/:id/payments","type":0,"val":"payments","end":""}],
+    types: placeholder as Registry['tenant.projects.payments.store']['types'],
+  },
+  'tenant.projects.refunds.store': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/projects/:id/refunds',
+    tokens: [{"old":"/t/:tenant/projects/:id/refunds","type":0,"val":"t","end":""},{"old":"/t/:tenant/projects/:id/refunds","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/projects/:id/refunds","type":0,"val":"projects","end":""},{"old":"/t/:tenant/projects/:id/refunds","type":1,"val":"id","end":""},{"old":"/t/:tenant/projects/:id/refunds","type":0,"val":"refunds","end":""}],
+    types: placeholder as Registry['tenant.projects.refunds.store']['types'],
+  },
+  'tenant.projects.deposit_outcome.store': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/projects/:id/deposit-outcome',
+    tokens: [{"old":"/t/:tenant/projects/:id/deposit-outcome","type":0,"val":"t","end":""},{"old":"/t/:tenant/projects/:id/deposit-outcome","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/projects/:id/deposit-outcome","type":0,"val":"projects","end":""},{"old":"/t/:tenant/projects/:id/deposit-outcome","type":1,"val":"id","end":""},{"old":"/t/:tenant/projects/:id/deposit-outcome","type":0,"val":"deposit-outcome","end":""}],
+    types: placeholder as Registry['tenant.projects.deposit_outcome.store']['types'],
+  },
+  'tenant.payments.verify': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/payments/:id/verify',
+    tokens: [{"old":"/t/:tenant/payments/:id/verify","type":0,"val":"t","end":""},{"old":"/t/:tenant/payments/:id/verify","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/payments/:id/verify","type":0,"val":"payments","end":""},{"old":"/t/:tenant/payments/:id/verify","type":1,"val":"id","end":""},{"old":"/t/:tenant/payments/:id/verify","type":0,"val":"verify","end":""}],
+    types: placeholder as Registry['tenant.payments.verify']['types'],
+  },
+  'tenant.payments.reject': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/payments/:id/reject',
+    tokens: [{"old":"/t/:tenant/payments/:id/reject","type":0,"val":"t","end":""},{"old":"/t/:tenant/payments/:id/reject","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/payments/:id/reject","type":0,"val":"payments","end":""},{"old":"/t/:tenant/payments/:id/reject","type":1,"val":"id","end":""},{"old":"/t/:tenant/payments/:id/reject","type":0,"val":"reject","end":""}],
+    types: placeholder as Registry['tenant.payments.reject']['types'],
+  },
+  'tenant.payments.reverse': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/payments/:id/reverse',
+    tokens: [{"old":"/t/:tenant/payments/:id/reverse","type":0,"val":"t","end":""},{"old":"/t/:tenant/payments/:id/reverse","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/payments/:id/reverse","type":0,"val":"payments","end":""},{"old":"/t/:tenant/payments/:id/reverse","type":1,"val":"id","end":""},{"old":"/t/:tenant/payments/:id/reverse","type":0,"val":"reverse","end":""}],
+    types: placeholder as Registry['tenant.payments.reverse']['types'],
   },
   'tenant.calendar.index': {
     methods: ["GET","HEAD"],

@@ -171,12 +171,23 @@ test.group("Project page", (group) => {
 		assert.deepEqual(first.history, []);
 		assert.isTrue(first.canQuote);
 		assert.isFalse(first.canAccept);
+		assert.isFalse(first.canSetPrice);
 
 		const later = (
 			await client.get(page(booked.id)).withInertia().loginAs(owner)
 		).inertiaProps;
 		assert.isFalse(later.canQuote);
 		assert.isFalse(later.canAccept);
+		assert.isFalse(later.canSetPrice);
+
+		// A booked project with no quote can get its price once (TAT-66).
+		const priceless = await inTenant(tenant, async () =>
+			makeProject(tenant, await makeClient(tenant), { status: "booked" }),
+		);
+		const pricelessProps = (
+			await client.get(page(priceless.id)).withInertia().loginAs(owner)
+		).inertiaProps;
+		assert.isTrue(pricelessProps.canSetPrice);
 	});
 
 	test("the assigned artist sees the page; another artist gets a 404", async ({
@@ -330,7 +341,8 @@ test.group("Project page: lifecycle props", (group) => {
 		).inertiaProps;
 
 		assert.isTrue(props.bookedWithoutSession);
-		assert.deepEqual(props.moves, []);
+		// A client can still withdraw from a booked project (TAT-66).
+		assert.deepEqual(props.moves, ["withdraw"]);
 		assert.equal(props.contactedText, "never contacted");
 	});
 
@@ -398,7 +410,7 @@ test.group("Project page: message and withdraw guards", (group) => {
 		assert.isFalse(await offered("cancelled"));
 	});
 
-	test("withdrawing is hidden and flagged while deposit money is held", async ({
+	test("withdrawing stays offered, and the page names the deposit it holds", async ({
 		client,
 		assert,
 	}) => {
@@ -415,14 +427,15 @@ test.group("Project page: message and withdraw guards", (group) => {
 		const heldProps = (
 			await client.get(page(paid.id)).withInertia().loginAs(owner)
 		).inertiaProps;
-		assert.deepEqual(heldProps.moves, []);
-		assert.isTrue(heldProps.withdrawBlocked);
+		assert.deepEqual(heldProps.moves, ["withdraw"]);
+		assert.equal(heldProps.depositHeldText, "NPR 3,000");
+		assert.notProperty(heldProps, "withdrawBlocked");
 
 		const freeProps = (
 			await client.get(page(unpaid.id)).withInertia().loginAs(owner)
 		).inertiaProps;
 		assert.deepEqual(freeProps.moves, ["withdraw"]);
-		assert.isFalse(freeProps.withdrawBlocked);
+		assert.isNull(freeProps.depositHeldText);
 	});
 });
 

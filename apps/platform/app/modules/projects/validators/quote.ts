@@ -168,3 +168,14 @@ function checkExpiry(
 export const acceptQuoteValidator = vine.create({
 	quoteId: vine.string().uuid(),
 });
+
+/** A direct booking's price, set once after booking (TAT-66): whole rupees. */
+export const priceValidator = vine.create({
+	fixedPrice: vine.number().withoutDecimals().range([1, 10_000_000]),
+});
+priceValidator.messagesProvider = new SimpleMessagesProvider({
+	"fixedPrice.required": PRICE,
+	"fixedPrice.number": PRICE,
+	"fixedPrice.withoutDecimals": PRICE,
+	"fixedPrice.range": PRICE,
+});

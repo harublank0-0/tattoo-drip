@@ -1,4 +1,5 @@
 import type { ReferenceProps } from "~/components/inquiries";
+import type { PaymentsCardProps } from "~/components/payments";
 
 /**
  * One quote version as the project page gets it. The amounts in the form's
@@ -53,6 +54,8 @@ export type ProjectPageProps = {
 	history: QuoteProps[];
 	canQuote: boolean;
 	canAccept: boolean;
+	/** Booked without a price: the Quote card offers "Set price" once. */
+	canSetPrice: boolean;
 	/** The chat message for the current quote, when it can be sent. */
 	message: ChatMessageProps | null;
 	form: {
@@ -63,8 +66,8 @@ export type ProjectPageProps = {
 	};
 	/** The manual moves this project can make now, in table order. */
 	moves: ManualMoveName[];
-	/** Withdrawing would be allowed, but the project holds deposit money. */
-	withdrawBlocked: boolean;
+	/** The deposit money the project holds ("NPR 3,000"), for the withdraw confirm; null when none. */
+	depositHeldText: string | null;
 	/** How many sessions a withdrawal would cancel. */
 	scheduledSessionCount: number;
 	/** Booked, but no tattoo session is scheduled. */
@@ -108,6 +111,8 @@ export type ProjectPageProps = {
 		/** Links open on this machine (the dev host), so no client can use them. */
 		devHost: boolean;
 	} | null;
+	/** The Payments card (TAT-66): owners get the screenshots and the forms, the assigned artist the list. */
+	payments: PaymentsCardProps;
 };
 
 export const STATUS_LABELS: Record<string, string> = {
@@ -151,6 +156,12 @@ export type ProjectRow = {
 	contactedText: string;
 	/** Booked, but no tattoo session is scheduled. */
 	noSession: boolean;
+	/** Owners: a deposit screenshot waits for a decision. */
+	proofWaiting: boolean;
+	/** Owners: a closed project holds deposit money with no outcome recorded. */
+	depositToSettle: boolean;
+	/** Owners: the quote expired but a late decision on the deposit spares the project; revise, take the rest or withdraw. */
+	quoteLapsed: boolean;
 };
 
 export type ProjectListProps = {

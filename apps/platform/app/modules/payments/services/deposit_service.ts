@@ -1,5 +1,6 @@
 import { inject } from "@adonisjs/core";
 import type { StoredImage } from "#modules/media/services/image_service";
+import { decidedLate, depositMoney } from "#modules/payments/ledger";
 import Payment from "#modules/payments/models/payment";
 import type { PaymentMethodKind } from "#modules/payments/models/payment_method";
 import type Quote from "#modules/projects/models/quote";
@@ -12,9 +13,8 @@ type TenantRef = Pick<Tenant, "id">;
 type ProjectRef = Pick<TattooProject, "id">;
 
 /**
- * Payment kinds that count toward a deposit. A `correction` is a verified
- * reversal of a mistaken verification (negative for a deposit that was
- * counted by mistake), so it counts too.
+ * The payment kinds deposit money is made of: deposits, and the corrections
+ * that reverse one (depositMoney decides which corrections those are).
  */
 const COUNTED_KINDS = ["deposit", "correction"];
 
@@ -22,7 +22,10 @@ const COUNTED_KINDS = ["deposit", "correction"];
  * A project's deposit: whether it is covered, what is left to pay, and the
  * proofs clients send from the deposit page (TAT-65 owns this class). The
  * current quote comes from QuoteService. Only payments in the quote's
- * currency count; another currency is not converted.
+ * currency count; another currency is not converted. TAT-66 owns it from
+ * here: corrections count only when they reverse a deposit, and
+ * `expirySpared` tells the expiry rule when a decision on the deposit came
+ * late.
  */
 @inject()
 export default class DepositService {
@@ -47,9 +50,10 @@ export default class DepositService {
 
 	/**
 	 * The deposit money the project holds in `currency`, in minor units: its
-	 * verified deposit and correction payments, summed (a reversal subtracts).
-	 * Unverified payments and other kinds don't count. Summed here, not in
-	 * SQL, for the same reason as isSettled.
+	 * verified deposits plus only the corrections that reverse one of them
+	 * (depositMoney in #modules/payments/ledger), so a reversed refund is not
+	 * counted as a deposit (TAT-66). Unverified payments and other kinds
+	 * don't count. Summed in JavaScript, as in isSettled.
 	 */
 	async verifiedPaid(
 		tenant: TenantRef,
@@ -62,7 +66,26 @@ export default class DepositService {
 			.where("status", "verified")
 			.where("currency", currency)
 			.whereIn("kind", COUNTED_KINDS);
-		return payments.reduce((sum, { amount }) => sum + amount, 0);
+		return depositMoney(payments, currency);
+	}
+
+	/**
+	 * Whether `quote`'s expiry must spare the project because the studio's
+	 * decision on its deposit is still owed or came late: a deposit
+	 * screenshot waits, or a deposit was verified, recorded at the desk,
+	 * rejected or reversed at or after the expiry (decidedLate).
+	 * ProjectService's expiry rule asks it first (TAT-66).
+	 */
+	async expirySpared(
+		tenant: TenantRef,
+		project: ProjectRef,
+		quote: Pick<Quote, "expiresAt">,
+	): Promise<boolean> {
+		const payments = await Payment.query()
+			.where("tenant_id", tenant.id)
+			.where("project_id", project.id)
+			.whereIn("kind", COUNTED_KINDS);
+		return decidedLate(payments, quote.expiresAt);
 	}
 
 	/**
