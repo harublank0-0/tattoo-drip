@@ -29,6 +29,7 @@ test("the prototype's mock data, pages and images are gone", () => {
 		!existsSync(new URL("public/prisma.svg", APP)),
 		"public/prisma.svg",
 	);
+	assert.ok(!existsSync(new URL("features", SRC)), "src/features");
 	assert.ok(existsSync(new URL("public/robots.txt", APP)), "public/robots.txt");
 });
 
@@ -47,6 +48,8 @@ test("nothing refers to the mock data, the prototype pages or PostHog", () => {
 			"features/home",
 			"posthog",
 			"components/layout",
+			"features/",
+			"booking-form",
 		]) {
 			assert.ok(
 				!text.toLowerCase().includes(banned),
@@ -56,15 +59,11 @@ test("nothing refers to the mock data, the prototype pages or PostHog", () => {
 	}
 });
 
-test("the prototype's booking form waits, unmounted, for the intake form", () => {
-	assert.ok(existsSync(new URL("features/intake/booking-form.tsx", SRC)));
-	assert.ok(existsSync(new URL("features/intake/booking-schema.ts", SRC)));
-	for (const file of sourceFiles()) {
-		if (file.startsWith("features/intake/")) continue;
-		const text = readFileSync(new URL(file, SRC), "utf8");
-		assert.ok(
-			!text.includes("booking-form"),
-			`${file} mounts the booking form`,
-		);
-	}
+test("the intake form replaced the prototype's booking form", () => {
+	assert.ok(existsSync(new URL("intake/components/intake-form.tsx", SRC)));
+	const section = readFileSync(
+		new URL("studio/components/inquiry.tsx", SRC),
+		"utf8",
+	);
+	assert.match(section, /<IntakeMount\b/);
 });

@@ -16,6 +16,11 @@ import { extname, join, relative, resolve } from "node:path";
 const SERVER_ONLY = [
 	"STOREFRONT_SERVER_KEY",
 	"STOREFRONT_URL",
+	// The setting's name, not its value: the site key is public and reaches
+	// the browser in the router's dehydrated state (TAT-57), never in the
+	// bundle. The platform's secret has no business in the storefront at all.
+	"TURNSTILE_SITE_KEY",
+	"TURNSTILE_SECRET_KEY",
 	"API_URL",
 	"serverKey",
 	"requestStudio",

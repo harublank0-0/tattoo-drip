@@ -1,22 +1,26 @@
+import { IntakeMount } from "../../intake/components/intake-mount.tsx";
 import type { InquiryChannels, InquiryState } from "../inquiry.ts";
 import { linkRel } from "../links.ts";
 
 type OpenInquiry = Extract<InquiryState, { kind: "open" }>;
 
 /**
- * The #inquiry section (TAT-48): the intake form's mount point. TAT-57
- * renders its form in place of <InquiryFallback> (the `open` branch), with
- * `state.preferredArtist` pre-selected and only `state.artists` to choose
- * from, and keeps the closed branches as they are. The section keeps its id
- * (`inquiry`) and label (`inquiry-title`) in every state; its heading says
- * "Inquiries" while closed, so it doesn't invite above a refusal.
+ * The #inquiry section (TAT-48): open, it holds the intake form (TAT-57),
+ * which mounts in the browser after hydration; on the server and until then,
+ * and without JavaScript, <InquiryFallback>'s chat links show. Closed, it
+ * says so. The section keeps its id (`inquiry`) and label (`inquiry-title`)
+ * in every state; its heading says "Inquiries" while closed, so it doesn't
+ * invite above a refusal.
  */
 export function InquirySection({
 	state,
 	channels,
+	challengeSiteKey = null,
 }: {
 	state: InquiryState;
 	channels: InquiryChannels;
+	/** The public Turnstile site key (null: no bot check, development). */
+	challengeSiteKey?: string | null;
 }) {
 	return (
 		<section id="inquiry" className="section" aria-labelledby="inquiry-title">
@@ -26,7 +30,12 @@ export function InquirySection({
 			</h2>
 			<div className="stack measure">
 				{state.kind === "open" ? (
-					<InquiryFallback state={state} channels={channels} />
+					<IntakeMount
+						state={state}
+						channels={channels}
+						challengeSiteKey={challengeSiteKey}
+						fallback={<InquiryFallback state={state} channels={channels} />}
+					/>
 				) : null}
 				{state.kind === "studio-closed" ? (
 					<p>
@@ -54,8 +63,9 @@ export function InquirySection({
 }
 
 /**
- * Until TAT-57's form: the inquiry goes by WhatsApp or email with a
- * prefilled message, else by Instagram.
+ * The open section on the server, before hydration and without JavaScript:
+ * the inquiry goes by WhatsApp or email with a prefilled message, else by
+ * Instagram. The intake form replaces it in the browser.
  */
 function InquiryFallback({
 	state,

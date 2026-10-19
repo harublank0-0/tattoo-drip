@@ -15,9 +15,9 @@ What the MVP (pilot with a design-partner studio) and V1 (paid launch) must do, 
 - [ ] Artist profiles: name, slug, bio, photo, visible or hidden, and an "accepting inquiries" switch with an optional message (the intake form shows the message and hides that artist)
 
 **Intake**
-- [ ] A public intake form on the studio page, plus a per-artist link
-- [ ] The form asks for: idea, up to 5 reference images (JPEG, PNG or WebP, 10 MB each and 20 MB together; phones convert HEIC photos when the form asks for these), placement, approximate size, preferred dates, preferred artist (optional), name, phone (required; used for WhatsApp or Viber), email (optional), budget (optional), and how they found the studio
-- [ ] After submitting, the customer is told the studio will reply on WhatsApp or Viber
+- [x] A public intake form on the studio page, plus a per-artist link
+- [x] The form asks for: idea, up to 5 reference images (JPEG, PNG or WebP, 10 MB each and 20 MB together; phones convert HEIC photos when the form asks for these), placement, approximate size, preferred dates, preferred artist (optional), name, phone (required; used for WhatsApp or Viber), email (optional), budget (optional), and how they found the studio
+- [x] After submitting, the customer is told the studio will reply on WhatsApp or Viber
 - An inquiry finds the studio's client by phone, or creates one; a returning client's details never change, and the inquiry keeps what was sent. A phone number has at most 3 open (unanswered) inquiries per studio. An artist who isn't accepting inquiries can't be chosen, and a studio whose visible artists are all closed takes none.
 
 **Inquiries and projects**
@@ -47,7 +47,7 @@ What the MVP (pilot with a design-partner studio) and V1 (paid launch) must do, 
 
 **Notifications, page and app**
 - [ ] Staff are alerted to new inquiries by email and in the app. No automatic customer messages in the MVP; replies go through the one-tap chat links
-- [ ] Studio page at `{slug}.platform.com`: profile, artists, Instagram link, intake form
+- [x] Studio page at `{slug}.platform.com`: profile, artists, Instagram link, intake form
 - [ ] The dashboard is mobile-first and installable as a web app
 - [ ] Pilot metrics: share of inquiries arriving through the link, time from inquiry to verified deposit, session no-shows
 
@@ -124,7 +124,7 @@ shortcuts:   flash or walk-in → booked     in_progress → booked (next sessio
 - The studio page reads and writes **only** through the API/SDK. It never touches the database or imports platform code.
 - Hidden artists don't appear, and a hidden or deleted artist's page is a not-found page. The page shows what the dashboard says it shows (the profile, the visible artists with their photos and closed messages), never deposit policies, payment details, members or anything about clients, inquiries or payments.
 - Each visible artist has a link of their own, `/artists/<slug>`, that asks for them by name; a hidden, unknown or renamed artist shows the not-found page.
-- The page shows only what the public API returns, always as text, and loads no analytics or third-party scripts (the bot challenge, TAT-55, will be the one exception).
+- The page shows only what the public API returns, always as text, and loads no analytics or third-party scripts (the intake form's bot challenge, Cloudflare Turnstile, is the one exception, loaded only once someone starts filling the form in).
 
 ## Not yet
 

@@ -72,6 +72,11 @@ export function createStorefrontQueryClient(
 				retry: environment === "server" ? false : shouldRetry,
 				retryDelay,
 			},
+			// A write never waits for the network (TanStack's default "online" pauses
+			// it while the browser is offline and sends it later): an inquiry would
+			// sit on "Sending…" and then go out with a spent Turnstile token. Offline,
+			// it fails at once and the person sends again with a fresh one.
+			mutations: { networkMode: "always" },
 			dehydrate: { shouldDehydrateQuery, shouldRedactErrors: () => true },
 		},
 	});

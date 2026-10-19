@@ -17,5 +17,13 @@ export const Route = createFileRoute("/artists/$slug")({
 });
 
 function ArtistRoute() {
-	return <ArtistPage data={Route.useLoaderData()} />;
+	const challengeSiteKey = Route.useRouteContext({
+		select: (context) => context.site.challengeSiteKey,
+	});
+	return (
+		<ArtistPage
+			data={Route.useLoaderData()}
+			challengeSiteKey={challengeSiteKey}
+		/>
+	);
 }

@@ -10,7 +10,14 @@ import { InquirySection } from "./inquiry.tsx";
  * router's glue), so test/studio/render.test.ts renders them on their own.
  */
 
-export function StudioPage({ data }: { data: StudioPageData }) {
+export function StudioPage({
+	data,
+	challengeSiteKey = null,
+}: {
+	data: StudioPageData;
+	/** The intake form's public Turnstile site key (TAT-57). */
+	challengeSiteKey?: string | null;
+}) {
 	const { studio, artists, inquiry, channels } = data;
 	return (
 		<>
@@ -43,14 +50,25 @@ export function StudioPage({ data }: { data: StudioPageData }) {
 					</div>
 				</header>
 				<ArtistRoster artists={artists} />
-				<InquirySection state={inquiry} channels={channels} />
+				<InquirySection
+					state={inquiry}
+					channels={channels}
+					challengeSiteKey={challengeSiteKey}
+				/>
 			</main>
 			<SiteFooter studioName={studio.name} />
 		</>
 	);
 }
 
-export function ArtistPage({ data }: { data: ArtistPageData }) {
+export function ArtistPage({
+	data,
+	challengeSiteKey = null,
+}: {
+	data: ArtistPageData;
+	/** The intake form's public Turnstile site key (TAT-57). */
+	challengeSiteKey?: string | null;
+}) {
 	const { studio, artist, inquiry, channels } = data;
 	return (
 		<>
@@ -61,7 +79,11 @@ export function ArtistPage({ data }: { data: ArtistPageData }) {
 			</header>
 			<main className="page">
 				<ArtistProfile artist={artist} studio={studio} />
-				<InquirySection state={inquiry} channels={channels} />
+				<InquirySection
+					state={inquiry}
+					channels={channels}
+					challengeSiteKey={challengeSiteKey}
+				/>
 				<section className="section" aria-labelledby="studio-title">
 					<h2 id="studio-title" className="section-title" dir="auto">
 						{studio.name}

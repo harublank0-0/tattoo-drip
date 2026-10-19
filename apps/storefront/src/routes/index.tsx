@@ -14,5 +14,13 @@ export const Route = createFileRoute("/")({
 });
 
 function StudioRoute() {
-	return <StudioPage data={Route.useLoaderData()} />;
+	const challengeSiteKey = Route.useRouteContext({
+		select: (context) => context.site.challengeSiteKey,
+	});
+	return (
+		<StudioPage
+			data={Route.useLoaderData()}
+			challengeSiteKey={challengeSiteKey}
+		/>
+	);
 }

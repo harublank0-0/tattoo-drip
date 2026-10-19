@@ -56,6 +56,8 @@ describe("check-client-bundle", () => {
 			"Studio lookup failed",
 			"Studio not found",
 			"handleTenantRequest",
+			"TURNSTILE_SITE_KEY",
+			"TURNSTILE_SECRET_KEY",
 		];
 		for (const name of names) {
 			for (const file of [
