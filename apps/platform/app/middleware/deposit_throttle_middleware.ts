@@ -5,6 +5,7 @@ import {
 	DEPOSIT_LIMITS,
 	depositLimitKeys,
 } from "#modules/payments/deposit_limits";
+import { callerIp } from "#services/api_caller";
 import { READ_METHODS } from "#services/public_api";
 
 /**
@@ -13,10 +14,12 @@ import { READ_METHODS } from "#services/public_api";
  * (GET and HEAD as reads, anything else as a proof upload), 404s and
  * refusals included. Over either limit it throws E_TOO_MANY_REQUESTS, which
  * the API answers as 429 `rate_limited` with Retry-After. Runs after
- * publicTenant and before the handler reads the body (the upload route is
- * in multipart.processManually), so a refused upload never reaches the
- * disk. The counts live on the limiter's own connection, so a request that
- * fails later still counts.
+ * publicTenant and before the handler reads the body (the body parser
+ * reads no multipart body itself: multipart.autoProcess is false), so a
+ * refused upload never reaches the disk. The counts live on the limiter's
+ * own connection, so a request that fails later still counts. Counted by
+ * the caller's address (`callerIp`: the storefront's visitor with a valid
+ * server key, TAT-38).
  */
 export default class DepositThrottleMiddleware {
 	async handle(ctx: HttpContext, next: NextFn) {
@@ -24,7 +27,7 @@ export default class DepositThrottleMiddleware {
 		const limits = DEPOSIT_LIMITS[action];
 		const keys = depositLimitKeys(
 			action,
-			ctx.request.ip(),
+			callerIp(ctx),
 			String(ctx.params.token),
 		);
 		// The address first, so a refused address never adds to the token's

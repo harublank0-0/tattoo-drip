@@ -6,6 +6,7 @@ import {
 	API_ERRORS,
 	type ApiErrorCode,
 	type ErrorKind,
+	RETRY_AFTER_BUSY_SECONDS,
 	setApiHeaders,
 } from "#services/public_api";
 
@@ -19,6 +20,7 @@ const CODE_BY_STATUS: Partial<Record<number, ApiErrorCode>> = {
 	400: "bad_request",
 	404: "not_found",
 	405: "method_not_allowed",
+	408: "request_timeout",
 	413: "payload_too_large",
 	415: "unsupported_media_type",
 	429: "rate_limited",
@@ -32,6 +34,9 @@ const CODE_BY_STATUS: Partial<Record<number, ApiErrorCode>> = {
  * the contract says; any other code with fields is refused at construction.
  */
 export class ApiException extends Error {
+	/** Seconds for Retry-After, for a refusal a client should retry later. */
+	retryAfter?: number;
+
 	constructor(
 		status: number,
 		code: "validation_failed",
@@ -52,6 +57,13 @@ export class ApiException extends Error {
 				`ApiException "${code}" cannot carry fields: only validation_failed does`,
 			);
 		}
+	}
+
+	/** A refusal to retry after `seconds` (TAT-38: write slots). */
+	static retryLater(code: "rate_limited" | "service_busy", seconds: number) {
+		const error = ApiException.of(code);
+		error.retryAfter = seconds;
+		return error;
 	}
 
 	/** The 404 of an unknown tenant or record: one answer for every reason. */
@@ -96,7 +108,15 @@ export function apiErrorFor(
 	error: unknown,
 	allow: string[] = [],
 ): ApiErrorResponse {
-	if (error instanceof ApiException) return respond(error, error.fields);
+	if (error instanceof ApiException) {
+		return respond(
+			error,
+			error.fields,
+			error.retryAfter === undefined
+				? {}
+				: { "Retry-After": String(error.retryAfter) },
+		);
+	}
 	if (error instanceof vineErrors.E_VALIDATION_ERROR) {
 		return respond(API_ERRORS.validation_failed, fieldsOf(error.messages));
 	}
@@ -107,6 +127,12 @@ export function apiErrorFor(
 	if (error instanceof httpErrors.E_ROUTE_NOT_FOUND && allow.length > 0) {
 		return respond(API_ERRORS.method_not_allowed, undefined, {
 			Allow: allow.join(", "),
+		});
+	}
+	// No pooled connection within the pool's wait (#services/db_pool).
+	if (error instanceof Error && error.name === "KnexTimeoutError") {
+		return respond(API_ERRORS.service_busy, undefined, {
+			"Retry-After": String(RETRY_AFTER_BUSY_SECONDS),
 		});
 	}
 	const status = statusOf(error);
@@ -124,6 +150,18 @@ export function apiErrorFor(
 }
 
 /**
+ * Whether an API error goes to the log: server errors do, a client's
+ * mistakes (4xx) don't, and neither does a deliberate busy refusal (a write
+ * slot, TAT-38). A pool timeout is a server error: it is logged.
+ */
+export function apiErrorIsReported(error: unknown): boolean {
+	if (error instanceof ApiException && error.code === "service_busy") {
+		return false;
+	}
+	return apiErrorFor(error).status >= 500;
+}
+
+/**
  * Answers a failed public API request with the error envelope; the
  * exception handler calls it for every /api request. A URL the router has
  * no route for under this method, but has one under another, is a 405.
@@ -136,6 +174,11 @@ export function renderApiError(error: unknown, ctx: HttpContext) {
 	setApiHeaders(ctx.response);
 	for (const [name, value] of Object.entries(headers)) {
 		ctx.response.header(name, value);
+	}
+	// Answered before its body arrived (a refusal, a deadline): close the
+	// connection rather than let Node read the rest of a slow body (TAT-38).
+	if (ctx.request.hasBody() && !ctx.request.request.complete) {
+		ctx.response.header("Connection", "close");
 	}
 	ctx.response.status(status).json(body);
 }

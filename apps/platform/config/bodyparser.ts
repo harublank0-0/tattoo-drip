@@ -51,26 +51,21 @@ const bodyParserConfig = defineConfig({
 	 */
 	multipart: {
 		/**
-		 * Automatically process uploaded files into the system tmp directory.
+		 * The parser reads no multipart body itself (TAT-38). Its handler
+		 * table is a plain object, so a file part named like an
+		 * Object.prototype property (`constructor`, `__proto__`) would throw
+		 * inside an async listener and end the process. Every multipart body
+		 * is read with receiveUploads (#services/uploads), which covers those
+		 * names: by WebMultipartMiddleware for a signed-in dashboard request,
+		 * and by a public API upload route's handler after publicTenant and
+		 * the limits (TAT-32 ruling 16).
 		 */
-		autoProcess: true,
+		autoProcess: false,
 
 		/**
 		 * Normalize empty string values to null.
 		 */
 		convertEmptyStringsToNull: true,
-
-		/**
-		 * Routes where multipart processing is handled manually: the parser
-		 * does not read their body, the handler does (receiveUploads in
-		 * #services/uploads). Every public API route that takes a body goes
-		 * here (a test checks), so no upload is written to disk before the
-		 * tenant is known (TAT-32 ruling 16, TAT-51).
-		 */
-		processManually: [
-			"/api/v1/tenants/:tenant/inquiries",
-			"/api/v1/tenants/:tenant/deposits/:token",
-		],
 
 		/**
 		 * Maximum accepted payload size for multipart requests.

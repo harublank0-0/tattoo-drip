@@ -6,6 +6,7 @@ import PaymentMethod from "#modules/payments/models/payment_method";
 import PaymentMethodService from "#modules/payments/services/payment_method_service";
 import { testImages, uploadOf } from "#tests/helpers/images";
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
+import { newTempUploads, tempUploads } from "#tests/helpers/uploads";
 import { assertValidationError } from "#tests/helpers/validation";
 
 const methods = new PaymentMethodService(new ImageService());
@@ -156,6 +157,41 @@ test.group("Editing a payment method", (group) => {
 		);
 		assert.equal(saved.label, "Fonepay (Nabil)");
 		assert.equal(saved.qrImageKey, method.qrImageKey);
+	});
+
+	test("a multipart PUT with a new QR reaches the controller with its fields and replaces the QR", async ({
+		client,
+		assert,
+	}) => {
+		// Inertia's form sends a real multipart PUT (no _method field); the body
+		// is read by WebMultipartMiddleware, not by the body parser (TAT-38).
+		const { owner, tenant } = await studioWithOwner();
+		const method = await inTenant(tenant, async () =>
+			methods.create(tenant, {
+				kind: "fonepay",
+				label: "Fonepay",
+				qr: await uploadOf(await testImages.png()),
+			}),
+		);
+		const before = await tempUploads();
+
+		const response = await client
+			.put(`${base}/${method.id}`)
+			.fields({ label: "Fonepay (Nabil)", showOnDepositPage: "on" })
+			.file("qr", await testImages.jpeg(), { filename: "new-qr.jpg" })
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		response.assertHeader("location", base);
+		const saved = await inTenant(tenant, () =>
+			PaymentMethod.findOrFail(method.id),
+		);
+		assert.equal(saved.label, "Fonepay (Nabil)");
+		assert.isTrue(saved.showOnDepositPage);
+		assert.isNotNull(saved.qrImageKey);
+		assert.notEqual(saved.qrImageKey, method.qrImageKey);
+		assert.deepEqual(await newTempUploads(before), []);
 	});
 
 	test("an owner removes a bank QR", async ({ client, assert }) => {

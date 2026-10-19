@@ -70,6 +70,39 @@ function responseOf(outcome: TenantOutcome): Response {
 }
 
 describe("handleTenantRequest", () => {
+	test("with a key, the lookup carries the visitor's address, and the studio goes on with it", async () => {
+		const { calls, fetch } = api();
+
+		const outcome = await handleTenantRequest(
+			request("blackneedle.tattoodrip.com", "/", {
+				headers: { "x-forwarded-for": "203.0.113.7, 10.0.0.1" },
+			}),
+			deps(fetch, { config: { ...CONFIG, serverKey: KEY } }),
+		);
+
+		assert.equal(
+			new Headers(calls[0].init.headers).get("x-visitor-ip"),
+			"203.0.113.7",
+		);
+		assert.ok(outcome.type === "studio");
+		assert.equal(outcome.visitorAddress, "203.0.113.7");
+	});
+
+	test("without a key, no visitor's address leaves the server", async () => {
+		const { calls, fetch } = api();
+
+		const outcome = await handleTenantRequest(
+			request("blackneedle.tattoodrip.com", "/", {
+				headers: { "x-forwarded-for": "203.0.113.7" },
+			}),
+			deps(fetch),
+		);
+
+		assert.equal(new Headers(calls[0].init.headers).get("x-visitor-ip"), null);
+		assert.ok(outcome.type === "studio");
+		assert.equal(outcome.visitorAddress, undefined);
+	});
+
 	test("the lookup carries the configured server key", async () => {
 		const { calls, fetch } = api();
 
@@ -117,6 +150,7 @@ describe("handleTenantRequest", () => {
 		assert.deepEqual(outcome, {
 			type: "studio",
 			studio: { slug: "blackneedle", name: "Black Needle" },
+			visitorAddress: undefined,
 		});
 		assert.deepEqual(
 			calls.map((call) => call.url),

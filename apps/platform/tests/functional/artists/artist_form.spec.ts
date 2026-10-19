@@ -8,6 +8,7 @@ import ArtistService, {
 import ImageService from "#modules/media/services/image_service";
 import { testImages } from "#tests/helpers/images";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
+import { newTempUploads, tempUploads } from "#tests/helpers/uploads";
 import { assertValidationError } from "#tests/helpers/validation";
 
 const artists = new ArtistService(new ImageService());
@@ -381,6 +382,40 @@ test.group("Editing an artist", (group) => {
 		assert.equal(saved.slug, "sita-r");
 		assert.equal(saved.bio, "New");
 		assert.equal(saved.photoKey, artist.photoKey);
+	});
+
+	test("a multipart PUT with a new photo reaches the controller with its fields and replaces the photo", async ({
+		client,
+		assert,
+	}) => {
+		// Inertia's form sends a real multipart PUT (no _method field); the body
+		// is read by WebMultipartMiddleware, not by the body parser (TAT-38).
+		const { owner, tenant } = await studioWithOwner();
+		await client
+			.post(base)
+			.fields({ name: "Sita Rai", slug: "sita", visible: "on" })
+			.file("photo", await testImages.png(), { filename: "p.png" })
+			.withCsrfToken()
+			.loginAs(owner);
+		const [artist] = await listOf(tenant);
+		const before = await tempUploads();
+
+		const response = await client
+			.put(`${base}/${artist.id}`)
+			.fields({ name: "Sita R.", slug: "sita-r", visible: "on", bio: "New" })
+			.file("photo", await testImages.jpeg(), { filename: "new.jpg" })
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		response.assertHeader("location", base);
+		response.assertFlashMessage("success", '"Sita R." saved.');
+		const [saved] = await listOf(tenant);
+		assert.equal(saved.slug, "sita-r");
+		assert.equal(saved.bio, "New");
+		assert.isNotNull(saved.photoKey);
+		assert.notEqual(saved.photoKey, artist.photoKey);
+		assert.deepEqual(await newTempUploads(before), []);
 	});
 
 	test("unchecked boxes on an edit turn the artist off", async ({

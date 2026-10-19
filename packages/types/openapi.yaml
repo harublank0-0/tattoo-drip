@@ -23,11 +23,23 @@ info:
       `Cache-Control: public, max-age=60, stale-while-revalidate=600` and an
       `ETag` (`If-None-Match` gets a 304). Everything else, errors included,
       is `Cache-Control: no-store`.
+    - **Rate limits (TAT-38).** Every request counts against its caller
+      before its body is read, reads and writes apart; reads also count per
+      studio. Over a limit the answer is 429 `rate_limited` with
+      `Retry-After` (seconds). A response served from a cache is not
+      counted. Never retry a write automatically.
+    - **Busy and slow uploads (TAT-38).** A write may be 503
+      `service_busy` with `Retry-After` while too many uploads are in
+      progress (429 `rate_limited` for one address); an upload whose body
+      takes longer than 90 seconds is 408 `request_timeout`.
+    - **Server key.** The hosted storefront's server sends a secret key
+      (`Authorization: Bearer`) and its visitor's address (`X-Visitor-IP`)
+      so that its server-side calls count per visitor. The key grants no
+      data and no access: every endpoint answers the same without it. It
+      is an operational header, not an authentication scheme; never send it
+      from a browser (CORS allows neither header).
 servers:
   - url: https://api.example.com/api/v1
-security:
-  - {}
-  - serverKey: []
 
 tags:
   - name: MVP
@@ -98,6 +110,7 @@ paths:
                   data: { $ref: "#/components/schemas/Studio" }
         "304": { $ref: "#/components/responses/NotModified" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
         default: { $ref: "#/components/responses/Error" }
 
   /tenants/{tenant}/artists:
@@ -128,6 +141,7 @@ paths:
                   data: { type: array, items: { $ref: "#/components/schemas/Artist" } }
         "304": { $ref: "#/components/responses/NotModified" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
         default: { $ref: "#/components/responses/Error" }
 
   /tenants/{tenant}/artists/{artist}:
@@ -158,6 +172,7 @@ paths:
                   data: { $ref: "#/components/schemas/Artist" }
         "304": { $ref: "#/components/responses/NotModified" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
         default: { $ref: "#/components/responses/Error" }
 
   /tenants/{tenant}/services:
@@ -317,6 +332,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "408": { $ref: "#/components/responses/Error" }
         "409":
           description: The studio takes no such inquiry now (`artist_not_accepting`, `studio_not_accepting`, `too_many_open_inquiries`)
           content:
@@ -327,7 +343,7 @@ paths:
         "422": { $ref: "#/components/responses/ValidationError" }
         "429": { $ref: "#/components/responses/RateLimited" }
         "503":
-          description: The bot challenge could not be checked (`challenge_unavailable`). Try again in a minute.
+          description: The bot challenge could not be checked (`challenge_unavailable`), or the API is busy (`service_busy`, with `Retry-After`). Try again in a minute.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -405,6 +421,7 @@ paths:
                   data: { $ref: "#/components/schemas/DepositPage" }
         "400": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "408": { $ref: "#/components/responses/Error" }
         "409":
           description: The page can't take a screenshot now (`deposit_not_due`, `deposit_changed`)
           content:
@@ -414,15 +431,14 @@ paths:
         "415": { $ref: "#/components/responses/Error" }
         "422": { $ref: "#/components/responses/ValidationError" }
         "429": { $ref: "#/components/responses/RateLimited" }
+        "503":
+          description: The API is busy (`service_busy`, with `Retry-After`). Try again in a moment.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
         default: { $ref: "#/components/responses/Error" }
 
 components:
-  securitySchemes:
-    serverKey:
-      type: http
-      scheme: bearer
-      description: Secret server key. Only sets rate-limit identity; grants no extra data access. Never use in a browser.
-
   parameters:
     Tenant:
       name: tenant
@@ -533,13 +549,15 @@ components:
                 (405), `payload_too_large` (413), `unsupported_media_type`
                 (415), `validation_failed` (422, with `fields`),
                 `rate_limited` (429, with `Retry-After`), `internal_error`
-                (500). Endpoint codes: `artist_not_accepting`,
+                (500), `request_timeout` (408, an upload that took too long)
+                and `service_busy` (503, with `Retry-After`: too many uploads
+                in progress, or no database connection free). Endpoint codes: `artist_not_accepting`,
                 `studio_not_accepting`, `too_many_open_inquiries` (409),
                 `challenge_failed` (403) and `challenge_unavailable` (503),
                 all `createInquiry`; `deposit_not_due`, `deposit_changed`
                 (409, `submitDepositProof`). Treat an unknown code by its HTTP
                 status.
-              examples: [not_found, validation_failed, rate_limited, too_many_open_inquiries, challenge_failed, deposit_changed]
+              examples: [not_found, validation_failed, rate_limited, service_busy, too_many_open_inquiries, challenge_failed, deposit_changed]
             message:
               type: string
               description: A sentence for people. Never parse it.

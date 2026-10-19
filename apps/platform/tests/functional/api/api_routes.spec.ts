@@ -11,7 +11,13 @@ const NAMED = new Set(Object.keys(middleware));
 const WEB_ONLY = ["auth", "guest", "dbContext", "tenant", "role"];
 
 /** Middleware only API routes may run. */
-const PUBLIC_ONLY = ["publicApi", "publicTenant", "publicCache", "intakeGuard"];
+const PUBLIC_ONLY = [
+	"publicApi",
+	"publicTenant",
+	"publicCache",
+	"intakeGuard",
+	"apiLimit",
+];
 
 /**
  * API GET routes that are not cacheable, and why. A new GET route either
@@ -72,6 +78,23 @@ test.group("Public API routes", () => {
 		}
 	});
 
+	test("every tenant route counts the studio's reads right after publicTenant", ({
+		assert,
+	}) => {
+		const routes = allRoutes().filter(
+			({ pattern }) => isTenantApi(pattern) && !isTestOnly(pattern),
+		);
+		assert.isNotEmpty(routes);
+
+		for (const { pattern, named } of routes) {
+			assert.equal(
+				named[named.indexOf("publicTenant") + 1],
+				"apiLimit",
+				pattern,
+			);
+		}
+	});
+
 	test("the intake checks its challenge and limits after resolving the tenant (TAT-55)", ({
 		assert,
 	}) => {
@@ -123,26 +146,10 @@ test.group("Public API routes", () => {
 		);
 	});
 
-	test("no API route lets the body parser write a multipart body before the tenant is known", ({
-		assert,
-	}) => {
-		const writes = allRoutes().filter(
-			({ pattern, methods }) =>
-				isApi(pattern) &&
-				!isTestOnly(pattern) &&
-				methods.some((method) => !["GET", "HEAD"].includes(method)),
-		);
-		assert.isNotEmpty(writes);
-
-		assert.deepEqual(
-			writes
-				.map(({ pattern }) => pattern)
-				.filter(
-					(pattern) =>
-						!bodyParserConfig.multipart.processManually.includes(pattern),
-				),
-			[],
-			"list the route in multipart.processManually (config/bodyparser.ts) and read its body with receiveUploads, after publicTenant (TAT-32 ruling 16)",
+	test("the body parser reads no multipart body itself", ({ assert }) => {
+		assert.isFalse(
+			bodyParserConfig.multipart.autoProcess,
+			"multipart.autoProcess must stay false (TAT-38 ruling 16): routes read uploads with receiveUploads (#services/uploads)",
 		);
 	});
 

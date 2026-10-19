@@ -56,6 +56,8 @@ export type ApiErrorCode =
 	| "validation_failed"
 	| "rate_limited"
 	| "internal_error"
+	| "request_timeout"
+	| "service_busy"
 	// createInquiry (TAT-51)
 	| "artist_not_accepting"
 	| "studio_not_accepting"
@@ -106,6 +108,16 @@ export const API_ERRORS: Record<ApiErrorCode, ErrorKind> = {
 		code: "internal_error",
 		message: "Something went wrong. Try again later.",
 	},
+	request_timeout: {
+		status: 408,
+		code: "request_timeout",
+		message: "The upload took too long. Try again on a faster connection.",
+	},
+	service_busy: {
+		status: 503,
+		code: "service_busy",
+		message: "We're busy right now. Try again in a moment.",
+	},
 	artist_not_accepting: {
 		status: 409,
 		code: "artist_not_accepting",
@@ -148,6 +160,9 @@ export const API_ERRORS: Record<ApiErrorCode, ErrorKind> = {
 			"The deposit amount changed. Check the new amount before you upload.",
 	},
 };
+
+/** Seconds a busy answer (service_busy, a write already in flight) asks a client to wait (TAT-38). */
+export const RETRY_AFTER_BUSY_SECONDS = 10;
 
 /** A raw request URL under /api (not decoded: decoding is what failed). */
 const RAW_API_URL = /^\/api(?:[/?#]|$)/;

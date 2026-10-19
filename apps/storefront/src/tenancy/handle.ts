@@ -9,9 +9,10 @@ import {
 	redirectResponse,
 	unavailableResponse,
 } from "./responses.ts";
+import { visitorAddress, withVisitorAddress } from "./visitor.ts";
 
 export type TenantOutcome =
-	| { type: "studio"; studio: Studio }
+	| { type: "studio"; studio: Studio; visitorAddress: string | undefined }
 	| { type: "respond"; response: Response };
 
 export interface TenantDeps {
@@ -48,16 +49,22 @@ export async function handleTenantRequest(
 	// `foreign` is where custom domains (TAT-79) will look the hostname up.
 	if (target.kind !== "tenant") return respond(notFoundResponse());
 
+	// Only keyed calls carry the visitor's address (TAT-38).
+	const visitor = deps.config.serverKey ? visitorAddress(request) : undefined;
 	const lookup = await lookUpTenant(target.slug, {
 		apiUrl: deps.config.apiUrl,
 		key: deps.config.serverKey,
 		signal: request.signal,
 		timeoutMs: deps.timeoutMs,
-		fetch: deps.fetch,
+		fetch: withVisitorAddress(deps.fetch, visitor),
 	});
 	switch (lookup.type) {
 		case "found":
-			return { type: "studio", studio: lookup.studio };
+			return {
+				type: "studio",
+				studio: lookup.studio,
+				visitorAddress: visitor,
+			};
 		case "moved":
 			// Writes need the current slug, as at the API (TAT-32).
 			return respond(

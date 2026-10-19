@@ -12,9 +12,10 @@ export interface StorefrontConfig {
 	/** ":3000" when STOREFRONT_URL names a port other than its scheme's default, else "". */
 	port: string;
 	/**
-	 * STOREFRONT_SERVER_KEY, only when set: the secret the server sends with
-	 * its API calls (Authorization: Bearer), for rate limiting only. The
-	 * platform checks it from TAT-38. Never sent to a browser.
+	 * STOREFRONT_SERVER_KEY: the secret the server sends with its API calls
+	 * (Authorization: Bearer), with its visitor's address (X-Visitor-IP), for
+	 * rate limiting only (TAT-38). Required with NODE_ENV=production. Never
+	 * sent to a browser.
 	 */
 	serverKey?: string;
 	/**
@@ -59,10 +60,15 @@ export function parseStorefrontConfig(env: Env): StorefrontConfig {
 	const problems: string[] = [];
 	const apiUrl = readApiUrl(env.API_URL?.trim(), problems);
 	const site = readStorefrontUrl(env.STOREFRONT_URL?.trim(), problems);
-	const serverKey = readServerKey(env.STOREFRONT_SERVER_KEY?.trim(), problems);
+	const production = env.NODE_ENV === "production";
+	const serverKey = readServerKey(
+		env.STOREFRONT_SERVER_KEY?.trim(),
+		production,
+		problems,
+	);
 	const challengeSiteKey = readChallengeSiteKey(
 		env.TURNSTILE_SITE_KEY?.trim(),
-		env.NODE_ENV === "production",
+		production,
 		problems,
 	);
 	if (!apiUrl || !site || problems.length > 0) {
@@ -158,12 +164,18 @@ function readStorefrontUrl(
 	return { protocol, baseHost, port };
 }
 
-/** Optional until the platform checks it (TAT-38); refused when set but malformed. */
+/** Required with NODE_ENV=production (TAT-38); refused when set but malformed. */
 function readServerKey(
 	value: string | undefined,
+	production: boolean,
 	problems: string[],
 ): string | undefined {
-	if (!value) return undefined;
+	if (!value) {
+		if (production) {
+			problems.push(problem("STOREFRONT_SERVER_KEY", value, SERVER_KEY_RULE));
+		}
+		return undefined;
+	}
 	if (!SERVER_KEY_SHAPE.test(value)) {
 		problems.push(problem("STOREFRONT_SERVER_KEY", value, SERVER_KEY_RULE));
 		return undefined;

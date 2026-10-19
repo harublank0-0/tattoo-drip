@@ -10,6 +10,7 @@ Map: `app/modules/<module>/` owns domain code; `app/controllers` and `app/transf
 - Dashboard components, forms or theme: [UI conventions](docs/ui.md).
 - Queues, workers or mail: [jobs and email](docs/jobs-and-email.md).
 - Tests, routes/pages/controllers or generated types: [testing and code generation](docs/testing.md).
+- Production settings, the reverse proxy, pools or the server key: [deploy](docs/deploy.md).
 - Cross-project design or product rules: choose the relevant document from the [documentation index](../../docs/README.md).
 
 ## Essential constraints

@@ -304,8 +304,9 @@ router
  * auth and Inertia middleware skip /api), CORS open without credentials,
  * { data } and { error } envelopes (#services/public_api_errors). Every /api
  * route goes in this group and runs publicApi first (a test checks). Cache
- * a read with middleware.publicCache(); everything else is no-store. TAT-38
- * adds its rate limits to these `use` lists.
+ * a read with middleware.publicCache(); everything else is no-store. Every
+ * request is counted per caller before its body (PublicGateMiddleware,
+ * router.use) and a studio's reads after publicTenant (apiLimit, TAT-38).
  */
 router
 	.group(() => {
@@ -356,7 +357,10 @@ router
 					.as("api.v1.deposits.store");
 			})
 			.prefix("/tenants/:tenant")
-			.use(middleware.publicTenant());
+			.use([
+				middleware.publicTenant(),
+				middleware.apiLimit({ name: "tenantReads" }),
+			]);
 	})
 	.prefix("/api/v1")
 	.use(middleware.publicApi());

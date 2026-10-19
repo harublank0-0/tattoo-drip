@@ -21,7 +21,8 @@ import PublicDepositTransformer from "#transformers/public_deposit_transformer";
  * openapi.yaml, TAT-65): a project's deposit through its link's token, and
  * the client's payment screenshot. Every link that doesn't work is the same
  * 404, before anything else is looked at; the upload's body is read only
- * after that (the route is in multipart.processManually).
+ * after that (the body parser reads no multipart body itself:
+ * multipart.autoProcess is false).
  */
 @inject()
 export default class PublicDepositsController {

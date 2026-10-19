@@ -11,6 +11,20 @@ import env from "#start/env";
 export const appUrl = env.get("APP_URL");
 
 /**
+ * The trust function for a comma-separated TRUST_PROXY list (already
+ * checked by #services/trust_proxy). The framework hands a string straight
+ * to proxy-addr, which reads it as ONE entry, so a list is compiled entry by
+ * entry and believed when any entry matches.
+ */
+export function trustedProxies(list: string) {
+	const checks = list
+		.split(",")
+		.map((entry) => defineConfig({ trustProxy: entry.trim() }).trustProxy);
+	return (address: string, hop: number) =>
+		checks.some((trusts) => trusts(address, hop));
+}
+
+/**
  * The configuration settings used by the HTTP server
  */
 export const http = defineConfig({
@@ -26,6 +40,20 @@ export const http = defineConfig({
 	 * submitting with POST.
 	 */
 	allowMethodSpoofing: false,
+
+	/**
+	 * The proxies whose X-Forwarded-For request.ip() believes (TRUST_PROXY,
+	 * required in production; loopback in development and tests). Never
+	 * every address: any client could then choose its own (TAT-38).
+	 */
+	trustProxy: trustedProxies(env.get("TRUST_PROXY") ?? "loopback"),
+
+	/**
+	 * Node drops a request whose whole body hasn't arrived within 120 s
+	 * (its default is 300 s): the backstop behind the reverse proxy's
+	 * timeouts and the uploads' own deadline (TAT-38).
+	 */
+	requestTimeout: 120_000,
 
 	/**
 	 * A URL that cannot be decoded is refused before any middleware runs;

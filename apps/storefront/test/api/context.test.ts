@@ -46,6 +46,27 @@ describe("the server's client", () => {
 		assert.equal(calls[0].init.credentials, "omit");
 	});
 
+	test("sends the visitor's address with the key, and never without it", async () => {
+		for (const [config, expected] of [
+			[CONFIG, "203.0.113.7"],
+			[{ apiUrl: API }, null],
+		] as const) {
+			const { calls, fetch } = fakeFetch(() => json(200, { data: STUDIO_A }));
+			const api = createApiContext("server");
+			connectServer(api, {
+				config,
+				studio: STUDIO_A,
+				fetch,
+				visitorAddress: "203.0.113.7",
+			});
+			await api.tattoo.client.studio.get();
+			assert.equal(
+				new Headers(calls[0].init.headers).get("x-visitor-ip"),
+				expected,
+			);
+		}
+	});
+
 	test("sends no Authorization when no key is set", async () => {
 		const { calls, fetch } = fakeFetch(() => json(200, { data: STUDIO_A }));
 		const api = serverApi(STUDIO_A, fetch, { apiUrl: API });
@@ -182,6 +203,7 @@ describe("what the browser gets", () => {
 		await browser.tattoo.client.studio.get();
 		assert.equal(calls[0].url, `${API}/api/v1/tenants/studio-a`);
 		assert.equal(authorization(calls[0].init), null);
+		assert.equal(new Headers(calls[0].init.headers).get("x-visitor-ip"), null);
 		assert.equal(calls[0].init.credentials, "omit");
 	});
 

@@ -11,7 +11,10 @@ import type {
 import { errors as limiterErrors } from "@adonisjs/limiter";
 import { abortRequestTransaction } from "#services/db_context";
 import { isApiRequest } from "#services/public_api";
-import { apiErrorFor, renderApiError } from "#services/public_api_errors";
+import {
+	apiErrorIsReported,
+	renderApiError,
+} from "#services/public_api_errors";
 import { tryAgainMessage } from "#services/rate_limits";
 
 export default class HttpExceptionHandler extends ExceptionHandler {
@@ -69,9 +72,10 @@ export default class HttpExceptionHandler extends ExceptionHandler {
 	 */
 	async report(error: unknown, ctx: HttpContext) {
 		if (isPathTraversal(error)) return;
-		// A client's mistake on the public API (an unknown slug, a bad body) is
-		// not logged: slug probing would flood the log. Server errors are.
-		if (isApiRequest(ctx) && apiErrorFor(error).status < 500) return;
+		// A client's mistake on the public API (an unknown slug, a bad body) and
+		// a deliberate busy refusal are not logged: slug probing would flood the
+		// log. Server errors are, a pool timeout included.
+		if (isApiRequest(ctx) && !apiErrorIsReported(error)) return;
 		return super.report(error, ctx);
 	}
 }

@@ -35,6 +35,8 @@ server.use([
  * requests with a registered route.
  */
 router.use([
+	// The public API's per-caller limits, before any body is read (TAT-38).
+	() => import("#middleware/public_gate_middleware"),
 	() => import("@adonisjs/core/bodyparser_middleware"),
 	// The session and shield (CSRF) skip the public API, which is stateless
 	// and cookieless (TAT-32).
@@ -42,6 +44,9 @@ router.use([
 	() => import("#middleware/web_shield_middleware"),
 	() => import("@adonisjs/auth/initialize_auth_middleware"),
 	() => import("#middleware/silent_auth_middleware"),
+	// Reads a signed-in dashboard request's multipart body; the parser reads
+	// none itself (TAT-38).
+	() => import("#middleware/web_multipart_middleware"),
 ]);
 
 /**
@@ -58,5 +63,6 @@ export const middleware = router.named({
 	publicTenant: () => import("#middleware/public_tenant_middleware"),
 	publicCache: () => import("#middleware/public_cache_middleware"),
 	depositThrottle: () => import("#middleware/deposit_throttle_middleware"),
+	apiLimit: () => import("#middleware/api_limit_middleware"),
 	intakeGuard: () => import("#middleware/intake_guard_middleware"),
 });

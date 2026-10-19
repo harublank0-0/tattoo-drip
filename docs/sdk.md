@@ -91,7 +91,7 @@ For SSR prefetching in route loaders, use `tattooQueries.*` with `queryClient.qu
 The studio page gets **no special access**. It uses the same endpoints and packages. If it needs something the API doesn't expose, the fix is to add it to the API. The only differences:
 
 - The tenant comes from the host on each request: the storefront's tenant middleware confirms it with `studio.get()` and redirects old slugs ([tenants and hosts](../apps/storefront/docs/development.md#tenants-and-hosts)).
-- Server-side rendering sends a secret server key (`STOREFRONT_SERVER_KEY`, as `Authorization: Bearer`), used only for rate limiting; the platform checks it from TAT-38.
+- Server-side rendering sends a secret server key (`STOREFRONT_SERVER_KEY`, as `Authorization: Bearer`), used only for rate limiting (TAT-38): with a valid key the platform counts the call by the visitor's address the storefront sends as `X-Visitor-IP` (added with the SDK's `fetch` option, `src/tenancy/visitor.ts`); without one, every call counts against the storefront server's own address.
 - Inquiries go from the browser straight to the API.
 
 ```ts
@@ -107,7 +107,7 @@ The SDK throws if it is given a key in a browser.
 ## Contract, keys, stability
 
 - **Contract:** `packages/types/openapi.yaml` is the source of truth. After editing it, run `pnpm --filter @tattoo-drip/types generate`. Contract tests (V1) check that real responses match it.
-- **Envelopes and codes:** `{ data }` on success; `{ error: { code, message, fields? } }` on failure. Shared codes: `bad_request`, `not_found`, `method_not_allowed`, `payload_too_large`, `unsupported_media_type`, `validation_failed` (with `fields`), `rate_limited` (with `Retry-After`), `internal_error`; `createInquiry` adds `artist_not_accepting`, `studio_not_accepting` and `too_many_open_inquiries` (409), `challenge_failed` (403) and `challenge_unavailable` (503); `submitDepositProof` adds `deposit_not_due` and `deposit_changed` (409); every code is listed in `openapi.yaml`. Branch on `code`, never on `message`.
+- **Envelopes and codes:** `{ data }` on success; `{ error: { code, message, fields? } }` on failure. Shared codes: `bad_request`, `not_found`, `method_not_allowed`, `payload_too_large`, `unsupported_media_type`, `validation_failed` (with `fields`), `rate_limited` (with `Retry-After`), `request_timeout` (408, an upload that took longer than 90 s), `service_busy` (503 with `Retry-After`: too many uploads in progress), `internal_error`; every endpoint can answer 429 `rate_limited` (per caller and, for reads, per studio); `createInquiry` adds `artist_not_accepting`, `studio_not_accepting` and `too_many_open_inquiries` (409), `challenge_failed` (403) and `challenge_unavailable` (503); `submitDepositProof` adds `deposit_not_due` and `deposit_changed` (409); every code is listed in `openapi.yaml`. Branch on `code`, never on `message`.
 - **Tenants and old slugs:** the path slug is matched exactly. An old slug answers reads like the current one, and `studio.get()` returns the current `slug` (the studio page redirects with it); a write under an old slug is a 404.
 - **Stateless, CORS, caching:** no cookies or sessions; CORS allows any origin without credentials. Cacheable reads send `Cache-Control: public, max-age=60, stale-while-revalidate=600` and an `ETag`; everything else is `no-store`.
 - **Versioning:** within `/api/v1`, changes are additive only. Breaking changes mean `/api/v2` and a new SDK major version. Until V2 opens the SDK to others, the draft may still change freely.

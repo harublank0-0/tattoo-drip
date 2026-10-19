@@ -13,6 +13,7 @@ import {
 	setRequestContext,
 } from "#services/db_context";
 import { ApiException } from "#services/public_api_errors";
+import { discardUploads, receiveUploads } from "#services/uploads";
 import { middleware } from "#start/kernel";
 
 /**
@@ -180,6 +181,15 @@ router
 		router.post("echo", async ({ request }) => ({
 			data: await request.validateUsing(echoValidator),
 		}));
+		// Holds a write slot while its body arrives (TAT-38's slot tests).
+		router.post("hold", async ({ request }) => {
+			try {
+				await receiveUploads(request, { deadlineMs: 10_000 });
+				return { data: { ok: true } };
+			} finally {
+				await discardUploads(request);
+			}
+		});
 		router.get("throws", () => {
 			throw new Error(
 				"connection refused at 10.0.0.5:5432 for tattoo_drip_app",
@@ -245,6 +255,18 @@ router
 				...(await ctx.request.validateUsing(echoValidator)),
 			},
 		}));
+		// Reads an upload with a 300 ms deadline (TAT-38's deadline test).
+		router.post("upload", async (ctx) => {
+			afterRollback(() => {
+				hooks.push("upload-rollback");
+			});
+			try {
+				await receiveUploads(ctx.request, { deadlineMs: 300 });
+				return { data: { files: Object.keys(ctx.request.allFiles()).length } };
+			} finally {
+				await discardUploads(ctx.request);
+			}
+		});
 	})
 	.prefix("/api/v1/tenants/:tenant/__test")
 	.use([middleware.publicApi(), middleware.publicTenant()]);

@@ -1,6 +1,6 @@
 import { createIsomorphicFn } from "@tanstack/react-start";
 import { storefrontConfig } from "../tenancy/config.ts";
-import { requestStudio } from "../tenancy/middleware.ts";
+import { requestStudio, requestVisitorAddress } from "../tenancy/middleware.ts";
 import {
 	type ApiContext,
 	connectServer,
@@ -19,7 +19,11 @@ export const createRequestApi = createIsomorphicFn()
 	.server((): ApiContext => {
 		const studio = requestStudio();
 		const api = createApiContext("server");
-		connectServer(api, { config: storefrontConfig(), studio });
+		connectServer(api, {
+			config: storefrontConfig(),
+			studio,
+			visitorAddress: requestVisitorAddress(),
+		});
 		seedStudio(api, studio);
 		return api;
 	})
