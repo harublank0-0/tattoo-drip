@@ -1,5 +1,6 @@
 import router from "@adonisjs/core/services/router";
 import { test } from "@japa/runner";
+import bodyParserConfig from "#config/bodyparser";
 import { middleware } from "#start/kernel";
 import { publicIsolationCases } from "#tests/isolation/public_cases";
 
@@ -99,6 +100,29 @@ test.group("Public API routes", () => {
 			),
 			[],
 			"UNCACHED_GET_ROUTES lists routes that no longer exist",
+		);
+	});
+
+	test("no API route lets the body parser write a multipart body before the tenant is known", ({
+		assert,
+	}) => {
+		const writes = allRoutes().filter(
+			({ pattern, methods }) =>
+				isApi(pattern) &&
+				!isTestOnly(pattern) &&
+				methods.some((method) => !["GET", "HEAD"].includes(method)),
+		);
+		assert.isNotEmpty(writes);
+
+		assert.deepEqual(
+			writes
+				.map(({ pattern }) => pattern)
+				.filter(
+					(pattern) =>
+						!bodyParserConfig.multipart.processManually.includes(pattern),
+				),
+			[],
+			"list the route in multipart.processManually (config/bodyparser.ts) and read its body with receiveUploads, after publicTenant (TAT-32 ruling 16)",
 		);
 	});
 

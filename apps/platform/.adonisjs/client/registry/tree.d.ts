@@ -94,6 +94,9 @@ export interface ApiDefinition {
   api: {
     v1: {
       studio: typeof routes['api.v1.studio']
+      inquiries: {
+        store: typeof routes['api.v1.inquiries.store']
+      }
     }
   }
 }

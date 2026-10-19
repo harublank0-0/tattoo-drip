@@ -29,10 +29,17 @@ security:
   - {}
   - serverKey: []
 
+tags:
+  - name: MVP
+    description: What the pilot's studio page uses.
+  - name: V1
+    description: Planned for the paid launch (docs/requirements.md, V1). Not implemented; the shapes may still change.
+
 paths:
   /styles:
     get:
       operationId: listStyles
+      tags: [V1]
       summary: Platform-wide tattoo styles
       responses:
         "200":
@@ -48,6 +55,7 @@ paths:
   /placements:
     get:
       operationId: listPlacements
+      tags: [V1]
       summary: Platform-wide body placements
       responses:
         "200":
@@ -65,6 +73,7 @@ paths:
       - $ref: "#/components/parameters/Tenant"
     get:
       operationId: getStudio
+      tags: [MVP]
       summary: Public profile of a tenant
       description: Cacheable. Under an old slug it answers like under the current one, and `slug` is the current slug.
       responses:
@@ -90,6 +99,7 @@ paths:
       - $ref: "#/components/parameters/Tenant"
     get:
       operationId: listArtists
+      tags: [MVP]
       summary: Visible artists of a tenant
       responses:
         "200":
@@ -113,6 +123,7 @@ paths:
         schema: { type: string }
     get:
       operationId: getArtist
+      tags: [MVP]
       summary: One artist by slug
       responses:
         "200":
@@ -131,6 +142,7 @@ paths:
       - $ref: "#/components/parameters/Tenant"
     get:
       operationId: listServices
+      tags: [V1]
       summary: Bookable services of a tenant
       parameters:
         - name: artistId
@@ -154,6 +166,7 @@ paths:
       - $ref: "#/components/parameters/Tenant"
     get:
       operationId: listPortfolio
+      tags: [V1]
       summary: Portfolio projects, newest first
       parameters:
         - name: artistId
@@ -187,6 +200,7 @@ paths:
       - $ref: "#/components/parameters/Tenant"
     get:
       operationId: listAvailability
+      tags: [V1]
       summary: Bookable slots for an artist and service
       description: Slots are computed, never stored. The range is clamped to the tenant's minimum notice and booking horizon.
       parameters:
@@ -219,44 +233,62 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/ValidationError" }
 
-  /tenants/{tenant}/bookings:
+  /tenants/{tenant}/inquiries:
     parameters:
       - $ref: "#/components/parameters/Tenant"
     post:
-      operationId: createBooking
-      summary: Submit a booking request (guest, no account)
+      operationId: createInquiry
+      tags: [MVP]
+      summary: Send the studio an inquiry, with reference images
+      description: |
+        No account needed. One `multipart/form-data` request with the fields
+        and up to 5 reference images (JPEG, PNG or WebP, 10 MB each and
+        20 MB for the whole request); any other body is a 415. The studio
+        finds the person by phone; the answer is the same whether or not it
+        knew the number, and says nothing but the new inquiry's id. Never
+        cached. Under an old slug it is a 404: send it to the current slug,
+        which `getStudio` names.
+
+        Own codes (409): `artist_not_accepting` (the chosen artist takes no
+        new inquiries), `studio_not_accepting` (no artist chosen, and every
+        artist of the studio is closed), `too_many_open_inquiries` (this
+        phone number already has 3 inquiries the studio hasn't answered).
+        An unknown or hidden `preferredArtistId` is `validation_failed` on
+        `preferredArtistId`; an image that isn't a JPEG, PNG or WebP is
+        `validation_failed` on `referenceImages.<index>`.
       requestBody:
         required: true
         content:
           multipart/form-data:
-            schema:
-              type: object
-              required: [booking]
-              properties:
-                booking: { $ref: "#/components/schemas/BookingRequestInput" }
-                referenceImages:
-                  type: array
-                  maxItems: 5
-                  items: { type: string, format: binary }
-                challengeToken:
-                  type: string
-                  description: Bot-challenge token. Required for browser submissions.
+            schema: { $ref: "#/components/schemas/InquiryForm" }
             encoding:
-              booking:
-                contentType: application/json
+              referenceImages:
+                contentType: image/jpeg, image/png, image/webp
       responses:
         "201":
-          description: Request received
+          description: Received. The studio replies on WhatsApp or Viber.
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
           content:
             application/json:
               schema:
                 type: object
                 required: [data]
+                additionalProperties: false
                 properties:
-                  data: { $ref: "#/components/schemas/BookingReceipt" }
+                  data: { $ref: "#/components/schemas/InquiryReceipt" }
+        "400": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: The studio takes no such inquiry now (`artist_not_accepting`, `studio_not_accepting`, `too_many_open_inquiries`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "413": { $ref: "#/components/responses/Error" }
+        "415": { $ref: "#/components/responses/Error" }
         "422": { $ref: "#/components/responses/ValidationError" }
         "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
 
 components:
   securitySchemes:
@@ -340,15 +372,16 @@ components:
                 (405), `payload_too_large` (413), `unsupported_media_type`
                 (415), `validation_failed` (422, with `fields`),
                 `rate_limited` (429, with `Retry-After`), `internal_error`
-                (500). An endpoint may add codes of its own and lists them.
-                Treat an unknown code by its HTTP status.
-              examples: [not_found, validation_failed, rate_limited, slot_unavailable]
+                (500). Endpoint codes: `artist_not_accepting`,
+                `studio_not_accepting`, `too_many_open_inquiries` (409,
+                `createInquiry`). Treat an unknown code by its HTTP status.
+              examples: [not_found, validation_failed, rate_limited, too_many_open_inquiries]
             message:
               type: string
               description: A sentence for people. Never parse it.
             fields:
               type: object
-              description: Field path (dot-separated, e.g. `client.phone` or `referenceImages.0`) → messages. Only on `validation_failed`.
+              description: Field path (dot-separated, e.g. `contactPhone` or `referenceImages.0`) → messages. Only on `validation_failed`.
               additionalProperties: { type: array, items: { type: string } }
 
     TattooStyle:
@@ -491,34 +524,57 @@ components:
         startsAt: { type: string, format: date-time }
         endsAt: { type: string, format: date-time }
 
-    BookingRequestInput:
-      type: object
-      required: [artistId, serviceId, startsAt, customer, tattoo]
-      properties:
-        artistId: { type: string, format: uuid }
-        serviceId: { type: string, format: uuid }
-        startsAt: { type: string, format: date-time, description: Must be a bookable slot }
-        customer:
-          type: object
-          required: [name, email]
-          properties:
-            name: { type: string, minLength: 2 }
-            email: { type: string, format: email }
-            phone: { type: string }
-        tattoo:
-          type: object
-          required: [idea]
-          properties:
-            idea: { type: string, minLength: 20 }
-            style: { type: string, description: Style slug }
-            placement: { type: string, description: Placement slug }
-            size: { type: string, examples: [10 cm] }
-            budget: { type: string }
-        notes: { type: string }
+    SourceChannel:
+      type: string
+      description: How the person found the studio
+      enum: [instagram, facebook, tiktok, google, friend, other]
 
-    BookingReceipt:
+    InquiryInput:
       type: object
-      required: [id, status]
+      description: |
+        An inquiry's text fields, kept exactly as sent (trimmed). The
+        lengths are the most the API takes. Leave an optional field out, or
+        empty, for none.
+      required: [idea, placement, approximateSize, preferredDates, sourceChannel, contactName, contactPhone]
       properties:
-        id: { type: string, format: uuid }
-        status: { type: string, enum: [requested] }
+        idea: { type: string, minLength: 1, maxLength: 4000, examples: [A fine-line peony with two leaves] }
+        placement: { type: string, minLength: 1, maxLength: 120, examples: [Left forearm] }
+        approximateSize: { type: string, minLength: 1, maxLength: 120, examples: [About 10 cm] }
+        preferredDates: { type: string, minLength: 1, maxLength: 500, examples: [Any weekday in November] }
+        preferredArtistId:
+          type: [string, "null"]
+          format: uuid
+          description: A visible artist of this studio who takes inquiries. Leave it out for any artist.
+        budget: { type: [string, "null"], maxLength: 120, description: Free text, examples: [NPR 15000] }
+        sourceChannel: { $ref: "#/components/schemas/SourceChannel" }
+        contactName: { type: string, minLength: 1, maxLength: 120 }
+        contactPhone:
+          type: string
+          minLength: 1
+          maxLength: 40
+          description: The person's WhatsApp or Viber number, as typed. A number without a country code is read as Nepali; it is stored in E.164.
+          examples: ["9812345678", "+977 981-234-5678"]
+        contactEmail: { type: [string, "null"], format: email, maxLength: 254 }
+
+    InquiryForm:
+      description: The multipart body of `createInquiry`
+      allOf:
+        - $ref: "#/components/schemas/InquiryInput"
+        - type: object
+          properties:
+            referenceImages:
+              type: array
+              maxItems: 5
+              description: Up to 5 JPEG, PNG or WebP images, 10 MB each and 20 MB together, each its own `referenceImages` part. Their metadata (EXIF, GPS) is removed, and only the studio sees them.
+              items: { type: string, format: binary }
+            challengeToken:
+              type: string
+              maxLength: 2048
+              description: Bot-challenge token. The intake form will need it (TAT-55); the API ignores it until then.
+
+    InquiryReceipt:
+      type: object
+      required: [id]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid, description: The new inquiry. Nothing in the public API reads it back. }

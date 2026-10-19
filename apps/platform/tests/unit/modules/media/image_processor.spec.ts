@@ -9,6 +9,12 @@ import { processImage } from "#modules/media/services/image_processor";
 import { testImages } from "#tests/helpers/images";
 
 test.group("processImage", () => {
+	test("keeps no decoded images in sharp's cache", ({ assert }) => {
+		const { files, items, memory } = sharp.cache();
+
+		assert.deepEqual([files.max, items.max, memory.max], [0, 0, 0]);
+	});
+
 	test("keeps a PNG as PNG", async ({ assert }) => {
 		const result = await processImage(await testImages.png());
 

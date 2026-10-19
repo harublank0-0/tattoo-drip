@@ -1,5 +1,10 @@
-import { queryOptions, skipToken } from "@tanstack/react-query";
+import {
+	mutationOptions,
+	queryOptions,
+	skipToken,
+} from "@tanstack/react-query";
 import type {
+	CreateInquiryInput,
 	ListAvailabilityQuery,
 	ListPortfolioQuery,
 	ListServicesQuery,
@@ -79,5 +84,19 @@ export const tattooQueries = {
 			queryKey: tattooKeys.placements(),
 			queryFn: ({ signal }) => client.placements.list({ signal }),
 			staleTime: Number.POSITIVE_INFINITY,
+		}),
+};
+
+/**
+ * Mutation options for each write. Use them with `useMutation`.
+ * `createInquiry` never retries, whatever the app's `QueryClient` defaults
+ * say: a retry after a timeout could send the inquiry (and its images) twice,
+ * and each copy uses one of the phone's three open-inquiry slots.
+ */
+export const tattooMutations = {
+	createInquiry: (client: TattooClient) =>
+		mutationOptions({
+			mutationFn: (input: CreateInquiryInput) => client.inquiries.create(input),
+			retry: false,
 		}),
 };

@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { createTattooClient, TattooApiError } from "../src/index.js";
+import {
+	type CreateInquiryInput,
+	createTattooClient,
+	TattooApiError,
+} from "../src/index.js";
 
 type Call = { url: string; init: RequestInit };
 
@@ -238,6 +242,173 @@ describe("createTattooClient", () => {
 		const controller = new AbortController();
 
 		const call = client(fetch).studio.get({ signal: controller.signal });
+		controller.abort();
+		const error = await rejection(call);
+
+		assert.ok(!(error instanceof TattooApiError));
+		assert.equal((error as Error).name, "AbortError");
+	});
+});
+
+describe("inquiries.create", () => {
+	const ID = "0195f3a0-0000-7000-8000-000000000051";
+	const input = {
+		idea: "Fine-line peony",
+		placement: "Left forearm",
+		approximateSize: "About 10 cm",
+		preferredDates: "Any weekday in November",
+		sourceChannel: "instagram",
+		contactName: "Ana",
+		contactPhone: "9812345678",
+	} satisfies CreateInquiryInput;
+
+	test("posts one multipart form to the tenant's inquiries, without cookies", async () => {
+		const { calls, fetch } = fakeFetch(() => json(201, { data: { id: ID } }));
+		const front = new File([new Uint8Array([0xff, 0xd8, 0xff])], "front.jpg", {
+			type: "image/jpeg",
+		});
+		const side = new Blob([new Uint8Array([0x89, 0x50])], {
+			type: "image/png",
+		});
+
+		const receipt = await client(fetch).inquiries.create({
+			...input,
+			preferredArtistId: "0195f3a0-0000-7000-8000-0000000000aa",
+			budget: undefined,
+			contactEmail: null,
+			referenceImages: [front, side],
+			challengeToken: "token-51",
+		});
+
+		assert.deepEqual(receipt, { id: ID });
+		assert.equal(
+			calls[0].url,
+			"https://api.example.com/api/v1/tenants/api-needle-32/inquiries",
+		);
+		assert.equal(calls[0].init.method, "POST");
+		assert.equal(calls[0].init.credentials, "omit");
+		const headers = new Headers(calls[0].init.headers);
+		assert.equal(headers.get("accept"), "application/json");
+		assert.equal(
+			headers.has("content-type"),
+			false,
+			"fetch sets the multipart boundary",
+		);
+		const form = calls[0].init.body as FormData;
+		assert.deepEqual([...new Set(form.keys())].sort(), [
+			"approximateSize",
+			"challengeToken",
+			"contactName",
+			"contactPhone",
+			"idea",
+			"placement",
+			"preferredArtistId",
+			"preferredDates",
+			"referenceImages",
+			"sourceChannel",
+		]);
+		assert.equal(form.get("contactPhone"), "9812345678");
+		assert.equal(form.get("challengeToken"), "token-51");
+		const images = form.getAll("referenceImages") as File[];
+		assert.deepEqual(
+			images.map(({ name, type }) => [name, type]),
+			[
+				["front.jpg", "image/jpeg"],
+				["blob", "image/png"],
+			],
+		);
+	});
+
+	test("without images or a token it sends only the fields", async () => {
+		const { calls, fetch } = fakeFetch(() => json(201, { data: { id: ID } }));
+
+		await client(fetch).inquiries.create(input);
+
+		const form = calls[0].init.body as FormData;
+		assert.equal(form.has("referenceImages"), false);
+		assert.equal(form.has("challengeToken"), false);
+		assert.equal(form.get("idea"), "Fine-line peony");
+	});
+
+	test("a refusal is a TattooApiError with its code, and fields on validation_failed", async () => {
+		const full = fakeFetch(() =>
+			json(409, {
+				error: {
+					code: "too_many_open_inquiries",
+					message:
+						"You already have requests waiting with this studio. They will reply on WhatsApp or Viber.",
+				},
+			}),
+		);
+		const invalid = fakeFetch(() =>
+			json(422, {
+				error: {
+					code: "validation_failed",
+					message: "Some fields are invalid.",
+					fields: {
+						contactPhone: [
+							"Enter a phone number, like 9812345678 or +977 1 4123456.",
+						],
+					},
+				},
+			}),
+		);
+
+		const capped = await rejection(client(full.fetch).inquiries.create(input));
+		const refused = await rejection(
+			client(invalid.fetch).inquiries.create(input),
+		);
+
+		assert.ok(capped instanceof TattooApiError);
+		assert.equal(capped.status, 409);
+		assert.equal(capped.code, "too_many_open_inquiries");
+		assert.ok(refused instanceof TattooApiError);
+		assert.deepEqual(Object.keys(refused.fields), ["contactPhone"]);
+	});
+
+	test("an upload waits longer than the client's timeout", {
+		timeout: 2000,
+	}, async () => {
+		// Unlike the plain fake, this fetch gives up when its signal aborts, so
+		// the test fails if the upload still used the client's 20 ms.
+		const { fetch } = fakeFetch(
+			({ init }) =>
+				new Promise<Response>((resolve, reject) => {
+					const signal = init.signal as AbortSignal;
+					signal.addEventListener("abort", () => reject(signal.reason), {
+						once: true,
+					});
+					setTimeout(() => resolve(json(201, { data: { id: ID } })), 60);
+				}),
+		);
+
+		const receipt = await client(fetch, { timeoutMs: 20 }).inquiries.create(
+			input,
+		);
+
+		assert.deepEqual(receipt, { id: ID });
+	});
+
+	test("a per-call timeoutMs still gives up", { timeout: 2000 }, async () => {
+		const { fetch } = fakeFetch(hangUntilAborted);
+
+		const error = await rejection(
+			client(fetch).inquiries.create(input, { timeoutMs: 20 }),
+		);
+
+		assert.ok(error instanceof TattooApiError);
+		assert.equal(error.code, "timeout");
+	});
+
+	test("a submission the caller cancels rejects with the AbortError", {
+		timeout: 2000,
+	}, async () => {
+		const { fetch } = fakeFetch(hangUntilAborted);
+		const controller = new AbortController();
+
+		const call = client(fetch).inquiries.create(input, {
+			signal: controller.signal,
+		});
 		controller.abort();
 		const error = await rejection(call);
 

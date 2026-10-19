@@ -1,12 +1,11 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
-	CreateBookingInput,
 	ListAvailabilityQuery,
 	ListPortfolioQuery,
 	ListServicesQuery,
 } from "@tattoo-drip/sdk";
 import { useTattooClient } from "./provider.js";
-import { tattooQueries } from "./queries.js";
+import { tattooMutations, tattooQueries } from "./queries.js";
 
 export function useStudio() {
 	return useQuery(tattooQueries.studio(useTattooClient()));
@@ -42,12 +41,12 @@ export function usePlacements() {
 }
 
 /**
- * Submits a booking request. Pending requests never hold a slot, so no
- * cached availability needs invalidating afterwards.
+ * Sends an inquiry with its reference images (`client.inquiries.create`).
+ * Never retried, even if the app's `QueryClient` retries mutations by
+ * default (`tattooMutations.createInquiry` sets `retry: false`): a retry
+ * after a timeout could send it twice. Nothing cached changes, so nothing is
+ * invalidated.
  */
-export function useCreateBooking() {
-	const client = useTattooClient();
-	return useMutation({
-		mutationFn: (input: CreateBookingInput) => client.bookings.create(input),
-	});
+export function useCreateInquiry() {
+	return useMutation(tattooMutations.createInquiry(useTattooClient()));
 }

@@ -57,7 +57,11 @@ export async function assertPublicIsolation(
 		isolationCase.method,
 	);
 	const body = isolationCase.body?.(a);
-	if (body) request.json(body);
+	if (body && isolationCase.encoding === "multipart") {
+		request.fields(body as Record<string, string>);
+	} else if (body) {
+		request.json(body);
+	}
 	const response = await request.redirects(0);
 
 	response.assertStatus(isolationCase.ownStatus);

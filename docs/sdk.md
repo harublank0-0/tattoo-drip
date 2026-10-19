@@ -28,11 +28,9 @@ Dependencies only point toward the API.
 
 Inquiries, clients, quotes and payments are never readable through the public API. The deposit page is the one exception: it reads a single project's deposit details through an unguessable link token.
 
-> The current `openapi.yaml` and SDK code still use the earlier booking draft (`bookings.create`, `availability`). Moving them to `inquiries.create` is tracked in Linear.
-
 ## Core SDK
 
-The core SDK targets one API version (`v1`) and one tenant per client. It has typed inputs and outputs, typed errors (`TattooApiError` with `status`, `code`, `message`, `fields` and `retryAfter`), no caching or UI state, and no business rules. Every call sends `Accept: application/json` and no cookies (`credentials: "omit"`), gives up after `timeoutMs` (10 seconds by default) with code `timeout`, and takes `{ signal }` to cancel, after which it rejects with the signal's `AbortError`. A response that never arrived is status 0 with `timeout` or `network_error`; a 2xx without `{ data }` is `invalid_response`.
+The core SDK targets one API version (`v1`) and one tenant per client. It has typed inputs and outputs, typed errors (`TattooApiError` with `status`, `code`, `message`, `fields` and `retryAfter`), no caching or UI state, and no business rules. Every call sends `Accept: application/json` and no cookies (`credentials: "omit"`), gives up after `timeoutMs` (10 seconds by default) with code `timeout`, and takes `{ signal }` to cancel, after which it rejects with the signal's `AbortError`. A response that never arrived is status 0 with `timeout` or `network_error`; a 2xx without `{ data }` is `invalid_response`. `inquiries.create` uploads, so it waits up to 2 minutes unless its own `{ timeoutMs }` says otherwise.
 
 ```ts
 import { createTattooClient, isTattooApiError } from "@tattoo-drip/sdk";
@@ -44,12 +42,16 @@ const artists = await client.artists.list();
 
 try {
   await client.inquiries.create({
-    client: { name: "Ana", phone: "+9779800000000" },
-    tattoo: { idea: "Fine line peony on the forearm", placement: "forearm", size: "10 cm" },
-    preferredDates: "any weekday in November",
-    preferredArtistId: artists[0]?.id,
-    referenceImages: [file],                            // sent as one multipart request
-    challengeToken,
+    idea: "Fine line peony on the forearm",
+    placement: "Left forearm",
+    approximateSize: "About 10 cm",
+    preferredDates: "Any weekday in November",
+    preferredArtistId: artists[0]?.id,                  // optional; a visible artist who takes inquiries
+    sourceChannel: "instagram",
+    contactName: "Ana",
+    contactPhone: "9812345678",                         // stored as +9779812345678
+    referenceImages: [file],                            // up to 5; sent as one multipart request
+    challengeToken,                                     // TAT-55; ignored until then
   });
 } catch (error) {
   if (isTattooApiError(error) && error.code === "too_many_open_inquiries") {
@@ -70,6 +72,8 @@ The app owns the `QueryClientProvider`, and `TattooProvider` goes inside it. Que
 const { data: artists } = useArtists();
 const createInquiry = useCreateInquiry();
 ```
+
+`useCreateInquiry()` never retries, even when the app's `QueryClient` retries mutations by default: its options (`tattooMutations.createInquiry(client)`) set `retry: false`, because a retry after a timeout could send the inquiry twice.
 
 For SSR prefetching in route loaders, use `tattooQueries.*` with `queryClient.ensureQueryData(tattooQueries.artists(client))`. The query options forward TanStack Query's `signal`, so a query nobody needs any more cancels its request.
 
@@ -92,7 +96,7 @@ The SDK throws if it is given a key in a browser.
 ## Contract, keys, stability
 
 - **Contract:** `packages/types/openapi.yaml` is the source of truth. After editing it, run `pnpm --filter @tattoo-drip/types generate`. Contract tests (V1) check that real responses match it.
-- **Envelopes and codes:** `{ data }` on success; `{ error: { code, message, fields? } }` on failure. Shared codes: `bad_request`, `not_found`, `method_not_allowed`, `payload_too_large`, `unsupported_media_type`, `validation_failed` (with `fields`), `rate_limited` (with `Retry-After`), `internal_error`; an endpoint may add its own, listed in `openapi.yaml`. Branch on `code`, never on `message`.
+- **Envelopes and codes:** `{ data }` on success; `{ error: { code, message, fields? } }` on failure. Shared codes: `bad_request`, `not_found`, `method_not_allowed`, `payload_too_large`, `unsupported_media_type`, `validation_failed` (with `fields`), `rate_limited` (with `Retry-After`), `internal_error`; `createInquiry` adds `artist_not_accepting`, `studio_not_accepting` and `too_many_open_inquiries` (409); every code is listed in `openapi.yaml`. Branch on `code`, never on `message`.
 - **Tenants and old slugs:** the path slug is matched exactly. An old slug answers reads like the current one, and `studio.get()` returns the current `slug` (the studio page redirects with it); a write under an old slug is a 404.
 - **Stateless, CORS, caching:** no cookies or sessions; CORS allows any origin without credentials. Cacheable reads send `Cache-Control: public, max-age=60, stale-while-revalidate=600` and an `ETag`; everything else is `no-store`.
 - **Versioning:** within `/api/v1`, changes are additive only. Breaking changes mean `/api/v2` and a new SDK major version. Until V2 opens the SDK to others, the draft may still change freely.

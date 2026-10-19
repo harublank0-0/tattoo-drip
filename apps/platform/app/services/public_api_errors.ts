@@ -25,9 +25,9 @@ const CODE_BY_STATUS: Partial<Record<number, ApiErrorCode>> = {
 };
 
 /**
- * An error a public endpoint answers with on purpose: a shared code, or the
- * endpoint's own (such as `too_many_open_inquiries`, listed in
- * openapi.yaml). Its message is shown to people: keep it plain and safe.
+ * An error a public endpoint answers with on purpose: a code from
+ * API_ERRORS (`ApiException.of`), or a one-off (such as an endpoint's own,
+ * listed in openapi.yaml). Its message is shown to people: keep it plain and safe.
  * `fields` (field path to messages) belongs to `validation_failed` only, as
  * the contract says; any other code with fields is refused at construction.
  */
@@ -57,6 +57,22 @@ export class ApiException extends Error {
 	/** The 404 of an unknown tenant or record: one answer for every reason. */
 	static notFound() {
 		return new ApiException(404, "not_found", API_ERRORS.not_found.message);
+	}
+
+	/**
+	 * The error for one of the codes in API_ERRORS, with its status and
+	 * message. `fields` go with `validation_failed` only.
+	 */
+	static of(
+		code: "validation_failed",
+		fields?: Record<string, string[]>,
+	): ApiException;
+	static of(code: Exclude<ApiErrorCode, "validation_failed">): ApiException;
+	static of(code: ApiErrorCode, fields?: Record<string, string[]>) {
+		const { status, message } = API_ERRORS[code];
+		return code === "validation_failed" && fields
+			? new ApiException(status, code, message, fields)
+			: new ApiException(status, code, message);
 	}
 }
 

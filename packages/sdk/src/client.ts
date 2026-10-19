@@ -2,8 +2,8 @@ import type {
 	ApiError,
 	Artist,
 	BodyPlacement,
-	BookingReceipt,
-	BookingRequestInput,
+	InquiryInput,
+	InquiryReceipt,
 	ListAvailabilityQuery,
 	ListPortfolioQuery,
 	ListServicesQuery,
@@ -17,6 +17,8 @@ import { TattooApiError } from "./errors.js";
 
 const API_VERSION = "v1";
 const DEFAULT_TIMEOUT_MS = 10_000;
+/** Uploads on a slow mobile connection need longer than a read (TAT-51). */
+const UPLOAD_TIMEOUT_MS = 120_000;
 
 export interface TattooClientOptions {
 	/** API origin, e.g. `https://api.example.com`. The SDK appends `/api/v1`. */
@@ -41,12 +43,18 @@ export interface TattooClientOptions {
 export interface RequestOptions {
 	/** Cancels the call; it then rejects with the signal's reason (an `AbortError`). */
 	signal?: AbortSignal;
+	/**
+	 * Milliseconds before this call gives up with `timeout`, instead of the
+	 * client's `timeoutMs` (or the 2 minutes an upload gets).
+	 */
+	timeoutMs?: number;
 }
 
-export interface CreateBookingInput extends BookingRequestInput {
-	/** Up to 5 images (JPEG, PNG, WebP or HEIC, 10 MB each). */
+/** An inquiry and its reference images, sent as one multipart request. */
+export interface CreateInquiryInput extends InquiryInput {
+	/** Up to 5 JPEG, PNG or WebP images, 10 MB each and 20 MB together. */
 	referenceImages?: Blob[];
-	/** Bot-challenge token, required for browser submissions. */
+	/** Bot-challenge token (TAT-55); the API ignores it until then. */
 	challengeToken?: string;
 }
 
@@ -71,13 +79,14 @@ export function createTattooClient(options: TattooClientOptions) {
 	async function request<T>(
 		url: string,
 		init: RequestInit = {},
-		{ signal }: RequestOptions = {},
+		call: RequestOptions = {},
 	): Promise<T> {
+		const { signal } = call;
 		const headers = new Headers(init.headers);
 		headers.set("Accept", "application/json");
 		if (options.key) headers.set("Authorization", `Bearer ${options.key}`);
 
-		const timeout = AbortSignal.timeout(timeoutMs);
+		const timeout = AbortSignal.timeout(call.timeoutMs ?? timeoutMs);
 		let response: Response;
 		let body: ResponseBody | undefined;
 		try {
@@ -159,19 +168,33 @@ export function createTattooClient(options: TattooClientOptions) {
 			list: (query: ListAvailabilityQuery, call?: RequestOptions) =>
 				getData<Slot[]>(withQuery(`${tenantRoot}/availability`, query), call),
 		},
-		bookings: {
-			create: async (input: CreateBookingInput) => {
-				const { referenceImages = [], challengeToken, ...booking } = input;
+		inquiries: {
+			/**
+			 * Sends an inquiry with its reference images as one multipart
+			 * request and returns the new inquiry's id. Waits up to 2 minutes
+			 * (an upload) unless `call.timeoutMs` says otherwise. Fails with a
+			 * TattooApiError such as `validation_failed` (with `fields` by
+			 * input name), `artist_not_accepting`, `studio_not_accepting`,
+			 * `too_many_open_inquiries` or `payload_too_large`.
+			 */
+			create: async (input: CreateInquiryInput, call: RequestOptions = {}) => {
+				const { referenceImages = [], challengeToken, ...fields } = input;
 				const form = new FormData();
-				form.set("booking", JSON.stringify(booking));
+				for (const [name, value] of Object.entries(fields)) {
+					if (value !== undefined && value !== null) {
+						form.set(name, String(value));
+					}
+				}
 				for (const image of referenceImages) {
 					form.append("referenceImages", image);
 				}
 				if (challengeToken) form.set("challengeToken", challengeToken);
 
-				const body = await request<{ data: BookingReceipt }>(
-					`${tenantRoot}/bookings`,
+				const body = await request<{ data: InquiryReceipt }>(
+					`${tenantRoot}/inquiries`,
+					// No Content-Type: fetch sets multipart's boundary itself.
 					{ method: "POST", body: form },
+					{ ...call, timeoutMs: call.timeoutMs ?? UPLOAD_TIMEOUT_MS },
 				);
 				return body.data;
 			},

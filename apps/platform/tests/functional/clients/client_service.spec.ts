@@ -324,3 +324,140 @@ test.group("ClientService.create", (group) => {
 		});
 	});
 });
+
+/**
+ * A ClientService whose first locked lookup misses, as if another request
+ * inserted the phone right after it looked.
+ */
+class RacingClientService extends ClientService {
+	misses = 1;
+
+	protected override async lockByPhone(tenant: { id: string }, phone: string) {
+		if (this.misses > 0) {
+			this.misses -= 1;
+			return null;
+		}
+		return super.lockByPhone(tenant, phone);
+	}
+}
+
+test.group("ClientService.matchByPhone", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	const contact = (phone: string) => ({
+		name: "Maya Gurung",
+		phone,
+		email: "maya@example.com",
+	});
+
+	test("a new phone gets a new client with the submitted name and email, no notes", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("match-new-51");
+
+		const client = await inTenant(tenant, () =>
+			clients.matchByPhone(tenant, contact("+9779812345601")),
+		);
+
+		assert.deepEqual(
+			[client.tenantId, client.name, client.phone, client.email, client.notes],
+			[tenant.id, "Maya Gurung", "+9779812345601", "maya@example.com", null],
+		);
+	});
+
+	test("a found client comes back untouched, whatever was submitted", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("match-found-51");
+		const existing = await inTenant(tenant, () =>
+			makeClient(tenant, {
+				name: "Maya G.",
+				email: null,
+				notes: "Prefers mornings",
+			}),
+		);
+		const stored = () =>
+			inTenant(tenant, async () =>
+				(await Client.findOrFail(existing.id)).serialize(),
+			);
+		const before = await stored();
+
+		const found = await inTenant(tenant, () =>
+			clients.matchByPhone(tenant, contact(existing.phone ?? "")),
+		);
+
+		assert.equal(found.id, existing.id);
+		assert.deepEqual(await stored(), before);
+	});
+
+	test("a deleted client's phone gets a new client", async ({ assert }) => {
+		const { tenant } = await studioWithOwner("match-deleted-51");
+		const gone = await inTenant(tenant, async () => {
+			const client = await makeClient(tenant);
+			await client.softDelete();
+			return client;
+		});
+
+		const fresh = await inTenant(tenant, () =>
+			clients.matchByPhone(tenant, contact(gone.phone ?? "")),
+		);
+
+		assert.notEqual(fresh.id, gone.id);
+		assert.equal(fresh.name, "Maya Gurung");
+	});
+
+	test("an anonymized client that still has the phone is reused untouched", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("match-anon-51");
+		const anonymized = await inTenant(tenant, () =>
+			makeClient(tenant, {
+				name: "Deleted client",
+				anonymizedAt: DateTime.now(),
+			}),
+		);
+
+		const found = await inTenant(tenant, () =>
+			clients.matchByPhone(tenant, contact(anonymized.phone ?? "")),
+		);
+
+		assert.equal(found.id, anonymized.id);
+		assert.equal(found.name, "Deleted client");
+	});
+
+	test("the same phone in another studio is another client", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("match-a-51");
+		const other = await studioWithOwner("match-b-51");
+		const theirs = await inTenant(other.tenant, () => makeClient(other.tenant));
+
+		const ours = await inTenant(tenant, () =>
+			clients.matchByPhone(tenant, contact(theirs.phone ?? "")),
+		);
+
+		assert.notEqual(ours.id, theirs.id);
+		assert.equal(ours.tenantId, tenant.id);
+	});
+
+	test("losing the race for a new phone finds the winner's client", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("match-race-51");
+		const winner = await inTenant(tenant, () =>
+			makeClient(tenant, { name: "First" }),
+		);
+
+		const found = await inTenant(tenant, () =>
+			new RacingClientService().matchByPhone(tenant, {
+				name: "Second",
+				phone: winner.phone ?? "",
+				email: null,
+			}),
+		);
+
+		assert.equal(found.id, winner.id);
+		assert.equal(found.name, "First");
+		assert.lengthOf(await inTenant(tenant, () => Client.query()), 1);
+	});
+});

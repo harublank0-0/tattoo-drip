@@ -41,7 +41,7 @@ export type NewClient = {
 /**
  * The way to find, list, add and edit a tenant's clients (TAT-37, TAT-41, TAT-43).
  * Every call is scoped to the tenant; the clients pages are owners only.
- * Intake (TAT-51) matches by phone with `findByPhone` and never changes a
+ * Intake (TAT-51) matches by phone with `matchByPhone` and never changes a
  * client: only an owner's edit does.
  */
 export default class ClientService {
@@ -101,6 +101,45 @@ export default class ClientService {
 			}
 			throw error;
 		}
+	}
+
+	/**
+	 * The client an inquiry from `contact.phone` (E.164) belongs to (intake,
+	 * TAT-51): the tenant's live client with that phone, else a new one with
+	 * the submitted name and email. A found client is never changed,
+	 * whatever the form says (an anonymized one included). Its row stays
+	 * locked until the transaction ends, so two submissions from one phone
+	 * run one after the other; a new phone is serialized by the unique index
+	 * instead, and the loser of that race gets the winner's client. Call it
+	 * inside a transaction.
+	 */
+	async matchByPhone(tenant: TenantRef, contact: NewClient): Promise<Client> {
+		const found = await this.lockByPhone(tenant, contact.phone);
+		if (found) return found;
+		try {
+			return await this.create(tenant, contact);
+		} catch (error) {
+			if (
+				!(error instanceof ClientRuleError && error.reason === "phone_taken")
+			) {
+				throw error;
+			}
+			const winner = await this.lockByPhone(tenant, contact.phone);
+			if (!winner) throw error;
+			return winner;
+		}
+	}
+
+	/** `findByPhone`, with the row locked until the transaction ends. */
+	protected async lockByPhone(
+		tenant: TenantRef,
+		phone: string,
+	): Promise<Client | null> {
+		return Client.query()
+			.where("tenant_id", tenant.id)
+			.where("phone", phone)
+			.forUpdate()
+			.first();
 	}
 
 	/**

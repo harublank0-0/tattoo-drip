@@ -607,4 +607,16 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_studio_controller').default['show']>>>
     }
   }
+  'api.v1.inquiries.store': {
+    methods: ["POST"]
+    pattern: '/api/v1/tenants/:tenant/inquiries'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/inquiries/validators/intake').intakeValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/inquiries/validators/intake').intakeValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_inquiries_controller').default['store']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_inquiries_controller').default['store']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
 }

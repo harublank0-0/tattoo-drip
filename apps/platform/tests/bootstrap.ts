@@ -1,4 +1,4 @@
-import { rm } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import { authApiClient } from "@adonisjs/auth/plugins/api_client";
 import { authBrowserClient } from "@adonisjs/auth/plugins/browser_client";
 import app from "@adonisjs/core/services/app";
@@ -54,6 +54,11 @@ export const plugins: Config["plugins"] = [
 const clearTestStorage = () =>
 	rm(app.tmpPath("storage"), { recursive: true, force: true });
 
+/** Where the body parser writes uploads in tests (config/bodyparser.ts). */
+const makeUploadsFolder = async () => {
+	await mkdir(app.tmpPath("storage", "uploads"), { recursive: true });
+};
+
 /**
  * A test's request runs in a savepoint on the test's one connection, so a
  * query that escapes the request transaction (db.from, db.rawQuery,
@@ -98,7 +103,7 @@ async function installDbTripwire() {
 const resetRateLimits = () => limiter.clear(["memory"]);
 
 export const runnerHooks: Required<Pick<Config, "setup" | "teardown">> = {
-	setup: [clearTestStorage, installDbTripwire],
+	setup: [clearTestStorage, makeUploadsFolder, installDbTripwire],
 	teardown: [clearTestStorage, () => removeTripwire?.()],
 };
 
