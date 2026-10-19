@@ -20,6 +20,7 @@ import {
 	queuedMails,
 	tokenOf,
 } from "#tests/helpers/accounts";
+import { studioWithOwner } from "#tests/helpers/tenants";
 
 const KEY = SESSION_TOKEN_KEYS.verify_email;
 const REFUSED = "Invalid or expired CSRF token";
@@ -51,10 +52,10 @@ async function confirm(
 }
 
 /** "Send a new link", as the notice page and the banner post it. */
-function resend(client: ApiClient, user: User) {
+function resend(client: ApiClient, user: User, referer = "/confirm-email") {
 	return client
 		.post("/confirm-email")
-		.header("referer", "/confirm-email")
+		.header("referer", referer)
 		.withCsrfToken()
 		.loginAs(user)
 		.redirects(0);
@@ -342,6 +343,61 @@ test.group("Email confirmation (TAT-18)", (group) => {
 		(await client.get("/confirm-email").redirects(0)).assertHeader(
 			"location",
 			"/login",
+		);
+	});
+
+	test("the notice offers the way back to a studio the account already has, and no setup", async ({
+		client,
+		assert,
+	}) => {
+		const fresh = await makeUser();
+		const none = await client
+			.get("/confirm-email")
+			.withInertia()
+			.loginAs(fresh);
+		assert.containSubset(none.inertiaProps, {
+			email: fresh.email,
+			hasStudio: false,
+		});
+
+		const { owner } = await studioWithOwner(
+			"notice-studio-18",
+			"Notice Studio",
+		);
+		const member = await client
+			.get("/confirm-email")
+			.withInertia()
+			.loginAs(owner);
+		assert.containSubset(member.inertiaProps, {
+			email: owner.email,
+			hasStudio: true,
+		});
+	});
+
+	test("'Send a new link' from the dead-link page goes to the notice, not back to the dead page", async ({
+		client,
+	}) => {
+		const user = await makeUser();
+		queue.fake();
+
+		for (const referer of [
+			"/verify-email",
+			"http://localhost:3402/verify-email",
+			"https://app.example.test/verify-email?x=1",
+		]) {
+			const response = await resend(client, user, referer);
+			response.assertHeader("location", "/confirm-email");
+			response.assertFlashMessage(
+				"success",
+				`We sent a new link to ${user.email}.`,
+			);
+			await limiter.clear(["memory"]);
+		}
+
+		// The banner and the notice still go back where they were.
+		(await resend(client, user, "/t/some-studio/inbox")).assertHeader(
+			"location",
+			"/t/some-studio/inbox",
 		);
 	});
 

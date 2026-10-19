@@ -1,5 +1,6 @@
 import { inject } from "@adonisjs/core";
 import type { HttpContext } from "@adonisjs/core/http";
+import router from "@adonisjs/core/services/router";
 import {
 	CONFIRMED_FLASH,
 	FLOW_FIELD,
@@ -7,8 +8,20 @@ import {
 } from "#modules/identity/account_tokens";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import AccountService from "#modules/identity/services/account_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import TenancyService from "#modules/tenancy/services/tenancy_service";
 
 const TOKEN_KEY = SESSION_TOKEN_KEYS.verify_email;
+
+/** The path of a Referer header, or null: only compared with a named route, never followed. */
+function refererPath(value: string | undefined) {
+	if (!value) return null;
+	try {
+		return new URL(value, "http://localhost").pathname;
+	} catch {
+		return null;
+	}
+}
 
 /**
  * Email confirmation (TAT-18). The emailed link's GET only moves its token
@@ -20,7 +33,10 @@ const TOKEN_KEY = SESSION_TOKEN_KEYS.verify_email;
  */
 @inject()
 export default class EmailVerificationController {
-	constructor(private accounts: AccountService) {}
+	constructor(
+		private accounts: AccountService,
+		private tenancy: TenancyService,
+	) {}
 
 	async link({ params, session, response }: HttpContext) {
 		session.put(TOKEN_KEY, params.token);
@@ -88,17 +104,37 @@ export default class EmailVerificationController {
 		return response.redirect().toRoute("email_verification.show");
 	}
 
+	/**
+	 * An existing member of a studio can land here too (any unconfirmed
+	 * account that opens /onboarding): `hasStudio` swaps "then you can set up
+	 * your studio" for a way back to it.
+	 */
 	async notice({ auth, inertia, response }: HttpContext) {
 		const user = auth.getUserOrFail();
 		if (user.emailVerified) return response.redirect().toRoute("dashboard");
-		return inertia.render("auth/confirm_email", { email: user.email });
+		return inertia.render("auth/confirm_email", {
+			email: user.email,
+			hasStudio: await this.tenancy.hasTenant(user),
+		});
 	}
 
-	async resend({ auth, session, response }: HttpContext) {
+	/**
+	 * From the dead-link page, back() would show the same dead link again, so
+	 * that visitor goes to the notice page. Everyone else (the banner, the
+	 * notice) goes back. The target is always a named route or back(): the
+	 * Referer is only compared with /verify-email, never followed.
+	 */
+	async resend({ auth, request, session, response }: HttpContext) {
 		const user = auth.getUserOrFail();
 		if (user.emailVerified) return response.redirect().toRoute("dashboard");
 		await this.accounts.sendVerification(user);
 		session.flash("success", `We sent a new link to ${user.email}.`);
+		if (
+			refererPath(request.header("referer")) ===
+			router.makeUrl("email_verification.show")
+		) {
+			return response.redirect().toRoute("email_verification.notice");
+		}
 		return response.redirect().back();
 	}
 }

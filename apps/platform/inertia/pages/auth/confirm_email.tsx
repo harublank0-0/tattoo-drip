@@ -1,4 +1,4 @@
-import { Form } from "@adonisjs/inertia/react";
+import { Form, Link } from "@adonisjs/inertia/react";
 import { Head } from "@inertiajs/react";
 import { Button } from "~/components/ui/button";
 import AuthLayout from "~/layouts/auth";
@@ -8,7 +8,13 @@ import AuthLayout from "~/layouts/auth";
  * (TAT-18, the verifiedEmail gate): its address, "Send a new link", and a
  * way out when the address is wrong.
  */
-export default function ConfirmEmail({ email }: { email: string }) {
+export default function ConfirmEmail({
+	email,
+	hasStudio,
+}: {
+	email: string;
+	hasStudio: boolean;
+}) {
 	return (
 		<>
 			<Head title="Confirm your email address" />
@@ -21,7 +27,8 @@ export default function ConfirmEmail({ email }: { email: string }) {
 					<strong className="font-medium break-words text-foreground">
 						{email}
 					</strong>
-					. Open it to confirm your address, then you can set up your studio.
+					. Open it to confirm your address
+					{hasStudio ? "." : ", then you can set up your studio."}
 				</p>
 			</div>
 
@@ -37,6 +44,12 @@ export default function ConfirmEmail({ email }: { email: string }) {
 					</Button>
 				)}
 			</Form>
+
+			{hasStudio && (
+				<Button asChild variant="outline" className="h-11 w-full">
+					<Link route="dashboard">Back to your studio</Link>
+				</Button>
+			)}
 
 			<div className="flex flex-col gap-2 border-t pt-4">
 				<p className="text-sm text-muted-foreground">
