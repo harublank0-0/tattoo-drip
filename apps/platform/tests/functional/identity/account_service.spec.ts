@@ -2,6 +2,7 @@ import testUtils from "@adonisjs/core/services/test_utils";
 import limiter from "@adonisjs/limiter/services/main";
 import queue from "@adonisjs/queue/services/main";
 import { test } from "@japa/runner";
+import { DateTime } from "luxon";
 import User from "#models/user";
 import AccountService from "#modules/identity/services/account_service";
 import AccountTokenService from "#modules/identity/services/account_token_service";
@@ -320,6 +321,29 @@ test.group("AccountService (TAT-18)", (group) => {
 		assert.equal((await tokens.state(resetB, "reset_password")).state, "live");
 		assert.equal((await tokens.state(confirmB, "verify_email")).state, "live");
 		assert.isNotNull(await resetWith(resetB, "a-new-password"));
+	});
+
+	test("lock order: a reset and the operator's confirmation revoke the confirmation link before they lock the user, even for a confirmed account", async ({
+		assert,
+	}) => {
+		// A confirmed account shouldn't have a live confirmation link, but both
+		// methods take the verify row's lock first whatever the account's state
+		// (the order is in the AccountService comment), so a stray one is gone.
+		const user = await User.create({
+			email: "order@service-18.example",
+			password: PASSWORD,
+			emailVerifiedAt: DateTime.now(),
+		});
+		const strayA = await tokens.issue(user, "verify_email");
+		await resetWith(
+			await tokens.issue(user, "reset_password"),
+			"a-new-password",
+		);
+		assert.equal((await tokens.state(strayA, "verify_email")).state, "unknown");
+
+		const strayB = await tokens.issue(user, "verify_email");
+		assert.equal(await accounts.markVerified(user.email), "already");
+		assert.equal((await tokens.state(strayB, "verify_email")).state, "unknown");
 	});
 
 	test("an expired token, a confirmation token or an altered one resets nothing", async ({

@@ -39,6 +39,13 @@ function appLink(path: string) {
  * method runs in one transaction (a savepoint inside a request's) and
  * queues its email with sendMailInTransaction, so an email exists only if
  * its writes committed. Tokens come from AccountTokenService.
+ *
+ * Lock order, the same in every method that takes more than one lock, so
+ * two of them can't wait on each other (a deadlock aborts one valid
+ * request): the reset token's row, then the confirmation token's row, then
+ * the user's row. `resetPassword` (reset row, verify row, user),
+ * `confirmEmail` (verify row, user) and `markVerified` (verify row, user)
+ * all follow it. A new method that touches two of them keeps this order.
  */
 @inject()
 export default class AccountService {
@@ -124,7 +131,8 @@ export default class AccountService {
 	 * (spec ruling 16). Whoever is signed in doesn't matter: the link proves
 	 * the mailbox, and it signs nobody in. `flow` is the id of the link the
 	 * page showed. Null for a dead link, a flow that isn't that link's, or a
-	 * link sent to an address the account no longer has.
+	 * link sent to an address the account no longer has. Lock order: the
+	 * confirmation token's row (consume), then the user (see the class).
 	 */
 	async confirmEmail(token: string, flow: string): Promise<User | null> {
 		return withTransaction(async () => {
@@ -146,21 +154,23 @@ export default class AccountService {
 	/**
 	 * Confirms an account's address without a link (spec ruling 20): the
 	 * operator's account:verify, once they checked the person some other
-	 * way. Revokes the account's confirmation link.
+	 * way. Revokes the account's confirmation link. Lock order: the
+	 * confirmation token's row (revoke), then the user (see the class), so
+	 * the account is found without a lock, its link revoked, and only then
+	 * locked.
 	 */
 	async markVerified(
 		email: string,
 	): Promise<"unknown" | "already" | "confirmed"> {
 		return withTransaction(async () => {
-			const user = await User.query()
-				.where("email", canonicalEmail(email))
-				.forUpdate()
-				.first();
+			const found = await User.findBy("email", canonicalEmail(email));
+			if (!found) return "unknown";
+			await this.tokens.revoke(found.id, "verify_email");
+			const user = await User.query().where("id", found.id).forUpdate().first();
 			if (!user) return "unknown";
 			if (user.emailVerifiedAt) return "already";
 			user.emailVerifiedAt = DateTime.now();
 			await user.save();
-			await this.tokens.revoke(user.id, "verify_email");
 			return "confirmed";
 		});
 	}
@@ -193,7 +203,8 @@ export default class AccountService {
 	 * clears the login failures of that stored address. Signs nobody in.
 	 * `flow` is the id of the link the page showed. Null for a dead link, a
 	 * flow that isn't that link's, or a link sent to an address the account
-	 * no longer has.
+	 * no longer has. Lock order: the reset token's row (consume), the
+	 * confirmation token's row (revoke), then the user (see the class).
 	 */
 	async resetPassword(
 		token: string,
@@ -203,6 +214,9 @@ export default class AccountService {
 		return withTransaction(async (trx) => {
 			const claim = await this.tokens.consume(token, "reset_password", flow);
 			if (!claim) return null;
+			// Any confirmation link dies with the reset (the link proved the
+			// mailbox), revoked before the user is locked: see the class.
+			await this.tokens.revoke(claim.userId, "verify_email");
 			const user = await User.query()
 				.where("id", claim.userId)
 				.forUpdate()
@@ -210,10 +224,7 @@ export default class AccountService {
 			if (!user || user.email !== claim.email) return null;
 			user.password = password;
 			user.sessionVersion += 1;
-			if (!user.emailVerifiedAt) {
-				user.emailVerifiedAt = DateTime.now();
-				await this.tokens.revoke(user.id, "verify_email");
-			}
+			if (!user.emailVerifiedAt) user.emailVerifiedAt = DateTime.now();
 			await user.save();
 			await sendMailInTransaction(
 				new PasswordChangedMail({
