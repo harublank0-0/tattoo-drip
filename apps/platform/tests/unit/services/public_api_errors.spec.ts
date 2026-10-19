@@ -302,3 +302,30 @@ test.group("The deposit codes", () => {
 		}
 	});
 });
+
+test.group("The challenge codes", () => {
+	test("challenge_failed is a 403 and challenge_unavailable a 503, each with its one message", ({
+		assert,
+	}) => {
+		const cases = [
+			[
+				403,
+				"challenge_failed",
+				"We couldn't confirm this request came from a person. Please try again.",
+			],
+			[
+				503,
+				"challenge_unavailable",
+				"We couldn't run the security check. Try again in a minute.",
+			],
+		] as const;
+
+		for (const [status, code, message] of cases) {
+			assert.deepEqual(
+				apiErrorFor(ApiException.of(code)),
+				{ status, body: { error: { code, message } }, headers: {} },
+				code,
+			);
+		}
+	});
+});

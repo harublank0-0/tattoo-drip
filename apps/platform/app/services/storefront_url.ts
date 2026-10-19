@@ -57,6 +57,15 @@ export function checkStorefrontUrl(
 }
 
 /**
+ * The host of `slug`'s studio page under `template` (STOREFRONT_URL), lower
+ * case, without port: where its intake form's bot-challenge token must have
+ * been made (TAT-55).
+ */
+export function studioHostname(template: string, slug: string): string {
+	return originOf(template, slug).hostname;
+}
+
+/**
  * Whether links built from `template` open on the machine that made them
  * (a loopback host such as the dev default): a client who gets one can't
  * open it.

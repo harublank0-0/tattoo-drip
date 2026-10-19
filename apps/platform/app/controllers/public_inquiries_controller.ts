@@ -5,6 +5,8 @@ import {
 	InquiryRuleError,
 	InvalidReferenceImageError,
 } from "#modules/inquiries/errors";
+import { HONEYPOT_FIELD, honeypotFilled } from "#modules/inquiries/honeypot";
+import { countIntake, intakePhoneKey } from "#modules/inquiries/intake_limits";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import IntakeService from "#modules/inquiries/services/intake_service";
 import {
@@ -18,7 +20,10 @@ import InquiryReceiptTransformer from "#transformers/inquiry_receipt_transformer
 /**
  * The public intake (createInquiry in openapi.yaml, TAT-51): one multipart
  * request with the fields and up to 5 reference images. The answer is only
- * the new inquiry's id, whether or not the phone was known.
+ * the new inquiry's id, whether or not the phone was known. The intakeGuard
+ * middleware already counted the address, checked the bot challenge and
+ * counted the studio (TAT-55); here come the honeypot, after the body, and
+ * the phone count, after validation.
  */
 @inject()
 export default class PublicInquiriesController {
@@ -34,6 +39,14 @@ export default class PublicInquiriesController {
 			// The tenant is known (publicTenant ran), so only now does the body
 			// go to disk (the route is in multipart.processManually).
 			await receiveUploads(request);
+			// A filled honeypot is refused like a failed challenge (TAT-55),
+			// before validation, so no field error names the trap. It is read from
+			// the body only: request.input() merges the query string over the body,
+			// so a query parameter of that name would fill it, and an empty one
+			// would hide a filled field.
+			if (honeypotFilled(request.body()[HONEYPOT_FIELD])) {
+				throw ApiException.of("challenge_failed");
+			}
 			const submission = await request.validateUsing(intakeValidator, {
 				// request.files() is always a list, also for a single part.
 				data: {
@@ -41,8 +54,12 @@ export default class PublicInquiriesController {
 					referenceImages: request.files("referenceImages"),
 				},
 			});
-			// TAT-55: the per-phone rate limit goes here (it needs the E.164
-			// phone), before anything is stored.
+			// Every validated try counts against its E.164 phone at this studio
+			// (TAT-55), whatever submit answers; the 3-open cap is submit's.
+			await countIntake(
+				"perPhone",
+				intakePhoneKey(tenant.id, submission.contactPhone),
+			);
 			const inquiry = await this.intake.submit(tenant, submission);
 			response.status(201);
 			return await ctx.serialize(InquiryReceiptTransformer.transform(inquiry));

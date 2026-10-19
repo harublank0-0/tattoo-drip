@@ -119,7 +119,8 @@ export const tattooQueries = {
  * Mutation options for each write. Use them with `useMutation`.
  * `createInquiry` never retries, whatever the app's `QueryClient` defaults
  * say: a retry after a timeout could send the inquiry (and its images) twice,
- * and each copy uses one of the phone's three open-inquiry slots.
+ * and each copy uses one of the phone's three open-inquiry slots; and its
+ * bot-challenge token is single-use, so a retry would send a spent one.
  */
 export const tattooMutations = {
 	createInquiry: (client: TattooClient) =>

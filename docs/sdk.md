@@ -32,6 +32,8 @@ The studio page reads `client.studio.get()`: `slug` (the current one), `name`, `
 
 The deposit page reads `client.deposits.get(token)` and sends the screenshot with `client.deposits.submitProof(token, { proof, method, expectedAmount })`, where `expectedAmount` is the page's `deposit.due` (React: `useDeposit(token)`, `useSubmitDepositProof(token)`). The token is the fragment of the link the studio sent (`https://<studio>/deposit#<token>`): a bearer secret that must stay out of logs and analytics. Every link that doesn't work is a 404; a state that takes no screenshot is `deposit_not_due` and a stale amount `deposit_changed` (both 409: refetch the page). Both calls are never cached and rate-limited per address and per link.
 
+The intake form sends `client.inquiries.create(input)` (React: `useCreateInquiry()`) straight from the browser. `challengeToken` is the token of the studio page's Cloudflare Turnstile widget, rendered with action `INQUIRY_CHALLENGE_ACTION` (`inquiry`); the SDK sends it as the `X-Challenge-Token` header, which the API checks before it reads the upload (so the request preflights). A token is single-use: reset the widget after every answer, success or error. `honeypot` is the value of a hidden text input named `INQUIRY_HONEYPOT_FIELD` (`website`) that people never fill; the SDK sends it only when it isn't empty. `challenge_failed` (403: a bad, expired or reused token, or a filled honeypot) means get a new token and try again; `challenge_unavailable` (503) means the API couldn't check it; `rate_limited` (429) carries `retryAfter` in seconds (limits per address, studio and phone; up to a day for one phone number). Nothing retries by itself.
+
 ## Core SDK
 
 The core SDK targets one API version (`v1`) and one tenant per client. It has typed inputs and outputs, typed errors (`TattooApiError` with `status`, `code`, `message`, `fields` and `retryAfter`), no caching or UI state, and no business rules. Every call sends `Accept: application/json` and no cookies (`credentials: "omit"`), gives up after `timeoutMs` (10 seconds by default) with code `timeout`, and takes `{ signal }` to cancel, after which it rejects with the signal's `AbortError`. A response that never arrived is status 0 with `timeout` or `network_error`; a 2xx whose body is not a JSON object with `data` (empty, not JSON, or a bare string, number, boolean, null or array) is `invalid_response` with the HTTP status, never a raw `TypeError` and never carrying the body's text; an error response with such a body is `unknown_error`. `inquiries.create` uploads, so it waits up to 2 minutes unless its own `{ timeoutMs }` says otherwise.
@@ -55,7 +57,8 @@ try {
     contactName: "Ana",
     contactPhone: "9812345678",                         // stored as +9779812345678
     referenceImages: [file],                            // up to 5; sent as one multipart request
-    challengeToken,                                     // TAT-55; ignored until then
+    challengeToken,                                     // the Turnstile widget's token; sent as X-Challenge-Token
+    honeypot: websiteInput.value,                       // the hidden "website" input; empty for people
   });
 } catch (error) {
   if (isTattooApiError(error) && error.code === "too_many_open_inquiries") {
@@ -102,7 +105,7 @@ The SDK throws if it is given a key in a browser.
 ## Contract, keys, stability
 
 - **Contract:** `packages/types/openapi.yaml` is the source of truth. After editing it, run `pnpm --filter @tattoo-drip/types generate`. Contract tests (V1) check that real responses match it.
-- **Envelopes and codes:** `{ data }` on success; `{ error: { code, message, fields? } }` on failure. Shared codes: `bad_request`, `not_found`, `method_not_allowed`, `payload_too_large`, `unsupported_media_type`, `validation_failed` (with `fields`), `rate_limited` (with `Retry-After`), `internal_error`; `createInquiry` adds `artist_not_accepting`, `studio_not_accepting` and `too_many_open_inquiries` (409); `submitDepositProof` adds `deposit_not_due` and `deposit_changed` (409); every code is listed in `openapi.yaml`. Branch on `code`, never on `message`.
+- **Envelopes and codes:** `{ data }` on success; `{ error: { code, message, fields? } }` on failure. Shared codes: `bad_request`, `not_found`, `method_not_allowed`, `payload_too_large`, `unsupported_media_type`, `validation_failed` (with `fields`), `rate_limited` (with `Retry-After`), `internal_error`; `createInquiry` adds `artist_not_accepting`, `studio_not_accepting` and `too_many_open_inquiries` (409), `challenge_failed` (403) and `challenge_unavailable` (503); `submitDepositProof` adds `deposit_not_due` and `deposit_changed` (409); every code is listed in `openapi.yaml`. Branch on `code`, never on `message`.
 - **Tenants and old slugs:** the path slug is matched exactly. An old slug answers reads like the current one, and `studio.get()` returns the current `slug` (the studio page redirects with it); a write under an old slug is a 404.
 - **Stateless, CORS, caching:** no cookies or sessions; CORS allows any origin without credentials. Cacheable reads send `Cache-Control: public, max-age=60, stale-while-revalidate=600` and an `ETag`; everything else is `no-store`.
 - **Versioning:** within `/api/v1`, changes are additive only. Breaking changes mean `/api/v2` and a new SDK major version. Until V2 opens the SDK to others, the draft may still change freely.

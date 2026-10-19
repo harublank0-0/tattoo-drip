@@ -10,6 +10,7 @@
 */
 
 import { Env } from "@adonisjs/core/env";
+import { checkChallengeSecret } from "#services/challenge_secret";
 import { checkStorefrontUrl } from "#services/storefront_url";
 
 export default await Env.create(new URL("../", import.meta.url), {
@@ -28,6 +29,11 @@ export default await Env.create(new URL("../", import.meta.url), {
 	// http://{tenant}.localhost:3000 (TAT-12's dev host).
 	STOREFRONT_URL: (key: string, value?: string) =>
 		checkStorefrontUrl(key, value, process.env.NODE_ENV === "production"),
+	// The secret key of the studio pages' Cloudflare Turnstile widget: the
+	// intake's bot challenge (TAT-55). Required in production; unset in
+	// development and tests, the check is off.
+	TURNSTILE_SECRET_KEY: (key: string, value?: string) =>
+		checkChallengeSecret(key, value, process.env.NODE_ENV === "production"),
 
 	// Session
 	SESSION_DRIVER: Env.schema.enum(["cookie", "memory", "database"] as const),

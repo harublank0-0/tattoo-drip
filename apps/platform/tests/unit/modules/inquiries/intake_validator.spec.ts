@@ -225,17 +225,13 @@ test.group("intakeValidator", () => {
 		);
 	});
 
-	test("a challenge token is taken up to 2048 characters", async ({
+	test("a challengeToken field is dropped: the token travels in a header (TAT-55)", async ({
 		assert,
 	}) => {
-		const token = "t".repeat(2048);
-		assert.equal(
-			(await intakeValidator.validate(body({ challengeToken: token })))
-				.challengeToken,
-			token,
+		const submission = await intakeValidator.validate(
+			body({ challengeToken: "t".repeat(5000) }),
 		);
-		assert.deepEqual(await problems(body({ challengeToken: `${token}t` })), {
-			challengeToken: "Use at most 2048 characters.",
-		});
+
+		assert.notProperty(submission, "challengeToken");
 	});
 });

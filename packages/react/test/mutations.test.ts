@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { MutationObserver, QueryClient } from "@tanstack/react-query";
-import type { CreateInquiryInput, TattooClient } from "@tattoo-drip/sdk";
+import {
+	type CreateInquiryInput,
+	TattooApiError,
+	type TattooClient,
+} from "@tattoo-drip/sdk";
 import { tattooMutations } from "../src/queries.js";
 
 const input = {
@@ -61,5 +65,31 @@ describe("tattooMutations.createInquiry", () => {
 		await assert.rejects(observer.mutate(input), /timed out/);
 
 		assert.equal(calls.length, 1);
+	});
+
+	test("passes the token and the honeypot through, and never retries a refused challenge", async () => {
+		const { client, calls } = fakeClient(async () => {
+			throw new TattooApiError(403, {
+				code: "challenge_failed",
+				message:
+					"We couldn't confirm this request came from a person. Please try again.",
+			});
+		});
+		const queryClient = new QueryClient({
+			defaultOptions: { mutations: { retry: 3, retryDelay: 0 } },
+		});
+		const observer = new MutationObserver(
+			queryClient,
+			tattooMutations.createInquiry(client),
+		);
+		const sent = { ...input, challengeToken: "tok-55", honeypot: "" };
+
+		await assert.rejects(
+			observer.mutate(sent),
+			(error) =>
+				error instanceof TattooApiError && error.code === "challenge_failed",
+		);
+
+		assert.deepEqual(calls, [sent]);
 	});
 });

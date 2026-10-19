@@ -11,7 +11,7 @@ const NAMED = new Set(Object.keys(middleware));
 const WEB_ONLY = ["auth", "guest", "dbContext", "tenant", "role"];
 
 /** Middleware only API routes may run. */
-const PUBLIC_ONLY = ["publicApi", "publicTenant", "publicCache"];
+const PUBLIC_ONLY = ["publicApi", "publicTenant", "publicCache", "intakeGuard"];
 
 /**
  * API GET routes that are not cacheable, and why. A new GET route either
@@ -70,6 +70,23 @@ test.group("Public API routes", () => {
 				pattern,
 			);
 		}
+	});
+
+	test("the intake checks its challenge and limits after resolving the tenant (TAT-55)", ({
+		assert,
+	}) => {
+		const intake = allRoutes().find(
+			({ pattern, methods }) =>
+				pattern === "/api/v1/tenants/:tenant/inquiries" &&
+				methods.includes("POST"),
+		);
+
+		assert.exists(intake);
+		assert.include(intake?.named ?? [], "intakeGuard");
+		assert.isAbove(
+			intake?.named.indexOf("intakeGuard") ?? -1,
+			intake?.named.indexOf("publicTenant") ?? -1,
+		);
 	});
 
 	test("no route outside /api runs the public API middleware", ({ assert }) => {

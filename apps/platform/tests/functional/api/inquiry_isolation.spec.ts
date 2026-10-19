@@ -144,7 +144,10 @@ test.group("Public API: POST /inquiries across studios", (group) => {
 			.options(`/api/v1/tenants/${tenant.slug}/inquiries`)
 			.header("origin", ORIGIN)
 			.header("access-control-request-method", "POST")
-			.header("access-control-request-headers", "content-type");
+			.header(
+				"access-control-request-headers",
+				"content-type,x-challenge-token",
+			);
 
 		post.assertStatus(201);
 		post.assertHeader("access-control-allow-origin", "*");
@@ -154,7 +157,7 @@ test.group("Public API: POST /inquiries across studios", (group) => {
 		preflight.assertHeader("access-control-allow-methods", "GET,HEAD,POST");
 		preflight.assertHeader(
 			"access-control-allow-headers",
-			"accept,content-type",
+			"accept,content-type,x-challenge-token",
 		);
 		assert.isUndefined(preflight.header("access-control-allow-credentials"));
 		assertNoCookies(preflight);

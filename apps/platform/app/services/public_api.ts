@@ -60,6 +60,8 @@ export type ApiErrorCode =
 	| "artist_not_accepting"
 	| "studio_not_accepting"
 	| "too_many_open_inquiries"
+	| "challenge_failed"
+	| "challenge_unavailable"
 	// submitDepositProof (TAT-65)
 	| "deposit_not_due"
 	| "deposit_changed";
@@ -120,6 +122,18 @@ export const API_ERRORS: Record<ApiErrorCode, ErrorKind> = {
 		code: "too_many_open_inquiries",
 		message:
 			"You already have requests waiting with this studio. They will reply on WhatsApp or Viber.",
+	},
+	// The intake's bot challenge and honeypot (TAT-55): one message, never why.
+	challenge_failed: {
+		status: 403,
+		code: "challenge_failed",
+		message:
+			"We couldn't confirm this request came from a person. Please try again.",
+	},
+	challenge_unavailable: {
+		status: 503,
+		code: "challenge_unavailable",
+		message: "We couldn't run the security check. Try again in a minute.",
 	},
 	deposit_not_due: {
 		status: 409,

@@ -33,9 +33,9 @@ const optionalText = (max: number) =>
  * gives it: strings, null for empty fields, and the `referenceImages` files
  * (the controller passes `request.files()`, always a list). Lengths are the
  * inquiry columns'; the phone becomes E.164. Images are only filtered here
- * (size, extension): ImageService checks what they really are. The
- * bot-challenge token is taken and ignored until TAT-55; any other field is
- * dropped.
+ * (size, extension): ImageService checks what they really are. Any other
+ * field is dropped, `challengeToken` included: the bot-challenge token
+ * travels in the X-Challenge-Token header (TAT-55).
  */
 export const intakeValidator = vine.create({
 	idea: text(4000),
@@ -58,7 +58,6 @@ export const intakeValidator = vine.create({
 		.array(imageFile())
 		.maxLength(MAX_REFERENCE_IMAGES)
 		.optional(),
-	challengeToken: vine.string().maxLength(2048).optional(),
 });
 
 export type IntakeSubmission = Infer<typeof intakeValidator>;

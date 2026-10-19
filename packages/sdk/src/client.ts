@@ -21,6 +21,10 @@ const API_VERSION = "v1";
 const DEFAULT_TIMEOUT_MS = 10_000;
 /** Uploads on a slow mobile connection need longer than a read (TAT-51). */
 const UPLOAD_TIMEOUT_MS = 120_000;
+/** The action the studio page's Turnstile widget is rendered with for an inquiry (TAT-55). */
+export const INQUIRY_CHALLENGE_ACTION = "inquiry";
+/** The intake form's honeypot field: people never see it, so they leave it empty (TAT-55). */
+export const INQUIRY_HONEYPOT_FIELD = "website";
 
 export interface TattooClientOptions {
 	/** API origin, e.g. `https://api.example.com`. The SDK appends `/api/v1`. */
@@ -56,8 +60,21 @@ export interface RequestOptions {
 export interface CreateInquiryInput extends InquiryInput {
 	/** Up to 5 JPEG, PNG or WebP images, 10 MB each and 20 MB together. */
 	referenceImages?: Blob[];
-	/** Bot-challenge token (TAT-55); the API ignores it until then. */
+	/**
+	 * The bot-challenge token the studio page's Turnstile widget made for
+	 * this submission (rendered with action `INQUIRY_CHALLENGE_ACTION`).
+	 * Sent as the `X-Challenge-Token` header, which the API checks before it
+	 * reads the upload. Single-use: get a new one for every call, also after
+	 * a refusal. The deployed API refuses a call without one
+	 * (`challenge_failed`).
+	 */
 	challengeToken?: string;
+	/**
+	 * What the form's hidden honeypot input (`INQUIRY_HONEYPOT_FIELD`) holds.
+	 * Sent as that field only when it isn't empty; a filled one is refused
+	 * as `challenge_failed`.
+	 */
+	honeypot?: string;
 }
 
 /** A deposit proof: the screenshot, how the client paid, and the `deposit.due` the page showed. */
@@ -196,10 +213,17 @@ export function createTattooClient(options: TattooClientOptions) {
 			 * (an upload) unless `call.timeoutMs` says otherwise. Fails with a
 			 * TattooApiError such as `validation_failed` (with `fields` by
 			 * input name), `artist_not_accepting`, `studio_not_accepting`,
-			 * `too_many_open_inquiries` or `payload_too_large`.
+			 * `too_many_open_inquiries`, `payload_too_large`,
+			 * `challenge_failed` (403: get a new token), `challenge_unavailable`
+			 * (503) or `rate_limited` (429, with `retryAfter`). Never retried.
 			 */
 			create: async (input: CreateInquiryInput, call: RequestOptions = {}) => {
-				const { referenceImages = [], challengeToken, ...fields } = input;
+				const {
+					referenceImages = [],
+					challengeToken,
+					honeypot,
+					...fields
+				} = input;
 				const form = new FormData();
 				for (const [name, value] of Object.entries(fields)) {
 					if (value !== undefined && value !== null) {
@@ -209,12 +233,20 @@ export function createTattooClient(options: TattooClientOptions) {
 				for (const image of referenceImages) {
 					form.append("referenceImages", image);
 				}
-				if (challengeToken) form.set("challengeToken", challengeToken);
+				if (honeypot) form.set(INQUIRY_HONEYPOT_FIELD, honeypot);
 
 				const body = await request<{ data: InquiryReceipt }>(
 					`${tenantRoot}/inquiries`,
-					// No Content-Type: fetch sets multipart's boundary itself.
-					{ method: "POST", body: form },
+					// No Content-Type: fetch sets multipart's boundary itself. The
+					// token goes in a header, so the API checks it before it reads
+					// the upload (TAT-55); the request then preflights.
+					{
+						method: "POST",
+						body: form,
+						headers: challengeToken
+							? { "X-Challenge-Token": challengeToken }
+							: undefined,
+					},
 					{ ...call, timeoutMs: call.timeoutMs ?? UPLOAD_TIMEOUT_MS },
 				);
 				return body.data;
