@@ -122,12 +122,13 @@ export default class AccountService {
 	/**
 	 * Confirms the address a live confirmation link was sent to, once
 	 * (spec ruling 16). Whoever is signed in doesn't matter: the link proves
-	 * the mailbox, and it signs nobody in. Null for a dead link, or one sent
-	 * to an address the account no longer has.
+	 * the mailbox, and it signs nobody in. `flow` is the id of the link the
+	 * page showed. Null for a dead link, a flow that isn't that link's, or a
+	 * link sent to an address the account no longer has.
 	 */
-	async confirmEmail(token: string): Promise<User | null> {
+	async confirmEmail(token: string, flow: string): Promise<User | null> {
 		return withTransaction(async () => {
-			const claim = await this.tokens.consume(token, "verify_email");
+			const claim = await this.tokens.consume(token, "verify_email", flow);
 			if (!claim) return null;
 			const user = await User.query()
 				.where("id", claim.userId)
@@ -190,12 +191,17 @@ export default class AccountService {
 	 * address if it wasn't (the link proved the mailbox), emails the
 	 * account's address that its password changed, and once committed
 	 * clears the login failures of that stored address. Signs nobody in.
-	 * Null for a dead link, or one sent to an address the account no longer
-	 * has.
+	 * `flow` is the id of the link the page showed. Null for a dead link, a
+	 * flow that isn't that link's, or a link sent to an address the account
+	 * no longer has.
 	 */
-	async resetPassword(token: string, password: string): Promise<User | null> {
+	async resetPassword(
+		token: string,
+		password: string,
+		flow: string,
+	): Promise<User | null> {
 		return withTransaction(async (trx) => {
-			const claim = await this.tokens.consume(token, "reset_password");
+			const claim = await this.tokens.consume(token, "reset_password", flow);
 			if (!claim) return null;
 			const user = await User.query()
 				.where("id", claim.userId)

@@ -11,14 +11,18 @@ import {
 import { Input } from "~/components/ui/input";
 import AuthLayout from "~/layouts/auth";
 
-type Props = { state: "ready" | "expired" | "invalid"; email: string | null };
+type Props = {
+	state: "ready" | "expired" | "invalid";
+	email: string | null;
+	flow: string | null;
+};
 
 /**
  * The page a reset link opens (TAT-18). The token stays in the session;
  * this page's URL never holds it. The new password is this form's POST.
  */
-export default function ResetPassword({ state, email }: Props) {
-	if (state !== "ready" || !email) {
+export default function ResetPassword({ state, email, flow }: Props) {
+	if (state !== "ready" || !email || !flow) {
 		return <DeadLink expired={state === "expired"} />;
 	}
 
@@ -42,6 +46,8 @@ export default function ResetPassword({ state, email }: Props) {
 			<Form route="password_reset.update">
 				{({ errors, processing }) => (
 					<FieldGroup>
+						{/* The link this page showed, so the POST can't act on another one staged since. */}
+						<input type="hidden" name="flow" value={flow} />
 						{/* Lets a password manager file the new password under this account. */}
 						<input
 							type="email"

@@ -4,7 +4,7 @@ import User from "#models/user";
 import { hashAccountToken } from "#modules/identity/account_tokens";
 import AccountTokenService from "#modules/identity/services/account_token_service";
 import { dbClient } from "#services/db_context";
-import { altered, expireToken } from "#tests/helpers/accounts";
+import { altered, expireToken, flowOf, NO_FLOW } from "#tests/helpers/accounts";
 
 const tokens = new AccountTokenService();
 
@@ -67,6 +67,7 @@ test.group("AccountTokenService (TAT-18)", (group) => {
 			state: "live",
 			userId: user.id,
 			email: user.email,
+			flow: await flowOf(second),
 		});
 		assert.equal((await tokens.state(reset, "reset_password")).state, "live");
 		assert.lengthOf(await rowsOf(user.id), 2);
@@ -77,12 +78,13 @@ test.group("AccountTokenService (TAT-18)", (group) => {
 	}) => {
 		const user = await makeUser();
 		const token = await tokens.issue(user, "reset_password");
+		const flow = await flowOf(token);
 
-		assert.deepEqual(await tokens.consume(token, "reset_password"), {
+		assert.deepEqual(await tokens.consume(token, "reset_password", flow), {
 			userId: user.id,
 			email: user.email,
 		});
-		assert.isNull(await tokens.consume(token, "reset_password"));
+		assert.isNull(await tokens.consume(token, "reset_password", flow));
 		assert.deepEqual(await tokens.state(token, "reset_password"), {
 			state: "unknown",
 		});
@@ -93,12 +95,13 @@ test.group("AccountTokenService (TAT-18)", (group) => {
 	}) => {
 		const user = await makeUser();
 		const token = await tokens.issue(user, "verify_email");
+		const flow = await flowOf(token);
 		await expireToken(user.id, "verify_email");
 
 		assert.deepEqual(await tokens.state(token, "verify_email"), {
 			state: "expired",
 		});
-		assert.isNull(await tokens.consume(token, "verify_email"));
+		assert.isNull(await tokens.consume(token, "verify_email", flow));
 		assert.deepEqual(await tokens.state(token, "verify_email"), {
 			state: "expired",
 		});
@@ -109,8 +112,9 @@ test.group("AccountTokenService (TAT-18)", (group) => {
 	}) => {
 		const user = await makeUser();
 		const token = await tokens.issue(user, "verify_email");
+		const flow = await flowOf(token);
 
-		assert.isNull(await tokens.consume(token, "reset_password"));
+		assert.isNull(await tokens.consume(token, "reset_password", flow));
 		assert.equal(
 			(await tokens.state(token, "reset_password")).state,
 			"unknown",
@@ -119,8 +123,33 @@ test.group("AccountTokenService (TAT-18)", (group) => {
 			(await tokens.state(altered(token), "verify_email")).state,
 			"unknown",
 		);
-		assert.isNull(await tokens.consume(altered(token), "verify_email"));
+		assert.isNull(await tokens.consume(altered(token), "verify_email", flow));
 		assert.equal((await tokens.state(token, "verify_email")).state, "live");
+	});
+
+	test("a token is used only with the flow id of its own row", async ({
+		assert,
+	}) => {
+		const user = await makeUser();
+		const other = await makeUser("other@tokens-18.example");
+		const token = await tokens.issue(user, "reset_password");
+		const otherToken = await tokens.issue(other, "reset_password");
+
+		for (const flow of [
+			await flowOf(otherToken),
+			NO_FLOW,
+			"not-a-flow-id",
+			"",
+			"' or true --",
+		]) {
+			assert.isNull(await tokens.consume(token, "reset_password", flow), flow);
+		}
+
+		assert.equal((await tokens.state(token, "reset_password")).state, "live");
+		assert.deepEqual(
+			await tokens.consume(token, "reset_password", await flowOf(token)),
+			{ userId: user.id, email: user.email },
+		);
 	});
 
 	test("revoking removes the account's token of that purpose only", async ({

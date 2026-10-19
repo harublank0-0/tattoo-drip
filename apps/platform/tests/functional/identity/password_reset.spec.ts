@@ -19,6 +19,8 @@ import {
 	altered,
 	cookieNames,
 	expireToken,
+	flowOf,
+	NO_FLOW,
 	queuedMails,
 } from "#tests/helpers/accounts";
 import { assertValidationError } from "#tests/helpers/validation";
@@ -44,18 +46,28 @@ function ask(client: ApiClient, email: string, ip = "203.0.113.110") {
 		.redirects(0);
 }
 
-/** POST /reset-password with `token` in the session, as the link leaves it. */
-function choose(
+/**
+ * POST /reset-password with `token` in the session, as the link leaves it,
+ * and the flow id of that token's row, as its page's hidden field posts it
+ * (pass `flow` to post another; `null` leaves the field out).
+ */
+async function choose(
 	client: ApiClient,
 	token: string | null,
 	password = NEW,
 	confirmation = password,
+	flow?: string | null,
 ) {
+	const posted = flow === undefined ? await flowOf(token ?? "") : flow;
 	return client
 		.post("/reset-password")
 		.withSession(token ? { [KEY]: token } : {})
 		.header("referer", "/reset-password")
-		.form({ password, passwordConfirmation: confirmation })
+		.form({
+			password,
+			passwordConfirmation: confirmation,
+			...(posted === null ? {} : { flow: posted }),
+		})
 		.withCsrfToken()
 		.redirects(0);
 }
@@ -214,6 +226,7 @@ test.group("Password reset (TAT-18)", (group) => {
 		assert.containSubset(live.inertiaProps, {
 			state: "ready",
 			email: user.email,
+			flow: await flowOf(token),
 		});
 		assert.notInclude(JSON.stringify(live.body()), token);
 		live.assertHeader("cache-control", "no-store");
@@ -281,15 +294,91 @@ test.group("Password reset (TAT-18)", (group) => {
 		elsewhere.assertHeader("location", "/login");
 	});
 
+	test("a form can only act on the link it showed: another link staged in between is not changed", async ({
+		client,
+		assert,
+	}) => {
+		const a = await makeUser("a@reset-18.example");
+		const b = await makeUser("b@reset-18.example");
+		const tokenA = await tokens.issue(a, "reset_password");
+		const tokenB = await tokens.issue(b, "reset_password");
+		const pageA = await client
+			.get("/reset-password")
+			.withSession({ [KEY]: tokenA })
+			.withInertia();
+		const flowA = String(pageA.inertiaProps.flow);
+		assert.equal(flowA, await flowOf(tokenA));
+		assert.notEqual(flowA, await flowOf(tokenB));
+
+		// B's link is opened in another tab, then A's form is submitted.
+		const refused = await choose(client, tokenB, NEW, NEW, flowA);
+
+		refused.assertHeader("location", "/reset-password");
+		refused.assertFlashMissing("success");
+		assert.isTrue(await signsIn(b.email, OLD));
+		assert.isFalse(await signsIn(b.email, NEW));
+		assert.isTrue(await signsIn(a.email, OLD));
+		assert.equal((await tokens.state(tokenB, "reset_password")).state, "live");
+		assert.equal((await tokens.state(tokenA, "reset_password")).state, "live");
+		// The page now shows B's link and B's flow id, and that form works.
+		const pageB = await client
+			.get("/reset-password")
+			.withSession({ [KEY]: tokenB })
+			.withInertia();
+		assert.containSubset(pageB.inertiaProps, {
+			state: "ready",
+			email: b.email,
+			flow: await flowOf(tokenB),
+		});
+		const done = await choose(
+			client,
+			tokenB,
+			NEW,
+			NEW,
+			String(pageB.inertiaProps.flow),
+		);
+		done.assertHeader("location", "/login");
+		assert.isTrue(await signsIn(b.email, NEW));
+		assert.isTrue(await signsIn(a.email, OLD));
+	});
+
+	test("a missing, malformed or foreign flow id is a dead link, never an error", async ({
+		client,
+		assert,
+	}) => {
+		const user = await makeUser();
+		const token = await tokens.issue(user, "reset_password");
+
+		for (const flow of [null, "", NO_FLOW, "not-a-flow-id", "' or true --"]) {
+			const response = await choose(client, token, NEW, NEW, flow);
+			response.assertStatus(302);
+			response.assertHeader("location", "/reset-password");
+			response.assertFlashMissing("success");
+		}
+
+		assert.isTrue(await signsIn(user.email, OLD));
+		assert.equal((await tokens.state(token, "reset_password")).state, "live");
+	});
+
 	test("a reset link works once: a replay changes nothing", async ({
 		client,
 		assert,
 	}) => {
 		const user = await makeUser();
 		const token = await tokens.issue(user, "reset_password");
-		(await choose(client, token)).assertHeader("location", "/login");
+		const flow = await flowOf(token);
+		(await choose(client, token, NEW, NEW, flow)).assertHeader(
+			"location",
+			"/login",
+		);
 
-		const replay = await choose(client, token, "a-third-password");
+		const replay = await choose(
+			client,
+			token,
+			"a-third-password",
+			undefined,
+			flow,
+		);
 
 		replay.assertHeader("location", "/reset-password");
 		replay.assertFlashMissing("success");

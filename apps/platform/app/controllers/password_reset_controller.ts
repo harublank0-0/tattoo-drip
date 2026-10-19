@@ -1,6 +1,7 @@
 import { inject } from "@adonisjs/core";
 import type { HttpContext } from "@adonisjs/core/http";
 import {
+	FLOW_FIELD,
 	SENT_TO_FLASH,
 	SESSION_TOKEN_KEYS,
 } from "#modules/identity/account_tokens";
@@ -65,20 +66,24 @@ export default class PasswordResetController {
 			return inertia.render("auth/reset_password", {
 				state: "ready",
 				email: found.email,
+				flow: found.flow,
 			});
 		}
 		return inertia.render("auth/reset_password", {
 			state: found.state === "expired" ? "expired" : "invalid",
 			email: null,
+			flow: null,
 		});
 	}
 
 	async update({ request, session, response }: HttpContext) {
 		const { password } = await request.validateUsing(newPasswordValidator);
 		const token = session.get(TOKEN_KEY);
+		// The page's hidden field: the link it showed, not whichever was staged since.
+		const flow = request.input(FLOW_FIELD);
 		const user =
-			typeof token === "string"
-				? await this.accounts.resetPassword(token, password)
+			typeof token === "string" && typeof flow === "string"
+				? await this.accounts.resetPassword(token, password, flow)
 				: null;
 		if (!user) return response.redirect().toRoute("password_reset.edit");
 		session.forget(TOKEN_KEY);

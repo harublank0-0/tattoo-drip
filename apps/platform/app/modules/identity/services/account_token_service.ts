@@ -1,5 +1,6 @@
 import {
 	hashAccountToken,
+	isFlowId,
 	newAccountToken,
 	TOKEN_MINUTES,
 	type TokenPurpose,
@@ -7,7 +8,8 @@ import {
 import { dbClient } from "#services/db_context";
 
 export type TokenState =
-	| { state: "live"; userId: string; email: string }
+	/** `flow` is the token row's id, for the page's hidden field (see `FLOW_FIELD`). */
+	| { state: "live"; userId: string; email: string; flow: string }
 	| { state: "expired" }
 	| { state: "unknown" };
 
@@ -50,28 +52,37 @@ export default class AccountTokenService {
 	 */
 	async state(token: string, purpose: TokenPurpose): Promise<TokenState> {
 		const { rows } = await dbClient().rawQuery(
-			"select user_id, email, expires_at > now() as live from account_tokens where token_hash = ? and purpose = ?",
+			"select id, user_id, email, expires_at > now() as live from account_tokens where token_hash = ? and purpose = ?",
 			[hashAccountToken(token), purpose],
 		);
 		const row = rows[0] as
-			| { user_id: string; email: string; live: boolean }
+			| { id: string; user_id: string; email: string; live: boolean }
 			| undefined;
 		if (!row) return { state: "unknown" };
 		if (!row.live) return { state: "expired" };
-		return { state: "live", userId: row.user_id, email: row.email };
+		return {
+			state: "live",
+			userId: row.user_id,
+			email: row.email,
+			flow: row.id,
+		};
 	}
 
 	/**
 	 * Uses a live token: deletes it and returns its account and address.
-	 * One statement, so two requests with one token get it once.
+	 * One statement, so two requests with one token get it once. `flow` is
+	 * the id of the row the form was shown for (see `state`): another row's
+	 * id, or anything that isn't an id, finds nothing, like a dead link.
 	 */
 	async consume(
 		token: string,
 		purpose: TokenPurpose,
+		flow: string,
 	): Promise<{ userId: string; email: string } | null> {
+		if (!isFlowId(flow)) return null;
 		const { rows } = await dbClient().rawQuery(
-			"delete from account_tokens where token_hash = ? and purpose = ? and expires_at > now() returning user_id, email",
-			[hashAccountToken(token), purpose],
+			"delete from account_tokens where token_hash = ? and purpose = ? and id = ? and expires_at > now() returning user_id, email",
+			[hashAccountToken(token), purpose, flow],
 		);
 		const row = rows[0] as { user_id: string; email: string } | undefined;
 		return row ? { userId: row.user_id, email: row.email } : null;

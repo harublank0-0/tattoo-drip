@@ -15,6 +15,8 @@ import { digest } from "#services/rate_limits";
 import {
 	altered,
 	expireToken,
+	flowOf,
+	NO_FLOW,
 	queuedMails,
 	tokenOf,
 } from "#tests/helpers/accounts";
@@ -29,11 +31,21 @@ function makeUser(email = "ink@verify-18.example") {
 
 const reload = (user: User) => User.findOrFail(user.id);
 
-/** POST /verify-email with `token` in the session, as the link leaves it. */
-function confirm(client: ApiClient, token: string | null) {
+/**
+ * POST /verify-email with `token` in the session, as the link leaves it, and
+ * the flow id of that token's row, as the page's hidden field posts it (pass
+ * `flow` to post another; `null` leaves the field out).
+ */
+async function confirm(
+	client: ApiClient,
+	token: string | null,
+	flow?: string | null,
+) {
+	const posted = flow === undefined ? await flowOf(token ?? "") : flow;
 	return client
 		.post("/verify-email")
 		.withSession(token ? { [KEY]: token } : {})
+		.form(posted === null ? {} : { flow: posted })
 		.withCsrfToken()
 		.redirects(0);
 }
@@ -95,6 +107,7 @@ test.group("Email confirmation (TAT-18)", (group) => {
 			forSignedInUser: false,
 			signedInEmail: null,
 			canResend: false,
+			flow: await flowOf(token),
 		});
 		assert.notInclude(JSON.stringify(page.body()), token);
 		page.assertHeader("cache-control", "no-store");
@@ -107,8 +120,9 @@ test.group("Email confirmation (TAT-18)", (group) => {
 	}) => {
 		const user = await makeUser();
 		const token = await tokens.issue(user, "verify_email");
+		const flow = await flowOf(token);
 
-		const first = await confirm(client, token);
+		const first = await confirm(client, token, flow);
 		first.assertHeader("location", "/verify-email");
 		first.assertFlashMessage(CONFIRMED_FLASH, user.email);
 		first.assertSessionMissing(KEY);
@@ -116,7 +130,7 @@ test.group("Email confirmation (TAT-18)", (group) => {
 		const confirmedAt = (await reload(user)).emailVerifiedAt;
 		assert.isNotNull(confirmedAt);
 
-		const replay = await confirm(client, token);
+		const replay = await confirm(client, token, flow);
 		replay.assertFlashMissing(CONFIRMED_FLASH);
 		const page = await client
 			.get("/verify-email")
@@ -127,6 +141,62 @@ test.group("Email confirmation (TAT-18)", (group) => {
 			(await reload(user)).emailVerifiedAt?.toMillis(),
 			confirmedAt?.toMillis(),
 		);
+	});
+
+	test("a form can only confirm the link it showed: another link staged in between stays unconfirmed", async ({
+		client,
+		assert,
+	}) => {
+		const a = await makeUser("a@verify-18.example");
+		const b = await makeUser("b@verify-18.example");
+		const tokenA = await tokens.issue(a, "verify_email");
+		const tokenB = await tokens.issue(b, "verify_email");
+		const pageA = await client
+			.get("/verify-email")
+			.withSession({ [KEY]: tokenA })
+			.withInertia();
+		const flowA = String(pageA.inertiaProps.flow);
+		assert.equal(flowA, await flowOf(tokenA));
+
+		// B's link is opened in another tab, then A's form is submitted.
+		const refused = await confirm(client, tokenB, flowA);
+
+		refused.assertHeader("location", "/verify-email");
+		refused.assertFlashMissing(CONFIRMED_FLASH);
+		assert.isNull((await reload(b)).emailVerifiedAt);
+		assert.isNull((await reload(a)).emailVerifiedAt);
+		assert.equal((await tokens.state(tokenB, "verify_email")).state, "live");
+		const pageB = await client
+			.get("/verify-email")
+			.withSession({ [KEY]: tokenB })
+			.withInertia();
+		assert.containSubset(pageB.inertiaProps, {
+			state: "ready",
+			email: b.email,
+			flow: await flowOf(tokenB),
+		});
+		const done = await confirm(client, tokenB, String(pageB.inertiaProps.flow));
+		done.assertFlashMessage(CONFIRMED_FLASH, b.email);
+		assert.isNotNull((await reload(b)).emailVerifiedAt);
+		assert.isNull((await reload(a)).emailVerifiedAt);
+	});
+
+	test("a missing, malformed or foreign flow id is a dead link, never an error", async ({
+		client,
+		assert,
+	}) => {
+		const user = await makeUser();
+		const token = await tokens.issue(user, "verify_email");
+
+		for (const flow of [null, "", NO_FLOW, "not-a-flow-id", "' or true --"]) {
+			const response = await confirm(client, token, flow);
+			response.assertStatus(302);
+			response.assertHeader("location", "/verify-email");
+			response.assertFlashMissing(CONFIRMED_FLASH);
+		}
+
+		assert.isNull((await reload(user)).emailVerifiedAt);
+		assert.equal((await tokens.state(token, "verify_email")).state, "live");
 	});
 
 	test("after confirming, the page says so and offers the next step", async ({
@@ -226,6 +296,7 @@ test.group("Email confirmation (TAT-18)", (group) => {
 		await client
 			.post("/verify-email")
 			.withSession({ [KEY]: token })
+			.form({ flow: await flowOf(token) })
 			.withCsrfToken()
 			.loginAs(other)
 			.redirects(0);

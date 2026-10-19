@@ -9,6 +9,7 @@ type State = "ready" | "done" | "expired" | "invalid";
 type Props = {
 	state: State;
 	email: string | null;
+	flow: string | null;
 	forSignedInUser: boolean;
 	signedInEmail: string | null;
 	canResend: boolean;
@@ -55,6 +56,7 @@ function lead(state: State, email: string | null): ReactNode {
 export default function VerifyEmail({
 	state,
 	email,
+	flow,
 	forSignedInUser,
 	signedInEmail,
 	canResend,
@@ -76,12 +78,20 @@ export default function VerifyEmail({
 				</p>
 			)}
 
-			{state === "ready" ? (
+			{state === "ready" && flow ? (
 				<Form route="email_verification.confirm">
 					{({ processing }) => (
-						<Button type="submit" className="h-11 w-full" disabled={processing}>
-							{processing ? "Confirming…" : "Confirm email"}
-						</Button>
+						<>
+							{/* The link this page showed, so the POST can't confirm another one staged since. */}
+							<input type="hidden" name="flow" value={flow} />
+							<Button
+								type="submit"
+								className="h-11 w-full"
+								disabled={processing}
+							>
+								{processing ? "Confirming…" : "Confirm email"}
+							</Button>
+						</>
 					)}
 				</Form>
 			) : (

@@ -2,6 +2,7 @@ import { inject } from "@adonisjs/core";
 import type { HttpContext } from "@adonisjs/core/http";
 import {
 	CONFIRMED_FLASH,
+	FLOW_FIELD,
 	SESSION_TOKEN_KEYS,
 } from "#modules/identity/account_tokens";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -42,6 +43,7 @@ export default class EmailVerificationController {
 			return inertia.render("auth/verify_email", {
 				state: "done",
 				email: confirmed,
+				flow: null,
 				forSignedInUser: viewer?.email === confirmed,
 				...signedIn,
 				canResend: false,
@@ -57,6 +59,7 @@ export default class EmailVerificationController {
 			return inertia.render("auth/verify_email", {
 				state: "ready",
 				email: found.email,
+				flow: found.flow,
 				forSignedInUser: viewer?.id === found.userId,
 				...signedIn,
 			});
@@ -64,16 +67,19 @@ export default class EmailVerificationController {
 		return inertia.render("auth/verify_email", {
 			state: found.state === "expired" ? "expired" : "invalid",
 			email: null,
+			flow: null,
 			forSignedInUser: false,
 			...signedIn,
 		});
 	}
 
-	async confirm({ session, response }: HttpContext) {
+	async confirm({ request, session, response }: HttpContext) {
 		const token = session.get(TOKEN_KEY);
+		// The page's hidden field: the link it showed, not whichever was staged since.
+		const flow = request.input(FLOW_FIELD);
 		const user =
-			typeof token === "string"
-				? await this.accounts.confirmEmail(token)
+			typeof token === "string" && typeof flow === "string"
+				? await this.accounts.confirmEmail(token, flow)
 				: null;
 		if (user) {
 			session.forget(TOKEN_KEY);

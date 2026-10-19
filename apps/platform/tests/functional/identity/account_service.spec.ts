@@ -14,6 +14,7 @@ import env from "#start/env";
 import {
 	altered,
 	expireToken,
+	flowOf,
 	queuedMails,
 	tokenOf,
 } from "#tests/helpers/accounts";
@@ -24,6 +25,15 @@ const PASSWORD = "secret-password";
 
 /** A link on this platform, as the emails write it. */
 const appLink = (path: string) => new URL(path, env.get("APP_URL")).toString();
+
+/** The service calls, with the flow id of the token's row as its page would post it. */
+async function confirmWith(token: string, flow?: string) {
+	return accounts.confirmEmail(token, flow ?? (await flowOf(token)));
+}
+
+async function resetWith(token: string, password: string, flow?: string) {
+	return accounts.resetPassword(token, password, flow ?? (await flowOf(token)));
+}
 
 async function signsIn(email: string, password: string) {
 	try {
@@ -65,6 +75,7 @@ test.group("AccountService (TAT-18)", (group) => {
 			state: "live",
 			userId: user.id,
 			email: user.email,
+			flow: await flowOf(tokenOf(url)),
 		});
 	});
 
@@ -112,13 +123,14 @@ test.group("AccountService (TAT-18)", (group) => {
 		const fake = queue.fake();
 		await accounts.sendVerification(user);
 		const token = tokenOf(queuedMails(fake)[0].data.url);
+		const flow = await flowOf(token);
 
-		const confirmed = await accounts.confirmEmail(token);
+		const confirmed = await confirmWith(token, flow);
 
 		assert.equal(confirmed?.id, user.id);
 		const at = (await User.findOrFail(user.id)).emailVerifiedAt;
 		assert.isNotNull(at);
-		assert.isNull(await accounts.confirmEmail(token));
+		assert.isNull(await confirmWith(token, flow));
 		assert.equal(
 			(await User.findOrFail(user.id)).emailVerifiedAt?.toMillis(),
 			at?.toMillis(),
@@ -138,7 +150,7 @@ test.group("AccountService (TAT-18)", (group) => {
 			user.id,
 		]);
 
-		assert.isNull(await accounts.confirmEmail(token));
+		assert.isNull(await confirmWith(token));
 		assert.isNull((await User.findOrFail(user.id)).emailVerifiedAt);
 	});
 
@@ -204,11 +216,12 @@ test.group("AccountService (TAT-18)", (group) => {
 		});
 		const pending = await tokens.issue(user, "verify_email");
 		const token = await tokens.issue(user, "reset_password");
+		const flow = await flowOf(token);
 		const fake = queue.fake();
 
-		const reset = await accounts.resetPassword(token, "a-new-password");
+		const changed = await resetWith(token, "a-new-password", flow);
 
-		assert.equal(reset?.id, user.id);
+		assert.equal(changed?.id, user.id);
 		const after = await User.findOrFail(user.id);
 		assert.equal(after.sessionVersion, 2);
 		assert.isNotNull(after.emailVerifiedAt);
@@ -234,7 +247,7 @@ test.group("AccountService (TAT-18)", (group) => {
 		);
 		assert.notInclude(JSON.stringify(mails[0].data), "/reset-password/");
 
-		assert.isNull(await accounts.resetPassword(token, "a-third-password"));
+		assert.isNull(await resetWith(token, "a-third-password", flow));
 		assert.equal((await User.findOrFail(user.id)).sessionVersion, 2);
 		assert.isTrue(await signsIn(user.email, "a-new-password"));
 	});
@@ -249,7 +262,7 @@ test.group("AccountService (TAT-18)", (group) => {
 		const perEmail = limiter.use({ ...AUTH_LIMITS.loginPerEmail });
 		await perEmail.increment(loginEmailKey(user.email), 25);
 
-		await accounts.resetPassword(
+		await resetWith(
 			await tokens.issue(user, "reset_password"),
 			"a-new-password",
 		);
@@ -273,13 +286,40 @@ test.group("AccountService (TAT-18)", (group) => {
 		await perEmail.increment(loginEmailKey(upper.email), 7);
 		await perEmail.increment(loginEmailKey(lower.email), 9);
 
-		await accounts.resetPassword(
+		await resetWith(
 			await tokens.issue(upper, "reset_password"),
 			"a-new-password",
 		);
 
 		assert.isNull(await perEmail.get(loginEmailKey(upper.email)));
 		assert.equal((await perEmail.get(loginEmailKey(lower.email)))?.consumed, 9);
+	});
+
+	test("a link works only with the flow id of its own row: another link's flow resets and confirms nothing", async ({
+		assert,
+	}) => {
+		const a = await User.create({
+			email: "a@flow-18.example",
+			password: PASSWORD,
+		});
+		const b = await User.create({
+			email: "b@flow-18.example",
+			password: PASSWORD,
+		});
+		const resetA = await tokens.issue(a, "reset_password");
+		const resetB = await tokens.issue(b, "reset_password");
+		const confirmB = await tokens.issue(b, "verify_email");
+
+		assert.isNull(
+			await resetWith(resetB, "a-new-password", await flowOf(resetA)),
+		);
+		assert.isNull(await confirmWith(confirmB, await flowOf(resetA)));
+
+		assert.isTrue(await signsIn(b.email, PASSWORD));
+		assert.isNull((await User.findOrFail(b.id)).emailVerifiedAt);
+		assert.equal((await tokens.state(resetB, "reset_password")).state, "live");
+		assert.equal((await tokens.state(confirmB, "verify_email")).state, "live");
+		assert.isNotNull(await resetWith(resetB, "a-new-password"));
 	});
 
 	test("an expired token, a confirmation token or an altered one resets nothing", async ({
@@ -294,7 +334,7 @@ test.group("AccountService (TAT-18)", (group) => {
 		const confirmation = await tokens.issue(user, "verify_email");
 
 		for (const token of [expired, confirmation, altered(confirmation)]) {
-			assert.isNull(await accounts.resetPassword(token, "a-new-password"));
+			assert.isNull(await resetWith(token, "a-new-password"));
 		}
 
 		assert.equal((await User.findOrFail(user.id)).sessionVersion, 1);

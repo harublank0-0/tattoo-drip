@@ -1,7 +1,10 @@
 import type queue from "@adonisjs/queue/services/main";
 import type { ApiResponse } from "@japa/api-client";
 import type { SendMailPayload } from "#jobs/send_mail_job";
-import type { TokenPurpose } from "#modules/identity/account_tokens";
+import {
+	hashAccountToken,
+	type TokenPurpose,
+} from "#modules/identity/account_tokens";
 import { dbClient } from "#services/db_context";
 import { parseSetCookie, setCookieLines } from "#tests/helpers/cookies";
 
@@ -53,3 +56,15 @@ export function cookieNames(response: ApiResponse): string[] {
 		.map((line) => parseSetCookie(line).name)
 		.sort();
 }
+
+/** The flow id of a token's row, which a form posts back (a zero id when the token has no row). */
+export async function flowOf(token: string): Promise<string> {
+	const { rows } = await dbClient().rawQuery(
+		"select id from account_tokens where token_hash = ?",
+		[hashAccountToken(token)],
+	);
+	return (rows[0]?.id as string | undefined) ?? NO_FLOW;
+}
+
+/** A well-formed flow id that no row has. */
+export const NO_FLOW = "00000000-0000-0000-0000-000000000000";

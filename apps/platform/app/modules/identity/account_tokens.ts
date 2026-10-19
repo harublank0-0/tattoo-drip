@@ -31,6 +31,21 @@ export const SESSION_TOKEN_KEYS: Record<TokenPurpose, string> = {
 };
 
 /**
+ * The flow id (TAT-18): the id of a token's row, which is not a secret. A
+ * link's page renders it in a hidden `flow` field, and the POST must send
+ * back the id of the token it staged, so a form can only act on the link it
+ * showed (not on another one staged in the same session since, in another
+ * tab). It never appears in a URL.
+ */
+export const FLOW_FIELD = "flow";
+const FLOW_ID =
+	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isFlowId(value: unknown): value is string {
+	return typeof value === "string" && FLOW_ID.test(value);
+}
+
+/**
  * Drops every staged link token from a session. Sign-in and sign-out call it:
  * regenerating the session id keeps its data, so without this a link opened
  * before a sign-out would still open its form for the next visitor of a
