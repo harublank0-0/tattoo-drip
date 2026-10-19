@@ -211,6 +211,11 @@ test.group("Users and account tokens tables (TAT-18)", (group) => {
 			"ÉVA@Example.com",
 			"plain@example.com",
 			"a.b+tag@Gmail.com",
+			// btrim() strips only U+0020: these stay as typed, in SQL and in JS.
+			"\tInk@tab.example",
+			" Ink@space.example",
+			"\u3000Ink@wide.example",
+			"\u00a0Ink@nbsp.example ",
 		];
 		await withProbe(emails, async (probe) => {
 			await probe.rawQuery(refuseCaseDuplicates(PROBE));
