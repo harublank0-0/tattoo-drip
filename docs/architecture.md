@@ -114,7 +114,7 @@ Isolation has several layers:
   - HEIC is not decoded (TAT-51): the intake form asks for JPEG, PNG or WebP, which iPhones convert their photos to, and a HEVC decoder would mean a custom libvips build or a WASM decoder running on hostile input.
 - **Image visibility:** portfolio images are public behind a CDN. Reference images are private and served through short-lived signed URLs, issued only after a membership check.
 - **Caching:** public reads that opt in send `Cache-Control: public, max-age=60, stale-while-revalidate=600` with an ETag behind a CDN; storefront pages use short TTLs too, and slots will have the shortest. Errors and writes are `no-store`. The storefront's own 404 page is kept 60 s at the CDN; its old-slug redirects and API-down page are never stored.
-- **Rate limits** apply per IP and per tenant. The storefront's server-side rendering calls the API with a secret **server key**. The key only stops the storefront server from counting as one client, and grants no extra data.
+- **Rate limits** apply per IP and per tenant. The storefront's server-side rendering calls the API with a secret **server key** (`STOREFRONT_SERVER_KEY`, sent as `Authorization: Bearer` from the server only; the platform checks it from TAT-38). The key only stops the storefront server from counting as one client, and grants no extra data.
 - **Jobs** use `@adonisjs/queue` with its database driver: a PostgreSQL-backed queue, with no Redis, run by a separate worker process. Jobs can be queued inside a transaction so they commit with the data. Jobs on tenant data carry their tenant.
 - **Email** is sent from the platform domain, with SPF, DKIM and DMARC set up. It is never sent from a tenant's domain.
 

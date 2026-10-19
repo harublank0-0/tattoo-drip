@@ -50,6 +50,7 @@ export async function handleTenantRequest(
 
 	const lookup = await lookUpTenant(target.slug, {
 		apiUrl: deps.config.apiUrl,
+		key: deps.config.serverKey,
 		signal: request.signal,
 		timeoutMs: deps.timeoutMs,
 		fetch: deps.fetch,

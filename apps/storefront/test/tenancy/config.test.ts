@@ -150,3 +150,63 @@ describe("tenantOrigin", () => {
 		}
 	});
 });
+
+describe("STOREFRONT_SERVER_KEY", () => {
+	const KEY = "test-server-key-0123456789abcdefghijklmnop";
+
+	test("is optional: without one the config has no serverKey", () => {
+		for (const value of [undefined, "", "   "]) {
+			const config = parseStorefrontConfig({
+				...PROD,
+				STOREFRONT_SERVER_KEY: value,
+			});
+			assert.equal("serverKey" in config, false, JSON.stringify(value));
+		}
+	});
+
+	test("reads a key of token68 characters, trimmed", () => {
+		for (const key of [
+			KEY,
+			"a".repeat(32),
+			`${"q".repeat(43)}=`,
+			"a".repeat(256),
+			`${"a".repeat(256)}==`,
+		]) {
+			assert.equal(
+				parseStorefrontConfig({ ...PROD, STOREFRONT_SERVER_KEY: ` ${key}\n` })
+					.serverKey,
+				key,
+			);
+		}
+	});
+
+	test("refuses a short, spaced or odd key without echoing it", () => {
+		for (const key of [
+			"changeme",
+			"a".repeat(31),
+			"a".repeat(257),
+			`${"a".repeat(20)} ${"b".repeat(20)}`,
+			`${"a".repeat(32)}é`,
+			`${"a".repeat(16)}=${"b".repeat(16)}`,
+			`${"a".repeat(32)}"`,
+			`${"a".repeat(32)}===`,
+			`${"a".repeat(256)}${"=".repeat(50)}`,
+		]) {
+			const message = failure({ ...PROD, STOREFRONT_SERVER_KEY: key });
+			assert.match(message, /STOREFRONT_SERVER_KEY is invalid/, key);
+			assert.match(
+				message,
+				/32 to 256 letters, digits or .* at most two =/,
+				key,
+			);
+			assert.doesNotMatch(message, /API_URL is|STOREFRONT_URL is/, key);
+			assert.ok(!message.includes(key), key);
+		}
+	});
+
+	test("is reported with the other settings' problems", () => {
+		const message = failure({ STOREFRONT_SERVER_KEY: "changeme" });
+		assert.match(message, /API_URL is not set/);
+		assert.match(message, /STOREFRONT_SERVER_KEY is invalid/);
+	});
+});

@@ -17,6 +17,8 @@ export type TenantLookup =
 export interface LookupOptions {
 	/** The API's origin (API_URL). */
 	apiUrl: string;
+	/** STOREFRONT_SERVER_KEY, sent as the SDK's bearer key when set (TAT-23). */
+	key?: string;
 	/** Cancels the lookup with the request; its AbortError is rethrown. */
 	signal?: AbortSignal;
 	timeoutMs?: number;
@@ -36,6 +38,7 @@ export async function lookUpTenant(
 	const client = createTattooClient({
 		baseUrl: options.apiUrl,
 		tenant: slug,
+		key: options.key,
 		fetch: options.fetch,
 		timeoutMs: options.timeoutMs ?? STUDIO_LOOKUP_TIMEOUT_MS,
 	});

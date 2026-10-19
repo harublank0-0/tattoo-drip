@@ -16,6 +16,7 @@ const CONFIG: StorefrontConfig = {
 };
 const SHORT = "public, max-age=0, s-maxage=60";
 const TENANTS = "http://api.test/api/v1/tenants/";
+const KEY = "test-server-key-0123456789abcdefghijklmnop";
 
 /**
  * A request whose URL host differs from its Host header, to prove that only
@@ -69,6 +70,20 @@ function responseOf(outcome: TenantOutcome): Response {
 }
 
 describe("handleTenantRequest", () => {
+	test("the lookup carries the configured server key", async () => {
+		const { calls, fetch } = api();
+
+		await handleTenantRequest(
+			request("blackneedle.tattoodrip.com"),
+			deps(fetch, { config: { ...CONFIG, serverKey: KEY } }),
+		);
+
+		assert.equal(
+			new Headers(calls[0].init.headers).get("authorization"),
+			`Bearer ${KEY}`,
+		);
+	});
+
 	test("the base domain's front page is the landing page, without asking the API", async () => {
 		const { calls, fetch } = api();
 		for (const host of ["tattoodrip.com", "www.tattoodrip.com"]) {

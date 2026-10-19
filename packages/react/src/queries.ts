@@ -40,8 +40,10 @@ export const tattooKeys = {
 };
 
 /**
- * Query options for each resource. Use them with `useQuery`, or with
- * `queryClient.ensureQueryData` in route loaders to prefetch during SSR.
+ * Query options for each resource. Use them with `useQuery`, or in route
+ * loaders to prefetch during SSR with
+ * `queryClient.query({ ...options, staleTime: "static" })` (cached data, else
+ * one fetch: TanStack Query 5.104's replacement for `ensureQueryData`).
  * Each forwards TanStack Query's `signal`, so a query nobody needs any more
  * cancels its request.
  */
@@ -82,13 +84,15 @@ export const tattooQueries = {
 	/**
 	 * A deposit page by its link's token. A 4xx (a link that doesn't work,
 	 * a rate limit) won't change by asking again at once, so only network
-	 * errors and 5xx are retried. Refetched when the window regains focus,
-	 * so coming back from the payment app shows the latest state.
+	 * errors and 5xx are retried. Always stale (`staleTime: 0`, whatever the
+	 * app's default), so it is refetched when the window regains focus:
+	 * coming back from the payment app shows the latest state.
 	 */
 	deposit: (client: TattooClient, token: string) =>
 		queryOptions({
 			queryKey: tattooKeys.deposit(client.tenant, token),
 			queryFn: ({ signal }) => client.deposits.get(token, { signal }),
+			staleTime: 0,
 			retry: (failures, error) =>
 				!(
 					isTattooApiError(error) &&
