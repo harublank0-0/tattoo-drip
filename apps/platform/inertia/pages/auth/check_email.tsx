@@ -14,7 +14,7 @@ export default function CheckEmail({
 	email: string | null;
 }) {
 	const address = email ? (
-		<strong className="font-medium break-all text-foreground">{email}</strong>
+		<strong className="font-medium break-words text-foreground">{email}</strong>
 	) : (
 		"the address you entered"
 	);

@@ -18,7 +18,7 @@ export default function ConfirmEmail({ email }: { email: string }) {
 				</h1>
 				<p className="text-sm text-muted-foreground">
 					We sent a link to{" "}
-					<strong className="font-medium break-all text-foreground">
+					<strong className="font-medium break-words text-foreground">
 						{email}
 					</strong>
 					. Open it to confirm your address, then you can set up your studio.

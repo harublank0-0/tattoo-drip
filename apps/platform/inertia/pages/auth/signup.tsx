@@ -96,11 +96,11 @@ export default function Signup() {
 				)}
 			</Form>
 
-			<p className="text-center text-sm text-muted-foreground">
-				Already have an account?{" "}
+			<p className="flex items-center justify-center gap-1 text-sm text-muted-foreground">
+				Already have an account?
 				<Link
 					route="session.create"
-					className="text-foreground underline underline-offset-4"
+					className="inline-flex min-h-11 items-center text-foreground underline underline-offset-4"
 				>
 					Sign in
 				</Link>

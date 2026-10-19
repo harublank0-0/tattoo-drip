@@ -18,7 +18,7 @@ export default function VerifyEmailBar() {
 		>
 			<p className="py-2">
 				Confirm your email address: we sent a link to{" "}
-				<strong className="font-medium break-all">{user.email}</strong>.
+				<strong className="font-medium break-words">{user.email}</strong>.
 			</p>
 			<Form route="email_verification.resend">
 				{({ processing }) => (

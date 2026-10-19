@@ -31,7 +31,7 @@ export default function ResetPassword({ state, email }: Props) {
 				</h1>
 				<p className="text-sm text-muted-foreground">
 					For{" "}
-					<strong className="font-medium break-all text-foreground">
+					<strong className="font-medium break-words text-foreground">
 						{email}
 					</strong>
 					. Every device signed in to this account will be signed out; then sign

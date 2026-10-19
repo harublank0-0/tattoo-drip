@@ -23,7 +23,7 @@ const TITLES: Record<State, string> = {
 
 function Address({ value }: { value: string }) {
 	return (
-		<strong className="font-medium break-all text-foreground">{value}</strong>
+		<strong className="font-medium break-words text-foreground">{value}</strong>
 	);
 }
 

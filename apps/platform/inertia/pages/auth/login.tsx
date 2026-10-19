@@ -62,11 +62,11 @@ export default function Login() {
 				>
 					Forgot your password?
 				</Link>
-				<p>
-					New here?{" "}
+				<p className="flex items-center gap-1">
+					New here?
 					<Link
 						route="new_account.create"
-						className="text-foreground underline underline-offset-4"
+						className="inline-flex min-h-11 items-center text-foreground underline underline-offset-4"
 					>
 						Create an account
 					</Link>
