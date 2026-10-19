@@ -703,6 +703,30 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_studio_controller').default['show']>>>
     }
   }
+  'api.v1.artists.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/tenants/:tenant/artists'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_artists_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_artists_controller').default['index']>>>
+    }
+  }
+  'api.v1.artists.show': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/tenants/:tenant/artists/:artist'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; artist: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_artists_controller').default['show']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_artists_controller').default['show']>>>
+    }
+  }
   'api.v1.inquiries.store': {
     methods: ["POST"]
     pattern: '/api/v1/tenants/:tenant/inquiries'

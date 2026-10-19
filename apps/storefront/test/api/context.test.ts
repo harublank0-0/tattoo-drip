@@ -12,12 +12,12 @@ import {
 	seedStudio,
 	TattooClientRef,
 } from "../../src/api/context.ts";
-import { fakeFetch, json } from "../tenancy/helpers.ts";
+import { fakeFetch, json, studioOf } from "../tenancy/helpers.ts";
 
 const API = "http://api.test";
 const KEY = "test-server-key-0123456789abcdefghijklmnop";
-const STUDIO_A: Studio = { slug: "studio-a", name: "Studio A" };
-const STUDIO_B: Studio = { slug: "studio-b", name: "Studio B" };
+const STUDIO_A: Studio = studioOf("studio-a", "Studio A");
+const STUDIO_B: Studio = studioOf("studio-b", "Studio B");
 const CONFIG = { apiUrl: API, serverKey: KEY };
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));

@@ -8,7 +8,7 @@ What the MVP (pilot with a design-partner studio) and V1 (paid launch) must do, 
 - [ ] Sign up with email and password, verify the email, log in and out, reset the password
 - [ ] Create a `studio` or `independent` tenant (needs a verified email), with a unique slug that is also its subdomain
 - [ ] Invite members as `owner` or `artist`; revoke invites; remove members; switch between tenants
-- [ ] Tenant profile: name, contact phone and email, address, social links, timezone
+- [x] Tenant profile: name, contact phone and email, address, social links, timezone
 - [ ] Payment settings: upload the studio's QR codes (Fonepay, eSewa, Khalti, bank) and a default deposit percentage
 
 **Artists**
@@ -122,7 +122,7 @@ shortcuts:   flash or walk-in → booked     in_progress → booked (next sessio
 
 - The tenant comes from the subdomain (`<slug>.localhost:3000` in development). An unknown subdomain shows a not-found page (404); an old slug redirects (302) to the current subdomain with the same path and query; the bare domain and `www.` show a landing page.
 - The studio page reads and writes **only** through the API/SDK. It never touches the database or imports platform code.
-- Hidden artists don't appear.
+- Hidden artists don't appear, and a hidden or deleted artist's page is a not-found page. The page shows what the dashboard says it shows (the profile, the visible artists with their photos and closed messages), never deposit policies, payment details, members or anything about clients, inquiries or payments.
 
 ## Not yet
 

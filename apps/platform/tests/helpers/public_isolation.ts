@@ -16,6 +16,8 @@ export function publicMarkers(studio: Studio): string[] {
 		studio.tenant.name,
 		studio.artistProfile.id,
 		studio.artistProfile.name,
+		studio.closedArtist.id,
+		studio.closedArtist.name,
 		studio.paymentMethod.id,
 		studio.client.id,
 		studio.project.id,

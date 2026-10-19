@@ -7,6 +7,7 @@
 import type { InferData, InferVariants } from '@adonisjs/core/types/transformers'
 import type { InferSharedProps, InferFlashData } from '@adonisjs/inertia/types'
 import type InquiryReceiptTransformer from '#transformers/inquiry_receipt_transformer'
+import type PublicArtistTransformer from '#transformers/public_artist_transformer'
 import type PublicDepositTransformer from '#transformers/public_deposit_transformer'
 import type PublicStudioTransformer from '#transformers/public_studio_transformer'
 import type UserTransformer from '#transformers/user_transformer'
@@ -16,6 +17,10 @@ export namespace Data {
   export type InquiryReceipt = InferData<InquiryReceiptTransformer>
   export namespace InquiryReceipt {
     export type Variants = InferVariants<InquiryReceiptTransformer>
+  }
+  export type PublicArtist = InferData<PublicArtistTransformer>
+  export namespace PublicArtist {
+    export type Variants = InferVariants<PublicArtistTransformer>
   }
   export type PublicDeposit = InferData<PublicDepositTransformer>
   export namespace PublicDeposit {

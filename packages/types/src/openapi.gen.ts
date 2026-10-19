@@ -54,8 +54,13 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Public profile of a tenant
-         * @description Cacheable. Under an old slug it answers like under the current one, and `slug` is the current slug.
+         * The studio's public profile
+         * @description What the studio page shows about the studio: its name, intro,
+         *     contact details, links, timezone and whether it takes inquiries
+         *     (TAT-44). Never its deposit policy, payment details, members or
+         *     anything about clients, inquiries or payments. Cacheable. Under an
+         *     old slug it answers like under the current one, and `slug` is the
+         *     current slug.
          */
         get: operations["getStudio"];
         put?: never;
@@ -81,7 +86,13 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** Visible artists of a tenant */
+        /**
+         * The studio's visible artists
+         * @description Every visible artist, by name (ignoring case); hidden and deleted
+         *     artists never appear, and a studio with no visible artist answers
+         *     an empty list. Cacheable. Under an old slug it answers like under
+         *     the current one.
+         */
         get: operations["listArtists"];
         put?: never;
         post?: never;
@@ -103,12 +114,20 @@ export interface paths {
                  *     an old slug is a 404, so writes must use the current slug.
                  */
                 tenant: components["parameters"]["Tenant"];
-                /** @description Artist slug */
-                artist: string;
+                /**
+                 * @description The artist's slug, matched exactly: never case-folded. An artist's
+                 *     old slug is not kept: after a change it is a 404.
+                 */
+                artist: components["parameters"]["ArtistSlug"];
             };
             cookie?: never;
         };
-        /** One artist by slug */
+        /**
+         * One visible artist, by slug
+         * @description A hidden, deleted or unknown artist, another studio's, and an
+         *     artist's old slug are the same 404 (`not_found`). Cacheable. Under
+         *     an old studio slug it answers like under the current one.
+         */
         get: operations["getArtist"];
         put?: never;
         post?: never;
@@ -337,11 +356,28 @@ export interface components {
             name: string;
         };
         Image: {
-            /** Format: uri */
+            /**
+             * Format: uri
+             * @description Public and absolute.
+             */
             url: string;
             width: number;
             height: number;
             alt?: string | null;
+        };
+        /**
+         * @description An artist's photo (TAT-44): an `Image` without `alt`, so every
+         *     property is always there. The page builds the `alt` text from the
+         *     artist's name.
+         */
+        Photo: {
+            /**
+             * Format: uri
+             * @description Public and absolute.
+             */
+            url: string;
+            width: number;
+            height: number;
         };
         Money: {
             /** @description Minor units (cents) */
@@ -353,11 +389,19 @@ export interface components {
             currency: string;
         };
         SocialLink: {
-            /** @example instagram */
+            /**
+             * @description `instagram`, `facebook`, `tiktok` or `website` today. Show any
+             *     other value as a plain link.
+             * @example instagram
+             */
             platform: string;
-            /** Format: uri */
+            /**
+             * Format: uri
+             * @description An https URL.
+             */
             url: string;
         };
+        /** @description V1 (TAT-54). Not served yet. */
         StorefrontSection: {
             /**
              * @example hero
@@ -369,6 +413,10 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /**
+         * @description V1 (TAT-54). Not served yet: `Studio` gains it as `storefront` with
+         *     themes and branding.
+         */
         StorefrontConfiguration: {
             /** @example classic */
             theme: string;
@@ -388,43 +436,77 @@ export interface components {
             sections: components["schemas"]["StorefrontSection"][];
         };
         /**
-         * @description A tenant's public profile. TAT-32 sends `slug` and `name`; the other
-         *     properties are the draft that TAT-44 implements and makes required.
+         * @description A tenant's public profile (TAT-44): what its owners were told the
+         *     studio page shows. Every property is always there; an empty one is
+         *     `null` or `[]`. All text is plain text: render it as text, never as
+         *     HTML.
          */
         Studio: {
             /** @description The current slug, also when the request used an old one */
             slug: string;
             name: string;
-            /** Format: uuid */
-            id?: string;
-            /** @enum {string} */
-            type?: "studio" | "independent";
-            description?: string | null;
             /**
-             * @description IANA timezone
+             * @description `independent` is one artist working alone; their own profile is
+             *     the studio's one artist.
+             * @enum {string}
+             */
+            type: "studio" | "independent";
+            intro: string | null;
+            /**
+             * @description The IANA timezone of the studio's dates and times
              * @example Asia/Kathmandu
              */
-            timezone?: string;
-            contact?: {
-                /** Format: email */
-                email: string;
-                phone?: string | null;
-                address?: string | null;
+            timezone: string;
+            contact: {
+                /**
+                 * @description E.164
+                 * @example +9779812345678
+                 */
+                phone: string | null;
+                /**
+                 * Format: email
+                 * @description The studio's contact email
+                 */
+                email: string | null;
+                /** @description Free text; keep its line breaks */
+                address: string | null;
             };
-            socialLinks?: components["schemas"]["SocialLink"][];
-            storefront?: components["schemas"]["StorefrontConfiguration"];
+            /**
+             * @description The links the studio set, in this order: instagram, facebook,
+             *     tiktok, website. Only https links.
+             */
+            socialLinks: components["schemas"]["SocialLink"][];
+            /**
+             * @description Whether `createInquiry` takes an inquiry that names no artist.
+             *     False only when every visible artist is closed (that inquiry
+             *     would be the 409 `studio_not_accepting`); a studio with no
+             *     visible artist takes general inquiries.
+             */
+            acceptingInquiries: boolean;
         };
+        /**
+         * @description A visible artist of the studio (TAT-44). Every property is always
+         *     there. All text is plain text: render it as text.
+         */
         Artist: {
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description What `createInquiry` takes as `preferredArtistId`
+             */
             id: string;
+            /** @description The artist's own link within the studio (`getArtist`) */
             slug: string;
             name: string;
-            bio?: string | null;
-            photo?: components["schemas"]["Image"] | null;
-            acceptingRequests: boolean;
-            /** @description Shown instead of the booking form when not accepting requests */
-            closedMessage?: string | null;
-            serviceIds: string[];
+            bio: string | null;
+            /** @description At most 2048 px on its longer side, or null */
+            photo: components["schemas"]["Photo"] | null;
+            /**
+             * @description False while the artist's books are closed: an inquiry naming
+             *     them is the 409 `artist_not_accepting`.
+             */
+            acceptingInquiries: boolean;
+            /** @description The artist's words to show instead of the inquiry form; null while they accept inquiries */
+            closedMessage: string | null;
         };
         Service: {
             /** Format: uuid */
@@ -656,6 +738,11 @@ export interface components {
          *     or send it to analytics.
          */
         DepositToken: string;
+        /**
+         * @description The artist's slug, matched exactly: never case-folded. An artist's
+         *     old slug is not kept: after a change it is a 404.
+         */
+        ArtistSlug: string;
     };
     requestBodies: never;
     headers: {
@@ -769,6 +856,8 @@ export interface operations {
             /** @description Artists */
             200: {
                 headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -777,7 +866,9 @@ export interface operations {
                     };
                 };
             };
+            304: components["responses"]["NotModified"];
             404: components["responses"]["NotFound"];
+            default: components["responses"]["Error"];
         };
     };
     getArtist: {
@@ -792,8 +883,11 @@ export interface operations {
                  *     an old slug is a 404, so writes must use the current slug.
                  */
                 tenant: components["parameters"]["Tenant"];
-                /** @description Artist slug */
-                artist: string;
+                /**
+                 * @description The artist's slug, matched exactly: never case-folded. An artist's
+                 *     old slug is not kept: after a change it is a 404.
+                 */
+                artist: components["parameters"]["ArtistSlug"];
             };
             cookie?: never;
         };
@@ -802,6 +896,8 @@ export interface operations {
             /** @description Artist */
             200: {
                 headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -810,7 +906,9 @@ export interface operations {
                     };
                 };
             };
+            304: components["responses"]["NotModified"];
             404: components["responses"]["NotFound"];
+            default: components["responses"]["Error"];
         };
     };
     listServices: {

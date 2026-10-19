@@ -80,6 +80,22 @@ export default class ArtistService {
 	}
 
 	/**
+	 * The tenant's live, visible profile with exactly this slug (the public
+	 * artist page, TAT-44), or null: a hidden, deleted, unknown or other
+	 * tenant's slug all give null. Never case-folded.
+	 */
+	async findVisibleBySlug(
+		tenant: TenantRef,
+		slug: string,
+	): Promise<Artist | null> {
+		return Artist.query()
+			.where("tenant_id", tenant.id)
+			.where("visible", true)
+			.where("slug", slug)
+			.first();
+	}
+
+	/**
 	 * The tenant's live profile with this id. An unknown id, a deleted
 	 * profile and another tenant's profile all throw E_ROW_NOT_FOUND (a 404),
 	 * so callers can't tell them apart.

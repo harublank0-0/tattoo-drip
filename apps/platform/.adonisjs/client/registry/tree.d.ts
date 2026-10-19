@@ -114,6 +114,10 @@ export interface ApiDefinition {
   api: {
     v1: {
       studio: typeof routes['api.v1.studio']
+      artists: {
+        index: typeof routes['api.v1.artists.index']
+        show: typeof routes['api.v1.artists.show']
+      }
       inquiries: {
         store: typeof routes['api.v1.inquiries.store']
       }

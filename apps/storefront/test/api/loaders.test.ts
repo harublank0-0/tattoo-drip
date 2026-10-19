@@ -12,10 +12,10 @@ import {
 	seedStudio,
 } from "../../src/api/context.ts";
 import { loadStudio, rethrowAsNotFound } from "../../src/api/loaders.ts";
-import { fakeFetch, json } from "../tenancy/helpers.ts";
+import { fakeFetch, json, studioOf } from "../tenancy/helpers.ts";
 
 const API = "http://api.test";
-const STUDIO: Studio = { slug: "studio-a", name: "Studio A" };
+const STUDIO: Studio = studioOf("studio-a", "Studio A");
 
 function serverApi(fetch: typeof globalThis.fetch) {
 	const api = createApiContext("server");

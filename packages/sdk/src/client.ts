@@ -153,11 +153,20 @@ export function createTattooClient(options: TattooClientOptions) {
 		tenant: options.tenant,
 
 		studio: {
+			/**
+			 * The studio's public profile (TAT-44). Under an old slug it answers
+			 * like under the current one, and `slug` is the current slug.
+			 */
 			get: (call?: RequestOptions) => getData<Studio>(tenantRoot, call),
 		},
 		artists: {
+			/** The studio's visible artists, by name. */
 			list: (call?: RequestOptions) =>
 				getData<Artist[]>(`${tenantRoot}/artists`, call),
+			/**
+			 * One visible artist by slug, matched exactly. A hidden, deleted or
+			 * unknown artist is a 404 TattooApiError (`not_found`).
+			 */
 			get: (slug: string, call?: RequestOptions) =>
 				getData<Artist>(
 					`${tenantRoot}/artists/${encodeURIComponent(slug)}`,

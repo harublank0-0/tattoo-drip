@@ -1,3 +1,4 @@
+import Artist from "#modules/artists/models/artist";
 import DepositLink from "#modules/payments/models/deposit_link";
 import Payment from "#modules/payments/models/payment";
 import Tenant from "#modules/tenancy/models/tenant";
@@ -43,6 +44,11 @@ const tenantRow = (target: Studio) =>
 		(await Tenant.findOrFail(target.tenant.id)).serialize(),
 	);
 
+const artistRows = (target: Studio) =>
+	inTenant(target.tenant, async () =>
+		(await Artist.query().orderBy("id")).map((row) => row.serialize()),
+	);
+
 const depositRows = (target: Studio) =>
 	inTenant(target.tenant, async () => ({
 		links: (await DepositLink.query().orderBy("id")).map((row) =>
@@ -60,6 +66,23 @@ export const publicIsolationCases: PublicIsolationCase[] = [
 		ownStatus: 200,
 		ownMarkers: (own) => [own.tenant.slug, own.tenant.name],
 		snapshot: tenantRow,
+	},
+	{
+		method: "GET",
+		pattern: "/api/v1/tenants/:tenant/artists",
+		ownStatus: 200,
+		ownMarkers: (own) => [own.artistProfile.id, own.closedArtist.id],
+		snapshot: artistRows,
+	},
+	{
+		method: "GET",
+		pattern: "/api/v1/tenants/:tenant/artists/:artist",
+		// Each studio's own slug (`<slug>-mira`): B's under A's path, and A's
+		// under B's, must be the 404.
+		params: (studio) => ({ artist: studio.closedArtist.slug }),
+		ownStatus: 200,
+		ownMarkers: (own) => [own.closedArtist.id, own.closedArtist.name],
+		snapshot: artistRows,
 	},
 	{
 		method: "POST",
