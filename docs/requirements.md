@@ -120,7 +120,7 @@ shortcuts:   flash or walk-in → booked     in_progress → booked (next sessio
 
 ## Studio page rules
 
-- The tenant comes from the subdomain. An unknown subdomain shows a not-found page.
+- The tenant comes from the subdomain (`<slug>.localhost:3000` in development). An unknown subdomain shows a not-found page (404); an old slug redirects (302) to the current subdomain with the same path and query; the bare domain and `www.` show a landing page.
 - The studio page reads and writes **only** through the API/SDK. It never touches the database or imports platform code.
 - Hidden artists don't appear.
 

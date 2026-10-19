@@ -6,6 +6,8 @@ The platform/data boundaries are in [root instructions](../../AGENTS.md). Pages 
 
 Before UI/forms, server-function or TanStack integration changes, read the relevant section of [development guidance](docs/development.md). Never run `shadcn add form`: `src/components/ui/form.tsx` is the custom TanStack Form toolkit. Preserve Sentry server-function instrumentation.
 
-Run from `apps/storefront`: `pnpm dev` (port 3000, loads `.env.local`), `pnpm typecheck`, `pnpm build`, `pnpm generate-routes`. `src/routeTree.gen.ts` is generated. There is no test script; use validation appropriate to changed behavior, including browser checks for UI.
+Run from `apps/storefront`: `pnpm dev` (port 3000, loads `.env.local`; needs `API_URL` and `STOREFRONT_URL`), `pnpm test` (`node:test` + `tsx`, `test/`), `pnpm typecheck`, `pnpm build`, `pnpm generate-routes`. `src/routeTree.gen.ts` is generated; its Register footer comes from `pnpm dev`/`pnpm build`, not `generate-routes`. Browser-check UI changes.
+
+Every request's studio comes from its host (`src/start.ts`, `src/tenancy/`): read [tenants and hosts](docs/development.md#tenants-and-hosts) before changing them.
 
 For product behavior or API integration, choose guidance from the [documentation index](../../docs/README.md).

@@ -32,7 +32,7 @@ The deposit page reads `client.deposits.get(token)` and sends the screenshot wit
 
 ## Core SDK
 
-The core SDK targets one API version (`v1`) and one tenant per client. It has typed inputs and outputs, typed errors (`TattooApiError` with `status`, `code`, `message`, `fields` and `retryAfter`), no caching or UI state, and no business rules. Every call sends `Accept: application/json` and no cookies (`credentials: "omit"`), gives up after `timeoutMs` (10 seconds by default) with code `timeout`, and takes `{ signal }` to cancel, after which it rejects with the signal's `AbortError`. A response that never arrived is status 0 with `timeout` or `network_error`; a 2xx without `{ data }` is `invalid_response`. `inquiries.create` uploads, so it waits up to 2 minutes unless its own `{ timeoutMs }` says otherwise.
+The core SDK targets one API version (`v1`) and one tenant per client. It has typed inputs and outputs, typed errors (`TattooApiError` with `status`, `code`, `message`, `fields` and `retryAfter`), no caching or UI state, and no business rules. Every call sends `Accept: application/json` and no cookies (`credentials: "omit"`), gives up after `timeoutMs` (10 seconds by default) with code `timeout`, and takes `{ signal }` to cancel, after which it rejects with the signal's `AbortError`. A response that never arrived is status 0 with `timeout` or `network_error`; a 2xx whose body is not a JSON object with `data` (empty, not JSON, or a bare string, number, boolean, null or array) is `invalid_response` with the HTTP status, never a raw `TypeError` and never carrying the body's text; an error response with such a body is `unknown_error`. `inquiries.create` uploads, so it waits up to 2 minutes unless its own `{ timeoutMs }` says otherwise.
 
 ```ts
 import { createTattooClient, isTattooApiError } from "@tattoo-drip/sdk";
@@ -83,14 +83,15 @@ For SSR prefetching in route loaders, use `tattooQueries.*` with `queryClient.en
 
 The studio page gets **no special access**. It uses the same endpoints and packages. If it needs something the API doesn't expose, the fix is to add it to the API. The only differences:
 
-- The tenant comes from the subdomain on each request.
+- The tenant comes from the host on each request: the storefront's tenant middleware confirms it with `studio.get()` and redirects old slugs ([tenants and hosts](../apps/storefront/docs/development.md#tenants-and-hosts)).
 - Server-side rendering sends a secret server key, used only for rate limiting.
 - Inquiries go from the browser straight to the API.
 
 ```ts
-// apps/storefront, server side
-const tenant = new URL(request.url).hostname.split(".")[0];
-const client = createTattooClient({ baseUrl: API_URL, tenant, key: env.STOREFRONT_SERVER_KEY });
+// apps/storefront, server side (TAT-23): the tenant middleware has already
+// confirmed the studio and redirected old slugs
+const { slug } = requestStudio();
+const client = createTattooClient({ baseUrl: API_URL, tenant: slug, key: env.STOREFRONT_SERVER_KEY });
 ```
 
 The SDK throws if it is given a key in a browser.

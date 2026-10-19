@@ -176,6 +176,52 @@ describe("createTattooClient", () => {
 		assert.equal(error.code, "invalid_response");
 	});
 
+	test("a 200 whose JSON isn't an object is an invalid_response, whatever it holds", async () => {
+		for (const raw of [
+			'"secret text"',
+			"5",
+			"true",
+			"null",
+			"0",
+			"false",
+			"[]",
+			'[{"data":1}]',
+		]) {
+			const { fetch } = fakeFetch(
+				() =>
+					new Response(raw, {
+						status: 200,
+						headers: { "content-type": "application/json" },
+					}),
+			);
+
+			const error = await rejection(client(fetch).studio.get());
+
+			assert.ok(error instanceof TattooApiError, raw);
+			assert.equal(error.status, 200, raw);
+			assert.equal(error.code, "invalid_response", raw);
+			assert.ok(!error.message.includes("secret"), raw);
+		}
+	});
+
+	test("an error whose JSON isn't an object keeps its status with unknown_error", async () => {
+		for (const raw of ['"secret text"', "5", "true", "[]"]) {
+			const { fetch } = fakeFetch(
+				() =>
+					new Response(raw, {
+						status: 502,
+						headers: { "content-type": "application/json" },
+					}),
+			);
+
+			const error = await rejection(client(fetch).studio.get());
+
+			assert.ok(error instanceof TattooApiError, raw);
+			assert.equal(error.status, 502, raw);
+			assert.equal(error.code, "unknown_error", raw);
+		}
+	});
+
 	test("a network failure is a network_error with status 0 and its cause", async () => {
 		const failure = new TypeError("fetch failed");
 		const { fetch } = fakeFetch(() => {

@@ -419,6 +419,9 @@ importers:
       '@tanstack/store':
         specifier: latest
         version: 0.11.2
+      '@tattoo-drip/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -498,6 +501,9 @@ importers:
       babel-plugin-react-compiler:
         specifier: ^1.0.0
         version: 1.0.0
+      tsx:
+        specifier: ^4.23.12
+        version: 4.23.12
       typescript:
         specifier: ^6.0.2
         version: 6.0.3

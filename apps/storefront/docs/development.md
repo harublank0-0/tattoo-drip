@@ -36,3 +36,20 @@ The linked TanStack skills cover most work. Only when a change depends on versio
 
 - Run `pnpm dlx @tanstack/intent@latest list` from `apps/storefront` to see the skills shipped with the installed packages.
 - Load the one matching skill with `pnpm dlx @tanstack/intent@latest load <package>#<skill>` before changing files, and follow its `SKILL.md`.
+
+## Tenants and hosts
+
+Every server request finds its studio from its `Host` header before any route runs (TAT-12): `src/start.ts` registers Start's CSRF check for server functions, then `tenantMiddleware` (`src/tenancy/`).
+
+- `<slug>.<base>` is a studio: the API confirms it with `studio.get()` (5 s timeout). The current slug goes on; an old slug gets a 302 to the same path and query on the current subdomain (GET and HEAD; other methods get the 404 page). The base domain and `www.` show a static landing page at `/`.
+- An unknown studio, a label that can't be a slug, a deeper name, an IP or another domain gets a static 404 page (`Cache-Control: public, max-age=0, s-maxage=60`, so a new studio shows within a minute). An API failure is a static 503 page with `Retry-After: 30`, logged with the slug, status and code.
+- Only `Host` counts, never `X-Forwarded-Host`. Labels are checked against the stored slug shape only (`STORED_SLUG`, a copy of the platform's, pinned by a test); reserved and old slugs are the API's answer, so never copy the platform's reserved list.
+- Server code reads the studio as `serverContext.studio` in loaders and `beforeLoad`, or with `requestStudio()` (`getRouter()`, server functions). The browser doesn't have it yet (TAT-23).
+- Settings, server only, from `process.env` (not `src/env.ts`, whose `import.meta.env` holds only `VITE_` variables): `API_URL`, the API's origin, and `STOREFRONT_URL`, `http://{tenant}.localhost:3000` in development and `https://{tenant}.<domain>` in production, the same value as the platform's setting of that name. Both use https except on localhost. `pnpm dev` refuses to start without them; a build and `pnpm preview` don't need them at start (neither loads `.env.local`, so export the settings when previewing a studio).
+- Unverified on Vercel (TAT-13 confirms it on the first deploy): the design assumes a function sees the studio's own domain in `Host` (from Vercel's docs, not yet observed), and that Vercel's CDN keys its cache by host. If `Host` shows another name there, tenant resolution needs another source and a new decision.
+- Also check on the first deploy (TAT-13), right after it goes live:
+  - Open the landing page. A bad production `API_URL` or `STOREFRONT_URL` is not checked at cold start: the settings are read on the first request, so a wrong value shows as a 500 on every page (the log line names the variable and its rule, never its value). Fix the environment and redeploy.
+  - A server function call from the deployed studio page works (none exists yet; check with the first one). Start's CSRF fallback for clients that send no `Sec-Fetch-Site` compares `Origin` with `request.url`'s origin, and that URL's scheme is `http:` behind Vercel's TLS termination (`trustProxy` is off). Browsers send `Sec-Fetch-Site` and are unaffected; only old or non-browser clients could get a 403.
+- Local development: run the platform, set `API_URL` to its address, and open `http://<slug>.localhost:3000` for a studio in its database. Chrome, Firefox, Edge and curl send `*.localhost` to this machine (for Safari: `curl -H 'Host: <slug>.localhost:3000' http://127.0.0.1:3000/`), and Vite allows those hosts. `http://localhost:3000` is the landing page.
+- `src/start.ts` puts `startInstance` in `routeTree.gen.ts`'s Register footer. The Start Vite plugin writes that footer (`pnpm dev`, `pnpm build`); `tsr generate` writes none, so after `pnpm generate-routes`, run `pnpm build` before committing the route tree.
+- Tests: `pnpm test` runs `test/**/*.test.ts` with `node:test` and `tsx`. Keep `src/tenancy/` free of React and TanStack imports (except `middleware.ts`) so its tests run in plain Node; its files import each other with `.ts` extensions.

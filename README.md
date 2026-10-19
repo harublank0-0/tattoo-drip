@@ -24,7 +24,7 @@ Use the repo's Node 24.3.0 (`.nvmrc`) and pnpm 12.8.1 (`package.json`) pins, plu
 pnpm install
 cp apps/platform/.env.example apps/platform/.env
 pnpm --filter @tattoo-drip/platform exec node ace generate:key
-cp apps/storefront/.env.local.example apps/storefront/.env.local
+cp apps/storefront/.env.local.example apps/storefront/.env.local   # set API_URL to the platform's address
 
 pnpm podman:up                           # Postgres 18, Redis, Mailpit (foreground)
 ```
@@ -54,11 +54,11 @@ An existing checkout must update `apps/platform/.env` from `.env.example` before
 | `pnpm worker` | Run the platform's job worker (queued jobs and emails) |
 | `pnpm build` | Build every package and app |
 | `pnpm typecheck` | Typecheck every package and app |
-| `pnpm test` | Run packages with test scripts; currently only platform (Japa) |
+| `pnpm test` | Run every package's tests: platform (Japa), SDK, React and storefront (`node:test`) |
 | `pnpm check` | Biome lint + format check (`pnpm format:fix` to format) |
 | `pnpm --filter @tattoo-drip/types generate` | Regenerate API types after editing `openapi.yaml` |
 
-Narrow work with `pnpm --filter @tattoo-drip/<area> typecheck` and [platform test guidance](apps/platform/docs/testing.md). Functional tests need migrated PostgreSQL; boot commands need the platform environment. Storefront and public packages currently have no test scripts, so root tests do not validate their behavior.
+Narrow work with `pnpm --filter @tattoo-drip/<area> typecheck` and [platform test guidance](apps/platform/docs/testing.md). Functional tests need migrated PostgreSQL; boot commands need the platform environment. The SDK, React and storefront tests (`node:test` with `tsx`) need no database. To try a studio page, run the platform and open `http://<slug>.localhost:3000` for a studio in its database; `http://localhost:3000` is the landing page.
 
 To try the installed dashboard app locally, build the platform and run the built server (the service worker is off in development): `pnpm --filter @tattoo-drip/platform build`, then `NODE_ENV=production node bin/server.js` from `apps/platform/build` with the platform's environment variables set (for example by copying `apps/platform/.env` into `build/`). Open it in Chrome on `http://localhost` and install it from the address bar (browsers only offer installation on HTTPS or `localhost`, so a phone needs an HTTPS tunnel; on iPhone: Share → Add to Home Screen). In DevTools → Network, "Offline" then a reload shows the offline page.
 
@@ -78,7 +78,7 @@ Use `/td-work <goal>` for a scoped implementation task and `/td-handoff <task>` 
 
 ## Deployment
 
-- **Storefront:** Vercel, with the project's Root Directory set to `apps/storefront`.
+- **Storefront:** Vercel, with the project's Root Directory set to `apps/storefront`, the apex and wildcard domains, and `API_URL` and `STOREFRONT_URL` (`https://{tenant}.<domain>`) set (TAT-13). On the first deploy, check that functions see the studio's domain in `Host`, open the landing page (a bad `API_URL` or `STOREFRONT_URL` is read on the first request, not at start, so it shows as a 500 on every page) and check that a server function call works (Start's CSRF Origin fallback sees the scheme `http:` behind Vercel's TLS, so only clients that send no `Sec-Fetch-Site` are affected). See [tenants and hosts](apps/storefront/docs/development.md#tenants-and-hosts).
 - **Platform:** a Node container (`node ace build`, then `node bin/server.js` in `build/`).
 - **Deposit links:** `STOREFRONT_URL` is required in production: the platform, its worker and every `ace` command refuse to start without it. Set it to the studio pages' origin with `{tenant}` for the slug (e.g. `https://{tenant}.example.com`, an http(s) URL with the slug in the host); deposit links are built from it (TAT-65). In development and tests it is optional and links use the dev host `http://{tenant}.localhost:3000`; the project page then warns that no client can open them.
 - **Payment proofs:** before a pilot takes deposits, the storefront deposit page (TAT-65b) and object storage (TAT-27) must ship. Private images are served only through 5-minute signed URLs that answer with `Cache-Control: private, no-store` (TAT-66). When the private disk moves to R2 (TAT-27), check that its signed URLs still send that header, and keep `/files` request URLs, which carry the signature, out of access logs.

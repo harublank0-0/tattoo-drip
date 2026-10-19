@@ -49,7 +49,7 @@ Inspect excluded material when the issue requires it: generated types for a comp
 
 Run checks for changed behavior first. Use `pnpm --filter @tattoo-drip/<area> typecheck`; platform test narrowing is in [testing](../apps/platform/docs/testing.md). For supported changed files, run `pnpm exec biome check <paths>`; use `--write` deliberately for fixes. Biome does not validate Markdown; check its links, examples and consistency directly. Avoid repo-wide format writes for a localized change.
 
-Include security/isolation, integration, browser or migration checks when the change needs them. Passing typechecks alone cannot prove runtime behavior. Root `pnpm test` currently runs platform only. Full gates and schema-generation checks are in [README](../README.md) and CI. Once appropriate checks pass, rerun only after relevant edits, a failure or new evidence. Report unrun checks and environment limitations; retain failure evidence.
+Include security/isolation, integration, browser or migration checks when the change needs them. Passing typechecks alone cannot prove runtime behavior. Root `pnpm test` runs every package's test script (platform, SDK, React, storefront). Full gates and schema-generation checks are in [README](../README.md) and CI. Once appropriate checks pass, rerun only after relevant edits, a failure or new evidence. Report unrun checks and environment limitations; retain failure evidence.
 
 ## Durable memory
 
