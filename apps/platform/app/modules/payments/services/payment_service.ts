@@ -103,7 +103,7 @@ export type Reversal = {
 	depositDue: number;
 };
 
-/** What the studio decided about a closed project's deposit (TAT-85 adds sessions and `moved`). */
+/** What the studio decided about a closed project's deposit (per-session outcomes and `moved` are a follow-up to TAT-85). */
 export type OutcomeInput =
 	| { outcome: "kept"; note: string | null }
 	| {

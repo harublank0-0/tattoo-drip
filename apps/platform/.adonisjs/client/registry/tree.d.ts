@@ -84,6 +84,9 @@ export interface ApiDefinition {
       artist: {
         update: typeof routes['tenant.projects.artist.update']
       }
+      sessions: {
+        store: typeof routes['tenant.projects.sessions.store']
+      }
       depositLink: {
         store: typeof routes['tenant.projects.deposit_link.store']
       }
@@ -101,6 +104,10 @@ export interface ApiDefinition {
       verify: typeof routes['tenant.payments.verify']
       reject: typeof routes['tenant.payments.reject']
       reverse: typeof routes['tenant.payments.reverse']
+    }
+    sessions: {
+      outcome: typeof routes['tenant.sessions.outcome']
+      move: typeof routes['tenant.sessions.move']
     }
     calendar: {
       index: typeof routes['tenant.calendar.index']

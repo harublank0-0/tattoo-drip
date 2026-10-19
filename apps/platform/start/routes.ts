@@ -227,6 +227,12 @@ router
 					.put(":id/artist", [controllers.ProjectChanges, "artist"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.projects.artist.update");
+				// A session on this project (TAT-85): owners, and the assigned
+				// artist with their own profile (SessionService.scheduleFor).
+				router
+					.post(":id/sessions", [controllers.ProjectSessions, "store"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.projects.sessions.store");
 				// Owners only: DepositLinkService gives anyone else a 404 (TAT-65).
 				router
 					.post(":id/deposit-link", [controllers.DepositLinks, "store"])
@@ -271,6 +277,26 @@ router
 			})
 			.prefix("/payments")
 			.use(middleware.role({ allow: ["owner"] }));
+
+		/**
+		 * One session's outcome and time (TAT-85): owners any session, an
+		 * artist only their own on a project assigned to them
+		 * (SessionService.findChangeable gives anyone else a 404). Every
+		 * sessions route goes in this group (a test checks).
+		 */
+		router
+			.group(() => {
+				router
+					.post(":id/outcome", [controllers.ProjectSessions, "outcome"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.sessions.outcome");
+				router
+					.post(":id/move", [controllers.ProjectSessions, "move"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.sessions.move");
+			})
+			.prefix("/sessions")
+			.use(middleware.role({ allow: ["owner", "artist"] }));
 
 		/**
 		 * The calendar: owners (the whole studio or one artist) and artists

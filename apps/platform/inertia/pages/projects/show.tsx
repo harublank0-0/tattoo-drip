@@ -13,12 +13,11 @@ import {
 	MOVE_LABELS,
 	type ProjectPageProps,
 	type QuoteProps,
-	SESSION_KIND_LABELS,
-	SESSION_STATUS_LABELS,
 	STATUS_LABELS,
 	suggestedDeposit,
 } from "~/components/projects";
 import ReferenceGrid from "~/components/references";
+import SessionsCard from "~/components/sessions_card";
 import { Badge } from "~/components/ui/badge";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -75,6 +74,8 @@ export default function ProjectShow({
 	bookedWithoutSession,
 	quoteExpiryShown,
 	sessions,
+	sessionDates,
+	scheduling,
 	notes,
 	contactedText,
 	assignment,
@@ -145,40 +146,12 @@ export default function ProjectShow({
 					</CardContent>
 				</Card>
 
-				<Card>
-					<CardHeader>
-						<CardTitle>Sessions</CardTitle>
-					</CardHeader>
-					<CardContent>
-						{sessions.length === 0 ? (
-							<p className="text-sm text-muted-foreground">No sessions yet.</p>
-						) : (
-							<ul className="flex flex-col divide-y text-sm">
-								{sessions.map((session) => (
-									<li
-										key={session.id}
-										className="flex flex-wrap items-center justify-between gap-2 py-2"
-									>
-										<span className="flex flex-col gap-0.5">
-											<span>{session.whenText}</span>
-											<span className="text-muted-foreground">
-												{SESSION_KIND_LABELS[session.kind] ?? session.kind} with{" "}
-												{session.artistName ?? "Unknown artist"}
-											</span>
-										</span>
-										<Badge
-											variant={
-												session.status === "scheduled" ? "secondary" : "outline"
-											}
-										>
-											{SESSION_STATUS_LABELS[session.status] ?? session.status}
-										</Badge>
-									</li>
-								))}
-							</ul>
-						)}
-					</CardContent>
-				</Card>
+				<SessionsCard
+					projectId={project.id}
+					sessions={sessions}
+					dates={sessionDates}
+					scheduling={scheduling}
+				/>
 
 				{request && (
 					<Card>

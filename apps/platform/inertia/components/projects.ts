@@ -76,6 +76,20 @@ export type ProjectPageProps = {
 	quoteExpiryShown: boolean;
 	/** The project's live sessions, earliest first. */
 	sessions: SessionRow[];
+	/** The move form's first and last day, yyyy-MM-dd in the studio's timezone (TAT-85). */
+	sessionDates: { today: string; max: string };
+	/**
+	 * Scheduling a session on this project (TAT-85): the artists this member
+	 * may choose, the default, whether it is fixed (an artist schedules only
+	 * themselves) and what a tattoo session would do; null when the project
+	 * takes no new sessions or the member has no artist to schedule with.
+	 */
+	scheduling: {
+		artists: { id: string; name: string }[];
+		artistId: string | null;
+		artistFixed: boolean;
+		hint: string | null;
+	} | null;
 	notes: string | null;
 	contactedText: string;
 	/** Owners only: the project's artist and the studio's artists. */
@@ -192,6 +206,12 @@ export type SessionRow = {
 	status: string;
 	/** Null when the artist's profile was deleted. */
 	artistName: string | null;
+	/** The outcomes this member can record now, in button order; [] for none (TAT-85). */
+	outcomes: ("completed" | "no_show" | "cancelled")[];
+	/** A started tattoo session whose project isn't booked yet: Done waits for the booking. */
+	awaitingBooking: boolean;
+	/** The move form's starting values in the studio's timezone; null when this member can't move it. */
+	move: { date: string; startTime: string; hours: number } | null;
 };
 
 export const SESSION_KIND_LABELS: Record<string, string> = {

@@ -1661,3 +1661,41 @@ test.group(
 		});
 	},
 );
+
+test.group(
+	"ProjectService withdrawal after the work started (TAT-85)",
+	(group) => {
+		group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+		test("a booked project with a finished tattoo session ends cancelled, its history kept", async ({
+			assert,
+		}) => {
+			const { tenant } = await studioWithOwner();
+
+			await inTenant(tenant, async () => {
+				const project = await makeProject(tenant, await makeClient(tenant), {
+					status: "booked",
+				});
+				const artist = await makeArtist(tenant);
+				const done = await makeSession(tenant, project, artist, {
+					status: "completed",
+					startsAt: DateTime.utc(2026, 10, 1, 10),
+					endsAt: DateTime.utc(2026, 10, 1, 12),
+				});
+				const next = await makeSession(tenant, project, artist);
+
+				// Cancelling `next` passes the project through in_progress inside the
+				// withdrawal's transaction; the withdrawal still decides the end.
+				assert.equal(
+					await projects.move(tenant, OWNER, project, "withdraw"),
+					"cancelled",
+				);
+				assert.equal(await statusOf(project), "cancelled");
+				await done.refresh();
+				await next.refresh();
+				assert.equal(done.status, "completed");
+				assert.equal(next.status, "cancelled");
+			});
+		});
+	},
+);

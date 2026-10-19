@@ -110,7 +110,7 @@ test.group("Payment decisions over HTTP", (group) => {
 			)
 		).assertFlashMessage(
 			"success",
-			"Payment verified. Schedule a tattoo session to book the project.",
+			"Payment verified. Schedule a tattoo session under Sessions to book the project.",
 		);
 
 		const { owner, tenant } = await studioWithOwner("pay-part-66", "Part");

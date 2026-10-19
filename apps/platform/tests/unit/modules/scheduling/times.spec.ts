@@ -1,6 +1,10 @@
 import { test } from "@japa/runner";
 import { DateTime, Settings } from "luxon";
-import { localDateTime, sessionTimeText } from "#modules/scheduling/times";
+import {
+	localDateTime,
+	sessionFormValues,
+	sessionTimeText,
+} from "#modules/scheduling/times";
 
 const KTM = "Asia/Kathmandu";
 const NY = "America/New_York";
@@ -67,6 +71,64 @@ test.group("sessionTimeText", () => {
 		assert.equal(
 			sessionTimeText(start, start.plus({ hours: 3 }), KTM),
 			"Sun 18 Oct 2026, 22:30 – Mon 19 Oct 2026, 01:30",
+		);
+	});
+});
+
+test.group("sessionFormValues", () => {
+	test("the move form starts from the session's local day, start and length", ({
+		assert,
+	}) => {
+		// 10:00 UTC is 15:45 in Kathmandu.
+		const startsAt = DateTime.utc(2026, 11, 2, 10);
+		assert.deepEqual(
+			sessionFormValues(
+				startsAt,
+				startsAt.plus({ minutes: 150 }),
+				KTM,
+				"2026-10-18",
+				"2027-10-18",
+			),
+			{ date: "2026-11-02", startTime: "15:45", hours: 2.5 },
+		);
+	});
+
+	test("the day is the studio's, and a day that can't be chosen starts on today", ({
+		assert,
+	}) => {
+		// 19:00 UTC on 1 Nov is 00:45 on 2 Nov in Kathmandu.
+		const late = DateTime.utc(2026, 11, 1, 19);
+		assert.equal(
+			sessionFormValues(
+				late,
+				late.plus({ hours: 1 }),
+				KTM,
+				"2026-10-18",
+				"2027-10-18",
+			).date,
+			"2026-11-02",
+		);
+		const past = DateTime.utc(2026, 10, 1, 4);
+		assert.deepEqual(
+			sessionFormValues(
+				past,
+				past.plus({ hours: 2 }),
+				KTM,
+				"2026-10-18",
+				"2027-10-18",
+			),
+			{ date: "2026-10-18", startTime: "09:45", hours: 2 },
+		);
+		const far = DateTime.utc(2027, 11, 1, 4);
+		assert.equal(
+			sessionFormValues(
+				far,
+				far.plus({ hours: 2 }),
+				KTM,
+				"2026-10-18",
+				"2027-10-18",
+			).date,
+			"2026-10-18",
 		);
 	});
 });

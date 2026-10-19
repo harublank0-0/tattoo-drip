@@ -241,7 +241,19 @@ test.group("Project page", (group) => {
 		).inertiaProps;
 
 		assert.deepEqual(
-			props.sessions.map(({ id: _id, ...rest }: { id: string }) => rest),
+			props.sessions.map(
+				({
+					whenText,
+					kind,
+					status,
+					artistName,
+				}: {
+					whenText: string;
+					kind: string;
+					status: string;
+					artistName: string | null;
+				}) => ({ whenText, kind, status, artistName }),
+			),
 			[
 				{
 					whenText: "Mon 2 Nov 2026, 15:45–17:45",
@@ -553,5 +565,241 @@ test.group("Project page: the client link", (group) => {
 			await client.get(page(project.id)).withInertia().loginAs(asha)
 		).inertiaProps;
 		assert.isNull(artistProps.clientId);
+	});
+});
+
+test.group("Project page: session actions (TAT-85)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	type Row = {
+		id: string;
+		outcomes: string[];
+		awaitingBooking: boolean;
+		move: { date: string; startTime: string; hours: number } | null;
+	};
+
+	test("an owner gets each scheduled session's outcomes and move values, and the form's days", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const now = DateTime.now().startOf("minute");
+		const { project, started, later, done } = await inTenant(
+			tenant,
+			async () => {
+				const sita = await makeArtist(tenant);
+				const project = await makeProject(tenant, await makeClient(tenant), {
+					status: "booked",
+					artistId: sita.id,
+				});
+				return {
+					project,
+					started: await makeSession(tenant, project, sita, {
+						startsAt: now.minus({ minutes: 120 }),
+						endsAt: now.minus({ minutes: 30 }),
+					}),
+					later: await makeSession(tenant, project, sita, {
+						startsAt: now.plus({ days: 3 }),
+						endsAt: now.plus({ days: 3, minutes: 150 }),
+					}),
+					done: await makeSession(tenant, project, sita, {
+						kind: "consultation",
+						status: "completed",
+						startsAt: now.minus({ days: 3 }),
+						endsAt: now.minus({ days: 3 }).plus({ hours: 1 }),
+					}),
+				};
+			},
+		);
+
+		const props = (
+			await client.get(page(project.id)).withInertia().loginAs(owner)
+		).inertiaProps;
+		const row = (id: string): Row =>
+			props.sessions.find((session: Row) => session.id === id);
+
+		const today = todayIn(KTM);
+		assert.deepEqual(props.sessionDates, {
+			today,
+			max: DateTime.fromISO(today, { zone: "utc" })
+				.plus({ years: 1 })
+				.toFormat("yyyy-MM-dd"),
+		});
+		assert.deepEqual(row(started.id).outcomes, [
+			"completed",
+			"no_show",
+			"cancelled",
+		]);
+		assert.isFalse(row(started.id).awaitingBooking);
+		// Its date depends on whether two hours ago was still today in Kathmandu.
+		const startedMove = row(started.id).move;
+		assert.equal(
+			startedMove?.startTime,
+			started.startsAt.setZone(KTM).toFormat("HH:mm"),
+		);
+		assert.equal(startedMove?.hours, 1.5);
+		assert.deepEqual(row(later.id).outcomes, ["cancelled"]);
+		assert.deepEqual(row(later.id).move, {
+			date: later.startsAt.setZone(KTM).toFormat("yyyy-MM-dd"),
+			startTime: later.startsAt.setZone(KTM).toFormat("HH:mm"),
+			hours: 2.5,
+		});
+		assert.deepEqual(row(done.id).outcomes, []);
+		assert.isFalse(row(done.id).awaitingBooking);
+		assert.isNull(row(done.id).move);
+	});
+
+	test("an artist gets actions only on their own sessions, and Done waits for a booked project", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+		const asha = await artistIn(tenant, "asha@example.com");
+		const now = DateTime.now().startOf("minute");
+		const { project, mine, theirs } = await inTenant(tenant, async () => {
+			const sita = await makeArtist(tenant, "sita");
+			sita.userId = asha.id;
+			await sita.save();
+			const anu = await makeArtist(tenant, "anu");
+			const project = await makeProject(tenant, await makeClient(tenant), {
+				status: "deposit_pending",
+				artistId: sita.id,
+			});
+			return {
+				project,
+				mine: await makeSession(tenant, project, sita, {
+					startsAt: now.minus({ minutes: 120 }),
+					endsAt: now.minus({ minutes: 60 }),
+				}),
+				theirs: await makeSession(tenant, project, anu, {
+					kind: "consultation",
+					startsAt: now.minus({ minutes: 120 }),
+					endsAt: now.minus({ minutes: 60 }),
+				}),
+			};
+		});
+
+		const props = (
+			await client.get(page(project.id)).withInertia().loginAs(asha)
+		).inertiaProps;
+		const row = (id: string): Row =>
+			props.sessions.find((session: Row) => session.id === id);
+
+		assert.deepEqual(row(mine.id).outcomes, ["no_show", "cancelled"]);
+		assert.isTrue(row(mine.id).awaitingBooking);
+		assert.isNotNull(row(mine.id).move);
+		assert.deepEqual(row(theirs.id).outcomes, []);
+		assert.isFalse(row(theirs.id).awaitingBooking);
+		assert.isNull(row(theirs.id).move);
+	});
+});
+
+test.group("Project page: scheduling (TAT-85)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("an owner gets every artist, the project's as the default, and what the deposit still needs", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const { project, sita, anu } = await inTenant(tenant, async () => {
+			const sita = await makeArtist(tenant, "sita");
+			const anu = await makeArtist(tenant, "anu");
+			const project = await makeProject(tenant, await makeClient(tenant), {
+				status: "deposit_pending",
+				artistId: sita.id,
+			});
+			await makeQuote(tenant, project);
+			return { project, sita, anu };
+		});
+
+		const { scheduling } = (
+			await client.get(page(project.id)).withInertia().loginAs(owner)
+		).inertiaProps;
+
+		assert.sameMembers(
+			scheduling.artists.map(({ id }: { id: string }) => id),
+			[sita.id, anu.id],
+		);
+		assert.equal(scheduling.artistId, sita.id);
+		assert.isFalse(scheduling.artistFixed);
+		assert.equal(
+			scheduling.hint,
+			"A tattoo session holds the date. The project is booked once the deposit is paid: NPR 3,000 still due.",
+		);
+	});
+
+	test("the hint follows what the booking rule will do: a settled deposit books, a missing quote does not", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const { noQuote, settled } = await inTenant(tenant, async () => {
+			const sita = await makeArtist(tenant, "sita");
+			const customer = await makeClient(tenant);
+			const project = () =>
+				makeProject(tenant, customer, {
+					status: "deposit_pending",
+					artistId: sita.id,
+				});
+			const settled = await project();
+			await makeQuote(tenant, settled, { depositAmount: 0 });
+			return { noQuote: await project(), settled };
+		});
+		const hint = async (id: string) =>
+			(await client.get(page(id)).withInertia().loginAs(owner)).inertiaProps
+				.scheduling.hint;
+
+		// DepositService.isSettled: a zero deposit is settled, no quote is not.
+		assert.equal(
+			await hint(settled.id),
+			"Scheduling a tattoo session books the project.",
+		);
+		assert.equal(
+			await hint(noQuote.id),
+			"A tattoo session holds the date. The project is booked once its deposit is settled.",
+		);
+	});
+
+	test("an artist schedules only themselves; a finished or closed project offers nothing", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const asha = await artistIn(tenant, "asha@example.com");
+		const { booked, finished, closed, sita } = await inTenant(
+			tenant,
+			async () => {
+				const sita = await makeArtist(tenant, "sita");
+				sita.userId = asha.id;
+				await sita.save();
+				await makeArtist(tenant, "anu");
+				const customer = await makeClient(tenant);
+				const project = (status: "booked" | "completed" | "cancelled") =>
+					makeProject(tenant, customer, { status, artistId: sita.id });
+				return {
+					sita,
+					booked: await project("booked"),
+					finished: await project("completed"),
+					closed: await project("cancelled"),
+				};
+			},
+		);
+
+		const mine = (await client.get(page(booked.id)).withInertia().loginAs(asha))
+			.inertiaProps;
+		assert.deepEqual(mine.scheduling, {
+			artists: [{ id: sita.id, name: "Sita" }],
+			artistId: sita.id,
+			artistFixed: true,
+			hint: null,
+		});
+
+		for (const project of [finished, closed]) {
+			const props = (
+				await client.get(page(project.id)).withInertia().loginAs(owner)
+			).inertiaProps;
+			assert.isNull(props.scheduling, project.status);
+		}
 	});
 });
