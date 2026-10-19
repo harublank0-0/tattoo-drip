@@ -7,6 +7,7 @@ import InquiryService from "#modules/inquiries/services/inquiry_service";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { ensureDbContext } from "#services/db_context";
 import { encryptsHistory } from "#services/history_encryption";
+import { isApiRequest } from "#services/public_api";
 import UserTransformer from "#transformers/user_transformer";
 
 export default class InertiaMiddleware extends BaseInertiaMiddleware {
@@ -104,6 +105,9 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 	}
 
 	async handle(ctx: HttpContext, next: NextFn) {
+		// The public API renders no pages, and must not get Inertia's 409 or
+		// headers (TAT-32).
+		if (isApiRequest(ctx)) return next();
 		await this.init(ctx);
 
 		// config/inertia.ts encrypts history; a plain-HTTP visit from another

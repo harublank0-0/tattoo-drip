@@ -1,0 +1,225 @@
+import { Exception } from "@adonisjs/core/exceptions";
+import { errors as httpErrors } from "@adonisjs/core/http";
+import { LimiterResponse, errors as limiterErrors } from "@adonisjs/limiter";
+import { test } from "@japa/runner";
+import { errors as vineErrors } from "@vinejs/vine";
+import { ApiException, apiErrorFor } from "#services/public_api_errors";
+
+const SECRET = "connection refused at 10.0.0.5:5432 for tattoo_drip_app";
+
+const shared = (status: number, code: string, message: string) => ({
+	status,
+	body: { error: { code, message } },
+	headers: {},
+});
+
+test.group("apiErrorFor", () => {
+	test("a VineJS error is validation_failed with its messages by field", ({
+		assert,
+	}) => {
+		const error = new vineErrors.E_VALIDATION_ERROR([
+			{
+				field: "client.phone",
+				message: "Enter a phone number",
+				rule: "required",
+			},
+			{ field: "client.phone", message: "Use the +977 format", rule: "regex" },
+			{
+				field: "referenceImages.0",
+				message: "Use a JPEG, PNG or WebP image",
+				rule: "file",
+			},
+		]);
+
+		assert.deepEqual(apiErrorFor(error), {
+			status: 422,
+			body: {
+				error: {
+					code: "validation_failed",
+					message: "Some fields are invalid.",
+					fields: {
+						"client.phone": ["Enter a phone number", "Use the +977 format"],
+						"referenceImages.0": ["Use a JPEG, PNG or WebP image"],
+					},
+				},
+			},
+			headers: {},
+		});
+	});
+
+	test("an ApiException keeps its status, code and message, without fields", ({
+		assert,
+	}) => {
+		const error = new ApiException(
+			409,
+			"too_many_open_inquiries",
+			"This studio already has your request.",
+		);
+
+		assert.deepEqual(apiErrorFor(error), {
+			status: 409,
+			body: {
+				error: {
+					code: "too_many_open_inquiries",
+					message: "This studio already has your request.",
+				},
+			},
+			headers: {},
+		});
+	});
+
+	test("only a validation_failed ApiException carries fields", ({ assert }) => {
+		const fields = { "client.phone": ["Already open"] };
+
+		assert.deepEqual(
+			apiErrorFor(
+				new ApiException(422, "validation_failed", "Check the fields.", fields),
+			),
+			{
+				status: 422,
+				body: {
+					error: {
+						code: "validation_failed",
+						message: "Check the fields.",
+						fields,
+					},
+				},
+				headers: {},
+			},
+		);
+		assert.throws(
+			() =>
+				// @ts-expect-error fields are refused for any other code
+				new ApiException(409, "too_many_open_inquiries", "Open.", fields),
+			/cannot carry fields/,
+		);
+	});
+
+	test("ApiException.notFound is a 404 even when other methods match", ({
+		assert,
+	}) => {
+		assert.deepEqual(
+			apiErrorFor(ApiException.notFound(), ["GET", "HEAD"]),
+			shared(404, "not_found", "Not found."),
+		);
+	});
+
+	test("a route miss is not_found, or method_not_allowed with Allow when another method matches", ({
+		assert,
+	}) => {
+		const miss = new httpErrors.E_ROUTE_NOT_FOUND(["PUT", "/api/v1/x"]);
+
+		assert.deepEqual(apiErrorFor(miss), shared(404, "not_found", "Not found."));
+		assert.deepEqual(apiErrorFor(miss, ["GET", "HEAD"]), {
+			...shared(405, "method_not_allowed", "This method is not allowed here."),
+			headers: { Allow: "GET, HEAD" },
+		});
+	});
+
+	test("framework errors map by status, with the shared message", ({
+		assert,
+	}) => {
+		const cases: [unknown, number, string, string][] = [
+			[
+				Object.assign(new SyntaxError(`Unexpected token in ${SECRET}`), {
+					status: 400,
+				}),
+				400,
+				"bad_request",
+				"The request could not be read.",
+			],
+			[
+				new Exception(SECRET, { status: 404, code: "E_ROW_NOT_FOUND" }),
+				404,
+				"not_found",
+				"Not found.",
+			],
+			[
+				new Exception(SECRET, {
+					status: 413,
+					code: "E_REQUEST_ENTITY_TOO_LARGE",
+				}),
+				413,
+				"payload_too_large",
+				"The request is too large.",
+			],
+			[
+				new Exception(SECRET, { status: 415, code: "E_ENCODING_UNSUPPORTED" }),
+				415,
+				"unsupported_media_type",
+				"This content type or encoding is not supported.",
+			],
+		];
+
+		for (const [error, status, code, message] of cases) {
+			assert.deepEqual(apiErrorFor(error), shared(status, code, message), code);
+		}
+	});
+
+	test("a 422 that is not a VineJS error is a 400 bad_request", ({
+		assert,
+	}) => {
+		const strictJson = new Exception(
+			"Invalid JSON, only supports object and array",
+			{ status: 422 },
+		);
+
+		assert.deepEqual(
+			apiErrorFor(strictJson),
+			shared(400, "bad_request", "The request could not be read."),
+		);
+	});
+
+	test("another 4xx keeps its status with bad_request", ({ assert }) => {
+		assert.deepEqual(
+			apiErrorFor(new Exception(SECRET, { status: 409 })),
+			shared(409, "bad_request", "The request could not be read."),
+		);
+	});
+
+	test("a rate limit is rate_limited with Retry-After and the limiter's headers", ({
+		assert,
+	}) => {
+		const error = new limiterErrors.E_TOO_MANY_REQUESTS(
+			new LimiterResponse({
+				limit: 10,
+				remaining: 0,
+				consumed: 11,
+				availableIn: 42,
+			}),
+		);
+
+		const { status, body, headers } = apiErrorFor(error);
+
+		assert.equal(status, 429);
+		assert.deepEqual(body, {
+			error: {
+				code: "rate_limited",
+				message: "Too many requests. Try again later.",
+			},
+		});
+		assert.equal(headers["Retry-After"], "42");
+		assert.equal(headers["X-RateLimit-Limit"], "10");
+		assert.equal(headers["X-RateLimit-Remaining"], "0");
+		assert.isString(headers["X-RateLimit-Reset"]);
+	});
+
+	test("anything else is internal_error and never shows its message", ({
+		assert,
+	}) => {
+		for (const error of [
+			new Error(SECRET),
+			new Exception(SECRET, { status: 503 }),
+			SECRET,
+			null,
+			undefined,
+		]) {
+			const result = apiErrorFor(error);
+			assert.deepEqual(
+				result,
+				shared(500, "internal_error", "Something went wrong. Try again later."),
+			);
+			assert.notInclude(JSON.stringify(result), "10.0.0.5");
+		}
+	});
+});

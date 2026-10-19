@@ -12,4 +12,4 @@ Public API contract and SDK, consumed from source in the workspace; no developme
 - Before API changes, read [SDK guidance](../docs/sdk.md#public-api-by-stage): the booking draft must move to inquiries. Read [architecture](../docs/architecture.md) for tenancy/module design.
 - Typecheck each package with `pnpm --filter @tattoo-drip/<name> typecheck`.
 
-No test scripts here; root `pnpm test` does not cover SDK/hooks. Validate changed behavior explicitly.
+The SDK has tests in `packages/sdk/test` (`pnpm --filter @tattoo-drip/sdk test`: `node:test` run by `tsx`, a mocked `fetch`); root `pnpm test` runs them too. The React hooks have none yet (TAT-11): validate changed hook behavior explicitly.

@@ -45,13 +45,22 @@ const EXPECTED_POLICIES: Record<string, string[]> = {
 };
 
 /**
- * SECURITY DEFINER functions, and why. They run as their owner, which
- * bypasses row-level security, so each one is a conscious edit: ids only,
- * a pinned search_path and no EXECUTE for PUBLIC (database/README.md).
+ * SECURITY DEFINER functions, with their argument lists, and why. They run
+ * as their owner, which bypasses row-level security, so each one is a
+ * conscious edit: ids only, no arguments except one exact lookup key, a
+ * pinned search_path and no EXECUTE for PUBLIC (database/README.md).
  */
-const DEFINER_FUNCTIONS: Record<string, string> = {
-	"public.expired_quote_candidates":
-		"lists (tenant_id, project_id, quote_id) of expired current quotes for the expiry sweep (TAT-83)",
+const DEFINER_FUNCTIONS: Record<string, { args: string; reason: string }> = {
+	"public.expired_quote_candidates": {
+		args: "",
+		reason:
+			"lists (tenant_id, project_id, quote_id) of expired current quotes for the expiry sweep (TAT-83)",
+	},
+	"public.tenant_for_slug": {
+		args: "requested_slug text",
+		reason:
+			"the id of the live tenant whose current or old slug is exactly the argument, for the public API (TAT-32)",
+	},
 };
 
 async function rows<T>(query: string) {
@@ -67,6 +76,7 @@ async function rows<T>(query: string) {
 async function definerFunctions(client: QueryClientContract = dbClient()) {
 	const result = await client.rawQuery(
 		`select n.nspname || '.' || p.proname as name, p.proconfig,
+		        pg_get_function_identity_arguments(p.oid) as args,
 		        has_function_privilege('public', p.oid, 'execute') as public_can_run
 		 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
 		 where p.prosecdef
@@ -80,6 +90,7 @@ async function definerFunctions(client: QueryClientContract = dbClient()) {
 	);
 	return result.rows as {
 		name: string;
+		args: string;
 		proconfig: string[] | null;
 		public_can_run: boolean;
 	}[];
@@ -225,7 +236,7 @@ test.group("Catalog guard", () => {
 		assert.deepEqual(loose, [], "use tenantReference() in the migration");
 	});
 
-	test("every SECURITY DEFINER function is listed, pins search_path and is closed to PUBLIC", async ({
+	test("every SECURITY DEFINER function is listed with its arguments, pins search_path and is closed to PUBLIC", async ({
 		assert,
 	}) => {
 		assert.deepEqual(
@@ -234,6 +245,7 @@ test.group("Catalog guard", () => {
 				.sort()
 				.map((name) => ({
 					name,
+					args: DEFINER_FUNCTIONS[name].args,
 					proconfig: ["search_path=pg_catalog, pg_temp"],
 					public_can_run: false,
 				})),

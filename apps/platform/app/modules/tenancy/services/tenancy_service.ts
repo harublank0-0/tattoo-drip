@@ -195,6 +195,21 @@ export default class TenancyService {
 	}
 
 	/**
+	 * The id of the live tenant whose current or old slug is exactly `slug`,
+	 * or null, for the public API (TAT-32). An unauthenticated request has
+	 * no context in which RLS would show a tenant, so this asks the
+	 * tenant_for_slug() SECURITY DEFINER function, which answers this one
+	 * question and nothing else. Read the tenant itself in its own context.
+	 */
+	async tenantIdForSlug(slug: string): Promise<string | null> {
+		const { rows } = await dbClient().rawQuery(
+			"select public.tenant_for_slug(?) as id",
+			[slug],
+		);
+		return rows[0]?.id ?? null;
+	}
+
+	/**
 	 * The user's live tenants with their role in each, oldest membership
 	 * first. Deleted memberships and deleted tenants are left out.
 	 */

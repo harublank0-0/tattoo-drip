@@ -91,4 +91,9 @@ export interface ApiDefinition {
     create: typeof routes['onboarding.create']
     store: typeof routes['onboarding.store']
   }
+  api: {
+    v1: {
+      studio: typeof routes['api.v1.studio']
+    }
+  }
 }

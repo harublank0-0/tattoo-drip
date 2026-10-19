@@ -595,4 +595,16 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/onboarding_controller').default['store']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
+  'api.v1.studio': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/tenants/:tenant'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_studio_controller').default['show']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_studio_controller').default['show']>>>
+    }
+  }
 }

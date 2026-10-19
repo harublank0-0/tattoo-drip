@@ -533,6 +533,12 @@ importers:
         specifier: workspace:*
         version: link:../types
     devDependencies:
+      '@types/node':
+        specifier: ~26.6.2
+        version: 26.6.3
+      tsx:
+        specifier: ^4.23.12
+        version: 4.23.12
       typescript:
         specifier: ^6.0.2
         version: 6.0.3
@@ -11496,7 +11502,6 @@ snapshots:
       '@esbuild/win32-arm64': 0.28.2
       '@esbuild/win32-ia32': 0.28.2
       '@esbuild/win32-x64': 0.28.2
-    optional: true
 
   escalade@3.2.0: {}
 
@@ -13830,7 +13835,6 @@ snapshots:
       esbuild: 0.28.2
     optionalDependencies:
       fsevents: 2.3.3
-    optional: true
 
   tw-animate-css@1.4.0: {}
 

@@ -1,50 +1,34 @@
-import app from "@adonisjs/core/services/app";
 import { defineConfig } from "@adonisjs/cors";
+import { isApiRequest } from "#services/public_api";
 
 /**
- * Configuration options to tweak the CORS policy. The following
- * options are documented on the official documentation website.
+ * CORS for the public API only (TAT-32): any origin, never credentials, the
+ * methods and request headers the SDK sends. The dashboard is same-origin
+ * and answers no cross-origin request. The publicApi middleware also sends
+ * Access-Control-Allow-Origin: * without an Origin header, for CDN copies.
  *
  * https://docs.adonisjs.com/guides/security/cors
  */
 const corsConfig = defineConfig({
-	/**
-	 * Enable or disable CORS handling globally.
-	 */
-	enabled: true,
+	enabled: (ctx) => isApiRequest(ctx),
+
+	origin: "*",
+
+	methods: ["GET", "HEAD", "POST"],
 
 	/**
-	 * In development, allow every origin to simplify local front/backend setup.
-	 * In production, keep an explicit allowlist (empty by default, so no
-	 * cross-origin browser access is allowed until configured).
+	 * JSON writes preflight for Content-Type. Authorization (the server key,
+	 * TAT-38) is server-side only, so browsers may not send it.
 	 */
-	origin: app.inDev ? true : [],
+	headers: ["accept", "content-type"],
 
-	/**
-	 * HTTP methods accepted for cross-origin requests.
-	 */
-	methods: ["GET", "HEAD", "POST", "PUT", "DELETE"],
+	/** So the studio page can say when to try again after a 429. */
+	exposeHeaders: ["retry-after"],
 
-	/**
-	 * Reflect request headers by default. Use a string array to restrict
-	 * allowed headers.
-	 */
-	headers: true,
+	credentials: false,
 
-	/**
-	 * Response headers exposed to the browser.
-	 */
-	exposeHeaders: [],
-
-	/**
-	 * Allow cookies/authorization headers on cross-origin requests.
-	 */
-	credentials: true,
-
-	/**
-	 * Cache CORS preflight response for N seconds.
-	 */
-	maxAge: 90,
+	/** Only JSON writes preflight; a CORS fix reaches browsers in 10 minutes. */
+	maxAge: 600,
 });
 
 export default corsConfig;

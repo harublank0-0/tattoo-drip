@@ -36,8 +36,10 @@ server.use([
  */
 router.use([
 	() => import("@adonisjs/core/bodyparser_middleware"),
-	() => import("@adonisjs/session/session_middleware"),
-	() => import("@adonisjs/shield/shield_middleware"),
+	// The session and shield (CSRF) skip the public API, which is stateless
+	// and cookieless (TAT-32).
+	() => import("#middleware/web_session_middleware"),
+	() => import("#middleware/web_shield_middleware"),
 	() => import("@adonisjs/auth/initialize_auth_middleware"),
 	() => import("#middleware/silent_auth_middleware"),
 ]);
@@ -52,4 +54,7 @@ export const middleware = router.named({
 	dbContext: () => import("#middleware/db_context_middleware"),
 	tenant: () => import("#middleware/tenant_middleware"),
 	role: () => import("#middleware/role_middleware"),
+	publicApi: () => import("#middleware/public_api_middleware"),
+	publicTenant: () => import("#middleware/public_tenant_middleware"),
+	publicCache: () => import("#middleware/public_cache_middleware"),
 });
