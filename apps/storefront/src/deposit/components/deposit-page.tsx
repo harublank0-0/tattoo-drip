@@ -10,6 +10,7 @@ import {
 	headingTemplate,
 	type MethodView,
 	payByLine,
+	receiptAmount,
 	stateTemplate,
 } from "../view-model.ts";
 import { CopyButton } from "./copy-button.tsx";
@@ -187,7 +188,7 @@ export function DepositIntro({ view }: { view: DepositView }) {
 	);
 }
 
-/** Every state but `due`: its sentence (focusable: focus moves here after a send), and for `submitted` the amount and code. */
+/** Every state but `due`: its sentence (focusable: focus moves here after a send), and for `submitted` and a paid deposit the amount and code (receiptAmount). */
 export function StateMessage({
 	view,
 	studioName,
@@ -199,6 +200,7 @@ export function StateMessage({
 	received: string | null;
 	ref?: Ref<HTMLParagraphElement>;
 }) {
+	const amount = receiptAmount(view);
 	return (
 		<div className="deposit-state">
 			<p ref={ref} className="deposit-state-title" tabIndex={-1}>
@@ -207,10 +209,10 @@ export function StateMessage({
 					values={{ studio: studioName, date: received ?? "" }}
 				/>
 			</p>
-			{view.state === "submitted" ? (
+			{amount !== null ? (
 				<dl className="deposit-details">
 					<dt>{copy.states.amount}</dt>
-					<dd translate="no">{view.dueText}</dd>
+					<dd translate="no">{amount}</dd>
 					<dt>{copy.code.title}</dt>
 					<dd className="deposit-number" translate="no">
 						{view.referenceCode}

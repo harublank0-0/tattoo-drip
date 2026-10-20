@@ -392,8 +392,27 @@ describe("the other states", () => {
 			assert.ok(message, String(overrides.state));
 			assert.match(textOf(message[1]), expected, String(overrides.state));
 			assert.match(message[0], /tabindex="-1"/i);
-			assert.doesNotMatch(html, /<dl/);
+			const receipt =
+				overrides.state === "paid" && overrides.deposit === undefined;
+			assert.equal(
+				tags(html, "dl").length,
+				receipt ? 1 : 0,
+				String(overrides.state),
+			);
 		}
+	});
+
+	test("paid is a receipt: the deposit's amount and the reference code (TAT-106)", () => {
+		const html = stateHtml({
+			state: "paid",
+			deposit: { ...PAGE.deposit, due: 0, dueText: "NPR 0" },
+		});
+		const text = textOf(html);
+		assert.match(text, /^Your deposit is paid\. Thank you!/);
+		assert.equal(tags(html, "dl").length, 1);
+		assert.match(html, /<dt>Amount<\/dt><dd translate="no">NPR 3,000<\/dd>/);
+		assert.match(text, /Reference code7K3M9Q/);
+		assert.doesNotMatch(text, /NPR 0/);
 	});
 
 	test("submitted says when it came, and repeats the amount and the code", () => {

@@ -8,6 +8,7 @@ import {
 	formatReceived,
 	headingTemplate,
 	payByLine,
+	receiptAmount,
 	stateTemplate,
 	todayIn,
 } from "../../src/deposit/view-model.ts";
@@ -256,6 +257,28 @@ describe("headingTemplate", () => {
 			headingTemplate(view("cancelled")),
 			"This booking was cancelled",
 		);
+	});
+});
+
+describe("receiptAmount", () => {
+	test("submitted repeats what was sent, a paid deposit its amount; nothing otherwise (TAT-106)", () => {
+		const amount = (state: (typeof PAGE)["state"], deposit = PAGE.deposit) =>
+			receiptAmount(depositView(page({ state, deposit })));
+		const partPaid = { ...PAGE.deposit, due: 100_000, dueText: "NPR 1,000" };
+		const paidUp = { ...PAGE.deposit, due: 0, dueText: "NPR 0" };
+		const nothingDue = {
+			...PAGE.deposit,
+			amount: 0,
+			amountText: "NPR 0",
+			due: 0,
+			dueText: "NPR 0",
+		};
+		assert.equal(amount("submitted", partPaid), "NPR 1,000");
+		assert.equal(amount("paid", paidUp), "NPR 3,000");
+		assert.equal(amount("paid", nothingDue), null);
+		for (const state of ["due", "updating", "expired", "cancelled"] as const) {
+			assert.equal(amount(state), null, state);
+		}
 	});
 });
 

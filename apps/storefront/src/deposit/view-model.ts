@@ -247,6 +247,19 @@ export function headingTemplate(
 	}
 }
 
+/**
+ * The amount the state message shows with the reference code: what was sent
+ * for `submitted`; for `paid`, the deposit as a receipt (TAT-106; its `due`
+ * is then 0). Null for the other states and when no deposit was needed.
+ */
+export function receiptAmount(
+	view: Pick<DepositView, "state" | "amount" | "amountText" | "dueText">,
+): string | null {
+	if (view.state === "submitted") return view.dueText;
+	if (view.state === "paid" && view.amount > 0) return view.amountText;
+	return null;
+}
+
 /** The studio's chat links on every state (spec ruling 9). */
 export interface DepositContact {
 	/** WhatsApp, the message prefilled with the reference code once it is known. */
