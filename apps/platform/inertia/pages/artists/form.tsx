@@ -23,7 +23,9 @@ type Errors = Partial<Record<string, string>>;
 
 /**
  * Adds an artist (`artist` is null) or edits one. `canLink` says whether
- * "This is my profile" can succeed for the signed-in owner.
+ * "This is my profile" can succeed for the signed-in owner; an artist on
+ * their own profile (TAT-30) never gets it, and their Cancel goes to
+ * Projects.
  */
 export default function ArtistForm({
 	artist,
@@ -34,9 +36,12 @@ export default function ArtistForm({
 }) {
 	const tenant = useTenant();
 	const params = { tenant: tenant.slug };
+	const owner = tenant.role === "owner";
 
 	return (
-		<Section title={artist ? "Edit artist" : "Add an artist"}>
+		<Section
+			title={owner ? (artist ? "Edit artist" : "Add an artist") : "Profile"}
+		>
 			{artist ? (
 				<Form
 					route="tenant.artists.update"
@@ -47,6 +52,7 @@ export default function ArtistForm({
 							artist={artist}
 							canLink={canLink}
 							errors={errors}
+							owner={owner}
 							processing={processing}
 							tenantSlug={tenant.slug}
 						/>
@@ -59,6 +65,7 @@ export default function ArtistForm({
 							artist={null}
 							canLink={canLink}
 							errors={errors}
+							owner={owner}
 							processing={processing}
 							tenantSlug={tenant.slug}
 						/>
@@ -73,12 +80,14 @@ function ArtistFields({
 	artist,
 	canLink,
 	errors,
+	owner,
 	processing,
 	tenantSlug,
 }: {
 	artist: ArtistProps | null;
 	canLink: boolean;
 	errors: Errors;
+	owner: boolean;
 	processing: boolean;
 	tenantSlug: string;
 }) {
@@ -261,7 +270,7 @@ function ArtistFields({
 					{processing ? "Saving…" : artist ? "Save" : "Add artist"}
 				</Button>
 				<Link
-					route="tenant.artists"
+					route={owner ? "tenant.artists" : "tenant.projects.index"}
 					routeParams={{ tenant: tenantSlug }}
 					className={buttonVariants({ variant: "ghost" })}
 				>
