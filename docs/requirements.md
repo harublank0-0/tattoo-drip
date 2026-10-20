@@ -45,7 +45,7 @@ What the MVP (pilot with a design-partner studio) and V1 (paid launch) must do, 
 - A direct booking looks the client up by phone first and never changes a returning client's details. The project starts Booked with its tattoo session, an optional price and no deposit step; the price can't be changed after booking. Owners book for any artist, artists only for themselves.
 - The calendar shows active sessions (scheduled or completed) by the studio's local day, a day or a Sunday-to-Saturday week at a time, each opening its project. Owners see the whole studio or one artist; artists see their own sessions, and one on a project that isn't theirs shows only its time and kind.
 - On the project page staff mark a scheduled session done or a no-show once it has started (also days later) and cancel it any time; an outcome is final. Moving a session changes its time, from today to a year ahead with the same artist, and an overlap is refused. Owners change any session, artists their own sessions on their own projects.
-- Staff schedule more sessions on an open project from its page (from review to in progress; not on a finished or closed one), from today to a year ahead. A tattoo session books a project waiting for its deposit as soon as the deposit is settled, so the deposit and the session can come in either order; before the quote is accepted it holds the date. Owners schedule any artist, artists only themselves on their own projects.
+- Staff schedule more sessions on an open project from its page (from review to in progress, and touch-ups during the healing check; not on a completed or closed one), from today to a year ahead. A tattoo session books a project waiting for its deposit as soon as the deposit is settled, so the deposit and the session can come in either order; before the quote is accepted it holds the date. Owners schedule any artist, artists only themselves on their own projects.
 
 **Clients**
 - [x] One client per phone number per tenant, with the history of their projects, references and payments
@@ -95,7 +95,7 @@ This is the most important rule in the system.
 A project is the sale of one tattoo (or one piercing). Custom work is never booked until its deposit is verified, unless the quote sets the deposit to zero.
 
 ```text
-Inquiry (a record, not a status) → reviewing → quoted → deposit_pending → booked → in_progress → completed → healing_check
+Inquiry (a record, not a status) → reviewing → quoted → deposit_pending → booked → in_progress → healing_check → completed
 
 side exits:  reviewing → declined     quoted ⇄ on_hold     deposit_pending → cancelled
 shortcuts:   flash or walk-in → booked     in_progress → booked (next session)
@@ -112,14 +112,15 @@ shortcuts:   flash or walk-in → booked     in_progress → booked (next sessio
 | `cancelled` | The quote expired, or the client withdrew |
 | `booked` | Deposit verified and a session is scheduled |
 | `in_progress` | At least one tattoo session done, more to come |
-| `completed` | The last session is done and the balance is paid |
-| `healing_check` | Follow-up for a touch-up or healed photo |
+| `healing_check` | The tattoo is finished; the studio waits for a photo of the healed tattoo or does a touch-up (due four weeks after the last tattoo session) |
+| `completed` | The healing check is done: the project is closed (a balance still due stays on it) |
 
 - Issuing a quote moves the project to `quoted`; staff mark it accepted when the client agrees, which moves it to `deposit_pending`. A quote can be revised (a new version) until the project is `booked`, and a revision moves a `deposit_pending` project back to `quoted`.
 - Staff move a project by hand only along the side exits: put a quoted project on hold and resume it, decline a project under review, or record that the client withdrew (from `reviewing`, `quoted`, `on_hold`, `deposit_pending`, `booked` or `in_progress`). Declining and withdrawing cancel the project's scheduled sessions. A client can be recorded as withdrawn until the work is done (up to `in_progress`); when the project holds deposit money, the owner records whether the studio keeps it or refunds it (moving it to a new date comes with per-session deposit outcomes, a follow-up to session outcomes).
 - The inquiry inbox is for owners. Accepting an inquiry creates a project under review, with the artist the owner picks, and its reference images follow the project (its assigned artist can then see them). Declining is final.
 - A quote's expiry moves a project that was never accepted (`quoted`, `on_hold`) or never paid (`deposit_pending` with the deposit not settled) to `cancelled`, and cancels its scheduled sessions. It spares a project while a deposit screenshot waits for the studio, and once the studio rejects a screenshot or reverses a deposit after the quote expired: the studio decides what happens next. A deposit that was already paid is never cancelled by expiry, even when staff revised the quote afterwards.
 - Sessions block the artist's time, and the database rejects overlaps. Each session is `scheduled`, `completed`, `no_show` or `cancelled`; rescheduling changes its time. A tattoo session is marked completed only once its project is booked. A booked project moves to `in_progress` once a tattoo session is completed and none is still scheduled, and back to `booked` when the next one is scheduled.
+- An owner marks the tattoo finished once no session is left (from `in_progress`), which starts the healing check, and closes the check when the healed photo came or the touch-up is done (any time; nothing closes it automatically). Each step names a balance still due and asks to confirm it rather than blocking; the money can be recorded afterwards, and the projects list flags a finished fixed-price project that still owes. A healing check takes touch-up sessions only; there is no way back from either step. The assigned artist sees the healing check but can't take either step.
 - Each studio writes its own deposit policy, which the deposit page shows. Tattoo Drip records what happened to a deposit (kept, moved to a new date, refunded) but doesn't impose a rule.
 - Payments are never edited or deleted. A refund is a new payment with a negative amount.
 - Balance due = quoted total (or hours × rate) − verified payments.
