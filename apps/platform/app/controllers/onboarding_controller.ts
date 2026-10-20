@@ -9,6 +9,7 @@ import {
 	createTenantValidator,
 	TIMEZONES,
 } from "#modules/tenancy/validators/tenant";
+import { studioAddress } from "#services/studio_links";
 
 /**
  * A signed-in user creates their first tenant (studio or independent).
@@ -28,6 +29,8 @@ export default class OnboardingController {
 			tenantTypes: [...TENANT_TYPES],
 			timezones: TIMEZONES,
 			defaultTimezone: DEFAULT_TIMEZONE,
+			// The real host the page link will have (TAT-101), not a made-up one.
+			addressHost: studioAddress(),
 		});
 	}
 

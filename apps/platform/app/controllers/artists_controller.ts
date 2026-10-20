@@ -20,6 +20,7 @@ import { InvalidImageError } from "#modules/media/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
 import type Tenant from "#modules/tenancy/models/tenant";
+import { artistLink } from "#services/studio_links";
 
 /**
  * The studio's artist profiles, managed by its owners. Every :id loads
@@ -139,6 +140,8 @@ export default class ArtistsController {
 			acceptingInquiries: artist.acceptingInquiries,
 			closedMessage: artist.closedMessage,
 			isMine: artist.userId === userId,
+			// The artist's own page (TAT-101); a hidden artist has none.
+			pageUrl: artist.visible ? artistLink(tenant.slug, artist.slug) : null,
 		};
 	}
 }

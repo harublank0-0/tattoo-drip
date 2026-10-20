@@ -7,6 +7,7 @@ import {
 	TIMEZONES,
 	updateProfileValidator,
 } from "#modules/tenancy/validators/tenant";
+import { studioAddress, studioLinks } from "#services/studio_links";
 
 /**
  * The studio's public profile, edited by its owners.
@@ -32,6 +33,10 @@ export default class StudioProfileController {
 				websiteUrl: tenant.websiteUrl,
 			},
 			timezones: TIMEZONES,
+			// The studio page link, always (TAT-101), and the host the web
+			// address form draws around the slug.
+			studioPage: studioLinks(tenant.slug),
+			addressHost: studioAddress(),
 		});
 	}
 

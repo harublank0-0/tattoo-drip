@@ -76,6 +76,15 @@ export default class InquiryService {
 		return Number(row.$extras.total);
 	}
 
+	/** Whether the tenant has ever received an inquiry, in any status (TAT-101's setup checklist). */
+	async hasAny(tenant: TenantRef): Promise<boolean> {
+		const first = await Inquiry.query()
+			.where("tenant_id", tenant.id)
+			.select("id")
+			.first();
+		return first !== null;
+	}
+
 	/** The tenant's live inquiry with this id, else E_ROW_NOT_FOUND (a 404). */
 	async findFor(tenant: TenantRef, id: string): Promise<Inquiry> {
 		return Inquiry.query()

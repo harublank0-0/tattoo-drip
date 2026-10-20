@@ -29,6 +29,9 @@ import { daysAgoText, lastContactText } from "#modules/projects/contact";
 import { formatDay } from "#modules/projects/quotes";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ProjectService from "#modules/projects/services/project_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import SetupService from "#modules/tenancy/services/setup_service";
+import { studioLinks } from "#services/studio_links";
 
 /**
  * The inquiry inbox (TAT-46): owners only (the route group's role check).
@@ -44,6 +47,7 @@ export default class InquiriesController {
 		private images: ImageService,
 		private clients: ClientService,
 		private templates: MessageTemplateService,
+		private setup: SetupService,
 	) {}
 
 	async index(ctx: HttpContext) {
@@ -69,6 +73,10 @@ export default class InquiriesController {
 
 		return ctx.inertia.render("inquiries/index", {
 			view,
+			// The new-studio checklist and the studio link (TAT-101): the New
+			// view's landing, until the four steps are done.
+			setup: view === "new" ? await this.setup.checklist(tenant) : null,
+			studioPage: view === "new" ? studioLinks(tenant.slug) : null,
 			newCount: await this.inquiries.countNew(tenant),
 			inquiries: inquiries.map((inquiry) => ({
 				id: inquiry.id,

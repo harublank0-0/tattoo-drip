@@ -80,3 +80,35 @@ export function pointsAtThisMachine(template: string): boolean {
 		/^127(\.\d{1,3}){3}$/.test(hostname)
 	);
 }
+
+/**
+ * The studio page's address (TAT-101): the origin of `template`
+ * (STOREFRONT_URL) with `slug` in the host, no path. It is the one string
+ * the dashboard opens, copies and shares, so they can never differ.
+ */
+export function studioPageUrl(template: string, slug: string): string {
+	return originOf(template, slug).origin;
+}
+
+/** An artist's own page: `/artists/<slug>` on the studio's origin. */
+export function artistPageUrl(
+	template: string,
+	studioSlug: string,
+	artistSlug: string,
+): string {
+	return `${studioPageUrl(template, studioSlug)}/artists/${artistSlug}`;
+}
+
+/**
+ * The host of a studio page as what comes before and after its slug
+ * (`.example.com` after it, for https://{tenant}.example.com): the onboarding
+ * and settings forms draw their slug box between the two.
+ */
+export function studioAddressParts(template: string): {
+	prefix: string;
+	suffix: string;
+} {
+	const marker = "tdslug";
+	const [prefix, suffix] = originOf(template, marker).host.split(marker);
+	return { prefix, suffix };
+}
