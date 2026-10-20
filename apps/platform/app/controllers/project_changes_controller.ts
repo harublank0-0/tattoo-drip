@@ -31,6 +31,9 @@ const MOVE_DONE: Record<ManualMove, string> = {
 const RULE_MESSAGES: Record<ProjectRuleReason, string> = {
 	move_not_allowed:
 		"This project can't make that change in its current status.",
+	session_scheduled: "Record or cancel the scheduled session first.",
+	balance_changed:
+		"The balance changed since this page loaded. Check it and try again.",
 };
 
 /**

@@ -29,11 +29,18 @@ export class QuoteRuleError extends Error {
 	}
 }
 
-export const PROJECT_RULE_REASONS = ["move_not_allowed"] as const;
+export const PROJECT_RULE_REASONS = [
+	"move_not_allowed",
+	"session_scheduled",
+	"balance_changed",
+] as const;
 export type ProjectRuleReason = (typeof PROJECT_RULE_REASONS)[number];
 
 const PROJECT_MESSAGES: Record<ProjectRuleReason, string> = {
 	move_not_allowed: "The project's status does not allow that move",
+	session_scheduled:
+		"A session is still scheduled: it needs its outcome before the project finishes",
+	balance_changed: "The balance due is not the amount the owner confirmed",
 };
 
 /**
