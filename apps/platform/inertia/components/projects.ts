@@ -45,6 +45,26 @@ export type ChatMessageProps = {
 	viberUrl: string;
 };
 
+/** The finish card (TAT-111): the step, the healing check's day, and the owner's action. */
+export type FinishProps = {
+	step: "finish" | "complete";
+	/** "7 Nov 2026"; null without a completed tattoo session. */
+	dueText: string | null;
+	/** The healing check's day has passed (the studio's today). */
+	overdue: boolean;
+	/** Owners only; null for the assigned artist, who sees the card without a button. */
+	action: {
+		/** The balance due the confirmation names, paisa as digits; "0" when nothing is owed. */
+		confirmedDue: string;
+		/** "NPR 15,000" when money is owed, else null. */
+		balanceDueText: string | null;
+		/** The balance is an hourly estimate. */
+		estimated: boolean;
+		/** A session is still scheduled: no button until it has its outcome. */
+		sessionScheduled: boolean;
+	} | null;
+};
+
 export type ProjectPageProps = {
 	project: {
 		id: string;
@@ -83,6 +103,10 @@ export type ProjectPageProps = {
 	scheduledSessionCount: number;
 	/** Booked, but no tattoo session is scheduled. */
 	bookedWithoutSession: boolean;
+	/** Finishing (TAT-111): in progress for owners, the healing check for owners and the assigned artist; null otherwise. */
+	finish: FinishProps | null;
+	/** Declined, cancelled or completed: no artist picker and no "Mark contacted". */
+	closed: boolean;
 	/** Whether the quote summary shows "Valid until" and Expired: false from booked on. */
 	quoteExpiryShown: boolean;
 	/** The project's live sessions, earliest first. */
@@ -238,6 +262,8 @@ export type ProjectRow = {
 	depositToSettle: boolean;
 	/** Owners: the quote expired but a late decision on the deposit spares the project; revise, take the rest or withdraw. */
 	quoteLapsed: boolean;
+	/** Owners: a finished fixed-price project with money still owed (TAT-111). */
+	balanceOwed: boolean;
 };
 
 export type ProjectListProps = {

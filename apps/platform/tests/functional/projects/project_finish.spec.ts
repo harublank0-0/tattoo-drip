@@ -432,4 +432,40 @@ test.group("ProjectService: finishing a project (TAT-111)", (group) => {
 			assert.equal(await statusOf(project), "completed");
 		});
 	});
+
+	test("the board flags money owed on a finished fixed-price project, never on an hourly one", async ({
+		assert,
+	}) => {
+		const { owner, tenant, sita } = await setup();
+		await inTenant(tenant, async () => {
+			const owing = await workDone(tenant, sita, "completed", 7);
+			await makeQuote(tenant, owing);
+			const healing = await workDone(tenant, sita, "healing_check", 9);
+			await makeQuote(tenant, healing);
+			const paid = await workDone(tenant, sita, "completed", 11);
+			await makeQuote(tenant, paid);
+			await makePayment(tenant, paid, {
+				kind: "balance",
+				amount: 1_500_000,
+				...verified(owner),
+			});
+			const hourly = await workDone(tenant, sita, "completed", 13);
+			await makeQuote(tenant, hourly, {
+				kind: "hourly",
+				fixedPrice: null,
+				hourlyRate: 300_000,
+				estimatedMinutes: 300,
+				depositAmount: 0,
+			});
+			const working = await workDone(tenant, sita, "in_progress", 15);
+			await makeQuote(tenant, working);
+
+			const all = [owing, healing, paid, hourly, working];
+			const flags = await payments.listFlags(tenant, all);
+			assert.deepEqual(
+				all.map(({ id }) => flags.get(id)?.balanceOwed),
+				[true, true, false, false, false],
+			);
+		});
+	});
 });
