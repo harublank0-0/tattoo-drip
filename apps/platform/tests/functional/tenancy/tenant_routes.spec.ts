@@ -282,6 +282,16 @@ test.group("Tenant routes", (group) => {
 		);
 	});
 
+	test("only test-only routes are exempt, so an app route cannot skip the role and isolation checks", ({
+		assert,
+	}) => {
+		// An exemption needs only a reason string, and appTenantRoutes() leaves
+		// exempt routes out of the role checks too: pin what may be exempt.
+		for (const key of Object.keys(EXEMPT_ROUTES)) {
+			assert.match(key, /^[A-Z]+ \/t\/:tenant\/__test\//, key);
+		}
+	});
+
 	test("tenantContext fails loudly outside a tenant route", async ({
 		assert,
 	}) => {
