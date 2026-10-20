@@ -6,6 +6,7 @@ import {
 	depositContact,
 	depositView,
 	formatReceived,
+	headingTemplate,
 	payByLine,
 	stateTemplate,
 	todayIn,
@@ -232,6 +233,29 @@ describe("stateTemplate", () => {
 		assert.equal(stateTemplate(view("updating"), null), copy.states.updating);
 		assert.equal(stateTemplate(view("expired"), null), copy.states.expired);
 		assert.equal(stateTemplate(view("cancelled"), null), copy.states.cancelled);
+	});
+});
+
+describe("headingTemplate", () => {
+	test("the page's h1 names the state; before the deposit is read, and while it is due, it names the studio", () => {
+		const view = (state: (typeof PAGE)["state"], amount = 300_000) => ({
+			state,
+			amount,
+		});
+		assert.equal(headingTemplate(null), "Pay your deposit to {studio}");
+		assert.equal(headingTemplate(view("due")), "Pay your deposit to {studio}");
+		assert.equal(headingTemplate(view("submitted")), "Screenshot sent");
+		assert.equal(headingTemplate(view("paid")), "Deposit paid");
+		assert.equal(headingTemplate(view("paid", 0)), "No deposit needed");
+		assert.equal(
+			headingTemplate(view("updating")),
+			"Your quote is being updated",
+		);
+		assert.equal(headingTemplate(view("expired")), "This quote has expired");
+		assert.equal(
+			headingTemplate(view("cancelled")),
+			"This booking was cancelled",
+		);
 	});
 });
 
