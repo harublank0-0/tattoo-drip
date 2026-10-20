@@ -105,6 +105,7 @@ function ArtistFields({
 				<Input
 					id="name"
 					name="name"
+					className="h-11"
 					maxLength={120}
 					autoComplete="off"
 					value={name}
@@ -122,6 +123,7 @@ function ArtistFields({
 				<Input
 					id="slug"
 					name="slug"
+					className="h-11"
 					autoComplete="off"
 					spellCheck={false}
 					value={slug}
@@ -177,6 +179,7 @@ function ArtistFields({
 				<Input
 					id="photo"
 					name="photo"
+					className="h-11"
 					type="file"
 					accept="image/jpeg,image/png,image/webp"
 					aria-invalid={!!errors.photo}
@@ -266,13 +269,16 @@ function ArtistFields({
 			)}
 
 			<div className="flex gap-2">
-				<Button type="submit" disabled={processing}>
+				<Button type="submit" className="h-11" disabled={processing}>
 					{processing ? "Saving…" : artist ? "Save" : "Add artist"}
 				</Button>
 				<Link
 					route={owner ? "tenant.artists" : "tenant.projects.index"}
 					routeParams={{ tenant: tenantSlug }}
-					className={buttonVariants({ variant: "ghost" })}
+					className={buttonVariants({
+						variant: "ghost",
+						className: "h-11",
+					})}
 				>
 					Cancel
 				</Link>
