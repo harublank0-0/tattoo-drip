@@ -9,7 +9,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
 			<div className="grid min-h-svh min-[880px]:grid-cols-[1.04fr_1fr]">
 				<div className="flex flex-col bg-card px-6 py-7 sm:px-9">
 					<div className="flex items-center justify-between">
-						<Logo size={28} />
+						<Logo />
 						<div className="min-[880px]:hidden">
 							<ThemeToggle />
 						</div>
@@ -19,7 +19,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
 					</div>
 				</div>
 
-				<aside className="hidden flex-col justify-between border-l bg-muted/40 p-11 min-[880px]:flex">
+				<aside className="hidden flex-col justify-between border-l bg-muted p-11 min-[880px]:flex">
 					<div className="flex justify-end">
 						<ThemeToggle />
 					</div>

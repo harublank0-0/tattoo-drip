@@ -12,7 +12,7 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
 		<>
 			<header className="absolute inset-x-0 top-0 z-10 py-5">
 				<div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-8">
-					<Logo size={28} />
+					<Logo />
 					<div className="flex items-center gap-2">
 						<ThemeToggle />
 						{props.user ? (

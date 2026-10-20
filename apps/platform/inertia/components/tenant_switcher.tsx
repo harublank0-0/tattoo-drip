@@ -30,7 +30,9 @@ export default function TenantSwitcher() {
 
 	if (!tenants || tenants.length < 2) {
 		return (
-			<span className="block truncate text-sm font-medium">{tenant.name}</span>
+			<span className="block truncate font-display text-lg leading-snug font-bold">
+				{tenant.name}
+			</span>
 		);
 	}
 
@@ -38,7 +40,9 @@ export default function TenantSwitcher() {
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
 				<Button variant="ghost" size="sm" className="max-w-56 justify-between">
-					<span className="truncate">{tenant.name}</span>
+					<span className="truncate font-display text-lg leading-snug font-bold">
+						{tenant.name}
+					</span>
 					<ChevronsUpDown data-icon="inline-end" />
 				</Button>
 			</DropdownMenuTrigger>
