@@ -3,7 +3,7 @@ import { describe, test } from "node:test";
 import { QueryClient, skipToken } from "@tanstack/react-query";
 import { createTattooClient } from "@tattoo-drip/sdk";
 import type { Studio } from "@tattoo-drip/types";
-import { tattooQueries } from "../src/queries.js";
+import { tattooKeys, tattooQueries } from "../src/queries.js";
 
 const TENANT = "lists-needle-11";
 const STUDIO: Studio = {
@@ -168,13 +168,30 @@ describe("tattooQueries.services, portfolio and availability", () => {
 			"lists-b-11",
 		);
 		const queryClient = noRetries();
+		// An answer that never goes stale: with the default staleTime of 0,
+		// fetchQuery would call the second client again even if both tenants
+		// shared one key, and this test could not fail. Now a shared key would
+		// hand tenant B the cached answer of tenant A.
+		const fresh = (client: typeof a.client) => ({
+			...tattooQueries.studio(client),
+			staleTime: Number.POSITIVE_INFINITY,
+		});
 
-		const first = await queryClient.fetchQuery(tattooQueries.studio(a.client));
-		const second = await queryClient.fetchQuery(tattooQueries.studio(b.client));
+		const first = await queryClient.fetchQuery(fresh(a.client));
+		const second = await queryClient.fetchQuery(fresh(b.client));
 
 		assert.equal(first.name, "Studio A");
 		assert.equal(second.name, "Studio B");
 		assert.equal(a.calls.length, 1);
 		assert.equal(b.calls.length, 1);
+		assert.equal(queryClient.getQueryCache().getAll().length, 2);
+		assert.equal(
+			queryClient.getQueryData<Studio>(tattooKeys.studio("lists-a-11"))?.name,
+			"Studio A",
+		);
+		assert.equal(
+			queryClient.getQueryData<Studio>(tattooKeys.studio("lists-b-11"))?.name,
+			"Studio B",
+		);
 	});
 });
