@@ -31,6 +31,7 @@ Read before a deploy or when changing production settings. The hosting itself is
 
 - Node 24.3.0 (`.nvmrc`) in the container: on Node 26.9 the multipart parser stalls on large text fields. Re-run `inquiry_refusals.spec.ts` before any Node upgrade.
 - Before each release: `node build/ace.js migration:run --connection=owner --force` ([database conventions](../database/README.md#row-level-security)).
+- Pilot numbers (TAT-70): `node build/ace.js metrics:pilot --days=42` from the migration step's environment (it lists the studios as the owner role, so it needs `DB_MIGRATION_USER` and `DB_MIGRATION_PASSWORD`, plus the app role's `DB_USER` and `DB_PASSWORD` for the numbers). It prints studio names, slugs and aggregates only.
 - One web server (`node bin/server.js` in `build/`): it upserts the recurring schedules when it boots.
 - At least one worker (`node ace.js queue:work` in `build/`, with the same environment): alerts, quote expiry and the expiry sweep run only there.
 

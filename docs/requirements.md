@@ -56,7 +56,8 @@ What the MVP (pilot with a design-partner studio) and V1 (paid launch) must do, 
 - A new inquiry alerts each owner, and the artist the client asked for when that profile is linked to a member, once each: an email (the client's first name and the start of the idea, never the phone; owners get a link to the inquiry) and an alert under the dashboard's bell. Email can be switched off for the whole platform until its sending domain exists. A deposit screenshot alerts the owners and the project's artist the same way (the client's first name, never the amount; the link opens the project's Payments card).
 - [x] Studio page at `{slug}.platform.com`: profile, artists, Instagram link, intake form
 - [ ] The dashboard is mobile-first and installable as a web app
-- [ ] Pilot metrics: share of inquiries arriving through the link, time from inquiry to verified deposit, session no-shows
+- [x] Pilot metrics: share of inquiries arriving through the link, time from inquiry to verified deposit, session no-shows
+- All three come from what the platform already stores, over a rolling window. Through the link: the inquiries that arrived (any outcome) out of those plus the projects booked at the desk. Inquiry to deposit: the median time from an inquiry to its project's first verified deposit that wasn't reversed (from the deposit page or the desk), counted when it was verified. No-shows: no-shows out of the sessions that were done or missed, by start time; past sessions without an outcome are named, not counted. Owners see their last 30 days at the bottom of the inbox; the team runs `metrics:pilot` for every studio (42 days by default, gate 1's six weeks).
 
 ## V1: what paid launch adds
 

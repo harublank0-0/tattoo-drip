@@ -32,6 +32,8 @@ The loop: intake link, inquiry inbox and project board, quote with deposit and Q
 
 **Gate 1:** for 6 weeks, the design-partner studio receives most new custom inquiries through the link, records every deposit in Tattoo Drip, and would pay the planned price for it. Any other pilot studios that join count the same way. If the studio keeps quoting in chat, narrow the wedge to a deposit-and-schedule tool.
 
+The numbers come from `node build/ace.js metrics:pilot --days=42` (TAT-70): each studio's share of new work through the link, median time from inquiry to verified deposit and no-show rate. Requests that never reached the platform (quoted in chat, never booked) only show up in the check-ins.
+
 ## V1: solid enough to pay for
 
 - Automatic deposit confirmation (Khalti, or Fonepay through an aggregator)
