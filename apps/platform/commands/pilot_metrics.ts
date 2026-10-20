@@ -8,6 +8,7 @@ import {
 	type PilotFacts,
 	pilotLines,
 } from "#modules/reports/pilot_metrics";
+import { terminalText } from "#services/terminal_text";
 
 /** A live studio as the command lists it: no more than it prints. */
 export type Studio = { id: string; slug: string; name: string };
@@ -19,13 +20,15 @@ export type Studio = { id: string; slug: string; name: string };
  * Only the list of studios crosses tenants, read as the owner role; each
  * studio's numbers come from PilotMetricsService as the app role inside that
  * studio's row-level security context, exactly as its owners' card does.
- * Prints names, slugs and aggregates only. The app's default connection must
- * be the restricted app role, like the web server's and the worker's: the
- * command refuses to start as a role that bypasses RLS, since RLS is what
- * proves each studio's numbers are its own (the owner connection only lists
- * the studios). Run it where the owner role's password is (the migration
- * step's environment, which also has DB_USER set to the app role), never
- * from the web or the worker:
+ * Prints names, slugs and aggregates only; a name's or slug's control
+ * characters are shown as escapes (`terminalText`), because a studio owner
+ * chooses the name and it must not be able to rewrite the operator's
+ * terminal. The app's default connection must be the restricted app role,
+ * like the web server's and the worker's: the command refuses to start as a
+ * role that bypasses RLS, since RLS is what proves each studio's numbers are
+ * its own (the owner connection only lists the studios). Run it where the
+ * owner role's password is (the migration step's environment, which also has
+ * DB_USER set to the app role), never from the web or the worker:
  *
  *   node ace metrics:pilot --days=42           (development)
  *   node build/ace.js metrics:pilot --days=42  (production)
@@ -71,7 +74,9 @@ export default class PilotMetrics extends BaseCommand {
 				metrics.forStudio(studio, window),
 			);
 			all.push(facts);
-			for (const line of pilotLines(`${studio.name} (${studio.slug})`, facts)) {
+			// A studio owner typed the name: show it, never let it drive the terminal.
+			const heading = `${terminalText(studio.name)} (${terminalText(studio.slug)})`;
+			for (const line of pilotLines(heading, facts)) {
 				this.logger.log(line);
 			}
 		}

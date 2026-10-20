@@ -94,6 +94,40 @@ test.group("metrics:pilot (TAT-70)", (group) => {
 		);
 	});
 
+	// A studio owner chooses the name (and a stored one may predate any rule):
+	// the operator's terminal must show it, not obey it.
+	test("shows a studio's control characters as escapes, so a name can't rewrite the report", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("metrics-ctl-70", "Metrics Ctl");
+		TestPilotMetrics.listed = [
+			{
+				id: tenant.id,
+				slug: "evil\u001b]0;pwn\u0007",
+				// Clear the screen, return to line start, a forged heading on a new
+				// line, a C1 control and a line separator; then Devanagari.
+				name: "Evil\u001b[2J\rFake\n  Pilot numbers for the last 42 days: x\u0085\u2028 कला स्टुडियो",
+			},
+		];
+
+		const command = await ace.create(TestPilotMetrics, []);
+		await command.exec();
+
+		command.assertSucceeded();
+		const lines = command.logger.getLogs().map(({ message }) => message);
+		for (const line of lines) {
+			assert.notMatch(line, /[\p{Cc}\u2028\u2029]/u);
+		}
+		assert.lengthOf(
+			lines.filter((line) => line.startsWith("Pilot numbers for the last")),
+			1,
+		);
+		assert.include(
+			lines,
+			"Evil\\x1b[2J\\x0dFake\\x0a  Pilot numbers for the last 42 days: x\\x85\\u{2028} कला स्टुडियो (evil\\x1b]0;pwn\\x07)",
+		);
+	});
+
 	test("says so when there are no studios", async () => {
 		TestPilotMetrics.listed = [];
 
