@@ -1,6 +1,6 @@
 import { Form, Link } from "@adonisjs/inertia/react";
 import { router } from "@inertiajs/react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { urlFor } from "~/client";
 import ChatMessage from "~/components/chat_message";
@@ -94,6 +94,9 @@ export default function ProjectShow({
 }: ProjectPageProps) {
 	const tenant = useTenant();
 	const params = { tenant: tenant.slug, id: project.id };
+	// A finished step replaces or removes the Finish card with the button
+	// that was focused: focus goes to the page heading instead of <body>.
+	const heading = useRef<HTMLHeadingElement>(null);
 	// Every chat link, Call and "Copy message" record the contact in the
 	// background (TAT-46), with the channel and the message (TAT-52).
 	const markContacted = (via: ContactVia = {}) =>
@@ -105,6 +108,7 @@ export default function ProjectShow({
 	return (
 		<Page
 			title={project.clientName ?? "Project"}
+			titleRef={heading}
 			description={
 				project.artistName ? `With ${project.artistName}` : "No artist yet"
 			}
@@ -161,6 +165,7 @@ export default function ProjectShow({
 						key={finish.step}
 						projectId={project.id}
 						finish={finish}
+						onDone={() => heading.current?.focus()}
 					/>
 				)}
 

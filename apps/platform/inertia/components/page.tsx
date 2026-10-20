@@ -1,19 +1,23 @@
 import { Head } from "@inertiajs/react";
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 
 /**
  * The frame for an app page: sets the document title and renders the page
  * heading, an optional description and optional actions (buttons, links)
  * aligned to the right. Pass `hideTitle` to only set the document title.
+ * Pass `titleRef` when the page moves focus to its heading after something
+ * on it goes away (the heading then takes focus from code, not from Tab).
  */
 export default function Page({
 	title,
+	titleRef,
 	hideTitle = false,
 	description,
 	actions,
 	children,
 }: {
 	title: string;
+	titleRef?: Ref<HTMLHeadingElement>;
 	hideTitle?: boolean;
 	description?: ReactNode;
 	actions?: ReactNode;
@@ -28,7 +32,11 @@ export default function Page({
 				<header className="flex flex-wrap items-end justify-between gap-4">
 					<div className="flex min-w-0 flex-col gap-1">
 						{!hideTitle && (
-							<h1 className="font-display text-[1.75rem] leading-snug font-bold text-balance wrap-anywhere">
+							<h1
+								ref={titleRef}
+								tabIndex={titleRef ? -1 : undefined}
+								className="font-display text-[1.75rem] leading-snug font-bold text-balance wrap-anywhere outline-none"
+							>
 								{title}
 							</h1>
 						)}

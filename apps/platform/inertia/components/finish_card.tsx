@@ -22,16 +22,19 @@ import { useTenant } from "~/hooks/use-tenant";
  * check done". Each step is confirmed in an inline panel: focus starts on
  * "Not yet", Escape closes it and returns focus to the button. A refused
  * amount (`confirmedDue`, only a hand-edited request can send one) shows
- * under the buttons and the panel stays open. The assigned artist gets the
- * healing check without a button. TAT-108 moves this into the project
- * page's Next step card.
+ * under the buttons and the panel stays open. When a step is done the card
+ * is replaced or gone, so `onDone` lets the page move focus somewhere
+ * sensible. The assigned artist gets the healing check without a button.
+ * TAT-108 moves this into the project page's Next step card.
  */
 export default function FinishCard({
 	projectId,
 	finish,
+	onDone,
 }: {
 	projectId: string;
 	finish: FinishProps;
+	onDone: () => void;
 }) {
 	const tenant = useTenant();
 	const error = usePage().props.errors.confirmedDue;
@@ -60,7 +63,10 @@ export default function FinishCard({
 				preserveScroll: true,
 				onStart: () => setSaving(true),
 				onFinish: () => setSaving(false),
-				onSuccess: () => setOpen(false),
+				onSuccess: () => {
+					setOpen(false);
+					onDone();
+				},
 			},
 		);
 	};
