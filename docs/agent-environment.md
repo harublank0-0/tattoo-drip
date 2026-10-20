@@ -7,7 +7,7 @@ Read this before running commands as a coding agent in this repository (any tool
 - Work in your own git worktree on your own branch, outside the main checkout (for example `/home/blank/Coding/tattoo-drip-wt/<ticket>`). Never check out, edit or commit in a checkout another agent or the user is using. Don't run `git worktree`, `git gc` or `git prune`: the human creates and removes worktrees.
 - A new worktree needs `pnpm install --frozen-lockfile` and the database and `.env` setup under "Before you run opencode" below. The human does both before the agent starts.
 - Commit locally only. Never `git push`, never open or merge a pull request: the user decides after a review.
-- Commits are Conventional Commits with an area scope (`test(sdk): ...`, `feat(platform): ...`, `docs: ...`). The pre-commit hook runs lint-staged (Biome) and commitlint; Biome may rewrite staged files, so read a file again before editing it after a commit attempt. End each commit message with a line naming the model, for example `Assisted-by: opencode (deepseek-v4.1-flash-free)`.
+- Commits are Conventional Commits with an area scope (`test(sdk): ...`, `feat(platform): ...`, `docs: ...`). Hooks: pre-commit runs lint-staged (Biome on the staged files, which it may rewrite, so read a file again before editing it after a commit attempt); commit-msg runs commitlint; pre-push (the human's) runs `pnpm check` and `pnpm typecheck`. Never use `--no-verify`. The attribution trailer is a convention, not a hook rule: end each commit message with a line naming the model, for example `Assisted-by: opencode (deepseek-v4.1-flash-free)`, by writing `git commit -m "<subject>" -m "<trailer>"`.
 
 ## Node and pnpm
 
@@ -22,7 +22,7 @@ Read this before running commands as a coding agent in this repository (any tool
 - Agents never create, drop or truncate a database, never run `psql`, `podman` or `docker`, and never kill a process. The human does those (see "Before you run opencode" below): ask when a task needs one.
 - The worktree has its own `apps/platform/.env`, built by the human from `.env.example` with `DB_DATABASE=tattoo_drip_oc` and `PORT=3411` set in the file, so a command that forgets the prefix below still cannot reach `tattoo_drip`. Never read, print, copy or commit `.env` files.
 - Keep the override as a second layer anyway: `DB_DATABASE=tattoo_drip_oc` goes on EVERY platform command that can reach the database (tests, migrate, ace commands) and `PORT=3412` on test runs.
-- Migrate with `DB_DATABASE=tattoo_drip_oc pnpm --filter @tattoo-drip/platform migrate`. Migrating rewrites `apps/platform/database/schema.ts`: `git checkout -- apps/platform/database/schema.ts` if the diff is only formatting.
+- Migrate with `PATH=/home/blank/.nvm/versions/node/v24.3.0/bin:$PATH DB_DATABASE=tattoo_drip_oc pnpm --filter @tattoo-drip/platform migrate`. Migrating rewrites `apps/platform/database/schema.ts`. Look at `git diff -- apps/platform/database/schema.ts` first: only when the whole diff is the `import type` line may you `git checkout -- apps/platform/database/schema.ts`; any other change is the schema change of your migration, so the regenerated file is part of the commit.
 - Don't start the dev server or the worker: ask the human if a ticket needs a running server. Long commands run under `timeout`, so they end by themselves.
 
 ## Before you run opencode (human setup; the agent never runs these)
@@ -82,11 +82,11 @@ Verified, by reading the installed binary and by printing the merged rules with 
 
 ## Platform tests
 
-- Run from the repo root: `DB_DATABASE=tattoo_drip_oc PORT=3412 pnpm -C apps/platform exec node ace test` (all, about 2 minutes: run it in the background, log under `apps/platform/tmp/`, which git ignores) or `... node ace test functional --files=<name>.spec.ts`.
+- Run from the repo root, with the assignments in this order: `PATH=/home/blank/.nvm/versions/node/v24.3.0/bin:$PATH DB_DATABASE=tattoo_drip_oc PORT=3412 timeout -s KILL 300 pnpm -C apps/platform exec node ace test > apps/platform/tmp/test.log 2>&1` (all, about 2 minutes: run it in the background; `apps/platform/tmp/` is ignored by git) or `... node ace test functional --files=<name>.spec.ts` with a shorter timeout.
 - If a run fails as if `TURNSTILE_SECRET_KEY`, `STOREFRONT_SERVER_KEYS`, `TRUST_PROXY` or `ALERT_EMAILS` were set in the shell (they beat `.env.test`), tell the human: you cannot unset them for opencode.
-- A spec that imports a missing module makes Japa hang instead of failing. Wrap red runs in `timeout 120` and read the log's `Tests` line, not the exit code.
+- A spec that imports a missing module makes Japa hang instead of failing, and a hung Japa ignores TERM: always run under `timeout -s KILL <seconds>` (as [testing](../apps/platform/docs/testing.md) says) and read the log's `Tests` line (`rg -n "Tests" <log>`), not the exit code.
 - A full run needs `queue_jobs` in `tattoo_drip_oc` empty, or `new_inquiry_alert_flow.spec.ts` fails. You cannot truncate it: ask the human ("Before you run opencode", step 6).
-- Every new `/t/:tenant` route needs a name, an isolation case in `tests/isolation/cases.ts` and (after TAT-30) an entry in `TENANT_ROUTE_ROLES`. Read [testing](../apps/platform/docs/testing.md).
+- Every new `/t/:tenant` route needs a name and an isolation case in `tests/isolation/cases.ts`. Once the role table of TAT-30 is on main (it is in review; `rg TENANT_ROUTE_ROLES apps/platform` finds nothing until then) it also needs an entry in `TENANT_ROUTE_ROLES`. Read [testing](../apps/platform/docs/testing.md).
 
 ## Generated files
 
