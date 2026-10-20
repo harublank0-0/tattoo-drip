@@ -29,7 +29,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 				<VerifyEmailBar />
 				<main
 					className={cn(
-						"flex flex-1 bg-muted/40 pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]",
+						"flex flex-1 bg-background pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]",
 						tabs && "pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pb-0",
 					)}
 				>
