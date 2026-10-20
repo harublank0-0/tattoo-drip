@@ -62,6 +62,8 @@ test.group("DepositProofAlertJob", (group) => {
 	}) => {
 		const { tenant } = await studioWithOwner("alert-proof-65");
 		const payment = await paymentIn(tenant);
+		// The alert path queues its email; nothing here sends one.
+		queue.fake();
 
 		const logged = await run({ tenantId: tenant.id, paymentId: payment.id });
 
@@ -87,6 +89,7 @@ test.group("DepositProofAlertJob", (group) => {
 			verifiedAt: DateTime.utc(),
 		});
 		const theirs = await paymentIn(other);
+		queue.fake();
 
 		for (const paymentId of [decided.id, randomUUID(), theirs.id]) {
 			assert.deepEqual(
