@@ -7,6 +7,7 @@ import type { LoadProblem } from "../problems.ts";
 import {
 	type DepositContact,
 	type DepositView,
+	headingTemplate,
 	type MethodView,
 	payByLine,
 	stateTemplate,
@@ -21,19 +22,29 @@ import { CopyButton } from "./copy-button.tsx";
  * replace the token in the URL.
  */
 
-/** Around every state: one h1 naming the studio, and who runs the page. */
+/**
+ * Around every state: one h1, and who runs the page. The h1 names the
+ * deposit's state once it is read (TAT-106); before that, and while it is
+ * due, it asks to pay the studio (headingTemplate).
+ */
 export function DepositFrame({
 	studioName,
+	view = null,
 	children,
 }: {
 	studioName: string;
+	/** The deposit, once read; null (or left out) while it loads and for a link that doesn't work. */
+	view?: Pick<DepositView, "state" | "amount"> | null;
 	children?: ReactNode;
 }) {
 	return (
 		<>
 			<main className="deposit">
 				<h1 className="deposit-title">
-					<Fill template={copy.heading} values={{ studio: studioName }} />
+					<Fill
+						template={headingTemplate(view)}
+						values={{ studio: studioName }}
+					/>
 				</h1>
 				{children}
 			</main>
