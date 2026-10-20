@@ -1,5 +1,5 @@
 import { Form } from "@adonisjs/inertia/react";
-import { router } from "@inertiajs/react";
+import { router, usePage } from "@inertiajs/react";
 import { cn } from "cn";
 import { urlFor } from "~/client";
 import CopyLinkButton from "~/components/copy_link_button";
@@ -65,14 +65,15 @@ export default function Members({
 	members,
 	invitations,
 	profiles,
-	newLink,
 }: {
 	members: MemberRow[];
 	invitations: InvitationRow[];
 	profiles: { id: string; name: string }[];
-	newLink: NewLink | null;
 }) {
 	const tenant = useTenant();
+	// The page's flash, not a prop: Inertia drops it from history state, so
+	// Back and reload never show a link again.
+	const newLink: NewLink | undefined = usePage().flash.invitationLink;
 
 	return (
 		<>

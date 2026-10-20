@@ -95,7 +95,9 @@ test.group("Settings, Members (TAT-33)", (group) => {
 			props.profiles.map(({ name }: { name: string }) => name),
 			["Free"],
 		);
-		assert.isNull(props.newLink);
+		assert.notProperty(props, "newLink");
+		assert.isUndefined(response.body().flash.invitationLink);
+		response.assertHeader("cache-control", "no-store");
 	});
 
 	test("inviting flashes the link once; the page shows it from the flash and never again", async ({
@@ -134,10 +136,32 @@ test.group("Settings, Members (TAT-33)", (group) => {
 			.withFlashMessages({ [INVITATION_LINK_FLASH]: link })
 			.withInertia()
 			.loginAs(owner);
-		assert.deepEqual(shown.inertiaProps.newLink, link);
+		// In the page object's flash field, which the Inertia client strips from
+		// history state, and nowhere in the props it keeps (and encrypts) there:
+		// Back after the owner left would otherwise bring the link back.
+		assert.deepEqual(shown.body().flash.invitationLink, link);
+		assert.notProperty(shown.inertiaProps, "newLink");
+		assert.notInclude(JSON.stringify(shown.inertiaProps), token);
+		// The response that carries a link is never stored by the browser.
+		shown.assertHeader("cache-control", "no-store");
 
 		const later = await client.get(base).withInertia().loginAs(owner);
-		assert.isNull(later.inertiaProps.newLink);
+		assert.isUndefined(later.body().flash.invitationLink);
+		assert.notInclude(JSON.stringify(later.body()), token);
+	});
+
+	test("a flash that isn't a link is not shown", async ({ client, assert }) => {
+		const { owner } = await studio();
+
+		const response = await client
+			.get(base)
+			.withFlashMessages({
+				[INVITATION_LINK_FLASH]: { url: "https://x.example" },
+			})
+			.withInertia()
+			.loginAs(owner);
+
+		assert.isUndefined(response.body().flash.invitationLink);
 	});
 
 	test("inviting an address again replaces its invitation", async ({

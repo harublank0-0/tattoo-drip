@@ -15,7 +15,6 @@ import {
 	INVITATION_LINK_FLASH,
 	invitationUrl,
 	inviteMessage,
-	isNewInvitationLink,
 	type NewInvitationLink,
 	ROLE_WORDS,
 	whatsappShareUrl,
@@ -36,8 +35,10 @@ import env from "#start/env";
 /**
  * Settings, Members (TAT-33): the studio's members and pending invitations,
  * for owners (TENANT_ROUTE_ROLES). A new invitation's link is shown once,
- * on the page after the request that made it, from a session flash; it is
- * never stored or shown again. Every :id loads through the services, scoped
+ * on the page after the request that made it, from a session flash that the
+ * Inertia middleware puts in the page object's `flash` field (not a prop, so
+ * browser history never keeps it); it is not stored outside the session or
+ * shown again. Every :id loads through the services, scoped
  * to the studio, so another studio's id is a 404.
  */
 @inject()
@@ -56,8 +57,9 @@ export default class MembersController {
 		const profiles = (await this.artists.list(tenant)).filter(
 			({ userId }) => userId === null,
 		);
-		const link = ctx.session.flashMessages.get(INVITATION_LINK_FLASH);
 
+		// The response may carry a link: the browser must not keep it.
+		ctx.response.header("Cache-Control", "no-store");
 		return ctx.inertia.render("settings/members", {
 			members: members.map((member) => ({
 				id: member.membershipId,
@@ -75,7 +77,6 @@ export default class MembersController {
 				expiresText: expiryText(invitation.expiresAt, tenant.timezone),
 			})),
 			profiles: profiles.map(({ id, name }) => ({ id, name })),
-			newLink: isNewInvitationLink(link) ? link : null,
 		});
 	}
 
@@ -179,7 +180,10 @@ function toMembers(ctx: HttpContext, tenant: Tenant) {
 		.toRoute("tenant.settings.members", { tenant: tenant.slug });
 }
 
-/** Puts a new link in the one-time flash the Members page shows. */
+/**
+ * Puts a new link in the one-time flash the Members page shows (the
+ * Inertia middleware moves it to the page's `flash` field).
+ */
 function flashLink(
 	ctx: HttpContext,
 	tenant: Tenant,

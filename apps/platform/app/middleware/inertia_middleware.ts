@@ -6,6 +6,10 @@ import type User from "#models/user";
 import InquiryService from "#modules/inquiries/services/inquiry_service";
 import AlertService from "#modules/notifications/services/alert_service";
 import DepositService from "#modules/payments/services/deposit_service";
+import {
+	INVITATION_LINK_FLASH,
+	isNewInvitationLink,
+} from "#modules/tenancy/invitations";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { ensureDbContext } from "#services/db_context";
 import { encryptsHistory } from "#services/history_encryption";
@@ -131,8 +135,12 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 
 		const success: string | undefined = session?.flashMessages.get("success");
 		const error: string | undefined = session?.flashMessages.get("error");
+		// A new invitation's link (TAT-33), shown once on Settings, Members.
+		// It travels here, not in a prop, so Back never brings it back.
+		const link = session?.flashMessages.get(INVITATION_LINK_FLASH);
+		const invitationLink = isNewInvitationLink(link) ? link : undefined;
 
-		return { success, error };
+		return { success, error, invitationLink };
 	}
 
 	async handle(ctx: HttpContext, next: NextFn) {
