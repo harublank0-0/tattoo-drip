@@ -1,6 +1,7 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import { errors as lucidErrors } from "@adonisjs/lucid";
 import { test } from "@japa/runner";
+import { Settings } from "luxon";
 import User from "#models/user";
 import Artist from "#modules/artists/models/artist";
 import { hashAccountToken } from "#modules/identity/account_tokens";
@@ -258,6 +259,42 @@ test.group("InvitationService: making invitations (TAT-33)", (group) => {
 		assert.isEmpty(await inTenant(other, () => invitations.pending(tenant)));
 	});
 });
+
+test.group(
+	"InvitationService: expiry by the database's clock (TAT-33)",
+	(group) => {
+		group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+		test("pending says expired by the database's clock, not the app's", async ({
+			assert,
+		}) => {
+			const { owner, tenant } = await studioWithOwner("clock-33", "Clock 33");
+			await invite(tenant, owner, { email: "live@clock-33.example" });
+			const old = await invite(tenant, owner, {
+				email: "old@clock-33.example",
+			});
+			await expireInvitation(tenant, old.id);
+			const real = Settings.now;
+			// An app clock far ahead: by it both invitations are long gone.
+			Settings.now = () => Date.now() + 30 * 24 * 60 * 60 * 1000;
+			try {
+				const list = await inTenant(tenant, () => invitations.pending(tenant));
+
+				assert.deepEqual(
+					list
+						.map(({ email, expired }) => ({ email, expired }))
+						.sort((a, b) => a.email.localeCompare(b.email)),
+					[
+						{ email: "live@clock-33.example", expired: false },
+						{ email: "old@clock-33.example", expired: true },
+					],
+				);
+			} finally {
+				Settings.now = real;
+			}
+		});
+	},
+);
 
 test.group("InvitationService: opening and accepting (TAT-33)", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());

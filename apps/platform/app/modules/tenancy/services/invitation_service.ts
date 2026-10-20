@@ -152,21 +152,23 @@ export default class InvitationService {
 
 	/** The studio's invitations, newest first. */
 	async pending(tenant: TenantRef): Promise<PendingInvitation[]> {
+		// Expired by the database's clock, like preview() and accept().
 		const rows = await TenantInvitation.query()
+			.select("*")
+			.select(dbClient().raw("expires_at <= now() as expired"))
 			.where("tenant_id", tenant.id)
 			.orderBy("created_at", "desc")
 			.orderBy("id", "desc");
 		const names = new Map(
 			(await this.artists.list(tenant)).map(({ id, name }) => [id, name]),
 		);
-		const now = DateTime.now().toMillis();
 		return rows.map((row) => ({
 			id: row.id,
 			email: row.email,
 			role: row.role,
 			profileName: row.artistId ? (names.get(row.artistId) ?? null) : null,
 			expiresAt: row.expiresAt,
-			expired: row.expiresAt.toMillis() <= now,
+			expired: row.$extras.expired === true,
 		}));
 	}
 
