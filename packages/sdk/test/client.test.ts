@@ -6,6 +6,7 @@ import {
 	createTattooClient,
 	INQUIRY_CHALLENGE_ACTION,
 	INQUIRY_HONEYPOT_FIELD,
+	isTattooApiError,
 	type Studio,
 	TattooApiError,
 } from "../src/index.js";
@@ -836,5 +837,107 @@ describe("secret key guard", () => {
 				}),
 			),
 		);
+	});
+});
+
+describe("lists with query parameters", () => {
+	const T = "https://api.example.com/api/v1/tenants/api-needle-32";
+	const SERVICE = {
+		id: "0199f000-0000-7000-8000-000000000011",
+		name: "Fine line",
+		durationMinutes: 90,
+	};
+
+	test("services.list() with no query has no question mark", async () => {
+		const { calls, fetch } = fakeFetch(() => json(200, { data: [] }));
+
+		assert.deepEqual(await client(fetch).services.list(), []);
+		assert.equal(calls[0].url, `${T}/services`);
+		assert.equal(calls[0].init.credentials, "omit");
+	});
+
+	test("services.list drops undefined values", async () => {
+		const { calls, fetch } = fakeFetch(() => json(200, { data: [] }));
+
+		await client(fetch).services.list({ artistId: undefined });
+		assert.equal(calls[0].url, `${T}/services`);
+		assert.equal(calls[0].init.credentials, "omit");
+	});
+
+	test("services.list sends artistId", async () => {
+		const { calls, fetch } = fakeFetch(() => json(200, { data: [SERVICE] }));
+
+		assert.deepEqual(await client(fetch).services.list({ artistId: "a1" }), [
+			SERVICE,
+		]);
+		assert.equal(calls[0].url, `${T}/services?artistId=a1`);
+		assert.equal(calls[0].init.credentials, "omit");
+	});
+
+	test("portfolio.list encodes the query like a form and returns the whole page", async () => {
+		const page = { data: [], nextCursor: null };
+		const { calls, fetch } = fakeFetch(() => json(200, page));
+
+		const result = await client(fetch).portfolio.list({
+			style: "fine line",
+			limit: 12,
+			cursor: "next page",
+		});
+
+		assert.equal(
+			calls[0].url,
+			`${T}/portfolio?style=fine+line&limit=12&cursor=next+page`,
+		);
+		assert.equal(calls[0].init.credentials, "omit");
+		assert.deepEqual(result, page);
+	});
+
+	test("availability.list sends all four parameters in the given order", async () => {
+		const slot = {
+			startsAt: "2026-11-02T04:00:00Z",
+			endsAt: "2026-11-02T05:30:00Z",
+		};
+		const { calls, fetch } = fakeFetch(() => json(200, { data: [slot] }));
+
+		const slots = await client(fetch).availability.list({
+			artistId: "a1",
+			serviceId: "s1",
+			from: "2026-11-01",
+			to: "2026-11-07",
+		});
+
+		assert.equal(
+			calls[0].url,
+			`${T}/availability?artistId=a1&serviceId=s1&from=2026-11-01&to=2026-11-07`,
+		);
+		assert.equal(calls[0].init.credentials, "omit");
+		assert.deepEqual(slots, [slot]);
+	});
+
+	test("styles.list and placements.list are not tenant-scoped", async () => {
+		const { calls, fetch } = fakeFetch(() => json(200, { data: [] }));
+		const tattoo = client(fetch);
+
+		await tattoo.styles.list();
+		await tattoo.placements.list();
+
+		assert.equal(calls[0].url, "https://api.example.com/api/v1/styles");
+		assert.equal(calls[1].url, "https://api.example.com/api/v1/placements");
+		assert.equal(calls[0].init.credentials, "omit");
+		assert.equal(calls[1].init.credentials, "omit");
+	});
+
+	test("a 404 from a list is a TattooApiError", async () => {
+		const { fetch } = fakeFetch(() =>
+			json(404, {
+				error: { code: "not_found", message: "No such studio." },
+			}),
+		);
+
+		const error = await rejection(client(fetch).services.list());
+
+		assert.ok(isTattooApiError(error));
+		assert.equal(error.status, 404);
+		assert.equal(error.code, "not_found");
 	});
 });
