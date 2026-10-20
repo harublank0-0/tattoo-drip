@@ -16,8 +16,10 @@ const LOWER = "abcdefghijklmnopqrstuvwxyz";
  * under a unique index; the invitation page finds the row's studio through
  * invitation_tenant() (the next migration). One per studio and address: a
  * new invitation replaces the old one. Not soft-deleted: a credential,
- * deleted when accepted or cancelled; an expired one stays until it is
- * renewed or cancelled. The roles are MEMBERSHIP_ROLES (copied).
+ * deleted when accepted or cancelled, and with a member's removal (theirs
+ * and the owner ones they sent); an expired one is not purged, it stays
+ * (address included) until it is renewed or cancelled. The roles are
+ * MEMBERSHIP_ROLES (copied).
  */
 export default class extends BaseSchema {
 	protected tableName = "tenant_invitations";
