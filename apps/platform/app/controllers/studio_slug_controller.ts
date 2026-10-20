@@ -13,8 +13,8 @@ function slugError(message: string, rule: string) {
 }
 
 /**
- * The studio's web address (TAT-24), changed by its owners on the profile
- * page. Old addresses keep redirecting (the tenant middleware).
+ * The studio's page link (TAT-24), changed by its owners on the profile
+ * page. Old page links keep redirecting (the tenant middleware).
  */
 @inject()
 export default class StudioSlugController {
@@ -31,13 +31,13 @@ export default class StudioSlugController {
 		} catch (error) {
 			if (error instanceof SlugTakenError) {
 				throw slugError(
-					"This address is already taken. Try another one.",
+					"This page link is already taken. Try another one.",
 					"unique",
 				);
 			}
 			if (error instanceof SlugLimitError) {
 				throw slugError(
-					`Your studio has used ${MAX_TENANT_SLUGS} addresses, the most allowed. You can still switch back to an earlier one.`,
+					`Your studio has used ${MAX_TENANT_SLUGS} page links, the most allowed. You can still switch back to an earlier one.`,
 					"slug_limit",
 				);
 			}
@@ -47,7 +47,7 @@ export default class StudioSlugController {
 		if (changed.slug !== previous) {
 			ctx.session.flash(
 				"success",
-				"Address changed. Links to the old address still work.",
+				"Page link changed. Your old links still work.",
 			);
 		}
 		return ctx.response

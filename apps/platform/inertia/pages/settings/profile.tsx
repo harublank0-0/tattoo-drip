@@ -234,9 +234,9 @@ export default function StudioProfile({
 }
 
 /**
- * The web address, in its own form: a change moves every link to the new
- * address, and the old one keeps redirecting. Keyed by the slug, so the
- * field shows the stored address again after a change.
+ * The page link, in its own form: a change moves every link to the new
+ * name, and the old one keeps redirecting. Keyed by the slug, so the
+ * field shows the stored name again after a change.
  */
 function WebAddress({ addressHost }: { addressHost: AddressHost }) {
 	const tenant = useTenant();
@@ -250,7 +250,7 @@ function WebAddress({ addressHost }: { addressHost: AddressHost }) {
 			>
 				{({ errors, processing }) => (
 					<Section
-						title="Web address"
+						title="Page link"
 						description="The name in your page link. If you change it, old links keep working and the old name stays yours."
 					>
 						<Field data-invalid={!!errors.slug}>

@@ -51,7 +51,7 @@ export default class OnboardingController {
 				throw new errors.E_VALIDATION_ERROR([
 					{
 						field: "slug",
-						message: "This address is already taken. Try another one.",
+						message: "This page link is already taken. Try another one.",
 						rule: "unique",
 					},
 				]);

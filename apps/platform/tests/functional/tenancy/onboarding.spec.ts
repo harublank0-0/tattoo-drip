@@ -166,7 +166,7 @@ test.group("Onboarding", (group) => {
 		assertValidationError(
 			response,
 			"slug",
-			"This address is already taken. Try another one.",
+			"This page link is already taken. Try another one.",
 		);
 	});
 
@@ -193,7 +193,7 @@ test.group("Onboarding", (group) => {
 		assertValidationError(
 			response,
 			"slug",
-			"This address is already taken. Try another one.",
+			"This page link is already taken. Try another one.",
 		);
 		assert.isFalse(
 			await inUser(user, () => new TenancyService().hasTenant(user)),

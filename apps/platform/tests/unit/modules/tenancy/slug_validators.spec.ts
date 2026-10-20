@@ -7,7 +7,7 @@ import {
 
 const FORMAT =
 	"Use 3 to 63 lowercase letters, numbers and single hyphens, with at least one letter. Don't start or end with a hyphen.";
-const RESERVED = "This address is reserved. Try another one.";
+const RESERVED = "This page link is reserved. Try another one.";
 
 const tenant = {
 	name: "Black Needle",
@@ -72,5 +72,18 @@ test.group("Slug validators", () => {
 
 	test("a missing slug is refused", async ({ assert }) => {
 		assert.isDefined(await slugError(changeSlugValidator, {}));
+	});
+
+	test("an empty page link is named a page link, never an address (TAT-101)", async ({
+		assert,
+	}) => {
+		for (const [validator, data] of [
+			[createTenantValidator, { ...tenant, slug: undefined }],
+			[changeSlugValidator, {}],
+		] as const) {
+			const message = await slugError(validator, data);
+			assert.include(message, "page link");
+			assert.notInclude(message?.toLowerCase(), "address");
+		}
 	});
 });

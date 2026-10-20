@@ -10,8 +10,8 @@ import { assertValidationError } from "#tests/helpers/validation";
 const tenancy = new TenancyService();
 const FORMAT =
 	"Use 3 to 63 lowercase letters, numbers and single hyphens, with at least one letter. Don't start or end with a hyphen.";
-const RESERVED = "This address is reserved. Try another one.";
-const TAKEN = "This address is already taken. Try another one.";
+const RESERVED = "This page link is reserved. Try another one.";
+const TAKEN = "This page link is already taken. Try another one.";
 
 /** The stored slug and every slug the tenant holds. */
 function stored(tenant: Tenant) {
@@ -23,10 +23,10 @@ function stored(tenant: Tenant) {
 	}));
 }
 
-test.group("Changing the web address", (group) => {
+test.group("Changing the page link", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 
-	test("an owner changes it and lands on the profile page under the new address", async ({
+	test("an owner changes it and lands on the profile page under the new page link", async ({
 		client,
 		assert,
 	}) => {
@@ -43,7 +43,7 @@ test.group("Changing the web address", (group) => {
 		response.assertHeader("location", "/t/red-ink/settings/profile");
 		response.assertFlashMessage(
 			"success",
-			"Address changed. Links to the old address still work.",
+			"Page link changed. Your old links still work.",
 		);
 		assert.deepEqual(await stored(tenant), {
 			slug: "red-ink",
@@ -57,7 +57,7 @@ test.group("Changing the web address", (group) => {
 		old.assertHeader("location", "/t/red-ink/settings/profile");
 	});
 
-	test("the same address, typed in capitals, changes nothing", async ({
+	test("the same page link, typed in capitals, changes nothing", async ({
 		client,
 		assert,
 	}) => {
@@ -79,7 +79,7 @@ test.group("Changing the web address", (group) => {
 	});
 
 	for (const [slug, message] of [
-		["www", "This address is reserved. Try another one."],
+		["www", "This page link is reserved. Try another one."],
 		["black--ink", FORMAT],
 		["12345", FORMAT],
 	] as const) {
@@ -98,7 +98,7 @@ test.group("Changing the web address", (group) => {
 		});
 	}
 
-	test("another studio's current or old address is taken", async ({
+	test("another studio's current or old page link is taken", async ({
 		client,
 		assert,
 	}) => {
@@ -123,7 +123,7 @@ test.group("Changing the web address", (group) => {
 		});
 	});
 
-	test(`after ${MAX_TENANT_SLUGS} addresses a new one is refused`, async ({
+	test(`after ${MAX_TENANT_SLUGS} page links a new one is refused`, async ({
 		client,
 		assert,
 	}) => {
@@ -142,7 +142,7 @@ test.group("Changing the web address", (group) => {
 		assertValidationError(
 			response,
 			"slug",
-			`Your studio has used ${MAX_TENANT_SLUGS} addresses, the most allowed. You can still switch back to an earlier one.`,
+			`Your studio has used ${MAX_TENANT_SLUGS} page links, the most allowed. You can still switch back to an earlier one.`,
 		);
 		assert.equal((await stored(tenant)).slug, `ink-${MAX_TENANT_SLUGS}`);
 	});
@@ -184,7 +184,7 @@ test.group("Changing the web address", (group) => {
 		});
 	}
 
-	test("an artist gets 404 and the address stays", async ({
+	test("an artist gets 404 and the page link stays", async ({
 		client,
 		assert,
 	}) => {
