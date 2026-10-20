@@ -1,0 +1,22 @@
+{
+	"$schema": "https://opencode.ai/config.json",
+	"model": "opencode/deepseek-v4.1-flash-free",
+	"instructions": [
+		"apps/platform/AGENTS.md",
+		"apps/storefront/AGENTS.md",
+		"docs/agent-environment.md"
+	],
+	"permission": {
+		"bash": {
+			"*": "allow",
+			"git push*": "deny",
+			"git worktree*": "deny",
+			"git gc*": "deny",
+			"git prune*": "deny",
+			"git reset --hard*": "deny",
+			"gh pr*": "deny",
+			"pkill*": "deny",
+			"killall*": "deny"
+		}
+	}
+}
