@@ -68,6 +68,6 @@ test.group("Installable app", () => {
 			"/icons/favicon.svg",
 			"/icons/icon-192.png",
 		]);
-		assert.include(source, 'const CACHE = "td-shell-v1";');
+		assert.include(source, 'const CACHE = "td-shell-v2";');
 	});
 });
