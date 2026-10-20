@@ -13,6 +13,9 @@ export const INVITATION_DAYS = 7;
 /** The one-time flash that carries a new link to the Members page. */
 export const INVITATION_LINK_FLASH = "invitationLink";
 
+/** The only page whose response carries that flash (a route name). */
+export const INVITATION_LINK_PAGE = "tenant.settings.members";
+
 /** A new link as the Members page shows it, once. */
 export type NewInvitationLink = {
 	email: string;

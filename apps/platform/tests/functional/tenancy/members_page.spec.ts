@@ -150,6 +150,31 @@ test.group("Settings, Members (TAT-33)", (group) => {
 		assert.notInclude(JSON.stringify(later.body()), token);
 	});
 
+	test("another page that receives the pending flash does not carry the link", async ({
+		client,
+		assert,
+	}) => {
+		const { owner } = await studio();
+		const link: NewInvitationLink = {
+			email: "mira@members-33.example",
+			url: "https://platform.example/invitations/Zm9vYmFyYmF6cXV4",
+			message: "You're invited to join Members 33 on Tattoo Drip.",
+			whatsappUrl: "https://wa.me/?text=hi",
+			expiresText: "27 Oct 2026, 14:05",
+		};
+
+		// A second tab's request, between the invitation and its redirect.
+		const other = await client
+			.get("/t/members-33/inbox")
+			.withFlashMessages({ [INVITATION_LINK_FLASH]: link })
+			.withInertia()
+			.loginAs(owner);
+
+		other.assertStatus(200);
+		assert.isUndefined(other.body().flash.invitationLink);
+		assert.notInclude(JSON.stringify(other.body()), "Zm9vYmFyYmF6cXV4");
+	});
+
 	test("a flash that isn't a link is not shown", async ({ client, assert }) => {
 		const { owner } = await studio();
 
