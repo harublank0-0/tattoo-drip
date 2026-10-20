@@ -1,5 +1,7 @@
 import { Form } from "@adonisjs/inertia/react";
 import Section from "~/components/section";
+import type { AddressHost, StudioPageProps } from "~/components/studio_link";
+import StudioLinkCard from "~/components/studio_link_card";
 import { Button } from "~/components/ui/button";
 import {
 	Field,
@@ -60,9 +62,13 @@ const SOCIAL_LINKS = [
 export default function StudioProfile({
 	profile,
 	timezones,
+	studioPage,
+	addressHost,
 }: {
 	profile: Profile;
 	timezones: string[];
+	studioPage: StudioPageProps;
+	addressHost: AddressHost;
 }) {
 	const tenant = useTenant();
 
@@ -74,6 +80,13 @@ export default function StudioProfile({
 			>
 				{({ errors, processing }) => (
 					<>
+						<Section
+							title="Your studio page"
+							description="The link clients use to send you their idea. Put it in your Instagram bio."
+						>
+							<StudioLinkCard studioPage={studioPage} />
+						</Section>
+
 						<Section title="Business">
 							<FieldGroup>
 								<Field data-invalid={!!errors.name}>
@@ -215,7 +228,7 @@ export default function StudioProfile({
 					</>
 				)}
 			</Form>
-			<WebAddress />
+			<WebAddress addressHost={addressHost} />
 		</>
 	);
 }
@@ -225,7 +238,7 @@ export default function StudioProfile({
  * address, and the old one keeps redirecting. Keyed by the slug, so the
  * field shows the stored address again after a change.
  */
-function WebAddress() {
+function WebAddress({ addressHost }: { addressHost: AddressHost }) {
 	const tenant = useTenant();
 
 	return (
@@ -238,11 +251,16 @@ function WebAddress() {
 				{({ errors, processing }) => (
 					<Section
 						title="Web address"
-						description="Your address on Tattoo Drip. If you change it, old links keep working and the old address stays yours."
+						description="The name in your page link. If you change it, old links keep working and the old name stays yours."
 					>
 						<Field data-invalid={!!errors.slug}>
-							<FieldLabel htmlFor="slug">Your address</FieldLabel>
+							<FieldLabel htmlFor="slug">Your page link</FieldLabel>
 							<div className="flex items-center gap-2">
+								{addressHost.prefix && (
+									<span className="shrink-0 text-sm text-muted-foreground">
+										{addressHost.prefix}
+									</span>
+								)}
 								<Input
 									id="slug"
 									name="slug"
@@ -254,7 +272,7 @@ function WebAddress() {
 									aria-describedby="slug-hint"
 								/>
 								<span className="shrink-0 text-sm text-muted-foreground">
-									.tattoodrip.com
+									{addressHost.suffix}
 								</span>
 							</div>
 							<FieldDescription id="slug-hint">
@@ -269,7 +287,7 @@ function WebAddress() {
 							className="mt-4"
 							disabled={processing}
 						>
-							{processing ? "Changing…" : "Change address"}
+							{processing ? "Changing…" : "Change page link"}
 						</Button>
 					</Section>
 				)}

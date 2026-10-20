@@ -1,5 +1,6 @@
 import { Form } from "@adonisjs/inertia/react";
 import { useState } from "react";
+import type { AddressHost } from "~/components/studio_link";
 import { Button } from "~/components/ui/button";
 import {
 	Field,
@@ -44,10 +45,12 @@ export default function CreateTenant({
 	tenantTypes,
 	timezones,
 	defaultTimezone,
+	addressHost,
 }: {
 	tenantTypes: string[];
 	timezones: string[];
 	defaultTimezone: string;
+	addressHost: AddressHost;
 }) {
 	const [name, setName] = useState("");
 	const [slug, setSlug] = useState("");
@@ -61,8 +64,8 @@ export default function CreateTenant({
 					Set up your business
 				</h1>
 				<p className="text-sm text-muted-foreground">
-					Clients will find you at your own address. You can change the details
-					later.
+					Clients will find you at your own page link. You can change the
+					details later.
 				</p>
 			</div>
 
@@ -120,8 +123,13 @@ export default function CreateTenant({
 						</FieldSet>
 
 						<Field data-invalid={!!errors.slug}>
-							<FieldLabel htmlFor="slug">Your address</FieldLabel>
+							<FieldLabel htmlFor="slug">Your page link</FieldLabel>
 							<div className="flex items-center gap-2">
+								{addressHost.prefix && (
+									<span className="shrink-0 text-sm text-muted-foreground">
+										{addressHost.prefix}
+									</span>
+								)}
 								<Input
 									id="slug"
 									name="slug"
@@ -138,7 +146,7 @@ export default function CreateTenant({
 									aria-describedby="slug-preview"
 								/>
 								<span className="shrink-0 text-sm text-muted-foreground">
-									.tattoodrip.com
+									{addressHost.suffix}
 								</span>
 							</div>
 							<FieldDescription id="slug-preview">

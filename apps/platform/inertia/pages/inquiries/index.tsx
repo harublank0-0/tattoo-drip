@@ -2,8 +2,17 @@ import { Link } from "@inertiajs/react";
 import { urlFor } from "~/client";
 import type { InboxListProps } from "~/components/inquiries";
 import Page from "~/components/page";
+import SetupChecklist from "~/components/setup_checklist";
 import StatusBadge from "~/components/status_badge";
+import StudioLinkCard from "~/components/studio_link_card";
 import { buttonVariants } from "~/components/ui/button";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "~/components/ui/card";
 import { useTenant } from "~/hooks/use-tenant";
 import AppLayout from "~/layouts/app";
 
@@ -13,6 +22,8 @@ import AppLayout from "~/layouts/app";
  */
 export default function InboxIndex({
 	view,
+	setup,
+	studioPage,
 	newCount,
 	inquiries,
 	page,
@@ -44,7 +55,24 @@ export default function InboxIndex({
 				))}
 			</nav>
 
-			{inquiries.length === 0 ? (
+			{setup && !setup.complete && studioPage && (
+				<SetupChecklist setup={setup} studioUrl={studioPage.url} />
+			)}
+
+			{inquiries.length === 0 && view === "new" && studioPage ? (
+				<Card>
+					<CardHeader>
+						<CardTitle>Your studio page</CardTitle>
+						<CardDescription>
+							No new inquiries yet. Clients send them from this link: put it in
+							your Instagram bio.
+						</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<StudioLinkCard studioPage={studioPage} />
+					</CardContent>
+				</Card>
+			) : inquiries.length === 0 ? (
 				<p className="text-sm text-muted-foreground">
 					{view === "new"
 						? "No new inquiries. They arrive here from the studio page."

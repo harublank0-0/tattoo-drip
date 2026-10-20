@@ -2,6 +2,7 @@ import type {
 	CardMessageProps,
 	ContactLinksProps,
 } from "~/components/messages";
+import type { SetupProps, StudioPageProps } from "~/components/studio_link";
 
 /** One row of the inbox. */
 export type InquiryRow = {
@@ -25,6 +26,9 @@ export type InquiryRow = {
 
 export type InboxListProps = {
 	view: "new" | "decided";
+	/** The new-studio checklist and the studio link; null in the Decided view (TAT-101). */
+	setup: SetupProps | null;
+	studioPage: StudioPageProps | null;
 	newCount: number;
 	inquiries: InquiryRow[];
 	page: { current: number; last: number; total: number };

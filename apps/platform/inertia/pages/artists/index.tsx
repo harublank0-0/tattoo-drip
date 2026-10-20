@@ -3,6 +3,7 @@ import { router } from "@inertiajs/react";
 import { Pencil, Plus, Trash2, User, Users } from "lucide-react";
 import { urlFor } from "~/client";
 import type { ArtistProps } from "~/components/artists";
+import CopyLinkButton from "~/components/copy_link_button";
 import Section from "~/components/section";
 import { Badge } from "~/components/ui/badge";
 import { Button, buttonVariants } from "~/components/ui/button";
@@ -111,7 +112,6 @@ function ArtistRow({
 						<Badge variant="outline">Not accepting inquiries</Badge>
 					)}
 				</div>
-				<p className="truncate text-sm text-muted-foreground">/{artist.slug}</p>
 			</div>
 			<div className="ml-auto flex items-center gap-1">
 				<Link
@@ -130,6 +130,25 @@ function ArtistRow({
 				>
 					<Trash2 />
 				</Button>
+			</div>
+			{/* The artist's own page (TAT-101): shown as text to select, with Copy. */}
+			<div className="flex w-full flex-wrap items-center gap-2">
+				{artist.pageUrl ? (
+					<>
+						<p className="min-w-0 flex-1 text-sm break-all text-muted-foreground select-all">
+							{artist.pageUrl}
+						</p>
+						<CopyLinkButton
+							text={artist.pageUrl}
+							variant="outline"
+							className="h-11"
+						/>
+					</>
+				) : (
+					<p className="text-sm text-muted-foreground">
+						Hidden: this artist has no public page.
+					</p>
+				)}
 			</div>
 		</div>
 	);
