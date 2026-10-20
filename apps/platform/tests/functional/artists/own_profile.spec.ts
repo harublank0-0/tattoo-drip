@@ -111,6 +111,36 @@ test.group("An artist's own profile (TAT-30)", (group) => {
 		);
 	});
 
+	test("an artist member with no linked profile gets 404 on every profile, which stay as they were", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, asha, mira, oona } = await studio();
+		// A second artist member, linked to nothing: not even the unlinked
+		// "Mira" (user_id null) is theirs.
+		const unlinked = await artistIn(tenant, "nobody@own-30.example");
+		const snapshot = () =>
+			inTenant(tenant, async () =>
+				(await Artist.query().orderBy("slug")).map(
+					({ name, slug, bio, userId }) => ({ name, slug, bio, userId }),
+				),
+			);
+		const before = await snapshot();
+
+		for (const profile of [asha, mira, oona]) {
+			for (const request of [
+				client.get(`${base}/${profile.id}/edit`),
+				client
+					.put(`${base}/${profile.id}`)
+					.fields({ name: "Taken", slug: "taken", bio: "Changed" }),
+			]) {
+				const response = await request.withCsrfToken().loginAs(unlinked);
+				response.assertStatus(404);
+			}
+		}
+		assert.deepEqual(await snapshot(), before);
+	});
+
 	test("the list, a new profile and deleting stay owners only", async ({
 		client,
 	}) => {
