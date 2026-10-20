@@ -25,9 +25,9 @@ mail.setMessenger((mailer) => ({
 		}).run(),
 }));
 
-// Said once per process, at boot: alerts still reach the dashboard (TAT-52).
+// Said once per process, at boot: alerts still reach the dashboard (TAT-52, TAT-88).
 if (env.get("ALERT_EMAILS") === false) {
 	logger.warn(
-		"Staff alert emails are off (ALERT_EMAILS=false): new inquiries alert the dashboard only.",
+		"Staff alert emails are off (ALERT_EMAILS=false): new inquiries and deposit screenshots alert the dashboard only.",
 	);
 }
