@@ -699,6 +699,42 @@ export class TattooProjectSchema extends BaseModel {
 	declare updatedAt: DateTime | null;
 }
 
+export class TenantInvitationSchema extends BaseModel {
+	static $columns = [
+		"artistId",
+		"createdAt",
+		"email",
+		"expiresAt",
+		"id",
+		"invitedByUserId",
+		"role",
+		"tenantId",
+		"tokenHash",
+		"updatedAt",
+	] as const;
+	$columns = TenantInvitationSchema.$columns;
+	@column()
+	declare artistId: string | null;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column()
+	declare email: string;
+	@column.dateTime()
+	declare expiresAt: DateTime;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare invitedByUserId: string | null;
+	@column()
+	declare role: string;
+	@column()
+	declare tenantId: string;
+	@column()
+	declare tokenHash: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
 export class TenantMembershipSchema extends BaseModel {
 	static $columns = [
 		"createdAt",
