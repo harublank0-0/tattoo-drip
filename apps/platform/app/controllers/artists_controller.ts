@@ -169,8 +169,7 @@ export default class ArtistsController {
 	 * Whether the user already has a live profile in the tenant.
 	 */
 	private async hasProfile(tenant: { id: string }, userId: string) {
-		const list = await this.artists.list(tenant);
-		return list.some((artist) => artist.userId === userId);
+		return (await this.artists.profileOf(tenant, userId)) !== null;
 	}
 
 	/**
