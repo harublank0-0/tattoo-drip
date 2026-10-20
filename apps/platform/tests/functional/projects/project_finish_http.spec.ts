@@ -189,21 +189,49 @@ test.group("Finishing a project over HTTP (TAT-111)", (group) => {
 		assert.equal(await statusOf(tenant, waiting), "in_progress");
 	});
 
-	test("a confirmation that isn't a whole paisa amount is a field error", async ({
+	test("a confirmation that isn't a whole paisa amount is a field error on both steps", async ({
 		client,
 		assert,
 	}) => {
 		const { owner, tenant, sita } = await setup();
 		const project = await workDone(tenant, sita);
+		const healing = await workDone(
+			tenant,
+			sita,
+			"healing_check",
+			LAST_SESSION_END.minus({ days: 1 }),
+		);
 
 		for (const confirmedDue of ["-5", "12.5", "abc", "1".repeat(21)]) {
-			assertValidationError(
-				await post(client, url(project.id, "/finish"), owner, { confirmedDue }),
-				"confirmedDue",
-				"Reload the page and try again.",
-			);
+			for (const [target, action] of [
+				[project, "/finish"],
+				[healing, "/complete"],
+			] as const) {
+				assertValidationError(
+					await post(client, url(target.id, action), owner, { confirmedDue }),
+					"confirmedDue",
+					"Reload the page and try again.",
+				);
+			}
 		}
 		assert.equal(await statusOf(tenant, project), "in_progress");
+		assert.equal(await statusOf(tenant, healing), "healing_check");
+	});
+
+	test("the field error reaches the project page's errors prop, where the card shows it", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant, sita } = await setup();
+		const project = await workDone(tenant, sita);
+		const message = "Reload the page and try again.";
+
+		const page = await client
+			.get(url(project.id))
+			.withInertia()
+			.withSession({ __flash__: { inputErrorsBag: { confirmedDue: message } } })
+			.loginAs(owner);
+		assert.equal(page.inertiaProps.errors.confirmedDue, message);
 	});
 
 	test("only owners: the assigned artist gets a 404 on both routes, whatever the body", async ({

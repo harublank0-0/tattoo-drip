@@ -1,5 +1,5 @@
-import { router } from "@inertiajs/react";
-import { useEffect, useRef, useState } from "react";
+import { router, usePage } from "@inertiajs/react";
+import { useEffect, useId, useRef, useState } from "react";
 import { urlFor } from "~/client";
 import {
 	balanceLine,
@@ -13,15 +13,18 @@ import {
 import type { FinishProps } from "~/components/projects";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { FieldError } from "~/components/ui/field";
 import { useTenant } from "~/hooks/use-tenant";
 
 /**
  * Finishing a project (TAT-111): "Mark the tattoo finished" on an
  * in-progress project, then the healing check with its day and "Healing
  * check done". Each step is confirmed in an inline panel: focus starts on
- * "Not yet", Escape closes it and returns focus to the button. The assigned
- * artist gets the healing check without a button. TAT-108 moves this into
- * the project page's Next step card.
+ * "Not yet", Escape closes it and returns focus to the button. A refused
+ * amount (`confirmedDue`, only a hand-edited request can send one) shows
+ * under the buttons and the panel stays open. The assigned artist gets the
+ * healing check without a button. TAT-108 moves this into the project
+ * page's Next step card.
  */
 export default function FinishCard({
 	projectId,
@@ -31,6 +34,8 @@ export default function FinishCard({
 	finish: FinishProps;
 }) {
 	const tenant = useTenant();
+	const error = usePage().props.errors.confirmedDue;
+	const errorId = useId();
 	const trigger = useRef<HTMLButtonElement>(null);
 	const keep = useRef<HTMLButtonElement>(null);
 	const [open, setOpen] = useState(false);
@@ -106,6 +111,7 @@ export default function FinishCard({
 								type="button"
 								className="h-11"
 								disabled={saving}
+								aria-describedby={error ? errorId : undefined}
 								onClick={confirm}
 							>
 								{saving ? "Saving…" : FINISH_CONFIRMS[step]}
@@ -121,6 +127,11 @@ export default function FinishCard({
 								Not yet
 							</Button>
 						</div>
+						{error && (
+							<FieldError id={errorId} className="clear-left mt-3">
+								{error}
+							</FieldError>
+						)}
 					</fieldset>
 				)}
 			</CardContent>
