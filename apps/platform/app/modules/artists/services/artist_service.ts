@@ -216,6 +216,45 @@ export default class ArtistService {
 	}
 
 	/**
+	 * Links the live, unlinked profile `artistId` to `userId`: the claim an
+	 * owner offered in an invitation (TAT-33). The only path that links a
+	 * profile to anyone but the acting member, so it checks under the row
+	 * lock: false, with nothing changed, when the profile is gone, was linked
+	 * to someone meanwhile, or the account already has a live profile here.
+	 */
+	async claim(
+		tenant: TenantRef,
+		artistId: string,
+		userId: string,
+	): Promise<boolean> {
+		return withTransaction(async (trx) => {
+			if (await this.profileOf(tenant, userId)) return false;
+			const live = await Artist.query({ client: trx })
+				.where("tenant_id", tenant.id)
+				.where("id", artistId)
+				.forUpdate()
+				.first();
+			if (!live || live.userId !== null) return false;
+			live.userId = userId;
+			await live.save();
+			return true;
+		});
+	}
+
+	/**
+	 * Unlinks every profile of the tenant linked to `userId`, deleted ones
+	 * included (TAT-33: a removed member's profile stays with the studio,
+	 * unlinked, with its projects and sessions). Update queries skip the
+	 * soft-delete hooks, so deleted rows are reached too.
+	 */
+	async unlinkUser(tenant: TenantRef, userId: string): Promise<void> {
+		await Artist.query()
+			.where("tenant_id", tenant.id)
+			.where("user_id", userId)
+			.update({ user_id: null, updated_at: new Date() });
+	}
+
+	/**
 	 * The body of update and updateOwn: stores a new photo, locks the live
 	 * row (a profile deleted since the form loaded is a 404), saves the
 	 * fields, the photo and the link `linkFor` decides from the locked row,

@@ -659,3 +659,106 @@ test.group("ArtistService own profiles (TAT-30)", (group) => {
 		});
 	});
 });
+
+test.group("ArtistService claims and unlinks (TAT-33)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("claim links a live, unlinked profile to the account", async ({
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("claim-33", "Claim 33");
+		const member = await artistIn(tenant, "asha@claim-33.example");
+		const asha = await inTenant(tenant, () =>
+			artists.create(tenant, input({ name: "Asha", slug: "asha" }), owner),
+		);
+
+		const claimed = await inTenant(tenant, () =>
+			artists.claim(tenant, asha.id, member.id),
+		);
+
+		assert.isTrue(claimed);
+		const saved = await inTenant(tenant, () => Artist.findOrFail(asha.id));
+		assert.equal(saved.userId, member.id);
+	});
+
+	test("claim links nothing to a profile linked meanwhile or deleted, nor for an account that has one", async ({
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("claim-no-33", "Claim No");
+		const member = await artistIn(tenant, "asha@claim-no-33.example");
+		const { linked, deleted, own, free } = await inTenant(tenant, async () => ({
+			linked: await artists.create(
+				tenant,
+				input({ name: "Oona", slug: "oona", linkToMe: true }),
+				owner,
+			),
+			deleted: await artists.create(
+				tenant,
+				input({ name: "Gone", slug: "gone" }),
+				owner,
+			),
+			own: await artists.create(
+				tenant,
+				input({ name: "Mine", slug: "mine" }),
+				owner,
+			),
+			free: await artists.create(
+				tenant,
+				input({ name: "Free", slug: "free" }),
+				owner,
+			),
+		}));
+
+		await inTenant(tenant, async () => {
+			await artists.delete(tenant, deleted);
+			assert.isFalse(await artists.claim(tenant, linked.id, member.id));
+			assert.isFalse(await artists.claim(tenant, deleted.id, member.id));
+			assert.isTrue(await artists.claim(tenant, own.id, member.id));
+			// One live profile per account and studio: a second claim links nothing.
+			assert.isFalse(await artists.claim(tenant, free.id, member.id));
+			assert.equal((await Artist.findOrFail(linked.id)).userId, owner.id);
+			assert.isNull((await Artist.findOrFail(free.id)).userId);
+		});
+	});
+
+	test("unlinkUser unlinks every profile linked to the account, deleted ones too, and nothing else", async ({
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("unlink-33", "Unlink 33");
+		const member = await artistIn(tenant, "asha@unlink-33.example");
+		const { live, gone, owners } = await inTenant(tenant, async () => ({
+			live: await artists.create(
+				tenant,
+				input({ name: "Asha", slug: "asha" }),
+				owner,
+			),
+			gone: await artists.create(
+				tenant,
+				input({ name: "Old", slug: "old" }),
+				owner,
+			),
+			owners: await artists.create(
+				tenant,
+				input({ name: "Oona", slug: "oona", linkToMe: true }),
+				owner,
+			),
+		}));
+		await inTenant(tenant, async () => {
+			// One live profile per account: link the one that is then deleted first.
+			await Artist.query().where("id", gone.id).update({ user_id: member.id });
+			await artists.delete(tenant, await artists.findFor(tenant, gone.id));
+			await Artist.query().where("id", live.id).update({ user_id: member.id });
+		});
+
+		await inTenant(tenant, () => artists.unlinkUser(tenant, member.id));
+
+		await inTenant(tenant, async () => {
+			assert.isNull((await Artist.findOrFail(live.id)).userId);
+			assert.isNull(
+				(await Artist.withTrashed().where("id", gone.id).firstOrFail()).userId,
+			);
+			assert.equal((await Artist.findOrFail(owners.id)).userId, owner.id);
+			assert.isNull(await artists.profileOf(tenant, member.id));
+		});
+	});
+});
