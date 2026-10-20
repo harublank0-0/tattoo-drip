@@ -62,7 +62,9 @@ test.group("metrics:pilot (TAT-70)", (group) => {
 		command.assertLogMatches(/All studios \(2\)/);
 	});
 
-	test("counts only the last --days days, and refuses a number outside 1 to 3650", async () => {
+	test("counts only the last --days days, and refuses a number outside 1 to 3650", async ({
+		assert,
+	}) => {
 		const { tenant } = await studioWithOwner("metrics-days-70", "Metrics Days");
 		await inTenant(tenant, async () => {
 			await makeInquiry(tenant, await makeClient(tenant), {
@@ -79,12 +81,17 @@ test.group("metrics:pilot (TAT-70)", (group) => {
 			/Through the link: — \(No inquiries or desk bookings yet\.\)/,
 		);
 
-		for (const days of ["0", "3651", "1.5"]) {
+		for (const days of ["0", "3651", "1.5", "-5"]) {
 			const refused = await ace.create(TestPilotMetrics, [`--days=${days}`]);
 			await refused.exec();
 			refused.assertFailed();
 			refused.assertLogMatches(/Give --days a whole number from 1 to 3650\./);
 		}
+		// Ace itself turns away a value that isn't a number, before run().
+		await assert.rejects(
+			() => ace.create(TestPilotMetrics, ["--days=abc"]),
+			/"days" flag accepts a "numeric" value/,
+		);
 	});
 
 	test("says so when there are no studios", async () => {
