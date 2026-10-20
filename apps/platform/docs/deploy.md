@@ -13,7 +13,7 @@ Read before a deploy or when changing production settings. The hosting itself is
 - `STOREFRONT_SERVER_KEYS`: the storefront's key ([below](#the-storefronts-server-key)).
 - `TRUST_PROXY`: the addresses of the reverse proxy in front of the app, as a list: `loopback` when it runs on the same host, its address or CIDR when it is a load balancer, plus Cloudflare's ranges if Cloudflare fronts the API. Never every address. Wrong, every visitor shares the proxy's address, and one person's attempts lock everyone out of login, signup, the intake and the deposit page.
 - `DB_USER` / `DB_PASSWORD` are the app role. `DB_MIGRATION_PASSWORD` belongs only in the migration step's environment.
-- Mail (TAT-52): new inquiries email the studio's owners and the asked-for artist from the worker. `MAIL_FROM_ADDRESS` must be on the platform's own sending domain with SPF, DKIM and DMARC (TAT-20), and `SMTP_*` a provider allowed to send for it. Until then set `ALERT_EMAILS=false`: the alerts reach the dashboard only, and every process logs one warning at boot. With mail on and SMTP failing, each email fails after 3 retries with one "Sending email failed." log line; the dashboard alerts don't depend on it.
+- Mail (TAT-52, TAT-88): new inquiries email the studio's owners and the asked-for artist, and deposit screenshots the owners and the project's artist, from the worker. `MAIL_FROM_ADDRESS` must be on the platform's own sending domain with SPF, DKIM and DMARC (TAT-20), and `SMTP_*` a provider allowed to send for it. Until then set `ALERT_EMAILS=false`: the alerts reach the dashboard only, and every process logs one warning at boot. With mail on and SMTP failing, each email fails after 3 retries with one "Sending email failed." log line; the dashboard alerts don't depend on it.
 
 ### Account email
 
@@ -65,7 +65,7 @@ Values for nginx; set the equivalent on the host's proxy.
 
 ### Accepted denial costs
 
-Known and accepted for the pilot. The owner gets no signal for any of them (429s and busy 503s are not logged on purpose, and TAT-52's alerts cover new inquiries only, not a form at its limit), so look here first when a studio says its form "stopped working".
+Known and accepted for the pilot. The owner gets no signal for any of them (429s and busy 503s are not logged on purpose, and the staff alerts cover new inquiries and deposit screenshots only, not a form at its limit: TAT-88 ruling 12), so look here first when a studio says its form "stopped working".
 
 - 60 solved bot challenges in an hour, from 3 or more addresses, close one studio's intake form for the rest of that hour (TAT-55's per-studio limit).
 - 10 solved challenges with a victim's phone number lock that number out of that studio's form for up to 24 hours (TAT-55's per-phone limit).
@@ -80,6 +80,7 @@ Known and accepted for the pilot. The owner gets no signal for any of them (429s
 - `curl -sI https://<api>/api/v1/tenants/<slug>` answers 200 with `Cache-Control: public…` and no `X-RateLimit-*` header.
 - Open a deposit link (a project's "Copy link") on a phone, sent by WhatsApp or Viber (Instagram and Facebook rewrite outgoing links through their own redirect, which carries the whole URL, fragment included, to Meta), then check the storefront's and the CDN's request logs: `/deposit` appears without its `#` fragment, and the API proxy's access log has no `/deposits/` line.
 - With `ALERT_EMAILS` on, send one inquiry to your own studio and check the owner's mailbox, spam folder included, for "New inquiry for …"; its button opens the inquiry.
+- With `ALERT_EMAILS` on, send one deposit screenshot to your own studio's deposit link and check the owner's mailbox for "Deposit screenshot for …"; its button opens the project at the Payments card.
 - Run the storefront's `pnpm check:page` against the production build before the first deploy (TAT-13).
 - Still required before any public deploy: object storage (TAT-27: the local disks must never deploy). The intake form (TAT-57) and the deposit page (TAT-65b) must be merged too.
 

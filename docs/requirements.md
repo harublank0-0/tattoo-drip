@@ -32,7 +32,7 @@ What the MVP (pilot with a design-partner studio) and V1 (paid launch) must do, 
 **Quotes and payments**
 - [ ] Quote: a fixed price, or an hourly rate with estimated hours, plus a deposit amount (which may be zero) and an expiry; quotes can be revised
 - [x] Deposit page per project: amount, the studio's QR codes and a reference code; the client uploads proof of payment
-- An owner makes a project's deposit link while its deposit is due; it works for 30 days and can be replaced at once (the old link stops working, the reference code stays). The page shows the studio, the project's brief, the deposit, the studio's deposit-page methods, a 6-character reference code for the payment remark and the deposit policy, and takes one screenshot at a time, which owners are alerted to.
+- An owner makes a project's deposit link while its deposit is due; it works for 30 days and can be replaced at once (the old link stops working, the reference code stays). The page shows the studio, the project's brief, the deposit, the studio's deposit-page methods, a 6-character reference code for the payment remark and the deposit policy, and takes one screenshot at a time, which the owners and the project's artist are alerted to, once per screenshot, by email and under the bell.
 - [x] Staff verify or reject the proof; cash and bank payments can be recorded at the desk
 - [x] Payments are deposits, session payments, balance payments or refunds; the balance due is computed
 - Owners verify or reject a screenshot next to the amount the deposit page asked for and the reference code; a different amount is rejected and recorded at the desk. A mistaken verification or entry is reversed, never edited. When a project closes holding a deposit, the owner records whether the studio kept or refunded it. The assigned artist sees the balance and the payments, never a screenshot.
@@ -53,7 +53,7 @@ What the MVP (pilot with a design-partner studio) and V1 (paid launch) must do, 
 
 **Notifications, page and app**
 - [x] Staff are alerted to new inquiries by email and in the app. No automatic customer messages in the MVP; replies go through the one-tap chat links
-- A new inquiry alerts each owner, and the artist the client asked for when that profile is linked to a member, once each: an email (the client's first name and the start of the idea, never the phone; owners get a link to the inquiry) and an alert under the dashboard's bell. Email can be switched off for the whole platform until its sending domain exists.
+- A new inquiry alerts each owner, and the artist the client asked for when that profile is linked to a member, once each: an email (the client's first name and the start of the idea, never the phone; owners get a link to the inquiry) and an alert under the dashboard's bell. Email can be switched off for the whole platform until its sending domain exists. A deposit screenshot alerts the owners and the project's artist the same way (the client's first name, never the amount; the link opens the project's Payments card).
 - [x] Studio page at `{slug}.platform.com`: profile, artists, Instagram link, intake form
 - [ ] The dashboard is mobile-first and installable as a web app
 - [ ] Pilot metrics: share of inquiries arriving through the link, time from inquiry to verified deposit, session no-shows

@@ -14,7 +14,7 @@
 
 - **Node 24.3.0.** Run every node and pnpm command with the pinned install first on PATH: `PATH=/home/blank/.nvm/versions/node/v24.3.0/bin:$PATH pnpm …`. Every command below already carries it.
 - `<repo>` is the checkout you build in (the coordinator decides; say which in your report). `<scratchpad>` is your session's scratchpad directory. `<db-env>` is the isolated-database prefix the coordinator gives you (for example `DB_DATABASE=td_build_88`): put it in front of every `migrate`, `migration:*` and test command below. **Never run them without it**: the user's dev database is not for builds. The shell's cwd resets between calls: every command uses `-C <repo>` or absolute paths.
-- **Migration (exact name):** `apps/platform/database/migrations/1791690000000_add_deposit_proof_to_staff_alerts.ts`. If Task 0 finds a migration numbered `17916900…` already there (another ticket landed first), use the next free number (`1791700000000`) and say so in your report. Apply with `<db-env> pnpm -C <repo>/apps/platform migrate` (owner role); it regenerates `database/schema.ts`, which you commit.
+- **Migration (exact name):** `apps/platform/database/migrations/1791694000000_add_deposit_proof_to_staff_alerts.ts`. The build found TAT-33's `1791693300000` and `1791693300001` already there, so the number is `1791694000000` (a migration must sort after the newest one; if a later one exists when you build, use the next free number and say so in your report). Apply with `<db-env> pnpm -C <repo>/apps/platform migrate` (owner role); it regenerates `database/schema.ts`, which you commit.
 - **No new route, no new setting, no dependency, no `package.json` change.** Never read or edit `apps/platform/.env`.
 - **Copy (verbatim).** Alerts: `Deposit screenshot to check` / `Open the project's Payments card.`, `A deposit screenshot for your project` / `An owner checks it on the Payments card.`, `No alerts yet. New inquiries and deposit screenshots show up here.`. Email: subject `Deposit screenshot for {studio}`, title `Deposit screenshot`, preheader `A deposit screenshot is waiting to be checked.`, intro `{First} sent {studio} a deposit screenshot.` / `… for your project.` / `A client sent …`, `Check that the money reached your account, then verify or reject it on the Payments card.`, `Check the screenshot`, `An owner of {studio} will check it.`, `Open the project`, `You get these emails as a member of {studio} on Tattoo Drip.`. Boot warning `Staff alert emails are off (ALERT_EMAILS=false): new inquiries and deposit screenshots alert the dashboard only.`. Job failure log `Alerting staff to a deposit proof failed.`.
 - Fixture slugs and addresses in new tests end in `-88` (`proof-alerts-88`, `asha@proof-alerts-88.example`). Tests added to an existing file that uses `studioWithOwner()` with no slug keep it (`black-needle`, "Black Needle").
@@ -73,7 +73,7 @@ git -C <repo> grep -n "\"deposit_proof\"\|'deposit_proof'" -- apps/platform/app 
 git -C <repo> ls-files apps/platform/app/modules/notifications/emails/deposit_proof_mail.ts
 ```
 
-And `ls <repo>/apps/platform/database/migrations | tail -1` → `1791680000002_create_account_tokens_table.ts` (anything later: read the Global Constraints' migration rule).
+And `ls <repo>/apps/platform/database/migrations | tail -1` → `1791693300001_create_invitation_tenant_function.ts` at the build (TAT-33 landed after TAT-18's `1791680000002`; anything newer: read the Global Constraints' migration rule).
 
 If a name moved (a later ticket renamed it), use the real one, keep the plan's behaviour and note the deviation in your report. If a "must print nothing" check prints something, STOP and report it.
 
@@ -319,7 +319,7 @@ git -C <repo> commit -m "feat(platform): add the deposit-proof alert kind, its w
 ### Task 2: The schema: a payment and its project on an alert
 
 **Files:**
-- Create: `apps/platform/database/migrations/1791690000000_add_deposit_proof_to_staff_alerts.ts`
+- Create: `apps/platform/database/migrations/1791694000000_add_deposit_proof_to_staff_alerts.ts`
 - Regenerated: `apps/platform/database/schema.ts` (by `pnpm migrate`)
 - Test: `apps/platform/tests/functional/notifications/staff_alerts_table.spec.ts` (add a test)
 
@@ -422,7 +422,7 @@ Expected: FAIL in the new test (the first `rejects` gets `column "project_id" of
 
 - [ ] **Step 3: Write the migration**
 
-Create `apps/platform/database/migrations/1791690000000_add_deposit_proof_to_staff_alerts.ts`:
+Create `apps/platform/database/migrations/1791694000000_add_deposit_proof_to_staff_alerts.ts`:
 
 ```ts
 import { BaseSchema } from "@adonisjs/lucid/schema";
@@ -496,8 +496,8 @@ Expected: PASS (4 table tests; the new-inquiry ones and the catalog guard unchan
 - [ ] **Step 6: Commit**
 
 ```bash
-PATH=/home/blank/.nvm/versions/node/v24.3.0/bin:$PATH pnpm -C <repo> exec biome check --write apps/platform/database/migrations/1791690000000_add_deposit_proof_to_staff_alerts.ts apps/platform/tests/functional/notifications/staff_alerts_table.spec.ts
-git -C <repo> add apps/platform/database/migrations/1791690000000_add_deposit_proof_to_staff_alerts.ts apps/platform/database/schema.ts apps/platform/tests/functional/notifications/staff_alerts_table.spec.ts
+PATH=/home/blank/.nvm/versions/node/v24.3.0/bin:$PATH pnpm -C <repo> exec biome check --write apps/platform/database/migrations/1791694000000_add_deposit_proof_to_staff_alerts.ts apps/platform/tests/functional/notifications/staff_alerts_table.spec.ts
+git -C <repo> add apps/platform/database/migrations/1791694000000_add_deposit_proof_to_staff_alerts.ts apps/platform/database/schema.ts apps/platform/tests/functional/notifications/staff_alerts_table.spec.ts
 git -C <repo> commit -m "feat(platform): let a staff alert name a deposit payment and its project" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 ```
 
