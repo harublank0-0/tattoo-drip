@@ -7,11 +7,15 @@ import InquiryService from "#modules/inquiries/services/inquiry_service";
 import DepositService from "#modules/payments/services/deposit_service";
 import TattooProject from "#modules/projects/models/tattoo_project";
 import ProjectService from "#modules/projects/services/project_service";
+import { noFacts } from "#modules/reports/pilot_metrics";
+import PilotMetricsService from "#modules/reports/services/pilot_metrics_service";
 import {
+	makeArtist,
 	makeClient,
 	makeInquiry,
 	makePayment,
 	makeProject,
+	makeSession,
 } from "#tests/helpers/pipeline";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
@@ -188,5 +192,127 @@ test.group("Pilot metrics reads (TAT-70)", (group) => {
 			received.get(made.inquiry.id)?.toMillis(),
 			nov(1, 8).toMillis(),
 		);
+	});
+
+	test("forStudio: the three facts from the studio's own data, and none from another studio's context", async ({
+		assert,
+	}) => {
+		const metrics = await app.container.make(PilotMetricsService);
+		const { tenant } = await studioWithOwner("facts-a-70");
+		const { tenant: other } = await studioWithOwner("facts-b-70");
+
+		await inTenant(tenant, async () => {
+			const client = await makeClient(tenant);
+			const artist = await makeArtist(tenant);
+			// Two inquiries that became projects with verified deposits: 48 h and 12 h.
+			const slow = await makeInquiry(tenant, client, {
+				status: "accepted",
+				decidedAt: nov(1, 12),
+				createdAt: nov(1, 10),
+			});
+			const quick = await makeInquiry(tenant, client, {
+				status: "accepted",
+				decidedAt: nov(2, 6),
+				createdAt: nov(2, 0),
+			});
+			for (const [inquiry, verified] of [
+				[slow, nov(3, 10)],
+				[quick, nov(2, 12)],
+			] as const) {
+				const project = await makeProject(tenant, client, {
+					inquiryId: inquiry.id,
+					status: "booked",
+				});
+				await makePayment(tenant, project, verifiedOn(verified));
+			}
+			// A desk booking: counted for the link share, not for the deposit time.
+			const desk = await makeProject(tenant, client, {
+				status: "booked",
+				artistId: artist.id,
+				createdAt: nov(4),
+			});
+			await makePayment(tenant, desk, verifiedOn(nov(5)));
+			// Its sessions: one done, one missed, one past without an outcome, one cancelled.
+			for (const [day, status] of [
+				[6, "completed"],
+				[7, "no_show"],
+				[8, "scheduled"],
+				[9, "cancelled"],
+			] as const) {
+				await makeSession(tenant, desk, artist, {
+					status,
+					startsAt: nov(day),
+					endsAt: nov(day, 11),
+				});
+			}
+		});
+
+		const facts = await inTenant(tenant, () =>
+			metrics.forStudio(tenant, WINDOW),
+		);
+		assert.deepEqual(
+			{ ...facts, depositHours: [...facts.depositHours].sort((a, b) => a - b) },
+			{
+				linkInquiries: 2,
+				deskProjects: 1,
+				depositHours: [12, 48],
+				sessions: { completed: 1, noShow: 1, noOutcome: 1 },
+			},
+		);
+		assert.deepEqual(
+			await inTenant(other, () => metrics.forStudio(tenant, WINDOW)),
+			noFacts(),
+		);
+	});
+
+	test("forStudio: another studio's busy data never changes a studio's numbers", async ({
+		assert,
+	}) => {
+		const metrics = await app.container.make(PilotMetricsService);
+		const { tenant } = await studioWithOwner("alone-a-70");
+		const { tenant: busy } = await studioWithOwner("alone-b-70");
+
+		await inTenant(tenant, async () => {
+			const client = await makeClient(tenant);
+			await makeInquiry(tenant, client, { createdAt: nov(2) });
+		});
+		const before = await inTenant(tenant, () =>
+			metrics.forStudio(tenant, WINDOW),
+		);
+
+		// The other studio has inquiries, a desk booking, a deposit and sessions.
+		await inTenant(busy, async () => {
+			const client = await makeClient(busy);
+			const artist = await makeArtist(busy);
+			const inquiry = await makeInquiry(busy, client, {
+				status: "accepted",
+				decidedAt: nov(3),
+				createdAt: nov(2),
+			});
+			await makeInquiry(busy, client, { createdAt: nov(4) });
+			const project = await makeProject(busy, client, {
+				inquiryId: inquiry.id,
+				status: "booked",
+				artistId: artist.id,
+			});
+			await makePayment(busy, project, verifiedOn(nov(5)));
+			await makeProject(busy, client, { status: "booked", createdAt: nov(6) });
+			await makeSession(busy, project, artist, {
+				status: "no_show",
+				startsAt: nov(7),
+				endsAt: nov(7, 11),
+			});
+		});
+
+		const after = await inTenant(tenant, () =>
+			metrics.forStudio(tenant, WINDOW),
+		);
+		assert.deepEqual(after, before);
+		assert.equal(after.linkInquiries, 1);
+		const others = await inTenant(busy, () => metrics.forStudio(busy, WINDOW));
+		assert.equal(others.linkInquiries, 2);
+		assert.equal(others.deskProjects, 1);
+		assert.lengthOf(others.depositHours, 1);
+		assert.equal(others.sessions.noShow, 1);
 	});
 });
