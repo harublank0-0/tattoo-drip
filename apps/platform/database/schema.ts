@@ -630,6 +630,8 @@ export class StaffAlertSchema extends BaseModel {
 		"id",
 		"inquiryId",
 		"kind",
+		"paymentId",
+		"projectId",
 		"readAt",
 		"tenantId",
 		"userId",
@@ -643,6 +645,10 @@ export class StaffAlertSchema extends BaseModel {
 	declare inquiryId: string | null;
 	@column()
 	declare kind: string;
+	@column()
+	declare paymentId: string | null;
+	@column()
+	declare projectId: string | null;
 	@column.dateTime()
 	declare readAt: DateTime | null;
 	@column()
