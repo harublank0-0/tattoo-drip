@@ -49,7 +49,7 @@ Every entity except `User` belongs to a `Tenant`; most of those lines are left o
 | **Tenant** | A `studio` or `independent` business: name, slug (every slug it has held is a `TenantSlug`), profile (contact phone and email, address, social links), timezone, default deposit percentage, deposit policy text |
 | **TenantSlug** | Every slug a tenant has held, its current one included. One namespace for the whole platform: a slug is never given to another tenant. Written by a database trigger; the app never changes or deletes one |
 | **TenantMembership** | One role (`owner` or `artist`) for one user in one tenant |
-| **TenantInvitation** | Email, role, an optional artist profile to claim, and a hashed single-use token that expires after 7 days |
+| **TenantInvitation** | Email (canonical), role, an optional artist profile to claim, and a hashed single-use token that expires after 7 days. One per tenant and address (a new one replaces it); deleted when accepted or cancelled, so a token works once |
 | **Artist** | A public profile in one tenant (name, slug, bio, photo, visible, accepting inquiries plus a message), optionally linked to a `User` |
 | **PaymentMethod** | A way the studio gets paid: kind (`fonepay`, `esewa`, `khalti`, `bank`, `cash`), a label, and a QR image or account details |
 | **Client** | A person who contacts the studio: one live client per normalized phone per tenant; name, optional email, notes. Form input never overwrites an existing client. Every client has a phone until its personal data is scrubbed (`anonymized_at`) |
