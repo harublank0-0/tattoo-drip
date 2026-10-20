@@ -152,6 +152,30 @@ router
 				router
 					.put("messages", [controllers.MessageTemplates, "update"])
 					.as("tenant.settings.messages.update");
+				// Members and invitations (TAT-33). A new invitation's link is
+				// shown once, on the members page.
+				router
+					.get("members", [controllers.Members, "index"])
+					.as("tenant.settings.members");
+				router
+					.post("members/invitations", [controllers.Members, "invite"])
+					.as("tenant.settings.members.invitations.store");
+				router
+					.post("members/invitations/:id/renew", [controllers.Members, "renew"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.settings.members.invitations.renew");
+				router
+					.delete("members/invitations/:id", [controllers.Members, "revoke"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.settings.members.invitations.destroy");
+				router
+					.put("members/:id/role", [controllers.Members, "role"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.settings.members.role.update");
+				router
+					.delete("members/:id", [controllers.Members, "remove"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.settings.members.destroy");
 			})
 			.prefix("/settings");
 

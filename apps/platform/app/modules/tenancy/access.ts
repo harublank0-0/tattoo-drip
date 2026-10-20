@@ -40,6 +40,12 @@ export const TENANT_ROUTE_ROLES = {
 	"tenant.settings.payments.destroy": OWNERS,
 	"tenant.settings.messages": OWNERS,
 	"tenant.settings.messages.update": OWNERS,
+	"tenant.settings.members": OWNERS,
+	"tenant.settings.members.invitations.store": OWNERS,
+	"tenant.settings.members.invitations.renew": OWNERS,
+	"tenant.settings.members.invitations.destroy": OWNERS,
+	"tenant.settings.members.role.update": OWNERS,
+	"tenant.settings.members.destroy": OWNERS,
 
 	// Artist profiles: owners manage every one; an artist edits only the
 	// live profile linked to them, never its link (ArtistService.findEditable,

@@ -355,6 +355,78 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/message_templates_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
+  'tenant.settings.members': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/settings/members'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/members_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/members_controller').default['index']>>>
+    }
+  }
+  'tenant.settings.members.invitations.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/settings/members/invitations'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/tenancy/validators/members').inviteValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/tenancy/validators/members').inviteValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/members_controller').default['invite']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/members_controller').default['invite']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.settings.members.invitations.renew': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/settings/members/invitations/:id/renew'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/members_controller').default['renew']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/members_controller').default['renew']>>>
+    }
+  }
+  'tenant.settings.members.invitations.destroy': {
+    methods: ["DELETE"]
+    pattern: '/t/:tenant/settings/members/invitations/:id'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/members_controller').default['revoke']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/members_controller').default['revoke']>>>
+    }
+  }
+  'tenant.settings.members.role.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/settings/members/:id/role'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/tenancy/validators/members').memberRoleValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/tenancy/validators/members').memberRoleValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/members_controller').default['role']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/members_controller').default['role']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.settings.members.destroy': {
+    methods: ["DELETE"]
+    pattern: '/t/:tenant/settings/members/:id'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/members_controller').default['remove']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/members_controller').default['remove']>>>
+    }
+  }
   'tenant.artists': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/artists'

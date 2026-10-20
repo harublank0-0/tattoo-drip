@@ -52,6 +52,17 @@ export interface ApiDefinition {
       messages: typeof routes['tenant.settings.messages'] & {
         update: typeof routes['tenant.settings.messages.update']
       }
+      members: typeof routes['tenant.settings.members'] & {
+        invitations: {
+          store: typeof routes['tenant.settings.members.invitations.store']
+          renew: typeof routes['tenant.settings.members.invitations.renew']
+          destroy: typeof routes['tenant.settings.members.invitations.destroy']
+        }
+        role: {
+          update: typeof routes['tenant.settings.members.role.update']
+        }
+        destroy: typeof routes['tenant.settings.members.destroy']
+      }
     }
     artists: typeof routes['tenant.artists'] & {
       mine: typeof routes['tenant.artists.mine']

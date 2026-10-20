@@ -14,6 +14,8 @@ import Quote from "#modules/projects/models/quote";
 import TattooProject from "#modules/projects/models/tattoo_project";
 import ProjectSession from "#modules/scheduling/models/project_session";
 import Tenant from "#modules/tenancy/models/tenant";
+import TenantInvitation from "#modules/tenancy/models/tenant_invitation";
+import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import TenantSlug from "#modules/tenancy/models/tenant_slug";
 import { inTenant, type Studio } from "#tests/helpers/tenants";
 
@@ -53,7 +55,9 @@ export type IsolationCase = {
 		| "sessionProject"
 		| "newInquiry"
 		| "client"
-		| "alert";
+		| "alert"
+		| "invitation"
+		| "artistMembership";
 	/** Who sends the request. Every settings route is owner-only. */
 	actor: "owner" | "artist";
 	/** A valid body for writes, built for the studio sending it. */
@@ -259,6 +263,27 @@ const alertRows = (target: Studio) =>
 				.orderBy("id")
 		).map((alert) => alert.serialize()),
 	);
+
+// Memberships (removed ones included), invitations and who each profile is
+// linked to (TAT-33): what the members routes could change.
+const memberRows = (target: Studio) =>
+	inTenant(target.tenant, async () => ({
+		memberships: (
+			await TenantMembership.withTrashed()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("id")
+		).map((membership) => membership.serialize()),
+		invitations: (
+			await TenantInvitation.query()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("id")
+		).map((invitation) => invitation.serialize()),
+		profiles: (
+			await Artist.withTrashed()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("id")
+		).map(({ id, userId }) => ({ id, userId })),
+	}));
 
 export const isolationCases: IsolationCase[] = [
 	{
@@ -774,5 +799,53 @@ export const isolationCases: IsolationCase[] = [
 		actor: "owner",
 		ownStatus: 302,
 		snapshot: alertRows,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/settings/members",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: memberRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/settings/members/invitations",
+		actor: "owner",
+		body: () => ({ email: "new-member@example.com", role: "artist" }),
+		ownStatus: 302,
+		snapshot: memberRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/settings/members/invitations/:id/renew",
+		resource: "invitation",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: memberRows,
+	},
+	{
+		method: "DELETE",
+		pattern: "/t/:tenant/settings/members/invitations/:id",
+		resource: "invitation",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: memberRows,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/settings/members/:id/role",
+		resource: "artistMembership",
+		actor: "owner",
+		body: () => ({ role: "owner" }),
+		ownStatus: 302,
+		snapshot: memberRows,
+	},
+	{
+		method: "DELETE",
+		pattern: "/t/:tenant/settings/members/:id",
+		resource: "artistMembership",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: memberRows,
 	},
 ];
