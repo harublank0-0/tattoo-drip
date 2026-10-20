@@ -5,10 +5,13 @@ import {
 	alertTarget,
 	alertTimeText,
 	dashboardUrl,
+	depositProofSubject,
 	excerpt,
 	inquiryIntro,
 	inquiryRecipients,
 	newInquirySubject,
+	paymentsCardPath,
+	proofIntro,
 } from "#modules/notifications/alerts";
 
 const KTM = "Asia/Kathmandu";
@@ -178,6 +181,77 @@ test.group("new-inquiry alerts", () => {
 		assert.equal(
 			alertTimeText(at("2025-12-31T05:00:00Z"), KTM, now),
 			"31 Dec 2025, 10:45",
+		);
+	});
+});
+
+test.group("deposit-proof alerts (TAT-88)", () => {
+	test("the email's intro, subject and link to the Payments card", ({
+		assert,
+	}) => {
+		const intro = (over: Partial<Parameters<typeof proofIntro>[0]>) =>
+			proofIntro({
+				clientName: "Sita Rai",
+				studioName: "Black Needle",
+				yourProject: false,
+				...over,
+			});
+
+		assert.equal(intro({}), "Sita sent Black Needle a deposit screenshot.");
+		assert.equal(
+			intro({ yourProject: true }),
+			"Sita sent Black Needle a deposit screenshot for your project.",
+		);
+		assert.equal(
+			intro({ clientName: "  " }),
+			"A client sent Black Needle a deposit screenshot.",
+		);
+		assert.equal(
+			intro({ clientName: "सीता राई" }),
+			"सीता sent Black Needle a deposit screenshot.",
+		);
+		assert.equal(
+			depositProofSubject("Black Needle"),
+			"Deposit screenshot for Black Needle",
+		);
+		assert.equal(
+			paymentsCardPath("black-needle", "p-1"),
+			"/t/black-needle/projects/p-1#payments",
+		);
+		assert.equal(
+			dashboardUrl("https://app.example.com", paymentsCardPath("x", "p-1")),
+			"https://app.example.com/t/x/projects/p-1#payments",
+		);
+	});
+
+	test("the in-app line and where opening it goes", ({ assert }) => {
+		assert.deepEqual(alertCopy("deposit_proof", true), {
+			title: "Deposit screenshot to check",
+			detail: "Open the project's Payments card.",
+		});
+		assert.deepEqual(alertCopy("deposit_proof", false), {
+			title: "A deposit screenshot for your project",
+			detail: "An owner checks it on the Payments card.",
+		});
+		const proof = {
+			kind: "deposit_proof" as const,
+			inquiryId: null,
+			projectId: "p-1",
+		};
+		for (const role of ["owner", "artist"]) {
+			assert.deepEqual(
+				alertTarget(proof, role),
+				{ route: "tenant.projects.show", id: "p-1", hash: "payments" },
+				role,
+			);
+		}
+		assert.isNull(alertTarget({ ...proof, projectId: null }, "owner"));
+		// A new-inquiry alert never opens a project, whatever the row holds.
+		assert.isNull(
+			alertTarget(
+				{ kind: "new_inquiry", inquiryId: null, projectId: "p-1" },
+				"owner",
+			),
 		);
 	});
 });
