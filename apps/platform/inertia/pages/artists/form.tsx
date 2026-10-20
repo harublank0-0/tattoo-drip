@@ -43,9 +43,15 @@ export default function ArtistForm({
 			title={owner ? (artist ? "Edit artist" : "Add an artist") : "Profile"}
 		>
 			{artist ? (
+				// An artist's save redirects back to this same page, and Inertia
+				// keeps a same-page form's state after a non-GET visit: the chosen
+				// photo would stay in the file input and ride along on every later
+				// save (silently winning over "Remove this photo"). Keep the state
+				// only when the save failed, so the form is fresh after a success.
 				<Form
 					route="tenant.artists.update"
 					routeParams={{ ...params, id: artist.id }}
+					options={{ preserveState: "errors" }}
 				>
 					{({ errors, processing }) => (
 						<ArtistFields
