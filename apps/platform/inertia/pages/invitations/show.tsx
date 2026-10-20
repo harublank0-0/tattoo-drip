@@ -77,7 +77,7 @@ export default function Invitation(props: Props) {
 		<>
 			<Head title={title} />
 			<div className="flex flex-col gap-1">
-				<h1 className="text-2xl font-semibold tracking-tight break-words">
+				<h1 className="text-2xl leading-snug font-semibold break-words">
 					{title}
 				</h1>
 				<p className="text-sm text-muted-foreground">{lead(props)}</p>

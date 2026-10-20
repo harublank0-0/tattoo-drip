@@ -85,6 +85,7 @@ export default function Members({
 				<Form
 					route="tenant.settings.members.invitations.store"
 					routeParams={{ tenant: tenant.slug }}
+					resetOnSuccess
 				>
 					{({ errors, processing }) => (
 						<FieldGroup>
