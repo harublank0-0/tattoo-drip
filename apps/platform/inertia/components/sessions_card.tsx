@@ -490,16 +490,22 @@ function ScheduleForm({
 								ref={kind}
 								id={field("kind")}
 								name="sessionKind"
-								defaultValue="tattoo"
+								defaultValue={
+									scheduling.kinds.includes("tattoo")
+										? "tattoo"
+										: scheduling.kinds[0]
+								}
 								aria-invalid={!!errors.sessionKind}
 								aria-describedby={
 									errors.sessionKind ? field("kind-error") : undefined
 								}
 								className={select}
 							>
-								<option value="tattoo">Tattoo</option>
-								<option value="consultation">Consultation</option>
-								<option value="touch_up">Touch-up</option>
+								{scheduling.kinds.map((value) => (
+									<option key={value} value={value}>
+										{SESSION_KIND_LABELS[value] ?? value}
+									</option>
+								))}
 							</select>
 							{errors.sessionKind && (
 								<FieldError id={field("kind-error")}>

@@ -94,6 +94,9 @@ export default function ProjectsIndex({
 										{project.quoteLapsed && (
 											<Badge variant="outline">quote expired</Badge>
 										)}
+										{project.balanceOwed && (
+											<Badge variant="outline">balance due</Badge>
+										)}
 										{project.noSession && (
 											<Badge variant="destructive">no session</Badge>
 										)}
