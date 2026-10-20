@@ -52,10 +52,11 @@ const DEMOS = [
 ] as const;
 
 /**
- * Development only: gives every tenant without inquiries three `new` ones
- * with generated placeholder references, stored like real uploads, so the
- * inbox can be tried before TAT-51's intake exists. Run as the owner role:
- * `pnpm seed:dev`.
+ * Development only: gives every tenant the three demo inquiries below (`new`,
+ * with generated placeholder references stored like real uploads), whatever
+ * else the tenant already has. A demo whose phone already has an inquiry in
+ * that tenant, accepted or not, is skipped, so a second run adds nothing.
+ * Run as the owner role: `pnpm seed:dev`.
  */
 export default class DemoInquiriesSeeder extends BaseSeeder {
 	static environment = ["development"];
@@ -68,69 +69,71 @@ export default class DemoInquiriesSeeder extends BaseSeeder {
 		// (`Model.query({ client })`) do honor the client.
 		const images = new ImageService();
 		for (const tenant of await Tenant.query({ client })) {
-			const existing = await Inquiry.query({ client })
+			const artist = await Artist.query({ client })
 				.where("tenant_id", tenant.id)
+				.orderBy("name")
 				.first();
-			if (!existing) {
-				const artist = await Artist.query({ client })
+			for (const demo of DEMOS) {
+				const person =
+					(await Client.query({ client })
+						.where("tenant_id", tenant.id)
+						.where("phone", demo.phone)
+						.first()) ??
+					(await Client.create(
+						{ tenantId: tenant.id, name: demo.name, phone: demo.phone },
+						{ connection: client.connectionName },
+					));
+				const existing = await Inquiry.query({ client })
 					.where("tenant_id", tenant.id)
-					.orderBy("name")
+					.where("client_id", person.id)
 					.first();
-				for (const demo of DEMOS) {
-					const person =
-						(await Client.query({ client })
-							.where("tenant_id", tenant.id)
-							.where("phone", demo.phone)
-							.first()) ??
-						(await Client.create(
-							{ tenantId: tenant.id, name: demo.name, phone: demo.phone },
-							{ connection: client.connectionName },
-						));
-					const inquiry = await Inquiry.create(
+				if (existing) {
+					continue;
+				}
+				const inquiry = await Inquiry.create(
+					{
+						tenantId: tenant.id,
+						clientId: person.id,
+						idea: demo.idea,
+						placement: demo.placement,
+						approximateSize: demo.size,
+						preferredDates: demo.dates,
+						preferredArtistId: demo.namesArtist ? (artist?.id ?? null) : null,
+						budget: demo.budget,
+						sourceChannel: "instagram",
+						contactName: person.name,
+						contactPhone: person.phone,
+						contactEmail: null,
+						status: "new",
+					},
+					{ connection: client.connectionName },
+				);
+				for (const [position, [r, g, b]] of demo.colours.entries()) {
+					const bytes = await sharp({
+						create: {
+							width: 640,
+							height: 480,
+							channels: 3,
+							background: { r, g, b },
+						},
+					})
+						.jpeg()
+						.toBuffer();
+					const stored = await images.storeBytes(bytes, {
+						tenant,
+						purpose: "reference_image",
+					});
+					await ReferenceImage.create(
 						{
 							tenantId: tenant.id,
-							clientId: person.id,
-							idea: demo.idea,
-							placement: demo.placement,
-							approximateSize: demo.size,
-							preferredDates: demo.dates,
-							preferredArtistId: demo.namesArtist ? (artist?.id ?? null) : null,
-							budget: demo.budget,
-							sourceChannel: "instagram",
-							contactName: person.name,
-							contactPhone: person.phone,
-							contactEmail: null,
-							status: "new",
+							inquiryId: inquiry.id,
+							imageKey: stored.key,
+							width: stored.width,
+							height: stored.height,
+							position,
 						},
 						{ connection: client.connectionName },
 					);
-					for (const [position, [r, g, b]] of demo.colours.entries()) {
-						const bytes = await sharp({
-							create: {
-								width: 640,
-								height: 480,
-								channels: 3,
-								background: { r, g, b },
-							},
-						})
-							.jpeg()
-							.toBuffer();
-						const stored = await images.storeBytes(bytes, {
-							tenant,
-							purpose: "reference_image",
-						});
-						await ReferenceImage.create(
-							{
-								tenantId: tenant.id,
-								inquiryId: inquiry.id,
-								imageKey: stored.key,
-								width: stored.width,
-								height: stored.height,
-								position,
-							},
-							{ connection: client.connectionName },
-						);
-					}
 				}
 			}
 			logger.info(`/t/${tenant.slug}/inbox`);
