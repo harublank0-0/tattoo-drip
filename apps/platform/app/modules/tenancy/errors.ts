@@ -31,3 +31,37 @@ export class SlugLimitError extends Error {
 		this.name = "SlugLimitError";
 	}
 }
+
+/** Why an invitation can't be made or accepted (TAT-33). */
+export const INVITATION_RULES = [
+	/** No live invitation for this token and flow: used, cancelled, replaced or never made. */
+	"invalid",
+	"expired",
+	/** The account's address isn't confirmed (TAT-18). */
+	"unverified",
+	/** The signed-in account's address isn't the invited one. */
+	"wrong_account",
+	"already_member",
+	/** The profile offered is gone or linked to someone. */
+	"profile_unavailable",
+] as const;
+export type InvitationRule = (typeof INVITATION_RULES)[number];
+
+/** An invitation refused for `reason`. Controllers write their own messages. */
+export class InvitationRuleError extends Error {
+	constructor(readonly reason: InvitationRule) {
+		super(`Invitation refused: ${reason}`);
+		this.name = "InvitationRuleError";
+	}
+}
+
+/**
+ * An owner acting on their own membership (TAT-33): removing yourself or
+ * changing your own role isn't done here.
+ */
+export class MemberRuleError extends Error {
+	constructor(readonly reason: "self") {
+		super(`Member change refused: ${reason}`);
+		this.name = "MemberRuleError";
+	}
+}
