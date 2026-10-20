@@ -9,7 +9,10 @@ import {
 	excerpt,
 	inquiryIntro,
 	inquiryRecipients,
+	paymentsCardPath,
+	proofIntro,
 } from "#modules/notifications/alerts";
+import DepositProofMail from "#modules/notifications/emails/deposit_proof_mail";
 import NewInquiryMail from "#modules/notifications/emails/new_inquiry_mail";
 import StaffAlert from "#modules/notifications/models/staff_alert";
 import type Tenant from "#modules/tenancy/models/tenant";
@@ -36,7 +39,19 @@ export type AlertPage = {
 };
 
 /**
- * Staff alerts (TAT-52): made by the jobs that learn of an event, read by
+ * What a deposit-proof alert needs (DepositProofAlertJob gathers it): the
+ * payment, its project, the project's artist profile and the client's name
+ * as the studio stores it.
+ */
+export type DepositProof = {
+	paymentId: string;
+	projectId: string;
+	artistId: string | null;
+	clientName: string;
+};
+
+/**
+ * Staff alerts (TAT-52, TAT-88): made by the jobs that learn of an event, read by
  * each member on the Alerts page. A row holds ids only (spec ruling 5).
  */
 @inject()
@@ -74,7 +89,7 @@ export default class AlertService {
 			const inserted = await insertAlerts(
 				trx,
 				tenant,
-				inquiry.id,
+				{ kind: "new_inquiry", inquiryId: inquiry.id },
 				recipients.map(({ userId }) => userId),
 			);
 			const alerted = recipients.filter(({ userId }) => inserted.has(userId));
@@ -99,6 +114,72 @@ export default class AlertService {
 											`/t/${studio.slug}/inbox/${inquiry.id}`,
 										)
 									: null,
+						}),
+						trx,
+					);
+				}
+			}
+			return alerted.map(({ userId }) => userId);
+		});
+	}
+
+	/**
+	 * Alerts the studio's owners, and the member linked to the project's
+	 * live artist profile, that a client sent a deposit screenshot
+	 * (DepositProofAlertJob, TAT-88): the new-inquiry rule with the project's
+	 * artist in place of the asked-for one. Each member gets one alert and
+	 * one email per payment, once: the unique (user_id, payment_id) and `on
+	 * conflict do nothing` make a repeated run add nothing, and each email is
+	 * queued in the same transaction as its alert. Both point at the
+	 * project's Payments card. Returns the users alerted by this call.
+	 */
+	async depositProof(
+		tenant: TenantRef,
+		proof: DepositProof,
+		options: AlertOptions = {},
+	): Promise<string[]> {
+		const studio = await this.tenancy.find(tenant.id);
+		if (!studio) return [];
+		const members = await this.tenancy.members(tenant);
+		const artist = proof.artistId
+			? (await this.artists.list(tenant)).find(
+					({ id }) => id === proof.artistId,
+				)
+			: undefined;
+		// askedForYou marks the project's artist here: "for your project".
+		const recipients = inquiryRecipients(members, artist?.userId ?? null);
+		const emails = options.emails ?? env.get("ALERT_EMAILS") !== false;
+		const url = dashboardUrl(
+			env.get("APP_URL"),
+			paymentsCardPath(studio.slug, proof.projectId),
+		);
+
+		return withTransaction(async (trx) => {
+			const inserted = await insertAlerts(
+				trx,
+				tenant,
+				{
+					kind: "deposit_proof",
+					projectId: proof.projectId,
+					paymentId: proof.paymentId,
+				},
+				recipients.map(({ userId }) => userId),
+			);
+			const alerted = recipients.filter(({ userId }) => inserted.has(userId));
+			if (emails) {
+				for (const recipient of alerted) {
+					await sendMailInTransaction(
+						new DepositProofMail({
+							to: recipient.email,
+							recipientName: recipient.fullName,
+							studioName: studio.name,
+							intro: proofIntro({
+								clientName: proof.clientName,
+								studioName: studio.name,
+								yourProject: recipient.askedForYou,
+							}),
+							forOwner: recipient.role === "owner",
+							url,
 						}),
 						trx,
 					);
@@ -169,20 +250,34 @@ export default class AlertService {
 	}
 }
 
-/** Inserts one new-inquiry alert per user, skipping those that exist; returns the users inserted now. */
+/** What one alert row names: an inquiry, or a payment and its project (TAT-88). */
+type AlertSubject =
+	| { kind: "new_inquiry"; inquiryId: string }
+	| { kind: "deposit_proof"; projectId: string; paymentId: string };
+
+/** Inserts one alert per user about `subject`, skipping those that exist; returns the users inserted now. */
 async function insertAlerts(
 	trx: TransactionClientContract,
 	tenant: TenantRef,
-	inquiryId: string,
+	subject: AlertSubject,
 	userIds: string[],
 ): Promise<Set<string>> {
 	if (userIds.length === 0) return new Set();
+	// Only the columns the kind names: constants, never request data.
+	const { columns, ids } =
+		subject.kind === "new_inquiry"
+			? { columns: ["inquiry_id"], ids: [subject.inquiryId] }
+			: {
+					columns: ["project_id", "payment_id"],
+					ids: [subject.projectId, subject.paymentId],
+				};
+	const row = `(?, ?, ?, ${ids.map(() => "?").join(", ")}, now())`;
 	const { rows } = await trx.rawQuery(
-		`insert into staff_alerts (tenant_id, user_id, kind, inquiry_id, created_at)
-		 values ${userIds.map(() => "(?, ?, 'new_inquiry', ?, now())").join(", ")}
+		`insert into staff_alerts (tenant_id, user_id, kind, ${columns.join(", ")}, created_at)
+		 values ${userIds.map(() => row).join(", ")}
 		 on conflict do nothing
 		 returning user_id`,
-		userIds.flatMap((userId) => [tenant.id, userId, inquiryId]),
+		userIds.flatMap((userId) => [tenant.id, userId, subject.kind, ...ids]),
 	);
 	return new Set((rows as { user_id: string }[]).map((row) => row.user_id));
 }
