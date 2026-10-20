@@ -140,7 +140,13 @@ export type ProjectPageProps = {
 	payments: PaymentsCardProps;
 };
 
+/**
+ * The word for every status a badge shows: a project's, an inquiry's, and the
+ * flag for a deposit screenshot that waits for a decision.
+ */
 export const STATUS_LABELS: Record<string, string> = {
+	new: "New request",
+	accepted: "Accepted",
 	reviewing: "Reviewing",
 	quoted: "Quoted",
 	on_hold: "On hold",
@@ -151,7 +157,50 @@ export const STATUS_LABELS: Record<string, string> = {
 	healing_check: "Healing check",
 	declined: "Declined",
 	cancelled: "Cancelled",
+	screenshot_to_check: "Screenshot to check",
 };
+
+/** The flag a project row shows while a deposit screenshot waits for an owner. */
+export const PROOF_WAITING_STATUS = "screenshot_to_check";
+
+/** Whose move it is (TAT-98); each group has its own colour and icon. */
+export type StatusGroup = "studio" | "client" | "booked" | "chair" | "closed";
+
+/**
+ * The group of every status in STATUS_LABELS, one each (a unit test pins it
+ * to the server's lists): waiting on the studio, waiting on the client,
+ * booked, in the chair, closed. Add a status here and in STATUS_LABELS
+ * together.
+ */
+export const STATUS_GROUPS: Record<string, StatusGroup> = {
+	new: "studio",
+	reviewing: "studio",
+	screenshot_to_check: "studio",
+	quoted: "client",
+	on_hold: "client",
+	deposit_pending: "client",
+	booked: "booked",
+	in_progress: "chair",
+	healing_check: "chair",
+	completed: "closed",
+	accepted: "closed",
+	declined: "closed",
+	cancelled: "closed",
+};
+
+/** What each group means, for the badge's tooltip and the page's legend. */
+export const STATUS_GROUP_LABELS: Record<StatusGroup, string> = {
+	studio: "Waiting on the studio",
+	client: "Waiting on the client",
+	booked: "Booked",
+	chair: "In the chair",
+	closed: "Closed",
+};
+
+/** A status's group; one nobody mapped reads as closed, never as someone's move. */
+export function statusGroup(status: string): StatusGroup {
+	return STATUS_GROUPS[status] ?? "closed";
+}
 
 const GROUPED = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 });
 
