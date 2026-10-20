@@ -347,4 +347,39 @@ test.group("The invitation link and page (TAT-33)", (group) => {
 			[{ userId: user.id, role: "owner" }],
 		);
 	});
+
+	test("a member of another studio can't use this studio's invitation for another address; nothing changes", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, made } = await studio();
+		const { owner: elsewhere, tenant: theirs } = await studioWithOwner(
+			"elsewhere-no-33",
+			"Elsewhere No",
+		);
+		await User.query()
+			.where("id", elsewhere.id)
+			.update({ email_verified_at: new Date() });
+		const user = await User.findOrFail(elsewhere.id);
+
+		const response = await client
+			.post("/invitations")
+			.withSession({ [INVITATION_TOKEN_KEY]: made.token })
+			.form({ flow: await invitationFlow(tenant, made.token) })
+			.withCsrfToken()
+			.loginAs(user)
+			.redirects(0);
+
+		response.assertHeader("location", "/invitations");
+		assert.lengthOf(await membersOf(tenant), 1);
+		const own = await inTenant(theirs, () =>
+			TenantMembership.query().where("tenant_id", theirs.id),
+		);
+		assert.lengthOf(own, 1);
+		assert.equal(
+			(await invitationFlow(tenant, made.token)) === made.id,
+			true,
+			"the invitation is still there",
+		);
+	});
 });
