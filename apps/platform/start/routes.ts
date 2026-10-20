@@ -23,7 +23,16 @@ import {
 	throttleVerifyResend,
 } from "#start/limiter";
 
-router.on("/").renderInertia("home", {}).as("home");
+/**
+ * The front door (TAT-100): there is no landing page, so / sends a signed-in
+ * user to /dashboard (their studio) and anyone else to the sign-in page. The
+ * Tattoo Drip wordmark links here.
+ */
+router
+	.get("/", ({ auth, response }) =>
+		response.redirect().toPath(auth.isAuthenticated ? "/dashboard" : "/login"),
+	)
+	.as("home");
 
 router
 	.group(() => {
