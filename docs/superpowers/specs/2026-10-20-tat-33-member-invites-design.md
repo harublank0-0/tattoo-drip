@@ -1,0 +1,202 @@
+# Member invites: invite, revoke, accept, claim an artist profile (TAT-33)
+
+Date: 2026-10-20
+Refs: TAT-33 (Member invites: invite, revoke, accept, claim artist profile). Builds on TAT-19 (`TenancyService.assertKeepsAnOwner`, memberships soft-deleted), TAT-28/29 (RLS, the isolation harness, SECURITY DEFINER rules), TAT-31 (artist profiles: `user_id` unique per live profile and tenant, `ON DELETE SET NULL`), TAT-18 (account tokens: 256-bit, SHA-256 only, single use; the link GET stages the token in the session; the `flow` field; `verifiedEmail`; canonical emails; `throttleAccountLinks`; `account:verify`), TAT-30 (`TENANT_ROUTE_ROLES`, `ArtistService.profileOf`, the artist walk), TAT-52 (`TenancyService.members`, alerts per member) and TAT-65 (the owner copies a link and sends it on WhatsApp or Viber). Honours the carry-forwards named on the ticket and in the docs: TAT-18's `verifiedEmail` on the accept route (and its route in `NEEDS_CONFIRMED_EMAIL`), matching by `canonicalEmail`, the hashed single-use token; TAT-31's "TAT-33's claim path adds its own check before linking anyone else" and "TAT-33 must unlink, not delete, a removed member's profile"; TAT-43/50's comment (linking an account to a profile makes the artist's calendar and booking work with no other change).
+Size: **about 5 points** (the ticket says 3). Ruling 1 says why and keeps it there.
+
+## Goal
+
+An owner invites someone by email as an owner or an artist, optionally offering an existing artist profile to claim, and gets a link to send them on WhatsApp or Viber. The person opens it, signs in with that confirmed address and joins the studio (and gets the profile). Owners see the members and the pending invitations, cancel an invitation, make a member an owner or an artist, and remove a member, whose access ends on their next request while their artist profile stays with the studio, unlinked. A studio can never be left without an owner.
+
+Two additive migrations (`tenant_invitations`, the `invitation_tenant()` lookup), no new setting, nine new routes (six owner routes under Settings, three for the invitation link), no email, no API, OpenAPI, SDK or storefront change. Written without the user (unattended run): every open question is a ruling below.
+
+## Depends on the built chain
+
+Designed on TAT-30's design commit (d1d1c1a), on top of 65eab5f (TAT-98, which holds TAT-18 and TAT-52). It needs **TAT-30 built** first: the six owner routes are entries in `TENANT_ROUTE_ROLES`, the new routes join TAT-30's artist walk, and the claim uses `ArtistService.profileOf`. The plan's Task 0 checks for those names, not a commit.
+
+## Rulings
+
+1. **About 5 points, the five boxes and the carry-forwards, nothing more.** In: invitations (create, replace, renew, cancel, list), the accept flow, the claim, removing a member, changing a member's role (ruling 13), the Members settings page, the accept page. Out, as carry-forwards: an invitation email (ruling 5), leaving a studio yourself (ruling 14), a cap on pending invitations (ruling 17), keeping a history of accepted invitations. Why 5: a new tenant-owned table with a cross-tenant lookup function, two services, nine routes with their isolation cases and two pages; TAT-18 needed 5 for a comparable token flow. Rejected: a 3-point slice without role changes or the members list (the ticket's own boxes need both).
+2. **The tenancy module owns it.** `TenantInvitation` (table `tenant_invitations`, tenant-owned, RLS) and `InvitationService` (`#modules/tenancy/services/invitation_service`); removing members and changing roles in a new `MemberService` (`#modules/tenancy/services/member_service`), which calls `TenancyService.assertKeepsAnOwner` and `ArtistService` (so `TenancyService`'s constructor, which a test fakes, stays as it is). Pure helpers in `#modules/tenancy/invitations`. Rejected: putting invitations in `identity` (they belong to a studio and its RLS); reusing `account_tokens` (not tenant-owned, keyed by an account that may not exist yet).
+3. **The token is TAT-18's, shown to the owner exactly once.** `newAccountToken()` (32 random bytes, base64url, 43 characters) and `hashAccountToken()` (SHA-256, hex) from `#modules/identity/account_tokens`; only the hash is stored, under a unique index, and looked up by it (TAT-18 ruling 3: the index lookup is the constant-time compare). The link is `APP_URL` + `/invitations/<token>` and travels from the create (or "New link") request to the Members page in a one-time session flash, so the owner sees it once, on the page right after, with Copy link and Share on WhatsApp; it is never stored, logged or shown again. "New link" replaces the token (the old link dies at once) and the 7 days start again. Rejected: TAT-65's re-showable link (a nonce and an HKDF key so the server can rebuild the token: more code, and a database dump plus `APP_KEY` would yield live invitations); a signed URL (can't be single-use or revoked).
+4. **Bound to one canonical email; one pending invitation per studio and address.** The address goes through `canonicalEmail` (the validator) and a database check identical to `users_email_canonical`, so it compares equal to the account's stored address. Inviting an address that already has a pending invitation replaces it (new token, role, profile, 7 days) in one upsert; the flash says the earlier link no longer works. Inviting a live member's address is a field error. Expiry is the database's clock (`now() + 7 days`), like TAT-18. Rejected: several invitations per address (which one wins?); refusing a second invitation (the owner would have to cancel first).
+5. **No invitation email (decided, behind no switch).** The owner sends the link himself on WhatsApp or Viber, as with deposit links. Why: no sending domain exists until TAT-20, so an email would fail or land in spam; an email to any typed address makes the platform a mailer for every owner, which needs its own limits; and the token would sit in `queue_jobs` (failed rows are kept a day). Rejected: an email queued behind an `INVITE_EMAILS`-style switch (a mail class, two templates, tests and a setting for a channel the pilot can't use). Carry-forward to TAT-20: the invitation email, and then, if wanted, letting its link confirm the exact address it was sent to (TAT-18's carry-forward; impossible now, since a WhatsApp link proves nothing about a mailbox).
+6. **The link's GET stages the token; the page has no token in its URL; joining is a POST.** `GET /invitations/<token>` (43 base64url characters, else the router's 404; `throttleAccountLinks`) only puts the token in the session (`INVITATION_TOKEN_KEY`) and redirects to `/invitations`, with `Referrer-Policy: no-referrer` and `Cache-Control: no-store`. The page reads it from the session and answers `Cache-Control: no-store` and `Referrer-Policy: same-origin`. It renders the invitation row's id (not a secret) in a hidden `flow` field, and the POST must send it back (TAT-18's flow id: a form acts only on the invitation it showed). A chat app's link preview that fetches the URL fills only its own session.
+7. **Accepting needs a signed-in account with that confirmed address.** `POST /invitations` runs `auth`, `dbContext`, `verifiedEmail` (TAT-18's gate: an unconfirmed account goes to `/confirm-email`) and `throttleAccountLinks`, and the route joins `NEEDS_CONFIRMED_EMAIL`. `InvitationService.accept` checks again, under the invitation's row lock: the row is live (`flow` and hash match, not expired by the database's clock), the account is confirmed, its stored (canonical) address equals the invitation's, and it isn't already a live member. Then, in the same transaction: the membership with the invitation's role, the claim (ruling 10), and the invitation's deletion. Any refusal changes nothing and the page shows why. After joining: an owner lands on the Inbox, an artist on Projects, with the toast (straight there: a flash doesn't survive the studio home's second redirect).
+8. **The accept page is open to everyone and never says whether an address has an account.** `/invitations` is outside the `guest` group (its usual visitor is signed in; it signs nobody in or out: TAT-18 ruling 16's reasoning, which supersedes backend.md's older "invitations go in the guest group"). A guest always sees both "Sign in" and "Create an account", whatever the address. A signed-in visitor sees one of: a different account ("sign out, then sign in as …"), an unconfirmed address ("confirm it first", with "Send a new link"), already a member ("Open {studio}"), or "Join {studio}". Sign-in and sign-out forget a staged invitation, like TAT-18's staged links (a shared browser): the page says "then open this link again". The onboarding page gains one line for invitees who signed up and landed there. Rejected: carrying the staged invitation across sign-in and redirecting `/dashboard` to it (saves one tap, but hands one person's staged link to the next person on a shared browser); a redirect parameter on `/login` (an open-redirect shape).
+9. **Finding the invitation's studio before any context exists: `invitation_tenant(requested_hash)`.** A SECURITY DEFINER function, built exactly like `tenant_for_slug`: one text argument compared with `=` against the unique `token_hash`, the tenant id of a live tenant or null, an SQL-standard body, `strict`, `search_path` pinned, schema-qualified tables, `EXECUTE` for the app role only. The service then reads and locks the row in that tenant's context (`withDbContext`), so everything else is ordinary RLS. It answers for an expired invitation too (the page says "expired"). Rejected: putting the slug in the link and using `tenant_for_slug` (couples the link to a slug that can change, and leaks the studio to anyone holding the URL anyway); exempting the table from RLS (it has a `tenant_id`: never).
+10. **The claim: only a live, unlinked profile, checked again on accept.** The invite form offers the studio's live profiles that nobody is linked to ("None" by default); creating an invitation for any other profile is a field error. `ArtistService.claim(tenant, artistId, userId)` links it under its row lock only if it is still live and unlinked and the account has no live profile in the studio (`profileOf`); otherwise it links nothing and returns false, the person still joins, and the toast says the profile was taken or removed and to ask an owner. Owners can still offer one profile in two invitations; the first to accept gets it. Why: this is the only path that links a profile to someone other than the acting member (TAT-31's carry-forward), so it carries its own check; and an owner's later edit shouldn't cost the invitee their access. Rejected: refusing the whole accept; a unique "one invitation per profile" index (a second rule to explain for a rare case).
+11. **Owners only, from Settings, Members.** The six routes are under `/t/:tenant/settings/members` and are `OWNERS` in `TENANT_ROUTE_ROLES`; artists get the 404 (TAT-30's walk proves it). An owner may invite owners.
+12. **Removing a member.** `MemberService.remove(tenant, actor, membershipId)`, in one transaction: the target must be a live membership of the studio (else E_ROW_NOT_FOUND); not the actor's own (`MemberRuleError` `self`, ruling 14); `TenancyService.assertKeepsAnOwner(trx, tenant.id, membershipId)` (it locks the owner rows; `LastOwnerError` → "A studio needs at least one owner: make someone else an owner first."); the row locked and read again (removed meanwhile: a 404); `ArtistService.unlinkUser(tenant, userId)` (every profile of the studio linked to them, deleted ones too, becomes unlinked; projects and sessions stay with the profile); `membership.softDelete(trx)`. Access ends on their next request: the tenant middleware reads the membership on every request (TAT-25), and a write they had in flight that re-checks the profile link under its row lock (`ProjectService.lockFor`, `SessionService`, `ArtistService.updateOwn`) is a 404. Their account, sessions in other studios, alerts (they can no longer open them) and the invitations they sent stay. Re-inviting them later works (the membership index is partial).
+13. **Changing a member's role, both ways.** `MemberService.changeRole(tenant, actor, membershipId, role)`: same checks; demoting an owner calls `assertKeepsAnOwner` first; the row is locked, and if it became an owner meanwhile the check runs then too. Profiles stay linked. Why: the ticket's last box ("can't be removed or demoted") presupposes a demotion, and promoting an artist would otherwise need remove-and-reinvite. Rejected: leaving role changes out.
+14. **Not on yourself.** An owner can't remove or change their own membership here (`MemberRuleError` `self`; the page offers no buttons on their own row). Leaving a studio is a carry-forward. Why: one crafted request shouldn't lock an owner out of settings; and "leave" needs its own wording and landing.
+15. **One Settings page: Members.** A new entry "Members" in the settings sidebar (after Artists), `/t/:tenant/settings/members`: the one-time link box (after create or "New link"), "Invite someone" (email, role, profile to claim), "Members" (each with role, "You" on your own row, "Make owner" / "Make artist", "Remove") and "Invitations" (address, role, profile, "Works until …" or "Expired", "New link", "Cancel invitation"). Destructive and promoting actions confirm first. TAT-107 and TAT-108 redo navigation; this page is the minimum that fits today's settings.
+16. **Routes and isolation.** Six owner routes, each with an isolation case (new `twoStudios` fixtures: `invitation`, a pending invitation per studio, and `artistMembership`, the artist's membership row; a `memberRows` snapshot of memberships, removed ones included, invitations and profile links). Three account routes, outside `/t/:tenant` (so no isolation case; they are covered by the cross-studio accept tests below): `GET /invitations/:token` and `GET /invitations` in no group (`OPEN` in `account_routes.spec.ts`), `POST /invitations` in the `auth` group.
+17. **Limits: TAT-18's link limit only.** The link GET and the accept POST count with `throttleAccountLinks` (30 per client address per 15 minutes, shared with the account links); guessing a 256-bit token is not a threat a limit needs to stop, but the count keeps the definer lookup cheap under abuse. Creating invitations is unlimited: owners only, no email sent, rows only in their own studio. Carry-forward: a cap on pending invitations if one is ever abused.
+18. **Two additive migrations.** (a) `tenant_invitations` with `enableTenantRls()`, joined to `EXPECTED_POLICIES`; (b) `invitation_tenant(text)`, joined to `DEFINER_FUNCTIONS`, with its own spec. Not soft-deleted (a credential; README's list). Rolling back loses pending invitations only.
+19. **`TenancyService.members` gains `membershipId`.** The Members list routes by the membership's id (a tenant-owned row), and the TAT-52 test that compares whole objects compares the four existing fields instead.
+
+## The pieces
+
+### Pure helpers (`#modules/tenancy/invitations`)
+
+`INVITATION_DAYS` (7), `INVITATION_LINK_FLASH` (`"invitationLink"`), `invitationPath(token)`, `invitationUrl(appUrl, token)`, `inviteMessage(studioName, url)`, `whatsappShareUrl(text)` (`https://wa.me/?text=` plus `encodeURIComponent`), `expiryText(expiresAt, timezone)` ("27 Oct 2026, 14:05" in the studio's timezone), `ROLE_WORDS` (owner: "an owner", artist: "an artist"). `INVITATION_TOKEN_KEY` lives next to TAT-18's session keys in `#modules/identity/account_tokens`, and `forgetStagedTokens` forgets it too.
+
+### Table `tenant_invitations`
+
+`id`, `tenant_id` (cascade), `email` (canonical check), `role` (`owner` or `artist`), `artist_id` (nullable, composite key to `artists`), `token_hash` (unique), `invited_by_user_id` (to `users`, set null), `expires_at`, `created_at`, `updated_at`; unique `(tenant_id, email)`; `expires_at > created_at`; RLS.
+
+### Services
+
+| Operation | Rule |
+|---|---|
+| `InvitationService.pending(tenant)` | The studio's invitations, newest first, with the profile's name and whether each has expired |
+| `InvitationService.invite(tenant, inviter, { email, role, artistId })` | Ruling 4 and 10 checks, then one upsert; returns `{ id, token, replaced }` |
+| `InvitationService.renew(tenant, inviter, id)` | New token and 7 days; E_ROW_NOT_FOUND for another studio's or an unknown id; returns `{ email, token }` |
+| `InvitationService.revoke(tenant, id)` | Deletes it; E_ROW_NOT_FOUND otherwise; returns `{ email }` |
+| `InvitationService.preview(token, viewer)` | `invalid`, `expired` (the studio's name) or `live` (flow, studio, email, role, the claimable profile's name, expiry, and the viewer's `step`) |
+| `InvitationService.accept(user, token, flow)` | Ruling 7; returns the studio, the role and `claimed` (null without a profile) |
+| `MemberService.remove(tenant, actor, membershipId)` | Ruling 12; returns the member's name |
+| `MemberService.changeRole(tenant, actor, membershipId, role)` | Ruling 13; returns the member's name |
+| `ArtistService.claim(tenant, artistId, userId)` | Ruling 10; true when linked |
+| `ArtistService.unlinkUser(tenant, userId)` | Every profile of the studio linked to the account becomes unlinked |
+| `TenancyService.members(tenant)` | Also gives `membershipId` |
+
+Errors: `InvitationRuleError` (`invalid`, `expired`, `unverified`, `wrong_account`, `already_member`, `profile_unavailable`) and `MemberRuleError` (`self`) in `#modules/tenancy/errors`.
+
+### Routes
+
+| Method and path | Name | Middleware |
+|---|---|---|
+| `GET /t/:tenant/settings/members` | `tenant.settings.members` | tenant group (owners) |
+| `POST /t/:tenant/settings/members/invitations` | `tenant.settings.members.invitations.store` | owners |
+| `POST /t/:tenant/settings/members/invitations/:id/renew` | `tenant.settings.members.invitations.renew` | owners |
+| `DELETE /t/:tenant/settings/members/invitations/:id` | `tenant.settings.members.invitations.destroy` | owners |
+| `PUT /t/:tenant/settings/members/:id/role` | `tenant.settings.members.role.update` | owners |
+| `DELETE /t/:tenant/settings/members/:id` | `tenant.settings.members.destroy` | owners |
+| `GET /invitations/:token` | `invitations.link` | none, `throttleAccountLinks`, `ACCOUNT_TOKEN` |
+| `GET /invitations` | `invitations.show` | none |
+| `POST /invitations` | `invitations.accept` | auth, dbContext, `verifiedEmail`, `throttleAccountLinks` |
+
+## Screens
+
+### Settings, Members (`settings/members`, owners)
+
+```
+[one-time box, only right after create or New link]
+Invitation link for ink@example.com
+[ https://app…/invitations/Xy…            ] [Copy link]
+[Share on WhatsApp]
+Send it to them yourself, on WhatsApp, Viber or any chat. It works once,
+until 27 Oct 2026, 14:05, and only for an account with ink@example.com.
+You won't see this link again: if you lose it, make a new one below.
+
+Invite someone
+Email            [                    ]
+Role             (•) Artist   Their own profile, and the projects and
+                              sessions assigned to them.
+                 ( ) Owner    Everything in the studio, including
+                              payments and settings.
+Artist profile   [ None                v ]   (only when one is unlinked)
+                 Gives them this profile, with its projects and sessions.
+[Create invitation link]
+
+Members
+Asha Gurung  asha@example.com   Artist   [Make owner] [Remove]
+You          ink@example.com    Owner
+
+Invitations
+mira@example.com  Artist · profile "Mira"  Works until 27 Oct 2026, 14:05
+                                           [New link] [Cancel invitation]
+(none: "No invitations waiting.")
+```
+
+One column at 375 px (rows wrap their buttons below), 44 px controls (`h-11` inputs, the native select, buttons), "Creating…" while the form posts. Confirms: remove "Remove {name}? They lose access to {studio} at once. Their artist profile stays with the studio, unlinked."; make owner "Make {name} an owner? Owners can do everything in the studio, including payments and settings."; make artist "Make {name} an artist? They keep their own profile and assigned projects, and lose everything else."; cancel "Cancel the invitation for {email}? Its link stops working."; new link "Make a new link for {email}? The link you sent before stops working."
+
+### The invitation page (`invitations/show`, `AuthLayout`)
+
+Title per state; the lead "{studio} invited {email} to join as an artist." (plus " It gives them the artist profile "{profile}", with its projects and sessions." when one is offered); then by step:
+
+- **sign_in** (a guest): "To accept, sign in as {email}, or create an account with that address first. Then open this link again." [Sign in] [Create an account].
+- **switch_account:** "You're signed in as {viewer}. Sign out, sign in as {email}, then open this link again." [Sign out].
+- **confirm_email:** "Confirm {email} first: open the link we emailed you when you signed up. Then open this invitation link again." [Send a new link].
+- **already_member:** "You're already a member of {studio}." [Open {studio}].
+- **accept:** "As an artist you get your own profile, and the projects and sessions assigned to you." / "As an owner you get everything in the studio, including payments and settings." [Join {studio}] ("Joining…").
+- Footer: "This invitation works until {expiry}."
+- **expired:** "This invitation has expired" / "Invitations work for 7 days. Ask {studio} for a new link."
+- **invalid:** "This invitation no longer works" / "It was already used or cancelled, or a newer link replaced it. Ask the studio for a new one."
+
+### Onboarding
+
+Under the heading: "Joining a studio instead? Open the invitation link the studio sent you."
+
+## Words
+
+Flashes: "Invitation link ready: send it to {email}.", "New invitation link ready for {email}. The earlier link no longer works.", "New link ready for {email}. The old one no longer works.", "Invitation for {email} cancelled. Its link no longer works.", "{name} removed. Their access to {studio} ended.", "{name} is now an owner.", "{name} is now an artist.", "A studio needs at least one owner: make someone else an owner first.", "You can't remove yourself or change your own role here.", "Link copied.", "Couldn't copy: select the link instead.", "You joined {studio}.", "You joined {studio}. Your artist profile is linked to you.", "You joined {studio}. The artist profile in the invitation was taken or removed: ask an owner to link one." Field errors: "Enter their email address.", "Enter an email address, like ink@example.com.", "Use at most 254 characters.", "Choose a role.", "Choose a profile from the list.", "{email} is already a member of this studio.", "That profile already belongs to someone, or was removed. Choose another, or none." The rest is in Screens.
+
+## Threat notes
+
+- **Token guessing.** 256 random bits, looked up by SHA-256 through a unique index; the router refuses anything that isn't 43 base64url characters before any query; the link and accept routes count 30 per client address per 15 minutes. The definer function returns only a tenant id for an exact hash.
+- **Leaked link.** It reveals the studio's name, the invited address and the role to whoever holds it, and nothing else; it can't be used without signing in as that confirmed address. It never appears in a page URL, a Referer or an app log; the proxy's access log is turned off for `/invitations/` (deploy.md, next to the account links). The owner's page shows it once (encrypted page history, TAT-82). A chat preview bot that opens it only stages it in its own session.
+- **Email mismatch.** The account's stored canonical address must equal the invitation's, checked under the row lock; a mismatch changes nothing and the page tells the visitor to switch accounts. An unconfirmed account is stopped by `verifiedEmail` and again by the service. Someone who signed up with the invitee's address can't confirm it without the invitee's mailbox (TAT-18), and `account:verify` is an operator's deliberate act.
+- **A member of studio A accepting for studio B.** The invitation's own `tenant_id` decides the studio; the visitor's memberships elsewhere grant nothing. An owner of A can't create, renew, cancel or list B's invitations (tenant from the URL, RLS, the isolation cases), nor offer B's profile (the composite key, and the form's list is A's).
+- **Replay and races.** Accepting deletes the invitation in the transaction that creates the membership, under its row lock; a second tab or a double tap waits on the lock and then finds nothing ("no longer works"). The `flow` id ties the POST to the invitation the page showed. A renewed or cancelled invitation's old link finds no row.
+- **A removed member's open sessions.** The tenant middleware reads the membership on every request, so their next request to the studio is a 404 (tested); their profile is unlinked in the same transaction, so a write in flight that re-checks the link under its lock is a 404 too. One request already past the tenant check when the removal commits can finish (accepted: one request; an owner's in-flight request is not re-checked).
+- **The last owner.** Every removal and every demotion of an owner calls `assertKeepsAnOwner` in its transaction; it locks the owner rows, so two owners removing or demoting each other at once can't both succeed (one gets the "at least one owner" error).
+- **Enumeration of accounts.** Nothing says whether the invited address has an account: creating an invitation answers the same either way (only "already a member", which the owner sees in the list anyway), and the accept page offers a guest both "Sign in" and "Create an account". Sign-in and signup keep TAT-18's guarantees.
+- **Artists and other roles.** Every owner route is `OWNERS` in the role table: an artist gets the 404 before the controller (TAT-30's walk sends each one).
+- **Shared browsers.** Sign-in and sign-out forget a staged invitation.
+- **CSRF.** Every POST, PUT and DELETE goes through Shield; the accept POST also needs the `flow` id.
+
+## Tests
+
+- **Unit:** `invitations.spec.ts` (`invitationPath`, `invitationUrl`, `inviteMessage`, `whatsappShareUrl` encoding Devanagari, `&`, `#` and `+`, `expiryText` in the studio's timezone, `ROLE_WORDS`); `account_tokens` (`forgetStagedTokens` forgets the invitation key).
+- **Functional, tables:** RLS (`assertRowLevelSecurity`), one per studio and address, the unique hash, the canonical-email check, the role check, expiry after creation, the composite key to another studio's profile; `invitation_tenant()` (gives the tenant though the app role sees no invitation, for an expired one too; null for an unknown hash, a deleted tenant and null); catalog guard entries.
+- **Functional, services:** `InvitationService` (invite stores only the hash, bound to the canonical address, 7 days by the database's clock; replacing; a member's address refused; an unavailable profile refused; renew replaces the token; revoke; pending; another studio's context sees none; preview's states and steps; accept: the membership with the role, the claim, the deletion, a replay, a second tab, an expired, renewed or cancelled link, a wrong account, an unconfirmed account, already a member, a profile taken meanwhile still joins); `MemberService` (remove unlinks and soft-deletes; the last owner refused for removal and demotion; self refused; another studio's id a 404; changeRole both ways; two owners demoting each other: one fails); `ArtistService.claim` and `unlinkUser`.
+- **Functional, HTTP:** the Members page props (members with "You", invitations, profiles, the one-time link only once); create (flash, the link box), replace, the field errors, renew, cancel, make owner and artist, remove (the next request of the removed member is a 404; their profile is unlinked), the last-owner and self flashes; artists 404 (TAT-30's walk); the link GET (session only, headers, the 404 for a malformed token); the page's states and steps (no token in the props or URL); accepting (lands on the role's page with the toast; the membership exists; the profile linked); every refusal leaves nothing changed; CSRF refused; a member of another studio accepting this studio's invitation for their own address works and for another address fails; sign-in and sign-out forget the staged invitation.
+- **Route guards:** `account_routes.spec.ts` (`POST /invitations` in `NEEDS_CONFIRMED_EMAIL` and `THROTTLES`; the two GETs in `OPEN` and in `THROTTLES` for the link); `cases.ts` (six cases); TAT-30's `tenant_routes.spec.ts` (table entries) and `role_access.spec.ts` (artists get the 404).
+- **Not automated:** how the pages look, the onboarding line, WhatsApp's share sheet (browser pass); the last-owner race between two owners (the lock is TAT-19's, proven by its own tests; here the sequential version).
+
+## Browser pass (in the PR)
+
+Dev server on `PORT=3401`; no mail needed (the link is copied). An artist account for the pass: sign up a throwaway address and confirm it with `node ace account:verify <email>`. At 375 px and 1280 px, light and dark:
+
+1. **Invite.** As the QA owner, Settings, Members: invite the throwaway address as an artist with an unlinked profile: the link box with Copy link (toast) and Share on WhatsApp (opens wa.me with the message); reload: the box is gone; the invitation is listed with "Works until …".
+2. **Accept, signed out.** In a private window open the link: the page (no token in the address bar) with "Sign in" and "Create an account"; sign in as the throwaway account: it lands on onboarding (no studio yet) with the new line; open the link again: "Join {studio}"; join: Projects with "You joined … Your artist profile is linked to you."; the account menu's "Your artist profile" opens the claimed profile (TAT-30's artist screens: edit the bio, save; the page has no settings sidebar).
+3. **Replay.** Open the same link again: "This invitation no longer works".
+4. **Wrong account.** Invite another address, open its link signed in as the throwaway account: "You're signed in as …".
+5. **Members.** As the owner: the artist listed; Make owner (confirm), Make artist; Remove (confirm): in the artist's window the next click is the not-found page, and the profile shows unlinked in Settings, Artists. Try to demote yourself: no button; with one owner, the demotion of the last owner can't be reached from the UI (the service test proves the refusal).
+6. **Cancel and renew.** Cancel an invitation: its link no longer works; "New link": the box with a new link, the old one no longer works.
+7. **Keyboard and screen reader.** Tab through both pages; the toasts and field errors are announced.
+
+## Docs
+
+- `apps/platform/docs/backend.md`: a new "Members and invitations (TAT-33)" bullet under Tenancy and route access (the services, the token, the definer function, the accept flow, removal and role changes); the Page history bullet (the invitation page is outside the guest group, like `/verify-email`; replaces "A new page where someone new may start (invitations) goes in the guest group"); the Artists bullet (`claim`, `unlinkUser`; the two TAT-33 sentences become past tense); the Accounts bullet on the gate (TAT-33's route is gated).
+- `apps/platform/database/README.md`: the SECURITY DEFINER paragraph (three functions; what `invitation_tenant` reads); `tenant_invitations` in the not-soft-deleted list.
+- `apps/platform/docs/testing.md`: the `twoStudios` bullet names `invitation` and `artistMembership`.
+- `apps/platform/docs/ui.md`: Settings, Members and the invitation page (an `AuthLayout` page outside the guest group).
+- `apps/platform/docs/deploy.md`: no access log for `/invitations/` (with the account links); invitees need a confirmed address, so until mail works `account:verify` is how a pilot artist joins.
+- `docs/requirements.md`: tick "Invite members as `owner` or `artist`; revoke invites; remove members; switch between tenants", with the rules underneath (link sent by the owner, 7 days, once, one address, confirmed account, claim, last owner, removal).
+- `docs/data-model.md`: `TenantInvitation`'s row (canonical email, one per studio and address, deleted when accepted or cancelled). `docs/architecture.md`: the Tenancy row is unchanged; the Domains/auth bullet already says accepting needs a confirmed address.
+
+## Carry-forwards
+
+Posted when the PR is ready (no Linear tickets were created in this run):
+
+- **TAT-20:** an invitation email (a mail class with the link, no secret in the subject), and possibly letting that link confirm the exact address it was sent to; until then pilot invitees are confirmed by the operator (`account:verify`) or by working SMTP.
+- **For the user, a follow-up:** "Leave this studio" for a member (an owner only while another owner remains); a cap on pending invitations; who accepted which invitation (history).
+- **TAT-42:** deleting an account deletes nothing here but sets `invited_by_user_id` to null; pending invitations hold an email address (personal data) for at most 7 days unless renewed; cancelled and accepted ones are deleted.
+- **TAT-107 / TAT-108:** Settings, Members and the invitation page's place in the new navigation.
+- **TAT-14:** the proxy's access log off for `/invitations/`.
+
+## Not in this ticket
+
+Invitation emails, leaving a studio, invite limits, invitation history, transferring ownership as a special flow, staff roles, any API, SDK or storefront change.
+
+## Assumptions the user can overrule at review
+
+No invitation email; the link shown to the owner once (a new link when lost); re-inviting an address replaces its invitation; owners can invite owners; role changes both ways; no removing or demoting yourself; a profile taken meanwhile doesn't block joining; sign-in forgets a staged invitation (open the link again); the invitation page outside the guest group; 7 days by the database's clock; Share on WhatsApp with no number (the owner picks the chat); the 5-point size.
+
+## Verification
+
+`PORT=3402 node ace test` passes on Node 24.3.0; `pnpm check`, `pnpm typecheck`, `pnpm build` and `node ace codegen` are clean; `database/schema.ts` changes only by `pnpm migrate`; the browser pass above. Then the whole-branch review and the Codex code and security reviews before the PR.
