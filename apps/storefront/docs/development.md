@@ -2,7 +2,7 @@
 
 Read the relevant section before changing UI/forms, server functions or version-specific TanStack integration. General commands and boundaries are in [area instructions](../AGENTS.md).
 
-Both apps use Tailwind CSS v4 and shadcn/ui (new-york, Radix, lucide, zinc), with separate themes until a shared design system replaces them. Storefront theme entry: `src/styles.css`. Environment validation: `src/env.ts`.
+Both apps use Tailwind CSS v4 and shadcn/ui (new-york, Radix, lucide) and the Stencil & Ink palette (TAT-97: warm paper, ink and line, the stencil violet for actions), kept as two copies of one token vocabulary until a shared design system replaces them: when you change a paper, ink, line or violet value, change `apps/platform/inertia/css/app.css` too (its comment holds the measured contrast). Storefront theme entry: `src/styles.css`. Environment validation: `src/env.ts`.
 
 The unused `@tanstack/ai*` prototype packages are slated for removal; do not build on them.
 
