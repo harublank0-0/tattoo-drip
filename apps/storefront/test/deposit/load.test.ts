@@ -1,14 +1,15 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { onlineManager } from "@tanstack/react-query";
-import { createTattooClient } from "@tattoo-drip/sdk";
+import { createTattooClient, type DepositPage } from "@tattoo-drip/sdk";
 import * as React from "react";
 import { createElement } from "react";
 import { DepositLoaded } from "../../src/deposit/components/deposit-screen.tsx";
 import { copy } from "../../src/deposit/copy.ts";
 import { renderWithProviders } from "../intake/providers.tsx";
-import { SHELL, TOKEN } from "./fixtures.ts";
+import { PAGE, page, SHELL, TOKEN } from "./fixtures.ts";
 import { attr, tags, textOf } from "./html.ts";
+import { renderWithDeposit } from "./providers.tsx";
 
 Object.assign(globalThis, { React });
 
@@ -46,5 +47,49 @@ describe("the screen while the deposit loads", () => {
 		} finally {
 			onlineManager.setOnline(true);
 		}
+	});
+});
+
+/** The loaded screen once the deposit has been read (TAT-106). */
+const readHtml = (deposit: DepositPage) =>
+	renderWithDeposit(
+		createTattooClient({
+			baseUrl: "http://api.test",
+			tenant: "black-needle-48",
+			fetch: () => Promise.reject(new Error("no request during a render")),
+		}),
+		TOKEN,
+		deposit,
+		createElement(DepositLoaded, { token: TOKEN, shell: SHELL }),
+	);
+
+describe("the screen once the deposit is read (TAT-106)", () => {
+	test("its one h1 names the state, above that state's message", () => {
+		const h1 = (html: string) => {
+			assert.equal(tags(html, "h1").length, 1);
+			return textOf(/<h1[^>]*>(.*?)<\/h1>/s.exec(html)?.[1] ?? "");
+		};
+		// Due without payment methods: no screenshot form (rendering one keeps the process alive for 5 s).
+		const due = readHtml(page({ paymentMethods: [] }));
+		assert.equal(h1(due), "Pay your deposit to Black Needle");
+		assert.match(textOf(due), /Deposit due/);
+
+		const paid = readHtml(
+			page({
+				state: "paid",
+				deposit: { ...PAGE.deposit, due: 0, dueText: "NPR 0" },
+			}),
+		);
+		assert.equal(h1(paid), "Deposit paid");
+		assert.match(textOf(paid), /Your deposit is paid\. Thank you!/);
+		assert.match(textOf(paid), /AmountNPR 3,000Reference code7K3M9Q/);
+
+		const expired = readHtml(page({ state: "expired" }));
+		assert.equal(h1(expired), "This quote has expired");
+		assert.match(
+			textOf(expired),
+			/This quote has expired\. Message Black Needle if you still want to book\./,
+		);
+		assert.match(textOf(expired), /You pay Black Needle directly\./);
 	});
 });
