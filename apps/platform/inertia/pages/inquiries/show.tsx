@@ -35,9 +35,16 @@ export default function InquiryShow({
 			via,
 			{ preserveScroll: true, preserveState: true },
 		);
-	const phone = inquiry.contactPhone ? (
-		<PhoneLink phone={inquiry.contactPhone} />
-	) : null;
+	// The same link as the Message card's Call button (`contact.callUrl`), and
+	// the same record of the contact.
+	const phone =
+		inquiry.contactPhone && contact ? (
+			<PhoneLink
+				phone={inquiry.contactPhone}
+				callUrl={contact.callUrl}
+				onCall={() => markContacted({ channel: "call" })}
+			/>
+		) : null;
 	const details: [string, ReactNode][] = [
 		["Placement", inquiry.placement],
 		["Approximate size", inquiry.approximateSize],
@@ -117,11 +124,11 @@ export default function InquiryShow({
 						<CardTitle>Details</CardTitle>
 					</CardHeader>
 					<CardContent>
-						<dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+						<dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
 							{details.map(([label, value]) => (
 								<div key={label} className="contents">
 									<dt className="text-muted-foreground">{label}</dt>
-									<dd className="break-words">{value ?? "—"}</dd>
+									<dd className="min-w-0 wrap-anywhere">{value ?? "—"}</dd>
 								</div>
 							))}
 						</dl>
@@ -153,14 +160,26 @@ export default function InquiryShow({
 }
 
 /**
- * The number the client sent (E.164), as a call link. It never wraps: a number split over two lines reads as two numbers. The
- * 44px tap target is the link's own height, pulled back with a negative
- * margin so the row keeps the height of its text.
+ * The number the client sent (E.164), as a call link (`callUrl` from the
+ * server). Tapping it tells the page, which records the call like the
+ * Message card's Call button does. It never wraps: a number split over two
+ * lines reads as two numbers. The 44px tap target is the link's own height,
+ * pulled back with a negative margin so the row keeps the height of its
+ * text.
  */
-function PhoneLink({ phone }: { phone: string }) {
+function PhoneLink({
+	phone,
+	callUrl,
+	onCall,
+}: {
+	phone: string;
+	callUrl: string;
+	onCall: () => void;
+}) {
 	return (
 		<a
-			href={`tel:${phone}`}
+			href={callUrl}
+			onClick={() => onCall()}
 			className="-my-3 inline-flex min-h-11 items-center whitespace-nowrap text-foreground underline underline-offset-4"
 		>
 			{phone}

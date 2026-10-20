@@ -465,6 +465,44 @@ test.group("Inbox contact (TAT-52)", (group) => {
 		assert.equal(props.contactedText, "never contacted");
 	});
 
+	test("a tap on the phone number records a call with no message (TAT-100)", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const inquiry = await inTenant(tenant, async () =>
+			makeInquiry(
+				tenant,
+				await makeClient(tenant, { name: "Sita Rai", phone: "+9779812345678" }),
+			),
+		);
+		const page = async () =>
+			(
+				await client
+					.get(inbox(`/${inquiry.id}`))
+					.withInertia()
+					.loginAs(owner)
+			).inertiaProps;
+		assert.equal((await page()).contactedText, "never contacted");
+
+		// What the number on the Details card posts: the channel alone.
+		const response = await client
+			.post(inbox(`/${inquiry.id}/contacted`))
+			.form({ channel: "call" })
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+		response.assertStatus(302);
+
+		const live = await inTenant(tenant, () => Inquiry.findOrFail(inquiry.id));
+		assert.equal(live.lastContactChannel, "call");
+		assert.isNull(live.lastContactKind);
+		const props = await page();
+		assert.equal(props.contactedText, "contacted today by phone");
+		// The same link the Message card's Call button uses.
+		assert.equal(props.contact.callUrl, "tel:+9779812345678");
+	});
+
 	test("the inbox shows the last contact; a decided inquiry keeps only the plain links", async ({
 		client,
 		assert,
