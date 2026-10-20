@@ -128,6 +128,13 @@ returning id, email, expires_at, (xmax = 0) as inserted`;
  * Taken first in invite() and accept(), before any row lock, so both lock in
  * one order. renew() and revoke() are single statements on one existing row
  * and cannot create an invitation, so they don't need it.
+ *
+ * Lock order of the whole feature: this advisory lock, then the inviter's
+ * membership (lockInviter), then the invitation row. MemberService takes
+ * the studio's owner memberships, then the target's, then the invitation
+ * rows, and never this lock. A transaction that holds the inviter's
+ * membership shares the owner locks of a removal, so the two never wait for
+ * each other while each holds what the other needs: no cycle.
  */
 async function lockAddress(
 	trx: TransactionClientContract,
@@ -137,6 +144,34 @@ async function lockAddress(
 	await trx.rawQuery("select pg_advisory_xact_lock(hashtextextended(?, 0))", [
 		`tattoo-drip:invitation:${tenantId}:${email}`,
 	]);
+}
+
+/**
+ * Locks the inviter's live owner membership against removal and demotion
+ * until the transaction ends, and refuses (E_ROW_NOT_FOUND, the 404 a
+ * request of a removed member gets) when it is gone. An owner link is only
+ * made by someone who is an owner, and removing or demoting an owner deletes
+ * the owner invitations they sent (MemberService.dropInvitations): that
+ * DELETE cannot see an invitation another transaction has inserted and not
+ * yet committed, so without this lock a link made at the same moment would
+ * outlive the owner. MemberService locks the owner memberships FOR UPDATE
+ * before it deletes anything: it waits for the invitation to commit, then
+ * deletes it, or, if it came first, this finds the membership gone (the
+ * lock waits, then re-reads the row as the other transaction left it).
+ * Shared, so owners inviting at once don't wait for each other.
+ */
+async function lockInviter(
+	trx: TransactionClientContract,
+	tenant: TenantRef,
+	inviter: { id: string },
+): Promise<void> {
+	const live = await TenantMembership.query({ client: trx })
+		.where("tenant_id", tenant.id)
+		.where("user_id", inviter.id)
+		.where("role", "owner")
+		.forShare()
+		.first();
+	if (!live) throw new lucidErrors.E_ROW_NOT_FOUND(TenantMembership);
 }
 
 /**
@@ -193,6 +228,7 @@ export default class InvitationService {
 		const email = canonicalEmail(input.email);
 		return withTransaction(async (trx) => {
 			await lockAddress(trx, tenant.id, email);
+			await lockInviter(trx, tenant, inviter);
 			if (await this.isMember(tenant, email)) {
 				throw new InvitationRuleError("already_member");
 			}
@@ -225,7 +261,9 @@ export default class InvitationService {
 
 	/**
 	 * A new link for the invitation `id` and 7 more days; the old link dies
-	 * at once. E_ROW_NOT_FOUND for another studio's or an unknown id.
+	 * at once, and the renewer becomes its sender. E_ROW_NOT_FOUND for
+	 * another studio's or an unknown id, and for a renewer who is no longer
+	 * an owner (lockInviter).
 	 */
 	async renew(
 		tenant: TenantRef,
@@ -233,20 +271,23 @@ export default class InvitationService {
 		id: string,
 	): Promise<{ email: string; token: string; expiresAt: DateTime }> {
 		const token = newAccountToken();
-		const { rows } = await dbClient().rawQuery(
-			`update tenant_invitations
-			 set token_hash = ?, invited_by_user_id = ?, expires_at = now() + make_interval(days => ?), created_at = now(), updated_at = now()
-			 where tenant_id = ? and id = ?
-			 returning id, email, expires_at`,
-			[hashAccountToken(token), inviter.id, INVITATION_DAYS, tenant.id, id],
-		);
-		const row = rows[0] as IssuedRow | undefined;
-		if (!row) throw new lucidErrors.E_ROW_NOT_FOUND(TenantInvitation);
-		return {
-			email: row.email,
-			token,
-			expiresAt: DateTime.fromJSDate(row.expires_at),
-		};
+		return withTransaction(async (trx) => {
+			await lockInviter(trx, tenant, inviter);
+			const { rows } = await trx.rawQuery(
+				`update tenant_invitations
+				 set token_hash = ?, invited_by_user_id = ?, expires_at = now() + make_interval(days => ?), created_at = now(), updated_at = now()
+				 where tenant_id = ? and id = ?
+				 returning id, email, expires_at`,
+				[hashAccountToken(token), inviter.id, INVITATION_DAYS, tenant.id, id],
+			);
+			const row = rows[0] as IssuedRow | undefined;
+			if (!row) throw new lucidErrors.E_ROW_NOT_FOUND(TenantInvitation);
+			return {
+				email: row.email,
+				token,
+				expiresAt: DateTime.fromJSDate(row.expires_at),
+			};
+		});
 	}
 
 	/** Cancels the invitation `id`: its link dies. E_ROW_NOT_FOUND otherwise. */

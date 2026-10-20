@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
+import { errors as lucidErrors } from "@adonisjs/lucid";
 import db from "@adonisjs/lucid/services/db";
 import { test } from "@japa/runner";
 import type User from "#models/user";
@@ -263,5 +264,202 @@ test.group(
 			);
 			assert.lengthOf(await rowsFor(world.tenant, world.invitee.email), 0);
 		}).timeout(20000);
+	},
+);
+
+/**
+ * A committed studio with two owners: `owner` sends owner invitations,
+ * `other` is who removes or demotes them. `alternate` is an address of
+ * `owner`'s own, with an account that could accept a link sent to it.
+ */
+async function studioWithTwoOwners() {
+	const slug = `race-${randomBytes(4).toString("hex")}`;
+	slugs.push(slug);
+	const { owner, tenant } = await studioWithOwner(slug, "Race 33");
+	const other = await confirmedUser(`second@${slug}.example`);
+	await inTenant(tenant, () =>
+		TenantMembership.create({
+			tenantId: tenant.id,
+			userId: other.id,
+			role: "owner",
+		}),
+	);
+	const alternate = await confirmedUser(`alternate@${slug}.example`);
+	const membership = await liveMembership(tenant, owner);
+	if (!membership) throw new Error("the owner has no membership");
+	return { owner, other, alternate, tenant, membership };
+}
+
+type TwoOwners = Awaited<ReturnType<typeof studioWithTwoOwners>>;
+
+/**
+ * The two ways an owner makes a link for their alternate address. Each
+ * prepares what it needs (committed, before the race) and gives the step
+ * that races. Renewing takes over an invitation the other owner made, so
+ * the removal's cleanup, which looks for what the owner sent, can't see it.
+ */
+const ISSUES: {
+	name: string;
+	prepare: (world: TwoOwners) => Promise<() => Promise<{ token: string }>>;
+}[] = [
+	{
+		name: "invites",
+		prepare:
+			async ({ tenant, owner, alternate }) =>
+			() =>
+				invite(tenant, owner, { email: alternate.email, role: "owner" }),
+	},
+	{
+		name: "renews an invitation",
+		prepare: async ({ tenant, owner, other, alternate }) => {
+			const pending = await invite(tenant, other, {
+				email: alternate.email,
+				role: "owner",
+			});
+			return () =>
+				inTenant(tenant, () => invitations.renew(tenant, owner, pending.id));
+		},
+	},
+];
+
+/** What the other owner does to the one who is sending the link. */
+const CHANGES: {
+	name: string;
+	run: (world: TwoOwners) => Promise<unknown>;
+}[] = [
+	{
+		name: "removes them",
+		run: ({ tenant, other, membership }) =>
+			members.remove(tenant, { userId: other.id }, membership.id),
+	},
+	{
+		name: "demotes them to artist",
+		run: ({ tenant, other, membership }) =>
+			members.changeRole(tenant, { userId: other.id }, membership.id, "artist"),
+	},
+];
+
+/**
+ * Runs `fn` in the studio's context and keeps its transaction open, uncommitted,
+ * after `fn` is done, until `release()`.
+ */
+function heldOpen<T>(tenant: Tenant, fn: () => Promise<T>) {
+	const reached = deferred();
+	const release = deferred();
+	const outcome = settle(
+		inTenant(tenant, async () => {
+			const value = await fn().finally(() => reached.resolve());
+			await release.promise;
+			return value;
+		}),
+	);
+	return { reached: reached.promise, release: release.resolve, outcome };
+}
+
+/**
+ * One side runs and stays uncommitted; the other starts on a second
+ * connection and is given time to run into it (or finish, if nothing stops
+ * it); then the first side commits. Resolves with how each ended, and
+ * whether the second one had to wait for a lock.
+ */
+async function raceIssueAndChange(
+	world: TwoOwners,
+	issue: () => Promise<{ token: string }>,
+	change: () => Promise<unknown>,
+	first: "issue" | "change",
+) {
+	const holding = first === "issue" ? issue : change;
+	const racing = first === "issue" ? change : issue;
+	const held = heldOpen(world.tenant, holding);
+	await held.reached;
+	const second = await onItsOwnConnection(world.tenant, racing);
+	const waited = await waitUntilBlocked(second.pid, second.outcome);
+	held.release();
+	const [heldEnd, racingEnd] = await Promise.all([
+		held.outcome,
+		second.outcome,
+	]);
+	return first === "issue"
+		? {
+				issued: heldEnd as Settled<{ token: string }>,
+				changed: racingEnd,
+				waited,
+			}
+		: {
+				issued: racingEnd as Settled<{ token: string }>,
+				changed: heldEnd,
+				waited,
+			};
+}
+
+test.group(
+	"An owner's link and the same owner's removal or demotion (TAT-33)",
+	(group) => {
+		group.each.teardown(async () => {
+			for (const slug of slugs.splice(0)) await forget(slug);
+		});
+
+		for (const issue of ISSUES) {
+			for (const change of CHANGES) {
+				for (const first of ["issue", "change"] as const) {
+					const order =
+						first === "issue"
+							? "the link is made first, uncommitted"
+							: "the change is made first, uncommitted";
+					test(`an owner who ${issue.name} while another owner ${change.name}: ${order}, and no owner link outlives them`, async ({
+						assert,
+					}) => {
+						const world = await studioWithTwoOwners();
+						const step = await issue.prepare(world);
+
+						const { issued, changed, waited } = await raceIssueAndChange(
+							world,
+							step,
+							() => change.run(world),
+							first,
+						);
+
+						assert.isUndefined(
+							errorOf(changed),
+							"the owner is removed or demoted",
+						);
+						if (first === "change") {
+							assert.instanceOf(
+								errorOf(issued),
+								lucidErrors.E_ROW_NOT_FOUND,
+								"someone who is no longer an owner makes no link",
+							);
+						}
+						assert.lengthOf(
+							await inTenant(world.tenant, () =>
+								TenantInvitation.query()
+									.where("tenant_id", world.tenant.id)
+									.where("invited_by_user_id", world.owner.id)
+									.where("role", "owner"),
+							),
+							0,
+							"no owner invitation sent by the departed owner is left",
+						);
+						// Whatever link they made, using it must not make an owner.
+						const token = "value" in issued ? issued.value.token : undefined;
+						if (token) {
+							await invitations
+								.accept(world.alternate, token, invitationFlow(token))
+								.catch((error: unknown) => {
+									if (!(error instanceof InvitationRuleError)) throw error;
+								});
+						}
+						assert.isNull(
+							await liveMembership(world.tenant, world.alternate),
+							"the owner's alternate address did not join",
+						);
+						assert.isTrue(
+							waited,
+							"the second request waited for the first one's locks",
+						);
+					}).timeout(20000);
+				}
+			}
+		}
 	},
 );
