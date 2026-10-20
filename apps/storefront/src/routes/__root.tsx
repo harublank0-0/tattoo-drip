@@ -69,12 +69,12 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 				{/* The router's head keeps one meta per name, so the two theme colours are written here. */}
 				<meta
 					name="theme-color"
-					content="#f5f6f8"
+					content="#f7f3ee"
 					media="(prefers-color-scheme: light)"
 				/>
 				<meta
 					name="theme-color"
-					content="#14121d"
+					content="#14110f"
 					media="(prefers-color-scheme: dark)"
 				/>
 			</head>
