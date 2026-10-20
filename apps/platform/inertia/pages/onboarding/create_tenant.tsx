@@ -67,6 +67,10 @@ export default function CreateTenant({
 					Clients will find you at your own page link. You can change the
 					details later.
 				</p>
+				<p className="text-sm text-muted-foreground">
+					Joining a studio instead? Open the invitation link the studio sent
+					you.
+				</p>
 			</div>
 
 			<Form route="onboarding.store">

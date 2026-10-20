@@ -14,6 +14,7 @@ export const controllers = {
   DepositSettings: () => import('#controllers/deposit_settings_controller'),
   EmailVerification: () => import('#controllers/email_verification_controller'),
   Inquiries: () => import('#controllers/inquiries_controller'),
+  Invitations: () => import('#controllers/invitations_controller'),
   Members: () => import('#controllers/members_controller'),
   MessageTemplates: () => import('#controllers/message_templates_controller'),
   NewAccount: () => import('#controllers/new_account_controller'),

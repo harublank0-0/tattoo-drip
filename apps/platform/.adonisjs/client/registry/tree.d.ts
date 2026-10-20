@@ -152,6 +152,11 @@ export interface ApiDefinition {
     notice: typeof routes['email_verification.notice']
     resend: typeof routes['email_verification.resend']
   }
+  invitations: {
+    link: typeof routes['invitations.link']
+    show: typeof routes['invitations.show']
+    accept: typeof routes['invitations.accept']
+  }
   dashboard: typeof routes['dashboard']
   onboarding: {
     create: typeof routes['onboarding.create']

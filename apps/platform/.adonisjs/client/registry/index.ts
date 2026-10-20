@@ -480,6 +480,18 @@ const routes = {
     tokens: [{"old":"/verify-email","type":0,"val":"verify-email","end":""}],
     types: placeholder as Registry['email_verification.confirm']['types'],
   },
+  'invitations.link': {
+    methods: ["GET","HEAD"],
+    pattern: '/invitations/:token',
+    tokens: [{"old":"/invitations/:token","type":0,"val":"invitations","end":""},{"old":"/invitations/:token","type":1,"val":"token","end":""}],
+    types: placeholder as Registry['invitations.link']['types'],
+  },
+  'invitations.show': {
+    methods: ["GET","HEAD"],
+    pattern: '/invitations',
+    tokens: [{"old":"/invitations","type":0,"val":"invitations","end":""}],
+    types: placeholder as Registry['invitations.show']['types'],
+  },
   'dashboard': {
     methods: ["GET","HEAD"],
     pattern: '/dashboard',
@@ -515,6 +527,12 @@ const routes = {
     pattern: '/onboarding',
     tokens: [{"old":"/onboarding","type":0,"val":"onboarding","end":""}],
     types: placeholder as Registry['onboarding.store']['types'],
+  },
+  'invitations.accept': {
+    methods: ["POST"],
+    pattern: '/invitations',
+    tokens: [{"old":"/invitations","type":0,"val":"invitations","end":""}],
+    types: placeholder as Registry['invitations.accept']['types'],
   },
   'api.v1.studio': {
     methods: ["GET","HEAD"],

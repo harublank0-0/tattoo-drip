@@ -447,6 +447,21 @@ router
 	.use(throttleAccountLinks)
 	.as("email_verification.confirm");
 
+/**
+ * Invitation links (TAT-33): the GET from the chat only stages the token
+ * and opens /invitations, whose URL holds no token. Open to guests and to
+ * whoever is signed in, so in no group; joining is the POST in the
+ * signed-in group below. The link counts per client address.
+ */
+router
+	.get("invitations/:token", [controllers.Invitations, "link"])
+	.where("token", ACCOUNT_TOKEN)
+	.use(throttleAccountLinks)
+	.as("invitations.link");
+router
+	.get("invitations", [controllers.Invitations, "show"])
+	.as("invitations.show");
+
 router
 	.group(() => {
 		router.get("dashboard", [controllers.Dashboard, "show"]).as("dashboard");
@@ -469,6 +484,13 @@ router
 		router
 			.post("onboarding", [controllers.Onboarding, "store"])
 			.use(middleware.verifiedEmail());
+
+		// Joining a studio through an invitation (TAT-33): a confirmed
+		// address, and the account links' limit.
+		router
+			.post("invitations", [controllers.Invitations, "accept"])
+			.use([middleware.verifiedEmail(), throttleAccountLinks])
+			.as("invitations.accept");
 	})
 	.use([middleware.auth(), middleware.dbContext()]);
 

@@ -3,9 +3,13 @@ import { test } from "@japa/runner";
 
 /**
  * Routes that create a tenant or accept an invitation: they need a
- * confirmed address (TAT-18). TAT-33 adds accepting an invitation here.
+ * confirmed address (TAT-18). Accepting an invitation is TAT-33's.
  */
-const NEEDS_CONFIRMED_EMAIL = ["GET /onboarding", "POST /onboarding"];
+const NEEDS_CONFIRMED_EMAIL = [
+	"GET /onboarding",
+	"POST /onboarding",
+	"POST /invitations",
+];
 
 /**
  * What each account form and link counts, in order. limiter.define names
@@ -18,6 +22,8 @@ const THROTTLES: Record<string, string[]> = {
 	"POST /reset-password": ["account_linksThrottle"],
 	"GET /verify-email/:token": ["account_linksThrottle"],
 	"POST /verify-email": ["account_linksThrottle"],
+	"GET /invitations/:token": ["account_linksThrottle"],
+	"POST /invitations": ["account_linksThrottle"],
 	"POST /confirm-email": ["verify_cooldownThrottle", "verify_resendThrottle"],
 };
 
@@ -36,11 +42,13 @@ const GUEST = [
 	"POST /reset-password",
 ];
 
-/** Open to guests and signed-in visitors alike (spec ruling 16). */
+/** Open to guests and signed-in visitors alike (TAT-18 spec ruling 16; the invitation page, TAT-33). */
 const OPEN = [
 	"GET /verify-email/:token",
 	"GET /verify-email",
 	"POST /verify-email",
+	"GET /invitations/:token",
+	"GET /invitations",
 ];
 
 /** The route's own middleware names, in the order they run. */

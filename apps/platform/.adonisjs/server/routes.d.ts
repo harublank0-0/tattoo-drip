@@ -83,12 +83,15 @@ export type ScannedRoutes = {
     'email_verification.link': { paramsTuple: [ParamValue]; params: {'token': ParamValue} }
     'email_verification.show': { paramsTuple?: []; params?: {} }
     'email_verification.confirm': { paramsTuple?: []; params?: {} }
+    'invitations.link': { paramsTuple: [ParamValue]; params: {'token': ParamValue} }
+    'invitations.show': { paramsTuple?: []; params?: {} }
     'dashboard': { paramsTuple?: []; params?: {} }
     'session.destroy': { paramsTuple?: []; params?: {} }
     'email_verification.notice': { paramsTuple?: []; params?: {} }
     'email_verification.resend': { paramsTuple?: []; params?: {} }
     'onboarding.create': { paramsTuple?: []; params?: {} }
     'onboarding.store': { paramsTuple?: []; params?: {} }
+    'invitations.accept': { paramsTuple?: []; params?: {} }
     'api.v1.studio': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.artists.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.artists.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'artist': ParamValue} }
@@ -131,6 +134,8 @@ export type ScannedRoutes = {
     'tenant.alerts.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'email_verification.link': { paramsTuple: [ParamValue]; params: {'token': ParamValue} }
     'email_verification.show': { paramsTuple?: []; params?: {} }
+    'invitations.link': { paramsTuple: [ParamValue]; params: {'token': ParamValue} }
+    'invitations.show': { paramsTuple?: []; params?: {} }
     'dashboard': { paramsTuple?: []; params?: {} }
     'email_verification.notice': { paramsTuple?: []; params?: {} }
     'onboarding.create': { paramsTuple?: []; params?: {} }
@@ -174,6 +179,8 @@ export type ScannedRoutes = {
     'tenant.alerts.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'email_verification.link': { paramsTuple: [ParamValue]; params: {'token': ParamValue} }
     'email_verification.show': { paramsTuple?: []; params?: {} }
+    'invitations.link': { paramsTuple: [ParamValue]; params: {'token': ParamValue} }
+    'invitations.show': { paramsTuple?: []; params?: {} }
     'dashboard': { paramsTuple?: []; params?: {} }
     'email_verification.notice': { paramsTuple?: []; params?: {} }
     'onboarding.create': { paramsTuple?: []; params?: {} }
@@ -217,6 +224,7 @@ export type ScannedRoutes = {
     'session.destroy': { paramsTuple?: []; params?: {} }
     'email_verification.resend': { paramsTuple?: []; params?: {} }
     'onboarding.store': { paramsTuple?: []; params?: {} }
+    'invitations.accept': { paramsTuple?: []; params?: {} }
     'api.v1.inquiries.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.deposits.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'token': ParamValue} }
   }
