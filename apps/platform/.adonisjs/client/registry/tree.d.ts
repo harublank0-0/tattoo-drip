@@ -111,6 +111,12 @@ export interface ApiDefinition {
       artist: {
         update: typeof routes['tenant.projects.artist.update']
       }
+      finish: {
+        store: typeof routes['tenant.projects.finish.store']
+      }
+      complete: {
+        store: typeof routes['tenant.projects.complete.store']
+      }
       sessions: {
         store: typeof routes['tenant.projects.sessions.store']
       }

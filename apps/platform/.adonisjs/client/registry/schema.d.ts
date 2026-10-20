@@ -751,6 +751,30 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/project_changes_controller').default['artist']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
+  'tenant.projects.finish.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/projects/:id/finish'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/project_changes_controller').default['finish']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/project_changes_controller').default['finish']>>>
+    }
+  }
+  'tenant.projects.complete.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/projects/:id/complete'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/project_changes_controller').default['complete']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/project_changes_controller').default['complete']>>>
+    }
+  }
   'tenant.projects.sessions.store': {
     methods: ["POST"]
     pattern: '/t/:tenant/projects/:id/sessions'

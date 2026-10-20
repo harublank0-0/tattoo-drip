@@ -320,6 +320,16 @@ router
 					.put(":id/artist", [controllers.ProjectChanges, "artist"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.projects.artist.update");
+				// Finishing (TAT-111): owners only (ProjectService.requireOwner gives
+				// the assigned artist a 404 before the body is read).
+				router
+					.post(":id/finish", [controllers.ProjectChanges, "finish"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.projects.finish.store");
+				router
+					.post(":id/complete", [controllers.ProjectChanges, "complete"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.projects.complete.store");
 				// A session on this project (TAT-85): owners, and the assigned
 				// artist with their own profile (SessionService.scheduleFor).
 				router

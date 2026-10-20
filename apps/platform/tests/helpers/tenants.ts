@@ -241,6 +241,28 @@ export async function seededStudio(slug: string, name: string) {
 		});
 		return { project, session };
 	});
+	// The finish routes (TAT-111): an in-progress project assigned to
+	// artistProfile whose tattoo session was done a week ago (clear of the
+	// session cases' days, 30 to 62 days out), and a project in its healing
+	// check. Neither has a quote, so nothing is owed and a finish needs no
+	// confirmed amount.
+	const finishing = await inTenant(tenant, async () => {
+		const project = await makeProject(tenant, pipeline.client, {
+			status: "in_progress",
+			artistId: artistProfile.id,
+		});
+		const endsAt = DateTime.now().minus({ days: 7 }).startOf("hour");
+		await makeSession(tenant, project, artistProfile, {
+			startsAt: endsAt.minus({ hours: 2 }),
+			endsAt,
+			status: "completed",
+		});
+		const healing = await makeProject(tenant, pipeline.client, {
+			status: "healing_check",
+			artistId: artistProfile.id,
+		});
+		return { project, healing };
+	});
 	// A pending invitation and the artist's membership row, for the members
 	// routes (TAT-33).
 	const invitation = await inTenant(tenant, async () => {
@@ -293,6 +315,9 @@ export async function seededStudio(slug: string, name: string) {
 		// The session routes' :id resource (TAT-85) and its project.
 		sessionProject: scheduled.project,
 		session: scheduled.session,
+		// The finish routes' :id resources (TAT-111).
+		finishProject: finishing.project,
+		healingProject: finishing.healing,
 		// The members routes' :id resources (TAT-33).
 		invitation,
 		artistMembership,
@@ -306,7 +331,7 @@ export type Studio = Awaited<ReturnType<typeof seededStudio>>;
  * (`paymentMethod` is the first), an artist profile (`artistProfile`), a visible artist who takes no inquiries with a slug only that studio has (`closedArtist`, `<slug>-mira`) and one
  * of each pipeline record (`pipeline`: client, accepted inquiry, project,
  * reference image, quote and a submitted payment), plus a quoted project
- * (`quotedProject`, `quotedQuote`), a new inquiry with a reference image (`newInquiry`) and a deposit_pending project with its deposit link (`depositProject`, `depositToken`, `depositReferenceCode`) and the eSewa method its page shows (`depositMethod`); `project` is the pipeline's project; a project booked without a price (`pricelessProject`), a booked project holding a verified deposit (`paidProject`, `verifiedPayment`) and a cancelled one holding a deposit without an outcome (`closedPaidProject`); `payment` is the pipeline's submitted payment. A booked project assigned to `artistProfile` with a scheduled tattoo session 60 days out (`sessionProject`, `session`) is the session routes' resource (TAT-85); an unread alert of the owner about the new inquiry (`alert`) is the alerts routes' (TAT-52), and the studio's own aftercare text (`messageTemplate`) is what the messages settings routes' snapshot reads. A pending invitation (`invitation`) and the artist's membership row (`artistMembership`) are the members routes' (TAT-33). Later tickets add seed data
+ * (`quotedProject`, `quotedQuote`), a new inquiry with a reference image (`newInquiry`) and a deposit_pending project with its deposit link (`depositProject`, `depositToken`, `depositReferenceCode`) and the eSewa method its page shows (`depositMethod`); `project` is the pipeline's project; a project booked without a price (`pricelessProject`), a booked project holding a verified deposit (`paidProject`, `verifiedPayment`) and a cancelled one holding a deposit without an outcome (`closedPaidProject`); `payment` is the pipeline's submitted payment. A booked project assigned to `artistProfile` with a scheduled tattoo session 60 days out (`sessionProject`, `session`) is the session routes' resource (TAT-85); an unread alert of the owner about the new inquiry (`alert`) is the alerts routes' (TAT-52), and the studio's own aftercare text (`messageTemplate`) is what the messages settings routes' snapshot reads. A pending invitation (`invitation`) and the artist's membership row (`artistMembership`) are the members routes' (TAT-33). An in-progress project with a done tattoo session and a project in its healing check, both assigned to `artistProfile` and without a quote (`finishProject`, `healingProject`), are the finish routes' resources (TAT-111). Later tickets add seed data
  * for their own tables here, so every isolation case sees it.
  */
 export async function twoStudios() {

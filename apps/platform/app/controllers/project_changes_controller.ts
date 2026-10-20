@@ -9,12 +9,14 @@ import {
 	ProjectRuleError,
 	type ProjectRuleReason,
 } from "#modules/projects/errors";
+import { type FinishStep, finishedFlash } from "#modules/projects/finish";
 import type TattooProject from "#modules/projects/models/tattoo_project";
 import type { ManualMove } from "#modules/projects/moves";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ProjectService from "#modules/projects/services/project_service";
 import {
 	artistValidator,
+	finishValidator,
 	moveValidator,
 	notesValidator,
 } from "#modules/projects/validators/project";
@@ -37,8 +39,8 @@ const RULE_MESSAGES: Record<ProjectRuleReason, string> = {
 };
 
 /**
- * The project page's changes that aren't quotes: status moves, notes, the
- * contact time and the artist (TAT-46). Every :id loads through
+ * The project page's changes that aren't quotes: status moves, finishing
+ * (TAT-111), notes, the contact time and the artist (TAT-46). Every :id loads through
  * ProjectService.findFor first, so another tenant's or another artist's
  * project is a 404 even with a bad body.
  */
@@ -111,6 +113,53 @@ export default class ProjectChangesController {
 			"success",
 			artistId ? "Artist assigned." : "Artist removed.",
 		);
+		return backTo(ctx, tenant, project);
+	}
+
+	/**
+	 * "Mark the tattoo finished" (TAT-111). Owners only: findFor gives anyone
+	 * who can't open the project a 404, and requireOwner gives the assigned
+	 * artist the same 404 before the body is read.
+	 */
+	async finish(ctx: HttpContext) {
+		return this.finishStep(ctx, "finish");
+	}
+
+	/** "Healing check done" (TAT-111), with the same checks as finish. */
+	async complete(ctx: HttpContext) {
+		return this.finishStep(ctx, "complete");
+	}
+
+	/**
+	 * One finish step: the service decides under the project's lock; a
+	 * refusal (a stale page, a session left, a changed balance) is a flash.
+	 */
+	private async finishStep(ctx: HttpContext, step: FinishStep) {
+		const { tenant, membership } = tenantContext(ctx);
+		const project = await this.projects.findFor(
+			tenant,
+			membership,
+			ctx.params.id,
+		);
+		this.projects.requireOwner(membership);
+		const { confirmedDue } = await ctx.request.validateUsing(finishValidator);
+		const confirmed =
+			typeof confirmedDue === "string" ? BigInt(confirmedDue) : null;
+		try {
+			const done =
+				step === "finish"
+					? await this.projects.finish(tenant, membership, project, confirmed)
+					: await this.projects.completeHealingCheck(
+							tenant,
+							membership,
+							project,
+							confirmed,
+						);
+			ctx.session.flash("success", finishedFlash(step, done));
+		} catch (error) {
+			if (!(error instanceof ProjectRuleError)) throw error;
+			ctx.session.flash("error", RULE_MESSAGES[error.reason]);
+		}
 		return backTo(ctx, tenant, project);
 	}
 }

@@ -25,3 +25,19 @@ export const artistValidator = vine.create({
 artistValidator.messagesProvider = new SimpleMessagesProvider({
 	"artistId.uuid": "Choose an artist from the list.",
 });
+
+/**
+ * A finish step (TAT-111): the balance due the confirmation named, in paisa
+ * as digits; left out, or "0", when the page named none. At most 20 digits,
+ * so a hostile value never reaches BigInt.
+ */
+export const finishValidator = vine.create({
+	confirmedDue: vine
+		.string()
+		.trim()
+		.regex(/^\d{1,20}$/)
+		.optional(),
+});
+finishValidator.messagesProvider = new SimpleMessagesProvider({
+	"confirmedDue.regex": "Reload the page and try again.",
+});

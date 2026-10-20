@@ -53,6 +53,8 @@ export type IsolationCase = {
 		| "depositProject"
 		| "session"
 		| "sessionProject"
+		| "finishProject"
+		| "healingProject"
 		| "newInquiry"
 		| "client"
 		| "alert"
@@ -748,6 +750,24 @@ export const isolationCases: IsolationCase[] = [
 		}),
 		ownStatus: 302,
 		snapshot: sessionRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/projects/:id/finish",
+		resource: "finishProject",
+		actor: "owner",
+		body: () => ({ confirmedDue: "0" }),
+		ownStatus: 302,
+		snapshot: projectRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/projects/:id/complete",
+		resource: "healingProject",
+		actor: "owner",
+		body: () => ({ confirmedDue: "0" }),
+		ownStatus: 302,
+		snapshot: projectRows,
 	},
 	{
 		method: "GET",
