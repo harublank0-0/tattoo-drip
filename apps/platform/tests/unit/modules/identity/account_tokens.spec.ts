@@ -3,7 +3,9 @@ import { test } from "@japa/runner";
 import {
 	ACCOUNT_TOKEN,
 	accountUrl,
+	forgetStagedTokens,
 	hashAccountToken,
+	INVITATION_TOKEN_KEY,
 	linkPath,
 	newAccountToken,
 	SESSION_TOKEN_KEYS,
@@ -12,6 +14,20 @@ import {
 } from "#modules/identity/account_tokens";
 
 test.group("Account tokens", () => {
+	test("forgetStagedTokens forgets the account links and a staged invitation (TAT-33)", ({
+		assert,
+	}) => {
+		const forgotten: string[] = [];
+		forgetStagedTokens({ forget: (key) => forgotten.push(key) });
+
+		assert.sameMembers(forgotten, [
+			SESSION_TOKEN_KEYS.verify_email,
+			SESSION_TOKEN_KEYS.reset_password,
+			INVITATION_TOKEN_KEY,
+		]);
+		assert.equal(INVITATION_TOKEN_KEY, "invitation_token");
+	});
+
 	test("a new token is 43 base64url characters, never the same twice", ({
 		assert,
 	}) => {
