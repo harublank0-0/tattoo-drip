@@ -19,9 +19,13 @@ export type Studio = { id: string; slug: string; name: string };
  * Only the list of studios crosses tenants, read as the owner role; each
  * studio's numbers come from PilotMetricsService as the app role inside that
  * studio's row-level security context, exactly as its owners' card does.
- * Prints names, slugs and aggregates only. Run it where the owner role's
- * password is (the migration step's environment), never from the web or
- * the worker:
+ * Prints names, slugs and aggregates only. The app's default connection must
+ * be the restricted app role, like the web server's and the worker's: the
+ * command refuses to start as a role that bypasses RLS, since RLS is what
+ * proves each studio's numbers are its own (the owner connection only lists
+ * the studios). Run it where the owner role's password is (the migration
+ * step's environment, which also has DB_USER set to the app role), never
+ * from the web or the worker:
  *
  *   node ace metrics:pilot --days=42           (development)
  *   node build/ace.js metrics:pilot --days=42  (production)
