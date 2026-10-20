@@ -1,13 +1,15 @@
 import { DateTime } from "luxon";
 import User from "#models/user";
 import ArtistService from "#modules/artists/services/artist_service";
-import { hashAccountToken } from "#modules/identity/account_tokens";
+import {
+	hashAccountToken,
+	invitationFlowId,
+} from "#modules/identity/account_tokens";
 import ImageService from "#modules/media/services/image_service";
 import InvitationService, {
 	type InvitationInput,
 } from "#modules/tenancy/services/invitation_service";
 import { dbClient } from "#services/db_context";
-import { NO_FLOW } from "#tests/helpers/accounts";
 import { inTenant } from "#tests/helpers/tenants";
 
 /** InvitationService with its real dependencies. */
@@ -39,15 +41,13 @@ export function invite(
 	);
 }
 
-/** The flow id the invitation page renders for `token` (a zero id when no row has it). */
-export async function invitationFlow(tenant: { id: string }, token: string) {
-	const { rows } = await inTenant(tenant, () =>
-		dbClient().rawQuery(
-			"select id from tenant_invitations where token_hash = ?",
-			[hashAccountToken(token)],
-		),
-	);
-	return (rows[0]?.id as string | undefined) ?? NO_FLOW;
+/**
+ * The flow id the invitation page renders for `token`. Pure: it doesn't
+ * look the row up, so it exists for a dead or expired link too (accept
+ * refuses those for their own reason).
+ */
+export function invitationFlow(token: string) {
+	return invitationFlowId(hashAccountToken(token));
 }
 
 /** Moves an invitation's expiry into the past, as time would. */

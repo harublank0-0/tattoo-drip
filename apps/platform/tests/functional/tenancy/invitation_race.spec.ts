@@ -142,7 +142,7 @@ async function reinviteWhileAccepting(world: {
 	const joining = accepting.accept(
 		invitee,
 		first.token,
-		await invitationFlow(tenant, first.token),
+		invitationFlow(first.token),
 	);
 	await accepting.reached.promise;
 
@@ -213,11 +213,7 @@ test.group(
 			const leftover = (again as { made?: { token: string } }).made?.token;
 			if (leftover) {
 				await invitations
-					.accept(
-						world.invitee,
-						leftover,
-						await invitationFlow(world.tenant, leftover),
-					)
+					.accept(world.invitee, leftover, invitationFlow(leftover))
 					.catch((error: unknown) => {
 						if (!(error instanceof InvitationRuleError)) throw error;
 					});

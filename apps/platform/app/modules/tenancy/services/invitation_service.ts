@@ -8,6 +8,7 @@ import User from "#models/user";
 import ArtistService from "#modules/artists/services/artist_service";
 import {
 	hashAccountToken,
+	invitationFlowId,
 	isFlowId,
 	newAccountToken,
 } from "#modules/identity/account_tokens";
@@ -53,7 +54,10 @@ export type InvitationPreview =
 	| { state: "expired"; studioName: string }
 	| {
 			state: "live";
-			/** The row's id, for the page's hidden `flow` field (TAT-18). */
+			/**
+			 * For the page's hidden `flow` field (TAT-18): changes with every
+			 * replacement or renewal, so a form acts only on the terms it showed.
+			 */
 			flow: string;
 			studio: { name: string; slug: string; timezone: string };
 			email: string;
@@ -281,7 +285,7 @@ export default class InvitationService {
 				if (!row.live) return { state: "expired", studioName: row.name };
 				return {
 					state: "live",
-					flow: row.id,
+					flow: invitationFlowId(hash),
 					studio: { name: row.name, slug: row.slug, timezone: row.timezone },
 					email: row.email,
 					role: row.role,
@@ -297,15 +301,20 @@ export default class InvitationService {
 
 	/**
 	 * Joins `user` to the invitation's studio (spec ruling 7), under the
-	 * invitation's row lock: the row must be live and match `flow`, the
-	 * account confirmed, its address the invited one, and not yet a member.
-	 * Then the membership, the claim (ruling 10) and the invitation's
-	 * deletion, in one transaction. Throws InvitationRuleError otherwise,
-	 * with nothing changed.
+	 * invitation's row lock: `flow` must be the one the page showed for this
+	 * very link (invitationFlowId of its hash: a replaced or renewed
+	 * invitation has a new one), the row live, the account confirmed, its
+	 * address the invited one, and not yet a member. Then the membership, the
+	 * claim (ruling 10) and the invitation's deletion, in one transaction.
+	 * Throws InvitationRuleError otherwise, with nothing changed.
 	 */
 	async accept(user: User, token: string, flow: string): Promise<Joined> {
-		if (!isFlowId(flow)) throw new InvitationRuleError("invalid");
 		const hash = hashAccountToken(token);
+		// The form must be the one that showed this link's terms (see
+		// invitationFlowId), not an older tab's.
+		if (!isFlowId(flow) || flow !== invitationFlowId(hash)) {
+			throw new InvitationRuleError("invalid");
+		}
 		const tenantId = await this.tenantOf(hash);
 		if (!tenantId) throw new InvitationRuleError("invalid");
 		const tenant = { id: tenantId };
@@ -317,8 +326,8 @@ export default class InvitationService {
 			// A second tab or a double tap waits on this lock, then finds the
 			// row gone.
 			const { rows } = await trx.rawQuery(
-				"select id, email, role, artist_id, expires_at > now() as live from tenant_invitations where tenant_id = ? and id = ? and token_hash = ? for update",
-				[tenantId, flow, hash],
+				"select id, email, role, artist_id, expires_at > now() as live from tenant_invitations where tenant_id = ? and token_hash = ? for update",
+				[tenantId, hash],
 			);
 			const row = rows[0] as LockedRow | undefined;
 			if (!row) throw new InvitationRuleError("invalid");

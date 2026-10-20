@@ -284,7 +284,7 @@ test.group("InvitationService: opening and accepting (TAT-33)", (group) => {
 		assert.equal(live.step, "sign_in");
 		assert.equal(live.email, "ink@preview-33.example");
 		assert.equal(live.studio.name, "Preview 33");
-		assert.equal(live.flow, await invitationFlow(tenant, made.token));
+		assert.equal(live.flow, invitationFlow(made.token));
 		assert.isNull(live.profileName);
 
 		const step = async (viewer: User) => {
@@ -328,7 +328,7 @@ test.group("InvitationService: opening and accepting (TAT-33)", (group) => {
 		const joined = await invitations.accept(
 			user,
 			made.token,
-			await invitationFlow(tenant, made.token),
+			invitationFlow(made.token),
 		);
 
 		assert.deepEqual(joined, {
@@ -367,7 +367,7 @@ test.group("InvitationService: opening and accepting (TAT-33)", (group) => {
 		const joined = await invitations.accept(
 			user,
 			made.token,
-			await invitationFlow(tenant, made.token),
+			invitationFlow(made.token),
 		);
 
 		assert.equal(joined.role, "owner");
@@ -381,7 +381,7 @@ test.group("InvitationService: opening and accepting (TAT-33)", (group) => {
 		const made = await invite(tenant, owner, {
 			email: "ink@refuse-33.example",
 		});
-		const flow = await invitationFlow(tenant, made.token);
+		const flow = invitationFlow(made.token);
 		const other = await confirmedUser("other@refuse-33.example");
 		const unconfirmed = await User.create({
 			email: "ink@refuse-33.example",
@@ -413,7 +413,11 @@ test.group("InvitationService: opening and accepting (TAT-33)", (group) => {
 		);
 		assert.equal(
 			await refusal(() =>
-				invitations.accept(confirmedMember, forMember.token, forMember.id),
+				invitations.accept(
+					confirmedMember,
+					forMember.token,
+					invitationFlow(forMember.token),
+				),
 			),
 			"already_member",
 		);
@@ -421,13 +425,15 @@ test.group("InvitationService: opening and accepting (TAT-33)", (group) => {
 			await refusal(() => invitations.accept(other, "x".repeat(43), flow)),
 			"invalid",
 		);
-		// Another invitation's flow, and something that isn't an id.
-		assert.equal(
-			await refusal(() =>
-				invitations.accept(unconfirmed, made.token, forMember.id),
-			),
-			"invalid",
-		);
+		// Another invitation's flow, this row's own id, and something that isn't an id.
+		for (const wrongFlow of [invitationFlow(forMember.token), made.id]) {
+			assert.equal(
+				await refusal(() =>
+					invitations.accept(unconfirmed, made.token, wrongFlow),
+				),
+				"invalid",
+			);
+		}
 		assert.equal(
 			await refusal(() => invitations.accept(other, made.token, "nope")),
 			"invalid",
@@ -454,6 +460,80 @@ test.group("InvitationService: opening and accepting (TAT-33)", (group) => {
 		);
 	});
 
+	test("an old tab's form can't accept the terms of a replacement it never showed", async ({
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("tabs-33", "Tabs 33");
+		const invitee = await confirmedUser("ink@tabs-33.example");
+		const first = await invite(tenant, owner, {
+			email: invitee.email,
+			role: "artist",
+		});
+		// Tab one renders the invitation as an artist.
+		const tabOne = await invitations.preview(first.token, invitee);
+		// The owner replaces it with another role (the row, and its id, stay);
+		// the recipient opens the new link in a second tab, which stages the
+		// new token in the session.
+		const second = await invite(tenant, owner, {
+			email: invitee.email,
+			role: "owner",
+		});
+		const tabTwo = await invitations.preview(second.token, invitee);
+		assert.equal(second.id, first.id);
+		assert.equal(tabOne.state, "live");
+		assert.equal(tabTwo.state, "live");
+		if (tabOne.state !== "live" || tabTwo.state !== "live") return;
+		assert.equal(tabTwo.role, "owner");
+
+		// Tab one's form, sent with the session's token (the new one).
+		assert.equal(
+			await refusal(() =>
+				invitations.accept(invitee, second.token, tabOne.flow),
+			),
+			"invalid",
+		);
+		assert.lengthOf(await memberships(tenant), 1, "only the owner so far");
+
+		// Tab two's form shows the owner role and gets it.
+		const joined = await invitations.accept(invitee, second.token, tabTwo.flow);
+		assert.equal(joined.role, "owner");
+		assert.lengthOf(await memberships(tenant), 2);
+	});
+
+	test("a renewed link's flow differs too, and a flow is never the row's id", async ({
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner(
+			"renew-flow-33",
+			"Renew 33",
+		);
+		const invitee = await confirmedUser("ink@renew-flow-33.example");
+		const made = await invite(tenant, owner, { email: invitee.email });
+		const other = await invite(tenant, owner, {
+			email: "other@renew-flow-33.example",
+		});
+		const flowOf = async (token: string) => {
+			const preview = await invitations.preview(token, invitee);
+			return preview.state === "live" ? preview.flow : preview.state;
+		};
+		const before = await flowOf(made.token);
+
+		const renewed = await inTenant(tenant, () =>
+			invitations.renew(tenant, owner, made.id),
+		);
+
+		const uuid = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
+		assert.match(before, uuid);
+		assert.equal(await flowOf(made.token), "invalid", "the old link is dead");
+		const after = await flowOf(renewed.token);
+		assert.match(after, uuid);
+		assert.notEqual(after, before, "a new link, a new flow");
+		assert.equal(await flowOf(renewed.token), after, "stable for one link");
+		assert.notEqual(before, made.id, "not the row's id");
+		assert.notEqual(after, made.id, "not the row's id, which a renewal keeps");
+		assert.notEqual(after, await flowOf(other.token));
+	});
+
 	test("a second accept with the same link finds nothing", async ({
 		assert,
 	}) => {
@@ -461,7 +541,7 @@ test.group("InvitationService: opening and accepting (TAT-33)", (group) => {
 		const made = await invite(tenant, owner, {
 			email: "ink@replay-33.example",
 		});
-		const flow = await invitationFlow(tenant, made.token);
+		const flow = invitationFlow(made.token);
 		const user = await confirmedUser("ink@replay-33.example");
 
 		await invitations.accept(user, made.token, flow);
@@ -490,7 +570,7 @@ test.group("InvitationService: opening and accepting (TAT-33)", (group) => {
 		const joined = await invitations.accept(
 			user,
 			made.token,
-			await invitationFlow(tenant, made.token),
+			invitationFlow(made.token),
 		);
 
 		assert.isFalse(joined.claimed);

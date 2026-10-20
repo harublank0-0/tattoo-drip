@@ -3,6 +3,7 @@ import { test } from "@japa/runner";
 import User from "#models/user";
 import Artist from "#modules/artists/models/artist";
 import { INVITATION_TOKEN_KEY } from "#modules/identity/account_tokens";
+import TenantInvitation from "#modules/tenancy/models/tenant_invitation";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import { addArtist } from "#tests/helpers/artists";
 import {
@@ -141,7 +142,7 @@ test.group("The invitation link and page (TAT-33)", (group) => {
 			.update({ email_verified_at: new Date() });
 		const ready = await stepOf(await User.findOrFail(invitee.id));
 		assert.equal(ready.step, "accept");
-		assert.equal(ready.flow, await invitationFlow(tenant, made.token));
+		assert.equal(ready.flow, invitationFlow(made.token));
 
 		await inTenant(tenant, () =>
 			TenantMembership.create({
@@ -186,7 +187,7 @@ test.group("The invitation link and page (TAT-33)", (group) => {
 		const response = await client
 			.post("/invitations")
 			.withSession({ [INVITATION_TOKEN_KEY]: made.token })
-			.form({ flow: await invitationFlow(tenant, made.token) })
+			.form({ flow: invitationFlow(made.token) })
 			.withCsrfToken()
 			.loginAs(user)
 			.redirects(0);
@@ -234,7 +235,7 @@ test.group("The invitation link and page (TAT-33)", (group) => {
 			client
 				.post("/invitations")
 				.withSession({ [INVITATION_TOKEN_KEY]: token })
-				.form({ flow: await invitationFlow(tenant, token) })
+				.form({ flow: invitationFlow(token) })
 				.withCsrfToken()
 				.loginAs(await confirmedUser(email))
 				.redirects(0);
@@ -265,13 +266,18 @@ test.group("The invitation link and page (TAT-33)", (group) => {
 		const wrongAccount = await client
 			.post("/invitations")
 			.withSession(staged)
-			.form({ flow: await invitationFlow(tenant, made.token) })
+			.form({ flow: invitationFlow(made.token) })
 			.withCsrfToken()
 			.loginAs(wrong)
 			.redirects(0);
 		wrongAccount.assertHeader("location", "/invitations");
 
-		for (const form of [{}, { flow: other.id }]) {
+		for (const form of [
+			{},
+			{ flow: other.id },
+			{ flow: made.id },
+			{ flow: invitationFlow(other.token) },
+		]) {
 			const response = await client
 				.post("/invitations")
 				.withSession(staged)
@@ -285,7 +291,7 @@ test.group("The invitation link and page (TAT-33)", (group) => {
 		const noCsrf = await client
 			.post("/invitations")
 			.withSession(staged)
-			.form({ flow: await invitationFlow(tenant, made.token) })
+			.form({ flow: invitationFlow(made.token) })
 			.loginAs(invitee)
 			.redirects(0);
 		noCsrf.assertFlashMessage("error", REFUSED);
@@ -306,7 +312,7 @@ test.group("The invitation link and page (TAT-33)", (group) => {
 		const response = await client
 			.post("/invitations")
 			.withSession({ [INVITATION_TOKEN_KEY]: made.token })
-			.form({ flow: await invitationFlow(tenant, made.token) })
+			.form({ flow: invitationFlow(made.token) })
 			.withCsrfToken()
 			.loginAs(unconfirmed)
 			.redirects(0);
@@ -332,7 +338,7 @@ test.group("The invitation link and page (TAT-33)", (group) => {
 		const response = await client
 			.post("/invitations")
 			.withSession({ [INVITATION_TOKEN_KEY]: made.token })
-			.form({ flow: await invitationFlow(tenant, made.token) })
+			.form({ flow: invitationFlow(made.token) })
 			.withCsrfToken()
 			.loginAs(user)
 			.redirects(0);
@@ -365,7 +371,7 @@ test.group("The invitation link and page (TAT-33)", (group) => {
 		const response = await client
 			.post("/invitations")
 			.withSession({ [INVITATION_TOKEN_KEY]: made.token })
-			.form({ flow: await invitationFlow(tenant, made.token) })
+			.form({ flow: invitationFlow(made.token) })
 			.withCsrfToken()
 			.loginAs(user)
 			.redirects(0);
@@ -376,9 +382,8 @@ test.group("The invitation link and page (TAT-33)", (group) => {
 			TenantMembership.query().where("tenant_id", theirs.id),
 		);
 		assert.lengthOf(own, 1);
-		assert.equal(
-			(await invitationFlow(tenant, made.token)) === made.id,
-			true,
+		assert.isNotNull(
+			await inTenant(tenant, () => TenantInvitation.find(made.id)),
 			"the invitation is still there",
 		);
 	});

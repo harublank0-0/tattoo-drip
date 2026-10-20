@@ -46,6 +46,28 @@ export function isFlowId(value: unknown): value is string {
 }
 
 /**
+ * An invitation form's flow id (TAT-33): a UUID-shaped fingerprint of the
+ * stored token hash. It is not the row's id, because replacing or renewing
+ * an invitation keeps the row (and its id) but changes the hash, and the
+ * form must be tied to the terms it showed: an old tab's form, sent with the
+ * session's newer token, would otherwise accept a replacement's other role
+ * or profile. Derived with its own prefix, so the stored hash (the lookup
+ * key) is not the value the page renders.
+ */
+export function invitationFlowId(tokenHash: string): string {
+	const hex = createHash("sha256")
+		.update(`invitation-flow:${tokenHash}`)
+		.digest("hex");
+	return [
+		hex.slice(0, 8),
+		hex.slice(8, 12),
+		hex.slice(12, 16),
+		hex.slice(16, 20),
+		hex.slice(20, 32),
+	].join("-");
+}
+
+/**
  * Where an invitation link's GET puts its token (TAT-33), like the account
  * links' keys above: the invitation page's URL then holds no token.
  */
