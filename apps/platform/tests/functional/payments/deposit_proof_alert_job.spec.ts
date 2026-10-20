@@ -95,6 +95,10 @@ test.group("DepositProofAlertJob", (group) => {
 				paymentId,
 			);
 		}
+		// Another studio's payment makes no alert in either studio (TAT-88).
+		for (const studio of [tenant, other]) {
+			assert.lengthOf(await inTenant(studio, () => StaffAlert.query()), 0);
+		}
 	});
 
 	test("alerts the studio's owner through AlertService, once however often it runs", async ({
