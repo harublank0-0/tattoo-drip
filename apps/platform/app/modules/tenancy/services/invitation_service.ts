@@ -1,5 +1,6 @@
 import { inject } from "@adonisjs/core";
 import { errors as lucidErrors } from "@adonisjs/lucid";
+import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
 import type { RawQueryBindings } from "@adonisjs/lucid/types/querybuilder";
 import { DateTime } from "luxon";
 import User from "#models/user";
@@ -112,6 +113,29 @@ set role = excluded.role, artist_id = excluded.artist_id, token_hash = excluded.
 returning id, email, expires_at, (xmax = 0) as inserted`;
 
 /**
+ * Makes sending an invitation to an address and that address joining the
+ * studio take turns: the lock is held until the transaction ends, and a
+ * second request for the same studio and canonical address waits for it.
+ * Without it, an invitation sent again while its address accepts could pass
+ * the membership check just before the membership exists, then insert a new
+ * invitation once accept had deleted the old one: a link for someone who is
+ * already a member, which would restore them if they were removed later.
+ *
+ * Taken first in invite() and accept(), before any row lock, so both lock in
+ * one order. renew() and revoke() are single statements on one existing row
+ * and cannot create an invitation, so they don't need it.
+ */
+async function lockAddress(
+	trx: TransactionClientContract,
+	tenantId: string,
+	email: string,
+) {
+	await trx.rawQuery("select pg_advisory_xact_lock(hashtextextended(?, 0))", [
+		`tattoo-drip:invitation:${tenantId}:${email}`,
+	]);
+}
+
+/**
  * Invitations to join a studio (TAT-33). A token is TAT-18's: 256 random
  * bits, only its SHA-256 stored, single use. The owner's methods run in the
  * studio's context (a request on /t/:tenant); preview and accept start from
@@ -161,7 +185,8 @@ export default class InvitationService {
 		expiresAt: DateTime;
 	}> {
 		const email = canonicalEmail(input.email);
-		return withTransaction(async () => {
+		return withTransaction(async (trx) => {
+			await lockAddress(trx, tenant.id, email);
 			if (await this.isMember(tenant, email)) {
 				throw new InvitationRuleError("already_member");
 			}
@@ -285,6 +310,10 @@ export default class InvitationService {
 		if (!tenantId) throw new InvitationRuleError("invalid");
 		const tenant = { id: tenantId };
 		return withDbContext({ tenantId }, async (trx): Promise<Joined> => {
+			// Before the row lock, like invite(). The visitor's address is the
+			// invitation's when they may join; any other is refused below, and a
+			// lock on the wrong key costs nothing.
+			await lockAddress(trx, tenantId, user.email);
 			// A second tab or a double tap waits on this lock, then finds the
 			// row gone.
 			const { rows } = await trx.rawQuery(
@@ -341,7 +370,11 @@ export default class InvitationService {
 		return (rows[0]?.id as string | null | undefined) ?? null;
 	}
 
-	private membershipOf(tenant: TenantRef, userId: string) {
+	/**
+	 * The user's live membership. Protected, so a test can stop accept at this
+	 * point, after its locks, to stage a race with a real second connection.
+	 */
+	protected membershipOf(tenant: TenantRef, userId: string) {
 		return TenantMembership.query()
 			.where("tenant_id", tenant.id)
 			.where("user_id", userId)
