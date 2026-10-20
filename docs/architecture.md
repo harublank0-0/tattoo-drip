@@ -82,6 +82,8 @@ Isolation has several layers:
 4. Composite foreign keys block links between tenants (see [data-model](data-model.md)).
 5. Every tenant-owned endpoint has a test proving that tenant A can't reach tenant B's data.
 
+Which role may use each dashboard route is one table (`TENANT_ROUTE_ROLES`), read on every request; which records an artist reaches is the owning module's service rule (TAT-30).
+
 ## Domains, sessions, auth
 
 - Studio pages run on `{slug}.<studio domain>` (later also a studio's own domain, TAT-79). The dashboard (`app.`) and the API (`api.`) run on a **separate** registrable domain, so no studio page is ever same-site with the dashboard and none can read or set its cookies. With `NODE_ENV=production` the platform refuses to start when `APP_URL` is not https, or sits on, under or above the studio pages' domain (`STOREFRONT_URL`); a sibling under a shared parent can't be detected and is a checklist item.
