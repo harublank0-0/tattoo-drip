@@ -107,6 +107,22 @@
   --sidebar-accent-foreground: var(--ink);
   --sidebar-border: var(--line);
   --sidebar-ring: var(--stencil);
+
+  /*
+   * Status groups (TAT-98), text on its wash, always shown with a word:
+   * waiting on the studio, waiting on the client, booked, in the chair, closed.
+   * Contrast of text on its wash: 5.2, 7.3, 5.6, 7.05 and 5.2:1.
+   */
+  --status-studio-fg: #8a5a00;
+  --status-studio-bg: #fbf0d9;
+  --status-client-fg: #1f4e79;
+  --status-client-bg: #e3edf7;
+  --status-booked-fg: #1e6b45;
+  --status-booked-bg: #e3f2e9;
+  --status-chair-fg: var(--stencil);
+  --status-chair-bg: var(--stencil-wash);
+  --status-closed-fg: var(--ink-muted);
+  --status-closed-bg: var(--line);
 }
 
 [data-theme='dark'] {
@@ -126,6 +142,14 @@
   --paper-shade: #26211d;
   --destructive: #f4a39a;
   --on-destructive: #14110f;
+
+  /* The same hues at about 80% lightness on 18% washes: 8.3, 7.9, 8.3, 6.7 and 5.2:1. */
+  --status-studio-fg: #f9d694;
+  --status-studio-bg: #473615;
+  --status-client-fg: #a9c8e5;
+  --status-client-bg: #1f2f3d;
+  --status-booked-fg: #abe3c7;
+  --status-booked-bg: #203c2e;
 }
 
 @theme inline {
@@ -161,6 +185,16 @@
   --color-stencil-strong: var(--stencil-strong);
   --color-stencil-wash: var(--stencil-wash);
   --color-marigold: var(--marigold);
+  --color-status-studio-fg: var(--status-studio-fg);
+  --color-status-studio-bg: var(--status-studio-bg);
+  --color-status-client-fg: var(--status-client-fg);
+  --color-status-client-bg: var(--status-client-bg);
+  --color-status-booked-fg: var(--status-booked-fg);
+  --color-status-booked-bg: var(--status-booked-bg);
+  --color-status-chair-fg: var(--status-chair-fg);
+  --color-status-chair-bg: var(--status-chair-bg);
+  --color-status-closed-fg: var(--status-closed-fg);
+  --color-status-closed-bg: var(--status-closed-bg);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
