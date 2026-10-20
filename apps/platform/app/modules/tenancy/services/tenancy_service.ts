@@ -62,6 +62,8 @@ export type DepositSettings = {
 
 /** A live member and their account's address: who an alert can reach (TAT-52). */
 export type TenantMember = {
+	/** The membership row's id (Settings, Members routes by it, TAT-33). */
+	membershipId: string;
 	userId: string;
 	role: MembershipRole;
 	email: string;
@@ -300,6 +302,7 @@ export default class TenancyService {
 			return user
 				? [
 						{
+							membershipId: membership.id,
 							userId: user.id,
 							role: membership.role,
 							email: user.email,

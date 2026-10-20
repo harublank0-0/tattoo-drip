@@ -321,8 +321,17 @@ test.group("AlertService.newInquiry", (group) => {
 		const gone = await artistIn(tenant, "gone@members-52.example");
 		await removeMembership(tenant, gone);
 
+		const listed = await inTenant(tenant, () =>
+			new TenancyService().members(tenant),
+		);
+		assert.isTrue(listed.every(({ membershipId }) => membershipId.length > 0));
 		assert.deepEqual(
-			await inTenant(tenant, () => new TenancyService().members(tenant)),
+			listed.map(({ userId, role, email, fullName }) => ({
+				userId,
+				role,
+				email,
+				fullName,
+			})),
 			[
 				{ userId: owner.id, role: "owner", email: owner.email, fullName: null },
 				{ userId: asha.id, role: "artist", email: asha.email, fullName: null },
