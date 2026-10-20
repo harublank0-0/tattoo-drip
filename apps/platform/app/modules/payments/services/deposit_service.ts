@@ -1,4 +1,5 @@
 import { inject } from "@adonisjs/core";
+import { DateTime } from "luxon";
 import type { StoredImage } from "#modules/media/services/image_service";
 import {
 	type Balance,
@@ -180,6 +181,37 @@ export default class DepositService {
 			.where("status", "submitted")
 			.count("* as total");
 		return Number(row.$extras.total);
+	}
+
+	/**
+	 * Each project's first verified deposit, for the projects whose first one
+	 * was verified in [from, to): the pilot's inquiry-to-deposit time
+	 * (TAT-70). A deposit counts once the studio verified it, a screenshot
+	 * from the deposit page or one recorded at the desk (`verified_at` is
+	 * when the studio decided); one a correction reverses doesn't count.
+	 */
+	async firstVerifiedDeposits(
+		tenant: TenantRef,
+		{ from, to }: { from: DateTime; to: DateTime },
+	): Promise<{ projectId: string; verifiedAt: DateTime }[]> {
+		const rows = await Payment.query()
+			.where("tenant_id", tenant.id)
+			.where("kind", "deposit")
+			.where("status", "verified")
+			.whereRaw(
+				"not exists (select 1 from payments as reversals where reversals.corrects_payment_id = payments.id)",
+			)
+			.select("project_id")
+			.min("verified_at as first_verified_at")
+			.groupBy("project_id")
+			.havingRaw("min(verified_at) >= ? and min(verified_at) < ?", [
+				from.toJSDate(),
+				to.toJSDate(),
+			]);
+		return rows.map((row) => ({
+			projectId: row.projectId,
+			verifiedAt: DateTime.fromJSDate(row.$extras.first_verified_at),
+		}));
 	}
 
 	/**

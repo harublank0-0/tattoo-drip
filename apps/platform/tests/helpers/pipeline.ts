@@ -60,6 +60,7 @@ type InquiryOver = Partial<
 		| "status"
 		| "decidedAt"
 		| "anonymizedAt"
+		| "createdAt"
 	>
 >;
 
@@ -90,7 +91,13 @@ export function makeInquiry(
 type ProjectOver = Partial<
 	Pick<
 		TattooProject,
-		"artistId" | "inquiryId" | "brief" | "notes" | "status" | "lastContactedAt"
+		| "artistId"
+		| "inquiryId"
+		| "brief"
+		| "notes"
+		| "status"
+		| "lastContactedAt"
+		| "createdAt"
 	>
 >;
 

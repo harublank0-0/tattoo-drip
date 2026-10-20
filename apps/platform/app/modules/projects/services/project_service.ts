@@ -245,6 +245,39 @@ export default class ProjectService {
 	}
 
 	/**
+	 * How many live projects were booked at the desk in [from, to): made
+	 * directly (TAT-43), with no inquiry. The pilot's link share (TAT-70).
+	 */
+	async countBookedAtDesk(
+		tenant: TenantRef,
+		{ from, to }: { from: DateTime; to: DateTime },
+	): Promise<number> {
+		const [row] = await TattooProject.query()
+			.where("tenant_id", tenant.id)
+			.whereNull("inquiry_id")
+			.where("created_at", ">=", from.toJSDate())
+			.where("created_at", "<", to.toJSDate())
+			// The soft-delete scope is a fetch hook; say it here too, for the aggregate.
+			.whereNull("deleted_at")
+			.count("* as total");
+		return Number(row.$extras.total);
+	}
+
+	/** The inquiry each of these live projects was made from, by project id; desk bookings are left out (TAT-70). */
+	async inquiryIdsFor(
+		tenant: TenantRef,
+		projectIds: string[],
+	): Promise<Map<string, string>> {
+		if (projectIds.length === 0) return new Map();
+		const rows = await TattooProject.query()
+			.where("tenant_id", tenant.id)
+			.whereIn("id", projectIds)
+			.whereNotNull("inquiry_id")
+			.select("id", "inquiry_id");
+		return new Map(rows.map((row) => [row.id, row.inquiryId as string]));
+	}
+
+	/**
 	 * The client's live projects, newest first (the client profile, TAT-41).
 	 * The clients pages are owners only, so there is no member scoping here.
 	 */
