@@ -41,12 +41,15 @@ export const TENANT_ROUTE_ROLES = {
 	"tenant.settings.messages": OWNERS,
 	"tenant.settings.messages.update": OWNERS,
 
-	// Artist profiles.
+	// Artist profiles: owners manage every one; an artist edits only the
+	// live profile linked to them, never its link (ArtistService.findEditable,
+	// updateOwn).
 	"tenant.artists": OWNERS,
+	"tenant.artists.mine": MEMBERS,
 	"tenant.artists.create": OWNERS,
 	"tenant.artists.store": OWNERS,
-	"tenant.artists.edit": OWNERS,
-	"tenant.artists.update": OWNERS,
+	"tenant.artists.edit": MEMBERS,
+	"tenant.artists.update": MEMBERS,
 	"tenant.artists.destroy": OWNERS,
 
 	// The inquiry inbox: reference images stay private to owners until a

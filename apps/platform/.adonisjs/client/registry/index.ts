@@ -186,6 +186,12 @@ const routes = {
     tokens: [{"old":"/t/:tenant/artists","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists","type":0,"val":"artists","end":""}],
     types: placeholder as Registry['tenant.artists']['types'],
   },
+  'tenant.artists.mine': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/artists/mine',
+    tokens: [{"old":"/t/:tenant/artists/mine","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/mine","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/mine","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/mine","type":0,"val":"mine","end":""}],
+    types: placeholder as Registry['tenant.artists.mine']['types'],
+  },
   'tenant.artists.create': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/artists/new',

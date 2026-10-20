@@ -367,6 +367,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['index']>>>
     }
   }
+  'tenant.artists.mine': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/artists/mine'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['mine']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['mine']>>>
+    }
+  }
   'tenant.artists.create': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/artists/new'

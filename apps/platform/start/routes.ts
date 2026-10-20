@@ -156,12 +156,18 @@ router
 			.prefix("/settings");
 
 		/**
-		 * Artist profiles (TENANT_ROUTE_ROLES). Every artists route goes in
-		 * this group (a test checks).
+		 * Artist profiles: owners manage every one; an artist edits only the
+		 * profile linked to them (TENANT_ROUTE_ROLES,
+		 * ArtistService.findEditable). Every artists route goes in this group
+		 * (a test checks).
 		 */
 		router
 			.group(() => {
 				router.get("/", [controllers.Artists, "index"]).as("tenant.artists");
+				// The member's own profile (TAT-30): its edit page, or a note.
+				router
+					.get("mine", [controllers.Artists, "mine"])
+					.as("tenant.artists.mine");
 				router
 					.get("new", [controllers.Artists, "create"])
 					.as("tenant.artists.create");
