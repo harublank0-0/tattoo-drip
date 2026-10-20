@@ -12,6 +12,7 @@ import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import InvitationService from "#modules/tenancy/services/invitation_service";
 import MemberService from "#modules/tenancy/services/member_service";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
+import { dbClient } from "#services/db_context";
 import {
 	confirmedUser,
 	invitationFlow,
@@ -30,13 +31,25 @@ const artists = new ArtistService(new ImageService());
 const members = new MemberService(new TenancyService(), artists);
 const invitations = new InvitationService(artists);
 
-function deferred() {
-	let resolve!: () => void;
-	const promise = new Promise<void>((done) => {
+function deferred<T = void>() {
+	let resolve!: (value: T) => void;
+	const promise = new Promise<T>((done) => {
 		resolve = done;
 	});
 	return { promise, resolve };
 }
+
+/** How a promise ended, as a value, so a refusal can be asserted on. */
+type Settled<T> = { value: T } | { error: unknown };
+
+const settle = <T>(work: Promise<T>): Promise<Settled<T>> =>
+	work.then(
+		(value) => ({ value }),
+		(error: unknown) => ({ error }),
+	);
+
+const errorOf = (settled: Settled<unknown>) =>
+	"error" in settled ? settled.error : undefined;
 
 /**
  * The accepting side of the race, held at a known point: after the
@@ -57,18 +70,47 @@ class HeldAccept extends InvitationService {
 	}
 }
 
-/** Waits until a backend of this database is waiting for a lock held by another. */
-async function waitForALockWait() {
+/**
+ * Runs `fn` in the studio's context on a connection of its own and says
+ * which backend that is, so the test can watch that one backend.
+ */
+async function onItsOwnConnection<T>(tenant: Tenant, fn: () => Promise<T>) {
+	const backend = deferred<number>();
+	const outcome = settle(
+		inTenant(tenant, async () => {
+			const { rows } = await dbClient().rawQuery(
+				"select pg_backend_pid() as pid",
+			);
+			backend.resolve(rows[0].pid as number);
+			return fn();
+		}),
+	);
+	return { pid: await backend.promise, outcome };
+}
+
+/**
+ * Waits until the backend `pid` waits for a lock another backend holds
+ * (true), or its work has ended without waiting (false). Only this backend
+ * counts: another session of the database waiting for a lock must not
+ * release the test early.
+ */
+async function waitUntilBlocked(pid: number, ended: Promise<unknown>) {
+	let over = false;
+	void ended.then(() => {
+		over = true;
+	});
 	for (let attempt = 0; attempt < 200; attempt++) {
+		if (over) return false;
 		const { rows } = await db
 			.connection("owner")
 			.rawQuery(
-				"select count(*)::int as n from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock'",
+				"select count(*)::int as n from pg_stat_activity where pid = ? and wait_event_type = 'Lock'",
+				[pid],
 			);
-		if (rows[0].n > 0) return;
+		if (rows[0].n > 0) return true;
 		await sleep(25);
 	}
-	throw new Error("the second request never waited for a lock");
+	throw new Error(`backend ${pid} never waited for a lock`);
 }
 
 const slugs: string[] = [];
@@ -146,17 +188,17 @@ async function reinviteWhileAccepting(world: {
 	);
 	await accepting.reached.promise;
 
-	const reinviting = invite(tenant, owner, {
-		email: invitee.email,
-		role: "owner",
-	}).then(
-		(made) => ({ made }),
-		(error: unknown) => ({ error }),
+	const reinviting = await onItsOwnConnection(tenant, () =>
+		invite(tenant, owner, { email: invitee.email, role: "owner" }),
 	);
-	await waitForALockWait();
+	if (!(await waitUntilBlocked(reinviting.pid, reinviting.outcome))) {
+		throw new Error(
+			"the second invitation ended without waiting for the first",
+		);
+	}
 	accepting.release.resolve();
 
-	return { joined: await joining, again: await reinviting };
+	return { joined: await joining, again: await reinviting.outcome };
 }
 
 test.group(
@@ -182,12 +224,9 @@ test.group(
 				[],
 				"the address is a member now: no invitation may be left for it",
 			);
-			assert.instanceOf(
-				(again as { error?: unknown }).error,
-				InvitationRuleError,
-			);
+			assert.instanceOf(errorOf(again), InvitationRuleError);
 			assert.equal(
-				(again as { error: InvitationRuleError }).error.reason,
+				(errorOf(again) as InvitationRuleError).reason,
 				"already_member",
 			);
 		}).timeout(20000);
@@ -210,7 +249,7 @@ test.group(
 
 			// Whatever link the owner's second request made (none, once the two
 			// are serialised), using it must not restore the access.
-			const leftover = (again as { made?: { token: string } }).made?.token;
+			const leftover = "value" in again ? again.value.token : undefined;
 			if (leftover) {
 				await invitations
 					.accept(world.invitee, leftover, invitationFlow(leftover))
