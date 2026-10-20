@@ -2,6 +2,7 @@ import { Link } from "@inertiajs/react";
 import { urlFor } from "~/client";
 import type { InboxListProps } from "~/components/inquiries";
 import Page from "~/components/page";
+import PilotMetricsCard from "~/components/pilot_metrics_card";
 import SetupChecklist from "~/components/setup_checklist";
 import StatusBadge from "~/components/status_badge";
 import StudioLinkCard from "~/components/studio_link_card";
@@ -18,7 +19,8 @@ import AppLayout from "~/layouts/app";
 
 /**
  * The inquiry inbox (TAT-46): new inquiries waiting for a decision, oldest
- * first, and the decided ones. Owners only.
+ * first, and the decided ones, with the studio's pilot numbers below
+ * (TAT-70). Owners only.
  */
 export default function InboxIndex({
 	view,
@@ -27,6 +29,7 @@ export default function InboxIndex({
 	newCount,
 	inquiries,
 	page,
+	pilotMetrics,
 }: InboxListProps) {
 	const tenant = useTenant();
 	const base = urlFor("tenant.inbox.index", { tenant: tenant.slug });
@@ -154,6 +157,8 @@ export default function InboxIndex({
 					)}
 				</nav>
 			)}
+
+			<PilotMetricsCard metrics={pilotMetrics} />
 		</Page>
 	);
 }

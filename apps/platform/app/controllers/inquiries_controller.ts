@@ -29,6 +29,9 @@ import { daysAgoText, lastContactText } from "#modules/projects/contact";
 import { formatDay } from "#modules/projects/quotes";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ProjectService from "#modules/projects/services/project_service";
+import { CARD_DAYS, lastDays, pilotCard } from "#modules/reports/pilot_metrics";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import PilotMetricsService from "#modules/reports/services/pilot_metrics_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import SetupService from "#modules/tenancy/services/setup_service";
 import { studioLinks } from "#services/studio_links";
@@ -48,6 +51,7 @@ export default class InquiriesController {
 		private clients: ClientService,
 		private templates: MessageTemplateService,
 		private setup: SetupService,
+		private metrics: PilotMetricsService,
 	) {}
 
 	async index(ctx: HttpContext) {
@@ -101,6 +105,11 @@ export default class InquiriesController {
 					: null,
 			})),
 			page: { current: page, last: lastPage, total },
+			// The owners' pilot numbers (TAT-70); TAT-107 moves them to Today.
+			pilotMetrics: pilotCard(
+				await this.metrics.forStudio(tenant, lastDays(CARD_DAYS)),
+				CARD_DAYS,
+			),
 		});
 	}
 

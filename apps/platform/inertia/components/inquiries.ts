@@ -2,6 +2,7 @@ import type {
 	CardMessageProps,
 	ContactLinksProps,
 } from "~/components/messages";
+import type { PilotCardProps } from "~/components/pilot_metrics_card";
 import type { SetupProps, StudioPageProps } from "~/components/studio_link";
 
 /** One row of the inbox. */
@@ -32,6 +33,8 @@ export type InboxListProps = {
 	newCount: number;
 	inquiries: InquiryRow[];
 	page: { current: number; last: number; total: number };
+	/** The owners' last 30 days (TAT-70). */
+	pilotMetrics: PilotCardProps;
 };
 
 /** A reference image with a signed URL (valid for a few minutes). */
