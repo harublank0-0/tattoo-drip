@@ -1,7 +1,6 @@
 import { test } from "@japa/runner";
 import { rolesFor, TENANT_ROUTE_ROLES } from "#modules/tenancy/access";
-
-const ROLES = ["owner", "artist"];
+import { MEMBERSHIP_ROLES } from "#modules/tenancy/models/tenant_membership";
 
 test.group("TENANT_ROUTE_ROLES", () => {
 	test("owners may use every route, and only known roles are listed", ({
@@ -9,7 +8,7 @@ test.group("TENANT_ROUTE_ROLES", () => {
 	}) => {
 		for (const [name, roles] of Object.entries(TENANT_ROUTE_ROLES)) {
 			assert.include(roles, "owner", name);
-			for (const role of roles) assert.include(ROLES, role, name);
+			for (const role of roles) assert.include(MEMBERSHIP_ROLES, role, name);
 			assert.equal(new Set(roles).size, roles.length, name);
 		}
 	});
