@@ -51,6 +51,14 @@ jobs:
 
       - run: pnpm typecheck
 
+      # The SDK and the storefront are built on these generated types, so fail
+      # when openapi.yaml changed without regenerating them. Biome ignores the
+      # generated file, so the output is compared as written.
+      - name: Check generated API types are committed
+        run: |
+          pnpm --filter @tattoo-drip/types generate
+          git diff --exit-code -- packages/types/src/openapi.gen.ts
+
       # Ace commands that boot the app, such as `migration:run` and `test`,
       # validate its env, so they need a .env. The defaults match the
       # Postgres service.
