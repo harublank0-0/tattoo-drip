@@ -6,7 +6,7 @@ import TenantSwitcher from "~/components/tenant_switcher";
 export default function TopBar() {
 	return (
 		<header className="sticky top-0 z-30 border-b bg-card pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)] lg:hidden">
-			<div className="flex h-14 items-center justify-between gap-3 px-4">
+			<div className="flex min-h-14 items-center justify-between gap-3 px-4 py-2">
 				<div className="min-w-0">
 					<TenantSwitcher />
 				</div>

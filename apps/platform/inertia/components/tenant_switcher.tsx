@@ -30,7 +30,7 @@ export default function TenantSwitcher() {
 
 	if (!tenants || tenants.length < 2) {
 		return (
-			<span className="block truncate font-display text-lg leading-snug font-bold">
+			<span className="block font-display text-lg leading-snug font-bold wrap-anywhere">
 				{tenant.name}
 			</span>
 		);
@@ -39,8 +39,12 @@ export default function TenantSwitcher() {
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
-				<Button variant="ghost" size="sm" className="max-w-56 justify-between">
-					<span className="truncate font-display text-lg leading-snug font-bold">
+				<Button
+					variant="ghost"
+					size="sm"
+					className="h-auto min-h-8 max-w-56 justify-between py-1 text-left whitespace-normal"
+				>
+					<span className="min-w-0 font-display text-lg leading-snug font-bold wrap-anywhere">
 						{tenant.name}
 					</span>
 					<ChevronsUpDown data-icon="inline-end" />
@@ -55,7 +59,7 @@ export default function TenantSwitcher() {
 							aria-current={item.slug === tenant.slug ? "true" : undefined}
 						>
 							<span className="flex min-w-0 flex-1 flex-col">
-								<span className="truncate">{item.name}</span>
+								<span className="wrap-anywhere">{item.name}</span>
 								<span className="text-xs text-muted-foreground">
 									{ROLE_LABELS[item.role]}
 								</span>
