@@ -46,6 +46,21 @@ function client(
 	});
 }
 
+/** Runs `fn` as if in a browser (a global `document`), then puts the global back. */
+function inBrowser<T>(fn: () => T): T {
+	const had = Object.hasOwn(globalThis, "document");
+	Object.defineProperty(globalThis, "document", {
+		value: {},
+		configurable: true,
+		writable: true,
+	});
+	try {
+		return fn();
+	} finally {
+		if (!had) delete (globalThis as { document?: unknown }).document;
+	}
+}
+
 /** Rejects with the signal's reason once it aborts, as fetch does. */
 function hangUntilAborted({ init }: Call): Promise<Response> {
 	const signal = init.signal as AbortSignal;
@@ -741,5 +756,85 @@ describe("studio and artists", () => {
 		assert.ok(error instanceof TattooApiError);
 		assert.equal(error.status, 404);
 		assert.equal(error.code, "not_found");
+	});
+});
+
+describe("secret key guard", () => {
+	const STUDIO = { slug: "guard-needle-11", name: "Guard Needle" };
+
+	test("a key in a browser is refused", () => {
+		assert.throws(
+			() =>
+				inBrowser(() =>
+					createTattooClient({
+						baseUrl: "https://api.example.com",
+						tenant: "guard-needle-11",
+						key: "secret-key-11",
+					}),
+				),
+			/secret keys must never be used in a browser/,
+		);
+	});
+
+	test("the refusal never carries the key", () => {
+		let error: unknown;
+		try {
+			inBrowser(() =>
+				createTattooClient({
+					baseUrl: "https://api.example.com",
+					tenant: "guard-needle-11",
+					key: "secret-key-11",
+				}),
+			);
+		} catch (thrown) {
+			error = thrown;
+		}
+
+		assert.ok(error instanceof Error);
+		assert.ok(!String(error).includes("secret-key-11"));
+	});
+
+	test("a client without a key is fine in a browser, and sends no Authorization header", async () => {
+		const { calls, fetch } = fakeFetch(() => json(200, { data: STUDIO }));
+		const tattoo = inBrowser(() =>
+			createTattooClient({
+				baseUrl: "https://api.example.com",
+				tenant: "guard-needle-11",
+				fetch,
+			}),
+		);
+
+		assert.deepEqual(await tattoo.studio.get(), STUDIO);
+		const headers = new Headers(calls[0].init.headers);
+		assert.equal(headers.has("authorization"), false);
+		assert.equal(headers.get("accept"), "application/json");
+	});
+
+	test("on a server the key is sent as a bearer token", async () => {
+		const { calls, fetch } = fakeFetch(() => json(200, { data: STUDIO }));
+
+		await createTattooClient({
+			baseUrl: "https://api.example.com",
+			tenant: "guard-needle-11",
+			key: "secret-key-11",
+			fetch,
+		}).studio.get();
+
+		assert.equal(
+			new Headers(calls[0].init.headers).get("authorization"),
+			"Bearer secret-key-11",
+		);
+	});
+
+	test("an empty key is no key", () => {
+		assert.doesNotThrow(() =>
+			inBrowser(() =>
+				createTattooClient({
+					baseUrl: "https://api.example.com",
+					tenant: "guard-needle-11",
+					key: "",
+				}),
+			),
+		);
 	});
 });
