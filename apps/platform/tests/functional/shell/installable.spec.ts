@@ -25,8 +25,8 @@ test.group("Installable app", () => {
 			start_url: "/dashboard",
 			scope: "/",
 			display: "standalone",
-			background_color: "#ffffff",
-			theme_color: "#18181b",
+			background_color: "#f7f3ee",
+			theme_color: "#f7f3ee",
 		});
 		assert.sameMembers(
 			manifest.icons.map(({ purpose }: { purpose: string }) => purpose),
