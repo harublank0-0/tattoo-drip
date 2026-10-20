@@ -1,0 +1,14 @@
+@email.layout({ title: 'Deposit screenshot', preheader: 'A deposit screenshot is waiting to be checked.' })
+  <p style="margin: 0 0 16px;">Hi {{ recipientName || 'there' }},</p>
+  <p style="margin: 0 0 16px;">{{ intro }}</p>
+  @if(forOwner)
+    <p style="margin: 0 0 16px;">Check that the money reached your account, then verify or reject it on the Payments card.</p>
+    @!email.button({ href: url, text: 'Check the screenshot' })
+  @else
+    <p style="margin: 0 0 16px;">An owner of {{ studioName }} will check it.</p>
+    @!email.button({ href: url, text: 'Open the project' })
+  @end
+  <p style="margin: 0; font-size: 14px; line-height: 20px; color: #71717a;">
+    You get these emails as a member of {{ studioName }} on Tattoo Drip.
+  </p>
+@end
