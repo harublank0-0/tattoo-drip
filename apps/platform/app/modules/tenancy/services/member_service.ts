@@ -4,7 +4,11 @@ import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
 import User from "#models/user";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
-import { MemberRuleError } from "#modules/tenancy/errors";
+import {
+	MemberRuleError,
+	MembershipNotLiveError,
+} from "#modules/tenancy/errors";
+import TenantInvitation from "#modules/tenancy/models/tenant_invitation";
 import TenantMembership, {
 	type MembershipRole,
 } from "#modules/tenancy/models/tenant_membership";
@@ -20,6 +24,8 @@ type TenantRef = { id: string };
  * acts, only that it isn't the target). Every removal and every demotion of
  * an owner calls TenancyService.assertKeepsAnOwner in its transaction,
  * which locks the owner rows, so a studio is never left without an owner.
+ * They also delete the invitations that could bring the person, or what
+ * they set up, back (dropInvitations).
  */
 @inject()
 export default class MemberService {
@@ -40,8 +46,9 @@ export default class MemberService {
 	 * Removes the member: their access ends on their next request (the
 	 * tenant middleware reads the membership every time), every profile of
 	 * the studio linked to them is unlinked (it stays with the studio, with
-	 * its projects and sessions) and the membership is soft-deleted, in one
-	 * transaction. LastOwnerError when they are the last owner;
+	 * its projects and sessions), the pending invitations for their address
+	 * and the owner invitations they sent are deleted, and the membership is
+	 * soft-deleted, in one transaction. LastOwnerError when they are the last owner;
 	 * MemberRuleError("self") for the actor's own membership.
 	 */
 	async remove(
@@ -51,17 +58,20 @@ export default class MemberService {
 	): Promise<{ name: string }> {
 		return withTransaction(async (trx) => {
 			const target = await this.target(trx, tenant, actor, membershipId);
-			await this.tenancy.assertKeepsAnOwner(trx, tenant.id, target.id);
+			await this.keepsAnOwner(trx, tenant, target.id);
 			const live = await this.lock(trx, tenant, target.id);
+			const account = await User.find(live.userId);
+			await this.dropInvitations(trx, tenant, live.userId, account?.email);
 			await this.artists.unlinkUser(tenant, live.userId);
 			await live.softDelete(trx);
-			return { name: await nameOf(live.userId) };
+			return { name: nameOf(account) };
 		});
 	}
 
 	/**
 	 * Makes the member an owner or an artist. Demoting an owner needs
-	 * another owner (LastOwnerError); the profile link stays.
+	 * another owner (LastOwnerError); the profile link stays, and the owner
+	 * invitations they sent are deleted, like a removal's.
 	 * MemberRuleError("self") for the actor's own membership.
 	 */
 	async changeRole(
@@ -75,19 +85,69 @@ export default class MemberService {
 		return withTransaction(async (trx) => {
 			const target = await this.target(trx, tenant, actor, membershipId);
 			if (demotes(target.role)) {
-				await this.tenancy.assertKeepsAnOwner(trx, tenant.id, target.id);
+				await this.keepsAnOwner(trx, tenant, target.id);
 			}
 			const live = await this.lock(trx, tenant, target.id);
 			// Made an owner by someone else while this request waited.
 			if (demotes(live.role) && !demotes(target.role)) {
-				await this.tenancy.assertKeepsAnOwner(trx, tenant.id, live.id);
+				await this.keepsAnOwner(trx, tenant, live.id);
+			}
+			const account = await User.find(live.userId);
+			if (demotes(live.role)) {
+				await this.dropInvitations(trx, tenant, live.userId, account?.email);
 			}
 			if (live.role !== role) {
 				live.role = role;
 				await live.save();
 			}
-			return { name: await nameOf(live.userId) };
+			return { name: nameOf(account) };
 		});
+	}
+
+	/**
+	 * TenancyService.assertKeepsAnOwner, where a membership that was removed
+	 * since this request read it is the 404 it would have been a moment later
+	 * (lock()), not a server error.
+	 */
+	private async keepsAnOwner(
+		trx: TransactionClientContract,
+		tenant: TenantRef,
+		membershipId: string,
+	): Promise<void> {
+		try {
+			await this.tenancy.assertKeepsAnOwner(trx, tenant.id, membershipId);
+		} catch (error) {
+			if (error instanceof MembershipNotLiveError) {
+				throw new lucidErrors.E_ROW_NOT_FOUND(TenantMembership);
+			}
+			throw error;
+		}
+	}
+
+	/**
+	 * Deletes the studio's pending invitations that would undo or outlive
+	 * this change: one for the member's own address (a link that would let
+	 * them back in after a removal, with no owner's approval; sending one to a
+	 * member is refused, so one can only be left by a lost race) and the
+	 * owner invitations they sent (a departing owner could otherwise invite
+	 * an address of their own and return as an owner). Their invitations to
+	 * an artist role stay: an owner who is still here can see and cancel them.
+	 */
+	private async dropInvitations(
+		trx: TransactionClientContract,
+		tenant: TenantRef,
+		userId: string,
+		email: string | undefined,
+	): Promise<void> {
+		await TenantInvitation.query({ client: trx })
+			.where("tenant_id", tenant.id)
+			.where((match) => {
+				match.where((sent) =>
+					sent.where("invited_by_user_id", userId).where("role", "owner"),
+				);
+				if (email) match.orWhere("email", email);
+			})
+			.delete();
 	}
 
 	/** The live membership to act on, not the actor's own. */
@@ -127,7 +187,6 @@ export default class MemberService {
 }
 
 /** How the flashes name a member: their name, else their address. */
-async function nameOf(userId: string): Promise<string> {
-	const user = await User.find(userId);
+function nameOf(user: User | null): string {
 	return user?.fullName ?? user?.email ?? "The member";
 }

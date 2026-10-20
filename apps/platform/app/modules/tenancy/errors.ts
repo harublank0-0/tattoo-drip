@@ -65,3 +65,20 @@ export class MemberRuleError extends Error {
 		this.name = "MemberRuleError";
 	}
 }
+
+/**
+ * assertKeepsAnOwner was asked about a membership that isn't a live one of the
+ * tenant: removed, or never there. A caller bug when the id came from
+ * nowhere; MemberService turns it into a 404 for a member removed meanwhile.
+ */
+export class MembershipNotLiveError extends Error {
+	constructor(
+		readonly membershipId: string,
+		readonly tenantId: string,
+	) {
+		super(
+			`Membership ${membershipId} is not a live membership of tenant ${tenantId}`,
+		);
+		this.name = "MembershipNotLiveError";
+	}
+}
