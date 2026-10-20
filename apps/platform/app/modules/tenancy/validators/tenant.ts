@@ -85,8 +85,25 @@ const tenantSlug = vine.createRule((value: unknown, _, field: FieldContext) => {
 	field.mutate(checked.slug, field);
 });
 
+/**
+ * A studio's name: 2 to 120 characters, no control characters (escapes, line
+ * breaks, tabs, DEL, C1) and no line or paragraph separators. The name is
+ * printed in places that obey them, such as the operator's terminal; the
+ * letters of any script, joiners included, pass.
+ */
+const studioName = () =>
+	vine
+		.string()
+		.trim()
+		.minLength(2)
+		.maxLength(120)
+		.regex(/^[^\p{Cc}\p{Zl}\p{Zp}]+$/u);
+
+const NAME_HAS_CONTROLS =
+	"The business name can't have line breaks or other hidden control characters.";
+
 export const createTenantValidator = vine.create({
-	name: vine.string().trim().minLength(2).maxLength(120),
+	name: studioName(),
 	type: vine.enum(TENANT_TYPES),
 	slug: vine.string().trim().use(tenantSlug()),
 	timezone: vine.string().trim().use(ianaTimezone()),
@@ -96,7 +113,7 @@ export const createTenantValidator = vine.create({
  * The page calls the slug "your page link", so the errors do too.
  */
 createTenantValidator.messagesProvider = new SimpleMessagesProvider(
-	{},
+	{ "name.regex": NAME_HAS_CONTROLS },
 	{ name: "business name", slug: "page link", timezone: "time zone" },
 );
 
@@ -127,7 +144,7 @@ const httpsUrl = () =>
  * null and clears the column. Slug and type can't be changed here.
  */
 export const updateProfileValidator = vine.create({
-	name: vine.string().trim().minLength(2).maxLength(120),
+	name: studioName(),
 	timezone: vine.string().trim().use(ianaTimezone()),
 	intro: vine.string().trim().maxLength(1000).nullable(),
 	contactPhone: vine.string().trim().use(phoneNumber()).nullable(),
@@ -140,7 +157,10 @@ export const updateProfileValidator = vine.create({
 });
 
 updateProfileValidator.messagesProvider = new SimpleMessagesProvider(
-	{ url: "Enter a full link that starts with https://" },
+	{
+		url: "Enter a full link that starts with https://",
+		"name.regex": NAME_HAS_CONTROLS,
+	},
 	{
 		name: "business name",
 		timezone: "time zone",
