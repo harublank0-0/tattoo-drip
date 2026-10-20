@@ -1,4 +1,5 @@
 import { inject } from "@adonisjs/core";
+import { DateTime } from "luxon";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import InquiryService from "#modules/inquiries/services/inquiry_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -25,9 +26,16 @@ export default class PilotMetricsService {
 		private sessions: SessionService,
 	) {}
 
+	/**
+	 * The window may end after `now` (a calendar month, TAT-76): a session
+	 * still to come isn't "past without an outcome", so `noOutcome` counts only
+	 * scheduled sessions that started before `now` (a second, narrower read,
+	 * made only when the window reaches past it). `now` is the clock, for tests.
+	 */
 	async forStudio(
 		tenant: { id: string },
 		window: MetricsWindow,
+		now: DateTime = DateTime.now(),
 	): Promise<PilotFacts> {
 		const linkInquiries = await this.inquiries.countReceived(tenant, window);
 		const deskProjects = await this.projects.countBookedAtDesk(tenant, window);
@@ -48,6 +56,15 @@ export default class PilotMetricsService {
 		});
 
 		const { studio } = await this.sessions.countByStatus(tenant, window);
+		const started =
+			window.to <= now
+				? studio
+				: (
+						await this.sessions.countByStatus(tenant, {
+							from: window.from,
+							to: now,
+						})
+					).studio;
 		return {
 			linkInquiries,
 			deskProjects,
@@ -55,8 +72,8 @@ export default class PilotMetricsService {
 			sessions: {
 				completed: studio.completed,
 				noShow: studio.no_show,
-				// The window ends now, so a session still scheduled in it has started.
-				noOutcome: studio.scheduled,
+				// Still scheduled though it has started: nobody recorded what happened.
+				noOutcome: started.scheduled,
 			},
 		};
 	}

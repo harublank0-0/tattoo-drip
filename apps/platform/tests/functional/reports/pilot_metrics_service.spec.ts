@@ -248,7 +248,7 @@ test.group("Pilot metrics reads (TAT-70)", (group) => {
 		});
 
 		const facts = await inTenant(tenant, () =>
-			metrics.forStudio(tenant, WINDOW),
+			metrics.forStudio(tenant, WINDOW, WINDOW.to),
 		);
 		assert.deepEqual(
 			{ ...facts, depositHours: [...facts.depositHours].sort((a, b) => a - b) },
@@ -263,6 +263,48 @@ test.group("Pilot metrics reads (TAT-70)", (group) => {
 			await inTenant(other, () => metrics.forStudio(tenant, WINDOW)),
 			noFacts(),
 		);
+	});
+
+	test("forStudio: a window that reaches into the future doesn't count a session still to come as past without an outcome", async ({
+		assert,
+	}) => {
+		const metrics = await app.container.make(PilotMetricsService);
+		const { tenant } = await studioWithOwner("future-a-70");
+		await inTenant(tenant, async () => {
+			const client = await makeClient(tenant);
+			const artist = await makeArtist(tenant);
+			const project = await makeProject(tenant, client, {
+				status: "booked",
+				artistId: artist.id,
+			});
+			for (const [day, status] of [
+				[6, "completed"],
+				[8, "scheduled"],
+				[9, "no_show"],
+				// Still to come on the 10th: nobody can have recorded it yet.
+				[20, "scheduled"],
+			] as const) {
+				await makeSession(tenant, project, artist, {
+					status,
+					startsAt: nov(day),
+					endsAt: nov(day, 11),
+				});
+			}
+		});
+
+		const month = await inTenant(tenant, () =>
+			metrics.forStudio(tenant, WINDOW, nov(10)),
+		);
+		assert.deepEqual(month.sessions, {
+			completed: 1,
+			noShow: 1,
+			noOutcome: 1,
+		});
+		// The same month judged after it ended: both scheduled ones are past.
+		const later = await inTenant(tenant, () =>
+			metrics.forStudio(tenant, WINDOW, WINDOW.to),
+		);
+		assert.equal(later.sessions.noOutcome, 2);
 	});
 
 	test("forStudio: another studio's busy data never changes a studio's numbers", async ({
