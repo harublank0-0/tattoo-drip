@@ -246,7 +246,8 @@ export default class SessionService {
 	 * (mayChangeSession: owners any; an artist only with their own profile
 	 * on a project assigned to it; E_ROW_NOT_FOUND otherwise), and the
 	 * project must take new sessions (scheduleRefusal: SessionRuleError
-	 * "project_closed" or "project_finished"). A tattoo session then books
+	 * "project_closed", "project_finished", or "touch_ups_only" for anything
+	 * but a touch-up during a healing check). A tattoo session then books
 	 * the project when it can, in the same transaction: in_progress to
 	 * booked, or deposit_pending to booked once the deposit is settled
 	 * (moveToBooked). SessionOverlapError after the savepoint rolled back.
@@ -371,7 +372,7 @@ export default class SessionService {
 					await this.assertMayChange(tenant, member, live, {
 						artistId: artist.id,
 					});
-					const refusal = scheduleRefusal(live.status);
+					const refusal = scheduleRefusal(live.status, input.kind);
 					if (refusal) throw new SessionRuleError(refusal);
 				} else if (CLOSED.includes(live.status)) {
 					throw new SessionRuleError("project_closed");

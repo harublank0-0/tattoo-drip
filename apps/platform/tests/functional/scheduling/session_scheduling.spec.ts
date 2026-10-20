@@ -253,7 +253,7 @@ test.group("SessionService.scheduleFor and booking (TAT-85)", (group) => {
 		await inTenant(tenant, async () => {
 			const expected = {
 				completed: "project_finished",
-				healing_check: "project_finished",
+				healing_check: "touch_ups_only",
 				declined: "project_closed",
 				cancelled: "project_closed",
 			} as const;
@@ -273,6 +273,56 @@ test.group("SessionService.scheduleFor and booking (TAT-85)", (group) => {
 				);
 				assert.lengthOf(await sessionsOf(project), 0, status);
 			}
+		});
+	});
+
+	test("a healing check takes a touch-up session and stays in its healing check (TAT-111)", async ({
+		assert,
+	}) => {
+		const { tenant, client, sita } = await setup();
+
+		await inTenant(tenant, async () => {
+			const healing = await makeProject(tenant, client, {
+				status: "healing_check",
+				artistId: sita.id,
+			});
+			const touchUp = await sessions.scheduleFor(
+				tenant,
+				OWNER,
+				healing,
+				slot(sita, 3, "touch_up"),
+			);
+			assert.deepEqual(
+				[touchUp.session.kind, touchUp.projectStatus, touchUp.booked],
+				["touch_up", "healing_check", false],
+			);
+			for (const kind of ["tattoo", "consultation"] as const) {
+				assert.equal(
+					await ruleOf(() =>
+						sessions.scheduleFor(tenant, OWNER, healing, slot(sita, 5, kind)),
+					),
+					"touch_ups_only",
+					kind,
+				);
+			}
+			assert.lengthOf(await sessionsOf(healing), 1);
+
+			const completed = await makeProject(tenant, client, {
+				status: "completed",
+				artistId: sita.id,
+			});
+			assert.equal(
+				await ruleOf(() =>
+					sessions.scheduleFor(
+						tenant,
+						OWNER,
+						completed,
+						slot(sita, 7, "touch_up"),
+					),
+				),
+				"project_finished",
+			);
+			assert.lengthOf(await sessionsOf(completed), 0);
 		});
 	});
 });

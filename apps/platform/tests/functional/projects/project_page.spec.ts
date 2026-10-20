@@ -794,6 +794,7 @@ test.group("Project page: scheduling (TAT-85)", (group) => {
 			artists: [{ id: sita.id, name: "Sita" }],
 			artistId: sita.id,
 			artistFixed: true,
+			kinds: ["tattoo", "consultation", "touch_up"],
 			hint: null,
 		});
 

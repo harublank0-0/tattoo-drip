@@ -99,6 +99,8 @@ export type ProjectPageProps = {
 		artists: { id: string; name: string }[];
 		artistId: string | null;
 		artistFixed: boolean;
+		/** The kinds this project takes now, in the form's order (touch-ups only during a healing check, TAT-111). */
+		kinds: string[];
 		hint: string | null;
 	} | null;
 	notes: string | null;

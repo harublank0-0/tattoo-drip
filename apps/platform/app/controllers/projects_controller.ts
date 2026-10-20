@@ -68,7 +68,7 @@ import {
 	outcomesFor,
 } from "#modules/scheduling/outcomes";
 import {
-	scheduleRefusal,
+	schedulableKinds,
 	schedulingHint,
 } from "#modules/scheduling/schedule_rules";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -392,11 +392,12 @@ export default class ProjectsController {
 			}),
 			sessionDates: { today: todayText, max: lastBookable },
 			scheduling:
-				scheduleRefusal(project.status) === null && bookable.length > 0
+				schedulableKinds(project.status).length > 0 && bookable.length > 0
 					? {
 							artists: bookable.map(({ id, name }) => ({ id, name })),
 							artistId: defaultArtistId,
 							artistFixed: membership.role !== "owner",
+							kinds: [...schedulableKinds(project.status)],
 							hint: schedulingHint(
 								project.status,
 								depositDue,

@@ -4,10 +4,10 @@ import type { SessionRuleReason } from "#modules/scheduling/errors";
 import type { SessionKind } from "#modules/scheduling/models/project_session";
 
 /**
- * The project statuses that take a new session from staff (TAT-85 part
- * 2): before booking, booked, and in progress (a long tattoo's next
- * sitting). Completed and healing-check projects wait for the
- * finish-project ticket; declined and cancelled ones are closed.
+ * The project statuses that take every kind of session from staff (TAT-85
+ * part 2): before booking, booked, and in progress (a long tattoo's next
+ * sitting). A healing check takes touch-ups only (TAT-111); completed,
+ * declined and cancelled projects take none (schedulableKinds).
  */
 export const SCHEDULABLE_STATUSES: readonly ProjectStatus[] = [
 	"reviewing",
@@ -25,14 +25,38 @@ const BEFORE_ACCEPTANCE: readonly ProjectStatus[] = [
 	"on_hold",
 ];
 
-/** Why a project in `status` takes no new session, or null when it does. */
+/** Every session kind, in the schedule form's order. */
+const ALL_KINDS: readonly SessionKind[] = [
+	"tattoo",
+	"consultation",
+	"touch_up",
+];
+
+/**
+ * The session kinds staff may schedule on a project in `status`, in the
+ * schedule form's order: every kind while it is open, touch-ups only during
+ * its healing check (TAT-111), none once it is completed, declined or
+ * cancelled. The Sessions card offers exactly these.
+ */
+export function schedulableKinds(
+	status: ProjectStatus,
+): readonly SessionKind[] {
+	if (SCHEDULABLE_STATUSES.includes(status)) return ALL_KINDS;
+	return status === "healing_check" ? ["touch_up"] : [];
+}
+
+/**
+ * Why a project in `status` takes no new `kind` session, or null when it
+ * does: "touch_ups_only" during a healing check, "project_finished" once
+ * completed, "project_closed" when declined or cancelled.
+ */
 export function scheduleRefusal(
 	status: ProjectStatus,
+	kind: SessionKind,
 ): SessionRuleReason | null {
-	if (SCHEDULABLE_STATUSES.includes(status)) return null;
-	return status === "completed" || status === "healing_check"
-		? "project_finished"
-		: "project_closed";
+	if (schedulableKinds(status).includes(kind)) return null;
+	if (status === "healing_check") return "touch_ups_only";
+	return status === "completed" ? "project_finished" : "project_closed";
 }
 
 /**
@@ -77,6 +101,9 @@ export function schedulingHint(
 	depositDue: number,
 	hasQuote: boolean,
 ): string | null {
+	if (status === "healing_check") {
+		return "The healing check takes touch-up sessions only.";
+	}
 	if (BEFORE_ACCEPTANCE.includes(status)) {
 		return "A tattoo session holds the date. The project is booked once the client accepts the quote and the deposit is settled.";
 	}
