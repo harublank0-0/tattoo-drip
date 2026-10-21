@@ -83,6 +83,36 @@ test.group("boot guard", () => {
 		assert.notMatch(output, /Starting worker/);
 	}).timeout(40_000);
 
+	// The command reads one studio's numbers at a time and leans on RLS to
+	// keep each its own (TAT-70), so it is guarded like the worker.
+	test("metrics:pilot refuses to run as the owner role", async ({ assert }) => {
+		const { exitCode, killed, output } = await bootAsOwner([
+			"ace.js",
+			"metrics:pilot",
+		]);
+
+		assert.isFalse(killed);
+		assert.equal(exitCode, 1);
+		assert.match(output, /is a superuser/);
+		assert.notMatch(output, /Pilot numbers/);
+	}).timeout(40_000);
+
+	// The guard checks the default (app role) connection only: the list of
+	// studios still comes through the command's own owner connection.
+	test("metrics:pilot runs as the app role and still lists studios as the owner", async ({
+		assert,
+	}) => {
+		const { exitCode, killed, output } = await boot(
+			["ace.js", "metrics:pilot", "--days=1"],
+			{},
+		);
+
+		assert.isFalse(killed);
+		assert.equal(exitCode, 0);
+		assert.match(output, /Pilot numbers for the last 1 days/);
+		assert.match(output, /No studios yet\.|All studios \(\d+\)/);
+	}).timeout(40_000);
+
 	test("the web server refuses to listen as the owner role", async ({
 		assert,
 	}) => {

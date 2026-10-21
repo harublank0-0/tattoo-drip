@@ -36,6 +36,9 @@ export class ContextAdapter extends Adapter {
 	}
 }
 
+/** The ace commands that refuse to run as a role that bypasses RLS. */
+const GUARDED_COMMANDS = new Set(["queue:work", "metrics:pilot"]);
+
 export default class DbContextProvider {
 	constructor(protected app: ApplicationService) {}
 
@@ -50,10 +53,12 @@ export default class DbContextProvider {
 		// bin/console.ts has already consumed process.argv), so the worker is
 		// recognized once its command has loaded. That is still before the
 		// command is created, so a refusal ends the process like a failed boot.
+		// metrics:pilot (TAT-70) is guarded too: it reads each studio's numbers
+		// on the default connection and relies on RLS to keep them its own.
 		if (this.app.getEnvironment() === "console") {
 			const ace = await this.app.container.make("ace");
 			ace.loaded(async (command) => {
-				if (command.commandName === "queue:work") await this.assertRole();
+				if (GUARDED_COMMANDS.has(command.commandName)) await this.assertRole();
 			});
 		}
 	}
@@ -61,9 +66,10 @@ export default class DbContextProvider {
 	/**
 	 * Refuses to serve, work or test as a role that bypasses RLS: the web
 	 * server (`node ace serve`, bin/server.ts) and the test runner are guarded
-	 * here, the worker (`queue:work`) by the hook boot() registers. This is
-	 * start(), not ready(): the HTTP server and the test run begin between the
-	 * two, and a ready() refusal would leave the server listening.
+	 * here, the worker (`queue:work`) and `metrics:pilot` by the hook boot()
+	 * registers. This is start(), not ready(): the HTTP server and the test
+	 * run begin between the two, and a ready() refusal would leave the server
+	 * listening.
 	 *
 	 * Exempt: `node ace codegen`, which warms the app up in the web environment
 	 * in "warmup" mode (it never starts, and skips provider shutdown, so a

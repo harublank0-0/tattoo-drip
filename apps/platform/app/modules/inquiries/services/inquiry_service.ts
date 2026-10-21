@@ -76,6 +76,38 @@ export default class InquiryService {
 		return Number(row.$extras.total);
 	}
 
+	/**
+	 * How many live inquiries arrived in [from, to), whatever became of
+	 * them: every inquiry comes through the intake link (TAT-51). The pilot's
+	 * link share (TAT-70).
+	 */
+	async countReceived(
+		tenant: TenantRef,
+		{ from, to }: { from: DateTime; to: DateTime },
+	): Promise<number> {
+		const [row] = await Inquiry.query()
+			.where("tenant_id", tenant.id)
+			.where("created_at", ">=", from.toJSDate())
+			.where("created_at", "<", to.toJSDate())
+			// The soft-delete scope is a fetch hook; say it here too, for the aggregate.
+			.whereNull("deleted_at")
+			.count("* as total");
+		return Number(row.$extras.total);
+	}
+
+	/** When each of these live inquiries arrived, by id (TAT-70). */
+	async receivedAt(
+		tenant: TenantRef,
+		ids: string[],
+	): Promise<Map<string, DateTime>> {
+		if (ids.length === 0) return new Map();
+		const rows = await Inquiry.query()
+			.where("tenant_id", tenant.id)
+			.whereIn("id", ids)
+			.select("id", "created_at");
+		return new Map(rows.map((row) => [row.id, row.createdAt]));
+	}
+
 	/** Whether the tenant has ever received an inquiry, in any status (TAT-101's setup checklist). */
 	async hasAny(tenant: TenantRef): Promise<boolean> {
 		const first = await Inquiry.query()

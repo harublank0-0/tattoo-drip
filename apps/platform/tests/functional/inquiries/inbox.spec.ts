@@ -142,6 +142,67 @@ test.group("Inbox pages", (group) => {
 		assert.equal(shown.projectId, projectId);
 	});
 
+	test("owners see the last 30 days' pilot numbers under the inbox", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		await inTenant(tenant, async () => {
+			const customer = await makeClient(tenant);
+			await makeInquiry(tenant, customer);
+			// Booked at the desk: a project with no inquiry.
+			await makeProject(tenant, customer, { status: "booked" });
+			// Older than 30 days: not counted.
+			await makeInquiry(tenant, customer, {
+				status: "declined",
+				decidedAt: DateTime.utc(),
+				createdAt: DateTime.utc().minus({ days: 31 }),
+			});
+		});
+
+		const props = (await client.get(inbox()).withInertia().loginAs(owner))
+			.inertiaProps;
+
+		assert.deepEqual(props.pilotMetrics, {
+			title: "Last 30 days",
+			tiles: [
+				{
+					label: "Through the link",
+					value: "50%",
+					detail: "1 inquiry through the link, 1 booking at the desk",
+				},
+				{
+					label: "Inquiry to deposit",
+					value: "—",
+					detail: "No deposits verified from an inquiry yet.",
+				},
+				{
+					label: "No-shows",
+					value: "—",
+					detail: "No finished sessions yet.",
+				},
+			],
+			note: null,
+		});
+	});
+
+	test("the Decided tab shows the same card, with dashes when there is nothing yet", async ({
+		client,
+		assert,
+	}) => {
+		const { owner } = await studioWithOwner();
+
+		const props = (
+			await client.get(inbox("?view=decided")).withInertia().loginAs(owner)
+		).inertiaProps;
+
+		assert.equal(props.pilotMetrics.title, "Last 30 days");
+		assert.deepEqual(
+			props.pilotMetrics.tiles.map(({ value }: { value: string }) => value),
+			["—", "—", "—"],
+		);
+	});
+
 	test("the inquiry page shows everything, signed references, and the accept choices", async ({
 		client,
 		assert,
