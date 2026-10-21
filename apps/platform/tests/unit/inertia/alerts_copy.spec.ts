@@ -14,7 +14,7 @@ test.group("Alerts copy", () => {
 	}) => {
 		assert.equal(
 			emptyAlertsText(0),
-			"No alerts yet. New inquiries show up here.",
+			"No alerts yet. New inquiries and deposit screenshots show up here.",
 		);
 		// A page past the last one: the alerts exist, just not here.
 		assert.equal(emptyAlertsText(30), "No alerts on this page.");

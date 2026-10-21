@@ -8,12 +8,20 @@ import ArtistService from "#modules/artists/services/artist_service";
 import ImageService from "#modules/media/services/image_service";
 import StaffAlert from "#modules/notifications/models/staff_alert";
 import AlertService from "#modules/notifications/services/alert_service";
+import type Payment from "#modules/payments/models/payment";
+import type TattooProject from "#modules/projects/models/tattoo_project";
 import type Tenant from "#modules/tenancy/models/tenant";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { withTransaction } from "#services/db_context";
 import env from "#start/env";
-import { makeArtist, makeClient, makeInquiry } from "#tests/helpers/pipeline";
+import {
+	makeArtist,
+	makeClient,
+	makeInquiry,
+	makePayment,
+	makeProject,
+} from "#tests/helpers/pipeline";
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
 const alerts = new AlertService(
@@ -82,6 +90,47 @@ const removeMembership = (tenant: Tenant, user: { id: string }) =>
 		(
 			await TenantMembership.query().where("user_id", user.id).firstOrFail()
 		).softDelete(),
+	);
+
+/** A deposit_pending project of `tenant` (assigned to `artistId` when given) and a submitted deposit payment: a screenshot that waits. */
+const proofIn = (
+	tenant: Tenant,
+	over: { artistId?: string | null; clientName?: string } = {},
+) =>
+	inTenant(tenant, async () => {
+		const client = await makeClient(tenant, {
+			name: over.clientName ?? "Sita Rai",
+		});
+		const project = await makeProject(tenant, client, {
+			status: "deposit_pending",
+			artistId: over.artistId ?? null,
+		});
+		const payment = await makePayment(tenant, project, { method: "esewa" });
+		return { client, project, payment };
+	});
+
+/** What DepositProofAlertJob hands AlertService.depositProof. */
+const factsOf = ({
+	project,
+	payment,
+	client,
+}: {
+	project: TattooProject;
+	payment: Payment;
+	client: { name: string };
+}) => ({
+	paymentId: payment.id,
+	projectId: project.id,
+	artistId: project.artistId,
+	clientName: client.name,
+});
+
+/** The users alerted about `paymentId`, sorted. */
+const proofAlertedUsers = (tenant: { id: string }, paymentId: string) =>
+	inTenant(tenant, async () =>
+		(await StaffAlert.query().where("payment_id", paymentId))
+			.map(({ userId }) => userId)
+			.sort(),
 	);
 
 test.group("AlertService.newInquiry", (group) => {
@@ -337,5 +386,246 @@ test.group("AlertService.newInquiry", (group) => {
 				{ userId: asha.id, role: "artist", email: asha.email, fullName: null },
 			],
 		);
+	});
+});
+
+test.group("AlertService.depositProof (TAT-88)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+	group.each.teardown(() => queue.restore());
+
+	test("a deposit proof alerts every live owner and the project's artist's member, once each", async ({
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("proof-alerts-88");
+		const second = await memberIn(
+			tenant,
+			"second@proof-alerts-88.example",
+			"owner",
+		);
+		const removed = await memberIn(
+			tenant,
+			"removed@proof-alerts-88.example",
+			"owner",
+		);
+		await removeMembership(tenant, removed);
+		const asha = await artistIn(tenant, "asha@proof-alerts-88.example");
+		await artistIn(tenant, "ram@proof-alerts-88.example");
+		const profile = await profileIn(tenant, "asha", "Asha", asha);
+		const proof = await proofIn(tenant, { artistId: profile.id });
+		const fake = queue.fake();
+
+		const alerted = await inTenant(tenant, () =>
+			alerts.depositProof(tenant, factsOf(proof), { emails: true }),
+		);
+
+		const expected = [owner.id, second.id, asha.id].sort();
+		assert.deepEqual([...alerted].sort(), expected);
+		assert.deepEqual(
+			await proofAlertedUsers(tenant, proof.payment.id),
+			expected,
+		);
+		assert.deepEqual(
+			recipients(fake),
+			[owner.email, second.email, asha.email].sort(),
+		);
+		const rows = await inTenant(tenant, () =>
+			StaffAlert.query().where("payment_id", proof.payment.id),
+		);
+		for (const row of rows) {
+			assert.equal(row.kind, "deposit_proof");
+			assert.equal(row.projectId, proof.project.id);
+			assert.isNull(row.inquiryId);
+			assert.isNull(row.readAt);
+		}
+	});
+
+	test("the owner's email checks the screenshot, the artist's opens the project, both at the Payments card", async ({
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner(
+			"proof-link-88",
+			"Ink Link",
+		);
+		const asha = await artistIn(tenant, "asha@proof-link-88.example");
+		const profile = await profileIn(tenant, "asha", "Asha", asha);
+		const proof = await proofIn(tenant, { artistId: profile.id });
+		const fake = queue.fake();
+
+		await inTenant(tenant, () =>
+			alerts.depositProof(tenant, factsOf(proof), { emails: true }),
+		);
+
+		const url = new URL(
+			`/t/proof-link-88/projects/${proof.project.id}#payments`,
+			env.get("APP_URL"),
+		).toString();
+		assert.deepInclude(mailTo(fake, owner.email), {
+			studioName: "Ink Link",
+			intro: "Sita sent Ink Link a deposit screenshot.",
+			forOwner: true,
+			url,
+		});
+		assert.deepInclude(mailTo(fake, asha.email), {
+			intro: "Sita sent Ink Link a deposit screenshot for your project.",
+			forOwner: false,
+			url,
+		});
+	});
+
+	test("a repeated run adds nothing; a new screenshot (a new payment) alerts again", async ({
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("proof-again-88");
+		const first = await proofIn(tenant);
+		const fake = queue.fake();
+		const run = (proof: Parameters<typeof factsOf>[0]) =>
+			inTenant(tenant, () =>
+				alerts.depositProof(tenant, factsOf(proof), { emails: true }),
+			);
+
+		assert.deepEqual(await run(first), [owner.id]);
+		assert.deepEqual(await run(first), []);
+		// After a rejection the deposit page takes the client's next
+		// screenshot as a new payment of the same project.
+		const next = {
+			...first,
+			payment: await inTenant(tenant, () =>
+				makePayment(tenant, first.project, { method: "esewa" }),
+			),
+		};
+		assert.deepEqual(await run(next), [owner.id]);
+
+		assert.deepEqual(await proofAlertedUsers(tenant, first.payment.id), [
+			owner.id,
+		]);
+		assert.deepEqual(await proofAlertedUsers(tenant, next.payment.id), [
+			owner.id,
+		]);
+		assert.deepEqual(recipients(fake), [owner.email, owner.email]);
+	});
+
+	test("a rollback leaves neither the alert nor its email", async ({
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("proof-rollback-88");
+		const proof = await proofIn(tenant);
+		// The real queue: a SendMailJob row's data carries the address.
+		const queued = async () =>
+			Number(
+				(
+					await db
+						.from("queue_jobs")
+						.where("data", "like", `%${owner.email}%`)
+						.count("* as total")
+				)[0].total,
+			);
+
+		await inTenant(tenant, () =>
+			assert.rejects(
+				() =>
+					withTransaction(async () => {
+						await alerts.depositProof(tenant, factsOf(proof), {
+							emails: true,
+						});
+						throw new Error("rolled back");
+					}),
+				/rolled back/,
+			),
+		);
+		assert.deepEqual(await proofAlertedUsers(tenant, proof.payment.id), []);
+		assert.equal(await queued(), 0);
+
+		await inTenant(tenant, () =>
+			alerts.depositProof(tenant, factsOf(proof), { emails: true }),
+		);
+		assert.deepEqual(await proofAlertedUsers(tenant, proof.payment.id), [
+			owner.id,
+		]);
+		assert.equal(await queued(), 1);
+	});
+
+	test("with emails off, the alerts are made and no email is queued", async ({
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("proof-off-88");
+		const proof = await proofIn(tenant);
+		const fake = queue.fake();
+
+		await inTenant(tenant, () =>
+			alerts.depositProof(tenant, factsOf(proof), { emails: false }),
+		);
+
+		assert.deepEqual(await proofAlertedUsers(tenant, proof.payment.id), [
+			owner.id,
+		]);
+		assert.deepEqual(mails(fake), []);
+	});
+
+	test("an unassigned project, or an unlinked, deleted or outside profile, alerts the owners only", async ({
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("proof-only-88");
+		const { owner: stranger, tenant: theirs } =
+			await studioWithOwner("proof-other-88");
+		const asha = await artistIn(tenant, "asha@proof-only-88.example");
+		const deleted = await profileIn(tenant, "gone", "Gone", asha);
+		await inTenant(tenant, () => deleted.softDelete());
+		const unlinked = await profileIn(tenant, "loose", "Loose", null);
+		// Linked to a user who belongs to another studio only.
+		const foreign = await profileIn(tenant, "foreign", "Foreign", stranger);
+
+		for (const artistId of [null, deleted.id, unlinked.id, foreign.id]) {
+			const proof = await proofIn(tenant, { artistId });
+			assert.deepEqual(
+				await inTenant(tenant, () =>
+					alerts.depositProof(tenant, factsOf(proof), { emails: false }),
+				),
+				[owner.id],
+				String(artistId),
+			);
+		}
+		assert.lengthOf(await inTenant(theirs, () => StaffAlert.query()), 0);
+	});
+
+	test("the email names the client by first name only, Devanagari intact, and never the amount, method, phone or a deposit link", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("proof-content-88");
+		const proof = await proofIn(tenant, { clientName: "सीता राई" });
+		const fake = queue.fake();
+
+		await inTenant(tenant, () =>
+			alerts.depositProof(tenant, factsOf(proof), { emails: true }),
+		);
+
+		const [payload] = mails(fake);
+		assert.equal(
+			payload?.mailMessage.message.subject,
+			"Deposit screenshot for Black Needle",
+		);
+		assert.equal(
+			payload?.mailMessage.views.html?.data.intro,
+			"सीता sent Black Needle a deposit screenshot.",
+		);
+		// The message and the data of both views; not the view names, which
+		// contain "/deposit" themselves ("emails/deposit_proof").
+		const { message, views } = payload.mailMessage;
+		const everything = JSON.stringify([
+			message,
+			views.html?.data,
+			views.text?.data,
+		]);
+		for (const secret of [
+			"राई",
+			// The phone's digits after the country code (String(): the column is nullable).
+			String(proof.client.phone).slice(4),
+			"300000",
+			"3,000",
+			"esewa",
+			"/deposit",
+			proof.payment.id,
+		]) {
+			assert.notInclude(everything, secret, secret);
+		}
 	});
 });

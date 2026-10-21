@@ -2,7 +2,12 @@ import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
 import StaffAlert from "#modules/notifications/models/staff_alert";
-import { makeClient, makeInquiry } from "#tests/helpers/pipeline";
+import {
+	makeClient,
+	makeInquiry,
+	makePayment,
+	makeProject,
+} from "#tests/helpers/pipeline";
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
 const alertsPage = (rest = "") => `/t/black-needle/alerts${rest}`;
@@ -21,6 +26,23 @@ async function alertFor(
 			kind: "new_inquiry",
 			inquiryId: inquiry.id,
 			...over,
+		});
+	});
+}
+
+/** An alert of `userId` about a deposit screenshot on a fresh project. */
+async function proofAlertFor(tenant: { id: string }, userId: string) {
+	return inTenant(tenant, async () => {
+		const project = await makeProject(tenant, await makeClient(tenant), {
+			status: "deposit_pending",
+		});
+		const payment = await makePayment(tenant, project);
+		return StaffAlert.create({
+			tenantId: tenant.id,
+			userId,
+			kind: "deposit_proof",
+			projectId: project.id,
+			paymentId: payment.id,
 		});
 	});
 }
@@ -204,5 +226,82 @@ test.group("Alerts", (group) => {
 			await client.get("/t/black-needle/calendar").withInertia().loginAs(artist)
 		).inertiaProps;
 		assert.equal(artistProps.alertCount, 1);
+	});
+
+	test("a deposit-proof alert reads its line and opens the project's Payments card", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const alert = await proofAlertFor(tenant, owner.id);
+
+		const list = (await client.get(alertsPage()).withInertia().loginAs(owner))
+			.inertiaProps;
+		assert.deepInclude(list.alerts[0], {
+			title: "Deposit screenshot to check",
+			detail: "Open the project's Payments card.",
+		});
+
+		const response = await client
+			.post(alertsPage(`/${alert.id}/open`))
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		response.assertStatus(302);
+		response.assertHeader(
+			"location",
+			`/t/black-needle/projects/${alert.projectId}#payments`,
+		);
+		assert.isNotNull((await reload(tenant, alert)).readAt);
+	});
+
+	test("from the dashboard, opening it is a location visit that keeps #payments", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const alert = await proofAlertFor(tenant, owner.id);
+
+		const response = await client
+			.post(alertsPage(`/${alert.id}/open`))
+			.withCsrfToken()
+			.withInertia()
+			.loginAs(owner)
+			.redirects(0);
+
+		response.assertStatus(409);
+		response.assertHeader(
+			"x-inertia-location",
+			`/t/black-needle/projects/${alert.projectId}#payments`,
+		);
+		assert.isNotNull((await reload(tenant, alert)).readAt);
+	});
+
+	test("the project's artist gets the artist's line and the same Payments card", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+		const artist = await artistIn(tenant);
+		const alert = await proofAlertFor(tenant, artist.id);
+
+		const list = (await client.get(alertsPage()).withInertia().loginAs(artist))
+			.inertiaProps;
+		assert.deepInclude(list.alerts[0], {
+			title: "A deposit screenshot for your project",
+			detail: "An owner checks it on the Payments card.",
+		});
+
+		const response = await client
+			.post(alertsPage(`/${alert.id}/open`))
+			.withCsrfToken()
+			.loginAs(artist)
+			.redirects(0);
+		response.assertStatus(302);
+		response.assertHeader(
+			"location",
+			`/t/black-needle/projects/${alert.projectId}#payments`,
+		);
 	});
 });

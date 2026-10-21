@@ -56,7 +56,12 @@ export default function PaymentsCard({
 	const { balance, deposit, rows, pending, actions, outcome } = payments;
 
 	return (
-		<Card id="payments">
+		// scroll-mt: an alert opens the page at #payments (TAT-88); on a phone the
+		// sticky top bar would cover the card's title.
+		<Card
+			id="payments"
+			className="scroll-mt-[calc(4rem+env(safe-area-inset-top))] lg:scroll-mt-0"
+		>
 			<CardHeader>
 				<CardTitle>
 					<h2 ref={heading} tabIndex={-1} className="outline-none">

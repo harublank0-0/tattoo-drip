@@ -1,17 +1,22 @@
+import app from "@adonisjs/core/services/app";
 import logger from "@adonisjs/core/services/logger";
+import ClientService from "#modules/clients/services/client_service";
+import AlertService from "#modules/notifications/services/alert_service";
 import Payment from "#modules/payments/models/payment";
+import ProjectService from "#modules/projects/services/project_service";
 import TenantJob from "#services/tenant_job";
 
 type Payload = { tenantId: string; paymentId: string };
 
 /**
- * Alerts a studio's owners that a client sent a deposit proof from the
+ * Alerts a studio's staff that a client sent a deposit proof from the
  * deposit page. DepositPageService.submitProof (TAT-65) queues it in the
- * payment's transaction, so it exists exactly when the payment does. For
- * now it logs the ids (never the link, the token, a URL or the amount):
- * TAT-52 sends the owners' email and in-app alert from here; the dashboard's
- * Projects badge already counts the proofs that wait. Safe to repeat; a
- * payment that is gone or already decided needs no alert.
+ * payment's transaction, so it exists exactly when the payment does. It logs
+ * the ids (never the link, the token, a URL or the amount), then
+ * AlertService.depositProof alerts the owners and the project's artist's
+ * member in the dashboard and by email (TAT-88), once each however often
+ * the job runs. A payment that is gone or already decided, or a deleted
+ * project, needs no alert.
  */
 export default class DepositProofAlertJob extends TenantJob<Payload> {
 	protected async handle() {
@@ -25,6 +30,20 @@ export default class DepositProofAlertJob extends TenantJob<Payload> {
 			{ tenantId, projectId: payment.projectId, paymentId },
 			"Deposit proof received.",
 		);
+
+		const tenant = { id: tenantId };
+		const projects = await app.container.make(ProjectService);
+		const project = await projects.findLive(tenant, payment.projectId);
+		if (!project) return;
+		const clients = await app.container.make(ClientService);
+		const client = await clients.find(tenant, project.clientId);
+		const alerts = await app.container.make(AlertService);
+		await alerts.depositProof(tenant, {
+			paymentId: payment.id,
+			projectId: project.id,
+			artistId: project.artistId,
+			clientName: client?.name ?? "",
+		});
 	}
 
 	async failed(error: Error): Promise<void> {
@@ -32,7 +51,7 @@ export default class DepositProofAlertJob extends TenantJob<Payload> {
 		const { tenantId, paymentId } = this.payload;
 		logger.error(
 			{ err: error, jobId, tenantId, paymentId },
-			"Alerting owners to a deposit proof failed.",
+			"Alerting staff to a deposit proof failed.",
 		);
 	}
 }

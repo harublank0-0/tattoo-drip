@@ -17,8 +17,9 @@ type AlertRow = {
 };
 
 /**
- * The member's alerts (TAT-52), newest first. Opening one marks it read and
- * goes to its inquiry (owners) or stays here.
+ * The member's alerts (TAT-52, TAT-88), newest first. Opening one marks it
+ * read and goes to its inquiry (owners) or, for a deposit screenshot, to the
+ * project's Payments card, or stays here.
  */
 export default function AlertsIndex({
 	alerts,

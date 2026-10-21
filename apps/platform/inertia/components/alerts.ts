@@ -1,5 +1,5 @@
 /**
- * The words of the alerts page and the bell (TAT-52). No imports: the unit
+ * The words of the alerts page and the bell (TAT-52, TAT-88). No imports: the unit
  * tests load it.
  */
 
@@ -7,7 +7,7 @@
 export function emptyAlertsText(total: number): string {
 	return total > 0
 		? "No alerts on this page."
-		: "No alerts yet. New inquiries show up here.";
+		: "No alerts yet. New inquiries and deposit screenshots show up here.";
 }
 
 /** The bell's accessible name: "Alerts, 3 unread", or "Alerts" with none. */

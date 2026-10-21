@@ -1,5 +1,6 @@
 import { inject } from "@adonisjs/core";
 import type { HttpContext } from "@adonisjs/core/http";
+import router from "@adonisjs/core/services/router";
 import { tenantContext } from "#middleware/tenant_middleware";
 import {
 	alertCopy,
@@ -43,7 +44,13 @@ export default class AlertsController {
 		});
 	}
 
-	/** Marks the alert read and goes where it points: never a URL from the request. */
+	/**
+	 * Marks the alert read and goes where it points: never a URL from the
+	 * request. A target with a fragment (a deposit proof's Payments card,
+	 * TAT-88) is a location visit for the dashboard's Inertia requests: an
+	 * Inertia visit follows a redirect without its fragment, so the page
+	 * would open at the top; a full load of the URL keeps it.
+	 */
 	async open(ctx: HttpContext) {
 		const { tenant, membership } = tenantContext(ctx);
 		const alert = await this.alerts.open(
@@ -52,14 +59,20 @@ export default class AlertsController {
 			ctx.params.id,
 		);
 		const target = alertTarget(alert, membership.role);
-		if (target) {
+		if (!target) {
 			return ctx.response
 				.redirect()
-				.toRoute(target.route, { tenant: tenant.slug, id: target.id });
+				.toRoute("tenant.alerts.index", { tenant: tenant.slug });
 		}
-		return ctx.response
-			.redirect()
-			.toRoute("tenant.alerts.index", { tenant: tenant.slug });
+		const params = { tenant: tenant.slug, id: target.id };
+		if ("hash" in target) {
+			const path = `${router.makeUrl(target.route, params)}#${target.hash}`;
+			if (ctx.inertia.requestInfo().isInertiaRequest) {
+				return ctx.inertia.location(path);
+			}
+			return ctx.response.redirect().toPath(path);
+		}
+		return ctx.response.redirect().toRoute(target.route, params);
 	}
 
 	async readAll(ctx: HttpContext) {

@@ -1,8 +1,8 @@
 import { DateTime } from "luxon";
 import { firstName } from "#modules/notifications/messages";
 
-/** What a staff alert is about (TAT-52). The deposit-proof alert is a follow-up (spec ruling 12). */
-export const ALERT_KINDS = ["new_inquiry"] as const;
+/** What a staff alert is about: a new inquiry (TAT-52) or a client's deposit screenshot (TAT-88). */
+export const ALERT_KINDS = ["new_inquiry", "deposit_proof"] as const;
 export type AlertKind = (typeof ALERT_KINDS)[number];
 
 /** How much of the idea a new-inquiry email quotes, in characters as people count them. */
@@ -86,6 +86,37 @@ export function dashboardUrl(appUrl: string, path: string): string {
 	return new URL(path, appUrl).toString();
 }
 
+/**
+ * The deposit-proof email's first line (TAT-88): "Sita sent Black Needle a
+ * deposit screenshot." and, for the project's artist, "… for your project.".
+ */
+export function proofIntro({
+	clientName,
+	studioName,
+	yourProject,
+}: {
+	clientName: string;
+	studioName: string;
+	yourProject: boolean;
+}): string {
+	const who = firstName(clientName) || "A client";
+	const whose = yourProject ? " for your project" : "";
+	return `${who} sent ${studioName} a deposit screenshot${whose}.`;
+}
+
+/** The deposit-proof subject: no client data, because SendMailJob.failed() logs it. */
+export function depositProofSubject(studioName: string): string {
+	return `Deposit screenshot for ${studioName}`;
+}
+
+/** The anchor of the project page's Payments card (inertia/components/payments_card.tsx). */
+export const PAYMENTS_CARD = "payments";
+
+/** A project's Payments card on the dashboard: where a deposit-proof alert opens. */
+export function paymentsCardPath(slug: string, projectId: string): string {
+	return `/t/${slug}/projects/${projectId}#${PAYMENTS_CARD}`;
+}
+
 type AlertLine = { title: string; detail: string };
 
 const LINES: Record<AlertKind, { owner: AlertLine; other: AlertLine }> = {
@@ -94,6 +125,16 @@ const LINES: Record<AlertKind, { owner: AlertLine; other: AlertLine }> = {
 		other: {
 			title: "A new inquiry asks for you",
 			detail: "An owner reviews it in the inbox.",
+		},
+	},
+	deposit_proof: {
+		owner: {
+			title: "Deposit screenshot to check",
+			detail: "Open the project's Payments card.",
+		},
+		other: {
+			title: "A deposit screenshot for your project",
+			detail: "An owner checks it on the Payments card.",
 		},
 	},
 };
@@ -124,17 +165,35 @@ export function alertTimeText(
 	return `${local.toFormat("d LLL yyyy")}, ${time}`;
 }
 
+/** Where opening an alert goes: a named route, its id and, for a card, the fragment. */
+export type AlertTarget =
+	| { route: "tenant.inbox.show"; id: string }
+	| { route: "tenant.projects.show"; id: string; hash: typeof PAYMENTS_CARD };
+
 /**
- * Where opening an alert goes (spec ruling 10): an owner's new-inquiry
- * alert opens its inquiry; anything else stays on the list. Computed from
- * the row and the member's current role, never from the request.
+ * Where opening an alert goes (TAT-52 ruling 10, TAT-88 ruling 9): an
+ * owner's new-inquiry alert opens its inquiry; a deposit-proof alert opens
+ * its project at the Payments card, for any role (the project page applies
+ * the member's access). Anything else stays on the list. Computed from the
+ * row and the member's current role, never from the request.
  */
 export function alertTarget(
-	alert: { kind: AlertKind; inquiryId: string | null },
+	alert: {
+		kind: AlertKind;
+		inquiryId: string | null;
+		projectId?: string | null;
+	},
 	role: string,
-): { route: "tenant.inbox.show"; id: string } | null {
+): AlertTarget | null {
 	if (alert.kind === "new_inquiry" && alert.inquiryId && role === "owner") {
 		return { route: "tenant.inbox.show", id: alert.inquiryId };
+	}
+	if (alert.kind === "deposit_proof" && alert.projectId) {
+		return {
+			route: "tenant.projects.show",
+			id: alert.projectId,
+			hash: PAYMENTS_CARD,
+		};
 	}
 	return null;
 }
