@@ -20,6 +20,7 @@ Select guidance for the current task. Follow ordinary links when needed; this in
 | Storefront forms, routing, API data and prefetching, the studio page, the intake form, the deposit page, monitoring, tenants and hosts | [Storefront development](../apps/storefront/docs/development.md) |
 | Repository exploration, Claude loading behavior, sessions and memory | [Agent workflow](agent-workflow.md) |
 | Maintaining this instruction setup and checking context sizes | [Agent context audit](agent-context-audit.md) |
+| Running commands as an agent: worktrees, Node 24, ports and databases, test pitfalls, opencode setup and permissions | [Agent environment](agent-environment.md) |
 
 Product documents describe intended behavior and design; they are not implementation status reports. Check the relevant routes, source and tests for what exists today. The OpenAPI contract is in `packages/types/openapi.yaml`.
 
