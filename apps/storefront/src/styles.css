@@ -355,6 +355,8 @@
   .deposit-progress { position: relative; block-size: 2px; overflow: hidden; background: var(--stencil-wash); }
   .deposit-progress::before { content: ''; position: absolute; inset-block: 0; inline-size: 30%; background: var(--stencil); animation: intake-trace 1.4s ease-in-out infinite; }
   .deposit-contact { display: flex; flex-wrap: wrap; align-items: center; gap: 0 0.75rem; color: var(--ink-muted); font-size: 0.9375rem; }
+  /* A short word ("Viber", 37px) is still a 44px wide target (TAT-119). */
+  .deposit-contact .text-link { min-inline-size: 2.75rem; justify-content: center; }
   .deposit-footer { width: min(28rem, 100% - 2rem); margin: 3rem auto 0; padding-block: 1.5rem 2.5rem; border-top: 1px solid var(--line); color: var(--ink-muted); font-size: 0.9375rem; }
 }
 
