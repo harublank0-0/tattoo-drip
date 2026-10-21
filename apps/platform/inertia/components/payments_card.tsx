@@ -57,10 +57,11 @@ export default function PaymentsCard({
 
 	return (
 		// scroll-mt: an alert opens the page at #payments (TAT-88); on a phone the
-		// sticky top bar would cover the card's title.
+		// sticky top bar would cover the card's title, and it grows when a long
+		// studio name wraps, so it publishes its height (TopBar).
 		<Card
 			id="payments"
-			className="scroll-mt-[calc(4rem+env(safe-area-inset-top))] lg:scroll-mt-0"
+			className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)] lg:scroll-mt-0"
 		>
 			<CardHeader>
 				<CardTitle>
