@@ -52,14 +52,31 @@ function useLocationHash(): string | undefined {
  * frame itself, so its h1 can name the deposit's state (TAT-106).
  */
 export function DepositScreen({ shell }: { shell: DepositShell }) {
-	const hash = useLocationHash();
+	return <DepositForHash hash={useLocationHash()} shell={shell} />;
+}
+
+/**
+ * The screen for the URL's fragment (`undefined` on the server and while
+ * hydrating). Exported for the render tests, which cannot set a fragment;
+ * the screen is its only user.
+ */
+export function DepositForHash({
+	hash,
+	shell,
+}: {
+	hash: string | undefined;
+	shell: DepositShell;
+}) {
 	const token = hash === undefined ? undefined : readDepositToken(hash);
 	if (typeof token === "string") {
 		return <DepositLoaded key={token} token={token} shell={shell} />;
 	}
 	const contact = depositContact(shell, null);
 	return (
-		<DepositFrame studioName={shell.studioName}>
+		<DepositFrame
+			studioName={shell.studioName}
+			problem={token === undefined ? null : "dead"}
+		>
 			{token === undefined ? (
 				<DepositLoading studioName={shell.studioName} />
 			) : (
@@ -127,7 +144,11 @@ export function DepositLoaded({
 	}, [moveFocus, shown]);
 
 	return (
-		<DepositFrame studioName={shell.studioName} view={view}>
+		<DepositFrame
+			studioName={shell.studioName}
+			view={view}
+			problem={screen.kind === "problem" ? screen.problem : null}
+		>
 			{view ? <DepositIntro view={view} /> : null}
 			<StateRegion quiet={moveFocus}>
 				{view && view.state !== "due" ? (

@@ -7,6 +7,7 @@ import { fill } from "../intake/copy.ts";
 import { safeImageUrl, viberLink, whatsappLink } from "../studio/links.ts";
 import { cleanLine, cleanText } from "../studio/text.ts";
 import { copy, type DepositMethodKind } from "./copy.ts";
+import type { LoadProblem } from "./problems.ts";
 
 /*
  * What the deposit page shows (TAT-65b), from the API's DepositPage. Pure.
@@ -223,13 +224,17 @@ export function stateTemplate(
 }
 
 /**
- * The page's one h1 (TAT-106): what the state's message says, in a few
- * words. Before the deposit is read (`null`: loading, or a link that doesn't
- * work) and while it is due, it asks to pay the studio.
+ * The page's one h1 (TAT-106): what the message under it says, in a few
+ * words. While the deposit loads (`null`, no problem) and while it is due, it
+ * asks to pay the studio; a link that doesn't work, a rate limit and a read
+ * that failed (`problem`, TAT-119) say so instead, and win over a page
+ * already read (a replaced link must stop saying "Deposit paid").
  */
 export function headingTemplate(
 	view: Pick<DepositView, "state" | "amount"> | null,
+	problem: LoadProblem | null = null,
 ): string {
+	if (problem !== null) return copy.headings.load[problem];
 	if (view === null) return copy.heading;
 	switch (view.state) {
 		case "due":

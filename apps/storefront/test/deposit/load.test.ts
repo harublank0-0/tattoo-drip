@@ -41,6 +41,12 @@ describe("the screen while the deposit loads", () => {
 				1,
 			);
 			assert.ok(textOf(html).includes(copy.load.failed));
+			// The h1 says the same as the message, not "Pay your deposit" (TAT-119).
+			assert.equal(tags(html, "h1").length, 1);
+			assert.equal(
+				textOf(/<h1[^>]*>(.*?)<\/h1>/s.exec(html)?.[1] ?? ""),
+				"We couldn't load your deposit",
+			);
 			const retry = tags(html, "button")[0];
 			assert.equal(attr(retry, "type"), "button");
 			assert.ok(textOf(html).includes(copy.load.retry));
