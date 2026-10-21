@@ -26,7 +26,7 @@ export default function Signup() {
 				{({ errors, processing }) => (
 					<FieldGroup>
 						<Field data-invalid={!!errors.fullName}>
-							<FieldLabel htmlFor="fullName">Full name</FieldLabel>
+							<FieldLabel htmlFor="fullName">Full name (optional)</FieldLabel>
 							<Input
 								id="fullName"
 								name="fullName"

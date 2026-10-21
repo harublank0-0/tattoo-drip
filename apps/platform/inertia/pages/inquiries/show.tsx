@@ -1,5 +1,6 @@
 import { Form } from "@adonisjs/inertia/react";
 import { Link, router } from "@inertiajs/react";
+import type { ReactNode } from "react";
 import { urlFor } from "~/client";
 import { type InquiryPageProps, SOURCE_LABELS } from "~/components/inquiries";
 import MessageCard from "~/components/message_card";
@@ -34,7 +35,17 @@ export default function InquiryShow({
 			via,
 			{ preserveScroll: true, preserveState: true },
 		);
-	const details: [string, string | null][] = [
+	// The same link as the Message card's Call button (`contact.callUrl`), and
+	// the same record of the contact.
+	const phone =
+		inquiry.contactPhone && contact ? (
+			<PhoneLink
+				phone={inquiry.contactPhone}
+				callUrl={contact.callUrl}
+				onCall={() => markContacted({ channel: "call" })}
+			/>
+		) : null;
+	const details: [string, ReactNode][] = [
 		["Placement", inquiry.placement],
 		["Approximate size", inquiry.approximateSize],
 		["Preferred dates", inquiry.preferredDates],
@@ -44,7 +55,7 @@ export default function InquiryShow({
 			"Found the studio through",
 			SOURCE_LABELS[inquiry.source] ?? inquiry.source,
 		],
-		["Phone", inquiry.contactPhone],
+		["Phone", phone],
 		["Email", inquiry.contactEmail],
 	];
 
@@ -65,18 +76,6 @@ export default function InquiryShow({
 			}
 		>
 			<div className="flex max-w-2xl flex-col gap-6">
-				{accept && (
-					<Card>
-						<CardHeader>
-							<CardTitle>Decide</CardTitle>
-						</CardHeader>
-						<CardContent className="flex flex-col gap-4">
-							<AcceptForm inquiryId={inquiry.id} accept={accept} />
-							<DeclineButton inquiryId={inquiry.id} />
-						</CardContent>
-					</Card>
-				)}
-
 				{inquiry.status !== "new" && (
 					<Card>
 						<CardContent className="flex flex-wrap items-center justify-between gap-3 text-sm">
@@ -99,17 +98,37 @@ export default function InquiryShow({
 					</Card>
 				)}
 
+				{/* Read first, decide last (TAT-100): the idea, then the references
+				    an artist wants to see, then the details, the message and the
+				    decision. */}
 				<Card>
 					<CardHeader>
 						<CardTitle>Idea</CardTitle>
 					</CardHeader>
-					<CardContent className="flex flex-col gap-4">
+					<CardContent>
 						<p className="text-sm whitespace-pre-line">{inquiry.idea}</p>
-						<dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+					</CardContent>
+				</Card>
+
+				<Card>
+					<CardHeader>
+						<CardTitle>References</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<ReferenceGrid references={references} />
+					</CardContent>
+				</Card>
+
+				<Card>
+					<CardHeader>
+						<CardTitle>Details</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
 							{details.map(([label, value]) => (
 								<div key={label} className="contents">
 									<dt className="text-muted-foreground">{label}</dt>
-									<dd className="min-w-0 break-words">{value ?? "—"}</dd>
+									<dd className="min-w-0 wrap-anywhere">{value ?? "—"}</dd>
 								</div>
 							))}
 						</dl>
@@ -124,16 +143,47 @@ export default function InquiryShow({
 					footer={contactedText}
 				/>
 
-				<Card>
-					<CardHeader>
-						<CardTitle>References</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<ReferenceGrid references={references} />
-					</CardContent>
-				</Card>
+				{accept && (
+					<Card>
+						<CardHeader>
+							<CardTitle>Decide</CardTitle>
+						</CardHeader>
+						<CardContent className="flex flex-col gap-4">
+							<AcceptForm inquiryId={inquiry.id} accept={accept} />
+							<DeclineButton inquiryId={inquiry.id} />
+						</CardContent>
+					</Card>
+				)}
 			</div>
 		</Page>
+	);
+}
+
+/**
+ * The number the client sent (E.164), as a call link (`callUrl` from the
+ * server). Tapping it tells the page, which records the call like the
+ * Message card's Call button does. It never wraps: a number split over two
+ * lines reads as two numbers. The 44px tap target is the link's own height,
+ * pulled back with a negative margin so the row keeps the height of its
+ * text.
+ */
+function PhoneLink({
+	phone,
+	callUrl,
+	onCall,
+}: {
+	phone: string;
+	callUrl: string;
+	onCall: () => void;
+}) {
+	return (
+		<a
+			href={callUrl}
+			onClick={() => onCall()}
+			className="-my-3 inline-flex min-h-11 items-center whitespace-nowrap text-foreground underline underline-offset-4"
+		>
+			{phone}
+		</a>
 	);
 }
 
@@ -154,13 +204,13 @@ function AcceptForm({
 			{({ errors, processing }) => (
 				<Field data-invalid={!!errors.artistId}>
 					<FieldLabel htmlFor="artistId">Artist</FieldLabel>
-					<div className="flex flex-wrap gap-2">
+					<div className="flex flex-col gap-2 sm:flex-row">
 						<select
 							id="artistId"
 							name="artistId"
 							defaultValue={accept.artistId ?? ""}
 							aria-invalid={!!errors.artistId}
-							className="h-9 min-w-0 flex-1 rounded-md border bg-transparent px-3 text-sm"
+							className="h-11 w-full min-w-0 rounded-md border bg-transparent px-3 text-sm sm:flex-1"
 						>
 							<option value="">No artist</option>
 							{accept.choices.map(({ id, name }) => (
@@ -169,7 +219,7 @@ function AcceptForm({
 								</option>
 							))}
 						</select>
-						<Button type="submit" disabled={processing}>
+						<Button type="submit" className="h-11" disabled={processing}>
 							{processing ? "Saving…" : "Accept and create project"}
 						</Button>
 					</div>
@@ -191,7 +241,12 @@ function DeclineButton({ inquiryId }: { inquiryId: string }) {
 
 	return (
 		<div>
-			<Button type="button" variant="outline" onClick={decline}>
+			<Button
+				type="button"
+				variant="outline"
+				className="h-11"
+				onClick={decline}
+			>
 				Decline
 			</Button>
 		</div>

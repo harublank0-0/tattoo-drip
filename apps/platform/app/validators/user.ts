@@ -1,11 +1,18 @@
 import vine from "@vinejs/vine";
 import { canonicalEmail } from "#modules/identity/email_address";
+import { accountMessages } from "#validators/account_messages";
 
 /**
  * Shared rules for email and password.
  */
 const email = () => vine.string().trim().email().maxLength(254);
 const password = () => vine.string().minLength(8).maxLength(32);
+
+/**
+ * The "type it again" box: it only has to match the password. Its own
+ * length rules would repeat the password's message under it (TAT-100).
+ */
+const passwordAgain = () => vine.string().sameAs("password");
 
 /**
  * An account's address, as stored and looked up: canonical (TAT-18,
@@ -27,7 +34,7 @@ export const signupValidator = vine.create({
 	fullName: vine.string().trim().maxLength(255).nullable(),
 	email: accountEmail(),
 	password: password(),
-	passwordConfirmation: password().sameAs("password"),
+	passwordConfirmation: passwordAgain(),
 });
 
 /**
@@ -50,5 +57,18 @@ export const passwordResetRequestValidator = vine.create({
 /** A new password from a reset link: signup's rules, never weaker (TAT-18). */
 export const newPasswordValidator = vine.create({
 	password: password(),
-	passwordConfirmation: password().sameAs("password"),
+	passwordConfirmation: passwordAgain(),
 });
+
+/**
+ * The account forms say what to do, not which field broke (TAT-100): one
+ * provider on all four, so signup, login and both reset steps read alike.
+ */
+for (const validator of [
+	signupValidator,
+	loginValidator,
+	passwordResetRequestValidator,
+	newPasswordValidator,
+]) {
+	validator.messagesProvider = accountMessages;
+}
