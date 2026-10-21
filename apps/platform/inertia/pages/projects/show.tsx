@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { urlFor } from "~/client";
 import ChatMessage from "~/components/chat_message";
+import DevHostWarning from "~/components/dev_host_warning";
 import { SOURCE_LABELS } from "~/components/inquiries";
 import MessageCard from "~/components/message_card";
 import type { ContactChannelName, ContactVia } from "~/components/messages";
@@ -378,11 +379,9 @@ function DepositCard({
 			</CardHeader>
 			<CardContent className="flex flex-col gap-4">
 				{devHost && (
-					<p className="rounded-md border border-destructive p-3 text-sm">
-						<strong>Warning:</strong> deposit links point at this computer, so a
-						client can't open them. Set STOREFRONT_URL to your studio pages'
-						address (for example https://{"{tenant}"}.example.com) and restart.
-					</p>
+					<DevHostWarning>
+						deposit links point at this computer, so a client can't open them.
+					</DevHostWarning>
 				)}
 				{proofReceivedText && (
 					<output className="block rounded-md border p-3 text-sm">

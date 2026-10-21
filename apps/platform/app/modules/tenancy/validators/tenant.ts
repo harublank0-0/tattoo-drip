@@ -61,7 +61,7 @@ const ianaTimezone = vine.createRule(
 const SLUG_MESSAGES = {
 	format:
 		"Use 3 to 63 lowercase letters, numbers and single hyphens, with at least one letter. Don't start or end with a hyphen.",
-	reserved: "This address is reserved. Try another one.",
+	reserved: "This page link is reserved. Try another one.",
 } as const;
 
 /**
@@ -93,15 +93,15 @@ export const createTenantValidator = vine.create({
 });
 
 /**
- * The page calls the slug "your address", so the errors do too.
+ * The page calls the slug "your page link", so the errors do too.
  */
 createTenantValidator.messagesProvider = new SimpleMessagesProvider(
 	{},
-	{ name: "business name", slug: "address", timezone: "time zone" },
+	{ name: "business name", slug: "page link", timezone: "time zone" },
 );
 
 /**
- * The web address form in the studio settings.
+ * The page link form in the studio settings.
  */
 export const changeSlugValidator = vine.create({
 	slug: vine.string().trim().use(tenantSlug()),
@@ -109,7 +109,7 @@ export const changeSlugValidator = vine.create({
 
 changeSlugValidator.messagesProvider = new SimpleMessagesProvider(
 	{},
-	{ slug: "address" },
+	{ slug: "page link" },
 );
 
 /**

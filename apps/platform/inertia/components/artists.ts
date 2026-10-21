@@ -12,4 +12,6 @@ export type ArtistProps = {
 	closedMessage: string | null;
 	/** Linked to the signed-in user. */
 	isMine: boolean;
+	/** The artist's own public page; null while hidden (TAT-101). */
+	pageUrl: string | null;
 };
