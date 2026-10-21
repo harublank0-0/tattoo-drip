@@ -6,6 +6,11 @@ import type User from "#models/user";
 import InquiryService from "#modules/inquiries/services/inquiry_service";
 import AlertService from "#modules/notifications/services/alert_service";
 import DepositService from "#modules/payments/services/deposit_service";
+import {
+	INVITATION_LINK_FLASH,
+	INVITATION_LINK_PAGE,
+	isNewInvitationLink,
+} from "#modules/tenancy/invitations";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { ensureDbContext } from "#services/db_context";
 import { encryptsHistory } from "#services/history_encryption";
@@ -131,8 +136,19 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 
 		const success: string | undefined = session?.flashMessages.get("success");
 		const error: string | undefined = session?.flashMessages.get("error");
+		// A new invitation's link (TAT-33), shown once on Settings, Members.
+		// It travels here, not in a prop, so Back never brings it back. Only
+		// that page emits it: another tab's request can be the one that finds
+		// the flash (it is read once), and the link must not end up in its
+		// response. A response that carries it is never stored.
+		const link =
+			ctx.route?.name === INVITATION_LINK_PAGE
+				? session?.flashMessages.get(INVITATION_LINK_FLASH)
+				: undefined;
+		const invitationLink = isNewInvitationLink(link) ? link : undefined;
+		if (invitationLink) ctx.response.header("Cache-Control", "no-store");
 
-		return { success, error };
+		return { success, error, invitationLink };
 	}
 
 	async handle(ctx: HttpContext, next: NextFn) {

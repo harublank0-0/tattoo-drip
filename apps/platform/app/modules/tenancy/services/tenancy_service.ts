@@ -4,6 +4,7 @@ import ArtistService from "#modules/artists/services/artist_service";
 import ImageService from "#modules/media/services/image_service";
 import {
 	LastOwnerError,
+	MembershipNotLiveError,
 	SlugLimitError,
 	SlugTakenError,
 } from "#modules/tenancy/errors";
@@ -62,6 +63,8 @@ export type DepositSettings = {
 
 /** A live member and their account's address: who an alert can reach (TAT-52). */
 export type TenantMember = {
+	/** The membership row's id (Settings, Members routes by it, TAT-33). */
+	membershipId: string;
 	userId: string;
 	role: MembershipRole;
 	email: string;
@@ -300,6 +303,7 @@ export default class TenancyService {
 			return user
 				? [
 						{
+							membershipId: membership.id,
 							userId: user.id,
 							role: membership.role,
 							email: user.email,
@@ -317,9 +321,9 @@ export default class TenancyService {
 	 * the owner rows, so two owners removing each other at once can't both
 	 * succeed.
 	 *
-	 * Throws a plain Error if `leavingId` isn't a live membership of the
-	 * tenant: that's a caller bug, and passing it would let the real last
-	 * owner be removed.
+	 * Throws MembershipNotLiveError if `leavingId` isn't a live membership of
+	 * the tenant: a caller bug unless the member was removed meanwhile, and
+	 * passing it would let the real last owner be removed.
 	 */
 	async assertKeepsAnOwner(
 		trx: TransactionClientContract,
@@ -330,11 +334,7 @@ export default class TenancyService {
 			.where("id", leavingId)
 			.where("tenant_id", tenantId)
 			.first();
-		if (!leaving) {
-			throw new Error(
-				`Membership ${leavingId} is not a live membership of tenant ${tenantId}`,
-			);
-		}
+		if (!leaving) throw new MembershipNotLiveError(leavingId, tenantId);
 
 		const owners = await TenantMembership.query({ client: trx })
 			.where("tenant_id", tenantId)

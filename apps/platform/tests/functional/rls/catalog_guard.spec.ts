@@ -36,6 +36,7 @@ const EXPECTED_POLICIES: Record<string, string[]> = {
 	reference_images: ["tenant_isolation:ALL"],
 	staff_alerts: ["tenant_isolation:ALL"],
 	tattoo_projects: ["tenant_isolation:ALL"],
+	tenant_invitations: ["tenant_isolation:ALL"],
 	tenant_memberships: [
 		"tenant_memberships_delete:DELETE",
 		"tenant_memberships_insert:INSERT",
@@ -61,6 +62,11 @@ const DEFINER_FUNCTIONS: Record<string, { args: string; reason: string }> = {
 		args: "",
 		reason:
 			"lists (tenant_id, project_id, quote_id) of expired current quotes for the expiry sweep (TAT-83)",
+	},
+	"public.invitation_tenant": {
+		args: "requested_hash text",
+		reason:
+			"the id of the live tenant holding the invitation whose token hash is exactly the argument, for the invitation page (TAT-33)",
 	},
 	"public.tenant_for_slug": {
 		args: "requested_slug text",

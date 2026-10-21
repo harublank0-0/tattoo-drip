@@ -152,6 +152,30 @@ router
 				router
 					.put("messages", [controllers.MessageTemplates, "update"])
 					.as("tenant.settings.messages.update");
+				// Members and invitations (TAT-33). A new invitation's link is
+				// shown once, on the members page.
+				router
+					.get("members", [controllers.Members, "index"])
+					.as("tenant.settings.members");
+				router
+					.post("members/invitations", [controllers.Members, "invite"])
+					.as("tenant.settings.members.invitations.store");
+				router
+					.post("members/invitations/:id/renew", [controllers.Members, "renew"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.settings.members.invitations.renew");
+				router
+					.delete("members/invitations/:id", [controllers.Members, "revoke"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.settings.members.invitations.destroy");
+				router
+					.put("members/:id/role", [controllers.Members, "role"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.settings.members.role.update");
+				router
+					.delete("members/:id", [controllers.Members, "remove"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.settings.members.destroy");
 			})
 			.prefix("/settings");
 
@@ -423,6 +447,21 @@ router
 	.use(throttleAccountLinks)
 	.as("email_verification.confirm");
 
+/**
+ * Invitation links (TAT-33): the GET from the chat only stages the token
+ * and opens /invitations, whose URL holds no token. Open to guests and to
+ * whoever is signed in, so in no group; joining is the POST in the
+ * signed-in group below. The link counts per client address.
+ */
+router
+	.get("invitations/:token", [controllers.Invitations, "link"])
+	.where("token", ACCOUNT_TOKEN)
+	.use(throttleAccountLinks)
+	.as("invitations.link");
+router
+	.get("invitations", [controllers.Invitations, "show"])
+	.as("invitations.show");
+
 router
 	.group(() => {
 		router.get("dashboard", [controllers.Dashboard, "show"]).as("dashboard");
@@ -445,6 +484,13 @@ router
 		router
 			.post("onboarding", [controllers.Onboarding, "store"])
 			.use(middleware.verifiedEmail());
+
+		// Joining a studio through an invitation (TAT-33): a confirmed
+		// address, and the account links' limit.
+		router
+			.post("invitations", [controllers.Invitations, "accept"])
+			.use([middleware.verifiedEmail(), throttleAccountLinks])
+			.as("invitations.accept");
 	})
 	.use([middleware.auth(), middleware.dbContext()]);
 

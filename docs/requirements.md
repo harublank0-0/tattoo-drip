@@ -9,7 +9,8 @@ What the MVP (pilot with a design-partner studio) and V1 (paid launch) must do, 
 - Signup always answers "Check your email": a new address gets a confirmation link (24 hours), a registered one an email saying it already has an account; the page never tells which. Email addresses are case-insensitive. A reset link works once, for an hour, signs every device out and emails the account that its password changed; asking for one never tells whether an address has an account.
 - [x] Create a `studio` or `independent` tenant (needs a verified email), with a unique slug that is also its subdomain
 - Accounts that existed before email confirmation keep every studio they belong to; any account confirms its address before it creates a tenant (or, with invitations, joins one).
-- [ ] Invite members as `owner` or `artist`; revoke invites; remove members; switch between tenants
+- [x] Invite members as `owner` or `artist`; revoke invites; remove members; switch between tenants
+- The owner sends the invitation link themselves (copied, or shared on WhatsApp); no email. It works once, for 7 days, for an account with that confirmed address; a new invitation or a new link for the address replaces the old one. An invitation can offer an unlinked artist profile, which the new member gets if it is still free. Owners make members owners or artists and remove them (access ends at once; their profile stays, unlinked, and the invitations that could bring them back, or that a departing owner sent for owners, are deleted); nobody changes or removes themselves, and a studio always keeps an owner.
 - [x] Tenant profile: name, contact phone and email, address, social links, timezone
 - [ ] Payment settings: upload the studio's QR codes (Fonepay, eSewa, Khalti, bank) and a default deposit percentage
 

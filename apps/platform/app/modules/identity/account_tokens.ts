@@ -46,13 +46,43 @@ export function isFlowId(value: unknown): value is string {
 }
 
 /**
- * Drops every staged link token from a session. Sign-in and sign-out call it:
- * regenerating the session id keeps its data, so without this a link opened
- * before a sign-out would still open its form for the next visitor of a
- * shared browser.
+ * An invitation form's flow id (TAT-33): a UUID-shaped fingerprint of the
+ * stored token hash. It is not the row's id, because replacing or renewing
+ * an invitation keeps the row (and its id) but changes the hash, and the
+ * form must be tied to the terms it showed: an old tab's form, sent with the
+ * session's newer token, would otherwise accept a replacement's other role
+ * or profile. Derived with its own prefix, so the stored hash (the lookup
+ * key) is not the value the page renders.
+ */
+export function invitationFlowId(tokenHash: string): string {
+	const hex = createHash("sha256")
+		.update(`invitation-flow:${tokenHash}`)
+		.digest("hex");
+	return [
+		hex.slice(0, 8),
+		hex.slice(8, 12),
+		hex.slice(12, 16),
+		hex.slice(16, 20),
+		hex.slice(20, 32),
+	].join("-");
+}
+
+/**
+ * Where an invitation link's GET puts its token (TAT-33), like the account
+ * links' keys above: the invitation page's URL then holds no token.
+ */
+export const INVITATION_TOKEN_KEY = "invitation_token";
+
+/**
+ * Drops every staged link token from a session: the account links and an
+ * invitation (TAT-33). Sign-in and sign-out call it: regenerating the
+ * session id keeps its data, so without this a link opened before a
+ * sign-out would still open its page for the next visitor of a shared
+ * browser.
  */
 export function forgetStagedTokens(session: { forget(key: string): void }) {
 	for (const key of Object.values(SESSION_TOKEN_KEYS)) session.forget(key);
+	session.forget(INVITATION_TOKEN_KEY);
 }
 
 /** The flash that carries the typed address to the "Check your email" page. */

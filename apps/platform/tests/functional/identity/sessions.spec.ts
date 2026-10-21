@@ -1,7 +1,10 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import User from "#models/user";
-import { SESSION_TOKEN_KEYS } from "#modules/identity/account_tokens";
+import {
+	INVITATION_TOKEN_KEY,
+	SESSION_TOKEN_KEYS,
+} from "#modules/identity/account_tokens";
 import AccountTokenService from "#modules/identity/services/account_token_service";
 
 const RESET_KEY = SESSION_TOKEN_KEYS.reset_password;
@@ -120,5 +123,28 @@ test.group("Session versions (TAT-18)", (group) => {
 		// Forgetting the session copy doesn't spend the links themselves.
 		assert.equal((await tokens.state(reset, "reset_password")).state, "live");
 		assert.equal((await tokens.state(confirm, "verify_email")).state, "live");
+	});
+
+	test("signing in and out forget a staged invitation (TAT-33)", async ({
+		client,
+	}) => {
+		const user = await makeUser();
+		const staged = { [INVITATION_TOKEN_KEY]: "i".repeat(43) };
+
+		const login = await client
+			.post("/login")
+			.withSession(staged)
+			.form({ email: user.email, password: PASSWORD })
+			.withCsrfToken()
+			.redirects(0);
+		login.assertSessionMissing(INVITATION_TOKEN_KEY);
+
+		const logout = await client
+			.post("/logout")
+			.withSession(staged)
+			.loginAs(await User.findOrFail(user.id))
+			.withCsrfToken()
+			.redirects(0);
+		logout.assertSessionMissing(INVITATION_TOKEN_KEY);
 	});
 });

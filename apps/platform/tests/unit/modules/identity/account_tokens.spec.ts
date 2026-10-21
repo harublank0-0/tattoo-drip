@@ -3,7 +3,11 @@ import { test } from "@japa/runner";
 import {
 	ACCOUNT_TOKEN,
 	accountUrl,
+	forgetStagedTokens,
 	hashAccountToken,
+	INVITATION_TOKEN_KEY,
+	invitationFlowId,
+	isFlowId,
 	linkPath,
 	newAccountToken,
 	SESSION_TOKEN_KEYS,
@@ -12,6 +16,40 @@ import {
 } from "#modules/identity/account_tokens";
 
 test.group("Account tokens", () => {
+	test("forgetStagedTokens forgets the account links and a staged invitation (TAT-33)", ({
+		assert,
+	}) => {
+		const forgotten: string[] = [];
+		forgetStagedTokens({ forget: (key) => forgotten.push(key) });
+
+		assert.sameMembers(forgotten, [
+			SESSION_TOKEN_KEYS.verify_email,
+			SESSION_TOKEN_KEYS.reset_password,
+			INVITATION_TOKEN_KEY,
+		]);
+		assert.equal(INVITATION_TOKEN_KEY, "invitation_token");
+	});
+
+	test("an invitation's flow id fingerprints the stored hash, with its own prefix (TAT-33)", ({
+		assert,
+	}) => {
+		const hash = hashAccountToken("a".repeat(43));
+		const flow = invitationFlowId(hash);
+		const expected = createHash("sha256")
+			.update(`invitation-flow:${hash}`)
+			.digest("hex");
+
+		assert.isTrue(isFlowId(flow));
+		assert.equal(flow.replaceAll("-", ""), expected.slice(0, 32));
+		assert.equal(invitationFlowId(hash), flow, "the same hash, the same flow");
+		assert.notEqual(
+			invitationFlowId(hashAccountToken("b".repeat(43))),
+			flow,
+			"another token, another flow",
+		);
+		assert.notInclude(flow.replaceAll("-", ""), hash.slice(0, 16));
+	});
+
 	test("a new token is 43 base64url characters, never the same twice", ({
 		assert,
 	}) => {

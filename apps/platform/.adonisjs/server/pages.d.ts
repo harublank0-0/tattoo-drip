@@ -30,10 +30,12 @@ declare module '@adonisjs/inertia/types' {
     'errors/server_error': ExtractProps<(typeof import('../../inertia/pages/errors/server_error.tsx'))['default']>
     'inquiries/index': ExtractProps<(typeof import('../../inertia/pages/inquiries/index.tsx'))['default']>
     'inquiries/show': ExtractProps<(typeof import('../../inertia/pages/inquiries/show.tsx'))['default']>
+    'invitations/show': ExtractProps<(typeof import('../../inertia/pages/invitations/show.tsx'))['default']>
     'onboarding/create_tenant': ExtractProps<(typeof import('../../inertia/pages/onboarding/create_tenant.tsx'))['default']>
     'projects/index': ExtractProps<(typeof import('../../inertia/pages/projects/index.tsx'))['default']>
     'projects/new': ExtractProps<(typeof import('../../inertia/pages/projects/new.tsx'))['default']>
     'projects/show': ExtractProps<(typeof import('../../inertia/pages/projects/show.tsx'))['default']>
+    'settings/members': ExtractProps<(typeof import('../../inertia/pages/settings/members.tsx'))['default']>
     'settings/messages': ExtractProps<(typeof import('../../inertia/pages/settings/messages.tsx'))['default']>
     'settings/payment_method_form': ExtractProps<(typeof import('../../inertia/pages/settings/payment_method_form.tsx'))['default']>
     'settings/payments': ExtractProps<(typeof import('../../inertia/pages/settings/payments.tsx'))['default']>

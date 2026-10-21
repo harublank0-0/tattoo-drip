@@ -6,7 +6,9 @@ import MessageTemplate from "#modules/notifications/models/message_template";
 import StaffAlert from "#modules/notifications/models/staff_alert";
 import PaymentMethodService from "#modules/payments/services/payment_method_service";
 import type Tenant from "#modules/tenancy/models/tenant";
+import TenantInvitation from "#modules/tenancy/models/tenant_invitation";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
+import InvitationService from "#modules/tenancy/services/invitation_service";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { withDbContext } from "#services/db_context";
 import { depositServices } from "#tests/helpers/deposits";
@@ -85,6 +87,7 @@ export function inTenantAs<T>(
 
 const paymentMethods = new PaymentMethodService(new ImageService());
 const artists = new ArtistService(new ImageService());
+const invitations = new InvitationService(artists);
 const depositLinks = depositServices().links;
 
 /** One studio seeded as each of twoStudios' studios is (see twoStudios); for tests that need only one. */
@@ -238,6 +241,22 @@ export async function seededStudio(slug: string, name: string) {
 		});
 		return { project, session };
 	});
+	// A pending invitation and the artist's membership row, for the members
+	// routes (TAT-33).
+	const invitation = await inTenant(tenant, async () => {
+		const made = await invitations.invite(tenant, owner, {
+			email: `invitee@${slug}.example`,
+			role: "artist",
+			artistId: null,
+		});
+		return TenantInvitation.findOrFail(made.id);
+	});
+	const artistMembership = await inTenant(tenant, () =>
+		TenantMembership.query()
+			.where("tenant_id", tenant.id)
+			.where("user_id", artist.id)
+			.firstOrFail(),
+	);
 	return {
 		tenant,
 		owner,
@@ -274,6 +293,9 @@ export async function seededStudio(slug: string, name: string) {
 		// The session routes' :id resource (TAT-85) and its project.
 		sessionProject: scheduled.project,
 		session: scheduled.session,
+		// The members routes' :id resources (TAT-33).
+		invitation,
+		artistMembership,
 	};
 }
 
@@ -284,7 +306,7 @@ export type Studio = Awaited<ReturnType<typeof seededStudio>>;
  * (`paymentMethod` is the first), an artist profile (`artistProfile`), a visible artist who takes no inquiries with a slug only that studio has (`closedArtist`, `<slug>-mira`) and one
  * of each pipeline record (`pipeline`: client, accepted inquiry, project,
  * reference image, quote and a submitted payment), plus a quoted project
- * (`quotedProject`, `quotedQuote`), a new inquiry with a reference image (`newInquiry`) and a deposit_pending project with its deposit link (`depositProject`, `depositToken`, `depositReferenceCode`) and the eSewa method its page shows (`depositMethod`); `project` is the pipeline's project; a project booked without a price (`pricelessProject`), a booked project holding a verified deposit (`paidProject`, `verifiedPayment`) and a cancelled one holding a deposit without an outcome (`closedPaidProject`); `payment` is the pipeline's submitted payment. A booked project assigned to `artistProfile` with a scheduled tattoo session 60 days out (`sessionProject`, `session`) is the session routes' resource (TAT-85); an unread alert of the owner about the new inquiry (`alert`) is the alerts routes' (TAT-52), and the studio's own aftercare text (`messageTemplate`) is what the messages settings routes' snapshot reads. Later tickets add seed data
+ * (`quotedProject`, `quotedQuote`), a new inquiry with a reference image (`newInquiry`) and a deposit_pending project with its deposit link (`depositProject`, `depositToken`, `depositReferenceCode`) and the eSewa method its page shows (`depositMethod`); `project` is the pipeline's project; a project booked without a price (`pricelessProject`), a booked project holding a verified deposit (`paidProject`, `verifiedPayment`) and a cancelled one holding a deposit without an outcome (`closedPaidProject`); `payment` is the pipeline's submitted payment. A booked project assigned to `artistProfile` with a scheduled tattoo session 60 days out (`sessionProject`, `session`) is the session routes' resource (TAT-85); an unread alert of the owner about the new inquiry (`alert`) is the alerts routes' (TAT-52), and the studio's own aftercare text (`messageTemplate`) is what the messages settings routes' snapshot reads. A pending invitation (`invitation`) and the artist's membership row (`artistMembership`) are the members routes' (TAT-33). Later tickets add seed data
  * for their own tables here, so every isolation case sees it.
  */
 export async function twoStudios() {

@@ -180,6 +180,42 @@ const routes = {
     tokens: [{"old":"/t/:tenant/settings/messages","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/messages","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/messages","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/messages","type":0,"val":"messages","end":""}],
     types: placeholder as Registry['tenant.settings.messages.update']['types'],
   },
+  'tenant.settings.members': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/settings/members',
+    tokens: [{"old":"/t/:tenant/settings/members","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/members","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/members","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/members","type":0,"val":"members","end":""}],
+    types: placeholder as Registry['tenant.settings.members']['types'],
+  },
+  'tenant.settings.members.invitations.store': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/settings/members/invitations',
+    tokens: [{"old":"/t/:tenant/settings/members/invitations","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/members/invitations","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/members/invitations","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/members/invitations","type":0,"val":"members","end":""},{"old":"/t/:tenant/settings/members/invitations","type":0,"val":"invitations","end":""}],
+    types: placeholder as Registry['tenant.settings.members.invitations.store']['types'],
+  },
+  'tenant.settings.members.invitations.renew': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/settings/members/invitations/:id/renew',
+    tokens: [{"old":"/t/:tenant/settings/members/invitations/:id/renew","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/members/invitations/:id/renew","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/members/invitations/:id/renew","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/members/invitations/:id/renew","type":0,"val":"members","end":""},{"old":"/t/:tenant/settings/members/invitations/:id/renew","type":0,"val":"invitations","end":""},{"old":"/t/:tenant/settings/members/invitations/:id/renew","type":1,"val":"id","end":""},{"old":"/t/:tenant/settings/members/invitations/:id/renew","type":0,"val":"renew","end":""}],
+    types: placeholder as Registry['tenant.settings.members.invitations.renew']['types'],
+  },
+  'tenant.settings.members.invitations.destroy': {
+    methods: ["DELETE"],
+    pattern: '/t/:tenant/settings/members/invitations/:id',
+    tokens: [{"old":"/t/:tenant/settings/members/invitations/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/members/invitations/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/members/invitations/:id","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/members/invitations/:id","type":0,"val":"members","end":""},{"old":"/t/:tenant/settings/members/invitations/:id","type":0,"val":"invitations","end":""},{"old":"/t/:tenant/settings/members/invitations/:id","type":1,"val":"id","end":""}],
+    types: placeholder as Registry['tenant.settings.members.invitations.destroy']['types'],
+  },
+  'tenant.settings.members.role.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/settings/members/:id/role',
+    tokens: [{"old":"/t/:tenant/settings/members/:id/role","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/members/:id/role","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/members/:id/role","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/members/:id/role","type":0,"val":"members","end":""},{"old":"/t/:tenant/settings/members/:id/role","type":1,"val":"id","end":""},{"old":"/t/:tenant/settings/members/:id/role","type":0,"val":"role","end":""}],
+    types: placeholder as Registry['tenant.settings.members.role.update']['types'],
+  },
+  'tenant.settings.members.destroy': {
+    methods: ["DELETE"],
+    pattern: '/t/:tenant/settings/members/:id',
+    tokens: [{"old":"/t/:tenant/settings/members/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/members/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/members/:id","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/members/:id","type":0,"val":"members","end":""},{"old":"/t/:tenant/settings/members/:id","type":1,"val":"id","end":""}],
+    types: placeholder as Registry['tenant.settings.members.destroy']['types'],
+  },
   'tenant.artists': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/artists',
@@ -444,6 +480,18 @@ const routes = {
     tokens: [{"old":"/verify-email","type":0,"val":"verify-email","end":""}],
     types: placeholder as Registry['email_verification.confirm']['types'],
   },
+  'invitations.link': {
+    methods: ["GET","HEAD"],
+    pattern: '/invitations/:token',
+    tokens: [{"old":"/invitations/:token","type":0,"val":"invitations","end":""},{"old":"/invitations/:token","type":1,"val":"token","end":""}],
+    types: placeholder as Registry['invitations.link']['types'],
+  },
+  'invitations.show': {
+    methods: ["GET","HEAD"],
+    pattern: '/invitations',
+    tokens: [{"old":"/invitations","type":0,"val":"invitations","end":""}],
+    types: placeholder as Registry['invitations.show']['types'],
+  },
   'dashboard': {
     methods: ["GET","HEAD"],
     pattern: '/dashboard',
@@ -479,6 +527,12 @@ const routes = {
     pattern: '/onboarding',
     tokens: [{"old":"/onboarding","type":0,"val":"onboarding","end":""}],
     types: placeholder as Registry['onboarding.store']['types'],
+  },
+  'invitations.accept': {
+    methods: ["POST"],
+    pattern: '/invitations',
+    tokens: [{"old":"/invitations","type":0,"val":"invitations","end":""}],
+    types: placeholder as Registry['invitations.accept']['types'],
   },
   'api.v1.studio': {
     methods: ["GET","HEAD"],
