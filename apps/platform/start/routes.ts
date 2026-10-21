@@ -83,7 +83,10 @@ router
 /**
  * Pages of one tenant. The tenant middleware checks the user's membership
  * on every request and 404s anyone else; read the tenant with
- * tenantContext(ctx). Every tenant route goes in this group (a test checks).
+ * tenantContext(ctx). The role middleware then lets the member through only
+ * if TENANT_ROUTE_ROLES (#modules/tenancy/access) gives their role the
+ * route (TAT-30). Every tenant route goes in this group and needs a name
+ * and an entry in that table (a test checks).
  */
 router
 	.group(() => {
@@ -92,9 +95,8 @@ router
 			.as("tenant.dashboard");
 
 		/**
-		 * Studio settings, owners only: artists get the same 404 as an
-		 * unknown URL. Every settings route goes in this group (a test
-		 * checks).
+		 * Studio settings: owners only (TENANT_ROUTE_ROLES). Every settings
+		 * route goes in this group (a test checks).
 		 */
 		router
 			.group(() => {
@@ -151,17 +153,21 @@ router
 					.put("messages", [controllers.MessageTemplates, "update"])
 					.as("tenant.settings.messages.update");
 			})
-			.prefix("/settings")
-			.use(middleware.role({ allow: ["owner"] }));
+			.prefix("/settings");
 
 		/**
-		 * Artist profiles, owners only for now: artists get the same 404 as
-		 * an unknown URL. TAT-30 opens this area to artists by changing the
-		 * allow list. Every artists route goes in this group (a test checks).
+		 * Artist profiles: owners manage every one; an artist edits only the
+		 * profile linked to them (TENANT_ROUTE_ROLES,
+		 * ArtistService.findEditable). Every artists route goes in this group
+		 * (a test checks).
 		 */
 		router
 			.group(() => {
 				router.get("/", [controllers.Artists, "index"]).as("tenant.artists");
+				// The member's own profile (TAT-30): its edit page, or a note.
+				router
+					.get("mine", [controllers.Artists, "mine"])
+					.as("tenant.artists.mine");
 				router
 					.get("new", [controllers.Artists, "create"])
 					.as("tenant.artists.create");
@@ -181,13 +187,12 @@ router
 					.where("id", router.matchers.uuid())
 					.as("tenant.artists.destroy");
 			})
-			.prefix("/artists")
-			.use(middleware.role({ allow: ["owner"] }));
+			.prefix("/artists");
 
 		/**
-		 * The inquiry inbox: owners only (reference images are private to
-		 * owners until a project is assigned). Every inbox route goes in this
-		 * group (a test checks).
+		 * The inquiry inbox: owners only (TENANT_ROUTE_ROLES); reference
+		 * images are private to owners until a project is assigned. Every
+		 * inbox route goes in this group (a test checks).
 		 */
 		router
 			.group(() => {
@@ -212,13 +217,12 @@ router
 					.where("id", router.matchers.uuid())
 					.as("tenant.inbox.contacted.store");
 			})
-			.prefix("/inbox")
-			.use(middleware.role({ allow: ["owner"] }));
+			.prefix("/inbox");
 
 		/**
-		 * Clients: owners only (the role table gives artists their assigned
-		 * projects, not the studio's client list). Every clients route goes
-		 * in this group (a test checks).
+		 * Clients: owners only (TENANT_ROUTE_ROLES); artists get their
+		 * assigned projects, not the studio's client list. Every clients
+		 * route goes in this group (a test checks).
 		 */
 		router
 			.group(() => {
@@ -238,15 +242,15 @@ router
 					.where("id", router.matchers.uuid())
 					.as("tenant.clients.update");
 			})
-			.prefix("/clients")
-			.use(middleware.role({ allow: ["owner"] }));
+			.prefix("/clients");
 
 		/**
 		 * Projects: owners, and the artist assigned to the project
-		 * (ProjectService.findFor gives anyone else a 404). Booking a session
-		 * (new, store) is open to both; BookingService decides which artists a
-		 * member may book. Every projects route goes in this group (a test
-		 * checks).
+		 * (ProjectService.findFor gives anyone else a 404). Money and the
+		 * project's artist are owners only (TENANT_ROUTE_ROLES, and their
+		 * services). Booking a session (new, store) is open to both;
+		 * BookingService decides which artists a member may book. Every
+		 * projects route goes in this group (a test checks).
 		 */
 		router
 			.group(() => {
@@ -317,13 +321,12 @@ router
 					.where("id", router.matchers.uuid())
 					.as("tenant.projects.deposit_outcome.store");
 			})
-			.prefix("/projects")
-			.use(middleware.role({ allow: ["owner", "artist"] }));
+			.prefix("/projects");
 
 		/**
-		 * Decisions on one payment (TAT-66): owners only, and
-		 * PaymentService.findFor checks again. Every payments route goes in
-		 * this group (a test checks).
+		 * Decisions on one payment (TAT-66): owners only (TENANT_ROUTE_ROLES),
+		 * and PaymentService.findFor checks again. Every payments route goes
+		 * in this group (a test checks).
 		 */
 		router
 			.group(() => {
@@ -340,8 +343,7 @@ router
 					.where("id", router.matchers.uuid())
 					.as("tenant.payments.reverse");
 			})
-			.prefix("/payments")
-			.use(middleware.role({ allow: ["owner"] }));
+			.prefix("/payments");
 
 		/**
 		 * One session's outcome and time (TAT-85): owners any session, an
@@ -360,8 +362,7 @@ router
 					.where("id", router.matchers.uuid())
 					.as("tenant.sessions.move");
 			})
-			.prefix("/sessions")
-			.use(middleware.role({ allow: ["owner", "artist"] }));
+			.prefix("/sessions");
 
 		/**
 		 * The calendar: owners (the whole studio or one artist) and artists
@@ -374,8 +375,7 @@ router
 					.get("/", [controllers.Calendar, "index"])
 					.as("tenant.calendar.index");
 			})
-			.prefix("/calendar")
-			.use(middleware.role({ allow: ["owner", "artist"] }));
+			.prefix("/calendar");
 
 		/**
 		 * Each member's own alerts (TAT-52): owners and artists; AlertService
@@ -395,11 +395,15 @@ router
 					.where("id", router.matchers.uuid())
 					.as("tenant.alerts.open");
 			})
-			.prefix("/alerts")
-			.use(middleware.role({ allow: ["owner", "artist"] }));
+			.prefix("/alerts");
 	})
 	.prefix("/t/:tenant")
-	.use([middleware.auth(), middleware.dbContext(), middleware.tenant()]);
+	.use([
+		middleware.auth(),
+		middleware.dbContext(),
+		middleware.tenant(),
+		middleware.role(),
+	]);
 
 /**
  * Email confirmation links (TAT-18): open to guests and to whoever is signed

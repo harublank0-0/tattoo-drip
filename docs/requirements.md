@@ -82,7 +82,7 @@ This is the most important rule in the system.
 | Role | Can do |
 |---|---|
 | `owner` | Everything in the tenant, including verifying payments |
-| `artist` | Their own profile, plus the projects and sessions assigned to them (with those projects' payments and balance, read-only) |
+| `artist` | Their own profile (everything on it but the link to their login), plus the projects and sessions assigned to them (with those projects' payments and balance, read-only) |
 
 - Invites are tied to one email, single-use, and expire in 7 days. Only a signed-in user with that verified email can accept one, and an invite can be linked to an existing artist profile for the new member to claim.
 - A tenant always has at least one owner. A removed member's artist profile stays with the tenant, unlinked.

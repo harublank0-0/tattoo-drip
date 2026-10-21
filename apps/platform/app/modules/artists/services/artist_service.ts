@@ -1,5 +1,6 @@
 import { inject } from "@adonisjs/core";
 import type { MultipartFile } from "@adonisjs/core/bodyparser";
+import { errors as lucidErrors } from "@adonisjs/lucid";
 import {
 	ArtistProfileExistsError,
 	ArtistSlugTakenError,
@@ -8,6 +9,7 @@ import Artist from "#modules/artists/models/artist";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
 import type Tenant from "#modules/tenancy/models/tenant";
+import type TenantMembership from "#modules/tenancy/models/tenant_membership";
 import {
 	afterCommit,
 	afterRollback,
@@ -42,6 +44,15 @@ export type ArtistInput = {
 	/** Drop the stored photo (ignored when `photo` is given). */
 	removePhoto?: boolean;
 };
+
+/** Who is editing a profile: their user and their role in the tenant (TAT-30). */
+export type ProfileEditor = Pick<TenantMembership, "userId" | "role">;
+
+/**
+ * What an artist may change on their own profile (TAT-30): everything but
+ * the link to a login.
+ */
+export type OwnProfileInput = Omit<ArtistInput, "linkToMe">;
 
 const PHOTO = "artist_photo";
 const SLUG_INDEX = "artists_tenant_slug_live_unique";
@@ -108,6 +119,36 @@ export default class ArtistService {
 	}
 
 	/**
+	 * The tenant's live profile linked to `userId`, or null (TAT-30): the
+	 * member's own profile.
+	 */
+	async profileOf(tenant: TenantRef, userId: string): Promise<Artist | null> {
+		return Artist.query()
+			.where("tenant_id", tenant.id)
+			.where("user_id", userId)
+			.first();
+	}
+
+	/**
+	 * The live profile `editor` may edit (TAT-30): any of the tenant's for an
+	 * owner (findFor), only the one linked to them for anyone else. Anything
+	 * else throws E_ROW_NOT_FOUND (a 404), the same as another tenant's
+	 * profile.
+	 */
+	async findEditable(
+		tenant: TenantRef,
+		editor: ProfileEditor,
+		id: string,
+	): Promise<Artist> {
+		if (editor.role === "owner") return this.findFor(tenant, id);
+		return Artist.query()
+			.where("tenant_id", tenant.id)
+			.where("id", id)
+			.where("user_id", editor.userId)
+			.firstOrFail();
+	}
+
+	/**
 	 * Adds a profile. Throws ArtistSlugTakenError or ArtistProfileExistsError
 	 * (after rolling back its own savepoint, so the request stays usable) and
 	 * InvalidImageError for a photo we can't accept.
@@ -136,9 +177,9 @@ export default class ArtistService {
 	}
 
 	/**
-	 * Saves an edit. A new `photo` replaces the stored one and `removePhoto`
-	 * drops it; the old file is deleted once the outermost transaction
-	 * commits.
+	 * Saves an owner's edit. A new `photo` replaces the stored one and
+	 * `removePhoto` drops it; the old file is deleted once the outermost
+	 * transaction commits.
 	 */
 	async update(
 		tenant: TenantRef,
@@ -147,6 +188,45 @@ export default class ArtistService {
 		member: Member,
 	): Promise<Artist> {
 		assertOwnedBy(tenant, artist);
+		return this.save(tenant, artist.id, input, (live) =>
+			nextUserId(live.userId, input.linkToMe, member),
+		);
+	}
+
+	/**
+	 * An artist's edit of their own profile (TAT-30): the profile fields and
+	 * the photo, never the link to a login. Under the row lock the profile
+	 * must still be live and linked to `userId` (an owner may have deleted it
+	 * since the form loaded, or TAT-33 unlinked a removed member):
+	 * E_ROW_NOT_FOUND otherwise.
+	 */
+	async updateOwn(
+		tenant: TenantRef,
+		userId: string,
+		artist: Artist,
+		input: OwnProfileInput,
+	): Promise<Artist> {
+		assertOwnedBy(tenant, artist);
+		return this.save(tenant, artist.id, input, (live) => {
+			if (live.userId !== userId) {
+				throw new lucidErrors.E_ROW_NOT_FOUND(Artist);
+			}
+			return live.userId;
+		});
+	}
+
+	/**
+	 * The body of update and updateOwn: stores a new photo, locks the live
+	 * row (a profile deleted since the form loaded is a 404), saves the
+	 * fields, the photo and the link `linkFor` decides from the locked row,
+	 * and deletes a replaced photo once the outermost transaction commits.
+	 */
+	private async save(
+		tenant: TenantRef,
+		id: string,
+		input: OwnProfileInput,
+		linkFor: (live: Artist) => string | null,
+	): Promise<Artist> {
 		try {
 			return await withTransaction(async (trx) => {
 				// Stored inside the transaction: nothing is stored if it cannot
@@ -159,14 +239,14 @@ export default class ArtistService {
 				// not from the form's copy.
 				const live = await Artist.query({ client: trx })
 					.where("tenant_id", tenant.id)
-					.where("id", artist.id)
+					.where("id", id)
 					.forUpdate()
 					.firstOrFail();
 				const previous = live.photoKey;
 				const keepsPhoto = !photo && !input.removePhoto;
 				live.merge({
 					...profileFields(input),
-					userId: nextUserId(live.userId, input.linkToMe, member),
+					userId: linkFor(live),
 					...(keepsPhoto ? {} : photoColumns(photo)),
 				});
 				await live.save();
@@ -228,7 +308,7 @@ export default class ArtistService {
 	}
 }
 
-function profileFields(input: ArtistInput) {
+function profileFields(input: OwnProfileInput) {
 	return {
 		name: input.name,
 		slug: input.slug,

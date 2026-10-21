@@ -1,7 +1,7 @@
-import { Form } from "@adonisjs/inertia/react";
+import { Form, Link } from "@adonisjs/inertia/react";
 import { usePage } from "@inertiajs/react";
 import { cn } from "cn";
-import { LogOut, Moon, Sun } from "lucide-react";
+import { LogOut, Moon, Sun, UserRound } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
 	DropdownMenu,
@@ -13,16 +13,20 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { useTheme } from "~/hooks/use-theme";
 
+/** 44px tap targets on phones; the sidebar's menu on desktop stays compact. */
+const ITEM = "min-h-11 lg:min-h-8";
+
 /**
  * The signed-in person's menu: who they are, the light/dark switch and
  * Log out. The trigger is their initials; in the sidebar it adds the name.
+ * Artists also get "Your artist profile" (TAT-30).
  */
 export default function AccountMenu({
 	showName = false,
 }: {
 	showName?: boolean;
 }) {
-	const { user } = usePage().props;
+	const { user, tenant } = usePage().props;
 	const { theme, setTheme } = useTheme();
 	if (!user) return null;
 	const dark = theme === "dark";
@@ -52,7 +56,19 @@ export default function AccountMenu({
 					</span>
 				</DropdownMenuLabel>
 				<DropdownMenuSeparator />
+				{tenant?.role === "artist" && (
+					<DropdownMenuItem asChild className={ITEM}>
+						<Link
+							route="tenant.artists.mine"
+							routeParams={{ tenant: tenant.slug }}
+						>
+							<UserRound />
+							Your artist profile
+						</Link>
+					</DropdownMenuItem>
+				)}
 				<DropdownMenuItem
+					className={ITEM}
 					onSelect={(event) => {
 						event.preventDefault();
 						setTheme(dark ? "light" : "dark");
@@ -65,6 +81,7 @@ export default function AccountMenu({
 				<Form route="session.destroy">
 					<DropdownMenuItem
 						asChild
+						className={ITEM}
 						onSelect={(event) => event.preventDefault()}
 					>
 						<button type="submit" className="w-full">

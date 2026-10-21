@@ -54,6 +54,7 @@ export interface ApiDefinition {
       }
     }
     artists: typeof routes['tenant.artists'] & {
+      mine: typeof routes['tenant.artists.mine']
       create: typeof routes['tenant.artists.create']
       store: typeof routes['tenant.artists.store']
       edit: typeof routes['tenant.artists.edit']

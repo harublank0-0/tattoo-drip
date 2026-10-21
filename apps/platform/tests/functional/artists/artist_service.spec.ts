@@ -1,4 +1,5 @@
 import testUtils from "@adonisjs/core/services/test_utils";
+import { errors as lucidErrors } from "@adonisjs/lucid";
 import { test } from "@japa/runner";
 import User from "#models/user";
 import {
@@ -11,7 +12,7 @@ import ArtistService, {
 } from "#modules/artists/services/artist_service";
 import ImageService from "#modules/media/services/image_service";
 import { dbClient, withDbContext } from "#services/db_context";
-import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
+import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
 const artists = new ArtistService(new ImageService());
 
@@ -544,5 +545,117 @@ test.group("ArtistService.findVisibleBySlug", (group) => {
 				artists.findVisibleBySlug(a.tenant, "only-b"),
 			),
 		);
+	});
+});
+
+test.group("ArtistService own profiles (TAT-30)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	/** A studio with an artist member linked to "Asha" and an unlinked "Mira". */
+	async function linked() {
+		const { owner, tenant } = await studioWithOwner("own-svc-30", "Own Svc");
+		const member = await artistIn(tenant, "asha@own-svc-30.example");
+		const { asha, mira } = await inTenant(tenant, async () => ({
+			asha: await artists.create(
+				tenant,
+				input({ name: "Asha", slug: "asha" }),
+				owner,
+			),
+			mira: await artists.create(
+				tenant,
+				input({ name: "Mira", slug: "mira" }),
+				owner,
+			),
+		}));
+		await inTenant(tenant, () =>
+			Artist.query().where("id", asha.id).update({ user_id: member.id }),
+		);
+		return { owner, tenant, member, asha, mira };
+	}
+
+	test("profileOf gives the live profile linked to the account, else null", async ({
+		assert,
+	}) => {
+		const { owner, tenant, member, asha } = await linked();
+
+		await inTenant(tenant, async () => {
+			assert.equal((await artists.profileOf(tenant, member.id))?.id, asha.id);
+			assert.isNull(await artists.profileOf(tenant, owner.id));
+			await artists.delete(tenant, await artists.findFor(tenant, asha.id));
+			assert.isNull(await artists.profileOf(tenant, member.id));
+		});
+	});
+
+	test("findEditable: owners any live profile, an artist only their own", async ({
+		assert,
+	}) => {
+		const { owner, tenant, member, asha, mira } = await linked();
+		const asOwner = { userId: owner.id, role: "owner" as const };
+		const asArtist = { userId: member.id, role: "artist" as const };
+
+		await inTenant(tenant, async () => {
+			assert.equal(
+				(await artists.findEditable(tenant, asOwner, mira.id)).id,
+				mira.id,
+			);
+			assert.equal(
+				(await artists.findEditable(tenant, asArtist, asha.id)).id,
+				asha.id,
+			);
+			await assert.rejects(
+				() => artists.findEditable(tenant, asArtist, mira.id),
+				lucidErrors.E_ROW_NOT_FOUND,
+			);
+		});
+	});
+
+	test("updateOwn changes the profile and never its link", async ({
+		assert,
+	}) => {
+		const { tenant, member, asha } = await linked();
+
+		const saved = await inTenant(tenant, () =>
+			artists.updateOwn(tenant, member.id, asha, {
+				name: "Asha Gurung",
+				slug: "asha-g",
+				bio: "Fine line",
+				visible: false,
+				acceptingInquiries: false,
+				closedMessage: "Back in May",
+			}),
+		);
+
+		assert.equal(saved.name, "Asha Gurung");
+		assert.equal(saved.slug, "asha-g");
+		assert.isFalse(saved.visible);
+		assert.equal(saved.closedMessage, "Back in May");
+		assert.equal(saved.userId, member.id);
+	});
+
+	test("updateOwn refuses a profile unlinked or deleted while the form was open", async ({
+		assert,
+	}) => {
+		const { tenant, member, asha, mira } = await linked();
+		const change = { ...input({ name: "Mine now", slug: "asha" }) };
+
+		await inTenant(tenant, async () => {
+			// The form was loaded while linked; an owner's change commits first.
+			await Artist.query().where("id", asha.id).update({ user_id: null });
+			await assert.rejects(
+				() => artists.updateOwn(tenant, member.id, asha, change),
+				lucidErrors.E_ROW_NOT_FOUND,
+			);
+			// A profile that was never theirs.
+			await assert.rejects(
+				() =>
+					artists.updateOwn(tenant, member.id, mira, {
+						...change,
+						slug: "mira",
+					}),
+				lucidErrors.E_ROW_NOT_FOUND,
+			);
+			assert.equal((await Artist.findOrFail(asha.id)).name, "Asha");
+			assert.isNull((await Artist.findOrFail(asha.id)).userId);
+		});
 	});
 });

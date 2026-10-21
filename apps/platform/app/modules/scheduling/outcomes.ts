@@ -58,7 +58,8 @@ export function outcomesFor(
  * Who may record an outcome on a session or move it: owners any session;
  * an artist member only a session with their own linked live profile
  * (`ownArtistId`, null without one), on a project assigned to that profile
- * (the project page they can open). TAT-30 folds this into the roles.
+ * (the project page they can open). The record rule behind the sessions
+ * entries of TENANT_ROUTE_ROLES (#modules/tenancy/access, TAT-30).
  */
 export function mayChangeSession(
 	member: { role: string },

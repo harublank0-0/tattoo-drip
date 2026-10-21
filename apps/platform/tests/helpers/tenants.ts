@@ -87,7 +87,8 @@ const paymentMethods = new PaymentMethodService(new ImageService());
 const artists = new ArtistService(new ImageService());
 const depositLinks = depositServices().links;
 
-async function studio(slug: string, name: string) {
+/** One studio seeded as each of twoStudios' studios is (see twoStudios); for tests that need only one. */
+export async function seededStudio(slug: string, name: string) {
 	const { owner, tenant } = await studioWithOwner(slug, name);
 	const artist = await artistIn(tenant, `artist@${slug}.example`);
 	const paymentMethod = await inTenant(tenant, async () => {
@@ -276,7 +277,7 @@ async function studio(slug: string, name: string) {
 	};
 }
 
-export type Studio = Awaited<ReturnType<typeof studio>>;
+export type Studio = Awaited<ReturnType<typeof seededStudio>>;
 
 /**
  * Two studios, each with an owner, an artist, two payment methods
@@ -288,7 +289,7 @@ export type Studio = Awaited<ReturnType<typeof studio>>;
  */
 export async function twoStudios() {
 	return {
-		a: await studio("studio-a", "Studio A"),
-		b: await studio("studio-b", "Studio B"),
+		a: await seededStudio("studio-a", "Studio A"),
+		b: await seededStudio("studio-b", "Studio B"),
 	};
 }

@@ -34,6 +34,7 @@ export type ScannedRoutes = {
     'tenant.settings.messages': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.messages.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.artists.mine': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists.create': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists.edit': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
@@ -108,6 +109,7 @@ export type ScannedRoutes = {
     'tenant.settings.payments.edit': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.messages': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.artists.mine': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists.create': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists.edit': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inbox.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -149,6 +151,7 @@ export type ScannedRoutes = {
     'tenant.settings.payments.edit': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.messages': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.artists.mine': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists.create': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists.edit': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inbox.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }

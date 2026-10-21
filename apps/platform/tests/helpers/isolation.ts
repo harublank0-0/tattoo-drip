@@ -46,6 +46,28 @@ function send(
 }
 
 /**
+ * Sends `isolationCase` as `user` to `studio`'s slug, with
+ * `resourceOwner`'s resource for an :id and the case's body built for
+ * `studio`: one request of the harness, for other walks over the cases
+ * (role_access.spec.ts, TAT-30).
+ */
+export function caseRequest(
+	client: ApiClient,
+	isolationCase: IsolationCase,
+	studio: Studio,
+	resourceOwner: Studio,
+	user: User,
+) {
+	return send(
+		client,
+		isolationCase,
+		urlFor(isolationCase, studio, resourceOwner),
+		user,
+		isolationCase.body?.(studio),
+	);
+}
+
+/**
  * Proves studio A's actor cannot reach studio B through one route.
  *
  * First a positive control: the same request, with the same body, against

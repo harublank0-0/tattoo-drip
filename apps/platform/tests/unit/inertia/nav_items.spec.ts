@@ -1,4 +1,5 @@
 import { test } from "@japa/runner";
+import { rolesFor } from "#modules/tenancy/access";
 // @ts-expect-error TS6305: the server project only references the inertia project, so it cannot read its sources and the module is untyped here; `NavModule` below restates its shape and the inertia project type-checks the real one.
 import * as navModule from "../../../inertia/components/shell/nav_items.js";
 
@@ -44,6 +45,20 @@ test.group("navItems", () => {
 			navItems(artist, null).find(({ key }) => key === "calendar"),
 			{ key: "calendar", label: "Calendar", route: "tenant.calendar.index" },
 		);
+	});
+
+	test("every destination a member sees is a route their role may use (TAT-30)", ({
+		assert,
+	}) => {
+		for (const role of ["owner", "artist"] as const) {
+			for (const item of navItems({ slug: "bnt", role }, 3, 2)) {
+				assert.include(
+					rolesFor(item.route) ?? [],
+					role,
+					`${role}: ${item.route}`,
+				);
+			}
+		}
 	});
 
 	test("the Inbox badge shows only above zero", ({ assert }) => {

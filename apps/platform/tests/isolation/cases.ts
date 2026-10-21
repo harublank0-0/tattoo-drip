@@ -380,6 +380,14 @@ export const isolationCases: IsolationCase[] = [
 		snapshot: none,
 	},
 	{
+		method: "GET",
+		pattern: "/t/:tenant/artists/mine",
+		actor: "owner",
+		// The owner has no profile of their own: the list.
+		ownStatus: 302,
+		snapshot: none,
+	},
+	{
 		method: "POST",
 		pattern: "/t/:tenant/artists",
 		actor: "owner",

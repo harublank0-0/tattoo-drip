@@ -46,9 +46,25 @@ function settingsNav(tenantSlug: string): NavItem[] {
  * current page. Nest it under the app layout from each settings page:
  *
  * `Profile.layout = [AppLayout, SettingsLayout]`
+ *
+ * A non-owner (an artist on their own profile, TAT-30) gets the card alone.
  */
 export default function SettingsLayout({ children }: { children: ReactNode }) {
 	const { tenant } = usePage().props;
+	// An artist reaches only their own profile here (TAT-30): no settings
+	// sidebar, whose links are all owners only.
+	if (tenant && tenant.role !== "owner") {
+		return (
+			<Page
+				title="Your artist profile"
+				description="What clients see about you on the studio page."
+			>
+				<Card>
+					<CardContent>{children}</CardContent>
+				</Card>
+			</Page>
+		);
+	}
 	const items = tenant ? settingsNav(tenant.slug) : [];
 
 	return (

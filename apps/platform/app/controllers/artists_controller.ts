@@ -23,8 +23,11 @@ import type Tenant from "#modules/tenancy/models/tenant";
 import { artistLink } from "#services/studio_links";
 
 /**
- * The studio's artist profiles, managed by its owners. Every :id loads
- * through findFor(tenant, id), so another tenant's artist is a 404.
+ * The studio's artist profiles. Owners manage every one; an artist edits
+ * only the profile linked to them (TAT-30: TENANT_ROUTE_ROLES lets them
+ * reach edit, update and mine, and ArtistService.findEditable decides
+ * which profile). Every :id loads through the service first, so another
+ * tenant's artist, or another artist's, is a 404.
  */
 @inject()
 export default class ArtistsController {
@@ -43,6 +46,34 @@ export default class ArtistsController {
 				list.map((artist) => this.toProps(tenant, artist, userId)),
 			),
 		});
+	}
+
+	/**
+	 * The member's own profile (TAT-30): its edit page. Without one, an
+	 * owner goes to the list and an artist to Projects with a note (straight
+	 * there: a flash doesn't survive a second redirect).
+	 */
+	async mine(ctx: HttpContext) {
+		const { tenant, membership } = tenantContext(ctx);
+		const profile = await this.artists.profileOf(tenant, membership.userId);
+		if (profile) {
+			return ctx.response.redirect().toRoute("tenant.artists.edit", {
+				tenant: tenant.slug,
+				id: profile.id,
+			});
+		}
+		if (membership.role === "owner") {
+			return ctx.response
+				.redirect()
+				.toRoute("tenant.artists", { tenant: tenant.slug });
+		}
+		ctx.session.flash(
+			"error",
+			`No artist profile is linked to you in ${tenant.name} yet. Ask an owner to link one.`,
+		);
+		return ctx.response
+			.redirect()
+			.toRoute("tenant.projects.index", { tenant: tenant.slug });
 	}
 
 	async create(ctx: HttpContext) {
@@ -71,14 +102,19 @@ export default class ArtistsController {
 	}
 
 	async edit(ctx: HttpContext) {
-		const { tenant } = tenantContext(ctx);
-		const userId = ctx.auth.getUserOrFail().id;
-		const artist = await this.artists.findFor(tenant, ctx.params.id);
+		const { tenant, membership } = tenantContext(ctx);
+		const userId = membership.userId;
+		const artist = await this.artists.findEditable(
+			tenant,
+			membership,
+			ctx.params.id,
+		);
 		// Linking has to succeed: not to someone else's profile, and not a
-		// second profile for the same person.
+		// second profile for the same person. Artists never link or unlink.
 		const canLink =
-			artist.userId === userId ||
-			(artist.userId === null && !(await this.hasProfile(tenant, userId)));
+			membership.role === "owner" &&
+			(artist.userId === userId ||
+				(artist.userId === null && !(await this.hasProfile(tenant, userId))));
 
 		return ctx.inertia.render("artists/form", {
 			artist: await this.toProps(tenant, artist, userId),
@@ -87,20 +123,34 @@ export default class ArtistsController {
 	}
 
 	async update(ctx: HttpContext) {
-		const { tenant } = tenantContext(ctx);
+		const { tenant, membership } = tenantContext(ctx);
 		const user = ctx.auth.getUserOrFail();
-		// Load first: another tenant's id is a 404 even with a bad body.
-		const artist = await this.artists.findFor(tenant, ctx.params.id);
+		// Load first: another tenant's id, or a profile that isn't the
+		// artist's, is a 404 even with a bad body.
+		const artist = await this.artists.findEditable(
+			tenant,
+			membership,
+			ctx.params.id,
+		);
 		const data = await ctx.request.validateUsing(updateArtistValidator);
+		const input = toInput(data);
+		const owner = membership.role === "owner";
 
 		const saved = await asFieldErrors(() =>
-			this.artists.update(tenant, artist, toInput(data), user),
+			owner
+				? this.artists.update(tenant, artist, input, user)
+				: this.artists.updateOwn(tenant, user.id, artist, input),
 		);
 
 		ctx.session.flash("success", `"${saved.name}" saved.`);
-		return ctx.response
-			.redirect()
-			.toRoute("tenant.artists", { tenant: tenant.slug });
+		return owner
+			? ctx.response
+					.redirect()
+					.toRoute("tenant.artists", { tenant: tenant.slug })
+			: ctx.response.redirect().toRoute("tenant.artists.edit", {
+					tenant: tenant.slug,
+					id: saved.id,
+				});
 	}
 
 	async destroy(ctx: HttpContext) {
@@ -119,8 +169,7 @@ export default class ArtistsController {
 	 * Whether the user already has a live profile in the tenant.
 	 */
 	private async hasProfile(tenant: { id: string }, userId: string) {
-		const list = await this.artists.list(tenant);
-		return list.some((artist) => artist.userId === userId);
+		return (await this.artists.profileOf(tenant, userId)) !== null;
 	}
 
 	/**

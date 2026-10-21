@@ -3,6 +3,7 @@ import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import { LAST_TENANT_KEY, tenantContext } from "#middleware/tenant_middleware";
 import User from "#models/user";
+import { TENANT_ROUTE_ROLES } from "#modules/tenancy/access";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { inTenant } from "#tests/helpers/tenants";
@@ -16,6 +17,17 @@ function makeUser(email: string) {
 
 function studio(slug: string, name = "Black Needle") {
 	return { type: "studio" as const, name, slug, timezone: "Asia/Kathmandu" };
+}
+
+/** The app's /t/:tenant routes: the test-only ones (EXEMPT_ROUTES) left out. */
+function appTenantRoutes() {
+	return Object.values(router.toJSON())
+		.flat()
+		.filter(({ pattern }) => /^\/t\/:tenant(\/|$)/.test(pattern))
+		.filter(
+			({ pattern, methods }) =>
+				!methods.some((method) => `${method} ${pattern}` in EXEMPT_ROUTES),
+		);
 }
 
 test.group("Tenant routes", (group) => {
@@ -186,45 +198,57 @@ test.group("Tenant routes", (group) => {
 		}
 	});
 
-	for (const { area, allow } of [
-		{ area: "settings", allow: ["owner"] },
-		{ area: "artists", allow: ["owner"] },
-		{ area: "inbox", allow: ["owner"] },
-		{ area: "clients", allow: ["owner"] },
-		{ area: "payments", allow: ["owner"] },
-		{ area: "projects", allow: ["owner", "artist"] },
-		{ area: "calendar", allow: ["owner", "artist"] },
-		{ area: "sessions", allow: ["owner", "artist"] },
-		{ area: "alerts", allow: ["owner", "artist"] },
-	]) {
-		test(`every ${area} route runs auth, then the tenant check, then the role check (${allow.join(", ")})`, ({
-			assert,
-		}) => {
-			const routes = Object.values(router.toJSON())
-				.flat()
-				.filter(({ pattern }) =>
-					new RegExp(`^/t/:tenant/${area}(/|$)`).test(pattern),
-				);
-			assert.isNotEmpty(routes);
+	test("every /t/:tenant route runs auth, the request transaction, the tenant check, then the role check", ({
+		assert,
+	}) => {
+		const routes = appTenantRoutes();
+		assert.isNotEmpty(routes);
 
-			for (const route of routes) {
-				const entries = [...route.middleware.all()].map((entry) =>
-					typeof entry === "function" ? undefined : entry,
-				);
-				const names = entries.map((entry) => entry?.name);
-				const auth = names.indexOf("auth");
-				const tenant = names.indexOf("tenant");
-				const role = names.indexOf("role");
-				const dbContext = names.indexOf("dbContext");
-				assert.isAbove(dbContext, auth, route.pattern);
-				assert.isBelow(dbContext, tenant, route.pattern);
-				assert.isAtLeast(auth, 0, route.pattern);
-				assert.isAbove(tenant, auth, route.pattern);
-				assert.isAbove(role, tenant, route.pattern);
-				assert.deepEqual(entries[role]?.args, { allow }, route.pattern);
-			}
-		});
-	}
+		for (const route of routes) {
+			const names = [...route.middleware.all()].map((entry) =>
+				typeof entry === "function" ? undefined : entry.name,
+			);
+			const auth = names.indexOf("auth");
+			const dbContext = names.indexOf("dbContext");
+			const tenant = names.indexOf("tenant");
+			const role = names.indexOf("role");
+			assert.isAtLeast(auth, 0, route.pattern);
+			assert.isAbove(dbContext, auth, route.pattern);
+			assert.isAbove(tenant, dbContext, route.pattern);
+			assert.isAbove(role, tenant, route.pattern);
+			// One role check per route: the group's, which reads the table.
+			assert.equal(
+				names.filter((name) => name === "role").length,
+				1,
+				route.pattern,
+			);
+		}
+	});
+
+	test("every /t/:tenant route has an entry in TENANT_ROUTE_ROLES, and every entry is a route", ({
+		assert,
+	}) => {
+		const routes = appTenantRoutes();
+		const unnamed = routes.filter(({ name }) => !name);
+		assert.deepEqual(
+			unnamed.map(({ pattern }) => pattern),
+			[],
+			"every tenant route needs a name: the role table is keyed by it",
+		);
+
+		const names = new Set(routes.map(({ name }) => String(name)));
+		const listed = new Set(Object.keys(TENANT_ROUTE_ROLES));
+		assert.deepEqual(
+			[...names].filter((name) => !listed.has(name)).sort(),
+			[],
+			"add the route to TENANT_ROUTE_ROLES (#modules/tenancy/access)",
+		);
+		assert.deepEqual(
+			[...listed].filter((name) => !names.has(name)).sort(),
+			[],
+			"entries in TENANT_ROUTE_ROLES for routes that no longer exist",
+		);
+	});
 
 	test("every /t/:tenant route has an isolation case or a written exemption", ({
 		assert,
@@ -256,6 +280,16 @@ test.group("Tenant routes", (group) => {
 			[],
 			"cases or exemptions for routes that no longer exist",
 		);
+	});
+
+	test("only test-only routes are exempt, so an app route cannot skip the role and isolation checks", ({
+		assert,
+	}) => {
+		// An exemption needs only a reason string, and appTenantRoutes() leaves
+		// exempt routes out of the role checks too: pin what may be exempt.
+		for (const key of Object.keys(EXEMPT_ROUTES)) {
+			assert.match(key, /^[A-Z]+ \/t\/:tenant\/__test\//, key);
+		}
 	});
 
 	test("tenantContext fails loudly outside a tenant route", async ({

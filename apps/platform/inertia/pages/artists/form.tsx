@@ -23,7 +23,9 @@ type Errors = Partial<Record<string, string>>;
 
 /**
  * Adds an artist (`artist` is null) or edits one. `canLink` says whether
- * "This is my profile" can succeed for the signed-in owner.
+ * "This is my profile" can succeed for the signed-in owner; an artist on
+ * their own profile (TAT-30) never gets it, and their Cancel goes to
+ * Projects.
  */
 export default function ArtistForm({
 	artist,
@@ -34,19 +36,29 @@ export default function ArtistForm({
 }) {
 	const tenant = useTenant();
 	const params = { tenant: tenant.slug };
+	const owner = tenant.role === "owner";
 
 	return (
-		<Section title={artist ? "Edit artist" : "Add an artist"}>
+		<Section
+			title={owner ? (artist ? "Edit artist" : "Add an artist") : "Profile"}
+		>
 			{artist ? (
+				// An artist's save redirects back to this same page, and Inertia
+				// keeps a same-page form's state after a non-GET visit: the chosen
+				// photo would stay in the file input and ride along on every later
+				// save (silently winning over "Remove this photo"). Keep the state
+				// only when the save failed, so the form is fresh after a success.
 				<Form
 					route="tenant.artists.update"
 					routeParams={{ ...params, id: artist.id }}
+					options={{ preserveState: "errors" }}
 				>
 					{({ errors, processing }) => (
 						<ArtistFields
 							artist={artist}
 							canLink={canLink}
 							errors={errors}
+							owner={owner}
 							processing={processing}
 							tenantSlug={tenant.slug}
 						/>
@@ -59,6 +71,7 @@ export default function ArtistForm({
 							artist={null}
 							canLink={canLink}
 							errors={errors}
+							owner={owner}
 							processing={processing}
 							tenantSlug={tenant.slug}
 						/>
@@ -73,12 +86,14 @@ function ArtistFields({
 	artist,
 	canLink,
 	errors,
+	owner,
 	processing,
 	tenantSlug,
 }: {
 	artist: ArtistProps | null;
 	canLink: boolean;
 	errors: Errors;
+	owner: boolean;
 	processing: boolean;
 	tenantSlug: string;
 }) {
@@ -96,6 +111,7 @@ function ArtistFields({
 				<Input
 					id="name"
 					name="name"
+					className="h-11"
 					maxLength={120}
 					autoComplete="off"
 					value={name}
@@ -113,6 +129,7 @@ function ArtistFields({
 				<Input
 					id="slug"
 					name="slug"
+					className="h-11"
 					autoComplete="off"
 					spellCheck={false}
 					value={slug}
@@ -168,6 +185,7 @@ function ArtistFields({
 				<Input
 					id="photo"
 					name="photo"
+					className="h-11"
 					type="file"
 					accept="image/jpeg,image/png,image/webp"
 					aria-invalid={!!errors.photo}
@@ -257,13 +275,16 @@ function ArtistFields({
 			)}
 
 			<div className="flex gap-2">
-				<Button type="submit" disabled={processing}>
+				<Button type="submit" className="h-11" disabled={processing}>
 					{processing ? "Saving…" : artist ? "Save" : "Add artist"}
 				</Button>
 				<Link
-					route="tenant.artists"
+					route={owner ? "tenant.artists" : "tenant.projects.index"}
 					routeParams={{ tenant: tenantSlug }}
-					className={buttonVariants({ variant: "ghost" })}
+					className={buttonVariants({
+						variant: "ghost",
+						className: "h-11",
+					})}
 				>
 					Cancel
 				</Link>
