@@ -1,10 +1,11 @@
 import { Form, Link } from "@adonisjs/inertia/react";
 import { router } from "@inertiajs/react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { urlFor } from "~/client";
 import ChatMessage from "~/components/chat_message";
 import DevHostWarning from "~/components/dev_host_warning";
+import FinishCard from "~/components/finish_card";
 import { SOURCE_LABELS } from "~/components/inquiries";
 import MessageCard from "~/components/message_card";
 import type { ContactChannelName, ContactVia } from "~/components/messages";
@@ -78,6 +79,8 @@ export default function ProjectShow({
 	depositHeldText,
 	scheduledSessionCount,
 	bookedWithoutSession,
+	finish,
+	closed,
 	quoteExpiryShown,
 	sessions,
 	sessionDates,
@@ -91,6 +94,9 @@ export default function ProjectShow({
 }: ProjectPageProps) {
 	const tenant = useTenant();
 	const params = { tenant: tenant.slug, id: project.id };
+	// A finished step replaces or removes the Finish card with the button
+	// that was focused: focus goes to the page heading instead of <body>.
+	const heading = useRef<HTMLHeadingElement>(null);
 	// Every chat link, Call and "Copy message" record the contact in the
 	// background (TAT-46), with the channel and the message (TAT-52).
 	const markContacted = (via: ContactVia = {}) =>
@@ -102,6 +108,7 @@ export default function ProjectShow({
 	return (
 		<Page
 			title={project.clientName ?? "Project"}
+			titleRef={heading}
 			description={
 				project.artistName ? `With ${project.artistName}` : "No artist yet"
 			}
@@ -128,7 +135,10 @@ export default function ProjectShow({
 					<CardContent className="flex flex-col gap-3">
 						<StatusBadge status={project.status} />
 						<p className="text-sm whitespace-pre-line">{project.brief}</p>
-						<ContactLine text={contactedText} onMark={() => markContacted()} />
+						<ContactLine
+							text={contactedText}
+							onMark={closed ? undefined : () => markContacted()}
+						/>
 						{moves.length > 0 && (
 							<MoveButtons
 								projectId={project.id}
@@ -149,6 +159,15 @@ export default function ProjectShow({
 						)}
 					</CardContent>
 				</Card>
+
+				{finish && (
+					<FinishCard
+						key={finish.step}
+						projectId={project.id}
+						finish={finish}
+						onDone={() => heading.current?.focus()}
+					/>
+				)}
 
 				<MessageCard
 					contact={contact}
@@ -726,13 +745,15 @@ function QuoteForm({
 	);
 }
 
-function ContactLine({ text, onMark }: { text: string; onMark: () => void }) {
+function ContactLine({ text, onMark }: { text: string; onMark?: () => void }) {
 	return (
 		<div className="flex flex-wrap items-center justify-between gap-2 text-sm">
 			<span className="text-muted-foreground">{text}</span>
-			<Button type="button" variant="outline" size="sm" onClick={onMark}>
-				Mark contacted
-			</Button>
+			{onMark && (
+				<Button type="button" variant="outline" size="sm" onClick={onMark}>
+					Mark contacted
+				</Button>
+			)}
 		</div>
 	);
 }

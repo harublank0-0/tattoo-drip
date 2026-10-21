@@ -35,6 +35,11 @@ import PaymentService, {
 	type ListFlags,
 } from "#modules/payments/services/payment_service";
 import { lastContactText } from "#modules/projects/contact";
+import {
+	finishStepFor,
+	healingCheckDueOn,
+	owed,
+} from "#modules/projects/finish";
 import type Quote from "#modules/projects/models/quote";
 import type TattooProject from "#modules/projects/models/tattoo_project";
 import {
@@ -68,7 +73,7 @@ import {
 	outcomesFor,
 } from "#modules/scheduling/outcomes";
 import {
-	scheduleRefusal,
+	schedulableKinds,
 	schedulingHint,
 } from "#modules/scheduling/schedule_rules";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -163,6 +168,7 @@ export default class ProjectsController {
 				proofWaiting: flags.get(project.id)?.proofWaiting ?? false,
 				depositToSettle: flags.get(project.id)?.depositToSettle ?? false,
 				quoteLapsed: flags.get(project.id)?.quoteLapsed ?? false,
+				balanceOwed: flags.get(project.id)?.balanceOwed ?? false,
 			})),
 			page: { current: page, last: lastPage, total },
 		});
@@ -303,6 +309,14 @@ export default class ProjectsController {
 				: null,
 		};
 
+		// Finishing (TAT-111): the step this project offers, the healing check's
+		// day and, for owners, what the confirmation names. A closed project
+		// offers no artist change and no "Mark contacted".
+		const step = finishStepFor(project.status);
+		const dueOn = healingCheckDueOn(sessions, timezone);
+		const owing = owed(money.balance.due);
+		const closed = CLOSED_STATUSES.includes(project.status);
+
 		return ctx.inertia.render("projects/show", {
 			project: {
 				id: project.id,
@@ -361,6 +375,25 @@ export default class ProjectsController {
 			bookedWithoutSession:
 				project.status === "booked" &&
 				!scheduled.some(({ kind }) => kind === "tattoo"),
+			// The assigned artist sees the healing check, never the action.
+			finish:
+				step && (isOwner || step === "complete")
+					? {
+							step,
+							dueText: dueOn ? formatDay(dueOn) : null,
+							overdue:
+								step === "complete" && dueOn !== null && todayText > dueOn,
+							action: isOwner
+								? {
+										confirmedDue: String(owing),
+										balanceDueText: owing > 0n ? formatMoney(owing) : null,
+										estimated: money.quote?.kind === "hourly",
+										sessionScheduled: scheduled.length > 0,
+									}
+								: null,
+						}
+					: null,
+			closed,
 			sessions: sessions.map((session) => {
 				const changeable =
 					session.status === "scheduled" &&
@@ -392,11 +425,12 @@ export default class ProjectsController {
 			}),
 			sessionDates: { today: todayText, max: lastBookable },
 			scheduling:
-				scheduleRefusal(project.status) === null && bookable.length > 0
+				schedulableKinds(project.status).length > 0 && bookable.length > 0
 					? {
 							artists: bookable.map(({ id, name }) => ({ id, name })),
 							artistId: defaultArtistId,
 							artistFixed: membership.role !== "owner",
+							kinds: [...schedulableKinds(project.status)],
 							hint: schedulingHint(
 								project.status,
 								depositDue,
@@ -410,7 +444,7 @@ export default class ProjectsController {
 				kind: project.lastContactKind,
 			}),
 			assignment:
-				membership.role === "owner"
+				membership.role === "owner" && !closed
 					? {
 							artistId: project.artistId,
 							choices: artists.map(({ id, name }) => ({ id, name })),

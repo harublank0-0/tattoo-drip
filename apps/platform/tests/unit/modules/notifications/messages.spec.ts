@@ -221,3 +221,22 @@ test.group("message helpers", () => {
 		assert.equal(sampleValues({ name: "X", address: null }).studio_address, "");
 	});
 });
+
+test.group("The aftercare default (TAT-111)", () => {
+	test("asks for a photo of the healed tattoo, for the healing check", ({
+		assert,
+	}) => {
+		const text = renderMessage(
+			"aftercare",
+			DEFAULT_TEMPLATES.aftercare,
+			SAMPLE,
+		);
+		assert.isTrue(
+			text.endsWith(
+				"Message us here if anything worries you. In about four weeks, send us a photo of the healed tattoo here.",
+			),
+			text,
+		);
+		assert.isNull(templateProblem("aftercare", DEFAULT_TEMPLATES.aftercare));
+	});
+});

@@ -14,6 +14,7 @@ import {
 import DepositOutcome from "#modules/payments/models/deposit_outcome";
 import Payment, { type DeskKind } from "#modules/payments/models/payment";
 import type { PaymentMethodKind } from "#modules/payments/models/payment_method";
+import { FINISHED_STATUSES, owed } from "#modules/projects/finish";
 import type Quote from "#modules/projects/models/quote";
 import TattooProject, {
 	type ProjectStatus,
@@ -66,6 +67,11 @@ export type ListFlags = {
 	proofWaiting: boolean;
 	depositToSettle: boolean;
 	quoteLapsed: boolean;
+	/**
+	 * A finished project (healing check or completed) whose fixed price is
+	 * still owed (TAT-111). Hourly totals are estimates, so never flagged.
+	 */
+	balanceOwed: boolean;
 };
 
 /** A verified payment and what it did to its project. */
@@ -241,7 +247,9 @@ export default class PaymentService {
 	 * deposit_pending project's quote has expired but the studio's late
 	 * decision on the deposit spares it from the sweep (`quoteLapsed`): it
 	 * waits for the owner to revise the quote, take the rest at the desk or
-	 * withdraw.
+	 * withdraw. A finished project whose fixed price is still owed is
+	 * `balanceOwed` (TAT-111): the owner confirmed finishing with it, and the
+	 * board keeps it in sight.
 	 */
 	async listFlags(
 		tenant: TenantRef,
@@ -290,7 +298,20 @@ export default class PaymentService {
 					isExpired(quote) &&
 					decidedLate(own, quote.expiresAt);
 			}
-			flags.set(project.id, { proofWaiting, depositToSettle, quoteLapsed });
+			let balanceOwed = false;
+			if (FINISHED_STATUSES.includes(project.status)) {
+				const quote = await this.quotes.current(tenant, project);
+				balanceOwed =
+					quote !== null &&
+					quote.kind === "fixed" &&
+					owed(balanceOf(quote, own).due) > 0n;
+			}
+			flags.set(project.id, {
+				proofWaiting,
+				depositToSettle,
+				quoteLapsed,
+				balanceOwed,
+			});
 		}
 		return flags;
 	}

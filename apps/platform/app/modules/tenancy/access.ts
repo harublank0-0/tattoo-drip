@@ -93,6 +93,10 @@ export const TENANT_ROUTE_ROLES = {
 	// anyone else too (ProjectService.assignArtist, DepositLinkService.issue,
 	// PaymentService.requireOwner).
 	"tenant.projects.artist.update": OWNERS,
+	// Finishing a project and closing its healing check (TAT-111): the
+	// money decision stays with owners (ProjectService.requireOwner).
+	"tenant.projects.finish.store": OWNERS,
+	"tenant.projects.complete.store": OWNERS,
 	"tenant.projects.deposit_link.store": OWNERS,
 	"tenant.projects.payments.store": OWNERS,
 	"tenant.projects.refunds.store": OWNERS,

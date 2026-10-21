@@ -117,7 +117,7 @@ export const DEFAULT_TEMPLATES: Record<MessageKind, string> = {
 	session_reminder:
 		"Hi {client_name}, a reminder of your session at {studio_name} on {session_time} with {artist_name}. See you soon!",
 	aftercare:
-		"Hi {client_name}, thank you for your tattoo at {studio_name}! For the next two weeks: wash it gently with clean water and mild soap and pat it dry, put on a thin layer of aftercare cream, don't scratch or pick it, and keep it out of the sun, pools and the sea. Message us here if anything worries you.",
+		"Hi {client_name}, thank you for your tattoo at {studio_name}! For the next two weeks: wash it gently with clean water and mild soap and pat it dry, put on a thin layer of aftercare cream, don't scratch or pick it, and keep it out of the sun, pools and the sea. Message us here if anything worries you. In about four weeks, send us a photo of the healed tattoo here.",
 };
 
 /** A message's longest text, in characters (the column is varchar(1000)). */

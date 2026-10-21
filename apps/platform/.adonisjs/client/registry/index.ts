@@ -378,6 +378,18 @@ const routes = {
     tokens: [{"old":"/t/:tenant/projects/:id/artist","type":0,"val":"t","end":""},{"old":"/t/:tenant/projects/:id/artist","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/projects/:id/artist","type":0,"val":"projects","end":""},{"old":"/t/:tenant/projects/:id/artist","type":1,"val":"id","end":""},{"old":"/t/:tenant/projects/:id/artist","type":0,"val":"artist","end":""}],
     types: placeholder as Registry['tenant.projects.artist.update']['types'],
   },
+  'tenant.projects.finish.store': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/projects/:id/finish',
+    tokens: [{"old":"/t/:tenant/projects/:id/finish","type":0,"val":"t","end":""},{"old":"/t/:tenant/projects/:id/finish","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/projects/:id/finish","type":0,"val":"projects","end":""},{"old":"/t/:tenant/projects/:id/finish","type":1,"val":"id","end":""},{"old":"/t/:tenant/projects/:id/finish","type":0,"val":"finish","end":""}],
+    types: placeholder as Registry['tenant.projects.finish.store']['types'],
+  },
+  'tenant.projects.complete.store': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/projects/:id/complete',
+    tokens: [{"old":"/t/:tenant/projects/:id/complete","type":0,"val":"t","end":""},{"old":"/t/:tenant/projects/:id/complete","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/projects/:id/complete","type":0,"val":"projects","end":""},{"old":"/t/:tenant/projects/:id/complete","type":1,"val":"id","end":""},{"old":"/t/:tenant/projects/:id/complete","type":0,"val":"complete","end":""}],
+    types: placeholder as Registry['tenant.projects.complete.store']['types'],
+  },
   'tenant.projects.sessions.store': {
     methods: ["POST"],
     pattern: '/t/:tenant/projects/:id/sessions',

@@ -1,6 +1,11 @@
 import { inject } from "@adonisjs/core";
 import type { StoredImage } from "#modules/media/services/image_service";
-import { decidedLate, depositMoney } from "#modules/payments/ledger";
+import {
+	type Balance,
+	balanceOf,
+	decidedLate,
+	depositMoney,
+} from "#modules/payments/ledger";
 import Payment from "#modules/payments/models/payment";
 import type { PaymentMethodKind } from "#modules/payments/models/payment_method";
 import type Quote from "#modules/projects/models/quote";
@@ -67,6 +72,27 @@ export default class DepositService {
 			.where("currency", currency)
 			.whereIn("kind", COUNTED_KINDS);
 		return depositMoney(payments, currency);
+	}
+
+	/**
+	 * The project's balance (balanceOf over its current quote and every
+	 * payment) and whether its total is an hourly estimate. ProjectService's
+	 * finish steps read it under the project's lock (TAT-111): PaymentService
+	 * shows the same balance but depends on ProjectService, so ProjectService
+	 * can't ask it.
+	 */
+	async balance(
+		tenant: TenantRef,
+		project: ProjectRef,
+	): Promise<{ balance: Balance; estimated: boolean }> {
+		const quote = await this.quotes.current(tenant, project);
+		const payments = await Payment.query()
+			.where("tenant_id", tenant.id)
+			.where("project_id", project.id);
+		return {
+			balance: balanceOf(quote, payments),
+			estimated: quote?.kind === "hourly",
+		};
 	}
 
 	/**

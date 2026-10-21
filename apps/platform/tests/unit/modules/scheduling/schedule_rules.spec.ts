@@ -3,8 +3,10 @@ import {
 	PROJECT_STATUSES,
 	type ProjectStatus,
 } from "#modules/projects/models/tattoo_project";
+import { SESSION_KINDS } from "#modules/scheduling/models/project_session";
 import {
 	SCHEDULABLE_STATUSES,
+	schedulableKinds,
 	scheduledNote,
 	scheduleRefusal,
 	schedulingHint,
@@ -13,7 +15,7 @@ import {
 const BEFORE_ACCEPTANCE = ["reviewing", "quoted", "on_hold"] as const;
 
 test.group("scheduleRefusal", () => {
-	test("open projects take new sessions; finished and closed ones refuse", ({
+	test("open projects take new sessions; finished and closed ones refuse a tattoo session", ({
 		assert,
 	}) => {
 		assert.deepEqual(
@@ -29,7 +31,10 @@ test.group("scheduleRefusal", () => {
 		);
 		assert.deepEqual(
 			Object.fromEntries(
-				PROJECT_STATUSES.map((status) => [status, scheduleRefusal(status)]),
+				PROJECT_STATUSES.map((status) => [
+					status,
+					scheduleRefusal(status, "tattoo"),
+				]),
 			),
 			{
 				reviewing: null,
@@ -39,10 +44,61 @@ test.group("scheduleRefusal", () => {
 				booked: null,
 				in_progress: null,
 				completed: "project_finished",
-				healing_check: "project_finished",
+				healing_check: "touch_ups_only",
 				declined: "project_closed",
 				cancelled: "project_closed",
 			},
+		);
+	});
+
+	test("a healing check takes touch-ups only; a completed project takes nothing (TAT-111)", ({
+		assert,
+	}) => {
+		const all = ["tattoo", "consultation", "touch_up"];
+		assert.sameMembers(all, [...SESSION_KINDS]);
+		assert.deepEqual(
+			Object.fromEntries(
+				PROJECT_STATUSES.map((status) => [
+					status,
+					[...schedulableKinds(status)],
+				]),
+			),
+			{
+				reviewing: all,
+				quoted: all,
+				on_hold: all,
+				deposit_pending: all,
+				booked: all,
+				in_progress: all,
+				completed: [],
+				healing_check: ["touch_up"],
+				declined: [],
+				cancelled: [],
+			},
+		);
+		assert.deepEqual(
+			Object.fromEntries(
+				PROJECT_STATUSES.map((status) => [
+					status,
+					scheduleRefusal(status, "touch_up"),
+				]),
+			),
+			{
+				reviewing: null,
+				quoted: null,
+				on_hold: null,
+				deposit_pending: null,
+				booked: null,
+				in_progress: null,
+				completed: "project_finished",
+				healing_check: null,
+				declined: "project_closed",
+				cancelled: "project_closed",
+			},
+		);
+		assert.equal(
+			scheduleRefusal("healing_check", "consultation"),
+			"touch_ups_only",
 		);
 	});
 });
@@ -138,6 +194,15 @@ test.group("schedulingHint", () => {
 				depositDue: 0,
 			}),
 			"booked once its deposit is settled",
+		);
+	});
+
+	test("a healing check says it takes touch-ups only (TAT-111)", ({
+		assert,
+	}) => {
+		assert.equal(
+			schedulingHint("healing_check", 0, true),
+			"The healing check takes touch-up sessions only.",
 		);
 	});
 });

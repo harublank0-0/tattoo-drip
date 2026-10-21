@@ -8,6 +8,14 @@ import { type ContactVia, NO_VIA } from "#modules/notifications/messages";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import DepositService from "#modules/payments/services/deposit_service";
 import { ProjectRuleError, QuoteRuleError } from "#modules/projects/errors";
+import {
+	FINISH_STEPS,
+	type FinishResult,
+	type FinishStep,
+	finishRefusal,
+	healingCheckDueOn,
+	owed,
+} from "#modules/projects/finish";
 import ExpireQuoteJob from "#modules/projects/jobs/expire_quote_job";
 import type Quote from "#modules/projects/models/quote";
 import TattooProject, {
@@ -40,6 +48,12 @@ import { dispatchInTransaction } from "#services/queue";
 
 type TenantRef = Pick<Tenant, "id">;
 
+/** A tenant with its timezone: the healing check's day is the studio's. */
+type TenantZone = Pick<Tenant, "id" | "timezone">;
+
+/** What a finish step did (TAT-111): the new status and what its flash needs. */
+export type Finished = FinishResult & { status: ProjectStatus };
+
 /** Who is asking: their user and their role in the tenant. */
 export type Member = Pick<TenantMembership, "userId" | "role">;
 
@@ -58,8 +72,9 @@ type ProjectQuery = ReturnType<typeof TattooProject.query>;
 /**
  * The way to find and list a tenant's projects and move them through their
  * lifecycle: the quote steps (TAT-64: issue, accept and expire) and the
- * manual moves (TAT-46: hold, resume, decline, withdraw), plus the artist,
- * notes and contact time. Every write locks the project row first, the
+ * manual moves (TAT-46: hold, resume, decline, withdraw), finishing (TAT-111:
+ * finish and close the healing check), plus the artist, notes and contact
+ * time. Every write locks the project row first, the
  * same order as SessionService, so a concurrent accept, revision, expiry or
  * session change serializes on that row.
  */
@@ -461,6 +476,45 @@ export default class ProjectService {
 	}
 
 	/**
+	 * Owners only (TAT-111's finish routes): anyone else gets E_ROW_NOT_FOUND
+	 * (a 404). The controller calls it before it validates a body, so the
+	 * assigned artist gets the same 404 whatever they post; finish and
+	 * completeHealingCheck check again. TAT-30 turns it into a capability.
+	 */
+	requireOwner(member: Member): void {
+		if (member.role !== "owner") {
+			throw new lucidErrors.E_ROW_NOT_FOUND(TattooProject);
+		}
+	}
+
+	/**
+	 * The owner marks the tattoo finished (TAT-111): `in_progress` to
+	 * `healing_check`. `confirmedDue` is the balance due the page's
+	 * confirmation named, in paisa (null when it named none). See finishStep.
+	 */
+	finish(
+		tenant: TenantZone,
+		member: Member,
+		project: TattooProject,
+		confirmedDue: bigint | null,
+	): Promise<Finished> {
+		return this.finishStep(tenant, member, project, "finish", confirmedDue);
+	}
+
+	/**
+	 * The owner closes the healing check (TAT-111): `healing_check` to
+	 * `completed`, with the same rules as finish.
+	 */
+	completeHealingCheck(
+		tenant: TenantZone,
+		member: Member,
+		project: TattooProject,
+		confirmedDue: bigint | null,
+	): Promise<Finished> {
+		return this.finishStep(tenant, member, project, "complete", confirmedDue);
+	}
+
+	/**
 	 * Whether the project holds verified deposit money: the current quote's
 	 * deposit payments, net of reversals, are above zero in the quote's
 	 * currency. A project with no quote holds none. The withdraw flash asks
@@ -565,6 +619,49 @@ export default class ProjectService {
 			quote.depositAmount === 0 ||
 			!(await this.deposits.isSettled(tenant, project))
 		);
+	}
+
+	/**
+	 * One finish step (TAT-111), owners only (E_ROW_NOT_FOUND for anyone else,
+	 * before the lock). Under the project's row lock, which every project
+	 * write takes first, so a session scheduled or a payment recorded in
+	 * another tab either came first and is seen here or waits: finishRefusal
+	 * decides from the live row, its live sessions and its balance
+	 * (ProjectRuleError "move_not_allowed" when the status moved on, as after
+	 * a second tap or from a stale tab; "session_scheduled"; "balance_changed"
+	 * when money is owed and `confirmedDue` isn't exactly it). Only the status
+	 * changes: sessions, payments, quotes and deposit outcomes stay as they
+	 * are.
+	 */
+	private async finishStep(
+		tenant: TenantZone,
+		member: Member,
+		project: TattooProject,
+		step: FinishStep,
+		confirmedDue: bigint | null,
+	): Promise<Finished> {
+		assertProjectOf(tenant, project);
+		this.requireOwner(member);
+		return withTransaction(async (trx) => {
+			const live = await this.lockFor(trx, tenant, member, project.id);
+			const sessions = await this.sessions.listForProject(tenant, live);
+			const { balance, estimated } = await this.deposits.balance(tenant, live);
+			const due = owed(balance.due);
+			const refusal = finishRefusal(step, {
+				status: live.status,
+				sessionScheduled: sessions.some(({ status }) => status === "scheduled"),
+				due,
+				confirmedDue,
+			});
+			if (refusal) throw new ProjectRuleError(refusal);
+			await setStatus(live, FINISH_STEPS[step].to);
+			return {
+				status: live.status,
+				due,
+				estimated,
+				dueOn: healingCheckDueOn(sessions, tenant.timezone),
+			};
+		});
 	}
 
 	/**

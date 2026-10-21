@@ -37,7 +37,7 @@ The long-term goal is still to be the studio's operating system and digital plat
 A tattoo is a **project**, not an appointment:
 
 ```text
-inquiry → review → quote → deposit → session(s) → completed → healing check
+inquiry → review → quote → deposit → session(s) → healing check → completed
 ```
 
 Flash, piercing and walk-ins skip the quote. Details are in [requirements](requirements.md#project-rules) and [data-model](data-model.md).
@@ -84,6 +84,6 @@ John
 
 **Walk-in, phone or DM booking:** staff create the project and session directly at the desk.
 
-**After the session:** mark it completed or no-show. When the last session is done, the project moves to a healing check (touch-up, healed photo).
+**After the session:** mark it completed or no-show. When the last session is done, the owner marks the tattoo finished and the project moves to a healing check (touch-up, healed photo); closing the check completes the project.
 
 **Work across tenants:** a user switches tenants in the dashboard. Tenant data never mixes.

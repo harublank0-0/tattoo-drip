@@ -51,12 +51,14 @@ const OUTCOME_REFUSED: Record<SessionRuleReason, string> = {
 	project_closed: "This session can't be changed.",
 	invalid_range: "This session can't be changed.",
 	project_finished: "This session can't be changed.",
+	touch_ups_only: "This session can't be changed.",
 };
 
 /** What a refused schedule tells the user. */
 const SCHEDULE_REFUSED: Record<SessionRuleReason, string> = {
 	project_closed: "This project is closed: it takes no new sessions.",
 	project_finished: "This project is finished: it takes no new sessions.",
+	touch_ups_only: "The healing check takes touch-up sessions only.",
 	not_scheduled: "This session can't be scheduled.",
 	not_started: "This session can't be scheduled.",
 	not_booked: "This session can't be scheduled.",
