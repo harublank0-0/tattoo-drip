@@ -226,13 +226,16 @@ export default class PaymentService {
 			tenant,
 			projects.map(({ id }) => id),
 		);
+		const quotes = await this.quotes.currentFor(
+			tenant,
+			projects.map(({ id }) => id),
+		);
 		const balances = new Map<string, Balance>();
 		for (const project of projects) {
-			const quote = await this.quotes.current(tenant, project);
 			balances.set(
 				project.id,
 				balanceOf(
-					quote,
+					quotes.get(project.id) ?? null,
 					all.filter(({ projectId }) => projectId === project.id),
 				),
 			);
@@ -276,6 +279,18 @@ export default class PaymentService {
 						)
 						.whereNull("session_id");
 		const settled = new Set(outcomes.map(({ projectId }) => projectId));
+		// The three flags that read a quote read them in one query, not one
+		// per row (TAT-119): the page lists up to 25 rows.
+		const needQuote = projects.filter(
+			({ status }) =>
+				CLOSED_FOR_OUTCOME.includes(status) ||
+				status === "deposit_pending" ||
+				FINISHED_STATUSES.includes(status),
+		);
+		const quotes = await this.quotes.currentFor(
+			tenant,
+			needQuote.map(({ id }) => id),
+		);
 		const flags = new Map<string, ListFlags>();
 		for (const project of projects) {
 			const own = rows.filter(({ projectId }) => projectId === project.id);
@@ -288,11 +303,11 @@ export default class PaymentService {
 				CLOSED_FOR_OUTCOME.includes(project.status) &&
 				!settled.has(project.id)
 			) {
-				const quote = await this.quotes.current(tenant, project);
+				const quote = quotes.get(project.id) ?? null;
 				depositToSettle = settleableDeposit(own, quote?.currency ?? "NPR") > 0;
 			}
 			if (project.status === "deposit_pending" && !proofWaiting) {
-				const quote = await this.quotes.current(tenant, project);
+				const quote = quotes.get(project.id) ?? null;
 				quoteLapsed =
 					quote !== null &&
 					isExpired(quote) &&
@@ -300,7 +315,7 @@ export default class PaymentService {
 			}
 			let balanceOwed = false;
 			if (FINISHED_STATUSES.includes(project.status)) {
-				const quote = await this.quotes.current(tenant, project);
+				const quote = quotes.get(project.id) ?? null;
 				balanceOwed =
 					quote !== null &&
 					quote.kind === "fixed" &&

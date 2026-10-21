@@ -42,6 +42,25 @@ export default class QuoteService {
 			.first();
 	}
 
+	/**
+	 * The current quote (the highest version) of each of these projects in one
+	 * query, by project id; a project with no quote is absent. The batch of
+	 * `current`, for a list that would otherwise read one quote per row.
+	 */
+	async currentFor(
+		tenant: TenantRef,
+		projectIds: string[],
+	): Promise<Map<string, Quote>> {
+		if (projectIds.length === 0) return new Map();
+		const quotes = await Quote.query()
+			.where("tenant_id", tenant.id)
+			.whereIn("project_id", projectIds)
+			.distinctOn("project_id")
+			.orderBy("project_id")
+			.orderBy("version", "desc");
+		return new Map(quotes.map((quote) => [quote.projectId, quote]));
+	}
+
 	/** Every version of the project's quote, newest first. */
 	async history(tenant: TenantRef, project: ProjectRef): Promise<Quote[]> {
 		return Quote.query()
