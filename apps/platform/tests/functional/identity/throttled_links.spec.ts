@@ -1,14 +1,16 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import type { ApiClient } from "@japa/api-client";
 import { test } from "@japa/runner";
+import { DateTime } from "luxon";
 import User from "#models/user";
 import {
 	INVITATION_TOKEN_KEY,
 	SESSION_TOKEN_KEYS,
 } from "#modules/identity/account_tokens";
 import AccountTokenService from "#modules/identity/services/account_token_service";
-import { invite } from "#tests/helpers/invitations";
-import { studioWithOwner } from "#tests/helpers/tenants";
+import TenantMembership from "#modules/tenancy/models/tenant_membership";
+import { confirmedUser, invite } from "#tests/helpers/invitations";
+import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
 const MESSAGE = "Too many tries. Wait a few minutes and open the link again.";
 const tokens = new AccountTokenService();
@@ -123,35 +125,119 @@ test.group("A throttled account link says so (TAT-119)", (group) => {
 		refused.assertStatus(429);
 	});
 
-	test("a signed-in person goes to the dashboard and ends on their studio with the message", async ({
-		client,
-		assert,
-	}) => {
-		const { owner } = await studioWithOwner("throttled-in-119", "Throttled In");
-		for (const [at, link] of [LINKS[1], LINKS[2]].entries()) {
-			const ip = `203.0.113.${180 + at}`;
-			await spendLimit(client, link.path(UNKNOWN), ip);
+	// Every state a signed-in person can be in when they open a link (TAT-119):
+	// the throttled link sends them to /dashboard, whose redirects (to the
+	// studio home and the list, or to /onboarding and on to /confirm-email)
+	// must each keep the flash until the page that shows it.
+	const STATES: Array<{
+		name: string;
+		landing: string;
+		person: () => Promise<User>;
+	}> = [
+		{
+			name: "verified, no studio (onboarding)",
+			landing: "onboarding/create_tenant",
+			person: () => confirmedUser("nostudio@throttled-119.example"),
+		},
+		{
+			name: "unverified, no studio (onboarding, then /confirm-email)",
+			landing: "auth/confirm_email",
+			person: () =>
+				User.create({
+					email: "unverified@throttled-119.example",
+					password: "secret-password",
+				}),
+		},
+		{
+			name: "unverified, one studio (the inbox)",
+			landing: "inquiries/index",
+			person: async () =>
+				(await studioWithOwner("throttled-uv-119", "Throttled UV")).owner,
+		},
+		{
+			name: "verified, one studio (the inbox)",
+			landing: "inquiries/index",
+			person: async () => {
+				const { owner } = await studioWithOwner(
+					"throttled-v-119",
+					"Throttled V",
+				);
+				owner.emailVerifiedAt = DateTime.now();
+				return owner.save();
+			},
+		},
+		{
+			name: "several studios (the oldest one's inbox)",
+			landing: "inquiries/index",
+			person: async () => {
+				const first = await studioWithOwner("throttled-m1-119", "Throttled M1");
+				const second = await studioWithOwner(
+					"throttled-m2-119",
+					"Throttled M2",
+				);
+				await inTenant(second.tenant, () =>
+					TenantMembership.create({
+						tenantId: second.tenant.id,
+						userId: first.owner.id,
+						role: "owner",
+					}),
+				);
+				first.owner.emailVerifiedAt = DateTime.now();
+				return first.owner.save();
+			},
+		},
+		{
+			name: "an artist member (their projects)",
+			landing: "projects/index",
+			person: async () => {
+				const { tenant } = await studioWithOwner(
+					"throttled-a-119",
+					"Throttled A",
+				);
+				return artistIn(tenant, "artist@throttled-119.example");
+			},
+		},
+	];
 
-			const refused = await client
-				.get(link.path(UNKNOWN))
-				.header("x-forwarded-for", ip)
-				.loginAs(owner)
-				.redirects(0);
-			refused.assertHeader("location", "/dashboard");
-			refused.assertFlashMessage("error", MESSAGE);
+	for (const [at, state] of STATES.entries()) {
+		test(`a signed-in person (${state.name}) ends on their page with the message, for a live and an unknown token`, async ({
+			client,
+			assert,
+		}) => {
+			const person = await state.person();
+			const ip = `203.0.113.${200 + at}`;
+			await spendLimit(client, LINKS[1].path(UNKNOWN), ip);
+			// Live tokens of the two links a signed-in person can open.
+			const live = [LINKS[1], LINKS[2]];
+			const tokensOf = new Map(
+				await Promise.all(
+					live.map(async (link) => [link, await link.live()] as const),
+				),
+			);
 
-			// /dashboard and the studio home redirect on to the inbox; the
-			// message survives both hops.
-			const landed = await client
-				.get(link.path(UNKNOWN))
-				.header("x-forwarded-for", ip)
-				.loginAs(owner)
-				.redirects(6)
-				.withInertia();
-			landed.assertInertiaComponent("inquiries/index");
-			assert.equal(landed.body().flash.error, MESSAGE);
-		}
-	});
+			for (const link of live) {
+				for (const token of [tokensOf.get(link) as string, UNKNOWN]) {
+					const open = () =>
+						client
+							.get(link.path(token))
+							.header("x-forwarded-for", ip)
+							.loginAs(person);
+					const refused = await open().redirects(0);
+					refused.assertHeader("location", "/dashboard");
+					refused.assertFlashMessage("error", MESSAGE);
+
+					// Every hop from /dashboard to the page keeps the message.
+					const landed = await open().redirects(8).withInertia();
+					landed.assertInertiaComponent(state.landing);
+					assert.equal(
+						landed.body().flash.error,
+						MESSAGE,
+						`${link.name}, ${state.name}`,
+					);
+				}
+			}
+		});
+	}
 
 	test("a form's throttle still goes back to the form with its minutes", async ({
 		client,
