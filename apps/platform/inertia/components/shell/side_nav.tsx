@@ -20,7 +20,7 @@ export default function SideNav({
 	tenantSlug: string;
 }) {
 	return (
-		<aside className="sticky top-0 hidden h-svh w-60 shrink-0 flex-col gap-4 border-r bg-background p-3 lg:flex">
+		<aside className="sticky top-0 hidden h-svh w-60 shrink-0 flex-col gap-4 border-r bg-card p-3 lg:flex">
 			<div className="px-1 pt-1">
 				<TenantSwitcher />
 			</div>

@@ -5,7 +5,7 @@
  * always come from the network; the offline page only when it fails.
  * Bump CACHE to drop everything stored by an older version.
  */
-const CACHE = "td-shell-v1";
+const CACHE = "td-shell-v2";
 const OFFLINE_URL = "/offline.html";
 const PRECACHE = ["/offline.html", "/icons/favicon.svg", "/icons/icon-192.png"];
 /** The most build files kept, oldest dropped first. */

@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html data-theme="{{ request.plainCookie('app_theme', { defaultValue: 'light', encoded: false }) }}">
+<html data-theme="{{ request.plainCookie('app_theme', { defaultValue: 'system', encoded: false }) }}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#09090b" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f7f3ee" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#14110f" media="(prefers-color-scheme: dark)" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Tattoo Drip" />
@@ -13,6 +13,25 @@
     <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <title data-inertia>Tattoo Drip</title>
+    <script>
+      /*
+       * No app_theme cookie yet (a first visit): follow the phone's light or
+       * dark setting, and keep following it until the theme toggle sets the
+       * cookie. Runs before the first paint, so the wrong theme never shows.
+       */
+      (function () {
+        var root = document.documentElement
+        if (root.dataset.theme !== 'system') return
+        var query = window.matchMedia('(prefers-color-scheme: dark)')
+        function follow() {
+          root.dataset.theme = query.matches ? 'dark' : 'light'
+        }
+        follow()
+        query.addEventListener('change', function () {
+          if (document.cookie.indexOf('app_theme=') === -1) follow()
+        })
+      })()
+    </script>
 
     @viteReactRefresh()
     @vite(['inertia/app.tsx'])

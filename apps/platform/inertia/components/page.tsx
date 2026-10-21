@@ -26,9 +26,11 @@ export default function Page({
 			<Head title={title} />
 			{hasHeader && (
 				<header className="flex flex-wrap items-end justify-between gap-4">
-					<div className="flex flex-col gap-1">
+					<div className="flex min-w-0 flex-col gap-1">
 						{!hideTitle && (
-							<h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+							<h1 className="font-display text-[1.75rem] leading-snug font-bold text-balance wrap-anywhere">
+								{title}
+							</h1>
 						)}
 						{description && (
 							<p className="text-sm text-muted-foreground">{description}</p>

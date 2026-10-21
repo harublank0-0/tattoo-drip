@@ -1,24 +1,18 @@
 import { Link } from "@adonisjs/inertia/react";
 
 /**
- * The Tattoo Drip mark and name, linking home. The mark is the
- * placeholder in public/icons (TAT-67); replace resources/brand/mark.svg
- * and regenerate the icons to change it.
+ * The Tattoo Drip name, linking home, set in the display face. An interim
+ * wordmark: the mark in public/icons is still the placeholder (TAT-67), so
+ * the name stands alone until a real one exists (replace
+ * resources/brand/mark.svg and regenerate the icons).
  */
-export default function Logo({ size = 26 }: { size?: number }) {
+export default function Logo() {
 	return (
 		<Link
 			route="home"
-			className="inline-flex items-center gap-2 font-semibold text-foreground"
+			className="font-display text-xl leading-tight font-bold text-foreground"
 		>
-			<img
-				src="/icons/favicon.svg"
-				width={size}
-				height={size}
-				alt=""
-				className="rounded-md"
-			/>
-			<span>Tattoo Drip</span>
+			Tattoo Drip
 		</Link>
 	);
 }

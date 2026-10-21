@@ -44,21 +44,25 @@
 
 /*
  * The studio page's palette (TAT-48): stencil paper, tattoo ink, and the
- * violet of a transfer stencil for everything you can tap. Contrast on
- * paper: ink 15.9:1, ink-muted 6.3:1, stencil 8.5:1, line-strong 3.6:1.
+ * violet of a transfer stencil for everything you can tap. The paper, ink and
+ * line values are the warm ones of Stencil & Ink (TAT-97), the same as the
+ * dashboard's (apps/platform/inertia/css/app.css, a copy: packages can't
+ * import from apps); the violets are unchanged. Measured contrast on paper,
+ * light: ink 15.8:1, ink-muted 6.5:1, stencil 8.4:1, line-strong 3.4:1;
+ * dark: ink 15.6:1, ink-muted 7.2:1, stencil 8.0:1, line-strong 3.2:1.
  * Themes (TAT-54) override these tokens.
  */
 :root {
   color-scheme: light dark;
-  --paper: #f5f6f8;
-  --ink: #1b1830;
-  --ink-muted: #5b5870;
+  --paper: #f7f3ee;
+  --ink: #1c1917;
+  --ink-muted: #5e5650;
   --stencil: #43389a;
   --stencil-strong: #362c80;
-  --on-stencil: #f5f6f8;
+  --on-stencil: #f7f3ee;
   --stencil-wash: #e7e4f4;
-  --line: #d6d4e0;
-  --line-strong: #827e98;
+  --line: #e3dbd2;
+  --line-strong: #8c8279;
 
   --body-face: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', 'Nirmala UI', 'Noto Sans Devanagari', sans-serif;
   --display-face: Eczar, 'Noto Serif Devanagari', 'Noto Serif', Georgia, 'Times New Roman', serif;
@@ -87,15 +91,15 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #14121d;
-    --ink: #eceaf4;
-    --ink-muted: #a7a3bc;
+    --paper: #14110f;
+    --ink: #efe9e2;
+    --ink-muted: #a89f96;
     --stencil: #a99cff;
     --stencil-strong: #c4bbff;
-    --on-stencil: #14121d;
+    --on-stencil: #14110f;
     --stencil-wash: #221e38;
-    --line: #34304a;
-    --line-strong: #6b6684;
+    --line: #342d27;
+    --line-strong: #6d645c;
     --destructive: #f2b8b5;
   }
 }
