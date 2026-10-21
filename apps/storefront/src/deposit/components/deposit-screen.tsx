@@ -48,27 +48,24 @@ function useLocationHash(): string | undefined {
 /**
  * The deposit page (TAT-65b): the token from the fragment (spec ruling 3),
  * then the page from useDeposit. A missing or malformed token is the
- * dead-link message, with no request.
+ * dead-link message, with no request. With a token, DepositLoaded draws the
+ * frame itself, so its h1 can name the deposit's state (TAT-106).
  */
 export function DepositScreen({ shell }: { shell: DepositShell }) {
 	const hash = useLocationHash();
 	const token = hash === undefined ? undefined : readDepositToken(hash);
+	if (typeof token === "string") {
+		return <DepositLoaded key={token} token={token} shell={shell} />;
+	}
 	const contact = depositContact(shell, null);
 	return (
 		<DepositFrame studioName={shell.studioName}>
 			{token === undefined ? (
-				<>
-					<DepositLoading studioName={shell.studioName} />
-					<ContactLine studioName={shell.studioName} contact={contact} />
-				</>
-			) : token === null ? (
-				<>
-					<LoadProblemView problem="dead" />
-					<ContactLine studioName={shell.studioName} contact={contact} />
-				</>
+				<DepositLoading studioName={shell.studioName} />
 			) : (
-				<DepositLoaded key={token} token={token} shell={shell} />
+				<LoadProblemView problem="dead" />
 			)}
+			<ContactLine studioName={shell.studioName} contact={contact} />
 		</DepositFrame>
 	);
 }
@@ -130,7 +127,7 @@ export function DepositLoaded({
 	}, [moveFocus, shown]);
 
 	return (
-		<>
+		<DepositFrame studioName={shell.studioName} view={view}>
 			{view ? <DepositIntro view={view} /> : null}
 			<StateRegion quiet={moveFocus}>
 				{view && view.state !== "due" ? (
@@ -182,6 +179,6 @@ export function DepositLoaded({
 				studioName={shell.studioName}
 				contact={depositContact(shell, view?.referenceCode || null)}
 			/>
-		</>
+		</DepositFrame>
 	);
 }

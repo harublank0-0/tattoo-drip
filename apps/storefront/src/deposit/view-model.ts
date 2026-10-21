@@ -222,6 +222,44 @@ export function stateTemplate(
 	}
 }
 
+/**
+ * The page's one h1 (TAT-106): what the state's message says, in a few
+ * words. Before the deposit is read (`null`: loading, or a link that doesn't
+ * work) and while it is due, it asks to pay the studio.
+ */
+export function headingTemplate(
+	view: Pick<DepositView, "state" | "amount"> | null,
+): string {
+	if (view === null) return copy.heading;
+	switch (view.state) {
+		case "due":
+			return copy.heading;
+		case "submitted":
+			return copy.headings.submitted;
+		case "paid":
+			return view.amount === 0 ? copy.headings.paidNone : copy.headings.paid;
+		case "updating":
+			return copy.headings.updating;
+		case "expired":
+			return copy.headings.expired;
+		case "cancelled":
+			return copy.headings.cancelled;
+	}
+}
+
+/**
+ * The amount the state message shows with the reference code: what was sent
+ * for `submitted`; for `paid`, the deposit as a receipt (TAT-106; its `due`
+ * is then 0). Null for the other states and when no deposit was needed.
+ */
+export function receiptAmount(
+	view: Pick<DepositView, "state" | "amount" | "amountText" | "dueText">,
+): string | null {
+	if (view.state === "submitted") return view.dueText;
+	if (view.state === "paid" && view.amount > 0) return view.amountText;
+	return null;
+}
+
 /** The studio's chat links on every state (spec ruling 9). */
 export interface DepositContact {
 	/** WhatsApp, the message prefilled with the reference code once it is known. */

@@ -103,6 +103,15 @@ export const copy = {
 	// title, titleWithStudio, description, descriptionWithStudio: head-copy.ts
 	...headCopy,
 	heading: "Pay your deposit to {studio}",
+	/** The h1 once the deposit has left `due` (TAT-106); each says what its state's message says. */
+	headings: {
+		submitted: "Screenshot sent",
+		paid: "Deposit paid",
+		paidNone: "No deposit needed",
+		updating: "Your quote is being updated",
+		expired: "This quote has expired",
+		cancelled: "This booking was cancelled",
+	},
 	withArtist: "with {artist}",
 	briefSummary: "Your tattoo idea",
 	loading: "Loading your deposit…",

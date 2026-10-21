@@ -7,8 +7,10 @@ import type { LoadProblem } from "../problems.ts";
 import {
 	type DepositContact,
 	type DepositView,
+	headingTemplate,
 	type MethodView,
 	payByLine,
+	receiptAmount,
 	stateTemplate,
 } from "../view-model.ts";
 import { CopyButton } from "./copy-button.tsx";
@@ -21,19 +23,29 @@ import { CopyButton } from "./copy-button.tsx";
  * replace the token in the URL.
  */
 
-/** Around every state: one h1 naming the studio, and who runs the page. */
+/**
+ * Around every state: one h1, and who runs the page. The h1 names the
+ * deposit's state once it is read (TAT-106); before that, and while it is
+ * due, it asks to pay the studio (headingTemplate).
+ */
 export function DepositFrame({
 	studioName,
+	view = null,
 	children,
 }: {
 	studioName: string;
+	/** The deposit, once read; null (or left out) while it loads and for a link that doesn't work. */
+	view?: Pick<DepositView, "state" | "amount"> | null;
 	children?: ReactNode;
 }) {
 	return (
 		<>
 			<main className="deposit">
 				<h1 className="deposit-title">
-					<Fill template={copy.heading} values={{ studio: studioName }} />
+					<Fill
+						template={headingTemplate(view)}
+						values={{ studio: studioName }}
+					/>
 				</h1>
 				{children}
 			</main>
@@ -176,7 +188,7 @@ export function DepositIntro({ view }: { view: DepositView }) {
 	);
 }
 
-/** Every state but `due`: its sentence (focusable: focus moves here after a send), and for `submitted` the amount and code. */
+/** Every state but `due`: its sentence (focusable: focus moves here after a send), and for `submitted` and a paid deposit the amount and code (receiptAmount). */
 export function StateMessage({
 	view,
 	studioName,
@@ -188,6 +200,7 @@ export function StateMessage({
 	received: string | null;
 	ref?: Ref<HTMLParagraphElement>;
 }) {
+	const amount = receiptAmount(view);
 	return (
 		<div className="deposit-state">
 			<p ref={ref} className="deposit-state-title" tabIndex={-1}>
@@ -196,10 +209,10 @@ export function StateMessage({
 					values={{ studio: studioName, date: received ?? "" }}
 				/>
 			</p>
-			{view.state === "submitted" ? (
+			{amount !== null ? (
 				<dl className="deposit-details">
 					<dt>{copy.states.amount}</dt>
-					<dd translate="no">{view.dueText}</dd>
+					<dd translate="no">{amount}</dd>
 					<dt>{copy.code.title}</dt>
 					<dd className="deposit-number" translate="no">
 						{view.referenceCode}

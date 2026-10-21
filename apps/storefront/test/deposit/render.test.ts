@@ -18,7 +18,11 @@ import {
 	ProofSummary,
 } from "../../src/deposit/components/notices.tsx";
 import { summaryItems } from "../../src/deposit/problems.ts";
-import { depositContact, depositView } from "../../src/deposit/view-model.ts";
+import {
+	type DepositView,
+	depositContact,
+	depositView,
+} from "../../src/deposit/view-model.ts";
 import { isAllowedHref } from "../../src/studio/links.ts";
 import { PAGE, page, QR_URL, SHELL } from "./fixtures.ts";
 import { attr, hrefs, tags, textOf } from "./html.ts";
@@ -90,6 +94,46 @@ describe("the frame", () => {
 		assert.match(
 			textOf(html),
 			/You pay मीना Ink directly\. Tattoo Drip runs this page for them and never handles your money\./,
+		);
+	});
+
+	test("the h1 names the deposit's state once it is read, and the studio before that and while due (TAT-106)", () => {
+		const h1 = (view: DepositView | null) => {
+			const html = render(
+				createElement(DepositFrame, { studioName: STUDIO, view }),
+			);
+			assert.equal(tags(html, "h1").length, 1);
+			return textOf(/<h1[^>]*>(.*?)<\/h1>/s.exec(html)?.[1] ?? "");
+		};
+		const nothingDue = {
+			...PAGE.deposit,
+			amount: 0,
+			amountText: "NPR 0",
+			due: 0,
+			dueText: "NPR 0",
+		};
+		assert.equal(h1(null), "Pay your deposit to Black Needle");
+		assert.equal(h1(depositView(PAGE)), "Pay your deposit to Black Needle");
+		assert.equal(
+			h1(depositView(page({ state: "submitted" }))),
+			"Screenshot sent",
+		);
+		assert.equal(h1(depositView(page({ state: "paid" }))), "Deposit paid");
+		assert.equal(
+			h1(depositView(page({ state: "paid", deposit: nothingDue }))),
+			"No deposit needed",
+		);
+		assert.equal(
+			h1(depositView(page({ state: "updating" }))),
+			"Your quote is being updated",
+		);
+		assert.equal(
+			h1(depositView(page({ state: "expired" }))),
+			"This quote has expired",
+		);
+		assert.equal(
+			h1(depositView(page({ state: "cancelled" }))),
+			"This booking was cancelled",
 		);
 	});
 
@@ -348,8 +392,27 @@ describe("the other states", () => {
 			assert.ok(message, String(overrides.state));
 			assert.match(textOf(message[1]), expected, String(overrides.state));
 			assert.match(message[0], /tabindex="-1"/i);
-			assert.doesNotMatch(html, /<dl/);
+			const receipt =
+				overrides.state === "paid" && overrides.deposit === undefined;
+			assert.equal(
+				tags(html, "dl").length,
+				receipt ? 1 : 0,
+				String(overrides.state),
+			);
 		}
+	});
+
+	test("paid is a receipt: the deposit's amount and the reference code (TAT-106)", () => {
+		const html = stateHtml({
+			state: "paid",
+			deposit: { ...PAGE.deposit, due: 0, dueText: "NPR 0" },
+		});
+		const text = textOf(html);
+		assert.match(text, /^Your deposit is paid\. Thank you!/);
+		assert.equal(tags(html, "dl").length, 1);
+		assert.match(html, /<dt>Amount<\/dt><dd translate="no">NPR 3,000<\/dd>/);
+		assert.match(text, /Reference code7K3M9Q/);
+		assert.doesNotMatch(text, /NPR 0/);
 	});
 
 	test("submitted says when it came, and repeats the amount and the code", () => {
