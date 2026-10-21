@@ -1,6 +1,6 @@
 # UX build plan (from the 2026-10-19 audit)
 
-Read with `ux-audit.md` (finding IDs such as P-1) and `ux-direction.md` (direction C, Stencil & Ink). Sizes are in points: 1 point is about half a day. Linear project: **E8 · UI & UX pass**. Tickets: WP-1 TAT-97, WP-2 TAT-98, WP-3 TAT-99, WP-4 TAT-100, WP-5 TAT-101, WP-6 TAT-102, WP-7 TAT-103, WP-8 TAT-104, WP-9 TAT-105, deposit headings TAT-106, WP-10 TAT-107, WP-11 TAT-108, WP-12 TAT-109, WP-13 TAT-110, WP-14 TAT-111, WP-15a TAT-112, WP-16 TAT-113, WP-17 TAT-114, WP-15b TAT-116, smaller items TAT-115.
+Read with `ux-audit.md` (finding IDs such as P-1) and `2026-10-20-ux-stencil-and-ink-design.md` (direction C, Stencil & Ink). Sizes are in points: 1 point is about half a day. Linear project: **E8 · UI & UX pass**. Tickets: WP-1 TAT-97, WP-2 TAT-98, WP-3 TAT-99, WP-4 TAT-100, WP-5 TAT-101, WP-6 TAT-102, WP-7 TAT-103, WP-8 TAT-104, WP-9 TAT-105, deposit headings TAT-106, WP-10 TAT-107, WP-11 TAT-108, WP-12 TAT-109, WP-13 TAT-110, WP-14 TAT-111, WP-15a TAT-112, WP-16 TAT-113, WP-17 TAT-114, WP-15b TAT-116, smaller items TAT-115.
 
 Rulings (2026-10-20, defaults accepted): direction C; cover and up to 6 work photos per artist before launch; Today home and the new tab bar; default theme follows the phone, then the user's choice; keep "Projects" and add piece titles; finish-a-project and healing check are in the pilot.
 

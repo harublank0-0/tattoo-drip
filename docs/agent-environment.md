@@ -96,7 +96,7 @@ Verified, by reading the installed opencode v2.0.32 binary and by printing the m
 - If a run fails as if `TURNSTILE_SECRET_KEY`, `STOREFRONT_SERVER_KEYS`, `TRUST_PROXY` or `ALERT_EMAILS` were set in the shell (they beat `.env.test`), tell the human: you cannot unset them for opencode.
 - A spec that imports a missing module makes Japa hang instead of failing, and a hung Japa ignores TERM: always run under `timeout -s KILL <seconds>` (as [testing](../apps/platform/docs/testing.md) says) and read the log's `Tests` line (`rg -n "Tests" <log>`), not the exit code.
 - A full run needs `queue_jobs` in `tattoo_drip_oc` empty, or `new_inquiry_alert_flow.spec.ts` fails. You cannot truncate it: ask the human ("Before you run opencode", step 6).
-- Every new `/t/:tenant` route needs a name and an isolation case in `tests/isolation/cases.ts`. Once the role table of TAT-30 is on main (it is in review; `rg TENANT_ROUTE_ROLES apps/platform` finds nothing until then) it also needs an entry in `TENANT_ROUTE_ROLES`. Read [testing](../apps/platform/docs/testing.md).
+- Every new `/t/:tenant` route needs a name and an isolation case in `tests/isolation/cases.ts`. It also needs an entry in `TENANT_ROUTE_ROLES` (`#modules/tenancy/access`, TAT-30), saying who may use it. Read [testing](../apps/platform/docs/testing.md).
 
 ## Generated files
 
