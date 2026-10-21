@@ -15,11 +15,11 @@ import {
 	MOVE_LABELS,
 	type ProjectPageProps,
 	type QuoteProps,
-	STATUS_LABELS,
 	suggestedDeposit,
 } from "~/components/projects";
 import ReferenceGrid from "~/components/references";
 import SessionsCard from "~/components/sessions_card";
+import StatusBadge from "~/components/status_badge";
 import { Badge } from "~/components/ui/badge";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -125,9 +125,7 @@ export default function ProjectShow({
 
 				<Card>
 					<CardContent className="flex flex-col gap-3">
-						<Badge variant="secondary">
-							{STATUS_LABELS[project.status] ?? project.status}
-						</Badge>
+						<StatusBadge status={project.status} />
 						<p className="text-sm whitespace-pre-line">{project.brief}</p>
 						<ContactLine text={contactedText} onMark={() => markContacted()} />
 						{moves.length > 0 && (

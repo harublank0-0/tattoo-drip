@@ -3,9 +3,11 @@ import { urlFor } from "~/client";
 import Page from "~/components/page";
 import {
 	ACTIVE_FILTERS,
+	PROOF_WAITING_STATUS,
 	type ProjectListProps,
 	STATUS_LABELS,
 } from "~/components/projects";
+import StatusBadge from "~/components/status_badge";
 import { Badge } from "~/components/ui/badge";
 import { buttonVariants } from "~/components/ui/button";
 import { useTenant } from "~/hooks/use-tenant";
@@ -82,8 +84,10 @@ export default function ProjectsIndex({
 									<span className="font-medium">
 										{project.clientName ?? "Unknown client"}
 									</span>
-									<span className="flex items-center gap-2">
-										{project.proofWaiting && <Badge>screenshot to check</Badge>}
+									<span className="flex flex-wrap items-center gap-2">
+										{project.proofWaiting && (
+											<StatusBadge status={PROOF_WAITING_STATUS} />
+										)}
 										{project.depositToSettle && (
 											<Badge variant="outline">deposit to settle</Badge>
 										)}
@@ -93,9 +97,7 @@ export default function ProjectsIndex({
 										{project.noSession && (
 											<Badge variant="destructive">no session</Badge>
 										)}
-										<Badge variant="secondary">
-											{STATUS_LABELS[project.status] ?? project.status}
-										</Badge>
+										<StatusBadge status={project.status} />
 									</span>
 								</span>
 								<span className="text-sm text-muted-foreground">

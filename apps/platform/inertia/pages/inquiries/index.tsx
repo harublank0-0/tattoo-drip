@@ -2,7 +2,7 @@ import { Link } from "@inertiajs/react";
 import { urlFor } from "~/client";
 import type { InboxListProps } from "~/components/inquiries";
 import Page from "~/components/page";
-import { Badge } from "~/components/ui/badge";
+import StatusBadge from "~/components/status_badge";
 import { buttonVariants } from "~/components/ui/button";
 import { useTenant } from "~/hooks/use-tenant";
 import AppLayout from "~/layouts/app";
@@ -72,17 +72,7 @@ export default function InboxIndex({
 										</span>
 									) : (
 										<span className="flex items-center gap-2 text-sm">
-											<Badge
-												variant={
-													inquiry.status === "accepted"
-														? "secondary"
-														: "outline"
-												}
-											>
-												{inquiry.status === "accepted"
-													? "Accepted"
-													: "Declined"}
-											</Badge>
+											<StatusBadge status={inquiry.status} />
 											<span className="text-muted-foreground">
 												{inquiry.decidedOn}
 											</span>

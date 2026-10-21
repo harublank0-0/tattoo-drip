@@ -12,10 +12,8 @@ import {
 	studioDate,
 } from "~/components/calendar";
 import Page from "~/components/page";
-import {
-	SESSION_KIND_LABELS,
-	SESSION_STATUS_LABELS,
-} from "~/components/projects";
+import { SESSION_KIND_LABELS } from "~/components/projects";
+import StatusBadge from "~/components/status_badge";
 import { Badge } from "~/components/ui/badge";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Field, FieldLabel } from "~/components/ui/field";
@@ -373,9 +371,7 @@ function SessionItem({
 					>
 						{project ? (project.clientName ?? "Unknown client") : hidden}
 					</span>
-					{session.status === "completed" && (
-						<Badge variant="outline">{SESSION_STATUS_LABELS.completed}</Badge>
-					)}
+					{session.status === "completed" && <StatusBadge status="completed" />}
 				</span>
 				<span className="text-sm">
 					{showArtist

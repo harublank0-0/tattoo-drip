@@ -3,8 +3,8 @@ import { urlFor } from "~/client";
 import type { ClientPageProps } from "~/components/clients";
 import Page from "~/components/page";
 import { KIND_LABELS, PAYMENT_STATUS_LABELS } from "~/components/payments";
-import { STATUS_LABELS } from "~/components/projects";
 import ReferenceGrid from "~/components/references";
+import StatusBadge from "~/components/status_badge";
 import { Badge } from "~/components/ui/badge";
 import { buttonVariants } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -120,9 +120,7 @@ export default function ClientShow({
 												{project.brief}
 											</span>
 											<span className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-												<Badge variant="secondary">
-													{STATUS_LABELS[project.status] ?? project.status}
-												</Badge>
+												<StatusBadge status={project.status} />
 												{project.artistName ?? "no artist"} ·{" "}
 												{project.createdText}
 											</span>

@@ -6,7 +6,7 @@ import MessageCard from "~/components/message_card";
 import type { ContactVia } from "~/components/messages";
 import Page from "~/components/page";
 import ReferenceGrid from "~/components/references";
-import { Badge } from "~/components/ui/badge";
+import StatusBadge from "~/components/status_badge";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Field, FieldError, FieldLabel } from "~/components/ui/field";
@@ -81,9 +81,7 @@ export default function InquiryShow({
 					<Card>
 						<CardContent className="flex flex-wrap items-center justify-between gap-3 text-sm">
 							<span className="flex items-center gap-2">
-								<Badge variant="secondary">
-									{inquiry.status === "accepted" ? "Accepted" : "Declined"}
-								</Badge>
+								<StatusBadge status={inquiry.status} />
 								{inquiry.decidedOn}
 							</span>
 							{projectId && (
