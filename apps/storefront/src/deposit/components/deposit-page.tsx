@@ -248,19 +248,29 @@ export function DepositIntro({ view }: { view: DepositView }) {
 	);
 }
 
-/** Every state but `due`: its sentence (focusable: focus moves here after a send), and for `submitted` and a paid deposit the amount and code (receiptAmount). */
+/**
+ * Every state but `due`: its sentence (focusable: focus moves here after a
+ * send), and for `submitted` and a paid deposit the amount and code
+ * (receiptAmount). A paid page adds the project's next session (TAT-110):
+ * `sessionStart` is its start in the studio's timezone (formatSessionStart),
+ * null when the browser doesn't know the zone, and then the rows are left out
+ * rather than shown in a wrong time.
+ */
 export function StateMessage({
 	view,
 	studioName,
 	received,
+	sessionStart,
 	ref,
 }: {
 	view: DepositView;
 	studioName: string;
 	received: string | null;
+	sessionStart: string | null;
 	ref?: Ref<HTMLParagraphElement>;
 }) {
 	const amount = receiptAmount(view);
+	const session = view.session && sessionStart ? view.session : null;
 	return (
 		<div className="deposit-state">
 			<p ref={ref} className="deposit-state-title" tabIndex={-1}>
@@ -269,14 +279,32 @@ export function StateMessage({
 					values={{ studio: studioName, date: received ?? "" }}
 				/>
 			</p>
-			{amount !== null ? (
+			{amount !== null || session ? (
 				<dl className="deposit-details">
-					<dt>{copy.states.amount}</dt>
-					<dd translate="no">{amount}</dd>
-					<dt>{copy.code.title}</dt>
-					<dd className="deposit-number" translate="no">
-						{view.referenceCode}
-					</dd>
+					{amount !== null ? (
+						<>
+							<dt>{copy.states.amount}</dt>
+							<dd translate="no">{amount}</dd>
+							<dt>{copy.code.title}</dt>
+							<dd className="deposit-number" translate="no">
+								{view.referenceCode}
+							</dd>
+						</>
+					) : null}
+					{session ? (
+						<>
+							<dt>{copy.states.session}</dt>
+							<dd>
+								<time dateTime={session.startsAt}>{sessionStart}</time>
+							</dd>
+							{session.artistName ? (
+								<>
+									<dt>{copy.states.artist}</dt>
+									<dd dir="auto">{session.artistName}</dd>
+								</>
+							) : null}
+						</>
+					) : null}
 				</dl>
 			) : null}
 		</div>

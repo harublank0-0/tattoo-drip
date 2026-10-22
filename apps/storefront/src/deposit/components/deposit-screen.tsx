@@ -14,6 +14,7 @@ import {
 	depositContact,
 	depositView,
 	formatReceived,
+	formatSessionStart,
 	selectedMethod,
 	todayIn,
 } from "../view-model.ts";
@@ -166,6 +167,11 @@ export function DepositLoaded({
 						view={view}
 						studioName={shell.studioName}
 						received={formatReceived(view.proofSubmittedAt, shell.timezone)}
+						sessionStart={
+							view.session
+								? formatSessionStart(view.session.startsAt, shell.timezone)
+								: null
+						}
 					/>
 				) : null}
 			</StateRegion>

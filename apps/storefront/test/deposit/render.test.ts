@@ -71,14 +71,20 @@ const radiosOf = (html: string, name: string) =>
 const stateHtml = (
 	overrides: Partial<DepositPage>,
 	received: string | null = null,
+	sessionStart: string | null = null,
 ) =>
 	render(
 		createElement(StateMessage, {
 			view: depositView(page(overrides)),
 			studioName: STUDIO,
 			received,
+			sessionStart,
 		}),
 	);
+
+const SESSION_AT = "2026-10-24T05:15:00.000Z";
+const SESSION_TEXT = "Sat 24 Oct 2026, 11:00 am";
+const PAID = { ...PAGE.deposit, due: 0, dueText: "NPR 0" };
 
 /** Every block, for the checks that hold everywhere. */
 function everything(): string {
@@ -669,6 +675,95 @@ describe("the other states", () => {
 		assert.match(html, /<dt>Amount<\/dt><dd translate="no">NPR 3,000<\/dd>/);
 		assert.match(text, /Reference code7K3M9Q/);
 		assert.doesNotMatch(text, /NPR 0/);
+	});
+
+	test("a paid receipt adds the next session's date and time, and its artist (TAT-110)", () => {
+		const html = stateHtml(
+			{
+				state: "paid",
+				deposit: PAID,
+				nextSession: { startsAt: SESSION_AT, artistName: "आरव श्रेष्ठ" },
+			},
+			null,
+			SESSION_TEXT,
+		);
+
+		assert.equal(tags(html, "dl").length, 1);
+		assert.match(
+			html,
+			/<dt>Amount<\/dt><dd translate="no">NPR 3,000<\/dd><dt>Reference code<\/dt><dd class="deposit-number" translate="no">7K3M9Q<\/dd><dt>Your session<\/dt><dd><time dateTime="2026-10-24T05:15:00.000Z">Sat 24 Oct 2026, 11:00 am<\/time><\/dd><dt>Artist<\/dt><dd dir="auto">आरव श्रेष्ठ<\/dd>/,
+		);
+	});
+
+	test("no artist name, no Artist row; no session or an unknown zone, the receipt as it was", () => {
+		const base = { state: "paid", deposit: PAID } as const;
+		const noArtist = stateHtml(
+			{ ...base, nextSession: { startsAt: SESSION_AT, artistName: null } },
+			null,
+			SESSION_TEXT,
+		);
+		assert.match(textOf(noArtist), /Your session.*Sat 24 Oct 2026, 11:00 am/);
+		assert.doesNotMatch(textOf(noArtist), /Artist/);
+
+		const without = stateHtml(base);
+		const unknownZone = stateHtml(
+			{
+				...base,
+				nextSession: { startsAt: SESSION_AT, artistName: "Aarav" },
+			},
+			null,
+			null,
+		);
+		assert.equal(unknownZone, without);
+		assert.doesNotMatch(without, /Your session|<time/);
+	});
+
+	test("a paid deposit of nothing with a session shows the session rows alone", () => {
+		const html = stateHtml(
+			{
+				state: "paid",
+				deposit: {
+					...PAGE.deposit,
+					amount: 0,
+					amountText: "NPR 0",
+					due: 0,
+					dueText: "NPR 0",
+				},
+				nextSession: { startsAt: SESSION_AT, artistName: "Aarav" },
+			},
+			null,
+			SESSION_TEXT,
+		);
+
+		assert.equal(tags(html, "dl").length, 1);
+		assert.doesNotMatch(textOf(html), /Amount|Reference code/);
+		assert.match(
+			textOf(html),
+			/^No deposit is needed for this booking\.Your sessionSat 24 Oct 2026, 11:00 amArtistAarav$/,
+		);
+	});
+
+	test("no other state shows a session, even if the page carries one", () => {
+		for (const state of [
+			"submitted",
+			"updating",
+			"expired",
+			"cancelled",
+		] as const) {
+			const withSession = stateHtml(
+				{
+					state,
+					nextSession: { startsAt: SESSION_AT, artistName: "Aarav" },
+				},
+				"18 Oct 2026, 2:05 pm",
+				SESSION_TEXT,
+			);
+			assert.equal(
+				withSession,
+				stateHtml({ state }, "18 Oct 2026, 2:05 pm", null),
+				state,
+			);
+		}
 	});
 
 	test("submitted says when it came, and repeats the amount and the code", () => {
