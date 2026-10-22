@@ -27,6 +27,9 @@ export const COVER = {
 	alt: null,
 };
 
+/** What the cover shows, when the API gave it a description. */
+export const COVER_ALT = "The front of Black Needle on Durbar Marg";
+
 /** A studio that set everything: logo, cover, a red accent, the serif face, the inquiry first. */
 export const BRANDED = {
 	theme: "stencil-and-ink",

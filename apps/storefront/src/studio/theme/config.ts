@@ -1,4 +1,5 @@
 import { safeImageUrl } from "../links.ts";
+import { cleanLine } from "../text.ts";
 
 /**
  * A studio's theme (TAT-54): the API's StorefrontConfiguration as the page
@@ -36,11 +37,16 @@ export const FONT_KEYS = ["eczar", "serif", "sans"] as const;
 export type FontKey = (typeof FONT_KEYS)[number];
 export const DEFAULT_FONT: FontKey = "eczar";
 
-/** A logo or cover image: a checked URL and its stored size. */
+/** A logo: a checked URL and its stored size. It is decoration: its alt text is always empty. */
 export interface BrandImage {
 	readonly src: string;
 	readonly width: number;
 	readonly height: number;
+}
+
+/** The cover: a BrandImage and its description, "" when the API gave none. A photograph, so it may say what it shows. */
+export interface CoverImage extends BrandImage {
+	readonly alt: string;
 }
 
 export interface ThemeConfig {
@@ -54,7 +60,7 @@ export interface ThemeConfig {
 	readonly font: FontKey;
 	readonly logo: BrandImage | null;
 	/** The cover image above the hero: TAT-116's cover photo, once the platform serves it here. */
-	readonly heroImage: BrandImage | null;
+	readonly heroImage: CoverImage | null;
 }
 
 /** What every studio gets today: the Stencil & Ink page as TAT-97 and TAT-105 built it. */
@@ -135,7 +141,8 @@ const MAX_IMAGE_SIDE = 10_000;
 
 /**
  * A logo or cover image from the API's `Image` (url, width, height; `alt` is
- * not read: both are decoration beside the studio's name), or null. The URL
+ * not read here: a logo is decoration beside the studio's name, and
+ * readCoverImage reads the cover's), or null. The URL
  * has no space or control character, passes safeImageUrl (http or https, no
  * credentials, at most 2048 characters) and is on exactly `imageOrigin`, the
  * API's origin: the same scheme, host and port. That one comparison is the
@@ -157,6 +164,29 @@ export function readBrandImage(
 	if (parsed.origin !== originOf(imageOrigin)) return null;
 	if (!isImageSide(width) || !isImageSide(height)) return null;
 	return { src, width, height };
+}
+
+/** The longest cover description kept, in characters; a longer one is no description. */
+const MAX_ALT_CHARACTERS = 300;
+
+/**
+ * The cover from the API's `Image`: readBrandImage's checks, and its `alt` as
+ * plain text on one line (cleanLine, as names are), or "" when it is missing,
+ * not text, blank or longer than 300 characters. React escapes it as an
+ * attribute value, so it can only ever be text.
+ */
+export function readCoverImage(
+	value: unknown,
+	imageOrigin: string | null,
+): CoverImage | null {
+	const image = readBrandImage(value, imageOrigin);
+	if (image === null) return null;
+	const raw = own(value, "alt");
+	const alt = typeof raw === "string" ? (cleanLine(raw) ?? "") : "";
+	return {
+		...image,
+		alt: Array.from(alt).length > MAX_ALT_CHARACTERS ? "" : alt,
+	};
 }
 
 function originOf(value: string): string | null {
@@ -198,6 +228,6 @@ export function parseThemeConfig(
 		accentDark: readHexColor(own(colors, "accentDark")),
 		font: readFontKey(own(branding, "font")),
 		logo: readBrandImage(own(branding, "logo"), imageOrigin),
-		heroImage: readBrandImage(own(branding, "heroImage"), imageOrigin),
+		heroImage: readCoverImage(own(branding, "heroImage"), imageOrigin),
 	};
 }

@@ -5,6 +5,7 @@ import {
 	FONT_KEYS,
 	parseThemeConfig,
 	readBrandImage,
+	readCoverImage,
 	readFontKey,
 	readHexColor,
 	readSections,
@@ -348,6 +349,94 @@ describe("readBrandImage (TAT-54)", () => {
 	});
 });
 
+describe("readCoverImage (TAT-54)", () => {
+	const API = "https://api.example.com";
+	const COVER =
+		"https://api.example.com/uploads/tenants/t/cover_photo/cover.jpg";
+	const cover = (alt: unknown) => ({
+		url: COVER,
+		width: 2048,
+		height: 1024,
+		alt,
+	});
+
+	test("the cover keeps its description, as one line of plain text", () => {
+		assert.deepEqual(
+			readCoverImage(cover("The front of Black Needle on Durbar Marg"), API),
+			{
+				src: COVER,
+				width: 2048,
+				height: 1024,
+				alt: "The front of Black Needle on Durbar Marg",
+			},
+		);
+		assert.equal(
+			readCoverImage(cover("  A\n  photo\tof\u0000 the \u202Estudio  "), API)
+				?.alt,
+			"A photo of the studio",
+		);
+		assert.equal(
+			readCoverImage(cover("कालो सुई स्टुडियो"), API)?.alt,
+			"कालो सुई स्टुडियो",
+		);
+		assert.equal(
+			readCoverImage(cover('"><script>alert(1)</script>'), API)?.alt,
+			'"><script>alert(1)</script>',
+			"kept as text: React escapes it",
+		);
+	});
+
+	test("no description, or one that is not text, is an empty alt", () => {
+		for (const alt of [
+			null,
+			undefined,
+			42,
+			true,
+			{},
+			["x"],
+			"",
+			"   ",
+			"\u0000\n\t",
+			"x".repeat(301),
+		]) {
+			assert.equal(readCoverImage(cover(alt), API)?.alt, "", String(alt));
+		}
+		assert.equal(
+			readCoverImage({ url: COVER, width: 2048, height: 1024 }, API)?.alt,
+			"",
+			"no alt at all",
+		);
+		assert.equal(readCoverImage(cover("x".repeat(300)), API)?.alt.length, 300);
+	});
+
+	test("the same checks as any brand image", () => {
+		assert.equal(
+			readCoverImage(
+				{ ...cover("x"), url: "https://evil.example/cover.jpg" },
+				API,
+			),
+			null,
+		);
+		assert.equal(readCoverImage({ ...cover("x"), width: 0 }, API), null);
+		assert.equal(readCoverImage(cover("x"), null), null);
+		assert.equal(readCoverImage("not an image", API), null);
+	});
+
+	test("the logo's description is never read", () => {
+		const parsed = parseThemeConfig(
+			{
+				branding: {
+					logo: { url: COVER, width: 600, height: 200, alt: "Black Needle" },
+					heroImage: cover("The studio"),
+				},
+			},
+			API,
+		);
+		assert.deepEqual(parsed.logo, { src: COVER, width: 600, height: 200 });
+		assert.equal(parsed.heroImage?.alt, "The studio");
+	});
+});
+
 describe("parseThemeConfig (TAT-54)", () => {
 	const API = "https://api.example.com";
 	const LOGO = {
@@ -411,7 +500,7 @@ describe("parseThemeConfig (TAT-54)", () => {
 			accentDark: "#fca5a5",
 			font: "serif",
 			logo: { src: LOGO.url, width: 600, height: 200 },
-			heroImage: { src: COVER.url, width: 2048, height: 1024 },
+			heroImage: { src: COVER.url, width: 2048, height: 1024, alt: "" },
 		});
 	});
 
@@ -438,6 +527,7 @@ describe("parseThemeConfig (TAT-54)", () => {
 			src: COVER.url,
 			width: 2048,
 			height: 1024,
+			alt: "",
 		});
 		assert.deepEqual(parsed.sections, ["inquiry", "artists"]);
 	});

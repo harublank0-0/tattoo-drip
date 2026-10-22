@@ -47,7 +47,7 @@ const BRANDED_THEME = {
 	accentDark: null,
 	font: "serif",
 	logo: { src: LOGO.url, width: 600, height: 200 },
-	heroImage: { src: COVER.url, width: 2048, height: 1024 },
+	heroImage: { src: COVER.url, width: 2048, height: 1024, alt: "" },
 };
 
 describe("the seam: storefrontInput (TAT-54)", () => {

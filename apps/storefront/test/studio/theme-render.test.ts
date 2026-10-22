@@ -26,6 +26,7 @@ import { firstDifference, SNAPSHOT_FILE } from "./snapshot.ts";
 import {
 	BRANDED,
 	COVER,
+	COVER_ALT,
 	HOSTILE,
 	IMAGE_ORIGIN,
 	LOGO,
@@ -162,6 +163,43 @@ describe("a studio's logo and cover (TAT-54)", () => {
 			html.includes(
 				`<main class="page"><div class="profile-cover"><img src="${COVER.url}" width="2048" height="1024" alt="" loading="eager" decoding="async" fetchPriority="high"/></div><header class="profile">`,
 			),
+		);
+	});
+
+	test("the cover says what it shows when the API described it; the logo stays decoration", () => {
+		const branding = {
+			...BRANDED.branding,
+			logo: { ...LOGO, alt: "Black Needle logo" },
+			heroImage: { ...COVER, alt: COVER_ALT },
+		};
+		const html = studioHtml(withStorefront({ ...BRANDED, branding }));
+		assertSafePage(html, BRAND_PAGE);
+		assert.ok(
+			html.includes(
+				`<img src="${COVER.url}" width="2048" height="1024" alt="${COVER_ALT}" loading="eager"`,
+			),
+		);
+		assert.ok(
+			html.includes(`src="${LOGO.url}" width="600" height="200" alt=""`),
+		);
+		assert.doesNotMatch(html, /Black Needle logo/);
+	});
+
+	test("a hostile description is text in an attribute, nothing else", () => {
+		const html = studioHtml(
+			withStorefront({
+				...BRANDED,
+				branding: {
+					...BRANDED.branding,
+					heroImage: { ...COVER, alt: '"><script>alert(1)</script>' },
+				},
+			}),
+		);
+		assertSafePage(html, BRAND_PAGE);
+		assert.doesNotMatch(html, /<script/);
+		assert.match(
+			html,
+			/alt="&quot;&gt;&lt;script&gt;alert\(1\)&lt;\/script&gt;"/,
 		);
 	});
 
