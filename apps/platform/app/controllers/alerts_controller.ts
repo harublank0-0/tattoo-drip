@@ -8,6 +8,8 @@ import {
 	alertTimeText,
 } from "#modules/notifications/alerts";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import AlertContentService from "#modules/notifications/services/alert_content_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import AlertService from "#modules/notifications/services/alert_service";
 
 /**
@@ -17,7 +19,10 @@ import AlertService from "#modules/notifications/services/alert_service";
  */
 @inject()
 export default class AlertsController {
-	constructor(private alerts: AlertService) {}
+	constructor(
+		private alerts: AlertService,
+		private content: AlertContentService,
+	) {}
 
 	async index(ctx: HttpContext) {
 		const { tenant, membership } = tenantContext(ctx);
@@ -31,11 +36,12 @@ export default class AlertsController {
 			page,
 		);
 		const isOwner = membership.role === "owner";
+		const content = await this.content.forAlerts(tenant, membership, alerts);
 
 		return ctx.inertia.render("alerts/index", {
 			alerts: alerts.map((alert) => ({
 				id: alert.id,
-				...alertCopy(alert.kind, isOwner),
+				...alertCopy(alert.kind, isOwner, content.get(alert.id)),
 				whenText: alertTimeText(alert.createdAt, tenant.timezone),
 				unread: alert.readAt === null,
 			})),

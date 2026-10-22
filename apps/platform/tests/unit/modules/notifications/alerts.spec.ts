@@ -255,3 +255,136 @@ test.group("deposit-proof alerts (TAT-88)", () => {
 		);
 	});
 });
+
+test.group("alert details (TAT-102)", () => {
+	const inquiry = (clientName: string, idea: string) => ({
+		kind: "new_inquiry" as const,
+		clientName,
+		idea,
+	});
+	const proof = (clientName: string, amountText: string | null) => ({
+		kind: "deposit_proof" as const,
+		clientName,
+		amountText,
+	});
+
+	test("a new inquiry reads as the client's first name and the start of the idea", ({
+		assert,
+	}) => {
+		const content = inquiry("Sita Thapa", "A koi fish swimming up my calf");
+
+		assert.deepEqual(alertCopy("new_inquiry", true, content), {
+			title: "New inquiry",
+			detail: "Sita: A koi fish swimming up my calf",
+		});
+		// The asked-for artist hears the same words the email gave them.
+		assert.deepEqual(alertCopy("new_inquiry", false, content), {
+			title: "A new inquiry asks for you",
+			detail: "Sita: A koi fish swimming up my calf",
+		});
+	});
+
+	test("a long idea is cut at a word after 80 characters, with an ellipsis, on one line", ({
+		assert,
+	}) => {
+		const idea =
+			"A koi fish swimming up my calf with a few waves and some lotus flowers around it,\nshaded softly\tin grey";
+		const { detail } = alertCopy("new_inquiry", true, inquiry("Sita", idea));
+
+		assert.equal(
+			detail,
+			"Sita: A koi fish swimming up my calf with a few waves and some lotus flowers around…",
+		);
+		assert.notMatch(detail, /[\n\t]/);
+		assert.equal(
+			alertCopy("new_inquiry", true, inquiry("Sita", "x".repeat(81))).detail,
+			`Sita: ${"x".repeat(80)}…`,
+		);
+	});
+
+	test("a Devanagari name and idea stay whole: the first name is the first word and no syllable is cut", ({
+		assert,
+	}) => {
+		const words = alertCopy(
+			"new_inquiry",
+			true,
+			inquiry("सीता थापा", "नमस्ते ".repeat(30)),
+		).detail;
+		assert.equal(words, `सीता: ${Array(20).fill("नमस्ते").join(" ")}…`);
+
+		// No space to cut at: the cut falls between syllables, never inside one.
+		const joined = alertCopy(
+			"new_inquiry",
+			true,
+			inquiry("सीता थापा", "नमस्ते".repeat(40)),
+		).detail;
+		assert.equal(joined, `सीता: ${"नमस्ते".repeat(26)}नम…`);
+	});
+
+	test("a blank name reads as 'A client'; a blank idea keeps the old line after the name", ({
+		assert,
+	}) => {
+		assert.equal(
+			alertCopy("new_inquiry", true, inquiry("   ", "A koi fish")).detail,
+			"A client: A koi fish",
+		);
+		assert.equal(
+			alertCopy("new_inquiry", true, inquiry("Sita Thapa", " \n ")).detail,
+			"Sita: Open it in the inbox.",
+		);
+	});
+
+	test("a deposit screenshot reads as the first name and the amount for an owner", ({
+		assert,
+	}) => {
+		assert.deepEqual(
+			alertCopy("deposit_proof", true, proof("Sita Thapa", "NPR 3,000")),
+			{ title: "Deposit screenshot to check", detail: "Sita: NPR 3,000" },
+		);
+		assert.deepEqual(
+			alertCopy("deposit_proof", true, proof("सीता थापा", "NPR 1,50,000")),
+			{
+				title: "Deposit screenshot to check",
+				detail: "सीता: NPR 1,50,000",
+			},
+		);
+		// Without an amount the owner still gets the name and the pointer.
+		assert.equal(
+			alertCopy("deposit_proof", true, proof("Sita", null)).detail,
+			"Sita: Open the project's Payments card.",
+		);
+	});
+
+	test("an artist's deposit alert names the client as the payer, never as the owner, and never shows an amount", ({
+		assert,
+	}) => {
+		assert.deepEqual(
+			alertCopy("deposit_proof", false, proof("Sita Thapa", "NPR 3,000")),
+			{
+				title: "A deposit screenshot for your project",
+				detail: "Deposit from Sita: an owner checks it on the Payments card.",
+			},
+		);
+		assert.equal(
+			alertCopy("deposit_proof", false, proof("  ", null)).detail,
+			"Deposit from A client: an owner checks it on the Payments card.",
+		);
+	});
+
+	test("without content, or with content of the other kind, the line is the old one", ({
+		assert,
+	}) => {
+		assert.equal(
+			alertCopy("new_inquiry", true, null).detail,
+			"Open it in the inbox.",
+		);
+		assert.equal(
+			alertCopy("deposit_proof", false, undefined).detail,
+			"An owner checks it on the Payments card.",
+		);
+		assert.equal(
+			alertCopy("new_inquiry", true, proof("Sita", "NPR 3,000")).detail,
+			"Open it in the inbox.",
+		);
+	});
+});

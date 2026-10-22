@@ -328,3 +328,43 @@ test.group("ProjectService.findLive and lockLive", (group) => {
 		assert.isNull(await lock(gone.id));
 	});
 });
+
+test.group("DepositService.amountsFor (TAT-102)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("each payment's amount by id, for this studio's payments only", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("amounts-a-102");
+		const { tenant: other } = await studioWithOwner("amounts-b-102");
+		const { project } = await quotedProject(tenant);
+		const { project: theirProject } = await quotedProject(other);
+		const mine = await inTenant(tenant, async () => [
+			await makePayment(tenant, project, { amount: 300_000 }),
+			await makePayment(tenant, project, { amount: 1_250_050 }),
+		]);
+		const theirs = await inTenant(other, () =>
+			makePayment(other, theirProject, { amount: 700_000 }),
+		);
+
+		const amounts = await inTenant(tenant, () =>
+			deposits.amountsFor(tenant, [
+				...mine.map(({ id }) => id),
+				theirs.id,
+				"0195f3a0-0000-7000-8000-000000000102",
+			]),
+		);
+
+		assert.deepEqual(
+			[...amounts].sort(([, a], [, b]) => Number(a) - Number(b)),
+			[
+				[mine[0].id, 300_000],
+				[mine[1].id, 1_250_050],
+			],
+		);
+		assert.equal(
+			(await inTenant(tenant, () => deposits.amountsFor(tenant, []))).size,
+			0,
+		);
+	});
+});

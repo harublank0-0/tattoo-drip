@@ -138,6 +138,42 @@ test.group("InquiryService reads", (group) => {
 		});
 	});
 
+	test("findMany gives the tenant's live inquiries among the ids, nothing for the rest (TAT-102)", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("many-a-102", "Many A");
+		const { tenant: other } = await studioWithOwner("many-b-102", "Many B");
+		const theirs = await inTenant(other, () => inquiryIn(other));
+
+		await inTenant(tenant, async () => {
+			const first = await inquiryIn(tenant, { idea: "first" });
+			const second = await inquiryIn(tenant, { idea: "second" });
+			await inquiryIn(tenant, { idea: "not asked for" });
+			const gone = await inquiryIn(tenant, { idea: "deleted" });
+			await gone.softDelete();
+
+			const found = await inquiries.findMany(tenant, [
+				first.id,
+				second.id,
+				gone.id,
+				theirs.id,
+				randomUUID(),
+			]);
+
+			assert.deepEqual(ideasOf(found).sort(), ["first", "second"]);
+			assert.deepEqual(await inquiries.findMany(tenant, []), []);
+
+			// Only what the Alerts list reads: never the phone or the email.
+			const [row] = await inquiries.findMany(tenant, [first.id]);
+			assert.equal(row.contactName, first.contactName);
+			assert.equal(row.preferredArtistId, null);
+			const loaded: Partial<Inquiry> = row;
+			assert.isString(first.contactPhone);
+			assert.isUndefined(loaded.contactPhone);
+			assert.isUndefined(loaded.contactEmail);
+		});
+	});
+
 	test("images by inquiry or by project, in order; imageCounts per inquiry", async ({
 		assert,
 	}) => {
