@@ -9,6 +9,7 @@ import type Inquiry from "#modules/inquiries/models/inquiry";
 import InquiryService from "#modules/inquiries/services/inquiry_service";
 import { ALERT_EXCERPT_LENGTH, excerpt } from "#modules/notifications/alerts";
 import { daysAgoText, lastContactText } from "#modules/projects/contact";
+import type { WaitingView } from "#modules/projects/project_list";
 import { todayIn } from "#modules/projects/quotes";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import WaitingService, {
@@ -44,24 +45,29 @@ type Row = {
 };
 type More = {
 	route: "tenant.inbox.index" | "tenant.projects.index";
-	status: string | null;
+	/** The Projects list view that holds exactly the group (`?waiting=`); null for the Inbox. */
+	waiting: WaitingView | null;
 } | null;
 type Group = { key: TodayGroupKey; count: number; rows: Row[]; more: More };
 
 /**
  * Groups that show every row, never five and a link: an owner's screenshots to check. An
- * unresolved payment is never hidden behind "See all", and the Projects list can't show
- * the closed (withdrawn) projects that sit in this group (TAT-109 adds a way to list them).
+ * unresolved payment is never hidden behind "See all". The Projects list can still list them
+ * (`?waiting=proofs`, withdrawn projects included), because it reads WaitingService.work too.
  */
 const UNCAPPED_GROUPS: readonly TodayGroupKey[] = ["proofs"];
 
-/** Where "See all" goes for a capped group, and the one project status that holds the whole group. */
+/**
+ * Where "See all" goes for a capped group: the Inbox for requests, else the Projects
+ * list's view that holds exactly the group (TAT-109), so the page shows the same rows in
+ * the same order and its count is the count on the link.
+ */
 const SEE_ALL: Partial<Record<TodayGroupKey, Exclude<More, null>>> = {
-	requests: { route: "tenant.inbox.index", status: null },
-	prices: { route: "tenant.projects.index", status: "reviewing" },
-	ending: { route: "tenant.projects.index", status: null },
-	deposits: { route: "tenant.projects.index", status: "deposit_pending" },
-	sessions: { route: "tenant.projects.index", status: null },
+	requests: { route: "tenant.inbox.index", waiting: null },
+	prices: { route: "tenant.projects.index", waiting: "prices" },
+	ending: { route: "tenant.projects.index", waiting: "ending" },
+	deposits: { route: "tenant.projects.index", waiting: "deposits" },
+	sessions: { route: "tenant.projects.index", waiting: "sessions" },
 };
 
 /**
@@ -216,7 +222,10 @@ export default class TodayController {
 				rows: shown.waiting.map((item) => projectRow(item, true)),
 				more:
 					work.onClient.length > shown.waiting.length
-						? ({ route: "tenant.projects.index", status: null } as const)
+						? ({
+								route: "tenant.projects.index",
+								waiting: "on_client",
+							} as const)
 						: null,
 			},
 			setup,

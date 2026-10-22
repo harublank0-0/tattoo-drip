@@ -5,7 +5,7 @@ import * as todayModule from "../../../inertia/components/today.js";
 type Section = "needsYou" | "sessions" | "waiting";
 type More = {
 	route: "tenant.inbox.index" | "tenant.projects.index";
-	status: string | null;
+	waiting: string | null;
 };
 type TodayModule = {
 	GROUP_TITLES: Record<string, string>;
@@ -32,14 +32,14 @@ test.group("Today copy", () => {
 		assert.equal(
 			moreText({
 				count: 7,
-				more: { route: "tenant.inbox.index", status: null },
+				more: { route: "tenant.inbox.index", waiting: null },
 			}),
 			"See all 7 in the Inbox",
 		);
 		assert.equal(
 			moreText({
 				count: 12,
-				more: { route: "tenant.projects.index", status: "reviewing" },
+				more: { route: "tenant.projects.index", waiting: "prices" },
 			}),
 			"See all 12 on Projects",
 		);

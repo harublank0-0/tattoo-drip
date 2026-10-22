@@ -58,7 +58,7 @@ type Group = {
 		meta: string | null;
 		target: { route: string; id: string; hash: string | null };
 	}[];
-	more: { route: string; status: string | null } | null;
+	more: { route: string; waiting: string | null } | null;
 };
 const groupsOf = (props: { needsYou?: unknown }) => props.needsYou as Group[];
 const keysOf = (props: { needsYou?: unknown }) =>
@@ -244,18 +244,77 @@ test.group("Today", (group) => {
 		);
 		assert.deepEqual(prices.more, {
 			route: "tenant.projects.index",
-			status: "reviewing",
+			waiting: "prices",
 		});
 		const requests = groupOf(props, "requests") as Group;
 		assert.equal(requests.count, 7);
 		assert.lengthOf(requests.rows, 5);
 		assert.deepEqual(requests.more, {
 			route: "tenant.inbox.index",
-			status: null,
+			waiting: null,
 		});
 		assert.deepEqual(
 			requests.rows.map(({ name }) => name),
 			["Asker 0", "Asker 1", "Asker 2", "Asker 3", "Asker 4"],
+		);
+	});
+
+	test("See all opens the same rows on Projects", async ({
+		client,
+		assert,
+	}) => {
+		const s = await studio("today-seeall-109");
+		await inTenant(s.tenant, () => seedGroups(s.tenant, null, 6));
+
+		const today = await propsOf(client, "today-seeall-109", s.owner);
+
+		// Every project group that has a See all (a group with five rows or fewer has none).
+		const withMore = groupsOf(today).filter(
+			({ key, more }) => key !== "requests" && more !== null,
+		);
+		assert.isAbove(withMore.length, 0);
+		for (const group of withMore) {
+			assert.deepEqual(
+				group.more,
+				{ route: "tenant.projects.index", waiting: group.key },
+				group.key,
+			);
+			const opened = await client
+				.get(`/t/today-seeall-109/projects?waiting=${group.key}`)
+				.withInertia()
+				.loginAs(s.owner);
+			opened.assertStatus(200);
+			// The page the link opens: the count on the link, and the five rows Today showed first.
+			assert.equal(opened.inertiaProps.page.total, group.count, group.key);
+			assert.deepEqual(
+				opened.inertiaProps.projects
+					.slice(0, group.rows.length)
+					.map(({ id }: { id: string }) => id),
+				group.rows.map(({ id }) => id),
+				group.key,
+			);
+		}
+		// Requests still go to the Inbox.
+		assert.deepEqual((groupOf(today, "requests") as Group).more, {
+			route: "tenant.inbox.index",
+			waiting: null,
+		});
+
+		const waitingOn = today.waiting;
+		assert.deepEqual(waitingOn.more, {
+			route: "tenant.projects.index",
+			waiting: "on_client",
+		});
+		const opened = await client
+			.get("/t/today-seeall-109/projects?waiting=on_client")
+			.withInertia()
+			.loginAs(s.owner);
+		assert.equal(opened.inertiaProps.page.total, waitingOn.count);
+		assert.deepEqual(
+			opened.inertiaProps.projects
+				.slice(0, waitingOn.rows.length)
+				.map(({ id }: { id: string }) => id),
+			waitingOn.rows.map(({ id }: { id: string }) => id),
 		);
 	});
 
