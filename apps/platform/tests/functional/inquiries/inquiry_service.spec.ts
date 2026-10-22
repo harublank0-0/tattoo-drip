@@ -162,6 +162,15 @@ test.group("InquiryService reads", (group) => {
 
 			assert.deepEqual(ideasOf(found).sort(), ["first", "second"]);
 			assert.deepEqual(await inquiries.findMany(tenant, []), []);
+
+			// Only what the Alerts list reads: never the phone or the email.
+			const [row] = await inquiries.findMany(tenant, [first.id]);
+			assert.equal(row.contactName, first.contactName);
+			assert.equal(row.preferredArtistId, null);
+			const loaded: Partial<Inquiry> = row;
+			assert.isString(first.contactPhone);
+			assert.isUndefined(loaded.contactPhone);
+			assert.isUndefined(loaded.contactEmail);
 		});
 	});
 

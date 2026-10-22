@@ -163,8 +163,10 @@ export type AlertContent =
  * (`excerpt`, so a Devanagari syllable is never cut) or, for a deposit
  * screenshot, its amount. Never a phone number. Without `content`, or when
  * the part after the name is unknown (a blank idea, no amount for an
- * artist), the fixed line stays: "Sita: Open it in the inbox.". Content of
- * another kind than the alert's is ignored.
+ * owner), the fixed line stays after the name: "Sita: Open it in the
+ * inbox.". An artist's deposit alert never has an amount and says whose
+ * deposit it is: "Deposit from Sita: an owner checks it on the Payments
+ * card." Content of another kind than the alert's is ignored.
  */
 export function alertCopy(
 	kind: AlertKind,
@@ -173,14 +175,19 @@ export function alertCopy(
 ): AlertLine {
 	const line = isOwner ? LINES[kind].owner : LINES[kind].other;
 	if (!content || content.kind !== kind) return line;
-	const what =
-		content.kind === "new_inquiry"
-			? excerpt(content.idea, ALERT_EXCERPT_LENGTH)
-			: isOwner
-				? (content.amountText ?? "")
-				: "";
 	const who = firstName(content.clientName) || "A client";
-	return { title: line.title, detail: `${who}: ${what || line.detail}` };
+	if (content.kind === "new_inquiry") {
+		const idea = excerpt(content.idea, ALERT_EXCERPT_LENGTH);
+		return { title: line.title, detail: `${who}: ${idea || line.detail}` };
+	}
+	if (!isOwner) {
+		const note = line.detail.charAt(0).toLowerCase() + line.detail.slice(1);
+		return { title: line.title, detail: `Deposit from ${who}: ${note}` };
+	}
+	return {
+		title: line.title,
+		detail: `${who}: ${content.amountText ?? line.detail}`,
+	};
 }
 
 /**

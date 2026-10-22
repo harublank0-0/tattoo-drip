@@ -355,15 +355,19 @@ test.group("alert details (TAT-102)", () => {
 		);
 	});
 
-	test("an artist's deposit alert names the client but never shows an amount", ({
+	test("an artist's deposit alert names the client as the payer, never as the owner, and never shows an amount", ({
 		assert,
 	}) => {
 		assert.deepEqual(
 			alertCopy("deposit_proof", false, proof("Sita Thapa", "NPR 3,000")),
 			{
 				title: "A deposit screenshot for your project",
-				detail: "Sita: An owner checks it on the Payments card.",
+				detail: "Deposit from Sita: an owner checks it on the Payments card.",
 			},
+		);
+		assert.equal(
+			alertCopy("deposit_proof", false, proof("  ", null)).detail,
+			"Deposit from A client: an owner checks it on the Payments card.",
 		);
 	});
 

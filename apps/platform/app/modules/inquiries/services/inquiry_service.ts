@@ -19,6 +19,12 @@ type TenantRef = Pick<Tenant, "id">;
 /** Inquiries per page in the inbox. */
 export const INQUIRIES_PER_PAGE = 25;
 
+/** The columns `findMany` loads. */
+export type AlertInquiry = Pick<
+	Inquiry,
+	"id" | "contactName" | "idea" | "preferredArtistId"
+>;
+
 export type InquiryPage = {
 	inquiries: Inquiry[];
 	total: number;
@@ -134,13 +140,16 @@ export default class InquiryService {
 	}
 
 	/**
-	 * The tenant's live inquiries among `ids`, in no particular order (the
-	 * Alerts list reads the idea of each new-inquiry alert in one query,
-	 * TAT-102).
+	 * The tenant's live inquiries among `ids`, in no particular order, with
+	 * only what the Alerts list reads (TAT-102): the contact name, the idea
+	 * and the artist the client asked for, never the phone or the email.
 	 */
-	async findMany(tenant: TenantRef, ids: string[]): Promise<Inquiry[]> {
+	async findMany(tenant: TenantRef, ids: string[]): Promise<AlertInquiry[]> {
 		if (ids.length === 0) return [];
-		return Inquiry.query().where("tenant_id", tenant.id).whereIn("id", ids);
+		return Inquiry.query()
+			.where("tenant_id", tenant.id)
+			.whereIn("id", ids)
+			.select("id", "contact_name", "idea", "preferred_artist_id");
 	}
 
 	/**
