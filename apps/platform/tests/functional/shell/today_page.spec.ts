@@ -294,6 +294,19 @@ test.group("Today", (group) => {
 				group.key,
 			);
 		}
+		// The owner's screenshots are never capped (TAT-107): every row shows and there is
+		// no link. The list still holds them under ?waiting=proofs.
+		const proofs = groupOf(today, "proofs") as Group;
+		assert.equal(proofs.rows.length, proofs.count);
+		assert.isNull(proofs.more);
+		const proofsList = await client
+			.get("/t/today-seeall-109/projects?waiting=proofs")
+			.withInertia()
+			.loginAs(s.owner);
+		assert.deepEqual(
+			proofsList.inertiaProps.projects.map(({ id }: { id: string }) => id),
+			proofs.rows.map(({ id }) => id),
+		);
 		// Requests still go to the Inbox.
 		assert.deepEqual((groupOf(today, "requests") as Group).more, {
 			route: "tenant.inbox.index",
