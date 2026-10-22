@@ -105,7 +105,7 @@ describe("the default theme (TAT-54)", () => {
 		assertSame(artistHtml("arjun"), "artist-arjun");
 	});
 
-	test("a config whose every value is hostile renders the default theme, byte for byte", () => {
+	test("a config whose every value is hostile renders the default theme's markup, byte for byte", () => {
 		assertSame(studioHtml(withStorefront(HOSTILE)), "studio");
 		assertSame(artistHtml("sita", withStorefront(HOSTILE)), "artist-sita");
 	});
