@@ -185,6 +185,23 @@ export default class ProjectService {
 		};
 	}
 
+	/**
+	 * Today's read (TAT-107): every live active project `member` may see (the
+	 * `findFor` rule), oldest first, not paginated: it is a studio's open
+	 * work, a few dozen rows at a pilot's scale.
+	 */
+	async listActive(
+		tenant: TenantRef,
+		member: Member,
+	): Promise<TattooProject[]> {
+		const query = TattooProject.query();
+		await this.scopeTo(query, tenant, member);
+		return query
+			.whereIn("status", [...ACTIVE_STATUSES])
+			.orderBy("created_at", "asc")
+			.orderBy("id", "asc");
+	}
+
 	/** How many live projects `member` may see, per status. */
 	async countByStatus(
 		tenant: TenantRef,

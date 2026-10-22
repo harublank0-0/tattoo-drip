@@ -176,6 +176,32 @@ export default class DepositLinkService {
 		};
 	}
 
+	/**
+	 * Each of these projects' deposit link as Today needs it (TAT-107), in one
+	 * query, by project id; a project without a link is absent: when the
+	 * current link was made (`updated_at`, which a new link moves; the row
+	 * says nothing about when the client was sent it) and whether it still
+	 * opens (liveToken). Never the token, nonce, hash or URL.
+	 */
+	async statesFor(
+		tenant: TenantRef,
+		projectIds: string[],
+	): Promise<Map<string, { madeAt: DateTime; works: boolean }>> {
+		if (projectIds.length === 0) return new Map();
+		const rows = await DepositLink.query()
+			.where("tenant_id", tenant.id)
+			.whereIn("project_id", projectIds);
+		return new Map(
+			rows.map((link) => [
+				link.projectId,
+				{
+					madeAt: link.updatedAt ?? link.createdAt,
+					works: liveToken(link) !== null,
+				},
+			]),
+		);
+	}
+
 	/** A new reference code. Protected, so a test can force a collision. */
 	protected newCode(): string {
 		return newReferenceCode();

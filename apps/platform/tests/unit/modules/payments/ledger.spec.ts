@@ -4,6 +4,7 @@ import {
 	balanceOf,
 	decidedLate,
 	depositMoney,
+	depositSettled,
 	formatSignedMoney,
 	type LedgerPayment,
 	netPaid,
@@ -117,6 +118,51 @@ test.group("depositMoney", () => {
 			),
 			0,
 		);
+	});
+});
+
+test.group("depositSettled", () => {
+	const quote = (depositAmount: number, currency = "NPR") => ({
+		depositAmount,
+		currency,
+	});
+
+	test("no quote is not covered; a zero deposit always is", ({ assert }) => {
+		assert.isFalse(depositSettled(null, []));
+		assert.isFalse(depositSettled(null, [pay()]));
+		assert.isTrue(depositSettled(quote(0), []));
+	});
+
+	test("the verified deposit money in the quote's currency has to reach the deposit", ({
+		assert,
+	}) => {
+		assert.isTrue(depositSettled(quote(300_000), [pay()]));
+		assert.isTrue(
+			depositSettled(quote(300_000), [
+				pay({ amount: 200_000 }),
+				pay({ amount: 100_000 }),
+			]),
+		);
+		assert.isFalse(depositSettled(quote(300_000), [pay({ amount: 200_000 })]));
+		assert.isFalse(
+			depositSettled(quote(300_000), [pay({ status: "submitted" })]),
+		);
+		assert.isFalse(
+			depositSettled(quote(300_000), [pay({ status: "rejected" })]),
+		);
+		assert.isFalse(depositSettled(quote(300_000), [pay({ currency: "USD" })]));
+	});
+
+	test("a correction that reverses the deposit uncovers it again", ({
+		assert,
+	}) => {
+		const deposit = pay();
+		const reversal = pay({
+			kind: "correction",
+			amount: -300_000,
+			correctsPaymentId: deposit.id,
+		});
+		assert.isFalse(depositSettled(quote(300_000), [deposit, reversal]));
 	});
 });
 

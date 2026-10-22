@@ -6,6 +6,7 @@ import {
 	balanceOf,
 	decidedLate,
 	depositMoney,
+	depositSettled,
 } from "#modules/payments/ledger";
 import Payment from "#modules/payments/models/payment";
 import type { PaymentMethodKind } from "#modules/payments/models/payment_method";
@@ -183,6 +184,49 @@ export default class DepositService {
 			.whereIn("id", paymentIds)
 			.select("id", "amount");
 		return new Map(rows.map(({ id, amount }) => [id, amount]));
+	}
+
+	/**
+	 * What Today and the Projects list need to know about many projects'
+	 * deposits, in one query (TAT-107): per project id whether a deposit
+	 * screenshot waits for the studio (`proofWaiting`) and whether the current
+	 * quote's deposit is covered (`settled`, the same rule as `isSettled` for
+	 * payments already read: `depositSettled` in the ledger). `quotes` are the
+	 * projects' current quotes (QuoteService.currentFor); a project without
+	 * one is never settled. Every asked project has an entry. Leaves
+	 * `isSettled` alone: that one is on the booking path.
+	 */
+	async depositStates(
+		tenant: TenantRef,
+		projectIds: string[],
+		quotes: Map<string, Pick<Quote, "depositAmount" | "currency">>,
+	): Promise<Map<string, { proofWaiting: boolean; settled: boolean }>> {
+		if (projectIds.length === 0) return new Map();
+		const payments = await Payment.query()
+			.where("tenant_id", tenant.id)
+			.whereIn("project_id", projectIds)
+			.whereIn("kind", COUNTED_KINDS);
+		const byProject = new Map<string, Payment[]>();
+		for (const payment of payments) {
+			const own = byProject.get(payment.projectId);
+			if (own) own.push(payment);
+			else byProject.set(payment.projectId, [payment]);
+		}
+		return new Map(
+			projectIds.map((id) => {
+				const own = byProject.get(id) ?? [];
+				return [
+					id,
+					{
+						proofWaiting: own.some(
+							({ kind, status }) =>
+								kind === "deposit" && status === "submitted",
+						),
+						settled: depositSettled(quotes.get(id) ?? null, own),
+					},
+				];
+			}),
+		);
 	}
 
 	/**
