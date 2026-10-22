@@ -175,7 +175,7 @@ export const copy = {
 	reassurance: "Only {studio} sees what you send.",
 	/** The small print under Send (TAT-105): who runs the page, and the bot check. */
 	privacy:
-		"Tattoo Drip runs this page for {studio}. To keep spam bots out, a Cloudflare check starts when you begin filling this in. Cloudflare sees your connection and device, not your answers.",
+		"Tattoo Drip runs this page for {studio}. To keep spam bots out, this form uses a Cloudflare check that runs in your browser. Cloudflare sees your connection and device, not your answers.",
 	privacyLink: "Cloudflare's privacy notice",
 	tattooLegend: "Your tattoo",
 	contactLegend: "How {studio} reaches you",

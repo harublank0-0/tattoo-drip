@@ -214,11 +214,11 @@ describe("the studio page", () => {
 		const heading = (html: string) =>
 			html.match(/<h2 id="inquiry-title"[^>]*>([^<]*)<\/h2>/)?.[1];
 
-		assert.equal(heading(studioHtml()), "Send an inquiry");
+		assert.equal(heading(studioHtml()), "Send your idea");
 		// Closed, the heading must not invite while the text below refuses.
 		const closed = studioHtml(CLOSED_STUDIO, [ARJUN]);
 		assert.equal(heading(closed), "Inquiries");
-		assert.doesNotMatch(closed, /Send an inquiry/);
+		assert.doesNotMatch(closed, /Send your idea/);
 		// TAT-57 mounts on this id and label either way.
 		assert.equal(count(closed, / id="inquiry"/g), 1);
 		assert.match(
@@ -403,6 +403,8 @@ describe("the studio page's first screen (TAT-105)", () => {
 		// The panel says more than the strip: a line for each step, the studio's name in <bdi>.
 		assert.match(panel, /<bdi>Black Needle<\/bdi> replies/);
 		assert.match(panel, /Tattoo Drip never handles your money\./);
+		assert.match(top, /<ol class="steps" role="list">/);
+		assert.match(panel, /<ol class="steps" role="list">/);
 		assert.equal(count(top, /step-detail/g), 0);
 		assert.equal(count(panel, /step-detail/g), 4);
 	});
@@ -531,14 +533,18 @@ describe("the artist page", () => {
 		assert.match(html, /Books open in March\./);
 		// The section refuses, so its heading doesn't invite.
 		assert.match(html, /<h2 id="inquiry-title"[^>]*>Inquiries<\/h2>/);
-		assert.doesNotMatch(html, /Send an inquiry/);
+		assert.doesNotMatch(html, /Send your idea/);
 	});
 
-	test("an open artist's page invites in the section's heading", () => {
+	test("an open artist's page invites in the section's heading, and its hero button says the same", () => {
+		const html = artistHtml("sita");
+
+		assert.match(html, /<h2 id="inquiry-title"[^>]*>Send your idea<\/h2>/);
 		assert.match(
-			artistHtml("sita"),
-			/<h2 id="inquiry-title"[^>]*>Send an inquiry<\/h2>/,
+			html,
+			/<a class="action action-primary" href="#inquiry">Send your idea<\/a>/,
 		);
+		assert.doesNotMatch(html, /Send an inquiry/);
 	});
 });
 

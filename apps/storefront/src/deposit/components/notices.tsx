@@ -1,6 +1,6 @@
 import type { Ref } from "react";
 import { Fill } from "../../intake/components/fill.tsx";
-import { fill } from "../../intake/copy.ts";
+import { fill } from "../../intake/template.ts";
 import { copy, type ProofNoticeCode } from "../copy.ts";
 import {
 	DEFAULT_WAIT_SECONDS,

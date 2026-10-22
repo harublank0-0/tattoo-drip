@@ -128,9 +128,22 @@ test("the head (seo.ts) imports only the head strings, never the page's copy: th
 		(match) => match[1],
 	).sort();
 	assert.deepEqual(imports, [
-		"../intake/copy.ts",
+		"../intake/template.ts",
 		"../studio/seo.ts",
 		"./head-copy.ts",
 	]);
 	assert.doesNotMatch(read("head-copy.ts"), /\bimport\b/);
+});
+
+test("takes the intake form's words only as types: `fill` comes from template.ts, so the deposit chunk doesn't carry the form's copy (TAT-105)", () => {
+	for (const file of depositFiles()) {
+		for (const match of read(file).matchAll(
+			/import\s+(type\s+)?[^;]*?from\s+["'][^"']*intake\/copy\.ts["']/g,
+		)) {
+			assert.ok(
+				match[1],
+				`${file} imports a value from intake/copy.ts: ${match[0]}`,
+			);
+		}
+	}
 });

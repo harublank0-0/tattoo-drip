@@ -141,5 +141,11 @@ describe("the copy", () => {
 		assert.match(copy.privacy, /\{studio\}/);
 		assert.match(copy.privacy, /Tattoo Drip runs this page for \{studio\}/);
 		assert.doesNotMatch(copy.privacy, /Only \{studio\} sees/);
+		// It is read under Send, after the form is filled in: nothing about what
+		// happens "when you begin filling this in".
+		assert.doesNotMatch(copy.privacy, /begin|starts|filling/);
+		assert.match(copy.privacy, /spam bots/);
+		assert.match(copy.privacy, /in your browser/);
+		assert.match(copy.privacy, /not your answers/);
 	});
 });

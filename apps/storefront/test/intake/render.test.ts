@@ -127,6 +127,7 @@ describe("the intake form", () => {
 			html,
 			/<p class="intake-fine">Tattoo Drip runs this page for <bdi>Black Needle<\/bdi>\./,
 		);
+		assert.doesNotMatch(html, /begin filling this in/);
 		assert.doesNotMatch(
 			html.slice(0, at("Your tattoo")),
 			/Cloudflare|spam/,

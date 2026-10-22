@@ -1,3 +1,4 @@
+import { studioCopy } from "../copy.ts";
 import type { ArtistPhoto, ArtistView, StudioView } from "../view-model.ts";
 
 /**
@@ -86,7 +87,7 @@ function ArtistEntry({
 /** The studio page's artists (TAT-48). Nothing when the studio shows none. */
 export function ArtistRoster({ artists }: { artists: readonly ArtistView[] }) {
 	if (artists.length === 0) return null;
-	// With one artist, "Send an inquiry" already asks for them.
+	// With one artist, "Send your idea" already asks for them.
 	const askLinks = artists.length > 1;
 	return (
 		<section id="artists" className="section" aria-labelledby="artists-title">
@@ -150,7 +151,7 @@ export function ArtistProfile({
 				{artist.accepting ? (
 					<div className="actions">
 						<a className="action action-primary" href="#inquiry">
-							Send an inquiry
+							{studioCopy.sendIdea}
 						</a>
 					</div>
 				) : null}

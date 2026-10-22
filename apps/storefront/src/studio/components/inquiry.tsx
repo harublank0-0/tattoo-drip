@@ -1,4 +1,5 @@
 import { IntakeMount } from "../../intake/components/intake-mount.tsx";
+import { studioCopy } from "../copy.ts";
 import type { InquiryChannels, InquiryState } from "../inquiry.ts";
 import { linkRel } from "../links.ts";
 import { BookingPanel, BookingStrip } from "./steps.tsx";
@@ -38,7 +39,7 @@ export function InquirySection({
 			<section id="inquiry" className="inquiry" aria-labelledby="inquiry-title">
 				{/* An invitation only while the section offers one. */}
 				<h2 id="inquiry-title" className="section-title">
-					{state.kind === "open" ? "Send an inquiry" : "Inquiries"}
+					{state.kind === "open" ? studioCopy.sendIdea : "Inquiries"}
 				</h2>
 				{state.kind === "open" && stripAbove ? (
 					<BookingStrip studioName={state.studioName} level={3} />

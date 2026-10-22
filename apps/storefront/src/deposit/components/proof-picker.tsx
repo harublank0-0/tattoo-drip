@@ -1,7 +1,7 @@
 import { ImagePlus, X } from "lucide-react";
 import type { Ref } from "react";
-import { fill } from "../../intake/copy.ts";
 import { ACCEPT } from "../../intake/images.ts";
+import { fill } from "../../intake/template.ts";
 import { copy } from "../copy.ts";
 import type { ProofState } from "../proof.ts";
 

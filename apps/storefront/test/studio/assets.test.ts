@@ -64,6 +64,14 @@ describe("text the studio typed", () => {
 		for (const selector of [
 			"h1, h2, h3",
 			".user-text",
+			// The studio's name sits in the booking steps' lines (TAT-105), and the
+			// location line holds the address (a backstop to locationLine's cap).
+			".step-title",
+			".step-detail",
+			".profile-location",
+			// The form's legends and hints and notes name the studio too.
+			".intake legend, .intake p",
+			".site-footer",
 			".action",
 			".link-chip",
 			".site-bar a",
@@ -181,5 +189,20 @@ describe("the booking steps' two layouts (TAT-105)", () => {
 		assert.match(wide, /\.steps-strip\s*\{\s*display:\s*none/);
 		assert.match(wide, /\.inquiry-aside\s*\{[^}]*display:\s*grid/);
 		assert.match(wide, /\.inquiry-aside\s*\{[^}]*position:\s*sticky/);
+	});
+
+	// "Prefer to chat?" is in the panel from 60rem and at the form's foot below
+	// it, never both (the panel carries the same links).
+	test("the form's foot 'Prefer to chat?' is hidden beside the panel, from 60rem", () => {
+		const wide = bare.slice(bare.indexOf("@media (min-width: 60rem)"));
+		assert.match(wide, /\.inquiry-split \.intake-chat\s*\{\s*display:\s*none/);
+		assert.doesNotMatch(ruleBody(css, ".intake-chat"), /display:\s*none/);
+	});
+
+	test("the location line has a backstop width", () => {
+		assert.match(
+			ruleBody(css, ".profile-location"),
+			/max-inline-size:\s*36rem/,
+		);
 	});
 });

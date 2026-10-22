@@ -3,7 +3,7 @@ import type {
 	DepositPaymentMethod,
 	DepositState,
 } from "@tattoo-drip/sdk";
-import { fill } from "../intake/copy.ts";
+import { fill } from "../intake/template.ts";
 import { safeImageUrl, viberLink, whatsappLink } from "../studio/links.ts";
 import { cleanLine, cleanText } from "../studio/text.ts";
 import { copy, type DepositMethodKind } from "./copy.ts";

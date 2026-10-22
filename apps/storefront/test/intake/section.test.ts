@@ -104,6 +104,63 @@ describe("the #inquiry section's panel (TAT-105)", () => {
 		assert.equal((html.match(/<li class="step">/g) ?? []).length, 8);
 	});
 
+	test("the steps are a list even where the sheet hides the numbers' list style (WebKit drops the semantics otherwise)", () => {
+		const html = renderToStaticMarkup(
+			createElement(InquirySection, {
+				state: OPEN,
+				channels: CHANNELS,
+				challengeSiteKey: SITE_KEY,
+				stripAbove: true,
+			}),
+		);
+
+		assert.equal(
+			(html.match(/<ol class="steps" role="list">/g) ?? []).length,
+			2,
+		);
+		assert.equal((html.match(/<ol /g) ?? []).length, 2);
+	});
+
+	test("the panel checks every chat link once more: a link the page may not render is left out", () => {
+		const html = renderToStaticMarkup(
+			createElement(InquirySection, {
+				state: OPEN,
+				channels: {
+					whatsapp: "javascript:alert(1)",
+					email: "mailto:hello@black-needle.example?subject=Hi",
+					instagram: "data:text/html,hi",
+				},
+				challengeSiteKey: SITE_KEY,
+			}),
+		);
+		const panel = html.match(/<aside [\s\S]*?<\/aside>/)?.[0] ?? "";
+
+		assert.match(
+			panel,
+			/href="mailto:hello@black-needle\.example\?subject=Hi"/,
+		);
+		assert.doesNotMatch(panel, /javascript:|data:/);
+		assert.equal((panel.match(/<a /g) ?? []).length, 1);
+	});
+
+	test("a panel with no chat link to offer says nothing about chatting", () => {
+		const html = renderToStaticMarkup(
+			createElement(InquirySection, {
+				state: OPEN,
+				channels: {
+					whatsapp: "javascript:alert(1)",
+					email: null,
+					instagram: null,
+				},
+				challengeSiteKey: SITE_KEY,
+			}),
+		);
+		const panel = html.match(/<aside [\s\S]*?<\/aside>/)?.[0] ?? "";
+
+		assert.doesNotMatch(panel, /Prefer to chat/);
+		assert.equal((panel.match(/<a /g) ?? []).length, 0);
+	});
+
 	test("a closed section has no panel and no steps", () => {
 		for (const state of [
 			{ kind: "studio-closed", studioName: "Black Needle" },

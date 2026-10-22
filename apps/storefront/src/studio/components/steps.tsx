@@ -1,7 +1,7 @@
 import { Fill } from "../../intake/components/fill.tsx";
 import { studioCopy } from "../copy.ts";
 import type { InquiryChannels } from "../inquiry.ts";
-import { linkRel } from "../links.ts";
+import { isAllowedHref, linkRel } from "../links.ts";
 
 /**
  * "How booking works" (TAT-105), once for a phone and once for a desktop:
@@ -19,7 +19,11 @@ function Steps({
 	detailed: boolean;
 }) {
 	return (
-		<ol className="steps">
+		// list-style: none drops the list semantics in WebKit (VoiceOver stops
+		// saying "list, 4 items"); the explicit role puts them back.
+		// biome-ignore lint/a11y/useSemanticElements: it is an <ol>; the role repairs WebKit's reading of list-style: none
+		// biome-ignore lint/a11y/noRedundantRoles: redundant for the spec, needed for WebKit with list-style: none
+		<ol className="steps" role="list">
 			{studioCopy.booking.steps.map((step) => (
 				<li key={step.title} className="step">
 					<span className="step-title">{step.title}</span>
@@ -62,21 +66,14 @@ export function BookingPanel({
 	channels: InquiryChannels;
 }) {
 	const { whatsapp, email, instagram } = channels;
+	// Every href is checked once more here, like the hero's and the contacts'.
 	const links: { href: string; label: string }[] = [];
-	if (whatsapp) {
-		links.push({
-			href: whatsapp,
-			label: studioCopy.booking.chatLinks.whatsapp,
-		});
-	}
-	if (email) {
-		links.push({ href: email, label: studioCopy.booking.chatLinks.email });
-	}
-	if (instagram) {
-		links.push({
-			href: instagram,
-			label: studioCopy.booking.chatLinks.instagram,
-		});
+	for (const [href, label] of [
+		[whatsapp, studioCopy.booking.chatLinks.whatsapp],
+		[email, studioCopy.booking.chatLinks.email],
+		[instagram, studioCopy.booking.chatLinks.instagram],
+	] as const) {
+		if (href && isAllowedHref(href)) links.push({ href, label });
 	}
 	return (
 		<aside className="inquiry-aside" aria-labelledby="steps-panel-title">

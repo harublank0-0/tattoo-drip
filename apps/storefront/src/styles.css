@@ -160,7 +160,7 @@
   .profile-name { font-size: clamp(2.75rem, 1.5rem + 6.5vw, 5.5rem); line-height: 1.12; }
   .profile-type { color: var(--ink-muted); }
   /* The hero's one location line (TAT-105): the address, or the kind of studio. */
-  .profile-location { color: var(--ink-muted); font-size: 1.125rem; line-height: 1.4; }
+  .profile-location { max-inline-size: 36rem; color: var(--ink-muted); font-size: 1.125rem; line-height: 1.4; overflow-wrap: anywhere; }
   .profile-actions { display: grid; gap: 1.5rem; align-content: start; }
   /* On a phone the two buttons share a row when they fit (each grows to fill it), else stack at full width. */
   .profile-actions .action { flex: 1 1 auto; padding-inline: 1rem; }
@@ -199,8 +199,8 @@
   .step { position: relative; display: grid; grid-template-columns: 2rem minmax(0, 1fr); column-gap: 0.75rem; align-items: start; padding-block-end: 0.625rem; counter-increment: step; }
   .step::before { content: counter(step); display: grid; place-items: center; grid-row: 1 / span 2; inline-size: 2rem; block-size: 2rem; border: 1.5px solid var(--stencil); border-radius: var(--radius); background: var(--paper); color: var(--stencil); font-family: var(--display-face); font-size: 1.125rem; font-weight: 700; line-height: 1; }
   .step:not(:last-child)::after { content: ''; position: absolute; inset-inline-start: calc(1rem - 0.75px); inset-block: 2.125rem 0.125rem; border-inline-start: 1.5px dotted var(--stencil); }
-  .step-title { font-weight: 600; line-height: 2rem; }
-  .step-detail { grid-column: 2; color: var(--ink-muted); font-size: 0.9375rem; line-height: 1.5; }
+  .step-title { font-weight: 600; line-height: 2rem; overflow-wrap: anywhere; }
+  .step-detail { grid-column: 2; color: var(--ink-muted); font-size: 0.9375rem; line-height: 1.5; overflow-wrap: anywhere; }
   .steps-strip { display: grid; gap: 0.75rem; }
   .inquiry-aside { display: none; }
   .steps-chat { display: grid; gap: 0; color: var(--ink-muted); font-size: 0.9375rem; }
@@ -230,7 +230,7 @@
 
   .site-bar { width: min(72rem, 100% - 2.5rem); margin-inline: auto; padding-block-start: 1rem; }
   .site-bar a { display: inline-flex; align-items: center; min-height: 2.75rem; font-family: var(--display-face); font-size: 1.25rem; font-weight: 700; text-decoration: none; overflow-wrap: anywhere; }
-  .site-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem 2rem; width: min(72rem, 100% - 2.5rem); margin: 5rem auto 0; padding-block: 1.5rem 2.5rem; border-top: 1px solid var(--line); color: var(--ink-muted); font-size: 0.9375rem; }
+  .site-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem 2rem; width: min(72rem, 100% - 2.5rem); margin: 5rem auto 0; padding-block: 1.5rem 2.5rem; border-top: 1px solid var(--line); color: var(--ink-muted); font-size: 0.9375rem; overflow-wrap: anywhere; }
   .status-page { display: grid; gap: 1rem; justify-items: start; padding-block: 4rem; }
 }
 
@@ -264,6 +264,8 @@
   .profile .contact { grid-column: 2; grid-row: 2 / span 2; }
   .profile { grid-template-rows: auto auto 1fr; }
   .steps-strip { display: none; }
+  /* The panel carries "Prefer to chat?": the form's foot drops its copy. */
+  .inquiry-split .intake-chat { display: none; }
   .section { margin-block-start: 6rem; }
   /* The form on the left, "How booking works" sticky on the right (TAT-105). */
   .inquiry-split { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); column-gap: 4rem; align-items: start; }
@@ -284,6 +286,8 @@
  */
 @layer components {
   .intake { display: grid; gap: 2rem; justify-self: stretch; }
+  /* The studio's name is in the form's legends, hints and notes: one long word must wrap, not widen the page. */
+  .intake legend, .intake p { overflow-wrap: anywhere; }
   .intake-note { color: var(--ink-muted); font-size: 0.9375rem; }
   /* The one line above the form (TAT-105), and the Cloudflare small print under Send. */
   .intake-reassure { color: var(--ink); font-size: 1.0625rem; font-weight: 600; }
