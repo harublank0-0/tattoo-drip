@@ -3,7 +3,9 @@ import { MessageCircle } from "lucide-react";
 import { studioCopy } from "../copy.ts";
 import { isAllowedHref, linkRel } from "../links.ts";
 import type { ArtistPageData, StudioPageData } from "../loaders.ts";
+import type { SectionKey } from "../theme/config.ts";
 import { ArtistProfile, ArtistRoster } from "./artists.tsx";
+import { BrandCover, BrandLogo } from "./brand.tsx";
 import { ContactBlock } from "./contact.tsx";
 import { InquirySection } from "./inquiry.tsx";
 import { BookingStrip } from "./steps.tsx";
@@ -22,7 +24,7 @@ export function StudioPage({
 	/** The intake form's public Turnstile site key (TAT-57). */
 	challengeSiteKey?: string | null;
 }) {
-	const { studio, artists, inquiry, channels } = data;
+	const { studio, theme } = data;
 	// The hero's WhatsApp button is the plain chat link the Chat group lists.
 	const whatsapp = studio.links.find(
 		(link) => link.kind === "whatsapp" && isAllowedHref(link.href),
@@ -30,8 +32,12 @@ export function StudioPage({
 	return (
 		<>
 			<main className="page">
+				{theme.heroImage ? <BrandCover image={theme.heroImage} /> : null}
 				<header className="profile">
 					<div className="profile-heading">
+						{theme.logo ? (
+							<BrandLogo image={theme.logo} className="profile-logo" />
+						) : null}
 						<h1 className="profile-name" dir="auto">
 							{studio.name}
 						</h1>
@@ -68,16 +74,45 @@ export function StudioPage({
 					) : null}
 					<ContactBlock studio={studio} />
 				</header>
-				<ArtistRoster artists={artists} />
-				<InquirySection
-					state={inquiry}
-					channels={channels}
-					challengeSiteKey={challengeSiteKey}
-				/>
+				{theme.sections.map((section) => (
+					<StudioSection
+						key={section}
+						section={section}
+						data={data}
+						challengeSiteKey={challengeSiteKey}
+					/>
+				))}
 			</main>
 			<SiteFooter studioName={studio.name} />
 		</>
 	);
+}
+
+/**
+ * One of the studio page's sections, in the order the theme's config gives
+ * (TAT-54). The inquiry section is always one of them (readSections).
+ */
+function StudioSection({
+	section,
+	data,
+	challengeSiteKey,
+}: {
+	section: SectionKey;
+	data: StudioPageData;
+	challengeSiteKey: string | null;
+}) {
+	switch (section) {
+		case "artists":
+			return <ArtistRoster artists={data.artists} />;
+		case "inquiry":
+			return (
+				<InquirySection
+					state={data.inquiry}
+					channels={data.channels}
+					challengeSiteKey={challengeSiteKey}
+				/>
+			);
+	}
 }
 
 export function ArtistPage({
@@ -88,12 +123,19 @@ export function ArtistPage({
 	/** The intake form's public Turnstile site key (TAT-57). */
 	challengeSiteKey?: string | null;
 }) {
-	const { studio, artist, inquiry, channels } = data;
+	const { studio, artist, inquiry, channels, theme } = data;
 	return (
 		<>
 			<header className="site-bar">
 				<a href="/" dir="auto">
-					{studio.name}
+					{theme.logo ? (
+						<>
+							<BrandLogo image={theme.logo} className="site-bar-logo" />
+							<span>{studio.name}</span>
+						</>
+					) : (
+						studio.name
+					)}
 				</a>
 			</header>
 			<main className="page">
