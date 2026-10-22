@@ -4,6 +4,13 @@ import Artist from "#modules/artists/models/artist";
 import Client from "#modules/clients/models/client";
 import Inquiry from "#modules/inquiries/models/inquiry";
 import ReferenceImage from "#modules/inquiries/models/reference_image";
+import {
+	hashToken,
+	newReferenceCode,
+	newTokenNonce,
+	tokenFor,
+} from "#modules/payments/deposit_links";
+import DepositLink from "#modules/payments/models/deposit_link";
 import Payment from "#modules/payments/models/payment";
 import Quote from "#modules/projects/models/quote";
 import TattooProject from "#modules/projects/models/tattoo_project";
@@ -218,6 +225,38 @@ export function makePayment(
 		status: "submitted",
 		...over,
 	});
+}
+
+type DepositLinkOver = Partial<Pick<DepositLink, "expiresAt" | "updatedAt">>;
+
+/**
+ * A working deposit link for `project`, valid for 30 days, without the
+ * rules `DepositLinkService.issue` checks (a project in any state can have
+ * one). `updatedAt` says when it was made, as a new link moves it
+ * (TAT-107): the model sets it itself, so it is written afterwards.
+ */
+export async function makeDepositLink(
+	tenant: TenantRef,
+	project: TattooProject,
+	{ updatedAt, ...over }: DepositLinkOver = {},
+) {
+	const nonce = newTokenNonce();
+	const link = await DepositLink.create({
+		tenantId: tenant.id,
+		projectId: project.id,
+		referenceCode: newReferenceCode(),
+		tokenNonce: nonce,
+		tokenHash: hashToken(tokenFor(nonce)),
+		expiresAt: DateTime.utc().plus({ days: 30 }),
+		...over,
+	});
+	if (updatedAt) {
+		await DepositLink.query()
+			.where("id", link.id)
+			.update({ updated_at: updatedAt.toSQL() });
+		await link.refresh();
+	}
+	return link;
 }
 
 /**
