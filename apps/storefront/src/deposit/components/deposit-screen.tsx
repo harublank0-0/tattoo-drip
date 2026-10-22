@@ -154,6 +154,7 @@ export function DepositLoaded({
 			studioName={shell.studioName}
 			logo={shell.logo}
 			artistName={view?.artistName ?? null}
+			wide={view?.state === "due" && view.methods.length > 0}
 			view={view}
 			problem={screen.kind === "problem" ? screen.problem : null}
 		>

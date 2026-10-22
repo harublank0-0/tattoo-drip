@@ -381,7 +381,10 @@
   .deposit-brief summary { display: flex; align-items: center; min-block-size: 2.75rem; color: var(--stencil); font-weight: 600; cursor: pointer; }
   .deposit-muted { color: var(--ink-muted); font-size: 0.9375rem; }
   .deposit-live:empty, .deposit-copied:empty { position: absolute; }
-  .deposit-due { display: grid; gap: 1.5rem; }
+  /* A flex column, not a grid: the I've paid bar is sticky, and a grid item may only move inside its own cell. */
+  .deposit-due { display: flex; flex-direction: column; gap: 1.5rem; }
+  .deposit-paid-bar { position: sticky; inset-block-end: 0; z-index: 1; padding-block: 0.75rem max(0.75rem, env(safe-area-inset-bottom)); border-block-start: 1px solid var(--line); background: var(--paper); }
+  .deposit-paid-bar .action { inline-size: 100%; }
   .deposit-block { display: grid; gap: 0.75rem; justify-items: start; min-width: 0; }
   .deposit-block h2 { font-size: 1.375rem; line-height: 1.25; }
   .deposit-block .deposit-step-title { display: flex; align-items: center; gap: 0.75rem; scroll-margin-block-start: 1rem; }
@@ -437,7 +440,30 @@
   .deposit-contact { display: flex; flex-wrap: wrap; align-items: center; gap: 0 0.75rem; color: var(--ink-muted); font-size: 0.9375rem; }
   /* A short word ("Viber", 37px) is still a 44px wide target (TAT-119). */
   .deposit-contact .text-link { min-inline-size: 2.75rem; justify-content: center; }
-  .deposit-footer { width: min(28rem, 100% - 2rem); margin: 3rem auto 0; padding-block: 1.5rem 2.5rem; border-top: 1px solid var(--line); color: var(--ink-muted); font-size: 0.9375rem; }
+  .deposit-footer { width: min(28rem, 100% - 2rem); margin: 2rem auto 0; padding-block: 1rem 1.5rem; border-top: 1px solid var(--line); color: var(--ink-muted); font-size: 0.9375rem; }
+  /* A keyboard focus in steps 1 and 2 is never hidden under the sticky bar (WCAG 2.4.11). */
+  @media (max-width: 59.99rem) {
+    :root:has(.deposit-paid-bar) { scroll-padding-block-end: 5rem; }
+  }
+  /*
+   * From 60rem, while due with methods (DepositFrame `wide`): the header, the
+   * h1 and the brief run across; below them the steps on the left and the
+   * picked method's panel, sticky, on the right. The area names live only
+   * here, where the template defines them: a name the template lacks makes
+   * implicit lines and every item lands in one cell.
+   */
+  @media (min-width: 60rem) {
+    .deposit.deposit-wide, .deposit-footer.deposit-wide { width: min(60rem, 100% - 4rem); }
+    .deposit-wide .deposit-due { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 22rem); column-gap: 3rem; grid-template-areas: 'amount panel' 'code panel' 'pay panel' 'proof panel' 'policy panel'; align-content: start; }
+    .deposit-wide .deposit-due-amount { grid-area: amount; }
+    .deposit-wide .deposit-due-code { grid-area: code; }
+    .deposit-wide .deposit-due-pay { grid-area: pay; }
+    .deposit-wide .deposit-due-proof { grid-area: proof; }
+    .deposit-wide .deposit-due-policy { grid-area: policy; }
+    .deposit-wide .deposit-method-panel { grid-area: panel; position: sticky; inset-block-start: 1.5rem; align-self: start; }
+    .deposit-wide .deposit-qr { max-inline-size: 20rem; }
+    .deposit-paid-bar, .deposit-same-phone { display: none; }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

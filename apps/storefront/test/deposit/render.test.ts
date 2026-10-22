@@ -47,6 +47,21 @@ const dueHtml = (
 		}),
 	);
 
+const FORM_MARK = '<form class="stand-in">';
+
+/** dueHtml with a stand-in for the screenshot form, so the bar shows. */
+const dueHtmlWithForm = (view = depositView(PAGE)) =>
+	render(
+		createElement(DueView, {
+			view,
+			studioName: STUDIO,
+			today: "2026-10-18",
+			selected: selectedMethod(view.methods, null),
+			onSelect: () => undefined,
+			form: createElement("form", { className: "stand-in" }),
+		}),
+	);
+
 /** The inputs named `name`, as their opening tags. */
 const radiosOf = (html: string, name: string) =>
 	tags(html, "input").filter(
@@ -124,6 +139,18 @@ describe("the frame", () => {
 		assert.doesNotMatch(textOf(html), /\bwith\b/);
 		assert.ok(html.indexOf("deposit-header") < html.indexOf("<h1"));
 		assert.equal(tags(html, "h1").length, 1);
+	});
+
+	test("a wide frame sets the page and its footer in the desktop's two columns (TAT-110)", () => {
+		const wide = render(
+			createElement(DepositFrame, { studioName: STUDIO, wide: true }),
+		);
+		const plain = render(createElement(DepositFrame, { studioName: STUDIO }));
+
+		assert.match(wide, /<main class="deposit deposit-wide">/);
+		assert.match(wide, /<footer class="deposit-footer deposit-wide">/);
+		assert.match(plain, /<main class="deposit">/);
+		assert.match(plain, /<footer class="deposit-footer">/);
 	});
 
 	test("the checked logo replaces the mark: decoration (alt empty), no Referer, its size reserved (TAT-110)", () => {
@@ -540,6 +567,27 @@ describe("due", () => {
 
 		assert.match(textOf(html), /Ask Black Needle for these details\./);
 		assert.equal(tags(html, "img").length, 0);
+	});
+
+	test("an I've paid button between the panel and step 3: a plain button, never a link (TAT-110)", () => {
+		const html = dueHtmlWithForm();
+		const bars = html.match(/<div class="deposit-paid-bar">.*?<\/div>/gs) ?? [];
+
+		assert.equal(bars.length, 1);
+		const button = tags(bars[0], "button");
+		assert.equal(button.length, 1);
+		assert.equal(attr(button[0], "type"), "button");
+		assert.equal(attr(button[0], "class"), "action action-secondary");
+		assert.equal(textOf(bars[0]), "I've paid: send the screenshot");
+		assert.equal(hrefs(bars[0]).length, 0);
+		assert.ok(
+			html.indexOf("deposit-method-panel") < html.indexOf("deposit-paid-bar"),
+		);
+		assert.ok(html.indexOf("deposit-paid-bar") < html.indexOf(FORM_MARK));
+	});
+
+	test("no form to send, no I've paid button", () => {
+		assert.doesNotMatch(dueHtml(), /deposit-paid-bar/);
 	});
 
 	test("the deposit policy keeps its line breaks", () => {

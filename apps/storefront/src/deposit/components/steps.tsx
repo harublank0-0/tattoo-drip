@@ -1,6 +1,8 @@
+import { ArrowDown } from "lucide-react";
 import type { ReactNode } from "react";
 import { Fill } from "../../intake/components/fill.tsx";
 import { fill } from "../../intake/template.ts";
+import { showProofStep } from "../browser.ts";
 import { copy } from "../copy.ts";
 import type { MethodView } from "../view-model.ts";
 import { CopyButton } from "./copy-button.tsx";
@@ -77,6 +79,28 @@ export function PayWith({
 				))}
 			</div>
 		</fieldset>
+	);
+}
+
+/**
+ * "I've paid": a button that takes the client to step 3. On a phone it sticks
+ * to the bottom of the screen while they are in steps 1 and 2, and settles in
+ * its own place, above step 3, when they get there (styles.css); on a desktop
+ * the QR sits beside the steps and the bar is hidden. Secondary, so Send is
+ * the one primary action. A button, never a link to "#proof-title".
+ */
+export function PaidBar() {
+	return (
+		<div className="deposit-paid-bar">
+			<button
+				type="button"
+				className="action action-secondary"
+				onClick={showProofStep}
+			>
+				<ArrowDown aria-hidden="true" className="size-5" />
+				{copy.paidButton}
+			</button>
+		</div>
 	);
 }
 

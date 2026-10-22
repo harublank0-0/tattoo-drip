@@ -16,7 +16,7 @@ import {
 	studioInitial,
 } from "../view-model.ts";
 import { CopyButton } from "./copy-button.tsx";
-import { MethodPanel, PayWith, StepHeading } from "./steps.tsx";
+import { MethodPanel, PaidBar, PayWith, StepHeading } from "./steps.tsx";
 
 /*
  * The deposit page's blocks (TAT-65b). Props only: no router or query hooks,
@@ -36,6 +36,7 @@ export function DepositFrame({
 	studioName,
 	logo = null,
 	artistName = null,
+	wide = false,
 	view = null,
 	problem = null,
 	children,
@@ -45,6 +46,8 @@ export function DepositFrame({
 	logo?: BrandImage | null;
 	/** The project's artist, once the deposit is read. */
 	artistName?: string | null;
+	/** `due` with a way to pay: from 60rem the page is two columns (styles.css). */
+	wide?: boolean;
 	/** The deposit, once read; null (or left out) while it loads. */
 	view?: Pick<DepositView, "state" | "amount"> | null;
 	/** A link that doesn't work, a rate limit or a failed read: the h1 matches it. */
@@ -53,7 +56,7 @@ export function DepositFrame({
 }) {
 	return (
 		<>
-			<main className="deposit">
+			<main className={wide ? "deposit deposit-wide" : "deposit"}>
 				<DepositHeader
 					studioName={studioName}
 					logo={logo}
@@ -67,7 +70,9 @@ export function DepositFrame({
 				</h1>
 				{children}
 			</main>
-			<footer className="deposit-footer">
+			<footer
+				className={wide ? "deposit-footer deposit-wide" : "deposit-footer"}
+			>
 				<p>
 					<Fill template={copy.footer} values={{ studio: studioName }} />
 				</p>
@@ -364,6 +369,7 @@ export function DueView({
 					studioName={studioName}
 				/>
 			) : null}
+			{form ? <PaidBar /> : null}
 			{form}
 			{view.policy ? (
 				<section
