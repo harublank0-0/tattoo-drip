@@ -22,6 +22,7 @@ import {
 	type DepositView,
 	depositContact,
 	depositView,
+	selectedMethod,
 } from "../../src/deposit/view-model.ts";
 import { isAllowedHref } from "../../src/studio/links.ts";
 import { PAGE, page, QR_URL, SHELL } from "./fixtures.ts";
@@ -33,9 +34,23 @@ const STUDIO = "Black Needle";
 const dueHtml = (
 	view = depositView(PAGE),
 	today: string | null = "2026-10-18",
+	selected = selectedMethod(view.methods, null),
 ) =>
 	render(
-		createElement(DueView, { view, studioName: STUDIO, today, form: null }),
+		createElement(DueView, {
+			view,
+			studioName: STUDIO,
+			today,
+			selected,
+			onSelect: () => undefined,
+			form: null,
+		}),
+	);
+
+/** The inputs named `name`, as their opening tags. */
+const radiosOf = (html: string, name: string) =>
+	tags(html, "input").filter(
+		(tag) => attr(tag, "type") === "radio" && attr(tag, "name") === name,
 	);
 
 const stateHtml = (
@@ -359,19 +374,60 @@ describe("due", () => {
 		const buttons = tags(html, "button");
 		assert.deepEqual(
 			buttons.map((button) => attr(button, "aria-label")),
-			["Copy code 7K3M9Q", "Copy 9812345678", "Copy 01234567890123"],
+			["Copy code 7K3M9Q", "Copy 9812345678"],
 		);
 		for (const button of buttons) assert.equal(attr(button, "type"), "button");
 		assert.match(html, /aria-label="Copy code 7K3M9Q">.*Copy code<\/button>/s);
-		assert.equal((html.match(/aria-live="polite"/g) ?? []).length, 3);
+		assert.equal((html.match(/aria-live="polite"/g) ?? []).length, 2);
+
+		const view = depositView(PAGE);
+		const bank = dueHtml(view, "2026-10-18", view.methods[1]);
+		assert.deepEqual(
+			tags(bank, "button").map((button) => attr(button, "aria-label")),
+			["Copy code 7K3M9Q", "Copy 01234567890123"],
+		);
 	});
 
-	test("each method: its label, its QR with alt text and reserved size, its details", () => {
+	test("steps 1 and 2 are numbered h2s: a hidden numeral, 'Step N: ' for screen readers, then the title (TAT-110)", () => {
+		const html = dueHtml();
+
+		assert.match(
+			html,
+			/<h2 id="deposit-code-title" class="deposit-step-title"><span class="deposit-step-number" aria-hidden="true">1<\/span><span class="sr-only">Step 1: <\/span>Copy the code<\/h2>/,
+		);
+		assert.match(
+			html,
+			/<h2 id="deposit-pay-title" class="deposit-step-title"><span class="deposit-step-number" aria-hidden="true">2<\/span><span class="sr-only">Step 2: <\/span>Pay<\/h2>/,
+		);
+		assert.doesNotMatch(html, /Reference code|How to pay/);
+	});
+
+	test("Pay with: a native radio group of the methods, the picked one checked, the labels in the studio's own words (TAT-110)", () => {
+		const html = dueHtml();
+		const radios = radiosOf(html, "pay-with");
+
+		assert.match(html, /<fieldset class="deposit-paywith">/);
+		assert.match(html, /<legend class="sr-only">Pay with<\/legend>/);
+		assert.deepEqual(
+			radios.map((radio) => [attr(radio, "id"), attr(radio, "value")]),
+			[
+				["pay-with-0", "method-0"],
+				["pay-with-1", "method-1"],
+			],
+		);
+		assert.match(radios[0], / checked=""/);
+		assert.doesNotMatch(radios[1], / checked=""/);
+		assert.match(html, /<span dir="auto">eSewa<\/span>/);
+		assert.match(html, /<span dir="auto">Bank transfer<\/span>/);
+		assert.equal(tags(html, "form").length, 0);
+		assert.equal(tags(html, "h3").length, 0);
+	});
+
+	test("only the picked method is on the page: its QR (eager, no Referer, reserved size), its caption, its details", () => {
 		const html = dueHtml();
 		const text = textOf(html);
-		assert.match(html, /<h3 dir="auto">eSewa<\/h3>/);
-		assert.match(html, /<h3 dir="auto">Bank transfer<\/h3>/);
 		const images = tags(html, "img");
+
 		assert.equal(images.length, 1);
 		assert.equal(attr(images[0], "src"), QR_URL);
 		assert.equal(attr(images[0], "alt"), "eSewa QR code for Black Needle");
@@ -381,35 +437,109 @@ describe("due", () => {
 		assert.equal(attr(images[0], "referrerpolicy"), "no-referrer");
 		assert.match(text, /Scan it with your eSewa app\./);
 		assert.match(text, /eSewa ID9812345678/);
-		assert.match(
-			text,
-			/BankNabil BankAccount nameBlack Needle Pvt LtdAccount number01234567890123/,
-		);
 		assert.match(text, /On this phone\? Press and hold the QR code to save it/);
+		assert.doesNotMatch(text, /Nabil Bank|01234567890123/);
+		assert.match(html, /class="deposit-method-panel"/);
 	});
 
-	test("the first QR loads at once, the others when scrolled to", () => {
+	test("the bank picked: no image, its details, its radio checked", () => {
+		const view = depositView(PAGE);
+		const html = dueHtml(view, "2026-10-18", view.methods[1]);
+		const radios = radiosOf(html, "pay-with");
+
+		assert.equal(tags(html, "img").length, 0);
+		assert.match(
+			textOf(html),
+			/BankNabil BankAccount nameBlack Needle Pvt LtdAccount number01234567890123/,
+		);
+		assert.doesNotMatch(textOf(html), /On this phone|eSewa ID/);
+		assert.doesNotMatch(radios[0], / checked=""/);
+		assert.match(radios[1], / checked=""/);
+	});
+
+	test("every QR on the page is the picked one's, whatever the studio lists", () => {
+		const view = depositView(
+			page({
+				paymentMethods: [
+					PAGE.paymentMethods[0],
+					{
+						kind: "khalti",
+						label: "Khalti",
+						qrImageUrl: "https://api.example.com/uploads/khalti.png",
+						accountName: null,
+						accountNumber: "9800000000",
+						bankName: null,
+					},
+				],
+			}),
+		);
+
+		const first = dueHtml(view);
+		const second = dueHtml(view, "2026-10-18", view.methods[1]);
+
+		assert.deepEqual(
+			tags(first, "img").map((image) => attr(image, "src")),
+			[QR_URL],
+		);
+		assert.deepEqual(
+			tags(second, "img").map((image) => attr(image, "src")),
+			["https://api.example.com/uploads/khalti.png"],
+		);
+	});
+
+	test("one method: no radios, the panel opens with 'Pay with <label>'", () => {
 		const html = dueHtml(
+			depositView(page({ paymentMethods: [PAGE.paymentMethods[0]] })),
+		);
+
+		assert.equal(tags(html, "fieldset").length, 0);
+		assert.equal(radiosOf(html, "pay-with").length, 0);
+		assert.match(html, /Pay with <bdi>eSewa<\/bdi>/);
+		assert.equal(tags(html, "img").length, 1);
+	});
+
+	test("a method with a QR and no details, and one with details and no QR", () => {
+		const qrOnly = dueHtml(
 			depositView(
 				page({
 					paymentMethods: [
-						PAGE.paymentMethods[0],
 						{
-							kind: "khalti",
-							label: "Khalti",
-							qrImageUrl: "https://api.example.com/uploads/khalti.png",
+							kind: "fonepay",
+							label: "Fonepay",
+							qrImageUrl: QR_URL,
 							accountName: null,
-							accountNumber: "9800000000",
+							accountNumber: null,
 							bankName: null,
 						},
 					],
 				}),
 			),
 		);
-		assert.deepEqual(
-			tags(html, "img").map((image) => attr(image, "loading")),
-			["eager", "lazy"],
+		assert.equal(tags(qrOnly, "img").length, 1);
+		assert.equal(tags(qrOnly, "dl").length, 0);
+		assert.doesNotMatch(textOf(qrOnly), /Ask Black Needle/);
+	});
+
+	test("a method with neither a QR that passes the check nor details says to ask the studio", () => {
+		const html = dueHtml(
+			depositView(
+				page({
+					paymentMethods: [
+						{
+							kind: "khalti",
+							label: "Khalti",
+							qrImageUrl: "javascript:alert(1)",
+							accountName: null,
+							accountNumber: null,
+							bankName: null,
+						},
+					],
+				}),
+			),
 		);
+
+		assert.match(textOf(html), /Ask Black Needle for these details\./);
+		assert.equal(tags(html, "img").length, 0);
 	});
 
 	test("the deposit policy keeps its line breaks", () => {
@@ -427,7 +557,9 @@ describe("due", () => {
 			textOf(html),
 			/The studio hasn't added payment details yet\. Message them to ask how to pay\./,
 		);
-		assert.doesNotMatch(html, /How to pay|<img|On this phone/);
+		assert.doesNotMatch(html, /<img|On this phone|<fieldset|<h3/);
+		assert.match(html, /<h2 id="deposit-pay-title"/);
+		assert.doesNotMatch(html, /deposit-method-panel/);
 	});
 });
 

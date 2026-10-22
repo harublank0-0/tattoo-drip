@@ -14,6 +14,7 @@ import {
 	depositContact,
 	depositView,
 	formatReceived,
+	selectedMethod,
 	todayIn,
 } from "../view-model.ts";
 import {
@@ -114,6 +115,10 @@ export function DepositLoaded({
 	);
 	const view = screen.kind === "page" ? depositView(screen.page) : null;
 	const shown = view ? view.state : screen.kind;
+	// The method picked in step 2 (a MethodView.id); null until the client picks.
+	const [pickedMethod, setPickedMethod] = useState<string | null>(null);
+	const selected =
+		view?.state === "due" ? selectedMethod(view.methods, pickedMethod) : null;
 	const [moveFocus, setMoveFocus] = useState(false);
 	const messageRef = useRef<HTMLParagraphElement>(null);
 
@@ -184,12 +189,15 @@ export function DepositLoaded({
 					view={view}
 					studioName={shell.studioName}
 					today={todayIn(shell.timezone)}
+					selected={selected}
+					onSelect={setPickedMethod}
 					form={
 						view.takesProof ? (
 							<ProofForm
 								token={token}
 								view={view}
 								studioName={shell.studioName}
+								paidWith={selected?.kind ?? null}
 								reread={reread}
 								onLeftDue={leftDue}
 								onGone={gone}

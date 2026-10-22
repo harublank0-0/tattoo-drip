@@ -16,6 +16,7 @@ import {
 	studioInitial,
 } from "../view-model.ts";
 import { CopyButton } from "./copy-button.tsx";
+import { MethodPanel, PayWith, StepHeading } from "./steps.tsx";
 
 /*
  * The deposit page's blocks (TAT-65b). Props only: no router or query hooks,
@@ -277,22 +278,34 @@ export function StateMessage({
 	);
 }
 
-/** `due`: the amount, the code, how to pay, the policy, then `form` (the screenshot form, or nothing). */
+/**
+ * `due` (TAT-110): the amount and who it goes to, then three numbered steps,
+ * the first two here (copy the code, pay) and the third in `form` (the
+ * screenshot form, or nothing), then the policy. The picked method's panel is
+ * a sibling of the steps, so a desktop can set it beside them (styles.css).
+ */
 export function DueView({
 	view,
 	studioName,
 	today,
+	selected,
+	onSelect,
 	form,
 }: {
 	view: DepositView;
 	studioName: string;
 	today: string | null;
+	/** The method whose QR and details show (selectedMethod), or null without methods. */
+	selected: MethodView | null;
+	onSelect(id: string): void;
 	form: ReactNode;
 }) {
-	const firstQr = view.methods.find((method) => method.qr)?.id ?? null;
 	return (
-		<>
-			<section className="deposit-block" aria-labelledby="deposit-due-title">
+		<div className="deposit-due">
+			<section
+				className="deposit-block deposit-due-amount"
+				aria-labelledby="deposit-due-title"
+			>
 				<h2 id="deposit-due-title" className="sr-only">
 					{copy.due.title}
 				</h2>
@@ -307,8 +320,13 @@ export function DueView({
 					<Fill template={copy.due.direct} values={{ studio: studioName }} />
 				</p>
 			</section>
-			<section className="deposit-block" aria-labelledby="deposit-code-title">
-				<h2 id="deposit-code-title">{copy.code.title}</h2>
+			<section
+				className="deposit-block deposit-due-code"
+				aria-labelledby="deposit-code-title"
+			>
+				<StepHeading step={1} id="deposit-code-title">
+					{copy.steps.code}
+				</StepHeading>
 				<div className="deposit-code-row">
 					<p className="deposit-code" translate="no">
 						{view.referenceCode}
@@ -321,33 +339,35 @@ export function DueView({
 				</div>
 				<p>{copy.code.hint}</p>
 			</section>
-			{view.methods.length > 0 ? (
-				<section
-					className="deposit-block"
-					aria-labelledby="deposit-methods-title"
-				>
-					<h2 id="deposit-methods-title">{copy.methods.title}</h2>
-					{firstQr ? (
-						<p className="deposit-muted">{copy.methods.samePhone}</p>
-					) : null}
-					<ul className="deposit-methods">
-						{view.methods.map((method) => (
-							<li key={method.id} className="deposit-method">
-								<MethodCard
-									method={method}
-									studioName={studioName}
-									eager={method.id === firstQr}
-								/>
-							</li>
-						))}
-					</ul>
-				</section>
-			) : (
-				<p className="deposit-note">{copy.methods.none}</p>
-			)}
+			<section
+				className="deposit-block deposit-due-pay"
+				aria-labelledby="deposit-pay-title"
+			>
+				<StepHeading step={2} id="deposit-pay-title">
+					{copy.steps.pay}
+				</StepHeading>
+				{selected ? (
+					<PayWith
+						methods={view.methods}
+						selected={selected}
+						onSelect={onSelect}
+					/>
+				) : (
+					<p className="deposit-note">{copy.methods.none}</p>
+				)}
+			</section>
+			{selected ? (
+				<MethodPanel
+					key={selected.id}
+					method={selected}
+					single={view.methods.length === 1}
+					studioName={studioName}
+				/>
+			) : null}
+			{form}
 			{view.policy ? (
 				<section
-					className="deposit-block"
+					className="deposit-block deposit-due-policy"
 					aria-labelledby="deposit-policy-title"
 				>
 					<h2 id="deposit-policy-title">{copy.policyTitle}</h2>
@@ -356,79 +376,7 @@ export function DueView({
 					</p>
 				</section>
 			) : null}
-			{form}
-		</>
-	);
-}
-
-/** One way to pay: its label, its QR (a square reserved while it loads), its details. */
-export function MethodCard({
-	method,
-	studioName,
-	eager,
-}: {
-	method: MethodView;
-	studioName: string;
-	eager: boolean;
-}) {
-	const hasDetails = Boolean(
-		method.bankName || method.accountName || method.accountNumber,
-	);
-	return (
-		<>
-			<h3 dir="auto">{method.label}</h3>
-			{method.qr ? (
-				<figure className="deposit-qr-figure">
-					<img
-						className="deposit-qr"
-						src={method.qr}
-						alt={fill(copy.methods.qrAlt, {
-							label: method.label,
-							studio: studioName,
-						})}
-						width={280}
-						height={280}
-						loading={eager ? "eager" : "lazy"}
-						decoding="async"
-						referrerPolicy="no-referrer"
-					/>
-					<figcaption>{copy.methods.scan[method.kind]}</figcaption>
-				</figure>
-			) : null}
-			{hasDetails ? (
-				<dl className="deposit-details">
-					{method.bankName ? (
-						<>
-							<dt>{copy.methods.bankName}</dt>
-							<dd dir="auto">{method.bankName}</dd>
-						</>
-					) : null}
-					{method.accountName ? (
-						<>
-							<dt>{copy.methods.accountName}</dt>
-							<dd dir="auto">{method.accountName}</dd>
-						</>
-					) : null}
-					{method.accountNumber ? (
-						<>
-							<dt>{copy.methods.accountNumber[method.kind]}</dt>
-							<dd>
-								<span className="deposit-number" translate="no">
-									{method.accountNumber}
-								</span>
-								<CopyButton
-									text={method.accountNumber}
-									label={fill(copy.methods.copyLabel, {
-										number: method.accountNumber,
-									})}
-									visible={copy.methods.copy}
-								/>
-							</dd>
-						</>
-					) : null}
-				</dl>
-			) : null}
-		</>
+		</div>
 	);
 }
 

@@ -144,7 +144,6 @@ export const copy = {
 	/** The sticky button that takes the client to step 3. */
 	paidButton: "I've paid: send the screenshot",
 	methods: {
-		title: "How to pay",
 		samePhone:
 			"On this phone? Press and hold the QR code to save it, then choose it in your payment app's scanner.",
 		/** A method whose QR didn't pass the image check and that has no number. */

@@ -17,6 +17,7 @@ import { NO_PROOF, prepareProof, previewOf, proofReducer } from "../proof.ts";
 import type { DepositView } from "../view-model.ts";
 import { ProofNoticeView, ProofSummary } from "./notices.tsx";
 import { ProofPicker } from "./proof-picker.tsx";
+import { StepHeading } from "./steps.tsx";
 
 /** After this long sending, the status line says a slow connection can take 2 minutes. */
 export const SLOW_AFTER_MS = 15_000;
@@ -37,6 +38,12 @@ export interface ProofFormProps {
 	/** A `due` page that takes a screenshot (`view.takesProof`). */
 	readonly view: DepositView;
 	readonly studioName: string;
+	/**
+	 * The kind of the method picked in step 2: "How did you pay?" follows each
+	 * new pick, one way (a change in the form itself stays until the next pick).
+	 * Null when nothing is picked.
+	 */
+	readonly paidWith: DepositMethodKind | null;
 	/** Reads the page again: its state now, "gone" (a 404) or "failed". */
 	reread(): Promise<DepositState | "gone" | "failed">;
 	/** The page left `due` (sent, or changed under the form): the screen moves focus to its message. */
@@ -61,6 +68,7 @@ export function ProofForm({
 	token,
 	view,
 	studioName,
+	paidWith,
 	reread,
 	onLeftDue,
 	onGone,
@@ -89,7 +97,12 @@ export function ProofForm({
 	const kinds = view.kinds;
 	const form = useAppForm({
 		defaultValues: {
-			method: kinds.length === 1 ? kinds[0] : "",
+			method:
+				paidWith && kinds.includes(paidWith)
+					? paidWith
+					: kinds.length === 1
+						? kinds[0]
+						: "",
 		} as ProofValues,
 		validationLogic: revalidateLogic({
 			mode: "submit",
@@ -113,6 +126,14 @@ export function ProofForm({
 			setFocusSummary(true);
 		},
 	});
+
+	// A pick in step 2 sets the answer; a re-render with the same pick never does.
+	const appliedPaidWith = useRef(paidWith);
+	useEffect(() => {
+		if (paidWith === appliedPaidWith.current) return;
+		appliedPaidWith.current = paidWith;
+		if (paidWith) form.setFieldValue("method", paidWith);
+	}, [paidWith, form]);
 
 	async function send(values: ProofValues): Promise<void> {
 		if (inFlight.current || blocked.current) return;
@@ -269,8 +290,13 @@ export function ProofForm({
 	const busy = sending || proof.kind === "preparing" || blockedUntil !== null;
 
 	return (
-		<section className="deposit-block" aria-labelledby="proof-title">
-			<h2 id="proof-title">{copy.form.title}</h2>
+		<section
+			className="deposit-block deposit-due-proof"
+			aria-labelledby="proof-title"
+		>
+			<StepHeading step={3} id="proof-title" focusable>
+				{copy.form.title}
+			</StepHeading>
 			{view.lastProofRejected ? (
 				<p className="deposit-note">{copy.rejected}</p>
 			) : null}
