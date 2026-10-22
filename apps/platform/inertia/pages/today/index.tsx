@@ -72,7 +72,7 @@ export default function TodayIndex({
 					className="lg:col-span-7"
 				>
 					{needsYou.length === 0 ? (
-						<CardContent className="py-4 text-sm text-muted-foreground">
+						<CardContent className="px-4 py-4 text-sm text-muted-foreground">
 							{emptyText("needsYou", tenant.role)}
 						</CardContent>
 					) : (
@@ -90,7 +90,7 @@ export default function TodayIndex({
 						lateChecklist ? "lg:row-span-3" : "lg:row-span-2",
 					)}
 				>
-					<CardContent className="flex flex-col gap-4 py-4">
+					<CardContent className="flex flex-col gap-4 px-4 py-4">
 						{sessions.rows.length === 0 ? (
 							<p className="text-sm text-muted-foreground">
 								{emptyText("sessions", tenant.role, sessions.scope)}
@@ -125,7 +125,7 @@ export default function TodayIndex({
 					className="lg:col-span-7"
 				>
 					{waiting.rows.length === 0 ? (
-						<CardContent className="py-4 text-sm text-muted-foreground">
+						<CardContent className="px-4 py-4 text-sm text-muted-foreground">
 							{emptyText("waiting", tenant.role)}
 						</CardContent>
 					) : (
@@ -247,15 +247,15 @@ function RowList({ rows, slug }: { rows: TodayRow[]; slug: string }) {
 	);
 }
 
-/** "See all 7 in the Inbox": a quiet link under a group that has more rows than are shown. */
+/** "See all 7 in the Inbox": a link under a group that has more rows than are shown. Violet, as actions are, so it reads as a link. */
 function SeeAll({ href, text }: { href: string; text: string }) {
 	return (
 		<div className="px-4 pb-3">
 			<Link
 				href={href}
 				className={cn(
-					buttonVariants({ variant: "ghost", size: "sm" }),
-					"-ml-3",
+					buttonVariants({ variant: "link", size: "sm" }),
+					"px-0 has-[>svg]:px-0",
 				)}
 			>
 				{text}
