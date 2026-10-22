@@ -109,12 +109,22 @@ export const DISPLAY_FACES: Record<FontKey, string | null> = {
 	sans: "var(--body-face)",
 };
 
-/** Only what brandingCss writes: letters, digits, spaces and # : ; , . ( ) { } @ - */
+/** Only these characters: letters, digits, spaces and # : ; , . ( ) { } @ - */
 const SAFE_CSS = /^[a-zA-Z0-9 #:;,.(){}@-]*$/;
 
-/** Whether `css` holds nothing brandingCss would not write: no quote, slash, backslash, angle bracket, ampersand or control character. */
+/** The CSS that loads or runs something, with or without a slash-free target: brandingCss writes none of it. */
+const LOADS_OR_RUNS = /url\(|@import|expression\(|@charset/i;
+
+/**
+ * Whether `css` passes two checks: every character is a letter, digit, space
+ * or one of # : ; , . ( ) { } @ - (so no quote, slash, backslash, angle
+ * bracket, ampersand or control character), and it holds neither `url(`,
+ * `@import`, `expression(` nor `@charset`, in any letter case. It does not
+ * parse the CSS: the text is safe because brandingCss builds it from fixed
+ * strings and checked `#rrggbb` values, and this is a second line behind that.
+ */
 export function isSafeCss(css: string): boolean {
-	return SAFE_CSS.test(css);
+	return SAFE_CSS.test(css) && !LOADS_OR_RUNS.test(css);
 }
 
 function tokenRule(tokens: AccentTokens): string {

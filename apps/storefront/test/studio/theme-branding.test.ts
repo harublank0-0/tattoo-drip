@@ -166,6 +166,38 @@ describe("isSafeCss (TAT-54)", () => {
 	});
 });
 
+describe("isSafeCss and the functions that load things (TAT-54)", () => {
+	test("refuses url(), @import, expression() and @charset in any letter case, with a slash-free target", () => {
+		for (const css of [
+			"html{background:url(x)}",
+			"html{background:URL(x)}",
+			"html{background:uRl(x)}",
+			"html{background:image-set(url(x) 1x)}",
+			"@import url(x);",
+			"@import x;",
+			"@IMPORT x;",
+			"@Import x;",
+			"html{width:expression(x)}",
+			"html{width:EXPRESSION(x)}",
+			"html{width:Expression(x)}",
+			"@charset x;",
+			"@CHARSET x;",
+			"@media (prefers-color-scheme: dark){html:root{--stencil:url(x)}}",
+		]) {
+			assert.equal(isSafeCss(css), false, css);
+		}
+	});
+
+	test("still accepts the rules brandingCss writes", () => {
+		for (const css of [
+			"html:root{--display-face:var(--body-face)}",
+			"@media (prefers-color-scheme: dark){html:root{--stencil:#ce6060}}",
+		]) {
+			assert.equal(isSafeCss(css), true, css);
+		}
+	});
+});
+
 describe("brandingCss (TAT-54)", () => {
 	test("the default theme adds no CSS", () => {
 		assert.equal(brandingCss(DEFAULT_THEME_CONFIG), null);
