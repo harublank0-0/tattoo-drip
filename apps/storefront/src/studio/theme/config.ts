@@ -180,3 +180,30 @@ function isImageSide(value: unknown): value is number {
 		(value as number) <= MAX_IMAGE_SIDE
 	);
 }
+
+/**
+ * The studio's theme from whatever the API sent as `Studio.storefront`
+ * (source.ts): `{ theme, branding: { logo, heroImage, colors: { accent,
+ * accentDark }, font }, sections }`. Not an object (today: the API sends
+ * nothing) is the default theme; each value is checked on its own, and one
+ * that fails is that value's default. Images are accepted only from
+ * `imageOrigin` (the API's origin; null accepts none).
+ */
+export function parseThemeConfig(
+	input: unknown,
+	imageOrigin: string | null,
+): ThemeConfig {
+	if (!isRecord(input)) return DEFAULT_THEME_CONFIG;
+	const key = readThemeKey(own(input, "theme"));
+	const branding = own(input, "branding");
+	const colors = own(branding, "colors");
+	return {
+		key,
+		sections: readSections(own(input, "sections"), key),
+		accent: readHexColor(own(colors, "accent")),
+		accentDark: readHexColor(own(colors, "accentDark")),
+		font: readFontKey(own(branding, "font")),
+		logo: readBrandImage(own(branding, "logo"), imageOrigin),
+		heroImage: readBrandImage(own(branding, "heroImage"), imageOrigin),
+	};
+}

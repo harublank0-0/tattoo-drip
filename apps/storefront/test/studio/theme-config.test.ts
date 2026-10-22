@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
+	DEFAULT_THEME_CONFIG,
 	FONT_KEYS,
+	parseThemeConfig,
 	readBrandImage,
 	readFontKey,
 	readHexColor,
@@ -331,5 +333,172 @@ describe("readBrandImage (TAT-54)", () => {
 			readBrandImage(image("http://api.test/uploads/a.png"), "http://api.test"),
 			null,
 		);
+	});
+});
+
+describe("parseThemeConfig (TAT-54)", () => {
+	const API = "https://api.example.com";
+	const LOGO = {
+		url: "https://api.example.com/uploads/tenants/t/brand_logo/logo.png",
+		width: 600,
+		height: 200,
+		alt: null,
+	};
+	const COVER = {
+		url: "https://api.example.com/uploads/tenants/t/cover_photo/cover.jpg",
+		width: 2048,
+		height: 1024,
+		alt: null,
+	};
+	const BRANDED = {
+		theme: "stencil-and-ink",
+		branding: {
+			logo: LOGO,
+			heroImage: COVER,
+			colors: { accent: "#B91C1C", accentDark: "#fca5a5" },
+			font: "serif",
+		},
+		sections: [
+			{ type: "inquiry", props: {} },
+			{ type: "artists", props: {} },
+		],
+	};
+
+	test("nothing sent (every studio today) is the default theme", () => {
+		assert.deepEqual(DEFAULT_THEME_CONFIG, {
+			key: "stencil-and-ink",
+			sections: ["artists", "inquiry"],
+			accent: null,
+			accentDark: null,
+			font: "eczar",
+			logo: null,
+			heroImage: null,
+		});
+		for (const value of [
+			undefined,
+			null,
+			"stencil-and-ink",
+			42,
+			true,
+			[],
+			[BRANDED],
+		]) {
+			assert.deepEqual(
+				parseThemeConfig(value, API),
+				DEFAULT_THEME_CONFIG,
+				String(value),
+			);
+		}
+	});
+
+	test("a whole config, every value checked", () => {
+		assert.deepEqual(parseThemeConfig(BRANDED, API), {
+			key: "stencil-and-ink",
+			sections: ["inquiry", "artists"],
+			accent: "#b91c1c",
+			accentDark: "#fca5a5",
+			font: "serif",
+			logo: { src: LOGO.url, width: 600, height: 200 },
+			heroImage: { src: COVER.url, width: 2048, height: 1024 },
+		});
+	});
+
+	test("one bad value falls back alone", () => {
+		const parsed = parseThemeConfig(
+			{
+				...BRANDED,
+				branding: {
+					...BRANDED.branding,
+					logo: { ...LOGO, url: "https://evil.example/logo.png" },
+					colors: {
+						accent: "red;background:url(//evil)",
+						accentDark: "#fca5a5",
+					},
+				},
+			},
+			API,
+		);
+		assert.equal(parsed.logo, null);
+		assert.equal(parsed.accent, null);
+		assert.equal(parsed.accentDark, "#fca5a5");
+		assert.equal(parsed.font, "serif");
+		assert.deepEqual(parsed.heroImage, {
+			src: COVER.url,
+			width: 2048,
+			height: 1024,
+		});
+		assert.deepEqual(parsed.sections, ["inquiry", "artists"]);
+	});
+
+	test("every value hostile or of the wrong type is the default theme", () => {
+		const hostile = {
+			theme: "}</style><script>alert(1)</script>",
+			branding: {
+				logo: { url: "javascript:alert(1)", width: 1, height: 1 },
+				heroImage: {
+					url: "data:image/svg+xml,<svg onload=alert(1)>",
+					width: 1,
+					height: 1,
+				},
+				colors: {
+					accent: "expression(alert(1))",
+					accentDark: "url(//evil.example/x.png)",
+					primary: "#111111",
+				},
+				font: "Comic Sans MS; src: url(//evil.example/font.woff2)",
+			},
+			sections: "artists;inquiry",
+		};
+		assert.deepEqual(parseThemeConfig(hostile, API), DEFAULT_THEME_CONFIG);
+		for (const branding of WRONG_TYPES) {
+			assert.deepEqual(
+				parseThemeConfig({ branding }, API),
+				DEFAULT_THEME_CONFIG,
+				String(branding),
+			);
+		}
+	});
+
+	test("reads own properties only, never inherited ones", () => {
+		assert.deepEqual(
+			parseThemeConfig(
+				Object.create({ sections: [], branding: BRANDED.branding }),
+				API,
+			),
+			DEFAULT_THEME_CONFIG,
+		);
+		assert.deepEqual(
+			parseThemeConfig(
+				JSON.parse(
+					'{"__proto__": {"sections": []}, "branding": {"__proto__": {"font": "sans"}}}',
+				),
+				API,
+			),
+			DEFAULT_THEME_CONFIG,
+		);
+	});
+
+	test("the contract's own example (theme classic, a primary colour, hero and portfolio sections)", () => {
+		assert.deepEqual(
+			parseThemeConfig(
+				{
+					theme: "classic",
+					branding: { colors: { primary: "#111111" }, font: null },
+					sections: [
+						{ type: "hero", props: {} },
+						{ type: "portfolio", props: {} },
+					],
+				},
+				API,
+			),
+			{ ...DEFAULT_THEME_CONFIG, sections: ["inquiry"] },
+		);
+	});
+
+	test("without the API's origin, images are dropped and the rest is kept", () => {
+		const parsed = parseThemeConfig(BRANDED, null);
+		assert.equal(parsed.logo, null);
+		assert.equal(parsed.heroImage, null);
+		assert.equal(parsed.accent, "#b91c1c");
 	});
 });
