@@ -11,13 +11,15 @@ import VerifyEmailBar from "~/components/shell/verify_email_bar";
 
 /**
  * The dashboard shell (TAT-67) for every tenant page. Below 1024px: a top
- * bar (studio switcher, account menu) and a bottom tab bar; from 1024px:
- * a left sidebar. Both list the destinations from `navItems`; add new
- * areas there.
+ * bar (studio switcher, account menu) and a bottom tab bar with a More
+ * menu; from 1024px: a left sidebar. Both list the destinations from
+ * `navItems`; add new areas there.
  */
 export default function AppLayout({ children }: { children: ReactNode }) {
-	const { tenant, inboxCount, proofCount } = usePage().props;
-	const items = tenant ? navItems(tenant, inboxCount, proofCount) : [];
+	const { tenant, inboxCount, todayCount } = usePage().props;
+	const items = tenant
+		? navItems(tenant, { inbox: inboxCount, today: todayCount })
+		: [];
 	const tabs = showTabBar(items);
 
 	return (

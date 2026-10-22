@@ -5,7 +5,7 @@ import BaseInertiaMiddleware from "@adonisjs/inertia/inertia_middleware";
 import type User from "#models/user";
 import InquiryService from "#modules/inquiries/services/inquiry_service";
 import AlertService from "#modules/notifications/services/alert_service";
-import DepositService from "#modules/payments/services/deposit_service";
+import WaitingService from "#modules/projects/services/waiting_service";
 import {
 	INVITATION_LINK_FLASH,
 	INVITATION_LINK_PAGE,
@@ -58,15 +58,17 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 					)
 				: null;
 
-		// The Projects badge: deposit proofs waiting for an owner (TAT-65).
-		const proofCount =
-			tenant && membership?.role === "owner" && auth?.user
+		// The Today badge (TAT-107): the projects that need this member. Owners
+		// also have the screenshots (they used to be the Projects badge).
+		const todayCount =
+			tenant && membership && auth?.user
 				? await ensureDbContext(
 						{ userId: auth.user.id, tenantId: tenant.id },
 						async () =>
-							(
-								await ctx.containerResolver.make(DepositService)
-							).countPendingProofs(tenant),
+							(await ctx.containerResolver.make(WaitingService)).needsYouCount(
+								tenant,
+								membership,
+							),
 					)
 				: null;
 
@@ -119,8 +121,8 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 			),
 			/** New inquiries waiting in the inbox; null unless an owner is on a tenant page. */
 			inboxCount: ctx.inertia.always(inboxCount),
-			/** Deposit proofs waiting for an owner; null unless an owner is on a tenant page. */
-			proofCount: ctx.inertia.always(proofCount),
+			/** The projects that need this member (TAT-107): Today's badge; null off tenant pages. */
+			todayCount: ctx.inertia.always(todayCount),
 			/** The member's unread alerts here (TAT-52); null unless on a tenant page. */
 			alertCount: ctx.inertia.always(alertCount),
 		};

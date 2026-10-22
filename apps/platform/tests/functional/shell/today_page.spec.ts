@@ -239,6 +239,10 @@ test.group("Today", (group) => {
 			meta: null,
 			target: projectTarget(made.booked[0].id, "sessions"),
 		});
+		// The badge counts the projects that need the studio, not the request
+		// (the Inbox counts that): nothing is counted twice.
+		assert.equal(props.todayCount, 5);
+		assert.equal(props.inboxCount, 1);
 		assert.match(props.dateText, /^[A-Z][a-z]+ \d{1,2} [A-Z][a-z]+$/);
 		assert.equal(props.date, todayIn(KTM));
 		assert.equal(props.timezone, KTM);
@@ -667,5 +671,29 @@ test.group("Today", (group) => {
 		for (const secret of secrets) {
 			assert.notInclude(everything, secret);
 		}
+	});
+	test("the badge costs a fixed number of queries on every page", async ({
+		client,
+		assert,
+	}) => {
+		const s = await studio("today-badge-107");
+		const projectsPage = async () => {
+			const { result, queries } = await recordQueries(() =>
+				client
+					.get("/t/today-badge-107/projects")
+					.withInertia()
+					.loginAs(s.owner),
+			);
+			result.assertStatus(200);
+			return { queries: queries.length, count: result.inertiaProps.todayCount };
+		};
+		await inTenant(s.tenant, () => seedGroups(s.tenant, s.sitaProfile.id, 1));
+		const one = await projectsPage();
+		await inTenant(s.tenant, () => seedGroups(s.tenant, s.sitaProfile.id, 3));
+		const four = await projectsPage();
+
+		assert.equal(one.count, 5);
+		assert.equal(four.count, 20);
+		assert.equal(four.queries, one.queries);
 	});
 });
