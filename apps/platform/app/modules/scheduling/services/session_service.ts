@@ -194,7 +194,7 @@ export default class SessionService {
 	}
 
 	/**
-	 * The first scheduled session that has not ended yet (any kind) of each of
+	 * The first scheduled session that has not started yet (any kind) of each of
 	 * `projectIds`, by project id; a project without one has no entry. One
 	 * query for many projects: the Projects list's "Next session" (TAT-109).
 	 * Pass only projects the member may open.
@@ -209,7 +209,8 @@ export default class SessionService {
 			.where("tenant_id", tenant.id)
 			.whereIn("project_id", projectIds)
 			.where("status", "scheduled")
-			.where("ends_at", ">", now.toJSDate())
+			// Not started: one under way is not "next" (the calendar and Today show it).
+			.where("starts_at", ">", now.toJSDate())
 			.orderBy("starts_at", "asc")
 			.orderBy("id", "asc");
 		const next = new Map<string, ProjectSession>();

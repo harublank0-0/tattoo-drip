@@ -138,7 +138,7 @@ test.group("SessionService.nextScheduledFor (TAT-109)", (group) => {
 		sessions = await app.container.make(SessionService);
 	});
 
-	test("gives each project its first scheduled session that has not ended, in one query", async ({
+	test("gives each project its first scheduled session that has not started, in one query", async ({
 		assert,
 	}) => {
 		const { tenant } = await studioWithOwner();
@@ -150,11 +150,25 @@ test.group("SessionService.nextScheduledFor (TAT-109)", (group) => {
 			const three = await makeProject(tenant, customer, { status: "booked" });
 			const four = await makeProject(tenant, customer, { status: "booked" });
 			const none = await makeProject(tenant, customer, { status: "booked" });
+			const underway = await makeProject(tenant, customer, {
+				status: "booked",
+			});
 
 			await makeSession(tenant, one, artist, slot(10));
 			const soonest = await makeSession(tenant, one, artist, slot(3));
 			// Ended yesterday (still "scheduled" until someone records it): skipped.
 			await makeSession(tenant, two, artist, slot(-1));
+			// Under way now (started an hour ago): it is not the "next" one, whatever its end.
+			await makeSession(tenant, two, artist, {
+				startsAt: DateTime.utc().minus({ hours: 1 }),
+				endsAt: DateTime.utc().plus({ hours: 1 }),
+			});
+			// (another artist: one artist cannot be in two sessions at once)
+			const other = await makeArtist(tenant, "other");
+			await makeSession(tenant, underway, other, {
+				startsAt: DateTime.utc().minus({ minutes: 30 }),
+				endsAt: DateTime.utc().plus({ hours: 2 }),
+			});
 			const upcoming = await makeSession(tenant, two, artist, slot(5));
 			for (const [day, status] of [
 				[20, "cancelled"],
@@ -168,20 +182,38 @@ test.group("SessionService.nextScheduledFor (TAT-109)", (group) => {
 				...slot(7),
 				kind: "touch_up",
 			});
-			return { one, two, three, four, none, soonest, upcoming, touchUp };
+			return {
+				one,
+				two,
+				three,
+				four,
+				none,
+				underway,
+				soonest,
+				upcoming,
+				touchUp,
+			};
 		});
-		const { one, two, three, four, none } = seeded;
+		const { one, two, three, four, none, underway } = seeded;
 
 		// recordQueries wraps the tenant context: it cannot run inside one.
 		const { result, queries } = await recordQueries(() =>
 			inTenant(tenant, () =>
-				sessions.nextScheduledFor(tenant, [one.id, two.id, three.id, none.id]),
+				sessions.nextScheduledFor(tenant, [
+					one.id,
+					two.id,
+					three.id,
+					none.id,
+					underway.id,
+				]),
 			),
 		);
 		assert.equal(result.get(one.id)?.id, seeded.soonest.id);
 		assert.equal(result.get(two.id)?.id, seeded.upcoming.id);
 		assert.isFalse(result.has(three.id));
 		assert.isFalse(result.has(none.id));
+		// A session that has begun is not a next session: the project shows none.
+		assert.isFalse(result.has(underway.id));
 		assert.lengthOf(
 			queries.filter((sql) => sql.includes('from "project_sessions"')),
 			1,
