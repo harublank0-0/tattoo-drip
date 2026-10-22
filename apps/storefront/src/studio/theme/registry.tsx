@@ -1,14 +1,6 @@
-import type { ComponentType } from "react";
+import type { ComponentProps, ComponentType } from "react";
 import { ArtistPage, StudioPage } from "../components/pages.tsx";
-import type { ArtistPageData, StudioPageData } from "../loaders.ts";
 import { DEFAULT_THEME_KEY, type ThemeKey } from "./config.ts";
-
-/** What a theme's pages take: the loader's data and the intake form's site key. */
-export interface ThemePageProps<Data> {
-	data: Data;
-	/** The intake form's public Turnstile site key (TAT-57). */
-	challengeSiteKey?: string | null;
-}
 
 /**
  * A theme (TAT-54): the studio page's two pages as React components of this
@@ -17,8 +9,8 @@ export interface ThemePageProps<Data> {
  * intake form) as it is, and never the deposit page.
  */
 export interface Theme {
-	readonly StudioPage: ComponentType<ThemePageProps<StudioPageData>>;
-	readonly ArtistPage: ComponentType<ThemePageProps<ArtistPageData>>;
+	readonly StudioPage: ComponentType<ComponentProps<typeof StudioPage>>;
+	readonly ArtistPage: ComponentType<ComponentProps<typeof ArtistPage>>;
 }
 
 /** Every theme, by key. Stencil & Ink is the page TAT-97 and TAT-105 built. */
@@ -34,13 +26,13 @@ export function themeFor(key: string): Theme {
 }
 
 /** `/` in the studio's theme. */
-export function ThemedStudioPage(props: ThemePageProps<StudioPageData>) {
+export function ThemedStudioPage(props: ComponentProps<typeof StudioPage>) {
 	const Page = themeFor(props.data.theme.key).StudioPage;
 	return <Page {...props} />;
 }
 
 /** `/artists/$slug` in the studio's theme. */
-export function ThemedArtistPage(props: ThemePageProps<ArtistPageData>) {
+export function ThemedArtistPage(props: ComponentProps<typeof ArtistPage>) {
 	const Page = themeFor(props.data.theme.key).ArtistPage;
 	return <Page {...props} />;
 }

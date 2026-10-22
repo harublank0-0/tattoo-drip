@@ -166,6 +166,7 @@
    * decoration beside its name. The cover takes the photos' stencil frame and
    * stays short, so the buttons still fit on a phone's first screen.
    */
+  /* `left center` is physical: the page is LTR. A mirrored (RTL) page would need `right center`; object-position has no logical keywords. */
   .profile-logo { display: block; inline-size: auto; max-inline-size: min(12rem, 100%); block-size: 4rem; object-fit: contain; object-position: left center; }
   .profile-cover { position: relative; isolation: isolate; margin: 0 0.375rem 1.875rem 0; }
   .profile-cover img { display: block; inline-size: 100%; block-size: auto; aspect-ratio: 3 / 1; max-block-size: 16rem; object-fit: cover; object-position: 50% 25%; background: var(--stencil-wash); }
