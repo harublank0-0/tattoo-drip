@@ -1342,6 +1342,43 @@ test.group("ProjectService.list and countByStatus", (group) => {
 		});
 	});
 
+	for (const status of ["declined", "cancelled", "completed"] as const) {
+		test(`the ${status} view alone is latest change first too, not in follow-up order (TAT-109)`, async ({
+			assert,
+		}) => {
+			const { tenant, owner } = await studioWithOwner();
+			const member = { userId: owner.id, role: "owner" as const };
+
+			await inTenant(tenant, async () => {
+				const client = await makeClient(tenant);
+				// In follow-up order the longest since contact comes first ("contacted long ago"),
+				// but the other one changed last.
+				const contactedLongAgo = await makeProject(tenant, client, {
+					status,
+					brief: "contacted long ago, changed earlier",
+					lastContactedAt: DateTime.utc().minus({ days: 20 }),
+				});
+				const changedLast = await makeProject(tenant, client, {
+					status,
+					brief: "contacted recently, changed last",
+					lastContactedAt: DateTime.utc().minus({ days: 2 }),
+				});
+				await TattooProject.query()
+					.where("id", contactedLongAgo.id)
+					.update({ updated_at: DateTime.utc().minus({ days: 5 }).toISO() });
+				await TattooProject.query()
+					.where("id", changedLast.id)
+					.update({ updated_at: DateTime.utc().minus({ days: 1 }).toISO() });
+
+				const listed = await projects.list(tenant, member, status, 1);
+				assert.deepEqual(briefsOf(listed.projects), [
+					"contacted recently, changed last",
+					"contacted long ago, changed earlier",
+				]);
+			});
+		});
+	}
+
 	test("pages of 25", async ({ assert }) => {
 		const { tenant, owner } = await studioWithOwner();
 		const member = { userId: owner.id, role: "owner" as const };

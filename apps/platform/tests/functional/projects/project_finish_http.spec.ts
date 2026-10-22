@@ -8,7 +8,7 @@ import { healingCheckDueOn } from "#modules/projects/finish";
 import TattooProject, {
 	type ProjectStatus,
 } from "#modules/projects/models/tattoo_project";
-import { formatDay } from "#modules/projects/quotes";
+import { formatDay, formatMoney } from "#modules/projects/quotes";
 import ProjectSession from "#modules/scheduling/models/project_session";
 import type Tenant from "#modules/tenancy/models/tenant";
 import {
@@ -449,7 +449,11 @@ test.group("Finishing on the project page and the board (TAT-111)", (group) => {
 			"healing_check",
 			LAST_SESSION_END.minus({ days: 2 }),
 		);
-		type Row = { id: string; status: string; balanceOwed: boolean };
+		type Row = {
+			id: string;
+			status: string;
+			line: { text: string; needsYou: boolean; hash: string | null } | null;
+		};
 		const rows = async (status: string, user: User) =>
 			(
 				await client
@@ -460,15 +464,26 @@ test.group("Finishing on the project page and the board (TAT-111)", (group) => {
 
 		assert.deepInclude(
 			(await rows("closed", owner)).find(({ id }) => id === owing.id),
-			{ status: "completed", balanceOwed: true },
+			{
+				status: "completed",
+				line: {
+					text: `${formatMoney(1_500_000n)} still due`,
+					needsYou: false,
+					hash: "payments",
+				},
+			},
 		);
-		assert.deepInclude(
-			(await rows("active", owner)).find(({ id }) => id === healing.id),
-			{ status: "healing_check", balanceOwed: false },
+		// The healing check has no price, so it owes nothing and its row has no line.
+		const healingRow = (await rows("active", owner)).find(
+			({ id }) => id === healing.id,
 		);
-		assert.deepInclude(
-			(await rows("closed", asha)).find(({ id }) => id === owing.id),
-			{ balanceOwed: false },
+		assert.isDefined(healingRow);
+		assert.isNull(healingRow?.line);
+		// The artist's row says nothing about money.
+		const artistRow = (await rows("closed", asha)).find(
+			({ id }) => id === owing.id,
 		);
+		assert.isDefined(artistRow);
+		assert.isNull(artistRow?.line);
 	});
 });

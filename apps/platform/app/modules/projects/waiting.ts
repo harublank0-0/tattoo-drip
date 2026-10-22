@@ -123,7 +123,8 @@ export function waitingOf(
 			depositSettled: facts.depositSettled,
 		});
 		if (isExpired(quote, now)) {
-			// Cancelled within minutes by the sweep, and flagged by the Projects list until then.
+			// Cancelled within minutes by the sweep: no row anywhere until then (the Projects list
+			// shows nothing for it either).
 			if (cancels && !facts.expirySpared) return null;
 		} else if (
 			cancels &&

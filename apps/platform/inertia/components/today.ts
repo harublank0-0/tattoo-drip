@@ -33,7 +33,8 @@ export type TodayRow = {
 
 export type TodayMore = {
 	route: "tenant.inbox.index" | "tenant.projects.index";
-	status: string | null;
+	/** The Projects list view that holds exactly the group (`?waiting=`); null for the Inbox. */
+	waiting: string | null;
 };
 
 export type TodayGroup = {

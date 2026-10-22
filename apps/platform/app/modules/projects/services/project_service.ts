@@ -158,9 +158,10 @@ export default class ProjectService {
 
 	/**
 	 * A page of the projects `member` may see (the `findFor` rule), for the
-	 * Active view, the Closed view or one status. Active and single-status
-	 * views sort for follow-up: never contacted first, then the longest
-	 * since contact; the Closed view sorts the most recently changed first.
+	 * Active view, the Closed view or one status. Active and open
+	 * single-status views sort for follow-up: never contacted first, then the
+	 * longest since contact; the Closed view and each closed status (declined,
+	 * cancelled, completed) sort the most recently changed first.
 	 */
 	async list(
 		tenant: TenantRef,
@@ -174,7 +175,10 @@ export default class ProjectService {
 		else if (filter === "closed") query.whereIn("status", [...CLOSED_STATUSES]);
 		else query.where("status", filter);
 
-		if (filter === "closed") {
+		if (
+			filter === "closed" ||
+			(filter !== "active" && CLOSED_STATUSES.includes(filter))
+		) {
 			query
 				.orderByRaw("coalesce(updated_at, created_at) desc")
 				.orderBy("id", "desc");
@@ -215,6 +219,32 @@ export default class ProjectService {
 				open.orWhereIn("id", this.deposits.pendingProofProjects(tenant));
 			}
 		});
+		return query.orderBy("created_at", "asc").orderBy("id", "asc");
+	}
+
+	/**
+	 * The sort keys of every live project in an open view that `member` may
+	 * see (the `findFor` rule), oldest first: the Projects list's Active and
+	 * single-status views (TAT-109). Unpaginated because the list orders them
+	 * by what waits (WaitingService.work) and cuts the page afterwards; the
+	 * page's full rows come from `findManyFor`.
+	 */
+	async listKeys(
+		tenant: TenantRef,
+		member: Member,
+		filter: "active" | ProjectStatus,
+	): Promise<
+		Pick<TattooProject, "id" | "status" | "createdAt" | "lastContactedAt">[]
+	> {
+		const query = TattooProject.query().select(
+			"id",
+			"status",
+			"created_at",
+			"last_contacted_at",
+		);
+		await this.scopeTo(query, tenant, member);
+		if (filter === "active") query.whereIn("status", [...ACTIVE_STATUSES]);
+		else query.where("status", filter);
 		return query.orderBy("created_at", "asc").orderBy("id", "asc");
 	}
 

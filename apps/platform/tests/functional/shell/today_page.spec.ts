@@ -2,7 +2,6 @@ import testUtils from "@adonisjs/core/services/test_utils";
 import type { ApiClient } from "@japa/api-client";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
-import Artist from "#modules/artists/models/artist";
 import Client from "#modules/clients/models/client";
 import Inquiry from "#modules/inquiries/models/inquiry";
 import ImageService from "#modules/media/services/image_service";
@@ -10,7 +9,7 @@ import PaymentMethodService from "#modules/payments/services/payment_method_serv
 import TattooProject, {
 	type ProjectStatus,
 } from "#modules/projects/models/tattoo_project";
-import { expiresAtFor, todayIn } from "#modules/projects/quotes";
+import { todayIn } from "#modules/projects/quotes";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { addArtist } from "#tests/helpers/artists";
 import { proofFor } from "#tests/helpers/payments";
@@ -30,15 +29,14 @@ import {
 	studioWithOwner,
 	twoStudios,
 } from "#tests/helpers/tenants";
-
-const KTM = "Asia/Kathmandu";
-const SITA_THAPA = "सीता थापा";
+import {
+	KTM,
+	SITA_THAPA,
+	seedGroups,
+	studio,
+} from "#tests/helpers/waiting_fixtures";
 
 const page = (slug: string) => `/t/${slug}/today`;
-const dayIn = (days: number) =>
-	DateTime.fromISO(todayIn(KTM), { zone: "utc" })
-		.plus({ days })
-		.toFormat("yyyy-MM-dd");
 
 type Who = Parameters<ReturnType<ApiClient["get"]>["loginAs"]>[0];
 
@@ -60,103 +58,13 @@ type Group = {
 		meta: string | null;
 		target: { route: string; id: string; hash: string | null };
 	}[];
-	more: { route: string; status: string | null } | null;
+	more: { route: string; waiting: string | null } | null;
 };
 const groupsOf = (props: { needsYou?: unknown }) => props.needsYou as Group[];
 const keysOf = (props: { needsYou?: unknown }) =>
 	groupsOf(props).map(({ key }) => key);
 const groupOf = (props: { needsYou?: unknown }, key: string) =>
 	groupsOf(props).find((group) => group.key === key);
-
-/** A studio with an owner, Asha (an artist member linked to her profile) and Sita (a profile without an account). */
-async function studio(slug = "today-107", name = "Today Ink") {
-	const { owner, tenant } = await studioWithOwner(slug, name);
-	const asha = await artistIn(tenant, `asha@${slug}.example`);
-	const profiles = await inTenant(tenant, async () => ({
-		ashaProfile: await Artist.create({
-			tenantId: tenant.id,
-			name: "Asha",
-			slug: "asha",
-			userId: asha.id,
-		}),
-		sitaProfile: await Artist.create({
-			tenantId: tenant.id,
-			name: "Sita",
-			slug: "sita",
-		}),
-	}));
-	return { owner, tenant, asha, ...profiles };
-}
-
-/**
- * One of each thing Today groups, `copies` times over (each with a client of
- * its own): a screenshot to check, a request, a price to send, a price
- * ending tomorrow, an unpaid deposit whose link is four days old, a booked
- * project with no session, and a price the client has yet to answer. Call
- * it inside `inTenant(tenant, …)`.
- */
-async function seedGroups(
-	tenant: { id: string },
-	preferredArtistId: string | null = null,
-	copies = 1,
-	label = "",
-) {
-	const made = {
-		proof: [] as TattooProject[],
-		inquiry: [] as Inquiry[],
-		price: [] as TattooProject[],
-		ending: [] as TattooProject[],
-		deposit: [] as TattooProject[],
-		booked: [] as TattooProject[],
-		sent: [] as TattooProject[],
-		clients: [] as Client[],
-	};
-	const project = async (status: ProjectStatus, name: string) => {
-		const client = await makeClient(tenant, { name: `${label}${name}` });
-		made.clients.push(client);
-		return makeProject(tenant, client, { status });
-	};
-	for (let at = 0; at < copies; at++) {
-		const n = `${at + 1}`;
-		const proof = await project("deposit_pending", `Proof ${n}`);
-		await makeQuote(tenant, proof);
-		await proofFor(tenant, proof);
-		made.proof.push(proof);
-
-		const requester = await makeClient(tenant, {
-			name: `${label}${SITA_THAPA}`,
-		});
-		made.clients.push(requester);
-		made.inquiry.push(
-			await makeInquiry(tenant, requester, {
-				contactName: `${label}${SITA_THAPA}`,
-				preferredArtistId,
-			}),
-		);
-
-		made.price.push(await project("reviewing", `Price ${n}`));
-
-		const ending = await project("quoted", `Ending ${n}`);
-		await makeQuote(tenant, ending, {
-			expiresAt: expiresAtFor(dayIn(1), KTM),
-		});
-		made.ending.push(ending);
-
-		const deposit = await project("deposit_pending", `Deposit ${n}`);
-		await makeQuote(tenant, deposit);
-		await makeDepositLink(tenant, deposit, {
-			updatedAt: DateTime.utc().minus({ days: 4 }),
-		});
-		made.deposit.push(deposit);
-
-		made.booked.push(await project("booked", `Booked ${n}`));
-
-		const sent = await project("quoted", `Sent ${n}`);
-		await makeQuote(tenant, sent);
-		made.sent.push(sent);
-	}
-	return made;
-}
 
 const idsIn = (props: unknown) => JSON.stringify(props);
 
@@ -336,18 +244,90 @@ test.group("Today", (group) => {
 		);
 		assert.deepEqual(prices.more, {
 			route: "tenant.projects.index",
-			status: "reviewing",
+			waiting: "prices",
 		});
 		const requests = groupOf(props, "requests") as Group;
 		assert.equal(requests.count, 7);
 		assert.lengthOf(requests.rows, 5);
 		assert.deepEqual(requests.more, {
 			route: "tenant.inbox.index",
-			status: null,
+			waiting: null,
 		});
 		assert.deepEqual(
 			requests.rows.map(({ name }) => name),
 			["Asker 0", "Asker 1", "Asker 2", "Asker 3", "Asker 4"],
+		);
+	});
+
+	test("See all opens the same rows on Projects", async ({
+		client,
+		assert,
+	}) => {
+		const s = await studio("today-seeall-109");
+		await inTenant(s.tenant, () => seedGroups(s.tenant, null, 6));
+
+		const today = await propsOf(client, "today-seeall-109", s.owner);
+
+		// Every project group that has a See all (a group with five rows or fewer has none).
+		const withMore = groupsOf(today).filter(
+			({ key, more }) => key !== "requests" && more !== null,
+		);
+		assert.isAbove(withMore.length, 0);
+		for (const group of withMore) {
+			assert.deepEqual(
+				group.more,
+				{ route: "tenant.projects.index", waiting: group.key },
+				group.key,
+			);
+			const opened = await client
+				.get(`/t/today-seeall-109/projects?waiting=${group.key}`)
+				.withInertia()
+				.loginAs(s.owner);
+			opened.assertStatus(200);
+			// The page the link opens: the count on the link, and the five rows Today showed first.
+			assert.equal(opened.inertiaProps.page.total, group.count, group.key);
+			assert.deepEqual(
+				opened.inertiaProps.projects
+					.slice(0, group.rows.length)
+					.map(({ id }: { id: string }) => id),
+				group.rows.map(({ id }) => id),
+				group.key,
+			);
+		}
+		// The owner's screenshots are never capped (TAT-107): every row shows and there is
+		// no link. The list still holds them under ?waiting=proofs.
+		const proofs = groupOf(today, "proofs") as Group;
+		assert.equal(proofs.rows.length, proofs.count);
+		assert.isNull(proofs.more);
+		const proofsList = await client
+			.get("/t/today-seeall-109/projects?waiting=proofs")
+			.withInertia()
+			.loginAs(s.owner);
+		assert.deepEqual(
+			proofsList.inertiaProps.projects.map(({ id }: { id: string }) => id),
+			proofs.rows.map(({ id }) => id),
+		);
+		// Requests still go to the Inbox.
+		assert.deepEqual((groupOf(today, "requests") as Group).more, {
+			route: "tenant.inbox.index",
+			waiting: null,
+		});
+
+		const waitingOn = today.waiting;
+		assert.deepEqual(waitingOn.more, {
+			route: "tenant.projects.index",
+			waiting: "on_client",
+		});
+		const opened = await client
+			.get("/t/today-seeall-109/projects?waiting=on_client")
+			.withInertia()
+			.loginAs(s.owner);
+		assert.equal(opened.inertiaProps.page.total, waitingOn.count);
+		assert.deepEqual(
+			opened.inertiaProps.projects
+				.slice(0, waitingOn.rows.length)
+				.map(({ id }: { id: string }) => id),
+			waitingOn.rows.map(({ id }: { id: string }) => id),
 		);
 	});
 

@@ -189,9 +189,6 @@ export const STATUS_LABELS: Record<string, string> = {
 	screenshot_to_check: "Screenshot to check",
 };
 
-/** The flag a project row shows while a deposit screenshot waits for an owner. */
-export const PROOF_WAITING_STATUS = "screenshot_to_check";
-
 /** Whose move it is (TAT-98); each group has its own colour and icon. */
 export type StatusGroup = "studio" | "client" | "booked" | "chair" | "closed";
 
@@ -250,29 +247,39 @@ export function suggestedDeposit(
 	return Math.min(Math.floor(total), Math.round((total * percent) / 100));
 }
 
-/** One row of the projects list. */
+/** One row of the projects list (TAT-109). */
 export type ProjectRow = {
 	id: string;
 	clientName: string | null;
+	/** The start of the brief (TAT-115 will make it the piece title). */
+	piece: string;
+	/** Owners only; null for artists and for a project without an artist. */
 	artistName: string | null;
 	status: string;
-	contactedText: string;
-	/** Booked, but no tattoo session is scheduled. */
-	noSession: boolean;
-	/** Owners: a deposit screenshot waits for a decision. */
-	proofWaiting: boolean;
-	/** Owners: a closed project holds deposit money with no outcome recorded. */
-	depositToSettle: boolean;
-	/** Owners: the quote expired but a late decision on the deposit spares the project; revise, take the rest or withdraw. */
-	quoteLapsed: boolean;
-	/** Owners: a finished fixed-price project with money still owed (TAT-111). */
-	balanceOwed: boolean;
+	/** What waits (WaitingService), else an owner's money fact; null when neither. */
+	line: { text: string; needsYou: boolean; hash: string | null } | null;
+	/** "Sat 24 Oct, 11:00": the next scheduled session that has not ended; null when none. */
+	nextSessionText: string | null;
+	/** "Contacted 2 days ago on WhatsApp (Quote)"; null when there was no contact. */
+	contactedText: string | null;
 };
 
 export type ProjectListProps = {
-	/** "active", "closed" or one status. */
+	/** The current chip: "active", "needs_you", "closed" or one status. */
 	filter: string;
-	counts: { active: number; closed: number; byStatus: Record<string, number> };
+	/** A Today group key or "on_client"; null for a plain chip view. */
+	waiting: string | null;
+	/** The chosen sort; null where the view has its own order (waiting and closed views). */
+	sort: "needs" | "contact" | null;
+	/** The sort asked for, kept in the views that have their own order so a chip can carry it back. */
+	chosenSort: "needs" | "contact";
+	counts: {
+		active: number;
+		/** WaitingService.work().needsYou.length: the Today badge's number. */
+		needsYou: number;
+		closed: number;
+		byStatus: Record<string, number>;
+	};
 	projects: ProjectRow[];
 	page: { current: number; last: number; total: number };
 };

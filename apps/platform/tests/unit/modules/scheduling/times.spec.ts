@@ -3,6 +3,7 @@ import { DateTime, Settings } from "luxon";
 import {
 	localDateTime,
 	sessionFormValues,
+	sessionStartText,
 	sessionTimeText,
 } from "#modules/scheduling/times";
 
@@ -71,6 +72,46 @@ test.group("sessionTimeText", () => {
 		assert.equal(
 			sessionTimeText(start, start.plus({ hours: 3 }), KTM),
 			"Sun 18 Oct 2026, 22:30 – Mon 19 Oct 2026, 01:30",
+		);
+	});
+});
+
+test.group("sessionStartText", () => {
+	const at = (iso: string) => DateTime.fromISO(iso, { zone: "utc" });
+
+	test("a start in this year, in the studio's timezone, without the year", ({
+		assert,
+	}) => {
+		assert.equal(
+			sessionStartText(
+				at("2026-10-24T05:15:00"),
+				KTM,
+				at("2026-10-22T10:00:00"),
+			),
+			"Sat 24 Oct, 11:00",
+		);
+	});
+
+	test("a start in another year names it", ({ assert }) => {
+		assert.equal(
+			sessionStartText(
+				at("2027-01-02T05:15:00"),
+				KTM,
+				at("2026-10-22T10:00:00"),
+			),
+			"Sat 2 Jan 2027, 11:00",
+		);
+	});
+
+	test("the year follows the studio's day, not UTC's", ({ assert }) => {
+		// 20:00 UTC on 31 Dec is already 1 Jan 2027 in Kathmandu.
+		assert.equal(
+			sessionStartText(
+				at("2026-10-24T05:15:00"),
+				KTM,
+				at("2026-12-31T20:00:00"),
+			),
+			"Sat 24 Oct 2026, 11:00",
 		);
 	});
 });

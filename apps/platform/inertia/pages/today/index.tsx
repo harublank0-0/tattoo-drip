@@ -28,10 +28,10 @@ function rowHref(slug: string, { route, id, hash }: TodayRow["target"]) {
 	return `${urlFor(route, { tenant: slug, id })}${hash ? `#${hash}` : ""}`;
 }
 
-/** "See all" opens the Inbox, or Projects in the one status that holds the whole group. */
+/** "See all" opens the Inbox, or the Projects view that holds exactly the group (`?waiting=`). */
 function moreHref(slug: string, more: TodayMore) {
 	const base = urlFor(more.route, { tenant: slug });
-	return more.status ? `${base}?status=${more.status}` : base;
+	return more.waiting ? `${base}?waiting=${more.waiting}` : base;
 }
 
 /**

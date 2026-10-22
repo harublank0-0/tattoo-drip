@@ -11,6 +11,7 @@ import ClientService from "#modules/clients/services/client_service";
 import InquiryService from "#modules/inquiries/services/inquiry_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
+import { ALERT_EXCERPT_LENGTH, excerpt } from "#modules/notifications/alerts";
 import { chatMessage, contactLinks } from "#modules/notifications/chat";
 import { MESSAGE_LABELS, renderMessage } from "#modules/notifications/messages";
 import {
@@ -46,8 +47,17 @@ import {
 	ACTIVE_STATUSES,
 	allowedMoves,
 	CLOSED_STATUSES,
-	toProjectFilter,
 } from "#modules/projects/moves";
+import {
+	contactLine,
+	inOrder,
+	isClosedFilter,
+	listLine,
+	ordered,
+	pageOf,
+	toListView,
+	waitingIds,
+} from "#modules/projects/project_list";
 import {
 	BOOKED_STATUSES,
 	formatDay,
@@ -64,9 +74,13 @@ import {
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import BookingService from "#modules/projects/services/booking_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
-import ProjectService from "#modules/projects/services/project_service";
+import ProjectService, {
+	PROJECTS_PER_PAGE,
+} from "#modules/projects/services/project_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import QuoteService from "#modules/projects/services/quote_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import WaitingService from "#modules/projects/services/waiting_service";
 import {
 	mayChangeSession,
 	outcomeRefusal,
@@ -78,7 +92,11 @@ import {
 } from "#modules/scheduling/schedule_rules";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import SessionService from "#modules/scheduling/services/session_service";
-import { sessionFormValues, sessionTimeText } from "#modules/scheduling/times";
+import {
+	sessionFormValues,
+	sessionStartText,
+	sessionTimeText,
+} from "#modules/scheduling/times";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { pointsAtThisMachine } from "#services/storefront_url";
 
@@ -105,72 +123,134 @@ export default class ProjectsController {
 		private payments: PaymentService,
 		private bookings: BookingService,
 		private templates: MessageTemplateService,
+		private waiting: WaitingService,
 	) {}
 
+	/**
+	 * The Projects list (TAT-109). Which projects need the member, their order
+	 * and their words are WaitingService.work's answer (the same as Today's and
+	 * its badge's); this only picks the view's rows, cuts the page and adds the
+	 * piece, the next session, the last contact and (owners only) a money fact.
+	 * Every row comes from a member-scoped read.
+	 */
 	async index(ctx: HttpContext) {
 		const { tenant, membership } = tenantContext(ctx);
-		const query = ctx.request.qs();
-		const filter = toProjectFilter(query.status);
-		const page = Math.max(1, Number.parseInt(String(query.page ?? 1), 10) || 1);
+		const view = toListView(ctx.request.qs());
+		const isOwner = membership.role === "owner";
+		const now = DateTime.now();
+		const work = await this.waiting.work(tenant, membership, now);
 
-		const { projects, total, lastPage } = await this.projects.list(
-			tenant,
-			membership,
-			filter,
-			page,
-		);
+		let projects: TattooProject[];
+		let total: number;
+		let lastPage: number;
+		if (isClosedFilter(view.filter)) {
+			// Closed projects are a plain SQL page, the latest change first.
+			({ projects, total, lastPage } = await this.projects.list(
+				tenant,
+				membership,
+				view.filter,
+				view.page,
+			));
+		} else {
+			const ids =
+				view.waiting !== null || view.filter === "needs_you"
+					? waitingIds(view, work)
+					: ordered(
+							await this.projects.listKeys(tenant, membership, view.filter),
+							view.sort,
+							work,
+						).map(({ id }) => id);
+			const slice = pageOf(ids, view.page, PROJECTS_PER_PAGE);
+			total = slice.total;
+			lastPage = slice.lastPage;
+			// The member-scoped read is the access check before any per-row read.
+			projects = inOrder(
+				slice.rows,
+				await this.projects.findManyFor(tenant, membership, slice.rows),
+			);
+		}
+
 		const counts = await this.projects.countByStatus(tenant, membership);
 		const clients = await this.clients.findMany(
 			tenant,
 			projects.map(({ clientId }) => clientId),
 		);
-		const artists = await this.artists.list(tenant);
-		const withSession = await this.sessions.projectsWithScheduledTattoo(
+		const artists = isOwner ? await this.artists.list(tenant) : [];
+		// Owners' money facts (TAT-66, TAT-111): a plain line where nothing waits.
+		const flags = isOwner
+			? await this.payments.listFlags(tenant, projects)
+			: new Map<string, ListFlags>();
+		const nextSessions = await this.sessions.nextScheduledFor(
 			tenant,
 			projects.map(({ id }) => id),
+			now,
 		);
-		// Owners' flags: a screenshot to check, a closed project's deposit to
-		// settle (TAT-66). The Projects badge counts the first.
-		const flags =
-			membership.role === "owner"
-				? await this.payments.listFlags(tenant, projects)
-				: new Map<string, ListFlags>();
 		const clientName = new Map(clients.map(({ id, name }) => [id, name]));
 		const artistName = new Map(artists.map(({ id, name }) => [id, name]));
+		const waitingOn = new Map(
+			[...work.needsYou, ...work.onClient].map((item) => [
+				item.project.id,
+				item,
+			]),
+		);
 		const sum = (statuses: readonly (keyof typeof counts)[]) =>
 			statuses.reduce((total, status) => total + (counts[status] ?? 0), 0);
+		// Closed and waiting views keep their own order; Needs you is work()'s.
+		const sortable =
+			!isClosedFilter(view.filter) &&
+			view.filter !== "needs_you" &&
+			view.waiting === null;
 
 		return ctx.inertia.render("projects/index", {
-			filter,
+			filter: view.filter,
+			waiting: view.waiting,
+			sort: sortable ? view.sort : null,
+			chosenSort: view.sort,
 			counts: {
 				active: sum(ACTIVE_STATUSES),
+				needsYou: work.needsYou.length,
 				closed: sum(CLOSED_STATUSES),
 				byStatus: Object.fromEntries(
 					ACTIVE_STATUSES.map((status) => [status, counts[status] ?? 0]),
 				),
 			},
-			projects: projects.map((project) => ({
-				id: project.id,
-				clientName: clientName.get(project.clientId) ?? null,
-				artistName: project.artistId
-					? (artistName.get(project.artistId) ?? null)
-					: null,
-				status: project.status,
-				contactedText: lastContactText(
-					project.lastContactedAt,
-					tenant.timezone,
-					{
-						channel: project.lastContactChannel,
-						kind: project.lastContactKind,
-					},
-				),
-				noSession: project.status === "booked" && !withSession.has(project.id),
-				proofWaiting: flags.get(project.id)?.proofWaiting ?? false,
-				depositToSettle: flags.get(project.id)?.depositToSettle ?? false,
-				quoteLapsed: flags.get(project.id)?.quoteLapsed ?? false,
-				balanceOwed: flags.get(project.id)?.balanceOwed ?? false,
-			})),
-			page: { current: page, last: lastPage, total },
+			projects: projects.map((project) => {
+				const flag = flags.get(project.id);
+				const next = nextSessions.get(project.id);
+				return {
+					id: project.id,
+					clientName: clientName.get(project.clientId) ?? null,
+					// The start of the brief until TAT-115 adds a short title.
+					piece: excerpt(project.brief, ALERT_EXCERPT_LENGTH),
+					artistName:
+						isOwner && project.artistId
+							? (artistName.get(project.artistId) ?? null)
+							: null,
+					status: project.status,
+					line: listLine(
+						waitingOn.get(project.id) ?? null,
+						flag
+							? {
+									depositToSettle: flag.depositToSettle,
+									balanceDue: flag.balanceDue,
+								}
+							: null,
+					),
+					nextSessionText: next
+						? sessionStartText(next.startsAt, tenant.timezone, now)
+						: null,
+					contactedText: contactLine(
+						project.lastContactedAt,
+						tenant.timezone,
+						{
+							channel: project.lastContactChannel,
+							kind: project.lastContactKind,
+						},
+						now,
+					),
+				};
+			}),
+			page: { current: view.page, last: lastPage, total },
 		});
 	}
 
