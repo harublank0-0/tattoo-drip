@@ -14,19 +14,26 @@ type MessagesModule = {
 	primaryChannel(last: Channel | null): Primary;
 	PRIMARY_LABELS: Record<Primary, string>;
 	otherWays(primary: Primary, offersPlain: boolean): Way[];
-	foldToggle(
-		expanded: boolean,
-		overflows: boolean,
-	): { clamp: boolean; showToggle: boolean; label: string };
-	FOLD_LINES: number;
+	tapViber(steps: {
+		copy(): Promise<boolean>;
+		record(): void;
+		hint(): void;
+		refused(): void;
+	}): void;
+	tapCopy(steps: {
+		copy(): Promise<boolean>;
+		done(): void;
+		record(): void;
+		refused(): void;
+	}): void;
 	VIBER_HINT: string;
 };
 const {
 	primaryChannel,
 	PRIMARY_LABELS,
 	otherWays,
-	foldToggle,
-	FOLD_LINES,
+	tapViber,
+	tapCopy,
 	VIBER_HINT,
 } = messagesModule as MessagesModule;
 
@@ -119,38 +126,6 @@ test.group("otherWays (TAT-104)", () => {
 	});
 });
 
-test.group("foldToggle (TAT-104)", () => {
-	test("the preview folds to two lines", ({ assert }) => {
-		assert.equal(FOLD_LINES, 2);
-	});
-
-	test("a long message is folded, with a toggle that offers to show it", ({
-		assert,
-	}) => {
-		assert.deepEqual(foldToggle(false, true), {
-			clamp: true,
-			showToggle: true,
-			label: "Show message",
-		});
-	});
-
-	test("shown in full, the toggle offers to hide it again", ({ assert }) => {
-		assert.deepEqual(foldToggle(true, true), {
-			clamp: false,
-			showToggle: true,
-			label: "Hide message",
-		});
-	});
-
-	test("a message that fits in two lines has nothing to fold", ({ assert }) => {
-		assert.deepEqual(foldToggle(false, false), {
-			clamp: true,
-			showToggle: false,
-			label: "Show message",
-		});
-	});
-});
-
 test.group("the Viber hint (TAT-104)", () => {
 	test("is one sentence pair that says the message is copied and where to paste it", ({
 		assert,
@@ -158,5 +133,97 @@ test.group("the Viber hint (TAT-104)", () => {
 		assert.match(VIBER_HINT, /copied/i);
 		assert.match(VIBER_HINT, /paste/i);
 		assert.include(VIBER_HINT, "Viber");
+	});
+});
+
+/** Lets the promise callbacks a tap queued run. */
+const settled = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+// The Viber tap is the anchor's own navigation: the page's click handler may
+// start the copy and record the contact, but must not wait for the copy, or
+// iOS Safari can refuse the viber:// navigation as not made by a user gesture.
+test.group("tapViber (TAT-104)", () => {
+	test("starts the copy and records the contact in the same tick, whatever the copy does", async ({
+		assert,
+	}) => {
+		const calls: string[] = [];
+		// A copy that never settles, like a clipboard that is slow to answer.
+		const never = new Promise<boolean>(() => {});
+		tapViber({
+			copy: () => {
+				calls.push("copy");
+				return never;
+			},
+			record: () => calls.push("record"),
+			hint: () => calls.push("hint"),
+			refused: () => calls.push("refused"),
+		});
+		// Nothing has been awaited: the click handler is done, so the anchor
+		// opens Viber now. (The hint and the refusal wait for the copy.)
+		assert.deepEqual(calls, ["copy", "record"]);
+		await settled();
+		assert.deepEqual(calls, ["copy", "record"]);
+	});
+
+	test("a copy that went through shows the hint, once", async ({ assert }) => {
+		const calls: string[] = [];
+		tapViber({
+			copy: async () => true,
+			record: () => calls.push("record"),
+			hint: () => calls.push("hint"),
+			refused: () => calls.push("refused"),
+		});
+		await settled();
+		assert.deepEqual(calls, ["record", "hint"]);
+	});
+
+	test("a refused or failed copy asks to select the text, and the contact is still recorded once", async ({
+		assert,
+	}) => {
+		for (const copy of [
+			async () => false,
+			() => Promise.reject(new Error("denied")),
+		]) {
+			const calls: string[] = [];
+			tapViber({
+				copy,
+				record: () => calls.push("record"),
+				hint: () => calls.push("hint"),
+				refused: () => calls.push("refused"),
+			});
+			await settled();
+			assert.deepEqual(calls, ["record", "refused"]);
+		}
+	});
+});
+
+test.group("tapCopy (TAT-104)", () => {
+	test("records the copy only after the clipboard took it", async ({
+		assert,
+	}) => {
+		const calls: string[] = [];
+		let finish: (copied: boolean) => void = () => {};
+		tapCopy({
+			copy: () => new Promise<boolean>((resolve) => (finish = resolve)),
+			done: () => calls.push("done"),
+			record: () => calls.push("record"),
+			refused: () => calls.push("refused"),
+		});
+		assert.deepEqual(calls, []);
+		finish(true);
+		await settled();
+		assert.deepEqual(calls, ["done", "record"]);
+	});
+
+	test("a refused copy records nothing", async ({ assert }) => {
+		const calls: string[] = [];
+		tapCopy({
+			copy: async () => false,
+			done: () => calls.push("done"),
+			record: () => calls.push("record"),
+			refused: () => calls.push("refused"),
+		});
+		await settled();
+		assert.deepEqual(calls, ["refused"]);
 	});
 });

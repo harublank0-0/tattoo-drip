@@ -118,22 +118,60 @@ export function otherWays(
 	return ways;
 }
 
-/** How many lines of a message the folded preview shows (the `line-clamp-2` class). */
-export const FOLD_LINES = 2;
+/**
+ * What follows a copy once it settles: `copied` when the clipboard took the
+ * text, `refused` when it said no, or there was no clipboard to ask.
+ */
+function afterCopy(
+	copied: Promise<boolean>,
+	onCopied: () => void,
+	onRefused: () => void,
+): void {
+	copied.then((ok) => (ok ? onCopied() : onRefused()), onRefused);
+}
 
 /**
- * The preview's fold: it is clamped to FOLD_LINES until opened, and the
- * toggle shows only when there is more to see (or to hide again).
+ * The Viber tap (TAT-104). Viber's chat link can't carry text, so the tap
+ * also copies it, but the tap itself is the anchor's own navigation: this
+ * runs inside the click, starts the copy and records the contact, and
+ * returns without waiting for anything. iOS Safari lets a user gesture open
+ * a custom scheme only while the gesture is still current, and an `await`
+ * before the navigation can lose it. The hint (or the refusal) comes when
+ * the copy settles; the page stays alive while Viber opens.
  */
-export function foldToggle(
-	expanded: boolean,
-	overflows: boolean,
-): { clamp: boolean; showToggle: boolean; label: string } {
-	return {
-		clamp: !expanded,
-		showToggle: expanded || overflows,
-		label: expanded ? "Hide message" : "Show message",
-	};
+export function tapViber(steps: {
+	/** Starts the copy; must not be awaited before the navigation. */
+	copy: () => Promise<boolean>;
+	/** Records the contact (`viber`, with the message's kind). */
+	record: () => void;
+	/** The one toast: copied, paste it in Viber. */
+	hint: () => void;
+	/** The text could not be copied: show it, to select. */
+	refused: () => void;
+}): void {
+	const copied = steps.copy();
+	steps.record();
+	afterCopy(copied, steps.hint, steps.refused);
+}
+
+/** The "Copy text" tap: the contact is recorded only after the clipboard took the text. */
+export function tapCopy(steps: {
+	copy: () => Promise<boolean>;
+	/** The toast: copied. */
+	done: () => void;
+	/** Records the contact (`copy`, with the message's kind). */
+	record: () => void;
+	/** The text could not be copied: show it, to select. */
+	refused: () => void;
+}): void {
+	afterCopy(
+		steps.copy(),
+		() => {
+			steps.done();
+			steps.record();
+		},
+		steps.refused,
+	);
 }
 
 /** `{name}`, with the one space before it that an empty value takes along. */

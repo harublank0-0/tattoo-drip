@@ -1,21 +1,17 @@
 import { cn } from "cn";
 import { ChevronDown } from "lucide-react";
-import {
-	type MouseEvent,
-	useId,
-	useLayoutEffect,
-	useRef,
-	useState,
-} from "react";
+import { useId } from "react";
 import { toast } from "sonner";
+import { useFold } from "~/components/fold";
 import {
 	type ContactChannelName,
 	type ContactLinksProps,
-	foldToggle,
 	type OtherWay,
 	otherWays,
 	PRIMARY_LABELS,
 	type PrimaryChannel,
+	tapCopy,
+	tapViber,
 	VIBER_HINT,
 } from "~/components/messages";
 import type { ChatMessageProps } from "~/components/projects";
@@ -47,7 +43,7 @@ async function copyText(text: string): Promise<boolean> {
  * folded to two lines, one leading button (WhatsApp, or Viber when the
  * client was last reached there), and one "Other ways" row. WhatsApp opens
  * with the text filled in; Viber's link can't carry text, so its tap copies
- * the text first and says so once. Every tap tells the page its channel,
+ * the text as the chat opens and says so once. Every tap tells the page its channel,
  * which records the contact: `onSent` for the taps that send the message
  * (the page adds its kind) and `plain.onSent` for Call and the chat without
  * a message. Without `plain` the row has no call and no plain chat: the
@@ -56,13 +52,13 @@ async function copyText(text: string): Promise<boolean> {
 export default function ChatMessage({
 	message,
 	onSent,
-	primary = "whatsapp",
+	primary,
 	label,
 	plain,
 }: {
 	message: ChatMessageProps;
 	onSent: (channel: ContactChannelName) => void;
-	primary?: PrimaryChannel;
+	primary: PrimaryChannel;
 	/** What the message is called, shown above the text. */
 	label?: string;
 	plain?: {
@@ -70,50 +66,31 @@ export default function ChatMessage({
 		onSent: (channel: ContactChannelName) => void;
 	};
 }) {
-	const [expanded, setExpanded] = useState(false);
-	const [overflows, setOverflows] = useState(false);
-	const text = useRef<HTMLParagraphElement>(null);
+	const fold = useFold(message.text);
+	const { expanded, setExpanded } = fold;
 	const textId = useId();
-	const fold = foldToggle(expanded, overflows);
-
-	// Only the folded text can be measured: open, it shows everything.
-	useLayoutEffect(() => {
-		const element = text.current;
-		if (!element || expanded) return;
-		const measure = () =>
-			setOverflows(element.scrollHeight > element.clientHeight + 1);
-		measure();
-		const observer = new ResizeObserver(measure);
-		observer.observe(element);
-		return () => observer.disconnect();
-	}, [expanded]);
 
 	const failed = () => {
 		toast.error("Couldn't copy: select the text instead.");
 		// The staff can still select it: show all of it.
 		setExpanded(true);
 	};
-	const copyTap = async () => {
-		if (await copyText(message.text)) {
-			toast.success("Message copied.");
-			onSent("copy");
-		} else {
-			failed();
-		}
-	};
-	// Copy first, then open: the chat opens empty, and by then the text is on
-	// the clipboard. A refused copy still opens the chat (the old link did
-	// too), with the text unfolded to select.
-	const openViber = async (event: MouseEvent<HTMLAnchorElement>) => {
-		event.preventDefault();
-		if (await copyText(message.text)) {
-			toast.success(VIBER_HINT);
-		} else {
-			failed();
-		}
-		onSent("viber");
-		window.location.assign(message.viberUrl);
-	};
+	const copyTap = () =>
+		tapCopy({
+			copy: () => copyText(message.text),
+			done: () => toast.success("Message copied."),
+			record: () => onSent("copy"),
+			refused: failed,
+		});
+	// The anchor opens Viber by itself, in the tap: nothing here may wait for
+	// the copy or cancel the click (see tapViber).
+	const viberTap = () =>
+		tapViber({
+			copy: () => copyText(message.text),
+			record: () => onSent("viber"),
+			hint: () => toast.success(VIBER_HINT),
+			refused: failed,
+		});
 
 	const whatsapp = (className: string, content: string) => (
 		<a
@@ -127,7 +104,7 @@ export default function ChatMessage({
 		</a>
 	);
 	const viber = (className: string, content: string, note?: string) => (
-		<a href={message.viberUrl} onClick={openViber} className={className}>
+		<a href={message.viberUrl} onClick={viberTap} className={className}>
 			{content}
 			{note && <span className="sr-only"> {note}</span>}
 		</a>
@@ -137,10 +114,15 @@ export default function ChatMessage({
 			case "whatsapp":
 				return whatsapp(WAY, item.label);
 			case "viber":
-				return viber(WAY, item.label, "(copies the message first)");
+				return viber(WAY, item.label, "(copies the message)");
 			case "copy":
 				return (
-					<Button type="button" variant="outline" onClick={copyTap}>
+					<Button
+						type="button"
+						variant="outline"
+						className="px-3"
+						onClick={copyTap}
+					>
 						{item.label}
 					</Button>
 				);
@@ -188,6 +170,7 @@ export default function ChatMessage({
 						{label && <span className="text-sm font-medium">{label}</span>}
 						{fold.showToggle && (
 							<Button
+								ref={fold.toggleRef}
 								type="button"
 								variant="ghost"
 								size="sm"
@@ -213,9 +196,10 @@ export default function ChatMessage({
 				)}
 				<p
 					id={textId}
-					ref={text}
+					ref={fold.textRef}
+					tabIndex={-1}
 					className={cn(
-						"text-sm leading-normal break-words whitespace-pre-line",
+						"text-sm leading-normal break-words whitespace-pre-line outline-none",
 						fold.clamp && "line-clamp-2",
 					)}
 				>
