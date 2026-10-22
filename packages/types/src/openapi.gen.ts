@@ -291,7 +291,8 @@ export interface paths {
          * @description What the client's deposit page shows: the studio, the project's
          *     brief, the deposit, the reference code to write in the payment
          *     remark, the studio's payment methods (only while the deposit is
-         *     due) and its deposit policy. Never cached. Every link that doesn't
+         *     due), its deposit policy, and once it is paid, the project's next
+         *     session. Never cached. Every link that doesn't
          *     work (unknown, replaced, expired, another studio's, or its project
          *     gone) is the same 404. Rate-limited per address and per link.
          */
@@ -673,6 +674,22 @@ export interface components {
             paymentMethods: components["schemas"]["DepositPaymentMethod"][];
             /** @description The studio's own words about deposits. */
             depositPolicy: string | null;
+            /** @description Once the deposit is paid, the project's next session; null in every other state and when none is scheduled. */
+            nextSession: components["schemas"]["DepositSession"] | null;
+        };
+        /**
+         * @description The project's earliest session that is still scheduled and hasn't
+         *     ended, of any kind (TAT-110).
+         */
+        DepositSession: {
+            /**
+             * Format: date-time
+             * @description When it starts, as a UTC instant. Show it in the studio's `timezone` (getStudio).
+             * @example 2026-10-24T05:15:00.000Z
+             */
+            startsAt: string;
+            /** @description The session's own artist; null when that profile was deleted. */
+            artistName: string | null;
         };
         /** @description The multipart body of `submitDepositProof` */
         DepositProofForm: {

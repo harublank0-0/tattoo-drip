@@ -570,6 +570,7 @@ describe("deposits", () => {
 		proofSubmittedAt: null,
 		paymentMethods: [],
 		depositPolicy: null,
+		nextSession: null,
 	};
 	const proof = () =>
 		new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], { type: "image/png" });

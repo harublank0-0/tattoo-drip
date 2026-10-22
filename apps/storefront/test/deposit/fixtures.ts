@@ -48,6 +48,7 @@ export const PAGE: DepositPage = {
 	],
 	depositPolicy:
 		"Deposits hold your date.\nThey are kept if you cancel within 48 hours.",
+	nextSession: null,
 };
 
 export const page = (overrides: Partial<DepositPage> = {}): DepositPage => ({
