@@ -11,6 +11,8 @@ import {
 	inquiryState,
 } from "./inquiry.ts";
 import { artistPageSeo, type PageSeo, studioPageSeo } from "./seo.ts";
+import { parseThemeConfig, type ThemeConfig } from "./theme/config.ts";
+import { storefrontInput } from "./theme/source.ts";
 import {
 	ARTIST_SLUG,
 	type ArtistView,
@@ -36,6 +38,8 @@ export interface StudioPageData {
 	readonly inquiry: InquiryState;
 	readonly channels: InquiryChannels;
 	readonly seo: PageSeo;
+	/** The studio's theme (TAT-54): its key, sections and checked branding. */
+	readonly theme: ThemeConfig;
 }
 
 export interface ArtistPageData {
@@ -44,12 +48,19 @@ export interface ArtistPageData {
 	readonly inquiry: InquiryState;
 	readonly channels: InquiryChannels;
 	readonly seo: PageSeo;
+	/** The studio's theme (TAT-54): its key, sections and checked branding. */
+	readonly theme: ThemeConfig;
 }
 
+/**
+ * The studio page's data. `imageOrigin` is the API's origin, the only one a
+ * logo or cover image may come from (TAT-54); null accepts none.
+ */
 export function studioPageData(
 	studio: Studio,
 	artists: readonly Artist[],
 	origin: string,
+	imageOrigin: string | null = null,
 ): StudioPageData {
 	const studioView = studioViewModel(studio);
 	const artistViews = artistViewModels(artists);
@@ -60,6 +71,7 @@ export function studioPageData(
 		inquiry,
 		channels: channelsFor(studioView, inquiry),
 		seo: studioPageSeo(studioView, artistViews, origin),
+		theme: parseThemeConfig(storefrontInput(studio), imageOrigin),
 	};
 }
 
@@ -69,6 +81,7 @@ export function artistPageData(
 	artists: readonly Artist[],
 	slug: string,
 	origin: string,
+	imageOrigin: string | null = null,
 ): ArtistPageData | null {
 	const studioView = studioViewModel(studio);
 	const artistViews = artistViewModels(artists);
@@ -81,6 +94,7 @@ export function artistPageData(
 		inquiry,
 		channels: channelsFor(studioView, inquiry),
 		seo: artistPageSeo(studioView, artist, origin),
+		theme: parseThemeConfig(storefrontInput(studio), imageOrigin),
 	};
 }
 
@@ -92,7 +106,12 @@ export async function loadStudioPage(
 		loadStudio(context),
 		loadArtists(context),
 	]);
-	return studioPageData(studio, artists, context.site.origin);
+	return studioPageData(
+		studio,
+		artists,
+		context.site.origin,
+		context.tattoo.connection.apiUrl,
+	);
 }
 
 /**
@@ -109,7 +128,13 @@ export async function loadArtistPage(
 		loadStudio(context),
 		loadArtists(context),
 	]);
-	const data = artistPageData(studio, artists, slug, context.site.origin);
+	const data = artistPageData(
+		studio,
+		artists,
+		slug,
+		context.site.origin,
+		context.tattoo.connection.apiUrl,
+	);
 	if (!data) throw notFound();
 	return data;
 }
