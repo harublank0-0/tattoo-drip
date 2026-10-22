@@ -15,7 +15,8 @@ import ProjectService, {
 } from "#modules/projects/services/project_service";
 import QuoteService from "#modules/projects/services/quote_service";
 import SessionService from "#modules/scheduling/services/session_service";
-import { makeClient, makeProject } from "#tests/helpers/pipeline";
+import { proofFor } from "#tests/helpers/payments";
+import { makeClient, makePayment, makeProject } from "#tests/helpers/pipeline";
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
 const artists = new ArtistService(new ImageService());
@@ -131,6 +132,54 @@ test.group("ProjectService.listActive", (group) => {
 		assert.notInclude(
 			found.map(({ id }) => id),
 			byStatus.reviewing,
+		);
+	});
+
+	test("an owner also gets a closed project that holds a waiting deposit screenshot (TAT-107 fix 1)", async ({
+		assert,
+	}) => {
+		const { tenant, ownerMember, ashaMember, byStatus } = await studio();
+		const { withScreenshot, decided } = await inTenant(tenant, async () => {
+			const withScreenshot = await TattooProject.findOrFail(byStatus.cancelled);
+			await proofFor(tenant, withScreenshot);
+			const decided = await TattooProject.findOrFail(byStatus.declined);
+			await proofFor(tenant, decided, {
+				status: "rejected",
+				verifiedAt: DateTime.utc(),
+			});
+			// A waiting screenshot on a screenshot-less kind of payment doesn't count.
+			const session = await TattooProject.findOrFail(byStatus.completed);
+			await makePayment(tenant, session, { kind: "session" });
+			return { withScreenshot, decided };
+		});
+
+		const ids = (
+			await inTenant(tenant, () => projects.listActive(tenant, ownerMember))
+		).map(({ id }) => id);
+		assert.include(ids, withScreenshot.id);
+		assert.notInclude(ids, decided.id);
+		assert.notInclude(ids, byStatus.completed);
+		assert.notInclude(ids, byStatus.declined);
+		// The other closed projects are still out: one extra project, nothing more.
+		const active = ACTIVE_STATUSES.length;
+		assert.equal(ids.length, active + 1);
+		// Artists don't act on money: a closed project stays closed for them.
+		const mine = await inTenant(tenant, () =>
+			projects.listActive(tenant, ashaMember),
+		);
+		assert.notInclude(
+			mine.map(({ id }) => id),
+			withScreenshot.id,
+		);
+		// A deleted project is nobody's work, screenshot or not.
+		await inTenant(tenant, async () => {
+			await (await TattooProject.findOrFail(withScreenshot.id)).softDelete();
+		});
+		assert.notInclude(
+			(
+				await inTenant(tenant, () => projects.listActive(tenant, ownerMember))
+			).map(({ id }) => id),
+			withScreenshot.id,
 		);
 	});
 

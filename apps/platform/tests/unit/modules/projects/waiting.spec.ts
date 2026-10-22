@@ -34,6 +34,7 @@ function facts(over: Partial<WaitingFacts> = {}): WaitingFacts {
 		status: "quoted",
 		since: now.minus({ days: 2 }),
 		proofWaiting: false,
+		proofSince: null,
 		quote: {
 			issuedAt: now.minus({ days: 2 }),
 			expiresAt: expiresOn("2026-10-23"),
@@ -58,12 +59,32 @@ const studio = (reason: NeedsYouReason): Waiting => ({
 });
 
 test.group("waitingOf", () => {
-	test("a waiting screenshot is the owner's to check, and the artist's to ignore", ({
+	test("a waiting screenshot is the owner's to check; for an artist it changes nothing", ({
 		assert,
 	}) => {
+		// An owner's first rule: the screenshot, whatever else the project is.
 		const f = facts({ status: "deposit_pending", proofWaiting: true });
 		assert.deepEqual(waitingOf(f, owner), studio("proof_to_check"));
-		assert.isNull(waitingOf(f, artist));
+		// An artist can't act on money (TAT-107 fix 3): the screenshot is skipped and
+		// the project shows under the state it has without it, never nothing.
+		assert.deepEqual(waitingOf(f, artist), studio("quote_ending"));
+		const later = facts({
+			status: "deposit_pending",
+			proofWaiting: true,
+			quote: quoteValidUntil("2026-11-05"),
+		});
+		assert.deepEqual(waitingOf(later, artist), {
+			side: "client",
+			reason: "deposit_due",
+		});
+		assert.deepEqual(waitingOf(later, owner), studio("proof_to_check"));
+		// Without a state of its own, an artist's project is simply absent.
+		assert.isNull(
+			waitingOf(
+				facts({ status: "in_progress", quote: null, proofWaiting: true }),
+				artist,
+			),
+		);
 	});
 
 	test("a reviewing project needs a price from both roles", ({ assert }) => {
@@ -88,14 +109,79 @@ test.group("waitingOf", () => {
 		);
 	});
 
-	test("an expired quote shows nowhere", ({ assert }) => {
+	test("an expired quote the sweep will cancel shows nowhere", ({ assert }) => {
 		const expired = {
 			issuedAt: now.minus({ days: 5 }),
 			expiresAt: now.minus({ minutes: 1 }),
 			depositAmount: 300_000,
 		};
+		// Quoted, nothing paid.
 		assert.isNull(waitingOf(facts({ quote: expired }), owner));
 		assert.isNull(waitingOf(facts({ quote: expired }), artist));
+		// Deposit pending, nothing paid (and a partly paid one is not covered either).
+		const pending = facts({ status: "deposit_pending", quote: expired });
+		assert.isNull(waitingOf(pending, owner));
+		assert.isNull(waitingOf({ ...pending, depositSettled: false }, owner));
+		// On hold, nothing paid.
+		assert.isNull(
+			waitingOf(facts({ status: "on_hold", quote: expired }), owner),
+		);
+		// A zero deposit is covered by definition and spares nothing: still the sweep's.
+		assert.isNull(
+			waitingOf(
+				facts({
+					quote: { ...expired, depositAmount: 0 },
+					depositSettled: true,
+				}),
+				owner,
+			),
+		);
+	});
+
+	test("an expired quote the sweep spares keeps its work (TAT-107 fix 2)", ({
+		assert,
+	}) => {
+		const expired = {
+			issuedAt: now.minus({ days: 20 }),
+			expiresAt: now.minus({ days: 2 }),
+			depositAmount: 300_000,
+		};
+		// Deposit covered, no session: the project stays deposit_pending forever,
+		// so the booking is still the studio's to make.
+		const paid = facts({
+			status: "deposit_pending",
+			quote: expired,
+			depositSettled: true,
+		});
+		for (const context of [owner, artist]) {
+			assert.deepEqual(waitingOf(paid, context), studio("no_session"));
+		}
+		// Once a session is in the calendar there is nothing to do.
+		assert.isNull(waitingOf({ ...paid, scheduledTattoo: true }, owner));
+		// A quoted project whose deposit was paid (the quote was revised after) stays quoted.
+		assert.deepEqual(
+			waitingOf(facts({ quote: expired, depositSettled: true }), owner),
+			{ side: "client", reason: "price_sent" },
+		);
+		assert.deepEqual(
+			waitingOf(
+				facts({ status: "on_hold", quote: expired, depositSettled: true }),
+				owner,
+			),
+			{ side: "client", reason: "on_hold" },
+		);
+		// A screenshot waiting spares the sweep too: an artist keeps the project.
+		assert.deepEqual(
+			waitingOf(
+				facts({
+					status: "deposit_pending",
+					quote: expired,
+					proofWaiting: true,
+				}),
+				artist,
+			),
+			{ side: "client", reason: "deposit_due" },
+		);
 	});
 
 	test("a quote whose expiry would cancel nothing is not ending", ({
@@ -329,19 +415,63 @@ test.group("waitingText", () => {
 				{ side: "client", reason: "deposit_link_sent" },
 				facts({ depositLink: { madeAt: now.minus({ days: 1 }), works: true } }),
 			),
-			"Deposit link sent yesterday",
+			"Deposit link sent 1 day ago",
 		);
 		assert.equal(
 			text(
 				{ side: "client", reason: "deposit_link_sent" },
 				facts({ depositLink: { madeAt: hoursAgo(2), works: true } }),
 			),
-			"Deposit link sent today",
+			"Deposit link sent less than a day ago",
 		);
 		assert.equal(
 			text({ side: "client", reason: "deposit_due" }, facts()),
 			"Waiting for the deposit",
 		);
+	});
+
+	test("a deposit link's age in words follows the 72-hour rule (TAT-107 fix 4)", ({
+		assert,
+	}) => {
+		const link = (hours: number) =>
+			facts({
+				status: "deposit_pending",
+				quote: quoteValidUntil("2026-11-05"),
+				depositLink: { madeAt: hoursAgo(hours), works: true },
+			});
+		const wordsAt = (hours: number) => {
+			const f = link(hours);
+			const waiting = waitingOf(f, owner);
+			return [waiting?.reason, waiting && text(waiting, f)];
+		};
+		assert.deepEqual(wordsAt(1), [
+			"deposit_link_sent",
+			"Deposit link sent less than a day ago",
+		]);
+		assert.deepEqual(wordsAt(23), [
+			"deposit_link_sent",
+			"Deposit link sent less than a day ago",
+		]);
+		assert.deepEqual(wordsAt(25), [
+			"deposit_link_sent",
+			"Deposit link sent 1 day ago",
+		]);
+		assert.deepEqual(wordsAt(71), [
+			"deposit_link_sent",
+			"Deposit link sent 2 days ago",
+		]);
+		assert.deepEqual(wordsAt(72), [
+			"deposit_unpaid",
+			"Deposit not paid, link made 3 days ago",
+		]);
+		assert.deepEqual(wordsAt(73), [
+			"deposit_unpaid",
+			"Deposit not paid, link made 3 days ago",
+		]);
+		assert.deepEqual(wordsAt(100), [
+			"deposit_unpaid",
+			"Deposit not paid, link made 4 days ago",
+		]);
 	});
 
 	test("missing facts fall back to plain words, never a crash", ({
@@ -447,10 +577,20 @@ test.group("groups, cards and the date a wait starts", () => {
 			sinceOf({ side: "client", reason: "price_sent" }, f).toMillis(),
 			f.quote?.issuedAt.toMillis(),
 		);
+		// A screenshot waits since it was sent, not since the project began (fix 5);
+		// without the time it falls back to the project's.
+		const sent = now.minus({ hours: 5 });
+		assert.equal(
+			sinceOf(studio("proof_to_check"), { ...f, proofSince: sent }).toMillis(),
+			sent.toMillis(),
+		);
+		assert.equal(
+			sinceOf(studio("proof_to_check"), f).toMillis(),
+			f.since.toMillis(),
+		);
 		for (const waiting of [
 			studio("price_to_send"),
 			studio("no_session"),
-			studio("proof_to_check"),
 			studio("deposit_link_missing"),
 			{ side: "client", reason: "on_hold" } as const,
 			{ side: "client", reason: "deposit_due" } as const,

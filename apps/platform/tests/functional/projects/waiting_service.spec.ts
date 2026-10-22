@@ -3,9 +3,13 @@ import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
 import Artist from "#modules/artists/models/artist";
-import type { ProjectStatus } from "#modules/projects/models/tattoo_project";
+import TattooProject, {
+	type ProjectStatus,
+} from "#modules/projects/models/tattoo_project";
 import { expiresAtFor, todayIn } from "#modules/projects/quotes";
-import type { Member } from "#modules/projects/services/project_service";
+import ProjectService, {
+	type Member,
+} from "#modules/projects/services/project_service";
 import WaitingService from "#modules/projects/services/waiting_service";
 import type {
 	ClientWaitReason,
@@ -15,6 +19,7 @@ import { proofFor } from "#tests/helpers/payments";
 import {
 	makeClient,
 	makeDepositLink,
+	makePayment,
 	makeProject,
 	makeQuote,
 	makeSession,
@@ -194,7 +199,10 @@ test.group("WaitingService.work", (group) => {
 		assert.equal(find("no_session")?.hash, "sessions");
 		assert.equal(find("price_sent")?.text, "Price sent today");
 		assert.equal(find("on_hold")?.hash, null);
-		assert.equal(find("deposit_link_sent")?.text, "Deposit link sent today");
+		assert.equal(
+			find("deposit_link_sent")?.text,
+			"Deposit link sent less than a day ago",
+		);
 
 		const everyone = [...needsYou, ...onClient].map(
 			({ project }) => project.id,
@@ -242,14 +250,13 @@ test.group("WaitingService.work", (group) => {
 		assert.sameMembers(
 			due.map(({ project }) => project.id),
 			[
+				// A waiting screenshot is the owner's to check, but the project is still the
+				// artist's: they see it under what it would be without the screenshot.
 				made.proof_to_check[0],
 				made.deposit_link_missing[0],
 				made.deposit_unpaid[0],
 				made.deposit_link_sent[0],
-			].filter(
-				// A waiting screenshot is the owner's: the artist's row for it is gone.
-				(id) => id !== made.proof_to_check[0],
-			),
+			],
 		);
 		assert.isTrue(due.every(({ text }) => text === "Waiting for the deposit"));
 		assert.deepEqual(
@@ -398,6 +405,183 @@ test.group("WaitingService.work", (group) => {
 		assert.equal(map.get(projects[2].id)?.waiting?.reason, "price_to_send");
 		assert.isNull(map.get(projects[3].id)?.waiting ?? null);
 		assert.isNull(map.get(projects[3].id)?.text ?? null);
+	});
+
+	test("a withdrawn project whose screenshot waits stays in the owner's work until it is decided (TAT-107 fix 1)", async ({
+		assert,
+	}) => {
+		const s = await studio("waiting-withdrawn-107");
+		const now = DateTime.now();
+		const service = await waiting();
+		const projects = await app.container.make(ProjectService);
+		const { withdrawn, plain, decided, deleted } = await inTenant(
+			s.tenant,
+			async () => {
+				const make = async (name: string) => {
+					const project = await makeProject(
+						s.tenant,
+						await makeClient(s.tenant, { name }),
+						{ status: "deposit_pending", artistId: s.asha.id },
+					);
+					await makeQuote(s.tenant, project);
+					return project;
+				};
+				const withdrawn = await make("Withdrawn with a screenshot");
+				const proof = await proofFor(s.tenant, withdrawn);
+				const plain = await make("Withdrawn, nothing waiting");
+				const decided = await make("Withdrawn, screenshot decided");
+				await proofFor(s.tenant, decided, {
+					status: "rejected",
+					verifiedAt: DateTime.utc(),
+				});
+				const deleted = await make("Deleted with a screenshot");
+				await proofFor(s.tenant, deleted);
+				for (const project of [withdrawn, plain, decided, deleted]) {
+					await projects.move(s.tenant, s.ownerMember, project, "withdraw");
+				}
+				await (await TattooProject.findOrFail(deleted.id)).softDelete();
+				return { withdrawn, plain, decided, deleted, proof };
+			},
+		);
+
+		const { needsYou } = await inTenant(s.tenant, () =>
+			service.work(s.tenant, s.ownerMember, now),
+		);
+
+		// Only the cancelled project that still holds a waiting screenshot is work.
+		assert.deepEqual(
+			needsYou.map(({ project }) => [project.id, project.status]),
+			[[withdrawn.id, "cancelled"]],
+		);
+		assert.equal(needsYou[0].waiting.reason, "proof_to_check");
+		assert.equal(needsYou[0].hash, "payments");
+		assert.notInclude(
+			needsYou.map(({ project }) => project.id),
+			plain.id,
+		);
+		assert.notInclude(
+			needsYou.map(({ project }) => project.id),
+			decided.id,
+		);
+		assert.notInclude(
+			needsYou.map(({ project }) => project.id),
+			deleted.id,
+		);
+		assert.equal(
+			await inTenant(s.tenant, () =>
+				service.needsYouCount(s.tenant, s.ownerMember, now),
+			),
+			1,
+		);
+		// An artist never acts on money, and a cancelled project is closed for them.
+		const asArtist = await inTenant(s.tenant, () =>
+			service.work(s.tenant, s.ashaMember, now),
+		);
+		assert.deepEqual(asArtist.needsYou, []);
+		assert.deepEqual(asArtist.onClient, []);
+	});
+
+	test("screenshots are oldest first by when they were sent, not by the project's age", async ({
+		assert,
+	}) => {
+		const s = await studio("waiting-proof-sort-107");
+		const now = DateTime.now();
+		const ids = await inTenant(s.tenant, async () => {
+			const make = async (
+				name: string,
+				projectAge: number,
+				sentAge: number,
+			) => {
+				const project = await makeProject(
+					s.tenant,
+					await makeClient(s.tenant, { name }),
+					{
+						status: "deposit_pending",
+						createdAt: now.minus({ days: projectAge }),
+					},
+				);
+				await makeQuote(s.tenant, project);
+				await proofFor(s.tenant, project, {
+					createdAt: now.minus({ days: sentAge }),
+				});
+				return project.id;
+			};
+			// An old project with a fresh screenshot, a new one with an old screenshot.
+			return {
+				freshProof: await make("Old project, screenshot today", 30, 0),
+				oldProof: await make("New project, screenshot 4 days ago", 5, 4),
+			};
+		});
+
+		const { needsYou } = await inTenant(s.tenant, async () =>
+			(await waiting()).work(s.tenant, s.ownerMember, now),
+		);
+
+		assert.deepEqual(
+			needsYou.map(({ project }) => project.id),
+			[ids.oldProof, ids.freshProof],
+		);
+	});
+
+	test("a paid project whose quote has expired still needs its session (TAT-107 fix 2)", async ({
+		assert,
+	}) => {
+		const s = await studio("waiting-expired-107");
+		const now = DateTime.now();
+		const made = await inTenant(s.tenant, async () => {
+			const expired = { expiresAt: now.minus({ days: 2 }) };
+			const make = async (status: ProjectStatus, name: string) => {
+				const project = await makeProject(
+					s.tenant,
+					await makeClient(s.tenant, { name }),
+					{ status, artistId: s.asha.id },
+				);
+				await makeQuote(s.tenant, project, expired);
+				return project;
+			};
+			const pay = (project: TattooProject, amount = 300_000) =>
+				makePayment(s.tenant, project, {
+					amount,
+					status: "verified",
+					verifiedAt: DateTime.utc(),
+				});
+			const paid = await make("deposit_pending", "Paid, no session");
+			await pay(paid);
+			const half = await make("deposit_pending", "Half paid");
+			await pay(half, 100_000);
+			const unpaid = await make("deposit_pending", "Unpaid");
+			const quotedPaid = await make("quoted", "Quoted, paid after a revision");
+			await pay(quotedPaid);
+			const quotedUnpaid = await make("quoted", "Quoted, unpaid");
+			return { paid, half, unpaid, quotedPaid, quotedUnpaid };
+		});
+
+		const owner = await inTenant(s.tenant, async () =>
+			(await waiting()).work(s.tenant, s.ownerMember, now),
+		);
+		const byReason = (
+			items: { project: { id: string }; waiting: { reason: string } }[],
+		) => Object.fromEntries(items.map((i) => [i.project.id, i.waiting.reason]));
+
+		// The sweep cancels the unpaid and half-paid ones: they show nowhere.
+		assert.deepEqual(byReason(owner.needsYou), {
+			[made.paid.id]: "no_session",
+		});
+		assert.deepEqual(byReason(owner.onClient), {
+			[made.quotedPaid.id]: "price_sent",
+		});
+		const artist = await inTenant(s.tenant, async () =>
+			(await waiting()).work(s.tenant, s.ashaMember, now),
+		);
+		assert.deepEqual(byReason(artist.needsYou), {
+			[made.paid.id]: "no_session",
+		});
+		assert.equal(
+			await inTenant(s.tenant, async () =>
+				(await waiting()).needsYouCount(s.tenant, s.ownerMember, now),
+			),
+			1,
+		);
 	});
 
 	test("an empty list asks nothing", async ({ assert }) => {

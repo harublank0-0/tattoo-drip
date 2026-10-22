@@ -1,5 +1,6 @@
 import { DateTime } from "luxon";
 import { daysAgoText } from "#modules/projects/contact";
+import { expiryCancels } from "#modules/projects/expiry";
 import type { ProjectStatus } from "#modules/projects/models/tattoo_project";
 import { isExpired, todayIn, validUntil } from "#modules/projects/quotes";
 import { dayBounds } from "#modules/scheduling/calendar";
@@ -48,6 +49,8 @@ export type WaitingFacts = {
 	since: DateTime;
 	/** A deposit screenshot waits for an owner. */
 	proofWaiting: boolean;
+	/** When the oldest waiting screenshot was sent; null without one. */
+	proofSince: DateTime | null;
 	/** The current quote of a quoted, on_hold or deposit_pending project; null otherwise. */
 	quote: {
 		issuedAt: DateTime;
@@ -68,6 +71,17 @@ export type WaitingContext = {
 	timezone: string;
 };
 
+/**
+ * How long ago `at` was in whole elapsed days, the same clock the 72-hour chase
+ * rule runs on (not studio calendar days): "less than a day ago", "1 day ago",
+ * "3 days ago". A link's age in words and the rule that chases it agree.
+ */
+function elapsedDaysText(at: DateTime, now: DateTime): string {
+	const days = Math.floor((now.toMillis() - at.toMillis()) / DAY_MS);
+	if (days < 1) return "less than a day ago";
+	return days === 1 ? "1 day ago" : `${days} days ago`;
+}
+
 const plusDays = (date: string, days: number) =>
 	DateTime.fromISO(date, { zone: "utc" }).plus({ days }).toFormat("yyyy-MM-dd");
 
@@ -79,31 +93,34 @@ export function quoteEndingBefore(now: DateTime, timezone: string): DateTime {
 	).from;
 }
 
-/** Whether the quote's expiry would still cancel the project (ProjectService's expiry rule). */
-function expiryWouldCancel(
-	facts: WaitingFacts,
-	depositAmount: number,
-): boolean {
-	if (facts.status === "deposit_pending") return !facts.depositSettled;
-	return depositAmount === 0 || !facts.depositSettled;
-}
-
 /** The project's one waiting state, or null when nothing waits (first rule that matches wins). */
 export function waitingOf(
 	facts: WaitingFacts,
 	{ isOwner, now, timezone }: WaitingContext,
 ): Waiting | null {
-	if (facts.proofWaiting) {
-		return isOwner ? { side: "studio", reason: "proof_to_check" } : null;
+	// A waiting screenshot is the owners' to check. An artist can't act on money, so
+	// the rule is skipped for them: their project shows under the state it has
+	// without it, never nothing because of money (TAT-107 fix 3).
+	if (facts.proofWaiting && isOwner) {
+		return { side: "studio", reason: "proof_to_check" };
 	}
 	const { status, quote } = facts;
 	if (status === "reviewing")
 		return { side: "studio", reason: "price_to_send" };
 	if (QUOTE_STATUSES.includes(status) && quote) {
-		// An expired quote is the sweep's, and the Projects list's flags', not Today's.
-		if (isExpired(quote, now)) return null;
-		if (
-			expiryWouldCancel(facts, quote.depositAmount) &&
+		// The same rule the expiry sweep uses (expiryCancels), so Today never hides
+		// a project the sweep leaves alone: a covered deposit, or a waiting screenshot,
+		// spares an expired quote, and its work (a session to book) stays.
+		const cancels = expiryCancels({
+			status,
+			depositAmount: quote.depositAmount,
+			depositSettled: facts.depositSettled,
+		});
+		if (isExpired(quote, now)) {
+			// Cancelled within minutes by the sweep, and flagged by the Projects list until then.
+			if (cancels && !facts.proofWaiting) return null;
+		} else if (
+			cancels &&
 			quote.expiresAt.toMillis() <= quoteEndingBefore(now, timezone).toMillis()
 		) {
 			return { side: "studio", reason: "quote_ending" };
@@ -176,7 +193,7 @@ export function waitingText(
 				: "No deposit link yet";
 		case "deposit_unpaid":
 			return facts.depositLink
-				? `Deposit not paid, link made ${ago(facts.depositLink.madeAt)}`
+				? `Deposit not paid, link made ${elapsedDaysText(facts.depositLink.madeAt, now)}`
 				: "Deposit not paid";
 		case "no_session":
 			return facts.status === "booked"
@@ -190,7 +207,7 @@ export function waitingText(
 			return "On hold";
 		case "deposit_link_sent":
 			return facts.depositLink
-				? `Deposit link sent ${ago(facts.depositLink.madeAt)}`
+				? `Deposit link sent ${elapsedDaysText(facts.depositLink.madeAt, now)}`
 				: "Deposit link sent";
 		case "deposit_due":
 			return "Waiting for the deposit";
@@ -255,6 +272,8 @@ export function groupOf(reason: NeedsYouReason): TodayGroupKey {
 /** When the wait began: the sort key, oldest first. */
 export function sinceOf(waiting: Waiting, facts: WaitingFacts): DateTime {
 	switch (waiting.reason) {
+		case "proof_to_check":
+			return facts.proofSince ?? facts.since;
 		case "quote_ending":
 			return facts.quote?.expiresAt ?? facts.since;
 		case "deposit_unpaid":

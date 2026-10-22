@@ -202,6 +202,7 @@ type PaymentOver = Partial<
 		| "verifiedAt"
 		| "correctsPaymentId"
 		| "note"
+		| "createdAt"
 	>
 >;
 

@@ -18,6 +18,7 @@ import {
 	makeClient,
 	makeDepositLink,
 	makeInquiry,
+	makePayment,
 	makeProject,
 	makeQuote,
 	makeSession,
@@ -412,13 +413,17 @@ test.group("Today", (group) => {
 			(groupOf(props, "prices") as Group).rows.map(({ id }) => id),
 			[mine.price.id],
 		);
-		assert.deepEqual(
+		// A waiting screenshot is the owners' to check, but the project is still the
+		// artist's: it shows as one waiting for the deposit, like the unpaid one
+		// (TAT-107 fix 3), and never as the screenshot itself.
+		assert.sameMembers(
 			props.waiting.rows.map(({ id }: { id: string }) => id),
-			[mine.unpaid.id],
+			[mine.screenshot.id, mine.unpaid.id],
 		);
-		assert.equal(props.waiting.rows[0].detail, "Waiting for the deposit");
-		// The screenshot is the owners' to check: it is nowhere in the artist's Today.
-		assert.notInclude(idsIn(props), mine.screenshot.id);
+		for (const row of props.waiting.rows) {
+			assert.equal(row.detail, "Waiting for the deposit");
+		}
+		assert.notInclude(keysOf(props), "proofs");
 		for (const row of [
 			...(groupOf(props, "prices") as Group).rows,
 			...props.waiting.rows,
@@ -695,5 +700,123 @@ test.group("Today", (group) => {
 		assert.equal(one.count, 5);
 		assert.equal(four.count, 20);
 		assert.equal(four.queries, one.queries);
+	});
+	test("a withdrawn project whose screenshot waits stays on Today and in the badge until the owner decides", async ({
+		client,
+		assert,
+	}) => {
+		const s = await studio("today-withdrawn-107");
+		const make = (name: string) =>
+			inTenant(s.tenant, async () => {
+				const project = await makeProject(
+					s.tenant,
+					await makeClient(s.tenant, { name }),
+					{ status: "deposit_pending", artistId: s.ashaProfile.id },
+				);
+				await makeQuote(s.tenant, project);
+				return { project, proof: await proofFor(s.tenant, project) };
+			});
+		const rejected = await make("Withdrew, will be rejected");
+		const verified = await make("Withdrew, will be verified");
+		const post = (path: string, form: Record<string, string> = {}) =>
+			client
+				.post(`/t/today-withdrawn-107${path}`)
+				.form(form)
+				.withCsrfToken()
+				.loginAs(s.owner)
+				.redirects(0);
+		const proofRows = async () => {
+			const props = await propsOf(client, "today-withdrawn-107", s.owner);
+			return {
+				ids: (groupOf(props, "proofs")?.rows ?? []).map(({ id }) => id),
+				count: props.todayCount as number,
+				props,
+			};
+		};
+
+		assert.sameMembers((await proofRows()).ids, [
+			rejected.project.id,
+			verified.project.id,
+		]);
+
+		// The client withdraws: the project is cancelled, the screenshot is still undecided.
+		for (const { project } of [rejected, verified]) {
+			const response = await post(`/projects/${project.id}/moves`, {
+				move: "withdraw",
+			});
+			response.assertFlashMessage(
+				"success",
+				"Client withdrew: project cancelled.",
+			);
+		}
+		const afterWithdrawal = await proofRows();
+		assert.sameMembers(afterWithdrawal.ids, [
+			rejected.project.id,
+			verified.project.id,
+		]);
+		assert.equal(afterWithdrawal.count, 2);
+		const row = (groupOf(afterWithdrawal.props, "proofs") as Group).rows[0];
+		assert.equal(row.detail, "Deposit screenshot to check");
+		assert.equal(row.target.hash, "payments");
+
+		// The destination works: the cancelled project's Payments card lists the screenshot to decide.
+		const page = await client
+			.get(`/t/today-withdrawn-107/projects/${rejected.project.id}`)
+			.withInertia()
+			.loginAs(s.owner);
+		page.assertStatus(200);
+		assert.equal(page.inertiaProps.project.status, "cancelled");
+		assert.lengthOf(page.inertiaProps.payments.pending, 1);
+
+		// A decision takes each one off Today and out of the badge.
+		(await post(`/payments/${rejected.proof.id}/reject`)).assertStatus(302);
+		const afterReject = await proofRows();
+		assert.deepEqual(afterReject.ids, [verified.project.id]);
+		assert.equal(afterReject.count, 1);
+		(await post(`/payments/${verified.proof.id}/verify`)).assertStatus(302);
+		const afterVerify = await proofRows();
+		assert.deepEqual(afterVerify.ids, []);
+		assert.equal(afterVerify.count, 0);
+
+		// The artist never saw any of it: a cancelled project is closed for them.
+		const artistProps = await propsOf(client, "today-withdrawn-107", s.asha);
+		assert.deepEqual(artistProps.needsYou, []);
+		assert.equal(artistProps.todayCount, 0);
+	});
+
+	test("a paid project with an expired quote still shows under Sessions to book (TAT-107 fix 2)", async ({
+		client,
+		assert,
+	}) => {
+		const s = await studio("today-expired-107");
+		const project = await inTenant(s.tenant, async () => {
+			const made = await makeProject(
+				s.tenant,
+				await makeClient(s.tenant, { name: "Paid, never booked" }),
+				{ status: "deposit_pending", artistId: s.ashaProfile.id },
+			);
+			await makeQuote(s.tenant, made, {
+				expiresAt: DateTime.utc().minus({ days: 3 }),
+			});
+			await makePayment(s.tenant, made, {
+				status: "verified",
+				verifiedAt: DateTime.utc().minus({ days: 5 }),
+			});
+			return made;
+		});
+
+		const owner = await propsOf(client, "today-expired-107", s.owner);
+		assert.deepEqual(keysOf(owner), ["sessions"]);
+		assert.equal(
+			(groupOf(owner, "sessions") as Group).rows[0].detail,
+			"Deposit paid, no session booked",
+		);
+		assert.equal(owner.todayCount, 1);
+		const artist = await propsOf(client, "today-expired-107", s.asha);
+		assert.deepEqual(
+			(groupOf(artist, "sessions") as Group).rows.map(({ id }) => id),
+			[project.id],
+		);
+		assert.equal(artist.todayCount, 1);
 	});
 });

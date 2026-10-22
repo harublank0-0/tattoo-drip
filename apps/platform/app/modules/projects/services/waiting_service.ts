@@ -106,6 +106,7 @@ export default class WaitingService {
 					status: project.status,
 					since: project.createdAt,
 					proofWaiting: deposit?.proofWaiting ?? false,
+					proofSince: deposit?.proofSince ?? null,
 					quote: quote && {
 						issuedAt: quote.createdAt,
 						expiresAt: quote.expiresAt,

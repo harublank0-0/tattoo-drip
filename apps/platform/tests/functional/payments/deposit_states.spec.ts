@@ -78,6 +78,37 @@ test.group("DepositService.depositStates", (group) => {
 		assert.equal(states.size, 4, "an entry per asked project");
 	});
 
+	test("a waiting screenshot says since when: its oldest submitted time (TAT-107 fix 5)", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("states-since-107");
+		const project = await projectIn(tenant);
+		const none = await projectIn(tenant);
+		const older = DateTime.utc().minus({ days: 3 });
+		await inTenant(tenant, async () => {
+			await makePayment(tenant, project, { createdAt: older });
+			await makePayment(tenant, project, {
+				createdAt: DateTime.utc().minus({ hours: 1 }),
+			});
+			// A decided one does not start a wait.
+			await makePayment(tenant, none, {
+				createdAt: older.minus({ days: 5 }),
+				status: "rejected",
+				verifiedAt: DateTime.utc(),
+			});
+		});
+
+		const states = await inTenant(tenant, () =>
+			deposits.depositStates(tenant, [project.id, none.id], new Map()),
+		);
+
+		assert.equal(
+			states.get(project.id)?.proofSince?.toMillis(),
+			older.toMillis(),
+		);
+		assert.isNull(states.get(none.id)?.proofSince ?? null);
+	});
+
 	test("settled agrees with isSettled for every way a deposit can stand", async ({
 		assert,
 	}) => {
