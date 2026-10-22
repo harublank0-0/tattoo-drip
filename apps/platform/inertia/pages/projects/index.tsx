@@ -171,23 +171,26 @@ export default function ProjectsIndex({
 						className="flex items-center gap-4 text-sm lg:hidden"
 					>
 						<span className="text-muted-foreground">Sort:</span>
-						{(["needs", "contact"] as const).map((key) =>
-							key === sort ? (
-								<span key={key} aria-current="true" className="font-semibold">
-									{SORT_LABELS[key]}
-								</span>
-							) : (
-								<Link
-									key={key}
-									href={listHref(base, { status: filter, sort: key })}
-									preserveScroll
-									preserveState
-									className="-my-3 flex min-h-11 items-center text-primary underline-offset-4 hover:underline"
-								>
-									{SORT_LABELS[key]}
-								</Link>
-							),
-						)}
+						{/* Both choices stay mounted as links and the visit keeps the page's state,
+						    so the activated link is the same element afterwards and keeps keyboard
+						    focus; the selected one is only marked. */}
+						{(["needs", "contact"] as const).map((key) => (
+							<Link
+								key={key}
+								href={listHref(base, { status: filter, sort: key })}
+								preserveScroll
+								preserveState
+								aria-current={key === sort ? "true" : undefined}
+								className={cn(
+									"-my-3 flex min-h-11 items-center underline-offset-4 hover:underline",
+									key === sort
+										? "font-semibold text-foreground"
+										: "text-primary",
+								)}
+							>
+								{SORT_LABELS[key]}
+							</Link>
+						))}
 					</nav>
 				)}
 			</div>
