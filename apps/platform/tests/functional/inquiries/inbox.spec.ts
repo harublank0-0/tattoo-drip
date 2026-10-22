@@ -564,6 +564,49 @@ test.group("Inbox contact (TAT-52)", (group) => {
 		assert.equal(props.contact.callUrl, "tel:+9779812345678");
 	});
 
+	test("the page carries the channel of the last contact, which the card leads with (TAT-104)", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const inquiry = await inTenant(tenant, async () =>
+			makeInquiry(
+				tenant,
+				await makeClient(tenant, { name: "Sita Rai", phone: "+9779812345678" }),
+			),
+		);
+		const lastChannel = async () =>
+			(
+				await client
+					.get(inbox(`/${inquiry.id}`))
+					.withInertia()
+					.loginAs(owner)
+			).inertiaProps.lastChannel;
+		const tap = (body: Record<string, string>) =>
+			client
+				.post(inbox(`/${inquiry.id}/contacted`))
+				.form(body)
+				.withCsrfToken()
+				.loginAs(owner)
+				.redirects(0);
+
+		// Nobody was contacted yet: the key is there, and null.
+		assert.isNull(await lastChannel());
+
+		await tap({ channel: "viber", kind: "inquiry_received" });
+		assert.equal(await lastChannel(), "viber");
+
+		// The newest tap wins, whatever it was.
+		await tap({ channel: "whatsapp", kind: "inquiry_received" });
+		assert.equal(await lastChannel(), "whatsapp");
+		await tap({ channel: "call" });
+		assert.equal(await lastChannel(), "call");
+
+		// "Mark contacted" names no channel.
+		await tap({});
+		assert.isNull(await lastChannel());
+	});
+
 	test("the inbox shows the last contact; a decided inquiry keeps only the plain links", async ({
 		client,
 		assert,

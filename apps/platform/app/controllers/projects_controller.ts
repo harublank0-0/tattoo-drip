@@ -443,6 +443,8 @@ export default class ProjectsController {
 				channel: project.lastContactChannel,
 				kind: project.lastContactKind,
 			}),
+			// The cards lead with the channel used last (TAT-104).
+			lastChannel: project.lastContactChannel,
 			assignment:
 				membership.role === "owner" && !closed
 					? {

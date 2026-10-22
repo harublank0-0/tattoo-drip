@@ -1,5 +1,6 @@
 import type {
 	CardMessageProps,
+	ContactChannelName,
 	ContactLinksProps,
 } from "~/components/messages";
 import type { PilotCardProps } from "~/components/pilot_metrics_card";
@@ -75,6 +76,8 @@ export type InquiryPageProps = {
 	/** The "received" message while the inquiry is new. */
 	message: CardMessageProps | null;
 	contactedText: string;
+	/** The channel of the last contact, which the Message card leads with (TAT-104). */
+	lastChannel: ContactChannelName | null;
 };
 
 /** How the client found the studio, for people. */

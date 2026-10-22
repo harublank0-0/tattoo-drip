@@ -190,6 +190,8 @@ export default class InquiriesController {
 				channel: inquiry.lastContactChannel,
 				kind: inquiry.lastContactKind,
 			}),
+			// The card leads with the channel used last (TAT-104).
+			lastChannel: inquiry.lastContactChannel,
 		});
 	}
 
