@@ -261,7 +261,11 @@ describe("a studio's logo and cover (TAT-54)", () => {
 		const original = [studio, studio, artist, artist, studio, studio];
 		for (const [index, [name, html]] of Object.entries(broken).entries()) {
 			assert.notEqual(html, original[index], `${name}: the page was changed`);
-			assert.throws(() => assertSafePage(html, BRAND_PAGE), undefined, name);
+			assert.throws(
+				() => assertSafePage(html, BRAND_PAGE),
+				assert.AssertionError,
+				name,
+			);
 		}
 	});
 

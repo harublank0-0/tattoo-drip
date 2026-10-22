@@ -27,10 +27,20 @@ export interface ThemeSections {
 	readonly required: readonly SectionKey[];
 }
 
-/** What each theme supports. The inquiry section is required: a client can always send an idea. */
-export const THEME_SECTIONS: Record<ThemeKey, ThemeSections> = {
-	"stencil-and-ink": { order: ["artists", "inquiry"], required: ["inquiry"] },
-};
+const sectionList = (...keys: SectionKey[]): readonly SectionKey[] =>
+	Object.freeze(keys);
+
+/**
+ * What each theme supports, frozen: DEFAULT_THEME_CONFIG shares these lists,
+ * so one write to them would change every studio's page in the process. The
+ * inquiry section is required: a client can always send an idea.
+ */
+export const THEME_SECTIONS: Record<ThemeKey, ThemeSections> = Object.freeze({
+	"stencil-and-ink": Object.freeze({
+		order: sectionList("artists", "inquiry"),
+		required: sectionList("inquiry"),
+	}),
+});
 
 /** The display faces a studio can pick (branding.ts maps each to a fixed stack). */
 export const FONT_KEYS = ["eczar", "serif", "sans"] as const;
@@ -63,8 +73,13 @@ export interface ThemeConfig {
 	readonly heroImage: CoverImage | null;
 }
 
-/** What every studio gets today: the Stencil & Ink page as TAT-97 and TAT-105 built it. */
-export const DEFAULT_THEME_CONFIG: ThemeConfig = {
+/**
+ * What every studio gets today: the Stencil & Ink page as TAT-97 and TAT-105
+ * built it. Frozen, with the section list it points at: parseThemeConfig
+ * hands out this very object, so nothing that holds it can change the next
+ * page's theme.
+ */
+export const DEFAULT_THEME_CONFIG: ThemeConfig = Object.freeze({
 	key: DEFAULT_THEME_KEY,
 	sections: THEME_SECTIONS[DEFAULT_THEME_KEY].order,
 	accent: null,
@@ -72,7 +87,7 @@ export const DEFAULT_THEME_CONFIG: ThemeConfig = {
 	font: DEFAULT_FONT,
 	logo: null,
 	heroImage: null,
-};
+});
 
 /** At most this many section items are read; a longer list is cut. */
 const MAX_SECTION_ITEMS = 32;

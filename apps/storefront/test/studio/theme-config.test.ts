@@ -542,6 +542,50 @@ describe("parseThemeConfig (TAT-54)", () => {
 		}
 	});
 
+	test("the default theme and the lists it points at can't be changed by whoever holds them", () => {
+		const defaults = {
+			key: "stencil-and-ink",
+			sections: ["artists", "inquiry"],
+			accent: null,
+			accentDark: null,
+			font: "eczar",
+			logo: null,
+			heroImage: null,
+		};
+		assert.ok(Object.isFrozen(DEFAULT_THEME_CONFIG));
+		assert.ok(Object.isFrozen(DEFAULT_THEME_CONFIG.sections));
+		assert.equal(
+			DEFAULT_THEME_CONFIG.sections,
+			THEME_SECTIONS["stencil-and-ink"].order,
+		);
+		for (const key of THEME_KEYS) {
+			assert.ok(Object.isFrozen(THEME_SECTIONS[key]), key);
+			assert.ok(Object.isFrozen(THEME_SECTIONS[key].order), key);
+			assert.ok(Object.isFrozen(THEME_SECTIONS[key].required), key);
+		}
+		// These tests are ES modules, so strict mode: writing to a frozen object throws.
+		const theme = parseThemeConfig(undefined, API) as unknown as {
+			accent: string | null;
+			sections: string[];
+		};
+		assert.throws(() => {
+			theme.accent = "#ff0000";
+		}, TypeError);
+		assert.throws(() => theme.sections.push("hero"), TypeError);
+		assert.throws(() => theme.sections.reverse(), TypeError);
+		assert.throws(() => {
+			(THEME_SECTIONS["stencil-and-ink"].order as string[]).length = 0;
+		}, TypeError);
+		assert.throws(() => {
+			(THEME_SECTIONS["stencil-and-ink"].required as string[])[0] = "artists";
+		}, TypeError);
+		assert.deepEqual(parseThemeConfig(undefined, API), defaults);
+		assert.deepEqual(readSections(undefined, "stencil-and-ink"), [
+			"artists",
+			"inquiry",
+		]);
+	});
+
 	test("a whole config, every value checked", () => {
 		assert.deepEqual(parseThemeConfig(BRANDED, API), {
 			key: "stencil-and-ink",
