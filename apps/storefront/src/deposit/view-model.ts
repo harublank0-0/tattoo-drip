@@ -262,13 +262,16 @@ export function payByLine(
 }
 
 /**
- * When the screenshot came, as "18 Oct 2026, 2:05 pm" in `timeZone`, or null.
- * Assembled from Intl's parts (en-GB month names, like the platform's
- * formatDay), so no browser's spacing or capitals change it.
+ * An instant as "18 Oct 2026, 2:05 pm" (with `weekday`, "Sat 18 Oct 2026, 2:05
+ * pm") in `timeZone`, or null (not a date, or a zone this browser doesn't know:
+ * never UTC, which would show a wrong time). Assembled from Intl's parts (en-GB
+ * month names, like the platform's formatDay), so no browser's spacing or
+ * capitals change it.
  */
-export function formatReceived(
+function formatInstant(
 	iso: string | null,
 	timeZone: string,
+	weekday: boolean,
 ): string | null {
 	if (!iso) return null;
 	const date = new Date(iso);
@@ -276,6 +279,7 @@ export function formatReceived(
 	try {
 		const parts = new Intl.DateTimeFormat("en-GB", {
 			timeZone,
+			...(weekday ? { weekday: "short" as const } : {}),
 			day: "numeric",
 			month: "short",
 			year: "numeric",
@@ -285,41 +289,28 @@ export function formatReceived(
 		}).formatToParts(date);
 		const part = (type: Intl.DateTimeFormatPartTypes) =>
 			parts.find((each) => each.type === type)?.value ?? "";
-		return `${part("day")} ${part("month")} ${part("year")}, ${part("hour")}:${part("minute")} ${part("dayPeriod").toLowerCase()}`;
+		const day = `${part("day")} ${part("month")} ${part("year")}`;
+		const time = `${part("hour")}:${part("minute")} ${part("dayPeriod").toLowerCase()}`;
+		return `${weekday ? `${part("weekday")} ` : ""}${day}, ${time}`;
 	} catch {
 		return null;
 	}
 }
 
-/**
- * When the next session starts, as "Sat 24 Oct 2026, 11:00 am" in
- * `timeZone`, or null (not a date, or a zone this browser doesn't know: never
- * UTC, which would show a wrong time). Same parts as formatReceived.
- */
+/** When the screenshot came, as "18 Oct 2026, 2:05 pm" in `timeZone`, or null. */
+export function formatReceived(
+	iso: string | null,
+	timeZone: string,
+): string | null {
+	return formatInstant(iso, timeZone, false);
+}
+
+/** When the next session starts, as "Sat 24 Oct 2026, 11:00 am" in `timeZone`, or null. */
 export function formatSessionStart(
 	iso: string | null,
 	timeZone: string,
 ): string | null {
-	if (!iso) return null;
-	const date = new Date(iso);
-	if (Number.isNaN(date.getTime())) return null;
-	try {
-		const parts = new Intl.DateTimeFormat("en-GB", {
-			timeZone,
-			weekday: "short",
-			day: "numeric",
-			month: "short",
-			year: "numeric",
-			hour: "numeric",
-			minute: "2-digit",
-			hour12: true,
-		}).formatToParts(date);
-		const part = (type: Intl.DateTimeFormatPartTypes) =>
-			parts.find((each) => each.type === type)?.value ?? "";
-		return `${part("weekday")} ${part("day")} ${part("month")} ${part("year")}, ${part("hour")}:${part("minute")} ${part("dayPeriod").toLowerCase()}`;
-	} catch {
-		return null;
-	}
+	return formatInstant(iso, timeZone, true);
 }
 
 /** The sentence a state other than `due` shows (copy.states). */
