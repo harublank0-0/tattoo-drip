@@ -4,6 +4,7 @@ import type { NextFn } from "@adonisjs/core/types/http";
 import BaseInertiaMiddleware from "@adonisjs/inertia/inertia_middleware";
 import type User from "#models/user";
 import InquiryService from "#modules/inquiries/services/inquiry_service";
+import { bellKinds } from "#modules/notifications/alerts";
 import AlertService from "#modules/notifications/services/alert_service";
 import WaitingService from "#modules/projects/services/waiting_service";
 import {
@@ -72,7 +73,9 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 					)
 				: null;
 
-		// The Alerts count (TAT-52): every member's own unread alerts here.
+		// The bell's count (TAT-52, TAT-107): the member's own unread alerts
+		// here that no tab counts. An owner's are all on the Inbox and Today,
+		// so no query runs for them.
 		const alertCount =
 			tenant && membership && auth?.user
 				? await ensureDbContext(
@@ -81,6 +84,7 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 							(await ctx.containerResolver.make(AlertService)).unreadCount(
 								tenant,
 								membership.userId,
+								bellKinds(membership.role),
 							),
 					)
 				: null;
@@ -123,7 +127,7 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 			inboxCount: ctx.inertia.always(inboxCount),
 			/** The projects that need this member (TAT-107): Today's badge; null off tenant pages. */
 			todayCount: ctx.inertia.always(todayCount),
-			/** The member's unread alerts here (TAT-52); null unless on a tenant page. */
+			/** The member's unread alerts here that no tab counts (TAT-52, TAT-107); null unless on a tenant page. */
 			alertCount: ctx.inertia.always(alertCount),
 		};
 	}

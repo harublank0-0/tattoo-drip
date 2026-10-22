@@ -7,9 +7,10 @@ import NavBadge from "~/components/shell/nav_badge";
 import { buttonVariants } from "~/components/ui/button";
 
 /**
- * The way to the member's alerts (TAT-52), with their unread count
- * (`alertCount`): a bell in the phone's top bar, a row above the account
- * menu in the desktop sidebar. Not a tab: the tab bar keeps its
+ * The way to the member's alerts (TAT-52), with the unread count no tab
+ * counts (`alertCount`, TAT-107: the Inbox and Today count an owner's, so an
+ * owner's bell shows no number): a bell in the phone's top bar, a row above
+ * the account menu in the desktop sidebar. Not a tab: the tab bar keeps its
  * destinations. Screen readers hear "Alerts, 3 unread".
  */
 export default function AlertsLink({ variant }: { variant: "icon" | "row" }) {
