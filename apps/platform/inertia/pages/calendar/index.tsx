@@ -237,10 +237,15 @@ function Toolbar({
 }
 
 /**
- * Owners: one artist or all. Choosing applies at once (TAT-103), with no
- * button: it visits the same page with the new `artist`, keeping the view
- * and the date. A page needs scripts to show at all (no server rendering),
- * so there is no form to fall back on.
+ * Owners: one artist or all. A pick with the mouse or a finger applies at
+ * once (TAT-103), with no button: it visits the same page with the new
+ * `artist`, keeping the view and the date. The visit keeps the page's state,
+ * so the select stays mounted and keeps focus. A closed native select also
+ * changes its value on every arrow key, and loading the calendar at each step
+ * would be a change of context the person didn't ask for (WCAG 3.2.2): a
+ * change made with the keyboard waits for Enter or for focus to leave. A page
+ * needs scripts to show at all (no server rendering), so there is no form to
+ * fall back on.
  */
 function ArtistPicker({
 	base,
@@ -255,10 +260,28 @@ function ArtistPicker({
 }) {
 	const select = useRef<HTMLSelectElement>(null);
 	const selected = filter.selected ?? "";
+	// What the last key press means: arrows move the value, Enter confirms.
+	const viaKeys = useRef(false);
+	const waiting = useRef(false);
 	// A back or forward step changes the prop, not what the person chose.
 	useEffect(() => {
 		if (select.current) select.current.value = selected;
+		waiting.current = false;
 	}, [selected]);
+
+	const apply = (value: string) => {
+		waiting.current = false;
+		router.get(
+			base,
+			{ view, date, ...(value ? { artist: value } : {}) },
+			{ preserveScroll: true, preserveState: true },
+		);
+	};
+	// Enter or blur: apply a keyboard change that is still waiting.
+	const confirm = (element: HTMLSelectElement) => {
+		if (waiting.current && element.value !== selected) apply(element.value);
+		waiting.current = false;
+	};
 
 	return (
 		<Field>
@@ -267,19 +290,29 @@ function ArtistPicker({
 				ref={select}
 				id="artist"
 				defaultValue={selected}
-				onChange={(event) =>
-					router.get(
-						base,
-						{
-							view,
-							date,
-							...(event.currentTarget.value
-								? { artist: event.currentTarget.value }
-								: {}),
-						},
-						{ preserveScroll: true },
-					)
-				}
+				onPointerDown={() => {
+					viaKeys.current = false;
+				}}
+				onKeyDown={(event) => {
+					if (event.key === "Enter" && waiting.current) {
+						// Chromium opens the picker on Enter, which would also
+						// swallow the key's release: apply the chosen artist instead.
+						event.preventDefault();
+						confirm(event.currentTarget);
+					} else if (event.key !== "Enter" && event.key !== "Tab") {
+						viaKeys.current = true;
+					}
+				}}
+				onChange={(event) => {
+					if (viaKeys.current) waiting.current = true;
+					else apply(event.currentTarget.value);
+				}}
+				// An Enter that picks an option in the open list changes the value
+				// after its keydown, so that one is confirmed on release.
+				onKeyUp={(event) => {
+					if (event.key === "Enter") confirm(event.currentTarget);
+				}}
+				onBlur={(event) => confirm(event.currentTarget)}
 				className="h-11 w-full min-w-0 rounded-md border bg-transparent px-3 text-sm"
 			>
 				<option value="">All artists</option>
