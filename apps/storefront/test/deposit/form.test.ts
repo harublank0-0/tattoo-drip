@@ -178,16 +178,19 @@ describe("ProofForm", () => {
 	const radiosIn = (html: string) =>
 		tags(html, "input").filter((tag) => attr(tag, "type") === "radio");
 
-	test("a Pay with pick answers How did you pay?: that kind is checked (TAT-110)", () => {
+	test("a Pay with pick answers How did you pay?, which shows as one line saying so, with Change (TAT-110)", () => {
 		const html = formHtml(depositView(PAGE), {
 			id: "bank:01234567890123",
 			kind: "bank",
 			count: 1,
 		});
-		const radios = radiosIn(html);
 
-		assert.doesNotMatch(radios[0], / checked=""/);
-		assert.match(radios[1], / checked=""/);
+		assert.equal(radiosIn(html).length, 0);
+		assert.doesNotMatch(html, /<legend[^>]*>How did you pay\?<\/legend>/);
+		assert.match(
+			html,
+			/<div class="deposit-answer" aria-live="polite"><div class="deposit-answer-line"><p>Paid with <bdi>Bank transfer<\/bdi><\/p><span aria-hidden="true">·<\/span><button type="button" class="deposit-change" aria-label="Change how you paid">Change<\/button><\/div><\/div>/,
+		);
 		// A kind the form doesn't offer is no answer.
 		const unknown = radiosIn(
 			formHtml(depositView(PAGE), { id: "khalti:1", kind: "khalti", count: 1 }),
@@ -211,15 +214,39 @@ describe("ProofForm", () => {
 		);
 	});
 
-	test("one way to pay is chosen already", () => {
+	test("the line is a polite live region that is always there, so a change of answer is announced; the Change button is a 44 px plain button", () => {
+		const collapsed = formHtml(depositView(PAGE), {
+			id: "esewa:9812345678",
+			kind: "esewa",
+			count: 1,
+		});
+		const expanded = formHtml(depositView(PAGE), null);
+		const button = tags(collapsed, "button").find(
+			(tag) => attr(tag, "class") === "deposit-change",
+		);
+
+		assert.ok(button);
+		assert.equal(attr(button, "type"), "button");
+		assert.match(
+			expanded,
+			/<div class="deposit-answer" aria-live="polite"><\/div>/,
+		);
+		assert.match(textOf(collapsed), /Paid with eSewa·Change/);
+	});
+
+	test("one way to pay is answered already: the line says so, and there is nothing to change", () => {
 		const html = formHtml(
 			depositView(page({ paymentMethods: [PAGE.paymentMethods[0]] })),
 		);
-		const radios = tags(html, "input").filter(
-			(tag) => attr(tag, "type") === "radio",
+
+		assert.equal(radiosIn(html).length, 0);
+		assert.match(textOf(html), /Paid with eSewa/);
+		assert.equal(
+			tags(html, "button").filter(
+				(tag) => attr(tag, "class") === "deposit-change",
+			).length,
+			0,
 		);
-		assert.equal(radios.length, 1);
-		assert.match(radios[0], / checked=""/);
 	});
 
 	test("says when the studio couldn't confirm the last screenshot", () => {

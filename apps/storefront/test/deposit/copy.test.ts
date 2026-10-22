@@ -152,6 +152,9 @@ describe("the deposit page's copy", () => {
 		assert.equal(copy.payWith.legend, "Pay with");
 		assert.equal(copy.payWith.only, "Pay with {label}");
 		assert.equal(copy.paidButton, "I've paid: send the screenshot");
+		assert.equal(copy.form.paidWith, "Paid with {label}");
+		assert.equal(copy.form.change, "Change");
+		assert.match(copy.form.changeLabel, /^Change\b/);
 		assert.equal(copy.methods.missing, "Ask {studio} for these details.");
 		assert.equal(copy.states.session, "Your session");
 		assert.equal(copy.states.artist, "Artist");

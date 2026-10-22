@@ -163,6 +163,10 @@ export const copy = {
 	form: {
 		title: "Send the screenshot",
 		method: "How did you pay?",
+		/** Once answered (by a pick in step 2, or one kind only), the answer is one line (TAT-110). */
+		paidWith: "Paid with {label}",
+		change: "Change",
+		changeLabel: "Change how you paid",
 		kinds,
 		proof: "Payment screenshot",
 		proofHint: "A screenshot or a photo of the payment: JPEG, PNG or WebP.",

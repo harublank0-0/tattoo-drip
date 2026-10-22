@@ -1,9 +1,14 @@
-import { type AnyFieldApi, revalidateLogic } from "@tanstack/react-form";
+import {
+	type AnyFieldApi,
+	revalidateLogic,
+	useStore,
+} from "@tanstack/react-form";
 import { useSubmitDepositProof } from "@tattoo-drip/react";
 import type { DepositState } from "@tattoo-drip/sdk";
 import { useEffect, useReducer, useRef, useState } from "react";
 import { useAppForm } from "../../components/ui/form.tsx";
 import { browserCodec } from "../../intake/browser-codec.ts";
+import { Fill } from "../../intake/components/fill.tsx";
 import { copy, type DepositMethodKind } from "../copy.ts";
 import {
 	describeProofError,
@@ -14,7 +19,12 @@ import {
 	validateProofForm,
 } from "../problems.ts";
 import { NO_PROOF, prepareProof, previewOf, proofReducer } from "../proof.ts";
-import { answerFor, type DepositView, type MethodPick } from "../view-model.ts";
+import {
+	answerCollapsed,
+	answerFor,
+	type DepositView,
+	type MethodPick,
+} from "../view-model.ts";
 import { ProofNoticeView, ProofSummary } from "./notices.tsx";
 import { ProofPicker } from "./proof-picker.tsx";
 import { StepHeading } from "./steps.tsx";
@@ -95,6 +105,9 @@ export function ProofForm({
 	const inputRef = useRef<HTMLInputElement>(null);
 
 	const kinds = view.kinds;
+	// Change (see "How did you pay?" as one line below): the choices are revealed again.
+	const [changing, setChanging] = useState(false);
+	const pointerPick = useRef(false);
 	const form = useAppForm({
 		defaultValues: {
 			method:
@@ -115,7 +128,16 @@ export function ProofForm({
 			},
 		},
 		listeners: {
-			onChange: ({ fieldApi }) => clearServerError(fieldApi),
+			onChange: ({ fieldApi }) => {
+				clearServerError(fieldApi);
+				// In the revealed choices, a pointer's pick of another kind ends Change
+				// (the line follows). The keyboard's doesn't: its arrows move one choice
+				// at a time, and Escape or leaving the choices ends it.
+				if (pointerPick.current) {
+					pointerPick.current = false;
+					setChanging(false);
+				}
+			},
 		},
 		onSubmit: ({ value }) => send(value),
 		onSubmitInvalid: () => {
@@ -135,6 +157,50 @@ export function ProofForm({
 		if (methodPick) appliedPick.current = methodPick.count;
 		if (kind) form.setFieldValue("method", kind);
 	}, [methodPick, kinds, form]);
+
+	// "How did you pay?" as one line once a pick has answered it (answerCollapsed).
+	// The field's value stays in the form while its choices are not on the page,
+	// so what is sent is always what the line says.
+	const answer = useStore(form.store, (state) => state.values.method);
+	const answerErrors = useStore(
+		form.store,
+		(state) => state.fieldMeta.method?.errors?.length ?? 0,
+	);
+	const choicesRef = useRef<HTMLDivElement>(null);
+	const changeRef = useRef<HTMLButtonElement>(null);
+	const focusChoices = useRef(false);
+	const wasCollapsed = useRef(false);
+	const collapsed = answerCollapsed({
+		answer,
+		kinds,
+		pick: methodPick,
+		changing,
+		hasError: answerErrors > 0,
+	});
+
+	// A new pick in step 2 answers it: Change is over.
+	const pickCount = methodPick?.count ?? 0;
+	useEffect(() => {
+		if (pickCount > 0) setChanging(false);
+	}, [pickCount]);
+
+	// Focus follows the swap: Change moves it to the checked choice; when the
+	// choices go while it was on one of them (a pick, Escape), to Change.
+	useEffect(() => {
+		if (focusChoices.current) {
+			focusChoices.current = false;
+			choicesRef.current
+				?.querySelector<HTMLInputElement>('input[name="method"]:checked')
+				?.focus();
+		} else if (
+			collapsed &&
+			!wasCollapsed.current &&
+			document.activeElement === document.body
+		) {
+			changeRef.current?.focus();
+		}
+		wasCollapsed.current = collapsed;
+	});
 
 	async function send(values: ProofValues): Promise<void> {
 		if (inFlight.current || blocked.current) return;
@@ -320,18 +386,83 @@ export function ProofForm({
 						) : null;
 					}}
 				</form.Subscribe>
-				<form.AppField name="method">
-					{(field) => (
-						<field.ChoiceField
-							legend={copy.form.method}
-							options={kinds.map((kind) => ({
-								value: kind,
-								label: copy.form.kinds[kind],
-							}))}
-							required
-						/>
-					)}
-				</form.AppField>
+				<div className="deposit-answer" aria-live="polite">
+					{collapsed ? (
+						<div className="deposit-answer-line">
+							<p>
+								<Fill
+									template={copy.form.paidWith}
+									values={{
+										label: copy.form.kinds[answer as DepositMethodKind],
+									}}
+								/>
+							</p>
+							{kinds.length > 1 ? (
+								<>
+									<span aria-hidden="true">·</span>
+									<button
+										ref={changeRef}
+										type="button"
+										className="deposit-change"
+										aria-label={copy.form.changeLabel}
+										onClick={() => {
+											focusChoices.current = true;
+											setChanging(true);
+										}}
+									>
+										{copy.form.change}
+									</button>
+								</>
+							) : null}
+						</div>
+					) : null}
+				</div>
+				{collapsed ? null : (
+					// biome-ignore lint/a11y/noStaticElementInteractions: only delegates the events of the radios inside, which are the interactive elements
+					<div
+						ref={choicesRef}
+						onClickCapture={(event) => {
+							const target = event.target;
+							if (
+								!changing ||
+								event.detail === 0 ||
+								!(target instanceof HTMLInputElement) ||
+								target.type !== "radio"
+							) {
+								return;
+							}
+							// The kind that is already answered fires no change: it is a pick too.
+							if (target.value === answer) setChanging(false);
+							else pointerPick.current = true;
+						}}
+						onKeyDown={(event) => {
+							if (changing && event.key === "Escape") setChanging(false);
+						}}
+						onBlur={(event) => {
+							if (
+								changing &&
+								!event.currentTarget.contains(
+									event.relatedTarget as Node | null,
+								)
+							) {
+								setChanging(false);
+							}
+						}}
+					>
+						<form.AppField name="method">
+							{(field) => (
+								<field.ChoiceField
+									legend={copy.form.method}
+									options={kinds.map((kind) => ({
+										value: kind,
+										label: copy.form.kinds[kind],
+									}))}
+									required
+								/>
+							)}
+						</form.AppField>
+					</div>
+				)}
 				<ProofPicker
 					state={proof}
 					preview={preview}

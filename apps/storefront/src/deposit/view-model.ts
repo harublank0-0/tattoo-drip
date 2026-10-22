@@ -181,6 +181,27 @@ export function answerFor(
 	return kinds.includes(pick.kind) ? pick.kind : null;
 }
 
+/**
+ * Whether "How did you pay?" shows as one line, "Paid with Bank transfer ·
+ * Change", instead of the choices. Only once it is answered by a pick in step 2
+ * (or there is one kind only, where it is answered already): before a pick, the
+ * choices show so the client can answer without picking. Never while the
+ * client is changing it, never with an error to show on the choices, and never
+ * for an answer the form doesn't offer, so the line always says what is sent.
+ */
+export function answerCollapsed(input: {
+	readonly answer: string;
+	readonly kinds: readonly DepositMethodKind[];
+	readonly pick: MethodPick | null;
+	readonly changing: boolean;
+	readonly hasError: boolean;
+}): boolean {
+	const { answer, kinds, pick, changing, hasError } = input;
+	if (changing || hasError) return false;
+	if (!kinds.includes(answer as DepositMethodKind)) return false;
+	return pick !== null || kinds.length === 1;
+}
+
 /** The studio's mark when it has no logo: its first user-perceived character, as typed. */
 export function studioInitial(name: string): string {
 	return graphemes(name.trim())[0] ?? "";
