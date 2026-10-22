@@ -537,16 +537,96 @@ describe("a method's identity (TAT-110 fix rounds 1 and 2)", () => {
 		assert.notEqual(noQr[0].id, noQr[1].id);
 	});
 
-	test("the order among them is used only for methods identical in every field", () => {
+	test("methods identical in every field are one method, the first of them: no ordinal exists", () => {
 		const twin = { ...a };
-		const ids = methodsOf([a, twin, b]).map((method) => method.id);
 
-		assert.equal(ids[1], `${ids[0]}#1`);
-		assert.ok(!ids[2].includes("#"), "a method of its own has no ordinal");
+		const methods = methodsOf([a, twin, b, { ...twin }]);
+
 		assert.deepEqual(
-			methodsOf([a, twin, twin]).map((method) => method.id.split("#")[1]),
-			[undefined, "1", "2"],
+			methods.map((method) => method.label),
+			["Fonepay A", "Fonepay B"],
 		);
+		assert.deepEqual(
+			methods.map((method) => method.id),
+			methodsOf([a, b]).map((method) => method.id),
+		);
+		assert.deepEqual(
+			depositView(page({ paymentMethods: [a, twin, b] })).kinds,
+			["fonepay"],
+		);
+	});
+
+	test("identical as the page shows them is identical: spacing, and a QR that fails the check", () => {
+		const methods = methodsOf([
+			{ ...bank, accountNumber: "98765 43210", bankName: "Nabil Bank" },
+			{ ...bank, accountNumber: "  98765  43210 ", bankName: " Nabil Bank " },
+			{ ...bank, accountNumber: "98765 43210", qrImageUrl: null },
+			{
+				...bank,
+				accountNumber: "98765 43210",
+				qrImageUrl: "javascript:alert(1)",
+			},
+		]);
+
+		assert.equal(methods.length, 1);
+	});
+
+	test("methods that differ in any one field stay two", () => {
+		type Method = DepositPage["paymentMethods"][number];
+		const base: Method = { ...bank, qrImageUrl: QR_URL };
+		const changes: Partial<Method>[] = [
+			{ kind: "khalti" },
+			{ accountNumber: "1" },
+			{ accountName: "Someone else" },
+			{ bankName: "Global IME" },
+			{ label: "Bank 2" },
+			{ qrImageUrl: `${QR_URL}?v=2` },
+			{ qrImageUrl: null },
+			{ accountNumber: null },
+		];
+
+		for (const change of changes) {
+			const methods = methodsOf([base, { ...base, ...change }]);
+			assert.equal(methods.length, 2, JSON.stringify(change));
+			assert.notEqual(methods[0].id, methods[1].id, JSON.stringify(change));
+		}
+	});
+
+	test("no identity has an ordinal, whatever the list holds", () => {
+		const lists = [
+			[a, { ...a }, { ...a }],
+			[bank, { ...bank }, esewa, { ...esewa }],
+			[a, b, c, { ...b }],
+		];
+
+		for (const list of lists) {
+			for (const method of methodsOf(list)) {
+				assert.ok(!method.id.includes("#"), method.id);
+			}
+		}
+	});
+
+	test("removing or re-adding a twin never changes the remaining method's identity or the selection", () => {
+		const twin = { ...bank };
+		const lists = [
+			[esewa, bank, twin],
+			[esewa, twin],
+			[esewa, bank],
+			[bank, esewa, twin],
+			[twin, esewa],
+			[esewa, bank, twin, { ...bank }],
+		];
+		// The last of the bank methods: the one an ordinal would have been given.
+		const picked = methodsOf([esewa, bank, twin])
+			.filter((method) => method.label === "Bank transfer")
+			.at(-1)?.id;
+		assert.ok(picked, "a bank method");
+
+		for (const list of lists) {
+			const shown = selectedMethod(methodsOf(list), picked);
+			assert.equal(shown?.label, "Bank transfer", `${list.length} methods`);
+			assert.equal(shown?.accountNumber, "01234567890123");
+		}
 	});
 
 	test("a part that looks like an ordinal or a separator can't make two methods one", () => {
@@ -650,7 +730,9 @@ describe("the answer follows an explicit pick (TAT-110 fix round 1)", () => {
 		};
 		return {
 			pick(label: string) {
-				const method = current.methods.find((each) => each.label === label);
+				const method = current.methods
+					.filter((each) => each.label === label)
+					.at(-1);
 				assert.ok(method, label);
 				picked = pickMethod(picked, method);
 				render();
@@ -721,6 +803,20 @@ describe("the answer follows an explicit pick (TAT-110 fix round 1)", () => {
 		page.refetch(view(esewa));
 
 		assert.equal(page.shown?.kind, "esewa");
+		assert.equal(page.answer, "bank");
+	});
+
+	test("[eSewa, bank, an identical bank] -> [eSewa, the identical one]: the pick and the answer are kept", () => {
+		const twin = { ...bank };
+		const page = client(view(esewa, bank, twin));
+		page.pick("Bank transfer");
+
+		page.refetch(view(esewa, twin));
+		assert.equal(page.shown?.accountNumber, "01234567890123");
+		assert.equal(page.answer, "bank");
+
+		page.refetch(view(esewa, bank, twin));
+		assert.equal(page.shown?.accountNumber, "01234567890123");
 		assert.equal(page.answer, "bank");
 	});
 });

@@ -43,10 +43,10 @@ export interface MethodView {
 	/**
 	 * The method's identity, which survives the studio reordering, adding to or
 	 * removing from its list between two reads (the page refetches when the tab
-	 * regains focus): every field that tells methods apart (kind, number,
-	 * names, label, QR URL), encoded; `#1`, `#2`… by order only for methods
-	 * identical in all of them. Never the place in the list. It lives in state
-	 * and keys only: it is not written to any attribute of the page.
+	 * regains focus): a function of its own fields alone (kind, number, names,
+	 * label, QR URL), encoded. Methods identical in all of them are listed once,
+	 * so there is no ordinal. Never the place in the list. It lives in state and
+	 * keys only: it is not written to any attribute of the page.
 	 */
 	readonly id: string;
 	readonly kind: DepositMethodKind;
@@ -187,36 +187,35 @@ export function studioInitial(name: string): string {
 }
 
 function methodViews(methods: readonly DepositPaymentMethod[]): MethodView[] {
-	const seen = new Map<string, number>();
-	return methods
-		.filter((method) => DEPOSIT_KINDS.includes(method.kind))
-		.map((method) => {
-			const shown = {
-				kind: method.kind,
-				label: cleanLine(method.label) ?? copy.form.kinds[method.kind],
-				qr: safeImageUrl(method.qrImageUrl),
-				accountName: cleanLine(method.accountName),
-				accountNumber: cleanLine(method.accountNumber),
-				bankName: cleanLine(method.bankName),
-			};
-			return { id: methodId(shown, seen), ...shown };
-		});
+	const views = new Map<string, MethodView>();
+	for (const method of methods) {
+		if (!DEPOSIT_KINDS.includes(method.kind)) continue;
+		const shown = {
+			kind: method.kind,
+			label: cleanLine(method.label) ?? copy.form.kinds[method.kind],
+			qr: safeImageUrl(method.qrImageUrl),
+			accountName: cleanLine(method.accountName),
+			accountNumber: cleanLine(method.accountNumber),
+			bankName: cleanLine(method.bankName),
+		};
+		const id = methodId(shown);
+		// A method identical to an earlier one in every field shows the same thing:
+		// it is the same method, listed once, so no identity needs an ordinal.
+		if (!views.has(id)) views.set(id, { id, ...shown });
+	}
+	return [...views.values()];
 }
 
 /**
- * A method's identity (MethodView.id), made of everything that tells it apart,
- * as the page shows it: kind, account number, account name, bank name, label
- * and the checked QR URL, each URL-encoded (so none can contain the `|` between
- * them or the `#` of an ordinal). The payload has no id of its own, and QR-only
- * methods (Fonepay) have no number, so the number alone is not enough. `seen`
- * counts the methods before this one with the same identity: only methods
- * identical in every field take `#1`, `#2`… by their order.
+ * A method's identity (MethodView.id): a pure function of its own fields as the
+ * page shows them (kind, account number, account name, bank name, label and the
+ * checked QR URL), each URL-encoded so none can contain the `|` between them.
+ * The payload has no id of its own, and QR-only methods (Fonepay) have no
+ * number, so the number alone is not enough. Nothing about the other methods
+ * goes in: reordering, adding or removing any of them can't change it.
  */
-function methodId(
-	shown: Omit<MethodView, "id">,
-	seen: Map<string, number>,
-): string {
-	const base = [
+function methodId(shown: Omit<MethodView, "id">): string {
+	return [
 		shown.kind,
 		shown.accountNumber,
 		shown.accountName,
@@ -226,9 +225,6 @@ function methodId(
 	]
 		.map((part) => encodeURIComponent(part ?? ""))
 		.join("|");
-	const nth = seen.get(base) ?? 0;
-	seen.set(base, nth + 1);
-	return nth === 0 ? base : `${base}#${nth}`;
 }
 
 /** Today's date (yyyy-mm-dd) in `timeZone`, or null when this browser doesn't know the zone. */
