@@ -1,7 +1,7 @@
-import { Link } from "@inertiajs/react";
+import { Link, router } from "@inertiajs/react";
 import { cn } from "cn";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { urlFor } from "~/client";
 import {
 	type CalendarDay,
@@ -15,7 +15,7 @@ import Page from "~/components/page";
 import { SESSION_KIND_LABELS } from "~/components/projects";
 import StatusBadge from "~/components/status_badge";
 import { Badge } from "~/components/ui/badge";
-import { Button, buttonVariants } from "~/components/ui/button";
+import { buttonVariants } from "~/components/ui/button";
 import { Field, FieldLabel } from "~/components/ui/field";
 import { useTenant } from "~/hooks/use-tenant";
 import AppLayout from "~/layouts/app";
@@ -236,7 +236,12 @@ function Toolbar({
 	);
 }
 
-/** Owners: one artist or all. A GET form with a button, no change-to-submit. */
+/**
+ * Owners: one artist or all. Choosing applies at once (TAT-103), with no
+ * button: it visits the same page with the new `artist`, keeping the view
+ * and the date. A page needs scripts to show at all (no server rendering),
+ * so there is no form to fall back on.
+ */
 function ArtistPicker({
 	base,
 	view,
@@ -248,31 +253,43 @@ function ArtistPicker({
 	date: string;
 	filter: NonNullable<CalendarPageProps["artistFilter"]>;
 }) {
+	const select = useRef<HTMLSelectElement>(null);
+	const selected = filter.selected ?? "";
+	// A back or forward step changes the prop, not what the person chose.
+	useEffect(() => {
+		if (select.current) select.current.value = selected;
+	}, [selected]);
+
 	return (
-		<form method="get" action={base} className="flex flex-wrap items-end gap-2">
-			<input type="hidden" name="view" value={view} />
-			<input type="hidden" name="date" value={date} />
-			<Field className="min-w-0 flex-1 basis-48">
-				<FieldLabel htmlFor="artist">Artist</FieldLabel>
-				<select
-					key={filter.selected ?? "all"}
-					id="artist"
-					name="artist"
-					defaultValue={filter.selected ?? ""}
-					className="h-11 w-full min-w-0 rounded-md border bg-transparent px-3 text-sm"
-				>
-					<option value="">All artists</option>
-					{filter.artists.map(({ id, name }) => (
-						<option key={id} value={id}>
-							{name}
-						</option>
-					))}
-				</select>
-			</Field>
-			<Button type="submit" variant="outline" className="min-h-11">
-				Show
-			</Button>
-		</form>
+		<Field>
+			<FieldLabel htmlFor="artist">Artist</FieldLabel>
+			<select
+				ref={select}
+				id="artist"
+				defaultValue={selected}
+				onChange={(event) =>
+					router.get(
+						base,
+						{
+							view,
+							date,
+							...(event.currentTarget.value
+								? { artist: event.currentTarget.value }
+								: {}),
+						},
+						{ preserveScroll: true },
+					)
+				}
+				className="h-11 w-full min-w-0 rounded-md border bg-transparent px-3 text-sm"
+			>
+				<option value="">All artists</option>
+				{filter.artists.map(({ id, name }) => (
+					<option key={id} value={id}>
+						{name}
+					</option>
+				))}
+			</select>
+		</Field>
 	);
 }
 
