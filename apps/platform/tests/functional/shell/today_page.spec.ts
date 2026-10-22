@@ -819,4 +819,57 @@ test.group("Today", (group) => {
 		);
 		assert.equal(artist.todayCount, 1);
 	});
+	test("every screenshot to check is shown, with no See all: an unresolved payment is never hidden behind a link (fix round 2)", async ({
+		client,
+		assert,
+	}) => {
+		const s = await studio("today-uncapped-107");
+		// Seven projects with a waiting screenshot, four of them withdrawn (closed), sent a day apart.
+		const ids = await inTenant(s.tenant, async () => {
+			const out: string[] = [];
+			for (let at = 0; at < 7; at++) {
+				const project = await makeProject(
+					s.tenant,
+					await makeClient(s.tenant, { name: `Shot ${at}` }),
+					{
+						status: at < 4 ? "cancelled" : "deposit_pending",
+						artistId: s.ashaProfile.id,
+					},
+				);
+				await makeQuote(s.tenant, project);
+				await proofFor(s.tenant, project, {
+					createdAt: DateTime.utc().minus({ days: 7 - at }),
+				});
+				out.push(project.id);
+			}
+			// Another group still caps at five and says where to see the rest.
+			for (let at = 0; at < 6; at++) {
+				await makeProject(
+					s.tenant,
+					await makeClient(s.tenant, { name: `Price ${at}` }),
+					{ status: "reviewing" },
+				);
+			}
+			return out;
+		});
+
+		const props = await propsOf(client, "today-uncapped-107", s.owner);
+
+		const proofs = groupOf(props, "proofs") as Group;
+		assert.equal(proofs.count, 7);
+		assert.deepEqual(
+			proofs.rows.map(({ id }) => id),
+			ids,
+			"all seven, the screenshot sent longest ago first",
+		);
+		assert.isNull(proofs.more);
+		for (const row of proofs.rows) {
+			assert.equal(row.target.hash, "payments");
+		}
+		const prices = groupOf(props, "prices") as Group;
+		assert.equal(prices.count, 6);
+		assert.lengthOf(prices.rows, 5);
+		assert.isNotNull(prices.more);
+		assert.equal(props.todayCount, 13);
+	});
 });

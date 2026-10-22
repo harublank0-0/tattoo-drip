@@ -48,9 +48,15 @@ type More = {
 } | null;
 type Group = { key: TodayGroupKey; count: number; rows: Row[]; more: More };
 
-/** Where "See all" goes for a group, and the one project status that holds the whole group. */
-const SEE_ALL: Record<TodayGroupKey, Exclude<More, null>> = {
-	proofs: { route: "tenant.projects.index", status: null },
+/**
+ * Groups that show every row, never five and a link: an owner's screenshots to check. An
+ * unresolved payment is never hidden behind "See all", and the Projects list can't show
+ * the closed (withdrawn) projects that sit in this group (TAT-109 adds a way to list them).
+ */
+const UNCAPPED_GROUPS: readonly TodayGroupKey[] = ["proofs"];
+
+/** Where "See all" goes for a capped group, and the one project status that holds the whole group. */
+const SEE_ALL: Partial<Record<TodayGroupKey, Exclude<More, null>>> = {
 	requests: { route: "tenant.inbox.index", status: null },
 	prices: { route: "tenant.projects.index", status: "reviewing" },
 	ending: { route: "tenant.projects.index", status: null },
@@ -102,7 +108,10 @@ export default class TodayController {
 		}
 		const shown = {
 			groups: new Map<TodayGroupKey, WaitingItem[]>(
-				[...byGroup].map(([key, items]) => [key, items.slice(0, TODAY_ROWS)]),
+				[...byGroup].map(([key, items]) => [
+					key,
+					UNCAPPED_GROUPS.includes(key) ? items : items.slice(0, TODAY_ROWS),
+				]),
 			),
 			waiting: work.onClient.slice(0, TODAY_ROWS),
 		};
@@ -181,7 +190,7 @@ export default class TodayController {
 				key,
 				count,
 				rows,
-				more: count > rows.length ? SEE_ALL[key] : null,
+				more: count > rows.length ? (SEE_ALL[key] ?? null) : null,
 			});
 		}
 
