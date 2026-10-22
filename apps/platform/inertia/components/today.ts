@@ -64,3 +64,62 @@ export type TodayPageProps = {
 	/** Owners only. */
 	pilotMetrics: PilotCardProps | null;
 };
+
+/** Each group's title, in page order. */
+export const GROUP_TITLES: Record<TodayGroupKey, string> = {
+	proofs: "Payment screenshots to check",
+	requests: "New requests",
+	prices: "Prices to send",
+	ending: "Prices ending soon",
+	deposits: "Deposits to chase",
+	sessions: "Sessions to book",
+};
+
+/** "See all 7 in the Inbox" / "See all 7 on Projects": where a long group goes on. */
+export function moreText({
+	count,
+	more,
+}: {
+	count: number;
+	more: TodayMore;
+}): string {
+	return `See all ${count} ${more.route === "tenant.inbox.index" ? "in the Inbox" : "on Projects"}`;
+}
+
+/** What an empty section says, in plain words, for the member's role. */
+export function emptyText(
+	section: "needsYou" | "sessions" | "waiting",
+	role: string,
+	scope?: string,
+): string {
+	const owner = role === "owner";
+	switch (section) {
+		case "needsYou":
+			return owner
+				? "Nothing needs you right now. New requests and payment screenshots show up here."
+				: "Nothing needs you right now. Your projects show up here when they need a price or a session.";
+		case "sessions":
+			if (scope === "unlinked") {
+				return "Your account isn't linked to an artist profile yet, so no sessions show here. Ask an owner to link it.";
+			}
+			return owner ? "No sessions today." : "No sessions for you today.";
+		case "waiting":
+			return owner
+				? "Nobody to chase. Prices and deposit links you send wait here until the client answers."
+				: "Nobody to chase. Prices you send wait here until the client answers.";
+	}
+}
+
+/**
+ * Whether the setup checklist leads the page: a new studio with nothing
+ * that needs it. Once something needs the owner, the checklist moves down.
+ */
+export function setupFirst({
+	setup,
+	needsYou,
+}: {
+	setup: unknown;
+	needsYou: unknown[];
+}): boolean {
+	return Boolean(setup) && needsYou.length === 0;
+}
