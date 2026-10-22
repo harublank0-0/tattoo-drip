@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
 	FONT_KEYS,
+	readBrandImage,
 	readFontKey,
 	readHexColor,
 	readSections,
@@ -213,5 +214,122 @@ describe("readHexColor (TAT-54)", () => {
 		]) {
 			assert.equal(readHexColor(value), null, JSON.stringify(value));
 		}
+	});
+});
+
+describe("readBrandImage (TAT-54)", () => {
+	const API = "https://api.example.com";
+	const LOGO = "https://api.example.com/uploads/tenants/t/brand_logo/logo.png";
+	const image = (
+		url: unknown,
+		width: unknown = 600,
+		height: unknown = 200,
+	) => ({
+		url,
+		width,
+		height,
+		alt: "Black Needle",
+	});
+
+	test("an image on the API's origin is kept: its URL and its size", () => {
+		assert.deepEqual(readBrandImage(image(LOGO), API), {
+			src: LOGO,
+			width: 600,
+			height: 200,
+		});
+		assert.deepEqual(
+			readBrandImage(image("https://API.example.com/uploads/a.png"), API),
+			{ src: "https://api.example.com/uploads/a.png", width: 600, height: 200 },
+		);
+	});
+
+	test("a URL from anywhere else, or not https, is no image", () => {
+		for (const url of [
+			"javascript:alert(1)",
+			"data:image/svg+xml,<svg onload=alert(1)>",
+			"data:image/png;base64,iVBORw0KGgo=",
+			"blob:https://api.example.com/0f0e",
+			"http://api.example.com/uploads/a.png",
+			"https://evil.example/uploads/a.png",
+			"https://api.example.com.evil.example/a.png",
+			"https://api.example.com@evil.example/a.png",
+			"https://user:secret@api.example.com/a.png",
+			"https://api.example.com:8443/a.png",
+			"https://аpi.example.com/a.png",
+			"//evil.example/a.png",
+			"/uploads/a.png",
+			"uploads/a.png",
+			"url(https://api.example.com/a.png)",
+			" https://api.example.com/a.png",
+			"https://api.example.com/a.png\n",
+			"https://api.example.com/a b.png",
+			"https://api.example.com/a\tb.png",
+			"https://api.example.com/a\u0000.png",
+			`https://api.example.com/${"a".repeat(3000)}.png`,
+			...HOSTILE_STRINGS,
+			...WRONG_TYPES,
+		]) {
+			assert.equal(readBrandImage(image(url), API), null, JSON.stringify(url));
+		}
+	});
+
+	test("a URL that would break out of CSS is harmless: it is only ever an <img> src, percent-encoded", () => {
+		const breakout = readBrandImage(
+			image('https://api.example.com/a.png");background:url(//evil.example'),
+			API,
+		);
+		assert.ok(breakout);
+		assert.doesNotMatch(breakout.src, /"/);
+		assert.match(breakout.src, /^https:\/\/api\.example\.com\/a\.png%22\)/);
+		const devanagari = readBrandImage(
+			image("https://api.example.com/uploads/लोगो.png"),
+			API,
+		);
+		assert.equal(
+			devanagari?.src,
+			"https://api.example.com/uploads/%E0%A4%B2%E0%A5%8B%E0%A4%97%E0%A5%8B.png",
+		);
+	});
+
+	test("its size must be whole pixels from 1 to 10000", () => {
+		for (const [width, height] of [
+			[0, 200],
+			[600, -1],
+			[1.5, 200],
+			["600", 200],
+			[600, Number.NaN],
+			[Number.POSITIVE_INFINITY, 200],
+			[10_001, 200],
+			[null, 200],
+		]) {
+			assert.equal(
+				readBrandImage(image(LOGO, width, height), API),
+				null,
+				`${width} x ${height}`,
+			);
+		}
+		assert.equal(readBrandImage({ url: LOGO }, API), null, "no size");
+		assert.ok(readBrandImage(image(LOGO, 10_000, 1), API));
+	});
+
+	test("not an Image object, or no origin to check against, is no image", () => {
+		for (const value of [LOGO, null, undefined, [], [LOGO], 42]) {
+			assert.equal(readBrandImage(value, API), null, String(value));
+		}
+		assert.equal(readBrandImage(Object.create(image(LOGO)), API), null);
+		assert.equal(readBrandImage(image(LOGO), null), null);
+		assert.equal(readBrandImage(image(LOGO), "not an origin"), null);
+	});
+
+	test("plain http only from an API on this machine (development)", () => {
+		const local = "http://localhost:3333";
+		assert.deepEqual(
+			readBrandImage(image("http://localhost:3333/uploads/a.png"), local),
+			{ src: "http://localhost:3333/uploads/a.png", width: 600, height: 200 },
+		);
+		assert.equal(
+			readBrandImage(image("http://api.test/uploads/a.png"), "http://api.test"),
+			null,
+		);
 	});
 });

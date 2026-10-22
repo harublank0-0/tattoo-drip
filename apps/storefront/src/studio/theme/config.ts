@@ -1,3 +1,5 @@
+import { safeImageUrl } from "../links.ts";
+
 /**
  * A studio's theme (TAT-54): the API's StorefrontConfiguration as the page
  * uses it, after every value has passed an allow-list. Pure. A studio never
@@ -126,4 +128,55 @@ export function readHexColor(value: unknown): string | null {
 	return typeof value === "string" && HEX_COLOR.test(value)
 		? value.toLowerCase()
 		: null;
+}
+
+/** Stored images are at most 2048 px (TAT-44); anything outside this is no image. */
+const MAX_IMAGE_SIDE = 10_000;
+
+/** Hosts on this machine, where the API may be plain http (development). */
+const LOCAL_HOST =
+	/^(?:localhost|127\.0\.0\.1|\[::1\]|[a-z0-9.-]+\.localhost)$/;
+
+/**
+ * A logo or cover image from the API's `Image` (url, width, height; `alt` is
+ * not read: both are decoration beside the studio's name), or null. The URL
+ * has no space or control character, passes safeImageUrl (http or https, no
+ * credentials, at most 2048 characters) and is on exactly `imageOrigin`, the
+ * API's origin; it is https unless the API runs on this machine. Without an
+ * origin no image is accepted.
+ */
+export function readBrandImage(
+	value: unknown,
+	imageOrigin: string | null,
+): BrandImage | null {
+	const url = own(value, "url");
+	const width = own(value, "width");
+	const height = own(value, "height");
+	if (imageOrigin === null || typeof url !== "string") return null;
+	if (/[\s\p{Cc}]/u.test(url)) return null;
+	const src = safeImageUrl(url);
+	if (src === null) return null;
+	const parsed = new URL(src);
+	if (parsed.origin !== originOf(imageOrigin)) return null;
+	if (parsed.protocol !== "https:" && !LOCAL_HOST.test(parsed.hostname)) {
+		return null;
+	}
+	if (!isImageSide(width) || !isImageSide(height)) return null;
+	return { src, width, height };
+}
+
+function originOf(value: string): string | null {
+	try {
+		return new URL(value).origin;
+	} catch {
+		return null;
+	}
+}
+
+function isImageSide(value: unknown): value is number {
+	return (
+		Number.isInteger(value) &&
+		(value as number) >= 1 &&
+		(value as number) <= MAX_IMAGE_SIDE
+	);
 }
