@@ -444,8 +444,8 @@ describe("due", () => {
 		assert.deepEqual(
 			radios.map((radio) => [attr(radio, "id"), attr(radio, "value")]),
 			[
-				["pay-with-0", "esewa:9812345678"],
-				["pay-with-1", "bank:01234567890123"],
+				["pay-with-0", "0"],
+				["pay-with-1", "1"],
 			],
 		);
 		assert.match(radios[0], / checked=""/);
@@ -454,6 +454,17 @@ describe("due", () => {
 		assert.match(html, /<span dir="auto">Bank transfer<\/span>/);
 		assert.equal(tags(html, "form").length, 0);
 		assert.equal(tags(html, "h3").length, 0);
+	});
+
+	test("a method's identity stays out of the markup: no attribute holds it, for a script or the clipboard to read (TAT-110 fix round 2)", () => {
+		const view = depositView(PAGE);
+		const html = dueHtml(view);
+
+		for (const method of view.methods) {
+			assert.ok(!html.includes(method.id), method.kind);
+			assert.ok(!html.includes(encodeURIComponent(method.id)), method.kind);
+		}
+		assert.doesNotMatch(html, /%7C/);
 	});
 
 	test("only the picked method is on the page: its QR (eager, no Referer, reserved size), its caption, its details", () => {

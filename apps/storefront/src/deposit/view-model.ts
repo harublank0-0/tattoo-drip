@@ -41,12 +41,12 @@ const DAY_MS = 86_400_000;
 
 export interface MethodView {
 	/**
-	 * The method's identity, which survives the studio reordering its list
-	 * between two reads (the page refetches when the tab regains focus): the
-	 * kind and the account or wallet number as shown, `bank:01234567890123`
-	 * (the number URL-encoded; empty for a QR-only method). Methods that can't
-	 * be told apart that way (the same kind and number, or no number) take
-	 * `#1`, `#2`… by their order among them. Never the place in the list.
+	 * The method's identity, which survives the studio reordering, adding to or
+	 * removing from its list between two reads (the page refetches when the tab
+	 * regains focus): every field that tells methods apart (kind, number,
+	 * names, label, QR URL), encoded; `#1`, `#2`… by order only for methods
+	 * identical in all of them. Never the place in the list. It lives in state
+	 * and keys only: it is not written to any attribute of the page.
 	 */
 	readonly id: string;
 	readonly kind: DepositMethodKind;
@@ -190,24 +190,42 @@ function methodViews(methods: readonly DepositPaymentMethod[]): MethodView[] {
 	const seen = new Map<string, number>();
 	return methods
 		.filter((method) => DEPOSIT_KINDS.includes(method.kind))
-		.map((method) => ({
-			id: methodId(method, seen),
-			kind: method.kind,
-			label: cleanLine(method.label) ?? copy.form.kinds[method.kind],
-			qr: safeImageUrl(method.qrImageUrl),
-			accountName: cleanLine(method.accountName),
-			accountNumber: cleanLine(method.accountNumber),
-			bankName: cleanLine(method.bankName),
-		}));
+		.map((method) => {
+			const shown = {
+				kind: method.kind,
+				label: cleanLine(method.label) ?? copy.form.kinds[method.kind],
+				qr: safeImageUrl(method.qrImageUrl),
+				accountName: cleanLine(method.accountName),
+				accountNumber: cleanLine(method.accountNumber),
+				bankName: cleanLine(method.bankName),
+			};
+			return { id: methodId(shown, seen), ...shown };
+		});
 }
 
-/** A method's identity (MethodView.id); `seen` counts the ones that came before with the same base. */
+/**
+ * A method's identity (MethodView.id), made of everything that tells it apart,
+ * as the page shows it: kind, account number, account name, bank name, label
+ * and the checked QR URL, each URL-encoded (so none can contain the `|` between
+ * them or the `#` of an ordinal). The payload has no id of its own, and QR-only
+ * methods (Fonepay) have no number, so the number alone is not enough. `seen`
+ * counts the methods before this one with the same identity: only methods
+ * identical in every field take `#1`, `#2`… by their order.
+ */
 function methodId(
-	method: DepositPaymentMethod,
+	shown: Omit<MethodView, "id">,
 	seen: Map<string, number>,
 ): string {
-	const number = cleanLine(method.accountNumber) ?? "";
-	const base = `${method.kind}:${encodeURIComponent(number)}`;
+	const base = [
+		shown.kind,
+		shown.accountNumber,
+		shown.accountName,
+		shown.bankName,
+		shown.label,
+		shown.qr,
+	]
+		.map((part) => encodeURIComponent(part ?? ""))
+		.join("|");
 	const nth = seen.get(base) ?? 0;
 	seen.set(base, nth + 1);
 	return nth === 0 ? base : `${base}#${nth}`;
