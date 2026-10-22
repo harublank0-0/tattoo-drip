@@ -151,7 +151,12 @@ export function readHexColor(value: unknown): string | null {
 		: null;
 }
 
-/** Stored images are at most 2048 px (TAT-44); anything outside this is no image. */
+/**
+ * The longest side of a brand image, in pixels. Stored images are at most
+ * 2048 px today (TAT-44); the limit is 10000 because TAT-56 may raise the
+ * stored size and this check should not need to change with it. A side
+ * outside 1 to 10000 is no image.
+ */
 const MAX_IMAGE_SIDE = 10_000;
 
 /**
