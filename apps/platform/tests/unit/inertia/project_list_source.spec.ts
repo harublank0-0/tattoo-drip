@@ -53,5 +53,20 @@ test.group(
 			// The sorted and the unsorted head are the same element: only the icon differs.
 			assert.notMatch(head, /sorted\s*\?\s*\(?\s*</);
 		});
+
+		test("the Waiting head is `other`: it ranks, it does not sort the words", async ({
+			assert,
+		}) => {
+			const source = await page();
+			assert.include(source, 'ariaSort="other"');
+			assert.notInclude(source, 'ariaSort="descending"');
+		});
+
+		test("the chips carry the chosen sort, also from views that have their own order", async ({
+			assert,
+		}) => {
+			const chips = between(await page(), "{chips.map(", "</nav>");
+			assert.include(chips, "sort: chosenSort");
+		});
 	},
 );

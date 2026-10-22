@@ -205,6 +205,7 @@ export default class ProjectsController {
 			filter: view.filter,
 			waiting: view.waiting,
 			sort: sortable ? view.sort : null,
+			chosenSort: view.sort,
 			counts: {
 				active: sum(ACTIVE_STATUSES),
 				needsYou: work.needsYou.length,

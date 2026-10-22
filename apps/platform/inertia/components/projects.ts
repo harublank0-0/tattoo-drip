@@ -189,9 +189,6 @@ export const STATUS_LABELS: Record<string, string> = {
 	screenshot_to_check: "Screenshot to check",
 };
 
-/** The flag a project row shows while a deposit screenshot waits for an owner. */
-export const PROOF_WAITING_STATUS = "screenshot_to_check";
-
 /** Whose move it is (TAT-98); each group has its own colour and icon. */
 export type StatusGroup = "studio" | "client" | "booked" | "chair" | "closed";
 
@@ -274,6 +271,8 @@ export type ProjectListProps = {
 	waiting: string | null;
 	/** The chosen sort; null where the view has its own order (waiting and closed views). */
 	sort: "needs" | "contact" | null;
+	/** The sort asked for, kept in the views that have their own order so a chip can carry it back. */
+	chosenSort: "needs" | "contact";
 	counts: {
 		active: number;
 		/** WaitingService.work().needsYou.length: the Today badge's number. */

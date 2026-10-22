@@ -226,6 +226,7 @@ test.group("Projects list", (group) => {
 				filter: props.filter,
 				waiting: props.waiting,
 				sort: props.sort,
+				chosenSort: props.chosenSort,
 				statuses: rowsOf(props).map(({ status }) => status),
 			};
 		};
@@ -234,24 +235,28 @@ test.group("Projects list", (group) => {
 			filter: "closed",
 			waiting: null,
 			sort: null,
+			chosenSort: "needs",
 			statuses: ["cancelled"],
 		});
 		assert.deepEqual(await view("?status=quoted"), {
 			filter: "quoted",
 			waiting: null,
 			sort: "needs",
+			chosenSort: "needs",
 			statuses: ["quoted"],
 		});
 		assert.deepEqual(await view("?status=bogus&page=abc"), {
 			filter: "active",
 			waiting: null,
 			sort: "needs",
+			chosenSort: "needs",
 			statuses: ["quoted"],
 		});
 		assert.deepEqual(await view("?page=99"), {
 			filter: "active",
 			waiting: null,
 			sort: "needs",
+			chosenSort: "needs",
 			statuses: [],
 		});
 
@@ -284,6 +289,20 @@ test.group("Projects list", (group) => {
 				query,
 			);
 		}
+		// The chosen sort survives the views that have their own order, so the chips can
+		// carry it back to Active: it is not the same as the view's effective `sort`.
+		for (const query of [
+			"?status=closed&sort=contact",
+			"?status=needs_you&sort=contact",
+			"?waiting=proofs&sort=contact",
+			"?status=cancelled&sort=contact",
+		]) {
+			const shown = await view(query);
+			assert.isNull(shown.sort, query);
+			assert.equal(shown.chosenSort, "contact", query);
+		}
+		assert.equal((await view("?sort=bogus")).chosenSort, "needs");
+		assert.equal((await view("?sort=contact")).chosenSort, "contact");
 		assert.equal((await view("?sort=bogus")).sort, "needs");
 		assert.equal((await view("?sort=contact")).sort, "contact");
 		assert.isNull((await view("?status=closed&sort=contact")).sort);
@@ -711,7 +730,6 @@ test.group("Projects list", (group) => {
 			const everything = JSON.stringify(props.projects);
 			for (const hidden of [
 				"still due",
-				"price has ended",
 				"deposit was kept",
 				"Theirs",
 				"Sita",

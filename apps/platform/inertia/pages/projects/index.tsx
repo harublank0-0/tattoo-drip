@@ -49,6 +49,7 @@ export default function ProjectsIndex({
 	filter,
 	waiting,
 	sort,
+	chosenSort,
 	counts,
 	projects,
 	page,
@@ -95,7 +96,12 @@ export default function ProjectsIndex({
 		: null;
 	const back = waiting ? backLink(waiting) : null;
 	const pageHref = (pageNumber: number) =>
-		listHref(base, { status: filter, waiting, sort, page: pageNumber });
+		listHref(base, {
+			status: filter,
+			waiting,
+			sort: chosenSort,
+			page: pageNumber,
+		});
 
 	return (
 		<Page
@@ -122,7 +128,7 @@ export default function ProjectsIndex({
 					{chips.map((chip) => (
 						<Link
 							key={chip.value}
-							href={listHref(base, { status: chip.value, sort })}
+							href={listHref(base, { status: chip.value, sort: chosenSort })}
 							preserveScroll
 							aria-current={
 								chip.value === filter ? (waiting ? "true" : "page") : undefined
@@ -154,7 +160,7 @@ export default function ProjectsIndex({
 							</span>
 						</h2>
 						<Link
-							href={listHref(base, { status: back.status })}
+							href={listHref(base, { status: back.status, sort: chosenSort })}
 							className={cn(
 								buttonVariants({ variant: "link", size: "sm" }),
 								"px-0",
@@ -202,7 +208,11 @@ export default function ProjectsIndex({
 					</p>
 					{page.current > page.last && (
 						<Link
-							href={listHref(base, { status: filter, waiting, sort })}
+							href={listHref(base, {
+								status: filter,
+								waiting,
+								sort: chosenSort,
+							})}
 							className="-my-3 flex min-h-11 items-center self-start text-sm text-primary underline-offset-4 hover:underline"
 						>
 							Back to the first page
@@ -270,7 +280,7 @@ export default function ProjectsIndex({
 										className="w-[26%]"
 										sorted={sort === "needs"}
 										sortable={sort !== null}
-										ariaSort="descending"
+										ariaSort="other"
 										href={listHref(base, { status: filter, sort: "needs" })}
 									/>
 									<TableHead>Next session</TableHead>
@@ -423,7 +433,7 @@ function SortHead({
 	href: string;
 	sorted: boolean;
 	sortable: boolean;
-	ariaSort: "ascending" | "descending";
+	ariaSort: "ascending" | "descending" | "other";
 }) {
 	const Icon = sorted ? ArrowDown : ArrowUpDown;
 	return (
