@@ -158,9 +158,10 @@ export default class ProjectService {
 
 	/**
 	 * A page of the projects `member` may see (the `findFor` rule), for the
-	 * Active view, the Closed view or one status. Active and single-status
-	 * views sort for follow-up: never contacted first, then the longest
-	 * since contact; the Closed view sorts the most recently changed first.
+	 * Active view, the Closed view or one status. Active and open
+	 * single-status views sort for follow-up: never contacted first, then the
+	 * longest since contact; the Closed view and each closed status (declined,
+	 * cancelled, completed) sort the most recently changed first.
 	 */
 	async list(
 		tenant: TenantRef,
@@ -174,7 +175,10 @@ export default class ProjectService {
 		else if (filter === "closed") query.whereIn("status", [...CLOSED_STATUSES]);
 		else query.where("status", filter);
 
-		if (filter === "closed") {
+		if (
+			filter === "closed" ||
+			(filter !== "active" && CLOSED_STATUSES.includes(filter))
+		) {
 			query
 				.orderByRaw("coalesce(updated_at, created_at) desc")
 				.orderBy("id", "desc");
