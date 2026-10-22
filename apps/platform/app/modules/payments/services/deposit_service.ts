@@ -230,10 +230,10 @@ export default class DepositService {
 	}
 
 	/**
-	 * How many deposit proofs wait for the studio: the Projects badge
-	 * (TAT-65). Payments have no soft delete and nothing deletes projects
-	 * from the dashboard yet, so every waiting deposit payment counts (TAT-42
-	 * defines the cascade).
+	 * How many deposit proofs wait for the studio (TAT-65). No badge reads it
+	 * since TAT-107: Today counts screenshots through `depositStates`. Payments
+	 * have no soft delete and nothing deletes projects from the dashboard yet,
+	 * so every waiting deposit payment counts (TAT-42 defines the cascade).
 	 */
 	async countPendingProofs(tenant: TenantRef): Promise<number> {
 		const [row] = await Payment.query()
