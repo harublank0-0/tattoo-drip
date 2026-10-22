@@ -57,6 +57,7 @@ export function ProofPicker({
 					className="deposit-preview"
 					src={preview}
 					alt={copy.form.previewAlt}
+					referrerPolicy="no-referrer"
 				/>
 			) : null}
 			<div className="deposit-proof-actions">
