@@ -1,4 +1,5 @@
 import { DateTime } from "luxon";
+import type { CalendarEntry } from "#modules/scheduling/services/calendar_service";
 
 /**
  * The calendar's dates (TAT-50). A calendar date is a plain yyyy-MM-dd,
@@ -148,4 +149,29 @@ export function briefPreview(brief: string): string {
 	return line.length > BRIEF_PREVIEW_LENGTH
 		? `${line.slice(0, BRIEF_PREVIEW_LENGTH - 1).trimEnd()}…`
 		: line;
+}
+
+/**
+ * One session as a row on `day`: times on that day, a preview of the brief.
+ * The calendar's rows and Today's (TAT-107).
+ */
+export function sessionRow(
+	{ session, artistName, project }: CalendarEntry,
+	day: string,
+	timezone: string,
+) {
+	return {
+		id: session.id,
+		startsAt: session.startsAt.toMillis(),
+		endsAt: session.endsAt.toMillis(),
+		...timesOnDay(session.startsAt, session.endsAt, day, timezone),
+		kind: session.kind,
+		status: session.status,
+		artistName,
+		project: project && {
+			id: project.id,
+			clientName: project.clientName,
+			brief: briefPreview(project.brief),
+		},
+	};
 }

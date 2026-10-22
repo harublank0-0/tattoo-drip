@@ -36,6 +36,7 @@ const ARTIST_ROUTES = [
 	"tenant.projects.store",
 	"tenant.sessions.move",
 	"tenant.sessions.outcome",
+	"tenant.today",
 ];
 
 /** The name of the route an isolation case sends. */

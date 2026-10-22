@@ -31,6 +31,7 @@ export interface ApiDefinition {
   }
   tenant: {
     dashboard: typeof routes['tenant.dashboard']
+    today: typeof routes['tenant.today']
     settings: typeof routes['tenant.settings'] & {
       profile: typeof routes['tenant.settings.profile'] & {
         update: typeof routes['tenant.settings.profile.update']

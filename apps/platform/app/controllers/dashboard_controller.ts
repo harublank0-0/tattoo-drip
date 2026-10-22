@@ -32,20 +32,15 @@ export default class DashboardController {
 	}
 
 	/**
-	 * /t/:tenant: the member's work list. Owners land on the inbox, artists
-	 * on their projects (the inbox is owners only). The studio switcher and
-	 * /dashboard link here, so everyone lands on what they work through.
+	 * /t/:tenant: every member lands on Today (TAT-107), what needs them right
+	 * now. The studio switcher and /dashboard link here; Today's own links go
+	 * on to the Inbox, Projects and the calendar.
 	 */
 	async tenantHome(ctx: HttpContext) {
 		ctx.session.reflash();
-		const { tenant, membership } = tenantContext(ctx);
+		const { tenant } = tenantContext(ctx);
 		return ctx.response
 			.redirect()
-			.toRoute(
-				membership.role === "owner"
-					? "tenant.inbox.index"
-					: "tenant.projects.index",
-				{ tenant: tenant.slug },
-			);
+			.toRoute("tenant.today", { tenant: tenant.slug });
 	}
 }

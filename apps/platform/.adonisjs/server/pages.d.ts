@@ -40,5 +40,6 @@ declare module '@adonisjs/inertia/types' {
     'settings/payment_method_form': ExtractProps<(typeof import('../../inertia/pages/settings/payment_method_form.tsx'))['default']>
     'settings/payments': ExtractProps<(typeof import('../../inertia/pages/settings/payments.tsx'))['default']>
     'settings/profile': ExtractProps<(typeof import('../../inertia/pages/settings/profile.tsx'))['default']>
+    'today/index': ExtractProps<(typeof import('../../inertia/pages/today/index.tsx'))['default']>
   }
 }

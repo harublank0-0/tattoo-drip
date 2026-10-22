@@ -26,14 +26,14 @@ test.group(
 	(group) => {
 		group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 
-		test("a new owner's inbox carries the four steps, none done, and the studio link", async ({
+		test("a new owner's Today carries the four steps, none done, and the studio link", async ({
 			client,
 			assert,
 		}) => {
 			const { owner } = await studioWithOwner("fresh-ink", "Fresh Ink");
 
 			const response = await client
-				.get("/t/fresh-ink/inbox")
+				.get("/t/fresh-ink/today")
 				.withInertia()
 				.loginAs(owner);
 
@@ -67,7 +67,7 @@ test.group(
 			const { owner, tenant } = await studioWithOwner("tick-ink", "Tick Ink");
 			const done = async () =>
 				(
-					await client.get("/t/tick-ink/inbox").withInertia().loginAs(owner)
+					await client.get("/t/tick-ink/today").withInertia().loginAs(owner)
 				).inertiaProps.setup.steps.map(({ done }: { done: boolean }) => done);
 			assert.deepEqual(await done(), [false, false, false, false]);
 
@@ -94,21 +94,36 @@ test.group(
 			await inTenant(tenant, async () =>
 				makeInquiry(tenant, await makeClient(tenant)),
 			);
-			assert.deepEqual(await done(), [true, true, true, true]);
+			// All four done: Today stops drawing the checklist and the link.
+			const props = (
+				await client.get("/t/tick-ink/today").withInertia().loginAs(owner)
+			).inertiaProps;
+			assert.isNull(props.setup);
+			assert.isNull(props.studioPage);
 		});
 
-		test("the decided view has no checklist to draw", async ({
+		test("the Inbox no longer carries the checklist; its empty New view keeps the studio link", async ({
 			client,
 			assert,
 		}) => {
 			const { owner } = await studioWithOwner("dec-ink", "Dec Ink");
 
-			const response = await client
+			const fresh = await client
+				.get("/t/dec-ink/inbox")
+				.withInertia()
+				.loginAs(owner);
+			const decided = await client
 				.get("/t/dec-ink/inbox?view=decided")
 				.withInertia()
 				.loginAs(owner);
 
-			assert.isNull(response.inertiaProps.setup);
+			assert.notProperty(fresh.inertiaProps, "setup");
+			assert.notProperty(decided.inertiaProps, "setup");
+			assert.equal(
+				fresh.inertiaProps.studioPage.url,
+				"http://dec-ink.localhost:3000",
+			);
+			assert.isNull(decided.inertiaProps.studioPage);
 		});
 
 		test("a studio never sees another studio's progress or link", async ({
@@ -119,11 +134,11 @@ test.group(
 			const { owner } = await studioWithOwner("lonely-ink", "Lonely Ink");
 
 			const fresh = await client
-				.get("/t/lonely-ink/inbox")
+				.get("/t/lonely-ink/today")
 				.withInertia()
 				.loginAs(owner);
 			const asA = await client
-				.get("/t/studio-a/inbox")
+				.get("/t/studio-a/today")
 				.withInertia()
 				.loginAs(a.owner);
 
