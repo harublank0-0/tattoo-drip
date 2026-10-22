@@ -181,6 +181,7 @@ export default function ProjectsIndex({
 									key={key}
 									href={listHref(base, { status: filter, sort: key })}
 									preserveScroll
+									preserveState
 									className="-my-3 flex min-h-11 items-center text-primary underline-offset-4 hover:underline"
 								>
 									{SORT_LABELS[key]}
@@ -257,12 +258,13 @@ export default function ProjectsIndex({
 							</TableCaption>
 							<TableHeader>
 								<TableRow>
-									<TableHead className="whitespace-normal">
+									<TableHead className="w-[34%] whitespace-normal">
 										Client and piece
 									</TableHead>
 									<TableHead>Status</TableHead>
 									<SortHead
 										word="Waiting"
+										className="w-[26%]"
 										sorted={sort === "needs"}
 										sortable={sort !== null}
 										ariaSort="descending"
@@ -272,6 +274,7 @@ export default function ProjectsIndex({
 									{isOwner && <TableHead>Artist</TableHead>}
 									<SortHead
 										word="Last contact"
+										className="w-[18%]"
 										sorted={sort === "contact"}
 										sortable={sort !== null}
 										ariaSort="ascending"
@@ -320,7 +323,7 @@ export default function ProjectsIndex({
 														{project.artistName}
 													</span>
 												) : (
-													<span className="text-muted-foreground">
+													<span className="whitespace-nowrap text-muted-foreground">
 														No artist yet
 													</span>
 												)}
@@ -341,7 +344,8 @@ export default function ProjectsIndex({
 				<nav aria-label="Pages" className="flex justify-between text-sm">
 					{page.current > 1 ? (
 						<Link
-							href={pageHref(page.current - 1)}
+							// From a page past the last, Previous goes to the last real one.
+							href={pageHref(Math.min(page.current - 1, page.last))}
 							preserveScroll
 							className="-my-3 flex min-h-11 items-center"
 						>
@@ -399,17 +403,20 @@ function Dash(): ReactNode {
 
 /**
  * A table header that sorts: a real link (sorting is a visit), with `aria-sort`
- * on the sorted column only. Where the view has its own order (`sortable`
+ * on the sorted column only. The visit keeps the page's state (`preserveState`)
+ * so the link stays mounted and keeps keyboard focus. Where the view has its own order (`sortable`
  * false) it is plain text.
  */
 function SortHead({
 	word,
+	className,
 	href,
 	sorted,
 	sortable,
 	ariaSort,
 }: {
 	word: string;
+	className: string;
 	href: string;
 	sorted: boolean;
 	sortable: boolean;
@@ -419,12 +426,13 @@ function SortHead({
 	return (
 		<TableHead
 			aria-sort={sorted ? ariaSort : undefined}
-			className="whitespace-normal"
+			className={cn("whitespace-normal", className)}
 		>
 			{sortable ? (
 				<Link
 					href={href}
 					preserveScroll
+					preserveState
 					className={cn(
 						buttonVariants({ variant: "ghost", size: "sm" }),
 						"-ml-3",
