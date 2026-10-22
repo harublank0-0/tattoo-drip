@@ -190,7 +190,7 @@ test("the studio and artist pages render as they did before themes (TAT-54)", ()
 
 ```bash
 git add apps/storefront/test/studio/snapshot.ts apps/storefront/test/studio/default-theme.test.ts apps/storefront/test/studio/default-theme.snapshot.json
-git commit -m "test(storefront): record the studio pages' markup before themes (TAT-54)" -m "The snapshot is what StudioPage and ArtistPage render before any theme code; the default theme must match it." -m "Assisted-by: opencode (deepseek-v4.1-flash-free)"
+git commit -m "test(storefront): record the studio pages' markup before themes (TAT-54)" -m "The snapshot is what StudioPage and ArtistPage render before any theme code." -m "The default theme must match it." -m "Assisted-by: opencode (deepseek-v4.1-flash-free)"
 ```
 
 - [ ] `git status --short` prints nothing.
@@ -657,7 +657,7 @@ export function readSections(value: unknown, theme: ThemeKey): SectionKey[] {
 
 ```bash
 git add apps/storefront/src/studio/theme/config.ts apps/storefront/test/studio/theme-config.test.ts
-git commit -m "feat(storefront): add theme keys, font keys and the section rules (TAT-54)" -m "readThemeKey, readFontKey and readSections accept known keys only; the inquiry section is always shown." -m "Assisted-by: opencode (deepseek-v4.1-flash-free)"
+git commit -m "feat(storefront): add theme keys, font keys and the section rules (TAT-54)" -m "readThemeKey, readFontKey and readSections accept known keys only." -m "The inquiry section is always shown." -m "Assisted-by: opencode (deepseek-v4.1-flash-free)"
 ```
 
 - [ ] `git status --short` prints nothing.
@@ -970,7 +970,7 @@ function isImageSide(value: unknown): value is number {
 
 ```bash
 git add apps/storefront/src/studio/theme/config.ts apps/storefront/test/studio/theme-config.test.ts
-git commit -m "feat(storefront): accept brand images from the API's origin only (TAT-54)" -m "readBrandImage keeps an https URL on exactly the API's origin and its stored size; anything else is no image." -m "Assisted-by: opencode (deepseek-v4.1-flash-free)"
+git commit -m "feat(storefront): accept brand images from the API's origin only (TAT-54)" -m "readBrandImage keeps an https URL on exactly the API's origin and its stored size." -m "Anything else is no image." -m "Assisted-by: opencode (deepseek-v4.1-flash-free)"
 ```
 
 - [ ] `git status --short` prints nothing.
@@ -1209,7 +1209,7 @@ export function parseThemeConfig(
 
 ```bash
 git add apps/storefront/src/studio/theme/config.ts apps/storefront/test/studio/theme-config.test.ts
-git commit -m "feat(storefront): check a studio's theme configuration value by value (TAT-54)" -m "parseThemeConfig reads own properties only; each bad value falls back alone, anything but an object is the default." -m "Assisted-by: opencode (deepseek-v4.1-flash-free)"
+git commit -m "feat(storefront): check a studio's theme configuration value by value (TAT-54)" -m "parseThemeConfig reads own properties only; each bad value falls back alone." -m "Anything but an object is the default." -m "Assisted-by: opencode (deepseek-v4.1-flash-free)"
 ```
 
 - [ ] `git status --short` prints nothing.
@@ -1603,7 +1603,7 @@ export function brandingCss(config: ThemeConfig): string | null {
 
 ```bash
 git add apps/storefront/src/studio/theme/branding.ts apps/storefront/test/studio/theme-branding.test.ts
-git commit -m "feat(storefront): build brand CSS with a contrast guard per colour scheme (TAT-54)" -m "An accent that reads under 4.5:1 on a scheme's paper leaves that scheme's violet; isSafeCss guards the text." -m "Assisted-by: opencode (deepseek-v4.1-flash-free)"
+git commit -m "feat(storefront): build brand CSS with a contrast guard per colour scheme (TAT-54)" -m "An accent that reads under 4.5:1 on a scheme's paper leaves that scheme's violet." -m "isSafeCss guards the text." -m "Assisted-by: opencode (deepseek-v4.1-flash-free)"
 ```
 
 - [ ] `git status --short` prints nothing.
@@ -2349,7 +2349,7 @@ Replace with:
 
 ```bash
 git add apps/storefront/src/studio/theme/registry.tsx apps/storefront/src/studio/components/pages.tsx apps/storefront/src/routes/index.tsx 'apps/storefront/src/routes/artists/$slug.tsx' apps/storefront/test/studio/theme-render.test.ts
-git commit -m "feat(storefront): render the studio pages through a theme registry (TAT-54)" -m "Stencil & Ink is the one theme; its studio page orders and hides sections, and the inquiry is always there." -m "Assisted-by: opencode (deepseek-v4.1-flash-free)"
+git commit -m "feat(storefront): render the studio pages through a theme registry (TAT-54)" -m "Stencil & Ink is the one theme; its studio page orders and hides sections." -m "The inquiry is always there." -m "Assisted-by: opencode (deepseek-v4.1-flash-free)"
 ```
 
 - [ ] `git status --short` prints nothing.
@@ -2619,7 +2619,7 @@ Replace with:
 
 ```bash
 git add apps/storefront/src/studio/components/brand.tsx apps/storefront/src/studio/components/pages.tsx apps/storefront/src/styles.css apps/storefront/test/studio/theme-render.test.ts
-git commit -m "feat(storefront): show a studio's logo and cover image (TAT-54)" -m "Both are img elements with their stored size and an empty alt, from checked URLs on the API's origin only." -m "Assisted-by: opencode (deepseek-v4.1-flash-free)"
+git commit -m "feat(storefront): show a studio's logo and cover image (TAT-54)" -m "Both are img elements with their stored size and an empty alt." -m "Their URLs are checked and on the API's origin only." -m "Assisted-by: opencode (deepseek-v4.1-flash-free)"
 ```
 
 - [ ] `git status --short` prints nothing.
@@ -2777,7 +2777,7 @@ Replace with:
 
 ```bash
 git add apps/storefront/src/studio/theme/head.ts apps/storefront/src/routes/index.tsx 'apps/storefront/src/routes/artists/$slug.tsx' apps/storefront/test/studio/theme-head.test.ts
-git commit -m "feat(storefront): put the brand's style in the studio pages' head (TAT-54)" -m "themedHeadTags is headTags plus one style element for a branded studio; the default head is unchanged." -m "Assisted-by: opencode (deepseek-v4.1-flash-free)"
+git commit -m "feat(storefront): put the brand's style in the studio pages' head (TAT-54)" -m "themedHeadTags is headTags plus one style element for a branded studio." -m "The default head is unchanged." -m "Assisted-by: opencode (deepseek-v4.1-flash-free)"
 ```
 
 - [ ] `git status --short` prints nothing.
@@ -2898,4 +2898,67 @@ Planner's notes, verified before writing this plan (for the coordinator; the cod
 
 Coding agent:
 
-(none yet)
+- Task 0 commit: `git commit -m "test(storefront): record the studio pages' markup before themes (TAT-54)" -m "The snapshot is what StudioPage and ArtistPage render before any theme code; the default theme must match it." -m "Assisted-by: opencode (deepseek-v4.1-flash-free)"` — expected: the commit-msg hook accepts the message and the commit lands; actual: commitlint (extends `@commitlint/config-conventional`) prints `✖ body's lines must not be longer than 100 characters [body-max-line-length]` and `husky - commit-msg script failed (code 1)`, exit 1, nothing committed (the 109-character body line is the plan's own text). The three Task 0 files remain staged; the pre-commit hook's Biome run changed nothing, and the storefront suite is at `ℹ tests 630`, `ℹ pass 630`, `ℹ fail 0`.
+
+## Corrections after review (2026-10-22)
+
+Fable's review (0 Critical, 2 Important, 10 Minor), the browser pass and Codex's code review were
+applied in fix round 1 (the commits after `1229038`, each named in `git log`). What was wrong in
+this plan, and what TAT-56 now has to do.
+
+### What the plan got wrong
+
+- **"Existing tests: you change none of them" forced a weaker helper (fix 1).** Task 9's tests had to fork
+  `assertSafePage` into `assertSafeBrandedPage`, which dropped three invariants (`rel="noopener
+  noreferrer"` on every `https:` anchor, no `target=`, no text beside an element inside a link).
+  The helper now lives in `test/studio/safety.ts` and both `render.test.ts` and the theme tests use
+  it, with an option that allows `alt=""` on the logo and the cover only. A test proves the
+  branded pages fail it when a link loses its `rel`. Commit a537da2.
+- **The logo was preloaded (fix 2).** Fact 8 said React 19 preloads every image that is neither lazy
+  nor `fetchPriority="low"`, and Task 9's `BrandLogo` then set neither. The logo now has
+  `fetchPriority="low"`; the cover keeps its preload. Commit 2399719.
+- **Decision 5's cover rationale (fix 5).** "Decoration beside the studio's name" fits a logo next
+  to the `<h1>`, not a photograph. The cover now takes the API's `alt` (`readCoverImage`: plain text
+  on one line, "" when missing, blank, not text or over 300 characters); the logo stays `alt=""`.
+  Commit 061f147.
+- **The dead "https unless local" branch (fix 4).** The origin comparison already fixes the scheme,
+  host and port, and the tenancy settings allow plain http only for an API on this machine, so the
+  `LOCAL_HOST` regex and its check could not change a result, and the `http://api.test` test
+  described a deployment that cannot exist. Removed; the test is now one about another scheme,
+  host or port of the API host. Commit 2bfe8a9.
+- **"A saved change can take about a minute to show" (fix 10).** It is `s-maxage=60` plus
+  `stale-while-revalidate=600` at the CDN plus the 60 s studio cache: up to about 12 minutes. In
+  `apps/storefront/docs/development.md` (Freshness). Commit 1c95398.
+- Also fixed from the review: `isSafeCss` refuses `url(`, `@import`, `expression(` and `@charset`
+  (3cee0f1); more hostile URL rows (f6a9d17); the default theme and the section lists it shares are
+  frozen (1a03fbc); the `MAX_IMAGE_SIDE` comment (557e822); "byte for byte" means the components'
+  markup, and the page data carries `theme` and, later, the raw `storefront` (c033b03); the cover is
+  cropped toward the top, `object-position: 50% 25%`, so a portrait photo keeps its head (afdc78a);
+  the registry's prop types and a CSS comment on the logo's physical `left center` (0bd48d2).
+- Eight of the plan's own `git commit` commands had a body line over 100 characters (the commit-msg
+  hook refuses it); they are replaced above by the versions opencode actually ran.
+
+### What TAT-56 must add (on top of the list in the plan)
+
+1. **Cap the stored configuration's size** on save, and **strip `storefront` from the studio before
+   it is dehydrated** once the parsed theme is stored elsewhere: the dehydrated state carries the
+   raw object in the cached studio query, so a large `sections` list would ship with every page.
+   The storefront's loaders read the raw copy again on a client-side navigation, so strip it only
+   after the parsed theme travels another way.
+2. **Resized cover and logo variants** with `srcset`/`sizes`, and **real width and height written
+   by the server** from the stored file. The storefront serves the stored image (up to 2048 px, no
+   smaller variant), and it trusts the pair it is given: a wrong pair such as 1 x 10000 is
+   accepted and shifts the logo while it loads, because the logo's width is `auto`.
+3. **Warn in the colour picker about an accent near the destructive red** (`--destructive`,
+   `#b3261e`). The plan's own `#b91c1c` is almost the same colour, so the error summary's links and
+   the field errors look like brand links. Contrast still passes; it is a legibility-of-meaning
+   problem, and no storefront code change was made for it.
+4. **A saved change takes up to about 12 minutes to show** (the Freshness note above): the preview
+   link, or the "saved" message, must say so or bypass the cache.
+5. **An SVG logo served from the API's origin is safe inside `<img>`** (scripts do not run there),
+   but it must not be served inline when someone opens its URL directly, where it would run as a
+   page (for example, serve it as an attachment or with a sandboxing `Content-Security-Policy`);
+   that is a platform concern.
+6. Leftovers outside this ticket, also in `apps/storefront/docs/development.md` ("Known limits"):
+   artist photos still accept any http(s) origin (`safeImageUrl`), which is weaker than the brand
+   images' rule; and the Eczar Latin preload stays for `serif` and `sans` studios.
