@@ -146,12 +146,22 @@ export default function InboxIndex({
 			{page.last > 1 && (
 				<nav aria-label="Pages" className="flex justify-between text-sm">
 					{page.current > 1 ? (
-						<Link href={href(view, page.current - 1)}>Previous</Link>
+						<Link
+							href={href(view, page.current - 1)}
+							className="-my-3 flex min-h-11 items-center"
+						>
+							Previous
+						</Link>
 					) : (
 						<span />
 					)}
 					{page.current < page.last ? (
-						<Link href={href(view, page.current + 1)}>Next</Link>
+						<Link
+							href={href(view, page.current + 1)}
+							className="-my-3 flex min-h-11 items-center"
+						>
+							Next
+						</Link>
 					) : (
 						<span />
 					)}

@@ -1,4 +1,5 @@
 import { Link } from "@inertiajs/react";
+import { useEffect, useRef } from "react";
 import { urlFor } from "~/client";
 import Page from "~/components/page";
 import {
@@ -24,6 +25,22 @@ export default function ProjectsIndex({
 	page,
 }: ProjectListProps) {
 	const tenant = useTenant();
+	const chipRow = useRef<HTMLElement>(null);
+	// The row scrolls on a phone: bring the chosen chip into view after a
+	// load or a back step, so the current filter is never off-screen.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: runs when the filter changes
+	useEffect(() => {
+		const row = chipRow.current;
+		const chip = row?.querySelector<HTMLElement>("[aria-current=page]");
+		if (!row || !chip) return;
+		if (
+			chip.offsetLeft < row.scrollLeft ||
+			chip.offsetLeft + chip.offsetWidth > row.scrollLeft + row.clientWidth
+		) {
+			row.scrollLeft =
+				chip.offsetLeft - (row.clientWidth - chip.offsetWidth) / 2;
+		}
+	}, [filter]);
 	const base = urlFor("tenant.projects.index", { tenant: tenant.slug });
 	const href = (status: string, pageNumber = 1) =>
 		`${base}?status=${status}${pageNumber > 1 ? `&page=${pageNumber}` : ""}`;
@@ -49,7 +66,14 @@ export default function ProjectsIndex({
 				</Link>
 			}
 		>
-			<nav aria-label="Filter projects" className="flex flex-wrap gap-2">
+			{/* One row that scrolls sideways below `lg`: it bleeds to the screen edge,
+			    so a cut-off chip shows there is more, and its padding keeps the
+			    focus rings from being clipped. From `lg` the chips wrap as before. */}
+			<nav
+				ref={chipRow}
+				aria-label="Filter projects"
+				className="relative -mx-4 -my-1 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 py-1 [scrollbar-width:none] sm:-mx-8 sm:scroll-px-8 sm:px-8 lg:mx-0 lg:my-0 lg:flex-wrap lg:overflow-visible lg:p-0 [&::-webkit-scrollbar]:hidden"
+			>
 				{chips.map((chip) => (
 					<Link
 						key={chip.value}
@@ -59,6 +83,7 @@ export default function ProjectsIndex({
 						className={buttonVariants({
 							variant: chip.value === filter ? "default" : "outline",
 							size: "sm",
+							className: "snap-start",
 						})}
 					>
 						{chip.label}
@@ -118,14 +143,22 @@ export default function ProjectsIndex({
 			{page.last > 1 && (
 				<nav aria-label="Pages" className="flex justify-between text-sm">
 					{page.current > 1 ? (
-						<Link href={href(filter, page.current - 1)} preserveScroll>
+						<Link
+							href={href(filter, page.current - 1)}
+							preserveScroll
+							className="-my-3 flex min-h-11 items-center"
+						>
 							Previous
 						</Link>
 					) : (
 						<span />
 					)}
 					{page.current < page.last ? (
-						<Link href={href(filter, page.current + 1)} preserveScroll>
+						<Link
+							href={href(filter, page.current + 1)}
+							preserveScroll
+							className="-my-3 flex min-h-11 items-center"
+						>
 							Next
 						</Link>
 					) : (
