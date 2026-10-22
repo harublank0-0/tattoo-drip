@@ -210,6 +210,43 @@ test.group("Projects list", (group) => {
 		}
 	});
 
+	test("a healing check that still owes carries the money line and, separately, its touch-up", async ({
+		client,
+		assert,
+	}) => {
+		const s = await studio("list-owing-109");
+		const touchUp = await inTenant(s.tenant, async () => {
+			const project = await makeProject(
+				s.tenant,
+				await makeClient(s.tenant, { name: "Healing owes" }),
+				{ status: "healing_check", artistId: s.ashaProfile.id },
+			);
+			await makeQuote(s.tenant, project);
+			const session = await makeSession(s.tenant, project, s.ashaProfile, {
+				...sessionIn(6),
+				kind: "touch_up",
+			});
+			return { project, session };
+		});
+
+		const props = await propsOf(client, "list-owing-109", s.owner);
+
+		const row = rowsOf(props).find(
+			({ id }) => id === touchUp.project.id,
+		) as Row;
+		// The card says one line, and the money line comes before the session (ui.md);
+		// the table has its own column for the session.
+		assert.deepEqual(row.line, {
+			text: "NPR 15,000 still due",
+			needsYou: false,
+			hash: "payments",
+		});
+		assert.equal(
+			row.nextSessionText,
+			sessionStartText(touchUp.session.startsAt, KTM),
+		);
+	});
+
 	test("filters, waiting views and sorts come from fixed lists", async ({
 		client,
 		assert,

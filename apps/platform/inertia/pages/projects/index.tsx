@@ -130,6 +130,7 @@ export default function ProjectsIndex({
 							key={chip.value}
 							href={listHref(base, { status: chip.value, sort: chosenSort })}
 							preserveScroll
+							preserveState
 							aria-current={
 								chip.value === filter ? (waiting ? "true" : "page") : undefined
 							}
@@ -161,6 +162,7 @@ export default function ProjectsIndex({
 						</h2>
 						<Link
 							href={listHref(base, { status: back.status, sort: chosenSort })}
+							preserveState
 							className={cn(
 								buttonVariants({ variant: "link", size: "sm" }),
 								"px-0",
@@ -360,6 +362,7 @@ export default function ProjectsIndex({
 							// From a page past the last, Previous goes to the last real one.
 							href={pageHref(Math.min(page.current - 1, page.last))}
 							preserveScroll
+							preserveState
 							className="-my-3 flex min-h-11 items-center"
 						>
 							Previous
@@ -371,6 +374,7 @@ export default function ProjectsIndex({
 						<Link
 							href={pageHref(page.current + 1)}
 							preserveScroll
+							preserveState
 							className="-my-3 flex min-h-11 items-center"
 						>
 							Next

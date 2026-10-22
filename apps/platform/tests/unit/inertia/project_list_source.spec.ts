@@ -54,6 +54,20 @@ test.group(
 			assert.notMatch(head, /sorted\s*\?\s*\(?\s*</);
 		});
 
+		test("the chips, the back link and the pager keep the page's state too, so focus stays on the activated link", async ({
+			assert,
+		}) => {
+			const source = await page();
+			const chips = between(source, "{chips.map(", "</nav>");
+			assert.include(chips, "preserveState");
+			const back = between(source, "{title && back && (", "</div>");
+			assert.include(back, "preserveState");
+			const pager = between(source, 'aria-label="Pages"', "</nav>");
+			// Previous and Next, one `Link` each.
+			assert.lengthOf(pager.match(/<Link\b/g) ?? [], 2);
+			assert.lengthOf(pager.match(/\bpreserveState\b/g) ?? [], 2);
+		});
+
 		test("the Waiting head is `other`: it ranks, it does not sort the words", async ({
 			assert,
 		}) => {
