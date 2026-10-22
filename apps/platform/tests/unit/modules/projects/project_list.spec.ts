@@ -237,12 +237,7 @@ test("inOrder follows the ids and drops an id without a row", ({ assert }) => {
 });
 
 test.group("listLine", () => {
-	const noFlags = {
-		proofWaiting: false,
-		depositToSettle: false,
-		quoteLapsed: false,
-		balanceDue: null,
-	};
+	const noFlags = { depositToSettle: false, balanceDue: null };
 
 	test("a studio item is a needs-you line with its text and card", ({
 		assert,
@@ -264,19 +259,12 @@ test.group("listLine", () => {
 		});
 	});
 
-	test("without an item the money facts come in order and never mark the row", ({
+	test("without an item the owner's two money facts come in order and never mark the row", ({
 		assert,
 	}) => {
-		assert.deepEqual(listLine(null, { ...noFlags, proofWaiting: true }), {
-			text: "A deposit screenshot is waiting",
-			needsYou: false,
-			hash: "payments",
-		});
 		assert.deepEqual(
 			listLine(null, {
-				...noFlags,
 				depositToSettle: true,
-				quoteLapsed: true,
 				balanceDue: 100n,
 			}),
 			{
@@ -284,10 +272,6 @@ test.group("listLine", () => {
 				needsYou: false,
 				hash: "payments",
 			},
-		);
-		assert.deepEqual(
-			listLine(null, { ...noFlags, quoteLapsed: true, balanceDue: 100n }),
-			{ text: "The price has ended", needsYou: false, hash: "quote" },
 		);
 		assert.deepEqual(listLine(null, { ...noFlags, balanceDue: 1_500_000n }), {
 			text: "NPR 15,000 still due",

@@ -1,8 +1,6 @@
-import app from "@adonisjs/core/services/app";
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
-import WaitingService from "#modules/projects/services/waiting_service";
 import { depositReady } from "#tests/helpers/deposits";
 import {
 	ownerMember,
@@ -16,12 +14,7 @@ import {
 	makeProject,
 	makeQuote,
 } from "#tests/helpers/pipeline";
-import {
-	artistIn,
-	inTenant,
-	inTenantAs,
-	studioWithOwner,
-} from "#tests/helpers/tenants";
+import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
 const SLUG = "pay-card-66";
 type Line = { text: string; needsYou: boolean; hash: string | null };
@@ -138,57 +131,35 @@ test.group("The Payments card on the project page", (group) => {
 					.withInertia()
 					.loginAs(user)
 			).inertiaProps.projects as { id: string; line: Line | null }[];
-		// What WaitingService says is the row's line; a money fact fills in only where it says nothing.
-		const workLine = async (
-			user: { id: string },
-			role: "owner" | "artist",
-			id: string,
-		) => {
-			const service = await app.container.make(WaitingService);
-			const work = await inTenantAs(tenant, user, () =>
-				service.work(tenant, { userId: user.id, role }, DateTime.now()),
-			);
-			const item = [...work.needsYou, ...work.onClient].find(
-				({ project }) => project.id === id,
-			);
-			return item
-				? {
-						text: item.text,
-						needsYou: item.waiting.side === "studio",
-						hash: item.hash,
-					}
-				: null;
-		};
-
 		const active = await rows("active");
+		// A waiting screenshot is work()'s, never a money line: the studio's, first.
 		assert.deepEqual(active.find(({ id }) => id === waiting.id)?.line, {
-			text: (await workLine(owner, "owner", waiting.id))?.text,
+			text: "Deposit screenshot to check",
 			needsYou: true,
 			hash: "payments",
 		});
-		// The expired quote the studio rejected a screenshot on late: the owner
-		// is told, as a plain line, unless work() already has something to say.
-		const lapsedLine = active.find(({ id }) => id === lapsed.id)?.line;
-		assert.deepEqual(
-			lapsedLine,
-			(await workLine(owner, "owner", lapsed.id)) ?? {
-				text: "The price has ended",
-				needsYou: false,
-				hash: "quote",
-			},
-		);
+		// An expired quote the studio rejected a screenshot on late is spared by the sweep, so
+		// work() has the project: an unpaid deposit and no link yet (the studio's to do).
+		assert.deepEqual(active.find(({ id }) => id === lapsed.id)?.line, {
+			text: "No deposit link yet",
+			needsYou: true,
+			hash: "deposit",
+		});
+		// A closed project is out of work(): the owner's money line, plain.
 		const closedRows = await rows("closed");
 		assert.deepEqual(closedRows.find(({ id }) => id === closed.id)?.line, {
 			text: "Record whether the deposit was kept or refunded",
 			needsYou: false,
 			hash: "payments",
 		});
-		// The artist's row says only what work() gives them: no screenshot, no money.
+		// The artist's row is the project they were given: an unpaid deposit on the client's
+		// side, with no screenshot and no money.
 		const artistRows = await rows("active", artist);
-		assert.deepEqual(
-			artistRows.find(({ id }) => id === waiting.id)?.line ?? null,
-			await workLine(artist, "artist", waiting.id),
-		);
+		assert.deepEqual(artistRows.find(({ id }) => id === waiting.id)?.line, {
+			text: "Waiting for the deposit",
+			needsYou: false,
+			hash: null,
+		});
 		assert.notInclude(JSON.stringify(artistRows), "screenshot");
 	});
 });

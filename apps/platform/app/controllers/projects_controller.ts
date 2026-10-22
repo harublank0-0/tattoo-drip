@@ -230,9 +230,7 @@ export default class ProjectsController {
 						waitingOn.get(project.id) ?? null,
 						flag
 							? {
-									proofWaiting: flag.proofWaiting,
 									depositToSettle: flag.depositToSettle,
-									quoteLapsed: flag.quoteLapsed,
 									balanceDue: flag.balanceDue,
 								}
 							: null,

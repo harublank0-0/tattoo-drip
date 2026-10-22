@@ -156,11 +156,14 @@ export function inOrder<R extends { id: string }>(
 /** A row's one line, and the card on the project page it opens. */
 export type ListLine = { text: string; needsYou: boolean; hash: string | null };
 
-/** An owner's money facts on a row (PaymentService.listFlags). */
+/**
+ * An owner's money facts on a row (PaymentService.listFlags). Only the two that WaitingService
+ * can never say: a waiting screenshot and a lapsed price are always work()'s (it holds every
+ * project an owner has a screenshot on, and spares an expired quote the sweep leaves alone),
+ * so they never get a line of their own here.
+ */
 export type RowFlags = {
-	proofWaiting: boolean;
 	depositToSettle: boolean;
-	quoteLapsed: boolean;
 	balanceDue: bigint | null;
 };
 
@@ -181,22 +184,12 @@ export function listLine(
 		};
 	}
 	if (!flags) return null;
-	if (flags.proofWaiting) {
-		return {
-			text: "A deposit screenshot is waiting",
-			needsYou: false,
-			hash: "payments",
-		};
-	}
 	if (flags.depositToSettle) {
 		return {
 			text: "Record whether the deposit was kept or refunded",
 			needsYou: false,
 			hash: "payments",
 		};
-	}
-	if (flags.quoteLapsed) {
-		return { text: "The price has ended", needsYou: false, hash: "quote" };
 	}
 	if (flags.balanceDue !== null) {
 		return {
