@@ -6,10 +6,13 @@ import {
 	depositContact,
 	depositView,
 	formatReceived,
+	formatSessionStart,
 	headingTemplate,
 	payByLine,
 	receiptAmount,
+	selectedMethod,
 	stateTemplate,
+	studioInitial,
 	todayIn,
 } from "../../src/deposit/view-model.ts";
 import { PAGE, page, QR_URL, SHELL } from "./fixtures.ts";
@@ -316,5 +319,108 @@ describe("depositContact", () => {
 			whatsapp: null,
 			viber: null,
 		});
+	});
+});
+
+describe("selectedMethod (TAT-110)", () => {
+	const methods = depositView(PAGE).methods;
+
+	test("the picked method while it is listed, else the first, else null", () => {
+		assert.equal(selectedMethod(methods, "method-1"), methods[1]);
+		assert.equal(selectedMethod(methods, "method-9"), methods[0]);
+		assert.equal(selectedMethod(methods, null), methods[0]);
+		assert.equal(selectedMethod([], "method-0"), null);
+		assert.equal(selectedMethod([], null), null);
+	});
+});
+
+describe("formatSessionStart (TAT-110)", () => {
+	test("weekday, date and 12-hour time in the studio's timezone", () => {
+		assert.equal(
+			formatSessionStart("2026-10-24T05:15:00.000Z", "Asia/Kathmandu"),
+			"Sat 24 Oct 2026, 11:00 am",
+		);
+		assert.equal(
+			formatSessionStart("2026-10-24T18:45:00.000Z", "Asia/Kathmandu"),
+			"Sun 25 Oct 2026, 12:30 am",
+		);
+	});
+
+	test("null for a start that isn't a date or a zone this browser doesn't know, never UTC", () => {
+		assert.equal(formatSessionStart("nope", "Asia/Kathmandu"), null);
+		assert.equal(
+			formatSessionStart("2026-10-24T05:15:00.000Z", "Not/AZone"),
+			null,
+		);
+	});
+});
+
+describe("studioInitial (TAT-110)", () => {
+	test("the first user-perceived character, as typed", () => {
+		assert.equal(studioInitial("Black Needle"), "B");
+		assert.equal(studioInitial("कालो सुई"), "का");
+		assert.equal(studioInitial("  x"), "x");
+		assert.equal(studioInitial("   "), "");
+	});
+});
+
+describe("depositView's session (TAT-110)", () => {
+	const startsAt = "2026-10-24T05:15:00.000Z";
+
+	test("a paid page keeps the next session's start and its cleaned artist", () => {
+		const view = depositView(
+			page({
+				state: "paid",
+				nextSession: { startsAt, artistName: "  Aarav  " },
+			}),
+		);
+
+		assert.deepEqual(view.session, { startsAt, artistName: "Aarav" });
+	});
+
+	test("only a paid page has one", () => {
+		for (const state of [
+			"due",
+			"submitted",
+			"updating",
+			"expired",
+			"cancelled",
+		] as const) {
+			const view = depositView(
+				page({ state, nextSession: { startsAt, artistName: "Aarav" } }),
+			);
+			assert.equal(view.session, null, state);
+		}
+	});
+
+	test("an API before TAT-110 (no field), a null, or a start that isn't a date is no session", () => {
+		const paid = page({ state: "paid" });
+		assert.equal(
+			depositView({ ...paid, nextSession: undefined } as never).session,
+			null,
+		);
+		assert.equal(depositView({ ...paid, nextSession: null }).session, null);
+		assert.equal(
+			depositView({
+				...paid,
+				nextSession: { startsAt: "soon", artistName: "Aarav" },
+			}).session,
+			null,
+		);
+		assert.equal(
+			depositView({
+				...paid,
+				nextSession: { startsAt: 5, artistName: null } as never,
+			}).session,
+			null,
+		);
+	});
+
+	test("a session without an artist name keeps its start", () => {
+		const view = depositView(
+			page({ state: "paid", nextSession: { startsAt, artistName: null } }),
+		);
+
+		assert.deepEqual(view.session, { startsAt, artistName: null });
 	});
 });

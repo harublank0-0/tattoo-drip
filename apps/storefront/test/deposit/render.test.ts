@@ -82,7 +82,7 @@ function everything(): string {
 }
 
 describe("the frame", () => {
-	test("one h1 naming the studio in <bdi>, and a footer saying the studio is paid directly", () => {
+	test("one h1 naming the studio in <bdi>, and a footer saying who runs the page", () => {
 		const html = render(
 			createElement(DepositFrame, { studioName: "मीना Ink" }),
 		);
@@ -91,10 +91,7 @@ describe("the frame", () => {
 			html,
 			/<h1[^>]*>Pay your deposit to <bdi>मीना Ink<\/bdi><\/h1>/,
 		);
-		assert.match(
-			textOf(html),
-			/You pay मीना Ink directly\. Tattoo Drip runs this page for them and never handles your money\./,
-		);
+		assert.match(textOf(html), /Tattoo Drip runs this page for मीना Ink\./);
 	});
 
 	test("the h1 names the deposit's state once it is read, and the studio before that and while due (TAT-106)", () => {
@@ -323,10 +320,7 @@ describe("due", () => {
 			text,
 			/BankNabil BankAccount nameBlack Needle Pvt LtdAccount number01234567890123/,
 		);
-		assert.match(
-			text,
-			/Paying from this phone\? Press and hold a QR code to save it/,
-		);
+		assert.match(text, /On this phone\? Press and hold the QR code to save it/);
 	});
 
 	test("the first QR loads at once, the others when scrolled to", () => {
@@ -368,7 +362,7 @@ describe("due", () => {
 			textOf(html),
 			/The studio hasn't added payment details yet\. Message them to ask how to pay\./,
 		);
-		assert.doesNotMatch(html, /How to pay|<img|Paying from this phone/);
+		assert.doesNotMatch(html, /How to pay|<img|On this phone/);
 	});
 });
 

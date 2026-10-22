@@ -89,7 +89,8 @@ export function locationLine(
 	return candidates.find((line) => line !== "" && fits(line)) ?? null;
 }
 
-function graphemes(text: string): string[] {
+/** The user-perceived characters of `text`, by Intl.Segmenter when there is one. */
+export function graphemes(text: string): string[] {
 	if (typeof Intl.Segmenter === "function") {
 		const segmenter = new Intl.Segmenter(undefined, {
 			granularity: "grapheme",

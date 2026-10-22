@@ -137,10 +137,7 @@ describe("ProofPicker", () => {
 describe("ProofForm", () => {
 	test("its heading, a no-validate form, both ways to pay, the picker and Send", () => {
 		const html = formHtml();
-		assert.match(
-			html,
-			/<h2 id="proof-title">After you pay, send a screenshot<\/h2>/,
-		);
+		assert.match(html, /<h2 id="proof-title">Send the screenshot<\/h2>/);
 		const form = tags(html, "form")[0];
 		assert.match(form, /novalidate=""/i);
 		assert.equal(attr(form, "aria-labelledby"), "proof-title");

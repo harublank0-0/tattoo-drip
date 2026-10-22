@@ -5,7 +5,7 @@ import type {
 } from "@tattoo-drip/sdk";
 import { fill } from "../intake/template.ts";
 import { safeImageUrl, viberLink, whatsappLink } from "../studio/links.ts";
-import { cleanLine, cleanText } from "../studio/text.ts";
+import { cleanLine, cleanText, graphemes } from "../studio/text.ts";
 import { copy, type DepositMethodKind } from "./copy.ts";
 import type { LoadProblem } from "./problems.ts";
 
@@ -52,6 +52,12 @@ export interface MethodView {
 	readonly bankName: string | null;
 }
 
+export interface SessionView {
+	/** The API's UTC instant, for <time dateTime>. */
+	readonly startsAt: string;
+	readonly artistName: string | null;
+}
+
 export interface DepositView {
 	readonly state: DepositState;
 	readonly brief: string | null;
@@ -78,6 +84,8 @@ export interface DepositView {
 	readonly policy: string | null;
 	/** `due`, with a way to pay and something to pay: the form shows. */
 	readonly takesProof: boolean;
+	/** Once `paid`, the project's next session (TAT-110); null otherwise. */
+	readonly session: SessionView | null;
 }
 
 export function depositView(page: DepositPage): DepositView {
@@ -107,7 +115,30 @@ export function depositView(page: DepositPage): DepositView {
 		policy: cleanText(page.depositPolicy),
 		takesProof:
 			state === "due" && methods.length > 0 && Number.isInteger(due) && due > 0,
+		session: state === "paid" ? sessionView(page.nextSession) : null,
 	};
+}
+
+/** The API's nextSession, or null: missing (an API before TAT-110), null, or a start that isn't a date. */
+function sessionView(
+	value: DepositPage["nextSession"] | undefined,
+): SessionView | null {
+	if (!value || typeof value.startsAt !== "string") return null;
+	if (Number.isNaN(Date.parse(value.startsAt))) return null;
+	return { startsAt: value.startsAt, artistName: cleanLine(value.artistName) };
+}
+
+/** The picked method while it is listed, else the first, else null. */
+export function selectedMethod(
+	methods: readonly MethodView[],
+	picked: string | null,
+): MethodView | null {
+	return methods.find((method) => method.id === picked) ?? methods[0] ?? null;
+}
+
+/** The studio's mark when it has no logo: its first user-perceived character, as typed. */
+export function studioInitial(name: string): string {
+	return graphemes(name.trim())[0] ?? "";
 }
 
 function methodViews(methods: readonly DepositPaymentMethod[]): MethodView[] {
@@ -197,6 +228,37 @@ export function formatReceived(
 		const part = (type: Intl.DateTimeFormatPartTypes) =>
 			parts.find((each) => each.type === type)?.value ?? "";
 		return `${part("day")} ${part("month")} ${part("year")}, ${part("hour")}:${part("minute")} ${part("dayPeriod").toLowerCase()}`;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * When the next session starts, as "Sat 24 Oct 2026, 11:00 am" in
+ * `timeZone`, or null (not a date, or a zone this browser doesn't know: never
+ * UTC, which would show a wrong time). Same parts as formatReceived.
+ */
+export function formatSessionStart(
+	iso: string | null,
+	timeZone: string,
+): string | null {
+	if (!iso) return null;
+	const date = new Date(iso);
+	if (Number.isNaN(date.getTime())) return null;
+	try {
+		const parts = new Intl.DateTimeFormat("en-GB", {
+			timeZone,
+			weekday: "short",
+			day: "numeric",
+			month: "short",
+			year: "numeric",
+			hour: "numeric",
+			minute: "2-digit",
+			hour12: true,
+		}).formatToParts(date);
+		const part = (type: Intl.DateTimeFormatPartTypes) =>
+			parts.find((each) => each.type === type)?.value ?? "";
+		return `${part("weekday")} ${part("day")} ${part("month")} ${part("year")}, ${part("hour")}:${part("minute")} ${part("dayPeriod").toLowerCase()}`;
 	} catch {
 		return null;
 	}

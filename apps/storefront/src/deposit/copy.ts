@@ -124,6 +124,8 @@ export const copy = {
 	noScript: "Turn on JavaScript to see your deposit, or message {studio}.",
 	due: {
 		title: "Deposit due",
+		/** Under the amount: who gets the money (TAT-110; was the footer's sentence). */
+		direct: "You pay {studio} directly. Tattoo Drip never handles your money.",
 		partial: "Part of your {amount} deposit was already received.",
 		payBy: "Pay by {date}.",
 		payByToday: "Pay by today, {date}.",
@@ -136,10 +138,17 @@ export const copy = {
 		copy: "Copy code",
 		copyLabel: "Copy code {code}",
 	},
+	/** The numbered steps' headings (TAT-110); step 3's is form.title. */
+	steps: { label: "Step {count}: ", code: "Copy the code", pay: "Pay" },
+	payWith: { legend: "Pay with", only: "Pay with {label}" },
+	/** The sticky button that takes the client to step 3. */
+	paidButton: "I've paid: send the screenshot",
 	methods: {
 		title: "How to pay",
 		samePhone:
-			"Paying from this phone? Press and hold a QR code to save it, then choose it from your gallery in your payment app's scanner.",
+			"On this phone? Press and hold the QR code to save it, then choose it in your payment app's scanner.",
+		/** A method whose QR didn't pass the image check and that has no number. */
+		missing: "Ask {studio} for these details.",
 		qrAlt: "{label} QR code for {studio}",
 		scan,
 		accountNumber,
@@ -153,7 +162,7 @@ export const copy = {
 	rejected:
 		"The studio couldn't confirm your last screenshot. Check the amount and the reference code, then send a new one, or message the studio.",
 	form: {
-		title: "After you pay, send a screenshot",
+		title: "Send the screenshot",
 		method: "How did you pay?",
 		kinds,
 		proof: "Payment screenshot",
@@ -192,6 +201,9 @@ export const copy = {
 		submittedUndated:
 			"We've sent your screenshot to {studio}. They'll check it and confirm on WhatsApp or Viber.",
 		amount: "Amount",
+		/** The paid receipt's next session (TAT-110). */
+		session: "Your session",
+		artist: "Artist",
 		paid: "Your deposit is paid. Thank you!",
 		paidNone: "No deposit is needed for this booking.",
 		updating:
@@ -215,6 +227,5 @@ export const copy = {
 	viber: "Viber",
 	whatsappText: "Hi {studio}, about my deposit (reference code {code}).",
 	whatsappTextNoCode: "Hi {studio}, about my deposit.",
-	footer:
-		"You pay {studio} directly. Tattoo Drip runs this page for them and never handles your money.",
+	footer: "Tattoo Drip runs this page for {studio}.",
 };
