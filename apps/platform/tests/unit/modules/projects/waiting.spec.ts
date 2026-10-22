@@ -35,6 +35,7 @@ function facts(over: Partial<WaitingFacts> = {}): WaitingFacts {
 		since: now.minus({ days: 2 }),
 		proofWaiting: false,
 		proofSince: null,
+		expirySpared: false,
 		quote: {
 			issuedAt: now.minus({ days: 2 }),
 			expiresAt: expiresOn("2026-10-23"),
@@ -170,18 +171,71 @@ test.group("waitingOf", () => {
 			),
 			{ side: "client", reason: "on_hold" },
 		);
-		// A screenshot waiting spares the sweep too: an artist keeps the project.
+		// A screenshot waiting spares the sweep too (the deposit batch reads it as
+		// `expirySpared`): an artist keeps the project.
 		assert.deepEqual(
 			waitingOf(
 				facts({
 					status: "deposit_pending",
 					quote: expired,
 					proofWaiting: true,
+					expirySpared: true,
 				}),
 				artist,
 			),
 			{ side: "client", reason: "deposit_due" },
 		);
+	});
+
+	test("an expired quote whose deposit was decided late falls through to the state it has without the expiry (fix round 2)", ({
+		assert,
+	}) => {
+		const expired = {
+			issuedAt: now.minus({ days: 20 }),
+			expiresAt: now.minus({ days: 2 }),
+			depositAmount: 300_000,
+		};
+		// The sweep spares it (a rejection, a partial verification or a reversal after
+		// the expiry): uncovered, expired, and still the studio's to settle.
+		const spared = (over: Partial<WaitingFacts>) =>
+			facts({ quote: expired, expirySpared: true, ...over });
+		const pending = spared({ status: "deposit_pending" });
+		// Owner: the deposit-link rules, as for any unpaid deposit.
+		assert.deepEqual(waitingOf(pending, owner), studio("deposit_link_missing"));
+		assert.deepEqual(
+			waitingOf(
+				{
+					...pending,
+					depositLink: { madeAt: hoursAgo(100), works: true },
+				},
+				owner,
+			),
+			studio("deposit_unpaid"),
+		);
+		// Artist: their usual state for an unpaid deposit.
+		assert.deepEqual(waitingOf(pending, artist), {
+			side: "client",
+			reason: "deposit_due",
+		});
+		// Quoted and on hold: the price still waits on the client.
+		assert.deepEqual(waitingOf(spared({}), owner), {
+			side: "client",
+			reason: "price_sent",
+		});
+		assert.deepEqual(waitingOf(spared({ status: "on_hold" }), owner), {
+			side: "client",
+			reason: "on_hold",
+		});
+		// The converse: the same facts the sweep does cancel are still hidden.
+		for (const context of [owner, artist]) {
+			assert.isNull(
+				waitingOf(
+					spared({ status: "deposit_pending", expirySpared: false }),
+					context,
+				),
+			);
+			assert.isNull(waitingOf(spared({ expirySpared: false }), context));
+		}
 	});
 
 	test("a quote whose expiry would cancel nothing is not ending", ({

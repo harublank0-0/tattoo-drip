@@ -206,22 +206,34 @@ export default class DepositService {
 	 * deposits, in one query (TAT-107): per project id whether a deposit
 	 * screenshot waits for the studio (`proofWaiting`) and since when
 	 * (`proofSince`, the oldest one's submitted time: its wait starts when it
-	 * was sent, not when the project began) and whether the current quote's
+	 * was sent, not when the project began), whether the current quote's
 	 * deposit is covered (`settled`, the same rule as `isSettled` for payments
-	 * already read: `depositSettled` in the ledger). `quotes` are the projects'
+	 * already read: `depositSettled` in the ledger) and whether the expiry sweep
+	 * would spare the project because the studio's decision on the deposit is
+	 * owed or came late (`expirySpared`, the same rule as the method of that name
+	 * for payments already read: `decidedLate` in the ledger), so Today shows
+	 * exactly the projects the sweep leaves alone. `quotes` are the projects'
 	 * current quotes (QuoteService.currentFor); a project without one is never
-	 * settled. Every asked project has an entry. Reads only the columns the
+	 * settled and has nothing to expire. Every asked project has an entry. Reads only the columns the
 	 * rules use (never the proof's key or size), because the badge asks on
 	 * every page. Leaves `isSettled` alone: that one is on the booking path.
 	 */
 	async depositStates(
 		tenant: TenantRef,
 		projectIds: string[],
-		quotes: Map<string, Pick<Quote, "depositAmount" | "currency">>,
+		quotes: Map<
+			string,
+			Pick<Quote, "depositAmount" | "currency" | "expiresAt">
+		>,
 	): Promise<
 		Map<
 			string,
-			{ proofWaiting: boolean; proofSince: DateTime | null; settled: boolean }
+			{
+				proofWaiting: boolean;
+				proofSince: DateTime | null;
+				expirySpared: boolean;
+				settled: boolean;
+			}
 		>
 	> {
 		if (projectIds.length === 0) return new Map();
@@ -249,6 +261,7 @@ export default class DepositService {
 		return new Map(
 			projectIds.map((id) => {
 				const own = byProject.get(id) ?? [];
+				const quote = quotes.get(id);
 				const waiting = own.filter(
 					({ kind, status }) => kind === "deposit" && status === "submitted",
 				);
@@ -261,7 +274,8 @@ export default class DepositService {
 								? (DateTime.min(...waiting.map(({ createdAt }) => createdAt)) ??
 									null)
 								: null,
-						settled: depositSettled(quotes.get(id) ?? null, own),
+						expirySpared: quote ? decidedLate(own, quote.expiresAt) : false,
+						settled: depositSettled(quote ?? null, own),
 					},
 				];
 			}),

@@ -539,21 +539,28 @@ test.group("WaitingService.work", (group) => {
 				await makeQuote(s.tenant, project, expired);
 				return project;
 			};
-			const pay = (project: TattooProject, amount = 300_000) =>
+			// Decided before the quote expired (2 days ago), or after it (1 day ago).
+			const pay = (project: TattooProject, amount = 300_000, daysAgo = 5) =>
 				makePayment(s.tenant, project, {
 					amount,
 					status: "verified",
-					verifiedAt: DateTime.utc(),
+					verifiedAt: now.minus({ days: daysAgo }),
 				});
 			const paid = await make("deposit_pending", "Paid, no session");
 			await pay(paid);
-			const half = await make("deposit_pending", "Half paid");
+			const half = await make("deposit_pending", "Half paid before the expiry");
 			await pay(half, 100_000);
+			// A partial payment verified after the expiry: the sweep spares it (TAT-66).
+			const lateHalf = await make(
+				"deposit_pending",
+				"Half paid after the expiry",
+			);
+			await pay(lateHalf, 100_000, 1);
 			const unpaid = await make("deposit_pending", "Unpaid");
 			const quotedPaid = await make("quoted", "Quoted, paid after a revision");
 			await pay(quotedPaid);
 			const quotedUnpaid = await make("quoted", "Quoted, unpaid");
-			return { paid, half, unpaid, quotedPaid, quotedUnpaid };
+			return { paid, half, lateHalf, unpaid, quotedPaid, quotedUnpaid };
 		});
 
 		const owner = await inTenant(s.tenant, async () =>
@@ -563,9 +570,11 @@ test.group("WaitingService.work", (group) => {
 			items: { project: { id: string }; waiting: { reason: string } }[],
 		) => Object.fromEntries(items.map((i) => [i.project.id, i.waiting.reason]));
 
-		// The sweep cancels the unpaid and half-paid ones: they show nowhere.
+		// The sweep cancels the unpaid and the early half-paid ones: they show nowhere.
+		// It spares the late half-paid one, so Today keeps it (an unpaid deposit, no link).
 		assert.deepEqual(byReason(owner.needsYou), {
 			[made.paid.id]: "no_session",
+			[made.lateHalf.id]: "deposit_link_missing",
 		});
 		assert.deepEqual(byReason(owner.onClient), {
 			[made.quotedPaid.id]: "price_sent",
@@ -576,11 +585,15 @@ test.group("WaitingService.work", (group) => {
 		assert.deepEqual(byReason(artist.needsYou), {
 			[made.paid.id]: "no_session",
 		});
+		assert.deepEqual(byReason(artist.onClient), {
+			[made.lateHalf.id]: "deposit_due",
+			[made.quotedPaid.id]: "price_sent",
+		});
 		assert.equal(
 			await inTenant(s.tenant, async () =>
 				(await waiting()).needsYouCount(s.tenant, s.ownerMember, now),
 			),
-			1,
+			2,
 		);
 	});
 

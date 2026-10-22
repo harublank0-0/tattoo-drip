@@ -109,6 +109,120 @@ test.group("DepositService.depositStates", (group) => {
 		assert.isNull(states.get(none.id)?.proofSince ?? null);
 	});
 
+	test("expirySpared follows the sweep's late-decision rule, payment by payment (fix round 2)", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("states-spared-107");
+		const expiresAt = DateTime.utc().minus({ days: 3 });
+		const early = DateTime.utc().minus({ days: 5 });
+		const late = DateTime.utc().minus({ days: 1 });
+		const decided = (verifiedAt: DateTime) => ({
+			verifiedAt,
+			createdAt: verifiedAt.minus({ hours: 1 }),
+		});
+		const fixtures: Record<string, () => Promise<{ id: string }>> = {
+			"no payments": () => projectIn(tenant, { expiresAt }),
+			"a screenshot waits": async () => {
+				const project = await projectIn(tenant, { expiresAt });
+				await inTenant(tenant, () => makePayment(tenant, project));
+				return project;
+			},
+			"rejected late": async () => {
+				const project = await projectIn(tenant, { expiresAt });
+				await inTenant(tenant, () =>
+					makePayment(tenant, project, {
+						status: "rejected",
+						...decided(late),
+					}),
+				);
+				return project;
+			},
+			"rejected early": async () => {
+				const project = await projectIn(tenant, { expiresAt });
+				await inTenant(tenant, () =>
+					makePayment(tenant, project, {
+						status: "rejected",
+						...decided(early),
+					}),
+				);
+				return project;
+			},
+			"partly verified late": async () => {
+				const project = await projectIn(tenant, { expiresAt });
+				await inTenant(tenant, () =>
+					makePayment(tenant, project, {
+						amount: 100_000,
+						status: "verified",
+						...decided(late),
+					}),
+				);
+				return project;
+			},
+			"reversed late": async () => {
+				const project = await projectIn(tenant, { expiresAt });
+				await inTenant(tenant, async () => {
+					const deposit = await makePayment(tenant, project, {
+						status: "verified",
+						...decided(early),
+					});
+					await makePayment(tenant, project, {
+						kind: "correction",
+						amount: -300_000,
+						correctsPaymentId: deposit.id,
+						status: "verified",
+						...decided(late),
+					});
+				});
+				return project;
+			},
+			"a late session payment is not a deposit decision": async () => {
+				const project = await projectIn(tenant, { expiresAt });
+				await inTenant(tenant, () =>
+					makePayment(tenant, project, {
+						kind: "session",
+						status: "verified",
+						...decided(late),
+					}),
+				);
+				return project;
+			},
+		};
+		const made: { name: string; id: string }[] = [];
+		for (const [name, make] of Object.entries(fixtures)) {
+			made.push({ name, id: (await make()).id });
+		}
+		const ids = made.map(({ id }) => id);
+		const noQuote = await projectIn(tenant, null);
+
+		await inTenant(tenant, async () => {
+			const current = await quotes.currentFor(tenant, ids);
+			const states = await deposits.depositStates(
+				tenant,
+				[...ids, noQuote.id],
+				current,
+			);
+			for (const { name, id } of made) {
+				const quote = current.get(id);
+				assert.isDefined(quote, name);
+				assert.equal(
+					states.get(id)?.expirySpared,
+					await deposits.expirySpared(
+						tenant,
+						{ id },
+						quote as { expiresAt: DateTime },
+					),
+					name,
+				);
+			}
+			// A project without a quote has nothing to expire.
+			assert.isFalse(states.get(noQuote.id)?.expirySpared);
+			assert.deepEqual(
+				made.map(({ id }) => states.get(id)?.expirySpared),
+				[false, true, true, false, true, true, false],
+			);
+		});
+	});
+
 	test("settled agrees with isSettled for every way a deposit can stand", async ({
 		assert,
 	}) => {

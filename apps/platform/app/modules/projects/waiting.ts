@@ -51,6 +51,11 @@ export type WaitingFacts = {
 	proofWaiting: boolean;
 	/** When the oldest waiting screenshot was sent; null without one. */
 	proofSince: DateTime | null;
+	/**
+	 * The expiry sweep would spare this project's quote: a screenshot waits, or the studio
+	 * decided on the deposit at or after the expiry (DepositService.expirySpared, TAT-66).
+	 */
+	expirySpared: boolean;
 	/** The current quote of a quoted, on_hold or deposit_pending project; null otherwise. */
 	quote: {
 		issuedAt: DateTime;
@@ -108,9 +113,10 @@ export function waitingOf(
 	if (status === "reviewing")
 		return { side: "studio", reason: "price_to_send" };
 	if (QUOTE_STATUSES.includes(status) && quote) {
-		// The same rule the expiry sweep uses (expiryCancels), so Today never hides
-		// a project the sweep leaves alone: a covered deposit, or a waiting screenshot,
-		// spares an expired quote, and its work (a session to book) stays.
+		// The same rules the expiry sweep uses, so Today never hides a project the sweep
+		// leaves alone: a covered deposit (expiryCancels), or a decision about the
+		// deposit that is owed or came late (`expirySpared`), spares an expired quote,
+		// and the project stays in the state it has without the expiry.
 		const cancels = expiryCancels({
 			status,
 			depositAmount: quote.depositAmount,
@@ -118,7 +124,7 @@ export function waitingOf(
 		});
 		if (isExpired(quote, now)) {
 			// Cancelled within minutes by the sweep, and flagged by the Projects list until then.
-			if (cancels && !facts.proofWaiting) return null;
+			if (cancels && !facts.expirySpared) return null;
 		} else if (
 			cancels &&
 			quote.expiresAt.toMillis() <= quoteEndingBefore(now, timezone).toMillis()
