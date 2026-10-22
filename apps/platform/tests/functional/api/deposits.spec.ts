@@ -2,6 +2,7 @@ import testUtils from "@adonisjs/core/services/test_utils";
 import queue from "@adonisjs/queue/services/main";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
+import Artist from "#modules/artists/models/artist";
 import { IMAGE_FORMAT_MESSAGE } from "#modules/media/errors";
 import { newTokenNonce, tokenFor } from "#modules/payments/deposit_links";
 import DepositProofAlertJob from "#modules/payments/jobs/deposit_proof_alert_job";
@@ -27,7 +28,7 @@ import {
 	storedProofs,
 } from "#tests/helpers/deposits";
 import { testImages } from "#tests/helpers/images";
-import { makeArtist } from "#tests/helpers/pipeline";
+import { makeArtist, makePayment, makeSession } from "#tests/helpers/pipeline";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
 import { newTempUploads, tempUploads } from "#tests/helpers/uploads";
 
@@ -98,9 +99,63 @@ test.group("Public API: GET /deposits/:token", (group) => {
 				},
 			],
 			depositPolicy: "Deposits hold your date.",
+			nextSession: null,
 		});
 		response.assertHeader("cache-control", "no-store");
 		assertApiHeaders(response);
+	});
+
+	test("a paid page carries the next session as a UTC instant and the session's artist (TAT-110)", async ({
+		client,
+	}) => {
+		const { tenant, project, quote, link, token } = await deposit();
+		await inTenant(tenant, async () => {
+			await makePayment(tenant, project, {
+				status: "verified",
+				verifiedAt: DateTime.utc(),
+			});
+			project.status = "booked";
+			await project.save();
+			const aarav = await Artist.create({
+				tenantId: tenant.id,
+				name: "Aarav Shrestha",
+				slug: "aarav",
+			});
+			await makeSession(tenant, project, aarav, {
+				startsAt: DateTime.utc(2030, 3, 2, 5, 15),
+				endsAt: DateTime.utc(2030, 3, 2, 8, 15),
+			});
+		});
+		const payBy = validUntil(quote.expiresAt, KTM);
+
+		const response = await client.get(depositPath(SLUG, token));
+
+		assertApiData(response, {
+			studio: { name: "Black Needle" },
+			project: {
+				brief: "A small fine-line moth on the forearm",
+				artistName: "Sita",
+			},
+			deposit: {
+				amount: 300_000,
+				amountText: "NPR 3,000",
+				due: 0,
+				dueText: "NPR 0",
+				currency: "NPR",
+				payBy,
+				payByText: formatDay(payBy),
+			},
+			referenceCode: link.referenceCode,
+			state: "paid",
+			lastProofRejected: false,
+			proofSubmittedAt: null,
+			paymentMethods: [],
+			depositPolicy: "Deposits hold your date.",
+			nextSession: {
+				startsAt: "2030-03-02T05:15:00.000Z",
+				artistName: "Aarav Shrestha",
+			},
+		});
 	});
 
 	test("a link that doesn't work is the same 404: unknown, malformed, replaced, expired, unknown studio", async ({
