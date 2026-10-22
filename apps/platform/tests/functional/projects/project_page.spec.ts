@@ -891,6 +891,74 @@ test.group("Project page: Message the client (TAT-52)", (group) => {
 		);
 	});
 
+	test("the page carries the channel of the last contact, which the cards lead with (TAT-104)", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const project = await inTenant(tenant, async () =>
+			makeProject(
+				tenant,
+				await makeClient(tenant, { phone: "+9779812345678" }),
+				{ status: "quoted" },
+			),
+		);
+		const lastChannel = async () =>
+			(await client.get(page(project.id)).withInertia().loginAs(owner))
+				.inertiaProps.lastChannel;
+		const tap = (body: Record<string, string>) =>
+			client
+				.post(`${page(project.id)}/contacted`)
+				.form(body)
+				.withCsrfToken()
+				.loginAs(owner)
+				.redirects(0);
+
+		assert.isNull(await lastChannel());
+
+		await tap({ channel: "viber", kind: "quote" });
+		assert.equal(await lastChannel(), "viber");
+
+		await tap({ channel: "copy", kind: "quote" });
+		assert.equal(await lastChannel(), "copy");
+
+		await tap({});
+		assert.isNull(await lastChannel());
+	});
+
+	test("a project made from a contacted inquiry starts with the inquiry's channel (TAT-104)", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const inquiry = await inTenant(tenant, async () =>
+			makeInquiry(
+				tenant,
+				await makeClient(tenant, { phone: "+9779812345678" }),
+			),
+		);
+		await client
+			.post(`/t/black-needle/inbox/${inquiry.id}/contacted`)
+			.form({ channel: "viber", kind: "inquiry_received" })
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+		const accepted = await client
+			.post(`/t/black-needle/inbox/${inquiry.id}/accept`)
+			.form({ artistId: "" })
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+		accepted.assertStatus(302);
+		const projectId = accepted.header("location")?.split("/").pop() ?? "";
+
+		const props = (
+			await client.get(page(projectId)).withInertia().loginAs(owner)
+		).inertiaProps;
+
+		assert.equal(props.lastChannel, "viber");
+	});
+
 	test("without a phone there is nothing to tap", async ({
 		client,
 		assert,

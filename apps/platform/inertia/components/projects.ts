@@ -1,6 +1,7 @@
 import type { ReferenceProps } from "~/components/inquiries";
 import type {
 	CardMessageProps,
+	ContactChannelName,
 	ContactLinksProps,
 	MessageKindName,
 } from "~/components/messages";
@@ -129,6 +130,8 @@ export type ProjectPageProps = {
 	} | null;
 	notes: string | null;
 	contactedText: string;
+	/** The channel of the last contact, which the message cards lead with (TAT-104). */
+	lastChannel: ContactChannelName | null;
 	/** Owners only: the project's artist and the studio's artists. */
 	assignment: {
 		artistId: string | null;

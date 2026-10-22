@@ -8,7 +8,12 @@ import DevHostWarning from "~/components/dev_host_warning";
 import FinishCard from "~/components/finish_card";
 import { SOURCE_LABELS } from "~/components/inquiries";
 import MessageCard from "~/components/message_card";
-import type { ContactChannelName, ContactVia } from "~/components/messages";
+import {
+	type ContactChannelName,
+	type ContactVia,
+	type PrimaryChannel,
+	primaryChannel,
+} from "~/components/messages";
 import Page from "~/components/page";
 import PaymentsCard from "~/components/payments_card";
 import {
@@ -87,6 +92,7 @@ export default function ProjectShow({
 	scheduling,
 	notes,
 	contactedText,
+	lastChannel,
 	assignment,
 	request,
 	clientId,
@@ -173,6 +179,7 @@ export default function ProjectShow({
 					contact={contact}
 					messages={messages}
 					initialKind={messageKind}
+					lastChannel={lastChannel}
 					onContact={markContacted}
 				/>
 
@@ -229,6 +236,7 @@ export default function ProjectShow({
 						{message && (
 							<ChatMessage
 								message={message}
+								primary={primaryChannel(lastChannel)}
 								onSent={(channel) => markContacted({ channel, kind: "quote" })}
 							/>
 						)}
@@ -242,6 +250,7 @@ export default function ProjectShow({
 					<DepositCard
 						projectId={project.id}
 						deposit={deposit}
+						primary={primaryChannel(lastChannel)}
 						onSent={(channel) =>
 							markContacted({ channel, kind: "deposit_link" })
 						}
@@ -352,10 +361,12 @@ function QuoteSummary({
 function DepositCard({
 	projectId,
 	deposit,
+	primary,
 	onSent,
 }: {
 	projectId: string;
 	deposit: NonNullable<ProjectPageProps["deposit"]>;
+	primary: PrimaryChannel;
 	onSent: (channel: ContactChannelName) => void;
 }) {
 	const tenant = useTenant();
@@ -442,7 +453,13 @@ function DepositCard({
 								{link.referenceCode}
 							</dd>
 						</dl>
-						{message && <ChatMessage message={message} onSent={onSent} />}
+						{message && (
+							<ChatMessage
+								message={message}
+								primary={primary}
+								onSent={onSent}
+							/>
+						)}
 					</>
 				) : (
 					<p className="text-sm text-muted-foreground">
