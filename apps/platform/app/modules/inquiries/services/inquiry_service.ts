@@ -134,6 +134,16 @@ export default class InquiryService {
 	}
 
 	/**
+	 * The tenant's live inquiries among `ids`, in no particular order (the
+	 * Alerts list reads the idea of each new-inquiry alert in one query,
+	 * TAT-102).
+	 */
+	async findMany(tenant: TenantRef, ids: string[]): Promise<Inquiry[]> {
+		if (ids.length === 0) return [];
+		return Inquiry.query().where("tenant_id", tenant.id).whereIn("id", ids);
+	}
+
+	/**
 	 * The live reference images of an inquiry, or of the project an accepted
 	 * inquiry became, by position. Load the inquiry or project scoped to the
 	 * tenant (and to the member, for a project) first: that is the access

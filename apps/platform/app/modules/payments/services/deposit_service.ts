@@ -169,6 +169,23 @@ export default class DepositService {
 	}
 
 	/**
+	 * The amount (paisa) of each of these payments, by id (the owners' Alerts
+	 * list says what a screenshot claims, TAT-102). Payments are never
+	 * deleted, so an id the tenant owns is always there.
+	 */
+	async amountsFor(
+		tenant: TenantRef,
+		paymentIds: string[],
+	): Promise<Map<string, number>> {
+		if (paymentIds.length === 0) return new Map();
+		const rows = await Payment.query()
+			.where("tenant_id", tenant.id)
+			.whereIn("id", paymentIds)
+			.select("id", "amount");
+		return new Map(rows.map(({ id, amount }) => [id, amount]));
+	}
+
+	/**
 	 * How many deposit proofs wait for the studio: the Projects badge
 	 * (TAT-65). Payments have no soft delete and nothing deletes projects
 	 * from the dashboard yet, so every waiting deposit payment counts (TAT-42
