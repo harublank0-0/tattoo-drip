@@ -5,7 +5,6 @@ import type { Artist, Studio } from "@tattoo-drip/sdk";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ArtistPage, StudioPage } from "../../src/studio/components/pages.tsx";
-import { isAllowedHref } from "../../src/studio/links.ts";
 import { artistPageData, studioPageData } from "../../src/studio/loaders.ts";
 import { THEME_KEYS } from "../../src/studio/theme/config.ts";
 import {
@@ -22,6 +21,7 @@ import {
 	SITA,
 	STUDIO,
 } from "./fixtures.ts";
+import { assertSafePage, type SafePageOptions } from "./safety.ts";
 import { firstDifference, SNAPSHOT_FILE } from "./snapshot.ts";
 import {
 	BRANDED,
@@ -67,6 +67,9 @@ function assertSame(actual: string, name: string) {
 	);
 }
 
+/** A branded page holds to every rule of an ordinary one; its logo and cover may be decoration. */
+const BRAND_PAGE: SafePageOptions = { brandImages: true };
+
 const sections = (...types: string[]) =>
 	types.map((type) => ({ type, props: {} }));
 const headings = (html: string) =>
@@ -77,24 +80,6 @@ const hrefs = (html: string) =>
 	);
 const ids = (html: string) =>
 	Array.from(html.matchAll(/ id="([^"]*)"/g), (match) => match[1]);
-
-/** What a branded page holds to, as every studio page does (test/studio/render.test.ts). */
-function assertSafeBrandedPage(html: string) {
-	assert.equal(html.match(/<h1[\s>]/g)?.length, 1, "exactly one h1");
-	for (const href of hrefs(html)) assert.ok(isAllowedHref(href), href);
-	assert.doesNotMatch(html, / style=/);
-	assert.doesNotMatch(html, /<style|<script|javascript:|url\(/i);
-	for (const image of html.match(/<img [^>]*>/g) ?? []) {
-		assert.match(image, / width="\d+"/, image);
-		assert.match(image, / height="\d+"/, image);
-		// Brand images are decoration (alt=""); every other image says what it shows.
-		if (/class="(profile-logo|site-bar-logo)"/.test(image)) {
-			assert.match(image, / alt=""/, image);
-		} else if (!image.includes(COVER.url)) {
-			assert.match(image, / alt="[^"]+"/, image);
-		}
-	}
-}
 
 describe("the theme registry (TAT-54)", () => {
 	test("has a theme for every key, and Stencil & Ink is today's page", () => {
@@ -167,7 +152,7 @@ describe("the studio page's sections (TAT-54)", () => {
 describe("a studio's logo and cover (TAT-54)", () => {
 	test("the logo sits above the name, the cover above the hero, both from the API's origin", () => {
 		const html = studioHtml(withStorefront(BRANDED));
-		assertSafeBrandedPage(html);
+		assertSafePage(html, BRAND_PAGE);
 		assert.ok(
 			html.includes(
 				`<div class="profile-heading"><img class="profile-logo" src="${LOGO.url}" width="600" height="200" alt="" decoding="async"/><h1 class="profile-name" dir="auto">Black Needle</h1>`,
@@ -182,13 +167,62 @@ describe("a studio's logo and cover (TAT-54)", () => {
 
 	test("the artist page shows the logo beside the studio's name in its bar, and no cover", () => {
 		const html = artistHtml("sita", withStorefront(BRANDED));
-		assertSafeBrandedPage(html);
+		assertSafePage(html, BRAND_PAGE);
 		assert.ok(
 			html.includes(
 				`<header class="site-bar"><a href="/" dir="auto"><img class="site-bar-logo" src="${LOGO.url}" width="600" height="200" alt="" decoding="async"/><span>Black Needle</span></a></header>`,
 			),
 		);
 		assert.doesNotMatch(html, /profile-cover/);
+	});
+
+	test("the shared safety check holds a branded page to every rule of an ordinary one", () => {
+		const studio = studioHtml(withStorefront(BRANDED));
+		const artist = artistHtml("sita", withStorefront(BRANDED));
+		assertSafePage(studio, BRAND_PAGE);
+		assertSafePage(artist, BRAND_PAGE);
+		const broken: Record<string, string> = {
+			"an https link without rel": studio.replace(
+				' rel="noopener noreferrer"',
+				"",
+			),
+			"a target": studio.replace("<a ", '<a target="_blank" '),
+			"text beside an element in a link": artist.replace(
+				'dir="auto"><img class="site-bar-logo"',
+				'dir="auto">Home <img class="site-bar-logo"',
+			),
+			"a logo with a description": artist.replace(
+				/(class="site-bar-logo"[^>]*) alt=""/,
+				'$1 alt="logo"',
+			),
+			"an image without a size": studio.replace(
+				/(<img class="profile-logo"[^>]*) width="\d+"/,
+				"$1",
+			),
+			"a style attribute": studio.replace("<h1 ", '<h1 style="x:y" '),
+		};
+		const original = [studio, studio, artist, artist, studio, studio];
+		for (const [index, [name, html]] of Object.entries(broken).entries()) {
+			assert.notEqual(html, original[index], `${name}: the page was changed`);
+			assert.throws(() => assertSafePage(html, BRAND_PAGE), undefined, name);
+		}
+	});
+
+	test("an empty alt is allowed on the logo and the cover, only when asked for", () => {
+		const html = studioHtml(withStorefront(BRANDED));
+		assert.throws(
+			() => assertSafePage(html),
+			"without the option: no empty alt",
+		);
+		const photo = html.replace(
+			/(<figure class="artist-photo"><img [^>]*?) alt="[^"]+"/,
+			'$1 alt=""',
+		);
+		assert.notEqual(photo, html, "an artist's photo was found");
+		assert.throws(
+			() => assertSafePage(photo, BRAND_PAGE),
+			"a photograph still needs its alt",
+		);
 	});
 
 	test("a logo or cover from anywhere else is not shown", () => {

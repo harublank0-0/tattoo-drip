@@ -14,7 +14,6 @@ import {
 	NotFoundPage,
 	StudioPage,
 } from "../../src/studio/components/pages.tsx";
-import { isAllowedHref } from "../../src/studio/links.ts";
 import { artistPageData, studioPageData } from "../../src/studio/loaders.ts";
 import {
 	ARJUN,
@@ -24,6 +23,7 @@ import {
 	SITA,
 	STUDIO,
 } from "./fixtures.ts";
+import { assertSafePage } from "./safety.ts";
 
 /** The first element of `type` in a component's returned tree (the component is called, not rendered). */
 function findElement(node: ReactNode, type: string): ReactElement | undefined {
@@ -97,33 +97,6 @@ const BOOKING_STEPS = [
 	"A deposit holds your date",
 	"Your session",
 ];
-
-/** What every page holds to, whatever its data. */
-function assertSafePage(html: string) {
-	assert.equal(count(html, /<h1[\s>]/g), 1, "exactly one h1");
-	for (const href of hrefs(html)) assert.ok(isAllowedHref(href), href);
-	for (const anchor of html.match(/<a [^>]*>/g) ?? []) {
-		if (/ href="https?:/.test(anchor)) {
-			assert.match(anchor, / rel="noopener noreferrer"/, anchor);
-		}
-	}
-	// Links are flex containers: text next to a <bdi> would become two flex
-	// items and lose the space between them ("Ask forSita Rai"), so a link's
-	// mixed content goes in one <span>.
-	assert.doesNotMatch(
-		html,
-		/<a [^>]*>[^<]+<(?!\/a>)/,
-		"text beside an element in a link",
-	);
-	assert.doesNotMatch(html, / target=/);
-	assert.doesNotMatch(html, / style=/);
-	assert.doesNotMatch(html, /javascript:/i);
-	for (const image of images(html)) {
-		assert.match(image, / width="\d+"/, image);
-		assert.match(image, / height="\d+"/, image);
-		assert.match(image, / alt="[^"]+"/, image);
-	}
-}
 
 describe("the studio page", () => {
 	test("has its landmarks, headings and sections in order", () => {
