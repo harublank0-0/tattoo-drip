@@ -81,6 +81,13 @@ describe("the deposit page's styles", () => {
 		);
 	});
 
+	test("a long unbroken studio or artist name wraps inside the header instead of widening the page", () => {
+		assert.match(
+			css,
+			/\.deposit-header-text\s*\{[^}]*overflow-wrap:\s*anywhere/,
+		);
+	});
+
 	test("a focused control in steps 1 and 2 is never hidden under the bar (WCAG 2.4.11)", () => {
 		assert.match(
 			css,
