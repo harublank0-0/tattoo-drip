@@ -22,8 +22,12 @@ const MEMBERS: readonly MembershipRole[] = ["owner", "artist"];
  * are new names in these lists, not a second table.
  */
 export const TENANT_ROUTE_ROLES = {
-	// The studio's address: owners land on the inbox, artists on Projects.
+	// The studio's address: every member lands on Today.
 	"tenant.dashboard": MEMBERS,
+	// Today (TAT-107): an artist sees only their own projects and sessions
+	// (WaitingService through ProjectService.listActive, CalendarService.load),
+	// never requests, money, the setup or the pilot numbers.
+	"tenant.today": MEMBERS,
 
 	// Studio settings.
 	"tenant.settings": OWNERS,

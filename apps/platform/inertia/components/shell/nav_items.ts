@@ -1,20 +1,32 @@
 /**
- * The dashboard's main destinations (TAT-67): one list, rendered as the
- * phone's bottom tab bar and the desktop sidebar. Plain data with no
- * imports, so the unit tests can load it. A new area is one more entry here.
+ * The dashboard's main destinations (TAT-67, TAT-107): one list, rendered as
+ * the phone's bottom tab bar (with a More menu for the rest) and the desktop
+ * sidebar. Plain data with no imports, so the unit tests can load it. A new
+ * area is one more entry here.
  */
-export type NavKey = "inbox" | "projects" | "calendar" | "clients" | "settings";
+export type NavKey =
+	| "today"
+	| "inbox"
+	| "projects"
+	| "calendar"
+	| "clients"
+	| "artists"
+	| "settings";
 
 export type ShellNavItem = {
 	key: NavKey;
 	label: string;
 	route:
+		| "tenant.today"
 		| "tenant.inbox.index"
 		| "tenant.projects.index"
 		| "tenant.calendar.index"
 		| "tenant.clients.index"
+		| "tenant.artists"
 		| "tenant.settings";
-	/** A count on the item (new inquiries, proofs to check); absent unless above zero. */
+	/** "bar": its own tab on the phone; "more": under More on the phone. The sidebar lists both. */
+	place: "bar" | "more";
+	/** A count on the item (new requests, projects that need you); absent unless above zero. */
 	badge?: number;
 	/** What the badge counts, read by screen readers after the number: "new" when absent. */
 	badgeLabel?: string;
@@ -22,55 +34,89 @@ export type ShellNavItem = {
 	also?: string[];
 };
 
+/** The shell's counts (TAT-107): new requests (owners) and the projects that need the member. */
+export type NavCounts = { inbox: number | null; today: number | null };
+
+const counted = (count: number | null, badgeLabel?: string) =>
+	count !== null && count > 0
+		? { badge: count, ...(badgeLabel ? { badgeLabel } : {}) }
+		: {};
+
 /**
- * What `tenant`'s member sees: owners get Inbox, Projects, Calendar, Clients
- * and Settings (the artist pages count as Settings); artists get Projects and
- * Calendar. Owners also see on Projects how many deposit proofs wait (TAT-65). The server 404s the rest anyway.
+ * What `tenant`'s member sees (TAT-107): Today, Inbox (owners), Projects and
+ * Calendar, and for owners Clients, Artists and Settings under More. Nothing
+ * is counted twice: the Inbox counts new requests, Today the projects that
+ * need the member, and the bell (not an item) the alerts neither counts. The
+ * server 404s the rest anyway.
  */
 export function navItems(
 	tenant: { slug: string; role: string },
-	inboxCount: number | null,
-	proofCount: number | null = null,
+	counts: NavCounts,
 ): ShellNavItem[] {
 	const owner = tenant.role === "owner";
-	const items: ShellNavItem[] = [];
+	const items: ShellNavItem[] = [
+		{
+			key: "today",
+			label: "Today",
+			route: "tenant.today",
+			place: "bar",
+			...counted(counts.today, "need you"),
+		},
+	];
 	if (owner) {
 		items.push({
 			key: "inbox",
 			label: "Inbox",
 			route: "tenant.inbox.index",
-			...(inboxCount && inboxCount > 0 ? { badge: inboxCount } : {}),
+			place: "bar",
+			...counted(counts.inbox),
 		});
 	}
-	items.push({
-		key: "projects",
-		label: "Projects",
-		route: "tenant.projects.index",
-		...(owner && proofCount && proofCount > 0
-			? { badge: proofCount, badgeLabel: "to check" }
-			: {}),
-	});
-	items.push({
-		key: "calendar",
-		label: "Calendar",
-		route: "tenant.calendar.index",
-	});
+	items.push(
+		{
+			key: "projects",
+			label: "Projects",
+			route: "tenant.projects.index",
+			place: "bar",
+		},
+		{
+			key: "calendar",
+			label: "Calendar",
+			route: "tenant.calendar.index",
+			place: "bar",
+		},
+	);
 	if (owner) {
 		items.push(
 			{
 				key: "clients",
 				label: "Clients",
 				route: "tenant.clients.index",
+				place: "more",
+			},
+			{
+				key: "artists",
+				label: "Artists",
+				route: "tenant.artists",
+				place: "more",
 			},
 			{
 				key: "settings",
 				label: "Settings",
 				route: "tenant.settings",
-				also: [`/t/${tenant.slug}/artists`],
+				place: "more",
 			},
 		);
 	}
 	return items;
+}
+
+/** The phone's tabs, and the items More opens (none: no More tab). */
+export function tabBarItems(items: ShellNavItem[]) {
+	return {
+		tabs: items.filter(({ place }) => place === "bar"),
+		more: items.filter(({ place }) => place === "more"),
+	};
 }
 
 /** The tab bar only earns its space with two or more destinations. */

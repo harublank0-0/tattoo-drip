@@ -1,9 +1,11 @@
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
 import {
+	ALERT_KINDS,
 	alertCopy,
 	alertTarget,
 	alertTimeText,
+	bellKinds,
 	dashboardUrl,
 	depositProofSubject,
 	excerpt,
@@ -386,5 +388,27 @@ test.group("alert details (TAT-102)", () => {
 			alertCopy("new_inquiry", true, proof("Sita", "NPR 3,000")).detail,
 			"Open it in the inbox.",
 		);
+	});
+});
+
+test.group("bellKinds (TAT-107)", () => {
+	test("an owner's bell counts nothing a tab already counts: the Inbox has the inquiries, Today the screenshots", ({
+		assert,
+	}) => {
+		assert.deepEqual(bellKinds("owner"), []);
+	});
+
+	test("an artist has neither count, so the bell counts every kind", ({
+		assert,
+	}) => {
+		assert.deepEqual(bellKinds("artist"), ["new_inquiry", "deposit_proof"]);
+	});
+
+	test("an unknown role counts everything, with no prototype lookup", ({
+		assert,
+	}) => {
+		for (const role of ["constructor", "__proto__", "toString", ""]) {
+			assert.deepEqual(bellKinds(role), [...ALERT_KINDS], role);
+		}
 	});
 });

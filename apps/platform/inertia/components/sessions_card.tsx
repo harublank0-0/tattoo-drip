@@ -67,7 +67,10 @@ export default function SessionsCard({
 	};
 
 	return (
-		<Card id="sessions">
+		<Card
+			id="sessions"
+			className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)] lg:scroll-mt-0"
+		>
 			<CardHeader>
 				<CardTitle>
 					<h2 ref={heading} tabIndex={-1} className="outline-none">

@@ -44,8 +44,8 @@ export default class InvitationsController {
 	}
 
 	/**
-	 * Joins and lands on the role's own page (straight there: a flash doesn't
-	 * survive the studio home's second redirect). A refusal changes nothing
+	 * Joins and lands on Today (straight there: a flash doesn't survive the
+	 * studio home's second redirect). A refusal changes nothing
 	 * and goes back to the page, which says why.
 	 */
 	async accept({ request, session, response, auth }: HttpContext) {
@@ -69,12 +69,7 @@ export default class InvitationsController {
 		session.flash("success", joinedMessage(joined));
 		return response
 			.redirect()
-			.toRoute(
-				joined.role === "owner"
-					? "tenant.inbox.index"
-					: "tenant.projects.index",
-				{ tenant: joined.studio.slug },
-			);
+			.toRoute("tenant.today", { tenant: joined.studio.slug });
 	}
 }
 

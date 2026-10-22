@@ -33,4 +33,5 @@ export const controllers = {
   Session: () => import('#controllers/session_controller'),
   StudioProfile: () => import('#controllers/studio_profile_controller'),
   StudioSlug: () => import('#controllers/studio_slug_controller'),
+  Today: () => import('#controllers/today_controller'),
 }

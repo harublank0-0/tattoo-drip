@@ -177,7 +177,7 @@ test.group("The invitation link and page (TAT-33)", (group) => {
 		assert.equal((await pageFor({})).state, "invalid");
 	});
 
-	test("joining: the member exists with the profile, the link is used up, and an artist lands on Projects", async ({
+	test("joining: the member exists with the profile, the link is used up, and an artist lands on Today", async ({
 		client,
 		assert,
 	}) => {
@@ -193,7 +193,7 @@ test.group("The invitation link and page (TAT-33)", (group) => {
 			.redirects(0);
 
 		response.assertStatus(302);
-		response.assertHeader("location", "/t/join-33/projects");
+		response.assertHeader("location", "/t/join-33/today");
 		response.assertFlashMessage(
 			"success",
 			"You joined Join 33. Your artist profile is linked to you.",
@@ -204,7 +204,7 @@ test.group("The invitation link and page (TAT-33)", (group) => {
 			(await inTenant(tenant, () => Artist.findOrFail(asha.id))).userId,
 			user.id,
 		);
-		(await client.get("/t/join-33/projects").loginAs(user)).assertStatus(200);
+		(await client.get("/t/join-33/today").loginAs(user)).assertStatus(200);
 		assert.equal(
 			(
 				await client
@@ -216,7 +216,7 @@ test.group("The invitation link and page (TAT-33)", (group) => {
 		);
 	});
 
-	test("an owner's invitation lands on the Inbox; a taken profile still joins, with the note", async ({
+	test("an owner's invitation lands on Today; a taken profile still joins, with the note", async ({
 		client,
 	}) => {
 		const { owner, tenant, asha } = await studio();
@@ -241,7 +241,7 @@ test.group("The invitation link and page (TAT-33)", (group) => {
 				.redirects(0);
 
 		const asOwner = await join("co@join-33.example", forOwner.token);
-		asOwner.assertHeader("location", "/t/join-33/inbox");
+		asOwner.assertHeader("location", "/t/join-33/today");
 		asOwner.assertFlashMessage("success", "You joined Join 33.");
 
 		const taken = await join("mira@join-33.example", forArtist.token);
@@ -343,7 +343,7 @@ test.group("The invitation link and page (TAT-33)", (group) => {
 			.loginAs(user)
 			.redirects(0);
 
-		response.assertHeader("location", "/t/join-33/projects");
+		response.assertHeader("location", "/t/join-33/today");
 		assert.lengthOf(await membersOf(tenant), 2);
 		const own = await inTenant(theirs, () =>
 			TenantMembership.query().where("tenant_id", theirs.id),

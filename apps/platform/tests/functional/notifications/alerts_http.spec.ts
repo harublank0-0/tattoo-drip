@@ -257,7 +257,7 @@ test.group("Alerts", (group) => {
 		assert.isNull((await reload(tenant, theirs)).readAt);
 	});
 
-	test("the shell counts each member's own unread alerts on every tenant page", async ({
+	test("the bell counts only what no tab counts: nothing for an owner, every unread alert for an artist", async ({
 		client,
 		assert,
 	}) => {
@@ -266,16 +266,41 @@ test.group("Alerts", (group) => {
 		await alertFor(tenant, owner.id);
 		await alertFor(tenant, owner.id);
 		await alertFor(tenant, owner.id, { readAt: DateTime.now() });
+		await proofAlertFor(tenant, owner.id);
 		await alertFor(tenant, artist.id);
+		await proofAlertFor(tenant, artist.id);
+		await alertFor(tenant, artist.id, { readAt: DateTime.now() });
 
+		// The Inbox badge and Today's badge already count these for an owner.
 		const ownerProps = (
 			await client.get("/t/black-needle/projects").withInertia().loginAs(owner)
 		).inertiaProps;
-		assert.equal(ownerProps.alertCount, 2);
+		assert.equal(ownerProps.alertCount, 0);
 		const artistProps = (
 			await client.get("/t/black-needle/calendar").withInertia().loginAs(artist)
 		).inertiaProps;
-		assert.equal(artistProps.alertCount, 1);
+		assert.equal(artistProps.alertCount, 2);
+	});
+
+	test("an owner's pages run no alerts query; the Alerts page still counts every unread alert", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		await alertFor(tenant, owner.id);
+		await proofAlertFor(tenant, owner.id);
+
+		const { queries } = await recordQueries(() =>
+			client.get("/t/black-needle/projects").withInertia().loginAs(owner),
+		);
+		assert.deepEqual(
+			queries.filter((sql) => sql.includes("staff_alerts")),
+			[],
+		);
+
+		const list = (await client.get(alertsPage()).withInertia().loginAs(owner))
+			.inertiaProps;
+		assert.equal(list.unread, 2);
 	});
 
 	test("a deposit-proof alert reads its line and opens the project's Payments card", async ({

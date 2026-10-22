@@ -5,6 +5,23 @@ import { firstName } from "#modules/notifications/messages";
 export const ALERT_KINDS = ["new_inquiry", "deposit_proof"] as const;
 export type AlertKind = (typeof ALERT_KINDS)[number];
 
+/** The alert kinds a tab already counts for an owner: the Inbox the new inquiries, Today the screenshots. */
+const OWNER_TAB_COUNTED: readonly AlertKind[] = [
+	"new_inquiry",
+	"deposit_proof",
+];
+
+/**
+ * The unread alert kinds the bell counts for `role` (TAT-107): only what no
+ * tab counts, so no number shows twice. An owner's are all on the Inbox and
+ * Today; an artist has neither count. A new kind counts on the bell until a
+ * tab counts it.
+ */
+export function bellKinds(role: string): AlertKind[] {
+	const counted = role === "owner" ? OWNER_TAB_COUNTED : [];
+	return ALERT_KINDS.filter((kind) => !counted.includes(kind));
+}
+
 /** How much of the idea a new-inquiry email quotes, in characters as people count them. */
 export const EXCERPT_LENGTH = 140;
 

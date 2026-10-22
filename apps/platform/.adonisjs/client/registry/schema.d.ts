@@ -187,6 +187,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/dashboard_controller').default['tenantHome']>>>
     }
   }
+  'tenant.today': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/today'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/today_controller').default['show']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/today_controller').default['show']>>>
+    }
+  }
   'tenant.settings': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/settings'

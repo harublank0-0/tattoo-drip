@@ -5,6 +5,8 @@ import { DateTime } from "luxon";
 import ArtistService from "#modules/artists/services/artist_service";
 import type Inquiry from "#modules/inquiries/models/inquiry";
 import {
+	ALERT_KINDS,
+	type AlertKind,
 	dashboardUrl,
 	excerpt,
 	inquiryIntro,
@@ -208,11 +210,21 @@ export default class AlertService {
 		};
 	}
 
-	/** How many of the member's alerts here are unread: the shell's count. */
-	async unreadCount(tenant: TenantRef, userId: string): Promise<number> {
+	/**
+	 * How many of the member's alerts here are unread, of `kinds` (every kind
+	 * by default): the Alerts page counts them all, the shell's bell only
+	 * what no tab counts (`bellKinds`, TAT-107). No kinds, no query.
+	 */
+	async unreadCount(
+		tenant: TenantRef,
+		userId: string,
+		kinds: readonly AlertKind[] = ALERT_KINDS,
+	): Promise<number> {
+		if (kinds.length === 0) return 0;
 		const [row] = await StaffAlert.query()
 			.where("tenant_id", tenant.id)
 			.where("user_id", userId)
+			.whereIn("kind", [...kinds])
 			.whereNull("read_at")
 			.count("* as total");
 		return Number(row.$extras.total);

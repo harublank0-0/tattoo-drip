@@ -149,14 +149,14 @@ test.group("A throttled account link says so (TAT-119)", (group) => {
 				}),
 		},
 		{
-			name: "unverified, one studio (the inbox)",
-			landing: "inquiries/index",
+			name: "unverified, one studio (Today)",
+			landing: "today/index",
 			person: async () =>
 				(await studioWithOwner("throttled-uv-119", "Throttled UV")).owner,
 		},
 		{
-			name: "verified, one studio (the inbox)",
-			landing: "inquiries/index",
+			name: "verified, one studio (Today)",
+			landing: "today/index",
 			person: async () => {
 				const { owner } = await studioWithOwner(
 					"throttled-v-119",
@@ -167,8 +167,8 @@ test.group("A throttled account link says so (TAT-119)", (group) => {
 			},
 		},
 		{
-			name: "several studios (the oldest one's inbox)",
-			landing: "inquiries/index",
+			name: "several studios (the oldest one's Today)",
+			landing: "today/index",
 			person: async () => {
 				const first = await studioWithOwner("throttled-m1-119", "Throttled M1");
 				const second = await studioWithOwner(
@@ -187,8 +187,8 @@ test.group("A throttled account link says so (TAT-119)", (group) => {
 			},
 		},
 		{
-			name: "an artist member (their projects)",
-			landing: "projects/index",
+			name: "an artist member (their Today)",
+			landing: "today/index",
 			person: async () => {
 				const { tenant } = await studioWithOwner(
 					"throttled-a-119",

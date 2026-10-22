@@ -52,6 +52,19 @@ export function depositMoney(
 }
 
 /**
+ * Whether `quote`'s deposit is covered: it asks none, or the deposit money in its currency reaches
+ * it (DepositService.isSettled's rule, for payments already read). No quote: not covered.
+ */
+export function depositSettled(
+	quote: Pick<Quote, "depositAmount" | "currency"> | null,
+	payments: readonly LedgerPayment[],
+): boolean {
+	if (!quote) return false;
+	if (quote.depositAmount === 0) return true;
+	return depositMoney(payments, quote.currency) >= quote.depositAmount;
+}
+
+/**
  * What the project holds in `currency`: every verified payment, signed
  * (refunds and reversals subtract). Waiting and rejected payments don't
  * count.

@@ -297,6 +297,13 @@ export const isolationCases: IsolationCase[] = [
 	},
 	{
 		method: "GET",
+		pattern: "/t/:tenant/today",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: none,
+	},
+	{
+		method: "GET",
 		pattern: "/t/:tenant/settings",
 		actor: "owner",
 		ownStatus: 302,

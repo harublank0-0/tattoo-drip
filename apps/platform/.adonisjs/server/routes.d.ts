@@ -19,6 +19,7 @@ export type ScannedRoutes = {
     'password_reset.edit': { paramsTuple?: []; params?: {} }
     'password_reset.update': { paramsTuple?: []; params?: {} }
     'tenant.dashboard': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.today': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.profile': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.profile.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -113,6 +114,7 @@ export type ScannedRoutes = {
     'password_reset.link': { paramsTuple: [ParamValue]; params: {'token': ParamValue} }
     'password_reset.edit': { paramsTuple?: []; params?: {} }
     'tenant.dashboard': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.today': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.profile': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -158,6 +160,7 @@ export type ScannedRoutes = {
     'password_reset.link': { paramsTuple: [ParamValue]; params: {'token': ParamValue} }
     'password_reset.edit': { paramsTuple?: []; params?: {} }
     'tenant.dashboard': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.today': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.profile': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
