@@ -133,17 +133,14 @@ export function readHexColor(value: unknown): string | null {
 /** Stored images are at most 2048 px (TAT-44); anything outside this is no image. */
 const MAX_IMAGE_SIDE = 10_000;
 
-/** Hosts on this machine, where the API may be plain http (development). */
-const LOCAL_HOST =
-	/^(?:localhost|127\.0\.0\.1|\[::1\]|[a-z0-9.-]+\.localhost)$/;
-
 /**
  * A logo or cover image from the API's `Image` (url, width, height; `alt` is
  * not read: both are decoration beside the studio's name), or null. The URL
  * has no space or control character, passes safeImageUrl (http or https, no
  * credentials, at most 2048 characters) and is on exactly `imageOrigin`, the
- * API's origin; it is https unless the API runs on this machine. Without an
- * origin no image is accepted.
+ * API's origin: the same scheme, host and port. That one comparison is the
+ * rule: the tenancy settings already allow http only for an API on this
+ * machine. Without an origin no image is accepted.
  */
 export function readBrandImage(
 	value: unknown,
@@ -158,9 +155,6 @@ export function readBrandImage(
 	if (src === null) return null;
 	const parsed = new URL(src);
 	if (parsed.origin !== originOf(imageOrigin)) return null;
-	if (parsed.protocol !== "https:" && !LOCAL_HOST.test(parsed.hostname)) {
-		return null;
-	}
 	if (!isImageSide(width) || !isImageSide(height)) return null;
 	return { src, width, height };
 }

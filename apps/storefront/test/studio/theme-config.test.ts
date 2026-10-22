@@ -323,16 +323,28 @@ describe("readBrandImage (TAT-54)", () => {
 		assert.equal(readBrandImage(image(LOGO), "not an origin"), null);
 	});
 
-	test("plain http only from an API on this machine (development)", () => {
+	test("the origin is the whole rule: scheme, host and port must all be the API's", () => {
 		const local = "http://localhost:3333";
 		assert.deepEqual(
 			readBrandImage(image("http://localhost:3333/uploads/a.png"), local),
 			{ src: "http://localhost:3333/uploads/a.png", width: 600, height: 200 },
 		);
-		assert.equal(
-			readBrandImage(image("http://api.test/uploads/a.png"), "http://api.test"),
-			null,
-		);
+		for (const url of [
+			"https://localhost:3333/uploads/a.png",
+			"http://localhost:3334/uploads/a.png",
+			"http://localhost/uploads/a.png",
+			"http://127.0.0.1:3333/uploads/a.png",
+		]) {
+			assert.equal(readBrandImage(image(url), local), null, url);
+		}
+		for (const url of [
+			"http://api.example.com/uploads/a.png",
+			"https://api.example.com:8443/uploads/a.png",
+			"https://api.example.com:80/uploads/a.png",
+			"wss://api.example.com/uploads/a.png",
+		]) {
+			assert.equal(readBrandImage(image(url), API), null, url);
+		}
 	});
 });
 
