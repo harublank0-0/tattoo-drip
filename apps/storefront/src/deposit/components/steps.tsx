@@ -106,8 +106,8 @@ export function PaidBar() {
 
 /**
  * The picked method: its QR (a square reserved while it loads), what to do
- * with it, and its details. The caller keys it by the method's id, so a
- * switch makes a fresh image (the previous QR never shows while the next one
+ * with it, and its details. The caller keys it by the method's identity and
+ * QR, so a switch makes a fresh image (the previous QR never shows while the next one
  * loads: scanning the wrong code is the worst thing this page can do) and a
  * fresh Copy button (no "Copied" beside another method's number).
  */

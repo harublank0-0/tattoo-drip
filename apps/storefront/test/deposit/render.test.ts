@@ -444,8 +444,8 @@ describe("due", () => {
 		assert.deepEqual(
 			radios.map((radio) => [attr(radio, "id"), attr(radio, "value")]),
 			[
-				["pay-with-0", "method-0"],
-				["pay-with-1", "method-1"],
+				["pay-with-0", "esewa:9812345678"],
+				["pay-with-1", "bank:01234567890123"],
 			],
 		);
 		assert.match(radios[0], / checked=""/);

@@ -40,7 +40,14 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_MS = 86_400_000;
 
 export interface MethodView {
-	/** Stable for React keys: the method's place in the API's list. */
+	/**
+	 * The method's identity, which survives the studio reordering its list
+	 * between two reads (the page refetches when the tab regains focus): the
+	 * kind and the account or wallet number as shown, `bank:01234567890123`
+	 * (the number URL-encoded; empty for a QR-only method). Methods that can't
+	 * be told apart that way (the same kind and number, or no number) take
+	 * `#1`, `#2`… by their order among them. Never the place in the list.
+	 */
 	readonly id: string;
 	readonly kind: DepositMethodKind;
 	readonly label: string;
@@ -142,10 +149,11 @@ export function studioInitial(name: string): string {
 }
 
 function methodViews(methods: readonly DepositPaymentMethod[]): MethodView[] {
+	const seen = new Map<string, number>();
 	return methods
 		.filter((method) => DEPOSIT_KINDS.includes(method.kind))
-		.map((method, index) => ({
-			id: `method-${index}`,
+		.map((method) => ({
+			id: methodId(method, seen),
 			kind: method.kind,
 			label: cleanLine(method.label) ?? copy.form.kinds[method.kind],
 			qr: safeImageUrl(method.qrImageUrl),
@@ -153,6 +161,18 @@ function methodViews(methods: readonly DepositPaymentMethod[]): MethodView[] {
 			accountNumber: cleanLine(method.accountNumber),
 			bankName: cleanLine(method.bankName),
 		}));
+}
+
+/** A method's identity (MethodView.id); `seen` counts the ones that came before with the same base. */
+function methodId(
+	method: DepositPaymentMethod,
+	seen: Map<string, number>,
+): string {
+	const number = cleanLine(method.accountNumber) ?? "";
+	const base = `${method.kind}:${encodeURIComponent(number)}`;
+	const nth = seen.get(base) ?? 0;
+	seen.set(base, nth + 1);
+	return nth === 0 ? base : `${base}#${nth}`;
 }
 
 /** Today's date (yyyy-mm-dd) in `timeZone`, or null when this browser doesn't know the zone. */

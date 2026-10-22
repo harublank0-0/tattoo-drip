@@ -390,8 +390,11 @@ export function DueView({
 				)}
 			</section>
 			{selected ? (
+				// Keyed by identity and QR: methods that can't be told apart take their
+				// order as identity, so a reorder between them keeps the id but changes
+				// the QR, and the image must still be a fresh one.
 				<MethodPanel
-					key={selected.id}
+					key={`${selected.id}|${selected.qr ?? ""}`}
 					method={selected}
 					single={view.methods.length === 1}
 					studioName={studioName}

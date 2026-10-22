@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
+import type { DepositPage } from "@tattoo-drip/sdk";
 import { copy } from "../../src/deposit/copy.ts";
 import {
 	daysUntil,
@@ -25,8 +26,8 @@ describe("depositView", () => {
 		assert.deepEqual(
 			view.methods.map((method) => [method.id, method.kind, method.label]),
 			[
-				["method-0", "esewa", "eSewa"],
-				["method-1", "bank", "Bank transfer"],
+				["esewa:9812345678", "esewa", "eSewa"],
+				["bank:01234567890123", "bank", "Bank transfer"],
 			],
 		);
 		assert.equal(view.methods[0].qr, QR_URL);
@@ -326,10 +327,10 @@ describe("selectedMethod (TAT-110)", () => {
 	const methods = depositView(PAGE).methods;
 
 	test("the picked method while it is listed, else the first, else null", () => {
-		assert.equal(selectedMethod(methods, "method-1"), methods[1]);
-		assert.equal(selectedMethod(methods, "method-9"), methods[0]);
+		assert.equal(selectedMethod(methods, "bank:01234567890123"), methods[1]);
+		assert.equal(selectedMethod(methods, "bank:nope"), methods[0]);
 		assert.equal(selectedMethod(methods, null), methods[0]);
-		assert.equal(selectedMethod([], "method-0"), null);
+		assert.equal(selectedMethod([], "esewa:9812345678"), null);
 		assert.equal(selectedMethod([], null), null);
 	});
 });
@@ -422,5 +423,78 @@ describe("depositView's session (TAT-110)", () => {
 		);
 
 		assert.deepEqual(view.session, { startsAt, artistName: null });
+	});
+});
+
+describe("a method's identity (TAT-110 fix round 1)", () => {
+	const [esewa, bank] = PAGE.paymentMethods;
+	const idsOf = (paymentMethods: DepositPage["paymentMethods"]) =>
+		depositView(page({ paymentMethods })).methods.map((method) => method.id);
+
+	test("is the kind and the account or wallet number as shown, never the place in the list", () => {
+		assert.deepEqual(idsOf([esewa, bank]), [
+			"esewa:9812345678",
+			"bank:01234567890123",
+		]);
+		assert.deepEqual(idsOf([bank, esewa]), [
+			"bank:01234567890123",
+			"esewa:9812345678",
+		]);
+	});
+
+	test("survives a reorder: the pick still finds its own method, with its own details", () => {
+		const before = depositView(page({ paymentMethods: [esewa, bank] }));
+		const after = depositView(page({ paymentMethods: [bank, esewa] }));
+		const picked = before.methods[1].id;
+
+		const found = selectedMethod(after.methods, picked);
+
+		assert.equal(found?.kind, "bank");
+		assert.equal(found?.bankName, "Nabil Bank");
+		assert.equal(found?.accountNumber, "01234567890123");
+	});
+
+	test("two accounts of one kind have two identities, and the number is cleaned like the page shows it", () => {
+		const second = { ...bank, accountNumber: "  98765  43210 " };
+
+		assert.deepEqual(idsOf([bank, second]), [
+			"bank:01234567890123",
+			"bank:98765%2043210",
+		]);
+		assert.deepEqual(idsOf([second, bank]), [
+			"bank:98765%2043210",
+			"bank:01234567890123",
+		]);
+	});
+
+	test("methods that can't be told apart (same kind, same or no number) get the order among them", () => {
+		const qrOnly = { ...esewa, kind: "fonepay" as const, accountNumber: null };
+
+		assert.deepEqual(idsOf([qrOnly, { ...qrOnly, label: "Fonepay 2" }, bank]), [
+			"fonepay:",
+			"fonepay:#1",
+			"bank:01234567890123",
+		]);
+		assert.deepEqual(idsOf([bank, { ...bank, label: "Bank 2" }]), [
+			"bank:01234567890123",
+			"bank:01234567890123#1",
+		]);
+	});
+
+	test("a number that looks like an ordinal can't collide with one", () => {
+		assert.deepEqual(
+			idsOf([
+				{ ...bank, accountNumber: "7" },
+				{ ...bank, accountNumber: "7" },
+				{ ...bank, accountNumber: "7#1" },
+			]),
+			["bank:7", "bank:7#1", "bank:7%231"],
+		);
+	});
+
+	test("a kind the page can't take doesn't shift anyone's identity", () => {
+		const cash = { ...bank, kind: "cash" as never };
+
+		assert.deepEqual(idsOf([cash, esewa, bank]), idsOf([esewa, bank]));
 	});
 });
