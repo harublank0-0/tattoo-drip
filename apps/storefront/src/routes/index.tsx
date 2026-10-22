@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { pageCacheHeaders } from "../studio/cache.ts";
-import { StudioPage } from "../studio/components/pages.tsx";
 import { loadStudioPage } from "../studio/loaders.ts";
 import { headTags, statusHead } from "../studio/seo.ts";
+import { ThemedStudioPage } from "../studio/theme/registry.tsx";
 
 /** The studio page (TAT-48): profile, contact links, artists and the inquiry section. */
 export const Route = createFileRoute("/")({
@@ -18,7 +18,7 @@ function StudioRoute() {
 		select: (context) => context.site.challengeSiteKey,
 	});
 	return (
-		<StudioPage
+		<ThemedStudioPage
 			data={Route.useLoaderData()}
 			challengeSiteKey={challengeSiteKey}
 		/>

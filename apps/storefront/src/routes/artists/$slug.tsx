@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { pageCacheHeaders } from "../../studio/cache.ts";
-import { ArtistPage } from "../../studio/components/pages.tsx";
 import { loadArtistPage } from "../../studio/loaders.ts";
 import { headTags, statusHead } from "../../studio/seo.ts";
+import { ThemedArtistPage } from "../../studio/theme/registry.tsx";
 
 /**
  * One visible artist (TAT-48): the link an artist shares to be asked for by
@@ -21,7 +21,7 @@ function ArtistRoute() {
 		select: (context) => context.site.challengeSiteKey,
 	});
 	return (
-		<ArtistPage
+		<ThemedArtistPage
 			data={Route.useLoaderData()}
 			challengeSiteKey={challengeSiteKey}
 		/>
