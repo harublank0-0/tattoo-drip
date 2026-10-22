@@ -843,7 +843,7 @@ function ArtistField({
 							name="artistId"
 							defaultValue={assignment.artistId ?? ""}
 							aria-invalid={!!errors.artistId}
-							className="h-9 min-w-0 flex-1 rounded-md border bg-transparent px-3 text-sm"
+							className="h-9 min-w-0 flex-1 rounded-md border bg-transparent px-3 text-sm max-lg:min-h-11"
 						>
 							<option value="">No artist</option>
 							{assignment.choices.map(({ id, name }) => (
