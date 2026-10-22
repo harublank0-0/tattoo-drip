@@ -5,6 +5,7 @@ import type { Artist, Studio } from "@tattoo-drip/sdk";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ArtistPage, StudioPage } from "../../src/studio/components/pages.tsx";
+import { isAllowedHref } from "../../src/studio/links.ts";
 import { artistPageData, studioPageData } from "../../src/studio/loaders.ts";
 import { THEME_KEYS } from "../../src/studio/theme/config.ts";
 import {
@@ -22,7 +23,14 @@ import {
 	STUDIO,
 } from "./fixtures.ts";
 import { firstDifference, SNAPSHOT_FILE } from "./snapshot.ts";
-import { HOSTILE, IMAGE_ORIGIN, withStorefront } from "./theme-fixtures.ts";
+import {
+	BRANDED,
+	COVER,
+	HOSTILE,
+	IMAGE_ORIGIN,
+	LOGO,
+	withStorefront,
+} from "./theme-fixtures.ts";
 
 const SNAPSHOT = JSON.parse(readFileSync(SNAPSHOT_FILE, "utf8")) as Record<
 	string,
@@ -69,6 +77,24 @@ const hrefs = (html: string) =>
 	);
 const ids = (html: string) =>
 	Array.from(html.matchAll(/ id="([^"]*)"/g), (match) => match[1]);
+
+/** What a branded page holds to, as every studio page does (test/studio/render.test.ts). */
+function assertSafeBrandedPage(html: string) {
+	assert.equal(html.match(/<h1[\s>]/g)?.length, 1, "exactly one h1");
+	for (const href of hrefs(html)) assert.ok(isAllowedHref(href), href);
+	assert.doesNotMatch(html, / style=/);
+	assert.doesNotMatch(html, /<style|<script|javascript:|url\(/i);
+	for (const image of html.match(/<img [^>]*>/g) ?? []) {
+		assert.match(image, / width="\d+"/, image);
+		assert.match(image, / height="\d+"/, image);
+		// Brand images are decoration (alt=""); every other image says what it shows.
+		if (/class="(profile-logo|site-bar-logo)"/.test(image)) {
+			assert.match(image, / alt=""/, image);
+		} else if (!image.includes(COVER.url)) {
+			assert.match(image, / alt="[^"]+"/, image);
+		}
+	}
+}
 
 describe("the theme registry (TAT-54)", () => {
 	test("has a theme for every key, and Stencil & Ink is today's page", () => {
@@ -135,5 +161,45 @@ describe("the studio page's sections (TAT-54)", () => {
 				assert.ok(ids(html).includes(href.slice(1)), href);
 			}
 		}
+	});
+});
+
+describe("a studio's logo and cover (TAT-54)", () => {
+	test("the logo sits above the name, the cover above the hero, both from the API's origin", () => {
+		const html = studioHtml(withStorefront(BRANDED));
+		assertSafeBrandedPage(html);
+		assert.ok(
+			html.includes(
+				`<div class="profile-heading"><img class="profile-logo" src="${LOGO.url}" width="600" height="200" alt="" decoding="async"/><h1 class="profile-name" dir="auto">Black Needle</h1>`,
+			),
+		);
+		assert.ok(
+			html.includes(
+				`<main class="page"><div class="profile-cover"><img src="${COVER.url}" width="2048" height="1024" alt="" loading="eager" decoding="async" fetchPriority="high"/></div><header class="profile">`,
+			),
+		);
+	});
+
+	test("the artist page shows the logo beside the studio's name in its bar, and no cover", () => {
+		const html = artistHtml("sita", withStorefront(BRANDED));
+		assertSafeBrandedPage(html);
+		assert.ok(
+			html.includes(
+				`<header class="site-bar"><a href="/" dir="auto"><img class="site-bar-logo" src="${LOGO.url}" width="600" height="200" alt="" decoding="async"/><span>Black Needle</span></a></header>`,
+			),
+		);
+		assert.doesNotMatch(html, /profile-cover/);
+	});
+
+	test("a logo or cover from anywhere else is not shown", () => {
+		const html = studioHtml(
+			withStorefront({
+				branding: {
+					logo: { ...LOGO, url: "https://evil.example/logo.png" },
+					heroImage: { ...COVER, url: "http://api.example.com/cover.jpg" },
+				},
+			}),
+		);
+		assertSame(html, "studio");
 	});
 });

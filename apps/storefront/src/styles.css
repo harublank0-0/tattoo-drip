@@ -161,6 +161,16 @@
   .profile-type { color: var(--ink-muted); }
   /* The hero's one location line (TAT-105): the address, or the kind of studio. */
   .profile-location { max-inline-size: 36rem; color: var(--ink-muted); font-size: 1.125rem; line-height: 1.4; overflow-wrap: anywhere; }
+  /*
+   * A studio's own logo and cover image (TAT-54, src/studio/components/brand.tsx):
+   * decoration beside its name. The cover takes the photos' stencil frame and
+   * stays short, so the buttons still fit on a phone's first screen.
+   */
+  .profile-logo { display: block; inline-size: auto; max-inline-size: min(12rem, 100%); block-size: 4rem; object-fit: contain; object-position: left center; }
+  .profile-cover { position: relative; isolation: isolate; margin: 0 0.375rem 1.875rem 0; }
+  .profile-cover img { display: block; inline-size: 100%; block-size: auto; aspect-ratio: 3 / 1; max-block-size: 16rem; object-fit: cover; background: var(--stencil-wash); }
+  .profile-cover::after { content: ''; position: absolute; inset: 0; z-index: -1; translate: 0.375rem 0.375rem; border: 1.5px solid var(--stencil); }
+  .site-bar-logo { display: block; inline-size: auto; max-inline-size: 6rem; block-size: 2rem; margin-inline-end: 0.75rem; object-fit: contain; }
   .profile-actions { display: grid; gap: 1.5rem; align-content: start; }
   /* On a phone the two buttons share a row when they fit (each grows to fill it), else stack at full width. */
   .profile-actions .action { flex: 1 1 auto; padding-inline: 1rem; }
