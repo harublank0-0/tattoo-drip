@@ -14,7 +14,7 @@ import {
 	validateProofForm,
 } from "../problems.ts";
 import { NO_PROOF, prepareProof, previewOf, proofReducer } from "../proof.ts";
-import type { DepositView } from "../view-model.ts";
+import { answerFor, type DepositView, type MethodPick } from "../view-model.ts";
 import { ProofNoticeView, ProofSummary } from "./notices.tsx";
 import { ProofPicker } from "./proof-picker.tsx";
 import { StepHeading } from "./steps.tsx";
@@ -39,11 +39,11 @@ export interface ProofFormProps {
 	readonly view: DepositView;
 	readonly studioName: string;
 	/**
-	 * The kind of the method picked in step 2: "How did you pay?" follows each
-	 * new pick, one way (a change in the form itself stays until the next pick).
-	 * Null when nothing is picked.
+	 * The client's latest pick in step 2, or null before any: each new pick sets
+	 * "How did you pay?", one way (a change in the form itself stays until the
+	 * next pick). Nothing else sets it: not a refetch, not a reordered list.
 	 */
-	readonly paidWith: DepositMethodKind | null;
+	readonly pick: MethodPick | null;
 	/** Reads the page again: its state now, "gone" (a 404) or "failed". */
 	reread(): Promise<DepositState | "gone" | "failed">;
 	/** The page left `due` (sent, or changed under the form): the screen moves focus to its message. */
@@ -68,7 +68,7 @@ export function ProofForm({
 	token,
 	view,
 	studioName,
-	paidWith,
+	pick: methodPick,
 	reread,
 	onLeftDue,
 	onGone,
@@ -98,10 +98,10 @@ export function ProofForm({
 	const form = useAppForm({
 		defaultValues: {
 			method:
-				paidWith && kinds.includes(paidWith)
-					? paidWith
-					: kinds.length === 1
-						? kinds[0]
+				kinds.length === 1
+					? kinds[0]
+					: methodPick && kinds.includes(methodPick.kind)
+						? methodPick.kind
 						: "",
 		} as ProofValues,
 		validationLogic: revalidateLogic({
@@ -127,13 +127,14 @@ export function ProofForm({
 		},
 	});
 
-	// A pick in step 2 sets the answer; a re-render with the same pick never does.
-	const appliedPaidWith = useRef(paidWith);
+	// A new pick in step 2 sets the answer, whatever its kind and whatever the
+	// client answered by hand since; a re-render with the same pick never does.
+	const appliedPick = useRef(methodPick?.count ?? 0);
 	useEffect(() => {
-		if (paidWith === appliedPaidWith.current) return;
-		appliedPaidWith.current = paidWith;
-		if (paidWith) form.setFieldValue("method", paidWith);
-	}, [paidWith, form]);
+		const kind = answerFor(methodPick, appliedPick.current, kinds);
+		if (methodPick) appliedPick.current = methodPick.count;
+		if (kind) form.setFieldValue("method", kind);
+	}, [methodPick, kinds, form]);
 
 	async function send(values: ProofValues): Promise<void> {
 		if (inFlight.current || blocked.current) return;

@@ -1,15 +1,19 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import type { DepositPage } from "@tattoo-drip/sdk";
-import { copy } from "../../src/deposit/copy.ts";
+import { copy, type DepositMethodKind } from "../../src/deposit/copy.ts";
 import {
+	answerFor,
+	type DepositView,
 	daysUntil,
 	depositContact,
 	depositView,
 	formatReceived,
 	formatSessionStart,
 	headingTemplate,
+	type MethodPick,
 	payByLine,
+	pickMethod,
 	receiptAmount,
 	selectedMethod,
 	stateTemplate,
@@ -496,5 +500,121 @@ describe("a method's identity (TAT-110 fix round 1)", () => {
 		const cash = { ...bank, kind: "cash" as never };
 
 		assert.deepEqual(idsOf([cash, esewa, bank]), idsOf([esewa, bank]));
+	});
+});
+
+describe("the answer follows an explicit pick (TAT-110 fix round 1)", () => {
+	const [esewa, bank] = PAGE.paymentMethods;
+	const bankB = { ...bank, bankName: "Global IME", accountNumber: "555000111" };
+	const view = (...paymentMethods: DepositPage["paymentMethods"]) =>
+		depositView(page({ paymentMethods }));
+
+	test("every pick is a new event, a second one of the same kind too", () => {
+		const first = pickMethod(null, { id: "bank:1", kind: "bank" });
+		const second = pickMethod(first, { id: "bank:2", kind: "bank" });
+
+		assert.deepEqual(first, { id: "bank:1", kind: "bank", count: 1 });
+		assert.deepEqual(second, { id: "bank:2", kind: "bank", count: 2 });
+	});
+
+	test("a pick gives its kind once; the same pick again, no pick, or a kind the form lacks gives nothing", () => {
+		const pick: MethodPick = { id: "bank:1", kind: "bank", count: 3 };
+		const kinds: readonly DepositMethodKind[] = ["esewa", "bank"];
+
+		assert.equal(answerFor(pick, 2, kinds), "bank");
+		assert.equal(answerFor(pick, 3, kinds), null);
+		assert.equal(answerFor(null, 0, kinds), null);
+		assert.equal(answerFor(pick, 2, ["esewa"]), null);
+	});
+
+	/**
+	 * What the page does, with the page's own functions: the radios call
+	 * pickMethod, the form applies answerFor after every render, a refetch
+	 * only replaces the view, and the client can change the answer by hand.
+	 */
+	function client(first: DepositView) {
+		let current = first;
+		let picked: MethodPick | null = null;
+		let applied = 0;
+		let answer = "";
+		const render = () => {
+			const kind = answerFor(picked, applied, current.kinds);
+			if (picked) applied = picked.count;
+			if (kind) answer = kind;
+		};
+		return {
+			pick(id: string) {
+				const method = current.methods.find((each) => each.id === id);
+				assert.ok(method, id);
+				picked = pickMethod(picked, method);
+				render();
+			},
+			setAnswer(kind: string) {
+				answer = kind;
+			},
+			refetch(next: DepositView) {
+				current = next;
+				render();
+			},
+			get answer() {
+				return answer;
+			},
+			get shown() {
+				return selectedMethod(current.methods, picked?.id ?? null);
+			},
+		};
+	}
+
+	test("nothing is answered before a pick, though the first method shows", () => {
+		const page = client(view(esewa, bank));
+
+		assert.equal(page.answer, "");
+		assert.equal(page.shown?.kind, "esewa");
+	});
+
+	test("picking the bank, then the studio reorders: the details and the answer stay the bank", () => {
+		const page = client(view(esewa, bank));
+		page.pick("bank:01234567890123");
+
+		page.refetch(view(bank, esewa));
+
+		assert.equal(page.shown?.kind, "bank");
+		assert.equal(page.shown?.bankName, "Nabil Bank");
+		assert.equal(page.answer, "bank");
+	});
+
+	test("two bank accounts and eSewa: bank A, a hand-made eSewa answer, bank B: the answer is the bank again", () => {
+		const page = client(view(esewa, bank, bankB));
+		page.pick("bank:01234567890123");
+		assert.equal(page.answer, "bank");
+		page.setAnswer("esewa");
+
+		page.pick("bank:555000111");
+
+		assert.equal(page.shown?.bankName, "Global IME");
+		assert.equal(page.answer, "bank");
+	});
+
+	test("a refetch with the same methods changes nothing, a hand-made answer included", () => {
+		const page = client(view(esewa, bank));
+		page.pick("bank:01234567890123");
+		page.setAnswer("esewa");
+
+		page.refetch(view(esewa, bank));
+		page.refetch(view(esewa, bank));
+
+		assert.equal(page.shown?.kind, "bank");
+		assert.equal(page.answer, "esewa");
+	});
+
+	test("a refetch after which the picked method is gone shows the first and keeps the answer", () => {
+		const page = client(view(esewa, bank));
+		page.pick("bank:01234567890123");
+		page.setAnswer("bank");
+
+		page.refetch(view(esewa));
+
+		assert.equal(page.shown?.kind, "esewa");
+		assert.equal(page.answer, "bank");
 	});
 });

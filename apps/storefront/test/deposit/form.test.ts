@@ -9,10 +9,13 @@ import {
 	ProofPicker,
 	type ProofPickerProps,
 } from "../../src/deposit/components/proof-picker.tsx";
-import type { DepositMethodKind } from "../../src/deposit/copy.ts";
 import { copy } from "../../src/deposit/copy.ts";
 import { NO_PROOF, type ProofState } from "../../src/deposit/proof.ts";
-import { type DepositView, depositView } from "../../src/deposit/view-model.ts";
+import {
+	type DepositView,
+	depositView,
+	type MethodPick,
+} from "../../src/deposit/view-model.ts";
 import { renderWithProviders } from "../intake/providers.tsx";
 import { PAGE, page, TOKEN } from "./fixtures.ts";
 import { attr, hrefs, tags, textOf } from "./html.ts";
@@ -44,7 +47,7 @@ const fileInput = (html: string) =>
 
 const formHtml = (
 	view: DepositView = depositView(PAGE),
-	paidWith: DepositMethodKind | null = null,
+	pick: MethodPick | null = null,
 ) =>
 	renderWithProviders(
 		createTattooClient({
@@ -56,7 +59,7 @@ const formHtml = (
 			token: TOKEN,
 			view,
 			studioName: "Black Needle",
-			paidWith,
+			pick,
 			reread: async () => "due" as const,
 			onLeftDue: () => undefined,
 			onGone: () => undefined,
@@ -172,19 +175,31 @@ describe("ProofForm", () => {
 		assert.doesNotMatch(html, /role="alert"|proof-summary-title/);
 	});
 
-	test("the Pay with pick answers How did you pay?: that kind is checked (TAT-110)", () => {
-		const html = formHtml(depositView(PAGE), "bank");
-		const radios = tags(html, "input").filter(
-			(tag) => attr(tag, "type") === "radio",
-		);
+	const radiosIn = (html: string) =>
+		tags(html, "input").filter((tag) => attr(tag, "type") === "radio");
+
+	test("a Pay with pick answers How did you pay?: that kind is checked (TAT-110)", () => {
+		const html = formHtml(depositView(PAGE), {
+			id: "bank:01234567890123",
+			kind: "bank",
+			count: 1,
+		});
+		const radios = radiosIn(html);
 
 		assert.doesNotMatch(radios[0], / checked=""/);
 		assert.match(radios[1], / checked=""/);
 		// A kind the form doesn't offer is no answer.
-		const unknown = tags(formHtml(depositView(PAGE), "khalti"), "input").filter(
-			(tag) => attr(tag, "type") === "radio",
+		const unknown = radiosIn(
+			formHtml(depositView(PAGE), { id: "khalti:1", kind: "khalti", count: 1 }),
 		);
 		for (const radio of unknown) assert.doesNotMatch(radio, / checked=""/);
+	});
+
+	test("no pick, no answer: with two kinds nothing is checked, though the first method is on show", () => {
+		const html = formHtml(depositView(PAGE), null);
+
+		for (const radio of radiosIn(html))
+			assert.doesNotMatch(radio, / checked=""/);
 	});
 
 	test("the payment screenshot legend is for screen readers only: step 3's heading names the field", () => {

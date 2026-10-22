@@ -143,6 +143,44 @@ export function selectedMethod(
 	return methods.find((method) => method.id === picked) ?? methods[0] ?? null;
 }
 
+/**
+ * The client's pick of a way to pay, as an event: the method's identity, its
+ * kind, and how many picks there have been, so a second pick of the same kind
+ * (another bank account) is a new event too.
+ */
+export interface MethodPick {
+	readonly id: string;
+	readonly kind: DepositMethodKind;
+	readonly count: number;
+}
+
+/** `previous` followed by the client picking `method`. */
+export function pickMethod(
+	previous: MethodPick | null,
+	method: Pick<MethodView, "id" | "kind">,
+): MethodPick {
+	return {
+		id: method.id,
+		kind: method.kind,
+		count: (previous?.count ?? 0) + 1,
+	};
+}
+
+/**
+ * What a pick sets in "How did you pay?", once: its kind when it is newer than
+ * the last one applied (`appliedCount`) and the form offers it, else null. Only
+ * a pick sets the answer; a re-render, a refetch, a reorder or a pick that has
+ * gone from the list never does, and never undoes the client's own answer.
+ */
+export function answerFor(
+	pick: MethodPick | null,
+	appliedCount: number,
+	kinds: readonly DepositMethodKind[],
+): DepositMethodKind | null {
+	if (!pick || pick.count === appliedCount) return null;
+	return kinds.includes(pick.kind) ? pick.kind : null;
+}
+
 /** The studio's mark when it has no logo: its first user-perceived character, as typed. */
 export function studioInitial(name: string): string {
 	return graphemes(name.trim())[0] ?? "";

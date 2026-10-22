@@ -73,6 +73,11 @@ export function PayWith({
 							value={method.id}
 							checked={method.id === selected.id}
 							onChange={() => onSelect(method.id)}
+							// Tapping the method that already shows fires no change event, and it
+							// is still the client saying how they pay.
+							onClick={() => {
+								if (method.id === selected.id) onSelect(method.id);
+							}}
 						/>
 						<span dir="auto">{method.label}</span>
 					</label>

@@ -15,6 +15,8 @@ import {
 	depositView,
 	formatReceived,
 	formatSessionStart,
+	type MethodPick,
+	pickMethod,
 	selectedMethod,
 	todayIn,
 } from "../view-model.ts";
@@ -116,10 +118,18 @@ export function DepositLoaded({
 	);
 	const view = screen.kind === "page" ? depositView(screen.page) : null;
 	const shown = view ? view.state : screen.kind;
-	// The method picked in step 2 (a MethodView.id); null until the client picks.
-	const [pickedMethod, setPickedMethod] = useState<string | null>(null);
+	// The client's latest pick in step 2 (by the method's identity, which survives
+	// a reorder); null until they pick. If the picked method has left the list
+	// the first one shows, and the answer in the form is left as it is.
+	const [picked, setPicked] = useState<MethodPick | null>(null);
 	const selected =
-		view?.state === "due" ? selectedMethod(view.methods, pickedMethod) : null;
+		view?.state === "due"
+			? selectedMethod(view.methods, picked?.id ?? null)
+			: null;
+	const choose = (id: string) => {
+		const method = view?.methods.find((each) => each.id === id);
+		if (method) setPicked((previous) => pickMethod(previous, method));
+	};
 	const [moveFocus, setMoveFocus] = useState(false);
 	const messageRef = useRef<HTMLParagraphElement>(null);
 
@@ -197,14 +207,14 @@ export function DepositLoaded({
 					studioName={shell.studioName}
 					today={todayIn(shell.timezone)}
 					selected={selected}
-					onSelect={setPickedMethod}
+					onSelect={choose}
 					form={
 						view.takesProof ? (
 							<ProofForm
 								token={token}
 								view={view}
 								studioName={shell.studioName}
-								paidWith={selected?.kind ?? null}
+								pick={picked}
 								reread={reread}
 								onLeftDue={leftDue}
 								onGone={gone}
