@@ -26,7 +26,7 @@ Dependencies only point toward the API.
 | V1 | `portfolio`, `services`, `flash`, `availability` (slots for instant booking), `styles`, `placements` |
 | V2 | Keys for external developers, webhooks if agencies need them |
 
-Inquiries, clients, quotes and payments are never readable through the public API. The deposit page is the one exception: it reads a single project's deposit details through an unguessable link token.
+Inquiries, clients, quotes and payments are never readable through the public API. The deposit page is the one exception: it reads a single project's deposit details (and, once paid, its next session's start and artist) through an unguessable link token.
 
 The studio page reads `client.studio.get()`: `slug` (the current one), `name`, `type`, `intro`, `timezone`, `contact` (`phone` in E.164, `email`, `address`, each possibly null), `socialLinks` (`{ platform, url }`, https only, in the order instagram, facebook, tiktok, website; show any other `platform` as a plain link) and `acceptingInquiries`, which is false only when every visible artist is closed, exactly when `inquiries.create` without an artist answers `studio_not_accepting`. `client.artists.list()` gives the visible artists by name and `client.artists.get(slug)` one of them (a hidden, deleted or unknown artist is a 404 `not_found`): `id` (the `preferredArtistId` to send), `slug`, `name`, `bio`, `photo` (`{ url, width, height }` or null), `acceptingInquiries` and `closedMessage` (null while they accept). All three are cached for 60 seconds, and every string is plain text: render it as text. React: `useStudio()`, `useArtists()`, `useArtist(slug)`; their options set no `staleTime` or `retry`, so the app's defaults decide.
 
