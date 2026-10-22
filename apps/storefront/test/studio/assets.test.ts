@@ -85,6 +85,20 @@ describe("text the studio typed", () => {
 	});
 });
 
+describe("a studio's cover image (TAT-54)", () => {
+	const css = readFileSync(new URL("styles.css", SRC), "utf8");
+
+	// object-fit: cover crops the middle of a portrait photo, which is a
+	// mid-body slice with the head cut off; a crop biased toward the top keeps
+	// a face in the frame, and a landscape photo (which only loses its top and
+	// bottom edges) barely moves.
+	test("crops toward the top, so a portrait photo keeps its head", () => {
+		const body = ruleBody(css, ".profile-cover img");
+		assert.match(body, /object-fit:\s*cover/);
+		assert.match(body, /object-position:\s*50%\s+25%/);
+	});
+});
+
 describe("route imports of built assets", () => {
 	test("every ?url import in src/ names a file that exists", () => {
 		const files = readdirSync(SRC, { recursive: true })
