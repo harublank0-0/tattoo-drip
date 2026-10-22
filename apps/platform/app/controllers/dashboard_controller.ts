@@ -14,6 +14,9 @@ export default class DashboardController {
 	constructor(private tenancy: TenancyService) {}
 
 	async show({ auth, session, response }: HttpContext) {
+		// A message flashed for the page this lands on (a throttled account
+		// link, TAT-119) must outlive this hop and the studio home's.
+		session.reflash();
 		const tenants = await this.tenancy.tenantsFor(auth.getUserOrFail());
 		if (tenants.length === 0) {
 			return response.redirect().toRoute("onboarding.create");
@@ -34,6 +37,7 @@ export default class DashboardController {
 	 * /dashboard link here, so everyone lands on what they work through.
 	 */
 	async tenantHome(ctx: HttpContext) {
+		ctx.session.reflash();
 		const { tenant, membership } = tenantContext(ctx);
 		return ctx.response
 			.redirect()

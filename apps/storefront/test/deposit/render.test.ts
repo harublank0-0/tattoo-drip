@@ -17,7 +17,7 @@ import {
 	ProofNoticeView,
 	ProofSummary,
 } from "../../src/deposit/components/notices.tsx";
-import { summaryItems } from "../../src/deposit/problems.ts";
+import { type LoadProblem, summaryItems } from "../../src/deposit/problems.ts";
 import {
 	type DepositView,
 	depositContact,
@@ -135,6 +135,23 @@ describe("the frame", () => {
 			h1(depositView(page({ state: "cancelled" }))),
 			"This booking was cancelled",
 		);
+	});
+
+	test("a link that doesn't work, a rate limit and a failed read have an h1 that matches their message, not 'Pay your deposit' (TAT-119)", () => {
+		const h1 = (problem: LoadProblem) => {
+			const html = render(
+				createElement(
+					DepositFrame,
+					{ studioName: STUDIO, problem },
+					createElement(LoadProblemView, { problem }),
+				),
+			);
+			assert.equal(tags(html, "h1").length, 1);
+			return textOf(/<h1[^>]*>(.*?)<\/h1>/s.exec(html)?.[1] ?? "");
+		};
+		assert.equal(h1("dead"), "This link doesn't work");
+		assert.equal(h1("rate-limited"), "Too many tries");
+		assert.equal(h1("failed"), "We couldn't load your deposit");
 	});
 
 	test("loading: a skeleton marked busy, words for screen readers, a no-JavaScript line", () => {

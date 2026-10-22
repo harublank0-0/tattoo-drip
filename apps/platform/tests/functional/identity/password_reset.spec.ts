@@ -486,9 +486,13 @@ test.group("Password reset (TAT-18)", (group) => {
 			(await open()).assertHeader("location", "/reset-password");
 		}
 
-		(await open()).assertFlashMessage(
+		// A link has no form to go back to: it says so on the sign-in page
+		// (throttled_links.spec.ts follows it there, TAT-119).
+		const refused = await open();
+		refused.assertHeader("location", "/login");
+		refused.assertFlashMessage(
 			"error",
-			"Too many attempts. Try again in 15 minutes.",
+			"Too many tries. Wait a few minutes and open the link again.",
 		);
 	});
 });

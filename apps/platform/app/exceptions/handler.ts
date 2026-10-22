@@ -15,7 +15,11 @@ import {
 	apiErrorIsReported,
 	renderApiError,
 } from "#services/public_api_errors";
-import { tryAgainMessage } from "#services/rate_limits";
+import {
+	ACCOUNT_LINK_ROUTES,
+	LINK_THROTTLED_MESSAGE,
+	tryAgainMessage,
+} from "#services/rate_limits";
 
 export default class HttpExceptionHandler extends ExceptionHandler {
 	/**
@@ -59,7 +63,9 @@ export default class HttpExceptionHandler extends ExceptionHandler {
 			);
 		}
 		if (error instanceof limiterErrors.E_TOO_MANY_REQUESTS && wantsPage(ctx)) {
-			return backWithThrottleMessage(error, ctx);
+			return ACCOUNT_LINK_ROUTES.includes(ctx.route?.name ?? "")
+				? toLandingWithThrottleMessage(ctx)
+				: backWithThrottleMessage(error, ctx);
 		}
 		return super.handle(error, ctx);
 	}
@@ -122,4 +128,20 @@ function backWithThrottleMessage(
 	]);
 	ctx.session.flash("error", tryAgainMessage(error.response.availableIn));
 	ctx.response.redirect().back();
+}
+
+/**
+ * An emailed or shared account link (TAT-119) that hit the limit. It has no
+ * form to go back to, and `back()` ends at `/`, whose own redirect would use
+ * up the flash, so the person goes straight to the page they would land on
+ * anyway: the sign-in page for a guest, /dashboard for someone signed in
+ * (which keeps the flash through its redirects). The words are the same
+ * whatever the token is, and nothing of the link is stored.
+ */
+function toLandingWithThrottleMessage(ctx: HttpContext) {
+	ctx.session.flash("error", LINK_THROTTLED_MESSAGE);
+	ctx.response.header("Cache-Control", "no-store");
+	ctx.response
+		.redirect()
+		.toPath(ctx.auth.isAuthenticated ? "/dashboard" : "/login");
 }

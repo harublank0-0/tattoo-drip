@@ -1,5 +1,6 @@
 import router from "@adonisjs/core/services/router";
 import { test } from "@japa/runner";
+import { ACCOUNT_LINK_ROUTES } from "#services/rate_limits";
 
 /**
  * Routes that create a tenant or accept an invitation: they need a
@@ -88,6 +89,22 @@ test.group("Account routes (TAT-18)", () => {
 				key,
 			);
 		}
+	});
+
+	test("every throttled GET link is one that says so when it is refused (TAT-119)", ({
+		assert,
+	}) => {
+		const links = Object.values(router.toJSON())
+			.flat()
+			.filter(
+				(entry) =>
+					entry.methods.includes("GET") &&
+					[...entry.middleware.all()].some(
+						(middleware) => middleware.name === "account_linksThrottle",
+					),
+			)
+			.map((entry) => entry.name);
+		assert.sameMembers(links as string[], [...ACCOUNT_LINK_ROUTES]);
 	});
 
 	test("the pages where someone new may start are guest pages; the confirmation page isn't", ({

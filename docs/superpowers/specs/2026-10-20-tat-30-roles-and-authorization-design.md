@@ -113,6 +113,8 @@ No options. `rolesFor(ctx.route?.name)`; unknown: throw; role not listed: `E_ROU
 
 Owner regression only (no artist can exist without TAT-33): at 375 px and 1280 px, light and dark, as an owner open Inbox, a project (deposit link, record a payment), Settings (each page), Artists (list, edit, add): all work as before; the account menu has no "Your artist profile". The artist side is TAT-33's browser pass.
 
+As built: the artist-side browser pass was done during TAT-30 itself (owner regression and the artist side, at 375 px and 1280 px, light and dark), not left to TAT-33, whose pass covers the invitation flow.
+
 ## Docs
 
 - `apps/platform/docs/backend.md`: the "Tenancy and route access" bullet (the table, `middleware.role()` on the group, the tests, "every tenant route needs an entry"); the Artists bullet ("TAT-30 opens it to artists by changing the allow list" becomes what this ticket did: `profileOf`, `findEditable`, `updateOwn`, `mine`); the Scheduling bullet's `mayChangeSession` sentence points at the table.

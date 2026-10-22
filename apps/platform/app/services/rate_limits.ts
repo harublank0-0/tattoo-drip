@@ -63,3 +63,22 @@ export function tryAgainMessage(seconds: number) {
 	const unit = minutes === 1 ? "minute" : "minutes";
 	return `Too many attempts. Try again in ${minutes} ${unit}.`;
 }
+
+/**
+ * The account links a person opens from an email or a chat (TAT-18, TAT-33):
+ * their GET only stages a token and redirects. Over the limit they show
+ * `LINK_THROTTLED_MESSAGE` instead of going back to a form they were never on.
+ */
+export const ACCOUNT_LINK_ROUTES: readonly string[] = [
+	"email_verification.link",
+	"invitations.link",
+	"password_reset.link",
+];
+
+/**
+ * What a throttled account link says (TAT-119). The same words whatever the
+ * token is, so the answer never tells whether a link is valid or an address
+ * is known; no number of minutes, for the same reason.
+ */
+export const LINK_THROTTLED_MESSAGE =
+	"Too many tries. Wait a few minutes and open the link again.";

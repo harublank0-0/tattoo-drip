@@ -10,6 +10,10 @@ import type { NextFn } from "@adonisjs/core/types/http";
 export default class VerifiedEmailMiddleware {
 	async handle(ctx: HttpContext, next: NextFn) {
 		if (!ctx.auth.getUserOrFail().emailVerified) {
+			// A message flashed for the page this chain ends on (a throttled
+			// account link sent here through /dashboard and /onboarding,
+			// TAT-119) must outlive this hop, as /dashboard's do.
+			ctx.session.reflash();
 			return ctx.response.redirect().toRoute("email_verification.notice");
 		}
 		return next();

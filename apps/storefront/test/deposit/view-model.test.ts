@@ -258,6 +258,23 @@ describe("headingTemplate", () => {
 			"This booking was cancelled",
 		);
 	});
+
+	test("a link that doesn't work, a rate limit and a failed read each get a heading that matches their message (TAT-119)", () => {
+		assert.equal(headingTemplate(null, "dead"), "This link doesn't work");
+		assert.equal(headingTemplate(null, "rate-limited"), "Too many tries");
+		assert.equal(
+			headingTemplate(null, "failed"),
+			"We couldn't load your deposit",
+		);
+		// A problem wins over a page already shown: a link that was replaced
+		// must stop saying "Deposit paid".
+		assert.equal(
+			headingTemplate({ state: "paid", amount: 300_000 }, "dead"),
+			"This link doesn't work",
+		);
+		// No problem: the studio, as before.
+		assert.equal(headingTemplate(null, null), "Pay your deposit to {studio}");
+	});
 });
 
 describe("receiptAmount", () => {

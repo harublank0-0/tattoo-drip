@@ -37,21 +37,29 @@ export default function AccountMenu({
 				<Button
 					variant="ghost"
 					size={showName ? "default" : "icon"}
-					className={cn(showName ? "w-full justify-start" : "rounded-full")}
+					className={cn(
+						showName
+							? "h-auto min-h-9 w-full justify-start py-1 whitespace-normal"
+							: "rounded-full",
+					)}
 					aria-label="Account menu"
 				>
-					<span className="flex size-7 items-center justify-center rounded-full bg-muted text-xs font-semibold">
+					<span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
 						{user.initials}
 					</span>
 					{showName && (
-						<span className="truncate">{user.fullName ?? user.email}</span>
+						<span className="min-w-0 text-left leading-snug wrap-anywhere">
+							{user.fullName ?? user.email}
+						</span>
 					)}
 				</Button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="end" className="w-60">
 				<DropdownMenuLabel className="flex flex-col">
-					{user.fullName && <span className="truncate">{user.fullName}</span>}
-					<span className="truncate text-xs font-normal text-muted-foreground">
+					{user.fullName && (
+						<span className="wrap-anywhere">{user.fullName}</span>
+					)}
+					<span className="text-xs font-normal text-muted-foreground wrap-anywhere">
 						{user.email}
 					</span>
 				</DropdownMenuLabel>

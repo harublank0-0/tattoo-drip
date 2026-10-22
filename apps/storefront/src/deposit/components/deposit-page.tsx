@@ -25,17 +25,21 @@ import { CopyButton } from "./copy-button.tsx";
 
 /**
  * Around every state: one h1, and who runs the page. The h1 names the
- * deposit's state once it is read (TAT-106); before that, and while it is
- * due, it asks to pay the studio (headingTemplate).
+ * deposit's state once it is read (TAT-106) and says what a load problem's
+ * message says (TAT-119); while it loads, and while it is due, it asks to pay
+ * the studio (headingTemplate).
  */
 export function DepositFrame({
 	studioName,
 	view = null,
+	problem = null,
 	children,
 }: {
 	studioName: string;
-	/** The deposit, once read; null (or left out) while it loads and for a link that doesn't work. */
+	/** The deposit, once read; null (or left out) while it loads. */
 	view?: Pick<DepositView, "state" | "amount"> | null;
+	/** A link that doesn't work, a rate limit or a failed read: the h1 matches it. */
+	problem?: LoadProblem | null;
 	children?: ReactNode;
 }) {
 	return (
@@ -43,7 +47,7 @@ export function DepositFrame({
 			<main className="deposit">
 				<h1 className="deposit-title">
 					<Fill
-						template={headingTemplate(view)}
+						template={headingTemplate(view, problem)}
 						values={{ studio: studioName }}
 					/>
 				</h1>
