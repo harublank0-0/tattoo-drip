@@ -259,6 +259,10 @@ describe("readBrandImage (TAT-54)", () => {
 			"https://user:secret@api.example.com/a.png",
 			"https://api.example.com:8443/a.png",
 			"https://аpi.example.com/a.png",
+			"https://evil.example\\@api.example.com/a.png",
+			"https://api.example.com./a.png",
+			"https://api.example.com.:443/a.png",
+			"https://api.example.com%2eevil.example/a.png",
 			"//evil.example/a.png",
 			"/uploads/a.png",
 			"uploads/a.png",
@@ -273,6 +277,52 @@ describe("readBrandImage (TAT-54)", () => {
 			...WRONG_TYPES,
 		]) {
 			assert.equal(readBrandImage(image(url), API), null, JSON.stringify(url));
+		}
+	});
+
+	test("a URL the parser puts on the API's origin is kept as its normalised form, never as typed", () => {
+		for (const [url, src] of [
+			// A backslash is a slash in an https URL: the host is still the API's, the rest is path.
+			[
+				"https://api.example.com\\@evil.example/a.png",
+				"https://api.example.com/@evil.example/a.png",
+			],
+			["https:\\\\api.example.com/a.png", "https://api.example.com/a.png"],
+			["https://api.example.com:443/a.png", "https://api.example.com/a.png"],
+			["https://api.example.com:/a.png", "https://api.example.com/a.png"],
+			["HTTPS://API.EXAMPLE.COM/a.png", "https://api.example.com/a.png"],
+			[
+				"Https://Api.Example.Com/Uploads/A.png",
+				"https://api.example.com/Uploads/A.png",
+			],
+			[
+				"https://api.example.com/uploads/../a.png",
+				"https://api.example.com/a.png",
+			],
+			[
+				"https://api.example.com/uploads/./a.png",
+				"https://api.example.com/uploads/a.png",
+			],
+			[
+				"https://api.example.com/uploads/%2e%2e/a.png",
+				"https://api.example.com/a.png",
+			],
+			[
+				"https://api.example.com/a.png#frag",
+				"https://api.example.com/a.png#frag",
+			],
+			// U+200B is dropped from a host by the URL parser and percent-encoded in a path.
+			["https://api.example.com\u200B/a.png", "https://api.example.com/a.png"],
+			[
+				"https://api.example.com/a\u200Bb.png",
+				"https://api.example.com/a%E2%80%8Bb.png",
+			],
+		]) {
+			assert.deepEqual(
+				readBrandImage(image(url), API),
+				{ src, width: 600, height: 200 },
+				JSON.stringify(url),
+			);
 		}
 	});
 
