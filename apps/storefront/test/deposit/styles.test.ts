@@ -88,10 +88,27 @@ describe("the deposit page's styles", () => {
 		);
 	});
 
-	test("a focused control in steps 1 and 2 is never hidden under the bar (WCAG 2.4.11)", () => {
+	test("a focused control in steps 1 and 2 is never hidden under the bar (WCAG 2.4.11): the clearance comes from the bar's own height property, plus the safe area", () => {
+		const root = /:root:has\(\.deposit-paid-bar\)\s*\{([^}]*)\}/.exec(css)?.[1];
+
+		assert.ok(root, "a :root:has(.deposit-paid-bar) rule");
+		assert.match(root, /--deposit-bar-height:\s*[\d.]+rem/);
+		assert.match(
+			root,
+			/scroll-padding-block-end:\s*calc\(var\(--deposit-bar-height\)[^;]*env\(safe-area-inset-bottom, 0px\)\)/,
+		);
 		assert.match(
 			css,
-			/:root:has\(\.deposit-paid-bar\)\s*\{[^}]*scroll-padding-block-end:\s*5rem/,
+			/\.deposit-paid-bar\s*\{[^}]*min-block-size:\s*var\(--deposit-bar-height/,
+		);
+		assert.equal(css.match(/--deposit-bar-height:/g)?.length, 1);
+	});
+
+	test("a focused Pay with chip shows one ring, the radio's own like the form's choices, not a second one on the label", () => {
+		assert.doesNotMatch(css, /\.deposit-paywith-option:has\(:focus-visible\)/);
+		assert.match(
+			css,
+			/:focus-visible\s*\{\s*outline:\s*2px solid var\(--stencil\)/,
 		);
 	});
 });
