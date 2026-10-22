@@ -218,6 +218,32 @@ export default class ProjectService {
 		return query.orderBy("created_at", "asc").orderBy("id", "asc");
 	}
 
+	/**
+	 * The sort keys of every live project in an open view that `member` may
+	 * see (the `findFor` rule), oldest first: the Projects list's Active and
+	 * single-status views (TAT-109). Unpaginated because the list orders them
+	 * by what waits (WaitingService.work) and cuts the page afterwards; the
+	 * page's full rows come from `findManyFor`.
+	 */
+	async listKeys(
+		tenant: TenantRef,
+		member: Member,
+		filter: "active" | ProjectStatus,
+	): Promise<
+		Pick<TattooProject, "id" | "status" | "createdAt" | "lastContactedAt">[]
+	> {
+		const query = TattooProject.query().select(
+			"id",
+			"status",
+			"created_at",
+			"last_contacted_at",
+		);
+		await this.scopeTo(query, tenant, member);
+		if (filter === "active") query.whereIn("status", [...ACTIVE_STATUSES]);
+		else query.where("status", filter);
+		return query.orderBy("created_at", "asc").orderBy("id", "asc");
+	}
+
 	/** How many live projects `member` may see, per status. */
 	async countByStatus(
 		tenant: TenantRef,

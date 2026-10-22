@@ -72,6 +72,8 @@ export type ListFlags = {
 	 * still owed (TAT-111). Hourly totals are estimates, so never flagged.
 	 */
 	balanceOwed: boolean;
+	/** What is still owed in paisa when `balanceOwed`, else null (TAT-109's list line). */
+	balanceDue: bigint | null;
 };
 
 /** A verified payment and what it did to its project. */
@@ -313,19 +315,19 @@ export default class PaymentService {
 					isExpired(quote) &&
 					decidedLate(own, quote.expiresAt);
 			}
-			let balanceOwed = false;
+			let balanceDue = 0n;
 			if (FINISHED_STATUSES.includes(project.status)) {
 				const quote = quotes.get(project.id) ?? null;
-				balanceOwed =
-					quote !== null &&
-					quote.kind === "fixed" &&
-					owed(balanceOf(quote, own).due) > 0n;
+				if (quote !== null && quote.kind === "fixed") {
+					balanceDue = owed(balanceOf(quote, own).due);
+				}
 			}
 			flags.set(project.id, {
 				proofWaiting,
 				depositToSettle,
 				quoteLapsed,
-				balanceOwed,
+				balanceOwed: balanceDue > 0n,
+				balanceDue: balanceDue > 0n ? balanceDue : null,
 			});
 		}
 		return flags;
