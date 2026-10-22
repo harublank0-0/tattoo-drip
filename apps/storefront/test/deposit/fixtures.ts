@@ -61,4 +61,5 @@ export const SHELL = {
 	studioName: "Black Needle",
 	timezone: "Asia/Kathmandu",
 	phone: "+9779812345678",
+	logo: null,
 };

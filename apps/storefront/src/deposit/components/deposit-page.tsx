@@ -2,6 +2,7 @@ import type { ReactNode, Ref } from "react";
 import { Fill } from "../../intake/components/fill.tsx";
 import { fill } from "../../intake/template.ts";
 import { linkRel } from "../../studio/links.ts";
+import type { BrandImage } from "../../studio/theme/config.ts";
 import { copy } from "../copy.ts";
 import type { LoadProblem } from "../problems.ts";
 import {
@@ -12,6 +13,7 @@ import {
 	payByLine,
 	receiptAmount,
 	stateTemplate,
+	studioInitial,
 } from "../view-model.ts";
 import { CopyButton } from "./copy-button.tsx";
 
@@ -31,11 +33,17 @@ import { CopyButton } from "./copy-button.tsx";
  */
 export function DepositFrame({
 	studioName,
+	logo = null,
+	artistName = null,
 	view = null,
 	problem = null,
 	children,
 }: {
 	studioName: string;
+	/** The studio's checked logo (DepositShell.logo), or null for its initial. */
+	logo?: BrandImage | null;
+	/** The project's artist, once the deposit is read. */
+	artistName?: string | null;
 	/** The deposit, once read; null (or left out) while it loads. */
 	view?: Pick<DepositView, "state" | "amount"> | null;
 	/** A link that doesn't work, a rate limit or a failed read: the h1 matches it. */
@@ -45,6 +53,11 @@ export function DepositFrame({
 	return (
 		<>
 			<main className="deposit">
+				<DepositHeader
+					studioName={studioName}
+					logo={logo}
+					artistName={artistName}
+				/>
 				<h1 className="deposit-title">
 					<Fill
 						template={headingTemplate(view, problem)}
@@ -59,6 +72,53 @@ export function DepositFrame({
 				</p>
 			</footer>
 		</>
+	);
+}
+
+/**
+ * Who the page is for (TAT-110): the studio's mark and name, then the
+ * project's artist once the deposit is read. The mark is the studio's checked
+ * logo (decoration: its name is beside it, so `alt` is empty), else the first
+ * user-perceived character of its name, never the cover. Server-rendered.
+ */
+function DepositHeader({
+	studioName,
+	logo,
+	artistName,
+}: {
+	studioName: string;
+	logo: BrandImage | null;
+	artistName: string | null;
+}) {
+	return (
+		<header className="deposit-header">
+			{logo ? (
+				<img
+					className="deposit-logo"
+					src={logo.src}
+					width={logo.width}
+					height={logo.height}
+					alt=""
+					decoding="async"
+					fetchPriority="low"
+					referrerPolicy="no-referrer"
+				/>
+			) : (
+				<span className="deposit-mark" aria-hidden="true">
+					{studioInitial(studioName)}
+				</span>
+			)}
+			<div className="deposit-header-text">
+				<p className="deposit-studio" dir="auto">
+					{studioName}
+				</p>
+				{artistName ? (
+					<p className="deposit-muted">
+						<Fill template={copy.withArtist} values={{ artist: artistName }} />
+					</p>
+				) : null}
+			</div>
+		</header>
 	);
 }
 
@@ -161,33 +221,23 @@ export function StateRegion({
 	);
 }
 
-/** The brief (folded when long, spec ruling 10) and the artist. */
+/** The brief, folded when long (spec ruling 10). The artist is in the header (TAT-110). */
 export function DepositIntro({ view }: { view: DepositView }) {
-	if (!view.brief && !view.artistName) return null;
+	if (!view.brief) return null;
 	return (
 		<div className="deposit-intro">
-			{view.brief ? (
-				view.briefLong ? (
-					<details className="deposit-brief">
-						<summary>{copy.briefSummary}</summary>
-						<p className="user-text" dir="auto">
-							{view.brief}
-						</p>
-					</details>
-				) : (
+			{view.briefLong ? (
+				<details className="deposit-brief">
+					<summary>{copy.briefSummary}</summary>
 					<p className="user-text" dir="auto">
 						{view.brief}
 					</p>
-				)
-			) : null}
-			{view.artistName ? (
-				<p className="deposit-muted">
-					<Fill
-						template={copy.withArtist}
-						values={{ artist: view.artistName }}
-					/>
+				</details>
+			) : (
+				<p className="user-text" dir="auto">
+					{view.brief}
 				</p>
-			) : null}
+			)}
 		</div>
 	);
 }
@@ -243,7 +293,9 @@ export function DueView({
 	return (
 		<>
 			<section className="deposit-block" aria-labelledby="deposit-due-title">
-				<h2 id="deposit-due-title">{copy.due.title}</h2>
+				<h2 id="deposit-due-title" className="sr-only">
+					{copy.due.title}
+				</h2>
 				<p className="deposit-amount" translate="no">
 					{view.dueText}
 				</p>
@@ -251,6 +303,9 @@ export function DueView({
 					<p>{fill(copy.due.partial, { amount: view.amountText })}</p>
 				) : null}
 				<p>{payByLine(view, today)}</p>
+				<p className="deposit-muted">
+					<Fill template={copy.due.direct} values={{ studio: studioName }} />
+				</p>
 			</section>
 			<section className="deposit-block" aria-labelledby="deposit-code-title">
 				<h2 id="deposit-code-title">{copy.code.title}</h2>

@@ -94,6 +94,62 @@ describe("the frame", () => {
 		assert.match(textOf(html), /Tattoo Drip runs this page for मीना Ink\./);
 	});
 
+	test("a header above the h1: the studio's initial as a mark, its name, no artist before the deposit is read (TAT-110)", () => {
+		const html = render(
+			createElement(DepositFrame, { studioName: "मीना Ink" }),
+		);
+
+		assert.match(html, /<header class="deposit-header">/);
+		assert.match(
+			html,
+			/<span class="deposit-mark" aria-hidden="true">मी<\/span>/,
+		);
+		assert.match(html, /<p class="deposit-studio" dir="auto">मीना Ink<\/p>/);
+		assert.equal(tags(html, "img").length, 0);
+		assert.doesNotMatch(textOf(html), /\bwith\b/);
+		assert.ok(html.indexOf("deposit-header") < html.indexOf("<h1"));
+		assert.equal(tags(html, "h1").length, 1);
+	});
+
+	test("the checked logo replaces the mark: decoration (alt empty), no Referer, its size reserved (TAT-110)", () => {
+		const html = render(
+			createElement(DepositFrame, {
+				studioName: STUDIO,
+				logo: {
+					src: "https://api.example.com/logo.png",
+					width: 600,
+					height: 200,
+				},
+			}),
+		);
+		const images = tags(html, "img");
+
+		assert.equal(images.length, 1);
+		assert.equal(attr(images[0], "class"), "deposit-logo");
+		assert.equal(attr(images[0], "src"), "https://api.example.com/logo.png");
+		assert.equal(attr(images[0], "width"), "600");
+		assert.equal(attr(images[0], "height"), "200");
+		assert.equal(attr(images[0], "alt"), "");
+		assert.equal(attr(images[0], "referrerpolicy"), "no-referrer");
+		assert.doesNotMatch(html, /deposit-mark/);
+		assert.match(
+			html,
+			/<p class="deposit-studio" dir="auto">Black Needle<\/p>/,
+		);
+	});
+
+	test("the project's artist sits under the studio's name, in <bdi> (TAT-110)", () => {
+		const html = render(
+			createElement(DepositFrame, {
+				studioName: STUDIO,
+				artistName: "Sita Rai",
+			}),
+		);
+
+		assert.match(html, /with <bdi>Sita Rai<\/bdi>/);
+		assert.ok(html.indexOf("Sita Rai") < html.indexOf("<h1"));
+	});
+
 	test("the h1 names the deposit's state once it is read, and the studio before that and while due (TAT-106)", () => {
 		const h1 = (view: DepositView | null) => {
 			const html = render(
@@ -234,7 +290,7 @@ describe("the state region", () => {
 });
 
 describe("the intro", () => {
-	test("a short brief as text, the artist in <bdi>", () => {
+	test("a short brief as text; the artist moved to the header (TAT-110)", () => {
 		const html = render(
 			createElement(DepositIntro, { view: depositView(PAGE) }),
 		);
@@ -242,7 +298,7 @@ describe("the intro", () => {
 			html,
 			/<p class="user-text" dir="auto">Fine line peony on the left forearm<\/p>/,
 		);
-		assert.match(html, /with <bdi>Sita Rai<\/bdi>/);
+		assert.doesNotMatch(html, /Sita Rai|\bwith\b/);
 		assert.doesNotMatch(html, /<details/);
 	});
 
@@ -261,13 +317,15 @@ describe("the intro", () => {
 		assert.ok(textOf(html).includes(brief));
 	});
 
-	test("nothing at all without a brief or an artist", () => {
-		const html = render(
-			createElement(DepositIntro, {
-				view: depositView(page({ project: { brief: " ", artistName: null } })),
-			}),
-		);
-		assert.equal(html, "");
+	test("nothing at all without a brief, an artist or not", () => {
+		for (const artistName of [null, "Sita Rai"]) {
+			const html = render(
+				createElement(DepositIntro, {
+					view: depositView(page({ project: { brief: " ", artistName } })),
+				}),
+			);
+			assert.equal(html, "", String(artistName));
+		}
 	});
 });
 
@@ -281,8 +339,15 @@ describe("due", () => {
 			),
 		);
 		const text = textOf(html);
-		assert.match(html, /<h2 id="deposit-due-title">Deposit due<\/h2>/);
+		assert.match(
+			html,
+			/<h2 id="deposit-due-title" class="sr-only">Deposit due<\/h2>/,
+		);
 		assert.match(html, /<p class="deposit-amount"[^>]*>NPR 1,000<\/p>/);
+		assert.match(
+			text,
+			/NPR 1,000.*You pay Black Needle directly\. Tattoo Drip never handles your money\./s,
+		);
 		assert.match(text, /Part of your NPR 3,000 deposit was already received\./);
 		assert.match(text, /Pay by 28 Oct 2026, in 10 days\./);
 		assert.match(html, /<p class="deposit-code"[^>]*>7K3M9Q<\/p>/);

@@ -75,6 +75,7 @@ export function DepositForHash({
 	return (
 		<DepositFrame
 			studioName={shell.studioName}
+			logo={shell.logo}
 			problem={token === undefined ? null : "dead"}
 		>
 			{token === undefined ? (
@@ -146,6 +147,8 @@ export function DepositLoaded({
 	return (
 		<DepositFrame
 			studioName={shell.studioName}
+			logo={shell.logo}
+			artistName={view?.artistName ?? null}
 			view={view}
 			problem={screen.kind === "problem" ? screen.problem : null}
 		>
