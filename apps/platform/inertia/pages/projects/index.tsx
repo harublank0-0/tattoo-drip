@@ -1,5 +1,5 @@
 import { Link } from "@inertiajs/react";
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { urlFor } from "~/client";
 import Page from "~/components/page";
 import {
@@ -27,9 +27,10 @@ export default function ProjectsIndex({
 	const tenant = useTenant();
 	const chipRow = useRef<HTMLElement>(null);
 	// The row scrolls on a phone: bring the chosen chip into view after a
-	// load or a back step, so the current filter is never off-screen.
+	// load or a back step, so the current filter is never off-screen. Before
+	// paint, so the first frame is already scrolled and the row doesn't jump.
 	// biome-ignore lint/correctness/useExhaustiveDependencies: runs when the filter changes
-	useEffect(() => {
+	useLayoutEffect(() => {
 		const row = chipRow.current;
 		const chip = row?.querySelector<HTMLElement>("[aria-current=page]");
 		if (!row || !chip) return;

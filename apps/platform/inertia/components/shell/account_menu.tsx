@@ -13,9 +13,6 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { useTheme } from "~/hooks/use-theme";
 
-/** 44px tap targets on phones; the sidebar's menu on desktop stays compact. */
-const ITEM = "min-h-11 lg:min-h-8";
-
 /**
  * The signed-in person's menu: who they are, the light/dark switch and
  * Log out. The trigger is their initials; in the sidebar it adds the name.
@@ -65,7 +62,7 @@ export default function AccountMenu({
 				</DropdownMenuLabel>
 				<DropdownMenuSeparator />
 				{tenant?.role === "artist" && (
-					<DropdownMenuItem asChild className={ITEM}>
+					<DropdownMenuItem asChild>
 						<Link
 							route="tenant.artists.mine"
 							routeParams={{ tenant: tenant.slug }}
@@ -76,7 +73,6 @@ export default function AccountMenu({
 					</DropdownMenuItem>
 				)}
 				<DropdownMenuItem
-					className={ITEM}
 					onSelect={(event) => {
 						event.preventDefault();
 						setTheme(dark ? "light" : "dark");
@@ -89,7 +85,6 @@ export default function AccountMenu({
 				<Form route="session.destroy">
 					<DropdownMenuItem
 						asChild
-						className={ITEM}
 						onSelect={(event) => event.preventDefault()}
 					>
 						<button type="submit" className="w-full">
