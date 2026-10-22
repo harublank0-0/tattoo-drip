@@ -5,7 +5,9 @@ import type { BrandImage } from "../theme/config.ts";
  * values only. Both are decoration beside the studio's name, so their alt
  * text is empty; width and height are always set, so nothing shifts while
  * they load. Never a CSS url(): a URL inside CSS would need CSS escaping and
- * could carry no size or alt text.
+ * could carry no size or alt text. The logo is small and has the page's text
+ * beside it: `fetchPriority="low"` also stops React from adding a
+ * `<link rel="preload">` for it, which would compete with the cover and the font.
  */
 export function BrandLogo({
 	image,
@@ -22,6 +24,7 @@ export function BrandLogo({
 			height={image.height}
 			alt=""
 			decoding="async"
+			fetchPriority="low"
 		/>
 	);
 }

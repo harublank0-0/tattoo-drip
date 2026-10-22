@@ -155,7 +155,7 @@ describe("a studio's logo and cover (TAT-54)", () => {
 		assertSafePage(html, BRAND_PAGE);
 		assert.ok(
 			html.includes(
-				`<div class="profile-heading"><img class="profile-logo" src="${LOGO.url}" width="600" height="200" alt="" decoding="async"/><h1 class="profile-name" dir="auto">Black Needle</h1>`,
+				`<div class="profile-heading"><img class="profile-logo" src="${LOGO.url}" width="600" height="200" alt="" decoding="async" fetchPriority="low"/><h1 class="profile-name" dir="auto">Black Needle</h1>`,
 			),
 		);
 		assert.ok(
@@ -170,10 +170,29 @@ describe("a studio's logo and cover (TAT-54)", () => {
 		assertSafePage(html, BRAND_PAGE);
 		assert.ok(
 			html.includes(
-				`<header class="site-bar"><a href="/" dir="auto"><img class="site-bar-logo" src="${LOGO.url}" width="600" height="200" alt="" decoding="async"/><span>Black Needle</span></a></header>`,
+				`<header class="site-bar"><a href="/" dir="auto"><img class="site-bar-logo" src="${LOGO.url}" width="600" height="200" alt="" decoding="async" fetchPriority="low"/><span>Black Needle</span></a></header>`,
 			),
 		);
 		assert.doesNotMatch(html, /profile-cover/);
+	});
+
+	test("the logo is never preloaded; the cover, the page's first image, still is", () => {
+		const preloads = (html: string) =>
+			html.match(/<link [^>]*rel="preload"[^>]*>/g) ?? [];
+		const studio = preloads(studioHtml(withStorefront(BRANDED)));
+		assert.ok(
+			studio.some((link) => link.includes(COVER.url)),
+			`the cover: ${studio.join()}`,
+		);
+		assert.ok(
+			!studio.some((link) => link.includes(LOGO.url)),
+			`the logo: ${studio.join()}`,
+		);
+		const artist = preloads(artistHtml("sita", withStorefront(BRANDED)));
+		assert.ok(
+			!artist.some((link) => link.includes(LOGO.url)),
+			`the logo on the artist page: ${artist.join()}`,
+		);
 	});
 
 	test("the shared safety check holds a branded page to every rule of an ordinary one", () => {
