@@ -68,6 +68,35 @@ const hrefs = (html: string) =>
 const headings = (html: string) =>
 	Array.from(html.matchAll(/<h([1-6])[\s>]/g), (match) => Number(match[1]));
 const images = (html: string) => html.match(/<img [^>]*>/g) ?? [];
+/** The first screen's markup: the page's <header class="profile">. */
+const hero = (html: string) =>
+	html.match(/<header class="profile">[\s\S]*?<\/header>/)?.[0] ?? "";
+/** The text of each link in the <ul> a contact group labels (Chat, Follow). */
+const groupLinks = (html: string, id: string) =>
+	Array.from(
+		(
+			html.match(
+				new RegExp(
+					`<ul class="links" aria-labelledby="${id}">([\\s\\S]*?)</ul>`,
+				),
+			)?.[1] ?? ""
+		).matchAll(/<a [^>]*>([^<]*)<\/a>/g),
+		(match) => match[1],
+	);
+/** The step titles in one "How booking works" block. */
+const stepTitles = (block: string) =>
+	Array.from(
+		block.matchAll(
+			/<li class="step"><span class="step-title">([^<]*)<\/span>/g,
+		),
+		(match) => match[1],
+	);
+const BOOKING_STEPS = [
+	"Send your idea",
+	"Get a price on WhatsApp",
+	"A deposit holds your date",
+	"Your session",
+];
 
 /** What every page holds to, whatever its data. */
 function assertSafePage(html: string) {
@@ -103,7 +132,8 @@ describe("the studio page", () => {
 		assertSafePage(html);
 		assert.equal(count(html, /<main[\s>]/g), 1);
 		assert.equal(count(html, /<footer[\s>]/g), 1);
-		assert.deepEqual(headings(html), [1, 2, 3, 3, 2]);
+		// h1; the strip; Artists and its two artists; the inquiry; the panel beside the form.
+		assert.deepEqual(headings(html), [1, 2, 2, 3, 3, 2, 2]);
 		assert.equal(count(html, / id="inquiry"/g), 1);
 		assert.match(
 			html,
@@ -160,7 +190,7 @@ describe("the studio page", () => {
 		assertSafePage(html);
 		assert.doesNotMatch(html, /<address/);
 		assert.doesNotMatch(html, / id="artists"/);
-		assert.deepEqual(headings(html), [1, 2]);
+		assert.deepEqual(headings(html), [1, 2, 2, 2]);
 		assert.match(
 			html,
 			/Black Needle<\/bdi> hasn(&#x27;|')t added contact details yet\./,
@@ -261,13 +291,211 @@ describe("the studio page", () => {
 	});
 });
 
+describe("the studio page's first screen (TAT-105)", () => {
+	test("is the name, one location line, and the two ways in, in that order", () => {
+		const top = hero(studioHtml());
+
+		const at = (text: string) => {
+			const index = top.indexOf(text);
+			assert.ok(index >= 0, text);
+			return index;
+		};
+		assert.match(top, /<h1 class="profile-name" dir="auto">Black Needle<\/h1>/);
+		assert.match(
+			top,
+			/<p class="profile-location user-text" dir="auto">Thamel Marg, Kathmandu<\/p>/,
+		);
+		assert.ok(at("<h1") < at("profile-location"));
+		assert.ok(at("profile-location") < at(">Send your idea<"));
+		assert.ok(at(">Send your idea<") < at("<span>WhatsApp</span>"));
+		assert.ok(at("<span>WhatsApp</span>") < at("How booking works"));
+		// The intro comes after the buttons, so a long one can't push them off the screen.
+		assert.ok(at("How booking works") < at("Fine line and blackwork"));
+		assert.ok(at("Fine line and blackwork") < at('class="contact"'));
+		assert.doesNotMatch(
+			top,
+			/Tattoo studio/,
+			"the address replaces the generic line",
+		);
+	});
+
+	test("Send your idea is the primary action and WhatsApp the secondary, with the plain chat link", () => {
+		const top = hero(studioHtml());
+
+		assert.match(
+			top,
+			/<a class="action action-primary" href="#inquiry">Send your idea<\/a>/,
+		);
+		assert.match(
+			top,
+			/<a class="action action-secondary" href="https:\/\/wa\.me\/9779812345678" rel="noopener noreferrer"><svg[^>]* aria-hidden="true"[^>]*>[\s\S]*?<\/svg><span>WhatsApp<\/span><\/a>/,
+		);
+		assert.doesNotMatch(top, /Send an inquiry/);
+	});
+
+	test("groups the contacts as Chat, Follow and Visit", () => {
+		const html = studioHtml();
+
+		assert.deepEqual(groupLinks(html, "contact-chat"), [
+			"WhatsApp",
+			"Viber",
+			"Call",
+			"Email",
+		]);
+		assert.deepEqual(groupLinks(html, "contact-follow"), [
+			"Instagram",
+			"Facebook",
+			"TikTok",
+			"Website",
+		]);
+		assert.match(html, /<p class="contact-label" id="contact-chat">Chat<\/p>/);
+		assert.match(
+			html,
+			/<p class="contact-label" id="contact-follow">Follow<\/p>/,
+		);
+		assert.match(
+			html,
+			/<p class="contact-label" id="contact-visit">Visit<\/p>/,
+		);
+		assert.match(
+			html,
+			/<div class="street"><p class="user-text" dir="auto">Thamel Marg\nKathmandu<\/p><a class="text-link" href="https:\/\/www\.google\.com\/maps\/search\/\?[^"]*" rel="noopener noreferrer">Open in Google Maps<\/a><\/div>/,
+		);
+	});
+
+	test("a group with nothing in it is left out", () => {
+		const html = studioHtml(
+			{
+				...EMPTY_STUDIO,
+				contact: {
+					phone: null,
+					email: "hi@black-needle.example",
+					address: null,
+				},
+				socialLinks: [],
+			},
+			[],
+		);
+
+		assert.deepEqual(groupLinks(html, "contact-chat"), ["Email"]);
+		assert.doesNotMatch(html, /contact-follow|contact-visit|>Follow<|>Visit</);
+	});
+
+	test("has the 4-step strip under the buttons and the same steps in the panel beside the form", () => {
+		const html = studioHtml();
+		const top = hero(html);
+		const panel = html.match(/<aside [\s\S]*?<\/aside>/)?.[0] ?? "";
+
+		assert.deepEqual(stepTitles(top), BOOKING_STEPS);
+		assert.deepEqual(stepTitles(panel), BOOKING_STEPS);
+		assert.match(
+			top,
+			/<h2 id="steps-strip-title"[^>]*>How booking works<\/h2>/,
+		);
+		assert.match(
+			panel,
+			/<h2 id="steps-panel-title"[^>]*>How booking works<\/h2>/,
+		);
+		assert.match(
+			panel,
+			/^<aside class="inquiry-aside" aria-labelledby="steps-panel-title">/,
+		);
+		// The panel says more than the strip: a line for each step, the studio's name in <bdi>.
+		assert.match(panel, /<bdi>Black Needle<\/bdi> replies/);
+		assert.match(panel, /Tattoo Drip never handles your money\./);
+		assert.equal(count(top, /step-detail/g), 0);
+		assert.equal(count(panel, /step-detail/g), 4);
+	});
+
+	test("the panel beside the form also offers the chat links", () => {
+		const panel = studioHtml().match(/<aside [\s\S]*?<\/aside>/)?.[0] ?? "";
+
+		assert.match(panel, /Prefer to chat\?/);
+		assert.match(panel, /href="https:\/\/wa\.me\/9779812345678\?text=/);
+	});
+
+	test("a Devanagari studio keeps its name, location and steps whole", () => {
+		const html = studioHtml(
+			{
+				...STUDIO,
+				name: "ब्ल्याक निडल स्टुडियो",
+				contact: { ...STUDIO.contact, address: "ठमेल\nकाठमाडौं" },
+			},
+			[ARJUN],
+		);
+
+		assertSafePage(html);
+		assert.match(
+			hero(html),
+			/<h1 class="profile-name" dir="auto">ब्ल्याक निडल स्टुडियो<\/h1>/,
+		);
+		assert.match(hero(html), />ठमेल, काठमाडौं<\/p>/);
+		assert.match(html, /<bdi>ब्ल्याक निडल स्टुडियो<\/bdi> replies/);
+	});
+
+	test("no WhatsApp number means one button: the others stay in the groups", () => {
+		const top = hero(
+			studioHtml({
+				...STUDIO,
+				contact: { ...STUDIO.contact, phone: null },
+			}),
+		);
+
+		assert.match(top, /action-primary" href="#inquiry">Send your idea/);
+		assert.doesNotMatch(top, /action-secondary/);
+		assert.doesNotMatch(top, /wa\.me/);
+	});
+
+	test("a studio with nothing set still opens on its name, the type of studio and the way in", () => {
+		const html = studioHtml(EMPTY_STUDIO, []);
+		const top = hero(html);
+
+		assertSafePage(html);
+		assert.match(
+			top,
+			/<p class="profile-location user-text" dir="auto">Tattoo studio<\/p>/,
+		);
+		assert.match(top, /action-primary" href="#inquiry">Send your idea/);
+		assert.doesNotMatch(
+			top,
+			/action-secondary|class="contact"|class="profile-intro/,
+		);
+		assert.deepEqual(stepTitles(top), BOOKING_STEPS);
+	});
+
+	test("an independent artist without an address is still named as one", () => {
+		const html = studioHtml({ ...EMPTY_STUDIO, type: "independent" }, []);
+
+		assert.match(hero(html), />Independent tattoo artist<\/p>/);
+	});
+
+	test("a studio not taking inquiries offers no steps, no Send your idea and no panel", () => {
+		const html = studioHtml(CLOSED_STUDIO, [ARJUN]);
+
+		assertSafePage(html);
+		assert.doesNotMatch(
+			html,
+			/How booking works|Send your idea|<aside|step-title/,
+		);
+		assert.match(hero(html), /Not taking new inquiries right now/);
+		// The chat links are still there to read.
+		assert.deepEqual(groupLinks(html, "contact-chat"), [
+			"WhatsApp",
+			"Viber",
+			"Call",
+			"Email",
+		]);
+	});
+});
+
 describe("the artist page", () => {
 	test("is the artist's own page, with the way back and the studio's contacts", () => {
 		const html = artistHtml("sita");
 		const links = hrefs(html);
 
 		assertSafePage(html);
-		assert.deepEqual(headings(html), [1, 2, 2]);
+		// h1; the inquiry with its steps; the panel beside the form; the studio.
+		assert.deepEqual(headings(html), [1, 2, 3, 2, 2]);
 		assert.match(
 			html,
 			/<h1 id="artist-title" class="artist-title" dir="auto">Sita Rai<\/h1>/,

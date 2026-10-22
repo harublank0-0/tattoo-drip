@@ -103,6 +103,37 @@ describe("the intake form", () => {
 		assert.match(html, /Everything is needed unless it says \(optional\)\./);
 	});
 
+	test("opens on one reassuring line and keeps the Cloudflare notice for under Send (TAT-105)", () => {
+		const html = formHtml();
+		const at = (text: string) => {
+			const index = html.indexOf(text);
+			assert.ok(index >= 0, text);
+			return index;
+		};
+
+		assert.match(
+			html,
+			/<p class="intake-note intake-reassure">Only <bdi>Black Needle<\/bdi> sees what you send\.<\/p>/,
+		);
+		// Nothing about spam bots or Cloudflare until the person has reached Send.
+		assert.ok(
+			at("Only <bdi>Black Needle</bdi> sees what you send.") <
+				at("Your tattoo"),
+		);
+		assert.ok(at("Your tattoo") < at(">Send inquiry<"));
+		assert.ok(at(">Send inquiry<") < at("Cloudflare"));
+		assert.ok(html.lastIndexOf("Cloudflare") < at("Prefer to chat?"));
+		assert.match(
+			html,
+			/<p class="intake-fine">Tattoo Drip runs this page for <bdi>Black Needle<\/bdi>\./,
+		);
+		assert.doesNotMatch(
+			html.slice(0, at("Your tattoo")),
+			/Cloudflare|spam/,
+			"the top of the form",
+		);
+	});
+
 	test("labels every control", () => {
 		const html = formHtml();
 		const labelled = new Set(

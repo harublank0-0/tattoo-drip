@@ -1,8 +1,12 @@
 import { useLocation } from "@tanstack/react-router";
+import { MessageCircle } from "lucide-react";
+import { studioCopy } from "../copy.ts";
+import { isAllowedHref, linkRel } from "../links.ts";
 import type { ArtistPageData, StudioPageData } from "../loaders.ts";
 import { ArtistProfile, ArtistRoster } from "./artists.tsx";
 import { ContactBlock } from "./contact.tsx";
 import { InquirySection } from "./inquiry.tsx";
+import { BookingStrip } from "./steps.tsx";
 
 /**
  * The studio page's two pages and its status pages (TAT-48). Props only and
@@ -19,6 +23,10 @@ export function StudioPage({
 	challengeSiteKey?: string | null;
 }) {
 	const { studio, artists, inquiry, channels } = data;
+	// The hero's WhatsApp button is the plain chat link the Chat group lists.
+	const whatsapp = studio.links.find(
+		(link) => link.kind === "whatsapp" && isAllowedHref(link.href),
+	);
 	return (
 		<>
 			<main className="page">
@@ -27,27 +35,38 @@ export function StudioPage({
 						<h1 className="profile-name" dir="auto">
 							{studio.name}
 						</h1>
-						<p className="profile-type">{studio.typeLabel}</p>
+						<p className="profile-location user-text" dir="auto">
+							{studio.location ?? studio.typeLabel}
+						</p>
 					</div>
+					<div className="profile-actions">
+						{studio.accepting ? (
+							<div className="actions">
+								<a className="action action-primary" href="#inquiry">
+									{studioCopy.sendIdea}
+								</a>
+								{whatsapp ? (
+									<a
+										className="action action-secondary"
+										href={whatsapp.href}
+										rel={linkRel(whatsapp.href)}
+									>
+										<MessageCircle aria-hidden="true" />
+										<span>{studioCopy.whatsapp}</span>
+									</a>
+								) : null}
+							</div>
+						) : (
+							<p className="status status-closed">{studioCopy.notTaking}</p>
+						)}
+					</div>
+					{studio.accepting ? <BookingStrip studioName={studio.name} /> : null}
 					{studio.intro ? (
 						<p className="profile-intro user-text measure" dir="auto">
 							{studio.intro}
 						</p>
 					) : null}
-					<div className="profile-actions">
-						{studio.accepting ? (
-							<div className="actions">
-								<a className="action action-primary" href="#inquiry">
-									Send an inquiry
-								</a>
-							</div>
-						) : (
-							<p className="status status-closed">
-								Not taking new inquiries right now
-							</p>
-						)}
-						<ContactBlock studio={studio} />
-					</div>
+					<ContactBlock studio={studio} />
 				</header>
 				<ArtistRoster artists={artists} />
 				<InquirySection
@@ -83,6 +102,7 @@ export function ArtistPage({
 					state={inquiry}
 					channels={channels}
 					challengeSiteKey={challengeSiteKey}
+					stripAbove
 				/>
 				<section className="section" aria-labelledby="studio-title">
 					<h2 id="studio-title" className="section-title" dir="auto">

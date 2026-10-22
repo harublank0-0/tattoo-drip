@@ -132,8 +132,14 @@ describe("the copy", () => {
 		assert.match(copy.sent.body, /\{studio\}/);
 	});
 
-	test("names Cloudflare in the privacy line", () => {
+	test("promises one thing at the top: only the studio sees the answers", () => {
+		assert.equal(copy.reassurance, "Only {studio} sees what you send.");
+	});
+
+	test("names Cloudflare, and who runs the page, in the small print under Send", () => {
 		assert.match(copy.privacy, /Cloudflare/);
 		assert.match(copy.privacy, /\{studio\}/);
+		assert.match(copy.privacy, /Tattoo Drip runs this page for \{studio\}/);
+		assert.doesNotMatch(copy.privacy, /Only \{studio\} sees/);
 	});
 });

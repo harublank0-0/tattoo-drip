@@ -1,5 +1,5 @@
 import { createElement, Fragment } from "react";
-import { fillParts } from "../copy.ts";
+import { fillParts } from "../template.ts";
 
 /**
  * A copy template with its values in <bdi> (names may be Nepali or

@@ -380,13 +380,10 @@ export function IntakeForm({
 				if (!busy && !blocked) void form.handleSubmit();
 			}}
 		>
-			<p className="intake-note">{copy.required}</p>
-			<p className="intake-note">
-				<Fill template={copy.privacy} values={{ studio: studioName }} />{" "}
-				<a href={TURNSTILE_PRIVACY_URL} rel="noopener noreferrer">
-					{copy.privacyLink}
-				</a>
+			<p className="intake-note intake-reassure">
+				<Fill template={copy.reassurance} values={{ studio: studioName }} />
 			</p>
+			<p className="intake-note">{copy.required}</p>
 
 			<form.Subscribe selector={(formState) => formState.fieldMeta}>
 				{(fieldMeta) => {
@@ -605,6 +602,12 @@ export function IntakeForm({
 					photoCount={readyItems(references).length}
 					bytes={totalBytes(references)}
 				/>
+				<p className="intake-fine">
+					<Fill template={copy.privacy} values={{ studio: studioName }} />{" "}
+					<a href={TURNSTILE_PRIVACY_URL} rel="noopener noreferrer">
+						{copy.privacyLink}
+					</a>
+				</p>
 			</div>
 			{hasChannels(channels) ? (
 				<p className="intake-chat">

@@ -11,7 +11,7 @@ import {
 	viberLink,
 	whatsappLink,
 } from "./links.ts";
-import { cleanLine, cleanText } from "./text.ts";
+import { cleanLine, cleanText, locationLine } from "./text.ts";
 
 /**
  * What the studio page shows (TAT-48), built from TAT-44's allow-list only.
@@ -52,6 +52,8 @@ export interface StudioView {
 	readonly phone: string | null;
 	readonly email: string | null;
 	readonly address: { readonly text: string; readonly mapsHref: string } | null;
+	/** The hero's one location line, from the address ("Thamel, Kathmandu"), or null. */
+	readonly location: string | null;
 	/** Instagram first, then the ways to reach the studio, then other places. */
 	readonly links: readonly ContactLink[];
 	/** The social links' https URLs, in the API's order (JSON-LD `sameAs`). */
@@ -158,6 +160,7 @@ export function studioViewModel(studio: Studio): StudioView {
 					mapsHref: mapsLink(`${name}, ${addressText.replace(/\n+/g, ", ")}`),
 				}
 			: null,
+		location: locationLine(addressText),
 		links,
 		socialUrls: social.map((link) => link.href),
 	};

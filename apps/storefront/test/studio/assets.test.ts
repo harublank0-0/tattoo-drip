@@ -166,3 +166,20 @@ describe("the vendored Eczar files", () => {
 		assert.doesNotMatch(root, /eczar-(latin-ext|devanagari)/);
 	});
 });
+
+describe("the booking steps' two layouts (TAT-105)", () => {
+	const css = readFileSync(new URL("styles.css", SRC), "utf8");
+	const bare = css.replace(/\/\*[\s\S]*?\*\//g, "");
+
+	// The page holds the four steps twice: the phone's strip and the desktop's
+	// sticky panel. Each is display: none where it doesn't apply, so a screen
+	// reader reads them once and no layout shows both.
+	test("the strip shows below 60rem and the panel from it, never both", () => {
+		assert.match(ruleBody(css, ".steps-strip"), /display:\s*grid/);
+		assert.match(ruleBody(css, ".inquiry-aside"), /display:\s*none/);
+		const wide = bare.slice(bare.indexOf("@media (min-width: 60rem)"));
+		assert.match(wide, /\.steps-strip\s*\{\s*display:\s*none/);
+		assert.match(wide, /\.inquiry-aside\s*\{[^}]*display:\s*grid/);
+		assert.match(wide, /\.inquiry-aside\s*\{[^}]*position:\s*sticky/);
+	});
+});

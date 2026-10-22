@@ -99,12 +99,32 @@ describe("studioViewModel", () => {
 		assert.equal(view.address, null);
 	});
 
-	test("an empty profile has no intro, links or address", () => {
+	test("an empty profile has no intro, links, address or location", () => {
 		const view = studioViewModel(EMPTY_STUDIO);
 
 		assert.equal(view.intro, null);
 		assert.deepEqual(view.links, []);
 		assert.equal(view.address, null);
+		assert.equal(view.location, null);
+	});
+
+	test("the hero's location line is the address on one line (TAT-105)", () => {
+		assert.equal(studioViewModel(STUDIO).location, "Thamel Marg, Kathmandu");
+		assert.equal(
+			studioViewModel({
+				...STUDIO,
+				contact: { ...STUDIO.contact, address: "ठमेल\nकाठमाडौं" },
+			}).location,
+			"ठमेल, काठमाडौं",
+		);
+		// A hostile address is still plain text with its bidi controls gone.
+		assert.equal(
+			studioViewModel({
+				...STUDIO,
+				contact: { ...STUDIO.contact, address: "Thamel \u202eMarg\nKathmandu" },
+			}).location,
+			"Thamel Marg, Kathmandu",
+		);
 	});
 
 	test("says what kind of tenant it is and whether it takes inquiries", () => {

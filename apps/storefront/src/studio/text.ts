@@ -58,6 +58,33 @@ export function trimDescription(text: string, max = DESCRIPTION_MAX): string {
 	return `${cut.join("").trimEnd()}…`;
 }
 
+/** The longest address, in user-perceived characters, the hero's location line shows whole. */
+export const LOCATION_MAX = 48;
+
+/**
+ * The hero's one location line (TAT-105) from the address text: its lines and
+ * comma-separated parts in the owner's order, on one line. Over
+ * `LOCATION_MAX` user-perceived characters it keeps the last two parts, which
+ * are usually the area and the city ("Thamel, Kathmandu"); the whole address
+ * stays under "Visit". Never cut inside a part and never an ellipsis (names
+ * and addresses may be Devanagari). No address, or only separators, is null.
+ */
+export function locationLine(
+	address: string | null | undefined,
+): string | null {
+	if (typeof address !== "string") return null;
+	const parts = address
+		.split(/[\n,]+/)
+		.map((part) => part.replace(/\s+/gu, " ").trim())
+		.filter((part) => part !== "");
+	if (parts.length === 0) return null;
+	const whole = parts.join(", ");
+	if (parts.length <= 2 || graphemes(whole).length <= LOCATION_MAX) {
+		return whole;
+	}
+	return parts.slice(-2).join(", ");
+}
+
 function graphemes(text: string): string[] {
 	if (typeof Intl.Segmenter === "function") {
 		const segmenter = new Intl.Segmenter(undefined, {

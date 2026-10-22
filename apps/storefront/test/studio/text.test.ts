@@ -4,6 +4,8 @@ import {
 	cleanLine,
 	cleanText,
 	DESCRIPTION_MAX,
+	LOCATION_MAX,
+	locationLine,
 	trimDescription,
 } from "../../src/studio/text.ts";
 
@@ -126,5 +128,53 @@ describe("trimDescription", () => {
 			trimDescription(accented.repeat(200)),
 			`${accented.repeat(DESCRIPTION_MAX - 1)}…`,
 		);
+	});
+});
+
+describe("locationLine", () => {
+	test("is nothing without an address", () => {
+		assert.equal(locationLine(null), null);
+		assert.equal(locationLine(""), null);
+		assert.equal(locationLine(" \n , \n"), null);
+	});
+
+	test("puts a short address on one line, its lines and commas in the owner's order", () => {
+		assert.equal(locationLine("Thamel, Kathmandu"), "Thamel, Kathmandu");
+		assert.equal(
+			locationLine("Thamel Marg\nKathmandu"),
+			"Thamel Marg, Kathmandu",
+		);
+		assert.equal(locationLine("  Patan  \n\n Lalitpur "), "Patan, Lalitpur");
+	});
+
+	test("keeps a Devanagari address whole, with its conjuncts", () => {
+		assert.equal(locationLine("ठमेल\nकाठमाडौं"), "ठमेल, काठमाडौं");
+		assert.equal(locationLine("क्\u200dषेत्री टोल, ठमेल"), "क्\u200dषेत्री टोल, ठमेल");
+	});
+
+	test("a long address keeps its last two parts: the area and the city", () => {
+		const address =
+			"House 12, Third floor, Jyatha Road, Thamel, Kathmandu 44600";
+		assert.ok([...address].length > LOCATION_MAX);
+		assert.equal(locationLine(address), "Thamel, Kathmandu 44600");
+		assert.equal(
+			locationLine(
+				"Third floor, Narayan Gopal Chowk Complex\nMaharajgunj\nKathmandu",
+			),
+			"Maharajgunj, Kathmandu",
+		);
+	});
+
+	test("counts what a reader sees, not code points: a Devanagari address under the limit stays whole", () => {
+		const address = "बानेश्वर, काठमाडौं, बागमती प्रदेश";
+		assert.ok([...address].length > 30);
+		assert.equal(locationLine(address), address);
+	});
+
+	test("never cuts inside a part or adds an ellipsis: a part longer than the limit stays whole", () => {
+		const long = "a".repeat(LOCATION_MAX + 20);
+		assert.equal(locationLine(`${long}, Pokhara`), `${long}, Pokhara`);
+		assert.equal(locationLine(long), long);
+		assert.doesNotMatch(String(locationLine("x, ".repeat(40))), /…/);
 	});
 });
