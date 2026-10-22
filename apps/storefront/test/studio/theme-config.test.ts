@@ -3,6 +3,7 @@ import { describe, test } from "node:test";
 import {
 	FONT_KEYS,
 	readFontKey,
+	readHexColor,
 	readSections,
 	readThemeKey,
 	SECTION_KEYS,
@@ -176,5 +177,41 @@ describe("readSections (TAT-54)", () => {
 			),
 			["artists", "inquiry"],
 		);
+	});
+});
+
+describe("readHexColor (TAT-54)", () => {
+	test("#rrggbb is kept, lowercased", () => {
+		assert.equal(readHexColor("#b91c1c"), "#b91c1c");
+		assert.equal(readHexColor("#B91C1C"), "#b91c1c");
+		assert.equal(readHexColor("#000000"), "#000000");
+	});
+
+	test("anything else is null: nothing but a colour reaches a CSS variable", () => {
+		for (const value of [
+			...HOSTILE_STRINGS,
+			...WRONG_TYPES,
+			"red",
+			"#fff",
+			"#b91c1c80",
+			"#b91c1",
+			"#b91c1g",
+			"b91c1c",
+			" #b91c1c",
+			"#b91c1c ",
+			"#b91c1c\n",
+			"#b91c1c;",
+			"#b91c1c;color:red",
+			"#b91c1c}html{color:red",
+			"#b91c1c\u0000",
+			"rgb(185, 28, 28)",
+			"var(--ink)",
+			"#ｂ９１ｃ１ｃ",
+			"#१२३४५६",
+			`#${"a".repeat(100_000)}`,
+			0xb91c1c,
+		]) {
+			assert.equal(readHexColor(value), null, JSON.stringify(value));
+		}
 	});
 });

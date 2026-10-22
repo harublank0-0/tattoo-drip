@@ -118,3 +118,12 @@ export function readSections(value: unknown, theme: ThemeKey): SectionKey[] {
 	}
 	return sections;
 }
+
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
+/** "#rrggbb", lowercased, or null: nothing else can reach a CSS variable. */
+export function readHexColor(value: unknown): string | null {
+	return typeof value === "string" && HEX_COLOR.test(value)
+		? value.toLowerCase()
+		: null;
+}
