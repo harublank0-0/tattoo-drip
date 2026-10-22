@@ -1,7 +1,6 @@
 import type { DateTime } from "luxon";
 import type { ContactVia } from "#modules/notifications/messages";
 import { lastContactText } from "#modules/projects/contact";
-import type { ProjectStatus } from "#modules/projects/models/tattoo_project";
 import {
 	CLOSED_STATUSES,
 	type ProjectFilter,
@@ -61,10 +60,11 @@ export function toListView(query: Record<string, unknown>): ListView {
 	};
 }
 
+/** The filters whose rows come from the database a page at a time. */
+export type ClosedFilter = "closed" | "declined" | "cancelled" | "completed";
+
 /** Closed views come from the database a page at a time, the latest change first. */
-export function isClosedFilter(
-	filter: ListFilter,
-): filter is "closed" | ProjectStatus {
+export function isClosedFilter(filter: ListFilter): filter is ClosedFilter {
 	return (
 		filter === "closed" || CLOSED_STATUSES.some((status) => status === filter)
 	);

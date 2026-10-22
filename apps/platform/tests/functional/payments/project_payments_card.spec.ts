@@ -1,6 +1,8 @@
+import app from "@adonisjs/core/services/app";
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
+import WaitingService from "#modules/projects/services/waiting_service";
 import { depositReady } from "#tests/helpers/deposits";
 import {
 	ownerMember,
@@ -14,9 +16,15 @@ import {
 	makeProject,
 	makeQuote,
 } from "#tests/helpers/pipeline";
-import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
+import {
+	artistIn,
+	inTenant,
+	inTenantAs,
+	studioWithOwner,
+} from "#tests/helpers/tenants";
 
 const SLUG = "pay-card-66";
+type Line = { text: string; needsYou: boolean; hash: string | null };
 const page = (id: string) => `/t/${SLUG}/projects/${id}`;
 const { links } = paymentServices();
 
@@ -129,26 +137,58 @@ test.group("The Payments card on the project page", (group) => {
 					.get(`/t/${SLUG}/projects?status=${status}`)
 					.withInertia()
 					.loginAs(user)
-			).inertiaProps.projects;
+			).inertiaProps.projects as { id: string; line: Line | null }[];
+		// What WaitingService says is the row's line; a money fact fills in only where it says nothing.
+		const workLine = async (
+			user: { id: string },
+			role: "owner" | "artist",
+			id: string,
+		) => {
+			const service = await app.container.make(WaitingService);
+			const work = await inTenantAs(tenant, user, () =>
+				service.work(tenant, { userId: user.id, role }, DateTime.now()),
+			);
+			const item = [...work.needsYou, ...work.onClient].find(
+				({ project }) => project.id === id,
+			);
+			return item
+				? {
+						text: item.text,
+						needsYou: item.waiting.side === "studio",
+						hash: item.hash,
+					}
+				: null;
+		};
 
 		const active = await rows("active");
-		assert.deepInclude(
-			active.find(({ id }: { id: string }) => id === waiting.id),
-			{ proofWaiting: true, depositToSettle: false, quoteLapsed: false },
-		);
-		assert.deepInclude(
-			active.find(({ id }: { id: string }) => id === lapsed.id),
-			{ proofWaiting: false, depositToSettle: false, quoteLapsed: true },
+		assert.deepEqual(active.find(({ id }) => id === waiting.id)?.line, {
+			text: (await workLine(owner, "owner", waiting.id))?.text,
+			needsYou: true,
+			hash: "payments",
+		});
+		// The expired quote the studio rejected a screenshot on late: the owner
+		// is told, as a plain line, unless work() already has something to say.
+		const lapsedLine = active.find(({ id }) => id === lapsed.id)?.line;
+		assert.deepEqual(
+			lapsedLine,
+			(await workLine(owner, "owner", lapsed.id)) ?? {
+				text: "The price has ended",
+				needsYou: false,
+				hash: "quote",
+			},
 		);
 		const closedRows = await rows("closed");
-		assert.deepInclude(
-			closedRows.find(({ id }: { id: string }) => id === closed.id),
-			{ proofWaiting: false, depositToSettle: true, quoteLapsed: false },
-		);
+		assert.deepEqual(closedRows.find(({ id }) => id === closed.id)?.line, {
+			text: "Record whether the deposit was kept or refunded",
+			needsYou: false,
+			hash: "payments",
+		});
+		// The artist's row says only what work() gives them: no screenshot, no money.
 		const artistRows = await rows("active", artist);
-		assert.deepInclude(
-			artistRows.find(({ id }: { id: string }) => id === waiting.id),
-			{ proofWaiting: false, depositToSettle: false, quoteLapsed: false },
+		assert.deepEqual(
+			artistRows.find(({ id }) => id === waiting.id)?.line ?? null,
+			await workLine(artist, "artist", waiting.id),
 		);
+		assert.notInclude(JSON.stringify(artistRows), "screenshot");
 	});
 });
