@@ -132,8 +132,20 @@ describe("the copy", () => {
 		assert.match(copy.sent.body, /\{studio\}/);
 	});
 
-	test("names Cloudflare in the privacy line", () => {
+	test("promises one thing at the top: only the studio sees the answers", () => {
+		assert.equal(copy.reassurance, "Only {studio} sees what you send.");
+	});
+
+	test("names Cloudflare, and who runs the page, in the small print under Send", () => {
 		assert.match(copy.privacy, /Cloudflare/);
 		assert.match(copy.privacy, /\{studio\}/);
+		assert.match(copy.privacy, /Tattoo Drip runs this page for \{studio\}/);
+		assert.doesNotMatch(copy.privacy, /Only \{studio\} sees/);
+		// It is read under Send, after the form is filled in: nothing about what
+		// happens "when you begin filling this in".
+		assert.doesNotMatch(copy.privacy, /begin|starts|filling/);
+		assert.match(copy.privacy, /spam bots/);
+		assert.match(copy.privacy, /in your browser/);
+		assert.match(copy.privacy, /not your answers/);
 	});
 });

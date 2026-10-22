@@ -1,4 +1,4 @@
-import { fill } from "../intake/copy.ts";
+import { fill } from "../intake/template.ts";
 import type { HeadMeta, HeadTags } from "../studio/seo.ts";
 import { headCopy } from "./head-copy.ts";
 

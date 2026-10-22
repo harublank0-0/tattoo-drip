@@ -171,8 +171,11 @@ const notices: Readonly<Record<NoticeCode, Notice>> = {
 
 export const copy = {
 	required: "Everything is needed unless it says (optional).",
+	/** The one line above the form (TAT-105): what a nervous client wants to know first. */
+	reassurance: "Only {studio} sees what you send.",
+	/** The small print under Send (TAT-105): who runs the page, and the bot check. */
 	privacy:
-		"Only {studio} sees what you send, photos included; Tattoo Drip runs this page for them. To keep spam bots out, a Cloudflare check starts when you begin filling this in. Cloudflare sees your connection and device, not your answers.",
+		"Tattoo Drip runs this page for {studio}. To keep spam bots out, this form uses a Cloudflare check that runs in your browser. Cloudflare sees your connection and device, not your answers.",
 	privacyLink: "Cloudflare's privacy notice",
 	tattooLegend: "Your tattoo",
 	contactLegend: "How {studio} reaches you",
@@ -249,34 +252,4 @@ export const copy = {
 	},
 };
 
-type Values = Readonly<Record<string, string | number>>;
-
-const PLACEHOLDER = /\{(\w+)\}/g;
-
-/** `template` with each {name} replaced by `values[name]`; a placeholder without a value stays. */
-export function fill(template: string, values: Values = {}): string {
-	return template.replace(PLACEHOLDER, (match, name: string) =>
-		name in values ? String(values[name]) : match,
-	);
-}
-
-export type Part = { readonly text: string } | { readonly value: string };
-
-/** `template` as text and values, so a component can put the values in <bdi>. */
-export function fillParts(template: string, values: Values): Part[] {
-	const parts: Part[] = [];
-	let text = "";
-	let last = 0;
-	for (const match of template.matchAll(PLACEHOLDER)) {
-		const name = match[1];
-		if (!(name in values)) continue;
-		text += template.slice(last, match.index);
-		if (text) parts.push({ text });
-		text = "";
-		parts.push({ value: String(values[name]) });
-		last = match.index + match[0].length;
-	}
-	text += template.slice(last);
-	if (text) parts.push({ text });
-	return parts;
-}
+export { fill, fillParts, type Part } from "./template.ts";

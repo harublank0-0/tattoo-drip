@@ -1,6 +1,6 @@
 import type { ReactNode, Ref } from "react";
 import { Fill } from "../../intake/components/fill.tsx";
-import { fill } from "../../intake/copy.ts";
+import { fill } from "../../intake/template.ts";
 import { linkRel } from "../../studio/links.ts";
 import { copy } from "../copy.ts";
 import type { LoadProblem } from "../problems.ts";

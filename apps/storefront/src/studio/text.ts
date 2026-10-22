@@ -58,6 +58,37 @@ export function trimDescription(text: string, max = DESCRIPTION_MAX): string {
 	return `${cut.join("").trimEnd()}…`;
 }
 
+/** The longest address, in user-perceived characters, the hero's location line shows whole. */
+export const LOCATION_MAX = 48;
+
+/**
+ * The hero's one location line (TAT-105) from the address text: its lines and
+ * comma-separated parts in the owner's order, on one line, and never longer
+ * than `LOCATION_MAX` user-perceived characters (the contract allows a
+ * 300-character address, and a longer line would push the buttons off a
+ * phone's first screen). The first of these that fits: the whole address, its
+ * last two parts (usually the area and the city, "Thamel, Kathmandu"), its
+ * last part, else null (the hero then shows the kind of studio). The whole
+ * address stays under "Visit". Never cut inside a part and never an ellipsis
+ * (names and addresses may be Devanagari).
+ */
+export function locationLine(
+	address: string | null | undefined,
+): string | null {
+	if (typeof address !== "string") return null;
+	const parts = address
+		.split(/[\n,]+/)
+		.map((part) => part.replace(/\s+/gu, " ").trim())
+		.filter((part) => part !== "");
+	const fits = (line: string) => graphemes(line).length <= LOCATION_MAX;
+	const candidates = [
+		parts.join(", "),
+		parts.slice(-2).join(", "),
+		parts.slice(-1).join(", "),
+	];
+	return candidates.find((line) => line !== "" && fits(line)) ?? null;
+}
+
 function graphemes(text: string): string[] {
 	if (typeof Intl.Segmenter === "function") {
 		const segmenter = new Intl.Segmenter(undefined, {

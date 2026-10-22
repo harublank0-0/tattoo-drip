@@ -67,6 +67,117 @@ describe("the #inquiry section on the server", () => {
 	});
 });
 
+describe("the #inquiry section's panel (TAT-105)", () => {
+	test("an open section is the form's column and a panel of the four steps beside it", () => {
+		const html = section(OPEN);
+
+		assert.match(html, /^<div class="section inquiry-split">/);
+		assert.match(
+			html,
+			/<section id="inquiry" class="inquiry" aria-labelledby="inquiry-title">/,
+		);
+		assert.equal((html.match(/<aside /g) ?? []).length, 1);
+		assert.equal((html.match(/<li class="step">/g) ?? []).length, 4);
+		// The panel follows the section, so a phone, where it is hidden, reads the form first.
+		assert.ok(html.indexOf("</section>") < html.indexOf("<aside "));
+		// No strip above the form unless the page asks for one (the artist's page does).
+		assert.doesNotMatch(html, /steps-strip/);
+	});
+
+	test("the artist's page asks for the strip above the form, under the section's heading", () => {
+		const html = renderToStaticMarkup(
+			createElement(InquirySection, {
+				state: OPEN,
+				channels: CHANNELS,
+				challengeSiteKey: SITE_KEY,
+				stripAbove: true,
+			}),
+		);
+
+		assert.match(
+			html,
+			/<h3 id="steps-strip-title"[^>]*>How booking works<\/h3>/,
+		);
+		assert.ok(
+			html.indexOf("inquiry-title") < html.indexOf("steps-strip-title"),
+		);
+		assert.equal((html.match(/<li class="step">/g) ?? []).length, 8);
+	});
+
+	test("the steps are a list even where the sheet hides the numbers' list style (WebKit drops the semantics otherwise)", () => {
+		const html = renderToStaticMarkup(
+			createElement(InquirySection, {
+				state: OPEN,
+				channels: CHANNELS,
+				challengeSiteKey: SITE_KEY,
+				stripAbove: true,
+			}),
+		);
+
+		assert.equal(
+			(html.match(/<ol class="steps" role="list">/g) ?? []).length,
+			2,
+		);
+		assert.equal((html.match(/<ol /g) ?? []).length, 2);
+	});
+
+	test("the panel checks every chat link once more: a link the page may not render is left out", () => {
+		const html = renderToStaticMarkup(
+			createElement(InquirySection, {
+				state: OPEN,
+				channels: {
+					whatsapp: "javascript:alert(1)",
+					email: "mailto:hello@black-needle.example?subject=Hi",
+					instagram: "data:text/html,hi",
+				},
+				challengeSiteKey: SITE_KEY,
+			}),
+		);
+		const panel = html.match(/<aside [\s\S]*?<\/aside>/)?.[0] ?? "";
+
+		assert.match(
+			panel,
+			/href="mailto:hello@black-needle\.example\?subject=Hi"/,
+		);
+		assert.doesNotMatch(panel, /javascript:|data:/);
+		assert.equal((panel.match(/<a /g) ?? []).length, 1);
+	});
+
+	test("a panel with no chat link to offer says nothing about chatting", () => {
+		const html = renderToStaticMarkup(
+			createElement(InquirySection, {
+				state: OPEN,
+				channels: {
+					whatsapp: "javascript:alert(1)",
+					email: null,
+					instagram: null,
+				},
+				challengeSiteKey: SITE_KEY,
+			}),
+		);
+		const panel = html.match(/<aside [\s\S]*?<\/aside>/)?.[0] ?? "";
+
+		assert.doesNotMatch(panel, /Prefer to chat/);
+		assert.equal((panel.match(/<a /g) ?? []).length, 0);
+	});
+
+	test("a closed section has no panel and no steps", () => {
+		for (const state of [
+			{ kind: "studio-closed", studioName: "Black Needle" },
+			{
+				kind: "artist-closed",
+				studioName: "Black Needle",
+				artistName: "Sita Rai",
+				studioOpen: true,
+			},
+		] as const) {
+			const html = section(state);
+			assert.doesNotMatch(html, /<aside|How booking works|step-title/);
+			assert.match(html, /<section id="inquiry" class="inquiry" /);
+		}
+	});
+});
+
 describe("the intake code", () => {
 	const DIR = new URL("../../src/intake/", import.meta.url);
 	const files = readdirSync(DIR, { recursive: true })
