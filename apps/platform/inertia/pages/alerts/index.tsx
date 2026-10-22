@@ -17,7 +17,8 @@ type AlertRow = {
 };
 
 /**
- * The member's alerts (TAT-52, TAT-88), newest first. Opening one marks it
+ * The member's alerts (TAT-52, TAT-88), newest first. Each says who and what
+ * (TAT-102): "Sita: A koi fish swimming up my calf…". Opening one marks it
  * read and goes to its inquiry (owners) or, for a deposit screenshot, to the
  * project's Payments card, or stays here.
  */
@@ -89,7 +90,7 @@ export default function AlertsIndex({
 										{alert.title}
 										{alert.unread && <span className="sr-only"> (Unread)</span>}
 									</span>
-									<span className="text-sm text-muted-foreground">
+									<span className="text-sm break-words text-muted-foreground">
 										{alert.detail}
 									</span>
 									<span className="text-xs text-muted-foreground">

@@ -1,42 +1,61 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
+import Inquiry from "#modules/inquiries/models/inquiry";
 import StaffAlert from "#modules/notifications/models/staff_alert";
+import TattooProject from "#modules/projects/models/tattoo_project";
 import {
+	makeArtist,
 	makeClient,
 	makeInquiry,
 	makePayment,
 	makeProject,
 } from "#tests/helpers/pipeline";
+import { recordQueries } from "#tests/helpers/query_count";
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
 const alertsPage = (rest = "") => `/t/black-needle/alerts${rest}`;
 
-/** An alert of `userId` about a fresh inquiry. */
+/** An alert of `userId` about a fresh inquiry (from `name`, saying `idea`, when given). */
 async function alertFor(
 	tenant: { id: string },
 	userId: string,
-	over: { readAt?: DateTime } = {},
+	over: { readAt?: DateTime; name?: string; idea?: string } = {},
 ) {
+	const { name, idea, ...alert } = over;
 	return inTenant(tenant, async () => {
-		const inquiry = await makeInquiry(tenant, await makeClient(tenant));
+		const inquiry = await makeInquiry(
+			tenant,
+			await makeClient(tenant, name ? { name } : {}),
+			idea ? { idea } : {},
+		);
 		return StaffAlert.create({
 			tenantId: tenant.id,
 			userId,
 			kind: "new_inquiry",
 			inquiryId: inquiry.id,
-			...over,
+			...alert,
 		});
 	});
 }
 
-/** An alert of `userId` about a deposit screenshot on a fresh project. */
-async function proofAlertFor(tenant: { id: string }, userId: string) {
+/** An alert of `userId` about a deposit screenshot on a fresh project (of `name`, assigned to `artistId`, claiming `amount` paisa, when given). */
+async function proofAlertFor(
+	tenant: { id: string },
+	userId: string,
+	over: { name?: string; artistId?: string; amount?: number } = {},
+) {
 	return inTenant(tenant, async () => {
-		const project = await makeProject(tenant, await makeClient(tenant), {
-			status: "deposit_pending",
-		});
-		const payment = await makePayment(tenant, project);
+		const project = await makeProject(
+			tenant,
+			await makeClient(tenant, over.name ? { name: over.name } : {}),
+			{ status: "deposit_pending", artistId: over.artistId ?? null },
+		);
+		const payment = await makePayment(
+			tenant,
+			project,
+			over.amount ? { amount: over.amount } : {},
+		);
 		return StaffAlert.create({
 			tenantId: tenant.id,
 			userId,
@@ -60,7 +79,7 @@ test.group("Alerts", (group) => {
 		const { owner, tenant } = await studioWithOwner();
 		const artist = await artistIn(tenant);
 		const older = await alertFor(tenant, owner.id, { readAt: DateTime.now() });
-		const newer = await alertFor(tenant, owner.id);
+		const newer = await alertFor(tenant, owner.id, { name: "Sita Thapa" });
 		await alertFor(tenant, artist.id);
 
 		const response = await client
@@ -83,7 +102,7 @@ test.group("Alerts", (group) => {
 		);
 		assert.deepInclude(props.alerts[0], {
 			title: "New inquiry",
-			detail: "Open it in the inbox.",
+			detail: "Sita: A small fine-line moth",
 		});
 		assert.match(props.alerts[0].whenText, /^Today, \d\d:\d\d$/);
 		assert.equal(props.unread, 1);
@@ -143,13 +162,13 @@ test.group("Alerts", (group) => {
 	}) => {
 		const { tenant } = await studioWithOwner();
 		const artist = await artistIn(tenant);
-		const alert = await alertFor(tenant, artist.id);
+		const alert = await alertFor(tenant, artist.id, { name: "Sita Thapa" });
 
 		const list = (await client.get(alertsPage()).withInertia().loginAs(artist))
 			.inertiaProps;
 		assert.deepInclude(list.alerts[0], {
 			title: "A new inquiry asks for you",
-			detail: "An owner reviews it in the inbox.",
+			detail: "Sita: A small fine-line moth",
 		});
 
 		const response = await client
@@ -233,13 +252,13 @@ test.group("Alerts", (group) => {
 		assert,
 	}) => {
 		const { owner, tenant } = await studioWithOwner();
-		const alert = await proofAlertFor(tenant, owner.id);
+		const alert = await proofAlertFor(tenant, owner.id, { name: "Sita Thapa" });
 
 		const list = (await client.get(alertsPage()).withInertia().loginAs(owner))
 			.inertiaProps;
 		assert.deepInclude(list.alerts[0], {
 			title: "Deposit screenshot to check",
-			detail: "Open the project's Payments card.",
+			detail: "Sita: NPR 3,000",
 		});
 
 		const response = await client
@@ -284,13 +303,22 @@ test.group("Alerts", (group) => {
 	}) => {
 		const { tenant } = await studioWithOwner();
 		const artist = await artistIn(tenant);
-		const alert = await proofAlertFor(tenant, artist.id);
+		const profile = await inTenant(tenant, async () => {
+			const made = await makeArtist(tenant, "mira");
+			made.userId = artist.id;
+			await made.save();
+			return made;
+		});
+		const alert = await proofAlertFor(tenant, artist.id, {
+			name: "Sita Thapa",
+			artistId: profile.id,
+		});
 
 		const list = (await client.get(alertsPage()).withInertia().loginAs(artist))
 			.inertiaProps;
 		assert.deepInclude(list.alerts[0], {
 			title: "A deposit screenshot for your project",
-			detail: "An owner checks it on the Payments card.",
+			detail: "Sita: An owner checks it on the Payments card.",
 		});
 
 		const response = await client
@@ -303,5 +331,152 @@ test.group("Alerts", (group) => {
 			"location",
 			`/t/black-needle/projects/${alert.projectId}#payments`,
 		);
+	});
+});
+
+test.group("Alerts: what they say (TAT-102)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("a Devanagari name and idea reach the list whole, and no phone number does", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const alert = await alertFor(tenant, owner.id, {
+			name: "सीता थापा",
+			idea: "मेरो पिंडुलामा माछा ".repeat(10),
+		});
+		const phone = String(
+			await inTenant(
+				tenant,
+				async () =>
+					(await Inquiry.findOrFail(alert.inquiryId as string)).contactPhone,
+			),
+		);
+
+		const response = await client
+			.get(alertsPage())
+			.withInertia()
+			.loginAs(owner);
+
+		assert.equal(
+			response.inertiaProps.alerts[0].detail,
+			`सीता: ${Array(7).fill("मेरो पिंडुलामा माछा").join(" ")} मेरो…`,
+		);
+		assert.match(phone, /^\+\d{8,}$/);
+		assert.notInclude(JSON.stringify(response.inertiaProps), phone);
+	});
+
+	test("a deposit screenshot reads as the first name and the amount in rupees", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		await proofAlertFor(tenant, owner.id, {
+			name: "सीता थापा",
+			amount: 15_000_000,
+		});
+
+		const list = (await client.get(alertsPage()).withInertia().loginAs(owner))
+			.inertiaProps;
+
+		assert.equal(list.alerts[0].detail, "सीता: NPR 1,50,000");
+	});
+
+	test("an alert whose inquiry or project is gone keeps the old line", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const inquiryAlert = await alertFor(tenant, owner.id, { name: "Sita" });
+		const proofAlert = await proofAlertFor(tenant, owner.id, { name: "Asha" });
+		await inTenant(tenant, async () => {
+			await (
+				await Inquiry.findOrFail(inquiryAlert.inquiryId as string)
+			).softDelete();
+			await (
+				await TattooProject.findOrFail(proofAlert.projectId as string)
+			).softDelete();
+		});
+
+		const list = (await client.get(alertsPage()).withInertia().loginAs(owner))
+			.inertiaProps;
+
+		assert.deepEqual(
+			list.alerts.map(({ id, detail }: { id: string; detail: string }) => [
+				id,
+				detail,
+			]),
+			[
+				[proofAlert.id, "Open the project's Payments card."],
+				[inquiryAlert.id, "Open it in the inbox."],
+			],
+		);
+	});
+
+	test("an artist sees the client on their own projects only, and never an amount", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+		const artist = await artistIn(tenant);
+		const mine = await inTenant(tenant, async () => {
+			const made = await makeArtist(tenant, "mira");
+			made.userId = artist.id;
+			await made.save();
+			return made;
+		});
+		const other = await inTenant(tenant, () => makeArtist(tenant, "asha"));
+		const own = await proofAlertFor(tenant, artist.id, {
+			name: "Sita Thapa",
+			artistId: mine.id,
+		});
+		const elsewhere = await proofAlertFor(tenant, artist.id, {
+			name: "Asha Rai",
+			artistId: other.id,
+		});
+
+		const list = (await client.get(alertsPage()).withInertia().loginAs(artist))
+			.inertiaProps;
+
+		const byId = new Map<string, string>(
+			list.alerts.map(({ id, detail }: { id: string; detail: string }) => [
+				id,
+				detail,
+			]),
+		);
+		assert.equal(
+			byId.get(own.id),
+			"Sita: An owner checks it on the Payments card.",
+		);
+		// Reassigned or never theirs: the project page would be a 404, so the
+		// list says nothing about the client either.
+		assert.equal(
+			byId.get(elsewhere.id),
+			"An owner checks it on the Payments card.",
+		);
+		assert.notInclude(JSON.stringify(list), "NPR");
+	});
+
+	test("a page of alerts is read in a fixed number of queries", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const queries = async () =>
+			(
+				await recordQueries(() =>
+					client.get(alertsPage()).withInertia().loginAs(owner),
+				)
+			).queries.length;
+		await alertFor(tenant, owner.id);
+		await proofAlertFor(tenant, owner.id);
+		const few = await queries();
+		for (let i = 0; i < 4; i++) {
+			await alertFor(tenant, owner.id);
+			await proofAlertFor(tenant, owner.id);
+		}
+
+		assert.equal(await queries(), few);
 	});
 });

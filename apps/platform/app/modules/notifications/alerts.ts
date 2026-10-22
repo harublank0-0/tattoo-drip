@@ -8,6 +8,9 @@ export type AlertKind = (typeof ALERT_KINDS)[number];
 /** How much of the idea a new-inquiry email quotes, in characters as people count them. */
 export const EXCERPT_LENGTH = 140;
 
+/** How much of the idea the Alerts list quotes: about two lines on a phone (TAT-102). */
+export const ALERT_EXCERPT_LENGTH = 80;
+
 const GRAPHEMES = new Intl.Segmenter("en", { granularity: "grapheme" });
 
 /**
@@ -139,9 +142,45 @@ const LINES: Record<AlertKind, { owner: AlertLine; other: AlertLine }> = {
 	},
 };
 
-/** The Alerts list's line for an alert. No client data: a row holds ids only (spec ruling 5). */
-export function alertCopy(kind: AlertKind, isOwner: boolean): AlertLine {
-	return isOwner ? LINES[kind].owner : LINES[kind].other;
+/**
+ * What an alert is about, read when the list is built (TAT-102): a row holds
+ * ids only (spec ruling 5), so the names come from the inquiry or project at
+ * render time and an old row needs no migration.
+ */
+export type AlertContent =
+	| { kind: "new_inquiry"; clientName: string; idea: string }
+	| {
+			kind: "deposit_proof";
+			clientName: string;
+			/** What the screenshot claims ("NPR 3,000"): owners only, else null. */
+			amountText: string | null;
+	  };
+
+/**
+ * The Alerts list's line for an alert. The title is fixed per kind and role.
+ * The detail is "Sita: A koi fish swimming up my calf…" (TAT-102): the
+ * client's first name, as the email says it, and the start of the idea
+ * (`excerpt`, so a Devanagari syllable is never cut) or, for a deposit
+ * screenshot, its amount. Never a phone number. Without `content`, or when
+ * the part after the name is unknown (a blank idea, no amount for an
+ * artist), the fixed line stays: "Sita: Open it in the inbox.". Content of
+ * another kind than the alert's is ignored.
+ */
+export function alertCopy(
+	kind: AlertKind,
+	isOwner: boolean,
+	content?: AlertContent | null,
+): AlertLine {
+	const line = isOwner ? LINES[kind].owner : LINES[kind].other;
+	if (!content || content.kind !== kind) return line;
+	const what =
+		content.kind === "new_inquiry"
+			? excerpt(content.idea, ALERT_EXCERPT_LENGTH)
+			: isOwner
+				? (content.amountText ?? "")
+				: "";
+	const who = firstName(content.clientName) || "A client";
+	return { title: line.title, detail: `${who}: ${what || line.detail}` };
 }
 
 /**
