@@ -23,6 +23,7 @@ export default function InquiryShow({
 	contact,
 	message,
 	contactedText,
+	lastChannel,
 }: InquiryPageProps) {
 	const tenant = useTenant();
 	// The chat links record the contact in the background (TAT-52).
@@ -139,6 +140,7 @@ export default function InquiryShow({
 					contact={contact}
 					messages={message ? [message] : []}
 					initialKind={message?.kind ?? null}
+					lastChannel={lastChannel}
 					onContact={markContacted}
 					footer={contactedText}
 				/>
