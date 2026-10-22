@@ -154,6 +154,27 @@ export default class SessionService {
 	}
 
 	/**
+	 * The project's next session (TAT-110, the paid deposit page): its
+	 * earliest live `scheduled` session that hasn't ended at `now`, of any
+	 * kind, or null. One query on the (tenant_id, project_id) index.
+	 */
+	async nextScheduled(
+		tenant: TenantRef,
+		project: TattooProject,
+		now: DateTime = DateTime.utc(),
+	): Promise<ProjectSession | null> {
+		assertProjectOf(tenant, project);
+		return ProjectSession.query()
+			.where("tenant_id", tenant.id)
+			.where("project_id", project.id)
+			.where("status", "scheduled")
+			.where("ends_at", ">", now.toJSDate())
+			.orderBy("starts_at", "asc")
+			.orderBy("id", "asc")
+			.first();
+	}
+
+	/**
 	 * The tenant's active sessions (scheduled or completed, not deleted) that
 	 * take time in the half-open window, earliest first: the calendar
 	 * (TAT-50). The overlap is the no-overlap constraint's own expression, so
