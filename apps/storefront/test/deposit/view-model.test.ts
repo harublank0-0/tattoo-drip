@@ -1,15 +1,23 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { copy } from "../../src/deposit/copy.ts";
+import type { DepositPage } from "@tattoo-drip/sdk";
+import { copy, type DepositMethodKind } from "../../src/deposit/copy.ts";
 import {
+	answerFor,
+	type DepositView,
 	daysUntil,
 	depositContact,
 	depositView,
 	formatReceived,
+	formatSessionStart,
 	headingTemplate,
+	type MethodPick,
 	payByLine,
+	pickMethod,
 	receiptAmount,
+	selectedMethod,
 	stateTemplate,
+	studioInitial,
 	todayIn,
 } from "../../src/deposit/view-model.ts";
 import { PAGE, page, QR_URL, SHELL } from "./fixtures.ts";
@@ -20,10 +28,10 @@ describe("depositView", () => {
 
 		assert.equal(view.state, "due");
 		assert.deepEqual(
-			view.methods.map((method) => [method.id, method.kind, method.label]),
+			view.methods.map((method) => [method.kind, method.label]),
 			[
-				["method-0", "esewa", "eSewa"],
-				["method-1", "bank", "Bank transfer"],
+				["esewa", "eSewa"],
+				["bank", "Bank transfer"],
 			],
 		);
 		assert.equal(view.methods[0].qr, QR_URL);
@@ -316,5 +324,499 @@ describe("depositContact", () => {
 			whatsapp: null,
 			viber: null,
 		});
+	});
+});
+
+describe("selectedMethod (TAT-110)", () => {
+	const methods = depositView(PAGE).methods;
+
+	test("the picked method while it is listed, else the first, else null", () => {
+		assert.equal(selectedMethod(methods, methods[1].id), methods[1]);
+		assert.equal(selectedMethod(methods, "nope"), methods[0]);
+		assert.equal(selectedMethod(methods, null), methods[0]);
+		assert.equal(selectedMethod([], methods[0].id), null);
+		assert.equal(selectedMethod([], null), null);
+	});
+});
+
+describe("formatSessionStart (TAT-110)", () => {
+	test("weekday, date and 12-hour time in the studio's timezone", () => {
+		assert.equal(
+			formatSessionStart("2026-10-24T05:15:00.000Z", "Asia/Kathmandu"),
+			"Sat 24 Oct 2026, 11:00 am",
+		);
+		assert.equal(
+			formatSessionStart("2026-10-24T18:45:00.000Z", "Asia/Kathmandu"),
+			"Sun 25 Oct 2026, 12:30 am",
+		);
+	});
+
+	test("null for a start that isn't a date or a zone this browser doesn't know, never UTC", () => {
+		assert.equal(formatSessionStart("nope", "Asia/Kathmandu"), null);
+		assert.equal(
+			formatSessionStart("2026-10-24T05:15:00.000Z", "Not/AZone"),
+			null,
+		);
+	});
+});
+
+describe("studioInitial (TAT-110)", () => {
+	test("the first user-perceived character, as typed", () => {
+		assert.equal(studioInitial("Black Needle"), "B");
+		assert.equal(studioInitial("कालो सुई"), "का");
+		assert.equal(studioInitial("  x"), "x");
+		assert.equal(studioInitial("   "), "");
+	});
+});
+
+describe("depositView's session (TAT-110)", () => {
+	const startsAt = "2026-10-24T05:15:00.000Z";
+
+	test("a paid page keeps the next session's start and its cleaned artist", () => {
+		const view = depositView(
+			page({
+				state: "paid",
+				nextSession: { startsAt, artistName: "  Aarav  " },
+			}),
+		);
+
+		assert.deepEqual(view.session, { startsAt, artistName: "Aarav" });
+	});
+
+	test("only a paid page has one", () => {
+		for (const state of [
+			"due",
+			"submitted",
+			"updating",
+			"expired",
+			"cancelled",
+		] as const) {
+			const view = depositView(
+				page({ state, nextSession: { startsAt, artistName: "Aarav" } }),
+			);
+			assert.equal(view.session, null, state);
+		}
+	});
+
+	test("an API before TAT-110 (no field), a null, or a start that isn't a date is no session", () => {
+		const paid = page({ state: "paid" });
+		assert.equal(
+			depositView({ ...paid, nextSession: undefined } as never).session,
+			null,
+		);
+		assert.equal(depositView({ ...paid, nextSession: null }).session, null);
+		assert.equal(
+			depositView({
+				...paid,
+				nextSession: { startsAt: "soon", artistName: "Aarav" },
+			}).session,
+			null,
+		);
+		assert.equal(
+			depositView({
+				...paid,
+				nextSession: { startsAt: 5, artistName: null } as never,
+			}).session,
+			null,
+		);
+	});
+
+	test("a session without an artist name keeps its start", () => {
+		const view = depositView(
+			page({ state: "paid", nextSession: { startsAt, artistName: null } }),
+		);
+
+		assert.deepEqual(view.session, { startsAt, artistName: null });
+	});
+});
+
+describe("a method's identity (TAT-110 fix rounds 1 and 2)", () => {
+	const [esewa, bank] = PAGE.paymentMethods;
+	const fonepay = (label: string, n: number | null) => ({
+		kind: "fonepay" as const,
+		label,
+		qrImageUrl:
+			n === null ? null : `https://api.example.com/uploads/fonepay-${n}.png`,
+		accountName: null,
+		accountNumber: null,
+		bankName: null,
+	});
+	const [a, b, c] = [
+		fonepay("Fonepay A", 1),
+		fonepay("Fonepay B", 2),
+		fonepay("Fonepay C", 3),
+	];
+	const methodsOf = (paymentMethods: DepositPage["paymentMethods"]) =>
+		depositView(page({ paymentMethods })).methods;
+	const idOf = (methods: ReturnType<typeof methodsOf>, label: string) => {
+		const found = methods.find((method) => method.label === label);
+		assert.ok(found, label);
+		return found.id;
+	};
+	/** What the client has picked is still what shows after `after` is read. */
+	const shownAfter = (
+		before: DepositPage["paymentMethods"],
+		pickLabel: string,
+		after: DepositPage["paymentMethods"],
+	) => {
+		const picked = idOf(methodsOf(before), pickLabel);
+		return selectedMethod(methodsOf(after), picked);
+	};
+
+	test("is made of everything that tells a method apart: kind, number, names, label and QR", () => {
+		const [m] = methodsOf([{ ...bank, qrImageUrl: QR_URL }]);
+		const changed = (over: Partial<(typeof PAGE.paymentMethods)[number]>) =>
+			methodsOf([{ ...bank, qrImageUrl: QR_URL, ...over }])[0].id;
+
+		assert.notEqual(changed({ accountNumber: "1" }), m.id);
+		assert.notEqual(changed({ accountName: "Someone else" }), m.id);
+		assert.notEqual(changed({ bankName: "Global IME" }), m.id);
+		assert.notEqual(changed({ label: "Bank 2" }), m.id);
+		assert.notEqual(changed({ qrImageUrl: `${QR_URL}?v=2` }), m.id);
+		assert.notEqual(changed({ qrImageUrl: null }), m.id);
+		assert.equal(changed({}), m.id);
+	});
+
+	test("is cleaned the way the page shows it: spacing and a blank name don't make another method", () => {
+		const [tidy] = methodsOf([{ ...bank, accountNumber: "98765 43210" }]);
+		const [messy] = methodsOf([
+			{ ...bank, accountNumber: "  98765  43210 ", bankName: " Nabil Bank " },
+		]);
+
+		assert.equal(messy.id, tidy.id);
+	});
+
+	test("is the same after a reorder, after other methods go, and after one is added", () => {
+		const all = [a, b, c, esewa, bank];
+		const id = (list: DepositPage["paymentMethods"], label: string) =>
+			idOf(methodsOf(list), label);
+
+		for (const label of [
+			"Fonepay A",
+			"Fonepay B",
+			"Fonepay C",
+			"eSewa",
+			"Bank transfer",
+		]) {
+			const base = id(all, label);
+			assert.equal(id([...all].reverse(), label), base, `${label}: reversed`);
+			assert.equal(
+				id([bank, c, esewa, a, b], label),
+				base,
+				`${label}: shuffled`,
+			);
+			assert.equal(
+				id(
+					all.filter((m) => m.label === label || m.kind === "bank"),
+					label,
+				),
+				base,
+				`${label}: others removed`,
+			);
+			assert.equal(
+				id([...all, fonepay("Fonepay D", 4)], label),
+				base,
+				`${label}: one added`,
+			);
+		}
+	});
+
+	test("differs for QR-only methods with different QR codes, and for the same QR under another label", () => {
+		const sameQr = { ...b, label: "Fonepay B again", qrImageUrl: b.qrImageUrl };
+		const ids = methodsOf([a, b, c, sameQr]).map((method) => method.id);
+
+		assert.equal(new Set(ids).size, 4);
+		assert.ok(
+			ids.every((id) => !id.includes("#")),
+			"no ordinal among distinct methods",
+		);
+		const noQr = methodsOf([
+			fonepay("Fonepay", null),
+			fonepay("Fonepay again", null),
+		]);
+		assert.notEqual(noQr[0].id, noQr[1].id);
+	});
+
+	test("methods identical in every field are one method, the first of them: no ordinal exists", () => {
+		const twin = { ...a };
+
+		const methods = methodsOf([a, twin, b, { ...twin }]);
+
+		assert.deepEqual(
+			methods.map((method) => method.label),
+			["Fonepay A", "Fonepay B"],
+		);
+		assert.deepEqual(
+			methods.map((method) => method.id),
+			methodsOf([a, b]).map((method) => method.id),
+		);
+		assert.deepEqual(
+			depositView(page({ paymentMethods: [a, twin, b] })).kinds,
+			["fonepay"],
+		);
+	});
+
+	test("identical as the page shows them is identical: spacing, and a QR that fails the check", () => {
+		const methods = methodsOf([
+			{ ...bank, accountNumber: "98765 43210", bankName: "Nabil Bank" },
+			{ ...bank, accountNumber: "  98765  43210 ", bankName: " Nabil Bank " },
+			{ ...bank, accountNumber: "98765 43210", qrImageUrl: null },
+			{
+				...bank,
+				accountNumber: "98765 43210",
+				qrImageUrl: "javascript:alert(1)",
+			},
+		]);
+
+		assert.equal(methods.length, 1);
+	});
+
+	test("methods that differ in any one field stay two", () => {
+		type Method = DepositPage["paymentMethods"][number];
+		const base: Method = { ...bank, qrImageUrl: QR_URL };
+		const changes: Partial<Method>[] = [
+			{ kind: "khalti" },
+			{ accountNumber: "1" },
+			{ accountName: "Someone else" },
+			{ bankName: "Global IME" },
+			{ label: "Bank 2" },
+			{ qrImageUrl: `${QR_URL}?v=2` },
+			{ qrImageUrl: null },
+			{ accountNumber: null },
+		];
+
+		for (const change of changes) {
+			const methods = methodsOf([base, { ...base, ...change }]);
+			assert.equal(methods.length, 2, JSON.stringify(change));
+			assert.notEqual(methods[0].id, methods[1].id, JSON.stringify(change));
+		}
+	});
+
+	test("no identity has an ordinal, whatever the list holds", () => {
+		const lists = [
+			[a, { ...a }, { ...a }],
+			[bank, { ...bank }, esewa, { ...esewa }],
+			[a, b, c, { ...b }],
+		];
+
+		for (const list of lists) {
+			for (const method of methodsOf(list)) {
+				assert.ok(!method.id.includes("#"), method.id);
+			}
+		}
+	});
+
+	test("removing or re-adding a twin never changes the remaining method's identity or the selection", () => {
+		const twin = { ...bank };
+		const lists = [
+			[esewa, bank, twin],
+			[esewa, twin],
+			[esewa, bank],
+			[bank, esewa, twin],
+			[twin, esewa],
+			[esewa, bank, twin, { ...bank }],
+		];
+		// The last of the bank methods: the one an ordinal would have been given.
+		const picked = methodsOf([esewa, bank, twin])
+			.filter((method) => method.label === "Bank transfer")
+			.at(-1)?.id;
+		assert.ok(picked, "a bank method");
+
+		for (const list of lists) {
+			const shown = selectedMethod(methodsOf(list), picked);
+			assert.equal(shown?.label, "Bank transfer", `${list.length} methods`);
+			assert.equal(shown?.accountNumber, "01234567890123");
+		}
+	});
+
+	test("a part that looks like an ordinal or a separator can't make two methods one", () => {
+		const ids = methodsOf([
+			{ ...bank, accountNumber: "7", bankName: "x" },
+			{ ...bank, accountNumber: "7|x", bankName: null },
+			{ ...bank, accountNumber: "7#1", bankName: "x" },
+		]).map((method) => method.id);
+
+		assert.equal(new Set(ids).size, 3);
+		assert.ok(
+			ids.every((id) => !id.includes("#")),
+			ids.join(" "),
+		);
+	});
+
+	test("a kind the page can't take doesn't shift anyone's identity", () => {
+		const cash = { ...bank, kind: "cash" as never };
+
+		assert.deepEqual(
+			methodsOf([cash, esewa, bank]).map((method) => method.id),
+			methodsOf([esewa, bank]).map((method) => method.id),
+		);
+	});
+
+	test("a picked QR-only method survives [A,B,C] -> [B,C], [C,B] and [A,B,C] again: its own QR shows", () => {
+		for (const after of [[b, c], [c, b], [a, b, c], [c, a, b], [b]]) {
+			const shown = shownAfter([a, b, c], "Fonepay B", after);
+			assert.equal(
+				shown?.label,
+				"Fonepay B",
+				after.map((m) => m.label).join(","),
+			);
+			assert.equal(shown?.qr, b.qrImageUrl);
+		}
+	});
+
+	test("when the picked method is gone, or its QR was re-uploaded, the first one shows", () => {
+		assert.equal(
+			shownAfter([a, b, c], "Fonepay B", [a, c])?.label,
+			"Fonepay A",
+		);
+		assert.equal(
+			shownAfter([a, b, c], "Fonepay B", [c, a])?.label,
+			"Fonepay C",
+		);
+		const reuploaded = {
+			...b,
+			qrImageUrl: "https://api.example.com/uploads/fonepay-2b.png",
+		};
+		assert.equal(
+			shownAfter([a, b, c], "Fonepay B", [a, reuploaded, c])?.label,
+			"Fonepay A",
+		);
+	});
+});
+
+describe("the answer follows an explicit pick (TAT-110 fix round 1)", () => {
+	const [esewa, bank] = PAGE.paymentMethods;
+	const bankB = {
+		...bank,
+		label: "Bank B",
+		bankName: "Global IME",
+		accountNumber: "555000111",
+	};
+	const view = (...paymentMethods: DepositPage["paymentMethods"]) =>
+		depositView(page({ paymentMethods }));
+
+	test("every pick is a new event, a second one of the same kind too", () => {
+		const first = pickMethod(null, { id: "bank:1", kind: "bank" });
+		const second = pickMethod(first, { id: "bank:2", kind: "bank" });
+
+		assert.deepEqual(first, { id: "bank:1", kind: "bank", count: 1 });
+		assert.deepEqual(second, { id: "bank:2", kind: "bank", count: 2 });
+	});
+
+	test("a pick gives its kind once; the same pick again, no pick, or a kind the form lacks gives nothing", () => {
+		const pick: MethodPick = { id: "bank:1", kind: "bank", count: 3 };
+		const kinds: readonly DepositMethodKind[] = ["esewa", "bank"];
+
+		assert.equal(answerFor(pick, 2, kinds), "bank");
+		assert.equal(answerFor(pick, 3, kinds), null);
+		assert.equal(answerFor(null, 0, kinds), null);
+		assert.equal(answerFor(pick, 2, ["esewa"]), null);
+	});
+
+	/**
+	 * What the page does, with the page's own functions: the radios call
+	 * pickMethod, the form applies answerFor after every render, a refetch
+	 * only replaces the view, and the client can change the answer by hand.
+	 */
+	function client(first: DepositView) {
+		let current = first;
+		let picked: MethodPick | null = null;
+		let applied = 0;
+		let answer = "";
+		const render = () => {
+			const kind = answerFor(picked, applied, current.kinds);
+			if (picked) applied = picked.count;
+			if (kind) answer = kind;
+		};
+		return {
+			pick(label: string) {
+				const method = current.methods
+					.filter((each) => each.label === label)
+					.at(-1);
+				assert.ok(method, label);
+				picked = pickMethod(picked, method);
+				render();
+			},
+			setAnswer(kind: string) {
+				answer = kind;
+			},
+			refetch(next: DepositView) {
+				current = next;
+				render();
+			},
+			get answer() {
+				return answer;
+			},
+			get shown() {
+				return selectedMethod(current.methods, picked?.id ?? null);
+			},
+		};
+	}
+
+	test("nothing is answered before a pick, though the first method shows", () => {
+		const page = client(view(esewa, bank));
+
+		assert.equal(page.answer, "");
+		assert.equal(page.shown?.kind, "esewa");
+	});
+
+	test("picking the bank, then the studio reorders: the details and the answer stay the bank", () => {
+		const page = client(view(esewa, bank));
+		page.pick("Bank transfer");
+
+		page.refetch(view(bank, esewa));
+
+		assert.equal(page.shown?.kind, "bank");
+		assert.equal(page.shown?.bankName, "Nabil Bank");
+		assert.equal(page.answer, "bank");
+	});
+
+	test("two bank accounts and eSewa: bank A, a hand-made eSewa answer, bank B: the answer is the bank again", () => {
+		const page = client(view(esewa, bank, bankB));
+		page.pick("Bank transfer");
+		assert.equal(page.answer, "bank");
+		page.setAnswer("esewa");
+
+		page.pick("Bank B");
+
+		assert.equal(page.shown?.bankName, "Global IME");
+		assert.equal(page.answer, "bank");
+	});
+
+	test("a refetch with the same methods changes nothing, a hand-made answer included", () => {
+		const page = client(view(esewa, bank));
+		page.pick("Bank transfer");
+		page.setAnswer("esewa");
+
+		page.refetch(view(esewa, bank));
+		page.refetch(view(esewa, bank));
+
+		assert.equal(page.shown?.kind, "bank");
+		assert.equal(page.answer, "esewa");
+	});
+
+	test("a refetch after which the picked method is gone shows the first and keeps the answer", () => {
+		const page = client(view(esewa, bank));
+		page.pick("Bank transfer");
+		page.setAnswer("bank");
+
+		page.refetch(view(esewa));
+
+		assert.equal(page.shown?.kind, "esewa");
+		assert.equal(page.answer, "bank");
+	});
+
+	test("[eSewa, bank, an identical bank] -> [eSewa, the identical one]: the pick and the answer are kept", () => {
+		const twin = { ...bank };
+		const page = client(view(esewa, bank, twin));
+		page.pick("Bank transfer");
+
+		page.refetch(view(esewa, twin));
+		assert.equal(page.shown?.accountNumber, "01234567890123");
+		assert.equal(page.answer, "bank");
+
+		page.refetch(view(esewa, bank, twin));
+		assert.equal(page.shown?.accountNumber, "01234567890123");
+		assert.equal(page.answer, "bank");
 	});
 });

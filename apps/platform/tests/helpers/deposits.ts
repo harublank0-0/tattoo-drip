@@ -27,12 +27,8 @@ export function depositServices(images: ImageService = new ImageService()) {
 	const artists = new ArtistService(images);
 	const quotes = new QuoteService();
 	const deposits = new DepositService(quotes);
-	const projects = new ProjectService(
-		artists,
-		quotes,
-		deposits,
-		new SessionService(artists, deposits),
-	);
+	const sessions = new SessionService(artists, deposits);
+	const projects = new ProjectService(artists, quotes, deposits, sessions);
 	const methods = new PaymentMethodService(images);
 	const links = new DepositLinkService(projects, quotes, deposits, methods);
 	const pages = new DepositPageService(
@@ -43,8 +39,19 @@ export function depositServices(images: ImageService = new ImageService()) {
 		methods,
 		artists,
 		images,
+		sessions,
 	);
-	return { images, artists, quotes, deposits, projects, methods, links, pages };
+	return {
+		images,
+		artists,
+		quotes,
+		deposits,
+		sessions,
+		projects,
+		methods,
+		links,
+		pages,
+	};
 }
 
 /**

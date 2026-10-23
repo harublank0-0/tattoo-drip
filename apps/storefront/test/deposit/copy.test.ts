@@ -81,7 +81,8 @@ describe("the deposit page's copy", () => {
 			copy.rejected,
 			"The studio couldn't confirm your last screenshot. Check the amount and the reference code, then send a new one, or message the studio.",
 		);
-		assert.equal(copy.form.title, "After you pay, send a screenshot");
+		// TAT-110 replaces TAT-65's "After you pay, send a screenshot": step 3's heading.
+		assert.equal(copy.form.title, "Send the screenshot");
 		assert.equal(copy.form.method, "How did you pay?");
 		assert.equal(copy.form.proof, "Payment screenshot");
 		assert.equal(copy.form.send, "Send screenshot");
@@ -137,9 +138,24 @@ describe("the deposit page's copy", () => {
 		);
 	});
 
-	test("says the studio is paid directly, never Tattoo Drip", () => {
-		assert.match(copy.footer, /\{studio\} directly/);
-		assert.match(copy.footer, /never handles your money/);
+	test("says the studio is paid directly, never Tattoo Drip, under the amount (TAT-110)", () => {
+		assert.match(copy.due.direct, /\{studio\} directly/);
+		assert.match(copy.due.direct, /never handles your money/);
+		assert.doesNotMatch(copy.footer, /directly|handles your money/);
+		assert.match(copy.footer, /runs this page for \{studio\}/);
+	});
+
+	test("the steps, Pay with, the I've paid button and the session words (TAT-110)", () => {
+		assert.equal(copy.steps.label, "Step {count}: ");
+		assert.equal(copy.steps.code, "Copy the code");
+		assert.equal(copy.steps.pay, "Pay");
+		assert.equal(copy.payWith.legend, "Pay with");
+		assert.equal(copy.payWith.only, "Pay with {label}");
+		assert.equal(copy.paidButton, "I've paid: send the screenshot");
+		assert.equal(copy.methods.missing, "Ask {studio} for these details.");
+		assert.equal(copy.states.session, "Your session");
+		assert.equal(copy.states.artist, "Artist");
+		assert.match(copy.methods.samePhone, /^On this phone\?/);
 	});
 });
 

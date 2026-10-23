@@ -48,6 +48,7 @@ export const PAGE: DepositPage = {
 	],
 	depositPolicy:
 		"Deposits hold your date.\nThey are kept if you cancel within 48 hours.",
+	nextSession: null,
 };
 
 export const page = (overrides: Partial<DepositPage> = {}): DepositPage => ({
@@ -60,4 +61,5 @@ export const SHELL = {
 	studioName: "Black Needle",
 	timezone: "Asia/Kathmandu",
 	phone: "+9779812345678",
+	logo: null,
 };

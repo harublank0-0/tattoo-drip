@@ -28,7 +28,7 @@ test("the server renders the shell only: the studio, a busy skeleton, its chat l
 		`https://wa.me/9779812345678?text=${encodeURIComponent("Hi Black Needle, about my deposit.")}`,
 		"viber://chat?number=%2B9779812345678",
 	]);
-	assert.match(textOf(html), /You pay Black Needle directly\./);
+	assert.match(textOf(html), /Tattoo Drip runs this page for Black Needle\./);
 	assert.doesNotMatch(html, /<form|deposits|Deposit due|role="alert"/);
 });
 

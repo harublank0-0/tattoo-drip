@@ -5,7 +5,7 @@ import type {
 } from "@tattoo-drip/sdk";
 import { fill } from "../intake/template.ts";
 import { safeImageUrl, viberLink, whatsappLink } from "../studio/links.ts";
-import { cleanLine, cleanText } from "../studio/text.ts";
+import { cleanLine, cleanText, graphemes } from "../studio/text.ts";
 import { copy, type DepositMethodKind } from "./copy.ts";
 import type { LoadProblem } from "./problems.ts";
 
@@ -40,7 +40,14 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_MS = 86_400_000;
 
 export interface MethodView {
-	/** Stable for React keys: the method's place in the API's list. */
+	/**
+	 * The method's identity, which survives the studio reordering, adding to or
+	 * removing from its list between two reads (the page refetches when the tab
+	 * regains focus): a function of its own fields alone (kind, number, names,
+	 * label, QR URL), encoded. Methods identical in all of them are listed once,
+	 * so there is no ordinal. Never the place in the list. It lives in state and
+	 * keys only: it is not written to any attribute of the page.
+	 */
 	readonly id: string;
 	readonly kind: DepositMethodKind;
 	readonly label: string;
@@ -50,6 +57,12 @@ export interface MethodView {
 	/** The bank account number, or the eSewa or Khalti ID. */
 	readonly accountNumber: string | null;
 	readonly bankName: string | null;
+}
+
+export interface SessionView {
+	/** The API's UTC instant, for <time dateTime>. */
+	readonly startsAt: string;
+	readonly artistName: string | null;
 }
 
 export interface DepositView {
@@ -78,6 +91,8 @@ export interface DepositView {
 	readonly policy: string | null;
 	/** `due`, with a way to pay and something to pay: the form shows. */
 	readonly takesProof: boolean;
+	/** Once `paid`, the project's next session (TAT-110); null otherwise. */
+	readonly session: SessionView | null;
 }
 
 export function depositView(page: DepositPage): DepositView {
@@ -107,21 +122,109 @@ export function depositView(page: DepositPage): DepositView {
 		policy: cleanText(page.depositPolicy),
 		takesProof:
 			state === "due" && methods.length > 0 && Number.isInteger(due) && due > 0,
+		session: state === "paid" ? sessionView(page.nextSession) : null,
 	};
 }
 
+/** The API's nextSession, or null: missing (an API before TAT-110), null, or a start that isn't a date. */
+function sessionView(
+	value: DepositPage["nextSession"] | undefined,
+): SessionView | null {
+	if (!value || typeof value.startsAt !== "string") return null;
+	if (Number.isNaN(Date.parse(value.startsAt))) return null;
+	return { startsAt: value.startsAt, artistName: cleanLine(value.artistName) };
+}
+
+/** The picked method while it is listed, else the first, else null. */
+export function selectedMethod(
+	methods: readonly MethodView[],
+	picked: string | null,
+): MethodView | null {
+	return methods.find((method) => method.id === picked) ?? methods[0] ?? null;
+}
+
+/**
+ * The client's pick of a way to pay, as an event: the method's identity, its
+ * kind, and how many picks there have been, so a second pick of the same kind
+ * (another bank account) is a new event too.
+ */
+export interface MethodPick {
+	readonly id: string;
+	readonly kind: DepositMethodKind;
+	readonly count: number;
+}
+
+/** `previous` followed by the client picking `method`. */
+export function pickMethod(
+	previous: MethodPick | null,
+	method: Pick<MethodView, "id" | "kind">,
+): MethodPick {
+	return {
+		id: method.id,
+		kind: method.kind,
+		count: (previous?.count ?? 0) + 1,
+	};
+}
+
+/**
+ * What a pick sets in "How did you pay?", once: its kind when it is newer than
+ * the last one applied (`appliedCount`) and the form offers it, else null. Only
+ * a pick sets the answer; a re-render, a refetch, a reorder or a pick that has
+ * gone from the list never does, and never undoes the client's own answer.
+ */
+export function answerFor(
+	pick: MethodPick | null,
+	appliedCount: number,
+	kinds: readonly DepositMethodKind[],
+): DepositMethodKind | null {
+	if (!pick || pick.count === appliedCount) return null;
+	return kinds.includes(pick.kind) ? pick.kind : null;
+}
+
+/** The studio's mark when it has no logo: its first user-perceived character, as typed. */
+export function studioInitial(name: string): string {
+	return graphemes(name.trim())[0] ?? "";
+}
+
 function methodViews(methods: readonly DepositPaymentMethod[]): MethodView[] {
-	return methods
-		.filter((method) => DEPOSIT_KINDS.includes(method.kind))
-		.map((method, index) => ({
-			id: `method-${index}`,
+	const views = new Map<string, MethodView>();
+	for (const method of methods) {
+		if (!DEPOSIT_KINDS.includes(method.kind)) continue;
+		const shown = {
 			kind: method.kind,
 			label: cleanLine(method.label) ?? copy.form.kinds[method.kind],
 			qr: safeImageUrl(method.qrImageUrl),
 			accountName: cleanLine(method.accountName),
 			accountNumber: cleanLine(method.accountNumber),
 			bankName: cleanLine(method.bankName),
-		}));
+		};
+		const id = methodId(shown);
+		// A method identical to an earlier one in every field shows the same thing:
+		// it is the same method, listed once, so no identity needs an ordinal.
+		if (!views.has(id)) views.set(id, { id, ...shown });
+	}
+	return [...views.values()];
+}
+
+/**
+ * A method's identity (MethodView.id): a pure function of its own fields as the
+ * page shows them (kind, account number, account name, bank name, label and the
+ * checked QR URL), each URL-encoded so none can contain the `|` between them.
+ * The payload has no id of its own, and QR-only methods (Fonepay) have no
+ * number, so the number alone is not enough. Nothing about the other methods
+ * goes in: reordering, adding or removing any of them can't change it.
+ */
+function methodId(shown: Omit<MethodView, "id">): string {
+	return [
+		shown.kind,
+		shown.accountNumber,
+		shown.accountName,
+		shown.bankName,
+		shown.label,
+		shown.qr,
+	]
+		.map((part) => encodeURIComponent(part ?? ""))
+		.join("|");
 }
 
 /** Today's date (yyyy-mm-dd) in `timeZone`, or null when this browser doesn't know the zone. */
@@ -173,13 +276,16 @@ export function payByLine(
 }
 
 /**
- * When the screenshot came, as "18 Oct 2026, 2:05 pm" in `timeZone`, or null.
- * Assembled from Intl's parts (en-GB month names, like the platform's
- * formatDay), so no browser's spacing or capitals change it.
+ * An instant as "18 Oct 2026, 2:05 pm" (with `weekday`, "Sat 18 Oct 2026, 2:05
+ * pm") in `timeZone`, or null (not a date, or a zone this browser doesn't know:
+ * never UTC, which would show a wrong time). Assembled from Intl's parts (en-GB
+ * month names, like the platform's formatDay), so no browser's spacing or
+ * capitals change it.
  */
-export function formatReceived(
+function formatInstant(
 	iso: string | null,
 	timeZone: string,
+	weekday: boolean,
 ): string | null {
 	if (!iso) return null;
 	const date = new Date(iso);
@@ -187,6 +293,7 @@ export function formatReceived(
 	try {
 		const parts = new Intl.DateTimeFormat("en-GB", {
 			timeZone,
+			...(weekday ? { weekday: "short" as const } : {}),
 			day: "numeric",
 			month: "short",
 			year: "numeric",
@@ -196,10 +303,28 @@ export function formatReceived(
 		}).formatToParts(date);
 		const part = (type: Intl.DateTimeFormatPartTypes) =>
 			parts.find((each) => each.type === type)?.value ?? "";
-		return `${part("day")} ${part("month")} ${part("year")}, ${part("hour")}:${part("minute")} ${part("dayPeriod").toLowerCase()}`;
+		const day = `${part("day")} ${part("month")} ${part("year")}`;
+		const time = `${part("hour")}:${part("minute")} ${part("dayPeriod").toLowerCase()}`;
+		return `${weekday ? `${part("weekday")} ` : ""}${day}, ${time}`;
 	} catch {
 		return null;
 	}
+}
+
+/** When the screenshot came, as "18 Oct 2026, 2:05 pm" in `timeZone`, or null. */
+export function formatReceived(
+	iso: string | null,
+	timeZone: string,
+): string | null {
+	return formatInstant(iso, timeZone, false);
+}
+
+/** When the next session starts, as "Sat 24 Oct 2026, 11:00 am" in `timeZone`, or null. */
+export function formatSessionStart(
+	iso: string | null,
+	timeZone: string,
+): string | null {
+	return formatInstant(iso, timeZone, true);
 }
 
 /** The sentence a state other than `due` shows (copy.states). */

@@ -11,7 +11,11 @@ import {
 } from "../../src/deposit/components/proof-picker.tsx";
 import { copy } from "../../src/deposit/copy.ts";
 import { NO_PROOF, type ProofState } from "../../src/deposit/proof.ts";
-import { depositView } from "../../src/deposit/view-model.ts";
+import {
+	type DepositView,
+	depositView,
+	type MethodPick,
+} from "../../src/deposit/view-model.ts";
 import { renderWithProviders } from "../intake/providers.tsx";
 import { PAGE, page, TOKEN } from "./fixtures.ts";
 import { attr, hrefs, tags, textOf } from "./html.ts";
@@ -41,7 +45,10 @@ const picker = (overrides: Partial<ProofPickerProps> = {}) =>
 const fileInput = (html: string) =>
 	tags(html, "input").find((tag) => attr(tag, "type") === "file") ?? "";
 
-const formHtml = (view = depositView(PAGE)) =>
+const formHtml = (
+	view: DepositView = depositView(PAGE),
+	pick: MethodPick | null = null,
+) =>
 	renderWithProviders(
 		createTattooClient({
 			baseUrl: "http://api.test",
@@ -52,6 +59,7 @@ const formHtml = (view = depositView(PAGE)) =>
 			token: TOKEN,
 			view,
 			studioName: "Black Needle",
+			pick,
 			reread: async () => "due" as const,
 			onLeftDue: () => undefined,
 			onGone: () => undefined,
@@ -139,7 +147,7 @@ describe("ProofForm", () => {
 		const html = formHtml();
 		assert.match(
 			html,
-			/<h2 id="proof-title">After you pay, send a screenshot<\/h2>/,
+			/<h2 id="proof-title" class="deposit-step-title" tabindex="-1"><span class="deposit-step-number" aria-hidden="true">3<\/span><span class="sr-only">Step 3: <\/span>Send the screenshot<\/h2>/,
 		);
 		const form = tags(html, "form")[0];
 		assert.match(form, /novalidate=""/i);
@@ -165,6 +173,42 @@ describe("ProofForm", () => {
 		assert.equal(attr(send, "aria-disabled"), undefined);
 		assert.match(html, />Send screenshot<\/button>/);
 		assert.doesNotMatch(html, /role="alert"|proof-summary-title/);
+	});
+
+	const radiosIn = (html: string) =>
+		tags(html, "input").filter((tag) => attr(tag, "type") === "radio");
+
+	test("a Pay with pick answers How did you pay?: that kind is checked (TAT-110)", () => {
+		const html = formHtml(depositView(PAGE), {
+			id: "bank:01234567890123",
+			kind: "bank",
+			count: 1,
+		});
+		const radios = radiosIn(html);
+
+		assert.doesNotMatch(radios[0], / checked=""/);
+		assert.match(radios[1], / checked=""/);
+		// A kind the form doesn't offer is no answer.
+		const unknown = radiosIn(
+			formHtml(depositView(PAGE), { id: "khalti:1", kind: "khalti", count: 1 }),
+		);
+		for (const radio of unknown) assert.doesNotMatch(radio, / checked=""/);
+	});
+
+	test("no pick, no answer: with two kinds nothing is checked, though the first method is on show", () => {
+		const html = formHtml(depositView(PAGE), null);
+
+		for (const radio of radiosIn(html))
+			assert.doesNotMatch(radio, / checked=""/);
+	});
+
+	test("the payment screenshot legend is for screen readers only: step 3's heading names the field", () => {
+		const html = picker();
+
+		assert.match(
+			html,
+			/<legend class="deposit-label sr-only">Payment screenshot<\/legend>/,
+		);
 	});
 
 	test("one way to pay is chosen already", () => {

@@ -28,6 +28,8 @@ import { isExpired } from "#modules/projects/quotes";
 import ProjectService from "#modules/projects/services/project_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import QuoteService from "#modules/projects/services/quote_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import SessionService from "#modules/scheduling/services/session_service";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { afterRollback, withTransaction } from "#services/db_context";
 import { dispatchInTransaction } from "#services/queue";
@@ -43,6 +45,9 @@ export type ShownMethod = Pick<
 	PaymentMethod,
 	"kind" | "label" | "accountName" | "accountNumber" | "bankName"
 > & { qrImageUrl: string | null };
+
+/** The project's next session as the paid page shows it (openapi.yaml, DepositSession). */
+export type NextSession = { startsAt: DateTime; artistName: string | null };
 
 /** The deposit page of one link (openapi.yaml, DepositPage, before formatting). */
 export type DepositPage = {
@@ -64,6 +69,8 @@ export type DepositPage = {
 	proofSubmittedAt: DateTime | null;
 	/** The studio's deposit-page methods, only in `due`; otherwise empty. */
 	methods: ShownMethod[];
+	/** Once `paid`, the project's next session (TAT-110); null in every other state. */
+	nextSession: NextSession | null;
 };
 
 /** A validated proof: the upload, how the client paid and the `due` the page showed. */
@@ -91,6 +98,7 @@ export default class DepositPageService {
 		private methods: PaymentMethodService,
 		private artists: ArtistService,
 		private images: ImageService,
+		private sessions: SessionService,
 	) {}
 
 	/**
@@ -125,13 +133,21 @@ export default class DepositPageService {
 			settled: due === 0,
 			proofPending: pending !== null,
 		});
+		const next =
+			state === "paid"
+				? await this.sessions.nextScheduled(tenant, project)
+				: null;
+		const nameOf = await this.artistNames(tenant, [
+			project.artistId,
+			next?.artistId ?? null,
+		]);
 		return {
 			projectId: project.id,
 			studioName: tenant.name,
 			timezone: tenant.timezone,
 			depositPolicy: tenant.depositPolicy,
 			brief: project.brief,
-			artistName: await this.artistName(tenant, project.artistId),
+			artistName: nameOf(project.artistId),
 			quote,
 			due,
 			referenceCode: link.referenceCode,
@@ -141,6 +157,9 @@ export default class DepositPageService {
 				(await this.deposits.lastDecisionRejected(tenant, project)),
 			proofSubmittedAt: pending?.createdAt ?? null,
 			methods: state === "due" ? await this.shownMethods(tenant) : [],
+			nextSession: next
+				? { startsAt: next.startsAt, artistName: nameOf(next.artistId) }
+				: null,
 		};
 	}
 
@@ -210,13 +229,14 @@ export default class DepositPageService {
 		return page;
 	}
 
-	private async artistName(
+	/** One read of the live profiles (hidden ones too) when any id is set; a lookup by id. */
+	private async artistNames(
 		tenant: DepositStudio,
-		artistId: string | null,
-	): Promise<string | null> {
-		if (!artistId) return null;
+		ids: (string | null)[],
+	): Promise<(id: string | null) => string | null> {
+		if (!ids.some(Boolean)) return () => null;
 		const artists = await this.artists.list(tenant);
-		return artists.find(({ id }) => id === artistId)?.name ?? null;
+		return (id) => artists.find((artist) => artist.id === id)?.name ?? null;
 	}
 
 	private async shownMethods(tenant: DepositStudio): Promise<ShownMethod[]> {

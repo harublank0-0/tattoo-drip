@@ -147,3 +147,32 @@ test("takes the intake form's words only as types: `fill` comes from template.ts
 		}
 	}
 });
+
+/*
+ * TAT-110's guards. The first and the third pass on the code as it is: they
+ * are regression guards for what the ticket must not change. The image one
+ * failed until the screenshot preview got the same attribute as the QR codes.
+ */
+
+test("the deposit route adds no brand style: the page stays violet and writes no <style> (TAT-110)", () => {
+	const route = readFileSync(new URL("routes/deposit.tsx", SRC), "utf8");
+	assert.doesNotMatch(route, /themedHeadTags|brandingCss|theme\/head/);
+	for (const file of depositFiles()) {
+		assert.doesNotMatch(read(file), /brandingCss|themedHeadTags/, file);
+	}
+});
+
+test("every image on the deposit page sends no Referer: the QR codes, the logo and the preview (TAT-110)", () => {
+	let seen = 0;
+	for (const file of depositFiles()) {
+		for (const match of read(file).matchAll(/<img\b[\s\S]*?\/>/g)) {
+			seen++;
+			assert.match(match[0], /referrerPolicy="no-referrer"/, file);
+		}
+	}
+	assert.ok(seen >= 3, "the guard found the logo, the QR and the preview");
+});
+
+test("the I've paid button never writes the URL: browser.ts touches no location or history (TAT-110)", () => {
+	assert.doesNotMatch(read("browser.ts"), /location\.|history\./);
+});

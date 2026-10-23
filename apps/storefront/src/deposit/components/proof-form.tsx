@@ -14,9 +14,10 @@ import {
 	validateProofForm,
 } from "../problems.ts";
 import { NO_PROOF, prepareProof, previewOf, proofReducer } from "../proof.ts";
-import type { DepositView } from "../view-model.ts";
+import { answerFor, type DepositView, type MethodPick } from "../view-model.ts";
 import { ProofNoticeView, ProofSummary } from "./notices.tsx";
 import { ProofPicker } from "./proof-picker.tsx";
+import { StepHeading } from "./steps.tsx";
 
 /** After this long sending, the status line says a slow connection can take 2 minutes. */
 export const SLOW_AFTER_MS = 15_000;
@@ -37,6 +38,12 @@ export interface ProofFormProps {
 	/** A `due` page that takes a screenshot (`view.takesProof`). */
 	readonly view: DepositView;
 	readonly studioName: string;
+	/**
+	 * The client's latest pick in step 2, or null before any: each new pick sets
+	 * "How did you pay?", one way (a change in the form itself stays until the
+	 * next pick). Nothing else sets it: not a refetch, not a reordered list.
+	 */
+	readonly pick: MethodPick | null;
 	/** Reads the page again: its state now, "gone" (a 404) or "failed". */
 	reread(): Promise<DepositState | "gone" | "failed">;
 	/** The page left `due` (sent, or changed under the form): the screen moves focus to its message. */
@@ -61,6 +68,7 @@ export function ProofForm({
 	token,
 	view,
 	studioName,
+	pick: methodPick,
 	reread,
 	onLeftDue,
 	onGone,
@@ -89,7 +97,12 @@ export function ProofForm({
 	const kinds = view.kinds;
 	const form = useAppForm({
 		defaultValues: {
-			method: kinds.length === 1 ? kinds[0] : "",
+			method:
+				kinds.length === 1
+					? kinds[0]
+					: methodPick && kinds.includes(methodPick.kind)
+						? methodPick.kind
+						: "",
 		} as ProofValues,
 		validationLogic: revalidateLogic({
 			mode: "submit",
@@ -113,6 +126,15 @@ export function ProofForm({
 			setFocusSummary(true);
 		},
 	});
+
+	// A new pick in step 2 sets the answer, whatever its kind and whatever the
+	// client answered by hand since; a re-render with the same pick never does.
+	const appliedPick = useRef(methodPick?.count ?? 0);
+	useEffect(() => {
+		const kind = answerFor(methodPick, appliedPick.current, kinds);
+		if (methodPick) appliedPick.current = methodPick.count;
+		if (kind) form.setFieldValue("method", kind);
+	}, [methodPick, kinds, form]);
 
 	async function send(values: ProofValues): Promise<void> {
 		if (inFlight.current || blocked.current) return;
@@ -269,8 +291,13 @@ export function ProofForm({
 	const busy = sending || proof.kind === "preparing" || blockedUntil !== null;
 
 	return (
-		<section className="deposit-block" aria-labelledby="proof-title">
-			<h2 id="proof-title">{copy.form.title}</h2>
+		<section
+			className="deposit-block deposit-due-proof"
+			aria-labelledby="proof-title"
+		>
+			<StepHeading step={3} id="proof-title" focusable>
+				{copy.form.title}
+			</StepHeading>
 			{view.lastProofRejected ? (
 				<p className="deposit-note">{copy.rejected}</p>
 			) : null}

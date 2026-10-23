@@ -48,7 +48,7 @@ export function ProofPicker({
 	const locked = busy || state.kind === "preparing";
 	return (
 		<fieldset id="proof" className="deposit-proof">
-			<legend className="deposit-label">{copy.form.proof}</legend>
+			<legend className="deposit-label sr-only">{copy.form.proof}</legend>
 			<p id="proof-hint" className="deposit-muted">
 				{copy.form.proofHint}
 			</p>
@@ -57,6 +57,7 @@ export function ProofPicker({
 					className="deposit-preview"
 					src={preview}
 					alt={copy.form.previewAlt}
+					referrerPolicy="no-referrer"
 				/>
 			) : null}
 			<div className="deposit-proof-actions">

@@ -29,6 +29,7 @@ const PAGE: DepositPage = {
 	proofSubmittedAt: null,
 	paymentMethods: [],
 	depositPolicy: null,
+	nextSession: null,
 };
 
 /** A client whose fetch answers every call with `status` and `body`. */

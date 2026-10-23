@@ -2,6 +2,7 @@ import type { ReactNode, Ref } from "react";
 import { Fill } from "../../intake/components/fill.tsx";
 import { fill } from "../../intake/template.ts";
 import { linkRel } from "../../studio/links.ts";
+import type { BrandImage } from "../../studio/theme/config.ts";
 import { copy } from "../copy.ts";
 import type { LoadProblem } from "../problems.ts";
 import {
@@ -12,8 +13,10 @@ import {
 	payByLine,
 	receiptAmount,
 	stateTemplate,
+	studioInitial,
 } from "../view-model.ts";
 import { CopyButton } from "./copy-button.tsx";
+import { MethodPanel, PaidBar, PayWith, StepHeading } from "./steps.tsx";
 
 /*
  * The deposit page's blocks (TAT-65b). Props only: no router or query hooks,
@@ -31,11 +34,20 @@ import { CopyButton } from "./copy-button.tsx";
  */
 export function DepositFrame({
 	studioName,
+	logo = null,
+	artistName = null,
+	wide = false,
 	view = null,
 	problem = null,
 	children,
 }: {
 	studioName: string;
+	/** The studio's checked logo (DepositShell.logo), or null for its initial. */
+	logo?: BrandImage | null;
+	/** The project's artist, once the deposit is read. */
+	artistName?: string | null;
+	/** `due` with a way to pay: from 60rem the page is two columns (styles.css). */
+	wide?: boolean;
 	/** The deposit, once read; null (or left out) while it loads. */
 	view?: Pick<DepositView, "state" | "amount"> | null;
 	/** A link that doesn't work, a rate limit or a failed read: the h1 matches it. */
@@ -44,7 +56,12 @@ export function DepositFrame({
 }) {
 	return (
 		<>
-			<main className="deposit">
+			<main className={wide ? "deposit deposit-wide" : "deposit"}>
+				<DepositHeader
+					studioName={studioName}
+					logo={logo}
+					artistName={artistName}
+				/>
 				<h1 className="deposit-title">
 					<Fill
 						template={headingTemplate(view, problem)}
@@ -53,12 +70,61 @@ export function DepositFrame({
 				</h1>
 				{children}
 			</main>
-			<footer className="deposit-footer">
+			<footer
+				className={wide ? "deposit-footer deposit-wide" : "deposit-footer"}
+			>
 				<p>
 					<Fill template={copy.footer} values={{ studio: studioName }} />
 				</p>
 			</footer>
 		</>
+	);
+}
+
+/**
+ * Who the page is for (TAT-110): the studio's mark and name, then the
+ * project's artist once the deposit is read. The mark is the studio's checked
+ * logo (decoration: its name is beside it, so `alt` is empty), else the first
+ * user-perceived character of its name, never the cover. Server-rendered.
+ */
+function DepositHeader({
+	studioName,
+	logo,
+	artistName,
+}: {
+	studioName: string;
+	logo: BrandImage | null;
+	artistName: string | null;
+}) {
+	return (
+		<header className="deposit-header">
+			{logo ? (
+				<img
+					className="deposit-logo"
+					src={logo.src}
+					width={logo.width}
+					height={logo.height}
+					alt=""
+					decoding="async"
+					fetchPriority="low"
+					referrerPolicy="no-referrer"
+				/>
+			) : (
+				<span className="deposit-mark" aria-hidden="true">
+					{studioInitial(studioName)}
+				</span>
+			)}
+			<div className="deposit-header-text">
+				<p className="deposit-studio" dir="auto">
+					{studioName}
+				</p>
+				{artistName ? (
+					<p className="deposit-muted">
+						<Fill template={copy.withArtist} values={{ artist: artistName }} />
+					</p>
+				) : null}
+			</div>
+		</header>
 	);
 }
 
@@ -161,50 +227,50 @@ export function StateRegion({
 	);
 }
 
-/** The brief (folded when long, spec ruling 10) and the artist. */
+/** The brief, folded when long (spec ruling 10). The artist is in the header (TAT-110). */
 export function DepositIntro({ view }: { view: DepositView }) {
-	if (!view.brief && !view.artistName) return null;
+	if (!view.brief) return null;
 	return (
 		<div className="deposit-intro">
-			{view.brief ? (
-				view.briefLong ? (
-					<details className="deposit-brief">
-						<summary>{copy.briefSummary}</summary>
-						<p className="user-text" dir="auto">
-							{view.brief}
-						</p>
-					</details>
-				) : (
+			{view.briefLong ? (
+				<details className="deposit-brief">
+					<summary>{copy.briefSummary}</summary>
 					<p className="user-text" dir="auto">
 						{view.brief}
 					</p>
-				)
-			) : null}
-			{view.artistName ? (
-				<p className="deposit-muted">
-					<Fill
-						template={copy.withArtist}
-						values={{ artist: view.artistName }}
-					/>
+				</details>
+			) : (
+				<p className="user-text" dir="auto">
+					{view.brief}
 				</p>
-			) : null}
+			)}
 		</div>
 	);
 }
 
-/** Every state but `due`: its sentence (focusable: focus moves here after a send), and for `submitted` and a paid deposit the amount and code (receiptAmount). */
+/**
+ * Every state but `due`: its sentence (focusable: focus moves here after a
+ * send), and for `submitted` and a paid deposit the amount and code
+ * (receiptAmount). A paid page adds the project's next session (TAT-110):
+ * `sessionStart` is its start in the studio's timezone (formatSessionStart),
+ * null when the browser doesn't know the zone, and then the rows are left out
+ * rather than shown in a wrong time.
+ */
 export function StateMessage({
 	view,
 	studioName,
 	received,
+	sessionStart,
 	ref,
 }: {
 	view: DepositView;
 	studioName: string;
 	received: string | null;
+	sessionStart: string | null;
 	ref?: Ref<HTMLParagraphElement>;
 }) {
 	const amount = receiptAmount(view);
+	const session = view.session && sessionStart ? view.session : null;
 	return (
 		<div className="deposit-state">
 			<p ref={ref} className="deposit-state-title" tabIndex={-1}>
@@ -213,37 +279,69 @@ export function StateMessage({
 					values={{ studio: studioName, date: received ?? "" }}
 				/>
 			</p>
-			{amount !== null ? (
+			{amount !== null || session ? (
 				<dl className="deposit-details">
-					<dt>{copy.states.amount}</dt>
-					<dd translate="no">{amount}</dd>
-					<dt>{copy.code.title}</dt>
-					<dd className="deposit-number" translate="no">
-						{view.referenceCode}
-					</dd>
+					{amount !== null ? (
+						<>
+							<dt>{copy.states.amount}</dt>
+							<dd translate="no">{amount}</dd>
+							<dt>{copy.code.title}</dt>
+							<dd className="deposit-number" translate="no">
+								{view.referenceCode}
+							</dd>
+						</>
+					) : null}
+					{session ? (
+						<>
+							<dt>{copy.states.session}</dt>
+							<dd>
+								<time dateTime={session.startsAt}>{sessionStart}</time>
+							</dd>
+							{session.artistName ? (
+								<>
+									<dt>{copy.states.artist}</dt>
+									<dd dir="auto">{session.artistName}</dd>
+								</>
+							) : null}
+						</>
+					) : null}
 				</dl>
 			) : null}
 		</div>
 	);
 }
 
-/** `due`: the amount, the code, how to pay, the policy, then `form` (the screenshot form, or nothing). */
+/**
+ * `due` (TAT-110): the amount and who it goes to, then three numbered steps,
+ * the first two here (copy the code, pay) and the third in `form` (the
+ * screenshot form, or nothing), then the policy. The picked method's panel is
+ * a sibling of the steps, so a desktop can set it beside them (styles.css).
+ */
 export function DueView({
 	view,
 	studioName,
 	today,
+	selected,
+	onSelect,
 	form,
 }: {
 	view: DepositView;
 	studioName: string;
 	today: string | null;
+	/** The method whose QR and details show (selectedMethod), or null without methods. */
+	selected: MethodView | null;
+	onSelect(id: string): void;
 	form: ReactNode;
 }) {
-	const firstQr = view.methods.find((method) => method.qr)?.id ?? null;
 	return (
-		<>
-			<section className="deposit-block" aria-labelledby="deposit-due-title">
-				<h2 id="deposit-due-title">{copy.due.title}</h2>
+		<div className="deposit-due">
+			<section
+				className="deposit-block deposit-due-amount"
+				aria-labelledby="deposit-due-title"
+			>
+				<h2 id="deposit-due-title" className="sr-only">
+					{copy.due.title}
+				</h2>
 				<p className="deposit-amount" translate="no">
 					{view.dueText}
 				</p>
@@ -251,9 +349,17 @@ export function DueView({
 					<p>{fill(copy.due.partial, { amount: view.amountText })}</p>
 				) : null}
 				<p>{payByLine(view, today)}</p>
+				<p className="deposit-muted">
+					<Fill template={copy.due.direct} values={{ studio: studioName }} />
+				</p>
 			</section>
-			<section className="deposit-block" aria-labelledby="deposit-code-title">
-				<h2 id="deposit-code-title">{copy.code.title}</h2>
+			<section
+				className="deposit-block deposit-due-code"
+				aria-labelledby="deposit-code-title"
+			>
+				<StepHeading step={1} id="deposit-code-title">
+					{copy.steps.code}
+				</StepHeading>
 				<div className="deposit-code-row">
 					<p className="deposit-code" translate="no">
 						{view.referenceCode}
@@ -266,33 +372,37 @@ export function DueView({
 				</div>
 				<p>{copy.code.hint}</p>
 			</section>
-			{view.methods.length > 0 ? (
-				<section
-					className="deposit-block"
-					aria-labelledby="deposit-methods-title"
-				>
-					<h2 id="deposit-methods-title">{copy.methods.title}</h2>
-					{firstQr ? (
-						<p className="deposit-muted">{copy.methods.samePhone}</p>
-					) : null}
-					<ul className="deposit-methods">
-						{view.methods.map((method) => (
-							<li key={method.id} className="deposit-method">
-								<MethodCard
-									method={method}
-									studioName={studioName}
-									eager={method.id === firstQr}
-								/>
-							</li>
-						))}
-					</ul>
-				</section>
-			) : (
-				<p className="deposit-note">{copy.methods.none}</p>
-			)}
+			<section
+				className="deposit-block deposit-due-pay"
+				aria-labelledby="deposit-pay-title"
+			>
+				<StepHeading step={2} id="deposit-pay-title">
+					{copy.steps.pay}
+				</StepHeading>
+				{selected ? (
+					<PayWith
+						methods={view.methods}
+						selected={selected}
+						onSelect={onSelect}
+					/>
+				) : (
+					<p className="deposit-note">{copy.methods.none}</p>
+				)}
+			</section>
+			{selected ? (
+				// Keyed by identity, which includes the QR URL: a switch makes a fresh image.
+				<MethodPanel
+					key={selected.id}
+					method={selected}
+					single={view.methods.length === 1}
+					studioName={studioName}
+				/>
+			) : null}
+			{form ? <PaidBar /> : null}
+			{form}
 			{view.policy ? (
 				<section
-					className="deposit-block"
+					className="deposit-block deposit-due-policy"
 					aria-labelledby="deposit-policy-title"
 				>
 					<h2 id="deposit-policy-title">{copy.policyTitle}</h2>
@@ -301,79 +411,7 @@ export function DueView({
 					</p>
 				</section>
 			) : null}
-			{form}
-		</>
-	);
-}
-
-/** One way to pay: its label, its QR (a square reserved while it loads), its details. */
-export function MethodCard({
-	method,
-	studioName,
-	eager,
-}: {
-	method: MethodView;
-	studioName: string;
-	eager: boolean;
-}) {
-	const hasDetails = Boolean(
-		method.bankName || method.accountName || method.accountNumber,
-	);
-	return (
-		<>
-			<h3 dir="auto">{method.label}</h3>
-			{method.qr ? (
-				<figure className="deposit-qr-figure">
-					<img
-						className="deposit-qr"
-						src={method.qr}
-						alt={fill(copy.methods.qrAlt, {
-							label: method.label,
-							studio: studioName,
-						})}
-						width={280}
-						height={280}
-						loading={eager ? "eager" : "lazy"}
-						decoding="async"
-						referrerPolicy="no-referrer"
-					/>
-					<figcaption>{copy.methods.scan[method.kind]}</figcaption>
-				</figure>
-			) : null}
-			{hasDetails ? (
-				<dl className="deposit-details">
-					{method.bankName ? (
-						<>
-							<dt>{copy.methods.bankName}</dt>
-							<dd dir="auto">{method.bankName}</dd>
-						</>
-					) : null}
-					{method.accountName ? (
-						<>
-							<dt>{copy.methods.accountName}</dt>
-							<dd dir="auto">{method.accountName}</dd>
-						</>
-					) : null}
-					{method.accountNumber ? (
-						<>
-							<dt>{copy.methods.accountNumber[method.kind]}</dt>
-							<dd>
-								<span className="deposit-number" translate="no">
-									{method.accountNumber}
-								</span>
-								<CopyButton
-									text={method.accountNumber}
-									label={fill(copy.methods.copyLabel, {
-										number: method.accountNumber,
-									})}
-									visible={copy.methods.copy}
-								/>
-							</dd>
-						</>
-					) : null}
-				</dl>
-			) : null}
-		</>
+		</div>
 	);
 }
 

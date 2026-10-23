@@ -24,6 +24,7 @@ export type InquiryReceipt = Schemas["InquiryReceipt"];
 export type DepositState = Schemas["DepositState"];
 export type DepositPaymentMethod = Schemas["DepositPaymentMethod"];
 export type DepositPage = Schemas["DepositPage"];
+export type DepositSession = Schemas["DepositSession"];
 export type DepositProofForm = Schemas["DepositProofForm"];
 
 export type ListServicesQuery = NonNullable<

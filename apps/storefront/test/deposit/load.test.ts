@@ -96,6 +96,9 @@ describe("the screen once the deposit is read (TAT-106)", () => {
 			textOf(expired),
 			/This quote has expired\. Message Black Needle if you still want to book\./,
 		);
-		assert.match(textOf(expired), /You pay Black Needle directly\./);
+		assert.match(
+			textOf(expired),
+			/Tattoo Drip runs this page for Black Needle\./,
+		);
 	});
 });

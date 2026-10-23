@@ -4,6 +4,7 @@ import db from "@adonisjs/lucid/services/db";
 import queue from "@adonisjs/queue/services/main";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
+import Artist from "#modules/artists/models/artist";
 import { InvalidImageError } from "#modules/media/errors";
 import { newTokenNonce, tokenFor } from "#modules/payments/deposit_links";
 import {
@@ -17,7 +18,6 @@ import DepositPageService, {
 	type ProofSubmission,
 } from "#modules/payments/services/deposit_page_service";
 import ProjectService from "#modules/projects/services/project_service";
-import SessionService from "#modules/scheduling/services/session_service";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { withDbContext } from "#services/db_context";
 import { depositReady, depositServices, OWNER } from "#tests/helpers/deposits";
@@ -26,7 +26,14 @@ import {
 	testImages,
 	uploadOf,
 } from "#tests/helpers/images";
-import { makeArtist, makePayment } from "#tests/helpers/pipeline";
+import {
+	makeArtist,
+	makeClient,
+	makePayment,
+	makeProject,
+	makeSession,
+} from "#tests/helpers/pipeline";
+import { recordQueries } from "#tests/helpers/query_count";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
 /**
@@ -287,7 +294,7 @@ test.group("DepositPageService.show", (group) => {
 			base.artists,
 			base.quotes,
 			base.deposits,
-			new SessionService(base.artists, base.deposits),
+			base.sessions,
 		);
 		const pages = new DepositPageService(
 			base.links,
@@ -297,6 +304,7 @@ test.group("DepositPageService.show", (group) => {
 			base.methods,
 			base.artists,
 			base.images,
+			base.sessions,
 		);
 		queue.fake();
 		try {
@@ -545,6 +553,7 @@ test.group("DepositPageService.submitProof", (group) => {
 			services.methods,
 			services.artists,
 			images,
+			services.sessions,
 		);
 		const { tenant, project, token } = await studioWithDeposit(
 			"proof-race-65",
@@ -599,5 +608,190 @@ test.group("DepositPageService.submitProof", (group) => {
 			services.pages.submitProof(tenant, token, await submission()),
 		);
 		assert.equal(await queuedJobs(), before + 1);
+	});
+});
+
+test.group("DepositPageService.show: the next session (TAT-110)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	const soon = (days: number, hours = 1) => {
+		const startsAt = DateTime.utc().plus({ days }).startOf("hour");
+		return { startsAt, endsAt: startsAt.plus({ hours }) };
+	};
+
+	/** A studio with a paid deposit: Sita is the project's artist, Aarav another. */
+	async function paidStudio(slug: string) {
+		const made = await studioWithDeposit(slug);
+		const { tenant, project } = made;
+		const { sita, aarav } = await inTenant(tenant, async () => {
+			await makePayment(tenant, project, verified());
+			const sita = await makeArtist(tenant, "sita");
+			const aarav = await Artist.create({
+				tenantId: tenant.id,
+				name: "Aarav Shrestha",
+				slug: "aarav",
+			});
+			project.artistId = sita.id;
+			project.status = "booked";
+			await project.save();
+			return { sita, aarav };
+		});
+		return { ...made, sita, aarav };
+	}
+
+	test("a paid page names the project's next session and that session's own artist", async ({
+		assert,
+	}) => {
+		const { tenant, services, project, token, aarav } =
+			await paidStudio("next-session-110");
+		const later = soon(9);
+		const first = soon(3, 3);
+		await inTenant(tenant, async () => {
+			await makeSession(tenant, project, aarav, later);
+			await makeSession(tenant, project, aarav, first);
+		});
+
+		const page = await show(services, tenant, token);
+
+		assert.equal(page.state, "paid");
+		assert.equal(page.artistName, "Sita");
+		assert.equal(page.nextSession?.artistName, "Aarav Shrestha");
+		assert.equal(
+			page.nextSession?.startsAt.toMillis(),
+			first.startsAt.toMillis(),
+		);
+	});
+
+	test("only a paid page has one", async ({ assert }) => {
+		const services = depositServices();
+		const { tenant } = await studioWithOwner("next-states-110", "Black Needle");
+		const made = async () => {
+			const ready = await depositReady(tenant);
+			const { token } = await services.links.issue(
+				tenant,
+				OWNER,
+				ready.project,
+			);
+			return { ...ready, token };
+		};
+		const cases = await inTenant(tenant, async () => {
+			const artist = await makeArtist(tenant);
+			const due = await made();
+			const waiting = await made();
+			await makePayment(tenant, waiting.project, { method: "esewa" });
+			const paid = await made();
+			await makePayment(tenant, paid.project, verified());
+			const cancelled = await made();
+			await makePayment(tenant, cancelled.project, verified());
+			cancelled.project.status = "cancelled";
+			await cancelled.project.save();
+			const revising = await made();
+			revising.project.status = "quoted";
+			await revising.project.save();
+			const expired = await made();
+			expired.quote.expiresAt = DateTime.utc().minus({ minutes: 1 });
+			await expired.quote.save();
+			const all = { due, waiting, paid, cancelled, revising, expired };
+			let day = 2;
+			for (const { project } of Object.values(all)) {
+				await makeSession(tenant, project, artist, soon(day++));
+			}
+			return all;
+		});
+
+		const states = {
+			due: "due",
+			waiting: "submitted",
+			paid: "paid",
+			cancelled: "cancelled",
+			revising: "updating",
+			expired: "expired",
+		} as const;
+		for (const [name, state] of Object.entries(states) as [
+			keyof typeof states,
+			string,
+		][]) {
+			const page = await show(services, tenant, cases[name].token);
+			assert.equal(page.state, state, name);
+			if (name === "paid") assert.isNotNull(page.nextSession, name);
+			else assert.isNull(page.nextSession, name);
+		}
+	});
+
+	test("another project's and another studio's sessions never show", async ({
+		assert,
+	}) => {
+		const a = await paidStudio("next-iso-a-110");
+		const b = await paidStudio("next-iso-b-110");
+		await inTenant(a.tenant, async () => {
+			const client = await makeClient(a.tenant);
+			const other = await makeProject(a.tenant, client, { status: "booked" });
+			await makeSession(a.tenant, other, a.sita, soon(2));
+		});
+		const bStart = soon(4);
+		await inTenant(b.tenant, () =>
+			makeSession(b.tenant, b.project, b.aarav, bStart),
+		);
+
+		const pageA = await show(a.services, a.tenant, a.token);
+		const pageB = await show(b.services, b.tenant, b.token);
+
+		assert.equal(pageA.state, "paid");
+		assert.isNull(pageA.nextSession);
+		assert.equal(
+			pageB.nextSession?.startsAt.toMillis(),
+			bStart.startsAt.toMillis(),
+		);
+		assert.equal(pageB.nextSession?.artistName, "Aarav Shrestha");
+	});
+
+	test("a session whose artist profile was deleted shows without a name", async ({
+		assert,
+	}) => {
+		const { tenant, services, project, token, aarav } =
+			await paidStudio("next-deleted-110");
+		await inTenant(tenant, async () => {
+			await makeSession(tenant, project, aarav, soon(3));
+			await aarav.softDelete();
+		});
+
+		const page = await show(services, tenant, token);
+
+		assert.isNotNull(page.nextSession);
+		assert.isNull(page.nextSession?.artistName);
+		assert.equal(page.artistName, "Sita");
+	});
+
+	test("a paid page reads the sessions once and the artists at most once; a due page reads no session", async ({
+		assert,
+	}) => {
+		const { tenant, services, project, token, sita, aarav } =
+			await paidStudio("next-queries-110");
+		await inTenant(tenant, async () => {
+			await makeSession(tenant, project, sita, soon(2));
+			await makeSession(tenant, project, aarav, soon(3));
+			await makeSession(tenant, project, aarav, soon(4));
+		});
+		const due = await studioWithDeposit("next-queries-due-110");
+
+		const paid = await recordQueries(() => show(services, tenant, token));
+		const notPaid = await recordQueries(() =>
+			show(due.services, due.tenant, due.token),
+		);
+
+		assert.equal(paid.result.state, "paid");
+		assert.lengthOf(
+			paid.queries.filter((sql) => /project_sessions/.test(sql)),
+			1,
+		);
+		assert.isAtMost(
+			paid.queries.filter((sql) => /from "artists"/.test(sql)).length,
+			1,
+		);
+		assert.equal(notPaid.result.state, "due");
+		assert.lengthOf(
+			notPaid.queries.filter((sql) => /project_sessions/.test(sql)),
+			0,
+		);
 	});
 });
