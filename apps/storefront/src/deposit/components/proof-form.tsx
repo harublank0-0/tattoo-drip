@@ -9,6 +9,7 @@ import { useEffect, useReducer, useRef, useState } from "react";
 import { useAppForm } from "../../components/ui/form.tsx";
 import { browserCodec } from "../../intake/browser-codec.ts";
 import { Fill } from "../../intake/components/fill.tsx";
+import { answerFocus, changeReducer, NOT_CHANGING } from "../answer-change.ts";
 import { copy, type DepositMethodKind } from "../copy.ts";
 import {
 	describeProofError,
@@ -105,9 +106,14 @@ export function ProofForm({
 	const inputRef = useRef<HTMLInputElement>(null);
 
 	const kinds = view.kinds;
-	// Change (see "How did you pay?" as one line below): the choices are revealed again.
-	const [changing, setChanging] = useState(false);
-	const pointerPick = useRef(false);
+	// Change (see "How did you pay?" as one line below): the choices are revealed
+	// again. `change` is a pure reducer (answer-change.ts): the DOM events below
+	// only say what happened.
+	const [change, dispatchChange] = useReducer(changeReducer, NOT_CHANGING);
+	// Whether the click that is changing the answer is a pointer's (a ref, not
+	// state: a render in the middle of a radio's click makes React put the old
+	// `checked` back before the change event, and the pick is lost).
+	const clickByPointer = useRef(false);
 	const form = useAppForm({
 		defaultValues: {
 			method:
@@ -130,13 +136,11 @@ export function ProofForm({
 		listeners: {
 			onChange: ({ fieldApi }) => {
 				clearServerError(fieldApi);
-				// In the revealed choices, a pointer's pick of another kind ends Change
-				// (the line follows). The keyboard's doesn't: its arrows move one choice
-				// at a time, and Escape or leaving the choices ends it.
-				if (pointerPick.current) {
-					pointerPick.current = false;
-					setChanging(false);
-				}
+				dispatchChange({
+					type: "answerChanged",
+					byPointer: clickByPointer.current,
+				});
+				clickByPointer.current = false;
 			},
 		},
 		onSubmit: ({ value }) => send(value),
@@ -169,7 +173,9 @@ export function ProofForm({
 	const choicesRef = useRef<HTMLDivElement>(null);
 	const changeRef = useRef<HTMLButtonElement>(null);
 	const focusChoices = useRef(false);
-	const wasCollapsed = useRef(false);
+	// Set while the choices close because focus is on its way elsewhere.
+	const focusMoving = useRef(false);
+	const { changing } = change;
 	const collapsed = answerCollapsed({
 		answer,
 		kinds,
@@ -177,26 +183,50 @@ export function ProofForm({
 		changing,
 		hasError: answerErrors > 0,
 	});
+	// Starts as the first `collapsed`: a form that mounts collapsed (rebuilt after a
+	// refused screenshot, with the pick still held) takes no focus by itself.
+	const wasCollapsed = useRef(collapsed);
 
 	// A new pick in step 2 answers it: Change is over.
 	const pickCount = methodPick?.count ?? 0;
 	useEffect(() => {
-		if (pickCount > 0) setChanging(false);
+		if (pickCount > 0) dispatchChange({ type: "pick" });
 	}, [pickCount]);
 
-	// Focus follows the swap: Change moves it to the checked choice; when the
-	// choices go while it was on one of them (a pick, Escape), to Change.
+	// While the choices are revealed, a press outside them (blank space too: iOS
+	// Safari moves no focus on a tap) closes them.
 	useEffect(() => {
-		if (focusChoices.current) {
-			focusChoices.current = false;
+		if (!changing) return;
+		const away = (event: PointerEvent) => {
+			if (!choicesRef.current?.contains(event.target as Node | null)) {
+				focusMoving.current = true;
+				dispatchChange({ type: "pointerDown", where: "outside" });
+			}
+		};
+		document.addEventListener("pointerdown", away, true);
+		return () => document.removeEventListener("pointerdown", away, true);
+	}, [changing]);
+
+	// Focus follows the swap (answerFocus).
+	useEffect(() => {
+		const target = answerFocus({
+			focusChoices: focusChoices.current,
+			wasCollapsed: wasCollapsed.current,
+			collapsed,
+			// On the body, or on a choice that has just been hidden (Chromium keeps it
+			// as the active element until its next frame).
+			focusLost:
+				document.activeElement === document.body ||
+				choicesRef.current?.contains(document.activeElement) === true,
+			focusMoving: focusMoving.current,
+		});
+		focusChoices.current = false;
+		focusMoving.current = false;
+		if (target === "choices") {
 			choicesRef.current
 				?.querySelector<HTMLInputElement>('input[name="method"]:checked')
 				?.focus();
-		} else if (
-			collapsed &&
-			!wasCollapsed.current &&
-			document.activeElement === document.body
-		) {
+		} else if (target === "change") {
 			changeRef.current?.focus();
 		}
 		wasCollapsed.current = collapsed;
@@ -386,83 +416,87 @@ export function ProofForm({
 						) : null;
 					}}
 				</form.Subscribe>
-				<div className="deposit-answer" aria-live="polite">
-					{collapsed ? (
-						<div className="deposit-answer-line">
-							<p>
-								<Fill
-									template={copy.form.paidWith}
-									values={{
-										label: copy.form.kinds[answer as DepositMethodKind],
-									}}
-								/>
-							</p>
-							{kinds.length > 1 ? (
-								<>
-									<span aria-hidden="true">·</span>
-									<button
-										ref={changeRef}
-										type="button"
-										className="deposit-change"
-										aria-label={copy.form.changeLabel}
-										onClick={() => {
-											focusChoices.current = true;
-											setChanging(true);
-										}}
-									>
-										{copy.form.change}
-									</button>
-								</>
-							) : null}
-						</div>
+				{/* The sentence alone is the live region (always mounted, so a change of answer is announced); the button beside it is not, or "Change" is read twice, once with the sentence and once when focus moves to it. */}
+				<div
+					className={
+						collapsed ? "deposit-answer" : "deposit-answer deposit-answer-off"
+					}
+				>
+					<p className="deposit-answer-text" aria-live="polite">
+						{collapsed ? (
+							<Fill
+								template={copy.form.paidWith}
+								values={{
+									label: copy.form.kinds[answer as DepositMethodKind],
+								}}
+							/>
+						) : null}
+					</p>
+					{collapsed && kinds.length > 1 ? (
+						<>
+							<span aria-hidden="true">·</span>
+							<button
+								ref={changeRef}
+								type="button"
+								className="deposit-change"
+								aria-label={copy.form.changeLabel}
+								onClick={() => {
+									focusChoices.current = true;
+									dispatchChange({ type: "open" });
+								}}
+							>
+								{copy.form.change}
+							</button>
+						</>
 					) : null}
 				</div>
-				{collapsed ? null : (
-					// biome-ignore lint/a11y/noStaticElementInteractions: only delegates the events of the radios inside, which are the interactive elements
-					<div
-						ref={choicesRef}
-						onClickCapture={(event) => {
-							const target = event.target;
-							if (
-								!changing ||
-								event.detail === 0 ||
-								!(target instanceof HTMLInputElement) ||
-								target.type !== "radio"
-							) {
-								return;
-							}
-							// The kind that is already answered fires no change: it is a pick too.
-							if (target.value === answer) setChanging(false);
-							else pointerPick.current = true;
-						}}
-						onKeyDown={(event) => {
-							if (changing && event.key === "Escape") setChanging(false);
-						}}
-						onBlur={(event) => {
-							if (
-								changing &&
-								!event.currentTarget.contains(
-									event.relatedTarget as Node | null,
-								)
-							) {
-								setChanging(false);
-							}
-						}}
-					>
-						<form.AppField name="method">
-							{(field) => (
-								<field.ChoiceField
-									legend={copy.form.method}
-									options={kinds.map((kind) => ({
-										value: kind,
-										label: copy.form.kinds[kind],
-									}))}
-									required
-								/>
-							)}
-						</form.AppField>
-					</div>
-				)}
+				{/* Always mounted, hidden while the line shows: a field that unmounts and mounts again loses a server error set on it (the refused method), and the choices must be there for the error summary to point at. */}
+				{/* biome-ignore lint/a11y/noStaticElementInteractions: only delegates the events of the radios inside, which are the interactive elements */}
+				<div
+					ref={choicesRef}
+					hidden={collapsed}
+					onClickCapture={(event) => {
+						const target = event.target;
+						if (
+							!(target instanceof HTMLInputElement) ||
+							target.type !== "radio"
+						) {
+							return;
+						}
+						clickByPointer.current = event.detail > 0;
+						// The kind that is answered already fires no change: a pointer's tap
+						// on it closes the choices, once the click is over.
+						if (event.detail > 0 && target.value === answer) {
+							window.setTimeout(
+								() => dispatchChange({ type: "sameKindTapped" }),
+								0,
+							);
+						}
+					}}
+					onKeyDown={(event) => {
+						if (event.key === "Escape") dispatchChange({ type: "escape" });
+					}}
+					onBlur={(event) => {
+						const to = event.relatedTarget as Node | null;
+						if (to !== null && !event.currentTarget.contains(to)) {
+							focusMoving.current = true;
+							dispatchChange({ type: "focusOut", to: "outside" });
+						}
+					}}
+				>
+					<form.AppField name="method">
+						{(field) => (
+							<field.ChoiceField
+								legend={copy.form.method}
+								options={kinds.map((kind) => ({
+									value: kind,
+									label: copy.form.kinds[kind],
+								}))}
+								required
+							/>
+						)}
+					</form.AppField>
+				</div>
 				<ProofPicker
 					state={proof}
 					preview={preview}

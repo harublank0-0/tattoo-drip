@@ -177,6 +177,13 @@ describe("ProofForm", () => {
 
 	const radiosIn = (html: string) =>
 		tags(html, "input").filter((tag) => attr(tag, "type") === "radio");
+	/**
+	 * The page without the choices' hidden block: the choices stay mounted while
+	 * the line shows (a field that unmounts and mounts again loses a server error),
+	 * so "no choices" means they are inside a \`hidden\` wrapper.
+	 */
+	const withoutHiddenChoices = (html: string) =>
+		html.replace(/<div hidden="">[\s\S]*?(?=<fieldset id="proof")/, "");
 
 	test("a Pay with pick answers How did you pay?, which shows as one line saying so, with Change (TAT-110)", () => {
 		const html = formHtml(depositView(PAGE), {
@@ -185,11 +192,15 @@ describe("ProofForm", () => {
 			count: 1,
 		});
 
-		assert.equal(radiosIn(html).length, 0);
-		assert.doesNotMatch(html, /<legend[^>]*>How did you pay\?<\/legend>/);
+		assert.match(html, /<div hidden="">/);
+		assert.equal(radiosIn(withoutHiddenChoices(html)).length, 0);
+		assert.doesNotMatch(
+			withoutHiddenChoices(html),
+			/<legend[^>]*>How did you pay\?<\/legend>/,
+		);
 		assert.match(
 			html,
-			/<div class="deposit-answer" aria-live="polite"><div class="deposit-answer-line"><p>Paid with <bdi>Bank transfer<\/bdi><\/p><span aria-hidden="true">·<\/span><button type="button" class="deposit-change" aria-label="Change how you paid">Change<\/button><\/div><\/div>/,
+			/<div class="deposit-answer"><p class="deposit-answer-text" aria-live="polite">Paid with <bdi>Bank transfer<\/bdi><\/p><span aria-hidden="true">·<\/span><button type="button" class="deposit-change" aria-label="Change how you paid">Change<\/button><\/div>/,
 		);
 		// A kind the form doesn't offer is no answer.
 		const unknown = radiosIn(
@@ -229,9 +240,18 @@ describe("ProofForm", () => {
 		assert.equal(attr(button, "type"), "button");
 		assert.match(
 			expanded,
-			/<div class="deposit-answer" aria-live="polite"><\/div>/,
+			/<div class="deposit-answer deposit-answer-off"><p class="deposit-answer-text" aria-live="polite"><\/p><\/div>/,
 		);
+		assert.doesNotMatch(expanded, /<div hidden="">/);
 		assert.match(textOf(collapsed), /Paid with eSewa·Change/);
+		// Only the sentence is live: the button beside it would be announced twice
+		// (with the sentence, then again when focus moves to it).
+		const live =
+			/<p class="deposit-answer-text" aria-live="polite">(.*?)<\/p>/.exec(
+				collapsed,
+			)?.[1];
+		assert.ok(live);
+		assert.doesNotMatch(live, /<button|Change/);
 	});
 
 	test("one way to pay is answered already: the line says so, and there is nothing to change", () => {
@@ -239,7 +259,8 @@ describe("ProofForm", () => {
 			depositView(page({ paymentMethods: [PAGE.paymentMethods[0]] })),
 		);
 
-		assert.equal(radiosIn(html).length, 0);
+		assert.match(html, /<div hidden="">/);
+		assert.equal(radiosIn(withoutHiddenChoices(html)).length, 0);
 		assert.match(textOf(html), /Paid with eSewa/);
 		assert.equal(
 			tags(html, "button").filter(
