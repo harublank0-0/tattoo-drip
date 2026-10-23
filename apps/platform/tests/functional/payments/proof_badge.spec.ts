@@ -6,10 +6,10 @@ import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
 const SLUG = "badge-needle-65";
 
-test.group("Projects badge", (group) => {
+test.group("Today badge", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 
-	test("owners get the number of deposit proofs to check on every tenant page; artists get null", async ({
+	test("the Today badge counts the screenshots to check for owners, with no Projects badge; an artist without a profile has none", async ({
 		client,
 		assert,
 	}) => {
@@ -35,13 +35,15 @@ test.group("Projects badge", (group) => {
 		const ownerProps = (
 			await client.get(`/t/${SLUG}/projects`).withInertia().loginAs(owner)
 		).inertiaProps;
-		assert.equal(ownerProps.proofCount, 2);
+		assert.equal(ownerProps.todayCount, 2);
+		assert.notProperty(ownerProps, "proofCount");
 
 		const artistResponse = await client
 			.get(`/t/${SLUG}/projects`)
 			.withInertia()
 			.loginAs(artist);
 		artistResponse.assertStatus(200);
-		assert.isNull(artistResponse.inertiaProps.proofCount);
+		assert.equal(artistResponse.inertiaProps.todayCount, 0);
+		assert.notProperty(artistResponse.inertiaProps, "proofCount");
 	});
 });

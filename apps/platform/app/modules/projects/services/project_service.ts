@@ -8,6 +8,7 @@ import { type ContactVia, NO_VIA } from "#modules/notifications/messages";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import DepositService from "#modules/payments/services/deposit_service";
 import { ProjectRuleError, QuoteRuleError } from "#modules/projects/errors";
+import { EXPIRING_STATUSES, expiryCancels } from "#modules/projects/expiry";
 import {
 	FINISH_STEPS,
 	type FinishResult,
@@ -57,15 +58,21 @@ export type Finished = FinishResult & { status: ProjectStatus };
 /** Who is asking: their user and their role in the tenant. */
 export type Member = Pick<TenantMembership, "userId" | "role">;
 
+/** The project columns `listActive` reads: what waiting.ts and Today's rows use. */
+const WAITING_COLUMNS = [
+	"id",
+	"tenant_id",
+	"client_id",
+	"artist_id",
+	"status",
+	"created_at",
+	"last_contacted_at",
+	"last_contact_channel",
+	"last_contact_kind",
+];
+
 /** Projects per page on the projects list. */
 export const PROJECTS_PER_PAGE = 25;
-
-/** The statuses a quote's expiry can cancel. */
-const EXPIRING_STATUSES: readonly ProjectStatus[] = [
-	"quoted",
-	"on_hold",
-	"deposit_pending",
-];
 
 type ProjectQuery = ReturnType<typeof TattooProject.query>;
 
@@ -151,9 +158,10 @@ export default class ProjectService {
 
 	/**
 	 * A page of the projects `member` may see (the `findFor` rule), for the
-	 * Active view, the Closed view or one status. Active and single-status
-	 * views sort for follow-up: never contacted first, then the longest
-	 * since contact; the Closed view sorts the most recently changed first.
+	 * Active view, the Closed view or one status. Active and open
+	 * single-status views sort for follow-up: never contacted first, then the
+	 * longest since contact; the Closed view and each closed status (declined,
+	 * cancelled, completed) sort the most recently changed first.
 	 */
 	async list(
 		tenant: TenantRef,
@@ -167,7 +175,10 @@ export default class ProjectService {
 		else if (filter === "closed") query.whereIn("status", [...CLOSED_STATUSES]);
 		else query.where("status", filter);
 
-		if (filter === "closed") {
+		if (
+			filter === "closed" ||
+			(filter !== "active" && CLOSED_STATUSES.includes(filter))
+		) {
 			query
 				.orderByRaw("coalesce(updated_at, created_at) desc")
 				.orderBy("id", "desc");
@@ -183,6 +194,58 @@ export default class ProjectService {
 			total: result.total,
 			lastPage: result.lastPage,
 		};
+	}
+
+	/**
+	 * Today's read (TAT-107): every live active project `member` may see (the
+	 * `findFor` rule), oldest first, not paginated: it is a studio's open
+	 * work, a few dozen rows at a pilot's scale. An owner also gets a closed
+	 * project that still holds a deposit screenshot nobody decided (the client
+	 * withdrew while it waited): the money is theirs to settle, so it stays
+	 * their work until they do. Artists never act on money, so a closed project
+	 * stays closed for them. Rows carry only the columns the waiting rules and
+	 * Today's rows read (`WAITING_COLUMNS`): the badge asks for this on every
+	 * page, so it skips the brief and notes.
+	 */
+	async listActive(
+		tenant: TenantRef,
+		member: Member,
+	): Promise<TattooProject[]> {
+		const query = TattooProject.query().select(WAITING_COLUMNS);
+		await this.scopeTo(query, tenant, member);
+		query.where((open) => {
+			open.whereIn("status", [...ACTIVE_STATUSES]);
+			if (member.role === "owner") {
+				open.orWhereIn("id", this.deposits.pendingProofProjects(tenant));
+			}
+		});
+		return query.orderBy("created_at", "asc").orderBy("id", "asc");
+	}
+
+	/**
+	 * The sort keys of every live project in an open view that `member` may
+	 * see (the `findFor` rule), oldest first: the Projects list's Active and
+	 * single-status views (TAT-109). Unpaginated because the list orders them
+	 * by what waits (WaitingService.work) and cuts the page afterwards; the
+	 * page's full rows come from `findManyFor`.
+	 */
+	async listKeys(
+		tenant: TenantRef,
+		member: Member,
+		filter: "active" | ProjectStatus,
+	): Promise<
+		Pick<TattooProject, "id" | "status" | "createdAt" | "lastContactedAt">[]
+	> {
+		const query = TattooProject.query().select(
+			"id",
+			"status",
+			"created_at",
+			"last_contacted_at",
+		);
+		await this.scopeTo(query, tenant, member);
+		if (filter === "active") query.whereIn("status", [...ACTIVE_STATUSES]);
+		else query.where("status", filter);
+		return query.orderBy("created_at", "asc").orderBy("id", "asc");
 	}
 
 	/** How many live projects `member` may see, per status. */
@@ -633,10 +696,8 @@ export default class ProjectService {
 	 * cancelled, and none whose deposit decision is owed or came late
 	 * (DepositService.expirySpared: a screenshot waits, or the studio verified,
 	 * recorded, rejected or reversed a deposit after the expiry; TAT-66): the
-	 * owner decides what happens next. A `quoted` or `on_hold` project is then cancelled
-	 * unless its (non-zero) deposit was paid: it can hold a payment when staff
-	 * revised the quote after the client paid. A zero deposit is "settled" by
-	 * definition, so it doesn't spare a quote nobody accepted.
+	 * owner decides what happens next. What the money decides is `expiryCancels`
+	 * (#modules/projects/expiry), which Today's rules share.
 	 */
 	private async expiryCancels(
 		tenant: TenantRef,
@@ -645,13 +706,12 @@ export default class ProjectService {
 	): Promise<boolean> {
 		if (!EXPIRING_STATUSES.includes(project.status)) return false;
 		if (await this.deposits.expirySpared(tenant, project, quote)) return false;
-		if (project.status === "deposit_pending") {
-			return !(await this.deposits.isSettled(tenant, project));
-		}
-		return (
-			quote.depositAmount === 0 ||
-			!(await this.deposits.isSettled(tenant, project))
-		);
+		// The money rule is shared with Today (TAT-107): see expiryCancels.
+		return expiryCancels({
+			status: project.status,
+			depositAmount: quote.depositAmount,
+			depositSettled: await this.deposits.isSettled(tenant, project),
+		});
 	}
 
 	/**

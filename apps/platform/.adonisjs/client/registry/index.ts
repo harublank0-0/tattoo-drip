@@ -96,6 +96,12 @@ const routes = {
     tokens: [{"old":"/t/:tenant","type":0,"val":"t","end":""},{"old":"/t/:tenant","type":1,"val":"tenant","end":""}],
     types: placeholder as Registry['tenant.dashboard']['types'],
   },
+  'tenant.today': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/today',
+    tokens: [{"old":"/t/:tenant/today","type":0,"val":"t","end":""},{"old":"/t/:tenant/today","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/today","type":0,"val":"today","end":""}],
+    types: placeholder as Registry['tenant.today']['types'],
+  },
   'tenant.settings': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/settings',

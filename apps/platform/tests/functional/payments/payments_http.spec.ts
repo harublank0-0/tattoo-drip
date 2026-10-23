@@ -171,18 +171,38 @@ test.group("Payment decisions over HTTP", (group) => {
 		assert.equal((await reload(tenant, proof)).status, "rejected");
 	});
 
-	test("the Projects badge drops after a decision", async ({
+	test("a decision moves the project from screenshots to sessions on Today", async ({
 		client,
 		assert,
 	}) => {
-		const { owner, proof } = await waiting();
-		const badge = async () =>
-			(await client.get(`/t/${SLUG}/projects`).withInertia().loginAs(owner))
-				.inertiaProps.proofCount;
+		const { owner, project, proof } = await waiting();
+		const today = async () =>
+			(await client.get(`/t/${SLUG}/today`).withInertia().loginAs(owner))
+				.inertiaProps;
+		type Row = { id: string; detail: string };
+		const groupsOf = (props: { needsYou?: unknown }) =>
+			Object.fromEntries(
+				(props.needsYou as { key: string; rows: Row[] }[]).map(
+					({ key, rows }) => [key, rows],
+				),
+			);
 
-		assert.equal(await badge(), 1);
+		const before = await today();
+		assert.deepEqual(Object.keys(groupsOf(before)), ["proofs"]);
+		assert.equal(groupsOf(before).proofs[0].id, project.id);
+		assert.equal(before.todayCount, 1);
+
 		await post(client, owner, `/t/${SLUG}/payments/${proof.id}/verify`);
-		assert.equal(await badge(), 0);
+
+		const after = await today();
+		assert.deepEqual(Object.keys(groupsOf(after)), ["sessions"]);
+		assert.equal(groupsOf(after).sessions[0].id, project.id);
+		assert.equal(
+			groupsOf(after).sessions[0].detail,
+			"Deposit paid, no session booked",
+		);
+		// Still one project that needs the studio: the badge moves, it doesn't drop.
+		assert.equal(after.todayCount, 1);
 	});
 });
 

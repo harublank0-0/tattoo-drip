@@ -17,6 +17,7 @@ import {
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
 const SLUG = "pay-card-66";
+type Line = { text: string; needsYou: boolean; hash: string | null };
 const page = (id: string) => `/t/${SLUG}/projects/${id}`;
 const { links } = paymentServices();
 
@@ -129,26 +130,36 @@ test.group("The Payments card on the project page", (group) => {
 					.get(`/t/${SLUG}/projects?status=${status}`)
 					.withInertia()
 					.loginAs(user)
-			).inertiaProps.projects;
-
+			).inertiaProps.projects as { id: string; line: Line | null }[];
 		const active = await rows("active");
-		assert.deepInclude(
-			active.find(({ id }: { id: string }) => id === waiting.id),
-			{ proofWaiting: true, depositToSettle: false, quoteLapsed: false },
-		);
-		assert.deepInclude(
-			active.find(({ id }: { id: string }) => id === lapsed.id),
-			{ proofWaiting: false, depositToSettle: false, quoteLapsed: true },
-		);
+		// A waiting screenshot is work()'s, never a money line: the studio's, first.
+		assert.deepEqual(active.find(({ id }) => id === waiting.id)?.line, {
+			text: "Deposit screenshot to check",
+			needsYou: true,
+			hash: "payments",
+		});
+		// An expired quote the studio rejected a screenshot on late is spared by the sweep, so
+		// work() has the project: an unpaid deposit and no link yet (the studio's to do).
+		assert.deepEqual(active.find(({ id }) => id === lapsed.id)?.line, {
+			text: "No deposit link yet",
+			needsYou: true,
+			hash: "deposit",
+		});
+		// A closed project is out of work(): the owner's money line, plain.
 		const closedRows = await rows("closed");
-		assert.deepInclude(
-			closedRows.find(({ id }: { id: string }) => id === closed.id),
-			{ proofWaiting: false, depositToSettle: true, quoteLapsed: false },
-		);
+		assert.deepEqual(closedRows.find(({ id }) => id === closed.id)?.line, {
+			text: "Record whether the deposit was kept or refunded",
+			needsYou: false,
+			hash: "payments",
+		});
+		// The artist's row is the project they were given: an unpaid deposit on the client's
+		// side, with no screenshot and no money.
 		const artistRows = await rows("active", artist);
-		assert.deepInclude(
-			artistRows.find(({ id }: { id: string }) => id === waiting.id),
-			{ proofWaiting: false, depositToSettle: false, quoteLapsed: false },
-		);
+		assert.deepEqual(artistRows.find(({ id }) => id === waiting.id)?.line, {
+			text: "Waiting for the deposit",
+			needsYou: false,
+			hash: null,
+		});
+		assert.notInclude(JSON.stringify(artistRows), "screenshot");
 	});
 });

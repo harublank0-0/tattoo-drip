@@ -221,7 +221,11 @@ export default function ProjectShow({
 					</Card>
 				)}
 
-				<Card>
+				{/* Today's rows open these cards by id (TAT-107): keep "quote", "quote-form", "deposit" and "sessions" (and "payments") when this page is restructured. */}
+				<Card
+					id="quote"
+					className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)] lg:scroll-mt-0"
+				>
 					<CardHeader>
 						<CardTitle>Quote</CardTitle>
 					</CardHeader>
@@ -273,7 +277,10 @@ export default function ProjectShow({
 				</Card>
 
 				{canQuote && (
-					<Card>
+					<Card
+						id="quote-form"
+						className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)] lg:scroll-mt-0"
+					>
 						<CardHeader>
 							<CardTitle>
 								{quote ? "Revise the quote" : "Issue a quote"}
@@ -403,7 +410,10 @@ function DepositCard({
 	};
 
 	return (
-		<Card>
+		<Card
+			id="deposit"
+			className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)] lg:scroll-mt-0"
+		>
 			<CardHeader>
 				<CardTitle>Deposit</CardTitle>
 			</CardHeader>

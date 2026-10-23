@@ -58,7 +58,7 @@ test.group("Tenant routes", (group) => {
 			.loginAs(owner);
 
 		response.assertStatus(200);
-		response.assertInertiaComponent("inquiries/index");
+		response.assertInertiaComponent("today/index");
 		assert.deepEqual(response.inertiaProps.tenant, {
 			name: "Black Needle",
 			slug: "black-needle",
@@ -78,7 +78,7 @@ test.group("Tenant routes", (group) => {
 		response.assertHeader("location", "/login");
 	});
 
-	test("the studio's address opens the member's work list", async ({
+	test("the studio's address opens Today for every member", async ({
 		client,
 	}) => {
 		const owner = await makeUser("owner@example.com");
@@ -97,14 +97,14 @@ test.group("Tenant routes", (group) => {
 			.loginAs(owner)
 			.redirects(0);
 		ownerResponse.assertStatus(302);
-		ownerResponse.assertHeader("location", "/t/black-needle/inbox");
+		ownerResponse.assertHeader("location", "/t/black-needle/today");
 
 		const artistResponse = await client
 			.get("/t/black-needle")
 			.loginAs(artistUser)
 			.redirects(0);
 		artistResponse.assertStatus(302);
-		artistResponse.assertHeader("location", "/t/black-needle/projects");
+		artistResponse.assertHeader("location", "/t/black-needle/today");
 	});
 
 	test("a member of another tenant gets 404", async ({ client }) => {

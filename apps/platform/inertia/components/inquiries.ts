@@ -3,8 +3,7 @@ import type {
 	ContactChannelName,
 	ContactLinksProps,
 } from "~/components/messages";
-import type { PilotCardProps } from "~/components/pilot_metrics_card";
-import type { SetupProps, StudioPageProps } from "~/components/studio_link";
+import type { StudioPageProps } from "~/components/studio_link";
 
 /** One row of the inbox. */
 export type InquiryRow = {
@@ -28,14 +27,11 @@ export type InquiryRow = {
 
 export type InboxListProps = {
 	view: "new" | "decided";
-	/** The new-studio checklist and the studio link; null in the Decided view (TAT-101). */
-	setup: SetupProps | null;
+	/** The studio link for the empty New view; null in the Decided view (TAT-101). */
 	studioPage: StudioPageProps | null;
 	newCount: number;
 	inquiries: InquiryRow[];
 	page: { current: number; last: number; total: number };
-	/** The owners' last 30 days (TAT-70). */
-	pilotMetrics: PilotCardProps;
 };
 
 /** A reference image with a signed URL (valid for a few minutes). */

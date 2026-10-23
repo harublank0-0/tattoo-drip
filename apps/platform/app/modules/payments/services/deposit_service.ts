@@ -6,6 +6,7 @@ import {
 	balanceOf,
 	decidedLate,
 	depositMoney,
+	depositSettled,
 } from "#modules/payments/ledger";
 import Payment from "#modules/payments/models/payment";
 import type { PaymentMethodKind } from "#modules/payments/models/payment_method";
@@ -186,18 +187,99 @@ export default class DepositService {
 	}
 
 	/**
-	 * How many deposit proofs wait for the studio: the Projects badge
-	 * (TAT-65). Payments have no soft delete and nothing deletes projects
-	 * from the dashboard yet, so every waiting deposit payment counts (TAT-42
-	 * defines the cascade).
+	 * The ids of the projects with a deposit screenshot waiting for the studio,
+	 * as a subquery for another module's query to nest (`ProjectService.listActive`
+	 * adds the closed ones to an owner's work, TAT-107). Payments have no soft
+	 * delete, so every submitted deposit counts; the caller's own filters decide
+	 * which projects are live.
 	 */
-	async countPendingProofs(tenant: TenantRef): Promise<number> {
-		const [row] = await Payment.query()
+	pendingProofProjects(tenant: TenantRef) {
+		return Payment.query()
 			.where("tenant_id", tenant.id)
 			.where("kind", "deposit")
 			.where("status", "submitted")
-			.count("* as total");
-		return Number(row.$extras.total);
+			.select("project_id");
+	}
+
+	/**
+	 * What Today and the Projects list need to know about many projects'
+	 * deposits, in one query (TAT-107): per project id whether a deposit
+	 * screenshot waits for the studio (`proofWaiting`) and since when
+	 * (`proofSince`, the oldest one's submitted time: its wait starts when it
+	 * was sent, not when the project began), whether the current quote's
+	 * deposit is covered (`settled`, the same rule as `isSettled` for payments
+	 * already read: `depositSettled` in the ledger) and whether the expiry sweep
+	 * would spare the project because the studio's decision on the deposit is
+	 * owed or came late (`expirySpared`, the same rule as the method of that name
+	 * for payments already read: `decidedLate` in the ledger), so Today shows
+	 * exactly the projects the sweep leaves alone. `quotes` are the projects'
+	 * current quotes (QuoteService.currentFor); a project without one is never
+	 * settled and has nothing to expire. Every asked project has an entry. Reads only the columns the
+	 * rules use (never the proof's key or size), because the badge asks on
+	 * every page. Leaves `isSettled` alone: that one is on the booking path.
+	 */
+	async depositStates(
+		tenant: TenantRef,
+		projectIds: string[],
+		quotes: Map<
+			string,
+			Pick<Quote, "depositAmount" | "currency" | "expiresAt">
+		>,
+	): Promise<
+		Map<
+			string,
+			{
+				proofWaiting: boolean;
+				proofSince: DateTime | null;
+				expirySpared: boolean;
+				settled: boolean;
+			}
+		>
+	> {
+		if (projectIds.length === 0) return new Map();
+		const payments = await Payment.query()
+			.where("tenant_id", tenant.id)
+			.whereIn("project_id", projectIds)
+			.whereIn("kind", COUNTED_KINDS)
+			.select(
+				"id",
+				"project_id",
+				"kind",
+				"status",
+				"amount",
+				"currency",
+				"corrects_payment_id",
+				"verified_at",
+				"created_at",
+			);
+		const byProject = new Map<string, Payment[]>();
+		for (const payment of payments) {
+			const own = byProject.get(payment.projectId);
+			if (own) own.push(payment);
+			else byProject.set(payment.projectId, [payment]);
+		}
+		return new Map(
+			projectIds.map((id) => {
+				const own = byProject.get(id) ?? [];
+				const quote = quotes.get(id);
+				const waiting = own.filter(
+					({ kind, status }) => kind === "deposit" && status === "submitted",
+				);
+				return [
+					id,
+					{
+						proofWaiting: waiting.length > 0,
+						proofSince:
+							waiting.length > 0
+								? (DateTime.min(...waiting.map(({ createdAt }) => createdAt)) ??
+									null)
+								: null,
+						expirySpared: quote ? decidedLate(own, quote.expiresAt) : false,
+						settled: depositSettled(quote ?? null, own),
+					},
+				];
+			}),
+		);
 	}
 
 	/**

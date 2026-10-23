@@ -215,6 +215,33 @@ export default class SessionService {
 	}
 
 	/**
+	 * The first scheduled session that has not started yet (any kind) of each of
+	 * `projectIds`, by project id; a project without one has no entry. One
+	 * query for many projects: the Projects list's "Next session" (TAT-109).
+	 * Pass only projects the member may open.
+	 */
+	async nextScheduledFor(
+		tenant: TenantRef,
+		projectIds: string[],
+		now: DateTime = DateTime.now(),
+	): Promise<Map<string, ProjectSession>> {
+		if (projectIds.length === 0) return new Map();
+		const rows = await ProjectSession.query()
+			.where("tenant_id", tenant.id)
+			.whereIn("project_id", projectIds)
+			.where("status", "scheduled")
+			// Not started: one under way is not "next" (the calendar and Today show it).
+			.where("starts_at", ">", now.toJSDate())
+			.orderBy("starts_at", "asc")
+			.orderBy("id", "asc");
+		const next = new Map<string, ProjectSession>();
+		for (const session of rows) {
+			if (!next.has(session.projectId)) next.set(session.projectId, session);
+		}
+		return next;
+	}
+
+	/**
 	 * How many of the tenant's live sessions start in the half-open window
 	 * [from, to), per status, for the studio and per artist: the pilot's
 	 * no-show rate (TAT-70) and the no-show report (TAT-76). Counted by

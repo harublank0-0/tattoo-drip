@@ -94,6 +94,9 @@ router
 			.get("/", [controllers.Dashboard, "tenantHome"])
 			.as("tenant.dashboard");
 
+		// Today (TAT-107): every member's home, what needs them right now.
+		router.get("today", [controllers.Today, "show"]).as("tenant.today");
+
 		/**
 		 * Studio settings: owners only (TENANT_ROUTE_ROLES). Every settings
 		 * route goes in this group (a test checks).

@@ -4,21 +4,18 @@ import { errors as lucidErrors } from "@adonisjs/lucid";
 import { tenantContext } from "#middleware/tenant_middleware";
 import { todayIn } from "#modules/projects/quotes";
 import {
-	briefPreview,
 	calendarDays,
 	dayBounds,
 	dayLabel,
 	overlapsDay,
 	rangeText,
+	sessionRow,
 	shiftDate,
-	timesOnDay,
 	toCalendarDate,
 	toCalendarView,
 } from "#modules/scheduling/calendar";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
-import CalendarService, {
-	type CalendarEntry,
-} from "#modules/scheduling/services/calendar_service";
+import CalendarService from "#modules/scheduling/services/calendar_service";
 
 /**
  * The calendar (TAT-50): a day or a week of sessions in the studio's
@@ -90,26 +87,4 @@ function artistParam(value: unknown): string | null {
 	if (value === undefined || value === "") return null;
 	if (typeof value !== "string") throw new lucidErrors.E_ROW_NOT_FOUND();
 	return value;
-}
-
-/** One session as a row on `day`: times on that day, a preview of the brief. */
-function sessionRow(
-	{ session, artistName, project }: CalendarEntry,
-	day: string,
-	timezone: string,
-) {
-	return {
-		id: session.id,
-		startsAt: session.startsAt.toMillis(),
-		endsAt: session.endsAt.toMillis(),
-		...timesOnDay(session.startsAt, session.endsAt, day, timezone),
-		kind: session.kind,
-		status: session.status,
-		artistName,
-		project: project && {
-			id: project.id,
-			clientName: project.clientName,
-			brief: briefPreview(project.brief),
-		},
-	};
 }

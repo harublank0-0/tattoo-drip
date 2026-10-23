@@ -42,6 +42,21 @@ export function sessionTimeText(
 }
 
 /**
+ * When a session starts, short, for a list: "Sat 24 Oct, 11:00" in the
+ * studio's timezone, with the year ("Sat 2 Jan 2027, 11:00") when the day is
+ * not in the studio's current year (`now` is read in the studio's zone too).
+ */
+export function sessionStartText(
+	startsAt: DateTime,
+	timezone: string,
+	now: DateTime = DateTime.now(),
+): string {
+	const start = startsAt.setZone(timezone).setLocale("en-GB");
+	const year = start.year === now.setZone(timezone).year ? "" : " yyyy";
+	return start.toFormat(`ccc d LLL${year}, HH:mm`);
+}
+
+/**
  * The move form's starting values for a session (TAT-85), in the studio's
  * timezone: its local day (today when that day can't be chosen: it has
  * passed, or is more than a year ahead), its local start time and its

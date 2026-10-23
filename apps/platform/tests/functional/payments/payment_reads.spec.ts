@@ -152,30 +152,35 @@ test.group("PaymentService reads", (group) => {
 			depositToSettle: false,
 			quoteLapsed: false,
 			balanceOwed: false,
+			balanceDue: null,
 		});
 		assert.deepEqual(flags.get(projects.closed.id), {
 			proofWaiting: false,
 			depositToSettle: true,
 			quoteLapsed: false,
 			balanceOwed: false,
+			balanceDue: null,
 		});
 		assert.deepEqual(flags.get(projects.settled.id), {
 			proofWaiting: false,
 			depositToSettle: false,
 			quoteLapsed: false,
 			balanceOwed: false,
+			balanceDue: null,
 		});
 		assert.deepEqual(flags.get(projects.open.id), {
 			proofWaiting: false,
 			depositToSettle: false,
 			quoteLapsed: false,
 			balanceOwed: false,
+			balanceDue: null,
 		});
 		assert.deepEqual(flags.get(projects.lapsed.id), {
 			proofWaiting: false,
 			depositToSettle: false,
 			quoteLapsed: true,
 			balanceOwed: false,
+			balanceDue: null,
 		});
 		assert.isFalse(flags.get(projects.unpaid.id)?.quoteLapsed);
 		assert.isFalse(flags.get(projects.fresh.id)?.quoteLapsed);
@@ -185,6 +190,7 @@ test.group("PaymentService reads", (group) => {
 			depositToSettle: false,
 			quoteLapsed: false,
 			balanceOwed: false,
+			balanceDue: null,
 		});
 	});
 

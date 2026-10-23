@@ -231,19 +231,25 @@ test.group("PaymentService.verify and reject", (group) => {
 		);
 	});
 
-	test("the Projects badge drops as screenshots are decided", async ({
+	test("a screenshot stops waiting as it is decided (what Today's badge counts)", async ({
 		assert,
 	}) => {
 		const { tenant, member, project, proof } = await waiting("badge-66");
 		const second = await inTenant(tenant, () => proofFor(tenant, project));
-		const count = () =>
-			inTenant(tenant, () => deposits.countPendingProofs(tenant));
+		const waits = () =>
+			inTenant(
+				tenant,
+				async () =>
+					(await deposits.depositStates(tenant, [project.id], new Map())).get(
+						project.id,
+					)?.proofWaiting,
+			);
 
-		assert.equal(await count(), 2);
+		assert.isTrue(await waits());
 		await inTenant(tenant, () => payments.verify(tenant, member, proof, null));
-		assert.equal(await count(), 1);
+		assert.isTrue(await waits(), "the second one still waits");
 		await inTenant(tenant, () => payments.reject(tenant, member, second, null));
-		assert.equal(await count(), 0);
+		assert.isFalse(await waits());
 	});
 
 	test("only owners decide, and only the studio's own payments are found", async ({

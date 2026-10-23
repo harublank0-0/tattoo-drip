@@ -9,16 +9,10 @@ type ProjectsModule = {
 	STATUS_LABELS: Record<string, string>;
 	STATUS_GROUPS: Record<string, Group>;
 	STATUS_GROUP_LABELS: Record<Group, string>;
-	PROOF_WAITING_STATUS: string;
 	statusGroup(status: string): Group;
 };
-const {
-	STATUS_LABELS,
-	STATUS_GROUPS,
-	STATUS_GROUP_LABELS,
-	PROOF_WAITING_STATUS,
-	statusGroup,
-} = projectsModule as ProjectsModule;
+const { STATUS_LABELS, STATUS_GROUPS, STATUS_GROUP_LABELS, statusGroup } =
+	projectsModule as ProjectsModule;
 
 const GROUPS: Group[] = ["studio", "client", "booked", "chair", "closed"];
 
@@ -38,7 +32,6 @@ test.group("Status groups", () => {
 			assert.include(GROUPS, group, `${status} has no group`);
 			assert.equal(statusGroup(status), group);
 		}
-		assert.equal(PROOF_WAITING_STATUS, "screenshot_to_check");
 	});
 
 	test("the map names no status the server doesn't have", ({ assert }) => {

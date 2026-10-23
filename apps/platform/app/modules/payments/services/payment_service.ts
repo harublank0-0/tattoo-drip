@@ -62,7 +62,11 @@ export type ProjectMoney = {
 	outcomeNeeded: boolean;
 };
 
-/** What the owners' projects list flags on one project (PaymentService.listFlags). */
+/**
+ * What the owners' flags say about one project (PaymentService.listFlags). The projects list
+ * words only `depositToSettle` and `balanceDue`: a waiting screenshot and a lapsed price are
+ * always WaitingService's, so `proofWaiting` and `quoteLapsed` are no page's.
+ */
 export type ListFlags = {
 	proofWaiting: boolean;
 	depositToSettle: boolean;
@@ -72,6 +76,8 @@ export type ListFlags = {
 	 * still owed (TAT-111). Hourly totals are estimates, so never flagged.
 	 */
 	balanceOwed: boolean;
+	/** What is still owed in paisa when `balanceOwed`, else null (TAT-109's list line). */
+	balanceDue: bigint | null;
 };
 
 /** A verified payment and what it did to its project. */
@@ -244,15 +250,17 @@ export default class PaymentService {
 	}
 
 	/**
-	 * The owners' flags on the projects list: a deposit screenshot waits
+	 * The owners' flags per project: a deposit screenshot waits
 	 * (`proofWaiting`), a closed project still holds deposit money
 	 * (settleableDeposit) with no outcome recorded (`depositToSettle`), or a
 	 * deposit_pending project's quote has expired but the studio's late
 	 * decision on the deposit spares it from the sweep (`quoteLapsed`): it
 	 * waits for the owner to revise the quote, take the rest at the desk or
 	 * withdraw. A finished project whose fixed price is still owed is
-	 * `balanceOwed` (TAT-111): the owner confirmed finishing with it, and the
-	 * board keeps it in sight.
+	 * `balanceOwed`, with the amount as `balanceDue` (TAT-111): the owner
+	 * confirmed finishing with it. The projects list (TAT-109) says only
+	 * `depositToSettle` and `balanceDue`: the other two projects are always in
+	 * WaitingService.work, which words them, so no page reads those flags.
 	 */
 	async listFlags(
 		tenant: TenantRef,
@@ -313,19 +321,19 @@ export default class PaymentService {
 					isExpired(quote) &&
 					decidedLate(own, quote.expiresAt);
 			}
-			let balanceOwed = false;
+			let balanceDue = 0n;
 			if (FINISHED_STATUSES.includes(project.status)) {
 				const quote = quotes.get(project.id) ?? null;
-				balanceOwed =
-					quote !== null &&
-					quote.kind === "fixed" &&
-					owed(balanceOf(quote, own).due) > 0n;
+				if (quote !== null && quote.kind === "fixed") {
+					balanceDue = owed(balanceOf(quote, own).due);
+				}
 			}
 			flags.set(project.id, {
 				proofWaiting,
 				depositToSettle,
 				quoteLapsed,
-				balanceOwed,
+				balanceOwed: balanceDue > 0n,
+				balanceDue: balanceDue > 0n ? balanceDue : null,
 			});
 		}
 		return flags;

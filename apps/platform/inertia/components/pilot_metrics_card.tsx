@@ -11,7 +11,7 @@ export type PilotCardProps = {
  * The studio's pilot numbers for the last 30 days (TAT-70): how much new
  * work comes through the intake link, how long an inquiry takes to become
  * a verified deposit, and how many clients miss their session. Owners only,
- * under the inbox; TAT-107's Today screen takes it over.
+ * at the bottom of Today (TAT-107).
  */
 export default function PilotMetricsCard({
 	metrics,

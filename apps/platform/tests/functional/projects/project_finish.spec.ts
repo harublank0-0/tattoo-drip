@@ -466,6 +466,13 @@ test.group("ProjectService: finishing a project (TAT-111)", (group) => {
 				all.map(({ id }) => flags.get(id)?.balanceOwed),
 				[true, true, false, false, false],
 			);
+			// What is left to pay, for the Projects list's line (TAT-109): the whole
+			// fixed price here, since the fixture records no payment.
+			const due = 1_500_000n;
+			assert.deepEqual(
+				all.map(({ id }) => flags.get(id)?.balanceDue),
+				[due, due, null, null, null],
+			);
 		});
 	});
 });

@@ -150,33 +150,6 @@ test.group("DepositService: what the deposit page reads", (group) => {
 		assert.isFalse(await rejected());
 	});
 
-	test("countPendingProofs counts this studio's submitted deposit payments only", async ({
-		assert,
-	}) => {
-		const { tenant } = await studioWithOwner("reads-count-a-65");
-		const { tenant: other } = await studioWithOwner("reads-count-b-65");
-		const one = await quotedProject(tenant);
-		const two = await quotedProject(tenant);
-		const theirs = await quotedProject(other);
-		await inTenant(tenant, async () => {
-			await makePayment(tenant, one.project);
-			await makePayment(tenant, two.project);
-			await makePayment(tenant, two.project, { kind: "session" });
-			await makePayment(tenant, one.project, { ...decided("verified") });
-		});
-		await inTenant(other, () => makePayment(other, theirs.project));
-
-		assert.equal(
-			await inTenant(tenant, () => deposits.countPendingProofs(tenant)),
-			2,
-		);
-		assert.equal(
-			await inTenant(other, () => deposits.countPendingProofs(tenant)),
-			0,
-			"another studio's context counts none of this studio's",
-		);
-	});
-
 	test("recordProof inserts a submitted deposit payment with its proof", async ({
 		assert,
 	}) => {
