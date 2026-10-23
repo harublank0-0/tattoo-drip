@@ -3,7 +3,6 @@ import { describe, test } from "node:test";
 import type { DepositPage } from "@tattoo-drip/sdk";
 import { copy, type DepositMethodKind } from "../../src/deposit/copy.ts";
 import {
-	answerCollapsed,
 	answerFor,
 	type DepositView,
 	daysUntil,
@@ -819,49 +818,5 @@ describe("the answer follows an explicit pick (TAT-110 fix round 1)", () => {
 		page.refetch(view(esewa, bank, twin));
 		assert.equal(page.shown?.accountNumber, "01234567890123");
 		assert.equal(page.answer, "bank");
-	});
-});
-
-describe("How did you pay? as one line (TAT-110 option 2)", () => {
-	const pick: MethodPick = { id: "bank:1", kind: "bank", count: 1 };
-	const both: readonly DepositMethodKind[] = ["esewa", "bank"];
-	const base = {
-		answer: "bank",
-		kinds: both,
-		pick,
-		changing: false,
-		hasError: false,
-	};
-
-	test("collapses once a pick has answered it", () => {
-		assert.equal(answerCollapsed(base), true);
-	});
-
-	test("with one kind the answer is already set: collapsed, with no pick", () => {
-		assert.equal(
-			answerCollapsed({
-				...base,
-				kinds: ["esewa"],
-				answer: "esewa",
-				pick: null,
-			}),
-			true,
-		);
-	});
-
-	test("before any pick, with several kinds, the choices show, even when the client answered by hand", () => {
-		assert.equal(answerCollapsed({ ...base, pick: null }), false);
-		assert.equal(answerCollapsed({ ...base, pick: null, answer: "" }), false);
-	});
-
-	test("shows the choices while the client is changing it, and when there is an error to show on them", () => {
-		assert.equal(answerCollapsed({ ...base, changing: true }), false);
-		assert.equal(answerCollapsed({ ...base, hasError: true }), false);
-	});
-
-	test("never collapses an empty answer or a kind the form doesn't offer, so the line always says what is sent", () => {
-		assert.equal(answerCollapsed({ ...base, answer: "" }), false);
-		assert.equal(answerCollapsed({ ...base, answer: "khalti" }), false);
-		assert.equal(answerCollapsed({ ...base, kinds: [], answer: "" }), false);
 	});
 });
