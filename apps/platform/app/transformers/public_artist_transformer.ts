@@ -20,6 +20,10 @@ export default class PublicArtistTransformer extends BaseTransformer<ShownArtist
 						url: artist.photo.url,
 						width: artist.photo.width,
 						height: artist.photo.height,
+						variants: artist.photo.variants.map(({ url, width }) => ({
+							url,
+							width,
+						})),
 					}
 				: null,
 			acceptingInquiries: artist.acceptingInquiries,
