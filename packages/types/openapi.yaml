@@ -583,7 +583,7 @@ components:
 
     Image:
       type: object
-      required: [url, width, height]
+      required: [url, width, height, variants]
       additionalProperties: false
       properties:
         url:
@@ -593,14 +593,23 @@ components:
         width: { type: integer, minimum: 1 }
         height: { type: integer, minimum: 1 }
         alt: { type: [string, "null"] }
+        variants:
+          type: array
+          maxItems: 8
+          description: |
+            Smaller copies, narrowest first, each narrower than `width`
+            (320, 640 and 1280 px, those below the image's own width). Empty
+            for an image stored before them or too small to have any: then
+            show `url` alone. Build `srcset` from these and `url` at `width`.
+          items: { $ref: "#/components/schemas/ImageVariant" }
 
     Photo:
       type: object
       description: |
-        An artist's photo (TAT-44): an `Image` without `alt`, so every
-        property is always there. The page builds the `alt` text from the
-        artist's name.
-      required: [url, width, height]
+        An artist's photo (TAT-44) and its smaller copies: an `Image`
+        without `alt`, so every property is always there. The page builds the
+        `alt` text from the artist's name.
+      required: [url, width, height, variants]
       additionalProperties: false
       properties:
         url:
@@ -609,6 +618,30 @@ components:
           description: Public and absolute.
         width: { type: integer, minimum: 1 }
         height: { type: integer, minimum: 1 }
+        variants:
+          type: array
+          maxItems: 8
+          description: |
+            Smaller copies, narrowest first, each narrower than `width`
+            (320, 640 and 1280 px, those below the image's own width). Empty
+            for an image stored before them or too small to have any: then
+            show `url` alone. Build `srcset` from these and `url` at `width`.
+          items: { $ref: "#/components/schemas/ImageVariant" }
+
+    ImageVariant:
+      type: object
+      description: |
+        A smaller copy of an image (TAT-112), for `srcset`: the same picture
+        in the same format, `width` px wide; its height keeps the image's
+        aspect ratio.
+      required: [url, width]
+      additionalProperties: false
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Absolute, on the same origin as the image's `url`.
+        width: { type: integer, minimum: 1 }
 
     Money:
       type: object

@@ -710,6 +710,12 @@ describe("studio and artists", () => {
 			url: "https://api.example.com/uploads/tenants/t/artist_photo/p.png",
 			width: 300,
 			height: 200,
+			variants: [
+				{
+					url: "https://api.example.com/uploads/tenants/t/artist_photo/p.320w.png",
+					width: 320,
+				},
+			],
 		},
 		acceptingInquiries: false,
 		closedMessage: "Books open in March.",

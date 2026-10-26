@@ -187,10 +187,25 @@ describe("artistViewModels", () => {
 
 	test("drops photos that aren't web images or have no real size", () => {
 		for (const photo of [
-			{ url: "javascript:alert(1)", width: 10, height: 10 },
-			{ url: "data:image/png;base64,AAAA", width: 10, height: 10 },
-			{ url: "https://api.example.com/p.jpg", width: 0, height: 10 },
-			{ url: "https://api.example.com/p.jpg", width: 10.5, height: 10 },
+			{ url: "javascript:alert(1)", width: 10, height: 10, variants: [] },
+			{
+				url: "data:image/png;base64,AAAA",
+				width: 10,
+				height: 10,
+				variants: [],
+			},
+			{
+				url: "https://api.example.com/p.jpg",
+				width: 0,
+				height: 10,
+				variants: [],
+			},
+			{
+				url: "https://api.example.com/p.jpg",
+				width: 10.5,
+				height: 10,
+				variants: [],
+			},
 		]) {
 			const [view] = artistViewModels([{ ...SITA, photo }]);
 			assert.equal(view.photo, null, JSON.stringify(photo));
@@ -202,6 +217,7 @@ describe("artistViewModels", () => {
 					url: "http://localhost:3333/uploads/p.jpg",
 					width: 10,
 					height: 10,
+					variants: [],
 				},
 			},
 		]);

@@ -212,7 +212,12 @@ describe("the studio page", () => {
 				{
 					...SITA,
 					bio: "<b>bold</b>",
-					photo: { url: "javascript:alert(1)", width: 10, height: 10 },
+					photo: {
+						url: "javascript:alert(1)",
+						width: 10,
+						height: 10,
+						variants: [],
+					},
 				},
 			],
 		);

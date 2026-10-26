@@ -43,7 +43,7 @@ export const SITA: Artist = {
 	slug: "sita",
 	name: "Sita Rai",
 	bio: "Fine line florals.\nBooks a month ahead.",
-	photo: { url: SITA_PHOTO_URL, width: 1200, height: 1500 },
+	photo: { url: SITA_PHOTO_URL, width: 1200, height: 1500, variants: [] },
 	acceptingInquiries: true,
 	closedMessage: null,
 };
