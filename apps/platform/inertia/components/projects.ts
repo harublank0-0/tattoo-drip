@@ -269,6 +269,30 @@ export function formatRupees(rupees: number): string {
 	return `NPR ${GROUPED.format(rupees)}`;
 }
 
+/** The money in a typed field as a number of rupees, or null when it is not a positive amount. */
+function typedRupees(typed: string): number | null {
+	const rupees = Number(typed.trim());
+	return typed.trim() !== "" && Number.isFinite(rupees) && rupees > 0
+		? rupees
+		: null;
+}
+
+/** A refund's submit button: it names the amount, which is the confirmation (TAT-108). */
+export function refundLabel(amount: string): string {
+	const rupees = typedRupees(amount);
+	return rupees === null
+		? "Record refund"
+		: `Record refund of ${formatRupees(rupees)}`;
+}
+
+/** Set price's submit button: it names the price, which can't be changed afterwards (TAT-108). */
+export function priceLabel(price: string): string {
+	const rupees = typedRupees(price);
+	return rupees === null
+		? "Set price"
+		: `Set the price to ${formatRupees(rupees)}`;
+}
+
 /**
  * The deposit the form suggests: `percent` of the total, in whole rupees and
  * never above the total. The server enforces the real limit.
