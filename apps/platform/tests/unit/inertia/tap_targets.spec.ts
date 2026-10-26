@@ -102,4 +102,18 @@ test.group("44px tap targets below lg (TAT-103)", () => {
 			assert.include(source, "max-lg:after:-inset-3.75", name);
 		}
 	});
+
+	test("the sheet's close button is a shared icon Button, and the form sheet and inline confirm draw no raw button (TAT-108)", async ({
+		assert,
+	}) => {
+		// The close "x" is a Button (44px below lg), not shadcn's bare icon.
+		const content = component(await read("sheet.tsx"), "SheetContent");
+		assert.include(content, "<Button");
+		assert.include(content, 'size="icon"');
+		assert.notInclude(content, '<XIcon className="size-4" />');
+		// Every control around the forms is the shared Button, so the 44px rule applies.
+		for (const file of ["../form_sheet.tsx", "../inline_confirm.tsx"]) {
+			assert.notMatch(await read(file), /<button\b/, file);
+		}
+	});
 });
