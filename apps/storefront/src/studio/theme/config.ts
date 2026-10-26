@@ -1,4 +1,5 @@
 import { safeImageUrl } from "../links.ts";
+import { readSrcSet } from "../srcset.ts";
 import { cleanLine } from "../text.ts";
 
 /**
@@ -52,6 +53,8 @@ export interface BrandImage {
 	readonly src: string;
 	readonly width: number;
 	readonly height: number;
+	/** The image and its smaller copies, when the API sent any (readSrcSet, TAT-112). */
+	readonly srcSet?: string;
 }
 
 /** The cover: a BrandImage and its description, "" when the API gave none. A photograph, so it may say what it shows. */
@@ -167,7 +170,9 @@ const MAX_IMAGE_SIDE = 10_000;
  * credentials, at most 2048 characters) and is on exactly `imageOrigin`, the
  * API's origin: the same scheme, host and port. That one comparison is the
  * rule: the tenancy settings already allow http only for an API on this
- * machine. Without an origin no image is accepted.
+ * machine. Without an origin no image is accepted. Its `variants` (smaller
+ * copies, TAT-112) pass readSrcSet: on the image's own origin, which is the
+ * API's, so a copy from anywhere else is dropped and the image stays.
  */
 export function readBrandImage(
 	value: unknown,
@@ -183,7 +188,8 @@ export function readBrandImage(
 	const parsed = new URL(src);
 	if (parsed.origin !== originOf(imageOrigin)) return null;
 	if (!isImageSide(width) || !isImageSide(height)) return null;
-	return { src, width, height };
+	const srcSet = readSrcSet(own(value, "variants"), src, width);
+	return { src, width, height, ...(srcSet ? { srcSet } : {}) };
 }
 
 /** The longest cover description kept, in characters; a longer one is no description. */

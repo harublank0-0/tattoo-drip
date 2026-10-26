@@ -11,6 +11,7 @@ import {
 	viberLink,
 	whatsappLink,
 } from "./links.ts";
+import { readSrcSet } from "./srcset.ts";
 import { cleanLine, cleanText, locationLine } from "./text.ts";
 
 /**
@@ -65,6 +66,8 @@ export interface ArtistPhoto {
 	readonly width: number;
 	readonly height: number;
 	readonly alt: string;
+	/** The photo and its smaller copies, when the API sent any (readSrcSet, TAT-112). */
+	readonly srcSet?: string;
 }
 
 export interface ArtistView {
@@ -104,7 +107,11 @@ const LINK_ORDER: readonly ContactLinkKind[] = [
 	"other",
 ];
 
-/** Photos are at most 2048 px (TAT-44); anything outside this is no photo. */
+/**
+ * Photos are at most 2048 px (TAT-44); anything outside this is no photo. The
+ * photo's smaller copies must be on its own origin (readSrcSet, TAT-112); the
+ * photo itself may be on any http(s) origin (TAT-54's known limit).
+ */
 const MAX_PHOTO_SIDE = 10_000;
 
 export function studioViewModel(studio: Studio): StudioView {
@@ -202,11 +209,13 @@ function photoView(photo: Artist["photo"], name: string): ArtistPhoto | null {
 	if (!photo) return null;
 	const src = safeImageUrl(photo.url);
 	if (!src || !isSide(photo.width) || !isSide(photo.height)) return null;
+	const srcSet = readSrcSet(photo.variants, src, photo.width);
 	return {
 		src,
 		width: photo.width,
 		height: photo.height,
 		alt: `Photo of ${name}`,
+		...(srcSet ? { srcSet } : {}),
 	};
 }
 

@@ -2,6 +2,7 @@ import type { ReactNode, Ref } from "react";
 import { Fill } from "../../intake/components/fill.tsx";
 import { fill } from "../../intake/template.ts";
 import { linkRel } from "../../studio/links.ts";
+import { IMAGE_SIZES } from "../../studio/srcset.ts";
 import type { BrandImage } from "../../studio/theme/config.ts";
 import { copy } from "../copy.ts";
 import type { LoadProblem } from "../problems.ts";
@@ -102,6 +103,8 @@ function DepositHeader({
 				<img
 					className="deposit-logo"
 					src={logo.src}
+					srcSet={logo.srcSet}
+					sizes={logo.srcSet ? IMAGE_SIZES.depositLogo : undefined}
 					width={logo.width}
 					height={logo.height}
 					alt=""

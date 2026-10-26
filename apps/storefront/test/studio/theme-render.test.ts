@@ -27,9 +27,12 @@ import {
 	BRANDED,
 	COVER,
 	COVER_ALT,
+	COVER_SIZED,
 	HOSTILE,
 	IMAGE_ORIGIN,
 	LOGO,
+	LOGO_SIZED,
+	srcSetOf,
 	withStorefront,
 } from "./theme-fixtures.ts";
 
@@ -164,6 +167,73 @@ describe("a studio's logo and cover (TAT-54)", () => {
 				`<main class="page"><div class="profile-cover"><img src="${COVER.url}" width="2048" height="1024" alt="" loading="eager" decoding="async" fetchPriority="high"/></div><header class="profile">`,
 			),
 		);
+	});
+
+	test("copies give the logo, the bar logo and the cover their srcset and sizes (TAT-112)", () => {
+		const branding = {
+			...BRANDED.branding,
+			logo: LOGO_SIZED,
+			heroImage: COVER_SIZED,
+		};
+		const config = withStorefront({ ...BRANDED, branding });
+
+		const studio = studioHtml(config);
+		assertSafePage(studio, BRAND_PAGE);
+		const [logo] = studio.match(/<img class="profile-logo"[^>]*>/) ?? [];
+		assert.ok(logo);
+		assert.match(logo, new RegExp(` srcSet="${srcSetOf(LOGO_SIZED)}"`, "i"));
+		assert.match(logo, / sizes="12rem"/);
+		assert.match(logo, /fetchPriority="low"/);
+		const [cover] =
+			studio.match(/<div class="profile-cover">(<img [^>]*>)/) ?? [];
+		assert.ok(cover);
+		assert.match(cover, new RegExp(` srcSet="${srcSetOf(COVER_SIZED)}"`, "i"));
+		assert.match(
+			cover,
+			/ sizes="\(min-width: 74\.5rem\) 72rem, calc\(100vw - 2\.5rem\)"/,
+		);
+		assert.match(cover, / loading="eager"/);
+		assert.match(cover, /fetchPriority="high"/);
+
+		const artist = artistHtml("sita", config);
+		assertSafePage(artist, BRAND_PAGE);
+		const [bar] = artist.match(/<img class="site-bar-logo"[^>]*>/) ?? [];
+		assert.ok(bar);
+		assert.match(bar, new RegExp(` srcSet="${srcSetOf(LOGO_SIZED)}"`, "i"));
+		assert.match(bar, / sizes="6rem"/);
+	});
+
+	test("the cover's preload carries its srcset; the logo is still never preloaded (TAT-112)", () => {
+		const branding = {
+			...BRANDED.branding,
+			logo: LOGO_SIZED,
+			heroImage: COVER_SIZED,
+		};
+		const links = (
+			studioHtml(withStorefront({ ...BRANDED, branding })).match(
+				/<link [^>]*rel="preload"[^>]*>/g,
+			) ?? []
+		).filter((link) => /as="image"/.test(link));
+
+		assert.equal(links.length, 1, links.join());
+		assert.match(links[0], /imageSrcSet=|imagesrcset=/i);
+		assert.match(links[0], /imageSizes=|imagesizes=/i);
+		assert.ok(!links[0].includes(LOGO.url));
+	});
+
+	test("a logo's copy on another origin is dropped, and the page is still safe (TAT-112)", () => {
+		const branding = {
+			...BRANDED.branding,
+			logo: {
+				...LOGO,
+				variants: [{ url: "https://evil.example/logo.320w.png", width: 320 }],
+			},
+		};
+		const html = studioHtml(withStorefront({ ...BRANDED, branding }));
+
+		assertSafePage(html, BRAND_PAGE);
+		assert.doesNotMatch(html, /evil\.example/);
+		assert.doesNotMatch(html, /<img class="profile-logo"[^>]* srcset=/i);
 	});
 
 	test("the cover says what it shows when the API described it; the logo stays decoration", () => {

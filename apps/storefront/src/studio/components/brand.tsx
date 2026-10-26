@@ -1,3 +1,4 @@
+import { IMAGE_SIZES } from "../srcset.ts";
 import type { BrandImage, CoverImage } from "../theme/config.ts";
 
 /**
@@ -8,6 +9,8 @@ import type { BrandImage, CoverImage } from "../theme/config.ts";
  * always set, so nothing shifts while they load. Never a CSS url(): a URL
  * inside CSS would need CSS escaping and could carry no size or alt text.
  *
+ * With smaller copies (TAT-112) both carry `srcset` and the slot's `sizes`.
+ *
  * The logo is small and has the studio's name beside it, so it has
  * `fetchPriority="low"`: that also stops React from adding a
  * `<link rel="preload">` for it, which would compete with the cover and the
@@ -16,14 +19,19 @@ import type { BrandImage, CoverImage } from "../theme/config.ts";
 export function BrandLogo({
 	image,
 	className,
+	sizes,
 }: {
 	image: BrandImage;
 	className: string;
+	/** The width the stylesheet draws this logo at (IMAGE_SIZES). */
+	sizes: string;
 }) {
 	return (
 		<img
 			className={className}
 			src={image.src}
+			srcSet={image.srcSet}
+			sizes={image.srcSet ? sizes : undefined}
 			width={image.width}
 			height={image.height}
 			alt=""
@@ -39,6 +47,8 @@ export function BrandCover({ image }: { image: CoverImage }) {
 		<div className="profile-cover">
 			<img
 				src={image.src}
+				srcSet={image.srcSet}
+				sizes={image.srcSet ? IMAGE_SIZES.cover : undefined}
 				width={image.width}
 				height={image.height}
 				alt={image.alt}

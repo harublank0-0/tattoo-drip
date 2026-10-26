@@ -14,6 +14,8 @@ import {
 	EMPTY_STUDIO,
 	SITA,
 	SITA_PHOTO_URL,
+	SITA_SIZED,
+	SITA_SRCSET,
 	STUDIO,
 } from "./fixtures.ts";
 
@@ -176,6 +178,53 @@ describe("artistViewModels", () => {
 		assert.equal(arjun.photo, null);
 		assert.equal(arjun.accepting, false);
 		assert.equal(arjun.closedMessage, "Books open in March.");
+	});
+
+	test("a photo with copies gets a checked srcset; one without gets none (TAT-112)", () => {
+		const [sized] = artistViewModels([SITA_SIZED]);
+		assert.equal(sized.photo?.srcSet, SITA_SRCSET);
+		assert.equal(sized.photo?.src, SITA_PHOTO_URL);
+
+		const [plain] = artistViewModels([SITA]);
+		assert.ok(plain.photo);
+		assert.equal("srcSet" in plain.photo, false);
+	});
+
+	test("a copy on another origin is dropped and the photo stays (TAT-112)", () => {
+		const [view] = artistViewModels([
+			{
+				...SITA_SIZED,
+				photo: {
+					...SITA_SIZED.photo,
+					variants: [
+						{ url: "https://evil.example/sita.320w.jpg", width: 320 },
+						...(SITA_SIZED.photo?.variants ?? []).slice(1),
+					],
+				} as NonNullable<typeof SITA_SIZED.photo>,
+			},
+		]);
+
+		assert.ok(view.photo);
+		assert.equal(
+			view.photo.srcSet,
+			`${SITA_SIZED.photo?.variants[1].url} 640w, ${SITA_PHOTO_URL} 1200w`,
+		);
+		assert.ok(!view.photo.srcSet?.includes("evil.example"));
+	});
+
+	test("a photo whose variants are not a list, or all hostile, keeps only its src (TAT-112)", () => {
+		for (const variants of [undefined, null, "320w", {}, [null], [{}]]) {
+			const [view] = artistViewModels([
+				{
+					...SITA,
+					photo: { ...SITA.photo, variants } as unknown as NonNullable<
+						typeof SITA.photo
+					>,
+				},
+			]);
+			assert.ok(view.photo, JSON.stringify(variants));
+			assert.equal("srcSet" in view.photo, false, JSON.stringify(variants));
+		}
 	});
 
 	test("a closed message never shows while the artist accepts", () => {

@@ -12,7 +12,7 @@ import { studioViewModel } from "../studio/view-model.ts";
  * server sees. Loader data is serialized into the page: all of it is public.
  * Of the studio's branding it reads the checked logo only (TAT-110): never the
  * colours, the font or the cover (the page stays violet and writes no brand
- * style, and a cover would be the full stored photo on a payment page).
+ * style, and a cover would compete with the QR on a payment page).
  */
 
 export interface DepositShell {
