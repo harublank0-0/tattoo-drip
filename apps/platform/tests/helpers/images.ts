@@ -21,6 +21,11 @@ function canvas(
 export const testImages = {
 	png: (width = 300, height = 200) => canvas(width, height).png().toBuffer(),
 	jpeg: (width = 300, height = 200) => canvas(width, height).jpeg().toBuffer(),
+	/** A PNG with an alpha channel (half see-through), for copies that must keep it. */
+	transparentPng: (width = 300, height = 200) =>
+		canvas(width, height, { r: 20, g: 120, b: 60, alpha: 0.5 })
+			.png()
+			.toBuffer(),
 	transparentWebp: () =>
 		canvas(20, 20, { r: 0, g: 0, b: 0, alpha: 0 }).webp().toBuffer(),
 	gif: () => canvas(10, 10).gif().toBuffer(),
@@ -31,8 +36,8 @@ export const testImages = {
 	 * A phone photo: sideways (EXIF orientation 6), with a description and a
 	 * GPS position.
 	 */
-	phonePhoto: () =>
-		canvas(300, 200)
+	phonePhoto: (width = 300, height = 200) =>
+		canvas(width, height)
 			.jpeg()
 			.withMetadata({ orientation: 6 })
 			.withExifMerge({
@@ -46,6 +51,20 @@ export const testImages = {
 			})
 			.toBuffer(),
 };
+
+/** Bytes a polyglot file hides after its image; neither a stored image nor a copy may keep them. */
+export const POLYGLOT_MARKERS = ["<script>", "PK\x03\x04"];
+
+/**
+ * A real JPEG with an HTML page and a ZIP header appended: it opens as an
+ * image and as the other two.
+ */
+export async function polyglot() {
+	return Buffer.concat([
+		await testImages.jpeg(1000, 800),
+		Buffer.from("<html><script>alert(1)</script></html>PK\x03\x04polyglot"),
+	]);
+}
 
 /**
  * What the body parser hands a service: the upload written to a temp file,

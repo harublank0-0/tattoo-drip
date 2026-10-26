@@ -5,8 +5,12 @@ import {
 	IMAGE_SIZE_MESSAGE,
 	InvalidImageError,
 } from "#modules/media/errors";
-import { processImage } from "#modules/media/services/image_processor";
-import { testImages } from "#tests/helpers/images";
+import {
+	makeVariants,
+	processImage,
+} from "#modules/media/services/image_processor";
+import { NO_VARIANTS, VARIANT_WIDTHS } from "#modules/media/variants";
+import { POLYGLOT_MARKERS, polyglot, testImages } from "#tests/helpers/images";
 
 test.group("processImage", () => {
 	test("keeps no decoded images in sharp's cache", ({ assert }) => {
@@ -124,5 +128,149 @@ test.group("processImage", () => {
 
 		assert.instanceOf(error, InvalidImageError);
 		assert.equal(error.message, IMAGE_SIZE_MESSAGE);
+	});
+});
+
+test.group("makeVariants (TAT-112)", () => {
+	test("makes 320, 640 and 1280 px copies of a big photo, narrowest first, as JPEG", async ({
+		assert,
+	}) => {
+		const image = await processImage(await testImages.jpeg(4000, 3000));
+		assert.deepEqual([image.width, image.height], [2048, 1536]);
+
+		const copies = await makeVariants(image, VARIANT_WIDTHS);
+
+		assert.deepEqual(
+			copies.map((copy) => copy.width),
+			[320, 640, 1280],
+		);
+		assert.deepEqual(
+			copies.map((copy) => copy.height),
+			[240, 480, 960],
+		);
+		for (const copy of copies) {
+			const seen = await sharp(copy.data).metadata();
+			assert.equal(seen.format, "jpeg");
+			assert.equal(seen.width, copy.width);
+			assert.equal(seen.height, copy.height);
+			assert.isBelow(copy.data.length, image.data.length);
+		}
+	});
+
+	test("never enlarges: only widths below the image's own", async ({
+		assert,
+	}) => {
+		const widths = async (width: number, height: number) =>
+			(
+				await makeVariants(
+					await processImage(await testImages.jpeg(width, height)),
+					VARIANT_WIDTHS,
+				)
+			).map((copy) => copy.width);
+
+		assert.deepEqual(await widths(640, 480), [320]);
+		assert.deepEqual(await widths(320, 240), []);
+		assert.deepEqual(await widths(300, 200), []);
+		assert.deepEqual(
+			await makeVariants(
+				await processImage(await testImages.jpeg(2048, 1536)),
+				NO_VARIANTS,
+			),
+			[],
+		);
+	});
+
+	test("a PNG's copies stay PNG, with their transparency", async ({
+		assert,
+	}) => {
+		const image = await processImage(
+			await testImages.transparentPng(1000, 400),
+		);
+		assert.equal(image.format, "png");
+
+		const copies = await makeVariants(image, VARIANT_WIDTHS);
+
+		assert.deepEqual(
+			copies.map((copy) => copy.width),
+			[320, 640],
+		);
+		for (const copy of copies) {
+			const seen = await sharp(copy.data).metadata();
+			assert.equal(seen.format, "png");
+			assert.isTrue(seen.hasAlpha);
+		}
+	});
+
+	test("a strip 4000 x 2 px: copies are 1 px tall, never 0", async ({
+		assert,
+	}) => {
+		const image = await processImage(await testImages.png(4000, 2));
+		assert.deepEqual([image.width, image.height], [2048, 1]);
+
+		const copies = await makeVariants(image, VARIANT_WIDTHS);
+
+		assert.deepEqual(
+			copies.map((copy) => [copy.width, copy.height]),
+			[
+				[320, 1],
+				[640, 1],
+				[1280, 1],
+			],
+		);
+		for (const copy of copies) {
+			assert.equal((await sharp(copy.data).metadata()).height, 1);
+		}
+	});
+
+	test("copies carry no metadata", async ({ assert }) => {
+		const input = await testImages.phonePhoto(1200, 900);
+		assert.exists((await sharp(input).metadata()).exif);
+		const image = await processImage(input);
+
+		const copies = await makeVariants(image, VARIANT_WIDTHS);
+
+		assert.isAbove(copies.length, 0);
+		for (const copy of copies) {
+			const seen = await sharp(copy.data).metadata();
+			assert.isUndefined(seen.exif);
+			assert.isUndefined(seen.xmp);
+			assert.isUndefined(seen.iptc);
+			assert.isFalse(copy.data.includes("Kathmandu studio"));
+		}
+	});
+
+	test("a polyglot: neither the image nor its copies keep what came after it", async ({
+		assert,
+	}) => {
+		const input = await polyglot();
+		for (const marker of POLYGLOT_MARKERS) {
+			assert.isTrue(input.includes(marker), marker);
+		}
+
+		const image = await processImage(input);
+		const copies = await makeVariants(image, VARIANT_WIDTHS);
+
+		assert.isAbove(copies.length, 0);
+		for (const data of [image.data, ...copies.map((copy) => copy.data)]) {
+			for (const marker of POLYGLOT_MARKERS) {
+				assert.isFalse(data.includes(marker), marker);
+			}
+		}
+	});
+
+	test("refuses anything larger than processImage's output", async ({
+		assert,
+	}) => {
+		const error = await makeVariants(
+			{
+				data: await testImages.jpeg(3000, 3000),
+				format: "jpeg",
+				width: 3000,
+				height: 3000,
+			},
+			VARIANT_WIDTHS,
+		).catch((e) => e);
+
+		assert.instanceOf(error, Error);
 	});
 });
