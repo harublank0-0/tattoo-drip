@@ -9,8 +9,8 @@ import {
 import { Button } from "~/components/ui/button";
 
 /**
- * Asks before a one-tap action, in the page and not in a dialog (TAT-108; it replaces
- * `window.confirm`): the trigger opens a panel with the question, the confirm button and the safe
+ * Asks before a one-tap action, in the page and not in a dialog (TAT-108; it replaces the
+ * browser's confirm box): the trigger opens a panel with the question, the confirm button and the safe
  * button, and focus starts on the safe one so Enter right away changes nothing. Escape or the safe
  * button closes it and returns focus to the trigger. `onConfirm` starts the request and calls
  * `finished` when it answers (`onFinish`): the panel closes, whatever the answer, and focus goes

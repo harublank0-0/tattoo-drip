@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { test } from "@japa/runner";
 
 const read = (file: string) =>
@@ -22,6 +22,29 @@ test.group(
 				assert.notInclude(source, "window.confirm", file);
 				assert.notMatch(source, /[^\w.]confirm\(/, file);
 				assert.notInclude(source, "onBefore=", file);
+			}
+		});
+
+		test("no project page, inquiry page or shared component calls the browser's confirm", async ({
+			assert,
+		}) => {
+			const components = (
+				await readdir(new URL("../../../inertia/components/", import.meta.url))
+			)
+				.filter((name) => name.endsWith(".tsx"))
+				.map((name) => `components/${name}`);
+			// pages/calendar has a confirm function of its own, and Settings and Artists still
+			// ask with the browser's dialog (a follow-up), so they are not scanned.
+			const files = [
+				"pages/projects/show.tsx",
+				"pages/inquiries/show.tsx",
+				...components,
+			];
+			assert.isAbove(components.length, 10);
+			for (const file of files) {
+				const source = await read(file);
+				assert.notInclude(source, "window.confirm", file);
+				assert.notMatch(source, /[^\w.]confirm\(/, file);
 			}
 		});
 	},

@@ -1,7 +1,8 @@
 import { Form } from "@adonisjs/inertia/react";
 import { Link, router } from "@inertiajs/react";
-import type { ReactNode } from "react";
+import { type ReactNode, type RefObject, useRef } from "react";
 import { urlFor } from "~/client";
+import InlineConfirm from "~/components/inline_confirm";
 import { type InquiryPageProps, SOURCE_LABELS } from "~/components/inquiries";
 import MessageCard from "~/components/message_card";
 import type { ContactVia } from "~/components/messages";
@@ -26,6 +27,8 @@ export default function InquiryShow({
 	lastChannel,
 }: InquiryPageProps) {
 	const tenant = useTenant();
+	// A decline that finishes may remove its button: focus goes to the heading.
+	const heading = useRef<HTMLHeadingElement>(null);
 	// The chat links record the contact in the background (TAT-52).
 	const markContacted = (via: ContactVia = {}) =>
 		router.post(
@@ -63,6 +66,7 @@ export default function InquiryShow({
 	return (
 		<Page
 			title={inquiry.contactName}
+			titleRef={heading}
 			description={inquiry.receivedText}
 			actions={
 				<Link
@@ -152,7 +156,7 @@ export default function InquiryShow({
 						</CardHeader>
 						<CardContent className="flex flex-col gap-4">
 							<AcceptForm inquiryId={inquiry.id} accept={accept} />
-							<DeclineButton inquiryId={inquiry.id} />
+							<DeclineButton inquiryId={inquiry.id} fallback={heading} />
 						</CardContent>
 					</Card>
 				)}
@@ -232,26 +236,33 @@ function AcceptForm({
 	);
 }
 
-function DeclineButton({ inquiryId }: { inquiryId: string }) {
+function DeclineButton({
+	inquiryId,
+	fallback,
+}: {
+	inquiryId: string;
+	fallback: RefObject<HTMLElement | null>;
+}) {
 	const tenant = useTenant();
-	const decline = () => {
-		if (!window.confirm("Decline this inquiry? This can't be undone.")) return;
-		router.post(
-			urlFor("tenant.inbox.decline", { tenant: tenant.slug, id: inquiryId }),
-		);
-	};
 
 	return (
-		<div>
-			<Button
-				type="button"
-				variant="outline"
-				className="h-11"
-				onClick={decline}
-			>
-				Decline
-			</Button>
-		</div>
+		<InlineConfirm
+			label="Decline"
+			question="Decline this inquiry? This can't be undone."
+			confirmLabel="Decline the inquiry"
+			keepLabel="Keep the inquiry"
+			onConfirm={(finished) =>
+				router.post(
+					urlFor("tenant.inbox.decline", {
+						tenant: tenant.slug,
+						id: inquiryId,
+					}),
+					{},
+					{ onFinish: finished },
+				)
+			}
+			fallback={fallback}
+		/>
 	);
 }
 
