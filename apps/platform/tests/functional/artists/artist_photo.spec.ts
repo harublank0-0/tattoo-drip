@@ -7,6 +7,7 @@ import ArtistService, {
 	type ArtistInput,
 } from "#modules/artists/services/artist_service";
 import { InvalidImageError } from "#modules/media/errors";
+import { variantsOfKey } from "#modules/media/variants";
 import { withDbContext } from "#services/db_context";
 import {
 	RecordingImageService,
@@ -287,5 +288,99 @@ test.group("ArtistService photo", (group) => {
 
 		assert.lengthOf(images.keys, 0);
 		assert.isTrue(await exists(oldKey), "the stored photo stays");
+	});
+});
+
+const widePhoto = async () => uploadOf(await testImages.jpeg(1000, 800));
+/** The image's key and the keys of the copies it names. */
+const filesOfKey = (key: string) => [
+	key,
+	...variantsOfKey(key).map((copy) => copy.key),
+];
+
+test.group("ArtistService photo copies (TAT-112)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("replacing a photo deletes the old photo's copies after the commit and keeps the new ones", async ({
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+		const { artists } = makeService();
+		const artist = await inTenant(tenant, async () =>
+			artists.create(tenant, input({ photo: await widePhoto() }), owner),
+		);
+		const oldKey = artist.photoKey ?? "";
+		const oldFiles = filesOfKey(oldKey);
+		assert.lengthOf(oldFiles, 3, "a 1000 px photo has two copies");
+		let newKey = "";
+
+		await withDbContext({ tenantId: tenant.id }, async () => {
+			const saved = await artists.update(
+				tenant,
+				artist,
+				input({ photo: await widePhoto() }),
+				owner,
+			);
+			newKey = saved.photoKey ?? "";
+			for (const key of oldFiles) {
+				assert.isTrue(await exists(key), `${key} stays until the commit`);
+			}
+		});
+
+		for (const key of oldFiles) {
+			assert.isFalse(await exists(key), `${key} was left behind`);
+		}
+		const newFiles = filesOfKey(newKey);
+		assert.lengthOf(newFiles, 3);
+		for (const key of newFiles) {
+			assert.isTrue(await exists(key), `${key} is missing`);
+		}
+		const idOf = (key: string) => key.split("/").at(-1)?.split(".")[0];
+		assert.notEqual(idOf(newKey), idOf(oldKey), "the copies share no id");
+	});
+
+	test("removePhoto deletes the copies too", async ({ assert }) => {
+		const { tenant, owner } = await studioWithOwner();
+		const { artists } = makeService();
+		const artist = await inTenant(tenant, async () =>
+			artists.create(tenant, input({ photo: await widePhoto() }), owner),
+		);
+		const files = filesOfKey(artist.photoKey ?? "");
+		assert.lengthOf(files, 3);
+
+		await inTenant(tenant, () =>
+			artists.update(tenant, artist, input({ removePhoto: true }), owner),
+		);
+
+		for (const key of files) {
+			assert.isFalse(await exists(key), `${key} was left behind`);
+		}
+	});
+
+	test("a slug conflict after the photo was stored removes the new photo and its copies", async ({
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+		const { images, artists } = makeService();
+		await inTenant(tenant, () => artists.create(tenant, input(), owner));
+
+		await assert.rejects(
+			async () =>
+				inTenant(tenant, async () =>
+					artists.create(
+						tenant,
+						input({ name: "Other", photo: await widePhoto() }),
+						owner,
+					),
+				),
+			ArtistSlugTakenError,
+		);
+
+		assert.lengthOf(images.keys, 1);
+		const files = filesOfKey(images.keys[0]);
+		assert.lengthOf(files, 3);
+		for (const key of files) {
+			assert.isFalse(await exists(key), `${key} was left on the public disk`);
+		}
 	});
 });

@@ -631,4 +631,22 @@ test.group("ImageService copies (TAT-112)", () => {
 			assert.isFalse(bytes.includes("Kathmandu studio"), file);
 		}
 	});
+
+	test("delete removes the image and every copy; a copy already gone is no error", async ({
+		assert,
+	}) => {
+		const studio = { id: randomUUID() };
+		const stored = await images.store(
+			await upload(await testImages.jpeg(2000, 1500)),
+			{ tenant: studio, purpose: "artist_photo" },
+		);
+		const [, medium] = variantsOfKey(stored.key);
+		await drive.use("public").delete(medium.key);
+		assert.lengthOf(await filesOf("public", studio, "artist_photo"), 3);
+
+		await images.delete("artist_photo", stored.key);
+
+		assert.deepEqual(await filesOf("public", studio, "artist_photo"), []);
+		await images.delete("artist_photo", stored.key);
+	});
 });
