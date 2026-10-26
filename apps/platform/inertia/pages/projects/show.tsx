@@ -17,50 +17,32 @@ import {
 import Page from "~/components/page";
 import PaymentsCard from "~/components/payments_card";
 import {
-	formatRupees,
 	type ManualMoveName,
 	MOVE_LABELS,
 	type ProjectPageProps,
-	type QuoteProps,
-	suggestedDeposit,
 } from "~/components/projects";
+import {
+	AcceptQuote,
+	PriceSheet,
+	QuoteForm,
+	QuoteSummary,
+	ReviseSheet,
+} from "~/components/quote_card";
 import ReferenceGrid from "~/components/references";
 import SessionsCard from "~/components/sessions_card";
 import StatusBadge from "~/components/status_badge";
-import { Badge } from "~/components/ui/badge";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import {
 	Field,
-	FieldContent,
 	FieldDescription,
 	FieldError,
-	FieldGroup,
 	FieldLabel,
-	FieldLegend,
-	FieldSet,
-	FieldTitle,
 } from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
-import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Textarea } from "~/components/ui/textarea";
 import { useTenant } from "~/hooks/use-tenant";
 import AppLayout from "~/layouts/app";
-
-type Kind = QuoteProps["kind"];
-
-const KINDS: { value: Kind; title: string; description: string }[] = [
-	{
-		value: "fixed",
-		title: "Fixed price",
-		description: "One price for the whole tattoo.",
-	},
-	{
-		value: "hourly",
-		title: "Hourly",
-		description: "A rate per hour and the hours you expect.",
-	},
-];
 
 /**
  * One project: its brief, current quote with the chat message and the
@@ -181,6 +163,7 @@ export default function ProjectShow({
 					sessions={sessions}
 					dates={sessionDates}
 					scheduling={scheduling}
+					fallback={heading}
 				/>
 
 				{request && (
@@ -225,10 +208,13 @@ export default function ProjectShow({
 					<CardContent className="flex flex-col gap-4">
 						{quote ? (
 							<QuoteSummary quote={quote} showExpiry={quoteExpiryShown} />
-						) : canSetPrice ? (
-							<PriceForm projectId={project.id} />
 						) : (
 							<p className="text-sm text-muted-foreground">No quote yet.</p>
+						)}
+						{canSetPrice && (
+							<div>
+								<PriceSheet projectId={project.id} fallback={heading} />
+							</div>
 						)}
 						{message && (
 							<ChatMessage
@@ -258,6 +244,7 @@ export default function ProjectShow({
 					projectId={project.id}
 					payments={payments}
 					canSetPrice={canSetPrice}
+					fallback={heading}
 				/>
 
 				<Card>
@@ -280,12 +267,21 @@ export default function ProjectShow({
 							</CardTitle>
 						</CardHeader>
 						<CardContent>
-							<QuoteForm
-								key={quote?.id ?? "first"}
-								projectId={project.id}
-								quote={quote}
-								form={form}
-							/>
+							{quote ? (
+								<ReviseSheet
+									projectId={project.id}
+									quote={quote}
+									form={form}
+									fallback={heading}
+								/>
+							) : (
+								<QuoteForm
+									key="first"
+									projectId={project.id}
+									quote={null}
+									form={form}
+								/>
+							)}
 						</CardContent>
 					</Card>
 				)}
@@ -317,39 +313,6 @@ export default function ProjectShow({
 				)}
 			</div>
 		</Page>
-	);
-}
-
-function QuoteSummary({
-	quote,
-	showExpiry,
-}: {
-	quote: QuoteProps;
-	showExpiry: boolean;
-}) {
-	return (
-		<dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-			<dt className="text-muted-foreground">Version</dt>
-			<dd>{quote.version}</dd>
-			<dt className="text-muted-foreground">Price</dt>
-			<dd>
-				{quote.priceText}
-				{quote.kind === "hourly" && ` ≈ ${quote.totalText}`}
-			</dd>
-			<dt className="text-muted-foreground">Deposit</dt>
-			<dd>{quote.depositText}</dd>
-			{showExpiry && (
-				<>
-					<dt className="text-muted-foreground">Valid until</dt>
-					<dd className="flex items-center gap-2">
-						{quote.validUntilText}
-						{quote.expired && <Badge variant="destructive">Expired</Badge>}
-					</dd>
-				</>
-			)}
-			<dt className="text-muted-foreground">Issued</dt>
-			<dd>{quote.issuedText}</dd>
-		</dl>
 	);
 }
 
@@ -488,280 +451,6 @@ function DepositCard({
 				)}
 			</CardContent>
 		</Card>
-	);
-}
-
-function AcceptQuote({
-	projectId,
-	quoteId,
-}: {
-	projectId: string;
-	quoteId: string;
-}) {
-	const tenant = useTenant();
-
-	return (
-		<Form
-			route="tenant.projects.quotes.accept"
-			routeParams={{ tenant: tenant.slug, id: projectId }}
-		>
-			{({ processing }) => (
-				<div className="flex flex-wrap items-center gap-3">
-					<input type="hidden" name="quoteId" value={quoteId} />
-					<Button type="submit" disabled={processing}>
-						{processing ? "Saving…" : "Client accepted"}
-					</Button>
-					<p className="text-sm text-muted-foreground">
-						Tap when the client agrees. The project then waits for the deposit.
-					</p>
-				</div>
-			)}
-		</Form>
-	);
-}
-
-/**
- * The price of a project booked without one (TAT-66): set once, behind a
- * confirm, because quotes are locked from booked on.
- */
-function PriceForm({ projectId }: { projectId: string }) {
-	const tenant = useTenant();
-	const [price, setPrice] = useState("");
-
-	return (
-		<Form
-			route="tenant.projects.price.store"
-			routeParams={{ tenant: tenant.slug, id: projectId }}
-			options={{ preserveScroll: true }}
-			onBefore={() =>
-				window.confirm(
-					`Set the price to ${formatRupees(Number(price))}? It can't be changed afterwards.`,
-				)
-			}
-		>
-			{({ errors, processing }) => (
-				<FieldGroup>
-					<p className="text-sm text-muted-foreground">
-						No price was set at booking. Set it once you know it: it can&apos;t
-						be changed afterwards.
-					</p>
-					<Field data-invalid={!!errors.fixedPrice}>
-						<FieldLabel htmlFor="finalPrice">Price (NPR)</FieldLabel>
-						<Input
-							id="finalPrice"
-							name="fixedPrice"
-							type="number"
-							inputMode="numeric"
-							min={1}
-							step={1}
-							value={price}
-							onChange={(event) => setPrice(event.target.value)}
-							aria-invalid={!!errors.fixedPrice}
-							aria-describedby={
-								errors.fixedPrice ? "finalPrice-error" : undefined
-							}
-						/>
-						{errors.fixedPrice && (
-							<FieldError id="finalPrice-error">{errors.fixedPrice}</FieldError>
-						)}
-					</Field>
-					<div>
-						<Button type="submit" className="h-11" disabled={processing}>
-							{processing ? "Saving…" : "Set price"}
-						</Button>
-					</div>
-				</FieldGroup>
-			)}
-		</Form>
-	);
-}
-
-/**
- * Issues the first quote or a revision. A revision starts from the current
- * quote; a first quote's deposit follows the studio's default percentage
- * until staff change it.
- */
-function QuoteForm({
-	projectId,
-	quote,
-	form,
-}: {
-	projectId: string;
-	quote: QuoteProps | null;
-	form: ProjectPageProps["form"];
-}) {
-	const tenant = useTenant();
-	const [kind, setKind] = useState<Kind>(quote?.kind ?? "fixed");
-	const [fixedPrice, setFixedPrice] = useState(
-		quote?.fixedPrice?.toString() ?? "",
-	);
-	const [hourlyRate, setHourlyRate] = useState(
-		quote?.hourlyRate?.toString() ?? "",
-	);
-	const [hours, setHours] = useState(quote?.estimatedHours?.toString() ?? "");
-	const [depositTouched, setDepositTouched] = useState(quote !== null);
-	const [deposit, setDeposit] = useState(quote?.depositAmount.toString() ?? "");
-
-	const total =
-		kind === "fixed" ? Number(fixedPrice) : Number(hourlyRate) * Number(hours);
-	const shownDeposit = depositTouched
-		? deposit
-		: String(suggestedDeposit(total, form.depositPercent));
-
-	return (
-		<Form
-			route="tenant.projects.quotes.store"
-			routeParams={{ tenant: tenant.slug, id: projectId }}
-		>
-			{({ errors, processing }) => (
-				<FieldGroup>
-					{/* The quote this form was built from: the server refuses the save
-					    if someone revised it meanwhile. Empty for a first quote. */}
-					<input type="hidden" name="baseQuoteId" value={quote?.id ?? ""} />
-					<FieldSet data-invalid={!!errors.kind}>
-						<FieldLegend variant="label">Pricing</FieldLegend>
-						<RadioGroup
-							name="kind"
-							value={kind}
-							onValueChange={(value) =>
-								setKind(value === "hourly" ? "hourly" : "fixed")
-							}
-						>
-							{KINDS.map(({ value, title, description }) => (
-								<FieldLabel key={value} htmlFor={`kind-${value}`}>
-									<Field orientation="horizontal">
-										<FieldContent>
-											<FieldTitle>{title}</FieldTitle>
-											<FieldDescription>{description}</FieldDescription>
-										</FieldContent>
-										<RadioGroupItem value={value} id={`kind-${value}`} />
-									</Field>
-								</FieldLabel>
-							))}
-						</RadioGroup>
-						{errors.kind && <FieldError>{errors.kind}</FieldError>}
-					</FieldSet>
-
-					{kind === "fixed" ? (
-						<Field data-invalid={!!errors.fixedPrice}>
-							<FieldLabel htmlFor="fixedPrice">Price (NPR)</FieldLabel>
-							<Input
-								id="fixedPrice"
-								name="fixedPrice"
-								type="number"
-								inputMode="numeric"
-								min={1}
-								step={1}
-								value={fixedPrice}
-								onChange={(event) => setFixedPrice(event.target.value)}
-								aria-invalid={!!errors.fixedPrice}
-							/>
-							{errors.fixedPrice && (
-								<FieldError>{errors.fixedPrice}</FieldError>
-							)}
-						</Field>
-					) : (
-						<>
-							<Field data-invalid={!!errors.hourlyRate}>
-								<FieldLabel htmlFor="hourlyRate">
-									Rate per hour (NPR)
-								</FieldLabel>
-								<Input
-									id="hourlyRate"
-									name="hourlyRate"
-									type="number"
-									inputMode="numeric"
-									min={1}
-									step={1}
-									value={hourlyRate}
-									onChange={(event) => setHourlyRate(event.target.value)}
-									aria-invalid={!!errors.hourlyRate}
-								/>
-								{errors.hourlyRate && (
-									<FieldError>{errors.hourlyRate}</FieldError>
-								)}
-							</Field>
-							<Field data-invalid={!!errors.estimatedHours}>
-								<FieldLabel htmlFor="estimatedHours">
-									Estimated hours
-								</FieldLabel>
-								<Input
-									id="estimatedHours"
-									name="estimatedHours"
-									type="number"
-									inputMode="decimal"
-									min={0.25}
-									step={0.25}
-									value={hours}
-									onChange={(event) => setHours(event.target.value)}
-									aria-invalid={!!errors.estimatedHours}
-								/>
-								<FieldDescription>
-									{total > 0
-										? `About ${formatRupees(total)} in total.`
-										: "In quarter hours: 4.5 for four and a half."}
-								</FieldDescription>
-								{errors.estimatedHours && (
-									<FieldError>{errors.estimatedHours}</FieldError>
-								)}
-							</Field>
-						</>
-					)}
-
-					<Field data-invalid={!!errors.depositAmount}>
-						<FieldLabel htmlFor="depositAmount">Deposit (NPR)</FieldLabel>
-						<Input
-							id="depositAmount"
-							name="depositAmount"
-							type="number"
-							inputMode="numeric"
-							min={0}
-							step={1}
-							value={shownDeposit}
-							onChange={(event) => {
-								setDepositTouched(true);
-								setDeposit(event.target.value);
-							}}
-							aria-invalid={!!errors.depositAmount}
-						/>
-						<FieldDescription>
-							{Number(shownDeposit) === 0
-								? "No deposit step: the project is booked once the client accepts and a session is scheduled."
-								: !depositTouched && form.depositPercent !== null
-									? `Your default ${form.depositPercent}% of the total.`
-									: "Paid before the first session."}
-						</FieldDescription>
-						{errors.depositAmount && (
-							<FieldError>{errors.depositAmount}</FieldError>
-						)}
-					</Field>
-
-					<Field data-invalid={!!errors.expiresOn}>
-						<FieldLabel htmlFor="expiresOn">Valid until</FieldLabel>
-						<Input
-							id="expiresOn"
-							name="expiresOn"
-							type="date"
-							min={form.minDate}
-							max={form.maxDate}
-							defaultValue={form.defaultValidUntil}
-							aria-invalid={!!errors.expiresOn}
-						/>
-						<FieldDescription>
-							If the client hasn&apos;t accepted, or hasn&apos;t paid the
-							deposit, by the end of this day, the project is cancelled.
-						</FieldDescription>
-						{errors.expiresOn && <FieldError>{errors.expiresOn}</FieldError>}
-					</Field>
-
-					<div>
-						<Button type="submit" disabled={processing}>
-							{processing ? "Saving…" : quote ? "Revise quote" : "Issue quote"}
-						</Button>
-					</div>
-				</FieldGroup>
-			)}
-		</Form>
 	);
 }
 

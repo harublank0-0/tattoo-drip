@@ -1,7 +1,13 @@
 import { Form } from "@adonisjs/inertia/react";
 import { router } from "@inertiajs/react";
-import { useEffect, useId, useRef, useState } from "react";
+import { type RefObject, useEffect, useId, useRef, useState } from "react";
 import { urlFor } from "~/client";
+import FormSheet, {
+	FormSheetActions,
+	type FormSheetState,
+	focusFirstInvalid,
+	useFormSheet,
+} from "~/components/form_sheet";
 import {
 	type ProjectPageProps,
 	SESSION_KIND_LABELS,
@@ -46,24 +52,20 @@ export default function SessionsCard({
 	sessions,
 	dates,
 	scheduling,
+	fallback,
 }: {
 	projectId: string;
 	sessions: SessionRow[];
 	dates: Dates;
 	scheduling: ProjectPageProps["scheduling"];
+	/** Where focus goes when the schedule sheet's trigger is gone after a save: the page heading. */
+	fallback: RefObject<HTMLElement | null>;
 }) {
 	const heading = useRef<HTMLHeadingElement>(null);
-	const scheduleButton = useRef<HTMLButtonElement>(null);
 	const [open, setOpen] = useState<Open>(null);
-	const [scheduleOpen, setScheduleOpen] = useState(false);
 	const done = () => {
 		setOpen(null);
-		setScheduleOpen(false);
 		heading.current?.focus();
-	};
-	const closeSchedule = () => {
-		setScheduleOpen(false);
-		scheduleButton.current?.focus();
 	};
 
 	return (
@@ -89,10 +91,7 @@ export default function SessionsCard({
 								session={session}
 								dates={dates}
 								open={open?.sessionId === session.id ? open.action : null}
-								onOpen={(action) => {
-									setScheduleOpen(false);
-									setOpen({ sessionId: session.id, action });
-								}}
+								onOpen={(action) => setOpen({ sessionId: session.id, action })}
 								onClose={() => setOpen(null)}
 								onDone={done}
 							/>
@@ -100,31 +99,13 @@ export default function SessionsCard({
 					</ul>
 				)}
 				{scheduling && (
-					<div className="flex flex-col gap-3 text-sm">
-						<div>
-							<Button
-								ref={scheduleButton}
-								type="button"
-								variant="outline"
-								className="h-11"
-								aria-expanded={scheduleOpen}
-								onClick={() => {
-									setOpen(null);
-									setScheduleOpen(true);
-								}}
-							>
-								Schedule a session
-							</Button>
-						</div>
-						{scheduleOpen && (
-							<ScheduleForm
-								projectId={projectId}
-								scheduling={scheduling}
-								dates={dates}
-								onCancel={closeSchedule}
-								onDone={done}
-							/>
-						)}
+					<div>
+						<ScheduleSheet
+							projectId={projectId}
+							scheduling={scheduling}
+							dates={dates}
+							fallback={fallback}
+						/>
 					</div>
 				)}
 			</CardContent>
@@ -292,17 +273,6 @@ function OutcomePanel({
 }
 
 /**
- * After a refused save: the submit button was disabled while saving, which
- * drops keyboard focus to the page (and Escape stops working), so focus goes
- * to the first field that needs fixing.
- */
-function focusFirstInvalid(fieldset: HTMLFieldSetElement | null) {
-	setTimeout(() => {
-		fieldset?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
-	}, 0);
-}
-
-/**
  * The new time: the booking form's three fields, prefilled with the
  * session's own. Focus starts on Date; Escape closes the form. After a
  * refused save it stays open with what was typed and the errors under
@@ -439,31 +409,58 @@ function MoveForm({
 }
 
 /**
- * A new session on the project (TAT-85 part 2): kind, artist (fixed for an
- * artist member), date, start and length, with the server's hint about
- * what a tattoo session does to the project. Focus starts on Kind; Escape
- * closes the form. After a refused save it stays open with what was typed.
+ * "Schedule a session" (TAT-85 part 2): the form in a sheet, with the server's hint about what a
+ * tattoo session does to the project as its description. Kind, artist (fixed for an artist
+ * member), date, start and length. After a refused save the sheet stays open with what was
+ * typed and the errors under their fields.
  */
-function ScheduleForm({
+export function ScheduleSheet({
 	projectId,
 	scheduling,
 	dates,
-	onCancel,
-	onDone,
+	fallback,
+	variant = "outline",
 }: {
 	projectId: string;
 	scheduling: NonNullable<ProjectPageProps["scheduling"]>;
 	dates: Dates;
-	onCancel: () => void;
-	onDone: () => void;
+	fallback: RefObject<HTMLElement | null>;
+	variant?: "default" | "outline";
+}) {
+	const sheet = useFormSheet();
+
+	return (
+		<FormSheet
+			label="Schedule a session"
+			variant={variant}
+			title="Schedule a session"
+			description={scheduling.hint ?? "Pick the kind, the artist and the time."}
+			sheet={sheet}
+			fallback={fallback}
+		>
+			<ScheduleForm
+				projectId={projectId}
+				scheduling={scheduling}
+				dates={dates}
+				sheet={sheet}
+			/>
+		</FormSheet>
+	);
+}
+
+function ScheduleForm({
+	projectId,
+	scheduling,
+	dates,
+	sheet,
+}: {
+	projectId: string;
+	scheduling: NonNullable<ProjectPageProps["scheduling"]>;
+	dates: Dates;
+	sheet: FormSheetState;
 }) {
 	const tenant = useTenant();
 	const id = useId();
-	const kind = useRef<HTMLSelectElement>(null);
-	const fieldset = useRef<HTMLFieldSetElement>(null);
-	useEffect(() => {
-		kind.current?.focus();
-	}, []);
 	const field = (name: string) => `${id}-${name}`;
 	const fixed = scheduling.artistFixed ? scheduling.artists[0] : undefined;
 	const select =
@@ -474,23 +471,17 @@ function ScheduleForm({
 			route="tenant.projects.sessions.store"
 			routeParams={{ tenant: tenant.slug, id: projectId }}
 			options={{ preserveScroll: true }}
-			onSuccess={onDone}
-			onError={() => focusFirstInvalid(fieldset.current)}
+			onStart={sheet.onStart}
+			onSuccess={sheet.onSuccess}
+			onError={sheet.onError}
+			onFinish={sheet.onFinish}
 		>
 			{({ errors, processing }) => (
-				<fieldset
-					ref={fieldset}
-					className="min-w-0 rounded-md bg-muted/50 p-3"
-					onKeyDown={(event) => {
-						if (event.key === "Escape") onCancel();
-					}}
-				>
-					<legend className="sr-only">Schedule a session</legend>
+				<div className="flex flex-col gap-4">
 					<div className="grid gap-4 sm:grid-cols-2">
 						<Field data-invalid={!!errors.sessionKind}>
 							<FieldLabel htmlFor={field("kind")}>Kind</FieldLabel>
 							<select
-								ref={kind}
 								id={field("kind")}
 								name="sessionKind"
 								defaultValue={
@@ -555,7 +546,7 @@ function ScheduleForm({
 							</Field>
 						)}
 					</div>
-					<div className="mt-4 grid gap-4 sm:grid-cols-3">
+					<div className="grid gap-4 sm:grid-cols-3">
 						<Field data-invalid={!!errors.date}>
 							<FieldLabel htmlFor={field("date")}>Date</FieldLabel>
 							<Input
@@ -621,24 +612,8 @@ function ScheduleForm({
 							)}
 						</Field>
 					</div>
-					{scheduling.hint && (
-						<p className="mt-4 text-muted-foreground">{scheduling.hint}</p>
-					)}
-					<div className="mt-4 flex flex-wrap gap-2">
-						<Button type="submit" className="h-11" disabled={processing}>
-							{processing ? "Saving…" : "Schedule session"}
-						</Button>
-						<Button
-							type="button"
-							variant="ghost"
-							className="h-11"
-							disabled={processing}
-							onClick={onCancel}
-						>
-							Close
-						</Button>
-					</div>
-				</fieldset>
+					<FormSheetActions submit="Schedule session" processing={processing} />
+				</div>
 			)}
 		</Form>
 	);

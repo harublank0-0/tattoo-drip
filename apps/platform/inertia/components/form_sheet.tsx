@@ -17,12 +17,16 @@ import {
  * every change. Hand `onStart`, `onSuccess` and `onFinish` to the sheet's `Form`: a save the rules
  * refuse (an error flash comes back as a successful visit) keeps the sheet open with the message,
  * and a field error (`onError`) leaves it open with the typed values, because the page stays
- * mounted.
+ * mounted. `onError` puts focus on the first field that needs fixing.
  */
 export function useFormSheet() {
 	const [state, dispatch] = useReducer(sheetStep, SHEET_CLOSED);
+	// The sheet's body, where focus goes to the first field that needs fixing.
+	const body = useRef<HTMLDivElement>(null);
 	return {
 		state,
+		body,
+		onError: () => focusFirstInvalid(body.current),
 		onOpenChange: (open: boolean) =>
 			dispatch({ type: open ? "open" : "dismiss" }),
 		onStart: () => dispatch({ type: "start" }),
@@ -87,7 +91,7 @@ export default function FormSheet({
 					<SheetTitle>{title}</SheetTitle>
 					<SheetDescription>{description}</SheetDescription>
 				</SheetHeader>
-				<div className="flex flex-col gap-4 px-4 pb-4">
+				<div ref={sheet.body} className="flex flex-col gap-4 px-4 pb-4">
 					{sheet.state.message && (
 						<p
 							role="alert"

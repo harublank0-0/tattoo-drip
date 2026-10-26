@@ -1,6 +1,11 @@
 import { Form } from "@adonisjs/inertia/react";
-import { useEffect, useId, useRef, useState } from "react";
+import { type RefObject, useEffect, useId, useRef, useState } from "react";
 import { urlFor } from "~/client";
+import FormSheet, {
+	FormSheetActions,
+	type FormSheetState,
+	useFormSheet,
+} from "~/components/form_sheet";
 import {
 	DESK_KIND_TEXT,
 	type DeskKindName,
@@ -14,7 +19,7 @@ import {
 	type PendingProofProps,
 	recordFormKey,
 } from "~/components/payments";
-import { formatRupees } from "~/components/projects";
+import { refundLabel } from "~/components/projects";
 import { Badge } from "~/components/ui/badge";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -46,10 +51,13 @@ export default function PaymentsCard({
 	projectId,
 	payments,
 	canSetPrice,
+	fallback,
 }: {
 	projectId: string;
 	payments: PaymentsCardProps;
 	canSetPrice: boolean;
+	/** Where focus goes when a sheet's trigger is gone after a save: the page heading. */
+	fallback: RefObject<HTMLElement | null>;
 }) {
 	const heading = useRef<HTMLHeadingElement>(null);
 	const done = () => heading.current?.focus();
@@ -110,21 +118,22 @@ export default function PaymentsCard({
 					</section>
 				)}
 				<PaymentList rows={rows} onDone={done} />
-				{actions && actions.recordKinds.length > 0 && (
-					<RecordPaymentForm
-						key={recordFormKey(actions)}
-						projectId={projectId}
-						actions={actions}
-						onDone={done}
-					/>
-				)}
-				{actions?.refundMax != null && actions.refundMaxText && (
-					<RefundForm
-						projectId={projectId}
-						maxText={actions.refundMaxText}
-						onDone={done}
-					/>
-				)}
+				<div className="flex flex-wrap gap-2">
+					{actions && actions.recordKinds.length > 0 && (
+						<RecordPaymentSheet
+							projectId={projectId}
+							actions={actions}
+							fallback={fallback}
+						/>
+					)}
+					{actions?.refundMax != null && actions.refundMaxText && (
+						<RefundSheet
+							projectId={projectId}
+							maxText={actions.refundMaxText}
+							fallback={fallback}
+						/>
+					)}
+				</div>
 			</CardContent>
 		</Card>
 	);
@@ -181,7 +190,7 @@ function BalanceBlock({
  * for and the reference code (side by side from 640 px, stacked below),
  * then Verify and Reject, each confirmed in an inline panel.
  */
-function PendingProof({
+export function PendingProof({
 	proof,
 	onDone,
 }: {
@@ -479,14 +488,47 @@ function prefill(actions: Actions, kind: DeskKindName): string {
 	return value === null ? "" : String(value);
 }
 
-function RecordPaymentForm({
+/** "Record payment": the desk form in a sheet. */
+export function RecordPaymentSheet({
 	projectId,
 	actions,
-	onDone,
+	fallback,
+	variant = "outline",
 }: {
 	projectId: string;
 	actions: Actions;
-	onDone: () => void;
+	fallback: RefObject<HTMLElement | null>;
+	variant?: "default" | "outline";
+}) {
+	const sheet = useFormSheet();
+
+	return (
+		<FormSheet
+			label="Record payment"
+			variant={variant}
+			title="Record payment"
+			description="Money the client paid at the desk or by transfer. It is recorded as verified."
+			sheet={sheet}
+			fallback={fallback}
+		>
+			<RecordPaymentForm
+				key={recordFormKey(actions)}
+				projectId={projectId}
+				actions={actions}
+				sheet={sheet}
+			/>
+		</FormSheet>
+	);
+}
+
+function RecordPaymentForm({
+	projectId,
+	actions,
+	sheet,
+}: {
+	projectId: string;
+	actions: Actions;
+	sheet: FormSheetState;
 }) {
 	const tenant = useTenant();
 	const first = actions.recordKinds[0];
@@ -505,14 +547,13 @@ function RecordPaymentForm({
 			route="tenant.projects.payments.store"
 			routeParams={{ tenant: tenant.slug, id: projectId }}
 			options={{ preserveScroll: true }}
-			onSuccess={() => {
-				setTyped(false);
-				onDone();
-			}}
+			onStart={sheet.onStart}
+			onSuccess={sheet.onSuccess}
+			onError={sheet.onError}
+			onFinish={sheet.onFinish}
 		>
 			{({ errors, processing }) => (
 				<FieldGroup>
-					<h3 className="text-sm font-semibold">Record payment</h3>
 					<FieldSet data-invalid={!!errors.kind}>
 						<FieldLegend variant="label">What was paid</FieldLegend>
 						<RadioGroup name="kind" value={kind} onValueChange={choose}>
@@ -551,66 +592,66 @@ function RecordPaymentForm({
 						hint={null}
 					/>
 					<NoteField id="record-note" error={errors.note} />
-					<div>
-						<Button type="submit" className="h-11" disabled={processing}>
-							{processing ? "Saving…" : "Record payment"}
-						</Button>
-					</div>
+					<FormSheetActions submit="Record payment" processing={processing} />
 				</FieldGroup>
 			)}
 		</Form>
 	);
 }
 
-/** "Record a refund": a button that shows the form; the submit asks first. */
-function RefundForm({
+/**
+ * "Record a refund": the form in a sheet. The submit button names the amount, which is the
+ * confirmation (it replaces the browser's confirm); the sheet's description says it is final.
+ */
+export function RefundSheet({
 	projectId,
 	maxText,
-	onDone,
+	fallback,
 }: {
 	projectId: string;
 	maxText: string;
-	onDone: () => void;
+	fallback: RefObject<HTMLElement | null>;
+}) {
+	const sheet = useFormSheet();
+
+	return (
+		<FormSheet
+			label="Record a refund"
+			title="Record a refund"
+			description="A refund can't be edited or deleted; a mistake is reversed."
+			sheet={sheet}
+			fallback={fallback}
+		>
+			<RefundForm projectId={projectId} maxText={maxText} sheet={sheet} />
+		</FormSheet>
+	);
+}
+
+function RefundForm({
+	projectId,
+	maxText,
+	sheet,
+}: {
+	projectId: string;
+	maxText: string;
+	sheet: FormSheetState;
 }) {
 	const tenant = useTenant();
-	const [open, setOpen] = useState(false);
 	const [method, setMethod] = useState<MethodKind>("cash");
 	const [amount, setAmount] = useState("");
 
-	if (!open) {
-		return (
-			<div>
-				<Button
-					type="button"
-					variant="outline"
-					className="h-11"
-					aria-expanded={false}
-					onClick={() => setOpen(true)}
-				>
-					Record a refund
-				</Button>
-			</div>
-		);
-	}
 	return (
 		<Form
 			route="tenant.projects.refunds.store"
 			routeParams={{ tenant: tenant.slug, id: projectId }}
 			options={{ preserveScroll: true }}
-			onBefore={() =>
-				window.confirm(
-					`Record a refund of ${formatRupees(Number(amount))}? It can't be edited or deleted; a mistake is reversed.`,
-				)
-			}
-			onSuccess={() => {
-				setOpen(false);
-				setAmount("");
-				onDone();
-			}}
+			onStart={sheet.onStart}
+			onSuccess={sheet.onSuccess}
+			onError={sheet.onError}
+			onFinish={sheet.onFinish}
 		>
 			{({ errors, processing }) => (
 				<FieldGroup>
-					<h3 className="text-sm font-semibold">Record a refund</h3>
 					<AmountField
 						id="refund-amount"
 						value={amount}
@@ -625,20 +666,10 @@ function RefundForm({
 						error={errors.method}
 					/>
 					<NoteField id="refund-note" error={errors.note} />
-					<div className="flex flex-wrap gap-2">
-						<Button type="submit" className="h-11" disabled={processing}>
-							{processing ? "Saving…" : "Record refund"}
-						</Button>
-						<Button
-							type="button"
-							variant="ghost"
-							className="h-11"
-							disabled={processing}
-							onClick={() => setOpen(false)}
-						>
-							Cancel
-						</Button>
-					</div>
+					<FormSheetActions
+						submit={refundLabel(amount)}
+						processing={processing}
+					/>
 				</FieldGroup>
 			)}
 		</Form>
@@ -646,7 +677,7 @@ function RefundForm({
 }
 
 /** What happened to a closed project's deposit: kept, or refunded (amount, method). */
-function OutcomeForm({
+export function OutcomeForm({
 	projectId,
 	needed,
 	onDone,
