@@ -1,4 +1,5 @@
 import { Form } from "@adonisjs/inertia/react";
+import { cn } from "cn";
 import { type RefObject, useEffect, useId, useRef, useState } from "react";
 import { urlFor } from "~/client";
 import FormSheet, {
@@ -19,7 +20,8 @@ import {
 	type PendingProofProps,
 	recordFormKey,
 } from "~/components/payments";
-import { refundLabel } from "~/components/projects";
+import { cardId, offers } from "~/components/project_page";
+import { type NextStepProps, refundLabel } from "~/components/projects";
 import { Badge } from "~/components/ui/badge";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -42,44 +44,75 @@ import { useTenant } from "~/hooks/use-tenant";
 type Actions = NonNullable<PaymentsCardProps["actions"]>;
 
 /**
- * The project's money (TAT-66): what happened to a closed project's
- * deposit, the balance, the screenshots to check, every payment, and the
- * owners' forms. After every successful submit focus moves to the card's
- * heading, so a screen reader lands on the updated card.
+ * The project's money (TAT-66, TAT-108): one line that says where it stands, what happened to a
+ * closed project's deposit, the screenshots to check, the payments behind "Show payments" and the
+ * owners' sheets for a payment and a refund. What the Next step card already holds (the
+ * screenshots, the outcome form, Record payment) is not drawn twice (`offers`), and the card gives
+ * up the `payments` id when the Next step carries it (`cardId`). After every successful submit
+ * focus moves to the card's heading, so a screen reader lands on the updated card.
  */
 export default function PaymentsCard({
 	projectId,
 	payments,
 	canSetPrice,
+	nextStep,
 	fallback,
 }: {
 	projectId: string;
 	payments: PaymentsCardProps;
 	canSetPrice: boolean;
+	nextStep: NextStepProps;
 	/** Where focus goes when a sheet's trigger is gone after a save: the page heading. */
 	fallback: RefObject<HTMLElement | null>;
 }) {
 	const heading = useRef<HTMLHeadingElement>(null);
+	const listId = useId();
+	const [showing, setShowing] = useState(false);
 	const done = () => heading.current?.focus();
-	const { balance, deposit, rows, pending, actions, outcome } = payments;
+	const { summary, balance, deposit, rows, pending, actions, outcome } =
+		payments;
+	const hint =
+		balance.state === "overpaid"
+			? "Record a refund if you give it back."
+			: balance.state === "no_price" && canSetPrice
+				? "Set it in the Quote card."
+				: balance.totalNote
+					? `The total is ${balance.totalNote}.`
+					: null;
 
 	return (
 		// scroll-mt: an alert opens the page at #payments (TAT-88); on a phone the
 		// sticky top bar would cover the card's title, and it grows when a long
 		// studio name wraps, so it publishes its height (TopBar).
 		<Card
-			id="payments"
+			id={cardId("payments", nextStep.anchor)}
 			className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)] lg:scroll-mt-0"
 		>
 			<CardHeader>
-				<CardTitle>
+				<CardTitle className="leading-snug">
 					<h2 ref={heading} tabIndex={-1} className="outline-none">
 						Payments
 					</h2>
 				</CardTitle>
 			</CardHeader>
-			<CardContent className="flex flex-col gap-6">
-				{outcome.needed && (
+			<CardContent className="flex flex-col gap-4">
+				<div className="flex flex-col gap-1 text-sm">
+					<p className="text-base font-semibold">{summary}</p>
+					{hint && <p className="text-muted-foreground">{hint}</p>}
+					{deposit &&
+						(deposit.lapsed ? (
+							<p className="mt-1 rounded-md border border-destructive/50 bg-destructive/10 p-3">
+								The deposit is no longer covered: {deposit.dueText} still due.
+							</p>
+						) : (
+							<p className="text-muted-foreground">
+								{deposit.covered
+									? `Deposit covered (${deposit.amountText})`
+									: `Deposit: ${deposit.receivedText} of ${deposit.amountText} received`}
+							</p>
+						))}
+				</div>
+				{outcome.needed && !offers(nextStep, "record_outcome") && (
 					<OutcomeForm
 						projectId={projectId}
 						needed={outcome.needed}
@@ -99,12 +132,7 @@ export default function PaymentsCard({
 						)}
 					</div>
 				)}
-				<BalanceBlock
-					balance={balance}
-					deposit={deposit}
-					canSetPrice={canSetPrice}
-				/>
-				{pending.length > 0 && (
+				{pending.length > 0 && !offers(nextStep, "verify_proof") && (
 					<section
 						aria-labelledby="proofs-heading"
 						className="flex flex-col gap-4"
@@ -117,15 +145,38 @@ export default function PaymentsCard({
 						))}
 					</section>
 				)}
-				<PaymentList rows={rows} onDone={done} />
+				{rows.length === 0 ? (
+					<p className="text-sm text-muted-foreground">No payments yet.</p>
+				) : (
+					<div className="flex flex-col gap-2">
+						<div>
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								className="-ml-3"
+								aria-expanded={showing}
+								aria-controls={listId}
+								onClick={() => setShowing((open) => !open)}
+							>
+								{showing ? "Hide payments" : `Show payments (${rows.length})`}
+							</Button>
+						</div>
+						<div id={listId} hidden={!showing}>
+							<PaymentList rows={rows} onDone={done} />
+						</div>
+					</div>
+				)}
 				<div className="flex flex-wrap gap-2">
-					{actions && actions.recordKinds.length > 0 && (
-						<RecordPaymentSheet
-							projectId={projectId}
-							actions={actions}
-							fallback={fallback}
-						/>
-					)}
+					{actions &&
+						actions.recordKinds.length > 0 &&
+						!offers(nextStep, "record_payment") && (
+							<RecordPaymentSheet
+								projectId={projectId}
+								actions={actions}
+								fallback={fallback}
+							/>
+						)}
 					{actions?.refundMax != null && actions.refundMaxText && (
 						<RefundSheet
 							projectId={projectId}
@@ -139,52 +190,6 @@ export default function PaymentsCard({
 	);
 }
 
-function BalanceBlock({
-	balance,
-	deposit,
-	canSetPrice,
-}: Pick<PaymentsCardProps, "balance" | "deposit"> & { canSetPrice: boolean }) {
-	const line = {
-		due: `Balance due ${balance.amountText}`,
-		paid: "Paid in full",
-		overpaid: `Overpaid by ${balance.amountText}: record a refund if you give it back.`,
-		no_price: canSetPrice
-			? "No price yet. Set it in the Quote card."
-			: "No price yet.",
-		closed: `Holds ${balance.amountText}`,
-		over_refunded: `Refunded ${balance.amountText} more than it received.`,
-	}[balance.state];
-	const total = balance.totalText
-		? balance.totalNote
-			? `${balance.totalText}, ${balance.totalNote}`
-			: balance.totalText
-		: "Not set";
-
-	return (
-		<div className="flex flex-col gap-2 text-sm">
-			<dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-				<dt className="text-muted-foreground">Total</dt>
-				<dd className="min-w-0 break-words">{total}</dd>
-				<dt className="text-muted-foreground">Paid</dt>
-				<dd>{balance.paidText}</dd>
-			</dl>
-			<p className="text-base font-semibold">{line}</p>
-			{deposit &&
-				(deposit.lapsed ? (
-					<p className="rounded-md border border-destructive/50 bg-destructive/10 p-3">
-						The deposit is no longer covered: {deposit.dueText} still due.
-					</p>
-				) : (
-					<p className="text-muted-foreground">
-						{deposit.covered
-							? `Deposit covered (${deposit.amountText})`
-							: `Deposit: ${deposit.receivedText} of ${deposit.amountText} received`}
-					</p>
-				))}
-		</div>
-	);
-}
-
 /**
  * One screenshot to check: the image next to what the deposit page asked
  * for and the reference code (side by side from 640 px, stacked below),
@@ -193,9 +198,12 @@ function BalanceBlock({
 export function PendingProof({
 	proof,
 	onDone,
+	compact = false,
 }: {
 	proof: PendingProofProps;
 	onDone: () => void;
+	/** In the Next step card the image is shorter, so Verify and Reject are on a phone's first screen. */
+	compact?: boolean;
 }) {
 	const tenant = useTenant();
 	const [open, setOpen] = useState<"verify" | "reject" | null>(null);
@@ -223,7 +231,10 @@ export function PendingProof({
 							alt={`Payment screenshot sent ${proof.sentText}`}
 							width={proof.width ?? undefined}
 							height={proof.height ?? undefined}
-							className="max-h-96 w-full rounded-md border object-contain"
+							className={cn(
+								"w-full rounded-md border object-contain",
+								compact ? "max-h-48" : "max-h-96",
+							)}
 						/>
 						<span>Open full size</span>
 					</a>

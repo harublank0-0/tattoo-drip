@@ -8,6 +8,7 @@ import FormSheet, {
 	focusFirstInvalid,
 	useFormSheet,
 } from "~/components/form_sheet";
+import { cardId } from "~/components/project_page";
 import {
 	type ProjectPageProps,
 	SESSION_KIND_LABELS,
@@ -53,6 +54,8 @@ export default function SessionsCard({
 	dates,
 	scheduling,
 	fallback,
+	anchor,
+	showSchedule,
 }: {
 	projectId: string;
 	sessions: SessionRow[];
@@ -60,6 +63,10 @@ export default function SessionsCard({
 	scheduling: ProjectPageProps["scheduling"];
 	/** Where focus goes when the schedule sheet's trigger is gone after a save: the page heading. */
 	fallback: RefObject<HTMLElement | null>;
+	/** The id the Next step card carries (`nextStep.anchor`): when it is `sessions`, the card gives its own up. */
+	anchor: string | null;
+	/** False when the Next step card already offers "Schedule a session". */
+	showSchedule: boolean;
 }) {
 	const heading = useRef<HTMLHeadingElement>(null);
 	const [open, setOpen] = useState<Open>(null);
@@ -70,7 +77,7 @@ export default function SessionsCard({
 
 	return (
 		<Card
-			id="sessions"
+			id={cardId("sessions", anchor)}
 			className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)] lg:scroll-mt-0"
 		>
 			<CardHeader>
@@ -98,7 +105,7 @@ export default function SessionsCard({
 						))}
 					</ul>
 				)}
-				{scheduling && (
+				{scheduling && showSchedule && (
 					<div>
 						<ScheduleSheet
 							projectId={projectId}

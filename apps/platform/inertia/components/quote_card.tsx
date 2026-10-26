@@ -1,12 +1,14 @@
 import { Form } from "@adonisjs/inertia/react";
-import { type RefObject, useState } from "react";
+import { type RefObject, useId, useState } from "react";
 import FormSheet, {
 	FormSheetActions,
 	type FormSheetState,
 	useFormSheet,
 } from "~/components/form_sheet";
+import { cardId, offers } from "~/components/project_page";
 import {
 	formatRupees,
+	type NextStepProps,
 	type ProjectPageProps,
 	priceLabel,
 	type QuoteProps,
@@ -14,6 +16,7 @@ import {
 } from "~/components/projects";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import {
 	Field,
 	FieldContent,
@@ -43,6 +46,108 @@ const KINDS: { value: Kind; title: string; description: string }[] = [
 		description: "A rate per hour and the hours you expect.",
 	},
 ];
+
+/**
+ * The Quote card (TAT-108): the current quote, "Set price" for a booking made without one,
+ * "Revise the quote" (unless the Next step card offers it) and the earlier versions behind a
+ * button. The card gives up the `quote` id when the Next step carries it (`cardId`): a link to
+ * `#quote` then lands on the card that holds the action.
+ */
+export function QuoteCard({
+	projectId,
+	quote,
+	history,
+	form,
+	showExpiry,
+	canQuote,
+	canSetPrice,
+	nextStep,
+	fallback,
+}: {
+	projectId: string;
+	quote: QuoteProps | null;
+	history: QuoteProps[];
+	form: ProjectPageProps["form"];
+	showExpiry: boolean;
+	canQuote: boolean;
+	canSetPrice: boolean;
+	nextStep: NextStepProps;
+	fallback: RefObject<HTMLElement | null>;
+}) {
+	const listId = useId();
+	const [showing, setShowing] = useState(false);
+
+	return (
+		<Card
+			id={cardId("quote", nextStep.anchor)}
+			className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)] lg:scroll-mt-0"
+		>
+			<CardHeader>
+				<CardTitle className="leading-snug">Quote</CardTitle>
+			</CardHeader>
+			<CardContent className="flex flex-col gap-4">
+				{quote ? (
+					<QuoteSummary quote={quote} showExpiry={showExpiry} />
+				) : (
+					<p className="text-sm text-muted-foreground">No quote yet.</p>
+				)}
+				{canSetPrice && (
+					<div>
+						<PriceSheet projectId={projectId} fallback={fallback} />
+					</div>
+				)}
+				{canQuote && quote && !offers(nextStep, "revise_quote") && (
+					<ReviseSheet
+						id={cardId("quote-form", nextStep.anchor)}
+						projectId={projectId}
+						quote={quote}
+						form={form}
+						fallback={fallback}
+					/>
+				)}
+				{history.length > 0 && (
+					<div className="flex flex-col gap-2">
+						<div>
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								className="-ml-3"
+								aria-expanded={showing}
+								aria-controls={listId}
+								onClick={() => setShowing((open) => !open)}
+							>
+								{showing
+									? "Hide earlier versions"
+									: `Earlier versions (${history.length})`}
+							</Button>
+						</div>
+						<ul
+							id={listId}
+							hidden={!showing}
+							className="flex flex-col divide-y text-sm"
+						>
+							{history.map((old) => (
+								<li
+									key={old.id}
+									className="flex flex-wrap justify-between gap-2 py-2"
+								>
+									<span>
+										Version {old.version}: {old.totalText}, deposit{" "}
+										{old.depositText}
+									</span>
+									<span className="text-muted-foreground">
+										Issued {old.issuedText}, valid until {old.validUntilText}
+									</span>
+								</li>
+							))}
+						</ul>
+					</div>
+				)}
+			</CardContent>
+		</Card>
+	);
+}
 
 export function QuoteSummary({
 	quote,
