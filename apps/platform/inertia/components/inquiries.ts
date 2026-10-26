@@ -34,10 +34,13 @@ export type InboxListProps = {
 	page: { current: number; last: number; total: number };
 };
 
-/** A reference image with a signed URL (valid for a few minutes). */
+/** A reference image with signed URLs (valid for a few minutes). */
 export type ReferenceProps = {
 	id: string;
+	/** The full image: what a tap opens. */
 	url: string;
+	/** What the grid shows: the signed 320 px copy, or the image itself when it has none. */
+	thumbnailUrl: string;
 	width: number;
 	height: number;
 };

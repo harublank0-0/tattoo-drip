@@ -1,9 +1,9 @@
 import type { ReferenceProps } from "~/components/inquiries";
 
 /**
- * The client's reference images as a thumbnail grid; each opens the full
- * image in a new tab. The URLs are signed for a few minutes, so reload the
- * page to view them later.
+ * The client's reference images as a thumbnail grid (the 320 px copy, never
+ * the full-size file: ui.md); each opens the full image in a new tab. The
+ * URLs are signed for a few minutes, so reload the page to view them later.
  */
 export default function ReferenceGrid({
 	references,
@@ -19,9 +19,10 @@ export default function ReferenceGrid({
 				<li key={reference.id}>
 					<a href={reference.url} target="_blank" rel="noreferrer">
 						<img
-							src={reference.url}
+							src={reference.thumbnailUrl}
 							alt={`Reference ${index + 1}`}
 							loading="lazy"
+							decoding="async"
 							className="aspect-square w-full rounded-md border object-cover"
 						/>
 					</a>

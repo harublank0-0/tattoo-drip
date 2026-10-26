@@ -95,6 +95,8 @@ function ArtistRow({
 				<img
 					src={artist.photoUrl}
 					alt={artist.name}
+					loading="lazy"
+					decoding="async"
 					className="size-16 rounded-md border object-cover"
 				/>
 			) : (

@@ -18,7 +18,9 @@ import {
 } from "#modules/artists/validators/artist";
 import { InvalidImageError } from "#modules/media/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
-import ImageService from "#modules/media/services/image_service";
+import ImageService, {
+	THUMBNAIL_WIDTH,
+} from "#modules/media/services/image_service";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { artistLink } from "#services/studio_links";
 
@@ -173,7 +175,8 @@ export default class ArtistsController {
 	}
 
 	/**
-	 * What the pages get for one artist, with the photo's public URL. Not the
+	 * What the pages get for one artist, with the photo's public URL (its 320 px
+	 * copy, TAT-112). Not the
 	 * row: the tenant and the linked user's id stay on the server.
 	 */
 	private async toProps(tenant: Tenant, artist: Artist, userId: string) {
@@ -182,8 +185,14 @@ export default class ArtistsController {
 			name: artist.name,
 			slug: artist.slug,
 			bio: artist.bio,
+			// The 320 px copy: the list and form draw it at 64 and 96 px.
 			photoUrl: artist.photoKey
-				? await this.images.url("artist_photo", artist.photoKey, tenant)
+				? await this.images.urlFor(
+						"artist_photo",
+						artist.photoKey,
+						tenant,
+						THUMBNAIL_WIDTH,
+					)
 				: null,
 			visible: artist.visible,
 			acceptingInquiries: artist.acceptingInquiries,

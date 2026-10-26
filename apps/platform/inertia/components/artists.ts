@@ -6,6 +6,7 @@ export type ArtistProps = {
 	name: string;
 	slug: string;
 	bio: string | null;
+	/** The photo's 320 px copy (TAT-112), or the photo itself when it has none. */
 	photoUrl: string | null;
 	visible: boolean;
 	acceptingInquiries: boolean;

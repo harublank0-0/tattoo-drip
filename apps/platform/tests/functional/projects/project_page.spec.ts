@@ -491,6 +491,7 @@ test.group("Project page: the original request", (group) => {
 		});
 		assert.lengthOf(props.request.references, 1);
 		assert.include(props.request.references[0].url, "reference_image/");
+		assert.match(props.request.references[0].thumbnailUrl, /signature=/);
 	});
 
 	test("a project made directly has no request", async ({ client, assert }) => {

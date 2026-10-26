@@ -190,6 +190,7 @@ test.group("Client profile", (group) => {
 		});
 		assert.lengthOf(props.references, 1);
 		assert.include(props.references[0].url, "reference_image/");
+		assert.match(props.references[0].thumbnailUrl, /signature=/);
 	});
 
 	test("a client with nothing yet shows empty lists and nulls", async ({

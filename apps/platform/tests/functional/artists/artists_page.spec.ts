@@ -66,6 +66,28 @@ test.group("Artists page", (group) => {
 		assert.notProperty(list[0], "userId");
 	});
 
+	test("the list shows the photo's 320 px copy, not the full image", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		await inTenant(tenant, async () =>
+			artists.create(
+				tenant,
+				input({ photo: await uploadOf(await testImages.jpeg(1000, 800)) }),
+				owner,
+			),
+		);
+
+		const [artist] = (await client.get(base).withInertia().loginAs(owner))
+			.inertiaProps.artists;
+
+		assert.match(
+			new URL(artist.photoUrl).pathname,
+			/^\/uploads\/tenants\/[^/]+\/artist_photo\/[^/]+\.320w\.jpg$/,
+		);
+	});
+
 	test("an owner deletes an artist", async ({ client, assert }) => {
 		const { owner, tenant } = await studioWithOwner();
 		const artist = await inTenant(tenant, () =>
