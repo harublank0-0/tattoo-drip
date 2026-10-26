@@ -634,7 +634,9 @@ test.group("nextStepOf: what the page can offer", () => {
 						if (action === null) continue;
 						assert.include(NEXT_STEP_ACTIONS, action, `${status}`);
 					}
-					assert.notInclude(step.secondary, step.primary);
+					if (step.primary !== null) {
+						assert.notInclude(step.secondary, step.primary);
+					}
 				}
 			}
 		}

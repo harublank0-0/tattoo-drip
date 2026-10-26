@@ -37,6 +37,7 @@ import PaymentService, {
 } from "#modules/payments/services/payment_service";
 import { lastContactText } from "#modules/projects/contact";
 import {
+	FINISHED_STATUSES,
 	finishStepFor,
 	healingCheckDueOn,
 	owed,
@@ -48,6 +49,12 @@ import {
 	allowedMoves,
 	CLOSED_STATUSES,
 } from "#modules/projects/moves";
+import {
+	type NextStepAction,
+	nextStepOf,
+	type SessionLine,
+	sweepWillCancel,
+} from "#modules/projects/next_step";
 import {
 	contactLine,
 	inOrder,
@@ -81,6 +88,7 @@ import ProjectService, {
 import QuoteService from "#modules/projects/services/quote_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import WaitingService from "#modules/projects/services/waiting_service";
+import type ProjectSession from "#modules/scheduling/models/project_session";
 import {
 	mayChangeSession,
 	outcomeRefusal,
@@ -397,37 +405,175 @@ export default class ProjectsController {
 		const owing = owed(money.balance.due);
 		const closed = CLOSED_STATUSES.includes(project.status);
 
+		// Everything the cards draw, gathered once: the render below sends it and
+		// the Next step card (TAT-108) reads the same flags, so the page never
+		// offers in one place what it hides in another.
+		const moves = allowedMoves(project.status);
+		const canQuote = QUOTABLE_STATUSES.includes(project.status);
+		const canAccept = project.status === "quoted" && live !== null;
+		// A booking made without a price can get one once (TAT-66).
+		const canSetPrice =
+			BOOKED_STATUSES.includes(project.status) && current === null;
+		// Only while the client's answer is awaited: not after acceptance, and
+		// not for a project that was declined or withdrawn.
+		const quoteChat =
+			live &&
+			client?.phone &&
+			(project.status === "quoted" || project.status === "on_hold")
+				? messageProps(
+						live,
+						client.name,
+						client.phone,
+						tenant.name,
+						timezone,
+						texts.quote,
+					)
+				: null;
+		// The assigned artist sees the healing check, never the action.
+		const finishProps =
+			step && (isOwner || step === "complete")
+				? {
+						step,
+						dueText: dueOn ? formatDay(dueOn) : null,
+						overdue: step === "complete" && dueOn !== null && todayText > dueOn,
+						action: isOwner
+							? {
+									confirmedDue: String(owing),
+									balanceDueText: owing > 0n ? formatMoney(owing) : null,
+									estimated: money.quote?.kind === "hourly",
+									sessionScheduled: scheduled.length > 0,
+								}
+							: null,
+					}
+				: null;
+		const sessionRows = sessions.map((session) => {
+			const changeable =
+				session.status === "scheduled" &&
+				mayChangeSession(membership, ownArtistId, session, project);
+			return {
+				id: session.id,
+				whenText: sessionTimeText(session.startsAt, session.endsAt, timezone),
+				kind: session.kind,
+				status: session.status,
+				artistName:
+					artists.find(({ id }) => id === session.artistId)?.name ?? null,
+				outcomes: changeable ? outcomesFor(session, project.status, now) : [],
+				// A started tattoo session whose project isn't booked yet: the
+				// card explains why Done isn't offered.
+				awaitingBooking:
+					changeable &&
+					outcomeRefusal(session, project.status, "completed", now) ===
+						"not_booked",
+				move: changeable
+					? sessionFormValues(
+							session.startsAt,
+							session.endsAt,
+							timezone,
+							todayText,
+							lastBookable,
+						)
+					: null,
+			};
+		});
+		const schedulingProps =
+			schedulableKinds(project.status).length > 0 && bookable.length > 0
+				? {
+						artists: bookable.map(({ id, name }) => ({ id, name })),
+						artistId: defaultArtistId,
+						artistFixed: membership.role !== "owner",
+						kinds: [...schedulableKinds(project.status)],
+						hint: schedulingHint(project.status, depositDue, current !== null),
+					}
+				: null;
+		// Owners only, while the project waits for its deposit (TAT-65).
+		const depositProps =
+			membership.role === "owner" && project.status === "deposit_pending"
+				? await this.depositPanel(tenant, project, client, texts.deposit_link)
+				: null;
+		const paymentsProps = paymentsCard({
+			money,
+			status: project.status,
+			isOwner,
+			timezone,
+			names,
+			proofUrls,
+			referenceCode: depositLink?.referenceCode ?? null,
+		});
+
+		// The Next step card (TAT-108): what waits on this project is
+		// WaitingService's answer, the one Today and the Projects list use, so the
+		// three say the same; nextStepOf turns it into the card.
+		const state = (
+			await this.waiting.forProjects(tenant, membership, [project], now)
+		).get(project.id);
+		const sessionLine = (session: ProjectSession): SessionLine => ({
+			startText: sessionStartText(session.startsAt, timezone, now),
+			artistName:
+				artists.find(({ id }) => id === session.artistId)?.name ?? null,
+		});
+		// A scheduled session that has started and this member may record: the
+		// one the No-show button is offered on.
+		const startedId = sessionRows.find(
+			({ status, outcomes }) =>
+				status === "scheduled" && outcomes.includes("no_show"),
+		)?.id;
+		const started = sessions.find(({ id }) => id === startedId);
+		// What the Projects list's money line says (PaymentService.listFlags): a
+		// finished project's fixed price still owed, owners only.
+		const balanceOwedText =
+			isOwner &&
+			FINISHED_STATUSES.includes(project.status) &&
+			money.quote?.kind === "fixed" &&
+			owing > 0n
+				? formatMoney(owing)
+				: null;
+		const can: Record<NextStepAction, boolean> = {
+			verify_proof: paymentsProps.pending.length > 0,
+			issue_quote: canQuote && current === null,
+			send_quote: quoteChat !== null,
+			client_accepted: canAccept,
+			revise_quote: canQuote && current !== null,
+			resume: moves.includes("resume"),
+			deposit_link: depositProps !== null,
+			record_payment: (paymentsProps.actions?.recordKinds.length ?? 0) > 0,
+			schedule: schedulingProps !== null,
+			open_sessions: started !== undefined,
+			finish: finishProps !== null,
+			record_outcome: paymentsProps.outcome.needed !== null,
+		};
+		const nextStep = nextStepOf({
+			status: project.status,
+			waiting: state?.waiting ?? null,
+			waitingText: state?.text ?? null,
+			waitingHash: state?.hash ?? null,
+			clientName: client?.name ?? null,
+			sweepWillCancel: state ? sweepWillCancel(state.facts, now) : false,
+			nextSession: upcoming ? sessionLine(upcoming) : null,
+			startedSession: started ? sessionLine(started) : null,
+			balanceOwedText,
+			can,
+		});
+
 		return ctx.inertia.render("projects/show", {
 			project: {
 				id: project.id,
 				status: project.status,
 				brief: project.brief,
+				// The start of the brief, as the Projects list names the piece, until
+				// TAT-115 adds a short title.
+				piece: excerpt(project.brief, ALERT_EXCERPT_LENGTH),
 				clientName: client?.name ?? null,
 				artistName: artist?.name ?? null,
 			},
+			nextStep,
 			quote: current ? quoteProps(current, timezone) : null,
 			history: versions.slice(1).map((quote) => quoteProps(quote, timezone)),
 			// From booked on, the quote's expiry no longer means anything.
 			quoteExpiryShown: !BOOKED_STATUSES.includes(project.status),
-			canQuote: QUOTABLE_STATUSES.includes(project.status),
-			canAccept: project.status === "quoted" && live !== null,
-			// A booking made without a price can get one once (TAT-66).
-			canSetPrice: BOOKED_STATUSES.includes(project.status) && current === null,
-			// Only while the client's answer is awaited: not after acceptance, and
-			// not for a project that was declined or withdrawn.
-			message:
-				live &&
-				client?.phone &&
-				(project.status === "quoted" || project.status === "on_hold")
-					? messageProps(
-							live,
-							client.name,
-							client.phone,
-							tenant.name,
-							timezone,
-							texts.quote,
-						)
-					: null,
+			canQuote,
+			canAccept,
+			canSetPrice,
+			message: quoteChat,
 			contact: phone ? contactLinks(phone) : null,
 			messages: phone
 				? cardMessages.map((kind) => ({
@@ -448,76 +594,15 @@ export default class ProjectsController {
 				minDate: today.toFormat("yyyy-MM-dd"),
 				maxDate: today.plus({ years: 1 }).toFormat("yyyy-MM-dd"),
 			},
-			moves: allowedMoves(project.status),
+			moves,
 			// The withdraw confirm names the deposit the project holds (TAT-66).
 			depositHeldText: held > 0 ? formatMoney(held) : null,
 			scheduledSessionCount: scheduled.length,
-			bookedWithoutSession:
-				project.status === "booked" &&
-				!scheduled.some(({ kind }) => kind === "tattoo"),
-			// The assigned artist sees the healing check, never the action.
-			finish:
-				step && (isOwner || step === "complete")
-					? {
-							step,
-							dueText: dueOn ? formatDay(dueOn) : null,
-							overdue:
-								step === "complete" && dueOn !== null && todayText > dueOn,
-							action: isOwner
-								? {
-										confirmedDue: String(owing),
-										balanceDueText: owing > 0n ? formatMoney(owing) : null,
-										estimated: money.quote?.kind === "hourly",
-										sessionScheduled: scheduled.length > 0,
-									}
-								: null,
-						}
-					: null,
+			finish: finishProps,
 			closed,
-			sessions: sessions.map((session) => {
-				const changeable =
-					session.status === "scheduled" &&
-					mayChangeSession(membership, ownArtistId, session, project);
-				return {
-					id: session.id,
-					whenText: sessionTimeText(session.startsAt, session.endsAt, timezone),
-					kind: session.kind,
-					status: session.status,
-					artistName:
-						artists.find(({ id }) => id === session.artistId)?.name ?? null,
-					outcomes: changeable ? outcomesFor(session, project.status, now) : [],
-					// A started tattoo session whose project isn't booked yet: the
-					// card explains why Done isn't offered.
-					awaitingBooking:
-						changeable &&
-						outcomeRefusal(session, project.status, "completed", now) ===
-							"not_booked",
-					move: changeable
-						? sessionFormValues(
-								session.startsAt,
-								session.endsAt,
-								timezone,
-								todayText,
-								lastBookable,
-							)
-						: null,
-				};
-			}),
+			sessions: sessionRows,
 			sessionDates: { today: todayText, max: lastBookable },
-			scheduling:
-				schedulableKinds(project.status).length > 0 && bookable.length > 0
-					? {
-							artists: bookable.map(({ id, name }) => ({ id, name })),
-							artistId: defaultArtistId,
-							artistFixed: membership.role !== "owner",
-							kinds: [...schedulableKinds(project.status)],
-							hint: schedulingHint(
-								project.status,
-								depositDue,
-								current !== null,
-							),
-						}
-					: null,
+			scheduling: schedulingProps,
 			notes: project.notes,
 			contactedText: lastContactText(project.lastContactedAt, timezone, {
 				channel: project.lastContactChannel,
@@ -535,20 +620,8 @@ export default class ProjectsController {
 			request,
 			// Owners only: the clients pages are theirs.
 			clientId: membership.role === "owner" ? project.clientId : null,
-			// Owners only, while the project waits for its deposit (TAT-65).
-			deposit:
-				membership.role === "owner" && project.status === "deposit_pending"
-					? await this.depositPanel(tenant, project, client, texts.deposit_link)
-					: null,
-			payments: paymentsCard({
-				money,
-				status: project.status,
-				isOwner,
-				timezone,
-				names,
-				proofUrls,
-				referenceCode: depositLink?.referenceCode ?? null,
-			}),
+			deposit: depositProps,
+			payments: paymentsProps,
 		});
 	}
 

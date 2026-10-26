@@ -83,7 +83,6 @@ export default function ProjectShow({
 	moves,
 	depositHeldText,
 	scheduledSessionCount,
-	bookedWithoutSession,
 	finish,
 	closed,
 	quoteExpiryShown,
@@ -131,12 +130,6 @@ export default function ProjectShow({
 			}
 		>
 			<div className="flex max-w-2xl flex-col gap-6">
-				{bookedWithoutSession && (
-					<output className="block rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm">
-						This project is booked, but no tattoo session is scheduled.
-					</output>
-				)}
-
 				<Card>
 					<CardContent className="flex flex-col gap-3">
 						<StatusBadge status={project.status} />
