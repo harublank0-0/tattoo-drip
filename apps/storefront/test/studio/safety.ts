@@ -23,7 +23,8 @@ const decodeAttribute = (value: string) =>
  * What every studio page holds to, whatever its data and theme: one h1, only
  * allowed links (https ones with `rel="noopener noreferrer"`, none with
  * `target`), no text beside an element inside a link, no `style` attribute,
- * no `javascript:`, and every image with its size and its alt text.
+ * no `javascript:`, and every image with its size and its alt text (a work
+ * thumbnail inside its "See work by" link has an empty one, TAT-116).
  */
 export function assertSafePage(html: string, options: SafePageOptions = {}) {
 	assert.equal(count(html, /<h1[\s>]/g), 1, "exactly one h1");
@@ -64,6 +65,14 @@ export function assertSafePage(html: string, options: SafePageOptions = {}) {
 			assert.match(image, / alt=""/, image);
 		} else if (covers.includes(image)) {
 			assert.match(image, / alt="[^"]*"/, image);
+		} else if (/class="work-thumb"/.test(image)) {
+			// Decorative inside a link whose own text names where it goes
+			// (TAT-116): it must have an empty alt, and sit inside a work link.
+			assert.match(image, / alt=""/, image);
+			assert.ok(
+				insideWorkLink(html, image),
+				`a work thumbnail outside a work link: ${image}`,
+			);
 		} else {
 			assert.match(image, / alt="[^"]+"/, image);
 		}
@@ -86,4 +95,14 @@ function assertSrcSet(image: string) {
 	for (const candidate of decodeAttribute(srcset).split(", ")) {
 		assert.match(candidate, /^https?:\/\/[^\s,]+ [1-9]\d*w$/, candidate);
 	}
+}
+
+/** Whether this exact image tag sits inside an `<a class="work-link">` in `html`. */
+function insideWorkLink(html: string, image: string): boolean {
+	for (const link of html.matchAll(
+		/<a class="work-link"[^>]*>[\s\S]*?<\/a>/g,
+	)) {
+		if (link[0].includes(image)) return true;
+	}
+	return false;
 }

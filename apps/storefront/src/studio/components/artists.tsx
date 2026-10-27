@@ -1,5 +1,10 @@
+import { Fill } from "../../intake/components/fill.tsx";
 import { studioCopy } from "../copy.ts";
-import { profilePhotoSizes, rosterPhotoSizes } from "../srcset.ts";
+import {
+	profilePhotoSizes,
+	rosterPhotoSizes,
+	workStripSizes,
+} from "../srcset.ts";
 import type { ArtistPhoto, ArtistView, StudioView } from "../view-model.ts";
 
 /**
@@ -34,6 +39,45 @@ function PhotoFigure({
 				fetchPriority={priority ? "high" : "low"}
 			/>
 		</figure>
+	);
+}
+
+/** The roster shows this many of an artist's work photos. */
+const STRIP_PHOTOS = 3;
+
+/**
+ * The first three work photos of an artist (TAT-116), as small squares in one
+ * link to their page's work grid. The squares are decorative (`alt=""`): the
+ * link's own text names where it goes.
+ */
+function WorkStrip({ artist }: { artist: ArtistView }) {
+	if (artist.workPhotos.length === 0) return null;
+	return (
+		<a className="work-link" href={`${artist.pageHref}#work`}>
+			<span className="work-strip">
+				{artist.workPhotos.slice(0, STRIP_PHOTOS).map((photo) => (
+					<img
+						key={photo.dialogId}
+						className="work-thumb"
+						src={photo.src}
+						srcSet={photo.srcSet}
+						sizes={photo.srcSet ? workStripSizes(photo) : undefined}
+						width={photo.width}
+						height={photo.height}
+						alt=""
+						loading="lazy"
+						decoding="async"
+						fetchPriority="low"
+					/>
+				))}
+			</span>
+			<span className="work-link-text">
+				<Fill
+					template={studioCopy.work.seeWork}
+					values={{ name: artist.name }}
+				/>
+			</span>
+		</a>
 	);
 }
 
@@ -82,6 +126,7 @@ function ArtistEntry({
 						{artist.closedMessage}
 					</p>
 				) : null}
+				<WorkStrip artist={artist} />
 				{askLink ? (
 					<div className="actions">
 						<a className="action action-secondary" href={artist.inquiryHref}>

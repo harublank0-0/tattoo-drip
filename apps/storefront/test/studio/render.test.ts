@@ -26,8 +26,10 @@ import {
 	SITA_SIZED,
 	SITA_SRCSET,
 	STUDIO,
+	sitaWithWork,
 } from "./fixtures.ts";
 import { assertSafePage } from "./safety.ts";
+import { IMAGE_ORIGIN } from "./theme-fixtures.ts";
 
 /** The first element of `type` in a component's returned tree (the component is called, not rendered). */
 function findElement(node: ReactNode, type: string): ReactElement | undefined {
@@ -674,5 +676,94 @@ describe("the status pages", () => {
 			);
 			assert.deepEqual(hrefs(html), ["/"], retryHref);
 		}
+	});
+});
+
+describe("the roster's work strip (TAT-116)", () => {
+	const roster = (artists: Artist[]) =>
+		renderToStaticMarkup(
+			createElement(StudioPage, {
+				data: studioPageData(STUDIO, artists, ORIGIN, IMAGE_ORIGIN),
+			}),
+		);
+	const thumbs = (html: string) =>
+		html.match(/<img class="work-thumb"[^>]*>/g) ?? [];
+
+	test("five photos show the first three in one link to the artist's work", () => {
+		const html = roster([sitaWithWork(5, ["Koi on the forearm"]), ARJUN]);
+
+		assertSafePage(html);
+		assert.equal(thumbs(html).length, 3);
+		assert.equal(count(html, /<a class="work-link"/g), 1);
+		const [link] = html.match(/<a class="work-link"[^>]*>[\s\S]*?<\/a>/) ?? [];
+		assert.ok(link);
+		assert.match(link, /^<a class="work-link" href="\/artists\/sita#work">/);
+		assert.equal(thumbs(link).length, 3);
+		assert.match(
+			link,
+			/<span class="work-link-text">See work by <bdi>Sita Rai<\/bdi><\/span><\/a>$/,
+		);
+		for (const image of thumbs(html)) {
+			assert.match(image, / alt=""/);
+			assert.match(image, / loading="lazy"/);
+			assert.match(image, / decoding="async"/);
+			assert.match(image, / width="2048" height="1536"/);
+			// A 4:3 photo covering a square is enlarged to 4/3 x 5rem.
+			assert.match(image, / sizes="6\.67rem"/);
+			assert.match(
+				image,
+				/ srcSet="[^"]*320w, [^"]*640w, [^"]*1280w, [^"]*2048w"/i,
+			);
+		}
+		// The first three, in the studio's order.
+		assert.deepEqual(
+			thumbs(html).map((image) => /w(\d)\.320-640-1280/.exec(image)?.[1]),
+			["1", "2", "3"],
+		);
+	});
+
+	test("two photos show two; none shows no link; a closed artist still shows their work", () => {
+		const two = roster([sitaWithWork(2), ARJUN]);
+		assert.equal(thumbs(two).length, 2);
+		assert.equal(count(two, /<a class="work-link"/g), 1);
+
+		const none = roster([SITA, ARJUN]);
+		assert.equal(count(none, /work-link|work-strip|work-thumb/g), 0);
+
+		const closed = roster([
+			{ ...ARJUN, workPhotos: sitaWithWork(1).workPhotos },
+		]);
+		assert.match(closed, /<a class="work-link" href="\/artists\/arjun#work">/);
+		assert.match(closed, /See work by <bdi>अर्जुन थापा<\/bdi>/);
+		assertSafePage(closed);
+	});
+
+	test("the link comes after the bio and the closed message, before 'Ask for'", () => {
+		const html = roster([sitaWithWork(3), ARJUN]);
+		const body = html.slice(html.indexOf('<div class="artist-body">'));
+		assert.ok(body.indexOf("Fine line florals") < body.indexOf("work-link"));
+		assert.ok(body.indexOf("work-link") < body.indexOf("Ask for"));
+	});
+
+	test("without the API's origin no work photo reaches the page", () => {
+		const html = renderToStaticMarkup(
+			createElement(StudioPage, {
+				data: studioPageData(STUDIO, [sitaWithWork(3)], ORIGIN),
+			}),
+		);
+		assert.equal(count(html, /work-link/g), 0);
+	});
+
+	test("a work thumbnail outside a work link fails the safety check", () => {
+		const loose =
+			'<h1>x</h1><img class="work-thumb" src="https://a.example/x.jpg" width="1" height="1" alt="">';
+		assert.throws(() => assertSafePage(loose));
+	});
+
+	test("a hostile description never reaches the roster: the thumbnails are decorative", () => {
+		const html = roster([sitaWithWork(1, ['"><script>alert(1)</script>'])]);
+		assertSafePage(html);
+		assert.doesNotMatch(html, /<script>alert/);
+		assert.doesNotMatch(html, /alert\(1\)/);
 	});
 });

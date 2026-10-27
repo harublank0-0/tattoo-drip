@@ -87,3 +87,30 @@ export const ARJUN: Artist = {
 	closedMessage: "Books open in March.",
 	workPhotos: [],
 };
+
+/**
+ * `count` photos of an artist's work as the API sends them (TAT-116): on the
+ * API's origin, 2048 x 1536 with the photo copies, the first with a
+ * description.
+ */
+export function workPhotos(count: number, alts: (string | null)[] = []) {
+	return Array.from({ length: count }, (_, index) => ({
+		url: `https://api.example.com/uploads/tenants/t/artist_work_photo/w${index + 1}.320-640-1280.jpg`,
+		width: 2048,
+		height: 1536,
+		alt: alts[index] ?? null,
+		variants: [320, 640, 1280].map((width) => ({
+			url: `https://api.example.com/uploads/tenants/t/artist_work_photo/w${index + 1}.${width}w.jpg`,
+			width,
+		})),
+	}));
+}
+
+/** Sita with `count` work photos. */
+export const sitaWithWork = (
+	count: number,
+	alts: (string | null)[] = [],
+): Artist => ({
+	...SITA,
+	workPhotos: workPhotos(count, alts),
+});

@@ -9,6 +9,7 @@ import {
 	profilePhotoSizes,
 	readSrcSet,
 	rosterPhotoSizes,
+	workStripSizes,
 } from "../../src/studio/srcset.ts";
 
 /** The image's own URL; it is 1200 px wide in these tests. */
@@ -273,6 +274,11 @@ const GEOMETRY = {
 		/@media \(min-width:\s*60rem\)\s*\{(?:(?!@media)[\s\S])*?\.profile-cover\s*\{[^}]*aspect-ratio:\s*\d+\s*\/\s*(\d+)/,
 		"the wide cover aspect",
 	),
+	workStrip: number(
+		css,
+		/\.work-strip\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*([\d.]+)rem\)/,
+		"the work strip's square",
+	),
 	logo: {
 		hero: {
 			maxRem: number(
@@ -425,6 +431,16 @@ const SLOTS: Slot[] = [
 					: G.coverAspectHeight / G.coverAspectWidth;
 			return { width, height: width * ratio, fit: "cover" };
 		},
+	},
+	{
+		// The roster's thumbnails (TAT-116): fixed 5rem squares at every width.
+		name: "work strip",
+		sizes: workStripSizes,
+		box: () => ({
+			width: G.workStrip * PX,
+			height: G.workStrip * PX,
+			fit: "cover",
+		}),
 	},
 	...(["hero", "siteBar", "deposit"] as LogoSlot[]).map((slot) => ({
 		name: `${slot} logo`,

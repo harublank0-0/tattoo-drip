@@ -192,6 +192,14 @@ export function coverSizes(image: ImageSize): string {
 	return `(min-width: ${PAGE_REM + PAGE_GUTTER_REM}rem) ${rem((PAGE_REM - MARGIN_REM) * wideFactor)}, (min-width: ${COVER_WIDE_REM}rem) ${wide}, ${narrow}`;
 }
 
+/** `.work-strip`: the roster's thumbnails are squares of this many rem at every width (TAT-116). */
+const WORK_STRIP_REM = 5;
+
+/** A roster thumbnail of an artist's work (`.work-thumb`): a fixed 5rem square covered by the photo. */
+export function workStripSizes(image: ImageSize): string {
+	return rem(WORK_STRIP_REM * coverFactor(1, image));
+}
+
 /** A logo: as wide as its height allows, at most the slot's max width. */
 export function logoSizes(image: ImageSize, slot: LogoSlot): string {
 	const { maxRem, heightRem } = LOGO_SLOTS[slot];
