@@ -12,6 +12,8 @@ import type Artist from "#modules/artists/models/artist";
 import ArtistService, {
 	type ArtistInput,
 } from "#modules/artists/services/artist_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import WorkPhotoService from "#modules/artists/services/work_photo_service";
 import {
 	createArtistValidator,
 	updateArtistValidator,
@@ -36,6 +38,7 @@ export default class ArtistsController {
 	constructor(
 		private artists: ArtistService,
 		private images: ImageService,
+		private workPhotos: WorkPhotoService,
 	) {}
 
 	async index(ctx: HttpContext) {
@@ -85,6 +88,8 @@ export default class ArtistsController {
 		return ctx.inertia.render("artists/form", {
 			artist: null,
 			canLink: !(await this.hasProfile(tenant, userId)),
+			// Photos come once the artist is saved (TAT-116).
+			workPhotos: [],
 		});
 	}
 
@@ -118,9 +123,26 @@ export default class ArtistsController {
 			(artist.userId === userId ||
 				(artist.userId === null && !(await this.hasProfile(tenant, userId))));
 
+		// The artist's work photos (TAT-116), loaded after findEditable: only
+		// what the tray draws, each as its 320 px copy.
+		const photos = await this.workPhotos.list(tenant, artist);
+		const workPhotos = await Promise.all(
+			photos.map(async (photo) => ({
+				id: photo.id,
+				thumbnailUrl: await this.images.urlFor(
+					"artist_work_photo",
+					photo.imageKey,
+					tenant,
+					THUMBNAIL_WIDTH,
+				),
+				alt: photo.alt,
+			})),
+		);
+
 		return ctx.inertia.render("artists/form", {
 			artist: await this.toProps(tenant, artist, userId),
 			canLink,
+			workPhotos,
 		});
 	}
 

@@ -2,6 +2,8 @@ import { inject } from "@adonisjs/core";
 import type { HttpContext } from "@adonisjs/core/http";
 import { tenantContext } from "#middleware/tenant_middleware";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import ImageService from "#modules/media/services/image_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import {
 	TIMEZONES,
@@ -9,12 +11,18 @@ import {
 } from "#modules/tenancy/validators/tenant";
 import { studioAddress, studioLinks } from "#services/studio_links";
 
+/** The cover's copy that Settings, Profile previews (the narrowest, as a phone shows it). */
+const COVER_PREVIEW_WIDTH = 640;
+
 /**
  * The studio's public profile, edited by its owners.
  */
 @inject()
 export default class StudioProfileController {
-	constructor(private tenancy: TenancyService) {}
+	constructor(
+		private tenancy: TenancyService,
+		private images: ImageService,
+	) {}
 
 	async show(ctx: HttpContext) {
 		const { tenant } = tenantContext(ctx);
@@ -32,6 +40,18 @@ export default class StudioProfileController {
 				tiktokUrl: tenant.tiktokUrl,
 				websiteUrl: tenant.websiteUrl,
 			},
+			// The studio's cover (TAT-116): its 640 px copy for the preview, never
+			// the key or the size.
+			cover: tenant.coverImageKey
+				? {
+						previewUrl: await this.images.urlFor(
+							"studio_cover",
+							tenant.coverImageKey,
+							tenant,
+							COVER_PREVIEW_WIDTH,
+						),
+					}
+				: null,
 			timezones: TIMEZONES,
 			// The studio page link, always (TAT-101), and the host the web
 			// address form draws around the slug.
