@@ -163,6 +163,7 @@ export function FormSheetPanel({
 		<Sheet open={sheet.state.open} onOpenChange={sheet.onOpenChange}>
 			<SheetContent
 				side="bottom"
+				busy={sheet.state.saving}
 				// A closing sheet stays on the page for its exit animation: nothing in it can be used.
 				inert={!sheet.state.open}
 				onSubmitCapture={sheet.guard}

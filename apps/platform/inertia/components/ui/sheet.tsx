@@ -46,9 +46,12 @@ function SheetContent({
 	className,
 	children,
 	side = "bottom",
+	busy = false,
 	...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
 	side?: "top" | "right" | "bottom" | "left";
+	/** A save is out: the sheet can't be dismissed, and the close button says so. */
+	busy?: boolean;
 }) {
 	return (
 		<SheetPortal>
@@ -67,18 +70,27 @@ function SheetContent({
 					// high and scrolling inside, clear of the home bar, and from lg centred
 					// and 36rem wide.
 					side === "bottom" &&
-						"inset-x-0 bottom-0 h-auto max-h-[90dvh] overflow-y-auto rounded-t-md border-t pb-[env(safe-area-inset-bottom)] data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom lg:mx-auto lg:max-w-xl lg:border-x",
+						"inset-x-0 bottom-0 h-auto max-h-[90dvh] overflow-hidden rounded-t-md border-t pb-[env(safe-area-inset-bottom)] data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom lg:mx-auto lg:max-w-xl lg:border-x",
 					className,
 				)}
+				aria-busy={busy}
 				{...props}
 			>
-				{children}
+				{/* The content scrolls in its own box, so the close button below stays on screen. */}
+				<div
+					data-slot="sheet-scroll"
+					className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto"
+				>
+					{children}
+				</div>
 				<SheetPrimitive.Close asChild>
 					<Button
 						type="button"
 						variant="ghost"
 						size="icon"
 						className="absolute top-2 right-2"
+						disabled={busy}
+						title={busy ? "It closes when it has saved" : undefined}
 					>
 						<XIcon />
 						<span className="sr-only">Close</span>

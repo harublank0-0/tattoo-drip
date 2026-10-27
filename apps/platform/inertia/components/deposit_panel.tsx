@@ -161,7 +161,9 @@ export function DepositCard({
 			className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)] lg:scroll-mt-0"
 		>
 			<CardHeader>
-				<CardTitle className="leading-snug">Deposit</CardTitle>
+				<CardTitle className="leading-snug">
+					<h2>Deposit</h2>
+				</CardTitle>
 			</CardHeader>
 			<CardContent>
 				<DepositPanel

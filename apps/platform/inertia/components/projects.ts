@@ -195,7 +195,6 @@ export type ProjectPageProps = {
 		} | null;
 		problem: string | null;
 		message: ChatMessageProps | null;
-		proofReceivedText: string | null;
 		/** Links open on this machine (the dev host), so no client can use them. */
 		devHost: boolean;
 	} | null;

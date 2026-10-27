@@ -153,3 +153,70 @@ test.group("One instance per sheet, mounted by the page (TAT-108)", () => {
 		assert.notInclude(source, "if (page.flash?.error) setTimeout");
 	});
 });
+
+// Small things the reviews found (TAT-108 fix round), pinned at the source because Playwright is not
+// in CI.
+test.group("Sheet and confirm details (TAT-108)", () => {
+	test("the sheet's close button stays put while its form scrolls, and says why it is disabled", async ({
+		assert,
+	}) => {
+		const sheet = await read("components/ui/sheet.tsx");
+		// The scrolling is an inner box, so the absolutely placed close button does not scroll away.
+		assert.include(sheet, "overflow-y-auto");
+		assert.match(sheet, /side === "bottom"[\s\S]*overflow-hidden/);
+		assert.include(sheet, "aria-busy={busy}");
+		assert.include(sheet, "disabled={busy}");
+		assert.include(
+			await read("components/form_sheet.tsx"),
+			"busy={sheet.state.saving}",
+		);
+	});
+
+	test("the inline confirm's trigger points at the panel it opens", async ({
+		assert,
+	}) => {
+		const source = await read("components/inline_confirm.tsx");
+		assert.include(source, "aria-controls={panelId}");
+		assert.include(source, "id={panelId}");
+	});
+
+	test("the compact screenshot's one-line fact is a term and a definition in a div, like the others", async ({
+		assert,
+	}) => {
+		const source = await read("components/payments_card.tsx");
+		assert.include(source, '<dt className="sr-only">Paid with and sent</dt>');
+	});
+
+	test("the card titles of the project page are headings", async ({
+		assert,
+	}) => {
+		for (const [file, titles] of [
+			["components/quote_card.tsx", ["Quote"]],
+			["components/change_card.tsx", ["Change this project"]],
+			["components/deposit_panel.tsx", ["Deposit"]],
+			["pages/projects/show.tsx", ["Notes"]],
+		] as const) {
+			const source = await read(file);
+			for (const title of titles) {
+				assert.match(
+					source,
+					new RegExp(`<h2[^>]*>\\s*${title}\\s*</h2>`),
+					`${file}: ${title}`,
+				);
+			}
+		}
+	});
+
+	test("the deposit panel no longer carries a proof-received note nobody reads", async ({
+		assert,
+	}) => {
+		assert.notInclude(
+			await read("components/projects.ts"),
+			"proofReceivedText",
+		);
+		assert.notInclude(
+			await read("components/deposit_panel.tsx"),
+			"proofReceivedText",
+		);
+	});
+});

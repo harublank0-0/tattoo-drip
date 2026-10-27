@@ -270,7 +270,7 @@ function RequestCard({
 		<Card>
 			<CardHeader>
 				<CardTitle className="leading-snug">
-					{fromInquiry ? "Request" : "About the piece"}
+					<h2>{fromInquiry ? "Request" : "About the piece"}</h2>
 				</CardTitle>
 			</CardHeader>
 			<CardContent className="flex flex-col gap-4">
@@ -316,7 +316,9 @@ function NotesCard({
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle className="leading-snug">Notes</CardTitle>
+				<CardTitle className="leading-snug">
+					<h2>Notes</h2>
+				</CardTitle>
 			</CardHeader>
 			<CardContent>
 				<NotesForm projectId={projectId} notes={notes} />

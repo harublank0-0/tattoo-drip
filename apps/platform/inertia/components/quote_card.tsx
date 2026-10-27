@@ -102,7 +102,9 @@ export function QuoteCard({
 			className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)] lg:scroll-mt-0"
 		>
 			<CardHeader>
-				<CardTitle className="leading-snug">Quote</CardTitle>
+				<CardTitle className="leading-snug">
+					<h2>Quote</h2>
+				</CardTitle>
 			</CardHeader>
 			<CardContent className="flex flex-col gap-4">
 				{quote ? (

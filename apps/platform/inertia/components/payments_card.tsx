@@ -270,9 +270,12 @@ export function PendingProof({
 					</Fact>
 					{compact && (
 						// One line on a phone, so Verify and Reject stay on the first screen.
-						<dd className="text-muted-foreground sm:hidden">
-							{METHOD_LABELS[proof.method]} · {proof.sentText}
-						</dd>
+						<div className="sm:hidden">
+							<dt className="sr-only">Paid with and sent</dt>
+							<dd className="text-muted-foreground">
+								{METHOD_LABELS[proof.method]} · {proof.sentText}
+							</dd>
+						</div>
 					)}
 					<Fact compact={compact} fromSm label="Paid with">
 						<dd>{METHOD_LABELS[proof.method]}</dd>

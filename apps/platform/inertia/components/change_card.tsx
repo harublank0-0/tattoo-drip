@@ -88,7 +88,9 @@ export default function ChangeCard({
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle className="leading-snug">Change this project</CardTitle>
+				<CardTitle className="leading-snug">
+					<h2>Change this project</h2>
+				</CardTitle>
 			</CardHeader>
 			<CardContent className="flex flex-col gap-4">
 				{assignment && (

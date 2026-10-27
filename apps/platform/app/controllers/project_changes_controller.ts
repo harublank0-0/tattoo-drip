@@ -58,13 +58,15 @@ export default class ProjectChangesController {
 		const { move } = await ctx.request.validateUsing(moveValidator);
 		try {
 			await this.projects.move(tenant, membership, project, move);
+			// The deposit's outcome is the owners' to record (and their money to know about).
 			const outcomeNext =
 				move === "withdraw" &&
+				membership.role === "owner" &&
 				(await this.projects.depositHeld(tenant, project));
 			ctx.session.flash(
 				"success",
 				outcomeNext
-					? `${MOVE_DONE[move]} Record what happened to the deposit under Payments.`
+					? `${MOVE_DONE[move]} Record what happened to the deposit: it is the next step on this page.`
 					: MOVE_DONE[move],
 			);
 		} catch (error) {

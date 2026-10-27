@@ -641,9 +641,9 @@ export default class ProjectsController {
 	/**
 	 * The deposit panel (TAT-65): the project's link, rebuilt from its nonce
 	 * (`url` null once it no longer works), why a link can't be made now,
-	 * the chat message that sends it (with a working link and a phone), the
-	 * day a screenshot came, while one waits, and whether links point at this
-	 * machine (the dev host).
+	 * the chat message that sends it (with a working link and a phone), and
+	 * whether links point at this machine (the dev host). A waiting screenshot
+	 * is the Next step itself (TAT-108), so the panel doesn't note it.
 	 */
 	private async depositPanel(
 		tenant: Tenant,
@@ -651,15 +651,12 @@ export default class ProjectsController {
 		client: Pick<Client, "name" | "phone"> | null,
 		depositTemplate: string,
 	) {
-		const day = (at: DateTime) =>
-			formatDay(at.setZone(tenant.timezone).toFormat("yyyy-MM-dd"));
 		const link = await this.depositLinks.forProject(tenant, project);
 		const problem = await this.depositLinks.issueProblem(tenant, project);
 		const quote = await this.quotes.current(tenant, project);
 		const due = quote
 			? await this.deposits.remaining(tenant, project, quote)
 			: 0;
-		const pending = await this.deposits.pendingProof(tenant, project);
 		const url = link?.url ?? null;
 		return {
 			link: link
@@ -687,7 +684,6 @@ export default class ProjectsController {
 							client.phone,
 						)
 					: null,
-			proofReceivedText: pending ? day(pending.createdAt) : null,
 			// Links that open on this machine reach no client: the card warns.
 			devHost: pointsAtThisMachine(storefrontTemplate()),
 		};

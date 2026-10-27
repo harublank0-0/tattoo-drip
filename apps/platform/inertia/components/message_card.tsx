@@ -52,7 +52,9 @@ export default function MessageCard({
 		<Card className="max-sm:gap-3 max-sm:py-4">
 			{/* On a phone the note shares the title's line when it fits. */}
 			<CardHeader className="max-sm:flex max-sm:flex-wrap max-sm:items-baseline max-sm:gap-x-3 max-sm:gap-y-1">
-				<CardTitle>Message the client</CardTitle>
+				<CardTitle>
+					<h2>Message the client</h2>
+				</CardTitle>
 				{footer && <CardDescription>{footer}</CardDescription>}
 			</CardHeader>
 			<CardContent className="flex flex-col gap-3 sm:gap-4">

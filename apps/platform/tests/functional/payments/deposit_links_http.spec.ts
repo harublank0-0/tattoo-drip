@@ -9,7 +9,7 @@ import DepositLink from "#modules/payments/models/deposit_link";
 import { formatDay, validUntil } from "#modules/projects/quotes";
 import env from "#start/env";
 import { depositReady, depositServices } from "#tests/helpers/deposits";
-import { makeArtist, makePayment } from "#tests/helpers/pipeline";
+import { makeArtist } from "#tests/helpers/pipeline";
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
 const SLUG = "deposit-needle-65";
@@ -62,7 +62,6 @@ test.group("The deposit link on the project page", (group) => {
 			link: null,
 			problem: null,
 			message: null,
-			proofReceivedText: null,
 			devHost: true,
 		});
 	});
@@ -256,21 +255,6 @@ test.group("The deposit link on the project page", (group) => {
 		assert.match(
 			(await panelFor(client, owner, project.id)).link.url,
 			URL_SHAPE,
-		);
-	});
-
-	test("a waiting screenshot shows when it came", async ({
-		client,
-		assert,
-	}) => {
-		const { owner, tenant, project } = await ready();
-		await inTenant(tenant, () =>
-			makePayment(tenant, project, { method: "esewa" }),
-		);
-
-		assert.equal(
-			(await panelFor(client, owner, project.id)).proofReceivedText,
-			formatDay(DateTime.now().setZone(KTM).toFormat("yyyy-MM-dd")),
 		);
 	});
 });

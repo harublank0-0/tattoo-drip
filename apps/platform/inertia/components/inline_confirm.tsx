@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useId, useRef, useState } from "react";
 import {
 	CONFIRM_CLOSED,
 	type ConfirmEvent,
@@ -35,6 +35,7 @@ export default function InlineConfirm({
 	onConfirm: (finished: () => void) => void;
 	fallback: RefObject<HTMLElement | null>;
 }) {
+	const panelId = useId();
 	const [state, setState] = useState<ConfirmState>(CONFIRM_CLOSED);
 	// The same steps, applied at once: a held key can fire a second click before React renders.
 	const latest = useRef<ConfirmState>(state);
@@ -75,6 +76,7 @@ export default function InlineConfirm({
 					type="button"
 					variant={variant}
 					aria-expanded={state.open}
+					aria-controls={panelId}
 					onClick={ask}
 				>
 					{label}
@@ -82,6 +84,7 @@ export default function InlineConfirm({
 			</div>
 			{state.open && (
 				<fieldset
+					id={panelId}
 					className="min-w-0 rounded-md bg-muted/50 p-3"
 					onKeyDown={(event) => {
 						if (event.key === "Escape") keepIt();
