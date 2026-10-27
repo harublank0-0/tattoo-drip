@@ -181,6 +181,21 @@ describe("a studio's logo and cover (TAT-54)", () => {
 		);
 	});
 
+	test("with both a logo and a cover the logo stays in the heading above the name, and the cover image is the box's only direct image (TAT-116)", () => {
+		const html = studioHtml(withStorefront(BRANDED));
+		assertSafePage(html, BRAND_PAGE);
+		const [cover] = html.match(/<div class="profile-cover">[\s\S]*?<h1/) ?? [];
+		assert.ok(cover);
+		// Two images in the box before the name: the cover first, then the logo inside the heading.
+		assert.equal(cover.match(/<img /g)?.length, 2);
+		assert.match(
+			cover,
+			/^<div class="profile-cover"><img src="[^"]*cover\.jpg"[^>]*\/><div class="profile-heading"><img class="profile-logo"[^>]*\/><h1/,
+		);
+		// The logo is not a direct child of the cover box, which the CSS styles with `> img`.
+		assert.doesNotMatch(cover, /^<div class="profile-cover"><img[^>]*\/><img/);
+	});
+
 	test("copies give the logo, the bar logo and the cover their srcset and sizes (TAT-112)", () => {
 		const branding = {
 			...BRANDED.branding,

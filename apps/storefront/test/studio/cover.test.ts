@@ -86,7 +86,7 @@ describe("the cover's box", () => {
 	});
 
 	test("the photo fills it, crops toward the top and shows a dark placeholder first", () => {
-		const body = rule(".profile-cover img");
+		const body = rule(".profile-cover > img");
 		assert.match(body, /object-fit:\s*cover/);
 		assert.match(body, /object-position:\s*50%\s+25%/);
 		assert.match(body, /background:\s*var\(--photo-shade\)/);
@@ -111,5 +111,25 @@ describe("the cover's box", () => {
 			rule(".profile-cover .profile-location"),
 			/color:\s*var\(--on-photo\)/,
 		);
+	});
+});
+
+describe("a cover and a logo together (TAT-116 fix round 1)", () => {
+	test("only the cover's own image gets the cover styles: no rule selects the cover's descendant images", () => {
+		// The logo sits inside the cover's heading when a theme supplies both;
+		// a descendant selector would stretch it over the heading.
+		const selectors = Array.from(bare.matchAll(/([^{}]+)\{/g), (match) =>
+			match[1].split(/[;}]/).pop()?.trim(),
+		);
+		const onCoverImages = selectors.filter(
+			(selector) =>
+				selector?.startsWith(".profile-cover") && /\bimg\b/.test(selector),
+		);
+		assert.deepEqual(onCoverImages, [".profile-cover > img"]);
+		// The logo keeps its own contained layout.
+		const logo = rule(".profile-logo");
+		assert.match(logo, /object-fit:\s*contain/);
+		assert.match(logo, /block-size:\s*4rem/);
+		assert.doesNotMatch(logo, /position:\s*absolute/);
 	});
 });

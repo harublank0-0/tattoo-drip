@@ -180,7 +180,7 @@ export function profilePhotoSizes(image: ImageSize): string {
 }
 
 /**
- * The cover (`.profile-cover img`, TAT-116): the page's width less the
+ * The cover (`.profile-cover > img`, TAT-116): the page's width less the
  * margin, in a box that is 4:3 below 60rem and 21:9 from it (no height
  * limit; a long name makes the real box taller, which only means a little
  * more enlargement than this asks for). A photo flatter than the box is
