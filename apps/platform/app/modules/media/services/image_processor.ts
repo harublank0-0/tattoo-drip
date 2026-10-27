@@ -100,11 +100,17 @@ export async function makeVariants(
 	if (wanted.length === 0) return [];
 	return decodeSlot(async () => {
 		const variants: ProcessedVariant[] = [];
+		// One source, a clone for each width: the bytes are those of a separate
+		// sharp() per width (tested). A Buffer input is still decoded once per
+		// clone, and that is cheap: libvips shrinks a JPEG while it decodes, so
+		// the 320 px copy costs a fraction of a full decode (measured: no gain
+		// from decoding once, TAT-112).
+		const source = sharp(image.data, {
+			limitInputPixels: MAX_VARIANT_INPUT_PIXELS,
+			failOn: "error",
+		});
 		for (const width of wanted) {
-			const resized = sharp(image.data, {
-				limitInputPixels: MAX_VARIANT_INPUT_PIXELS,
-				failOn: "error",
-			}).resize({ width });
+			const resized = source.clone().resize({ width });
 			const { data, info } =
 				image.format === "png"
 					? await resized.png().toBuffer({ resolveWithObject: true })

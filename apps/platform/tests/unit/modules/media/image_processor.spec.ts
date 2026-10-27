@@ -157,6 +157,35 @@ test.group("makeVariants (TAT-112)", () => {
 		}
 	});
 
+	test("gives the same bytes as a separate decode for each width", async ({
+		assert,
+	}) => {
+		for (const [format, source] of [
+			["jpeg", await testImages.jpeg(2400, 1800)],
+			["png", await testImages.transparentPng(1500, 900)],
+		] as const) {
+			const image = await processImage(source);
+			const copies = await makeVariants(image, VARIANT_WIDTHS);
+			assert.isAbove(copies.length, 1);
+
+			for (const copy of copies) {
+				// What makeVariants did before one source served every width.
+				const resized = sharp(image.data, {
+					limitInputPixels: 2048 * 2048,
+					failOn: "error",
+				}).resize({ width: copy.width });
+				const alone =
+					format === "png"
+						? await resized.png().toBuffer()
+						: await resized.jpeg({ quality: 80, mozjpeg: true }).toBuffer();
+				assert.isTrue(
+					copy.data.equals(alone),
+					`${format} ${copy.width} px differs`,
+				);
+			}
+		}
+	});
+
 	test("never enlarges: only widths below the image's own", async ({
 		assert,
 	}) => {
