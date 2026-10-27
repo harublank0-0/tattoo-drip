@@ -15,6 +15,11 @@ import {
 } from "#tests/helpers/pipeline";
 import { inTenant, inTenantAs } from "#tests/helpers/tenants";
 import { seedGroups, studio } from "#tests/helpers/waiting_fixtures";
+// @ts-expect-error TS6305: the server project only references the inertia project, so it cannot read its sources and the module is untyped here; `PageModule` below restates its shape and the inertia project type-checks the real one.
+import * as pageModule from "../../../inertia/components/project_page.js";
+
+type PageModule = { idsOnPage(page: unknown): string[] };
+const { idsOnPage } = pageModule as PageModule;
 
 type Who = Parameters<ReturnType<ApiClient["get"]>["loginAs"]>[0];
 type Step = {
@@ -24,6 +29,8 @@ type Step = {
 	anchor: string | null;
 	needsYou: boolean;
 };
+// biome-ignore lint/suspicious/noExplicitAny: the page props are read by name, as the page does.
+type Props = any;
 
 /**
  * The project page's Next step card and Today's rows (TAT-107) and the Projects list (TAT-109)
@@ -56,18 +63,26 @@ test.group("Next step agreement (TAT-108)", (group) => {
 		);
 	}
 
+	async function propsOf(
+		client: ApiClient,
+		slug: string,
+		user: Who,
+		projectId: string,
+	): Promise<Props> {
+		const response = await client
+			.get(`/t/${slug}/projects/${projectId}`)
+			.withInertia()
+			.loginAs(user);
+		response.assertStatus(200);
+		return response.inertiaProps;
+	}
 	async function stepOf(
 		client: ApiClient,
 		slug: string,
 		user: Who,
 		projectId: string,
 	): Promise<Step> {
-		const response = await client
-			.get(`/t/${slug}/projects/${projectId}`)
-			.withInertia()
-			.loginAs(user);
-		response.assertStatus(200);
-		return response.inertiaProps.nextStep;
+		return (await propsOf(client, slug, user, projectId)).nextStep;
 	}
 
 	/** The seeded groups plus a project of each state the groups don't cover. */
@@ -134,11 +149,26 @@ test.group("Next step agreement (TAT-108)", (group) => {
 		const slug = s.tenant.slug;
 		for (const item of items) {
 			if (!ids.includes(item.project.id)) continue;
-			const step = await stepOf(client, slug, user, item.project.id);
+			const props = await propsOf(client, slug, user, item.project.id);
+			const step: Step = props.nextStep;
 			const label = `${role} ${item.waiting.reason}`;
 			seen.add(item.waiting.reason);
 			// The card the member acts on, and whether it needs them.
 			assert.equal(step.anchor, item.hash, `${label}: card`);
+			// The link Today's row opens exists on the page, once.
+			const pageIds = idsOnPage(props);
+			assert.deepEqual(
+				pageIds,
+				[...new Set(pageIds)],
+				`${label}: each id once`,
+			);
+			if (item.hash !== null) {
+				assert.include(
+					pageIds,
+					item.hash,
+					`${label}: #${item.hash} is on the page`,
+				);
+			}
 			assert.equal(
 				step.needsYou,
 				item.waiting.side === "studio",

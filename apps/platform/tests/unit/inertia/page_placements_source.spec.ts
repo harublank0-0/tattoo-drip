@@ -67,4 +67,21 @@ test.group("The cards draw what placementsOf gives them (TAT-108)", () => {
 			assert.notMatch(await read(file), /\boffers\(/, file);
 		}
 	});
+
+	test("the Next step card wraps Revise and the deposit panel in the ids they own", async ({
+		assert,
+	}) => {
+		const card = await read("components/next_step_card.tsx");
+		assert.include(card, 'cardId("quote-form", step.anchor)');
+		assert.include(card, 'cardId("deposit", step.anchor)');
+		// And the cards that draw them when the step does not.
+		assert.include(
+			await read("components/quote_card.tsx"),
+			'cardId("quote-form", nextStep.anchor)',
+		);
+		assert.include(
+			await read("components/deposit_panel.tsx"),
+			'cardId("deposit", anchor)',
+		);
+	});
 });

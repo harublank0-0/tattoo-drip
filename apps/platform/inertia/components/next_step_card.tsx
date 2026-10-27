@@ -138,13 +138,20 @@ export default function NextStepCard({
 			case "deposit_link":
 				return (
 					deposit && (
-						<DepositPanel
-							projectId={projectId}
-							deposit={deposit}
-							primary={primaryChannel(lastChannel)}
-							onSent={(channel) => onContact({ channel, kind: "deposit_link" })}
-							fallback={fallback}
-						/>
+						<div
+							id={cardId("deposit", step.anchor)}
+							className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)] lg:scroll-mt-0"
+						>
+							<DepositPanel
+								projectId={projectId}
+								deposit={deposit}
+								primary={primaryChannel(lastChannel)}
+								onSent={(channel) =>
+									onContact({ channel, kind: "deposit_link" })
+								}
+								fallback={fallback}
+							/>
+						</div>
 					)
 				);
 			case "record_payment":
