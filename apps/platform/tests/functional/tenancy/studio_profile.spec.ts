@@ -180,13 +180,20 @@ test.group("The cover on the profile page (TAT-116)", (group) => {
 		);
 		const { cover } = (await page()).inertiaProps;
 
-		assert.deepEqual(Object.keys(cover), ["previewUrl"]);
-		// The 640 px copy, in the studio's own folder; never the key.
+		assert.deepEqual(Object.keys(cover).sort(), [
+			"height",
+			"previewUrl",
+			"width",
+		]);
+		// The 960 px copy (a 448 px box on a 2x screen), in the studio's own
+		// folder, with that copy's own size; never the key.
 		assert.match(
 			new URL(cover.previewUrl).pathname,
 			new RegExp(
-				`^/uploads/tenants/${tenant.id}/studio_cover/.+\\.640w\\.jpg$`,
+				`^/uploads/tenants/${tenant.id}/studio_cover/.+\\.960w\\.jpg$`,
 			),
 		);
+		assert.equal(cover.width, 960);
+		assert.equal(cover.height, 720);
 	});
 });

@@ -50,6 +50,8 @@ export default function CoverPhotoForm({
 						<div className="flex flex-col gap-2">
 							<img
 								src={cover.previewUrl}
+								width={cover.width}
+								height={cover.height}
 								alt="Your current cover"
 								className="aspect-[4/3] w-full max-w-md rounded-md border object-cover"
 							/>

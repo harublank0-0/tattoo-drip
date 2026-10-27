@@ -17,8 +17,8 @@ export type WorkPhotoProps = {
 	alt: string | null;
 };
 
-/** The studio's cover as Settings, Profile gets it: its 640 px copy. */
-export type CoverProps = { previewUrl: string };
+/** The studio's cover as Settings, Profile gets it: the 960 px copy and its own size. */
+export type CoverProps = { previewUrl: string; width: number; height: number };
 
 export const PHOTO_ACCEPT = "image/jpeg,image/png,image/webp";
 
