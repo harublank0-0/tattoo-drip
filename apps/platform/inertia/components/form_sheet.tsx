@@ -7,7 +7,7 @@ import {
 	useRef,
 } from "react";
 import { toast } from "sonner";
-import { focusBack } from "~/components/confirm";
+import { focusBack, ignoreHeldEnter } from "~/components/confirm";
 import {
 	maySubmit,
 	SHEET_CLOSED,
@@ -123,6 +123,7 @@ export function FormSheetTrigger({
 			variant={variant}
 			aria-haspopup="dialog"
 			aria-expanded={sheet.state.open}
+			onKeyDown={ignoreHeldEnter}
 			onClick={() => sheet.onOpenChange(true)}
 		>
 			{label}

@@ -172,6 +172,17 @@ test.group("Sheet and confirm details (TAT-108)", () => {
 		);
 	});
 
+	test("the triggers ignore a held Enter, so a closing sheet or confirmation is not reopened", async ({
+		assert,
+	}) => {
+		for (const file of [
+			"components/form_sheet.tsx",
+			"components/inline_confirm.tsx",
+		]) {
+			assert.include(await read(file), "onKeyDown={ignoreHeldEnter}", file);
+		}
+	});
+
 	test("the inline confirm's trigger points at the panel it opens", async ({
 		assert,
 	}) => {

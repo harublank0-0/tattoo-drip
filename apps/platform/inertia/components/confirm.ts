@@ -50,3 +50,16 @@ export function focusBack<T extends { isConnected: boolean }>(
 	if (trigger?.isConnected) return trigger;
 	return fallback?.isConnected ? fallback : null;
 }
+
+/**
+ * A trigger's `onKeyDown`: the repeat of a held Enter does nothing. When a sheet or a confirmation
+ * closes, focus goes back to its trigger; a key still held down would press it again and reopen
+ * what has just been answered (and, in a sheet, submit the next empty form).
+ */
+export function ignoreHeldEnter(event: {
+	key: string;
+	repeat: boolean;
+	preventDefault(): void;
+}): void {
+	if (event.key === "Enter" && event.repeat) event.preventDefault();
+}

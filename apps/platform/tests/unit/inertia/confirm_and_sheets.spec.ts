@@ -6,8 +6,10 @@ import * as sheetsModule from "../../../inertia/components/sheets.js";
 
 type Confirm = { open: boolean; saving: boolean };
 type Focus = "keep" | "trigger" | null;
+type KeyEvent = { key: string; repeat: boolean; preventDefault(): void };
 type ConfirmModule = {
 	CONFIRM_CLOSED: Confirm;
+	ignoreHeldEnter(event: KeyEvent): void;
 	confirmStep(
 		state: Confirm,
 		event: "ask" | "keep" | "confirm" | "finished",
@@ -17,7 +19,7 @@ type ConfirmModule = {
 		fallback: T | null,
 	): T | null;
 };
-const { CONFIRM_CLOSED, confirmStep, focusBack } =
+const { CONFIRM_CLOSED, confirmStep, focusBack, ignoreHeldEnter } =
 	confirmModule as ConfirmModule;
 
 type Flash =
@@ -292,5 +294,32 @@ test.group("maySubmit (TAT-108)", () => {
 		// A save in flight is not cut off by it.
 		const sending = sheetStep(OPENED, { type: "start" });
 		assert.deepEqual(sheetStep(sending, { type: "unavailable" }), sending);
+	});
+});
+
+// Focus goes back to the trigger when a sheet or a confirmation closes; a key still held down must
+// not press it again and reopen what has just been answered (TAT-108 fix round).
+test.group("ignoreHeldEnter (TAT-108)", () => {
+	const press = (key: string, repeat: boolean) => {
+		let prevented = false;
+		ignoreHeldEnter({
+			key,
+			repeat,
+			preventDefault: () => {
+				prevented = true;
+			},
+		});
+		return prevented;
+	};
+
+	test("the repeat of a held Enter is ignored", ({ assert }) => {
+		assert.isTrue(press("Enter", true));
+	});
+
+	test("the first Enter, and any other key, still work", ({ assert }) => {
+		assert.isFalse(press("Enter", false));
+		assert.isFalse(press(" ", true));
+		assert.isFalse(press("Escape", true));
+		assert.isFalse(press("Tab", true));
 	});
 });

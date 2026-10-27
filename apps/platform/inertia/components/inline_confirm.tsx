@@ -5,6 +5,7 @@ import {
 	type ConfirmState,
 	confirmStep,
 	focusBack,
+	ignoreHeldEnter,
 } from "~/components/confirm";
 import { Button } from "~/components/ui/button";
 
@@ -77,6 +78,7 @@ export default function InlineConfirm({
 					variant={variant}
 					aria-expanded={state.open}
 					aria-controls={panelId}
+					onKeyDown={ignoreHeldEnter}
 					onClick={ask}
 				>
 					{label}
