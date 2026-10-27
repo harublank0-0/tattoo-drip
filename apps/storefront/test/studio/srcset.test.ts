@@ -9,6 +9,7 @@ import {
 	profilePhotoSizes,
 	readSrcSet,
 	rosterPhotoSizes,
+	workGridSizes,
 	workStripSizes,
 } from "../../src/studio/srcset.ts";
 
@@ -274,6 +275,16 @@ const GEOMETRY = {
 		/@media \(min-width:\s*60rem\)\s*\{(?:(?!@media)[\s\S])*?\.profile-cover\s*\{[^}]*aspect-ratio:\s*\d+\s*\/\s*(\d+)/,
 		"the wide cover aspect",
 	),
+	workGridMax: number(
+		css,
+		/\.work-grid\s*\{[^}]*max-inline-size:\s*([\d.]+)rem/,
+		"the work grid's width",
+	),
+	workGridGap: number(
+		css,
+		/\.work-grid\s*\{[^}]*gap:\s*([\d.]+)rem/,
+		"the work grid's gap",
+	),
 	workStrip: number(
 		css,
 		/\.work-strip\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*([\d.]+)rem\)/,
@@ -430,6 +441,17 @@ const SLOTS: Slot[] = [
 					? G.coverWideAspectHeight / G.coverWideAspectWidth
 					: G.coverAspectHeight / G.coverAspectWidth;
 			return { width, height: width * ratio, fit: "cover" };
+		},
+	},
+	{
+		// The artist page's work grid (TAT-116): three square columns of the
+		// page (at most 48rem) with 0.5rem gaps.
+		name: "work grid",
+		sizes: workGridSizes,
+		box: (viewport) => {
+			const grid = Math.min(G.workGridMax * PX, pageWidth(viewport));
+			const width = (grid - 2 * G.workGridGap * PX) / 3;
+			return { width, height: width, fit: "cover" };
 		},
 	},
 	{

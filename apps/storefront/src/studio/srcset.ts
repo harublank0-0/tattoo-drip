@@ -156,9 +156,14 @@ export function rosterPhotoSizes(image: ImageSize): string {
 	return `(min-width: 48rem) ${rem((ROSTER_REM.wide - MARGIN_REM) * factor)}, ${rem((ROSTER_REM.narrow - MARGIN_REM) * factor)}`;
 }
 
-/** The width of the page's column less its margin, times `factor`: `calc` of `vw`, a plain length when it is 1. */
-function viewportCalc(offsetRem: number, factor: number): string {
-	const rounded = Math.ceil(Number((factor * 100).toFixed(6))) / 100;
+/**
+ * The width of the page's column less its margin, times `factor`: `calc` of
+ * `vw`, a plain length when it is 1. `factor` is rounded up to a hundredth
+ * (a thousandth with `fine`, for a third of a column).
+ */
+function viewportCalc(offsetRem: number, factor: number, fine = false): string {
+	const scale = fine ? 1000 : 100;
+	const rounded = Math.ceil(Number((factor * scale).toFixed(6))) / scale;
 	const minus = `100vw - ${offsetRem}rem`;
 	return rounded === 1 ? `calc(${minus})` : `calc((${minus}) * ${rounded})`;
 }
@@ -198,6 +203,22 @@ const WORK_STRIP_REM = 5;
 /** A roster thumbnail of an artist's work (`.work-thumb`): a fixed 5rem square covered by the photo. */
 export function workStripSizes(image: ImageSize): string {
 	return rem(WORK_STRIP_REM * coverFactor(1, image));
+}
+
+/** `.work-grid`: three square columns, at most 48rem wide, with 0.5rem gaps (TAT-116). */
+const WORK_GRID_MAX_REM = 48;
+const WORK_GRID_GAP_REM = 0.5;
+
+/**
+ * A photo in the artist page's work grid (`.work-photo`): a square column,
+ * a third of the grid less its gaps. The grid is the page's width (a phone:
+ * 100vw less the page's gutter) up to 48rem, which the page reaches at
+ * 50.5rem.
+ */
+export function workGridSizes(image: ImageSize): string {
+	const factor = coverFactor(1, image);
+	const column = (WORK_GRID_MAX_REM - 2 * WORK_GRID_GAP_REM) / 3;
+	return `(min-width: ${WORK_GRID_MAX_REM + PAGE_GUTTER_REM}rem) ${rem(column * factor)}, ${viewportCalc(PAGE_GUTTER_REM + 2 * WORK_GRID_GAP_REM, factor / 3, true)}`;
 }
 
 /** A logo: as wide as its height allows, at most the slot's max width. */

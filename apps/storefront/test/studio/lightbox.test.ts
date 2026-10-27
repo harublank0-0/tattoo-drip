@@ -1,0 +1,113 @@
+import assert from "node:assert/strict";
+import { readdirSync, readFileSync } from "node:fs";
+import { describe, test } from "node:test";
+
+/**
+ * The photo viewer (TAT-116) is the browser's own modal `<dialog>`: Escape,
+ * the first focus, the return of focus and the inert page behind it are all
+ * the browser's. These source guards keep it that way: the one DOM call is
+ * `showPhoto` in src/studio/lightbox.ts, and no component adds focus code,
+ * listeners, a scroll lock or a custom overlay.
+ */
+const SRC = new URL("../../src/", import.meta.url);
+const read = (path: string) => readFileSync(new URL(path, SRC), "utf8");
+
+const sources = (folder: string) =>
+	readdirSync(new URL(folder, SRC), { recursive: true })
+		.map(String)
+		.filter((file) => /\.(ts|tsx)$/.test(file))
+		.map((file) => ({
+			file: `${folder}${file}`,
+			text: read(`${folder}${file}`),
+		}));
+
+const rule = (css: string, selector: string) => {
+	const bare = css.replace(/\/\*[\s\S]*?\*\//g, "");
+	for (const match of bare.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+		const own = match[1].split(/[;}]/).pop()?.trim();
+		if (own === selector) return match[2];
+	}
+	return "";
+};
+
+describe("the photo viewer is the browser's dialog (TAT-116)", () => {
+	test("showModal is called in lightbox.ts only", () => {
+		const callers = [
+			...sources("studio/"),
+			...sources("routes/"),
+			...sources("intake/"),
+			...sources("deposit/"),
+		]
+			.filter(({ text }) => text.includes("showModal"))
+			.map(({ file }) => file);
+		assert.deepEqual(callers, ["studio/lightbox.ts"]);
+	});
+
+	test("showPhoto opens a closed dialog by id and nothing else", () => {
+		const text = read("studio/lightbox.ts");
+		assert.match(text, /export function showPhoto\(id: string\): void/);
+		assert.match(text, /document\.getElementById\(id\)/);
+		assert.match(text, /instanceof HTMLDialogElement/);
+		assert.match(text, /!dialog\.open/);
+		assert.equal((text.match(/document\./g) ?? []).length, 1);
+	});
+
+	test("the components hold no focus code, listeners or DOM access", () => {
+		// pages.tsx also holds the router's error page, which reloads the
+		// page (`window`, `preventDefault`): not part of the viewer.
+		const viewer = [
+			"studio/components/artists.tsx",
+			"studio/components/brand.tsx",
+		];
+		for (const { file, text } of sources("studio/components/")) {
+			const forbidden = [
+				"tabIndex",
+				".focus(",
+				"addEventListener",
+				"document.",
+				"useEffect",
+				"useState",
+				"useRef",
+				...(viewer.includes(file) ? ["preventDefault", "window."] : []),
+			];
+			for (const word of forbidden) {
+				assert.ok(!text.includes(word), `${file} uses ${word}`);
+			}
+		}
+	});
+
+	test("the page's scroll is never locked", () => {
+		const css = read("styles.css");
+		for (const selector of ["html", "body", ":root"]) {
+			assert.doesNotMatch(
+				rule(css, selector),
+				/overflow\s*:\s*hidden/,
+				selector,
+			);
+		}
+		assert.doesNotMatch(
+			css,
+			/:has\(\s*(?:\.work-dialog|dialog)\[open\]\s*\)[^{]*\{[^}]*overflow/,
+		);
+	});
+
+	test("the dialog scrolls inside itself, and a closed one stays hidden", () => {
+		const css = read("styles.css");
+		const dialog = rule(css, ".work-dialog");
+		assert.match(dialog, /overscroll-behavior:\s*contain/);
+		assert.match(dialog, /overflow:\s*auto/);
+		// Only the open dialog sets `display`, or a closed one would show.
+		assert.doesNotMatch(dialog, /(?:^|[;\s])display\s*:/);
+		assert.match(rule(css, ".work-dialog[open]"), /display:\s*grid/);
+	});
+
+	test("Close is a 48 px control and the large photo fits the screen", () => {
+		const css = read("styles.css");
+		assert.match(rule(css, ".action"), /min-height:\s*3rem/);
+		assert.match(
+			rule(css, ".work-large"),
+			/max-block-size:\s*calc\(100dvh\s*-\s*8rem\)/,
+		);
+		assert.match(rule(css, ".work-large"), /object-fit:\s*contain/);
+	});
+});

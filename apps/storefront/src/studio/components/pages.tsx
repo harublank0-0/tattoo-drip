@@ -5,7 +5,7 @@ import { isAllowedHref, linkRel } from "../links.ts";
 import type { ArtistPageData, StudioPageData } from "../loaders.ts";
 import { logoSizes } from "../srcset.ts";
 import type { SectionKey } from "../theme/config.ts";
-import { ArtistProfile, ArtistRoster } from "./artists.tsx";
+import { ArtistProfile, ArtistRoster, WorkGrid } from "./artists.tsx";
 import { BrandCover, BrandLogo } from "./brand.tsx";
 import { ContactBlock } from "./contact.tsx";
 import { InquirySection } from "./inquiry.tsx";
@@ -155,6 +155,7 @@ export function ArtistPage({
 			</header>
 			<main className="page">
 				<ArtistProfile artist={artist} studio={studio} />
+				<WorkGrid artist={artist} />
 				<InquirySection
 					state={inquiry}
 					channels={channels}
