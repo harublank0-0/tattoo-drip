@@ -367,7 +367,9 @@ test.group(
 			assert.isNull(placementsOf(facts({ finish })).finish);
 		});
 
-		test("an artist's page has no money to place", ({ assert }) => {
+		test("a page without a payments card places no money control", ({
+			assert,
+		}) => {
 			const place = placementsOf(
 				facts({ payments: null, canQuote: true, quote }),
 			);
@@ -443,9 +445,7 @@ test.group("idsOnPage: each link target exists once (TAT-108)", () => {
 		assert.notInclude(idsOnPage(facts({ canQuote: true, quote })), "deposit");
 	});
 
-	test("an artist's page has no Payments card, so no #payments", ({
-		assert,
-	}) => {
+	test("a payload without a Payments card has no #payments", ({ assert }) => {
 		assert.notInclude(idsOnPage(facts({ payments: null })), "payments");
 		assert.include(idsOnPage(facts()), "payments");
 	});

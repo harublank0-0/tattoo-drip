@@ -6,6 +6,11 @@ import type User from "#models/user";
 import { chatLinks } from "#modules/clients/contact_links";
 import { expiresAtFor, todayIn } from "#modules/projects/quotes";
 import { sessionStartText, sessionTimeText } from "#modules/scheduling/times";
+import {
+	artistMoneyFixture,
+	figuresOf,
+	newFigures,
+} from "#tests/helpers/artist_money";
 import { proofFor } from "#tests/helpers/payments";
 import {
 	makeArtist,
@@ -1520,126 +1525,131 @@ test.group("Project page: queries (TAT-108)", (group) => {
 	});
 });
 
+/**
+ * Every money figure main (9ac7621) sent the assigned artist for `artistMoneyFixture()`: captured by
+ * running the same fixture against main's project page (the "dump" spec in the report). docs/
+ * requirements.md:87 gives an artist their projects' payments and balance, read-only (TAT-30), and
+ * nothing more.
+ */
+const MAIN_ARTIST_FIGURES = [
+	0, 1, 2, 4.5, 123, 555, 666, 777.3, 911.5, 1234.56, 2011.86, 2088.5, 2334,
+	2500, 2877, 3000, 10623, 12500, 12988.14, 13500, 14088.5, 15000,
+];
+
 test.group(
-	"Project page: an artist is sent no money (TAT-108 fix round)",
+	"Project page: what an artist is sent is what main sent them (TAT-108 fix round 2)",
 	(group) => {
 		group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 
-		/** Amounts nothing else on the page has (the quote is NPR 15,000 with a NPR 3,000 deposit). */
-		const LABELS = ["1,234.56", "777.30", "12,988.14", "911.50", "2,088.50"];
-		const NUMBERS = [
-			123456, 1234.56, 77730, 777.3, 1298814, 12988.14, 91150, 911.5, 208850,
-			2088.5,
-		];
+		test("the comparator names a figure the artist was never sent", ({
+			assert,
+		}) => {
+			assert.deepEqual(
+				figuresOf({ a: "Paid NPR 1,234.56 of NPR 15,000", b: 77.5 }),
+				[77.5, 1234.56, 15000],
+			);
+			assert.deepEqual(
+				newFigures({ line: "Paid NPR 999" }, MAIN_ARTIST_FIGURES),
+				[999],
+			);
+			assert.deepEqual(
+				newFigures({ line: "Paid NPR 2,011.86" }, MAIN_ARTIST_FIGURES),
+				[],
+			);
+		});
 
-		async function studioWithMoney() {
-			const { owner, tenant } = await studioWithOwner();
-			const asha = await artistIn(tenant, "asha@example.com");
-			const { paid, deposit } = await inTenant(tenant, async () => {
-				const profile = await makeArtist(tenant, "asha");
-				profile.userId = asha.id;
-				await profile.save();
-				const decided = (
-					amount: number,
-					kind: "session" | "balance" | "deposit",
-				) => ({
-					kind,
-					amount,
-					status: "verified" as const,
-					verifiedAt: DateTime.utc(),
-					verifiedByUserId: owner.id,
-				});
-				// A booked project with two payments: NPR 1,234.56 and NPR 777.30.
-				const paid = await makeProject(tenant, await makeClient(tenant), {
-					status: "booked",
-					artistId: profile.id,
-				});
-				await makeQuote(tenant, paid);
-				await makePayment(tenant, paid, decided(123_456, "session"));
-				await makePayment(tenant, paid, decided(77_730, "balance"));
-				// A project waiting for its deposit, NPR 911.50 of NPR 3,000 paid: NPR 2,088.50 due.
-				const deposit = await makeProject(tenant, await makeClient(tenant), {
-					status: "deposit_pending",
-					artistId: profile.id,
-				});
-				await makeQuote(tenant, deposit);
-				await makePayment(tenant, deposit, decided(91_150, "deposit"));
-				return { paid, deposit };
-			});
-			return { owner, asha, paid, deposit };
-		}
-
-		/** Every string and number in a serialized page. */
-		function leaves(
-			value: unknown,
-			into: { strings: string[]; numbers: number[] } = {
-				strings: [],
-				numbers: [],
-			},
-		) {
-			if (typeof value === "string") into.strings.push(value);
-			else if (typeof value === "number") into.numbers.push(value);
-			else if (value && typeof value === "object") {
-				for (const inner of Object.values(value)) leaves(inner, into);
-			}
-			return into;
-		}
-
-		test("the owner's page holds the amounts and the artist's page holds none of them", async ({
+		test("an artist's payload holds exactly the money figures main's did: nothing new, nothing lost", async ({
 			client,
 			assert,
 		}) => {
-			const { owner, asha, paid, deposit } = await studioWithMoney();
-			const found = async (user: User, id: string) => {
-				const response = await client.get(page(id)).withInertia().loginAs(user);
+			const { asha, projects } = await artistMoneyFixture();
+			const seen = new Set<number>();
+			for (const [name, project] of Object.entries(projects)) {
+				const response = await client
+					.get(page(project.id))
+					.withInertia()
+					.loginAs(asha);
 				response.assertStatus(200);
-				const everything = leaves(response.inertiaProps);
-				// The page's own flash travels with it too.
-				const text = JSON.stringify(response.inertiaProps);
-				return {
-					labels: LABELS.filter((label) => text.includes(label)),
-					numbers: NUMBERS.filter((number) =>
-						everything.numbers.includes(number),
-					),
-					props: response.inertiaProps,
-				};
-			};
+				// Anything the branch adds (the summary line, the header, the Next step's words) may only
+				// repeat a figure the artist already had.
+				assert.deepEqual(
+					newFigures(response.inertiaProps, MAIN_ARTIST_FIGURES),
+					[],
+					name,
+				);
+				for (const figure of figuresOf(response.inertiaProps)) seen.add(figure);
+			}
+			assert.deepEqual(
+				[...seen].sort((a, b) => a - b),
+				MAIN_ARTIST_FIGURES,
+			);
+		});
 
-			// Positive controls: the owner is sent them, so their absence for the artist proves something.
-			const ownerPaid = await found(owner, paid.id);
-			assert.includeMembers(ownerPaid.labels, [
-				"1,234.56",
-				"777.30",
-				"12,988.14",
-			]);
-			const ownerDeposit = await found(owner, deposit.id);
-			assert.includeMembers(ownerDeposit.labels, ["911.50", "2,088.50"]);
-
-			for (const id of [paid.id, deposit.id]) {
-				const artist = await found(asha, id);
-				assert.deepEqual(artist.labels, [], "no amount as words");
-				assert.deepEqual(artist.numbers, [], "no amount as a number");
-				assert.isNull(artist.props.payments, "no Payments card");
-				assert.isNull(artist.props.depositHeldText, "no deposit held");
-				assert.isNull(artist.props.deposit);
-				assert.isNull(artist.props.finish?.action ?? null);
+		test("the artist's money is read-only: no screenshot, no deposit link, no control", async ({
+			client,
+			assert,
+		}) => {
+			const { asha, projects } = await artistMoneyFixture();
+			for (const [name, project] of Object.entries(projects)) {
+				const props = (
+					await client.get(page(project.id)).withInertia().loginAs(asha)
+				).inertiaProps;
+				const card = props.payments;
+				assert.isNotNull(card, `${name}: the artist has the card`);
+				assert.deepEqual(card.pending, [], `${name}: no screenshot to check`);
+				assert.isNull(card.actions, `${name}: no payment or refund form`);
+				assert.isNull(card.outcome.needed, `${name}: no outcome form`);
+				for (const row of card.rows) {
+					assert.isNull(row.proofUrl, `${name}: no screenshot link`);
+					assert.isFalse(row.canReverse, `${name}: no Reverse`);
+				}
+				assert.isNull(props.deposit, `${name}: no deposit link or panel`);
+				assert.isNull(
+					props.finish?.action ?? null,
+					`${name}: no finish action`,
+				);
+				assert.notInclude(
+					JSON.stringify(props),
+					"signature=",
+					`${name}: no signed URL`,
+				);
 			}
 		});
 
-		test("the schedule hint tells an artist the deposit is due, not how much", async ({
+		test("the summary line and the ledger are the artist's too, the same as the owner's", async ({
 			client,
 			assert,
 		}) => {
-			const { owner, asha, deposit } = await studioWithMoney();
-			const hint = async (user: User) =>
-				(await client.get(page(deposit.id)).withInertia().loginAs(user))
-					.inertiaProps.scheduling.hint;
+			const { owner, asha, projects } = await artistMoneyFixture();
+			const read = async (user: User) =>
+				(await client.get(page(projects.booked.id)).withInertia().loginAs(user))
+					.inertiaProps.payments;
 
-			assert.include(await hint(owner), "NPR 2,088.50 still due");
+			const mine = await read(asha);
+			const theirs = await read(owner);
 			assert.equal(
-				await hint(asha),
-				"A tattoo session holds the date. The project is booked once the deposit is paid.",
+				mine.summary,
+				"Paid NPR 2,011.86 of NPR 15,000 · Balance NPR 12,988.14",
 			);
+			assert.equal(mine.summary, theirs.summary);
+			assert.deepEqual(mine.balance, theirs.balance);
+			assert.lengthOf(mine.rows, 2);
+		});
+
+		test("the schedule hint and the withdraw confirm name the deposit, as main's did", async ({
+			client,
+			assert,
+		}) => {
+			const { asha, projects } = await artistMoneyFixture();
+			const props = (
+				await client.get(page(projects.waiting.id)).withInertia().loginAs(asha)
+			).inertiaProps;
+
+			assert.equal(
+				props.scheduling.hint,
+				"A tattoo session holds the date. The project is booked once the deposit is paid: NPR 2,088.50 still due.",
+			);
+			assert.equal(props.depositHeldText, "NPR 911.50");
 		});
 	},
 );

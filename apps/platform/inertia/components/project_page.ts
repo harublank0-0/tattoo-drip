@@ -131,7 +131,7 @@ export type PageFacts = {
 	finish: unknown;
 	moves: readonly string[];
 	assignment: unknown;
-	/** Null for an artist: they are sent no money. */
+	/** The artist's card has no `pending`, no `actions` and no outcome: nothing money is theirs to do. */
 	payments: {
 		pending: readonly unknown[];
 		actions: {
@@ -188,8 +188,7 @@ export function placementsOf(page: PageFacts): Record<Affordance, Placement> {
 
 /**
  * The element ids the page carries, each once (`cardId` and the Next step's `anchor`): the targets
- * Today's rows, the Projects list's lines and the alert's link can name. The Payments card is the
- * owner's; an artist has none, so `#payments` is not on their page.
+ * Today's rows, the Projects list's lines and the alert's link can name.
  */
 export function idsOnPage(page: PageFacts): string[] {
 	const place = placementsOf(page);

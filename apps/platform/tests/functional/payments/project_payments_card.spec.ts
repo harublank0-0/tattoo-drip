@@ -52,7 +52,7 @@ test.group("The Payments card on the project page", (group) => {
 		]);
 	});
 
-	test("the assigned artist is sent no payments card at all: no list, no balance, no screenshots (TAT-108)", async ({
+	test("the assigned artist's card has the list and balance, no screenshots and no actions", async ({
 		client,
 		assert,
 	}) => {
@@ -79,8 +79,13 @@ test.group("The Payments card on the project page", (group) => {
 			.loginAs(asha);
 
 		response.assertStatus(200);
-		assert.isNull(response.inertiaProps.payments);
-		assert.notInclude(JSON.stringify(response.inertiaProps), "signature=");
+		const card = response.inertiaProps.payments;
+		assert.lengthOf(card.rows, 2);
+		assert.deepEqual(card.pending, []);
+		assert.isNull(card.actions);
+		assert.isNull(card.outcome.needed);
+		assert.notInclude(JSON.stringify(card), "signature=");
+		assert.equal(card.balance.state, "due");
 	});
 
 	test("the projects list flags, for owners, a screenshot to check, a deposit to settle and an expired quote", async ({

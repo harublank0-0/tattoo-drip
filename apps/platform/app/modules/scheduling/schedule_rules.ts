@@ -69,24 +69,18 @@ export function scheduledNote({
 	booked,
 	projectStatus,
 	depositDue,
-	withAmount = true,
 }: {
 	kind: SessionKind;
 	booked: boolean;
 	projectStatus: ProjectStatus;
 	depositDue: number;
-	/** False for an artist: they are sent no money (TAT-108), so the note says "due", not how much. */
-	withAmount?: boolean;
 }): string {
 	if (kind !== "tattoo") return "";
 	if (booked) return " The project is booked.";
 	if (projectStatus === "deposit_pending") {
-		if (depositDue <= 0) {
-			return " The project is booked once its deposit is settled.";
-		}
-		return withAmount
+		return depositDue > 0
 			? ` ${formatMoney(depositDue)} of the deposit is still due: the project is booked once it's paid.`
-			: " The deposit is still due: the project is booked once it's paid.";
+			: " The project is booked once its deposit is settled.";
 	}
 	if (BEFORE_ACCEPTANCE.includes(projectStatus)) {
 		return " It holds the date: the project is booked once the client accepts the quote and the deposit is settled.";
@@ -106,7 +100,6 @@ export function schedulingHint(
 	status: ProjectStatus,
 	depositDue: number,
 	hasQuote: boolean,
-	withAmount = true,
 ): string | null {
 	if (status === "healing_check") {
 		return "The healing check takes touch-up sessions only.";
@@ -118,11 +111,9 @@ export function schedulingHint(
 		if (!hasQuote) {
 			return "A tattoo session holds the date. The project is booked once its deposit is settled.";
 		}
-		if (depositDue <= 0)
-			return "Scheduling a tattoo session books the project.";
-		return withAmount
+		return depositDue > 0
 			? `A tattoo session holds the date. The project is booked once the deposit is paid: ${formatMoney(depositDue)} still due.`
-			: "A tattoo session holds the date. The project is booked once the deposit is paid.";
+			: "Scheduling a tattoo session books the project.";
 	}
 	if (status === "in_progress") {
 		return "Scheduling the next tattoo session books the project again.";

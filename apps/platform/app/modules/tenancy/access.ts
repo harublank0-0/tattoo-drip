@@ -80,8 +80,8 @@ export const TENANT_ROUTE_ROLES = {
 	// artist profile (ProjectService.findFor, re-checked under the row lock
 	// by lockFor); booking and scheduling only themselves
 	// (BookingService.bookableArtists, SessionService.scheduleFor); on the
-	// page, no money at all (TAT-108: the controller builds no paymentsCard
-	// for them and words no amount in their schedule hint or flash).
+	// page, the balance and the payments but never a screenshot
+	// (paymentsCard).
 	"tenant.projects.create": MEMBERS,
 	"tenant.projects.store": MEMBERS,
 	"tenant.projects.index": MEMBERS,

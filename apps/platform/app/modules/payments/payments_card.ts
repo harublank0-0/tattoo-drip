@@ -96,6 +96,7 @@ export type PaymentsCardProps = {
 export type PaymentsCardInput = {
 	money: ProjectMoney;
 	status: ProjectStatus;
+	isOwner: boolean;
 	timezone: string;
 	/** Who decided or recorded, by user id (PaymentService.memberNames). */
 	names: Map<string, string>;
@@ -118,15 +119,15 @@ const KIND_WORDS: Record<PaymentKind, string> = {
 const MAX_PREFILL = 1_000_000_000n;
 
 /**
- * The project page's Payments card (TAT-66), from the project's money: the
- * screenshots to check, the signed screenshot links, the Reverse buttons,
- * the forms' limits and the outcome form. It is the owners' card: an artist
- * is sent no money at all (TAT-108), so the controller never builds it for
- * them. Dates are the studio's.
+ * The project page's Payments card (TAT-66), from the project's money.
+ * Owners get the screenshots to check, the signed screenshot links, the
+ * Reverse buttons, the forms' limits and the outcome form; an artist on
+ * the project gets the balance and the list only. Dates are the studio's.
  */
 export function paymentsCard({
 	money,
 	status,
+	isOwner,
 	timezone,
 	names,
 	proofUrls,
@@ -164,34 +165,37 @@ export function paymentsCard({
 					? `Reversed ${day(reversal.createdAt)}`
 					: null,
 			proofUrl:
-				payment.status !== "submitted"
+				isOwner && payment.status !== "submitted"
 					? (proofUrls.get(payment.id) ?? null)
 					: null,
 			canReverse:
+				isOwner &&
 				payment.status === "verified" &&
 				payment.kind !== "correction" &&
 				reversal === undefined,
 		};
 	});
 
-	const pending = money.payments
-		.filter(({ status: state }) => state === "submitted")
-		.map(
-			(payment): PendingProofProps => ({
-				paymentId: payment.id,
-				imageUrl: proofUrls.get(payment.id) ?? null,
-				width: payment.proofImageWidth,
-				height: payment.proofImageHeight,
-				expectedText: formatMoney(payment.amount),
-				referenceCode,
-				method: payment.method,
-				sentText: `${day(payment.createdAt)}, ${payment.createdAt.setZone(timezone).toFormat("HH:mm")}`,
-				dueNowText:
-					payment.kind === "deposit" && money.depositDue !== payment.amount
-						? formatMoney(money.depositDue)
-						: null,
-			}),
-		);
+	const pending = isOwner
+		? money.payments
+				.filter(({ status: state }) => state === "submitted")
+				.map(
+					(payment): PendingProofProps => ({
+						paymentId: payment.id,
+						imageUrl: proofUrls.get(payment.id) ?? null,
+						width: payment.proofImageWidth,
+						height: payment.proofImageHeight,
+						expectedText: formatMoney(payment.amount),
+						referenceCode,
+						method: payment.method,
+						sentText: `${day(payment.createdAt)}, ${payment.createdAt.setZone(timezone).toFormat("HH:mm")}`,
+						dueNowText:
+							payment.kind === "deposit" && money.depositDue !== payment.amount
+								? formatMoney(money.depositDue)
+								: null,
+					}),
+				)
+		: [];
 
 	const closed = CLOSED_FOR_OUTCOME.includes(status);
 	const due = balance.due;
@@ -254,31 +258,34 @@ export function paymentsCard({
 				: null,
 		rows,
 		pending,
-		actions: {
-			recordKinds:
-				status === "declined"
-					? []
-					: status === "deposit_pending"
-						? ["deposit", "session", "balance"]
-						: ["session", "balance"],
-			depositDue:
-				status === "deposit_pending" && money.depositDue > 0
-					? money.depositDue / 100
-					: null,
-			balanceDue:
-				due !== null && due > 0n && due <= MAX_PREFILL
-					? Number(due) / 100
-					: null,
-			refundMax: refundable ? Number(balance.paid) / 100 : null,
-			refundMaxText: refundable ? formatMoney(balance.paid) : null,
-		},
+		actions: isOwner
+			? {
+					recordKinds:
+						status === "declined"
+							? []
+							: status === "deposit_pending"
+								? ["deposit", "session", "balance"]
+								: ["session", "balance"],
+					depositDue:
+						status === "deposit_pending" && money.depositDue > 0
+							? money.depositDue / 100
+							: null,
+					balanceDue:
+						due !== null && due > 0n && due <= MAX_PREFILL
+							? Number(due) / 100
+							: null,
+					refundMax: refundable ? Number(balance.paid) / 100 : null,
+					refundMaxText: refundable ? formatMoney(balance.paid) : null,
+				}
+			: null,
 		outcome: {
-			needed: money.outcomeNeeded
-				? {
-						held: money.depositSettleable / 100,
-						heldText: formatMoney(money.depositSettleable),
-					}
-				: null,
+			needed:
+				isOwner && money.outcomeNeeded
+					? {
+							held: money.depositSettleable / 100,
+							heldText: formatMoney(money.depositSettleable),
+						}
+					: null,
 			recorded: money.outcome
 				? {
 						text: outcomeText(money.outcome, byId),

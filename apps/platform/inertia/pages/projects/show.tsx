@@ -113,9 +113,7 @@ export default function ProjectShow(props: ProjectPageProps) {
 						)}
 					</div>
 					<ProgressLine status={project.status} />
-					{payments && (
-						<p className="text-sm font-medium lg:hidden">{payments.summary}</p>
-					)}
+					<p className="text-sm font-medium lg:hidden">{payments.summary}</p>
 				</div>
 			}
 		>
@@ -177,16 +175,14 @@ export default function ProjectShow(props: ProjectPageProps) {
 				{/* From lg the right column stays in view while the left scrolls, and
 				    scrolls inside itself when an opened ledger is taller than the screen. */}
 				<div className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-6 lg:-m-1 lg:col-span-5 lg:max-h-[calc(100dvh-3rem)] lg:self-start lg:overflow-y-auto lg:p-1">
-					{payments && (
-						<PaymentsCard
-							projectId={project.id}
-							payments={payments}
-							canSetPrice={canSetPrice}
-							place={place}
-							nextStep={nextStep}
-							sheets={sheets}
-						/>
-					)}
+					<PaymentsCard
+						projectId={project.id}
+						payments={payments}
+						canSetPrice={canSetPrice}
+						place={place}
+						nextStep={nextStep}
+						sheets={sheets}
+					/>
 
 					{deposit && place.deposit_link === "card" && (
 						<DepositCard
@@ -233,13 +229,13 @@ export default function ProjectShow(props: ProjectPageProps) {
 			<RecordPaymentPanel
 				sheet={sheets.record}
 				projectId={project.id}
-				actions={payments?.actions ?? null}
+				actions={payments.actions}
 				fallback={heading}
 			/>
 			<RefundPanel
 				sheet={sheets.refund}
 				projectId={project.id}
-				maxText={payments?.actions?.refundMaxText ?? null}
+				maxText={payments.actions?.refundMaxText ?? null}
 				fallback={heading}
 			/>
 			<SchedulePanel

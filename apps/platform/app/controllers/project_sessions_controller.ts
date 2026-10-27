@@ -207,7 +207,7 @@ export default class ProjectSessionsController {
 			: 0;
 		ctx.session.flash(
 			"success",
-			`Session scheduled: ${sessionTimeText(session.startsAt, session.endsAt, tenant.timezone)}.${scheduledNote({ kind: session.kind, booked, projectStatus, depositDue, withAmount: membership.role === "owner" })}`,
+			`Session scheduled: ${sessionTimeText(session.startsAt, session.endsAt, tenant.timezone)}.${scheduledNote({ kind: session.kind, booked, projectStatus, depositDue })}`,
 		);
 		return backTo(ctx, tenant, project.id);
 	}

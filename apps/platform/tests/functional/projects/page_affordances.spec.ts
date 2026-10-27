@@ -66,6 +66,25 @@ function oldPageOffered(props: Props): string[] {
 /** Offered by the old page, deliberately not by the new one: the plan names it (row 15 before 16). */
 const DROPPED_ON_PURPOSE = ["finish"];
 
+/**
+ * What an artist's Payments card is: the balance and the ledger, read-only (docs/requirements.md:87,
+ * TAT-30). No screenshot to check, no image, no Reverse, no form, no outcome.
+ */
+function readOnly(card: Props, label: string) {
+	if (!card)
+		throw new Error(`${label}: an artist gets the payments card, read-only`);
+	if (card.pending.length !== 0)
+		throw new Error(`${label}: no screenshot to check`);
+	if (card.actions !== null)
+		throw new Error(`${label}: no payment or refund form`);
+	if (card.outcome.needed !== null)
+		throw new Error(`${label}: no outcome form`);
+	for (const row of card.rows) {
+		if (row.proofUrl !== null) throw new Error(`${label}: no screenshot link`);
+		if (row.canReverse) throw new Error(`${label}: no Reverse`);
+	}
+}
+
 type Studio = Awaited<ReturnType<typeof studio>>;
 async function studio() {
 	const { owner, tenant } = await studioWithOwner();
@@ -489,10 +508,7 @@ test.group(
 				const project = await build(s, row);
 				const props = await read(client, s.asha, project.id);
 				const place = placementsOf(props);
-				assert.isNull(
-					props.payments,
-					`${row.name}: an artist is sent no payments`,
-				);
+				readOnly(props.payments, row.name);
 				for (const name of oldPageOffered(props)) {
 					if (place[name] === null) {
 						assert.include(DROPPED_ON_PURPOSE, name, `${row.name}: ${name}`);
@@ -565,7 +581,7 @@ test.group(
 			});
 		}
 
-		test("a closed project has a read-only artist: no money, no change", async ({
+		test("a closed project has a read-only artist: the card to read, no money control, no change", async ({
 			client,
 			assert,
 		}) => {
@@ -578,7 +594,7 @@ test.group(
 				const offered = Object.entries(placementsOf(props)).filter(
 					([, where]) => where !== null,
 				);
-				assert.isNull(props.payments, name);
+				readOnly(props.payments, name);
 				// Set price is the one control an artist keeps on a completed project booked without one.
 				assert.deepEqual(
 					offered.map(([affordance]) => affordance),

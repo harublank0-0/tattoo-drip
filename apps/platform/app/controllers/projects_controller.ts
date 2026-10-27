@@ -278,13 +278,9 @@ export default class ProjectsController {
 		const scheduled = sessions.filter(({ status }) => status === "scheduled");
 		const versions = await this.quotes.history(tenant, project);
 		const current = versions.at(0) ?? null;
-		// An artist is sent no money (TAT-108): no payments, no balance, no deposit held, no amounts
-		// in the schedule hint. Money is the owners' (the TAT-30 table in docs/ui.md).
-		const isOwner = membership.role === "owner";
-		const held =
-			isOwner && current
-				? await this.deposits.verifiedPaid(tenant, project, current.currency)
-				: 0;
+		const held = current
+			? await this.deposits.verifiedPaid(tenant, project, current.currency)
+			: 0;
 		const live = current && !isExpired(current) ? current : null;
 		const { timezone } = tenant;
 		// The studio's own chat texts, else the defaults (TAT-52).
@@ -329,13 +325,12 @@ export default class ProjectsController {
 				}
 			: null;
 
-		// The Payments card (TAT-66), the owners' only. Screenshot URLs are signed
-		// after the tenant-scoped project and payment reads.
-		const money = isOwner
-			? await this.payments.forProject(tenant, project)
-			: null;
+		// The Payments card (TAT-66). Screenshot URLs are signed for owners
+		// only, after the tenant-scoped project and payment reads.
+		const money = await this.payments.forProject(tenant, project);
+		const isOwner = membership.role === "owner";
 		const proofUrls = new Map<string, string>();
-		if (money) {
+		if (isOwner) {
 			for (const payment of money.payments) {
 				if (payment.proofImageKey) {
 					proofUrls.set(
@@ -349,12 +344,10 @@ export default class ProjectsController {
 				}
 			}
 		}
-		const names = money
-			? await this.payments.memberNames([
-					...money.payments.map(({ verifiedByUserId }) => verifiedByUserId),
-					money.outcome?.recordedByUserId ?? null,
-				])
-			: new Map<string, string>();
+		const names = await this.payments.memberNames([
+			...money.payments.map(({ verifiedByUserId }) => verifiedByUserId),
+			money.outcome?.recordedByUserId ?? null,
+		]);
 		const depositLink = isOwner
 			? await this.depositLinks.forProject(tenant, project)
 			: null;
@@ -409,7 +402,7 @@ export default class ProjectsController {
 		// offers no artist change and no "Mark contacted".
 		const step = finishStepFor(project.status);
 		const dueOn = healingCheckDueOn(sessions, timezone);
-		const owing = money ? owed(money.balance.due) : 0n;
+		const owing = owed(money.balance.due);
 		const closed = CLOSED_STATUSES.includes(project.status);
 
 		// Everything the cards draw, gathered once: the render below sends it and
@@ -443,7 +436,7 @@ export default class ProjectsController {
 						step,
 						dueText: dueOn ? formatDay(dueOn) : null,
 						overdue: step === "complete" && dueOn !== null && todayText > dueOn,
-						action: money
+						action: isOwner
 							? {
 									confirmedDue: String(owing),
 									balanceDueText: owing > 0n ? formatMoney(owing) : null,
@@ -489,12 +482,7 @@ export default class ProjectsController {
 						artistId: defaultArtistId,
 						artistFixed: membership.role !== "owner",
 						kinds: [...schedulableKinds(project.status)],
-						hint: schedulingHint(
-							project.status,
-							depositDue,
-							current !== null,
-							isOwner,
-						),
+						hint: schedulingHint(project.status, depositDue, current !== null),
 					}
 				: null;
 		// Owners only, while the project waits for its deposit (TAT-65).
@@ -502,16 +490,15 @@ export default class ProjectsController {
 			membership.role === "owner" && project.status === "deposit_pending"
 				? await this.depositPanel(tenant, project, client, texts.deposit_link)
 				: null;
-		const paymentsProps = money
-			? paymentsCard({
-					money,
-					status: project.status,
-					timezone,
-					names,
-					proofUrls,
-					referenceCode: depositLink?.referenceCode ?? null,
-				})
-			: null;
+		const paymentsProps = paymentsCard({
+			money,
+			status: project.status,
+			isOwner,
+			timezone,
+			names,
+			proofUrls,
+			referenceCode: depositLink?.referenceCode ?? null,
+		});
 
 		// The Next step card (TAT-108): what waits on this project is
 		// WaitingService's answer, the one Today and the Projects list use, so the
@@ -534,25 +521,25 @@ export default class ProjectsController {
 		// What the Projects list's money line says (PaymentService.listFlags): a
 		// finished project's fixed price still owed, owners only.
 		const balanceOwedText =
-			money &&
+			isOwner &&
 			FINISHED_STATUSES.includes(project.status) &&
 			money.quote?.kind === "fixed" &&
 			owing > 0n
 				? formatMoney(owing)
 				: null;
 		const can: Record<NextStepAction, boolean> = {
-			verify_proof: (paymentsProps?.pending.length ?? 0) > 0,
+			verify_proof: paymentsProps.pending.length > 0,
 			issue_quote: canQuote && current === null,
 			send_quote: quoteChat !== null,
 			client_accepted: canAccept,
 			revise_quote: canQuote && current !== null,
 			resume: moves.includes("resume"),
 			deposit_link: depositProps !== null,
-			record_payment: (paymentsProps?.actions?.recordKinds.length ?? 0) > 0,
+			record_payment: (paymentsProps.actions?.recordKinds.length ?? 0) > 0,
 			schedule: schedulingProps !== null,
 			open_sessions: started !== undefined,
 			finish: finishProps !== null,
-			record_outcome: (paymentsProps?.outcome.needed ?? null) !== null,
+			record_outcome: paymentsProps.outcome.needed !== null,
 		};
 		const nextStep = nextStepOf({
 			status: project.status,

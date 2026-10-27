@@ -145,41 +145,6 @@ test.group("scheduledNote", () => {
 	});
 });
 
-// TAT-108 fix round: an artist is sent no money, so their hint and their flash name no amount.
-test.group("schedule messages without an amount", () => {
-	test("the hint and the note say the deposit is due, not how much", ({
-		assert,
-	}) => {
-		assert.equal(
-			schedulingHint("deposit_pending", 100_000, true, false),
-			"A tattoo session holds the date. The project is booked once the deposit is paid.",
-		);
-		assert.equal(
-			scheduledNote({
-				kind: "tattoo",
-				booked: false,
-				projectStatus: "deposit_pending",
-				depositDue: 100_000,
-				withAmount: false,
-			}),
-			" The deposit is still due: the project is booked once it's paid.",
-		);
-	});
-
-	test("an owner still gets the amount, and a settled deposit needs none", ({
-		assert,
-	}) => {
-		assert.include(
-			schedulingHint("deposit_pending", 100_000, true),
-			"NPR 1,000",
-		);
-		assert.equal(
-			schedulingHint("deposit_pending", 0, true, false),
-			"Scheduling a tattoo session books the project.",
-		);
-	});
-});
-
 test.group("schedulingHint", () => {
 	test("says what a tattoo session will do to the project", ({ assert }) => {
 		for (const status of BEFORE_ACCEPTANCE) {
