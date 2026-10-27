@@ -1,6 +1,8 @@
 import vine, { SimpleMessagesProvider } from "@vinejs/vine";
 import type { FieldContext } from "@vinejs/vine/types";
 import { IANAZone } from "luxon";
+import { IMAGE_FORMAT_MESSAGE } from "#modules/media/errors";
+import { imageFile } from "#modules/media/validators/image_file";
 import { TENANT_TYPES } from "#modules/tenancy/models/tenant";
 import { checkSlug } from "#modules/tenancy/slugs";
 import { phoneNumber } from "#validators/phone";
@@ -186,4 +188,17 @@ updateDepositSettingsValidator.messagesProvider = new SimpleMessagesProvider({
 	"defaultDepositPercent.number": DEPOSIT_PERCENT_MESSAGE,
 	"defaultDepositPercent.withoutDecimals": DEPOSIT_PERCENT_MESSAGE,
 	"defaultDepositPercent.range": DEPOSIT_PERCENT_MESSAGE,
+});
+
+/**
+ * The studio's cover photo (TAT-116). The image is only filtered here (size,
+ * extension): ImageService checks what it really is.
+ */
+export const coverValidator = vine.create({ cover: imageFile() });
+
+coverValidator.messagesProvider = new SimpleMessagesProvider({
+	"cover.required": "Choose a photo to upload.",
+	"cover.file": IMAGE_FORMAT_MESSAGE,
+	"cover.file.extname": IMAGE_FORMAT_MESSAGE,
+	"cover.file.size": "Use an image of 10 MB or less.",
 });

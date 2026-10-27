@@ -39,6 +39,10 @@ export interface ApiDefinition {
       slug: {
         update: typeof routes['tenant.settings.slug.update']
       }
+      cover: {
+        update: typeof routes['tenant.settings.cover.update']
+        destroy: typeof routes['tenant.settings.cover.destroy']
+      }
       payments: typeof routes['tenant.settings.payments'] & {
         create: typeof routes['tenant.settings.payments.create']
         store: typeof routes['tenant.settings.payments.store']
@@ -72,6 +76,12 @@ export interface ApiDefinition {
       edit: typeof routes['tenant.artists.edit']
       update: typeof routes['tenant.artists.update']
       destroy: typeof routes['tenant.artists.destroy']
+      photos: {
+        store: typeof routes['tenant.artists.photos.store']
+        update: typeof routes['tenant.artists.photos.update']
+        move: typeof routes['tenant.artists.photos.move']
+        destroy: typeof routes['tenant.artists.photos.destroy']
+      }
     }
     inbox: {
       index: typeof routes['tenant.inbox.index']

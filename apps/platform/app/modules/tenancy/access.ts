@@ -34,6 +34,9 @@ export const TENANT_ROUTE_ROLES = {
 	"tenant.settings.profile": OWNERS,
 	"tenant.settings.profile.update": OWNERS,
 	"tenant.settings.slug.update": OWNERS,
+	// The studio's cover photo (TAT-116).
+	"tenant.settings.cover.update": OWNERS,
+	"tenant.settings.cover.destroy": OWNERS,
 	"tenant.settings.payments": OWNERS,
 	"tenant.settings.deposits.update": OWNERS,
 	"tenant.settings.payments.create": OWNERS,
@@ -61,6 +64,13 @@ export const TENANT_ROUTE_ROLES = {
 	"tenant.artists.edit": MEMBERS,
 	"tenant.artists.update": MEMBERS,
 	"tenant.artists.destroy": OWNERS,
+	// An artist's work photos (TAT-116): an owner changes any live artist's,
+	// an artist only their own linked profile's
+	// (WorkPhotoService.findEditable, re-checked under the artist's row lock).
+	"tenant.artists.photos.store": MEMBERS,
+	"tenant.artists.photos.update": MEMBERS,
+	"tenant.artists.photos.move": MEMBERS,
+	"tenant.artists.photos.destroy": MEMBERS,
 
 	// The inquiry inbox: reference images stay private to owners until a
 	// project is assigned.

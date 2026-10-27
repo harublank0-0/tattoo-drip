@@ -31,7 +31,9 @@ export const controllers = {
   PublicStudio: () => import('#controllers/public_studio_controller'),
   Quotes: () => import('#controllers/quotes_controller'),
   Session: () => import('#controllers/session_controller'),
+  StudioCover: () => import('#controllers/studio_cover_controller'),
   StudioProfile: () => import('#controllers/studio_profile_controller'),
   StudioSlug: () => import('#controllers/studio_slug_controller'),
   Today: () => import('#controllers/today_controller'),
+  WorkPhotos: () => import('#controllers/work_photos_controller'),
 }
