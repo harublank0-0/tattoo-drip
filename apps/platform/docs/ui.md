@@ -37,7 +37,7 @@ Read before changing dashboard components, forms, styling or SSR. Dashboard UI l
 Check every page against these:
 
 - Open-ended lists are paginated (25 per page); a view bounded by a range (the calendar's day or week) lists the whole range instead. Props carry only what the screen shows.
-- Images in lists and grids are lazy-loaded thumbnails, never the full-size file. Reference grids use `thumbnailUrl` and artist photos `photoUrl`, both the 320 px copy (`ImageService.urlFor` with `THUMBNAIL_WIDTH`, TAT-112); the link opens the full image.
+- Images in lists and grids are lazy-loaded thumbnails, never the full-size file. Reference grids use `thumbnailUrl` and artist photos `photoUrl`, both the 320 px copy (`ImageService.urlFor` with `THUMBNAIL_WIDTH`, TAT-112); the link opens the full image. It is one fixed copy, with no `srcset`: soft on a 3x screen, accepted for a thumbnail.
 - Forms disable their button and say "Saving…" while a request is in flight.
 - Optimistic UI only for reversible single-field changes (notes, "Mark contacted"); never for money, quotes, status moves, or accepting and declining.
 - Touch targets are at least 44px below `lg` (see Tap targets under Components), and nothing is wider than 375px.
