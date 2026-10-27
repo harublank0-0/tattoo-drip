@@ -4,6 +4,7 @@ import { describe, test } from "node:test";
 import {
 	coverSizes,
 	type LogoSlot,
+	largeSource,
 	logoSizes,
 	profilePhotoSizes,
 	readSrcSet,
@@ -556,5 +557,61 @@ describe("sizes follow the box each image is drawn in (TAT-112)", () => {
 			siteBar: { maxRem: 6, heightRem: 2 },
 			deposit: { maxRem: 8, heightRem: 2.75 },
 		});
+	});
+});
+
+describe("largeSource: what the photo viewer shows (TAT-116)", () => {
+	const image = (width: number, srcSet?: string) => ({
+		src: "https://api.example.com/w.jpg",
+		width,
+		...(srcSet ? { srcSet } : {}),
+	});
+	const SET =
+		"https://api.example.com/w.320w.jpg 320w, https://api.example.com/w.640w.jpg 640w, https://api.example.com/w.1280w.jpg 1280w, https://api.example.com/w.jpg 2048w";
+
+	test("a 2048 px photo shows its 1280 px copy", () => {
+		assert.equal(
+			largeSource(image(2048, SET)),
+			"https://api.example.com/w.1280w.jpg",
+		);
+	});
+
+	test("a photo 1280 px wide or narrower shows the photo itself", () => {
+		assert.equal(
+			largeSource(image(1280, SET)),
+			"https://api.example.com/w.jpg",
+		);
+		assert.equal(
+			largeSource(
+				image(
+					600,
+					"https://api.example.com/w.320w.jpg 320w, https://api.example.com/w.jpg 600w",
+				),
+			),
+			"https://api.example.com/w.jpg",
+		);
+	});
+
+	test("a photo with no copies shows the photo", () => {
+		assert.equal(largeSource(image(2048)), "https://api.example.com/w.jpg");
+	});
+
+	test("with only small copies the widest one up to 1280 px is the pick", () => {
+		assert.equal(
+			largeSource(
+				image(
+					2048,
+					"https://api.example.com/w.320w.jpg 320w, https://api.example.com/w.640w.jpg 640w, https://api.example.com/w.jpg 2048w",
+				),
+			),
+			"https://api.example.com/w.640w.jpg",
+		);
+	});
+
+	test("a maximum of its own picks accordingly", () => {
+		assert.equal(
+			largeSource(image(2048, SET), 700),
+			"https://api.example.com/w.640w.jpg",
+		);
 	});
 });

@@ -1,4 +1,6 @@
 import type { Artist, Studio } from "@tattoo-drip/sdk";
+import { fill } from "../intake/template.ts";
+import { studioCopy } from "./copy.ts";
 import {
 	isEmail,
 	isPhone,
@@ -11,8 +13,9 @@ import {
 	viberLink,
 	whatsappLink,
 } from "./links.ts";
-import { readSrcSet } from "./srcset.ts";
+import { largeSource, readSrcSet } from "./srcset.ts";
 import { cleanLine, cleanText, locationLine } from "./text.ts";
+import { type BrandImage, readBrandImage } from "./theme/config.ts";
 
 /**
  * What the studio page shows (TAT-48), built from TAT-44's allow-list only.
@@ -70,6 +73,25 @@ export interface ArtistPhoto {
 	readonly srcSet?: string;
 }
 
+/** The most work photos an artist shows (the contract's maxItems). */
+export const MAX_WORK_PHOTOS = 6;
+/** The longest description kept, in characters; a longer one is no description. */
+const MAX_WORK_ALT = 200;
+
+/** One photo of an artist's work (TAT-116), checked: see workPhotoViews. */
+export interface WorkPhotoView extends BrandImage {
+	/** The studio's description, else "Tattoo by {name}, photo {n} of {count}". */
+	readonly alt: string;
+	/** The studio's description for the viewer, or null. */
+	readonly caption: string | null;
+	/** What the viewer shows (largeSource). */
+	readonly largeSrc: string;
+	/** The viewer's `<dialog>` id. */
+	readonly dialogId: string;
+	/** "Photo {n} of {count}". */
+	readonly label: string;
+}
+
 export interface ArtistView {
 	readonly id: string;
 	readonly slug: string;
@@ -81,6 +103,8 @@ export interface ArtistView {
 	readonly closedMessage: string | null;
 	readonly pageHref: string;
 	readonly inquiryHref: string;
+	/** Up to six photos of the artist's work, in the studio's order (TAT-116). */
+	readonly workPhotos: readonly WorkPhotoView[];
 }
 
 const TYPE_LABELS: Record<Studio["type"], string> = {
@@ -173,11 +197,18 @@ export function studioViewModel(studio: Studio): StudioView {
 	};
 }
 
-/** The visible artists as the page shows them; one whose slug can't be a link is left out. */
-export function artistViewModels(artists: readonly Artist[]): ArtistView[] {
+/**
+ * The visible artists as the page shows them; one whose slug can't be a link
+ * is left out. `imageOrigin` is the API's origin, the only one a work photo
+ * may come from (TAT-116); null accepts none.
+ */
+export function artistViewModels(
+	artists: readonly Artist[],
+	imageOrigin: string | null = null,
+): ArtistView[] {
 	return artists
 		.filter((artist) => ARTIST_SLUG.test(artist.slug))
-		.map(artistViewModel);
+		.map((artist) => artistViewModel(artist, imageOrigin));
 }
 
 /** The artist with exactly this slug, or null. */
@@ -189,7 +220,10 @@ export function findArtist(
 	return artists.find((artist) => artist.slug === slug) ?? null;
 }
 
-function artistViewModel(artist: Artist): ArtistView {
+function artistViewModel(
+	artist: Artist,
+	imageOrigin: string | null,
+): ArtistView {
 	const name = cleanLine(artist.name) ?? artist.slug;
 	const accepting = artist.acceptingInquiries === true;
 	return {
@@ -202,7 +236,51 @@ function artistViewModel(artist: Artist): ArtistView {
 		closedMessage: accepting ? null : cleanText(artist.closedMessage),
 		pageHref: `/artists/${artist.slug}`,
 		inquiryHref: `/artists/${artist.slug}#inquiry`,
+		workPhotos: workPhotoViews(
+			(artist as { readonly workPhotos?: unknown }).workPhotos,
+			name,
+			imageOrigin,
+		),
 	};
+}
+
+/**
+ * An artist's work photos from the API's `workPhotos` (TAT-116): at most six,
+ * each passing the brand images' rule (readBrandImage: the API's origin only,
+ * sides from 1 to 10000, copies on the same origin), the rest dropped and the
+ * others renumbered. Anything but a list (an older API sends none) is []. The
+ * description is plain text on one line, up to 200 characters, else
+ * "Tattoo by {name}, photo {n} of {count}"; the viewer shows the widest copy
+ * up to 1280 px. Pure.
+ */
+export function workPhotoViews(
+	value: unknown,
+	name: string,
+	imageOrigin: string | null,
+): WorkPhotoView[] {
+	if (!Array.isArray(value)) return [];
+	const kept = value.slice(0, MAX_WORK_PHOTOS).flatMap((item) => {
+		const image = readBrandImage(item, imageOrigin);
+		return image ? [{ item, image }] : [];
+	});
+	return kept.map(({ item, image }, index) => {
+		const raw =
+			typeof item === "object" && item !== null && Object.hasOwn(item, "alt")
+				? (item as { alt: unknown }).alt
+				: null;
+		const line = typeof raw === "string" ? cleanLine(raw) : null;
+		const caption =
+			line && Array.from(line).length <= MAX_WORK_ALT ? line : null;
+		const values = { name, n: index + 1, count: kept.length };
+		return {
+			...image,
+			alt: caption ?? fill(studioCopy.work.fallbackAlt, values),
+			caption,
+			largeSrc: largeSource(image),
+			dialogId: `work-photo-${index + 1}`,
+			label: fill(studioCopy.work.photoOf, values),
+		};
+	});
 }
 
 function photoView(photo: Artist["photo"], name: string): ArtistPhoto | null {

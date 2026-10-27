@@ -68,6 +68,32 @@ export function readSrcSet(
 	return [...candidates, `${src} ${width}w`].join(", ");
 }
 
+/** The widest copy the photo viewer shows (TAT-116). */
+export const LARGE_WIDTH = 1280;
+
+/**
+ * What the photo viewer shows (TAT-116): the widest copy up to `max` px in the
+ * image's checked `srcSet` (readSrcSet's string), else the image itself, which
+ * is what an image no wider than `max`, or without copies, shows. Pure.
+ */
+export function largeSource(
+	image: {
+		readonly src: string;
+		readonly width: number;
+		readonly srcSet?: string;
+	},
+	max = LARGE_WIDTH,
+): string {
+	if (image.width <= max || !image.srcSet) return image.src;
+	let best: { url: string; width: number } | null = null;
+	for (const candidate of image.srcSet.split(", ")) {
+		const [url, descriptor] = candidate.split(" ");
+		const width = Number.parseInt(descriptor, 10);
+		if (width <= max && (!best || width > best.width)) best = { url, width };
+	}
+	return best?.url ?? image.src;
+}
+
 /** What `sizes` needs of an image: its stored size (the page's own width and height). */
 export interface ImageSize {
 	readonly width: number;

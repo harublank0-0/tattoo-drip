@@ -84,3 +84,30 @@ export const HOSTILE = {
 	},
 	sections: "artists;inquiry",
 };
+
+/**
+ * The studio's cover as the API sends it in `Studio.cover` (TAT-116): always
+ * without a description, with copies 640, 960 and 1280 px wide.
+ */
+export const API_COVER = {
+	url: "https://api.example.com/uploads/tenants/t/studio_cover/cover.jpg",
+	width: 2048,
+	height: 1536,
+	alt: null,
+	variants: [640, 960, 1280].map((width) => ({
+		url: `https://api.example.com/uploads/tenants/t/studio_cover/cover.${width}w.jpg`,
+		width,
+	})),
+};
+
+/** The srcset the page builds from API_COVER. */
+export const API_COVER_SRCSET = [
+	...API_COVER.variants.map(({ url, width }) => `${url} ${width}w`),
+	`${API_COVER.url} ${API_COVER.width}w`,
+].join(", ");
+
+/** A studio with a cover, the way the API sends one. */
+export const withCover = (
+	studio: Studio = STUDIO,
+	cover: unknown = API_COVER,
+) => ({ ...studio, cover }) as Studio;
