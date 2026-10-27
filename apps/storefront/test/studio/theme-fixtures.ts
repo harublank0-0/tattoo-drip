@@ -87,14 +87,14 @@ export const HOSTILE = {
 
 /**
  * The studio's cover as the API sends it in `Studio.cover` (TAT-116): always
- * without a description, with copies 640, 960 and 1280 px wide.
+ * without a description, with copies 640, 960, 1280 and 1600 px wide.
  */
 export const API_COVER = {
 	url: "https://api.example.com/uploads/tenants/t/studio_cover/cover.jpg",
 	width: 2048,
 	height: 1536,
 	alt: null,
-	variants: [640, 960, 1280].map((width) => ({
+	variants: [640, 960, 1280, 1600].map((width) => ({
 		url: `https://api.example.com/uploads/tenants/t/studio_cover/cover.${width}w.jpg`,
 		width,
 	})),

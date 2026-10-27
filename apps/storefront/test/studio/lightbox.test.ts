@@ -43,10 +43,11 @@ describe("the photo viewer is the browser's dialog (TAT-116)", () => {
 		assert.deepEqual(callers, ["studio/lightbox.ts"]);
 	});
 
-	test("showPhoto opens a closed dialog by id and nothing else", () => {
+	test("showPhoto opens a closed dialog by id, guards a browser without <dialog>, and touches nothing else", () => {
 		const text = read("studio/lightbox.ts");
 		assert.match(text, /export function showPhoto\(id: string\): void/);
 		assert.match(text, /document\.getElementById\(id\)/);
+		assert.match(text, /typeof HTMLDialogElement/);
 		assert.match(text, /instanceof HTMLDialogElement/);
 		assert.match(text, /!dialog\.open/);
 		assert.equal((text.match(/document\./g) ?? []).length, 1);
@@ -99,6 +100,9 @@ describe("the photo viewer is the browser's dialog (TAT-116)", () => {
 		// Only the open dialog sets `display`, or a closed one would show.
 		assert.doesNotMatch(dialog, /(?:^|[;\s])display\s*:/);
 		assert.match(rule(css, ".work-dialog[open]"), /display:\s*grid/);
+		// Where <dialog> is unknown the element is an inline unknown element
+		// and would show every large photo: hide it unless it is open.
+		assert.match(rule(css, ".work-dialog:not([open])"), /display:\s*none/);
 	});
 
 	test("Close is a 48 px control and the large photo fits the screen", () => {

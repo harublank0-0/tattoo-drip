@@ -344,8 +344,8 @@ interface Box {
 	fit: "cover" | "contain";
 }
 
-/** The copies a cover has (TAT-116): 640, 960 and 1280 px. */
-const COVER_COPIES = [640, 960, 1280];
+/** The copies a cover has (TAT-116): 640, 960, 1280 and 1600 px. */
+const COVER_COPIES = [640, 960, 1280, 1600];
 
 /** The candidate widths the page gives the browser: the copies below the image, then the image. */
 const candidatesOf = (image: Size, copies: number[] = COPIES) => [

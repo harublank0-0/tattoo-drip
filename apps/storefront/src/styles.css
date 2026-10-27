@@ -210,6 +210,7 @@
   .work-open { display: block; inline-size: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
   .work-photo { display: block; inline-size: 100%; block-size: auto; aspect-ratio: 1; object-fit: cover; background: var(--stencil-wash); }
   .work-dialog { inline-size: 100%; max-inline-size: 100%; block-size: 100%; max-block-size: 100%; margin: 0; padding: 1rem; border: 0; background: var(--paper); color: var(--ink); overflow: auto; overscroll-behavior: contain; }
+  .work-dialog:not([open]) { display: none; }
   .work-dialog[open] { display: grid; align-content: start; justify-items: center; gap: 1rem; }
   .work-dialog::backdrop { background: var(--paper); }
   .work-dialog-bar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; inline-size: 100%; max-inline-size: 64rem; }
