@@ -26,14 +26,15 @@ type Flash =
 	| undefined;
 type Sheet = { open: boolean; saving: boolean; message: string | null };
 type SheetEvent =
-	| { type: "open" | "dismiss" | "start" | "finished" }
+	| { type: "open" | "dismiss" | "start" | "finished" | "unavailable" }
 	| { type: "saved"; flash: Flash };
 type SheetsModule = {
 	SHEET_CLOSED: Sheet;
 	sheetAfterSave(flash: Flash): { close: boolean; message: string | null };
 	sheetStep(state: Sheet, event: SheetEvent): Sheet;
+	maySubmit(state: Sheet): boolean;
 };
-const { SHEET_CLOSED, sheetAfterSave, sheetStep } =
+const { SHEET_CLOSED, sheetAfterSave, sheetStep, maySubmit } =
 	sheetsModule as SheetsModule;
 
 const OPEN: Confirm = { open: true, saving: false };
@@ -246,5 +247,50 @@ test.group("sheetStep (TAT-108)", () => {
 			sheetStep(SHEET_CLOSED, { type: "finished" }),
 			SHEET_CLOSED,
 		);
+	});
+});
+
+// A closing sheet stays on the page for its exit animation with the form still filled in: a held
+// Enter must not send a refund a second time (TAT-108 fix round).
+test.group("maySubmit (TAT-108)", () => {
+	const OPENED: Sheet = { open: true, saving: false, message: null };
+
+	test("an open sheet at rest may submit", ({ assert }) => {
+		assert.isTrue(maySubmit(OPENED));
+		assert.isTrue(maySubmit({ ...OPENED, message: "Nothing to refund." }));
+	});
+
+	test("a sheet that is closed, or closing after a save, may not", ({
+		assert,
+	}) => {
+		assert.isFalse(maySubmit(SHEET_CLOSED));
+		const sending = sheetStep(OPENED, { type: "start" });
+		const saved = sheetStep(sending, { type: "saved", flash: undefined });
+		assert.isFalse(
+			maySubmit(saved),
+			"the save went through: the sheet is closing",
+		);
+		assert.isFalse(maySubmit(sheetStep(saved, { type: "finished" })));
+	});
+
+	test("a request that is out may not be sent again", ({ assert }) => {
+		assert.isFalse(maySubmit(sheetStep(OPENED, { type: "start" })));
+	});
+
+	test("a refusal frees the sheet for another try", ({ assert }) => {
+		const refused = sheetStep(sheetStep(OPENED, { type: "start" }), {
+			type: "saved",
+			flash: { error: "Nothing to refund." },
+		});
+		assert.isTrue(maySubmit(refused));
+	});
+
+	test("a sheet whose data went away closes and stays closed", ({ assert }) => {
+		const gone = sheetStep(OPENED, { type: "unavailable" });
+		assert.deepEqual(gone, SHEET_CLOSED);
+		assert.isFalse(maySubmit(gone));
+		// A save in flight is not cut off by it.
+		const sending = sheetStep(OPENED, { type: "start" });
+		assert.deepEqual(sheetStep(sending, { type: "unavailable" }), sending);
 	});
 });

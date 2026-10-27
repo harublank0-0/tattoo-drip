@@ -37,12 +37,15 @@ export type SheetEvent =
 	| { type: "dismiss" }
 	| { type: "start" }
 	| { type: "saved"; flash: SheetFlash }
-	| { type: "finished" };
+	| { type: "finished" }
+	| { type: "unavailable" };
 
 /**
  * open: the trigger. dismiss: Escape, the close button, Cancel or a tap outside; ignored while a
  * save is out. start: the form was submitted. saved: the request went through (a field error is
- * not this: it leaves the sheet as it is). finished: the request ended either way.
+ * not this: it leaves the sheet as it is). finished: the request ended either way. unavailable:
+ * what the sheet edits is no longer on the page, so it closes (and can't open by itself later),
+ * unless a save is out.
  */
 export function sheetStep(state: SheetState, event: SheetEvent): SheetState {
 	switch (event.type) {
@@ -59,5 +62,16 @@ export function sheetStep(state: SheetState, event: SheetEvent): SheetState {
 		}
 		case "finished":
 			return state.saving ? { ...state, saving: false } : state;
+		case "unavailable":
+			return state.saving ? state : SHEET_CLOSED;
 	}
+}
+
+/**
+ * Whether the sheet's form may be sent now: only while it is open and at rest. A sheet that just
+ * saved is closed at once, yet Radix keeps it (and its filled-in form) on the page for its exit
+ * animation, so a held Enter would send a refund twice; a request that is out is not sent again.
+ */
+export function maySubmit(state: SheetState): boolean {
+	return state.open && !state.saving;
 }

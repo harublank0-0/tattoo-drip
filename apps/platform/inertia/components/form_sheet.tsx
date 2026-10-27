@@ -1,7 +1,19 @@
-import { type ReactNode, type RefObject, useReducer, useRef } from "react";
+import {
+	type FormEvent,
+	type ReactNode,
+	type RefObject,
+	useReducer,
+	useRef,
+} from "react";
 import { toast } from "sonner";
 import { focusBack } from "~/components/confirm";
-import { SHEET_CLOSED, type SheetFlash, sheetStep } from "~/components/sheets";
+import {
+	maySubmit,
+	SHEET_CLOSED,
+	type SheetEvent,
+	type SheetFlash,
+	sheetStep,
+} from "~/components/sheets";
 import { Button } from "~/components/ui/button";
 import {
 	Sheet,
@@ -22,21 +34,35 @@ import {
  */
 export function useFormSheet() {
 	const [state, dispatch] = useReducer(sheetStep, SHEET_CLOSED);
+	// The same steps, applied at once: a held key can send a second submit before React renders.
+	const latest = useRef(state);
+	const send = (event: SheetEvent) => {
+		latest.current = sheetStep(latest.current, event);
+		dispatch(event);
+	};
 	// The sheet's body, where focus goes to the first field that needs fixing.
 	const body = useRef<HTMLDivElement>(null);
 	return {
 		state,
 		body,
 		onError: () => focusFirstInvalid(body.current),
-		onOpenChange: (open: boolean) =>
-			dispatch({ type: open ? "open" : "dismiss" }),
-		onStart: () => dispatch({ type: "start" }),
+		onOpenChange: (open: boolean) => send({ type: open ? "open" : "dismiss" }),
+		onStart: () => send({ type: "start" }),
 		onSuccess: (page: { flash?: SheetFlash }) => {
-			dispatch({ type: "saved", flash: page.flash });
+			send({ type: "saved", flash: page.flash });
 			// A refusal is shown inside the sheet; the page's toast would only cover its title.
 			if (page.flash?.error) setTimeout(() => toast.dismiss("flash"), 0);
 		},
-		onFinish: () => dispatch({ type: "finished" }),
+		onFinish: () => send({ type: "finished" }),
+		/**
+		 * Capture-phase guard for the form's `submit` (`maySubmit`): nothing is sent from a sheet
+		 * that is closed or closing, or while its request is out.
+		 */
+		guard: (event: FormEvent) => {
+			if (maySubmit(latest.current)) return;
+			event.preventDefault();
+			event.stopPropagation();
+		},
 	};
 }
 export type FormSheetState = ReturnType<typeof useFormSheet>;
@@ -86,6 +112,9 @@ export default function FormSheet({
 			</SheetTrigger>
 			<SheetContent
 				side="bottom"
+				// A closing sheet stays on the page for its exit animation: nothing in it can be used.
+				inert={!sheet.state.open}
+				onSubmitCapture={sheet.guard}
 				onCloseAutoFocus={(event) => {
 					event.preventDefault();
 					focusBack(trigger.current, fallback.current)?.focus();

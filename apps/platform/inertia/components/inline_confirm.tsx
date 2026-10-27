@@ -36,6 +36,8 @@ export default function InlineConfirm({
 	fallback: RefObject<HTMLElement | null>;
 }) {
 	const [state, setState] = useState<ConfirmState>(CONFIRM_CLOSED);
+	// The same steps, applied at once: a held key can fire a second click before React renders.
+	const latest = useRef<ConfirmState>(state);
 	const trigger = useRef<HTMLButtonElement>(null);
 	const keep = useRef<HTMLButtonElement>(null);
 	// Opening puts focus on the safe button, once it is on the page.
@@ -44,8 +46,9 @@ export default function InlineConfirm({
 	}, [state.open, state.saving]);
 
 	const send = (event: ConfirmEvent) => {
-		const next = confirmStep(state, event);
-		setState({ open: next.open, saving: next.saving });
+		const next = confirmStep(latest.current, event);
+		latest.current = { open: next.open, saving: next.saving };
+		setState(latest.current);
 		// After the answer React has committed the new page: the button that had
 		// focus may be gone, so focus waits one tick (as focusFirstInvalid does).
 		if (next.focus === "trigger") {
@@ -59,7 +62,9 @@ export default function InlineConfirm({
 	const ask = () => send("ask");
 	const keepIt = () => send("keep");
 	const confirm = () => {
-		if (send("confirm").saving) onConfirm(() => send("finished"));
+		// Only the step that starts the request sends it: never a second one while it is out.
+		const wasSaving = latest.current.saving;
+		if (send("confirm").saving && !wasSaving) onConfirm(() => send("finished"));
 	};
 
 	return (

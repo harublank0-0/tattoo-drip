@@ -78,3 +78,26 @@ test.group("The project page's layout (TAT-108)", () => {
 		}
 	});
 });
+
+// A sheet that just saved stays on the page for its exit animation, form filled in: nothing may be
+// sent from it (TAT-108 fix round, a refund sent twice by a held Enter). The rule is `maySubmit`
+// (confirm_and_sheets.spec.ts); this pins that the sheet applies it.
+test.group("A closing sheet cannot be submitted (TAT-108)", () => {
+	test("the sheet is inert once it is closed and guards its form's submit", async ({
+		assert,
+	}) => {
+		const source = await read("components/form_sheet.tsx");
+		assert.include(source, "inert={!sheet.state.open}");
+		assert.include(source, "onSubmitCapture={sheet.guard}");
+		assert.include(source, "maySubmit(latest.current)");
+		assert.include(source, "event.preventDefault()");
+	});
+
+	test("the inline confirm sends its request only from the step that starts it", async ({
+		assert,
+	}) => {
+		const source = await read("components/inline_confirm.tsx");
+		assert.include(source, "latest.current.saving");
+		assert.include(source, "!wasSaving");
+	});
+});
