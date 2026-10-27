@@ -72,7 +72,7 @@ export interface ThemeConfig {
 	readonly accentDark: string | null;
 	readonly font: FontKey;
 	readonly logo: BrandImage | null;
-	/** The cover image above the hero: TAT-116's cover photo, once the platform serves it here. */
+	/** The hero's cover photo with the name over it: the studio's `Studio.cover` (TAT-116, merged in at the seam), or a configuration's own. */
 	readonly heroImage: CoverImage | null;
 }
 

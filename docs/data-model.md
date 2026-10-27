@@ -9,6 +9,7 @@ erDiagram
   Tenant ||--o{ TenantMembership : has
   Tenant ||--o{ TenantInvitation : sends
   Tenant ||--o{ Artist : has
+  Artist ||--o{ ArtistWorkPhoto : shows
   User |o--o{ Artist : "may be"
   Tenant ||--o{ PaymentMethod : accepts
   Tenant ||--o{ Client : has
@@ -46,11 +47,12 @@ Every entity except `User` belongs to a `Tenant`; most of those lines are left o
 |---|---|
 | **User** | A person who can log in: a canonical email address (trimmed, ASCII letters in lower case, so unique whatever its case), when that address was confirmed (needed to create a tenant or accept an invitation), and a session version that a password reset raises to sign out every session |
 | **AccountToken** | A single-use link for one account: confirm its email address (24 hours) or choose a new password (60 minutes). Only the token's SHA-256 is stored, with the address it was sent to; one per account and purpose, replaced by the next, deleted when used |
-| **Tenant** | A `studio` or `independent` business: name, slug (every slug it has held is a `TenantSlug`), profile (contact phone and email, address, social links), timezone, default deposit percentage, deposit policy text |
+| **Tenant** | A `studio` or `independent` business: name, slug (every slug it has held is a `TenantSlug`), profile (contact phone and email, address, social links), timezone, default deposit percentage, deposit policy text, and an optional cover photo (TAT-116: the public `studio_cover` image, its key and size) |
 | **TenantSlug** | Every slug a tenant has held, its current one included. One namespace for the whole platform: a slug is never given to another tenant. Written by a database trigger; the app never changes or deletes one |
 | **TenantMembership** | One role (`owner` or `artist`) for one user in one tenant |
 | **TenantInvitation** | Email (canonical), role, an optional artist profile to claim, and a hashed single-use token that expires after 7 days. One per tenant and address (a new one replaces it); deleted when accepted or cancelled, so a token works once |
 | **Artist** | A public profile in one tenant (name, slug, bio, photo, visible, accepting inquiries plus a message), optionally linked to a `User` |
+| **ArtistWorkPhoto** | One of up to six public photos of an artist's work (TAT-116), in the studio's order, with an optional one-line description. Deleted for good when removed (its files go with it), never soft-deleted. The V1 `PortfolioItem` is the later, richer form (a project, a style, paging) |
 | **PaymentMethod** | A way the studio gets paid: kind (`fonepay`, `esewa`, `khalti`, `bank`, `cash`), a label, and a QR image or account details |
 | **Client** | A person who contacts the studio: one live client per normalized phone per tenant; name, optional email, notes. Form input never overwrites an existing client. Every client has a phone until its personal data is scrubbed (`anonymized_at`) |
 | **Inquiry** | The first contact, exactly as submitted: idea, placement, approximate size, preferred dates, preferred artist, budget, source channel, contact snapshot. Status `new`, `accepted` or `declined`, with the time of the decision. Its last contact (when, on which channel, with which message) is recorded too. The submitted fields never change (a database trigger); only the privacy deletion can scrub the contact snapshot and free text, and only in the one update that first marks the inquiry anonymized (frozen again afterwards) |
