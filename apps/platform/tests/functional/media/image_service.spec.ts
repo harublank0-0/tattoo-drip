@@ -13,6 +13,7 @@ import ImageService, {
 import { variantsOfKey } from "#modules/media/variants";
 import env from "#start/env";
 import { POLYGLOT_MARKERS, polyglot, testImages } from "#tests/helpers/images";
+import { storedImages } from "#tests/helpers/uploads";
 
 const images = new ImageService();
 const tenant = { id: "0199c0de-0000-7000-8000-000000000001" };
@@ -648,5 +649,163 @@ test.group("ImageService copies (TAT-112)", () => {
 
 		assert.deepEqual(await filesOf("public", studio, "artist_photo"), []);
 		await images.delete("artist_photo", stored.key);
+	});
+});
+
+test.group("cover and work photo purposes (TAT-116)", () => {
+	const PURPOSES = [
+		{ purpose: "studio_cover", key: /\.640-960-1280\.jpg$/ },
+		{ purpose: "artist_work_photo", key: /\.320-640-1280\.jpg$/ },
+	] as const;
+
+	test("a studio cover is stored on the public disk with 640, 960 and 1280 px copies", async ({
+		assert,
+	}) => {
+		const studio = { id: randomUUID() };
+
+		const stored = await images.store(
+			await upload(await testImages.jpeg(2048, 1536)),
+			{ tenant: studio, purpose: "studio_cover" },
+		);
+
+		assert.match(
+			stored.key,
+			new RegExp(
+				`^tenants/${studio.id}/studio_cover/${V4}\\.640-960-1280\\.jpg$`,
+			),
+		);
+		assert.lengthOf(await storedImages(studio, "studio_cover"), 4);
+		assert.deepEqual(await storedImages(studio, "studio_cover", "private"), []);
+		const shown = await images.shownImage(
+			"studio_cover",
+			stored.key,
+			studio,
+			stored,
+		);
+		assert.deepEqual(
+			shown.variants.map((copy) => copy.width),
+			[640, 960, 1280],
+		);
+		assert.equal(shown.width, 2048);
+		assert.equal(shown.height, 1536);
+	});
+
+	test("a work photo gets 320, 640 and 1280 px copies on the public disk", async ({
+		assert,
+	}) => {
+		const studio = { id: randomUUID() };
+
+		const stored = await images.store(
+			await upload(await testImages.jpeg(2048, 1536)),
+			{ tenant: studio, purpose: "artist_work_photo" },
+		);
+
+		assert.match(stored.key, PURPOSES[1].key);
+		assert.lengthOf(await storedImages(studio, "artist_work_photo"), 4);
+		const shown = await images.shownImage(
+			"artist_work_photo",
+			stored.key,
+			studio,
+			stored,
+		);
+		assert.deepEqual(
+			shown.variants.map((copy) => copy.width),
+			[320, 640, 1280],
+		);
+	});
+
+	test("a polyglot upload is stored clean under both purposes: no marker in the file or any copy", async ({
+		assert,
+	}) => {
+		for (const { purpose } of PURPOSES) {
+			const studio = { id: randomUUID() };
+			await images.store(await upload(await polyglot()), {
+				tenant: studio,
+				purpose,
+			});
+
+			const folder = app.tmpPath(
+				"storage",
+				"public",
+				"tenants",
+				studio.id,
+				purpose,
+			);
+			const files = await storedImages(studio, purpose);
+			assert.isAbove(files.length, 1, purpose);
+			for (const file of files) {
+				const bytes = await readFile(join(folder, file));
+				for (const marker of POLYGLOT_MARKERS) {
+					assert.isFalse(
+						bytes.includes(marker),
+						`${purpose} ${file} keeps ${marker}`,
+					);
+				}
+			}
+		}
+	});
+
+	test("a huge image, a HEIC, a GIF and an SVG are refused under both purposes and leave no file", async ({
+		assert,
+	}) => {
+		const hostile: [string, Buffer][] = [
+			["49 MP PNG", await testImages.huge()],
+			["HEIC", await testImages.heif()],
+			["GIF", await testImages.gif()],
+			["SVG", Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>')],
+		];
+		for (const { purpose } of PURPOSES) {
+			for (const [name, bytes] of hostile) {
+				const studio = { id: randomUUID() };
+				const file = await upload(bytes);
+				await assert.rejects(
+					() => images.store(file, { tenant: studio, purpose }),
+					InvalidImageError,
+				);
+				assert.deepEqual(
+					await storedImages(studio, purpose),
+					[],
+					`${purpose} ${name}`,
+				);
+			}
+		}
+	});
+
+	test("a work photo's file and copies have no EXIF or GPS", async ({
+		assert,
+	}) => {
+		const studio = { id: randomUUID() };
+
+		await images.store(await upload(await testImages.phonePhoto(1500, 1000)), {
+			tenant: studio,
+			purpose: "artist_work_photo",
+		});
+
+		const folder = app.tmpPath(
+			"storage",
+			"public",
+			"tenants",
+			studio.id,
+			"artist_work_photo",
+		);
+		const files = await storedImages(studio, "artist_work_photo");
+		assert.lengthOf(files, 3);
+		for (const file of files) {
+			const bytes = await readFile(join(folder, file));
+			assert.isUndefined((await sharp(bytes).metadata()).exif, file);
+			assert.isFalse(bytes.includes("Kathmandu studio"), file);
+		}
+	});
+
+	test("delete removes a cover and every copy", async ({ assert }) => {
+		const studio = { id: randomUUID() };
+		const stored = await images.store(
+			await upload(await testImages.jpeg(2048, 1536)),
+			{ tenant: studio, purpose: "studio_cover" },
+		);
+
+		await images.delete("studio_cover", stored.key);
+
+		assert.deepEqual(await storedImages(studio, "studio_cover"), []);
 	});
 });

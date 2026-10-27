@@ -21,3 +21,23 @@ export function storedReferenceImages(tenant: {
 		app.tmpPath("storage", "private", "tenants", tenant.id, "reference_image"),
 	).catch(() => [] as string[]);
 }
+
+/**
+ * The files stored for `tenant` under one image purpose on a test disk (the
+ * image and its copies), sorted; [] when there are none (TAT-116). The
+ * public disk is the default.
+ */
+export async function storedImages(
+	tenant: { id: string },
+	purpose: string,
+	visibility: "public" | "private" = "public",
+): Promise<string[]> {
+	const folder = app.tmpPath(
+		"storage",
+		visibility,
+		"tenants",
+		tenant.id,
+		purpose,
+	);
+	return (await readdir(folder).catch(() => [] as string[])).sort();
+}

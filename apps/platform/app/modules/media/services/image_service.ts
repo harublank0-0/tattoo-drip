@@ -10,6 +10,7 @@ import {
 	processImage,
 } from "#modules/media/services/image_processor";
 import {
+	COVER_WIDTHS,
 	type ImageExtension,
 	NO_VARIANTS,
 	originalKey,
@@ -31,6 +32,8 @@ export const IMAGE_PURPOSES = {
 	payment_proof: { visibility: "private", variants: NO_VARIANTS }, // TAT-65
 	artist_photo: { visibility: "public", variants: VARIANT_WIDTHS }, // TAT-31
 	reference_image: { visibility: "private", variants: VARIANT_WIDTHS }, // TAT-37
+	studio_cover: { visibility: "public", variants: COVER_WIDTHS }, // TAT-116
+	artist_work_photo: { visibility: "public", variants: VARIANT_WIDTHS }, // TAT-116
 } as const;
 
 export type ImagePurpose = keyof typeof IMAGE_PURPOSES;
