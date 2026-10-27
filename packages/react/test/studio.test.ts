@@ -15,6 +15,7 @@ const STUDIO: Studio = {
 	contact: { phone: null, email: null, address: null },
 	socialLinks: [],
 	acceptingInquiries: true,
+	cover: null,
 };
 const ARTIST: Artist = {
 	id: "0199f000-0000-7000-8000-000000000044",
@@ -24,6 +25,7 @@ const ARTIST: Artist = {
 	photo: null,
 	acceptingInquiries: true,
 	closedMessage: null,
+	workPhotos: [],
 };
 
 /** A client whose fetch answers every call with `status` and `body`. */

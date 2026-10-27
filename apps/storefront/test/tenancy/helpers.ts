@@ -45,5 +45,6 @@ export function studioOf(slug: string, name: string): Studio {
 		contact: { phone: null, email: null, address: null },
 		socialLinks: [],
 		acceptingInquiries: true,
+		cover: null,
 	};
 }

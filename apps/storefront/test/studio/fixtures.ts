@@ -22,6 +22,7 @@ export const STUDIO: Studio = {
 		{ platform: "website", url: "https://black-needle.example" },
 	],
 	acceptingInquiries: true,
+	cover: null,
 };
 
 /** A studio that set nothing but its name. */
@@ -46,6 +47,7 @@ export const SITA: Artist = {
 	photo: { url: SITA_PHOTO_URL, width: 1200, height: 1500, variants: [] },
 	acceptingInquiries: true,
 	closedMessage: null,
+	workPhotos: [],
 };
 
 /** The photo's smaller copies, as the API lists them (TAT-112). */
@@ -83,4 +85,5 @@ export const ARJUN: Artist = {
 	photo: null,
 	acceptingInquiries: false,
 	closedMessage: "Books open in March.",
+	workPhotos: [],
 };

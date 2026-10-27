@@ -56,8 +56,8 @@ export interface paths {
         /**
          * The studio's public profile
          * @description What the studio page shows about the studio: its name, intro,
-         *     contact details, links, timezone and whether it takes inquiries
-         *     (TAT-44). Never its deposit policy, payment details, members or
+         *     contact details, links, timezone, whether it takes inquiries
+         *     (TAT-44) and its cover photo (TAT-116). Never its deposit policy, payment details, members or
          *     anything about clients, inquiries or payments. Cacheable. Under an
          *     old slug it answers like under the current one, and `slug` is the
          *     current slug.
@@ -88,9 +88,10 @@ export interface paths {
         };
         /**
          * The studio's visible artists
-         * @description Every visible artist, by name (ignoring case); hidden and deleted
-         *     artists never appear, and a studio with no visible artist answers
-         *     an empty list. Cacheable. Under an old slug it answers like under
+         * @description Every visible artist, by name (ignoring case), each with up to six
+         *     photos of their work (TAT-116); hidden and deleted artists never
+         *     appear, nor do their photos, and a studio with no visible artist
+         *     answers an empty list. Cacheable. Under an old slug it answers like under
          *     the current one.
          */
         get: operations["listArtists"];
@@ -380,10 +381,12 @@ export interface components {
             height: number;
             alt?: string | null;
             /**
-             * @description Smaller copies, narrowest first, each narrower than `width`
-             *     (320, 640 and 1280 px, those below the image's own width). Empty
-             *     for an image stored before them or too small to have any: then
-             *     show `url` alone. Build `srcset` from these and `url` at `width`.
+             * @description Smaller copies, narrowest first, each narrower than `width`. The
+             *     widths depend on the kind of image: 320, 640 and 1280 px for
+             *     photos, 640, 960 and 1280 px for a cover, only those below the
+             *     image's own width. Empty for an image stored before them or too
+             *     small to have any: then show `url` alone. Build `srcset` from
+             *     these and `url` at `width`.
              */
             variants: components["schemas"]["ImageVariant"][];
         };
@@ -405,6 +408,33 @@ export interface components {
              *     (320, 640 and 1280 px, those below the image's own width). Empty
              *     for an image stored before them or too small to have any: then
              *     show `url` alone. Build `srcset` from these and `url` at `width`.
+             */
+            variants: components["schemas"]["ImageVariant"][];
+        };
+        /**
+         * @description A photo of an artist's work (TAT-116) and its smaller copies. Every
+         *     property is always there. It carries no id, key, position or
+         *     timestamp: the list's order is the studio's order.
+         */
+        WorkPhoto: {
+            /**
+             * Format: uri
+             * @description Public and absolute.
+             */
+            url: string;
+            width: number;
+            height: number;
+            /**
+             * @description The studio's own description of the photo, one line of plain
+             *     text, or null: then build one from the artist's name, such as
+             *     "Tattoo by Sita Rai, photo 2 of 4".
+             */
+            alt: string | null;
+            /**
+             * @description Smaller copies, narrowest first, each narrower than `width`
+             *     (320, 640 and 1280 px, those below the photo's own width). Empty
+             *     for a photo too small to have any: then show `url` alone. Build
+             *     `srcset` from these and `url` at `width`.
              */
             variants: components["schemas"]["ImageVariant"][];
         };
@@ -464,6 +494,10 @@ export interface components {
             theme: string;
             branding: {
                 logo?: components["schemas"]["Image"] | null;
+                /**
+                 * @description Never sent: the studio's one cover is `Studio.cover` (TAT-116),
+                 *     which the storefront shows here.
+                 */
                 heroImage?: components["schemas"]["Image"] | null;
                 /**
                  * @example {
@@ -525,6 +559,14 @@ export interface components {
              *     visible artist takes general inquiries.
              */
             acceptingInquiries: boolean;
+            /**
+             * @description The studio's cover photo (TAT-116), at most 2048 px on its longer
+             *     side, with its smaller copies, or null. The studio page opens on
+             *     it with the studio's name over it. `alt` is always null: the name
+             *     over it says what the page is. It is the page's hero image:
+             *     `StorefrontConfiguration.branding.heroImage` is never sent.
+             */
+            cover: components["schemas"]["Image"] | null;
         };
         /**
          * @description A visible artist of the studio (TAT-44). Every property is always
@@ -549,6 +591,12 @@ export interface components {
             acceptingInquiries: boolean;
             /** @description The artist's words to show instead of the inquiry form; null while they accept inquiries */
             closedMessage: string | null;
+            /**
+             * @description Up to six photos of the artist's work, in the studio's order; []
+             *     when none. An artist who is closed for inquiries still shows
+             *     theirs.
+             */
+            workPhotos: components["schemas"]["WorkPhoto"][];
         };
         Service: {
             /** Format: uuid */
