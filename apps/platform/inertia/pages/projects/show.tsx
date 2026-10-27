@@ -5,6 +5,7 @@ import { useRef } from "react";
 import { urlFor } from "~/client";
 import ChangeCard from "~/components/change_card";
 import { DepositCard } from "~/components/deposit_panel";
+import { FinishCard } from "~/components/finish_card";
 import { usePageSheets } from "~/components/form_sheet";
 import { SOURCE_LABELS } from "~/components/inquiries";
 import MessageCard from "~/components/message_card";
@@ -133,6 +134,15 @@ export default function ProjectShow(props: ProjectPageProps) {
 						sheets={sheets}
 						fallback={heading}
 					/>
+
+					{finish && place.finish === "card" && (
+						<FinishCard
+							key={finish.step}
+							projectId={project.id}
+							finish={finish}
+							onDone={() => heading.current?.focus()}
+						/>
+					)}
 
 					<SessionsCard
 						sessions={sessions}

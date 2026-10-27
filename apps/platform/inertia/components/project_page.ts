@@ -128,7 +128,8 @@ export type PageFacts = {
 	message: unknown;
 	deposit: unknown;
 	scheduling: unknown;
-	finish: unknown;
+	/** The finish step the server offers (`action` null: the artist's read-only healing check). */
+	finish: { action: { sessionScheduled: boolean } | null } | null;
 	moves: readonly string[];
 	assignment: unknown;
 	/** The artist's card has no `pending`, no `actions` and no outcome: nothing money is theirs to do. */
@@ -146,9 +147,10 @@ export type PageFacts = {
  * Where each thing the page offers is drawn. An action the Next step names is drawn there (and
  * hidden from its own card, so two identical buttons never sit side by side); an action the step
  * does not name, but the page offers (the quote's message while a project is on hold, Accept and the
- * deposit panel while a screenshot waits), is drawn by the card that owns it. Only the finish panel
- * has no card: while a session is scheduled the step is that session, and finishing is refused then
- * anyway (`session_scheduled`), so the panel is dropped on purpose.
+ * deposit panel while a screenshot waits, finishing while a screenshot waits), is drawn by the card
+ * that owns it. Only one thing is dropped, on purpose: an owner's Finish panel while a session is
+ * scheduled or under way. The step is then that session, finishing is refused (`session_scheduled`)
+ * and the old card held no button either, only "record or cancel the session first".
  */
 export function placementsOf(page: PageFacts): Record<Affordance, Placement> {
 	const { nextStep, payments } = page;
@@ -161,6 +163,11 @@ export function placementsOf(page: PageFacts): Record<Affordance, Placement> {
 	): Placement =>
 		!available ? null : offers(nextStep, action) ? "step" : home;
 	const quoted = has(page.quote);
+	// Finishing is available unless a session is scheduled or under way (the artist's panel has no
+	// button and is always drawn). The step may still name it then (a healing check with a touch-up
+	// booked: the panel says the session comes first).
+	const finishing =
+		page.finish !== null && page.finish.action?.sessionScheduled !== true;
 	return {
 		issue_quote: where(page.canQuote && !quoted, "issue_quote"),
 		send_quote: where(has(page.message), "send_quote"),
@@ -176,7 +183,12 @@ export function placementsOf(page: PageFacts): Record<Affordance, Placement> {
 		),
 		record_refund: has(actions?.refundMax) ? "card" : null,
 		schedule: where(has(page.scheduling), "schedule"),
-		finish: where(has(page.finish), "finish", null),
+		finish:
+			page.finish !== null && offers(nextStep, "finish")
+				? "step"
+				: finishing
+					? "card"
+					: null,
 		resume: where(page.moves.includes("resume"), "resume"),
 		hold: page.moves.includes("hold") ? "card" : null,
 		withdraw: page.moves.includes("withdraw") ? "card" : null,

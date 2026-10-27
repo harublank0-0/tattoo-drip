@@ -5,12 +5,14 @@ import {
 	balanceLine,
 	FINISH_BUTTONS,
 	FINISH_CONFIRMS,
+	FINISH_TITLES,
 	finishIntro,
 	finishQuestion,
 	SESSION_FIRST,
 } from "~/components/finish";
 import type { FinishProps } from "~/components/projects";
 import { Button } from "~/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { FieldError } from "~/components/ui/field";
 import { useTenant } from "~/hooks/use-tenant";
 
@@ -136,5 +138,33 @@ export default function FinishPanel({
 				</fieldset>
 			)}
 		</div>
+	);
+}
+
+/**
+ * The Finish panel in a card of its own, for a project whose Next step is something else while
+ * finishing is available (a deposit screenshot nobody decided after the money was recorded at the
+ * desk). The old page always drew it; the Next step card holds it when it names the step.
+ */
+export function FinishCard({
+	projectId,
+	finish,
+	onDone,
+}: {
+	projectId: string;
+	finish: FinishProps;
+	onDone: () => void;
+}) {
+	return (
+		<Card>
+			<CardHeader>
+				<CardTitle className="leading-snug">
+					<h2>{FINISH_TITLES[finish.step]}</h2>
+				</CardTitle>
+			</CardHeader>
+			<CardContent>
+				<FinishPanel projectId={projectId} finish={finish} onDone={onDone} />
+			</CardContent>
+		</Card>
 	);
 }

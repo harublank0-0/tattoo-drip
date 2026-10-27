@@ -351,20 +351,50 @@ test.group(
 			assert.isNull(placementsOf(facts({ closed: true })).mark_contacted);
 		});
 
-		test("the finish panel is only ever the step's: with a session first it is dropped on purpose", ({
+		test("the finish panel is the step's when it names it, else its own card, unless a session comes first", ({
 			assert,
 		}) => {
-			const finish = { step: "finish" };
+			const ready = { step: "finish", action: { sessionScheduled: false } };
+			const waiting = { step: "finish", action: { sessionScheduled: true } };
+			const named = {
+				primary: "finish",
+				secondary: [],
+				anchor: null,
+			};
+			// The step names it.
+			assert.equal(
+				placementsOf(facts({ finish: ready, nextStep: named })).finish,
+				"step",
+			);
+			// Finishing is available (no session scheduled) but the step is something else, a screenshot
+			// to check: the panel is still drawn, by its own card.
 			assert.equal(
 				placementsOf(
 					facts({
-						finish,
-						nextStep: { primary: "finish", secondary: [], anchor: null },
+						finish: ready,
+						nextStep: {
+							primary: "verify_proof",
+							secondary: [],
+							anchor: "payments",
+						},
 					}),
 				).finish,
+				"card",
+			);
+			// The step may name it while a touch-up is booked (the panel says the session comes first).
+			assert.equal(
+				placementsOf(facts({ finish: waiting, nextStep: named })).finish,
 				"step",
 			);
-			assert.isNull(placementsOf(facts({ finish })).finish);
+			// A session is scheduled or under way: finishing is refused (`session_scheduled`) and the
+			// step is that session, so the panel is dropped on purpose.
+			assert.isNull(placementsOf(facts({ finish: waiting })).finish);
+			// The artist's healing check is a panel with no button (no action): never dropped.
+			assert.equal(
+				placementsOf(facts({ finish: { step: "complete", action: null } }))
+					.finish,
+				"card",
+			);
 		});
 
 		test("a page without a payments card places no money control", ({

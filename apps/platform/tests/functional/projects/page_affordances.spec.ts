@@ -63,8 +63,15 @@ function oldPageOffered(props: Props): string[] {
 	return offered;
 }
 
-/** Offered by the old page, deliberately not by the new one: the plan names it (row 15 before 16). */
-const DROPPED_ON_PURPOSE = ["finish"];
+/**
+ * Offered by the old page, deliberately not by the new one, and only in the one case the plan names
+ * (row 15 before 16): the Finish card of an owner while a session is scheduled or under way. The old
+ * card then held no button, only "record or cancel the session first", and finishing is refused
+ * (`session_scheduled`). Any other missing control is a lost capability, whatever it is.
+ */
+function droppedOnPurpose(name: string, props: Props): boolean {
+	return name === "finish" && props.finish?.action?.sessionScheduled === true;
+}
 
 /**
  * What an artist's Payments card is: the balance and the ledger, read-only (docs/requirements.md:87,
@@ -305,6 +312,43 @@ const ROWS: Row[] = [
 		place: { finish: null },
 	},
 	{
+		name: "in progress, a screenshot nobody decided",
+		status: "in_progress",
+		seed: async (s, p) => {
+			await quote(s, p);
+			await makePayment(s.tenant, p as never, verified(s, 300_000));
+			await proofFor(s.tenant, p as never);
+		},
+		// Paid at the desk, the screenshot still undecided: the screenshot is the step, and finishing
+		// (no session is scheduled) stays reachable in a card of its own.
+		place: { verify_proof: "step", finish: "card", schedule: "card" },
+	},
+	{
+		name: "healing check, a screenshot nobody decided",
+		status: "healing_check",
+		seed: async (s, p) => {
+			await quote(s, p);
+			await makePayment(s.tenant, p as never, verified(s, 300_000));
+			await proofFor(s.tenant, p as never);
+		},
+		place: { verify_proof: "step", finish: "card", record_payment: "card" },
+	},
+	{
+		name: "healing check, a touch-up under way",
+		status: "healing_check",
+		seed: async (s, p) => {
+			await quote(s, p);
+			const at = DateTime.now().minus({ hours: 5 }).startOf("minute");
+			await makeSession(s.tenant, p as never, s.profile, {
+				kind: "touch_up",
+				startsAt: at,
+				endsAt: at.plus({ hours: 2 }),
+			});
+		},
+		// The step is the session to record; the owner's panel would only say "record it first".
+		place: { finish: null },
+	},
+	{
 		name: "healing check, a balance owed",
 		status: "healing_check",
 		seed: async (s, p) => {
@@ -448,9 +492,8 @@ test.group(
 
 				for (const name of oldPageOffered(props)) {
 					if (place[name] === null) {
-						assert.include(
-							DROPPED_ON_PURPOSE,
-							name,
+						assert.isTrue(
+							droppedOnPurpose(name, props),
 							`${row.name}: ${name} is offered by the old page and by no card of the new one`,
 						);
 					}
@@ -475,14 +518,17 @@ test.group(
 			);
 		});
 
-		test("the one thing dropped on purpose is the finish panel while a session comes first", async ({
+		test("the one thing dropped on purpose is the owner's finish panel while a session comes first", async ({
 			client,
 			assert,
 		}) => {
 			const s = await studio();
 			const rows = ROWS.filter(({ name }) =>
-				name.startsWith("in progress, a session"),
+				["in progress, a session", "healing check, a touch-up under way"].some(
+					(start) => name.startsWith(start),
+				),
 			);
+			assert.isAtLeast(rows.length, 3);
 			for (const row of rows) {
 				const project = await build(s, row);
 				const props = await read(client, s.owner, project.id);
@@ -490,12 +536,34 @@ test.group(
 					props.finish,
 					`${row.name}: the server still offers the step`,
 				);
+				// The real condition: a session is scheduled or under way, which refuses finishing.
+				assert.isTrue(props.finish.action.sessionScheduled, row.name);
 				assert.isNull(placementsOf(props).finish, row.name);
 				assert.include(
 					["next_session", "record_session"],
 					props.nextStep.kind,
 					row.name,
 				);
+			}
+		});
+
+		test("a screenshot to check never hides finishing: the Finish panel is drawn by its own card", async ({
+			client,
+			assert,
+		}) => {
+			const s = await studio();
+			for (const name of [
+				"in progress, a screenshot nobody decided",
+				"healing check, a screenshot nobody decided",
+			]) {
+				const row = ROWS.find((candidate) => candidate.name === name);
+				if (!row) throw new Error(`no row ${name}`);
+				const project = await build(s, row);
+				const props = await read(client, s.owner, project.id);
+				assert.equal(props.nextStep.kind, "check_proof", name);
+				// The server offers finishing (nothing is scheduled), and the step does not name it.
+				assert.isFalse(props.finish.action.sessionScheduled, name);
+				assert.equal(placementsOf(props).finish, "card", name);
 			}
 		});
 
@@ -511,7 +579,10 @@ test.group(
 				readOnly(props.payments, row.name);
 				for (const name of oldPageOffered(props)) {
 					if (place[name] === null) {
-						assert.include(DROPPED_ON_PURPOSE, name, `${row.name}: ${name}`);
+						assert.isTrue(
+							droppedOnPurpose(name, props),
+							`${row.name}: ${name}`,
+						);
 					}
 				}
 				for (const money of [

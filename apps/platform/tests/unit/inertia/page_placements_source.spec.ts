@@ -19,6 +19,8 @@ test.group("The cards draw what placementsOf gives them (TAT-108)", () => {
 			assert.include(tag.slice(0, tag.indexOf("/>")), "place={place}", card);
 		}
 		assert.include(page, "<DepositCard");
+		assert.include(page, "<FinishCard");
+		assert.include(page, 'place.finish === "card"');
 		assert.include(page, 'place.deposit_link === "card"');
 		assert.include(page, 'place.schedule === "card"');
 		assert.include(page, 'place.resume === "step"');
