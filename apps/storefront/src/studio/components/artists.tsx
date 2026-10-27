@@ -73,11 +73,14 @@ function WorkStrip({ artist }: { artist: ArtistView }) {
 					/>
 				))}
 			</span>
+			{/* One inner <span>: the row is a flex container, and a text node beside a <bdi> would become two flex items and lose the space ("See work bySita Rai"). */}
 			<span className="work-link-text">
-				<Fill
-					template={studioCopy.work.seeWork}
-					values={{ name: artist.name }}
-				/>
+				<span>
+					<Fill
+						template={studioCopy.work.seeWork}
+						values={{ name: artist.name }}
+					/>
+				</span>
 			</span>
 		</a>
 	);

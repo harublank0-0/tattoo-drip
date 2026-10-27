@@ -701,7 +701,7 @@ describe("the roster's work strip (TAT-116)", () => {
 		assert.equal(thumbs(link).length, 3);
 		assert.match(
 			link,
-			/<span class="work-link-text">See work by <bdi>Sita Rai<\/bdi><\/span><\/a>$/,
+			/<span class="work-link-text"><span>See work by <bdi>Sita Rai<\/bdi><\/span><\/span><\/a>$/,
 		);
 		for (const image of thumbs(html)) {
 			assert.match(image, / alt=""/);
@@ -720,6 +720,17 @@ describe("the roster's work strip (TAT-116)", () => {
 			thumbs(html).map((image) => /w(\d)\.320-640-1280/.exec(image)?.[1]),
 			["1", "2", "3"],
 		);
+	});
+
+	test("the link's words sit in one inner span, so a flex row can't drop the space before the name", () => {
+		const html = roster([sitaWithWork(1), ARJUN]);
+		// The row is a flex container: text next to a <bdi> would be two flex
+		// items and lose its space, as "See work bySita Rai" did in the browser.
+		assert.match(
+			html,
+			/<span class="work-link-text"><span>See work by <bdi>Sita Rai<\/bdi><\/span><\/span>/,
+		);
+		assert.doesNotMatch(html, /<span class="work-link-text">[^<]/);
 	});
 
 	test("two photos show two; none shows no link; a closed artist still shows their work", () => {
