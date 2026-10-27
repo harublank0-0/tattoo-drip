@@ -509,5 +509,83 @@ test.group(
 				}
 			}
 		});
+
+		// The closed-project policy (docs/ui.md, "Closed projects"): no change to the project itself from
+		// the page, money settlement stays. Exactly these controls, per status and condition.
+		const CLOSED_POLICY: [string, Record<string, Place>][] = [
+			[
+				"completed, a balance owed",
+				{ record_payment: "step", record_refund: "card" },
+			],
+			["completed and paid", { record_payment: "card", record_refund: "card" }],
+			[
+				"completed without a price",
+				{ set_price: "card", record_payment: "card" },
+			],
+			["declined", {}],
+			["declined, holding a deposit", { record_outcome: "step" }],
+			[
+				"cancelled, holding a deposit",
+				{ record_outcome: "step", record_payment: "card" },
+			],
+			[
+				"cancelled, a screenshot nobody decided",
+				{ verify_proof: "step", record_payment: "card" },
+			],
+		];
+
+		for (const [name, expected] of CLOSED_POLICY) {
+			test(`closed (${name}): the owner is offered exactly this, and no change to the project`, async ({
+				client,
+				assert,
+			}) => {
+				const s = await studio();
+				const row = ROWS.find((candidate) => candidate.name === name);
+				if (!row) throw new Error(`no row ${name}`);
+				const project = await build(s, row);
+				const props = await read(client, s.owner, project.id);
+
+				assert.isTrue(props.closed);
+				// Nothing that changes the project: no status move, no artist picker, no quote, no
+				// message to send, no scheduling, no finish step.
+				assert.deepEqual(props.moves, []);
+				assert.isNull(props.assignment);
+				assert.isFalse(props.canQuote);
+				assert.isFalse(props.canAccept);
+				assert.isNull(props.message);
+				assert.isNull(props.scheduling);
+				assert.isNull(props.finish);
+				assert.isNull(props.deposit);
+				const offered = Object.fromEntries(
+					Object.entries(placementsOf(props)).filter(
+						([, where]) => where !== null,
+					),
+				);
+				assert.deepEqual(offered, expected);
+			});
+		}
+
+		test("a closed project has a read-only artist: no money, no change", async ({
+			client,
+			assert,
+		}) => {
+			const s = await studio();
+			for (const [name] of CLOSED_POLICY) {
+				const row = ROWS.find((candidate) => candidate.name === name);
+				if (!row) throw new Error(`no row ${name}`);
+				const project = await build(s, row);
+				const props = await read(client, s.asha, project.id);
+				const offered = Object.entries(placementsOf(props)).filter(
+					([, where]) => where !== null,
+				);
+				assert.isNull(props.payments, name);
+				// Set price is the one control an artist keeps on a completed project booked without one.
+				assert.deepEqual(
+					offered.map(([affordance]) => affordance),
+					name === "completed without a price" ? ["set_price"] : [],
+					name,
+				);
+			}
+		});
 	},
 );
