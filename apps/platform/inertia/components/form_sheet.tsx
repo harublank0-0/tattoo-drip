@@ -2,6 +2,7 @@ import {
 	type FormEvent,
 	type ReactNode,
 	type RefObject,
+	useEffect,
 	useReducer,
 	useRef,
 } from "react";
@@ -22,7 +23,6 @@ import {
 	SheetDescription,
 	SheetHeader,
 	SheetTitle,
-	SheetTrigger,
 } from "~/components/ui/sheet";
 
 /**
@@ -42,17 +42,25 @@ export function useFormSheet() {
 	};
 	// The sheet's body, where focus goes to the first field that needs fixing.
 	const body = useRef<HTMLDivElement>(null);
+	// Whichever trigger draws it right now (the Next step card or the card that owns the control).
+	const trigger = useRef<HTMLButtonElement>(null);
+	// A refusal is shown inside the sheet that is open: the page's toast would only cover its title.
+	useEffect(() => {
+		if (!state.message) return;
+		const later = setTimeout(() => toast.dismiss("flash"), 0);
+		return () => clearTimeout(later);
+	}, [state.message]);
 	return {
 		state,
 		body,
+		trigger,
 		onError: () => focusFirstInvalid(body.current),
 		onOpenChange: (open: boolean) => send({ type: open ? "open" : "dismiss" }),
 		onStart: () => send({ type: "start" }),
-		onSuccess: (page: { flash?: SheetFlash }) => {
-			send({ type: "saved", flash: page.flash });
-			// A refusal is shown inside the sheet; the page's toast would only cover its title.
-			if (page.flash?.error) setTimeout(() => toast.dismiss("flash"), 0);
-		},
+		onSuccess: (page: { flash?: SheetFlash }) =>
+			send({ type: "saved", flash: page.flash }),
+		/** What the sheet edits is no longer on the page: it closes. */
+		onUnavailable: () => send({ type: "unavailable" }),
 		onFinish: () => send({ type: "finished" }),
 		/**
 		 * Capture-phase guard for the form's `submit` (`maySubmit`): nothing is sent from a sheet
@@ -68,6 +76,23 @@ export function useFormSheet() {
 export type FormSheetState = ReturnType<typeof useFormSheet>;
 
 /**
+ * The five sheets of the project page, one instance each, held by the page (TAT-108 fix round):
+ * the state of a sheet must not live in the card that draws its trigger, because the Next step can
+ * move a trigger to another card while the sheet is open (a stale Revise whose refusal returns the
+ * project in another status), and an unmounted sheet would take the refusal with it.
+ */
+export function usePageSheets() {
+	return {
+		revise: useFormSheet(),
+		record: useFormSheet(),
+		refund: useFormSheet(),
+		price: useFormSheet(),
+		schedule: useFormSheet(),
+	};
+}
+export type PageSheets = ReturnType<typeof usePageSheets>;
+
+/**
  * After a refused save the submit button was disabled while saving, which drops keyboard focus
  * to the page (and Escape stops working), so focus goes to the first field that needs fixing.
  */
@@ -78,38 +103,64 @@ export function focusFirstInvalid(container: HTMLElement | null) {
 }
 
 /**
- * A button that opens a bottom sheet holding one form (TAT-108): the title and description, the
- * refusal's message (a `role="alert"` paragraph, because the toast's live region is hidden from
- * screen readers while a modal is open), then the `Form`. Radix moves focus into the sheet,
- * traps it, closes on Escape, the close button and the overlay, and focus goes back to the
- * trigger, or to `fallback` (the page's heading) when a save removed the trigger.
+ * The button that opens a sheet (TAT-108). Any card may draw it; the sheet itself is the page's
+ * (`FormSheetPanel`). Only one trigger of a sheet is on the page at a time, and it is where focus
+ * goes back to when the sheet closes.
  */
-export default function FormSheet({
+export function FormSheetTrigger({
+	sheet,
 	label,
 	variant = "outline",
-	title,
-	description,
-	sheet,
-	fallback,
-	children,
 }: {
+	sheet: FormSheetState;
 	label: string;
 	variant?: "default" | "outline";
+}) {
+	return (
+		<Button
+			ref={sheet.trigger}
+			type="button"
+			variant={variant}
+			aria-haspopup="dialog"
+			aria-expanded={sheet.state.open}
+			onClick={() => sheet.onOpenChange(true)}
+		>
+			{label}
+		</Button>
+	);
+}
+
+/**
+ * A bottom sheet holding one form (TAT-108): the title and description, the refusal's message (a
+ * `role="alert"` paragraph, because the toast's live region is hidden from screen readers while a
+ * modal is open), then the `Form`. Radix moves focus into the sheet, traps it, closes on Escape, the
+ * close button and the overlay, and focus goes back to the trigger, or to `fallback` (the page's
+ * heading) when a save removed the trigger. `available` is false when what the sheet edits is no
+ * longer on the page: it closes then and can't open by itself later.
+ */
+export function FormSheetPanel({
+	sheet,
+	title,
+	description,
+	fallback,
+	available,
+	children,
+}: {
+	sheet: FormSheetState;
 	title: string;
 	description: string;
-	sheet: FormSheetState;
 	fallback: RefObject<HTMLElement | null>;
+	available: boolean;
 	children: ReactNode;
 }) {
-	const trigger = useRef<HTMLButtonElement>(null);
+	const { onUnavailable } = sheet;
+	useEffect(() => {
+		if (!available) onUnavailable();
+	}, [available, onUnavailable]);
+	if (!available) return null;
 
 	return (
 		<Sheet open={sheet.state.open} onOpenChange={sheet.onOpenChange}>
-			<SheetTrigger asChild>
-				<Button ref={trigger} type="button" variant={variant}>
-					{label}
-				</Button>
-			</SheetTrigger>
 			<SheetContent
 				side="bottom"
 				// A closing sheet stays on the page for its exit animation: nothing in it can be used.
@@ -117,7 +168,7 @@ export default function FormSheet({
 				onSubmitCapture={sheet.guard}
 				onCloseAutoFocus={(event) => {
 					event.preventDefault();
-					focusBack(trigger.current, fallback.current)?.focus();
+					focusBack(sheet.trigger.current, fallback.current)?.focus();
 				}}
 			>
 				<SheetHeader className="pr-14">

@@ -1,10 +1,12 @@
 import { Form } from "@adonisjs/inertia/react";
 import { type RefObject, useId, useState } from "react";
 import ChatMessage from "~/components/chat_message";
-import FormSheet, {
+import {
 	FormSheetActions,
+	FormSheetPanel,
 	type FormSheetState,
-	useFormSheet,
+	FormSheetTrigger,
+	type PageSheets,
 } from "~/components/form_sheet";
 import {
 	type ContactChannelName,
@@ -76,7 +78,7 @@ export function QuoteCard({
 	onContact,
 	place,
 	nextStep,
-	fallback,
+	sheets,
 }: {
 	projectId: string;
 	quote: QuoteProps | null;
@@ -88,7 +90,8 @@ export function QuoteCard({
 	onContact: (via: ContactVia) => void;
 	place: Record<Affordance, Placement>;
 	nextStep: NextStepProps;
-	fallback: RefObject<HTMLElement | null>;
+	/** The page's sheets: this card only draws their triggers. */
+	sheets: Pick<PageSheets, "revise" | "price">;
 }) {
 	const listId = useId();
 	const [showing, setShowing] = useState(false);
@@ -121,16 +124,13 @@ export function QuoteCard({
 				)}
 				{place.set_price === "card" && (
 					<div>
-						<PriceSheet projectId={projectId} fallback={fallback} />
+						<FormSheetTrigger sheet={sheets.price} label="Set price" />
 					</div>
 				)}
 				{place.revise_quote === "card" && quote && (
-					<ReviseSheet
+					<ReviseTrigger
 						id={cardId("quote-form", nextStep.anchor)}
-						projectId={projectId}
-						quote={quote}
-						form={form}
-						fallback={fallback}
+						sheet={sheets.revise}
 					/>
 				)}
 				{place.issue_quote === "card" && (
@@ -257,27 +257,30 @@ export function AcceptQuote({
 
 /**
  * "Set price" for a project booked without one (TAT-66): a sheet, because the price is set once
- * and quotes are locked from booked on. The button names the price; that is the confirmation.
+ * and quotes are locked from booked on. The button names the price; that is the confirmation. The
+ * Quote card draws the trigger; the page mounts this panel once.
  */
-export function PriceSheet({
+export function PricePanel({
+	sheet,
 	projectId,
+	available,
 	fallback,
 }: {
+	sheet: FormSheetState;
 	projectId: string;
+	available: boolean;
 	fallback: RefObject<HTMLElement | null>;
 }) {
-	const sheet = useFormSheet();
-
 	return (
-		<FormSheet
-			label="Set price"
+		<FormSheetPanel
+			sheet={sheet}
 			title="Set the price"
 			description="No price was set at booking. It can't be changed afterwards."
-			sheet={sheet}
 			fallback={fallback}
+			available={available}
 		>
 			<PriceForm projectId={projectId} sheet={sheet} />
-		</FormSheet>
+		</FormSheetPanel>
 	);
 }
 
@@ -334,37 +337,62 @@ function PriceForm({
 }
 
 /**
- * "Revise the quote": the quote form in a sheet. The form is keyed by the quote it was built
- * from, so a refused save because someone revised the quote meanwhile remounts it with the new
- * terms while the sheet stays open with the server's message.
+ * The "Revise the quote" button, in the Next step card when it names the action and else in the
+ * Quote card, inside `id` (`cardId("quote-form", anchor)`) so a link to `#quote-form` lands on it.
  */
-export function ReviseSheet({
-	projectId,
-	quote,
-	form,
-	fallback,
+export function ReviseTrigger({
+	sheet,
 	id,
+	variant = "outline",
 }: {
-	projectId: string;
-	quote: QuoteProps;
-	form: ProjectPageProps["form"];
-	fallback: RefObject<HTMLElement | null>;
+	sheet: FormSheetState;
 	id?: string;
+	variant?: "default" | "outline";
 }) {
-	const sheet = useFormSheet();
-
 	return (
 		<div
 			id={id}
 			className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)] lg:scroll-mt-0"
 		>
-			<FormSheet
-				label="Revise the quote"
-				title="Revise the quote"
-				description="The client gets a new price to accept. Saving sends the project back to Quoted."
+			<FormSheetTrigger
 				sheet={sheet}
-				fallback={fallback}
-			>
+				label="Revise the quote"
+				variant={variant}
+			/>
+		</div>
+	);
+}
+
+/**
+ * "Revise the quote": the quote form in a sheet, mounted once by the page whichever card draws the
+ * trigger. The form is keyed by the quote it was built from, so a refused save because someone
+ * revised the quote meanwhile remounts it with the new terms while the sheet stays open with the
+ * server's message, even when that refusal moves the trigger to another card.
+ */
+export function RevisePanel({
+	sheet,
+	projectId,
+	quote,
+	form,
+	available,
+	fallback,
+}: {
+	sheet: FormSheetState;
+	projectId: string;
+	quote: QuoteProps | null;
+	form: ProjectPageProps["form"];
+	available: boolean;
+	fallback: RefObject<HTMLElement | null>;
+}) {
+	return (
+		<FormSheetPanel
+			sheet={sheet}
+			title="Revise the quote"
+			description="The client gets a new price to accept. Saving sends the project back to Quoted."
+			fallback={fallback}
+			available={available && quote !== null}
+		>
+			{quote && (
 				<QuoteForm
 					key={quote.id}
 					projectId={projectId}
@@ -372,8 +400,8 @@ export function ReviseSheet({
 					form={form}
 					sheet={sheet}
 				/>
-			</FormSheet>
-		</div>
+			)}
+		</FormSheetPanel>
 	);
 }
 

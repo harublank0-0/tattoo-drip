@@ -9,10 +9,12 @@ import {
 	useState,
 } from "react";
 import { urlFor } from "~/client";
-import FormSheet, {
+import {
 	FormSheetActions,
+	FormSheetPanel,
 	type FormSheetState,
-	useFormSheet,
+	FormSheetTrigger,
+	type PageSheets,
 } from "~/components/form_sheet";
 import {
 	DESK_KIND_TEXT,
@@ -68,7 +70,7 @@ export default function PaymentsCard({
 	canSetPrice,
 	place,
 	nextStep,
-	fallback,
+	sheets,
 }: {
 	projectId: string;
 	payments: PaymentsCardProps;
@@ -76,15 +78,14 @@ export default function PaymentsCard({
 	/** Where `placementsOf` draws each control: the card draws the ones the Next step does not. */
 	place: Record<Affordance, Placement>;
 	nextStep: NextStepProps;
-	/** Where focus goes when a sheet's trigger is gone after a save: the page heading. */
-	fallback: RefObject<HTMLElement | null>;
+	/** The page's sheets: this card only draws their triggers. */
+	sheets: Pick<PageSheets, "record" | "refund">;
 }) {
 	const heading = useRef<HTMLHeadingElement>(null);
 	const listId = useId();
 	const [showing, setShowing] = useState(false);
 	const done = () => heading.current?.focus();
-	const { summary, balance, deposit, rows, pending, actions, outcome } =
-		payments;
+	const { summary, balance, deposit, rows, pending, outcome } = payments;
 	const hint =
 		balance.state === "overpaid"
 			? "Record a refund if you give it back."
@@ -182,21 +183,11 @@ export default function PaymentsCard({
 					</div>
 				)}
 				<div className="flex flex-wrap gap-2">
-					{actions &&
-						actions.recordKinds.length > 0 &&
-						place.record_payment === "card" && (
-							<RecordPaymentSheet
-								projectId={projectId}
-								actions={actions}
-								fallback={fallback}
-							/>
-						)}
-					{place.record_refund === "card" && actions?.refundMaxText && (
-						<RefundSheet
-							projectId={projectId}
-							maxText={actions.refundMaxText}
-							fallback={fallback}
-						/>
+					{place.record_payment === "card" && (
+						<FormSheetTrigger sheet={sheets.record} label="Record payment" />
+					)}
+					{place.record_refund === "card" && (
+						<FormSheetTrigger sheet={sheets.refund} label="Record a refund" />
 					)}
 				</div>
 			</CardContent>
@@ -565,36 +556,38 @@ function prefill(actions: Actions, kind: DeskKindName): string {
 	return value === null ? "" : String(value);
 }
 
-/** "Record payment": the desk form in a sheet. */
-export function RecordPaymentSheet({
+/**
+ * "Record payment": the desk form in a sheet, mounted once by the page whichever card draws the
+ * trigger (the Next step card, or the Payments card).
+ */
+export function RecordPaymentPanel({
+	sheet,
 	projectId,
 	actions,
 	fallback,
-	variant = "outline",
 }: {
+	sheet: FormSheetState;
 	projectId: string;
-	actions: Actions;
+	actions: Actions | null;
 	fallback: RefObject<HTMLElement | null>;
-	variant?: "default" | "outline";
 }) {
-	const sheet = useFormSheet();
-
 	return (
-		<FormSheet
-			label="Record payment"
-			variant={variant}
+		<FormSheetPanel
+			sheet={sheet}
 			title="Record payment"
 			description="Money the client paid at the desk or by transfer. It is recorded as verified."
-			sheet={sheet}
 			fallback={fallback}
+			available={actions !== null && actions.recordKinds.length > 0}
 		>
-			<RecordPaymentForm
-				key={recordFormKey(actions)}
-				projectId={projectId}
-				actions={actions}
-				sheet={sheet}
-			/>
-		</FormSheet>
+			{actions && (
+				<RecordPaymentForm
+					key={recordFormKey(actions)}
+					projectId={projectId}
+					actions={actions}
+					sheet={sheet}
+				/>
+			)}
+		</FormSheetPanel>
 	);
 }
 
@@ -680,27 +673,29 @@ function RecordPaymentForm({
  * "Record a refund": the form in a sheet. The submit button names the amount, which is the
  * confirmation (it replaces the browser's confirm); the sheet's description says it is final.
  */
-export function RefundSheet({
+export function RefundPanel({
+	sheet,
 	projectId,
 	maxText,
 	fallback,
 }: {
+	sheet: FormSheetState;
 	projectId: string;
-	maxText: string;
+	maxText: string | null;
 	fallback: RefObject<HTMLElement | null>;
 }) {
-	const sheet = useFormSheet();
-
 	return (
-		<FormSheet
-			label="Record a refund"
+		<FormSheetPanel
+			sheet={sheet}
 			title="Record a refund"
 			description="A refund can't be edited or deleted; a mistake is reversed."
-			sheet={sheet}
 			fallback={fallback}
+			available={maxText !== null}
 		>
-			<RefundForm projectId={projectId} maxText={maxText} sheet={sheet} />
-		</FormSheet>
+			{maxText && (
+				<RefundForm projectId={projectId} maxText={maxText} sheet={sheet} />
+			)}
+		</FormSheetPanel>
 	);
 }
 

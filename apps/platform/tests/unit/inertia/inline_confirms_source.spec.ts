@@ -101,3 +101,55 @@ test.group("A closing sheet cannot be submitted (TAT-108)", () => {
 		assert.include(source, "!wasSaving");
 	});
 });
+
+// A sheet that lives inside the card its trigger sits in is unmounted when the Next step moves that
+// trigger to another card, and a refusal (a stale Revise: someone revised first) disappears with it.
+// Each sheet is one instance mounted by the page, whichever card draws its trigger.
+test.group("One instance per sheet, mounted by the page (TAT-108)", () => {
+	const PANELS = [
+		"RevisePanel",
+		"PricePanel",
+		"RecordPaymentPanel",
+		"RefundPanel",
+		"SchedulePanel",
+	];
+
+	test("the page mounts each sheet's panel once and holds its state", async ({
+		assert,
+	}) => {
+		const page = await read("pages/projects/show.tsx");
+		assert.include(page, "usePageSheets()");
+		for (const panel of PANELS) {
+			assert.equal(page.split(`<${panel}`).length - 1, 1, panel);
+		}
+	});
+
+	test("no card owns a sheet's state or its Radix trigger", async ({
+		assert,
+	}) => {
+		for (const file of [
+			"components/quote_card.tsx",
+			"components/payments_card.tsx",
+			"components/sessions_card.tsx",
+			"components/next_step_card.tsx",
+		]) {
+			const source = await read(file);
+			assert.notInclude(source, "useFormSheet(", file);
+			assert.notInclude(source, "<SheetTrigger", file);
+			assert.notMatch(source, /<FormSheet[\s>]/, file);
+		}
+		// Only the shared trigger opens a sheet.
+		assert.include(
+			await read("components/form_sheet.tsx"),
+			"export function FormSheetTrigger",
+		);
+	});
+
+	test("a refusal's toast is dismissed only for a message a sheet is showing", async ({
+		assert,
+	}) => {
+		const source = await read("components/form_sheet.tsx");
+		assert.include(source, "state.message");
+		assert.notInclude(source, "if (page.flash?.error) setTimeout");
+	});
+});

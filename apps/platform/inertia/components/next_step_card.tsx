@@ -4,21 +4,17 @@ import { urlFor } from "~/client";
 import ChatMessage from "~/components/chat_message";
 import DepositPanel from "~/components/deposit_panel";
 import FinishPanel from "~/components/finish_card";
+import { FormSheetTrigger, type PageSheets } from "~/components/form_sheet";
 import type { ContactVia } from "~/components/messages";
 import { primaryChannel } from "~/components/messages";
-import {
-	OutcomeForm,
-	PendingProof,
-	RecordPaymentSheet,
-} from "~/components/payments_card";
-import { layoutOf } from "~/components/project_page";
+import { OutcomeForm, PendingProof } from "~/components/payments_card";
+import { cardId, layoutOf } from "~/components/project_page";
 import type {
 	NextStepAction,
 	NextStepProps,
 	ProjectPageProps,
 } from "~/components/projects";
-import { AcceptQuote, QuoteForm, ReviseSheet } from "~/components/quote_card";
-import { ScheduleSheet } from "~/components/sessions_card";
+import { AcceptQuote, QuoteForm, ReviseTrigger } from "~/components/quote_card";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { useTenant } from "~/hooks/use-tenant";
@@ -41,11 +37,10 @@ export default function NextStepCard({
 	message,
 	deposit,
 	payments,
-	scheduling,
-	dates,
 	finish,
 	lastChannel,
 	onContact,
+	sheets,
 	fallback,
 }: {
 	projectId: string;
@@ -55,11 +50,11 @@ export default function NextStepCard({
 	message: ProjectPageProps["message"];
 	deposit: ProjectPageProps["deposit"];
 	payments: ProjectPageProps["payments"];
-	scheduling: ProjectPageProps["scheduling"];
-	dates: ProjectPageProps["sessionDates"];
 	finish: ProjectPageProps["finish"];
 	lastChannel: ProjectPageProps["lastChannel"];
 	onContact: (via: ContactVia) => void;
+	/** The page's sheets: this card only draws their triggers. */
+	sheets: Pick<PageSheets, "revise" | "record" | "schedule">;
 	/** The page's heading: where focus goes when an action removes the button that had it. */
 	fallback: RefObject<HTMLElement | null>;
 }) {
@@ -114,11 +109,10 @@ export default function NextStepCard({
 			case "revise_quote":
 				return (
 					quote && (
-						<ReviseSheet
-							projectId={projectId}
-							quote={quote}
-							form={form}
-							fallback={fallback}
+						<ReviseTrigger
+							id={cardId("quote-form", step.anchor)}
+							sheet={sheets.revise}
+							variant={variant}
 						/>
 					)
 				);
@@ -156,25 +150,20 @@ export default function NextStepCard({
 			case "record_payment":
 				return (
 					payments.actions && (
-						<RecordPaymentSheet
-							projectId={projectId}
-							actions={payments.actions}
-							fallback={fallback}
+						<FormSheetTrigger
+							sheet={sheets.record}
+							label="Record payment"
 							variant={variant}
 						/>
 					)
 				);
 			case "schedule":
 				return (
-					scheduling && (
-						<ScheduleSheet
-							projectId={projectId}
-							scheduling={scheduling}
-							dates={dates}
-							fallback={fallback}
-							variant={variant}
-						/>
-					)
+					<FormSheetTrigger
+						sheet={sheets.schedule}
+						label="Schedule a session"
+						variant={variant}
+					/>
 				);
 			case "open_sessions":
 				return (

@@ -2,11 +2,12 @@ import { Form } from "@adonisjs/inertia/react";
 import { router } from "@inertiajs/react";
 import { type RefObject, useEffect, useId, useRef, useState } from "react";
 import { urlFor } from "~/client";
-import FormSheet, {
+import {
 	FormSheetActions,
+	FormSheetPanel,
 	type FormSheetState,
+	FormSheetTrigger,
 	focusFirstInvalid,
-	useFormSheet,
 } from "~/components/form_sheet";
 import { cardId } from "~/components/project_page";
 import {
@@ -49,20 +50,18 @@ type Dates = { today: string; max: string };
  * moves to the card's heading, so a screen reader lands on the updated list.
  */
 export default function SessionsCard({
-	projectId,
 	sessions,
 	dates,
 	scheduling,
-	fallback,
+	schedule,
 	anchor,
 	showSchedule,
 }: {
-	projectId: string;
 	sessions: SessionRow[];
 	dates: Dates;
 	scheduling: ProjectPageProps["scheduling"];
-	/** Where focus goes when the schedule sheet's trigger is gone after a save: the page heading. */
-	fallback: RefObject<HTMLElement | null>;
+	/** The page's schedule sheet: this card only draws its trigger. */
+	schedule: FormSheetState;
 	/** The id the Next step card carries (`nextStep.anchor`): when it is `sessions`, the card gives its own up. */
 	anchor: string | null;
 	/** False when the Next step card already offers "Schedule a session". */
@@ -107,12 +106,7 @@ export default function SessionsCard({
 				)}
 				{scheduling && showSchedule && (
 					<div>
-						<ScheduleSheet
-							projectId={projectId}
-							scheduling={scheduling}
-							dates={dates}
-							fallback={fallback}
-						/>
+						<FormSheetTrigger sheet={schedule} label="Schedule a session" />
 					</div>
 				)}
 			</CardContent>
@@ -419,39 +413,41 @@ function MoveForm({
  * "Schedule a session" (TAT-85 part 2): the form in a sheet, with the server's hint about what a
  * tattoo session does to the project as its description. Kind, artist (fixed for an artist
  * member), date, start and length. After a refused save the sheet stays open with what was
- * typed and the errors under their fields.
+ * typed and the errors under their fields. Mounted once by the page whichever card draws the
+ * trigger (the Next step card, or the Sessions card).
  */
-export function ScheduleSheet({
+export function SchedulePanel({
+	sheet,
 	projectId,
 	scheduling,
 	dates,
 	fallback,
-	variant = "outline",
 }: {
+	sheet: FormSheetState;
 	projectId: string;
-	scheduling: NonNullable<ProjectPageProps["scheduling"]>;
+	scheduling: ProjectPageProps["scheduling"];
 	dates: Dates;
 	fallback: RefObject<HTMLElement | null>;
-	variant?: "default" | "outline";
 }) {
-	const sheet = useFormSheet();
-
 	return (
-		<FormSheet
-			label="Schedule a session"
-			variant={variant}
-			title="Schedule a session"
-			description={scheduling.hint ?? "Pick the kind, the artist and the time."}
+		<FormSheetPanel
 			sheet={sheet}
+			title="Schedule a session"
+			description={
+				scheduling?.hint ?? "Pick the kind, the artist and the time."
+			}
 			fallback={fallback}
+			available={scheduling !== null}
 		>
-			<ScheduleForm
-				projectId={projectId}
-				scheduling={scheduling}
-				dates={dates}
-				sheet={sheet}
-			/>
-		</FormSheet>
+			{scheduling && (
+				<ScheduleForm
+					projectId={projectId}
+					scheduling={scheduling}
+					dates={dates}
+					sheet={sheet}
+				/>
+			)}
+		</FormSheetPanel>
 	);
 }
 

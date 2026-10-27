@@ -5,18 +5,22 @@ import { useRef } from "react";
 import { urlFor } from "~/client";
 import ChangeCard from "~/components/change_card";
 import { DepositCard } from "~/components/deposit_panel";
+import { usePageSheets } from "~/components/form_sheet";
 import { SOURCE_LABELS } from "~/components/inquiries";
 import MessageCard from "~/components/message_card";
 import type { ContactVia } from "~/components/messages";
 import NextStepCard from "~/components/next_step_card";
 import Page from "~/components/page";
-import PaymentsCard from "~/components/payments_card";
+import PaymentsCard, {
+	RecordPaymentPanel,
+	RefundPanel,
+} from "~/components/payments_card";
 import ProgressLine from "~/components/progress_line";
 import { placementsOf } from "~/components/project_page";
 import type { ProjectPageProps } from "~/components/projects";
-import { QuoteCard } from "~/components/quote_card";
+import { PricePanel, QuoteCard, RevisePanel } from "~/components/quote_card";
 import ReferenceGrid from "~/components/references";
-import SessionsCard from "~/components/sessions_card";
+import SessionsCard, { SchedulePanel } from "~/components/sessions_card";
 import StatusBadge from "~/components/status_badge";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -67,6 +71,8 @@ export default function ProjectShow(props: ProjectPageProps) {
 	// Where each control is drawn: in the Next step card when it names it, else in its own card, so
 	// nothing the page offers is out of reach.
 	const place = placementsOf(props);
+	// One instance of each sheet, whichever card draws its trigger (see usePageSheets).
+	const sheets = usePageSheets();
 	const params = { tenant: tenant.slug, id: project.id };
 	// A save or a finished step can remove the button that had focus: focus goes
 	// to the page heading instead of <body>.
@@ -121,20 +127,18 @@ export default function ProjectShow(props: ProjectPageProps) {
 						message={message}
 						deposit={deposit}
 						payments={payments}
-						scheduling={scheduling}
-						dates={sessionDates}
 						finish={finish}
 						lastChannel={lastChannel}
 						onContact={markContacted}
+						sheets={sheets}
 						fallback={heading}
 					/>
 
 					<SessionsCard
-						projectId={project.id}
 						sessions={sessions}
 						dates={sessionDates}
 						scheduling={scheduling}
-						fallback={heading}
+						schedule={sheets.schedule}
 						anchor={nextStep.anchor}
 						showSchedule={place.schedule === "card"}
 					/>
@@ -177,7 +181,7 @@ export default function ProjectShow(props: ProjectPageProps) {
 						canSetPrice={canSetPrice}
 						place={place}
 						nextStep={nextStep}
-						fallback={heading}
+						sheets={sheets}
 					/>
 
 					{deposit && place.deposit_link === "card" && (
@@ -202,10 +206,45 @@ export default function ProjectShow(props: ProjectPageProps) {
 						onContact={markContacted}
 						place={place}
 						nextStep={nextStep}
-						fallback={heading}
+						sheets={sheets}
 					/>
 				</div>
 			</div>
+
+			{/* The sheets: one instance each, whichever card draws the trigger. */}
+			<RevisePanel
+				sheet={sheets.revise}
+				projectId={project.id}
+				quote={quote}
+				form={form}
+				available={place.revise_quote !== null}
+				fallback={heading}
+			/>
+			<PricePanel
+				sheet={sheets.price}
+				projectId={project.id}
+				available={place.set_price !== null}
+				fallback={heading}
+			/>
+			<RecordPaymentPanel
+				sheet={sheets.record}
+				projectId={project.id}
+				actions={payments.actions}
+				fallback={heading}
+			/>
+			<RefundPanel
+				sheet={sheets.refund}
+				projectId={project.id}
+				maxText={payments.actions?.refundMaxText ?? null}
+				fallback={heading}
+			/>
+			<SchedulePanel
+				sheet={sheets.schedule}
+				projectId={project.id}
+				scheduling={scheduling}
+				dates={sessionDates}
+				fallback={heading}
+			/>
 		</Page>
 	);
 }
