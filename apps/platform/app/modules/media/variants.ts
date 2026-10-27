@@ -15,12 +15,15 @@
 /** The copies a purpose with copies gets, narrowest first. */
 export const VARIANT_WIDTHS = [320, 640, 1280] as const;
 /**
- * A studio's cover photo (TAT-116): copies 640, 960 and 1280 px wide. The
- * hero is about 329 px wide on a phone, so a phone at 2x to 2.75x takes the
- * 960 copy instead of the 1280 one (about half the bytes of the first
- * screen); a phone at 3x and a wide screen take the 1280 one.
+ * A studio's cover photo (TAT-116): copies 640, 960, 1280 and 1600 px wide.
+ * The hero is about 329 px wide on a phone, so a phone at 2x to 2.75x takes
+ * the 960 copy (about half the bytes of the 1280 one) and a 4:3 photo at 3x
+ * the 1280 one. A 16:9 photo is enlarged to fill the phone's 4:3 box, so at
+ * 3x it needs about 1320 px: without the 1600 copy the browser took the
+ * stored 2048 px image (428 KB for a detailed photo). A wide screen takes the
+ * 1280 or the 1600 one.
  */
-export const COVER_WIDTHS = [640, 960, 1280] as const;
+export const COVER_WIDTHS = [640, 960, 1280, 1600] as const;
 /** A purpose that keeps one size. */
 export const NO_VARIANTS = [] as const;
 

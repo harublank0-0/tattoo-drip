@@ -304,7 +304,7 @@ test.group("StudioPageService: cover and work photos (TAT-116)", (group) => {
 		});
 		assert.deepEqual(
 			result.cover?.variants.map((copy) => copy.width),
-			[640, 960, 1280],
+			[640, 960, 1280, 1600],
 		);
 		// Only the artists read: the cover comes from the row already loaded.
 		assert.lengthOf(

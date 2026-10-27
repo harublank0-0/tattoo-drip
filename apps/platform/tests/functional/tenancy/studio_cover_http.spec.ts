@@ -64,7 +64,7 @@ test.group("Studio cover photo (TAT-116)", (group) => {
 		);
 		assert.equal(first.coverImageWidth, 2048);
 		assert.equal(first.coverImageHeight, 1536);
-		assert.lengthOf(await storedImages(tenant, PURPOSE), 4);
+		assert.lengthOf(await storedImages(tenant, PURPOSE), 5);
 
 		const replaced = await setCover(
 			client,
@@ -78,7 +78,7 @@ test.group("Studio cover photo (TAT-116)", (group) => {
 		assert.notEqual(second.coverImageKey, first.coverImageKey);
 		assert.lengthOf(
 			await storedImages(tenant, PURPOSE),
-			4,
+			5,
 			"one cover is left",
 		);
 
@@ -114,7 +114,7 @@ test.group("Studio cover photo (TAT-116)", (group) => {
 		set.assertStatus(404);
 		removed.assertStatus(404);
 		assert.equal((await reload(tenant)).coverImageKey, before.coverImageKey);
-		assert.lengthOf(await storedImages(tenant, PURPOSE), 4);
+		assert.lengthOf(await storedImages(tenant, PURPOSE), 5);
 		await new Promise((resolve) => setTimeout(resolve, 100));
 		assert.deepEqual(await newTempUploads(temp), []);
 	});
@@ -164,7 +164,7 @@ test.group("Studio cover photo (TAT-116)", (group) => {
 
 		assertValidationError(response, "cover", FORMAT);
 		assert.equal((await reload(tenant)).coverImageKey, before);
-		assert.lengthOf(await storedImages(tenant, PURPOSE), 4);
+		assert.lengthOf(await storedImages(tenant, PURPOSE), 5);
 	});
 
 	test("without a file, or over 10 MB, the cover field says so", async ({
@@ -242,7 +242,7 @@ test.group(
 				"Couldn't remove the cover photo, try again.",
 			);
 			assert.equal((await reload(tenant)).coverImageKey, key);
-			assert.lengthOf(await storedImages(tenant, PURPOSE), 4);
+			assert.lengthOf(await storedImages(tenant, PURPOSE), 5);
 
 			const retry = await removeCover(client, owner, tenant);
 			retry.assertFlashMessage("success", "Cover photo removed.");

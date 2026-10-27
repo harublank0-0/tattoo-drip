@@ -39,11 +39,13 @@ test.group("TenancyService cover (TAT-116)", (group) => {
 		const row = await reload(tenant);
 		assert.match(
 			row.coverImageKey ?? "",
-			new RegExp(`^tenants/${tenant.id}/${PURPOSE}/.+\\.640-960-1280\\.jpg$`),
+			new RegExp(
+				`^tenants/${tenant.id}/${PURPOSE}/.+\\.640-960-1280-1600\\.jpg$`,
+			),
 		);
 		assert.equal(row.coverImageWidth, 2048);
 		assert.equal(row.coverImageHeight, 1536);
-		assert.lengthOf(await storedImages(tenant, PURPOSE), 4);
+		assert.lengthOf(await storedImages(tenant, PURPOSE), 5);
 		assert.deepEqual(await storedImages(tenant, PURPOSE, "private"), []);
 	});
 
@@ -59,7 +61,7 @@ test.group("TenancyService cover (TAT-116)", (group) => {
 			await tenancy.setCover(tenant, await cover());
 			assert.lengthOf(
 				await storedImages(tenant, PURPOSE),
-				8,
+				10,
 				"the old cover stays until the commit",
 			);
 		});
@@ -68,7 +70,7 @@ test.group("TenancyService cover (TAT-116)", (group) => {
 		assert.notEqual(row.coverImageKey, old);
 		assert.lengthOf(
 			await storedImages(tenant, PURPOSE),
-			4,
+			5,
 			"one cover is left",
 		);
 	});
@@ -86,7 +88,7 @@ test.group("TenancyService cover (TAT-116)", (group) => {
 			);
 		}
 
-		assert.lengthOf(await storedImages(tenant, PURPOSE), 4);
+		assert.lengthOf(await storedImages(tenant, PURPOSE), 5);
 		assert.isNotNull((await reload(tenant)).coverImageKey);
 	});
 
@@ -108,7 +110,7 @@ test.group("TenancyService cover (TAT-116)", (group) => {
 		);
 
 		assert.equal((await reload(tenant)).coverImageKey, old);
-		assert.lengthOf(await storedImages(tenant, PURPOSE), 4);
+		assert.lengthOf(await storedImages(tenant, PURPOSE), 5);
 	});
 
 	test("removeCover deletes the files first, then clears the three columns", async ({
@@ -167,7 +169,7 @@ test.group("TenancyService cover (TAT-116)", (group) => {
 		}
 
 		assert.equal((await reload(tenant)).coverImageKey, old);
-		assert.lengthOf(await storedImages(tenant, PURPOSE), 4);
+		assert.lengthOf(await storedImages(tenant, PURPOSE), 5);
 	});
 
 	test("another tenant's context cannot set this tenant's cover", async ({
@@ -278,8 +280,8 @@ test.group(
 				),
 				"the failed key is in the error log",
 			);
-			// The new cover's four files, plus the one old file that could not be deleted.
-			assert.lengthOf(await storedImages(tenant, PURPOSE), 5);
+			// The new cover's five files, plus the one old file that could not be deleted.
+			assert.lengthOf(await storedImages(tenant, PURPOSE), 6);
 		});
 	},
 );

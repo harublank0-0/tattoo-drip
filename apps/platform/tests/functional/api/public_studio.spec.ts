@@ -212,7 +212,7 @@ test.group("GET /api/v1/tenants/:tenant (getStudio)", (group) => {
 		assert.isNull(data.cover.alt);
 		assert.deepEqual(
 			data.cover.variants.map((variant: { width: number }) => variant.width),
-			[640, 960, 1280],
+			[640, 960, 1280, 1600],
 		);
 		for (const variant of data.cover.variants) {
 			assert.deepEqual(Object.keys(variant).sort(), ["url", "width"]);

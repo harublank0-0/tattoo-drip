@@ -656,11 +656,11 @@ test.group("ImageService copies (TAT-112)", () => {
 
 test.group("cover and work photo purposes (TAT-116)", () => {
 	const PURPOSES = [
-		{ purpose: "studio_cover", key: /\.640-960-1280\.jpg$/ },
+		{ purpose: "studio_cover", key: /\.640-960-1280-1600\.jpg$/ },
 		{ purpose: "artist_work_photo", key: /\.320-640-1280\.jpg$/ },
 	] as const;
 
-	test("a studio cover is stored on the public disk with 640, 960 and 1280 px copies", async ({
+	test("a studio cover is stored on the public disk with 640, 960, 1280 and 1600 px copies", async ({
 		assert,
 	}) => {
 		const studio = { id: randomUUID() };
@@ -673,10 +673,10 @@ test.group("cover and work photo purposes (TAT-116)", () => {
 		assert.match(
 			stored.key,
 			new RegExp(
-				`^tenants/${studio.id}/studio_cover/${V4}\\.640-960-1280\\.jpg$`,
+				`^tenants/${studio.id}/studio_cover/${V4}\\.640-960-1280-1600\\.jpg$`,
 			),
 		);
-		assert.lengthOf(await storedImages(studio, "studio_cover"), 4);
+		assert.lengthOf(await storedImages(studio, "studio_cover"), 5);
 		assert.deepEqual(await storedImages(studio, "studio_cover", "private"), []);
 		const shown = await images.shownImage(
 			"studio_cover",
@@ -686,7 +686,7 @@ test.group("cover and work photo purposes (TAT-116)", () => {
 		);
 		assert.deepEqual(
 			shown.variants.map((copy) => copy.width),
-			[640, 960, 1280],
+			[640, 960, 1280, 1600],
 		);
 		assert.equal(shown.width, 2048);
 		assert.equal(shown.height, 1536);

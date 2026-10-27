@@ -383,8 +383,8 @@ export interface components {
             /**
              * @description Smaller copies, narrowest first, each narrower than `width`. The
              *     widths depend on the kind of image: 320, 640 and 1280 px for
-             *     photos, 640, 960 and 1280 px for a cover, only those below the
-             *     image's own width. Empty for an image stored before them or too
+             *     photos, 640, 960, 1280 and 1600 px for a cover, only those below
+             *     the image's own width. Empty for an image stored before them or too
              *     small to have any: then show `url` alone. Build `srcset` from
              *     these and `url` at `width`.
              */

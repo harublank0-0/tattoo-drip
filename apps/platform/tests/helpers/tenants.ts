@@ -148,7 +148,7 @@ export async function seededStudio(slug: string, name: string) {
 	// photos, so that a move changes something.
 	await inTenant(tenant, async () => {
 		tenant.merge({
-			coverImageKey: `tenants/${tenant.id}/studio_cover/${randomUUID()}.640-960-1280.jpg`,
+			coverImageKey: `tenants/${tenant.id}/studio_cover/${randomUUID()}.640-960-1280-1600.jpg`,
 			coverImageWidth: 2048,
 			coverImageHeight: 1536,
 		});
