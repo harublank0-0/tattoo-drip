@@ -20,7 +20,7 @@ import {
 	uploadOf,
 } from "#tests/helpers/images";
 import { recordQueries } from "#tests/helpers/query_count";
-import { failDeletes } from "#tests/helpers/storage_failures";
+import { failDeletes, withStrayCopy } from "#tests/helpers/storage_failures";
 import {
 	artistIn,
 	inTenant,
@@ -686,3 +686,47 @@ test.group("removing a photo is durable (TAT-116 fix round 1)", (group) => {
 		);
 	});
 });
+
+test.group(
+	"removing a photo stored in the upload fallback state (TAT-116 fix round 2)",
+	(group) => {
+		group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+		test("a variant write fails and its cleanup fails: the owner's removal still leaves no file for that photo", async ({
+			assert,
+		}) => {
+			const { tenant, owner: user } = await studioWithOwner();
+			const sita = await addArtist(tenant, user);
+			const { photos } = makeService();
+			const editor = owner(user.id);
+			const photo = await withStrayCopy(
+				"public",
+				{ writtenFirst: ".320w.jpg", failing: ".640w.jpg" },
+				async () =>
+					inTenant(tenant, async () =>
+						photos.add(tenant, editor, sita, await upload()),
+					),
+			);
+			// A plain key names no copies, yet one is on the disk.
+			assert.notMatch(photo.imageKey, /\.320-640-1280\./);
+			assert.lengthOf(await storedImages(tenant, PURPOSE), 2);
+			// Another photo with all its files, which must survive.
+			const other = await inTenant(tenant, async () =>
+				photos.add(tenant, editor, sita, await upload()),
+			);
+
+			await inTenant(tenant, () => photos.remove(tenant, editor, photo));
+
+			const left = await storedImages(tenant, PURPOSE);
+			const idOf = (key: string) => key.split("/").pop()?.split(".")[0] ?? "";
+			assert.lengthOf(left, 4, "only the other photo's files are left");
+			assert.isTrue(
+				left.every((file) => file.startsWith(idOf(other.imageKey))),
+			);
+			assert.deepEqual(
+				(await order(tenant, sita.id)).map((row) => [row.id, row.position]),
+				[[other.id, 0]],
+			);
+		});
+	},
+);

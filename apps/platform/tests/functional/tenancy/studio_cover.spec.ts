@@ -11,7 +11,7 @@ import {
 	uploadOf,
 } from "#tests/helpers/images";
 import { captureLogs } from "#tests/helpers/logs";
-import { failDeletes } from "#tests/helpers/storage_failures";
+import { failDeletes, withStrayCopy } from "#tests/helpers/storage_failures";
 import { inTenant, inTenantAs, studioWithOwner } from "#tests/helpers/tenants";
 import { storedImages } from "#tests/helpers/uploads";
 
@@ -282,6 +282,55 @@ test.group(
 			);
 			// The new cover's five files, plus the one old file that could not be deleted.
 			assert.lengthOf(await storedImages(tenant, PURPOSE), 6);
+		});
+	},
+);
+
+test.group(
+	"a cover stored in the upload fallback state (TAT-116 fix round 2)",
+	(group) => {
+		group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+		const strayCover = (tenant: { id: string }, tenancy: TenancyService) =>
+			withStrayCopy(
+				"public",
+				{ writtenFirst: ".640w.jpg", failing: ".960w.jpg" },
+				async () =>
+					inTenant(tenant, async () => tenancy.setCover(tenant, await cover())),
+			);
+
+		test("removeCover leaves no file for that cover", async ({ assert }) => {
+			const { tenant } = await studioWithOwner();
+			const { tenancy } = makeService();
+			await strayCover(tenant, tenancy);
+			assert.lengthOf(
+				await storedImages(tenant, PURPOSE),
+				2,
+				"the plain image and a stray copy",
+			);
+
+			await inTenant(tenant, () => tenancy.removeCover(tenant));
+
+			assert.isNull((await reload(tenant)).coverImageKey);
+			assert.deepEqual(await storedImages(tenant, PURPOSE), []);
+		});
+
+		test("replacing it removes the old image and its stray copy (best effort), and the new cover is whole", async ({
+			assert,
+		}) => {
+			const { tenant } = await studioWithOwner();
+			const { tenancy } = makeService();
+			await strayCover(tenant, tenancy);
+
+			await inTenant(tenant, async () =>
+				tenancy.setCover(tenant, await cover()),
+			);
+
+			assert.lengthOf(
+				await storedImages(tenant, PURPOSE),
+				5,
+				"only the new cover's files",
+			);
 		});
 	},
 );

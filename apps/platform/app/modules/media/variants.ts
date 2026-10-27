@@ -84,3 +84,26 @@ export function variantsOfKey(key: string): { width: number; key: string }[] {
 		key: variantKey(base, width, extension as ImageExtension),
 	}));
 }
+
+/** The base and extension of an image's own key, whether or not it names copies. */
+const IMAGE_KEY = /^([^.]+)(?:\.[1-9]\d{0,3}(?:-[1-9]\d{0,3})*)?\.(jpg|png)$/;
+
+/**
+ * The key of every copy an image could have for these widths, named or not
+ * (TAT-116 fix round 2): `[]` for a key that is not an image's own (a copy's
+ * key, anything malformed). A key names the copies that were written, but an
+ * upload whose copy cleanup failed is stored under a plain key while a copy
+ * stays on the disk, so removing an image must look for every width its
+ * purpose could have made, not only the ones its key names.
+ */
+export function possibleCopyKeys(
+	key: string,
+	widths: readonly number[],
+): string[] {
+	const match = IMAGE_KEY.exec(key);
+	if (!match) return [];
+	const [, base, extension] = match;
+	return widths.map((width) =>
+		variantKey(base, width, extension as ImageExtension),
+	);
+}

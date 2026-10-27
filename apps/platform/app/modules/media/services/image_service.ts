@@ -15,6 +15,7 @@ import {
 	type ImageExtension,
 	NO_VARIANTS,
 	originalKey,
+	possibleCopyKeys,
 	VARIANT_WIDTHS,
 	variantKey,
 	variantsOfKey,
@@ -174,7 +175,15 @@ export default class ImageService {
 				{ err: error, purpose },
 				"image copies could not be stored; keeping the image without them",
 			);
-			await this.removeAll(purpose, written);
+			const stray = await this.removeAll(purpose, written);
+			if (stray.length > 0) {
+				// The image is stored without copies now, so nothing names these:
+				// say which, once, so they can be found (and removal looks for them).
+				logger.error(
+					{ purpose, base, stray },
+					"copies of an image stored without them could not be deleted",
+				);
+			}
 			return [];
 		}
 	}
@@ -271,8 +280,8 @@ export default class ImageService {
 	deleteFailures = 0;
 
 	/**
-	 * Removes a stored image and the copies its key names, best effort:
-	 * every file is tried, a failure is counted (`deleteFailures`) and logged
+	 * Removes a stored image, the copies its key names and every copy its
+	 * purpose could have made for it (`filesOf`), best effort: every file is tried, a failure is counted (`deleteFailures`) and logged
 	 * with its purpose and key, never thrown, so cleanup can't fail a request.
 	 * Use it for what no record points at any more or what a rollback leaves
 	 * (a replaced image after the commit); a file that fails stays unreferenced
@@ -280,10 +289,7 @@ export default class ImageService {
 	 * while a file is still reachable uses `deleteOrThrow`.
 	 */
 	async delete(purpose: ImagePurpose, key: string): Promise<void> {
-		await this.removeAll(purpose, [
-			key,
-			...variantsOfKey(key).map((copy) => copy.key),
-		]);
+		await this.removeAll(purpose, this.filesOf(purpose, key));
 	}
 
 	/**
@@ -296,11 +302,27 @@ export default class ImageService {
 	 * the record for the owner to try again.
 	 */
 	async deleteOrThrow(purpose: ImagePurpose, key: string): Promise<void> {
-		const failed = await this.removeAll(purpose, [
-			key,
-			...variantsOfKey(key).map((copy) => copy.key),
-		]);
+		const failed = await this.removeAll(purpose, this.filesOf(purpose, key));
 		if (failed.length > 0) throw new ImageDeleteError(purpose, failed);
+	}
+
+	/**
+	 * Every file an image can have: the image, the copies its key names, and
+	 * every copy its purpose could have made for the same base name. The
+	 * second set is for the fallback state: if a copy was written, a later one
+	 * failed and the cleanup of the first failed too, the image is stored under
+	 * a plain key (it names no copies) while a copy stays on the disk, and a
+	 * removal that trusted the key would leave that copy fetchable. A file that
+	 * was never written is not an error to delete.
+	 */
+	private filesOf(purpose: ImagePurpose, key: string): string[] {
+		return [
+			...new Set([
+				key,
+				...variantsOfKey(key).map((copy) => copy.key),
+				...possibleCopyKeys(key, IMAGE_PURPOSES[purpose].variants),
+			]),
+		];
 	}
 
 	/** Deletes each key on its own (one that fails or is gone leaves the rest) and returns the keys that failed. */

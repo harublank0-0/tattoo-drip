@@ -14,7 +14,7 @@ import { variantsOfKey } from "#modules/media/variants";
 import env from "#start/env";
 import { POLYGLOT_MARKERS, polyglot, testImages } from "#tests/helpers/images";
 import { captureLogs } from "#tests/helpers/logs";
-import { failDeletes } from "#tests/helpers/storage_failures";
+import { failDeletes, withStrayCopy } from "#tests/helpers/storage_failures";
 import { storedImages } from "#tests/helpers/uploads";
 
 const images = new ImageService();
@@ -883,3 +883,141 @@ test.group("deleting stored images (TAT-116 fix round 1)", () => {
 		await images.deleteOrThrow("artist_work_photo", stored.key);
 	});
 });
+
+test.group(
+	"a copy left by the upload fallback is removed too (TAT-116 fix round 2)",
+	() => {
+		/** An image stored in the fallback state: a plain key, and its 320 copy still on the disk. */
+		async function storedWithStrayCopy(
+			studio: { id: string },
+			purpose: "artist_work_photo" | "studio_cover",
+			service = new ImageService(),
+		) {
+			const widths = purpose === "studio_cover" ? [640, 960] : [320, 640];
+			return withStrayCopy(
+				"public",
+				{ writtenFirst: `.${widths[0]}w.jpg`, failing: `.${widths[1]}w.jpg` },
+				async () =>
+					service.store(await upload(await testImages.jpeg(2000, 1500)), {
+						tenant: studio,
+						purpose,
+					}),
+			);
+		}
+
+		for (const purpose of ["artist_work_photo", "studio_cover"] as const) {
+			test(`${purpose}: stored as a plain key with a stray copy, deleteOrThrow leaves no file for that base`, async ({
+				assert,
+			}) => {
+				const studio = { id: randomUUID() };
+				const logs = captureLogs();
+				let stored: Awaited<ReturnType<typeof storedWithStrayCopy>>;
+				try {
+					stored = await storedWithStrayCopy(studio, purpose);
+				} finally {
+					logs.restore();
+				}
+
+				// The fallback state: no copy is named, yet one is on the disk.
+				assert.match(stored.key, /\.jpg$/);
+				assert.deepEqual(variantsOfKey(stored.key), []);
+				assert.lengthOf(await storedImages(studio, purpose), 2);
+				// The stray copy is logged with its purpose and base, not swallowed.
+				const entry = logs
+					.errors()
+					.map(
+						([fields]) =>
+							fields as { purpose?: string; base?: string; stray?: string[] },
+					)
+					.find((fields) => fields.stray !== undefined);
+				assert.equal(entry?.purpose, purpose);
+				assert.equal(entry?.base, stored.key.replace(/\.jpg$/, ""));
+				assert.lengthOf(entry?.stray ?? [], 1);
+
+				await images.deleteOrThrow(purpose, stored.key);
+
+				assert.deepEqual(await storedImages(studio, purpose), []);
+			});
+		}
+
+		test("delete (best effort) removes the stray copy too", async ({
+			assert,
+		}) => {
+			const studio = { id: randomUUID() };
+			const logs = captureLogs();
+			let stored: Awaited<ReturnType<typeof storedWithStrayCopy>>;
+			try {
+				stored = await storedWithStrayCopy(studio, "artist_work_photo");
+			} finally {
+				logs.restore();
+			}
+			const service = new ImageService();
+
+			await service.delete("artist_work_photo", stored.key);
+
+			assert.deepEqual(await storedImages(studio, "artist_work_photo"), []);
+			assert.equal(service.deleteFailures, 0);
+		});
+
+		test("a normal key still removes exactly its files, and a file that is not there is no error", async ({
+			assert,
+		}) => {
+			const studio = { id: randomUUID() };
+			// 700 px wide: the key names the 320 and 640 copies; the 1280 one never existed.
+			const stored = await images.store(
+				await upload(await testImages.jpeg(700, 500)),
+				{ tenant: studio, purpose: "artist_work_photo" },
+			);
+			assert.lengthOf(await storedImages(studio, "artist_work_photo"), 3);
+			const service = new ImageService();
+
+			await service.deleteOrThrow("artist_work_photo", stored.key);
+			await service.deleteOrThrow("artist_work_photo", stored.key);
+			await service.delete("artist_work_photo", stored.key);
+
+			assert.deepEqual(await storedImages(studio, "artist_work_photo"), []);
+			assert.equal(service.deleteFailures, 0);
+		});
+
+		test("another image of the same studio is never touched", async ({
+			assert,
+		}) => {
+			const studio = { id: randomUUID() };
+			const keep = await images.store(
+				await upload(await testImages.jpeg(2000, 1500)),
+				{ tenant: studio, purpose: "artist_work_photo" },
+			);
+			const gone = await images.store(
+				await upload(await testImages.jpeg(2000, 1500)),
+				{ tenant: studio, purpose: "artist_work_photo" },
+			);
+
+			await images.deleteOrThrow("artist_work_photo", gone.key);
+
+			const idOf = (key: string) => key.split("/").pop()?.split(".")[0] ?? "";
+			const left = await storedImages(studio, "artist_work_photo");
+			assert.lengthOf(left, 4);
+			assert.isTrue(left.every((file) => file.startsWith(idOf(keep.key))));
+		});
+
+		test("a purpose that keeps one size has no copies to look for", async ({
+			assert,
+		}) => {
+			const studio = { id: randomUUID() };
+			const stored = await images.store(
+				await upload(await testImages.jpeg(2000, 1500)),
+				{ tenant: studio, purpose: "payment_qr" },
+			);
+			const service = new ImageService();
+			const attempts = failDeletes("public", () => false);
+
+			try {
+				await service.deleteOrThrow("payment_qr", stored.key);
+			} finally {
+				attempts.restore();
+			}
+
+			assert.lengthOf(attempts.attempts, 1);
+		});
+	},
+);
