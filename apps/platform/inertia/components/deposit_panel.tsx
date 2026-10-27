@@ -5,9 +5,16 @@ import { urlFor } from "~/client";
 import ChatMessage from "~/components/chat_message";
 import DevHostWarning from "~/components/dev_host_warning";
 import InlineConfirm from "~/components/inline_confirm";
-import type { ContactChannelName, PrimaryChannel } from "~/components/messages";
+import {
+	type ContactChannelName,
+	type ContactVia,
+	type PrimaryChannel,
+	primaryChannel,
+} from "~/components/messages";
+import { cardId } from "~/components/project_page";
 import type { ProjectPageProps } from "~/components/projects";
 import { Button } from "~/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Field, FieldDescription, FieldLabel } from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
 import { useTenant } from "~/hooks/use-tenant";
@@ -124,5 +131,47 @@ export default function DepositPanel({
 				</div>
 			)}
 		</div>
+	);
+}
+
+/**
+ * The Deposit card (TAT-108): the deposit panel in a card of its own, for a project that waits for
+ * its deposit while the Next step card is something else (a screenshot to check, a price that
+ * ended). The panel is the Next step's own when it names `deposit_link`; the old page always drew
+ * it, so it is never out of reach. The card carries the `deposit` id unless the Next step does.
+ */
+export function DepositCard({
+	projectId,
+	deposit,
+	lastChannel,
+	onContact,
+	anchor,
+	fallback,
+}: {
+	projectId: string;
+	deposit: NonNullable<ProjectPageProps["deposit"]>;
+	lastChannel: ProjectPageProps["lastChannel"];
+	onContact: (via: ContactVia) => void;
+	anchor: string | null;
+	fallback: RefObject<HTMLElement | null>;
+}) {
+	return (
+		<Card
+			id={cardId("deposit", anchor)}
+			className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)] lg:scroll-mt-0"
+		>
+			<CardHeader>
+				<CardTitle className="leading-snug">Deposit</CardTitle>
+			</CardHeader>
+			<CardContent>
+				<DepositPanel
+					projectId={projectId}
+					deposit={deposit}
+					primary={primaryChannel(lastChannel)}
+					onSent={(channel) => onContact({ channel, kind: "deposit_link" })}
+					fallback={fallback}
+				/>
+			</CardContent>
+		</Card>
 	);
 }

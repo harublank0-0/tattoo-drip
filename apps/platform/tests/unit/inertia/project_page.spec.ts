@@ -19,9 +19,64 @@ type PageModule = {
 		blocks: string[];
 		buttons: string[];
 	};
+	AFFORDANCES: readonly string[];
+	placementsOf(page: Facts): Record<string, "step" | "card" | null>;
+	idsOnPage(page: Facts): string[];
 };
-const { PROGRESS_STEPS, CARD_IDS, progressOf, cardId, offers, layoutOf } =
-	pageModule as PageModule;
+const {
+	PROGRESS_STEPS,
+	CARD_IDS,
+	progressOf,
+	cardId,
+	offers,
+	layoutOf,
+	AFFORDANCES,
+	placementsOf,
+	idsOnPage,
+} = pageModule as PageModule;
+
+/** What the page knows about a project (the props the cards read). */
+type Facts = {
+	nextStep: Step & { anchor: string | null };
+	closed: boolean;
+	canQuote: boolean;
+	canAccept: boolean;
+	canSetPrice: boolean;
+	quote: unknown;
+	message: unknown;
+	deposit: unknown;
+	scheduling: unknown;
+	finish: unknown;
+	moves: string[];
+	assignment: unknown;
+	payments: {
+		pending: unknown[];
+		actions: { recordKinds: unknown[]; refundMax: number | null } | null;
+		outcome: { needed: unknown };
+	} | null;
+};
+
+/** A quiet owner's page: nothing available, no step. */
+const facts = (over: Partial<Facts> = {}): Facts => ({
+	nextStep: { primary: null, secondary: [], anchor: null },
+	closed: false,
+	canQuote: false,
+	canAccept: false,
+	canSetPrice: false,
+	quote: null,
+	message: null,
+	deposit: null,
+	scheduling: null,
+	finish: null,
+	moves: [],
+	assignment: null,
+	payments: {
+		pending: [],
+		actions: { recordKinds: [], refundMax: null },
+		outcome: { needed: null },
+	},
+	...over,
+});
 
 const states = (status: string) =>
 	progressOf(status)?.map(({ state }) => state) ?? null;
@@ -172,5 +227,226 @@ test.group("offers and layoutOf (TAT-108)", () => {
 			[...every.blocks, ...every.buttons],
 			[...NEXT_STEP_ACTIONS],
 		);
+	});
+});
+
+test.group(
+	"placementsOf: everything the page offers is drawn somewhere (TAT-108)",
+	() => {
+		const quote = { id: "q1" };
+		const phone = { text: "Hi" };
+
+		test("an action the Next step names is drawn there, any other the card that owns it", ({
+			assert,
+		}) => {
+			const page = facts({
+				nextStep: {
+					primary: "client_accepted",
+					secondary: ["send_quote"],
+					anchor: "quote",
+				},
+				canQuote: true,
+				canAccept: true,
+				quote,
+				message: phone,
+			});
+			const place = placementsOf(page);
+			assert.equal(place.client_accepted, "step");
+			assert.equal(place.send_quote, "step");
+			// Not named by the step, still offered by the page: the Quote card has it.
+			assert.equal(place.revise_quote, "card");
+		});
+
+		test("a held project's quote message is drawn by the Quote card (the step offers only Resume)", ({
+			assert,
+		}) => {
+			const place = placementsOf(
+				facts({
+					nextStep: {
+						primary: "resume",
+						secondary: ["revise_quote"],
+						anchor: "quote",
+					},
+					canQuote: true,
+					quote,
+					message: phone,
+					moves: ["resume", "withdraw"],
+				}),
+			);
+			assert.equal(place.send_quote, "card");
+			assert.equal(place.resume, "step");
+			assert.equal(place.withdraw, "card");
+			assert.isNull(place.client_accepted, "nothing to accept while held");
+		});
+
+		test("a screenshot to check does not hide Accept, the quote message or the deposit panel", ({
+			assert,
+		}) => {
+			const page = facts({
+				nextStep: {
+					primary: "verify_proof",
+					secondary: [],
+					anchor: "payments",
+				},
+				canQuote: true,
+				canAccept: true,
+				quote,
+				message: phone,
+				deposit: { link: null },
+				payments: {
+					pending: [{}],
+					actions: { recordKinds: ["deposit"], refundMax: null },
+					outcome: { needed: null },
+				},
+			});
+			const place = placementsOf(page);
+			assert.equal(place.verify_proof, "step");
+			assert.equal(place.client_accepted, "card");
+			assert.equal(place.send_quote, "card");
+			assert.equal(place.deposit_link, "card");
+			assert.equal(place.record_payment, "card");
+		});
+
+		test("the first quote has a card to be drawn in when the step does not offer it", ({
+			assert,
+		}) => {
+			const page = facts({ canQuote: true, quote: null });
+			assert.equal(placementsOf(page).issue_quote, "card");
+			assert.equal(
+				placementsOf({
+					...page,
+					nextStep: {
+						primary: "issue_quote",
+						secondary: [],
+						anchor: "quote-form",
+					},
+				}).issue_quote,
+				"step",
+			);
+		});
+
+		test("what is not available is placed nowhere", ({ assert }) => {
+			const place = placementsOf(facts({ closed: true }));
+			for (const action of AFFORDANCES) assert.isNull(place[action], action);
+		});
+
+		test("Mark contacted, the artist, set price and a refund are cards of their own", ({
+			assert,
+		}) => {
+			const place = placementsOf(
+				facts({
+					assignment: { artistId: null },
+					canSetPrice: true,
+					payments: {
+						pending: [],
+						actions: { recordKinds: [], refundMax: 500 },
+						outcome: { needed: null },
+					},
+				}),
+			);
+			assert.equal(place.mark_contacted, "card");
+			assert.equal(place.assign_artist, "card");
+			assert.equal(place.set_price, "card");
+			assert.equal(place.record_refund, "card");
+			assert.isNull(placementsOf(facts({ closed: true })).mark_contacted);
+		});
+
+		test("the finish panel is only ever the step's: with a session first it is dropped on purpose", ({
+			assert,
+		}) => {
+			const finish = { step: "finish" };
+			assert.equal(
+				placementsOf(
+					facts({
+						finish,
+						nextStep: { primary: "finish", secondary: [], anchor: null },
+					}),
+				).finish,
+				"step",
+			);
+			assert.isNull(placementsOf(facts({ finish })).finish);
+		});
+
+		test("an artist's page has no money to place", ({ assert }) => {
+			const place = placementsOf(
+				facts({ payments: null, canQuote: true, quote }),
+			);
+			for (const action of [
+				"verify_proof",
+				"record_outcome",
+				"record_payment",
+				"record_refund",
+				"deposit_link",
+			]) {
+				assert.isNull(place[action], action);
+			}
+			assert.equal(place.revise_quote, "card");
+		});
+	},
+);
+
+test.group("idsOnPage: each link target exists once (TAT-108)", () => {
+	const quote = { id: "q1" };
+
+	test("the step carries its anchor and the card that owns it gives it up", ({
+		assert,
+	}) => {
+		for (const anchor of [
+			"payments",
+			"quote",
+			"quote-form",
+			"deposit",
+			"sessions",
+		]) {
+			const ids = idsOnPage(
+				facts({
+					nextStep: { primary: null, secondary: [], anchor },
+					canQuote: true,
+					quote,
+					deposit: { link: null },
+				}),
+			);
+			assert.equal(ids.filter((id) => id === anchor).length, 1, anchor);
+			assert.deepEqual(ids, [...new Set(ids)], `${anchor}: no id twice`);
+		}
+	});
+
+	test("Revise and the deposit panel carry their ids wherever they are drawn", ({
+		assert,
+	}) => {
+		const base = {
+			canQuote: true,
+			quote,
+			deposit: { link: null },
+		};
+		// In the step (anchor elsewhere): both ids exist.
+		const inStep = idsOnPage(
+			facts({
+				...base,
+				nextStep: {
+					primary: "deposit_link",
+					secondary: ["revise_quote"],
+					anchor: "quote",
+				},
+			}),
+		);
+		assert.includeMembers(inStep, [
+			"quote-form",
+			"deposit",
+			"sessions",
+			"payments",
+		]);
+		// In their own cards (the step offers neither).
+		const inCards = idsOnPage(facts(base));
+		assert.includeMembers(inCards, ["quote", "quote-form", "deposit"]);
+		// No deposit panel, no id.
+		assert.notInclude(idsOnPage(facts({ canQuote: true, quote })), "deposit");
+	});
+
+	test("an artist's page has no Payments card, so no #payments", ({
+		assert,
+	}) => {
+		assert.notInclude(idsOnPage(facts({ payments: null })), "payments");
+		assert.include(idsOnPage(facts()), "payments");
 	});
 });

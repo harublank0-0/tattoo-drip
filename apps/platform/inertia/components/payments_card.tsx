@@ -27,7 +27,11 @@ import {
 	type PendingProofProps,
 	recordFormKey,
 } from "~/components/payments";
-import { cardId, offers } from "~/components/project_page";
+import {
+	type Affordance,
+	cardId,
+	type Placement,
+} from "~/components/project_page";
 import { type NextStepProps, refundLabel } from "~/components/projects";
 import { Badge } from "~/components/ui/badge";
 import { Button, buttonVariants } from "~/components/ui/button";
@@ -54,7 +58,7 @@ type Actions = NonNullable<PaymentsCardProps["actions"]>;
  * The project's money (TAT-66, TAT-108): one line that says where it stands, what happened to a
  * closed project's deposit, the screenshots to check, the payments behind "Show payments" and the
  * owners' sheets for a payment and a refund. What the Next step card already holds (the
- * screenshots, the outcome form, Record payment) is not drawn twice (`offers`), and the card gives
+ * screenshots, the outcome form, Record payment) is not drawn twice (`placementsOf`), and the card gives
  * up the `payments` id when the Next step carries it (`cardId`). After every successful submit
  * focus moves to the card's heading, so a screen reader lands on the updated card.
  */
@@ -62,12 +66,15 @@ export default function PaymentsCard({
 	projectId,
 	payments,
 	canSetPrice,
+	place,
 	nextStep,
 	fallback,
 }: {
 	projectId: string;
 	payments: PaymentsCardProps;
 	canSetPrice: boolean;
+	/** Where `placementsOf` draws each control: the card draws the ones the Next step does not. */
+	place: Record<Affordance, Placement>;
 	nextStep: NextStepProps;
 	/** Where focus goes when a sheet's trigger is gone after a save: the page heading. */
 	fallback: RefObject<HTMLElement | null>;
@@ -119,7 +126,7 @@ export default function PaymentsCard({
 							</p>
 						))}
 				</div>
-				{outcome.needed && !offers(nextStep, "record_outcome") && (
+				{outcome.needed && place.record_outcome === "card" && (
 					<OutcomeForm
 						projectId={projectId}
 						needed={outcome.needed}
@@ -139,7 +146,7 @@ export default function PaymentsCard({
 						)}
 					</div>
 				)}
-				{pending.length > 0 && !offers(nextStep, "verify_proof") && (
+				{pending.length > 0 && place.verify_proof === "card" && (
 					<section
 						aria-labelledby="proofs-heading"
 						className="flex flex-col gap-4"
@@ -177,14 +184,14 @@ export default function PaymentsCard({
 				<div className="flex flex-wrap gap-2">
 					{actions &&
 						actions.recordKinds.length > 0 &&
-						!offers(nextStep, "record_payment") && (
+						place.record_payment === "card" && (
 							<RecordPaymentSheet
 								projectId={projectId}
 								actions={actions}
 								fallback={fallback}
 							/>
 						)}
-					{actions?.refundMax != null && actions.refundMaxText && (
+					{place.record_refund === "card" && actions?.refundMaxText && (
 						<RefundSheet
 							projectId={projectId}
 							maxText={actions.refundMaxText}

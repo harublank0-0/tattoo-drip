@@ -4,6 +4,7 @@ import { cn } from "cn";
 import { useRef } from "react";
 import { urlFor } from "~/client";
 import ChangeCard from "~/components/change_card";
+import { DepositCard } from "~/components/deposit_panel";
 import { SOURCE_LABELS } from "~/components/inquiries";
 import MessageCard from "~/components/message_card";
 import type { ContactVia } from "~/components/messages";
@@ -11,7 +12,7 @@ import NextStepCard from "~/components/next_step_card";
 import Page from "~/components/page";
 import PaymentsCard from "~/components/payments_card";
 import ProgressLine from "~/components/progress_line";
-import { offers } from "~/components/project_page";
+import { placementsOf } from "~/components/project_page";
 import type { ProjectPageProps } from "~/components/projects";
 import { QuoteCard } from "~/components/quote_card";
 import ReferenceGrid from "~/components/references";
@@ -32,37 +33,40 @@ import AppLayout from "~/layouts/app";
  * quote); from `lg` the money and the quote sit in a second column that stays in view while the
  * first scrolls. Rarely used forms open in a bottom sheet and one-tap actions ask in the page.
  */
-export default function ProjectShow({
-	project,
-	nextStep,
-	quote,
-	history,
-	canQuote,
-	canSetPrice,
-	payments,
-	message,
-	contact,
-	messages,
-	messageKind,
-	form,
-	moves,
-	depositHeldText,
-	scheduledSessionCount,
-	finish,
-	closed,
-	quoteExpiryShown,
-	sessions,
-	sessionDates,
-	scheduling,
-	notes,
-	contactedText,
-	lastChannel,
-	assignment,
-	request,
-	clientId,
-	deposit,
-}: ProjectPageProps) {
+export default function ProjectShow(props: ProjectPageProps) {
+	const {
+		project,
+		nextStep,
+		quote,
+		history,
+		canSetPrice,
+		payments,
+		message,
+		contact,
+		messages,
+		messageKind,
+		form,
+		moves,
+		depositHeldText,
+		scheduledSessionCount,
+		finish,
+		closed,
+		quoteExpiryShown,
+		sessions,
+		sessionDates,
+		scheduling,
+		notes,
+		contactedText,
+		lastChannel,
+		assignment,
+		request,
+		clientId,
+		deposit,
+	} = props;
 	const tenant = useTenant();
+	// Where each control is drawn: in the Next step card when it names it, else in its own card, so
+	// nothing the page offers is out of reach.
+	const place = placementsOf(props);
 	const params = { tenant: tenant.slug, id: project.id };
 	// A save or a finished step can remove the button that had focus: focus goes
 	// to the page heading instead of <body>.
@@ -132,7 +136,7 @@ export default function ProjectShow({
 						scheduling={scheduling}
 						fallback={heading}
 						anchor={nextStep.anchor}
-						showSchedule={!offers(nextStep, "schedule")}
+						showSchedule={place.schedule === "card"}
 					/>
 
 					<MessageCard
@@ -159,7 +163,7 @@ export default function ProjectShow({
 						scheduledSessionCount={scheduledSessionCount}
 						depositHeldText={depositHeldText}
 						assignment={assignment}
-						resumeInNextStep={offers(nextStep, "resume")}
+						resumeInNextStep={place.resume === "step"}
 						fallback={heading}
 					/>
 				</div>
@@ -171,9 +175,21 @@ export default function ProjectShow({
 						projectId={project.id}
 						payments={payments}
 						canSetPrice={canSetPrice}
+						place={place}
 						nextStep={nextStep}
 						fallback={heading}
 					/>
+
+					{deposit && place.deposit_link === "card" && (
+						<DepositCard
+							projectId={project.id}
+							deposit={deposit}
+							lastChannel={lastChannel}
+							onContact={markContacted}
+							anchor={nextStep.anchor}
+							fallback={heading}
+						/>
+					)}
 
 					<QuoteCard
 						projectId={project.id}
@@ -181,8 +197,10 @@ export default function ProjectShow({
 						history={history}
 						form={form}
 						showExpiry={quoteExpiryShown}
-						canQuote={canQuote}
-						canSetPrice={canSetPrice}
+						message={message}
+						lastChannel={lastChannel}
+						onContact={markContacted}
+						place={place}
 						nextStep={nextStep}
 						fallback={heading}
 					/>

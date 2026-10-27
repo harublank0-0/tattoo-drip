@@ -1,11 +1,21 @@
 import { Form } from "@adonisjs/inertia/react";
 import { type RefObject, useId, useState } from "react";
+import ChatMessage from "~/components/chat_message";
 import FormSheet, {
 	FormSheetActions,
 	type FormSheetState,
 	useFormSheet,
 } from "~/components/form_sheet";
-import { cardId, offers } from "~/components/project_page";
+import {
+	type ContactChannelName,
+	type ContactVia,
+	primaryChannel,
+} from "~/components/messages";
+import {
+	type Affordance,
+	cardId,
+	type Placement,
+} from "~/components/project_page";
 import {
 	formatRupees,
 	type NextStepProps,
@@ -48,10 +58,12 @@ const KINDS: { value: Kind; title: string; description: string }[] = [
 ];
 
 /**
- * The Quote card (TAT-108): the current quote, "Set price" for a booking made without one,
- * "Revise the quote" (unless the Next step card offers it) and the earlier versions behind a
- * button. The card gives up the `quote` id when the Next step carries it (`cardId`): a link to
- * `#quote` then lands on the card that holds the action.
+ * The Quote card (TAT-108): the current quote and, where the Next step card does not draw them
+ * (`place`, from `placementsOf`), the quote's message, "Client accepted", the first quote, "Set
+ * price", "Revise the quote", and the earlier versions behind a button. A held project's price
+ * message and a quoted project's Accept stay reachable while a screenshot or something else is
+ * the next step. The card gives up the `quote` id when the Next step carries it (`cardId`): a link
+ * to `#quote` then lands on the card that holds the action.
  */
 export function QuoteCard({
 	projectId,
@@ -59,8 +71,10 @@ export function QuoteCard({
 	history,
 	form,
 	showExpiry,
-	canQuote,
-	canSetPrice,
+	message,
+	lastChannel,
+	onContact,
+	place,
 	nextStep,
 	fallback,
 }: {
@@ -69,8 +83,10 @@ export function QuoteCard({
 	history: QuoteProps[];
 	form: ProjectPageProps["form"];
 	showExpiry: boolean;
-	canQuote: boolean;
-	canSetPrice: boolean;
+	message: ProjectPageProps["message"];
+	lastChannel: ProjectPageProps["lastChannel"];
+	onContact: (via: ContactVia) => void;
+	place: Record<Affordance, Placement>;
 	nextStep: NextStepProps;
 	fallback: RefObject<HTMLElement | null>;
 }) {
@@ -91,12 +107,24 @@ export function QuoteCard({
 				) : (
 					<p className="text-sm text-muted-foreground">No quote yet.</p>
 				)}
-				{canSetPrice && (
+				{place.send_quote === "card" && message && (
+					<ChatMessage
+						message={message}
+						primary={primaryChannel(lastChannel)}
+						onSent={(channel: ContactChannelName) =>
+							onContact({ channel, kind: "quote" })
+						}
+					/>
+				)}
+				{place.client_accepted === "card" && quote && (
+					<AcceptQuote projectId={projectId} quoteId={quote.id} />
+				)}
+				{place.set_price === "card" && (
 					<div>
 						<PriceSheet projectId={projectId} fallback={fallback} />
 					</div>
 				)}
-				{canQuote && quote && !offers(nextStep, "revise_quote") && (
+				{place.revise_quote === "card" && quote && (
 					<ReviseSheet
 						id={cardId("quote-form", nextStep.anchor)}
 						projectId={projectId}
@@ -104,6 +132,19 @@ export function QuoteCard({
 						form={form}
 						fallback={fallback}
 					/>
+				)}
+				{place.issue_quote === "card" && (
+					<div
+						id={cardId("quote-form", nextStep.anchor)}
+						className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)] lg:scroll-mt-0"
+					>
+						<QuoteForm
+							key="first"
+							projectId={projectId}
+							quote={null}
+							form={form}
+						/>
+					</div>
 				)}
 				{history.length > 0 && (
 					<div className="flex flex-col gap-2">
