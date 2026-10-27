@@ -1,6 +1,13 @@
 import { Form } from "@adonisjs/inertia/react";
 import { cn } from "cn";
-import { type RefObject, useEffect, useId, useRef, useState } from "react";
+import {
+	type ReactNode,
+	type RefObject,
+	useEffect,
+	useId,
+	useRef,
+	useState,
+} from "react";
 import { urlFor } from "~/client";
 import FormSheet, {
 	FormSheetActions,
@@ -218,7 +225,13 @@ export function PendingProof({
 
 	return (
 		<div className="flex flex-col gap-3 rounded-md border p-3">
-			<div className="flex flex-col gap-3 sm:grid sm:grid-cols-[minmax(0,20rem)_1fr] sm:gap-4">
+			<div
+				className={cn(
+					compact
+						? "grid grid-cols-[7.5rem_minmax(0,1fr)] gap-3 sm:grid-cols-[minmax(0,14rem)_1fr] sm:gap-4"
+						: "flex flex-col gap-3 sm:grid sm:grid-cols-[minmax(0,20rem)_1fr] sm:gap-4",
+				)}
+			>
 				{proof.imageUrl ? (
 					<a
 						href={proof.imageUrl}
@@ -233,7 +246,7 @@ export function PendingProof({
 							height={proof.height ?? undefined}
 							className={cn(
 								"w-full rounded-md border object-contain",
-								compact ? "max-h-48" : "max-h-96",
+								compact ? "max-h-40 sm:max-h-48" : "max-h-96",
 							)}
 						/>
 						<span>Open full size</span>
@@ -241,17 +254,34 @@ export function PendingProof({
 				) : (
 					<p className="text-sm text-muted-foreground">No screenshot.</p>
 				)}
-				<dl className="grid grid-cols-[auto_1fr] content-start gap-x-4 gap-y-2 text-sm">
-					<dt className="text-muted-foreground">Asked to pay</dt>
-					<dd className="text-lg font-semibold">{proof.expectedText}</dd>
-					<dt className="text-muted-foreground">Reference code</dt>
-					<dd className="font-mono text-lg tracking-widest">
-						{proof.referenceCode ?? "No deposit link"}
-					</dd>
-					<dt className="text-muted-foreground">Paid with</dt>
-					<dd>{METHOD_LABELS[proof.method]}</dd>
-					<dt className="text-muted-foreground">Sent</dt>
-					<dd>{proof.sentText}</dd>
+				<dl
+					className={cn(
+						"content-start text-sm",
+						compact
+							? "flex min-w-0 flex-col gap-2 sm:grid sm:grid-cols-[auto_1fr] sm:gap-x-4"
+							: "grid grid-cols-[auto_1fr] gap-x-4 gap-y-2",
+					)}
+				>
+					<Fact compact={compact} label="Asked to pay">
+						<dd className="text-lg font-semibold">{proof.expectedText}</dd>
+					</Fact>
+					<Fact compact={compact} label="Reference code">
+						<dd className="font-mono text-lg tracking-widest wrap-anywhere">
+							{proof.referenceCode ?? "No deposit link"}
+						</dd>
+					</Fact>
+					{compact && (
+						// One line on a phone, so Verify and Reject stay on the first screen.
+						<dd className="text-muted-foreground sm:hidden">
+							{METHOD_LABELS[proof.method]} · {proof.sentText}
+						</dd>
+					)}
+					<Fact compact={compact} fromSm label="Paid with">
+						<dd>{METHOD_LABELS[proof.method]}</dd>
+					</Fact>
+					<Fact compact={compact} fromSm label="Sent">
+						<dd>{proof.sentText}</dd>
+					</Fact>
 				</dl>
 			</div>
 			{proof.dueNowText && (
@@ -307,6 +337,35 @@ export function PendingProof({
 					}}
 				/>
 			)}
+		</div>
+	);
+}
+
+/**
+ * One fact of a screenshot: its label over its value on a phone in the Next step card (the
+ * image sits beside the facts there), side by side everywhere else.
+ */
+function Fact({
+	compact,
+	label,
+	fromSm = false,
+	children,
+}: {
+	compact: boolean;
+	label: string;
+	/** Only from `sm`: a phone's compact card says it in one line instead. */
+	fromSm?: boolean;
+	children: ReactNode;
+}) {
+	return (
+		<div
+			className={cn(
+				compact ? "flex min-w-0 flex-col sm:contents" : "contents",
+				compact && fromSm && "max-sm:hidden",
+			)}
+		>
+			<dt className="text-muted-foreground">{label}</dt>
+			{children}
 		</div>
 	);
 }
@@ -692,10 +751,13 @@ export function OutcomeForm({
 	projectId,
 	needed,
 	onDone,
+	embedded = false,
 }: {
 	projectId: string;
 	needed: NonNullable<PaymentsCardProps["outcome"]["needed"]>;
 	onDone: () => void;
+	/** In the Next step card, whose title already asks the question: no box and no heading of its own. */
+	embedded?: boolean;
 }) {
 	const tenant = useTenant();
 	const [outcome, setOutcome] = useState<"kept" | "refunded">("kept");
@@ -710,10 +772,12 @@ export function OutcomeForm({
 			onSuccess={onDone}
 		>
 			{({ errors, processing }) => (
-				<FieldGroup className="rounded-md border p-3">
-					<h3 className="text-sm font-semibold">
-						What happened to the deposit?
-					</h3>
+				<FieldGroup className={cn(!embedded && "rounded-md border p-3")}>
+					{!embedded && (
+						<h3 className="text-sm font-semibold">
+							What happened to the deposit?
+						</h3>
+					)}
 					<p className="text-sm">
 						This project closed holding a deposit of {needed.heldText}. Record
 						what the studio decided; your deposit policy is yours.

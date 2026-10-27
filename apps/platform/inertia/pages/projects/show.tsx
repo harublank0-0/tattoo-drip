@@ -1,5 +1,6 @@
 import { Form, Link } from "@adonisjs/inertia/react";
 import { router } from "@inertiajs/react";
+import { cn } from "cn";
 import { useRef } from "react";
 import { urlFor } from "~/client";
 import ChangeCard from "~/components/change_card";
@@ -80,7 +81,7 @@ export default function ProjectShow({
 			titleRef={heading}
 			description={project.piece}
 			details={
-				<div className="flex flex-col gap-3 pt-2">
+				<div className="flex flex-col gap-2 pt-1">
 					<div className="flex flex-wrap items-center gap-x-3 gap-y-1">
 						<StatusBadge status={project.status} />
 						<span className="text-sm text-muted-foreground">
@@ -88,21 +89,22 @@ export default function ProjectShow({
 								? `With ${project.artistName}`
 								: "No artist yet"}
 						</span>
+						{clientId && (
+							<Link
+								route="tenant.clients.show"
+								routeParams={{ tenant: tenant.slug, id: clientId }}
+								className={cn(
+									buttonVariants({ variant: "link", size: "sm" }),
+									"-mx-3",
+								)}
+							>
+								View client
+							</Link>
+						)}
 					</div>
 					<ProgressLine status={project.status} />
 					<p className="text-sm font-medium lg:hidden">{payments.summary}</p>
 				</div>
-			}
-			actions={
-				clientId ? (
-					<Link
-						route="tenant.clients.show"
-						routeParams={{ tenant: tenant.slug, id: clientId }}
-						className={buttonVariants({ variant: "outline", size: "sm" })}
-					>
-						View client
-					</Link>
-				) : undefined
 			}
 		>
 			<div className="grid gap-6 lg:grid-cols-12 lg:items-start">

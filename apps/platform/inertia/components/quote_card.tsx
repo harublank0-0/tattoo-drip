@@ -388,9 +388,11 @@ export function QuoteForm({
 					<input type="hidden" name="baseQuoteId" value={quote?.id ?? ""} />
 					<FieldSet data-invalid={!!errors.kind}>
 						<FieldLegend variant="label">Pricing</FieldLegend>
+						{/* Side by side: the price field stays on a phone's first screen. */}
 						<RadioGroup
 							name="kind"
 							value={kind}
+							className="grid-cols-2 gap-2"
 							onValueChange={(value) =>
 								setKind(value === "hourly" ? "hourly" : "fixed")
 							}

@@ -200,6 +200,7 @@ export default function NextStepCard({
 							projectId={projectId}
 							needed={payments.outcome.needed}
 							onDone={done}
+							embedded
 						/>
 					)
 				);

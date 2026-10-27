@@ -20,7 +20,7 @@ export default function ProgressLine({ status }: { status: string }) {
 	if (!steps) return null;
 
 	return (
-		<ol aria-label="Progress" className="grid grid-cols-5 pt-1">
+		<ol aria-label="Progress" className="grid grid-cols-5">
 			{steps.map(({ label, state }, index) => (
 				<li
 					key={label}
