@@ -67,7 +67,7 @@ export default function NextStepCard({
 			case "verify_proof":
 				return (
 					<div className="flex flex-col gap-4">
-						{payments.pending.map((proof) => (
+						{payments?.pending.map((proof) => (
 							<PendingProof
 								key={proof.paymentId}
 								proof={proof}
@@ -149,7 +149,7 @@ export default function NextStepCard({
 				);
 			case "record_payment":
 				return (
-					payments.actions && (
+					payments?.actions && (
 						<FormSheetTrigger
 							sheet={sheets.record}
 							label="Record payment"
@@ -184,7 +184,7 @@ export default function NextStepCard({
 				);
 			case "record_outcome":
 				return (
-					payments.outcome.needed && (
+					payments?.outcome.needed && (
 						<OutcomeForm
 							projectId={projectId}
 							needed={payments.outcome.needed}

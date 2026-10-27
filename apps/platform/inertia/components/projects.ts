@@ -199,8 +199,8 @@ export type ProjectPageProps = {
 		/** Links open on this machine (the dev host), so no client can use them. */
 		devHost: boolean;
 	} | null;
-	/** The Payments card (TAT-66): owners get the screenshots and the forms, the assigned artist the list. */
-	payments: PaymentsCardProps;
+	/** The Payments card (TAT-66), the owners' only: an artist is sent no money (TAT-108), so null. */
+	payments: PaymentsCardProps | null;
 };
 
 /**

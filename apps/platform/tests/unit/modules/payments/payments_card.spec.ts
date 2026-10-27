@@ -78,13 +78,11 @@ function money(
 const card = (
 	data: ProjectMoney,
 	status: ProjectStatus,
-	isOwner = true,
 	proofUrls = new Map<string, string>(),
 ) =>
 	paymentsCard({
 		money: data,
 		status,
-		isOwner,
 		timezone: KTM,
 		names: new Map([[ASHA, "Asha Rai"]]),
 		proofUrls,
@@ -107,7 +105,6 @@ test.group("paymentsCard", () => {
 		const props = card(
 			money([proof], quote(), "deposit_pending"),
 			"deposit_pending",
-			true,
 			new Map([[proof.id, "https://files/signed"]]),
 		);
 
@@ -184,7 +181,6 @@ test.group("paymentsCard", () => {
 		const props = card(
 			money([reversal, turnedDown, shot, desk]),
 			"booked",
-			true,
 			new Map([[shot.id, "https://files/shot"]]),
 		);
 		const row = (id: string) => props.rows.find((r) => r.id === id);
@@ -323,11 +319,6 @@ test.group("paymentsCard", () => {
 			summary(refunded(450_000), "cancelled"),
 			"Refunded NPR 1,500 more than it received",
 		);
-		// The artist's card carries the same line: it holds no more than the balance.
-		assert.equal(
-			card(money([payment()]), "booked", false).summary,
-			"Paid NPR 3,000 of NPR 15,000 · Balance NPR 12,000",
-		);
 	});
 
 	test("the deposit line: received, covered, and lapsed after a reversal on a booked project", ({
@@ -357,9 +348,7 @@ test.group("paymentsCard", () => {
 		);
 	});
 
-	test("an owner's actions follow the status; an artist gets none, no screenshots and no outcome form", ({
-		assert,
-	}) => {
+	test("an owner's actions follow the status", ({ assert }) => {
 		const waitingDeposit = card(
 			money([], quote(), "deposit_pending"),
 			"deposit_pending",
@@ -415,22 +404,6 @@ test.group("paymentsCard", () => {
 			"cancelled",
 		);
 		assert.isNull(none.outcome.needed);
-
-		const shot = payment({
-			proofImageKey: "k",
-			proofImageWidth: 1,
-			proofImageHeight: 1,
-		});
-		const artist = card(
-			money([shot], quote(), "cancelled"),
-			"cancelled",
-			false,
-			new Map([[shot.id, "u"]]),
-		);
-		assert.isNull(artist.actions);
-		assert.deepEqual(artist.pending, []);
-		assert.isNull(artist.outcome.needed);
-		assert.deepInclude(artist.rows[0], { proofUrl: null, canReverse: false });
 	});
 
 	test("a recorded outcome reads as what the studio decided", ({ assert }) => {

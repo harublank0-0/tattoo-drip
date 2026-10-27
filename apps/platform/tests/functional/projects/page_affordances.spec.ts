@@ -76,7 +76,14 @@ async function studio() {
 		await profile.save();
 		return profile;
 	});
-	return { owner, asha, tenant, profile };
+	// A start that no other session of the studio's artist overlaps: each call is three hours later.
+	let slot = 0;
+	const at = (days: number) =>
+		DateTime.now()
+			.plus({ days })
+			.startOf("hour")
+			.plus({ hours: 3 * slot++ });
+	return { owner, asha, tenant, profile, at };
 }
 
 type Row = {
@@ -235,7 +242,7 @@ const ROWS: Row[] = [
 		seed: async (s, p) => {
 			await quote(s, p);
 			await makePayment(s.tenant, p as never, verified(s, 300_000));
-			const at = DateTime.now().plus({ days: 1 }).startOf("hour");
+			const at = s.at(1);
 			await makeSession(s.tenant, p as never, s.profile, {
 				startsAt: at,
 				endsAt: at.plus({ hours: 2 }),
@@ -257,7 +264,7 @@ const ROWS: Row[] = [
 		status: "in_progress",
 		seed: async (s, p) => {
 			await quote(s, p);
-			const at = DateTime.now().plus({ days: 1 }).startOf("hour");
+			const at = s.at(1);
 			await makeSession(s.tenant, p as never, s.profile, {
 				startsAt: at,
 				endsAt: at.plus({ hours: 2 }),
@@ -292,7 +299,7 @@ const ROWS: Row[] = [
 		status: "healing_check",
 		seed: async (s, p) => {
 			await quote(s, p);
-			const at = DateTime.now().plus({ days: 5 }).startOf("hour");
+			const at = s.at(5);
 			await makeSession(s.tenant, p as never, s.profile, {
 				kind: "touch_up",
 				startsAt: at,
@@ -470,6 +477,36 @@ test.group(
 					props.nextStep.kind,
 					row.name,
 				);
+			}
+		});
+
+		test("the assigned artist keeps every non-money control the old page gave them", async ({
+			client,
+			assert,
+		}) => {
+			const s = await studio();
+			for (const row of ROWS) {
+				const project = await build(s, row);
+				const props = await read(client, s.asha, project.id);
+				const place = placementsOf(props);
+				assert.isNull(
+					props.payments,
+					`${row.name}: an artist is sent no payments`,
+				);
+				for (const name of oldPageOffered(props)) {
+					if (place[name] === null) {
+						assert.include(DROPPED_ON_PURPOSE, name, `${row.name}: ${name}`);
+					}
+				}
+				for (const money of [
+					"verify_proof",
+					"record_outcome",
+					"record_payment",
+					"record_refund",
+					"deposit_link",
+				]) {
+					assert.isNull(place[money], `${row.name}: ${money}`);
+				}
 			}
 		});
 	},

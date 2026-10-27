@@ -1519,3 +1519,127 @@ test.group("Project page: queries (TAT-108)", (group) => {
 		}
 	});
 });
+
+test.group(
+	"Project page: an artist is sent no money (TAT-108 fix round)",
+	(group) => {
+		group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+		/** Amounts nothing else on the page has (the quote is NPR 15,000 with a NPR 3,000 deposit). */
+		const LABELS = ["1,234.56", "777.30", "12,988.14", "911.50", "2,088.50"];
+		const NUMBERS = [
+			123456, 1234.56, 77730, 777.3, 1298814, 12988.14, 91150, 911.5, 208850,
+			2088.5,
+		];
+
+		async function studioWithMoney() {
+			const { owner, tenant } = await studioWithOwner();
+			const asha = await artistIn(tenant, "asha@example.com");
+			const { paid, deposit } = await inTenant(tenant, async () => {
+				const profile = await makeArtist(tenant, "asha");
+				profile.userId = asha.id;
+				await profile.save();
+				const decided = (
+					amount: number,
+					kind: "session" | "balance" | "deposit",
+				) => ({
+					kind,
+					amount,
+					status: "verified" as const,
+					verifiedAt: DateTime.utc(),
+					verifiedByUserId: owner.id,
+				});
+				// A booked project with two payments: NPR 1,234.56 and NPR 777.30.
+				const paid = await makeProject(tenant, await makeClient(tenant), {
+					status: "booked",
+					artistId: profile.id,
+				});
+				await makeQuote(tenant, paid);
+				await makePayment(tenant, paid, decided(123_456, "session"));
+				await makePayment(tenant, paid, decided(77_730, "balance"));
+				// A project waiting for its deposit, NPR 911.50 of NPR 3,000 paid: NPR 2,088.50 due.
+				const deposit = await makeProject(tenant, await makeClient(tenant), {
+					status: "deposit_pending",
+					artistId: profile.id,
+				});
+				await makeQuote(tenant, deposit);
+				await makePayment(tenant, deposit, decided(91_150, "deposit"));
+				return { paid, deposit };
+			});
+			return { owner, asha, paid, deposit };
+		}
+
+		/** Every string and number in a serialized page. */
+		function leaves(
+			value: unknown,
+			into: { strings: string[]; numbers: number[] } = {
+				strings: [],
+				numbers: [],
+			},
+		) {
+			if (typeof value === "string") into.strings.push(value);
+			else if (typeof value === "number") into.numbers.push(value);
+			else if (value && typeof value === "object") {
+				for (const inner of Object.values(value)) leaves(inner, into);
+			}
+			return into;
+		}
+
+		test("the owner's page holds the amounts and the artist's page holds none of them", async ({
+			client,
+			assert,
+		}) => {
+			const { owner, asha, paid, deposit } = await studioWithMoney();
+			const found = async (user: User, id: string) => {
+				const response = await client.get(page(id)).withInertia().loginAs(user);
+				response.assertStatus(200);
+				const everything = leaves(response.inertiaProps);
+				// The page's own flash travels with it too.
+				const text = JSON.stringify(response.inertiaProps);
+				return {
+					labels: LABELS.filter((label) => text.includes(label)),
+					numbers: NUMBERS.filter((number) =>
+						everything.numbers.includes(number),
+					),
+					props: response.inertiaProps,
+				};
+			};
+
+			// Positive controls: the owner is sent them, so their absence for the artist proves something.
+			const ownerPaid = await found(owner, paid.id);
+			assert.includeMembers(ownerPaid.labels, [
+				"1,234.56",
+				"777.30",
+				"12,988.14",
+			]);
+			const ownerDeposit = await found(owner, deposit.id);
+			assert.includeMembers(ownerDeposit.labels, ["911.50", "2,088.50"]);
+
+			for (const id of [paid.id, deposit.id]) {
+				const artist = await found(asha, id);
+				assert.deepEqual(artist.labels, [], "no amount as words");
+				assert.deepEqual(artist.numbers, [], "no amount as a number");
+				assert.isNull(artist.props.payments, "no Payments card");
+				assert.isNull(artist.props.depositHeldText, "no deposit held");
+				assert.isNull(artist.props.deposit);
+				assert.isNull(artist.props.finish?.action ?? null);
+			}
+		});
+
+		test("the schedule hint tells an artist the deposit is due, not how much", async ({
+			client,
+			assert,
+		}) => {
+			const { owner, asha, deposit } = await studioWithMoney();
+			const hint = async (user: User) =>
+				(await client.get(page(deposit.id)).withInertia().loginAs(user))
+					.inertiaProps.scheduling.hint;
+
+			assert.include(await hint(owner), "NPR 2,088.50 still due");
+			assert.equal(
+				await hint(asha),
+				"A tattoo session holds the date. The project is booked once the deposit is paid.",
+			);
+		});
+	},
+);
