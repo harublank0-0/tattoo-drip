@@ -34,6 +34,42 @@ export class AccountTokenSchema extends BaseModel {
 	declare userId: string;
 }
 
+export class ArtistWorkPhotoSchema extends BaseModel {
+	static $columns = [
+		"alt",
+		"artistId",
+		"createdAt",
+		"height",
+		"id",
+		"imageKey",
+		"position",
+		"tenantId",
+		"updatedAt",
+		"width",
+	] as const;
+	$columns = ArtistWorkPhotoSchema.$columns;
+	@column()
+	declare alt: string | null;
+	@column()
+	declare artistId: string;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column()
+	declare height: number;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare imageKey: string;
+	@column()
+	declare position: number;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+	@column()
+	declare width: number;
+}
+
 export class ArtistSchema extends BaseModel {
 	static $columns = [
 		"acceptingInquiries",
@@ -786,6 +822,9 @@ export class TenantSchema extends BaseModel {
 		"address",
 		"contactEmail",
 		"contactPhone",
+		"coverImageHeight",
+		"coverImageKey",
+		"coverImageWidth",
 		"createdAt",
 		"defaultDepositPercent",
 		"deletedAt",
@@ -809,6 +848,12 @@ export class TenantSchema extends BaseModel {
 	declare contactEmail: string | null;
 	@column()
 	declare contactPhone: string | null;
+	@column()
+	declare coverImageHeight: number | null;
+	@column()
+	declare coverImageKey: string | null;
+	@column()
+	declare coverImageWidth: number | null;
 	@column.dateTime({ autoCreate: true })
 	declare createdAt: DateTime;
 	@column()
