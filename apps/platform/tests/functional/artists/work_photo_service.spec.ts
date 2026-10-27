@@ -10,7 +10,8 @@ import ArtistService, {
 import WorkPhotoService, {
 	MAX_WORK_PHOTOS,
 } from "#modules/artists/services/work_photo_service";
-import { InvalidImageError } from "#modules/media/errors";
+import { ImageDeleteError, InvalidImageError } from "#modules/media/errors";
+import StudioPageService from "#modules/storefront/services/studio_page_service";
 import { withDbContext } from "#services/db_context";
 import { addArtist, addWorkPhoto } from "#tests/helpers/artists";
 import {
@@ -19,6 +20,7 @@ import {
 	uploadOf,
 } from "#tests/helpers/images";
 import { recordQueries } from "#tests/helpers/query_count";
+import { failDeletes } from "#tests/helpers/storage_failures";
 import {
 	artistIn,
 	inTenant,
@@ -386,7 +388,7 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 		);
 	});
 
-	test("remove compacts the positions and deletes the file and its copies after the commit, not before", async ({
+	test("remove deletes the file and its copies first, then the row, and compacts the positions", async ({
 		assert,
 	}) => {
 		const { tenant, owner: user } = await studioWithOwner();
@@ -407,8 +409,8 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 			await photos.remove(tenant, editor, added[0]);
 			assert.lengthOf(
 				await storedImages(tenant, PURPOSE),
-				12,
-				"the files stay until the commit",
+				8,
+				"the files go first, before the commit",
 			);
 		});
 
@@ -423,7 +425,7 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 		);
 	});
 
-	test("a failure after remove keeps the row and the files", async ({
+	test("a later failure in the same request restores the row but the files are already gone; removing again finishes", async ({
 		assert,
 	}) => {
 		const { tenant, owner: user } = await studioWithOwner();
@@ -443,8 +445,12 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 			"later failure",
 		);
 
-		assert.lengthOf(await storedImages(tenant, PURPOSE), 4);
+		// The documented limit of "files first": the row is back, its files are not.
+		assert.deepEqual(await storedImages(tenant, PURPOSE), []);
 		assert.lengthOf(await order(tenant, sita.id), 1);
+		// A missing file counts as deleted, so the owner's retry removes the row.
+		await inTenant(tenant, () => photos.remove(tenant, editor, photo));
+		assert.lengthOf(await order(tenant, sita.id), 0);
 	});
 
 	test("a deleted artist's photos cannot be found, edited, moved or removed", async ({
@@ -587,5 +593,96 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 		);
 		assert.equal(images.keys.length, stored);
 		assert.lengthOf(await order(tenant, sita.id), MAX_WORK_PHOTOS);
+	});
+});
+
+test.group("removing a photo is durable (TAT-116 fix round 1)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("a failed file delete fails the removal, keeps the row, the order and the public listing; the retry removes every copy", async ({
+		assert,
+	}) => {
+		const { tenant, owner: user } = await studioWithOwner();
+		const sita = await addArtist(tenant, user);
+		const { images, artists, photos } = makeService();
+		const editor = owner(user.id);
+		const added: ArtistWorkPhoto[] = [];
+		for (let n = 0; n < 3; n++) {
+			added.push(
+				await inTenant(tenant, async () =>
+					photos.add(tenant, editor, sita, await upload()),
+				),
+			);
+		}
+		const copies = (key: string) =>
+			key.replace(/\.320-640-1280\.jpg$/, ".640w.jpg");
+		const failing = failDeletes(
+			"public",
+			(key) => key === copies(added[0].imageKey),
+		);
+
+		let thrown: unknown;
+		try {
+			await inTenant(tenant, () => photos.remove(tenant, editor, added[0]));
+		} catch (error) {
+			thrown = error;
+		} finally {
+			failing.restore();
+		}
+
+		assert.instanceOf(thrown, ImageDeleteError);
+		// The row is still there, in its place, and the public read still lists it.
+		assert.deepEqual(
+			(await order(tenant, sita.id)).map((row) => [row.id, row.position]),
+			added.map((photo, index) => [photo.id, index]),
+		);
+		const listed = await inTenant(tenant, () =>
+			new StudioPageService(artists, images, photos).visibleArtists(tenant),
+		);
+		assert.lengthOf(listed[0].workPhotos, 3);
+		// The other files of the photo were tried and are gone; the failed one is left.
+		const left = await storedImages(tenant, PURPOSE);
+		assert.lengthOf(left, 12 - 3);
+		assert.include(left, copies(added[0].imageKey).split("/").pop() ?? "");
+
+		// Storage is back: the retry removes every copy and closes the gap.
+		await inTenant(tenant, () => photos.remove(tenant, editor, added[0]));
+		assert.lengthOf(await storedImages(tenant, PURPOSE), 8);
+		assert.deepEqual(
+			(await order(tenant, sita.id)).map((row) => [row.id, row.position]),
+			[
+				[added[1].id, 0],
+				[added[2].id, 1],
+			],
+		);
+	});
+
+	test("the files go before the row: a row delete that fails afterwards leaves the owner able to remove again", async ({
+		assert,
+	}) => {
+		const { tenant, owner: user } = await studioWithOwner();
+		const sita = await addArtist(tenant, user);
+		const { photos } = makeService();
+		const editor = owner(user.id);
+		const photo = await inTenant(tenant, async () =>
+			photos.add(tenant, editor, sita, await upload()),
+		);
+		const failing = failDeletes("public", () => true);
+		try {
+			await assert.rejects(
+				() => inTenant(tenant, () => photos.remove(tenant, editor, photo)),
+				ImageDeleteError,
+			);
+		} finally {
+			failing.restore();
+		}
+		// Nothing was deleted: every file is still there and the row too.
+		assert.lengthOf(await storedImages(tenant, PURPOSE), 4);
+		assert.lengthOf(await order(tenant, sita.id), 1);
+		assert.lengthOf(
+			failing.attempts,
+			4,
+			"every file was tried, none gave up early",
+		);
 	});
 });

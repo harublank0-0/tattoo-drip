@@ -9,6 +9,7 @@ import ImageService from "#modules/media/services/image_service";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { addArtist, addWorkPhoto } from "#tests/helpers/artists";
 import { polyglot, testImages, uploadOf } from "#tests/helpers/images";
+import { failDeletes } from "#tests/helpers/storage_failures";
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 import {
 	newTempUploads,
@@ -653,3 +654,52 @@ test.group("Work photo descriptions, order and removal (TAT-116)", (group) => {
 		assert.equal(still.alt, "B");
 	});
 });
+
+test.group(
+	"A removal that can't delete the files fails visibly (TAT-116 fix round 1)",
+	(group) => {
+		group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+		test("the photo stays with an error message, and removing again once storage is back succeeds", async ({
+			client,
+			assert,
+		}) => {
+			const { tenant, owner } = await studioWithOwner();
+			const sita = await addArtist(tenant, owner);
+			const photo = await realPhoto(tenant, owner, sita.id);
+			const remove = () =>
+				client
+					.delete(`/t/${tenant.slug}/artists/photos/${photo.id}`)
+					.withCsrfToken()
+					.loginAs(owner)
+					.redirects(0);
+			const failing = failDeletes("public", () => true);
+
+			let refused: Awaited<ReturnType<typeof remove>>;
+			try {
+				refused = await remove();
+			} finally {
+				failing.restore();
+			}
+
+			refused.assertStatus(302);
+			refused.assertHeader(
+				"location",
+				`/t/${tenant.slug}/artists/${sita.id}/edit`,
+			);
+			refused.assertFlashMessage(
+				"error",
+				"Couldn't remove the photo, try again.",
+			);
+			assert.notExists(refused.flashMessage("success"));
+			assert.lengthOf(await rows(tenant, sita.id), 1);
+			assert.lengthOf(await storedImages(tenant, PURPOSE), 4);
+
+			const retry = await remove();
+			retry.assertStatus(302);
+			retry.assertFlashMessage("success", "Photo removed.");
+			assert.lengthOf(await rows(tenant, sita.id), 0);
+			assert.deepEqual(await storedImages(tenant, PURPOSE), []);
+		});
+	},
+);

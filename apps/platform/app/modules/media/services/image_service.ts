@@ -3,6 +3,7 @@ import { readFile, rm } from "node:fs/promises";
 import type { MultipartFile } from "@adonisjs/core/bodyparser";
 import logger from "@adonisjs/core/services/logger";
 import drive from "@adonisjs/drive/services/main";
+import { ImageDeleteError } from "#modules/media/errors";
 import {
 	makeVariants,
 	type ProcessedImage,
@@ -263,9 +264,20 @@ export default class ImageService {
 	}
 
 	/**
+	 * How many file deletes have failed on this instance (TAT-116): each one
+	 * is also logged at error level with its purpose and key, so a test (or
+	 * an operator) can see that a best-effort cleanup left something behind.
+	 */
+	deleteFailures = 0;
+
+	/**
 	 * Removes a stored image and the copies its key names, best effort:
-	 * failures are logged, never thrown, so cleanup can't fail a request.
-	 * When replacing an image, call this after the transaction commits.
+	 * every file is tried, a failure is counted (`deleteFailures`) and logged
+	 * with its purpose and key, never thrown, so cleanup can't fail a request.
+	 * Use it for what no record points at any more or what a rollback leaves
+	 * (a replaced image after the commit); a file that fails stays unreferenced
+	 * until the orphan sweep of TAT-27. A removal that must not report success
+	 * while a file is still reachable uses `deleteOrThrow`.
 	 */
 	async delete(purpose: ImagePurpose, key: string): Promise<void> {
 		await this.removeAll(purpose, [
@@ -274,17 +286,41 @@ export default class ImageService {
 		]);
 	}
 
-	/** Deletes each key on its own: one that fails or is gone leaves the rest. */
-	private async removeAll(purpose: ImagePurpose, keys: string[]) {
+	/**
+	 * Removes a stored image and every copy its key names, or throws
+	 * ImageDeleteError naming the files left (TAT-116: a photo a client asked
+	 * to take down must not stay fetchable while the studio is told it is
+	 * gone). Every file is tried even after one fails, and a file that is
+	 * already missing counts as deleted, so a retry finishes the job. Call it
+	 * before the record that names the image is deleted, so a failure leaves
+	 * the record for the owner to try again.
+	 */
+	async deleteOrThrow(purpose: ImagePurpose, key: string): Promise<void> {
+		const failed = await this.removeAll(purpose, [
+			key,
+			...variantsOfKey(key).map((copy) => copy.key),
+		]);
+		if (failed.length > 0) throw new ImageDeleteError(purpose, failed);
+	}
+
+	/** Deletes each key on its own (one that fails or is gone leaves the rest) and returns the keys that failed. */
+	private async removeAll(
+		purpose: ImagePurpose,
+		keys: string[],
+	): Promise<string[]> {
+		const failed: string[] = [];
 		for (const key of keys) {
 			try {
 				await diskFor(purpose).delete(key);
 			} catch (error) {
+				this.deleteFailures++;
+				failed.push(key);
 				logger.error(
 					{ err: error, purpose, key },
 					"could not delete a stored image",
 				);
 			}
 		}
+		return failed;
 	}
 }

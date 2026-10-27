@@ -2,7 +2,7 @@ import { inject } from "@adonisjs/core";
 import type { HttpContext } from "@adonisjs/core/http";
 import { errors } from "@vinejs/vine";
 import { tenantContext } from "#middleware/tenant_middleware";
-import { InvalidImageError } from "#modules/media/errors";
+import { ImageDeleteError, InvalidImageError } from "#modules/media/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { coverValidator } from "#modules/tenancy/validators/tenant";
@@ -39,7 +39,16 @@ export default class StudioCoverController {
 	async destroy(ctx: HttpContext) {
 		const { tenant } = tenantContext(ctx);
 
-		await this.tenancy.removeCover(tenant);
+		try {
+			await this.tenancy.removeCover(tenant);
+		} catch (error) {
+			// A file could not be deleted: the cover stays (and is still public).
+			if (!(error instanceof ImageDeleteError)) throw error;
+			ctx.session.flash("error", "Couldn't remove the cover photo, try again.");
+			return ctx.response
+				.redirect()
+				.toRoute("tenant.settings.profile", { tenant: tenant.slug });
+		}
 
 		ctx.session.flash("success", "Cover photo removed.");
 		return ctx.response

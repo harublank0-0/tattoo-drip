@@ -14,7 +14,7 @@ import {
 	describeWorkPhotoValidator,
 	moveWorkPhotoValidator,
 } from "#modules/artists/validators/work_photo";
-import { InvalidImageError } from "#modules/media/errors";
+import { ImageDeleteError, InvalidImageError } from "#modules/media/errors";
 
 /**
  * An artist's work photos (TAT-116), changed from the artist's edit page by
@@ -90,7 +90,15 @@ export default class WorkPhotosController {
 			ctx.params.id,
 		);
 
-		await this.photos.remove(tenant, membership, photo);
+		try {
+			await this.photos.remove(tenant, membership, photo);
+		} catch (error) {
+			// A file could not be deleted: the photo stays (and is still public),
+			// so say so and let the owner try again.
+			if (!(error instanceof ImageDeleteError)) throw error;
+			ctx.session.flash("error", "Couldn't remove the photo, try again.");
+			return this.toEditPage(ctx, tenant.slug, artist.id);
+		}
 
 		ctx.session.flash("success", "Photo removed.");
 		return this.toEditPage(ctx, tenant.slug, artist.id);

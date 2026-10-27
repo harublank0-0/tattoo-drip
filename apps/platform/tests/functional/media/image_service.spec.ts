@@ -6,13 +6,15 @@ import app from "@adonisjs/core/services/app";
 import drive from "@adonisjs/drive/services/main";
 import { test } from "@japa/runner";
 import sharp from "sharp";
-import { InvalidImageError } from "#modules/media/errors";
+import { ImageDeleteError, InvalidImageError } from "#modules/media/errors";
 import ImageService, {
 	THUMBNAIL_WIDTH,
 } from "#modules/media/services/image_service";
 import { variantsOfKey } from "#modules/media/variants";
 import env from "#start/env";
 import { POLYGLOT_MARKERS, polyglot, testImages } from "#tests/helpers/images";
+import { captureLogs } from "#tests/helpers/logs";
+import { failDeletes } from "#tests/helpers/storage_failures";
 import { storedImages } from "#tests/helpers/uploads";
 
 const images = new ImageService();
@@ -807,5 +809,77 @@ test.group("cover and work photo purposes (TAT-116)", () => {
 		await images.delete("studio_cover", stored.key);
 
 		assert.deepEqual(await storedImages(studio, "studio_cover"), []);
+	});
+});
+
+test.group("deleting stored images (TAT-116 fix round 1)", () => {
+	const store = async (studio: { id: string }) =>
+		images.store(await upload(await testImages.jpeg(2000, 1500)), {
+			tenant: studio,
+			purpose: "artist_work_photo",
+		});
+
+	test("delete tries every file, logs each failure with its purpose and key, and counts them", async ({
+		assert,
+	}) => {
+		const studio = { id: randomUUID() };
+		const stored = await store(studio);
+		const [, medium] = variantsOfKey(stored.key);
+		const service = new ImageService();
+		const logs = captureLogs();
+		const failing = failDeletes("public", (key) => key === medium.key);
+
+		try {
+			await service.delete("artist_work_photo", stored.key);
+		} finally {
+			failing.restore();
+			logs.restore();
+		}
+
+		assert.equal(service.deleteFailures, 1);
+		assert.lengthOf(failing.attempts, 4, "every file was tried");
+		const [fields] =
+			logs
+				.errors()
+				.find(([first]) => (first as { key?: string }).key === medium.key) ??
+			[];
+		assert.deepInclude(fields, {
+			purpose: "artist_work_photo",
+			key: medium.key,
+		});
+		assert.lengthOf(await storedImages(studio, "artist_work_photo"), 1);
+	});
+
+	test("deleteOrThrow tries every file, then throws naming the files left; a retry removes them; a missing file counts as deleted", async ({
+		assert,
+	}) => {
+		const studio = { id: randomUUID() };
+		const stored = await store(studio);
+		const [small, medium] = variantsOfKey(stored.key);
+		const failing = failDeletes(
+			"public",
+			(key) => key === small.key || key === medium.key,
+		);
+
+		let thrown: unknown;
+		try {
+			await images.deleteOrThrow("artist_work_photo", stored.key);
+		} catch (error) {
+			thrown = error;
+		} finally {
+			failing.restore();
+		}
+
+		assert.instanceOf(thrown, ImageDeleteError);
+		assert.sameMembers(
+			[...(thrown as ImageDeleteError).failed],
+			[small.key, medium.key],
+		);
+		assert.lengthOf(await storedImages(studio, "artist_work_photo"), 2);
+
+		await images.deleteOrThrow("artist_work_photo", stored.key);
+		assert.deepEqual(await storedImages(studio, "artist_work_photo"), []);
+		// Idempotent: everything is already gone.
+		await images.deleteOrThrow("artist_work_photo", stored.key);
 	});
 });

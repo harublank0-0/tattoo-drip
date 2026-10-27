@@ -12,11 +12,7 @@ import ArtistService, {
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
 import type Tenant from "#modules/tenancy/models/tenant";
-import {
-	afterCommit,
-	afterRollback,
-	withTransaction,
-} from "#services/db_context";
+import { afterRollback, withTransaction } from "#services/db_context";
 
 type Upload = Pick<MultipartFile, "tmpPath">;
 type TenantRef = Pick<Tenant, "id">;
@@ -215,9 +211,15 @@ export default class WorkPhotoService {
 	}
 
 	/**
-	 * Deletes the photo for good: the row now, the photo's files (and its
-	 * copies) once the outermost transaction commits. The photos after it move
-	 * up one place in one UPDATE.
+	 * Deletes the photo for good, files first (TAT-116): under the artist's
+	 * lock the photo's files and every copy are deleted, and only then the row
+	 * goes and the photos after it move up one place in one UPDATE. A photo a
+	 * client asked to take down must not stay fetchable while the studio is
+	 * told it is gone, so if any file cannot be deleted this throws
+	 * ImageDeleteError (the controller says so and the row stays, so the owner
+	 * can try again: a missing file counts as deleted, so a retry finishes the
+	 * job). The deletes are real the moment they run, before the commit; the
+	 * transaction only has the row delete and the compaction left to fail.
 	 */
 	async remove(
 		tenant: TenantRef,
@@ -229,13 +231,13 @@ export default class WorkPhotoService {
 			await this.lockArtist(trx, tenant, editor, photo.artistId);
 			const live = await this.lockedPhoto(trx, tenant, photo);
 			const { imageKey, position, artistId } = live;
+			await this.images.deleteOrThrow(PURPOSE, imageKey);
 			await live.delete();
 			await trx.rawQuery(
 				`update artist_work_photos set position = position - 1, updated_at = now()
 				 where tenant_id = ? and artist_id = ? and position > ?`,
 				[tenant.id, artistId, position],
 			);
-			afterCommit(() => this.images.delete(PURPOSE, imageKey));
 		});
 	}
 

@@ -95,7 +95,10 @@ export default class TenancyService {
 			ArtistService,
 			"createOwnerProfile"
 		> = new ArtistService(new ImageService()),
-		private images: Pick<ImageService, "store" | "delete"> = new ImageService(),
+		private images: Pick<
+			ImageService,
+			"store" | "delete" | "deleteOrThrow"
+		> = new ImageService(),
 	) {}
 
 	/**
@@ -178,9 +181,11 @@ export default class TenancyService {
 	}
 
 	/**
-	 * Removes the studio's cover photo: the columns now, the files and their
-	 * copies once the outermost transaction commits. Nothing to remove is not
-	 * an error.
+	 * Removes the studio's cover photo, files first (TAT-116): under the
+	 * tenant row's lock the cover's files and every copy are deleted, and only
+	 * then the columns are cleared. If any file cannot be deleted this throws
+	 * ImageDeleteError and the cover stays, so the owner can try again (a
+	 * missing file counts as deleted). Nothing to remove is not an error.
 	 */
 	async removeCover(tenant: Pick<Tenant, "id">): Promise<void> {
 		await withTransaction(async (trx) => {
@@ -190,13 +195,13 @@ export default class TenancyService {
 				.firstOrFail();
 			const previous = live.coverImageKey;
 			if (!previous) return;
+			await this.images.deleteOrThrow(COVER, previous);
 			live.merge({
 				coverImageKey: null,
 				coverImageWidth: null,
 				coverImageHeight: null,
 			});
 			await live.save();
-			afterCommit(() => this.images.delete(COVER, previous));
 		});
 	}
 

@@ -4,6 +4,7 @@ import { test } from "@japa/runner";
 import type User from "#models/user";
 import Tenant from "#modules/tenancy/models/tenant";
 import { polyglot, testImages } from "#tests/helpers/images";
+import { failDeletes } from "#tests/helpers/storage_failures";
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 import {
 	newTempUploads,
@@ -212,3 +213,41 @@ test.group("Studio cover photo (TAT-116)", (group) => {
 		assert.isNull((await reload(tenant)).coverImageKey);
 	});
 });
+
+test.group(
+	"A cover removal that can't delete the files fails visibly (TAT-116 fix round 1)",
+	(group) => {
+		group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+		test("the cover stays with an error message, and removing again once storage is back succeeds", async ({
+			client,
+			assert,
+		}) => {
+			const { tenant, owner } = await studioWithOwner();
+			await setCover(client, owner, tenant, await testImages.jpeg(2048, 1536));
+			const key = (await reload(tenant)).coverImageKey;
+			const failing = failDeletes("public", () => true);
+
+			let refused: Awaited<ReturnType<typeof removeCover>>;
+			try {
+				refused = await removeCover(client, owner, tenant);
+			} finally {
+				failing.restore();
+			}
+
+			refused.assertStatus(302);
+			refused.assertHeader("location", `/t/${tenant.slug}/settings/profile`);
+			refused.assertFlashMessage(
+				"error",
+				"Couldn't remove the cover photo, try again.",
+			);
+			assert.equal((await reload(tenant)).coverImageKey, key);
+			assert.lengthOf(await storedImages(tenant, PURPOSE), 4);
+
+			const retry = await removeCover(client, owner, tenant);
+			retry.assertFlashMessage("success", "Cover photo removed.");
+			assert.isNull((await reload(tenant)).coverImageKey);
+			assert.deepEqual(await storedImages(tenant, PURPOSE), []);
+		});
+	},
+);
