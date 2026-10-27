@@ -1,4 +1,5 @@
 import { type ReactNode, type RefObject, useReducer, useRef } from "react";
+import { toast } from "sonner";
 import { focusBack } from "~/components/confirm";
 import { SHEET_CLOSED, type SheetFlash, sheetStep } from "~/components/sheets";
 import { Button } from "~/components/ui/button";
@@ -30,8 +31,11 @@ export function useFormSheet() {
 		onOpenChange: (open: boolean) =>
 			dispatch({ type: open ? "open" : "dismiss" }),
 		onStart: () => dispatch({ type: "start" }),
-		onSuccess: (page: { flash?: SheetFlash }) =>
-			dispatch({ type: "saved", flash: page.flash }),
+		onSuccess: (page: { flash?: SheetFlash }) => {
+			dispatch({ type: "saved", flash: page.flash });
+			// A refusal is shown inside the sheet; the page's toast would only cover its title.
+			if (page.flash?.error) setTimeout(() => toast.dismiss("flash"), 0);
+		},
 		onFinish: () => dispatch({ type: "finished" }),
 	};
 }
