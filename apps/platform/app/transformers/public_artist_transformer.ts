@@ -28,6 +28,15 @@ export default class PublicArtistTransformer extends BaseTransformer<ShownArtist
 				: null,
 			acceptingInquiries: artist.acceptingInquiries,
 			closedMessage: artist.closedMessage,
+			// Up to six, in the studio's order: no id, key, position or
+			// timestamp (openapi.yaml, WorkPhoto).
+			workPhotos: artist.workPhotos.map((photo) => ({
+				url: photo.url,
+				width: photo.width,
+				height: photo.height,
+				alt: photo.alt,
+				variants: photo.variants.map(({ url, width }) => ({ url, width })),
+			})),
 		};
 	}
 }

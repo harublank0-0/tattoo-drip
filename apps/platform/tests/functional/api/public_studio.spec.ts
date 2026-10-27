@@ -15,16 +15,19 @@ import {
 	assertNoCookies,
 } from "#tests/helpers/api";
 import { addArtist, artistInput } from "#tests/helpers/artists";
+import { testImages, uploadOf } from "#tests/helpers/images";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
 const CACHED = "public, max-age=60, stale-while-revalidate=600";
-const tenancy = new TenancyService();
-const artists = new ArtistService(new ImageService());
+const images = new ImageService();
+const tenancy = new TenancyService(undefined, images);
+const artists = new ArtistService(images);
 
 /** The documented fields (openapi.yaml, Studio). A new one needs the contract and a ruling first. */
 const STUDIO_FIELDS = [
 	"acceptingInquiries",
 	"contact",
+	"cover",
 	"intro",
 	"name",
 	"slug",
@@ -58,6 +61,7 @@ const bareStudio = (slug: string, name: string) => ({
 	contact: { phone: null, email: null, address: null },
 	socialLinks: [],
 	acceptingInquiries: true,
+	cover: null,
 });
 
 function changeSlug(tenant: Tenant, slug: string) {
@@ -95,6 +99,7 @@ test.group("GET /api/v1/tenants/:tenant (getStudio)", (group) => {
 				{ platform: "website", url: "https://black-needle.example" },
 			],
 			acceptingInquiries: true,
+			cover: null,
 		});
 		assertApiHeaders(response);
 	});
@@ -160,6 +165,94 @@ test.group("GET /api/v1/tenants/:tenant (getStudio)", (group) => {
 		after.assertStatus(200);
 		assert.isFalse(after.body().data.acceptingInquiries);
 		assert.notEqual(after.header("etag"), before);
+	});
+
+	test("a studio without a cover answers cover: null", async ({
+		client,
+		assert,
+	}) => {
+		await studioWithOwner("api-nocover-116");
+
+		const { data } = (
+			await client.get("/api/v1/tenants/api-nocover-116")
+		).body();
+
+		assert.isNull(data.cover);
+	});
+
+	test("a cover is its public URL, its size, alt null and its copies, in the studio's own folder", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("api-cover-116");
+		const withCover = await inTenant(tenant, async () =>
+			tenancy.setCover(
+				tenant,
+				await uploadOf(await testImages.jpeg(2048, 1536)),
+			),
+		);
+		const url = await images.url(
+			"studio_cover",
+			withCover.coverImageKey ?? "",
+			tenant,
+		);
+
+		const { data } = (await client.get("/api/v1/tenants/api-cover-116")).body();
+
+		assert.deepEqual(Object.keys(data.cover).sort(), [
+			"alt",
+			"height",
+			"url",
+			"variants",
+			"width",
+		]);
+		assert.equal(data.cover.url, url);
+		assert.equal(data.cover.width, 2048);
+		assert.equal(data.cover.height, 1536);
+		assert.isNull(data.cover.alt);
+		assert.deepEqual(
+			data.cover.variants.map((variant: { width: number }) => variant.width),
+			[640, 960, 1280],
+		);
+		for (const variant of data.cover.variants) {
+			assert.deepEqual(Object.keys(variant).sort(), ["url", "width"]);
+			assert.equal(new URL(variant.url).origin, new URL(url).origin);
+			assert.match(
+				new URL(variant.url).pathname,
+				new RegExp(`^/uploads/tenants/${tenant.id}/studio_cover/`),
+			);
+			(await client.get(new URL(variant.url).pathname)).assertStatus(200);
+		}
+		// The stored key and the tenant row's columns never show.
+		const text = JSON.stringify(data);
+		assert.notInclude(text, "cover_image");
+		assert.notInclude(text, "coverImage");
+	});
+
+	test("setting or removing the cover changes the ETag; the cache headers stay", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("api-coveretag-116");
+		const url = "/api/v1/tenants/api-coveretag-116";
+		const bare = await client.get(url);
+		bare.assertHeader("cache-control", CACHED);
+		const bareTag = bare.header("etag") ?? "";
+
+		await inTenant(tenant, async () =>
+			tenancy.setCover(
+				tenant,
+				await uploadOf(await testImages.jpeg(2048, 1536)),
+			),
+		);
+		const set = await client.get(url).header("if-none-match", bareTag);
+		set.assertStatus(200);
+		set.assertHeader("cache-control", CACHED);
+		assert.notEqual(set.header("etag"), bareTag);
+
+		await inTenant(tenant, () => tenancy.removeCover(tenant));
+		const removed = await client.get(url);
+		assert.equal(removed.header("etag"), bareTag);
 	});
 
 	test("an independent artist's studio says so", async ({ client }) => {

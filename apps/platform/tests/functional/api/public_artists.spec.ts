@@ -3,6 +3,7 @@ import { test } from "@japa/runner";
 import User from "#models/user";
 import type Artist from "#modules/artists/models/artist";
 import ArtistService from "#modules/artists/services/artist_service";
+import WorkPhotoService from "#modules/artists/services/work_photo_service";
 import ImageService from "#modules/media/services/image_service";
 import type Tenant from "#modules/tenancy/models/tenant";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
@@ -12,7 +13,7 @@ import {
 	assertApiHeaders,
 	assertNoCookies,
 } from "#tests/helpers/api";
-import { addArtist, artistInput } from "#tests/helpers/artists";
+import { addArtist, addWorkPhoto, artistInput } from "#tests/helpers/artists";
 import { testImages, uploadOf } from "#tests/helpers/images";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
@@ -30,7 +31,9 @@ const ARTIST_FIELDS = [
 	"name",
 	"photo",
 	"slug",
+	"workPhotos",
 ];
+const WORK_PHOTO_FIELDS = ["alt", "height", "url", "variants", "width"];
 const PHOTO_FIELDS = ["height", "url", "variants", "width"];
 
 /** The public Artist of a profile without a photo. */
@@ -42,6 +45,7 @@ const shown = (artist: Artist) => ({
 	photo: null,
 	acceptingInquiries: artist.acceptingInquiries,
 	closedMessage: artist.acceptingInquiries ? null : artist.closedMessage,
+	workPhotos: [],
 });
 
 function changeSlug(tenant: Tenant, slug: string) {
@@ -146,6 +150,156 @@ test.group("GET /api/v1/tenants/:tenant/artists (listArtists)", (group) => {
 			);
 			(await client.get(new URL(variant.url).pathname)).assertStatus(200);
 		}
+	});
+
+	test("work photos come in the studio's order with exactly url, width, height, alt and variants", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("api-work-116");
+		const sita = await addArtist(tenant, owner);
+		const photos = new WorkPhotoService(images, artists);
+		const added = await inTenant(tenant, async () => [
+			await photos.add(
+				tenant,
+				{ userId: owner.id, role: "owner" },
+				sita,
+				await uploadOf(await testImages.jpeg(1600, 1200)),
+			),
+			await photos.add(
+				tenant,
+				{ userId: owner.id, role: "owner" },
+				sita,
+				await uploadOf(await testImages.jpeg(300, 400)),
+			),
+		]);
+		await inTenant(tenant, () =>
+			photos.describe(
+				tenant,
+				{ userId: owner.id, role: "owner" },
+				added[0],
+				"Koi on the forearm",
+			),
+		);
+		// The studio's order: the second photo first.
+		await inTenant(tenant, () =>
+			photos.move(tenant, { userId: owner.id, role: "owner" }, added[1], "up"),
+		);
+
+		const { data } = (
+			await client.get("/api/v1/tenants/api-work-116/artists")
+		).body();
+		const one = (
+			await client.get("/api/v1/tenants/api-work-116/artists/sita")
+		).body().data;
+
+		const work = data[0].workPhotos;
+		assert.lengthOf(work, 2);
+		assert.deepEqual(one.workPhotos, work);
+		for (const photo of work) {
+			assert.deepEqual(Object.keys(photo).sort(), WORK_PHOTO_FIELDS);
+			assert.match(
+				new URL(photo.url).pathname,
+				new RegExp(`^/uploads/tenants/${tenant.id}/artist_work_photo/`),
+			);
+			(await client.get(new URL(photo.url).pathname)).assertStatus(200);
+		}
+		assert.equal(work[0].width, 300);
+		assert.isNull(work[0].alt);
+		assert.deepEqual(work[0].variants, []);
+		assert.equal(work[1].width, 1600);
+		assert.equal(work[1].alt, "Koi on the forearm");
+		assert.deepEqual(
+			work[1].variants.map((variant: { width: number }) => variant.width),
+			[320, 640, 1280],
+		);
+		// Never the row: no id, key, position, artist id or timestamp.
+		const text = JSON.stringify(work);
+		for (const word of [
+			"position",
+			"artist_id",
+			"artistId",
+			"created",
+			"imageKey",
+		]) {
+			assert.notInclude(text, word);
+		}
+		assert.notInclude(text, added[0].id);
+		assert.notInclude(text, added[1].id);
+	});
+
+	test("a closed artist shows their work, and the list is the one-artist answer", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("api-workclosed-116");
+		const closed = await addArtist(tenant, owner, {
+			acceptingInquiries: false,
+			closedMessage: "Books open in March.",
+		});
+		await inTenant(tenant, () =>
+			addWorkPhoto(tenant, closed, { alt: "Still shown" }),
+		);
+
+		const list = (
+			await client.get("/api/v1/tenants/api-workclosed-116/artists")
+		).body().data;
+
+		assert.isFalse(list[0].acceptingInquiries);
+		assert.equal(list[0].closedMessage, "Books open in March.");
+		assert.deepEqual(
+			list[0].workPhotos.map((photo: { alt: string }) => photo.alt),
+			["Still shown"],
+		);
+	});
+
+	test("adding a photo, describing it and moving it each change the list's ETag", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("api-worketag-116");
+		const sita = await addArtist(tenant, owner);
+		const editor = { userId: owner.id, role: "owner" } as const;
+		const photos = new WorkPhotoService(images, artists);
+		const url = "/api/v1/tenants/api-worketag-116/artists";
+		const etags = [(await client.get(url)).header("etag")];
+
+		const first = await inTenant(tenant, async () =>
+			photos.add(
+				tenant,
+				editor,
+				sita,
+				await uploadOf(await testImages.jpeg(1600, 1200)),
+			),
+		);
+		etags.push((await client.get(url)).header("etag"));
+		const second = await inTenant(tenant, async () =>
+			photos.add(
+				tenant,
+				editor,
+				sita,
+				await uploadOf(await testImages.jpeg(1600, 1200)),
+			),
+		);
+		etags.push((await client.get(url)).header("etag"));
+		await inTenant(tenant, () =>
+			photos.describe(tenant, editor, second, "Koi"),
+		);
+		etags.push((await client.get(url)).header("etag"));
+		await inTenant(tenant, () => photos.move(tenant, editor, second, "up"));
+		etags.push((await client.get(url)).header("etag"));
+		await inTenant(tenant, () => photos.remove(tenant, editor, first));
+		etags.push((await client.get(url)).header("etag"));
+
+		assert.lengthOf(
+			new Set(etags),
+			etags.length,
+			"every change shows in the ETag",
+		);
+		const same = await client
+			.get(url)
+			.header("if-none-match", etags.at(-1) ?? "");
+		same.assertStatus(304);
 	});
 
 	test("a studio with no visible artist answers an empty list", async ({

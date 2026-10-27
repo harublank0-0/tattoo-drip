@@ -1,12 +1,14 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import ArtistService from "#modules/artists/services/artist_service";
+import WorkPhotoService from "#modules/artists/services/work_photo_service";
 import ImageService from "#modules/media/services/image_service";
 import StudioPageService from "#modules/storefront/services/studio_page_service";
+import type Tenant from "#modules/tenancy/models/tenant";
 import TenancyService, {
 	type TenantProfile,
 } from "#modules/tenancy/services/tenancy_service";
-import { addArtist } from "#tests/helpers/artists";
+import { addArtist, addWorkPhoto } from "#tests/helpers/artists";
 import { testImages, uploadOf } from "#tests/helpers/images";
 import { recordQueries } from "#tests/helpers/query_count";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
@@ -37,7 +39,7 @@ class CountingArtists extends ArtistService {
 
 const images = new ImageService();
 const pagesWith = (artists: ArtistService = new ArtistService(images)) =>
-	new StudioPageService(artists, images);
+	new StudioPageService(artists, images, new WorkPhotoService(images, artists));
 
 const PROFILE: TenantProfile = {
 	name: "Page Needle",
@@ -68,6 +70,7 @@ test.group("StudioPageService.studio", (group) => {
 		assert.deepEqual(page, {
 			profile: { ...PROFILE, slug: "page-needle-44", type: "studio" },
 			acceptingInquiries: true,
+			cover: null,
 		});
 	});
 
@@ -162,6 +165,7 @@ test.group("StudioPageService.visibleArtists", (group) => {
 				photo: null,
 				acceptingInquiries: true,
 				closedMessage: null,
+				workPhotos: [],
 			},
 			{
 				id: zara.id,
@@ -171,6 +175,7 @@ test.group("StudioPageService.visibleArtists", (group) => {
 				photo: null,
 				acceptingInquiries: false,
 				closedMessage: "Books open in March.",
+				workPhotos: [],
 			},
 		]);
 	});
@@ -262,5 +267,192 @@ test.group("StudioPageService.visibleArtist", (group) => {
 		assert.isNull(found.gone);
 		assert.isNull(found.nobody);
 		assert.isNull(found.cased);
+	});
+});
+
+test.group("StudioPageService: cover and work photos (TAT-116)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("the cover is the tenant row's image with its copies, and costs no query of its own", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("page-cover-116");
+		const withCover = await inTenant(tenant, async () =>
+			new TenancyService(undefined, images).setCover(
+				tenant,
+				await uploadOf(await testImages.jpeg(2048, 1536)),
+			),
+		);
+
+		const { result, queries } = await recordQueries(() =>
+			inTenant(tenant, () => pagesWith().studio(withCover)),
+		);
+
+		assert.deepEqual(result.cover, {
+			url: await images.url(
+				"studio_cover",
+				withCover.coverImageKey ?? "",
+				tenant,
+			),
+			width: 2048,
+			height: 1536,
+			variants: await images.variants(
+				"studio_cover",
+				withCover.coverImageKey ?? "",
+				tenant,
+			),
+		});
+		assert.deepEqual(
+			result.cover?.variants.map((copy) => copy.width),
+			[640, 960, 1280],
+		);
+		// Only the artists read: the cover comes from the row already loaded.
+		assert.lengthOf(
+			queries.filter((sql) => /from "?artists"?/.test(sql)),
+			1,
+		);
+		assert.lengthOf(
+			queries.filter((sql) => sql.includes("artist_work_photos")),
+			0,
+		);
+	});
+
+	test("a studio without a cover has cover null", async ({ assert }) => {
+		const { tenant } = await studioWithOwner("page-nocover-116");
+
+		const page = await inTenant(tenant, () => pagesWith().studio(tenant));
+
+		assert.isNull(page.cover);
+	});
+
+	test("an artist's work photos come in the studio's order with only their public fields", async ({
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("page-work-116");
+		const sita = await addArtist(tenant, owner);
+		await inTenant(tenant, async () => {
+			await addWorkPhoto(tenant, sita, { alt: "Koi on the forearm" });
+			await addWorkPhoto(tenant, sita, { width: 300, height: 400 });
+		});
+
+		const [shown] = await inTenant(tenant, () =>
+			pagesWith().visibleArtists(tenant),
+		);
+		const one = await inTenant(tenant, () =>
+			pagesWith().visibleArtist(tenant, "sita"),
+		);
+
+		assert.lengthOf(shown.workPhotos, 2);
+		assert.deepEqual(
+			shown.workPhotos.map((photo) => photo.alt),
+			["Koi on the forearm", null],
+		);
+		assert.deepEqual(Object.keys(shown.workPhotos[0]).sort(), [
+			"alt",
+			"height",
+			"url",
+			"variants",
+			"width",
+		]);
+		assert.deepEqual(
+			shown.workPhotos[0].variants.map((copy) => copy.width),
+			[320, 640, 1280],
+		);
+		assert.deepEqual(one?.workPhotos, shown.workPhotos);
+	});
+
+	test("a closed artist still shows their work; a hidden or deleted artist's photos are never read", async ({
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("page-closed-116");
+		const closed = await addArtist(tenant, owner, {
+			name: "Closed",
+			slug: "closed",
+			acceptingInquiries: false,
+			closedMessage: "Books open in March.",
+		});
+		const hidden = await addArtist(tenant, owner, {
+			name: "Hidden",
+			slug: "hidden",
+			visible: false,
+		});
+		const gone = await addArtist(tenant, owner, { name: "Gone", slug: "gone" });
+		await inTenant(tenant, async () => {
+			await addWorkPhoto(tenant, closed, { alt: "closed-photo" });
+			await addWorkPhoto(tenant, hidden, { alt: "hidden-photo" });
+			await addWorkPhoto(tenant, gone, { alt: "gone-photo" });
+			await new ArtistService(images).delete(tenant, gone);
+		});
+
+		const list = await inTenant(tenant, () =>
+			pagesWith().visibleArtists(tenant),
+		);
+
+		assert.deepEqual(
+			list.map((artist) => artist.slug),
+			["closed"],
+		);
+		assert.deepEqual(
+			list[0].workPhotos.map((photo) => photo.alt),
+			["closed-photo"],
+		);
+		assert.notInclude(JSON.stringify(list), "hidden-photo");
+		assert.notInclude(JSON.stringify(list), "gone-photo");
+	});
+
+	test("a list costs two queries (artists, then every artist's photos), one artist two, none extra for a studio", async ({
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("page-count-116");
+		for (const [slug, name] of [
+			["sita", "Sita"],
+			["bina", "Bina"],
+			["mira", "Mira"],
+		]) {
+			const artist = await addArtist(tenant, owner, { name, slug });
+			await inTenant(tenant, async () => {
+				await addWorkPhoto(tenant, artist);
+				await addWorkPhoto(tenant, artist);
+			});
+		}
+		const empty = await studioWithOwner("page-count-empty-116");
+		// The context's own statements (savepoint, settings) cost the same
+		// whatever runs inside, so an empty one is the baseline to subtract.
+		const baseline = (
+			await recordQueries(() => inTenant(tenant, async () => {}))
+		).queries.length;
+		const queries = async <T>(who: { tenant: Tenant }, fn: () => Promise<T>) =>
+			(await recordQueries(() => inTenant(who.tenant, fn))).queries.length -
+			baseline;
+
+		assert.equal(
+			await queries({ tenant }, () => pagesWith().studio(tenant)),
+			1,
+			"studio",
+		);
+		assert.equal(
+			await queries({ tenant }, () => pagesWith().visibleArtists(tenant)),
+			2,
+			"list of three artists with six photos",
+		);
+		assert.equal(
+			await queries({ tenant }, () =>
+				pagesWith().visibleArtist(tenant, "bina"),
+			),
+			2,
+			"one artist",
+		);
+		assert.equal(
+			await queries({ tenant }, () =>
+				pagesWith().visibleArtist(tenant, "nobody"),
+			),
+			1,
+			"an unknown slug reads no photos",
+		);
+		assert.equal(
+			await queries(empty, () => pagesWith().visibleArtists(empty.tenant)),
+			1,
+			"no visible artist reads no photos",
+		);
 	});
 });
