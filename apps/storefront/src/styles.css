@@ -83,6 +83,15 @@
   --accent: var(--stencil-wash);
   --accent-foreground: var(--ink);
   --destructive: #b3261e;
+  /*
+   * The cover hero (TAT-116): the studio's photo with its name over it. The
+   * photo is the same in both schemes, so these are too. Over a white photo
+   * the scrim gives #4f4d4b, and --on-photo on it is 7.62:1; on the
+   * placeholder (--photo-shade) 17:1. test/studio/cover.test.ts measures both.
+   */
+  --on-photo: #f7f3ee;
+  --photo-shade: #14110f;
+  --photo-scrim: rgb(20 17 15 / 0.75);
   --border: var(--line);
   --input: var(--line-strong);
   --ring: var(--stencil);
@@ -168,9 +177,19 @@
    */
   /* `left center` is physical: the page is LTR. A mirrored (RTL) page would need `right center`; object-position has no logical keywords. */
   .profile-logo { display: block; inline-size: auto; max-inline-size: min(12rem, 100%); block-size: 4rem; object-fit: contain; object-position: left center; }
-  .profile-cover { position: relative; isolation: isolate; margin: 0 0.375rem 1.875rem 0; }
-  .profile-cover img { display: block; inline-size: 100%; block-size: auto; aspect-ratio: 3 / 1; max-block-size: 16rem; object-fit: cover; object-position: 50% 25%; background: var(--stencil-wash); }
+  /*
+   * The cover (TAT-116): the studio's photo with its name over it, inside the
+   * page margins with the stencil frame. 4:3 on a phone, 21:9 from 60rem. A
+   * long name makes the box taller (an aspect-ratio box's automatic minimum
+   * height), never clipped. The scrim is solid behind every line of text and
+   * fades only across the empty top padding.
+   */
+  .profile-cover { position: relative; isolation: isolate; display: grid; align-content: end; aspect-ratio: 4 / 3; margin: 0 0.375rem 0.375rem 0; }
+  .profile-cover img { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; object-fit: cover; object-position: 50% 25%; background: var(--photo-shade); }
   .profile-cover::after { content: ''; position: absolute; inset: 0; z-index: -1; translate: 0.375rem 0.375rem; border: 1.5px solid var(--stencil); }
+  .profile-cover .profile-heading { position: relative; padding: 3rem 1rem 1rem; background: linear-gradient(to top, var(--photo-scrim) calc(100% - 3rem), transparent); color: var(--on-photo); }
+  .profile-cover .profile-name { font-size: clamp(2.25rem, 1.25rem + 5vw, 4.5rem); }
+  .profile-cover .profile-location { color: var(--on-photo); }
   .site-bar-logo { display: block; inline-size: auto; max-inline-size: 6rem; block-size: 2rem; margin-inline-end: 0.75rem; object-fit: contain; }
   .profile-actions { display: grid; gap: 1.5rem; align-content: start; }
   /* On a phone the two buttons share a row when they fit (each grows to fill it), else stack at full width. */
@@ -270,6 +289,8 @@
   .page { padding-block-start: 4.5rem; }
   .profile { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); column-gap: 4rem; align-items: start; }
   .profile-heading { grid-column: 1 / -1; }
+  .profile-cover { grid-column: 1 / -1; aspect-ratio: 21 / 9; }
+  .profile-cover .profile-heading { padding: 3rem 2rem 1.5rem; }
   /* The buttons and the intro on the left, the contact groups on the right (TAT-105). */
   .profile-actions, .profile-intro { grid-column: 1; }
   .profile .contact { grid-column: 2; grid-row: 2 / span 2; }

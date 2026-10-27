@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { coverSizes } from "../srcset.ts";
 import type { BrandImage, CoverImage } from "../theme/config.ts";
 
@@ -41,8 +42,20 @@ export function BrandLogo({
 	);
 }
 
-/** The cover above the hero: the page's first image, so it loads first. */
-export function BrandCover({ image }: { image: CoverImage }) {
+/**
+ * The cover (TAT-116): the studio's photo, the page's first image, so it
+ * loads first, with the heading (logo, name, location) over it. The photo
+ * is the box's first child, which is how the tests find it; `children` sit
+ * above it on the scrim. The name is text in the HTML, so it reads before
+ * the photo arrives, on the box's dark placeholder.
+ */
+export function BrandCover({
+	image,
+	children,
+}: {
+	image: CoverImage;
+	children?: ReactNode;
+}) {
 	return (
 		<div className="profile-cover">
 			<img
@@ -56,6 +69,7 @@ export function BrandCover({ image }: { image: CoverImage }) {
 				decoding="async"
 				fetchPriority="high"
 			/>
+			{children}
 		</div>
 	);
 }

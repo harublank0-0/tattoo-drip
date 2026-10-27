@@ -30,26 +30,32 @@ export function StudioPage({
 	const whatsapp = studio.links.find(
 		(link) => link.kind === "whatsapp" && isAllowedHref(link.href),
 	);
+	const heading = (
+		<div className="profile-heading">
+			{theme.logo ? (
+				<BrandLogo
+					image={theme.logo}
+					className="profile-logo"
+					sizes={logoSizes(theme.logo, "hero")}
+				/>
+			) : null}
+			<h1 className="profile-name" dir="auto">
+				{studio.name}
+			</h1>
+			<p className="profile-location user-text" dir="auto">
+				{studio.location ?? studio.typeLabel}
+			</p>
+		</div>
+	);
 	return (
 		<>
 			<main className="page">
-				{theme.heroImage ? <BrandCover image={theme.heroImage} /> : null}
 				<header className="profile">
-					<div className="profile-heading">
-						{theme.logo ? (
-							<BrandLogo
-								image={theme.logo}
-								className="profile-logo"
-								sizes={logoSizes(theme.logo, "hero")}
-							/>
-						) : null}
-						<h1 className="profile-name" dir="auto">
-							{studio.name}
-						</h1>
-						<p className="profile-location user-text" dir="auto">
-							{studio.location ?? studio.typeLabel}
-						</p>
-					</div>
+					{theme.heroImage ? (
+						<BrandCover image={theme.heroImage}>{heading}</BrandCover>
+					) : (
+						heading
+					)}
 					<div className="profile-actions">
 						{studio.accepting ? (
 							<div className="actions">

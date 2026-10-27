@@ -121,11 +121,13 @@ const PHOTO_RATIO = 5 / 4;
 /** The photo columns: the roster's 7rem (9rem from 48rem) and the artist page's 20rem. */
 const ROSTER_REM = { narrow: 7, wide: 9 };
 const PROFILE_REM = 20;
-/** The page is min(72rem, 100% - 2.5rem) wide; the cover is 3 / 1 and at most 16rem tall. */
+/** The page is min(72rem, 100% - 2.5rem) wide; the cover is 4 / 3, and 21 / 9 from 60rem (TAT-116). */
 const PAGE_REM = 72;
 const PAGE_GUTTER_REM = 2.5;
-const COVER_RATIO = 1 / 3;
-const COVER_MAX_HEIGHT_REM = 16;
+const COVER_RATIO = 3 / 4;
+const COVER_WIDE_RATIO = 9 / 21;
+/** Where the cover turns wide (styles.css: `@media (min-width: 60rem)`). */
+const COVER_WIDE_REM = 60;
 
 /** The logos' boxes: `block-size` and `max-inline-size` in styles.css. */
 export const LOGO_SLOTS = {
@@ -173,18 +175,21 @@ export function profilePhotoSizes(image: ImageSize): string {
 }
 
 /**
- * The cover (`.profile-cover img`): the page's width less the margin, 3:1 (at
- * most 16rem tall, which only makes a wide screen's box flatter). The 3:1
- * factor is an upper bound between 48rem and 74.5rem, where the box is flatter.
+ * The cover (`.profile-cover img`, TAT-116): the page's width less the
+ * margin, in a box that is 4:3 below 60rem and 21:9 from it (no height
+ * limit; a long name makes the real box taller, which only means a little
+ * more enlargement than this asks for). A photo flatter than the box is
+ * enlarged until it is as tall as the box, so it needs the box's width times
+ * how much flatter the box is. From 74.5rem the page stops growing (72rem).
  */
 export function coverSizes(image: ImageSize): string {
-	const wide = PAGE_REM - MARGIN_REM;
-	const wideFactor = coverFactor(COVER_MAX_HEIGHT_REM / wide, image);
+	const wideFactor = coverFactor(COVER_WIDE_RATIO, image);
 	const narrow = viewportCalc(
 		PAGE_GUTTER_REM + MARGIN_REM,
 		coverFactor(COVER_RATIO, image),
 	);
-	return `(min-width: ${PAGE_REM + PAGE_GUTTER_REM}rem) ${rem(wide * wideFactor)}, ${narrow}`;
+	const wide = viewportCalc(PAGE_GUTTER_REM + MARGIN_REM, wideFactor);
+	return `(min-width: ${PAGE_REM + PAGE_GUTTER_REM}rem) ${rem((PAGE_REM - MARGIN_REM) * wideFactor)}, (min-width: ${COVER_WIDE_REM}rem) ${wide}, ${narrow}`;
 }
 
 /** A logo: as wide as its height allows, at most the slot's max width. */
