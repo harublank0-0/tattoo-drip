@@ -190,7 +190,7 @@ describe("a studio's logo and cover (TAT-54)", () => {
 		assert.match(cover, new RegExp(` srcSet="${srcSetOf(COVER_SIZED)}"`, "i"));
 		assert.match(
 			cover,
-			/ sizes="\(min-width: 74\.5rem\) 72rem, calc\(100vw - 2\.5rem\)"/,
+			/ sizes="\(min-width: 74\.5rem\) 71\.63rem, calc\(100vw - 2\.875rem\)"/,
 		);
 		assert.match(cover, / loading="eager"/);
 		assert.match(cover, /fetchPriority="high"/);
@@ -201,6 +201,35 @@ describe("a studio's logo and cover (TAT-54)", () => {
 		assert.ok(bar);
 		assert.match(bar, new RegExp(` srcSet="${srcSetOf(LOGO_SIZED)}"`, "i"));
 		assert.match(bar, / sizes="6rem"/);
+	});
+
+	test("a square logo asks for the 4rem its box is tall, not the 12rem it could be wide (TAT-112)", () => {
+		const square = {
+			url: "https://api.example.com/uploads/tenants/t/brand_logo/mark.png",
+			width: 600,
+			height: 600,
+			alt: null,
+			variants: [
+				{
+					url: "https://api.example.com/uploads/tenants/t/brand_logo/mark.320w.png",
+					width: 320,
+				},
+			],
+		};
+		const config = withStorefront({
+			...BRANDED,
+			branding: { ...BRANDED.branding, logo: square },
+		});
+
+		const [logo] =
+			studioHtml(config).match(/<img class="profile-logo"[^>]*>/) ?? [];
+		const [bar] =
+			artistHtml("sita", config).match(/<img class="site-bar-logo"[^>]*>/) ??
+			[];
+
+		assert.ok(logo && bar);
+		assert.match(logo, / sizes="4rem"/);
+		assert.match(bar, / sizes="2rem"/);
 	});
 
 	test("the cover's preload carries its srcset; the logo is still never preloaded (TAT-112)", () => {

@@ -1,4 +1,4 @@
-import { IMAGE_SIZES } from "../srcset.ts";
+import { coverSizes } from "../srcset.ts";
 import type { BrandImage, CoverImage } from "../theme/config.ts";
 
 /**
@@ -23,7 +23,7 @@ export function BrandLogo({
 }: {
 	image: BrandImage;
 	className: string;
-	/** The width the stylesheet draws this logo at (IMAGE_SIZES). */
+	/** The width this logo is drawn at (logoSizes, srcset.ts). */
 	sizes: string;
 }) {
 	return (
@@ -48,7 +48,7 @@ export function BrandCover({ image }: { image: CoverImage }) {
 			<img
 				src={image.src}
 				srcSet={image.srcSet}
-				sizes={image.srcSet ? IMAGE_SIZES.cover : undefined}
+				sizes={image.srcSet ? coverSizes(image) : undefined}
 				width={image.width}
 				height={image.height}
 				alt={image.alt}

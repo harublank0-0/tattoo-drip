@@ -208,6 +208,23 @@ describe("the frame", () => {
 		assert.equal(attr(image, "src"), "https://api.example.com/logo.png");
 	});
 
+	test("a square logo asks for its 2.75rem height, not the 8rem it could be wide (TAT-112)", () => {
+		const html = render(
+			createElement(DepositFrame, {
+				studioName: STUDIO,
+				logo: {
+					src: "https://api.example.com/mark.png",
+					width: 600,
+					height: 600,
+					srcSet:
+						"https://api.example.com/mark.320w.png 320w, https://api.example.com/mark.png 600w",
+				},
+			}),
+		);
+
+		assert.equal(attr(tags(html, "img")[0], "sizes"), "2.75rem");
+	});
+
 	test("a logo without copies has no srcset or sizes", () => {
 		const html = render(
 			createElement(DepositFrame, {

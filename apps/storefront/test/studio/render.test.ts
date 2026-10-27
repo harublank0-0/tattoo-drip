@@ -165,7 +165,7 @@ describe("the studio page", () => {
 
 		assert.ok(image);
 		assert.match(image, new RegExp(` srcSet="${SITA_SRCSET}"`, "i"));
-		assert.match(image, / sizes="\(min-width: 48rem\) 9rem, 7rem"/);
+		assert.match(image, / sizes="\(min-width: 48rem\) 8\.63rem, 6\.63rem"/);
 		assert.match(image, / loading="lazy"/);
 		assert.match(image, / width="1200" height="1500"/);
 		assert.match(image, / alt="Photo of Sita Rai"/);
@@ -180,6 +180,32 @@ describe("the studio page", () => {
 			assert.doesNotMatch(plain, / srcset=/i);
 			assert.doesNotMatch(plain, / sizes=/);
 		}
+	});
+
+	test("a landscape photo asks for the width its 4:5 box needs (TAT-112)", () => {
+		const landscape: Artist = {
+			...SITA_SIZED,
+			photo: {
+				url: SITA_PHOTO_URL,
+				width: 2000,
+				height: 1500,
+				variants: [
+					{ url: SITA_PHOTO_URL.replace(".jpg", ".320w.jpg"), width: 320 },
+					{ url: SITA_PHOTO_URL.replace(".jpg", ".640w.jpg"), width: 640 },
+					{ url: SITA_PHOTO_URL.replace(".jpg", ".1280w.jpg"), width: 1280 },
+				],
+			},
+		};
+		const html = renderToStaticMarkup(
+			createElement(StudioPage, {
+				data: studioPageData(STUDIO, [landscape], ORIGIN),
+			}),
+		);
+		const [image] = images(html);
+
+		// 2000 x 1500 is enlarged to fill a 4:5 box: 5/4 x 4/3 = 1.67 x the box's width.
+		assert.ok(image);
+		assert.match(image, / sizes="\(min-width: 48rem\) 14\.38rem, 11\.05rem"/);
 	});
 
 	test("shows a closed artist's own words", () => {
@@ -542,7 +568,10 @@ describe("the artist page", () => {
 
 		assert.ok(image);
 		assert.match(image, new RegExp(` srcSet="${SITA_SRCSET}"`, "i"));
-		assert.match(image, / sizes="20rem"/);
+		assert.match(
+			image,
+			/ sizes="\(min-width: 48rem\) 19\.63rem, \(min-width: 22\.875rem\) 20rem, calc\(100vw - 2\.875rem\)"/,
+		);
 		assert.match(image, / loading="eager"/);
 		assert.match(image, / fetchpriority="high"/i);
 		assert.equal(data.seo.image?.src, SITA_PHOTO_URL);

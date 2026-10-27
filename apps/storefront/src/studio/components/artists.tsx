@@ -1,12 +1,13 @@
 import { studioCopy } from "../copy.ts";
-import { IMAGE_SIZES } from "../srcset.ts";
+import { profilePhotoSizes, rosterPhotoSizes } from "../srcset.ts";
 import type { ArtistPhoto, ArtistView, StudioView } from "../view-model.ts";
 
 /**
  * Photos are the stored image (up to 2048 px, TAT-44): width and height are
  * always set and CSS crops them to 4:5, so nothing shifts while they load.
  * When the API sent smaller copies the browser picks one by `srcset` and
- * `sizes` (the width CSS draws the photo at, IMAGE_SIZES); `src` stays the
+ * `sizes` (the width the browser must ask for to fill the 4:5 box without
+ * enlarging the copy, from this photo's own size: srcset.ts); `src` stays the
  * stored image. The artist page's photo is its largest element and loads
  * first; roster photos are below the fold and load lazily.
  */
@@ -61,7 +62,7 @@ function ArtistEntry({
 				<PhotoFigure
 					photo={artist.photo}
 					priority={false}
-					sizes={IMAGE_SIZES.rosterPhoto}
+					sizes={rosterPhotoSizes(artist.photo)}
 				/>
 			) : null}
 			<div className="artist-head">
@@ -138,7 +139,7 @@ export function ArtistProfile({
 				<PhotoFigure
 					photo={artist.photo}
 					priority
-					sizes={IMAGE_SIZES.profilePhoto}
+					sizes={profilePhotoSizes(artist.photo)}
 				/>
 			) : null}
 			<div className="artist-profile-text">

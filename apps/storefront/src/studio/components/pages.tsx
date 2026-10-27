@@ -3,7 +3,7 @@ import { MessageCircle } from "lucide-react";
 import { studioCopy } from "../copy.ts";
 import { isAllowedHref, linkRel } from "../links.ts";
 import type { ArtistPageData, StudioPageData } from "../loaders.ts";
-import { IMAGE_SIZES } from "../srcset.ts";
+import { logoSizes } from "../srcset.ts";
 import type { SectionKey } from "../theme/config.ts";
 import { ArtistProfile, ArtistRoster } from "./artists.tsx";
 import { BrandCover, BrandLogo } from "./brand.tsx";
@@ -40,7 +40,7 @@ export function StudioPage({
 							<BrandLogo
 								image={theme.logo}
 								className="profile-logo"
-								sizes={IMAGE_SIZES.profileLogo}
+								sizes={logoSizes(theme.logo, "hero")}
 							/>
 						) : null}
 						<h1 className="profile-name" dir="auto">
@@ -138,7 +138,7 @@ export function ArtistPage({
 							<BrandLogo
 								image={theme.logo}
 								className="site-bar-logo"
-								sizes={IMAGE_SIZES.siteBarLogo}
+								sizes={logoSizes(theme.logo, "siteBar")}
 							/>
 							<span>{studio.name}</span>
 						</>
