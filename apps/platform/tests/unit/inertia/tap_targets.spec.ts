@@ -116,4 +116,22 @@ test.group("44px tap targets below lg (TAT-103)", () => {
 			assert.notMatch(await read(file), /<button\b/, file);
 		}
 	});
+
+	test("the sheet and its overlay stop animating under prefers-reduced-motion (TAT-108)", async ({
+		assert,
+	}) => {
+		// `motion-reduce:animate-none` alone loses to the data-state variants' animation (it has
+		// less specificity), as a browser pass with reducedMotion showed: both states are named.
+		const source = await read("sheet.tsx");
+		for (const part of ["SheetOverlay", "SheetContent"]) {
+			const body = component(source, part);
+			for (const state of ["open", "closed"]) {
+				assert.include(
+					body,
+					`motion-reduce:data-[state=${state}]:animate-none`,
+					`${part} ${state}`,
+				);
+			}
+		}
+	});
 });
