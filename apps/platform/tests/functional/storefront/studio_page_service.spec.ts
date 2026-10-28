@@ -41,6 +41,15 @@ const images = new ImageService();
 const pagesWith = (artists: ArtistService = new ArtistService(images)) =>
 	new StudioPageService(artists, images, new WorkPhotoService(images, artists));
 
+/** The look of a studio that set nothing (TAT-56). */
+const DEFAULT_LOOK = {
+	theme: "stencil-and-ink",
+	accent: null,
+	accentDark: null,
+	font: "eczar",
+	sections: ["artists", "inquiry"],
+};
+
 const PROFILE: TenantProfile = {
 	name: "Page Needle",
 	timezone: "Asia/Kathmandu",
@@ -71,6 +80,7 @@ test.group("StudioPageService.studio", (group) => {
 			profile: { ...PROFILE, slug: "page-needle-44", type: "studio" },
 			acceptingInquiries: true,
 			cover: null,
+			storefront: { look: DEFAULT_LOOK, logo: null },
 		});
 	});
 
@@ -454,5 +464,82 @@ test.group("StudioPageService: cover and work photos (TAT-116)", (group) => {
 			1,
 			"no visible artist reads no photos",
 		);
+	});
+});
+
+test.group("StudioPageService: page look and logo (TAT-56)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("the saved look and the logo come from the tenant row and cost no query of their own", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("page-look-56");
+		const tenancy = new TenancyService(undefined, images);
+		await inTenant(tenant, () =>
+			tenancy.updateLook(tenant, {
+				theme: "stencil-and-ink",
+				accent: "#0f766e",
+				accentDark: null,
+				font: "sans",
+				artists: "last",
+			}),
+		);
+		const withLogo = await inTenant(tenant, async () =>
+			tenancy.setLogo(tenant, await uploadOf(await testImages.png(600, 200))),
+		);
+
+		const { result, queries } = await recordQueries(() =>
+			inTenant(tenant, () => pagesWith().studio(withLogo)),
+		);
+
+		assert.deepEqual(result.storefront.look, {
+			theme: "stencil-and-ink",
+			accent: "#0f766e",
+			accentDark: null,
+			font: "sans",
+			sections: ["inquiry", "artists"],
+		});
+		assert.deepEqual(result.storefront.logo, {
+			url: await images.url("studio_logo", withLogo.logoImageKey ?? "", tenant),
+			width: 600,
+			height: 200,
+			variants: await images.variants(
+				"studio_logo",
+				withLogo.logoImageKey ?? "",
+				tenant,
+			),
+		});
+		assert.deepEqual(
+			result.storefront.logo?.variants.map((copy) => copy.width),
+			[320],
+		);
+		// Only the artists read: the look and the logo come from the row already loaded.
+		assert.lengthOf(
+			queries.filter((sql) => /from "?artists"?/.test(sql)),
+			1,
+		);
+		assert.lengthOf(
+			queries.filter((sql) => /from "?tenants"?/.test(sql)),
+			0,
+		);
+	});
+
+	test("a studio that set nothing has the default look and no logo", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("page-nolook-56");
+
+		const page = await inTenant(tenant, () => pagesWith().studio(tenant));
+
+		assert.deepEqual(page.storefront, { look: DEFAULT_LOOK, logo: null });
+	});
+
+	test("a half-set logo (no size) is no logo", async ({ assert }) => {
+		const { tenant } = await studioWithOwner("page-halflogo-56");
+		const half = Object.assign(tenant, { logoImageKey: "tenants/x/k.png" });
+
+		const page = await inTenant(tenant, () => pagesWith().studio(half));
+
+		assert.isNull(page.storefront.logo);
 	});
 });

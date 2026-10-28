@@ -2,9 +2,9 @@ import type { Studio } from "@tattoo-drip/sdk";
 import { STUDIO } from "./fixtures.ts";
 
 /**
- * Shared by the theme tests (TAT-54). The contract has no `Studio.storefront`
- * yet (src/studio/theme/source.ts), so a config goes on a fixture studio
- * through this cast.
+ * Shared by the theme tests (TAT-54). A hostile or newer API can send a
+ * `storefront` the contract does not allow (src/studio/theme/source.ts), so a
+ * config of any shape goes on a fixture studio through this cast.
  */
 export function withStorefront(storefront: unknown, studio = STUDIO): Studio {
 	return { ...studio, storefront } as Studio;

@@ -16,6 +16,15 @@ const STUDIO: Studio = {
 	socialLinks: [],
 	acceptingInquiries: true,
 	cover: null,
+	storefront: {
+		theme: "stencil-and-ink",
+		branding: {
+			logo: null,
+			colors: { accent: null, accentDark: null },
+			font: "eczar",
+		},
+		sections: [{ type: "artists" }, { type: "inquiry" }],
+	},
 };
 const ARTIST: Artist = {
 	id: "0199f000-0000-7000-8000-000000000044",

@@ -14,10 +14,13 @@ import {
 	studioPageData,
 } from "../../src/studio/loaders.ts";
 import { brandingCss } from "../../src/studio/theme/branding.ts";
-import { DEFAULT_THEME_CONFIG } from "../../src/studio/theme/config.ts";
+import {
+	DEFAULT_THEME_CONFIG,
+	parseThemeConfig,
+} from "../../src/studio/theme/config.ts";
 import { storefrontInput } from "../../src/studio/theme/source.ts";
 import { fakeFetch, json } from "../tenancy/helpers.ts";
-import { ARJUN, ORIGIN, SITA, STUDIO } from "./fixtures.ts";
+import { ARJUN, DEFAULT_STOREFRONT, ORIGIN, SITA, STUDIO } from "./fixtures.ts";
 import {
 	API_COVER,
 	API_COVER_SRCSET,
@@ -55,9 +58,21 @@ const BRANDED_THEME = {
 };
 
 describe("the seam: storefrontInput (TAT-54)", () => {
-	test("today's studio has no storefront: nothing", () => {
-		assert.equal(storefrontInput(STUDIO), undefined);
-		assert.equal(Object.hasOwn(STUDIO, "storefront"), false);
+	test("the platform's default configuration is handed on as it is and parses to the default theme (TAT-56)", () => {
+		assert.equal(Object.hasOwn(STUDIO, "storefront"), true);
+		assert.equal(storefrontInput(STUDIO), STUDIO.storefront);
+		const theme = parseThemeConfig(storefrontInput(STUDIO), IMAGE_ORIGIN);
+		assert.deepEqual(theme, DEFAULT_THEME_CONFIG);
+		assert.equal(brandingCss(theme), null);
+	});
+
+	test("an older API that sends neither property gives undefined", () => {
+		const { storefront: _storefront, cover: _cover, ...older } = STUDIO;
+		assert.equal(storefrontInput(older as Studio), undefined);
+		assert.deepEqual(
+			parseThemeConfig(storefrontInput(older as Studio), IMAGE_ORIGIN),
+			DEFAULT_THEME_CONFIG,
+		);
 	});
 
 	test("hands on whatever the API sent, unchecked", () => {
@@ -68,8 +83,8 @@ describe("the seam: storefrontInput (TAT-54)", () => {
 
 describe("the seam brings the studio's cover in as the hero image (TAT-116)", () => {
 	test("a studio without a cover gives exactly the input it gave before", () => {
-		assert.equal(storefrontInput(STUDIO), undefined);
-		assert.equal(storefrontInput(withCover(STUDIO, null)), undefined);
+		assert.equal(storefrontInput(STUDIO), STUDIO.storefront);
+		assert.equal(storefrontInput(withCover(STUDIO, null)), STUDIO.storefront);
 		assert.equal(storefrontInput(withStorefront(BRANDED)), BRANDED);
 		assert.equal(
 			storefrontInput({ ...withStorefront(BRANDED), cover: null } as Studio),
@@ -77,12 +92,19 @@ describe("the seam brings the studio's cover in as the hero image (TAT-116)", ()
 		);
 		// An older API that doesn't send the property at all.
 		assert.equal(Object.hasOwn(STUDIO, "cover"), true);
-		const { cover: _cover, ...older } = STUDIO;
+		const { cover: _cover, storefront: _storefront, ...older } = STUDIO;
 		assert.equal(storefrontInput(older as Studio), undefined);
 	});
 
 	test("a cover becomes branding.heroImage; the rest of a branded input is kept", () => {
+		// The platform's default configuration keeps its other values.
 		assert.deepEqual(storefrontInput(withCover()), {
+			...DEFAULT_STOREFRONT,
+			branding: { ...DEFAULT_STOREFRONT.branding, heroImage: API_COVER },
+		});
+		// An older API with no `storefront` at all: just the hero image.
+		const { storefront: _storefront, ...older } = STUDIO;
+		assert.deepEqual(storefrontInput(withCover(older as Studio)), {
 			branding: { heroImage: API_COVER },
 		});
 		const input = storefrontInput(withCover(withStorefront(BRANDED)));

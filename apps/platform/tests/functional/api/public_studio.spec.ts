@@ -32,11 +32,23 @@ const STUDIO_FIELDS = [
 	"name",
 	"slug",
 	"socialLinks",
+	"storefront",
 	"timezone",
 	"type",
 ];
 const CONTACT_FIELDS = ["address", "email", "phone"];
 const LINK_FIELDS = ["platform", "url"];
+
+/** The page look of a studio that set nothing (openapi.yaml, StorefrontConfiguration; TAT-56). */
+const DEFAULT_STOREFRONT = {
+	theme: "stencil-and-ink",
+	branding: {
+		logo: null,
+		colors: { accent: null, accentDark: null },
+		font: "eczar",
+	},
+	sections: [{ type: "artists" }, { type: "inquiry" }],
+};
 
 const PROFILE: TenantProfile = {
 	name: "Black Needle",
@@ -62,6 +74,7 @@ const bareStudio = (slug: string, name: string) => ({
 	socialLinks: [],
 	acceptingInquiries: true,
 	cover: null,
+	storefront: DEFAULT_STOREFRONT,
 });
 
 function changeSlug(tenant: Tenant, slug: string) {
@@ -100,6 +113,7 @@ test.group("GET /api/v1/tenants/:tenant (getStudio)", (group) => {
 			],
 			acceptingInquiries: true,
 			cover: null,
+			storefront: DEFAULT_STOREFRONT,
 		});
 		assertApiHeaders(response);
 	});
@@ -253,6 +267,200 @@ test.group("GET /api/v1/tenants/:tenant (getStudio)", (group) => {
 		await inTenant(tenant, () => tenancy.removeCover(tenant));
 		const removed = await client.get(url);
 		assert.equal(removed.header("etag"), bareTag);
+	});
+
+	test("has exactly the documented storefront fields", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("api-look-fields-56");
+		await inTenant(tenant, async () =>
+			tenancy.setLogo(tenant, await uploadOf(await testImages.png(600, 200))),
+		);
+
+		const { data } = (
+			await client.get("/api/v1/tenants/api-look-fields-56")
+		).body();
+
+		assert.deepEqual(Object.keys(data.storefront).sort(), [
+			"branding",
+			"sections",
+			"theme",
+		]);
+		assert.deepEqual(Object.keys(data.storefront.branding).sort(), [
+			"colors",
+			"font",
+			"logo",
+		]);
+		assert.deepEqual(Object.keys(data.storefront.branding.colors).sort(), [
+			"accent",
+			"accentDark",
+		]);
+		for (const section of data.storefront.sections) {
+			assert.deepEqual(Object.keys(section), ["type"]);
+		}
+	});
+
+	test("a saved look is served as storefront", async ({ client }) => {
+		const { tenant } = await studioWithOwner("api-look-56");
+		await inTenant(tenant, () =>
+			tenancy.updateLook(tenant, {
+				theme: "stencil-and-ink",
+				accent: "#0f766e",
+				accentDark: "#a99cff",
+				font: "serif",
+				artists: "hidden",
+			}),
+		);
+
+		assertApiData(await client.get("/api/v1/tenants/api-look-56"), {
+			...bareStudio("api-look-56", "Black Needle"),
+			storefront: {
+				theme: "stencil-and-ink",
+				branding: {
+					logo: null,
+					colors: { accent: "#0f766e", accentDark: "#a99cff" },
+					font: "serif",
+				},
+				sections: [{ type: "inquiry" }],
+			},
+		});
+	});
+
+	test("the artists list can come after the form", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("api-look-order-56");
+		await inTenant(tenant, () =>
+			tenancy.updateLook(tenant, {
+				theme: "stencil-and-ink",
+				accent: null,
+				accentDark: null,
+				font: "eczar",
+				artists: "last",
+			}),
+		);
+
+		const { data } = (
+			await client.get("/api/v1/tenants/api-look-order-56")
+		).body();
+
+		assert.deepEqual(data.storefront.sections, [
+			{ type: "inquiry" },
+			{ type: "artists" },
+		]);
+	});
+
+	test("the logo is its public URL, its size, alt null and its copies, in the studio's own folder", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("api-logo-56");
+		const withLogo = await inTenant(tenant, async () =>
+			tenancy.setLogo(tenant, await uploadOf(await testImages.png(600, 200))),
+		);
+		const url = await images.url(
+			"studio_logo",
+			withLogo.logoImageKey ?? "",
+			tenant,
+		);
+
+		const { data } = (await client.get("/api/v1/tenants/api-logo-56")).body();
+		const logo = data.storefront.branding.logo;
+
+		assert.deepEqual(Object.keys(logo).sort(), [
+			"alt",
+			"height",
+			"url",
+			"variants",
+			"width",
+		]);
+		assert.equal(logo.url, url);
+		assert.equal(logo.width, 600);
+		assert.equal(logo.height, 200);
+		assert.isNull(logo.alt);
+		assert.deepEqual(
+			logo.variants.map((variant: { width: number }) => variant.width),
+			[320],
+		);
+		for (const variant of logo.variants) {
+			assert.deepEqual(Object.keys(variant).sort(), ["url", "width"]);
+			assert.equal(new URL(variant.url).origin, new URL(url).origin);
+			assert.match(
+				new URL(variant.url).pathname,
+				new RegExp(`^/uploads/tenants/${tenant.id}/studio_logo/`),
+			);
+			(await client.get(new URL(variant.url).pathname)).assertStatus(200);
+		}
+		// The stored key and the tenant row's columns never show.
+		const text = JSON.stringify(data);
+		assert.notInclude(text, "logo_image");
+		assert.notInclude(text, "logoImage");
+		assert.isNull(data.cover, "the logo is not the cover");
+	});
+
+	test("saving the look, or the logo, changes the ETag; the cache headers stay", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("api-looketag-56");
+		const url = "/api/v1/tenants/api-looketag-56";
+		const bare = await client.get(url);
+		bare.assertHeader("cache-control", CACHED);
+		const bareTag = bare.header("etag") ?? "";
+
+		await inTenant(tenant, () =>
+			tenancy.updateLook(tenant, {
+				theme: "stencil-and-ink",
+				accent: "#0f766e",
+				accentDark: null,
+				font: "eczar",
+				artists: "first",
+			}),
+		);
+		const saved = await client.get(url).header("if-none-match", bareTag);
+		saved.assertStatus(200);
+		saved.assertHeader("cache-control", CACHED);
+		const savedTag = saved.header("etag") ?? "";
+		assert.notEqual(savedTag, bareTag);
+
+		await inTenant(tenant, async () =>
+			tenancy.setLogo(tenant, await uploadOf(await testImages.png(600, 200))),
+		);
+		const withLogo = await client.get(url).header("if-none-match", savedTag);
+		withLogo.assertStatus(200);
+		assert.notEqual(withLogo.header("etag"), savedTag);
+	});
+
+	test("a stored value off today's list is served as its default, alone", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("api-lookdefault-56");
+		await inTenant(tenant, () =>
+			dbClient().rawQuery(
+				`update tenants set brand_font = 'mono', storefront_theme = 'classic',
+				brand_accent = '#e8a317', brand_accent_dark = '#a99cff',
+				storefront_sections = 'inquiry,flash,artists' where id = ?`,
+				[tenant.id],
+			),
+		);
+
+		const { data } = (
+			await client.get("/api/v1/tenants/api-lookdefault-56")
+		).body();
+
+		assert.deepEqual(data.storefront, {
+			theme: "stencil-and-ink",
+			branding: {
+				logo: null,
+				// The unreadable light colour is dropped; the readable dark one stays.
+				colors: { accent: null, accentDark: "#a99cff" },
+				font: "eczar",
+			},
+			sections: [{ type: "inquiry" }, { type: "artists" }],
+		});
 	});
 
 	test("an independent artist's studio says so", async ({ client }) => {

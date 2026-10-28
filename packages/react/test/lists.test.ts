@@ -16,6 +16,15 @@ const STUDIO: Studio = {
 	socialLinks: [],
 	acceptingInquiries: true,
 	cover: null,
+	storefront: {
+		theme: "stencil-and-ink",
+		branding: {
+			logo: null,
+			colors: { accent: null, accentDark: null },
+			font: "eczar",
+		},
+		sections: [{ type: "artists" }, { type: "inquiry" }],
+	},
 };
 
 /** A client whose fetch answers every call with `status` and `body`. */

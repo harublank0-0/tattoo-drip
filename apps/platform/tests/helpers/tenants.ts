@@ -42,6 +42,9 @@ export async function studioWithOwner(
 		slug,
 		timezone: "Asia/Kathmandu",
 	});
+	// A created model holds only what was assigned: read the columns the
+	// database defaulted (the page look, TAT-56) like a loaded tenant has.
+	await inTenant(tenant, () => tenant.refresh());
 	return { owner, tenant };
 }
 

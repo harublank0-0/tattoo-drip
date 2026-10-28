@@ -717,6 +717,27 @@ describe("studio and artists", () => {
 				},
 			],
 		},
+		// The studio's page look (TAT-56): checked values only.
+		storefront: {
+			theme: "stencil-and-ink",
+			branding: {
+				logo: {
+					url: "https://api.example.com/uploads/tenants/t/studio_logo/l.320.png",
+					width: 600,
+					height: 200,
+					alt: null,
+					variants: [
+						{
+							url: "https://api.example.com/uploads/tenants/t/studio_logo/l.320w.png",
+							width: 320,
+						},
+					],
+				},
+				colors: { accent: "#0f766e", accentDark: null },
+				font: "serif",
+			},
+			sections: [{ type: "inquiry" }, { type: "artists" }],
+		},
 	};
 	const ARTIST: Artist = {
 		id: "0199f000-0000-7000-8000-000000000044",

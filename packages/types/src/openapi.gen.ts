@@ -473,42 +473,63 @@ export interface components {
              */
             url: string;
         };
-        /** @description V1 (TAT-54). Not served yet. */
+        /**
+         * @description One section of the studio page (TAT-56). Show the sections in the
+         *     order they are listed. Treat an unknown `type` as one to leave out.
+         */
         StorefrontSection: {
             /**
-             * @example hero
-             * @example portfolio
-             * @example services
+             * @description `artists` (the artists list) or `inquiry` (the idea form, always
+             *     listed). More will come: treat an unknown value as one to leave
+             *     out.
+             * @enum {string}
              */
-            type: string;
-            props: {
-                [key: string]: unknown;
-            };
+            type: "artists" | "inquiry";
         };
         /**
-         * @description V1 (TAT-54). Not served yet: `Studio` gains it as `storefront` with
-         *     themes and branding.
+         * @description How the studio page looks (TAT-56): the owner's choices, as checked
+         *     values only, never markup, CSS or scripts. Colours and fonts are
+         *     applied by the page from fixed lists. Each value stands alone: a
+         *     value you do not know falls back to its default and the rest still
+         *     applies. A studio that set nothing gets the defaults.
          */
         StorefrontConfiguration: {
-            /** @example classic */
-            theme: string;
+            /**
+             * @description The studio's theme. More will come: treat an unknown value as
+             *     `stencil-and-ink`.
+             * @enum {string}
+             */
+            theme: "stencil-and-ink";
             branding: {
-                logo?: components["schemas"]["Image"] | null;
                 /**
-                 * @description Never sent: the studio's one cover is `Studio.cover` (TAT-116),
-                 *     which the storefront shows here.
+                 * @description The studio's logo, or null. `alt` is always null (it sits
+                 *     beside the studio's name). A PNG keeps its transparency.
                  */
-                heroImage?: components["schemas"]["Image"] | null;
-                /**
-                 * @example {
-                 *       "primary": "#111111"
-                 *     }
-                 */
-                colors?: {
-                    [key: string]: string;
+                logo: components["schemas"]["Image"] | null;
+                colors: {
+                    /**
+                     * @description The studio's colour for buttons, links and the frame
+                     *     around photos, `#rrggbb` in lowercase, 4.5:1 or more on
+                     *     `#f7f3ee`; null is the theme's own violet.
+                     * @example #0f766e
+                     */
+                    accent: string | null;
+                    /**
+                     * @description The same for dark mode, 4.5:1 or more on `#14110f`; null
+                     *     is a lighter shade of `accent` (or the theme's violet).
+                     * @example #a99cff
+                     */
+                    accentDark: string | null;
                 };
-                font?: string | null;
+                /**
+                 * @description The face of the studio's name and headings, a key into the
+                 *     page's fixed list. More will come: treat an unknown value as
+                 *     `eczar`.
+                 * @enum {string}
+                 */
+                font: "eczar" | "serif" | "sans";
             };
+            /** @description The sections to show, in order. The form is always there. */
             sections: components["schemas"]["StorefrontSection"][];
         };
         /**
@@ -563,10 +584,11 @@ export interface components {
              * @description The studio's cover photo (TAT-116), at most 2048 px on its longer
              *     side, with its smaller copies, or null. The studio page opens on
              *     it with the studio's name over it. `alt` is always null: the name
-             *     over it says what the page is. It is the page's hero image:
-             *     `StorefrontConfiguration.branding.heroImage` is never sent.
+             *     over it says what the page is. It is the page's hero image; there
+             *     is no other.
              */
             cover: components["schemas"]["Image"] | null;
+            storefront: components["schemas"]["StorefrontConfiguration"];
         };
         /**
          * @description A visible artist of the studio (TAT-44). Every property is always

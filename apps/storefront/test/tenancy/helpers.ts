@@ -1,4 +1,5 @@
 import type { Studio } from "@tattoo-drip/sdk";
+import { DEFAULT_STOREFRONT } from "../studio/fixtures.ts";
 
 /** Fakes shared by the tenancy tests, in the style of the SDK's own tests. */
 
@@ -46,5 +47,6 @@ export function studioOf(slug: string, name: string): Studio {
 		socialLinks: [],
 		acceptingInquiries: true,
 		cover: null,
+		storefront: DEFAULT_STOREFRONT,
 	};
 }

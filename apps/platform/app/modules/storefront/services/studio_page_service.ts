@@ -10,6 +10,7 @@ import WorkPhotoService from "#modules/artists/services/work_photo_service";
 import ImageService, {
 	type ShownImage,
 } from "#modules/media/services/image_service";
+import { lookOf, type PageLook } from "#modules/storefront/look";
 import type Tenant from "#modules/tenancy/models/tenant";
 import type { TenantProfile } from "#modules/tenancy/services/tenancy_service";
 
@@ -28,6 +29,8 @@ export type StudioPage = {
 	acceptingInquiries: boolean;
 	/** The studio's cover photo (TAT-116), or null. */
 	cover: ShownImage | null;
+	/** How the page looks (TAT-56): the checked look and the logo. */
+	storefront: { look: PageLook; logo: ShownImage | null };
 };
 
 /** A work photo as the public API shows it (openapi.yaml, WorkPhoto). */
@@ -41,6 +44,7 @@ export type ShownArtist = Pick<
 
 const PHOTO = "artist_photo";
 const COVER = "studio_cover";
+const LOGO = "studio_logo";
 const WORK_PHOTO = "artist_work_photo";
 
 /**
@@ -68,6 +72,10 @@ export default class StudioPageService {
 			profile: profileOf(tenant),
 			acceptingInquiries: studioTakesInquiries(visible),
 			cover: await this.coverOf(tenant),
+			storefront: {
+				look: lookOf(tenant),
+				logo: await this.logoOf(tenant),
+			},
 		};
 	}
 
@@ -135,6 +143,18 @@ export default class StudioPageService {
 		return this.images.shownImage(COVER, coverImageKey, tenant, {
 			width: coverImageWidth,
 			height: coverImageHeight,
+		});
+	}
+
+	/** The logo (TAT-56) from the row already loaded, like the cover: no query. */
+	private async logoOf(tenant: Tenant): Promise<ShownImage | null> {
+		const { logoImageKey, logoImageWidth, logoImageHeight } = tenant;
+		if (!logoImageKey || logoImageWidth === null || logoImageHeight === null) {
+			return null;
+		}
+		return this.images.shownImage(LOGO, logoImageKey, tenant, {
+			width: logoImageWidth,
+			height: logoImageHeight,
 		});
 	}
 
