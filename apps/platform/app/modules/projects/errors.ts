@@ -29,6 +29,26 @@ export class QuoteRuleError extends Error {
 	}
 }
 
+/**
+ * An artist's quote, revision or acceptance had a deposit under what an
+ * artist may offer (TAT-16): `floor` paisa, the studio's default share of the
+ * total (NPR 1 at least while a rule is in force). `percent` is the studio's
+ * default deposit, null when it has none. Only an owner may go lower. Thrown
+ * before anything is stored or changed; the message is for developers, the
+ * controller words the user's.
+ */
+export class DepositFloorError extends Error {
+	constructor(
+		readonly floor: bigint,
+		readonly percent: number | null,
+	) {
+		super(
+			`An artist's deposit must be at least ${floor} paisa; only an owner can go lower`,
+		);
+		this.name = "DepositFloorError";
+	}
+}
+
 export const PROJECT_RULE_REASONS = [
 	"move_not_allowed",
 	"session_scheduled",

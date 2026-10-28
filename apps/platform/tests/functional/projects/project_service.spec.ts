@@ -7,7 +7,11 @@ import { DateTime, Settings } from "luxon";
 import ArtistService from "#modules/artists/services/artist_service";
 import ImageService from "#modules/media/services/image_service";
 import DepositService from "#modules/payments/services/deposit_service";
-import { ProjectRuleError, QuoteRuleError } from "#modules/projects/errors";
+import {
+	DepositFloorError,
+	ProjectRuleError,
+	QuoteRuleError,
+} from "#modules/projects/errors";
 import ExpireQuoteJob from "#modules/projects/jobs/expire_quote_job";
 import TattooProject, {
 	PROJECT_STATUSES,
@@ -22,6 +26,7 @@ import QuoteService, {
 	type NewQuote,
 } from "#modules/projects/services/quote_service";
 import SessionService from "#modules/scheduling/services/session_service";
+import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { withTransaction } from "#services/db_context";
 import {
 	makeArtist,
@@ -1736,3 +1741,283 @@ test.group(
 		});
 	},
 );
+
+test.group("The artist deposit floor (TAT-16)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	/** A studio with the given default deposit, and its assigned artist's project. */
+	async function studioWith(
+		percent: number | null,
+		status: ProjectStatus = "reviewing",
+	) {
+		const { owner, tenant } = await studioWithOwner();
+		const asha = await artistIn(tenant, "asha@example.com");
+		const artist = { userId: asha.id, role: "artist" as const };
+		const boss = { userId: owner.id, role: "owner" as const };
+		const project = await inTenant(tenant, async () => {
+			await new TenancyService().updateDepositSettings(tenant, {
+				defaultDepositPercent: percent,
+				depositPolicy: null,
+			});
+			const profile = await makeArtist(tenant, "asha");
+			profile.userId = asha.id;
+			await profile.save();
+			return makeProject(tenant, await makeClient(tenant), {
+				artistId: profile.id,
+				status,
+			});
+		});
+		return { tenant, artist, boss, project };
+	}
+
+	/** A quote of NPR 15,000 with `depositAmount` paisa of deposit. */
+	const withDeposit = (depositAmount: number): NewQuote => ({
+		...fixed(),
+		depositAmount,
+	});
+
+	/** The DepositFloorError `act` throws. */
+	async function refusal(act: () => Promise<unknown>) {
+		try {
+			await act();
+		} catch (error) {
+			if (error instanceof DepositFloorError) return error;
+			throw error;
+		}
+		throw new Error("expected a DepositFloorError");
+	}
+
+	test("an artist's quote under the studio's default is refused and nothing is stored", async ({
+		assert,
+	}) => {
+		const { tenant, artist, project } = await studioWith(20);
+
+		await inTenant(tenant, async () => {
+			const error = await refusal(() =>
+				projects.issueQuote(
+					tenant,
+					artist,
+					project,
+					withDeposit(299_900),
+					null,
+				),
+			);
+
+			assert.equal(error.floor, 300_000n);
+			assert.equal(error.percent, 20);
+			assert.lengthOf(await quotes.history(tenant, project), 0);
+			assert.equal(await statusOf(project), "reviewing");
+		});
+	});
+
+	test("a project that can't be quoted any more says so, not the deposit (fix round 1)", async ({
+		assert,
+	}) => {
+		const { tenant, artist, project } = await studioWith(20, "booked");
+
+		await inTenant(tenant, async () => {
+			let caught: unknown;
+			try {
+				await projects.issueQuote(
+					tenant,
+					artist,
+					project,
+					withDeposit(0),
+					null,
+				);
+			} catch (error) {
+				caught = error;
+			}
+
+			assert.instanceOf(caught, QuoteRuleError);
+			assert.equal((caught as QuoteRuleError).reason, "project_closed");
+			assert.lengthOf(await quotes.history(tenant, project), 0);
+		});
+	});
+
+	test("an artist who no longer has the project gets the 404, not the deposit error", async ({
+		assert,
+	}) => {
+		const { tenant, project } = await studioWith(20);
+		const ravi = await artistIn(tenant, "ravi@example.com");
+		await inTenant(tenant, async () => {
+			const profile = await makeArtist(tenant, "ravi");
+			profile.userId = ravi.id;
+			await profile.save();
+		});
+
+		await inTenant(tenant, async () => {
+			await assert.rejects(
+				() =>
+					projects.issueQuote(
+						tenant,
+						{ userId: ravi.id, role: "artist" },
+						project,
+						withDeposit(0),
+						null,
+					),
+				/Row not found/,
+			);
+		});
+	});
+
+	test("an artist's deposit of exactly the floor passes", async ({
+		assert,
+	}) => {
+		const { tenant, artist, project } = await studioWith(20);
+
+		await inTenant(tenant, async () => {
+			const quote = await projects.issueQuote(
+				tenant,
+				artist,
+				project,
+				withDeposit(300_000),
+				null,
+			);
+
+			assert.equal(quote.depositAmount, 300_000);
+			assert.equal(await statusOf(project), "quoted");
+		});
+	});
+
+	test("without a default, an artist can't quote zero but can quote NPR 1", async ({
+		assert,
+	}) => {
+		const { tenant, artist, project } = await studioWith(null);
+
+		await inTenant(tenant, async () => {
+			const error = await refusal(() =>
+				projects.issueQuote(tenant, artist, project, withDeposit(0), null),
+			);
+			assert.equal(error.floor, 100n);
+			assert.isNull(error.percent);
+			assert.lengthOf(await quotes.history(tenant, project), 0);
+
+			const quote = await projects.issueQuote(
+				tenant,
+				artist,
+				project,
+				withDeposit(100),
+				null,
+			);
+			assert.equal(quote.depositAmount, 100);
+		});
+	});
+
+	test("a 0% default is the owner's policy of no deposit: an artist may quote zero", async ({
+		assert,
+	}) => {
+		const { tenant, artist, project } = await studioWith(0);
+
+		await inTenant(tenant, async () => {
+			const quote = await projects.issueQuote(
+				tenant,
+				artist,
+				project,
+				withDeposit(0),
+				null,
+			);
+
+			assert.equal(quote.depositAmount, 0);
+			assert.equal(await statusOf(project), "quoted");
+		});
+	});
+
+	test("a revision under the floor is refused too", async ({ assert }) => {
+		const { tenant, artist, project } = await studioWith(20);
+
+		await inTenant(tenant, async () => {
+			const first = await projects.issueQuote(
+				tenant,
+				artist,
+				project,
+				withDeposit(300_000),
+				null,
+			);
+
+			const error = await refusal(() =>
+				projects.issueQuote(tenant, artist, project, withDeposit(0), first.id),
+			);
+
+			assert.equal(error.floor, 300_000n);
+			assert.lengthOf(await quotes.history(tenant, project), 1);
+		});
+	});
+
+	test("an owner may quote less, or no deposit at all", async ({ assert }) => {
+		const { tenant, boss, project } = await studioWith(20);
+
+		await inTenant(tenant, async () => {
+			const quote = await projects.issueQuote(
+				tenant,
+				boss,
+				project,
+				withDeposit(0),
+				null,
+			);
+
+			assert.equal(quote.depositAmount, 0);
+			assert.equal(await statusOf(project), "quoted");
+		});
+	});
+
+	test("an artist can't mark accepted a quote an owner issued under the floor; an owner can", async ({
+		assert,
+	}) => {
+		const { tenant, artist, boss, project } = await studioWith(20, "quoted");
+
+		await inTenant(tenant, async () => {
+			const quote = await makeQuote(tenant, project, { depositAmount: 0 });
+
+			const error = await refusal(() =>
+				projects.acceptQuote(tenant, artist, project, quote.id),
+			);
+			assert.equal(error.floor, 300_000n);
+			assert.equal(await statusOf(project), "quoted");
+
+			assert.equal(
+				await projects.acceptQuote(tenant, boss, project, quote.id),
+				"deposit_pending",
+			);
+		});
+	});
+
+	test("an artist may mark accepted a quote that meets the floor", async ({
+		assert,
+	}) => {
+		const { tenant, artist, project } = await studioWith(20, "quoted");
+
+		await inTenant(tenant, async () => {
+			const quote = await makeQuote(tenant, project);
+
+			assert.equal(
+				await projects.acceptQuote(tenant, artist, project, quote.id),
+				"deposit_pending",
+			);
+		});
+	});
+
+	test("the studio's current default decides at accept time; stored quotes are never rewritten", async ({
+		assert,
+	}) => {
+		const { tenant, artist, project } = await studioWith(0, "quoted");
+
+		await inTenant(tenant, async () => {
+			const quote = await makeQuote(tenant, project, { depositAmount: 0 });
+			// The owner raises the default after the quote was issued.
+			await new TenancyService().updateDepositSettings(tenant, {
+				defaultDepositPercent: 20,
+				depositPolicy: null,
+			});
+
+			await refusal(() =>
+				projects.acceptQuote(tenant, artist, project, quote.id),
+			);
+
+			const current = await quotes.current(tenant, project);
+			assert.equal(current?.id, quote.id);
+			assert.equal(current?.depositAmount, 0);
+			assert.equal(await statusOf(project), "quoted");
+		});
+	});
+});

@@ -6,6 +6,7 @@ import type User from "#models/user";
 import { chatLinks } from "#modules/clients/contact_links";
 import { expiresAtFor, todayIn } from "#modules/projects/quotes";
 import { sessionStartText, sessionTimeText } from "#modules/scheduling/times";
+import TenancyService from "#modules/tenancy/services/tenancy_service";
 import {
 	artistMoneyFixture,
 	figuresOf,
@@ -106,6 +107,7 @@ test.group("Project page", (group) => {
 		);
 		assert.deepEqual(props.form, {
 			depositPercent: null,
+			depositFloor: false,
 			defaultValidUntil: dayFromNow(14),
 			minDate: todayIn(KTM),
 			maxDate: DateTime.fromISO(todayIn(KTM))
@@ -1637,6 +1639,40 @@ test.group(
 			assert.lengthOf(mine.rows, 2);
 		});
 
+		test("no member's email reaches the artist (TAT-16)", async ({
+			client,
+			assert,
+		}) => {
+			const { owner, asha, projects } = await artistMoneyFixture();
+			for (const [name, project] of Object.entries(projects)) {
+				const text = JSON.stringify(
+					(await client.get(page(project.id)).withInertia().loginAs(asha))
+						.inertiaProps,
+				);
+				assert.notInclude(text, owner.email, name);
+				assert.notInclude(text, "@black-needle.example", name);
+			}
+
+			const rows = (
+				await client.get(page(projects.booked.id)).withInertia().loginAs(asha)
+			).inertiaProps.payments.rows;
+			assert.lengthOf(rows, 2);
+			for (const row of rows) {
+				assert.match(row.decisionText, /^Recorded by an owner, /);
+			}
+
+			// The owner still sees who did it, by email when there is no full name.
+			const ownerRows = (
+				await client.get(page(projects.booked.id)).withInertia().loginAs(owner)
+			).inertiaProps.payments.rows;
+			for (const row of ownerRows) {
+				assert.match(
+					row.decisionText,
+					new RegExp(`^Recorded by ${owner.email},`),
+				);
+			}
+		});
+
 		test("the schedule hint and the withdraw confirm name the deposit, as main's did", async ({
 			client,
 			assert,
@@ -1654,3 +1690,111 @@ test.group(
 		});
 	},
 );
+
+test.group("Project page: the artist deposit floor (TAT-16)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	/** A quoted project of the studio's artist Asha, in a studio with `percent` as its default. */
+	async function quotedWith(percent: number | null, depositAmount: number) {
+		const { owner, tenant } = await studioWithOwner();
+		const asha = await artistIn(tenant, "asha@example.com");
+		const project = await inTenant(tenant, async () => {
+			await new TenancyService().updateDepositSettings(tenant, {
+				defaultDepositPercent: percent,
+				depositPolicy: null,
+			});
+			const profile = await makeArtist(tenant, "asha");
+			profile.userId = asha.id;
+			await profile.save();
+			const project = await makeProject(tenant, await makeClient(tenant), {
+				artistId: profile.id,
+				status: "quoted",
+			});
+			await makeQuote(tenant, project, { depositAmount });
+			return project;
+		});
+		return { owner, asha, project };
+	}
+
+	/** The actions the Next step card offers. */
+	const offered = (nextStep: {
+		primary: string | null;
+		secondary: string[];
+	}) => [nextStep.primary, ...nextStep.secondary];
+
+	test("a quote under the artist's floor is the owner's to confirm", async ({
+		client,
+		assert,
+	}) => {
+		const { asha, project } = await quotedWith(20, 0);
+
+		const props = (
+			await client.get(page(project.id)).withInertia().loginAs(asha)
+		).inertiaProps;
+
+		assert.isTrue(props.ownerAccepts);
+		assert.isFalse(props.canAccept);
+		assert.notInclude(offered(props.nextStep), "client_accepted");
+		assert.isTrue(props.form.depositFloor);
+	});
+
+	test("a quote at the floor can be confirmed by the artist", async ({
+		client,
+		assert,
+	}) => {
+		const { asha, project } = await quotedWith(20, 300_000);
+
+		const props = (
+			await client.get(page(project.id)).withInertia().loginAs(asha)
+		).inertiaProps;
+
+		assert.isFalse(props.ownerAccepts);
+		assert.isTrue(props.canAccept);
+		assert.isTrue(props.form.depositFloor);
+	});
+
+	test("the owner confirms any quote, and the form carries no floor note for them", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, project } = await quotedWith(20, 0);
+
+		const props = (
+			await client.get(page(project.id)).withInertia().loginAs(owner)
+		).inertiaProps;
+
+		assert.isFalse(props.ownerAccepts);
+		assert.isTrue(props.canAccept);
+		assert.isFalse(props.form.depositFloor);
+	});
+
+	test("a 0% default is the owner's policy: the artist confirms a no-deposit quote and sees no floor", async ({
+		client,
+		assert,
+	}) => {
+		const { asha, project } = await quotedWith(0, 0);
+
+		const props = (
+			await client.get(page(project.id)).withInertia().loginAs(asha)
+		).inertiaProps;
+
+		assert.isFalse(props.ownerAccepts);
+		assert.isTrue(props.canAccept);
+		assert.isFalse(props.form.depositFloor);
+	});
+
+	test("without a default, a no-deposit quote is the owner's to confirm", async ({
+		client,
+		assert,
+	}) => {
+		const { asha, project } = await quotedWith(null, 0);
+
+		const props = (
+			await client.get(page(project.id)).withInertia().loginAs(asha)
+		).inertiaProps;
+
+		assert.isTrue(props.ownerAccepts);
+		assert.isFalse(props.canAccept);
+		assert.isTrue(props.form.depositFloor);
+	});
+});

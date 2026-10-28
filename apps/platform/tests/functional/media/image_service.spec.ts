@@ -164,6 +164,27 @@ test.group("ImageService", () => {
 		(await client.get(`${url.pathname}${url.search}`)).assertStatus(401);
 	});
 
+	test("a parameter added to a signed URL is a 401 (TAT-16)", async ({
+		client,
+	}) => {
+		const stored = await images.store(await upload(await testImages.jpeg()), {
+			tenant,
+			purpose: "payment_proof",
+		});
+		const signed = await images.url("payment_proof", stored.key, tenant);
+
+		// The control: as signed, it is served.
+		(await client.get(pathOf(signed))).assertStatus(200);
+		for (const [name, value] of [
+			["contentType", "text/html"],
+			["contentDisposition", "attachment"],
+		]) {
+			const url = new URL(signed);
+			url.searchParams.set(name, value);
+			(await client.get(pathOf(url.href))).assertStatus(401);
+		}
+	});
+
 	test("removes the raw upload, which still has its metadata", async ({
 		assert,
 	}) => {

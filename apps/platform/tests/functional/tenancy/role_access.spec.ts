@@ -6,7 +6,12 @@ import StaffAlert from "#modules/notifications/models/staff_alert";
 import TattooProject from "#modules/projects/models/tattoo_project";
 import { rolesFor, TENANT_ROUTE_ROLES } from "#modules/tenancy/access";
 import { caseRequest } from "#tests/helpers/isolation";
-import { inTenant, type Studio, seededStudio } from "#tests/helpers/tenants";
+import {
+	artistIn,
+	inTenant,
+	type Studio,
+	seededStudio,
+} from "#tests/helpers/tenants";
 import { type IsolationCase, isolationCases } from "#tests/isolation/cases";
 
 /**
@@ -131,4 +136,66 @@ test.group("What an artist may use (TAT-30)", (group) => {
 			);
 		});
 	}
+});
+
+/**
+ * The isolation cases an artist may send that take an :id (TAT-16). The router is not loaded when
+ * this file is, so it is read when a test runs, and the walk below holds only these cases: one
+ * that is not open to artists is never in it, so no check passes without asserting anything.
+ */
+const artistIdCases = () =>
+	isolationCases.filter(
+		(isolationCase) =>
+			/:id(?=\/|$)/.test(isolationCase.pattern) &&
+			rolesFor(routeName(isolationCase))?.includes("artist"),
+	);
+
+test.group("A second artist of the same studio (TAT-16)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	/** artistsStudio() plus a second artist member with a live profile of their own. */
+	async function twoArtists() {
+		const studio = await artistsStudio();
+		const other = await artistIn(studio.tenant, "other@roles-30.example");
+		await inTenant(studio.tenant, () =>
+			Artist.create({
+				tenantId: studio.tenant.id,
+				name: "Other",
+				slug: "other",
+				userId: other.id,
+			}),
+		);
+		return { studio, other };
+	}
+
+	test("the walk covers the artist routes that take an id", ({ assert }) => {
+		assert.isAbove(artistIdCases().length, 10);
+	});
+
+	test("every artist route that takes an id is a 404 for the other artist", async ({
+		client,
+		assert,
+	}) => {
+		const { studio, other } = await twoArtists();
+
+		for (const isolationCase of artistIdCases()) {
+			const name = `${isolationCase.method} ${isolationCase.pattern}`;
+			const before = await isolationCase.snapshot(studio);
+
+			const response = await caseRequest(
+				client,
+				isolationCase,
+				studio,
+				studio,
+				other,
+			);
+
+			assert.equal(response.status(), 404, name);
+			assert.deepEqual(
+				await isolationCase.snapshot(studio),
+				before,
+				`${name}: the other artist changed what is not theirs`,
+			);
+		}
+	});
 });

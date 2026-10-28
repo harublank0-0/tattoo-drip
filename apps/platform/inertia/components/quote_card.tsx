@@ -19,12 +19,14 @@ import {
 	type Placement,
 } from "~/components/project_page";
 import {
+	depositAutofill,
+	depositFloorHint,
 	formatRupees,
 	type NextStepProps,
+	OWNER_ACCEPTS_NOTE,
 	type ProjectPageProps,
 	priceLabel,
 	type QuoteProps,
-	suggestedDeposit,
 } from "~/components/projects";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -73,6 +75,7 @@ export function QuoteCard({
 	history,
 	form,
 	showExpiry,
+	ownerAccepts,
 	message,
 	lastChannel,
 	onContact,
@@ -85,6 +88,8 @@ export function QuoteCard({
 	history: QuoteProps[];
 	form: ProjectPageProps["form"];
 	showExpiry: boolean;
+	/** An artist's quote under their deposit minimum: an owner confirms the client's yes (TAT-16). */
+	ownerAccepts: boolean;
 	message: ProjectPageProps["message"];
 	lastChannel: ProjectPageProps["lastChannel"];
 	onContact: (via: ContactVia) => void;
@@ -111,6 +116,9 @@ export function QuoteCard({
 					<QuoteSummary quote={quote} showExpiry={showExpiry} />
 				) : (
 					<p className="text-sm text-muted-foreground">No quote yet.</p>
+				)}
+				{ownerAccepts && (
+					<p className="text-sm text-muted-foreground">{OWNER_ACCEPTS_NOTE}</p>
 				)}
 				{place.send_quote === "card" && message && (
 					<ChatMessage
@@ -433,14 +441,26 @@ export function QuoteForm({
 		quote?.hourlyRate?.toString() ?? "",
 	);
 	const [hours, setHours] = useState(quote?.estimatedHours?.toString() ?? "");
-	const [depositTouched, setDepositTouched] = useState(quote !== null);
+	// An owner's revision starts from the quote's deposit and keeps it (touched). An artist's is
+	// filled in again while untouched, so it never falls under their minimum when the price
+	// changes (depositAutofill).
+	const [depositTouched, setDepositTouched] = useState(
+		quote !== null && !form.depositFloor,
+	);
 	const [deposit, setDeposit] = useState(quote?.depositAmount.toString() ?? "");
 
 	const total =
 		kind === "fixed" ? Number(fixedPrice) : Number(hourlyRate) * Number(hours);
 	const shownDeposit = depositTouched
 		? deposit
-		: String(suggestedDeposit(total, form.depositPercent));
+		: String(
+				depositAutofill(
+					total,
+					form.depositPercent,
+					form.depositFloor,
+					quote?.depositAmount ?? null,
+				),
+			);
 
 	return (
 		<Form
@@ -564,13 +584,18 @@ export function QuoteForm({
 							}}
 							aria-invalid={!!errors.depositAmount}
 						/>
-						<FieldDescription>
-							{Number(shownDeposit) === 0
-								? "No deposit step: the project is booked once the client accepts and a session is scheduled."
-								: !depositTouched && form.depositPercent !== null
-									? `Your default ${form.depositPercent}% of the total.`
-									: "Paid before the first session."}
-						</FieldDescription>
+						{/* The server's error says the same as the note: show one. */}
+						{!(form.depositFloor && errors.depositAmount) && (
+							<FieldDescription>
+								{form.depositFloor
+									? depositFloorHint(total, form.depositPercent)
+									: Number(shownDeposit) === 0
+										? "No deposit step: the project is booked once the client accepts and a session is scheduled."
+										: !depositTouched && form.depositPercent !== null
+											? `Your default ${form.depositPercent}% of the total.`
+											: "Paid before the first session."}
+							</FieldDescription>
+						)}
 						{errors.depositAmount && (
 							<FieldError>{errors.depositAmount}</FieldError>
 						)}

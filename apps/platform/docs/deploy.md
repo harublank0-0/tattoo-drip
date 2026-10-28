@@ -72,7 +72,8 @@ Known and accepted for the pilot. The owner gets no signal for any of them (429s
 - 10 solved challenges with a victim's phone number lock that number out of that studio's form for up to 24 hours (TAT-55's per-phone limit).
 - A few slow uploads (4 per web process, from 2 or more addresses) make every upload answer 503 `service_busy` for up to about 100 s at a time; the pages and the dashboard keep working.
 - A flood of one studio's pages from many addresses can spend its read budget (6000 storefront reads per 5 minutes) and show its pages' "try again" page for the rest of the window; other studios are untouched.
-- One carrier-NAT address shared by many customers shares 60 writes an hour across the platform, and the intake's 20 per studio per hour, which counts before Cloudflare is asked. All of these count the right address only when `TRUST_PROXY` is right.
+- Someone who knows an owner's sign-in email (a studio page that prints the same address makes it easy) can keep that account out of sign-in: 25 wrong passwords in 15 minutes from 3 or more addresses refuse even the right password until the window ends, and can be repeated every window (TAT-8's per-email limit counts before the password is checked). A completed password reset clears that count: "Forgot your password?", then sign in right away with the new password. Give the studio page a contact address other than the sign-in one.
+- One visitor on a shared mobile address (carrier NAT: many Nepali customers share one IPv4 address) can, without solving a challenge, spend the intake's 20 tries per studio an hour and the platform's 60 public writes an hour for that address: everyone else on it gets "try again later" on the form and on the deposit page's screenshot upload for up to an hour. These count before Cloudflare is asked, on purpose (no Cloudflare call for a refused address). All of these count the right address only when `TRUST_PROXY` is right.
 
 ### After the first deploy
 

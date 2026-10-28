@@ -6,6 +6,7 @@ import {
 } from "#modules/notifications/messages";
 import type Quote from "#modules/projects/models/quote";
 import type { ProjectStatus } from "#modules/projects/models/tattoo_project";
+import type { NewQuote } from "#modules/projects/services/quote_service";
 
 /**
  * The statuses in which a project can be quoted or re-quoted. Issuing a
@@ -51,6 +52,46 @@ export function quoteTotal(quote: QuoteAmounts): bigint {
 	return (product * 2n + 60n) / 120n;
 }
 
+/** The amounts a new quote is made of, so its total can be computed before it is stored. */
+export function newQuoteAmounts(input: NewQuote): QuoteAmounts {
+	return input.kind === "fixed"
+		? {
+				kind: "fixed",
+				fixedPrice: input.fixedPrice,
+				hourlyRate: null,
+				estimatedMinutes: null,
+			}
+		: {
+				kind: "hourly",
+				fixedPrice: null,
+				hourlyRate: input.hourlyRate,
+				estimatedMinutes: input.estimatedMinutes,
+			};
+}
+
+/**
+ * The smallest deposit an artist may quote, in paisa (TAT-16). The studio's
+ * default share of `total` in whole rupees, rounded half up and never above
+ * the total's whole rupees, which is what the quote form fills in
+ * (suggestedDeposit in inertia/components/projects.ts; a unit test keeps the
+ * two equal), and never under NPR 1: a deposit rule is in force. Without a
+ * default (null) the owner hasn't ruled, so zero is theirs to decide and the
+ * floor is NPR 1. A default of 0% is the owner's own policy of no deposit:
+ * the floor is zero and an artist may offer none.
+ */
+export function artistDepositFloor(
+	total: bigint,
+	percent: number | null,
+): bigint {
+	if (percent === 0) return 0n;
+	const wholeRupees = total / 100n;
+	const share = percent
+		? (total * BigInt(percent) * 2n + 10_000n) / 20_000n
+		: 0n;
+	const rupees = share < wholeRupees ? share : wholeRupees;
+	return (rupees > 1n ? rupees : 1n) * 100n;
+}
+
 const GROUPED = new Intl.NumberFormat("en-IN");
 
 /**
@@ -64,6 +105,20 @@ export function formatMoney(paisa: bigint | number): string {
 	return rest === 0n
 		? `NPR ${rupees}`
 		: `NPR ${rupees}.${String(rest).padStart(2, "0")}`;
+}
+
+/**
+ * The field error for an artist's deposit under their floor (TAT-16): the
+ * minimum and who can go lower. `percent` is the studio's default, null when
+ * it has none.
+ */
+export function depositFloorMessage(
+	floor: bigint,
+	percent: number | null,
+): string {
+	return percent === null
+		? "Enter a deposit. Only an owner can quote without one."
+		: `Enter at least ${formatMoney(floor)}, your studio's ${percent}% deposit. Only an owner can quote less or no deposit.`;
 }
 
 /** Whole minutes as hours, without trailing zeros: 270 is "4.5". */

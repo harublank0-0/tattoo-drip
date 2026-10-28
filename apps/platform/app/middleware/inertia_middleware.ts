@@ -30,6 +30,18 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 		 */
 		const { auth, request, tenant, membership } = ctx as Partial<HttpContext>;
 
+		// A page for a signed-in user is never stored (TAT-16, web-2). share() is
+		// the one hook that runs exactly when a page is rendered, a full load or
+		// an Inertia visit alike (handle() runs before the session and auth
+		// middleware, and can't tell a page from a /files or /uploads stream), so
+		// the header goes here. safeHeader keeps a controller's own value. It
+		// keeps the page out of shared caches and out of the back/forward and
+		// HTTP caches a document navigation could restore after sign-out;
+		// Inertia's own history is TAT-82's (encryptHistory, clearHistory).
+		if (auth?.user) {
+			ctx.response.safeHeader("Cache-Control", "private, no-store");
+		}
+
 		const theme: "light" | "dark" =
 			request?.plainCookie("app_theme", {
 				defaultValue: "light",

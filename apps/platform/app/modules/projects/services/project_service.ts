@@ -7,7 +7,11 @@ import ArtistService from "#modules/artists/services/artist_service";
 import { type ContactVia, NO_VIA } from "#modules/notifications/messages";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import DepositService from "#modules/payments/services/deposit_service";
-import { ProjectRuleError, QuoteRuleError } from "#modules/projects/errors";
+import {
+	DepositFloorError,
+	ProjectRuleError,
+	QuoteRuleError,
+} from "#modules/projects/errors";
 import { EXPIRING_STATUSES, expiryCancels } from "#modules/projects/expiry";
 import {
 	FINISH_STEPS,
@@ -30,10 +34,14 @@ import {
 	type ProjectFilter,
 } from "#modules/projects/moves";
 import {
+	artistDepositFloor,
 	BOOKED_STATUSES,
 	expiresAtFor,
 	isExpired,
+	newQuoteAmounts,
 	QUOTABLE_STATUSES,
+	type QuoteAmounts,
+	quoteTotal,
 	todayIn,
 } from "#modules/projects/quotes";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -48,6 +56,9 @@ import { withTransaction } from "#services/db_context";
 import { dispatchInTransaction } from "#services/queue";
 
 type TenantRef = Pick<Tenant, "id">;
+
+/** A tenant with its default deposit: the artist's deposit floor is a share of it (TAT-16). */
+type TenantDeposit = Pick<Tenant, "id" | "defaultDepositPercent">;
 
 /** A tenant with its timezone: the healing check's day is the studio's. */
 type TenantZone = Pick<Tenant, "id" | "timezone">;
@@ -400,10 +411,14 @@ export default class ProjectService {
 	 * and saving this form would resurrect stale terms ("quote_changed"). The
 	 * project becomes `quoted`, so a revision after the client accepted must
 	 * be accepted again. Queues ExpireQuoteJob for the quote's expiry in the
-	 * same transaction, so a rolled-back save leaves no job.
+	 * same transaction, so a rolled-back save leaves no job. An artist's
+	 * deposit must be at least the studio's default share of the total
+	 * (artistDepositFloor; DepositFloorError, checked under the lock after the
+	 * assignment and status checks and before anything is stored), so only an
+	 * owner quotes less or no deposit (TAT-16); artists keep quoting.
 	 */
 	async issueQuote(
-		tenant: TenantRef,
+		tenant: TenantDeposit,
 		member: Member,
 		project: TattooProject,
 		input: NewQuote,
@@ -416,6 +431,14 @@ export default class ProjectService {
 			if (!QUOTABLE_STATUSES.includes(live.status)) {
 				throw new QuoteRuleError("project_closed");
 			}
+			// After the assignment and status checks, so a project that can't be quoted
+			// says so; before anything is written.
+			assertDepositFloor(
+				tenant,
+				member,
+				newQuoteAmounts(input),
+				input.depositAmount,
+			);
 			const current = await this.quotes.current(tenant, live);
 			if ((current?.id ?? null) !== baseQuoteId) {
 				throw new QuoteRuleError("quote_changed");
@@ -434,11 +457,13 @@ export default class ProjectService {
 	 * once if the deposit is already settled (or zero) and a tattoo session
 	 * is scheduled. QuoteRuleError "not_quoted" outside `quoted`,
 	 * "quote_changed" when `quoteId` is no longer the current quote (revised
-	 * since the page loaded), "expired" once its expiry has passed. Returns
-	 * the project's new status.
+	 * since the page loaded), "expired" once its expiry has passed. An artist
+	 * may mark accepted only a quote that meets their deposit floor, by the
+	 * studio's default now (DepositFloorError; otherwise an owner confirms it,
+	 * TAT-16). Returns the project's new status.
 	 */
 	async acceptQuote(
-		tenant: TenantRef,
+		tenant: TenantDeposit,
 		member: Member,
 		project: TattooProject,
 		quoteId: string,
@@ -452,6 +477,7 @@ export default class ProjectService {
 				throw new QuoteRuleError("quote_changed");
 			}
 			if (isExpired(quote)) throw new QuoteRuleError("expired");
+			assertDepositFloor(tenant, member, quote, quote.depositAmount);
 
 			await setStatus(live, "deposit_pending");
 			const booked = await this.sessions.settleBooking(tenant, live);
@@ -867,6 +893,24 @@ function assertProjectOf(tenant: TenantRef, project: TattooProject) {
 	if (project.tenantId !== tenant.id) {
 		throw new Error(`Project ${project.id} belongs to another tenant`);
 	}
+}
+
+/**
+ * The artist deposit floor (TAT-16): an owner may offer any deposit up to the
+ * total; an artist at least artistDepositFloor of the studio's default. Reads
+ * the member's role, never a request value. Throws before anything is stored.
+ */
+function assertDepositFloor(
+	tenant: TenantDeposit,
+	member: Member,
+	amounts: QuoteAmounts,
+	depositAmount: number,
+) {
+	if (member.role === "owner") return;
+	const percent = tenant.defaultDepositPercent;
+	const floor = artistDepositFloor(quoteTotal(amounts), percent);
+	if (BigInt(depositAmount) < floor)
+		throw new DepositFloorError(floor, percent);
 }
 
 /** An aggregate's timestamp, as node-pg returns it (a Date), as a DateTime. */

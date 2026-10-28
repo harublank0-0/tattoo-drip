@@ -1,8 +1,10 @@
 import { existsSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 import app from "@adonisjs/core/services/app";
+import testUtils from "@adonisjs/core/services/test_utils";
 import drive from "@adonisjs/drive/services/main";
 import { test } from "@japa/runner";
+import { studioWithOwner } from "#tests/helpers/tenants";
 
 test.group("File serving", () => {
 	test("tests write to tmp/storage, not the real storage folder", async ({
@@ -29,6 +31,7 @@ test.group("File serving", () => {
 
 		response.assertStatus(200);
 		response.assertTextIncludes("hello");
+		response.assertHeader("x-content-type-options", "nosniff");
 	});
 
 	test("a private file without a signature gets 401", async ({ client }) => {
@@ -94,5 +97,24 @@ test.group("File serving", () => {
 
 		response.assertStatus(404);
 		assert.notInclude(response.text(), "@tattoo-drip/platform");
+	});
+});
+
+test.group("File serving for a signed-in user (TAT-16)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("a public file stays cacheable: only pages are no-store", async ({
+		client,
+		assert,
+	}) => {
+		const { owner } = await studioWithOwner();
+		await drive.use("public").put("tests/cacheable.txt", "hello");
+
+		const response = await client
+			.get("/uploads/tests/cacheable.txt")
+			.loginAs(owner);
+
+		response.assertStatus(200);
+		assert.notInclude(response.header("cache-control") ?? "", "no-store");
 	});
 });

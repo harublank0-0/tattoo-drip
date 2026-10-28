@@ -181,6 +181,30 @@ test.group("GET /api/v1/tenants/:tenant (getStudio)", (group) => {
 		assert.notEqual(after.header("etag"), before);
 	});
 
+	test("one studio's ETag never earns a 304 under another's slug (TAT-16)", async ({
+		client,
+		assert,
+	}) => {
+		await studioWithOwner("api-etag-a-16", "Etag A");
+		await studioWithOwner("api-etag-b-16", "Etag B");
+		const a = await client.get("/api/v1/tenants/api-etag-a-16");
+		const tag = a.header("etag") ?? "";
+		assert.isNotEmpty(tag);
+
+		const elsewhere = await client
+			.get("/api/v1/tenants/api-etag-b-16")
+			.header("if-none-match", tag);
+		const own = await client
+			.get("/api/v1/tenants/api-etag-a-16")
+			.header("if-none-match", tag);
+
+		elsewhere.assertStatus(200);
+		assert.equal(elsewhere.body().data.name, "Etag B");
+		assert.notEqual(elsewhere.header("etag"), tag);
+		// The control: the same tag under its own slug is a 304.
+		own.assertStatus(304);
+	});
+
 	test("a studio without a cover answers cover: null", async ({
 		client,
 		assert,

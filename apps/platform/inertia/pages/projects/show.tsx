@@ -45,6 +45,7 @@ export default function ProjectShow(props: ProjectPageProps) {
 		quote,
 		history,
 		canSetPrice,
+		ownerAccepts,
 		payments,
 		message,
 		contact,
@@ -211,6 +212,7 @@ export default function ProjectShow(props: ProjectPageProps) {
 						history={history}
 						form={form}
 						showExpiry={quoteExpiryShown}
+						ownerAccepts={ownerAccepts}
 						message={message}
 						lastChannel={lastChannel}
 						onContact={markContacted}

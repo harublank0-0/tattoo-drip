@@ -116,6 +116,11 @@ export type ProjectPageProps = {
 	history: QuoteProps[];
 	canQuote: boolean;
 	canAccept: boolean;
+	/**
+	 * An artist's view of a quoted project whose deposit is under what an artist may offer
+	 * (TAT-16): "Client accepted" is not offered, an owner confirms it. Always false for owners.
+	 */
+	ownerAccepts: boolean;
 	/** Booked without a price: the Quote card offers "Set price" once. */
 	canSetPrice: boolean;
 	/** The chat message for the current quote, when it can be sent. */
@@ -128,6 +133,8 @@ export type ProjectPageProps = {
 	messageKind: MessageKindName | null;
 	form: {
 		depositPercent: number | null;
+		/** An artist, in a studio whose default deposit sets a minimum: the Deposit field explains it (TAT-16). */
+		depositFloor: boolean;
 		defaultValidUntil: string;
 		minDate: string;
 		maxDate: string;
@@ -303,6 +310,58 @@ export function suggestedDeposit(
 	if (!percent || !(total > 0)) return 0;
 	return Math.min(Math.floor(total), Math.round((total * percent) / 100));
 }
+
+/**
+ * The smallest deposit an artist may quote, in whole rupees (TAT-16): the form's own suggestion,
+ * and never under NPR 1, except in a studio whose default is 0%, which has chosen no deposit.
+ * The server's artistDepositFloor is the rule; a unit test keeps the two equal.
+ */
+export function artistDepositFloor(
+	total: number,
+	percent: number | null,
+): number {
+	return percent === 0 ? 0 : Math.max(1, suggestedDeposit(total, percent));
+}
+
+/**
+ * What an untouched Deposit field holds, in whole rupees. The quote's own deposit when revising
+ * (`current`), else the suggestion; and for an artist (`floorApplies`, `form.depositFloor`) never
+ * under their minimum, so keeping the automatic value is never refused (TAT-16, fix round 1: with
+ * no default, or a share that rounds to nothing, the plain suggestion was 0).
+ */
+export function depositAutofill(
+	total: number,
+	percent: number | null,
+	floorApplies: boolean,
+	current: number | null,
+): number {
+	const wanted = current ?? suggestedDeposit(total, percent);
+	return floorApplies
+		? Math.max(wanted, artistDepositFloor(total, percent))
+		: wanted;
+}
+
+/**
+ * The Deposit field's note for an artist while a minimum applies (`form.depositFloor`): the
+ * minimum for the typed total, and that only an owner goes lower.
+ */
+export function depositFloorHint(
+	total: number,
+	percent: number | null,
+): string {
+	if (percent === null) return "Only an owner can quote without a deposit.";
+	const least =
+		total > 0 ? formatRupees(artistDepositFloor(total, percent)) : null;
+	return `${
+		least === null
+			? `At least your studio's ${percent}% of the total`
+			: `At least ${least}, your studio's ${percent}% deposit`
+	}. Only an owner can quote less or no deposit.`;
+}
+
+/** The Quote card's note when an owner has to confirm the client's yes (TAT-16). */
+export const OWNER_ACCEPTS_NOTE =
+	"An owner confirms this quote when the client agrees: its deposit is below what an artist can offer.";
 
 /** One row of the projects list (TAT-109). */
 export type ProjectRow = {

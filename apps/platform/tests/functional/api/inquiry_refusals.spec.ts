@@ -179,6 +179,33 @@ test.group("Public API: POST /inquiries refusals", (group) => {
 		assert.deepEqual(await newTempUploads(before), []);
 	});
 
+	test("a body of more than 1000 fields is 413 and leaves no temp file (TAT-16)", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner(SLUG);
+		const before = await tempUploads();
+		const request = client.post(`/api/v1/tenants/${SLUG}/inquiries`);
+		// The images come first, so they are on disk when the limit trips.
+		for (let i = 0; i < 3; i++) {
+			const image = await png(`ref-${i}.png`);
+			request.file("referenceImages", image.data, {
+				filename: image.name,
+				contentType: image.type,
+			});
+		}
+		const crowd: Record<string, string> = {};
+		for (let i = 0; i < 1000; i++) crowd[`extra${i}`] = "x";
+		request.fields({ ...intakeFields(), ...crowd });
+
+		const response = await request;
+
+		assertApiError(response, 413, "payload_too_large");
+		await assertNothingSaved(assert, tenant);
+		await settle();
+		assert.deepEqual(await newTempUploads(before), []);
+	});
+
 	test("an image over 10 MB is a field error; over 20 MB in all is 413", async ({
 		client,
 		assert,
