@@ -2,7 +2,12 @@
 export type BookingLookup =
 	| null
 	| { state: "invalid"; typed: string; message: string }
-	| { state: "found"; phone: string; client: { id: string; name: string } }
+	| {
+			state: "found";
+			phone: string;
+			/** null for an artist: they learn that the client exists, not who (TAT-16). */
+			client: { id: string; name: string | null };
+	  }
 	| { state: "new"; phone: string };
 
 export type BookingPageProps = {

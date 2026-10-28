@@ -162,7 +162,7 @@ test.group("Booking page", (group) => {
 		assert.deepEqual(none.artists, []);
 	});
 
-	test("an artist's lookup shows the client's name only; owners are told apart by isOwner", async ({
+	test("an artist's lookup says a client exists without their name; owners get the name (TAT-16)", async ({
 		client,
 		assert,
 	}) => {
@@ -176,27 +176,70 @@ test.group("Booking page", (group) => {
 			}),
 		);
 		const { user } = await linkedArtist(tenant);
-		const found = {
-			state: "found",
-			phone: "+9779812345678",
-			client: { id: maya.id, name: "Maya Gurung" },
-		};
 
-		// Nothing but the id (for the form) and the name: no email, no notes.
+		// Nothing but the id (for the form): no name, no email, no notes.
 		const asArtist = (
 			await client.get(newUrl("9812345678")).withInertia().loginAs(user)
 		).inertiaProps;
-		assert.deepEqual(asArtist.lookup, found);
+		assert.deepEqual(asArtist.lookup, {
+			state: "found",
+			phone: "+9779812345678",
+			client: { id: maya.id, name: null },
+		});
 		assert.isFalse(asArtist.isOwner);
-		assert.notInclude(JSON.stringify(asArtist), "maya@example.com");
-		assert.notInclude(JSON.stringify(asArtist), "latex");
+		for (const secret of ["Maya", "maya@example.com", "latex"]) {
+			assert.notInclude(JSON.stringify(asArtist), secret);
+		}
 
-		// Owners get the same lookup; isOwner is what shows them "View client".
+		// Owners get the name; isOwner is what shows them "View client".
 		const asOwner = (
 			await client.get(newUrl("9812345678")).withInertia().loginAs(owner)
 		).inertiaProps;
-		assert.deepEqual(asOwner.lookup, found);
+		assert.deepEqual(asOwner.lookup, {
+			state: "found",
+			phone: "+9779812345678",
+			client: { id: maya.id, name: "Maya Gurung" },
+		});
 		assert.isTrue(asOwner.isOwner);
+	});
+
+	test("an artist can still book the client the lookup found (TAT-16)", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+		const maya = await inTenant(tenant, () =>
+			makeClient(tenant, { name: "Maya Gurung", phone: "+9779812345678" }),
+		);
+		const { user, profile } = await linkedArtist(tenant);
+		const before = await countsIn(tenant);
+
+		const lookup = (
+			await client.get(newUrl("9812345678")).withInertia().loginAs(user)
+		).inertiaProps.lookup;
+		const response = await client
+			.post(bookUrl)
+			.form({
+				clientId: lookup.client.id,
+				artistId: profile.id,
+				date: dayFromNow(3),
+				startTime: "14:00",
+				hours: "3",
+				brief: "A small rose on the left wrist",
+				priceKind: "none",
+			})
+			.withCsrfToken()
+			.loginAs(user)
+			.redirects(0);
+
+		response.assertStatus(302);
+		const after = await countsIn(tenant);
+		assert.equal(after.projects, before.projects + 1);
+		assert.equal(after.clients, before.clients);
+		const project = await inTenant(tenant, () =>
+			TattooProject.query().orderBy("createdAt", "desc").firstOrFail(),
+		);
+		assert.equal(project.clientId, maya.id);
 	});
 
 	test("an artist without a profile cannot look a number up", async ({
@@ -558,6 +601,36 @@ test.group("Refused bookings", (group) => {
 			response,
 			"phone",
 			"This number now belongs to Ram Thapa. Check the client and book again.",
+		);
+		assert.deepEqual(await countsIn(tenant), before);
+	});
+
+	test("a number added meanwhile: an artist's phone error names nobody (TAT-16)", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+		await inTenant(tenant, () =>
+			makeClient(tenant, { name: "Ram Thapa", phone: "+9779812345678" }),
+		);
+		const { user, profile } = await linkedArtist(tenant);
+		const before = await countsIn(tenant);
+
+		const response = await client
+			.post(bookUrl)
+			.form(newClientForm(profile.id))
+			.withCsrfToken()
+			.loginAs(user)
+			.redirects(0);
+
+		assertValidationError(
+			response,
+			"phone",
+			"This number now belongs to another client of the studio. Look the number up again to book them.",
+		);
+		assert.notInclude(
+			JSON.stringify(response.flashMessage("inputErrorsBag")),
+			"Ram Thapa",
 		);
 		assert.deepEqual(await countsIn(tenant), before);
 	});

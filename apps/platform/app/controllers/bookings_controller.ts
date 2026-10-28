@@ -20,13 +20,19 @@ import { toCalendarDate } from "#modules/scheduling/calendar";
 import { SessionOverlapError } from "#modules/scheduling/errors";
 import { sessionTimeText } from "#modules/scheduling/times";
 import type Tenant from "#modules/tenancy/models/tenant";
+import type { MembershipRole } from "#modules/tenancy/models/tenant_membership";
 import { normalizePhone, PHONE_MESSAGE } from "#validators/phone";
 
 /** What the page knows about the number typed in step 1. */
 type Lookup =
 	| null
 	| { state: "invalid"; typed: string; message: string }
-	| { state: "found"; phone: string; client: { id: string; name: string } }
+	| {
+			state: "found";
+			phone: string;
+			/** `name` is null for an artist: they learn only that the client exists. */
+			client: { id: string; name: string | null };
+	  }
 	| { state: "new"; phone: string };
 
 /** The longest typed number the page echoes back. */
@@ -58,7 +64,9 @@ export default class BookingsController {
 
 		return ctx.inertia.render("projects/new", {
 			// A member who can't book gets the "not linked" card, not a client's name.
-			lookup: artists.length ? await this.lookup(tenant, typed) : null,
+			lookup: artists.length
+				? await this.lookup(tenant, membership.role, typed)
+				: null,
 			artists: artists.map(({ id, name }) => ({ id, name })),
 			isOwner: membership.role === "owner",
 			dates: {
@@ -117,6 +125,14 @@ export default class BookingsController {
 			error.reason === "phone_taken" &&
 			booking.client.kind === "new"
 		) {
+			// An artist learns that the number is a client's, not whose (TAT-16).
+			if (membership.role !== "owner") {
+				throw fieldError(
+					"phone",
+					"This number now belongs to another client of the studio. Look the number up again to book them.",
+					"unique",
+				);
+			}
 			const holder = await this.clients.findByPhone(
 				tenant,
 				booking.client.phone,
@@ -147,11 +163,13 @@ export default class BookingsController {
 	}
 
 	/**
-	 * The client with the typed number in this studio, if any. Only the name
-	 * is shown (artists use the lookup too).
+	 * The client with the typed number in this studio, if any. Owners get the
+	 * name; an artist learns only that the number is a client's, and gets the
+	 * id the form posts (TAT-16: the client list is the owners').
 	 */
 	private async lookup(
 		tenant: Pick<Tenant, "id">,
+		role: MembershipRole,
 		typed: string,
 	): Promise<Lookup> {
 		if (!typed) return null;
@@ -159,7 +177,14 @@ export default class BookingsController {
 		if (!phone) return { state: "invalid", typed, message: PHONE_MESSAGE };
 		const client = await this.clients.findByPhone(tenant, phone);
 		return client
-			? { state: "found", phone, client: { id: client.id, name: client.name } }
+			? {
+					state: "found",
+					phone,
+					client: {
+						id: client.id,
+						name: role === "owner" ? client.name : null,
+					},
+				}
 			: { state: "new", phone };
 	}
 }

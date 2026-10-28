@@ -249,11 +249,17 @@ function ClientCard({
 				<FieldGroup>
 					<div className="flex flex-wrap items-start justify-between gap-2">
 						<div className="flex min-w-0 flex-col gap-1">
-							{lookup.state === "found" && (
-								<span className="font-medium break-words">
-									{lookup.client.name}
-								</span>
-							)}
+							{lookup.state === "found" &&
+								(lookup.client.name === null ? (
+									// An artist isn't told whose number it is (TAT-16).
+									<span className="text-sm break-words">
+										A client with this number is already in the studio.
+									</span>
+								) : (
+									<span className="font-medium break-words">
+										{lookup.client.name}
+									</span>
+								))}
 							<span className="text-sm text-muted-foreground">
 								{lookup.phone}
 							</span>
