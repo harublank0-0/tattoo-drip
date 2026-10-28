@@ -4,6 +4,13 @@ import { test } from "@japa/runner";
 const read = (file: string) =>
 	readFile(new URL(`../../../inertia/${file}`, import.meta.url), "utf8");
 
+// TAT-116's cover form (Settings) and work photo tray (Artists) live in components/ but belong to
+// the Settings and Artists follow-up that replaces the browser's dialog (X-8), not to this scan.
+const SETTINGS_AND_ARTISTS_COMPONENTS = [
+	"cover_photo_form.tsx",
+	"work_photo_tray.tsx",
+];
+
 // TAT-108: the project and inquiry pages ask in the page, never in the browser's dialog. A source
 // scan, because Playwright is not in CI; the behaviour itself (focus on the safe button, Escape,
 // the sheet staying open on a refusal) is the pure steps in confirm_and_sheets.spec.ts and a
@@ -32,6 +39,7 @@ test.group(
 				await readdir(new URL("../../../inertia/components/", import.meta.url))
 			)
 				.filter((name) => name.endsWith(".tsx"))
+				.filter((name) => !SETTINGS_AND_ARTISTS_COMPONENTS.includes(name))
 				.map((name) => `components/${name}`);
 			// pages/calendar has a confirm function of its own, and Settings and Artists still
 			// ask with the browser's dialog (a follow-up), so they are not scanned.
