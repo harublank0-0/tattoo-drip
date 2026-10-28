@@ -1,4 +1,5 @@
 import { Form, Link } from "@adonisjs/inertia/react";
+import { PASSWORD_HINT } from "~/components/account";
 import { Button } from "~/components/ui/button";
 import {
 	Field,
@@ -66,7 +67,7 @@ export default function Signup() {
 								aria-describedby="password-rules"
 							/>
 							<FieldDescription id="password-rules">
-								8 to 32 characters.
+								{PASSWORD_HINT}
 							</FieldDescription>
 							{errors.password && <FieldError>{errors.password}</FieldError>}
 						</Field>

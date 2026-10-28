@@ -1,4 +1,5 @@
 import { SimpleMessagesProvider } from "@vinejs/vine";
+import { PASSWORD_RANGE } from "#modules/identity/passwords";
 
 /**
  * What the account forms (signup, login, password reset) say when a field is
@@ -23,8 +24,8 @@ export const ACCOUNT_MESSAGES = {
 
 	"password.required": "Enter your password.",
 	"password.string": "Enter your password.",
-	"password.minLength": "Use 8 to 32 characters.",
-	"password.maxLength": "Use 8 to 32 characters.",
+	"password.minLength": `Use ${PASSWORD_RANGE}.`,
+	"password.maxLength": `Use ${PASSWORD_RANGE}.`,
 
 	"passwordConfirmation.required": "Type your password again.",
 	"passwordConfirmation.string": "Type your password again.",

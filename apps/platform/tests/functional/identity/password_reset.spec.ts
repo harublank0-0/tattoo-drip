@@ -255,7 +255,7 @@ test.group("Password reset (TAT-18)", (group) => {
 
 		assertValidationError(await choose(client, token, "short"), "password");
 		assertValidationError(
-			await choose(client, token, "x".repeat(33)),
+			await choose(client, token, "x".repeat(129)),
 			"password",
 		);
 		assertValidationError(
@@ -265,6 +265,12 @@ test.group("Password reset (TAT-18)", (group) => {
 
 		assert.isTrue(await signsIn(user.email, OLD));
 		assert.equal((await tokens.state(token, "reset_password")).state, "live");
+
+		// 100 characters are fine (TAT-95): a password manager's long password.
+		const long = "x".repeat(100);
+		const response = await choose(client, token, long);
+		response.assertHeader("location", "/login");
+		assert.isTrue(await signsIn(user.email, long));
 	});
 
 	test("a completed reset changes the password, signs every session out and signs nobody in", async ({

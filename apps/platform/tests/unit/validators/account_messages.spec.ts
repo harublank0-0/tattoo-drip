@@ -83,23 +83,37 @@ test.group("Account form messages (TAT-100)", () => {
 			}),
 			{
 				email: "Enter a valid email address.",
-				password: "Use 8 to 32 characters.",
+				password: "Use 8 to 128 characters.",
 				passwordConfirmation: "Type the same password again.",
 			},
 		);
 	});
 
-	test("a password over 32 characters gets the same range hint", async ({
+	test("a password over 128 characters gets the same range hint", async ({
 		assert,
 	}) => {
-		const long = "x".repeat(33);
+		const long = "x".repeat(129);
 		assert.deepEqual(
 			await problems(signupValidator, {
 				...GOOD,
 				password: long,
 				passwordConfirmation: long,
 			}),
-			{ password: "Use 8 to 32 characters." },
+			{ password: "Use 8 to 128 characters." },
+		);
+	});
+
+	test("128 characters pass, for a password manager's long password (TAT-95)", async ({
+		assert,
+	}) => {
+		const long = "x".repeat(128);
+		assert.deepEqual(
+			await problems(signupValidator, {
+				...GOOD,
+				password: long,
+				passwordConfirmation: long,
+			}),
+			{},
 		);
 	});
 
@@ -151,7 +165,7 @@ test.group("Account form messages (TAT-100)", () => {
 				passwordConfirmation: "other",
 			}),
 			{
-				password: "Use 8 to 32 characters.",
+				password: "Use 8 to 128 characters.",
 				passwordConfirmation: "Type the same password again.",
 			},
 		);
