@@ -3,6 +3,7 @@ import {
 	ARTIST_PLACEMENT_KEYS,
 	FONT_KEYS,
 	FONTS,
+	LOOK_SAVED_MESSAGE,
 	THEME_ACCENT,
 	THEMES,
 } from "#modules/storefront/look";
@@ -114,6 +115,8 @@ test.group("page look words (TAT-56)", () => {
 			words.PREVIEW_NOTE,
 			"It shows what you've saved. A change can take up to 15 minutes to appear.",
 		);
+		// The server's flash after a save is the same sentence.
+		assert.equal(words.SAVED_NOTE, LOOK_SAVED_MESSAGE);
 	});
 
 	test("the fixed sentences", ({ assert }) => {
