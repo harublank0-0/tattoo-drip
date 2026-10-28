@@ -46,7 +46,7 @@ export const Route = createRootRouteWithContext<ApiContext & SiteContext>()({
 				rel: "stylesheet",
 				href: appCss,
 			},
-			// No favicon until branding (TAT-56): this stops the /favicon.ico request.
+			// No favicon: most logos are not square (TAT-56 left it out); this stops the /favicon.ico request.
 			{
 				rel: "icon",
 				href: "data:,",
