@@ -242,6 +242,10 @@ test.group("AccountService (TAT-18)", (group) => {
 			[[user.email, "Your Tattoo Drip password was changed"]],
 		);
 		assert.equal(mails[0].data.resetUrl, appLink("/forgot-password"));
+		assert.equal(
+			mails[0].data.signedOut,
+			"every device that was signed in was signed out",
+		);
 		assert.match(
 			String(mails[0].data.changedAt),
 			/^\d{1,2} [A-Z][a-z]{2} \d{4} at \d{2}:\d{2} UTC$/,

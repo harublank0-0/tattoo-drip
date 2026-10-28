@@ -52,6 +52,7 @@ test.group("Account mails", () => {
 			to: TO,
 			changedAt: "19 Oct 2026 at 14:05 UTC",
 			resetUrl: FORGOT,
+			signedOut: "everywhere",
 		});
 		await mail.buildWithContents();
 		const { message } = mail;
@@ -63,6 +64,51 @@ test.group("Account mails", () => {
 		message.assertTextIncludes(FORGOT);
 		message.assertTextIncludes(
 			"every device that was signed in was signed out",
+		);
+	});
+
+	test("a change made while signed in says the device that made it stayed (TAT-95)", async ({
+		assert,
+	}) => {
+		const mail = new PasswordChangedMail({
+			to: TO,
+			changedAt: "19 Oct 2026 at 14:05 UTC",
+			resetUrl: FORGOT,
+			signedOut: "elsewhere",
+		});
+		await mail.buildWithContents();
+		const { message } = mail;
+		const clause =
+			"every device that was signed in was signed out except the one used to change it";
+
+		message.assertSubject("Your Tattoo Drip password was changed");
+		message.assertHtmlIncludes(clause);
+		message.assertTextIncludes(clause);
+		message.assertHtmlIncludes("19 Oct 2026 at 14:05 UTC");
+		message.assertHtmlIncludes(`href="${FORGOT}"`);
+		message.assertTextIncludes(FORGOT);
+		for (const body of [
+			message.nodeMailerMessage.html,
+			message.nodeMailerMessage.text,
+		]) {
+			assert.notInclude(String(body), "reset-password/");
+			assert.notInclude(String(body), "verify-email/");
+		}
+	});
+
+	test("a reset's notice keeps the everywhere wording without the exception (TAT-95)", async ({
+		assert,
+	}) => {
+		const mail = new PasswordChangedMail({
+			to: TO,
+			changedAt: "19 Oct 2026 at 14:05 UTC",
+			resetUrl: FORGOT,
+			signedOut: "everywhere",
+		});
+		await mail.buildWithContents();
+		assert.notInclude(
+			String(mail.message.nodeMailerMessage.text),
+			"except the one used to change it",
 		);
 	});
 

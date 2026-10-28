@@ -231,6 +231,7 @@ export default class AccountService {
 					to: user.email,
 					changedAt: changedAtText(DateTime.now()),
 					resetUrl: appLink("/forgot-password"),
+					signedOut: "everywhere",
 				}),
 				trx,
 			);

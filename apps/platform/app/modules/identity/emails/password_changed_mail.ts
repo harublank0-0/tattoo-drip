@@ -8,7 +8,21 @@ export type PasswordChangedMailData = {
 	changedAt: string;
 	/** APP_URL/forgot-password: a page to ask for a new link, never a token. */
 	resetUrl: string;
+	/**
+	 * A reset signs every device out; a change made while signed in keeps the
+	 * device that made it (TAT-95). Required, so each call site chooses.
+	 */
+	signedOut: "everywhere" | "elsewhere";
 };
+
+/** The end of the notice's first sentence. */
+export function signedOutText(
+	signedOut: PasswordChangedMailData["signedOut"],
+): string {
+	return signedOut === "everywhere"
+		? "every device that was signed in was signed out"
+		: "every device that was signed in was signed out except the one used to change it";
+}
 
 /** When the password changed, for the email: "19 Oct 2026 at 14:05 UTC". */
 export function changedAtText(at: DateTime): string {
@@ -19,8 +33,10 @@ export function changedAtText(at: DateTime): string {
 }
 
 /**
- * Tells the account's mailbox that its password was changed and every
- * session signed out (TAT-18), with a way to take the account back.
+ * Tells the account's mailbox that its password was changed and which
+ * sessions were signed out (TAT-18: a reset signs out every one; TAT-95: a
+ * change from the account page keeps the device that made it), with a way to
+ * take the account back.
  */
 export default class PasswordChangedMail extends BaseMail {
 	subject = "Your Tattoo Drip password was changed";
@@ -33,6 +49,7 @@ export default class PasswordChangedMail extends BaseMail {
 		const view = {
 			changedAt: this.data.changedAt,
 			resetUrl: this.data.resetUrl,
+			signedOut: signedOutText(this.data.signedOut),
 		};
 		this.message
 			.to(this.data.to)
