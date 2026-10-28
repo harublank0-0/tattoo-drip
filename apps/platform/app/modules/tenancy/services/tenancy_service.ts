@@ -4,6 +4,12 @@ import User from "#models/user";
 import ArtistService from "#modules/artists/services/artist_service";
 import ImageService from "#modules/media/services/image_service";
 import {
+	ARTIST_PLACEMENTS,
+	type ArtistPlacement,
+	type FontKey,
+	type ThemeKey,
+} from "#modules/storefront/look";
+import {
 	LastOwnerError,
 	MembershipNotLiveError,
 	SlugLimitError,
@@ -24,8 +30,26 @@ import {
 } from "#services/db_context";
 import { isUniqueViolation } from "#services/db_errors";
 
-/** The image purpose of a studio's cover photo (TAT-116). */
-const COVER = "studio_cover";
+/**
+ * The studio's two public images and the tenant columns each is kept in
+ * (TAT-116 cover, TAT-56 logo): the purpose picks the disk and the copies,
+ * and the three columns hold the key and the size, all set or all null.
+ */
+const BRAND_IMAGES = {
+	cover: {
+		purpose: "studio_cover",
+		key: "coverImageKey",
+		width: "coverImageWidth",
+		height: "coverImageHeight",
+	},
+	logo: {
+		purpose: "studio_logo",
+		key: "logoImageKey",
+		width: "logoImageWidth",
+		height: "logoImageHeight",
+	},
+} as const;
+type BrandImage = (typeof BRAND_IMAGES)[keyof typeof BRAND_IMAGES];
 
 /**
  * A slug is taken when it is another tenant's current slug or any slug a
@@ -60,6 +84,19 @@ export type TenantProfile = {
 	facebookUrl: string | null;
 	tiktokUrl: string | null;
 	websiteUrl: string | null;
+};
+
+/**
+ * What an owner sets in Settings, Page look (TAT-56): already checked by the
+ * validator (keys on today's lists, lowercase "#rrggbb" colours that read on
+ * their paper). `accent` and `accentDark` null mean the theme's own violet.
+ */
+export type PageLookInput = {
+	theme: ThemeKey;
+	accent: string | null;
+	accentDark: string | null;
+	font: FontKey;
+	artists: ArtistPlacement;
 };
 
 /**
@@ -146,6 +183,34 @@ export default class TenancyService {
 	}
 
 	/**
+	 * Saves the studio's page look (TAT-56, owners only: the route says so).
+	 * The row is read under its lock first, so a studio that is not in this
+	 * context is not found (E_ROW_NOT_FOUND) instead of silently updated to
+	 * nothing; only the five look columns are written (Lucid saves the dirty
+	 * ones), so a logo or cover saved at the same moment is not overwritten.
+	 */
+	async updateLook(
+		tenant: Pick<Tenant, "id">,
+		input: PageLookInput,
+	): Promise<Tenant> {
+		return withTransaction(async (trx) => {
+			const live = await Tenant.query({ client: trx })
+				.where("id", tenant.id)
+				.forUpdate()
+				.firstOrFail();
+			live.merge({
+				storefrontTheme: input.theme,
+				brandAccent: input.accent,
+				brandAccentDark: input.accentDark,
+				brandFont: input.font,
+				storefrontSections: ARTIST_PLACEMENTS[input.artists].join(","),
+			});
+			await live.save();
+			return live;
+		});
+	}
+
+	/**
 	 * Sets or replaces the studio's cover photo (TAT-116, owners only: the
 	 * route says so). The file is stored inside the transaction with its
 	 * cleanup registered at once, before the tenant row is locked; the key and
@@ -158,26 +223,7 @@ export default class TenancyService {
 		tenant: Pick<Tenant, "id">,
 		upload: Pick<MultipartFile, "tmpPath">,
 	): Promise<Tenant> {
-		return withTransaction(async (trx) => {
-			const stored = await this.images.store(upload, {
-				tenant,
-				purpose: COVER,
-			});
-			afterRollback(() => this.images.delete(COVER, stored.key));
-			const live = await Tenant.query({ client: trx })
-				.where("id", tenant.id)
-				.forUpdate()
-				.firstOrFail();
-			const previous = live.coverImageKey;
-			live.merge({
-				coverImageKey: stored.key,
-				coverImageWidth: stored.width,
-				coverImageHeight: stored.height,
-			});
-			await live.save();
-			if (previous) afterCommit(() => this.images.delete(COVER, previous));
-			return live;
-		});
+		return this.setImage(tenant, upload, BRAND_IMAGES.cover);
 	}
 
 	/**
@@ -188,19 +234,74 @@ export default class TenancyService {
 	 * missing file counts as deleted). Nothing to remove is not an error.
 	 */
 	async removeCover(tenant: Pick<Tenant, "id">): Promise<void> {
+		await this.removeImage(tenant, BRAND_IMAGES.cover);
+	}
+
+	/**
+	 * Sets or replaces the studio's logo (TAT-56, owners only): the cover's
+	 * rules, with the studio_logo purpose and the three logo columns. A PNG
+	 * keeps its see-through background, in its copies too.
+	 */
+	async setLogo(
+		tenant: Pick<Tenant, "id">,
+		upload: Pick<MultipartFile, "tmpPath">,
+	): Promise<Tenant> {
+		return this.setImage(tenant, upload, BRAND_IMAGES.logo);
+	}
+
+	/** Removes the studio's logo, files first: the cover's rules (removeCover). */
+	async removeLogo(tenant: Pick<Tenant, "id">): Promise<void> {
+		await this.removeImage(tenant, BRAND_IMAGES.logo);
+	}
+
+	/**
+	 * Order matters (TAT-116): store before the lock, register the cleanup at
+	 * once with no await in between (afterRollback), lock, swap the columns,
+	 * and delete the old files only after the outermost commit (afterCommit).
+	 */
+	private async setImage(
+		tenant: Pick<Tenant, "id">,
+		upload: Pick<MultipartFile, "tmpPath">,
+		slot: BrandImage,
+	): Promise<Tenant> {
+		return withTransaction(async (trx) => {
+			const stored = await this.images.store(upload, {
+				tenant,
+				purpose: slot.purpose,
+			});
+			afterRollback(() => this.images.delete(slot.purpose, stored.key));
+			const live = await Tenant.query({ client: trx })
+				.where("id", tenant.id)
+				.forUpdate()
+				.firstOrFail();
+			const previous = live[slot.key];
+			live[slot.key] = stored.key;
+			live[slot.width] = stored.width;
+			live[slot.height] = stored.height;
+			await live.save();
+			if (previous) {
+				afterCommit(() => this.images.delete(slot.purpose, previous));
+			}
+			return live;
+		});
+	}
+
+	/** Files first, under the row's lock; the columns are cleared only when every file is gone. */
+	private async removeImage(
+		tenant: Pick<Tenant, "id">,
+		slot: BrandImage,
+	): Promise<void> {
 		await withTransaction(async (trx) => {
 			const live = await Tenant.query({ client: trx })
 				.where("id", tenant.id)
 				.forUpdate()
 				.firstOrFail();
-			const previous = live.coverImageKey;
+			const previous = live[slot.key];
 			if (!previous) return;
-			await this.images.deleteOrThrow(COVER, previous);
-			live.merge({
-				coverImageKey: null,
-				coverImageWidth: null,
-				coverImageHeight: null,
-			});
+			await this.images.deleteOrThrow(slot.purpose, previous);
+			live[slot.key] = null;
+			live[slot.width] = null;
+			live[slot.height] = null;
 			await live.save();
 		});
 	}
