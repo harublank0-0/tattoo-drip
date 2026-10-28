@@ -138,6 +138,18 @@ test.group("What an artist may use (TAT-30)", (group) => {
 	}
 });
 
+/**
+ * The isolation cases an artist may send that take an :id (TAT-16). The router is not loaded when
+ * this file is, so it is read when a test runs, and the walk below holds only these cases: one
+ * that is not open to artists is never in it, so no check passes without asserting anything.
+ */
+const artistIdCases = () =>
+	isolationCases.filter(
+		(isolationCase) =>
+			/:id(?=\/|$)/.test(isolationCase.pattern) &&
+			rolesFor(routeName(isolationCase))?.includes("artist"),
+	);
+
 test.group("A second artist of the same studio (TAT-16)", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 
@@ -157,23 +169,17 @@ test.group("A second artist of the same studio (TAT-16)", (group) => {
 	}
 
 	test("the walk covers the artist routes that take an id", ({ assert }) => {
-		const covered = isolationCases.filter(
-			(isolationCase) =>
-				/:id(?=\/|$)/.test(isolationCase.pattern) &&
-				rolesFor(routeName(isolationCase))?.includes("artist"),
-		);
-		assert.isAbove(covered.length, 10);
+		assert.isAbove(artistIdCases().length, 10);
 	});
 
-	for (const isolationCase of isolationCases) {
-		if (!/:id(?=\/|$)/.test(isolationCase.pattern)) continue;
-		test(`${isolationCase.method} ${isolationCase.pattern} is a 404 for the other artist`, async ({
-			client,
-			assert,
-		}) => {
-			const name = routeName(isolationCase);
-			if (!rolesFor(name)?.includes("artist")) return;
-			const { studio, other } = await twoArtists();
+	test("every artist route that takes an id is a 404 for the other artist", async ({
+		client,
+		assert,
+	}) => {
+		const { studio, other } = await twoArtists();
+
+		for (const isolationCase of artistIdCases()) {
+			const name = `${isolationCase.method} ${isolationCase.pattern}`;
 			const before = await isolationCase.snapshot(studio);
 
 			const response = await caseRequest(
@@ -184,12 +190,12 @@ test.group("A second artist of the same studio (TAT-16)", (group) => {
 				other,
 			);
 
-			response.assertStatus(404);
+			assert.equal(response.status(), 404, name);
 			assert.deepEqual(
 				await isolationCase.snapshot(studio),
 				before,
 				`${name}: the other artist changed what is not theirs`,
 			);
-		});
-	}
+		}
+	});
 });
