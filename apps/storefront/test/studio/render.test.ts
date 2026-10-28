@@ -15,12 +15,16 @@ import {
 	StudioPage,
 } from "../../src/studio/components/pages.tsx";
 import { artistPageData, studioPageData } from "../../src/studio/loaders.ts";
+import { headTags } from "../../src/studio/seo.ts";
 import {
 	ARJUN,
 	CLOSED_STUDIO,
 	EMPTY_STUDIO,
 	ORIGIN,
 	SITA,
+	SITA_PHOTO_URL,
+	SITA_SIZED,
+	SITA_SRCSET,
 	STUDIO,
 } from "./fixtures.ts";
 import { assertSafePage } from "./safety.ts";
@@ -150,6 +154,60 @@ describe("the studio page", () => {
 		assert.match(image, / loading="lazy"/);
 	});
 
+	test("a photo with copies carries srcset and sizes, still lazy; one without carries neither (TAT-112)", () => {
+		const sized = renderToStaticMarkup(
+			createElement(StudioPage, {
+				data: studioPageData(STUDIO, [SITA_SIZED, ARJUN], ORIGIN),
+			}),
+		);
+		assertSafePage(sized);
+		const [image] = images(sized);
+
+		assert.ok(image);
+		assert.match(image, new RegExp(` srcSet="${SITA_SRCSET}"`, "i"));
+		assert.match(image, / sizes="\(min-width: 48rem\) 8\.63rem, 6\.63rem"/);
+		assert.match(image, / loading="lazy"/);
+		assert.match(image, / width="1200" height="1500"/);
+		assert.match(image, / alt="Photo of Sita Rai"/);
+		// src stays the stored image, and the only <img> is Sita's (Arjun has none).
+		assert.match(
+			image,
+			/ src="https:\/\/api\.example\.com\/uploads\/tenants\/t\/artist_photo\/sita\.jpg"/,
+		);
+		assert.equal(images(sized).length, 1);
+
+		for (const plain of [studioHtml(), studioHtml(STUDIO, [ARJUN])]) {
+			assert.doesNotMatch(plain, / srcset=/i);
+			assert.doesNotMatch(plain, / sizes=/);
+		}
+	});
+
+	test("a landscape photo asks for the width its 4:5 box needs (TAT-112)", () => {
+		const landscape: Artist = {
+			...SITA_SIZED,
+			photo: {
+				url: SITA_PHOTO_URL,
+				width: 2000,
+				height: 1500,
+				variants: [
+					{ url: SITA_PHOTO_URL.replace(".jpg", ".320w.jpg"), width: 320 },
+					{ url: SITA_PHOTO_URL.replace(".jpg", ".640w.jpg"), width: 640 },
+					{ url: SITA_PHOTO_URL.replace(".jpg", ".1280w.jpg"), width: 1280 },
+				],
+			},
+		};
+		const html = renderToStaticMarkup(
+			createElement(StudioPage, {
+				data: studioPageData(STUDIO, [landscape], ORIGIN),
+			}),
+		);
+		const [image] = images(html);
+
+		// 2000 x 1500 is enlarged to fill a 4:5 box: 5/4 x 4/3 = 1.67 x the box's width.
+		assert.ok(image);
+		assert.match(image, / sizes="\(min-width: 48rem\) 14\.38rem, 11\.05rem"/);
+	});
+
 	test("shows a closed artist's own words", () => {
 		assert.match(
 			studioHtml(),
@@ -212,7 +270,12 @@ describe("the studio page", () => {
 				{
 					...SITA,
 					bio: "<b>bold</b>",
-					photo: { url: "javascript:alert(1)", width: 10, height: 10 },
+					photo: {
+						url: "javascript:alert(1)",
+						width: 10,
+						height: 10,
+						variants: [],
+					},
 				},
 			],
 		);
@@ -494,6 +557,34 @@ describe("the artist page", () => {
 		assert.ok(image);
 		assert.match(image, / loading="eager"/);
 		assert.match(image, / fetchpriority="high"/i);
+	});
+
+	test("its photo picks a copy by width, is still eager and high, and og:image stays the stored image (TAT-112)", () => {
+		const data = artistPageData(STUDIO, [SITA_SIZED, ARJUN], "sita", ORIGIN);
+		assert.ok(data);
+		const html = renderToStaticMarkup(createElement(ArtistPage, { data }));
+		assertSafePage(html);
+		const [image] = images(html);
+
+		assert.ok(image);
+		assert.match(image, new RegExp(` srcSet="${SITA_SRCSET}"`, "i"));
+		assert.match(
+			image,
+			/ sizes="\(min-width: 48rem\) 19\.63rem, \(min-width: 22\.875rem\) 20rem, calc\(100vw - 2\.875rem\)"/,
+		);
+		assert.match(image, / loading="eager"/);
+		assert.match(image, / fetchpriority="high"/i);
+		assert.equal(data.seo.image?.src, SITA_PHOTO_URL);
+		assert.deepEqual(
+			headTags(data.seo).meta.find(
+				(tag) => "property" in tag && tag.property === "og:image",
+			),
+			{ property: "og:image", content: SITA_PHOTO_URL },
+		);
+		for (const plain of [artistHtml("sita"), artistHtml("arjun")]) {
+			assert.doesNotMatch(plain, / srcset=/i);
+			assert.doesNotMatch(plain, / sizes=/);
+		}
 	});
 
 	test("a closed artist's page offers the studio instead", () => {

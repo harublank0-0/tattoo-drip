@@ -186,6 +186,61 @@ describe("the frame", () => {
 		);
 	});
 
+	test("a logo with copies carries srcset and sizes and keeps its Referer rule (TAT-112)", () => {
+		const srcSet =
+			"https://api.example.com/logo.320w.png 320w, https://api.example.com/logo.png 600w";
+		const html = render(
+			createElement(DepositFrame, {
+				studioName: STUDIO,
+				logo: {
+					src: "https://api.example.com/logo.png",
+					width: 600,
+					height: 200,
+					srcSet,
+				},
+			}),
+		);
+		const [image] = tags(html, "img");
+
+		assert.equal(attr(image, "srcset"), srcSet);
+		assert.equal(attr(image, "sizes"), "8rem");
+		assert.equal(attr(image, "referrerpolicy"), "no-referrer");
+		assert.equal(attr(image, "src"), "https://api.example.com/logo.png");
+	});
+
+	test("a square logo asks for its 2.75rem height, not the 8rem it could be wide (TAT-112)", () => {
+		const html = render(
+			createElement(DepositFrame, {
+				studioName: STUDIO,
+				logo: {
+					src: "https://api.example.com/mark.png",
+					width: 600,
+					height: 600,
+					srcSet:
+						"https://api.example.com/mark.320w.png 320w, https://api.example.com/mark.png 600w",
+				},
+			}),
+		);
+
+		assert.equal(attr(tags(html, "img")[0], "sizes"), "2.75rem");
+	});
+
+	test("a logo without copies has no srcset or sizes", () => {
+		const html = render(
+			createElement(DepositFrame, {
+				studioName: STUDIO,
+				logo: {
+					src: "https://api.example.com/logo.png",
+					width: 600,
+					height: 200,
+				},
+			}),
+		);
+
+		assert.doesNotMatch(html, / srcset=/i);
+		assert.doesNotMatch(html, / sizes=/);
+	});
+
 	test("the project's artist sits under the studio's name, in <bdi> (TAT-110)", () => {
 		const html = render(
 			createElement(DepositFrame, {

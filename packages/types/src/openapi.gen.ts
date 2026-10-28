@@ -379,11 +379,18 @@ export interface components {
             width: number;
             height: number;
             alt?: string | null;
+            /**
+             * @description Smaller copies, narrowest first, each narrower than `width`
+             *     (320, 640 and 1280 px, those below the image's own width). Empty
+             *     for an image stored before them or too small to have any: then
+             *     show `url` alone. Build `srcset` from these and `url` at `width`.
+             */
+            variants: components["schemas"]["ImageVariant"][];
         };
         /**
-         * @description An artist's photo (TAT-44): an `Image` without `alt`, so every
-         *     property is always there. The page builds the `alt` text from the
-         *     artist's name.
+         * @description An artist's photo (TAT-44) and its smaller copies: an `Image`
+         *     without `alt`, so every property is always there. The page builds the
+         *     `alt` text from the artist's name.
          */
         Photo: {
             /**
@@ -393,6 +400,26 @@ export interface components {
             url: string;
             width: number;
             height: number;
+            /**
+             * @description Smaller copies, narrowest first, each narrower than `width`
+             *     (320, 640 and 1280 px, those below the image's own width). Empty
+             *     for an image stored before them or too small to have any: then
+             *     show `url` alone. Build `srcset` from these and `url` at `width`.
+             */
+            variants: components["schemas"]["ImageVariant"][];
+        };
+        /**
+         * @description A smaller copy of an image (TAT-112), for `srcset`: the same picture
+         *     in the same format, `width` px wide; its height keeps the image's
+         *     aspect ratio.
+         */
+        ImageVariant: {
+            /**
+             * Format: uri
+             * @description Absolute, on the same origin as the image's `url`.
+             */
+            url: string;
+            width: number;
         };
         Money: {
             /** @description Minor units (cents) */

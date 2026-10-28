@@ -43,10 +43,36 @@ export const SITA: Artist = {
 	slug: "sita",
 	name: "Sita Rai",
 	bio: "Fine line florals.\nBooks a month ahead.",
-	photo: { url: SITA_PHOTO_URL, width: 1200, height: 1500 },
+	photo: { url: SITA_PHOTO_URL, width: 1200, height: 1500, variants: [] },
 	acceptingInquiries: true,
 	closedMessage: null,
 };
+
+/** The photo's smaller copies, as the API lists them (TAT-112). */
+export const SITA_VARIANTS = [
+	{
+		url: "https://api.example.com/uploads/tenants/t/artist_photo/sita.320w.jpg",
+		width: 320,
+	},
+	{
+		url: "https://api.example.com/uploads/tenants/t/artist_photo/sita.640w.jpg",
+		width: 640,
+	},
+];
+
+/** Sita with a photo that has two smaller copies. */
+export const SITA_SIZED: Artist = {
+	...SITA,
+	photo: {
+		url: SITA_PHOTO_URL,
+		width: 1200,
+		height: 1500,
+		variants: SITA_VARIANTS,
+	},
+};
+
+/** The srcset the page builds from SITA_SIZED. */
+export const SITA_SRCSET = `${SITA_VARIANTS[0].url} 320w, ${SITA_VARIANTS[1].url} 640w, ${SITA_PHOTO_URL} 1200w`;
 
 /** Closed, no photo, a Devanagari name. */
 export const ARJUN: Artist = {

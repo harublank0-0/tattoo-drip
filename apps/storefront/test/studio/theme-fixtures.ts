@@ -27,6 +27,27 @@ export const COVER = {
 	alt: null,
 };
 
+/** The same image with smaller copies on the API's origin (TAT-112). */
+const withCopies = (image: typeof LOGO, widths: number[]) => ({
+	...image,
+	variants: widths.map((width) => ({
+		url: image.url.replace(/\.(png|jpg)$/, `.${width}w.$1`),
+		width,
+	})),
+});
+
+export const LOGO_SIZED = withCopies(LOGO, [320]);
+export const COVER_SIZED = withCopies(COVER, [320, 640, 1280]);
+
+/** The srcset the page builds from a fixture with copies. */
+export const srcSetOf = (
+	image: typeof LOGO & { variants: { url: string; width: number }[] },
+) =>
+	[
+		...image.variants.map(({ url, width }) => `${url} ${width}w`),
+		`${image.url} ${image.width}w`,
+	].join(", ");
+
 /** What the cover shows, when the API gave it a description. */
 export const COVER_ALT = "The front of Black Needle on Durbar Marg";
 

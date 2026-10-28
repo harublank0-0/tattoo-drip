@@ -1,23 +1,31 @@
 import { studioCopy } from "../copy.ts";
+import { profilePhotoSizes, rosterPhotoSizes } from "../srcset.ts";
 import type { ArtistPhoto, ArtistView, StudioView } from "../view-model.ts";
 
 /**
  * Photos are the stored image (up to 2048 px, TAT-44): width and height are
  * always set and CSS crops them to 4:5, so nothing shifts while they load.
- * The artist page's photo is its largest element and loads first; roster
- * photos are below the fold and load lazily.
+ * When the API sent smaller copies the browser picks one by `srcset` and
+ * `sizes` (the width the browser must ask for to fill the 4:5 box without
+ * enlarging the copy, from this photo's own size: srcset.ts); `src` stays the
+ * stored image. The artist page's photo is its largest element and loads
+ * first; roster photos are below the fold and load lazily.
  */
 function PhotoFigure({
 	photo,
 	priority,
+	sizes,
 }: {
 	photo: ArtistPhoto;
 	priority: boolean;
+	sizes: string;
 }) {
 	return (
 		<figure className="artist-photo">
 			<img
 				src={photo.src}
+				srcSet={photo.srcSet}
+				sizes={photo.srcSet ? sizes : undefined}
 				width={photo.width}
 				height={photo.height}
 				alt={photo.alt}
@@ -51,7 +59,11 @@ function ArtistEntry({
 			aria-labelledby={titleId}
 		>
 			{artist.photo ? (
-				<PhotoFigure photo={artist.photo} priority={false} />
+				<PhotoFigure
+					photo={artist.photo}
+					priority={false}
+					sizes={rosterPhotoSizes(artist.photo)}
+				/>
 			) : null}
 			<div className="artist-head">
 				<h3 id={titleId} className="artist-name" dir="auto">
@@ -123,7 +135,13 @@ export function ArtistProfile({
 			}
 			aria-labelledby="artist-title"
 		>
-			{artist.photo ? <PhotoFigure photo={artist.photo} priority /> : null}
+			{artist.photo ? (
+				<PhotoFigure
+					photo={artist.photo}
+					priority
+					sizes={profilePhotoSizes(artist.photo)}
+				/>
+			) : null}
 			<div className="artist-profile-text">
 				<h1 id="artist-title" className="artist-title" dir="auto">
 					{artist.name}

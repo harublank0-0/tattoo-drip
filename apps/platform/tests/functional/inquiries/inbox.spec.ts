@@ -3,7 +3,9 @@ import { test } from "@japa/runner";
 import { DateTime } from "luxon";
 import { chatLinks } from "#modules/clients/contact_links";
 import Inquiry from "#modules/inquiries/models/inquiry";
+import ImageService from "#modules/media/services/image_service";
 import TattooProject from "#modules/projects/models/tattoo_project";
+import { testImages } from "#tests/helpers/images";
 import {
 	makeArtist,
 	makeClient,
@@ -199,9 +201,56 @@ test.group("Inbox pages", (group) => {
 		assert.lengthOf(props.references, 1);
 		assert.include(props.references[0].url, "reference_image/");
 		assert.match(props.references[0].url, /signature=/);
+		// The helper's fake key names no copies: the thumbnail is the image.
+		assert.equal(
+			new URL(props.references[0].thumbnailUrl).pathname,
+			new URL(props.references[0].url).pathname,
+		);
 		assert.deepEqual(props.accept.artistId, artist.id);
 		assert.deepInclude(props.accept.choices, { id: artist.id, name: "Sita" });
 		assert.isNull(props.projectId);
+	});
+
+	test("the inquiry page's grid shows the signed 320 px copy and opens the original", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const inquiry = await inTenant(tenant, async () => {
+			const inquiry = await makeInquiry(tenant, await makeClient(tenant));
+			const stored = await new ImageService().storeBytes(
+				await testImages.jpeg(1000, 800),
+				{ tenant, purpose: "reference_image" },
+			);
+			await makeReferenceImage(tenant, {
+				inquiryId: inquiry.id,
+				imageKey: stored.key,
+				width: 1000,
+				height: 800,
+			});
+			return inquiry;
+		});
+
+		const { references } = (
+			await client
+				.get(inbox(`/${inquiry.id}`))
+				.withInertia()
+				.loginAs(owner)
+		).inertiaProps;
+
+		assert.lengthOf(references, 1);
+		const thumbnail = new URL(references[0].thumbnailUrl);
+		assert.match(thumbnail.pathname, /\.320w\.jpg$/);
+		assert.isTrue(thumbnail.searchParams.has("signature"));
+		assert.isTrue(thumbnail.searchParams.has("cacheControl"));
+		// The link still opens the full image, signed as well.
+		const original = new URL(references[0].url);
+		assert.match(original.pathname, /\.320-640\.jpg$/);
+		assert.isTrue(original.searchParams.has("signature"));
+		(await client.get(thumbnail.pathname + thumbnail.search)).assertHeader(
+			"cache-control",
+			"private, no-store",
+		);
 	});
 
 	test("missing details stay null, and a deleted preferred artist pre-selects none", async ({

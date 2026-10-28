@@ -8,6 +8,7 @@ import ArtistService from "#modules/artists/services/artist_service";
 import ClientService from "#modules/clients/services/client_service";
 import { InquiryRuleError } from "#modules/inquiries/errors";
 import type Inquiry from "#modules/inquiries/models/inquiry";
+import { referenceView } from "#modules/inquiries/reference_view";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import InquiryService from "#modules/inquiries/services/inquiry_service";
 import { acceptInquiryValidator } from "#modules/inquiries/validators/inquiry";
@@ -143,12 +144,7 @@ export default class InquiriesController {
 				decidedOn: decidedOn(inquiry, tenant.timezone),
 			},
 			references: await Promise.all(
-				images.map(async (image) => ({
-					id: image.id,
-					url: await this.images.url("reference_image", image.imageKey, tenant),
-					width: image.width,
-					height: image.height,
-				})),
+				images.map((image) => referenceView(this.images, tenant, image)),
 			),
 			accept:
 				inquiry.status === "new"

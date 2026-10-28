@@ -9,6 +9,7 @@ export type TattooStyle = Schemas["TattooStyle"];
 export type BodyPlacement = Schemas["BodyPlacement"];
 export type Image = Schemas["Image"];
 export type Photo = Schemas["Photo"];
+export type ImageVariant = Schemas["ImageVariant"];
 export type Money = Schemas["Money"];
 export type SocialLink = Schemas["SocialLink"];
 export type StorefrontSection = Schemas["StorefrontSection"];

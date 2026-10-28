@@ -31,7 +31,7 @@ const ARTIST_FIELDS = [
 	"photo",
 	"slug",
 ];
-const PHOTO_FIELDS = ["height", "url", "width"];
+const PHOTO_FIELDS = ["height", "url", "variants", "width"];
 
 /** The public Artist of a profile without a photo. */
 const shown = (artist: Artist) => ({
@@ -106,12 +106,46 @@ test.group("GET /api/v1/tenants/:tenant/artists (listArtists)", (group) => {
 		assert.lengthOf(data, 1);
 		assert.deepEqual(Object.keys(data[0]).sort(), ARTIST_FIELDS);
 		assert.deepEqual(Object.keys(data[0].photo).sort(), PHOTO_FIELDS);
-		assert.deepEqual(data[0].photo, { url, width: 300, height: 200 });
+		assert.deepEqual(data[0].photo, {
+			url,
+			width: 300,
+			height: 200,
+			variants: [],
+		});
 		// The studio's own public folder, nothing else.
 		assert.match(
 			new URL(url).pathname,
 			new RegExp(`^/uploads/tenants/${tenant.id}/artist_photo/`),
 		);
+	});
+
+	test("a wide photo has its smaller copies, narrowest first, on the photo's origin and in the studio's own folder", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("api-copies-112");
+		await addArtist(tenant, owner, {
+			photo: await uploadOf(await testImages.jpeg(2000, 1500)),
+		});
+
+		const { data } = (
+			await client.get("/api/v1/tenants/api-copies-112/artists")
+		).body();
+
+		const photo = data[0].photo;
+		assert.deepEqual(
+			photo.variants.map((variant: { width: number }) => variant.width),
+			[320, 640, 1280],
+		);
+		for (const variant of photo.variants) {
+			assert.deepEqual(Object.keys(variant).sort(), ["url", "width"]);
+			assert.equal(new URL(variant.url).origin, new URL(photo.url).origin);
+			assert.match(
+				new URL(variant.url).pathname,
+				new RegExp(`^/uploads/tenants/${tenant.id}/artist_photo/`),
+			);
+			(await client.get(new URL(variant.url).pathname)).assertStatus(200);
+		}
 	});
 
 	test("a studio with no visible artist answers an empty list", async ({

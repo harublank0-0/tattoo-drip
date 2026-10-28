@@ -56,6 +56,7 @@ export function assertSafePage(html: string, options: SafePageOptions = {}) {
 	for (const image of html.match(/<img [^>]*>/g) ?? []) {
 		assert.match(image, / width="\d+"/, image);
 		assert.match(image, / height="\d+"/, image);
+		assertSrcSet(image);
 		if (
 			options.brandImages &&
 			/class="(profile-logo|site-bar-logo)"/.test(image)
@@ -66,5 +67,23 @@ export function assertSafePage(html: string, options: SafePageOptions = {}) {
 		} else {
 			assert.match(image, / alt="[^"]+"/, image);
 		}
+	}
+}
+
+/**
+ * An image with `srcset` also has a non-empty `sizes`, and every candidate is
+ * an http(s) URL with no space or comma and a whole width descriptor (TAT-112);
+ * an image without `srcset` has no `sizes`.
+ */
+function assertSrcSet(image: string) {
+	const srcset = / srcset="([^"]*)"/i.exec(image)?.[1];
+	const sizes = / sizes="([^"]*)"/.exec(image)?.[1];
+	if (srcset === undefined) {
+		assert.equal(sizes, undefined, `sizes without srcset: ${image}`);
+		return;
+	}
+	assert.ok(sizes && sizes.length > 0, `srcset without sizes: ${image}`);
+	for (const candidate of decodeAttribute(srcset).split(", ")) {
+		assert.match(candidate, /^https?:\/\/[^\s,]+ [1-9]\d*w$/, candidate);
 	}
 }

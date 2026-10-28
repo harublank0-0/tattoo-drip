@@ -698,3 +698,82 @@ describe("parseThemeConfig (TAT-54)", () => {
 		assert.equal(parsed.accent, "#b91c1c");
 	});
 });
+
+describe("a logo's and cover's smaller copies (TAT-112)", () => {
+	const API = "https://api.example.com";
+	const LOGO = "https://api.example.com/uploads/tenants/t/brand_logo/logo.png";
+	const COVER =
+		"https://api.example.com/uploads/tenants/t/cover_photo/cover.jpg";
+	const copy = (base: string, width: number) =>
+		base.replace(/\.(png|jpg)$/, `.${width}w.$1`);
+	const withCopies = (url: string, width: number, height: number) => ({
+		url,
+		width,
+		height,
+		alt: null,
+		variants: [
+			{ url: copy(url, 640), width: 640 },
+			{ url: copy(url, 320), width: 320 },
+		],
+	});
+
+	test("copies on the API's origin become a srcSet, narrowest first, ending with the image", () => {
+		assert.deepEqual(readBrandImage(withCopies(LOGO, 1200, 400), API), {
+			src: LOGO,
+			width: 1200,
+			height: 400,
+			srcSet: `${copy(LOGO, 320)} 320w, ${copy(LOGO, 640)} 640w, ${LOGO} 1200w`,
+		});
+		const cover = readCoverImage(withCopies(COVER, 2048, 1024), API);
+		assert.equal(
+			cover?.srcSet,
+			`${copy(COVER, 320)} 320w, ${copy(COVER, 640)} 640w, ${COVER} 2048w`,
+		);
+		assert.equal(cover?.alt, "");
+	});
+
+	test("copies on another origin are dropped, the image stays", () => {
+		const hostile = {
+			url: LOGO,
+			width: 1200,
+			height: 400,
+			variants: [
+				{ url: "https://evil.example/logo.320w.png", width: 320 },
+				{ url: "http://api.example.com/logo.640w.png", width: 640 },
+				{ url: "javascript:alert(1)", width: 480 },
+			],
+		};
+
+		assert.deepEqual(readBrandImage(hostile, API), {
+			src: LOGO,
+			width: 1200,
+			height: 400,
+		});
+		assert.deepEqual(readCoverImage({ ...hostile, alt: "A cover" }, API), {
+			src: LOGO,
+			width: 1200,
+			height: 400,
+			alt: "A cover",
+		});
+	});
+
+	test("the cover keeps its alt beside its srcSet", () => {
+		const cover = readCoverImage(
+			{ ...withCopies(COVER, 2048, 1024), alt: "The front of the shop" },
+			API,
+		);
+
+		assert.equal(cover?.alt, "The front of the shop");
+		assert.ok(cover?.srcSet);
+	});
+
+	test("an image without variants is exactly { src, width, height }", () => {
+		for (const variants of [undefined, null, [], "320w", {}]) {
+			assert.deepEqual(
+				readBrandImage({ url: LOGO, width: 600, height: 200, variants }, API),
+				{ src: LOGO, width: 600, height: 200 },
+				JSON.stringify(variants),
+			);
+		}
+	});
+});

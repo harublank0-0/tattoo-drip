@@ -4,7 +4,9 @@ import type Artist from "#modules/artists/models/artist";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
-import ImageService from "#modules/media/services/image_service";
+import ImageService, {
+	type ShownImage,
+} from "#modules/media/services/image_service";
 import type Tenant from "#modules/tenancy/models/tenant";
 import type { TenantProfile } from "#modules/tenancy/services/tenancy_service";
 
@@ -23,13 +25,11 @@ export type StudioPage = {
 	acceptingInquiries: boolean;
 };
 
-export type ShownPhoto = { url: string; width: number; height: number };
-
 /** A visible artist as the public API shows it (openapi.yaml, Artist). */
 export type ShownArtist = Pick<
 	Artist,
 	"id" | "slug" | "name" | "bio" | "acceptingInquiries" | "closedMessage"
-> & { photo: ShownPhoto | null };
+> & { photo: ShownImage | null };
 
 const PHOTO = "artist_photo";
 
@@ -37,8 +37,9 @@ const PHOTO = "artist_photo";
  * The studio page's public reads (TAT-44): the studio's profile and its
  * visible artists, for the tenant the publicTenant middleware resolved (its
  * row is already loaded, so the profile costs no query). Each read is one
- * query (ArtistService.listVisible or findVisibleBySlug); photo URLs are
- * built without I/O. Only the fields the contract lists leave here.
+ * query (ArtistService.listVisible or findVisibleBySlug); a photo is
+ * ImageService.shownImage: its URL, size and smaller copies, all built from
+ * the key without I/O. Only the fields the contract lists leave here.
  */
 @inject()
 export default class StudioPageService {
@@ -87,14 +88,13 @@ export default class StudioPageService {
 	private async photoOf(
 		tenant: Tenant,
 		artist: Artist,
-	): Promise<ShownPhoto | null> {
+	): Promise<ShownImage | null> {
 		const { photoKey, photoWidth, photoHeight } = artist;
 		if (!photoKey || photoWidth === null || photoHeight === null) return null;
-		return {
-			url: await this.images.url(PHOTO, photoKey, tenant),
+		return this.images.shownImage(PHOTO, photoKey, tenant, {
 			width: photoWidth,
 			height: photoHeight,
-		};
+		});
 	}
 }
 

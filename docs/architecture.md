@@ -112,8 +112,8 @@ Which role may use each dashboard route is one table (`TENANT_ROUTE_ROLES`), rea
 
 ## Files, scale, hosting
 
-- **Uploads** always go through the API. Images are re-encoded, which strips EXIF data and GPS location and rejects disguised files. The worker resizes them.
-  - Built so far (TAT-21 core): re-encoding happens in the request, and images over 2048 px are scaled down there. Resized variants in the worker come when an image needs them (artist photos, portfolio).
+- **Uploads** always go through the API. Images are re-encoded, which strips EXIF data and GPS location and rejects disguised files. They are resized in the request, not in the worker (TAT-21, TAT-112).
+  - Built so far (TAT-21 core): re-encoding happens in the request, and images over 2048 px are scaled down there. Copies at 320, 640 and 1280 px are made in the request too, from the cleaned image (TAT-112): artist photos and references; QR codes and payment screenshots keep one size. The API lists them as `variants` and the storefront builds `srcset` from them.
   - HEIC is not decoded (TAT-51): the intake form asks for JPEG, PNG or WebP, which iPhones convert their photos to, and a HEVC decoder would mean a custom libvips build or a WASM decoder running on hostile input.
 - **Image visibility:** portfolio images are public behind a CDN. Reference images are private and served through short-lived signed URLs, issued only after a membership check.
 - **Caching:** public reads that opt in send `Cache-Control: public, max-age=60, stale-while-revalidate=600` with an ETag behind a CDN; storefront pages use short TTLs too, and slots will have the shortest. Errors and writes are `no-store`. The storefront's own 404 page is kept 60 s at the CDN; its old-slug redirects and API-down page are never stored.

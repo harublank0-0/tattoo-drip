@@ -8,6 +8,7 @@ import TenancyService, {
 } from "#modules/tenancy/services/tenancy_service";
 import { addArtist } from "#tests/helpers/artists";
 import { testImages, uploadOf } from "#tests/helpers/images";
+import { recordQueries } from "#tests/helpers/query_count";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
 /**
@@ -188,7 +189,34 @@ test.group("StudioPageService.visibleArtists", (group) => {
 			url: await images.url("artist_photo", sita.photoKey ?? "", tenant),
 			width: 300,
 			height: 200,
+			variants: [],
 		});
+	});
+
+	test("photos with copies cost no extra query", async ({ assert }) => {
+		const plain = await studioWithOwner("page-plain-112");
+		await addArtist(plain.tenant, plain.owner);
+		await addArtist(plain.tenant, plain.owner, { name: "Bina", slug: "bina" });
+		const wide = await studioWithOwner("page-wide-112");
+		await addArtist(wide.tenant, wide.owner, {
+			photo: await uploadOf(await testImages.jpeg(1000, 800)),
+		});
+		await addArtist(wide.tenant, wide.owner, {
+			name: "Bina",
+			slug: "bina",
+			photo: await uploadOf(await testImages.jpeg(1000, 800)),
+		});
+
+		const without = await recordQueries(() =>
+			inTenant(plain.tenant, () => pagesWith().visibleArtists(plain.tenant)),
+		);
+		const withCopies = await recordQueries(() =>
+			inTenant(wide.tenant, () => pagesWith().visibleArtists(wide.tenant)),
+		);
+
+		assert.lengthOf(withCopies.result, 2);
+		assert.lengthOf(withCopies.result[0].photo?.variants ?? [], 2);
+		assert.equal(withCopies.queries.length, without.queries.length);
 	});
 
 	test("a studio with no visible artist has none", async ({ assert }) => {

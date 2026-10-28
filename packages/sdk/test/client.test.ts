@@ -707,9 +707,20 @@ describe("studio and artists", () => {
 		name: "Sita Rai",
 		bio: null,
 		photo: {
-			url: "https://api.example.com/uploads/tenants/t/artist_photo/p.png",
-			width: 300,
-			height: 200,
+			url: "https://api.example.com/uploads/tenants/t/artist_photo/p.320-640.png",
+			width: 1000,
+			height: 800,
+			// Each copy is narrower than the photo (the contract's invariant).
+			variants: [
+				{
+					url: "https://api.example.com/uploads/tenants/t/artist_photo/p.320w.png",
+					width: 320,
+				},
+				{
+					url: "https://api.example.com/uploads/tenants/t/artist_photo/p.640w.png",
+					width: 640,
+				},
+			],
 		},
 		acceptingInquiries: false,
 		closedMessage: "Books open in March.",

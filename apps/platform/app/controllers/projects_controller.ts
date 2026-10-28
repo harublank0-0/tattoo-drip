@@ -7,6 +7,7 @@ import ArtistService from "#modules/artists/services/artist_service";
 import type Client from "#modules/clients/models/client";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ClientService from "#modules/clients/services/client_service";
+import { referenceView } from "#modules/inquiries/reference_view";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import InquiryService from "#modules/inquiries/services/inquiry_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -303,16 +304,7 @@ export default class ProjectsController {
 					references: await Promise.all(
 						(
 							await this.inquiries.images(tenant, { projectId: project.id })
-						).map(async (image) => ({
-							id: image.id,
-							url: await this.images.url(
-								"reference_image",
-								image.imageKey,
-								tenant,
-							),
-							width: image.width,
-							height: image.height,
-						})),
+						).map((image) => referenceView(this.images, tenant, image)),
 					),
 				}
 			: null;
