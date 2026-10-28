@@ -79,6 +79,33 @@ test.group("RLS: tenant context", (group) => {
 		}
 	});
 
+	test("a malformed tenant setting fails closed, and the context recovers (TAT-16)", async ({
+		assert,
+	}) => {
+		const { a } = await seed();
+
+		await withDbContext({ tenantId: a.tenant.id }, async (trx) => {
+			await assert.rejects(
+				() =>
+					withTransaction(async (inner) => {
+						await inner.rawQuery(
+							"select set_config('app.tenant_id', 'not-a-uuid', true)",
+						);
+						return inner.rawQuery(
+							"select count(*)::int as n from payment_methods",
+						);
+					}),
+				/invalid input syntax for type uuid/,
+			);
+
+			// The refused statement leaves A's context as it was.
+			const { rows } = await trx.rawQuery(
+				"select count(*)::int as n from payment_methods",
+			);
+			assert.isAbove(rows[0].n, 0);
+		});
+	});
+
 	test("an insert for another tenant fails the policy check", async ({
 		assert,
 	}) => {
