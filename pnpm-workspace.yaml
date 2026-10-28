@@ -23,5 +23,10 @@ minimumReleaseAgeExclude:
 # @adonisjs/queue and the platform both import @boringnode/queue; a second
 # copy breaks transactional dispatch, so force one version (see
 # apps/platform/docs/jobs-and-email.md, Jobs). Bump it together with @adonisjs/queue.
+#
+# @adonisjs/mail 10.4.0 still asks for nodemailer ^9, whose address parser has 12
+# advisories fixed only in 10.1.4 (TAT-16). nodemailer 10's only breaking change is
+# Node 20 or newer. Drop this once @adonisjs/mail depends on nodemailer 10.
 overrides:
   '@boringnode/queue': 0.6.0
+  '@adonisjs/mail>nodemailer': ^10.1.4
