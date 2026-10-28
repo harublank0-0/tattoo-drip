@@ -7,7 +7,8 @@ import { clientAddress, digest } from "#services/rate_limits";
  * The auth rate limits (TAT-8, TAT-18), by name. Each window is fixed: it
  * starts with the first counted attempt, and a lockout ends when it does
  * (no extra block). The request limits are `limiter.define` middleware in
- * start/limiter.ts; login counts failures in throttleLogin below.
+ * start/limiter.ts; login and the current-password check count failures in
+ * throttleLogin and throttlePasswordCheck below.
  */
 export const AUTH_LIMITS = {
 	/** Login attempts from one client address that didn't sign in. */
@@ -43,6 +44,18 @@ export const AUTH_LIMITS = {
 	verifyResendCooldown: { requests: 1, duration: "1 min" },
 	/** ...and five an hour. */
 	verifyResendPerUser: { requests: 5, duration: "1 hour" },
+	/**
+	 * Wrong current passwords on the account page's "Change password" (TAT-95),
+	 * for one account from any address. Only a signed-in session can try.
+	 */
+	passwordCheckPerUser: { requests: 5, duration: "15 mins" },
+	/** ...and from one client address, across accounts. */
+	passwordCheckPerIp: { requests: 10, duration: "15 mins" },
+	/**
+	 * "Sign out of other devices" (TAT-95), every request of one account. It
+	 * also keeps session_version far below the 9 digits a session can hold.
+	 */
+	signOutOthersPerUser: { requests: 10, duration: "1 hour" },
 } as const;
 
 export function loginIpKey(ip: string) {
@@ -119,6 +132,47 @@ export async function throttleLogin<T>(
 		giveBack(perEmail, emailKey, countedAt, emailWindow),
 	]);
 	return result;
+}
+
+export function passwordCheckIpKey(ip: string) {
+	return `password_check_ip_${digest(clientAddress(ip))}`;
+}
+
+export function passwordCheckUserKey(userId: string) {
+	return `password_check_user_${digest(userId)}`;
+}
+
+/**
+ * Runs `verify` (the current-password check of "Change password", TAT-95) unless
+ * this address or this account is over its limit, and returns its answer.
+ * Counted like a sign-in (throttleLogin): the address first, so a refused
+ * address never adds to the account's count; both before `verify`, so parallel
+ * guesses can't all pass a check first; a right password gives back the two
+ * points it took while their windows are open, and wrong ones stay counted.
+ * Over a limit it throws E_TOO_MANY_REQUESTS without checking.
+ */
+export async function throttlePasswordCheck(
+	ip: string,
+	userId: string,
+	verify: () => Promise<boolean>,
+): Promise<boolean> {
+	// use() parses the durations in the object it gets, so give it copies.
+	const perIp = limiter.use({ ...AUTH_LIMITS.passwordCheckPerIp });
+	const perUser = limiter.use({ ...AUTH_LIMITS.passwordCheckPerUser });
+	const ipKey = passwordCheckIpKey(ip);
+	const userKey = passwordCheckUserKey(userId);
+
+	const countedAt = Date.now();
+	const ipWindow = await perIp.consume(ipKey);
+	const userWindow = await perUser.consume(userKey);
+	const right = await verify();
+	if (right) {
+		await Promise.all([
+			giveBack(perIp, ipKey, countedAt, ipWindow),
+			giveBack(perUser, userKey, countedAt, userWindow),
+		]);
+	}
+	return right;
 }
 
 /**

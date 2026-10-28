@@ -75,3 +75,6 @@ export const throttleVerifyCooldown = limiter.define("verify_cooldown", (ctx) =>
 export const throttleVerifyResend = limiter.define("verify_resend", (ctx) =>
 	perAccount(ctx, AUTH_LIMITS.verifyResendPerUser),
 );
+export const throttleSignOutOthers = limiter.define("sign_out_others", (ctx) =>
+	perAccount(ctx, AUTH_LIMITS.signOutOthersPerUser),
+);
