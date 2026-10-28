@@ -1,6 +1,8 @@
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
 import {
+	artistDepositFloor,
+	depositFloorMessage,
 	expiresAtFor,
 	formatDay,
 	formatHours,
@@ -56,6 +58,60 @@ test.group("quoteTotal", () => {
 		assert.equal(
 			quoteTotal({ ...hourly, hourlyRate: max, estimatedMinutes: max }),
 			76_861_433_568_873_677n,
+		);
+	});
+});
+
+test.group("artistDepositFloor (TAT-16)", () => {
+	test("is the studio's default share of the total in whole rupees, rounded half up", ({
+		assert,
+	}) => {
+		assert.equal(artistDepositFloor(1_500_000n, 20), 300_000n);
+		// 33% of NPR 1,001 is 330.33: down. 50% is 500.5: up.
+		assert.equal(artistDepositFloor(100_100n, 33), 33_000n);
+		assert.equal(artistDepositFloor(100_100n, 50), 50_100n);
+		// An hourly total of NPR 1,001.25 at 100%: whole rupees only.
+		assert.equal(artistDepositFloor(100_125n, 100), 100_100n);
+		// The total of an hourly NPR 1,500 x 2.25 h, at 20%.
+		assert.equal(
+			artistDepositFloor(
+				quoteTotal({ ...hourly, hourlyRate: 150_000, estimatedMinutes: 135 }),
+				20,
+			),
+			67_500n,
+		);
+	});
+
+	test("is never under NPR 1 while the studio has a deposit rule", ({
+		assert,
+	}) => {
+		// 20% of NPR 2 is 40 paisa; 1% of NPR 20 is 20 paisa.
+		assert.equal(artistDepositFloor(2_000n, 1), 100n);
+		assert.equal(artistDepositFloor(200n, 20), 100n);
+	});
+
+	test("without a default, zero is an owner's decision: the floor is NPR 1", ({
+		assert,
+	}) => {
+		assert.equal(artistDepositFloor(1_500_000n, null), 100n);
+	});
+
+	test("a 0% default is the owner's own policy of no deposit: the floor is zero", ({
+		assert,
+	}) => {
+		assert.equal(artistDepositFloor(1_500_000n, 0), 0n);
+	});
+
+	test("depositFloorMessage says the minimum and who can go lower", ({
+		assert,
+	}) => {
+		assert.equal(
+			depositFloorMessage(300_000n, 20),
+			"Enter at least NPR 3,000, your studio's 20% deposit. Only an owner can quote less or no deposit.",
+		);
+		assert.equal(
+			depositFloorMessage(100n, null),
+			"Enter a deposit. Only an owner can quote without one.",
 		);
 	});
 });

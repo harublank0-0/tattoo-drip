@@ -6,6 +6,7 @@ import TattooProject, {
 	type ProjectStatus,
 } from "#modules/projects/models/tattoo_project";
 import { expiresAtFor } from "#modules/projects/quotes";
+import TenancyService from "#modules/tenancy/services/tenancy_service";
 import {
 	makeArtist,
 	makeClient,
@@ -338,6 +339,150 @@ test.group("Quotes and artists", (group) => {
 			.loginAs(asha)
 			.redirects(0);
 		own.assertFlashMessage("success", "Quote revised (version 2).");
+	});
+});
+
+test.group("Quotes and the artist deposit floor (TAT-16)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	const OWNER_ACCEPTS =
+		"Only an owner can confirm this quote: its deposit is below what an artist can offer.";
+
+	/** A studio with a default deposit, and the project assigned to its artist Asha. */
+	async function studioWith(percent: number | null, status: ProjectStatus) {
+		const { owner, tenant } = await studioWithOwner();
+		const asha = await artistIn(tenant, "asha@example.com");
+		const project = await inTenant(tenant, async () => {
+			await new TenancyService().updateDepositSettings(tenant, {
+				defaultDepositPercent: percent,
+				depositPolicy: null,
+			});
+			const profile = await makeArtist(tenant, "asha");
+			profile.userId = asha.id;
+			await profile.save();
+			return makeProject(tenant, await makeClient(tenant), {
+				artistId: profile.id,
+				status,
+			});
+		});
+		return { owner, asha, tenant, project };
+	}
+
+	test("a zero deposit needs an owner: the artist gets a field error and nothing is stored", async ({
+		client,
+		assert,
+	}) => {
+		const { asha, tenant, project } = await studioWith(null, "reviewing");
+
+		const response = await client
+			.post(quotesUrl(project.id))
+			.form(fixedForm({ depositAmount: "0" }))
+			.withCsrfToken()
+			.loginAs(asha)
+			.redirects(0);
+
+		assertValidationError(
+			response,
+			"depositAmount",
+			"Enter a deposit. Only an owner can quote without one.",
+		);
+		assert.lengthOf(await versions(tenant, project), 0);
+		assert.equal((await reload(tenant, project)).status, "reviewing");
+	});
+
+	test("under the studio's default is refused with the minimum; the minimum passes", async ({
+		client,
+		assert,
+	}) => {
+		const { asha, tenant, project } = await studioWith(20, "reviewing");
+
+		const under = await client
+			.post(quotesUrl(project.id))
+			.form(fixedForm({ depositAmount: "2999" }))
+			.withCsrfToken()
+			.loginAs(asha)
+			.redirects(0);
+		assertValidationError(
+			under,
+			"depositAmount",
+			"Enter at least NPR 3,000, your studio's 20% deposit. Only an owner can quote less or no deposit.",
+		);
+		assert.lengthOf(await versions(tenant, project), 0);
+
+		const ok = await client
+			.post(quotesUrl(project.id))
+			.form(fixedForm({ depositAmount: "3000" }))
+			.withCsrfToken()
+			.loginAs(asha)
+			.redirects(0);
+		ok.assertFlashMessage("success", "Quote issued.");
+		assert.lengthOf(await versions(tenant, project), 1);
+	});
+
+	test("a 0% default lets an artist quote no deposit: that is the owner's policy", async ({
+		client,
+		assert,
+	}) => {
+		const { asha, tenant, project } = await studioWith(0, "reviewing");
+
+		const response = await client
+			.post(quotesUrl(project.id))
+			.form(fixedForm({ depositAmount: "0" }))
+			.withCsrfToken()
+			.loginAs(asha)
+			.redirects(0);
+
+		response.assertFlashMessage("success", "Quote issued.");
+		assert.lengthOf(await versions(tenant, project), 1);
+	});
+
+	test("an owner quotes no deposit in the same studio", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant, project } = await studioWith(20, "reviewing");
+
+		const response = await client
+			.post(quotesUrl(project.id))
+			.form(fixedForm({ depositAmount: "0" }))
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		response.assertFlashMessage("success", "Quote issued.");
+		const [quote] = await versions(tenant, project);
+		assert.equal(quote.depositAmount, 0);
+	});
+
+	test("an artist can't mark a zero-deposit quote accepted; the owner can", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, asha, tenant, project } = await studioWith(20, "quoted");
+		const quote = await inTenant(tenant, () =>
+			makeQuote(tenant, project, { depositAmount: 0 }),
+		);
+
+		const refused = await client
+			.post(acceptUrl(project.id))
+			.form({ quoteId: quote.id })
+			.withCsrfToken()
+			.loginAs(asha)
+			.redirects(0);
+		refused.assertFlashMessage("error", OWNER_ACCEPTS);
+		assert.equal((await reload(tenant, project)).status, "quoted");
+
+		const accepted = await client
+			.post(acceptUrl(project.id))
+			.form({ quoteId: quote.id })
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+		accepted.assertFlashMessage(
+			"success",
+			"Accepted: waiting for the deposit.",
+		);
+		assert.equal((await reload(tenant, project)).status, "deposit_pending");
 	});
 });
 
