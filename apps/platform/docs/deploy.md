@@ -77,7 +77,7 @@ Known and accepted for the pilot. The owner gets no signal for any of them (429s
 
 ### After the first deploy
 
-- Sign up with an address you own: "Confirm your email address" arrives (spam folder included), its link opens the confirmation page, and confirming lets you set up a studio. "Forgot your password?" sends "Choose a new password"; finishing the reset signs out your other browser.
+- Sign up with an address you own: "Confirm your email address" arrives (spam folder included), its link opens the confirmation page, and confirming lets you set up a studio. "Forgot your password?" sends "Choose a new password"; finishing the reset signs out your other browser. Sign in on two browsers, then change the password from "Your account" (account menu) on one: the other is signed out on its next click, this one stays, and "Your Tattoo Drip password was changed" arrives (TAT-95; no new setting, and nobody is signed out by the deploy itself, since the session's format is unchanged).
 - Open a studio page, then check the API log: no "server key this API does not accept" and no "no usable X-Visitor-IP" warning (either means the key or the visitor's address isn't reaching the API).
 - `curl -sI https://<api>/api/v1/tenants/<slug>` answers 200 with `Cache-Control: public…` and no `X-RateLimit-*` header.
 - Open a deposit link (a project's "Copy link") on a phone, sent by WhatsApp or Viber (Instagram and Facebook rewrite outgoing links through their own redirect, which carries the whole URL, fragment included, to Meta), then check the storefront's and the CDN's request logs: `/deposit` appears without its `#` fragment, and the API proxy's access log has no `/deposits/` line.

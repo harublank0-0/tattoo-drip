@@ -45,7 +45,7 @@ Every entity except `User` belongs to a `Tenant`; most of those lines are left o
 
 | Entity | Responsibility |
 |---|---|
-| **User** | A person who can log in: a canonical email address (trimmed, ASCII letters in lower case, so unique whatever its case), when that address was confirmed (needed to create a tenant or accept an invitation), and a session version that a password reset raises to sign out every session |
+| **User** | A person who can log in: a canonical email address (trimmed, ASCII letters in lower case, so unique whatever its case), when that address was confirmed (needed to create a tenant or accept an invitation), and a session version that a password reset, a password change or "sign out of other devices" raises to sign out sessions |
 | **AccountToken** | A single-use link for one account: confirm its email address (24 hours) or choose a new password (60 minutes). Only the token's SHA-256 is stored, with the address it was sent to; one per account and purpose, replaced by the next, deleted when used |
 | **Tenant** | A `studio` or `independent` business: name, slug (every slug it has held is a `TenantSlug`), profile (contact phone and email, address, social links), timezone, default deposit percentage, deposit policy text, and an optional cover photo (TAT-116: the public `studio_cover` image, its key and size) |
 | **TenantSlug** | Every slug a tenant has held, its current one included. One namespace for the whole platform: a slug is never given to another tenant. Written by a database trigger; the app never changes or deletes one |
