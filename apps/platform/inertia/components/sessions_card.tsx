@@ -1,7 +1,15 @@
 import { Form } from "@adonisjs/inertia/react";
 import { router } from "@inertiajs/react";
-import { useEffect, useId, useRef, useState } from "react";
+import { type RefObject, useEffect, useId, useRef, useState } from "react";
 import { urlFor } from "~/client";
+import {
+	FormSheetActions,
+	FormSheetPanel,
+	type FormSheetState,
+	FormSheetTrigger,
+	focusFirstInvalid,
+} from "~/components/form_sheet";
+import { cardId } from "~/components/project_page";
 import {
 	type ProjectPageProps,
 	SESSION_KIND_LABELS,
@@ -42,33 +50,33 @@ type Dates = { today: string; max: string };
  * moves to the card's heading, so a screen reader lands on the updated list.
  */
 export default function SessionsCard({
-	projectId,
 	sessions,
 	dates,
 	scheduling,
+	schedule,
+	anchor,
+	showSchedule,
 }: {
-	projectId: string;
 	sessions: SessionRow[];
 	dates: Dates;
 	scheduling: ProjectPageProps["scheduling"];
+	/** The page's schedule sheet: this card only draws its trigger. */
+	schedule: FormSheetState;
+	/** The id the Next step card carries (`nextStep.anchor`): when it is `sessions`, the card gives its own up. */
+	anchor: string | null;
+	/** False when the Next step card already offers "Schedule a session". */
+	showSchedule: boolean;
 }) {
 	const heading = useRef<HTMLHeadingElement>(null);
-	const scheduleButton = useRef<HTMLButtonElement>(null);
 	const [open, setOpen] = useState<Open>(null);
-	const [scheduleOpen, setScheduleOpen] = useState(false);
 	const done = () => {
 		setOpen(null);
-		setScheduleOpen(false);
 		heading.current?.focus();
-	};
-	const closeSchedule = () => {
-		setScheduleOpen(false);
-		scheduleButton.current?.focus();
 	};
 
 	return (
 		<Card
-			id="sessions"
+			id={cardId("sessions", anchor)}
 			className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)] lg:scroll-mt-0"
 		>
 			<CardHeader>
@@ -89,42 +97,16 @@ export default function SessionsCard({
 								session={session}
 								dates={dates}
 								open={open?.sessionId === session.id ? open.action : null}
-								onOpen={(action) => {
-									setScheduleOpen(false);
-									setOpen({ sessionId: session.id, action });
-								}}
+								onOpen={(action) => setOpen({ sessionId: session.id, action })}
 								onClose={() => setOpen(null)}
 								onDone={done}
 							/>
 						))}
 					</ul>
 				)}
-				{scheduling && (
-					<div className="flex flex-col gap-3 text-sm">
-						<div>
-							<Button
-								ref={scheduleButton}
-								type="button"
-								variant="outline"
-								className="h-11"
-								aria-expanded={scheduleOpen}
-								onClick={() => {
-									setOpen(null);
-									setScheduleOpen(true);
-								}}
-							>
-								Schedule a session
-							</Button>
-						</div>
-						{scheduleOpen && (
-							<ScheduleForm
-								projectId={projectId}
-								scheduling={scheduling}
-								dates={dates}
-								onCancel={closeSchedule}
-								onDone={done}
-							/>
-						)}
+				{scheduling && showSchedule && (
+					<div>
+						<FormSheetTrigger sheet={schedule} label="Schedule a session" />
 					</div>
 				)}
 			</CardContent>
@@ -292,17 +274,6 @@ function OutcomePanel({
 }
 
 /**
- * After a refused save: the submit button was disabled while saving, which
- * drops keyboard focus to the page (and Escape stops working), so focus goes
- * to the first field that needs fixing.
- */
-function focusFirstInvalid(fieldset: HTMLFieldSetElement | null) {
-	setTimeout(() => {
-		fieldset?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
-	}, 0);
-}
-
-/**
  * The new time: the booking form's three fields, prefilled with the
  * session's own. Focus starts on Date; Escape closes the form. After a
  * refused save it stays open with what was typed and the errors under
@@ -439,31 +410,60 @@ function MoveForm({
 }
 
 /**
- * A new session on the project (TAT-85 part 2): kind, artist (fixed for an
- * artist member), date, start and length, with the server's hint about
- * what a tattoo session does to the project. Focus starts on Kind; Escape
- * closes the form. After a refused save it stays open with what was typed.
+ * "Schedule a session" (TAT-85 part 2): the form in a sheet, with the server's hint about what a
+ * tattoo session does to the project as its description. Kind, artist (fixed for an artist
+ * member), date, start and length. After a refused save the sheet stays open with what was
+ * typed and the errors under their fields. Mounted once by the page whichever card draws the
+ * trigger (the Next step card, or the Sessions card).
  */
+export function SchedulePanel({
+	sheet,
+	projectId,
+	scheduling,
+	dates,
+	fallback,
+}: {
+	sheet: FormSheetState;
+	projectId: string;
+	scheduling: ProjectPageProps["scheduling"];
+	dates: Dates;
+	fallback: RefObject<HTMLElement | null>;
+}) {
+	return (
+		<FormSheetPanel
+			sheet={sheet}
+			title="Schedule a session"
+			description={
+				scheduling?.hint ?? "Pick the kind, the artist and the time."
+			}
+			fallback={fallback}
+			available={scheduling !== null}
+		>
+			{scheduling && (
+				<ScheduleForm
+					projectId={projectId}
+					scheduling={scheduling}
+					dates={dates}
+					sheet={sheet}
+				/>
+			)}
+		</FormSheetPanel>
+	);
+}
+
 function ScheduleForm({
 	projectId,
 	scheduling,
 	dates,
-	onCancel,
-	onDone,
+	sheet,
 }: {
 	projectId: string;
 	scheduling: NonNullable<ProjectPageProps["scheduling"]>;
 	dates: Dates;
-	onCancel: () => void;
-	onDone: () => void;
+	sheet: FormSheetState;
 }) {
 	const tenant = useTenant();
 	const id = useId();
-	const kind = useRef<HTMLSelectElement>(null);
-	const fieldset = useRef<HTMLFieldSetElement>(null);
-	useEffect(() => {
-		kind.current?.focus();
-	}, []);
 	const field = (name: string) => `${id}-${name}`;
 	const fixed = scheduling.artistFixed ? scheduling.artists[0] : undefined;
 	const select =
@@ -474,23 +474,17 @@ function ScheduleForm({
 			route="tenant.projects.sessions.store"
 			routeParams={{ tenant: tenant.slug, id: projectId }}
 			options={{ preserveScroll: true }}
-			onSuccess={onDone}
-			onError={() => focusFirstInvalid(fieldset.current)}
+			onStart={sheet.onStart}
+			onSuccess={sheet.onSuccess}
+			onError={sheet.onError}
+			onFinish={sheet.onFinish}
 		>
 			{({ errors, processing }) => (
-				<fieldset
-					ref={fieldset}
-					className="min-w-0 rounded-md bg-muted/50 p-3"
-					onKeyDown={(event) => {
-						if (event.key === "Escape") onCancel();
-					}}
-				>
-					<legend className="sr-only">Schedule a session</legend>
+				<div className="flex flex-col gap-4">
 					<div className="grid gap-4 sm:grid-cols-2">
 						<Field data-invalid={!!errors.sessionKind}>
 							<FieldLabel htmlFor={field("kind")}>Kind</FieldLabel>
 							<select
-								ref={kind}
 								id={field("kind")}
 								name="sessionKind"
 								defaultValue={
@@ -555,7 +549,7 @@ function ScheduleForm({
 							</Field>
 						)}
 					</div>
-					<div className="mt-4 grid gap-4 sm:grid-cols-3">
+					<div className="grid gap-4 sm:grid-cols-3">
 						<Field data-invalid={!!errors.date}>
 							<FieldLabel htmlFor={field("date")}>Date</FieldLabel>
 							<Input
@@ -621,24 +615,8 @@ function ScheduleForm({
 							)}
 						</Field>
 					</div>
-					{scheduling.hint && (
-						<p className="mt-4 text-muted-foreground">{scheduling.hint}</p>
-					)}
-					<div className="mt-4 flex flex-wrap gap-2">
-						<Button type="submit" className="h-11" disabled={processing}>
-							{processing ? "Saving…" : "Schedule session"}
-						</Button>
-						<Button
-							type="button"
-							variant="ghost"
-							className="h-11"
-							disabled={processing}
-							onClick={onCancel}
-						>
-							Close
-						</Button>
-					</div>
-				</fieldset>
+					<FormSheetActions submit="Schedule session" processing={processing} />
+				</div>
 			)}
 		</Form>
 	);

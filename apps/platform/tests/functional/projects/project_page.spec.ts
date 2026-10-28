@@ -1,12 +1,21 @@
 import testUtils from "@adonisjs/core/services/test_utils";
+import type { ApiClient } from "@japa/api-client";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
+import type User from "#models/user";
 import { chatLinks } from "#modules/clients/contact_links";
 import { expiresAtFor, todayIn } from "#modules/projects/quotes";
-import { sessionTimeText } from "#modules/scheduling/times";
+import { sessionStartText, sessionTimeText } from "#modules/scheduling/times";
+import {
+	artistMoneyFixture,
+	figuresOf,
+	newFigures,
+} from "#tests/helpers/artist_money";
+import { proofFor } from "#tests/helpers/payments";
 import {
 	makeArtist,
 	makeClient,
+	makeDepositLink,
 	makeInquiry,
 	makePayment,
 	makeProject,
@@ -14,6 +23,7 @@ import {
 	makeReferenceImage,
 	makeSession,
 } from "#tests/helpers/pipeline";
+import { recordQueries } from "#tests/helpers/query_count";
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
 const KTM = "Asia/Kathmandu";
@@ -63,6 +73,7 @@ test.group("Project page", (group) => {
 			id: project.id,
 			status: "quoted",
 			brief: "A small fine-line moth on the forearm",
+			piece: "A small fine-line moth on the forearm",
 			clientName: "Sita Rai",
 			artistName: null,
 		});
@@ -333,7 +344,8 @@ test.group("Project page: lifecycle props", (group) => {
 
 		assert.deepEqual(props.moves, ["hold", "withdraw"]);
 		assert.equal(props.scheduledSessionCount, 1);
-		assert.isFalse(props.bookedWithoutSession);
+		// The Next step card says what the "booked without a session" banner did (TAT-108).
+		assert.notProperty(props, "bookedWithoutSession");
 		assert.equal(props.notes, "Prefers mornings.");
 		assert.equal(props.contactedText, "contacted yesterday");
 		assert.equal(props.assignment.artistId, asha.id);
@@ -341,7 +353,7 @@ test.group("Project page: lifecycle props", (group) => {
 		assert.deepInclude(props.assignment.choices, { id: asha.id, name: "Sita" });
 	});
 
-	test("a booked project without a tattoo session carries the warning", async ({
+	test("a booked project without a tattoo session has it as its next step", async ({
 		client,
 		assert,
 	}) => {
@@ -354,7 +366,7 @@ test.group("Project page: lifecycle props", (group) => {
 			await client.get(page(project.id)).withInertia().loginAs(owner)
 		).inertiaProps;
 
-		assert.isTrue(props.bookedWithoutSession);
+		assert.equal(props.nextStep.kind, "book_session");
 		// A client can still withdraw from a booked project (TAT-66).
 		assert.deepEqual(props.moves, ["withdraw"]);
 		assert.equal(props.contactedText, "never contacted");
@@ -981,3 +993,664 @@ test.group("Project page: Message the client (TAT-52)", (group) => {
 		assert.isNull(props.messageKind);
 	});
 });
+
+type Step = {
+	kind: string;
+	title: string;
+	text: string | null;
+	primary: string | null;
+	secondary: string[];
+	anchor: string | null;
+	needsYou: boolean;
+};
+
+test.group("Project page: the Next step (TAT-108)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	const stepFor = async (
+		client: ApiClient,
+		user: User,
+		projectId: string,
+	): Promise<Step> => {
+		const response = await client
+			.get(page(projectId))
+			.withInertia()
+			.loginAs(user);
+		response.assertStatus(200);
+		return response.inertiaProps.nextStep;
+	};
+
+	/** A studio with its owner and an artist member linked to the profile `asha`. */
+	async function studioWithArtist() {
+		const { owner, tenant } = await studioWithOwner();
+		const asha = await artistIn(tenant, "asha@example.com");
+		const profile = await inTenant(tenant, async () => {
+			const profile = await makeArtist(tenant, "asha");
+			profile.userId = asha.id;
+			await profile.save();
+			return profile;
+		});
+		return { owner, asha, tenant, profile };
+	}
+
+	test("a project under review needs a price from both roles", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, asha, tenant, profile } = await studioWithArtist();
+		const project = await inTenant(tenant, async () =>
+			makeProject(tenant, await makeClient(tenant, { name: "सीता थापा" }), {
+				status: "reviewing",
+				artistId: profile.id,
+			}),
+		);
+
+		for (const user of [owner, asha]) {
+			const step = await stepFor(client, user, project.id);
+			assert.equal(step.kind, "send_price");
+			assert.equal(step.title, "Send सीता a price");
+			assert.equal(step.anchor, "quote-form");
+			assert.equal(step.primary, "issue_quote");
+			assert.isTrue(step.needsYou);
+		}
+	});
+
+	test("a quoted project waits for the answer; Send is offered only with a phone", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const { withPhone, withoutPhone } = await inTenant(tenant, async () => {
+			const make = async (over = {}) => {
+				const project = await makeProject(
+					tenant,
+					await makeClient(tenant, over),
+					{ status: "quoted" },
+				);
+				await makeQuote(tenant, project);
+				return project;
+			};
+			return {
+				withPhone: await make(),
+				withoutPhone: await make({ phone: null, anonymizedAt: DateTime.utc() }),
+			};
+		});
+
+		const sent = await stepFor(client, owner, withPhone.id);
+		assert.equal(sent.kind, "await_answer");
+		assert.equal(sent.primary, "client_accepted");
+		assert.sameMembers(sent.secondary, ["send_quote", "revise_quote"]);
+		assert.isFalse(sent.needsYou);
+		assert.equal(sent.anchor, "quote");
+
+		const noPhone = await stepFor(client, owner, withoutPhone.id);
+		assert.equal(noPhone.primary, "client_accepted");
+		assert.deepEqual(noPhone.secondary, ["revise_quote"]);
+	});
+
+	test("a price that ends in two days is a reminder for the studio", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const project = await inTenant(tenant, async () => {
+			const project = await makeProject(tenant, await makeClient(tenant), {
+				status: "quoted",
+			});
+			await makeQuote(tenant, project, {
+				expiresAt: expiresAtFor(dayFromNow(2), KTM),
+			});
+			return project;
+		});
+
+		const step = await stepFor(client, owner, project.id);
+		assert.equal(step.kind, "price_ending");
+		assert.isTrue(step.needsYou);
+		assert.equal(step.primary, "send_quote");
+		assert.equal(step.anchor, "quote");
+	});
+
+	test("an on-hold project is resumed from the card", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const project = await inTenant(tenant, async () => {
+			const project = await makeProject(tenant, await makeClient(tenant), {
+				status: "on_hold",
+			});
+			await makeQuote(tenant, project);
+			return project;
+		});
+
+		const step = await stepFor(client, owner, project.id);
+		assert.equal(step.kind, "on_hold");
+		assert.equal(step.primary, "resume");
+		assert.isNull(step.anchor);
+	});
+
+	test("a project waiting for its deposit: the link first, then the chase; an artist only waits", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, asha, tenant, profile } = await studioWithArtist();
+		const make = async (age: number | null) =>
+			inTenant(tenant, async () => {
+				const project = await makeProject(tenant, await makeClient(tenant), {
+					status: "deposit_pending",
+					artistId: profile.id,
+				});
+				await makeQuote(tenant, project);
+				if (age !== null) {
+					await makeDepositLink(tenant, project, {
+						updatedAt: DateTime.utc().minus({ days: age }),
+					});
+				}
+				return project;
+			});
+		const none = await make(null);
+		const young = await make(1);
+		const old = await make(4);
+
+		const noLink = await stepFor(client, owner, none.id);
+		assert.equal(noLink.kind, "make_link");
+		assert.equal(noLink.anchor, "deposit");
+		assert.equal(noLink.primary, "deposit_link");
+		assert.equal((await stepFor(client, owner, young.id)).kind, "link_sent");
+		const chase = await stepFor(client, owner, old.id);
+		assert.equal(chase.kind, "chase_deposit");
+		assert.equal(chase.title, "Remind Client about the deposit");
+
+		// An artist learns that the deposit is awaited, nothing about links or money.
+		for (const project of [none, young, old]) {
+			const step = await stepFor(client, asha, project.id);
+			assert.deepEqual(step, {
+				kind: "await_deposit",
+				title: "Waiting for the deposit",
+				text: "An owner records it when it is paid.",
+				primary: null,
+				secondary: [],
+				anchor: null,
+				needsYou: false,
+			});
+		}
+	});
+
+	test("a waiting screenshot is the owner's card, on a withdrawn project too; an artist never sees it", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, asha, tenant, profile } = await studioWithArtist();
+		const { open, withdrawn } = await inTenant(tenant, async () => {
+			const make = async (status: "deposit_pending" | "cancelled") => {
+				const project = await makeProject(tenant, await makeClient(tenant), {
+					status,
+					artistId: profile.id,
+				});
+				await makeQuote(tenant, project);
+				await proofFor(tenant, project);
+				return project;
+			};
+			return {
+				open: await make("deposit_pending"),
+				withdrawn: await make("cancelled"),
+			};
+		});
+
+		const step = await stepFor(client, owner, open.id);
+		assert.equal(step.kind, "check_proof");
+		assert.equal(step.anchor, "payments");
+		assert.equal(step.primary, "verify_proof");
+		assert.isTrue(step.needsYou);
+		const cancelled = await stepFor(client, owner, withdrawn.id);
+		assert.equal(cancelled.kind, "check_proof");
+		assert.match(
+			cancelled.text ?? "",
+			/^The client withdrew while this screenshot/,
+		);
+
+		const forArtist = await stepFor(client, asha, open.id);
+		assert.equal(forArtist.kind, "await_deposit");
+		assert.isNull(forArtist.primary);
+	});
+
+	test("a closed project holding a deposit asks for its outcome; an artist sees it closed", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, asha, tenant, profile } = await studioWithArtist();
+		const project = await inTenant(tenant, async () => {
+			const project = await makeProject(tenant, await makeClient(tenant), {
+				status: "cancelled",
+				artistId: profile.id,
+			});
+			await makeQuote(tenant, project);
+			await makePayment(tenant, project, {
+				status: "verified",
+				verifiedAt: DateTime.utc(),
+				verifiedByUserId: owner.id,
+			});
+			return project;
+		});
+
+		const step = await stepFor(client, owner, project.id);
+		assert.equal(step.kind, "record_outcome");
+		assert.equal(step.primary, "record_outcome");
+		assert.equal(step.anchor, "payments");
+		const forArtist = await stepFor(client, asha, project.id);
+		assert.equal(forArtist.kind, "closed");
+		assert.equal(forArtist.title, "Cancelled");
+		assert.isNull(forArtist.primary);
+	});
+
+	test("a booked project: no tattoo session is booked first, then the next one is named", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, asha, tenant, profile } = await studioWithArtist();
+		const start = DateTime.now().plus({ days: 1 }).startOf("hour");
+		const { bare, scheduled } = await inTenant(tenant, async () => {
+			const make = async () =>
+				makeProject(tenant, await makeClient(tenant), {
+					status: "booked",
+					artistId: profile.id,
+				});
+			const scheduled = await make();
+			await makeSession(tenant, scheduled, profile, {
+				startsAt: start,
+				endsAt: start.plus({ hours: 2 }),
+			});
+			return { bare: await make(), scheduled };
+		});
+
+		for (const user of [owner, asha]) {
+			const step = await stepFor(client, user, bare.id);
+			assert.equal(step.kind, "book_session");
+			assert.equal(step.anchor, "sessions");
+			assert.equal(step.primary, "schedule");
+			assert.isTrue(step.needsYou);
+			const next = await stepFor(client, user, scheduled.id);
+			assert.equal(next.kind, "next_session");
+			assert.equal(
+				next.title,
+				`Next session: ${sessionStartText(start, KTM, DateTime.now())}`,
+			);
+			assert.equal(next.text, "With Sita.");
+			assert.isFalse(next.needsYou);
+		}
+	});
+
+	test("a session that has started is recorded under Sessions; an artist is not asked about another artist's", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, asha, tenant, profile } = await studioWithArtist();
+		const now = DateTime.now().startOf("minute");
+		const { own, others } = await inTenant(tenant, async () => {
+			const anu = await makeArtist(tenant, "anu");
+			const make = async (by: typeof profile) => {
+				const project = await makeProject(tenant, await makeClient(tenant), {
+					status: "booked",
+					artistId: profile.id,
+				});
+				await makeSession(tenant, project, by, {
+					startsAt: now.minus({ hours: 1 }),
+					endsAt: now.plus({ hours: 1 }),
+				});
+				return project;
+			};
+			return { own: await make(profile), others: await make(anu) };
+		});
+
+		const step = await stepFor(client, owner, own.id);
+		assert.equal(step.kind, "record_session");
+		assert.equal(step.primary, "open_sessions");
+		assert.isNull(step.anchor);
+		assert.include(step.text ?? "", "with Sita has started");
+		assert.equal((await stepFor(client, asha, own.id)).kind, "record_session");
+		assert.equal(
+			(await stepFor(client, owner, others.id)).kind,
+			"record_session",
+		);
+		// Not theirs to record: nothing for them to do here.
+		assert.equal((await stepFor(client, asha, others.id)).kind, "nothing");
+	});
+
+	test("in progress: the owner finishes, the artist schedules the next session", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, asha, tenant, profile } = await studioWithArtist();
+		const project = await inTenant(tenant, async () =>
+			makeProject(tenant, await makeClient(tenant), {
+				status: "in_progress",
+				artistId: profile.id,
+			}),
+		);
+
+		const mine = await stepFor(client, owner, project.id);
+		assert.equal(mine.kind, "finish");
+		assert.equal(mine.primary, "finish");
+		const theirs = await stepFor(client, asha, project.id);
+		assert.equal(theirs.kind, "more_sessions");
+		assert.equal(theirs.primary, "schedule");
+	});
+
+	test("a healing check offers the balance only with a fixed price still owed", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, asha, tenant, profile } = await studioWithArtist();
+		const { priced, priceless } = await inTenant(tenant, async () => {
+			const make = async (quoted: boolean) => {
+				const project = await makeProject(tenant, await makeClient(tenant), {
+					status: "healing_check",
+					artistId: profile.id,
+				});
+				if (quoted) await makeQuote(tenant, project);
+				return project;
+			};
+			return { priced: await make(true), priceless: await make(false) };
+		});
+
+		const owing = await stepFor(client, owner, priced.id);
+		assert.equal(owing.kind, "healing_check");
+		assert.equal(owing.primary, "finish");
+		assert.include(owing.secondary, "record_payment");
+		const none = await stepFor(client, owner, priceless.id);
+		assert.equal(none.kind, "healing_check");
+		assert.notInclude(none.secondary, "record_payment");
+		// The assigned artist sees the check, and no money.
+		const forArtist = await stepFor(client, asha, priced.id);
+		assert.equal(forArtist.kind, "healing_check");
+		assert.notInclude(forArtist.secondary, "record_payment");
+	});
+
+	test("a completed project: the balance owed is the card; paid in full is closed; an artist sees closed", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, asha, tenant, profile } = await studioWithArtist();
+		const verified = (amount: number) => ({
+			amount,
+			status: "verified" as const,
+			verifiedAt: DateTime.utc(),
+			verifiedByUserId: owner.id,
+		});
+		const { owing, paid } = await inTenant(tenant, async () => {
+			const make = async (paidAmount: number) => {
+				const project = await makeProject(tenant, await makeClient(tenant), {
+					status: "completed",
+					artistId: profile.id,
+				});
+				await makeQuote(tenant, project);
+				await makePayment(tenant, project, verified(paidAmount));
+				return project;
+			};
+			return { owing: await make(300_000), paid: await make(1_500_000) };
+		});
+
+		const step = await stepFor(client, owner, owing.id);
+		assert.equal(step.kind, "collect_balance");
+		assert.equal(step.title, "NPR 12,000 still due");
+		assert.equal(step.anchor, "payments");
+		assert.equal(step.primary, "record_payment");
+		const done = await stepFor(client, owner, paid.id);
+		assert.equal(done.kind, "closed");
+		assert.equal(done.title, "Completed");
+		const forArtist = await stepFor(client, asha, owing.id);
+		assert.equal(forArtist.kind, "closed");
+		assert.isNull(forArtist.primary);
+	});
+
+	test("a declined project is closed", async ({ client, assert }) => {
+		const { owner, tenant } = await studioWithOwner();
+		const project = await inTenant(tenant, async () =>
+			makeProject(tenant, await makeClient(tenant), { status: "declined" }),
+		);
+
+		const step = await stepFor(client, owner, project.id);
+		assert.equal(step.kind, "closed");
+		assert.equal(step.title, "Declined");
+		assert.isNull(step.primary);
+	});
+
+	test("an expired quote the sweep will cancel says the price has ended", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const project = await inTenant(tenant, async () => {
+			const project = await makeProject(tenant, await makeClient(tenant), {
+				status: "quoted",
+			});
+			await makeQuote(tenant, project, {
+				expiresAt: DateTime.utc().minus({ hours: 1 }),
+			});
+			return project;
+		});
+
+		const step = await stepFor(client, owner, project.id);
+		assert.equal(step.kind, "price_ended");
+		assert.equal(step.primary, "revise_quote");
+		assert.isFalse(step.needsYou);
+	});
+});
+
+test.group("Project page: queries (TAT-108)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("the page costs the same number of queries with one and with three of everything", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const asha = await artistIn(tenant, "asha@example.com");
+		const { profile, forOwner, forArtist } = await inTenant(
+			tenant,
+			async () => {
+				const profile = await makeArtist(tenant, "asha");
+				profile.userId = asha.id;
+				await profile.save();
+				const make = async (status: "deposit_pending" | "booked") => {
+					const customer = await makeClient(tenant);
+					const inquiry = await makeInquiry(tenant, customer, {
+						status: "accepted",
+						decidedAt: DateTime.utc(),
+					});
+					return makeProject(tenant, customer, {
+						status,
+						inquiryId: inquiry.id,
+						artistId: profile.id,
+					});
+				};
+				return {
+					profile,
+					forOwner: await make("deposit_pending"),
+					forArtist: await make("booked"),
+				};
+			},
+		);
+
+		/** Adds the `at`th session, payment, reference and quote version to both projects. */
+		const grow = (at: number) =>
+			inTenant(tenant, async () => {
+				for (const project of [forOwner, forArtist]) {
+					const day = DateTime.utc(
+						2026,
+						11,
+						2 + at * 2 + (project === forOwner ? 0 : 1),
+						10,
+					);
+					await makeSession(tenant, project, profile, {
+						startsAt: day,
+						endsAt: day.plus({ hours: 2 }),
+					});
+					await makeQuote(tenant, project, { version: at });
+					await makeReferenceImage(tenant, {
+						inquiryId: project.inquiryId ?? undefined,
+						projectId: project.id,
+						position: at,
+					});
+				}
+				await proofFor(tenant, forOwner);
+				await makePayment(tenant, forArtist, {
+					status: "verified",
+					verifiedAt: DateTime.utc(),
+					verifiedByUserId: owner.id,
+				});
+			});
+		const count = async (user: User, projectId: string) => {
+			const { result, queries } = await recordQueries(() =>
+				client.get(page(projectId)).withInertia().loginAs(user),
+			);
+			result.assertStatus(200);
+			return queries.length;
+		};
+		const views: [string, User, string][] = [
+			["owner", owner, forOwner.id],
+			["artist", asha, forArtist.id],
+		];
+
+		await grow(1);
+		const few = new Map<string, number>();
+		for (const [who, user, id] of views) {
+			await count(user, id); // warm up
+			few.set(who, await count(user, id));
+		}
+		await grow(2);
+		await grow(3);
+		for (const [who, user, id] of views) {
+			assert.equal(await count(user, id), few.get(who), who);
+		}
+	});
+});
+
+/**
+ * Every money figure main (9ac7621) sent the assigned artist for `artistMoneyFixture()`: captured by
+ * running the same fixture against main's project page (the "dump" spec in the report). docs/
+ * requirements.md:87 gives an artist their projects' payments and balance, read-only (TAT-30), and
+ * nothing more.
+ */
+const MAIN_ARTIST_FIGURES = [
+	0, 1, 2, 4.5, 123, 555, 666, 777.3, 911.5, 1234.56, 2011.86, 2088.5, 2334,
+	2500, 2877, 3000, 10623, 12500, 12988.14, 13500, 14088.5, 15000,
+];
+
+test.group(
+	"Project page: what an artist is sent is what main sent them (TAT-108 fix round 2)",
+	(group) => {
+		group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+		test("the comparator names a figure the artist was never sent", ({
+			assert,
+		}) => {
+			assert.deepEqual(
+				figuresOf({ a: "Paid NPR 1,234.56 of NPR 15,000", b: 77.5 }),
+				[77.5, 1234.56, 15000],
+			);
+			assert.deepEqual(
+				newFigures({ line: "Paid NPR 999" }, MAIN_ARTIST_FIGURES),
+				[999],
+			);
+			assert.deepEqual(
+				newFigures({ line: "Paid NPR 2,011.86" }, MAIN_ARTIST_FIGURES),
+				[],
+			);
+		});
+
+		test("an artist's payload holds exactly the money figures main's did: nothing new, nothing lost", async ({
+			client,
+			assert,
+		}) => {
+			const { asha, projects } = await artistMoneyFixture();
+			const seen = new Set<number>();
+			for (const [name, project] of Object.entries(projects)) {
+				const response = await client
+					.get(page(project.id))
+					.withInertia()
+					.loginAs(asha);
+				response.assertStatus(200);
+				// Anything the branch adds (the summary line, the header, the Next step's words) may only
+				// repeat a figure the artist already had.
+				assert.deepEqual(
+					newFigures(response.inertiaProps, MAIN_ARTIST_FIGURES),
+					[],
+					name,
+				);
+				for (const figure of figuresOf(response.inertiaProps)) seen.add(figure);
+			}
+			assert.deepEqual(
+				[...seen].sort((a, b) => a - b),
+				MAIN_ARTIST_FIGURES,
+			);
+		});
+
+		test("the artist's money is read-only: no screenshot, no deposit link, no control", async ({
+			client,
+			assert,
+		}) => {
+			const { asha, projects } = await artistMoneyFixture();
+			for (const [name, project] of Object.entries(projects)) {
+				const props = (
+					await client.get(page(project.id)).withInertia().loginAs(asha)
+				).inertiaProps;
+				const card = props.payments;
+				assert.isNotNull(card, `${name}: the artist has the card`);
+				assert.deepEqual(card.pending, [], `${name}: no screenshot to check`);
+				assert.isNull(card.actions, `${name}: no payment or refund form`);
+				assert.isNull(card.outcome.needed, `${name}: no outcome form`);
+				for (const row of card.rows) {
+					assert.isNull(row.proofUrl, `${name}: no screenshot link`);
+					assert.isFalse(row.canReverse, `${name}: no Reverse`);
+				}
+				assert.isNull(props.deposit, `${name}: no deposit link or panel`);
+				assert.isNull(
+					props.finish?.action ?? null,
+					`${name}: no finish action`,
+				);
+				assert.notInclude(
+					JSON.stringify(props),
+					"signature=",
+					`${name}: no signed URL`,
+				);
+			}
+		});
+
+		test("the summary line and the ledger are the artist's too, the same as the owner's", async ({
+			client,
+			assert,
+		}) => {
+			const { owner, asha, projects } = await artistMoneyFixture();
+			const read = async (user: User) =>
+				(await client.get(page(projects.booked.id)).withInertia().loginAs(user))
+					.inertiaProps.payments;
+
+			const mine = await read(asha);
+			const theirs = await read(owner);
+			assert.equal(
+				mine.summary,
+				"Paid NPR 2,011.86 of NPR 15,000 · Balance NPR 12,988.14",
+			);
+			assert.equal(mine.summary, theirs.summary);
+			assert.deepEqual(mine.balance, theirs.balance);
+			assert.lengthOf(mine.rows, 2);
+		});
+
+		test("the schedule hint and the withdraw confirm name the deposit, as main's did", async ({
+			client,
+			assert,
+		}) => {
+			const { asha, projects } = await artistMoneyFixture();
+			const props = (
+				await client.get(page(projects.waiting.id)).withInertia().loginAs(asha)
+			).inertiaProps;
+
+			assert.equal(
+				props.scheduling.hint,
+				"A tattoo session holds the date. The project is booked once the deposit is paid: NPR 2,088.50 still due.",
+			);
+			assert.equal(props.depositHeldText, "NPR 911.50");
+		});
+	},
+);

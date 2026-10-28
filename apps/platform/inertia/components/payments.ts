@@ -39,6 +39,8 @@ export type BalanceState =
 	| "closed"
 	| "over_refunded";
 export type PaymentsCardProps = {
+	/** The money in one line (TAT-108): "Paid NPR 5,000 of NPR 20,000 · Balance NPR 15,000". */
+	summary: string;
 	balance: {
 		totalText: string | null;
 		/** Hourly: "estimated: 5 h at NPR 3,000/hour". */

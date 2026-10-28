@@ -66,14 +66,50 @@ export type FinishProps = {
 	} | null;
 };
 
+/** What the Next step card can hold (the server's NEXT_STEP_ACTIONS, TAT-108). */
+export type NextStepAction =
+	| "verify_proof"
+	| "issue_quote"
+	| "send_quote"
+	| "client_accepted"
+	| "revise_quote"
+	| "resume"
+	| "deposit_link"
+	| "record_payment"
+	| "schedule"
+	| "open_sessions"
+	| "finish"
+	| "record_outcome";
+
+/**
+ * The project page's Next step card (TAT-108), chosen on the server by the rules Today and the
+ * Projects list use: its words, the actions it holds (names, drawn by `NextStepCard`) and the
+ * id Today's and the list's links land on.
+ */
+export type NextStepProps = {
+	kind: string;
+	title: string;
+	text: string | null;
+	/** The one main action, or null when there is nothing to do here. */
+	primary: NextStepAction | null;
+	secondary: NextStepAction[];
+	/** The element id the card carries (`payments`, `quote`, `quote-form`, `deposit`, `sessions`); null for none. */
+	anchor: string | null;
+	/** It waits on the studio: the marigold dot. */
+	needsYou: boolean;
+};
+
 export type ProjectPageProps = {
 	project: {
 		id: string;
 		status: string;
 		brief: string;
+		/** The start of the brief, as the Projects list names the piece. */
+		piece: string;
 		clientName: string | null;
 		artistName: string | null;
 	};
+	nextStep: NextStepProps;
 	/** The current quote (the highest version), or null. */
 	quote: QuoteProps | null;
 	/** Earlier versions, newest first. */
@@ -102,8 +138,6 @@ export type ProjectPageProps = {
 	depositHeldText: string | null;
 	/** How many sessions a withdrawal would cancel. */
 	scheduledSessionCount: number;
-	/** Booked, but no tattoo session is scheduled. */
-	bookedWithoutSession: boolean;
 	/** Finishing (TAT-111): in progress for owners, the healing check for owners and the assigned artist; null otherwise. */
 	finish: FinishProps | null;
 	/** Declined, cancelled or completed: no artist picker and no "Mark contacted". */
@@ -161,7 +195,6 @@ export type ProjectPageProps = {
 		} | null;
 		problem: string | null;
 		message: ChatMessageProps | null;
-		proofReceivedText: string | null;
 		/** Links open on this machine (the dev host), so no client can use them. */
 		devHost: boolean;
 	} | null;
@@ -233,6 +266,30 @@ const GROUPED = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 });
 /** Rupees for people, like the server's formatMoney: "NPR 1,50,000". */
 export function formatRupees(rupees: number): string {
 	return `NPR ${GROUPED.format(rupees)}`;
+}
+
+/** The money in a typed field as a number of rupees, or null when it is not a positive amount. */
+function typedRupees(typed: string): number | null {
+	const rupees = Number(typed.trim());
+	return typed.trim() !== "" && Number.isFinite(rupees) && rupees > 0
+		? rupees
+		: null;
+}
+
+/** A refund's submit button: it names the amount, which is the confirmation (TAT-108). */
+export function refundLabel(amount: string): string {
+	const rupees = typedRupees(amount);
+	return rupees === null
+		? "Record refund"
+		: `Record refund of ${formatRupees(rupees)}`;
+}
+
+/** Set price's submit button: it names the price, which can't be changed afterwards (TAT-108). */
+export function priceLabel(price: string): string {
+	const rupees = typedRupees(price);
+	return rupees === null
+		? "Set price"
+		: `Set the price to ${formatRupees(rupees)}`;
 }
 
 /**

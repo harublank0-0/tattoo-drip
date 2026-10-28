@@ -55,6 +55,11 @@ export type BalanceState =
 	| "over_refunded";
 
 export type PaymentsCardProps = {
+	/**
+	 * The money in one line (TAT-108): "Paid NPR 5,000 of NPR 20,000 · Balance NPR 15,000". The
+	 * Payments card's main line and, on a phone, a line under the page's name.
+	 */
+	summary: string;
 	balance: {
 		totalText: string | null;
 		totalNote: string | null;
@@ -216,8 +221,21 @@ export function paymentsCard({
 						? formatMoney(-due)
 						: null;
 
+	const paid = formatSignedMoney(balance.paid);
+	const total = balance.total === null ? "" : formatMoney(balance.total);
+	const summaries: Record<BalanceState, string> = {
+		due: `Paid ${paid} of ${total} · Balance ${amountText}${quote?.kind === "hourly" ? " (estimated)" : ""}`,
+		paid: `Paid in full: ${total}`,
+		overpaid: `Paid ${paid} of ${total} · Overpaid by ${amountText}`,
+		no_price:
+			balance.paid === 0n ? "No price yet" : `Paid ${paid} · No price yet`,
+		closed: balance.paid === 0n ? "Nothing paid" : `Holds ${amountText}`,
+		over_refunded: `Refunded ${amountText} more than it received`,
+	};
+
 	const refundable = !money.outcomeNeeded && balance.paid > 0n;
 	return {
+		summary: summaries[state],
 		balance: {
 			totalText: balance.total === null ? null : formatMoney(balance.total),
 			totalNote:

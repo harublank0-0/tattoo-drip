@@ -7,12 +7,15 @@ import type { ReactNode, Ref } from "react";
  * aligned to the right. Pass `hideTitle` to only set the document title.
  * Pass `titleRef` when the page moves focus to its heading after something
  * on it goes away (the heading then takes focus from code, not from Tab).
+ * `details` is anything under the description in the same column: the
+ * project page's status, artist and progress line (TAT-108).
  */
 export default function Page({
 	title,
 	titleRef,
 	hideTitle = false,
 	description,
+	details,
 	actions,
 	children,
 }: {
@@ -20,10 +23,11 @@ export default function Page({
 	titleRef?: Ref<HTMLHeadingElement>;
 	hideTitle?: boolean;
 	description?: ReactNode;
+	details?: ReactNode;
 	actions?: ReactNode;
 	children?: ReactNode;
 }) {
-	const hasHeader = !hideTitle || description || actions;
+	const hasHeader = !hideTitle || description || details || actions;
 
 	return (
 		<div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 pt-7 pb-12 sm:px-8 sm:pt-10 sm:pb-16">
@@ -43,6 +47,7 @@ export default function Page({
 						{description && (
 							<p className="text-sm text-muted-foreground">{description}</p>
 						)}
+						{details}
 					</div>
 					{actions && <div className="flex items-center gap-2">{actions}</div>}
 				</header>

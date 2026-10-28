@@ -265,6 +265,71 @@ test.group("paymentsCard", () => {
 		);
 	});
 
+	test("the summary is one line for every balance state (TAT-108)", ({
+		assert,
+	}) => {
+		const summary = (data: ProjectMoney, status: ProjectStatus = "booked") =>
+			card(data, status).summary;
+
+		assert.equal(
+			summary(money([payment()])),
+			"Paid NPR 3,000 of NPR 15,000 · Balance NPR 12,000",
+		);
+		assert.equal(
+			summary(money([])),
+			"Paid NPR 0 of NPR 15,000 · Balance NPR 15,000",
+		);
+		// An hourly quote's total is an estimate, and so is what is left.
+		const hourly = quote({
+			kind: "hourly",
+			fixedPrice: null,
+			hourlyRate: 300_000,
+			estimatedMinutes: 300,
+		});
+		assert.equal(
+			summary(money([payment()], hourly)),
+			"Paid NPR 3,000 of NPR 15,000 · Balance NPR 12,000 (estimated)",
+		);
+		assert.equal(
+			summary(money([payment({ amount: 1_500_000 })])),
+			"Paid in full: NPR 15,000",
+		);
+		assert.equal(
+			summary(money([payment({ amount: 1_550_000 })])),
+			"Paid NPR 15,500 of NPR 15,000 · Overpaid by NPR 500",
+		);
+		assert.equal(summary(money([], null)), "No price yet");
+		assert.equal(
+			summary(money([payment()], null)),
+			"Paid NPR 3,000 · No price yet",
+		);
+		// A declined or cancelled project holds what it received, or nothing.
+		assert.equal(
+			summary(money([payment()], quote(), "cancelled"), "cancelled"),
+			"Holds NPR 3,000",
+		);
+		assert.equal(
+			summary(money([], quote(), "declined"), "declined"),
+			"Nothing paid",
+		);
+		const refunded = (amount: number) =>
+			money(
+				[payment(), payment({ kind: "refund", amount: -amount })],
+				quote(),
+				"cancelled",
+			);
+		assert.equal(summary(refunded(300_000), "cancelled"), "Nothing paid");
+		assert.equal(
+			summary(refunded(450_000), "cancelled"),
+			"Refunded NPR 1,500 more than it received",
+		);
+		// The artist's card carries the same line: it holds no more than the balance.
+		assert.equal(
+			card(money([payment()]), "booked", false).summary,
+			"Paid NPR 3,000 of NPR 15,000 · Balance NPR 12,000",
+		);
+	});
+
 	test("the deposit line: received, covered, and lapsed after a reversal on a booked project", ({
 		assert,
 	}) => {

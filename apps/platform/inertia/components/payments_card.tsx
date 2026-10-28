@@ -1,6 +1,21 @@
 import { Form } from "@adonisjs/inertia/react";
-import { useEffect, useId, useRef, useState } from "react";
+import { cn } from "cn";
+import {
+	type ReactNode,
+	type RefObject,
+	useEffect,
+	useId,
+	useRef,
+	useState,
+} from "react";
 import { urlFor } from "~/client";
+import {
+	FormSheetActions,
+	FormSheetPanel,
+	type FormSheetState,
+	FormSheetTrigger,
+	type PageSheets,
+} from "~/components/form_sheet";
 import {
 	DESK_KIND_TEXT,
 	type DeskKindName,
@@ -14,7 +29,12 @@ import {
 	type PendingProofProps,
 	recordFormKey,
 } from "~/components/payments";
-import { formatRupees } from "~/components/projects";
+import {
+	type Affordance,
+	cardId,
+	type Placement,
+} from "~/components/project_page";
+import { type NextStepProps, refundLabel } from "~/components/projects";
 import { Badge } from "~/components/ui/badge";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -37,41 +57,77 @@ import { useTenant } from "~/hooks/use-tenant";
 type Actions = NonNullable<PaymentsCardProps["actions"]>;
 
 /**
- * The project's money (TAT-66): what happened to a closed project's
- * deposit, the balance, the screenshots to check, every payment, and the
- * owners' forms. After every successful submit focus moves to the card's
- * heading, so a screen reader lands on the updated card.
+ * The project's money (TAT-66, TAT-108): one line that says where it stands, what happened to a
+ * closed project's deposit, the screenshots to check, the payments behind "Show payments" and the
+ * owners' sheets for a payment and a refund. What the Next step card already holds (the
+ * screenshots, the outcome form, Record payment) is not drawn twice (`placementsOf`), and the card gives
+ * up the `payments` id when the Next step carries it (`cardId`). After every successful submit
+ * focus moves to the card's heading, so a screen reader lands on the updated card.
  */
 export default function PaymentsCard({
 	projectId,
 	payments,
 	canSetPrice,
+	place,
+	nextStep,
+	sheets,
 }: {
 	projectId: string;
 	payments: PaymentsCardProps;
 	canSetPrice: boolean;
+	/** Where `placementsOf` draws each control: the card draws the ones the Next step does not. */
+	place: Record<Affordance, Placement>;
+	nextStep: NextStepProps;
+	/** The page's sheets: this card only draws their triggers. */
+	sheets: Pick<PageSheets, "record" | "refund">;
 }) {
 	const heading = useRef<HTMLHeadingElement>(null);
+	const listId = useId();
+	const [showing, setShowing] = useState(false);
 	const done = () => heading.current?.focus();
-	const { balance, deposit, rows, pending, actions, outcome } = payments;
+	const { summary, balance, deposit, rows, pending, outcome } = payments;
+	const hint =
+		balance.state === "overpaid"
+			? "Record a refund if you give it back."
+			: balance.state === "no_price" && canSetPrice
+				? "Set it in the Quote card."
+				: balance.totalNote
+					? `The total is ${balance.totalNote}.`
+					: null;
 
 	return (
 		// scroll-mt: an alert opens the page at #payments (TAT-88); on a phone the
 		// sticky top bar would cover the card's title, and it grows when a long
 		// studio name wraps, so it publishes its height (TopBar).
 		<Card
-			id="payments"
+			id={cardId("payments", nextStep.anchor)}
 			className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)] lg:scroll-mt-0"
 		>
 			<CardHeader>
-				<CardTitle>
+				<CardTitle className="leading-snug">
 					<h2 ref={heading} tabIndex={-1} className="outline-none">
 						Payments
 					</h2>
 				</CardTitle>
 			</CardHeader>
-			<CardContent className="flex flex-col gap-6">
-				{outcome.needed && (
+			<CardContent className="flex flex-col gap-4">
+				<div className="flex flex-col gap-1 text-sm">
+					<p className="text-base font-semibold">{summary}</p>
+					{hint && <p className="text-muted-foreground">{hint}</p>}
+					{deposit &&
+						(deposit.lapsed ? (
+							<p className="mt-1 rounded-md border border-destructive/50 bg-destructive/10 p-3">
+								The deposit is no longer covered: {deposit.dueText} still due.
+							</p>
+						) : (
+							<p className="text-muted-foreground">
+								{deposit.covered
+									? `Deposit covered (${deposit.amountText})`
+									: `Deposit: ${deposit.receivedText} of ${deposit.amountText} received`}
+							</p>
+						))}
+				</div>
+				{outcome.needed && place.record_outcome === "card" && (
 					<OutcomeForm
 						projectId={projectId}
 						needed={outcome.needed}
@@ -91,12 +147,7 @@ export default function PaymentsCard({
 						)}
 					</div>
 				)}
-				<BalanceBlock
-					balance={balance}
-					deposit={deposit}
-					canSetPrice={canSetPrice}
-				/>
-				{pending.length > 0 && (
+				{pending.length > 0 && place.verify_proof === "card" && (
 					<section
 						aria-labelledby="proofs-heading"
 						className="flex flex-col gap-4"
@@ -109,70 +160,38 @@ export default function PaymentsCard({
 						))}
 					</section>
 				)}
-				<PaymentList rows={rows} onDone={done} />
-				{actions && actions.recordKinds.length > 0 && (
-					<RecordPaymentForm
-						key={recordFormKey(actions)}
-						projectId={projectId}
-						actions={actions}
-						onDone={done}
-					/>
+				{rows.length === 0 ? (
+					<p className="text-sm text-muted-foreground">No payments yet.</p>
+				) : (
+					<div className="flex flex-col gap-2">
+						<div>
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								className="-ml-3"
+								aria-expanded={showing}
+								aria-controls={listId}
+								onClick={() => setShowing((open) => !open)}
+							>
+								{showing ? "Hide payments" : `Show payments (${rows.length})`}
+							</Button>
+						</div>
+						<div id={listId} hidden={!showing}>
+							<PaymentList rows={rows} onDone={done} />
+						</div>
+					</div>
 				)}
-				{actions?.refundMax != null && actions.refundMaxText && (
-					<RefundForm
-						projectId={projectId}
-						maxText={actions.refundMaxText}
-						onDone={done}
-					/>
-				)}
+				<div className="flex flex-wrap gap-2">
+					{place.record_payment === "card" && (
+						<FormSheetTrigger sheet={sheets.record} label="Record payment" />
+					)}
+					{place.record_refund === "card" && (
+						<FormSheetTrigger sheet={sheets.refund} label="Record a refund" />
+					)}
+				</div>
 			</CardContent>
 		</Card>
-	);
-}
-
-function BalanceBlock({
-	balance,
-	deposit,
-	canSetPrice,
-}: Pick<PaymentsCardProps, "balance" | "deposit"> & { canSetPrice: boolean }) {
-	const line = {
-		due: `Balance due ${balance.amountText}`,
-		paid: "Paid in full",
-		overpaid: `Overpaid by ${balance.amountText}: record a refund if you give it back.`,
-		no_price: canSetPrice
-			? "No price yet. Set it in the Quote card."
-			: "No price yet.",
-		closed: `Holds ${balance.amountText}`,
-		over_refunded: `Refunded ${balance.amountText} more than it received.`,
-	}[balance.state];
-	const total = balance.totalText
-		? balance.totalNote
-			? `${balance.totalText}, ${balance.totalNote}`
-			: balance.totalText
-		: "Not set";
-
-	return (
-		<div className="flex flex-col gap-2 text-sm">
-			<dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-				<dt className="text-muted-foreground">Total</dt>
-				<dd className="min-w-0 break-words">{total}</dd>
-				<dt className="text-muted-foreground">Paid</dt>
-				<dd>{balance.paidText}</dd>
-			</dl>
-			<p className="text-base font-semibold">{line}</p>
-			{deposit &&
-				(deposit.lapsed ? (
-					<p className="rounded-md border border-destructive/50 bg-destructive/10 p-3">
-						The deposit is no longer covered: {deposit.dueText} still due.
-					</p>
-				) : (
-					<p className="text-muted-foreground">
-						{deposit.covered
-							? `Deposit covered (${deposit.amountText})`
-							: `Deposit: ${deposit.receivedText} of ${deposit.amountText} received`}
-					</p>
-				))}
-		</div>
 	);
 }
 
@@ -181,12 +200,15 @@ function BalanceBlock({
  * for and the reference code (side by side from 640 px, stacked below),
  * then Verify and Reject, each confirmed in an inline panel.
  */
-function PendingProof({
+export function PendingProof({
 	proof,
 	onDone,
+	compact = false,
 }: {
 	proof: PendingProofProps;
 	onDone: () => void;
+	/** In the Next step card the image is shorter, so Verify and Reject are on a phone's first screen. */
+	compact?: boolean;
 }) {
 	const tenant = useTenant();
 	const [open, setOpen] = useState<"verify" | "reject" | null>(null);
@@ -201,7 +223,13 @@ function PendingProof({
 
 	return (
 		<div className="flex flex-col gap-3 rounded-md border p-3">
-			<div className="flex flex-col gap-3 sm:grid sm:grid-cols-[minmax(0,20rem)_1fr] sm:gap-4">
+			<div
+				className={cn(
+					compact
+						? "grid grid-cols-[7.5rem_minmax(0,1fr)] gap-3 sm:grid-cols-[minmax(0,14rem)_1fr] sm:gap-4"
+						: "flex flex-col gap-3 sm:grid sm:grid-cols-[minmax(0,20rem)_1fr] sm:gap-4",
+				)}
+			>
 				{proof.imageUrl ? (
 					<a
 						href={proof.imageUrl}
@@ -214,24 +242,47 @@ function PendingProof({
 							alt={`Payment screenshot sent ${proof.sentText}`}
 							width={proof.width ?? undefined}
 							height={proof.height ?? undefined}
-							className="max-h-96 w-full rounded-md border object-contain"
+							className={cn(
+								"w-full rounded-md border object-contain",
+								compact ? "max-h-40 sm:max-h-48" : "max-h-96",
+							)}
 						/>
 						<span>Open full size</span>
 					</a>
 				) : (
 					<p className="text-sm text-muted-foreground">No screenshot.</p>
 				)}
-				<dl className="grid grid-cols-[auto_1fr] content-start gap-x-4 gap-y-2 text-sm">
-					<dt className="text-muted-foreground">Asked to pay</dt>
-					<dd className="text-lg font-semibold">{proof.expectedText}</dd>
-					<dt className="text-muted-foreground">Reference code</dt>
-					<dd className="font-mono text-lg tracking-widest">
-						{proof.referenceCode ?? "No deposit link"}
-					</dd>
-					<dt className="text-muted-foreground">Paid with</dt>
-					<dd>{METHOD_LABELS[proof.method]}</dd>
-					<dt className="text-muted-foreground">Sent</dt>
-					<dd>{proof.sentText}</dd>
+				<dl
+					className={cn(
+						"content-start text-sm",
+						compact
+							? "flex min-w-0 flex-col gap-2 sm:grid sm:grid-cols-[auto_1fr] sm:gap-x-4"
+							: "grid grid-cols-[auto_1fr] gap-x-4 gap-y-2",
+					)}
+				>
+					<Fact compact={compact} label="Asked to pay">
+						<dd className="text-lg font-semibold">{proof.expectedText}</dd>
+					</Fact>
+					<Fact compact={compact} label="Reference code">
+						<dd className="font-mono text-lg tracking-widest wrap-anywhere">
+							{proof.referenceCode ?? "No deposit link"}
+						</dd>
+					</Fact>
+					{compact && (
+						// One line on a phone, so Verify and Reject stay on the first screen.
+						<div className="sm:hidden">
+							<dt className="sr-only">Paid with and sent</dt>
+							<dd className="text-muted-foreground">
+								{METHOD_LABELS[proof.method]} · {proof.sentText}
+							</dd>
+						</div>
+					)}
+					<Fact compact={compact} fromSm label="Paid with">
+						<dd>{METHOD_LABELS[proof.method]}</dd>
+					</Fact>
+					<Fact compact={compact} fromSm label="Sent">
+						<dd>{proof.sentText}</dd>
+					</Fact>
 				</dl>
 			</div>
 			{proof.dueNowText && (
@@ -287,6 +338,35 @@ function PendingProof({
 					}}
 				/>
 			)}
+		</div>
+	);
+}
+
+/**
+ * One fact of a screenshot: its label over its value on a phone in the Next step card (the
+ * image sits beside the facts there), side by side everywhere else.
+ */
+function Fact({
+	compact,
+	label,
+	fromSm = false,
+	children,
+}: {
+	compact: boolean;
+	label: string;
+	/** Only from `sm`: a phone's compact card says it in one line instead. */
+	fromSm?: boolean;
+	children: ReactNode;
+}) {
+	return (
+		<div
+			className={cn(
+				compact ? "flex min-w-0 flex-col sm:contents" : "contents",
+				compact && fromSm && "max-sm:hidden",
+			)}
+		>
+			<dt className="text-muted-foreground">{label}</dt>
+			{children}
 		</div>
 	);
 }
@@ -479,14 +559,49 @@ function prefill(actions: Actions, kind: DeskKindName): string {
 	return value === null ? "" : String(value);
 }
 
+/**
+ * "Record payment": the desk form in a sheet, mounted once by the page whichever card draws the
+ * trigger (the Next step card, or the Payments card).
+ */
+export function RecordPaymentPanel({
+	sheet,
+	projectId,
+	actions,
+	fallback,
+}: {
+	sheet: FormSheetState;
+	projectId: string;
+	actions: Actions | null;
+	fallback: RefObject<HTMLElement | null>;
+}) {
+	return (
+		<FormSheetPanel
+			sheet={sheet}
+			title="Record payment"
+			description="Money the client paid at the desk or by transfer. It is recorded as verified."
+			fallback={fallback}
+			available={actions !== null && actions.recordKinds.length > 0}
+		>
+			{actions && (
+				<RecordPaymentForm
+					key={recordFormKey(actions)}
+					projectId={projectId}
+					actions={actions}
+					sheet={sheet}
+				/>
+			)}
+		</FormSheetPanel>
+	);
+}
+
 function RecordPaymentForm({
 	projectId,
 	actions,
-	onDone,
+	sheet,
 }: {
 	projectId: string;
 	actions: Actions;
-	onDone: () => void;
+	sheet: FormSheetState;
 }) {
 	const tenant = useTenant();
 	const first = actions.recordKinds[0];
@@ -505,14 +620,13 @@ function RecordPaymentForm({
 			route="tenant.projects.payments.store"
 			routeParams={{ tenant: tenant.slug, id: projectId }}
 			options={{ preserveScroll: true }}
-			onSuccess={() => {
-				setTyped(false);
-				onDone();
-			}}
+			onStart={sheet.onStart}
+			onSuccess={sheet.onSuccess}
+			onError={sheet.onError}
+			onFinish={sheet.onFinish}
 		>
 			{({ errors, processing }) => (
 				<FieldGroup>
-					<h3 className="text-sm font-semibold">Record payment</h3>
 					<FieldSet data-invalid={!!errors.kind}>
 						<FieldLegend variant="label">What was paid</FieldLegend>
 						<RadioGroup name="kind" value={kind} onValueChange={choose}>
@@ -551,66 +665,68 @@ function RecordPaymentForm({
 						hint={null}
 					/>
 					<NoteField id="record-note" error={errors.note} />
-					<div>
-						<Button type="submit" className="h-11" disabled={processing}>
-							{processing ? "Saving…" : "Record payment"}
-						</Button>
-					</div>
+					<FormSheetActions submit="Record payment" processing={processing} />
 				</FieldGroup>
 			)}
 		</Form>
 	);
 }
 
-/** "Record a refund": a button that shows the form; the submit asks first. */
+/**
+ * "Record a refund": the form in a sheet. The submit button names the amount, which is the
+ * confirmation (it replaces the browser's confirm); the sheet's description says it is final.
+ */
+export function RefundPanel({
+	sheet,
+	projectId,
+	maxText,
+	fallback,
+}: {
+	sheet: FormSheetState;
+	projectId: string;
+	maxText: string | null;
+	fallback: RefObject<HTMLElement | null>;
+}) {
+	return (
+		<FormSheetPanel
+			sheet={sheet}
+			title="Record a refund"
+			description="A refund can't be edited or deleted; a mistake is reversed."
+			fallback={fallback}
+			available={maxText !== null}
+		>
+			{maxText && (
+				<RefundForm projectId={projectId} maxText={maxText} sheet={sheet} />
+			)}
+		</FormSheetPanel>
+	);
+}
+
 function RefundForm({
 	projectId,
 	maxText,
-	onDone,
+	sheet,
 }: {
 	projectId: string;
 	maxText: string;
-	onDone: () => void;
+	sheet: FormSheetState;
 }) {
 	const tenant = useTenant();
-	const [open, setOpen] = useState(false);
 	const [method, setMethod] = useState<MethodKind>("cash");
 	const [amount, setAmount] = useState("");
 
-	if (!open) {
-		return (
-			<div>
-				<Button
-					type="button"
-					variant="outline"
-					className="h-11"
-					aria-expanded={false}
-					onClick={() => setOpen(true)}
-				>
-					Record a refund
-				</Button>
-			</div>
-		);
-	}
 	return (
 		<Form
 			route="tenant.projects.refunds.store"
 			routeParams={{ tenant: tenant.slug, id: projectId }}
 			options={{ preserveScroll: true }}
-			onBefore={() =>
-				window.confirm(
-					`Record a refund of ${formatRupees(Number(amount))}? It can't be edited or deleted; a mistake is reversed.`,
-				)
-			}
-			onSuccess={() => {
-				setOpen(false);
-				setAmount("");
-				onDone();
-			}}
+			onStart={sheet.onStart}
+			onSuccess={sheet.onSuccess}
+			onError={sheet.onError}
+			onFinish={sheet.onFinish}
 		>
 			{({ errors, processing }) => (
 				<FieldGroup>
-					<h3 className="text-sm font-semibold">Record a refund</h3>
 					<AmountField
 						id="refund-amount"
 						value={amount}
@@ -625,20 +741,10 @@ function RefundForm({
 						error={errors.method}
 					/>
 					<NoteField id="refund-note" error={errors.note} />
-					<div className="flex flex-wrap gap-2">
-						<Button type="submit" className="h-11" disabled={processing}>
-							{processing ? "Saving…" : "Record refund"}
-						</Button>
-						<Button
-							type="button"
-							variant="ghost"
-							className="h-11"
-							disabled={processing}
-							onClick={() => setOpen(false)}
-						>
-							Cancel
-						</Button>
-					</div>
+					<FormSheetActions
+						submit={refundLabel(amount)}
+						processing={processing}
+					/>
 				</FieldGroup>
 			)}
 		</Form>
@@ -646,14 +752,17 @@ function RefundForm({
 }
 
 /** What happened to a closed project's deposit: kept, or refunded (amount, method). */
-function OutcomeForm({
+export function OutcomeForm({
 	projectId,
 	needed,
 	onDone,
+	embedded = false,
 }: {
 	projectId: string;
 	needed: NonNullable<PaymentsCardProps["outcome"]["needed"]>;
 	onDone: () => void;
+	/** In the Next step card, whose title already asks the question: no box and no heading of its own. */
+	embedded?: boolean;
 }) {
 	const tenant = useTenant();
 	const [outcome, setOutcome] = useState<"kept" | "refunded">("kept");
@@ -668,10 +777,12 @@ function OutcomeForm({
 			onSuccess={onDone}
 		>
 			{({ errors, processing }) => (
-				<FieldGroup className="rounded-md border p-3">
-					<h3 className="text-sm font-semibold">
-						What happened to the deposit?
-					</h3>
+				<FieldGroup className={cn(!embedded && "rounded-md border p-3")}>
+					{!embedded && (
+						<h3 className="text-sm font-semibold">
+							What happened to the deposit?
+						</h3>
+					)}
 					<p className="text-sm">
 						This project closed holding a deposit of {needed.heldText}. Record
 						what the studio decided; your deposit policy is yours.

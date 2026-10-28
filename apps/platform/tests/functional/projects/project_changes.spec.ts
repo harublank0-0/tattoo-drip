@@ -138,9 +138,43 @@ test.group("Project moves", (group) => {
 
 		response.assertFlashMessage(
 			"success",
-			"Client withdrew: project cancelled. Record what happened to the deposit under Payments.",
+			"Client withdrew: project cancelled. Record what happened to the deposit: it is the next step on this page.",
 		);
 		assert.equal((await reload(tenant, project)).status, "cancelled");
+	});
+
+	test("an artist who withdraws it is not told about the deposit: its outcome is the owners' (TAT-108)", async ({
+		client,
+	}) => {
+		const { tenant } = await studioWithOwner();
+		const asha = await artistIn(tenant, "asha@example.com");
+		const project = await inTenant(tenant, async () => {
+			const profile = await makeArtist(tenant, "asha");
+			profile.userId = asha.id;
+			await profile.save();
+			const made = await makeProject(tenant, await makeClient(tenant), {
+				status: "booked",
+				artistId: profile.id,
+			});
+			await makeQuote(tenant, made);
+			await makePayment(tenant, made, {
+				status: "verified",
+				verifiedAt: DateTime.utc(),
+			});
+			return made;
+		});
+
+		const response = await client
+			.post(url(project.id, "/moves"))
+			.form({ move: "withdraw" })
+			.withCsrfToken()
+			.loginAs(asha)
+			.redirects(0);
+
+		response.assertFlashMessage(
+			"success",
+			"Client withdrew: project cancelled.",
+		);
 	});
 });
 

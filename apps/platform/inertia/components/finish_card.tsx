@@ -22,12 +22,13 @@ import { useTenant } from "~/hooks/use-tenant";
  * check done". Each step is confirmed in an inline panel: focus starts on
  * "Not yet", Escape closes it and returns focus to the button. A refused
  * amount (`confirmedDue`, only a hand-edited request can send one) shows
- * under the buttons and the panel stays open. When a step is done the card
+ * under the buttons and the panel stays open. When a step is done the panel
  * is replaced or gone, so `onDone` lets the page move focus somewhere
  * sensible. The assigned artist gets the healing check without a button.
- * TAT-108 moves this into the project page's Next step card.
+ * Since TAT-108 it is the body of the Next step card, whose title (the same
+ * words, FINISH_TITLES) is drawn by the card.
  */
-export default function FinishCard({
+export default function FinishPanel({
 	projectId,
 	finish,
 	onDone,
@@ -72,74 +73,97 @@ export default function FinishCard({
 	};
 
 	return (
-		<Card id="finish">
-			<CardHeader>
-				<CardTitle>{FINISH_TITLES[step]}</CardTitle>
-			</CardHeader>
-			<CardContent className="flex flex-col gap-3 text-sm">
-				<p>{finishIntro(step, finish.dueText, finish.overdue)}</p>
-				{action?.balanceDueText && (
-					<p>{balanceLine(action.balanceDueText, action.estimated)}</p>
-				)}
-				{action &&
-					(action.sessionScheduled ? (
-						<p className="text-muted-foreground">{SESSION_FIRST}</p>
-					) : (
-						<div>
-							<Button
-								ref={trigger}
-								type="button"
-								className="h-11"
-								aria-expanded={open}
-								onClick={() => setOpen(true)}
-							>
-								{FINISH_BUTTONS[step]}
-							</Button>
-						</div>
-					))}
-				{open && action && (
-					<fieldset
-						className="min-w-0 rounded-md bg-muted/50 p-3"
-						onKeyDown={(event) => {
-							if (event.key === "Escape") close();
-						}}
-					>
-						<legend className="float-left mb-3 w-full">
-							{finishQuestion(
-								step,
-								finish.dueText,
-								action.balanceDueText,
-								action.estimated,
-							)}
-						</legend>
-						<div className="clear-left flex flex-wrap gap-2">
-							<Button
-								type="button"
-								className="h-11"
-								disabled={saving}
-								aria-describedby={error ? errorId : undefined}
-								onClick={confirm}
-							>
-								{saving ? "Saving…" : FINISH_CONFIRMS[step]}
-							</Button>
-							<Button
-								ref={keep}
-								type="button"
-								variant="ghost"
-								className="h-11"
-								disabled={saving}
-								onClick={close}
-							>
-								Not yet
-							</Button>
-						</div>
-						{error && (
-							<FieldError id={errorId} className="clear-left mt-3">
-								{error}
-							</FieldError>
+		<div className="flex flex-col gap-3 text-sm">
+			<p>{finishIntro(step, finish.dueText, finish.overdue)}</p>
+			{action?.balanceDueText && (
+				<p>{balanceLine(action.balanceDueText, action.estimated)}</p>
+			)}
+			{action &&
+				(action.sessionScheduled ? (
+					<p className="text-muted-foreground">{SESSION_FIRST}</p>
+				) : (
+					<div>
+						<Button
+							ref={trigger}
+							type="button"
+							className="h-11"
+							aria-expanded={open}
+							onClick={() => setOpen(true)}
+						>
+							{FINISH_BUTTONS[step]}
+						</Button>
+					</div>
+				))}
+			{open && action && (
+				<fieldset
+					className="min-w-0 rounded-md bg-muted/50 p-3"
+					onKeyDown={(event) => {
+						if (event.key === "Escape") close();
+					}}
+				>
+					<legend className="float-left mb-3 w-full">
+						{finishQuestion(
+							step,
+							finish.dueText,
+							action.balanceDueText,
+							action.estimated,
 						)}
-					</fieldset>
-				)}
+					</legend>
+					<div className="clear-left flex flex-wrap gap-2">
+						<Button
+							type="button"
+							className="h-11"
+							disabled={saving}
+							aria-describedby={error ? errorId : undefined}
+							onClick={confirm}
+						>
+							{saving ? "Saving…" : FINISH_CONFIRMS[step]}
+						</Button>
+						<Button
+							ref={keep}
+							type="button"
+							variant="ghost"
+							className="h-11"
+							disabled={saving}
+							onClick={close}
+						>
+							Not yet
+						</Button>
+					</div>
+					{error && (
+						<FieldError id={errorId} className="clear-left mt-3">
+							{error}
+						</FieldError>
+					)}
+				</fieldset>
+			)}
+		</div>
+	);
+}
+
+/**
+ * The Finish panel in a card of its own, for a project whose Next step is something else while
+ * finishing is available (a deposit screenshot nobody decided after the money was recorded at the
+ * desk). The old page always drew it; the Next step card holds it when it names the step.
+ */
+export function FinishCard({
+	projectId,
+	finish,
+	onDone,
+}: {
+	projectId: string;
+	finish: FinishProps;
+	onDone: () => void;
+}) {
+	return (
+		<Card>
+			<CardHeader>
+				<CardTitle className="leading-snug">
+					<h2>{FINISH_TITLES[finish.step]}</h2>
+				</CardTitle>
+			</CardHeader>
+			<CardContent>
+				<FinishPanel projectId={projectId} finish={finish} onDone={onDone} />
 			</CardContent>
 		</Card>
 	);

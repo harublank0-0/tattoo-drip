@@ -68,7 +68,9 @@ export default class WaitingService {
 
 	/**
 	 * What waits on each of `projects`, by project id (an entry for every one). Pass only projects
-	 * `member` may see (ProjectService.list or listActive).
+	 * `member` may see (ProjectService.list or listActive). `work` calls it for the active projects;
+	 * the project page calls it for its one project (TAT-108), so its Next step card says what
+	 * Today and the list say: at most four queries either way.
 	 */
 	async forProjects(
 		tenant: TenantZone,

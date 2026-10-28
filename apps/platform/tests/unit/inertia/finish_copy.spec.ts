@@ -1,4 +1,5 @@
 import { test } from "@japa/runner";
+import { NEXT_STEP_ACTIONS, nextStepOf } from "#modules/projects/next_step";
 // @ts-expect-error TS6305: the server project only references the inertia project, so it cannot read its sources and the module is untyped here; `FinishModule` below restates its shape and the inertia project type-checks the real one.
 import * as finishModule from "../../../inertia/components/finish.js";
 
@@ -93,3 +94,34 @@ test.group("The finish card's words (TAT-111)", () => {
 		);
 	});
 });
+
+// TAT-108: the Next step card's title and the panel's own words come from two places (the server's
+// table, the client's finish.ts); this keeps them one phrase.
+test.group(
+	"The Next step card names the finish steps as the panel does (TAT-108)",
+	() => {
+		const can = Object.fromEntries(
+			NEXT_STEP_ACTIONS.map((action) => [action, true]),
+		) as Record<(typeof NEXT_STEP_ACTIONS)[number], boolean>;
+		const stepFor = (status: "in_progress" | "healing_check") =>
+			nextStepOf({
+				status,
+				waiting: null,
+				waitingText: null,
+				waitingHash: null,
+				clientName: null,
+				sweepWillCancel: false,
+				nextSession: null,
+				startedSession: null,
+				balanceOwedText: null,
+				can,
+			});
+
+		test("an in-progress project and a healing check carry the panel's titles", ({
+			assert,
+		}) => {
+			assert.equal(stepFor("in_progress").title, FINISH_TITLES.finish);
+			assert.equal(stepFor("healing_check").title, FINISH_TITLES.complete);
+		});
+	},
+);

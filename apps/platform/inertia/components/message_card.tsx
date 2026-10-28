@@ -8,6 +8,7 @@ import {
 	type MessageKindName,
 	primaryChannel,
 } from "~/components/messages";
+import { Button } from "~/components/ui/button";
 import {
 	Card,
 	CardContent,
@@ -30,6 +31,7 @@ export default function MessageCard({
 	lastChannel,
 	onContact,
 	footer,
+	onMarkContacted,
 }: {
 	contact: ContactLinksProps | null;
 	messages: CardMessageProps[];
@@ -39,6 +41,8 @@ export default function MessageCard({
 	onContact: (via: ContactVia) => void;
 	/** Shown under the title, e.g. the inquiry's last contact. */
 	footer?: string;
+	/** Records a contact made some other way (TAT-46): the project page's "Mark contacted". */
+	onMarkContacted?: () => void;
 }) {
 	const [kind, setKind] = useState(initialKind);
 	const selected =
@@ -48,7 +52,9 @@ export default function MessageCard({
 		<Card className="max-sm:gap-3 max-sm:py-4">
 			{/* On a phone the note shares the title's line when it fits. */}
 			<CardHeader className="max-sm:flex max-sm:flex-wrap max-sm:items-baseline max-sm:gap-x-3 max-sm:gap-y-1">
-				<CardTitle>Message the client</CardTitle>
+				<CardTitle>
+					<h2>Message the client</h2>
+				</CardTitle>
 				{footer && <CardDescription>{footer}</CardDescription>}
 			</CardHeader>
 			<CardContent className="flex flex-col gap-3 sm:gap-4">
@@ -105,6 +111,18 @@ export default function MessageCard({
 							</div>
 						)}
 					</>
+				)}
+				{onMarkContacted && (
+					<div>
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							onClick={onMarkContacted}
+						>
+							Mark contacted
+						</Button>
+					</div>
 				)}
 			</CardContent>
 		</Card>

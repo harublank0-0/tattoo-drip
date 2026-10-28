@@ -166,6 +166,32 @@ test.group("Scheduling on a project over HTTP (TAT-85)", (group) => {
 		assert.equal(await statusOf(tenant, project.id), "deposit_pending");
 	});
 
+	test("an artist's flash names what is due too, as it always did", async ({
+		client,
+	}) => {
+		const { asha, tenant, customer, sita } = await setup();
+		const project = await projectIn(
+			tenant,
+			customer,
+			"deposit_pending",
+			sita.id,
+		);
+		await inTenant(tenant, () => makeQuote(tenant, project));
+
+		const response = await post(
+			client,
+			scheduleUrl(project.id),
+			tattoo(sita.id),
+			asha,
+		);
+
+		const [session] = await sessionsOf(tenant, project.id);
+		response.assertFlashMessage(
+			"success",
+			`Session scheduled: ${sessionTimeText(session.startsAt, session.endsAt, KTM)}. NPR 3,000 of the deposit is still due: the project is booked once it's paid.`,
+		);
+	});
+
 	test("before acceptance a tattoo session holds the date; a consultation adds nothing", async ({
 		client,
 		assert,
