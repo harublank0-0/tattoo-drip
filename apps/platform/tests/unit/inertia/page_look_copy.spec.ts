@@ -13,6 +13,7 @@ import * as pageLookModule from "../../../inertia/components/page_look.js";
 type PageLookModule = {
 	swatchValue(text: string, fallback: string): string;
 	colourText(typed: string, stored: string, seen: string): string;
+	followStored<T>(picked: T, stored: T, seen: T): T;
 	takesFocusBack(
 		hadFocus: boolean,
 		wasProcessing: boolean,
@@ -70,6 +71,24 @@ test.group("page look words (TAT-56)", () => {
 		// The stored colour changed (a save): the box shows the stored, lowercased value.
 		assert.equal(words.colourText("#0F766E", "#0f766e", ""), "#0f766e");
 		assert.equal(words.colourText("#0f766e", "", "#0f766e"), "");
+	});
+
+	// Fix round 4: the radio groups follow a changed stored choice in place, like the colour boxes.
+	test("a choice follows the stored value when it changes and keeps the pick when it does not", ({
+		assert,
+	}) => {
+		// Stored changed (another tab saved, or this save landed): the group shows the stored value.
+		assert.equal(words.followStored("eczar", "serif", "eczar"), "serif");
+		assert.equal(words.followStored("sans", "serif", "eczar"), "serif");
+		// Stored unchanged: the owner's pick stays, typed or chosen but not yet saved.
+		assert.equal(words.followStored("sans", "eczar", "eczar"), "sans");
+		// A refused save leaves the stored value alone, so the pick stays.
+		assert.equal(words.followStored("comic", "eczar", "eczar"), "comic");
+		// It is the one rule: the colour boxes are this with strings.
+		assert.equal(
+			words.colourText("#E8A317", "", ""),
+			words.followStored("#E8A317", "", ""),
+		);
 	});
 
 	test("the Save button takes focus back only when it had it, a save has just ended and no other control holds focus", async ({

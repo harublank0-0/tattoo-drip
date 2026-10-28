@@ -96,19 +96,26 @@ export function swatchValue(text: string, fallback: string): string {
 }
 
 /**
- * What a colour box shows after a render (fix round 1): what was typed, until
- * the stored colour changes (`stored` is no longer what the box last `seen`),
- * which is a save: then the stored, lowercased colour. A refusal leaves the
- * stored colour alone, so the typed text and its error stay. The box follows
- * the stored colour instead of being remounted by a key, because a remount
- * drops the focus of a box that Enter has just submitted.
+ * What a form control shows after a render (fix rounds 1 and 4): what the owner
+ * picked or typed, until the stored value changes (`stored` is no longer what
+ * the control last `seen`): then the stored value. That is a save landing (the
+ * stored, normalised value shows) or fresher data arriving, such as the look
+ * another tab saved coming back with this page's logo removal. A refusal leaves
+ * the stored value alone, so the pick and its error stay. Controls follow the
+ * stored value in place instead of being remounted by a key, because a remount
+ * drops the focus of a control that Enter has just submitted.
  */
+export function followStored<T>(picked: T, stored: T, seen: T): T {
+	return stored === seen ? picked : stored;
+}
+
+/** A colour box's text after a render: `followStored` for the text. */
 export function colourText(
 	typed: string,
 	stored: string,
 	seen: string,
 ): string {
-	return stored === seen ? typed : stored;
+	return followStored(typed, stored, seen);
 }
 
 /**

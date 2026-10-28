@@ -25,6 +25,7 @@ import {
 	takesFocusBack,
 } from "~/components/page_look";
 import Section from "~/components/section";
+import { useStoredChoice } from "~/components/stored_choice";
 import type { StudioPageProps } from "~/components/studio_link";
 import { Button, buttonVariants } from "~/components/ui/button";
 import {
@@ -49,8 +50,9 @@ import SettingsLayout from "~/layouts/settings";
  * to what the page can use, and the logo's preview; this page holds only the
  * colour text while it is typed. Nothing here is markup or CSS: the form
  * sends keys and "#rrggbb" codes, and the server refuses the rest. Nothing is
- * keyed to the stored look (a remount drops focus): the colour boxes follow a
- * changed stored colour in place (`ColourField`) and the Save button, which is
+ * keyed to the stored look (a remount drops focus): the colour boxes and the
+ * radio groups follow a changed stored value in place (`ColourField`,
+ * `useStoredChoice`: fresher data from another tab must not be sent back) and the Save button, which is
  * disabled while it saves, takes its focus back when the save ends (`SaveButton`),
  * so a keyboard user does not land on <body> after a save or a refusal.
  */
@@ -74,6 +76,10 @@ export default function PageLook({
 	studioPage: StudioPageProps;
 }) {
 	const tenant = useTenant();
+	// Each group follows the stored value in place when it changes (no keys).
+	const [pickedTheme, pickTheme] = useStoredChoice(look.theme);
+	const [pickedFont, pickFont] = useStoredChoice(look.font);
+	const [pickedArtists, pickArtists] = useStoredChoice(look.artists);
 
 	return (
 		<>
@@ -114,7 +120,8 @@ export default function PageLook({
 										<FieldLegend variant="label">Theme</FieldLegend>
 										<RadioGroup
 											name="theme"
-											defaultValue={look.theme}
+											value={pickedTheme}
+											onValueChange={pickTheme}
 											aria-invalid={!!errors.theme}
 											aria-describedby={
 												errors.theme ? "theme-error" : undefined
@@ -172,7 +179,8 @@ export default function PageLook({
 										</FieldDescription>
 										<RadioGroup
 											name="font"
-											defaultValue={look.font}
+											value={pickedFont}
+											onValueChange={pickFont}
 											aria-invalid={!!errors.font}
 											aria-describedby={
 												errors.font ? "font-help font-error" : "font-help"
@@ -214,7 +222,8 @@ export default function PageLook({
 										</FieldDescription>
 										<RadioGroup
 											name="artists"
-											defaultValue={look.artists}
+											value={pickedArtists}
+											onValueChange={pickArtists}
 											aria-invalid={!!errors.artists}
 											aria-describedby={
 												errors.artists

@@ -108,6 +108,40 @@ test.group("The page look components (TAT-56)", () => {
 		assert.include(field, "colourText(");
 	});
 
+	// Fix round 4: uncontrolled radio groups ignored a stored value that changed under them (a
+	// logo removed in one tab returns the look another tab saved), and a later colour-only save
+	// then sent the old font and order. Each group follows the stored value in place, with no key.
+	test("each radio group follows its stored value in place, and nothing is keyed", async ({
+		assert,
+	}) => {
+		const page = await read("pages/settings/look.tsx");
+		for (const [name, stored] of [
+			["theme", "look.theme"],
+			["font", "look.font"],
+			["artists", "look.artists"],
+		]) {
+			const group = new RegExp(`<RadioGroup\\s[^>]*name="${name}"[^>]*>`).exec(
+				page,
+			)?.[0];
+			assert.isDefined(group, `${name} is a RadioGroup`);
+			assert.match(group as string, /\bvalue=\{/, `${name} is controlled`);
+			assert.match(group as string, /\bonValueChange=\{/, name);
+			assert.notMatch(
+				group as string,
+				/defaultValue/,
+				`${name} has no stale default`,
+			);
+			assert.include(page, `useStoredChoice(${stored})`);
+		}
+		assert.notMatch(
+			page,
+			/\bkey=\{`?(look|JSON)/,
+			"nothing is keyed to the stored look",
+		);
+		const hook = await read("components/stored_choice.ts");
+		assert.include(hook, "followStored(");
+	});
+
 	test("the Save button is the one that gets its focus back after a save", async ({
 		assert,
 	}) => {
