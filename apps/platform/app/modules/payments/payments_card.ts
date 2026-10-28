@@ -99,7 +99,7 @@ export type PaymentsCardInput = {
 	isOwner: boolean;
 	timezone: string;
 	/** Who decided or recorded, by user id (PaymentService.memberNames). */
-	names: Map<string, string>;
+	names: Map<string, string | null>;
 	/** Owners only: signed screenshot URLs by payment id. */
 	proofUrls: Map<string, string>;
 	/** The project's deposit-link reference code, if it has a link. */
@@ -135,8 +135,12 @@ export function paymentsCard({
 }: PaymentsCardInput): PaymentsCardProps {
 	const day = (at: DateTime) =>
 		formatDay(at.setZone(timezone).toFormat("yyyy-MM-dd"));
+	// A user without a name here is a member whose email isn't for this reader
+	// (memberNames, TAT-16): only owners decide or record payments.
 	const who = (id: string | null) =>
-		(id !== null && names.get(id)) || "a deleted account";
+		id === null || !names.has(id)
+			? "a deleted account"
+			: (names.get(id) ?? "an owner");
 	const byId = new Map(money.payments.map((payment) => [payment.id, payment]));
 	const reversals = new Map(
 		money.payments

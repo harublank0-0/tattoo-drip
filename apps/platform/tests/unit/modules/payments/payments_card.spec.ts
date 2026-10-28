@@ -80,13 +80,14 @@ const card = (
 	status: ProjectStatus,
 	isOwner = true,
 	proofUrls = new Map<string, string>(),
+	names = new Map<string, string | null>([[ASHA, "Asha Rai"]]),
 ) =>
 	paymentsCard({
 		money: data,
 		status,
 		isOwner,
 		timezone: KTM,
-		names: new Map([[ASHA, "Asha Rai"]]),
+		names,
 		proofUrls,
 		referenceCode: "7KQ2MX",
 	});
@@ -431,6 +432,47 @@ test.group("paymentsCard", () => {
 		assert.deepEqual(artist.pending, []);
 		assert.isNull(artist.outcome.needed);
 		assert.deepInclude(artist.rows[0], { proofUrl: null, canReverse: false });
+	});
+
+	test('a member without a full name reads "an owner"; an unknown id stays a deleted account (TAT-16)', ({
+		assert,
+	}) => {
+		const shot = payment({
+			proofImageKey: "k",
+			proofImageWidth: 1,
+			proofImageHeight: 1,
+		});
+		const gone = payment({ verifiedByUserId: "user-gone" });
+		const refund = payment({ kind: "refund", amount: -200_000 });
+		const outcome = {
+			outcome: "refunded",
+			amount: 300_000,
+			refundPaymentId: refund.id,
+			recordedByUserId: ASHA,
+			createdAt: AT,
+			note: null,
+		} as unknown as DepositOutcome;
+		const props = card(
+			money([refund, gone, shot], quote(), "cancelled", outcome),
+			"cancelled",
+			false,
+			new Map(),
+			new Map<string, string | null>([[ASHA, null]]),
+		);
+		const row = (id: string) => props.rows.find((r) => r.id === id);
+
+		assert.equal(
+			row(shot.id)?.decisionText,
+			"Verified by an owner, 18 Oct 2026",
+		);
+		assert.equal(
+			row(gone.id)?.decisionText,
+			"Recorded by a deleted account, 18 Oct 2026",
+		);
+		assert.equal(
+			props.outcome.recorded?.recordedText,
+			"Recorded 18 Oct 2026 by an owner",
+		);
 	});
 
 	test("a recorded outcome reads as what the studio decided", ({ assert }) => {

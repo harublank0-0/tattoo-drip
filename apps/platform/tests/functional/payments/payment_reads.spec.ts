@@ -194,7 +194,9 @@ test.group("PaymentService reads", (group) => {
 		});
 	});
 
-	test("memberNames: the full name, else the email", async ({ assert }) => {
+	test("memberNames: the full name, else the email for owners and null for others (TAT-16)", async ({
+		assert,
+	}) => {
 		const named = await User.create({
 			fullName: "Asha Rai",
 			email: "asha-66@example.com",
@@ -204,17 +206,18 @@ test.group("PaymentService reads", (group) => {
 			email: "bare-66@example.com",
 			password: "secret-password",
 		});
+		const ids = [named.id, bare.id, null, named.id];
 
-		const names = await payments.memberNames([
-			named.id,
-			bare.id,
-			null,
-			named.id,
-		]);
+		const withEmails = await payments.memberNames(ids, { emails: true });
+		const withoutEmails = await payments.memberNames(ids, { emails: false });
 
-		assert.deepEqual(Object.fromEntries(names), {
+		assert.deepEqual(Object.fromEntries(withEmails), {
 			[named.id]: "Asha Rai",
 			[bare.id]: "bare-66@example.com",
+		});
+		assert.deepEqual(Object.fromEntries(withoutEmails), {
+			[named.id]: "Asha Rai",
+			[bare.id]: null,
 		});
 	});
 

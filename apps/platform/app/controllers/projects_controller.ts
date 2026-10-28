@@ -336,10 +336,13 @@ export default class ProjectsController {
 				}
 			}
 		}
-		const names = await this.payments.memberNames([
-			...money.payments.map(({ verifiedByUserId }) => verifiedByUserId),
-			money.outcome?.recordedByUserId ?? null,
-		]);
+		const names = await this.payments.memberNames(
+			[
+				...money.payments.map(({ verifiedByUserId }) => verifiedByUserId),
+				money.outcome?.recordedByUserId ?? null,
+			],
+			{ emails: isOwner },
+		);
 		const depositLink = isOwner
 			? await this.depositLinks.forProject(tenant, project)
 			: null;

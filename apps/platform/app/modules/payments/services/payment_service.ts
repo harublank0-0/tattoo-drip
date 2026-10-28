@@ -341,14 +341,24 @@ export default class PaymentService {
 
 	/**
 	 * Who decided or recorded, for the page: each user's full name, else
-	 * their email. Users are global identity with no module service, so this
-	 * reads them by id; unknown ids (deleted accounts) are left out.
+	 * their email when `emails` is set (owners, who see emails on the Members
+	 * page) and null otherwise (TAT-16: an artist's Payments card never prints
+	 * a member's email). Users are global identity with no module service, so
+	 * this reads them by id; unknown ids (deleted accounts) are left out.
 	 */
-	async memberNames(userIds: (string | null)[]): Promise<Map<string, string>> {
+	async memberNames(
+		userIds: (string | null)[],
+		{ emails }: { emails: boolean },
+	): Promise<Map<string, string | null>> {
 		const ids = [...new Set(userIds.filter((id): id is string => id !== null))];
 		if (ids.length === 0) return new Map();
 		const users = await User.query().whereIn("id", ids);
-		return new Map(users.map((user) => [user.id, user.fullName ?? user.email]));
+		return new Map(
+			users.map((user) => [
+				user.id,
+				user.fullName ?? (emails ? user.email : null),
+			]),
+		);
 	}
 
 	/**

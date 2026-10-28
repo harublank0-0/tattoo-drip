@@ -1637,6 +1637,40 @@ test.group(
 			assert.lengthOf(mine.rows, 2);
 		});
 
+		test("no member's email reaches the artist (TAT-16)", async ({
+			client,
+			assert,
+		}) => {
+			const { owner, asha, projects } = await artistMoneyFixture();
+			for (const [name, project] of Object.entries(projects)) {
+				const text = JSON.stringify(
+					(await client.get(page(project.id)).withInertia().loginAs(asha))
+						.inertiaProps,
+				);
+				assert.notInclude(text, owner.email, name);
+				assert.notInclude(text, "@black-needle.example", name);
+			}
+
+			const rows = (
+				await client.get(page(projects.booked.id)).withInertia().loginAs(asha)
+			).inertiaProps.payments.rows;
+			assert.lengthOf(rows, 2);
+			for (const row of rows) {
+				assert.match(row.decisionText, /^Recorded by an owner, /);
+			}
+
+			// The owner still sees who did it, by email when there is no full name.
+			const ownerRows = (
+				await client.get(page(projects.booked.id)).withInertia().loginAs(owner)
+			).inertiaProps.payments.rows;
+			for (const row of ownerRows) {
+				assert.match(
+					row.decisionText,
+					new RegExp(`^Recorded by ${owner.email},`),
+				);
+			}
+		});
+
 		test("the schedule hint and the withdraw confirm name the deposit, as main's did", async ({
 			client,
 			assert,
