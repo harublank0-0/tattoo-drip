@@ -205,12 +205,21 @@ test.group("page look words (TAT-56)", () => {
 		);
 	});
 
-	test("the theme list the server sends has plain words for each theme", ({
+	test("the theme and font lists the server sends have these exact words", ({
 		assert,
 	}) => {
-		for (const theme of THEMES) {
-			assert.match(theme.label, /\S/);
-			assert.match(theme.description, /\S/);
-		}
+		assert.deepEqual(THEMES, [
+			{
+				key: "stencil-and-ink",
+				label: "Stencil & Ink",
+				description:
+					"Paper, black ink and a violet stencil line. Made for phones.",
+			},
+		]);
+		assert.deepEqual(FONTS, [
+			{ key: "eczar", label: "Eczar (the stencil look)" },
+			{ key: "serif", label: "Classic serif" },
+			{ key: "sans", label: "Plain" },
+		]);
 	});
 });

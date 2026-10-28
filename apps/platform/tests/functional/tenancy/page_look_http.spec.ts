@@ -9,7 +9,6 @@ import {
 	THEME_ACCENT_DARK,
 	THEMES,
 } from "#modules/storefront/look";
-import { LOOK_SAVED_MESSAGE } from "#modules/tenancy/look_messages";
 import Tenant from "#modules/tenancy/models/tenant";
 import { studioLinks } from "#services/studio_links";
 import { polyglot, testImages } from "#tests/helpers/images";
@@ -81,7 +80,7 @@ test.group("Settings, Page look: the page (TAT-56)", (group) => {
 		});
 		assert.isNull(props.logo);
 		assert.isFalse(props.hasCover);
-		assert.isString(props.studioPage.url);
+		assert.deepEqual(props.studioPage, studioLinks(tenant.slug));
 		const text = JSON.stringify(props);
 		for (const secret of ["logoImage", "logo_image", "coverImage"]) {
 			assert.notInclude(text, secret);
@@ -141,17 +140,17 @@ test.group("Settings, Page look: saving (TAT-56)", (group) => {
 
 		response.assertStatus(302);
 		response.assertHeader("location", `/t/${tenant.slug}/settings/look`);
-		response.assertFlashMessage("success", LOOK_SAVED_MESSAGE);
+		// The sentence a real save sends, spelled out here (not the constant it comes from).
+		response.assertFlashMessage(
+			"success",
+			"Page look saved. It can take up to 15 minutes to show on your page.",
+		);
 		const row = await reload(tenant);
 		assert.equal(row.brandAccent, "#0f766e");
 		assert.equal(row.brandAccentDark, "#a99cff");
 		assert.equal(row.brandFont, "serif");
 		assert.equal(row.storefrontTheme, "stencil-and-ink");
 		assert.equal(row.storefrontSections, "inquiry,artists");
-	});
-
-	test("the saved note says up to 15 minutes", ({ assert }) => {
-		assert.match(LOOK_SAVED_MESSAGE, /15 minutes/);
 	});
 
 	test("an empty colour clears the stored one", async ({ client, assert }) => {

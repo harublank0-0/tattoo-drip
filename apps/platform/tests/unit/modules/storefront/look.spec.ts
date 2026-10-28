@@ -217,9 +217,5 @@ test.group("the lists the dashboard shows", () => {
 			FONTS.map((font) => font.key),
 			[...FONT_KEYS],
 		);
-		for (const entry of [...THEMES, ...FONTS]) {
-			assert.isAbove(entry.label.length, 0);
-		}
-		for (const theme of THEMES) assert.isAbove(theme.description.length, 0);
 	});
 });
