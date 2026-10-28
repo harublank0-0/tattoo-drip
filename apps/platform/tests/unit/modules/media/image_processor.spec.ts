@@ -27,6 +27,37 @@ test.group("processImage", () => {
 		assert.deepEqual([result.width, result.height], [300, 200]);
 	});
 
+	test("an animated WebP is stored as one still frame (TAT-16)", async ({
+		assert,
+	}) => {
+		const frame = (r: number, g: number, b: number) =>
+			sharp({
+				create: { width: 64, height: 48, channels: 3, background: { r, g, b } },
+			})
+				.png()
+				.toBuffer();
+		const animated = await sharp(
+			[await frame(255, 0, 0), await frame(0, 0, 255)],
+			{
+				join: { animated: true },
+			},
+		)
+			.webp({ loop: 0, delay: [100, 100] })
+			.toBuffer();
+		// The control: the input really has two frames.
+		assert.equal(
+			(await sharp(animated, { animated: true }).metadata()).pages,
+			2,
+		);
+
+		const result = await processImage(animated);
+
+		const after = await sharp(result.data, { animated: true }).metadata();
+		assert.equal(after.format, "jpeg");
+		assert.isTrue(after.pages === undefined || after.pages === 1);
+		assert.deepEqual([result.width, result.height], [64, 48]);
+	});
+
 	test("drops EXIF and GPS from a phone photo", async ({ assert }) => {
 		const input = await testImages.phonePhoto();
 		assert.exists((await sharp(input).metadata()).exif);

@@ -247,10 +247,10 @@ test.group("Inbox pages", (group) => {
 		const original = new URL(references[0].url);
 		assert.match(original.pathname, /\.320-640\.jpg$/);
 		assert.isTrue(original.searchParams.has("signature"));
-		(await client.get(thumbnail.pathname + thumbnail.search)).assertHeader(
-			"cache-control",
-			"private, no-store",
-		);
+		const served = await client.get(thumbnail.pathname + thumbnail.search);
+		served.assertHeader("cache-control", "private, no-store");
+		// A served file is never sniffed into something else (TAT-16).
+		served.assertHeader("x-content-type-options", "nosniff");
 	});
 
 	test("missing details stay null, and a deleted preferred artist pre-selects none", async ({

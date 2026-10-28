@@ -88,6 +88,56 @@ test.group("The Payments card on the project page", (group) => {
 		assert.equal(card.balance.state, "due");
 	});
 
+	test("the assigned artist gets no URL or key of a decided screenshot; the owner does (TAT-16)", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner(SLUG, "Black Needle");
+		const asha = await artistIn(tenant, `asha@${SLUG}.example`);
+		const { project, shots } = await inTenant(tenant, async () => {
+			const profile = await makeArtist(tenant, "asha");
+			profile.userId = asha.id;
+			await profile.save();
+			const { project: made } = await depositReady(tenant);
+			made.artistId = profile.id;
+			await made.save();
+			const verified = await proofFor(tenant, made, {
+				status: "verified",
+				verifiedAt: DateTime.utc(),
+				verifiedByUserId: owner.id,
+			});
+			const rejected = await proofFor(tenant, made, {
+				status: "rejected",
+				verifiedAt: DateTime.utc(),
+				verifiedByUserId: owner.id,
+			});
+			return { project: made, shots: [verified, rejected] };
+		});
+
+		const mine = (
+			await client.get(page(project.id)).withInertia().loginAs(asha)
+		).inertiaProps;
+		const theirs = (
+			await client.get(page(project.id)).withInertia().loginAs(owner)
+		).inertiaProps;
+
+		assert.lengthOf(mine.payments.rows, 2);
+		for (const row of mine.payments.rows) assert.isNull(row.proofUrl);
+		const text = JSON.stringify(mine);
+		assert.notInclude(text, "signature=");
+		for (const shot of shots) {
+			assert.notInclude(text, shot.proofImageKey as string);
+		}
+		// The control: the owner's page has each decided screenshot's signed URL.
+		for (const shot of shots) {
+			const row = theirs.payments.rows.find(
+				({ id }: { id: string }) => id === shot.id,
+			);
+			assert.include(row.proofUrl, `/files/${shot.proofImageKey}?`);
+			assert.include(row.proofUrl, "signature=");
+		}
+	});
+
 	test("the projects list flags, for owners, a screenshot to check, a deposit to settle and an expired quote", async ({
 		client,
 		assert,

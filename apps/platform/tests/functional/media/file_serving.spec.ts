@@ -31,6 +31,7 @@ test.group("File serving", () => {
 
 		response.assertStatus(200);
 		response.assertTextIncludes("hello");
+		response.assertHeader("x-content-type-options", "nosniff");
 	});
 
 	test("a private file without a signature gets 401", async ({ client }) => {
