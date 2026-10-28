@@ -1,7 +1,12 @@
 import { BaseMail } from "@adonisjs/mail";
 import type { DateTime } from "luxon";
 
-/** What the email shows: plain values, because queued mail is JSON until the worker renders it. */
+/**
+ * What the email shows: plain values, because queued mail is JSON until the
+ * worker renders it. The worker renders with the templates it runs, so a job
+ * queued before a template learned a new view field carries none of it: the
+ * templates default each one to the wording of the first version.
+ */
 export type PasswordChangedMailData = {
 	to: string;
 	/** changedAtText() of the change. */
@@ -14,6 +19,19 @@ export type PasswordChangedMailData = {
 	 */
 	signedOut: "everywhere" | "elsewhere";
 };
+
+/**
+ * What the notice asks the person to check if it wasn't them (TAT-95): after a
+ * reset the person had the mailbox, after a change made while signed in they
+ * had the password and a session, never the mailbox.
+ */
+export function checkWhoText(
+	signedOut: PasswordChangedMailData["signedOut"],
+): string {
+	return signedOut === "everywhere"
+		? "who else can read this mailbox"
+		: "who else knows your password";
+}
 
 /** The end of the notice's first sentence. */
 export function signedOutText(
@@ -50,6 +68,7 @@ export default class PasswordChangedMail extends BaseMail {
 			changedAt: this.data.changedAt,
 			resetUrl: this.data.resetUrl,
 			signedOut: signedOutText(this.data.signedOut),
+			checkWho: checkWhoText(this.data.signedOut),
 		};
 		this.message
 			.to(this.data.to)

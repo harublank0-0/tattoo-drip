@@ -248,6 +248,7 @@ test.group("AccountService (TAT-18)", (group) => {
 			mails[0].data.signedOut,
 			"every device that was signed in was signed out",
 		);
+		assert.equal(mails[0].data.checkWho, "who else can read this mailbox");
 		assert.match(
 			String(mails[0].data.changedAt),
 			/^\d{1,2} [A-Z][a-z]{2} \d{4} at \d{2}:\d{2} UTC$/,
@@ -420,7 +421,9 @@ test.group("Signed-in account changes (TAT-95)", (group) => {
 			"changedAt",
 			"resetUrl",
 			"signedOut",
+			"checkWho",
 		]);
+		assert.equal(mails[0].data.checkWho, "who else knows your password");
 		assert.equal(mails[0].data.resetUrl, appLink("/forgot-password"));
 		assert.equal(mails[0].data.signedOut, SIGNED_OUT_ELSEWHERE);
 		// A pending reset link ends; the confirmation link is left alone.

@@ -1,5 +1,8 @@
+import emitter from "@adonisjs/core/services/emitter";
+import mailer from "@adonisjs/mail/services/main";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
+import SendMailJob from "#jobs/send_mail_job";
 import AccountExistsMail from "#modules/identity/emails/account_exists_mail";
 import PasswordChangedMail, {
 	changedAtText,
@@ -11,7 +14,12 @@ const SIGN_IN = "https://app.tattoo-drip.test/login";
 const RESET = "https://app.tattoo-drip.test/reset-password/abc";
 const FORGOT = "https://app.tattoo-drip.test/forgot-password";
 
-test.group("Account mails", () => {
+test.group("Account mails", (group) => {
+	group.each.teardown(() => {
+		mailer.restore();
+		emitter.restore();
+	});
+
 	test("an address that already has an account gets a sign-in and a reset link", async ({
 		assert,
 	}) => {
@@ -84,6 +92,9 @@ test.group("Account mails", () => {
 		message.assertSubject("Your Tattoo Drip password was changed");
 		message.assertHtmlIncludes(clause);
 		message.assertTextIncludes(clause);
+		// The actor needed the password and a session, not the mailbox.
+		message.assertHtmlIncludes("check who else knows your password");
+		message.assertTextIncludes("check who else knows your password");
 		message.assertHtmlIncludes("19 Oct 2026 at 14:05 UTC");
 		message.assertHtmlIncludes(`href="${FORGOT}"`);
 		message.assertTextIncludes(FORGOT);
@@ -93,23 +104,82 @@ test.group("Account mails", () => {
 		]) {
 			assert.notInclude(String(body), "reset-password/");
 			assert.notInclude(String(body), "verify-email/");
+			assert.notInclude(String(body), "who else can read this mailbox");
 		}
 	});
 
 	test("a reset's notice keeps the everywhere wording without the exception (TAT-95)", async ({
 		assert,
 	}) => {
-		const mail = new PasswordChangedMail({
+		const notice = new PasswordChangedMail({
 			to: TO,
 			changedAt: "19 Oct 2026 at 14:05 UTC",
 			resetUrl: FORGOT,
 			signedOut: "everywhere",
 		});
-		await mail.buildWithContents();
+		await notice.buildWithContents();
+		const { message } = notice;
 		assert.notInclude(
-			String(mail.message.nodeMailerMessage.text),
+			String(message.nodeMailerMessage.text),
 			"except the one used to change it",
 		);
+		// A reset needed the mailbox: that is what to check.
+		message.assertHtmlIncludes("check who else can read this mailbox");
+		message.assertTextIncludes("check who else can read this mailbox");
+		assert.notInclude(
+			String(message.nodeMailerMessage.html),
+			"who else knows your password",
+		);
+	});
+
+	test("a notice queued before this change carries no new fields and still reads as the old wording, never 'undefined' (TAT-95)", async ({
+		assert,
+	}) => {
+		mailer.fake();
+		const events = emitter.fake(["mail:sent"]);
+		const queued = new PasswordChangedMail({
+			to: TO,
+			changedAt: "19 Oct 2026 at 14:05 UTC",
+			resetUrl: FORGOT,
+			signedOut: "everywhere",
+		});
+		await queued.build();
+		const mailMessage = JSON.parse(JSON.stringify(queued.message.toObject()));
+		// What the job held before: the view data was changedAt and resetUrl only.
+		for (const view of [mailMessage.views.html, mailMessage.views.text]) {
+			view.data = {
+				changedAt: view.data.changedAt,
+				resetUrl: view.data.resetUrl,
+			};
+		}
+		const job = new SendMailJob();
+		job.$hydrate(
+			{ mailerName: "smtp", mailMessage },
+			{
+				jobId: "old-notice",
+				name: "SendMailJob",
+				attempt: 1,
+				queue: "default",
+				priority: 0,
+				acquiredAt: new Date(),
+				stalledCount: 0,
+			},
+		);
+
+		await job.execute();
+
+		const sent = events.find("mail:sent");
+		assert.exists(sent);
+		for (const body of [sent?.data.message.html, sent?.data.message.text]) {
+			const text = String(body);
+			assert.include(
+				text,
+				"19 Oct 2026 at 14:05 UTC, and every device that was signed in was signed out.",
+			);
+			assert.include(text, "check who else can read this mailbox");
+			assert.notInclude(text, "undefined");
+			assert.include(text, FORGOT);
+		}
 	});
 
 	test("the change time is written in UTC", ({ assert }) => {
