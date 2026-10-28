@@ -17,6 +17,7 @@ type PageLookModule = {
 		hadFocus: boolean,
 		wasProcessing: boolean,
 		processing: boolean,
+		otherHasFocus: boolean,
 	): boolean;
 	logoButton(
 		hasLogo: boolean,
@@ -71,19 +72,31 @@ test.group("page look words (TAT-56)", () => {
 		assert.equal(words.colourText("#0f766e", "", "#0f766e"), "");
 	});
 
-	test("the Save button takes focus back only when it had it and a save has just ended", ({
+	test("the Save button takes focus back only when it had it, a save has just ended and no other control holds focus", async ({
 		assert,
 	}) => {
-		assert.isTrue(words.takesFocusBack(true, true, false));
-		assert.isFalse(words.takesFocusBack(false, true, false), "focus moved on");
+		assert.isTrue(words.takesFocusBack(true, true, false, false));
 		assert.isFalse(
-			words.takesFocusBack(true, false, false),
+			words.takesFocusBack(false, true, false, false),
+			"focus moved on",
+		);
+		assert.isFalse(
+			words.takesFocusBack(true, false, false, false),
 			"no save was running",
 		);
-		assert.isFalse(words.takesFocusBack(true, true, true), "still saving");
 		assert.isFalse(
-			words.takesFocusBack(true, false, true),
+			words.takesFocusBack(true, true, true, false),
+			"still saving",
+		);
+		assert.isFalse(
+			words.takesFocusBack(true, false, true, false),
 			"a save is starting",
+		);
+		// Fix round 2: the user moved to another field while the save was pending (the blur
+		// happens in React's commit, where onBlur does not run, so `hadFocus` is stale).
+		assert.isFalse(
+			words.takesFocusBack(true, true, false, true),
+			"another control has focus",
 		);
 	});
 

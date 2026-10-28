@@ -98,6 +98,8 @@ test.group("The page look components (TAT-56)", () => {
 	}) => {
 		const page = await read("pages/settings/look.tsx");
 		assert.include(page, "takesFocusBack(");
+		// Only when no other control holds focus (the user may have moved on while it saved).
+		assert.include(page, "document.activeElement");
 		assert.match(page, /<SaveButton\s+processing=\{processing\}/);
 		// Disabled while it saves, like every form (docs/ui.md); the focus comes back after.
 		assert.match(page, /disabled=\{processing\}/);

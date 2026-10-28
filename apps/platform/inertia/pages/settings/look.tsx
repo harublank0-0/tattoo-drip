@@ -255,16 +255,28 @@ export default function PageLook({
 
 /**
  * The form's Save button: disabled while it saves ("Saving…"), and when the save
- * ends, if it had focus when the save started, it takes focus back (a disabled
- * focused button drops its focus to the page: takesFocusBack). A refusal ends
- * the same way, so the error and the button are where the keyboard user is.
+ * ends, if it had focus when the save started and nothing else has focus now,
+ * it takes focus back (a disabled focused button drops its focus to the page:
+ * takesFocusBack). A refusal ends the same way, so the error and the button are
+ * where the keyboard user is. The user may move to another field while the
+ * request is pending: that field keeps its focus.
  */
 function SaveButton({ processing }: { processing: boolean }) {
 	const button = useRef<HTMLButtonElement>(null);
 	const hadFocus = useRef(false);
 	const wasProcessing = useRef(false);
 	useEffect(() => {
-		if (takesFocusBack(hadFocus.current, wasProcessing.current, processing)) {
+		const active = document.activeElement;
+		const otherHasFocus =
+			active !== null && active !== document.body && active !== button.current;
+		if (
+			takesFocusBack(
+				hadFocus.current,
+				wasProcessing.current,
+				processing,
+				otherHasFocus,
+			)
+		) {
 			button.current?.focus();
 		}
 		wasProcessing.current = processing;

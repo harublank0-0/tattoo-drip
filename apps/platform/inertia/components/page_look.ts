@@ -108,18 +108,23 @@ export function colourText(
 }
 
 /**
- * Whether a Save button takes focus back (fix round 1): it had focus when a
- * save started and the save has just ended. The button is disabled while it
- * saves (docs/ui.md), and a focused button that gets disabled drops its focus
- * to the page, so without this a keyboard or screen reader user lands on
- * <body> after every save. If focus moved elsewhere meanwhile, it stays there.
+ * Whether a Save button takes focus back (fix rounds 1 and 2): it had focus
+ * when a save started, the save has just ended, and no other control holds
+ * focus now (`otherHasFocus`: `document.activeElement` is something besides
+ * the page itself and this button). The button is disabled while it saves
+ * (docs/ui.md), and a focused button that gets disabled drops its focus to the
+ * page, so without this a keyboard or screen reader user lands on <body> after
+ * every save. The blur happens during React's commit, where `onBlur` does not
+ * run, so `hadFocus` can be stale: if the user moved to another field while
+ * the request was pending, that field keeps its focus.
  */
 export function takesFocusBack(
 	hadFocus: boolean,
 	wasProcessing: boolean,
 	processing: boolean,
+	otherHasFocus: boolean,
 ): boolean {
-	return hadFocus && wasProcessing && !processing;
+	return hadFocus && wasProcessing && !processing && !otherHasFocus;
 }
 
 /** The logo form's button: upload, replace, or the wait. */
