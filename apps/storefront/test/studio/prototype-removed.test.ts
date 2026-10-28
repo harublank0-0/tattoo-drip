@@ -72,3 +72,19 @@ test("the intake form replaced the prototype's booking form", () => {
 	);
 	assert.match(section, /<IntakeMount\b/);
 });
+
+test("the storefront declares no analytics, AI, markdown or prototype-font package and no latest range (TAT-16)", () => {
+	const manifest = JSON.parse(
+		readFileSync(new URL("package.json", APP), "utf8"),
+	);
+	const declared: Record<string, string> = {
+		...manifest.dependencies,
+		...manifest.devDependencies,
+	};
+	const unused =
+		/^(@posthog\/|posthog-js$|@tanstack\/ai(-|$)|streamdown$|highlight\.js$|@fontsource\/(cormorant-garamond|manrope)$|@tanstack\/(react-store|store|devtools-event-client)$)/;
+	for (const [name, range] of Object.entries(declared)) {
+		assert.ok(!unused.test(name), `${name} is declared but nothing imports it`);
+		assert.notEqual(range, "latest", `${name} floats on latest`);
+	}
+});
