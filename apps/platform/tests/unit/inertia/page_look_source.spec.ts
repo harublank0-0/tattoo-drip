@@ -4,6 +4,21 @@ import { test } from "@japa/runner";
 const read = (file: string) =>
 	readFile(new URL(`../../../inertia/${file}`, import.meta.url), "utf8");
 
+const readStorefront = (file: string) =>
+	readFile(new URL(`../../../../storefront/${file}`, import.meta.url), "utf8");
+
+/** A font stack without quotes or extra spaces, so two spellings of one stack compare equal. */
+const stack = (value: string) =>
+	value
+		.replace(/['"]/g, "")
+		.split(",")
+		.map((family) => family.trim())
+		.join(", ");
+
+/** The value of a CSS custom property declared in a source, up to its semicolon. */
+const token = (source: string, name: string) =>
+	new RegExp(`${name}:\\s*([^;]+);`).exec(source)?.[1];
+
 /** The source without its comments, so a hex code in a comment is not a finding. */
 const withoutComments = (source: string) =>
 	source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
@@ -114,6 +129,35 @@ test.group("The page look components (TAT-56)", () => {
 		assert.notMatch(link as string, /\bh-11\b/);
 		const button = await read("components/ui/button.tsx");
 		assert.include(button, "max-lg:min-h-11");
+	});
+
+	// Fix round 2: a font card shows the studio's name in the face the studio page will use.
+	test("the font samples use the storefront's own font stacks", async ({
+		assert,
+	}) => {
+		const css = await read("css/app.css");
+		const storefrontCss = await readStorefront("src/styles.css");
+		const branding = await readStorefront("src/studio/theme/branding.ts");
+		const serif = /serif:\s*"([^"]+)"/.exec(branding)?.[1];
+		assert.isDefined(serif, "the storefront's serif stack");
+		assert.equal(
+			stack(token(css, "--serif-face") ?? ""),
+			stack(serif as string),
+			"--serif-face is the storefront's serif stack",
+		);
+		// Eczar and the plain face are the dashboard's own tokens: the same text as the storefront's.
+		for (const name of ["--display-face", "--body-face"]) {
+			assert.equal(
+				stack(token(css, name) ?? ""),
+				stack(token(storefrontCss, name) ?? "?"),
+				name,
+			);
+		}
+		// Tailwind's own `font-serif` stack is not the storefront's, and the sign-in and error pages use it.
+		assert.notMatch(withoutComments(css), /--font-serif\s*:/);
+		const page = await read("components/page_look.ts");
+		assert.include(page, "font-(family-name:--serif-face)");
+		assert.notInclude(page, '"font-serif"');
 	});
 
 	test("Remove logo asks first, and says what happens", async ({ assert }) => {

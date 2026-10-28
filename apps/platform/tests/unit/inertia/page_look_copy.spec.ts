@@ -148,7 +148,10 @@ test.group("page look words (TAT-56)", () => {
 			[...FONT_KEYS],
 		);
 		assert.equal(words.FONT_SAMPLE_CLASS.eczar, "font-display");
-		assert.equal(words.FONT_SAMPLE_CLASS.serif, "font-serif");
+		assert.equal(
+			words.FONT_SAMPLE_CLASS.serif,
+			"font-(family-name:--serif-face)",
+		);
 		assert.equal(words.FONT_SAMPLE_CLASS.sans, "font-sans");
 	});
 

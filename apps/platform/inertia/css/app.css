@@ -79,6 +79,13 @@
 
   --body-face: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', 'Nirmala UI', 'Noto Sans Devanagari', sans-serif;
   --display-face: Eczar, 'Noto Serif Devanagari', 'Noto Serif', Georgia, 'Times New Roman', serif;
+  /*
+   * The studio page's "Classic serif" heading face (TAT-56), the same stack as
+   * the storefront's (src/studio/theme/branding.ts), so the font cards in
+   * Page look show the name as the page will. Not mapped to `--font-serif`:
+   * the sign-in and error pages use Tailwind's own `font-serif` stack.
+   */
+  --serif-face: Georgia, 'Noto Serif', 'Noto Serif Devanagari', 'Times New Roman', serif;
   --radius: 0.25rem;
 
   --background: var(--paper);

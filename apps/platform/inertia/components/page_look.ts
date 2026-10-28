@@ -73,10 +73,14 @@ export const PLACEMENT_WORDS: Record<
 	},
 };
 
-/** The class that sets a font card's sample (the studio's name) in its face. */
+/**
+ * The class that sets a font card's sample (the studio's name) in its face:
+ * the storefront's own stacks (`--display-face`, `--serif-face`, `--body-face`
+ * in css/app.css; page_look_source.spec.ts pins them to the storefront's).
+ */
 export const FONT_SAMPLE_CLASS: Record<FontKey, string> = {
 	eczar: "font-display",
-	serif: "font-serif",
+	serif: "font-(family-name:--serif-face)",
 	sans: "font-sans",
 };
 
