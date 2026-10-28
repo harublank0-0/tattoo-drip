@@ -702,37 +702,80 @@ components:
           description: An https URL.
 
     StorefrontSection:
-      description: V1 (TAT-54). Not served yet.
+      description: |
+        One section of the studio page (TAT-56). Show the sections in the
+        order they are listed. Treat an unknown `type` as one to leave out.
       type: object
-      required: [type, props]
+      required: [type]
+      additionalProperties: false
       properties:
-        type: { type: string, examples: [hero, portfolio, services] }
-        props: { type: object, additionalProperties: true }
+        type:
+          description: |
+            `artists` (the artists list) or `inquiry` (the idea form, always
+            listed). More will come: treat an unknown value as one to leave
+            out.
+          type: string
+          enum: [artists, inquiry]
 
     StorefrontConfiguration:
       description: |
-        V1 (TAT-54). Not served yet: `Studio` gains it as `storefront` with
-        themes and branding.
+        How the studio page looks (TAT-56): the owner's choices, as checked
+        values only, never markup, CSS or scripts. Colours and fonts are
+        applied by the page from fixed lists. Each value stands alone: a
+        value you do not know falls back to its default and the rest still
+        applies. A studio that set nothing gets the defaults.
       type: object
       required: [theme, branding, sections]
+      additionalProperties: false
       properties:
-        theme: { type: string, examples: [classic] }
+        theme:
+          description: |
+            The studio's theme. More will come: treat an unknown value as
+            `stencil-and-ink`.
+          type: string
+          enum: [stencil-and-ink]
         branding:
           type: object
+          required: [logo, colors, font]
+          additionalProperties: false
           properties:
-            logo: { oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }] }
-            heroImage:
+            logo:
               description: |
-                Never sent: the studio's one cover is `Studio.cover` (TAT-116),
-                which the storefront shows here.
+                The studio's logo, or null. `alt` is always null (it sits
+                beside the studio's name). A PNG keeps its transparency.
               oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }]
             colors:
               type: object
-              additionalProperties: { type: string }
-              examples: [{ primary: "#111111" }]
-            font: { type: [string, "null"] }
+              required: [accent, accentDark]
+              additionalProperties: false
+              properties:
+                accent:
+                  description: |
+                    The studio's colour for buttons, links and the frame
+                    around photos, `#rrggbb` in lowercase, 4.5:1 or more on
+                    `#f7f3ee`; null is the theme's own violet.
+                  type: [string, "null"]
+                  pattern: "^#[0-9a-f]{6}$"
+                  examples: ["#0f766e"]
+                accentDark:
+                  description: |
+                    The same for dark mode, 4.5:1 or more on `#14110f`; null
+                    is a lighter shade of `accent` (or the theme's violet).
+                  type: [string, "null"]
+                  pattern: "^#[0-9a-f]{6}$"
+                  examples: ["#a99cff"]
+            font:
+              description: |
+                The face of the studio's name and headings, a key into the
+                page's fixed list. More will come: treat an unknown value as
+                `eczar`.
+              type: string
+              enum: [eczar, serif, sans]
         sections:
+          description: The sections to show, in order. The form is always there.
           type: array
+          minItems: 1
+          maxItems: 2
           items: { $ref: "#/components/schemas/StorefrontSection" }
 
     Studio:
@@ -742,7 +785,7 @@ components:
         studio page shows. Every property is always there; an empty one is
         `null` or `[]`. All text is plain text: render it as text, never as
         HTML.
-      required: [slug, name, type, intro, timezone, contact, socialLinks, acceptingInquiries, cover]
+      required: [slug, name, type, intro, timezone, contact, socialLinks, acceptingInquiries, cover, storefront]
       additionalProperties: false
       properties:
         slug:
@@ -795,9 +838,11 @@ components:
             The studio's cover photo (TAT-116), at most 2048 px on its longer
             side, with its smaller copies, or null. The studio page opens on
             it with the studio's name over it. `alt` is always null: the name
-            over it says what the page is. It is the page's hero image:
-            `StorefrontConfiguration.branding.heroImage` is never sent.
+            over it says what the page is. It is the page's hero image; there
+            is no other.
           oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }]
+        storefront:
+          $ref: "#/components/schemas/StorefrontConfiguration"
 
     Artist:
       type: object

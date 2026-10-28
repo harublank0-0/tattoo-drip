@@ -96,6 +96,14 @@
   --input: var(--line-strong);
   --ring: var(--stencil);
   --radius: 0.25rem;
+  /*
+   * The tile a studio's logo sits on (TAT-56), light in both schemes on
+   * purpose (not repeated in the dark block): a dark logo with a see-through
+   * background would vanish over the cover photo and on the dark paper. The
+   * studio's ink on it is 15.8:1. The dashboard keeps a copy for its preview
+   * (apps/platform/inertia/css/app.css).
+   */
+  --logo-plate: #f7f3ee;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -173,10 +181,16 @@
   /*
    * A studio's own logo and cover image (TAT-54, src/studio/components/brand.tsx):
    * decoration beside its name. The cover takes the photos' stencil frame and
-   * stays short, so the buttons still fit on a phone's first screen.
+   * stays short, so the buttons still fit on a phone's first screen. A logo
+   * sits on a light tile (TAT-56, --logo-plate): content-box, so the image's
+   * own box keeps its height (4rem here, 2rem in the artist bar, 2.75rem on
+   * the deposit page; logoSizes and srcset.test.ts read those) and the tile
+   * is the padding around it. The hero logo's cap leaves the padding's two sides
+   * out of the container (`100% - 0.5rem`), so the tile never overflows a narrow
+   * one; its own 12rem cap is what srcset.test.ts and logoSizes read.
    */
   /* `left center` is physical: the page is LTR. A mirrored (RTL) page would need `right center`; object-position has no logical keywords. */
-  .profile-logo { display: block; inline-size: auto; max-inline-size: min(12rem, 100%); block-size: 4rem; object-fit: contain; object-position: left center; }
+  .profile-logo { display: block; inline-size: auto; max-inline-size: min(12rem, calc(100% - 0.5rem)); block-size: 4rem; object-fit: contain; object-position: left center; box-sizing: content-box; padding: 0.25rem; background: var(--logo-plate); border-radius: var(--radius); }
   /*
    * The cover (TAT-116): the studio's photo with its name over it, inside the
    * page margins with the stencil frame. 4:3 on a phone, 21:9 from 60rem. A
@@ -216,7 +230,7 @@
   .work-dialog-bar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; inline-size: 100%; max-inline-size: 64rem; }
   .work-large { display: block; inline-size: auto; block-size: auto; max-inline-size: 100%; max-block-size: calc(100dvh - 8rem); object-fit: contain; background: var(--stencil-wash); }
   .work-dialog-caption { max-inline-size: 36rem; }
-  .site-bar-logo { display: block; inline-size: auto; max-inline-size: 6rem; block-size: 2rem; margin-inline-end: 0.75rem; object-fit: contain; }
+  .site-bar-logo { display: block; inline-size: auto; max-inline-size: 6rem; block-size: 2rem; margin-inline-end: 0.75rem; object-fit: contain; box-sizing: content-box; padding: 0.25rem; background: var(--logo-plate); border-radius: var(--radius); }
   .profile-actions { display: grid; gap: 1.5rem; align-content: start; }
   /* On a phone the two buttons share a row when they fit (each grows to fill it), else stack at full width. */
   .profile-actions .action { flex: 1 1 auto; padding-inline: 1rem; }
@@ -422,7 +436,7 @@
   .deposit-studio { font-family: var(--display-face); font-size: 1.125rem; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
   .deposit-mark { position: relative; isolation: isolate; display: grid; place-items: center; inline-size: 2.75rem; block-size: 2.75rem; margin: 0 0.25rem 0.25rem 0; border: 1.5px solid var(--stencil); background: var(--paper); color: var(--stencil); font-family: var(--display-face); font-size: 1.5rem; font-weight: 700; line-height: 1; }
   .deposit-mark::after { content: ''; position: absolute; inset: 0; z-index: -1; translate: 0.25rem 0.25rem; border: 1.5px solid var(--stencil); }
-  .deposit-logo { display: block; inline-size: auto; max-inline-size: 8rem; block-size: 2.75rem; object-fit: contain; }
+  .deposit-logo { display: block; inline-size: auto; max-inline-size: 8rem; block-size: 2.75rem; object-fit: contain; box-sizing: content-box; padding: 0.25rem; background: var(--logo-plate); border-radius: var(--radius); }
   .deposit-title { font-size: clamp(1.75rem, 1.4rem + 1.5vw, 2.25rem); line-height: 1.2; }
   .deposit-intro { display: grid; gap: 0.5rem; justify-items: start; }
   .deposit-brief summary { display: flex; align-items: center; min-block-size: 2.75rem; color: var(--stencil); font-weight: 600; cursor: pointer; }

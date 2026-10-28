@@ -37,6 +37,11 @@ export const TENANT_ROUTE_ROLES = {
 	// The studio's cover photo (TAT-116).
 	"tenant.settings.cover.update": OWNERS,
 	"tenant.settings.cover.destroy": OWNERS,
+	// The studio's page look and logo (TAT-56).
+	"tenant.settings.look": OWNERS,
+	"tenant.settings.look.update": OWNERS,
+	"tenant.settings.logo.update": OWNERS,
+	"tenant.settings.logo.destroy": OWNERS,
 	"tenant.settings.payments": OWNERS,
 	"tenant.settings.deposits.update": OWNERS,
 	"tenant.settings.payments.create": OWNERS,

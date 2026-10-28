@@ -36,6 +36,7 @@ export const IMAGE_PURPOSES = {
 	reference_image: { visibility: "private", variants: VARIANT_WIDTHS }, // TAT-37
 	studio_cover: { visibility: "public", variants: COVER_WIDTHS }, // TAT-116
 	artist_work_photo: { visibility: "public", variants: VARIANT_WIDTHS }, // TAT-116
+	studio_logo: { visibility: "public", variants: VARIANT_WIDTHS }, // TAT-56
 } as const;
 
 export type ImagePurpose = keyof typeof IMAGE_PURPOSES;

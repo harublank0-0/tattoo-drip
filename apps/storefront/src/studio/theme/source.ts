@@ -5,13 +5,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * THE SEAM between this ticket (TAT-54) and TAT-56: where a studio's theme
- * config comes from. It is the API's studio's `storefront` property, which
- * the contract (packages/types/openapi.yaml, `Studio`) does not have yet and
- * the platform never sends: on every real page that is `undefined`, and the
- * page shows the default theme. Tests put a config on a fixture studio.
- * When TAT-56 adds `storefront` to `Studio`, read `studio.storefront` here
- * without the cast; parseThemeConfig checks whatever arrives either way.
+ * THE SEAM between the platform's page look (TAT-56) and this app's theme:
+ * where a studio's theme config comes from. It is the API's studio's
+ * `storefront` property (packages/types/openapi.yaml, `Studio`), read here
+ * as it arrives; parseThemeConfig checks every value of it, so a hostile or
+ * newer API changes nothing it should not. An older API that omits the
+ * property gives `undefined`, and the page shows the default theme. Tests
+ * put a config on a fixture studio.
  *
  * TAT-116's cover (`Studio.cover`) comes in here too, as the configuration's
  * `branding.heroImage`: the studio's one hero image, checked by
@@ -22,7 +22,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * cover wins.
  */
 export function storefrontInput(studio: Studio): unknown {
-	const raw = (studio as Studio & { readonly storefront?: unknown }).storefront;
+	const raw: unknown = Object.hasOwn(studio, "storefront")
+		? studio.storefront
+		: undefined;
 	const cover = Object.hasOwn(studio, "cover") ? studio.cover : undefined;
 	if (cover === undefined || cover === null) return raw;
 	const config = isRecord(raw) ? raw : {};

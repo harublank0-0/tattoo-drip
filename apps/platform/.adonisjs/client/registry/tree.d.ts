@@ -43,6 +43,13 @@ export interface ApiDefinition {
         update: typeof routes['tenant.settings.cover.update']
         destroy: typeof routes['tenant.settings.cover.destroy']
       }
+      look: typeof routes['tenant.settings.look'] & {
+        update: typeof routes['tenant.settings.look.update']
+      }
+      logo: {
+        update: typeof routes['tenant.settings.logo.update']
+        destroy: typeof routes['tenant.settings.logo.destroy']
+      }
       payments: typeof routes['tenant.settings.payments'] & {
         create: typeof routes['tenant.settings.payments.create']
         store: typeof routes['tenant.settings.payments.store']

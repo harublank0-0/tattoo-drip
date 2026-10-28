@@ -26,6 +26,10 @@ export type ScannedRoutes = {
     'tenant.settings.slug.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.cover.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.cover.destroy': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.look': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.look.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.logo.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.logo.destroy': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.deposits.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.create': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -123,6 +127,7 @@ export type ScannedRoutes = {
     'tenant.today': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.profile': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.look': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.create': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.edit': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
@@ -169,6 +174,7 @@ export type ScannedRoutes = {
     'tenant.today': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.profile': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.look': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.create': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.edit': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
@@ -247,6 +253,8 @@ export type ScannedRoutes = {
     'tenant.settings.profile.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.slug.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.cover.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.look.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.logo.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.deposits.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.messages.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -259,6 +267,7 @@ export type ScannedRoutes = {
   }
   DELETE: {
     'tenant.settings.cover.destroy': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.logo.destroy': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.members.invitations.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.members.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }

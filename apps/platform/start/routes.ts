@@ -126,6 +126,19 @@ router
 				router
 					.delete("cover", [controllers.StudioCover, "destroy"])
 					.as("tenant.settings.cover.destroy");
+				// The studio page's look and logo (TAT-56).
+				router
+					.get("look", [controllers.PageLook, "show"])
+					.as("tenant.settings.look");
+				router
+					.put("look", [controllers.PageLook, "update"])
+					.as("tenant.settings.look.update");
+				router
+					.put("logo", [controllers.StudioLogo, "update"])
+					.as("tenant.settings.logo.update");
+				router
+					.delete("logo", [controllers.StudioLogo, "destroy"])
+					.as("tenant.settings.logo.destroy");
 				router
 					.get("payments", [controllers.PaymentMethods, "index"])
 					.as("tenant.settings.payments");

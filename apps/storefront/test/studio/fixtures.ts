@@ -4,6 +4,17 @@ import type { Artist, Studio } from "@tattoo-drip/sdk";
 
 export const ORIGIN = "https://black-needle-48.tattoodrip.com";
 
+/** What the platform sends for a studio that set nothing (TAT-56): the default page look. */
+export const DEFAULT_STOREFRONT: Studio["storefront"] = {
+	theme: "stencil-and-ink",
+	branding: {
+		logo: null,
+		colors: { accent: null, accentDark: null },
+		font: "eczar",
+	},
+	sections: [{ type: "artists" }, { type: "inquiry" }],
+};
+
 export const STUDIO: Studio = {
 	slug: "black-needle-48",
 	name: "Black Needle",
@@ -23,6 +34,7 @@ export const STUDIO: Studio = {
 	],
 	acceptingInquiries: true,
 	cover: null,
+	storefront: DEFAULT_STOREFRONT,
 };
 
 /** A studio that set nothing but its name. */

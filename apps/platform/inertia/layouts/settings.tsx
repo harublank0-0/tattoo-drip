@@ -2,6 +2,7 @@ import { usePage } from "@inertiajs/react";
 import { cn } from "cn";
 import {
 	MessageSquareText,
+	Palette,
 	Store,
 	UserPlus,
 	Users,
@@ -25,6 +26,12 @@ function settingsNav(tenantSlug: string): NavItem[] {
 			route: "tenant.settings.profile",
 			params,
 			icon: Store,
+		},
+		{
+			label: "Page look",
+			route: "tenant.settings.look",
+			params,
+			icon: Palette,
 		},
 		{
 			label: "Payments",

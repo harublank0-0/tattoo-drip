@@ -64,7 +64,7 @@ What the MVP (pilot with a design-partner studio) and V1 (paid launch) must do, 
 - Automatic deposit confirmation: Khalti ePayment, or a dynamic Fonepay QR through an aggregator
 - Flash with instant booking, and bookable consultation and piercing slots. This brings services, weekly availability, exceptions, the slot engine, minimum notice and booking horizon
 - SMS reminders, plus aftercare and healing-check messages
-- Studio site: portfolio, flash, artist pages, themes, branding, custom domain
+- Studio site: portfolio, flash, artist pages, more themes, custom domain
 - English-first tourist mode, with NPR shown alongside approximate USD
 - Reports: deposits collected, no-show rate
 - Tattoo style and body placement lists
@@ -134,6 +134,7 @@ shortcuts:   flash or walk-in → booked     in_progress → booked (next sessio
 - The studio page reads and writes **only** through the API/SDK. It never touches the database or imports platform code.
 - Hidden artists don't appear, and a hidden or deleted artist's page is a not-found page. The page shows what the dashboard says it shows (the profile, the visible artists with their photos and closed messages), never deposit policies, payment details, members or anything about clients, inquiries or payments.
 - Each visible artist has a link of their own, `/artists/<slug>`, that asks for them by name; a hidden, unknown or renamed artist shows the not-found page.
+- Owners set the page's look in Settings, Page look: a theme from the platform's list, a logo, a colour (and optionally a dark-mode colour) that reads at 4.5:1 on the page, a heading font from a fixed list, and whether the artists list comes before the idea form, after it or not at all (the form is always there). The look is stored as these values only, never markup or CSS; a value the page can't use falls back to the default alone.
 - The page shows only what the public API returns, always as text, and loads no analytics or third-party scripts (the intake form's bot challenge, Cloudflare Turnstile, is the one exception, loaded only once someone starts filling the form in).
 - The deposit page (`/deposit#<token>`) is the one page that shows a project's deposit, the studio's deposit-page payment methods and its deposit policy and, once the deposit is paid, the date, time and artist of the project's next session (TAT-110), to whoever holds the link: never cached or indexed, sending no Referer, and the token, in the link's fragment, never reaches the studio page's server or anything but the API.
 

@@ -820,6 +820,9 @@ export class TenantSlugSchema extends BaseModel {
 export class TenantSchema extends BaseModel {
 	static $columns = [
 		"address",
+		"brandAccent",
+		"brandAccentDark",
+		"brandFont",
 		"contactEmail",
 		"contactPhone",
 		"coverImageHeight",
@@ -833,8 +836,13 @@ export class TenantSchema extends BaseModel {
 		"id",
 		"instagramUrl",
 		"intro",
+		"logoImageHeight",
+		"logoImageKey",
+		"logoImageWidth",
 		"name",
 		"slug",
+		"storefrontSections",
+		"storefrontTheme",
 		"tiktokUrl",
 		"timezone",
 		"type",
@@ -844,6 +852,12 @@ export class TenantSchema extends BaseModel {
 	$columns = TenantSchema.$columns;
 	@column()
 	declare address: string | null;
+	@column()
+	declare brandAccent: string | null;
+	@column()
+	declare brandAccentDark: string | null;
+	@column()
+	declare brandFont: string;
 	@column()
 	declare contactEmail: string | null;
 	@column()
@@ -871,9 +885,19 @@ export class TenantSchema extends BaseModel {
 	@column()
 	declare intro: string | null;
 	@column()
+	declare logoImageHeight: number | null;
+	@column()
+	declare logoImageKey: string | null;
+	@column()
+	declare logoImageWidth: number | null;
+	@column()
 	declare name: string;
 	@column()
 	declare slug: string;
+	@column()
+	declare storefrontSections: string;
+	@column()
+	declare storefrontTheme: string;
 	@column()
 	declare tiktokUrl: string | null;
 	@column()
