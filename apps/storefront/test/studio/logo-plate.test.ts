@@ -64,7 +64,33 @@ describe("the logo's light tile (TAT-56)", () => {
 		});
 	}
 
-	test("the studio's ink on the tile reads at 15.8:1 or better", () => {
-		assert.ok(contrastRatio("#1c1917", "#f7f3ee") >= 15.8);
+	// content-box adds the padding to the image's width, so a cap of `100%` would let the tile
+	// overflow a container narrower than the logo's own cap plus its padding (12.5rem).
+	test(".profile-logo's cap leaves room for the tile's padding, so the tile fits its container", () => {
+		const body = rule(".profile-logo");
+		const padding = Number(/padding:\s*([\d.]+)rem/.exec(body)?.[1]);
+		assert.ok(padding > 0, "the tile has padding");
+		const cap =
+			/max-inline-size:\s*min\(\s*([\d.]+)rem,\s*calc\(\s*100%\s*-\s*([\d.]+)rem\s*\)\s*\)/.exec(
+				body,
+			);
+		assert.ok(
+			cap,
+			"max-inline-size is min(<cap>rem, calc(100% - <padding on both sides>rem))",
+		);
+		assert.equal(
+			Number(cap[1]),
+			12,
+			"the logo's own cap stays 12rem (srcset.test.ts, logoSizes)",
+		);
+		assert.equal(Number(cap[2]), padding * 2, "both sides of the padding");
+	});
+
+	test("the studio's ink on the tile reads at 15.8:1 or better, with the colours read from the stylesheet", () => {
+		const root = rule(":root");
+		const ink = /--ink:\s*(#[0-9a-f]{6});/.exec(root)?.[1];
+		const plate = /--logo-plate:\s*(#[0-9a-f]{6});/.exec(root)?.[1];
+		assert.ok(ink && plate, "--ink and --logo-plate are in :root");
+		assert.ok(contrastRatio(ink as string, plate as string) >= 15.8);
 	});
 });

@@ -185,10 +185,12 @@
    * sits on a light tile (TAT-56, --logo-plate): content-box, so the image's
    * own box keeps its height (4rem here, 2rem in the artist bar, 2.75rem on
    * the deposit page; logoSizes and srcset.test.ts read those) and the tile
-   * is the padding around it.
+   * is the padding around it. The hero logo's cap leaves the padding's two sides
+   * out of the container (`100% - 0.5rem`), so the tile never overflows a narrow
+   * one; its own 12rem cap is what srcset.test.ts and logoSizes read.
    */
   /* `left center` is physical: the page is LTR. A mirrored (RTL) page would need `right center`; object-position has no logical keywords. */
-  .profile-logo { display: block; inline-size: auto; max-inline-size: min(12rem, 100%); block-size: 4rem; object-fit: contain; object-position: left center; box-sizing: content-box; padding: 0.25rem; background: var(--logo-plate); border-radius: var(--radius); }
+  .profile-logo { display: block; inline-size: auto; max-inline-size: min(12rem, calc(100% - 0.5rem)); block-size: 4rem; object-fit: contain; object-position: left center; box-sizing: content-box; padding: 0.25rem; background: var(--logo-plate); border-radius: var(--radius); }
   /*
    * The cover (TAT-116): the studio's photo with its name over it, inside the
    * page margins with the stencil frame. 4:3 on a phone, 21:9 from 60rem. A
