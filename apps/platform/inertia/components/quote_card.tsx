@@ -19,8 +19,10 @@ import {
 	type Placement,
 } from "~/components/project_page";
 import {
+	depositFloorHint,
 	formatRupees,
 	type NextStepProps,
+	OWNER_ACCEPTS_NOTE,
 	type ProjectPageProps,
 	priceLabel,
 	type QuoteProps,
@@ -73,6 +75,7 @@ export function QuoteCard({
 	history,
 	form,
 	showExpiry,
+	ownerAccepts,
 	message,
 	lastChannel,
 	onContact,
@@ -85,6 +88,8 @@ export function QuoteCard({
 	history: QuoteProps[];
 	form: ProjectPageProps["form"];
 	showExpiry: boolean;
+	/** An artist's quote under their deposit minimum: an owner confirms the client's yes (TAT-16). */
+	ownerAccepts: boolean;
 	message: ProjectPageProps["message"];
 	lastChannel: ProjectPageProps["lastChannel"];
 	onContact: (via: ContactVia) => void;
@@ -111,6 +116,9 @@ export function QuoteCard({
 					<QuoteSummary quote={quote} showExpiry={showExpiry} />
 				) : (
 					<p className="text-sm text-muted-foreground">No quote yet.</p>
+				)}
+				{ownerAccepts && (
+					<p className="text-sm text-muted-foreground">{OWNER_ACCEPTS_NOTE}</p>
 				)}
 				{place.send_quote === "card" && message && (
 					<ChatMessage
@@ -564,13 +572,18 @@ export function QuoteForm({
 							}}
 							aria-invalid={!!errors.depositAmount}
 						/>
-						<FieldDescription>
-							{Number(shownDeposit) === 0
-								? "No deposit step: the project is booked once the client accepts and a session is scheduled."
-								: !depositTouched && form.depositPercent !== null
-									? `Your default ${form.depositPercent}% of the total.`
-									: "Paid before the first session."}
-						</FieldDescription>
+						{/* The server's error says the same as the note: show one. */}
+						{!(form.depositFloor && errors.depositAmount) && (
+							<FieldDescription>
+								{form.depositFloor
+									? depositFloorHint(total, form.depositPercent)
+									: Number(shownDeposit) === 0
+										? "No deposit step: the project is booked once the client accepts and a session is scheduled."
+										: !depositTouched && form.depositPercent !== null
+											? `Your default ${form.depositPercent}% of the total.`
+											: "Paid before the first session."}
+							</FieldDescription>
+						)}
 						{errors.depositAmount && (
 							<FieldError>{errors.depositAmount}</FieldError>
 						)}

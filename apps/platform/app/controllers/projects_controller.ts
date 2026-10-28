@@ -67,6 +67,7 @@ import {
 	waitingIds,
 } from "#modules/projects/project_list";
 import {
+	artistDepositFloor,
 	BOOKED_STATUSES,
 	formatDay,
 	formatMoney,
@@ -405,7 +406,16 @@ export default class ProjectsController {
 		// offers in one place what it hides in another.
 		const moves = allowedMoves(project.status);
 		const canQuote = QUOTABLE_STATUSES.includes(project.status);
-		const canAccept = project.status === "quoted" && live !== null;
+		// An artist may confirm the client's yes only for a quote that meets their deposit
+		// floor; otherwise an owner does (TAT-16, ProjectService.acceptQuote enforces it).
+		const ownerAccepts =
+			!isOwner &&
+			project.status === "quoted" &&
+			live !== null &&
+			BigInt(live.depositAmount) <
+				artistDepositFloor(quoteTotal(live), tenant.defaultDepositPercent);
+		const canAccept =
+			project.status === "quoted" && live !== null && !ownerAccepts;
 		// A booking made without a price can get one once (TAT-66).
 		const canSetPrice =
 			BOOKED_STATUSES.includes(project.status) && current === null;
@@ -567,6 +577,7 @@ export default class ProjectsController {
 			quoteExpiryShown: !BOOKED_STATUSES.includes(project.status),
 			canQuote,
 			canAccept,
+			ownerAccepts,
 			canSetPrice,
 			message: quoteChat,
 			contact: phone ? contactLinks(phone) : null,
@@ -583,6 +594,8 @@ export default class ProjectsController {
 			messageKind: phone ? defaultCardKind(project.status, cardMessages) : null,
 			form: {
 				depositPercent: tenant.defaultDepositPercent,
+				// An artist in a studio with a 0% default has no minimum to explain.
+				depositFloor: !isOwner && tenant.defaultDepositPercent !== 0,
 				defaultValidUntil: today
 					.plus({ days: DEFAULT_VALID_DAYS })
 					.toFormat("yyyy-MM-dd"),
