@@ -17,6 +17,7 @@ import {
 	throttleAccountLinks,
 	throttleResetEmail,
 	throttleResetRequest,
+	throttleSignOutOthers,
 	throttleSignup,
 	throttleSignupEmail,
 	throttleVerifyCooldown,
@@ -542,6 +543,18 @@ router
 			.post("invitations", [controllers.Invitations, "accept"])
 			.use([middleware.verifiedEmail(), throttleAccountLinks])
 			.as("invitations.accept");
+
+		// The person's own account (TAT-95): no studio, every action on the
+		// signed-in account. The current password is counted inside the
+		// handler; signing out other devices counts every request.
+		router.get("account", [controllers.Account, "show"]).as("account.show");
+		router
+			.put("account/password", [controllers.Account, "changePassword"])
+			.as("account.password.update");
+		router
+			.post("account/sign-out-others", [controllers.Account, "signOutOthers"])
+			.use(throttleSignOutOthers)
+			.as("account.sign_out_others");
 	})
 	.use([middleware.auth(), middleware.dbContext()]);
 

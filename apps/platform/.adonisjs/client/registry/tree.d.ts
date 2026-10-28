@@ -186,6 +186,13 @@ export interface ApiDefinition {
     create: typeof routes['onboarding.create']
     store: typeof routes['onboarding.store']
   }
+  account: {
+    show: typeof routes['account.show']
+    password: {
+      update: typeof routes['account.password.update']
+    }
+    signOutOthers: typeof routes['account.sign_out_others']
+  }
   api: {
     v1: {
       studio: typeof routes['api.v1.studio']

@@ -112,6 +112,19 @@ function wantsPage(ctx: HttpContext) {
 }
 
 /**
+ * What a refused form never keeps in the session's flash: the CSRF token, the
+ * method spoof, and every password field, the account page's current password
+ * included (TAT-95). A password must never sit in the session.
+ */
+const UNFLASHED_INPUTS = [
+	"_csrf",
+	"_method",
+	"password",
+	"passwordConfirmation",
+	"currentPassword",
+];
+
+/**
  * A form that hit a rate limit (TAT-8) goes back to its page with the error
  * toast, like a wrong password does, keeping what was typed except
  * passwords. JSON clients keep the limiter's own 429 with Retry-After.
@@ -120,12 +133,7 @@ function backWithThrottleMessage(
 	error: InstanceType<typeof limiterErrors.E_TOO_MANY_REQUESTS>,
 	ctx: HttpContext,
 ) {
-	ctx.session.flashExcept([
-		"_csrf",
-		"_method",
-		"password",
-		"passwordConfirmation",
-	]);
+	ctx.session.flashExcept(UNFLASHED_INPUTS);
 	ctx.session.flash("error", tryAgainMessage(error.response.availableIn));
 	ctx.response.redirect().back();
 }

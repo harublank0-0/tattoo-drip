@@ -612,6 +612,24 @@ const routes = {
     tokens: [{"old":"/invitations","type":0,"val":"invitations","end":""}],
     types: placeholder as Registry['invitations.accept']['types'],
   },
+  'account.show': {
+    methods: ["GET","HEAD"],
+    pattern: '/account',
+    tokens: [{"old":"/account","type":0,"val":"account","end":""}],
+    types: placeholder as Registry['account.show']['types'],
+  },
+  'account.password.update': {
+    methods: ["PUT"],
+    pattern: '/account/password',
+    tokens: [{"old":"/account/password","type":0,"val":"account","end":""},{"old":"/account/password","type":0,"val":"password","end":""}],
+    types: placeholder as Registry['account.password.update']['types'],
+  },
+  'account.sign_out_others': {
+    methods: ["POST"],
+    pattern: '/account/sign-out-others',
+    tokens: [{"old":"/account/sign-out-others","type":0,"val":"account","end":""},{"old":"/account/sign-out-others","type":0,"val":"sign-out-others","end":""}],
+    types: placeholder as Registry['account.sign_out_others']['types'],
+  },
   'api.v1.studio': {
     methods: ["GET","HEAD"],
     pattern: '/api/v1/tenants/:tenant',
