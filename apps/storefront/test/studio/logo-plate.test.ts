@@ -64,8 +64,7 @@ describe("the logo's light tile (TAT-56)", () => {
 		});
 	}
 
-	test("the studio's ink on the tile reads at 7:1 or better", () => {
-		assert.ok(contrastRatio("#1c1917", "#f7f3ee") >= 7);
+	test("the studio's ink on the tile reads at 15.8:1 or better", () => {
 		assert.ok(contrastRatio("#1c1917", "#f7f3ee") >= 15.8);
 	});
 });
