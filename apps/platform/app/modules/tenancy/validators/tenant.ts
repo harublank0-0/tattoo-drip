@@ -262,10 +262,12 @@ updateLookValidator.messagesProvider = new SimpleMessagesProvider({
 	"accentDark.regex": COLOUR_FORMAT,
 	"accent.required": COLOUR_MISSING,
 	"accentDark.required": COLOUR_MISSING,
+	// "Hard to read", not "too light": true for a pale colour and for a saturated mid-tone
+	// such as red, which is under 4.5:1 without being light.
 	"accent.readable":
-		"This colour is too light to read on your page. Pick a darker one.",
+		"This colour is hard to read on your page. Pick a darker one.",
 	"accentDark.readable":
-		"This colour is too dark to read in dark mode. Pick a lighter one.",
+		"This colour is hard to read in dark mode. Pick a lighter one.",
 	"theme.enum": "Choose one of the themes.",
 	"font.enum": "Choose one of the fonts.",
 	"artists.enum": "Choose where the artists list goes.",

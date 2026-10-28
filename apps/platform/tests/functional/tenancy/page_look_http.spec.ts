@@ -194,16 +194,25 @@ test.group("Settings, Page look: saving (TAT-56)", (group) => {
 		assert,
 	}) => {
 		const { owner, tenant } = await studioWithOwner();
+		// True for a pale colour and for a saturated mid-tone such as red (3.62:1 on the paper), so it says
+		// "hard to read", not "too light".
 		const readable =
-			"This colour is too light to read on your page. Pick a darker one.";
+			"This colour is hard to read on your page. Pick a darker one.";
 		const readableDark =
-			"This colour is too dark to read in dark mode. Pick a lighter one.";
+			"This colour is hard to read in dark mode. Pick a lighter one.";
 		const format =
 			"Type the colour as # and six letters or digits, like #0f766e.";
 		const cases: [string, Record<string, unknown>, string, string][] = [
 			["a light accent", { accent: "#e8a317" }, "accent", readable],
 			["a grey too light", { accent: "#777777" }, "accent", readable],
 			["white", { accent: "#ffffff" }, "accent", readable],
+			["a mid-tone red", { accent: "#ff0000" }, "accent", readable],
+			[
+				"a mid-tone blue in dark mode",
+				{ accentDark: "#5050ff" },
+				"accentDark",
+				readableDark,
+			],
 			[
 				"a dark-mode colour too dark",
 				{ accentDark: "#43389a" },

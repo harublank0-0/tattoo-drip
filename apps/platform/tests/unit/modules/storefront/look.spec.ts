@@ -39,8 +39,8 @@ function listOf(source: string, name: string): string[] {
 	return [...match[1].matchAll(/"([^"]+)"/g)].map((item) => item[1]);
 }
 
-const near = (actual: number, expected: number) =>
-	Math.abs(actual - expected) < 0.0005;
+const near = (actual: number, expected: number, tolerance = 0.0005) =>
+	Math.abs(actual - expected) < tolerance;
 
 test.group("the page look rules match the storefront's own", () => {
 	test("the theme, section and font lists are the storefront's", ({
@@ -83,6 +83,9 @@ test.group("contrast", () => {
 		assert.isTrue(near(contrastRatio("#e8a317", LIGHT_PAPER), 1.963));
 		assert.isTrue(near(contrastRatio("#43389a", DARK_PAPER), 2.033));
 		assert.isTrue(near(contrastRatio("#a99cff", DARK_PAPER), 7.957));
+		// A saturated mid-tone: neither pale nor dark, and still under the line.
+		assert.isTrue(near(contrastRatio("#ff0000", LIGHT_PAPER), 3.62, 0.01));
+		assert.isTrue(near(contrastRatio("#5050ff", DARK_PAPER), 3.52, 0.01));
 		assert.equal(contrastRatio("#f7f3ee", "#f7f3ee"), 1);
 	});
 
