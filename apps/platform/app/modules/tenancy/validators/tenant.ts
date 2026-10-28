@@ -254,9 +254,14 @@ export const updateLookValidator = vine.create({
 
 const COLOUR_FORMAT =
 	"Type the colour as # and six letters or digits, like #0f766e.";
+// The form always sends both boxes (empty is null); only a hand-made request leaves one out.
+const COLOUR_MISSING =
+	"Leave the colour empty or type it as # and six letters or digits, like #0f766e.";
 updateLookValidator.messagesProvider = new SimpleMessagesProvider({
 	"accent.regex": COLOUR_FORMAT,
 	"accentDark.regex": COLOUR_FORMAT,
+	"accent.required": COLOUR_MISSING,
+	"accentDark.required": COLOUR_MISSING,
 	"accent.readable":
 		"This colour is too light to read on your page. Pick a darker one.",
 	"accentDark.readable":

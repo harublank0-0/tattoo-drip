@@ -259,6 +259,24 @@ test.group("Settings, Page look: saving (TAT-56)", (group) => {
 		}
 	});
 
+	test("a request that leaves a colour out gets a plain message, and nothing is stored", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const message =
+			"Leave the colour empty or type it as # and six letters or digits, like #0f766e.";
+
+		for (const field of ["accent", "accentDark"]) {
+			const { [field]: _left, ...rest } = BODY as Record<string, unknown>;
+			const response = await putLook(client, owner, tenant, rest);
+			assertValidationError(response, field, message);
+		}
+		const row = await reload(tenant);
+		assert.equal(row.brandFont, "eczar");
+		assert.isNull(row.brandAccent);
+	});
+
 	test("the borderline colours: 4.62:1 passes, 4.05:1 does not", async ({
 		client,
 		assert,
