@@ -1810,6 +1810,57 @@ test.group("The artist deposit floor (TAT-16)", (group) => {
 		});
 	});
 
+	test("a project that can't be quoted any more says so, not the deposit (fix round 1)", async ({
+		assert,
+	}) => {
+		const { tenant, artist, project } = await studioWith(20, "booked");
+
+		await inTenant(tenant, async () => {
+			let caught: unknown;
+			try {
+				await projects.issueQuote(
+					tenant,
+					artist,
+					project,
+					withDeposit(0),
+					null,
+				);
+			} catch (error) {
+				caught = error;
+			}
+
+			assert.instanceOf(caught, QuoteRuleError);
+			assert.equal((caught as QuoteRuleError).reason, "project_closed");
+			assert.lengthOf(await quotes.history(tenant, project), 0);
+		});
+	});
+
+	test("an artist who no longer has the project gets the 404, not the deposit error", async ({
+		assert,
+	}) => {
+		const { tenant, project } = await studioWith(20);
+		const ravi = await artistIn(tenant, "ravi@example.com");
+		await inTenant(tenant, async () => {
+			const profile = await makeArtist(tenant, "ravi");
+			profile.userId = ravi.id;
+			await profile.save();
+		});
+
+		await inTenant(tenant, async () => {
+			await assert.rejects(
+				() =>
+					projects.issueQuote(
+						tenant,
+						{ userId: ravi.id, role: "artist" },
+						project,
+						withDeposit(0),
+						null,
+					),
+				/Row not found/,
+			);
+		});
+	});
+
 	test("an artist's deposit of exactly the floor passes", async ({
 		assert,
 	}) => {

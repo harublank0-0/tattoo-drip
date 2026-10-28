@@ -413,8 +413,9 @@ export default class ProjectService {
 	 * be accepted again. Queues ExpireQuoteJob for the quote's expiry in the
 	 * same transaction, so a rolled-back save leaves no job. An artist's
 	 * deposit must be at least the studio's default share of the total
-	 * (artistDepositFloor; DepositFloorError, before anything is stored), so
-	 * only an owner quotes less or no deposit (TAT-16); artists keep quoting.
+	 * (artistDepositFloor; DepositFloorError, checked under the lock after the
+	 * assignment and status checks and before anything is stored), so only an
+	 * owner quotes less or no deposit (TAT-16); artists keep quoting.
 	 */
 	async issueQuote(
 		tenant: TenantDeposit,
@@ -425,17 +426,19 @@ export default class ProjectService {
 	): Promise<Quote> {
 		assertProjectOf(tenant, project);
 		if (isExpired(input)) throw new QuoteRuleError("expired");
-		assertDepositFloor(
-			tenant,
-			member,
-			newQuoteAmounts(input),
-			input.depositAmount,
-		);
 		return withTransaction(async (trx) => {
 			const live = await this.lockFor(trx, tenant, member, project.id);
 			if (!QUOTABLE_STATUSES.includes(live.status)) {
 				throw new QuoteRuleError("project_closed");
 			}
+			// After the assignment and status checks, so a project that can't be quoted
+			// says so; before anything is written.
+			assertDepositFloor(
+				tenant,
+				member,
+				newQuoteAmounts(input),
+				input.depositAmount,
+			);
 			const current = await this.quotes.current(tenant, live);
 			if ((current?.id ?? null) !== baseQuoteId) {
 				throw new QuoteRuleError("quote_changed");
