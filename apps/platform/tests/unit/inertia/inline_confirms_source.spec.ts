@@ -34,6 +34,14 @@ test.group(
 			}
 		});
 
+		test("the account page asks before signing out other devices with the in-page confirm (TAT-95)", async ({
+			assert,
+		}) => {
+			const source = await read("pages/account/show.tsx");
+			assert.include(source, "<InlineConfirm");
+			assert.notInclude(source, "window.confirm");
+		});
+
 		test("no project page, inquiry page or shared component calls the browser's confirm", async ({
 			assert,
 		}) => {
@@ -48,6 +56,7 @@ test.group(
 			const files = [
 				"pages/projects/show.tsx",
 				"pages/inquiries/show.tsx",
+				"pages/account/show.tsx",
 				...components,
 			];
 			assert.isAbove(components.length, 10);

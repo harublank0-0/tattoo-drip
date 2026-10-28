@@ -16,8 +16,9 @@ import { Button } from "~/components/ui/button";
  * button closes it and returns focus to the trigger. `onConfirm` starts the request and calls
  * `finished` when it answers (`onFinish`): the panel closes, whatever the answer, and focus goes
  * back to the trigger, or to `fallback` (the page's heading) when the answer removed it. Every
- * step is `confirmStep` (components/confirm.ts, unit-tested). Never inside a sheet: Escape would
- * close the sheet.
+ * step is `confirmStep` (components/confirm.ts, unit-tested). `busyLabel` is what the confirm
+ * button says while the request is out ("Saving…" unless the action has a better word). Never
+ * inside a sheet: Escape would close the sheet.
  */
 export default function InlineConfirm({
 	label,
@@ -25,6 +26,7 @@ export default function InlineConfirm({
 	question,
 	confirmLabel,
 	keepLabel,
+	busyLabel = "Saving…",
 	onConfirm,
 	fallback,
 }: {
@@ -33,6 +35,7 @@ export default function InlineConfirm({
 	question: string;
 	confirmLabel: string;
 	keepLabel: string;
+	busyLabel?: string;
 	onConfirm: (finished: () => void) => void;
 	fallback: RefObject<HTMLElement | null>;
 }) {
@@ -100,7 +103,7 @@ export default function InlineConfirm({
 							disabled={state.saving}
 							onClick={confirm}
 						>
-							{state.saving ? "Saving…" : confirmLabel}
+							{state.saving ? busyLabel : confirmLabel}
 						</Button>
 						<Button
 							ref={keep}
