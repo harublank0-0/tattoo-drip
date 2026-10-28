@@ -1,5 +1,6 @@
 import app from "@adonisjs/core/services/app";
 import testUtils from "@adonisjs/core/services/test_utils";
+import limiter from "@adonisjs/limiter/services/main";
 import queue from "@adonisjs/queue/services/main";
 import type { ApiClient } from "@japa/api-client";
 import { test } from "@japa/runner";
@@ -7,7 +8,9 @@ import User from "#models/user";
 import { SessionEndedError } from "#modules/identity/errors";
 import AccountService from "#modules/identity/services/account_service";
 import AccountTokenService from "#modules/identity/services/account_token_service";
+import { AUTH_LIMITS } from "#modules/identity/services/auth_limits";
 import { sessionCookieName } from "#services/cookie_policy";
+import { digest } from "#services/rate_limits";
 import { queuedMails } from "#tests/helpers/accounts";
 import { recordQueries } from "#tests/helpers/query_count";
 import { studioWithOwner } from "#tests/helpers/tenants";
@@ -428,26 +431,58 @@ test.group("Your account page (TAT-95)", (group) => {
 		ended.assertHeader("location", "/login");
 	});
 
-	test("the account-wide sign-out ceiling: ten addresses spend ten each, the next address is refused", async ({
+	test("a thief cycling through the /64s of one /48 shares one sign-out allowance; another prefix has its own", async ({
+		client,
+		assert,
+	}) => {
+		queue.fake();
+		const user = await makeUser("prefix@account-95.example");
+		let current = user;
+
+		// Ten different /64s, all inside 2001:db8:abcd::/48.
+		for (let i = 0; i < 10; i++) {
+			const response = await signOutOthers(
+				client,
+				current,
+				`2001:db8:abcd:${i + 1}::1`,
+			);
+			response.assertFlashMessage("success", SIGNED_OUT);
+			current = await User.findOrFail(user.id);
+		}
+		const refused = await signOutOthers(client, current, "2001:db8:abcd:ff::1");
+		assert.match(
+			String(refused.flashMessage("error")),
+			/^Too many attempts\. Try again in (59|60) minutes\.$/,
+		);
+
+		// The owner on another prefix is not blocked.
+		const elsewhere = await signOutOthers(
+			client,
+			current,
+			"2001:db8:ef01:1::1",
+		);
+		elsewhere.assertFlashMessage("success", SIGNED_OUT);
+	});
+
+	test("the account-wide sign-out ceiling exists: the thousandth in an hour passes, the next address is refused", async ({
 		client,
 		assert,
 	}) => {
 		queue.fake();
 		const user = await makeUser("ceiling@account-95.example");
-		let current = user;
+		// 999 already counted for the account by sessions at other prefixes
+		// (the middleware's key is `<name>_<digest of the account id>`).
+		await limiter
+			.use({ ...AUTH_LIMITS.signOutOthersPerUser })
+			.increment(`sign_out_others_account_${digest(user.id)}`, 999);
 
-		for (let address = 0; address < 10; address++) {
-			for (let i = 0; i < 10; i++) {
-				const response = await signOutOthers(
-					client,
-					current,
-					`203.0.113.${180 + address}`,
-				);
-				response.assertFlashMessage("success", SIGNED_OUT);
-				current = await User.findOrFail(user.id);
-			}
-		}
-		const refused = await signOutOthers(client, current, "203.0.113.199");
+		const last = await signOutOthers(client, user, "203.0.113.190");
+		last.assertFlashMessage("success", SIGNED_OUT);
+		const refused = await signOutOthers(
+			client,
+			await User.findOrFail(user.id),
+			"203.0.113.191",
+		);
 
 		assert.match(
 			String(refused.flashMessage("error")),
@@ -455,8 +490,44 @@ test.group("Your account page (TAT-95)", (group) => {
 		);
 		assert.equal(
 			(await User.findOrFail(user.id)).sessionVersion,
-			user.sessionVersion + 100,
+			user.sessionVersion + 1,
 		);
+	});
+
+	test("refused change requests never spend the cap: ten malformed ones and four wrong passwords, then a valid change still goes through", async ({
+		client,
+		assert,
+	}) => {
+		queue.fake();
+		const user = await makeUser("malformed@account-95.example");
+		const bodies: Record<string, string>[] = [
+			{},
+			{ password: NEW },
+			{ currentPassword: OLD },
+			{ ...right, password: "short1", passwordConfirmation: "short1" },
+			{ ...right, passwordConfirmation: "something-else" },
+			{ ...right, password: OLD, passwordConfirmation: OLD },
+			{
+				...right,
+				password: "x".repeat(129),
+				passwordConfirmation: "x".repeat(129),
+			},
+			{ currentPassword: OLD, password: "", passwordConfirmation: "" },
+			{ ...right, passwordConfirmation: "" },
+			{ currentPassword: "", password: NEW, passwordConfirmation: NEW },
+		];
+		for (const body of bodies) {
+			await change(client, user, body).withInertia();
+		}
+		for (let i = 0; i < 4; i++) {
+			const response = await change(client, user, wrong).withInertia();
+			assertValidationError(response, "currentPassword");
+		}
+
+		const valid = await change(client, user, right);
+
+		valid.assertFlashMessage("success", CHANGED);
+		assert.isTrue(await signsIn(user.email, NEW));
 	});
 
 	test("ten changes an hour: the eleventh goes back with the toast and changes nothing", async ({

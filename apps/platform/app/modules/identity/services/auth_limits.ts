@@ -1,4 +1,4 @@
-import type { Limiter, LimiterResponse } from "@adonisjs/limiter";
+import { errors, type Limiter, type LimiterResponse } from "@adonisjs/limiter";
 import limiter from "@adonisjs/limiter/services/main";
 import { typedEmail } from "#modules/identity/email_address";
 import { clientAddress, digest } from "#services/rate_limits";
@@ -52,30 +52,37 @@ export const AUTH_LIMITS = {
 	/** ...and from one client address, across accounts. */
 	passwordCheckPerIp: { requests: 10, duration: "15 mins" },
 	/**
-	 * Password changes (TAT-95), every request of one account: each success
-	 * raises session_version and emails the notice. The wrong-password limit
-	 * above stays the stricter one for guesses; if a stolen session burns this
-	 * cap, a reset by email is the way back in (it needs the mailbox, not the
-	 * session).
+	 * Successful password changes (TAT-95), per account: each one raises
+	 * session_version and queues the notice, so this bounds that mail. Only a
+	 * success counts (`countPasswordChange`, after the commit) and the door is
+	 * checked before the work (`assertPasswordChangeAllowed`): a malformed
+	 * request or a wrong password never spends it, so nobody can exhaust it
+	 * without already holding the current password. Checking before and
+	 * counting after lets a burst of concurrent requests overshoot by up to the
+	 * number in flight; the wrong-password limit above and the cost of hashing
+	 * keep that small. If a stolen session burns the cap, a reset by email is
+	 * the way back in (it needs the mailbox, not the session).
 	 */
 	passwordChangePerUser: { requests: 10, duration: "1 hour" },
 	/**
-	 * "Sign out of other devices" (TAT-95), per account AND client address. A
-	 * stolen session can follow its re-issued cookie through every call, so a
-	 * per-account cap alone lets it spend the owner's whole allowance from one
-	 * address; keyed by address too, it spends only its own.
+	 * "Sign out of other devices" (TAT-95), per account AND client network
+	 * (`clientNetwork`: IPv4 as is, IPv6 by its /48). A stolen session can
+	 * follow its re-issued cookie through every call, so a per-account cap
+	 * alone lets it spend the owner's whole allowance from one address; keyed by
+	 * network too, it spends only its own.
 	 */
 	signOutOthersPerAddress: { requests: 10, duration: "1 hour" },
 	/**
-	 * ...and a loose cap per account over every address: it bounds how fast
-	 * session_version can grow and how often one account is written, however
-	 * many addresses a stolen session comes from (10 an hour for a lifetime
-	 * of addresses is not a bound: a thief with a whole /48 has 65,536 /64s).
-	 * At 100 an hour the 9 digits a session can hold last over a million years.
-	 * Ten distinct addresses are needed to reach it, and a reset or a password
-	 * change (separate limits) stays the owner's way back.
+	 * ...and a loose cap per account over every network: it bounds how fast
+	 * session_version can grow and how often one account is written. The
+	 * 9 digits a session can hold (999,999,999) last 999,999,999 / 1000 =
+	 * about a million hours, over 114 years, at the ceiling; burning it in
+	 * one hour takes at least 1000 / 10 = 100 distinct IPv4 addresses or IPv6
+	 * /48 prefixes. If a thief does, the owner's way back is "Change password"
+	 * (its own limit, and it ends every other session) or the reset by email;
+	 * neither touches this limit.
 	 */
-	signOutOthersPerUser: { requests: 100, duration: "1 hour" },
+	signOutOthersPerUser: { requests: 1000, duration: "1 hour" },
 } as const;
 
 export function loginIpKey(ip: string) {
@@ -193,6 +200,34 @@ export async function throttlePasswordCheck(
 		]);
 	}
 	return right;
+}
+
+export function passwordChangeKey(userId: string) {
+	return `password_change_user_${digest(userId)}`;
+}
+
+/**
+ * Refuses a password change when the account has already made as many
+ * successful ones this hour as it may (TAT-95), with the same
+ * E_TOO_MANY_REQUESTS a throttle gives (the handler turns it into the
+ * "Try again in N minutes" toast). It only looks: a refused or malformed
+ * request must not spend the cap. `countPasswordChange` spends it, after the
+ * change committed.
+ */
+export async function assertPasswordChangeAllowed(userId: string) {
+	const limit = AUTH_LIMITS.passwordChangePerUser;
+	// use() parses the durations in the object it gets, so give it a copy.
+	const window = await limiter.use({ ...limit }).get(passwordChangeKey(userId));
+	if (window && window.consumed >= limit.requests) {
+		throw new errors.E_TOO_MANY_REQUESTS(window);
+	}
+}
+
+/** Counts one successful password change; call it once the change has committed. */
+export async function countPasswordChange(userId: string) {
+	await limiter
+		.use({ ...AUTH_LIMITS.passwordChangePerUser })
+		.increment(passwordChangeKey(userId));
 }
 
 /**

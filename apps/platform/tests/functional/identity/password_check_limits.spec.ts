@@ -3,12 +3,14 @@ import limiter from "@adonisjs/limiter/services/main";
 import { test } from "@japa/runner";
 import {
 	AUTH_LIMITS,
+	assertPasswordChangeAllowed,
+	countPasswordChange,
+	passwordChangeKey,
 	passwordCheckIpKey,
 	passwordCheckUserKey,
 	throttlePasswordCheck,
 } from "#modules/identity/services/auth_limits";
 import {
-	throttlePasswordChange,
 	throttleSignOutOthers,
 	throttleSignOutOthersAccount,
 } from "#start/limiter";
@@ -61,16 +63,49 @@ test.group("Current password checks are counted (TAT-95)", () => {
 			duration: "1 hour",
 		});
 		assert.deepEqual(AUTH_LIMITS.signOutOthersPerUser, {
-			requests: 100,
+			requests: 1000,
 			duration: "1 hour",
 		});
 		for (const middleware of [
-			throttlePasswordChange,
 			throttleSignOutOthers,
 			throttleSignOutOthersAccount,
 		]) {
 			assert.isFunction(middleware);
 		}
+	});
+
+	test("the ceiling arithmetic: a hundred prefixes to burn it, over a century to reach the nine digits", ({
+		assert,
+	}) => {
+		const perHour = AUTH_LIMITS.signOutOthersPerUser.requests;
+		assert.isAtLeast(
+			perHour / AUTH_LIMITS.signOutOthersPerAddress.requests,
+			100,
+		);
+		// session_version's identifier holds at most 9 digits: 999,999,999.
+		const years = 999_999_999 / perHour / (24 * 365);
+		assert.isAbove(years, 100);
+	});
+
+	test("a change counts only when it is counted: checking never consumes, and the tenth success closes the door", async ({
+		assert,
+	}) => {
+		for (let i = 0; i < 25; i++) await assertPasswordChangeAllowed(A);
+		assert.equal(
+			await left(AUTH_LIMITS.passwordChangePerUser, passwordChangeKey(A)),
+			10,
+		);
+
+		for (let i = 0; i < 9; i++) await countPasswordChange(A);
+		await assertPasswordChangeAllowed(A);
+		await countPasswordChange(A);
+
+		await assert.rejects(
+			() => assertPasswordChangeAllowed(A),
+			errors.E_TOO_MANY_REQUESTS,
+		);
+		// Another account has its own count.
+		await assertPasswordChangeAllowed(B);
 	});
 
 	test("the account-wide sign-out ceiling is loose enough that it can't be the owner's lockout, and the per-address cap sits well below it", ({
@@ -90,6 +125,11 @@ test.group("Current password checks are counted (TAT-95)", () => {
 		const user = passwordCheckUserKey(A);
 		assert.match(ip, /^password_check_ip_[A-Za-z0-9_-]{43}$/);
 		assert.match(user, /^password_check_user_[A-Za-z0-9_-]{43}$/);
+		assert.match(
+			passwordChangeKey(A),
+			/^password_change_user_[A-Za-z0-9_-]{43}$/,
+		);
+		assert.notInclude(passwordChangeKey(A), A);
 		assert.notInclude(ip, "203.0.113");
 		assert.notInclude(user, A);
 	});

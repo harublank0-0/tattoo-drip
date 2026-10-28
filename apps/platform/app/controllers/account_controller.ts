@@ -7,7 +7,10 @@ import { forgetStagedTokens } from "#modules/identity/account_tokens";
 import { SessionEndedError } from "#modules/identity/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import AccountService from "#modules/identity/services/account_service";
-import { throttlePasswordCheck } from "#modules/identity/services/auth_limits";
+import {
+	assertPasswordChangeAllowed,
+	throttlePasswordCheck,
+} from "#modules/identity/services/auth_limits";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { WRONG_CURRENT_PASSWORD } from "#validators/account_messages";
@@ -32,13 +35,19 @@ export default class AccountController {
 		return inertia.render("account/show", { hasStudio });
 	}
 
-	/** The current password is checked (and counted) before anything is locked. */
+	/**
+	 * The hourly cap on successful changes is checked first and spent only by a
+	 * success (`AccountService.changePassword`, after the commit), so a
+	 * malformed or refused request never uses it up. Then the current password
+	 * is checked (and counted) before anything is locked.
+	 */
 	async changePassword(ctx: HttpContext) {
 		const { request, auth, session, response } = ctx;
+		const user = auth.getUserOrFail();
+		await assertPasswordChangeAllowed(user.id);
 		const { currentPassword, password } = await request.validateUsing(
 			changePasswordValidator,
 		);
-		const user = auth.getUserOrFail();
 		const right = await throttlePasswordCheck(request.ip(), user.id, () =>
 			user.verifyPassword(currentPassword),
 		);

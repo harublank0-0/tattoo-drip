@@ -18,7 +18,10 @@ import { SessionEndedError } from "#modules/identity/errors";
 import AccountTokenService, {
 	type TokenState,
 } from "#modules/identity/services/account_token_service";
-import { clearLoginFailures } from "#modules/identity/services/auth_limits";
+import {
+	clearLoginFailures,
+	countPasswordChange,
+} from "#modules/identity/services/auth_limits";
 import { afterCommit, withTransaction } from "#services/db_context";
 import { isUniqueViolation } from "#services/db_errors";
 import { sendMailInTransaction } from "#services/mail_in_transaction";
@@ -251,9 +254,10 @@ export default class AccountService {
 	 * reset link, then, under the user's lock, sets the password and raises the
 	 * session version in one UPDATE (every other session is signed out on its
 	 * next request), emails the stored address and, once committed, clears its
-	 * login failures. Returns the account with its new version, for the
-	 * caller to sign the asking session in again. Lock order: the reset
-	 * token's row (revoke), then the user (see the class).
+	 * login failures and counts the change against the account's hourly cap
+	 * (the controller checked that cap first). Returns the account with its
+	 * new version, for the caller to sign the asking session in again. Lock
+	 * order: the reset token's row (revoke), then the user (see the class).
 	 */
 	async changePassword(user: User, password: string): Promise<User> {
 		return withTransaction(async (trx) => {
@@ -273,6 +277,9 @@ export default class AccountService {
 			);
 			const storedEmail = locked.email;
 			afterCommit(() => clearLoginFailures(storedEmail));
+			// The hourly cap on changes (assertPasswordChangeAllowed, checked by
+			// the controller) is spent by a change that committed, never before.
+			afterCommit(() => countPasswordChange(locked.id));
 			return locked;
 		});
 	}

@@ -17,7 +17,7 @@ import {
 	AUTH_LIMITS,
 	emailCountKey,
 } from "#modules/identity/services/auth_limits";
-import { clientAddress, digest } from "#services/rate_limits";
+import { clientAddress, clientNetwork, digest } from "#services/rate_limits";
 
 type Limit = { requests: number; duration: string };
 
@@ -47,17 +47,17 @@ function perEmail(ctx: HttpContext, limit: Limit) {
 }
 
 /**
- * Every request of the signed-in account from one client address (TAT-95); use
- * it after auth. The key is the digest of both, so an address spends only its
- * own count of the account.
+ * Every request of the signed-in account from one client network (TAT-95;
+ * `clientNetwork`: IPv4 as is, IPv6 by its /48); use it after auth. The key is
+ * the digest of both, so a network spends only its own count of the account.
  */
-function perAccountAndAddress(ctx: HttpContext, limit: Limit) {
+function perAccountAndNetwork(ctx: HttpContext, limit: Limit) {
 	return limiter
 		.allowRequests(limit.requests)
 		.every(limit.duration)
 		.usingKey(
 			digest(
-				`${ctx.auth.getUserOrFail().id}:${clientAddress(ctx.request.ip())}`,
+				`${ctx.auth.getUserOrFail().id}:${clientNetwork(ctx.request.ip())}`,
 			),
 		);
 }
@@ -91,11 +91,8 @@ export const throttleVerifyCooldown = limiter.define("verify_cooldown", (ctx) =>
 export const throttleVerifyResend = limiter.define("verify_resend", (ctx) =>
 	perAccount(ctx, AUTH_LIMITS.verifyResendPerUser),
 );
-export const throttlePasswordChange = limiter.define("password_change", (ctx) =>
-	perAccount(ctx, AUTH_LIMITS.passwordChangePerUser),
-);
 export const throttleSignOutOthers = limiter.define("sign_out_others", (ctx) =>
-	perAccountAndAddress(ctx, AUTH_LIMITS.signOutOthersPerAddress),
+	perAccountAndNetwork(ctx, AUTH_LIMITS.signOutOthersPerAddress),
 );
 export const throttleSignOutOthersAccount = limiter.define(
 	"sign_out_others_account",

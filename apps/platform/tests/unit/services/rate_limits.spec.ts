@@ -1,7 +1,12 @@
 import { createHash } from "node:crypto";
 import { test } from "@japa/runner";
 import { http } from "#config/app";
-import { clientAddress, digest, tryAgainMessage } from "#services/rate_limits";
+import {
+	clientAddress,
+	clientNetwork,
+	digest,
+	tryAgainMessage,
+} from "#services/rate_limits";
 
 test.group("clientAddress", () => {
 	test("keeps an IPv4 address, also written IPv4-mapped", ({ assert }) => {
@@ -27,6 +32,37 @@ test.group("clientAddress", () => {
 	test("returns anything else as it is", ({ assert }) => {
 		assert.equal(clientAddress("unknown"), "unknown");
 		assert.equal(clientAddress(""), "");
+	});
+});
+
+test.group("clientNetwork (TAT-95)", () => {
+	test("keeps an IPv4 address, also written IPv4-mapped, like clientAddress", ({
+		assert,
+	}) => {
+		assert.equal(clientNetwork("203.0.113.7"), "203.0.113.7");
+		assert.equal(clientNetwork("::ffff:203.0.113.7"), "203.0.113.7");
+	});
+
+	test("counts an IPv6 address by its /48, the block a small site or a household plan gets, so cycling through its /64s buys nothing", ({
+		assert,
+	}) => {
+		for (const ip of [
+			"2001:db8:1:2::9",
+			"2001:db8:1:3::1",
+			"2001:db8:1:ffff:3:4:5:6",
+			"2001:DB8:1::1",
+			"2001:0db8:0001:0002::1",
+		]) {
+			assert.equal(clientNetwork(ip), "2001:db8:1::/48", ip);
+		}
+		assert.equal(clientNetwork("2001:db8:2:2::9"), "2001:db8:2::/48");
+		assert.equal(clientNetwork("2001:db8::"), "2001:db8:0::/48");
+		// The /64 key the other limiters use is untouched.
+		assert.equal(clientAddress("2001:db8:1:2::9"), "2001:db8:1:2::/64");
+	});
+
+	test("returns anything else as it is", ({ assert }) => {
+		assert.equal(clientNetwork("unknown"), "unknown");
 	});
 });
 

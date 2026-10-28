@@ -15,7 +15,6 @@ import { DEPOSIT_TOKEN } from "#modules/payments/deposit_links";
 import { middleware } from "#start/kernel";
 import {
 	throttleAccountLinks,
-	throttlePasswordChange,
 	throttleResetEmail,
 	throttleResetRequest,
 	throttleSignOutOthers,
@@ -547,13 +546,13 @@ router
 			.as("invitations.accept");
 
 		// The person's own account (TAT-95): no studio, every action on the
-		// signed-in account. A change counts every request per account, and its
-		// wrong current passwords are counted again inside the handler; signing
-		// out other devices counts per account and address, then per account.
+		// signed-in account. A change counts inside the handler (its wrong
+		// current passwords, and the successful changes, which only a success
+		// spends); signing out other devices counts per account and network,
+		// then per account.
 		router.get("account", [controllers.Account, "show"]).as("account.show");
 		router
 			.put("account/password", [controllers.Account, "changePassword"])
-			.use(throttlePasswordChange)
 			.as("account.password.update");
 		router
 			.post("account/sign-out-others", [controllers.Account, "signOutOthers"])
