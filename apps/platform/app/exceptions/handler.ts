@@ -5,6 +5,7 @@ import {
 } from "@adonisjs/core/http";
 import app from "@adonisjs/core/services/app";
 import type {
+	HttpError,
 	StatusPageRange,
 	StatusPageRenderer,
 } from "@adonisjs/core/types/http";
@@ -20,6 +21,20 @@ import {
 	LINK_THROTTLED_MESSAGE,
 	tryAgainMessage,
 } from "#services/rate_limits";
+
+/**
+ * What a refused form never keeps in the session's flash: the CSRF token, the
+ * method spoof, and every password field, the account page's current password
+ * included (TAT-95). A password must never sit in the session. Used for a throttled
+ * form and for a refused plain HTML form post alike.
+ */
+const UNFLASHED_INPUTS = [
+	"_csrf",
+	"_method",
+	"password",
+	"passwordConfirmation",
+	"currentPassword",
+];
 
 export default class HttpExceptionHandler extends ExceptionHandler {
 	/**
@@ -71,6 +86,28 @@ export default class HttpExceptionHandler extends ExceptionHandler {
 	}
 
 	/**
+	 * A plain HTML form post that fails validation goes back to its form with
+	 * the errors and what was typed, like the session package does (it replaces
+	 * this method with its own), but the typed input is flashed through
+	 * `UNFLASHED_INPUTS`: the package alone leaves out only `password` and
+	 * `password_confirmation`, so `passwordConfirmation` and the account page's
+	 * `currentPassword` would sit in the session (TAT-95). An Inertia request
+	 * flashes no input at all. The order is the package's: input first, then
+	 * the errors, so a field named like an error key can't hide one.
+	 */
+	override async renderValidationErrorAsHTML(
+		error: HttpError,
+		ctx: HttpContext,
+	) {
+		if (!ctx.session) return super.renderValidationErrorAsHTML(error, ctx);
+		if (!ctx.request.header("X-Inertia")) {
+			ctx.session.flashExcept(UNFLASHED_INPUTS);
+		}
+		ctx.session.flashValidationErrors(error, false);
+		ctx.response.redirect("back", true);
+	}
+
+	/**
 	 * The method is used to report error to the logging service or
 	 * the a third party error monitoring service.
 	 *
@@ -110,19 +147,6 @@ function wantsPage(ctx: HttpContext) {
 	]);
 	return (type === "html" || type === null) && Boolean(ctx.session);
 }
-
-/**
- * What a refused form never keeps in the session's flash: the CSRF token, the
- * method spoof, and every password field, the account page's current password
- * included (TAT-95). A password must never sit in the session.
- */
-const UNFLASHED_INPUTS = [
-	"_csrf",
-	"_method",
-	"password",
-	"passwordConfirmation",
-	"currentPassword",
-];
 
 /**
  * A form that hit a rate limit (TAT-8) goes back to its page with the error
