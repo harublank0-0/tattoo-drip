@@ -5,11 +5,11 @@ import type User from "#models/user";
 import {
 	ARTIST_PLACEMENT_KEYS,
 	FONTS,
-	LOOK_SAVED_MESSAGE,
 	THEME_ACCENT,
 	THEME_ACCENT_DARK,
 	THEMES,
 } from "#modules/storefront/look";
+import { LOOK_SAVED_MESSAGE } from "#modules/tenancy/look_messages";
 import Tenant from "#modules/tenancy/models/tenant";
 import { studioLinks } from "#services/studio_links";
 import { polyglot, testImages } from "#tests/helpers/images";

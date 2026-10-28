@@ -3,10 +3,10 @@ import {
 	ARTIST_PLACEMENT_KEYS,
 	FONT_KEYS,
 	FONTS,
-	LOOK_SAVED_MESSAGE,
 	THEME_ACCENT,
 	THEMES,
 } from "#modules/storefront/look";
+import { LOOK_SAVED_MESSAGE } from "#modules/tenancy/look_messages";
 // @ts-expect-error TS6305: the server project only references the inertia project, so it cannot read its sources and the module is untyped here; `PageLookModule` below restates its shape and the inertia project type-checks the real one.
 import * as pageLookModule from "../../../inertia/components/page_look.js";
 

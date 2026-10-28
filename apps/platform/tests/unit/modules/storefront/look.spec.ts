@@ -187,6 +187,21 @@ test.group("sections", () => {
 	});
 });
 
+test.group("the rules module is shared with the public read path", () => {
+	test("it holds rules and lists, none of the dashboard's sentences", ({
+		assert,
+	}) => {
+		const source = readFileSync(
+			new URL("../../../../app/modules/storefront/look.ts", import.meta.url),
+			"utf8",
+		);
+		// The save flash and the notes live with the dashboard (#modules/tenancy/look_messages).
+		assert.notMatch(source, /minutes/i);
+		assert.notMatch(source, /Page look saved/);
+		assert.notMatch(source, /LOOK_SAVED_MESSAGE/);
+	});
+});
+
 test.group("the lists the dashboard shows", () => {
 	test("THEMES and FONTS name exactly the keys the rules know, in order", ({
 		assert,

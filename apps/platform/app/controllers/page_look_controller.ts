@@ -6,13 +6,13 @@ import ImageService from "#modules/media/services/image_service";
 import {
 	ARTIST_PLACEMENT_KEYS,
 	FONTS,
-	LOOK_SAVED_MESSAGE,
 	lookOf,
 	placementOf,
 	THEME_ACCENT,
 	THEME_ACCENT_DARK,
 	THEMES,
 } from "#modules/storefront/look";
+import { LOOK_SAVED_MESSAGE } from "#modules/tenancy/look_messages";
 import type Tenant from "#modules/tenancy/models/tenant";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import TenancyService from "#modules/tenancy/services/tenancy_service";
