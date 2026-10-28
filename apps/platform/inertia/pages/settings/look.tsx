@@ -112,7 +112,14 @@ export default function PageLook({
 								<FieldGroup>
 									<FieldSet data-invalid={!!errors.theme}>
 										<FieldLegend variant="label">Theme</FieldLegend>
-										<RadioGroup name="theme" defaultValue={look.theme}>
+										<RadioGroup
+											name="theme"
+											defaultValue={look.theme}
+											aria-invalid={!!errors.theme}
+											aria-describedby={
+												errors.theme ? "theme-error" : undefined
+											}
+										>
 											{themes.map((theme) => (
 												<FieldLabel
 													key={theme.key}
@@ -134,7 +141,9 @@ export default function PageLook({
 												</FieldLabel>
 											))}
 										</RadioGroup>
-										{errors.theme && <FieldError>{errors.theme}</FieldError>}
+										{errors.theme && (
+											<FieldError id="theme-error">{errors.theme}</FieldError>
+										)}
 									</FieldSet>
 
 									<ColourField
@@ -158,10 +167,17 @@ export default function PageLook({
 
 									<FieldSet data-invalid={!!errors.font}>
 										<FieldLegend variant="label">Heading font</FieldLegend>
-										<FieldDescription>
+										<FieldDescription id="font-help">
 											Your studio's name and the headings on your page.
 										</FieldDescription>
-										<RadioGroup name="font" defaultValue={look.font}>
+										<RadioGroup
+											name="font"
+											defaultValue={look.font}
+											aria-invalid={!!errors.font}
+											aria-describedby={
+												errors.font ? "font-help font-error" : "font-help"
+											}
+										>
 											{fonts.map((font) => (
 												<FieldLabel key={font.key} htmlFor={`font-${font.key}`}>
 													<Field orientation="horizontal">
@@ -186,13 +202,26 @@ export default function PageLook({
 												</FieldLabel>
 											))}
 										</RadioGroup>
-										{errors.font && <FieldError>{errors.font}</FieldError>}
+										{errors.font && (
+											<FieldError id="font-error">{errors.font}</FieldError>
+										)}
 									</FieldSet>
 
 									<FieldSet data-invalid={!!errors.artists}>
 										<FieldLegend variant="label">Artists list</FieldLegend>
-										<FieldDescription>{PLACEMENT_INTRO}</FieldDescription>
-										<RadioGroup name="artists" defaultValue={look.artists}>
+										<FieldDescription id="artists-help">
+											{PLACEMENT_INTRO}
+										</FieldDescription>
+										<RadioGroup
+											name="artists"
+											defaultValue={look.artists}
+											aria-invalid={!!errors.artists}
+											aria-describedby={
+												errors.artists
+													? "artists-help artists-error"
+													: "artists-help"
+											}
+										>
 											{placements.map((placement) => (
 												<FieldLabel
 													key={placement}
@@ -219,7 +248,9 @@ export default function PageLook({
 											))}
 										</RadioGroup>
 										{errors.artists && (
-											<FieldError>{errors.artists}</FieldError>
+											<FieldError id="artists-error">
+												{errors.artists}
+											</FieldError>
 										)}
 									</FieldSet>
 								</FieldGroup>

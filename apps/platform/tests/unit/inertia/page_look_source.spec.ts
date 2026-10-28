@@ -160,6 +160,41 @@ test.group("The page look components (TAT-56)", () => {
 		assert.notInclude(page, '"font-serif"');
 	});
 
+	// Fix round 2: an error under a radio group is tied to the group (role=radiogroup, which
+	// takes aria-describedby and aria-invalid), as the colour boxes tie theirs to the input.
+	test("each radio group's error is tied to the group", async ({ assert }) => {
+		const page = await read("pages/settings/look.tsx");
+		for (const name of ["theme", "font", "artists"]) {
+			const group = new RegExp(`<RadioGroup\\s[^>]*name="${name}"[^>]*>`).exec(
+				page,
+			)?.[0];
+			assert.isDefined(group, `${name} is a RadioGroup`);
+			assert.match(group as string, /aria-describedby=/, name);
+			assert.include(
+				group as string,
+				`${name}-error`,
+				`${name} points at its error`,
+			);
+			assert.match(
+				group as string,
+				new RegExp(`aria-invalid=\\{!!errors\\.${name}\\}`),
+				name,
+			);
+			assert.match(
+				page,
+				new RegExp(
+					`<FieldError\\s+id="${name}-error">\\s*\\{errors\\.${name}\\}\\s*</FieldError>`,
+				),
+				`${name}'s error has the id the group points at`,
+			);
+		}
+		// The two groups with a sentence under their legend point at it too.
+		for (const name of ["font", "artists"]) {
+			assert.include(page, `id="${name}-help"`);
+			assert.include(page, `${name}-help`);
+		}
+	});
+
 	test("Remove logo asks first, and says what happens", async ({ assert }) => {
 		const form = await read("components/logo_form.tsx");
 		assert.include(form, "window.confirm(REMOVE_LOGO_QUESTION)");
