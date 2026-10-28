@@ -24,17 +24,54 @@ import {
 
 /**
  * What a refused form never keeps in the session's flash: the CSRF token, the
- * method spoof, and every password field, the account page's current password
- * included (TAT-95). A password must never sit in the session. Used for a throttled
- * form and for a refused plain HTML form post alike.
+ * method spoof, and every password field under every spelling the forms or
+ * the session package use (TAT-95): camelCase, snake_case, the account page's
+ * current password. A password must never sit in the session. `flashTypedInput`
+ * also drops any other field whose name looks like a password, at any depth.
  */
 const UNFLASHED_INPUTS = [
 	"_csrf",
 	"_method",
 	"password",
+	"password_confirmation",
 	"passwordConfirmation",
+	"current_password",
 	"currentPassword",
+	"new_password",
+	"newPassword",
 ];
+
+/** A field name that holds a password: password, passwd, passcode, newPasswordConfirmation... */
+const PASSWORD_LIKE = /pass/i;
+
+/** Whether a value is, or holds at any depth, a field named like a password. */
+function holdsPassword(value: unknown): boolean {
+	if (Array.isArray(value)) return value.some(holdsPassword);
+	if (value !== null && typeof value === "object") {
+		return Object.entries(value).some(
+			([name, inner]) => PASSWORD_LIKE.test(name) || holdsPassword(inner),
+		);
+	}
+	return false;
+}
+
+/**
+ * Flashes what the person typed so the form can show it again, minus every
+ * password (UNFLASHED_INPUTS, any field named like a password, nested ones
+ * too). The session package's `flashExcept` omits only the exact names it is
+ * given at the top level, so the allowed names are worked out first.
+ */
+function flashTypedInput(ctx: HttpContext) {
+	const keep = Object.entries(ctx.request.original())
+		.filter(
+			([name, value]) =>
+				!UNFLASHED_INPUTS.includes(name) &&
+				!PASSWORD_LIKE.test(name) &&
+				!holdsPassword(value),
+		)
+		.map(([name]) => name);
+	ctx.session.flashOnly(keep);
+}
 
 export default class HttpExceptionHandler extends ExceptionHandler {
 	/**
@@ -89,10 +126,11 @@ export default class HttpExceptionHandler extends ExceptionHandler {
 	 * A plain HTML form post that fails validation goes back to its form with
 	 * the errors and what was typed, like the session package does (it replaces
 	 * this method with its own), but the typed input is flashed through
-	 * `UNFLASHED_INPUTS`: the package alone leaves out only `password` and
+	 * `flashTypedInput`: the package alone leaves out only `password` and
 	 * `password_confirmation`, so `passwordConfirmation` and the account page's
-	 * `currentPassword` would sit in the session (TAT-95). An Inertia request
-	 * flashes no input at all. The order is the package's: input first, then
+	 * `currentPassword` would sit in the session, and a snake_case spelling must
+	 * not come back when the list changes (TAT-95). An Inertia request flashes
+	 * no input at all. The order is the package's: input first, then
 	 * the errors, so a field named like an error key can't hide one.
 	 */
 	override async renderValidationErrorAsHTML(
@@ -100,9 +138,7 @@ export default class HttpExceptionHandler extends ExceptionHandler {
 		ctx: HttpContext,
 	) {
 		if (!ctx.session) return super.renderValidationErrorAsHTML(error, ctx);
-		if (!ctx.request.header("X-Inertia")) {
-			ctx.session.flashExcept(UNFLASHED_INPUTS);
-		}
+		if (!ctx.request.header("X-Inertia")) flashTypedInput(ctx);
 		ctx.session.flashValidationErrors(error, false);
 		ctx.response.redirect("back", true);
 	}
@@ -157,7 +193,7 @@ function backWithThrottleMessage(
 	error: InstanceType<typeof limiterErrors.E_TOO_MANY_REQUESTS>,
 	ctx: HttpContext,
 ) {
-	ctx.session.flashExcept(UNFLASHED_INPUTS);
+	flashTypedInput(ctx);
 	ctx.session.flash("error", tryAgainMessage(error.response.availableIn));
 	ctx.response.redirect().back();
 }

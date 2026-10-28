@@ -155,6 +155,103 @@ test.group(
 			assert.notInclude(JSON.stringify(response.flashMessages()), OLD);
 		});
 
+		test("snake_case and other spellings of a password are kept out of the flash too, nested ones included, while the email stays", async ({
+			client,
+			assert,
+		}) => {
+			const secrets = {
+				password_confirmation: "typed-secret",
+				current_password: "typed-secret",
+				new_password: "typed-secret",
+				newPassword: "typed-secret",
+				newPasswordConfirmation: "typed-secret",
+				passcode: "typed-secret",
+				user: { password: "typed-secret", name: "kept?" },
+				list: [{ passwd: "typed-secret" }],
+			};
+
+			const signup = await plainPost(
+				client,
+				"/signup",
+				{
+					fullName: "Ada Ink",
+					email: "ada@flash-95.example",
+					password: "typed-secret",
+					passwordConfirmation: "typed-secret-other",
+					...secrets,
+				},
+				"203.0.113.166",
+			);
+			signup.assertStatus(302);
+			assert.equal(signup.flashMessage("email"), "ada@flash-95.example");
+			assertNoPasswords(signup);
+
+			const user = await User.create({
+				email: "snake@flash-95.example",
+				password: OLD,
+			});
+			const token = await tokens.issue(user, "reset_password");
+			const reset = await client
+				.post("/reset-password")
+				.header("referer", "/reset-password")
+				.header("x-forwarded-for", "203.0.113.167")
+				.withSession({ [SESSION_TOKEN_KEYS.reset_password]: token })
+				.form({
+					password: "typed-secret",
+					passwordConfirmation: "typed-secret-other",
+					flow: await flowOf(token),
+					...secrets,
+				})
+				.withCsrfToken()
+				.redirects(0);
+			reset.assertStatus(302);
+			assertNoPasswords(reset);
+
+			const account = await client
+				.put("/account/password")
+				.header("referer", "/account")
+				.header("x-forwarded-for", "203.0.113.168")
+				.form({
+					currentPassword: OLD,
+					password: "typed-secret",
+					passwordConfirmation: "typed-secret-other",
+					...secrets,
+				})
+				.withCsrfToken()
+				.loginAs(user)
+				.redirects(0);
+			account.assertStatus(302);
+			assertNoPasswords(account);
+		});
+
+		test("a throttled form keeps no password under any spelling either, and still keeps the email", async ({
+			client,
+			assert,
+		}) => {
+			const body = {
+				email: "nobody@flash-95.example",
+				password: "typed-secret",
+				password_confirmation: "typed-secret",
+				current_password: "typed-secret",
+				newPassword: "typed-secret",
+				user: { password: "typed-secret" },
+			};
+			// Ten failed sign-ins from one address use up its allowance.
+			for (let i = 0; i < 10; i++) {
+				await plainPost(client, "/login", body, "203.0.113.169");
+			}
+
+			const refused = await plainPost(client, "/login", body, "203.0.113.169");
+
+			refused.assertStatus(302);
+			assert.match(
+				String(refused.flashMessage("error")),
+				/^Too many attempts\. Try again in \d+ minutes\.$/,
+			);
+			assert.equal(refused.flashMessage("email"), "nobody@flash-95.example");
+			assertNoPasswords(refused);
+		});
+
 		test("an Inertia post keeps no input at all, as before", async ({
 			client,
 			assert,
