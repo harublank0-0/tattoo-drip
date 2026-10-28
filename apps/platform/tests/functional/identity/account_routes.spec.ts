@@ -26,10 +26,15 @@ const THROTTLES: Record<string, string[]> = {
 	"GET /invitations/:token": ["account_linksThrottle"],
 	"POST /invitations": ["account_linksThrottle"],
 	"POST /confirm-email": ["verify_cooldownThrottle", "verify_resendThrottle"],
-	// The current password is counted inside the handler (throttlePasswordCheck:
-	// a right one gives its points back), so the route counts nothing (TAT-95).
-	"PUT /account/password": [],
-	"POST /account/sign-out-others": ["sign_out_othersThrottle"],
+	// Every change request counts per account; the wrong current passwords are
+	// counted on top, inside the handler (throttlePasswordCheck: a right one
+	// gives its points back) (TAT-95).
+	"PUT /account/password": ["password_changeThrottle"],
+	// One count per account and client address, then a loose one per account.
+	"POST /account/sign-out-others": [
+		"sign_out_othersThrottle",
+		"sign_out_others_accountThrottle",
+	],
 };
 
 /** Where someone new may start: guest pages, which clear page history (TAT-82). */

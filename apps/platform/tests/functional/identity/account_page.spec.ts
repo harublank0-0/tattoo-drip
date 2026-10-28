@@ -59,10 +59,11 @@ function change(
 		.redirects(0);
 }
 
-function signOutOthers(client: ApiClient, user: User) {
+function signOutOthers(client: ApiClient, user: User, ip = "203.0.113.150") {
 	return client
 		.post("/account/sign-out-others")
 		.header("referer", "/account")
+		.header("x-forwarded-for", ip)
 		.withCsrfToken()
 		.loginAs(user)
 		.redirects(0);
@@ -394,6 +395,117 @@ test.group("Your account page (TAT-95)", (group) => {
 			(await User.findOrFail(user.id)).sessionVersion,
 			user.sessionVersion + 10,
 		);
+	});
+
+	test("a thief who spends one address's sign-out allowance can't block the owner at another address, and the owner still ends the thief's session", async ({
+		client,
+		assert,
+	}) => {
+		queue.fake();
+		const user = await makeUser("thief@account-95.example");
+		const THIEF = "203.0.113.171";
+		const OWNER = "203.0.113.172";
+
+		// The thief follows the cookies: each call re-issues the session.
+		let thief = user;
+		for (let i = 0; i < 10; i++) {
+			const response = await signOutOthers(client, thief, THIEF);
+			response.assertFlashMessage("success", SIGNED_OUT);
+			thief = await User.findOrFail(user.id);
+		}
+		const refused = await signOutOthers(client, thief, THIEF);
+		assert.match(
+			String(refused.flashMessage("error")),
+			/^Too many attempts\. Try again in (59|60) minutes\.$/,
+		);
+
+		// The owner's own session (the stolen one's twin: same version, other address).
+		const owner = await User.findOrFail(user.id);
+		const response = await signOutOthers(client, owner, OWNER);
+		response.assertHeader("location", "/account");
+		response.assertFlashMessage("success", SIGNED_OUT);
+		const ended = await client.get("/dashboard").loginAs(thief).redirects(0);
+		ended.assertHeader("location", "/login");
+	});
+
+	test("the account-wide sign-out ceiling: ten addresses spend ten each, the next address is refused", async ({
+		client,
+		assert,
+	}) => {
+		queue.fake();
+		const user = await makeUser("ceiling@account-95.example");
+		let current = user;
+
+		for (let address = 0; address < 10; address++) {
+			for (let i = 0; i < 10; i++) {
+				const response = await signOutOthers(
+					client,
+					current,
+					`203.0.113.${180 + address}`,
+				);
+				response.assertFlashMessage("success", SIGNED_OUT);
+				current = await User.findOrFail(user.id);
+			}
+		}
+		const refused = await signOutOthers(client, current, "203.0.113.199");
+
+		assert.match(
+			String(refused.flashMessage("error")),
+			/^Too many attempts\. Try again in (59|60) minutes\.$/,
+		);
+		assert.equal(
+			(await User.findOrFail(user.id)).sessionVersion,
+			user.sessionVersion + 100,
+		);
+	});
+
+	test("ten changes an hour: the eleventh goes back with the toast and changes nothing", async ({
+		client,
+		assert,
+	}) => {
+		queue.fake();
+		const user = await makeUser("often@account-95.example");
+		let current = user;
+		let password = OLD;
+
+		for (let i = 0; i < 10; i++) {
+			const next = `change-number-${i}-password`;
+			const response = await change(
+				client,
+				current,
+				{
+					currentPassword: password,
+					password: next,
+					passwordConfirmation: next,
+				},
+				"203.0.113.173",
+			);
+			response.assertFlashMessage("success", CHANGED);
+			password = next;
+			current = await User.findOrFail(user.id);
+		}
+		const last = "change-number-eleven-password";
+		const eleventh = await change(
+			client,
+			current,
+			{ currentPassword: password, password: last, passwordConfirmation: last },
+			"203.0.113.173",
+		);
+
+		eleventh.assertHeader("location", "/account");
+		assert.match(
+			String(eleventh.flashMessage("error")),
+			/^Too many attempts\. Try again in (59|60) minutes\.$/,
+		);
+		assert.isTrue(await signsIn(user.email, password));
+		assert.isFalse(await signsIn(user.email, last));
+		for (const field of [
+			"currentPassword",
+			"password",
+			"passwordConfirmation",
+		]) {
+			assert.isUndefined(eleventh.flashMessage(field), field);
+		}
 	});
 
 	test("a session another request ended meanwhile is signed out and sent to sign in", async ({

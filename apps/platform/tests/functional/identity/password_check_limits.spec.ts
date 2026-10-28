@@ -7,7 +7,11 @@ import {
 	passwordCheckUserKey,
 	throttlePasswordCheck,
 } from "#modules/identity/services/auth_limits";
-import { throttleSignOutOthers } from "#start/limiter";
+import {
+	throttlePasswordChange,
+	throttleSignOutOthers,
+	throttleSignOutOthersAccount,
+} from "#start/limiter";
 
 const IP = "203.0.113.150";
 const A = "0195f3a0-0000-7000-8000-0000000000a1";
@@ -37,7 +41,7 @@ function check(right: boolean) {
 
 // Functional suite: tests/bootstrap.ts empties the memory store before each test.
 test.group("Current password checks are counted (TAT-95)", () => {
-	test("the numbers: 5 wrong per account and 10 per address in 15 minutes, 10 sign-outs an hour", ({
+	test("the numbers: 5 wrong per account and 10 per address in 15 minutes; 10 changes an hour; sign-outs 10 an hour per account and address, 100 per account", ({
 		assert,
 	}) => {
 		assert.deepEqual(AUTH_LIMITS.passwordCheckPerUser, {
@@ -48,11 +52,35 @@ test.group("Current password checks are counted (TAT-95)", () => {
 			requests: 10,
 			duration: "15 mins",
 		});
-		assert.deepEqual(AUTH_LIMITS.signOutOthersPerUser, {
+		assert.deepEqual(AUTH_LIMITS.passwordChangePerUser, {
 			requests: 10,
 			duration: "1 hour",
 		});
-		assert.isFunction(throttleSignOutOthers);
+		assert.deepEqual(AUTH_LIMITS.signOutOthersPerAddress, {
+			requests: 10,
+			duration: "1 hour",
+		});
+		assert.deepEqual(AUTH_LIMITS.signOutOthersPerUser, {
+			requests: 100,
+			duration: "1 hour",
+		});
+		for (const middleware of [
+			throttlePasswordChange,
+			throttleSignOutOthers,
+			throttleSignOutOthersAccount,
+		]) {
+			assert.isFunction(middleware);
+		}
+	});
+
+	test("the account-wide sign-out ceiling is loose enough that it can't be the owner's lockout, and the per-address cap sits well below it", ({
+		assert,
+	}) => {
+		// A thief reaches the ceiling only from ten or more client addresses.
+		assert.isAtLeast(
+			AUTH_LIMITS.signOutOthersPerUser.requests,
+			5 * AUTH_LIMITS.signOutOthersPerAddress.requests,
+		);
 	});
 
 	test("keys hold digests, never the address or the account id", ({

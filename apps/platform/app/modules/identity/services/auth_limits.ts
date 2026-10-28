@@ -52,10 +52,30 @@ export const AUTH_LIMITS = {
 	/** ...and from one client address, across accounts. */
 	passwordCheckPerIp: { requests: 10, duration: "15 mins" },
 	/**
-	 * "Sign out of other devices" (TAT-95), every request of one account. It
-	 * also keeps session_version far below the 9 digits a session can hold.
+	 * Password changes (TAT-95), every request of one account: each success
+	 * raises session_version and emails the notice. The wrong-password limit
+	 * above stays the stricter one for guesses; if a stolen session burns this
+	 * cap, a reset by email is the way back in (it needs the mailbox, not the
+	 * session).
 	 */
-	signOutOthersPerUser: { requests: 10, duration: "1 hour" },
+	passwordChangePerUser: { requests: 10, duration: "1 hour" },
+	/**
+	 * "Sign out of other devices" (TAT-95), per account AND client address. A
+	 * stolen session can follow its re-issued cookie through every call, so a
+	 * per-account cap alone lets it spend the owner's whole allowance from one
+	 * address; keyed by address too, it spends only its own.
+	 */
+	signOutOthersPerAddress: { requests: 10, duration: "1 hour" },
+	/**
+	 * ...and a loose cap per account over every address: it bounds how fast
+	 * session_version can grow and how often one account is written, however
+	 * many addresses a stolen session comes from (10 an hour for a lifetime
+	 * of addresses is not a bound: a thief with a whole /48 has 65,536 /64s).
+	 * At 100 an hour the 9 digits a session can hold last over a million years.
+	 * Ten distinct addresses are needed to reach it, and a reset or a password
+	 * change (separate limits) stays the owner's way back.
+	 */
+	signOutOthersPerUser: { requests: 100, duration: "1 hour" },
 } as const;
 
 export function loginIpKey(ip: string) {
