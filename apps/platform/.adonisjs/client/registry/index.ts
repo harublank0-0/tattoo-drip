@@ -126,6 +126,18 @@ const routes = {
     tokens: [{"old":"/t/:tenant/settings/slug","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/slug","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/slug","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/slug","type":0,"val":"slug","end":""}],
     types: placeholder as Registry['tenant.settings.slug.update']['types'],
   },
+  'tenant.settings.cover.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/settings/cover',
+    tokens: [{"old":"/t/:tenant/settings/cover","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/cover","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/cover","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/cover","type":0,"val":"cover","end":""}],
+    types: placeholder as Registry['tenant.settings.cover.update']['types'],
+  },
+  'tenant.settings.cover.destroy': {
+    methods: ["DELETE"],
+    pattern: '/t/:tenant/settings/cover',
+    tokens: [{"old":"/t/:tenant/settings/cover","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/cover","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/cover","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/cover","type":0,"val":"cover","end":""}],
+    types: placeholder as Registry['tenant.settings.cover.destroy']['types'],
+  },
   'tenant.settings.payments': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/settings/payments',
@@ -263,6 +275,30 @@ const routes = {
     pattern: '/t/:tenant/artists/:id',
     tokens: [{"old":"/t/:tenant/artists/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/:id","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/:id","type":1,"val":"id","end":""}],
     types: placeholder as Registry['tenant.artists.destroy']['types'],
+  },
+  'tenant.artists.photos.store': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/artists/:id/photos',
+    tokens: [{"old":"/t/:tenant/artists/:id/photos","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/:id/photos","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/:id/photos","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/:id/photos","type":1,"val":"id","end":""},{"old":"/t/:tenant/artists/:id/photos","type":0,"val":"photos","end":""}],
+    types: placeholder as Registry['tenant.artists.photos.store']['types'],
+  },
+  'tenant.artists.photos.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/artists/photos/:id',
+    tokens: [{"old":"/t/:tenant/artists/photos/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/photos/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/photos/:id","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/photos/:id","type":0,"val":"photos","end":""},{"old":"/t/:tenant/artists/photos/:id","type":1,"val":"id","end":""}],
+    types: placeholder as Registry['tenant.artists.photos.update']['types'],
+  },
+  'tenant.artists.photos.move': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/artists/photos/:id/move',
+    tokens: [{"old":"/t/:tenant/artists/photos/:id/move","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/photos/:id/move","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/photos/:id/move","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/photos/:id/move","type":0,"val":"photos","end":""},{"old":"/t/:tenant/artists/photos/:id/move","type":1,"val":"id","end":""},{"old":"/t/:tenant/artists/photos/:id/move","type":0,"val":"move","end":""}],
+    types: placeholder as Registry['tenant.artists.photos.move']['types'],
+  },
+  'tenant.artists.photos.destroy': {
+    methods: ["DELETE"],
+    pattern: '/t/:tenant/artists/photos/:id',
+    tokens: [{"old":"/t/:tenant/artists/photos/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/photos/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/photos/:id","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/photos/:id","type":0,"val":"photos","end":""},{"old":"/t/:tenant/artists/photos/:id","type":1,"val":"id","end":""}],
+    types: placeholder as Registry['tenant.artists.photos.destroy']['types'],
   },
   'tenant.inbox.index': {
     methods: ["GET","HEAD"],

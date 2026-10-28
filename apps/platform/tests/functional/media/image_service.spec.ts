@@ -6,13 +6,16 @@ import app from "@adonisjs/core/services/app";
 import drive from "@adonisjs/drive/services/main";
 import { test } from "@japa/runner";
 import sharp from "sharp";
-import { InvalidImageError } from "#modules/media/errors";
+import { ImageDeleteError, InvalidImageError } from "#modules/media/errors";
 import ImageService, {
 	THUMBNAIL_WIDTH,
 } from "#modules/media/services/image_service";
 import { variantsOfKey } from "#modules/media/variants";
 import env from "#start/env";
 import { POLYGLOT_MARKERS, polyglot, testImages } from "#tests/helpers/images";
+import { captureLogs } from "#tests/helpers/logs";
+import { failDeletes, withStrayCopy } from "#tests/helpers/storage_failures";
+import { storedImages } from "#tests/helpers/uploads";
 
 const images = new ImageService();
 const tenant = { id: "0199c0de-0000-7000-8000-000000000001" };
@@ -650,3 +653,371 @@ test.group("ImageService copies (TAT-112)", () => {
 		await images.delete("artist_photo", stored.key);
 	});
 });
+
+test.group("cover and work photo purposes (TAT-116)", () => {
+	const PURPOSES = [
+		{ purpose: "studio_cover", key: /\.640-960-1280-1600\.jpg$/ },
+		{ purpose: "artist_work_photo", key: /\.320-640-1280\.jpg$/ },
+	] as const;
+
+	test("a studio cover is stored on the public disk with 640, 960, 1280 and 1600 px copies", async ({
+		assert,
+	}) => {
+		const studio = { id: randomUUID() };
+
+		const stored = await images.store(
+			await upload(await testImages.jpeg(2048, 1536)),
+			{ tenant: studio, purpose: "studio_cover" },
+		);
+
+		assert.match(
+			stored.key,
+			new RegExp(
+				`^tenants/${studio.id}/studio_cover/${V4}\\.640-960-1280-1600\\.jpg$`,
+			),
+		);
+		assert.lengthOf(await storedImages(studio, "studio_cover"), 5);
+		assert.deepEqual(await storedImages(studio, "studio_cover", "private"), []);
+		const shown = await images.shownImage(
+			"studio_cover",
+			stored.key,
+			studio,
+			stored,
+		);
+		assert.deepEqual(
+			shown.variants.map((copy) => copy.width),
+			[640, 960, 1280, 1600],
+		);
+		assert.equal(shown.width, 2048);
+		assert.equal(shown.height, 1536);
+	});
+
+	test("a work photo gets 320, 640 and 1280 px copies on the public disk", async ({
+		assert,
+	}) => {
+		const studio = { id: randomUUID() };
+
+		const stored = await images.store(
+			await upload(await testImages.jpeg(2048, 1536)),
+			{ tenant: studio, purpose: "artist_work_photo" },
+		);
+
+		assert.match(stored.key, PURPOSES[1].key);
+		assert.lengthOf(await storedImages(studio, "artist_work_photo"), 4);
+		const shown = await images.shownImage(
+			"artist_work_photo",
+			stored.key,
+			studio,
+			stored,
+		);
+		assert.deepEqual(
+			shown.variants.map((copy) => copy.width),
+			[320, 640, 1280],
+		);
+	});
+
+	test("a polyglot upload is stored clean under both purposes: no marker in the file or any copy", async ({
+		assert,
+	}) => {
+		for (const { purpose } of PURPOSES) {
+			const studio = { id: randomUUID() };
+			await images.store(await upload(await polyglot()), {
+				tenant: studio,
+				purpose,
+			});
+
+			const folder = app.tmpPath(
+				"storage",
+				"public",
+				"tenants",
+				studio.id,
+				purpose,
+			);
+			const files = await storedImages(studio, purpose);
+			assert.isAbove(files.length, 1, purpose);
+			for (const file of files) {
+				const bytes = await readFile(join(folder, file));
+				for (const marker of POLYGLOT_MARKERS) {
+					assert.isFalse(
+						bytes.includes(marker),
+						`${purpose} ${file} keeps ${marker}`,
+					);
+				}
+			}
+		}
+	});
+
+	test("a huge image, a HEIC, a GIF and an SVG are refused under both purposes and leave no file", async ({
+		assert,
+	}) => {
+		const hostile: [string, Buffer][] = [
+			["49 MP PNG", await testImages.huge()],
+			["HEIC", await testImages.heif()],
+			["GIF", await testImages.gif()],
+			["SVG", Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>')],
+		];
+		for (const { purpose } of PURPOSES) {
+			for (const [name, bytes] of hostile) {
+				const studio = { id: randomUUID() };
+				const file = await upload(bytes);
+				await assert.rejects(
+					() => images.store(file, { tenant: studio, purpose }),
+					InvalidImageError,
+				);
+				assert.deepEqual(
+					await storedImages(studio, purpose),
+					[],
+					`${purpose} ${name}`,
+				);
+			}
+		}
+	});
+
+	test("a work photo's file and copies have no EXIF or GPS", async ({
+		assert,
+	}) => {
+		const studio = { id: randomUUID() };
+
+		await images.store(await upload(await testImages.phonePhoto(1500, 1000)), {
+			tenant: studio,
+			purpose: "artist_work_photo",
+		});
+
+		const folder = app.tmpPath(
+			"storage",
+			"public",
+			"tenants",
+			studio.id,
+			"artist_work_photo",
+		);
+		const files = await storedImages(studio, "artist_work_photo");
+		assert.lengthOf(files, 3);
+		for (const file of files) {
+			const bytes = await readFile(join(folder, file));
+			assert.isUndefined((await sharp(bytes).metadata()).exif, file);
+			assert.isFalse(bytes.includes("Kathmandu studio"), file);
+		}
+	});
+
+	test("delete removes a cover and every copy", async ({ assert }) => {
+		const studio = { id: randomUUID() };
+		const stored = await images.store(
+			await upload(await testImages.jpeg(2048, 1536)),
+			{ tenant: studio, purpose: "studio_cover" },
+		);
+
+		await images.delete("studio_cover", stored.key);
+
+		assert.deepEqual(await storedImages(studio, "studio_cover"), []);
+	});
+});
+
+test.group("deleting stored images (TAT-116 fix round 1)", () => {
+	const store = async (studio: { id: string }) =>
+		images.store(await upload(await testImages.jpeg(2000, 1500)), {
+			tenant: studio,
+			purpose: "artist_work_photo",
+		});
+
+	test("delete tries every file, logs each failure with its purpose and key, and counts them", async ({
+		assert,
+	}) => {
+		const studio = { id: randomUUID() };
+		const stored = await store(studio);
+		const [, medium] = variantsOfKey(stored.key);
+		const service = new ImageService();
+		const logs = captureLogs();
+		const failing = failDeletes("public", (key) => key === medium.key);
+
+		try {
+			await service.delete("artist_work_photo", stored.key);
+		} finally {
+			failing.restore();
+			logs.restore();
+		}
+
+		assert.equal(service.deleteFailures, 1);
+		assert.lengthOf(failing.attempts, 4, "every file was tried");
+		const [fields] =
+			logs
+				.errors()
+				.find(([first]) => (first as { key?: string }).key === medium.key) ??
+			[];
+		assert.deepInclude(fields, {
+			purpose: "artist_work_photo",
+			key: medium.key,
+		});
+		assert.lengthOf(await storedImages(studio, "artist_work_photo"), 1);
+	});
+
+	test("deleteOrThrow tries every file, then throws naming the files left; a retry removes them; a missing file counts as deleted", async ({
+		assert,
+	}) => {
+		const studio = { id: randomUUID() };
+		const stored = await store(studio);
+		const [small, medium] = variantsOfKey(stored.key);
+		const failing = failDeletes(
+			"public",
+			(key) => key === small.key || key === medium.key,
+		);
+
+		let thrown: unknown;
+		try {
+			await images.deleteOrThrow("artist_work_photo", stored.key);
+		} catch (error) {
+			thrown = error;
+		} finally {
+			failing.restore();
+		}
+
+		assert.instanceOf(thrown, ImageDeleteError);
+		assert.sameMembers(
+			[...(thrown as ImageDeleteError).failed],
+			[small.key, medium.key],
+		);
+		assert.lengthOf(await storedImages(studio, "artist_work_photo"), 2);
+
+		await images.deleteOrThrow("artist_work_photo", stored.key);
+		assert.deepEqual(await storedImages(studio, "artist_work_photo"), []);
+		// Idempotent: everything is already gone.
+		await images.deleteOrThrow("artist_work_photo", stored.key);
+	});
+});
+
+test.group(
+	"a copy left by the upload fallback is removed too (TAT-116 fix round 2)",
+	() => {
+		/** An image stored in the fallback state: a plain key, and its 320 copy still on the disk. */
+		async function storedWithStrayCopy(
+			studio: { id: string },
+			purpose: "artist_work_photo" | "studio_cover",
+			service = new ImageService(),
+		) {
+			const widths = purpose === "studio_cover" ? [640, 960] : [320, 640];
+			return withStrayCopy(
+				"public",
+				{ writtenFirst: `.${widths[0]}w.jpg`, failing: `.${widths[1]}w.jpg` },
+				async () =>
+					service.store(await upload(await testImages.jpeg(2000, 1500)), {
+						tenant: studio,
+						purpose,
+					}),
+			);
+		}
+
+		for (const purpose of ["artist_work_photo", "studio_cover"] as const) {
+			test(`${purpose}: stored as a plain key with a stray copy, deleteOrThrow leaves no file for that base`, async ({
+				assert,
+			}) => {
+				const studio = { id: randomUUID() };
+				const logs = captureLogs();
+				let stored: Awaited<ReturnType<typeof storedWithStrayCopy>>;
+				try {
+					stored = await storedWithStrayCopy(studio, purpose);
+				} finally {
+					logs.restore();
+				}
+
+				// The fallback state: no copy is named, yet one is on the disk.
+				assert.match(stored.key, /\.jpg$/);
+				assert.deepEqual(variantsOfKey(stored.key), []);
+				assert.lengthOf(await storedImages(studio, purpose), 2);
+				// The stray copy is logged with its purpose and base, not swallowed.
+				const entry = logs
+					.errors()
+					.map(
+						([fields]) =>
+							fields as { purpose?: string; base?: string; stray?: string[] },
+					)
+					.find((fields) => fields.stray !== undefined);
+				assert.equal(entry?.purpose, purpose);
+				assert.equal(entry?.base, stored.key.replace(/\.jpg$/, ""));
+				assert.lengthOf(entry?.stray ?? [], 1);
+
+				await images.deleteOrThrow(purpose, stored.key);
+
+				assert.deepEqual(await storedImages(studio, purpose), []);
+			});
+		}
+
+		test("delete (best effort) removes the stray copy too", async ({
+			assert,
+		}) => {
+			const studio = { id: randomUUID() };
+			const logs = captureLogs();
+			let stored: Awaited<ReturnType<typeof storedWithStrayCopy>>;
+			try {
+				stored = await storedWithStrayCopy(studio, "artist_work_photo");
+			} finally {
+				logs.restore();
+			}
+			const service = new ImageService();
+
+			await service.delete("artist_work_photo", stored.key);
+
+			assert.deepEqual(await storedImages(studio, "artist_work_photo"), []);
+			assert.equal(service.deleteFailures, 0);
+		});
+
+		test("a normal key still removes exactly its files, and a file that is not there is no error", async ({
+			assert,
+		}) => {
+			const studio = { id: randomUUID() };
+			// 700 px wide: the key names the 320 and 640 copies; the 1280 one never existed.
+			const stored = await images.store(
+				await upload(await testImages.jpeg(700, 500)),
+				{ tenant: studio, purpose: "artist_work_photo" },
+			);
+			assert.lengthOf(await storedImages(studio, "artist_work_photo"), 3);
+			const service = new ImageService();
+
+			await service.deleteOrThrow("artist_work_photo", stored.key);
+			await service.deleteOrThrow("artist_work_photo", stored.key);
+			await service.delete("artist_work_photo", stored.key);
+
+			assert.deepEqual(await storedImages(studio, "artist_work_photo"), []);
+			assert.equal(service.deleteFailures, 0);
+		});
+
+		test("another image of the same studio is never touched", async ({
+			assert,
+		}) => {
+			const studio = { id: randomUUID() };
+			const keep = await images.store(
+				await upload(await testImages.jpeg(2000, 1500)),
+				{ tenant: studio, purpose: "artist_work_photo" },
+			);
+			const gone = await images.store(
+				await upload(await testImages.jpeg(2000, 1500)),
+				{ tenant: studio, purpose: "artist_work_photo" },
+			);
+
+			await images.deleteOrThrow("artist_work_photo", gone.key);
+
+			const idOf = (key: string) => key.split("/").pop()?.split(".")[0] ?? "";
+			const left = await storedImages(studio, "artist_work_photo");
+			assert.lengthOf(left, 4);
+			assert.isTrue(left.every((file) => file.startsWith(idOf(keep.key))));
+		});
+
+		test("a purpose that keeps one size has no copies to look for", async ({
+			assert,
+		}) => {
+			const studio = { id: randomUUID() };
+			const stored = await images.store(
+				await upload(await testImages.jpeg(2000, 1500)),
+				{ tenant: studio, purpose: "payment_qr" },
+			);
+			const service = new ImageService();
+			const attempts = failDeletes("public", () => false);
+
+			try {
+				await service.deleteOrThrow("payment_qr", stored.key);
+			} finally {
+				attempts.restore();
+			}
+
+			assert.lengthOf(attempts.attempts, 1);
+		});
+	},
+);

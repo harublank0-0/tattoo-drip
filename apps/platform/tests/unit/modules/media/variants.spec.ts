@@ -2,6 +2,7 @@ import { test } from "@japa/runner";
 import {
 	NO_VARIANTS,
 	originalKey,
+	possibleCopyKeys,
 	VARIANT_WIDTHS,
 	variantKey,
 	variantsOfKey,
@@ -92,6 +93,45 @@ test.group("image copies' keys (TAT-112)", () => {
 		];
 		for (const key of keys) {
 			assert.deepEqual(variantsOfKey(key), [], JSON.stringify(key));
+		}
+	});
+});
+
+test.group("every copy an image could have (TAT-116 fix round 2)", () => {
+	test("a plain key, a key naming copies and a key naming only some give the same candidates", ({
+		assert,
+	}) => {
+		const want = [320, 640, 1280].map((width) => `${BASE}.${width}w.jpg`);
+		assert.deepEqual(possibleCopyKeys(`${BASE}.jpg`, VARIANT_WIDTHS), want);
+		assert.deepEqual(
+			possibleCopyKeys(`${BASE}.320-640-1280.jpg`, VARIANT_WIDTHS),
+			want,
+		);
+		assert.deepEqual(possibleCopyKeys(`${BASE}.320.jpg`, VARIANT_WIDTHS), want);
+	});
+
+	test("the extension follows the image, and a purpose with no copies has none", ({
+		assert,
+	}) => {
+		assert.deepEqual(possibleCopyKeys(`${BASE}.png`, [640]), [
+			`${BASE}.640w.png`,
+		]);
+		assert.deepEqual(possibleCopyKeys(`${BASE}.jpg`, NO_VARIANTS), []);
+	});
+
+	test("a copy's own key, a malformed key and another extension name no candidates", ({
+		assert,
+	}) => {
+		for (const key of [
+			`${BASE}.320w.jpg`,
+			`${BASE}.gif`,
+			`${BASE}.320-.jpg`,
+			`${BASE}..jpg`,
+			"tenants/../x.jpg",
+			`${BASE}.0.jpg`,
+			"",
+		]) {
+			assert.deepEqual(possibleCopyKeys(key, VARIANT_WIDTHS), [], key);
 		}
 	});
 });

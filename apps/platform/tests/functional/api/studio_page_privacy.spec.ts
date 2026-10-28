@@ -4,7 +4,7 @@ import ArtistService from "#modules/artists/services/artist_service";
 import ImageService from "#modules/media/services/image_service";
 import PaymentMethodService from "#modules/payments/services/payment_method_service";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
-import { addArtist } from "#tests/helpers/artists";
+import { addArtist, addWorkPhoto } from "#tests/helpers/artists";
 import { seedPipeline } from "#tests/helpers/pipeline";
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
@@ -54,9 +54,27 @@ test.group("Studio page reads: nothing private", (group) => {
 			new ArtistService(new ImageService()).delete(tenant, gone),
 		);
 		const pipeline = await inTenant(tenant, () => seedPipeline(tenant));
+		// Work photos (TAT-116): the shown artist's are public, a hidden and a
+		// deleted artist's are not, and another studio's never are.
+		await inTenant(tenant, async () => {
+			await addWorkPhoto(tenant, shown, { alt: "shown-photo-44" });
+			await addWorkPhoto(tenant, hidden, {
+				alt: "canary-hidden-photo-44",
+				key: `tenants/${tenant.id}/artist_work_photo/canary-hidden-photo-key-44.jpg`,
+			});
+			await addWorkPhoto(tenant, gone, {
+				alt: "canary-deleted-photo-44",
+				key: `tenants/${tenant.id}/artist_work_photo/canary-deleted-photo-key-44.jpg`,
+			});
+		});
+		const other = await studioWithOwner("api-private-other-44", "Other Needle");
+		const otherArtist = await addArtist(other.tenant, other.owner);
+		await inTenant(other.tenant, () =>
+			addWorkPhoto(other.tenant, otherArtist, { alt: "canary-other-photo-44" }),
+		);
 
 		const canaries = [
-			// No photo here, so the tenant id has no reason to appear anywhere.
+			// Only inside a work photo's URL path, which the check below strips.
 			tenant.id,
 			owner.id,
 			owner.email,
@@ -82,6 +100,13 @@ test.group("Studio page reads: nothing private", (group) => {
 			pipeline.payment.id,
 			pipeline.referenceImage.id,
 			pipeline.referenceImage.imageKey,
+			"canary-hidden-photo-44",
+			"canary-hidden-photo-key-44",
+			"canary-deleted-photo-44",
+			"canary-deleted-photo-key-44",
+			"canary-other-photo-44",
+			other.tenant.id,
+			otherArtist.id,
 		].filter((canary) => canary !== "");
 
 		for (const path of ["", "/artists", "/artists/shown"]) {
@@ -89,9 +114,15 @@ test.group("Studio page reads: nothing private", (group) => {
 				`/api/v1/tenants/api-private-44${path}`,
 			);
 			response.assertStatus(200);
-			const text = JSON.stringify(response.body());
+			// The tenant id may appear in one place only: inside the path of a
+			// public work photo's URL (and its copies').
+			const text = JSON.stringify(response.body()).replaceAll(
+				`/uploads/tenants/${tenant.id}/artist_work_photo/`,
+				"/uploads/PHOTO/",
+			);
 			// Positive control: the answer is this studio's page.
 			assert.include(text, path === "" ? "Private Needle" : shown.id);
+			if (path !== "") assert.include(text, "shown-photo-44");
 			for (const canary of canaries) {
 				assert.notInclude(text, canary, `${path || "/"} names ${canary}`);
 			}

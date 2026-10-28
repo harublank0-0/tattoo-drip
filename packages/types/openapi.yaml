@@ -89,8 +89,8 @@ paths:
       summary: The studio's public profile
       description: |
         What the studio page shows about the studio: its name, intro,
-        contact details, links, timezone and whether it takes inquiries
-        (TAT-44). Never its deposit policy, payment details, members or
+        contact details, links, timezone, whether it takes inquiries
+        (TAT-44) and its cover photo (TAT-116). Never its deposit policy, payment details, members or
         anything about clients, inquiries or payments. Cacheable. Under an
         old slug it answers like under the current one, and `slug` is the
         current slug.
@@ -121,9 +121,10 @@ paths:
       tags: [MVP]
       summary: The studio's visible artists
       description: |
-        Every visible artist, by name (ignoring case); hidden and deleted
-        artists never appear, and a studio with no visible artist answers
-        an empty list. Cacheable. Under an old slug it answers like under
+        Every visible artist, by name (ignoring case), each with up to six
+        photos of their work (TAT-116); hidden and deleted artists never
+        appear, nor do their photos, and a studio with no visible artist
+        answers an empty list. Cacheable. Under an old slug it answers like under
         the current one.
       responses:
         "200":
@@ -597,10 +598,12 @@ components:
           type: array
           maxItems: 8
           description: |
-            Smaller copies, narrowest first, each narrower than `width`
-            (320, 640 and 1280 px, those below the image's own width). Empty
-            for an image stored before them or too small to have any: then
-            show `url` alone. Build `srcset` from these and `url` at `width`.
+            Smaller copies, narrowest first, each narrower than `width`. The
+            widths depend on the kind of image: 320, 640 and 1280 px for
+            photos, 640, 960, 1280 and 1600 px for a cover, only those below
+            the image's own width. Empty for an image stored before them or too
+            small to have any: then show `url` alone. Build `srcset` from
+            these and `url` at `width`.
           items: { $ref: "#/components/schemas/ImageVariant" }
 
     Photo:
@@ -626,6 +629,38 @@ components:
             (320, 640 and 1280 px, those below the image's own width). Empty
             for an image stored before them or too small to have any: then
             show `url` alone. Build `srcset` from these and `url` at `width`.
+          items: { $ref: "#/components/schemas/ImageVariant" }
+
+    WorkPhoto:
+      type: object
+      description: |
+        A photo of an artist's work (TAT-116) and its smaller copies. Every
+        property is always there. It carries no id, key, position or
+        timestamp: the list's order is the studio's order.
+      required: [url, width, height, alt, variants]
+      additionalProperties: false
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Public and absolute.
+        width: { type: integer, minimum: 1 }
+        height: { type: integer, minimum: 1 }
+        alt:
+          type: [string, "null"]
+          maxLength: 200
+          description: |
+            The studio's own description of the photo, one line of plain
+            text, or null: then build one from the artist's name, such as
+            "Tattoo by Sita Rai, photo 2 of 4".
+        variants:
+          type: array
+          maxItems: 8
+          description: |
+            Smaller copies, narrowest first, each narrower than `width`
+            (320, 640 and 1280 px, those below the photo's own width). Empty
+            for a photo too small to have any: then show `url` alone. Build
+            `srcset` from these and `url` at `width`.
           items: { $ref: "#/components/schemas/ImageVariant" }
 
     ImageVariant:
@@ -686,7 +721,11 @@ components:
           type: object
           properties:
             logo: { oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }] }
-            heroImage: { oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }] }
+            heroImage:
+              description: |
+                Never sent: the studio's one cover is `Studio.cover` (TAT-116),
+                which the storefront shows here.
+              oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }]
             colors:
               type: object
               additionalProperties: { type: string }
@@ -703,7 +742,7 @@ components:
         studio page shows. Every property is always there; an empty one is
         `null` or `[]`. All text is plain text: render it as text, never as
         HTML.
-      required: [slug, name, type, intro, timezone, contact, socialLinks, acceptingInquiries]
+      required: [slug, name, type, intro, timezone, contact, socialLinks, acceptingInquiries, cover]
       additionalProperties: false
       properties:
         slug:
@@ -751,13 +790,21 @@ components:
             False only when every visible artist is closed (that inquiry
             would be the 409 `studio_not_accepting`); a studio with no
             visible artist takes general inquiries.
+        cover:
+          description: |
+            The studio's cover photo (TAT-116), at most 2048 px on its longer
+            side, with its smaller copies, or null. The studio page opens on
+            it with the studio's name over it. `alt` is always null: the name
+            over it says what the page is. It is the page's hero image:
+            `StorefrontConfiguration.branding.heroImage` is never sent.
+          oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }]
 
     Artist:
       type: object
       description: |
         A visible artist of the studio (TAT-44). Every property is always
         there. All text is plain text: render it as text.
-      required: [id, slug, name, bio, photo, acceptingInquiries, closedMessage]
+      required: [id, slug, name, bio, photo, acceptingInquiries, closedMessage, workPhotos]
       additionalProperties: false
       properties:
         id:
@@ -781,6 +828,14 @@ components:
           type: [string, "null"]
           maxLength: 300
           description: The artist's words to show instead of the inquiry form; null while they accept inquiries
+        workPhotos:
+          type: array
+          maxItems: 6
+          description: |
+            Up to six photos of the artist's work, in the studio's order; []
+            when none. An artist who is closed for inquiries still shows
+            theirs.
+          items: { $ref: "#/components/schemas/WorkPhoto" }
 
     Service:
       type: object

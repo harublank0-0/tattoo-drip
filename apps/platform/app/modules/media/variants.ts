@@ -14,6 +14,16 @@
 
 /** The copies a purpose with copies gets, narrowest first. */
 export const VARIANT_WIDTHS = [320, 640, 1280] as const;
+/**
+ * A studio's cover photo (TAT-116): copies 640, 960, 1280 and 1600 px wide.
+ * The hero is about 329 px wide on a phone, so a phone at 2x to 2.75x takes
+ * the 960 copy (about half the bytes of the 1280 one) and a 4:3 photo at 3x
+ * the 1280 one. A 16:9 photo is enlarged to fill the phone's 4:3 box, so at
+ * 3x it needs about 1320 px: without the 1600 copy the browser took the
+ * stored 2048 px image (428 KB for a detailed photo). A wide screen takes the
+ * 1280 or the 1600 one.
+ */
+export const COVER_WIDTHS = [640, 960, 1280, 1600] as const;
 /** A purpose that keeps one size. */
 export const NO_VARIANTS = [] as const;
 
@@ -73,4 +83,27 @@ export function variantsOfKey(key: string): { width: number; key: string }[] {
 		width,
 		key: variantKey(base, width, extension as ImageExtension),
 	}));
+}
+
+/** The base and extension of an image's own key, whether or not it names copies. */
+const IMAGE_KEY = /^([^.]+)(?:\.[1-9]\d{0,3}(?:-[1-9]\d{0,3})*)?\.(jpg|png)$/;
+
+/**
+ * The key of every copy an image could have for these widths, named or not
+ * (TAT-116 fix round 2): `[]` for a key that is not an image's own (a copy's
+ * key, anything malformed). A key names the copies that were written, but an
+ * upload whose copy cleanup failed is stored under a plain key while a copy
+ * stays on the disk, so removing an image must look for every width its
+ * purpose could have made, not only the ones its key names.
+ */
+export function possibleCopyKeys(
+	key: string,
+	widths: readonly number[],
+): string[] {
+	const match = IMAGE_KEY.exec(key);
+	if (!match) return [];
+	const [, base, extension] = match;
+	return widths.map((width) =>
+		variantKey(base, width, extension as ImageExtension),
+	);
 }

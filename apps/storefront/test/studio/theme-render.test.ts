@@ -162,11 +162,38 @@ describe("a studio's logo and cover (TAT-54)", () => {
 				`<div class="profile-heading"><img class="profile-logo" src="${LOGO.url}" width="600" height="200" alt="" decoding="async" fetchPriority="low"/><h1 class="profile-name" dir="auto">Black Needle</h1>`,
 			),
 		);
+		// The cover is the header's first child and holds the heading: the
+		// name over the photo (TAT-116).
 		assert.ok(
 			html.includes(
-				`<main class="page"><div class="profile-cover"><img src="${COVER.url}" width="2048" height="1024" alt="" loading="eager" decoding="async" fetchPriority="high"/></div><header class="profile">`,
+				`<main class="page"><header class="profile"><div class="profile-cover"><img src="${COVER.url}" width="2048" height="1024" alt="" loading="eager" decoding="async" fetchPriority="high"/><div class="profile-heading">`,
 			),
 		);
+		const cover = html.indexOf('<div class="profile-cover">');
+		const actions = html.indexOf('<div class="profile-actions">');
+		const h1 = html.indexOf("<h1");
+		assert.ok(cover < h1 && h1 < actions, "the one h1 is inside the cover");
+		assert.equal(html.match(/<h1[\s>]/g)?.length, 1);
+		// The logo rides in the same heading, over the same photo.
+		assert.ok(
+			html.indexOf('class="profile-logo"') < h1 &&
+				html.indexOf('class="profile-logo"') > cover,
+		);
+	});
+
+	test("with both a logo and a cover the logo stays in the heading above the name, and the cover image is the box's only direct image (TAT-116)", () => {
+		const html = studioHtml(withStorefront(BRANDED));
+		assertSafePage(html, BRAND_PAGE);
+		const [cover] = html.match(/<div class="profile-cover">[\s\S]*?<h1/) ?? [];
+		assert.ok(cover);
+		// Two images in the box before the name: the cover first, then the logo inside the heading.
+		assert.equal(cover.match(/<img /g)?.length, 2);
+		assert.match(
+			cover,
+			/^<div class="profile-cover"><img src="[^"]*cover\.jpg"[^>]*\/><div class="profile-heading"><img class="profile-logo"[^>]*\/><h1/,
+		);
+		// The logo is not a direct child of the cover box, which the CSS styles with `> img`.
+		assert.doesNotMatch(cover, /^<div class="profile-cover"><img[^>]*\/><img/);
 	});
 
 	test("copies give the logo, the bar logo and the cover their srcset and sizes (TAT-112)", () => {
@@ -190,7 +217,7 @@ describe("a studio's logo and cover (TAT-54)", () => {
 		assert.match(cover, new RegExp(` srcSet="${srcSetOf(COVER_SIZED)}"`, "i"));
 		assert.match(
 			cover,
-			/ sizes="\(min-width: 74\.5rem\) 71\.63rem, calc\(100vw - 2\.875rem\)"/,
+			/ sizes="\(min-width: 74\.5rem\) 71\.63rem, \(min-width: 60rem\) calc\(100vw - 2\.875rem\), calc\(\(100vw - 2\.875rem\) \* 1\.5\)"/,
 		);
 		assert.match(cover, / loading="eager"/);
 		assert.match(cover, /fetchPriority="high"/);

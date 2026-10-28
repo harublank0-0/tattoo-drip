@@ -1,5 +1,7 @@
+import { randomUUID } from "node:crypto";
 import { DateTime } from "luxon";
 import User from "#models/user";
+import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
 import ArtistService from "#modules/artists/services/artist_service";
 import ImageService from "#modules/media/services/image_service";
 import MessageTemplate from "#modules/notifications/models/message_template";
@@ -141,6 +143,21 @@ export async function seededStudio(slug: string, name: string) {
 			owner,
 		),
 	);
+	// A cover photo for the studio and two work photos for the artist (TAT-116),
+	// with made-up keys (the drive ignores a delete of a missing file). Two
+	// photos, so that a move changes something.
+	await inTenant(tenant, async () => {
+		tenant.merge({
+			coverImageKey: `tenants/${tenant.id}/studio_cover/${randomUUID()}.640-960-1280-1600.jpg`,
+			coverImageWidth: 2048,
+			coverImageHeight: 1536,
+		});
+		await tenant.save();
+	});
+	const [workPhoto] = await inTenant(tenant, async () => [
+		await seedWorkPhoto(tenant, artistProfile, 0),
+		await seedWorkPhoto(tenant, artistProfile, 1),
+	]);
 	const pipeline = await inTenant(tenant, () => seedPipeline(tenant));
 	// A second project waiting for the client's answer, for the accept route.
 	const quoted = await inTenant(tenant, async () => {
@@ -321,7 +338,27 @@ export async function seededStudio(slug: string, name: string) {
 		// The members routes' :id resources (TAT-33).
 		invitation,
 		artistMembership,
+		// The work photo routes' :id resource (TAT-116): the artist profile's
+		// first photo (it has a second one).
+		workPhoto,
 	};
+}
+
+/** A work photo row with a made-up key; call it in the tenant's context. */
+function seedWorkPhoto(
+	tenant: Tenant,
+	artist: { id: string },
+	position: number,
+) {
+	return ArtistWorkPhoto.create({
+		tenantId: tenant.id,
+		artistId: artist.id,
+		imageKey: `tenants/${tenant.id}/artist_work_photo/${randomUUID()}.320-640-1280.jpg`,
+		width: 2048,
+		height: 1536,
+		position,
+		alt: null,
+	});
 }
 
 export type Studio = Awaited<ReturnType<typeof seededStudio>>;

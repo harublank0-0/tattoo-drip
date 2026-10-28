@@ -1,3 +1,4 @@
+import type { MultipartFile } from "@adonisjs/core/bodyparser";
 import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
 import User from "#models/user";
 import ArtistService from "#modules/artists/services/artist_service";
@@ -14,8 +15,17 @@ import TenantMembership, {
 } from "#modules/tenancy/models/tenant_membership";
 import TenantSlug from "#modules/tenancy/models/tenant_slug";
 import { MAX_TENANT_SLUGS } from "#modules/tenancy/slugs";
-import { dbClient, withDbContext, withTransaction } from "#services/db_context";
+import {
+	afterCommit,
+	afterRollback,
+	dbClient,
+	withDbContext,
+	withTransaction,
+} from "#services/db_context";
 import { isUniqueViolation } from "#services/db_errors";
+
+/** The image purpose of a studio's cover photo (TAT-116). */
+const COVER = "studio_cover";
 
 /**
  * A slug is taken when it is another tenant's current slug or any slug a
@@ -77,13 +87,18 @@ export type TenantMember = {
 export default class TenancyService {
 	/**
 	 * `artists` is only replaceable so a test can make the profile step
-	 * fail; everything else uses the default.
+	 * fail, and `images` so a test can see what the cover stores; everything
+	 * else uses the defaults.
 	 */
 	constructor(
 		private artists: Pick<
 			ArtistService,
 			"createOwnerProfile"
 		> = new ArtistService(new ImageService()),
+		private images: Pick<
+			ImageService,
+			"store" | "delete" | "deleteOrThrow"
+		> = new ImageService(),
 	) {}
 
 	/**
@@ -128,6 +143,66 @@ export default class TenancyService {
 		tenant.merge(input);
 		await tenant.save();
 		return tenant;
+	}
+
+	/**
+	 * Sets or replaces the studio's cover photo (TAT-116, owners only: the
+	 * route says so). The file is stored inside the transaction with its
+	 * cleanup registered at once, before the tenant row is locked; the key and
+	 * size go in the three cover columns, and the replaced cover and its copies
+	 * are deleted once the outermost transaction commits. Throws
+	 * InvalidImageError for a file we can't accept. Call it in the tenant's
+	 * context: another tenant's row is not found (E_ROW_NOT_FOUND).
+	 */
+	async setCover(
+		tenant: Pick<Tenant, "id">,
+		upload: Pick<MultipartFile, "tmpPath">,
+	): Promise<Tenant> {
+		return withTransaction(async (trx) => {
+			const stored = await this.images.store(upload, {
+				tenant,
+				purpose: COVER,
+			});
+			afterRollback(() => this.images.delete(COVER, stored.key));
+			const live = await Tenant.query({ client: trx })
+				.where("id", tenant.id)
+				.forUpdate()
+				.firstOrFail();
+			const previous = live.coverImageKey;
+			live.merge({
+				coverImageKey: stored.key,
+				coverImageWidth: stored.width,
+				coverImageHeight: stored.height,
+			});
+			await live.save();
+			if (previous) afterCommit(() => this.images.delete(COVER, previous));
+			return live;
+		});
+	}
+
+	/**
+	 * Removes the studio's cover photo, files first (TAT-116): under the
+	 * tenant row's lock the cover's files and every copy are deleted, and only
+	 * then the columns are cleared. If any file cannot be deleted this throws
+	 * ImageDeleteError and the cover stays, so the owner can try again (a
+	 * missing file counts as deleted). Nothing to remove is not an error.
+	 */
+	async removeCover(tenant: Pick<Tenant, "id">): Promise<void> {
+		await withTransaction(async (trx) => {
+			const live = await Tenant.query({ client: trx })
+				.where("id", tenant.id)
+				.forUpdate()
+				.firstOrFail();
+			const previous = live.coverImageKey;
+			if (!previous) return;
+			await this.images.deleteOrThrow(COVER, previous);
+			live.merge({
+				coverImageKey: null,
+				coverImageWidth: null,
+				coverImageHeight: null,
+			});
+			await live.save();
+		});
 	}
 
 	/**

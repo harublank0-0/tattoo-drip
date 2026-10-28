@@ -6,8 +6,9 @@ import ArtistService, {
 	type ArtistInput,
 } from "#modules/artists/services/artist_service";
 import ImageService from "#modules/media/services/image_service";
+import { addArtist, addWorkPhoto } from "#tests/helpers/artists";
 import { testImages } from "#tests/helpers/images";
-import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
+import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 import { newTempUploads, tempUploads } from "#tests/helpers/uploads";
 import { assertValidationError } from "#tests/helpers/validation";
 
@@ -480,5 +481,110 @@ test.group("Editing an artist", (group) => {
 		const saved = await inTenant(tenant, () => Artist.findOrFail(first.id));
 		assert.equal(saved.name, "Sita Rai");
 		assert.equal(saved.slug, "sita");
+	});
+});
+
+test.group("The work photos on the artist form (TAT-116)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("the edit page carries the photos in order, each with only its id, thumbnail and description", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const sita = await addArtist(tenant, owner);
+		const [first, second] = await inTenant(tenant, async () => [
+			await addWorkPhoto(tenant, sita, { alt: "Koi on the forearm" }),
+			await addWorkPhoto(tenant, sita),
+		]);
+
+		const response = await client
+			.get(`${base}/${sita.id}/edit`)
+			.withInertia()
+			.loginAs(owner);
+
+		const { workPhotos } = response.inertiaProps;
+		assert.lengthOf(workPhotos, 2);
+		assert.deepEqual(
+			workPhotos.map((photo: { id: string }) => photo.id),
+			[first.id, second.id],
+		);
+		for (const photo of workPhotos) {
+			assert.deepEqual(Object.keys(photo).sort(), [
+				"alt",
+				"id",
+				"thumbnailUrl",
+			]);
+		}
+		assert.equal(workPhotos[0].alt, "Koi on the forearm");
+		assert.isNull(workPhotos[1].alt);
+		// The 320 px copy, in the studio's own folder.
+		assert.match(
+			new URL(workPhotos[0].thumbnailUrl).pathname,
+			new RegExp(
+				`^/uploads/tenants/${tenant.id}/artist_work_photo/.+\\.320w\\.jpg$`,
+			),
+		);
+		// Never the key, the tenant or artist ids, positions or timestamps.
+		const text = JSON.stringify(workPhotos);
+		for (const word of [
+			"imageKey",
+			"tenantId",
+			"artistId",
+			"position",
+			"createdAt",
+		]) {
+			assert.notInclude(text, word);
+		}
+		assert.notInclude(text, sita.id);
+	});
+
+	test("the create page has no photos yet", async ({ client, assert }) => {
+		const { owner } = await studioWithOwner();
+
+		const response = await client
+			.get(`${base}/new`)
+			.withInertia()
+			.loginAs(owner);
+
+		assert.deepEqual(response.inertiaProps.workPhotos, []);
+	});
+
+	test("an artist's own page carries their photos, and nobody else's", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const member = await artistIn(tenant);
+		const own = await addArtist(tenant, member, {
+			name: "Own",
+			slug: "own",
+			linkToMe: true,
+		});
+		const other = await addArtist(tenant, owner, {
+			name: "Mira",
+			slug: "mira",
+		});
+		await inTenant(tenant, async () => {
+			await addWorkPhoto(tenant, own, { alt: "mine" });
+			await addWorkPhoto(tenant, other, { alt: "theirs" });
+		});
+
+		const response = await client
+			.get(`${base}/${own.id}/edit`)
+			.withInertia()
+			.loginAs(member);
+
+		assert.deepEqual(
+			response.inertiaProps.workPhotos.map(
+				(photo: { alt: string }) => photo.alt,
+			),
+			["mine"],
+		);
+		const theirs = await client
+			.get(`${base}/${other.id}/edit`)
+			.withInertia()
+			.loginAs(member);
+		theirs.assertStatus(404);
 	});
 });

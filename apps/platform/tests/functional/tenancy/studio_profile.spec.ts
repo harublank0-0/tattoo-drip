@@ -1,6 +1,8 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import Tenant from "#modules/tenancy/models/tenant";
+import TenancyService from "#modules/tenancy/services/tenancy_service";
+import { testImages, uploadOf } from "#tests/helpers/images";
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 import { assertValidationError } from "#tests/helpers/validation";
 
@@ -151,5 +153,47 @@ test.group("Saving the studio profile", (group) => {
 		const saved = await inTenant(tenant, () => Tenant.findOrFail(tenant.id));
 		assert.equal(saved.slug, "black-needle");
 		assert.equal(saved.type, "studio");
+	});
+});
+
+test.group("The cover on the profile page (TAT-116)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("the page has cover null, then only the preview URL once one is set", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const page = () =>
+			client
+				.get("/t/black-needle/settings/profile")
+				.withInertia()
+				.loginAs(owner);
+
+		assert.isNull((await page()).inertiaProps.cover);
+
+		await inTenant(tenant, async () =>
+			new TenancyService().setCover(
+				tenant,
+				await uploadOf(await testImages.jpeg(2048, 1536)),
+			),
+		);
+		const { cover } = (await page()).inertiaProps;
+
+		assert.deepEqual(Object.keys(cover).sort(), [
+			"height",
+			"previewUrl",
+			"width",
+		]);
+		// The 960 px copy (a 448 px box on a 2x screen), in the studio's own
+		// folder, with that copy's own size; never the key.
+		assert.match(
+			new URL(cover.previewUrl).pathname,
+			new RegExp(
+				`^/uploads/tenants/${tenant.id}/studio_cover/.+\\.960w\\.jpg$`,
+			),
+		);
+		assert.equal(cover.width, 960);
+		assert.equal(cover.height, 720);
 	});
 });

@@ -1,6 +1,11 @@
 import { Form, Link } from "@adonisjs/inertia/react";
 import { useState } from "react";
 import type { ArtistProps } from "~/components/artists";
+import {
+	TRAY_CREATE_NOTE,
+	trayIntro,
+	type WorkPhotoProps,
+} from "~/components/photos";
 import Section from "~/components/section";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
@@ -14,6 +19,7 @@ import {
 } from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
+import WorkPhotoTray from "~/components/work_photo_tray";
 import { useTenant } from "~/hooks/use-tenant";
 import AppLayout from "~/layouts/app";
 import SettingsLayout from "~/layouts/settings";
@@ -30,55 +36,76 @@ type Errors = Partial<Record<string, string>>;
 export default function ArtistForm({
 	artist,
 	canLink,
+	workPhotos,
 }: {
 	artist: ArtistProps | null;
 	canLink: boolean;
+	workPhotos: WorkPhotoProps[];
 }) {
 	const tenant = useTenant();
 	const params = { tenant: tenant.slug };
 	const owner = tenant.role === "owner";
 
 	return (
-		<Section
-			title={owner ? (artist ? "Edit artist" : "Add an artist") : "Profile"}
-		>
-			{artist ? (
-				// An artist's save redirects back to this same page, and Inertia
-				// keeps a same-page form's state after a non-GET visit: the chosen
-				// photo would stay in the file input and ride along on every later
-				// save (silently winning over "Remove this photo"). Keep the state
-				// only when the save failed, so the form is fresh after a success.
-				<Form
-					route="tenant.artists.update"
-					routeParams={{ ...params, id: artist.id }}
-					options={{ preserveState: "errors" }}
-				>
-					{({ errors, processing }) => (
-						<ArtistFields
-							artist={artist}
-							canLink={canLink}
-							errors={errors}
-							owner={owner}
-							processing={processing}
-							tenantSlug={tenant.slug}
-						/>
-					)}
-				</Form>
-			) : (
-				<Form route="tenant.artists.store" routeParams={params}>
-					{({ errors, processing }) => (
-						<ArtistFields
-							artist={null}
-							canLink={canLink}
-							errors={errors}
-							owner={owner}
-							processing={processing}
-							tenantSlug={tenant.slug}
-						/>
-					)}
-				</Form>
-			)}
-		</Section>
+		<>
+			<Section
+				title={owner ? (artist ? "Edit artist" : "Add an artist") : "Profile"}
+			>
+				{artist ? (
+					// An artist's save redirects back to this same page, and Inertia
+					// keeps a same-page form's state after a non-GET visit: the chosen
+					// photo would stay in the file input and ride along on every later
+					// save (silently winning over "Remove this photo"). Keep the state
+					// only when the save failed, so the form is fresh after a success.
+					<Form
+						route="tenant.artists.update"
+						routeParams={{ ...params, id: artist.id }}
+						options={{ preserveState: "errors" }}
+					>
+						{({ errors, processing }) => (
+							<ArtistFields
+								artist={artist}
+								canLink={canLink}
+								errors={errors}
+								owner={owner}
+								processing={processing}
+								tenantSlug={tenant.slug}
+							/>
+						)}
+					</Form>
+				) : (
+					<Form route="tenant.artists.store" routeParams={params}>
+						{({ errors, processing }) => (
+							<ArtistFields
+								artist={null}
+								canLink={canLink}
+								errors={errors}
+								owner={owner}
+								processing={processing}
+								tenantSlug={tenant.slug}
+							/>
+						)}
+					</Form>
+				)}
+			</Section>
+
+			{/* Outside the profile's <Form>: forms can't nest, and a photo is
+			    saved by its own request (TAT-116). */}
+			<Section
+				title="Work photos"
+				description={artist ? trayIntro(owner) : undefined}
+			>
+				{artist ? (
+					<WorkPhotoTray
+						tenantSlug={tenant.slug}
+						artistId={artist.id}
+						photos={workPhotos}
+					/>
+				) : (
+					<p className="text-sm text-muted-foreground">{TRAY_CREATE_NOTE}</p>
+				)}
+			</Section>
+		</>
 	);
 }
 

@@ -1,4 +1,6 @@
 import { Form } from "@adonisjs/inertia/react";
+import CoverPhotoForm from "~/components/cover_photo_form";
+import type { CoverProps } from "~/components/photos";
 import Section from "~/components/section";
 import type { AddressHost, StudioPageProps } from "~/components/studio_link";
 import StudioLinkCard from "~/components/studio_link_card";
@@ -61,11 +63,13 @@ const SOCIAL_LINKS = [
 
 export default function StudioProfile({
 	profile,
+	cover,
 	timezones,
 	studioPage,
 	addressHost,
 }: {
 	profile: Profile;
+	cover: CoverProps | null;
 	timezones: string[];
 	studioPage: StudioPageProps;
 	addressHost: AddressHost;
@@ -228,6 +232,7 @@ export default function StudioProfile({
 					</>
 				)}
 			</Form>
+			<CoverPhotoForm cover={cover} />
 			<WebAddress addressHost={addressHost} />
 		</>
 	);

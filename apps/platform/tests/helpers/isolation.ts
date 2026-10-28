@@ -29,19 +29,32 @@ function urlFor(
 	return url.replace(ID_SEGMENT, resourceOwner[resource].id);
 }
 
-function send(
+async function send(
 	client: ApiClient,
 	isolationCase: IsolationCase,
 	url: string,
 	user: User,
-	body?: Record<string, unknown>,
+	own: Studio,
 ) {
 	// client.get() and friends type the body as `never`; request() is what they
 	// all call.
 	const request = client.request(url, isolationCase.method);
 	if (isolationCase.method === "GET") request.withInertia();
 	else request.withCsrfToken();
-	if (body) request.form(body);
+	const body = isolationCase.body?.(own);
+	const files = (await isolationCase.files?.(own)) ?? [];
+	if (files.length > 0) {
+		// A multipart form (TAT-116): the fields, then each file as a part.
+		request.fields((body ?? {}) as Record<string, string>);
+		for (const part of files) {
+			request.file(part.field, part.data, {
+				filename: part.name,
+				contentType: part.type,
+			});
+		}
+	} else if (body) {
+		request.form(body);
+	}
 	return request.loginAs(user).redirects(0);
 }
 
@@ -63,7 +76,7 @@ export function caseRequest(
 		isolationCase,
 		urlFor(isolationCase, studio, resourceOwner),
 		user,
-		isolationCase.body?.(studio),
+		studio,
 	);
 }
 
@@ -88,7 +101,6 @@ export async function assertCrossTenantIsolation(
 	isolationCase: IsolationCase,
 ) {
 	const actor = isolationCase.actor === "owner" ? a.owner : a.artist;
-	const body = isolationCase.body?.(a);
 	const writes = isolationCase.method !== "GET";
 
 	// B's baseline is taken before anything is sent: a handler that also
@@ -100,7 +112,7 @@ export async function assertCrossTenantIsolation(
 		isolationCase,
 		urlFor(isolationCase, a, a),
 		actor,
-		body,
+		a,
 	);
 	control.assertStatus(isolationCase.ownStatus);
 	assert.deepEqual(
@@ -122,7 +134,7 @@ export async function assertCrossTenantIsolation(
 	}
 
 	for (const url of attacks) {
-		const response = await send(client, isolationCase, url, actor, body);
+		const response = await send(client, isolationCase, url, actor, a);
 		response.assertStatus(404);
 		assert.deepEqual(
 			await isolationCase.snapshot(b),

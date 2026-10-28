@@ -54,7 +54,8 @@ export interface ArtistPageData {
 
 /**
  * The studio page's data. `imageOrigin` is the API's origin, the only one a
- * logo or cover image may come from (TAT-54); null accepts none.
+ * logo, cover or work photo may come from (TAT-54, TAT-116); null accepts
+ * none.
  */
 export function studioPageData(
 	studio: Studio,
@@ -63,7 +64,7 @@ export function studioPageData(
 	imageOrigin: string | null = null,
 ): StudioPageData {
 	const studioView = studioViewModel(studio);
-	const artistViews = artistViewModels(artists);
+	const artistViews = artistViewModels(artists, imageOrigin);
 	const inquiry = inquiryState(studioView, artistViews, null);
 	return {
 		studio: studioView,
@@ -84,7 +85,7 @@ export function artistPageData(
 	imageOrigin: string | null = null,
 ): ArtistPageData | null {
 	const studioView = studioViewModel(studio);
-	const artistViews = artistViewModels(artists);
+	const artistViews = artistViewModels(artists, imageOrigin);
 	const artist = findArtist(artistViews, slug);
 	if (!artist) return null;
 	const inquiry = inquiryState(studioView, artistViews, artist);

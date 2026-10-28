@@ -247,6 +247,30 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/studio_slug_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
+  'tenant.settings.cover.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/settings/cover'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/tenancy/validators/tenant').coverValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/tenancy/validators/tenant').coverValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/studio_cover_controller').default['update']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/studio_cover_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.settings.cover.destroy': {
+    methods: ["DELETE"]
+    pattern: '/t/:tenant/settings/cover'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/studio_cover_controller').default['destroy']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/studio_cover_controller').default['destroy']>>>
+    }
+  }
   'tenant.settings.payments': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/settings/payments'
@@ -521,6 +545,54 @@ export interface Registry {
       query: {}
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['destroy']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['destroy']>>>
+    }
+  }
+  'tenant.artists.photos.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/artists/:id/photos'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/artists/validators/work_photo').addWorkPhotoValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/artists/validators/work_photo').addWorkPhotoValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/work_photos_controller').default['store']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/work_photos_controller').default['store']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.artists.photos.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/artists/photos/:id'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/artists/validators/work_photo').describeWorkPhotoValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/artists/validators/work_photo').describeWorkPhotoValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/work_photos_controller').default['update']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/work_photos_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.artists.photos.move': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/artists/photos/:id/move'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/artists/validators/work_photo').moveWorkPhotoValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/artists/validators/work_photo').moveWorkPhotoValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/work_photos_controller').default['move']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/work_photos_controller').default['move']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.artists.photos.destroy': {
+    methods: ["DELETE"]
+    pattern: '/t/:tenant/artists/photos/:id'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/work_photos_controller').default['destroy']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/work_photos_controller').default['destroy']>>>
     }
   }
   'tenant.inbox.index': {

@@ -3,6 +3,7 @@ import { readFile, rm } from "node:fs/promises";
 import type { MultipartFile } from "@adonisjs/core/bodyparser";
 import logger from "@adonisjs/core/services/logger";
 import drive from "@adonisjs/drive/services/main";
+import { ImageDeleteError } from "#modules/media/errors";
 import {
 	makeVariants,
 	type ProcessedImage,
@@ -10,9 +11,11 @@ import {
 	processImage,
 } from "#modules/media/services/image_processor";
 import {
+	COVER_WIDTHS,
 	type ImageExtension,
 	NO_VARIANTS,
 	originalKey,
+	possibleCopyKeys,
 	VARIANT_WIDTHS,
 	variantKey,
 	variantsOfKey,
@@ -31,6 +34,8 @@ export const IMAGE_PURPOSES = {
 	payment_proof: { visibility: "private", variants: NO_VARIANTS }, // TAT-65
 	artist_photo: { visibility: "public", variants: VARIANT_WIDTHS }, // TAT-31
 	reference_image: { visibility: "private", variants: VARIANT_WIDTHS }, // TAT-37
+	studio_cover: { visibility: "public", variants: COVER_WIDTHS }, // TAT-116
+	artist_work_photo: { visibility: "public", variants: VARIANT_WIDTHS }, // TAT-116
 } as const;
 
 export type ImagePurpose = keyof typeof IMAGE_PURPOSES;
@@ -170,7 +175,15 @@ export default class ImageService {
 				{ err: error, purpose },
 				"image copies could not be stored; keeping the image without them",
 			);
-			await this.removeAll(purpose, written);
+			const stray = await this.removeAll(purpose, written);
+			if (stray.length > 0) {
+				// The image is stored without copies now, so nothing names these:
+				// say which, once, so they can be found (and removal looks for them).
+				logger.error(
+					{ purpose, base, stray },
+					"copies of an image stored without them could not be deleted",
+				);
+			}
 			return [];
 		}
 	}
@@ -260,28 +273,76 @@ export default class ImageService {
 	}
 
 	/**
-	 * Removes a stored image and the copies its key names, best effort:
-	 * failures are logged, never thrown, so cleanup can't fail a request.
-	 * When replacing an image, call this after the transaction commits.
+	 * How many file deletes have failed on this instance (TAT-116): each one
+	 * is also logged at error level with its purpose and key, so a test (or
+	 * an operator) can see that a best-effort cleanup left something behind.
+	 */
+	deleteFailures = 0;
+
+	/**
+	 * Removes a stored image, the copies its key names and every copy its
+	 * purpose could have made for it (`filesOf`), best effort: every file is tried, a failure is counted (`deleteFailures`) and logged
+	 * with its purpose and key, never thrown, so cleanup can't fail a request.
+	 * Use it for what no record points at any more or what a rollback leaves
+	 * (a replaced image after the commit); a file that fails stays unreferenced
+	 * until the orphan sweep of TAT-27. A removal that must not report success
+	 * while a file is still reachable uses `deleteOrThrow`.
 	 */
 	async delete(purpose: ImagePurpose, key: string): Promise<void> {
-		await this.removeAll(purpose, [
-			key,
-			...variantsOfKey(key).map((copy) => copy.key),
-		]);
+		await this.removeAll(purpose, this.filesOf(purpose, key));
 	}
 
-	/** Deletes each key on its own: one that fails or is gone leaves the rest. */
-	private async removeAll(purpose: ImagePurpose, keys: string[]) {
+	/**
+	 * Removes a stored image and every copy its key names, or throws
+	 * ImageDeleteError naming the files left (TAT-116: a photo a client asked
+	 * to take down must not stay fetchable while the studio is told it is
+	 * gone). Every file is tried even after one fails, and a file that is
+	 * already missing counts as deleted, so a retry finishes the job. Call it
+	 * before the record that names the image is deleted, so a failure leaves
+	 * the record for the owner to try again.
+	 */
+	async deleteOrThrow(purpose: ImagePurpose, key: string): Promise<void> {
+		const failed = await this.removeAll(purpose, this.filesOf(purpose, key));
+		if (failed.length > 0) throw new ImageDeleteError(purpose, failed);
+	}
+
+	/**
+	 * Every file an image can have: the image, the copies its key names, and
+	 * every copy its purpose could have made for the same base name. The
+	 * second set is for the fallback state: if a copy was written, a later one
+	 * failed and the cleanup of the first failed too, the image is stored under
+	 * a plain key (it names no copies) while a copy stays on the disk, and a
+	 * removal that trusted the key would leave that copy fetchable. A file that
+	 * was never written is not an error to delete.
+	 */
+	private filesOf(purpose: ImagePurpose, key: string): string[] {
+		return [
+			...new Set([
+				key,
+				...variantsOfKey(key).map((copy) => copy.key),
+				...possibleCopyKeys(key, IMAGE_PURPOSES[purpose].variants),
+			]),
+		];
+	}
+
+	/** Deletes each key on its own (one that fails or is gone leaves the rest) and returns the keys that failed. */
+	private async removeAll(
+		purpose: ImagePurpose,
+		keys: string[],
+	): Promise<string[]> {
+		const failed: string[] = [];
 		for (const key of keys) {
 			try {
 				await diskFor(purpose).delete(key);
 			} catch (error) {
+				this.deleteFailures++;
+				failed.push(key);
 				logger.error(
 					{ err: error, purpose, key },
 					"could not delete a stored image",
 				);
 			}
 		}
+		return failed;
 	}
 }

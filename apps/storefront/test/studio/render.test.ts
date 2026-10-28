@@ -26,8 +26,10 @@ import {
 	SITA_SIZED,
 	SITA_SRCSET,
 	STUDIO,
+	sitaWithWork,
 } from "./fixtures.ts";
 import { assertSafePage } from "./safety.ts";
+import { IMAGE_ORIGIN } from "./theme-fixtures.ts";
 
 /** The first element of `type` in a component's returned tree (the component is called, not rendered). */
 function findElement(node: ReactNode, type: string): ReactElement | undefined {
@@ -674,5 +676,247 @@ describe("the status pages", () => {
 			);
 			assert.deepEqual(hrefs(html), ["/"], retryHref);
 		}
+	});
+});
+
+describe("the roster's work strip (TAT-116)", () => {
+	const roster = (artists: Artist[]) =>
+		renderToStaticMarkup(
+			createElement(StudioPage, {
+				data: studioPageData(STUDIO, artists, ORIGIN, IMAGE_ORIGIN),
+			}),
+		);
+	const thumbs = (html: string) =>
+		html.match(/<img class="work-thumb"[^>]*>/g) ?? [];
+
+	test("five photos show the first three in one link to the artist's work", () => {
+		const html = roster([sitaWithWork(5, ["Koi on the forearm"]), ARJUN]);
+
+		assertSafePage(html);
+		assert.equal(thumbs(html).length, 3);
+		assert.equal(count(html, /<a class="work-link"/g), 1);
+		const [link] = html.match(/<a class="work-link"[^>]*>[\s\S]*?<\/a>/) ?? [];
+		assert.ok(link);
+		assert.match(link, /^<a class="work-link" href="\/artists\/sita#work">/);
+		assert.equal(thumbs(link).length, 3);
+		assert.match(
+			link,
+			/<span class="work-link-text"><span>See work by <bdi>Sita Rai<\/bdi><\/span><\/span><\/a>$/,
+		);
+		for (const image of thumbs(html)) {
+			assert.match(image, / alt=""/);
+			assert.match(image, / loading="lazy"/);
+			assert.match(image, / decoding="async"/);
+			assert.match(image, / width="2048" height="1536"/);
+			// A 4:3 photo covering a square is enlarged to 4/3 x 5rem.
+			assert.match(image, / sizes="6\.67rem"/);
+			assert.match(
+				image,
+				/ srcSet="[^"]*320w, [^"]*640w, [^"]*1280w, [^"]*2048w"/i,
+			);
+		}
+		// The first three, in the studio's order.
+		assert.deepEqual(
+			thumbs(html).map((image) => /w(\d)\.320-640-1280/.exec(image)?.[1]),
+			["1", "2", "3"],
+		);
+	});
+
+	test("the link's words sit in one inner span, so a flex row can't drop the space before the name", () => {
+		const html = roster([sitaWithWork(1), ARJUN]);
+		// The row is a flex container: text next to a <bdi> would be two flex
+		// items and lose its space, as "See work bySita Rai" did in the browser.
+		assert.match(
+			html,
+			/<span class="work-link-text"><span>See work by <bdi>Sita Rai<\/bdi><\/span><\/span>/,
+		);
+		assert.doesNotMatch(html, /<span class="work-link-text">[^<]/);
+	});
+
+	test("two photos show two; none shows no link; a closed artist still shows their work", () => {
+		const two = roster([sitaWithWork(2), ARJUN]);
+		assert.equal(thumbs(two).length, 2);
+		assert.equal(count(two, /<a class="work-link"/g), 1);
+
+		const none = roster([SITA, ARJUN]);
+		assert.equal(count(none, /work-link|work-strip|work-thumb/g), 0);
+
+		const closed = roster([
+			{ ...ARJUN, workPhotos: sitaWithWork(1).workPhotos },
+		]);
+		assert.match(closed, /<a class="work-link" href="\/artists\/arjun#work">/);
+		assert.match(closed, /See work by <bdi>अर्जुन थापा<\/bdi>/);
+		assertSafePage(closed);
+	});
+
+	test("the link comes after the bio and the closed message, before 'Ask for'", () => {
+		const html = roster([sitaWithWork(3), ARJUN]);
+		const body = html.slice(html.indexOf('<div class="artist-body">'));
+		assert.ok(body.indexOf("Fine line florals") < body.indexOf("work-link"));
+		assert.ok(body.indexOf("work-link") < body.indexOf("Ask for"));
+	});
+
+	test("without the API's origin no work photo reaches the page", () => {
+		const html = renderToStaticMarkup(
+			createElement(StudioPage, {
+				data: studioPageData(STUDIO, [sitaWithWork(3)], ORIGIN),
+			}),
+		);
+		assert.equal(count(html, /work-link/g), 0);
+	});
+
+	test("a work thumbnail outside a work link fails the safety check", () => {
+		const loose =
+			'<h1>x</h1><img class="work-thumb" src="https://a.example/x.jpg" width="1" height="1" alt="">';
+		assert.throws(() => assertSafePage(loose));
+	});
+
+	test("a hostile description never reaches the roster: the thumbnails are decorative", () => {
+		const html = roster([sitaWithWork(1, ['"><script>alert(1)</script>'])]);
+		assertSafePage(html);
+		assert.doesNotMatch(html, /<script>alert/);
+		assert.doesNotMatch(html, /alert\(1\)/);
+	});
+});
+
+describe("the artist page's work grid and viewer (TAT-116)", () => {
+	const ALTS = ["Koi on the forearm", null, "कालो माछा"];
+	const withWork = (count = 5, alts: (string | null)[] = ALTS) => {
+		const data = artistPageData(
+			STUDIO,
+			[sitaWithWork(count, alts), ARJUN],
+			"sita",
+			ORIGIN,
+			IMAGE_ORIGIN,
+		);
+		assert.ok(data);
+		return renderToStaticMarkup(createElement(ArtistPage, { data }));
+	};
+	const dialogs = (html: string) =>
+		html.match(/<dialog [^>]*>[\s\S]*?<\/dialog>/g) ?? [];
+
+	test("a Work section follows the profile and comes before the inquiry", () => {
+		const html = withWork();
+
+		assertSafePage(html);
+		const work = html.indexOf('<section id="work"');
+		assert.ok(work > html.indexOf("</article>"), "after the profile");
+		assert.ok(work < html.indexOf('id="inquiry"'), "before the inquiry");
+		assert.match(
+			html,
+			/<section id="work" class="section" aria-labelledby="work-title"><h2 id="work-title" class="section-title">Work<\/h2>/,
+		);
+		// h1; Work; the inquiry with its steps; the panel; the studio.
+		assert.deepEqual(headings(html), [1, 2, 2, 3, 2, 2]);
+	});
+
+	test("each photo is a button that names its own dialog; the grid holds at most six", () => {
+		const html = withWork(5);
+		const buttons = html.match(/<button [^>]*class="work-open"[^>]*>/g) ?? [];
+
+		assert.equal(buttons.length, 5);
+		buttons.forEach((button, index) => {
+			assert.match(button, / type="button"/);
+			assert.match(button, / aria-haspopup="dialog"/);
+			assert.match(
+				button,
+				new RegExp(` aria-controls="work-photo-${index + 1}"`),
+			);
+			assert.ok(html.includes(` id="work-photo-${index + 1}"`));
+		});
+		assert.equal(count(withWork(9, []), /class="work-open"/g), 6);
+		assert.equal(count(html, /<ul class="work-grid" role="list">/g), 1);
+	});
+
+	test("a dialog has its label, a Close form, the large copy (lazy) and the description", () => {
+		const html = withWork();
+		const all = dialogs(html);
+
+		assert.equal(all.length, 5);
+		all.forEach((dialog, index) => {
+			const n = index + 1;
+			assert.match(
+				dialog,
+				new RegExp(
+					`^<dialog id="work-photo-${n}" class="work-dialog" aria-label="Photo ${n} of 5">`,
+				),
+			);
+			assert.match(
+				dialog,
+				new RegExp(
+					`<form class="work-dialog-bar" method="dialog"><p>Photo ${n} of 5</p><button type="submit" class="action action-secondary">Close</button></form>`,
+				),
+			);
+			const large = dialog.match(/<img class="work-large"[^>]*>/g) ?? [];
+			assert.equal(large.length, 1);
+			// The widest copy up to 1280 px: never the 2048 px original.
+			assert.match(
+				large[0],
+				new RegExp(
+					` src="https://api\\.example\\.com/uploads/tenants/t/artist_work_photo/w${n}\\.1280w\\.jpg"`,
+				),
+			);
+			assert.match(large[0], / loading="lazy"/);
+			assert.match(large[0], / width="2048" height="1536"/);
+			assert.doesNotMatch(large[0], / srcset=/i);
+		});
+		assert.doesNotMatch(html, /<dialog[^>]* open/);
+	});
+
+	test("a description is the alt of the grid photo and the large one, and the caption; without one the alt names the artist", () => {
+		const html = withWork();
+		const [first = "", second = "", third = ""] = dialogs(html);
+
+		assert.match(first, /alt="Koi on the forearm"/);
+		assert.match(
+			first,
+			/<p class="work-dialog-caption user-text" dir="auto">Koi on the forearm<\/p>/,
+		);
+		assert.match(second, /alt="Tattoo by Sita Rai, photo 2 of 5"/);
+		assert.doesNotMatch(second, /work-dialog-caption/);
+		assert.match(
+			third,
+			/<p class="work-dialog-caption user-text" dir="auto">कालो माछा<\/p>/,
+		);
+		const grid = html.match(/<img class="work-photo"[^>]*>/g) ?? [];
+		assert.match(grid[0] ?? "", / alt="Koi on the forearm"/);
+		assert.match(grid[1] ?? "", / alt="Tattoo by Sita Rai, photo 2 of 5"/);
+		for (const image of grid) {
+			assert.match(image, / loading="lazy"/);
+			assert.match(image, / decoding="async"/);
+			assert.match(image, / sizes="/);
+			assert.match(image, / srcSet="/i);
+		}
+	});
+
+	test("a hostile description is text, never markup", () => {
+		const html = withWork(1, ['"><script>alert(1)</script>']);
+
+		assertSafePage(html);
+		assert.doesNotMatch(html, /<script>alert/);
+		assert.match(html, /&quot;&gt;&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+	});
+
+	test("without work photos the page has no Work section and no dialog", () => {
+		const html = artistHtml("sita");
+
+		assert.equal(count(html, /work-|<dialog/g), 0);
+		assert.deepEqual(headings(html), [1, 2, 3, 2, 2]);
+	});
+
+	test("a closed artist's page still shows their work", () => {
+		const data = artistPageData(
+			STUDIO,
+			[{ ...ARJUN, workPhotos: sitaWithWork(2).workPhotos }],
+			"arjun",
+			ORIGIN,
+			IMAGE_ORIGIN,
+		);
+		assert.ok(data);
+		const html = renderToStaticMarkup(createElement(ArtistPage, { data }));
+
+		assertSafePage(html);
+		assert.equal(count(html, /class="work-open"/g), 2);
+		assert.match(html, /alt="Tattoo by अर्जुन थापा, photo 1 of 2"/);
 	});
 });

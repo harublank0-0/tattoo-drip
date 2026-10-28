@@ -1,5 +1,6 @@
 import { DateTime } from "luxon";
 import Artist from "#modules/artists/models/artist";
+import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
 import Client from "#modules/clients/models/client";
 import Inquiry from "#modules/inquiries/models/inquiry";
 import ReferenceImage from "#modules/inquiries/models/reference_image";
@@ -17,6 +18,7 @@ import Tenant from "#modules/tenancy/models/tenant";
 import TenantInvitation from "#modules/tenancy/models/tenant_invitation";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import TenantSlug from "#modules/tenancy/models/tenant_slug";
+import { testImages } from "#tests/helpers/images";
 import { inTenant, type Studio } from "#tests/helpers/tenants";
 
 /**
@@ -43,6 +45,7 @@ export type IsolationCase = {
 	resource?:
 		| "paymentMethod"
 		| "artistProfile"
+		| "workPhoto"
 		| "project"
 		| "quotedProject"
 		| "pricelessProject"
@@ -64,6 +67,13 @@ export type IsolationCase = {
 	actor: "owner" | "artist";
 	/** A valid body for writes, built for the studio sending it. */
 	body?: (own: Studio) => Record<string, unknown>;
+	/**
+	 * Files to send as parts of a multipart form (TAT-116), with the body's
+	 * values as its fields.
+	 */
+	files?: (
+		own: Studio,
+	) => Promise<{ field: string; name: string; type: string; data: Buffer }[]>;
 	/** The status the actor gets on its own studio: the positive control. */
 	ownStatus: 200 | 302;
 	/** Reads the state of the targeted studio that the route could change. */
@@ -107,6 +117,27 @@ const artistRows = (target: Studio) =>
 				.orderBy("id")
 		).map((artist) => artist.serialize()),
 	);
+
+// The artists' work photos, every column, in the studio's order (TAT-116):
+// what the photo routes could change.
+const workPhotoRows = (target: Studio) =>
+	inTenant(target.tenant, async () =>
+		(
+			await ArtistWorkPhoto.query()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("artist_id")
+				.orderBy("position")
+				.orderBy("id")
+		).map((photo) => photo.serialize()),
+	);
+
+/** A PNG upload as the part of a multipart form named `field`. */
+const imagePart = async (field: string) => ({
+	field,
+	name: `${field}.png`,
+	type: "image/png",
+	data: await testImages.png(1200, 900),
+});
 
 const depositLinkRows = (target: Studio) =>
 	inTenant(target.tenant, async () =>
@@ -324,6 +355,22 @@ export const isolationCases: IsolationCase[] = [
 		ownStatus: 302,
 		snapshot: tenantRow,
 	},
+	// The studio's cover photo (TAT-116): a file part, so a multipart case.
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/settings/cover",
+		actor: "owner",
+		files: async () => [await imagePart("cover")],
+		ownStatus: 302,
+		snapshot: tenantRow,
+	},
+	{
+		method: "DELETE",
+		pattern: "/t/:tenant/settings/cover",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: tenantRow,
+	},
 	{
 		method: "GET",
 		pattern: "/t/:tenant/settings/payments",
@@ -456,6 +503,43 @@ export const isolationCases: IsolationCase[] = [
 		actor: "owner",
 		ownStatus: 302,
 		snapshot: artistRows,
+	},
+	// An artist's work photos (TAT-116): the upload names the artist, the
+	// others name the photo.
+	{
+		method: "POST",
+		pattern: "/t/:tenant/artists/:id/photos",
+		resource: "artistProfile",
+		actor: "owner",
+		files: async () => [await imagePart("photo")],
+		ownStatus: 302,
+		snapshot: workPhotoRows,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/artists/photos/:id",
+		resource: "workPhoto",
+		actor: "owner",
+		body: () => ({ alt: "Koi on the forearm" }),
+		ownStatus: 302,
+		snapshot: workPhotoRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/artists/photos/:id/move",
+		resource: "workPhoto",
+		actor: "owner",
+		body: () => ({ direction: "down" }),
+		ownStatus: 302,
+		snapshot: workPhotoRows,
+	},
+	{
+		method: "DELETE",
+		pattern: "/t/:tenant/artists/photos/:id",
+		resource: "workPhoto",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: workPhotoRows,
 	},
 	{
 		method: "GET",

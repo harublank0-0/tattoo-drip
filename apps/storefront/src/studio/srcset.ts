@@ -68,6 +68,32 @@ export function readSrcSet(
 	return [...candidates, `${src} ${width}w`].join(", ");
 }
 
+/** The widest copy the photo viewer shows (TAT-116). */
+export const LARGE_WIDTH = 1280;
+
+/**
+ * What the photo viewer shows (TAT-116): the widest copy up to `max` px in the
+ * image's checked `srcSet` (readSrcSet's string), else the image itself, which
+ * is what an image no wider than `max`, or without copies, shows. Pure.
+ */
+export function largeSource(
+	image: {
+		readonly src: string;
+		readonly width: number;
+		readonly srcSet?: string;
+	},
+	max = LARGE_WIDTH,
+): string {
+	if (image.width <= max || !image.srcSet) return image.src;
+	let best: { url: string; width: number } | null = null;
+	for (const candidate of image.srcSet.split(", ")) {
+		const [url, descriptor] = candidate.split(" ");
+		const width = Number.parseInt(descriptor, 10);
+		if (width <= max && (!best || width > best.width)) best = { url, width };
+	}
+	return best?.url ?? image.src;
+}
+
 /** What `sizes` needs of an image: its stored size (the page's own width and height). */
 export interface ImageSize {
 	readonly width: number;
@@ -95,11 +121,13 @@ const PHOTO_RATIO = 5 / 4;
 /** The photo columns: the roster's 7rem (9rem from 48rem) and the artist page's 20rem. */
 const ROSTER_REM = { narrow: 7, wide: 9 };
 const PROFILE_REM = 20;
-/** The page is min(72rem, 100% - 2.5rem) wide; the cover is 3 / 1 and at most 16rem tall. */
+/** The page is min(72rem, 100% - 2.5rem) wide; the cover is 4 / 3, and 21 / 9 from 60rem (TAT-116). */
 const PAGE_REM = 72;
 const PAGE_GUTTER_REM = 2.5;
-const COVER_RATIO = 1 / 3;
-const COVER_MAX_HEIGHT_REM = 16;
+const COVER_RATIO = 3 / 4;
+const COVER_WIDE_RATIO = 9 / 21;
+/** Where the cover turns wide (styles.css: `@media (min-width: 60rem)`). */
+const COVER_WIDE_REM = 60;
 
 /** The logos' boxes: `block-size` and `max-inline-size` in styles.css. */
 export const LOGO_SLOTS = {
@@ -128,9 +156,14 @@ export function rosterPhotoSizes(image: ImageSize): string {
 	return `(min-width: 48rem) ${rem((ROSTER_REM.wide - MARGIN_REM) * factor)}, ${rem((ROSTER_REM.narrow - MARGIN_REM) * factor)}`;
 }
 
-/** The width of the page's column less its margin, times `factor`: `calc` of `vw`, a plain length when it is 1. */
-function viewportCalc(offsetRem: number, factor: number): string {
-	const rounded = Math.ceil(Number((factor * 100).toFixed(6))) / 100;
+/**
+ * The width of the page's column less its margin, times `factor`: `calc` of
+ * `vw`, a plain length when it is 1. `factor` is rounded up to a hundredth
+ * (a thousandth with `fine`, for a third of a column).
+ */
+function viewportCalc(offsetRem: number, factor: number, fine = false): string {
+	const scale = fine ? 1000 : 100;
+	const rounded = Math.ceil(Number((factor * scale).toFixed(6))) / scale;
 	const minus = `100vw - ${offsetRem}rem`;
 	return rounded === 1 ? `calc(${minus})` : `calc((${minus}) * ${rounded})`;
 }
@@ -147,18 +180,45 @@ export function profilePhotoSizes(image: ImageSize): string {
 }
 
 /**
- * The cover (`.profile-cover img`): the page's width less the margin, 3:1 (at
- * most 16rem tall, which only makes a wide screen's box flatter). The 3:1
- * factor is an upper bound between 48rem and 74.5rem, where the box is flatter.
+ * The cover (`.profile-cover > img`, TAT-116): the page's width less the
+ * margin, in a box that is 4:3 below 60rem and 21:9 from it (no height
+ * limit; a long name makes the real box taller, which only means a little
+ * more enlargement than this asks for). A photo flatter than the box is
+ * enlarged until it is as tall as the box, so it needs the box's width times
+ * how much flatter the box is. From 74.5rem the page stops growing (72rem).
  */
 export function coverSizes(image: ImageSize): string {
-	const wide = PAGE_REM - MARGIN_REM;
-	const wideFactor = coverFactor(COVER_MAX_HEIGHT_REM / wide, image);
+	const wideFactor = coverFactor(COVER_WIDE_RATIO, image);
 	const narrow = viewportCalc(
 		PAGE_GUTTER_REM + MARGIN_REM,
 		coverFactor(COVER_RATIO, image),
 	);
-	return `(min-width: ${PAGE_REM + PAGE_GUTTER_REM}rem) ${rem(wide * wideFactor)}, ${narrow}`;
+	const wide = viewportCalc(PAGE_GUTTER_REM + MARGIN_REM, wideFactor);
+	return `(min-width: ${PAGE_REM + PAGE_GUTTER_REM}rem) ${rem((PAGE_REM - MARGIN_REM) * wideFactor)}, (min-width: ${COVER_WIDE_REM}rem) ${wide}, ${narrow}`;
+}
+
+/** `.work-strip`: the roster's thumbnails are squares of this many rem at every width (TAT-116). */
+const WORK_STRIP_REM = 5;
+
+/** A roster thumbnail of an artist's work (`.work-thumb`): a fixed 5rem square covered by the photo. */
+export function workStripSizes(image: ImageSize): string {
+	return rem(WORK_STRIP_REM * coverFactor(1, image));
+}
+
+/** `.work-grid`: three square columns, at most 48rem wide, with 0.5rem gaps (TAT-116). */
+const WORK_GRID_MAX_REM = 48;
+const WORK_GRID_GAP_REM = 0.5;
+
+/**
+ * A photo in the artist page's work grid (`.work-photo`): a square column,
+ * a third of the grid less its gaps. The grid is the page's width (a phone:
+ * 100vw less the page's gutter) up to 48rem, which the page reaches at
+ * 50.5rem.
+ */
+export function workGridSizes(image: ImageSize): string {
+	const factor = coverFactor(1, image);
+	const column = (WORK_GRID_MAX_REM - 2 * WORK_GRID_GAP_REM) / 3;
+	return `(min-width: ${WORK_GRID_MAX_REM + PAGE_GUTTER_REM}rem) ${rem(column * factor)}, ${viewportCalc(PAGE_GUTTER_REM + 2 * WORK_GRID_GAP_REM, factor / 3, true)}`;
 }
 
 /** A logo: as wide as its height allows, at most the slot's max width. */

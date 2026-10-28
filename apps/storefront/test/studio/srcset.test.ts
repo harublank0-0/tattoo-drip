@@ -4,10 +4,13 @@ import { describe, test } from "node:test";
 import {
 	coverSizes,
 	type LogoSlot,
+	largeSource,
 	logoSizes,
 	profilePhotoSizes,
 	readSrcSet,
 	rosterPhotoSizes,
+	workGridSizes,
+	workStripSizes,
 } from "../../src/studio/srcset.ts";
 
 /** The image's own URL; it is 1200 px wide in these tests. */
@@ -248,18 +251,44 @@ const GEOMETRY = {
 	),
 	coverAspectWidth: number(
 		css,
-		/\.profile-cover img\s*\{[^}]*aspect-ratio:\s*(\d+)\s*\/\s*\d+/,
+		/\.profile-cover\s*\{[^}]*aspect-ratio:\s*(\d+)\s*\/\s*\d+/,
 		"the cover aspect",
 	),
 	coverAspectHeight: number(
 		css,
-		/\.profile-cover img\s*\{[^}]*aspect-ratio:\s*\d+\s*\/\s*(\d+)/,
+		/\.profile-cover\s*\{[^}]*aspect-ratio:\s*\d+\s*\/\s*(\d+)/,
 		"the cover aspect",
 	),
-	coverMaxHeight: number(
+	/** The breakpoint where the cover turns wide, and its wide aspect. */
+	coverWideBreakpoint: number(
 		css,
-		/\.profile-cover img\s*\{[^}]*max-block-size:\s*([\d.]+)rem/,
-		"the cover's max height",
+		/@media \(min-width:\s*([\d.]+)rem\)\s*\{(?:(?!@media)[\s\S])*?\.profile-cover\s*\{/,
+		"the cover's wide breakpoint",
+	),
+	coverWideAspectWidth: number(
+		css,
+		/@media \(min-width:\s*60rem\)\s*\{(?:(?!@media)[\s\S])*?\.profile-cover\s*\{[^}]*aspect-ratio:\s*(\d+)\s*\//,
+		"the wide cover aspect",
+	),
+	coverWideAspectHeight: number(
+		css,
+		/@media \(min-width:\s*60rem\)\s*\{(?:(?!@media)[\s\S])*?\.profile-cover\s*\{[^}]*aspect-ratio:\s*\d+\s*\/\s*(\d+)/,
+		"the wide cover aspect",
+	),
+	workGridMax: number(
+		css,
+		/\.work-grid\s*\{[^}]*max-inline-size:\s*([\d.]+)rem/,
+		"the work grid's width",
+	),
+	workGridGap: number(
+		css,
+		/\.work-grid\s*\{[^}]*gap:\s*([\d.]+)rem/,
+		"the work grid's gap",
+	),
+	workStrip: number(
+		css,
+		/\.work-strip\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*([\d.]+)rem\)/,
+		"the work strip's square",
 	),
 	logo: {
 		hero: {
@@ -315,9 +344,12 @@ interface Box {
 	fit: "cover" | "contain";
 }
 
+/** The copies a cover has (TAT-116): 640, 960, 1280 and 1600 px. */
+const COVER_COPIES = [640, 960, 1280, 1600];
+
 /** The candidate widths the page gives the browser: the copies below the image, then the image. */
-const candidatesOf = (image: Size) => [
-	...COPIES.filter((width) => width < image.width),
+const candidatesOf = (image: Size, copies: number[] = COPIES) => [
+	...copies.filter((width) => width < image.width),
 	image.width,
 ];
 
@@ -372,6 +404,8 @@ interface Slot {
 	name: string;
 	sizes: (image: Size) => string;
 	box: (viewport: number, image: Size) => Box;
+	/** The widths of the copies this slot's images have; the photos' by default. */
+	copies?: number[];
 }
 
 const SLOTS: Slot[] = [
@@ -397,14 +431,38 @@ const SLOTS: Slot[] = [
 	{
 		name: "cover",
 		sizes: coverSizes,
+		copies: COVER_COPIES,
+		// 4:3 below the wide breakpoint, 21:9 from it, with no height limit
+		// (TAT-116); a long name makes the real box taller, which is accepted.
 		box: (viewport) => {
 			const width = pageWidth(viewport) - G.coverMargin * PX;
-			const height = Math.min(
-				(width * G.coverAspectHeight) / G.coverAspectWidth,
-				G.coverMaxHeight * PX,
-			);
-			return { width, height, fit: "cover" };
+			const ratio =
+				viewport >= G.coverWideBreakpoint * PX
+					? G.coverWideAspectHeight / G.coverWideAspectWidth
+					: G.coverAspectHeight / G.coverAspectWidth;
+			return { width, height: width * ratio, fit: "cover" };
 		},
+	},
+	{
+		// The artist page's work grid (TAT-116): three square columns of the
+		// page (at most 48rem) with 0.5rem gaps.
+		name: "work grid",
+		sizes: workGridSizes,
+		box: (viewport) => {
+			const grid = Math.min(G.workGridMax * PX, pageWidth(viewport));
+			const width = (grid - 2 * G.workGridGap * PX) / 3;
+			return { width, height: width, fit: "cover" };
+		},
+	},
+	{
+		// The roster's thumbnails (TAT-116): fixed 5rem squares at every width.
+		name: "work strip",
+		sizes: workStripSizes,
+		box: () => ({
+			width: G.workStrip * PX,
+			height: G.workStrip * PX,
+			fit: "cover",
+		}),
 	},
 	...(["hero", "siteBar", "deposit"] as LogoSlot[]).map((slot) => ({
 		name: `${slot} logo`,
@@ -469,14 +527,21 @@ describe("sizes follow the box each image is drawn in (TAT-112)", () => {
 		assert.equal(logoSizes({ width: 200, height: 2000 }, "hero"), "0.4rem");
 	});
 
-	test("the cover keeps the page's width unless it is wider than its 3:1 box", () => {
+	test("the cover asks for the page's width less its margin, times how much flatter its box is than the photo", () => {
+		// A 4:3 photo fills the 4:3 box of a phone and is flatter than the wide one.
 		assert.equal(
-			coverSizes({ width: 2048, height: 1024 }),
-			"(min-width: 74.5rem) 71.63rem, calc(100vw - 2.875rem)",
+			coverSizes({ width: 2048, height: 1536 }),
+			"(min-width: 74.5rem) 71.63rem, (min-width: 60rem) calc(100vw - 2.875rem), calc(100vw - 2.875rem)",
 		);
+		// A 2:1 photo is enlarged to the 4:3 box's height on a phone (x1.5), not in the 21:9 box.
 		assert.equal(
-			coverSizes({ width: 2000, height: 500 }),
-			"(min-width: 74.5rem) 71.63rem, calc((100vw - 2.875rem) * 1.34)",
+			coverSizes({ width: 2000, height: 1000 }),
+			"(min-width: 74.5rem) 71.63rem, (min-width: 60rem) calc(100vw - 2.875rem), calc((100vw - 2.875rem) * 1.5)",
+		);
+		// A 3:1 photo is enlarged in both boxes: x2.25 in 4:3 and x1.29 in 21:9.
+		assert.equal(
+			coverSizes({ width: 3000, height: 1000 }),
+			"(min-width: 74.5rem) 92.09rem, (min-width: 60rem) calc((100vw - 2.875rem) * 1.29), calc((100vw - 2.875rem) * 2.25)",
 		);
 	});
 
@@ -493,7 +558,7 @@ describe("sizes follow the box each image is drawn in (TAT-112)", () => {
 		describe(slot.name, () => {
 			for (const [name, image] of IMAGES) {
 				test(`${name}: the browser picks the smallest candidate that is not enlarged`, () => {
-					const candidates = candidatesOf(image);
+					const candidates = candidatesOf(image, slot.copies);
 					const sizes = slot.sizes(image);
 					for (const viewport of [320, 375, 767, 768, 1024, 1280, 1600]) {
 						for (const dpr of [1, 2, 3]) {
@@ -547,14 +612,72 @@ describe("sizes follow the box each image is drawn in (TAT-112)", () => {
 				G.coverMargin,
 				G.coverAspectWidth,
 				G.coverAspectHeight,
-				G.coverMaxHeight,
+				G.coverWideBreakpoint,
+				G.coverWideAspectWidth,
+				G.coverWideAspectHeight,
 			],
-			[20, 20, 0.375, 3, 1, 16],
+			[20, 20, 0.375, 4, 3, 60, 21, 9],
 		);
 		assert.deepEqual(G.logo, {
 			hero: { maxRem: 12, heightRem: 4 },
 			siteBar: { maxRem: 6, heightRem: 2 },
 			deposit: { maxRem: 8, heightRem: 2.75 },
 		});
+	});
+});
+
+describe("largeSource: what the photo viewer shows (TAT-116)", () => {
+	const image = (width: number, srcSet?: string) => ({
+		src: "https://api.example.com/w.jpg",
+		width,
+		...(srcSet ? { srcSet } : {}),
+	});
+	const SET =
+		"https://api.example.com/w.320w.jpg 320w, https://api.example.com/w.640w.jpg 640w, https://api.example.com/w.1280w.jpg 1280w, https://api.example.com/w.jpg 2048w";
+
+	test("a 2048 px photo shows its 1280 px copy", () => {
+		assert.equal(
+			largeSource(image(2048, SET)),
+			"https://api.example.com/w.1280w.jpg",
+		);
+	});
+
+	test("a photo 1280 px wide or narrower shows the photo itself", () => {
+		assert.equal(
+			largeSource(image(1280, SET)),
+			"https://api.example.com/w.jpg",
+		);
+		assert.equal(
+			largeSource(
+				image(
+					600,
+					"https://api.example.com/w.320w.jpg 320w, https://api.example.com/w.jpg 600w",
+				),
+			),
+			"https://api.example.com/w.jpg",
+		);
+	});
+
+	test("a photo with no copies shows the photo", () => {
+		assert.equal(largeSource(image(2048)), "https://api.example.com/w.jpg");
+	});
+
+	test("with only small copies the widest one up to 1280 px is the pick", () => {
+		assert.equal(
+			largeSource(
+				image(
+					2048,
+					"https://api.example.com/w.320w.jpg 320w, https://api.example.com/w.640w.jpg 640w, https://api.example.com/w.jpg 2048w",
+				),
+			),
+			"https://api.example.com/w.640w.jpg",
+		);
+	});
+
+	test("a maximum of its own picks accordingly", () => {
+		assert.equal(
+			largeSource(image(2048, SET), 700),
+			"https://api.example.com/w.640w.jpg",
+		);
 	});
 });

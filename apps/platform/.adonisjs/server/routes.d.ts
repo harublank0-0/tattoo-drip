@@ -24,6 +24,8 @@ export type ScannedRoutes = {
     'tenant.settings.profile': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.profile.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.slug.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.cover.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.cover.destroy': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.deposits.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.create': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -47,6 +49,10 @@ export type ScannedRoutes = {
     'tenant.artists.edit': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.artists.photos.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.artists.photos.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.artists.photos.move': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.artists.photos.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inbox.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.inbox.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inbox.accept': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
@@ -204,6 +210,8 @@ export type ScannedRoutes = {
     'tenant.settings.members.invitations.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.members.invitations.renew': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.artists.photos.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.artists.photos.move': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inbox.accept': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inbox.decline': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inbox.contacted.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
@@ -238,20 +246,24 @@ export type ScannedRoutes = {
   PUT: {
     'tenant.settings.profile.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.slug.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.cover.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.deposits.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.messages.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.members.role.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.artists.photos.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.clients.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.projects.notes.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.projects.artist.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
   }
   DELETE: {
+    'tenant.settings.cover.destroy': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.members.invitations.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.members.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.artists.photos.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
   }
 }
 declare module '@adonisjs/core/types/http' {

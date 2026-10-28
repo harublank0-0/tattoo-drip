@@ -6,7 +6,9 @@ import {
 	ARTIST_SLUG,
 	artistViewModels,
 	findArtist,
+	MAX_WORK_PHOTOS,
 	studioViewModel,
+	workPhotoViews,
 } from "../../src/studio/view-model.ts";
 import {
 	ARJUN,
@@ -173,6 +175,7 @@ describe("artistViewModels", () => {
 			closedMessage: null,
 			pageHref: "/artists/sita",
 			inquiryHref: "/artists/sita#inquiry",
+			workPhotos: [],
 		});
 		assert.equal(arjun.name, "अर्जुन थापा");
 		assert.equal(arjun.photo, null);
@@ -319,5 +322,151 @@ describe("ARTIST_SLUG", () => {
 		assert.ok(match, "ArtistSlug has a pattern in openapi.yaml");
 		assert.equal(ARTIST_SLUG.source, match[1]);
 		assert.equal(ARTIST_SLUG.flags, "");
+	});
+});
+
+describe("workPhotoViews (TAT-116)", () => {
+	const ORIGIN = "https://api.example.com";
+	const work = (n: number, over: Record<string, unknown> = {}) => ({
+		url: `${ORIGIN}/uploads/tenants/t/artist_work_photo/w${n}.320-640-1280.jpg`,
+		width: 2048,
+		height: 1536,
+		alt: null,
+		variants: [320, 640, 1280].map((width) => ({
+			url: `${ORIGIN}/uploads/tenants/t/artist_work_photo/w${n}.${width}w.jpg`,
+			width,
+		})),
+		...over,
+	});
+
+	test("keeps at most six of nine, in the API's order", () => {
+		const views = workPhotoViews(
+			Array.from({ length: 9 }, (_, n) => work(n)),
+			"Sita Rai",
+			ORIGIN,
+		);
+		assert.equal(MAX_WORK_PHOTOS, 6);
+		assert.equal(views.length, 6);
+		assert.deepEqual(
+			views.map((view) => view.src),
+			Array.from({ length: 6 }, (_, n) => work(n).url),
+		);
+	});
+
+	test("a photo has its checked srcset, the viewer's 1280 copy, its place and the dialog's id", () => {
+		const [first, second] = workPhotoViews(
+			[work(0), work(1, { alt: "Koi on the forearm" })],
+			"Sita Rai",
+			ORIGIN,
+		);
+		assert.equal(first.width, 2048);
+		assert.equal(first.height, 1536);
+		assert.match(
+			first.srcSet ?? "",
+			/w0\.320w\.jpg 320w, .*w0\.1280w\.jpg 1280w, .*w0\.320-640-1280\.jpg 2048w$/,
+		);
+		assert.equal(
+			first.largeSrc,
+			`${ORIGIN}/uploads/tenants/t/artist_work_photo/w0.1280w.jpg`,
+		);
+		assert.equal(first.dialogId, "work-photo-1");
+		assert.equal(first.label, "Photo 1 of 2");
+		assert.equal(second.dialogId, "work-photo-2");
+		assert.equal(second.label, "Photo 2 of 2");
+	});
+
+	test("the description is the alt and the caption; without one the alt is built from the name and place", () => {
+		const [described, plain] = workPhotoViews(
+			[work(0, { alt: "  Koi on the forearm  " }), work(1)],
+			"Sita Rai",
+			ORIGIN,
+		);
+		assert.equal(described.alt, "Koi on the forearm");
+		assert.equal(described.caption, "Koi on the forearm");
+		assert.equal(plain.alt, "Tattoo by Sita Rai, photo 2 of 2");
+		assert.equal(plain.caption, null);
+		const [devanagari] = workPhotoViews([work(0)], "अर्जुन थापा", ORIGIN);
+		assert.equal(devanagari.alt, "Tattoo by अर्जुन थापा, photo 1 of 1");
+	});
+
+	test("a description is cleaned to one line of plain text; one that is too long, blank or not text is the fallback", () => {
+		const FALLBACK = "Tattoo by Sita Rai, photo 1 of 1";
+		const cases: [unknown, string][] = [
+			['"><script>alert(1)</script>', '"><script>alert(1)</script>'],
+			["two\nlines", "two lines"],
+			["a\r\n\r\nb", "a b"],
+			["  Koi  ", "Koi"],
+			["क".repeat(200), "क".repeat(200)],
+			["x".repeat(201), FALLBACK],
+			["   ", FALLBACK],
+			["\u0000\u2028", FALLBACK],
+			[7, FALLBACK],
+			[{ not: "text" }, FALLBACK],
+			[null, FALLBACK],
+		];
+		for (const [alt, expected] of cases) {
+			const [view] = workPhotoViews([work(0, { alt })], "Sita Rai", ORIGIN);
+			assert.equal(view.alt, expected, String(alt));
+			assert.equal(view.caption, expected === FALLBACK ? null : expected);
+			assert.doesNotMatch(view.alt, /[\p{Cc}\p{Zl}\p{Zp}]/u);
+		}
+	});
+
+	test("an item off the API's origin, with sides out of range or not an image at all is dropped; the rest renumber", () => {
+		const views = workPhotoViews(
+			[
+				work(0, { url: "https://evil.example/w.jpg" }),
+				work(1, { width: 0 }),
+				work(2, { height: 10001 }),
+				work(3, { url: "javascript:alert(1)" }),
+				"nonsense",
+				work(4),
+			],
+			"Sita Rai",
+			ORIGIN,
+		);
+		assert.equal(views.length, 1);
+		assert.equal(views[0].label, "Photo 1 of 1");
+		assert.equal(views[0].alt, "Tattoo by Sita Rai, photo 1 of 1");
+	});
+
+	test("a copy off the origin is dropped and the photo stays", () => {
+		const [view] = workPhotoViews(
+			[
+				work(0, {
+					variants: [
+						{ url: "https://evil.example/w.320w.jpg", width: 320 },
+						{ url: `${ORIGIN}/w.640w.jpg`, width: 640 },
+					],
+				}),
+			],
+			"Sita Rai",
+			ORIGIN,
+		);
+		assert.equal(
+			view.srcSet,
+			`${ORIGIN}/w.640w.jpg 640w, ${work(0).url} 2048w`,
+		);
+		assert.equal(view.largeSrc, `${ORIGIN}/w.640w.jpg`);
+	});
+
+	test("not a list, undefined (an older API) or no origin gives none", () => {
+		for (const value of [undefined, null, "x", 7, {}, { length: 2 }]) {
+			assert.deepEqual(workPhotoViews(value, "Sita Rai", ORIGIN), []);
+		}
+		assert.deepEqual(workPhotoViews([work(0)], "Sita Rai", null), []);
+	});
+
+	test("artistViewModels passes the origin through, and leaves the work out without one", () => {
+		const sita = { ...SITA, workPhotos: [work(0), work(1)] };
+		const [withOrigin] = artistViewModels([sita], ORIGIN);
+		const [without] = artistViewModels([sita]);
+		assert.equal(withOrigin.workPhotos.length, 2);
+		assert.deepEqual(without.workPhotos, []);
+		// Their alt names the artist as the page shows the name.
+		assert.equal(
+			withOrigin.workPhotos[0].alt,
+			"Tattoo by Sita Rai, photo 1 of 2",
+		);
 	});
 });

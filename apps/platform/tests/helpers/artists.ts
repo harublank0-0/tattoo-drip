@@ -1,3 +1,6 @@
+import { randomUUID } from "node:crypto";
+import type Artist from "#modules/artists/models/artist";
+import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
 import ArtistService, {
 	type ArtistInput,
 	type Member,
@@ -31,4 +34,43 @@ export function addArtist(
 			owner,
 		),
 	);
+}
+
+/**
+ * A work photo row for `artist` with a made-up key and no file (the drive
+ * ignores a delete of a missing file), at `position` or the next free one
+ * (TAT-116). Call it inside the tenant's context, as the model needs.
+ */
+export async function addWorkPhoto(
+	tenant: Pick<Tenant, "id">,
+	artist: Pick<Artist, "id">,
+	over: Partial<{
+		position: number;
+		alt: string | null;
+		key: string;
+		width: number;
+		height: number;
+	}> = {},
+) {
+	const position =
+		over.position ??
+		Number(
+			(
+				await ArtistWorkPhoto.query()
+					.where("tenant_id", tenant.id)
+					.where("artist_id", artist.id)
+					.count("* as total")
+			)[0].$extras.total,
+		);
+	return ArtistWorkPhoto.create({
+		tenantId: tenant.id,
+		artistId: artist.id,
+		imageKey:
+			over.key ??
+			`tenants/${tenant.id}/artist_work_photo/${randomUUID()}.320-640-1280.jpg`,
+		width: over.width ?? 2048,
+		height: over.height ?? 1536,
+		position,
+		alt: over.alt ?? null,
+	});
 }

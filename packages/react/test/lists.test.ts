@@ -15,6 +15,7 @@ const STUDIO: Studio = {
 	contact: { phone: null, email: null, address: null },
 	socialLinks: [],
 	acceptingInquiries: true,
+	cover: null,
 };
 
 /** A client whose fetch answers every call with `status` and `body`. */

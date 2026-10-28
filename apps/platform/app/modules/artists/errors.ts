@@ -18,3 +18,14 @@ export class ArtistProfileExistsError extends Error {
 		this.name = "ArtistProfileExistsError";
 	}
 }
+
+/**
+ * The artist already shows the most work photos there are room for (TAT-116).
+ * The message is for developers; the dashboard words its own.
+ */
+export class WorkPhotoLimitError extends Error {
+	constructor() {
+		super("The artist already has the most work photos allowed");
+		this.name = "WorkPhotoLimitError";
+	}
+}

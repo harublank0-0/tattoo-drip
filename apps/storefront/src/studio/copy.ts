@@ -26,6 +26,14 @@ export const studioCopy = {
 		visit: "Visit",
 		map: "Open in Google Maps",
 	},
+	/** The artists' work photos (TAT-116). Templates hold {name}, {n} and {count}. */
+	work: {
+		title: "Work",
+		seeWork: "See work by {name}",
+		fallbackAlt: "Tattoo by {name}, photo {n} of {count}",
+		photoOf: "Photo {n} of {count}",
+		close: "Close",
+	},
 	booking: {
 		title: "How booking works",
 		steps: [

@@ -147,3 +147,45 @@ describe("loadArtistPage", () => {
 		});
 	});
 });
+
+describe("the loaders' work photos (TAT-116)", () => {
+	const work = (origin: string) => ({
+		url: `${origin}/uploads/tenants/t/artist_work_photo/w.jpg`,
+		width: 1200,
+		height: 900,
+		alt: "Koi on the forearm",
+		variants: [],
+	});
+
+	test("both pages show work photos served from the API's own origin", async () => {
+		const sita = { ...SITA, workPhotos: [work(API)] };
+		const { fetch } = listing([sita, ARJUN]);
+
+		const studio = await loadStudioPage(pageContext(fetch));
+		const artist = await loadArtistPage(pageContext(fetch), "sita");
+
+		assert.equal(studio.artists[0].workPhotos.length, 1);
+		assert.equal(studio.artists[0].workPhotos[0].alt, "Koi on the forearm");
+		assert.deepEqual(artist.artist.workPhotos, studio.artists[0].workPhotos);
+		assert.deepEqual(studio.artists[1].workPhotos, []);
+	});
+
+	test("work photos from any other origin are dropped, and the page still loads", async () => {
+		const sita = { ...SITA, workPhotos: [work("https://evil.example")] };
+		const { fetch } = listing([sita, ARJUN]);
+
+		const studio = await loadStudioPage(pageContext(fetch));
+
+		assert.deepEqual(studio.artists[0].workPhotos, []);
+		assert.equal(studio.artists[0].name, "Sita Rai");
+	});
+
+	test("an API that sends no workPhotos at all (older) still loads", async () => {
+		const { workPhotos: _gone, ...older } = SITA;
+		const { fetch } = listing([older as Artist, ARJUN]);
+
+		const studio = await loadStudioPage(pageContext(fetch));
+
+		assert.deepEqual(studio.artists[0].workPhotos, []);
+	});
+});

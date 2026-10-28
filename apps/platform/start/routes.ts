@@ -119,6 +119,13 @@ router
 				router
 					.put("slug", [controllers.StudioSlug, "update"])
 					.as("tenant.settings.slug.update");
+				// The studio's cover photo (TAT-116).
+				router
+					.put("cover", [controllers.StudioCover, "update"])
+					.as("tenant.settings.cover.update");
+				router
+					.delete("cover", [controllers.StudioCover, "destroy"])
+					.as("tenant.settings.cover.destroy");
 				router
 					.get("payments", [controllers.PaymentMethods, "index"])
 					.as("tenant.settings.payments");
@@ -213,6 +220,24 @@ router
 					.delete(":id", [controllers.Artists, "destroy"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.artists.destroy");
+				// An artist's work photos (TAT-116): the upload names the artist,
+				// the others name the photo. One :id per route.
+				router
+					.post(":id/photos", [controllers.WorkPhotos, "store"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.artists.photos.store");
+				router
+					.put("photos/:id", [controllers.WorkPhotos, "update"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.artists.photos.update");
+				router
+					.post("photos/:id/move", [controllers.WorkPhotos, "move"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.artists.photos.move");
+				router
+					.delete("photos/:id", [controllers.WorkPhotos, "destroy"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.artists.photos.destroy");
 			})
 			.prefix("/artists");
 

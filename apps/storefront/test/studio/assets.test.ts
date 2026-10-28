@@ -93,7 +93,7 @@ describe("a studio's cover image (TAT-54)", () => {
 	// a face in the frame, and a landscape photo (which only loses its top and
 	// bottom edges) barely moves.
 	test("crops toward the top, so a portrait photo keeps its head", () => {
-		const body = ruleBody(css, ".profile-cover img");
+		const body = ruleBody(css, ".profile-cover > img");
 		assert.match(body, /object-fit:\s*cover/);
 		assert.match(body, /object-position:\s*50%\s+25%/);
 	});

@@ -700,6 +700,23 @@ describe("studio and artists", () => {
 			{ platform: "instagram", url: "https://instagram.com/blackneedle" },
 		],
 		acceptingInquiries: true,
+		// The studio's cover photo (TAT-116): always without a description.
+		cover: {
+			url: "https://api.example.com/uploads/tenants/t/studio_cover/c.640-960-1280.jpg",
+			width: 2048,
+			height: 1536,
+			alt: null,
+			variants: [
+				{
+					url: "https://api.example.com/uploads/tenants/t/studio_cover/c.640w.jpg",
+					width: 640,
+				},
+				{
+					url: "https://api.example.com/uploads/tenants/t/studio_cover/c.960w.jpg",
+					width: 960,
+				},
+			],
+		},
 	};
 	const ARTIST: Artist = {
 		id: "0199f000-0000-7000-8000-000000000044",
@@ -724,6 +741,32 @@ describe("studio and artists", () => {
 		},
 		acceptingInquiries: false,
 		closedMessage: "Books open in March.",
+		// Up to six photos of the artist's work (TAT-116), in the studio's order.
+		workPhotos: [
+			{
+				url: "https://api.example.com/uploads/tenants/t/artist_work_photo/w1.320-640.jpg",
+				width: 1000,
+				height: 800,
+				alt: "Koi on the forearm, black and grey",
+				variants: [
+					{
+						url: "https://api.example.com/uploads/tenants/t/artist_work_photo/w1.320w.jpg",
+						width: 320,
+					},
+					{
+						url: "https://api.example.com/uploads/tenants/t/artist_work_photo/w1.640w.jpg",
+						width: 640,
+					},
+				],
+			},
+			{
+				url: "https://api.example.com/uploads/tenants/t/artist_work_photo/w2.jpg",
+				width: 300,
+				height: 400,
+				alt: null,
+				variants: [],
+			},
+		],
 	};
 
 	test("studio.get returns the whole profile", async () => {
