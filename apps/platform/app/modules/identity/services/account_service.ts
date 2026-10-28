@@ -13,6 +13,7 @@ import PasswordChangedMail, {
 } from "#modules/identity/emails/password_changed_mail";
 import ResetPasswordMail from "#modules/identity/emails/reset_password_mail";
 import VerifyEmailMail from "#modules/identity/emails/verify_email_mail";
+import { SessionEndedError } from "#modules/identity/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import AccountTokenService, {
 	type TokenState,
@@ -45,7 +46,10 @@ function appLink(path: string) {
  * request): the reset token's row, then the confirmation token's row, then
  * the user's row. `resetPassword` (reset row, verify row, user),
  * `confirmEmail` (verify row, user) and `markVerified` (verify row, user)
- * all follow it. A new method that touches two of them keeps this order.
+ * all follow it, and so do the account page's writes (TAT-95):
+ * `changePassword` (reset row via revoke, then the user) and
+ * `signOutOtherSessions` (the user only). A new method that touches two of
+ * them keeps this order.
  */
 @inject()
 export default class AccountService {
@@ -239,6 +243,71 @@ export default class AccountService {
 			afterCommit(() => clearLoginFailures(storedEmail));
 			return user;
 		});
+	}
+
+	/**
+	 * Changes the password of a signed-in account (TAT-95): the caller has
+	 * checked the current password (throttlePasswordCheck). Ends a pending
+	 * reset link, then, under the user's lock, sets the password and raises the
+	 * session version in one UPDATE (every other session is signed out on its
+	 * next request), emails the stored address and, once committed, clears its
+	 * login failures. Returns the account with its new version, for the
+	 * caller to sign the asking session in again. Lock order: the reset
+	 * token's row (revoke), then the user (see the class).
+	 */
+	async changePassword(user: User, password: string): Promise<User> {
+		return withTransaction(async (trx) => {
+			await this.tokens.revoke(user.id, "reset_password");
+			const locked = await this.lockSession(user);
+			locked.password = password;
+			locked.sessionVersion += 1;
+			await locked.save();
+			await sendMailInTransaction(
+				new PasswordChangedMail({
+					to: locked.email,
+					changedAt: changedAtText(DateTime.now()),
+					resetUrl: appLink("/forgot-password"),
+					signedOut: "elsewhere",
+				}),
+				trx,
+			);
+			const storedEmail = locked.email;
+			afterCommit(() => clearLoginFailures(storedEmail));
+			return locked;
+		});
+	}
+
+	/**
+	 * "Sign out of other devices" (TAT-95): raises the session version under the
+	 * user's lock, so every other session is signed out on its next request.
+	 * Returns the account with its new version, for the caller to sign the
+	 * asking session in again.
+	 */
+	async signOutOtherSessions(user: User): Promise<User> {
+		return withTransaction(async () => {
+			const locked = await this.lockSession(user);
+			locked.sessionVersion += 1;
+			await locked.save();
+			return locked;
+		});
+	}
+
+	/**
+	 * Locks the account of the session that asked and checks that the session
+	 * still holds its current version (`user` is the instance auth loaded, so
+	 * its version is the session's). Another request may have raised it since
+	 * (a reset, a change or a sign-out elsewhere): then this session is over
+	 * and SessionEndedError rolls the caller's work back. Every write of
+	 * `users.password` raises `session_version` in the same UPDATE, so an
+	 * unchanged version also means the hash the caller checked is the stored
+	 * one: keep that true in any new path that sets a password.
+	 */
+	private async lockSession(user: User): Promise<User> {
+		const locked = await User.query().where("id", user.id).forUpdate().first();
+		if (!locked || locked.sessionVersion !== user.sessionVersion) {
+			throw new SessionEndedError();
+		}
+		return locked;
 	}
 
 	private linkFor(purpose: TokenPurpose, token: string) {

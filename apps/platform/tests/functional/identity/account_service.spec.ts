@@ -4,6 +4,7 @@ import queue from "@adonisjs/queue/services/main";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
 import User from "#models/user";
+import { SessionEndedError } from "#modules/identity/errors";
 import AccountService from "#modules/identity/services/account_service";
 import AccountTokenService from "#modules/identity/services/account_token_service";
 import {
@@ -19,6 +20,7 @@ import {
 	queuedMails,
 	tokenOf,
 } from "#tests/helpers/accounts";
+import { recordQueries } from "#tests/helpers/query_count";
 
 const tokens = new AccountTokenService();
 const accounts = new AccountService(tokens);
@@ -367,5 +369,157 @@ test.group("AccountService (TAT-18)", (group) => {
 
 		assert.equal((await User.findOrFail(user.id)).sessionVersion, 1);
 		assert.isTrue(await signsIn(user.email, PASSWORD));
+	});
+});
+
+const OLD = "the-old-password";
+const NEW = "a-new-password";
+const SIGNED_OUT_ELSEWHERE =
+	"every device that was signed in was signed out except the one used to change it";
+
+/** An account, loaded the way `auth` loads it for a request. */
+async function signedIn(email: string) {
+	const created = await User.create({ email, password: OLD });
+	return User.findOrFail(created.id);
+}
+
+/** What another request does meanwhile: a reset, a change or a sign-out raises the version. */
+function raiseVersion(id: string) {
+	return User.query().where("id", id).increment("session_version", 1);
+}
+
+test.group("Signed-in account changes (TAT-95)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+	group.each.teardown(() => queue.restore());
+
+	test("a change sets the password, raises the version once and emails the stored address", async ({
+		assert,
+	}) => {
+		const user = await signedIn("change@service-95.example");
+		const other = await User.create({
+			email: "other@service-95.example",
+			password: OLD,
+		});
+		const reset = await tokens.issue(user, "reset_password");
+		const confirmation = await tokens.issue(user, "verify_email");
+		const fake = queue.fake();
+
+		const changed = await accounts.changePassword(user, NEW);
+
+		assert.isTrue(await signsIn(user.email, NEW));
+		assert.isFalse(await signsIn(user.email, OLD));
+		const row = await User.findOrFail(user.id);
+		assert.equal(row.sessionVersion, user.sessionVersion + 1);
+		assert.equal(changed.sessionVersion, row.sessionVersion);
+		const mails = queuedMails(fake);
+		assert.deepEqual(
+			mails.map(({ to, subject }) => [to, subject]),
+			[[user.email, "Your Tattoo Drip password was changed"]],
+		);
+		assert.sameMembers(Object.keys(mails[0].data), [
+			"changedAt",
+			"resetUrl",
+			"signedOut",
+		]);
+		assert.equal(mails[0].data.resetUrl, appLink("/forgot-password"));
+		assert.equal(mails[0].data.signedOut, SIGNED_OUT_ELSEWHERE);
+		// A pending reset link ends; the confirmation link is left alone.
+		assert.equal(
+			(await tokens.state(reset, "reset_password")).state,
+			"unknown",
+		);
+		assert.equal(
+			(await tokens.state(confirmation, "verify_email")).state,
+			"live",
+		);
+		// Nobody else changes.
+		const untouched = await User.findOrFail(other.id);
+		assert.equal(untouched.sessionVersion, other.sessionVersion);
+		assert.isTrue(await signsIn(other.email, OLD));
+	});
+
+	test("a change clears the login failures of the stored address", async ({
+		assert,
+	}) => {
+		const user = await signedIn("failures@service-95.example");
+		const perEmail = limiter.use({ ...AUTH_LIMITS.loginPerEmail });
+		await perEmail.increment(loginEmailKey(user.email), 25);
+		queue.fake();
+
+		await accounts.changePassword(user, NEW);
+
+		assert.isNull(await perEmail.get(loginEmailKey(user.email)));
+	});
+
+	test("a session that was ended meanwhile changes nothing and says so", async ({
+		assert,
+	}) => {
+		const before = await signedIn("stale@service-95.example");
+		const reset = await tokens.issue(before, "reset_password");
+		await raiseVersion(before.id);
+		const fake = queue.fake();
+
+		await assert.rejects(
+			() => accounts.changePassword(before, NEW),
+			SessionEndedError,
+		);
+		await assert.rejects(
+			() => accounts.signOutOtherSessions(before),
+			SessionEndedError,
+		);
+
+		assert.isTrue(await signsIn(before.email, OLD));
+		assert.isFalse(await signsIn(before.email, NEW));
+		// One raise (the other request's), not two: nothing here wrote.
+		assert.equal(
+			(await User.findOrFail(before.id)).sessionVersion,
+			before.sessionVersion + 1,
+		);
+		// The revoke ran in the same savepoint, so it was rolled back too.
+		assert.equal((await tokens.state(reset, "reset_password")).state, "live");
+		assert.lengthOf(queuedMails(fake), 0);
+	});
+
+	test("signing out other devices raises the version only", async ({
+		assert,
+	}) => {
+		const user = await signedIn("signout@service-95.example");
+		const reset = await tokens.issue(user, "reset_password");
+		const fake = queue.fake();
+
+		const changed = await accounts.signOutOtherSessions(user);
+
+		const row = await User.findOrFail(user.id);
+		assert.equal(row.sessionVersion, user.sessionVersion + 1);
+		assert.equal(changed.sessionVersion, row.sessionVersion);
+		assert.isTrue(await signsIn(user.email, OLD));
+		assert.lengthOf(queuedMails(fake), 0);
+		assert.equal((await tokens.state(reset, "reset_password")).state, "live");
+	});
+
+	test("lock order: the reset link is revoked before the user is locked, and one UPDATE writes the hash and the version", async ({
+		assert,
+	}) => {
+		const user = await signedIn("order@service-95.example");
+		await tokens.issue(user, "reset_password");
+		queue.fake();
+
+		const { queries } = await recordQueries(() =>
+			accounts.changePassword(user, NEW),
+		);
+
+		const revoke = queries.findIndex((sql) =>
+			/delete from "?account_tokens/i.test(sql),
+		);
+		const lock = queries.findIndex((sql) =>
+			/from "users".*for update/i.test(sql),
+		);
+		assert.isAtLeast(revoke, 0);
+		assert.isAtLeast(lock, 0);
+		assert.isBelow(revoke, lock);
+		assert.lengthOf(
+			queries.filter((sql) => /^update "users"/i.test(sql)),
+			1,
+		);
 	});
 });
