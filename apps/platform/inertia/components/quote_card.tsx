@@ -19,6 +19,7 @@ import {
 	type Placement,
 } from "~/components/project_page";
 import {
+	depositAutofill,
 	depositFloorHint,
 	formatRupees,
 	type NextStepProps,
@@ -26,7 +27,6 @@ import {
 	type ProjectPageProps,
 	priceLabel,
 	type QuoteProps,
-	suggestedDeposit,
 } from "~/components/projects";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -441,14 +441,26 @@ export function QuoteForm({
 		quote?.hourlyRate?.toString() ?? "",
 	);
 	const [hours, setHours] = useState(quote?.estimatedHours?.toString() ?? "");
-	const [depositTouched, setDepositTouched] = useState(quote !== null);
+	// An owner's revision starts from the quote's deposit and keeps it (touched). An artist's is
+	// filled in again while untouched, so it never falls under their minimum when the price
+	// changes (depositAutofill).
+	const [depositTouched, setDepositTouched] = useState(
+		quote !== null && !form.depositFloor,
+	);
 	const [deposit, setDeposit] = useState(quote?.depositAmount.toString() ?? "");
 
 	const total =
 		kind === "fixed" ? Number(fixedPrice) : Number(hourlyRate) * Number(hours);
 	const shownDeposit = depositTouched
 		? deposit
-		: String(suggestedDeposit(total, form.depositPercent));
+		: String(
+				depositAutofill(
+					total,
+					form.depositPercent,
+					form.depositFloor,
+					quote?.depositAmount ?? null,
+				),
+			);
 
 	return (
 		<Form

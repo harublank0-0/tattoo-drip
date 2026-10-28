@@ -10,16 +10,23 @@ type ProjectsModule = {
 	artistDepositFloor(total: number, percent: number | null): number;
 	suggestedDeposit(total: number, percent: number | null): number;
 	depositFloorHint(total: number, percent: number | null): string;
+	depositAutofill(
+		total: number,
+		percent: number | null,
+		floorApplies: boolean,
+		current: number | null,
+	): number;
 	OWNER_ACCEPTS_NOTE: string;
 };
 const {
 	artistDepositFloor: pageFloor,
 	suggestedDeposit,
 	depositFloorHint,
+	depositAutofill,
 	OWNER_ACCEPTS_NOTE,
 } = projectsModule as ProjectsModule;
 
-const PERCENTS = [null, 0, 1, 20, 33, 50, 99, 100];
+const PERCENTS = [null, 0, 1, 2, 5, 20, 33, 50, 99, 100];
 
 /** Fixed totals in rupees, then hourly ones (rate x quarter hours, as the form multiplies them). */
 const TOTALS: { rupees: number; paisa: bigint }[] = [
@@ -66,6 +73,54 @@ test.group("The artist deposit floor on the page (TAT-16)", () => {
 				);
 			}
 		}
+	});
+
+	test("an artist's untouched deposit is never under the minimum, whatever the default (fix round 1)", ({
+		assert,
+	}) => {
+		for (const { rupees, paisa } of TOTALS) {
+			for (const percent of PERCENTS) {
+				const filled = depositAutofill(rupees, percent, percent !== 0, null);
+				assert.isAtLeast(
+					filled * 100,
+					Number(serverFloor(paisa, percent)),
+					`NPR ${rupees} at ${percent}%`,
+				);
+			}
+		}
+		// The cases the server refused before: no default, and a share that rounds to nothing.
+		assert.equal(depositAutofill(15_000, null, true, null), 1);
+		assert.equal(depositAutofill(20, 1, true, null), 1);
+		assert.equal(depositAutofill(Number.NaN, null, true, null), 1);
+		// The usual case is what the form always suggested.
+		assert.equal(depositAutofill(15_000, 20, true, null), 3000);
+		// A 0% default has no minimum: the owner's own policy, so zero is filled in.
+		assert.equal(depositAutofill(15_000, 0, false, null), 0);
+	});
+
+	test("a revision starts from the quote's deposit but never below an artist's minimum", ({
+		assert,
+	}) => {
+		assert.equal(depositAutofill(15_000, 20, true, 5000), 5000);
+		assert.equal(depositAutofill(15_000, 20, true, 0), 3000);
+		assert.equal(depositAutofill(15_000, null, true, 0), 1);
+		// The price went up: the old deposit is now under the minimum.
+		assert.equal(depositAutofill(30_000, 20, true, 3000), 6000);
+	});
+
+	test("an owner's untouched deposit is what the form always filled in", ({
+		assert,
+	}) => {
+		for (const { rupees } of TOTALS) {
+			for (const percent of PERCENTS) {
+				assert.equal(
+					depositAutofill(rupees, percent, false, null),
+					suggestedDeposit(rupees, percent),
+				);
+			}
+		}
+		assert.equal(depositAutofill(15_000, null, false, null), 0);
+		assert.equal(depositAutofill(15_000, 20, false, 0), 0);
 	});
 
 	test("a 0% default has no minimum; without a default the minimum is NPR 1", ({

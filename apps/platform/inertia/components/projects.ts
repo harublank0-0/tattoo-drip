@@ -324,6 +324,24 @@ export function artistDepositFloor(
 }
 
 /**
+ * What an untouched Deposit field holds, in whole rupees. The quote's own deposit when revising
+ * (`current`), else the suggestion; and for an artist (`floorApplies`, `form.depositFloor`) never
+ * under their minimum, so keeping the automatic value is never refused (TAT-16, fix round 1: with
+ * no default, or a share that rounds to nothing, the plain suggestion was 0).
+ */
+export function depositAutofill(
+	total: number,
+	percent: number | null,
+	floorApplies: boolean,
+	current: number | null,
+): number {
+	const wanted = current ?? suggestedDeposit(total, percent);
+	return floorApplies
+		? Math.max(wanted, artistDepositFloor(total, percent))
+		: wanted;
+}
+
+/**
  * The Deposit field's note for an artist while a minimum applies (`form.depositFloor`): the
  * minimum for the typed total, and that only an owner goes lower.
  */
