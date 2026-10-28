@@ -91,6 +91,37 @@ export function swatchValue(text: string, fallback: string): string {
 	return /^#[0-9a-f]{6}$/.test(value) ? value : fallback;
 }
 
+/**
+ * What a colour box shows after a render (fix round 1): what was typed, until
+ * the stored colour changes (`stored` is no longer what the box last `seen`),
+ * which is a save: then the stored, lowercased colour. A refusal leaves the
+ * stored colour alone, so the typed text and its error stay. The box follows
+ * the stored colour instead of being remounted by a key, because a remount
+ * drops the focus of a box that Enter has just submitted.
+ */
+export function colourText(
+	typed: string,
+	stored: string,
+	seen: string,
+): string {
+	return stored === seen ? typed : stored;
+}
+
+/**
+ * Whether a Save button takes focus back (fix round 1): it had focus when a
+ * save started and the save has just ended. The button is disabled while it
+ * saves (docs/ui.md), and a focused button that gets disabled drops its focus
+ * to the page, so without this a keyboard or screen reader user lands on
+ * <body> after every save. If focus moved elsewhere meanwhile, it stays there.
+ */
+export function takesFocusBack(
+	hadFocus: boolean,
+	wasProcessing: boolean,
+	processing: boolean,
+): boolean {
+	return hadFocus && wasProcessing && !processing;
+}
+
 /** The logo form's button: upload, replace, or the wait. */
 export function logoButton(
 	hasLogo: boolean,

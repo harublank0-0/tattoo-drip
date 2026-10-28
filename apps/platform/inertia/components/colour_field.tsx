@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { swatchValue } from "~/components/page_look";
+import { colourText, swatchValue } from "~/components/page_look";
 import { Button } from "~/components/ui/button";
 import {
 	Field,
@@ -13,7 +13,8 @@ import { Input } from "~/components/ui/input";
  * One colour of the page look (TAT-56): a text box for the code (#rrggbb, what
  * the form sends; empty means the theme's own colour), the phone's native
  * colour picker beside it (it has no `name`, so only the box is sent) and a
- * Clear button. The picker and the box share one piece of state; the picker
+ * Clear button. The picker and the box share one piece of state, which follows
+ * the stored colour when a save changes it (`defaultValue`); the picker
  * shows the typed colour while it is whole, else `fallback` (the theme's
  * violet), because a native picker cannot show "nothing". The server decides
  * whether a colour is accepted (4.5:1 on the page's paper).
@@ -38,6 +39,14 @@ export default function ColourField({
 	error?: string;
 }) {
 	const [text, setText] = useState(defaultValue);
+	// After a save the stored colour changes: show it (lowercased) in place, without
+	// remounting, so a box that Enter submitted keeps its focus. A refusal changes
+	// nothing stored, so the typed text and the error stay.
+	const [seen, setSeen] = useState(defaultValue);
+	if (seen !== defaultValue) {
+		setSeen(defaultValue);
+		setText(colourText(text, defaultValue, seen));
+	}
 	const help = useId();
 	const problem = useId();
 

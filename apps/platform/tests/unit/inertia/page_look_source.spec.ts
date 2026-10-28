@@ -64,6 +64,56 @@ test.group("The page look components (TAT-56)", () => {
 		assert.include(page, "#cover-photo");
 	});
 
+	// Fix round 1: a successful save changes the stored look. Keying the whole form by it remounted
+	// the form and unmounted the focused Save button, so focus fell to <body>. Only the colour
+	// boxes are keyed (they are the one state the page holds); Save stays mounted.
+	test("the form is not keyed by the look, so the Save button keeps focus after a save", async ({
+		assert,
+	}) => {
+		const source = await read("pages/settings/look.tsx");
+		const form =
+			/<Form\s[^>]*route="tenant\.settings\.look\.update"[^>]*>/.exec(
+				source,
+			)?.[0];
+		assert.isDefined(form, "look.tsx has the look form");
+		assert.notMatch(form as string, /\bkey=/);
+		assert.notInclude(source, "JSON.stringify(look)");
+	});
+
+	test("the colour boxes follow a changed stored colour without remounting, so their focus stays", async ({
+		assert,
+	}) => {
+		const page = await read("pages/settings/look.tsx");
+		// A key that follows the stored colour remounts the box on a save and drops the focus of
+		// a box that Enter just submitted (and two empty colours gave two siblings one key).
+		for (const field of page.match(/<ColourField[\s\S]*?\/>/g) ?? []) {
+			assert.notMatch(field, /\bkey=/);
+		}
+		const field = await read("components/colour_field.tsx");
+		assert.include(field, "colourText(");
+	});
+
+	test("the Save button is the one that gets its focus back after a save", async ({
+		assert,
+	}) => {
+		const page = await read("pages/settings/look.tsx");
+		assert.include(page, "takesFocusBack(");
+		assert.match(page, /<SaveButton\s+processing=\{processing\}/);
+		// Disabled while it saves, like every form (docs/ui.md); the focus comes back after.
+		assert.match(page, /disabled=\{processing\}/);
+	});
+
+	test("Open your page takes its 44 px below lg from the button, not a fixed height", async ({
+		assert,
+	}) => {
+		const source = await read("pages/settings/look.tsx");
+		const link = /<a\s[^>]*href=\{studioPage\.url\}[\s\S]*?>/.exec(source)?.[0];
+		assert.isDefined(link);
+		assert.notMatch(link as string, /\bh-11\b/);
+		const button = await read("components/ui/button.tsx");
+		assert.include(button, "max-lg:min-h-11");
+	});
+
 	test("Remove logo asks first, and says what happens", async ({ assert }) => {
 		const form = await read("components/logo_form.tsx");
 		assert.include(form, "window.confirm(REMOVE_LOGO_QUESTION)");

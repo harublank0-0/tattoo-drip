@@ -1,6 +1,7 @@
 import { Form } from "@adonisjs/inertia/react";
 import { Link } from "@inertiajs/react";
 import { cn } from "cn";
+import { useEffect, useRef } from "react";
 import { urlFor } from "~/client";
 import ColourField from "~/components/colour_field";
 import DevHostWarning from "~/components/dev_host_warning";
@@ -21,6 +22,7 @@ import {
 	PREVIEW_NOTE,
 	type Swatches,
 	type ThemeOption,
+	takesFocusBack,
 } from "~/components/page_look";
 import Section from "~/components/section";
 import type { StudioPageProps } from "~/components/studio_link";
@@ -46,7 +48,11 @@ import SettingsLayout from "~/layouts/settings";
  * every list (themes, fonts, placements), the stored look already filtered
  * to what the page can use, and the logo's preview; this page holds only the
  * colour text while it is typed. Nothing here is markup or CSS: the form
- * sends keys and "#rrggbb" codes, and the server refuses the rest.
+ * sends keys and "#rrggbb" codes, and the server refuses the rest. Nothing is
+ * keyed to the stored look (a remount drops focus): the colour boxes follow a
+ * changed stored colour in place (`ColourField`) and the Save button, which is
+ * disabled while it saves, takes its focus back when the save ends (`SaveButton`),
+ * so a keyboard user does not land on <body> after a save or a refusal.
  */
 export default function PageLook({
 	look,
@@ -86,10 +92,7 @@ export default function PageLook({
 						href={studioPage.url}
 						target="_blank"
 						rel="noreferrer"
-						className={cn(
-							buttonVariants({ variant: "outline" }),
-							"h-11 self-start",
-						)}
+						className={cn(buttonVariants({ variant: "outline" }), "self-start")}
 					>
 						Open your page
 					</a>
@@ -99,7 +102,6 @@ export default function PageLook({
 
 			<div className="mt-6 border-t pt-6">
 				<Form
-					key={JSON.stringify(look)}
 					route="tenant.settings.look.update"
 					routeParams={{ tenant: tenant.slug }}
 					options={{ preserveScroll: true }}
@@ -223,9 +225,7 @@ export default function PageLook({
 								</FieldGroup>
 							</Section>
 
-							<Button type="submit" className="mt-6" disabled={processing}>
-								{processing ? "Saving…" : "Save page look"}
-							</Button>
+							<SaveButton processing={processing} />
 						</>
 					)}
 				</Form>
@@ -250,6 +250,41 @@ export default function PageLook({
 				</Section>
 			</div>
 		</>
+	);
+}
+
+/**
+ * The form's Save button: disabled while it saves ("Saving…"), and when the save
+ * ends, if it had focus when the save started, it takes focus back (a disabled
+ * focused button drops its focus to the page: takesFocusBack). A refusal ends
+ * the same way, so the error and the button are where the keyboard user is.
+ */
+function SaveButton({ processing }: { processing: boolean }) {
+	const button = useRef<HTMLButtonElement>(null);
+	const hadFocus = useRef(false);
+	const wasProcessing = useRef(false);
+	useEffect(() => {
+		if (takesFocusBack(hadFocus.current, wasProcessing.current, processing)) {
+			button.current?.focus();
+		}
+		wasProcessing.current = processing;
+	}, [processing]);
+
+	return (
+		<Button
+			ref={button}
+			type="submit"
+			className="mt-6"
+			disabled={processing}
+			onFocus={() => {
+				hadFocus.current = true;
+			}}
+			onBlur={() => {
+				hadFocus.current = false;
+			}}
+		>
+			{processing ? "Saving…" : "Save page look"}
+		</Button>
 	);
 }
 

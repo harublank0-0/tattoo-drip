@@ -12,6 +12,12 @@ import * as pageLookModule from "../../../inertia/components/page_look.js";
 
 type PageLookModule = {
 	swatchValue(text: string, fallback: string): string;
+	colourText(typed: string, stored: string, seen: string): string;
+	takesFocusBack(
+		hadFocus: boolean,
+		wasProcessing: boolean,
+		processing: boolean,
+	): boolean;
 	logoButton(
 		hasLogo: boolean,
 		processing: boolean,
@@ -50,6 +56,35 @@ test.group("page look words (TAT-56)", () => {
 		assert.equal(words.swatchValue("teal", fallback), fallback);
 		assert.equal(words.swatchValue("#0f766eff", fallback), fallback);
 		assert.equal(words.swatchValue("#gggggg", fallback), fallback);
+	});
+
+	// Fix round 1: a save must not drop the typed text of a refused colour, nor leave a stale
+	// one after a good save, and the Save button disabled while it works loses focus.
+	test("a colour box keeps what was typed until the stored colour changes", ({
+		assert,
+	}) => {
+		// Nothing stored changed (a refusal, or typing): the typed text stays.
+		assert.equal(words.colourText("#E8A317", "", ""), "#E8A317");
+		assert.equal(words.colourText("#0F766E", "#0f766e", "#0f766e"), "#0F766E");
+		// The stored colour changed (a save): the box shows the stored, lowercased value.
+		assert.equal(words.colourText("#0F766E", "#0f766e", ""), "#0f766e");
+		assert.equal(words.colourText("#0f766e", "", "#0f766e"), "");
+	});
+
+	test("the Save button takes focus back only when it had it and a save has just ended", ({
+		assert,
+	}) => {
+		assert.isTrue(words.takesFocusBack(true, true, false));
+		assert.isFalse(words.takesFocusBack(false, true, false), "focus moved on");
+		assert.isFalse(
+			words.takesFocusBack(true, false, false),
+			"no save was running",
+		);
+		assert.isFalse(words.takesFocusBack(true, true, true), "still saving");
+		assert.isFalse(
+			words.takesFocusBack(true, false, true),
+			"a save is starting",
+		);
 	});
 
 	test("the logo button says upload, replace or the wait", ({ assert }) => {
