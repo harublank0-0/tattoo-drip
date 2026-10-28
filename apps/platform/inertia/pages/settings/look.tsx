@@ -4,6 +4,7 @@ import { cn } from "cn";
 import { urlFor } from "~/client";
 import ColourField from "~/components/colour_field";
 import DevHostWarning from "~/components/dev_host_warning";
+import LogoForm from "~/components/logo_form";
 import {
 	COLOUR_HELP,
 	COVER_INTRO_LINE,
@@ -53,6 +54,7 @@ export default function PageLook({
 	fonts,
 	placements,
 	swatches,
+	logo,
 	hasCover,
 	studioPage,
 }: {
@@ -224,6 +226,8 @@ export default function PageLook({
 					</>
 				)}
 			</Form>
+
+			<LogoForm logo={logo} />
 
 			<div className="mt-8 border-t pt-6">
 				<Section title="Cover photo" description={COVER_INTRO_LINE}>

@@ -4,10 +4,12 @@ import { test } from "@japa/runner";
 const read = (file: string) =>
 	readFile(new URL(`../../../inertia/${file}`, import.meta.url), "utf8");
 
-// TAT-116's cover form (Settings) and work photo tray (Artists) live in components/ but belong to
-// the Settings and Artists follow-up that replaces the browser's dialog (X-8), not to this scan.
+// TAT-116's cover form (Settings) and work photo tray (Artists), and TAT-56's logo form (Settings),
+// live in components/ but belong to the Settings and Artists follow-up that replaces the browser's
+// dialog (X-8), not to this scan.
 const SETTINGS_AND_ARTISTS_COMPONENTS = [
 	"cover_photo_form.tsx",
+	"logo_form.tsx",
 	"work_photo_tray.tsx",
 ];
 

@@ -123,6 +123,15 @@
   --status-chair-bg: var(--stencil-wash);
   --status-closed-fg: var(--ink-muted);
   --status-closed-bg: var(--line);
+
+  /*
+   * The studio's logo tile (TAT-56): the storefront draws a logo on a small
+   * light tile in both schemes (its --logo-plate, the same paper colour), so
+   * the dashboard's preview shows what clients see. Light in dark mode on
+   * purpose (not repeated in the dark block): a dark logo with a see-through
+   * background would vanish on a dark surface. Ink on it is 15.8:1.
+   */
+  --logo-plate: #f7f3ee;
 }
 
 [data-theme='dark'] {
@@ -185,6 +194,7 @@
   --color-stencil-strong: var(--stencil-strong);
   --color-stencil-wash: var(--stencil-wash);
   --color-marigold: var(--marigold);
+  --color-logo-plate: var(--logo-plate);
   --color-status-studio-fg: var(--status-studio-fg);
   --color-status-studio-bg: var(--status-studio-bg);
   --color-status-client-fg: var(--status-client-fg);

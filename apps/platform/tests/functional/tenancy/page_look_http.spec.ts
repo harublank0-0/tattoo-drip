@@ -11,6 +11,7 @@ import {
 	THEMES,
 } from "#modules/storefront/look";
 import Tenant from "#modules/tenancy/models/tenant";
+import { studioLinks } from "#services/studio_links";
 import { polyglot, testImages } from "#tests/helpers/images";
 import { failDeletes } from "#tests/helpers/storage_failures";
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
@@ -440,12 +441,12 @@ test.group("Settings, Page look: the logo (TAT-56)", (group) => {
 		const { tenant, owner } = await studioWithOwner();
 		const { studioPage } = (await lookPage(client, owner, tenant)).inertiaProps;
 
+		assert.deepEqual(studioPage, studioLinks(tenant.slug));
 		assert.include(studioPage.url, tenant.slug);
 		assert.equal(
 			studioPage.shareUrl,
 			`https://wa.me/?text=${encodeURIComponent(studioPage.url)}`,
 		);
-		assert.isBoolean(studioPage.devHost);
 	});
 
 	test("an unusable file is a field error on logo and changes nothing", async ({
