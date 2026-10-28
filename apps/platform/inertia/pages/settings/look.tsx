@@ -97,135 +97,139 @@ export default function PageLook({
 				</div>
 			</Section>
 
-			<Form
-				key={JSON.stringify(look)}
-				route="tenant.settings.look.update"
-				routeParams={{ tenant: tenant.slug }}
-				options={{ preserveScroll: true }}
-			>
-				{({ errors, processing }) => (
-					<>
-						<Section title="Look">
-							<FieldGroup>
-								<FieldSet data-invalid={!!errors.theme}>
-									<FieldLegend variant="label">Theme</FieldLegend>
-									<RadioGroup name="theme" defaultValue={look.theme}>
-										{themes.map((theme) => (
-											<FieldLabel
-												key={theme.key}
-												htmlFor={`theme-${theme.key}`}
-											>
-												<Field orientation="horizontal">
-													<FieldContent>
-														<FieldTitle>{theme.label}</FieldTitle>
-														<FieldDescription>
-															{theme.description}
-														</FieldDescription>
-													</FieldContent>
-													<RadioGroupItem
-														value={theme.key}
-														id={`theme-${theme.key}`}
-														aria-invalid={!!errors.theme}
-													/>
-												</Field>
-											</FieldLabel>
-										))}
-									</RadioGroup>
-									{errors.theme && <FieldError>{errors.theme}</FieldError>}
-								</FieldSet>
-
-								<ColourField
-									name="accent"
-									label="Your colour"
-									pickLabel="Pick your colour"
-									description={COLOUR_HELP}
-									defaultValue={look.accent ?? ""}
-									fallback={swatches.light}
-									error={errors.accent}
-								/>
-								<ColourField
-									name="accentDark"
-									label="Colour in dark mode (optional)"
-									pickLabel="Pick the dark mode colour"
-									description={DARK_COLOUR_HELP}
-									defaultValue={look.accentDark ?? ""}
-									fallback={swatches.dark}
-									error={errors.accentDark}
-								/>
-
-								<FieldSet data-invalid={!!errors.font}>
-									<FieldLegend variant="label">Heading font</FieldLegend>
-									<FieldDescription>
-										Your studio's name and the headings on your page.
-									</FieldDescription>
-									<RadioGroup name="font" defaultValue={look.font}>
-										{fonts.map((font) => (
-											<FieldLabel key={font.key} htmlFor={`font-${font.key}`}>
-												<Field orientation="horizontal">
-													<FieldContent>
-														<FieldTitle
-															dir="auto"
-															className={cn(
-																"wrap-anywhere text-lg leading-[1.35]",
-																FONT_SAMPLE_CLASS[font.key],
-															)}
-														>
-															{tenant.name}
-														</FieldTitle>
-														<FieldDescription>{font.label}</FieldDescription>
-													</FieldContent>
-													<RadioGroupItem
-														value={font.key}
-														id={`font-${font.key}`}
-														aria-invalid={!!errors.font}
-													/>
-												</Field>
-											</FieldLabel>
-										))}
-									</RadioGroup>
-									{errors.font && <FieldError>{errors.font}</FieldError>}
-								</FieldSet>
-
-								<FieldSet data-invalid={!!errors.artists}>
-									<FieldLegend variant="label">Artists list</FieldLegend>
-									<FieldDescription>{PLACEMENT_INTRO}</FieldDescription>
-									<RadioGroup name="artists" defaultValue={look.artists}>
-										{placements.map((placement) => (
-											<FieldLabel
-												key={placement}
-												htmlFor={`artists-${placement}`}
-											>
-												<Field orientation="horizontal">
-													<FieldContent>
-														<FieldTitle>
-															{PLACEMENT_WORDS[placement].title}
-														</FieldTitle>
-														{PLACEMENT_WORDS[placement].description && (
+			<div className="mt-6 border-t pt-6">
+				<Form
+					key={JSON.stringify(look)}
+					route="tenant.settings.look.update"
+					routeParams={{ tenant: tenant.slug }}
+					options={{ preserveScroll: true }}
+				>
+					{({ errors, processing }) => (
+						<>
+							<Section title="Look">
+								<FieldGroup>
+									<FieldSet data-invalid={!!errors.theme}>
+										<FieldLegend variant="label">Theme</FieldLegend>
+										<RadioGroup name="theme" defaultValue={look.theme}>
+											{themes.map((theme) => (
+												<FieldLabel
+													key={theme.key}
+													htmlFor={`theme-${theme.key}`}
+												>
+													<Field orientation="horizontal">
+														<FieldContent>
+															<FieldTitle>{theme.label}</FieldTitle>
 															<FieldDescription>
-																{PLACEMENT_WORDS[placement].description}
+																{theme.description}
 															</FieldDescription>
-														)}
-													</FieldContent>
-													<RadioGroupItem
-														value={placement}
-														id={`artists-${placement}`}
-														aria-invalid={!!errors.artists}
-													/>
-												</Field>
-											</FieldLabel>
-										))}
-									</RadioGroup>
-									{errors.artists && <FieldError>{errors.artists}</FieldError>}
-								</FieldSet>
-							</FieldGroup>
-						</Section>
+														</FieldContent>
+														<RadioGroupItem
+															value={theme.key}
+															id={`theme-${theme.key}`}
+															aria-invalid={!!errors.theme}
+														/>
+													</Field>
+												</FieldLabel>
+											))}
+										</RadioGroup>
+										{errors.theme && <FieldError>{errors.theme}</FieldError>}
+									</FieldSet>
 
-						<Button type="submit" className="mt-6" disabled={processing}>
-							{processing ? "Saving…" : "Save page look"}
-						</Button>
-					</>
-				)}
-			</Form>
+									<ColourField
+										name="accent"
+										label="Your colour"
+										pickLabel="Pick your colour"
+										description={COLOUR_HELP}
+										defaultValue={look.accent ?? ""}
+										fallback={swatches.light}
+										error={errors.accent}
+									/>
+									<ColourField
+										name="accentDark"
+										label="Colour in dark mode (optional)"
+										pickLabel="Pick the dark mode colour"
+										description={DARK_COLOUR_HELP}
+										defaultValue={look.accentDark ?? ""}
+										fallback={swatches.dark}
+										error={errors.accentDark}
+									/>
+
+									<FieldSet data-invalid={!!errors.font}>
+										<FieldLegend variant="label">Heading font</FieldLegend>
+										<FieldDescription>
+											Your studio's name and the headings on your page.
+										</FieldDescription>
+										<RadioGroup name="font" defaultValue={look.font}>
+											{fonts.map((font) => (
+												<FieldLabel key={font.key} htmlFor={`font-${font.key}`}>
+													<Field orientation="horizontal">
+														<FieldContent>
+															<FieldTitle
+																dir="auto"
+																className={cn(
+																	"wrap-anywhere text-lg leading-[1.35]",
+																	FONT_SAMPLE_CLASS[font.key],
+																)}
+															>
+																{tenant.name}
+															</FieldTitle>
+															<FieldDescription>{font.label}</FieldDescription>
+														</FieldContent>
+														<RadioGroupItem
+															value={font.key}
+															id={`font-${font.key}`}
+															aria-invalid={!!errors.font}
+														/>
+													</Field>
+												</FieldLabel>
+											))}
+										</RadioGroup>
+										{errors.font && <FieldError>{errors.font}</FieldError>}
+									</FieldSet>
+
+									<FieldSet data-invalid={!!errors.artists}>
+										<FieldLegend variant="label">Artists list</FieldLegend>
+										<FieldDescription>{PLACEMENT_INTRO}</FieldDescription>
+										<RadioGroup name="artists" defaultValue={look.artists}>
+											{placements.map((placement) => (
+												<FieldLabel
+													key={placement}
+													htmlFor={`artists-${placement}`}
+												>
+													<Field orientation="horizontal">
+														<FieldContent>
+															<FieldTitle>
+																{PLACEMENT_WORDS[placement].title}
+															</FieldTitle>
+															{PLACEMENT_WORDS[placement].description && (
+																<FieldDescription>
+																	{PLACEMENT_WORDS[placement].description}
+																</FieldDescription>
+															)}
+														</FieldContent>
+														<RadioGroupItem
+															value={placement}
+															id={`artists-${placement}`}
+															aria-invalid={!!errors.artists}
+														/>
+													</Field>
+												</FieldLabel>
+											))}
+										</RadioGroup>
+										{errors.artists && (
+											<FieldError>{errors.artists}</FieldError>
+										)}
+									</FieldSet>
+								</FieldGroup>
+							</Section>
+
+							<Button type="submit" className="mt-6" disabled={processing}>
+								{processing ? "Saving…" : "Save page look"}
+							</Button>
+						</>
+					)}
+				</Form>
+			</div>
 
 			<LogoForm logo={logo} />
 
