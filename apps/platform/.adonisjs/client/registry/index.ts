@@ -138,6 +138,30 @@ const routes = {
     tokens: [{"old":"/t/:tenant/settings/cover","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/cover","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/cover","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/cover","type":0,"val":"cover","end":""}],
     types: placeholder as Registry['tenant.settings.cover.destroy']['types'],
   },
+  'tenant.settings.look': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/settings/look',
+    tokens: [{"old":"/t/:tenant/settings/look","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/look","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/look","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/look","type":0,"val":"look","end":""}],
+    types: placeholder as Registry['tenant.settings.look']['types'],
+  },
+  'tenant.settings.look.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/settings/look',
+    tokens: [{"old":"/t/:tenant/settings/look","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/look","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/look","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/look","type":0,"val":"look","end":""}],
+    types: placeholder as Registry['tenant.settings.look.update']['types'],
+  },
+  'tenant.settings.logo.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/settings/logo',
+    tokens: [{"old":"/t/:tenant/settings/logo","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/logo","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/logo","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/logo","type":0,"val":"logo","end":""}],
+    types: placeholder as Registry['tenant.settings.logo.update']['types'],
+  },
+  'tenant.settings.logo.destroy': {
+    methods: ["DELETE"],
+    pattern: '/t/:tenant/settings/logo',
+    tokens: [{"old":"/t/:tenant/settings/logo","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/logo","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/logo","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/logo","type":0,"val":"logo","end":""}],
+    types: placeholder as Registry['tenant.settings.logo.destroy']['types'],
+  },
   'tenant.settings.payments': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/settings/payments',

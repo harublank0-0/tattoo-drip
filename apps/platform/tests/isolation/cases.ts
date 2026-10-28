@@ -371,6 +371,45 @@ export const isolationCases: IsolationCase[] = [
 		ownStatus: 302,
 		snapshot: tenantRow,
 	},
+	// The studio page's look and logo (TAT-56): the look is a plain form, the
+	// logo a file part like the cover. A's logo is seeded, so the DELETE's
+	// positive control changes something.
+	{
+		method: "GET",
+		pattern: "/t/:tenant/settings/look",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: tenantRow,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/settings/look",
+		actor: "owner",
+		body: () => ({
+			theme: "stencil-and-ink",
+			accent: "#0f766e",
+			accentDark: "",
+			font: "serif",
+			artists: "last",
+		}),
+		ownStatus: 302,
+		snapshot: tenantRow,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/settings/logo",
+		actor: "owner",
+		files: async () => [await imagePart("logo")],
+		ownStatus: 302,
+		snapshot: tenantRow,
+	},
+	{
+		method: "DELETE",
+		pattern: "/t/:tenant/settings/logo",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: tenantRow,
+	},
 	{
 		method: "GET",
 		pattern: "/t/:tenant/settings/payments",

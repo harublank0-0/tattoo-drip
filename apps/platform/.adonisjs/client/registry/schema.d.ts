@@ -271,6 +271,54 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/studio_cover_controller').default['destroy']>>>
     }
   }
+  'tenant.settings.look': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/settings/look'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/page_look_controller').default['show']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/page_look_controller').default['show']>>>
+    }
+  }
+  'tenant.settings.look.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/settings/look'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/tenancy/validators/tenant').updateLookValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/tenancy/validators/tenant').updateLookValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/page_look_controller').default['update']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/page_look_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.settings.logo.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/settings/logo'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/tenancy/validators/tenant').logoValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/tenancy/validators/tenant').logoValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/studio_logo_controller').default['update']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/studio_logo_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.settings.logo.destroy': {
+    methods: ["DELETE"]
+    pattern: '/t/:tenant/settings/logo'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/studio_logo_controller').default['destroy']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/studio_logo_controller').default['destroy']>>>
+    }
+  }
   'tenant.settings.payments': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/settings/payments'

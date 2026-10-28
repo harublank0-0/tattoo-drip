@@ -146,14 +146,17 @@ export async function seededStudio(slug: string, name: string) {
 			owner,
 		),
 	);
-	// A cover photo for the studio and two work photos for the artist (TAT-116),
-	// with made-up keys (the drive ignores a delete of a missing file). Two
-	// photos, so that a move changes something.
+	// A cover photo and a logo for the studio (TAT-116, TAT-56) and two work
+	// photos for the artist, with made-up keys (the drive ignores a delete of a
+	// missing file). Two photos, so that a move changes something.
 	await inTenant(tenant, async () => {
 		tenant.merge({
 			coverImageKey: `tenants/${tenant.id}/studio_cover/${randomUUID()}.640-960-1280-1600.jpg`,
 			coverImageWidth: 2048,
 			coverImageHeight: 1536,
+			logoImageKey: `tenants/${tenant.id}/studio_logo/${randomUUID()}.320.png`,
+			logoImageWidth: 600,
+			logoImageHeight: 200,
 		});
 		await tenant.save();
 	});

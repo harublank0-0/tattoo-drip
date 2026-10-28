@@ -3,6 +3,15 @@ import type { FieldContext } from "@vinejs/vine/types";
 import { IANAZone } from "luxon";
 import { IMAGE_FORMAT_MESSAGE } from "#modules/media/errors";
 import { imageFile } from "#modules/media/validators/image_file";
+import {
+	ARTIST_PLACEMENT_KEYS,
+	DARK_PAPER,
+	FONT_KEYS,
+	HEX_COLOR,
+	LIGHT_PAPER,
+	readsOn,
+	THEME_KEYS,
+} from "#modules/storefront/look";
 import { TENANT_TYPES } from "#modules/tenancy/models/tenant";
 import { checkSlug } from "#modules/tenancy/slugs";
 import { phoneNumber } from "#validators/phone";
@@ -201,4 +210,71 @@ coverValidator.messagesProvider = new SimpleMessagesProvider({
 	"cover.file": IMAGE_FORMAT_MESSAGE,
 	"cover.file.extname": IMAGE_FORMAT_MESSAGE,
 	"cover.file.size": "Use an image of 10 MB or less.",
+});
+
+/**
+ * A colour that reads on `paper` (TAT-56): trimmed, lowercased "#rrggbb",
+ * 4.5:1 or more against the page's paper in that scheme (the rule the
+ * storefront applies, #modules/storefront/look). Empty is null: the theme's
+ * own colour.
+ */
+const readableOn = vine.createRule(
+	(value: unknown, options: { paper: string }, field: FieldContext) => {
+		if (typeof value === "string" && !readsOn(value, options.paper)) {
+			field.report(
+				"This colour is hard to read on the page.",
+				"readable",
+				field,
+			);
+		}
+	},
+);
+
+const colour = (paper: string) =>
+	vine
+		.string()
+		.trim()
+		.toLowerCase()
+		.regex(HEX_COLOR)
+		.use(readableOn({ paper }))
+		.nullable();
+
+/**
+ * The studio's page look (TAT-56): every value is a key from the app's list or
+ * a checked colour, never markup. The theme, font and artists list are
+ * required (the form always sends them); a colour left empty clears it.
+ */
+export const updateLookValidator = vine.create({
+	theme: vine.enum(THEME_KEYS),
+	accent: colour(LIGHT_PAPER),
+	accentDark: colour(DARK_PAPER),
+	font: vine.enum(FONT_KEYS),
+	artists: vine.enum(ARTIST_PLACEMENT_KEYS),
+});
+
+const COLOUR_FORMAT =
+	"Type the colour as # and six letters or digits, like #0f766e.";
+updateLookValidator.messagesProvider = new SimpleMessagesProvider({
+	"accent.regex": COLOUR_FORMAT,
+	"accentDark.regex": COLOUR_FORMAT,
+	"accent.readable":
+		"This colour is too light to read on your page. Pick a darker one.",
+	"accentDark.readable":
+		"This colour is too dark to read in dark mode. Pick a lighter one.",
+	"theme.enum": "Choose one of the themes.",
+	"font.enum": "Choose one of the fonts.",
+	"artists.enum": "Choose where the artists list goes.",
+});
+
+/**
+ * The studio's logo (TAT-56). Only filtered here (size, extension):
+ * ImageService checks what it really is.
+ */
+export const logoValidator = vine.create({ logo: imageFile() });
+
+logoValidator.messagesProvider = new SimpleMessagesProvider({
+	"logo.required": "Choose an image to upload.",
+	"logo.file": IMAGE_FORMAT_MESSAGE,
+	"logo.file.extname": IMAGE_FORMAT_MESSAGE,
+	"logo.file.size": "Use an image of 10 MB or less.",
 });

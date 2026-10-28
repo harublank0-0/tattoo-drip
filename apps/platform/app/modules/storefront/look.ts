@@ -46,6 +46,10 @@ export const FONTS: { key: FontKey; label: string }[] = [
 	{ key: "sans", label: "Plain" },
 ];
 
+/** The flash after a save: a CDN may keep the studio page for up to this long (TAT-56). */
+export const LOOK_SAVED_MESSAGE =
+	"Page look saved. It can take up to 15 minutes to show on your page.";
+
 /** The storefront's papers (branding.ts LIGHT and DARK) and its minimum (color.ts). */
 export const LIGHT_PAPER = "#f7f3ee";
 export const DARK_PAPER = "#14110f";
