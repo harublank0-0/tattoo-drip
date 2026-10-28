@@ -8,6 +8,7 @@ import {
 	bellKinds,
 	dashboardUrl,
 	depositProofSubject,
+	emailName,
 	excerpt,
 	inquiryIntro,
 	inquiryRecipients,
@@ -183,6 +184,81 @@ test.group("new-inquiry alerts", () => {
 		assert.equal(
 			alertTimeText(at("2025-12-31T05:00:00Z"), KTM, now),
 			"31 Dec 2025, 10:45",
+		);
+	});
+});
+
+/** First words a mail client would turn into a link or a phone number (TAT-16, abuse-4). */
+const LINK_SHAPES = [
+	"https://evil.example/pay Rai",
+	"evil.com",
+	"www.evil.example",
+	"a@b.co",
+	"evil:8080",
+	"J.R. Tolkien",
+	"+9779812345678",
+	"😀 Sita",
+	"evil\uFF0Ecom",
+	"1234",
+];
+
+test.group("emailName (TAT-16)", () => {
+	test("a first word made of name characters is kept, in any script", ({
+		assert,
+	}) => {
+		const kept: [string, string][] = [
+			["Sita Rai", "Sita"],
+			["सीता राई", "सीता"],
+			["श्री कृष्ण", "श्री"],
+			["क्षितिज", "क्षितिज"],
+			["ज़रीना", "ज़रीना"],
+			["Anne-Marie Dupont", "Anne-Marie"],
+			["O\u2019Brien", "O\u2019Brien"],
+			["Ma'ya", "Ma'ya"],
+			["Zoë", "Zoë"],
+			["Nguyễn Văn", "Nguyễn"],
+			["محمد علي", "محمد"],
+			["  Sita   Rai  ", "Sita"],
+		];
+		for (const [name, word] of kept) assert.equal(emailName(name), word, name);
+	});
+
+	test('a link, address, number or symbol reads "A client"', ({ assert }) => {
+		for (const name of [...LINK_SHAPES, "", "   ", "-", "'"]) {
+			assert.equal(emailName(name), "A client", JSON.stringify(name));
+		}
+	});
+
+	test("neither staff intro prints a link shape; the Devanagari name stays whole", ({
+		assert,
+	}) => {
+		for (const clientName of LINK_SHAPES) {
+			const lines = [
+				inquiryIntro({
+					clientName,
+					studioName: "Black Needle",
+					artistName: null,
+					askedForYou: false,
+				}),
+				proofIntro({
+					clientName,
+					studioName: "Black Needle",
+					yourProject: false,
+				}),
+			];
+			for (const line of lines) {
+				assert.match(line, /^A client sent Black Needle /, clientName);
+				assert.notMatch(line, /:\/\/|@|\.\p{L}/u, clientName);
+			}
+		}
+		assert.equal(
+			inquiryIntro({
+				clientName: "क्षितिज राई",
+				studioName: "Black Needle",
+				artistName: null,
+				askedForYou: false,
+			}),
+			"क्षितिज sent Black Needle a new tattoo inquiry:",
 		);
 	});
 });

@@ -77,6 +77,20 @@ export function inquiryRecipients(
 	}));
 }
 
+/** A word a name can be made of: letters, marks (Devanagari vowel signs, virama, nukta), ZWNJ/ZWJ, hyphens, apostrophes. */
+const NAME_WORD = /^(?:[\p{L}\p{M}'\u2019-]|\u200C|\u200D)+$/u;
+const LETTER = /\p{L}/u;
+
+/**
+ * The client's first name as an email may print it (TAT-16, abuse-4): the first word when it is
+ * made of name characters only, else "A client". A word with a dot, colon, slash, @ or digit is
+ * what mail clients turn into a link, and the email comes from our trusted sender.
+ */
+export function emailName(clientName: string): string {
+	const word = firstName(clientName);
+	return NAME_WORD.test(word) && LETTER.test(word) ? word : "A client";
+}
+
 /** The email's first line: "Sita sent Black Needle a new tattoo inquiry and asked for you:". */
 export function inquiryIntro({
 	clientName,
@@ -89,7 +103,7 @@ export function inquiryIntro({
 	artistName: string | null;
 	askedForYou: boolean;
 }): string {
-	const who = firstName(clientName) || "A client";
+	const who = emailName(clientName);
 	let asked = "";
 	if (askedForYou) asked = " and asked for you";
 	else if (artistName) asked = ` and asked for ${artistName}`;
@@ -119,7 +133,7 @@ export function proofIntro({
 	studioName: string;
 	yourProject: boolean;
 }): string {
-	const who = firstName(clientName) || "A client";
+	const who = emailName(clientName);
 	const whose = yourProject ? " for your project" : "";
 	return `${who} sent ${studioName} a deposit screenshot${whose}.`;
 }
