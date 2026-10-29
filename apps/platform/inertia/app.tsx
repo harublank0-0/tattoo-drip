@@ -1,6 +1,7 @@
 import "./css/app.css";
 import { resolvePageComponent } from "@adonisjs/inertia/helpers";
 import { TuyauProvider } from "@adonisjs/inertia/react";
+import { HttpNetworkError } from "@inertiajs/core";
 import {
 	createInertiaApp,
 	type ResolvedComponent,
@@ -41,6 +42,7 @@ watchVisits(
 	(type, callback) => router.on(type as "finish", callback as never),
 	document,
 	(text) => toast.error(text),
+	(error) => error instanceof HttpNetworkError,
 );
 
 // The installed app's service worker (TAT-67): production builds only, so

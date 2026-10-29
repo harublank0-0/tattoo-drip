@@ -42,7 +42,9 @@ export function focusField(field: HTMLElement | null): void {
 	field.scrollIntoView?.({ block: "center" });
 }
 
-type VisitEvent = { detail: { visit?: { method: string } } };
+type VisitEvent = {
+	detail: { visit?: { method: string }; error?: unknown };
+};
 /** Inertia's `router.on`, narrowed to the events used here. */
 export type OnVisit = (
 	type: "error" | "networkError" | "finish",
@@ -55,6 +57,10 @@ export type OnVisit = (
  * A visit the network cut off (no answer at all) gets a toast at its `finish`, which carries
  * the method; the `networkError` handler returns false, so Inertia does not reject the visit's
  * promise. It never retries: a save may have reached the server before the answer was lost.
+ * Only a lost connection counts (`isNetworkError`, Inertia's `HttpNetworkError`, passed in by
+ * `app.tsx` so this module imports nothing): Inertia 3.8 also hands `networkError` any exception
+ * thrown while it handles an answer (resolving a component, an `onSuccess` callback), and that
+ * one gets no toast and is not cancelled, so the visit rejects as before.
  *
  * A capture-phase `submit` listener remembers the form that was sent (only the element, dropped
  * at the next `finish`). When that visit's answer has field errors (`error`), its first invalid
@@ -66,6 +72,7 @@ export function watchVisits(
 	on: OnVisit,
 	doc: Document,
 	notify: (text: string) => void,
+	isNetworkError: (error: unknown) => boolean,
 ): () => void {
 	let lost = false;
 	let refused = false;
@@ -76,7 +83,8 @@ export function watchVisits(
 	};
 	doc.addEventListener("submit", remember, true);
 	const stops = [
-		on("networkError", () => {
+		on("networkError", (event) => {
+			if (!isNetworkError(event.detail.error)) return undefined;
 			lost = true;
 			return false;
 		}),

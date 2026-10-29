@@ -3,7 +3,9 @@ import { JSDOM } from "jsdom";
 // @ts-expect-error TS6305: the server project only references the inertia project, so it cannot read its sources and the module is untyped here; `VisitsModule` below restates its shape and the inertia project type-checks the real one.
 import * as visitsModule from "../../../inertia/components/visits.js";
 
-type VisitEvent = { detail: { visit?: { method: string } } };
+type VisitEvent = {
+	detail: { visit?: { method: string }; error?: unknown };
+};
 type Callback = (event: VisitEvent) => boolean | undefined;
 type VisitsModule = {
 	PAGE_LOST: string;
@@ -13,6 +15,7 @@ type VisitsModule = {
 		on: (type: string, callback: Callback) => () => void,
 		doc: Document,
 		notify: (text: string) => void,
+		isNetworkError: (error: unknown) => boolean,
 	): () => void;
 	firstInvalidField(scope: ParentNode | null): HTMLElement | null;
 	focusField(field: HTMLElement | null): void;
@@ -26,6 +29,10 @@ const {
 	focusField,
 } = visitsModule as VisitsModule;
 
+/** What `app.tsx` passes: Inertia's `HttpNetworkError`, here a stand-in. */
+class NetworkError extends Error {}
+const isNetworkError = (error: unknown) => error instanceof NetworkError;
+
 /** A fake of Inertia's `router.on`: it keeps each callback by event type and returns its remover. */
 function fakeRouter() {
 	const callbacks = new Map<string, Callback>();
@@ -37,9 +44,9 @@ function fakeRouter() {
 				callbacks.delete(type);
 			};
 		},
-		fire(type: string, method?: string) {
+		fire(type: string, method?: string, error: unknown = new NetworkError()) {
 			return callbacks.get(type)?.({
-				detail: { visit: method ? { method } : undefined },
+				detail: { visit: method ? { method } : undefined, error },
 			});
 		},
 	};
@@ -75,7 +82,7 @@ test.group("A lost connection (TAT-84)", () => {
 		assert,
 	}) => {
 		const router = fakeRouter();
-		watchVisits(router.on, documentOf(), () => {});
+		watchVisits(router.on, documentOf(), () => {}, isNetworkError);
 		assert.isFalse(router.fire("networkError"));
 	});
 
@@ -84,7 +91,12 @@ test.group("A lost connection (TAT-84)", () => {
 	}) => {
 		const router = fakeRouter();
 		const toasts: string[] = [];
-		watchVisits(router.on, documentOf(), (text) => toasts.push(text));
+		watchVisits(
+			router.on,
+			documentOf(),
+			(text) => toasts.push(text),
+			isNetworkError,
+		);
 
 		router.fire("networkError");
 		router.fire("finish", "get");
@@ -103,15 +115,40 @@ test.group("A lost connection (TAT-84)", () => {
 	}) => {
 		const router = fakeRouter();
 		const toasts: string[] = [];
-		watchVisits(router.on, documentOf(), (text) => toasts.push(text));
+		watchVisits(
+			router.on,
+			documentOf(),
+			(text) => toasts.push(text),
+			isNetworkError,
+		);
 		router.fire("finish", "post");
 		router.fire("finish", "get");
 		assert.deepEqual(toasts, []);
 	});
 
+	test("an error that is not the network's gets no toast and is not cancelled", ({
+		assert,
+	}) => {
+		// Inertia 3.8 hands `networkError` any exception thrown while it handles an answer
+		// (resolving a component, an onSuccess callback), not only a lost connection.
+		const router = fakeRouter();
+		const toasts: string[] = [];
+		watchVisits(
+			router.on,
+			documentOf(),
+			(text) => toasts.push(text),
+			isNetworkError,
+		);
+		assert.isUndefined(
+			router.fire("networkError", undefined, new Error("boom")),
+		);
+		router.fire("finish", "post");
+		assert.deepEqual(toasts, []);
+	});
+
 	test("the returned function removes every callback", ({ assert }) => {
 		const router = fakeRouter();
-		const stop = watchVisits(router.on, documentOf(), () => {});
+		const stop = watchVisits(router.on, documentOf(), () => {}, isNetworkError);
 		assert.isAbove(router.callbacks.size, 0);
 		stop();
 		assert.equal(router.callbacks.size, 0);
@@ -147,7 +184,7 @@ function setup() {
 		scrolled.push([this, options]);
 	};
 	const router = fakeRouter();
-	const stop = watchVisits(router.on, doc, () => {});
+	const stop = watchVisits(router.on, doc, () => {}, isNetworkError);
 	const send = (id: string) =>
 		doc
 			.getElementById(id)
