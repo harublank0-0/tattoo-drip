@@ -36,6 +36,13 @@ test.group("socialLinks", () => {
 		);
 	});
 
+	test("an artist's links have no website entry", ({ assert }) => {
+		assert.deepEqual(
+			socialLinks({ instagramUrl: "https://a.example", tiktokUrl: null }),
+			[{ platform: "instagram", url: "https://a.example" }],
+		);
+	});
+
 	test("leaves out anything that isn't an https URL, whatever the row holds", ({
 		assert,
 	}) => {

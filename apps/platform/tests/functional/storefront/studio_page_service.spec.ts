@@ -176,6 +176,8 @@ test.group("StudioPageService.visibleArtists", (group) => {
 				acceptingInquiries: true,
 				closedMessage: null,
 				workPhotos: [],
+				styles: [],
+				socialLinks: [],
 			},
 			{
 				id: zara.id,
@@ -186,6 +188,8 @@ test.group("StudioPageService.visibleArtists", (group) => {
 				acceptingInquiries: false,
 				closedMessage: "Books open in March.",
 				workPhotos: [],
+				styles: [],
+				socialLinks: [],
 			},
 		]);
 	});

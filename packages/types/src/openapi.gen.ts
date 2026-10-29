@@ -619,6 +619,10 @@ export interface components {
              *     theirs.
              */
             workPhotos: components["schemas"]["WorkPhoto"][];
+            /** @description The artist's styles from the platform's list, in the list's order; [] when none. */
+            styles: components["schemas"]["TattooStyle"][];
+            /** @description The links the artist set, in this order: instagram, facebook, tiktok. Only https links. */
+            socialLinks: components["schemas"]["SocialLink"][];
         };
         Service: {
             /** Format: uuid */

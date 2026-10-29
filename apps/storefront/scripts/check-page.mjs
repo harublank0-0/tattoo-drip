@@ -47,6 +47,8 @@ const ARTISTS = [
 		photo: null,
 		acceptingInquiries: true,
 		closedMessage: null,
+		styles: [],
+		socialLinks: [],
 	},
 ];
 
