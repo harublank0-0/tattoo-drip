@@ -11,7 +11,6 @@ export type CalendarSession = {
 	id: string;
 	/** Epoch milliseconds, for the Now marker. */
 	startsAt: number;
-	endsAt: number;
 	/** "14:00", or "Mon 01:30" for a time on another day. */
 	startText: string;
 	endText: string;
@@ -36,8 +35,6 @@ export type CalendarPageProps = {
 	view: CalendarView;
 	/** yyyy-MM-dd: the day shown, or a day of the week shown. */
 	date: string;
-	/** yyyy-MM-dd: today in the studio's timezone when the page loaded. */
-	today: string;
 	/** The studio's timezone, for the Now marker's time. */
 	timezone: string;
 	/** "Mon 2 Nov 2026", or "1–7 Nov 2026" for a week. */
@@ -72,7 +69,7 @@ export function nowIndex(
 /**
  * The studio's date (yyyy-MM-dd) at `now`. The page moves it with the clock
  * so a tab left open past the studio's midnight still knows which day is
- * today; the server's `today` prop is only the date at load.
+ * today.
  */
 export function studioDate(now: number, timezone: string): string {
 	const parts = new Intl.DateTimeFormat("en-CA", {
