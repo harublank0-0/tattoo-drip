@@ -14,9 +14,17 @@ type VisitsModule = {
 		doc: Document,
 		notify: (text: string) => void,
 	): () => void;
+	firstInvalidField(scope: ParentNode | null): HTMLElement | null;
+	focusField(field: HTMLElement | null): void;
 };
-const { PAGE_LOST, SAVE_LOST, connectionLostText, watchVisits } =
-	visitsModule as VisitsModule;
+const {
+	PAGE_LOST,
+	SAVE_LOST,
+	connectionLostText,
+	watchVisits,
+	firstInvalidField,
+	focusField,
+} = visitsModule as VisitsModule;
 
 /** A fake of Inertia's `router.on`: it keeps each callback by event type and returns its remover. */
 function fakeRouter() {
@@ -107,5 +115,149 @@ test.group("A lost connection (TAT-84)", () => {
 		assert.isAbove(router.callbacks.size, 0);
 		stop();
 		assert.equal(router.callbacks.size, 0);
+	});
+});
+
+/**
+ * Form B comes FIRST in the document with an invalid input; form A, the one that is sent, holds a
+ * plain input, a radio group marked invalid (its second choice checked) and an invalid input.
+ */
+const FORMS = `<body>
+	<form id="b"><input id="b-name" aria-invalid="true" /></form>
+	<form id="a">
+		<input id="a-plain" />
+		<div id="a-group" role="radiogroup" aria-invalid="true">
+			<button type="button" role="radio" id="a-first" aria-checked="false"></button>
+			<button type="button" role="radio" id="a-second" aria-checked="true"></button>
+		</div>
+		<input id="a-name" aria-invalid="true" />
+	</form>
+</body>`;
+
+const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+function setup() {
+	const window = new JSDOM(FORMS).window;
+	const doc = window.document;
+	const scrolled: Array<[Element, unknown]> = [];
+	window.HTMLElement.prototype.scrollIntoView = function (
+		this: Element,
+		options?: unknown,
+	) {
+		scrolled.push([this, options]);
+	};
+	const router = fakeRouter();
+	const stop = watchVisits(router.on, doc, () => {});
+	const send = (id: string) =>
+		doc
+			.getElementById(id)
+			?.dispatchEvent(
+				new window.Event("submit", { bubbles: true, cancelable: true }),
+			);
+	return { window, doc, router, scrolled, stop, send };
+}
+
+test.group("Focus after a refused form (TAT-84)", () => {
+	test("the form that was sent wins: its radio group's checked choice gets focus, scrolled to the middle", async ({
+		assert,
+	}) => {
+		const { doc, router, scrolled, send } = setup();
+		send("a");
+		router.fire("error");
+		router.fire("finish", "post");
+		await tick();
+		assert.equal(doc.activeElement?.id, "a-second");
+		assert.lengthOf(scrolled, 1);
+		assert.equal(scrolled[0][0].id, "a-second");
+		assert.deepEqual(scrolled[0][1], { block: "center" });
+	});
+
+	test("firstInvalidField takes the first marked control of a scope", ({
+		assert,
+	}) => {
+		const { doc } = setup();
+		assert.equal(firstInvalidField(doc.getElementById("b"))?.id, "b-name");
+		assert.equal(firstInvalidField(doc.getElementById("a"))?.id, "a-second");
+	});
+
+	test("a group with no checked choice gives its first control", ({
+		assert,
+	}) => {
+		const { doc } = setup();
+		doc.getElementById("a-second")?.setAttribute("aria-checked", "false");
+		assert.equal(firstInvalidField(doc.getElementById("a"))?.id, "a-first");
+	});
+
+	test("nothing marked, or no scope, gives null", ({ assert }) => {
+		const { doc } = setup();
+		assert.isNull(firstInvalidField(null));
+		doc.getElementById("a-name")?.removeAttribute("aria-invalid");
+		doc.getElementById("a-group")?.removeAttribute("aria-invalid");
+		assert.isNull(firstInvalidField(doc.getElementById("a")));
+	});
+
+	test("focusField with nothing does nothing", ({ assert }) => {
+		assert.doesNotThrow(() => focusField(null));
+	});
+
+	test("an answer with field errors but no submit before it moves nothing", async ({
+		assert,
+	}) => {
+		const { doc, router, scrolled } = setup();
+		router.fire("error");
+		router.fire("finish", "post");
+		await tick();
+		assert.equal(doc.activeElement, doc.body);
+		assert.lengthOf(scrolled, 0);
+	});
+
+	test("a form removed before the answer cannot take focus", async ({
+		assert,
+	}) => {
+		const { doc, router, scrolled, send } = setup();
+		const form = doc.getElementById("a");
+		send("a");
+		form?.remove();
+		router.fire("error");
+		assert.doesNotThrow(() => router.fire("finish", "post"));
+		await tick();
+		assert.notEqual(doc.activeElement?.id, "a-second");
+		assert.lengthOf(scrolled, 0);
+	});
+
+	test("a saved form (no field errors) moves nothing", async ({ assert }) => {
+		const { doc, router, scrolled, send } = setup();
+		send("a");
+		router.fire("finish", "post");
+		await tick();
+		assert.notEqual(doc.activeElement?.id, "a-second");
+		assert.lengthOf(scrolled, 0);
+	});
+
+	test("the form is forgotten at the visit's end", async ({ assert }) => {
+		const { doc, router, scrolled, send } = setup();
+		send("a");
+		router.fire("finish", "post");
+		router.fire("error");
+		router.fire("finish", "post");
+		await tick();
+		assert.notEqual(doc.activeElement?.id, "a-second");
+		assert.lengthOf(scrolled, 0);
+	});
+
+	test("the cleanup removes the submit listener", ({ assert }) => {
+		const { doc, stop } = setup();
+		const calls: unknown[][] = [];
+		const remove = doc.removeEventListener.bind(doc);
+		doc.removeEventListener = ((...args: unknown[]) => {
+			calls.push(args);
+			// biome-ignore lint/suspicious/noExplicitAny: forwards to the real method
+			return (remove as any)(...args);
+		}) as typeof doc.removeEventListener;
+		stop();
+		assert.lengthOf(calls, 1);
+		assert.equal(calls[0][0], "submit");
+		assert.typeOf(calls[0][1], "function");
+		assert.isTrue(calls[0][2]);
 	});
 });
