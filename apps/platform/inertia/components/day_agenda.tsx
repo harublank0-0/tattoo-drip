@@ -80,7 +80,8 @@ function NowMarker({ now, timezone }: { now: number; timezone: string }) {
 }
 
 /**
- * One session: the times in a fixed column, then who, what and the brief.
+ * One session: the times in a fixed column (80 px, never wrapped: it fits "Mon 22:30" on one
+ * line at 375 px, TAT-84), then who, what and the brief.
  * A link to the project's Sessions card, unless this member can't open it.
  * The client's name wraps (a Devanagari name is never cut off).
  */
@@ -100,7 +101,7 @@ function SessionItem({
 	const hidden = isOwner ? "Project not available" : "Not assigned to you";
 	const content = (
 		<>
-			<span className="flex w-18 shrink-0 flex-col tabular-nums">
+			<span className="flex w-20 shrink-0 flex-col whitespace-nowrap tabular-nums">
 				<span className="font-semibold">{session.startText}</span>
 				<span className="sr-only">to</span>
 				<span className="text-sm text-muted-foreground">{session.endText}</span>

@@ -97,3 +97,32 @@ test.group("Optimistic only for Mark contacted and notes (TAT-84)", () => {
 		}
 	});
 });
+
+test.group("Small fixes (TAT-84)", () => {
+	test("the agenda's time column fits Mon 22:30 on one line", async ({
+		assert,
+	}) => {
+		const source = await read("components/day_agenda.tsx");
+		// The column is the span around the one that holds the start time.
+		const column = source
+			.slice(0, source.indexOf("{session.startText}"))
+			.match(/className="([^"]*)"/g)
+			?.at(-2);
+		assert.isDefined(column);
+		assert.include(column, "w-20");
+		assert.include(column, "whitespace-nowrap");
+		assert.notInclude(column, "w-18");
+	});
+
+	test("the Clients search's Clear link is a 44 px target on phones", async ({
+		assert,
+	}) => {
+		const source = await read("pages/clients/index.tsx");
+		const classes = source.match(
+			/<Link[^>]*className="([^"]*)"[^>]*>\s*Clear\s*<\/Link>/,
+		)?.[1];
+		assert.isDefined(classes);
+		assert.include(classes, "max-lg:min-h-11");
+		assert.notInclude(classes, "self-center");
+	});
+});
