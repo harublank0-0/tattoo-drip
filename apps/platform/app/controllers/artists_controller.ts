@@ -238,6 +238,11 @@ function toInput(data: Infer<typeof updateArtistValidator>): ArtistInput {
 		visible: data.visible ?? false,
 		acceptingInquiries: data.acceptingInquiries ?? false,
 		closedMessage: data.closedMessage ?? null,
+		// The form does not send styles or links yet: a save clears them.
+		styles: [],
+		instagramUrl: null,
+		facebookUrl: null,
+		tiktokUrl: null,
 		linkToMe: data.linkToMe ?? false,
 		photo: data.photo,
 		removePhoto: data.removePhoto ?? false,

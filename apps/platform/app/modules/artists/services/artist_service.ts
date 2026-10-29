@@ -6,6 +6,7 @@ import {
 	ArtistSlugTakenError,
 } from "#modules/artists/errors";
 import Artist from "#modules/artists/models/artist";
+import type { StyleSlug } from "#modules/artists/styles";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
 import type Tenant from "#modules/tenancy/models/tenant";
@@ -33,6 +34,12 @@ export type ArtistInput = {
 	visible: boolean;
 	acceptingInquiries: boolean;
 	closedMessage: string | null;
+	/** Up to MAX_ARTIST_STYLES slugs from the list, in the order given. */
+	styles: StyleSlug[];
+	/** https links; the form checks them, the service stores them as given. */
+	instagramUrl: string | null;
+	facebookUrl: string | null;
+	tiktokUrl: string | null;
 	/**
 	 * Link the profile to the acting member. Unchecking it unlinks the member
 	 * from their own profile; a profile linked to someone else is never
@@ -355,6 +362,10 @@ function profileFields(input: OwnProfileInput) {
 		visible: input.visible,
 		acceptingInquiries: input.acceptingInquiries,
 		closedMessage: input.closedMessage,
+		styles: input.styles,
+		instagramUrl: input.instagramUrl,
+		facebookUrl: input.facebookUrl,
+		tiktokUrl: input.tiktokUrl,
 	};
 }
 

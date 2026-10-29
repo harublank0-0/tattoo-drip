@@ -351,6 +351,10 @@ test.group("TenancyService.membershipFor", (group) => {
 					acceptingInquiries: true,
 					closedMessage: null,
 					linkToMe: false,
+					styles: [],
+					instagramUrl: null,
+					facebookUrl: null,
+					tiktokUrl: null,
 				},
 				owner,
 			);
