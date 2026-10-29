@@ -1,8 +1,10 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
+import { ALERT_EXCERPT_LENGTH, excerpt } from "#modules/notifications/alerts";
 import {
 	makeClient,
+	makeInquiry,
 	makePayment,
 	makeProject,
 	makeQuote,
@@ -85,5 +87,36 @@ test.group("Payments on the client profile", (group) => {
 		).inertiaProps;
 
 		assert.deepEqual(props.payments, { balanceDueText: null, rows: [] });
+	});
+
+	test("a long brief and idea are one line's worth on the client page (TAT-84)", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner(SLUG, "Black Needle");
+		const text = Array.from({ length: 30 }, () => "सीता wants a koi").join(" ");
+		const sita = await inTenant(tenant, async () => {
+			const sita = await makeClient(tenant, { name: "सीता थापा" });
+			await makeInquiry(tenant, sita, { idea: text });
+			const project = await makeProject(tenant, sita, {
+				status: "booked",
+				brief: text,
+			});
+			await makePayment(tenant, project, verified());
+			return sita;
+		});
+
+		const props = (
+			await client
+				.get(`/t/${SLUG}/clients/${sita.id}`)
+				.withInertia()
+				.loginAs(owner)
+		).inertiaProps;
+
+		const cut = excerpt(text, ALERT_EXCERPT_LENGTH);
+		assert.isBelow(cut.length, text.length);
+		assert.equal(props.projects[0].brief, cut);
+		assert.equal(props.inquiries[0].idea, cut);
+		assert.equal(props.payments.rows[0].projectBrief, cut);
 	});
 });

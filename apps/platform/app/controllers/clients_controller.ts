@@ -16,6 +16,7 @@ import { referenceView } from "#modules/inquiries/reference_view";
 import InquiryService from "#modules/inquiries/services/inquiry_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
+import { ALERT_EXCERPT_LENGTH, excerpt } from "#modules/notifications/alerts";
 import { formatSignedMoney } from "#modules/payments/ledger";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import PaymentService, {
@@ -115,6 +116,10 @@ export default class ClientsController {
 		const day = (time: DateTime) =>
 			formatDay(time.setZone(tenant.timezone).toFormat("yyyy-MM-dd"));
 
+		// The page shows one line of each brief and idea (line-clamp-1), like the Projects list's
+		// piece, so the server sends an excerpt of that length, not up to 4,000 characters a row.
+		const line = (text: string) => excerpt(text, ALERT_EXCERPT_LENGTH);
+
 		return ctx.inertia.render("clients/show", {
 			client: {
 				id: client.id,
@@ -131,7 +136,7 @@ export default class ClientsController {
 					: null,
 			projects: projects.map((project) => ({
 				id: project.id,
-				brief: project.brief,
+				brief: line(project.brief),
 				status: project.status,
 				artistName: project.artistId
 					? (artistName.get(project.artistId) ?? null)
@@ -140,7 +145,7 @@ export default class ClientsController {
 			})),
 			inquiries: inquiries.map((inquiry) => ({
 				id: inquiry.id,
-				idea: inquiry.idea,
+				idea: line(inquiry.idea),
 				status: inquiry.status,
 				receivedText: day(inquiry.createdAt),
 			})),
@@ -152,7 +157,7 @@ export default class ClientsController {
 				rows: paid.map((payment) => ({
 					id: payment.id,
 					projectId: payment.projectId,
-					projectBrief: briefs.get(payment.projectId) ?? "",
+					projectBrief: line(briefs.get(payment.projectId) ?? ""),
 					kind: payment.kind,
 					amountText: formatSignedMoney(payment.amount),
 					status: payment.status,
