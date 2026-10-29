@@ -6,8 +6,14 @@ import { lastContactText } from "#modules/projects/contact";
 // @ts-expect-error TS6305: the server project only references the inertia project, so it cannot read its sources and the module is untyped here; the type below restates its one export and the inertia project type-checks the real one.
 import * as messagesModule from "../../../inertia/components/messages.js";
 
-const { MARKED_CONTACTED_TEXT } = messagesModule as {
+type Shown = { contactedText: string; lastChannel: string | null };
+const { MARKED_CONTACTED_TEXT, shownContact } = messagesModule as {
 	MARKED_CONTACTED_TEXT: string;
+	shownContact(
+		markedFor: string | null,
+		projectId: string,
+		server: Shown,
+	): Shown;
 };
 
 const read = (file: string) =>
@@ -54,49 +60,86 @@ test.group("One-tap moves send once (TAT-84)", () => {
 	});
 });
 
-test.group("Optimistic only for Mark contacted and notes (TAT-84)", () => {
-	test("the words shown at once are the server's words for a contact now with no channel", ({
-		assert,
-	}) => {
-		assert.equal(
-			MARKED_CONTACTED_TEXT,
-			lastContactText(DateTime.now(), "Asia/Kathmandu", NO_VIA),
-		);
-	});
+// TAT-84, fix round 1: Inertia's own optimistic visits are not used anywhere. While one is pending
+// Inertia swaps every page's props that share a name with the current page's for the CURRENT
+// page's values, so a save on project A that is still out would leave project B's notes and
+// contact line empty (or A's). "Mark contacted" shows its words from state held in the page
+// instead, scoped to the project it was tapped on; the notes save is an async visit.
+test.group(
+	"Mark contacted and notes without optimistic visits (TAT-84)",
+	() => {
+		const server = {
+			contactedText: "contacted 2 days ago on Viber",
+			lastChannel: "viber",
+		};
 
-	test("the project page makes exactly its two changes optimistic", async ({
-		assert,
-	}) => {
-		const source = await read("pages/projects/show.tsx");
-		assert.include(source, "MARKED_CONTACTED_TEXT");
-		assert.include(source, "lastChannel: null");
-		assert.lengthOf(source.match(/\boptimistic:/g) ?? [], 1);
-		assert.lengthOf(source.match(/\boptimistic=\{/g) ?? [], 1);
-		assert.include(
-			source,
-			"onMarkContacted={closed ? undefined : markContactedAtOnce}",
-		);
-	});
+		test("the words shown at once are the server's words for a contact now with no channel", ({
+			assert,
+		}) => {
+			assert.equal(
+				MARKED_CONTACTED_TEXT,
+				lastContactText(DateTime.now(), "Asia/Kathmandu", NO_VIA),
+			);
+		});
 
-	test("nothing else in the dashboard is optimistic (ui.md)", async ({
-		assert,
-	}) => {
-		const files = (
-			await readdir(new URL("../../../inertia/", import.meta.url), {
-				recursive: true,
-			})
-		).filter(
-			(file) =>
-				/\.tsx?$/.test(file) &&
-				!file.startsWith("components/ui/") &&
-				file !== "pages/projects/show.tsx",
-		);
-		assert.isAbove(files.length, 50);
-		for (const file of files) {
-			assert.notMatch(await read(file), /\boptimistic\s*[:=]/, file);
-		}
-	});
-});
+		test("the project it was tapped on shows them, and the lead channel is no longer the last one", ({
+			assert,
+		}) => {
+			assert.deepEqual(shownContact("a", "a", server), {
+				contactedText: MARKED_CONTACTED_TEXT,
+				lastChannel: null,
+			});
+		});
+
+		test("another project, or none marked, shows the server's own values", ({
+			assert,
+		}) => {
+			assert.deepEqual(shownContact("a", "b", server), server);
+			assert.deepEqual(shownContact(null, "a", server), server);
+		});
+
+		test("the project page keeps the mark in state scoped to the project and clears it when the visit ends", async ({
+			assert,
+		}) => {
+			const source = await read("pages/projects/show.tsx");
+			assert.include(source, "useState<string | null>(null)");
+			assert.include(source, "setMarkedFor(project.id)");
+			assert.include(source, "shownContact(");
+			assert.include(source, "setMarkedFor(null)");
+			assert.include(
+				source,
+				"onMarkContacted={closed ? undefined : markContactedAtOnce}",
+			);
+		});
+
+		test("the notes save is an async visit that still says Saving…", async ({
+			assert,
+		}) => {
+			const source = await read("pages/projects/show.tsx");
+			const form = source.slice(source.indexOf("function NotesForm("));
+			assert.include(form, "options={{ preserveScroll: true, async: true }}");
+			assert.include(form, '"Saving…"');
+		});
+
+		test("no file under inertia/ passes `optimistic` to Inertia", async ({
+			assert,
+		}) => {
+			const files = (
+				await readdir(new URL("../../../inertia/", import.meta.url), {
+					recursive: true,
+				})
+			).filter((file) => /\.tsx?$/.test(file));
+			assert.isAbove(files.length, 50);
+			for (const file of files) {
+				assert.notMatch(
+					await read(file),
+					/\boptimistic\s*[:=(]|\.optimistic\b/,
+					file,
+				);
+			}
+		});
+	},
+);
 
 test.group("Small fixes (TAT-84)", () => {
 	test("the agenda's time column fits Mon 22:30 on one line", async ({

@@ -36,6 +36,24 @@ export type CardMessageProps = {
  */
 export const MARKED_CONTACTED_TEXT = "contacted today";
 
+/**
+ * What the Message card shows for the last contact: while "Mark contacted" is out for
+ * `projectId` (`markedFor`, state held by the page) the words the server will answer with and
+ * no last channel, which is what the server stores for it (so the leading chat button becomes
+ * WhatsApp at once); every other project, and no mark, shows the server's own values. It is
+ * state held in the page, not an Inertia optimistic visit: while one of those is pending
+ * Inertia puts the current page's values into the next page's props of the same names.
+ */
+export function shownContact(
+	markedFor: string | null,
+	projectId: string,
+	server: { contactedText: string; lastChannel: ContactChannelName | null },
+): { contactedText: string; lastChannel: ContactChannelName | null } {
+	return markedFor === projectId
+		? { contactedText: MARKED_CONTACTED_TEXT, lastChannel: null }
+		: server;
+}
+
 /** What the contact routes take: the link tapped and the message it carried. */
 export type ContactVia = {
 	channel?: ContactChannelName;
