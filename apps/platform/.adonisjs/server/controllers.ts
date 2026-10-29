@@ -4,6 +4,7 @@
  */
 
 export const controllers = {
+  Account: () => import('#controllers/account_controller'),
   Alerts: () => import('#controllers/alerts_controller'),
   Artists: () => import('#controllers/artists_controller'),
   Bookings: () => import('#controllers/bookings_controller'),

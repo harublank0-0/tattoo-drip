@@ -1,6 +1,8 @@
 import { test } from "@japa/runner";
 import { errors } from "@vinejs/vine";
+import { WRONG_CURRENT_PASSWORD } from "#validators/account_messages";
 import {
+	changePasswordValidator,
 	loginValidator,
 	newPasswordValidator,
 	passwordResetRequestValidator,
@@ -32,6 +34,7 @@ const JARGON = [
 	"field",
 	"fullName",
 	"passwordConfirmation",
+	"currentPassword",
 	"must be",
 	"defined",
 	"string",
@@ -83,23 +86,37 @@ test.group("Account form messages (TAT-100)", () => {
 			}),
 			{
 				email: "Enter a valid email address.",
-				password: "Use 8 to 32 characters.",
+				password: "Use 8 to 128 characters.",
 				passwordConfirmation: "Type the same password again.",
 			},
 		);
 	});
 
-	test("a password over 32 characters gets the same range hint", async ({
+	test("a password over 128 characters gets the same range hint", async ({
 		assert,
 	}) => {
-		const long = "x".repeat(33);
+		const long = "x".repeat(129);
 		assert.deepEqual(
 			await problems(signupValidator, {
 				...GOOD,
 				password: long,
 				passwordConfirmation: long,
 			}),
-			{ password: "Use 8 to 32 characters." },
+			{ password: "Use 8 to 128 characters." },
+		);
+	});
+
+	test("128 characters pass, for a password manager's long password (TAT-95)", async ({
+		assert,
+	}) => {
+		const long = "x".repeat(128);
+		assert.deepEqual(
+			await problems(signupValidator, {
+				...GOOD,
+				password: long,
+				passwordConfirmation: long,
+			}),
+			{},
 		);
 	});
 
@@ -151,10 +168,62 @@ test.group("Account form messages (TAT-100)", () => {
 				passwordConfirmation: "other",
 			}),
 			{
-				password: "Use 8 to 32 characters.",
+				password: "Use 8 to 128 characters.",
 				passwordConfirmation: "Type the same password again.",
 			},
 		);
+	});
+
+	test("changing the password says what to do for each box (TAT-95)", async ({
+		assert,
+	}) => {
+		assert.deepEqual(await problems(changePasswordValidator, {}), {
+			currentPassword: "Enter your current password.",
+			password: "Enter your password.",
+			passwordConfirmation: "Type your password again.",
+		});
+		assert.deepEqual(
+			await problems(changePasswordValidator, {
+				currentPassword: "same-password-1",
+				password: "same-password-1",
+				passwordConfirmation: "same-password-1",
+			}),
+			{ password: "Choose a password different from your current one." },
+		);
+		assert.deepEqual(
+			await problems(changePasswordValidator, {
+				currentPassword: "x",
+				password: "short",
+				passwordConfirmation: "other",
+			}),
+			{
+				password: "Use 8 to 128 characters.",
+				passwordConfirmation: "Type the same password again.",
+			},
+		);
+	});
+
+	test("the current password takes any length, like sign-in", async ({
+		assert,
+	}) => {
+		assert.deepEqual(
+			await problems(changePasswordValidator, {
+				currentPassword: "y".repeat(300),
+				password: "a-new-password",
+				passwordConfirmation: "a-new-password",
+			}),
+			{},
+		);
+	});
+
+	test("the wrong-current-password message is plain too", ({ assert }) => {
+		assert.equal(WRONG_CURRENT_PASSWORD, "That isn't your current password.");
+		for (const word of JARGON) {
+			assert.notInclude(
+				WRONG_CURRENT_PASSWORD.toLowerCase(),
+				word.toLowerCase(),
+			);
+		}
 	});
 
 	test("no message of any account form carries a field name or validator wording", async ({
@@ -184,6 +253,7 @@ test.group("Account form messages (TAT-100)", () => {
 			loginValidator,
 			passwordResetRequestValidator,
 			newPasswordValidator,
+			changePasswordValidator,
 		]) {
 			for (const data of bodies) {
 				for (const [field, message] of Object.entries(

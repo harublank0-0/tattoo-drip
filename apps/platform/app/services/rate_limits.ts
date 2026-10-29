@@ -22,19 +22,35 @@ export function digest(value: string) {
  * that isn't an IPv6 address is returned as it is.
  */
 export function clientAddress(ip: string) {
+	return countedBlock(ip, 4);
+}
+
+/**
+ * A coarser count for a limit a thief with a stolen session can reach (TAT-95:
+ * "Sign out of other devices"): IPv4 as is, and IPv6 by its /48, the block a
+ * site or a household plan gets, so cycling through the 65,536 /64s inside it
+ * buys no fresh allowance. Only that limiter uses it; the others keep the
+ * /64 of `clientAddress`.
+ */
+export function clientNetwork(ip: string) {
+	return countedBlock(ip, 3);
+}
+
+/** IPv4 as is; IPv6 by its first `groups` 16-bit groups (4 is the /64, 3 the /48). */
+function countedBlock(ip: string, groups: 3 | 4) {
 	const address = ip.split("%")[0].toLowerCase();
 	if (!isIPv6(address)) return address;
 
-	const groups = ipv6Groups(address);
+	const all = ipv6Groups(address);
 	const mapped =
-		groups.slice(0, 5).every((group) => group === 0) && groups[5] === 0xffff;
+		all.slice(0, 5).every((group) => group === 0) && all[5] === 0xffff;
 	if (mapped) {
-		return [groups[6], groups[7]]
+		return [all[6], all[7]]
 			.flatMap((group) => [Math.floor(group / 256), group % 256])
 			.join(".");
 	}
-	const prefix = groups.slice(0, 4).map((group) => group.toString(16));
-	return `${prefix.join(":")}::/64`;
+	const prefix = all.slice(0, groups).map((group) => group.toString(16));
+	return `${prefix.join(":")}::/${groups * 16}`;
 }
 
 /** The eight 16-bit groups of a valid IPv6 address. */

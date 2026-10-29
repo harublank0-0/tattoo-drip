@@ -1,4 +1,4 @@
-import type { Limiter, LimiterResponse } from "@adonisjs/limiter";
+import { errors, type Limiter, type LimiterResponse } from "@adonisjs/limiter";
 import limiter from "@adonisjs/limiter/services/main";
 import { typedEmail } from "#modules/identity/email_address";
 import { clientAddress, digest } from "#services/rate_limits";
@@ -7,7 +7,8 @@ import { clientAddress, digest } from "#services/rate_limits";
  * The auth rate limits (TAT-8, TAT-18), by name. Each window is fixed: it
  * starts with the first counted attempt, and a lockout ends when it does
  * (no extra block). The request limits are `limiter.define` middleware in
- * start/limiter.ts; login counts failures in throttleLogin below.
+ * start/limiter.ts; login and the current-password check count failures in
+ * throttleLogin and throttlePasswordCheck below.
  */
 export const AUTH_LIMITS = {
 	/** Login attempts from one client address that didn't sign in. */
@@ -43,6 +44,45 @@ export const AUTH_LIMITS = {
 	verifyResendCooldown: { requests: 1, duration: "1 min" },
 	/** ...and five an hour. */
 	verifyResendPerUser: { requests: 5, duration: "1 hour" },
+	/**
+	 * Wrong current passwords on the account page's "Change password" (TAT-95),
+	 * for one account from any address. Only a signed-in session can try.
+	 */
+	passwordCheckPerUser: { requests: 5, duration: "15 mins" },
+	/** ...and from one client address, across accounts. */
+	passwordCheckPerIp: { requests: 10, duration: "15 mins" },
+	/**
+	 * Successful password changes (TAT-95), per account: each one raises
+	 * session_version and queues the notice, so this bounds that mail. Only a
+	 * success counts (`countPasswordChange`, after the commit) and the door is
+	 * checked before the work (`assertPasswordChangeAllowed`): a malformed
+	 * request or a wrong password never spends it, so nobody can exhaust it
+	 * without already holding the current password. Checking before and
+	 * counting after lets a burst of concurrent requests overshoot by up to the
+	 * number in flight; the wrong-password limit above and the cost of hashing
+	 * keep that small. If a stolen session burns the cap, a reset by email is
+	 * the way back in (it needs the mailbox, not the session).
+	 */
+	passwordChangePerUser: { requests: 10, duration: "1 hour" },
+	/**
+	 * "Sign out of other devices" (TAT-95), per account AND client network
+	 * (`clientNetwork`: IPv4 as is, IPv6 by its /48). A stolen session can
+	 * follow its re-issued cookie through every call, so a per-account cap
+	 * alone lets it spend the owner's whole allowance from one address; keyed by
+	 * network too, it spends only its own.
+	 */
+	signOutOthersPerAddress: { requests: 10, duration: "1 hour" },
+	/**
+	 * ...and a loose cap per account over every network: it bounds how fast
+	 * session_version can grow and how often one account is written. The
+	 * 9 digits a session can hold (999,999,999) last 999,999,999 / 1000 =
+	 * about a million hours, over 114 years, at the ceiling; burning it in
+	 * one hour takes at least 1000 / 10 = 100 distinct IPv4 addresses or IPv6
+	 * /48 prefixes. If a thief does, the owner's way back is "Change password"
+	 * (its own limit, and it ends every other session) or the reset by email;
+	 * neither touches this limit.
+	 */
+	signOutOthersPerUser: { requests: 1000, duration: "1 hour" },
 } as const;
 
 export function loginIpKey(ip: string) {
@@ -119,6 +159,75 @@ export async function throttleLogin<T>(
 		giveBack(perEmail, emailKey, countedAt, emailWindow),
 	]);
 	return result;
+}
+
+export function passwordCheckIpKey(ip: string) {
+	return `password_check_ip_${digest(clientAddress(ip))}`;
+}
+
+export function passwordCheckUserKey(userId: string) {
+	return `password_check_user_${digest(userId)}`;
+}
+
+/**
+ * Runs `verify` (the current-password check of "Change password", TAT-95) unless
+ * this address or this account is over its limit, and returns its answer.
+ * Counted like a sign-in (throttleLogin): the address first, so a refused
+ * address never adds to the account's count; both before `verify`, so parallel
+ * guesses can't all pass a check first; a right password gives back the two
+ * points it took while their windows are open, and wrong ones stay counted.
+ * Over a limit it throws E_TOO_MANY_REQUESTS without checking.
+ */
+export async function throttlePasswordCheck(
+	ip: string,
+	userId: string,
+	verify: () => Promise<boolean>,
+): Promise<boolean> {
+	// use() parses the durations in the object it gets, so give it copies.
+	const perIp = limiter.use({ ...AUTH_LIMITS.passwordCheckPerIp });
+	const perUser = limiter.use({ ...AUTH_LIMITS.passwordCheckPerUser });
+	const ipKey = passwordCheckIpKey(ip);
+	const userKey = passwordCheckUserKey(userId);
+
+	const countedAt = Date.now();
+	const ipWindow = await perIp.consume(ipKey);
+	const userWindow = await perUser.consume(userKey);
+	const right = await verify();
+	if (right) {
+		await Promise.all([
+			giveBack(perIp, ipKey, countedAt, ipWindow),
+			giveBack(perUser, userKey, countedAt, userWindow),
+		]);
+	}
+	return right;
+}
+
+export function passwordChangeKey(userId: string) {
+	return `password_change_user_${digest(userId)}`;
+}
+
+/**
+ * Refuses a password change when the account has already made as many
+ * successful ones this hour as it may (TAT-95), with the same
+ * E_TOO_MANY_REQUESTS a throttle gives (the handler turns it into the
+ * "Try again in N minutes" toast). It only looks: a refused or malformed
+ * request must not spend the cap. `countPasswordChange` spends it, after the
+ * change committed.
+ */
+export async function assertPasswordChangeAllowed(userId: string) {
+	const limit = AUTH_LIMITS.passwordChangePerUser;
+	// use() parses the durations in the object it gets, so give it a copy.
+	const window = await limiter.use({ ...limit }).get(passwordChangeKey(userId));
+	if (window && window.consumed >= limit.requests) {
+		throw new errors.E_TOO_MANY_REQUESTS(window);
+	}
+}
+
+/** Counts one successful password change; call it once the change has committed. */
+export async function countPasswordChange(userId: string) {
+	await limiter
+		.use({ ...AUTH_LIMITS.passwordChangePerUser })
+		.increment(passwordChangeKey(userId));
 }
 
 /**
