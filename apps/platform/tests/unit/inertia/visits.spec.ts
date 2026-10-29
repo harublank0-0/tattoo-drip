@@ -3,10 +3,16 @@ import { JSDOM } from "jsdom";
 // @ts-expect-error TS6305: the server project only references the inertia project, so it cannot read its sources and the module is untyped here; `VisitsModule` below restates its shape and the inertia project type-checks the real one.
 import * as visitsModule from "../../../inertia/components/visits.js";
 
-type VisitEvent = {
-	detail: { visit?: { method: string }; error?: unknown };
+// The events have the shapes Inertia 3.8 fires (core/dist/index.js): `start` and `finish` carry
+// `detail.visit` (the visit's own object, with its `id`, `method` and `url`), `error` carries
+// `detail.visitId`, and `networkError` carries only `detail.error`.
+type Detail = {
+	visit?: { id?: string; method?: string; url?: URL };
+	visitId?: string;
+	errors?: Record<string, string>;
+	error?: unknown;
 };
-type Callback = (event: VisitEvent) => boolean | undefined;
+type Callback = (event: { detail: Detail }) => boolean | undefined;
 type VisitsModule = {
 	PAGE_LOST: string;
 	SAVE_LOST: string;
@@ -29,13 +35,21 @@ const {
 	focusField,
 } = visitsModule as VisitsModule;
 
-/** What `app.tsx` passes: Inertia's `HttpNetworkError`, here a stand-in. */
-class NetworkError extends Error {}
+/** What `app.tsx` passes: Inertia's `HttpNetworkError`, here a stand-in with its `url`. */
+class NetworkError extends Error {
+	constructor(readonly url?: string) {
+		super("Network error");
+	}
+}
 const isNetworkError = (error: unknown) => error instanceof NetworkError;
+
+const href = (path: string) => `http://localhost:3401${path}`;
 
 /** A fake of Inertia's `router.on`: it keeps each callback by event type and returns its remover. */
 function fakeRouter() {
 	const callbacks = new Map<string, Callback>();
+	const fire = (type: string, detail: Detail) =>
+		callbacks.get(type)?.({ detail });
 	return {
 		callbacks,
 		on(type: string, callback: Callback) {
@@ -44,16 +58,33 @@ function fakeRouter() {
 				callbacks.delete(type);
 			};
 		},
-		fire(type: string, method?: string, error: unknown = new NetworkError()) {
-			return callbacks.get(type)?.({
-				detail: { visit: method ? { method } : undefined, error },
-			});
-		},
+		start: (id: string, method = "post", path = `/visits/${id}`) =>
+			fire("start", { visit: { id, method, url: new URL(href(path)) } }),
+		refuse: (id: string) =>
+			fire("error", { errors: { field: "wrong" }, visitId: id }),
+		lose: (url?: string) =>
+			fire("networkError", { error: new NetworkError(url) }),
+		crash: () => fire("networkError", { error: new Error("boom") }),
+		finish: (id: string, method = "post", path = `/visits/${id}`) =>
+			fire("finish", { visit: { id, method, url: new URL(href(path)) } }),
 	};
 }
 
 function documentOf(html = "<body></body>") {
 	return new JSDOM(html).window.document;
+}
+
+/** The module watching a fake router, and the toasts it raised. */
+function watched() {
+	const router = fakeRouter();
+	const toasts: string[] = [];
+	const stop = watchVisits(
+		router.on,
+		documentOf(),
+		(text) => toasts.push(text),
+		isNetworkError,
+	);
+	return { router, toasts, stop };
 }
 
 test.group("A lost connection (TAT-84)", () => {
@@ -81,49 +112,27 @@ test.group("A lost connection (TAT-84)", () => {
 	test("a network error is answered with false, so Inertia does not reject the visit", ({
 		assert,
 	}) => {
-		const router = fakeRouter();
-		watchVisits(router.on, documentOf(), () => {}, isNetworkError);
-		assert.isFalse(router.fire("networkError"));
+		const { router } = watched();
+		assert.isFalse(router.lose(href("/x")));
 	});
 
 	test("the toast comes at the visit's end, once, with the words for its method", ({
 		assert,
 	}) => {
-		const router = fakeRouter();
-		const toasts: string[] = [];
-		watchVisits(
-			router.on,
-			documentOf(),
-			(text) => toasts.push(text),
-			isNetworkError,
-		);
+		const { router, toasts } = watched();
 
-		router.fire("networkError");
-		router.fire("finish", "get");
+		router.start("g", "get", "/projects");
+		router.lose(href("/projects"));
+		router.finish("g", "get", "/projects");
 		assert.deepEqual(toasts, [PAGE_LOST]);
 
-		router.fire("finish", "get");
-		assert.deepEqual(toasts, [PAGE_LOST], "the flag resets after a toast");
+		router.finish("g", "get", "/projects");
+		assert.deepEqual(toasts, [PAGE_LOST], "the entry is used up by a toast");
 
-		router.fire("networkError");
-		router.fire("finish", "post");
+		router.start("p", "post", "/notes");
+		router.lose(href("/notes"));
+		router.finish("p", "post", "/notes");
 		assert.deepEqual(toasts, [PAGE_LOST, SAVE_LOST]);
-	});
-
-	test("a visit that finishes without a network error says nothing", ({
-		assert,
-	}) => {
-		const router = fakeRouter();
-		const toasts: string[] = [];
-		watchVisits(
-			router.on,
-			documentOf(),
-			(text) => toasts.push(text),
-			isNetworkError,
-		);
-		router.fire("finish", "post");
-		router.fire("finish", "get");
-		assert.deepEqual(toasts, []);
 	});
 
 	test("an error that is not the network's gets no toast and is not cancelled", ({
@@ -131,24 +140,62 @@ test.group("A lost connection (TAT-84)", () => {
 	}) => {
 		// Inertia 3.8 hands `networkError` any exception thrown while it handles an answer
 		// (resolving a component, an onSuccess callback), not only a lost connection.
-		const router = fakeRouter();
-		const toasts: string[] = [];
-		watchVisits(
-			router.on,
-			documentOf(),
-			(text) => toasts.push(text),
-			isNetworkError,
-		);
-		assert.isUndefined(
-			router.fire("networkError", undefined, new Error("boom")),
-		);
-		router.fire("finish", "post");
+		const { router, toasts } = watched();
+		router.start("p");
+		assert.isUndefined(router.crash());
+		router.finish("p");
 		assert.deepEqual(toasts, []);
 	});
 
+	test("a visit that finishes without a network error says nothing", ({
+		assert,
+	}) => {
+		const { router, toasts } = watched();
+		router.start("a", "post");
+		router.finish("a", "post");
+		router.start("b", "get");
+		router.finish("b", "get");
+		assert.deepEqual(toasts, []);
+	});
+
+	test("another visit finishing first neither takes the toast nor gets it", ({
+		assert,
+	}) => {
+		const { router, toasts } = watched();
+		router.start("save", "post", "/notes");
+		router.start("page", "get", "/projects");
+		router.lose(href("/notes"));
+		router.finish("page", "get", "/projects");
+		assert.deepEqual(toasts, [], "the page load did not fail");
+		router.finish("save", "post", "/notes");
+		assert.deepEqual(toasts, [SAVE_LOST]);
+	});
+
+	test("two lost visits each get the words for their own method", ({
+		assert,
+	}) => {
+		const { router, toasts } = watched();
+		router.start("save", "post", "/notes");
+		router.start("page", "get", "/projects");
+		router.lose(href("/notes"));
+		router.lose(href("/projects"));
+		router.finish("page", "get", "/projects");
+		router.finish("save", "post", "/notes");
+		assert.deepEqual(toasts, [PAGE_LOST, SAVE_LOST]);
+	});
+
+	test("an error that names no address still gets its toast at the next finish", ({
+		assert,
+	}) => {
+		const { router, toasts } = watched();
+		router.start("save", "post", "/notes");
+		router.lose();
+		router.finish("save", "post", "/notes");
+		assert.deepEqual(toasts, [SAVE_LOST]);
+	});
+
 	test("the returned function removes every callback", ({ assert }) => {
-		const router = fakeRouter();
-		const stop = watchVisits(router.on, documentOf(), () => {}, isNetworkError);
+		const { router, stop } = watched();
 		assert.isAbove(router.callbacks.size, 0);
 		stop();
 		assert.equal(router.callbacks.size, 0);
@@ -200,8 +247,9 @@ test.group("Focus after a refused form (TAT-84)", () => {
 	}) => {
 		const { doc, router, scrolled, send } = setup();
 		send("a");
-		router.fire("error");
-		router.fire("finish", "post");
+		router.start("v1");
+		router.refuse("v1");
+		router.finish("v1");
 		await tick();
 		assert.equal(doc.activeElement?.id, "a-second");
 		assert.lengthOf(scrolled, 1);
@@ -241,8 +289,9 @@ test.group("Focus after a refused form (TAT-84)", () => {
 		assert,
 	}) => {
 		const { doc, router, scrolled } = setup();
-		router.fire("error");
-		router.fire("finish", "post");
+		router.start("v1");
+		router.refuse("v1");
+		router.finish("v1");
 		await tick();
 		assert.equal(doc.activeElement, doc.body);
 		assert.lengthOf(scrolled, 0);
@@ -254,9 +303,10 @@ test.group("Focus after a refused form (TAT-84)", () => {
 		const { doc, router, scrolled, send } = setup();
 		const form = doc.getElementById("a");
 		send("a");
+		router.start("v1");
 		form?.remove();
-		router.fire("error");
-		assert.doesNotThrow(() => router.fire("finish", "post"));
+		router.refuse("v1");
+		assert.doesNotThrow(() => router.finish("v1"));
 		await tick();
 		assert.notEqual(doc.activeElement?.id, "a-second");
 		assert.lengthOf(scrolled, 0);
@@ -265,20 +315,100 @@ test.group("Focus after a refused form (TAT-84)", () => {
 	test("a saved form (no field errors) moves nothing", async ({ assert }) => {
 		const { doc, router, scrolled, send } = setup();
 		send("a");
-		router.fire("finish", "post");
+		router.start("v1");
+		router.finish("v1");
 		await tick();
 		assert.notEqual(doc.activeElement?.id, "a-second");
 		assert.lengthOf(scrolled, 0);
 	});
 
-	test("the form is forgotten at the visit's end", async ({ assert }) => {
+	test("the form is forgotten at its visit's end", async ({ assert }) => {
 		const { doc, router, scrolled, send } = setup();
 		send("a");
-		router.fire("finish", "post");
-		router.fire("error");
-		router.fire("finish", "post");
+		router.start("v1");
+		router.finish("v1");
+		router.start("v2");
+		router.refuse("v2");
+		router.finish("v2");
 		await tick();
 		assert.notEqual(doc.activeElement?.id, "a-second");
+		assert.lengthOf(scrolled, 0);
+	});
+
+	test("a visit that interrupts another keeps its own form: the old visit's finish does not wipe it", async ({
+		assert,
+	}) => {
+		// Form A is out; form B is submitted. Inertia's order: submit, before, the old visit is
+		// interrupted (its finish fires at once), then the new visit starts.
+		const { doc, router, scrolled, send } = setup();
+		send("a");
+		router.start("v1");
+		send("b");
+		router.finish("v1");
+		router.start("v2");
+		router.refuse("v2");
+		router.finish("v2");
+		await tick();
+		assert.equal(doc.activeElement?.id, "b-name");
+		assert.lengthOf(scrolled, 1);
+	});
+
+	test("an interrupted visit's answer never focuses anything", async ({
+		assert,
+	}) => {
+		const { doc, router, scrolled, send } = setup();
+		send("a");
+		router.start("v1");
+		send("b");
+		router.finish("v1");
+		router.start("v2");
+		router.finish("v2");
+		await tick();
+		assert.equal(doc.activeElement, doc.body);
+		assert.lengthOf(scrolled, 0);
+	});
+
+	test("an async visit finishing while a form's request is out does not wipe the form", async ({
+		assert,
+	}) => {
+		// The notes save is async: it starts before form A is sent and finishes while A is out.
+		const { doc, router, send } = setup();
+		router.start("notes", "put", "/notes");
+		send("a");
+		router.start("v1");
+		router.finish("notes", "put", "/notes");
+		router.refuse("v1");
+		router.finish("v1");
+		await tick();
+		assert.equal(doc.activeElement?.id, "a-second");
+	});
+
+	test("another visit's refusal, finishing first, does not focus a form that was not refused", async ({
+		assert,
+	}) => {
+		const { doc, router, scrolled, send } = setup();
+		router.start("button", "post", "/moves");
+		send("a");
+		router.start("v1");
+		router.refuse("button");
+		router.finish("button", "post", "/moves");
+		router.finish("v1");
+		await tick();
+		assert.equal(doc.activeElement, doc.body);
+		assert.lengthOf(scrolled, 0);
+	});
+
+	test("a submit that never starts a visit cannot bind to a later, unrelated one", async ({
+		assert,
+	}) => {
+		const { doc, router, scrolled, send } = setup();
+		send("a");
+		await tick();
+		router.start("later", "post", "/moves");
+		router.refuse("later");
+		router.finish("later", "post", "/moves");
+		await tick();
+		assert.equal(doc.activeElement, doc.body);
 		assert.lengthOf(scrolled, 0);
 	});
 
