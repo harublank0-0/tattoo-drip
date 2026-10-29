@@ -942,8 +942,10 @@ describe("an artist's styles and links", () => {
 		return renderToStaticMarkup(createElement(ArtistPage, { data }));
 	};
 	const STYLES_LINE = /<p class="artist-styles">([^<]*)<\/p>/;
-	const STYLE_LIST = /<ul class="style-list">([\s\S]*?)<\/ul>/;
-	const ARTIST_LINKS = /<ul class="artist-links">([\s\S]*?)<\/ul>/;
+	const STYLE_LIST =
+		/<ul class="style-list" aria-label="Styles">([\s\S]*?)<\/ul>/;
+	const ARTIST_LINKS =
+		/<ul class="artist-links" aria-label="Links">([\s\S]*?)<\/ul>/;
 
 	test("the card shows the artist's styles on one line", () => {
 		const html = studioHtml(STUDIO, [THREE_STYLES, ARJUN]);
@@ -982,6 +984,19 @@ describe("an artist's styles and links", () => {
 		assert.equal(count(links, /<li>/g), 1);
 		// The card's one-line version is not repeated on the artist's own page.
 		assert.equal(count(html, /class="artist-styles"/g), 0);
+	});
+
+	test("the artist page's two lists are named Styles and Links", () => {
+		const html = pageOf(THREE_STYLES);
+
+		assert.equal(
+			count(html, /<ul class="style-list" aria-label="Styles">/g),
+			1,
+		);
+		assert.equal(
+			count(html, /<ul class="artist-links" aria-label="Links">/g),
+			1,
+		);
 	});
 
 	test("the artist page lists every style as a chip, and every link in Instagram, Facebook, TikTok order", () => {

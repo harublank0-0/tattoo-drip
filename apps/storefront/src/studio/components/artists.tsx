@@ -104,7 +104,7 @@ function ArtistStatus({ accepting }: { accepting: boolean }) {
 function StyleList({ styles }: { styles: readonly string[] }) {
 	if (styles.length === 0) return null;
 	return (
-		<ul className="style-list">
+		<ul className="style-list" aria-label={studioCopy.artist.styles}>
 			{styles.map((name) => (
 				<li key={name}>{name}</li>
 			))}
@@ -116,7 +116,7 @@ function ArtistLinks({ links }: { links: ArtistView["links"] }) {
 	const allowed = links.filter((link) => isAllowedHref(link.href));
 	if (allowed.length === 0) return null;
 	return (
-		<ul className="artist-links">
+		<ul className="artist-links" aria-label={studioCopy.artist.links}>
 			{allowed.map((link) => (
 				<li key={`${link.kind}:${link.href}`}>
 					<a className="link-chip" href={link.href} rel={linkRel(link.href)}>
