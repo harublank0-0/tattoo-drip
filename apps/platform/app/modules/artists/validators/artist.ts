@@ -65,6 +65,8 @@ const messages = new SimpleMessagesProvider(
 /**
  * VineJS reports a bad style under its position ("styles.0"). The form has
  * one Styles fieldset, so every style error is shown under "styles".
+ * It relies on SimpleErrorReporter pushing one entry per `report` call; the
+ * unknown-style test in artist_form.spec.ts guards that.
  */
 class ArtistErrorReporter extends SimpleErrorReporter {
 	override report(

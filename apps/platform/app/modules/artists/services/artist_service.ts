@@ -333,6 +333,10 @@ export default class ArtistService {
 			visible: true,
 			acceptingInquiries: true,
 			closedMessage: null,
+			styles: [],
+			instagramUrl: null,
+			facebookUrl: null,
+			tiktokUrl: null,
 			userId: owner.id,
 		});
 	}

@@ -513,6 +513,11 @@ test.group("ArtistService profiles", (group) => {
 		assert.equal(artist.userId, owner.id);
 		assert.isTrue(artist.visible);
 		assert.isTrue(artist.acceptingInquiries);
+		// The returned instance matches what the database stores.
+		assert.deepEqual(artist.styles, []);
+		assert.isNull(artist.instagramUrl);
+		assert.isNull(artist.facebookUrl);
+		assert.isNull(artist.tiktokUrl);
 	});
 });
 

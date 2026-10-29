@@ -579,6 +579,23 @@ test.group("An artist's styles and social links", (group) => {
 		assert.equal(saved.name, "Sita Rai");
 	});
 
+	test("exactly five styles are accepted", async ({ client, assert }) => {
+		const { owner, tenant } = await studioWithOwner();
+		// Not the list's order: the order sent is the order stored.
+		const sent = ["realism", "blackwork", "colour", "fine-line", "japanese"];
+
+		const response = await client
+			.post(base)
+			.fields({ name: "Sita Rai", slug: "sita", "styles[]": sent })
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		response.assertHeader("location", base);
+		const [artist] = await listOf(tenant);
+		assert.deepEqual(artist.styles, sent);
+	});
+
 	test("an unknown style is a field error", async ({ client, assert }) => {
 		const { owner, tenant } = await studioWithOwner();
 		const artist = await inTenant(tenant, () =>
