@@ -14,6 +14,7 @@ import ArtistService, {
 } from "#modules/artists/services/artist_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import WorkPhotoService from "#modules/artists/services/work_photo_service";
+import { knownStyles, TATTOO_STYLES } from "#modules/artists/styles";
 import {
 	createArtistValidator,
 	updateArtistValidator,
@@ -25,6 +26,9 @@ import ImageService, {
 } from "#modules/media/services/image_service";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { artistLink } from "#services/studio_links";
+
+/** The styles the form offers, in the list's order. */
+const STYLE_OPTIONS = TATTOO_STYLES.map(({ slug, name }) => ({ slug, name }));
 
 /**
  * The studio's artist profiles. Owners manage every one; an artist edits
@@ -90,6 +94,7 @@ export default class ArtistsController {
 			canLink: !(await this.hasProfile(tenant, userId)),
 			// Photos come once the artist is saved (TAT-116).
 			workPhotos: [],
+			styleOptions: STYLE_OPTIONS,
 		});
 	}
 
@@ -143,6 +148,7 @@ export default class ArtistsController {
 			artist: await this.toProps(tenant, artist, userId),
 			canLink,
 			workPhotos,
+			styleOptions: STYLE_OPTIONS,
 		});
 	}
 
@@ -219,6 +225,11 @@ export default class ArtistsController {
 			visible: artist.visible,
 			acceptingInquiries: artist.acceptingInquiries,
 			closedMessage: artist.closedMessage,
+			// Only listed styles: a slug that left the list has no box to show.
+			styles: knownStyles(artist.styles).map(({ slug }) => slug),
+			instagramUrl: artist.instagramUrl,
+			facebookUrl: artist.facebookUrl,
+			tiktokUrl: artist.tiktokUrl,
 			isMine: artist.userId === userId,
 			// The artist's own page (TAT-101); a hidden artist has none.
 			pageUrl: artist.visible ? artistLink(tenant.slug, artist.slug) : null,
@@ -228,7 +239,8 @@ export default class ArtistsController {
 
 /**
  * The service's input from the validated body. A checkbox that is not
- * checked is not sent at all, so a missing boolean means off.
+ * checked is not sent at all, so a missing boolean means off and no style
+ * box means no styles.
  */
 function toInput(data: Infer<typeof updateArtistValidator>): ArtistInput {
 	return {
@@ -238,11 +250,10 @@ function toInput(data: Infer<typeof updateArtistValidator>): ArtistInput {
 		visible: data.visible ?? false,
 		acceptingInquiries: data.acceptingInquiries ?? false,
 		closedMessage: data.closedMessage ?? null,
-		// The form does not send styles or links yet: a save clears them.
-		styles: [],
-		instagramUrl: null,
-		facebookUrl: null,
-		tiktokUrl: null,
+		styles: data.styles ?? [],
+		instagramUrl: data.instagramUrl ?? null,
+		facebookUrl: data.facebookUrl ?? null,
+		tiktokUrl: data.tiktokUrl ?? null,
 		linkToMe: data.linkToMe ?? false,
 		photo: data.photo,
 		removePhoto: data.removePhoto ?? false,

@@ -5,6 +5,7 @@ import Artist from "#modules/artists/models/artist";
 import ArtistService, {
 	type ArtistInput,
 } from "#modules/artists/services/artist_service";
+import { TATTOO_STYLES } from "#modules/artists/styles";
 import ImageService from "#modules/media/services/image_service";
 import { addArtist, addWorkPhoto } from "#tests/helpers/artists";
 import { testImages } from "#tests/helpers/images";
@@ -485,6 +486,219 @@ test.group("Editing an artist", (group) => {
 		const saved = await inTenant(tenant, () => Artist.findOrFail(first.id));
 		assert.equal(saved.name, "Sita Rai");
 		assert.equal(saved.slug, "sita");
+	});
+});
+
+test.group("An artist's styles and social links", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("an owner saves two styles and an Instagram link", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+
+		const response = await client
+			.post(base)
+			.fields({
+				name: "Sita Rai",
+				slug: "sita",
+				"styles[]": ["blackwork", "fine-line"],
+				instagramUrl: "https://instagram.com/sita",
+				// The form sends every box: an empty one is no link.
+				facebookUrl: "",
+				tiktokUrl: "",
+			})
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		response.assertHeader("location", base);
+		const [artist] = await listOf(tenant);
+		assert.deepEqual(artist.styles, ["blackwork", "fine-line"]);
+		assert.equal(artist.instagramUrl, "https://instagram.com/sita");
+		assert.isNull(artist.facebookUrl);
+		assert.isNull(artist.tiktokUrl);
+	});
+
+	test("no style boxes sent means none", async ({ client, assert }) => {
+		const { owner, tenant } = await studioWithOwner();
+		const artist = await inTenant(tenant, () =>
+			artists.create(
+				tenant,
+				input({
+					styles: ["blackwork", "realism"],
+					tiktokUrl: "https://tiktok.com/@sita",
+				}),
+				owner,
+			),
+		);
+
+		await client
+			.put(`${base}/${artist.id}`)
+			.fields({ name: "Sita Rai", slug: "sita" })
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		const [saved] = await listOf(tenant);
+		assert.deepEqual(saved.styles, []);
+		assert.isNull(saved.tiktokUrl);
+	});
+
+	test("a sixth style is a field error on styles", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const artist = await inTenant(tenant, () =>
+			artists.create(tenant, input({ styles: ["blackwork"] }), owner),
+		);
+
+		const response = await client
+			.put(`${base}/${artist.id}`)
+			.fields({
+				name: "Renamed",
+				slug: "sita",
+				"styles[]": [
+					"blackwork",
+					"fine-line",
+					"traditional",
+					"realism",
+					"colour",
+					"japanese",
+				],
+			})
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		assertValidationError(response, "styles", "Pick up to 5 styles.");
+		const saved = await inTenant(tenant, () => Artist.findOrFail(artist.id));
+		assert.deepEqual(saved.styles, ["blackwork"]);
+		assert.equal(saved.name, "Sita Rai");
+	});
+
+	test("an unknown style is a field error", async ({ client, assert }) => {
+		const { owner, tenant } = await studioWithOwner();
+		const artist = await inTenant(tenant, () =>
+			artists.create(tenant, input({ styles: ["blackwork"] }), owner),
+		);
+
+		const response = await client
+			.put(`${base}/${artist.id}`)
+			.fields({ name: "Renamed", slug: "sita", "styles[]": ["nope"] })
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		assertValidationError(response, "styles", "Pick styles from the list.");
+		const saved = await inTenant(tenant, () => Artist.findOrFail(artist.id));
+		assert.deepEqual(saved.styles, ["blackwork"]);
+		assert.equal(saved.name, "Sita Rai");
+	});
+
+	test("a plain-http link is a field error", async ({ client, assert }) => {
+		const { owner, tenant } = await studioWithOwner();
+
+		const response = await client
+			.post(base)
+			.fields({
+				name: "Sita Rai",
+				slug: "sita",
+				facebookUrl: "http://facebook.com/sita",
+			})
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		assertValidationError(
+			response,
+			"facebookUrl",
+			"Enter a full link that starts with https://",
+		);
+		assert.isEmpty(await listOf(tenant));
+	});
+
+	test("styles survive a save that also uploads a photo", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+
+		await client
+			.post(base)
+			.fields({
+				name: "Sita Rai",
+				slug: "sita",
+				"styles[]": ["blackwork", "fine-line"],
+			})
+			.file("photo", await testImages.png(), { filename: "p.png" })
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		const [artist] = await listOf(tenant);
+		assert.isNotNull(artist.photoKey);
+		assert.deepEqual(artist.styles, ["blackwork", "fine-line"]);
+	});
+
+	test("the edit form offers every style and shows a dropped one unchecked", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const artist = await inTenant(tenant, () =>
+			artists.create(tenant, input(), owner),
+		);
+		// A slug that has since left the list, written past the validator.
+		await inTenant(tenant, () =>
+			Artist.query()
+				.where("id", artist.id)
+				.update({ styles: ["blackwork", "retired-style"] }),
+		);
+
+		const edit = await client
+			.get(`${base}/${artist.id}/edit`)
+			.withInertia()
+			.loginAs(owner);
+
+		const { styleOptions } = edit.inertiaProps;
+		assert.lengthOf(styleOptions, 18);
+		assert.deepEqual(styleOptions[0], { slug: "blackwork", name: "Blackwork" });
+		assert.notInclude(
+			styleOptions.map((option: { slug: string }) => option.slug),
+			"retired-style",
+		);
+		// Only listed styles reach the form, so the dropped one has no box to check.
+		assert.deepEqual(edit.inertiaProps.artist.styles, ["blackwork"]);
+
+		await client
+			.put(`${base}/${artist.id}`)
+			.fields({ name: "Sita Rai", slug: "sita", "styles[]": "blackwork" })
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		const saved = await inTenant(tenant, () => Artist.findOrFail(artist.id));
+		assert.deepEqual(saved.styles, ["blackwork"]);
+	});
+
+	test("the add form offers every style, in order", async ({
+		client,
+		assert,
+	}) => {
+		const { owner } = await studioWithOwner();
+
+		const response = await client
+			.get(`${base}/new`)
+			.withInertia()
+			.loginAs(owner);
+
+		assert.deepEqual(
+			response.inertiaProps.styleOptions,
+			TATTOO_STYLES.map(({ slug, name }) => ({ slug, name })),
+		);
 	});
 });
 
