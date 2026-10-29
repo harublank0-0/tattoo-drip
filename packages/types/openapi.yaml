@@ -573,7 +573,7 @@ components:
       required: [slug, name]
       properties:
         slug: { type: string, examples: [fine-line] }
-        name: { type: string, examples: [Fine Line] }
+        name: { type: string, examples: [Fine line] }
 
     BodyPlacement:
       type: object

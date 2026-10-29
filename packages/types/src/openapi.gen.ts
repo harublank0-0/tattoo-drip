@@ -362,7 +362,7 @@ export interface components {
         TattooStyle: {
             /** @example fine-line */
             slug: string;
-            /** @example Fine Line */
+            /** @example Fine line */
             name: string;
         };
         BodyPlacement: {
