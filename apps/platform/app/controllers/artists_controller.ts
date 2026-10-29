@@ -48,7 +48,7 @@ export default class ArtistsController {
 
 		return ctx.inertia.render("artists/index", {
 			artists: await Promise.all(
-				list.map((artist) => this.toProps(tenant, artist, userId)),
+				list.map((artist) => this.toRowProps(tenant, artist, userId)),
 			),
 		});
 	}
@@ -197,16 +197,14 @@ export default class ArtistsController {
 	}
 
 	/**
-	 * What the pages get for one artist, with the photo's public URL (its 320 px
+	 * What the list shows for one artist, with the photo's public URL (its 320 px
 	 * copy, TAT-112). Not the
 	 * row: the tenant and the linked user's id stay on the server.
 	 */
-	private async toProps(tenant: Tenant, artist: Artist, userId: string) {
+	private async toRowProps(tenant: Tenant, artist: Artist, userId: string) {
 		return {
 			id: artist.id,
 			name: artist.name,
-			slug: artist.slug,
-			bio: artist.bio,
 			// The 320 px copy: the list and form draw it at 64 and 96 px.
 			photoUrl: artist.photoKey
 				? await this.images.urlFor(
@@ -218,10 +216,19 @@ export default class ArtistsController {
 				: null,
 			visible: artist.visible,
 			acceptingInquiries: artist.acceptingInquiries,
-			closedMessage: artist.closedMessage,
 			isMine: artist.userId === userId,
 			// The artist's own page (TAT-101); a hidden artist has none.
 			pageUrl: artist.visible ? artistLink(tenant.slug, artist.slug) : null,
+		};
+	}
+
+	/** What the edit form gets: the list's fields and the ones it edits. */
+	private async toProps(tenant: Tenant, artist: Artist, userId: string) {
+		return {
+			...(await this.toRowProps(tenant, artist, userId)),
+			slug: artist.slug,
+			bio: artist.bio,
+			closedMessage: artist.closedMessage,
 		};
 	}
 }

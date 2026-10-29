@@ -35,6 +35,49 @@ export type ContactVia = {
 	kind?: MessageKindName;
 };
 
+/** How the last contact names its channel; the server's `CHANNEL_TEXT`. */
+export const CHANNEL_TEXT: Record<ContactChannelName, string> = {
+	whatsapp: "on WhatsApp",
+	viber: "on Viber",
+	call: "by phone",
+	copy: "with a copied message",
+};
+
+/** How the last contact names its message; the server's `MESSAGE_LABELS`. */
+export const MESSAGE_LABELS: Record<MessageKindName, string> = {
+	inquiry_received: "Inquiry received",
+	quote: "Quote",
+	deposit_link: "Deposit link",
+	booking_confirmation: "Booking confirmation",
+	session_reminder: "Session reminder",
+	aftercare: "Aftercare",
+};
+
+/**
+ * What the server will say about a contact recorded now (`lastContactText`):
+ * "contacted today on WhatsApp (Quote)". The page shows it while the record
+ * is out (optimistic, ui.md), and Inertia puts the old text back if it fails.
+ */
+export function justContactedText(via: ContactVia): string {
+	const channel = via.channel ? ` ${CHANNEL_TEXT[via.channel]}` : "";
+	const kind = via.kind ? ` (${MESSAGE_LABELS[via.kind]})` : "";
+	return `contacted today${channel}${kind}`;
+}
+
+/**
+ * The page props a contact recorded now changes, as the server will send
+ * them back: the last contact's words and channel (null for "Mark contacted").
+ */
+export function justContacted(via: ContactVia): {
+	contactedText: string;
+	lastChannel: ContactChannelName | null;
+} {
+	return {
+		contactedText: justContactedText(via),
+		lastChannel: via.channel ?? null,
+	};
+}
+
 /** The two channels a message can lead with. */
 export type PrimaryChannel = "whatsapp" | "viber";
 
