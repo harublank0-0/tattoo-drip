@@ -1,5 +1,5 @@
 /**
- * The tattoo styles an artist can pick (studio website, plan 1). A fixed
+ * The tattoo styles an artist can pick (TAT-125). A fixed
  * list: the slug is what is stored and sent, the name is what people read.
  * Both stay in this order wherever styles are shown.
  */

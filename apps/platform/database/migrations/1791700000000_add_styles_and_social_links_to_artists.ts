@@ -1,7 +1,7 @@
 import { BaseSchema } from "@adonisjs/lucid/schema";
 
 /**
- * An artist's tattoo styles and social links (studio website, plan 1).
+ * An artist's tattoo styles and social links (TAT-125).
  * `styles` holds slugs from the list in #modules/artists/styles, at most
  * five (the list itself is not checked here, so a style can leave it without
  * a migration). The links are https URLs; the form checks them.
