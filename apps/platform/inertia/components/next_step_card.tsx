@@ -1,6 +1,5 @@
-import { router } from "@inertiajs/react";
 import type { ReactNode, RefObject } from "react";
-import { urlFor } from "~/client";
+import { MoveButton } from "~/components/change_card";
 import ChatMessage from "~/components/chat_message";
 import DepositPanel from "~/components/deposit_panel";
 import FinishPanel from "~/components/finish_card";
@@ -15,9 +14,8 @@ import type {
 	ProjectPageProps,
 } from "~/components/projects";
 import { AcceptQuote, QuoteForm, ReviseTrigger } from "~/components/quote_card";
-import { Button, buttonVariants } from "~/components/ui/button";
+import { buttonVariants } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { useTenant } from "~/hooks/use-tenant";
 
 type Variant = "default" | "outline";
 
@@ -58,7 +56,6 @@ export default function NextStepCard({
 	/** The page's heading: where focus goes when an action removes the button that had it. */
 	fallback: RefObject<HTMLElement | null>;
 }) {
-	const tenant = useTenant();
 	const done = () => fallback.current?.focus();
 	const { primary, blocks, buttons } = layoutOf(step);
 
@@ -118,22 +115,12 @@ export default function NextStepCard({
 				);
 			case "resume":
 				return (
-					<Button
-						type="button"
+					<MoveButton
+						projectId={projectId}
+						move="resume"
 						variant={variant}
-						onClick={() =>
-							router.post(
-								urlFor("tenant.projects.moves.store", {
-									tenant: tenant.slug,
-									id: projectId,
-								}),
-								{ move: "resume" },
-								{ preserveScroll: true },
-							)
-						}
-					>
-						Resume
-					</Button>
+						fallback={fallback}
+					/>
 				);
 			case "deposit_link":
 				return (
