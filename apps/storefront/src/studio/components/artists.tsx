@@ -1,6 +1,7 @@
 import { Fill } from "../../intake/components/fill.tsx";
 import { studioCopy } from "../copy.ts";
 import { showPhoto } from "../lightbox.ts";
+import { isAllowedHref, linkRel } from "../links.ts";
 import {
 	profilePhotoSizes,
 	rosterPhotoSizes,
@@ -94,6 +95,39 @@ function ArtistStatus({ accepting }: { accepting: boolean }) {
 	);
 }
 
+/**
+ * The artist page's styles as small outlined chips, and (ArtistLinks) their
+ * links as the studio's link chips. Nothing at all while a list is empty, so
+ * an artist who set none has no empty row. The roster card shows the styles
+ * as one line instead.
+ */
+function StyleList({ styles }: { styles: readonly string[] }) {
+	if (styles.length === 0) return null;
+	return (
+		<ul className="style-list">
+			{styles.map((name) => (
+				<li key={name}>{name}</li>
+			))}
+		</ul>
+	);
+}
+
+function ArtistLinks({ links }: { links: ArtistView["links"] }) {
+	const allowed = links.filter((link) => isAllowedHref(link.href));
+	if (allowed.length === 0) return null;
+	return (
+		<ul className="artist-links">
+			{allowed.map((link) => (
+				<li key={`${link.kind}:${link.href}`}>
+					<a className="link-chip" href={link.href} rel={linkRel(link.href)}>
+						{link.label}
+					</a>
+				</li>
+			))}
+		</ul>
+	);
+}
+
 function ArtistEntry({
 	artist,
 	askLink,
@@ -118,6 +152,9 @@ function ArtistEntry({
 				<h3 id={titleId} className="artist-name" dir="auto">
 					{artist.name}
 				</h3>
+				{artist.styles.length > 0 ? (
+					<p className="artist-styles">{artist.styles.join(" · ")}</p>
+				) : null}
 				<ArtistStatus accepting={artist.accepting} />
 			</div>
 			<div className="artist-body">
@@ -205,12 +242,14 @@ export function ArtistProfile({
 						</>
 					)}
 				</p>
+				<StyleList styles={artist.styles} />
 				<ArtistStatus accepting={artist.accepting} />
 				{artist.bio ? (
 					<p className="user-text measure" dir="auto">
 						{artist.bio}
 					</p>
 				) : null}
+				<ArtistLinks links={artist.links} />
 				{artist.closedMessage ? (
 					<p className="note user-text measure" dir="auto">
 						{artist.closedMessage}

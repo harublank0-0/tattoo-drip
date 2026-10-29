@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, test } from "node:test";
-import type { Studio } from "@tattoo-drip/sdk";
+import type { Artist, Studio } from "@tattoo-drip/sdk";
 import {
 	ARTIST_SLUG,
 	artistViewModels,
 	findArtist,
 	MAX_WORK_PHOTOS,
+	socialContactLinks,
 	studioViewModel,
 	workPhotoViews,
 } from "../../src/studio/view-model.ts";
@@ -176,6 +177,14 @@ describe("artistViewModels", () => {
 			pageHref: "/artists/sita",
 			inquiryHref: "/artists/sita#inquiry",
 			workPhotos: [],
+			styles: ["Fine line"],
+			links: [
+				{
+					kind: "instagram",
+					label: "Instagram",
+					href: "https://instagram.com/sita.ink",
+				},
+			],
 		});
 		assert.equal(arjun.name, "अर्जुन थापा");
 		assert.equal(arjun.photo, null);
@@ -285,6 +294,152 @@ describe("artistViewModels", () => {
 			]).map((artist) => artist.slug),
 			["arjun"],
 		);
+	});
+});
+
+describe("an artist's styles and links", () => {
+	/** An API response that sends whatever these two keys hold (a hostile or older API can send what the contract does not allow). */
+	const withKeys = (keys: Record<string, unknown>) =>
+		({ ...SITA, ...keys }) as unknown as Artist;
+	const view = (artist: Artist) => artistViewModels([artist])[0];
+
+	test("an artist's styles are their names, in the API's order", () => {
+		assert.deepEqual(view(SITA).styles, ["Fine line"]);
+		assert.deepEqual(
+			view(
+				withKeys({
+					styles: [
+						{ slug: "japanese", name: "Japanese" },
+						{ slug: "blackwork", name: "Blackwork" },
+					],
+				}),
+			).styles,
+			["Japanese", "Blackwork"],
+		);
+		assert.deepEqual(view(ARJUN).styles, []);
+	});
+
+	test("a style name is one line of plain text, and at most five are kept", () => {
+		const named = (name: unknown) => ({ slug: "x", name });
+		assert.deepEqual(
+			view(
+				withKeys({
+					styles: [
+						named("  Fine \n line  "),
+						named("A"),
+						named("B"),
+						named("C"),
+						named("D"),
+						named("E"),
+					],
+				}),
+			).styles,
+			["Fine line", "A", "B", "C", "D"],
+		);
+	});
+
+	test("an artist's links are the safe ones, labelled like the studio's", () => {
+		assert.deepEqual(view(SITA).links, [
+			{
+				kind: "instagram",
+				label: "Instagram",
+				href: "https://instagram.com/sita.ink",
+			},
+		]);
+		assert.deepEqual(
+			view(
+				withKeys({
+					socialLinks: [
+						{ platform: "instagram", url: "javascript:alert(1)" },
+						{ platform: "facebook", url: "http://facebook.com/sita" },
+						{ platform: "tiktok", url: "https://www.tiktok.com/@sita" },
+					],
+				}),
+			).links,
+			[
+				{
+					kind: "tiktok",
+					label: "TikTok",
+					href: "https://www.tiktok.com/@sita",
+				},
+			],
+		);
+		assert.deepEqual(view(ARJUN).links, []);
+	});
+
+	test("an older API without styles or socialLinks means none", () => {
+		const older: Record<string, unknown> = { ...SITA };
+		delete older.styles;
+		delete older.socialLinks;
+		for (const artist of [
+			older,
+			{ ...SITA, styles: "x", socialLinks: {} },
+			{ ...SITA, styles: null, socialLinks: null },
+			{ ...SITA, styles: { length: 1, 0: { name: "x" } }, socialLinks: 7 },
+		]) {
+			const shown = view(artist as unknown as Artist);
+			assert.deepEqual(shown.styles, []);
+			assert.deepEqual(shown.links, []);
+		}
+	});
+
+	test("a style or link that is malformed is dropped and the rest stay", () => {
+		const shown = view(
+			withKeys({
+				styles: [
+					null,
+					"Fine line",
+					{ slug: "no-name" },
+					{ slug: "x", name: 7 },
+					{ slug: "x", name: "   " },
+					{ slug: "japanese", name: "Japanese" },
+				],
+				socialLinks: [
+					null,
+					"https://instagram.com/a",
+					{ platform: "instagram" },
+					{ platform: "instagram", url: 7 },
+					{ platform: "instagram", url: "https://instagram.com/sita.ink" },
+				],
+			}),
+		);
+		assert.deepEqual(shown.styles, ["Japanese"]);
+		assert.deepEqual(
+			shown.links.map((link) => link.href),
+			["https://instagram.com/sita.ink"],
+		);
+	});
+});
+
+describe("socialContactLinks", () => {
+	test("names the known platforms, labels an unknown one by its host and drops what is not https", () => {
+		assert.deepEqual(
+			socialContactLinks([
+				{ platform: "instagram", url: "https://instagram.com/a" },
+				{ platform: "youtube", url: "https://www.youtube.com/@a" },
+				{ platform: "constructor", url: "https://example.org/x" },
+				{ platform: "facebook", url: "http://facebook.com/a" },
+			]),
+			[
+				{
+					kind: "instagram",
+					label: "Instagram",
+					href: "https://instagram.com/a",
+				},
+				{
+					kind: "other",
+					label: "youtube.com",
+					href: "https://www.youtube.com/@a",
+				},
+				{ kind: "other", label: "example.org", href: "https://example.org/x" },
+			],
+		);
+	});
+
+	test("anything but a list is none", () => {
+		for (const value of [undefined, null, "x", 7, {}, { length: 1, 0: {} }]) {
+			assert.deepEqual(socialContactLinks(value), []);
+		}
 	});
 });
 

@@ -298,6 +298,16 @@
   .artist-profile-text { display: grid; gap: 1rem; align-content: start; justify-items: start; }
   .artist-title { font-size: clamp(2.25rem, 1.5rem + 4vw, 4rem); line-height: 1.12; }
 
+  /*
+   * An artist's styles: one muted line on the roster card, outlined chips on
+   * their page. Their links reuse the studio's .link-chip. The names are the
+   * platform's fixed list, but a long word still wraps instead of widening
+   * the page; the chips wrap onto new rows.
+   */
+  .artist-styles { color: var(--ink-muted); font-size: 0.9375rem; line-height: 1.4; overflow-wrap: anywhere; }
+  .style-list, .artist-links { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0; padding: 0; list-style: none; overflow-wrap: anywhere; }
+  .style-list li { padding: 0.125rem 0.625rem; border: 1px solid var(--line-strong); border-radius: var(--radius); font-size: 0.9375rem; line-height: 1.5; }
+
   .site-bar { width: min(72rem, 100% - 2.5rem); margin-inline: auto; padding-block-start: 1rem; }
   .site-bar a { display: inline-flex; align-items: center; min-height: 2.75rem; font-family: var(--display-face); font-size: 1.25rem; font-weight: 700; text-decoration: none; overflow-wrap: anywhere; }
   .site-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem 2rem; width: min(72rem, 100% - 2.5rem); margin: 5rem auto 0; padding-block: 1.5rem 2.5rem; border-top: 1px solid var(--line); color: var(--ink-muted); font-size: 0.9375rem; overflow-wrap: anywhere; }
