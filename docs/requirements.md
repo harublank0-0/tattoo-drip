@@ -7,6 +7,8 @@ What the MVP (pilot with a design-partner studio) and V1 (paid launch) must do, 
 **Accounts and tenants**
 - [x] Sign up with email and password, verify the email, log in and out, reset the password
 - Signup always answers "Check your email": a new address gets a confirmation link (24 hours), a registered one an email saying it already has an account; the page never tells which. Email addresses are case-insensitive. A reset link works once, for an hour, signs every device out and emails the account that its password changed; asking for one never tells whether an address has an account.
+- [x] Change the password while signed in, and sign out of every other device
+- Passwords are 8 to 128 characters. Changing one asks for the current password (wrong tries are limited per account and per address, like sign-in) and a new one that differs from it; every other device is signed out, this one stays signed in, a pending reset link stops working, and the account is emailed that its password changed. "Sign out of other devices" asks on the page first and keeps this device signed in.
 - [x] Create a `studio` or `independent` tenant (needs a verified email), with a unique slug that is also its subdomain
 - Accounts that existed before email confirmation keep every studio they belong to; any account confirms its address before it creates a tenant (or, with invitations, joins one).
 - [x] Invite members as `owner` or `artist`; revoke invites; remove members; switch between tenants
