@@ -112,12 +112,17 @@ test.group(
 			);
 		});
 
-		test("the notes save is an async visit that still says Saving…", async ({
+		test("the notes save is an async partial visit that still says Saving…", async ({
 			assert,
 		}) => {
+			// `only: ["notes"]` keeps its answer (the redirect to the project page can be computed
+			// before, and delivered after, a later answer) from restoring any other, older prop.
 			const source = await read("pages/projects/show.tsx");
 			const form = source.slice(source.indexOf("function NotesForm("));
-			assert.include(form, "options={{ preserveScroll: true, async: true }}");
+			assert.include(
+				form,
+				'options={{ preserveScroll: true, async: true, only: ["notes"] }}',
+			);
 			assert.include(form, '"Saving…"');
 		});
 

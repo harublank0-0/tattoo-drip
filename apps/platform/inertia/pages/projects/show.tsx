@@ -372,10 +372,13 @@ function NotesForm({
 		<Form
 			route="tenant.projects.notes.update"
 			routeParams={{ tenant: tenant.slug, id: projectId }}
-			// An async visit (TAT-84): a tap on another tab while the save is out does not
-			// interrupt it (only sync visits do), and Inertia does not apply its answer to
-			// another page, so nothing from it reaches the page the person went to.
-			options={{ preserveScroll: true, async: true }}
+			// An async partial visit (TAT-84): a tap on another tab while the save is out does not
+			// interrupt it (only sync visits do), and Inertia does not apply its answer to another
+			// page, so nothing from it reaches the page the person went to. `only: ["notes"]`
+			// (the headers survive the redirect to this page, and the answer then carries `notes`
+			// and the always-shared props) keeps an older answer, which can land after a later
+			// one, from putting any other prop back to its old value.
+			options={{ preserveScroll: true, async: true, only: ["notes"] }}
 		>
 			{({ errors, processing }) => (
 				<Field data-invalid={!!errors.notes}>
