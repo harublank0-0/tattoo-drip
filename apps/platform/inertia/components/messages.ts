@@ -29,6 +29,13 @@ export type CardMessageProps = {
 	viberUrl: string;
 };
 
+/**
+ * The contact line once "Mark contacted" is tapped (TAT-84), before the server answers: the
+ * server's `lastContactText` for a contact now with no channel (pinned by
+ * slow_connection_source.spec.ts).
+ */
+export const MARKED_CONTACTED_TEXT = "contacted today";
+
 /** What the contact routes take: the link tapped and the message it carried. */
 export type ContactVia = {
 	channel?: ContactChannelName;

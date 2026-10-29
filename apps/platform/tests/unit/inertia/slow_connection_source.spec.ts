@@ -1,5 +1,14 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { test } from "@japa/runner";
+import { DateTime } from "luxon";
+import { NO_VIA } from "#modules/notifications/messages";
+import { lastContactText } from "#modules/projects/contact";
+// @ts-expect-error TS6305: the server project only references the inertia project, so it cannot read its sources and the module is untyped here; the type below restates its one export and the inertia project type-checks the real one.
+import * as messagesModule from "../../../inertia/components/messages.js";
+
+const { MARKED_CONTACTED_TEXT } = messagesModule as {
+	MARKED_CONTACTED_TEXT: string;
+};
 
 const read = (file: string) =>
 	readFile(new URL(`../../../inertia/${file}`, import.meta.url), "utf8");
@@ -42,5 +51,49 @@ test.group("One-tap moves send once (TAT-84)", () => {
 		const source = await read("components/change_card.tsx");
 		const field = source.slice(source.indexOf("function ArtistField("));
 		assert.include(field, 'processing ? "Saving…" : "Save"');
+	});
+});
+
+test.group("Optimistic only for Mark contacted and notes (TAT-84)", () => {
+	test("the words shown at once are the server's words for a contact now with no channel", ({
+		assert,
+	}) => {
+		assert.equal(
+			MARKED_CONTACTED_TEXT,
+			lastContactText(DateTime.now(), "Asia/Kathmandu", NO_VIA),
+		);
+	});
+
+	test("the project page makes exactly its two changes optimistic", async ({
+		assert,
+	}) => {
+		const source = await read("pages/projects/show.tsx");
+		assert.include(source, "MARKED_CONTACTED_TEXT");
+		assert.include(source, "lastChannel: null");
+		assert.lengthOf(source.match(/\boptimistic:/g) ?? [], 1);
+		assert.lengthOf(source.match(/\boptimistic=\{/g) ?? [], 1);
+		assert.include(
+			source,
+			"onMarkContacted={closed ? undefined : markContactedAtOnce}",
+		);
+	});
+
+	test("nothing else in the dashboard is optimistic (ui.md)", async ({
+		assert,
+	}) => {
+		const files = (
+			await readdir(new URL("../../../inertia/", import.meta.url), {
+				recursive: true,
+			})
+		).filter(
+			(file) =>
+				/\.tsx?$/.test(file) &&
+				!file.startsWith("components/ui/") &&
+				file !== "pages/projects/show.tsx",
+		);
+		assert.isAbove(files.length, 50);
+		for (const file of files) {
+			assert.notMatch(await read(file), /\boptimistic\s*[:=]/, file);
+		}
 	});
 });

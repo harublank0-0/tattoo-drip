@@ -9,7 +9,7 @@ import { FinishCard } from "~/components/finish_card";
 import { usePageSheets } from "~/components/form_sheet";
 import { SOURCE_LABELS } from "~/components/inquiries";
 import MessageCard from "~/components/message_card";
-import type { ContactVia } from "~/components/messages";
+import { type ContactVia, MARKED_CONTACTED_TEXT } from "~/components/messages";
 import NextStepCard from "~/components/next_step_card";
 import Page from "~/components/page";
 import PaymentsCard, {
@@ -86,6 +86,21 @@ export default function ProjectShow(props: ProjectPageProps) {
 			preserveScroll: true,
 			preserveState: true,
 		});
+	// "Mark contacted" (TAT-84): the contact line and the leading chat button change at once, as
+	// the server's answer will; Inertia puts them back if the request fails.
+	const markContactedAtOnce = () =>
+		router.post(
+			urlFor("tenant.projects.contacted.store", params),
+			{},
+			{
+				preserveScroll: true,
+				preserveState: true,
+				optimistic: () => ({
+					contactedText: MARKED_CONTACTED_TEXT,
+					lastChannel: null,
+				}),
+			},
+		);
 
 	return (
 		<Page
@@ -161,7 +176,7 @@ export default function ProjectShow(props: ProjectPageProps) {
 						lastChannel={lastChannel}
 						onContact={markContacted}
 						footer={contactedText}
-						onMarkContacted={closed ? undefined : () => markContacted()}
+						onMarkContacted={closed ? undefined : markContactedAtOnce}
 					/>
 
 					<RequestCard
@@ -349,6 +364,10 @@ function NotesForm({
 			route="tenant.projects.notes.update"
 			routeParams={{ tenant: tenant.slug, id: projectId }}
 			options={{ preserveScroll: true }}
+			// The textarea already shows what was typed; this makes the save async, so a tap on
+			// another tab while it is out does not cancel it (Inertia never applies an async
+			// answer to another page). TAT-84.
+			optimistic={(_props, data) => ({ notes: String(data.notes ?? "") })}
 		>
 			{({ errors, processing }) => (
 				<Field data-invalid={!!errors.notes}>
