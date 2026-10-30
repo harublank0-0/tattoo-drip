@@ -129,8 +129,9 @@ export default class ArtistsController {
 				(artist.userId === null && !(await this.hasProfile(tenant, userId))));
 
 		// The artist's work photos (TAT-116), newest first, loaded after
-		// findEditable: only what the tray draws, each as its 320 px copy. The
-		// styles are the stored slugs, unknown ones included.
+		// findEditable: only what the tray draws, each as its 320 px copy. Only
+		// listed styles reach the form, like the artist's own: a slug that left
+		// the list has no box and is dropped on the next save.
 		const photos = await this.workPhotos.list(tenant, artist);
 		const workPhotos = await Promise.all(
 			photos.map(async (photo) => ({
@@ -142,7 +143,7 @@ export default class ArtistsController {
 					THUMBNAIL_WIDTH,
 				),
 				alt: photo.alt,
-				styles: photo.styles,
+				styles: knownStyles(photo.styles).map(({ slug }) => slug),
 				healed: photo.healed,
 			})),
 		);

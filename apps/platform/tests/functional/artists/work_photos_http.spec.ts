@@ -672,8 +672,9 @@ test.group("Work photo details and removal (TAT-116, TAT-126)", (group) => {
 				"thumbnailUrl",
 			]);
 		}
-		// The stored slugs as they are, then the defaults.
-		assert.deepEqual(workPhotos[0].styles, ["realism", "retired-style"]);
+		// Only listed styles reach the form, like the artist's own: a slug that
+		// left the list has no box and is dropped on the next save. Then the defaults.
+		assert.deepEqual(workPhotos[0].styles, ["realism"]);
 		assert.isTrue(workPhotos[0].healed);
 		assert.deepEqual(workPhotos[1].styles, []);
 		assert.isFalse(workPhotos[1].healed);

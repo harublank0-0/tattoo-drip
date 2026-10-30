@@ -112,6 +112,7 @@ export default function ArtistForm({
 						tenantSlug={tenant.slug}
 						artistId={artist.id}
 						photos={workPhotos}
+						styleOptions={styleOptions}
 					/>
 				) : (
 					<p className="text-sm text-muted-foreground">{TRAY_CREATE_NOTE}</p>

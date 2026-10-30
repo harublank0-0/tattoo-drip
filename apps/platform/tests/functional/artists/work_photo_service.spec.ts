@@ -123,6 +123,10 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 			added.imageKey,
 			new RegExp(`^tenants/${tenant.id}/${PURPOSE}/`),
 		);
+		// The returned instance matches what the database stores for a new photo.
+		assert.isNull(added.alt);
+		assert.deepEqual(added.styles, []);
+		assert.isFalse(added.healed);
 		const listed = await inTenant(tenant, () => photos.list(tenant, sita));
 		assert.lengthOf(listed, MAX_WORK_PHOTOS);
 		assert.equal(listed[0].id, added.id, "the new photo is the newest");

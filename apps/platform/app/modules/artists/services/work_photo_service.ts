@@ -172,6 +172,8 @@ export default class WorkPhotoService {
 					width: stored.width,
 					height: stored.height,
 					alt: null,
+					styles: [],
+					healed: false,
 				},
 				{ client: trx },
 			);

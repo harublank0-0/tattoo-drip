@@ -10,6 +10,9 @@ export const MAX_WORK_PHOTOS = 100;
 /** The longest description of a work photo, in characters. */
 export const MAX_PHOTO_ALT = 200;
 
+/** The most styles one work photo can carry. The server holds the same limit (a unit test pins them equal). */
+export const MAX_PHOTO_STYLES = 3;
+
 /**
  * A work photo as the artist form gets it, newest first: its id, its 320 px
  * copy, its description, its styles (the stored slugs) and the healed mark.
@@ -26,6 +29,24 @@ export type WorkPhotoProps = {
 export type CoverProps = { previewUrl: string; width: number; height: number };
 
 export const PHOTO_ACCEPT = "image/jpeg,image/png,image/webp";
+
+export const UPLOAD_LABEL = "Add photos";
+
+export const UPLOAD_HELP =
+	"Choose one or more. JPEG, PNG or WebP, up to 10 MB each. Photos from a phone work as they are.";
+
+/** A photo whose upload ended with neither an answer nor a reason (the connection, a proxy's limit). */
+export const UPLOAD_FAILED = "It didn't upload. Try again.";
+
+export const STYLES_HELP = `Up to ${MAX_PHOTO_STYLES}.`;
+
+export const HEALED_LABEL = "Healed";
+
+export const HEALED_HELP = "The photo shows the tattoo once it healed.";
+
+/** Under the details sheet's title. */
+export const SHEET_HELP =
+	"Tell clients what it shows, and tag it so they can find it.";
 
 export const NO_PHOTOS = "No photos yet.";
 
@@ -61,13 +82,74 @@ export function photoAlt(alt: string | null, n: number, count: number): string {
 /** The line under the tray's title: an owner speaks about the artist, an artist about themselves. */
 export function trayIntro(owner: boolean): string {
 	return owner
-		? `Up to ${MAX_WORK_PHOTOS} photos of this artist's work. The first three show on the studio page and all of them on the artist's own page, in this order.`
-		: `Up to ${MAX_WORK_PHOTOS} photos of your work. The first three show on the studio page and all of them on your own page, in this order.`;
+		? `Up to ${MAX_WORK_PHOTOS} photos of this artist's work. Your page shows them newest first: on the artist's page, in Recent work and in All work.`
+		: `Up to ${MAX_WORK_PHOTOS} photos of your work. The studio page shows them newest first: on your page, in Recent work and in All work.`;
 }
 
 /** The upload button while a photo is on its way. */
 export function uploadingText(percentage?: number): string {
 	return percentage === undefined ? "Uploading…" : `Uploading… ${percentage}%`;
+}
+
+/**
+ * The upload button while photo `index` of `total` is on its way (counted from
+ * 1); one file needs no count.
+ */
+export function uploadingPhotos(
+	index: number,
+	total: number,
+	percentage?: number,
+): string {
+	const head = total === 1 ? "Uploading…" : `Uploading ${index} of ${total}…`;
+	return percentage === undefined ? head : `${head} ${percentage}%`;
+}
+
+/**
+ * What the upload field says when more files are chosen than the tray has room
+ * for (nothing is sent then), or null when they fit.
+ */
+export function roomNote(room: number, chosen: number): string | null {
+	if (chosen <= room) return null;
+	return room === 1
+		? "There's room for 1 more photo. Choose 1."
+		: `There's room for ${room} more photos. Choose ${room} or fewer.`;
+}
+
+/**
+ * The first line of the summary after an upload: what was added and, when some
+ * were refused, the lead-in to the list of those (one `failureLine` each).
+ */
+export function addedLine(added: number, refused: number): string {
+	const addedText = `${added} ${added === 1 ? "photo" : "photos"} added.`;
+	if (refused === 0) return addedText;
+	if (added === 0) {
+		return refused === 1
+			? "This photo couldn't be added:"
+			: `These ${refused} photos couldn't be added:`;
+	}
+	return refused === 1
+		? `${addedText} This one couldn't be added:`
+		: `${addedText} These ${refused} couldn't be added:`;
+}
+
+/** One refused file: its name and why. */
+export function failureLine(name: string, message: string): string {
+	return `${name}: ${message}`;
+}
+
+/** A tile's name: its place in the set, counted from 1, and its description when it has one. */
+export function editLabel(n: number, alt: string | null): string {
+	return alt ? `Edit photo ${n}: ${alt}` : `Edit photo ${n}`;
+}
+
+/** The small note under a tile: how many styles it carries and whether it is healed, or null when neither. */
+export function tileNote(styleCount: number, healed: boolean): string | null {
+	const parts: string[] = [];
+	if (styleCount > 0) {
+		parts.push(`${styleCount} ${styleCount === 1 ? "style" : "styles"}`);
+	}
+	if (healed) parts.push("Healed");
+	return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 /** The cover form's button: upload, replace, or the wait. */
@@ -83,9 +165,4 @@ export function coverButton(
 /** Whether the tray offers an upload: there is room for one more. */
 export function canAddPhoto(count: number): boolean {
 	return count < MAX_WORK_PHOTOS;
-}
-
-/** The remove button is named for the photo, counted from 1. */
-export function removeLabel(n: number): string {
-	return `Remove photo ${n}`;
 }
