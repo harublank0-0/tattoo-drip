@@ -28,12 +28,20 @@ type TenantRef = Pick<Tenant, "id">;
  *
  * It is a function, not a FlashService method, so PaymentService and
  * SessionService keep their constructors. It runs on the caller's
- * transaction (`dbClient()`), under the project's lock, so a claim commits
- * with the deposit or the booking that caused it. The design's row is not
- * locked first: no artist lock is taken, so there is no new lock order (the
- * artist-then-design order of FlashService.remove and the intake hold is
- * unchanged, and a claim only ever updates a design row it did not lock
- * before; a removal waits on the project's foreign key, never the reverse).
+ * transaction (`dbClient()`), under the project's row lock, so a claim
+ * commits with the deposit or the booking that caused it.
+ *
+ * Lock order. The studio's writes on a design take the artist's row first
+ * (`lockEditable`, `holdVisible`) and the design's row after; a claim takes
+ * the project's row first (the caller's lock) and then the design's row (and
+ * never an artist's row, so it adds no wait on one). A write that took the
+ * design's row and then waited for a project's would meet it in a cycle:
+ * FlashService.remove therefore asks first whether a request or project
+ * names the design (`isNamed`, a plain read) before it deletes the row. A
+ * hide or a hand claim (`update`, `setClaimed`) waits for an in-flight claim
+ * on the design's row and then changes only its own columns, never the
+ * claim's. An intake holds the design `FOR KEY SHARE`, which a claim (a
+ * non-key update) does not wait for, nor the other way round.
  */
 export async function claimFlashFor(
 	tenant: TenantRef,

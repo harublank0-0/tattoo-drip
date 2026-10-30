@@ -269,11 +269,13 @@ export default class FlashService {
 	}
 
 	/**
-	 * Deletes the design for good: under the artist's lock the row goes
-	 * first, in its own savepoint, so a design that a request or a project
-	 * names (the database's `NO ACTION` keys) becomes FlashInUseError before
-	 * any file is touched. Then, in the same savepoint, the files and every
-	 * copy are deleted ("removed"). A design a client asked to take down must
+	 * Deletes the design for good: under the artist's lock a design that a
+	 * request or a project names is FlashInUseError at once (a plain read,
+	 * so the delete never holds the design's row while it waits for a
+	 * project's lock: see `isNamed`). Otherwise the row goes first, in its
+	 * own savepoint, so one named in the meantime (the database's `NO ACTION`
+	 * keys) becomes FlashInUseError too, before any file is touched. Then, in
+	 * the same savepoint, the files and every copy are deleted ("removed"). A design a client asked to take down must
 	 * not stay fetchable while the studio is told it is gone, and a file
 	 * delete can fail after others succeeded: if any file cannot be deleted
 	 * the savepoint rolls the row back, but the design is then damaged (some
@@ -292,6 +294,12 @@ export default class FlashService {
 		return withTransaction(async (trx) => {
 			await this.artists.lockEditable(trx, tenant, editor, design.artistId);
 			const live = await this.lockedDesign(trx, tenant, design);
+			// Before the design's row is touched: deleting it would take the row and
+			// then wait, in the foreign keys' check, for the lock of a project that is
+			// being claimed (it holds the project first, then wants this row).
+			if (await this.isNamed(trx, tenant, live.id)) {
+				throw new FlashInUseError();
+			}
 			try {
 				await withTransaction(async (savepoint) => {
 					await live.useTransaction(savepoint).delete();
@@ -452,6 +460,24 @@ export default class FlashService {
 			.whereIn("id", [...ids]);
 		for (const row of rows) found.set(row.id, row);
 		return found;
+	}
+
+	/**
+	 * Whether an inquiry or a project (a deleted one too: the keys count every
+	 * row) names the design. A plain read, no lock: it never waits for the
+	 * transaction that holds a project's row.
+	 */
+	private async isNamed(
+		trx: QueryClientContract,
+		tenant: TenantRef,
+		designId: string,
+	): Promise<boolean> {
+		const { rows } = await trx.rawQuery(
+			`select exists (select 1 from inquiries where tenant_id = ? and flash_design_id = ?)
+				or exists (select 1 from tattoo_projects where tenant_id = ? and flash_design_id = ?) as named`,
+			[tenant.id, designId, tenant.id, designId],
+		);
+		return rows[0].named === true;
 	}
 
 	/** How many designs the artist has now. A hook so a test can stage a racing upload. */
