@@ -289,6 +289,8 @@ export default class ProjectService {
 			inquiryId: string;
 			brief: string;
 			artistId: string | null;
+			/** The flash design the inquiry asked for (TAT-129), if any. */
+			flashDesignId: string | null;
 			lastContact?: { at: DateTime | null } & ContactVia;
 		},
 	): Promise<TattooProject> {
@@ -298,6 +300,7 @@ export default class ProjectService {
 			inquiryId: input.inquiryId,
 			brief: input.brief,
 			artistId: input.artistId,
+			flashDesignId: input.flashDesignId,
 			status: "reviewing",
 			lastContactedAt: input.lastContact?.at ?? null,
 			lastContactChannel: input.lastContact?.channel ?? null,

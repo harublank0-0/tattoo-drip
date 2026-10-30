@@ -9,6 +9,7 @@ import Artist from "#modules/artists/models/artist";
 import ArtistService from "#modules/artists/services/artist_service";
 import Client from "#modules/clients/models/client";
 import ClientService from "#modules/clients/services/client_service";
+import FlashService from "#modules/flash/services/flash_service";
 import {
 	InquiryRuleError,
 	InvalidReferenceImageError,
@@ -21,6 +22,7 @@ import IntakeService, {
 } from "#modules/inquiries/services/intake_service";
 import { IMAGE_FORMAT_MESSAGE } from "#modules/media/errors";
 import { withDbContext } from "#services/db_context";
+import { addFlashDesign } from "#tests/helpers/artists";
 import {
 	RecordingImageService,
 	testImages,
@@ -55,6 +57,7 @@ function makeIntake(
 			new ArtistService(images),
 			new ClientService(),
 			images,
+			new FlashService(images, new ArtistService(images)),
 		),
 	};
 }
@@ -291,6 +294,108 @@ test.group("IntakeService.submit", (group) => {
 		assert.deepEqual(images.keys, [], "no image was decoded");
 		const rows = await rowsIn(tenant);
 		assert.deepEqual([rows.clients.length, rows.inquiries.length], [0, 0]);
+	});
+
+	test("the flash rules come before any image is decoded", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("intake-flash-129");
+		const other = await studioWithOwner("intake-flash-129b");
+		const { intake, images } = makeIntake();
+		const { open, off, hiddenArtist, hiddenDesign, shown, foreign, ofHidden } =
+			await inTenant(tenant, async () => {
+				const open = await Artist.create({
+					tenantId: tenant.id,
+					name: "Open",
+					slug: "open",
+				});
+				const off = await Artist.create({
+					tenantId: tenant.id,
+					name: "Off",
+					slug: "off",
+					acceptingFlash: false,
+				});
+				const hiddenArtist = await Artist.create({
+					tenantId: tenant.id,
+					name: "Hidden",
+					slug: "hidden",
+					visible: false,
+				});
+				return {
+					open,
+					off,
+					hiddenArtist,
+					shown: await addFlashDesign(tenant, open),
+					hiddenDesign: await addFlashDesign(tenant, open, { hidden: true }),
+					ofHidden: await addFlashDesign(tenant, hiddenArtist),
+					foreign: await inTenant(other.tenant, async () =>
+						addFlashDesign(
+							other.tenant,
+							await Artist.create({
+								tenantId: other.tenant.id,
+								name: "Ram",
+								slug: "ram",
+							}),
+						),
+					),
+				};
+			});
+		const offDesign = await inTenant(tenant, () => addFlashDesign(tenant, off));
+
+		for (const [label, over, reason] of [
+			[
+				"hidden design",
+				{ flashDesignId: hiddenDesign.id },
+				"flash_unavailable",
+			],
+			[
+				"hidden artist's design",
+				{ flashDesignId: ofHidden.id },
+				"flash_unavailable",
+			],
+			["unknown design", { flashDesignId: randomUUID() }, "flash_unavailable"],
+			[
+				"another studio's design",
+				{ flashDesignId: foreign.id },
+				"flash_unavailable",
+			],
+			["flash off", { flashDesignId: offDesign.id }, "artist_not_accepting"],
+			[
+				"another artist than the design's",
+				{ flashDesignId: shown.id, preferredArtistId: off.id },
+				"artist_unavailable",
+			],
+		] as const) {
+			const refused = await reasonOf(async () =>
+				inTenant(tenant, async () =>
+					intake.submit(
+						tenant,
+						submission({ ...over, referenceImages: await pngs(1) }),
+					),
+				),
+			);
+			assert.equal(refused, reason, label);
+		}
+
+		assert.deepEqual(images.keys, [], "no image was decoded");
+		const rows = await rowsIn(tenant);
+		assert.deepEqual([rows.clients.length, rows.inquiries.length], [0, 0]);
+		assert.isString(hiddenArtist.id);
+
+		// The design's own artist, named or not, is accepted and recorded.
+		const named = await inTenant(tenant, () =>
+			intake.submit(
+				tenant,
+				submission({ flashDesignId: shown.id, preferredArtistId: open.id }),
+			),
+		);
+		const unnamed = await inTenant(tenant, () =>
+			intake.submit(tenant, submission({ flashDesignId: shown.id })),
+		);
+		for (const inquiry of [named, unnamed]) {
+			assert.equal(inquiry.flashDesignId, shown.id);
+			assert.equal(inquiry.preferredArtistId, open.id);
+		}
 	});
 
 	test("an open artist can be chosen, and no artist is fine while one is open", async ({
