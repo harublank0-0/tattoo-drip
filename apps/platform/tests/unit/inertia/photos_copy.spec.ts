@@ -22,6 +22,7 @@ type PhotosModule = {
 	UPLOAD_LABEL: string;
 	UPLOAD_HELP: string;
 	UPLOAD_FAILED: string;
+	UPLOAD_INTERRUPTED: string;
 	STYLES_HELP: string;
 	HEALED_LABEL: string;
 	HEALED_HELP: string;
@@ -165,6 +166,10 @@ test.group("work photo words (TAT-116)", () => {
 			"Choose one or more. JPEG, PNG or WebP, up to 10 MB each. Photos from a phone work as they are.",
 		);
 		assert.equal(photos.UPLOAD_FAILED, "It didn't upload. Try again.");
+		assert.equal(
+			photos.UPLOAD_INTERRUPTED,
+			"Not sent: the upload was interrupted.",
+		);
 		assert.equal(photos.STYLES_HELP, "Up to 3.");
 		assert.equal(photos.HEALED_LABEL, "Healed");
 		assert.equal(

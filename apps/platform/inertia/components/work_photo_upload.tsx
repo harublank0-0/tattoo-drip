@@ -8,6 +8,7 @@ import {
 	roomNote,
 	UPLOAD_FAILED,
 	UPLOAD_HELP,
+	UPLOAD_INTERRUPTED,
 	UPLOAD_LABEL,
 	uploadingPhotos,
 } from "~/components/photos";
@@ -78,17 +79,22 @@ function sendPhoto(
  * One photo per request keeps every request under the 20 MB limit with no
  * resizing, and Inertia cancels a visit when another starts, so they could
  * not overlap anyway. A refused file is named in the summary and the queue
- * goes on; a cancelled visit (the person went elsewhere) stops it. More files
- * than `room` are not sent at all.
+ * goes on; a cancelled visit (the person went elsewhere, or saved a photo in
+ * the sheet) stops it, and the file it cut off and every one not yet sent are
+ * named as not sent. More files than `room` are not sent at all. `onBusyChange`
+ * tells the tray while the queue is going, so the sheet holds Save and Remove
+ * (either would cancel the visit that is uploading).
  */
 export default function WorkPhotoUpload({
 	tenantSlug,
 	artistId,
 	room,
+	onBusyChange,
 }: {
 	tenantSlug: string;
 	artistId: string;
 	room: number;
+	onBusyChange: (busy: boolean) => void;
 }) {
 	const input = useRef<HTMLInputElement>(null);
 	const [sending, setSending] = useState<Sending | null>(null);
@@ -112,17 +118,28 @@ export default function WorkPhotoUpload({
 		const total = files.length;
 		let added = 0;
 		const failures: Summary["failures"] = [];
+		onBusyChange(true);
 		for (const [id, file] of files.entries()) {
 			const index = id + 1;
 			setSending({ index, total });
 			const outcome = await sendPhoto(url, file, (percentage) =>
 				setSending({ index, total, percentage }),
 			);
-			if (outcome.kind === "cancelled") break;
+			if (outcome.kind === "cancelled") {
+				// The cut-off file and every one after it: name them, send nothing more.
+				for (const [offset, unsent] of files.slice(id).entries()) {
+					failures.push({
+						id: id + offset,
+						line: failureLine(unsent.name, UPLOAD_INTERRUPTED),
+					});
+				}
+				break;
+			}
 			if (outcome.kind === "added") added += 1;
 			else failures.push({ id, line: failureLine(file.name, outcome.message) });
 		}
 
+		onBusyChange(false);
 		setSending(null);
 		if (added + failures.length > 0) setSummary({ added, failures });
 		if (input.current) input.current.value = "";

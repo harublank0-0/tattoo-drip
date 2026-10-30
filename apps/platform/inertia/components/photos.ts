@@ -38,6 +38,9 @@ export const UPLOAD_HELP =
 /** A photo whose upload ended with neither an answer nor a reason (the connection, a proxy's limit). */
 export const UPLOAD_FAILED = "It didn't upload. Try again.";
 
+/** A photo the upload never sent because the queue was cut short (another visit started while the files were going up). */
+export const UPLOAD_INTERRUPTED = "Not sent: the upload was interrupted.";
+
 export const STYLES_HELP = `Up to ${MAX_PHOTO_STYLES}.`;
 
 export const HEALED_LABEL = "Healed";

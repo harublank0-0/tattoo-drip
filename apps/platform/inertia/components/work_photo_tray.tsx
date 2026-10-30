@@ -70,6 +70,9 @@ export default function WorkPhotoTray({
 	// Where focus goes when a removed photo took its tile with it.
 	const countLine = useRef<HTMLOutputElement>(null);
 	const noteId = useId();
+	// A multi-photo upload is going up: the sheet holds Save and Remove, since
+	// either would start a visit and cancel the upload's.
+	const [uploading, setUploading] = useState(false);
 
 	const selectedIndex = photos.findIndex((photo) => photo.id === selectedId);
 	const selected = selectedIndex === -1 ? null : photos[selectedIndex];
@@ -81,6 +84,7 @@ export default function WorkPhotoTray({
 					tenantSlug={tenantSlug}
 					artistId={artistId}
 					room={MAX_WORK_PHOTOS - count}
+					onBusyChange={setUploading}
 				/>
 			) : (
 				<p className="text-sm text-muted-foreground">{TRAY_FULL}</p>
@@ -155,6 +159,7 @@ export default function WorkPhotoTray({
 						n={selectedIndex + 1}
 						count={count}
 						styleOptions={styleOptions}
+						uploading={uploading}
 					/>
 				)}
 			</FormSheetPanel>
@@ -174,6 +179,7 @@ function PhotoDetails({
 	n,
 	count,
 	styleOptions,
+	uploading,
 }: {
 	tenantSlug: string;
 	sheet: FormSheetState;
@@ -181,6 +187,7 @@ function PhotoDetails({
 	n: number;
 	count: number;
 	styleOptions: StyleOption[];
+	uploading: boolean;
 }) {
 	const params = { tenant: tenantSlug, id: photo.id };
 
@@ -287,14 +294,14 @@ function PhotoDetails({
 						</Field>
 
 						<div className="flex flex-wrap gap-2">
-							<Button type="submit" disabled={processing}>
+							<Button type="submit" disabled={processing || uploading}>
 								{processing ? "Saving…" : "Save photo"}
 							</Button>
 							<Button
 								type="button"
 								variant="outline"
 								className="text-destructive hover:text-destructive"
-								disabled={sheet.state.saving}
+								disabled={sheet.state.saving || uploading}
 								onClick={remove}
 							>
 								Remove photo
