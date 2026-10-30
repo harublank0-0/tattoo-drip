@@ -591,7 +591,8 @@
   .know-item dt { color: var(--ink-muted); font-size: 0.9375rem; font-weight: 600; }
   .know-item dd { min-inline-size: 0; margin: 0; overflow-wrap: anywhere; }
   .know-lines { display: grid; gap: 0.25rem; margin: 0; padding: 0; list-style: none; }
-  .know-when { display: inline-block; min-inline-size: 7rem; font-weight: 600; }
+  .know-lines li { display: grid; grid-template-columns: 7rem minmax(0, 1fr); column-gap: 0.75rem; }
+  .know-when { font-weight: 600; }
   .know-more { border-block-end: 1px solid var(--line); }
   .know-list + .know-more { margin-block-start: 1.5rem; }
   .section-title + .know-more, .know-list + .know-more { border-block-start: 1px solid var(--line); }

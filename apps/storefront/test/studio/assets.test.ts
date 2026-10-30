@@ -244,6 +244,12 @@ describe("Good to know and the cover's state line (TAT-128)", () => {
 		);
 	});
 
+	test("a line of hours or closed days is a label column and a text column, so a long note wraps under itself", () => {
+		const line = ruleBody(css, ".know-lines li");
+		assert.match(line, /display:\s*grid/);
+		assert.match(line, /grid-template-columns:\s*7rem minmax\(0, 1fr\)/);
+	});
+
 	test("a studio's words in the list wrap instead of widening the page", () => {
 		assert.match(ruleBody(css, ".know-item dd"), /overflow-wrap:\s*anywhere/);
 		assert.match(ruleBody(css, ".know-item dd"), /min-inline-size:\s*0/);
