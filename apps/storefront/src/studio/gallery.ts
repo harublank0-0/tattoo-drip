@@ -187,27 +187,22 @@ export interface PortfolioSearch {
 export type WorkSearch = PortfolioSearch & { artist?: string; style?: string };
 
 /**
- * The router parses `?healed=1` as the number 1 (it reads each value as JSON
- * first), so a hand-typed address and a link we wrote both come here as 1;
- * "1" and true are the same wish. Anything else is no filter.
+ * The router hands over each value as the string in the address (search.ts),
+ * so `?healed=1` is "1". Anything else is no filter.
  */
-function readHealed(value: unknown): value is 1 | "1" | true {
-	return value === 1 || value === "1" || value === true;
+function readHealed(value: unknown): value is "1" {
+	return value === "1";
 }
 
 function readCursor(value: unknown): string | undefined {
 	return typeof value === "string" && CURSOR.test(value) ? value : undefined;
 }
 
-/**
- * An artist's address: their slug, as the API writes it. The router reads each
- * value as JSON first (see readHealed), so a slug of digits only, `?artist=2025`,
- * arrives as the number 2025: a safe integer is its own digits again. (Larger
- * numbers lose digits on the way, so they are no slug.)
- */
+/** An artist's address: their slug, as the API writes it. */
 function readSlug(value: unknown): string | undefined {
-	const slug = Number.isSafeInteger(value) ? String(value) : value;
-	return typeof slug === "string" && ARTIST_SLUG.test(slug) ? slug : undefined;
+	return typeof value === "string" && ARTIST_SLUG.test(value)
+		? value
+		: undefined;
 }
 
 function readStyle(value: unknown): string | undefined {
@@ -215,20 +210,9 @@ function readStyle(value: unknown): string | undefined {
 }
 
 /**
- * What the router writes into an address for `search`: `healed: true` as
- * `healed=1`, the way our links write it. The router (on the server) redirects
- * an address to its own spelling of it, so with its default `healed=true` every
- * `?healed=1` link would cost a redirect. Pure; the router's `stringifySearch`
- * (src/router.tsx) runs the default writer on the result.
- */
-export function healedAsOne<T extends Record<string, unknown>>(search: T): T {
-	return search.healed === true ? { ...search, healed: 1 } : search;
-}
-
-/**
- * The artist page's filters from its address, strictly: `healed` is on for 1,
- * "1" and true only, `cursor` must look like a cursor, and nothing else is
- * read. Absent keys, never null.
+ * The artist page's filters from its address, strictly: `healed` is on for
+ * "1" only, `cursor` must look like a cursor, and nothing else is read.
+ * Absent keys, never null.
  */
 export function readPortfolioSearch(
 	search: Record<string, unknown>,

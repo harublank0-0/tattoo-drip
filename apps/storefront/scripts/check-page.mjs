@@ -344,6 +344,30 @@ try {
 		`/work?artist=sita&healed=1 is ${page.status}, not 200 (the router redirects an address it spells otherwise).`,
 	);
 
+	// The router reads the search as plain strings: an artist whose slug looks
+	// like JSON (true, null, 1e2, 2025) is no redirect and reaches the API as typed.
+	for (const slug of ["true", "false", "null", "1e2", "2025"]) {
+		apiLog.length = 0;
+		page = await get(`/work?artist=${slug}&healed=1`);
+		expect(
+			page.status === 200,
+			`/work?artist=${slug}&healed=1 is ${page.status}, not 200 (a redirect, or the router read the slug as JSON).`,
+		);
+		expect(
+			apiLog.some(
+				(call) =>
+					call.url ===
+					`/api/v1/tenants/${SLUG}/work?artist=${slug}&healed=true&limit=24`,
+			),
+			`/work?artist=${slug}&healed=1 asked the API for ${apiLog.map((call) => call.url).join(", ")}, not for artist ${slug} healed.`,
+		);
+	}
+	page = await get("/artists/sita?healed=1");
+	expect(
+		page.status === 200,
+		`/artists/sita?healed=1 is ${page.status}, not 200.`,
+	);
+
 	// A cursor the API refuses (a hand-edited link) is the not-found page.
 	page = await get("/work?cursor=bogus");
 	expect(

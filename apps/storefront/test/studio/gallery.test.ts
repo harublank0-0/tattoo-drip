@@ -1,11 +1,8 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { describe, test } from "node:test";
-import { defaultStringifySearch } from "@tanstack/react-router";
 import {
 	EMPTY_GALLERY,
 	galleryView,
-	healedAsOne,
 	MAX_GALLERY_PAGE,
 	RECENT_WORK_COUNT,
 	readPortfolioSearch,
@@ -258,28 +255,26 @@ describe("the address's filters are read strictly (TAT-126)", () => {
 			readWorkSearch({
 				artist: "sita",
 				style: "fine-line",
-				healed: 1,
+				healed: "1",
 				cursor: "abc_-",
 			}),
 			{ artist: "sita", style: "fine-line", healed: true, cursor: "abc_-" },
 		);
 	});
 
-	test("healed is on for the number 1 (what the router makes of ?healed=1), '1' and true only", () => {
-		for (const on of [1, "1", true]) {
-			assert.deepEqual(
-				readWorkSearch({ healed: on }),
-				{ healed: true },
-				String(on),
-			);
-			assert.deepEqual(readPortfolioSearch({ healed: on }), { healed: true });
-		}
+	test("healed is on for '1' only, the string the router gives for ?healed=1", () => {
+		assert.deepEqual(readWorkSearch({ healed: "1" }), { healed: true });
+		assert.deepEqual(readPortfolioSearch({ healed: "1" }), { healed: true });
 		for (const off of [
 			"on",
 			0,
+			1,
+			"01",
+			" 1",
 			"true ",
 			"true",
 			"yes",
+			true,
 			false,
 			null,
 			2,
@@ -299,11 +294,10 @@ describe("the address's filters are read strictly (TAT-126)", () => {
 			["artist", "Sita"],
 			["artist", "s"],
 			["artist", "-sita"],
-			["artist", 1],
-			["artist", -12],
-			["artist", 12.5],
-			["artist", Number.MAX_SAFE_INTEGER + 1],
-			["artist", Number.NaN],
+			// The router gives strings (search.ts); anything else is no slug.
+			["artist", 12],
+			["artist", true],
+			["artist", null],
 			["style", "Fine line"],
 			["style", "fine--line"],
 			["style", "x".repeat(41)],
@@ -321,19 +315,14 @@ describe("the address's filters are read strictly (TAT-126)", () => {
 		assert.deepEqual(readWorkSearch({}), {});
 	});
 
-	test("an artist slug of digits only comes from the router as a number and is read back as its digits", () => {
-		// `?artist=2025` is parsed by the router as the number 2025 (it reads each value as JSON first).
-		assert.deepEqual(readWorkSearch({ artist: 2025 }), { artist: "2025" });
-		assert.deepEqual(readWorkSearch({ artist: 12 }), { artist: "12" });
-		assert.deepEqual(readWorkSearch({ artist: "2025" }), { artist: "2025" });
-		assert.deepEqual(readWorkSearch({ artist: Number.MAX_SAFE_INTEGER }), {
-			artist: String(Number.MAX_SAFE_INTEGER),
-		});
-		// It reaches the API's read as the string.
-		assert.deepEqual(workQuery(readWorkSearch({ artist: 2025 }), 24), {
-			artist: "2025",
-			limit: 24,
-		});
+	test("a slug that looks like JSON is still a slug", () => {
+		for (const slug of ["true", "false", "null", "1e2", "2025", "sita-rai"]) {
+			assert.deepEqual(readWorkSearch({ artist: slug }), { artist: slug });
+			assert.deepEqual(workQuery(readWorkSearch({ artist: slug }), 24), {
+				artist: slug,
+				limit: 24,
+			});
+		}
 	});
 
 	test("the artist page reads only healed and cursor", () => {
@@ -350,7 +339,7 @@ describe("the address's filters are read strictly (TAT-126)", () => {
 	});
 
 	test("properties it did not set itself are not read", () => {
-		const inherited = Object.create({ artist: "sita", healed: 1 });
+		const inherited = Object.create({ artist: "sita", healed: "1" });
 
 		assert.deepEqual(readWorkSearch(inherited), {});
 	});
@@ -358,7 +347,12 @@ describe("the address's filters are read strictly (TAT-126)", () => {
 	test("the keys come in the order the address writes them", () => {
 		assert.deepEqual(
 			Object.keys(
-				readWorkSearch({ cursor: "c", healed: 1, style: "s", artist: "sita" }),
+				readWorkSearch({
+					cursor: "c",
+					healed: "1",
+					style: "s",
+					artist: "sita",
+				}),
 			),
 			["artist", "style", "healed", "cursor"],
 		);
@@ -434,73 +428,5 @@ describe("workHref and portfolioHref keep the filters (TAT-126)", () => {
 		]) {
 			assert.ok(isAllowedHref(href), href);
 		}
-	});
-});
-
-describe("the router writes the addresses our links write (TAT-126)", () => {
-	// The router redirects an address to its own spelling of it, so a link it
-	// would spell differently costs a redirect every time it is followed.
-	const searches = [
-		{ artist: "sita", healed: true as const },
-		{
-			artist: "sita",
-			style: "fine-line",
-			healed: true as const,
-			cursor: "c2_-",
-		},
-		{ style: "japanese" },
-		{ cursor: "abcDEF012" },
-		{ healed: true as const },
-		{},
-	];
-
-	test("healed is written 1, not true", () => {
-		assert.deepEqual(healedAsOne({ healed: true, cursor: "c" }), {
-			healed: 1,
-			cursor: "c",
-		});
-		assert.equal(defaultStringifySearch({ healed: true }), "?healed=true");
-		assert.equal(
-			defaultStringifySearch(healedAsOne({ healed: true })),
-			"?healed=1",
-		);
-	});
-
-	test("its spelling of a search is the one workHref and portfolioHref write", () => {
-		for (const search of searches) {
-			const router = defaultStringifySearch(healedAsOne(search));
-			assert.equal(workHref(search), `/work${router}`, JSON.stringify(search));
-		}
-		const { artist: _a, style: _s, ...portfolio } = searches[1];
-		assert.equal(
-			portfolioHref("sita", portfolio),
-			`/artists/sita${defaultStringifySearch(healedAsOne(portfolio))}#work`,
-		);
-	});
-
-	test("the router is given it: stringifySearch passes the search through healedAsOne", () => {
-		// A source pin, as the router needs a Start build to run: without this
-		// wiring every `?healed=1` link would cost a redirect to `healed=true`.
-		const router = readFileSync(
-			new URL("../../src/router.tsx", import.meta.url),
-			"utf8",
-		);
-
-		assert.match(
-			router,
-			/import \{ healedAsOne \} from "\.\/studio\/gallery\.ts";/,
-		);
-		assert.match(
-			router,
-			/stringifySearch:\s*\(search\)\s*=>\s*defaultStringifySearch\(healedAsOne\(search\)\)/,
-		);
-	});
-
-	test("what is not true is left as it is", () => {
-		const search = { healed: false, cursor: "c" };
-
-		assert.equal(healedAsOne(search), search);
-		const none = {};
-		assert.equal(healedAsOne(none), none);
 	});
 });
