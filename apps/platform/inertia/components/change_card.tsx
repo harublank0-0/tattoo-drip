@@ -1,7 +1,8 @@
 import { Form } from "@adonisjs/inertia/react";
 import { router } from "@inertiajs/react";
-import type { RefObject } from "react";
+import { type RefObject, useRef, useState } from "react";
 import { urlFor } from "~/client";
+import { focusBack, ignoreHeldEnter } from "~/components/confirm";
 import InlineConfirm from "~/components/inline_confirm";
 import {
 	type ManualMoveName,
@@ -50,8 +51,8 @@ const CONFIRM: Partial<
 /**
  * "Change this project" (TAT-108): the rarely used changes to the project itself, at the end of
  * the page as plain buttons: put it on hold or resume it, mark that the client withdrew, decline
- * it, and (owners) pick its artist. Withdrawing and declining ask in the page (`InlineConfirm`).
- * Nothing renders for a closed project, and Resume is left out when the Next step card offers it.
+ * it, and (owners) pick its artist. Withdrawing and declining ask in the page (`InlineConfirm`);
+ * Put on hold and Resume ask nothing and are one `MoveButton`. Nothing renders for a closed project, and Resume is left out when the Next step card offers it.
  */
 export default function ChangeCard({
 	projectId,
@@ -114,20 +115,77 @@ export default function ChangeCard({
 									fallback={fallback}
 								/>
 							) : (
-								<Button
+								<MoveButton
 									key={move}
-									type="button"
-									variant="secondary"
-									onClick={() => post(move)}
-								>
-									{MOVE_LABELS[move]}
-								</Button>
+									projectId={projectId}
+									move={move}
+									fallback={fallback}
+								/>
 							);
 						})}
 					</div>
 				)}
 			</CardContent>
 		</Card>
+	);
+}
+
+/**
+ * A move that asks nothing (Put on hold, Resume), in this card and in the Next step card
+ * (TAT-84). One tap sends it once: while the request is out the button is disabled and says
+ * "Saving…", a second click in the same frame and a held Enter do nothing, and the answer puts
+ * focus back on it, or on the page heading when the move removed it.
+ */
+export function MoveButton({
+	projectId,
+	move,
+	variant = "secondary",
+	fallback,
+}: {
+	projectId: string;
+	move: ManualMoveName;
+	variant?: "default" | "outline" | "secondary";
+	fallback: RefObject<HTMLElement | null>;
+}) {
+	const tenant = useTenant();
+	const button = useRef<HTMLButtonElement>(null);
+	// The state, applied at once: a double click can come before React renders.
+	const sending = useRef(false);
+	const [saving, setSaving] = useState(false);
+	const send = () => {
+		if (sending.current) return;
+		sending.current = true;
+		setSaving(true);
+		router.post(
+			urlFor("tenant.projects.moves.store", {
+				tenant: tenant.slug,
+				id: projectId,
+			}),
+			{ move },
+			{
+				preserveScroll: true,
+				onFinish: () => {
+					sending.current = false;
+					setSaving(false);
+					setTimeout(
+						() => focusBack(button.current, fallback.current)?.focus(),
+						0,
+					);
+				},
+			},
+		);
+	};
+	return (
+		<Button
+			ref={button}
+			type="button"
+			variant={variant}
+			disabled={saving}
+			onKeyDown={ignoreHeldEnter}
+			onClick={send}
+		>
+			{saving ? "Saving…" : MOVE_LABELS[move]}
+		</Button>
 	);
 }
 
@@ -165,7 +223,7 @@ function ArtistField({
 							))}
 						</select>
 						<Button type="submit" size="sm" disabled={processing}>
-							Save
+							{processing ? "Saving…" : "Save"}
 						</Button>
 					</div>
 					{errors.artistId && <FieldError>{errors.artistId}</FieldError>}

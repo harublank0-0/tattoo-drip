@@ -39,7 +39,10 @@ export default function ClientsIndex({
 						Search
 					</Button>
 					{search && (
-						<Link href={base} className="self-center text-sm underline">
+						<Link
+							href={base}
+							className="flex items-center text-sm underline max-lg:min-h-11"
+						>
 							Clear
 						</Link>
 					)}

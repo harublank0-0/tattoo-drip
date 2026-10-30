@@ -56,7 +56,7 @@ export const MESSAGE_LABELS: Record<MessageKindName, string> = {
 /**
  * What the server will say about a contact recorded now (`lastContactText`):
  * "contacted today on WhatsApp (Quote)". The page shows it while the record
- * is out (optimistic, ui.md), and Inertia puts the old text back if it fails.
+ * is out (`shownContact`, ui.md), so the answer doesn't change the text.
  */
 export function justContactedText(via: ContactVia): string {
 	const channel = via.channel ? ` ${CHANNEL_TEXT[via.channel]}` : "";
@@ -76,6 +76,25 @@ export function justContacted(via: ContactVia): {
 		contactedText: justContactedText(via),
 		lastChannel: via.channel ?? null,
 	};
+}
+
+/** A contact being recorded (TAT-84): the project or inquiry it was tapped on, and what it carried. */
+export type ContactMark = { id: string; via: ContactVia };
+
+/**
+ * What a project's or inquiry's Message card shows for the last contact: while a contact is
+ * being recorded for `recordId` (`mark`, state held by the page) what the server will answer
+ * with (`justContacted`, so the leading chat button changes at once too); any other record, and
+ * no mark, shows the server's own values. It is state held in the page, not an Inertia
+ * optimistic visit: while one of those is pending Inertia puts the current page's values into
+ * the next page's props of the same names (a pending record on A leaves B's contact line empty).
+ */
+export function shownContact(
+	mark: ContactMark | null,
+	recordId: string,
+	server: { contactedText: string; lastChannel: ContactChannelName | null },
+): { contactedText: string; lastChannel: ContactChannelName | null } {
+	return mark?.id === recordId ? justContacted(mark.via) : server;
 }
 
 /** The two channels a message can lead with. */
