@@ -237,7 +237,10 @@ export async function loadStudioPage(
 		theme,
 	);
 	// Today's state at this server's clock, only when it holds for the page's
-	// cache life (TAT-128); the browser recomputes the rest.
+	// cache life (TAT-128); the browser recomputes the rest. The studio it is
+	// computed from is fresh: the render's reads ask every cache for a fresh
+	// answer (tenancy/revalidate.ts), so a closure added minutes ago is in it
+	// and the page's 11 minutes are not added to an API answer's own age.
 	return { ...data, openNow: openNowView(studio, new Date()) };
 }
 

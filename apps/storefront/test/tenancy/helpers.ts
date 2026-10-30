@@ -18,6 +18,42 @@ export function fakeFetch(
 	return { calls, fetch: fetch as typeof globalThis.fetch };
 }
 
+/**
+ * A shared cache (a CDN) in front of the API, as docs/architecture.md and
+ * deploy.md describe it: it keeps the first answer and serves that copy,
+ * with an `Age`, to every later request, unless the request asks for a
+ * fresh one with `Cache-Control: no-cache`. `origin()` is the API itself.
+ */
+export function cdnInFront(origin: () => Response) {
+	let stored: { status: number; body: string; headers: Headers } | undefined;
+	let hits = 0;
+	const fetch = async (_input: RequestInfo | URL, init: RequestInit = {}) => {
+		const wantsFresh = /\bno-cache\b/.test(
+			new Headers(init.headers).get("cache-control") ?? "",
+		);
+		if (stored && !wantsFresh) {
+			hits++;
+			const headers = new Headers(stored.headers);
+			headers.set("age", "540");
+			return new Response(stored.body, { status: stored.status, headers });
+		}
+		const answer = origin();
+		stored = {
+			status: answer.status,
+			body: await answer.clone().text(),
+			headers: new Headers(answer.headers),
+		};
+		return answer;
+	};
+	return {
+		fetch: fetch as typeof globalThis.fetch,
+		/** How many answers came from the stored copy. */
+		get hits() {
+			return hits;
+		},
+	};
+}
+
 export function json(status: number, body: unknown): Response {
 	return new Response(JSON.stringify(body), {
 		status,
