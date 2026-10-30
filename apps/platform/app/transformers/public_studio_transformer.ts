@@ -12,7 +12,7 @@ import { socialLinks } from "#modules/storefront/studio_page";
  * new one needs the contract, a ruling and the exact-fields test.
  * The deposit policy is shown (in Good to know, as the spec decided); never
  * the default deposit percentage, the tenant id, payment methods or members
- * (the cover's and logo's key and size columns stay on the row), nor a closed
+ * (the cover's, logo's and icon's key and size columns stay on the row), nor a closed
  * day's id or an ended one.
  */
 export default class PublicStudioTransformer extends BaseTransformer<StudioPage> {
@@ -65,6 +65,20 @@ export default class PublicStudioTransformer extends BaseTransformer<StudioPage>
 									url,
 									width,
 								})),
+								// TAT-123: the tile it sits on and its square icon.
+								tile: logo.tile,
+								icon: logo.icon
+									? {
+											url: logo.icon.url,
+											width: logo.icon.width,
+											height: logo.icon.height,
+											alt: null,
+											variants: logo.icon.variants.map(({ url, width }) => ({
+												url,
+												width,
+											})),
+										}
+									: null,
 							}
 						: null,
 					colors: { accent: look.accent, accentDark: look.accentDark },

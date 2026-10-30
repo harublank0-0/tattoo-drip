@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
@@ -556,6 +557,8 @@ test.group("GET /api/v1/tenants/:tenant (getStudio)", (group) => {
 		assert.deepEqual(Object.keys(logo).sort(), [
 			"alt",
 			"height",
+			"icon",
+			"tile",
 			"url",
 			"variants",
 			"width",
@@ -581,7 +584,128 @@ test.group("GET /api/v1/tenants/:tenant (getStudio)", (group) => {
 		const text = JSON.stringify(data);
 		assert.notInclude(text, "logo_image");
 		assert.notInclude(text, "logoImage");
+		assert.notInclude(text, "logo_icon");
+		assert.notInclude(text, "logoIcon");
 		assert.isNull(data.cover, "the logo is not the cover");
+	});
+
+	test("the logo's tile and its square icon (TAT-123)", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("api-icon-123");
+		const withLogo = await inTenant(tenant, async () =>
+			tenancy.setLogo(tenant, await uploadOf(await testImages.png(600, 200))),
+		);
+		const iconUrl = await images.url(
+			"studio_icon",
+			withLogo.logoIconKey ?? "",
+			tenant,
+		);
+
+		const { data } = (await client.get("/api/v1/tenants/api-icon-123")).body();
+		const { tile, icon } = data.storefront.branding.logo;
+
+		assert.equal(tile, "light");
+		assert.deepEqual(Object.keys(icon).sort(), [
+			"alt",
+			"height",
+			"url",
+			"variants",
+			"width",
+		]);
+		assert.equal(icon.url, iconUrl);
+		assert.deepEqual([icon.width, icon.height], [180, 180]);
+		assert.isNull(icon.alt);
+		assert.deepEqual(
+			icon.variants.map((variant: { width: number }) => variant.width),
+			[32],
+		);
+		for (const url of [
+			icon.url,
+			...icon.variants.map((v: { url: string }) => v.url),
+		]) {
+			assert.equal(
+				new URL(url).origin,
+				new URL(data.storefront.branding.logo.url).origin,
+			);
+			assert.match(
+				new URL(url).pathname,
+				new RegExp(`^/uploads/tenants/${tenant.id}/studio_icon/`),
+			);
+			(await client.get(new URL(url).pathname)).assertStatus(200);
+		}
+		for (const variant of icon.variants) {
+			assert.deepEqual(Object.keys(variant).sort(), ["url", "width"]);
+		}
+	});
+
+	test("a white logo with a see-through background is served on the dark tile", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("api-darktile-123");
+		await inTenant(tenant, async () =>
+			tenancy.setLogo(
+				tenant,
+				await uploadOf(
+					await testImages.logoOnClear([{ r: 255, g: 255, b: 255 }]),
+				),
+			),
+		);
+
+		const { data } = (
+			await client.get("/api/v1/tenants/api-darktile-123")
+		).body();
+
+		assert.equal(data.storefront.branding.logo.tile, "dark");
+	});
+
+	test("an owner's switch is served, and a logo without an icon serves icon null", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("api-switch-123");
+		// A logo saved before TAT-123: no icon, the default tile.
+		await inTenant(tenant, async () => {
+			tenant.merge({
+				logoImageKey: `tenants/${tenant.id}/studio_logo/${randomUUID()}.320.png`,
+				logoImageWidth: 600,
+				logoImageHeight: 200,
+			});
+			await tenant.save();
+		});
+
+		const before = (await client.get("/api/v1/tenants/api-switch-123")).body()
+			.data.storefront.branding.logo;
+		await inTenant(tenant, () => tenancy.setLogoTile(tenant, "dark"));
+		const after = (await client.get("/api/v1/tenants/api-switch-123")).body()
+			.data.storefront.branding.logo;
+
+		assert.deepEqual([before.tile, before.icon], ["light", null]);
+		assert.deepEqual([after.tile, after.icon], ["dark", null]);
+	});
+
+	test("a stored tile the contract does not list is served as light", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("api-oddtile-123");
+		await inTenant(tenant, async () => {
+			tenant.merge({
+				logoImageKey: `tenants/${tenant.id}/studio_logo/${randomUUID()}.320.png`,
+				logoImageWidth: 600,
+				logoImageHeight: 200,
+				logoTile: "accent",
+			});
+			await tenant.save();
+		});
+
+		const { data } = (
+			await client.get("/api/v1/tenants/api-oddtile-123")
+		).body();
+
+		assert.equal(data.storefront.branding.logo.tile, "light");
 	});
 
 	test("saving the look, or the logo, changes the ETag; the cache headers stay", async ({

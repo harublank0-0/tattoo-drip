@@ -104,6 +104,23 @@ test.group("the page look rules match the storefront's own", () => {
 		);
 	});
 
+	test("the contract's Logo lists the same tiles, light first, and a logo is a Logo", ({
+		assert,
+	}) => {
+		const yaml = contract();
+		const logo = schemaOf(yaml, "Logo");
+		const listed = /tile:\n\s+type: string\n\s+enum: \[([^\]]*)\]/.exec(logo);
+		assert.deepEqual(
+			(listed?.[1] ?? "").split(",").map((key) => key.trim()),
+			[...LOGO_TILES],
+			"Logo.tile's enum is LOGO_TILES",
+		);
+		assert.match(
+			schemaOf(yaml, "StorefrontConfiguration"),
+			/logo:[\s\S]*?oneOf: \[\{ \$ref: "#\/components\/schemas\/Logo" \}, \{ type: "null" \}\]/,
+		);
+	});
+
 	test("the two papers and the minimum contrast are the storefront's", ({
 		assert,
 	}) => {
