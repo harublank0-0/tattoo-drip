@@ -166,6 +166,8 @@ export default class ArtistsController {
 				price: design.price === null ? null : design.price / 100,
 				priceText: design.price === null ? null : formatMoney(design.price),
 				hidden: design.hidden,
+				oneOfAKind: design.oneOfAKind,
+				claimed: design.claimedAt !== null,
 				thumbnailUrl: await this.images.urlFor(
 					"flash_design",
 					design.imageKey,

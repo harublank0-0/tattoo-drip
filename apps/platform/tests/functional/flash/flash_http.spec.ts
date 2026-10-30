@@ -38,7 +38,12 @@ const rows = (tenant: Tenant, artistId: string) =>
 			.orderBy("id", "desc"),
 	);
 
-type Fields = { name?: string; size?: string; price?: string };
+type Fields = {
+	name?: string;
+	size?: string;
+	price?: string;
+	oneOfAKind?: string;
+};
 
 /** POST a picture and the fields as the artist page's add form sends them. */
 const add = (
@@ -95,6 +100,21 @@ const save = (
 	client
 		.put(`/t/${tenant.slug}/artists/flash/${id}`)
 		.fields({ name: "Moth", size: "About 3 in", ...fields })
+		.withCsrfToken()
+		.loginAs(user)
+		.redirects(0);
+
+/** The one-tap claim: `claimed` is "1" to mark the design claimed, "0" to make it available. */
+const claim = (
+	client: ApiClient,
+	user: User,
+	tenant: Tenant,
+	id: string,
+	fields: { claimed?: string } = {},
+) =>
+	client
+		.put(`/t/${tenant.slug}/artists/flash/${id}/claim`)
+		.fields({ ...fields })
 		.withCsrfToken()
 		.loginAs(user)
 		.redirects(0);
@@ -461,7 +481,7 @@ test.group("Flash designs over HTTP (TAT-129)", (group) => {
 		assert.lengthOf(await rows(b.tenant, artistB.id), 1);
 	});
 
-	test("the edit page lists the artist's designs newest first, hidden ones too, each with exactly id, name, size, price, priceText, hidden and thumbnailUrl", async ({
+	test("the edit page lists the artist's designs newest first, hidden ones too, each with exactly id, name, size, price, priceText, hidden, oneOfAKind, claimed and thumbnailUrl", async ({
 		client,
 		assert,
 	}) => {
@@ -497,9 +517,11 @@ test.group("Flash designs over HTTP (TAT-129)", (group) => {
 		);
 		for (const design of flashDesigns) {
 			assert.deepEqual(Object.keys(design).sort(), [
+				"claimed",
 				"hidden",
 				"id",
 				"name",
+				"oneOfAKind",
 				"price",
 				"priceText",
 				"size",
@@ -519,5 +541,170 @@ test.group("Flash designs over HTTP (TAT-129)", (group) => {
 			.withInertia()
 			.loginAs(owner);
 		assert.deepEqual(created.inertiaProps.flashDesigns, []);
+	});
+	test("the add and edit forms save One of a kind; unticked means it can be tattooed again", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+		const sita = await addArtist(tenant, owner);
+
+		(
+			await add(client, owner, tenant, sita.id, {
+				name: "Koi",
+				size: "About 5 in",
+				oneOfAKind: "1",
+			})
+		).assertStatus(302);
+		(await add(client, owner, tenant, sita.id)).assertStatus(302);
+		const [repeatable, single] = await rows(tenant, sita.id);
+		assert.isFalse(repeatable.oneOfAKind, "an unticked box is not sent");
+		assert.isTrue(single.oneOfAKind);
+
+		(
+			await save(client, owner, tenant, repeatable.id, {
+				oneOfAKind: "1",
+				shown: "1",
+			})
+		).assertStatus(302);
+		assert.isTrue((await rows(tenant, sita.id))[0].oneOfAKind);
+		(
+			await save(client, owner, tenant, repeatable.id, { shown: "1" })
+		).assertStatus(302);
+		assert.isFalse((await rows(tenant, sita.id))[0].oneOfAKind);
+	});
+
+	test("Mark claimed and Make available are one tap each", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+		const sita = await addArtist(tenant, owner);
+		const design = await inTenant(tenant, () =>
+			addFlashDesign(tenant, sita, { oneOfAKind: true }),
+		);
+		const edit = async () =>
+			(
+				await client
+					.get(`/t/${tenant.slug}/artists/${sita.id}/edit`)
+					.withInertia()
+					.loginAs(owner)
+			).inertiaProps.flashDesigns[0];
+
+		const marked = await claim(client, owner, tenant, design.id, {
+			claimed: "1",
+		});
+		marked.assertStatus(302);
+		marked.assertHeader(
+			"location",
+			`/t/${tenant.slug}/artists/${sita.id}/edit`,
+		);
+		marked.assertFlashMessage("success", "Marked claimed.");
+		const claimed = (await rows(tenant, sita.id))[0];
+		assert.isNotNull(claimed.claimedAt);
+		assert.isNull(claimed.claimedProjectId);
+		assert.deepInclude(await edit(), { oneOfAKind: true, claimed: true });
+
+		const freed = await claim(client, owner, tenant, design.id, {
+			claimed: "0",
+		});
+		freed.assertStatus(302);
+		freed.assertFlashMessage("success", "Available again.");
+		assert.isNull((await rows(tenant, sita.id))[0].claimedAt);
+		assert.deepInclude(await edit(), { oneOfAKind: true, claimed: false });
+	});
+
+	test("a repeatable design's claim is refused with its words and nothing changes", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+		const sita = await addArtist(tenant, owner);
+		const design = await inTenant(tenant, () => addFlashDesign(tenant, sita));
+
+		for (const claimed of ["1", "0"]) {
+			const refused = await claim(client, owner, tenant, design.id, {
+				claimed,
+			});
+			refused.assertStatus(302);
+			refused.assertHeader(
+				"location",
+				`/t/${tenant.slug}/artists/${sita.id}/edit`,
+			);
+			refused.assertFlashMessage(
+				"error",
+				"A design that can be tattooed again is never claimed.",
+			);
+		}
+		const [row] = await rows(tenant, sita.id);
+		assert.isNull(row.claimedAt);
+		assert.isFalse(row.oneOfAKind);
+	});
+
+	test("a claim without a yes or no is a field error and nothing changes", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+		const sita = await addArtist(tenant, owner);
+		const design = await inTenant(tenant, () =>
+			addFlashDesign(tenant, sita, { oneOfAKind: true }),
+		);
+
+		assertValidationError(
+			await claim(client, owner, tenant, design.id, {}),
+			"claimed",
+		);
+		assert.isNull((await rows(tenant, sita.id))[0].claimedAt);
+	});
+
+	test("an artist claims their own design; another artist's, another studio's and an unknown id are a 404", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+		const member = await artistIn(tenant);
+		const own = await addArtist(tenant, member, {
+			name: "Own",
+			slug: "own",
+			linkToMe: true,
+		});
+		const other = await addArtist(tenant, owner, {
+			name: "Mira",
+			slug: "mira",
+		});
+		const [mine, theirs] = await inTenant(tenant, async () => [
+			await addFlashDesign(tenant, own, { oneOfAKind: true }),
+			await addFlashDesign(tenant, other, { oneOfAKind: true }),
+		]);
+		const b = await studioWithOwner("flash-claim-b", "Flash B");
+		const artistB = await addArtist(b.tenant, b.owner);
+		const designB = await inTenant(b.tenant, () =>
+			addFlashDesign(b.tenant, artistB, { oneOfAKind: true }),
+		);
+
+		(
+			await claim(client, member, tenant, mine.id, { claimed: "1" })
+		).assertFlashMessage("success", "Marked claimed.");
+		(
+			await claim(client, member, tenant, theirs.id, { claimed: "1" })
+		).assertStatus(404);
+		(
+			await claim(client, owner, tenant, designB.id, { claimed: "1" })
+		).assertStatus(404);
+		(
+			await claim(
+				client,
+				owner,
+				tenant,
+				"0191a2b3-0000-7000-8000-000000000000",
+				{
+					claimed: "1",
+				},
+			)
+		).assertStatus(404);
+		assert.isNotNull((await rows(tenant, own.id))[0].claimedAt);
+		assert.isNull((await rows(tenant, other.id))[0].claimedAt);
+		assert.isNull((await rows(b.tenant, artistB.id))[0].claimedAt);
 	});
 });

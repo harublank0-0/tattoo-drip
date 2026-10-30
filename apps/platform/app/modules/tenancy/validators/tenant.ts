@@ -4,6 +4,7 @@ import { IANAZone } from "luxon";
 import { IMAGE_FORMAT_MESSAGE } from "#modules/media/errors";
 import { imageFile } from "#modules/media/validators/image_file";
 import {
+	CLAIMED_FLASH_CHOICES,
 	DARK_PAPER,
 	FONT_KEYS,
 	HEX_COLOR,
@@ -249,6 +250,9 @@ export const updateLookValidator = vine.create({
 	accent: colour(LIGHT_PAPER),
 	accentDark: colour(DARK_PAPER),
 	font: vine.enum(FONT_KEYS),
+	// What the page does with flash designs somebody has claimed (required like
+	// the rest: the form always sends it).
+	claimedFlash: vine.enum(CLAIMED_FLASH_CHOICES),
 	// The shown sections in order (the form sends one `sections[]` per shown row). The
 	// service adds the form at the end if it is missing.
 	sections: vine
@@ -275,6 +279,8 @@ updateLookValidator.messagesProvider = new SimpleMessagesProvider({
 		"This colour is hard to read in dark mode. Pick a lighter one.",
 	"theme.enum": "Choose one of the themes.",
 	"font.enum": "Choose one of the fonts.",
+	"claimedFlash.enum": "Choose one of the options.",
+	"claimedFlash.required": "Choose one of the options.",
 	// An item off the list is "sections.0" (the page shows the first section error under the list).
 	"sections.*.enum": "Choose sections from the list.",
 	"sections.distinct": "Show each section once.",

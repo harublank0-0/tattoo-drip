@@ -57,6 +57,7 @@ export const addFlashDesignValidator = vine.create({
 	name: line(MAX_FLASH_NAME),
 	size: line(MAX_FLASH_SIZE),
 	price: price(),
+	oneOfAKind: vine.boolean().optional(),
 });
 
 addFlashDesignValidator.messagesProvider = new SimpleMessagesProvider({
@@ -68,15 +69,31 @@ addFlashDesignValidator.messagesProvider = new SimpleMessagesProvider({
 });
 
 /**
- * What the design's sheet saves: the words, the price and whether the design
- * is shown. An unchecked box is not sent, so a missing `shown` means hidden
- * (the controller reads it).
+ * What the design's sheet saves: the words, the price, whether the design is
+ * one of a kind and whether it is shown. An unchecked box is not sent, so a
+ * missing `shown` means hidden and a missing `oneOfAKind` means the design
+ * can be tattooed again (the controller reads both).
  */
 export const updateFlashDesignValidator = vine.create({
 	name: line(MAX_FLASH_NAME),
 	size: line(MAX_FLASH_SIZE),
 	price: price(),
+	oneOfAKind: vine.boolean().optional(),
 	shown: vine.boolean().optional(),
+});
+
+/**
+ * The one-tap claim: `claimed` true marks the design claimed by hand, false
+ * makes it available again. Required: a request that names neither is a
+ * field error.
+ */
+export const claimFlashDesignValidator = vine.create({
+	claimed: vine.boolean(),
+});
+
+claimFlashDesignValidator.messagesProvider = new SimpleMessagesProvider({
+	"claimed.required": "Say whether the design is claimed.",
+	"claimed.boolean": "Say whether the design is claimed.",
 });
 
 updateFlashDesignValidator.messagesProvider = new SimpleMessagesProvider(

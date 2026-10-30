@@ -4,15 +4,20 @@ import { useRef, useState } from "react";
 import { urlFor } from "~/client";
 import { ignoreHeldEnter } from "~/components/confirm";
 import {
+	claimDesignLabel,
 	designNote,
 	editDesignLabel,
 	FLASH_FULL,
 	FLASH_SHEET_HELP,
 	type FlashDesignProps,
 	flashCount,
+	MAKE_AVAILABLE,
+	MARK_CLAIMED,
 	MAX_FLASH_DESIGNS,
 	NAME_HELP,
 	NO_FLASH,
+	ONE_OF_A_KIND_HELP,
+	ONE_OF_A_KIND_LABEL,
 	PICTURE_LABEL,
 	PRICE_HELP,
 	PRICE_LABEL,
@@ -32,6 +37,7 @@ import {
 } from "~/components/form_sheet";
 import InlineConfirm from "~/components/inline_confirm";
 import { PHOTO_ACCEPT } from "~/components/photos";
+import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
 import {
@@ -115,6 +121,16 @@ export default function FlashTray({
 								<div>
 									<p className="font-medium wrap-anywhere" dir="auto">
 										{design.name}
+										{design.claimed && (
+											// The note under the name says it too: the badge is the eye's cue.
+											<Badge
+												variant="secondary"
+												aria-hidden="true"
+												className="ml-2 align-middle"
+											>
+												Claimed
+											</Badge>
+										)}
 									</p>
 									<p className="text-sm text-muted-foreground wrap-anywhere">
 										{designNote(design)}
@@ -135,6 +151,13 @@ export default function FlashTray({
 									>
 										Edit
 									</Button>
+									{design.oneOfAKind && (
+										<ClaimButton
+											tenantSlug={tenantSlug}
+											design={design}
+											held={uploading}
+										/>
+									)}
 									<InlineConfirm
 										label="Remove"
 										ariaLabel={removeDesignLabel(design.name)}
@@ -178,6 +201,55 @@ export default function FlashTray({
 				)}
 			</FormSheetPanel>
 		</div>
+	);
+}
+
+/**
+ * A one-of-a-kind design's one claim button: "Mark claimed" while it is free,
+ * "Make available" once it is claimed (the claim is released by nothing else,
+ * FlashService). One tap, no question: either way is undone by the other.
+ * While the request is out the button is `aria-disabled`, not `disabled`, so
+ * focus stays on it (a disabled button gives it up) and a second tap does
+ * nothing; it is also held while a design is going up, which would cancel
+ * the upload's visit.
+ */
+function ClaimButton({
+	tenantSlug,
+	design,
+	held,
+}: {
+	tenantSlug: string;
+	design: FlashDesignProps;
+	held: boolean;
+}) {
+	const [saving, setSaving] = useState(false);
+	const off = saving || held;
+	return (
+		<Button
+			type="button"
+			variant="outline"
+			aria-label={claimDesignLabel(design.name, design.claimed)}
+			aria-disabled={off}
+			className={off ? "opacity-50" : undefined}
+			onKeyDown={ignoreHeldEnter}
+			onClick={() => {
+				if (off) return;
+				router.put(
+					urlFor("tenant.artists.flash.claim.update", {
+						tenant: tenantSlug,
+						id: design.id,
+					}),
+					{ claimed: design.claimed ? "0" : "1" },
+					{
+						preserveScroll: true,
+						onStart: () => setSaving(true),
+						onFinish: () => setSaving(false),
+					},
+				);
+			}}
+		>
+			{design.claimed ? MAKE_AVAILABLE : MARK_CLAIMED}
+		</Button>
 	);
 }
 
@@ -231,7 +303,7 @@ function AddDesign({
 	);
 }
 
-/** The words of a design: its name, size and price, with their help and errors. */
+/** The words of a design: its name, size and price, and whether it is one of a kind, with their help and errors. */
 function DesignFields({
 	idPrefix,
 	errors,
@@ -288,6 +360,29 @@ function DesignFields({
 				<FieldDescription>{PRICE_HELP}</FieldDescription>
 				{errors.price && <FieldError>{errors.price}</FieldError>}
 			</Field>
+			<Field
+				orientation="horizontal"
+				className="min-h-11 items-center"
+				data-invalid={!!errors.oneOfAKind}
+			>
+				<Checkbox
+					id={`${idPrefix}-one-of-a-kind`}
+					name="oneOfAKind"
+					value="1"
+					defaultChecked={design?.oneOfAKind ?? false}
+					aria-invalid={!!errors.oneOfAKind}
+				/>
+				<FieldContent>
+					<FieldLabel
+						htmlFor={`${idPrefix}-one-of-a-kind`}
+						className="font-normal"
+					>
+						{ONE_OF_A_KIND_LABEL}
+					</FieldLabel>
+					<FieldDescription>{ONE_OF_A_KIND_HELP}</FieldDescription>
+					{errors.oneOfAKind && <FieldError>{errors.oneOfAKind}</FieldError>}
+				</FieldContent>
+			</Field>
 		</>
 	);
 }
@@ -319,7 +414,7 @@ function DesignDetails({
 				className="size-40 self-center rounded-md border bg-muted object-contain sm:size-48"
 			/>
 			<Form
-				key={`${design.id}:${design.name}:${design.size}:${design.price ?? ""}:${design.hidden}`}
+				key={`${design.id}:${design.name}:${design.size}:${design.price ?? ""}:${design.hidden}:${design.oneOfAKind}`}
 				route="tenant.artists.flash.update"
 				routeParams={{ tenant: tenantSlug, id: design.id }}
 				options={{ preserveScroll: true }}

@@ -101,6 +101,9 @@ export interface ApiDefinition {
       flash: {
         store: typeof routes['tenant.artists.flash.store']
         update: typeof routes['tenant.artists.flash.update']
+        claim: {
+          update: typeof routes['tenant.artists.flash.claim.update']
+        }
         destroy: typeof routes['tenant.artists.flash.destroy']
       }
     }

@@ -19,6 +19,10 @@ export type FlashDesignProps = {
 	price: number | null;
 	priceText: string | null;
 	hidden: boolean;
+	/** The studio will tattoo it only once (part 4b). */
+	oneOfAKind: boolean;
+	/** Someone has claimed it, by a project or by hand. */
+	claimed: boolean;
 	thumbnailUrl: string;
 };
 
@@ -84,13 +88,25 @@ export const REMOVE_FLASH_CONFIRM = "Remove design";
 
 export const REMOVE_FLASH_KEEP = "Keep the design";
 
-/** The line under a design's name: its size, its price if it has one, and whether it is hidden. */
+/**
+ * The line under a design's name: its size, its price if it has one, whether
+ * it is one of a kind and claimed, and whether it is hidden. The one-of-a-kind
+ * fields are optional so earlier calls stand.
+ */
 export function designNote(design: {
 	size: string;
 	priceText: string | null;
 	hidden: boolean;
+	oneOfAKind?: boolean;
+	claimed?: boolean;
 }): string {
-	return [design.size, design.priceText, design.hidden ? "Hidden" : null]
+	return [
+		design.size,
+		design.priceText,
+		design.oneOfAKind ? "One of a kind" : null,
+		design.claimed ? "Claimed" : null,
+		design.hidden ? "Hidden" : null,
+	]
 		.filter((part): part is string => part !== null)
 		.join(" · ");
 }
@@ -129,3 +145,19 @@ export const SHOWN_HELP =
 /** Under the edit sheet's title. */
 export const FLASH_SHEET_HELP =
 	"Change the words or the price, or take it off the studio page. The picture stays: add a new design for a new picture.";
+
+/** The add form's and the sheet's box: a design the studio will tattoo only once. */
+export const ONE_OF_A_KIND_LABEL = "One of a kind";
+
+export const ONE_OF_A_KIND_HELP =
+	"You'll tattoo it only once. It's marked Claimed when its client's deposit is verified or their project is booked. Leave it unchecked for a design that can be tattooed again.";
+
+/** A one-of-a-kind row's one button: mark it claimed by hand, or make it available again. */
+export const MARK_CLAIMED = "Mark claimed";
+
+export const MAKE_AVAILABLE = "Make available";
+
+/** The claim button names its design for a screen reader, like Edit and Remove. */
+export function claimDesignLabel(name: string, claimed: boolean): string {
+	return `${claimed ? MAKE_AVAILABLE : MARK_CLAIMED}: ${name}`;
+}

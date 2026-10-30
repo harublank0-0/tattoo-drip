@@ -511,6 +511,7 @@ test.group("StudioPageService: page look and logo (TAT-56)", (group) => {
 				accentDark: null,
 				font: "sans",
 				sections: ["inquiry", "artists"],
+				claimedFlash: "show",
 			}),
 		);
 		const withLogo = await inTenant(tenant, async () =>

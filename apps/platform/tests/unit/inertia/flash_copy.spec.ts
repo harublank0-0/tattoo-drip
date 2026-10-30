@@ -11,6 +11,8 @@ type FlashModule = {
 		size: string;
 		priceText: string | null;
 		hidden: boolean;
+		oneOfAKind?: boolean;
+		claimed?: boolean;
 	}): string;
 	flashCardLine(card: {
 		artistName: string | null;
@@ -34,6 +36,10 @@ type FlashModule = {
 	PRICE_HELP: string;
 	SHOWN_LABEL: string;
 	SHOWN_HELP: string;
+	ONE_OF_A_KIND_LABEL: string;
+	ONE_OF_A_KIND_HELP: string;
+	MARK_CLAIMED: string;
+	MAKE_AVAILABLE: string;
 };
 const flash = flashModule as FlashModule;
 
@@ -142,6 +148,56 @@ test.group("flash design words (TAT-129)", () => {
 				priceText: null,
 			}),
 			"About 3 in",
+		);
+	});
+	test("one of a kind: the box, its help, the two claim buttons and the note under a design's name", ({
+		assert,
+	}) => {
+		assert.equal(flash.ONE_OF_A_KIND_LABEL, "One of a kind");
+		assert.equal(
+			flash.ONE_OF_A_KIND_HELP,
+			"You'll tattoo it only once. It's marked Claimed when its client's deposit is verified or their project is booked. Leave it unchecked for a design that can be tattooed again.",
+		);
+		assert.equal(flash.MARK_CLAIMED, "Mark claimed");
+		assert.equal(flash.MAKE_AVAILABLE, "Make available");
+		assert.equal(
+			flash.designNote({
+				size: "About 3 in",
+				priceText: "NPR 3,000",
+				hidden: false,
+				oneOfAKind: true,
+				claimed: true,
+			}),
+			"About 3 in · NPR 3,000 · One of a kind · Claimed",
+		);
+		assert.equal(
+			flash.designNote({
+				size: "About 3 in",
+				priceText: null,
+				hidden: true,
+				oneOfAKind: false,
+				claimed: false,
+			}),
+			"About 3 in · Hidden",
+		);
+		// Plan 4a's calls pass neither field.
+		assert.equal(
+			flash.designNote({
+				size: "About 3 in",
+				priceText: null,
+				hidden: false,
+			}),
+			"About 3 in",
+		);
+		assert.equal(
+			flash.designNote({
+				size: "About 3 in",
+				priceText: null,
+				hidden: false,
+				oneOfAKind: true,
+				claimed: false,
+			}),
+			"About 3 in · One of a kind",
 		);
 	});
 });

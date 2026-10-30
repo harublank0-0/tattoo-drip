@@ -4,6 +4,7 @@ import User from "#models/user";
 import ArtistService from "#modules/artists/services/artist_service";
 import ImageService from "#modules/media/services/image_service";
 import {
+	type ClaimedFlash,
 	type FontKey,
 	type SectionKey,
 	sectionList,
@@ -96,6 +97,8 @@ export type PageLookInput = {
 	accent: string | null;
 	accentDark: string | null;
 	font: FontKey;
+	/** What the page does with flash designs somebody has claimed (TAT-129). */
+	claimedFlash: ClaimedFlash;
 	/** The sections to show, in order; stored through `sectionList`, so the form is always there. */
 	sections: SectionKey[];
 };
@@ -199,7 +202,7 @@ export default class TenancyService {
 	 * Saves the studio's page look (TAT-56, owners only: the route says so).
 	 * The row is read under its lock first, so a studio that is not in this
 	 * context is not found (E_ROW_NOT_FOUND) instead of silently updated to
-	 * nothing; only the five look columns are written (Lucid saves the dirty
+	 * nothing; only the six look columns are written (Lucid saves the dirty
 	 * ones), so a logo or cover saved at the same moment is not overwritten.
 	 */
 	async updateLook(
@@ -216,6 +219,7 @@ export default class TenancyService {
 				brandAccent: input.accent,
 				brandAccentDark: input.accentDark,
 				brandFont: input.font,
+				storefrontClaimedFlash: input.claimedFlash,
 				storefrontSections: sectionList(input.sections).join(","),
 			});
 			await live.save();

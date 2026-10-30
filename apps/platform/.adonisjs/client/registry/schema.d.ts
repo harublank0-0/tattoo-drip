@@ -715,6 +715,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/flash_designs_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
+  'tenant.artists.flash.claim.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/artists/flash/:id/claim'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/flash/validators/flash_design').claimFlashDesignValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/flash/validators/flash_design').claimFlashDesignValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/flash_designs_controller').default['claim']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/flash_designs_controller').default['claim']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
   'tenant.artists.flash.destroy': {
     methods: ["DELETE"]
     pattern: '/t/:tenant/artists/flash/:id'

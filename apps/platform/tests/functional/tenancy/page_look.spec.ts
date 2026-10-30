@@ -22,12 +22,13 @@ const LOOK: PageLookInput = {
 	accentDark: "#a99cff",
 	font: "serif",
 	sections: ["inquiry"],
+	claimedFlash: "hide",
 };
 
 test.group("TenancyService.updateLook (TAT-56)", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 
-	test("writes the five look columns; the sections become their comma list", async ({
+	test("writes the six look columns; the sections become their comma list", async ({
 		assert,
 	}) => {
 		const { tenant } = await studioWithOwner();
@@ -40,6 +41,7 @@ test.group("TenancyService.updateLook (TAT-56)", (group) => {
 		assert.equal(row.brandAccentDark, "#a99cff");
 		assert.equal(row.brandFont, "serif");
 		assert.equal(row.storefrontSections, "inquiry");
+		assert.equal(row.storefrontClaimedFlash, "hide");
 
 		await inTenant(tenant, () =>
 			new TenancyService().updateLook(tenant, {

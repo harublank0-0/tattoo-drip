@@ -24,6 +24,7 @@ const ARTIST_ROUTES = [
 	"tenant.alerts.open",
 	"tenant.alerts.read",
 	"tenant.artists.edit",
+	"tenant.artists.flash.claim.update",
 	"tenant.artists.flash.destroy",
 	"tenant.artists.flash.store",
 	"tenant.artists.flash.update",
