@@ -298,7 +298,11 @@ describe("the address's filters are read strictly (TAT-126)", () => {
 			["artist", "Sita"],
 			["artist", "s"],
 			["artist", "-sita"],
-			["artist", 12],
+			["artist", 1],
+			["artist", -12],
+			["artist", 12.5],
+			["artist", Number.MAX_SAFE_INTEGER + 1],
+			["artist", Number.NaN],
 			["style", "Fine line"],
 			["style", "fine--line"],
 			["style", "x".repeat(41)],
@@ -314,6 +318,21 @@ describe("the address's filters are read strictly (TAT-126)", () => {
 			assert.ok(!(key in read));
 		}
 		assert.deepEqual(readWorkSearch({}), {});
+	});
+
+	test("an artist slug of digits only comes from the router as a number and is read back as its digits", () => {
+		// `?artist=2025` is parsed by the router as the number 2025 (it reads each value as JSON first).
+		assert.deepEqual(readWorkSearch({ artist: 2025 }), { artist: "2025" });
+		assert.deepEqual(readWorkSearch({ artist: 12 }), { artist: "12" });
+		assert.deepEqual(readWorkSearch({ artist: "2025" }), { artist: "2025" });
+		assert.deepEqual(readWorkSearch({ artist: Number.MAX_SAFE_INTEGER }), {
+			artist: String(Number.MAX_SAFE_INTEGER),
+		});
+		// It reaches the API's read as the string.
+		assert.deepEqual(workQuery(readWorkSearch({ artist: 2025 }), 24), {
+			artist: "2025",
+			limit: 24,
+		});
 	});
 
 	test("the artist page reads only healed and cursor", () => {

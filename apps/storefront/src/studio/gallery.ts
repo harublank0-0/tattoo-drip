@@ -199,11 +199,15 @@ function readCursor(value: unknown): string | undefined {
 	return typeof value === "string" && CURSOR.test(value) ? value : undefined;
 }
 
-/** An artist's address: their slug, as the API writes it. */
+/**
+ * An artist's address: their slug, as the API writes it. The router reads each
+ * value as JSON first (see readHealed), so a slug of digits only, `?artist=2025`,
+ * arrives as the number 2025: a safe integer is its own digits again. (Larger
+ * numbers lose digits on the way, so they are no slug.)
+ */
 function readSlug(value: unknown): string | undefined {
-	return typeof value === "string" && ARTIST_SLUG.test(value)
-		? value
-		: undefined;
+	const slug = Number.isSafeInteger(value) ? String(value) : value;
+	return typeof slug === "string" && ARTIST_SLUG.test(slug) ? slug : undefined;
 }
 
 function readStyle(value: unknown): string | undefined {
