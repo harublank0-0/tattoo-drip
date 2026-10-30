@@ -762,7 +762,7 @@ describe("studio and artists", () => {
 		},
 		acceptingInquiries: false,
 		closedMessage: "Books open in March.",
-		// Up to six photos of the artist's work (TAT-116), in the studio's order.
+		// The artist's six newest photos of work (TAT-116, TAT-126), newest first.
 		workPhotos: [
 			{
 				url: "https://api.example.com/uploads/tenants/t/artist_work_photo/w1.320-640.jpg",

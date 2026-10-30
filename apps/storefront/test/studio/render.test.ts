@@ -722,7 +722,7 @@ describe("the roster's work strip (TAT-116)", () => {
 				/ srcSet="[^"]*320w, [^"]*640w, [^"]*1280w, [^"]*2048w"/i,
 			);
 		}
-		// The first three, in the studio's order.
+		// The first three of the artist's newest photos, newest first.
 		assert.deepEqual(
 			thumbs(html).map((image) => /w(\d)\.320-640-1280/.exec(image)?.[1]),
 			["1", "2", "3"],

@@ -91,8 +91,9 @@ export interface paths {
         };
         /**
          * The studio's visible artists
-         * @description Every visible artist, by name (ignoring case), each with up to six
-         *     photos of their work (TAT-116); hidden and deleted artists never
+         * @description Every visible artist, by name (ignoring case), each with their six
+         *     newest photos of work, newest first (TAT-116, TAT-126; the whole
+         *     portfolio is `listWork`); hidden and deleted artists never
          *     appear, nor do their photos, and a studio with no visible artist
          *     answers an empty list. Cacheable. Under an old slug it answers like under
          *     the current one.
