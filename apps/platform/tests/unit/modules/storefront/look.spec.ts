@@ -29,6 +29,23 @@ function storefront(path: string): string {
 	);
 }
 
+/** The API contract as text, read like the storefront's source: no YAML parser needed for two lines. */
+function contract(): string {
+	return readFileSync(
+		new URL("../../../../../../packages/types/openapi.yaml", import.meta.url),
+		"utf8",
+	);
+}
+
+/** A schema's lines in the contract: from its name (4 spaces in) to the next schema. */
+function schemaOf(yaml: string, name: string): string {
+	const match = new RegExp(`\n {4}${name}:\n([\\s\\S]*?)\n {4}[A-Za-z]`).exec(
+		yaml,
+	);
+	if (!match) throw new Error(`${name} is not in the contract.`);
+	return match[1];
+}
+
 /** The strings of `export const NAME = [ ... ] as const` in a source file. */
 function listOf(source: string, name: string): string[] {
 	const match = new RegExp(
@@ -59,6 +76,28 @@ test.group("the page look rules match the storefront's own", () => {
 		assert.equal(DEFAULT_THEME, "stencil-and-ink");
 		assert.match(config, /DEFAULT_FONT: FontKey = "eczar"/);
 		assert.equal(DEFAULT_FONT, "eczar");
+	});
+
+	test("the contract lists the same sections, so a new key cannot forget it", ({
+		assert,
+	}) => {
+		const yaml = contract();
+		const listed = /enum: \[([^\]]*)\]/.exec(
+			schemaOf(yaml, "StorefrontSection"),
+		);
+		assert.deepEqual(
+			(listed?.[1] ?? "").split(",").map((key) => key.trim()),
+			[...SECTION_KEYS],
+			"StorefrontSection's enum is SECTION_KEYS",
+		);
+		const room = /\n {8}sections:\n[\s\S]*?maxItems: (\d+)/.exec(
+			schemaOf(yaml, "StorefrontConfiguration"),
+		);
+		assert.equal(
+			Number(room?.[1]),
+			SECTION_KEYS.length,
+			"StorefrontConfiguration.sections.maxItems is SECTION_KEYS.length",
+		);
 	});
 
 	test("the two papers and the minimum contrast are the storefront's", ({
