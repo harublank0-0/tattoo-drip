@@ -1,4 +1,4 @@
-import type { Artist, Studio } from "@tattoo-drip/sdk";
+import type { Artist, Studio, WorkPage } from "@tattoo-drip/sdk";
 
 /** Shared by the studio page tests: whole TAT-44 objects. */
 
@@ -132,3 +132,27 @@ export const sitaWithWork = (
 	...SITA,
 	workPhotos: workPhotos(count, alts),
 });
+
+/**
+ * A page of the gallery read (TAT-126) as the API sends it: `count` photos by
+ * Sita, on the API's origin with their copies, the first tagged Fine line and
+ * healed, no next page, and the filters that go with it. `over` replaces any
+ * of the page's own keys.
+ */
+export function galleryPage(
+	count: number,
+	over: Partial<WorkPage> = {},
+): WorkPage {
+	const fineLine = { slug: "fine-line", name: "Fine line" };
+	return {
+		data: workPhotos(count).map((photo, index) => ({
+			...photo,
+			styles: index === 0 ? [fineLine] : [],
+			healed: index === 0,
+			artist: { slug: "sita", name: "Sita Rai" },
+		})),
+		nextCursor: null,
+		filters: { styles: [fineLine], healed: true },
+		...over,
+	};
+}

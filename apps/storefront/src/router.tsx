@@ -1,4 +1,7 @@
-import { createRouter as createTanStackRouter } from "@tanstack/react-router";
+import {
+	createRouter as createTanStackRouter,
+	defaultStringifySearch,
+} from "@tanstack/react-router";
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
 import { type DehydratedApi, dehydrateApi, hydrateApi } from "./api/context.ts";
 import { createRequestApi } from "./api/request.ts";
@@ -11,6 +14,7 @@ import {
 } from "./site/context.ts";
 import { createRequestSite } from "./site/request.ts";
 import { NotFoundPage, RouteErrorPage } from "./studio/components/pages.tsx";
+import { healedAsOne } from "./studio/gallery.ts";
 
 type Dehydrated = DehydratedApi & DehydratedSite;
 
@@ -32,6 +36,8 @@ export function getRouter() {
 	const router = createTanStackRouter({
 		routeTree,
 		context: { queryClient: api.queryClient, tattoo: api.tattoo, site },
+		// `?healed=1`, as our links write it (the default would redirect it to `healed=true`).
+		stringifySearch: (search) => defaultStringifySearch(healedAsOne(search)),
 		scrollRestoration: true,
 		// Never the href: a deposit link's token is in its fragment (TAT-65b).
 		getScrollRestorationKey: scrollRestorationKey,

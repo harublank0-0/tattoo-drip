@@ -258,6 +258,7 @@ describe("the page data's theme (TAT-54)", () => {
 		const artist = await loadArtistPage(
 			pageContext(studio, IMAGE_ORIGIN),
 			"sita",
+			{},
 		);
 		assert.deepEqual(artist.theme.heroImage, BRANDED_THEME.heroImage);
 		// The same images, served from an API somewhere else: refused.

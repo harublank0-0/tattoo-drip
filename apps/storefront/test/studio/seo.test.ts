@@ -6,6 +6,7 @@ import {
 	serializeJsonLd,
 	statusHead,
 	studioPageSeo,
+	workPageSeo,
 } from "../../src/studio/seo.ts";
 import {
 	artistViewModels,
@@ -120,6 +121,64 @@ describe("artistPageSeo", () => {
 		assert.equal(
 			seo.description,
 			"Black Needle is a tattoo artist. Send an inquiry.",
+		);
+	});
+});
+
+describe("workPageSeo (TAT-126)", () => {
+	test("titles the page with the studio and says what it shows", () => {
+		const seo = workPageSeo(studio, ORIGIN);
+
+		assert.equal(seo.title, "All work at Black Needle");
+		assert.equal(
+			seo.description,
+			"Tattoos by the artists of Black Needle, newest first.",
+		);
+		assert.equal(seo.canonical, `${ORIGIN}/work`);
+		assert.equal(seo.type, "website");
+		assert.equal(seo.siteName, "Black Needle");
+		assert.equal(seo.image, null);
+		assert.equal(seo.jsonLd, null);
+	});
+
+	test("an independent studio's work is its artist's", () => {
+		const alone = studioViewModel({
+			...STUDIO,
+			name: "Sita Rai",
+			type: "independent",
+		});
+		const seo = workPageSeo(alone, ORIGIN);
+
+		assert.equal(seo.title, "All work by Sita Rai");
+		assert.equal(seo.description, "Tattoos by Sita Rai, newest first.");
+	});
+
+	test("the canonical address is /work whatever the filters or page", () => {
+		// The head takes the studio and the origin alone, never the address's search.
+		assert.equal(workPageSeo.length, 2);
+		assert.equal(workPageSeo(studio, ORIGIN).canonical, `${ORIGIN}/work`);
+	});
+
+	test("writes its head like the other pages, with no image card and no JSON-LD", () => {
+		const head = headTags(workPageSeo(studio, ORIGIN));
+
+		assert.deepEqual(head.scripts, []);
+		assert.deepEqual(head.links, [
+			{ rel: "canonical", href: `${ORIGIN}/work` },
+		]);
+		assert.ok(
+			head.meta.some(
+				(m) => "title" in m && m.title === "All work at Black Needle",
+			),
+		);
+		assert.ok(
+			head.meta.some(
+				(m) =>
+					"name" in m && m.name === "twitter:card" && m.content === "summary",
+			),
+		);
+		assert.ok(
+			!head.meta.some((m) => "property" in m && m.property === "og:image"),
 		);
 	});
 });

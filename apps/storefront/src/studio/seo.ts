@@ -1,4 +1,5 @@
 import { rootRouteId } from "@tanstack/react-router";
+import { studioCopy } from "./copy.ts";
 import { trimDescription } from "./text.ts";
 import type { ArtistPhoto, ArtistView, StudioView } from "./view-model.ts";
 
@@ -72,6 +73,24 @@ export function artistPageSeo(
 		type: "profile",
 		siteName: studio.name,
 		image: artist.photo,
+		jsonLd: null,
+	};
+}
+
+/**
+ * The All work page's head (TAT-126). One canonical address whatever the
+ * filters or page, so a search engine indexes the page and not each filter;
+ * no image (the page has many) and no JSON-LD.
+ */
+export function workPageSeo(studio: StudioView, origin: string): PageSeo {
+	const independent = studio.type === "independent";
+	return {
+		title: `${studioCopy.work.pageTitle} ${independent ? "by" : "at"} ${studio.name}`,
+		description: `Tattoos by ${independent ? studio.name : `the artists of ${studio.name}`}, newest first.`,
+		canonical: `${origin}/work`,
+		type: "website",
+		siteName: studio.name,
+		image: null,
 		jsonLd: null,
 	};
 }

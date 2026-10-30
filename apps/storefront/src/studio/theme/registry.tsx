@@ -1,9 +1,9 @@
 import type { ComponentProps, ComponentType } from "react";
-import { ArtistPage, StudioPage } from "../components/pages.tsx";
+import { ArtistPage, StudioPage, WorkPage } from "../components/pages.tsx";
 import { DEFAULT_THEME_KEY, type ThemeKey } from "./config.ts";
 
 /**
- * A theme (TAT-54): the studio page's two pages as React components of this
+ * A theme (TAT-54): the studio page's pages as React components of this
  * app. A studio picks one by key and fills in its options; it never sends
  * markup. Every theme renders the inquiry section (InquirySection, with the
  * intake form) as it is, and never the deposit page.
@@ -11,11 +11,12 @@ import { DEFAULT_THEME_KEY, type ThemeKey } from "./config.ts";
 export interface Theme {
 	readonly StudioPage: ComponentType<ComponentProps<typeof StudioPage>>;
 	readonly ArtistPage: ComponentType<ComponentProps<typeof ArtistPage>>;
+	readonly WorkPage: ComponentType<ComponentProps<typeof WorkPage>>;
 }
 
 /** Every theme, by key. Stencil & Ink is the page TAT-97 and TAT-105 built. */
 export const THEMES: Record<ThemeKey, Theme> = {
-	"stencil-and-ink": { StudioPage, ArtistPage },
+	"stencil-and-ink": { StudioPage, ArtistPage, WorkPage },
 };
 
 /** The theme with this key, else the default. */
@@ -34,5 +35,11 @@ export function ThemedStudioPage(props: ComponentProps<typeof StudioPage>) {
 /** `/artists/$slug` in the studio's theme. */
 export function ThemedArtistPage(props: ComponentProps<typeof ArtistPage>) {
 	const Page = themeFor(props.data.theme.key).ArtistPage;
+	return <Page {...props} />;
+}
+
+/** `/work` in the studio's theme. */
+export function ThemedWorkPage(props: ComponentProps<typeof WorkPage>) {
+	const Page = themeFor(props.data.theme.key).WorkPage;
 	return <Page {...props} />;
 }
