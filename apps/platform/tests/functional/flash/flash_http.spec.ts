@@ -80,7 +80,7 @@ async function realDesign(
 			{ userId: owner.id, role: "owner" },
 			artist,
 			await uploadOf(await testImages.png(1200, 1200)),
-			{ name, size: "About 3 in", price: null },
+			{ name, size: "About 3 in", price: null, oneOfAKind: false },
 		),
 	);
 }

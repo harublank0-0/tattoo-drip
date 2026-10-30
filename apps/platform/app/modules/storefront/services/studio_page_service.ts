@@ -304,6 +304,7 @@ export default class StudioPageService {
 		const withDesigns = await this.flashDesigns.artistsWithDesigns(
 			tenant,
 			visible.map((artist) => artist.id),
+			true,
 		);
 		const filters = {
 			artists: visible
@@ -317,7 +318,7 @@ export default class StudioPageService {
 		if (artists.length === 0) return { designs: [], nextCursor: null, filters };
 		const { designs, next } = await this.flashDesigns.page(
 			tenant,
-			{ artistIds: artists.map((artist) => artist.id) },
+			{ artistIds: artists.map((artist) => artist.id), withClaimed: true },
 			query.cursor,
 			query.limit,
 		);

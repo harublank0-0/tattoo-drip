@@ -253,6 +253,8 @@ export class DepositOutcomeSchema extends BaseModel {
 export class FlashDesignSchema extends BaseModel {
 	static $columns = [
 		"artistId",
+		"claimedAt",
+		"claimedProjectId",
 		"createdAt",
 		"currency",
 		"height",
@@ -260,6 +262,7 @@ export class FlashDesignSchema extends BaseModel {
 		"id",
 		"imageKey",
 		"name",
+		"oneOfAKind",
 		"price",
 		"size",
 		"tenantId",
@@ -269,6 +272,10 @@ export class FlashDesignSchema extends BaseModel {
 	$columns = FlashDesignSchema.$columns;
 	@column()
 	declare artistId: string;
+	@column.dateTime()
+	declare claimedAt: DateTime | null;
+	@column()
+	declare claimedProjectId: string | null;
 	@column.dateTime({ autoCreate: true })
 	declare createdAt: DateTime;
 	@column()
@@ -283,6 +290,8 @@ export class FlashDesignSchema extends BaseModel {
 	declare imageKey: string;
 	@column()
 	declare name: string;
+	@column()
+	declare oneOfAKind: boolean;
 	@column()
 	declare price: number | null;
 	@column()
@@ -967,6 +976,7 @@ export class TenantSchema extends BaseModel {
 		"logoImageWidth",
 		"name",
 		"slug",
+		"storefrontClaimedFlash",
 		"storefrontSections",
 		"storefrontTheme",
 		"tiktokUrl",
@@ -1027,6 +1037,8 @@ export class TenantSchema extends BaseModel {
 	declare name: string;
 	@column()
 	declare slug: string;
+	@column()
+	declare storefrontClaimedFlash: string;
 	@column()
 	declare storefrontSections: string;
 	@column()

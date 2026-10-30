@@ -8,7 +8,11 @@ import ArtistService, {
 	type ProfileEditor,
 } from "#modules/artists/services/artist_service";
 import type { WorkCursor } from "#modules/artists/work_cursor";
-import { FlashInUseError, FlashLimitError } from "#modules/flash/errors";
+import {
+	FlashInUseError,
+	FlashLimitError,
+	FlashRuleError,
+} from "#modules/flash/errors";
 import FlashDesign from "#modules/flash/models/flash_design";
 import { ImageDeleteError } from "#modules/media/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -48,18 +52,31 @@ const VISIBLE_ARTIST = `exists (
 		and artists.deleted_at is null
 )`;
 
-/** What a new design needs besides the picture; `price` is in paisa, null for none. */
+/**
+ * What a new design needs besides the picture; `price` is in paisa, null for
+ * none. `oneOfAKind`: the studio will tattoo it only once, so it is claimed
+ * (never by `add` itself) when a client's deposit is verified or their
+ * project is booked.
+ */
 export type NewFlashDesign = {
 	name: string;
 	size: string;
 	price: number | null;
+	oneOfAKind: boolean;
 };
 
-/** What an owner or an artist can change on a design: its words, price and whether it is shown. */
+/** What an owner or an artist can change on a design: its words, price, whether it is one of a kind and whether it is shown. */
 export type FlashDetails = NewFlashDesign & { hidden: boolean };
 
-/** What a page of designs shows: these artists' shown designs. */
-export type FlashFilter = { artistIds: readonly string[] };
+/**
+ * What a page of designs shows: these artists' shown designs, claimed ones
+ * too when `withClaimed` (the studio shows them greyed), else only the
+ * designs nobody has claimed.
+ */
+export type FlashFilter = {
+	artistIds: readonly string[];
+	withClaimed: boolean;
+};
 
 /**
  * The flash designs of an artist (TAT-129): up to 100, newest first
@@ -171,6 +188,7 @@ export default class FlashService {
 					price: details.price,
 					currency: "NPR",
 					hidden: false,
+					oneOfAKind: details.oneOfAKind,
 				},
 				{ client: trx },
 			);
@@ -178,9 +196,14 @@ export default class FlashService {
 	}
 
 	/**
-	 * Saves the design's name, size, price and whether it is hidden, in one
-	 * save, from a fresh read under the artist's lock. The picture never
-	 * changes: a new picture is a new design.
+	 * Saves the design's name, size, price, whether it is one of a kind and
+	 * whether it is hidden, from a fresh read under the artist's lock. The
+	 * picture never changes: a new picture is a new design. Switching a design
+	 * to "can be tattooed again" clears its claim in the same transaction (the
+	 * claim goes first, in its own statement, before the design is read, so a
+	 * claim that committed meanwhile is cleared too and the database's check
+	 * `flash_designs_claim_one_of_a_kind` never sees a claimed repeatable
+	 * design); saving it still one of a kind keeps the claim.
 	 */
 	async update(
 		tenant: TenantRef,
@@ -191,15 +214,57 @@ export default class FlashService {
 		assertDesignOf(tenant, design);
 		return withTransaction(async (trx) => {
 			await this.artists.lockEditable(trx, tenant, editor, design.artistId);
+			if (!details.oneOfAKind) {
+				await trx.rawQuery(
+					`update flash_designs set claimed_at = null, claimed_project_id = null, updated_at = now()
+					where tenant_id = ? and id = ? and claimed_at is not null`,
+					[tenant.id, design.id],
+				);
+			}
 			const live = await this.lockedDesign(trx, tenant, design);
 			live.merge({
 				name: details.name.trim(),
 				size: details.size.trim(),
 				price: details.price,
+				oneOfAKind: details.oneOfAKind,
 				hidden: details.hidden,
 			});
 			await live.save();
 			return live;
+		});
+	}
+
+	/**
+	 * Marks a one-of-a-kind design claimed by hand (`claimed` true: the claim
+	 * has no project) or available again (`false`: both claim columns
+	 * cleared, whoever made the claim). Under the artist's lock, like every
+	 * change by the studio, and as a conditional UPDATE: claiming an already
+	 * claimed design changes nothing (a project's claim stays the project's)
+	 * and a claim made by a project in the same instant is never overwritten
+	 * by a stale copy. A design that can be tattooed again is
+	 * FlashRuleError("repeatable"); an artist unlinked meanwhile or a deleted
+	 * one is E_ROW_NOT_FOUND (lockEditable). Returns the design as stored.
+	 */
+	async setClaimed(
+		tenant: TenantRef,
+		editor: ProfileEditor,
+		design: FlashDesign,
+		claimed: boolean,
+	): Promise<FlashDesign> {
+		assertDesignOf(tenant, design);
+		return withTransaction(async (trx) => {
+			await this.artists.lockEditable(trx, tenant, editor, design.artistId);
+			const live = await this.lockedDesign(trx, tenant, design);
+			if (!live.oneOfAKind) throw new FlashRuleError("repeatable");
+			await trx.rawQuery(
+				claimed
+					? `update flash_designs set claimed_at = now(), claimed_project_id = null, updated_at = now()
+						where tenant_id = ? and id = ? and one_of_a_kind and claimed_at is null`
+					: `update flash_designs set claimed_at = null, claimed_project_id = null, updated_at = now()
+						where tenant_id = ? and id = ? and claimed_at is not null`,
+				[tenant.id, live.id],
+			);
+			return this.lockedDesign(trx, tenant, design);
 		});
 	}
 
@@ -281,6 +346,7 @@ export default class FlashService {
 			.where("hidden", false)
 			.whereIn("artist_id", [...filter.artistIds])
 			.whereRaw(VISIBLE_ARTIST, [tenant.id]);
+		if (!filter.withClaimed) query.whereNull("claimed_at");
 		if (after) {
 			query.whereRaw("(created_at, id) < (?::timestamptz, ?::uuid)", [
 				after.at,
@@ -302,25 +368,29 @@ export default class FlashService {
 
 	/**
 	 * Which of these artists, still visible and live in this query, have a
-	 * shown design (the filter a page offers). One query; none for [].
+	 * shown design (the filter a page offers), a claimed one only when
+	 * `withClaimed`. One query; none for [].
 	 */
 	async artistsWithDesigns(
 		tenant: TenantRef,
 		artistIds: readonly string[],
+		withClaimed: boolean,
 	): Promise<Set<string>> {
 		if (artistIds.length === 0) return new Set();
-		const rows = await FlashDesign.query()
+		const query = FlashDesign.query()
 			.where("tenant_id", tenant.id)
 			.where("hidden", false)
 			.whereIn("artist_id", [...artistIds])
-			.whereRaw(VISIBLE_ARTIST, [tenant.id])
-			.distinct("artist_id");
+			.whereRaw(VISIBLE_ARTIST, [tenant.id]);
+		if (!withClaimed) query.whereNull("claimed_at");
+		const rows = await query.distinct("artist_id");
 		return new Set(rows.map((row) => row.artistId));
 	}
 
 	/**
 	 * The design when it is shown and its artist is one of `artistIds` and
-	 * still visible and live in this query, else null.
+	 * still visible and live in this query, else null. A claimed design is
+	 * returned too (its caller decides what a claim means there).
 	 */
 	async findShown(
 		tenant: TenantRef,

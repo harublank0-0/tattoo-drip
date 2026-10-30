@@ -46,6 +46,7 @@ export default class FlashDesignsController {
 				name: data.name,
 				size: data.size,
 				price: toPaisa(data.price),
+				oneOfAKind: false,
 			}),
 		);
 
@@ -70,6 +71,7 @@ export default class FlashDesignsController {
 			name: data.name,
 			size: data.size,
 			price: toPaisa(data.price),
+			oneOfAKind: design.oneOfAKind,
 			hidden: !(data.shown ?? false),
 		});
 

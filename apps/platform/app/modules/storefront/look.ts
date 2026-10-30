@@ -50,6 +50,26 @@ export const DEFAULT_SECTIONS: readonly SectionKey[] = [
 	"inquiry",
 ];
 
+/**
+ * What the studio page does with one-of-a-kind flash designs somebody has
+ * claimed (TAT-129, part 4b): `show` them greyed and marked Claimed (the
+ * default), or `hide` them from every public answer. Not part of `PageLook`
+ * (the public `Studio.storefront` is unchanged): the flash reads apply it on
+ * the platform, so the storefront only ever sees what to show.
+ */
+export const CLAIMED_FLASH_CHOICES = ["show", "hide"] as const;
+export type ClaimedFlash = (typeof CLAIMED_FLASH_CHOICES)[number];
+export const DEFAULT_CLAIMED_FLASH: ClaimedFlash = "show";
+
+/** The stored choice, or `show` for anything off today's list (the database checks only the shape). */
+export function claimedFlashOf(row: {
+	storefrontClaimedFlash: string;
+}): ClaimedFlash {
+	return isOneOf(CLAIMED_FLASH_CHOICES, row.storefrontClaimedFlash)
+		? row.storefrontClaimedFlash
+		: DEFAULT_CLAIMED_FLASH;
+}
+
 /** The themes an owner can pick, with the words the settings page shows. */
 export const THEMES: { key: ThemeKey; label: string; description: string }[] = [
 	{
