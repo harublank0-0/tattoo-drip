@@ -323,6 +323,140 @@ describe("the artist page's portfolio (TAT-126)", () => {
 		}
 	});
 
+	describe("a portfolio that cannot be read is logged, and only that", () => {
+		/** What each failure is logged as: the studio, the status and the code. */
+		const FAILURES: Array<{
+			name: string;
+			respond: () => Response;
+			logged: { status: number; code: string };
+		}> = [
+			{
+				name: "a 500",
+				respond: () =>
+					json(500, {
+						error: { code: "internal_error", message: "Boom in /secret/path." },
+					}),
+				logged: { status: 500, code: "internal_error" },
+			},
+			{
+				name: "a platform without /work (404)",
+				respond: () => json(404, NOT_FOUND),
+				logged: { status: 404, code: "not_found" },
+			},
+			{
+				name: "a network error",
+				respond: () => {
+					throw new TypeError("fetch failed: http://api.test/secret");
+				},
+				logged: { status: 0, code: "network_error" },
+			},
+		];
+		const withArtists = (respondToWork: () => Response) =>
+			fakeFetch(({ url }) =>
+				url.endsWith("/artists")
+					? json(200, { data: [SITA] })
+					: respondToWork(),
+			);
+
+		for (const { name, respond, logged } of FAILURES) {
+			test(`${name} logs the studio, status and code once, and the page still renders`, async (t) => {
+				const log = t.mock.method(console, "error", () => {});
+				const { fetch } = withArtists(respond);
+				const data = await loadArtistPage(pageContext(fetch), "sita", {
+					cursor: "secretcursor",
+				});
+
+				assert.equal(data.artist.name, "Sita Rai");
+				assert.deepEqual(data.portfolio, {
+					gallery: EMPTY_GALLERY,
+					search: {},
+				});
+				assert.deepEqual(
+					log.mock.calls.map((call) => call.arguments),
+					[["Portfolio read failed", { slug: STUDIO.slug, ...logged }]],
+				);
+			});
+		}
+
+		test("what is not an API error is logged without its status, code or text", async (t) => {
+			const log = t.mock.method(console, "error", () => {});
+			const { fetch } = listing();
+			const context = pageContext(fetch);
+			const query = context.queryClient.query.bind(context.queryClient);
+			t.mock.method(
+				context.queryClient,
+				"query",
+				(options: { queryKey: readonly unknown[] }) => {
+					// Only the gallery read breaks; the studio and the artists read as before.
+					if (options.queryKey.includes("work")) {
+						throw new TypeError("a bug with secretcursor in http://api.test/x");
+					}
+					return query(options as never);
+				},
+			);
+			const data = await loadArtistPage(context, "sita", {
+				cursor: "secretcursor",
+			});
+
+			assert.deepEqual(data.portfolio.gallery, EMPTY_GALLERY);
+			assert.deepEqual(
+				log.mock.calls.map((call) => call.arguments),
+				[
+					[
+						"Portfolio read failed",
+						{ slug: STUDIO.slug, status: undefined, code: undefined },
+					],
+				],
+			);
+		});
+
+		test("the line holds no error, address, cursor or key", async (t) => {
+			const log = t.mock.method(console, "error", () => {});
+			for (const { respond } of FAILURES) {
+				await loadArtistPage(pageContext(withArtists(respond).fetch), "sita", {
+					cursor: "secretcursor",
+					healed: true,
+				});
+			}
+
+			const written = JSON.stringify(log.mock.calls.map((c) => c.arguments));
+			assert.equal(log.mock.calls.length, FAILURES.length);
+			for (const secret of ["secretcursor", "secret", "api.test", "Boom"]) {
+				assert.ok(!written.includes(secret), secret);
+			}
+		});
+
+		test("the address's own refused cursor or healed is the not-found, not a log line", async (t) => {
+			const log = t.mock.method(console, "error", () => {});
+			for (const field of ["cursor", "healed"]) {
+				const { fetch } = withArtists(() =>
+					json(422, {
+						error: {
+							code: "validation_failed",
+							message: "No.",
+							fields: { [field]: ["No."] },
+						},
+					}),
+				);
+				await assert.rejects(
+					loadArtistPage(pageContext(fetch), "sita", { cursor: "!!" }),
+					notFound,
+					field,
+				);
+			}
+
+			assert.equal(log.mock.calls.length, 0);
+		});
+
+		test("a portfolio that reads fine logs nothing", async (t) => {
+			const log = t.mock.method(console, "error", () => {});
+			const { fetch } = listing();
+			await loadArtistPage(pageContext(fetch), "sita", {});
+
+			assert.equal(log.mock.calls.length, 0);
+		});
+	});
+
 	test("a portfolio read that is not a gallery at all is an empty one", async () => {
 		const { fetch } = listing([SITA], { data: "x", filters: 5 });
 		const data = await loadArtistPage(pageContext(fetch), "sita", {});

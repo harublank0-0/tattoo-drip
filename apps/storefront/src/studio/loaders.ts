@@ -289,9 +289,9 @@ function refusedTheAddress(error: unknown): boolean {
 /**
  * The artist's portfolio: their newest 24 photos, narrowed by the address.
  * A refused address is the not-found. Any other failure (an older platform's
- * 404, a 5xx, the network) leaves the portfolio out and the page standing:
- * the artist page is how a client reaches an artist, and a gallery that won't
- * load is no reason to lose it.
+ * 404, a 5xx, the network) is logged and leaves the portfolio out and the page
+ * standing: the artist page is how a client reaches an artist, and a gallery
+ * that won't load is no reason to lose it.
  */
 async function loadPortfolio(
 	{ queryClient, tattoo }: ApiContext,
@@ -309,6 +309,16 @@ async function loadPortfolio(
 		return { page, search };
 	} catch (error) {
 		if (refusedTheAddress(error)) throw notFound();
+		// The page stands without its portfolio, so say so where an operator
+		// looks: a platform without `/work`, a timeout or a bug here would
+		// otherwise leave every artist page without one, all of them 200s. Like
+		// the tenant lookup's line (src/tenancy/handle.ts): the studio, the
+		// status and the code, never the error, the address, a cursor or a key.
+		console.error("Portfolio read failed", {
+			slug: tattoo.connection.tenant,
+			status: isTattooApiError(error) ? error.status : undefined,
+			code: isTattooApiError(error) ? error.code : undefined,
+		});
 		return NO_PORTFOLIO;
 	}
 }
