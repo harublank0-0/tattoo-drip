@@ -32,7 +32,7 @@ export const Route = createFileRoute("/artists/$slug")({
 
 function ArtistRoute() {
 	const data = Route.useLoaderData();
-	const { queryClient, tattoo, site } = Route.useRouteContext();
+	const { queryClient, tattoo } = Route.useRouteContext();
 	// The same read as the loader's (portfolioQuery), for Show more.
 	const query = portfolioQuery(
 		data.artist.slug,
@@ -42,7 +42,6 @@ function ArtistRoute() {
 	return (
 		<ThemedArtistPage
 			data={data}
-			challengeSiteKey={site.challengeSiteKey}
 			more={(cursor, offset) =>
 				moreWork(
 					{ queryClient, tattoo },

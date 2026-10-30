@@ -86,11 +86,21 @@ function WorkStrip({ artist }: { artist: ArtistView }) {
 	);
 }
 
-function ArtistStatus({ accepting }: { accepting: boolean }) {
-	return accepting ? (
-		<p className="status status-open">Taking new inquiries</p>
+/**
+ * Whether the artist takes new work (TAT-127): "Taking new work", else their
+ * own closed message, else "Not taking new work right now". The message is
+ * said here and nowhere else on the page.
+ */
+function ArtistStatus({ artist }: { artist: ArtistView }) {
+	if (artist.accepting) {
+		return <p className="status status-open">{studioCopy.status.open}</p>;
+	}
+	return artist.closedMessage ? (
+		<p className="status status-closed user-text" dir="auto">
+			{artist.closedMessage}
+		</p>
 	) : (
-		<p className="status status-closed">Not taking new inquiries</p>
+		<p className="status status-closed">{studioCopy.status.closed}</p>
 	);
 }
 
@@ -154,7 +164,7 @@ function ArtistEntry({
 				{artist.styles.length > 0 ? (
 					<p className="artist-styles">{artist.styles.join(" · ")}</p>
 				) : null}
-				<ArtistStatus accepting={artist.accepting} />
+				<ArtistStatus artist={artist} />
 			</div>
 			<div className="artist-body">
 				{artist.bio ? (
@@ -162,15 +172,10 @@ function ArtistEntry({
 						{artist.bio}
 					</p>
 				) : null}
-				{artist.closedMessage ? (
-					<p className="note user-text measure" dir="auto">
-						{artist.closedMessage}
-					</p>
-				) : null}
 				<WorkStrip artist={artist} />
 				{askLink ? (
 					<div className="actions">
-						<a className="action action-secondary" href={artist.inquiryHref}>
+						<a className="action action-secondary" href={artist.requestHref}>
 							<span>
 								Ask for <bdi>{artist.name}</bdi>
 							</span>
@@ -242,22 +247,23 @@ export function ArtistProfile({
 					)}
 				</p>
 				<StyleList styles={artist.styles} />
-				<ArtistStatus accepting={artist.accepting} />
+				<ArtistStatus artist={artist} />
 				{artist.bio ? (
 					<p className="user-text measure" dir="auto">
 						{artist.bio}
 					</p>
 				) : null}
 				<ArtistLinks links={artist.links} />
-				{artist.closedMessage ? (
-					<p className="note user-text measure" dir="auto">
-						{artist.closedMessage}
-					</p>
-				) : null}
+				{/* The id keeps an old `/artists/<slug>#inquiry` link landing here, one tap from the form. */}
 				{artist.accepting ? (
-					<div className="actions">
-						<a className="action action-primary" href="#inquiry">
-							{studioCopy.sendIdea}
+					<div id="inquiry" className="actions artist-request">
+						<a className="action action-primary" href={artist.requestHref}>
+							<span>
+								<Fill
+									template={studioCopy.request.artistButton}
+									values={{ name: artist.name }}
+								/>
+							</span>
 						</a>
 					</div>
 				) : null}

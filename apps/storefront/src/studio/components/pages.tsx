@@ -1,7 +1,13 @@
 import { useLocation } from "@tanstack/react-router";
 import { MessageCircle } from "lucide-react";
 import { studioCopy } from "../copy.ts";
-import { isAllowedHref, linkRel, portfolioHref, workHref } from "../links.ts";
+import {
+	isAllowedHref,
+	linkRel,
+	portfolioHref,
+	requestHref,
+	workHref,
+} from "../links.ts";
 import type {
 	ArtistPageData,
 	RequestPageData,
@@ -16,7 +22,7 @@ import { ArtistProfile, ArtistRoster } from "./artists.tsx";
 import { BrandCover, BrandLogo } from "./brand.tsx";
 import { ContactBlock } from "./contact.tsx";
 import { HealedFilter, RecentWork, WorkFilters } from "./gallery.tsx";
-import { InquirySection } from "./inquiry.tsx";
+import { InquirySection, RequestInvite } from "./inquiry.tsx";
 import { BookingStrip } from "./steps.tsx";
 
 /**
@@ -25,14 +31,7 @@ import { BookingStrip } from "./steps.tsx";
  * router's glue), so test/studio/render.test.ts renders them on their own.
  */
 
-export function StudioPage({
-	data,
-	challengeSiteKey = null,
-}: {
-	data: StudioPageData;
-	/** The intake form's public Turnstile site key (TAT-57). */
-	challengeSiteKey?: string | null;
-}) {
+export function StudioPage({ data }: { data: StudioPageData }) {
 	const { studio, theme } = data;
 	// The hero's WhatsApp button is the plain chat link the Chat group lists.
 	const whatsapp = studio.links.find(
@@ -67,7 +66,7 @@ export function StudioPage({
 					<div className="profile-actions">
 						{studio.accepting ? (
 							<div className="actions">
-								<a className="action action-primary" href="#inquiry">
+								<a className="action action-primary" href={requestHref({})}>
 									{studioCopy.sendIdea}
 								</a>
 								{whatsapp ? (
@@ -94,12 +93,7 @@ export function StudioPage({
 					<ContactBlock studio={studio} />
 				</header>
 				{theme.sections.map((section) => (
-					<StudioSection
-						key={section}
-						section={section}
-						data={data}
-						challengeSiteKey={challengeSiteKey}
-					/>
+					<StudioSection key={section} section={section} data={data} />
 				))}
 			</main>
 			<SiteFooter studioName={studio.name} />
@@ -110,16 +104,15 @@ export function StudioPage({
 /**
  * One of the studio page's sections, in the order the theme's config gives
  * (TAT-54): Recent work (TAT-126), the artists and the inquiry section, which
- * is always one of them (readSections).
+ * is always one of them (readSections) and, since TAT-127, only invites: the
+ * form is on /request.
  */
 function StudioSection({
 	section,
 	data,
-	challengeSiteKey,
 }: {
 	section: SectionKey;
 	data: StudioPageData;
-	challengeSiteKey: string | null;
 }) {
 	switch (section) {
 		case "work":
@@ -127,28 +120,19 @@ function StudioSection({
 		case "artists":
 			return <ArtistRoster artists={data.artists} />;
 		case "inquiry":
-			return (
-				<InquirySection
-					state={data.inquiry}
-					channels={data.channels}
-					challengeSiteKey={challengeSiteKey}
-				/>
-			);
+			return <RequestInvite state={data.inquiry} />;
 	}
 }
 
 export function ArtistPage({
 	data,
-	challengeSiteKey = null,
 	more,
 }: {
 	data: ArtistPageData;
-	/** The intake form's public Turnstile site key (TAT-57). */
-	challengeSiteKey?: string | null;
 	/** The browser's "Show more" (TAT-126); without it the link loads the next page. */
 	more?: MoreWork;
 }) {
-	const { studio, artist, inquiry, channels, theme, portfolio } = data;
+	const { studio, artist, theme, portfolio } = data;
 	return (
 		<>
 			<SiteBar studio={studio} theme={theme} />
@@ -159,12 +143,6 @@ export function ArtistPage({
 					gallery={portfolio.gallery}
 					search={portfolio.search}
 					more={more}
-				/>
-				<InquirySection
-					state={inquiry}
-					channels={channels}
-					challengeSiteKey={challengeSiteKey}
-					stripAbove
 				/>
 				<StudioAside studio={studio} />
 			</main>
@@ -197,8 +175,6 @@ export function RequestPage({
 					state={inquiry}
 					channels={channels}
 					challengeSiteKey={challengeSiteKey}
-					level={1}
-					stripAbove
 				/>
 				<StudioAside studio={studio} />
 			</main>

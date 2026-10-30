@@ -342,6 +342,20 @@ describe("loadStudioPage", () => {
 		});
 	});
 
+	test("the studio page's data keeps the invitation's state and holds no chat channels", async () => {
+		const { fetch } = listing();
+		const data = await loadStudioPage(pageContext(fetch));
+
+		assert.deepEqual(Object.keys(data).sort(), [
+			"artists",
+			"inquiry",
+			"recentWork",
+			"seo",
+			"studio",
+			"theme",
+		]);
+	});
+
 	test("a closed studio's page takes no inquiry", async () => {
 		const { fetch } = listing([ARJUN]);
 		const data = await loadStudioPage(pageContext(fetch, CLOSED_STUDIO));
@@ -387,7 +401,20 @@ describe("loadArtistPage", () => {
 		);
 		assert.equal(data.artist.name, "Sita Rai");
 		assert.equal(data.seo.canonical, `${ORIGIN}/artists/sita`);
-		assert.equal(data.inquiry.kind, "open");
+		assert.equal(data.artist.requestHref, "/request?artist=sita");
+	});
+
+	test("the artist page's data holds no inquiry state and no chat channels: the form is on /request", async () => {
+		const { fetch } = listing();
+		const data = await loadArtistPage(pageContext(fetch), "sita", {});
+
+		assert.deepEqual(Object.keys(data).sort(), [
+			"artist",
+			"portfolio",
+			"seo",
+			"studio",
+			"theme",
+		]);
 	});
 
 	test("an unknown, hidden or renamed artist is a not-found", async () => {
@@ -423,17 +450,12 @@ describe("loadArtistPage", () => {
 		assert.equal(calls.length, 0);
 	});
 
-	test("a closed artist's page points to the studio", async () => {
+	test("a closed artist's page carries their status words", async () => {
 		const { fetch } = listing();
 		const data = await loadArtistPage(pageContext(fetch), "arjun", {});
 
-		assert.deepEqual(data.inquiry, {
-			kind: "artist-closed",
-			studioName: "Black Needle",
-			artistName: "अर्जुन थापा",
-			studioOpen: true,
-			closedMessage: "Books open in March.",
-		});
+		assert.equal(data.artist.accepting, false);
+		assert.equal(data.artist.closedMessage, "Books open in March.");
 	});
 });
 

@@ -286,9 +286,10 @@
   /*
    * "How booking works" (TAT-105): four numbered steps joined by the
    * stencil's dotted line. The strip is the phone's (under the hero's
-   * buttons; above the artist page's form), the panel the desktop's (beside
-   * the form, sticky). Each is display: none where it doesn't apply, so the
-   * steps are read once. Numerals come from a counter, in the display face.
+   * buttons; under the request page's heading), the panel the desktop's
+   * (beside the form, sticky). Each is display: none where it doesn't apply,
+   * so the steps are read once. Numerals come from a counter, in the display
+   * face.
    */
   .steps-title { margin: 0; font-size: 1.25rem; line-height: 1.25; }
   .steps { display: grid; margin: 0; padding: 0; list-style: none; counter-reset: step; }

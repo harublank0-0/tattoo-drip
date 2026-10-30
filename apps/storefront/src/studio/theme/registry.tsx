@@ -10,8 +10,9 @@ import { DEFAULT_THEME_KEY, type ThemeKey } from "./config.ts";
 /**
  * A theme (TAT-54): the studio page's pages as React components of this
  * app. A studio picks one by key and fills in its options; it never sends
- * markup. Every theme renders the inquiry section (InquirySection, with the
- * intake form) as it is, and never the deposit page.
+ * markup. Every theme renders the inquiry section as it is (the invitation
+ * to /request on the studio page, InquirySection with the intake form on
+ * /request), and never the deposit page.
  */
 export interface Theme {
 	readonly StudioPage: ComponentType<ComponentProps<typeof StudioPage>>;

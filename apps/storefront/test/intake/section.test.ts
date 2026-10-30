@@ -35,7 +35,7 @@ describe("the #inquiry section on the server", () => {
 
 		assert.equal((html.match(/<form[\s>]/g) ?? []).length, 0);
 		assert.match(html, /Message on WhatsApp/);
-		assert.match(html, /<h2 id="inquiry-title"/);
+		assert.match(html, /<h1 id="inquiry-title"/);
 		assert.doesNotMatch(
 			html,
 			/challenges\.cloudflare\.com|1x00000000000000000000AA/,
@@ -110,43 +110,14 @@ describe("the #inquiry section's panel (TAT-105)", () => {
 			/<section id="inquiry" class="inquiry" aria-labelledby="inquiry-title">/,
 		);
 		assert.equal((html.match(/<aside /g) ?? []).length, 1);
-		assert.equal((html.match(/<li class="step">/g) ?? []).length, 4);
+		// The strip's four titles and the panel's four steps.
+		assert.equal((html.match(/<li class="step">/g) ?? []).length, 8);
 		// The panel follows the section, so a phone, where it is hidden, reads the form first.
 		assert.ok(html.indexOf("</section>") < html.indexOf("<aside "));
-		// No strip above the form unless the page asks for one (the artist's page does).
-		assert.doesNotMatch(html, /steps-strip/);
 	});
 
-	test("the artist's page asks for the strip above the form, under the section's heading", () => {
-		const html = renderToStaticMarkup(
-			createElement(InquirySection, {
-				state: OPEN,
-				channels: CHANNELS,
-				challengeSiteKey: SITE_KEY,
-				stripAbove: true,
-			}),
-		);
-
-		assert.match(
-			html,
-			/<h3 id="steps-strip-title"[^>]*>How booking works<\/h3>/,
-		);
-		assert.ok(
-			html.indexOf("inquiry-title") < html.indexOf("steps-strip-title"),
-		);
-		assert.equal((html.match(/<li class="step">/g) ?? []).length, 8);
-	});
-
-	test("level 1 makes the heading the page's h1 and the strip under it an h2", () => {
-		const html = renderToStaticMarkup(
-			createElement(InquirySection, {
-				state: OPEN,
-				channels: CHANNELS,
-				challengeSiteKey: SITE_KEY,
-				level: 1,
-				stripAbove: true,
-			}),
-		);
+	test("the section is the request page's: the h1, the strip under it as an h2, the panel beside it", () => {
+		const html = section(OPEN);
 
 		assert.match(
 			html,
@@ -156,27 +127,30 @@ describe("the #inquiry section's panel (TAT-105)", () => {
 			html,
 			/<h2 id="steps-strip-title"[^>]*>How booking works<\/h2>/,
 		);
+		assert.match(
+			html,
+			/<h2 id="steps-panel-title"[^>]*>How booking works<\/h2>/,
+		);
 		assert.doesNotMatch(html, /<h3/);
 		assert.ok(
 			html.indexOf("inquiry-title") < html.indexOf("steps-strip-title"),
+			"the strip is under the h1",
 		);
+		assert.ok(html.indexOf("</section>") < html.indexOf("<aside "));
+		assert.equal((html.match(/<h1/g) ?? []).length, 1);
 	});
 
-	test("level 1 is also the heading of a closed section, and level 2 stays the default", () => {
-		const closed = renderToStaticMarkup(
-			createElement(InquirySection, {
-				state: { kind: "studio-closed", studioName: "Black Needle" },
-				channels: CHANNELS,
-				level: 1,
-			}),
-		);
+	test("a closed section is headed by the h1 too, with no strip or panel", () => {
+		const closed = section({
+			kind: "studio-closed",
+			studioName: "Black Needle",
+		});
 
 		assert.match(
 			closed,
 			/<h1 id="inquiry-title" class="section-title">Inquiries<\/h1>/,
 		);
-		assert.doesNotMatch(section(OPEN), /<h1/);
-		assert.match(section(OPEN), /<h2 id="inquiry-title"/);
+		assert.doesNotMatch(closed, /<h2|steps-strip|<aside/);
 	});
 
 	test("the steps are a list even where the sheet hides the numbers' list style (WebKit drops the semantics otherwise)", () => {
@@ -185,7 +159,6 @@ describe("the #inquiry section's panel (TAT-105)", () => {
 				state: OPEN,
 				channels: CHANNELS,
 				challengeSiteKey: SITE_KEY,
-				stripAbove: true,
 			}),
 		);
 

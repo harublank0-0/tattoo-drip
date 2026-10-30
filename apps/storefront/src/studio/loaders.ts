@@ -57,8 +57,8 @@ export type PageContext = ApiContext & SiteContext;
 export interface StudioPageData {
 	readonly studio: StudioView;
 	readonly artists: readonly ArtistView[];
+	/** Whether the "Got an idea?" invitation invites (TAT-127); the form itself is on /request. */
 	readonly inquiry: InquiryState;
-	readonly channels: InquiryChannels;
 	readonly seo: PageSeo;
 	/** The studio's theme (TAT-54): its key, sections and checked branding. */
 	readonly theme: ThemeConfig;
@@ -73,8 +73,6 @@ export interface StudioPageData {
 export interface ArtistPageData {
 	readonly studio: StudioView;
 	readonly artist: ArtistView;
-	readonly inquiry: InquiryState;
-	readonly channels: InquiryChannels;
 	readonly seo: PageSeo;
 	/** The studio's theme (TAT-54): its key, sections and checked branding. */
 	readonly theme: ThemeConfig;
@@ -145,12 +143,10 @@ export function studioPageData(
 ): StudioPageData {
 	const studioView = studioViewModel(studio);
 	const artistViews = artistViewModels(artists, imageOrigin);
-	const inquiry = inquiryState(studioView, artistViews, null);
 	return {
 		studio: studioView,
 		artists: artistViews,
-		inquiry,
-		channels: channelsFor(studioView, inquiry),
+		inquiry: inquiryState(studioView, artistViews, null),
 		seo: studioPageSeo(studioView, artistViews, origin),
 		theme,
 		recentWork: galleryView(recentWork, imageOrigin),
@@ -173,12 +169,9 @@ export function artistPageData(
 	const artistViews = artistViewModels(artists, imageOrigin);
 	const artist = findArtist(artistViews, slug);
 	if (!artist) return null;
-	const inquiry = inquiryState(studioView, artistViews, artist);
 	return {
 		studio: studioView,
 		artist,
-		inquiry,
-		channels: channelsFor(studioView, inquiry),
 		seo: artistPageSeo(studioView, artist, origin),
 		theme: parseThemeConfig(storefrontInput(studio), imageOrigin),
 		portfolio: {

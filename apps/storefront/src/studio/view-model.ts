@@ -7,6 +7,7 @@ import {
 	linkHostname,
 	mailtoLink,
 	mapsLink,
+	requestHref,
 	safeHttpsUrl,
 	safeImageUrl,
 	telLink,
@@ -102,7 +103,8 @@ export interface ArtistView {
 	/** Only while the artist isn't accepting inquiries. */
 	readonly closedMessage: string | null;
 	readonly pageHref: string;
-	readonly inquiryHref: string;
+	/** `/request?artist=<slug>`: asks for this artist (TAT-127). */
+	readonly requestHref: string;
 	/** The artist's six newest work photos, newest first (TAT-116, TAT-126); the whole portfolio is the gallery's. */
 	readonly workPhotos: readonly WorkPhotoView[];
 	/** The names of up to five tattoo styles, in the API's order; [] when none. */
@@ -275,7 +277,7 @@ function artistViewModel(
 		accepting,
 		closedMessage: accepting ? null : cleanText(artist.closedMessage),
 		pageHref: `/artists/${artist.slug}`,
-		inquiryHref: `/artists/${artist.slug}#inquiry`,
+		requestHref: requestHref({ artist: artist.slug }),
 		workPhotos: workPhotoViews(
 			(artist as { readonly workPhotos?: unknown }).workPhotos,
 			name,

@@ -165,14 +165,14 @@ describe("the studio page's sections (TAT-54)", () => {
 			withStorefront({ sections: sections("inquiry", "artists") }),
 		);
 		assert.ok(html.indexOf(' id="inquiry"') < html.indexOf(' id="artists"'));
-		// h1; the strip; the inquiry and its panel; Artists and its two artists.
-		assert.deepEqual(headings(html), [1, 2, 2, 2, 2, 3, 3]);
+		// h1; the strip; the invitation; Artists and its two artists.
+		assert.deepEqual(headings(html), [1, 2, 2, 2, 3, 3]);
 	});
 
 	test("a hidden roster is gone; the hero, the inquiry and the footer stay", () => {
 		const html = studioHtml(withStorefront({ sections: sections("inquiry") }));
 		assert.doesNotMatch(html, / id="artists"|Ask for/);
-		assert.deepEqual(headings(html), [1, 2, 2, 2]);
+		assert.deepEqual(headings(html), [1, 2, 2]);
 		assert.match(
 			html,
 			/<h1 class="profile-name" dir="auto">Black Needle<\/h1>/,

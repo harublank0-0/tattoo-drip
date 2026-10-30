@@ -1,3 +1,4 @@
+import { Fill } from "../../intake/components/fill.tsx";
 import { IntakeMount } from "../../intake/components/intake-mount.tsx";
 import { studioCopy } from "../copy.ts";
 import type { InquiryChannels, InquiryState } from "../inquiry.ts";
@@ -7,50 +8,38 @@ import { BookingPanel, BookingStrip } from "./steps.tsx";
 type OpenInquiry = Extract<InquiryState, { kind: "open" }>;
 
 /**
- * The #inquiry section (TAT-48): open, it holds the intake form (TAT-57),
- * which mounts in the browser after hydration; on the server and until then,
- * and without JavaScript, <InquiryFallback>'s chat links show. Closed, it
- * says so. The section keeps its id (`inquiry`) and label (`inquiry-title`)
- * in every state; its heading says "Inquiries" while closed, so it doesn't
- * invite above a refusal.
+ * The request page's section (TAT-48, TAT-127): open, it holds the intake
+ * form (TAT-57), which mounts in the browser after hydration; on the server
+ * and until then, and without JavaScript, <InquiryFallback>'s chat links
+ * show. Closed, it says so. The section keeps its id (`inquiry`) and label
+ * (`inquiry-title`) in every state; its heading, the page's `h1`, says
+ * "Inquiries" while closed, so it doesn't invite above a refusal.
  *
- * Open (TAT-105), the section is the form's column and "How booking works"
- * is a sticky panel beside it from 60rem (hidden below that). A page whose
- * hero has no steps of its own shows the compact strip above the form on a
- * phone (`stripAbove`). On the request page (TAT-127) the section is the
- * page: its heading is the page's `h1` (`level` 1) and the strip an `h2`.
+ * Open (TAT-105), the section is the form's column with the compact "How
+ * booking works" strip (an `h2`) under the heading on a phone, and the
+ * sticky panel beside it from 60rem.
  */
 export function InquirySection({
 	state,
 	channels,
 	challengeSiteKey = null,
-	stripAbove = false,
-	level = 2,
 }: {
 	state: InquiryState;
 	channels: InquiryChannels;
 	/** The public Turnstile site key (null: no bot check, development). */
 	challengeSiteKey?: string | null;
-	/** Show the four steps as a strip under the heading (on a phone). */
-	stripAbove?: boolean;
-	/** The heading's level: 1 on the page whose `h1` it is, else 2. */
-	level?: 1 | 2;
 }) {
-	const Heading = level === 1 ? "h1" : "h2";
 	return (
 		<div
 			className={state.kind === "open" ? "section inquiry-split" : "section"}
 		>
 			<section id="inquiry" className="inquiry" aria-labelledby="inquiry-title">
 				{/* An invitation only while the section offers one. */}
-				<Heading id="inquiry-title" className="section-title">
+				<h1 id="inquiry-title" className="section-title">
 					{state.kind === "open" ? studioCopy.sendIdea : "Inquiries"}
-				</Heading>
-				{state.kind === "open" && stripAbove ? (
-					<BookingStrip
-						studioName={state.studioName}
-						level={level === 1 ? 2 : 3}
-					/>
+				</h1>
+				{state.kind === "open" ? (
+					<BookingStrip studioName={state.studioName} />
 				) : null}
 				<div className="stack measure">
 					{state.kind === "open" ? (
@@ -93,6 +82,48 @@ export function InquirySection({
 				<BookingPanel studioName={state.studioName} channels={channels} />
 			) : null}
 		</div>
+	);
+}
+
+/**
+ * The home page's #inquiry section (TAT-127): the form lives on /request, so
+ * this is an invitation with one button there. It keeps the id the hero's old
+ * link and every `/#inquiry` shared before it point at, so those links still
+ * land one tap from the form. Open, it invites; in any other state it says
+ * the studio isn't taking inquiries and links nowhere, so it never invites
+ * above a refusal.
+ */
+export function RequestInvite({ state }: { state: InquiryState }) {
+	const open = state.kind === "open";
+	return (
+		<section
+			id="inquiry"
+			className="section request-invite"
+			aria-labelledby="inquiry-title"
+		>
+			<h2 id="inquiry-title" className="section-title">
+				{open ? studioCopy.request.inviteTitle : "Inquiries"}
+			</h2>
+			{open ? (
+				<div className="stack">
+					<p className="measure">
+						<Fill
+							template={studioCopy.request.inviteLine}
+							values={{ studio: state.studioName }}
+						/>
+					</p>
+					<div className="actions">
+						<a className="action action-primary" href={requestHref({})}>
+							{studioCopy.sendIdea}
+						</a>
+					</div>
+				</div>
+			) : (
+				<p className="measure">
+					<bdi>{state.studioName}</bdi> isn't taking new inquiries right now.
+				</p>
+			)}
+		</section>
 	);
 }
 
