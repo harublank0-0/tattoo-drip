@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, test } from "node:test";
 import { defaultStringifySearch } from "@tanstack/react-router";
 import {
@@ -474,6 +475,24 @@ describe("the router writes the addresses our links write (TAT-126)", () => {
 		assert.equal(
 			portfolioHref("sita", portfolio),
 			`/artists/sita${defaultStringifySearch(healedAsOne(portfolio))}#work`,
+		);
+	});
+
+	test("the router is given it: stringifySearch passes the search through healedAsOne", () => {
+		// A source pin, as the router needs a Start build to run: without this
+		// wiring every `?healed=1` link would cost a redirect to `healed=true`.
+		const router = readFileSync(
+			new URL("../../src/router.tsx", import.meta.url),
+			"utf8",
+		);
+
+		assert.match(
+			router,
+			/import \{ healedAsOne \} from "\.\/studio\/gallery\.ts";/,
+		);
+		assert.match(
+			router,
+			/stringifySearch:\s*\(search\)\s*=>\s*defaultStringifySearch\(healedAsOne\(search\)\)/,
 		);
 	});
 
