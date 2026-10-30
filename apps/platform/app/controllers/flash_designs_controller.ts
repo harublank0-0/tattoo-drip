@@ -13,7 +13,7 @@ import {
 	addFlashDesignValidator,
 	updateFlashDesignValidator,
 } from "#modules/flash/validators/flash_design";
-import { ImageDeleteError, InvalidImageError } from "#modules/media/errors";
+import { InvalidImageError } from "#modules/media/errors";
 
 /**
  * An artist's flash designs (TAT-129), changed from the artist's edit page by
@@ -86,21 +86,26 @@ export default class FlashDesignsController {
 			ctx.params.id,
 		);
 
+		let outcome: Awaited<ReturnType<FlashService["remove"]>>;
 		try {
-			await this.flash.remove(tenant, membership, design);
+			outcome = await this.flash.remove(tenant, membership, design);
 		} catch (error) {
 			// A request or a project names the design: it stays, hidden if the
-			// studio wants. Or a file could not be deleted: the design stays
-			// (and is still public), so let the owner try again.
-			if (error instanceof FlashInUseError) {
-				ctx.session.flash(
-					"error",
-					"Clients asked for this design, so it can't be removed. Hide it instead.",
-				);
-				return this.toEditPage(ctx, tenant.slug, artist.id);
-			}
-			if (!(error instanceof ImageDeleteError)) throw error;
-			ctx.session.flash("error", "Couldn't remove the design, try again.");
+			// studio wants.
+			if (!(error instanceof FlashInUseError)) throw error;
+			ctx.session.flash(
+				"error",
+				"Clients asked for this design, so it can't be removed. Hide it instead.",
+			);
+			return this.toEditPage(ctx, tenant.slug, artist.id);
+		}
+		if (outcome === "hidden") {
+			// A file could not be deleted and the design is hidden now (the hide is
+			// committed with this request), so a client can't ask for it.
+			ctx.session.flash(
+				"error",
+				"Some of this design's files couldn't be removed. It's hidden now; try Remove again.",
+			);
 			return this.toEditPage(ctx, tenant.slug, artist.id);
 		}
 

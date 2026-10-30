@@ -7,19 +7,26 @@ import Artist from "#modules/artists/models/artist";
 import ArtistService, {
 	type ProfileEditor,
 } from "#modules/artists/services/artist_service";
+import ClientService from "#modules/clients/services/client_service";
 import { FlashInUseError, FlashLimitError } from "#modules/flash/errors";
 import FlashDesign from "#modules/flash/models/flash_design";
 import FlashService, {
 	MAX_FLASH_DESIGNS,
 } from "#modules/flash/services/flash_service";
-import { ImageDeleteError } from "#modules/media/errors";
+import { InquiryRuleError } from "#modules/inquiries/errors";
+import IntakeService from "#modules/inquiries/services/intake_service";
 import { addArtist, addFlashDesign } from "#tests/helpers/artists";
 import {
 	RecordingImageService,
 	testImages,
 	uploadOf,
 } from "#tests/helpers/images";
-import { makeClient, makeInquiry, makeProject } from "#tests/helpers/pipeline";
+import {
+	makeClient,
+	makeInquiry,
+	makeProject,
+	nextPhone,
+} from "#tests/helpers/pipeline";
 import { recordQueries } from "#tests/helpers/query_count";
 import { failDeletes } from "#tests/helpers/storage_failures";
 import {
@@ -230,7 +237,7 @@ test.group("FlashService (TAT-129)", (group) => {
 		assert.equal(read.imageKey, design.imageKey);
 	});
 
-	test("remove deletes the row and then the files; a file that can't be deleted keeps the row", async ({
+	test("remove deletes the row and then the files; when a file can't be deleted the design stays, hidden", async ({
 		assert,
 	}) => {
 		const { tenant, owner: user } = await studioWithOwner();
@@ -245,7 +252,10 @@ test.group("FlashService (TAT-129)", (group) => {
 		);
 		assert.lengthOf(await storedImages(tenant, PURPOSE), 6);
 
-		await inTenant(tenant, () => flash.remove(tenant, editor, gone));
+		assert.equal(
+			await inTenant(tenant, () => flash.remove(tenant, editor, gone)),
+			"removed",
+		);
 		assert.lengthOf(await storedImages(tenant, PURPOSE), 3);
 		assert.deepEqual(
 			(await inTenant(tenant, () => flash.list(tenant, sita))).map((d) => d.id),
@@ -254,20 +264,105 @@ test.group("FlashService (TAT-129)", (group) => {
 
 		const failing = failDeletes("public", () => true);
 		try {
-			await assert.rejects(
-				() => inTenant(tenant, () => flash.remove(tenant, editor, kept)),
-				ImageDeleteError,
+			assert.equal(
+				await inTenant(tenant, () => flash.remove(tenant, editor, kept)),
+				"hidden",
 			);
 		} finally {
 			failing.restore();
 		}
-		assert.deepEqual(
-			(await inTenant(tenant, () => flash.list(tenant, sita))).map((d) => d.id),
-			[kept.id],
-			"the design is still listed",
-		);
+		const [left] = await inTenant(tenant, () => flash.list(tenant, sita));
+		assert.equal(left.id, kept.id, "the row is still there");
+		assert.isTrue(left.hidden, "and hidden");
 		// A retry finishes the job.
-		await inTenant(tenant, () => flash.remove(tenant, editor, kept));
+		assert.equal(
+			await inTenant(tenant, () => flash.remove(tenant, editor, left)),
+			"removed",
+		);
+		assert.lengthOf(await inTenant(tenant, () => flash.list(tenant, sita)), 0);
+		assert.deepEqual(await storedImages(tenant, PURPOSE), []);
+	});
+
+	test("one copy that can't be deleted after the picture is: the design is hidden, so it is neither shown nor requestable; a retry removes the rest", async ({
+		assert,
+	}) => {
+		const { tenant, owner: user } = await studioWithOwner();
+		const sita = await addArtist(tenant, user);
+		const { flash, artists, images } = makeService();
+		const intake = new IntakeService(
+			artists,
+			new ClientService(),
+			images,
+			flash,
+		);
+		const editor = owner(user.id);
+		const design = await inTenant(tenant, async () =>
+			flash.add(tenant, editor, sita, await upload(), MOTH),
+		);
+		const files = await storedImages(tenant, PURPOSE);
+		assert.lengthOf(files, 3);
+		const request = {
+			idea: "The moth, small, on the wrist",
+			placement: "Left wrist",
+			approximateSize: "About 3 in",
+			preferredDates: "Any weekday",
+			sourceChannel: "other" as const,
+			contactName: "Maya Gurung",
+			contactPhone: nextPhone(),
+			flashDesignId: design.id,
+		};
+		// Shown and requestable before.
+		assert.isNotNull(
+			await inTenant(tenant, () =>
+				flash.findShown(tenant, design.id, [sita.id]),
+			),
+		);
+
+		const failing = failDeletes("public", (key) => key.includes("640w"));
+		let outcome: string;
+		try {
+			outcome = await inTenant(tenant, () =>
+				flash.remove(tenant, editor, design),
+			);
+		} finally {
+			failing.restore();
+		}
+
+		assert.equal(outcome, "hidden");
+		assert.lengthOf(
+			await storedImages(tenant, PURPOSE),
+			1,
+			"the picture and the other copy are gone, the copy that failed is left",
+		);
+		await inTenant(tenant, async () => {
+			const [row] = await flash.list(tenant, sita);
+			assert.deepEqual([row.id, row.hidden], [design.id, true]);
+			assert.isNull(await flash.findShown(tenant, design.id, [sita.id]));
+			assert.deepEqual(
+				(await flash.page(tenant, { artistIds: [sita.id] }, null, 24)).designs,
+				[],
+			);
+			assert.deepEqual(
+				[...(await flash.artistsWithDesigns(tenant, [sita.id]))],
+				[],
+			);
+		});
+		const refusal = await inTenant(tenant, async () => {
+			try {
+				await intake.submit(tenant, request);
+			} catch (error) {
+				return error;
+			}
+			return null;
+		});
+		assert.instanceOf(refusal, InquiryRuleError);
+		assert.equal((refusal as InquiryRuleError).reason, "flash_unavailable");
+
+		// A retry, the disk healed, deletes what is left and then the row.
+		assert.equal(
+			await inTenant(tenant, () => flash.remove(tenant, editor, design)),
+			"removed",
+		);
 		assert.lengthOf(await inTenant(tenant, () => flash.list(tenant, sita)), 0);
 		assert.deepEqual(await storedImages(tenant, PURPOSE), []);
 	});

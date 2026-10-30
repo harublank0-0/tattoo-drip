@@ -11,6 +11,7 @@ import type Tenant from "#modules/tenancy/models/tenant";
 import { addArtist, addFlashDesign } from "#tests/helpers/artists";
 import { testImages, uploadOf } from "#tests/helpers/images";
 import { makeClient, makeInquiry } from "#tests/helpers/pipeline";
+import { failDeletes } from "#tests/helpers/storage_failures";
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 import { storedImages } from "#tests/helpers/uploads";
 import { assertValidationError } from "#tests/helpers/validation";
@@ -412,6 +413,35 @@ test.group("Flash designs over HTTP (TAT-129)", (group) => {
 		);
 		assert.lengthOf(await rows(tenant, sita.id), 1);
 		assert.lengthOf(await storedImages(tenant, PURPOSE), 3);
+	});
+
+	test("remove: when a file can't be deleted the design is hidden and the owner is told, and a retry removes it", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+		const sita = await addArtist(tenant, owner);
+		const design = await realDesign(tenant, owner, sita.id);
+
+		const failing = failDeletes("public", (key) => key.includes("640w"));
+		let refused: Awaited<ReturnType<typeof remove>>;
+		try {
+			refused = await remove(client, owner, tenant, design.id);
+		} finally {
+			failing.restore();
+		}
+		refused.assertStatus(302);
+		refused.assertFlashMessage(
+			"error",
+			"Some of this design's files couldn't be removed. It's hidden now; try Remove again.",
+		);
+		const [row] = await rows(tenant, sita.id);
+		assert.deepEqual([row.id, row.hidden], [design.id, true]);
+
+		const retried = await remove(client, owner, tenant, design.id);
+		retried.assertFlashMessage("success", "Design removed.");
+		assert.lengthOf(await rows(tenant, sita.id), 0);
+		assert.deepEqual(await storedImages(tenant, PURPOSE), []);
 	});
 
 	test("another studio's design id is a 404 for every route", async ({

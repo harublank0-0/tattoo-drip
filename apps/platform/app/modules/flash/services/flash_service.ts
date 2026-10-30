@@ -10,6 +10,7 @@ import ArtistService, {
 import type { WorkCursor } from "#modules/artists/work_cursor";
 import { FlashInUseError, FlashLimitError } from "#modules/flash/errors";
 import FlashDesign from "#modules/flash/models/flash_design";
+import { ImageDeleteError } from "#modules/media/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
 import type Tenant from "#modules/tenancy/models/tenant";
@@ -206,25 +207,32 @@ export default class FlashService {
 	 * Deletes the design for good: under the artist's lock the row goes
 	 * first, in its own savepoint, so a design that a request or a project
 	 * names (the database's `NO ACTION` keys) becomes FlashInUseError before
-	 * any file is touched. Then the files and every copy are deleted; if any
-	 * cannot be, this throws ImageDeleteError and the row delete rolls back,
-	 * so the owner can try again (a missing file counts as deleted, so a
-	 * retry finishes the job). A design a client asked to take down must not
-	 * stay fetchable while the studio is told it is gone.
+	 * any file is touched. Then, in the same savepoint, the files and every
+	 * copy are deleted ("removed"). A design a client asked to take down must
+	 * not stay fetchable while the studio is told it is gone, and a file
+	 * delete can fail after others succeeded: if any file cannot be deleted
+	 * the savepoint rolls the row back, but the design is then damaged (some
+	 * files gone), so it is hidden at once, in the caller's transaction
+	 * ("hidden", not an error, so the hide is committed with it): no longer
+	 * on the public pages and not requestable (`findShown`, `holdShown`), and
+	 * the owner is told to try again. A retry finishes the job: a missing file
+	 * counts as deleted.
 	 */
 	async remove(
 		tenant: TenantRef,
 		editor: ProfileEditor,
 		design: FlashDesign,
-	): Promise<void> {
+	): Promise<"removed" | "hidden"> {
 		assertDesignOf(tenant, design);
-		await withTransaction(async (trx) => {
+		return withTransaction(async (trx) => {
 			await this.artists.lockEditable(trx, tenant, editor, design.artistId);
 			const live = await this.lockedDesign(trx, tenant, design);
 			try {
-				await withTransaction((savepoint) =>
-					live.useTransaction(savepoint).delete(),
-				);
+				await withTransaction(async (savepoint) => {
+					await live.useTransaction(savepoint).delete();
+					await this.images.deleteOrThrow(PURPOSE, live.imageKey);
+				});
+				return "removed";
 			} catch (error) {
 				if (
 					isForeignKeyViolation(error, INQUIRY_KEY) ||
@@ -232,9 +240,13 @@ export default class FlashService {
 				) {
 					throw new FlashInUseError();
 				}
-				throw error;
+				if (!(error instanceof ImageDeleteError)) throw error;
 			}
-			await this.images.deleteOrThrow(PURPOSE, live.imageKey);
+			// The row is back (and `live` still says deleted): read it again to hide it.
+			const damaged = await this.lockedDesign(trx, tenant, design);
+			damaged.hidden = true;
+			await damaged.save();
+			return "hidden";
 		});
 	}
 
