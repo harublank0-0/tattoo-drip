@@ -133,7 +133,11 @@ export type TileColours = { light: string; dark: string };
 const TILE_SAMPLE = 64;
 /** WCAG's minimum for graphics (1.4.11): a pixel under 3:1 against a tile is hard to see on it. */
 const MIN_TILE_CONTRAST = 3;
-/** The icon's side (TAT-123): Apple's home-screen size; its 32 px copy is the browser tab's (ICON_WIDTHS). */
+/**
+ * The icon's side (TAT-123): Apple's home-screen size; its 32 px copy is the browser tab's (ICON_WIDTHS).
+ * The public contract advertises this as the stored icon's width and height without reading the
+ * file, so changing it needs a backfill of every `logo_icon_key` row (the stored icons keep the old size).
+ */
 export const ICON_SIZE = 180;
 /** The margin around the logo inside its icon, a tenth of each side, so iOS's rounded corners never cut it. */
 export const ICON_PADDING = 18;
