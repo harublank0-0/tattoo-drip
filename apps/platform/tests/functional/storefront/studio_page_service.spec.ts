@@ -689,6 +689,51 @@ test.group("StudioPageService.work (TAT-126)", (group) => {
 		}
 	});
 
+	test("a listed style the request asked for stays in the filters when the chosen artist has none of it, so the controls show the filtering", async ({
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("page-work-126e");
+		const a = await addArtist(tenant, owner, { name: "Asha", slug: "asha" });
+		const b = await addArtist(tenant, owner, { name: "Bina", slug: "bina" });
+		await inTenant(tenant, async () => {
+			await addWorkPhoto(tenant, a, { styles: ["blackwork"] });
+			await addWorkPhoto(tenant, b, { styles: ["fine-line"], healed: true });
+		});
+		const blackwork = { slug: "blackwork", name: "Blackwork" };
+		const fineLine = { slug: "fine-line", name: "Fine line" };
+		const work = (query: Partial<WorkQuery>) =>
+			inTenant(tenant, () =>
+				pagesWith().work(tenant, { ...everything, ...query }),
+			);
+
+		const lacking = await work({ artist: "asha", style: "fine-line" });
+		const carried = await work({ artist: "bina", style: "fine-line" });
+		const unfiltered = await work({});
+		const nobody = await work({ artist: "nobody", style: "fine-line" });
+
+		// An empty page, and the filters the artist's own plus the style asked for, in the list's order.
+		assert.deepEqual(lacking.photos, []);
+		assert.isNull(lacking.nextCursor);
+		assert.deepEqual(lacking.filters, {
+			styles: [blackwork, fineLine],
+			healed: false,
+		});
+		// A style the artist does carry is there once.
+		assert.lengthOf(carried.photos, 1);
+		assert.deepEqual(carried.filters, { styles: [fineLine], healed: true });
+		// No style asked for: the facets alone.
+		assert.deepEqual(unfiltered.filters, {
+			styles: [blackwork, fineLine],
+			healed: true,
+		});
+		// No visible artist by that slug: nothing to filter, but the control still shows its style.
+		assert.deepEqual(nobody, {
+			photos: [],
+			nextCursor: null,
+			filters: { styles: [fineLine], healed: false },
+		});
+	});
+
 	test("reads the artists once, then one query for the page and one for the filters", async ({
 		assert,
 	}) => {

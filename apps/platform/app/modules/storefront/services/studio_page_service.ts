@@ -161,10 +161,15 @@ export default class StudioPageService {
 	 * photo query. A style that is not in the list (a retired one still on a
 	 * photo included) matches nothing, as the photos no longer show it.
 	 * Then one query for the page and one for the filters, which are not
-	 * narrowed by `style`, `healed` or the cursor.
+	 * narrowed by `style`, `healed` or the cursor. A listed `style` the
+	 * request asked for is in the filters even when no photo of these artists
+	 * carries it (they are an artist's own, so choosing an artist can leave a
+	 * chosen style without photos), so the gallery's controls always show the
+	 * filtering that was applied.
 	 */
 	async work(tenant: Tenant, query: WorkQuery): Promise<ShownWorkPage> {
 		const visible = await this.artists.listVisible(tenant);
+		const asked = query.style === null ? [] : [query.style];
 		const artists =
 			query.artist === null
 				? visible
@@ -173,7 +178,7 @@ export default class StudioPageService {
 			return {
 				photos: [],
 				nextCursor: null,
-				filters: { styles: [], healed: false },
+				filters: { styles: knownStyles(asked), healed: false },
 			};
 		}
 		const artistIds = artists.map((artist) => artist.id);
@@ -204,7 +209,10 @@ export default class StudioPageService {
 				}),
 			),
 			nextCursor: next ? encodeWorkCursor(next) : null,
-			filters: { styles: knownStyles(facets.styles), healed: facets.healed },
+			filters: {
+				styles: knownStyles([...facets.styles, ...asked]),
+				healed: facets.healed,
+			},
 		};
 	}
 

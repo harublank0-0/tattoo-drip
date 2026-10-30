@@ -363,6 +363,44 @@ test.group("GET /api/v1/tenants/:tenant/work (listWork)", (group) => {
 		});
 	});
 
+	test("a style asked for stays in the filters when the chosen artist has no photo of it, so the page's controls show the filtering", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("api-work-126q");
+		const a = await addArtist(tenant, owner, { name: "Asha", slug: "asha" });
+		await addArtist(tenant, owner, { name: "Bina", slug: "bina" });
+		await inTenant(tenant, () =>
+			addWorkPhoto(tenant, a, { createdAt: at(1), styles: ["blackwork"] }),
+		);
+		const blackwork = { slug: "blackwork", name: "Blackwork" };
+		const fineLine = { slug: "fine-line", name: "Fine line" };
+
+		const lacking = await client.get(
+			work("api-work-126q", "?artist=asha&style=fine-line"),
+		);
+		const carried = await client.get(
+			work("api-work-126q", "?artist=asha&style=blackwork"),
+		);
+		const retired = await client.get(
+			work("api-work-126q", "?artist=asha&style=retired-style"),
+		);
+
+		lacking.assertStatus(200);
+		assert.deepEqual(lacking.body(), {
+			data: [],
+			nextCursor: null,
+			filters: { styles: [blackwork, fineLine], healed: false },
+		});
+		// One the artist carries is there once; one that is not on the list is never added.
+		assert.deepEqual(carried.body().filters.styles, [blackwork]);
+		assert.deepEqual(retired.body().filters.styles, [blackwork]);
+		assert.deepEqual(Object.keys(lacking.body().filters).sort(), [
+			"healed",
+			"styles",
+		]);
+	});
+
 	test("healed=false is the same as leaving healed out: every photo, never only the unhealed", async ({
 		client,
 		assert,
