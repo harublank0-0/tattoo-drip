@@ -228,7 +228,10 @@ function ClaimButton({
 		<Button
 			type="button"
 			variant="outline"
-			aria-label={claimDesignLabel(design.name, design.claimed)}
+			// While "Saving…" shows, the name is those words: the name should contain what is on the button.
+			aria-label={
+				saving ? undefined : claimDesignLabel(design.name, design.claimed)
+			}
 			aria-disabled={off}
 			className={off ? "opacity-50" : undefined}
 			onKeyDown={ignoreHeldEnter}
@@ -248,7 +251,7 @@ function ClaimButton({
 				);
 			}}
 		>
-			{design.claimed ? MAKE_AVAILABLE : MARK_CLAIMED}
+			{saving ? "Saving…" : design.claimed ? MAKE_AVAILABLE : MARK_CLAIMED}
 		</Button>
 	);
 }

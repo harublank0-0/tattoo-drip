@@ -1,5 +1,6 @@
 import { Form } from "@adonisjs/inertia/react";
 import { cn } from "cn";
+import { TriangleAlert } from "lucide-react";
 import {
 	type ReactNode,
 	type RefObject,
@@ -10,7 +11,7 @@ import {
 } from "react";
 import { urlFor } from "~/client";
 import { useDesignTaken } from "~/components/design_taken";
-import { verifyQuestion } from "~/components/flash";
+import { recordTakenNote, verifyQuestion } from "~/components/flash";
 import {
 	FormSheetActions,
 	FormSheetPanel,
@@ -610,6 +611,7 @@ function RecordPaymentForm({
 	sheet: FormSheetState;
 }) {
 	const tenant = useTenant();
+	const designTaken = useDesignTaken();
 	const first = actions.recordKinds[0];
 	const [kind, setKind] = useState<DeskKindName>(first);
 	const [method, setMethod] = useState<MethodKind>("cash");
@@ -620,6 +622,8 @@ function RecordPaymentForm({
 		setKind(next);
 		if (!typed) setAmount(prefill(actions, next));
 	};
+	// A deposit recorded at the desk claims a one-of-a-kind design like a verified screenshot.
+	const takenNote = recordTakenNote(designTaken, kind);
 
 	return (
 		<Form
@@ -671,6 +675,15 @@ function RecordPaymentForm({
 						hint={null}
 					/>
 					<NoteField id="record-note" error={errors.note} />
+					{takenNote && (
+						<p className="flex items-start gap-2 rounded-md border border-marigold bg-marigold/10 p-3 text-sm">
+							<TriangleAlert
+								aria-hidden="true"
+								className="mt-0.5 size-4 shrink-0"
+							/>
+							<span>{takenNote}</span>
+						</p>
+					)}
 					<FormSheetActions submit="Record payment" processing={processing} />
 				</FieldGroup>
 			)}

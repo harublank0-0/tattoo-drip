@@ -47,6 +47,8 @@ type FlashModule = {
 	LINK_TAKEN_CONFIRM: string;
 	LINK_TAKEN_KEEP: string;
 	VERIFY_TAKEN_NOTE: string;
+	RECORD_TAKEN_NOTE: string;
+	recordTakenNote(designTaken: boolean, kind: string): string | null;
 };
 const flash = flashModule as FlashModule;
 
@@ -163,7 +165,7 @@ test.group("flash design words (TAT-129)", () => {
 		assert.equal(flash.ONE_OF_A_KIND_LABEL, "One of a kind");
 		assert.equal(
 			flash.ONE_OF_A_KIND_HELP,
-			"You'll tattoo it only once. It's marked Claimed when its client's deposit is verified or their project is booked. Leave it unchecked for a design that can be tattooed again.",
+			"You'll tattoo it only once. It's marked Claimed when its client's deposit is verified or their project is booked. Leave it unchecked for a design that can be tattooed again. Unchecking a claimed design releases its claim.",
 		);
 		assert.equal(flash.MARK_CLAIMED, "Mark claimed");
 		assert.equal(flash.MAKE_AVAILABLE, "Make available");
@@ -226,5 +228,21 @@ test.group("flash design words (TAT-129)", () => {
 			flash.VERIFY_TAKEN_NOTE,
 			"This design is already claimed by another client: talk to this client before you verify.",
 		);
+	});
+
+	test("recording a deposit at the desk is a claim moment, so the record sheet warns about a taken design for a deposit only", ({
+		assert,
+	}) => {
+		assert.equal(
+			flash.RECORD_TAKEN_NOTE,
+			"This design is already claimed by another client: talk to this client before you record the deposit.",
+		);
+		assert.equal(
+			flash.recordTakenNote(true, "deposit"),
+			flash.RECORD_TAKEN_NOTE,
+		);
+		assert.isNull(flash.recordTakenNote(false, "deposit"));
+		assert.isNull(flash.recordTakenNote(true, "session"));
+		assert.isNull(flash.recordTakenNote(true, "balance"));
 	});
 });

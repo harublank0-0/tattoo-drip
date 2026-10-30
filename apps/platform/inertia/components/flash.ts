@@ -154,7 +154,7 @@ export const FLASH_SHEET_HELP =
 export const ONE_OF_A_KIND_LABEL = "One of a kind";
 
 export const ONE_OF_A_KIND_HELP =
-	"You'll tattoo it only once. It's marked Claimed when its client's deposit is verified or their project is booked. Leave it unchecked for a design that can be tattooed again.";
+	"You'll tattoo it only once. It's marked Claimed when its client's deposit is verified or their project is booked. Leave it unchecked for a design that can be tattooed again. Unchecking a claimed design releases its claim.";
 
 /** A one-of-a-kind row's one button: mark it claimed by hand, or make it available again. */
 export const MARK_CLAIMED = "Mark claimed";
@@ -187,6 +187,17 @@ export const LINK_TAKEN_KEEP = "Not yet";
 
 /** The start of the verify panel's question while the design is taken. */
 export const VERIFY_TAKEN_NOTE = `${TAKEN_BY_ANOTHER.slice(0, -1)}: talk to this client before you verify.`;
+
+/** The record sheet's note while the design is taken: recording a deposit at the desk is a claim moment, like Verify. */
+export const RECORD_TAKEN_NOTE = `${TAKEN_BY_ANOTHER.slice(0, -1)}: talk to this client before you record the deposit.`;
+
+/** The record sheet's note for the kind picked, or null: only a deposit claims the design. */
+export function recordTakenNote(
+	designTaken: boolean,
+	kind: string,
+): string | null {
+	return designTaken && kind === "deposit" ? RECORD_TAKEN_NOTE : null;
+}
 
 /** The sentence "New link" asks, with the warning in front while the design is taken. */
 export function newLinkQuestion(designTaken: boolean): string {
