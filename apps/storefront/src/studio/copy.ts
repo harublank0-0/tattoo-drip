@@ -128,6 +128,11 @@ export const studioCopy = {
 		failed:
 			"We couldn't load this flash design. You can still send your idea: name the design in it.",
 		ideaStart: "The {name} flash",
+		/** One-of-a-kind designs somebody has claimed (part 4b). */
+		claimed: "Claimed",
+		similar: "Ask for something similar",
+		similarStart: "Something similar to the {name} flash",
+		claimedNote: "Someone has claimed this design: it was one of a kind.",
 		showMore: "Show more",
 		newest: "Back to the newest",
 	},

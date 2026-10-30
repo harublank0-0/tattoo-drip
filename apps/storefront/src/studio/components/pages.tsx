@@ -439,7 +439,7 @@ const BY = studioCopy.flash.by.replace("{name}", "");
  * while it can be. The site bar's Request button is the studio's general one.
  */
 export function FlashDesignPage({ data }: { data: FlashDesignPageData }) {
-	const { studio, theme, design, closedNote } = data;
+	const { studio, theme, design, closedNote, similar } = data;
 	const artist = design.artist;
 	return (
 		<>
@@ -490,11 +490,24 @@ export function FlashDesignPage({ data }: { data: FlashDesignPageData }) {
 							<div>
 								<dt>{studioCopy.flash.status}</dt>
 								<dd className="user-text" dir="auto">
-									{closedNote ?? studioCopy.flash.available}
+									{design.claimed
+										? studioCopy.flash.claimed
+										: (closedNote ?? studioCopy.flash.available)}
 								</dd>
 							</div>
 						</dl>
-						{closedNote === null ? (
+						{design.claimed ? (
+							// Taken: ask the artist for something like it, else the studio.
+							similar === "artist" ? (
+								<a className="action action-primary" href={design.requestHref}>
+									{studioCopy.flash.similar}
+								</a>
+							) : similar === "studio" ? (
+								<a className="action action-primary" href={requestHref({})}>
+									{studioCopy.sendIdea}
+								</a>
+							) : null
+						) : closedNote === null ? (
 							<a className="action action-primary" href={design.requestHref}>
 								{studioCopy.flash.request}
 							</a>

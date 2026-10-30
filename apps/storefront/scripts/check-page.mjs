@@ -265,7 +265,7 @@ try {
 			[
 				`/api/v1/tenants/${SLUG}`,
 				`/api/v1/tenants/${SLUG}/artists`,
-				`/api/v1/tenants/${SLUG}/flash?limit=6`,
+				`/api/v1/tenants/${SLUG}/flash?available=true&limit=6`,
 				`/api/v1/tenants/${SLUG}/work?limit=9`,
 			].join(",") &&
 			apiLog.every(

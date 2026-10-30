@@ -365,6 +365,22 @@ describe("flash requests (TAT-129)", () => {
 		);
 	});
 
+	test("a design claimed meanwhile is a notice with the studio's chat links", () => {
+		const claimed = new TattooApiError(409, {
+			code: "flash_claimed",
+			message: DETAIL,
+		});
+
+		assert.deepEqual(
+			describeSubmitError(claimed, { ...CONTEXT, sentFlash: true }),
+			notice("flash-claimed", { contact: true }),
+		);
+		assert.deepEqual(
+			describeSubmitError(claimed, CONTEXT),
+			notice("flash-claimed", { contact: true }),
+		);
+	});
+
 	test("an artist who stopped taking flash requests is a notice, not an error under a picker the form doesn't show", () => {
 		assert.deepEqual(
 			describeSubmitError(closed, {

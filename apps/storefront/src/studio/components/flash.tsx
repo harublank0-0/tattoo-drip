@@ -23,8 +23,8 @@ import type { ArtistView } from "../view-model.ts";
  * and holds the picture (drawn whole, from its copies), the name, the artist
  * (`showArtist`: an artist's own page does not name them on each card), the
  * price when the studio set one and, for a design that can't be requested
- * now, the words why (the card is then greyed but still a link). Nothing when
- * there are no designs.
+ * now, the words why (the card is then greyed but still a link); a claimed
+ * design is greyed too and marked Claimed. Nothing when there are no designs.
  */
 export function FlashGrid({
 	designs,
@@ -46,7 +46,11 @@ export function FlashGrid({
 					<li
 						key={design.id}
 						className={
-							note === null ? "flash-card" : "flash-card flash-card-closed"
+							design.claimed
+								? "flash-card flash-card-claimed"
+								: note === null
+									? "flash-card"
+									: "flash-card flash-card-closed"
 						}
 					>
 						<a
@@ -77,6 +81,11 @@ export function FlashGrid({
 							) : null}
 							{design.priceText ? (
 								<span className="flash-card-price">{design.priceText}</span>
+							) : null}
+							{design.claimed ? (
+								<span className="flash-card-badge">
+									{studioCopy.flash.claimed}
+								</span>
 							) : null}
 							{note ? (
 								<p className="note user-text" dir="auto">
@@ -189,7 +198,9 @@ export function FlashSummary({
 			className={
 				request.kind === "closed"
 					? "flash-summary flash-summary-closed"
-					: "flash-summary"
+					: request.kind === "claimed"
+						? "flash-summary flash-summary-closed flash-summary-claimed"
+						: "flash-summary"
 			}
 		>
 			<img
@@ -219,6 +230,12 @@ export function FlashSummary({
 				</p>
 				{design.priceText ? (
 					<p className="flash-card-price">{design.priceText}</p>
+				) : null}
+				{request.kind === "claimed" ? (
+					<>
+						<span className="flash-card-badge">{studioCopy.flash.claimed}</span>
+						<p className="note">{studioCopy.flash.claimedNote}</p>
+					</>
 				) : null}
 				{request.kind === "closed" ? (
 					<p className="note user-text" dir="auto">

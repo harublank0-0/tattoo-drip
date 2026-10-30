@@ -49,6 +49,7 @@ import {
 	type InquiryState,
 	inquiryChannels,
 	inquiryState,
+	similarInquiryState,
 } from "./inquiry.ts";
 import {
 	type RequestLink,
@@ -197,8 +198,14 @@ export interface FlashDesignPageData {
 	readonly chat: ChatLinks | null;
 	readonly seo: PageSeo;
 	readonly design: FlashDesignView;
-	/** Why the design can't be requested now (the artist's own words, else ours), or null while it can. */
+	/** Why the design can't be requested now (the artist's own words, else ours), or null while it can (and for a claimed design: its badge says it). */
 	readonly closedNote: string | null;
+	/**
+	 * For a claimed design, where "something similar" goes: `artist` (their own
+	 * request), `studio` (the general request, the artist's books being closed)
+	 * or null (nobody takes work); null for any other design.
+	 */
+	readonly similar: "artist" | "studio" | null;
 }
 
 /**
@@ -305,7 +312,9 @@ export function artistPageData(
  * a requestable one is a flash request for its artist, whatever their books
  * say (the artist is found in the list by the design's slug); one whose artist
  * takes no flash requests is shown with the artist's own words, else ours, and
- * the artist's own request state below it, so their books decide; a design
+ * the artist's own request state below it, so their books decide; a claimed
+ * design (one of a kind, taken) is shown marked Claimed and asks the artist for
+ * something similar as a custom request (`similarInquiryState`); a design
  * the page can't show, an artist who is not in the list, one the API doesn't
  * know or a read that failed is the general form with a note, never a
  * not-found.
@@ -325,7 +334,9 @@ export function requestPageData(
 		: null;
 	const named =
 		found?.owner &&
-		(found.view.kind === "requestable" || found.view.kind === "closed")
+		(found.view.kind === "requestable" ||
+			found.view.kind === "claimed" ||
+			found.view.kind === "closed")
 			? { view: found.view, owner: found.owner }
 			: null;
 	const theme = parseThemeConfig(storefrontInput(studio), imageOrigin);
@@ -333,9 +344,12 @@ export function requestPageData(
 		const { view, owner } = named;
 		const design = view.design;
 		const requestable = view.kind === "requestable";
+		// A claimed design is not asked for: the artist is asked for something similar.
 		const inquiry = requestable
 			? flashInquiryState(studioView, design, owner)
-			: inquiryState(studioView, artistViews, owner);
+			: view.kind === "claimed"
+				? similarInquiryState(studioView, design, owner, artistViews)
+				: inquiryState(studioView, artistViews, owner);
 		return {
 			studio: studioView,
 			inquiry,
@@ -384,6 +398,8 @@ function flashRequestView(
 	const design = flashDesignView(flash.design, imageOrigin);
 	const owner = design?.artist ? findArtist(artists, design.artist.slug) : null;
 	if (!design || !owner) return { view: { kind: "gone" }, owner: null };
+	// Claimed first: a claimed design is never requestable, whatever the API says.
+	if (design.claimed) return { view: { kind: "claimed", design }, owner };
 	if (design.requestable) {
 		return { view: { kind: "requestable", design }, owner };
 	}
@@ -441,6 +457,7 @@ export function flashDesignPageData(
 	const studioView = studioViewModel(studio);
 	const view = flashDesignView(design, imageOrigin);
 	if (!view) return null;
+	const artistViews = artistViewModels(artists, imageOrigin);
 	return {
 		studio: studioView,
 		theme: parseThemeConfig(storefrontInput(studio), imageOrigin),
@@ -451,8 +468,26 @@ export function flashDesignPageData(
 		),
 		seo: flashDesignSeo(studioView, view, origin),
 		design: view,
-		closedNote: closedNoteFor(view, artistViewModels(artists, imageOrigin)),
+		closedNote: closedNoteFor(view, artistViews),
+		similar: similarFor(studioView, view, artistViews),
 	};
+}
+
+/**
+ * Where a claimed design's page sends a client who wants something like it:
+ * to the artist's own request while they take new work, else to the studio's
+ * general request while the studio takes any, else nowhere. Null for a design
+ * that is not claimed (its page has the Request button).
+ */
+function similarFor(
+	studio: StudioView,
+	design: FlashDesignView,
+	artists: readonly ArtistView[],
+): "artist" | "studio" | null {
+	if (!design.claimed) return null;
+	const owner = design.artist ? findArtist(artists, design.artist.slug) : null;
+	if (owner?.accepting) return "artist";
+	return studio.accepting ? "studio" : null;
 }
 
 /**
@@ -754,7 +789,8 @@ async function loadHomeFlash(context: ApiContext): Promise<unknown> {
 		return await context.queryClient.query({
 			...tattooQueries.flash(
 				context.tattoo.client,
-				flashQuery({}, HOME_FLASH_COUNT),
+				// Claimed designs stay out of the home's Flash section.
+				flashQuery({}, HOME_FLASH_COUNT, true),
 			),
 			staleTime: "static",
 		});
