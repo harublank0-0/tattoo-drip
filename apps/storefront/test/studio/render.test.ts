@@ -2068,6 +2068,11 @@ describe("the header and the chat button (TAT-127)", () => {
 		);
 		// The studio's own Request is not offered anywhere on that page.
 		assert.doesNotMatch(bar(openArtist), /href="\/request"/);
+		// The All work page is the studio's, too: nothing to lead to while it is closed.
+		const work = workOn(CLOSED_STUDIO);
+		assertSafePage(work);
+		assert.ok(bar(work).includes(homeLink("Black Needle")));
+		assert.doesNotMatch(work, /site-bar-request/);
 	});
 
 	test("the chat button opens WhatsApp with a message naming what the page shows, and Viber's plain chat", () => {

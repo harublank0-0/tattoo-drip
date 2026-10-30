@@ -46,6 +46,17 @@ describe("the stylesheet's files", () => {
 	});
 });
 
+/** The declarations of the rule whose selector list holds `selector` (among others, if it shares them). */
+function ruleWith(css: string, selector: string): string {
+	const bare = css.replace(/\/\*[\s\S]*?\*\//g, "");
+	for (const match of bare.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+		const own = match[1].split(/[;}]/).pop() ?? "";
+		if (own.split(",").some((part) => part.trim() === selector))
+			return match[2];
+	}
+	return "";
+}
+
 /** The declarations of the rule whose selector list is exactly `selector`. */
 function ruleBody(css: string, selector: string): string {
 	const bare = css.replace(/\/\*[\s\S]*?\*\//g, "");
@@ -253,18 +264,23 @@ describe("the header and the chat button (TAT-127)", () => {
 		assert.ok((defs[0].index ?? Number.POSITIVE_INFINITY) < dark);
 	});
 
+	// --site-bar-height is the bar's one-line minimum; the bar grows to two
+	// lines (a wrapped name, about 4.75rem) and no further, because both names
+	// are clamped to two lines (below). The padding adds 2.5rem to the one-line
+	// height, which leaves 1.5rem clear under a two-line bar.
 	test("an anchor or a focused control is never hidden under the bar or the chat button", () => {
 		assert.match(
 			ruleBody(css, ":root:has(.site-bar)"),
-			/scroll-padding-block-start:\s*calc\(var\(--site-bar-height\) \+ 1rem\)/,
+			/scroll-padding-block-start:\s*calc\(var\(--site-bar-height\) \+ 2\.5rem\)/,
 		);
+		// The toggle sits above the device's bottom inset (max(1rem, inset)), so the clearances add it.
 		assert.match(
 			ruleBody(css, ":root:has(.chat-float)"),
-			/scroll-padding-block-end:\s*5\.5rem/,
+			/scroll-padding-block-end:\s*calc\(5\.5rem \+ env\(safe-area-inset-bottom, 0px\)\)/,
 		);
 		assert.match(
 			ruleBody(css, ":root:has(.chat-float) .site-footer"),
-			/padding-block-end:\s*6rem/,
+			/padding-block-end:\s*calc\(6rem \+ env\(safe-area-inset-bottom, 0px\)\)/,
 		);
 		assert.match(
 			wide,
@@ -304,6 +320,35 @@ describe("the header and the chat button (TAT-127)", () => {
 		assert.match(links, /inset-block-end:\s*calc\(100% \+ 0\.5rem\)/);
 		assert.match(links, /background:\s*var\(--paper\)/);
 		assert.match(links, /border:[^;]*var\(--line-strong\)/);
+	});
+
+	// The bar's height is the scroll padding's arithmetic: a name that wrapped
+	// to three lines or more would put focus targets under it, so the artist's
+	// name in the Request button and the studio's own name stop at two lines.
+	const CLAMP = [
+		/display:\s*-webkit-box/,
+		/-webkit-box-orient:\s*vertical/,
+		/-webkit-line-clamp:\s*2\b/,
+		/(?<!-webkit-)line-clamp:\s*2\b/,
+		/overflow:\s*hidden/,
+	];
+
+	test("the Request button's text stops at two lines, so the bar is never taller than the scroll padding allows", () => {
+		const body = ruleWith(css, ".site-bar-request > span");
+		for (const pattern of CLAMP) assert.match(body, pattern, String(pattern));
+	});
+
+	test("the studio's name in the bar stops at two lines too, with or without a logo", () => {
+		// With a logo the name is a <span> beside the image; without one it is the link's own text.
+		for (const selector of [
+			".site-bar-home > span",
+			".site-bar-home:not(:has(.site-bar-logo))",
+		]) {
+			const body = ruleWith(css, selector);
+			for (const pattern of CLAMP) {
+				assert.match(body, pattern, `${selector} ${pattern}`);
+			}
+		}
 	});
 
 	test("the bar's Request button shrinks and wraps inside the bar instead of widening the page", () => {
