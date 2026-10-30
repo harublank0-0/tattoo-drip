@@ -4,11 +4,15 @@ import {
 	contrastRatio,
 	DARK_PAPER,
 	DEFAULT_FONT,
+	DEFAULT_LOGO_TILE,
 	DEFAULT_SECTIONS,
 	DEFAULT_THEME,
 	FONT_KEYS,
 	FONTS,
 	LIGHT_PAPER,
+	LOGO_TILE_COLOURS,
+	LOGO_TILES,
+	logoTileOf,
 	lookOf,
 	MIN_TEXT_CONTRAST,
 	readsOn,
@@ -327,5 +331,28 @@ test.group("the lists the dashboard shows", () => {
 			FONTS.map((font) => font.key),
 			[...FONT_KEYS],
 		);
+	});
+});
+
+test.group("a logo's tile (TAT-123)", () => {
+	test("the tiles are the light and the dark paper, light by default", ({
+		assert,
+	}) => {
+		assert.deepEqual([...LOGO_TILES], ["light", "dark"]);
+		assert.equal(DEFAULT_LOGO_TILE, "light");
+		assert.deepEqual(LOGO_TILE_COLOURS, {
+			light: LIGHT_PAPER,
+			dark: DARK_PAPER,
+		});
+	});
+
+	test("logoTileOf reads the exact word and anything else as light", ({
+		assert,
+	}) => {
+		assert.equal(logoTileOf("dark"), "dark");
+		assert.equal(logoTileOf("light"), "light");
+		for (const stored of ["Dark", "", "accent", "dark "]) {
+			assert.equal(logoTileOf(stored), "light", stored);
+		}
 	});
 });
