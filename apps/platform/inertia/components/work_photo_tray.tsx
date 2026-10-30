@@ -190,6 +190,13 @@ function PhotoDetails({
 	uploading: boolean;
 }) {
 	const params = { tenant: tenantSlug, id: photo.id };
+	// Help and error texts, tied to their controls with aria-describedby.
+	const altHelp = `alt-help-${photo.id}`;
+	const altError = `alt-error-${photo.id}`;
+	const stylesHelp = `styles-help-${photo.id}`;
+	const stylesError = `styles-error-${photo.id}`;
+	const healedHelp = `healed-help-${photo.id}`;
+	const healedError = `healed-error-${photo.id}`;
 
 	const remove = () => {
 		if (!window.confirm(REMOVE_PHOTO_QUESTION)) return;
@@ -236,19 +243,29 @@ function PhotoDetails({
 								defaultValue={photo.alt ?? ""}
 								autoComplete="off"
 								aria-invalid={!!errors.alt}
+								aria-describedby={
+									errors.alt ? `${altHelp} ${altError}` : altHelp
+								}
 							/>
-							<FieldDescription>
+							<FieldDescription id={altHelp}>
 								What the photo shows, read aloud to clients who can&apos;t see
 								it. For example: Koi fish on the forearm, black and grey.
 							</FieldDescription>
-							{errors.alt && <FieldError>{errors.alt}</FieldError>}
+							{errors.alt && (
+								<FieldError id={altError}>{errors.alt}</FieldError>
+							)}
 						</Field>
 
-						<FieldSet data-invalid={!!errors.styles}>
+						<FieldSet
+							data-invalid={!!errors.styles}
+							aria-describedby={
+								errors.styles ? `${stylesHelp} ${stylesError}` : stylesHelp
+							}
+						>
 							<FieldLegend variant="label">Styles</FieldLegend>
-							<FieldDescription>{STYLES_HELP}</FieldDescription>
+							<FieldDescription id={stylesHelp}>{STYLES_HELP}</FieldDescription>
 							<div className="grid gap-x-6 sm:grid-cols-2">
-								{styleOptions.map((style) => (
+								{styleOptions.map((style, index) => (
 									<Field
 										key={style.slug}
 										orientation="horizontal"
@@ -259,6 +276,12 @@ function PhotoDetails({
 											name="styles[]"
 											value={style.slug}
 											defaultChecked={photo.styles.includes(style.slug)}
+											// A refused save puts focus here (focusFirstInvalid finds it):
+											// the first box stands for the whole list.
+											aria-invalid={index === 0 && !!errors.styles}
+											aria-describedby={
+												index === 0 && errors.styles ? stylesError : undefined
+											}
 										/>
 										<FieldLabel
 											htmlFor={`photo-style-${style.slug}`}
@@ -269,7 +292,9 @@ function PhotoDetails({
 									</Field>
 								))}
 							</div>
-							{errors.styles && <FieldError>{errors.styles}</FieldError>}
+							{errors.styles && (
+								<FieldError id={stylesError}>{errors.styles}</FieldError>
+							)}
 						</FieldSet>
 
 						<Field
@@ -283,13 +308,20 @@ function PhotoDetails({
 								value="1"
 								defaultChecked={photo.healed}
 								aria-invalid={!!errors.healed}
+								aria-describedby={
+									errors.healed ? `${healedHelp} ${healedError}` : healedHelp
+								}
 							/>
 							<FieldContent>
 								<FieldLabel htmlFor="photo-healed" className="font-normal">
 									{HEALED_LABEL}
 								</FieldLabel>
-								<FieldDescription>{HEALED_HELP}</FieldDescription>
-								{errors.healed && <FieldError>{errors.healed}</FieldError>}
+								<FieldDescription id={healedHelp}>
+									{HEALED_HELP}
+								</FieldDescription>
+								{errors.healed && (
+									<FieldError id={healedError}>{errors.healed}</FieldError>
+								)}
 							</FieldContent>
 						</Field>
 
