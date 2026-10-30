@@ -4,6 +4,7 @@ import { DateTime } from "luxon";
 import ArtistService from "#modules/artists/services/artist_service";
 import ClientService from "#modules/clients/services/client_service";
 import FlashDesign from "#modules/flash/models/flash_design";
+import FlashService from "#modules/flash/services/flash_service";
 import ImageService from "#modules/media/services/image_service";
 import type TattooProject from "#modules/projects/models/tattoo_project";
 import BookingService from "#modules/projects/services/booking_service";
@@ -25,6 +26,24 @@ import { recordQueries } from "#tests/helpers/query_count";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
 const { payments, projects, sessions, quotes } = paymentServices();
+
+/** What "Make available" runs, as the studio's owner. */
+function releaseByHand(
+	tenant: { id: string },
+	owner: { id: string },
+	design: FlashDesign,
+) {
+	const images = new ImageService();
+	const flash = new FlashService(images, new ArtistService(images));
+	return inTenant(tenant, () =>
+		flash.setClaimed(
+			tenant,
+			{ userId: owner.id, role: "owner" },
+			design,
+			false,
+		),
+	);
+}
 
 /** A studio with an artist and one one-of-a-kind design, nobody has claimed. */
 async function studio(slug: string) {
@@ -345,5 +364,125 @@ test.group("Claiming a one-of-a-kind design (TAT-129)", (group) => {
 		assert.equal(verified.result.payment.status, "verified");
 		assert.deepEqual(EVERY_SQL(booked.queries), []);
 		assert.deepEqual(EVERY_SQL(verified.queries), []);
+	});
+
+	test("the project's first deposit is its claim moment: after Make available, the rest of a split deposit does not claim the design again", async ({
+		assert,
+	}) => {
+		const { tenant, owner, design, member } = await studio("claim-split");
+		const project = await projectFor(tenant, design);
+
+		await inTenant(tenant, () =>
+			payments.record(tenant, member, project, cash("deposit", 100_000)),
+		);
+		assert.equal((await stored(tenant, design)).claimedProjectId, project.id);
+		await releaseByHand(tenant, owner, design);
+		assert.isNull((await stored(tenant, design)).claimedAt, "made available");
+
+		await inTenant(tenant, () =>
+			payments.record(tenant, member, project, cash("deposit", 200_000)),
+		);
+
+		const after = await stored(tenant, design);
+		assert.isNull(after.claimedAt, "the second deposit did not undo it");
+		assert.isNull(after.claimedProjectId);
+	});
+
+	test("a verified second screenshot after Make available does not claim the design again either", async ({
+		assert,
+	}) => {
+		const { tenant, owner, design, member } =
+			await studio("claim-second-proof");
+		const project = await projectFor(tenant, design);
+		const first = await inTenant(tenant, () => proofFor(tenant, project));
+		await inTenant(tenant, () => payments.verify(tenant, member, first, null));
+		assert.equal((await stored(tenant, design)).claimedProjectId, project.id);
+		await releaseByHand(tenant, owner, design);
+
+		const second = await inTenant(tenant, () => proofFor(tenant, project));
+		await inTenant(tenant, () => payments.verify(tenant, member, second, null));
+
+		assert.isNull((await stored(tenant, design)).claimedAt);
+	});
+
+	test("the project becoming booked after Make available does not claim the design again", async ({
+		assert,
+	}) => {
+		const { tenant, owner, artist, design, member } =
+			await studio("claim-rebook");
+		const project = await projectFor(tenant, design);
+		await inTenant(tenant, () =>
+			payments.record(tenant, member, project, cash("deposit")),
+		);
+		assert.equal((await stored(tenant, design)).claimedProjectId, project.id);
+		await releaseByHand(tenant, owner, design);
+
+		const start = DateTime.utc(2026, 11, 3, 10);
+		await inTenant(tenant, () =>
+			sessions.schedule(tenant, project, {
+				artistId: artist.id,
+				kind: "tattoo",
+				startsAt: start,
+				endsAt: start.plus({ hours: 2 }),
+			}),
+		);
+
+		assert.equal(await statusOf(tenant, project), "booked");
+		assert.isNull((await stored(tenant, design)).claimedAt);
+	});
+
+	test("a project booked first claims once: a deposit verified later, after Make available, claims nothing", async ({
+		assert,
+	}) => {
+		const { tenant, owner, design, member } = await studio(
+			"claim-book-then-pay",
+		);
+		const project = await projectFor(tenant, design, "quoted", {
+			depositAmount: 0,
+		});
+		const quote = await inTenant(tenant, async () => {
+			await makeSession(tenant, project, await makeArtist(tenant, "claim-b"));
+			return quotes.current(tenant, project);
+		});
+		await inTenant(tenant, () =>
+			projects.acceptQuote(
+				tenant,
+				OWNER,
+				project,
+				(quote as { id: string }).id,
+			),
+		);
+		assert.equal(await statusOf(tenant, project), "booked");
+		assert.equal((await stored(tenant, design)).claimedProjectId, project.id);
+		await releaseByHand(tenant, owner, design);
+
+		const proof = await inTenant(tenant, () => proofFor(tenant, project));
+		await inTenant(tenant, () => payments.verify(tenant, member, proof, null));
+
+		assert.isNull((await stored(tenant, design)).claimedAt);
+	});
+
+	test("the first event uses up the moment even when it claims nothing: a design claimed by hand and released is not taken by the project's next deposit", async ({
+		assert,
+	}) => {
+		const { tenant, owner, artist, member } = await studio("claim-used-up");
+		const byHand = await inTenant(tenant, () =>
+			addFlashDesign(tenant, artist, {
+				oneOfAKind: true,
+				claimedAt: DateTime.now().minus({ days: 2 }),
+			}),
+		);
+		const project = await projectFor(tenant, byHand);
+		await inTenant(tenant, () =>
+			payments.record(tenant, member, project, cash("deposit", 100_000)),
+		);
+		assert.isNotNull((await stored(tenant, byHand)).claimedAt, "still by hand");
+		await releaseByHand(tenant, owner, byHand);
+
+		await inTenant(tenant, () =>
+			payments.record(tenant, member, project, cash("deposit", 200_000)),
+		);
+
+		assert.isNull((await stored(tenant, byHand)).claimedAt);
 	});
 });
