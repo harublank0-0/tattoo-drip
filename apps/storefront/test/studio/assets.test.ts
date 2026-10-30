@@ -351,6 +351,13 @@ describe("the header and the chat button (TAT-127)", () => {
 		}
 	});
 
+	test("a name without a logo stays centred in the bar though its clamp is a block (Chrome computes -webkit-box with a line clamp as flow-root, which ignores -webkit-box-pack)", () => {
+		assert.match(
+			ruleWith(css, ".site-bar-home:not(:has(.site-bar-logo))"),
+			/align-content:\s*center/,
+		);
+	});
+
 	test("the bar's Request button shrinks and wraps inside the bar instead of widening the page", () => {
 		const request = ruleBody(css, ".site-bar-request");
 		assert.match(request, /flex:\s*0 1 auto/);

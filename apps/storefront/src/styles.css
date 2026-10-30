@@ -366,7 +366,8 @@
   .site-bar-home { display: inline-flex; align-items: center; min-height: 2.75rem; min-inline-size: 0; font-family: var(--display-face); font-size: 1.25rem; font-weight: 700; text-decoration: none; overflow-wrap: anywhere; }
   .site-bar-request { flex: 0 1 auto; max-inline-size: 60%; text-align: center; }
   .site-bar-home > span, .site-bar-request > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
-  .site-bar-home:not(:has(.site-bar-logo)) { display: -webkit-box; -webkit-box-orient: vertical; -webkit-box-pack: center; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+  /* align-content: current Chrome computes a clamped -webkit-box as flow-root, where -webkit-box-pack no longer centres the text in the link's 44 px; older engines still use the pack. */
+  .site-bar-home:not(:has(.site-bar-logo)) { display: -webkit-box; -webkit-box-orient: vertical; -webkit-box-pack: center; align-content: center; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
   .site-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem 2rem; width: min(72rem, 100% - 2.5rem); margin: 5rem auto 0; padding-block: 1.5rem 2.5rem; border-top: 1px solid var(--line); color: var(--ink-muted); font-size: 0.9375rem; overflow-wrap: anywhere; }
   .status-page { display: grid; gap: 1rem; justify-items: start; padding-block: 4rem; }
 
