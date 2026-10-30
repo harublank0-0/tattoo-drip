@@ -7,15 +7,37 @@ import {
 	createRoute,
 	createRouter,
 } from "@tanstack/react-router";
+import type { WorkPage as WorkPageBody } from "@tattoo-drip/sdk";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import {
+	connectServer,
+	createApiContext,
+	seedStudio,
+} from "../../src/api/context.ts";
+import { SiteRef } from "../../src/site/context.ts";
+import { ArtistPage, WorkPage } from "../../src/studio/components/pages.tsx";
+import {
+	type PortfolioSearch,
 	readPortfolioSearch,
 	readWorkSearch,
+	type WorkSearch,
 } from "../../src/studio/gallery.ts";
 import { portfolioHref, workHref } from "../../src/studio/links.ts";
+import { loadArtistPage, loadWorkPage } from "../../src/studio/loaders.ts";
 import {
 	parsePlainSearch,
 	stringifyPlainSearch,
 } from "../../src/studio/search.ts";
+import { fakeFetch, json } from "../tenancy/helpers.ts";
+import {
+	ARJUN,
+	galleryPage,
+	ORIGIN,
+	STUDIO,
+	sitaWithWork,
+} from "./fixtures.ts";
+import { IMAGE_ORIGIN } from "./theme-fixtures.ts";
 
 /*
  * The router reads and writes the address's search as plain strings (TAT-126
@@ -275,5 +297,139 @@ describe("a full round trip through the router: parse, validate, write", () => {
 
 		assert.equal(result.redirectedTo, null);
 		assert.equal(result.loaded > 0, true);
+	});
+});
+
+/*
+ * Fix round 3. The router merges what a reader dropped back into the search
+ * the loaders get, as the strings typed, so `?healed=false` arrives as the
+ * truthy string "false" even though readHealed refused it. Everything that
+ * decides "healed is on" has to mean what the reader means (exactly `true`,
+ * only `healed=1`): the API read, the control on the page and every link.
+ */
+describe("a healed value the reader rejects is no filter anywhere", () => {
+	// The API's origin is the photos' (the gallery keeps no photo from another).
+	const API = IMAGE_ORIGIN;
+	const WORK = `${API}/api/v1/tenants/${STUDIO.slug}/work`;
+
+	/** A server render's context against a stand-in API that records its calls. */
+	function context(body: WorkPageBody) {
+		const { calls, fetch } = fakeFetch(({ url }) => {
+			if (url.endsWith("/artists")) {
+				return json(200, { data: [sitaWithWork(2), ARJUN] });
+			}
+			if (url.includes("/work?")) return json(200, body);
+			return json(404, { error: { code: "not_found", message: "No." } });
+		});
+		const api = createApiContext("server");
+		connectServer(api, { config: { apiUrl: API }, studio: STUDIO, fetch });
+		seedStudio(api, STUDIO);
+		const site = new SiteRef();
+		site.connect(ORIGIN);
+		return {
+			context: { ...api, site },
+			workReads: () =>
+				calls.map((call) => call.url).filter((url) => url.includes("/work?")),
+		};
+	}
+
+	/** A page with a next page, so the "Show more" link is there to check. */
+	const page = () => galleryPage(3, { nextCursor: "c2" });
+	const hrefsOf = (html: string) =>
+		[...html.matchAll(/href="([^"]*)"/g)].map((match) =>
+			match[1].replaceAll("&amp;", "&"),
+		);
+	const checkboxOf = (html: string) =>
+		html.match(/<input type="checkbox"[^>]*>/)?.[0] ?? "";
+
+	const OFF = ["false", "0", "true", "yes"];
+
+	for (const value of OFF) {
+		test(`/work?healed=${value} asks the API for no healed filter and shows the box unticked`, async () => {
+			const { context: ctx, workReads } = context(page());
+			const { work } = await visit(`/work?healed=${value}`);
+			const data = await loadWorkPage(ctx, work as WorkSearch);
+			const html = renderToStaticMarkup(createElement(WorkPage, { data }));
+
+			assert.deepEqual(workReads(), [`${WORK}?limit=24`]);
+			assert.match(checkboxOf(html), /name="healed"/, "the box is there");
+			assert.doesNotMatch(checkboxOf(html), /checked/, "and unticked");
+			assert.equal(
+				hrefsOf(html).filter((href) => href.includes("healed")).length,
+				0,
+				"no link carries healed",
+			);
+			assert.ok(hrefsOf(html).includes("/work?cursor=c2"), "Show more");
+		});
+
+		test(`/artists/sita?healed=${value} asks for no healed filter and shows All`, async () => {
+			const { context: ctx, workReads } = context(page());
+			const { artist } = await visit(`/artists/sita?healed=${value}`);
+			const data = await loadArtistPage(ctx, "sita", artist as PortfolioSearch);
+			const html = renderToStaticMarkup(createElement(ArtistPage, { data }));
+			const nav = html.match(
+				/<nav class="work-filter-nav"[\s\S]*?<\/nav>/,
+			)?.[0];
+
+			assert.deepEqual(workReads(), [`${WORK}?artist=sita&limit=24`]);
+			assert.match(
+				nav ?? "",
+				/<a href="\/artists\/sita#work" aria-current="page">All<\/a>/,
+			);
+			assert.match(
+				nav ?? "",
+				/<a href="\/artists\/sita\?healed=1#work">Healed<\/a>/,
+			);
+			assert.ok(
+				hrefsOf(html).includes("/artists/sita?cursor=c2#work"),
+				"Show more keeps no healed",
+			);
+		});
+	}
+
+	test("/work?healed=1 asks for healed photos and says so: the box ticked, the links keep it", async () => {
+		const { context: ctx, workReads } = context(page());
+		const { work } = await visit("/work?healed=1");
+		const data = await loadWorkPage(ctx, work as WorkSearch);
+		const html = renderToStaticMarkup(createElement(WorkPage, { data }));
+
+		assert.deepEqual(workReads(), [`${WORK}?healed=true&limit=24`]);
+		assert.match(checkboxOf(html), /name="healed"[^>]* checked=""/);
+		assert.ok(hrefsOf(html).includes("/work?healed=1&cursor=c2"), "Show more");
+	});
+
+	test("/artists/sita?healed=1 asks for healed photos and marks Healed", async () => {
+		const { context: ctx, workReads } = context(page());
+		const { artist } = await visit("/artists/sita?healed=1");
+		const data = await loadArtistPage(ctx, "sita", artist as PortfolioSearch);
+		const html = renderToStaticMarkup(createElement(ArtistPage, { data }));
+		const nav = html.match(/<nav class="work-filter-nav"[\s\S]*?<\/nav>/)?.[0];
+
+		assert.deepEqual(workReads(), [`${WORK}?artist=sita&healed=true&limit=24`]);
+		assert.match(
+			nav ?? "",
+			/<a href="\/artists\/sita\?healed=1#work" aria-current="page">Healed<\/a>/,
+		);
+		assert.ok(
+			hrefsOf(html).includes("/artists/sita?healed=1&cursor=c2#work"),
+			"Show more",
+		);
+	});
+
+	test("a malformed cursor still goes to the API as typed, so it is still the not-found page", async () => {
+		const { context: ctx, workReads } = context(page());
+		const { work } = await visit("/work?cursor=bogus&healed=false");
+		await loadWorkPage(ctx, work as WorkSearch);
+
+		assert.deepEqual(workReads(), [`${WORK}?cursor=bogus&limit=24`]);
+	});
+
+	test("an artist= in an artist page's address does not change whose photos it shows", async () => {
+		const { context: ctx, workReads } = context(page());
+		const { artist } = await visit("/artists/sita?artist=bina&style=japanese");
+		await loadArtistPage(ctx, "sita", artist as PortfolioSearch);
+
+		assert.equal(workReads().length, 1);
+		assert.match(workReads()[0], /\/work\?artist=sita(&|$)/);
 	});
 });

@@ -245,7 +245,9 @@ export function WorkPage({
 }) {
 	const { studio, theme, artists, search, gallery } = data;
 	const { cursor: _page, ...firstPage } = search;
-	const filtered = Boolean(search.artist || search.style || search.healed);
+	const filtered = Boolean(
+		search.artist || search.style || search.healed === true,
+	);
 	return (
 		<>
 			<SiteBar studio={studio} theme={theme} />

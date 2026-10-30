@@ -241,13 +241,16 @@ export function readWorkSearch(search: Record<string, unknown>): WorkSearch {
 /**
  * The API's read for these filters: `artist`, `style`, `healed`, `cursor` in
  * that order, absent ones left out, then `limit`. `healed` is only ever true
- * (the contract reads false as no filter).
+ * (the contract reads false as no filter), and is on only for exactly `true`,
+ * which is all readHealed makes of an address: the router merges what the
+ * readers dropped (`?healed=false`, `0`, `yes`) back into the search the
+ * loaders get, as the strings typed, and those must not filter.
  */
 export function workQuery(search: WorkSearch, limit: number): ListWorkQuery {
 	return {
 		...(search.artist ? { artist: search.artist } : {}),
 		...(search.style ? { style: search.style } : {}),
-		...(search.healed ? { healed: true } : {}),
+		...(search.healed === true ? { healed: true } : {}),
 		...(search.cursor ? { cursor: search.cursor } : {}),
 		limit,
 	};

@@ -102,7 +102,7 @@ export function workHref(search: WorkSearch): string {
 	return `/work${queryOf([
 		["artist", search.artist],
 		["style", search.style],
-		["healed", search.healed ? "1" : undefined],
+		["healed", search.healed === true ? "1" : undefined],
 		["cursor", search.cursor],
 	])}`;
 }
@@ -114,7 +114,7 @@ export function workHref(search: WorkSearch): string {
  */
 export function portfolioHref(slug: string, search: PortfolioSearch): string {
 	return `/artists/${slug}${queryOf([
-		["healed", search.healed ? "1" : undefined],
+		["healed", search.healed === true ? "1" : undefined],
 		["cursor", search.cursor],
 	])}#work`;
 }

@@ -33,8 +33,9 @@ export const Route = createFileRoute("/artists/$slug")({
 function ArtistRoute() {
 	const data = Route.useLoaderData();
 	const { queryClient, tattoo, site } = Route.useRouteContext();
+	// This artist's slug last (see loadPortfolio).
 	const query = workQuery(
-		{ artist: data.artist.slug, ...data.portfolio.search },
+		{ ...data.portfolio.search, artist: data.artist.slug },
 		WORK_PAGE_SIZE,
 	);
 	return (
