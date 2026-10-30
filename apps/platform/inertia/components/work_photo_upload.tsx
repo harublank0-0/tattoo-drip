@@ -6,10 +6,11 @@ import {
 	failureLine,
 	PHOTO_ACCEPT,
 	roomNote,
-	UPLOAD_FAILED,
+	trackUpload,
 	UPLOAD_HELP,
 	UPLOAD_INTERRUPTED,
 	UPLOAD_LABEL,
+	type UploadOutcome,
 	uploadingPhotos,
 } from "~/components/photos";
 import { Button } from "~/components/ui/button";
@@ -21,12 +22,6 @@ import {
 } from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
 
-/** How one file's request ended: the server took it, refused it (with its words), or the visit was cancelled. */
-type Outcome =
-	| { kind: "added" }
-	| { kind: "refused"; message: string }
-	| { kind: "cancelled" };
-
 /** Where the queue is: photo `index` of `total` (counted from 1) and how much of it has gone. */
 type Sending = { index: number; total: number; percentage?: number };
 
@@ -34,16 +29,16 @@ type Sending = { index: number; total: number; percentage?: number };
 type Summary = { added: number; failures: { id: number; line: string }[] };
 
 /**
- * Sends one photo as its own request. Anything but a clear answer counts as
- * refused (a dropped connection, a proxy's size limit), never as added.
+ * Sends one photo as its own request and says how it ended (trackUpload, in
+ * photos.ts, holds the rules: anything but a clear answer is refused).
  */
 function sendPhoto(
 	url: string,
 	file: File,
 	onPercentage: (percentage: number | undefined) => void,
-): Promise<Outcome> {
+): Promise<UploadOutcome> {
 	return new Promise((resolve) => {
-		let outcome: Outcome = { kind: "refused", message: UPLOAD_FAILED };
+		const upload = trackUpload();
 		router.post(
 			url,
 			{ photo: file },
@@ -52,22 +47,8 @@ function sendPhoto(
 				preserveScroll: true,
 				preserveState: true,
 				onProgress: (event) => onPercentage(event?.percentage),
-				onSuccess: () => {
-					outcome = { kind: "added" };
-				},
-				onError: (errors) => {
-					outcome = {
-						kind: "refused",
-						message: errors.photo || UPLOAD_FAILED,
-					};
-				},
-				onCancel: () => {
-					outcome = { kind: "cancelled" };
-				},
-				// A lost connection ends the visit through onFinish with the default
-				// outcome; nothing else needs to hear about it.
-				onNetworkError: () => false,
-				onFinish: () => resolve(outcome),
+				...upload.callbacks,
+				onFinish: () => resolve(upload.outcome()),
 			},
 		);
 	});

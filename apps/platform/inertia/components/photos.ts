@@ -72,6 +72,47 @@ export const COVER_PREVIEW_NOTE =
 export const COVER_INTRO =
 	"The first thing clients see on your studio page, with your studio's name over it. A wide photo of your work or your studio works best.";
 
+/** How one file's request ended: the server took it, refused it (with its words), or the visit was cancelled. */
+export type UploadOutcome =
+	| { kind: "added" }
+	| { kind: "refused"; message: string }
+	| { kind: "cancelled" };
+
+/**
+ * The callbacks of one file's upload visit and, once it has finished, how it
+ * ended. Anything but a clear answer counts as refused, never as added (a
+ * dropped connection, a proxy's size limit, a server error).
+ *
+ * `onHttpException` returns false so an HTTP error status leaves the outcome
+ * at that default: Inertia otherwise renders the error response (in
+ * production the server's error page) over the dashboard and then still runs
+ * `onSuccess`, which would count the failed photo as added, unmount the
+ * upload while its loop goes on sending, and lose the summary. With false it
+ * runs neither `onSuccess` nor `onError`, and `onFinish` still fires.
+ * `onNetworkError` returns false for the same reason: a lost connection ends
+ * through `onFinish` with the default outcome and nothing else needs to hear
+ * of it.
+ */
+export function trackUpload() {
+	let outcome: UploadOutcome = { kind: "refused", message: UPLOAD_FAILED };
+	return {
+		outcome: () => outcome,
+		callbacks: {
+			onSuccess: () => {
+				outcome = { kind: "added" };
+			},
+			onError: (errors: Record<string, string | undefined>) => {
+				outcome = { kind: "refused", message: errors.photo || UPLOAD_FAILED };
+			},
+			onCancel: () => {
+				outcome = { kind: "cancelled" };
+			},
+			onHttpException: () => false as const,
+			onNetworkError: () => false as const,
+		},
+	};
+}
+
 /** "37 of 100 photos". */
 export function photoCount(count: number): string {
 	return `${count} of ${MAX_WORK_PHOTOS} photos`;

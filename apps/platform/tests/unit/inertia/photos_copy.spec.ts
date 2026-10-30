@@ -4,6 +4,11 @@ import { MAX_PHOTO_STYLES as SERVER_MAX_STYLES } from "#modules/artists/styles";
 // @ts-expect-error TS6305: the server project only references the inertia project, so it cannot read its sources and the module is untyped here; `PhotosModule` below restates its shape and the inertia project type-checks the real one.
 import * as photosModule from "../../../inertia/components/photos.js";
 
+type UploadOutcome =
+	| { kind: "added" }
+	| { kind: "refused"; message: string }
+	| { kind: "cancelled" };
+
 type PhotosModule = {
 	MAX_WORK_PHOTOS: number;
 	MAX_PHOTO_ALT: number;
@@ -17,6 +22,16 @@ type PhotosModule = {
 	roomNote(room: number, chosen: number): string | null;
 	addedLine(added: number, refused: number): string;
 	failureLine(name: string, message: string): string;
+	trackUpload(): {
+		outcome(): UploadOutcome;
+		callbacks: {
+			onSuccess(): void;
+			onError(errors: Record<string, string | undefined>): void;
+			onCancel(): void;
+			onHttpException(): false;
+			onNetworkError(): false;
+		};
+	};
 	editLabel(n: number, alt: string | null): string;
 	tileNote(styleCount: number, healed: boolean): string | null;
 	UPLOAD_LABEL: string;
@@ -215,5 +230,76 @@ test.group("work photo words (TAT-116)", () => {
 		assert.equal(photos.coverButton(true, false), "Replace cover");
 		assert.equal(photos.coverButton(true, true, 10), "Uploading… 10%");
 		assert.equal(photos.coverButton(false, true), "Uploading…");
+	});
+});
+
+test.group("one file's upload visit (TAT-126 fix round 2)", () => {
+	test("a visit that ends with no answer is refused, never added", ({
+		assert,
+	}) => {
+		const upload = photos.trackUpload();
+
+		assert.deepEqual(upload.outcome(), {
+			kind: "refused",
+			message: photos.UPLOAD_FAILED,
+		});
+	});
+
+	test("an HTTP error status is refused and named: onHttpException returns false, so Inertia neither renders the error page nor runs onSuccess", ({
+		assert,
+	}) => {
+		// What Inertia 3.8 does for a 5xx page in production: it calls onHttpException
+		// and, only when that returns exactly false, stops (no onSuccess, no onError);
+		// onFinish follows either way.
+		const upload = photos.trackUpload();
+
+		assert.strictEqual(upload.callbacks.onHttpException(), false);
+		assert.deepEqual(upload.outcome(), {
+			kind: "refused",
+			message: photos.UPLOAD_FAILED,
+		});
+		const outcome = upload.outcome();
+		assert.equal(outcome.kind, "refused");
+		if (outcome.kind === "refused") {
+			assert.equal(
+				photos.failureLine("IMG_9.jpg", outcome.message),
+				"IMG_9.jpg: It didn't upload. Try again.",
+			);
+		}
+		// The connection lost is handled the same way.
+		assert.strictEqual(upload.callbacks.onNetworkError(), false);
+	});
+
+	test("a clear answer decides the outcome", ({ assert }) => {
+		const added = photos.trackUpload();
+		added.callbacks.onSuccess();
+		assert.deepEqual(added.outcome(), { kind: "added" });
+
+		const refused = photos.trackUpload();
+		refused.callbacks.onError({ photo: "Use a JPEG, PNG or WebP image." });
+		assert.deepEqual(refused.outcome(), {
+			kind: "refused",
+			message: "Use a JPEG, PNG or WebP image.",
+		});
+
+		const unsaid = photos.trackUpload();
+		unsaid.callbacks.onError({});
+		assert.deepEqual(unsaid.outcome(), {
+			kind: "refused",
+			message: photos.UPLOAD_FAILED,
+		});
+
+		const cancelled = photos.trackUpload();
+		cancelled.callbacks.onCancel();
+		assert.deepEqual(cancelled.outcome(), { kind: "cancelled" });
+	});
+
+	test("each visit has its own outcome", ({ assert }) => {
+		const first = photos.trackUpload();
+		const second = photos.trackUpload();
+		first.callbacks.onSuccess();
+
+		assert.equal(first.outcome().kind, "added");
+		assert.equal(second.outcome().kind, "refused");
 	});
 });
