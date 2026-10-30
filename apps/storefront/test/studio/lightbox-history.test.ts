@@ -109,13 +109,25 @@ class FakeHistory {
 
 class FakeDialog extends Target {
 	open = false;
+	isConnected = true;
+	/** A browser queues the `close` event as a task: it comes after close() returns. */
+	deferClose = false;
+	#queued = 0;
 	showModal(): void {
 		this.open = true;
 	}
 	close(): void {
 		if (!this.open) return;
 		this.open = false;
-		this.dispatch("close");
+		if (this.deferClose) this.#queued++;
+		else this.dispatch("close");
+	}
+	/** The queued `close` events run. */
+	deliverClose(): void {
+		while (this.#queued > 0) {
+			this.#queued--;
+			this.dispatch("close");
+		}
 	}
 }
 
@@ -256,6 +268,70 @@ describe("Back closes the work photo viewer (TAT-123)", () => {
 			2,
 			"each push replaced the forward entry",
 		);
+	});
+
+	test("a photo reopened before its close event is delivered starts no second traversal", async () => {
+		const { history, dialogs, showPhoto } = await page();
+		const dialog = dialogs["work-photo-1"];
+		dialog.deferClose = true;
+		showPhoto("work-photo-1");
+
+		dialog.close(); // open is false at once; the close event is queued
+		showPhoto("work-photo-1");
+		assert.equal(dialog.open, false, "the viewer session is still guarded");
+		assert.deepEqual(history.calls, ["push"], "no second entry");
+		assert.equal(dialog.count("close"), 1, "one handler, not two");
+
+		dialog.deliverClose();
+		assert.deepEqual(history.calls, ["push", "back"], "exactly one back()");
+		showPhoto("work-photo-1");
+		showPhoto("work-photo-2");
+		assert.equal(dialog.open, false, "guarded until the real popstate");
+		assert.equal(dialogs["work-photo-2"].open, false);
+
+		history.pop();
+		showPhoto("work-photo-1");
+		assert.ok(dialog.open, "it opens after the pop");
+		assert.deepEqual(history.calls, ["push", "back", "push"]);
+	});
+
+	test("Back, then the same photo again before the close event is delivered: no back() at all", async () => {
+		const { window, history, dialogs, showPhoto } = await page();
+		const dialog = dialogs["work-photo-1"];
+		dialog.deferClose = true;
+		showPhoto("work-photo-1");
+
+		history.pop(); // Back closes the dialog; its close event is queued
+		assert.equal(dialog.open, false);
+		showPhoto("work-photo-1");
+		assert.equal(dialog.open, false, "guarded until the close event ran");
+		assert.deepEqual(history.calls, ["push"]);
+
+		dialog.deliverClose();
+		assert.deepEqual(
+			history.calls,
+			["push"],
+			"Back already took the entry off",
+		);
+		assert.equal(window.count("popstate"), 0);
+		assert.equal(dialog.count("close"), 0);
+
+		showPhoto("work-photo-1");
+		assert.ok(dialog.open);
+		assert.deepEqual(history.calls, ["push", "push"]);
+	});
+
+	test("a photo's dialog that left the page while open does not keep the viewer shut", async () => {
+		const { window, history, dialogs, showPhoto } = await page();
+		showPhoto("work-photo-1");
+		dialogs["work-photo-1"].isConnected = false; // the route changed under it
+
+		showPhoto("work-photo-2");
+
+		assert.ok(dialogs["work-photo-2"].open);
+		assert.equal(window.count("popstate"), 1, "only the new photo listens");
+		assert.equal(dialogs["work-photo-1"].count("close"), 0);
+		assert.deepEqual(history.calls, ["push", "replace"]);
 	});
 
 	test("there is no timer: nothing is scheduled, and nothing is exported to wait for", async () => {

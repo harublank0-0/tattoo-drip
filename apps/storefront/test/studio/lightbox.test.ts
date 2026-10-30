@@ -49,7 +49,7 @@ describe("the photo viewer is the browser's dialog (TAT-116)", () => {
 		assert.match(text, /document\.getElementById\(id\)/);
 		assert.match(text, /typeof HTMLDialogElement/);
 		assert.match(text, /instanceof HTMLDialogElement/);
-		assert.match(text, /dialog\.open \|\| leaving/);
+		assert.match(text, /dialog\.open \|\| session \|\| leaving/);
 		assert.equal((text.match(/document\./g) ?? []).length, 1);
 		// The browser's own pushState with no URL: the address never changes, and
 		// TanStack's wrapper on window.history (which runs the loaders) is not used.
@@ -67,6 +67,9 @@ describe("the photo viewer is the browser's dialog (TAT-116)", () => {
 			text,
 			/History\.prototype\.replaceState\.call\(history, router, ""\)/,
 		);
+		// One place calls back(), and refuses a second while one is in flight.
+		assert.equal((text.match(/window\.history\.back\(\)/g) ?? []).length, 1);
+		assert.match(text, /if \(leaving\) return;\n\tleaving = true;/);
 		// The wait for a closed photo's back() is its popstate, never a timer.
 		assert.doesNotMatch(text, /setTimeout|clearTimeout|LEAVE_WAIT_MS/);
 		assert.doesNotMatch(text, /location\.hash|location\.href|\.hash =/);

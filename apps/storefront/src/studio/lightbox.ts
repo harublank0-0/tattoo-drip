@@ -26,10 +26,27 @@
 export const PHOTO_ENTRY = "tattooDripPhoto";
 
 /**
+ * The open photo's viewer session (TAT-123): from showModal until the browser
+ * has moved after the photo closed. `dialog.close()` clears `open` at once but
+ * queues its `close` event, so `open` alone cannot guard the cleanup that
+ * event starts: a photo opened again in between would register a second
+ * handler, and the one queued event would then take the entry off twice.
+ * Nothing opens while a session is held.
+ */
+type Session = {
+	dialog: HTMLDialogElement;
+	id: string;
+	backed: boolean;
+	stop: () => void;
+};
+let session: Session | null = null;
+
+/**
  * While a closed photo's entry is being taken off (`history.back()`), until
- * the browser's popstate says it has moved. There is no timer: a slow back()
- * keeps the viewer shut, so a photo reopened and closed meanwhile cannot queue
- * a second traversal that leaves the studio page.
+ * the browser's popstate says it has moved. Set at the moment back() is
+ * called, and a second back() is refused while it is. There is no timer: a
+ * slow back() keeps the viewer shut, so a photo reopened and closed meanwhile
+ * cannot queue a second traversal that leaves the studio page.
  */
 let leaving = false;
 
@@ -45,7 +62,10 @@ export function showPhoto(id: string): void {
 		if (large?.src) window.location.assign(large.src);
 		return;
 	}
-	if (dialog.open || leaving) return;
+	// A session whose dialog left the page while open (the route changed under
+	// it) gets no close event, ever: let it go rather than keep the viewer shut.
+	if (session && session.dialog.isConnected === false) endSession();
+	if (dialog.open || session || leaving) return;
 	dialog.showModal();
 	addEntry(dialog, id);
 }
@@ -75,9 +95,24 @@ export function forgetStaleEntry(): void {
 
 forgetStaleEntry();
 
+/** Takes the session off: its listeners go, and the viewer may open again. */
+function endSession(): void {
+	session?.stop();
+	session = null;
+}
+
 /** The browser has moved after a closed photo's back(): the viewer may open again. */
 function arrived(): void {
 	leaving = false;
+	endSession();
+}
+
+/** One back() at a time; the session is held until its popstate. */
+function takeEntryOff(): void {
+	if (leaving) return;
+	leaving = true;
+	window.addEventListener("popstate", arrived, { once: true });
+	window.history.back();
 }
 
 /**
@@ -89,9 +124,11 @@ function arrived(): void {
  * wraps `window.history.pushState` and would run the page's loaders for it.
  * Back fires popstate: close. Escape, Close or Android's close request close
  * the dialog: take the entry off with one back(), if it is still current, and
- * wait for its popstate before another photo may open. An entry that is
- * marked when the photo opens (the browser's Forward returned to it) is
- * reused, not stacked.
+ * wait for its popstate before another photo may open. The session lasts
+ * until the dialog's `close` event has run (after a Back too, which only
+ * closes the dialog) and, when a back() was needed, until its popstate. An
+ * entry that is marked when the photo opens (the browser's Forward returned
+ * to it) is reused, not stacked.
  */
 function addEntry(dialog: HTMLDialogElement, id: string): void {
 	const history = window.history;
@@ -106,18 +143,24 @@ function addEntry(dialog: HTMLDialogElement, id: string): void {
 		window.removeEventListener("popstate", onBack);
 		dialog.removeEventListener("close", onClose);
 	};
+	const mine: Session = { dialog, id, backed: false, stop };
 	function onBack() {
-		stop();
+		// The browser moved off the entry: it is already off, only the dialog
+		// closes, and its close event ends the session.
+		window.removeEventListener("popstate", onBack);
+		mine.backed = true;
 		if (dialog.open) dialog.close();
 	}
 	function onClose() {
 		stop();
 		const current: unknown = window.history.state;
-		if (!isRecord(current) || current[PHOTO_ENTRY] !== id) return;
-		leaving = true;
-		window.addEventListener("popstate", arrived, { once: true });
-		window.history.back();
+		if (mine.backed || !isRecord(current) || current[PHOTO_ENTRY] !== id) {
+			if (session === mine) session = null;
+			return;
+		}
+		takeEntryOff();
 	}
+	session = mine;
 	window.addEventListener("popstate", onBack);
 	dialog.addEventListener("close", onClose);
 }
