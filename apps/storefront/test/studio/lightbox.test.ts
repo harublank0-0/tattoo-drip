@@ -43,14 +43,27 @@ describe("the photo viewer is the browser's dialog (TAT-116)", () => {
 		assert.deepEqual(callers, ["studio/lightbox.ts"]);
 	});
 
-	test("showPhoto opens a closed dialog by id, guards a browser without <dialog>, and touches nothing else", () => {
+	test("showPhoto opens a closed dialog by id, guards a browser without <dialog>, and adds one history entry at the same address (TAT-123)", () => {
 		const text = read("studio/lightbox.ts");
 		assert.match(text, /export function showPhoto\(id: string\): void/);
 		assert.match(text, /document\.getElementById\(id\)/);
 		assert.match(text, /typeof HTMLDialogElement/);
 		assert.match(text, /instanceof HTMLDialogElement/);
-		assert.match(text, /!dialog\.open/);
+		assert.match(text, /dialog\.open \|\| leaving/);
 		assert.equal((text.match(/document\./g) ?? []).length, 1);
+		// The browser's own pushState with no URL: the address never changes, and
+		// TanStack's wrapper on window.history (which runs the loaders) is not used.
+		assert.match(
+			text,
+			/History\.prototype\.pushState\.call\(history, entry, ""\)/,
+		);
+		assert.match(
+			text,
+			/History\.prototype\.replaceState\.call\(history, entry, ""\)/,
+		);
+		assert.doesNotMatch(text, /history\.pushState\(|history\.replaceState\(/);
+		assert.doesNotMatch(text, /location\.hash|location\.href|\.hash =/);
+		assert.doesNotMatch(text, /@tanstack/, "the router is never imported");
 	});
 
 	test("the components hold no focus code, listeners or DOM access", () => {
