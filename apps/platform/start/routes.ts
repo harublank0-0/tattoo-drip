@@ -246,10 +246,6 @@ router
 					.where("id", router.matchers.uuid())
 					.as("tenant.artists.photos.update");
 				router
-					.post("photos/:id/move", [controllers.WorkPhotos, "move"])
-					.where("id", router.matchers.uuid())
-					.as("tenant.artists.photos.move");
-				router
 					.delete("photos/:id", [controllers.WorkPhotos, "destroy"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.artists.photos.destroy");

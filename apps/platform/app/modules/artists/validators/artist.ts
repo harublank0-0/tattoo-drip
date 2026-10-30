@@ -64,11 +64,12 @@ const messages = new SimpleMessagesProvider(
 
 /**
  * VineJS reports a bad style under its position ("styles.0"). The form has
- * one Styles fieldset, so every style error is shown under "styles".
+ * one Styles fieldset, so every style error is shown under "styles". The
+ * artist form and a work photo's form (TAT-126) both use it.
  * It relies on SimpleErrorReporter pushing one entry per `report` call; the
  * unknown-style test in artist_form.spec.ts guards that.
  */
-class ArtistErrorReporter extends SimpleErrorReporter {
+export class StylesErrorReporter extends SimpleErrorReporter {
 	override report(
 		message: string,
 		rule: string,
@@ -83,5 +84,5 @@ class ArtistErrorReporter extends SimpleErrorReporter {
 
 for (const validator of [createArtistValidator, updateArtistValidator]) {
 	validator.messagesProvider = messages;
-	validator.errorReporter = () => new ArtistErrorReporter();
+	validator.errorReporter = () => new StylesErrorReporter();
 }

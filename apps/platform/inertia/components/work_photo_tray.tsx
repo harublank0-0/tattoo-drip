@@ -1,12 +1,10 @@
 import { Form } from "@adonisjs/inertia/react";
 import { router } from "@inertiajs/react";
-import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { urlFor } from "~/client";
 import {
 	canAddPhoto,
 	MAX_PHOTO_ALT,
-	moveLabel,
-	moves,
 	NO_PHOTOS,
 	PHOTO_ACCEPT,
 	photoAlt,
@@ -27,10 +25,10 @@ import {
 import { Input } from "~/components/ui/input";
 
 /**
- * An artist's work photos (TAT-116), on the artist form: the photos in the
- * studio's order, each with its description, move and remove buttons, then
- * the upload. One photo per upload, so a phone photo (3 to 10 MB) never meets
- * the 20 MB request limit and the dashboard needs no resizing of its own.
+ * An artist's work photos (TAT-116), on the artist form: the photos newest
+ * first, each with its description and a remove button, then the upload.
+ * One photo per upload, so a phone photo (3 to 10 MB) never meets the 20 MB
+ * request limit and the dashboard needs no resizing of its own.
  * Every word is in `components/photos.ts`; the server decides everything
  * else (WorkPhotoService), so a refused change comes back as a field error
  * next to its control, with what was typed still in it.
@@ -120,14 +118,7 @@ function PhotoRow({
 	count: number;
 }) {
 	const params = { tenant: tenantSlug, id: photo.id };
-	const { earlier, later } = moves(n - 1, count);
 
-	const move = (direction: "up" | "down") =>
-		router.post(
-			urlFor("tenant.artists.photos.move", params),
-			{ direction },
-			{ preserveScroll: true },
-		);
 	const remove = () => {
 		if (window.confirm(REMOVE_PHOTO_QUESTION)) {
 			router.delete(urlFor("tenant.artists.photos.destroy", params), {
@@ -185,37 +176,15 @@ function PhotoRow({
 					</Field>
 				)}
 			</Form>
-			<div className="flex gap-1">
-				<Button
-					type="button"
-					variant="ghost"
-					size="icon"
-					aria-label={moveLabel("up", n)}
-					disabled={!earlier}
-					onClick={() => move("up")}
-				>
-					<ArrowUp />
-				</Button>
-				<Button
-					type="button"
-					variant="ghost"
-					size="icon"
-					aria-label={moveLabel("down", n)}
-					disabled={!later}
-					onClick={() => move("down")}
-				>
-					<ArrowDown />
-				</Button>
-				<Button
-					type="button"
-					variant="ghost"
-					size="icon"
-					aria-label={removeLabel(n)}
-					onClick={remove}
-				>
-					<Trash2 />
-				</Button>
-			</div>
+			<Button
+				type="button"
+				variant="ghost"
+				size="icon"
+				aria-label={removeLabel(n)}
+				onClick={remove}
+			>
+				<Trash2 />
+			</Button>
 		</li>
 	);
 }

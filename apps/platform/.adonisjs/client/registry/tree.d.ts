@@ -86,7 +86,6 @@ export interface ApiDefinition {
       photos: {
         store: typeof routes['tenant.artists.photos.store']
         update: typeof routes['tenant.artists.photos.update']
-        move: typeof routes['tenant.artists.photos.move']
         destroy: typeof routes['tenant.artists.photos.destroy']
       }
     }

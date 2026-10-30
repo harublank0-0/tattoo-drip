@@ -118,15 +118,14 @@ const artistRows = (target: Studio) =>
 		).map((artist) => artist.serialize()),
 	);
 
-// The artists' work photos, every column, in the studio's order (TAT-116):
-// what the photo routes could change.
+// The artists' work photos, every column, oldest first (TAT-116): what the
+// photo routes could change.
 const workPhotoRows = (target: Studio) =>
 	inTenant(target.tenant, async () =>
 		(
 			await ArtistWorkPhoto.query()
 				.where("tenant_id", target.tenant.id)
-				.orderBy("artist_id")
-				.orderBy("position")
+				.orderBy("created_at")
 				.orderBy("id")
 		).map((photo) => photo.serialize()),
 	);
@@ -559,16 +558,13 @@ export const isolationCases: IsolationCase[] = [
 		pattern: "/t/:tenant/artists/photos/:id",
 		resource: "workPhoto",
 		actor: "owner",
-		body: () => ({ alt: "Koi on the forearm" }),
-		ownStatus: 302,
-		snapshot: workPhotoRows,
-	},
-	{
-		method: "POST",
-		pattern: "/t/:tenant/artists/photos/:id/move",
-		resource: "workPhoto",
-		actor: "owner",
-		body: () => ({ direction: "down" }),
+		// "styles[]" as a browser names it: a form body with one "styles" value
+		// would arrive as a string, not a list.
+		body: () => ({
+			alt: "Koi on the forearm",
+			"styles[]": ["blackwork"],
+			healed: "1",
+		}),
 		ownStatus: 302,
 		snapshot: workPhotoRows,
 	},

@@ -722,13 +722,13 @@ test.group("An artist's styles and social links", (group) => {
 test.group("The work photos on the artist form (TAT-116)", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 
-	test("the edit page carries the photos in order, each with only its id, thumbnail and description", async ({
+	test("the edit page carries the photos newest first, each with only its id, thumbnail, description, styles and healed mark", async ({
 		client,
 		assert,
 	}) => {
 		const { owner, tenant } = await studioWithOwner();
 		const sita = await addArtist(tenant, owner);
-		const [first, second] = await inTenant(tenant, async () => [
+		const [older, newer] = await inTenant(tenant, async () => [
 			await addWorkPhoto(tenant, sita, { alt: "Koi on the forearm" }),
 			await addWorkPhoto(tenant, sita),
 		]);
@@ -742,20 +742,22 @@ test.group("The work photos on the artist form (TAT-116)", (group) => {
 		assert.lengthOf(workPhotos, 2);
 		assert.deepEqual(
 			workPhotos.map((photo: { id: string }) => photo.id),
-			[first.id, second.id],
+			[newer.id, older.id],
 		);
 		for (const photo of workPhotos) {
 			assert.deepEqual(Object.keys(photo).sort(), [
 				"alt",
+				"healed",
 				"id",
+				"styles",
 				"thumbnailUrl",
 			]);
 		}
-		assert.equal(workPhotos[0].alt, "Koi on the forearm");
-		assert.isNull(workPhotos[1].alt);
+		assert.isNull(workPhotos[0].alt);
+		assert.equal(workPhotos[1].alt, "Koi on the forearm");
 		// The 320 px copy, in the studio's own folder.
 		assert.match(
-			new URL(workPhotos[0].thumbnailUrl).pathname,
+			new URL(workPhotos[1].thumbnailUrl).pathname,
 			new RegExp(
 				`^/uploads/tenants/${tenant.id}/artist_work_photo/.+\\.320w\\.jpg$`,
 			),

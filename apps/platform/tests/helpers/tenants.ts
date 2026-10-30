@@ -169,8 +169,8 @@ export async function seededStudio(slug: string, name: string) {
 		await tenant.save();
 	});
 	const [workPhoto] = await inTenant(tenant, async () => [
-		await seedWorkPhoto(tenant, artistProfile, 0),
-		await seedWorkPhoto(tenant, artistProfile, 1),
+		await seedWorkPhoto(tenant, artistProfile),
+		await seedWorkPhoto(tenant, artistProfile),
 	]);
 	const pipeline = await inTenant(tenant, () => seedPipeline(tenant));
 	// A second project waiting for the client's answer, for the accept route.
@@ -359,18 +359,13 @@ export async function seededStudio(slug: string, name: string) {
 }
 
 /** A work photo row with a made-up key; call it in the tenant's context. */
-function seedWorkPhoto(
-	tenant: Tenant,
-	artist: { id: string },
-	position: number,
-) {
+function seedWorkPhoto(tenant: Tenant, artist: { id: string }) {
 	return ArtistWorkPhoto.create({
 		tenantId: tenant.id,
 		artistId: artist.id,
 		imageKey: `tenants/${tenant.id}/artist_work_photo/${randomUUID()}.320-640-1280.jpg`,
 		width: 2048,
 		height: 1536,
-		position,
 		alt: null,
 	});
 }

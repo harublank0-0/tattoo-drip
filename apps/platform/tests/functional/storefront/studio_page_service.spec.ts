@@ -339,7 +339,7 @@ test.group("StudioPageService: cover and work photos (TAT-116)", (group) => {
 		assert.isNull(page.cover);
 	});
 
-	test("an artist's work photos come in the studio's order with only their public fields", async ({
+	test("an artist's work photos come newest first with only their public fields", async ({
 		assert,
 	}) => {
 		const { owner, tenant } = await studioWithOwner("page-work-116");
@@ -359,7 +359,7 @@ test.group("StudioPageService: cover and work photos (TAT-116)", (group) => {
 		assert.lengthOf(shown.workPhotos, 2);
 		assert.deepEqual(
 			shown.workPhotos.map((photo) => photo.alt),
-			["Koi on the forearm", null],
+			[null, "Koi on the forearm"],
 		);
 		assert.deepEqual(Object.keys(shown.workPhotos[0]).sort(), [
 			"alt",
@@ -369,7 +369,7 @@ test.group("StudioPageService: cover and work photos (TAT-116)", (group) => {
 			"width",
 		]);
 		assert.deepEqual(
-			shown.workPhotos[0].variants.map((copy) => copy.width),
+			shown.workPhotos[1].variants.map((copy) => copy.width),
 			[320, 640, 1280],
 		);
 		assert.deepEqual(one?.workPhotos, shown.workPhotos);

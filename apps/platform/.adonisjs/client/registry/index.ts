@@ -312,12 +312,6 @@ const routes = {
     tokens: [{"old":"/t/:tenant/artists/photos/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/photos/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/photos/:id","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/photos/:id","type":0,"val":"photos","end":""},{"old":"/t/:tenant/artists/photos/:id","type":1,"val":"id","end":""}],
     types: placeholder as Registry['tenant.artists.photos.update']['types'],
   },
-  'tenant.artists.photos.move': {
-    methods: ["POST"],
-    pattern: '/t/:tenant/artists/photos/:id/move',
-    tokens: [{"old":"/t/:tenant/artists/photos/:id/move","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/photos/:id/move","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/photos/:id/move","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/photos/:id/move","type":0,"val":"photos","end":""},{"old":"/t/:tenant/artists/photos/:id/move","type":1,"val":"id","end":""},{"old":"/t/:tenant/artists/photos/:id/move","type":0,"val":"move","end":""}],
-    types: placeholder as Registry['tenant.artists.photos.move']['types'],
-  },
   'tenant.artists.photos.destroy': {
     methods: ["DELETE"],
     pattern: '/t/:tenant/artists/photos/:id',

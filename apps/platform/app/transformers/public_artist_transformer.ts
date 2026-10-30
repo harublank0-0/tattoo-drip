@@ -28,7 +28,7 @@ export default class PublicArtistTransformer extends BaseTransformer<ShownArtist
 				: null,
 			acceptingInquiries: artist.acceptingInquiries,
 			closedMessage: artist.closedMessage,
-			// Up to six, in the studio's order: no id, key, position or
+			// The six newest, newest first: no id, key, styles, healed mark or
 			// timestamp (openapi.yaml, WorkPhoto).
 			workPhotos: artist.workPhotos.map((photo) => ({
 				url: photo.url,

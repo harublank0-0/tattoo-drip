@@ -4,17 +4,22 @@
  * (tests/unit/inertia/photos_copy.spec.ts); the components only lay them out.
  */
 
-/** The most work photos an artist shows. The server holds the same limit (WorkPhotoService, and the database check). */
-export const MAX_WORK_PHOTOS = 6;
+/** The most work photos an artist shows. The server holds the same limit (WorkPhotoService counts under the artist's lock). */
+export const MAX_WORK_PHOTOS = 100;
 
 /** The longest description of a work photo, in characters. */
 export const MAX_PHOTO_ALT = 200;
 
-/** A work photo as the artist form gets it: its id, its 320 px copy and its description. */
+/**
+ * A work photo as the artist form gets it, newest first: its id, its 320 px
+ * copy, its description, its styles (the stored slugs) and the healed mark.
+ */
 export type WorkPhotoProps = {
 	id: string;
 	thumbnailUrl: string;
 	alt: string | null;
+	styles: string[];
+	healed: boolean;
 };
 
 /** The studio's cover as Settings, Profile gets it: the 960 px copy and its own size. */
@@ -43,7 +48,7 @@ export const COVER_PREVIEW_NOTE =
 export const COVER_INTRO =
 	"The first thing clients see on your studio page, with your studio's name over it. A wide photo of your work or your studio works best.";
 
-/** "4 of 6 photos". */
+/** "37 of 100 photos". */
 export function photoCount(count: number): string {
 	return `${count} of ${MAX_WORK_PHOTOS} photos`;
 }
@@ -80,19 +85,7 @@ export function canAddPhoto(count: number): boolean {
 	return count < MAX_WORK_PHOTOS;
 }
 
-/** Which way a photo at `index` of `count` can still move. */
-export function moves(
-	index: number,
-	count: number,
-): { earlier: boolean; later: boolean } {
-	return { earlier: index > 0, later: index < count - 1 };
-}
-
-/** The move buttons are named for the photo, counted from 1. */
-export function moveLabel(direction: "up" | "down", n: number): string {
-	return `Move photo ${n} ${direction === "up" ? "earlier" : "later"}`;
-}
-
+/** The remove button is named for the photo, counted from 1. */
 export function removeLabel(n: number): string {
 	return `Remove photo ${n}`;
 }

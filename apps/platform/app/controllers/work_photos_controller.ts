@@ -11,15 +11,14 @@ import WorkPhotoService, {
 } from "#modules/artists/services/work_photo_service";
 import {
 	addWorkPhotoValidator,
-	describeWorkPhotoValidator,
-	moveWorkPhotoValidator,
+	updateWorkPhotoValidator,
 } from "#modules/artists/validators/work_photo";
 import { ImageDeleteError, InvalidImageError } from "#modules/media/errors";
 
 /**
- * An artist's work photos (TAT-116), changed from the artist's edit page by
- * owners (any live artist) and by the artist (their own linked profile):
- * TENANT_ROUTE_ROLES lets every member reach the routes and
+ * An artist's work photos (TAT-116, TAT-126), changed from the artist's edit
+ * page by owners (any live artist) and by the artist (their own linked
+ * profile): TENANT_ROUTE_ROLES lets every member reach the routes and
  * WorkPhotoService / ArtistService.findEditable decide whose photos. Each
  * route loads first and validates after, so another tenant's artist or
  * photo, or another artist's for an artist member, is a 404 with any body.
@@ -50,7 +49,11 @@ export default class WorkPhotosController {
 		return this.toEditPage(ctx, tenant.slug, artist.id);
 	}
 
-	/** `:id` is the photo. */
+	/**
+	 * `:id` is the photo. Saves its description, styles and healed mark. A
+	 * checkbox that is not ticked is not sent, so no style box means no styles
+	 * and no healed box means not healed.
+	 */
 	async update(ctx: HttpContext) {
 		const { tenant, membership } = tenantContext(ctx);
 		const { photo, artist } = await this.photos.findEditable(
@@ -58,26 +61,15 @@ export default class WorkPhotosController {
 			membership,
 			ctx.params.id,
 		);
-		const data = await ctx.request.validateUsing(describeWorkPhotoValidator);
+		const data = await ctx.request.validateUsing(updateWorkPhotoValidator);
 
-		await this.photos.describe(tenant, membership, photo, data.alt);
+		await this.photos.updateDetails(tenant, membership, photo, {
+			alt: data.alt,
+			styles: data.styles ?? [],
+			healed: data.healed ?? false,
+		});
 
-		ctx.session.flash("success", "Description saved.");
-		return this.toEditPage(ctx, tenant.slug, artist.id);
-	}
-
-	/** `:id` is the photo. */
-	async move(ctx: HttpContext) {
-		const { tenant, membership } = tenantContext(ctx);
-		const { photo, artist } = await this.photos.findEditable(
-			tenant,
-			membership,
-			ctx.params.id,
-		);
-		const data = await ctx.request.validateUsing(moveWorkPhotoValidator);
-
-		await this.photos.move(tenant, membership, photo, data.direction);
-
+		ctx.session.flash("success", "Photo saved.");
 		return this.toEditPage(ctx, tenant.slug, artist.id);
 	}
 

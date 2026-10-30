@@ -10,9 +10,10 @@ import {
 import { addArtist } from "#tests/helpers/artists";
 import { studioWithOwner } from "#tests/helpers/tenants";
 
-// Raw SQL only (TAT-116): the database itself must hold the limit of six
-// photos per artist, keep a photo inside its tenant and hide other tenants'
-// rows, even when the app's own query code is bypassed.
+// Raw SQL only (TAT-116, TAT-126): the database itself must keep a photo
+// inside its tenant, hide other tenants' rows and hold the style limit, even
+// when the app's own query code is bypassed. The photo limit (100) is not
+// the database's: WorkPhotoService counts under the artist's row lock.
 const sql = (
 	context: DbContextValues,
 	query: string,
@@ -20,7 +21,7 @@ const sql = (
 ) => withDbContext(context, (trx) => trx.rawQuery(query, bindings));
 
 const INSERT =
-	"insert into artist_work_photos (tenant_id, artist_id, image_key, width, height, position, created_at) values (?, ?, ?, 1200, 900, ?, now())";
+	"insert into artist_work_photos (tenant_id, artist_id, image_key, width, height, created_at) values (?, ?, ?, 1200, 900, now())";
 
 async function seed() {
 	const a = await studioWithOwner("photos-a", "Photos A");
@@ -30,24 +31,23 @@ async function seed() {
 	const add = (
 		who: { tenant: { id: string } },
 		artist: { id: string },
-		position: number,
+		n = 0,
 	) =>
 		sql({ tenantId: who.tenant.id }, INSERT, [
 			who.tenant.id,
 			artist.id,
-			`tenants/${who.tenant.id}/artist_work_photo/p${position}.jpg`,
-			position,
+			`tenants/${who.tenant.id}/artist_work_photo/p${n}.jpg`,
 		]);
 	return { a, b, artistA, artistB, add };
 }
 
-const positionsOf = async (tenantId: string, artistId: string) => {
+const countOf = async (tenantId: string, artistId: string) => {
 	const { rows } = await sql(
 		{ tenantId },
-		"select id, position from artist_work_photos where artist_id = ? order by position",
+		"select count(*)::int as n from artist_work_photos where artist_id = ?",
 		[artistId],
 	);
-	return rows as { id: string; position: number }[];
+	return rows[0].n as number;
 };
 
 test.group("RLS: artist_work_photos (TAT-116)", (group) => {
@@ -57,8 +57,8 @@ test.group("RLS: artist_work_photos (TAT-116)", (group) => {
 		assert,
 	}) => {
 		const { a, b, artistA, artistB, add } = await seed();
-		await add(a, artistA, 0);
-		await add(b, artistB, 0);
+		await add(a, artistA);
+		await add(b, artistB);
 
 		const { rows } = await sql(
 			{ tenantId: a.tenant.id },
@@ -82,7 +82,7 @@ test.group("RLS: artist_work_photos (TAT-116)", (group) => {
 			await assert.rejects(
 				() =>
 					withTransaction((trx) =>
-						trx.rawQuery(INSERT, [b.tenant.id, artistB.id, "x.jpg", 0]),
+						trx.rawQuery(INSERT, [b.tenant.id, artistB.id, "x.jpg"]),
 					),
 				/row-level security/,
 			);
@@ -98,48 +98,63 @@ test.group("RLS: artist_work_photos (TAT-116)", (group) => {
 			await assert.rejects(
 				() =>
 					withTransaction((trx) =>
-						trx.rawQuery(INSERT, [a.tenant.id, artistB.id, "x.jpg", 0]),
+						trx.rawQuery(INSERT, [a.tenant.id, artistB.id, "x.jpg"]),
 					),
 				/violates foreign key constraint "artist_work_photos_tenant_id_artist_id_foreign"/,
 			);
 		});
 	});
 
-	test("a row at position 6 is refused, so a seventh photo cannot exist", async ({
-		assert,
-	}) => {
+	test("a new row has no styles and is not healed", async ({ assert }) => {
 		const { a, artistA, add } = await seed();
-		for (let position = 0; position < 6; position++) {
-			await add(a, artistA, position);
-		}
+		await add(a, artistA);
 
-		await withDbContext({ tenantId: a.tenant.id }, async () => {
-			await assert.rejects(
-				() =>
-					withTransaction((trx) =>
-						trx.rawQuery(INSERT, [a.tenant.id, artistA.id, "x.jpg", 6]),
-					),
-				/artist_work_photos_position_range/,
-			);
-		});
-		assert.lengthOf(await positionsOf(a.tenant.id, artistA.id), 6);
+		const { rows } = await sql(
+			{ tenantId: a.tenant.id },
+			"select styles, healed from artist_work_photos",
+		);
+
+		assert.deepEqual(rows, [{ styles: [], healed: false }]);
 	});
 
-	test("a second row at an occupied position is refused", async ({
+	test("a fourth style is refused, three are fine, and the list itself is not checked", async ({
 		assert,
 	}) => {
 		const { a, artistA, add } = await seed();
-		await add(a, artistA, 2);
-
-		await withDbContext({ tenantId: a.tenant.id }, async () => {
-			await assert.rejects(
-				() =>
-					withTransaction((trx) =>
-						trx.rawQuery(INSERT, [a.tenant.id, artistA.id, "y.jpg", 2]),
+		await add(a, artistA);
+		const setStyles = (slugs: string) =>
+			withDbContext({ tenantId: a.tenant.id }, () =>
+				withTransaction((trx) =>
+					trx.rawQuery(
+						"update artist_work_photos set styles = ?::varchar[] where artist_id = ?",
+						[slugs, artistA.id],
 					),
-				/artist_work_photos_position_unique/,
+				),
 			);
-		});
+
+		await assert.rejects(
+			() => setStyles("{blackwork,fine-line,realism,colour}"),
+			/artist_work_photos_styles_max/,
+		);
+		await setStyles("{blackwork,fine-line,not-on-the-list}");
+		const { rows } = await sql(
+			{ tenantId: a.tenant.id },
+			"select styles from artist_work_photos",
+		);
+		assert.deepEqual(rows[0].styles, [
+			"blackwork",
+			"fine-line",
+			"not-on-the-list",
+		]);
+	});
+
+	test("the database no longer refuses a seventh photo: the count under the artist's lock is the only limit", async ({
+		assert,
+	}) => {
+		const { a, artistA, add } = await seed();
+		for (let n = 0; n < 7; n++) await add(a, artistA, n);
+
+		assert.equal(await countOf(a.tenant.id, artistA.id), 7);
 	});
 
 	test("a width or height of zero is refused", async ({ assert }) => {
@@ -150,7 +165,7 @@ test.group("RLS: artist_work_photos (TAT-116)", (group) => {
 				() =>
 					withTransaction((trx) =>
 						trx.rawQuery(
-							"insert into artist_work_photos (tenant_id, artist_id, image_key, width, height, position, created_at) values (?, ?, 'x.jpg', 0, 900, 0, now())",
+							"insert into artist_work_photos (tenant_id, artist_id, image_key, width, height, created_at) values (?, ?, 'x.jpg', 0, 900, now())",
 							[a.tenant.id, artistA.id],
 						),
 					),
@@ -159,49 +174,11 @@ test.group("RLS: artist_work_photos (TAT-116)", (group) => {
 		});
 	});
 
-	test("swapping two positions in one UPDATE succeeds (deferrable), and compacting too", async ({
-		assert,
-	}) => {
-		const { a, artistA, add } = await seed();
-		await add(a, artistA, 0);
-		await add(a, artistA, 1);
-		await add(a, artistA, 2);
-		const before = await positionsOf(a.tenant.id, artistA.id);
-
-		await sql(
-			{ tenantId: a.tenant.id },
-			`update artist_work_photos
-			 set position = case when id = ? then 1::smallint else 0::smallint end
-			 where id in (?, ?)`,
-			[before[0].id, before[0].id, before[1].id],
-		);
-		const swapped = await positionsOf(a.tenant.id, artistA.id);
-		assert.deepEqual(
-			swapped.map((row) => row.id),
-			[before[1].id, before[0].id, before[2].id],
-		);
-
-		// Removing the first photo and shifting the rest down is one UPDATE too.
-		await withDbContext({ tenantId: a.tenant.id }, async (trx) => {
-			await trx.rawQuery("delete from artist_work_photos where id = ?", [
-				swapped[0].id,
-			]);
-			await trx.rawQuery(
-				"update artist_work_photos set position = position - 1 where artist_id = ? and position > 0",
-				[artistA.id],
-			);
-		});
-		assert.deepEqual(
-			(await positionsOf(a.tenant.id, artistA.id)).map((row) => row.position),
-			[0, 1],
-		);
-	});
-
 	test("update and delete of another tenant's rows affect zero rows", async ({
 		assert,
 	}) => {
 		const { a, b, artistB, add } = await seed();
-		await add(b, artistB, 0);
+		await add(b, artistB);
 
 		await withDbContext({ tenantId: a.tenant.id }, async (trx) => {
 			const update = await trx.rawQuery(

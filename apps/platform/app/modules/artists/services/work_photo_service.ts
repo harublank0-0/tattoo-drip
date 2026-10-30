@@ -9,6 +9,7 @@ import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
 import ArtistService, {
 	type ProfileEditor,
 } from "#modules/artists/services/artist_service";
+import type { StyleSlug } from "#modules/artists/styles";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
 import type Tenant from "#modules/tenancy/models/tenant";
@@ -18,23 +19,30 @@ type Upload = Pick<MultipartFile, "tmpPath">;
 type TenantRef = Pick<Tenant, "id">;
 
 /**
- * The most work photos an artist shows. The database holds the same limit
- * (`artist_work_photos_position_range`: positions 0 to 5): change both.
+ * The most work photos an artist shows. The database no longer holds this
+ * limit: the count under the artist's row lock (`add`) is the only guard.
  */
-export const MAX_WORK_PHOTOS = 6;
+export const MAX_WORK_PHOTOS = 100;
 
 const PURPOSE = "artist_work_photo";
 
+/** What an artist or an owner sets on a photo besides the file (TAT-126). */
+export type WorkPhotoDetails = {
+	alt: string | null;
+	styles: readonly StyleSlug[];
+	healed: boolean;
+};
+
 /**
- * The photos of an artist's work (TAT-116): up to six public photos, in the
- * studio's order, with an optional description each. Every call is scoped to
- * the tenant. Who may change an artist's photos is ArtistService.findEditable
- * (an owner any live artist's, an artist their own linked profile's), and
- * every write checks that again under the artist's row lock, the lock
- * ArtistService.save takes too, so an upload and a profile save never
- * interleave. Files are stored through ImageService and deleted here, after
- * the real commit or rollback. Positions are dense (0 to n-1): only `add`
- * (append), `move` (swap two neighbours) and `remove` (compact) write them.
+ * The photos of an artist's work (TAT-116, TAT-126): up to 100 public
+ * photos, newest first (`created_at desc, id desc`, nothing reorders them),
+ * each with an optional description, up to three styles and a healed mark.
+ * Every call is scoped to the tenant. Who may change an artist's photos is
+ * ArtistService.findEditable (an owner any live artist's, an artist their
+ * own linked profile's), and every write checks that again under the
+ * artist's row lock, the lock ArtistService.save takes too, so an upload and
+ * a profile save never interleave. Files are stored through ImageService and deleted here, after
+ * the real commit or rollback.
  */
 @inject()
 export default class WorkPhotoService {
@@ -43,31 +51,49 @@ export default class WorkPhotoService {
 		private artists: ArtistService,
 	) {}
 
-	/** The artist's photos in the studio's order. */
+	/** The artist's photos, newest first. */
 	async list(tenant: TenantRef, artist: Artist): Promise<ArtistWorkPhoto[]> {
 		assertOwnedBy(tenant, artist);
 		return ArtistWorkPhoto.query()
 			.where("tenant_id", tenant.id)
 			.where("artist_id", artist.id)
-			.orderBy("position", "asc");
+			.orderBy("created_at", "desc")
+			.orderBy("id", "desc");
 	}
 
 	/**
-	 * Many artists' photos in one query, each artist's in the studio's order;
-	 * an artist with none has no entry. The caller passes the ids of artists
-	 * it may show (the public reads pass only visible ones); no query for [].
+	 * Many artists' newest `perArtist` photos in one query, each artist's
+	 * newest first; an artist with none has no entry. The caller passes the
+	 * ids of artists it may show (the public reads pass only visible ones); no
+	 * query for []. The cut is made in the database by ranking each artist's
+	 * photos in the order of `list`, so a tie in dates is broken by id and the
+	 * same photos come back every time.
 	 */
 	async forArtists(
 		tenant: TenantRef,
 		artistIds: readonly string[],
+		perArtist: number,
 	): Promise<Map<string, ArtistWorkPhoto[]>> {
 		const byArtist = new Map<string, ArtistWorkPhoto[]>();
 		if (artistIds.length === 0) return byArtist;
 		const photos = await ArtistWorkPhoto.query()
 			.where("tenant_id", tenant.id)
-			.whereIn("artist_id", [...artistIds])
+			.whereRaw(
+				`id in (
+					select id from (
+						select id, row_number() over (
+							partition by artist_id order by created_at desc, id desc
+						) as place
+						from artist_work_photos
+						where tenant_id = ? and artist_id in (${artistIds.map(() => "?").join(", ")})
+					) as ranked
+					where place <= ?
+				)`,
+				[tenant.id, ...artistIds, perArtist],
+			)
 			.orderBy("artist_id", "asc")
-			.orderBy("position", "asc");
+			.orderBy("created_at", "desc")
+			.orderBy("id", "desc");
 		for (const photo of photos) {
 			const list = byArtist.get(photo.artistId) ?? [];
 			list.push(photo);
@@ -101,10 +127,11 @@ export default class WorkPhotoService {
 	}
 
 	/**
-	 * Adds a photo at the end. Throws WorkPhotoLimitError when the artist
-	 * already shows six (also when two uploads race for the last place: the
-	 * second is refused under the lock and its file is deleted) and
-	 * InvalidImageError for a file we can't accept.
+	 * Adds a photo, dated now, so it is the artist's newest. Throws
+	 * WorkPhotoLimitError when the artist already shows 100 (also when two
+	 * uploads race for the last place: the second is refused under the lock
+	 * and its file is deleted) and InvalidImageError for a file we can't
+	 * accept.
 	 *
 	 * The order matters. The unlocked count refuses a full set before any
 	 * decode; the file is stored inside the transaction with its cleanup
@@ -144,7 +171,6 @@ export default class WorkPhotoService {
 					imageKey: stored.key,
 					width: stored.width,
 					height: stored.height,
-					position: count,
 					alt: null,
 				},
 				{ client: trx },
@@ -152,74 +178,41 @@ export default class WorkPhotoService {
 		});
 	}
 
-	/** Sets the photo's description; empty text clears it (the public page then words its own). */
-	async describe(
+	/**
+	 * Sets the photo's description, styles and healed mark in one save. Empty
+	 * text clears the description (the public page then words its own). The
+	 * styles are stored as given: the validator has checked them against the
+	 * list and the database holds the limit of three.
+	 */
+	async updateDetails(
 		tenant: TenantRef,
 		editor: ProfileEditor,
 		photo: ArtistWorkPhoto,
-		alt: string | null,
+		details: WorkPhotoDetails,
 	): Promise<ArtistWorkPhoto> {
 		assertPhotoOf(tenant, photo);
 		return withTransaction(async (trx) => {
 			await this.lockArtist(trx, tenant, editor, photo.artistId);
 			const live = await this.lockedPhoto(trx, tenant, photo);
-			const text = alt?.trim();
+			const text = details.alt?.trim();
 			live.alt = text ? text : null;
+			live.styles = [...details.styles];
+			live.healed = details.healed;
 			await live.save();
 			return live;
 		});
 	}
 
 	/**
-	 * Moves the photo one place earlier or later by swapping it with its
-	 * neighbour in one UPDATE (the position constraint is deferrable for
-	 * this). At either end nothing changes.
-	 */
-	async move(
-		tenant: TenantRef,
-		editor: ProfileEditor,
-		photo: ArtistWorkPhoto,
-		direction: "up" | "down",
-	): Promise<void> {
-		assertPhotoOf(tenant, photo);
-		await withTransaction(async (trx) => {
-			await this.lockArtist(trx, tenant, editor, photo.artistId);
-			const live = await this.lockedPhoto(trx, tenant, photo);
-			const neighbourPosition =
-				direction === "up" ? live.position - 1 : live.position + 1;
-			const neighbour = await ArtistWorkPhoto.query({ client: trx })
-				.where("tenant_id", tenant.id)
-				.where("artist_id", live.artistId)
-				.where("position", neighbourPosition)
-				.first();
-			if (!neighbour) return;
-			await trx.rawQuery(
-				`update artist_work_photos
-				 set position = case when id = ? then ?::smallint else ?::smallint end,
-				     updated_at = now()
-				 where tenant_id = ? and id in (?, ?)`,
-				[
-					live.id,
-					neighbour.position,
-					live.position,
-					tenant.id,
-					live.id,
-					neighbour.id,
-				],
-			);
-		});
-	}
-
-	/**
 	 * Deletes the photo for good, files first (TAT-116): under the artist's
 	 * lock the photo's files and every copy are deleted, and only then the row
-	 * goes and the photos after it move up one place in one UPDATE. A photo a
+	 * goes; the other photos keep their dates, so their order stays. A photo a
 	 * client asked to take down must not stay fetchable while the studio is
 	 * told it is gone, so if any file cannot be deleted this throws
 	 * ImageDeleteError (the controller says so and the row stays, so the owner
 	 * can try again: a missing file counts as deleted, so a retry finishes the
 	 * job). The deletes are real the moment they run, before the commit; the
-	 * transaction only has the row delete and the compaction left to fail.
+	 * transaction only has the row delete left to fail.
 	 */
 	async remove(
 		tenant: TenantRef,
@@ -230,14 +223,8 @@ export default class WorkPhotoService {
 		await withTransaction(async (trx) => {
 			await this.lockArtist(trx, tenant, editor, photo.artistId);
 			const live = await this.lockedPhoto(trx, tenant, photo);
-			const { imageKey, position, artistId } = live;
-			await this.images.deleteOrThrow(PURPOSE, imageKey);
+			await this.images.deleteOrThrow(PURPOSE, live.imageKey);
 			await live.delete();
-			await trx.rawQuery(
-				`update artist_work_photos set position = position - 1, updated_at = now()
-				 where tenant_id = ? and artist_id = ? and position > ?`,
-				[tenant.id, artistId, position],
-			);
 		});
 	}
 

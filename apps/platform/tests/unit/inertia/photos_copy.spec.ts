@@ -11,8 +11,6 @@ type PhotosModule = {
 	trayIntro(owner: boolean): string;
 	uploadingText(percentage?: number): string;
 	canAddPhoto(count: number): boolean;
-	moves(index: number, count: number): { earlier: boolean; later: boolean };
-	moveLabel(direction: "up" | "down", n: number): string;
 	removeLabel(n: number): string;
 	TRAY_FULL: string;
 	NO_PHOTOS: string;
@@ -30,15 +28,15 @@ type PhotosModule = {
 const photos = photosModule as PhotosModule;
 
 test.group("work photo words (TAT-116)", () => {
-	test("the limit is the server's", ({ assert }) => {
-		assert.equal(photos.MAX_WORK_PHOTOS, 6);
+	test("the limit is 100 and the server's", ({ assert }) => {
+		assert.equal(photos.MAX_WORK_PHOTOS, 100);
 		assert.equal(photos.MAX_WORK_PHOTOS, SERVER_MAX);
 	});
 
-	test("the count reads 'n of 6 photos'", ({ assert }) => {
-		assert.equal(photos.photoCount(0), "0 of 6 photos");
-		assert.equal(photos.photoCount(4), "4 of 6 photos");
-		assert.equal(photos.photoCount(6), "6 of 6 photos");
+	test("the count reads 'n of 100 photos'", ({ assert }) => {
+		assert.equal(photos.photoCount(0), "0 of 100 photos");
+		assert.equal(photos.photoCount(37), "37 of 100 photos");
+		assert.equal(photos.photoCount(100), "100 of 100 photos");
 	});
 
 	test("a photo's alt is its description, else its place in the set", ({
@@ -55,11 +53,11 @@ test.group("work photo words (TAT-116)", () => {
 	}) => {
 		assert.equal(
 			photos.trayIntro(true),
-			"Up to 6 photos of this artist's work. The first three show on the studio page and all of them on the artist's own page, in this order.",
+			"Up to 100 photos of this artist's work. The first three show on the studio page and all of them on the artist's own page, in this order.",
 		);
 		assert.equal(
 			photos.trayIntro(false),
-			"Up to 6 photos of your work. The first three show on the studio page and all of them on your own page, in this order.",
+			"Up to 100 photos of your work. The first three show on the studio page and all of them on your own page, in this order.",
 		);
 	});
 
@@ -71,25 +69,18 @@ test.group("work photo words (TAT-116)", () => {
 		assert.equal(photos.uploadingText(undefined), "Uploading…");
 	});
 
-	test("a photo can be added until there are six", ({ assert }) => {
+	test("a photo can be added until there are 100", ({ assert }) => {
 		assert.isTrue(photos.canAddPhoto(0));
-		assert.isTrue(photos.canAddPhoto(5));
-		assert.isFalse(photos.canAddPhoto(6));
-		assert.isFalse(photos.canAddPhoto(7));
+		assert.isTrue(photos.canAddPhoto(99));
+		assert.isFalse(photos.canAddPhoto(100));
+		assert.isFalse(photos.canAddPhoto(101));
 	});
 
-	test("the first photo can't move earlier and the last can't move later", ({
+	test("photos can no longer be moved, and the remove button is named for the photo, counted from 1", ({
 		assert,
 	}) => {
-		assert.deepEqual(photos.moves(0, 3), { earlier: false, later: true });
-		assert.deepEqual(photos.moves(1, 3), { earlier: true, later: true });
-		assert.deepEqual(photos.moves(2, 3), { earlier: true, later: false });
-		assert.deepEqual(photos.moves(0, 1), { earlier: false, later: false });
-	});
-
-	test("buttons are named for the photo, counted from 1", ({ assert }) => {
-		assert.equal(photos.moveLabel("up", 2), "Move photo 2 earlier");
-		assert.equal(photos.moveLabel("down", 2), "Move photo 2 later");
+		assert.notProperty(photosModule, "moves");
+		assert.notProperty(photosModule, "moveLabel");
 		assert.equal(photos.removeLabel(3), "Remove photo 3");
 	});
 
@@ -97,11 +88,11 @@ test.group("work photo words (TAT-116)", () => {
 		assert.equal(photos.NO_PHOTOS, "No photos yet.");
 		assert.equal(
 			photos.TRAY_FULL,
-			"That's 6 photos, the most an artist can show. Remove one to add another.",
+			"That's 100 photos, the most an artist can show. Remove one to add another.",
 		);
 		assert.equal(
 			photos.TRAY_CREATE_NOTE,
-			"Once the artist is saved, you can add up to 6 photos of their work here.",
+			"Once the artist is saved, you can add up to 100 photos of their work here.",
 		);
 		assert.equal(
 			photos.REMOVE_PHOTO_QUESTION,

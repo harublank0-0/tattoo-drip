@@ -156,38 +156,34 @@ test.group("GET /api/v1/tenants/:tenant/artists (listArtists)", (group) => {
 		}
 	});
 
-	test("work photos come in the studio's order with exactly url, width, height, alt and variants", async ({
+	test("work photos are the six newest, newest first, with exactly url, width, height, alt and variants", async ({
 		client,
 		assert,
 	}) => {
 		const { owner, tenant } = await studioWithOwner("api-work-116");
 		const sita = await addArtist(tenant, owner);
 		const photos = new WorkPhotoService(images, artists);
-		const added = await inTenant(tenant, async () => [
-			await photos.add(
-				tenant,
-				{ userId: owner.id, role: "owner" },
-				sita,
-				await uploadOf(await testImages.jpeg(1600, 1200)),
-			),
-			await photos.add(
-				tenant,
-				{ userId: owner.id, role: "owner" },
-				sita,
-				await uploadOf(await testImages.jpeg(300, 400)),
-			),
-		]);
+		const editor = { userId: owner.id, role: "owner" } as const;
+		const added = await inTenant(tenant, async () => {
+			const rows = [];
+			for (let n = 0; n < 8; n++) {
+				// One narrow photo (no smaller copies); the rest are wide.
+				const bytes =
+					n === 6
+						? await testImages.jpeg(300, 400)
+						: await testImages.jpeg(1600, 1200);
+				rows.push(
+					await photos.add(tenant, editor, sita, await uploadOf(bytes)),
+				);
+			}
+			return rows;
+		});
 		await inTenant(tenant, () =>
-			photos.describe(
-				tenant,
-				{ userId: owner.id, role: "owner" },
-				added[0],
-				"Koi on the forearm",
-			),
-		);
-		// The studio's order: the second photo first.
-		await inTenant(tenant, () =>
-			photos.move(tenant, { userId: owner.id, role: "owner" }, added[1], "up"),
+			photos.updateDetails(tenant, editor, added[7], {
+				alt: "Koi on the forearm",
+				styles: ["realism"],
+				healed: true,
+			}),
 		);
 
 		const { data } = (
@@ -198,8 +194,16 @@ test.group("GET /api/v1/tenants/:tenant/artists (listArtists)", (group) => {
 		).body().data;
 
 		const work = data[0].workPhotos;
-		assert.lengthOf(work, 2);
+		assert.lengthOf(work, 6);
 		assert.deepEqual(one.workPhotos, work);
+		// The six newest (added 7 down to 2), newest first: the URLs hold the keys.
+		assert.deepEqual(
+			work.map((photo: { url: string }) => new URL(photo.url).pathname),
+			added
+				.slice(2)
+				.reverse()
+				.map((row) => `/uploads/${row.imageKey}`),
+		);
 		for (const photo of work) {
 			assert.deepEqual(Object.keys(photo).sort(), WORK_PHOTO_FIELDS);
 			assert.match(
@@ -208,28 +212,29 @@ test.group("GET /api/v1/tenants/:tenant/artists (listArtists)", (group) => {
 			);
 			(await client.get(new URL(photo.url).pathname)).assertStatus(200);
 		}
-		assert.equal(work[0].width, 300);
-		assert.isNull(work[0].alt);
-		assert.deepEqual(work[0].variants, []);
-		assert.equal(work[1].width, 1600);
-		assert.equal(work[1].alt, "Koi on the forearm");
+		assert.equal(work[0].alt, "Koi on the forearm");
 		assert.deepEqual(
-			work[1].variants.map((variant: { width: number }) => variant.width),
+			work[0].variants.map((variant: { width: number }) => variant.width),
 			[320, 640, 1280],
 		);
-		// Never the row: no id, key, position, artist id or timestamp.
+		assert.equal(work[1].width, 300);
+		assert.isNull(work[1].alt);
+		assert.deepEqual(work[1].variants, []);
+		// Never the row: no id, key, position, styles, healed, artist id or timestamp.
 		const text = JSON.stringify(work);
 		for (const word of [
 			"position",
+			"styles",
+			"healed",
 			"artist_id",
 			"artistId",
 			"created",
 			"imageKey",
+			"realism",
 		]) {
 			assert.notInclude(text, word);
 		}
-		assert.notInclude(text, added[0].id);
-		assert.notInclude(text, added[1].id);
+		for (const row of added) assert.notInclude(text, row.id);
 	});
 
 	test("styles come in the list's order as slug and name, an unknown one dropped", async ({
@@ -337,7 +342,7 @@ test.group("GET /api/v1/tenants/:tenant/artists (listArtists)", (group) => {
 		);
 	});
 
-	test("adding a photo, describing it and moving it each change the list's ETag", async ({
+	test("adding a photo or saving its details changes the list's ETag", async ({
 		client,
 		assert,
 	}) => {
@@ -367,10 +372,12 @@ test.group("GET /api/v1/tenants/:tenant/artists (listArtists)", (group) => {
 		);
 		etags.push((await client.get(url)).header("etag"));
 		await inTenant(tenant, () =>
-			photos.describe(tenant, editor, second, "Koi"),
+			photos.updateDetails(tenant, editor, second, {
+				alt: "Koi",
+				styles: [],
+				healed: false,
+			}),
 		);
-		etags.push((await client.get(url)).header("etag"));
-		await inTenant(tenant, () => photos.move(tenant, editor, second, "up"));
 		etags.push((await client.get(url)).header("etag"));
 		await inTenant(tenant, () => photos.remove(tenant, editor, first));
 		etags.push((await client.get(url)).header("etag"));

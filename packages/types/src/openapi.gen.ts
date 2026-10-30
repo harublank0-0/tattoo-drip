@@ -413,8 +413,8 @@ export interface components {
         };
         /**
          * @description A photo of an artist's work (TAT-116) and its smaller copies. Every
-         *     property is always there. It carries no id, key, position or
-         *     timestamp: the list's order is the studio's order.
+         *     property is always there. It carries no id, key, styles, healed mark
+         *     or timestamp: the list's order is newest first.
          */
         WorkPhoto: {
             /**
@@ -614,9 +614,9 @@ export interface components {
             /** @description The artist's words to show instead of the inquiry form; null while they accept inquiries */
             closedMessage: string | null;
             /**
-             * @description Up to six photos of the artist's work, in the studio's order; []
-             *     when none. An artist who is closed for inquiries still shows
-             *     theirs.
+             * @description The artist's six newest photos, newest first; [] when none. An
+             *     artist who is closed for inquiries still shows theirs. All of them
+             *     are in `listWork`.
              */
             workPhotos: components["schemas"]["WorkPhoto"][];
             /** @description The artist's styles from the platform's list, in the list's order; [] when none. */

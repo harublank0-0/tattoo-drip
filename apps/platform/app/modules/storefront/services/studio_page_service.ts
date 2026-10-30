@@ -59,6 +59,9 @@ const COVER = "studio_cover";
 const LOGO = "studio_logo";
 const WORK_PHOTO = "artist_work_photo";
 
+/** How many photos an Artist carries: the six newest. All of them are in the work gallery. */
+const PHOTOS_PER_ARTIST = 6;
+
 /**
  * The studio page's public reads (TAT-44): the studio's profile and its
  * visible artists, for the tenant the publicTenant middleware resolved (its
@@ -97,6 +100,7 @@ export default class StudioPageService {
 		const work = await this.workPhotos.forArtists(
 			tenant,
 			visible.map((artist) => artist.id),
+			PHOTOS_PER_ARTIST,
 		);
 		return Promise.all(
 			visible.map((artist) =>
@@ -112,7 +116,11 @@ export default class StudioPageService {
 	): Promise<ShownArtist | null> {
 		const artist = await this.artists.findVisibleBySlug(tenant, slug);
 		if (!artist) return null;
-		const work = await this.workPhotos.forArtists(tenant, [artist.id]);
+		const work = await this.workPhotos.forArtists(
+			tenant,
+			[artist.id],
+			PHOTOS_PER_ARTIST,
+		);
 		return this.shown(tenant, artist, work.get(artist.id) ?? []);
 	}
 
