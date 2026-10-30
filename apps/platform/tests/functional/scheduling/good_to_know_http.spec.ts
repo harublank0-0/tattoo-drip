@@ -195,6 +195,29 @@ test.group("Settings, Good to know: the page (TAT-128)", (group) => {
 		assert.notInclude(JSON.stringify(props), "Deposits hold your date.");
 	});
 
+	test("it says when Good to know is hidden on the studio page", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("know-hidden");
+
+		assert.isTrue((await page(client, owner, tenant)).inertiaProps.shownOnPage);
+
+		await inTenant(tenant, async () => {
+			tenant.merge({ storefrontSections: "work,artists,inquiry" });
+			await tenant.save();
+		});
+		assert.isFalse(
+			(await page(client, owner, tenant)).inertiaProps.shownOnPage,
+		);
+
+		await inTenant(tenant, async () => {
+			tenant.merge({ storefrontSections: "info,inquiry" });
+			await tenant.save();
+		});
+		assert.isTrue((await page(client, owner, tenant)).inertiaProps.shownOnPage);
+	});
+
 	test("it reads the hours and the closed days with one query each", async ({
 		client,
 		assert,

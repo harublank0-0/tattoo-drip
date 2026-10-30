@@ -25,6 +25,11 @@ export const SECTION_WORDS = {
 		description:
 			"Each artist with their photo, styles and status. Their own pages work either way.",
 	},
+	info: {
+		title: "Good to know",
+		description:
+			"Your hours, closed days, walk-ins, age rule, deposit policy, and what to do before and after a session. Shows only what you filled in.",
+	},
 	inquiry: {
 		title: "The form",
 		description: "Where clients send their idea. Always on your page.",

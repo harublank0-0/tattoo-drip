@@ -12,7 +12,12 @@ export const DEFAULT_STOREFRONT: Studio["storefront"] = {
 		colors: { accent: null, accentDark: null },
 		font: "eczar",
 	},
-	sections: [{ type: "work" }, { type: "artists" }, { type: "inquiry" }],
+	sections: [
+		{ type: "work" },
+		{ type: "artists" },
+		{ type: "info" },
+		{ type: "inquiry" },
+	],
 };
 
 export const STUDIO: Studio = {

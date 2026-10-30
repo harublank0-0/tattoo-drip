@@ -83,7 +83,7 @@ test.group("tenants page look columns (TAT-56)", (group) => {
 
 		assert.deepEqual(row, {
 			storefront_theme: "stencil-and-ink",
-			storefront_sections: "work,artists,inquiry",
+			storefront_sections: "work,artists,info,inquiry",
 			brand_accent: null,
 			brand_accent_dark: null,
 			brand_font: "eczar",
@@ -104,7 +104,7 @@ test.group("tenants page look columns (TAT-56)", (group) => {
 				);
 				// The failed update left the look as it was.
 				const { rows } = await trx.rawQuery(READ, [tenant.id]);
-				assert.equal(rows[0].storefront_sections, "work,artists,inquiry");
+				assert.equal(rows[0].storefront_sections, "work,artists,info,inquiry");
 				assert.isNull(rows[0].brand_accent);
 			});
 		});
@@ -129,7 +129,7 @@ test.group("tenants page look columns (TAT-56)", (group) => {
 		});
 	});
 
-	test("a new studio's sections are work, artists, then the form", async ({
+	test("a new studio's sections are work, artists, Good to know, then the form", async ({
 		assert,
 	}) => {
 		const { tenant } = await studioWithOwner();
@@ -139,7 +139,8 @@ test.group("tenants page look columns (TAT-56)", (group) => {
 			return rows[0];
 		});
 
-		assert.equal(row.storefront_sections, "work,artists,inquiry");
+		assert.equal(row.storefront_sections, "work,artists,info,inquiry");
+		// The raw column, not a literal: a key added to the list without a migration fails here.
 		assert.equal(row.storefront_sections, DEFAULT_SECTIONS.join(","));
 	});
 

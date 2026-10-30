@@ -11,7 +11,13 @@ import {
 	openNowView,
 } from "../../src/studio/good-to-know.ts";
 import { studioPageData } from "../../src/studio/loaders.ts";
-import { GOOD_TO_KNOW_STUDIO, ORIGIN, SITA, STUDIO } from "./fixtures.ts";
+import {
+	DEFAULT_STOREFRONT,
+	GOOD_TO_KNOW_STUDIO,
+	ORIGIN,
+	SITA,
+	STUDIO,
+} from "./fixtures.ts";
 import { assertSafePage } from "./safety.ts";
 
 /** The instant that is `local` on a Kathmandu wall clock (+05:45). */
@@ -304,5 +310,94 @@ describe("the cover's line", () => {
 		assert.deepEqual(view.initial, { kind: "open", closes: "20:00" });
 		// Serializable: loader data travels as JSON-like data.
 		assert.deepEqual(JSON.parse(JSON.stringify(view)), view);
+	});
+});
+
+/** `studio` with the page look's sections as the API sends them. */
+const withSections = (studio: Studio, ...types: string[]): Studio => ({
+	...studio,
+	storefront: {
+		...DEFAULT_STOREFRONT,
+		sections: types.map((type) => ({
+			type,
+		})) as Studio["storefront"]["sections"],
+	},
+});
+
+describe("the page mounts the Good to know section (TAT-128)", () => {
+	const page = (studio: Studio) =>
+		renderToStaticMarkup(
+			createElement(StudioPage, {
+				data: studioPageData(studio, [SITA], ORIGIN),
+			}),
+		);
+	const at = (html: string, text: string) => {
+		const index = html.indexOf(text);
+		assert.ok(index >= 0, `${text} is in the page`);
+		return index;
+	};
+
+	test("a studio that filled it in shows it on the page: the hours, a text and the two folded ones", () => {
+		const html = page(GOOD_TO_KNOW_STUDIO);
+
+		at(html, '<section id="good-to-know"');
+		at(html, ">Good to know</h2>");
+		at(html, ">Sun – Fri</span>");
+		at(html, "11 am – 8 pm");
+		at(html, "Small flash welcome on Saturdays.");
+		at(html, "A deposit holds your date.");
+		at(html, "<span>Before your session</span>");
+		at(html, "<span>Aftercare</span>");
+		assertSafePage(html);
+	});
+
+	test("it sits where the configuration puts it: after the artists and before the form by default", () => {
+		const html = page(GOOD_TO_KNOW_STUDIO);
+
+		assert.ok(at(html, 'id="artists"') < at(html, 'id="good-to-know"'));
+		assert.ok(at(html, 'id="good-to-know"') < at(html, 'id="inquiry"'));
+	});
+
+	test("a list with info first puts it right after the intro, before the other sections", () => {
+		const html = page(
+			withSections(GOOD_TO_KNOW_STUDIO, "info", "work", "artists", "inquiry"),
+		);
+
+		assert.ok(at(html, "Black Needle") < at(html, 'id="good-to-know"'));
+		assert.ok(at(html, 'id="good-to-know"') < at(html, 'id="artists"'));
+		assert.ok(at(html, 'id="good-to-know"') < at(html, 'id="inquiry"'));
+	});
+
+	test("a studio that hides it shows none, even when it is filled in", () => {
+		const html = page(
+			withSections(GOOD_TO_KNOW_STUDIO, "work", "artists", "inquiry"),
+		);
+
+		assert.doesNotMatch(html, /good-to-know/);
+		assert.doesNotMatch(html, /Before your session/);
+		assert.doesNotMatch(html, /Small flash welcome/);
+		// The cover's line is not a section: it stays.
+		assert.match(html, /profile-hours/);
+	});
+
+	test("an empty Good to know shows no section even where it is listed", () => {
+		const html = page(
+			withSections(STUDIO, "work", "artists", "info", "inquiry"),
+		);
+
+		assert.doesNotMatch(html, /good-to-know/);
+		assert.match(html, /id="inquiry"/);
+	});
+
+	test("an older API's list without info shows no Good to know", () => {
+		const html = page({
+			...GOOD_TO_KNOW_STUDIO,
+			storefront: {
+				...DEFAULT_STOREFRONT,
+				sections: [{ type: "artists" }, { type: "inquiry" }],
+			},
+		});
+
+		assert.doesNotMatch(html, /id="good-to-know"/);
 	});
 });

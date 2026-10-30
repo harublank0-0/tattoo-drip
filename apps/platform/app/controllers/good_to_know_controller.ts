@@ -23,6 +23,7 @@ import {
 	toClosure,
 	toOpeningWeek,
 } from "#modules/scheduling/validators/opening_hours";
+import { lookOf } from "#modules/storefront/look";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { updateGoodToKnowValidator } from "#modules/tenancy/validators/good_to_know";
@@ -75,6 +76,8 @@ export default class GoodToKnowController {
 			},
 			// Whether Payments holds a policy; the policy itself is not sent.
 			hasDepositPolicy: (tenant.depositPolicy ?? "").trim() !== "",
+			// Whether Page look lists Good to know among the sections shown.
+			shownOnPage: lookOf(tenant).sections.includes("info"),
 		});
 	}
 

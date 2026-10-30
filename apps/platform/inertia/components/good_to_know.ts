@@ -72,3 +72,8 @@ export const depositLine = (hasPolicy: boolean) =>
 	hasPolicy
 		? "Your deposit policy shows here too. Change it in Payments."
 		: "Add a deposit policy in Payments and it shows here too.";
+
+/** At the top of the page while the section is hidden in Page look: the sentence, then the link's words. */
+export const HIDDEN_TEXT = "Good to know is hidden on your page.";
+export const HIDDEN_LINK = "Show it in Page look.";
+export const HIDDEN_NOTE = `${HIDDEN_TEXT} ${HIDDEN_LINK}`;

@@ -6,6 +6,8 @@ import {
 	CLOSED_INTRO,
 	DAY_NAMES,
 	depositLine,
+	HIDDEN_LINK,
+	HIDDEN_TEXT,
 	HOURS_INTRO,
 	NO_CLOSED_DAYS,
 	removeLabel,
@@ -54,6 +56,7 @@ export default function GoodToKnow({
 	dates,
 	texts,
 	hasDepositPolicy,
+	shownOnPage,
 }: {
 	timezone: string;
 	week: WeekRow[];
@@ -61,12 +64,24 @@ export default function GoodToKnow({
 	dates: { today: string; max: string };
 	texts: Texts;
 	hasDepositPolicy: boolean;
+	shownOnPage: boolean;
 }) {
 	const tenant = useTenant();
 	const params = { tenant: tenant.slug };
 
 	return (
 		<>
+			{!shownOnPage && (
+				<p className="mb-6 rounded-md border p-3 text-sm">
+					{HIDDEN_TEXT}{" "}
+					<Link
+						href={urlFor("tenant.settings.look", params)}
+						className="underline underline-offset-4"
+					>
+						{HIDDEN_LINK}
+					</Link>
+				</p>
+			)}
 			<Section title="Opening hours" description={HOURS_INTRO(timezone)}>
 				{/* Keyed by the stored week: a save remounts it with the stored values. */}
 				<HoursForm key={JSON.stringify(week)} week={week} />

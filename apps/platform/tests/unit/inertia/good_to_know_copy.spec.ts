@@ -22,6 +22,7 @@ type GoodToKnowModule = {
 	CLOSED_INTRO: string;
 	TEXTS_INTRO: string;
 	NO_CLOSED_DAYS: string;
+	HIDDEN_NOTE: string;
 };
 const words = goodToKnowModule as GoodToKnowModule;
 
@@ -138,6 +139,10 @@ test.group("Good to know words (TAT-128)", () => {
 			"Short answers to what clients ask before they come. Your page shows each one you fill in and leaves out the rest.",
 		);
 		assert.equal(words.NO_CLOSED_DAYS, "No closed days ahead.");
+		assert.equal(
+			words.HIDDEN_NOTE,
+			"Good to know is hidden on your page. Show it in Page look.",
+		);
 	});
 });
 

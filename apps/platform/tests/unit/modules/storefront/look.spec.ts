@@ -204,11 +204,34 @@ test.group("lookOf", () => {
 });
 
 test.group("sections", () => {
-	test("the default is Recent work, the artists, then the form", ({
+	test("the default is Recent work, the artists, Good to know, then the form", ({
 		assert,
 	}) => {
-		assert.deepEqual([...SECTION_KEYS], ["work", "artists", "inquiry"]);
-		assert.deepEqual([...DEFAULT_SECTIONS], ["work", "artists", "inquiry"]);
+		assert.deepEqual([...SECTION_KEYS], ["work", "artists", "info", "inquiry"]);
+		assert.deepEqual(
+			[...DEFAULT_SECTIONS],
+			["work", "artists", "info", "inquiry"],
+		);
+	});
+
+	test("sectionList keeps Good to know once, where it was put", ({
+		assert,
+	}) => {
+		assert.deepEqual(sectionList(["info", "work", "info", "inquiry"]), [
+			"info",
+			"work",
+			"inquiry",
+		]);
+		assert.deepEqual(sectionList(["work", "info"]), [
+			"work",
+			"info",
+			"inquiry",
+		]);
+		assert.deepEqual(sectionsOf("artists,info,inquiry"), [
+			"artists",
+			"info",
+			"inquiry",
+		]);
 	});
 
 	test("sectionList keeps known keys once, in order, and adds the form at the end", ({

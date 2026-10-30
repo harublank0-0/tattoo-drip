@@ -493,11 +493,13 @@ export interface components {
         StorefrontSection: {
             /**
              * @description `work` (Recent work: the newest photos), `artists` (the artists
-             *     list) or `inquiry` (the idea form, always listed). More will
-             *     come: treat an unknown value as one to leave out.
+             *     list), `info` (Good to know: hours, closed days and what clients
+             *     ask, shown only when the studio filled something in) or
+             *     `inquiry` (the idea form, always listed). More will come: treat
+             *     an unknown value as one to leave out.
              * @enum {string}
              */
-            type: "work" | "artists" | "inquiry";
+            type: "work" | "artists" | "info" | "inquiry";
         };
         /**
          * @description How the studio page looks (TAT-56): the owner's choices, as checked
