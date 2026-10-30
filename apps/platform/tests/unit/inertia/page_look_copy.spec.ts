@@ -162,7 +162,7 @@ test.group("page look words (TAT-56)", () => {
 		assert.deepEqual(Object.keys(words.SECTION_WORDS), [...SECTION_KEYS]);
 		assert.deepEqual(
 			SECTION_KEYS.map((key) => words.SECTION_WORDS[key].title),
-			["Recent work", "Artists", "Good to know", "The form"],
+			["Recent work", "Artists", "Good to know", "Got an idea?"],
 		);
 		assert.deepEqual(
 			SECTION_KEYS.map((key) => words.SECTION_WORDS[key].description),
@@ -170,7 +170,7 @@ test.group("page look words (TAT-56)", () => {
 				"The newest photos from all your artists, with a link to all of them.",
 				"Each artist with their photo, styles and status. Their own pages work either way.",
 				"Your hours, closed days, walk-ins, age rule, deposit policy, and what to do before and after a session. Shows only what you filled in.",
-				"Where clients send their idea. Always on your page.",
+				"A short invitation with a button to the page where clients send their idea. Always on your page.",
 			],
 		);
 		assert.equal(words.REQUIRED_SECTION, "inquiry");
@@ -220,7 +220,7 @@ test.group("page look words (TAT-56)", () => {
 		assert.deepEqual(rows, words.sectionRows(["artists", "inquiry"], ALL));
 	});
 
-	test("a row can be shown or hidden, but the form is always shown", ({
+	test("a row can be shown or hidden, but the invitation is always shown", ({
 		assert,
 	}) => {
 		const rows = words.sectionRows(["artists", "inquiry"], ALL);
@@ -232,7 +232,7 @@ test.group("page look words (TAT-56)", () => {
 			key: "artists",
 			shown: false,
 		});
-		// The form (index 1) cannot be hidden, whatever is asked.
+		// "Got an idea?" (index 1) cannot be hidden, whatever is asked.
 		assert.deepEqual(words.toggleRow(rows, 1, false), rows);
 		assert.isTrue(words.toggleRow(rows, 1, true)[1].shown);
 		assert.deepEqual(words.toggleRow(rows, 9, true), rows);

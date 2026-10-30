@@ -31,8 +31,9 @@ export const SECTION_WORDS = {
 			"Your hours, closed days, walk-ins, age rule, deposit policy, and what to do before and after a session. Shows only what you filled in.",
 	},
 	inquiry: {
-		title: "The form",
-		description: "Where clients send their idea. Always on your page.",
+		title: "Got an idea?",
+		description:
+			"A short invitation with a button to the page where clients send their idea. Always on your page.",
 	},
 } as const satisfies Record<string, { title: string; description: string }>;
 export type SectionKey = keyof typeof SECTION_WORDS;
@@ -132,7 +133,7 @@ export function moveRow(
 	return moved;
 }
 
-/** The rows with one shown or hidden; the form cannot be hidden. */
+/** The rows with one shown or hidden; the "Got an idea?" row cannot be hidden. */
 export function toggleRow(
 	rows: SectionRow[],
 	index: number,

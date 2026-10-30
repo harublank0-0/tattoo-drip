@@ -751,8 +751,9 @@ components:
             `work` (Recent work: the newest photos), `artists` (the artists
             list), `info` (Good to know: hours, closed days and what clients
             ask, shown only when the studio filled something in) or
-            `inquiry` (the idea form, always listed). More will come: treat
-            an unknown value as one to leave out.
+            `inquiry` (the "Got an idea?" invitation to the request page,
+            always listed). More will come: treat an unknown value as one to
+            leave out.
           type: string
           enum: [work, artists, info, inquiry]
 

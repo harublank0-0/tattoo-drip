@@ -265,7 +265,7 @@ export default function PageLook({
 
 /**
  * The sections list (TAT-126): one row for each section with its words, a
- * "Show on your page" box (the form's row says "Always shown" instead) and
+ * "Show on your page" box (the "Got an idea?" row says "Always shown" instead) and
  * two buttons that move it a place earlier or later. Each shown row sends a
  * hidden `sections[]`, in the rows' order, which is how the server learns the
  * order and what is hidden. A moved row's node moves in the DOM and a moved
