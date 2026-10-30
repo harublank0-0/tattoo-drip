@@ -1243,6 +1243,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/account_controller').default['signOutOthers']>>>
     }
   }
+  'api.v1.styles.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/styles'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_styles_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_styles_controller').default['index']>>>
+    }
+  }
   'api.v1.studio': {
     methods: ["GET","HEAD"]
     pattern: '/api/v1/tenants/:tenant'
@@ -1277,6 +1289,18 @@ export interface Registry {
       query: {}
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_artists_controller').default['show']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_artists_controller').default['show']>>>
+    }
+  }
+  'api.v1.work.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/tenants/:tenant/work'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQueryForGet<InferInput<(typeof import('#modules/storefront/validators/work').listWorkValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_work_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_work_controller').default['index']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
   'api.v1.inquiries.store': {

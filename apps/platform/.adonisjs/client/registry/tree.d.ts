@@ -194,10 +194,16 @@ export interface ApiDefinition {
   }
   api: {
     v1: {
+      styles: {
+        index: typeof routes['api.v1.styles.index']
+      }
       studio: typeof routes['api.v1.studio']
       artists: {
         index: typeof routes['api.v1.artists.index']
         show: typeof routes['api.v1.artists.show']
+      }
+      work: {
+        index: typeof routes['api.v1.work.index']
       }
       inquiries: {
         store: typeof routes['api.v1.inquiries.store']

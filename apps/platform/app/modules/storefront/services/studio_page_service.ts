@@ -7,6 +7,10 @@ import ArtistService from "#modules/artists/services/artist_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import WorkPhotoService from "#modules/artists/services/work_photo_service";
 import { knownStyles, type TattooStyleRef } from "#modules/artists/styles";
+import {
+	encodeWorkCursor,
+	type WorkCursor,
+} from "#modules/artists/work_cursor";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService, {
 	type ShownImage,
@@ -40,6 +44,29 @@ export type StudioPage = {
 
 /** A work photo as the public API shows it (openapi.yaml, WorkPhoto). */
 export type ShownWorkPhoto = ShownImage & { alt: string | null };
+
+/** A photo of the gallery as the public API shows it (openapi.yaml, GalleryPhoto). */
+export type ShownGalleryPhoto = ShownWorkPhoto & {
+	styles: TattooStyleRef[];
+	healed: boolean;
+	artist: { slug: string; name: string };
+};
+
+/** What listWork asks for: `healed: false` is no filter, and `limit` is already within bounds. */
+export type WorkQuery = {
+	artist: string | null;
+	style: string | null;
+	healed: boolean;
+	cursor: WorkCursor | null;
+	limit: number;
+};
+
+/** A page of the gallery before formatting (openapi.yaml, listWork). */
+export type ShownWorkPage = {
+	photos: ShownGalleryPhoto[];
+	nextCursor: string | null;
+	filters: { styles: TattooStyleRef[]; healed: boolean };
+};
 
 /** A visible artist as the public API shows it (openapi.yaml, Artist). */
 export type ShownArtist = Pick<
@@ -124,6 +151,63 @@ export default class StudioPageService {
 		return this.shown(tenant, artist, work.get(artist.id) ?? []);
 	}
 
+	/**
+	 * One page of the gallery (TAT-126): the photos of the visible artists
+	 * (all of them, or the one whose slug is `query.artist`), newest first,
+	 * with what the gallery can be filtered by among those artists' photos.
+	 * The artists are one read, which also gives each photo its artist's slug
+	 * and name; an artist who is not visible, not there or not exactly that
+	 * slug (never case-folded) is an empty page and empty filters, without a
+	 * photo query. A style that is not in the list (a retired one still on a
+	 * photo included) matches nothing, as the photos no longer show it.
+	 * Then one query for the page and one for the filters, which are not
+	 * narrowed by `style`, `healed` or the cursor.
+	 */
+	async work(tenant: Tenant, query: WorkQuery): Promise<ShownWorkPage> {
+		const visible = await this.artists.listVisible(tenant);
+		const artists =
+			query.artist === null
+				? visible
+				: visible.filter((artist) => artist.slug === query.artist);
+		if (artists.length === 0) {
+			return {
+				photos: [],
+				nextCursor: null,
+				filters: { styles: [], healed: false },
+			};
+		}
+		const artistIds = artists.map((artist) => artist.id);
+		const listed = query.style === null || isListed(query.style);
+		const { photos, next } = listed
+			? await this.workPhotos.page(
+					tenant,
+					{ artistIds, style: query.style, healed: query.healed },
+					query.cursor,
+					query.limit,
+				)
+			: { photos: [], next: null };
+		const facets = await this.workPhotos.facets(tenant, artistIds);
+		const owners = new Map(artists.map((artist) => [artist.id, artist]));
+		return {
+			photos: await Promise.all(
+				photos.map(async (photo) => {
+					const owner = owners.get(photo.artistId);
+					if (!owner) {
+						throw new Error(`Work photo ${photo.id} is of an artist not read`);
+					}
+					return {
+						...(await this.shownWorkPhoto(tenant, photo)),
+						styles: knownStyles(photo.styles),
+						healed: photo.healed,
+						artist: { slug: owner.slug, name: owner.name },
+					};
+				}),
+			),
+			nextCursor: next ? encodeWorkCursor(next) : null,
+			filters: { styles: knownStyles(facets.styles), healed: facets.healed },
+		};
+	}
+
 	private async shown(
 		tenant: Tenant,
 		artist: Artist,
@@ -140,16 +224,23 @@ export default class StudioPageService {
 			closedMessage: artist.acceptingInquiries ? null : artist.closedMessage,
 			photo: await this.photoOf(tenant, artist),
 			workPhotos: await Promise.all(
-				work.map(async (photo) => ({
-					...(await this.images.shownImage(WORK_PHOTO, photo.imageKey, tenant, {
-						width: photo.width,
-						height: photo.height,
-					})),
-					alt: photo.alt,
-				})),
+				work.map((photo) => this.shownWorkPhoto(tenant, photo)),
 			),
 			styles: knownStyles(artist.styles),
 			socialLinks: socialLinks(artist),
+		};
+	}
+
+	private async shownWorkPhoto(
+		tenant: Tenant,
+		photo: ArtistWorkPhoto,
+	): Promise<ShownWorkPhoto> {
+		return {
+			...(await this.images.shownImage(WORK_PHOTO, photo.imageKey, tenant, {
+				width: photo.width,
+				height: photo.height,
+			})),
+			alt: photo.alt,
 		};
 	}
 
@@ -191,6 +282,11 @@ export default class StudioPageService {
 			height: photoHeight,
 		});
 	}
+}
+
+/** Whether `slug` is in the platform's list of styles. */
+function isListed(slug: string): boolean {
+	return knownStyles([slug]).length > 0;
 }
 
 /** The tenant's public profile, field by field: nothing else of the row. */

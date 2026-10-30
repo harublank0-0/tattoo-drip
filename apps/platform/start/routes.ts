@@ -568,6 +568,13 @@ router
  */
 router
 	.group(() => {
+		// The platform's tattoo styles (TAT-126): the fixed list, the same for
+		// everyone and under no studio, so it is cached like the studio's reads.
+		router
+			.get("/styles", [controllers.PublicStyles, "index"])
+			.use(middleware.publicCache())
+			.as("api.v1.styles.index");
+
 		/**
 		 * One tenant's public data. The tenant is the path's slug, current or
 		 * old, matched exactly; handlers run in its database context. Every
@@ -592,6 +599,15 @@ router
 					.where("artist", ARTIST_SLUG)
 					.use(middleware.publicCache())
 					.as("api.v1.artists.show");
+				// The studio's gallery (TAT-126): every visible artist's photos
+				// (a closed artist's too), newest first, a page at a time. Only the
+				// query string is read; a refused parameter or cursor is the 422
+				// validation_failed, and an artist or style that matches nothing is
+				// an empty page.
+				router
+					.get("/work", [controllers.PublicWork, "index"])
+					.use(middleware.publicCache())
+					.as("api.v1.work.index");
 				// The intake (TAT-51). intakeGuard counts the address, checks the
 				// bot challenge and counts the studio before its multipart body is
 				// read (TAT-55); the controller does the honeypot and the phone count.
