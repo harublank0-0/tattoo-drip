@@ -50,6 +50,9 @@ export default class extends BaseSchema {
 			table.timestamp("created_at", { useTz: true }).notNullable();
 			table.timestamp("updated_at", { useTz: true }).nullable();
 			// A purged artist takes its design rows (soft deletes never reach here).
+			// `artist_id` cascades while the inquiry and project keys below are NO
+			// ACTION, so a hard purge of an artist whose design a request names would
+			// fail on that key. Artists are only soft-deleted, so it can't happen today.
 			tenantReference(table, "artist_id", "artists");
 			// The studio-wide and per-artist lists, newest first.
 			table.index(["tenant_id", "created_at", "id"], "flash_designs_newest");
