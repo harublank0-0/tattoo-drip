@@ -338,15 +338,17 @@ export default class FlashService {
 	}
 
 	/**
-	 * Holds the design for a request about to name it: the artist's row, then
-	 * the design's own, each `FOR KEY SHARE` until the transaction ends (the
-	 * locks the request's foreign keys take anyway, taken before the slow work
-	 * is over). It returns the design when it is still shown and its artist is
-	 * still visible, else null. An owner removing the design (`remove`) then
-	 * waits for the request and finds it named (FlashInUseError), or has
-	 * removed it first and the request finds nothing. Artist first, like
+	 * Holds the design for a request about to name it: the artist's row
+	 * `FOR SHARE` (so the artist cannot be hidden or deleted until the
+	 * request ends, ArtistService.holdVisible), then the design's own
+	 * `FOR KEY SHARE`, the lock the request's foreign key takes anyway. It
+	 * returns the design when it is still shown and its artist is still
+	 * visible, else null. An owner removing the design (`remove`) then waits
+	 * for the request and finds it named (FlashInUseError), or has removed it
+	 * first and the request finds nothing; a design hidden meanwhile
+	 * (`update`) waits behind the artist's hold too. Artist first, like
 	 * `remove`, so neither waits for the other while holding what it needs.
-	 * Call it inside the request's transaction.
+	 * Call it inside the request's transaction, as late as possible.
 	 */
 	async holdShown(
 		trx: QueryClientContract,

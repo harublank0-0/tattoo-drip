@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import queue from "@adonisjs/queue/services/main";
 import { test } from "@japa/runner";
+import Artist from "#modules/artists/models/artist";
 import ArtistService, {
 	type ProfileEditor,
 } from "#modules/artists/services/artist_service";
@@ -13,7 +14,7 @@ import Inquiry from "#modules/inquiries/models/inquiry";
 import IntakeService, {
 	type Submission,
 } from "#modules/inquiries/services/intake_service";
-import { addArtist, addFlashDesign } from "#tests/helpers/artists";
+import { addArtist, addFlashDesign, artistInput } from "#tests/helpers/artists";
 import {
 	RecordingImageService,
 	testImages,
@@ -50,8 +51,25 @@ class HeldImages extends RecordingImageService {
 	}
 }
 
-function servicesWith(images: RecordingImageService) {
-	const artists = new ArtistService(images);
+/** The request, stopped right after it holds the artist and before it reads the design. */
+class ArtistsPausedAfterHold extends ArtistService {
+	readonly reached = deferred();
+	readonly release = deferred();
+
+	override async holdVisible(
+		...args: Parameters<ArtistService["holdVisible"]>
+	) {
+		const held = await super.holdVisible(...args);
+		this.reached.resolve();
+		await this.release.promise;
+		return held;
+	}
+}
+
+function servicesWith(
+	images: RecordingImageService,
+	artists: ArtistService = new ArtistService(images),
+) {
 	const flash = new FlashService(images, artists);
 	return {
 		flash,
@@ -82,8 +100,44 @@ async function studioWithDesign() {
 	const artist = await addArtist(tenant, owner);
 	const design = await inTenant(tenant, () => addFlashDesign(tenant, artist));
 	const editor: ProfileEditor = { userId: owner.id, role: "owner" };
-	return { tenant, design, editor };
+	return { tenant, owner, artist, design, editor };
 }
+
+/** The artist as stored now: the instance `addArtist` returned belongs to a finished transaction. */
+const storedArtist = (id: string) =>
+	Artist.query().where("id", id).firstOrFail();
+
+/**
+ * The two changes an owner can make to an artist that take the profile off
+ * the public pages: both are plain updates of the row.
+ */
+const takeDowns: {
+	name: string;
+	apply: (
+		artist: { id: string },
+		tenant: { id: string },
+		owner: { id: string },
+	) => Promise<unknown>;
+}[] = [
+	{
+		name: "deleted",
+		apply: async (artist, tenant) =>
+			new ArtistService(new RecordingImageService()).delete(
+				tenant,
+				await storedArtist(artist.id),
+			),
+	},
+	{
+		name: "hidden",
+		apply: async (artist, tenant, owner) =>
+			new ArtistService(new RecordingImageService()).update(
+				tenant,
+				await storedArtist(artist.id),
+				artistInput({ visible: false }),
+				owner,
+			),
+	},
+];
 
 const inquiriesOf = (tenant: { id: string }) =>
 	inTenant(tenant, () => Inquiry.query().where("tenant_id", tenant.id));
@@ -195,5 +249,104 @@ test.group("A flash request and the design's removal (TAT-129)", (group) => {
 		const [inquiry] = await inquiriesOf(tenant);
 		assert.equal(inquiry.flashDesignId, design.id);
 		assert.lengthOf(await designsOf(tenant), 1);
+	}).timeout(20000);
+
+	for (const takeDown of takeDowns) {
+		test(`an artist ${takeDown.name} but not committed yet: the request waits for it, then finds the design unavailable`, async ({
+			assert,
+		}) => {
+			const { tenant, owner, artist, design } = await studioWithDesign();
+			const { intake } = servicesWith(new RecordingImageService());
+			const changing = heldOpen(tenant, () =>
+				takeDown.apply(artist, tenant, owner),
+			);
+			await changing.reached;
+
+			const requesting = await onItsOwnConnection(tenant, () =>
+				intake.submit(tenant, submission(design.id)),
+			);
+			const waited = await waitUntilBlocked(requesting.pid, requesting.outcome);
+			changing.release();
+			const [changed, outcome] = await Promise.all([
+				changing.outcome,
+				requesting.outcome,
+			]);
+
+			assert.isTrue(waited, "the request waited for the artist's change");
+			assert.isUndefined(errorOf(changed), String(errorOf(changed)));
+			const refusal = errorOf(outcome);
+			assert.instanceOf(refusal, InquiryRuleError, String(refusal));
+			assert.equal((refusal as InquiryRuleError).reason, "flash_unavailable");
+			assert.lengthOf(await inquiriesOf(tenant), 0);
+		}).timeout(20000);
+
+		test(`an artist ${takeDown.name} after the request holds them: the change waits for the request, so no request is stored for a taken-down artist`, async ({
+			assert,
+		}) => {
+			const { tenant, owner, artist, design } = await studioWithDesign();
+			const images = new RecordingImageService();
+			const paused = new ArtistsPausedAfterHold(images);
+			const { intake } = servicesWith(images, paused);
+			const requesting = await onItsOwnConnection(tenant, () =>
+				intake.submit(tenant, submission(design.id)),
+			);
+			// The request holds the artist and has not read the design yet.
+			await paused.reached.promise;
+
+			const changing = await onItsOwnConnection(tenant, () =>
+				takeDown.apply(artist, tenant, owner),
+			);
+			const waited = await waitUntilBlocked(changing.pid, changing.outcome);
+			paused.release.resolve();
+			const [submitted, changed] = await Promise.all([
+				requesting.outcome,
+				changing.outcome,
+			]);
+
+			assert.isTrue(waited, "the change waited for the request's hold");
+			assert.isUndefined(errorOf(submitted), String(errorOf(submitted)));
+			assert.isUndefined(errorOf(changed), String(errorOf(changed)));
+			// The request came first: it is stored, then the change lands.
+			const [inquiry] = await inquiriesOf(tenant);
+			assert.equal(inquiry.flashDesignId, design.id);
+		}).timeout(20000);
+	}
+
+	test("an artist's profile save does not wait for a request that is still processing its pictures", async ({
+		assert,
+	}) => {
+		const { tenant, owner, artist, design } = await studioWithDesign();
+		const held = new HeldImages();
+		const { intake } = servicesWith(held);
+		const requesting = settle(
+			inTenant(tenant, async () =>
+				intake.submit(
+					tenant,
+					submission(design.id, {
+						referenceImages: [await uploadOf(await testImages.png())],
+					}),
+				),
+			),
+		);
+		// The request has passed its lookup and now decodes its picture.
+		await held.reached.promise;
+
+		const saving = await onItsOwnConnection(tenant, async () =>
+			new ArtistService(new RecordingImageService()).update(
+				tenant,
+				await storedArtist(artist.id),
+				artistInput({ bio: "Fine line work" }),
+				owner,
+			),
+		);
+		const waited = await waitUntilBlocked(saving.pid, saving.outcome);
+		const saved = await saving.outcome;
+		held.release.resolve();
+		const outcome = await requesting;
+
+		assert.isFalse(waited, "the save did not wait for the request");
+		assert.isUndefined(errorOf(saved), String(errorOf(saved)));
+		assert.isUndefined(errorOf(outcome), String(errorOf(outcome)));
+		assert.lengthOf(await inquiriesOf(tenant), 1);
 	}).timeout(20000);
 });

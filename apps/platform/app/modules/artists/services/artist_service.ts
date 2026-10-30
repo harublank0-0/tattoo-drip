@@ -184,13 +184,21 @@ export default class ArtistService {
 
 	/**
 	 * Holds the live, visible profile `artistId` until the transaction ends
-	 * (`FOR KEY SHARE`: the lock a row naming the artist takes through its
-	 * foreign key anyway, taken here early), or null when it is not one. A
-	 * request that names one of the artist's flash designs takes it before the
-	 * design's own lock (FlashService.holdShown): the owner removing a design
-	 * takes the artist's `FOR UPDATE` (`lockEditable`) and then the design's,
-	 * so both go artist first and neither can wait for the other. Call it
-	 * inside a transaction.
+	 * (`FOR SHARE`), or null when it is not one. A request that names one of
+	 * the artist's flash designs takes it before the design's own lock
+	 * (FlashService.holdShown), after its slow work and just before its
+	 * insert, so an owner's save never waits behind an upload.
+	 *
+	 * `FOR SHARE`, not the weaker `FOR KEY SHARE` the request's foreign key
+	 * takes anyway: `delete` is a plain UPDATE of `deleted_at`, which does
+	 * not conflict with `FOR KEY SHARE`, so a delete could commit after the
+	 * hold and before the design is read. `FOR SHARE` conflicts with every
+	 * update, so a delete or a save waits for the request, and one still
+	 * uncommitted when this runs is waited for: the `where` below is then
+	 * judged on the row it left (hidden or deleted gives null), which is the
+	 * check under the lock. The owner removing a design takes the artist's
+	 * `FOR UPDATE` (`lockEditable`) and then the design's, so both go artist
+	 * first and neither can wait for the other. Call it inside a transaction.
 	 */
 	async holdVisible(
 		trx: QueryClientContract,
@@ -201,7 +209,7 @@ export default class ArtistService {
 			.where("tenant_id", tenant.id)
 			.where("id", artistId)
 			.where("visible", true);
-		query.knexQuery.forKeyShare();
+		query.knexQuery.forShare();
 		return query.first();
 	}
 

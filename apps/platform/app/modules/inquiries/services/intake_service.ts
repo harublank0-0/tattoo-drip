@@ -90,9 +90,12 @@ export default class IntakeService {
 				submission.referenceImages ?? [],
 			);
 			// `target` looked the design up without a lock, to refuse early. An
-			// owner may have removed it while the pictures were processed: hold
-			// it (and its artist) now, so a removal waits for this request, and
-			// a design already gone is the same refusal, not a database error.
+			// owner may have removed it, or the artist been hidden or deleted,
+			// while the pictures were processed: hold the artist and the design
+			// now, so a removal or an artist's change waits for this request, and
+			// anything already gone is the same refusal, not a database error.
+			// Held this late, after the slow work, an owner's profile save waits
+			// only for the insert below, never for an upload.
 			if (flashDesignId !== null) {
 				const held =
 					artistId !== null &&
