@@ -15,6 +15,7 @@ import { isClaimed } from "#modules/flash/claims";
 import type FlashDesign from "#modules/flash/models/flash_design";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import FlashService from "#modules/flash/services/flash_service";
+import { ICON_SIZE } from "#modules/media/services/image_processor";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService, {
 	type ShownImage,
@@ -28,6 +29,8 @@ import type {
 import OpeningHoursService from "#modules/scheduling/services/opening_hours_service";
 import {
 	claimedFlashOf,
+	type LogoTile,
+	logoTileOf,
 	lookOf,
 	type PageLook,
 } from "#modules/storefront/look";
@@ -46,6 +49,15 @@ import type { TenantProfile } from "#modules/tenancy/services/tenancy_service";
  */
 export type StudioProfile = TenantProfile & Pick<Tenant, "slug" | "type">;
 
+/**
+ * The logo as the public API shows it (openapi.yaml, Logo; TAT-123): the
+ * image, the tile it sits on and its square icon, or null when it has none.
+ */
+export type ShownLogo = ShownImage & {
+	tile: LogoTile;
+	icon: ShownImage | null;
+};
+
 /** The public Studio before formatting (openapi.yaml, Studio). */
 export type StudioPage = {
 	profile: StudioProfile;
@@ -54,7 +66,7 @@ export type StudioPage = {
 	/** The studio's cover photo (TAT-116), or null. */
 	cover: ShownImage | null;
 	/** How the page looks (TAT-56): the checked look and the logo. */
-	storefront: { look: PageLook; logo: ShownImage | null };
+	storefront: { look: PageLook; logo: ShownLogo | null };
 	/** The open weekdays, Sunday first (TAT-128). */
 	openingHours: OpeningDay[];
 	/** The closed days that haven't ended in the studio's timezone, earliest first. */
@@ -147,6 +159,7 @@ export type ShownArtist = Pick<
 const PHOTO = "artist_photo";
 const COVER = "studio_cover";
 const LOGO = "studio_logo";
+const ICON = "studio_icon";
 const WORK_PHOTO = "artist_work_photo";
 const FLASH_DESIGN = "flash_design";
 
@@ -454,16 +467,27 @@ export default class StudioPageService {
 		});
 	}
 
-	/** The logo (TAT-56) from the row already loaded, like the cover: no query. */
-	private async logoOf(tenant: Tenant): Promise<ShownImage | null> {
+	/**
+	 * The logo (TAT-56) from the row already loaded, like the cover: no query.
+	 * TAT-123: with its tile (an unknown stored word is the light one) and its
+	 * square icon, which a logo saved before the icons existed does not have.
+	 */
+	private async logoOf(tenant: Tenant): Promise<ShownLogo | null> {
 		const { logoImageKey, logoImageWidth, logoImageHeight } = tenant;
 		if (!logoImageKey || logoImageWidth === null || logoImageHeight === null) {
 			return null;
 		}
-		return this.images.shownImage(LOGO, logoImageKey, tenant, {
+		const logo = await this.images.shownImage(LOGO, logoImageKey, tenant, {
 			width: logoImageWidth,
 			height: logoImageHeight,
 		});
+		const icon = tenant.logoIconKey
+			? await this.images.shownImage(ICON, tenant.logoIconKey, tenant, {
+					width: ICON_SIZE,
+					height: ICON_SIZE,
+				})
+			: null;
+		return { ...logo, tile: logoTileOf(tenant.logoTile), icon };
 	}
 
 	private async photoOf(

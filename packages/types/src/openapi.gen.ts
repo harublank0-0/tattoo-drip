@@ -485,6 +485,43 @@ export interface components {
             variants: components["schemas"]["ImageVariant"][];
         };
         /**
+         * @description The studio's logo (TAT-56) as an `Image` (`alt` is always null: it
+         *     sits beside the studio's name; a PNG keeps its transparency), with the
+         *     tile it sits on and its square icon (TAT-123).
+         */
+        Logo: {
+            /**
+             * Format: uri
+             * @description Public and absolute.
+             */
+            url: string;
+            width: number;
+            height: number;
+            alt: string | null;
+            /**
+             * @description Smaller copies, narrowest first (320, 640 and 1280 px, those below
+             *     the logo's own width), `[]` when it has none. Build `srcset` from
+             *     these and `url` at `width`.
+             */
+            variants: components["schemas"]["ImageVariant"][];
+            /**
+             * @description The small tile the logo sits on, in both colour schemes: `light`
+             *     (#f7f3ee) or `dark` (#14110f). Picked when the logo is uploaded (a
+             *     light logo with a see-through background gets the dark one); the
+             *     owner can change it. Treat an unknown value as `light`.
+             * @enum {string}
+             */
+            tile: "light" | "dark";
+            /**
+             * @description A square copy of the logo for the browser tab and a phone's home
+             *     screen, or null (a logo saved before TAT-123, or one whose icon
+             *     could not be made): a 180 x 180 PNG of the logo on the tile picked
+             *     at upload, never see-through, with its 32 px copy in `variants`.
+             *     `alt` is always null.
+             */
+            icon: components["schemas"]["Image"] | null;
+        };
+        /**
          * @description An artist's photo (TAT-44) and its smaller copies: an `Image`
          *     without `alt`, so every property is always there. The page builds the
          *     `alt` text from the artist's name.
@@ -602,9 +639,10 @@ export interface components {
             branding: {
                 /**
                  * @description The studio's logo, or null. `alt` is always null (it sits
-                 *     beside the studio's name). A PNG keeps its transparency.
+                 *     beside the studio's name). A PNG keeps its transparency. It
+                 *     comes with the tile it sits on and its square icon (`Logo`).
                  */
-                logo: components["schemas"]["Image"] | null;
+                logo: components["schemas"]["Logo"] | null;
                 colors: {
                     /**
                      * @description The studio's colour for buttons, links and the frame

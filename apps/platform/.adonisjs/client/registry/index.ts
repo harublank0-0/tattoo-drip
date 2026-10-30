@@ -162,6 +162,12 @@ const routes = {
     tokens: [{"old":"/t/:tenant/settings/logo","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/logo","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/logo","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/logo","type":0,"val":"logo","end":""}],
     types: placeholder as Registry['tenant.settings.logo.destroy']['types'],
   },
+  'tenant.settings.logo.tile.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/settings/logo/tile',
+    tokens: [{"old":"/t/:tenant/settings/logo/tile","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/logo/tile","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/logo/tile","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/logo/tile","type":0,"val":"logo","end":""},{"old":"/t/:tenant/settings/logo/tile","type":0,"val":"tile","end":""}],
+    types: placeholder as Registry['tenant.settings.logo.tile.update']['types'],
+  },
   'tenant.settings.payments': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/settings/payments',

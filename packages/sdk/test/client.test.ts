@@ -753,6 +753,19 @@ describe("studio and artists", () => {
 							width: 320,
 						},
 					],
+					tile: "dark",
+					icon: {
+						url: "https://api.example.com/uploads/tenants/t/studio_icon/i.32.png",
+						width: 180,
+						height: 180,
+						alt: null,
+						variants: [
+							{
+								url: "https://api.example.com/uploads/tenants/t/studio_icon/i.32w.png",
+								width: 32,
+							},
+						],
+					},
 				},
 				colors: { accent: "#0f766e", accentDark: null },
 				font: "serif",

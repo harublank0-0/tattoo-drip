@@ -538,7 +538,27 @@ test.group("StudioPageService: page look and logo (TAT-56)", (group) => {
 				withLogo.logoImageKey ?? "",
 				tenant,
 			),
+			// TAT-123: the tile and the square icon, from the same row.
+			tile: "light",
+			icon: {
+				url: await images.url(
+					"studio_icon",
+					withLogo.logoIconKey ?? "",
+					tenant,
+				),
+				width: 180,
+				height: 180,
+				variants: await images.variants(
+					"studio_icon",
+					withLogo.logoIconKey ?? "",
+					tenant,
+				),
+			},
 		});
+		assert.deepEqual(
+			result.storefront.logo?.icon?.variants.map((copy) => copy.width),
+			[32],
+		);
 		assert.deepEqual(
 			result.storefront.logo?.variants.map((copy) => copy.width),
 			[320],

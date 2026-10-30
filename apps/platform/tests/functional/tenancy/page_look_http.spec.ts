@@ -9,6 +9,11 @@ import {
 	THEME_ACCENT_DARK,
 	THEMES,
 } from "#modules/storefront/look";
+import {
+	LOGO_SAVED,
+	LOGO_SAVED_ON_DARK_TILE,
+	LOGO_TILE_SAVED,
+} from "#modules/tenancy/look_messages";
 import Tenant from "#modules/tenancy/models/tenant";
 import { studioLinks } from "#services/studio_links";
 import { polyglot, testImages } from "#tests/helpers/images";
@@ -88,7 +93,14 @@ test.group("Settings, Page look: the page (TAT-56)", (group) => {
 		assert.isFalse(props.hasCover);
 		assert.deepEqual(props.studioPage, studioLinks(tenant.slug));
 		const text = JSON.stringify(props);
-		for (const secret of ["logoImage", "logo_image", "coverImage"]) {
+		for (const secret of [
+			"logoImage",
+			"logo_image",
+			"logoIcon",
+			"logo_icon",
+			"studio_icon",
+			"coverImage",
+		]) {
 			assert.notInclude(text, secret);
 		}
 	});
@@ -559,6 +571,12 @@ test.group("Settings, Page look: saving (TAT-56)", (group) => {
 				.withCsrfToken()
 				.loginAs(member)
 				.redirects(0),
+			await client
+				.put(`/t/${tenant.slug}/settings/logo/tile`)
+				.form({ tile: "dark" })
+				.withCsrfToken()
+				.loginAs(member)
+				.redirects(0),
 		];
 
 		for (const response of responses) response.assertStatus(404);
@@ -580,6 +598,19 @@ const setLogo = (
 	client
 		.put(`/t/${tenant.slug}/settings/logo`)
 		.file("logo", data, { filename })
+		.withCsrfToken()
+		.loginAs(user)
+		.redirects(0);
+
+const putTile = (
+	client: ApiClient,
+	user: User,
+	tenant: { slug: string },
+	body: Record<string, unknown>,
+) =>
+	client
+		.put(`/t/${tenant.slug}/settings/logo/tile`)
+		.form(body)
 		.withCsrfToken()
 		.loginAs(user)
 		.redirects(0);
@@ -608,7 +639,7 @@ test.group("Settings, Page look: the logo (TAT-56)", (group) => {
 		);
 		set.assertStatus(302);
 		set.assertHeader("location", `/t/${tenant.slug}/settings/look`);
-		set.assertFlashMessage("success", "Logo saved.");
+		set.assertFlashMessage("success", LOGO_SAVED);
 		const first = await reload(tenant);
 		assert.match(
 			first.logoImageKey ?? "",
@@ -653,8 +684,10 @@ test.group("Settings, Page look: the logo (TAT-56)", (group) => {
 		assert.deepEqual(Object.keys(logo).sort(), [
 			"height",
 			"previewUrl",
+			"tile",
 			"width",
 		]);
+		assert.equal(logo.tile, "light");
 		assert.match(
 			new URL(logo.previewUrl).pathname,
 			new RegExp(`^/uploads/tenants/${tenant.id}/${LOGO}/.+\\.640w\\.png$`),
@@ -667,6 +700,86 @@ test.group("Settings, Page look: the logo (TAT-56)", (group) => {
 		assert.equal(narrow.width, 500);
 		assert.equal(narrow.height, 250);
 		assert.notMatch(narrow.previewUrl, /640w/);
+	});
+
+	test("uploading a light logo says it went on the dark tile; a dark one says only that it is saved", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+
+		const white = await setLogo(
+			client,
+			owner,
+			tenant,
+			await testImages.logoOnClear([{ r: 255, g: 255, b: 255 }]),
+		);
+		const whiteTile = (await reload(tenant)).logoTile;
+		const dark = await setLogo(
+			client,
+			owner,
+			tenant,
+			await testImages.logoOnClear([{ r: 0, g: 0, b: 0 }]),
+		);
+
+		white.assertStatus(302);
+		white.assertFlashMessage("success", LOGO_SAVED_ON_DARK_TILE);
+		assert.equal(whiteTile, "dark");
+		dark.assertFlashMessage("success", LOGO_SAVED);
+		assert.equal((await reload(tenant)).logoTile, "light");
+	});
+
+	test("the preview carries the tile, and never the icon", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+		await setLogo(
+			client,
+			owner,
+			tenant,
+			await testImages.logoOnClear([{ r: 255, g: 255, b: 255 }]),
+		);
+
+		const { logo } = (await lookPage(client, owner, tenant)).inertiaProps;
+
+		assert.equal(logo.tile, "dark");
+		assert.notInclude(JSON.stringify(logo), "studio_icon");
+	});
+
+	test("an owner switches the tile, and back", async ({ client, assert }) => {
+		const { tenant, owner } = await studioWithOwner();
+		await setLogo(client, owner, tenant, await testImages.png(600, 200));
+		const before = await reload(tenant);
+
+		const dark = await putTile(client, owner, tenant, { tile: "dark" });
+		const darkRow = await reload(tenant);
+		const light = await putTile(client, owner, tenant, { tile: "light" });
+
+		dark.assertStatus(302);
+		dark.assertHeader("location", `/t/${tenant.slug}/settings/look`);
+		dark.assertFlashMessage("success", LOGO_TILE_SAVED);
+		assert.equal(darkRow.logoTile, "dark");
+		assert.equal(darkRow.logoImageKey, before.logoImageKey);
+		assert.equal(darkRow.logoIconKey, before.logoIconKey);
+		light.assertStatus(302);
+		assert.equal((await reload(tenant)).logoTile, "light");
+	});
+
+	test("an unknown or missing tile is a field error and nothing changes", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+		await setLogo(client, owner, tenant, await testImages.png(600, 200));
+		const before = (await reload(tenant)).serialize();
+
+		for (const body of [{ tile: "blue" }, { tile: "Dark" }, {}]) {
+			const response = await putTile(client, owner, tenant, body);
+			assertValidationError(response, "tile", "Choose a light or a dark tile.");
+		}
+
+		assert.deepEqual((await reload(tenant)).serialize(), before);
 	});
 
 	test("the cover is separate: hasCover follows the cover, not the logo", async ({

@@ -99,6 +99,7 @@ The studio page gets **no special access**. It uses the same endpoints and packa
 - The tenant comes from the host on each request: the storefront's tenant middleware confirms it with `studio.get()` and redirects old slugs ([tenants and hosts](../apps/storefront/docs/development.md#tenants-and-hosts)).
 - Server-side rendering sends a secret server key (`STOREFRONT_SERVER_KEY`, as `Authorization: Bearer`), used only for rate limiting (TAT-38): with a valid key the platform counts the call by the visitor's address the storefront sends as `X-Visitor-IP` (added with the SDK's `fetch` option, `src/tenancy/visitor.ts`); without one, every call counts against the storefront server's own address.
 - Inquiries go from the browser straight to the API.
+- `Studio.storefront.branding.logo` is a `Logo` (TAT-123): the `Image` fields plus `tile` (`light` or `dark`, the small tile the logo sits on; treat an unknown value as `light`) and `icon` (an `Image`, or null: a 180 px square copy of the logo with its 32 px copy in `variants`, for the browser tab and a phone's home screen). The storefront checks both like any brand image (the API's origin only).
 
 ```ts
 // apps/storefront (TAT-23, src/api/): a QueryClient and a client per server request and per tab

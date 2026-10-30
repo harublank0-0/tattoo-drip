@@ -51,11 +51,14 @@ test.group("The page look components (TAT-56)", () => {
 		}
 	});
 
-	test("the logo is drawn on the plate token, which is light in both schemes", async ({
+	test("the logo is drawn on the plate tokens, the same in both schemes", async ({
 		assert,
 	}) => {
 		const form = await read("components/logo_form.tsx");
-		assert.include(form, "bg-logo-plate");
+		assert.include(form, "LOGO_TILE_CLASS[logo.tile]");
+		const words = await read("components/page_look.ts");
+		assert.include(words, '"bg-logo-plate"');
+		assert.include(words, '"bg-logo-plate-dark"');
 		const css = await read("css/app.css");
 		const dark = css.indexOf("\n[data-theme='dark'] {");
 		assert.isAbove(dark, 0);
@@ -64,6 +67,15 @@ test.group("The page look components (TAT-56)", () => {
 		assert.isBelow(css.indexOf("--logo-plate:"), dark, "in the light :root");
 		assert.include(css, "--logo-plate: #f7f3ee;");
 		assert.include(css, "--color-logo-plate: var(--logo-plate);");
+		// TAT-123: the dark tile is the dark paper, defined once, in the light :root.
+		assert.lengthOf(css.match(/--logo-plate-dark:/g) ?? [], 1, "defined once");
+		assert.isBelow(
+			css.indexOf("--logo-plate-dark:"),
+			dark,
+			"in the light :root, so it is the same in dark mode",
+		);
+		assert.include(css, "--logo-plate-dark: #14110f;");
+		assert.include(css, "--color-logo-plate-dark: var(--logo-plate-dark);");
 	});
 
 	test("the cover form has the anchor the page links to, clear of the top bar", async ({

@@ -245,6 +245,39 @@ describe("a studio's logo and cover (TAT-54)", () => {
 		assert.doesNotMatch(cover, /^<div class="profile-cover"><img[^>]*\/><img/);
 	});
 
+	test("a logo on the dark tile says so on the hero's and the bar's image; a light one renders as before (TAT-123)", () => {
+		const dark = withStorefront({
+			...BRANDED,
+			branding: { ...BRANDED.branding, logo: { ...LOGO, tile: "dark" } },
+		});
+		const light = withStorefront({
+			...BRANDED,
+			branding: { ...BRANDED.branding, logo: { ...LOGO, tile: "light" } },
+		});
+
+		const studio = studioHtml(dark);
+		const artist = artistHtml("sita", dark);
+		const request = requestHtml(dark, "sita");
+
+		assertSafePage(studio, BRAND_PAGE);
+		assert.match(
+			studio.match(/<img class="profile-logo"[^>]*>/)?.[0] ?? "",
+			/ data-tile="dark"\/>$/,
+		);
+		assert.match(
+			artist.match(/<img class="site-bar-logo"[^>]*>/)?.[0] ?? "",
+			/ data-tile="dark"\/>$/,
+		);
+		assert.match(
+			request.match(/<img class="site-bar-logo"[^>]*>/)?.[0] ?? "",
+			/ data-tile="dark"\/>$/,
+		);
+		// Light, or no tile sent: no attribute, the same bytes as before.
+		assert.equal(studioHtml(light), studioHtml(withStorefront(BRANDED)));
+		assert.doesNotMatch(studioHtml(light), /data-tile/);
+		assert.doesNotMatch(artistHtml("sita", light), /data-tile/);
+	});
+
 	test("copies give the logo, the bar logo and the cover their srcset and sizes (TAT-112)", () => {
 		const branding = {
 			...BRANDED.branding,

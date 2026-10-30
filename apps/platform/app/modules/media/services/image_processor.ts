@@ -126,6 +126,121 @@ export async function makeVariants(
 	});
 }
 
+/** A logo's two tiles (TAT-123), "#rrggbb": the colour behind it on the studio page. */
+export type TileColours = { light: string; dark: string };
+
+/** A logo is judged on a copy at most this many pixels on a side: enough for shares, cheap to read. */
+const TILE_SAMPLE = 64;
+/** WCAG's minimum for graphics (1.4.11): a pixel under 3:1 against a tile is hard to see on it. */
+const MIN_TILE_CONTRAST = 3;
+/**
+ * The icon's side (TAT-123): Apple's home-screen size; its 32 px copy is the browser tab's (ICON_WIDTHS).
+ * The public contract advertises this as the stored icon's width and height without reading the
+ * file, so changing it needs a backfill of every `logo_icon_key` row (the stored icons keep the old size).
+ */
+export const ICON_SIZE = 180;
+/** The margin around the logo inside its icon, a tenth of each side, so iOS's rounded corners never cut it. */
+export const ICON_PADDING = 18;
+
+function linear(value: number): number {
+	const c = value / 255;
+	return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+}
+
+function luminance(r: number, g: number, b: number): number {
+	return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
+}
+
+function hexLuminance(hex: string): number {
+	const [r, g, b] = [1, 3, 5].map((start) =>
+		Number.parseInt(hex.slice(start, start + 2), 16),
+	);
+	return luminance(r, g, b);
+}
+
+function contrast(a: number, b: number): number {
+	return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+/**
+ * The tile a logo shows on (TAT-123): "dark" when more than half of what can
+ * be seen of it is under 3:1 on the light tile and less of it is under 3:1 on
+ * the dark one (a white or yellow logo); "light" otherwise, and always for a
+ * logo with nothing see-through (a JPEG, an opaque PNG: the tile is only a thin
+ * frame around it) or nothing visible. Pixels count by their opacity, on a copy
+ * at most TILE_SAMPLE px on a side. Takes a decode slot; only processImage's
+ * output may come in.
+ */
+export async function logoTile(
+	image: ProcessedImage,
+	tiles: TileColours,
+): Promise<"light" | "dark"> {
+	if (image.format !== "png") return "light";
+	return decodeSlot(async () => {
+		const { data, info } = await sharp(image.data, {
+			limitInputPixels: MAX_VARIANT_INPUT_PIXELS,
+			failOn: "error",
+		})
+			.toColourspace("srgb")
+			.ensureAlpha()
+			.resize({ width: TILE_SAMPLE, height: TILE_SAMPLE, fit: "inside" })
+			.raw()
+			.toBuffer({ resolveWithObject: true });
+		if (info.channels !== 4) {
+			throw new Error(`a tile sample came out with ${info.channels} channels`);
+		}
+		const light = hexLuminance(tiles.light);
+		const dark = hexLuminance(tiles.dark);
+		let seen = 0;
+		let hiddenOnLight = 0;
+		let hiddenOnDark = 0;
+		let seeThrough = false;
+		for (let index = 0; index < data.length; index += 4) {
+			const alpha = data[index + 3];
+			if (alpha < 255) seeThrough = true;
+			if (alpha === 0) continue;
+			const weight = alpha / 255;
+			const pixel = luminance(data[index], data[index + 1], data[index + 2]);
+			seen += weight;
+			if (contrast(pixel, light) < MIN_TILE_CONTRAST) hiddenOnLight += weight;
+			if (contrast(pixel, dark) < MIN_TILE_CONTRAST) hiddenOnDark += weight;
+		}
+		if (!seeThrough || seen === 0) return "light";
+		return hiddenOnLight > seen / 2 && hiddenOnDark < hiddenOnLight
+			? "dark"
+			: "light";
+	});
+}
+
+/**
+ * A logo's square icon (TAT-123): an ICON_SIZE px PNG, the logo fitted inside a
+ * margin of ICON_PADDING (enlarged when smaller), centred on `background` (a
+ * tile's "#rrggbb"), never see-through: a home screen fills transparency with
+ * black. Takes a decode slot. Store it with storeBytes: its copies come from
+ * its purpose.
+ */
+export async function squareIcon(
+	image: ProcessedImage,
+	background: string,
+): Promise<Buffer> {
+	return decodeSlot(async () => {
+		const inner = ICON_SIZE - 2 * ICON_PADDING;
+		const fitted = await sharp(image.data, {
+			limitInputPixels: MAX_VARIANT_INPUT_PIXELS,
+			failOn: "error",
+		})
+			.resize({ width: inner, height: inner, fit: "inside" })
+			.png()
+			.toBuffer();
+		return sharp({
+			create: { width: ICON_SIZE, height: ICON_SIZE, channels: 3, background },
+		})
+			.composite([{ input: fitted, gravity: "centre" }])
+			.png()
+			.toBuffer();
+	});
+}
+
 /** processImage's work once the format is known and a slot is free. */
 async function decode(
 	input: Buffer,

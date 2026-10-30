@@ -167,6 +167,7 @@ describe("the frame", () => {
 					src: "https://api.example.com/logo.png",
 					width: 600,
 					height: 200,
+					tile: "light",
 				},
 			}),
 		);
@@ -186,6 +187,39 @@ describe("the frame", () => {
 		);
 	});
 
+	test("a logo on the dark tile says so; a light one has no tile attribute (TAT-123)", () => {
+		const logo = {
+			src: "https://api.example.com/logo.png",
+			width: 600,
+			height: 200,
+		};
+
+		const [dark] = tags(
+			render(
+				createElement(DepositFrame, {
+					studioName: STUDIO,
+					logo: { ...logo, tile: "dark" },
+				}),
+			),
+			"img",
+		);
+		const [light] = tags(
+			render(
+				createElement(DepositFrame, {
+					studioName: STUDIO,
+					logo: { ...logo, tile: "light" },
+				}),
+			),
+			"img",
+		);
+
+		assert.equal(attr(dark, "class"), "deposit-logo");
+		assert.equal(attr(dark, "data-tile"), "dark");
+		assert.equal(attr(dark, "referrerpolicy"), "no-referrer");
+		assert.equal(attr(light, "class"), "deposit-logo");
+		assert.doesNotMatch(light, /data-tile/);
+	});
+
 	test("a logo with copies carries srcset and sizes and keeps its Referer rule (TAT-112)", () => {
 		const srcSet =
 			"https://api.example.com/logo.320w.png 320w, https://api.example.com/logo.png 600w";
@@ -196,6 +230,7 @@ describe("the frame", () => {
 					src: "https://api.example.com/logo.png",
 					width: 600,
 					height: 200,
+					tile: "light",
 					srcSet,
 				},
 			}),
@@ -216,6 +251,7 @@ describe("the frame", () => {
 					src: "https://api.example.com/mark.png",
 					width: 600,
 					height: 600,
+					tile: "light",
 					srcSet:
 						"https://api.example.com/mark.320w.png 320w, https://api.example.com/mark.png 600w",
 				},
@@ -233,6 +269,7 @@ describe("the frame", () => {
 					src: "https://api.example.com/logo.png",
 					width: 600,
 					height: 200,
+					tile: "light",
 				},
 			}),
 		);

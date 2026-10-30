@@ -1,7 +1,7 @@
 import type { Studio } from "@tattoo-drip/sdk";
 import type { ApiContext } from "../api/context.ts";
 import { loadStudio } from "../api/loaders.ts";
-import { type BrandImage, parseThemeConfig } from "../studio/theme/config.ts";
+import { type LogoImage, parseThemeConfig } from "../studio/theme/config.ts";
 import { storefrontInput } from "../studio/theme/source.ts";
 import { studioViewModel } from "../studio/view-model.ts";
 
@@ -22,7 +22,7 @@ export interface DepositShell {
 	/** E.164, checked; null when the studio set none. */
 	readonly phone: string | null;
 	/** The studio's logo when it passes the theme's checks (the API's own origin), else null: the header then shows the initial. */
-	readonly logo: BrandImage | null;
+	readonly logo: LogoImage | null;
 }
 
 /** `imageOrigin` is the API's origin, the only one a logo may come from; null accepts none. */

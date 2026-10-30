@@ -6,11 +6,15 @@ import {
 	contrastRatio,
 	DARK_PAPER,
 	DEFAULT_FONT,
+	DEFAULT_LOGO_TILE,
 	DEFAULT_SECTIONS,
 	DEFAULT_THEME,
 	FONT_KEYS,
 	FONTS,
 	LIGHT_PAPER,
+	LOGO_TILE_COLOURS,
+	LOGO_TILES,
+	logoTileOf,
 	lookOf,
 	MIN_TEXT_CONTRAST,
 	readsOn,
@@ -99,6 +103,23 @@ test.group("the page look rules match the storefront's own", () => {
 			Number(room?.[1]),
 			SECTION_KEYS.length,
 			"StorefrontConfiguration.sections.maxItems is SECTION_KEYS.length",
+		);
+	});
+
+	test("the contract's Logo lists the same tiles, light first, and a logo is a Logo", ({
+		assert,
+	}) => {
+		const yaml = contract();
+		const logo = schemaOf(yaml, "Logo");
+		const listed = /tile:\n\s+type: string\n\s+enum: \[([^\]]*)\]/.exec(logo);
+		assert.deepEqual(
+			(listed?.[1] ?? "").split(",").map((key) => key.trim()),
+			[...LOGO_TILES],
+			"Logo.tile's enum is LOGO_TILES",
+		);
+		assert.match(
+			schemaOf(yaml, "StorefrontConfiguration"),
+			/logo:[\s\S]*?oneOf: \[\{ \$ref: "#\/components\/schemas\/Logo" \}, \{ type: "null" \}\]/,
 		);
 	});
 
@@ -329,6 +350,51 @@ test.group("the lists the dashboard shows", () => {
 			FONTS.map((font) => font.key),
 			[...FONT_KEYS],
 		);
+	});
+});
+
+test.group("a logo's tile (TAT-123)", () => {
+	test("the tiles are the light and the dark paper, light by default", ({
+		assert,
+	}) => {
+		assert.deepEqual([...LOGO_TILES], ["light", "dark"]);
+		assert.equal(DEFAULT_LOGO_TILE, "light");
+		assert.deepEqual(LOGO_TILE_COLOURS, {
+			light: LIGHT_PAPER,
+			dark: DARK_PAPER,
+		});
+	});
+
+	test("the tile colours are the storefront's and the dashboard's tile tokens", ({
+		assert,
+	}) => {
+		const css = storefront("src/styles.css");
+		assert.include(css, `--logo-plate: ${LOGO_TILE_COLOURS.light};`);
+		assert.include(css, `--logo-plate-dark: ${LOGO_TILE_COLOURS.dark};`);
+		const dashboard = readFileSync(
+			new URL("../../../../inertia/css/app.css", import.meta.url),
+			"utf8",
+		);
+		assert.include(dashboard, `--logo-plate: ${LOGO_TILE_COLOURS.light};`);
+		assert.include(dashboard, `--logo-plate-dark: ${LOGO_TILE_COLOURS.dark};`);
+	});
+
+	test("the storefront reads the same two tiles", ({ assert }) => {
+		const config = storefront("src/studio/theme/config.ts");
+		assert.include(
+			config,
+			`export type LogoTile = ${LOGO_TILES.map((tile) => `"${tile}"`).join(" | ")};`,
+		);
+	});
+
+	test("logoTileOf reads the exact word and anything else as light", ({
+		assert,
+	}) => {
+		assert.equal(logoTileOf("dark"), "dark");
+		assert.equal(logoTileOf("light"), "light");
+		for (const stored of ["Dark", "", "accent", "dark "]) {
+			assert.equal(logoTileOf(stored), "light", stored);
+		}
 	});
 });
 

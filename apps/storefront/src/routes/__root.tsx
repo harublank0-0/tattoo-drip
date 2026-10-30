@@ -12,6 +12,7 @@ import { loadStudio } from "../api/loaders.ts";
 import eczarLatin from "../assets/fonts/eczar/eczar-latin-700-normal.woff2?url";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import type { SiteContext } from "../site/context.ts";
+import { studioIconLinks } from "../studio/icon.ts";
 import { rootMeta } from "../studio/seo.ts";
 import appCss from "../styles.css?url";
 
@@ -46,11 +47,13 @@ export const Route = createRootRouteWithContext<ApiContext & SiteContext>()({
 				rel: "stylesheet",
 				href: appCss,
 			},
-			// No favicon: most logos are not square (TAT-56 left it out); this stops the /favicon.ico request.
-			{
-				rel: "icon",
-				href: "data:,",
-			},
+			// The studio's icon, made from its logo at upload (TAT-123); without one,
+			// a stop for the /favicon.ico request. Its API's origin is connected once
+			// the root loader has read the studio.
+			...studioIconLinks(
+				loaderData,
+				loaderData ? match.context.tattoo.connection.apiUrl : null,
+			),
 		],
 	}),
 	shellComponent: RootDocument,

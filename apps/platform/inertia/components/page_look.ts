@@ -77,8 +77,19 @@ export type PageLookProps = {
 export type ThemeOption = { key: string; label: string; description: string };
 export type FontOption = { key: FontKey; label: string };
 
-/** The logo as Settings, Page look gets it: the 640 px copy and its own size. */
-export type LogoProps = { previewUrl: string; width: number; height: number };
+/** The small tile a logo sits on (the server's LOGO_TILES; dashboard modules import no server code). */
+export type LogoTile = "light" | "dark";
+
+/**
+ * The logo as Settings, Page look gets it: the 640 px copy, its own size and
+ * the tile it sits on (TAT-123).
+ */
+export type LogoProps = {
+	previewUrl: string;
+	width: number;
+	height: number;
+	tile: LogoTile;
+};
 
 /** The theme's violets: where an empty colour box starts its swatch. */
 export type Swatches = { light: string; dark: string };
@@ -99,7 +110,26 @@ export const SECTIONS_INTRO =
 	"What your page shows under its cover and intro, in this order.";
 
 export const LOGO_INTRO =
-	"Shown above your studio's name, on each artist's page and on the deposit page, on a light tile. A dark logo saved as a PNG with a see-through background works best.";
+	"Shown above your studio's name, on each artist's page and on the deposit page, on a small tile, and as your page's icon in the browser tab. A PNG with a see-through background works best.";
+
+/** The preview's tile: literal class names, so Tailwind sees them. */
+export const LOGO_TILE_CLASS = {
+	light: "bg-logo-plate",
+	dark: "bg-logo-plate-dark",
+} as const satisfies Record<LogoTile, string>;
+
+/** Which tile the logo sits on, and which kind of logo shows better on the other. */
+export function tileLine(tile: LogoTile): string {
+	return tile === "dark"
+		? "It sits on a dark tile. A dark logo shows better on a light one."
+		: "It sits on a light tile. A white or light logo shows better on a dark one.";
+}
+
+/** The tile button's words: `offered` is the tile it switches to; or the wait. */
+export function tileButton(offered: LogoTile, processing: boolean): string {
+	if (processing) return "Saving…";
+	return offered === "dark" ? "Use a dark tile" : "Use a light tile";
+}
 
 export const NO_LOGO =
 	"No logo yet. Your page shows your studio's name on its own.";

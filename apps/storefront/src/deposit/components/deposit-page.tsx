@@ -3,7 +3,7 @@ import { Fill } from "../../intake/components/fill.tsx";
 import { fill } from "../../intake/template.ts";
 import { linkRel } from "../../studio/links.ts";
 import { logoSizes } from "../../studio/srcset.ts";
-import type { BrandImage } from "../../studio/theme/config.ts";
+import type { LogoImage } from "../../studio/theme/config.ts";
 import { copy } from "../copy.ts";
 import type { LoadProblem } from "../problems.ts";
 import {
@@ -44,7 +44,7 @@ export function DepositFrame({
 }: {
 	studioName: string;
 	/** The studio's checked logo (DepositShell.logo), or null for its initial. */
-	logo?: BrandImage | null;
+	logo?: LogoImage | null;
 	/** The project's artist, once the deposit is read. */
 	artistName?: string | null;
 	/** `due` with a way to pay: from 60rem the page is two columns (styles.css). */
@@ -94,7 +94,7 @@ function DepositHeader({
 	artistName,
 }: {
 	studioName: string;
-	logo: BrandImage | null;
+	logo: LogoImage | null;
 	artistName: string | null;
 }) {
 	return (
@@ -111,6 +111,7 @@ function DepositHeader({
 					decoding="async"
 					fetchPriority="low"
 					referrerPolicy="no-referrer"
+					data-tile={logo.tile === "dark" ? "dark" : undefined}
 				/>
 			) : (
 				<span className="deposit-mark" aria-hidden="true">

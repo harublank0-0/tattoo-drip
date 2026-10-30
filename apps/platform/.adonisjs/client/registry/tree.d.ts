@@ -49,6 +49,9 @@ export interface ApiDefinition {
       logo: {
         update: typeof routes['tenant.settings.logo.update']
         destroy: typeof routes['tenant.settings.logo.destroy']
+        tile: {
+          update: typeof routes['tenant.settings.logo.tile.update']
+        }
       }
       payments: typeof routes['tenant.settings.payments'] & {
         create: typeof routes['tenant.settings.payments.create']

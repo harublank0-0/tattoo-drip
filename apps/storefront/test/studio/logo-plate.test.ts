@@ -94,3 +94,39 @@ describe("the logo's light tile (TAT-56)", () => {
 		assert.ok(contrastRatio(ink as string, plate as string) >= 15.8);
 	});
 });
+
+describe("the logo's dark tile (TAT-123)", () => {
+	const DARK_LOGOS = LOGOS.map(
+		({ selector }) => `${selector}[data-tile="dark"]`,
+	);
+
+	test("--logo-plate-dark is the dark paper, defined once, on :root and not in the dark block", () => {
+		const defs = [...bare.matchAll(/--logo-plate-dark:\s*([^;]+);/g)];
+		assert.equal(defs.length, 1, "defined exactly once");
+		assert.equal(defs[0][1].trim(), "#14110f");
+		const dark = bare.indexOf("@media (prefers-color-scheme: dark) {");
+		assert.ok(dark > 0);
+		assert.ok(
+			(defs[0].index ?? Number.POSITIVE_INFINITY) < dark,
+			"before the dark block",
+		);
+		assert.match(rule(":root"), /--logo-plate-dark:\s*#14110f;/);
+	});
+
+	test("one rule puts the three logos on it when their tile is dark", () => {
+		const selector = DARK_LOGOS.join(", ");
+		assert.match(
+			rule(selector),
+			/background:\s*var\(--logo-plate-dark\)/,
+			"the one rule",
+		);
+	});
+
+	test("white on the dark tile reads at 18:1 or better", () => {
+		const plate = /--logo-plate-dark:\s*(#[0-9a-f]{6});/.exec(
+			rule(":root"),
+		)?.[1];
+		assert.ok(plate);
+		assert.ok(contrastRatio("#ffffff", plate as string) >= 18);
+	});
+});

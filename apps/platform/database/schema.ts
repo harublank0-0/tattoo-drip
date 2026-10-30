@@ -971,9 +971,11 @@ export class TenantSchema extends BaseModel {
 		"id",
 		"instagramUrl",
 		"intro",
+		"logoIconKey",
 		"logoImageHeight",
 		"logoImageKey",
 		"logoImageWidth",
+		"logoTile",
 		"name",
 		"slug",
 		"storefrontClaimedFlash",
@@ -1028,11 +1030,15 @@ export class TenantSchema extends BaseModel {
 	@column()
 	declare intro: string | null;
 	@column()
+	declare logoIconKey: string | null;
+	@column()
 	declare logoImageHeight: number | null;
 	@column()
 	declare logoImageKey: string | null;
 	@column()
 	declare logoImageWidth: number | null;
+	@column()
+	declare logoTile: string;
 	@column()
 	declare name: string;
 	@column()

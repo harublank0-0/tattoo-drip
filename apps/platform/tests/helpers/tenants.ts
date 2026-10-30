@@ -158,7 +158,7 @@ export async function seededStudio(slug: string, name: string) {
 			owner,
 		),
 	);
-	// A cover photo and a logo for the studio (TAT-116, TAT-56) and two work
+	// A cover photo and a logo for the studio (TAT-116, TAT-56, TAT-123) and two work
 	// photos for the artist, with made-up keys (the drive ignores a delete of a
 	// missing file). Two photos, so that a move changes something.
 	await inTenant(tenant, async () => {
@@ -169,6 +169,10 @@ export async function seededStudio(slug: string, name: string) {
 			logoImageKey: `tenants/${tenant.id}/studio_logo/${randomUUID()}.320.png`,
 			logoImageWidth: 600,
 			logoImageHeight: 200,
+			// TAT-123: the dark tile and an icon, so the public isolation suite
+			// covers an icon URL and the tile switch's isolation case changes a row.
+			logoTile: "dark",
+			logoIconKey: `tenants/${tenant.id}/studio_icon/${randomUUID()}.32.png`,
 		});
 		await tenant.save();
 	});

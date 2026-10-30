@@ -94,6 +94,27 @@ export const MIN_TEXT_CONTRAST = 4.5;
 export const THEME_ACCENT = "#43389a";
 export const THEME_ACCENT_DARK = "#a99cff";
 
+/**
+ * The small tile a studio's logo sits on (TAT-123), in both colour schemes:
+ * the light paper or the dark one. Picked when the logo is uploaded (a light
+ * logo with a see-through background gets the dark one); the owner can switch
+ * it. The storefront reads the same two words (`branding.logo.tile`; an
+ * unknown one is "light") and keeps the colours as `--logo-plate` and
+ * `--logo-plate-dark`; look.spec.ts compares them.
+ */
+export const LOGO_TILES = ["light", "dark"] as const;
+export type LogoTile = (typeof LOGO_TILES)[number];
+export const DEFAULT_LOGO_TILE: LogoTile = "light";
+export const LOGO_TILE_COLOURS: Record<LogoTile, string> = {
+	light: LIGHT_PAPER,
+	dark: DARK_PAPER,
+};
+
+/** A stored tile as the page can use it: the word while it is on the list, else the light tile. The database checks only the shape. */
+export function logoTileOf(stored: string): LogoTile {
+	return isOneOf(LOGO_TILES, stored) ? stored : DEFAULT_LOGO_TILE;
+}
+
 export const HEX_COLOR = /^#[0-9a-f]{6}$/;
 
 function luminance(color: string): number {

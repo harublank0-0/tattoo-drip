@@ -7,7 +7,12 @@ import {
 	THEME_ACCENT,
 	THEMES,
 } from "#modules/storefront/look";
-import { LOOK_SAVED_MESSAGE } from "#modules/tenancy/look_messages";
+import {
+	LOGO_SAVED,
+	LOGO_SAVED_ON_DARK_TILE,
+	LOGO_TILE_SAVED,
+	LOOK_SAVED_MESSAGE,
+} from "#modules/tenancy/look_messages";
 // @ts-expect-error TS6305: the server project only references the inertia project, so it cannot read its sources and the module is untyped here; `PageLookModule` below restates its shape and the inertia project type-checks the real one.
 import * as pageLookModule from "../../../inertia/components/page_look.js";
 
@@ -26,6 +31,9 @@ type PageLookModule = {
 		processing: boolean,
 		percentage?: number,
 	): string;
+	tileLine(tile: "light" | "dark"): string;
+	tileButton(tile: "light" | "dark", processing: boolean): string;
+	LOGO_TILE_CLASS: Record<string, string>;
 	coverLine(hasCover: boolean): string;
 	coverLink(hasCover: boolean): string;
 	SECTION_WORDS: Record<string, { title: string; description: string }>;
@@ -369,7 +377,7 @@ test.group("page look words (TAT-56)", () => {
 		);
 		assert.equal(
 			words.LOGO_INTRO,
-			"Shown above your studio's name, on each artist's page and on the deposit page, on a light tile. A dark logo saved as a PNG with a see-through background works best.",
+			"Shown above your studio's name, on each artist's page and on the deposit page, on a small tile, and as your page's icon in the browser tab. A PNG with a see-through background works best.",
 		);
 		assert.equal(
 			words.NO_LOGO,
@@ -387,6 +395,41 @@ test.group("page look words (TAT-56)", () => {
 			words.COVER_INTRO_LINE,
 			"The big photo at the top of your page, with your studio's name over it.",
 		);
+	});
+
+	test("the logo's tile words (TAT-123)", ({ assert }) => {
+		assert.equal(
+			words.tileLine("light"),
+			"It sits on a light tile. A white or light logo shows better on a dark one.",
+		);
+		assert.equal(
+			words.tileLine("dark"),
+			"It sits on a dark tile. A dark logo shows better on a light one.",
+		);
+		// The button offers the other tile.
+		assert.equal(words.tileButton("dark", false), "Use a dark tile");
+		assert.equal(words.tileButton("light", false), "Use a light tile");
+		assert.equal(words.tileButton("dark", true), "Saving…");
+		assert.equal(words.tileButton("light", true), "Saving…");
+		// Literal class names, so Tailwind finds them.
+		assert.deepEqual(words.LOGO_TILE_CLASS, {
+			light: "bg-logo-plate",
+			dark: "bg-logo-plate-dark",
+		});
+	});
+
+	test("the server's logo messages (TAT-123)", ({ assert }) => {
+		assert.equal(LOGO_SAVED, "Logo saved.");
+		assert.equal(
+			LOGO_SAVED_ON_DARK_TILE,
+			"Logo saved. It's light, so your page shows it on a dark tile. You can change that under Logo.",
+		);
+		assert.equal(
+			LOGO_TILE_SAVED,
+			"Tile saved. It can take up to 15 minutes to show on your page.",
+		);
+		// Like the look's flash, the tile's says how long a CDN may keep the page.
+		assert.include(LOGO_TILE_SAVED, "up to 15 minutes");
 	});
 
 	test("the theme and font lists the server sends have these exact words", ({

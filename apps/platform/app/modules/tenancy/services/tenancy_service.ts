@@ -6,6 +6,8 @@ import ImageService from "#modules/media/services/image_service";
 import {
 	type ClaimedFlash,
 	type FontKey,
+	LOGO_TILE_COLOURS,
+	type LogoTile,
 	type SectionKey,
 	sectionList,
 	type ThemeKey,
@@ -32,9 +34,11 @@ import {
 import { isUniqueViolation } from "#services/db_errors";
 
 /**
- * The studio's two public images and the tenant columns each is kept in
- * (TAT-116 cover, TAT-56 logo): the purpose picks the disk and the copies,
- * and the three columns hold the key and the size, all set or all null.
+ * The studio's cover photo and the tenant columns it is kept in (TAT-116):
+ * the purpose picks the disk and the copies, and the three columns hold the
+ * key and the size, all set or all null. The logo (TAT-56) is not here: it
+ * comes with a tile and an icon (TAT-123), so setLogo and removeLogo have
+ * their own steps.
  */
 const BRAND_IMAGES = {
 	cover: {
@@ -42,12 +46,6 @@ const BRAND_IMAGES = {
 		key: "coverImageKey",
 		width: "coverImageWidth",
 		height: "coverImageHeight",
-	},
-	logo: {
-		purpose: "studio_logo",
-		key: "logoImageKey",
-		width: "logoImageWidth",
-		height: "logoImageHeight",
 	},
 } as const;
 type BrandImage = (typeof BRAND_IMAGES)[keyof typeof BRAND_IMAGES];
@@ -150,7 +148,7 @@ export default class TenancyService {
 		> = new ArtistService(new ImageService()),
 		private images: Pick<
 			ImageService,
-			"store" | "delete" | "deleteOrThrow"
+			"store" | "storeLogo" | "delete" | "deleteOrThrow"
 		> = new ImageService(),
 	) {}
 
@@ -256,19 +254,96 @@ export default class TenancyService {
 
 	/**
 	 * Sets or replaces the studio's logo (TAT-56, owners only): the cover's
-	 * rules, with the studio_logo purpose and the three logo columns. A PNG
-	 * keeps its see-through background, in its copies too.
+	 * rules (setCover), with the studio_logo purpose and the three logo
+	 * columns. A PNG keeps its see-through background, in its copies too.
+	 * TAT-123: the logo comes with the tile it shows on (picked from its
+	 * pixels: a light logo with a see-through background gets the dark one) and
+	 * a square icon on that tile, stored under studio_icon (best effort: a
+	 * logo whose icon could not be made has none). A new upload decides the
+	 * tile again. The replaced logo's files and its icon are deleted after the
+	 * commit; a rollback deletes the new ones.
 	 */
 	async setLogo(
 		tenant: Pick<Tenant, "id">,
 		upload: Pick<MultipartFile, "tmpPath">,
 	): Promise<Tenant> {
-		return this.setImage(tenant, upload, BRAND_IMAGES.logo);
+		return withTransaction(async (trx) => {
+			const stored = await this.images.storeLogo(upload, {
+				tenant,
+				tiles: LOGO_TILE_COLOURS,
+			});
+			// Both cleanups at once, with no await between them and the store.
+			afterRollback(() => this.images.delete("studio_logo", stored.key));
+			const icon = stored.icon;
+			if (icon)
+				afterRollback(() => this.images.delete("studio_icon", icon.key));
+			const live = await Tenant.query({ client: trx })
+				.where("id", tenant.id)
+				.forUpdate()
+				.firstOrFail();
+			const previousLogo = live.logoImageKey;
+			const previousIcon = live.logoIconKey;
+			live.merge({
+				logoImageKey: stored.key,
+				logoImageWidth: stored.width,
+				logoImageHeight: stored.height,
+				logoIconKey: icon?.key ?? null,
+				logoTile: stored.tile,
+			});
+			await live.save();
+			if (previousLogo) {
+				afterCommit(() => this.images.delete("studio_logo", previousLogo));
+			}
+			if (previousIcon) {
+				afterCommit(() => this.images.delete("studio_icon", previousIcon));
+			}
+			return live;
+		});
 	}
 
-	/** Removes the studio's logo, files first: the cover's rules (removeCover). */
+	/**
+	 * Removes the studio's logo, files first (removeCover's rules), and its
+	 * icon with it (TAT-123): the icon first, so a failure leaves the logo
+	 * whole for the retry. The tile stays: it is only a preference, and the
+	 * next upload decides it again.
+	 */
 	async removeLogo(tenant: Pick<Tenant, "id">): Promise<void> {
-		await this.removeImage(tenant, BRAND_IMAGES.logo);
+		await withTransaction(async (trx) => {
+			const live = await Tenant.query({ client: trx })
+				.where("id", tenant.id)
+				.forUpdate()
+				.firstOrFail();
+			if (!live.logoImageKey) return;
+			if (live.logoIconKey) {
+				await this.images.deleteOrThrow("studio_icon", live.logoIconKey);
+			}
+			await this.images.deleteOrThrow("studio_logo", live.logoImageKey);
+			live.merge({
+				logoImageKey: null,
+				logoImageWidth: null,
+				logoImageHeight: null,
+				logoIconKey: null,
+			});
+			await live.save();
+		});
+	}
+
+	/**
+	 * Puts the studio's logo on the light or the dark tile (TAT-123, owners
+	 * only: the route says so). Only the tile column is written (Lucid saves
+	 * the dirty ones), under the row's lock, so a logo or look saved at the
+	 * same moment is not overwritten; a studio that is not in this context is
+	 * not found (E_ROW_NOT_FOUND). The icon keeps the tile it was made on.
+	 */
+	async setLogoTile(tenant: Pick<Tenant, "id">, tile: LogoTile): Promise<void> {
+		await withTransaction(async (trx) => {
+			const live = await Tenant.query({ client: trx })
+				.where("id", tenant.id)
+				.forUpdate()
+				.firstOrFail();
+			live.logoTile = tile;
+			await live.save();
+		});
 	}
 
 	/**

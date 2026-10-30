@@ -7,6 +7,7 @@ import {
 	CLAIMED_FLASH_CHOICES,
 	claimedFlashOf,
 	FONTS,
+	logoTileOf,
 	lookOf,
 	SECTION_KEYS,
 	THEME_ACCENT,
@@ -92,6 +93,8 @@ export default class PageLookController {
 	) {
 		const shownWidth = Math.min(LOGO_PREVIEW_WIDTH, width);
 		return {
+			// The tile it sits on (TAT-123), read from the row: no query.
+			tile: logoTileOf(tenant.logoTile),
 			previewUrl: await this.images.urlFor(
 				"studio_logo",
 				key,

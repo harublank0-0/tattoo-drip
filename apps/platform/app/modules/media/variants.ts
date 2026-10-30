@@ -24,6 +24,11 @@ export const VARIANT_WIDTHS = [320, 640, 1280] as const;
  * 1280 or the 1600 one.
  */
 export const COVER_WIDTHS = [640, 960, 1280, 1600] as const;
+/**
+ * A studio logo's square icon (TAT-123): one copy, 32 px, the browser tab's
+ * copy of the 180 px icon.
+ */
+export const ICON_WIDTHS = [32] as const;
 /** A purpose that keeps one size. */
 export const NO_VARIANTS = [] as const;
 
