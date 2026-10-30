@@ -374,14 +374,18 @@
   /*
    * An anchor, or a control the keyboard focuses, is never hidden under the
    * sticky header (WCAG 2.4.11): the header's one-line height and 2.5rem, so a
-   * two-line bar (the most it grows to) leaves 1.5rem clear. With the chat
+   * two-line bar (the most it grows to) leaves 1.5rem clear. That one is
+   * unconditional (every page with fragment targets has the bar; the status
+   * and deposit pages have no top anchors), so a browser without :has()
+   * (Firefox before 121, Safari before 15.4) clears the bar too. With the chat
    * button, 5.5rem at the bottom (the 3rem toggle, the 1rem above the edge,
    * slack) plus the device's bottom inset, which the toggle also stands above
-   * (as .deposit-paid-bar does). The footer's last line clears the button too.
-   * Root-level, so it holds for every target: a `.section`, the `.inquiry`
-   * section and the artist page's `.artist-request` row.
+   * (as .deposit-paid-bar does). The footer's last line clears the button too;
+   * both need :has(), and the button is optional anyway. Root-level, so it
+   * holds for every target: a `.section`, the `.inquiry` section and the
+   * artist page's `.artist-request` row.
    */
-  :root:has(.site-bar) { scroll-padding-block-start: calc(var(--site-bar-height) + 2.5rem); }
+  :root { scroll-padding-block-start: calc(var(--site-bar-height) + 2.5rem); }
   :root:has(.chat-float) { scroll-padding-block-end: calc(5.5rem + env(safe-area-inset-bottom, 0px)); }
   :root:has(.chat-float) .site-footer { padding-block-end: calc(6rem + env(safe-area-inset-bottom, 0px)); }
 

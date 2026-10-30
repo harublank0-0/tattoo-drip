@@ -269,10 +269,14 @@ describe("the header and the chat button (TAT-127)", () => {
 	// are clamped to two lines (below). The padding adds 2.5rem to the one-line
 	// height, which leaves 1.5rem clear under a two-line bar.
 	test("an anchor or a focused control is never hidden under the bar or the chat button", () => {
+		// Unconditional, so a browser without :has() (Firefox before 121, Safari
+		// before 15.4) keeps anchors and focus clear of the bar too.
+		const bare = css.replace(/\/\*[\s\S]*?\*\//g, "");
 		assert.match(
-			ruleBody(css, ":root:has(.site-bar)"),
-			/scroll-padding-block-start:\s*calc\(var\(--site-bar-height\) \+ 2\.5rem\)/,
+			bare,
+			/(?:^|[;}\s]):root\s*\{\s*scroll-padding-block-start:\s*calc\(var\(--site-bar-height\) \+ 2\.5rem\);?\s*\}/,
 		);
+		assert.doesNotMatch(bare, /:has\(\.site-bar\)/);
 		// The toggle sits above the device's bottom inset (max(1rem, inset)), so the clearances add it.
 		assert.match(
 			ruleBody(css, ":root:has(.chat-float)"),

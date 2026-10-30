@@ -112,7 +112,7 @@ export function requestPageSeo(
 	studio: StudioView,
 	artist: ArtistView | null,
 	origin: string,
-	open = true,
+	open: boolean,
 ): PageSeo {
 	const sameName = artist?.name === studio.name;
 	const who = artist?.name ?? studio.name;

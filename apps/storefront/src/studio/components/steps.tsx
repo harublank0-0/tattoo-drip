@@ -38,20 +38,13 @@ function Steps({
 	);
 }
 
-/** The compact strip: the four titles. `level` is the heading level under the page's outline. */
-export function BookingStrip({
-	studioName,
-	level = 2,
-}: {
-	studioName: string;
-	level?: 2 | 3;
-}) {
-	const Heading = level === 2 ? "h2" : "h3";
+/** The compact strip: the four titles under an `h2`. */
+export function BookingStrip({ studioName }: { studioName: string }) {
 	return (
 		<section className="steps-strip" aria-labelledby="steps-strip-title">
-			<Heading id="steps-strip-title" className="steps-title">
+			<h2 id="steps-strip-title" className="steps-title">
 				{studioCopy.booking.title}
-			</Heading>
+			</h2>
 			<Steps studioName={studioName} detailed={false} />
 		</section>
 	);

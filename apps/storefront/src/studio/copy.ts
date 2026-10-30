@@ -88,7 +88,9 @@ export const studioCopy = {
 		 * The request page's title and description while it declines (the page
 		 * says "Inquiries" and that nobody is taking new ones, so its tab, search
 		 * snippet and share card must not invite). {who} is the artist's name when
-		 * one is picked, else the studio's.
+		 * one is picked, else the studio's. The description is also the sentence
+		 * the page itself says (the request page's closed section and the home
+		 * page's closed invitation), so the two never drift apart.
 		 */
 		closedTitle: "Inquiries at {studio}",
 		closedTitleArtist: "Inquiries for {name} at {studio}",

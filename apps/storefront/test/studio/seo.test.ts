@@ -186,7 +186,7 @@ describe("workPageSeo (TAT-126)", () => {
 
 describe("requestPageSeo (TAT-127)", () => {
 	test("the general request page asks for the idea and names the studio", () => {
-		const seo = requestPageSeo(studio, null, ORIGIN);
+		const seo = requestPageSeo(studio, null, ORIGIN, true);
 
 		assert.equal(seo.title, "Send your idea to Black Needle");
 		assert.equal(
@@ -201,7 +201,7 @@ describe("requestPageSeo (TAT-127)", () => {
 	});
 
 	test("with an artist, the title and description name them, and the artist stays in the canonical address", () => {
-		const seo = requestPageSeo(studio, sita, ORIGIN);
+		const seo = requestPageSeo(studio, sita, ORIGIN, true);
 
 		assert.equal(seo.title, "Send your idea to Sita Rai at Black Needle");
 		assert.equal(
@@ -216,7 +216,7 @@ describe("requestPageSeo (TAT-127)", () => {
 
 	test("an independent artist named like their studio isn't named twice", () => {
 		const [same] = artistViewModels([{ ...SITA, name: "Black Needle" }]);
-		const seo = requestPageSeo(studio, same, ORIGIN);
+		const seo = requestPageSeo(studio, same, ORIGIN, true);
 
 		assert.equal(seo.title, "Send your idea to Black Needle");
 	});
@@ -260,19 +260,20 @@ describe("requestPageSeo (TAT-127)", () => {
 		);
 	});
 
-	test("open is the default, and an open page keeps its inviting title", () => {
-		assert.deepEqual(
-			requestPageSeo(studio, sita, ORIGIN),
-			requestPageSeo(studio, sita, ORIGIN, true),
-		);
+	// `open` has no default: a caller that forgets it fails typecheck instead of inviting.
+	test("an open page keeps its inviting title, and a closed one differs from it", () => {
 		assert.equal(
 			requestPageSeo(studio, sita, ORIGIN, true).title,
 			"Send your idea to Sita Rai at Black Needle",
 		);
+		assert.notDeepEqual(
+			requestPageSeo(studio, sita, ORIGIN, true),
+			requestPageSeo(studio, sita, ORIGIN, false),
+		);
 	});
 
 	test("writes its head like the other pages, with the artist's photo for the card", () => {
-		const head = headTags(requestPageSeo(studio, sita, ORIGIN));
+		const head = headTags(requestPageSeo(studio, sita, ORIGIN, true));
 
 		assert.deepEqual(head.scripts, []);
 		assert.deepEqual(head.links, [

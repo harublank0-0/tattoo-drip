@@ -52,15 +52,19 @@ export function InquirySection({
 					) : null}
 					{state.kind === "studio-closed" ? (
 						<p>
-							<bdi>{state.studioName}</bdi> isn't taking new inquiries right
-							now.
+							<Fill
+								template={studioCopy.request.closedDescription}
+								values={{ who: state.studioName }}
+							/>
 						</p>
 					) : null}
 					{state.kind === "artist-closed" ? (
 						<>
 							<p>
-								<bdi>{state.artistName}</bdi> isn't taking new inquiries right
-								now.
+								<Fill
+									template={studioCopy.request.closedDescription}
+									values={{ who: state.artistName }}
+								/>
 							</p>
 							{state.closedMessage ? (
 								<p className="note user-text measure" dir="auto">
@@ -120,7 +124,10 @@ export function RequestInvite({ state }: { state: InquiryState }) {
 				</div>
 			) : (
 				<p className="measure">
-					<bdi>{state.studioName}</bdi> isn't taking new inquiries right now.
+					<Fill
+						template={studioCopy.request.closedDescription}
+						values={{ who: state.studioName }}
+					/>
 				</p>
 			)}
 		</section>
