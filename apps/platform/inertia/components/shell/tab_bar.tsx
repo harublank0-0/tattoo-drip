@@ -1,5 +1,6 @@
 import { Link } from "@adonisjs/inertia/react";
 import { usePage } from "@inertiajs/react";
+import { cn } from "cn";
 import { urlFor } from "~/client";
 import NavLink from "~/components/nav_link";
 import NavBadge from "~/components/shell/nav_badge";
@@ -15,6 +16,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
+import { useTyping } from "~/hooks/use-typing";
 
 const TAB =
 	"flex min-h-14 w-full flex-col items-center justify-center gap-0.5 text-xs text-muted-foreground";
@@ -23,7 +25,9 @@ const TAB =
  * The phone navigation (below 1024px): one tab per main destination, fixed
  * to the bottom and padded clear of the iPhone home indicator, and for owners
  * a last "More" tab that opens Clients, Artists and Settings (TAT-107). The
- * layout pads the page by the same height.
+ * layout pads the page by the same height. On a touch screen it hides while a
+ * field takes typing (TAT-84): Android lifts fixed bars above the keyboard,
+ * where the bar would cover the field.
  */
 export default function TabBar({
 	items,
@@ -33,11 +37,15 @@ export default function TabBar({
 	tenantSlug: string;
 }) {
 	const { tabs, more } = tabBarItems(items);
+	const typing = useTyping();
 
 	return (
 		<nav
 			aria-label="Main"
-			className="fixed inset-x-0 bottom-0 z-40 border-t bg-card pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] lg:hidden"
+			className={cn(
+				"fixed inset-x-0 bottom-0 z-40 border-t bg-card pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] lg:hidden",
+				typing && "pointer-coarse:hidden",
+			)}
 		>
 			<ul className="flex">
 				{tabs.map((item) => {

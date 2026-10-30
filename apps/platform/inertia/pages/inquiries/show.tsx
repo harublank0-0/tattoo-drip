@@ -5,7 +5,7 @@ import { urlFor } from "~/client";
 import InlineConfirm from "~/components/inline_confirm";
 import { type InquiryPageProps, SOURCE_LABELS } from "~/components/inquiries";
 import MessageCard from "~/components/message_card";
-import type { ContactVia } from "~/components/messages";
+import { type ContactVia, justContacted } from "~/components/messages";
 import Page from "~/components/page";
 import ReferenceGrid from "~/components/references";
 import StatusBadge from "~/components/status_badge";
@@ -29,7 +29,8 @@ export default function InquiryShow({
 	const tenant = useTenant();
 	// A decline that finishes may remove its button: focus goes to the heading.
 	const heading = useRef<HTMLHeadingElement>(null);
-	// The chat links record the contact in the background (TAT-52).
+	// The chat links record the contact in the background (TAT-52); the footer
+	// says so at once (optimistic, TAT-84).
 	const markContacted = (via: ContactVia = {}) =>
 		router.post(
 			urlFor("tenant.inbox.contacted.store", {
@@ -37,7 +38,11 @@ export default function InquiryShow({
 				id: inquiry.id,
 			}),
 			via,
-			{ preserveScroll: true, preserveState: true },
+			{
+				preserveScroll: true,
+				preserveState: true,
+				optimistic: () => justContacted(via),
+			},
 		);
 	// The same link as the Message card's Call button (`contact.callUrl`), and
 	// the same record of the contact.

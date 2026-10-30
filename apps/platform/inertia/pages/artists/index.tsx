@@ -2,7 +2,7 @@ import { Link } from "@adonisjs/inertia/react";
 import { router } from "@inertiajs/react";
 import { Pencil, Plus, Trash2, User, Users } from "lucide-react";
 import { urlFor } from "~/client";
-import type { ArtistProps } from "~/components/artists";
+import type { ArtistRowProps } from "~/components/artists";
 import CopyLinkButton from "~/components/copy_link_button";
 import Section from "~/components/section";
 import { Badge } from "~/components/ui/badge";
@@ -19,7 +19,7 @@ import { useTenant } from "~/hooks/use-tenant";
 import AppLayout from "~/layouts/app";
 import SettingsLayout from "~/layouts/settings";
 
-export default function Artists({ artists }: { artists: ArtistProps[] }) {
+export default function Artists({ artists }: { artists: ArtistRowProps[] }) {
 	const tenant = useTenant();
 	const params = { tenant: tenant.slug };
 	const add = (
@@ -72,7 +72,7 @@ function ArtistRow({
 	artist,
 	tenantSlug,
 }: {
-	artist: ArtistProps;
+	artist: ArtistRowProps;
 	tenantSlug: string;
 }) {
 	const params = { tenant: tenantSlug, id: artist.id };

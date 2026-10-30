@@ -68,6 +68,10 @@ test.group("Artists page", (group) => {
 		// The page gets what it shows, not the row.
 		assert.notProperty(list[0], "tenantId");
 		assert.notProperty(list[0], "userId");
+		// Only the edit form uses these (TAT-84).
+		assert.notProperty(list[0], "slug");
+		assert.notProperty(list[0], "bio");
+		assert.notProperty(list[0], "closedMessage");
 	});
 
 	test("the list shows the photo's 320 px copy, not the full image", async ({
