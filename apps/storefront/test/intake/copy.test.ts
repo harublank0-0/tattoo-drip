@@ -102,7 +102,11 @@ describe("the copy", () => {
 			assert.ok(copy.notices[code].title.length > 0, code);
 			assert.ok(copy.notices[code].body.length > 0, code);
 		}
-		for (const code of ["flash-unavailable", "flash-closed"] as const) {
+		for (const code of [
+			"flash-unavailable",
+			"flash-closed",
+			"flash-claimed",
+		] as const) {
 			assert.ok(NOTICE_CODES.includes(code), code);
 		}
 		assert.equal(
@@ -120,6 +124,14 @@ describe("the copy", () => {
 		assert.equal(
 			copy.notices["flash-closed"].body,
 			"Your request wasn't sent. You can still message {studio} about it.",
+		);
+		assert.equal(
+			copy.notices["flash-claimed"].title,
+			"Someone just claimed this design",
+		);
+		assert.equal(
+			copy.notices["flash-claimed"].body,
+			"It was one of a kind, so your request wasn't sent. Message {studio} to ask for something similar.",
 		);
 		for (const problem of PHOTO_PROBLEMS) {
 			assert.match(copy.photos.problems[problem], /\{name\}/, problem);

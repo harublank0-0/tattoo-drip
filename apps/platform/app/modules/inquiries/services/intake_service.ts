@@ -6,6 +6,7 @@ import { studioTakesInquiries } from "#modules/artists/accepting";
 import ArtistService from "#modules/artists/services/artist_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ClientService from "#modules/clients/services/client_service";
+import { isClaimed } from "#modules/flash/claims";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import FlashService from "#modules/flash/services/flash_service";
 import {
@@ -59,7 +60,8 @@ export type Submission = {
  * images, the inquiry with what was sent, its reference rows, and the staff
  * alert job. Every refusal comes before any image is decoded. Refusals are
  * InquiryRuleError (`artist_unavailable`, `artist_not_accepting`,
- * `studio_not_accepting`, `too_many_open_inquiries`, `flash_unavailable`) or
+ * `studio_not_accepting`, `too_many_open_inquiries`, `flash_unavailable`,
+ * `flash_claimed`) or
  * InvalidReferenceImageError, thrown after the savepoint rolled back.
  *
  * A request for a flash design (TAT-129) names the design's artist itself
@@ -101,6 +103,10 @@ export default class IntakeService {
 					artistId !== null &&
 					(await this.flash.holdShown(trx, tenant, artistId, flashDesignId));
 				if (!held) throw new InquiryRuleError("flash_unavailable");
+				// Again on the row just locked: a claim that committed since `target`
+				// read the design is the same refusal (holdShown waits for a claim in
+				// flight and reads the row it left).
+				if (isClaimed(held)) throw new InquiryRuleError("flash_claimed");
 			}
 
 			const inquiry = await Inquiry.create(
@@ -145,7 +151,7 @@ export default class IntakeService {
 	 * Who and what the inquiry asks for. With a `flashDesignId`: the design
 	 * must be shown and its artist visible ("flash_unavailable" otherwise,
 	 * the same for unknown, hidden, a hidden or deleted artist's and another
-	 * studio's), a `preferredArtistId` other than the design's artist is
+	 * studio's) and not claimed ("flash_claimed"), a `preferredArtistId` other than the design's artist is
 	 * "artist_unavailable", and an artist who takes no flash requests is
 	 * "artist_not_accepting", whatever their books say; the inquiry then
 	 * names the design's artist. Without one, a chosen artist must be one of
@@ -171,6 +177,8 @@ export default class IntakeService {
 			);
 			const owner = visible.find(({ id }) => id === design?.artistId);
 			if (!design || !owner) throw new InquiryRuleError("flash_unavailable");
+			// One of a kind and taken: refused whether the studio shows it or hides it.
+			if (isClaimed(design)) throw new InquiryRuleError("flash_claimed");
 			if (artistId !== null && artistId !== owner.id) {
 				throw new InquiryRuleError("artist_unavailable");
 			}

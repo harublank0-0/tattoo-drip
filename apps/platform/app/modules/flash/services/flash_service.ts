@@ -8,7 +8,11 @@ import ArtistService, {
 	type ProfileEditor,
 } from "#modules/artists/services/artist_service";
 import type { WorkCursor } from "#modules/artists/work_cursor";
-import { FlashInUseError, FlashLimitError } from "#modules/flash/errors";
+import {
+	FlashInUseError,
+	FlashLimitError,
+	FlashRuleError,
+} from "#modules/flash/errors";
 import FlashDesign from "#modules/flash/models/flash_design";
 import { ImageDeleteError } from "#modules/media/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -48,18 +52,31 @@ const VISIBLE_ARTIST = `exists (
 		and artists.deleted_at is null
 )`;
 
-/** What a new design needs besides the picture; `price` is in paisa, null for none. */
+/**
+ * What a new design needs besides the picture; `price` is in paisa, null for
+ * none. `oneOfAKind`: the studio will tattoo it only once, so it is claimed
+ * (never by `add` itself) when a client's deposit is verified or their
+ * project is booked.
+ */
 export type NewFlashDesign = {
 	name: string;
 	size: string;
 	price: number | null;
+	oneOfAKind: boolean;
 };
 
-/** What an owner or an artist can change on a design: its words, price and whether it is shown. */
+/** What an owner or an artist can change on a design: its words, price, whether it is one of a kind and whether it is shown. */
 export type FlashDetails = NewFlashDesign & { hidden: boolean };
 
-/** What a page of designs shows: these artists' shown designs. */
-export type FlashFilter = { artistIds: readonly string[] };
+/**
+ * What a page of designs shows: these artists' shown designs, claimed ones
+ * too when `withClaimed` (the studio shows them greyed), else only the
+ * designs nobody has claimed.
+ */
+export type FlashFilter = {
+	artistIds: readonly string[];
+	withClaimed: boolean;
+};
 
 /**
  * The flash designs of an artist (TAT-129): up to 100, newest first
@@ -171,6 +188,7 @@ export default class FlashService {
 					price: details.price,
 					currency: "NPR",
 					hidden: false,
+					oneOfAKind: details.oneOfAKind,
 				},
 				{ client: trx },
 			);
@@ -178,9 +196,14 @@ export default class FlashService {
 	}
 
 	/**
-	 * Saves the design's name, size, price and whether it is hidden, in one
-	 * save, from a fresh read under the artist's lock. The picture never
-	 * changes: a new picture is a new design.
+	 * Saves the design's name, size, price, whether it is one of a kind and
+	 * whether it is hidden, from a fresh read under the artist's lock. The
+	 * picture never changes: a new picture is a new design. Switching a design
+	 * to "can be tattooed again" clears its claim in the same transaction (the
+	 * claim goes first, in its own statement, before the design is read, so a
+	 * claim that committed meanwhile is cleared too and the database's check
+	 * `flash_designs_claim_one_of_a_kind` never sees a claimed repeatable
+	 * design); saving it still one of a kind keeps the claim.
 	 */
 	async update(
 		tenant: TenantRef,
@@ -191,11 +214,19 @@ export default class FlashService {
 		assertDesignOf(tenant, design);
 		return withTransaction(async (trx) => {
 			await this.artists.lockEditable(trx, tenant, editor, design.artistId);
+			if (!details.oneOfAKind) {
+				await trx.rawQuery(
+					`update flash_designs set claimed_at = null, claimed_project_id = null, updated_at = now()
+					where tenant_id = ? and id = ? and claimed_at is not null`,
+					[tenant.id, design.id],
+				);
+			}
 			const live = await this.lockedDesign(trx, tenant, design);
 			live.merge({
 				name: details.name.trim(),
 				size: details.size.trim(),
 				price: details.price,
+				oneOfAKind: details.oneOfAKind,
 				hidden: details.hidden,
 			});
 			await live.save();
@@ -204,11 +235,47 @@ export default class FlashService {
 	}
 
 	/**
-	 * Deletes the design for good: under the artist's lock the row goes
-	 * first, in its own savepoint, so a design that a request or a project
-	 * names (the database's `NO ACTION` keys) becomes FlashInUseError before
-	 * any file is touched. Then, in the same savepoint, the files and every
-	 * copy are deleted ("removed"). A design a client asked to take down must
+	 * Marks a one-of-a-kind design claimed by hand (`claimed` true: the claim
+	 * has no project) or available again (`false`: both claim columns
+	 * cleared, whoever made the claim). Under the artist's lock, like every
+	 * change by the studio, and as a conditional UPDATE: claiming an already
+	 * claimed design changes nothing (a project's claim stays the project's)
+	 * and a claim made by a project in the same instant is never overwritten
+	 * by a stale copy. A design that can be tattooed again is
+	 * FlashRuleError("repeatable"); an artist unlinked meanwhile or a deleted
+	 * one is E_ROW_NOT_FOUND (lockEditable). Returns the design as stored.
+	 */
+	async setClaimed(
+		tenant: TenantRef,
+		editor: ProfileEditor,
+		design: FlashDesign,
+		claimed: boolean,
+	): Promise<FlashDesign> {
+		assertDesignOf(tenant, design);
+		return withTransaction(async (trx) => {
+			await this.artists.lockEditable(trx, tenant, editor, design.artistId);
+			const live = await this.lockedDesign(trx, tenant, design);
+			if (!live.oneOfAKind) throw new FlashRuleError("repeatable");
+			await trx.rawQuery(
+				claimed
+					? `update flash_designs set claimed_at = now(), claimed_project_id = null, updated_at = now()
+						where tenant_id = ? and id = ? and one_of_a_kind and claimed_at is null`
+					: `update flash_designs set claimed_at = null, claimed_project_id = null, updated_at = now()
+						where tenant_id = ? and id = ? and claimed_at is not null`,
+				[tenant.id, live.id],
+			);
+			return this.lockedDesign(trx, tenant, design);
+		});
+	}
+
+	/**
+	 * Deletes the design for good: under the artist's lock a design that a
+	 * request or a project names is FlashInUseError at once (a plain read,
+	 * so the delete never holds the design's row while it waits for a
+	 * project's lock: see `isNamed`). Otherwise the row goes first, in its
+	 * own savepoint, so one named in the meantime (the database's `NO ACTION`
+	 * keys) becomes FlashInUseError too, before any file is touched. Then, in
+	 * the same savepoint, the files and every copy are deleted ("removed"). A design a client asked to take down must
 	 * not stay fetchable while the studio is told it is gone, and a file
 	 * delete can fail after others succeeded: if any file cannot be deleted
 	 * the savepoint rolls the row back, but the design is then damaged (some
@@ -227,6 +294,12 @@ export default class FlashService {
 		return withTransaction(async (trx) => {
 			await this.artists.lockEditable(trx, tenant, editor, design.artistId);
 			const live = await this.lockedDesign(trx, tenant, design);
+			// Before the design's row is touched: deleting it would take the row and
+			// then wait, in the foreign keys' check, for the lock of a project that is
+			// being claimed (it holds the project first, then wants this row).
+			if (await this.isNamed(trx, tenant, live.id)) {
+				throw new FlashInUseError();
+			}
 			try {
 				await withTransaction(async (savepoint) => {
 					await live.useTransaction(savepoint).delete();
@@ -281,6 +354,7 @@ export default class FlashService {
 			.where("hidden", false)
 			.whereIn("artist_id", [...filter.artistIds])
 			.whereRaw(VISIBLE_ARTIST, [tenant.id]);
+		if (!filter.withClaimed) query.whereNull("claimed_at");
 		if (after) {
 			query.whereRaw("(created_at, id) < (?::timestamptz, ?::uuid)", [
 				after.at,
@@ -302,25 +376,29 @@ export default class FlashService {
 
 	/**
 	 * Which of these artists, still visible and live in this query, have a
-	 * shown design (the filter a page offers). One query; none for [].
+	 * shown design (the filter a page offers), a claimed one only when
+	 * `withClaimed`. One query; none for [].
 	 */
 	async artistsWithDesigns(
 		tenant: TenantRef,
 		artistIds: readonly string[],
+		withClaimed: boolean,
 	): Promise<Set<string>> {
 		if (artistIds.length === 0) return new Set();
-		const rows = await FlashDesign.query()
+		const query = FlashDesign.query()
 			.where("tenant_id", tenant.id)
 			.where("hidden", false)
 			.whereIn("artist_id", [...artistIds])
-			.whereRaw(VISIBLE_ARTIST, [tenant.id])
-			.distinct("artist_id");
+			.whereRaw(VISIBLE_ARTIST, [tenant.id]);
+		if (!withClaimed) query.whereNull("claimed_at");
+		const rows = await query.distinct("artist_id");
 		return new Set(rows.map((row) => row.artistId));
 	}
 
 	/**
 	 * The design when it is shown and its artist is one of `artistIds` and
-	 * still visible and live in this query, else null.
+	 * still visible and live in this query, else null. A claimed design is
+	 * returned too (its caller decides what a claim means there).
 	 */
 	async findShown(
 		tenant: TenantRef,
@@ -341,14 +419,22 @@ export default class FlashService {
 	 * Holds the design for a request about to name it: the artist's row
 	 * `FOR SHARE` (so the artist cannot be hidden or deleted until the
 	 * request ends, ArtistService.holdVisible), then the design's own
-	 * `FOR KEY SHARE`, the lock the request's foreign key takes anyway. It
-	 * returns the design when it is still shown and its artist is still
-	 * visible, else null. An owner removing the design (`remove`) then waits
-	 * for the request and finds it named (FlashInUseError), or has removed it
-	 * first and the request finds nothing; a design hidden meanwhile
-	 * (`update`) waits behind the artist's hold too. Artist first, like
-	 * `remove`, so neither waits for the other while holding what it needs.
-	 * Call it inside the request's transaction, as late as possible.
+	 * `FOR SHARE`. It returns the design when it is still shown and its
+	 * artist is still visible, else null, as the row stands after any change
+	 * in flight: the lock waits for a claim or a change that has not
+	 * committed and reads what it left, and a claim that comes later waits
+	 * for the request. So the caller can refuse a claimed design on the
+	 * returned row (`claimed_at`) and no claim slips in between that check
+	 * and the request's insert (a claim is a non-key update, which a
+	 * `FOR KEY SHARE`, the lock the foreign key takes, would not wait for).
+	 * An owner removing the design (`remove`) then waits for the request and
+	 * finds it named (FlashInUseError), or has removed it first and the
+	 * request finds nothing; a design hidden meanwhile (`update`) waits behind
+	 * the artist's hold too. Artist first, like `remove`, so neither waits
+	 * for the other while holding what it needs. A claim holds a project and
+	 * then takes this row, and the request holds nothing a claim needs: they
+	 * wait for each other only for the request's inserts. Call it inside the
+	 * request's transaction, as late as possible.
 	 */
 	async holdShown(
 		trx: QueryClientContract,
@@ -362,7 +448,7 @@ export default class FlashService {
 			.where("id", designId)
 			.where("artist_id", artistId)
 			.where("hidden", false);
-		query.knexQuery.forKeyShare();
+		query.knexQuery.forShare();
 		return query.first();
 	}
 
@@ -382,6 +468,24 @@ export default class FlashService {
 			.whereIn("id", [...ids]);
 		for (const row of rows) found.set(row.id, row);
 		return found;
+	}
+
+	/**
+	 * Whether an inquiry or a project (a deleted one too: the keys count every
+	 * row) names the design. A plain read, no lock: it never waits for the
+	 * transaction that holds a project's row.
+	 */
+	private async isNamed(
+		trx: QueryClientContract,
+		tenant: TenantRef,
+		designId: string,
+	): Promise<boolean> {
+		const { rows } = await trx.rawQuery(
+			`select exists (select 1 from inquiries where tenant_id = ? and flash_design_id = ?)
+				or exists (select 1 from tattoo_projects where tenant_id = ? and flash_design_id = ?) as named`,
+			[tenant.id, designId, tenant.id, designId],
+		);
+		return rows[0].named === true;
 	}
 
 	/** How many designs the artist has now. A hook so a test can stage a racing upload. */

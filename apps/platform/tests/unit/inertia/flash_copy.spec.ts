@@ -11,6 +11,8 @@ type FlashModule = {
 		size: string;
 		priceText: string | null;
 		hidden: boolean;
+		oneOfAKind?: boolean;
+		claimed?: boolean;
 	}): string;
 	flashCardLine(card: {
 		artistName: string | null;
@@ -34,6 +36,19 @@ type FlashModule = {
 	PRICE_HELP: string;
 	SHOWN_LABEL: string;
 	SHOWN_HELP: string;
+	ONE_OF_A_KIND_LABEL: string;
+	ONE_OF_A_KIND_HELP: string;
+	MARK_CLAIMED: string;
+	MAKE_AVAILABLE: string;
+	TAKEN_LABEL: string;
+	CLAIMED_HERE: string;
+	QUOTE_TAKEN_WARNING: string;
+	LINK_TAKEN_QUESTION: string;
+	LINK_TAKEN_CONFIRM: string;
+	LINK_TAKEN_KEEP: string;
+	VERIFY_TAKEN_NOTE: string;
+	RECORD_TAKEN_NOTE: string;
+	recordTakenNote(designTaken: boolean, kind: string): string | null;
 };
 const flash = flashModule as FlashModule;
 
@@ -143,5 +158,91 @@ test.group("flash design words (TAT-129)", () => {
 			}),
 			"About 3 in",
 		);
+	});
+	test("one of a kind: the box, its help, the two claim buttons and the note under a design's name", ({
+		assert,
+	}) => {
+		assert.equal(flash.ONE_OF_A_KIND_LABEL, "One of a kind");
+		assert.equal(
+			flash.ONE_OF_A_KIND_HELP,
+			"You'll tattoo it only once. It's marked Claimed when its client's deposit is verified or their project is booked. Leave it unchecked for a design that can be tattooed again. Unchecking a claimed design releases its claim.",
+		);
+		assert.equal(flash.MARK_CLAIMED, "Mark claimed");
+		assert.equal(flash.MAKE_AVAILABLE, "Make available");
+		assert.equal(
+			flash.designNote({
+				size: "About 3 in",
+				priceText: "NPR 3,000",
+				hidden: false,
+				oneOfAKind: true,
+				claimed: true,
+			}),
+			"About 3 in · NPR 3,000 · One of a kind · Claimed",
+		);
+		assert.equal(
+			flash.designNote({
+				size: "About 3 in",
+				priceText: null,
+				hidden: true,
+				oneOfAKind: false,
+				claimed: false,
+			}),
+			"About 3 in · Hidden",
+		);
+		// Plan 4a's calls pass neither field.
+		assert.equal(
+			flash.designNote({
+				size: "About 3 in",
+				priceText: null,
+				hidden: false,
+			}),
+			"About 3 in",
+		);
+		assert.equal(
+			flash.designNote({
+				size: "About 3 in",
+				priceText: null,
+				hidden: false,
+				oneOfAKind: true,
+				claimed: false,
+			}),
+			"About 3 in · One of a kind",
+		);
+	});
+	test("the words of a design taken: the label, the claimed-here note and the three warnings", ({
+		assert,
+	}) => {
+		assert.equal(flash.TAKEN_LABEL, "Design taken: offer something similar");
+		assert.equal(flash.CLAIMED_HERE, "Claimed for this client");
+		assert.equal(
+			flash.QUOTE_TAKEN_WARNING,
+			"This design is already claimed by another client. Talk to this client about something similar before you send a price.",
+		);
+		assert.equal(
+			flash.LINK_TAKEN_QUESTION,
+			"This design is already claimed by another client. Make a deposit link anyway?",
+		);
+		assert.equal(flash.LINK_TAKEN_CONFIRM, "Make the link anyway");
+		assert.equal(flash.LINK_TAKEN_KEEP, "Not yet");
+		assert.equal(
+			flash.VERIFY_TAKEN_NOTE,
+			"This design is already claimed by another client: talk to this client before you verify.",
+		);
+	});
+
+	test("recording a deposit at the desk is a claim moment, so the record sheet warns about a taken design for a deposit only", ({
+		assert,
+	}) => {
+		assert.equal(
+			flash.RECORD_TAKEN_NOTE,
+			"This design is already claimed by another client: talk to this client before you record the deposit.",
+		);
+		assert.equal(
+			flash.recordTakenNote(true, "deposit"),
+			flash.RECORD_TAKEN_NOTE,
+		);
+		assert.isNull(flash.recordTakenNote(false, "deposit"));
+		assert.isNull(flash.recordTakenNote(true, "session"));
+		assert.isNull(flash.recordTakenNote(true, "balance"));
 	});
 });

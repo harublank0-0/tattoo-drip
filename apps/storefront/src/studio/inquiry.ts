@@ -120,6 +120,31 @@ export function flashInquiryState(
 }
 
 /**
+ * A request for something similar to a claimed design (part 4b): not a flash
+ * request (no `flashDesignId`: the design is taken). While the design's artist
+ * takes new work it is open for them, with the idea ("Something similar to the
+ * Moth flash") and the size started; otherwise it is the artist's own state
+ * (`inquiryState`: their closed words, and the studio's general request when
+ * the studio still takes work). `artists` is the studio's whole list.
+ */
+export function similarInquiryState(
+	studio: StudioView,
+	design: FlashDesignView,
+	artist: ArtistView,
+	artists: readonly ArtistView[],
+): InquiryState {
+	const state = inquiryState(studio, artists, artist);
+	if (state.kind !== "open") return state;
+	return {
+		...state,
+		start: {
+			idea: fill(studioCopy.flash.similarStart, { name: design.name }),
+			approximateSize: design.size,
+		},
+	};
+}
+
+/**
  * The fallback's chat and email, prefilled. With a `flashName` (TAT-129) they
  * ask about that flash design.
  */

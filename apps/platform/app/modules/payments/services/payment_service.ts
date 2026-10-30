@@ -3,6 +3,7 @@ import { errors as lucidErrors } from "@adonisjs/lucid";
 import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
 import { DateTime } from "luxon";
 import User from "#models/user";
+import { claimFlashFor } from "#modules/flash/services/flash_claim";
 import { PaymentRuleError } from "#modules/payments/errors";
 import {
 	type Balance,
@@ -19,6 +20,7 @@ import type Quote from "#modules/projects/models/quote";
 import TattooProject, {
 	type ProjectStatus,
 } from "#modules/projects/models/tattoo_project";
+import { CLOSED_STATUSES } from "#modules/projects/moves";
 import { isExpired } from "#modules/projects/quotes";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ProjectService, {
@@ -663,15 +665,28 @@ export default class PaymentService {
 	}
 
 	/**
-	 * After a payment is verified or recorded: a deposit goes through
-	 * settleBooking. Returns whether that booked the project, its status and
-	 * what is still due of the deposit.
+	 * After a payment is verified or recorded: a deposit claims the project's
+	 * one-of-a-kind flash design, then goes through settleBooking. Returns
+	 * whether that booked the project, its status and what is still due of
+	 * the deposit.
 	 */
 	private async afterPayment(
 		tenant: TenantRef,
 		project: TattooProject,
 		payment: Payment,
 	): Promise<Recorded> {
+		// Claim rule (claimFlashFor): the project's first verified deposit claims
+		// its one-of-a-kind design, here, in the verifying transaction and under
+		// the project's lock. A session or balance payment never claims, and a
+		// deposit on a project that is already closed does not either (a dead
+		// project does not hold a design); the claim is a no-op when someone
+		// else claimed first, and it changes no status, payment or deposit link.
+		if (
+			payment.kind === "deposit" &&
+			!CLOSED_STATUSES.includes(project.status)
+		) {
+			await claimFlashFor(tenant, project);
+		}
 		const booked =
 			payment.kind === "deposit" &&
 			(await this.sessions.settleBooking(tenant, project));

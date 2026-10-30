@@ -2524,6 +2524,71 @@ describe("flash on the artist page, /flash and a design's page (TAT-129)", () =>
 		assertSafePage(arjun);
 	});
 
+	test("a claimed design shows greyed, marked Claimed, still linking to its page", () => {
+		const claimed = {
+			...moth,
+			status: "claimed" as const,
+			requestable: false,
+		};
+		const html = flashHtml(
+			flashPage(2, { data: [claimed, flashPage(2).data[1]] }),
+		);
+
+		assertSafePage(html);
+		assert.equal(count(html, /class="flash-card"/g), 1);
+		assert.match(html, /<li class="flash-card flash-card-claimed">/);
+		assert.match(html, /<span class="flash-card-badge">Claimed<\/span>/);
+		// The card is still a link to the design's own page, and carries no "closed" words.
+		assert.ok(hrefs(html).includes(`/flash/${flashId(1)}`));
+		assert.doesNotMatch(html, /Not taking flash requests right now/);
+		assert.equal(count(html, /flash-card-badge/g), 1);
+	});
+
+	test("the design page of a claimed design says Claimed and offers something similar", () => {
+		const claimed = {
+			...moth,
+			status: "claimed" as const,
+			requestable: false,
+		};
+		const html = designHtml(claimed);
+
+		assertSafePage(html);
+		assert.doesNotMatch(html, /Request this design/);
+		assert.match(html, /<dt>Status<\/dt><dd[^>]*>Claimed<\/dd>/);
+		assert.match(
+			html,
+			new RegExp(
+				`<a class="action action-primary" href="/request\\?flash=${flashId(1)}">Ask for something similar</a>`,
+			),
+		);
+
+		// The artist's books are closed but the studio takes work: the general form.
+		const arjun = designHtml({
+			...claimed,
+			artist: { slug: "arjun", name: "अर्जुन थापा" },
+		});
+		assert.doesNotMatch(arjun, /Ask for something similar/);
+		assert.match(
+			arjun,
+			/<a class="action action-primary" href="\/request">Send your idea<\/a>/,
+		);
+		assert.match(arjun, /<dt>Status<\/dt><dd[^>]*>Claimed<\/dd>/);
+
+		// Nobody takes work: no request link at all.
+		const data = flashDesignPageData(
+			CLOSED_STUDIO,
+			[{ ...SITA, acceptingInquiries: false }, ARJUN],
+			claimed,
+			ORIGIN,
+			IMAGE_ORIGIN,
+		);
+		assert.ok(data);
+		const none = renderToStaticMarkup(createElement(FlashDesignPage, { data }));
+		assert.doesNotMatch(none, /Ask for something similar|Send your idea/);
+		assert.doesNotMatch(none, /Request this design/);
+		assert.match(none, /<dt>Status<\/dt><dd[^>]*>Claimed<\/dd>/);
+	});
+
 	test("every card's picture asks for the copies and is drawn whole", () => {
 		const html = flashHtml(flashPage(2));
 		const [first] = images(html).filter((tag) =>
@@ -2675,6 +2740,38 @@ describe("the request page for a flash design (TAT-129)", () => {
 			arjun,
 			/<h1 id="inquiry-title" class="section-title">Inquiries<\/h1>/,
 		);
+	});
+
+	test("a claimed design on the request page asks the artist for something similar", () => {
+		const claimed = {
+			...moth,
+			status: "claimed" as const,
+			requestable: false,
+		};
+		const html = page({ kind: "found", design: claimed });
+
+		assertSafePage(html);
+		// The summary is marked Claimed, with the note, and greyed like a closed design.
+		assert.match(
+			html,
+			/class="flash-summary flash-summary-closed flash-summary-claimed"/,
+		);
+		assert.match(html, /<span class="flash-card-badge">Claimed<\/span>/);
+		assert.match(
+			html,
+			/<p class="note">Someone has claimed this design: it was one of a kind\.<\/p>/,
+		);
+		// The form below is a custom request: "Send your idea", the idea started, no design id.
+		assert.match(
+			html,
+			/<h1 id="inquiry-title" class="section-title">Send your idea<\/h1>/,
+		);
+		assert.match(
+			html,
+			/Ask <bdi>Black Needle<\/bdi> for <bdi>Something similar to the Moth flash<\/bdi>/,
+		);
+		assert.doesNotMatch(html, /Ask for this design/);
+		assert.match(html, /about%20the%20Moth%20flash/);
 	});
 
 	test("a gone design's page shows the note and the general form; so does a failed read", () => {

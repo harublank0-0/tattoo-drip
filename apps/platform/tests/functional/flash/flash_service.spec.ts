@@ -8,8 +8,13 @@ import ArtistService, {
 	type ProfileEditor,
 } from "#modules/artists/services/artist_service";
 import ClientService from "#modules/clients/services/client_service";
-import { FlashInUseError, FlashLimitError } from "#modules/flash/errors";
+import {
+	FlashInUseError,
+	FlashLimitError,
+	FlashRuleError,
+} from "#modules/flash/errors";
 import FlashDesign from "#modules/flash/models/flash_design";
+import { claimFlashFor } from "#modules/flash/services/flash_claim";
 import FlashService, {
 	MAX_FLASH_DESIGNS,
 } from "#modules/flash/services/flash_service";
@@ -39,7 +44,12 @@ import { storedImages } from "#tests/helpers/uploads";
 
 const PURPOSE = "flash_design";
 const upload = async () => uploadOf(await testImages.png(1200, 1200));
-const MOTH = { name: "Moth", size: "About 3 in", price: 300_000 };
+const MOTH = {
+	name: "Moth",
+	size: "About 3 in",
+	price: 300_000,
+	oneOfAKind: false,
+};
 
 function makeService() {
 	const images = new RecordingImageService();
@@ -120,6 +130,7 @@ test.group("FlashService (TAT-129)", (group) => {
 				name: "Koi",
 				size: "About 5 in",
 				price: null,
+				oneOfAKind: false,
 			}),
 		);
 		const third = await inTenant(tenant, async () =>
@@ -127,6 +138,7 @@ test.group("FlashService (TAT-129)", (group) => {
 				name: "Lotus",
 				size: "About 2 in",
 				price: null,
+				oneOfAKind: false,
 			}),
 		);
 
@@ -223,6 +235,7 @@ test.group("FlashService (TAT-129)", (group) => {
 				name: "  Moth  ",
 				size: "About 4 in",
 				price: null,
+				oneOfAKind: false,
 				hidden: true,
 			}),
 		);
@@ -339,11 +352,18 @@ test.group("FlashService (TAT-129)", (group) => {
 			assert.deepEqual([row.id, row.hidden], [design.id, true]);
 			assert.isNull(await flash.findShown(tenant, design.id, [sita.id]));
 			assert.deepEqual(
-				(await flash.page(tenant, { artistIds: [sita.id] }, null, 24)).designs,
+				(
+					await flash.page(
+						tenant,
+						{ artistIds: [sita.id], withClaimed: true },
+						null,
+						24,
+					)
+				).designs,
 				[],
 			);
 			assert.deepEqual(
-				[...(await flash.artistsWithDesigns(tenant, [sita.id]))],
+				[...(await flash.artistsWithDesigns(tenant, [sita.id], true))],
 				[],
 			);
 		});
@@ -424,7 +444,13 @@ test.group("FlashService (TAT-129)", (group) => {
 		const { artists, flash } = makeService();
 		const [mine] = await seedDesigns(tenant, own, 1);
 		const [theirs] = await seedDesigns(tenant, other, 1);
-		const details = { name: "New", size: "1 in", price: null, hidden: false };
+		const details = {
+			name: "New",
+			size: "1 in",
+			price: null,
+			oneOfAKind: false,
+			hidden: false,
+		};
 
 		await inTenant(tenant, () => artists.unlinkUser(tenant, member.id));
 		const editor = asArtist(member.id);
@@ -550,7 +576,7 @@ test.group("FlashService (TAT-129)", (group) => {
 					(x.id < y.id ? 1 : -1),
 			)
 			.map((design) => design.id);
-		const filter = { artistIds: [sita.id] };
+		const filter = { artistIds: [sita.id], withClaimed: true };
 
 		const one = await inTenant(tenant, () =>
 			flash.page(tenant, filter, null, 2),
@@ -577,7 +603,9 @@ test.group("FlashService (TAT-129)", (group) => {
 		assert.isNull(three.next);
 
 		const none = await recordQueries(() =>
-			inTenant(tenant, () => flash.page(tenant, { artistIds: [] }, null, 5)),
+			inTenant(tenant, () =>
+				flash.page(tenant, { artistIds: [], withClaimed: true }, null, 5),
+			),
 		);
 		assert.deepEqual(none.result, { designs: [], next: null });
 		assert.lengthOf(
@@ -607,10 +635,10 @@ test.group("FlashService (TAT-129)", (group) => {
 
 		await inTenant(tenant, async () => {
 			assert.deepEqual(
-				[...(await flash.artistsWithDesigns(tenant, ids))].sort(),
+				[...(await flash.artistsWithDesigns(tenant, ids, true))].sort(),
 				[sita.id, mira.id].sort(),
 			);
-			assert.lengthOf(await flash.artistsWithDesigns(tenant, []), 0);
+			assert.lengthOf(await flash.artistsWithDesigns(tenant, [], true), 0);
 			assert.equal(
 				(await flash.findShown(tenant, shown.id, ids))?.id,
 				shown.id,
@@ -652,7 +680,12 @@ test.group("FlashService (TAT-129)", (group) => {
 		});
 
 		await inTenant(tenant, async () => {
-			const page = await flash.page(tenant, { artistIds: stale }, null, 10);
+			const page = await flash.page(
+				tenant,
+				{ artistIds: stale, withClaimed: true },
+				null,
+				10,
+			);
 			assert.deepEqual(
 				page.designs.map((design) => design.id),
 				[designs.staying.id],
@@ -660,14 +693,14 @@ test.group("FlashService (TAT-129)", (group) => {
 			for (const gone of [hiding, leaving]) {
 				const own = await flash.page(
 					tenant,
-					{ artistIds: [gone.id] },
+					{ artistIds: [gone.id], withClaimed: true },
 					null,
 					10,
 				);
 				assert.lengthOf(own.designs, 0);
 			}
 			assert.deepEqual(
-				[...(await flash.artistsWithDesigns(tenant, stale))],
+				[...(await flash.artistsWithDesigns(tenant, stale, true))],
 				[staying.id],
 			);
 			assert.equal(
@@ -693,7 +726,7 @@ test.group("FlashService (TAT-129)", (group) => {
 		await inTenant(a.tenant, async () => {
 			const page = await flash.page(
 				a.tenant,
-				{ artistIds: [artistB.id] },
+				{ artistIds: [artistB.id], withClaimed: true },
 				null,
 				5,
 			);
@@ -701,9 +734,301 @@ test.group("FlashService (TAT-129)", (group) => {
 			assert.isNull(await flash.findShown(a.tenant, designB.id, [artistB.id]));
 			assert.equal((await flash.forIds(a.tenant, [designB.id])).size, 0);
 			assert.lengthOf(
-				await flash.artistsWithDesigns(a.tenant, [artistB.id]),
+				await flash.artistsWithDesigns(a.tenant, [artistB.id], true),
 				0,
 			);
+		});
+	});
+	test("add and update store one of a kind; a new design can be tattooed again unless asked", async ({
+		assert,
+	}) => {
+		const { tenant, owner: user } = await studioWithOwner();
+		const sita = await addArtist(tenant, user);
+		const { flash } = makeService();
+		const editor = owner(user.id);
+
+		const repeatable = await inTenant(tenant, async () =>
+			flash.add(tenant, editor, sita, await upload(), MOTH),
+		);
+		const single = await inTenant(tenant, async () =>
+			flash.add(tenant, editor, sita, await upload(), {
+				...MOTH,
+				name: "Koi",
+				oneOfAKind: true,
+			}),
+		);
+		// Lucid reads nothing back after an insert: read both as stored.
+		const [storedRepeatable, storedSingle] = await inTenant(tenant, () =>
+			Promise.all([
+				FlashDesign.findOrFail(repeatable.id),
+				FlashDesign.findOrFail(single.id),
+			]),
+		);
+		assert.isFalse(storedRepeatable.oneOfAKind);
+		assert.isTrue(storedSingle.oneOfAKind);
+		for (const design of [storedRepeatable, storedSingle]) {
+			assert.isNull(design.claimedAt, "nothing is claimed by adding it");
+			assert.isNull(design.claimedProjectId);
+		}
+
+		await inTenant(tenant, () =>
+			flash.update(tenant, editor, repeatable, {
+				...MOTH,
+				oneOfAKind: true,
+				hidden: false,
+			}),
+		);
+		const read = await inTenant(tenant, () =>
+			FlashDesign.findOrFail(repeatable.id),
+		);
+		assert.isTrue(read.oneOfAKind);
+		assert.isNull(read.claimedAt, "ticking the box claims nothing");
+	});
+
+	test("switching a claimed design to can be tattooed again clears the claim in the same save", async ({
+		assert,
+	}) => {
+		const { tenant, owner: user } = await studioWithOwner();
+		const sita = await addArtist(tenant, user);
+		const { flash } = makeService();
+		const editor = owner(user.id);
+		const { design, project } = await inTenant(tenant, async () => {
+			const client = await makeClient(tenant);
+			const made = await addFlashDesign(tenant, sita, { oneOfAKind: true });
+			const claimed = await makeProject(tenant, client, {
+				flashDesignId: made.id,
+			});
+			await claimFlashFor(tenant, claimed);
+			return {
+				design: await FlashDesign.findOrFail(made.id),
+				project: claimed,
+			};
+		});
+		assert.equal(design.claimedProjectId, project.id);
+		const details = { name: "Moth", size: "About 3 in", price: null };
+
+		// Saving it still one of a kind keeps the claim.
+		await inTenant(tenant, () =>
+			flash.update(tenant, editor, design, {
+				...details,
+				oneOfAKind: true,
+				hidden: false,
+			}),
+		);
+		const kept = await inTenant(tenant, () =>
+			FlashDesign.findOrFail(design.id),
+		);
+		assert.equal(kept.claimedProjectId, project.id);
+		assert.isNotNull(kept.claimedAt);
+
+		// Switching it to repeatable clears both columns in that save.
+		await inTenant(tenant, () =>
+			flash.update(tenant, editor, kept, {
+				...details,
+				oneOfAKind: false,
+				hidden: false,
+			}),
+		);
+		const cleared = await inTenant(tenant, () =>
+			FlashDesign.findOrFail(design.id),
+		);
+		assert.isFalse(cleared.oneOfAKind);
+		assert.isNull(cleared.claimedAt);
+		assert.isNull(cleared.claimedProjectId);
+	});
+
+	test("setClaimed marks a one-of-a-kind design claimed by hand and available again; a repeatable one is FlashRuleError 'repeatable'; an artist unlinked meanwhile is E_ROW_NOT_FOUND", async ({
+		assert,
+	}) => {
+		const { tenant, owner: boss } = await studioWithOwner();
+		const member = await artistIn(tenant);
+		const own = await addArtist(tenant, member, {
+			name: "Own",
+			slug: "own",
+			linkToMe: true,
+		});
+		const { artists, flash } = makeService();
+		const [single, repeatable] = await inTenant(tenant, async () => [
+			await addFlashDesign(tenant, own, { oneOfAKind: true }),
+			await addFlashDesign(tenant, own),
+		]);
+		const editor = asArtist(member.id);
+
+		const claimed = await inTenantAs(tenant, member, () =>
+			flash.setClaimed(tenant, editor, single, true),
+		);
+		assert.isNotNull(claimed.claimedAt);
+		assert.isNull(claimed.claimedProjectId, "claimed by hand: no project");
+		const at = claimed.claimedAt?.toMillis();
+
+		// Claiming it again changes nothing, not even the time.
+		const again = await inTenantAs(tenant, member, () =>
+			flash.setClaimed(tenant, editor, claimed, true),
+		);
+		assert.equal(again.claimedAt?.toMillis(), at);
+
+		const free = await inTenantAs(tenant, member, () =>
+			flash.setClaimed(tenant, editor, claimed, false),
+		);
+		assert.isNull(free.claimedAt);
+		assert.isNull(free.claimedProjectId);
+		// Available again when it already is: still fine.
+		await inTenantAs(tenant, member, () =>
+			flash.setClaimed(tenant, editor, free, false),
+		);
+
+		for (const wanted of [true, false]) {
+			const refusal = await inTenantAs(tenant, member, () =>
+				flash.setClaimed(tenant, editor, repeatable, wanted),
+			).catch((error: unknown) => error);
+			assert.instanceOf(refusal, FlashRuleError);
+			assert.equal((refusal as FlashRuleError).reason, "repeatable");
+		}
+		const untouched = await inTenant(tenant, () =>
+			FlashDesign.findOrFail(repeatable.id),
+		);
+		assert.isNull(untouched.claimedAt);
+
+		// The owner may claim any artist's design.
+		const byOwner = await inTenant(tenant, () =>
+			flash.setClaimed(tenant, owner(boss.id), single, true),
+		);
+		assert.isNotNull(byOwner.claimedAt);
+
+		await inTenant(tenant, () => artists.unlinkUser(tenant, member.id));
+		await assert.rejects(
+			() =>
+				inTenantAs(tenant, member, () =>
+					flash.setClaimed(tenant, editor, single, true),
+				),
+			lucidErrors.E_ROW_NOT_FOUND,
+		);
+	});
+
+	test("claimFlashFor claims an unclaimed one-of-a-kind design for the project, once: a second project's claim returns false and changes nothing; a repeatable design and a design claimed by hand stay as they were; no design means no query", async ({
+		assert,
+	}) => {
+		const { tenant, owner: user } = await studioWithOwner();
+		const sita = await addArtist(tenant, user);
+		const made = await inTenant(tenant, async () => {
+			const client = await makeClient(tenant);
+			const single = await addFlashDesign(tenant, sita, { oneOfAKind: true });
+			const repeatable = await addFlashDesign(tenant, sita);
+			const byHand = await addFlashDesign(tenant, sita, {
+				oneOfAKind: true,
+				claimedAt: DateTime.now().minus({ days: 1 }),
+			});
+			const project = (flashDesignId: string | null) =>
+				makeProject(tenant, client, { flashDesignId });
+			return {
+				single,
+				repeatable,
+				byHand,
+				first: await project(single.id),
+				second: await project(single.id),
+				ofRepeatable: await project(repeatable.id),
+				ofByHand: await project(byHand.id),
+				plain: await project(null),
+			};
+		});
+		const reread = (id: string) =>
+			inTenant(tenant, () => FlashDesign.findOrFail(id));
+
+		assert.isTrue(
+			await inTenant(tenant, () => claimFlashFor(tenant, made.first)),
+		);
+		const claimed = await reread(made.single.id);
+		assert.equal(claimed.claimedProjectId, made.first.id);
+		assert.isNotNull(claimed.claimedAt);
+
+		assert.isFalse(
+			await inTenant(tenant, () => claimFlashFor(tenant, made.second)),
+		);
+		const still = await reread(made.single.id);
+		assert.equal(still.claimedProjectId, made.first.id);
+		assert.equal(still.claimedAt?.toMillis(), claimed.claimedAt?.toMillis());
+
+		assert.isFalse(
+			await inTenant(tenant, () => claimFlashFor(tenant, made.ofRepeatable)),
+		);
+		assert.isNull((await reread(made.repeatable.id)).claimedAt);
+
+		assert.isFalse(
+			await inTenant(tenant, () => claimFlashFor(tenant, made.ofByHand)),
+		);
+		const byHand = await reread(made.byHand.id);
+		assert.isNull(byHand.claimedProjectId, "claimed by hand stays so");
+		assert.equal(
+			byHand.claimedAt?.toMillis(),
+			made.byHand.claimedAt?.toMillis(),
+		);
+
+		const none = await recordQueries(() =>
+			inTenant(tenant, () => claimFlashFor(tenant, made.plain)),
+		);
+		assert.isFalse(none.result);
+		assert.lengthOf(
+			none.queries.filter((query) => query.includes("flash_designs")),
+			0,
+		);
+	});
+
+	test("page and artistsWithDesigns leave claimed designs out when withClaimed is false", async ({
+		assert,
+	}) => {
+		const { tenant, owner: user } = await studioWithOwner();
+		const sita = await addArtist(tenant, user);
+		const mira = await addArtist(tenant, user, { name: "Mira", slug: "mira" });
+		const { flash } = makeService();
+		const [free, taken] = await inTenant(tenant, async () => [
+			await addFlashDesign(tenant, sita, { oneOfAKind: true }),
+			await addFlashDesign(tenant, sita, {
+				oneOfAKind: true,
+				claimedAt: DateTime.now(),
+			}),
+			await addFlashDesign(tenant, mira, {
+				oneOfAKind: true,
+				claimedAt: DateTime.now(),
+			}),
+		]);
+		const ids = [sita.id, mira.id];
+
+		await inTenant(tenant, async () => {
+			const all = await flash.page(
+				tenant,
+				{ artistIds: ids, withClaimed: true },
+				null,
+				10,
+			);
+			assert.lengthOf(all.designs, 3);
+			assert.includeMembers(
+				all.designs.map((design) => design.id),
+				[free.id, taken.id],
+			);
+			const open = await flash.page(
+				tenant,
+				{ artistIds: ids, withClaimed: false },
+				null,
+				10,
+			);
+			assert.deepEqual(
+				open.designs.map((design) => design.id),
+				[free.id],
+			);
+			assert.deepEqual(
+				[...(await flash.artistsWithDesigns(tenant, ids, true))].sort(),
+				ids.sort(),
+			);
+			assert.deepEqual(
+				[...(await flash.artistsWithDesigns(tenant, ids, false))],
+				[sita.id],
+			);
+			// findShown and forIds still return a claimed design: their callers decide.
+			assert.equal(
+				(await flash.findShown(tenant, taken.id, ids))?.id,
+				taken.id,
+			);
+			assert.isTrue((await flash.forIds(tenant, [taken.id])).has(taken.id));
 		});
 	});
 });

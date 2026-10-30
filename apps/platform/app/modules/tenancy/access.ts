@@ -86,6 +86,7 @@ export const TENANT_ROUTE_ROLES = {
 	// (FlashService.findEditable, re-checked under the artist's row lock).
 	"tenant.artists.flash.store": MEMBERS,
 	"tenant.artists.flash.update": MEMBERS,
+	"tenant.artists.flash.claim.update": MEMBERS,
 	"tenant.artists.flash.destroy": MEMBERS,
 
 	// The inquiry inbox: reference images stay private to owners until a

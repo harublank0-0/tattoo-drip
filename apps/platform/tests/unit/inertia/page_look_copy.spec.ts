@@ -1,5 +1,6 @@
 import { test } from "@japa/runner";
 import {
+	CLAIMED_FLASH_CHOICES,
 	FONT_KEYS,
 	FONTS,
 	SECTION_KEYS,
@@ -71,6 +72,9 @@ type PageLookModule = {
 	REMOVE_LOGO_QUESTION: string;
 	COVER_INTRO_LINE: string;
 	SECTIONS_INTRO: string;
+	CLAIMED_FLASH_WORDS: Record<string, string>;
+	CLAIMED_FLASH_LEGEND: string;
+	CLAIMED_FLASH_HELP: string;
 };
 const words = pageLookModule as PageLookModule;
 
@@ -444,5 +448,24 @@ test.group("page look words (TAT-56)", () => {
 			{ key: "serif", label: "Classic serif" },
 			{ key: "sans", label: "Plain" },
 		]);
+	});
+});
+
+test.group("claimed flash words (TAT-129)", () => {
+	test("there are words for exactly the server's choices, in its order", ({
+		assert,
+	}) => {
+		assert.deepEqual(Object.keys(words.CLAIMED_FLASH_WORDS), [
+			...CLAIMED_FLASH_CHOICES,
+		]);
+		assert.deepEqual(words.CLAIMED_FLASH_WORDS, {
+			show: "Show them, greyed out and marked Claimed",
+			hide: "Hide them",
+		});
+		assert.equal(words.CLAIMED_FLASH_LEGEND, "Claimed flash designs");
+		assert.equal(
+			words.CLAIMED_FLASH_HELP,
+			"One-of-a-kind designs that someone has claimed.",
+		);
 	});
 });

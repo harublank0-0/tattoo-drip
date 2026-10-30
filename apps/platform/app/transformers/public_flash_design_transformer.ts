@@ -32,6 +32,7 @@ export default class PublicFlashDesignTransformer extends BaseTransformer<ShownF
 			},
 			artist: { slug: design.artist.slug, name: design.artist.name },
 			requestable: design.requestable,
+			status: design.status,
 		};
 	}
 }

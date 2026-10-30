@@ -239,7 +239,8 @@ export function createTattooClient(options: TattooClientOptions) {
 			 * TattooApiError such as `validation_failed` (with `fields` by
 			 * input name), `artist_not_accepting`, `studio_not_accepting`,
 			 * `too_many_open_inquiries`, `flash_unavailable` (a request for a flash
-			 * design that is no longer offered), `payload_too_large`,
+			 * design that is no longer offered), `flash_claimed` (a one-of-a-kind
+			 * design that someone has claimed), `payload_too_large`,
 			 * `challenge_failed` (403: get a new token), `challenge_unavailable`
 			 * (503) or `rate_limited` (429, with `retryAfter`). Never retried.
 			 */

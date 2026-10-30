@@ -36,6 +36,7 @@ const BODY = {
 	accent: "#0f766e",
 	accentDark: "#a99cff",
 	font: "serif",
+	claimedFlash: "show",
 	// What the page posts: one `sections[]` for each shown row, in order. (A single value would
 	// be read as a string, not a list: the field name carries the brackets.)
 	"sections[]": ["inquiry", "artists"],
@@ -77,7 +78,9 @@ test.group("Settings, Page look: the page (TAT-56)", (group) => {
 			accentDark: null,
 			font: "eczar",
 			sections: ["work", "artists", "flash", "info", "inquiry"],
+			claimedFlash: "show",
 		});
+		assert.deepEqual(props.claimedFlashChoices, ["show", "hide"]);
 		assert.deepEqual(props.themes, THEMES);
 		assert.deepEqual(props.fonts, FONTS);
 		assert.deepEqual(props.sectionKeys, [...SECTION_KEYS]);
@@ -117,6 +120,7 @@ test.group("Settings, Page look: the page (TAT-56)", (group) => {
 			accentDark: "#a99cff",
 			font: "serif",
 			sections: ["inquiry", "artists"],
+			claimedFlash: "show",
 		});
 	});
 
@@ -171,15 +175,18 @@ test.group("Settings, Page look: the page (TAT-56)", (group) => {
 	}) => {
 		const { owner, tenant } = await studioWithOwner();
 		await inTenant(tenant, () =>
-			Tenant.query()
-				.where("id", tenant.id)
-				.update({ brandFont: "mono", brandAccent: "#e8a317" }),
+			Tenant.query().where("id", tenant.id).update({
+				brandFont: "mono",
+				brandAccent: "#e8a317",
+				storefrontClaimedFlash: "banish",
+			}),
 		);
 
 		const { look } = (await lookPage(client, owner, tenant)).inertiaProps;
 
 		assert.equal(look.font, "eczar");
 		assert.isNull(look.accent);
+		assert.equal(look.claimedFlash, "show");
 	});
 });
 
@@ -319,6 +326,7 @@ test.group("Settings, Page look: saving (TAT-56)", (group) => {
 				accent: "",
 				accentDark: "",
 				font: "eczar",
+				claimedFlash: "show",
 				"sections[]": ["inquiry", "work"],
 			})
 			.withCsrfToken()
@@ -918,5 +926,53 @@ test.group("Settings, Page look: the logo (TAT-56)", (group) => {
 		retry.assertFlashMessage("success", "Logo removed.");
 		assert.isNull((await reload(tenant)).logoImageKey);
 		assert.deepEqual(await storedImages(tenant, LOGO), []);
+	});
+});
+
+test.group("Settings, Page look: claimed flash designs (TAT-129)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("saves the claimed flash choice, and the page shows it with both choices", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		assert.equal((await reload(tenant)).storefrontClaimedFlash, "show");
+
+		const hidden = await putLook(client, owner, tenant, {
+			...BODY,
+			claimedFlash: "hide",
+		});
+		hidden.assertStatus(302);
+		assert.equal((await reload(tenant)).storefrontClaimedFlash, "hide");
+		const props = (await lookPage(client, owner, tenant)).inertiaProps;
+		assert.equal(props.look.claimedFlash, "hide");
+		assert.deepEqual(props.claimedFlashChoices, ["show", "hide"]);
+
+		(
+			await putLook(client, owner, tenant, { ...BODY, claimedFlash: "show" })
+		).assertStatus(302);
+		assert.equal((await reload(tenant)).storefrontClaimedFlash, "show");
+	});
+
+	test("an unknown or missing choice is a field error and nothing changes", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		await putLook(client, owner, tenant, { ...BODY, claimedFlash: "hide" });
+
+		assertValidationError(
+			await putLook(client, owner, tenant, { ...BODY, claimedFlash: "banish" }),
+			"claimedFlash",
+		);
+		const { claimedFlash: _left, ...without } = BODY;
+		assertValidationError(
+			await putLook(client, owner, tenant, without),
+			"claimedFlash",
+		);
+		const row = await reload(tenant);
+		assert.equal(row.storefrontClaimedFlash, "hide");
+		assert.equal(row.brandFont, "serif", "the rest of the save did not land");
 	});
 });

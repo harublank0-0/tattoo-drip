@@ -5,6 +5,7 @@ import {
 	flashInquiryState,
 	inquiryChannels,
 	inquiryState,
+	similarInquiryState,
 } from "../../src/studio/inquiry.ts";
 import {
 	artistViewModels,
@@ -159,6 +160,41 @@ describe("a flash request (TAT-129)", () => {
 			start: { idea: "The Moth flash", approximateSize: "About 3 in" },
 			flashDesignId: design.id,
 		});
+	});
+
+	test("something similar: open for an artist taking new work, with the idea started and no design id", () => {
+		assert.ok(design);
+		const state = similarInquiryState(studio, design, sita, [sita, arjun]);
+
+		assert.equal(state.kind, "open");
+		if (state.kind !== "open") return;
+		assert.deepEqual(state.preferredArtist, { id: sita.id, name: sita.name });
+		assert.deepEqual(state.start, {
+			idea: "Something similar to the Moth flash",
+			approximateSize: "About 3 in",
+		});
+		assert.equal("flashDesignId" in state, false);
+	});
+
+	test("something similar from an artist whose books are closed is the artist-closed state with their words", () => {
+		assert.ok(design);
+		const [closedBooks] = artistViewModels([
+			{ ...SITA, acceptingInquiries: false, closedMessage: "Booked." },
+		]);
+
+		const state = similarInquiryState(studio, design, closedBooks, [
+			closedBooks,
+			arjun,
+		]);
+
+		assert.deepEqual(
+			state,
+			inquiryState(studio, [closedBooks, arjun], closedBooks),
+		);
+		assert.equal(state.kind, "artist-closed");
+		if (state.kind === "artist-closed") {
+			assert.equal(state.closedMessage, "Booked.");
+		}
 	});
 
 	test("a custom request's state has neither key", () => {

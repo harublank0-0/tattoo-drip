@@ -220,10 +220,13 @@ export interface paths {
          * The studio's flash designs, newest first, a page at a time
          * @description Every shown design of every visible artist (one whose books are
          *     closed too), newest first. `requestable` says whether `createInquiry`
-         *     takes a request for the design now. An artist that matches nothing is
-         *     an empty page. Hidden designs, and hidden or deleted artists' designs,
-         *     never appear. Cacheable. Under an old studio slug it answers like
-         *     under the current one.
+         *     takes a request for the design now. A one-of-a-kind design someone
+         *     has claimed is listed with `status` `claimed` while the studio shows
+         *     claimed designs, and not at all when it hides them or when
+         *     `available=true`. An artist that matches nothing is an empty page.
+         *     Hidden designs, and hidden or deleted artists' designs, never appear.
+         *     Cacheable. Under an old studio slug it answers like under the current
+         *     one.
          */
         get: operations["listFlash"];
         put?: never;
@@ -254,7 +257,8 @@ export interface paths {
         /**
          * One shown flash design of a visible artist
          * @description A hidden design, a hidden or deleted artist's design, an unknown id
-         *     and another studio's design are all a 404. Cacheable. Under an old
+         *     and another studio's design are all a 404, and so is a claimed design
+         *     when the studio hides claimed designs. Cacheable. Under an old
          *     studio slug it answers like under the current one.
          */
         get: operations["getFlashDesign"];
@@ -327,7 +331,10 @@ export interface paths {
          *     phone number already has 3 inquiries the studio hasn't answered).
          *     A request for a flash design (`flashDesignId`) is also a 409
          *     `flash_unavailable` when the design is hidden, its artist is hidden
-         *     or deleted, or the id is unknown; a request for a design whose artist
+         *     or deleted, or the id is unknown, and `flash_claimed` when the design
+         *     was one of a kind and someone has claimed it (the studio shows or
+         *     hides claimed designs: either way it takes no request; offer to ask
+         *     for something similar as a plain request); a request for a design whose artist
          *     takes no flash requests is `artist_not_accepting`, though their books
          *     may be open. A `preferredArtistId` other than the design's artist is
          *     `validation_failed` on `preferredArtistId`.
@@ -421,7 +428,8 @@ export interface components {
                  *     (500), `request_timeout` (408, an upload that took too long)
                  *     and `service_busy` (503, with `Retry-After`: too many uploads
                  *     in progress, or no database connection free). Endpoint codes: `artist_not_accepting`,
-                 *     `studio_not_accepting`, `too_many_open_inquiries`, `flash_unavailable` (409),
+                 *     `studio_not_accepting`, `too_many_open_inquiries`, `flash_unavailable`,
+                 *     `flash_claimed` (409),
                  *     `challenge_failed` (403) and `challenge_unavailable` (503),
                  *     all `createInquiry`; `deposit_not_due`, `deposit_changed`
                  *     (409, `submitDepositProof`). Treat an unknown code by its HTTP
@@ -432,6 +440,7 @@ export interface components {
                  * @example service_busy
                  * @example too_many_open_inquiries
                  * @example flash_unavailable
+                 * @example flash_claimed
                  * @example challenge_failed
                  * @example deposit_changed
                  */
@@ -904,11 +913,19 @@ export interface components {
                 name: string;
             };
             /**
-             * @description Whether `createInquiry` takes a request for it now: the artist
-             *     takes flash requests, whatever their books say. False: show it
-             *     greyed with the artist's `closedMessage`.
+             * @description Whether `createInquiry` takes a request for it now: `status` is
+             *     `available` and the artist takes flash requests, whatever their
+             *     books say. False: show it greyed (a claimed design is marked
+             *     Claimed; otherwise use the artist's `closedMessage`).
              */
             requestable: boolean;
+            /**
+             * @description `claimed`: one of a kind and taken. Listed only while the studio
+             *     shows claimed designs: show it greyed, marked Claimed; it is never
+             *     requestable. Treat an unknown value as `claimed`.
+             * @enum {string}
+             */
+            status: "available" | "claimed";
         };
         /** @description A price with the words to show for it. Not `Money`, which has no text. */
         Price: {
@@ -1444,6 +1461,8 @@ export interface operations {
     listFlash: {
         parameters: {
             query?: {
+                /** @description `true`: only designs nobody has claimed. Left out or `false`: claimed designs too, unless the studio hides them. */
+                available?: boolean;
                 /** @description An artist's slug (`getArtist`) */
                 artist?: string;
                 /** @description The previous page's `nextCursor`, as sent, with the same filter */
@@ -1619,7 +1638,7 @@ export interface operations {
             };
             404: components["responses"]["NotFound"];
             408: components["responses"]["Error"];
-            /** @description The studio takes no such inquiry now (`artist_not_accepting`, `studio_not_accepting`, `too_many_open_inquiries`, `flash_unavailable`) */
+            /** @description The studio takes no such inquiry now (`artist_not_accepting`, `studio_not_accepting`, `too_many_open_inquiries`, `flash_unavailable`, `flash_claimed`) */
             409: {
                 headers: {
                     [name: string]: unknown;

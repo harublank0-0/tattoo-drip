@@ -285,6 +285,12 @@ router
 					.put("flash/:id", [controllers.FlashDesigns, "update"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.artists.flash.update");
+				// One tap: mark a one-of-a-kind design claimed, or make it available
+				// again (a body of `claimed`).
+				router
+					.put("flash/:id/claim", [controllers.FlashDesigns, "claim"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.artists.flash.claim.update");
 				router
 					.delete("flash/:id", [controllers.FlashDesigns, "destroy"])
 					.where("id", router.matchers.uuid())

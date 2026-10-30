@@ -252,4 +252,65 @@ test.group("RLS: flash_designs (TAT-129)", (group) => {
 		);
 		assert.deepEqual(rows, [{ name: "Moth" }]);
 	});
+	test("a repeatable design can't be claimed, a claiming project needs a claim time, and another tenant's project can't claim a design", async ({
+		assert,
+	}) => {
+		const { a, b, artistA, artistB, add } = await seed();
+		const design = await add(a, artistA, 1);
+		const foreign = await add(b, artistB, 2);
+		const ownProject = (
+			await (await requestNaming(a.tenant.id, design)).project()
+		).rows[0].id as string;
+		const otherProject = (
+			await (await requestNaming(b.tenant.id, foreign)).project()
+		).rows[0].id as string;
+		const update = (set: string, bindings: RawQueryBindings) =>
+			sql(
+				{ tenantId: a.tenant.id },
+				`update flash_designs set ${set}`,
+				bindings,
+			);
+
+		// The new design can be tattooed again, and the check says so in the database.
+		await assert.rejects(
+			() => update("claimed_at = now() where id = ?", [design]),
+			/flash_designs_claim_one_of_a_kind/,
+		);
+		await assert.rejects(
+			() => update("claimed_project_id = ? where id = ?", [ownProject, design]),
+			/flash_designs_claim_project_needs_time/,
+		);
+		// One of a kind, a claiming project must come with its time.
+		await update("one_of_a_kind = true where id = ?", [design]);
+		await assert.rejects(
+			() => update("claimed_project_id = ? where id = ?", [ownProject, design]),
+			/flash_designs_claim_project_needs_time/,
+		);
+		// Another tenant's project is not a project of this tenant (composite key).
+		await assert.rejects(
+			() =>
+				update("claimed_at = now(), claimed_project_id = ? where id = ?", [
+					otherProject,
+					design,
+				]),
+			/flash_designs_claimed_project_fk/,
+		);
+
+		// By hand (no project) and by the tenant's own project both work.
+		await update("claimed_at = now() where id = ?", [design]);
+		await update("claimed_project_id = ? where id = ?", [ownProject, design]);
+		const { rows } = await sql(
+			{ tenantId: a.tenant.id },
+			"select one_of_a_kind, claimed_at is not null as claimed, claimed_project_id from flash_designs where id = ?",
+			[design],
+		);
+		assert.deepEqual(rows, [
+			{ one_of_a_kind: true, claimed: true, claimed_project_id: ownProject },
+		]);
+		// A claimed design can't go back to repeatable without clearing the claim.
+		await assert.rejects(
+			() => update("one_of_a_kind = false where id = ?", [design]),
+			/flash_designs_claim_one_of_a_kind/,
+		);
+	});
 });

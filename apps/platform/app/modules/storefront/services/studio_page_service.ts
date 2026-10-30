@@ -11,6 +11,7 @@ import {
 	encodeWorkCursor,
 	type WorkCursor,
 } from "#modules/artists/work_cursor";
+import { isClaimed } from "#modules/flash/claims";
 import type FlashDesign from "#modules/flash/models/flash_design";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import FlashService from "#modules/flash/services/flash_service";
@@ -27,6 +28,7 @@ import type {
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import OpeningHoursService from "#modules/scheduling/services/opening_hours_service";
 import {
+	claimedFlashOf,
 	type LogoTile,
 	logoTileOf,
 	lookOf,
@@ -120,13 +122,16 @@ export type ShownFlashDesign = {
 	price: ShownPrice | null;
 	image: ShownImage;
 	artist: { slug: string; name: string };
-	/** The artist takes flash requests, whatever their books say. */
+	/** `available` and the artist takes flash requests, whatever their books say. */
 	requestable: boolean;
+	/** `claimed`: one of a kind and taken (listed only while the studio shows claimed designs). */
+	status: "available" | "claimed";
 };
 
-/** What listFlash asks for: `limit` is already within bounds. */
+/** What listFlash asks for: `limit` is already within bounds; `available` leaves claimed designs out. */
 export type FlashQuery = {
 	artist: string | null;
+	available: boolean;
 	cursor: WorkCursor | null;
 	limit: number;
 };
@@ -313,13 +318,18 @@ export default class StudioPageService {
 	 * case-folded) is an empty page without a design query. `filters.artists`
 	 * are the visible artists with a shown design, by name (listVisible's
 	 * order), whatever `query.artist` asks. A design is `requestable` while
-	 * its artist takes flash requests, whatever their books say.
+	 * it is available and its artist takes flash requests, whatever their
+	 * books say. Claimed designs (one of a kind, taken) are in the page and
+	 * the filters while the studio shows them (`claimedFlashOf`), and in
+	 * neither when it hides them or `query.available` asks for the unclaimed.
 	 */
 	async flash(tenant: Tenant, query: FlashQuery): Promise<ShownFlashPage> {
+		const withClaimed = claimedFlashOf(tenant) === "show" && !query.available;
 		const visible = await this.artists.listVisible(tenant);
 		const withDesigns = await this.flashDesigns.artistsWithDesigns(
 			tenant,
 			visible.map((artist) => artist.id),
+			withClaimed,
 		);
 		const filters = {
 			artists: visible
@@ -333,7 +343,7 @@ export default class StudioPageService {
 		if (artists.length === 0) return { designs: [], nextCursor: null, filters };
 		const { designs, next } = await this.flashDesigns.page(
 			tenant,
-			{ artistIds: artists.map((artist) => artist.id) },
+			{ artistIds: artists.map((artist) => artist.id), withClaimed },
 			query.cursor,
 			query.limit,
 		);
@@ -355,7 +365,11 @@ export default class StudioPageService {
 		};
 	}
 
-	/** One shown design of a visible artist; null for a hidden or unknown one, or a hidden or deleted artist's (the API's 404). */
+	/**
+	 * One shown design of a visible artist; null for a hidden or unknown one,
+	 * a hidden or deleted artist's, or a claimed one while the studio hides
+	 * claimed designs (the API's 404).
+	 */
 	async flashDesign(
 		tenant: Tenant,
 		id: string,
@@ -367,6 +381,7 @@ export default class StudioPageService {
 			visible.map((artist) => artist.id),
 		);
 		if (!design) return null;
+		if (isClaimed(design) && claimedFlashOf(tenant) === "hide") return null;
 		const owner = visible.find((artist) => artist.id === design.artistId);
 		if (!owner) return null;
 		return this.shownFlashDesign(tenant, design, owner);
@@ -396,7 +411,8 @@ export default class StudioPageService {
 				{ width: design.width, height: design.height },
 			),
 			artist: { slug: artist.slug, name: artist.name },
-			requestable: artist.acceptingFlash,
+			requestable: artist.acceptingFlash && !isClaimed(design),
+			status: isClaimed(design) ? "claimed" : "available",
 		};
 	}
 

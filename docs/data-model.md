@@ -77,7 +77,7 @@ Every entity except `User` belongs to a `Tenant`; most of those lines are left o
 | Entity | Responsibility |
 |---|---|
 | **Service** | A fixed-price offering (piercing, flash size, consultation) with duration; artist ↔ service mapping |
-| **FlashDesign** | A pre-drawn design an artist offers (TAT-129): a picture, a name, a size in words, an optional price and a hidden flag, up to 100 per artist, newest first; not soft-deleted, and kept while a request or project names it. Clients ask for one through the usual inquiry and quote (the inquiry and the project record the design); a fixed quote and instant booking are V1 |
+| **FlashDesign** | A pre-drawn design an artist offers (TAT-129): a picture, a name, a size in words, an optional price and a hidden flag, up to 100 per artist, newest first; not soft-deleted, and kept while a request or project names it. It can be tattooed again by default; the studio can mark it one of a kind, and it is then claimed once, at its first project's first verified deposit or when that project is booked (or by hand), by that project (or none, for a hand claim), and released only by hand or by switching it to can be tattooed again, never by a reversed deposit or a cancelled project. Clients ask for one through the usual inquiry and quote (the inquiry and the project record the design); a fixed quote and instant booking are V1 |
 | **ArtistAvailability**, **AvailabilityException** | Weekly hours and dated overrides (time off, extra hours), used for instant booking; the studio-wide hours and closures are `StudioHours` and `StudioClosure` |
 | **TattooStyle**, **BodyPlacement** | Platform-wide lists with stable slugs |
 | **GatewayPayment** | A Khalti or Fonepay transaction behind an automatically confirmed `Payment` |

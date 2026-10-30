@@ -415,6 +415,8 @@ function seedFlashDesign(
 		price: 300_000,
 		currency: "NPR",
 		hidden: false,
+		// One of a kind and free: the claim route's resource (TAT-129, part 4b).
+		oneOfAKind: true,
 	});
 }
 

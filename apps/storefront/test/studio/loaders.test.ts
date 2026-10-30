@@ -143,7 +143,7 @@ describe("loadStudioPage", () => {
 		await loadStudioPage(context);
 		assert.deepEqual(calls.map((call) => call.url).sort(), [
 			`${TENANT}/artists`,
-			`${TENANT}/flash?limit=6`,
+			`${TENANT}/flash?available=true&limit=6`,
 			`${TENANT}/work?limit=9`,
 		]);
 	});
@@ -205,7 +205,7 @@ describe("loadStudioPage", () => {
 
 		assert.deepEqual(calls.map((call) => call.url).sort(), [
 			`${IMAGE_ORIGIN}/api/v1/tenants/${STUDIO.slug}/artists`,
-			`${IMAGE_ORIGIN}/api/v1/tenants/${STUDIO.slug}/flash?limit=6`,
+			`${IMAGE_ORIGIN}/api/v1/tenants/${STUDIO.slug}/flash?available=true&limit=6`,
 			`${IMAGE_ORIGIN}/api/v1/tenants/${STUDIO.slug}/work?limit=9`,
 		]);
 		assert.equal(data.recentWork.photos.length, 9);
@@ -250,7 +250,7 @@ describe("loadStudioPage", () => {
 
 				assert.deepEqual(
 					calls.map((call) => call.url).sort(),
-					[`${ROOT}/artists`, `${ROOT}/flash?limit=6`],
+					[`${ROOT}/artists`, `${ROOT}/flash?available=true&limit=6`],
 					order.join(),
 				);
 				assert.equal(data.flash.designs.length, 6, order.join());
@@ -1625,6 +1625,52 @@ describe("loadRequestPage with ?flash= (TAT-129)", () => {
 			closed.flash?.kind === "closed" && closed.flash.note,
 			"Books open in March.",
 		);
+		assert.equal(closed.inquiry.kind, "artist-closed");
+	});
+
+	test("a claimed design's request page asks for something similar: the artist's own form, no design id, the idea started", async () => {
+		const claimed = { ...moth, status: "claimed", requestable: false };
+		const { calls, fetch } = listing(
+			[SITA, ARJUN],
+			EMPTY_PAGE,
+			EMPTY_FLASH_PAGE,
+			claimed,
+		);
+
+		const data = await loadRequestPage(context(fetch), { flash: ID });
+
+		assert.deepEqual(calls.map((call) => call.url).sort(), [
+			`${ROOT}/artists`,
+			`${ROOT}/flash/${ID}`,
+		]);
+		assert.equal(data.flash?.kind, "claimed");
+		assert.equal(data.inquiry.kind, "open");
+		if (data.inquiry.kind !== "open") return;
+		assert.deepEqual(data.inquiry.preferredArtist, {
+			id: SITA.id,
+			name: "Sita Rai",
+		});
+		assert.deepEqual(data.inquiry.start, {
+			idea: "Something similar to the Moth flash",
+			approximateSize: "About 3 in",
+		});
+		assert.equal("flashDesignId" in data.inquiry, false);
+		// The chat still names the design; the page's head is the artist's, not the design's.
+		assert.ok(data.chat?.whatsapp.endsWith("about%20the%20Moth%20flash"));
+		assert.equal(data.seo.canonical, `${ORIGIN}/request?artist=sita`);
+
+		// An artist whose books are closed: their own closed state below the summary.
+		const arjun = {
+			...claimed,
+			artist: { slug: "arjun", name: "अर्जुन थापा" },
+		};
+		const closed = await loadRequestPage(
+			context(
+				listing([SITA, ARJUN], EMPTY_PAGE, EMPTY_FLASH_PAGE, arjun).fetch,
+			),
+			{ flash: ID },
+		);
+		assert.equal(closed.flash?.kind, "claimed");
 		assert.equal(closed.inquiry.kind, "artist-closed");
 	});
 

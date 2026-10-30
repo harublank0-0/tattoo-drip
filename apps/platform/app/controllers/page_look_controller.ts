@@ -4,6 +4,8 @@ import { tenantContext } from "#middleware/tenant_middleware";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
 import {
+	CLAIMED_FLASH_CHOICES,
+	claimedFlashOf,
 	FONTS,
 	logoTileOf,
 	lookOf,
@@ -51,7 +53,10 @@ export default class PageLookController {
 				accentDark: look.accentDark,
 				font: look.font,
 				sections: look.sections,
+				// Not part of the served look (the flash reads apply it): the form's own.
+				claimedFlash: claimedFlashOf(tenant),
 			},
+			claimedFlashChoices: [...CLAIMED_FLASH_CHOICES],
 			themes: THEMES,
 			fonts: FONTS,
 			sectionKeys: [...SECTION_KEYS],

@@ -6,6 +6,7 @@ import { encodeWorkCursor } from "#modules/artists/work_cursor";
 import type FlashDesign from "#modules/flash/models/flash_design";
 import ImageService from "#modules/media/services/image_service";
 import { CURSOR_MESSAGE } from "#modules/storefront/validators/work";
+import Tenant from "#modules/tenancy/models/tenant";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import {
 	assertApiError,
@@ -29,6 +30,7 @@ const DESIGN_FIELDS = [
 	"price",
 	"requestable",
 	"size",
+	"status",
 ];
 
 const T0 = DateTime.fromISO("2026-10-01T10:00:00.000Z", { zone: "utc" });
@@ -428,5 +430,150 @@ test.group("GET /api/v1/tenants/:tenant/flash (listFlash)", (group) => {
 		const post = await client.post(flash("api-flash-129k")).json({});
 		assertApiError(post, 405, "method_not_allowed");
 		post.assertHeader("allow", "GET, HEAD");
+	});
+	test("a claimed design is listed as claimed and never requestable while the studio shows claimed designs", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("api-flash-129k");
+		const sita = await addArtist(tenant, owner);
+		const [free, byProject, byHand, repeatable] = await inTenant(
+			tenant,
+			async () => [
+				await addFlashDesign(tenant, sita, {
+					name: "Free",
+					oneOfAKind: true,
+					createdAt: at(1),
+				}),
+				await addFlashDesign(tenant, sita, {
+					name: "Taken",
+					oneOfAKind: true,
+					claimedAt: at(10),
+					createdAt: at(2),
+				}),
+				await addFlashDesign(tenant, sita, {
+					name: "By hand",
+					oneOfAKind: true,
+					claimedAt: at(11),
+					createdAt: at(3),
+				}),
+				await addFlashDesign(tenant, sita, {
+					name: "Again",
+					createdAt: at(4),
+				}),
+			],
+		);
+
+		const listed = (await client.get(flash("api-flash-129k"))).body();
+		const one = await client.get(design("api-flash-129k", byProject.id));
+
+		assert.deepEqual(
+			listed.data.map(
+				(item: { id: string; status: string; requestable: boolean }) => [
+					item.id,
+					item.status,
+					item.requestable,
+				],
+			),
+			[
+				[repeatable.id, "available", true],
+				[byHand.id, "claimed", false],
+				[byProject.id, "claimed", false],
+				[free.id, "available", true],
+			],
+		);
+		one.assertStatus(200);
+		assert.equal(one.body().data.status, "claimed");
+		assert.isFalse(one.body().data.requestable);
+		assert.deepEqual(listed.filters.artists, [
+			{ slug: "sita", name: "Sita Rai" },
+		]);
+	});
+
+	test("with available=true, or under hide, claimed designs are in no page and no filter; under hide the design read is 404", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("api-flash-129l");
+		const sita = await addArtist(tenant, owner);
+		const mira = await addArtist(tenant, owner, { name: "Mira", slug: "mira" });
+		const [free, taken, miras] = await inTenant(tenant, async () => [
+			await addFlashDesign(tenant, sita, {
+				name: "Free",
+				oneOfAKind: true,
+				createdAt: at(1),
+			}),
+			await addFlashDesign(tenant, sita, {
+				name: "Taken",
+				oneOfAKind: true,
+				claimedAt: at(10),
+				createdAt: at(2),
+			}),
+			await addFlashDesign(tenant, mira, {
+				name: "Mira's",
+				oneOfAKind: true,
+				claimedAt: at(11),
+				createdAt: at(3),
+			}),
+		]);
+		const slug = "api-flash-129l";
+
+		// Asked for: available designs only. Mira has none left, so no filter for her.
+		const available = (await client.get(flash(slug, "?available=true"))).body();
+		assert.deepEqual(ids(available.data), [free.id]);
+		assert.deepEqual(available.filters.artists, [
+			{ slug: "sita", name: "Sita Rai" },
+		]);
+		const emptyMira = (
+			await client.get(flash(slug, "?available=true&artist=mira"))
+		).body();
+		assert.deepEqual(emptyMira.data, []);
+		// available=false is the same as leaving it out.
+		const everything = (
+			await client.get(flash(slug, "?available=false"))
+		).body();
+		assert.deepEqual(ids(everything.data), [miras.id, taken.id, free.id]);
+		assert.lengthOf(everything.filters.artists, 2);
+
+		// The studio hides claimed designs: the same, whatever is asked, and the read is a 404.
+		await inTenant(tenant, () =>
+			Tenant.query()
+				.where("id", tenant.id)
+				.update({ storefrontClaimedFlash: "hide" }),
+		);
+		for (const query of ["", "?available=false", "?available=true"]) {
+			const hidden = (await client.get(flash(slug, query))).body();
+			assert.deepEqual(ids(hidden.data), [free.id], query);
+			assert.deepEqual(hidden.filters.artists, [
+				{ slug: "sita", name: "Sita Rai" },
+			]);
+		}
+		assertApiError(await client.get(design(slug, taken.id)), 404, "not_found");
+		assert.equal(
+			(await client.get(design(slug, free.id))).body().data.status,
+			"available",
+		);
+
+		// An unknown value of the setting reads as show.
+		await inTenant(tenant, () =>
+			Tenant.query()
+				.where("id", tenant.id)
+				.update({ storefrontClaimedFlash: "banish" }),
+		);
+		assert.lengthOf((await client.get(flash(slug))).body().data, 3);
+	});
+
+	test("available takes true or false only: anything else is validation_failed on available", async ({
+		client,
+		assert,
+	}) => {
+		await studioWithOwner("api-flash-129m");
+
+		const response = await client.get(
+			flash("api-flash-129m", "?available=sometimes"),
+		);
+
+		assertApiError(response, 422, "validation_failed");
+		assert.property(response.body().error.fields, "available");
 	});
 });
