@@ -25,15 +25,13 @@
  */
 export const PHOTO_ENTRY = "tattooDripPhoto";
 
-/** While a closed photo's entry is being taken off (`history.back()`), until the browser has moved. */
-let leaving = false;
-
 /**
- * How long a closed photo waits for that move. A back() that has nowhere to go
- * (the marked entry is the session's first, as in a duplicated tab) fires no
- * popstate, and the viewer would otherwise stay shut until a reload.
+ * While a closed photo's entry is being taken off (`history.back()`), until
+ * the browser's popstate says it has moved. There is no timer: a slow back()
+ * keeps the viewer shut, so a photo reopened and closed meanwhile cannot queue
+ * a second traversal that leaves the studio page.
  */
-export const LEAVE_WAIT_MS = 500;
+let leaving = false;
 
 export function showPhoto(id: string): void {
 	const dialog = document.getElementById(id);
@@ -57,6 +55,32 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
+ * A page loaded on an entry that still carries the viewer's marker (a reload
+ * with a photo open, a duplicated tab) has no dialog open and, in a duplicated
+ * tab, no earlier entry: a later Close would call back() with nowhere to go,
+ * fire no popstate and keep the viewer shut. The marker is only ever set by
+ * addEntry, after this module has loaded, so one found when it loads is a
+ * leftover: take it off, keeping the router's state, through the browser's own
+ * replaceState. The next photo then adds a new entry of its own, which has a
+ * predecessor.
+ */
+export function forgetStaleEntry(): void {
+	if (typeof window === "undefined") return;
+	const history = window.history;
+	const state: unknown = history.state;
+	if (!isRecord(state) || !(PHOTO_ENTRY in state)) return;
+	const { [PHOTO_ENTRY]: _marker, ...router } = state;
+	History.prototype.replaceState.call(history, router, "");
+}
+
+forgetStaleEntry();
+
+/** The browser has moved after a closed photo's back(): the viewer may open again. */
+function arrived(): void {
+	leaving = false;
+}
+
+/**
  * Back closes the photo (TAT-123): one entry while it is open, at the same
  * address (no URL is passed, so the address, its search and its hash never
  * change and a reload or a copied address is the page itself) with the
@@ -65,8 +89,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * wraps `window.history.pushState` and would run the page's loaders for it.
  * Back fires popstate: close. Escape, Close or Android's close request close
  * the dialog: take the entry off with one back(), if it is still current, and
- * wait for its popstate (at most LEAVE_WAIT_MS). An entry a reload left behind
- * is reused, not stacked.
+ * wait for its popstate before another photo may open. An entry that is
+ * marked when the photo opens (the browser's Forward returned to it) is
+ * reused, not stacked.
  */
 function addEntry(dialog: HTMLDialogElement, id: string): void {
 	const history = window.history;
@@ -90,13 +115,7 @@ function addEntry(dialog: HTMLDialogElement, id: string): void {
 		const current: unknown = window.history.state;
 		if (!isRecord(current) || current[PHOTO_ENTRY] !== id) return;
 		leaving = true;
-		const arrived = () => {
-			leaving = false;
-			window.removeEventListener("popstate", arrived);
-			clearTimeout(timer);
-		};
-		const timer = setTimeout(arrived, LEAVE_WAIT_MS);
-		window.addEventListener("popstate", arrived);
+		window.addEventListener("popstate", arrived, { once: true });
 		window.history.back();
 	}
 	window.addEventListener("popstate", onBack);

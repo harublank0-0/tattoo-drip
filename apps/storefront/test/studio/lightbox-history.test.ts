@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, mock, test } from "node:test";
-import {
-	LEAVE_WAIT_MS,
-	PHOTO_ENTRY,
-	showPhoto,
-} from "../../src/studio/lightbox.ts";
+import type * as Lightbox from "../../src/studio/lightbox.ts";
+import { PHOTO_ENTRY } from "../../src/studio/lightbox.ts";
 
 /**
  * Back closes the work photo viewer (TAT-123). lightbox.ts reads the browser's
@@ -14,6 +11,11 @@ import {
  * pushState / replaceState throw, as a stand-in for TanStack's wrappers: they
  * tell the router, which would run the page's loaders, so the viewer must go
  * through History.prototype, the browser's own.
+ *
+ * Each test loads its own copy of the module (a query on the address), after
+ * the globals are in place: the module looks at the entry the page was loaded
+ * on when it loads, and keeps whether a closed photo is still leaving in the
+ * module, so a copy per test is a page load per test.
  */
 const globals = globalThis as Record<string, unknown>;
 const saved = {
@@ -119,8 +121,10 @@ class FakeDialog extends Target {
 
 const ROUTER_STATE = { key: "k1", __TSR_key: "k1", __TSR_index: 3 };
 
-/** A page with two photo dialogs, on a history entry that has this state. */
-function page(state: unknown = ROUTER_STATE) {
+let loads = 0;
+
+/** A page with two photo dialogs, loaded on a history entry that has this state. */
+async function page(state: unknown = ROUTER_STATE) {
 	const window = new FakeWindow();
 	const history = new FakeHistory(window, structuredClone(state));
 	// TanStack replaces the instance's own methods; the viewer must not use them.
@@ -139,12 +143,15 @@ function page(state: unknown = ROUTER_STATE) {
 	globals.document = {
 		getElementById: (id: string) => dialogs[id] ?? null,
 	};
-	return { window, history, dialogs };
+	const loaded = (await import(
+		`../../src/studio/lightbox.ts?load=${++loads}`
+	)) as typeof Lightbox;
+	return { window, history, dialogs, showPhoto: loaded.showPhoto, loaded };
 }
 
 describe("Back closes the work photo viewer (TAT-123)", () => {
-	test("opening a photo adds one entry at the same address with the router's own state", () => {
-		const { history, dialogs } = page();
+	test("opening a photo adds one entry at the same address with the router's own state", async () => {
+		const { history, dialogs, showPhoto } = await page();
 
 		showPhoto("work-photo-1");
 
@@ -162,8 +169,8 @@ describe("Back closes the work photo viewer (TAT-123)", () => {
 		assert.equal(PHOTO_ENTRY, "tattooDripPhoto");
 	});
 
-	test("Back closes the photo and takes nothing more off", () => {
-		const { window, history, dialogs } = page();
+	test("Back closes the photo and takes nothing more off", async () => {
+		const { window, history, dialogs, showPhoto } = await page();
 		showPhoto("work-photo-1");
 
 		history.pop();
@@ -175,8 +182,8 @@ describe("Back closes the work photo viewer (TAT-123)", () => {
 		assert.deepEqual(history.state, ROUTER_STATE);
 	});
 
-	test("Close or Escape takes the entry off with one back(); a photo clicked before it lands waits", () => {
-		const { window, history, dialogs } = page();
+	test("Close or Escape takes the entry off with one back(); a photo clicked before it lands waits", async () => {
+		const { window, history, dialogs, showPhoto } = await page();
 		showPhoto("work-photo-1");
 
 		dialogs["work-photo-1"].close();
@@ -199,54 +206,139 @@ describe("Back closes the work photo viewer (TAT-123)", () => {
 		});
 	});
 
-	test("a back() that moves nowhere (the marked entry is the session's first) does not lock the viewer", () => {
+	test("a slow back() keeps the viewer shut until its popstate: reopening and closing meanwhile queue no second traversal", async () => {
+		const { window, history, dialogs, showPhoto } = await page();
 		mock.timers.enable({ apis: ["setTimeout"] });
-		const { window, history, dialogs } = page({
-			...ROUTER_STATE,
-			[PHOTO_ENTRY]: "work-photo-1",
-		});
-		showPhoto("work-photo-2"); // reuses the entry a duplicated tab carried over
-		dialogs["work-photo-2"].close();
-		assert.deepEqual(history.calls, ["replace", "back"]);
-
 		showPhoto("work-photo-1");
-		assert.equal(dialogs["work-photo-1"].open, false, "it waits for the back");
+		dialogs["work-photo-1"].close();
+		assert.deepEqual(history.calls, ["push", "back"]);
 
-		// No popstate comes: there is no earlier entry to go back to.
-		mock.timers.tick(LEAVE_WAIT_MS);
-		assert.equal(window.count("popstate"), 0, "no listener is left");
+		// The browser is slow to move: time passing, taps and Escapes change nothing.
+		mock.timers.tick(60_000);
+		for (let tap = 0; tap < 5; tap++) {
+			showPhoto("work-photo-1");
+			showPhoto("work-photo-2");
+		}
+		assert.equal(dialogs["work-photo-1"].open, false);
+		assert.equal(dialogs["work-photo-2"].open, false);
+		assert.deepEqual(history.calls, ["push", "back"], "still the one back()");
+		assert.equal(window.count("popstate"), 1, "still waiting for the move");
 
-		showPhoto("work-photo-1");
-		assert.ok(
-			dialogs["work-photo-1"].open,
-			"a photo opens again without a reload",
+		history.pop(); // it lands at last
+		assert.equal(window.count("popstate"), 0);
+		assert.deepEqual(history.state, ROUTER_STATE);
+		assert.deepEqual(history.calls, ["push", "back"]);
+	});
+
+	test("after the delayed popstate a photo opens and closes again, one back() each time", async () => {
+		const { history, dialogs, showPhoto } = await page();
+		for (const id of ["work-photo-1", "work-photo-2", "work-photo-1"]) {
+			showPhoto(id);
+			assert.ok(dialogs[id].open, `${id} opens`);
+			dialogs[id].close();
+			showPhoto(id); // too early
+			assert.equal(dialogs[id].open, false);
+			history.pop();
+			assert.deepEqual(history.state, ROUTER_STATE);
+		}
+
+		assert.deepEqual(history.calls, [
+			"push",
+			"back",
+			"push",
+			"back",
+			"push",
+			"back",
+		]);
+		assert.equal(history.index, 0, "back on the page's own entry");
+		assert.equal(
+			history.entries.length,
+			2,
+			"each push replaced the forward entry",
 		);
-		assert.deepEqual(history.calls, ["replace", "back", "replace"]);
-		assert.equal(history.entries.length, 1);
-		assert.deepEqual(history.state, {
+	});
+
+	test("there is no timer: nothing is scheduled, and nothing is exported to wait for", async () => {
+		const timers = globals.setTimeout;
+		globals.setTimeout = () => {
+			throw new Error("the viewer scheduled a timer");
+		};
+		try {
+			const { dialogs, history, loaded, showPhoto } = await page();
+			showPhoto("work-photo-1");
+			dialogs["work-photo-1"].close();
+			showPhoto("work-photo-2");
+			history.pop();
+			assert.equal("LEAVE_WAIT_MS" in loaded, false);
+		} finally {
+			globals.setTimeout = timers;
+		}
+	});
+
+	test("a page loaded on a marked entry (a reload with a photo open) takes the marker off, keeping the router's state", async () => {
+		const { window, history, dialogs } = await page({
 			...ROUTER_STATE,
 			[PHOTO_ENTRY]: "work-photo-1",
 		});
-		history.pop(0);
+
+		assert.deepEqual(history.calls, ["replace"], "the browser's own, once");
+		assert.deepEqual(history.urls, [undefined], "no URL: the address stays");
+		assert.deepEqual(history.state, ROUTER_STATE);
+		assert.equal(history.entries.length, 1);
+		assert.equal(dialogs["work-photo-1"].open, false);
+		assert.equal(window.count("popstate"), 0);
+	});
+
+	test("a page loaded on an unmarked entry, or on a state that is not an object, is left alone", async () => {
+		for (const state of [ROUTER_STATE, null, "x", 5, ["a"]]) {
+			const { history } = await page(state);
+
+			assert.deepEqual(history.calls, [], String(state));
+			assert.deepEqual(history.state, state);
+		}
+	});
+
+	test("a duplicated tab (one marked entry, nothing before it): Close does not lock the viewer", async () => {
+		const { window, history, dialogs, showPhoto } = await page({
+			...ROUTER_STATE,
+			[PHOTO_ENTRY]: "work-photo-1",
+		});
+		assert.deepEqual(history.state, ROUTER_STATE, "the leftover is gone");
+
+		showPhoto("work-photo-2");
+		assert.deepEqual(history.calls, ["replace", "push"], "a new entry");
+		assert.equal(history.entries.length, 2, "so Close has an entry before it");
+		dialogs["work-photo-2"].close();
+		assert.deepEqual(history.calls, ["replace", "push", "back"]);
+		history.pop();
+		assert.equal(window.count("popstate"), 0);
+
+		showPhoto("work-photo-1");
+		assert.ok(dialogs["work-photo-1"].open, "opens again without a reload");
+		history.pop();
 		assert.equal(dialogs["work-photo-1"].open, false, "Back still closes it");
 	});
 
-	test("a back() that lands in time clears the wait, and the timeout does nothing later", () => {
-		mock.timers.enable({ apis: ["setTimeout"] });
-		const { history, dialogs } = page();
+	test("an entry the browser's Forward returned to, still marked, is reused, not stacked", async () => {
+		const { history, dialogs, showPhoto } = await page();
 		showPhoto("work-photo-1");
-		dialogs["work-photo-1"].close();
-		history.pop();
+		history.pop(); // Back: closed
+		history.pop(1); // Forward: the marked entry again, nothing open
 
 		showPhoto("work-photo-2");
+
 		assert.ok(dialogs["work-photo-2"].open);
-		mock.timers.tick(LEAVE_WAIT_MS * 2);
-		assert.ok(dialogs["work-photo-2"].open, "the old timeout was cleared");
-		assert.deepEqual(history.calls, ["push", "back", "push"]);
+		assert.deepEqual(history.calls, ["push", "replace"]);
+		assert.deepEqual(history.urls, [undefined, undefined]);
+		assert.equal(history.entries.length, 2);
+		assert.deepEqual(history.state, {
+			...ROUTER_STATE,
+			[PHOTO_ENTRY]: "work-photo-2",
+		});
 	});
 
-	test("an open photo is not opened or pushed again", () => {
-		const { history } = page();
+	test("an open photo is not opened or pushed again", async () => {
+		const { history, showPhoto } = await page();
 
 		showPhoto("work-photo-1");
 		showPhoto("work-photo-1");
@@ -254,26 +346,8 @@ describe("Back closes the work photo viewer (TAT-123)", () => {
 		assert.deepEqual(history.calls, ["push"]);
 	});
 
-	test("an entry a reload left behind is reused, not stacked", () => {
-		const { history, dialogs } = page({
-			...ROUTER_STATE,
-			[PHOTO_ENTRY]: "work-photo-1",
-		});
-
-		showPhoto("work-photo-2");
-
-		assert.ok(dialogs["work-photo-2"].open);
-		assert.deepEqual(history.calls, ["replace"]);
-		assert.deepEqual(history.urls, [undefined]);
-		assert.equal(history.entries.length, 1);
-		assert.deepEqual(history.state, {
-			...ROUTER_STATE,
-			[PHOTO_ENTRY]: "work-photo-2",
-		});
-	});
-
-	test("a close after the entry is no longer current calls no back()", () => {
-		const { window, history, dialogs } = page();
+	test("a close after the entry is no longer current calls no back()", async () => {
+		const { window, history, dialogs, showPhoto } = await page();
 		showPhoto("work-photo-1");
 		history.index = 0; // the browser moved on without a popstate reaching the viewer
 
@@ -284,8 +358,8 @@ describe("Back closes the work photo viewer (TAT-123)", () => {
 		assert.equal(dialogs["work-photo-1"].count("close"), 0);
 	});
 
-	test("Back, then the same photo again, opens it with a new entry", () => {
-		const { history, dialogs } = page();
+	test("Back, then the same photo again, opens it with a new entry", async () => {
+		const { history, dialogs, showPhoto } = await page();
 		showPhoto("work-photo-1");
 		history.pop();
 
@@ -295,9 +369,9 @@ describe("Back closes the work photo viewer (TAT-123)", () => {
 		assert.deepEqual(history.calls, ["push", "push"]);
 	});
 
-	test("history state that is not an object is treated as the router's empty state", () => {
+	test("history state that is not an object is treated as the router's empty state", async () => {
 		for (const state of [null, "x", 5, ["a"]]) {
-			const { history } = page(state);
+			const { history, showPhoto } = await page(state);
 
 			showPhoto("work-photo-1");
 
@@ -306,8 +380,8 @@ describe("Back closes the work photo viewer (TAT-123)", () => {
 		}
 	});
 
-	test("without <dialog> the large photo opens and no entry is added", () => {
-		const { window, history } = page();
+	test("without <dialog> the large photo opens and no entry is added", async () => {
+		const { window, history, showPhoto } = await page();
 		delete globals.HTMLDialogElement;
 		globals.document = {
 			getElementById: () => ({

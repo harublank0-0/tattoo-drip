@@ -62,6 +62,13 @@ describe("the photo viewer is the browser's dialog (TAT-116)", () => {
 			/History\.prototype\.replaceState\.call\(history, entry, ""\)/,
 		);
 		assert.doesNotMatch(text, /history\.pushState\(|history\.replaceState\(/);
+		// A marker left on the entry the page loaded on is taken off the same way.
+		assert.match(
+			text,
+			/History\.prototype\.replaceState\.call\(history, router, ""\)/,
+		);
+		// The wait for a closed photo's back() is its popstate, never a timer.
+		assert.doesNotMatch(text, /setTimeout|clearTimeout|LEAVE_WAIT_MS/);
 		assert.doesNotMatch(text, /location\.hash|location\.href|\.hash =/);
 		assert.doesNotMatch(text, /@tanstack/, "the router is never imported");
 	});
