@@ -424,6 +424,50 @@ describe("a healed value the reader rejects is no filter anywhere", () => {
 		assert.deepEqual(workReads(), [`${WORK}?cursor=bogus&limit=24`]);
 	});
 
+	test("a stray style in an artist page's address is not part of the portfolio read: the whole portfolio shows", async () => {
+		const { context: ctx, workReads } = context(page());
+		const { artist } = await visit("/artists/sita?style=fine-line");
+		const data = await loadArtistPage(ctx, "sita", artist as PortfolioSearch);
+		const html = renderToStaticMarkup(createElement(ArtistPage, { data }));
+		const nav = html.match(/<nav class="work-filter-nav"[\s\S]*?<\/nav>/)?.[0];
+
+		assert.deepEqual(workReads(), [`${WORK}?artist=sita&limit=24`]);
+		assert.equal(data.portfolio.gallery.photos.length, 3);
+		assert.equal(
+			[...html.matchAll(/class="work-open"/g)].length,
+			3,
+			"all three photos are on the page",
+		);
+		assert.match(
+			nav ?? "",
+			/<a href="\/artists\/sita#work" aria-current="page">All<\/a>/,
+		);
+		assert.ok(
+			hrefsOf(html).every((href) => !href.includes("style")),
+			"no link carries style",
+		);
+	});
+
+	test("a stray style with healed=1 reads the healed portfolio and no style", async () => {
+		const { context: ctx, workReads } = context(page());
+		const { artist } = await visit("/artists/sita?style=fine-line&healed=1");
+		await loadArtistPage(ctx, "sita", artist as PortfolioSearch);
+
+		assert.deepEqual(workReads(), [`${WORK}?artist=sita&healed=true&limit=24`]);
+	});
+
+	test("a stray style and artist beside a cursor: only the cursor is passed on", async () => {
+		const { context: ctx, workReads } = context(page());
+		const { artist } = await visit(
+			"/artists/sita?style=japanese&artist=bina&cursor=bogus",
+		);
+		await loadArtistPage(ctx, "sita", artist as PortfolioSearch);
+
+		assert.deepEqual(workReads(), [
+			`${WORK}?artist=sita&cursor=bogus&limit=24`,
+		]);
+	});
+
 	test("an artist= in an artist page's address does not change whose photos it shows", async () => {
 		const { context: ctx, workReads } = context(page());
 		const { artist } = await visit("/artists/sita?artist=bina&style=japanese");

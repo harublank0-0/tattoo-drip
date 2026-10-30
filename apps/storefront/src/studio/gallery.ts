@@ -239,6 +239,30 @@ export function readWorkSearch(search: Record<string, unknown>): WorkSearch {
 }
 
 /**
+ * The API's read for an artist's portfolio, built only from what that page
+ * offers: their slug, `healed` (exactly `true`, as in workQuery), the
+ * address's `cursor` as typed (a garbled one is the API's 422, the not-found
+ * page) and `limit`. Never a `style` or any other key of the address: the
+ * router merges what the readers dropped back into `search`, and the page has
+ * no such filter to show.
+ */
+export function portfolioQuery(
+	slug: string,
+	search: PortfolioSearch,
+	limit: number,
+): ListWorkQuery {
+	const { healed, cursor } = search;
+	return workQuery(
+		{
+			artist: slug,
+			...(healed === true ? { healed } : {}),
+			...(cursor !== undefined ? { cursor } : {}),
+		},
+		limit,
+	);
+}
+
+/**
  * The API's read for these filters: `artist`, `style`, `healed`, `cursor` in
  * that order, absent ones left out, then `limit`. `healed` is only ever true
  * (the contract reads false as no filter), and is on only for exactly `true`,

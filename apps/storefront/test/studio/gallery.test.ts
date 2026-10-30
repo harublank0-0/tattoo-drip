@@ -4,6 +4,7 @@ import {
 	EMPTY_GALLERY,
 	galleryView,
 	MAX_GALLERY_PAGE,
+	portfolioQuery,
 	RECENT_WORK_COUNT,
 	readPortfolioSearch,
 	readWorkSearch,
@@ -356,6 +357,42 @@ describe("the address's filters are read strictly (TAT-126)", () => {
 			),
 			["artist", "style", "healed", "cursor"],
 		);
+	});
+});
+
+describe("portfolioQuery (TAT-126)", () => {
+	test("the artist's slug, healed when exactly true, the cursor as typed, then the limit", () => {
+		assert.deepEqual(portfolioQuery("sita", {}, 24), {
+			artist: "sita",
+			limit: 24,
+		});
+		assert.deepEqual(portfolioQuery("sita", { healed: true }, 24), {
+			artist: "sita",
+			healed: true,
+			limit: 24,
+		});
+		assert.deepEqual(
+			Object.keys(portfolioQuery("sita", { healed: true, cursor: "c2" }, 24)),
+			["artist", "healed", "cursor", "limit"],
+		);
+		// A garbled cursor goes on as typed: the API refuses it.
+		assert.equal(portfolioQuery("sita", { cursor: "a b" }, 24).cursor, "a b");
+	});
+
+	test("nothing else of the address is read, whatever the router merged in", () => {
+		const raw = {
+			style: "fine-line",
+			artist: "bina",
+			healed: "false",
+			cursor: "c2",
+			utm_source: "x",
+		} as never;
+
+		assert.deepEqual(portfolioQuery("sita", raw, 24), {
+			artist: "sita",
+			cursor: "c2",
+			limit: 24,
+		});
 	});
 });
 

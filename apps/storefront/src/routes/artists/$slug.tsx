@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { pageCacheHeaders } from "../../studio/cache.ts";
 import {
+	portfolioQuery,
 	readPortfolioSearch,
 	WORK_PAGE_SIZE,
-	workQuery,
 } from "../../studio/gallery.ts";
 import { loadArtistPage, moreWork } from "../../studio/loaders.ts";
 import { statusHead } from "../../studio/seo.ts";
@@ -33,9 +33,10 @@ export const Route = createFileRoute("/artists/$slug")({
 function ArtistRoute() {
 	const data = Route.useLoaderData();
 	const { queryClient, tattoo, site } = Route.useRouteContext();
-	// This artist's slug last (see loadPortfolio).
-	const query = workQuery(
-		{ ...data.portfolio.search, artist: data.artist.slug },
+	// The same read as the loader's (portfolioQuery), for Show more.
+	const query = portfolioQuery(
+		data.artist.slug,
+		data.portfolio.search,
 		WORK_PAGE_SIZE,
 	);
 	return (

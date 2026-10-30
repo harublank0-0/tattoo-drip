@@ -13,6 +13,7 @@ import {
 	type GalleryView,
 	galleryView,
 	type PortfolioSearch,
+	portfolioQuery,
 	RECENT_WORK_COUNT,
 	WORK_PAGE_SIZE,
 	type WorkSearch,
@@ -322,12 +323,10 @@ async function loadPortfolio(
 	search: PortfolioSearch,
 ): Promise<PortfolioRead> {
 	try {
-		// The page's artist last: the router merges an `artist=` of the address
-		// back into `search`, and this page shows only this artist's photos.
 		const page = await context.queryClient.query({
 			...tattooQueries.work(
 				context.tattoo.client,
-				workQuery({ ...search, artist: slug }, WORK_PAGE_SIZE),
+				portfolioQuery(slug, search, WORK_PAGE_SIZE),
 			),
 			staleTime: "static",
 		});
