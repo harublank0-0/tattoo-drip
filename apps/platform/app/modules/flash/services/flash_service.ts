@@ -222,7 +222,9 @@ export default class FlashService {
 			await this.artists.lockEditable(trx, tenant, editor, design.artistId);
 			const live = await this.lockedDesign(trx, tenant, design);
 			try {
-				await withTransaction(() => live.delete());
+				await withTransaction((savepoint) =>
+					live.useTransaction(savepoint).delete(),
+				);
 			} catch (error) {
 				if (
 					isForeignKeyViolation(error, INQUIRY_KEY) ||
