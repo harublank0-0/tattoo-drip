@@ -37,6 +37,13 @@ export default class PublicArtistTransformer extends BaseTransformer<ShownArtist
 				alt: photo.alt,
 				variants: photo.variants.map(({ url, width }) => ({ url, width })),
 			})),
+			// Slug and name only; links are platform and https URL only
+			// (openapi.yaml, TattooStyle and SocialLink).
+			styles: artist.styles.map(({ slug, name }) => ({ slug, name })),
+			socialLinks: artist.socialLinks.map(({ platform, url }) => ({
+				platform,
+				url,
+			})),
 		};
 	}
 }

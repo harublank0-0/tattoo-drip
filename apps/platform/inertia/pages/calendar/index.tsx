@@ -39,7 +39,7 @@ export default function CalendarIndex({
 }: CalendarPageProps) {
 	const tenant = useTenant();
 	const now = useNow();
-	// Moves with the clock: the `today` prop is only the studio's date at load.
+	// The studio's date, moving with the clock (a tab left open past midnight).
 	const today = studioDate(now, timezone);
 	const isOwner = tenant.role === "owner";
 	const base = urlFor("tenant.calendar.index", { tenant: tenant.slug });

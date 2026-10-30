@@ -18,6 +18,10 @@ export const artistInput = (over: Partial<ArtistInput> = {}): ArtistInput => ({
 	acceptingInquiries: true,
 	closedMessage: null,
 	linkToMe: false,
+	styles: [],
+	instagramUrl: null,
+	facebookUrl: null,
+	tiktokUrl: null,
 	...over,
 });
 

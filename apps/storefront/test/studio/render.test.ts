@@ -920,3 +920,162 @@ describe("the artist page's work grid and viewer (TAT-116)", () => {
 		assert.match(html, /alt="Tattoo by अर्जुन थापा, photo 1 of 2"/);
 	});
 });
+
+describe("an artist's styles and links", () => {
+	/** An artist who sets styles and links, shown on the studio page and on their own. */
+	const THREE_STYLES: Artist = {
+		...SITA,
+		styles: [
+			{ slug: "japanese", name: "Japanese" },
+			{ slug: "blackwork", name: "Blackwork" },
+			{ slug: "cover-up", name: "Cover-up" },
+		],
+		socialLinks: [
+			{ platform: "instagram", url: "https://instagram.com/sita.ink" },
+			{ platform: "facebook", url: "https://facebook.com/sita.ink" },
+			{ platform: "tiktok", url: "https://www.tiktok.com/@sita.ink" },
+		],
+	};
+	const pageOf = (artist: Artist) => {
+		const data = artistPageData(STUDIO, [artist], artist.slug, ORIGIN);
+		assert.ok(data);
+		return renderToStaticMarkup(createElement(ArtistPage, { data }));
+	};
+	const STYLES_LINE = /<p class="artist-styles">([^<]*)<\/p>/;
+	const STYLE_LIST =
+		/<ul class="style-list" aria-label="Styles">([\s\S]*?)<\/ul>/;
+	const ARTIST_LINKS =
+		/<ul class="artist-links" aria-label="Links">([\s\S]*?)<\/ul>/;
+
+	test("the card shows the artist's styles on one line", () => {
+		const html = studioHtml(STUDIO, [THREE_STYLES, ARJUN]);
+
+		assertSafePage(html);
+		assert.equal(count(html, /class="artist-styles"/g), 1);
+		assert.equal(
+			html.match(STYLES_LINE)?.[1],
+			"Japanese · Blackwork · Cover-up",
+		);
+		// Under the name, in the card's head.
+		assert.match(
+			html,
+			/<h3 id="artist-sita" class="artist-name" dir="auto">Sita Rai<\/h3><p class="artist-styles">/,
+		);
+		// Styles are on the card alone: the roster has no chips or links.
+		assert.equal(count(html, /class="style-list"|class="artist-links"/g), 0);
+	});
+
+	test("the artist page shows styles and links", () => {
+		const html = pageOf(SITA);
+
+		assertSafePage(html);
+		const styles = html.match(STYLE_LIST)?.[1];
+		assert.ok(styles);
+		assert.deepEqual(
+			Array.from(styles.matchAll(/<li>([^<]*)<\/li>/g), (m) => m[1]),
+			["Fine line"],
+		);
+		const links = html.match(ARTIST_LINKS)?.[1];
+		assert.ok(links);
+		assert.match(
+			links,
+			/<a class="link-chip" href="https:\/\/instagram\.com\/sita\.ink" rel="noopener noreferrer">Instagram<\/a>/,
+		);
+		assert.equal(count(links, /<li>/g), 1);
+		// The card's one-line version is not repeated on the artist's own page.
+		assert.equal(count(html, /class="artist-styles"/g), 0);
+	});
+
+	test("the artist page's two lists are named Styles and Links", () => {
+		const html = pageOf(THREE_STYLES);
+
+		assert.equal(
+			count(html, /<ul class="style-list" aria-label="Styles">/g),
+			1,
+		);
+		assert.equal(
+			count(html, /<ul class="artist-links" aria-label="Links">/g),
+			1,
+		);
+	});
+
+	test("the artist page lists every style as a chip, and every link in Instagram, Facebook, TikTok order", () => {
+		const html = pageOf(THREE_STYLES);
+
+		assertSafePage(html);
+		assert.deepEqual(
+			Array.from(
+				(html.match(STYLE_LIST)?.[1] ?? "").matchAll(/<li>([^<]*)<\/li>/g),
+				(m) => m[1],
+			),
+			["Japanese", "Blackwork", "Cover-up"],
+		);
+		assert.deepEqual(
+			Array.from(
+				(html.match(ARTIST_LINKS)?.[1] ?? "").matchAll(
+					/<a [^>]*>([^<]*)<\/a>/g,
+				),
+				(m) => m[1],
+			),
+			["Instagram", "Facebook", "TikTok"],
+		);
+	});
+
+	test("the page puts the styles under the title and the links after the bio", () => {
+		const html = pageOf(THREE_STYLES);
+		const at = (pattern: RegExp) => html.search(pattern);
+
+		assert.ok(at(/<h1 /) < at(/class="style-list"/));
+		assert.ok(at(/class="style-list"/) < at(/Fine line florals/));
+		assert.ok(at(/Fine line florals/) < at(/class="artist-links"/));
+		assert.ok(at(/class="artist-links"/) < at(/id="inquiry"/));
+	});
+
+	test("an artist with no styles or links shows neither", () => {
+		const roster = studioHtml(STUDIO, [ARJUN]);
+		const page = pageOf(ARJUN);
+
+		assert.equal(count(roster, /artist-styles/g), 0);
+		for (const html of [roster, page]) {
+			assert.equal(count(html, /artist-styles|style-list|artist-links/g), 0);
+		}
+	});
+
+	test("an artist saved before this feature (an empty object, null) shows neither", () => {
+		const old = {
+			...SITA,
+			styles: {},
+			socialLinks: null,
+		} as unknown as Artist;
+		for (const html of [studioHtml(STUDIO, [old]), pageOf(old)]) {
+			assert.equal(count(html, /artist-styles|style-list|artist-links/g), 0);
+		}
+	});
+
+	test("a link that is not https never reaches the page, and a list left empty is not drawn", () => {
+		const hostile = {
+			...SITA,
+			socialLinks: [
+				{ platform: "instagram", url: "javascript:alert(1)" },
+				{ platform: "facebook", url: "http://facebook.com/sita" },
+			],
+		} as unknown as Artist;
+		const html = pageOf(hostile);
+
+		assertSafePage(html);
+		assert.equal(count(html, /artist-links/g), 0);
+	});
+
+	test("hostile style text stays text", () => {
+		const hostile = {
+			...SITA,
+			styles: [{ slug: "x", name: "<script>alert(1)</script>" }],
+		} as unknown as Artist;
+
+		for (const html of [studioHtml(STUDIO, [hostile]), pageOf(hostile)]) {
+			assertSafePage(html);
+			assert.doesNotMatch(html, /<script>alert/);
+			assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+		}
+	});
+});

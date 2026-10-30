@@ -9,7 +9,7 @@ import { FinishCard } from "~/components/finish_card";
 import { usePageSheets } from "~/components/form_sheet";
 import { SOURCE_LABELS } from "~/components/inquiries";
 import MessageCard from "~/components/message_card";
-import type { ContactVia } from "~/components/messages";
+import { type ContactVia, justContacted } from "~/components/messages";
 import NextStepCard from "~/components/next_step_card";
 import Page from "~/components/page";
 import PaymentsCard, {
@@ -80,11 +80,13 @@ export default function ProjectShow(props: ProjectPageProps) {
 	// to the page heading instead of <body>.
 	const heading = useRef<HTMLHeadingElement>(null);
 	// Every chat link, Call and "Copy message" record the contact in the
-	// background (TAT-46), with the channel and the message (TAT-52).
+	// background (TAT-46), with the channel and the message (TAT-52); the
+	// footer says so at once (optimistic, TAT-84).
 	const markContacted = (via: ContactVia = {}) =>
 		router.post(urlFor("tenant.projects.contacted.store", params), via, {
 			preserveScroll: true,
 			preserveState: true,
+			optimistic: () => justContacted(via),
 		});
 
 	return (

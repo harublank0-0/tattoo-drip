@@ -34,6 +34,11 @@ export const studioCopy = {
 		photoOf: "Photo {n} of {count}",
 		close: "Close",
 	},
+	/** The artist page's two lists, named for screen readers (TAT-125). */
+	artist: {
+		styles: "Styles",
+		links: "Links",
+	},
 	booking: {
 		title: "How booking works",
 		steps: [

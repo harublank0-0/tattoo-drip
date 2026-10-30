@@ -11,7 +11,7 @@ import ArtistService, {
 	type ArtistInput,
 } from "#modules/artists/services/artist_service";
 import ImageService from "#modules/media/services/image_service";
-import { dbClient, withDbContext } from "#services/db_context";
+import { dbClient, withDbContext, withTransaction } from "#services/db_context";
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
 const artists = new ArtistService(new ImageService());
@@ -24,6 +24,10 @@ const input = (over: Partial<ArtistInput> = {}): ArtistInput => ({
 	acceptingInquiries: true,
 	closedMessage: null,
 	linkToMe: false,
+	styles: [],
+	instagramUrl: null,
+	facebookUrl: null,
+	tiktokUrl: null,
 	...over,
 });
 
@@ -47,6 +51,91 @@ test.group("ArtistService profiles", (group) => {
 		assert.isTrue(artist.acceptingInquiries);
 		assert.isNull(artist.userId);
 		assert.isNull(artist.photoKey);
+	});
+
+	test("create stores styles and links", async ({ assert }) => {
+		const { tenant, owner } = await studioWithOwner();
+
+		const created = await inTenant(tenant, () =>
+			artists.create(
+				tenant,
+				input({
+					styles: ["realism", "blackwork"],
+					instagramUrl: "https://instagram.com/sita",
+				}),
+				owner,
+			),
+		);
+		const artist = await inTenant(tenant, () =>
+			artists.findFor(tenant, created.id),
+		);
+
+		assert.deepEqual(artist.styles, ["realism", "blackwork"]);
+		assert.equal(artist.instagramUrl, "https://instagram.com/sita");
+		assert.isNull(artist.facebookUrl);
+		assert.isNull(artist.tiktokUrl);
+	});
+
+	test("update with no styles and no links clears them", async ({ assert }) => {
+		const { tenant, owner } = await studioWithOwner();
+
+		const artist = await inTenant(tenant, async () => {
+			const created = await artists.create(
+				tenant,
+				input({
+					styles: ["realism", "blackwork"],
+					instagramUrl: "https://instagram.com/sita",
+					facebookUrl: "https://facebook.com/sita",
+					tiktokUrl: "https://tiktok.com/@sita",
+				}),
+				owner,
+			);
+			await artists.update(
+				tenant,
+				created,
+				input({ styles: [], instagramUrl: null }),
+				owner,
+			);
+			return artists.findFor(tenant, created.id);
+		});
+
+		assert.deepEqual(artist.styles, []);
+		assert.isNull(artist.instagramUrl);
+		assert.isNull(artist.facebookUrl);
+		assert.isNull(artist.tiktokUrl);
+	});
+
+	test("the database refuses a sixth style", async ({ assert }) => {
+		const { tenant, owner } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const artist = await artists.create(
+				tenant,
+				input({ styles: ["blackwork"] }),
+				owner,
+			);
+			await assert.rejects(
+				() =>
+					withTransaction((trx) =>
+						Artist.query({ client: trx })
+							.where("id", artist.id)
+							.update({
+								styles: [
+									"blackwork",
+									"fine-line",
+									"traditional",
+									"neo-traditional",
+									"realism",
+									"colour",
+								],
+							}),
+					),
+				/artists_styles_max/,
+			);
+			assert.deepEqual((await artists.findFor(tenant, artist.id)).styles, [
+				"blackwork",
+			]);
+		});
 	});
 
 	test("linkToMe links the profile to the acting member", async ({
@@ -424,6 +513,11 @@ test.group("ArtistService profiles", (group) => {
 		assert.equal(artist.userId, owner.id);
 		assert.isTrue(artist.visible);
 		assert.isTrue(artist.acceptingInquiries);
+		// The returned instance matches what the database stores.
+		assert.deepEqual(artist.styles, []);
+		assert.isNull(artist.instagramUrl);
+		assert.isNull(artist.facebookUrl);
+		assert.isNull(artist.tiktokUrl);
 	});
 });
 
@@ -622,6 +716,10 @@ test.group("ArtistService own profiles (TAT-30)", (group) => {
 				visible: false,
 				acceptingInquiries: false,
 				closedMessage: "Back in May",
+				styles: [],
+				instagramUrl: null,
+				facebookUrl: null,
+				tiktokUrl: null,
 			}),
 		);
 

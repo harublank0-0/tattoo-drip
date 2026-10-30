@@ -6,11 +6,16 @@ import type ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
 import ArtistService from "#modules/artists/services/artist_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import WorkPhotoService from "#modules/artists/services/work_photo_service";
+import { knownStyles, type TattooStyleRef } from "#modules/artists/styles";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService, {
 	type ShownImage,
 } from "#modules/media/services/image_service";
 import { lookOf, type PageLook } from "#modules/storefront/look";
+import {
+	type PublicSocialLink,
+	socialLinks,
+} from "#modules/storefront/studio_page";
 import type Tenant from "#modules/tenancy/models/tenant";
 import type { TenantProfile } from "#modules/tenancy/services/tenancy_service";
 
@@ -40,7 +45,14 @@ export type ShownWorkPhoto = ShownImage & { alt: string | null };
 export type ShownArtist = Pick<
 	Artist,
 	"id" | "slug" | "name" | "bio" | "acceptingInquiries" | "closedMessage"
-> & { photo: ShownImage | null; workPhotos: ShownWorkPhoto[] };
+> & {
+	photo: ShownImage | null;
+	workPhotos: ShownWorkPhoto[];
+	/** The listed styles among the artist's, in the list's order. */
+	styles: TattooStyleRef[];
+	/** The artist's set https links: instagram, facebook, tiktok. */
+	socialLinks: PublicSocialLink[];
+};
 
 const PHOTO = "artist_photo";
 const COVER = "studio_cover";
@@ -128,6 +140,8 @@ export default class StudioPageService {
 					alt: photo.alt,
 				})),
 			),
+			styles: knownStyles(artist.styles),
+			socialLinks: socialLinks(artist),
 		};
 	}
 

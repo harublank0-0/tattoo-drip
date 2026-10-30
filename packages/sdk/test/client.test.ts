@@ -788,6 +788,8 @@ describe("studio and artists", () => {
 				variants: [],
 			},
 		],
+		styles: [],
+		socialLinks: [],
 	};
 
 	test("studio.get returns the whole profile", async () => {

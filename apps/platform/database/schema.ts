@@ -77,13 +77,17 @@ export class ArtistSchema extends BaseModel {
 		"closedMessage",
 		"createdAt",
 		"deletedAt",
+		"facebookUrl",
 		"id",
+		"instagramUrl",
 		"name",
 		"photoHeight",
 		"photoKey",
 		"photoWidth",
 		"slug",
+		"styles",
 		"tenantId",
+		"tiktokUrl",
 		"updatedAt",
 		"userId",
 		"visible",
@@ -99,8 +103,12 @@ export class ArtistSchema extends BaseModel {
 	declare createdAt: DateTime;
 	@column.dateTime()
 	declare deletedAt: DateTime | null;
+	@column()
+	declare facebookUrl: string | null;
 	@column({ isPrimary: true })
 	declare id: string;
+	@column()
+	declare instagramUrl: string | null;
 	@column()
 	declare name: string;
 	@column()
@@ -112,7 +120,11 @@ export class ArtistSchema extends BaseModel {
 	@column()
 	declare slug: string;
 	@column()
+	declare styles: string[];
+	@column()
 	declare tenantId: string;
+	@column()
+	declare tiktokUrl: string | null;
 	@column.dateTime({ autoCreate: true, autoUpdate: true })
 	declare updatedAt: DateTime | null;
 	@column()

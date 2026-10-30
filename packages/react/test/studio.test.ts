@@ -35,6 +35,8 @@ const ARTIST: Artist = {
 	acceptingInquiries: true,
 	closedMessage: null,
 	workPhotos: [],
+	styles: [],
+	socialLinks: [],
 };
 
 /** A client whose fetch answers every call with `status` and `body`. */

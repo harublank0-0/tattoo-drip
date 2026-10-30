@@ -1,6 +1,6 @@
 import { Form, Link } from "@adonisjs/inertia/react";
 import { useState } from "react";
-import type { ArtistProps } from "~/components/artists";
+import type { ArtistProps, StyleOption } from "~/components/artists";
 import {
 	TRAY_CREATE_NOTE,
 	trayIntro,
@@ -16,6 +16,8 @@ import {
 	FieldError,
 	FieldGroup,
 	FieldLabel,
+	FieldLegend,
+	FieldSet,
 } from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
@@ -27,6 +29,12 @@ import { slugify } from "~/lib/slugify";
 
 type Errors = Partial<Record<string, string>>;
 
+const SOCIAL_LINKS = [
+	{ name: "instagramUrl", label: "Instagram link" },
+	{ name: "facebookUrl", label: "Facebook link" },
+	{ name: "tiktokUrl", label: "TikTok link" },
+] as const;
+
 /**
  * Adds an artist (`artist` is null) or edits one. `canLink` says whether
  * "This is my profile" can succeed for the signed-in owner; an artist on
@@ -37,10 +45,12 @@ export default function ArtistForm({
 	artist,
 	canLink,
 	workPhotos,
+	styleOptions,
 }: {
 	artist: ArtistProps | null;
 	canLink: boolean;
 	workPhotos: WorkPhotoProps[];
+	styleOptions: StyleOption[];
 }) {
 	const tenant = useTenant();
 	const params = { tenant: tenant.slug };
@@ -69,6 +79,7 @@ export default function ArtistForm({
 								errors={errors}
 								owner={owner}
 								processing={processing}
+								styleOptions={styleOptions}
 								tenantSlug={tenant.slug}
 							/>
 						)}
@@ -82,6 +93,7 @@ export default function ArtistForm({
 								errors={errors}
 								owner={owner}
 								processing={processing}
+								styleOptions={styleOptions}
 								tenantSlug={tenant.slug}
 							/>
 						)}
@@ -115,6 +127,7 @@ function ArtistFields({
 	errors,
 	owner,
 	processing,
+	styleOptions,
 	tenantSlug,
 }: {
 	artist: ArtistProps | null;
@@ -122,6 +135,7 @@ function ArtistFields({
 	errors: Errors;
 	owner: boolean;
 	processing: boolean;
+	styleOptions: StyleOption[];
 	tenantSlug: string;
 }) {
 	const [name, setName] = useState(artist?.name ?? "");
@@ -191,6 +205,52 @@ function ArtistFields({
 				/>
 				{errors.bio && <FieldError>{errors.bio}</FieldError>}
 			</Field>
+
+			<FieldSet data-invalid={!!errors.styles}>
+				<FieldLegend variant="label">Styles</FieldLegend>
+				<FieldDescription>Pick up to 5.</FieldDescription>
+				<div className="grid gap-x-6 sm:grid-cols-2">
+					{styleOptions.map((style) => (
+						<Field
+							key={style.slug}
+							orientation="horizontal"
+							className="min-h-11 items-center"
+						>
+							<Checkbox
+								id={`style-${style.slug}`}
+								name="styles[]"
+								value={style.slug}
+								defaultChecked={artist?.styles.includes(style.slug) ?? false}
+							/>
+							<FieldLabel
+								htmlFor={`style-${style.slug}`}
+								className="font-normal"
+							>
+								{style.name}
+							</FieldLabel>
+						</Field>
+					))}
+				</div>
+				{errors.styles && <FieldError>{errors.styles}</FieldError>}
+			</FieldSet>
+
+			{SOCIAL_LINKS.map((link) => (
+				<Field key={link.name} data-invalid={!!errors[link.name]}>
+					<FieldLabel htmlFor={link.name}>{link.label}</FieldLabel>
+					<Input
+						id={link.name}
+						name={link.name}
+						className="h-11"
+						type="url"
+						inputMode="url"
+						autoComplete="off"
+						placeholder="https://"
+						defaultValue={artist?.[link.name] ?? ""}
+						aria-invalid={!!errors[link.name]}
+					/>
+					{errors[link.name] && <FieldError>{errors[link.name]}</FieldError>}
+				</Field>
+			))}
 
 			<Field data-invalid={!!errors.photo}>
 				<FieldLabel htmlFor="photo">Photo</FieldLabel>

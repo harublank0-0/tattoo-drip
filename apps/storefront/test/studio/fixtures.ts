@@ -60,6 +60,10 @@ export const SITA: Artist = {
 	acceptingInquiries: true,
 	closedMessage: null,
 	workPhotos: [],
+	styles: [{ slug: "fine-line", name: "Fine line" }],
+	socialLinks: [
+		{ platform: "instagram", url: "https://instagram.com/sita.ink" },
+	],
 };
 
 /** The photo's smaller copies, as the API lists them (TAT-112). */
@@ -98,6 +102,8 @@ export const ARJUN: Artist = {
 	acceptingInquiries: false,
 	closedMessage: "Books open in March.",
 	workPhotos: [],
+	styles: [],
+	socialLinks: [],
 };
 
 /**

@@ -1,7 +1,7 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import User from "#models/user";
-import type Artist from "#modules/artists/models/artist";
+import Artist from "#modules/artists/models/artist";
 import ArtistService from "#modules/artists/services/artist_service";
 import WorkPhotoService from "#modules/artists/services/work_photo_service";
 import ImageService from "#modules/media/services/image_service";
@@ -31,12 +31,14 @@ const ARTIST_FIELDS = [
 	"name",
 	"photo",
 	"slug",
+	"socialLinks",
+	"styles",
 	"workPhotos",
 ];
 const WORK_PHOTO_FIELDS = ["alt", "height", "url", "variants", "width"];
 const PHOTO_FIELDS = ["height", "url", "variants", "width"];
 
-/** The public Artist of a profile without a photo. */
+/** The public Artist of a profile without a photo, styles or links. */
 const shown = (artist: Artist) => ({
 	id: artist.id,
 	slug: artist.slug,
@@ -46,6 +48,8 @@ const shown = (artist: Artist) => ({
 	acceptingInquiries: artist.acceptingInquiries,
 	closedMessage: artist.acceptingInquiries ? null : artist.closedMessage,
 	workPhotos: [],
+	styles: [],
+	socialLinks: [],
 });
 
 function changeSlug(tenant: Tenant, slug: string) {
@@ -226,6 +230,86 @@ test.group("GET /api/v1/tenants/:tenant/artists (listArtists)", (group) => {
 		}
 		assert.notInclude(text, added[0].id);
 		assert.notInclude(text, added[1].id);
+	});
+
+	test("styles come in the list's order as slug and name, an unknown one dropped", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("api-styles-site1");
+		const sita = await addArtist(tenant, owner);
+		// A slug that has since left the list, written past the validator.
+		await inTenant(tenant, () =>
+			Artist.query()
+				.where("id", sita.id)
+				.update({ styles: ["realism", "retired-style", "blackwork"] }),
+		);
+
+		const list = (
+			await client.get("/api/v1/tenants/api-styles-site1/artists")
+		).body().data;
+		const one = (
+			await client.get("/api/v1/tenants/api-styles-site1/artists/sita")
+		).body().data;
+
+		const expected = [
+			{ slug: "blackwork", name: "Blackwork" },
+			{ slug: "realism", name: "Realism" },
+		];
+		assert.deepEqual(list[0].styles, expected);
+		assert.deepEqual(one.styles, expected);
+		for (const style of list[0].styles) {
+			assert.deepEqual(Object.keys(style).sort(), ["name", "slug"]);
+		}
+	});
+
+	test("social links are the set https ones, in order", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("api-links-site1");
+		const sita = await addArtist(tenant, owner, {
+			tiktokUrl: "https://www.tiktok.com/@sita",
+			instagramUrl: "https://instagram.com/sita",
+		});
+		// A plain-http link, written past the validator: never sent.
+		await inTenant(tenant, () =>
+			Artist.query()
+				.where("id", sita.id)
+				.update({ facebookUrl: "http://facebook.com/sita" }),
+		);
+
+		const list = (
+			await client.get("/api/v1/tenants/api-links-site1/artists")
+		).body().data;
+		const one = (
+			await client.get("/api/v1/tenants/api-links-site1/artists/sita")
+		).body().data;
+
+		const expected = [
+			{ platform: "instagram", url: "https://instagram.com/sita" },
+			{ platform: "tiktok", url: "https://www.tiktok.com/@sita" },
+		];
+		assert.deepEqual(list[0].socialLinks, expected);
+		assert.deepEqual(one.socialLinks, expected);
+		for (const link of list[0].socialLinks) {
+			assert.deepEqual(Object.keys(link).sort(), ["platform", "url"]);
+		}
+	});
+
+	test("an artist with no styles or links has empty lists", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("api-bare-site1");
+		await addArtist(tenant, owner);
+
+		const { data } = (
+			await client.get("/api/v1/tenants/api-bare-site1/artists")
+		).body();
+
+		assert.deepEqual(data[0].styles, []);
+		assert.deepEqual(data[0].socialLinks, []);
 	});
 
 	test("a closed artist shows their work, and the list is the one-artist answer", async ({

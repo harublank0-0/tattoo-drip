@@ -143,7 +143,7 @@ changeSlugValidator.messagesProvider = new SimpleMessagesProvider(
 /**
  * A full link to a profile or site. https only: the storefront links to it.
  */
-const httpsUrl = () =>
+export const httpsUrl = () =>
 	vine
 		.string()
 		.trim()

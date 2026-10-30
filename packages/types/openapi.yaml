@@ -573,7 +573,7 @@ components:
       required: [slug, name]
       properties:
         slug: { type: string, examples: [fine-line] }
-        name: { type: string, examples: [Fine Line] }
+        name: { type: string, examples: [Fine line] }
 
     BodyPlacement:
       type: object
@@ -849,7 +849,7 @@ components:
       description: |
         A visible artist of the studio (TAT-44). Every property is always
         there. All text is plain text: render it as text.
-      required: [id, slug, name, bio, photo, acceptingInquiries, closedMessage, workPhotos]
+      required: [id, slug, name, bio, photo, acceptingInquiries, closedMessage, workPhotos, styles, socialLinks]
       additionalProperties: false
       properties:
         id:
@@ -881,6 +881,15 @@ components:
             when none. An artist who is closed for inquiries still shows
             theirs.
           items: { $ref: "#/components/schemas/WorkPhoto" }
+        styles:
+          type: array
+          maxItems: 5
+          description: The artist's styles from the platform's list, in the list's order; [] when none.
+          items: { $ref: "#/components/schemas/TattooStyle" }
+        socialLinks:
+          type: array
+          description: "The links the artist set, in this order: instagram, facebook, tiktok. Only https links."
+          items: { $ref: "#/components/schemas/SocialLink" }
 
     Service:
       type: object
