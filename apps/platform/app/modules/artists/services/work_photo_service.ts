@@ -10,10 +10,11 @@ import ArtistService, {
 	type ProfileEditor,
 } from "#modules/artists/services/artist_service";
 import type { StyleSlug } from "#modules/artists/styles";
+import type { WorkCursor } from "#modules/artists/work_cursor";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
 import type Tenant from "#modules/tenancy/models/tenant";
-import { afterRollback, withTransaction } from "#services/db_context";
+import { afterRollback, dbClient, withTransaction } from "#services/db_context";
 
 type Upload = Pick<MultipartFile, "tmpPath">;
 type TenantRef = Pick<Tenant, "id">;
@@ -30,6 +31,13 @@ const PURPOSE = "artist_work_photo";
 export type WorkPhotoDetails = {
 	alt: string | null;
 	styles: readonly StyleSlug[];
+	healed: boolean;
+};
+
+/** What the gallery shows: these artists' photos, optionally one style and healed ones only. */
+export type WorkFilter = {
+	artistIds: readonly string[];
+	style: string | null;
 	healed: boolean;
 };
 
@@ -100,6 +108,80 @@ export default class WorkPhotoService {
 			byArtist.set(photo.artistId, list);
 		}
 		return byArtist;
+	}
+
+	/**
+	 * One page of the photos of `filter.artistIds`, newest first
+	 * (`created_at desc, id desc`), starting after the cursor `after`. The
+	 * caller passes the ids of artists it may show (the public reads pass only
+	 * visible ones); no query for []. `style` keeps the photos tagged with
+	 * that slug and `healed` the healed ones. `next` is the cursor of the
+	 * last photo returned when more remain, else null: one more photo is read
+	 * to know that. The cursor's time is read from and compared in the
+	 * database, as text with its microseconds (see WorkCursor).
+	 */
+	async page(
+		tenant: TenantRef,
+		filter: WorkFilter,
+		after: WorkCursor | null,
+		limit: number,
+	): Promise<{ photos: ArtistWorkPhoto[]; next: WorkCursor | null }> {
+		if (!Number.isInteger(limit) || limit < 1) {
+			throw new Error(`A page needs a limit of 1 or more, got ${limit}`);
+		}
+		if (filter.artistIds.length === 0) return { photos: [], next: null };
+		const query = ArtistWorkPhoto.query()
+			.select("*")
+			.select(
+				dbClient().raw(
+					`to_char(created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as cursor_at`,
+				),
+			)
+			.where("tenant_id", tenant.id)
+			.whereIn("artist_id", [...filter.artistIds]);
+		if (filter.style !== null) {
+			query.whereRaw("styles @> array[?]::varchar[]", [filter.style]);
+		}
+		if (filter.healed) query.where("healed", true);
+		if (after) {
+			query.whereRaw("(created_at, id) < (?::timestamptz, ?::uuid)", [
+				after.at,
+				after.id,
+			]);
+		}
+		const rows = await query
+			.orderBy("created_at", "desc")
+			.orderBy("id", "desc")
+			.limit(limit + 1);
+		const photos = rows.slice(0, limit);
+		const last = photos[limit - 1];
+		const next =
+			rows.length > limit
+				? { at: String(last.$extras.cursor_at), id: last.id }
+				: null;
+		return { photos, next };
+	}
+
+	/**
+	 * What the gallery can filter by for these artists: the distinct style
+	 * slugs their photos carry (as stored, unordered: the caller orders and
+	 * filters them) and whether any photo is healed. One query; none for [].
+	 */
+	async facets(
+		tenant: TenantRef,
+		artistIds: readonly string[],
+	): Promise<{ styles: string[]; healed: boolean }> {
+		if (artistIds.length === 0) return { styles: [], healed: false };
+		const { rows } = await dbClient().rawQuery(
+			`select
+				coalesce(array_agg(distinct s.style) filter (where s.style is not null), '{}') as styles,
+				coalesce(bool_or(p.healed), false) as healed
+			from artist_work_photos p
+			left join lateral unnest(p.styles) as s(style) on true
+			where p.tenant_id = ? and p.artist_id in (${artistIds.map(() => "?").join(", ")})`,
+			[tenant.id, ...artistIds],
+		);
+		return { styles: rows[0].styles, healed: rows[0].healed };
 	}
 
 	/**
