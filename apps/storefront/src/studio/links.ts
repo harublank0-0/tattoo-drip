@@ -6,6 +6,7 @@
  * which the storefront may not import.
  */
 
+import type { FlashSearch } from "./flash.ts";
 import type { PortfolioSearch, WorkSearch } from "./gallery.ts";
 import type { RequestSearch } from "./request.ts";
 
@@ -120,13 +121,29 @@ export function portfolioHref(slug: string, search: PortfolioSearch): string {
 	])}#work`;
 }
 
+/** The flash page (TAT-129) with this filter: `artist` then `cursor`, absent ones left out. */
+export function flashHref(search: FlashSearch): string {
+	return `/flash${queryOf([
+		["artist", search.artist],
+		["cursor", search.cursor],
+	])}`;
+}
+
+/** One flash design's page (TAT-129); `id` is a checked UUID. */
+export function flashDesignHref(id: string): string {
+	return `/flash/${encodeURIComponent(id)}`;
+}
+
 /**
- * The request page (TAT-127): `/request`, or `/request?artist=<slug>` to ask
- * for one artist. Every Request button leads here.
+ * The request page (TAT-127): `/request`, `/request?artist=<slug>` to ask
+ * for one artist, or (TAT-129) `/request?flash=<id>` to ask for a flash
+ * design, which names its artist, so `artist` is then left out. Every Request
+ * button leads here.
  */
 export function requestHref(search: RequestSearch): string {
 	const query = new URLSearchParams();
-	if (search.artist !== undefined) query.set("artist", search.artist);
+	if (search.flash !== undefined) query.set("flash", search.flash);
+	else if (search.artist !== undefined) query.set("artist", search.artist);
 	const text = query.toString();
 	return text === "" ? "/request" : `/request?${text}`;
 }

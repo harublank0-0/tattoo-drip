@@ -14,6 +14,8 @@ import { Route as DepositRouteImport } from './routes/deposit'
 import { Route as RequestRouteImport } from './routes/request'
 import { Route as WorkRouteImport } from './routes/work'
 import { Route as ArtistsSlugRouteImport } from './routes/artists/$slug'
+import { Route as FlashIndexRouteImport } from './routes/flash/index'
+import { Route as FlashIdRouteImport } from './routes/flash/$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -40,6 +42,16 @@ const ArtistsSlugRoute = ArtistsSlugRouteImport.update({
   path: '/artists/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FlashIndexRoute = FlashIndexRouteImport.update({
+  id: '/flash/',
+  path: '/flash/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FlashIdRoute = FlashIdRouteImport.update({
+  id: '/flash/$id',
+  path: '/flash/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -47,6 +59,8 @@ export interface FileRoutesByFullPath {
   '/request': typeof RequestRoute
   '/work': typeof WorkRoute
   '/artists/$slug': typeof ArtistsSlugRoute
+  '/flash/$id': typeof FlashIdRoute
+  '/flash/': typeof FlashIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -54,6 +68,8 @@ export interface FileRoutesByTo {
   '/request': typeof RequestRoute
   '/work': typeof WorkRoute
   '/artists/$slug': typeof ArtistsSlugRoute
+  '/flash/$id': typeof FlashIdRoute
+  '/flash': typeof FlashIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,13 +78,37 @@ export interface FileRoutesById {
   '/request': typeof RequestRoute
   '/work': typeof WorkRoute
   '/artists/$slug': typeof ArtistsSlugRoute
+  '/flash/$id': typeof FlashIdRoute
+  '/flash/': typeof FlashIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/deposit' | '/request' | '/work' | '/artists/$slug'
+  fullPaths:
+    | '/'
+    | '/deposit'
+    | '/request'
+    | '/work'
+    | '/artists/$slug'
+    | '/flash/$id'
+    | '/flash/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/deposit' | '/request' | '/work' | '/artists/$slug'
-  id: '__root__' | '/' | '/deposit' | '/request' | '/work' | '/artists/$slug'
+  to:
+    | '/'
+    | '/deposit'
+    | '/request'
+    | '/work'
+    | '/artists/$slug'
+    | '/flash/$id'
+    | '/flash'
+  id:
+    | '__root__'
+    | '/'
+    | '/deposit'
+    | '/request'
+    | '/work'
+    | '/artists/$slug'
+    | '/flash/$id'
+    | '/flash/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -77,6 +117,8 @@ export interface RootRouteChildren {
   RequestRoute: typeof RequestRoute
   WorkRoute: typeof WorkRoute
   ArtistsSlugRoute: typeof ArtistsSlugRoute
+  FlashIdRoute: typeof FlashIdRoute
+  FlashIndexRoute: typeof FlashIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -116,6 +158,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ArtistsSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/flash/': {
+      id: '/flash/'
+      path: '/flash'
+      fullPath: '/flash/'
+      preLoaderRoute: typeof FlashIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/flash/$id': {
+      id: '/flash/$id'
+      path: '/flash/$id'
+      fullPath: '/flash/$id'
+      preLoaderRoute: typeof FlashIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -125,6 +181,8 @@ const rootRouteChildren: RootRouteChildren = {
   RequestRoute: RequestRoute,
   WorkRoute: WorkRoute,
   ArtistsSlugRoute: ArtistsSlugRoute,
+  FlashIdRoute: FlashIdRoute,
+  FlashIndexRoute: FlashIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

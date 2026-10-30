@@ -3,6 +3,7 @@ import { MessageCircle } from "lucide-react";
 import { Fill } from "../../intake/components/fill.tsx";
 import { studioCopy } from "../copy.ts";
 import {
+	flashHref,
 	isAllowedHref,
 	linkRel,
 	portfolioHref,
@@ -11,6 +12,8 @@ import {
 } from "../links.ts";
 import type {
 	ArtistPageData,
+	FlashDesignPageData,
+	FlashPageData,
 	RequestPageData,
 	StudioPageData,
 	WorkPageData,
@@ -18,13 +21,14 @@ import type {
 import { OpenNow } from "../open-now.tsx";
 import { type MoreWork, PagedGallery } from "../paging.tsx";
 import type { RequestLink } from "../request.ts";
-import { logoSizes } from "../srcset.ts";
+import { flashDesignSizes, logoSizes } from "../srcset.ts";
 import type { SectionKey, ThemeConfig } from "../theme/config.ts";
 import type { StudioView } from "../view-model.ts";
 import { ArtistProfile, ArtistRoster } from "./artists.tsx";
 import { BrandCover, BrandLogo } from "./brand.tsx";
 import { ChatButton } from "./chat.tsx";
 import { ContactBlock } from "./contact.tsx";
+import { ArtistFlash, FlashGrid } from "./flash.tsx";
 import { HealedFilter, RecentWork, WorkFilters } from "./gallery.tsx";
 import { GoodToKnowSection } from "./good-to-know.tsx";
 import { InquirySection, RequestInvite } from "./inquiry.tsx";
@@ -160,6 +164,7 @@ export function ArtistPage({
 					search={portfolio.search}
 					more={more}
 				/>
+				<ArtistFlash artist={artist} list={data.flash} />
 				<StudioAside studio={studio} />
 			</main>
 			<SiteFooter studioName={studio.name} />
@@ -314,6 +319,190 @@ export function WorkPage({
 						</div>
 					)}
 				</section>
+				<StudioAside studio={studio} />
+			</main>
+			<SiteFooter studioName={studio.name} />
+			<ChatButton chat={data.chat} studioName={studio.name} />
+		</>
+	);
+}
+
+/**
+ * `/flash` (TAT-129): every shown design of the visible artists, newest first,
+ * narrowed to one artist by the address and shown a page at a time ("Show
+ * more" is a plain link to the next page, so it works without JavaScript).
+ * The artist filter shows only when two or more artists have a design. The
+ * site bar's Request button is the studio's general one.
+ */
+export function FlashPage({ data }: { data: FlashPageData }) {
+	const { studio, theme, artists, search, list } = data;
+	const filtered = search.artist !== undefined;
+	const firstPage = filtered ? { artist: search.artist } : {};
+	return (
+		<>
+			<SiteBar studio={studio} theme={theme} requestLink={data.requestLink} />
+			<main className="page">
+				<section aria-labelledby="flash-page-title">
+					<h1 id="flash-page-title" className="section-title">
+						{studioCopy.flash.pageTitle}
+					</h1>
+					{list.artists.length >= 2 ? (
+						<nav
+							aria-label={studioCopy.flash.filterNav}
+							className="work-filter-nav"
+						>
+							<a
+								href={flashHref({})}
+								aria-current={filtered ? undefined : "page"}
+							>
+								{studioCopy.flash.all}
+							</a>
+							{list.artists.map((artist) => (
+								<a
+									key={artist.slug}
+									href={flashHref({ artist: artist.slug })}
+									aria-current={
+										search.artist === artist.slug ? "page" : undefined
+									}
+								>
+									<bdi>{artist.name}</bdi>
+								</a>
+							))}
+						</nav>
+					) : null}
+					{search.cursor !== undefined ? (
+						<p className="work-newest">
+							<a className="text-link" href={flashHref(firstPage)}>
+								{studioCopy.flash.newest}
+							</a>
+						</p>
+					) : null}
+					{list.designs.length > 0 ? (
+						<>
+							<FlashGrid designs={list.designs} showArtist artists={artists} />
+							{list.nextCursor !== null ? (
+								<p className="flash-more-bar">
+									<a
+										className="action action-secondary flash-more"
+										href={flashHref({ ...firstPage, cursor: list.nextCursor })}
+									>
+										{studioCopy.flash.showMore}
+									</a>
+								</p>
+							) : null}
+						</>
+					) : (
+						<div className="stack">
+							<p>
+								{filtered ? studioCopy.flash.noMatch : studioCopy.flash.empty}
+							</p>
+							{filtered ? (
+								<a className="text-link" href={flashHref({})}>
+									{studioCopy.flash.showAll}
+								</a>
+							) : (
+								<a className="text-link" href="/">
+									Go to the studio page
+								</a>
+							)}
+						</div>
+					)}
+				</section>
+				<StudioAside studio={studio} />
+			</main>
+			<SiteFooter studioName={studio.name} />
+			<ChatButton chat={data.chat} studioName={studio.name} />
+		</>
+	);
+}
+
+/** The words before the artist's name in "by {name}": the name itself is a link on a design's page. */
+const BY = studioCopy.flash.by.replace("{name}", "");
+
+/**
+ * One flash design's page (TAT-129): the picture whole and large, its name,
+ * the artist, the size, the price when the studio set one and the status
+ * ("Available", or why it can't be requested now), and Request this design
+ * while it can be. The site bar's Request button is the studio's general one.
+ */
+export function FlashDesignPage({ data }: { data: FlashDesignPageData }) {
+	const { studio, theme, design, closedNote } = data;
+	const artist = design.artist;
+	return (
+		<>
+			<SiteBar studio={studio} theme={theme} requestLink={data.requestLink} />
+			<main className="page">
+				<article className="flash-design" aria-labelledby="flash-design-title">
+					<img
+						className="flash-design-picture"
+						src={design.largeSrc}
+						srcSet={design.image.srcSet}
+						sizes={design.image.srcSet ? flashDesignSizes() : undefined}
+						width={design.image.width}
+						height={design.image.height}
+						alt={design.alt}
+						loading="eager"
+						decoding="async"
+						fetchPriority="high"
+					/>
+					<div className="flash-design-body">
+						<h1
+							id="flash-design-title"
+							className="section-title user-text"
+							dir="auto"
+						>
+							{design.name}
+						</h1>
+						{artist ? (
+							<p className="flash-design-by">
+								{BY}
+								<a className="text-link" href={artist.href}>
+									<bdi>{artist.name}</bdi>
+								</a>
+							</p>
+						) : null}
+						<dl className="flash-facts">
+							<div>
+								<dt>{studioCopy.flash.size}</dt>
+								<dd className="user-text" dir="auto">
+									{design.size}
+								</dd>
+							</div>
+							{design.priceText ? (
+								<div>
+									<dt>{studioCopy.flash.price}</dt>
+									<dd>{design.priceText}</dd>
+								</div>
+							) : null}
+							<div>
+								<dt>{studioCopy.flash.status}</dt>
+								<dd className="user-text" dir="auto">
+									{closedNote ?? studioCopy.flash.available}
+								</dd>
+							</div>
+						</dl>
+						{closedNote === null ? (
+							<a className="action action-primary" href={design.requestHref}>
+								{studioCopy.flash.request}
+							</a>
+						) : null}
+						{artist ? (
+							<p>
+								<a
+									className="text-link"
+									href={flashHref({ artist: artist.slug })}
+								>
+									<span>
+										<Fill
+											template={studioCopy.flash.allBy}
+											values={{ name: artist.name }}
+										/>
+									</span>
+								</a>
+							</p>
+						) : null}
+					</div>
+				</article>
 				<StudioAside studio={studio} />
 			</main>
 			<SiteFooter studioName={studio.name} />

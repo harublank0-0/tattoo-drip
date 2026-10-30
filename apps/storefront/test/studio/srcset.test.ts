@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { describe, test } from "node:test";
 import {
 	coverSizes,
+	flashDesignSizes,
+	flashGridSizes,
 	type LogoSlot,
 	largeSource,
 	logoSizes,
@@ -678,6 +680,44 @@ describe("largeSource: what the photo viewer shows (TAT-116)", () => {
 		assert.equal(
 			largeSource(image(2048, SET), 700),
 			"https://api.example.com/w.640w.jpg",
+		);
+	});
+});
+
+describe("the flash pictures' sizes (TAT-129)", () => {
+	const css = readFileSync(
+		new URL("../../src/styles.css", import.meta.url),
+		"utf8",
+	);
+
+	test("the grid: two columns, three from 40rem, a 48rem grid with 1rem gaps", () => {
+		assert.equal(
+			flashGridSizes(),
+			"(min-width: 50.5rem) 15.34rem, (min-width: 40rem) calc((100vw - 4.5rem) * 0.334), calc((100vw - 3.5rem) * 0.5)",
+		);
+	});
+
+	test("the design page's picture: 36rem, or the page less its gutter", () => {
+		assert.equal(
+			flashDesignSizes(),
+			"(min-width: 38.5rem) 36rem, calc(100vw - 2.5rem)",
+		);
+	});
+
+	test("the boxes are the ones styles.css draws", () => {
+		assert.match(css, /\.flash-grid\s*\{[^}]*max-inline-size:\s*48rem/);
+		assert.match(css, /\.flash-grid\s*\{[^}]*gap:\s*1rem/);
+		assert.match(
+			css,
+			/\.flash-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/,
+		);
+		assert.match(
+			css,
+			/@media \(min-width:\s*40rem\)\s*\{[^@]*\.flash-grid\s*\{[^}]*repeat\(3,/,
+		);
+		assert.match(
+			css,
+			/\.flash-design-picture\s*\{[^}]*max-inline-size:\s*36rem/,
 		);
 	});
 });

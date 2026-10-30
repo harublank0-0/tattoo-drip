@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
+import { flashDesignView } from "../../src/studio/flash.ts";
 import {
 	artistPageSeo,
+	flashDesignSeo,
+	flashPageSeo,
 	headTags,
 	requestPageSeo,
 	serializeJsonLd,
@@ -13,7 +16,15 @@ import {
 	artistViewModels,
 	studioViewModel,
 } from "../../src/studio/view-model.ts";
-import { ARJUN, EMPTY_STUDIO, ORIGIN, SITA, STUDIO } from "./fixtures.ts";
+import {
+	ARJUN,
+	EMPTY_STUDIO,
+	flashId,
+	flashPage,
+	ORIGIN,
+	SITA,
+	STUDIO,
+} from "./fixtures.ts";
 
 const studio = studioViewModel(STUDIO);
 const empty = studioViewModel(EMPTY_STUDIO);
@@ -366,5 +377,83 @@ describe("statusHead", () => {
 			{ title: "Please try again" },
 			{ name: "robots", content: "noindex" },
 		]);
+	});
+});
+
+describe("the flash pages' heads (TAT-129)", () => {
+	const moth = (over: object = {}) => {
+		const view = flashDesignView(
+			{ ...flashPage(1).data[0], ...over },
+			"https://api.example.com",
+		);
+		assert.ok(view);
+		return view;
+	};
+
+	test("flashPageSeo: one canonical address whatever the filter, no image, no JSON-LD", () => {
+		const seo = flashPageSeo(studio, ORIGIN);
+
+		assert.equal(seo.title, "Flash at Black Needle");
+		assert.equal(
+			seo.description,
+			"Flash designs by the artists of Black Needle: pick one and ask for it.",
+		);
+		assert.equal(seo.canonical, `${ORIGIN}/flash`);
+		assert.equal(seo.image, null);
+		assert.equal(seo.jsonLd, null);
+		const alone = flashPageSeo(
+			studioViewModel({ ...STUDIO, type: "independent" }),
+			ORIGIN,
+		);
+		assert.equal(alone.title, "Flash by Black Needle");
+		assert.equal(
+			alone.description,
+			"Flash designs by Black Needle: pick one and ask for it.",
+		);
+	});
+
+	test("flashDesignSeo names the design and its artist, and says how to ask", () => {
+		const seo = flashDesignSeo(studio, moth(), ORIGIN);
+
+		assert.equal(seo.title, "Moth, flash by Sita Rai at Black Needle");
+		assert.equal(
+			seo.description,
+			"A flash design by Sita Rai, About 3 in, NPR 3,000. Ask Black Needle for it.",
+		);
+		assert.equal(seo.canonical, `${ORIGIN}/flash/${flashId(1)}`);
+		assert.equal(seo.image, null);
+		assert.equal(seo.jsonLd, null);
+	});
+
+	test("one name when the studio is named like the artist; no price, no artist", () => {
+		const same = studioViewModel({ ...STUDIO, name: "Sita Rai" });
+		assert.equal(
+			flashDesignSeo(same, moth(), ORIGIN).title,
+			"Moth, flash by Sita Rai",
+		);
+		const cheap = flashDesignSeo(studio, moth({ price: null }), ORIGIN);
+		assert.equal(
+			cheap.description,
+			"A flash design by Sita Rai, About 3 in. Ask Black Needle for it.",
+		);
+		const nobody = flashDesignSeo(
+			studio,
+			moth({ artist: { slug: "Bad", name: "x" } }),
+			ORIGIN,
+		);
+		assert.equal(nobody.title, "Moth, flash at Black Needle");
+		assert.equal(
+			nobody.description,
+			"A flash design, About 3 in, NPR 3,000. Ask Black Needle for it.",
+		);
+	});
+
+	test("a long description is trimmed like the others", () => {
+		const long = flashDesignSeo(
+			studio,
+			moth({ size: "x".repeat(60), price: null }),
+			ORIGIN,
+		);
+		assert.ok(long.description.length <= 160);
 	});
 });

@@ -8,8 +8,22 @@ import {
 } from "@tattoo-drip/sdk";
 import type { ApiContext } from "../api/context.ts";
 import { loadStudio, rethrowAsNotFound } from "../api/loaders.ts";
+import { fill } from "../intake/template.ts";
 import type { SiteContext } from "../site/context.ts";
 import { type ChatLinks, chatLinks } from "./chat.ts";
+import { studioCopy } from "./copy.ts";
+import {
+	ARTIST_FLASH_COUNT,
+	closedNoteFor,
+	FLASH_ID,
+	FLASH_PAGE_SIZE,
+	type FlashDesignView,
+	type FlashListView,
+	type FlashSearch,
+	flashDesignView,
+	flashListView,
+	flashQuery,
+} from "./flash.ts";
 import {
 	type GalleryView,
 	galleryView,
@@ -39,6 +53,8 @@ import {
 } from "./request.ts";
 import {
 	artistPageSeo,
+	flashDesignSeo,
+	flashPageSeo,
 	type PageSeo,
 	requestPageSeo,
 	studioPageSeo,
@@ -108,6 +124,12 @@ export interface ArtistPageData {
 		readonly gallery: GalleryView;
 		readonly search: PortfolioSearch;
 	};
+	/**
+	 * The artist's newest flash designs (TAT-129), at most ARTIST_FLASH_COUNT,
+	 * and whether more follow (`nextCursor`). Empty when there are none or the
+	 * read failed, which leaves the Flash section out.
+	 */
+	readonly flash: FlashListView;
 }
 
 /**
@@ -136,6 +158,37 @@ export interface WorkPageData {
 	/** The address's filters, checked. */
 	readonly search: WorkSearch;
 	readonly gallery: GalleryView;
+}
+
+/** `/flash` (TAT-129): every shown design of the visible artists, newest first, filtered by the address. */
+export interface FlashPageData {
+	readonly studio: StudioView;
+	/** The studio's theme (TAT-54): its key, sections and checked branding. */
+	readonly theme: ThemeConfig;
+	/** The header's Request button (TAT-127): the studio's general one, or none while it is closed. */
+	readonly requestLink: RequestLink | null;
+	/** The chat button's links; its message names the artist the address filters by. */
+	readonly chat: ChatLinks | null;
+	readonly seo: PageSeo;
+	/** The visible artists, for the "closed" words under a design that can't be requested. */
+	readonly artists: readonly ArtistView[];
+	/** The address's filter, checked. */
+	readonly search: FlashSearch;
+	readonly list: FlashListView;
+}
+
+/** One flash design's page (TAT-129). */
+export interface FlashDesignPageData {
+	readonly studio: StudioView;
+	readonly theme: ThemeConfig;
+	/** The header's Request button: the studio's general one, or none while it is closed. */
+	readonly requestLink: RequestLink | null;
+	/** The chat button's links; its message names this design. */
+	readonly chat: ChatLinks | null;
+	readonly seo: PageSeo;
+	readonly design: FlashDesignView;
+	/** Why the design can't be requested now (the artist's own words, else ours), or null while it can. */
+	readonly closedNote: string | null;
 }
 
 /**
@@ -192,7 +245,8 @@ export function studioPageData(
 
 /**
  * The artist page's data, or null when no visible artist has exactly `slug`.
- * `portfolio` is the gallery read for that artist (none: no Work section).
+ * `portfolio` is the gallery read for that artist (none: no Work section);
+ * `flash` the flash read for them (TAT-129; none: no Flash section).
  */
 export function artistPageData(
 	studio: Studio,
@@ -201,6 +255,7 @@ export function artistPageData(
 	origin: string,
 	imageOrigin: string | null = null,
 	portfolio: PortfolioRead = NO_PORTFOLIO,
+	flash: unknown = null,
 ): ArtistPageData | null {
 	const studioView = studioViewModel(studio);
 	const artistViews = artistViewModels(artists, imageOrigin);
@@ -217,6 +272,7 @@ export function artistPageData(
 			gallery: galleryView(portfolio.page, imageOrigin),
 			search: portfolio.search,
 		},
+		flash: flashListView(flash, imageOrigin),
 	};
 }
 
@@ -247,6 +303,62 @@ export function requestPageData(
 		chat: chatLinks(studioView, artist?.name ?? null),
 		seo: requestPageSeo(studioView, artist, origin, inquiry.kind === "open"),
 		theme: parseThemeConfig(storefrontInput(studio), imageOrigin),
+	};
+}
+
+/**
+ * `/flash`'s data (TAT-129). `page` is the flash read for `search`, as the API
+ * sent it. The chat names the artist the address filters by when the list
+ * offers them; any other address is the general message.
+ */
+export function flashPageData(
+	studio: Studio,
+	artists: readonly Artist[],
+	page: unknown,
+	search: FlashSearch,
+	origin: string,
+	imageOrigin: string | null = null,
+): FlashPageData {
+	const studioView = studioViewModel(studio);
+	const list = flashListView(page, imageOrigin);
+	const filtered = list.artists.find(({ slug }) => slug === search.artist);
+	return {
+		studio: studioView,
+		theme: parseThemeConfig(storefrontInput(studio), imageOrigin),
+		requestLink: requestLink(studioView, null),
+		chat: chatLinks(studioView, filtered?.name ?? null),
+		seo: flashPageSeo(studioView, origin),
+		artists: artistViewModels(artists, imageOrigin),
+		search,
+		list,
+	};
+}
+
+/**
+ * One flash design's data (TAT-129), or null when the API's design can't be
+ * shown (flashDesignView refuses it). The chat's message names the design.
+ */
+export function flashDesignPageData(
+	studio: Studio,
+	artists: readonly Artist[],
+	design: unknown,
+	origin: string,
+	imageOrigin: string | null = null,
+): FlashDesignPageData | null {
+	const studioView = studioViewModel(studio);
+	const view = flashDesignView(design, imageOrigin);
+	if (!view) return null;
+	return {
+		studio: studioView,
+		theme: parseThemeConfig(storefrontInput(studio), imageOrigin),
+		requestLink: requestLink(studioView, null),
+		chat: chatLinks(
+			studioView,
+			fill(studioCopy.chat.flash, { name: view.name }),
+		),
+		seo: flashDesignSeo(studioView, view, origin),
+		design: view,
+		closedNote: closedNoteFor(view, artistViewModels(artists, imageOrigin)),
 	};
 }
 
@@ -320,7 +432,8 @@ export async function loadStudioPage(
  * artist's is a not-found before any API call; hidden, deleted, renamed and
  * unknown artists aren't in the list, so they are the same not-found. The
  * artist's portfolio (their newest 24 photos, `search`'s filters) is read at
- * the same time (loadPortfolio).
+ * the same time (loadPortfolio), and so are their newest 12 flash designs
+ * (loadArtistFlash).
  */
 export async function loadArtistPage(
 	context: PageContext,
@@ -328,10 +441,11 @@ export async function loadArtistPage(
 	search: PortfolioSearch,
 ): Promise<ArtistPageData> {
 	if (!ARTIST_SLUG.test(slug)) throw notFound();
-	const [studio, artists, portfolio] = await Promise.all([
+	const [studio, artists, portfolio, flash] = await Promise.all([
 		loadStudio(context),
 		loadArtists(context),
 		loadPortfolio(context, slug, search),
+		loadArtistFlash(context, slug),
 	]);
 	const data = artistPageData(
 		studio,
@@ -340,6 +454,7 @@ export async function loadArtistPage(
 		context.site.origin,
 		context.tattoo.connection.apiUrl,
 		portfolio,
+		flash,
 	);
 	if (!data) throw notFound();
 	return data;
@@ -392,6 +507,58 @@ export async function loadWorkPage(
 		context.site.origin,
 		context.tattoo.connection.apiUrl,
 	);
+}
+
+/**
+ * `/flash` (TAT-129): the studio, its artists and the first page of flash
+ * with the address's filter. The API refusing the address (a hand-edited
+ * cursor is a 422 `validation_failed`) or not knowing the read (a 404) is the
+ * router's not-found; any other failure is an error, as for the other pages.
+ */
+export async function loadFlashPage(
+	context: PageContext,
+	search: FlashSearch,
+): Promise<FlashPageData> {
+	const [studio, artists, page] = await Promise.all([
+		loadStudio(context),
+		loadArtists(context),
+		loadFlash(context, search),
+	]);
+	return flashPageData(
+		studio,
+		artists,
+		page,
+		search,
+		context.site.origin,
+		context.tattoo.connection.apiUrl,
+	);
+}
+
+/**
+ * `/flash/<id>` (TAT-129): the studio, its artists and the design, read
+ * together. An id that can't be a design's is a not-found before any API
+ * call; the API not knowing the design (hidden, an artist hidden, unknown) is
+ * the same not-found, and so is a design the page can't show.
+ */
+export async function loadFlashDesignPage(
+	context: PageContext,
+	id: string,
+): Promise<FlashDesignPageData> {
+	if (!FLASH_ID.test(id)) throw notFound();
+	const [studio, artists, design] = await Promise.all([
+		loadStudio(context),
+		loadArtists(context),
+		loadFlashDesign(context, id),
+	]);
+	const data = flashDesignPageData(
+		studio,
+		artists,
+		design,
+		context.site.origin,
+		context.tattoo.connection.apiUrl,
+	);
+	if (!data) throw notFound();
+	return data;
 }
 
 /**
@@ -472,6 +639,69 @@ async function loadRecentWork(context: ApiContext): Promise<unknown> {
 	} catch (error) {
 		logReadFailed("Recent work", context, error);
 		return null;
+	}
+}
+
+/**
+ * An artist's newest flash designs for their page, as the API sent them (null
+ * when the read failed). Any failure (an older platform's 404, a 422, a 5xx,
+ * the network) is logged and leaves the Flash section out and the page
+ * standing (it also makes the deploy order safe: this storefront can run
+ * against a platform without `/flash`).
+ */
+async function loadArtistFlash(
+	context: ApiContext,
+	slug: string,
+): Promise<unknown> {
+	try {
+		return await context.queryClient.query({
+			...tattooQueries.flash(
+				context.tattoo.client,
+				flashQuery({ artist: slug }, ARTIST_FLASH_COUNT),
+			),
+			staleTime: "static",
+		});
+	} catch (error) {
+		logReadFailed("Flash", context, error);
+		return null;
+	}
+}
+
+async function loadFlash(
+	{ queryClient, tattoo }: ApiContext,
+	search: FlashSearch,
+): Promise<unknown> {
+	try {
+		return await queryClient.query({
+			...tattooQueries.flash(
+				tattoo.client,
+				flashQuery(search, FLASH_PAGE_SIZE),
+			),
+			staleTime: "static",
+		});
+	} catch (error) {
+		if (
+			isTattooApiError(error) &&
+			error.status === 422 &&
+			error.code === "validation_failed"
+		) {
+			throw notFound();
+		}
+		return rethrowAsNotFound(error);
+	}
+}
+
+async function loadFlashDesign(
+	{ queryClient, tattoo }: ApiContext,
+	id: string,
+): Promise<unknown> {
+	try {
+		return await queryClient.query({
+			...tattooQueries.flashDesign(tattoo.client, id),
+			staleTime: "static",
+		});
+	} catch (error) {
+		return rethrowAsNotFound(error);
 	}
 }
 

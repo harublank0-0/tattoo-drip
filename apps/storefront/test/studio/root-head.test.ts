@@ -12,7 +12,7 @@ import { rootMeta, statusHead } from "../../src/studio/seo.ts";
 /**
  * The root route's head on the installed router, with the root's own `head`
  * the way src/routes/__root.tsx wires it: a path no page route matches (the
- * prototype's /flash, /admin/bookings) is the not-found page, so its head
+ * prototype's /admin/bookings) is the not-found page, so its head
  * says so and is noindex, not the studio's name as a page title.
  */
 async function rootMetaFor(

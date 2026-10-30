@@ -8,8 +8,11 @@ import { ARTIST_SLUG, type ArtistView, type StudioView } from "./view-model.ts";
  * artist's old slug) is dropped here and never makes the page a not-found.
  */
 
-/** `/request` reads which artist to ask for. Absent, never null, so the router writes nothing back. */
-export type RequestSearch = { artist?: string };
+/**
+ * `/request` reads which artist to ask for and, since TAT-129, which flash
+ * design. Absent, never null, so the router writes nothing back.
+ */
+export type RequestSearch = { artist?: string; flash?: string };
 
 /** An own property only, never one inherited from Object.prototype. */
 function own(value: unknown, key: string): unknown {

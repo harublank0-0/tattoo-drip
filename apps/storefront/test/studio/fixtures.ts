@@ -1,4 +1,4 @@
-import type { Artist, Studio, WorkPage } from "@tattoo-drip/sdk";
+import type { Artist, FlashPage, Studio, WorkPage } from "@tattoo-drip/sdk";
 
 /** Shared by the studio page tests: whole TAT-44 objects. */
 
@@ -197,3 +197,54 @@ export function galleryPage(
 		...over,
 	};
 }
+
+/** A flash design's picture as the API sends it (TAT-129): on the API's origin, 1200 x 1200 with the photo copies. */
+export const flashImage = (n: number) => ({
+	url: `https://api.example.com/uploads/tenants/t/flash_design/f${n}.320-640-1280.png`,
+	width: 1200,
+	height: 1200,
+	variants: [320, 640].map((width) => ({
+		url: `https://api.example.com/uploads/tenants/t/flash_design/f${n}.${width}w.png`,
+		width,
+	})),
+});
+
+/** The design ids `flashPage` uses: lowercase UUIDs, the first one is `FLASH_ID_1`. */
+export const flashId = (n: number) =>
+	`0199f000-0000-7000-8000-${String(n).padStart(12, "0")}`;
+
+/**
+ * A page of the flash read (TAT-129) as the API sends it: `count` designs by
+ * Sita, the first named Moth, About 3 in and NPR 3,000, the rest unpriced, all
+ * requestable, no next page, and Sita as the only artist to filter by. `over`
+ * replaces any of the page's own keys.
+ */
+export function flashPage(
+	count: number,
+	over: Partial<FlashPage> = {},
+): FlashPage {
+	return {
+		data: Array.from({ length: count }, (_, index) => ({
+			id: flashId(index + 1),
+			name: index === 0 ? "Moth" : `Design ${index + 1}`,
+			size: "About 3 in",
+			price:
+				index === 0
+					? { amount: 300000, currency: "NPR" as const, text: "NPR 3,000" }
+					: null,
+			image: flashImage(index + 1),
+			artist: { slug: "sita", name: "Sita Rai" },
+			requestable: true,
+		})),
+		nextCursor: null,
+		filters: { artists: [{ slug: "sita", name: "Sita Rai" }] },
+		...over,
+	};
+}
+
+/** The flash read with no design in it. */
+export const EMPTY_FLASH_PAGE: FlashPage = {
+	data: [],
+	nextCursor: null,
+	filters: { artists: [] },
+};

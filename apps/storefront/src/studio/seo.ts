@@ -1,7 +1,8 @@
 import { rootRouteId } from "@tanstack/react-router";
 import { fill } from "../intake/template.ts";
 import { studioCopy } from "./copy.ts";
-import { requestHref } from "./links.ts";
+import type { FlashDesignView } from "./flash.ts";
+import { flashDesignHref, requestHref } from "./links.ts";
 import { trimDescription } from "./text.ts";
 import type { ArtistPhoto, ArtistView, StudioView } from "./view-model.ts";
 
@@ -90,6 +91,51 @@ export function workPageSeo(studio: StudioView, origin: string): PageSeo {
 		title: `${studioCopy.work.pageTitle} ${independent ? "by" : "at"} ${studio.name}`,
 		description: `Tattoos by ${independent ? studio.name : `the artists of ${studio.name}`}, newest first.`,
 		canonical: `${origin}/work`,
+		type: "website",
+		siteName: studio.name,
+		image: null,
+		jsonLd: null,
+	};
+}
+
+/**
+ * The flash page's head (TAT-129). One canonical address whatever the filter
+ * or page, so a search engine indexes the page and not each filter; no image
+ * (the page has many) and no JSON-LD.
+ */
+export function flashPageSeo(studio: StudioView, origin: string): PageSeo {
+	const independent = studio.type === "independent";
+	return {
+		title: `${studioCopy.flash.pageTitle} ${independent ? "by" : "at"} ${studio.name}`,
+		description: `Flash designs by ${independent ? studio.name : `the artists of ${studio.name}`}: pick one and ask for it.`,
+		canonical: `${origin}/flash`,
+		type: "website",
+		siteName: studio.name,
+		image: null,
+		jsonLd: null,
+	};
+}
+
+/**
+ * One flash design's head (TAT-129): its name and artist (one name when the
+ * studio is named like the artist, as the artist page does), what it is and
+ * how to ask. No image (the picture is not the artist's photo) and no JSON-LD.
+ */
+export function flashDesignSeo(
+	studio: StudioView,
+	design: FlashDesignView,
+	origin: string,
+): PageSeo {
+	const artist = design.artist;
+	const sameName = artist?.name === studio.name;
+	const by = artist ? `, flash by ${artist.name}` : ", flash";
+	const price = design.priceText ? `, ${design.priceText}` : "";
+	return {
+		title: `${design.name}${by}${artist && sameName ? "" : ` at ${studio.name}`}`,
+		description: trimDescription(
+			`A flash design${artist ? ` by ${artist.name}` : ""}, ${design.size}${price}. Ask ${studio.name} for it.`,
+		),
+		canonical: `${origin}${flashDesignHref(design.id)}`,
 		type: "website",
 		siteName: studio.name,
 		image: null,
@@ -229,7 +275,7 @@ export function statusHead(status: string): HeadTags {
 /**
  * The root route's title and robots tags (src/routes/__root.tsx). A page
  * route sets its own head and wins over this one; this is what a path no page
- * route matches (the prototype's /flash, /admin/*) and a failed studio read
+ * route matches (the prototype's /admin/*) and a failed studio read
  * show: the not-found or error head, noindex, never the studio's name as the
  * title of a page that isn't the studio's page. Otherwise the studio's name,
  * the title of a page that sets none. (A root loader's `notFound()` leaves
