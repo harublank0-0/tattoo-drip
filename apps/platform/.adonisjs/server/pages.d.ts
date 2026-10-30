@@ -36,6 +36,7 @@ declare module '@adonisjs/inertia/types' {
     'projects/index': ExtractProps<(typeof import('../../inertia/pages/projects/index.tsx'))['default']>
     'projects/new': ExtractProps<(typeof import('../../inertia/pages/projects/new.tsx'))['default']>
     'projects/show': ExtractProps<(typeof import('../../inertia/pages/projects/show.tsx'))['default']>
+    'settings/good_to_know': ExtractProps<(typeof import('../../inertia/pages/settings/good_to_know.tsx'))['default']>
     'settings/look': ExtractProps<(typeof import('../../inertia/pages/settings/look.tsx'))['default']>
     'settings/members': ExtractProps<(typeof import('../../inertia/pages/settings/members.tsx'))['default']>
     'settings/messages': ExtractProps<(typeof import('../../inertia/pages/settings/messages.tsx'))['default']>

@@ -14,6 +14,8 @@ import PaymentMethod from "#modules/payments/models/payment_method";
 import Quote from "#modules/projects/models/quote";
 import TattooProject from "#modules/projects/models/tattoo_project";
 import ProjectSession from "#modules/scheduling/models/project_session";
+import StudioClosure from "#modules/scheduling/models/studio_closure";
+import StudioHour from "#modules/scheduling/models/studio_hour";
 import Tenant from "#modules/tenancy/models/tenant";
 import TenantInvitation from "#modules/tenancy/models/tenant_invitation";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
@@ -61,6 +63,7 @@ export type IsolationCase = {
 		| "newInquiry"
 		| "client"
 		| "alert"
+		| "closedDay"
 		| "invitation"
 		| "artistMembership";
 	/** Who sends the request. Every settings route is owner-only. */
@@ -285,6 +288,25 @@ const templateRows = (target: Studio) =>
 				.orderBy("kind")
 		).map((row) => row.serialize()),
 	);
+
+// What the Good to know routes could change (TAT-128): the tenant row (its
+// four texts and the rest of the profile), the week by weekday and the
+// closed days by first day.
+const goodToKnowRows = (target: Studio) =>
+	inTenant(target.tenant, async () => ({
+		tenant: (await Tenant.findOrFail(target.tenant.id)).serialize(),
+		hours: (
+			await StudioHour.query()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("weekday")
+		).map((row) => row.serialize()),
+		closures: (
+			await StudioClosure.query()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("starts_on")
+				.orderBy("id")
+		).map((row) => row.serialize()),
+	}));
 
 // Every member's alerts (TAT-52): what reading or opening one could change.
 const alertRows = (target: Studio) =>
@@ -914,6 +936,60 @@ export const isolationCases: IsolationCase[] = [
 		}),
 		ownStatus: 302,
 		snapshot: templateRows,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/settings/good-to-know",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: goodToKnowRows,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/settings/good-to-know",
+		actor: "owner",
+		body: () => ({
+			walkIns: "Isolation walk-ins",
+			ageRule: "",
+			beforeSession: "",
+			aftercare: "",
+		}),
+		ownStatus: 302,
+		snapshot: goodToKnowRows,
+	},
+	{
+		// Replaces the seeded week, so the control changes A's snapshot.
+		method: "PUT",
+		pattern: "/t/:tenant/settings/hours",
+		actor: "owner",
+		body: () => ({
+			hours: { sun: { open: "1", opens: "10:00", closes: "18:00" } },
+		}),
+		ownStatus: 302,
+		snapshot: goodToKnowRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/settings/closed-days",
+		actor: "owner",
+		body: (own) => ({
+			closedFrom: DateTime.now()
+				.setZone(own.tenant.timezone)
+				.plus({ days: 30 })
+				.toFormat("yyyy-MM-dd"),
+			closedTo: "",
+			closedNote: "Isolation",
+		}),
+		ownStatus: 302,
+		snapshot: goodToKnowRows,
+	},
+	{
+		method: "DELETE",
+		pattern: "/t/:tenant/settings/closed-days/:id",
+		resource: "closedDay",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: goodToKnowRows,
 	},
 	{
 		method: "POST",

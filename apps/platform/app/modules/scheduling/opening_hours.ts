@@ -84,3 +84,16 @@ export function closedDaysWhen(from: string, to: string): string {
 	}
 	return `${a.day} – ${b.day} ${b.month} ${b.year}`;
 }
+
+/**
+ * The flash messages of the Good to know settings page (TAT-128). The
+ * page's own words are in inertia/components/good_to_know.ts. "Up to 15
+ * minutes" is the public cache (Page look says the same).
+ */
+export const HOURS_SAVED =
+	"Opening hours saved. They can take up to 15 minutes to show on your page.";
+export const CLOSED_DAYS_ADDED =
+	"Closed days added. They can take up to 15 minutes to show on your page.";
+export const CLOSED_DAYS_REMOVED = "Closed days removed.";
+export const TEXTS_SAVED =
+	"Saved. It can take up to 15 minutes to show on your page.";

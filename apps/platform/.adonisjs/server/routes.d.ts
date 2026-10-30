@@ -40,6 +40,11 @@ export type ScannedRoutes = {
     'tenant.settings.payments.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.messages': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.messages.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.good_to_know': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.good_to_know.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.hours.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.closed_days.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.closed_days.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.members': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.members.invitations.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.members.invitations.renew': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
@@ -136,6 +141,7 @@ export type ScannedRoutes = {
     'tenant.settings.payments.create': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.edit': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.messages': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.good_to_know': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.members': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists.mine': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -186,6 +192,7 @@ export type ScannedRoutes = {
     'tenant.settings.payments.create': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.edit': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.messages': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.good_to_know': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.members': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists.mine': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -223,6 +230,7 @@ export type ScannedRoutes = {
     'password_reset.update': { paramsTuple?: []; params?: {} }
     'tenant.settings.payments.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.move': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.settings.closed_days.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.members.invitations.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.members.invitations.renew': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -268,6 +276,8 @@ export type ScannedRoutes = {
     'tenant.settings.deposits.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.messages.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.good_to_know.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.hours.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.members.role.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.photos.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
@@ -280,6 +290,7 @@ export type ScannedRoutes = {
     'tenant.settings.cover.destroy': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.logo.destroy': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.settings.closed_days.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.members.invitations.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.members.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }

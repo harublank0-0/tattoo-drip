@@ -222,6 +222,36 @@ const routes = {
     tokens: [{"old":"/t/:tenant/settings/messages","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/messages","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/messages","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/messages","type":0,"val":"messages","end":""}],
     types: placeholder as Registry['tenant.settings.messages.update']['types'],
   },
+  'tenant.settings.good_to_know': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/settings/good-to-know',
+    tokens: [{"old":"/t/:tenant/settings/good-to-know","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/good-to-know","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/good-to-know","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/good-to-know","type":0,"val":"good-to-know","end":""}],
+    types: placeholder as Registry['tenant.settings.good_to_know']['types'],
+  },
+  'tenant.settings.good_to_know.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/settings/good-to-know',
+    tokens: [{"old":"/t/:tenant/settings/good-to-know","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/good-to-know","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/good-to-know","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/good-to-know","type":0,"val":"good-to-know","end":""}],
+    types: placeholder as Registry['tenant.settings.good_to_know.update']['types'],
+  },
+  'tenant.settings.hours.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/settings/hours',
+    tokens: [{"old":"/t/:tenant/settings/hours","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/hours","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/hours","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/hours","type":0,"val":"hours","end":""}],
+    types: placeholder as Registry['tenant.settings.hours.update']['types'],
+  },
+  'tenant.settings.closed_days.store': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/settings/closed-days',
+    tokens: [{"old":"/t/:tenant/settings/closed-days","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/closed-days","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/closed-days","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/closed-days","type":0,"val":"closed-days","end":""}],
+    types: placeholder as Registry['tenant.settings.closed_days.store']['types'],
+  },
+  'tenant.settings.closed_days.destroy': {
+    methods: ["DELETE"],
+    pattern: '/t/:tenant/settings/closed-days/:id',
+    tokens: [{"old":"/t/:tenant/settings/closed-days/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/closed-days/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/closed-days/:id","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/closed-days/:id","type":0,"val":"closed-days","end":""},{"old":"/t/:tenant/settings/closed-days/:id","type":1,"val":"id","end":""}],
+    types: placeholder as Registry['tenant.settings.closed_days.destroy']['types'],
+  },
   'tenant.settings.members': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/settings/members',

@@ -177,6 +177,27 @@ router
 				router
 					.put("messages", [controllers.MessageTemplates, "update"])
 					.as("tenant.settings.messages.update");
+				// Good to know and opening hours (TAT-128): one page, three forms
+				// (the texts, the week, closed days), so the writes redirect back.
+				router
+					.get("good-to-know", [controllers.GoodToKnow, "show"])
+					.as("tenant.settings.good_to_know");
+				router
+					.put("good-to-know", [controllers.GoodToKnow, "update"])
+					.as("tenant.settings.good_to_know.update");
+				router
+					.put("hours", [controllers.GoodToKnow, "updateHours"])
+					.as("tenant.settings.hours.update");
+				router
+					.post("closed-days", [controllers.GoodToKnow, "storeClosedDays"])
+					.as("tenant.settings.closed_days.store");
+				router
+					.delete("closed-days/:id", [
+						controllers.GoodToKnow,
+						"destroyClosedDays",
+					])
+					.where("id", router.matchers.uuid())
+					.as("tenant.settings.closed_days.destroy");
 				// Members and invitations (TAT-33). A new invitation's link is
 				// shown once, on the members page.
 				router

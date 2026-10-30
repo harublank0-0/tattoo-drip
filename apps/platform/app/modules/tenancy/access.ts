@@ -52,6 +52,12 @@ export const TENANT_ROUTE_ROLES = {
 	"tenant.settings.payments.destroy": OWNERS,
 	"tenant.settings.messages": OWNERS,
 	"tenant.settings.messages.update": OWNERS,
+	// Good to know and opening hours (TAT-128).
+	"tenant.settings.good_to_know": OWNERS,
+	"tenant.settings.good_to_know.update": OWNERS,
+	"tenant.settings.hours.update": OWNERS,
+	"tenant.settings.closed_days.store": OWNERS,
+	"tenant.settings.closed_days.destroy": OWNERS,
 	"tenant.settings.members": OWNERS,
 	"tenant.settings.members.invitations.store": OWNERS,
 	"tenant.settings.members.invitations.renew": OWNERS,
