@@ -13,6 +13,7 @@ import WorkPhotoService, {
 	type WorkFilter,
 } from "#modules/artists/services/work_photo_service";
 import type { WorkCursor } from "#modules/artists/work_cursor";
+import FlashService from "#modules/flash/services/flash_service";
 import { ImageDeleteError, InvalidImageError } from "#modules/media/errors";
 import OpeningHoursService from "#modules/scheduling/services/opening_hours_service";
 import StudioPageService from "#modules/storefront/services/studio_page_service";
@@ -750,6 +751,7 @@ test.group("removing a photo is durable (TAT-116 fix round 1)", (group) => {
 				images,
 				photos,
 				new OpeningHoursService(),
+				new FlashService(images, artists),
 			).visibleArtists(tenant),
 		);
 		assert.lengthOf(listed[0].workPhotos, 3);

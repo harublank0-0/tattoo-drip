@@ -702,6 +702,18 @@ const routes = {
     tokens: [{"old":"/api/v1/tenants/:tenant/work","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/work","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/work","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/work","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/work","type":0,"val":"work","end":""}],
     types: placeholder as Registry['api.v1.work.index']['types'],
   },
+  'api.v1.flash.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/tenants/:tenant/flash',
+    tokens: [{"old":"/api/v1/tenants/:tenant/flash","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/flash","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/flash","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/flash","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/flash","type":0,"val":"flash","end":""}],
+    types: placeholder as Registry['api.v1.flash.index']['types'],
+  },
+  'api.v1.flash.show': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/tenants/:tenant/flash/:design',
+    tokens: [{"old":"/api/v1/tenants/:tenant/flash/:design","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/flash/:design","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/flash/:design","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/flash/:design","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/flash/:design","type":0,"val":"flash","end":""},{"old":"/api/v1/tenants/:tenant/flash/:design","type":1,"val":"design","end":""}],
+    types: placeholder as Registry['api.v1.flash.show']['types'],
+  },
   'api.v1.inquiries.store': {
     methods: ["POST"],
     pattern: '/api/v1/tenants/:tenant/inquiries',

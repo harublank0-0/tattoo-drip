@@ -31,6 +31,7 @@ export const controllers = {
   Projects: () => import('#controllers/projects_controller'),
   PublicArtists: () => import('#controllers/public_artists_controller'),
   PublicDeposits: () => import('#controllers/public_deposits_controller'),
+  PublicFlash: () => import('#controllers/public_flash_controller'),
   PublicInquiries: () => import('#controllers/public_inquiries_controller'),
   PublicStudio: () => import('#controllers/public_studio_controller'),
   PublicStyles: () => import('#controllers/public_styles_controller'),

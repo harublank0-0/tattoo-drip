@@ -220,6 +220,10 @@ export interface ApiDefinition {
       work: {
         index: typeof routes['api.v1.work.index']
       }
+      flash: {
+        index: typeof routes['api.v1.flash.index']
+        show: typeof routes['api.v1.flash.show']
+      }
       inquiries: {
         store: typeof routes['api.v1.inquiries.store']
       }

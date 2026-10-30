@@ -3,16 +3,22 @@ import { test } from "@japa/runner";
 import { DateTime } from "luxon";
 import ArtistService from "#modules/artists/services/artist_service";
 import WorkPhotoService from "#modules/artists/services/work_photo_service";
+import FlashService from "#modules/flash/services/flash_service";
 import ImageService from "#modules/media/services/image_service";
 import OpeningHoursService from "#modules/scheduling/services/opening_hours_service";
 import StudioPageService, {
+	type FlashQuery,
 	type WorkQuery,
 } from "#modules/storefront/services/studio_page_service";
 import type Tenant from "#modules/tenancy/models/tenant";
 import TenancyService, {
 	type TenantProfile,
 } from "#modules/tenancy/services/tenancy_service";
-import { addArtist, addWorkPhoto } from "#tests/helpers/artists";
+import {
+	addArtist,
+	addFlashDesign,
+	addWorkPhoto,
+} from "#tests/helpers/artists";
 import { testImages, uploadOf } from "#tests/helpers/images";
 import { recordQueries } from "#tests/helpers/query_count";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
@@ -48,6 +54,7 @@ const pagesWith = (artists: ArtistService = new ArtistService(images)) =>
 		images,
 		new WorkPhotoService(images, artists),
 		new OpeningHoursService(),
+		new FlashService(images, artists),
 	);
 
 /** The look of a studio that set nothing (TAT-56). */
@@ -796,5 +803,115 @@ test.group("StudioPageService.work (TAT-126)", (group) => {
 			styles: [{ slug: "realism", name: "Realism" }],
 			healed: false,
 		});
+	});
+});
+
+test.group("StudioPageService.flash (TAT-129)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	const everything: FlashQuery = { artist: null, cursor: null, limit: 24 };
+
+	test("flash names each design's artist and orders filters.artists by name", async ({
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("page-flash-129a");
+		const zara = await addArtist(tenant, owner, { name: "Zara", slug: "zara" });
+		const bina = await addArtist(tenant, owner, { name: "Bina", slug: "bina" });
+		await addArtist(tenant, owner, { name: "None", slug: "none" });
+		const at = DateTime.fromISO("2026-10-01T10:00:00.000Z", { zone: "utc" });
+		const [older, newer] = await inTenant(tenant, async () => [
+			await addFlashDesign(tenant, zara, {
+				name: "Moth",
+				price: 300_000,
+				createdAt: at.plus({ minutes: 1 }),
+			}),
+			await addFlashDesign(tenant, bina, {
+				name: "Koi",
+				createdAt: at.plus({ minutes: 2 }),
+			}),
+		]);
+
+		const page = await inTenant(tenant, () =>
+			pagesWith().flash(tenant, everything),
+		);
+
+		assert.deepEqual(
+			page.designs.map((shown) => [shown.name, shown.artist]),
+			[
+				["Koi", { slug: "bina", name: "Bina" }],
+				["Moth", { slug: "zara", name: "Zara" }],
+			],
+		);
+		assert.deepEqual(page.designs[1].price, {
+			amount: 300000,
+			currency: "NPR",
+			text: "NPR 3,000",
+		});
+		assert.isNull(page.designs[0].price);
+		assert.isTrue(page.designs[0].requestable);
+		assert.equal(
+			page.designs[0].image.url,
+			await images.url("flash_design", newer.imageKey, tenant),
+		);
+		assert.deepEqual(
+			page.designs[1].image.variants.map((copy) => copy.width),
+			[320, 640, 1280],
+		);
+		assert.isNull(page.nextCursor);
+		assert.deepEqual(page.filters, {
+			artists: [
+				{ slug: "bina", name: "Bina" },
+				{ slug: "zara", name: "Zara" },
+			],
+		});
+		assert.deepEqual(Object.keys(page.designs[0]).sort(), [
+			"artist",
+			"id",
+			"image",
+			"name",
+			"price",
+			"requestable",
+			"size",
+		]);
+		const one = await inTenant(tenant, () =>
+			pagesWith().flashDesign(tenant, older.id),
+		);
+		assert.deepEqual(one, page.designs[1]);
+		assert.isNull(
+			await inTenant(tenant, () =>
+				pagesWith().flashDesign(tenant, "0199f000-0000-7000-8000-000000000001"),
+			),
+		);
+	});
+
+	test("an artist who is not visible, or not there, is an empty page and no design query", async ({
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("page-flash-129b");
+		const sita = await addArtist(tenant, owner);
+		await addArtist(tenant, owner, {
+			name: "Hidden",
+			slug: "hidden",
+			visible: false,
+		});
+		await inTenant(tenant, () => addFlashDesign(tenant, sita));
+
+		const { result, queries } = await recordQueries(() =>
+			inTenant(tenant, () =>
+				pagesWith().flash(tenant, { ...everything, artist: "hidden" }),
+			),
+		);
+
+		assert.deepEqual(result.designs, []);
+		assert.isNull(result.nextCursor);
+		assert.deepEqual(result.filters.artists, [
+			{ slug: "sita", name: "Sita Rai" },
+		]);
+		assert.lengthOf(
+			queries.filter(
+				(sql) => sql.includes("flash_designs") && !sql.includes("distinct"),
+			),
+			0,
+		);
 	});
 });

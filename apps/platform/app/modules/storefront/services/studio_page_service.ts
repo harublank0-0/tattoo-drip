@@ -11,10 +11,14 @@ import {
 	encodeWorkCursor,
 	type WorkCursor,
 } from "#modules/artists/work_cursor";
+import type FlashDesign from "#modules/flash/models/flash_design";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import FlashService from "#modules/flash/services/flash_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService, {
 	type ShownImage,
 } from "#modules/media/services/image_service";
+import { formatMoney } from "#modules/projects/quotes";
 import type {
 	OpeningDay,
 	ShownClosure,
@@ -90,6 +94,35 @@ export type ShownWorkPage = {
 	filters: { styles: TattooStyleRef[]; healed: boolean };
 };
 
+/** A price as the public API shows it (openapi.yaml, Price): in paisa, with the words to show. */
+export type ShownPrice = { amount: number; currency: string; text: string };
+
+/** A flash design as the public API shows it (openapi.yaml, FlashDesign). */
+export type ShownFlashDesign = {
+	id: string;
+	name: string;
+	size: string;
+	price: ShownPrice | null;
+	image: ShownImage;
+	artist: { slug: string; name: string };
+	/** The artist takes flash requests, whatever their books say. */
+	requestable: boolean;
+};
+
+/** What listFlash asks for: `limit` is already within bounds. */
+export type FlashQuery = {
+	artist: string | null;
+	cursor: WorkCursor | null;
+	limit: number;
+};
+
+/** A page of flash designs before formatting (openapi.yaml, listFlash). */
+export type ShownFlashPage = {
+	designs: ShownFlashDesign[];
+	nextCursor: string | null;
+	filters: { artists: { slug: string; name: string }[] };
+};
+
 /** A visible artist as the public API shows it (openapi.yaml, Artist). */
 export type ShownArtist = Pick<
 	Artist,
@@ -107,6 +140,7 @@ const PHOTO = "artist_photo";
 const COVER = "studio_cover";
 const LOGO = "studio_logo";
 const WORK_PHOTO = "artist_work_photo";
+const FLASH_DESIGN = "flash_design";
 
 /** How many photos an Artist carries: the six newest. All of them are in the work gallery. */
 const PHOTOS_PER_ARTIST = 6;
@@ -122,7 +156,9 @@ const PHOTOS_PER_ARTIST = 6;
  * more query (WorkPhotoService.forArtists), only for visible artists. The
  * studio read adds the opening hours and the upcoming closed days (two more
  * queries, OpeningHoursService.forPage; TAT-128) and the Good to know texts
- * from the row. Only the fields the contract lists leave here.
+ * from the row. The flash reads (TAT-129) are `flash` (a page, with
+ * listVisible once and one query for the page and one for the filter) and
+ * `flashDesign`. Only the fields the contract lists leave here.
  */
 @inject()
 export default class StudioPageService {
@@ -131,6 +167,7 @@ export default class StudioPageService {
 		private images: ImageService,
 		private workPhotos: WorkPhotoService,
 		private hours: OpeningHoursService,
+		private flashDesigns: FlashService,
 	) {}
 
 	async studio(tenant: Tenant): Promise<StudioPage> {
@@ -248,6 +285,102 @@ export default class StudioPageService {
 				styles: knownStyles([...facets.styles, ...asked]),
 				healed: facets.healed,
 			},
+		};
+	}
+
+	/**
+	 * One page of the flash designs (TAT-129): the shown designs of the
+	 * visible artists (all of them, or the one whose slug is `query.artist`),
+	 * newest first, with the artists the page can be narrowed to. The artists
+	 * are one read, which also gives each design its artist's slug and name;
+	 * an artist who is not visible, not there or not exactly that slug (never
+	 * case-folded) is an empty page without a design query. `filters.artists`
+	 * are the visible artists with a shown design, by name (listVisible's
+	 * order), whatever `query.artist` asks. A design is `requestable` while
+	 * its artist takes flash requests, whatever their books say.
+	 */
+	async flash(tenant: Tenant, query: FlashQuery): Promise<ShownFlashPage> {
+		const visible = await this.artists.listVisible(tenant);
+		const withDesigns = await this.flashDesigns.artistsWithDesigns(
+			tenant,
+			visible.map((artist) => artist.id),
+		);
+		const filters = {
+			artists: visible
+				.filter((artist) => withDesigns.has(artist.id))
+				.map(({ slug, name }) => ({ slug, name })),
+		};
+		const artists =
+			query.artist === null
+				? visible
+				: visible.filter((artist) => artist.slug === query.artist);
+		if (artists.length === 0) return { designs: [], nextCursor: null, filters };
+		const { designs, next } = await this.flashDesigns.page(
+			tenant,
+			{ artistIds: artists.map((artist) => artist.id) },
+			query.cursor,
+			query.limit,
+		);
+		const owners = new Map(artists.map((artist) => [artist.id, artist]));
+		return {
+			designs: await Promise.all(
+				designs.map(async (design) => {
+					const owner = owners.get(design.artistId);
+					if (!owner) {
+						throw new Error(
+							`Flash design ${design.id} is of an artist not read`,
+						);
+					}
+					return this.shownFlashDesign(tenant, design, owner);
+				}),
+			),
+			nextCursor: next ? encodeWorkCursor(next) : null,
+			filters,
+		};
+	}
+
+	/** One shown design of a visible artist; null for a hidden or unknown one, or a hidden or deleted artist's (the API's 404). */
+	async flashDesign(
+		tenant: Tenant,
+		id: string,
+	): Promise<ShownFlashDesign | null> {
+		const visible = await this.artists.listVisible(tenant);
+		const design = await this.flashDesigns.findShown(
+			tenant,
+			id,
+			visible.map((artist) => artist.id),
+		);
+		if (!design) return null;
+		const owner = visible.find((artist) => artist.id === design.artistId);
+		if (!owner) return null;
+		return this.shownFlashDesign(tenant, design, owner);
+	}
+
+	private async shownFlashDesign(
+		tenant: Tenant,
+		design: FlashDesign,
+		artist: Artist,
+	): Promise<ShownFlashDesign> {
+		return {
+			id: design.id,
+			name: design.name,
+			size: design.size,
+			price:
+				design.price === null
+					? null
+					: {
+							amount: design.price,
+							currency: design.currency,
+							text: formatMoney(design.price),
+						},
+			image: await this.images.shownImage(
+				FLASH_DESIGN,
+				design.imageKey,
+				tenant,
+				{ width: design.width, height: design.height },
+			),
+			artist: { slug: artist.slug, name: artist.name },
+			requestable: artist.acceptingFlash,
 		};
 	}
 
