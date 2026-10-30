@@ -17,11 +17,14 @@ import { Button } from "~/components/ui/button";
  * `finished` when it answers (`onFinish`): the panel closes, whatever the answer, and focus goes
  * back to the trigger, or to `fallback` (the page's heading) when the answer removed it. Every
  * step is `confirmStep` (components/confirm.ts, unit-tested). `busyLabel` is what the confirm
- * button says while the request is out ("Saving…" unless the action has a better word). Never
- * inside a sheet: Escape would close the sheet.
+ * button says while the request is out ("Saving…" unless the action has a better word).
+ * `ariaLabel` is the trigger's accessible name when its visible `label` is not unique on the page
+ * (a list of rows each with "Remove"); omitted, the label names it. Never inside a sheet: Escape
+ * would close the sheet.
  */
 export default function InlineConfirm({
 	label,
+	ariaLabel,
 	variant = "outline",
 	question,
 	confirmLabel,
@@ -31,6 +34,7 @@ export default function InlineConfirm({
 	fallback,
 }: {
 	label: string;
+	ariaLabel?: string;
 	variant?: "default" | "outline" | "secondary";
 	question: string;
 	confirmLabel: string;
@@ -79,6 +83,7 @@ export default function InlineConfirm({
 					ref={trigger}
 					type="button"
 					variant={variant}
+					aria-label={ariaLabel}
 					aria-expanded={state.open}
 					aria-controls={panelId}
 					onKeyDown={ignoreHeldEnter}
