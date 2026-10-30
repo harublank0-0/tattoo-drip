@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { lookUpTenant } from "../../src/tenancy/lookup.ts";
-import { fakeFetch, hangUntilAborted, json } from "./helpers.ts";
+import { cdnInFront, fakeFetch, hangUntilAborted, json } from "./helpers.ts";
 
 const API = "http://api.test";
 const studio = { slug: "blackneedle", name: "Black Needle" };
@@ -36,6 +36,59 @@ describe("lookUpTenant", () => {
 		assert.equal(calls[0].url, "http://api.test/api/v1/tenants/blackneedle");
 		assert.equal(calls[0].init.method, undefined);
 		assert.equal(calls[0].init.credentials, "omit");
+	});
+
+	// TAT-128: the page is cached for up to 11 minutes after it is rendered, and
+	// the API's own answer may sit in a shared cache for 11 more. The lookup asks
+	// for a fresh one, so the studio a page is built from is not minutes old
+	// before the page's own cache life starts (a closure added now would still
+	// say "Open now" 22 minutes later).
+	test("asks every cache on the way for a fresh studio", async () => {
+		const { calls, fetch } = fakeFetch(() => json(200, { data: studio }));
+
+		await lookUpTenant("blackneedle", { apiUrl: API, fetch });
+
+		assert.equal(
+			new Headers(calls[0].init.headers).get("cache-control"),
+			"no-cache",
+		);
+	});
+
+	test("a shared cache in front of the API can't hand the page an old studio", async () => {
+		let closed = false;
+		const origin = () =>
+			json(200, {
+				data: {
+					...studio,
+					closedDays: closed
+						? [{ from: "2026-10-30", to: "2026-10-30", note: "Closed today" }]
+						: [],
+				},
+			});
+		const cdn = cdnInFront(origin);
+		// A browser fills the shared cache before the closure exists.
+		await cdn.fetch("http://api.test/api/v1/tenants/blackneedle");
+		closed = true;
+
+		const stale = await cdn.fetch("http://api.test/api/v1/tenants/blackneedle");
+		const found = await lookUpTenant("blackneedle", {
+			apiUrl: API,
+			fetch: cdn.fetch,
+		});
+
+		// The control: without the request header the cache does answer old data.
+		assert.equal(stale.headers.get("age"), "540");
+		assert.deepEqual(
+			((await stale.json()) as { data: { closedDays: unknown[] } }).data
+				.closedDays,
+			[],
+		);
+		assert.equal(cdn.hits, 1);
+		assert.equal(found.type, "found");
+		assert.equal(
+			(found as { studio: { closedDays: unknown[] } }).studio.closedDays.length,
+			1,
+		);
 	});
 
 	test("a different slug in the body means the studio moved", async () => {

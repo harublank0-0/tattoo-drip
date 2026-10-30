@@ -738,6 +738,15 @@ describe("studio and artists", () => {
 			},
 			sections: [{ type: "inquiry" }, { type: "artists" }],
 		},
+		openingHours: [],
+		closedDays: [],
+		goodToKnow: {
+			walkIns: null,
+			ageRule: null,
+			depositPolicy: null,
+			beforeSession: null,
+			aftercare: null,
+		},
 	};
 	const ARTIST: Artist = {
 		id: "0199f000-0000-7000-8000-000000000044",

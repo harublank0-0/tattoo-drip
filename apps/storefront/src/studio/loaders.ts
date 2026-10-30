@@ -20,6 +20,12 @@ import {
 	workQuery,
 } from "./gallery.ts";
 import {
+	type GoodToKnowView,
+	goodToKnowView,
+	type OpenNowView,
+	openNowView,
+} from "./good-to-know.ts";
+import {
 	type InquiryChannels,
 	type InquiryState,
 	inquiryChannels,
@@ -66,6 +72,10 @@ export interface StudioPageData {
 	 * leaves the section out.
 	 */
 	readonly recentWork: GalleryView;
+	/** The Good to know section's parts (TAT-128); empty when the studio filled in nothing. */
+	readonly goodToKnow: GoodToKnowView;
+	/** The cover's state line (TAT-128), or null when the studio set no hours or closed days. */
+	readonly openNow: OpenNowView | null;
 }
 
 export interface ArtistPageData {
@@ -138,6 +148,9 @@ export function studioPageData(
 		seo: studioPageSeo(studioView, artistViews, origin),
 		theme,
 		recentWork: galleryView(recentWork, imageOrigin),
+		goodToKnow: goodToKnowView(studio),
+		// No clock here (pure, deterministic): loadStudioPage sets the server's.
+		openNow: openNowView(studio, null),
 	};
 }
 
@@ -215,7 +228,7 @@ export async function loadStudioPage(
 		loadArtists(context),
 		theme.sections.includes("work") ? loadRecentWork(context) : null,
 	]);
-	return studioPageData(
+	const data = studioPageData(
 		studio,
 		artists,
 		context.site.origin,
@@ -223,6 +236,12 @@ export async function loadStudioPage(
 		recentWork,
 		theme,
 	);
+	// Today's state at this server's clock, only when it holds for the page's
+	// cache life (TAT-128); the browser recomputes the rest. The studio it is
+	// computed from is fresh: the render's reads ask every cache for a fresh
+	// answer (tenancy/revalidate.ts), so a closure added minutes ago is in it
+	// and the page's 11 minutes are not added to an API answer's own age.
+	return { ...data, openNow: openNowView(studio, new Date()) };
 }
 
 /**

@@ -55,7 +55,7 @@ export default function Payments({
 		<>
 			<Section
 				title="Deposits"
-				description="Shown to clients on the deposit page."
+				description="Shown to clients on the deposit page, and in Good to know on your studio page."
 			>
 				<Form route="tenant.settings.deposits.update" routeParams={params}>
 					{({ errors, processing }) => (

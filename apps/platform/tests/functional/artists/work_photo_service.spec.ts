@@ -14,6 +14,7 @@ import WorkPhotoService, {
 } from "#modules/artists/services/work_photo_service";
 import type { WorkCursor } from "#modules/artists/work_cursor";
 import { ImageDeleteError, InvalidImageError } from "#modules/media/errors";
+import OpeningHoursService from "#modules/scheduling/services/opening_hours_service";
 import StudioPageService from "#modules/storefront/services/studio_page_service";
 import { dbClient, withDbContext, withTransaction } from "#services/db_context";
 import { addArtist, addWorkPhoto } from "#tests/helpers/artists";
@@ -744,7 +745,12 @@ test.group("removing a photo is durable (TAT-116 fix round 1)", (group) => {
 				.map((photo) => photo.id),
 		);
 		const listed = await inTenant(tenant, () =>
-			new StudioPageService(artists, images, photos).visibleArtists(tenant),
+			new StudioPageService(
+				artists,
+				images,
+				photos,
+				new OpeningHoursService(),
+			).visibleArtists(tenant),
 		);
 		assert.lengthOf(listed[0].workPhotos, 3);
 		// The other files of the photo were tried and are gone; the failed one is left.

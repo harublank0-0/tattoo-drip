@@ -7,6 +7,7 @@ import type {
 	StudioPageData,
 	WorkPageData,
 } from "../loaders.ts";
+import { OpenNow } from "../open-now.tsx";
 import { type MoreWork, PagedGallery } from "../paging.tsx";
 import { logoSizes } from "../srcset.ts";
 import type { SectionKey, ThemeConfig } from "../theme/config.ts";
@@ -15,6 +16,7 @@ import { ArtistProfile, ArtistRoster } from "./artists.tsx";
 import { BrandCover, BrandLogo } from "./brand.tsx";
 import { ContactBlock } from "./contact.tsx";
 import { HealedFilter, RecentWork, WorkFilters } from "./gallery.tsx";
+import { GoodToKnowSection } from "./good-to-know.tsx";
 import { InquirySection } from "./inquiry.tsx";
 import { BookingStrip } from "./steps.tsx";
 
@@ -52,6 +54,7 @@ export function StudioPage({
 			<p className="profile-location user-text" dir="auto">
 				{studio.location ?? studio.typeLabel}
 			</p>
+			{data.openNow ? <OpenNow view={data.openNow} /> : null}
 		</div>
 	);
 	return (
@@ -108,8 +111,9 @@ export function StudioPage({
 
 /**
  * One of the studio page's sections, in the order the theme's config gives
- * (TAT-54): Recent work (TAT-126), the artists and the inquiry section, which
- * is always one of them (readSections).
+ * (TAT-54): Recent work (TAT-126), the artists, Good to know (TAT-128, which
+ * renders nothing until the studio filled something in) and the inquiry
+ * section, which is always one of them (readSections).
  */
 function StudioSection({
 	section,
@@ -125,6 +129,8 @@ function StudioSection({
 			return <RecentWork gallery={data.recentWork} />;
 		case "artists":
 			return <ArtistRoster artists={data.artists} />;
+		case "info":
+			return <GoodToKnowSection view={data.goodToKnow} />;
 		case "inquiry":
 			return (
 				<InquirySection

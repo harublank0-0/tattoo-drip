@@ -7,6 +7,7 @@ import {
 } from "@tattoo-drip/sdk";
 import type { StorefrontConfig } from "../tenancy/config.ts";
 import { STORED_SLUG } from "../tenancy/host.ts";
+import { withRevalidation } from "../tenancy/revalidate.ts";
 import { withVisitorAddress } from "../tenancy/visitor.ts";
 import {
 	createStorefrontQueryClient,
@@ -97,7 +98,8 @@ export interface ServerConnectOptions {
 /**
  * Connects a server render's client: API_URL, the confirmed studio's slug,
  * and the server key when set (sent as Authorization: Bearer) and, with the
- * key, the visitor's address (X-Visitor-IP).
+ * key, the visitor's address (X-Visitor-IP). Its reads ask every cache on the
+ * way for a fresh answer (`withRevalidation`).
  */
 export function connectServer(
 	api: ApiContext,
@@ -108,7 +110,10 @@ export function connectServer(
 		tenant: studio.slug,
 		key: config.serverKey,
 		timeoutMs: SERVER_TIMEOUT_MS,
-		fetch: config.serverKey ? withVisitorAddress(fetch, visitorAddress) : fetch,
+		// A render's reads ask every cache for a fresh answer (TAT-128).
+		fetch: withRevalidation(
+			config.serverKey ? withVisitorAddress(fetch, visitorAddress) : fetch,
+		),
 	});
 	api.tattoo.connect({ apiUrl: config.apiUrl, tenant: studio.slug }, client);
 }

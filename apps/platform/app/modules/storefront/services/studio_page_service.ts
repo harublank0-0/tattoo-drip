@@ -15,6 +15,12 @@ import {
 import ImageService, {
 	type ShownImage,
 } from "#modules/media/services/image_service";
+import type {
+	OpeningDay,
+	ShownClosure,
+} from "#modules/scheduling/opening_hours";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import OpeningHoursService from "#modules/scheduling/services/opening_hours_service";
 import { lookOf, type PageLook } from "#modules/storefront/look";
 import {
 	type PublicSocialLink,
@@ -26,8 +32,8 @@ import type { TenantProfile } from "#modules/tenancy/services/tenancy_service";
 /**
  * What getStudio may read of a tenant: the profile its owners were told is
  * shown on the studio page (TenantProfile), its current slug and its type.
- * Never the deposit settings, which the settings page says the deposit page
- * shows.
+ * The deposit policy is shown in Good to know (TAT-128, `StudioPage.goodToKnow`);
+ * never the default deposit percentage.
  */
 export type StudioProfile = TenantProfile & Pick<Tenant, "slug" | "type">;
 
@@ -40,6 +46,22 @@ export type StudioPage = {
 	cover: ShownImage | null;
 	/** How the page looks (TAT-56): the checked look and the logo. */
 	storefront: { look: PageLook; logo: ShownImage | null };
+	/** The open weekdays, Sunday first (TAT-128). */
+	openingHours: OpeningDay[];
+	/** The closed days that haven't ended in the studio's timezone, earliest first. */
+	closedDays: ShownClosure[];
+	/**
+	 * The texts the studio wrote for clients, as stored (the transformer
+	 * trims them and turns a blank one into null). The deposit policy is the
+	 * one text of the deposit settings the page shows; never the percentage.
+	 */
+	goodToKnow: {
+		walkIns: string | null;
+		ageRule: string | null;
+		depositPolicy: string | null;
+		beforeSession: string | null;
+		aftercare: string | null;
+	};
 };
 
 /** A work photo as the public API shows it (openapi.yaml, WorkPhoto). */
@@ -97,8 +119,10 @@ const PHOTOS_PER_ARTIST = 6;
  * ImageService.shownImage: its URL, size and smaller copies, all built from
  * the key without I/O. The studio's cover (TAT-116) comes from the tenant row
  * already loaded; the work photos of the artists a read returns come in one
- * more query (WorkPhotoService.forArtists), only for visible artists. Only the
- * fields the contract lists leave here.
+ * more query (WorkPhotoService.forArtists), only for visible artists. The
+ * studio read adds the opening hours and the upcoming closed days (two more
+ * queries, OpeningHoursService.forPage; TAT-128) and the Good to know texts
+ * from the row. Only the fields the contract lists leave here.
  */
 @inject()
 export default class StudioPageService {
@@ -106,10 +130,12 @@ export default class StudioPageService {
 		private artists: ArtistService,
 		private images: ImageService,
 		private workPhotos: WorkPhotoService,
+		private hours: OpeningHoursService,
 	) {}
 
 	async studio(tenant: Tenant): Promise<StudioPage> {
 		const visible = await this.artists.listVisible(tenant);
+		const { openingHours, closedDays } = await this.hours.forPage(tenant);
 		return {
 			profile: profileOf(tenant),
 			acceptingInquiries: studioTakesInquiries(visible),
@@ -117,6 +143,15 @@ export default class StudioPageService {
 			storefront: {
 				look: lookOf(tenant),
 				logo: await this.logoOf(tenant),
+			},
+			openingHours,
+			closedDays,
+			goodToKnow: {
+				walkIns: tenant.walkInsText,
+				ageRule: tenant.ageRuleText,
+				depositPolicy: tenant.depositPolicy,
+				beforeSession: tenant.beforeSessionText,
+				aftercare: tenant.aftercareText,
 			},
 		};
 	}

@@ -117,6 +117,26 @@ describe("handleTenantRequest", () => {
 		);
 	});
 
+	test("a page request's lookup asks for a fresh studio, with or without a key (TAT-128)", async () => {
+		for (const config of [CONFIG, { ...CONFIG, serverKey: KEY }]) {
+			const { calls, fetch } = api();
+
+			await handleTenantRequest(
+				request("blackneedle.tattoodrip.com", "/", {
+					headers: { "x-forwarded-for": "203.0.113.7" },
+				}),
+				deps(fetch, { config }),
+			);
+
+			const headers = new Headers(calls[0].init.headers);
+			assert.equal(headers.get("cache-control"), "no-cache");
+			assert.equal(
+				headers.get("x-visitor-ip"),
+				config.serverKey ? "203.0.113.7" : null,
+			);
+		}
+	});
+
 	test("the base domain's front page is the landing page, without asking the API", async () => {
 		const { calls, fetch } = api();
 		for (const host of ["tattoodrip.com", "www.tattoodrip.com"]) {

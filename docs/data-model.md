@@ -63,6 +63,8 @@ Every entity except `User` belongs to a `Tenant`; most of those lines are left o
 | **Session** | A time block for one artist inside a project (table `project_sessions`): kind (`consultation`, `tattoo`, `touch_up`), start and end, status (`scheduled`, `completed`, `no_show`, `cancelled`). The database prevents overlapping active sessions for the same artist: a session is active while it is `scheduled` or `completed` and not deleted, and the time is a half-open range, so back-to-back sessions are fine. `completed`, `no_show` and `cancelled` are final |
 | **ReferenceImage** | An image from the client, attached to the inquiry and then to its project. Private |
 | **MessageTemplate** | A studio's own text for one of its six chat messages (inquiry received, quote, deposit link, booking confirmation, session reminder, aftercare), with placeholders such as `{client_name}`. A row only for a message the studio changed; the defaults are in code |
+| **StudioHours** (table `studio_hours`) | One opening and closing time per open weekday (0 = Sunday), on the studio's wall clock and never past midnight, unique per studio and weekday. A weekday without a row is closed. Shown on the studio page (TAT-128); the slot engine will bound artists' availability by them |
+| **StudioClosure** (table `studio_closures`) | A dated closure, first and last day (both included) and a note of at most 120 characters. The studio-wide part of `AvailabilityException`. Shown on the studio page while it has not ended (TAT-128) |
 | **StaffAlert** | One member's alert about one event, a new inquiry or a deposit screenshot (the payment and its project): the member, the kind, the event's ids and when it was read. Ids only, no client data |
 | **StorefrontConfiguration** | One per tenant: a theme and its options (branding, sections). Not a table: since TAT-56 it is columns of `tenants` (`storefront_theme`, `storefront_sections` (the shown sections in their order, `work,artists,inquiry` by default: Recent work, the artists, the inquiry form, TAT-126), `brand_accent`, `brand_accent_dark`, `brand_font`, and the logo's `logo_image_key`, `_width`, `_height`, all or none), set by owners in Settings, Page look and served to the studio page as `Studio.storefront`; the hero is the cover (`cover_image_*`, TAT-116), not a second upload. The studio page also shows the tenant's profile (intro, contact, links) and the artists whose visible switch is on |
 
@@ -76,7 +78,7 @@ Every entity except `User` belongs to a `Tenant`; most of those lines are left o
 |---|---|
 | **Service** | A fixed-price offering (piercing, flash size, consultation) with duration; artist ↔ service mapping |
 | **Flash** | A pre-drawn design: image, price, size, one-off or repeatable. Booking one creates a project with a fixed quote |
-| **ArtistAvailability**, **AvailabilityException** | Weekly hours and dated overrides (time off, extra hours, studio-wide closures), used for instant booking |
+| **ArtistAvailability**, **AvailabilityException** | Weekly hours and dated overrides (time off, extra hours), used for instant booking; the studio-wide hours and closures are `StudioHours` and `StudioClosure` |
 | **TattooStyle**, **BodyPlacement** | Platform-wide lists with stable slugs |
 | **GatewayPayment** | A Khalti or Fonepay transaction behind an automatically confirmed `Payment` |
 

@@ -67,6 +67,32 @@ describe("the server's client", () => {
 		}
 	});
 
+	// TAT-128: the page's reads ask every cache on the way for a fresh answer
+	// (see tenancy/lookup.ts); the browser's client never does, because its
+	// requests are cross-origin and the API allows only a few request headers.
+	test("the server's reads ask for a fresh answer, the browser's don't", async () => {
+		const { calls, fetch } = fakeFetch(() => json(200, { data: STUDIO_A }));
+		await serverApi(STUDIO_A, fetch).tattoo.client.studio.get();
+		await serverApi(STUDIO_A, fetch, {
+			apiUrl: API,
+		}).tattoo.client.studio.get();
+
+		const browser = createApiContext("browser");
+		hydrateApi(
+			browser,
+			{ tattoo: { apiUrl: API, tenant: "studio-a" } },
+			{ fetch },
+		);
+		await browser.tattoo.client.studio.get();
+
+		const cacheControl = (init: RequestInit) =>
+			new Headers(init.headers).get("cache-control");
+		assert.deepEqual(
+			calls.map((call) => cacheControl(call.init)),
+			["no-cache", "no-cache", null],
+		);
+	});
+
 	test("sends no Authorization when no key is set", async () => {
 		const { calls, fetch } = fakeFetch(() => json(200, { data: STUDIO_A }));
 		const api = serverApi(STUDIO_A, fetch, { apiUrl: API });
