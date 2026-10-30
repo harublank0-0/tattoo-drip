@@ -584,7 +584,12 @@ test.group("Settings, Good to know: the texts (TAT-128)", (group) => {
 				...ALL_TEXTS,
 				[field]: "x".repeat(limit + 1),
 			});
-			assertValidationError(refused, field);
+			// In the form's words: short, kind, no field name.
+			assertValidationError(
+				refused,
+				field,
+				`Keep it to ${limit} characters or fewer.`,
+			);
 			assert.isNull(await storedText(tenant, field));
 
 			const kept = await putTexts(client, owner, tenant, {
