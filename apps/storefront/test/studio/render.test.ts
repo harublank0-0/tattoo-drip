@@ -2584,3 +2584,98 @@ describe("the Flash section on the studio page (TAT-129)", () => {
 		assert.match(html, /Not taking flash requests right now/);
 	});
 });
+
+describe("the request page for a flash design (TAT-129)", () => {
+	const ID = flashId(1);
+	const page = (
+		flash: Parameters<typeof requestPageData>[5],
+		artists: Artist[] = [SITA, ARJUN],
+	) =>
+		renderToStaticMarkup(
+			createElement(RequestPage, {
+				data: requestPageData(
+					STUDIO,
+					artists,
+					{ flash: ID },
+					ORIGIN,
+					IMAGE_ORIGIN,
+					flash,
+				),
+			}),
+		);
+	const moth = flashPage(1).data[0];
+
+	test("shows the design above the form and asks for it", () => {
+		const html = page({ kind: "found", design: moth });
+
+		assertSafePage(html);
+		assert.match(
+			html,
+			/<h1 id="inquiry-title" class="section-title">Ask for this design<\/h1><div class="flash-summary">/,
+		);
+		const summary =
+			html.match(/<div class="flash-summary">[\s\S]*?<\/div><\/div>/)?.[0] ??
+			"";
+		assert.match(summary, /<img [^>]*alt="Moth, a flash design by Sita Rai"/);
+		assert.match(summary, /sizes="8rem"/);
+		assert.match(summary, /<bdi>Moth<\/bdi>/);
+		assert.match(summary, /by <bdi>Sita Rai<\/bdi>/);
+		assert.match(summary, /About 3 in/);
+		assert.match(summary, /NPR 3,000/);
+		assert.ok(html.indexOf("flash-summary") < html.indexOf("steps-strip"));
+		// The fallback asks for the design; the form mounts after hydration.
+		assert.match(
+			html,
+			/Ask <bdi>Black Needle<\/bdi> for <bdi>The Moth flash<\/bdi>: say where it goes and the dates that suit you\./,
+		);
+		// The chat button's WhatsApp text ends with the design.
+		assert.match(html, /about%20the%20Moth%20flash/);
+		assert.doesNotMatch(html, /Send your idea<\/h1>/);
+	});
+
+	test("a closed design's page shows it greyed with the note, and the artist's own state", () => {
+		const off = { ...moth, requestable: false };
+		const html = page({ kind: "found", design: off });
+
+		assertSafePage(html);
+		assert.match(html, /class="flash-summary flash-summary-closed"/);
+		assert.match(
+			html,
+			/<p class="note user-text" dir="auto">Sita Rai isn&#x27;t taking flash requests right now\.<\/p>/,
+		);
+		// Sita's books are open: her own request form (the fallback) is below.
+		assert.match(
+			html,
+			/<h1 id="inquiry-title" class="section-title">Send your idea<\/h1>/,
+		);
+
+		const arjun = page({
+			kind: "found",
+			design: { ...off, artist: { slug: "arjun", name: "अर्जुन थापा" } },
+		});
+		assert.match(arjun, /Books open in March\./);
+		assert.match(
+			arjun,
+			/<h1 id="inquiry-title" class="section-title">Inquiries<\/h1>/,
+		);
+	});
+
+	test("a gone design's page shows the note and the general form; so does a failed read", () => {
+		const gone = page({ kind: "gone" });
+		assertSafePage(gone);
+		assert.match(
+			gone,
+			/<p class="note flash-summary-note">This flash design isn&#x27;t on <bdi>Black Needle<\/bdi>&#x27;s page any more\. Tell them about your idea instead\.<\/p>/,
+		);
+		assert.match(
+			gone,
+			/<h1 id="inquiry-title" class="section-title">Send your idea<\/h1>/,
+		);
+		assert.doesNotMatch(gone, /flash-summary"/);
+
+		const failed = page({ kind: "failed" });
+		assertSafePage(failed);
+		assert.match(failed, /We couldn&#x27;t load this flash design\./);
+		assert.match(failed, /Send your idea<\/h1>/);
+	});
+});

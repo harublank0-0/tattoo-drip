@@ -372,6 +372,40 @@ try {
 		`/request?artist=Nobody&fbclid=… is ${page.status}, not the general form at /request.`,
 	);
 
+	// A flash design the API doesn't know (the stand-in 404s every design): the
+	// general form with a note, never a not-found, and the design is read once.
+	const FLASH_ID = "0199f000-0000-7000-8000-000000000001";
+	apiLog.length = 0;
+	page = await get(`/request?flash=${FLASH_ID}&fbclid=IwAR0`);
+	expect(
+		page.status === 200 &&
+			page.body.includes(
+				"<title>Send your idea to Canary Ink &lt;Studio&gt;</title>",
+			) &&
+			page.body.includes("page any more") &&
+			!page.body.includes(CANARY),
+		`/request?flash=<unknown id> is ${page.status}, or lacks the general form and the note that the design isn't on the page.`,
+	);
+	expect(
+		apiLog
+			.map((call) => call.url)
+			.sort()
+			.join(",") ===
+			[
+				`/api/v1/tenants/${SLUG}`,
+				`/api/v1/tenants/${SLUG}/artists`,
+				`/api/v1/tenants/${SLUG}/flash/${FLASH_ID}`,
+			].join(","),
+		`/request?flash=<id> asked the API for ${apiLog.map((call) => call.url).join(", ")} instead of the lookup, the list and the design.`,
+	);
+	// A well-formed request for an artist still reads the lookup and the list alone.
+	apiLog.length = 0;
+	page = await get("/request?artist=sita");
+	expect(
+		page.status === 200 && apiLog.every((call) => !call.url.includes("/flash")),
+		`/request?artist=sita read a flash design (${apiLog.map((call) => call.url).join(", ")}).`,
+	);
+
 	// All work (TAT-126): the lookup, the list and the first page of photos.
 	apiLog.length = 0;
 	page = await get("/work");

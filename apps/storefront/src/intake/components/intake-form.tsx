@@ -90,7 +90,10 @@ export function IntakeForm({
 	challengeSiteKey,
 }: IntakeFormProps) {
 	const { studioName, preferredArtist, artists } = state;
-	const showArtists = artists.length >= 2 || preferredArtist !== null;
+	// A flash request is for the design's artist alone: no picker (TAT-129).
+	const flashDesignId = state.flashDesignId ?? null;
+	const showArtists =
+		flashDesignId === null && (artists.length >= 2 || preferredArtist !== null);
 	const createInquiry = useCreateInquiry();
 
 	const [references, dispatch] = useReducer(
@@ -148,7 +151,10 @@ export function IntakeForm({
 	);
 
 	const form = useAppForm({
-		defaultValues: initialValues(preferredArtist?.id ?? null),
+		defaultValues: initialValues(
+			preferredArtist?.id ?? null,
+			state.start ?? null,
+		),
 		validationLogic: revalidateLogic({
 			mode: "submit",
 			modeAfterSubmission: "change",
@@ -205,6 +211,7 @@ export function IntakeForm({
 					values,
 					sent.map((item) => item.file),
 					honeypot.current?.value ?? "",
+					flashDesignId,
 				),
 			);
 			if (result.kind === "busy") return;
@@ -220,6 +227,7 @@ export function IntakeForm({
 					? describeChallengeFailure(result.reason)
 					: describeSubmitError(result.error, {
 							sentArtistId: values.preferredArtistId || null,
+							sentFlash: flashDesignId !== null,
 							artistName: (id) =>
 								artists.find((artist) => artist.id === id)?.name ?? null,
 						});

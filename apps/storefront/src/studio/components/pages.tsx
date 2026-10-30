@@ -28,7 +28,12 @@ import { ArtistProfile, ArtistRoster } from "./artists.tsx";
 import { BrandCover, BrandLogo } from "./brand.tsx";
 import { ChatButton } from "./chat.tsx";
 import { ContactBlock } from "./contact.tsx";
-import { ArtistFlash, FlashGrid, FlashSection } from "./flash.tsx";
+import {
+	ArtistFlash,
+	FlashGrid,
+	FlashSection,
+	FlashSummary,
+} from "./flash.tsx";
 import { HealedFilter, RecentWork, WorkFilters } from "./gallery.tsx";
 import { GoodToKnowSection } from "./good-to-know.tsx";
 import { InquirySection, RequestInvite } from "./inquiry.tsx";
@@ -200,6 +205,11 @@ export function RequestPage({
 					state={inquiry}
 					channels={channels}
 					challengeSiteKey={challengeSiteKey}
+					intro={
+						data.flash ? (
+							<FlashSummary request={data.flash} studioName={studio.name} />
+						) : null
+					}
 				/>
 				<StudioAside studio={studio} />
 			</main>

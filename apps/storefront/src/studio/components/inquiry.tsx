@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Fill } from "../../intake/components/fill.tsx";
 import { IntakeMount } from "../../intake/components/intake-mount.tsx";
 import { studioCopy } from "../copy.ts";
@@ -18,16 +19,22 @@ type OpenInquiry = Extract<InquiryState, { kind: "open" }>;
  * Open (TAT-105), the section is the form's column with the compact "How
  * booking works" strip (an `h2`) under the heading on a phone, and the
  * sticky panel beside it from 60rem.
+ *
+ * `intro` (TAT-129) is what the request page shows right under the heading
+ * and above the steps strip: the flash design asked for. Asking for a design
+ * (`state.flashDesignId`) changes the heading to "Ask for this design".
  */
 export function InquirySection({
 	state,
 	channels,
 	challengeSiteKey = null,
+	intro = null,
 }: {
 	state: InquiryState;
 	channels: InquiryChannels;
 	/** The public Turnstile site key (null: no bot check, development). */
 	challengeSiteKey?: string | null;
+	intro?: ReactNode;
 }) {
 	return (
 		<div
@@ -36,8 +43,13 @@ export function InquirySection({
 			<section id="inquiry" className="inquiry" aria-labelledby="inquiry-title">
 				{/* An invitation only while the section offers one. */}
 				<h1 id="inquiry-title" className="section-title">
-					{state.kind === "open" ? studioCopy.sendIdea : "Inquiries"}
+					{state.kind === "open"
+						? state.flashDesignId === undefined
+							? studioCopy.sendIdea
+							: studioCopy.flash.requestTitle
+						: "Inquiries"}
 				</h1>
+				{intro}
 				{state.kind === "open" ? (
 					<BookingStrip studioName={state.studioName} />
 				) : null}
@@ -157,7 +169,12 @@ function InquiryFallback({
 	return (
 		<>
 			<p>
-				{state.preferredArtist ? (
+				{state.flashDesignId !== undefined && state.start ? (
+					<>
+						Ask <bdi>{state.studioName}</bdi> for <bdi>{state.start.idea}</bdi>:
+						say where it goes and the dates that suit you.
+					</>
+				) : state.preferredArtist ? (
 					<>
 						Send <bdi>{state.studioName}</bdi> your idea for{" "}
 						<bdi>{state.preferredArtist.name}</bdi>: the placement and size, and

@@ -79,11 +79,18 @@ export interface IntakeRules {
 	readonly artistIds: readonly string[];
 }
 
-export function initialValues(preferredArtistId: string | null): IntakeValues {
+/**
+ * The form's starting answers. A flash request (`start`, TAT-129) begins with
+ * the design's idea and size, which the client can still edit.
+ */
+export function initialValues(
+	preferredArtistId: string | null,
+	start: { idea: string; approximateSize: string } | null = null,
+): IntakeValues {
 	return {
-		idea: "",
+		idea: start?.idea ?? "",
 		placement: "",
-		approximateSize: "",
+		approximateSize: start?.approximateSize ?? "",
 		preferredDates: "",
 		preferredArtistId: preferredArtistId ?? "",
 		budget: "",

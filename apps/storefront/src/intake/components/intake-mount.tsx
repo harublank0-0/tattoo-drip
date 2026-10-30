@@ -38,10 +38,14 @@ function useHydrated(): boolean {
  * re-seeds only while nothing was touched, so moving between `/request?artist=
  * sita` and `/request` (back and forward, a header link) would otherwise keep
  * a touched form on the old artist under a heading that names the new one. A
- * different key mounts a fresh form (TAT-127).
+ * different key mounts a fresh form (TAT-127). A flash request (TAT-129) is its
+ * design's own form, so moving between a design and the same artist's custom
+ * request mounts a fresh one too.
  */
 export function intakeFormKey(state: IntakeFormProps["state"]): string {
-	return state.preferredArtist?.id ?? "";
+	return state.flashDesignId !== undefined
+		? `flash:${state.flashDesignId}`
+		: (state.preferredArtist?.id ?? "");
 }
 
 export function IntakeMount({

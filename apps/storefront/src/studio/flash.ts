@@ -171,6 +171,29 @@ export function flashListView(
 	};
 }
 
+/**
+ * What the request page's read of `?flash=<id>` gave (TAT-129): the API's
+ * design as it came (flashDesignView checks it), the API not knowing it (a
+ * 404: hidden, its artist hidden, unknown) or the read failing for any other
+ * reason.
+ */
+export type FlashLookup =
+	| { readonly kind: "found"; readonly design: unknown }
+	| { readonly kind: "gone" }
+	| { readonly kind: "failed" };
+
+/** What the request page shows of the design the address names. */
+export type FlashRequestView =
+	| { readonly kind: "requestable"; readonly design: FlashDesignView }
+	| {
+			readonly kind: "closed";
+			readonly design: FlashDesignView;
+			/** The artist's own words, else ours: why the design can't be asked for now. */
+			readonly note: string;
+	  }
+	| { readonly kind: "gone" }
+	| { readonly kind: "failed" };
+
 /** `/flash` reads these from its address. Absent keys, never null, so the router writes nothing back. */
 export interface FlashSearch {
 	artist?: string;

@@ -5,6 +5,7 @@ import {
 	closedNoteFor,
 	type FlashDesignView,
 	type FlashListView,
+	type FlashRequestView,
 	HOME_FLASH_COUNT,
 } from "../flash.ts";
 import { flashHref, isAllowedHref } from "../links.ts";
@@ -152,5 +153,79 @@ export function ArtistFlash({
 				</p>
 			) : null}
 		</section>
+	);
+}
+
+/**
+ * What the request page shows of the design its address names (TAT-129), above
+ * the form: the picture at 8rem, the name, the artist, the size and the price;
+ * for a design that can't be asked for now (`closed`) greyed, with the words
+ * why; for a design the page doesn't have (`gone`) or couldn't read
+ * (`failed`) a note, and the general form below it.
+ */
+export function FlashSummary({
+	request,
+	studioName,
+}: {
+	request: FlashRequestView;
+	studioName: string;
+}) {
+	if (request.kind === "gone") {
+		return (
+			<p className="note flash-summary-note">
+				<Fill
+					template={studioCopy.flash.gone}
+					values={{ studio: studioName }}
+				/>
+			</p>
+		);
+	}
+	if (request.kind === "failed") {
+		return <p className="note flash-summary-note">{studioCopy.flash.failed}</p>;
+	}
+	const { design } = request;
+	return (
+		<div
+			className={
+				request.kind === "closed"
+					? "flash-summary flash-summary-closed"
+					: "flash-summary"
+			}
+		>
+			<img
+				className="flash-summary-picture"
+				src={design.image.src}
+				srcSet={design.image.srcSet}
+				sizes={design.image.srcSet ? "8rem" : undefined}
+				width={design.image.width}
+				height={design.image.height}
+				alt={design.alt}
+				decoding="async"
+			/>
+			<div className="flash-summary-text">
+				<p className="flash-card-name user-text" dir="auto">
+					<bdi>{design.name}</bdi>
+				</p>
+				{design.artist ? (
+					<p className="flash-card-artist">
+						<Fill
+							template={studioCopy.flash.by}
+							values={{ name: design.artist.name }}
+						/>
+					</p>
+				) : null}
+				<p className="flash-card-artist user-text" dir="auto">
+					{design.size}
+				</p>
+				{design.priceText ? (
+					<p className="flash-card-price">{design.priceText}</p>
+				) : null}
+				{request.kind === "closed" ? (
+					<p className="note user-text" dir="auto">
+						{request.note}
+					</p>
+				) : null}
+			</div>
+		</div>
 	);
 }

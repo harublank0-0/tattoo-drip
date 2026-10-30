@@ -153,13 +153,32 @@ export function flashDesignSeo(
  * keeps the artist (`/request?artist=<slug>`) either way, because Facebook keys
  * a shared link by its canonical `og:url`; a page for the general form is
  * `/request`, whatever else the address carried.
+ *
+ * With a flash `design` (TAT-129; the loader passes one only for a design that
+ * can be requested) the page is about that design: its title and description
+ * name it and its artist, the canonical address is `/request?flash=<id>` and
+ * there is no image. A closed design's page has the artist's own head.
  */
 export function requestPageSeo(
 	studio: StudioView,
 	artist: ArtistView | null,
 	origin: string,
 	open: boolean,
+	design: FlashDesignView | null = null,
 ): PageSeo {
+	if (design) {
+		return {
+			title: `Ask for the ${design.name} flash at ${studio.name}`,
+			description: trimDescription(
+				`Ask ${studio.name} for the ${design.name} flash${design.artist ? ` by ${design.artist.name}` : ""}: say where it goes and the dates that suit you.`,
+			),
+			canonical: `${origin}${requestHref({ flash: design.id })}`,
+			type: "website",
+			siteName: studio.name,
+			image: null,
+			jsonLd: null,
+		};
+	}
 	const sameName = artist?.name === studio.name;
 	const who = artist?.name ?? studio.name;
 	const named = artist && !sameName ? artist : null;

@@ -19,6 +19,8 @@ import {
 	FLASH_PAGE_SIZE,
 	type FlashDesignView,
 	type FlashListView,
+	type FlashLookup,
+	type FlashRequestView,
 	type FlashSearch,
 	flashDesignView,
 	flashListView,
@@ -42,6 +44,7 @@ import {
 	openNowView,
 } from "./good-to-know.ts";
 import {
+	flashInquiryState,
 	type InquiryChannels,
 	type InquiryState,
 	inquiryChannels,
@@ -215,6 +218,11 @@ export interface RequestPageData {
 	readonly seo: PageSeo;
 	/** The studio's theme (TAT-54): its key, sections and checked branding. */
 	readonly theme: ThemeConfig;
+	/**
+	 * The flash design the address names (`?flash=<id>`, TAT-129) and what the
+	 * page can do with it; null for any other address.
+	 */
+	readonly flash: FlashRequestView | null;
 }
 
 /**
@@ -292,6 +300,15 @@ export function artistPageData(
  * reach the studio. An open artist's page works while the studio as a whole is
  * closed (each artist has their own switch, as `inquiryState` says), and a
  * closed one says so and offers the studio's general request.
+ *
+ * With a design (`flash`, TAT-129, what the loader read for `?flash=<id>`):
+ * a requestable one is a flash request for its artist, whatever their books
+ * say (the artist is found in the list by the design's slug); one whose artist
+ * takes no flash requests is shown with the artist's own words, else ours, and
+ * the artist's own request state below it, so their books decide; a design
+ * the page can't show, an artist who is not in the list, one the API doesn't
+ * know or a read that failed is the general form with a note, never a
+ * not-found.
  */
 export function requestPageData(
 	studio: Studio,
@@ -299,19 +316,86 @@ export function requestPageData(
 	search: RequestSearch,
 	origin: string,
 	imageOrigin: string | null = null,
+	flash: FlashLookup | null = null,
 ): RequestPageData {
 	const studioView = studioViewModel(studio);
 	const artistViews = artistViewModels(artists, imageOrigin);
+	const found = flash
+		? flashRequestView(flash, artistViews, imageOrigin)
+		: null;
+	const named =
+		found?.owner &&
+		(found.view.kind === "requestable" || found.view.kind === "closed")
+			? { view: found.view, owner: found.owner }
+			: null;
+	const theme = parseThemeConfig(storefrontInput(studio), imageOrigin);
+	if (named) {
+		const { view, owner } = named;
+		const design = view.design;
+		const requestable = view.kind === "requestable";
+		const inquiry = requestable
+			? flashInquiryState(studioView, design, owner)
+			: inquiryState(studioView, artistViews, owner);
+		return {
+			studio: studioView,
+			inquiry,
+			channels: channelsFor(studioView, inquiry, design.name),
+			chat: chatLinks(
+				studioView,
+				fill(studioCopy.chat.flash, { name: design.name }),
+			),
+			seo: requestPageSeo(
+				studioView,
+				owner,
+				origin,
+				inquiry.kind === "open",
+				requestable ? design : null,
+			),
+			theme,
+			flash: view,
+		};
+	}
 	const artist =
 		search.artist === undefined ? null : findArtist(artistViews, search.artist);
 	const inquiry = inquiryState(studioView, artistViews, artist);
 	return {
 		studio: studioView,
 		inquiry,
-		channels: channelsFor(studioView, inquiry),
+		channels: channelsFor(studioView, inquiry, null),
 		chat: chatLinks(studioView, artist?.name ?? null),
 		seo: requestPageSeo(studioView, artist, origin, inquiry.kind === "open"),
-		theme: parseThemeConfig(storefrontInput(studio), imageOrigin),
+		theme,
+		flash: found ? found.view : null,
+	};
+}
+
+/**
+ * What the request page makes of the read of the design its address names.
+ * `owner` is the design's artist, from the list, when the design is shown.
+ */
+function flashRequestView(
+	flash: FlashLookup,
+	artists: readonly ArtistView[],
+	imageOrigin: string | null,
+): { view: FlashRequestView; owner: ArtistView | null } {
+	if (flash.kind !== "found") {
+		return { view: { kind: flash.kind }, owner: null };
+	}
+	const design = flashDesignView(flash.design, imageOrigin);
+	const owner = design?.artist ? findArtist(artists, design.artist.slug) : null;
+	if (!design || !owner) return { view: { kind: "gone" }, owner: null };
+	if (design.requestable) {
+		return { view: { kind: "requestable", design }, owner };
+	}
+	return {
+		view: {
+			kind: "closed",
+			design,
+			note:
+				owner.closedMessage ??
+				fill(studioCopy.flash.closedNamed, { name: owner.name }),
+		},
+		owner,
 	};
 }
 
@@ -475,7 +559,8 @@ export async function loadArtistPage(
 
 /**
  * `/request`: the studio (from the cache) and its artists, read together; no
- * work read. `search` is what `readRequestSearch` gave (the route's
+ * work read. With `?flash=` (TAT-129) the design is read at the same time,
+ * and never throws: see loadFlashLookup. `search` is what `readRequestSearch` gave (the route's
  * `loaderDeps` re-reads the merged search through it, so a stray key never
  * reaches here). The artists are read as on the other pages: a failure is an
  * error page, a list the API does not know the not-found.
@@ -484,9 +569,10 @@ export async function loadRequestPage(
 	context: PageContext,
 	search: RequestSearch,
 ): Promise<RequestPageData> {
-	const [studio, artists] = await Promise.all([
+	const [studio, artists, flash] = await Promise.all([
 		loadStudio(context),
 		loadArtists(context),
+		search.flash === undefined ? null : loadFlashLookup(context, search.flash),
 	]);
 	return requestPageData(
 		studio,
@@ -494,6 +580,7 @@ export async function loadRequestPage(
 		search,
 		context.site.origin,
 		context.tattoo.connection.apiUrl,
+		flash,
 	);
 }
 
@@ -702,6 +789,36 @@ async function loadArtistFlash(
 	}
 }
 
+/**
+ * The flash design the request page's address names. The API's 404 (hidden,
+ * its artist hidden, unknown) is `gone`; any other failure (a platform without
+ * `/flash/<id>`, a 5xx, the network) is logged and is `failed`. Either way the
+ * request page stands with the general form: a client with an old link must
+ * still reach the studio.
+ */
+async function loadFlashLookup(
+	context: ApiContext,
+	id: string,
+): Promise<FlashLookup> {
+	try {
+		const design = await context.queryClient.query({
+			...tattooQueries.flashDesign(context.tattoo.client, id),
+			staleTime: "static",
+		});
+		return { kind: "found", design };
+	} catch (error) {
+		if (
+			isTattooApiError(error) &&
+			error.status === 404 &&
+			error.code === "not_found"
+		) {
+			return { kind: "gone" };
+		}
+		logReadFailed("Flash design", context, error);
+		return { kind: "failed" };
+	}
+}
+
 async function loadFlash(
 	{ queryClient, tattoo }: ApiContext,
 	search: FlashSearch,
@@ -798,9 +915,14 @@ async function loadArtists({
 function channelsFor(
 	studio: StudioView,
 	inquiry: InquiryState,
+	flashName: string | null,
 ): InquiryChannels {
 	return inquiryChannels(
 		studio,
 		inquiry.kind === "open" ? inquiry.preferredArtist : null,
+		// The design's name while the inquiry is a flash request.
+		inquiry.kind === "open" && inquiry.flashDesignId !== undefined
+			? flashName
+			: null,
 	);
 }

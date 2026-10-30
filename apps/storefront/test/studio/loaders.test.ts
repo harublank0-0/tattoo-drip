@@ -1544,3 +1544,149 @@ describe("the flash design page's loader (TAT-129)", () => {
 		);
 	});
 });
+
+describe("loadRequestPage with ?flash= (TAT-129)", () => {
+	const ROOT = `${IMAGE_ORIGIN}/api/v1/tenants/${STUDIO.slug}`;
+	const ID = flashId(1);
+	const moth = flashPage(1).data[0];
+	const context = (fetch: typeof globalThis.fetch, studio: Studio = STUDIO) =>
+		pageContext(fetch, studio, IMAGE_ORIGIN);
+
+	test("reads the design with the studio and the artists; a requestable design is a flash request for its artist, books closed or not", async () => {
+		const closedBooks = { ...SITA, acceptingInquiries: false };
+		const { calls, fetch } = listing(
+			[closedBooks, ARJUN],
+			EMPTY_PAGE,
+			EMPTY_FLASH_PAGE,
+			moth,
+		);
+
+		const data = await loadRequestPage(context(fetch), { flash: ID });
+
+		assert.deepEqual(calls.map((call) => call.url).sort(), [
+			`${ROOT}/artists`,
+			`${ROOT}/flash/${ID}`,
+		]);
+		assert.equal(data.flash?.kind, "requestable");
+		assert.equal(data.inquiry.kind, "open");
+		assert.deepEqual(data.inquiry.kind === "open" && data.inquiry.start, {
+			idea: "The Moth flash",
+			approximateSize: "About 3 in",
+		});
+		assert.equal(
+			data.inquiry.kind === "open" && data.inquiry.flashDesignId,
+			ID,
+		);
+		assert.deepEqual(data.inquiry.kind === "open" && data.inquiry.artists, [
+			{ id: SITA.id, name: "Sita Rai" },
+		]);
+		assert.equal(data.seo.canonical, `${ORIGIN}/request?flash=${ID}`);
+		assert.equal(data.seo.title, "Ask for the Moth flash at Black Needle");
+		assert.ok(data.chat?.whatsapp.endsWith("about%20the%20Moth%20flash"));
+		assert.match(
+			decodeURIComponent(data.channels.whatsapp ?? ""),
+			/I'd like to ask about the Moth flash\.$/,
+		);
+	});
+
+	test("a design whose artist's flash is off is the closed view, with that artist's own request state below", async () => {
+		const off = { ...moth, requestable: false };
+		const { fetch } = listing([SITA, ARJUN], EMPTY_PAGE, EMPTY_FLASH_PAGE, off);
+		const data = await loadRequestPage(context(fetch), { flash: ID });
+
+		assert.deepEqual(data.flash && data.flash.kind, "closed");
+		assert.equal(
+			data.flash?.kind === "closed" && data.flash.note,
+			"Sita Rai isn't taking flash requests right now.",
+		);
+		// Sita's books are open, so her own request form stands below the note.
+		assert.equal(data.inquiry.kind, "open");
+		assert.equal(
+			data.inquiry.kind === "open" && data.inquiry.flashDesignId,
+			undefined,
+		);
+		// The artist's head, not the design's; the chat still names the design.
+		assert.equal(data.seo.canonical, `${ORIGIN}/request?artist=sita`);
+		assert.ok(data.chat?.whatsapp.endsWith("about%20the%20Moth%20flash"));
+
+		// An artist with closed books and flash off: their words, and their closed state.
+		const arjun = {
+			...moth,
+			requestable: false,
+			artist: { slug: "arjun", name: "अर्जुन थापा" },
+		};
+		const closed = await loadRequestPage(
+			context(
+				listing([SITA, ARJUN], EMPTY_PAGE, EMPTY_FLASH_PAGE, arjun).fetch,
+			),
+			{ flash: ID },
+		);
+		assert.equal(
+			closed.flash?.kind === "closed" && closed.flash.note,
+			"Books open in March.",
+		);
+		assert.equal(closed.inquiry.kind, "artist-closed");
+	});
+
+	test("an unknown design (404) is the general form with the 'isn't on the page' view; neither it nor a failure is a not-found or an error", async (t) => {
+		const log = t.mock.method(console, "error", () => {});
+		const unknown = await loadRequestPage(context(listing().fetch), {
+			flash: ID,
+		});
+		assert.deepEqual(unknown.flash, { kind: "gone" });
+		assert.equal(unknown.inquiry.kind, "open");
+		assert.equal(
+			unknown.inquiry.kind === "open" && unknown.inquiry.preferredArtist,
+			null,
+		);
+		assert.equal(unknown.seo.canonical, `${ORIGIN}/request`);
+		assert.equal(log.mock.calls.length, 0, "a 404 is not a failure");
+
+		for (const respond of [
+			() => json(500, { error: { code: "internal_error", message: "Boom." } }),
+			(): Response => {
+				throw new TypeError("fetch failed: http://api.test/secret");
+			},
+		]) {
+			log.mock.resetCalls();
+			const { fetch } = fakeFetch(({ url }) =>
+				url.endsWith("/artists")
+					? json(200, { data: [SITA, ARJUN] })
+					: respond(),
+			);
+			const failed = await loadRequestPage(context(fetch), { flash: ID });
+
+			assert.deepEqual(failed.flash, { kind: "failed" });
+			assert.equal(failed.inquiry.kind, "open");
+			assert.equal(log.mock.calls.length, 1);
+			assert.equal(log.mock.calls[0].arguments[0], "Flash design read failed");
+		}
+	});
+
+	test("a design the page can't show, or whose artist is not in the list, is the 'isn't on the page' view", async () => {
+		const broken = { ...moth, name: "" };
+		const stranger = { ...moth, artist: { slug: "nobody", name: "Nobody" } };
+		for (const design of [broken, stranger]) {
+			const { fetch } = listing(
+				[SITA, ARJUN],
+				EMPTY_PAGE,
+				EMPTY_FLASH_PAGE,
+				design,
+			);
+			const data = await loadRequestPage(context(fetch), { flash: ID });
+
+			assert.deepEqual(data.flash, { kind: "gone" });
+		}
+	});
+
+	test("without ?flash= the page reads the artists alone, and has no design view", async () => {
+		const { calls, fetch } = listing();
+		const data = await loadRequestPage(context(fetch), { artist: "sita" });
+
+		assert.deepEqual(
+			calls.map((call) => call.url),
+			[`${ROOT}/artists`],
+		);
+		assert.equal(data.flash, null);
+	});
+});

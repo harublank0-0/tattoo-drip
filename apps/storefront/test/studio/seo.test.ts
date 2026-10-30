@@ -457,3 +457,32 @@ describe("the flash pages' heads (TAT-129)", () => {
 		assert.ok(long.description.length <= 160);
 	});
 });
+
+describe("requestPageSeo for a flash design (TAT-129)", () => {
+	const moth = flashDesignView(flashPage(1).data[0], "https://api.example.com");
+
+	test("names the design and its artist, with its own canonical address and no image", () => {
+		assert.ok(moth);
+		const seo = requestPageSeo(studio, sita, ORIGIN, true, moth);
+
+		assert.equal(seo.title, "Ask for the Moth flash at Black Needle");
+		assert.equal(
+			seo.description,
+			"Ask Black Needle for the Moth flash by Sita Rai: say where it goes and the dates that suit you.",
+		);
+		assert.equal(seo.canonical, `${ORIGIN}/request?flash=${flashId(1)}`);
+		assert.equal(seo.image, null);
+		assert.equal(seo.jsonLd, null);
+	});
+
+	test("without a design TAT-127's results stand", () => {
+		assert.deepEqual(
+			requestPageSeo(studio, sita, ORIGIN, true, null),
+			requestPageSeo(studio, sita, ORIGIN, true),
+		);
+		assert.equal(
+			requestPageSeo(studio, sita, ORIGIN, true).canonical,
+			`${ORIGIN}/request?artist=sita`,
+		);
+	});
+});

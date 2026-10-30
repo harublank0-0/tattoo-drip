@@ -343,3 +343,49 @@ describe("afterBlockEnds", () => {
 		assert.equal(afterBlockEnds(null), null);
 	});
 });
+
+describe("flash requests (TAT-129)", () => {
+	const unavailable = new TattooApiError(409, {
+		code: "flash_unavailable",
+		message: DETAIL,
+	});
+	const closed = new TattooApiError(409, {
+		code: "artist_not_accepting",
+		message: DETAIL,
+	});
+
+	test("a design hidden meanwhile is a notice with the studio's chat links, never a field error", () => {
+		assert.deepEqual(
+			describeSubmitError(unavailable, CONTEXT),
+			notice("flash-unavailable", { contact: true }),
+		);
+		assert.deepEqual(
+			describeSubmitError(unavailable, { ...CONTEXT, sentFlash: true }),
+			notice("flash-unavailable", { contact: true }),
+		);
+	});
+
+	test("an artist who stopped taking flash requests is a notice, not an error under a picker the form doesn't show", () => {
+		assert.deepEqual(
+			describeSubmitError(closed, {
+				...CONTEXT,
+				sentArtistId: SITA_ID,
+				sentFlash: true,
+			}),
+			notice("flash-closed", { contact: true }),
+		);
+	});
+
+	test("without a flash design the artist-closed field error is as before", () => {
+		for (const context of [
+			{ ...CONTEXT, sentArtistId: SITA_ID },
+			{ ...CONTEXT, sentArtistId: SITA_ID, sentFlash: false },
+		]) {
+			const problem = describeSubmitError(closed, context);
+			assert.equal(problem.kind, "fields");
+			assert.deepEqual(Object.keys((problem as { fields: object }).fields), [
+				"preferredArtistId",
+			]);
+		}
+	});
+});
