@@ -104,6 +104,14 @@
    * (apps/platform/inertia/css/app.css).
    */
   --logo-plate: #f7f3ee;
+  /*
+   * The sticky header's height (TAT-127): a 48 px button, 0.375rem above and
+   * below. The bar's minimum height, the scroll padding that keeps an anchor
+   * or a focused control clear of it, and the request page's sticky panel all
+   * read this one value; a taller bar (a larger text size, a name that wraps
+   * to a third line) needs a larger one. Not repeated in the dark block.
+   */
+  --site-bar-height: 3.75rem;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -281,6 +289,8 @@
 
   .section { margin-block-start: 4.5rem; scroll-margin-block-start: 1.5rem; }
   .inquiry { scroll-margin-block-start: 1.5rem; }
+  /* An old `/artists/<slug>#inquiry` link lands on the open artist's request row: the same room as the other two #inquiry places (the bar's is the root's scroll padding). */
+  .artist-request { scroll-margin-block-start: 1.5rem; }
   .section-title { margin-block-end: 1.5rem; font-size: clamp(1.75rem, 1.4rem + 1.5vw, 2.25rem); line-height: 1.2; }
 
   /*
@@ -335,10 +345,44 @@
   .style-list, .artist-links { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0; padding: 0; list-style: none; overflow-wrap: anywhere; }
   .style-list li { padding: 0.125rem 0.625rem; border: 1px solid var(--line-strong); border-radius: var(--radius); font-size: 0.9375rem; line-height: 1.5; }
 
-  .site-bar { width: min(72rem, 100% - 2.5rem); margin-inline: auto; padding-block-start: 1rem; }
-  .site-bar a { display: inline-flex; align-items: center; min-height: 2.75rem; font-family: var(--display-face); font-size: 1.25rem; font-weight: 700; text-decoration: none; overflow-wrap: anywhere; }
+  /*
+   * The header (TAT-127): the studio's name on the left, the Request button on
+   * the right, stuck to the top of the screen over the content (z-index 1;
+   * the chat button's 2 is above it, the open photo viewer's top layer above
+   * both). It takes the theme's paper and line, so a themed page keeps its
+   * look. The name wraps inside its share and the button is capped at 60% of
+   * the row, so a long Devanagari name wraps and the page never scrolls sideways.
+   */
+  .site-bar { position: sticky; inset-block-start: 0; z-index: 1; border-block-end: 1px solid var(--line); background: var(--paper); }
+  .site-bar-inner { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; width: min(72rem, 100% - 2.5rem); min-block-size: var(--site-bar-height); margin-inline: auto; padding-block: 0.375rem; }
+  .site-bar-home { display: inline-flex; align-items: center; min-height: 2.75rem; min-inline-size: 0; font-family: var(--display-face); font-size: 1.25rem; font-weight: 700; text-decoration: none; overflow-wrap: anywhere; }
+  .site-bar-request { flex: 0 1 auto; max-inline-size: 60%; text-align: center; }
   .site-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem 2rem; width: min(72rem, 100% - 2.5rem); margin: 5rem auto 0; padding-block: 1.5rem 2.5rem; border-top: 1px solid var(--line); color: var(--ink-muted); font-size: 0.9375rem; overflow-wrap: anywhere; }
   .status-page { display: grid; gap: 1rem; justify-items: start; padding-block: 4rem; }
+
+  /*
+   * An anchor, or a control the keyboard focuses, is never hidden under the
+   * sticky header (WCAG 2.4.11): the header's height and a rem of slack at the
+   * top, and, with the chat button, 5.5rem at the bottom (the 3rem toggle, the
+   * 1rem above the edge, slack). The footer's last line clears the button too.
+   * Root-level, so it holds for every target: a `.section`, the `.inquiry`
+   * section and the artist page's `.artist-request` row.
+   */
+  :root:has(.site-bar) { scroll-padding-block-start: calc(var(--site-bar-height) + 1rem); }
+  :root:has(.chat-float) { scroll-padding-block-end: 5.5rem; }
+  :root:has(.chat-float) .site-footer { padding-block-end: 6rem; }
+
+  /*
+   * The chat button (TAT-127, src/studio/components/chat.tsx): a 48 px toggle
+   * in the corner, above the header's layer, that the browser's own <details>
+   * opens into the two chat links above it. `max()` keeps it off a phone's
+   * home indicator. The summary's marker is dropped in WebKit and elsewhere.
+   */
+  .chat-float { position: fixed; z-index: 2; inset-inline-end: 1rem; inset-block-end: max(1rem, env(safe-area-inset-bottom)); }
+  .chat-float-toggle { list-style: none; cursor: pointer; }
+  .chat-float-toggle::-webkit-details-marker { display: none; }
+  .chat-float-links { position: absolute; inset-block-end: calc(100% + 0.5rem); inset-inline-end: 0; display: grid; gap: 0.5rem; margin: 0; padding: 0.5rem; list-style: none; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--paper); }
+  .chat-float-links .action { min-inline-size: 9rem; }
 }
 
 @media (min-width: 40rem) {
@@ -378,7 +422,7 @@
   .section { margin-block-start: 6rem; }
   /* The form on the left, "How booking works" sticky on the right (TAT-105). */
   .inquiry-split { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); column-gap: 4rem; align-items: start; }
-  .inquiry-aside { position: sticky; inset-block-start: 1.5rem; isolation: isolate; display: grid; gap: 1.25rem; margin: 0 0.375rem 0.375rem 0; padding: 1.5rem; border: 1.5px solid var(--stencil); background: var(--paper); }
+  .inquiry-aside { position: sticky; inset-block-start: calc(var(--site-bar-height) + 1.5rem); isolation: isolate; display: grid; gap: 1.25rem; margin: 0 0.375rem 0.375rem 0; padding: 1.5rem; border: 1.5px solid var(--stencil); background: var(--paper); }
   .inquiry-aside::after { content: ''; position: absolute; inset: 0; z-index: -1; translate: 0.375rem 0.375rem; border: 1.5px solid var(--stencil); }
   .inquiry-aside .steps-title { font-size: 1.5rem; }
 }

@@ -9,6 +9,7 @@ import {
 import type { ApiContext } from "../api/context.ts";
 import { loadStudio, rethrowAsNotFound } from "../api/loaders.ts";
 import type { SiteContext } from "../site/context.ts";
+import { type ChatLinks, chatLinks } from "./chat.ts";
 import {
 	type GalleryView,
 	galleryView,
@@ -25,7 +26,11 @@ import {
 	inquiryChannels,
 	inquiryState,
 } from "./inquiry.ts";
-import type { RequestSearch } from "./request.ts";
+import {
+	type RequestLink,
+	type RequestSearch,
+	requestLink,
+} from "./request.ts";
 import {
 	artistPageSeo,
 	type PageSeo,
@@ -59,6 +64,10 @@ export interface StudioPageData {
 	readonly artists: readonly ArtistView[];
 	/** Whether the "Got an idea?" invitation invites (TAT-127); the form itself is on /request. */
 	readonly inquiry: InquiryState;
+	/** The header's Request button (TAT-127): the studio's, or none while it is closed. */
+	readonly requestLink: RequestLink | null;
+	/** The chat button's links (TAT-127), or none without a valid phone. */
+	readonly chat: ChatLinks | null;
 	readonly seo: PageSeo;
 	/** The studio's theme (TAT-54): its key, sections and checked branding. */
 	readonly theme: ThemeConfig;
@@ -73,6 +82,10 @@ export interface StudioPageData {
 export interface ArtistPageData {
 	readonly studio: StudioView;
 	readonly artist: ArtistView;
+	/** The header's Request button (TAT-127): this artist's while they take new work, else the studio's. */
+	readonly requestLink: RequestLink | null;
+	/** The chat button's links (TAT-127); its message names this artist. */
+	readonly chat: ChatLinks | null;
 	readonly seo: PageSeo;
 	/** The studio's theme (TAT-54): its key, sections and checked branding. */
 	readonly theme: ThemeConfig;
@@ -103,6 +116,10 @@ export interface WorkPageData {
 	readonly studio: StudioView;
 	/** The studio's theme (TAT-54): its key, sections and checked branding. */
 	readonly theme: ThemeConfig;
+	/** The header's Request button (TAT-127): the studio's, or none while it is closed. */
+	readonly requestLink: RequestLink | null;
+	/** The chat button's links (TAT-127); its message names the artist the address filters by. */
+	readonly chat: ChatLinks | null;
 	readonly seo: PageSeo;
 	/** The visible artists with at least one work photo, by name: the artist filter's choices. */
 	readonly artists: readonly { readonly slug: string; readonly name: string }[];
@@ -120,6 +137,11 @@ export interface RequestPageData {
 	readonly studio: StudioView;
 	readonly inquiry: InquiryState;
 	readonly channels: InquiryChannels;
+	/**
+	 * The chat button's links (TAT-127); its message names the picked artist,
+	 * open or closed. The page has no Request button: it is where they lead.
+	 */
+	readonly chat: ChatLinks | null;
 	readonly seo: PageSeo;
 	/** The studio's theme (TAT-54): its key, sections and checked branding. */
 	readonly theme: ThemeConfig;
@@ -147,6 +169,8 @@ export function studioPageData(
 		studio: studioView,
 		artists: artistViews,
 		inquiry: inquiryState(studioView, artistViews, null),
+		requestLink: requestLink(studioView, null),
+		chat: chatLinks(studioView, null),
 		seo: studioPageSeo(studioView, artistViews, origin),
 		theme,
 		recentWork: galleryView(recentWork, imageOrigin),
@@ -172,6 +196,8 @@ export function artistPageData(
 	return {
 		studio: studioView,
 		artist,
+		requestLink: requestLink(studioView, artist),
+		chat: chatLinks(studioView, artist.name),
 		seo: artistPageSeo(studioView, artist, origin),
 		theme: parseThemeConfig(storefrontInput(studio), imageOrigin),
 		portfolio: {
@@ -205,6 +231,7 @@ export function requestPageData(
 		studio: studioView,
 		inquiry,
 		channels: channelsFor(studioView, inquiry),
+		chat: chatLinks(studioView, artist?.name ?? null),
 		seo: requestPageSeo(studioView, artist, origin, inquiry.kind === "open"),
 		theme: parseThemeConfig(storefrontInput(studio), imageOrigin),
 	};
@@ -224,14 +251,20 @@ export function workPageData(
 	imageOrigin: string | null = null,
 ): WorkPageData {
 	const studioView = studioViewModel(studio);
+	const withWork = artistViewModels(artists, imageOrigin)
+		.filter((artist) => artist.workPhotos.length > 0)
+		.map(({ slug, name }) => ({ slug, name }))
+		.sort((a, b) => a.name.localeCompare(b.name, "en"));
+	// An artist the address filters by who is not listed (hidden, renamed, no
+	// work photo) is the general message, never an error.
+	const filtered = withWork.find(({ slug }) => slug === search.artist);
 	return {
 		studio: studioView,
 		theme: parseThemeConfig(storefrontInput(studio), imageOrigin),
+		requestLink: requestLink(studioView, null),
+		chat: chatLinks(studioView, filtered?.name ?? null),
 		seo: workPageSeo(studioView, origin),
-		artists: artistViewModels(artists, imageOrigin)
-			.filter((artist) => artist.workPhotos.length > 0)
-			.map(({ slug, name }) => ({ slug, name }))
-			.sort((a, b) => a.name.localeCompare(b.name, "en")),
+		artists: withWork,
 		search,
 		gallery: galleryView(page, imageOrigin),
 	};

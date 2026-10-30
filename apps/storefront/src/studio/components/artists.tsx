@@ -187,11 +187,24 @@ function ArtistEntry({
 	);
 }
 
-/** The studio page's artists (TAT-48). Nothing when the studio shows none. */
-export function ArtistRoster({ artists }: { artists: readonly ArtistView[] }) {
+/**
+ * The studio page's artists (TAT-48). Nothing when the studio shows none.
+ * Each artist who takes new work has an "Ask for" link to their own form
+ * (TAT-127) when there is more than one artist, or while the studio as a
+ * whole is closed: a closed studio has no "Send your idea" and no Request
+ * button, so a lone open artist's card is the client's way to her form.
+ */
+export function ArtistRoster({
+	artists,
+	studioAccepting,
+}: {
+	artists: readonly ArtistView[];
+	/** Whether the studio takes new inquiries (its own switch, not the artists'). */
+	studioAccepting: boolean;
+}) {
 	if (artists.length === 0) return null;
-	// With one artist, "Send your idea" already asks for them.
-	const askLinks = artists.length > 1;
+	// With one artist in an open studio, "Send your idea" already asks for them.
+	const askLinks = artists.length > 1 || !studioAccepting;
 	return (
 		<section id="artists" className="section" aria-labelledby="artists-title">
 			<h2 id="artists-title" className="section-title">

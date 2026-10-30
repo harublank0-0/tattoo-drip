@@ -50,7 +50,9 @@ describe("the stylesheet's files", () => {
 function ruleBody(css: string, selector: string): string {
 	const bare = css.replace(/\/\*[\s\S]*?\*\//g, "");
 	for (const match of bare.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-		if (match[1].trim() === selector) return match[2];
+		// `.pop()` drops a statement before the selector (`@import ...;`, `@custom-variant ...;`).
+		const own = match[1].split(/[;}]/).pop()?.trim();
+		if (own === selector) return match[2];
 	}
 	return "";
 }
@@ -74,7 +76,9 @@ describe("text the studio typed", () => {
 			".site-footer",
 			".action",
 			".link-chip",
-			".site-bar a",
+			// The Request button is an .action, listed above; a long Devanagari
+			// studio name wraps in the way home (TAT-127).
+			".site-bar-home",
 		]) {
 			assert.match(
 				ruleBody(css, selector),
@@ -218,5 +222,113 @@ describe("the booking steps' two layouts (TAT-105)", () => {
 			ruleBody(css, ".profile-location"),
 			/max-inline-size:\s*36rem/,
 		);
+	});
+});
+
+describe("the header and the chat button (TAT-127)", () => {
+	const css = readFileSync(new URL("styles.css", SRC), "utf8");
+	const bare = css.replace(/\/\*[\s\S]*?\*\//g, "");
+	const wide = bare.slice(bare.indexOf("@media (min-width: 60rem)"));
+
+	test("the bar sticks to the top over the content", () => {
+		const body = ruleBody(css, ".site-bar");
+		assert.match(body, /position:\s*sticky/);
+		assert.match(body, /inset-block-start:\s*0\b/);
+		assert.match(body, /z-index:\s*1\b/);
+		assert.match(body, /background:\s*var\(--paper\)/);
+		assert.match(ruleBody(css, ":root"), /--site-bar-height:\s*3\.75rem/);
+		assert.match(
+			ruleBody(css, ".site-bar-inner"),
+			/min-block-size:\s*var\(--site-bar-height\)/,
+		);
+	});
+
+	// The height is one token for the scroll padding, the bar and the sticky
+	// panel; the dark block changes colours only.
+	test("--site-bar-height is defined once, on :root and not in the dark block", () => {
+		const defs = [...bare.matchAll(/--site-bar-height:/g)];
+		const dark = bare.indexOf("@media (prefers-color-scheme: dark) {");
+		assert.equal(defs.length, 1);
+		assert.ok(dark > 0);
+		assert.ok((defs[0].index ?? Number.POSITIVE_INFINITY) < dark);
+	});
+
+	test("an anchor or a focused control is never hidden under the bar or the chat button", () => {
+		assert.match(
+			ruleBody(css, ":root:has(.site-bar)"),
+			/scroll-padding-block-start:\s*calc\(var\(--site-bar-height\) \+ 1rem\)/,
+		);
+		assert.match(
+			ruleBody(css, ":root:has(.chat-float)"),
+			/scroll-padding-block-end:\s*5\.5rem/,
+		);
+		assert.match(
+			ruleBody(css, ":root:has(.chat-float) .site-footer"),
+			/padding-block-end:\s*6rem/,
+		);
+		assert.match(
+			wide,
+			/\.inquiry-aside\s*\{[^}]*inset-block-start:\s*calc\(var\(--site-bar-height\) \+ 1\.5rem\)/,
+		);
+	});
+
+	// An old `/artists/<slug>#inquiry` link lands on the open artist's request
+	// row (render.test.ts pins its class), which is neither a .section nor the
+	// .inquiry section: the root's scroll padding clears it for any target, and
+	// it gets the same extra room the other two have.
+	test("every #inquiry landing place has room under the bar", () => {
+		for (const selector of [".section", ".inquiry", ".artist-request"]) {
+			assert.match(
+				ruleBody(css, selector),
+				/scroll-margin-block-start:\s*1\.5rem/,
+				selector,
+			);
+		}
+	});
+
+	test("the chat button floats in the corner above the bar's layer, with a 48 px toggle and no marker", () => {
+		const float = ruleBody(css, ".chat-float");
+		assert.match(float, /position:\s*fixed/);
+		assert.match(float, /z-index:\s*2\b/);
+		assert.match(float, /inset-block-end:[^;]*env\(safe-area-inset-bottom/);
+		assert.match(float, /inset-inline-end:\s*1rem/);
+		// .action is 3rem tall; the toggle adds nothing that shrinks it.
+		assert.match(ruleBody(css, ".action"), /min-height:\s*3rem/);
+		assert.match(ruleBody(css, ".chat-float-toggle"), /list-style:\s*none/);
+		assert.match(
+			ruleBody(css, ".chat-float-toggle::-webkit-details-marker"),
+			/display:\s*none/,
+		);
+		const links = ruleBody(css, ".chat-float-links");
+		assert.match(links, /position:\s*absolute/);
+		assert.match(links, /inset-block-end:\s*calc\(100% \+ 0\.5rem\)/);
+		assert.match(links, /background:\s*var\(--paper\)/);
+		assert.match(links, /border:[^;]*var\(--line-strong\)/);
+	});
+
+	test("the bar's Request button shrinks and wraps inside the bar instead of widening the page", () => {
+		const request = ruleBody(css, ".site-bar-request");
+		assert.match(request, /flex:\s*0 1 auto/);
+		assert.match(request, /max-inline-size:\s*60%/);
+		assert.match(ruleBody(css, ".site-bar-home"), /min-inline-size:\s*0/);
+		assert.match(ruleBody(css, ".site-bar-inner"), /display:\s*flex/);
+	});
+
+	test("the layers use the theme's tokens only, no colour of their own", () => {
+		for (const selector of [
+			".site-bar",
+			".site-bar-inner",
+			".site-bar-home",
+			".site-bar-request",
+			".chat-float",
+			".chat-float-toggle",
+			".chat-float-links",
+		]) {
+			assert.doesNotMatch(
+				ruleBody(css, selector),
+				/#[0-9a-f]{3,8}\b|rgb\(|hsl\(/i,
+				selector,
+			);
+		}
 	});
 });

@@ -153,7 +153,7 @@ describe("the request page in the studio's theme (TAT-127)", () => {
 		assertSafePage(html, BRAND_PAGE);
 		assert.ok(
 			html.includes(
-				`<header class="site-bar"><a href="/" dir="auto"><img class="site-bar-logo" src="${LOGO.url}" width="600" height="200" alt="" decoding="async" fetchPriority="low"/><span>Black Needle</span></a></header>`,
+				`<header class="site-bar"><div class="site-bar-inner"><a class="site-bar-home" href="/" dir="auto"><img class="site-bar-logo" src="${LOGO.url}" width="600" height="200" alt="" decoding="async" fetchPriority="low"/><span>Black Needle</span></a></div></header>`,
 			),
 		);
 	});
@@ -379,7 +379,7 @@ describe("a studio's logo and cover (TAT-54)", () => {
 		assertSafePage(html, BRAND_PAGE);
 		assert.ok(
 			html.includes(
-				`<header class="site-bar"><a href="/" dir="auto"><img class="site-bar-logo" src="${LOGO.url}" width="600" height="200" alt="" decoding="async" fetchPriority="low"/><span>Black Needle</span></a></header>`,
+				`<header class="site-bar"><div class="site-bar-inner"><a class="site-bar-home" href="/" dir="auto"><img class="site-bar-logo" src="${LOGO.url}" width="600" height="200" alt="" decoding="async" fetchPriority="low"/><span>Black Needle</span></a><a class="action action-primary site-bar-request" href="/request?artist=sita"><span>Request <bdi>Sita Rai</bdi></span></a></div></header>`,
 			),
 		);
 		assert.doesNotMatch(html, /profile-cover/);

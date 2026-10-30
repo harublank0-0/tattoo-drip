@@ -1,5 +1,6 @@
 import { useLocation } from "@tanstack/react-router";
 import { MessageCircle } from "lucide-react";
+import { Fill } from "../../intake/components/fill.tsx";
 import { studioCopy } from "../copy.ts";
 import {
 	isAllowedHref,
@@ -15,11 +16,13 @@ import type {
 	WorkPageData,
 } from "../loaders.ts";
 import { type MoreWork, PagedGallery } from "../paging.tsx";
+import type { RequestLink } from "../request.ts";
 import { logoSizes } from "../srcset.ts";
 import type { SectionKey, ThemeConfig } from "../theme/config.ts";
 import type { StudioView } from "../view-model.ts";
 import { ArtistProfile, ArtistRoster } from "./artists.tsx";
 import { BrandCover, BrandLogo } from "./brand.tsx";
+import { ChatButton } from "./chat.tsx";
 import { ContactBlock } from "./contact.tsx";
 import { HealedFilter, RecentWork, WorkFilters } from "./gallery.tsx";
 import { InquirySection, RequestInvite } from "./inquiry.tsx";
@@ -56,6 +59,7 @@ export function StudioPage({ data }: { data: StudioPageData }) {
 	);
 	return (
 		<>
+			<SiteBar studio={studio} theme={theme} requestLink={data.requestLink} />
 			<main className="page">
 				<header className="profile">
 					{theme.heroImage ? (
@@ -97,6 +101,7 @@ export function StudioPage({ data }: { data: StudioPageData }) {
 				))}
 			</main>
 			<SiteFooter studioName={studio.name} />
+			<ChatButton chat={data.chat} studioName={studio.name} />
 		</>
 	);
 }
@@ -118,7 +123,12 @@ function StudioSection({
 		case "work":
 			return <RecentWork gallery={data.recentWork} />;
 		case "artists":
-			return <ArtistRoster artists={data.artists} />;
+			return (
+				<ArtistRoster
+					artists={data.artists}
+					studioAccepting={data.studio.accepting}
+				/>
+			);
 		case "inquiry":
 			return <RequestInvite state={data.inquiry} />;
 	}
@@ -135,7 +145,7 @@ export function ArtistPage({
 	const { studio, artist, theme, portfolio } = data;
 	return (
 		<>
-			<SiteBar studio={studio} theme={theme} />
+			<SiteBar studio={studio} theme={theme} requestLink={data.requestLink} />
 			<main className="page">
 				<ArtistProfile artist={artist} studio={studio} />
 				<PortfolioSection
@@ -147,6 +157,7 @@ export function ArtistPage({
 				<StudioAside studio={studio} />
 			</main>
 			<SiteFooter studioName={studio.name} />
+			<ChatButton chat={data.chat} studioName={studio.name} />
 		</>
 	);
 }
@@ -169,7 +180,7 @@ export function RequestPage({
 	const { studio, theme, inquiry, channels } = data;
 	return (
 		<>
-			<SiteBar studio={studio} theme={theme} />
+			<SiteBar studio={studio} theme={theme} requestLink={null} />
 			<main className="page request-page">
 				<InquirySection
 					state={inquiry}
@@ -179,6 +190,7 @@ export function RequestPage({
 				<StudioAside studio={studio} />
 			</main>
 			<SiteFooter studioName={studio.name} />
+			<ChatButton chat={data.chat} studioName={studio.name} />
 		</>
 	);
 }
@@ -261,7 +273,7 @@ export function WorkPage({
 	);
 	return (
 		<>
-			<SiteBar studio={studio} theme={theme} />
+			<SiteBar studio={studio} theme={theme} requestLink={data.requestLink} />
 			<main className="page">
 				<section aria-labelledby="work-page-title">
 					<h1 id="work-page-title" className="section-title">
@@ -299,34 +311,64 @@ export function WorkPage({
 				<StudioAside studio={studio} />
 			</main>
 			<SiteFooter studioName={studio.name} />
+			<ChatButton chat={data.chat} studioName={studio.name} />
 		</>
 	);
 }
 
-/** The slim bar above the artist page and the All work page: the studio's name (and logo), back to its page. */
+/**
+ * The header at the top of the studio, artist, work and request pages
+ * (TAT-127): the studio's name (and logo), back to its page, and the Request button, which
+ * stays on screen as the page scrolls (it is `position: sticky`; no script).
+ * `requestLink` is the button, null for none (a closed studio, or the request
+ * page itself, where the button would lead to where the client is): on an
+ * artist's page it names them, otherwise it asks the studio.
+ */
 function SiteBar({
 	studio,
 	theme,
+	requestLink,
 }: {
 	studio: StudioView;
 	theme: ThemeConfig;
+	requestLink: RequestLink | null;
 }) {
 	return (
 		<header className="site-bar">
-			<a href="/" dir="auto">
-				{theme.logo ? (
-					<>
-						<BrandLogo
-							image={theme.logo}
-							className="site-bar-logo"
-							sizes={logoSizes(theme.logo, "siteBar")}
-						/>
-						<span>{studio.name}</span>
-					</>
-				) : (
-					studio.name
-				)}
-			</a>
+			<div className="site-bar-inner">
+				<a className="site-bar-home" href="/" dir="auto">
+					{theme.logo ? (
+						<>
+							<BrandLogo
+								image={theme.logo}
+								className="site-bar-logo"
+								sizes={logoSizes(theme.logo, "siteBar")}
+							/>
+							<span>{studio.name}</span>
+						</>
+					) : (
+						studio.name
+					)}
+				</a>
+				{requestLink && isAllowedHref(requestLink.href) ? (
+					<a
+						className="action action-primary site-bar-request"
+						href={requestLink.href}
+					>
+						{requestLink.artistName === null ? (
+							studioCopy.request.bar
+						) : (
+							// One <span>: a link is a flex container, and text beside a <bdi> would become two items and lose the space.
+							<span>
+								<Fill
+									template={studioCopy.request.barArtist}
+									values={{ name: requestLink.artistName }}
+								/>
+							</span>
+						)}
+					</a>
+				) : null}
+			</div>
 		</header>
 	);
 }
