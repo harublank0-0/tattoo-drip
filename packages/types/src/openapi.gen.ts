@@ -690,7 +690,9 @@ export interface components {
             /**
              * @description The styles at least one photo carries, among the visible artists'
              *     photos (only `artist`'s when it is given), in the list's order:
-             *     offer only these.
+             *     offer only these. Plus the listed `style` the request asked for,
+             *     even when none of those photos carries it, so the control that
+             *     is on is always among them.
              */
             styles: components["schemas"]["TattooStyle"][];
             /** @description Whether one of those photos is marked healed. */
