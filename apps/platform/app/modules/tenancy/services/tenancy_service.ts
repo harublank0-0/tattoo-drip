@@ -109,6 +109,18 @@ export type DepositSettings = {
 	depositPolicy: string | null;
 };
 
+/**
+ * The short answers a studio's page gives clients before they come (TAT-128).
+ * Plain text; null is not set. The deposit policy is the one in
+ * DepositSettings.
+ */
+export type GoodToKnowTexts = {
+	walkInsText: string | null;
+	ageRuleText: string | null;
+	beforeSessionText: string | null;
+	aftercareText: string | null;
+};
+
 /** A live member and their account's address: who an alert can reach (TAT-52). */
 export type TenantMember = {
 	/** The membership row's id (Settings, Members routes by it, TAT-33). */
@@ -313,6 +325,19 @@ export default class TenancyService {
 	async updateDepositSettings(
 		tenant: Tenant,
 		input: DepositSettings,
+	): Promise<Tenant> {
+		tenant.merge(input);
+		await tenant.save();
+		return tenant;
+	}
+
+	/**
+	 * Saves the four Good to know texts (TAT-128); the rest of the profile is
+	 * left alone.
+	 */
+	async updateGoodToKnow(
+		tenant: Tenant,
+		input: GoodToKnowTexts,
 	): Promise<Tenant> {
 		tenant.merge(input);
 		await tenant.save();
