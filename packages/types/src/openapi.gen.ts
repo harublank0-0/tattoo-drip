@@ -60,7 +60,9 @@ export interface paths {
          * The studio's public profile
          * @description What the studio page shows about the studio: its name, intro,
          *     contact details, links, timezone, whether it takes inquiries
-         *     (TAT-44) and its cover photo (TAT-116). Never its deposit policy, payment details, members or
+         *     (TAT-44), its cover photo (TAT-116), and its opening hours, closed
+         *     days and Good to know texts, among them its deposit policy (TAT-128).
+         *     Never its default deposit percentage, payment details, members or
          *     anything about clients, inquiries or payments. Cacheable. Under an
          *     old slug it answers like under the current one, and `slug` is the
          *     current slug.
@@ -600,6 +602,62 @@ export interface components {
              */
             cover: components["schemas"]["Image"] | null;
             storefront: components["schemas"]["StorefrontConfiguration"];
+            /**
+             * @description The weekdays the studio opens (TAT-128), Sunday first; a weekday
+             *     not listed is closed. [] when the studio set no hours.
+             */
+            openingHours: components["schemas"]["OpeningHours"][];
+            /**
+             * @description Closed days that haven't ended in the studio's timezone,
+             *     earliest first (TAT-128). [] when there are none.
+             */
+            closedDays: components["schemas"]["ClosedDays"][];
+            goodToKnow: components["schemas"]["GoodToKnow"];
+        };
+        /**
+         * @description One weekday the studio opens (TAT-128): one opening and one closing time,
+         *     24-hour, in the studio's `timezone`. Hours never run past midnight.
+         */
+        OpeningHours: {
+            /** @enum {string} */
+            day: "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
+            /** @example 11:00 */
+            opens: string;
+            /**
+             * @description Later than `opens`, on the same day
+             * @example 20:00
+             */
+            closes: string;
+        };
+        /**
+         * @description Days the studio is closed whatever its hours say (TAT-128), from `from`
+         *     to `to`, both included, in the studio's `timezone`.
+         */
+        ClosedDays: {
+            /** Format: date */
+            from: string;
+            /**
+             * Format: date
+             * @description The last closed day; the same as `from` for one day
+             */
+            to: string;
+            /**
+             * @description The studio's words, one line, plain text
+             * @example Closed for Dashain, back on 28 October
+             */
+            note: string | null;
+        };
+        /**
+         * @description What clients ask before they come (TAT-128), as plain text the studio
+         *     wrote; null when not set. Show each only when set.
+         */
+        GoodToKnow: {
+            walkIns: string | null;
+            ageRule: string | null;
+            /** @description The policy the deposit page also shows */
+            depositPolicy: string | null;
+            beforeSession: string | null;
+            aftercare: string | null;
         };
         /**
          * @description A visible artist of the studio (TAT-44). Every property is always

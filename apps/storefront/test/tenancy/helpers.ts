@@ -48,5 +48,14 @@ export function studioOf(slug: string, name: string): Studio {
 		acceptingInquiries: true,
 		cover: null,
 		storefront: DEFAULT_STOREFRONT,
+		openingHours: [],
+		closedDays: [],
+		goodToKnow: {
+			walkIns: null,
+			ageRule: null,
+			depositPolicy: null,
+			beforeSession: null,
+			aftercare: null,
+		},
 	};
 }

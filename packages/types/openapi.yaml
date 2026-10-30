@@ -98,7 +98,9 @@ paths:
       description: |
         What the studio page shows about the studio: its name, intro,
         contact details, links, timezone, whether it takes inquiries
-        (TAT-44) and its cover photo (TAT-116). Never its deposit policy, payment details, members or
+        (TAT-44), its cover photo (TAT-116), and its opening hours, closed
+        days and Good to know texts, among them its deposit policy (TAT-128).
+        Never its default deposit percentage, payment details, members or
         anything about clients, inquiries or payments. Cacheable. Under an
         old slug it answers like under the current one, and `slug` is the
         current slug.
@@ -820,7 +822,7 @@ components:
         studio page shows. Every property is always there; an empty one is
         `null` or `[]`. All text is plain text: render it as text, never as
         HTML.
-      required: [slug, name, type, intro, timezone, contact, socialLinks, acceptingInquiries, cover, storefront]
+      required: [slug, name, type, intro, timezone, contact, socialLinks, acceptingInquiries, cover, storefront, openingHours, closedDays, goodToKnow]
       additionalProperties: false
       properties:
         slug:
@@ -878,6 +880,68 @@ components:
           oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }]
         storefront:
           $ref: "#/components/schemas/StorefrontConfiguration"
+        openingHours:
+          type: array
+          maxItems: 7
+          description: |
+            The weekdays the studio opens (TAT-128), Sunday first; a weekday
+            not listed is closed. [] when the studio set no hours.
+          items: { $ref: "#/components/schemas/OpeningHours" }
+        closedDays:
+          type: array
+          maxItems: 20
+          description: |
+            Closed days that haven't ended in the studio's timezone,
+            earliest first (TAT-128). [] when there are none.
+          items: { $ref: "#/components/schemas/ClosedDays" }
+        goodToKnow:
+          $ref: "#/components/schemas/GoodToKnow"
+
+    OpeningHours:
+      type: object
+      description: |
+        One weekday the studio opens (TAT-128): one opening and one closing time,
+        24-hour, in the studio's `timezone`. Hours never run past midnight.
+      required: [day, opens, closes]
+      additionalProperties: false
+      properties:
+        day: { type: string, enum: [sun, mon, tue, wed, thu, fri, sat] }
+        opens: { type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$", examples: ["11:00"] }
+        closes:
+          type: string
+          pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+          description: Later than `opens`, on the same day
+          examples: ["20:00"]
+
+    ClosedDays:
+      type: object
+      description: |
+        Days the studio is closed whatever its hours say (TAT-128), from `from`
+        to `to`, both included, in the studio's `timezone`.
+      required: [from, to, note]
+      additionalProperties: false
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date, description: "The last closed day; the same as `from` for one day" }
+        note:
+          type: [string, "null"]
+          maxLength: 120
+          description: The studio's words, one line, plain text
+          examples: ["Closed for Dashain, back on 28 October"]
+
+    GoodToKnow:
+      type: object
+      description: |
+        What clients ask before they come (TAT-128), as plain text the studio
+        wrote; null when not set. Show each only when set.
+      required: [walkIns, ageRule, depositPolicy, beforeSession, aftercare]
+      additionalProperties: false
+      properties:
+        walkIns: { type: [string, "null"], maxLength: 300 }
+        ageRule: { type: [string, "null"], maxLength: 200 }
+        depositPolicy: { type: [string, "null"], maxLength: 2000, description: The policy the deposit page also shows }
+        beforeSession: { type: [string, "null"], maxLength: 2000 }
+        aftercare: { type: [string, "null"], maxLength: 2000 }
 
     Artist:
       type: object

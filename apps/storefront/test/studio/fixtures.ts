@@ -35,6 +35,42 @@ export const STUDIO: Studio = {
 	acceptingInquiries: true,
 	cover: null,
 	storefront: DEFAULT_STOREFRONT,
+	openingHours: [],
+	closedDays: [],
+	goodToKnow: {
+		walkIns: null,
+		ageRule: null,
+		depositPolicy: null,
+		beforeSession: null,
+		aftercare: null,
+	},
+};
+
+/**
+ * A studio that filled in hours (Sunday to Friday 11:00 to 20:00, Saturday
+ * closed), a closed day with a Devanagari note and every Good to know text,
+ * one in Devanagari (TAT-128). 2 November 2026 is a Monday.
+ */
+export const GOOD_TO_KNOW_STUDIO: Studio = {
+	...STUDIO,
+	openingHours: (["sun", "mon", "tue", "wed", "thu", "fri"] as const).map(
+		(day) => ({ day, opens: "11:00", closes: "20:00" }),
+	),
+	closedDays: [
+		{
+			from: "2026-11-02",
+			to: "2026-11-04",
+			note: "दशैं बिदा, back on 5 November",
+		},
+	],
+	goodToKnow: {
+		walkIns: "Small flash welcome on Saturdays.",
+		ageRule: "18 and over, with a photo ID.",
+		depositPolicy:
+			"A deposit holds your date. It is not refunded after 48 hours.",
+		beforeSession: "Eat a good meal.\nWear clothes that leave the spot free.",
+		aftercare: "घाउ सफा राख्नुहोस्।\nKeep the wrap on for 2 hours.",
+	},
 };
 
 /** A studio that set nothing but its name. */

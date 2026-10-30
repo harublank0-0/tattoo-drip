@@ -4,6 +4,7 @@ import { DateTime } from "luxon";
 import ArtistService from "#modules/artists/services/artist_service";
 import WorkPhotoService from "#modules/artists/services/work_photo_service";
 import ImageService from "#modules/media/services/image_service";
+import OpeningHoursService from "#modules/scheduling/services/opening_hours_service";
 import StudioPageService, {
 	type WorkQuery,
 } from "#modules/storefront/services/studio_page_service";
@@ -42,7 +43,12 @@ class CountingArtists extends ArtistService {
 
 const images = new ImageService();
 const pagesWith = (artists: ArtistService = new ArtistService(images)) =>
-	new StudioPageService(artists, images, new WorkPhotoService(images, artists));
+	new StudioPageService(
+		artists,
+		images,
+		new WorkPhotoService(images, artists),
+		new OpeningHoursService(),
+	);
 
 /** The look of a studio that set nothing (TAT-56). */
 const DEFAULT_LOOK = {
@@ -84,6 +90,15 @@ test.group("StudioPageService.studio", (group) => {
 			acceptingInquiries: true,
 			cover: null,
 			storefront: { look: DEFAULT_LOOK, logo: null },
+			openingHours: [],
+			closedDays: [],
+			goodToKnow: {
+				walkIns: null,
+				ageRule: null,
+				depositPolicy: null,
+				beforeSession: null,
+				aftercare: null,
+			},
 		});
 	});
 
@@ -444,7 +459,7 @@ test.group("StudioPageService: cover and work photos (TAT-116)", (group) => {
 
 		assert.equal(
 			await queries({ tenant }, () => pagesWith().studio(tenant)),
-			1,
+			3,
 			"studio",
 		);
 		assert.equal(
