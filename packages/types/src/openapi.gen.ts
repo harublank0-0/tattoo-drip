@@ -957,6 +957,8 @@ export interface operations {
             /** @description Styles */
             200: {
                 headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -965,6 +967,9 @@ export interface operations {
                     };
                 };
             };
+            304: components["responses"]["NotModified"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
         };
     };
     listPlacements: {
@@ -1143,7 +1148,7 @@ export interface operations {
                 artist?: string;
                 /** @description A style's slug (`listStyles`) */
                 style?: string;
-                /** @description `true`: only photos marked healed. Leave it out for all. */
+                /** @description `true`: only photos marked healed. `false` is the same as leaving it out: all photos. */
                 healed?: boolean;
                 /** @description The previous page's `nextCursor`, as sent, with the same filters */
                 cursor?: string;

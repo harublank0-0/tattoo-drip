@@ -57,13 +57,20 @@ paths:
       responses:
         "200":
           description: Styles
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            ETag: { $ref: "#/components/headers/ETag" }
           content:
             application/json:
               schema:
                 type: object
                 required: [data]
+                additionalProperties: false
                 properties:
                   data: { type: array, items: { $ref: "#/components/schemas/TattooStyle" } }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
 
   /placements:
     get:
@@ -225,7 +232,7 @@ paths:
           schema: { type: string, maxLength: 40, pattern: "^[a-z0-9]+(-[a-z0-9]+)*$" }
         - name: healed
           in: query
-          description: "`true`: only photos marked healed. Leave it out for all."
+          description: "`true`: only photos marked healed. `false` is the same as leaving it out: all photos."
           schema: { type: boolean }
         - name: cursor
           in: query
