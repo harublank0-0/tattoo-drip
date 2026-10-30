@@ -84,6 +84,8 @@ export function describeSubmitError(
 			return fieldProblem(error.fields);
 		case "flash_unavailable":
 			return notice("flash-unavailable", { contact: true });
+		case "flash_claimed":
+			return notice("flash-claimed", { contact: true });
 		case "artist_not_accepting": {
 			// A flash request has no artist picker to put the error under: it is a notice.
 			if (context.sentFlash) return notice("flash-closed", { contact: true });

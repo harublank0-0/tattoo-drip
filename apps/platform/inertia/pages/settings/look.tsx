@@ -8,6 +8,10 @@ import ColourField from "~/components/colour_field";
 import DevHostWarning from "~/components/dev_host_warning";
 import LogoForm from "~/components/logo_form";
 import {
+	CLAIMED_FLASH_HELP,
+	CLAIMED_FLASH_LEGEND,
+	CLAIMED_FLASH_WORDS,
+	type ClaimedFlashKey,
 	COLOUR_HELP,
 	COVER_INTRO_LINE,
 	canMove,
@@ -70,6 +74,7 @@ import SettingsLayout from "~/layouts/settings";
  */
 export default function PageLook({
 	look,
+	claimedFlashChoices,
 	themes,
 	fonts,
 	sectionKeys,
@@ -79,6 +84,7 @@ export default function PageLook({
 	studioPage,
 }: {
 	look: PageLookProps;
+	claimedFlashChoices: ClaimedFlashKey[];
 	themes: ThemeOption[];
 	fonts: FontOption[];
 	sectionKeys: SectionKey[];
@@ -91,6 +97,7 @@ export default function PageLook({
 	// Each group follows the stored value in place when it changes (no keys).
 	const [pickedTheme, pickTheme] = useStoredChoice(look.theme);
 	const [pickedFont, pickFont] = useStoredChoice(look.font);
+	const [pickedClaimed, pickClaimed] = useStoredChoice(look.claimedFlash);
 	const [rows, setRows] = useStoredRows(look.sections, sectionKeys);
 
 	return (
@@ -232,6 +239,51 @@ export default function PageLook({
 										setRows={setRows}
 										errors={errors}
 									/>
+
+									<FieldSet data-invalid={!!errors.claimedFlash}>
+										<FieldLegend variant="label">
+											{CLAIMED_FLASH_LEGEND}
+										</FieldLegend>
+										<FieldDescription id="claimed-flash-help">
+											{CLAIMED_FLASH_HELP}
+										</FieldDescription>
+										<RadioGroup
+											name="claimedFlash"
+											value={pickedClaimed}
+											onValueChange={pickClaimed}
+											aria-invalid={!!errors.claimedFlash}
+											aria-describedby={
+												errors.claimedFlash
+													? "claimed-flash-help claimed-flash-error"
+													: "claimed-flash-help"
+											}
+										>
+											{claimedFlashChoices.map((choice) => (
+												<FieldLabel
+													key={choice}
+													htmlFor={`claimed-flash-${choice}`}
+												>
+													<Field orientation="horizontal">
+														<FieldContent>
+															<FieldTitle>
+																{CLAIMED_FLASH_WORDS[choice]}
+															</FieldTitle>
+														</FieldContent>
+														<RadioGroupItem
+															value={choice}
+															id={`claimed-flash-${choice}`}
+															aria-invalid={!!errors.claimedFlash}
+														/>
+													</Field>
+												</FieldLabel>
+											))}
+										</RadioGroup>
+										{errors.claimedFlash && (
+											<FieldError id="claimed-flash-error">
+												{errors.claimedFlash}
+											</FieldError>
+										)}
+									</FieldSet>
 								</FieldGroup>
 							</Section>
 

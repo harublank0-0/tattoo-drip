@@ -494,6 +494,7 @@ test.group("GET /api/v1/tenants/:tenant (getStudio)", (group) => {
 				accentDark: "#a99cff",
 				font: "serif",
 				sections: ["inquiry"],
+				claimedFlash: "show",
 			}),
 		);
 
@@ -523,6 +524,7 @@ test.group("GET /api/v1/tenants/:tenant (getStudio)", (group) => {
 				accentDark: null,
 				font: "eczar",
 				sections: ["inquiry", "artists"],
+				claimedFlash: "show",
 			}),
 		);
 
@@ -601,6 +603,7 @@ test.group("GET /api/v1/tenants/:tenant (getStudio)", (group) => {
 				accentDark: null,
 				font: "eczar",
 				sections: ["work", "artists", "inquiry"],
+				claimedFlash: "show",
 			}),
 		);
 		const saved = await client.get(url).header("if-none-match", bareTag);

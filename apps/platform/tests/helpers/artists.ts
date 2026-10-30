@@ -82,7 +82,9 @@ export async function addWorkPhoto(
  * A flash design row for `artist` with a made-up key and no file (the drive
  * ignores a delete of a missing file), shown, 1200 x 1200, dated now unless
  * `createdAt` says otherwise: designs are listed newest first (TAT-129).
- * `price` is in paisa. Call it inside the tenant's context, as the model needs.
+ * `price` is in paisa. It can be tattooed again unless `oneOfAKind` (or a
+ * `claimedAt`, which only a one-of-a-kind design may have); `claimedProjectId`
+ * needs a `claimedAt`. Call it inside the tenant's context, as the model needs.
  */
 export async function addFlashDesign(
 	tenant: Pick<Tenant, "id">,
@@ -94,6 +96,9 @@ export async function addFlashDesign(
 		hidden: boolean;
 		key: string;
 		createdAt: DateTime;
+		oneOfAKind: boolean;
+		claimedAt: DateTime | null;
+		claimedProjectId: string | null;
 	}> = {},
 ) {
 	return FlashDesign.create({
@@ -108,6 +113,11 @@ export async function addFlashDesign(
 		size: over.size ?? "About 3 in",
 		price: over.price ?? null,
 		hidden: over.hidden ?? false,
+		// A claim needs a one-of-a-kind design (the table's check); a design
+		// built with a claim time is one of a kind unless the test says otherwise.
+		oneOfAKind: over.oneOfAKind ?? over.claimedAt != null,
+		claimedAt: over.claimedAt ?? null,
+		claimedProjectId: over.claimedProjectId ?? null,
 		// Left out, the model dates it now.
 		...(over.createdAt ? { createdAt: over.createdAt } : {}),
 	});

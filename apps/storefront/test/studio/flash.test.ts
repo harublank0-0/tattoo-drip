@@ -144,6 +144,52 @@ describe("flash designs (TAT-129)", () => {
 		assert.deepEqual(Object.keys(flashQuery({}, 6)), ["limit"]);
 	});
 
+	test("status claimed makes the design claimed and never requestable; a missing status does not", () => {
+		const [good] = flashPage(1).data;
+		const view = (over: object) => {
+			const made = flashDesignView({ ...good, ...over }, IMAGE_ORIGIN);
+			assert.ok(made);
+			return made;
+		};
+
+		assert.equal(view({ status: "available" }).claimed, false);
+		// An older API sends no status: not claimed.
+		const { status: _status, ...older } = good;
+		const olderView = flashDesignView(older, IMAGE_ORIGIN);
+		assert.ok(olderView);
+		assert.equal(olderView.claimed, false);
+		assert.equal(view({ status: "claimed" }).claimed, true);
+		// Any other value is treated as claimed, as the contract says.
+		assert.equal(view({ status: "sold" }).claimed, true);
+		// Even a claimed design the API called requestable is not.
+		assert.equal(
+			view({ status: "claimed", requestable: true }).requestable,
+			false,
+		);
+	});
+
+	test("closedNoteFor is null for a claimed design: the Claimed badge says it", () => {
+		const made = flashDesignView(
+			{ ...flashPage(1).data[0], status: "claimed", requestable: false },
+			IMAGE_ORIGIN,
+		);
+		assert.ok(made);
+
+		assert.equal(
+			closedNoteFor(made, artistViewModels([SITA, ARJUN], IMAGE_ORIGIN)),
+			null,
+		);
+	});
+
+	test("flashQuery asks for the available designs in the order the contract writes them", () => {
+		assert.deepEqual(Object.keys(flashQuery({}, 6, true)), [
+			"available",
+			"limit",
+		]);
+		assert.deepEqual(flashQuery({}, 6, true), { available: true, limit: 6 });
+		assert.deepEqual(Object.keys(flashQuery({}, 6)), ["limit"]);
+	});
+
 	test("closedNoteFor: null while requestable; the artist's words, else 'Not taking flash requests right now'", () => {
 		const view = (over: object) => {
 			const made = flashDesignView(

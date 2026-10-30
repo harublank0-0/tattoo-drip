@@ -15,6 +15,7 @@ export const NOTICE_CODES = [
 	"studio-closed",
 	"flash-unavailable",
 	"flash-closed",
+	"flash-claimed",
 	"challenge-failed",
 	"challenge-unavailable",
 	"challenge-blocked",
@@ -124,6 +125,10 @@ const notices: Readonly<Record<NoticeCode, Notice>> = {
 	"flash-closed": {
 		title: "This artist just stopped taking flash requests",
 		body: "Your request wasn't sent. You can still message {studio} about it.",
+	},
+	"flash-claimed": {
+		title: "Someone just claimed this design",
+		body: "It was one of a kind, so your request wasn't sent. Message {studio} to ask for something similar.",
 	},
 	"challenge-failed": {
 		title: "We couldn't confirm you're a person",

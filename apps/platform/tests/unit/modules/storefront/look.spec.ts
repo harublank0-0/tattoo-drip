@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { test } from "@japa/runner";
 import {
+	CLAIMED_FLASH_CHOICES,
+	claimedFlashOf,
 	contrastRatio,
 	DARK_PAPER,
 	DEFAULT_FONT,
@@ -327,5 +329,17 @@ test.group("the lists the dashboard shows", () => {
 			FONTS.map((font) => font.key),
 			[...FONT_KEYS],
 		);
+	});
+});
+
+test.group("the claimed-flash setting (TAT-129)", () => {
+	test("the choices are show and hide, and a stored value off the list reads as show", ({
+		assert,
+	}) => {
+		assert.deepEqual([...CLAIMED_FLASH_CHOICES], ["show", "hide"]);
+		assert.equal(claimedFlashOf({ storefrontClaimedFlash: "hide" }), "hide");
+		assert.equal(claimedFlashOf({ storefrontClaimedFlash: "show" }), "show");
+		assert.equal(claimedFlashOf({ storefrontClaimedFlash: "nope" }), "show");
+		assert.equal(claimedFlashOf({ storefrontClaimedFlash: "" }), "show");
 	});
 });

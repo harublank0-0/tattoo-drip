@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { test } from "@japa/runner";
 // @ts-expect-error TS6305: the server project only references the inertia project, so it cannot read its sources and the module is untyped here; `PaymentsModule` below restates its shape and the inertia project type-checks the real one.
 import * as paymentsModule from "../../../inertia/components/payments.js";
@@ -81,5 +82,36 @@ test.group("refundLabel and priceLabel", () => {
 		for (const typed of ["", "0", "-1", "ten", "Infinity"]) {
 			assert.equal(priceLabel(typed), "Set price", typed);
 		}
+	});
+});
+
+// TAT-129 review fix: recording a deposit at the desk claims a one-of-a-kind design like Verify
+// does, so the record sheet warns while the design is taken. Playwright is not in CI, so the
+// wiring is pinned in the source (the words and the kind rule are in flash_copy.spec.ts).
+test.group("The record sheet warns about a taken design (TAT-129)", () => {
+	test("RecordPaymentForm reads the page's taken flag and shows the note for the chosen kind, right above its buttons", async ({
+		assert,
+	}) => {
+		const source = await readFile(
+			new URL("../../../inertia/components/payments_card.tsx", import.meta.url),
+			"utf8",
+		);
+		const form = source.slice(
+			source.indexOf("function RecordPaymentForm("),
+			source.indexOf("function RefundForm("),
+		);
+
+		assert.include(form, "useDesignTaken()");
+		assert.include(form, "recordTakenNote(designTaken, kind)");
+		assert.isAbove(
+			form.indexOf("{takenNote && ("),
+			form.indexOf("<NoteField"),
+			"the warning comes after the fields",
+		);
+		assert.isBelow(
+			form.indexOf("{takenNote && ("),
+			form.indexOf('<FormSheetActions submit="Record payment"'),
+			"and before the submit",
+		);
 	});
 });

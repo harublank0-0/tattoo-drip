@@ -511,6 +511,7 @@ test.group("StudioPageService: page look and logo (TAT-56)", (group) => {
 				accentDark: null,
 				font: "sans",
 				sections: ["inquiry", "artists"],
+				claimedFlash: "show",
 			}),
 		);
 		const withLogo = await inTenant(tenant, async () =>
@@ -809,7 +810,12 @@ test.group("StudioPageService.work (TAT-126)", (group) => {
 test.group("StudioPageService.flash (TAT-129)", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 
-	const everything: FlashQuery = { artist: null, cursor: null, limit: 24 };
+	const everything: FlashQuery = {
+		artist: null,
+		available: false,
+		cursor: null,
+		limit: 24,
+	};
 
 	test("flash names each design's artist and orders filters.artists by name", async ({
 		assert,
@@ -872,6 +878,7 @@ test.group("StudioPageService.flash (TAT-129)", (group) => {
 			"price",
 			"requestable",
 			"size",
+			"status",
 		]);
 		const one = await inTenant(tenant, () =>
 			pagesWith().flashDesign(tenant, older.id),

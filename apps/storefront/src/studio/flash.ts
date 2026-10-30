@@ -53,6 +53,8 @@ export interface FlashDesignView {
 		readonly name: string;
 		readonly href: string;
 	} | null;
+	/** Someone has claimed this one-of-a-kind design (`status` other than `available`): shown greyed, marked Claimed, never requestable. */
+	readonly claimed: boolean;
 	readonly requestable: boolean;
 	/** The design's own page. */
 	readonly href: string;
@@ -105,7 +107,9 @@ function readSlugName(value: unknown): { slug: string; name: string } | null {
  * characters or a size of 1 to 60 (one line of plain text each) missing, or
  * no usable picture (readBrandImage: the API's origin only). The artist is
  * kept only with a slug that can be an artist's and a name; `requestable`
- * only for `true`. Pure.
+ * only for `true` and never for a claimed design. A `status` other than
+ * `available` is claimed (the contract: an unknown value is `claimed`); a
+ * missing one, from an older API, is not. Pure.
  */
 export function flashDesignView(
 	value: unknown,
@@ -121,6 +125,8 @@ export function flashDesignView(
 	const artist = artistRef
 		? { ...artistRef, href: `/artists/${artistRef.slug}` }
 		: null;
+	const status = own(value, "status");
+	const claimed = status !== undefined && status !== "available";
 	return {
 		id,
 		name,
@@ -132,7 +138,8 @@ export function flashDesignView(
 			? fill(studioCopy.flash.alt, { name, artist: artist.name })
 			: fill(studioCopy.flash.altNoArtist, { name }),
 		artist,
-		requestable: own(value, "requestable") === true,
+		claimed,
+		requestable: own(value, "requestable") === true && !claimed,
 		href: flashDesignHref(id),
 		requestHref: requestHref({ flash: id }),
 	};
@@ -185,6 +192,8 @@ export type FlashLookup =
 /** What the request page shows of the design the address names. */
 export type FlashRequestView =
 	| { readonly kind: "requestable"; readonly design: FlashDesignView }
+	/** Someone has claimed it: the page asks the artist for something similar instead. */
+	| { readonly kind: "claimed"; readonly design: FlashDesignView }
 	| {
 			readonly kind: "closed";
 			readonly design: FlashDesignView;
@@ -218,26 +227,34 @@ export function readFlashSearch(search: Record<string, unknown>): FlashSearch {
 
 /**
  * The API's read for this filter: `artist`, `cursor` (as typed: a garbled one
- * is the API's 422, the not-found page), then `limit`. Never any other key of
+ * is the API's 422, the not-found page), `available` (only the home's Flash
+ * section asks for it: claimed designs stay out of it), then `limit`. Never any other key of
  * the address: the router merges what the reader dropped back into `search`.
  */
-export function flashQuery(search: FlashSearch, limit: number): ListFlashQuery {
+export function flashQuery(
+	search: FlashSearch,
+	limit: number,
+	available = false,
+): ListFlashQuery {
 	return {
 		...(search.artist ? { artist: search.artist } : {}),
 		...(search.cursor ? { cursor: search.cursor } : {}),
+		// The studio page's sections show what can still be asked for.
+		...(available ? { available: true } : {}),
 		limit,
 	};
 }
 
 /**
- * What a design that can't be requested says: null while it can; else the
- * artist's own closed message, else "Not taking flash requests right now".
+ * What a design that can't be requested says: null while it can, and for a
+ * claimed design (its Claimed badge says it); else the artist's own closed
+ * message, else "Not taking flash requests right now".
  */
 export function closedNoteFor(
 	design: FlashDesignView,
 	artists: readonly ArtistView[],
 ): string | null {
-	if (design.requestable) return null;
+	if (design.claimed || design.requestable) return null;
 	const artist = design.artist
 		? artists.find(({ slug }) => slug === design.artist?.slug)
 		: undefined;

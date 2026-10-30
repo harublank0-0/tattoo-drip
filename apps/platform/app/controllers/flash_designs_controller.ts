@@ -4,13 +4,18 @@ import { errors } from "@vinejs/vine";
 import { tenantContext } from "#middleware/tenant_middleware";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
-import { FlashInUseError, FlashLimitError } from "#modules/flash/errors";
+import {
+	FlashInUseError,
+	FlashLimitError,
+	FlashRuleError,
+} from "#modules/flash/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import FlashService, {
 	MAX_FLASH_DESIGNS,
 } from "#modules/flash/services/flash_service";
 import {
 	addFlashDesignValidator,
+	claimFlashDesignValidator,
 	updateFlashDesignValidator,
 } from "#modules/flash/validators/flash_design";
 import { InvalidImageError } from "#modules/media/errors";
@@ -46,6 +51,7 @@ export default class FlashDesignsController {
 				name: data.name,
 				size: data.size,
 				price: toPaisa(data.price),
+				oneOfAKind: data.oneOfAKind ?? false,
 			}),
 		);
 
@@ -54,8 +60,10 @@ export default class FlashDesignsController {
 	}
 
 	/**
-	 * `:id` is the design. Saves its words, price and whether it is shown; an
-	 * unchecked "shown" box is not sent, so a missing one hides the design.
+	 * `:id` is the design. Saves its words, price, whether it is one of a kind
+	 * and whether it is shown; an unchecked box is not sent, so a missing
+	 * "shown" hides the design and a missing "one of a kind" makes it
+	 * repeatable (which clears a claim on it).
 	 */
 	async update(ctx: HttpContext) {
 		const { tenant, membership } = tenantContext(ctx);
@@ -70,10 +78,43 @@ export default class FlashDesignsController {
 			name: data.name,
 			size: data.size,
 			price: toPaisa(data.price),
+			oneOfAKind: data.oneOfAKind ?? false,
 			hidden: !(data.shown ?? false),
 		});
 
 		ctx.session.flash("success", "Design saved.");
+		return this.toEditPage(ctx, tenant.slug, artist.id);
+	}
+
+	/**
+	 * `:id` is the design. The one-tap claim: "Mark claimed" (`claimed` true)
+	 * and "Make available" (false). A design that can be tattooed again is
+	 * never claimed: the error flash says so and nothing changes.
+	 */
+	async claim(ctx: HttpContext) {
+		const { tenant, membership } = tenantContext(ctx);
+		const { design, artist } = await this.flash.findEditable(
+			tenant,
+			membership,
+			ctx.params.id,
+		);
+		const data = await ctx.request.validateUsing(claimFlashDesignValidator);
+
+		try {
+			await this.flash.setClaimed(tenant, membership, design, data.claimed);
+		} catch (error) {
+			if (!(error instanceof FlashRuleError)) throw error;
+			ctx.session.flash(
+				"error",
+				"A design that can be tattooed again is never claimed.",
+			);
+			return this.toEditPage(ctx, tenant.slug, artist.id);
+		}
+
+		ctx.session.flash(
+			"success",
+			data.claimed ? "Marked claimed." : "Available again.",
+		);
 		return this.toEditPage(ctx, tenant.slug, artist.id);
 	}
 

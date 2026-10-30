@@ -2,12 +2,14 @@ import testUtils from "@adonisjs/core/services/test_utils";
 import drive from "@adonisjs/drive/services/main";
 import queue from "@adonisjs/queue/services/main";
 import { test } from "@japa/runner";
+import { DateTime } from "luxon";
 import ArtistService from "#modules/artists/services/artist_service";
 import Client from "#modules/clients/models/client";
 import NewInquiryAlertJob from "#modules/inquiries/jobs/new_inquiry_alert_job";
 import Inquiry from "#modules/inquiries/models/inquiry";
 import ReferenceImage from "#modules/inquiries/models/reference_image";
 import ImageService from "#modules/media/services/image_service";
+import Tenant from "#modules/tenancy/models/tenant";
 import {
 	assertApiData,
 	assertApiError,
@@ -404,6 +406,95 @@ test.group(
 				"Choose a design from the studio's page, or none.",
 			]);
 			assert.deepEqual(await intakeRows({ tenant }), before);
+		});
+		test("a request for a claimed design is flash_claimed and stores nothing, under either setting", async ({
+			client,
+			assert,
+		}) => {
+			const { tenant, owner } = await studioWithOwner("intake-flash-129h");
+			const sita = await addArtist(tenant, owner);
+			const claimed = await inTenant(tenant, () =>
+				addFlashDesign(tenant, sita, {
+					oneOfAKind: true,
+					claimedAt: DateTime.now().minus({ hours: 1 }),
+				}),
+			);
+			const before = await intakeRows({ tenant });
+
+			for (const setting of ["show", "hide"]) {
+				await inTenant(tenant, () =>
+					Tenant.query()
+						.where("id", tenant.id)
+						.update({ storefrontClaimedFlash: setting }),
+				);
+				const response = await postInquiry(
+					client,
+					"intake-flash-129h",
+					intakeFields({ flashDesignId: claimed.id }),
+					[await png()],
+				);
+
+				assertApiError(response, 409, "flash_claimed");
+				assert.equal(
+					response.body().error.message,
+					"Someone has claimed this design: it was one of a kind.",
+				);
+			}
+
+			assert.deepEqual(await intakeRows({ tenant }), before);
+			assert.deepEqual(await storedReferenceImages(tenant), []);
+		});
+
+		test("a request for a design claimed by hand is refused the same way, before the artist's switches are looked at", async ({
+			client,
+			assert,
+		}) => {
+			const { tenant, owner } = await studioWithOwner("intake-flash-129i");
+			const off = await addArtist(tenant, owner, {
+				name: "Off",
+				slug: "off",
+				acceptingFlash: false,
+			});
+			const byHand = await inTenant(tenant, () =>
+				addFlashDesign(tenant, off, {
+					oneOfAKind: true,
+					claimedAt: DateTime.now(),
+				}),
+			);
+			const before = await intakeRows({ tenant });
+
+			const response = await postInquiry(
+				client,
+				"intake-flash-129i",
+				intakeFields({ flashDesignId: byHand.id }),
+			);
+
+			// The artist takes no flash requests, but the design's being taken is the answer.
+			assertApiError(response, 409, "flash_claimed");
+			assert.deepEqual(await intakeRows({ tenant }), before);
+		});
+
+		test("a one-of-a-kind design nobody has claimed, and a repeatable one, are still requested", async ({
+			client,
+			assert,
+		}) => {
+			const { tenant, owner } = await studioWithOwner("intake-flash-129j");
+			const sita = await addArtist(tenant, owner);
+			const [single, repeatable] = await inTenant(tenant, async () => [
+				await addFlashDesign(tenant, sita, { oneOfAKind: true }),
+				await addFlashDesign(tenant, sita),
+			]);
+
+			for (const design of [single, repeatable]) {
+				const response = await postInquiry(
+					client,
+					"intake-flash-129j",
+					intakeFields({ flashDesignId: design.id }),
+				);
+				response.assertStatus(201);
+			}
+
+			assert.lengthOf((await intakeRows({ tenant })).inquiries, 2);
 		});
 	},
 );

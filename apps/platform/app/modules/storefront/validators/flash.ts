@@ -14,6 +14,9 @@ import {
  */
 export const listFlashValidator = vine.create({
 	artist: vine.string().regex(ARTIST_SLUG).optional(),
+	// `true`: only designs nobody has claimed. A query string is text, so the
+	// words are read here (`false` is the same as leaving it out).
+	available: vine.boolean().optional(),
 	cursor: vine
 		.string()
 		.maxLength(200)
@@ -26,6 +29,7 @@ const LIMIT_MESSAGE = `Use a whole number from 1 to ${MAX_WORK_PAGE}.`;
 listFlashValidator.messagesProvider = new SimpleMessagesProvider({
 	"artist.regex": "Use an artist's slug.",
 	"artist.string": "Use an artist's slug.",
+	"available.boolean": "Use true or false.",
 	"cursor.regex": CURSOR_MESSAGE,
 	"cursor.maxLength": CURSOR_MESSAGE,
 	"cursor.string": CURSOR_MESSAGE,

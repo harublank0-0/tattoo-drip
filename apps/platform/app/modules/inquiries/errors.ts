@@ -5,6 +5,7 @@ export const INQUIRY_RULE_REASONS = [
 	"studio_not_accepting",
 	"too_many_open_inquiries",
 	"flash_unavailable",
+	"flash_claimed",
 ] as const;
 export type InquiryRuleReason = (typeof INQUIRY_RULE_REASONS)[number];
 
@@ -19,6 +20,8 @@ const MESSAGES: Record<InquiryRuleReason, string> = {
 		"The phone already has as many open inquiries as the tenant takes",
 	flash_unavailable:
 		"The flash design is hidden, its artist is hidden or deleted, or it is not the tenant's",
+	flash_claimed:
+		"The flash design is one of a kind and someone has claimed it, by a project or by hand",
 };
 
 /**

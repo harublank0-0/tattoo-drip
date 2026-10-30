@@ -43,6 +43,22 @@ export const SECTION_WORDS = {
 } as const satisfies Record<string, { title: string; description: string }>;
 export type SectionKey = keyof typeof SECTION_WORDS;
 
+/**
+ * What the page does with one-of-a-kind flash designs somebody has claimed
+ * (TAT-129), in the server's order (its CLAIMED_FLASH_CHOICES;
+ * page_look_copy.spec.ts compares the two).
+ */
+export const CLAIMED_FLASH_WORDS = {
+	show: "Show them, greyed out and marked Claimed",
+	hide: "Hide them",
+} as const satisfies Record<string, string>;
+export type ClaimedFlashKey = keyof typeof CLAIMED_FLASH_WORDS;
+
+export const CLAIMED_FLASH_LEGEND = "Claimed flash designs";
+
+export const CLAIMED_FLASH_HELP =
+	"One-of-a-kind designs that someone has claimed.";
+
 /** The section that cannot be hidden: a client can always send an idea. */
 export const REQUIRED_SECTION: SectionKey = "inquiry";
 
@@ -54,6 +70,8 @@ export type PageLookProps = {
 	font: FontKey;
 	/** The sections shown, in order. */
 	sections: SectionKey[];
+	/** What the page does with claimed flash designs (not in the served look). */
+	claimedFlash: ClaimedFlashKey;
 };
 
 export type ThemeOption = { key: string; label: string; description: string };

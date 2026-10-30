@@ -1,5 +1,6 @@
 import { Form } from "@adonisjs/inertia/react";
 import { cn } from "cn";
+import { TriangleAlert } from "lucide-react";
 import {
 	type ReactNode,
 	type RefObject,
@@ -9,6 +10,8 @@ import {
 	useState,
 } from "react";
 import { urlFor } from "~/client";
+import { useDesignTaken } from "~/components/design_taken";
+import { recordTakenNote, verifyQuestion } from "~/components/flash";
 import {
 	FormSheetActions,
 	FormSheetPanel,
@@ -211,6 +214,7 @@ export function PendingProof({
 	compact?: boolean;
 }) {
 	const tenant = useTenant();
+	const designTaken = useDesignTaken();
 	const [open, setOpen] = useState<"verify" | "reject" | null>(null);
 	const verifyButton = useRef<HTMLButtonElement>(null);
 	const rejectButton = useRef<HTMLButtonElement>(null);
@@ -315,7 +319,10 @@ export function PendingProof({
 			{open === "verify" && (
 				<ConfirmPanel
 					action={urlFor("tenant.payments.verify", params)}
-					question={`Verify ${proof.expectedText}? Do it only if it reached your account${proof.referenceCode ? ` with code ${proof.referenceCode}` : ""}.`}
+					question={verifyQuestion(
+						designTaken,
+						`Verify ${proof.expectedText}? Do it only if it reached your account${proof.referenceCode ? ` with code ${proof.referenceCode}` : ""}.`,
+					)}
 					noteLabel="Note (optional, only your team sees it)"
 					submitLabel="Verify payment"
 					onCancel={close}
@@ -604,6 +611,7 @@ function RecordPaymentForm({
 	sheet: FormSheetState;
 }) {
 	const tenant = useTenant();
+	const designTaken = useDesignTaken();
 	const first = actions.recordKinds[0];
 	const [kind, setKind] = useState<DeskKindName>(first);
 	const [method, setMethod] = useState<MethodKind>("cash");
@@ -614,6 +622,8 @@ function RecordPaymentForm({
 		setKind(next);
 		if (!typed) setAmount(prefill(actions, next));
 	};
+	// A deposit recorded at the desk claims a one-of-a-kind design like a verified screenshot.
+	const takenNote = recordTakenNote(designTaken, kind);
 
 	return (
 		<Form
@@ -665,6 +675,15 @@ function RecordPaymentForm({
 						hint={null}
 					/>
 					<NoteField id="record-note" error={errors.note} />
+					{takenNote && (
+						<p className="flex items-start gap-2 rounded-md border border-marigold bg-marigold/10 p-3 text-sm">
+							<TriangleAlert
+								aria-hidden="true"
+								className="mt-0.5 size-4 shrink-0"
+							/>
+							<span>{takenNote}</span>
+						</p>
+					)}
 					<FormSheetActions submit="Record payment" processing={processing} />
 				</FieldGroup>
 			)}

@@ -360,6 +360,12 @@ const routes = {
     tokens: [{"old":"/t/:tenant/artists/flash/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/flash/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/flash/:id","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/flash/:id","type":0,"val":"flash","end":""},{"old":"/t/:tenant/artists/flash/:id","type":1,"val":"id","end":""}],
     types: placeholder as Registry['tenant.artists.flash.update']['types'],
   },
+  'tenant.artists.flash.claim.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/artists/flash/:id/claim',
+    tokens: [{"old":"/t/:tenant/artists/flash/:id/claim","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/flash/:id/claim","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/flash/:id/claim","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/flash/:id/claim","type":0,"val":"flash","end":""},{"old":"/t/:tenant/artists/flash/:id/claim","type":1,"val":"id","end":""},{"old":"/t/:tenant/artists/flash/:id/claim","type":0,"val":"claim","end":""}],
+    types: placeholder as Registry['tenant.artists.flash.claim.update']['types'],
+  },
   'tenant.artists.flash.destroy': {
     methods: ["DELETE"],
     pattern: '/t/:tenant/artists/flash/:id',

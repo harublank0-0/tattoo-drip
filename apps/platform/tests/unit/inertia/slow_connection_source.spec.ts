@@ -51,6 +51,19 @@ test.group("One-tap moves send once (TAT-84)", () => {
 		const field = source.slice(source.indexOf("function ArtistField("));
 		assert.include(field, 'processing ? "Saving…" : "Save"');
 	});
+
+	test("a one-of-a-kind design's claim button says Saving… while its visit is out, and keeps its label while held by an upload", async ({
+		assert,
+	}) => {
+		const source = await read("components/flash_tray.tsx");
+		const button = source.slice(
+			source.indexOf("function ClaimButton("),
+			source.indexOf("function AddDesign("),
+		);
+		assert.include(button, "aria-disabled={off}");
+		assert.include(button, '{saving ? "Saving…" :');
+		assert.include(button, "design.claimed ? MAKE_AVAILABLE : MARK_CLAIMED");
+	});
 });
 
 // TAT-84, fix round 1 (and the merge with main's contact recording): Inertia's own optimistic

@@ -169,7 +169,7 @@ function InquiryFallback({
 	return (
 		<>
 			<p>
-				{state.flashDesignId !== undefined && state.start ? (
+				{state.start ? (
 					<>
 						Ask <bdi>{state.studioName}</bdi> for <bdi>{state.start.idea}</bdi>:
 						say where it goes and the dates that suit you.
