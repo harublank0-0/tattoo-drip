@@ -1594,7 +1594,7 @@ describe("loadRequestPage with ?flash= (TAT-129)", () => {
 		const { fetch } = listing([SITA, ARJUN], EMPTY_PAGE, EMPTY_FLASH_PAGE, off);
 		const data = await loadRequestPage(context(fetch), { flash: ID });
 
-		assert.deepEqual(data.flash && data.flash.kind, "closed");
+		assert.deepEqual(data.flash?.kind, "closed");
 		assert.equal(
 			data.flash?.kind === "closed" && data.flash.note,
 			"Sita Rai isn't taking flash requests right now.",

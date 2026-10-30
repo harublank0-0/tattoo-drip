@@ -5,7 +5,6 @@ import type { QueryClientContract } from "@adonisjs/lucid/types/database";
 import { WorkPhotoLimitError } from "#modules/artists/errors";
 import Artist from "#modules/artists/models/artist";
 import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
-// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService, {
 	mayEdit,
 	type ProfileEditor,

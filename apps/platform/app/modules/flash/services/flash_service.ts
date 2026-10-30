@@ -3,7 +3,6 @@ import type { MultipartFile } from "@adonisjs/core/bodyparser";
 import { errors as lucidErrors } from "@adonisjs/lucid";
 import type { QueryClientContract } from "@adonisjs/lucid/types/database";
 import Artist from "#modules/artists/models/artist";
-// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService, {
 	mayEdit,
 	type ProfileEditor,
