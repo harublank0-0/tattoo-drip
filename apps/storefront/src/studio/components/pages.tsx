@@ -415,7 +415,7 @@ export function FlashPage({ data }: { data: FlashPageData }) {
 								</a>
 							) : (
 								<a className="text-link" href="/">
-									Go to the studio page
+									{studioCopy.goToStudio}
 								</a>
 							)}
 						</div>
@@ -616,7 +616,7 @@ export function NotFoundPage() {
 			<h1 className="section-title">Page not found</h1>
 			<p>This page doesn't exist. The link may be old or mistyped.</p>
 			<a className="text-link" href="/">
-				Go to the studio page
+				{studioCopy.goToStudio}
 			</a>
 		</main>
 	);

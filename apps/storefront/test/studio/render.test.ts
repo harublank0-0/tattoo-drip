@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { describe, test } from "node:test";
 import type { Artist, Studio } from "@tattoo-drip/sdk";
 import {
@@ -18,6 +19,7 @@ import {
 	StudioPage,
 	WorkPage,
 } from "../../src/studio/components/pages.tsx";
+import { studioCopy } from "../../src/studio/copy.ts";
 import type { FlashSearch } from "../../src/studio/flash.ts";
 import type { PortfolioSearch, WorkSearch } from "../../src/studio/gallery.ts";
 import {
@@ -2429,6 +2431,21 @@ describe("flash on the artist page, /flash and a design's page (TAT-129)", () =>
 			/<a class="text-link" href="\/flash\?artist=sita">Back to the newest<\/a>/,
 		);
 		assertSafePage(filtered);
+	});
+
+	test("the way back to the studio page is one string in studioCopy, used by the not-found page and the empty flash page", async () => {
+		const notFound = renderToStaticMarkup(createElement(NotFoundPage));
+		const empty = flashHtml(EMPTY_FLASH_PAGE);
+		const source = await readFile(
+			new URL("../../src/studio/components/pages.tsx", import.meta.url),
+			"utf8",
+		);
+
+		assert.equal(studioCopy.goToStudio, "Go to the studio page");
+		for (const html of [notFound, empty]) {
+			assert.match(html, />Go to the studio page<\/a>/);
+		}
+		assert.doesNotMatch(source, /Go to the studio page/);
 	});
 
 	test("/flash with no designs, and with a filter that matches none", () => {

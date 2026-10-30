@@ -20,6 +20,8 @@ export const studioCopy = {
 	/** The hero's secondary action: a WhatsApp chat with the studio. */
 	whatsapp: "WhatsApp",
 	notTaking: "Not taking new inquiries right now",
+	/** The way back from a page that has nothing: not found, or no flash yet. */
+	goToStudio: "Go to the studio page",
 	contact: {
 		chat: "Chat",
 		follow: "Follow",
