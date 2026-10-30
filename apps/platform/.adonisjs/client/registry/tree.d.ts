@@ -64,6 +64,16 @@ export interface ApiDefinition {
       messages: typeof routes['tenant.settings.messages'] & {
         update: typeof routes['tenant.settings.messages.update']
       }
+      goodToKnow: typeof routes['tenant.settings.good_to_know'] & {
+        update: typeof routes['tenant.settings.good_to_know.update']
+      }
+      hours: {
+        update: typeof routes['tenant.settings.hours.update']
+      }
+      closedDays: {
+        store: typeof routes['tenant.settings.closed_days.store']
+        destroy: typeof routes['tenant.settings.closed_days.destroy']
+      }
       members: typeof routes['tenant.settings.members'] & {
         invitations: {
           store: typeof routes['tenant.settings.members.invitations.store']

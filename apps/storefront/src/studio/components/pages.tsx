@@ -15,6 +15,7 @@ import type {
 	StudioPageData,
 	WorkPageData,
 } from "../loaders.ts";
+import { OpenNow } from "../open-now.tsx";
 import { type MoreWork, PagedGallery } from "../paging.tsx";
 import type { RequestLink } from "../request.ts";
 import { logoSizes } from "../srcset.ts";
@@ -25,6 +26,7 @@ import { BrandCover, BrandLogo } from "./brand.tsx";
 import { ChatButton } from "./chat.tsx";
 import { ContactBlock } from "./contact.tsx";
 import { HealedFilter, RecentWork, WorkFilters } from "./gallery.tsx";
+import { GoodToKnowSection } from "./good-to-know.tsx";
 import { InquirySection, RequestInvite } from "./inquiry.tsx";
 import { BookingStrip } from "./steps.tsx";
 
@@ -55,6 +57,7 @@ export function StudioPage({ data }: { data: StudioPageData }) {
 			<p className="profile-location user-text" dir="auto">
 				{studio.location ?? studio.typeLabel}
 			</p>
+			{data.openNow ? <OpenNow view={data.openNow} /> : null}
 		</div>
 	);
 	return (
@@ -108,9 +111,10 @@ export function StudioPage({ data }: { data: StudioPageData }) {
 
 /**
  * One of the studio page's sections, in the order the theme's config gives
- * (TAT-54): Recent work (TAT-126), the artists and the inquiry section, which
- * is always one of them (readSections) and, since TAT-127, only invites: the
- * form is on /request.
+ * (TAT-54): Recent work (TAT-126), the artists, Good to know (TAT-128, which
+ * renders nothing until the studio filled something in) and the inquiry
+ * section, which is always one of them (readSections) and, since TAT-127, only
+ * invites: the form is on /request.
  */
 function StudioSection({
 	section,
@@ -129,6 +133,8 @@ function StudioSection({
 					studioAccepting={data.studio.accepting}
 				/>
 			);
+		case "info":
+			return <GoodToKnowSection view={data.goodToKnow} />;
 		case "inquiry":
 			return <RequestInvite state={data.inquiry} />;
 	}

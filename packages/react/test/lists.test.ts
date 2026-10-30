@@ -25,6 +25,15 @@ const STUDIO: Studio = {
 		},
 		sections: [{ type: "artists" }, { type: "inquiry" }],
 	},
+	openingHours: [],
+	closedDays: [],
+	goodToKnow: {
+		walkIns: null,
+		ageRule: null,
+		depositPolicy: null,
+		beforeSession: null,
+		aftercare: null,
+	},
 };
 
 /** A client whose fetch answers every call with `status` and `body`. */

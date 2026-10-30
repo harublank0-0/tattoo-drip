@@ -439,6 +439,66 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/message_templates_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
+  'tenant.settings.good_to_know': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/settings/good-to-know'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/good_to_know_controller').default['show']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/good_to_know_controller').default['show']>>>
+    }
+  }
+  'tenant.settings.good_to_know.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/settings/good-to-know'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/tenancy/validators/good_to_know').updateGoodToKnowValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/tenancy/validators/good_to_know').updateGoodToKnowValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/good_to_know_controller').default['update']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/good_to_know_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.settings.hours.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/settings/hours'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/scheduling/validators/opening_hours').openingHoursValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/scheduling/validators/opening_hours').openingHoursValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/good_to_know_controller').default['updateHours']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/good_to_know_controller').default['updateHours']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.settings.closed_days.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/settings/closed-days'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/scheduling/validators/opening_hours').closedDaysValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/scheduling/validators/opening_hours').closedDaysValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/good_to_know_controller').default['storeClosedDays']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/good_to_know_controller').default['storeClosedDays']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.settings.closed_days.destroy': {
+    methods: ["DELETE"]
+    pattern: '/t/:tenant/settings/closed-days/:id'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/good_to_know_controller').default['destroyClosedDays']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/good_to_know_controller').default['destroyClosedDays']>>>
+    }
+  }
   'tenant.settings.members': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/settings/members'

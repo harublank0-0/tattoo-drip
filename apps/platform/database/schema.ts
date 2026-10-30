@@ -708,6 +708,60 @@ export class StaffAlertSchema extends BaseModel {
 	declare userId: string;
 }
 
+export class StudioClosureSchema extends BaseModel {
+	static $columns = [
+		"createdAt",
+		"endsOn",
+		"id",
+		"note",
+		"startsOn",
+		"tenantId",
+		"updatedAt",
+	] as const;
+	$columns = StudioClosureSchema.$columns;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.date()
+	declare endsOn: DateTime;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare note: string | null;
+	@column.date()
+	declare startsOn: DateTime;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
+export class StudioHourSchema extends BaseModel {
+	static $columns = [
+		"closesAt",
+		"createdAt",
+		"id",
+		"opensAt",
+		"tenantId",
+		"updatedAt",
+		"weekday",
+	] as const;
+	$columns = StudioHourSchema.$columns;
+	@column()
+	declare closesAt: string;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare opensAt: string;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+	@column()
+	declare weekday: number;
+}
+
 export class TattooProjectSchema extends BaseModel {
 	static $columns = [
 		"artistId",
@@ -835,6 +889,9 @@ export class TenantSlugSchema extends BaseModel {
 export class TenantSchema extends BaseModel {
 	static $columns = [
 		"address",
+		"aftercareText",
+		"ageRuleText",
+		"beforeSessionText",
 		"brandAccent",
 		"brandAccentDark",
 		"brandFont",
@@ -862,11 +919,18 @@ export class TenantSchema extends BaseModel {
 		"timezone",
 		"type",
 		"updatedAt",
+		"walkInsText",
 		"websiteUrl",
 	] as const;
 	$columns = TenantSchema.$columns;
 	@column()
 	declare address: string | null;
+	@column()
+	declare aftercareText: string | null;
+	@column()
+	declare ageRuleText: string | null;
+	@column()
+	declare beforeSessionText: string | null;
 	@column()
 	declare brandAccent: string | null;
 	@column()
@@ -921,6 +985,8 @@ export class TenantSchema extends BaseModel {
 	declare type: string;
 	@column.dateTime({ autoCreate: true, autoUpdate: true })
 	declare updatedAt: DateTime | null;
+	@column()
+	declare walkInsText: string | null;
 	@column()
 	declare websiteUrl: string | null;
 }

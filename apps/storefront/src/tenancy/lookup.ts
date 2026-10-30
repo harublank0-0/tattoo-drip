@@ -4,6 +4,7 @@ import {
 	type Studio,
 } from "@tattoo-drip/sdk";
 import { STORED_SLUG } from "./host.ts";
+import { withRevalidation } from "./revalidate.ts";
 
 /** How long a page waits for the API to confirm its studio (the SDK's default is 10 s). */
 export const STUDIO_LOOKUP_TIMEOUT_MS = 5_000;
@@ -29,7 +30,10 @@ export interface LookupOptions {
 /**
  * Asks the API whether `slug` is a studio (getStudio, TAT-32). The API answers
  * an old slug like the current one and names the current slug in the body,
- * so a different slug there means the studio moved.
+ * so a different slug there means the studio moved. The read asks every
+ * cache on the way for a fresh answer (`withRevalidation`, TAT-128): the page
+ * built from it is cached for minutes after, and a studio that was already
+ * minutes old would double that.
  */
 export async function lookUpTenant(
 	slug: string,
@@ -39,7 +43,7 @@ export async function lookUpTenant(
 		baseUrl: options.apiUrl,
 		tenant: slug,
 		key: options.key,
-		fetch: options.fetch,
+		fetch: withRevalidation(options.fetch),
 		timeoutMs: options.timeoutMs ?? STUDIO_LOOKUP_TIMEOUT_MS,
 	});
 	let studio: Studio;

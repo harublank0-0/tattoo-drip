@@ -1,8 +1,10 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
+import { DateTime } from "luxon";
 import User from "#models/user";
 import ArtistService from "#modules/artists/services/artist_service";
 import ImageService from "#modules/media/services/image_service";
+import OpeningHoursService from "#modules/scheduling/services/opening_hours_service";
 import type Tenant from "#modules/tenancy/models/tenant";
 import TenancyService, {
 	type TenantProfile,
@@ -26,10 +28,13 @@ const artists = new ArtistService(images);
 /** The documented fields (openapi.yaml, Studio). A new one needs the contract and a ruling first. */
 const STUDIO_FIELDS = [
 	"acceptingInquiries",
+	"closedDays",
 	"contact",
 	"cover",
+	"goodToKnow",
 	"intro",
 	"name",
+	"openingHours",
 	"slug",
 	"socialLinks",
 	"storefront",
@@ -37,6 +42,15 @@ const STUDIO_FIELDS = [
 	"type",
 ];
 const CONTACT_FIELDS = ["address", "email", "phone"];
+const GOOD_TO_KNOW_FIELDS = [
+	"aftercare",
+	"ageRule",
+	"beforeSession",
+	"depositPolicy",
+	"walkIns",
+];
+const CLOSED_DAY_FIELDS = ["from", "note", "to"];
+const HOURS_FIELDS = ["closes", "day", "opens"];
 const LINK_FIELDS = ["platform", "url"];
 
 /** The page look of a studio that set nothing (openapi.yaml, StorefrontConfiguration; TAT-56). */
@@ -47,7 +61,12 @@ const DEFAULT_STOREFRONT = {
 		colors: { accent: null, accentDark: null },
 		font: "eczar",
 	},
-	sections: [{ type: "work" }, { type: "artists" }, { type: "inquiry" }],
+	sections: [
+		{ type: "work" },
+		{ type: "artists" },
+		{ type: "info" },
+		{ type: "inquiry" },
+	],
 };
 
 const PROFILE: TenantProfile = {
@@ -63,6 +82,15 @@ const PROFILE: TenantProfile = {
 	websiteUrl: "https://black-needle.example",
 };
 
+/** What a studio that wrote none of the Good to know texts answers (TAT-128). */
+const EMPTY_GOOD_TO_KNOW = {
+	walkIns: null,
+	ageRule: null,
+	depositPolicy: null,
+	beforeSession: null,
+	aftercare: null,
+};
+
 /** The public Studio of a studioWithOwner() studio: no profile filled in, no artists. */
 const bareStudio = (slug: string, name: string) => ({
 	slug,
@@ -75,6 +103,9 @@ const bareStudio = (slug: string, name: string) => ({
 	acceptingInquiries: true,
 	cover: null,
 	storefront: DEFAULT_STOREFRONT,
+	openingHours: [],
+	closedDays: [],
+	goodToKnow: EMPTY_GOOD_TO_KNOW,
 });
 
 function changeSlug(tenant: Tenant, slug: string) {
@@ -114,6 +145,9 @@ test.group("GET /api/v1/tenants/:tenant (getStudio)", (group) => {
 			acceptingInquiries: true,
 			cover: null,
 			storefront: DEFAULT_STOREFRONT,
+			openingHours: [],
+			closedDays: [],
+			goodToKnow: EMPTY_GOOD_TO_KNOW,
 		});
 		assertApiHeaders(response);
 	});
@@ -126,6 +160,7 @@ test.group("GET /api/v1/tenants/:tenant (getStudio)", (group) => {
 
 		assert.deepEqual(Object.keys(data).sort(), STUDIO_FIELDS);
 		assert.deepEqual(Object.keys(data.contact).sort(), CONTACT_FIELDS);
+		assert.deepEqual(Object.keys(data.goodToKnow).sort(), GOOD_TO_KNOW_FIELDS);
 		assert.isNotEmpty(data.socialLinks);
 		for (const link of data.socialLinks) {
 			assert.deepEqual(Object.keys(link).sort(), LINK_FIELDS);
@@ -203,6 +238,130 @@ test.group("GET /api/v1/tenants/:tenant (getStudio)", (group) => {
 		assert.notEqual(elsewhere.header("etag"), tag);
 		// The control: the same tag under its own slug is a 304.
 		own.assertStatus(304);
+	});
+
+	test("a studio that set nothing has no hours, no closed days and empty Good to know", async ({
+		client,
+		assert,
+	}) => {
+		await studioWithOwner("api-know-empty-128");
+
+		const { data } = (
+			await client.get("/api/v1/tenants/api-know-empty-128")
+		).body();
+
+		assert.deepEqual(data.openingHours, []);
+		assert.deepEqual(data.closedDays, []);
+		assert.deepEqual(data.goodToKnow, EMPTY_GOOD_TO_KNOW);
+	});
+
+	test("hours, upcoming closed days and the texts are served; an ended closure is not", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("api-know-128");
+		const hours = new OpeningHoursService();
+		const today = DateTime.now().setZone("Asia/Kathmandu");
+		const day = (days: number) => today.plus({ days }).toFormat("yyyy-MM-dd");
+		await inTenant(tenant, async () => {
+			// Saved out of order: the answer is Sunday first.
+			await hours.replaceWeek(tenant, [
+				{ day: "sat", opens: "10:30", closes: "17:00" },
+				{ day: "sun", opens: "11:00", closes: "20:00" },
+			]);
+			await hours.addClosure(
+				tenant,
+				{ startsOn: day(9), endsOn: day(10), note: "दशैं बिदा" },
+				day(0),
+			);
+			await hours.addClosure(
+				tenant,
+				{ startsOn: day(3), endsOn: day(3), note: null },
+				day(0),
+			);
+			await hours.addClosure(
+				tenant,
+				{ startsOn: day(-9), endsOn: day(-8), note: "ended-closure-128" },
+				day(-9),
+			);
+			tenant.merge({
+				walkInsText: "  Small flash on Saturdays.  ",
+				ageRuleText: "   ",
+				beforeSessionText: "Eat well.\nBring ID.",
+				aftercareText: "दिनमा दुई पटक सफा गर्नुहोस्।",
+				depositPolicy: "Deposits hold your date.",
+			});
+			await tenant.save();
+		});
+
+		const response = await client.get("/api/v1/tenants/api-know-128");
+
+		response.assertStatus(200);
+		const { data } = response.body();
+		assert.deepEqual(data.openingHours, [
+			{ day: "sun", opens: "11:00", closes: "20:00" },
+			{ day: "sat", opens: "10:30", closes: "17:00" },
+		]);
+		assert.deepEqual(data.closedDays, [
+			{ from: day(3), to: day(3), note: null },
+			{ from: day(9), to: day(10), note: "दशैं बिदा" },
+		]);
+		assert.deepEqual(data.goodToKnow, {
+			walkIns: "Small flash on Saturdays.",
+			ageRule: null,
+			depositPolicy: "Deposits hold your date.",
+			beforeSession: "Eat well.\nBring ID.",
+			aftercare: "दिनमा दुई पटक सफा गर्नुहोस्।",
+		});
+		for (const closure of data.closedDays) {
+			assert.deepEqual(Object.keys(closure).sort(), CLOSED_DAY_FIELDS);
+		}
+		for (const open of data.openingHours) {
+			assert.deepEqual(Object.keys(open).sort(), HOURS_FIELDS);
+		}
+		assert.notInclude(JSON.stringify(data), "ended-closure-128");
+	});
+
+	test("a whitespace-only deposit policy is null, and the percentage is never in the answer", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("api-policy-128");
+		await inTenant(tenant, () =>
+			new TenancyService().updateDepositSettings(tenant, {
+				defaultDepositPercent: 37,
+				depositPolicy: " \n ",
+			}),
+		);
+
+		const { data } = (
+			await client.get("/api/v1/tenants/api-policy-128")
+		).body();
+
+		assert.isNull(data.goodToKnow.depositPolicy);
+		assert.notProperty(data, "defaultDepositPercent");
+		assert.notInclude(JSON.stringify(data), "37");
+	});
+
+	test("saving the hours changes the ETag", async ({ client, assert }) => {
+		const { tenant } = await studioWithOwner("api-know-etag-128");
+		const before =
+			(await client.get("/api/v1/tenants/api-know-etag-128")).header("etag") ??
+			"";
+		assert.isNotEmpty(before);
+
+		await inTenant(tenant, () =>
+			new OpeningHoursService().replaceWeek(tenant, [
+				{ day: "mon", opens: "11:00", closes: "20:00" },
+			]),
+		);
+		const after = await client
+			.get("/api/v1/tenants/api-know-etag-128")
+			.header("if-none-match", before);
+
+		after.assertStatus(200);
+		assert.notEqual(after.header("etag"), before);
+		assert.lengthOf(after.body().data.openingHours, 1);
 	});
 
 	test("a studio without a cover answers cover: null", async ({

@@ -58,6 +58,7 @@ What the MVP (pilot with a design-partner studio) and V1 (paid launch) must do, 
 - [x] Staff are alerted to new inquiries by email and in the app. No automatic customer messages in the MVP; replies go through the one-tap chat links
 - A new inquiry alerts each owner, and the artist the client asked for when that profile is linked to a member, once each: an email (the client's first name and the start of the idea, never the phone; owners get a link to the inquiry) and an alert under the dashboard's bell. Email can be switched off for the whole platform until its sending domain exists. A deposit screenshot alerts the owners and the project's artist the same way (the client's first name, never the amount; the link opens the project's Payments card).
 - [x] Studio page at `{slug}.platform.com`: profile, artists, Instagram link, intake form
+- [x] Studio website: the gallery and each artist's portfolio, and Good to know with the studio's opening hours (one open and one close time per weekday, in its timezone), dated closed days with a note, walk-ins, age rule, deposit policy, what to do before a session and aftercare, plus "Open now" on the cover. Each part shows only when filled in; the owner sets them in Settings, Good to know
 - [ ] The dashboard is mobile-first and installable as a web app
 - [x] Pilot metrics: share of inquiries arriving through the link, time from inquiry to verified deposit, session no-shows
 - All three come from what the platform already stores, over a rolling window. Through the link: the inquiries that arrived (any outcome) out of those plus the projects booked at the desk. Inquiry to deposit: the median time from an inquiry to its project's first verified deposit that wasn't reversed (from the deposit page or the desk), counted when it was verified. No-shows: no-shows out of the sessions that were done or missed, by start time; past sessions without an outcome are named, not counted. Owners see their last 30 days at the bottom of the inbox; the team runs `metrics:pilot` for every studio (42 days by default, gate 1's six weeks).
@@ -67,7 +68,7 @@ What the MVP (pilot with a design-partner studio) and V1 (paid launch) must do, 
 - Automatic deposit confirmation: Khalti ePayment, or a dynamic Fonepay QR through an aggregator
 - Flash with instant booking, and bookable consultation and piercing slots. This brings services, weekly availability, exceptions, the slot engine, minimum notice and booking horizon
 - SMS reminders, plus aftercare and healing-check messages
-- Studio site: portfolio, flash, artist pages, more themes, custom domain
+- Studio site: flash, more themes, custom domain
 - English-first tourist mode, with NPR shown alongside approximate USD
 - Reports: deposits collected, no-show rate
 - Tattoo style and body placement lists
@@ -136,7 +137,7 @@ shortcuts:   flash or walk-in → booked     in_progress → booked (next sessio
 
 - The tenant comes from the subdomain (`<slug>.localhost:3000` in development). An unknown subdomain shows a not-found page (404); an old slug redirects (302) to the current subdomain with the same path and query; the bare domain and `www.` show a landing page.
 - The studio page reads and writes **only** through the API/SDK. It never touches the database or imports platform code.
-- Hidden artists don't appear, and a hidden or deleted artist's page is a not-found page. The page shows what the dashboard says it shows (the profile, the visible artists with their photos and closed messages), never deposit policies, payment details, members or anything about clients, inquiries or payments.
+- Hidden artists don't appear, and a hidden or deleted artist's page is a not-found page. The page shows what the dashboard says it shows (the profile, the visible artists with their photos and closed messages), its deposit policy in Good to know (TAT-128) and nothing else about money: never the default deposit percentage, payment details, members or anything about clients, inquiries or payments. "Open now" is worked out in the visitor's browser from the hours (the page is cached for minutes), so it is right when the cached page is not.
 - Each visible artist has a link of their own, `/artists/<slug>`, that asks for them by name; a hidden, unknown or renamed artist shows the not-found page.
 - Owners set the page's look in Settings, Page look: a theme from the platform's list, a logo, a colour (and optionally a dark-mode colour) that reads at 4.5:1 on the page, a heading font from a fixed list, and whether the artists list comes before the idea form, after it or not at all (the form is always there). The look is stored as these values only, never markup or CSS; a value the page can't use falls back to the default alone.
 - The page shows only what the public API returns, always as text, and loads no analytics or third-party scripts (the intake form's bot challenge, Cloudflare Turnstile, is the one exception, loaded only once someone starts filling the form in).

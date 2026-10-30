@@ -56,7 +56,7 @@ John
 ## Product areas
 
 - **Dashboard:** a mobile-first, installable web app. It holds the inquiry inbox, projects, clients, the artist calendar, artists and settings, including the studio's payment QR codes.
-- **Studio page:** `{slug}.platform.com`. In the MVP: the profile, artists, an Instagram link and the intake form. In V1: a full site with portfolio, flash and themes.
+- **Studio page:** `{slug}.platform.com`. In the MVP: the profile, artists, an Instagram link, the intake form, the gallery and each artist's portfolio, and Good to know with opening hours and closed days. In V1: flash, more themes and a custom domain.
 - **Developer platform:** the API is used by our own studio page first. The public SDK opens in V2, and only if agencies ask for it.
 
 ## Storefront customization levels

@@ -94,6 +94,19 @@ describe("the photo viewer is the browser's dialog (TAT-116)", () => {
 		assert.deepEqual(others, []);
 	});
 
+	test("open-now.tsx holds the cover's only timer and touches no DOM (TAT-128)", () => {
+		const text = read("studio/open-now.tsx");
+
+		assert.match(text, /setInterval/);
+		assert.match(text, /clearInterval/);
+		assert.ok(!text.includes("document."), "open-now.tsx uses document.");
+		assert.ok(!text.includes("window."), "open-now.tsx uses window.");
+		for (const { file, text: other } of sources("studio/")) {
+			if (file === "studio/open-now.tsx") continue;
+			assert.ok(!other.includes("setInterval"), `${file} uses setInterval`);
+		}
+	});
+
 	test("the page's scroll is never locked", () => {
 		const css = read("styles.css");
 		for (const selector of ["html", "body", ":root"]) {
