@@ -174,8 +174,10 @@ export default function FlashTray({
 
 /**
  * The add form: a picture, a name, a size and an optional price. A saved
- * design clears the form (the file input too); a refusal shows under its field
- * and keeps what was typed.
+ * design clears this form (the file input too) and nothing else: the visit
+ * keeps the page's state (`preserveState: true`, as the work photos do), so
+ * the profile form above keeps its unsaved edits and chosen photo. A refusal
+ * shows under its field and keeps what was typed.
  */
 function AddDesign({
 	tenantSlug,
@@ -188,7 +190,7 @@ function AddDesign({
 		<Form
 			route="tenant.artists.flash.store"
 			routeParams={{ tenant: tenantSlug, id: artistId }}
-			options={{ preserveScroll: true, preserveState: "errors" }}
+			options={{ preserveScroll: true, preserveState: true }}
 			resetOnSuccess
 		>
 			{({ errors, processing }) => (
