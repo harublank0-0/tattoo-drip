@@ -7,6 +7,9 @@ import ArtistService from "#modules/artists/services/artist_service";
 import type Client from "#modules/clients/models/client";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ClientService from "#modules/clients/services/client_service";
+import { flashCard } from "#modules/flash/flash_card";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import FlashService from "#modules/flash/services/flash_service";
 import { referenceView } from "#modules/inquiries/reference_view";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import InquiryService from "#modules/inquiries/services/inquiry_service";
@@ -134,6 +137,7 @@ export default class ProjectsController {
 		private bookings: BookingService,
 		private templates: MessageTemplateService,
 		private waiting: WaitingService,
+		private flash: FlashService,
 	) {}
 
 	/**
@@ -316,6 +320,22 @@ export default class ProjectsController {
 						).map((image) => referenceView(this.images, tenant, image)),
 					),
 				}
+			: null;
+
+		// The flash design the project came from (TAT-129), hidden or not: the
+		// project is read member-scoped above, so its design is theirs to see.
+		const design = project.flashDesignId
+			? (await this.flash.forIds(tenant, [project.flashDesignId])).get(
+					project.flashDesignId,
+				)
+			: undefined;
+		const flash = design
+			? await flashCard(
+					this.images,
+					tenant,
+					design,
+					artists.find(({ id }) => id === design.artistId)?.name ?? null,
+				)
 			: null;
 
 		// The Payments card (TAT-66). Screenshot URLs are signed for owners
@@ -571,6 +591,7 @@ export default class ProjectsController {
 				artistName: artist?.name ?? null,
 			},
 			nextStep,
+			flash,
 			quote: current ? quoteProps(current, timezone) : null,
 			history: versions.slice(1).map((quote) => quoteProps(quote, timezone)),
 			// From booked on, the quote's expiry no longer means anything.

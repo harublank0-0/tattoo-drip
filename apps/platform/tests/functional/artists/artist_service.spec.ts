@@ -22,6 +22,7 @@ const input = (over: Partial<ArtistInput> = {}): ArtistInput => ({
 	bio: null,
 	visible: true,
 	acceptingInquiries: true,
+	acceptingFlash: true,
 	closedMessage: null,
 	linkToMe: false,
 	styles: [],
@@ -715,6 +716,7 @@ test.group("ArtistService own profiles (TAT-30)", (group) => {
 				bio: "Fine line",
 				visible: false,
 				acceptingInquiries: false,
+				acceptingFlash: true,
 				closedMessage: "Back in May",
 				styles: [],
 				instagramUrl: null,
@@ -858,5 +860,33 @@ test.group("ArtistService claims and unlinks (TAT-33)", (group) => {
 			assert.equal((await Artist.findOrFail(owners.id)).userId, owner.id);
 			assert.isNull(await artists.profileOf(tenant, member.id));
 		});
+	});
+
+	test("an artist takes flash requests by default and the switch is saved", async ({
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+		const made = await inTenant(tenant, () =>
+			artists.create(tenant, input(), owner),
+		);
+		assert.isTrue(made.acceptingFlash);
+
+		const saved = await inTenant(tenant, () =>
+			artists.update(tenant, made, input({ acceptingFlash: false }), owner),
+		);
+		assert.isFalse(saved.acceptingFlash);
+		const read = await inTenant(tenant, () => Artist.findOrFail(made.id));
+		assert.isFalse(read.acceptingFlash);
+
+		const again = await inTenant(tenant, () =>
+			artists.update(tenant, read, input({ acceptingFlash: true }), owner),
+		);
+		assert.isTrue(again.acceptingFlash);
+
+		const own = await studioWithOwner("flash-own", "Flash Own");
+		const profile = await inTenant(own.tenant, () =>
+			artists.createOwnerProfile(own.tenant, own.owner),
+		);
+		assert.isTrue(profile.acceptingFlash);
 	});
 });

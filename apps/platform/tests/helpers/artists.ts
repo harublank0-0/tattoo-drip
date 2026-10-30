@@ -6,6 +6,7 @@ import ArtistService, {
 	type ArtistInput,
 	type Member,
 } from "#modules/artists/services/artist_service";
+import FlashDesign from "#modules/flash/models/flash_design";
 import ImageService from "#modules/media/services/image_service";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { inTenant } from "#tests/helpers/tenants";
@@ -17,6 +18,7 @@ export const artistInput = (over: Partial<ArtistInput> = {}): ArtistInput => ({
 	bio: null,
 	visible: true,
 	acceptingInquiries: true,
+	acceptingFlash: true,
 	closedMessage: null,
 	linkToMe: false,
 	styles: [],
@@ -71,6 +73,41 @@ export async function addWorkPhoto(
 		alt: over.alt ?? null,
 		styles: over.styles ?? [],
 		healed: over.healed ?? false,
+		// Left out, the model dates it now.
+		...(over.createdAt ? { createdAt: over.createdAt } : {}),
+	});
+}
+
+/**
+ * A flash design row for `artist` with a made-up key and no file (the drive
+ * ignores a delete of a missing file), shown, 1200 x 1200, dated now unless
+ * `createdAt` says otherwise: designs are listed newest first (TAT-129).
+ * `price` is in paisa. Call it inside the tenant's context, as the model needs.
+ */
+export async function addFlashDesign(
+	tenant: Pick<Tenant, "id">,
+	artist: Pick<Artist, "id">,
+	over: Partial<{
+		name: string;
+		size: string;
+		price: number | null;
+		hidden: boolean;
+		key: string;
+		createdAt: DateTime;
+	}> = {},
+) {
+	return FlashDesign.create({
+		tenantId: tenant.id,
+		artistId: artist.id,
+		imageKey:
+			over.key ??
+			`tenants/${tenant.id}/flash_design/${randomUUID()}.320-640-1280.png`,
+		width: 1200,
+		height: 1200,
+		name: over.name ?? "Moth",
+		size: over.size ?? "About 3 in",
+		price: over.price ?? null,
+		hidden: over.hidden ?? false,
 		// Left out, the model dates it now.
 		...(over.createdAt ? { createdAt: over.createdAt } : {}),
 	});

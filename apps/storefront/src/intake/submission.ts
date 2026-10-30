@@ -12,6 +12,7 @@ export function toInquiryInput(
 	values: IntakeValues,
 	referenceImages: readonly File[],
 	honeypot: string,
+	flashDesignId: string | null = null,
 ): CreateInquiryInput {
 	if (values.sourceChannel === "") {
 		throw new Error("toInquiryInput() needs answers validateIntake passed.");
@@ -23,6 +24,8 @@ export function toInquiryInput(
 		approximateSize: values.approximateSize.trim(),
 		preferredDates: values.preferredDates.trim(),
 		preferredArtistId: optional(values.preferredArtistId),
+		// The flash design asked for (TAT-129); absent for a custom request.
+		...(flashDesignId ? { flashDesignId } : {}),
 		budget: optional(values.budget),
 		sourceChannel: values.sourceChannel,
 		contactName: values.contactName.trim(),

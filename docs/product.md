@@ -40,7 +40,7 @@ A tattoo is a **project**, not an appointment:
 inquiry → review → quote → deposit → session(s) → healing check → completed
 ```
 
-Flash, piercing and walk-ins skip the quote. Details are in [requirements](requirements.md#project-rules) and [data-model](data-model.md).
+Piercing and walk-ins skip the quote, and so does flash booked instantly (V1). A flash design asked for from the studio page goes through the usual quote. Details are in [requirements](requirements.md#project-rules) and [data-model](data-model.md).
 
 ## Tenants
 
@@ -56,7 +56,7 @@ John
 ## Product areas
 
 - **Dashboard:** a mobile-first, installable web app. It holds the inquiry inbox, projects, clients, the artist calendar, artists and settings, including the studio's payment QR codes.
-- **Studio page:** `{slug}.platform.com`. In the MVP: the profile, artists, an Instagram link, the intake form, the gallery and each artist's portfolio, and Good to know with opening hours and closed days. In V1: flash, more themes and a custom domain.
+- **Studio page:** `{slug}.platform.com`. In the MVP: the profile, artists, an Instagram link, the intake form, the gallery and each artist's portfolio, Good to know with opening hours and closed days, and flash designs a client can ask for (a design's page and a request that names it). In V1: more themes and a custom domain.
 - **Developer platform:** the API is used by our own studio page first. The public SDK opens in V2, and only if agencies ask for it.
 
 ## Storefront customization levels

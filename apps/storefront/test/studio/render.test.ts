@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { describe, test } from "node:test";
 import type { Artist, Studio } from "@tattoo-drip/sdk";
 import {
@@ -11,14 +12,20 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
 	ArtistPage,
 	ErrorPage,
+	FlashDesignPage,
+	FlashPage,
 	NotFoundPage,
 	RequestPage,
 	StudioPage,
 	WorkPage,
 } from "../../src/studio/components/pages.tsx";
+import { studioCopy } from "../../src/studio/copy.ts";
+import type { FlashSearch } from "../../src/studio/flash.ts";
 import type { PortfolioSearch, WorkSearch } from "../../src/studio/gallery.ts";
 import {
 	artistPageData,
+	flashDesignPageData,
+	flashPageData,
 	requestPageData,
 	studioPageData,
 	workPageData,
@@ -28,7 +35,10 @@ import { headTags } from "../../src/studio/seo.ts";
 import {
 	ARJUN,
 	CLOSED_STUDIO,
+	EMPTY_FLASH_PAGE,
 	EMPTY_STUDIO,
+	flashId,
+	flashPage,
 	galleryPage,
 	ORIGIN,
 	SITA,
@@ -2250,5 +2260,439 @@ describe("the roster's 'Ask for' links while the studio is closed (TAT-127)", ()
 			"/request?artist=sita",
 		]);
 		assert.doesNotMatch(studioHtml(STUDIO, [SITA]), /Ask for/);
+	});
+});
+
+describe("flash on the artist page, /flash and a design's page (TAT-129)", () => {
+	const withFlash = (flash: unknown, slug = "sita") => {
+		const data = artistPageData(
+			STUDIO,
+			[SITA, ARJUN],
+			slug,
+			ORIGIN,
+			IMAGE_ORIGIN,
+			undefined,
+			flash,
+		);
+		assert.ok(data);
+		return renderToStaticMarkup(createElement(ArtistPage, { data }));
+	};
+	const flashHtml = (
+		page: unknown,
+		search: FlashSearch = {},
+		artists: Artist[] = [SITA, ARJUN],
+	) =>
+		renderToStaticMarkup(
+			createElement(FlashPage, {
+				data: flashPageData(
+					STUDIO,
+					artists,
+					page,
+					search,
+					ORIGIN,
+					IMAGE_ORIGIN,
+				),
+			}),
+		);
+	const designHtml = (design: unknown, artists: Artist[] = [SITA, ARJUN]) => {
+		const data = flashDesignPageData(
+			STUDIO,
+			artists,
+			design,
+			ORIGIN,
+			IMAGE_ORIGIN,
+		);
+		assert.ok(data);
+		return renderToStaticMarkup(createElement(FlashDesignPage, { data }));
+	};
+	const [moth] = flashPage(1).data;
+
+	test("the artist page shows the artist's flash with 'All flash by'", () => {
+		const html = withFlash(flashPage(3, { nextCursor: "c2" }));
+
+		assertSafePage(html);
+		assert.match(
+			html,
+			/<section id="flash" class="section" aria-labelledby="flash-title"><h2 id="flash-title" class="section-title">Flash<\/h2>/,
+		);
+		assert.ok(
+			html.indexOf('id="flash"') > html.indexOf('id="work"') ||
+				!html.includes('id="work"'),
+		);
+		assert.ok(html.indexOf('id="flash"') < html.indexOf('id="studio-title"'));
+		assert.ok(hrefs(html).includes(`/flash/${flashId(1)}`));
+		assert.match(html, /Moth/);
+		assert.match(html, /NPR 3,000/);
+		// An artist's own page does not name them on each card.
+		assert.doesNotMatch(html, /class="flash-card-artist"/);
+		assert.match(
+			html,
+			/<a class="text-link" href="\/flash\?artist=sita"><span>All flash by <bdi>Sita Rai<\/bdi><\/span><\/a>/,
+		);
+		assert.equal(count(html, /class="flash-card"/g), 3);
+	});
+
+	test("an artist page with one page of designs has no 'All flash by' link; without designs, no section", () => {
+		assert.doesNotMatch(withFlash(flashPage(2)), /All flash by/);
+		const none = withFlash(EMPTY_FLASH_PAGE);
+		assert.doesNotMatch(none, /id="flash"/);
+		assert.doesNotMatch(withFlash(undefined), /id="flash"/);
+		assertSafePage(none);
+	});
+
+	test("a design whose artist takes no flash requests shows greyed with the artist's words", () => {
+		const closed = {
+			...flashPage(1).data[0],
+			requestable: false,
+			artist: { slug: "arjun", name: "अर्जुन थापा" },
+		};
+		const html = withFlash(flashPage(1, { data: [closed] }), "arjun");
+
+		assert.match(html, /class="flash-card flash-card-closed"/);
+		assert.match(
+			html,
+			/<p class="note user-text" dir="auto">Books open in March\.<\/p>/,
+		);
+		// Still a link to the design.
+		assert.ok(hrefs(html).includes(`/flash/${flashId(1)}`));
+		assertSafePage(html);
+
+		const off = withFlash(
+			flashPage(1, { data: [{ ...moth, requestable: false }] }),
+		);
+		assert.match(off, /Not taking flash requests right now/);
+	});
+
+	test("/flash lists every design with its artist; the filter shows only with two artists", () => {
+		const one = flashHtml(flashPage(3));
+
+		assertSafePage(one);
+		assert.deepEqual(headings(one), [1, 2]);
+		assert.match(one, /<h1 [^>]*>Flash<\/h1>/);
+		assert.equal(count(one, /class="flash-card"/g), 3);
+		assert.match(one, /class="flash-card-artist">by <bdi>Sita Rai<\/bdi>/);
+		assert.doesNotMatch(one, /<nav /);
+		// The site bar's Request is the studio's general one; the chat button is there.
+		assert.match(
+			one,
+			/^<header class="site-bar"><div class="site-bar-inner"><a class="site-bar-home" href="\/" dir="auto">Black Needle<\/a><a class="action action-primary site-bar-request" href="\/request">Request<\/a>/,
+		);
+		assert.match(one, /class="chat/);
+
+		const two = flashHtml(
+			flashPage(3, {
+				filters: {
+					artists: [
+						{ slug: "arjun", name: "Arjun" },
+						{ slug: "sita", name: "Sita Rai" },
+					],
+				},
+			}),
+		);
+		assert.match(two, /<nav aria-label="Whose flash"/);
+		assert.match(two, /<a href="\/flash" aria-current="page">All<\/a>/);
+		assert.match(two, /<a href="\/flash\?artist=arjun"><bdi>Arjun<\/bdi><\/a>/);
+		const sita = flashHtml(
+			flashPage(3, {
+				filters: {
+					artists: [
+						{ slug: "arjun", name: "Arjun" },
+						{ slug: "sita", name: "Sita Rai" },
+					],
+				},
+			}),
+			{ artist: "sita" },
+		);
+		assert.match(
+			sita,
+			/<a href="\/flash\?artist=sita" aria-current="page"><bdi>Sita Rai<\/bdi><\/a>/,
+		);
+		assert.doesNotMatch(sita, /<a href="\/flash" aria-current/);
+	});
+
+	test("Show more is a link to the next page; a cursor page has 'Back to the newest'", () => {
+		const first = flashHtml(flashPage(3, { nextCursor: "c2" }));
+		assert.match(
+			first,
+			/<a class="action action-secondary flash-more" href="\/flash\?cursor=c2">Show more<\/a>/,
+		);
+		assert.doesNotMatch(first, /Back to the newest/);
+
+		const filtered = flashHtml(flashPage(3, { nextCursor: "c3" }), {
+			artist: "sita",
+			cursor: "c2",
+		});
+		assert.match(
+			filtered,
+			/href="\/flash\?artist=sita&amp;cursor=c3">Show more/,
+		);
+		assert.match(
+			filtered,
+			/<a class="text-link" href="\/flash\?artist=sita">Back to the newest<\/a>/,
+		);
+		assertSafePage(filtered);
+	});
+
+	test("the way back to the studio page is one string in studioCopy, used by the not-found page and the empty flash page", async () => {
+		const notFound = renderToStaticMarkup(createElement(NotFoundPage));
+		const empty = flashHtml(EMPTY_FLASH_PAGE);
+		const source = await readFile(
+			new URL("../../src/studio/components/pages.tsx", import.meta.url),
+			"utf8",
+		);
+
+		assert.equal(studioCopy.goToStudio, "Go to the studio page");
+		for (const html of [notFound, empty]) {
+			assert.match(html, />Go to the studio page<\/a>/);
+		}
+		assert.doesNotMatch(source, /Go to the studio page/);
+	});
+
+	test("/flash with no designs, and with a filter that matches none", () => {
+		const empty = flashHtml(EMPTY_FLASH_PAGE);
+		assert.match(empty, /No flash designs yet\./);
+		assert.match(empty, /href="\/">Go to the studio page<\/a>/);
+		assertSafePage(empty);
+
+		const none = flashHtml(EMPTY_FLASH_PAGE, { artist: "sita" });
+		assert.match(none, /No flash designs by this artist\./);
+		assert.match(
+			none,
+			/<a class="text-link" href="\/flash">Show all flash<\/a>/,
+		);
+		assertSafePage(none);
+
+		// A broken answer is the empty page too.
+		assert.match(flashHtml("garbage"), /No flash designs yet\./);
+	});
+
+	test("the design page shows the picture large, the artist, size, price, status and Request this design", () => {
+		const html = designHtml(moth);
+
+		assertSafePage(html);
+		assert.deepEqual(headings(html), [1, 2]);
+		assert.match(html, /<h1 id="flash-design-title"[^>]*>Moth<\/h1>/);
+		assert.match(
+			html,
+			/by <a class="text-link" href="\/artists\/sita"><bdi>Sita Rai<\/bdi><\/a>/,
+		);
+		assert.match(html, /<dt>Size<\/dt><dd[^>]*>About 3 in<\/dd>/);
+		assert.match(html, /<dt>Price<\/dt><dd>NPR 3,000<\/dd>/);
+		assert.match(html, /<dt>Status<\/dt><dd[^>]*>Available<\/dd>/);
+		assert.match(
+			html,
+			new RegExp(
+				`<a class="action action-primary" href="/request\\?flash=${flashId(1)}">Request this design</a>`,
+			),
+		);
+		const image = images(html).find((tag) =>
+			tag.includes("flash-design-picture"),
+		);
+		assert.ok(image);
+		assert.match(
+			image,
+			/sizes="\(min-width: 38\.5rem\) 36rem, calc\(100vw - 2\.5rem\)"/,
+		);
+		assert.match(image, /fetchPriority="high"/i);
+		// A 1200 px picture is already within 1280: the widest copy is the picture itself.
+		assert.match(
+			image,
+			/src="https:\/\/api\.example\.com\/uploads\/tenants\/t\/flash_design\/f1\.320-640-1280\.png"/,
+		);
+		assert.match(html, /All flash by <bdi>Sita Rai<\/bdi>/);
+		// The chat's WhatsApp text names the design.
+		assert.match(html, /about%20the%20Moth%20flash/);
+	});
+
+	test("a design that can't be requested shows no request link and says why; an unpriced design has no Price", () => {
+		const off = designHtml({ ...moth, requestable: false, price: null });
+
+		assertSafePage(off);
+		assert.doesNotMatch(off, /Request this design/);
+		assert.doesNotMatch(off, /<dt>Price<\/dt>/);
+		assert.match(
+			off,
+			/<dt>Status<\/dt><dd[^>]*>Not taking flash requests right now<\/dd>/,
+		);
+
+		const arjun = designHtml({
+			...moth,
+			requestable: false,
+			artist: { slug: "arjun", name: "अर्जुन थापा" },
+		});
+		assert.match(arjun, /<dd[^>]*>Books open in March\.<\/dd>/);
+		assertSafePage(arjun);
+	});
+
+	test("every card's picture asks for the copies and is drawn whole", () => {
+		const html = flashHtml(flashPage(2));
+		const [first] = images(html).filter((tag) =>
+			tag.includes("flash-card-picture"),
+		);
+
+		assert.match(first, /srcSet="|srcset="/i);
+		assert.match(first, /sizes="\(min-width: 50\.5rem\) 15\.34rem, /);
+		assert.match(first, /loading="lazy"/);
+	});
+});
+
+describe("the Flash section on the studio page (TAT-129)", () => {
+	const homeHtml = (flash: unknown, studio: Studio = STUDIO) =>
+		renderToStaticMarkup(
+			createElement(StudioPage, {
+				data: studioPageData(
+					studio,
+					[SITA, ARJUN],
+					ORIGIN,
+					IMAGE_ORIGIN,
+					null,
+					flash,
+				),
+			}),
+		);
+
+	test("shows six designs with their artists and All flash, between the artists and the form", () => {
+		const html = homeHtml(flashPage(8, { nextCursor: "c2" }));
+
+		assertSafePage(html);
+		assert.match(
+			html,
+			/<section id="flash" class="section" aria-labelledby="flash-title"><h2 id="flash-title" class="section-title">Flash<\/h2>/,
+		);
+		assert.ok(html.indexOf('id="artists"') < html.indexOf('id="flash"'));
+		assert.ok(html.indexOf('id="flash"') < html.indexOf('id="inquiry"'));
+		assert.equal(count(html, /class="flash-card"/g), 6);
+		assert.match(html, /class="flash-card-artist">by <bdi>Sita Rai<\/bdi>/);
+		assert.match(
+			html,
+			/<a class="text-link" href="\/flash"><span>All flash<\/span><svg/,
+		);
+		assert.ok(hrefs(html).includes(`/flash/${flashId(1)}`));
+	});
+
+	test("no designs, no Flash section and no All flash link", () => {
+		for (const none of [EMPTY_FLASH_PAGE, null, "broken"]) {
+			const html = homeHtml(none);
+			assert.doesNotMatch(html, /id="flash"/);
+			assert.doesNotMatch(html, /All flash/);
+			assertSafePage(html);
+		}
+	});
+
+	test("a studio that hides Flash shows none even with designs", () => {
+		const hidden = withStorefront({
+			sections: [
+				{ type: "artists", props: {} },
+				{ type: "inquiry", props: {} },
+			],
+		});
+		const html = homeHtml(flashPage(6), hidden);
+
+		assert.doesNotMatch(html, /id="flash"/);
+		assert.doesNotMatch(html, /class="flash-card"/);
+	});
+
+	test("a design that can't be requested is greyed with its words on the home page too", () => {
+		const html = homeHtml(
+			flashPage(1, { data: [{ ...flashPage(1).data[0], requestable: false }] }),
+		);
+
+		assert.match(html, /class="flash-card flash-card-closed"/);
+		assert.match(html, /Not taking flash requests right now/);
+	});
+});
+
+describe("the request page for a flash design (TAT-129)", () => {
+	const ID = flashId(1);
+	const page = (
+		flash: Parameters<typeof requestPageData>[5],
+		artists: Artist[] = [SITA, ARJUN],
+	) =>
+		renderToStaticMarkup(
+			createElement(RequestPage, {
+				data: requestPageData(
+					STUDIO,
+					artists,
+					{ flash: ID },
+					ORIGIN,
+					IMAGE_ORIGIN,
+					flash,
+				),
+			}),
+		);
+	const moth = flashPage(1).data[0];
+
+	test("shows the design above the form and asks for it", () => {
+		const html = page({ kind: "found", design: moth });
+
+		assertSafePage(html);
+		assert.match(
+			html,
+			/<h1 id="inquiry-title" class="section-title">Ask for this design<\/h1><div class="flash-summary">/,
+		);
+		const summary =
+			html.match(/<div class="flash-summary">[\s\S]*?<\/div><\/div>/)?.[0] ??
+			"";
+		assert.match(summary, /<img [^>]*alt="Moth, a flash design by Sita Rai"/);
+		assert.match(summary, /sizes="8rem"/);
+		assert.match(summary, /<bdi>Moth<\/bdi>/);
+		assert.match(summary, /by <bdi>Sita Rai<\/bdi>/);
+		assert.match(summary, /About 3 in/);
+		assert.match(summary, /NPR 3,000/);
+		assert.ok(html.indexOf("flash-summary") < html.indexOf("steps-strip"));
+		// The fallback asks for the design; the form mounts after hydration.
+		assert.match(
+			html,
+			/Ask <bdi>Black Needle<\/bdi> for <bdi>The Moth flash<\/bdi>: say where it goes and the dates that suit you\./,
+		);
+		// The chat button's WhatsApp text ends with the design.
+		assert.match(html, /about%20the%20Moth%20flash/);
+		assert.doesNotMatch(html, /Send your idea<\/h1>/);
+	});
+
+	test("a closed design's page shows it greyed with the note, and the artist's own state", () => {
+		const off = { ...moth, requestable: false };
+		const html = page({ kind: "found", design: off });
+
+		assertSafePage(html);
+		assert.match(html, /class="flash-summary flash-summary-closed"/);
+		assert.match(
+			html,
+			/<p class="note user-text" dir="auto">Sita Rai isn&#x27;t taking flash requests right now\.<\/p>/,
+		);
+		// Sita's books are open: her own request form (the fallback) is below.
+		assert.match(
+			html,
+			/<h1 id="inquiry-title" class="section-title">Send your idea<\/h1>/,
+		);
+
+		const arjun = page({
+			kind: "found",
+			design: { ...off, artist: { slug: "arjun", name: "अर्जुन थापा" } },
+		});
+		assert.match(arjun, /Books open in March\./);
+		assert.match(
+			arjun,
+			/<h1 id="inquiry-title" class="section-title">Inquiries<\/h1>/,
+		);
+	});
+
+	test("a gone design's page shows the note and the general form; so does a failed read", () => {
+		const gone = page({ kind: "gone" });
+		assertSafePage(gone);
+		assert.match(
+			gone,
+			/<p class="note flash-summary-note">This flash design isn&#x27;t on <bdi>Black Needle<\/bdi>&#x27;s page any more\. Tell them about your idea instead\.<\/p>/,
+		);
+		assert.match(
+			gone,
+			/<h1 id="inquiry-title" class="section-title">Send your idea<\/h1>/,
+		);
+		assert.doesNotMatch(gone, /flash-summary"/);
+
+		const failed = page({ kind: "failed" });
+		assertSafePage(failed);
+		assert.match(failed, /We couldn&#x27;t load this flash design\./);
+		assert.match(failed, /Send your idea<\/h1>/);
 	});
 });

@@ -317,3 +317,59 @@ describe("the intake code", () => {
 		}
 	});
 });
+
+describe("a flash request's section (TAT-129)", () => {
+	const FLASH_STATE: InquiryState = {
+		kind: "open",
+		studioName: "Black Needle",
+		preferredArtist: {
+			id: "0199f000-0000-7000-8000-000000000048",
+			name: "Sita Rai",
+		},
+		artists: [{ id: "0199f000-0000-7000-8000-000000000048", name: "Sita Rai" }],
+		start: { idea: "The Moth flash", approximateSize: "About 3 in" },
+		flashDesignId: "0199f000-0000-7000-8000-000000000001",
+	};
+
+	test("asks for the design: the h1, the intro between the h1 and the strip, the fallback naming the idea", () => {
+		const html = renderToStaticMarkup(
+			createElement(InquirySection, {
+				state: FLASH_STATE,
+				channels: CHANNELS,
+				challengeSiteKey: SITE_KEY,
+				intro: createElement("div", { className: "flash-summary" }, "Moth"),
+			}),
+		);
+
+		assert.match(
+			html,
+			/<h1 id="inquiry-title" class="section-title">Ask for this design<\/h1><div class="flash-summary">Moth<\/div>/,
+		);
+		assert.ok(html.indexOf("flash-summary") < html.indexOf("steps-strip"));
+		assert.match(
+			html,
+			/Ask <bdi>Black Needle<\/bdi> for <bdi>The Moth flash<\/bdi>: say where it goes and the dates that suit you\./,
+		);
+	});
+
+	test("a custom request keeps its h1 and has no intro", () => {
+		const html = section(OPEN);
+
+		assert.match(
+			html,
+			/<h1 id="inquiry-title" class="section-title">Send your idea<\/h1>/,
+		);
+	});
+
+	test("the form is keyed by the design, so a design's form and the artist's custom form are two mounts", () => {
+		const custom: InquiryState = { ...FLASH_STATE };
+		delete (custom as { flashDesignId?: string }).flashDesignId;
+
+		assert.notEqual(intakeFormKey(FLASH_STATE), intakeFormKey(custom));
+		assert.equal(
+			intakeFormKey(FLASH_STATE),
+			"flash:0199f000-0000-7000-8000-000000000001",
+		);
+		assert.equal(intakeFormKey(custom), "0199f000-0000-7000-8000-000000000048");
+	});
+});

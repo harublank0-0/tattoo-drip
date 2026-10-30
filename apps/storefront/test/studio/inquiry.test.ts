@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { inquiryChannels, inquiryState } from "../../src/studio/inquiry.ts";
+import { flashDesignView } from "../../src/studio/flash.ts";
+import {
+	flashInquiryState,
+	inquiryChannels,
+	inquiryState,
+} from "../../src/studio/inquiry.ts";
 import {
 	artistViewModels,
 	studioViewModel,
@@ -9,6 +14,7 @@ import {
 	ARJUN,
 	CLOSED_STUDIO,
 	EMPTY_STUDIO,
+	flashPage,
 	SITA,
 	STUDIO,
 } from "./fixtures.ts";
@@ -128,5 +134,57 @@ describe("inquiryChannels", () => {
 			email: null,
 			instagram: null,
 		});
+	});
+});
+
+describe("a flash request (TAT-129)", () => {
+	const design = flashDesignView(
+		flashPage(1).data[0],
+		"https://api.example.com",
+	);
+
+	test("is open for the design's artist alone, with the idea and size filled in", () => {
+		assert.ok(design);
+		const [closedBooks] = artistViewModels([
+			{ ...SITA, acceptingInquiries: false, closedMessage: "Booked." },
+		]);
+
+		const state = flashInquiryState(studio, design, closedBooks);
+
+		assert.deepEqual(state, {
+			kind: "open",
+			studioName: "Black Needle",
+			preferredArtist: { id: SITA.id, name: "Sita Rai" },
+			artists: [{ id: SITA.id, name: "Sita Rai" }],
+			start: { idea: "The Moth flash", approximateSize: "About 3 in" },
+			flashDesignId: design.id,
+		});
+	});
+
+	test("a custom request's state has neither key", () => {
+		const state = inquiryState(studio, [sita, arjun], sita);
+
+		assert.equal(state.kind, "open");
+		assert.equal("start" in state, false);
+		assert.equal("flashDesignId" in state, false);
+	});
+
+	test("the fallback channels name the design", () => {
+		const channels = inquiryChannels(studio, null, "Moth");
+
+		assert.equal(
+			decodeURIComponent(channels.whatsapp ?? ""),
+			"https://wa.me/9779812345678?text=Hi Black Needle, I'd like to ask about the Moth flash.",
+		);
+		assert.match(channels.email ?? "", /subject=Flash%20request%3A%20Moth/);
+		assert.match(
+			decodeURIComponent(channels.email ?? ""),
+			/My idea:\r\nPlacement and size:/,
+		);
+		// Without a name nothing changes.
+		assert.deepEqual(
+			inquiryChannels(studio, null),
+			inquiryChannels(studio, null, null),
+		);
 	});
 });

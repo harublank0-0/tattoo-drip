@@ -16,6 +16,7 @@ import TattooProject from "#modules/projects/models/tattoo_project";
 import ProjectService from "#modules/projects/services/project_service";
 import QuoteService from "#modules/projects/services/quote_service";
 import SessionService from "#modules/scheduling/services/session_service";
+import { addFlashDesign } from "#tests/helpers/artists";
 import {
 	makeArtist,
 	makeClient,
@@ -297,6 +298,30 @@ test.group("InquiryService accept and decline", (group) => {
 				.firstOrFail();
 			assert.isNull(stillGone.projectId);
 			assert.isNull((await ReferenceImage.findOrFail(theirs.id)).projectId);
+		});
+	});
+
+	test("accepting a flash request carries the design to the project", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, async () => {
+			const artist = await makeArtist(tenant);
+			const design = await addFlashDesign(tenant, artist);
+			const flash = await inquiryIn(tenant, { flashDesignId: design.id });
+			const custom = await inquiryIn(tenant);
+
+			const fromFlash = await inquiries.accept(tenant, flash, artist.id);
+			const fromCustom = await inquiries.accept(tenant, custom, artist.id);
+
+			assert.equal(
+				(await TattooProject.findOrFail(fromFlash.id)).flashDesignId,
+				design.id,
+			);
+			assert.isNull(
+				(await TattooProject.findOrFail(fromCustom.id)).flashDesignId,
+			);
 		});
 	});
 

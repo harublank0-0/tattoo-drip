@@ -24,6 +24,7 @@ const fields = () => ({
 	bio: vine.string().trim().maxLength(1000).nullable().optional(),
 	visible: vine.boolean().optional(),
 	acceptingInquiries: vine.boolean().optional(),
+	acceptingFlash: vine.boolean().optional(),
 	closedMessage: vine.string().trim().maxLength(300).nullable().optional(),
 	linkToMe: vine.boolean().optional(),
 	styles: vine

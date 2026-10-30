@@ -226,3 +226,30 @@ export function logoSizes(image: ImageSize, slot: LogoSlot): string {
 	const { maxRem, heightRem } = LOGO_SLOTS[slot];
 	return rem(Math.min(maxRem, (heightRem * image.width) / image.height));
 }
+
+/**
+ * A flash design in the grid (`.flash-card img`, TAT-129): a square drawn
+ * whole (`object-fit: contain`), so no cover factor. `.flash-grid` is two
+ * columns on a phone, three from 40rem, at most 48rem wide with 1rem gaps;
+ * the page reaches 48rem at 50.5rem (the page's gutter is 2.5rem), where a
+ * column is (48 - 2) / 3 rem. Below that a column is the page's width less its
+ * gutter and the gaps, shared out.
+ */
+export function flashGridSizes(): string {
+	const column = (WORK_GRID_MAX_REM - 2 * FLASH_GRID_GAP_REM) / 3;
+	return `(min-width: ${WORK_GRID_MAX_REM + PAGE_GUTTER_REM}rem) ${rem(column)}, (min-width: ${FLASH_THREE_COLUMNS_REM}rem) ${viewportCalc(PAGE_GUTTER_REM + 2 * FLASH_GRID_GAP_REM, 1 / 3, true)}, ${viewportCalc(PAGE_GUTTER_REM + FLASH_GRID_GAP_REM, 1 / 2)}`;
+}
+
+/** `.flash-grid`: its gap, and where it turns to three columns (styles.css). */
+const FLASH_GRID_GAP_REM = 1;
+const FLASH_THREE_COLUMNS_REM = 40;
+/** `.flash-design-picture`: at most this wide, a square drawn whole. */
+const FLASH_PICTURE_REM = 36;
+
+/**
+ * A flash design's own picture (`.flash-design-picture`, TAT-129): a square
+ * at most 36rem wide, or the page's width less its gutter below 38.5rem.
+ */
+export function flashDesignSizes(): string {
+	return `(min-width: ${FLASH_PICTURE_REM + PAGE_GUTTER_REM}rem) ${FLASH_PICTURE_REM}rem, ${viewportCalc(PAGE_GUTTER_REM, 1)}`;
+}

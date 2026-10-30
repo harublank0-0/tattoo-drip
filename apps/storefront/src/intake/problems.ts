@@ -36,6 +36,8 @@ export type SubmitProblem =
 export interface ProblemContext {
 	/** The artist the attempt asked for, if any. */
 	readonly sentArtistId: string | null;
+	/** The attempt asked for a flash design (TAT-129); absent is false. */
+	readonly sentFlash?: boolean;
 	artistName(id: string): string | null;
 }
 
@@ -80,7 +82,11 @@ export function describeSubmitError(
 	switch (error.code) {
 		case "validation_failed":
 			return fieldProblem(error.fields);
+		case "flash_unavailable":
+			return notice("flash-unavailable", { contact: true });
 		case "artist_not_accepting": {
+			// A flash request has no artist picker to put the error under: it is a notice.
+			if (context.sentFlash) return notice("flash-closed", { contact: true });
 			const name = context.sentArtistId
 				? context.artistName(context.sentArtistId)
 				: null;

@@ -323,6 +323,15 @@ describe("what the browser keeps", () => {
 			defaults(tattooKeys.work("studio-a", { artist: "sita", limit: 24 })),
 			Infinity,
 		);
+		// Every flash read (TAT-129) and every design's own.
+		assert.equal(defaults(tattooKeys.flash("studio-a")), Infinity);
+		assert.equal(
+			defaults(tattooKeys.flash("studio-a", { artist: "sita", limit: 12 })),
+			Infinity,
+		);
+		assert.equal(defaults(tattooKeys.flashDesign("studio-a", "d1")), Infinity);
+		assert.equal(defaults(tattooKeys.flash("studio-b")), undefined);
+		assert.equal(defaults(tattooKeys.flashDesign("studio-b", "d1")), undefined);
 		assert.equal(defaults(tattooKeys.work("studio-b")), undefined);
 		assert.equal(defaults(tattooKeys.artists("studio-b")), undefined);
 		assert.equal(defaults(tattooKeys.services("studio-a")), undefined);

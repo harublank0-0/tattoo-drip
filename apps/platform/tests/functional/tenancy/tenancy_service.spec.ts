@@ -349,6 +349,7 @@ test.group("TenancyService.membershipFor", (group) => {
 					bio: null,
 					visible: true,
 					acceptingInquiries: true,
+					acceptingFlash: true,
 					closedMessage: null,
 					linkToMe: false,
 					styles: [],

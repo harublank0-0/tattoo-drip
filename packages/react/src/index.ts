@@ -4,6 +4,8 @@ export {
 	useAvailability,
 	useCreateInquiry,
 	useDeposit,
+	useFlash,
+	useFlashDesign,
 	usePlacements,
 	useServices,
 	useStudio,

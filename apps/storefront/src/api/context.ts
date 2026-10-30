@@ -146,7 +146,8 @@ export function dehydrateApi(api: ApiContext): DehydratedApi {
  * as a second tap on the same `#inquiry` link) would fetch them again, and a
  * failure would replace the page with the route's error. The artists key is a
  * prefix of each artist's own key, so one default covers both, and the work
- * key (TAT-126) of every gallery read, whatever its filters. A query takes
+ * key (TAT-126) of every gallery read, whatever its filters, and the flash
+ * keys (TAT-129): every flash read and every design's own. A query takes
  * its defaults when it is built, so this comes before the cache is hydrated
  * (a gcTime passed to the loader's query() would not reach a query that
  * already exists).
@@ -161,6 +162,8 @@ export function hydrateApi(
 		tattooKeys.studio(connection.tenant),
 		tattooKeys.artists(connection.tenant),
 		tattooKeys.work(connection.tenant),
+		tattooKeys.flash(connection.tenant),
+		tattooKeys.flashDesigns(connection.tenant),
 	]) {
 		api.queryClient.setQueryDefaults(key, {
 			gcTime: Number.POSITIVE_INFINITY,

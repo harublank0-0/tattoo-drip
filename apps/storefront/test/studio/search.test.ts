@@ -17,6 +17,7 @@ import {
 } from "../../src/api/context.ts";
 import { SiteRef } from "../../src/site/context.ts";
 import { ArtistPage, WorkPage } from "../../src/studio/components/pages.tsx";
+import { readFlashSearch } from "../../src/studio/flash.ts";
 import {
 	type PortfolioSearch,
 	readPortfolioSearch,
@@ -175,7 +176,12 @@ describe("the router is given them", () => {
  * validated search), and the search.
  */
 async function visit(url: string) {
-	const seen: { work?: unknown; artist?: unknown; params?: unknown } = {};
+	const seen: {
+		work?: unknown;
+		artist?: unknown;
+		flash?: unknown;
+		params?: unknown;
+	} = {};
 	const root = createRootRoute();
 	const index = createRoute({
 		getParentRoute: () => root,
@@ -203,13 +209,24 @@ async function visit(url: string) {
 		},
 		component: () => null,
 	});
+	// /flash (TAT-129) is wired as src/routes/flash/index.tsx wires it.
+	const flash = createRoute({
+		getParentRoute: () => root,
+		path: "/flash",
+		validateSearch: readFlashSearch,
+		loaderDeps: ({ search }) => readFlashSearch(search),
+		loader: ({ deps }) => {
+			seen.flash = deps;
+		},
+		component: () => null,
+	});
 	const deposit = createRoute({
 		getParentRoute: () => root,
 		path: "/deposit",
 		component: () => null,
 	});
 	const router = createRouter({
-		routeTree: root.addChildren([index, work, artist, deposit]),
+		routeTree: root.addChildren([index, work, artist, flash, deposit]),
 		history: createMemoryHistory({ initialEntries: [url] }),
 		isServer: true,
 		parseSearch: parsePlainSearch,
@@ -293,10 +310,24 @@ describe("a full round trip through the router: parse, validate, write", () => {
 	});
 
 	test("a path no page matches is still the root's not-found, not an error", async () => {
-		const result = await visit("/flash?artist=true");
+		const result = await visit("/shop?artist=true");
 
 		assert.equal(result.redirectedTo, null);
 		assert.equal(result.loaded > 0, true);
+	});
+
+	test("/flash?artist=1e2&cursor=c2_-  reaches the loader as that and is not redirected", async () => {
+		const result = await visit("/flash?artist=1e2&cursor=c2_-");
+
+		assert.deepEqual(result.flash, { artist: "1e2", cursor: "c2_-" });
+		assert.equal(result.redirectedTo, null);
+		assert.equal(result.loaded > 0, true);
+	});
+
+	test("a stray key on /flash never reaches the loader", async () => {
+		const result = await visit("/flash?artist=sita&fbclid=abc");
+
+		assert.deepEqual(result.flash, { artist: "sita" });
 	});
 });
 

@@ -20,6 +20,8 @@ export const studioCopy = {
 	/** The hero's secondary action: a WhatsApp chat with the studio. */
 	whatsapp: "WhatsApp",
 	notTaking: "Not taking new inquiries right now",
+	/** The way back from a page that has nothing: not found, or no flash yet. */
+	goToStudio: "Go to the studio page",
 	contact: {
 		chat: "Chat",
 		follow: "Follow",
@@ -96,6 +98,39 @@ export const studioCopy = {
 		closedTitleArtist: "Inquiries for {name} at {studio}",
 		closedDescription: "{who} isn't taking new inquiries right now.",
 	},
+	/**
+	 * Flash designs (TAT-129): the home and artist sections, /flash, a
+	 * design's page and the request page's summary. Templates hold {name},
+	 * {artist} and {studio}.
+	 */
+	flash: {
+		title: "Flash",
+		allFlash: "All flash",
+		allBy: "All flash by {name}",
+		pageTitle: "Flash",
+		by: "by {name}",
+		request: "Request this design",
+		requestTitle: "Ask for this design",
+		closed: "Not taking flash requests right now",
+		closedNamed: "{name} isn't taking flash requests right now.",
+		alt: "{name}, a flash design by {artist}",
+		altNoArtist: "{name}, a flash design",
+		size: "Size",
+		price: "Price",
+		status: "Status",
+		available: "Available",
+		empty: "No flash designs yet.",
+		noMatch: "No flash designs by this artist.",
+		showAll: "Show all flash",
+		filterNav: "Whose flash",
+		all: "All",
+		gone: "This flash design isn't on {studio}'s page any more. Tell them about your idea instead.",
+		failed:
+			"We couldn't load this flash design. You can still send your idea: name the design in it.",
+		ideaStart: "The {name} flash",
+		showMore: "Show more",
+		newest: "Back to the newest",
+	},
 	/** The studio's flag in words; a closed artist's own message comes first. */
 	status: {
 		open: "Taking new work",
@@ -109,6 +144,8 @@ export const studioCopy = {
 		viber: "Viber",
 		message: "Hi, I'm asking about {subject}",
 		anyTattoo: "a tattoo",
+		/** The subject on a flash design's page (TAT-129). */
+		flash: "the {name} flash",
 	},
 	/** The artist page's two lists, named for screen readers (TAT-125). */
 	artist: {

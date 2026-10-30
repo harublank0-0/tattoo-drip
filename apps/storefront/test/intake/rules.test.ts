@@ -281,6 +281,20 @@ describe("validateIntake", () => {
 			contactEmail: "",
 		});
 		assert.equal(initialValues(SITA_ID).preferredArtistId, SITA_ID);
+		// A flash request starts with the design's idea and size (TAT-129).
+		assert.deepEqual(
+			initialValues(SITA_ID, {
+				idea: "The Moth flash",
+				approximateSize: "About 3 in",
+			}),
+			{
+				...initialValues(null),
+				idea: "The Moth flash",
+				approximateSize: "About 3 in",
+				preferredArtistId: SITA_ID,
+			},
+		);
+		assert.deepEqual(initialValues(SITA_ID, null), initialValues(SITA_ID));
 	});
 });
 

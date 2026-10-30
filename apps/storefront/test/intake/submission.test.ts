@@ -174,4 +174,12 @@ describe("on the wire (the SDK's real inquiries.create)", () => {
 		assert.equal(form.get("website"), "https://spam.example");
 		assert.equal(form.has("honeypot"), false);
 	});
+
+	test("a flash request carries the design's id; without one the key is absent (TAT-129)", () => {
+		const ID = "0199f000-0000-7000-8000-000000000001";
+
+		assert.equal(toInquiryInput(FULL, [], "", ID).flashDesignId, ID);
+		assert.equal("flashDesignId" in toInquiryInput(FULL, [], ""), false);
+		assert.equal("flashDesignId" in toInquiryInput(FULL, [], "", null), false);
+	});
 });

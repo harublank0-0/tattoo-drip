@@ -59,6 +59,7 @@ type InquiryOver = Partial<
 		| "approximateSize"
 		| "preferredDates"
 		| "preferredArtistId"
+		| "flashDesignId"
 		| "budget"
 		| "sourceChannel"
 		| "contactName"
@@ -100,6 +101,7 @@ type ProjectOver = Partial<
 		TattooProject,
 		| "artistId"
 		| "inquiryId"
+		| "flashDesignId"
 		| "brief"
 		| "notes"
 		| "status"

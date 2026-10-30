@@ -6,6 +6,8 @@ import { studioTakesInquiries } from "#modules/artists/accepting";
 import ArtistService from "#modules/artists/services/artist_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ClientService from "#modules/clients/services/client_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import FlashService from "#modules/flash/services/flash_service";
 import {
 	InquiryRuleError,
 	InvalidReferenceImageError,
@@ -40,6 +42,8 @@ export type Submission = {
 	approximateSize: string;
 	preferredDates: string;
 	preferredArtistId?: string | null;
+	/** A flash design from the public list (TAT-129): the inquiry then asks for it and its artist. */
+	flashDesignId?: string | null;
 	budget?: string | null;
 	sourceChannel: SourceChannel;
 	contactName: string;
@@ -55,8 +59,11 @@ export type Submission = {
  * images, the inquiry with what was sent, its reference rows, and the staff
  * alert job. Every refusal comes before any image is decoded. Refusals are
  * InquiryRuleError (`artist_unavailable`, `artist_not_accepting`,
- * `studio_not_accepting`, `too_many_open_inquiries`) or
+ * `studio_not_accepting`, `too_many_open_inquiries`, `flash_unavailable`) or
  * InvalidReferenceImageError, thrown after the savepoint rolled back.
+ *
+ * A request for a flash design (TAT-129) names the design's artist itself
+ * and is judged by the artist's flash switch, not by their books.
  */
 @inject()
 export default class IntakeService {
@@ -64,11 +71,12 @@ export default class IntakeService {
 		private artists: ArtistService,
 		private clients: ClientService,
 		private images: ImageService,
+		private flash: FlashService,
 	) {}
 
 	async submit(tenant: TenantRef, submission: Submission): Promise<Inquiry> {
 		return withTransaction(async (trx) => {
-			await this.checkArtist(tenant, submission.preferredArtistId ?? null);
+			const { artistId, flashDesignId } = await this.target(tenant, submission);
 			// Locks the client (or, for a new phone, its index entry) until the
 			// transaction ends, so the count below can't be overtaken.
 			const client = await this.clients.matchByPhone(tenant, {
@@ -81,6 +89,19 @@ export default class IntakeService {
 				tenant,
 				submission.referenceImages ?? [],
 			);
+			// `target` looked the design up without a lock, to refuse early. An
+			// owner may have removed it, or the artist been hidden or deleted,
+			// while the pictures were processed: hold the artist and the design
+			// now, so a removal or an artist's change waits for this request, and
+			// anything already gone is the same refusal, not a database error.
+			// Held this late, after the slow work, an owner's profile save waits
+			// only for the insert below, never for an upload.
+			if (flashDesignId !== null) {
+				const held =
+					artistId !== null &&
+					(await this.flash.holdShown(trx, tenant, artistId, flashDesignId));
+				if (!held) throw new InquiryRuleError("flash_unavailable");
+			}
 
 			const inquiry = await Inquiry.create(
 				{
@@ -90,7 +111,8 @@ export default class IntakeService {
 					placement: submission.placement,
 					approximateSize: submission.approximateSize,
 					preferredDates: submission.preferredDates,
-					preferredArtistId: submission.preferredArtistId ?? null,
+					preferredArtistId: artistId,
+					flashDesignId,
 					budget: submission.budget ?? null,
 					sourceChannel: submission.sourceChannel,
 					// What was sent, frozen: never the client's stored details.
@@ -120,26 +142,55 @@ export default class IntakeService {
 	}
 
 	/**
-	 * A chosen artist must be one of the studio's visible artists
-	 * ("artist_unavailable" otherwise, the same for unknown, hidden, deleted
-	 * and another studio's) and accept inquiries ("artist_not_accepting").
-	 * With none chosen, a studio whose visible artists are all closed takes
-	 * none ("studio_not_accepting"); one with no visible artists takes
-	 * general inquiries. Compared in memory, so no id reaches a query.
+	 * Who and what the inquiry asks for. With a `flashDesignId`: the design
+	 * must be shown and its artist visible ("flash_unavailable" otherwise,
+	 * the same for unknown, hidden, a hidden or deleted artist's and another
+	 * studio's), a `preferredArtistId` other than the design's artist is
+	 * "artist_unavailable", and an artist who takes no flash requests is
+	 * "artist_not_accepting", whatever their books say; the inquiry then
+	 * names the design's artist. Without one, a chosen artist must be one of
+	 * the studio's visible artists ("artist_unavailable" otherwise, the same
+	 * for unknown, hidden, deleted and another studio's) and accept inquiries
+	 * ("artist_not_accepting"). With none chosen, a studio whose visible
+	 * artists are all closed takes none ("studio_not_accepting"); one with no
+	 * visible artists takes general inquiries. Artists are compared in
+	 * memory, so no artist id reaches a query.
 	 */
-	private async checkArtist(tenant: TenantRef, artistId: string | null) {
+	private async target(
+		tenant: TenantRef,
+		submission: Submission,
+	): Promise<{ artistId: string | null; flashDesignId: string | null }> {
 		const visible = await this.artists.listVisible(tenant);
+		const artistId = submission.preferredArtistId ?? null;
+		const designId = submission.flashDesignId ?? null;
+		if (designId !== null) {
+			const design = await this.flash.findShown(
+				tenant,
+				designId,
+				visible.map(({ id }) => id),
+			);
+			const owner = visible.find(({ id }) => id === design?.artistId);
+			if (!design || !owner) throw new InquiryRuleError("flash_unavailable");
+			if (artistId !== null && artistId !== owner.id) {
+				throw new InquiryRuleError("artist_unavailable");
+			}
+			if (!owner.acceptingFlash) {
+				throw new InquiryRuleError("artist_not_accepting");
+			}
+			return { artistId: owner.id, flashDesignId: design.id };
+		}
 		if (artistId !== null) {
 			const artist = visible.find(({ id }) => id === artistId);
 			if (!artist) throw new InquiryRuleError("artist_unavailable");
 			if (!artist.acceptingInquiries) {
 				throw new InquiryRuleError("artist_not_accepting");
 			}
-			return;
+			return { artistId, flashDesignId: null };
 		}
 		if (!studioTakesInquiries(visible)) {
 			throw new InquiryRuleError("studio_not_accepting");
 		}
+		return { artistId: null, flashDesignId: null };
 	}
 
 	/**

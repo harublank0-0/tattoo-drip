@@ -98,6 +98,11 @@ export interface ApiDefinition {
         update: typeof routes['tenant.artists.photos.update']
         destroy: typeof routes['tenant.artists.photos.destroy']
       }
+      flash: {
+        store: typeof routes['tenant.artists.flash.store']
+        update: typeof routes['tenant.artists.flash.update']
+        destroy: typeof routes['tenant.artists.flash.destroy']
+      }
     }
     inbox: {
       index: typeof routes['tenant.inbox.index']
@@ -214,6 +219,10 @@ export interface ApiDefinition {
       }
       work: {
         index: typeof routes['api.v1.work.index']
+      }
+      flash: {
+        index: typeof routes['api.v1.flash.index']
+        show: typeof routes['api.v1.flash.show']
       }
       inquiries: {
         store: typeof routes['api.v1.inquiries.store']

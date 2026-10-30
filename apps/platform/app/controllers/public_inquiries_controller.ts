@@ -88,6 +88,7 @@ function toApiError(error: unknown) {
 		case "artist_not_accepting":
 		case "studio_not_accepting":
 		case "too_many_open_inquiries":
+		case "flash_unavailable":
 			return ApiException.of(error.reason);
 		default:
 			return error;

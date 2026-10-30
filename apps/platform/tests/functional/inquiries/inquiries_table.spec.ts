@@ -6,6 +6,7 @@ import Inquiry, {
 	SOURCE_CHANNELS,
 } from "#modules/inquiries/models/inquiry";
 import { withDbContext, withTransaction } from "#services/db_context";
+import { addFlashDesign } from "#tests/helpers/artists";
 import { makeArtist, makeClient, makeInquiry } from "#tests/helpers/pipeline";
 import { assertRowLevelSecurity } from "#tests/helpers/rls";
 import { idOf, insertRow, updateRow } from "#tests/helpers/sql";
@@ -180,6 +181,7 @@ test.group("inquiries table", (group) => {
 		const { a, b, clientA } = await twoTenants();
 		const otherClient = await inTenant(a, () => makeClient(a));
 		const artist = await inTenant(a, () => makeArtist(a));
+		const design = await inTenant(a, () => addFlashDesign(a, artist));
 		const frozen: [string, unknown][] = [
 			["tenant_id", b.id],
 			["client_id", otherClient.id],
@@ -188,6 +190,8 @@ test.group("inquiries table", (group) => {
 			["approximate_size", "20 cm"],
 			["preferred_dates", "December"],
 			["preferred_artist_id", artist.id],
+			// A flash design asked for (TAT-129) is as frozen as the rest.
+			["flash_design_id", design.id],
 			["budget", "10k"],
 			["source_channel", "google"],
 			["contact_name", "Someone else"],

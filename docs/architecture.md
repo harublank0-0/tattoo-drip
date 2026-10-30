@@ -55,7 +55,8 @@ Each module owns its models and services. Other modules call its services instea
 | Notifications | Staff alerts (MVP), click-to-chat templates (MVP), SMS reminders (V1) | MVP |
 | Reports | Pilot metrics (MVP), owner reports (V1) | MVP |
 | Storefront | The studio page's public reads: the profile and the visible artists (TAT-44). Configuration and themes in V1 | MVP |
-| Catalog | Services, flash, style and placement lists | V1 |
+| Catalog | Services, style and placement lists | V1 |
+| Flash | Flash designs per artist, the public flash reads and requests for a design (TAT-129) | MVP |
 | Portfolio | Portfolio items and images | V1 |
 
 ## Tenant context

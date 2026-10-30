@@ -175,6 +175,59 @@ describe("tattooQueries.services, work and availability", () => {
 		);
 	});
 
+	test("flash and a flash design have keys under the tenant, and the design keys share a prefix", async () => {
+		const { client } = clientAnswering(200, { data: [] });
+		const tenant = ["tattoo-drip", "tenant", TENANT];
+		const id = "0199f000-0000-7000-8000-000000000001";
+
+		assert.deepEqual(tattooQueries.flash(client).queryKey, [
+			...tenant,
+			"flash",
+			{},
+		]);
+		assert.deepEqual(tattooQueries.flash(client, { artist: "sita" }).queryKey, [
+			...tenant,
+			"flash",
+			{ artist: "sita" },
+		]);
+		assert.deepEqual(tattooQueries.flashDesign(client, id).queryKey, [
+			...tenant,
+			"flash-design",
+			id,
+		]);
+		assert.deepEqual(tattooKeys.flashDesigns(TENANT), [
+			...tenant,
+			"flash-design",
+		]);
+		assert.deepEqual(
+			tattooQueries.flashDesign(client, id).queryKey.slice(0, 4),
+			tattooKeys.flashDesigns(TENANT),
+		);
+		assert.equal(tattooQueries.flashDesign(client, id).staleTime, undefined);
+	});
+
+	test("flash and a flash design load through the SDK", async () => {
+		const page = { data: [], nextCursor: null, filters: { artists: [] } };
+		const flash = clientAnswering(200, page);
+		const id = "0199f000-0000-7000-8000-000000000001";
+		const design = clientAnswering(200, { data: { id } });
+		const queryClient = noRetries();
+		const base = `https://api.example.com/api/v1/tenants/${TENANT}`;
+
+		assert.deepEqual(
+			await queryClient.fetchQuery(tattooQueries.flash(flash.client)),
+			page,
+		);
+		assert.deepEqual(flash.calls, [`${base}/flash`]);
+		assert.deepEqual(
+			await queryClient.fetchQuery(
+				tattooQueries.flashDesign(design.client, id),
+			),
+			{ id },
+		);
+		assert.deepEqual(design.calls, [`${base}/flash/${id}`]);
+	});
+
 	test("one QueryClient never serves one tenant's data for another", async () => {
 		const a = clientAnswering(
 			200,

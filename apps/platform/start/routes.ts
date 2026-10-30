@@ -270,6 +270,21 @@ router
 					.delete("photos/:id", [controllers.WorkPhotos, "destroy"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.artists.photos.destroy");
+				// An artist's flash designs (TAT-129), the same shape: the upload
+				// names the artist, the others name the design. A design a request
+				// names can't be removed; hiding it is a save.
+				router
+					.post(":id/flash", [controllers.FlashDesigns, "store"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.artists.flash.store");
+				router
+					.put("flash/:id", [controllers.FlashDesigns, "update"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.artists.flash.update");
+				router
+					.delete("flash/:id", [controllers.FlashDesigns, "destroy"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.artists.flash.destroy");
 			})
 			.prefix("/artists");
 
@@ -629,6 +644,20 @@ router
 					.get("/work", [controllers.PublicWork, "index"])
 					.use(middleware.publicCache())
 					.as("api.v1.work.index");
+				// The studio's flash (TAT-129): every shown design of every visible
+				// artist (a closed artist's too), newest first, a page at a time,
+				// like the gallery; and one design. A hidden design, a hidden or
+				// deleted artist's and an unknown id are the handler's 404; an id
+				// that is not a UUID is the router's, without a query.
+				router
+					.get("/flash", [controllers.PublicFlash, "index"])
+					.use(middleware.publicCache())
+					.as("api.v1.flash.index");
+				router
+					.get("/flash/:design", [controllers.PublicFlash, "show"])
+					.where("design", router.matchers.uuid())
+					.use(middleware.publicCache())
+					.as("api.v1.flash.show");
 				// The intake (TAT-51). intakeGuard counts the address, checks the
 				// bot challenge and counts the studio before its multipart body is
 				// read (TAT-55); the controller does the honeypot and the phone count.

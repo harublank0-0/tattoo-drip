@@ -75,6 +75,7 @@ export class ArtistWorkPhotoSchema extends BaseModel {
 
 export class ArtistSchema extends BaseModel {
 	static $columns = [
+		"acceptingFlash",
 		"acceptingInquiries",
 		"bio",
 		"closedMessage",
@@ -96,6 +97,8 @@ export class ArtistSchema extends BaseModel {
 		"visible",
 	] as const;
 	$columns = ArtistSchema.$columns;
+	@column()
+	declare acceptingFlash: boolean;
 	@column()
 	declare acceptingInquiries: boolean;
 	@column()
@@ -247,6 +250,51 @@ export class DepositOutcomeSchema extends BaseModel {
 	declare updatedAt: DateTime | null;
 }
 
+export class FlashDesignSchema extends BaseModel {
+	static $columns = [
+		"artistId",
+		"createdAt",
+		"currency",
+		"height",
+		"hidden",
+		"id",
+		"imageKey",
+		"name",
+		"price",
+		"size",
+		"tenantId",
+		"updatedAt",
+		"width",
+	] as const;
+	$columns = FlashDesignSchema.$columns;
+	@column()
+	declare artistId: string;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column()
+	declare currency: string;
+	@column()
+	declare height: number;
+	@column()
+	declare hidden: boolean;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare imageKey: string;
+	@column()
+	declare name: string;
+	@column()
+	declare price: number | null;
+	@column()
+	declare size: string;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+	@column()
+	declare width: number;
+}
+
 export class InquirySchema extends BaseModel {
 	static $columns = [
 		"anonymizedAt",
@@ -259,6 +307,7 @@ export class InquirySchema extends BaseModel {
 		"createdAt",
 		"decidedAt",
 		"deletedAt",
+		"flashDesignId",
 		"id",
 		"idea",
 		"lastContactChannel",
@@ -293,6 +342,8 @@ export class InquirySchema extends BaseModel {
 	declare decidedAt: DateTime | null;
 	@column.dateTime()
 	declare deletedAt: DateTime | null;
+	@column()
+	declare flashDesignId: string | null;
 	@column({ isPrimary: true })
 	declare id: string;
 	@column()
@@ -769,6 +820,7 @@ export class TattooProjectSchema extends BaseModel {
 		"clientId",
 		"createdAt",
 		"deletedAt",
+		"flashDesignId",
 		"id",
 		"inquiryId",
 		"lastContactChannel",
@@ -790,6 +842,8 @@ export class TattooProjectSchema extends BaseModel {
 	declare createdAt: DateTime;
 	@column.dateTime()
 	declare deletedAt: DateTime | null;
+	@column()
+	declare flashDesignId: string | null;
 	@column({ isPrimary: true })
 	declare id: string;
 	@column()

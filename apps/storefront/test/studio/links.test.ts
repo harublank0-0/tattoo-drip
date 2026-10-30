@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
+	flashDesignHref,
+	flashHref,
 	isAllowedHref,
 	linkHostname,
 	linkRel,
@@ -204,6 +206,41 @@ describe("isAllowedHref", () => {
 			"",
 		]) {
 			assert.ok(!isAllowedHref(href), href);
+		}
+	});
+});
+
+describe("the flash addresses (TAT-129)", () => {
+	const ID = "0199f000-0000-7000-8000-000000000001";
+
+	test("flashHref writes the artist then the cursor, nothing else", () => {
+		assert.equal(flashHref({}), "/flash");
+		assert.equal(flashHref({ artist: "sita" }), "/flash?artist=sita");
+		assert.equal(
+			flashHref({ artist: "sita", cursor: "c2" }),
+			"/flash?artist=sita&cursor=c2",
+		);
+		assert.equal(flashHref({ cursor: "c2" }), "/flash?cursor=c2");
+	});
+
+	test("flashDesignHref and the request link for a design", () => {
+		assert.equal(flashDesignHref(ID), `/flash/${ID}`);
+		assert.equal(requestHref({ flash: ID }), `/request?flash=${ID}`);
+		// The design names the artist: the artist is left out.
+		assert.equal(
+			requestHref({ flash: ID, artist: "sita" }),
+			`/request?flash=${ID}`,
+		);
+		assert.equal(requestHref({ artist: "sita" }), "/request?artist=sita");
+	});
+
+	test("each passes isAllowedHref", () => {
+		for (const href of [
+			flashHref({ artist: "sita", cursor: "c2" }),
+			flashDesignHref(ID),
+			requestHref({ flash: ID }),
+		]) {
+			assert.equal(isAllowedHref(href), true);
 		}
 	});
 });

@@ -201,13 +201,16 @@ export function FormSheetPanel({
 export function FormSheetActions({
 	submit,
 	processing,
+	held = false,
 }: {
 	submit: string;
 	processing: boolean;
+	/** Something else on the page has a request out that a save would cancel: the save waits, Cancel doesn't. */
+	held?: boolean;
 }) {
 	return (
 		<div className="flex flex-wrap gap-2">
-			<Button type="submit" className="h-11" disabled={processing}>
+			<Button type="submit" className="h-11" disabled={processing || held}>
 				{processing ? "Saving…" : submit}
 			</Button>
 			<SheetClose asChild>

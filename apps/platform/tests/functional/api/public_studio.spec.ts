@@ -64,6 +64,7 @@ const DEFAULT_STOREFRONT = {
 	sections: [
 		{ type: "work" },
 		{ type: "artists" },
+		{ type: "flash" },
 		{ type: "info" },
 		{ type: "inquiry" },
 	],
@@ -625,7 +626,7 @@ test.group("GET /api/v1/tenants/:tenant (getStudio)", (group) => {
 			dbClient().rawQuery(
 				`update tenants set brand_font = 'mono', storefront_theme = 'classic',
 				brand_accent = '#e8a317', brand_accent_dark = '#a99cff',
-				storefront_sections = 'inquiry,flash,artists' where id = ?`,
+				storefront_sections = 'inquiry,zzz,artists' where id = ?`,
 				[tenant.id],
 			),
 		);

@@ -1,6 +1,8 @@
 import type { ComponentProps, ComponentType } from "react";
 import {
 	ArtistPage,
+	FlashDesignPage,
+	FlashPage,
 	RequestPage,
 	StudioPage,
 	WorkPage,
@@ -18,12 +20,23 @@ export interface Theme {
 	readonly StudioPage: ComponentType<ComponentProps<typeof StudioPage>>;
 	readonly ArtistPage: ComponentType<ComponentProps<typeof ArtistPage>>;
 	readonly WorkPage: ComponentType<ComponentProps<typeof WorkPage>>;
+	readonly FlashPage: ComponentType<ComponentProps<typeof FlashPage>>;
+	readonly FlashDesignPage: ComponentType<
+		ComponentProps<typeof FlashDesignPage>
+	>;
 	readonly RequestPage: ComponentType<ComponentProps<typeof RequestPage>>;
 }
 
 /** Every theme, by key. Stencil & Ink is the page TAT-97 and TAT-105 built. */
 export const THEMES: Record<ThemeKey, Theme> = {
-	"stencil-and-ink": { StudioPage, ArtistPage, WorkPage, RequestPage },
+	"stencil-and-ink": {
+		StudioPage,
+		ArtistPage,
+		WorkPage,
+		FlashPage,
+		FlashDesignPage,
+		RequestPage,
+	},
 };
 
 /** The theme with this key, else the default. */
@@ -48,6 +61,20 @@ export function ThemedArtistPage(props: ComponentProps<typeof ArtistPage>) {
 /** `/work` in the studio's theme. */
 export function ThemedWorkPage(props: ComponentProps<typeof WorkPage>) {
 	const Page = themeFor(props.data.theme.key).WorkPage;
+	return <Page {...props} />;
+}
+
+/** `/flash` in the studio's theme (TAT-129). */
+export function ThemedFlashPage(props: ComponentProps<typeof FlashPage>) {
+	const Page = themeFor(props.data.theme.key).FlashPage;
+	return <Page {...props} />;
+}
+
+/** `/flash/$id` in the studio's theme (TAT-129). */
+export function ThemedFlashDesignPage(
+	props: ComponentProps<typeof FlashDesignPage>,
+) {
+	const Page = themeFor(props.data.theme.key).FlashDesignPage;
 	return <Page {...props} />;
 }
 

@@ -18,6 +18,8 @@ export type ArtistRowProps = {
 export type ArtistProps = ArtistRowProps & {
 	slug: string;
 	bio: string | null;
+	/** The "Taking flash requests" switch (TAT-129). */
+	acceptingFlash: boolean;
 	closedMessage: string | null;
 	/** The artist's styles that are still on the list, in the list's order. */
 	styles: string[];

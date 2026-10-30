@@ -5,8 +5,8 @@ import type { QueryClientContract } from "@adonisjs/lucid/types/database";
 import { WorkPhotoLimitError } from "#modules/artists/errors";
 import Artist from "#modules/artists/models/artist";
 import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
-// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService, {
+	mayEdit,
 	type ProfileEditor,
 } from "#modules/artists/services/artist_service";
 import type { StyleSlug } from "#modules/artists/styles";
@@ -242,7 +242,7 @@ export default class WorkPhotoService {
 				purpose: PURPOSE,
 			});
 			afterRollback(() => this.images.delete(PURPOSE, stored.key));
-			await this.lockArtist(trx, tenant, editor, artist.id);
+			await this.artists.lockEditable(trx, tenant, editor, artist.id);
 			// Again under the lock: another upload may have landed meanwhile.
 			const count = await this.countPhotos(tenant, artist.id, trx);
 			if (count >= MAX_WORK_PHOTOS) throw new WorkPhotoLimitError();
@@ -276,7 +276,7 @@ export default class WorkPhotoService {
 	): Promise<ArtistWorkPhoto> {
 		assertPhotoOf(tenant, photo);
 		return withTransaction(async (trx) => {
-			await this.lockArtist(trx, tenant, editor, photo.artistId);
+			await this.artists.lockEditable(trx, tenant, editor, photo.artistId);
 			const live = await this.lockedPhoto(trx, tenant, photo);
 			const text = details.alt?.trim();
 			live.alt = text ? text : null;
@@ -305,7 +305,7 @@ export default class WorkPhotoService {
 	): Promise<void> {
 		assertPhotoOf(tenant, photo);
 		await withTransaction(async (trx) => {
-			await this.lockArtist(trx, tenant, editor, photo.artistId);
+			await this.artists.lockEditable(trx, tenant, editor, photo.artistId);
 			const live = await this.lockedPhoto(trx, tenant, photo);
 			await this.images.deleteOrThrow(PURPOSE, live.imageKey);
 			await live.delete();
@@ -325,28 +325,6 @@ export default class WorkPhotoService {
 		return Number(row.$extras.total);
 	}
 
-	/**
-	 * Locks the artist's live row (`FOR UPDATE`, the lock ArtistService.save
-	 * takes) and checks `editor` may still change it: a profile deleted since
-	 * the page loaded, or unlinked from an artist member, is a 404.
-	 */
-	private async lockArtist(
-		trx: QueryClientContract,
-		tenant: TenantRef,
-		editor: ProfileEditor,
-		artistId: string,
-	): Promise<Artist> {
-		const live = await Artist.query({ client: trx })
-			.where("tenant_id", tenant.id)
-			.where("id", artistId)
-			.forUpdate()
-			.firstOrFail();
-		if (!mayEdit(editor, live.userId)) {
-			throw new lucidErrors.E_ROW_NOT_FOUND(Artist);
-		}
-		return live;
-	}
-
 	/** The photo's row, read again under the artist's lock: gone meanwhile is a 404. */
 	private async lockedPhoto(
 		trx: QueryClientContract,
@@ -358,11 +336,6 @@ export default class WorkPhotoService {
 			.where("id", photo.id)
 			.firstOrFail();
 	}
-}
-
-/** ArtistService.findEditable's rule: an owner any profile, anyone else their own linked one. */
-function mayEdit(editor: ProfileEditor, linkedUserId: string | null): boolean {
-	return editor.role === "owner" || linkedUserId === editor.userId;
 }
 
 /** A caller bug, not a user error: artists come from findEditable(tenant, editor, id). */

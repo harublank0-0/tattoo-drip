@@ -62,6 +62,7 @@ export type ApiErrorCode =
 	| "artist_not_accepting"
 	| "studio_not_accepting"
 	| "too_many_open_inquiries"
+	| "flash_unavailable"
 	| "challenge_failed"
 	| "challenge_unavailable"
 	// submitDepositProof (TAT-65)
@@ -134,6 +135,13 @@ export const API_ERRORS: Record<ApiErrorCode, ErrorKind> = {
 		code: "too_many_open_inquiries",
 		message:
 			"You already have requests waiting with this studio. They will reply on WhatsApp or Viber.",
+	},
+	// A request for a flash design that is hidden, whose artist is hidden or
+	// deleted, or that does not exist (TAT-129).
+	flash_unavailable: {
+		status: 409,
+		code: "flash_unavailable",
+		message: "This flash design isn't available any more.",
 	},
 	// The intake's bot challenge and honeypot (TAT-55): one message, never why.
 	challenge_failed: {

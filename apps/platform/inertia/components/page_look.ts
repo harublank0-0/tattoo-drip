@@ -25,6 +25,11 @@ export const SECTION_WORDS = {
 		description:
 			"Each artist with their photo, styles and status. Their own pages work either way.",
 	},
+	flash: {
+		title: "Flash",
+		description:
+			"A few of your newest flash designs, with a link to all of them.",
+	},
 	info: {
 		title: "Good to know",
 		description:

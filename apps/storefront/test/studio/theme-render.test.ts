@@ -6,6 +6,8 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
 	ArtistPage,
+	FlashDesignPage,
+	FlashPage,
 	RequestPage,
 	StudioPage,
 } from "../../src/studio/components/pages.tsx";
@@ -114,6 +116,8 @@ describe("the theme registry (TAT-54)", () => {
 		assert.equal(THEMES["stencil-and-ink"].StudioPage, StudioPage);
 		assert.equal(THEMES["stencil-and-ink"].ArtistPage, ArtistPage);
 		assert.equal(THEMES["stencil-and-ink"].RequestPage, RequestPage);
+		assert.equal(THEMES["stencil-and-ink"].FlashPage, FlashPage);
+		assert.equal(THEMES["stencil-and-ink"].FlashDesignPage, FlashDesignPage);
 	});
 
 	test("an unknown key is the default theme", () => {

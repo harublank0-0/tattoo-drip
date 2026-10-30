@@ -71,7 +71,7 @@ test.group("Settings, Page look: the page (TAT-56)", (group) => {
 			accent: null,
 			accentDark: null,
 			font: "eczar",
-			sections: ["work", "artists", "info", "inquiry"],
+			sections: ["work", "artists", "flash", "info", "inquiry"],
 		});
 		assert.deepEqual(props.themes, THEMES);
 		assert.deepEqual(props.fonts, FONTS);
@@ -120,7 +120,13 @@ test.group("Settings, Page look: the page (TAT-56)", (group) => {
 
 		const props = (await lookPage(client, owner, tenant)).inertiaProps;
 
-		assert.deepEqual(props.sectionKeys, ["work", "artists", "info", "inquiry"]);
+		assert.deepEqual(props.sectionKeys, [
+			"work",
+			"artists",
+			"flash",
+			"info",
+			"inquiry",
+		]);
 		assert.deepEqual(props.look.sections, ["artists", "work", "inquiry"]);
 	});
 
@@ -138,7 +144,13 @@ test.group("Settings, Page look: the page (TAT-56)", (group) => {
 		const props = (await lookPage(client, owner, tenant)).inertiaProps;
 
 		assert.deepEqual(props.look.sections, ["artists", "inquiry"]);
-		assert.deepEqual(props.sectionKeys, ["work", "artists", "info", "inquiry"]);
+		assert.deepEqual(props.sectionKeys, [
+			"work",
+			"artists",
+			"flash",
+			"info",
+			"inquiry",
+		]);
 	});
 
 	test("a stored value off today's list shows as its default", async ({
@@ -217,6 +229,35 @@ test.group("Settings, Page look: saving (TAT-56)", (group) => {
 		assert.equal(
 			(await reload(tenant)).storefrontSections,
 			"artists,work,inquiry",
+		);
+	});
+
+	test("saves Flash in the order sent, and hiding it stores the list without it", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+
+		await putLook(client, owner, tenant, {
+			...BODY,
+			"sections[]": ["flash", "work", "inquiry"],
+		});
+		assert.equal(
+			(await reload(tenant)).storefrontSections,
+			"flash,work,inquiry",
+		);
+		assert.deepEqual(
+			(await lookPage(client, owner, tenant)).inertiaProps.look.sections,
+			["flash", "work", "inquiry"],
+		);
+
+		await putLook(client, owner, tenant, {
+			...BODY,
+			"sections[]": ["work", "artists", "inquiry"],
+		});
+		assert.deepEqual(
+			(await lookPage(client, owner, tenant)).inertiaProps.look.sections,
+			["work", "artists", "inquiry"],
 		);
 	});
 
@@ -315,7 +356,7 @@ test.group("Settings, Page look: saving (TAT-56)", (group) => {
 		const cases: [string, string[], string, string][] = [
 			[
 				"an unknown section",
-				["flash", "inquiry"],
+				["zzz", "inquiry"],
 				"sections.0",
 				"Choose sections from the list.",
 			],
@@ -343,7 +384,11 @@ test.group("Settings, Page look: saving (TAT-56)", (group) => {
 			assert.deepEqual(Object.keys(errors), [field], name);
 			assert.deepEqual(errors[field], [message], name);
 			const row = await reload(tenant);
-			assert.equal(row.storefrontSections, "work,artists,info,inquiry", name);
+			assert.equal(
+				row.storefrontSections,
+				"work,artists,flash,info,inquiry",
+				name,
+			);
 			assert.equal(row.brandFont, "eczar", name);
 		}
 	});
@@ -417,7 +462,11 @@ test.group("Settings, Page look: saving (TAT-56)", (group) => {
 			assert.equal(row.brandFont, "eczar", name);
 			assert.isNull(row.brandAccent, name);
 			assert.isNull(row.brandAccentDark, name);
-			assert.equal(row.storefrontSections, "work,artists,info,inquiry", name);
+			assert.equal(
+				row.storefrontSections,
+				"work,artists,flash,info,inquiry",
+				name,
+			);
 		}
 	});
 
@@ -455,7 +504,7 @@ test.group("Settings, Page look: saving (TAT-56)", (group) => {
 		);
 		assert.equal(
 			(await reload(tenant)).storefrontSections,
-			"work,artists,info,inquiry",
+			"work,artists,flash,info,inquiry",
 		);
 	});
 

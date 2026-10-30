@@ -4,6 +4,7 @@ export const INQUIRY_RULE_REASONS = [
 	"artist_not_accepting",
 	"studio_not_accepting",
 	"too_many_open_inquiries",
+	"flash_unavailable",
 ] as const;
 export type InquiryRuleReason = (typeof INQUIRY_RULE_REASONS)[number];
 
@@ -16,6 +17,8 @@ const MESSAGES: Record<InquiryRuleReason, string> = {
 		"No artist was chosen and none of the tenant's visible artists accepts inquiries",
 	too_many_open_inquiries:
 		"The phone already has as many open inquiries as the tenant takes",
+	flash_unavailable:
+		"The flash design is hidden, its artist is hidden or deleted, or it is not the tenant's",
 };
 
 /**

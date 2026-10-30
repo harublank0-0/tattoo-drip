@@ -61,6 +61,13 @@ const EMPTY_WORK = {
 	filters: { styles: [], healed: false },
 };
 
+// The flash read with no design in it (TAT-129).
+const EMPTY_FLASH = {
+	data: [],
+	nextCursor: null,
+	filters: { artists: [] },
+};
+
 if (!existsSync(SERVER)) {
 	console.error("There is no build to run. Run pnpm build first.");
 	process.exit(1);
@@ -104,6 +111,10 @@ const api = http.createServer((request, response) => {
 			return mode === "artists-5xx"
 				? send(500, { error: { code: "internal", message: API_DETAIL } })
 				: send(200, { data: ARTISTS });
+		}
+		// Flash (TAT-129): the list is empty; a design is the API's 404 below.
+		if (request.url.startsWith(`/api/v1/tenants/${SLUG}/flash?`)) {
+			return send(200, EMPTY_FLASH);
 		}
 		if (request.url.startsWith(`/api/v1/tenants/${SLUG}/work?`)) {
 			if (mode === "work-5xx") {
@@ -254,6 +265,7 @@ try {
 			[
 				`/api/v1/tenants/${SLUG}`,
 				`/api/v1/tenants/${SLUG}/artists`,
+				`/api/v1/tenants/${SLUG}/flash?limit=6`,
 				`/api/v1/tenants/${SLUG}/work?limit=9`,
 			].join(",") &&
 			apiLog.every(
@@ -262,7 +274,7 @@ try {
 					call.visitor === VISITOR &&
 					call.cookie === null,
 			),
-		`The page made the API calls ${apiLog.map((call) => call.url).join(", ")} instead of one keyed, cookie-less lookup, one artists read and the newest 9 photos, each carrying the visitor's address.`,
+		`The page made the API calls ${apiLog.map((call) => call.url).join(", ")} instead of one keyed, cookie-less lookup, one artists read, the newest 6 flash designs and the newest 9 photos, each carrying the visitor's address.`,
 	);
 	expect(
 		!page.body.includes("Recent work") && !page.body.includes("All work"),
@@ -291,9 +303,10 @@ try {
 			[
 				`/api/v1/tenants/${SLUG}`,
 				`/api/v1/tenants/${SLUG}/artists`,
+				`/api/v1/tenants/${SLUG}/flash?artist=sita&limit=12`,
 				`/api/v1/tenants/${SLUG}/work?artist=sita&limit=24`,
 			].join(","),
-		`An artist's page asked the API for ${apiLog.map((call) => call.url).join(", ")} instead of the lookup, the list and the artist's newest 24 photos.`,
+		`An artist's page asked the API for ${apiLog.map((call) => call.url).join(", ")} instead of the lookup, the list, the artist's newest 12 flash designs and their newest 24 photos.`,
 	);
 	expect(
 		apiLog.every(
@@ -359,6 +372,40 @@ try {
 		`/request?artist=Nobody&fbclid=… is ${page.status}, not the general form at /request.`,
 	);
 
+	// A flash design the API doesn't know (the stand-in 404s every design): the
+	// general form with a note, never a not-found, and the design is read once.
+	const FLASH_ID = "0199f000-0000-7000-8000-000000000001";
+	apiLog.length = 0;
+	page = await get(`/request?flash=${FLASH_ID}&fbclid=IwAR0`);
+	expect(
+		page.status === 200 &&
+			page.body.includes(
+				"<title>Send your idea to Canary Ink &lt;Studio&gt;</title>",
+			) &&
+			page.body.includes("page any more") &&
+			!page.body.includes(CANARY),
+		`/request?flash=<unknown id> is ${page.status}, or lacks the general form and the note that the design isn't on the page.`,
+	);
+	expect(
+		apiLog
+			.map((call) => call.url)
+			.sort()
+			.join(",") ===
+			[
+				`/api/v1/tenants/${SLUG}`,
+				`/api/v1/tenants/${SLUG}/artists`,
+				`/api/v1/tenants/${SLUG}/flash/${FLASH_ID}`,
+			].join(","),
+		`/request?flash=<id> asked the API for ${apiLog.map((call) => call.url).join(", ")} instead of the lookup, the list and the design.`,
+	);
+	// A well-formed request for an artist still reads the lookup and the list alone.
+	apiLog.length = 0;
+	page = await get("/request?artist=sita");
+	expect(
+		page.status === 200 && apiLog.every((call) => !call.url.includes("/flash")),
+		`/request?artist=sita read a flash design (${apiLog.map((call) => call.url).join(", ")}).`,
+	);
+
 	// All work (TAT-126): the lookup, the list and the first page of photos.
 	apiLog.length = 0;
 	page = await get("/work");
@@ -392,6 +439,48 @@ try {
 				`/api/v1/tenants/${SLUG}/work?limit=24`,
 			].join(","),
 		`/work asked the API for ${apiLog.map((call) => call.url).join(", ")} instead of the lookup, the list and the first 24 photos.`,
+	);
+
+	// Flash (TAT-129): the lookup, the list and the first page of designs.
+	apiLog.length = 0;
+	page = await get("/flash");
+	expect(
+		page.status === 200 &&
+			page.body.includes("<title>Flash at Canary Ink &lt;Studio&gt;</title>") &&
+			page.body.includes(
+				`href="http://${SLUG}.localhost:${storefrontPort}/flash"`,
+			),
+		`/flash is ${page.status}, or lacks its own title and canonical link.`,
+	);
+	expect(
+		page.cacheControl ===
+			"public, max-age=0, s-maxage=60, stale-while-revalidate=600",
+		`/flash's Cache-Control is "${page.cacheControl}".`,
+	);
+	expect(
+		page.body.includes("No flash designs yet.") && !page.body.includes(CANARY),
+		"/flash does not say there are no designs, or shows the server key.",
+	);
+	expect(
+		apiLog
+			.map((call) => call.url)
+			.sort()
+			.join(",") ===
+			[
+				`/api/v1/tenants/${SLUG}`,
+				`/api/v1/tenants/${SLUG}/artists`,
+				`/api/v1/tenants/${SLUG}/flash?limit=24`,
+			].join(","),
+		`/flash asked the API for ${apiLog.map((call) => call.url).join(", ")} instead of the lookup, the list and the first 24 designs.`,
+	);
+	// A design id that is not a UUID is the not-found with no call but the lookup.
+	apiLog.length = 0;
+	page = await get("/flash/NOT-A-UUID");
+	expect(
+		page.status === 404 &&
+			page.body.includes("Page not found") &&
+			apiLog.every((call) => call.url === `/api/v1/tenants/${SLUG}`),
+		`/flash/NOT-A-UUID is ${page.status}, or asked the API for ${apiLog.map((call) => call.url).join(", ")}.`,
 	);
 
 	// The router's own spelling of the address is ours: ?healed=1 is no redirect.
@@ -477,13 +566,13 @@ try {
 	);
 
 	// Unknown, hidden or malformed artists and unknown paths are the same not-found.
-	for (const path of ["/artists/nobody", "/artists/Sita", "/flash"]) {
+	for (const path of ["/artists/nobody", "/artists/Sita", "/admin/bookings"]) {
 		apiLog.length = 0;
 		page = await get(path);
 		expect(page.status === 404, `${path} is ${page.status}, not 404.`);
 		// A matched route answers its own header; an unmatched path gets none of ours.
 		const wantedCache =
-			path === "/flash" ? undefined : "public, max-age=0, s-maxage=60";
+			path === "/admin/bookings" ? undefined : "public, max-age=0, s-maxage=60";
 		expect(
 			page.cacheControl === wantedCache,
 			`${path}: Cache-Control is "${page.cacheControl}".`,
@@ -583,5 +672,5 @@ if (problems.length > 0) {
 	process.exit(1);
 }
 console.log(
-	"Page check passed: the key is in no page, header or log line; one keyed lookup and one artists read per page (the studio page, an artist's page and /work add one gallery read), each carrying the visitor's address; a failed read is an uncached error page (a failed gallery read only leaves the photos out), a failed lookup a 503; the deposit page is an uncached, unindexed shell from the lookup alone; the public site key is in the page.",
+	"Page check passed: the key is in no page, header or log line; one keyed lookup and one artists read per page (the studio page, an artist's page and /work add one gallery read, /flash and an artist's page one flash read), each carrying the visitor's address; a failed read is an uncached error page (a failed gallery read only leaves the photos out), a failed lookup a 503; the deposit page is an uncached, unindexed shell from the lookup alone; the public site key is in the page.",
 );

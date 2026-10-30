@@ -5,6 +5,7 @@ import { urlFor } from "~/client";
 import ChangeCard from "~/components/change_card";
 import { DepositCard } from "~/components/deposit_panel";
 import { FinishCard } from "~/components/finish_card";
+import FlashDesignCard from "~/components/flash_design_card";
 import { usePageSheets } from "~/components/form_sheet";
 import { SOURCE_LABELS } from "~/components/inquiries";
 import MessageCard from "~/components/message_card";
@@ -41,6 +42,7 @@ export default function ProjectShow(props: ProjectPageProps) {
 	const {
 		project,
 		nextStep,
+		flash,
 		quote,
 		history,
 		canSetPrice,
@@ -164,6 +166,8 @@ export default function ProjectShow(props: ProjectPageProps) {
 						footer={contactedText}
 						onMarkContacted={closed ? undefined : () => markContacted()}
 					/>
+
+					{flash && <FlashDesignCard flash={flash} />}
 
 					<RequestCard
 						brief={project.brief}

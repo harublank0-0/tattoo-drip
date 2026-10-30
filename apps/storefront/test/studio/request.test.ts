@@ -47,6 +47,40 @@ describe("readRequestSearch", () => {
 	});
 });
 
+describe("readRequestSearch with a flash design (TAT-129)", () => {
+	const ID = "0199f000-0000-7000-8000-000000000001";
+
+	test("the address keeps a well-formed flash id, and the design names the artist", () => {
+		assert.deepEqual(readRequestSearch({ flash: ID, fbclid: "x" }), {
+			flash: ID,
+		});
+		assert.deepEqual(readRequestSearch({ artist: "sita", flash: ID }), {
+			flash: ID,
+		});
+	});
+
+	test("an uppercase, cut-off, number-like or repeated flash id is dropped; the artist then stands", () => {
+		for (const flash of [
+			ID.toUpperCase(),
+			ID.slice(0, 35),
+			"moth",
+			"",
+			12,
+			[ID, ID],
+			null,
+			undefined,
+			`${ID} `,
+		]) {
+			assert.deepEqual(readRequestSearch({ flash }), {}, String(flash));
+			assert.deepEqual(
+				readRequestSearch({ artist: "sita", flash }),
+				{ artist: "sita" },
+				String(flash),
+			);
+		}
+	});
+});
+
 describe("requestLink", () => {
 	test("the header's Request: the artist while they take new work, else the studio while it does, else none", () => {
 		assert.deepEqual(requestLink(studio, null), {

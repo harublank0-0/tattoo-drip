@@ -2,6 +2,14 @@ import { Form, Link } from "@adonisjs/inertia/react";
 import { useState } from "react";
 import type { ArtistProps, StyleOption } from "~/components/artists";
 import {
+	FLASH_CREATE_NOTE,
+	FLASH_OPEN_HELP,
+	FLASH_OPEN_LABEL,
+	type FlashDesignProps,
+	flashIntro,
+} from "~/components/flash";
+import FlashTray from "~/components/flash_tray";
+import {
 	TRAY_CREATE_NOTE,
 	trayIntro,
 	type WorkPhotoProps,
@@ -45,11 +53,13 @@ export default function ArtistForm({
 	artist,
 	canLink,
 	workPhotos,
+	flashDesigns,
 	styleOptions,
 }: {
 	artist: ArtistProps | null;
 	canLink: boolean;
 	workPhotos: WorkPhotoProps[];
+	flashDesigns: FlashDesignProps[];
 	styleOptions: StyleOption[];
 }) {
 	const tenant = useTenant();
@@ -116,6 +126,23 @@ export default function ArtistForm({
 					/>
 				) : (
 					<p className="text-sm text-muted-foreground">{TRAY_CREATE_NOTE}</p>
+				)}
+			</Section>
+
+			{/* Flash designs (TAT-129): also outside the profile's <Form>, each
+			    design is saved by its own request. */}
+			<Section
+				title="Flash"
+				description={artist ? flashIntro(owner) : undefined}
+			>
+				{artist ? (
+					<FlashTray
+						tenantSlug={tenant.slug}
+						artistId={artist.id}
+						designs={flashDesigns}
+					/>
+				) : (
+					<p className="text-sm text-muted-foreground">{FLASH_CREATE_NOTE}</p>
 				)}
 			</Section>
 		</>
@@ -316,6 +343,21 @@ function ArtistFields({
 					</FieldDescription>
 					{errors.acceptingInquiries && (
 						<FieldError>{errors.acceptingInquiries}</FieldError>
+					)}
+				</FieldContent>
+			</Field>
+
+			<Field orientation="horizontal">
+				<Checkbox
+					id="acceptingFlash"
+					name="acceptingFlash"
+					defaultChecked={artist?.acceptingFlash ?? true}
+				/>
+				<FieldContent>
+					<FieldLabel htmlFor="acceptingFlash">{FLASH_OPEN_LABEL}</FieldLabel>
+					<FieldDescription>{FLASH_OPEN_HELP}</FieldDescription>
+					{errors.acceptingFlash && (
+						<FieldError>{errors.acceptingFlash}</FieldError>
 					)}
 				</FieldContent>
 			</Field>

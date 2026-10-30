@@ -21,7 +21,15 @@ import {
 	stringifyPlainSearch,
 } from "../../src/studio/search.ts";
 import { fakeFetch, json } from "../tenancy/helpers.ts";
-import { ARJUN, CLOSED_STUDIO, ORIGIN, SITA, STUDIO } from "./fixtures.ts";
+import {
+	ARJUN,
+	CLOSED_STUDIO,
+	flashId,
+	flashPage,
+	ORIGIN,
+	SITA,
+	STUDIO,
+} from "./fixtures.ts";
 
 /*
  * /request through a real router (TAT-127). The router merges the raw search
@@ -44,6 +52,17 @@ const TENANT = `${API}/api/v1/tenants/${STUDIO.slug}`;
 function context(studio = STUDIO) {
 	const { calls, fetch } = fakeFetch(({ url }) => {
 		if (url.endsWith("/artists")) return json(200, { data: [SITA, ARJUN] });
+		if (url.endsWith(`/flash/${flashId(1)}`)) {
+			// The picture is on the API's own origin, as the loader requires.
+			return json(200, {
+				data: JSON.parse(
+					JSON.stringify(flashPage(1).data[0]).replaceAll(
+						"https://api.example.com",
+						API,
+					),
+				),
+			});
+		}
 		return json(404, { error: { code: "not_found", message: "No." } });
 	});
 	const api = createApiContext("server");
@@ -178,5 +197,40 @@ describe("/request through the router", () => {
 		const general = await visit("/request", CLOSED_STUDIO);
 		assert.equal(general.status, "success");
 		assert.equal(general.data?.inquiry.kind, "studio-closed");
+	});
+
+	test("?flash=<id>&fbclid=x reaches the loader as { flash }, and ?flash=<id>&artist=sita too", async () => {
+		const ID = flashId(1);
+		for (const url of [
+			`/request?flash=${ID}&fbclid=x`,
+			`/request?flash=${ID}&artist=sita`,
+			`/request?artist=arjun&flash=${ID}`,
+		]) {
+			const result = await visit(url);
+
+			assert.deepEqual(result.deps, { flash: ID }, url);
+			assert.equal(result.data?.flash?.kind, "requestable", url);
+			assert.deepEqual(
+				result.calls.map((call) => call.url).sort(),
+				[`${TENANT}/artists`, `${TENANT}/flash/${ID}`],
+				url,
+			);
+			assert.equal(result.status, "success", url);
+		}
+	});
+
+	test("a malformed flash id is the general form and makes no design read", async () => {
+		for (const flash of [flashId(1).toUpperCase(), "moth", "12", ""]) {
+			const result = await visit(`/request?flash=${flash}`);
+
+			assert.deepEqual(result.deps, {}, flash);
+			assert.equal(result.data?.flash, null, flash);
+			assert.deepEqual(
+				result.calls.map((call) => call.url),
+				[`${TENANT}/artists`],
+				flash,
+			);
+			assert.equal(result.status, "success", flash);
+		}
 	});
 });

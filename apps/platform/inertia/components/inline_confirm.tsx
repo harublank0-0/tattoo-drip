@@ -17,11 +17,16 @@ import { Button } from "~/components/ui/button";
  * `finished` when it answers (`onFinish`): the panel closes, whatever the answer, and focus goes
  * back to the trigger, or to `fallback` (the page's heading) when the answer removed it. Every
  * step is `confirmStep` (components/confirm.ts, unit-tested). `busyLabel` is what the confirm
- * button says while the request is out ("Saving…" unless the action has a better word). Never
- * inside a sheet: Escape would close the sheet.
+ * button says while the request is out ("Saving…" unless the action has a better word).
+ * `ariaLabel` is the trigger's accessible name when its visible `label` is not unique on the page
+ * (a list of rows each with "Remove"); omitted, the label names it. Never inside a sheet: Escape
+ * would close the sheet. `disabled` holds the trigger and the confirm button while something else on the
+ * page has a request out that this one would cancel (the flash tray's upload); the safe button still closes
+ * the panel.
  */
 export default function InlineConfirm({
 	label,
+	ariaLabel,
 	variant = "outline",
 	question,
 	confirmLabel,
@@ -29,8 +34,10 @@ export default function InlineConfirm({
 	busyLabel = "Saving…",
 	onConfirm,
 	fallback,
+	disabled = false,
 }: {
 	label: string;
+	ariaLabel?: string;
 	variant?: "default" | "outline" | "secondary";
 	question: string;
 	confirmLabel: string;
@@ -38,6 +45,7 @@ export default function InlineConfirm({
 	busyLabel?: string;
 	onConfirm: (finished: () => void) => void;
 	fallback: RefObject<HTMLElement | null>;
+	disabled?: boolean;
 }) {
 	const panelId = useId();
 	const [state, setState] = useState<ConfirmState>(CONFIRM_CLOSED);
@@ -79,8 +87,10 @@ export default function InlineConfirm({
 					ref={trigger}
 					type="button"
 					variant={variant}
+					aria-label={ariaLabel}
 					aria-expanded={state.open}
 					aria-controls={panelId}
+					disabled={disabled}
 					onKeyDown={ignoreHeldEnter}
 					onClick={ask}
 				>
@@ -100,7 +110,7 @@ export default function InlineConfirm({
 						<Button
 							type="button"
 							className="h-11"
-							disabled={state.saving}
+							disabled={state.saving || disabled}
 							onClick={confirm}
 						>
 							{state.saving ? busyLabel : confirmLabel}

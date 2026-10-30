@@ -201,6 +201,71 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tenants/{tenant}/flash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The studio's flash designs, newest first, a page at a time
+         * @description Every shown design of every visible artist (one whose books are
+         *     closed too), newest first. `requestable` says whether `createInquiry`
+         *     takes a request for the design now. An artist that matches nothing is
+         *     an empty page. Hidden designs, and hidden or deleted artists' designs,
+         *     never appear. Cacheable. Under an old studio slug it answers like
+         *     under the current one.
+         */
+        get: operations["listFlash"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tenants/{tenant}/flash/{design}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+                /** @description A design's `id` (`listFlash`) */
+                design: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * One shown flash design of a visible artist
+         * @description A hidden design, a hidden or deleted artist's design, an unknown id
+         *     and another studio's design are all a 404. Cacheable. Under an old
+         *     studio slug it answers like under the current one.
+         */
+        get: operations["getFlashDesign"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tenants/{tenant}/availability": {
         parameters: {
             query?: never;
@@ -260,6 +325,12 @@ export interface paths {
          *     new inquiries), `studio_not_accepting` (no artist chosen, and every
          *     artist of the studio is closed), `too_many_open_inquiries` (this
          *     phone number already has 3 inquiries the studio hasn't answered).
+         *     A request for a flash design (`flashDesignId`) is also a 409
+         *     `flash_unavailable` when the design is hidden, its artist is hidden
+         *     or deleted, or the id is unknown; a request for a design whose artist
+         *     takes no flash requests is `artist_not_accepting`, though their books
+         *     may be open. A `preferredArtistId` other than the design's artist is
+         *     `validation_failed` on `preferredArtistId`.
          *     An unknown or hidden `preferredArtistId` is `validation_failed` on
          *     `preferredArtistId`; an image that isn't a JPEG, PNG or WebP is
          *     `validation_failed` on `referenceImages.<index>`.
@@ -350,7 +421,7 @@ export interface components {
                  *     (500), `request_timeout` (408, an upload that took too long)
                  *     and `service_busy` (503, with `Retry-After`: too many uploads
                  *     in progress, or no database connection free). Endpoint codes: `artist_not_accepting`,
-                 *     `studio_not_accepting`, `too_many_open_inquiries` (409),
+                 *     `studio_not_accepting`, `too_many_open_inquiries`, `flash_unavailable` (409),
                  *     `challenge_failed` (403) and `challenge_unavailable` (503),
                  *     all `createInquiry`; `deposit_not_due`, `deposit_changed`
                  *     (409, `submitDepositProof`). Treat an unknown code by its HTTP
@@ -360,6 +431,7 @@ export interface components {
                  * @example rate_limited
                  * @example service_busy
                  * @example too_many_open_inquiries
+                 * @example flash_unavailable
                  * @example challenge_failed
                  * @example deposit_changed
                  */
@@ -493,14 +565,16 @@ export interface components {
         StorefrontSection: {
             /**
              * @description `work` (Recent work: the newest photos), `artists` (the artists
-             *     list), `info` (Good to know: hours, closed days and what clients
-             *     ask, shown only when the studio filled something in) or
+             *     list), `flash` (a few of the newest flash designs, shown only
+             *     when there are some), `info` (Good to know: hours, closed days
+             *     and what clients ask, shown only when the studio filled something
+             *     in) or
              *     `inquiry` (the "Got an idea?" invitation to the request page,
              *     always listed). More will come: treat an unknown value as one to
              *     leave out.
              * @enum {string}
              */
-            type: "work" | "artists" | "info" | "inquiry";
+            type: "work" | "artists" | "flash" | "info" | "inquiry";
         };
         /**
          * @description How the studio page looks (TAT-56): the owner's choices, as checked
@@ -762,6 +836,70 @@ export interface components {
             /** @description Whether one of those photos is marked healed. */
             healed: boolean;
         };
+        /**
+         * @description A flash design an artist offers (TAT-129). Every property is always
+         *     there. All text is plain text: render it as text. It carries no key,
+         *     hidden flag or timestamp: the list's order is newest first.
+         */
+        FlashDesign: {
+            /**
+             * Format: uuid
+             * @description What `createInquiry` takes as `flashDesignId`. The design's page is `/flash/<id>`.
+             */
+            id: string;
+            /** @example Moth */
+            name: string;
+            /**
+             * @description In words, such as About 3 in
+             * @example About 3 in
+             */
+            size: string;
+            /** @description null when the studio keeps the price to itself. */
+            price: components["schemas"]["Price"] | null;
+            /** @description The picture. The page builds the `alt` text from the name and the artist. */
+            image: components["schemas"]["Photo"];
+            /** @description Whose design it is: the artist's page is `getArtist(slug)`. */
+            artist: {
+                /** @example sita-rai */
+                slug: string;
+                /** @example Sita Rai */
+                name: string;
+            };
+            /**
+             * @description Whether `createInquiry` takes a request for it now: the artist
+             *     takes flash requests, whatever their books say. False: show it
+             *     greyed with the artist's `closedMessage`.
+             */
+            requestable: boolean;
+        };
+        /** @description A price with the words to show for it. Not `Money`, which has no text. */
+        Price: {
+            /** @description In the currency's smallest unit (paisa) */
+            amount: number;
+            /** @enum {string} */
+            currency: "NPR";
+            /**
+             * @description Show it as it is.
+             * @example NPR 3,000
+             */
+            text: string;
+        };
+        /**
+         * @description What the flash list can be narrowed by. Offer only these: an artist
+         *     with no shown design would give an empty page.
+         */
+        FlashFilters: {
+            /**
+             * @description The visible artists with a shown design, by name, whatever
+             *     `artist` asks: offer only these.
+             */
+            artists: {
+                /** @example sita-rai */
+                slug: string;
+                /** @example Sita Rai */
+                name: string;
+            }[];
+        };
         Slot: {
             /** Format: date-time */
             startsAt: string;
@@ -792,6 +930,13 @@ export interface components {
              * @description A visible artist of this studio who takes inquiries. Leave it out for any artist.
              */
             preferredArtistId?: string | null;
+            /**
+             * Format: uuid
+             * @description A flash design from `listFlash`. The inquiry then asks for that
+             *     design and its artist: leave `preferredArtistId` out or give the
+             *     design's artist.
+             */
+            flashDesignId?: string | null;
             /**
              * @description Free text
              * @example NPR 15000
@@ -1258,6 +1403,90 @@ export interface operations {
             default: components["responses"]["Error"];
         };
     };
+    listFlash: {
+        parameters: {
+            query?: {
+                /** @description An artist's slug (`getArtist`) */
+                artist?: string;
+                /** @description The previous page's `nextCursor`, as sent, with the same filter */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of flash designs */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["FlashDesign"][];
+                        /** @description Pass it as `cursor` for the next page; null on the last. */
+                        nextCursor: string | null;
+                        filters: components["schemas"]["FlashFilters"];
+                    };
+                };
+            };
+            304: components["responses"]["NotModified"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getFlashDesign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+                /** @description A design's `id` (`listFlash`) */
+                design: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The design */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["FlashDesign"];
+                    };
+                };
+            };
+            304: components["responses"]["NotModified"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
     listAvailability: {
         parameters: {
             query: {
@@ -1352,7 +1581,7 @@ export interface operations {
             };
             404: components["responses"]["NotFound"];
             408: components["responses"]["Error"];
-            /** @description The studio takes no such inquiry now (`artist_not_accepting`, `studio_not_accepting`, `too_many_open_inquiries`) */
+            /** @description The studio takes no such inquiry now (`artist_not_accepting`, `studio_not_accepting`, `too_many_open_inquiries`, `flash_unavailable`) */
             409: {
                 headers: {
                     [name: string]: unknown;

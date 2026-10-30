@@ -12,6 +12,7 @@ import {
 	figuresOf,
 	newFigures,
 } from "#tests/helpers/artist_money";
+import { addFlashDesign } from "#tests/helpers/artists";
 import { proofFor } from "#tests/helpers/payments";
 import {
 	makeArtist,
@@ -506,6 +507,58 @@ test.group("Project page: the original request", (group) => {
 		assert.lengthOf(props.request.references, 1);
 		assert.include(props.request.references[0].url, "reference_image/");
 		assert.match(props.request.references[0].thumbnailUrl, /signature=/);
+	});
+
+	test("a project made from a flash request shows its design, to the owner and to its assigned artist; another project has none", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const asha = await artistIn(tenant, "asha@example.com");
+		const { flashProject, plainProject } = await inTenant(tenant, async () => {
+			const profile = await makeArtist(tenant, "asha");
+			profile.userId = asha.id;
+			await profile.save();
+			const design = await addFlashDesign(tenant, profile, {
+				name: "Moth",
+				price: 300_000,
+			});
+			const customer = await makeClient(tenant);
+			const inquiry = await makeInquiry(tenant, customer, {
+				status: "accepted",
+				decidedAt: DateTime.utc(),
+				flashDesignId: design.id,
+			});
+			return {
+				flashProject: await makeProject(tenant, customer, {
+					inquiryId: inquiry.id,
+					artistId: profile.id,
+					flashDesignId: design.id,
+				}),
+				plainProject: await makeProject(tenant, customer),
+			};
+		});
+
+		for (const who of [owner, asha]) {
+			const props = (
+				await client.get(page(flashProject.id)).withInertia().loginAs(who)
+			).inertiaProps;
+			assert.equal(props.flash.name, "Moth");
+			assert.equal(props.flash.artistName, "Sita");
+			assert.equal(props.flash.priceText, "NPR 3,000");
+			assert.deepEqual(Object.keys(props.project).sort(), [
+				"artistName",
+				"brief",
+				"clientName",
+				"id",
+				"piece",
+				"status",
+			]);
+		}
+		const plain = (
+			await client.get(page(plainProject.id)).withInertia().loginAs(owner)
+		).inertiaProps;
+		assert.isNull(plain.flash);
 	});
 
 	test("a project made directly has no request", async ({ client, assert }) => {
