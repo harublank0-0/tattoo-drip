@@ -574,3 +574,39 @@
   .deposit-progress::before { animation: none; inline-size: 100%; opacity: 0.5; }
   .deposit-copy { transition: none; }
 }
+
+/*
+ * Today's state on the cover and the Good to know section (TAT-128). The
+ * state line keeps its height while it is empty (the browser fills it after
+ * the page loads), so filling it moves nothing, and on the cover it takes the
+ * location line's colour on the scrim. The list is a two-column definition
+ * list from 40rem; the two folded texts are native <details> with a 48 px
+ * summary. Studio words wrap anywhere.
+ */
+@layer components {
+  .profile-hours { min-block-size: 1.4em; max-inline-size: 36rem; color: var(--ink-muted); font-size: 1.0625rem; line-height: 1.4; overflow-wrap: anywhere; }
+  .profile-cover .profile-hours { color: var(--on-photo); }
+  .know-list { display: grid; gap: 1rem; margin: 0; }
+  .know-item { display: grid; gap: 0.25rem; }
+  .know-item dt { color: var(--ink-muted); font-size: 0.9375rem; font-weight: 600; }
+  .know-item dd { min-inline-size: 0; margin: 0; overflow-wrap: anywhere; }
+  .know-lines { display: grid; gap: 0.25rem; margin: 0; padding: 0; list-style: none; }
+  .know-when { display: inline-block; min-inline-size: 7rem; font-weight: 600; }
+  .know-more { border-block-end: 1px solid var(--line); }
+  .know-list + .know-more { margin-block-start: 1.5rem; }
+  .section-title + .know-more, .know-list + .know-more { border-block-start: 1px solid var(--line); }
+  .know-more > summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-block-size: 3rem; cursor: pointer; font-weight: 600; list-style: none; }
+  .know-more > summary::-webkit-details-marker { display: none; }
+  .know-more > summary svg { flex: none; color: var(--stencil); transition: rotate 150ms ease; }
+  .know-more[open] > summary svg { rotate: 180deg; }
+  .know-more > p { margin-block: 0 1rem; }
+}
+
+@media (min-width: 40rem) {
+  .know-item { grid-template-columns: 9rem minmax(0, 1fr); gap: 1rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .know-more > summary svg { transition: none; }
+}
+

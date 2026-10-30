@@ -76,6 +76,8 @@ const MONTHS = [
 	"Nov",
 	"Dec",
 ] as const;
+/** The word for a day with no hours, and for a closed-days entry with no note. */
+export const CLOSED_TEXT = "Closed";
 const CLOCK = /^([01]\d|2[0-3]):[0-5]\d$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -256,7 +258,7 @@ export interface HoursLine {
 export function hoursLines(week: Week): HoursLine[] {
 	if (week.every((day) => day === null)) return [];
 	const text = (day: OpeningDay | null) =>
-		day ? `${clockText(day.opens)} – ${clockText(day.closes)}` : "Closed";
+		day ? `${clockText(day.opens)} – ${clockText(day.closes)}` : CLOSED_TEXT;
 	const lines: HoursLine[] = [];
 	let start = 0;
 	for (let i = 1; i <= 7; i++) {

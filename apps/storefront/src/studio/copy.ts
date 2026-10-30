@@ -77,6 +77,20 @@ export const studioCopy = {
 		styles: "Styles",
 		links: "Links",
 	},
+	/**
+	 * The Good to know section's labels (TAT-128). The time words ("Open
+	 * now", "Sun – Fri", "Closed") are in hours.ts, which builds them.
+	 */
+	goodToKnow: {
+		title: "Good to know",
+		hours: "Hours",
+		closedDays: "Closed days",
+		walkIns: "Walk-ins",
+		age: "Age",
+		deposit: "Deposit",
+		beforeSession: "Before your session",
+		aftercare: "Aftercare",
+	},
 	booking: {
 		title: "How booking works",
 		steps: [

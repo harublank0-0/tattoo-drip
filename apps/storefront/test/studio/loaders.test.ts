@@ -23,6 +23,7 @@ import { fakeFetch, json } from "../tenancy/helpers.ts";
 import {
 	ARJUN,
 	CLOSED_STUDIO,
+	GOOD_TO_KNOW_STUDIO,
 	galleryPage,
 	ORIGIN,
 	SITA,
@@ -338,6 +339,34 @@ describe("loadStudioPage", () => {
 					error instanceof TattooApiError && !isNotFound(error),
 			);
 		});
+	});
+
+	test("sets today's steady state from the clock; studioPageData has none", async () => {
+		const { fetch } = listing();
+		const context = pageContext(fetch, GOOD_TO_KNOW_STUDIO);
+
+		const data = await loadStudioPage(context);
+
+		// Whatever the day, the loader's view is there (the studio has hours)
+		// and its initial state is a state or null, never anything else.
+		assert.ok(data.openNow);
+		assert.equal(data.openNow.timezone, "Asia/Kathmandu");
+		assert.ok(
+			data.openNow.initial === null ||
+				["open", "later", "closed", "closure"].includes(
+					data.openNow.initial.kind,
+				),
+		);
+		assert.equal(data.goodToKnow.hours.length > 0, true);
+		// The pure builder has no clock: no initial state.
+		const pure = studioPageData(GOOD_TO_KNOW_STUDIO, [SITA], ORIGIN);
+		assert.ok(pure.openNow);
+		assert.equal(pure.openNow.initial, null);
+		// A studio with no hours has no view either way.
+		assert.equal(
+			(await loadStudioPage(pageContext(listing().fetch))).openNow,
+			null,
+		);
 	});
 
 	test("a closed studio's page takes no inquiry", async () => {

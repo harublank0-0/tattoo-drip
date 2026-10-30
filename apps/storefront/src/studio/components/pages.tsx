@@ -7,6 +7,7 @@ import type {
 	StudioPageData,
 	WorkPageData,
 } from "../loaders.ts";
+import { OpenNow } from "../open-now.tsx";
 import { type MoreWork, PagedGallery } from "../paging.tsx";
 import { logoSizes } from "../srcset.ts";
 import type { SectionKey, ThemeConfig } from "../theme/config.ts";
@@ -52,6 +53,7 @@ export function StudioPage({
 			<p className="profile-location user-text" dir="auto">
 				{studio.location ?? studio.typeLabel}
 			</p>
+			{data.openNow ? <OpenNow view={data.openNow} /> : null}
 		</div>
 	);
 	return (

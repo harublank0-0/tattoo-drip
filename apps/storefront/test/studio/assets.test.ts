@@ -220,3 +220,32 @@ describe("the booking steps' two layouts (TAT-105)", () => {
 		);
 	});
 });
+
+describe("Good to know and the cover's state line (TAT-128)", () => {
+	const css = readFileSync(new URL("styles.css", SRC), "utf8");
+
+	test("each summary is a 48 px, full-width row with no browser marker", () => {
+		const summary = ruleBody(css, ".know-more > summary");
+		assert.match(summary, /min-block-size:\s*3rem/);
+		assert.match(summary, /list-style:\s*none/);
+		assert.match(
+			ruleBody(css, ".know-more > summary::-webkit-details-marker"),
+			/display:\s*none/,
+		);
+	});
+
+	test("the cover's line keeps its height while the browser fills it, and wraps anywhere", () => {
+		const hours = ruleBody(css, ".profile-hours");
+		assert.match(hours, /min-block-size:\s*1\.4em/);
+		assert.match(hours, /overflow-wrap:\s*anywhere/);
+		assert.match(
+			ruleBody(css, ".profile-cover .profile-hours"),
+			/color:\s*var\(--on-photo\)/,
+		);
+	});
+
+	test("a studio's words in the list wrap instead of widening the page", () => {
+		assert.match(ruleBody(css, ".know-item dd"), /overflow-wrap:\s*anywhere/);
+		assert.match(ruleBody(css, ".know-item dd"), /min-inline-size:\s*0/);
+	});
+});
