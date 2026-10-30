@@ -10,6 +10,13 @@ import { BaseSchema } from "@adonisjs/lucid/schema";
  * its default place; each can hide it from Page look. The existing check
  * (shapes only, 'inquiry' always present) already allows the new key.
  *
+ * The check allows up to eight keys, repeats and unknown words, and the
+ * column holds 100 characters, so prepending to the stored text could break
+ * the check or the length and abort the whole migration. up() instead
+ * rebuilds the value as `work` followed by the distinct known keys (artists,
+ * inquiry) in their stored order: at most 'work,artists,inquiry', and the
+ * check guarantees `inquiry` is there. Lists that already hold `work` stay.
+ *
  * down() takes `work` out of every list and restores the old default; the
  * list keeps `inquiry`, which the check requires.
  */
@@ -21,7 +28,15 @@ export default class extends BaseSchema {
 			"alter table tenants alter column storefront_sections set default 'work,artists,inquiry'",
 		);
 		this.schema.raw(
-			"update tenants set storefront_sections = 'work,' || storefront_sections where not ('work' = any (string_to_array(storefront_sections, ',')))",
+			`update tenants set storefront_sections = 'work,' || (
+				select string_agg(key, ',' order by first_place)
+				from (
+					select key, min(place) as first_place
+					from unnest(string_to_array(tenants.storefront_sections, ',')) with ordinality as stored(key, place)
+					where key in ('artists', 'inquiry')
+					group by key
+				) as known
+			) where not ('work' = any (string_to_array(storefront_sections, ',')))`,
 		);
 	}
 
