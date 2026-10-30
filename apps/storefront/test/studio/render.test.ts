@@ -12,15 +12,18 @@ import {
 	ArtistPage,
 	ErrorPage,
 	NotFoundPage,
+	RequestPage,
 	StudioPage,
 	WorkPage,
 } from "../../src/studio/components/pages.tsx";
 import type { PortfolioSearch, WorkSearch } from "../../src/studio/gallery.ts";
 import {
 	artistPageData,
+	requestPageData,
 	studioPageData,
 	workPageData,
 } from "../../src/studio/loaders.ts";
+import type { RequestSearch } from "../../src/studio/request.ts";
 import { headTags } from "../../src/studio/seo.ts";
 import {
 	ARJUN,
@@ -36,7 +39,7 @@ import {
 	sitaWithWork,
 } from "./fixtures.ts";
 import { assertSafePage } from "./safety.ts";
-import { IMAGE_ORIGIN, withStorefront } from "./theme-fixtures.ts";
+import { BRANDED, IMAGE_ORIGIN, withStorefront } from "./theme-fixtures.ts";
 
 /** The first element of `type` in a component's returned tree (the component is called, not rendered). */
 function findElement(node: ReactNode, type: string): ReactElement | undefined {
@@ -61,8 +64,8 @@ function studioHtml(
 	);
 }
 
-function artistHtml(slug: string) {
-	const data = artistPageData(STUDIO, [SITA, ARJUN], slug, ORIGIN);
+function artistHtml(slug: string, artists: Artist[] = [SITA, ARJUN]) {
+	const data = artistPageData(STUDIO, artists, slug, ORIGIN);
 	assert.ok(data, slug);
 	return renderToStaticMarkup(createElement(ArtistPage, { data }));
 }
@@ -118,8 +121,8 @@ describe("the studio page", () => {
 		assertSafePage(html);
 		assert.equal(count(html, /<main[\s>]/g), 1);
 		assert.equal(count(html, /<footer[\s>]/g), 1);
-		// h1; the strip; Artists and its two artists; the inquiry; the panel beside the form.
-		assert.deepEqual(headings(html), [1, 2, 2, 3, 3, 2, 2]);
+		// h1; the strip; Artists and its two artists; the invitation to /request.
+		assert.deepEqual(headings(html), [1, 2, 2, 3, 3, 2]);
 		assert.equal(count(html, / id="inquiry"/g), 1);
 		assert.match(
 			html,
@@ -128,15 +131,31 @@ describe("the studio page", () => {
 		assert.match(html, /Studio page by Tattoo Drip/);
 	});
 
-	test("links to the inquiry, each open artist and every contact", () => {
+	test("every way in goes to the request page and no #inquiry link is left", () => {
 		const links = hrefs(studioHtml());
 
-		assert.ok(links.includes("#inquiry"));
-		assert.ok(links.includes("/artists/sita#inquiry"));
+		// The header, the hero and the invitation lead to /request; Sita's card asks for her.
+		assert.equal(links.filter((href) => href === "/request").length, 3);
+		assert.ok(links.includes("/request?artist=sita"));
 		assert.ok(
-			!links.includes("/artists/arjun#inquiry"),
+			!links.includes("/request?artist=arjun"),
 			"no Ask link for a closed artist",
 		);
+		for (const html of [
+			studioHtml(),
+			artistHtml("sita"),
+			artistHtml("arjun"),
+		]) {
+			assert.ok(
+				hrefs(html).every((href) => !href.includes("#inquiry")),
+				"no #inquiry link",
+			);
+		}
+	});
+
+	test("links to every contact", () => {
+		const links = hrefs(studioHtml());
+
 		for (const href of [
 			"https://instagram.com/blackneedle",
 			"https://wa.me/9779812345678",
@@ -146,11 +165,55 @@ describe("the studio page", () => {
 		]) {
 			assert.ok(links.includes(href), href);
 		}
-		assert.ok(
-			links.some((href) =>
-				href.startsWith("https://wa.me/9779812345678?text="),
-			),
-			"the prefilled inquiry",
+	});
+
+	test("the studio page's inquiry section is the 'Got an idea?' invitation: one button to /request, no form and no panel", () => {
+		const html = studioHtml();
+		const invite = html.match(/<section id="inquiry"[\s\S]*?<\/section>/)?.[0];
+
+		assert.equal(count(html, / id="inquiry"/g), 1);
+		assert.ok(invite, "the invitation");
+		assert.match(
+			html,
+			/<section id="inquiry" class="section request-invite" aria-labelledby="inquiry-title">/,
+		);
+		assert.match(
+			invite,
+			/<h2 id="inquiry-title" class="section-title">Got an idea\?<\/h2>/,
+		);
+		assert.match(
+			invite,
+			/<p class="measure">Tell <bdi>Black Needle<\/bdi> what you&#x27;d like and where it goes\. Add photos if you have them\.<\/p>/,
+		);
+		assert.match(
+			invite,
+			/<div class="actions"><a class="action action-primary" href="\/request">Send your idea<\/a><\/div>/,
+		);
+		assert.doesNotMatch(html, /inquiry-aside|Message on WhatsApp|<form/);
+		assert.deepEqual(headings(html), [1, 2, 2, 3, 3, 2]);
+	});
+
+	test("a closed studio's invitation refuses instead of inviting", () => {
+		const html = studioHtml(CLOSED_STUDIO, [ARJUN]);
+		const invite = html.match(/<section id="inquiry"[\s\S]*?<\/section>/)?.[0];
+
+		assertSafePage(html);
+		assert.ok(invite, "the section");
+		assert.match(
+			invite,
+			/<h2 id="inquiry-title" class="section-title">Inquiries<\/h2>/,
+		);
+		assert.match(
+			invite,
+			/<bdi>Black Needle<\/bdi> isn&#x27;t taking new inquiries right now\./,
+		);
+		assert.doesNotMatch(invite, /href=/);
+		assert.doesNotMatch(html, /href="\/request/);
+		assert.doesNotMatch(html, /Got an idea/);
+		// The same section, so an old #inquiry link still lands somewhere.
+		assert.match(
+			invite,
+			/^<section id="inquiry" class="section request-invite" aria-labelledby="inquiry-title">/,
 		);
 	});
 
@@ -217,11 +280,40 @@ describe("the studio page", () => {
 		assert.match(image, / sizes="\(min-width: 48rem\) 14\.38rem, 11\.05rem"/);
 	});
 
-	test("shows a closed artist's own words", () => {
-		assert.match(
-			studioHtml(),
-			/<p class="note user-text measure" dir="auto">Books open in March\.<\/p>/,
-		);
+	test("a closed artist's status is their own words, said once; no request button and no inquiry target", () => {
+		const page = artistHtml("arjun");
+		const words =
+			'<p class="status status-closed user-text" dir="auto">Books open in March.</p>';
+
+		assertSafePage(page);
+		assert.ok(page.includes(words));
+		assert.equal(count(page, /Books open in March\./g), 1);
+		assert.doesNotMatch(page, / id="inquiry"|Request a tattoo from/);
+		assert.doesNotMatch(page, /class="note/);
+		// The studio page's card for them says the same, once, with no separate note.
+		const card = studioHtml();
+		assert.ok(card.includes(words));
+		assert.equal(count(card, /Books open in March\./g), 1);
+		assert.doesNotMatch(card, /class="note/);
+	});
+
+	test("the status says 'Taking new work', and 'Not taking new work right now' for a closed artist without words", () => {
+		const open = '<p class="status status-open">Taking new work</p>';
+		const closed =
+			'<p class="status status-closed">Not taking new work right now</p>';
+		const silent = { ...ARJUN, closedMessage: null };
+
+		assert.ok(studioHtml().includes(open));
+		assert.ok(artistHtml("sita").includes(open));
+		assert.equal(count(artistHtml("sita"), /class="status/g), 1);
+		for (const html of [
+			studioHtml(STUDIO, [SITA, silent]),
+			artistHtml("arjun", [SITA, silent]),
+		]) {
+			assert.ok(html.includes(closed));
+			assert.doesNotMatch(html, /Books open in March/);
+		}
+		assert.doesNotMatch(studioHtml(), /Taking new inquiries/);
 	});
 
 	test("leaves out what an empty studio hasn't set", () => {
@@ -230,40 +322,23 @@ describe("the studio page", () => {
 		assertSafePage(html);
 		assert.doesNotMatch(html, /<address/);
 		assert.doesNotMatch(html, / id="artists"/);
-		assert.deepEqual(headings(html), [1, 2, 2, 2]);
-		assert.match(
-			html,
-			/Black Needle<\/bdi> hasn(&#x27;|')t added contact details yet\./,
-		);
+		// h1; the strip; the invitation.
+		assert.deepEqual(headings(html), [1, 2, 2]);
+		// The invitation does not depend on contact details: the request page says so.
+		assert.match(html, /Tell <bdi>Black Needle<\/bdi> what you&#x27;d like/);
+		assert.doesNotMatch(html, /hasn(&#x27;|')t added contact details/);
 	});
 
 	test("a studio not taking inquiries says so instead of offering them", () => {
 		const html = studioHtml(CLOSED_STUDIO, [ARJUN]);
 
 		assertSafePage(html);
-		assert.ok(!hrefs(html).includes("#inquiry"));
+		assert.ok(hrefs(html).every((href) => !href.startsWith("/request")));
 		assert.match(html, /Not taking new inquiries right now/);
 		assert.match(html, /isn(&#x27;|')t taking new inquiries right now\./);
 		assert.match(
 			html,
 			/<h2 id="artists-title" class="section-title">Artist<\/h2>/,
-		);
-	});
-
-	test("the inquiry section is headed by what it holds: an invitation only while open", () => {
-		const heading = (html: string) =>
-			html.match(/<h2 id="inquiry-title"[^>]*>([^<]*)<\/h2>/)?.[1];
-
-		assert.equal(heading(studioHtml()), "Send your idea");
-		// Closed, the heading must not invite while the text below refuses.
-		const closed = studioHtml(CLOSED_STUDIO, [ARJUN]);
-		assert.equal(heading(closed), "Inquiries");
-		assert.doesNotMatch(closed, /Send your idea/);
-		// TAT-57 mounts on this id and label either way.
-		assert.equal(count(closed, / id="inquiry"/g), 1);
-		assert.match(
-			closed,
-			/<section id="inquiry"[^>]* aria-labelledby="inquiry-title"/,
 		);
 	});
 
@@ -310,15 +385,26 @@ describe("the studio page", () => {
 		const html = studioHtml(hostile, artists);
 		const page = artistPageData(hostile, artists, "sita", ORIGIN);
 		assert.ok(page);
+		const artistMarkup = renderToStaticMarkup(
+			createElement(ArtistPage, { data: page }),
+		);
 
 		const carried = [
 			html,
-			renderToStaticMarkup(createElement(ArtistPage, { data: page })),
+			artistMarkup,
 			JSON.stringify(data),
 			JSON.stringify(page),
 			...hrefs(html).map((href) => decodeURIComponent(href)),
+			// The chat button's WhatsApp message names the artist (TAT-127).
+			...hrefs(artistMarkup).map((href) => decodeURIComponent(href)),
 		].join("\n");
 		assert.doesNotMatch(carried, /[\u202a-\u202e\u2066-\u2069\ufeff]/u);
+		assert.ok(
+			hrefs(artistMarkup).includes(
+				"https://wa.me/9779812345678?text=Hi%2C%20I'm%20asking%20about%20Sita%20Rai",
+			),
+			"the chat button's message",
+		);
 		assert.equal(data.studio.name, "Black Needle");
 		assert.match(data.seo.title, /^Black Needle$/);
 		assert.match(html, /<h1[^>]*>Black Needle<\/h1>/);
@@ -369,7 +455,7 @@ describe("the studio page's first screen (TAT-105)", () => {
 
 		assert.match(
 			top,
-			/<a class="action action-primary" href="#inquiry">Send your idea<\/a>/,
+			/<a class="action action-primary" href="\/request">Send your idea<\/a>/,
 		);
 		assert.match(
 			top,
@@ -426,39 +512,26 @@ describe("the studio page's first screen (TAT-105)", () => {
 		assert.doesNotMatch(html, /contact-follow|contact-visit|>Follow<|>Visit</);
 	});
 
-	test("has the 4-step strip under the buttons and the same steps in the panel beside the form", () => {
+	test("has the 4-step strip under the buttons and no panel: the form is on /request", () => {
 		const html = studioHtml();
 		const top = hero(html);
-		const panel = html.match(/<aside [\s\S]*?<\/aside>/)?.[0] ?? "";
 
 		assert.deepEqual(stepTitles(top), BOOKING_STEPS);
-		assert.deepEqual(stepTitles(panel), BOOKING_STEPS);
 		assert.match(
 			top,
 			/<h2 id="steps-strip-title"[^>]*>How booking works<\/h2>/,
 		);
-		assert.match(
-			panel,
-			/<h2 id="steps-panel-title"[^>]*>How booking works<\/h2>/,
-		);
-		assert.match(
-			panel,
-			/^<aside class="inquiry-aside" aria-labelledby="steps-panel-title">/,
-		);
-		// The panel says more than the strip: a line for each step, the studio's name in <bdi>.
-		assert.match(panel, /<bdi>Black Needle<\/bdi> replies/);
-		assert.match(panel, /Tattoo Drip never handles your money\./);
 		assert.match(top, /<ol class="steps" role="list">/);
-		assert.match(panel, /<ol class="steps" role="list">/);
 		assert.equal(count(top, /step-detail/g), 0);
-		assert.equal(count(panel, /step-detail/g), 4);
-	});
-
-	test("the panel beside the form also offers the chat links", () => {
-		const panel = studioHtml().match(/<aside [\s\S]*?<\/aside>/)?.[0] ?? "";
-
-		assert.match(panel, /Prefer to chat\?/);
-		assert.match(panel, /href="https:\/\/wa\.me\/9779812345678\?text=/);
+		// The panel with a line for each step is the request page's.
+		assert.equal(
+			count(
+				html,
+				/<aside class="inquiry-aside"|step-detail|steps-panel-title/g,
+			),
+			0,
+		);
+		assert.equal(count(html, /<li class="step">/g), 4);
 	});
 
 	test("a Devanagari studio keeps its name, location and steps whole", () => {
@@ -477,7 +550,10 @@ describe("the studio page's first screen (TAT-105)", () => {
 			/<h1 class="profile-name" dir="auto">ब्ल्याक निडल स्टुडियो<\/h1>/,
 		);
 		assert.match(hero(html), />ठमेल, काठमाडौं<\/p>/);
-		assert.match(html, /<bdi>ब्ल्याक निडल स्टुडियो<\/bdi> replies/);
+		assert.match(
+			html,
+			/Tell <bdi>ब्ल्याक निडल स्टुडियो<\/bdi> what you&#x27;d like/,
+		);
 	});
 
 	test("no WhatsApp number means one button: the others stay in the groups", () => {
@@ -488,7 +564,7 @@ describe("the studio page's first screen (TAT-105)", () => {
 			}),
 		);
 
-		assert.match(top, /action-primary" href="#inquiry">Send your idea/);
+		assert.match(top, /action-primary" href="\/request">Send your idea/);
 		assert.doesNotMatch(top, /action-secondary/);
 		assert.doesNotMatch(top, /wa\.me/);
 	});
@@ -502,7 +578,7 @@ describe("the studio page's first screen (TAT-105)", () => {
 			top,
 			/<p class="profile-location user-text" dir="auto">Tattoo studio<\/p>/,
 		);
-		assert.match(top, /action-primary" href="#inquiry">Send your idea/);
+		assert.match(top, /action-primary" href="\/request">Send your idea/);
 		assert.doesNotMatch(
 			top,
 			/action-secondary|class="contact"|class="profile-intro/,
@@ -522,7 +598,7 @@ describe("the studio page's first screen (TAT-105)", () => {
 		assertSafePage(html);
 		assert.doesNotMatch(
 			html,
-			/How booking works|Send your idea|<aside|step-title/,
+			/How booking works|Send your idea|<aside class="inquiry-aside"|step-title/,
 		);
 		assert.match(hero(html), /Not taking new inquiries right now/);
 		// The chat links are still there to read.
@@ -541,22 +617,27 @@ describe("the artist page", () => {
 		const links = hrefs(html);
 
 		assertSafePage(html);
-		// h1; the inquiry with its steps; the panel beside the form; the studio.
-		assert.deepEqual(headings(html), [1, 2, 3, 2, 2]);
+		// h1; the studio. The form is on /request, so there is no inquiry section.
+		assert.deepEqual(headings(html), [1, 2]);
 		assert.match(
 			html,
 			/<h1 id="artist-title" class="artist-title" dir="auto">Sita Rai<\/h1>/,
 		);
 		assert.match(html, /Tattoo artist at <bdi>Black Needle<\/bdi>/);
 		assert.ok(links.includes("/"));
-		assert.ok(links.includes("#inquiry"));
+		assert.ok(links.includes("/request?artist=sita"));
+		assert.doesNotMatch(html, /inquiry-aside|steps-strip|<form/);
+	});
+
+	test("the sticky header does not hide an old #inquiry link's landing place (TAT-127)", () => {
+		// The target is the button's own row, not a .section or .inquiry, so the
+		// bar must clear it through the page-wide scroll padding (assets.test.ts).
+		const html = artistHtml("sita");
+		const target = html.match(/<[a-z]+ id="inquiry" class="([^"]*)"/)?.[1];
+
+		assert.equal(target, "actions artist-request");
 		assert.ok(
-			links.some(
-				(href) =>
-					href.startsWith("https://wa.me/9779812345678?text=") &&
-					href.includes("Sita%20Rai"),
-			),
-			"the prefilled inquiry names the artist",
+			html.indexOf('<header class="site-bar">') < html.indexOf('id="inquiry"'),
 		);
 	});
 
@@ -596,28 +677,173 @@ describe("the artist page", () => {
 		}
 	});
 
-	test("a closed artist's page offers the studio instead", () => {
-		const html = artistHtml("arjun");
-		const links = hrefs(html);
-
-		assertSafePage(html);
-		assert.ok(links.includes("/#inquiry"));
-		assert.ok(!links.includes("#inquiry"));
-		assert.match(html, /Books open in March\./);
-		// The section refuses, so its heading doesn't invite.
-		assert.match(html, /<h2 id="inquiry-title"[^>]*>Inquiries<\/h2>/);
-		assert.doesNotMatch(html, /Send your idea/);
-	});
-
-	test("an open artist's page invites in the section's heading, and its hero button says the same", () => {
+	test("an open artist's page has no form, and its 'Request a tattoo from' button holds id=inquiry, so an old #inquiry link lands one tap from the form", () => {
 		const html = artistHtml("sita");
 
-		assert.match(html, /<h2 id="inquiry-title"[^>]*>Send your idea<\/h2>/);
+		assertSafePage(html);
+		assert.ok(
+			html.includes(
+				'<div id="inquiry" class="actions artist-request"><a class="action action-primary" href="/request?artist=sita"><span>Request a tattoo from <bdi>Sita Rai</bdi></span></a></div>',
+			),
+		);
+		assert.equal(count(html, / id="inquiry"/g), 1);
+		assert.doesNotMatch(html, /inquiry-aside|steps-strip|<form/);
+		// No work photos: the profile, then the studio.
+		assert.deepEqual(headings(html), [1, 2]);
+		// The button ends the profile; the studio block follows.
+		assert.ok(
+			html.indexOf("Request a tattoo from") < html.indexOf("studio-title"),
+		);
+	});
+
+	test("a closed artist's page has no request button and nothing to land on", () => {
+		const html = artistHtml("arjun");
+
+		assertSafePage(html);
+		assert.doesNotMatch(
+			html,
+			/ id="inquiry"|Request a tattoo from|Send your idea/,
+		);
+		assert.match(html, /Books open in March\./);
+	});
+});
+
+/** `/request` for `search`: the page rendered from the loader's data. */
+function requestHtml(
+	search: RequestSearch,
+	studio: Studio = STUDIO,
+	artists: Artist[] = [SITA, ARJUN],
+) {
+	return renderToStaticMarkup(
+		createElement(RequestPage, {
+			data: requestPageData(studio, artists, search, ORIGIN),
+		}),
+	);
+}
+
+describe("the request page (TAT-127)", () => {
+	test("is the form's own page: one h1, the steps, the panel and the studio's contacts", () => {
+		const html = requestHtml({});
+
+		assertSafePage(html);
 		assert.match(
 			html,
-			/<a class="action action-primary" href="#inquiry">Send your idea<\/a>/,
+			/<h1 id="inquiry-title" class="section-title">Send your idea<\/h1>/,
 		);
-		assert.doesNotMatch(html, /Send an inquiry/);
+		// h1; the steps strip; the panel beside the form; the studio block.
+		assert.deepEqual(headings(html), [1, 2, 2, 2]);
+		assert.equal(count(html, /<aside class="inquiry-aside"/g), 1);
+		assert.ok(hrefs(html).includes("/"));
+		assert.match(html, /See the studio page/);
+		// The form mounts after hydration.
+		assert.doesNotMatch(html, /<form/);
+		assert.match(html, /<header class="site-bar">/);
+		assert.match(html, /<main class="page request-page">/);
+	});
+
+	test("has the 4-step strip under the h1 and the same steps, with a line each, in the panel beside the form", () => {
+		const html = requestHtml({});
+		const panel = html.match(/<aside [\s\S]*?<\/aside>/)?.[0] ?? "";
+		const strip = html.slice(
+			html.indexOf('<section class="steps-strip"'),
+			html.indexOf("<aside"),
+		);
+
+		assert.deepEqual(stepTitles(strip), BOOKING_STEPS);
+		assert.deepEqual(stepTitles(panel), BOOKING_STEPS);
+		assert.match(
+			strip,
+			/<h2 id="steps-strip-title"[^>]*>How booking works<\/h2>/,
+		);
+		assert.match(
+			panel,
+			/^<aside class="inquiry-aside" aria-labelledby="steps-panel-title">/,
+		);
+		assert.match(
+			panel,
+			/<h2 id="steps-panel-title"[^>]*>How booking works<\/h2>/,
+		);
+		// The panel says more than the strip: a line for each step, the studio's name in <bdi>.
+		assert.match(panel, /<bdi>Black Needle<\/bdi> replies/);
+		assert.match(panel, /Tattoo Drip never handles your money\./);
+		assert.match(panel, /<ol class="steps" role="list">/);
+		assert.equal(count(strip, /step-detail/g), 0);
+		assert.equal(count(panel, /step-detail/g), 4);
+	});
+
+	test("the panel beside the form also offers the chat links", () => {
+		const panel = requestHtml({}).match(/<aside [\s\S]*?<\/aside>/)?.[0] ?? "";
+
+		assert.match(panel, /Prefer to chat\?/);
+		assert.match(panel, /href="https:\/\/wa\.me\/9779812345678\?text=/);
+	});
+
+	test("?artist=sita picks Sita", () => {
+		const html = requestHtml({ artist: "sita" });
+		const whatsapp = hrefs(html).find((href) =>
+			href.startsWith("https://wa.me/9779812345678?text="),
+		);
+
+		assertSafePage(html);
+		assert.match(html, /your idea for <bdi>Sita Rai<\/bdi>/);
+		assert.ok(whatsapp, "the WhatsApp link");
+		assert.ok(
+			decodeURIComponent(whatsapp.split("?text=")[1]).includes("Sita Rai"),
+		);
+	});
+
+	test("an artist who is not in the list is the general form", () => {
+		const html = requestHtml({ artist: "nobody" });
+
+		assert.doesNotMatch(html, /your idea for/);
+		assert.match(html, /Send <bdi>Black Needle<\/bdi> your idea/);
+		assert.match(
+			html,
+			/<h1 id="inquiry-title" class="section-title">Send your idea<\/h1>/,
+		);
+	});
+
+	test("a closed artist's request page says so, with their own words, and offers the studio's general request", () => {
+		const html = requestHtml({ artist: "arjun" });
+
+		assertSafePage(html);
+		assert.match(
+			html,
+			/<h1 id="inquiry-title" class="section-title">Inquiries<\/h1>/,
+		);
+		assert.match(html, /isn&#x27;t taking new inquiries right now/);
+		assert.match(
+			html,
+			/<p class="note user-text measure" dir="auto">Books open in March\.<\/p>/,
+		);
+		assert.ok(hrefs(html).includes("/request"));
+		assert.doesNotMatch(html, /inquiry-aside/);
+	});
+
+	test("a closed studio's request page says so and offers no form", () => {
+		const html = requestHtml({}, CLOSED_STUDIO, [ARJUN]);
+
+		assertSafePage(html);
+		assert.match(
+			html,
+			/<bdi>Black Needle<\/bdi> isn&#x27;t taking new inquiries right now\./,
+		);
+		assert.doesNotMatch(html, /Message on WhatsApp/);
+		assert.doesNotMatch(html, /inquiry-aside/);
+	});
+
+	test("an open artist's request page works while the studio as a whole is closed", () => {
+		const html = requestHtml({ artist: "sita" }, CLOSED_STUDIO, [SITA, ARJUN]);
+
+		assertSafePage(html);
+		assert.match(
+			html,
+			/<h1 id="inquiry-title" class="section-title">Send your idea<\/h1>/,
+		);
+		assert.match(html, /your idea for <bdi>Sita Rai<\/bdi>/);
+		assert.match(html, /Message on WhatsApp/);
+		assert.doesNotMatch(html, /isn&#x27;t taking new inquiries/);
+		assert.equal(count(html, /<aside class="inquiry-aside"/g), 1);
 	});
 });
 
@@ -756,7 +982,7 @@ describe("the roster's work strip (TAT-116)", () => {
 		assertSafePage(closed);
 	});
 
-	test("the link comes after the bio and the closed message, before 'Ask for'", () => {
+	test("the link comes after the bio, before 'Ask for'", () => {
 		const html = roster([sitaWithWork(3), ARJUN]);
 		const body = html.slice(html.indexOf('<div class="artist-body">'));
 		assert.ok(body.indexOf("Fine line florals") < body.indexOf("work-link"));
@@ -815,7 +1041,7 @@ describe("Recent work on the studio page (TAT-126)", () => {
 			work < html.indexOf('<section id="artists"'),
 			"before the artists",
 		);
-		assert.ok(work < html.indexOf('id="inquiry"'), "before the form");
+		assert.ok(work < html.indexOf('id="inquiry"'), "before the invitation");
 		const section = recent(html);
 		assert.match(
 			section,
@@ -987,19 +1213,20 @@ describe("the artist page's portfolio and viewer (TAT-126)", () => {
 		};
 	};
 
-	test("a Work section follows the profile and comes before the inquiry", () => {
+	test("a Work section follows the profile (and its request button) and comes before the studio", () => {
 		const html = portfolioOf(galleryPage(5));
 
 		assertSafePage(html);
 		const work = html.indexOf('<section id="work"');
 		assert.ok(work > html.indexOf("</article>"), "after the profile");
-		assert.ok(work < html.indexOf('id="inquiry"'), "before the inquiry");
+		assert.ok(work > html.indexOf('id="inquiry"'), "after the request button");
+		assert.ok(work < html.indexOf("studio-title"), "before the studio");
 		assert.match(
 			html,
 			/<section id="work" class="section" aria-labelledby="work-title"><h2 id="work-title" class="section-title">Work<\/h2>/,
 		);
-		// h1; Work; the inquiry with its steps; the panel; the studio.
-		assert.deepEqual(headings(html), [1, 2, 2, 3, 2, 2]);
+		// h1; Work; the studio.
+		assert.deepEqual(headings(html), [1, 2, 2]);
 	});
 
 	test("the artist page shows the whole portfolio with All and Healed", () => {
@@ -1220,7 +1447,8 @@ describe("the artist page's portfolio and viewer (TAT-126)", () => {
 			const html = portfolioOf(page);
 
 			assert.equal(count(html, /work-|<dialog/g), 0);
-			assert.deepEqual(headings(html), [1, 2, 3, 2, 2]);
+			// h1; the studio.
+			assert.deepEqual(headings(html), [1, 2]);
 		}
 	});
 
@@ -1293,7 +1521,7 @@ describe("the All work page (TAT-126)", () => {
 		assert.match(html, /<h1 [^>]*>All work<\/h1>/);
 		assert.match(
 			html,
-			/^<header class="site-bar"><a href="\/" dir="auto">Black Needle<\/a><\/header><main class="page">/,
+			/^<header class="site-bar"><div class="site-bar-inner"><a class="site-bar-home" href="\/" dir="auto">Black Needle<\/a><a class="action action-primary site-bar-request" href="\/request">Request<\/a><\/div><\/header><main class="page">/,
 		);
 		assert.equal(count(html, /class="work-open"/g), 3);
 		assert.match(html, /<footer class="site-footer">/);
@@ -1303,14 +1531,15 @@ describe("the All work page (TAT-126)", () => {
 		assert.match(html, />See the studio page<\/a>/);
 	});
 
-	test("shares its site bar and studio block with the artist page, byte for byte", () => {
+	test("shares its site bar's way home and studio block with the artist page, byte for byte", () => {
 		const artist = artistPageData(STUDIO, [SITA], "sita", ORIGIN);
 		assert.ok(artist);
 		const artistHtml = renderToStaticMarkup(
 			createElement(ArtistPage, { data: artist }),
 		);
+		// The Request button differs: Sita's page asks for her, this one for the studio.
 		const bar = (html: string) =>
-			html.match(/<header class="site-bar">[\s\S]*?<\/header>/)?.[0];
+			html.match(/<a class="site-bar-home"[\s\S]*?<\/a>/)?.[0];
 		const studio = (html: string) =>
 			html.match(
 				/<section class="section" aria-labelledby="studio-title">[\s\S]*?<\/section>/,
@@ -1727,5 +1956,299 @@ describe("an artist's styles and links", () => {
 			assert.doesNotMatch(html, /<script>alert/);
 			assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
 		}
+	});
+});
+
+describe("the header and the chat button (TAT-127)", () => {
+	/** The page's bar: the `<header class="site-bar">…</header>`. */
+	const bar = (html: string) =>
+		html.match(/<header class="site-bar">[\s\S]*?<\/header>/)?.[0] ?? "";
+	/** The chat button: the `<aside class="chat-float" …>…</aside>`. */
+	const chat = (html: string) =>
+		html.match(/<aside class="chat-float"[\s\S]*?<\/aside>/)?.[0] ?? "";
+	const homeLink = (name: string) =>
+		`<a class="site-bar-home" href="/" dir="auto">${name}</a>`;
+	const REQUEST = '<a class="action action-primary site-bar-request"';
+	const WHATSAPP = "https://wa.me/9779812345678?text=";
+
+	const artistOn = (studio: Studio, artists: Artist[], slug: string) => {
+		const data = artistPageData(studio, artists, slug, ORIGIN);
+		assert.ok(data, slug);
+		return renderToStaticMarkup(createElement(ArtistPage, { data }));
+	};
+	const workOn = (
+		studio: Studio = STUDIO,
+		search: WorkSearch = {},
+		artists: Artist[] = [sitaWithWork(2), ARJUN],
+	) =>
+		renderToStaticMarkup(
+			createElement(WorkPage, {
+				data: workPageData(
+					studio,
+					artists,
+					galleryPage(3),
+					search,
+					ORIGIN,
+					IMAGE_ORIGIN,
+				),
+			}),
+		);
+	/** The WhatsApp link inside the chat button. */
+	const whatsapp = (html: string) =>
+		hrefs(chat(html)).find((href) => href.startsWith("https://wa.me/"));
+
+	test("every page has the bar with the studio's name and the right Request button", () => {
+		const studio = studioHtml();
+		const sita = artistHtml("sita");
+		const arjun = artistHtml("arjun");
+		const work = workOn();
+		const request = requestHtml({});
+
+		assert.ok(bar(studio).includes(homeLink("Black Needle")));
+		assert.ok(bar(studio).includes(`${REQUEST} href="/request">Request</a>`));
+		assert.ok(bar(sita).includes(homeLink("Black Needle")));
+		assert.ok(
+			bar(sita).includes(
+				`${REQUEST} href="/request?artist=sita"><span>Request <bdi>Sita Rai</bdi></span></a>`,
+			),
+		);
+		// Arjun is closed and the studio is open: the general request.
+		assert.ok(bar(arjun).includes(`${REQUEST} href="/request">Request</a>`));
+		assert.ok(bar(work).includes(`${REQUEST} href="/request">Request</a>`));
+		// The request page is where the button leads: it has none.
+		assert.ok(bar(request).includes(homeLink("Black Needle")));
+		assert.doesNotMatch(bar(request), /site-bar-request/);
+
+		for (const html of [studio, sita, arjun, work, request]) {
+			assertSafePage(html);
+			assert.match(html, /^(<link [^>]*>)*<header class="site-bar">/);
+			assert.ok(
+				html.indexOf('<header class="site-bar">') < html.indexOf("<main"),
+				"the bar comes before <main",
+			);
+			assert.equal(count(html, /<header class="site-bar">/g), 1);
+		}
+	});
+
+	test("the studio page's cover hero stays inside <main>, under the bar", () => {
+		const html = renderToStaticMarkup(
+			createElement(StudioPage, {
+				data: studioPageData(
+					withStorefront(BRANDED),
+					[SITA],
+					ORIGIN,
+					IMAGE_ORIGIN,
+				),
+			}),
+		);
+
+		assertSafePage(html, { brandImages: true });
+		assert.ok(
+			html.indexOf('<header class="site-bar">') < html.indexOf("<main"),
+		);
+		assert.ok(html.indexOf("<main") < html.indexOf("profile-cover"));
+		assert.equal(count(html, /<h1[\s>]/g), 1);
+	});
+
+	test("a closed studio's bar offers no Request; an open artist's page still offers theirs (Review Focus 4)", () => {
+		const home = studioHtml(CLOSED_STUDIO, [ARJUN]);
+		const closedArtist = artistOn(CLOSED_STUDIO, [ARJUN], "arjun");
+		const openArtist = artistOn(CLOSED_STUDIO, [SITA, ARJUN], "sita");
+
+		for (const html of [home, closedArtist]) {
+			assertSafePage(html);
+			assert.ok(bar(html).includes(homeLink("Black Needle")));
+			assert.doesNotMatch(html, /site-bar-request/);
+		}
+		assertSafePage(openArtist);
+		assert.ok(
+			bar(openArtist).includes(
+				`${REQUEST} href="/request?artist=sita"><span>Request <bdi>Sita Rai</bdi></span></a>`,
+			),
+		);
+		// The studio's own Request is not offered anywhere on that page.
+		assert.doesNotMatch(bar(openArtist), /href="\/request"/);
+		// The All work page is the studio's, too: nothing to lead to while it is closed.
+		const work = workOn(CLOSED_STUDIO);
+		assertSafePage(work);
+		assert.ok(bar(work).includes(homeLink("Black Needle")));
+		assert.doesNotMatch(work, /site-bar-request/);
+	});
+
+	test("the chat button opens WhatsApp with a message naming what the page shows, and Viber's plain chat", () => {
+		const html = studioHtml();
+		const button = chat(html);
+
+		assert.equal(count(html, /<aside class="chat-float"/g), 1);
+		assert.ok(
+			button.startsWith(
+				'<aside class="chat-float" aria-label="Chat with Black Needle"><details><summary class="action action-primary chat-float-toggle">',
+			),
+			button,
+		);
+		assert.match(
+			button,
+			/<summary class="action action-primary chat-float-toggle"><svg [^>]*aria-hidden="true"[^>]*>[\s\S]*?<\/svg><span>Chat<\/span><\/summary>/,
+		);
+		assert.match(button, /<ul class="chat-float-links" role="list"><li>/);
+		assert.equal(count(button, /<li>/g), 2);
+		assert.deepEqual(hrefs(button), [
+			`${WHATSAPP}Hi%2C%20I'm%20asking%20about%20a%20tattoo`,
+			"viber://chat?number=%2B9779812345678",
+		]);
+		assert.match(
+			button,
+			/<a class="action action-secondary" href="[^"]*" rel="noopener noreferrer">WhatsApp<\/a>/,
+		);
+		assert.match(
+			button,
+			/<a class="action action-secondary" href="viber:\/\/chat\?number=%2B9779812345678">Viber<\/a>/,
+		);
+		// After the footer, the last thing on the page.
+		assert.ok(html.indexOf("</footer>") < html.indexOf("<aside"));
+		assert.ok(html.endsWith(button));
+		assertSafePage(html);
+
+		// What the page shows is what the message names.
+		const named = (html: string, name: string) =>
+			assert.equal(
+				whatsapp(html),
+				`${WHATSAPP}Hi%2C%20I'm%20asking%20about%20${encodeURIComponent(name)}`,
+			);
+		named(artistHtml("sita"), "Sita Rai");
+		named(requestHtml({ artist: "sita" }), "Sita Rai");
+		named(workOn(STUDIO, { artist: "sita" }), "Sita Rai");
+		// A closed artist's page and request page name them too.
+		named(artistHtml("arjun"), "अर्जुन थापा");
+		named(requestHtml({ artist: "arjun" }), "अर्जुन थापा");
+		// The general pages ask about "a tattoo".
+		named(requestHtml({}), "a tattoo");
+		named(workOn(), "a tattoo");
+		// An artist who is not in the list, or who has no work photo, is the general message.
+		named(requestHtml({ artist: "nobody" }), "a tattoo");
+		named(workOn(STUDIO, { artist: "arjun" }), "a tattoo");
+		// The Viber link is the plain chat everywhere.
+		for (const page of [
+			artistHtml("sita"),
+			requestHtml({ artist: "arjun" }),
+			workOn(STUDIO, { artist: "sita" }),
+		]) {
+			assert.ok(
+				hrefs(chat(page)).includes("viber://chat?number=%2B9779812345678"),
+			);
+		}
+	});
+
+	test("every page that has a bar has the chat button, over the same studio", () => {
+		for (const html of [
+			studioHtml(),
+			artistHtml("sita"),
+			artistHtml("arjun"),
+			workOn(),
+			requestHtml({}),
+			// A closed studio still has a way to the phone.
+			studioHtml(CLOSED_STUDIO, [ARJUN]),
+			requestHtml({}, CLOSED_STUDIO, [ARJUN]),
+		]) {
+			assertSafePage(html);
+			assert.equal(count(html, /<aside class="chat-float"/g), 1);
+			assert.ok(html.indexOf("</footer>") < html.indexOf('<aside class="chat'));
+		}
+	});
+
+	test("no phone, no chat button; the bar stays", () => {
+		const studio = studioHtml(EMPTY_STUDIO, [SITA]);
+		const pages = [
+			studio,
+			artistOn(EMPTY_STUDIO, [SITA], "sita"),
+			workOn(EMPTY_STUDIO),
+			requestHtml({}, EMPTY_STUDIO, [SITA]),
+		];
+
+		for (const html of pages) {
+			assertSafePage(html);
+			assert.doesNotMatch(html, /chat-float/);
+			assert.equal(count(html, /<header class="site-bar">/g), 1);
+			assert.ok(bar(html).includes(homeLink("Black Needle")));
+		}
+		// A phone the platform would not accept is no phone either.
+		const bad = studioHtml({
+			...STUDIO,
+			contact: { ...STUDIO.contact, phone: "9812345678" },
+		});
+		assert.doesNotMatch(bad, /chat-float/);
+	});
+
+	test("a lone surrogate in a name never throws while the chat link is built", () => {
+		const artists = [{ ...SITA, name: "Sita \ud800 Rai" }];
+		const studio = { ...STUDIO, name: "Black \udfff Needle" };
+
+		for (const html of [
+			studioHtml(studio, artists),
+			artistOn(studio, artists, "sita"),
+			requestHtml({ artist: "sita" }, studio, artists),
+		]) {
+			assertSafePage(html);
+			assert.doesNotMatch(html, /[\ud800-\udfff]/u);
+		}
+		assert.equal(
+			whatsapp(artistOn(studio, artists, "sita")),
+			`${WHATSAPP}Hi%2C%20I'm%20asking%20about%20Sita%20%EF%BF%BD%20Rai`,
+		);
+	});
+
+	test("a hostile name is text in the bar and the chat button", () => {
+		const hostile = {
+			...SITA,
+			name: '"><script>alert(1)</script>',
+		};
+		const studio = { ...STUDIO, name: "<b>Needle</b> & Ink" };
+		const html = artistOn(studio, [hostile], "sita");
+
+		assertSafePage(html);
+		assert.doesNotMatch(html, /<script|<b>/);
+		assert.match(
+			chat(html),
+			/aria-label="Chat with &lt;b&gt;Needle&lt;\/b&gt; &amp; Ink"/,
+		);
+		assert.match(bar(html), /Request <bdi>&quot;&gt;&lt;script&gt;/);
+		assert.equal(
+			whatsapp(html),
+			`${WHATSAPP}Hi%2C%20I'm%20asking%20about%20${encodeURIComponent(hostile.name)}`,
+		);
+	});
+});
+
+describe("the roster's 'Ask for' links while the studio is closed (TAT-127)", () => {
+	const askLinks = (html: string) =>
+		hrefs(html).filter((href) => href.startsWith("/request?artist="));
+
+	test("a closed studio with exactly one open artist still has a way from / to her form", () => {
+		const html = studioHtml(CLOSED_STUDIO, [SITA]);
+
+		assertSafePage(html);
+		assert.deepEqual(askLinks(html), ["/request?artist=sita"]);
+		assert.match(
+			html,
+			/<a class="action action-secondary" href="\/request\?artist=sita"><span>Ask for <bdi>Sita Rai<\/bdi><\/span><\/a>/,
+		);
+		// The studio's own invitation and Request stay closed.
+		assert.doesNotMatch(html, /href="\/request"/);
+		assert.match(html, /isn&#x27;t taking new inquiries right now/);
+	});
+
+	test("a closed studio offers it for each open artist and for no closed one", () => {
+		const html = studioHtml(CLOSED_STUDIO, [SITA, ARJUN]);
+
+		assert.deepEqual(askLinks(html), ["/request?artist=sita"]);
+		assert.deepEqual(askLinks(studioHtml(CLOSED_STUDIO, [ARJUN])), []);
+	});
+
+	test("an open studio keeps the 2+ rule: one artist is asked for by 'Send your idea' alone", () => {
+		assert.deepEqual(askLinks(studioHtml(STUDIO, [SITA])), []);
+		assert.deepEqual(askLinks(studioHtml(STUDIO, [SITA, ARJUN])), [
+			"/request?artist=sita",
+		]);
+		assert.doesNotMatch(studioHtml(STUDIO, [SITA]), /Ask for/);
 	});
 });

@@ -86,11 +86,21 @@ function WorkStrip({ artist }: { artist: ArtistView }) {
 	);
 }
 
-function ArtistStatus({ accepting }: { accepting: boolean }) {
-	return accepting ? (
-		<p className="status status-open">Taking new inquiries</p>
+/**
+ * Whether the artist takes new work (TAT-127): "Taking new work", else their
+ * own closed message, else "Not taking new work right now". The message is
+ * said here and nowhere else on the page.
+ */
+function ArtistStatus({ artist }: { artist: ArtistView }) {
+	if (artist.accepting) {
+		return <p className="status status-open">{studioCopy.status.open}</p>;
+	}
+	return artist.closedMessage ? (
+		<p className="status status-closed user-text" dir="auto">
+			{artist.closedMessage}
+		</p>
 	) : (
-		<p className="status status-closed">Not taking new inquiries</p>
+		<p className="status status-closed">{studioCopy.status.closed}</p>
 	);
 }
 
@@ -154,7 +164,7 @@ function ArtistEntry({
 				{artist.styles.length > 0 ? (
 					<p className="artist-styles">{artist.styles.join(" · ")}</p>
 				) : null}
-				<ArtistStatus accepting={artist.accepting} />
+				<ArtistStatus artist={artist} />
 			</div>
 			<div className="artist-body">
 				{artist.bio ? (
@@ -162,15 +172,10 @@ function ArtistEntry({
 						{artist.bio}
 					</p>
 				) : null}
-				{artist.closedMessage ? (
-					<p className="note user-text measure" dir="auto">
-						{artist.closedMessage}
-					</p>
-				) : null}
 				<WorkStrip artist={artist} />
 				{askLink ? (
 					<div className="actions">
-						<a className="action action-secondary" href={artist.inquiryHref}>
+						<a className="action action-secondary" href={artist.requestHref}>
 							<span>
 								Ask for <bdi>{artist.name}</bdi>
 							</span>
@@ -182,11 +187,24 @@ function ArtistEntry({
 	);
 }
 
-/** The studio page's artists (TAT-48). Nothing when the studio shows none. */
-export function ArtistRoster({ artists }: { artists: readonly ArtistView[] }) {
+/**
+ * The studio page's artists (TAT-48). Nothing when the studio shows none.
+ * Each artist who takes new work has an "Ask for" link to their own form
+ * (TAT-127) when there is more than one artist, or while the studio as a
+ * whole is closed: a closed studio has no "Send your idea" and no Request
+ * button, so a lone open artist's card is the client's way to her form.
+ */
+export function ArtistRoster({
+	artists,
+	studioAccepting,
+}: {
+	artists: readonly ArtistView[];
+	/** Whether the studio takes new inquiries (its own switch, not the artists'). */
+	studioAccepting: boolean;
+}) {
 	if (artists.length === 0) return null;
-	// With one artist, "Send your idea" already asks for them.
-	const askLinks = artists.length > 1;
+	// With one artist in an open studio, "Send your idea" already asks for them.
+	const askLinks = artists.length > 1 || !studioAccepting;
 	return (
 		<section id="artists" className="section" aria-labelledby="artists-title">
 			<h2 id="artists-title" className="section-title">
@@ -242,22 +260,23 @@ export function ArtistProfile({
 					)}
 				</p>
 				<StyleList styles={artist.styles} />
-				<ArtistStatus accepting={artist.accepting} />
+				<ArtistStatus artist={artist} />
 				{artist.bio ? (
 					<p className="user-text measure" dir="auto">
 						{artist.bio}
 					</p>
 				) : null}
 				<ArtistLinks links={artist.links} />
-				{artist.closedMessage ? (
-					<p className="note user-text measure" dir="auto">
-						{artist.closedMessage}
-					</p>
-				) : null}
+				{/* The id keeps an old `/artists/<slug>#inquiry` link landing here, one tap from the form. */}
 				{artist.accepting ? (
-					<div className="actions">
-						<a className="action action-primary" href="#inquiry">
-							{studioCopy.sendIdea}
+					<div id="inquiry" className="actions artist-request">
+						<a className="action action-primary" href={artist.requestHref}>
+							<span>
+								<Fill
+									template={studioCopy.request.artistButton}
+									values={{ name: artist.name }}
+								/>
+							</span>
 						</a>
 					</div>
 				) : null}

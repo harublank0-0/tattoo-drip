@@ -4,12 +4,21 @@ import { describe, test } from "node:test";
 import type { Artist, Studio } from "@tattoo-drip/sdk";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ArtistPage, StudioPage } from "../../src/studio/components/pages.tsx";
-import { artistPageData, studioPageData } from "../../src/studio/loaders.ts";
+import {
+	ArtistPage,
+	RequestPage,
+	StudioPage,
+} from "../../src/studio/components/pages.tsx";
+import {
+	artistPageData,
+	requestPageData,
+	studioPageData,
+} from "../../src/studio/loaders.ts";
 import { THEME_KEYS } from "../../src/studio/theme/config.ts";
 import {
 	THEMES,
 	ThemedArtistPage,
+	ThemedRequestPage,
 	ThemedStudioPage,
 	themeFor,
 } from "../../src/studio/theme/registry.tsx";
@@ -64,6 +73,20 @@ function artistHtml(slug: string, studio: Studio = STUDIO) {
 	return renderToStaticMarkup(createElement(ThemedArtistPage, { data }));
 }
 
+function requestHtml(studio: Studio = STUDIO, artist?: string) {
+	return renderToStaticMarkup(
+		createElement(ThemedRequestPage, {
+			data: requestPageData(
+				studio,
+				[SITA, ARJUN],
+				artist === undefined ? {} : { artist },
+				ORIGIN,
+				IMAGE_ORIGIN,
+			),
+		}),
+	);
+}
+
 function assertSame(actual: string, name: string) {
 	assert.ok(
 		actual === SNAPSHOT[name],
@@ -90,6 +113,7 @@ describe("the theme registry (TAT-54)", () => {
 		assert.deepEqual(Object.keys(THEMES), [...THEME_KEYS]);
 		assert.equal(THEMES["stencil-and-ink"].StudioPage, StudioPage);
 		assert.equal(THEMES["stencil-and-ink"].ArtistPage, ArtistPage);
+		assert.equal(THEMES["stencil-and-ink"].RequestPage, RequestPage);
 	});
 
 	test("an unknown key is the default theme", () => {
@@ -114,20 +138,41 @@ describe("the default theme (TAT-54)", () => {
 	});
 });
 
+describe("the request page in the studio's theme (TAT-127)", () => {
+	test("a config whose every value is hostile renders the default theme's request page, byte for byte", () => {
+		assert.equal(requestHtml(withStorefront(HOSTILE)), requestHtml());
+		assert.equal(
+			requestHtml(withStorefront(HOSTILE), "sita"),
+			requestHtml(STUDIO, "sita"),
+		);
+	});
+
+	test("the bar carries the studio's logo, and the page keeps every rule of an ordinary one", () => {
+		const html = requestHtml(withStorefront(BRANDED), "sita");
+
+		assertSafePage(html, BRAND_PAGE);
+		assert.ok(
+			html.includes(
+				`<header class="site-bar"><div class="site-bar-inner"><a class="site-bar-home" href="/" dir="auto"><img class="site-bar-logo" src="${LOGO.url}" width="600" height="200" alt="" decoding="async" fetchPriority="low"/><span>Black Needle</span></a></div></header>`,
+			),
+		);
+	});
+});
+
 describe("the studio page's sections (TAT-54)", () => {
 	test("follow the config's order", () => {
 		const html = studioHtml(
 			withStorefront({ sections: sections("inquiry", "artists") }),
 		);
 		assert.ok(html.indexOf(' id="inquiry"') < html.indexOf(' id="artists"'));
-		// h1; the strip; the inquiry and its panel; Artists and its two artists.
-		assert.deepEqual(headings(html), [1, 2, 2, 2, 2, 3, 3]);
+		// h1; the strip; the invitation; Artists and its two artists.
+		assert.deepEqual(headings(html), [1, 2, 2, 2, 3, 3]);
 	});
 
 	test("a hidden roster is gone; the hero, the inquiry and the footer stay", () => {
 		const html = studioHtml(withStorefront({ sections: sections("inquiry") }));
 		assert.doesNotMatch(html, / id="artists"|Ask for/);
-		assert.deepEqual(headings(html), [1, 2, 2, 2]);
+		assert.deepEqual(headings(html), [1, 2, 2]);
 		assert.match(
 			html,
 			/<h1 class="profile-name" dir="auto">Black Needle<\/h1>/,
@@ -334,7 +379,7 @@ describe("a studio's logo and cover (TAT-54)", () => {
 		assertSafePage(html, BRAND_PAGE);
 		assert.ok(
 			html.includes(
-				`<header class="site-bar"><a href="/" dir="auto"><img class="site-bar-logo" src="${LOGO.url}" width="600" height="200" alt="" decoding="async" fetchPriority="low"/><span>Black Needle</span></a></header>`,
+				`<header class="site-bar"><div class="site-bar-inner"><a class="site-bar-home" href="/" dir="auto"><img class="site-bar-logo" src="${LOGO.url}" width="600" height="200" alt="" decoding="async" fetchPriority="low"/><span>Black Needle</span></a><a class="action action-primary site-bar-request" href="/request?artist=sita"><span>Request <bdi>Sita Rai</bdi></span></a></div></header>`,
 			),
 		);
 		assert.doesNotMatch(html, /profile-cover/);

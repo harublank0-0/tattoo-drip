@@ -72,6 +72,44 @@ export const studioCopy = {
 			apply: "Show photos",
 		},
 	},
+	/**
+	 * The request page, its buttons and the invitation to it (TAT-127).
+	 * Templates hold {name}, {studio} and {who}.
+	 */
+	request: {
+		/** The header's button, and on an artist's page the one that names them. */
+		bar: "Request",
+		barArtist: "Request {name}",
+		artistButton: "Request a tattoo from {name}",
+		inviteTitle: "Got an idea?",
+		inviteLine:
+			"Tell {studio} what you'd like and where it goes. Add photos if you have them.",
+		/**
+		 * The request page's title and description while it declines (the page
+		 * says "Inquiries" and that nobody is taking new ones, so its tab, search
+		 * snippet and share card must not invite). {who} is the artist's name when
+		 * one is picked, else the studio's. The description is also the sentence
+		 * the page itself says (the request page's closed section and the home
+		 * page's closed invitation), so the two never drift apart.
+		 */
+		closedTitle: "Inquiries at {studio}",
+		closedTitleArtist: "Inquiries for {name} at {studio}",
+		closedDescription: "{who} isn't taking new inquiries right now.",
+	},
+	/** The studio's flag in words; a closed artist's own message comes first. */
+	status: {
+		open: "Taking new work",
+		closed: "Not taking new work right now",
+	},
+	/** The chat button (TAT-127). The message holds {subject}. */
+	chat: {
+		toggle: "Chat",
+		label: "Chat with {studio}",
+		whatsapp: "WhatsApp",
+		viber: "Viber",
+		message: "Hi, I'm asking about {subject}",
+		anyTattoo: "a tattoo",
+	},
 	/** The artist page's two lists, named for screen readers (TAT-125). */
 	artist: {
 		styles: "Styles",

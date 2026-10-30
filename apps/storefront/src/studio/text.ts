@@ -15,16 +15,27 @@
 const CONTROL = /(?![\t\n])\p{Cc}|[\u202A-\u202E\u2066-\u2069\uFEFF]/gu;
 
 /**
+ * A surrogate with no partner (a JSON "\ud800" the API passed on): `\p{Cs}`
+ * matches only an unpaired one in a `u` regex, so a real pair (an emoji) is
+ * left whole. `encodeURIComponent` throws on one, and a name is encoded into
+ * the chat link on every page. The same repair as `String.prototype
+ * .toWellFormed`, which the ES2022 lib and older browsers lack.
+ */
+const LONE_SURROGATE = /\p{Cs}/gu;
+
+/**
  * Multi-line text from the API (an intro, a bio, an address, a closed
  * message), ready for `white-space: pre-line`: Windows and old Mac line ends
  * become "\n", control characters go, spaces before a line break go, more
  * than one blank line becomes one, and the ends are trimmed. Bidi overrides
- * and the byte order mark go too; joiners (U+200C, U+200D) stay: Devanagari
- * and emoji need them. Blank text is null.
+ * and the byte order mark go too, and an unpaired surrogate becomes U+FFFD;
+ * joiners (U+200C, U+200D) stay: Devanagari and emoji need them. Blank text
+ * is null.
  */
 export function cleanText(value: string | null | undefined): string | null {
 	if (typeof value !== "string") return null;
 	const text = value
+		.replace(LONE_SURROGATE, "\uFFFD")
 		.replace(/\r\n?/g, "\n")
 		.replace(CONTROL, "")
 		.replace(/[ \t]+\n/g, "\n")

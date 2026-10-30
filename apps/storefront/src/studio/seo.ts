@@ -1,5 +1,7 @@
 import { rootRouteId } from "@tanstack/react-router";
+import { fill } from "../intake/template.ts";
 import { studioCopy } from "./copy.ts";
+import { requestHref } from "./links.ts";
 import { trimDescription } from "./text.ts";
 import type { ArtistPhoto, ArtistView, StudioView } from "./view-model.ts";
 
@@ -91,6 +93,49 @@ export function workPageSeo(studio: StudioView, origin: string): PageSeo {
 		type: "website",
 		siteName: studio.name,
 		image: null,
+		jsonLd: null,
+	};
+}
+
+/**
+ * The request page's head (TAT-127). While the page invites (`open`), with an
+ * artist the title and description name them, as the artist page's do (one
+ * name when they are named like their studio). While it declines (a closed
+ * artist or studio: the page says "Inquiries" and that no one is taking new
+ * ones) the head says the same, so the tab, the search snippet and the share
+ * card never advertise an invitation the page refuses. The canonical address
+ * keeps the artist (`/request?artist=<slug>`) either way, because Facebook keys
+ * a shared link by its canonical `og:url`; a page for the general form is
+ * `/request`, whatever else the address carried.
+ */
+export function requestPageSeo(
+	studio: StudioView,
+	artist: ArtistView | null,
+	origin: string,
+	open: boolean,
+): PageSeo {
+	const sameName = artist?.name === studio.name;
+	const who = artist?.name ?? studio.name;
+	const named = artist && !sameName ? artist : null;
+	const title = open
+		? named
+			? `${studioCopy.sendIdea} to ${named.name} at ${studio.name}`
+			: `${studioCopy.sendIdea} to ${who}`
+		: named
+			? fill(studioCopy.request.closedTitleArtist, {
+					name: named.name,
+					studio: studio.name,
+				})
+			: fill(studioCopy.request.closedTitle, { studio: studio.name });
+	return {
+		title,
+		description: open
+			? `Tell ${who} about the tattoo you'd like: the idea, where it goes and the dates that suit you.`
+			: fill(studioCopy.request.closedDescription, { who }),
+		canonical: `${origin}${requestHref(artist ? { artist: artist.slug } : {})}`,
+		type: "website",
+		siteName: studio.name,
+		image: artist?.photo ?? null,
 		jsonLd: null,
 	};
 }

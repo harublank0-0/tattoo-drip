@@ -46,11 +46,24 @@ describe("the stylesheet's files", () => {
 	});
 });
 
+/** The declarations of the rule whose selector list holds `selector` (among others, if it shares them). */
+function ruleWith(css: string, selector: string): string {
+	const bare = css.replace(/\/\*[\s\S]*?\*\//g, "");
+	for (const match of bare.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+		const own = match[1].split(/[;}]/).pop() ?? "";
+		if (own.split(",").some((part) => part.trim() === selector))
+			return match[2];
+	}
+	return "";
+}
+
 /** The declarations of the rule whose selector list is exactly `selector`. */
 function ruleBody(css: string, selector: string): string {
 	const bare = css.replace(/\/\*[\s\S]*?\*\//g, "");
 	for (const match of bare.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-		if (match[1].trim() === selector) return match[2];
+		// `.pop()` drops a statement before the selector (`@import ...;`, `@custom-variant ...;`).
+		const own = match[1].split(/[;}]/).pop()?.trim();
+		if (own === selector) return match[2];
 	}
 	return "";
 }
@@ -74,7 +87,9 @@ describe("text the studio typed", () => {
 			".site-footer",
 			".action",
 			".link-chip",
-			".site-bar a",
+			// The Request button is an .action, listed above; a long Devanagari
+			// studio name wraps in the way home (TAT-127).
+			".site-bar-home",
 		]) {
 			assert.match(
 				ruleBody(css, selector),
@@ -218,6 +233,159 @@ describe("the booking steps' two layouts (TAT-105)", () => {
 			ruleBody(css, ".profile-location"),
 			/max-inline-size:\s*36rem/,
 		);
+	});
+});
+
+describe("the header and the chat button (TAT-127)", () => {
+	const css = readFileSync(new URL("styles.css", SRC), "utf8");
+	const bare = css.replace(/\/\*[\s\S]*?\*\//g, "");
+	const wide = bare.slice(bare.indexOf("@media (min-width: 60rem)"));
+
+	test("the bar sticks to the top over the content", () => {
+		const body = ruleBody(css, ".site-bar");
+		assert.match(body, /position:\s*sticky/);
+		assert.match(body, /inset-block-start:\s*0\b/);
+		assert.match(body, /z-index:\s*1\b/);
+		assert.match(body, /background:\s*var\(--paper\)/);
+		assert.match(ruleBody(css, ":root"), /--site-bar-height:\s*3\.75rem/);
+		assert.match(
+			ruleBody(css, ".site-bar-inner"),
+			/min-block-size:\s*var\(--site-bar-height\)/,
+		);
+	});
+
+	// The height is one token for the scroll padding, the bar and the sticky
+	// panel; the dark block changes colours only.
+	test("--site-bar-height is defined once, on :root and not in the dark block", () => {
+		const defs = [...bare.matchAll(/--site-bar-height:/g)];
+		const dark = bare.indexOf("@media (prefers-color-scheme: dark) {");
+		assert.equal(defs.length, 1);
+		assert.ok(dark > 0);
+		assert.ok((defs[0].index ?? Number.POSITIVE_INFINITY) < dark);
+	});
+
+	// --site-bar-height is the bar's one-line minimum; the bar grows to two
+	// lines (a wrapped name, about 4.75rem) and no further, because both names
+	// are clamped to two lines (below). The padding adds 2.5rem to the one-line
+	// height, which leaves 1.5rem clear under a two-line bar.
+	test("an anchor or a focused control is never hidden under the bar or the chat button", () => {
+		// Unconditional, so a browser without :has() (Firefox before 121, Safari
+		// before 15.4) keeps anchors and focus clear of the bar too.
+		const bare = css.replace(/\/\*[\s\S]*?\*\//g, "");
+		assert.match(
+			bare,
+			/(?:^|[;}\s]):root\s*\{\s*scroll-padding-block-start:\s*calc\(var\(--site-bar-height\) \+ 2\.5rem\);?\s*\}/,
+		);
+		assert.doesNotMatch(bare, /:has\(\.site-bar\)/);
+		// The toggle sits above the device's bottom inset (max(1rem, inset)), so the clearances add it.
+		assert.match(
+			ruleBody(css, ":root:has(.chat-float)"),
+			/scroll-padding-block-end:\s*calc\(5\.5rem \+ env\(safe-area-inset-bottom, 0px\)\)/,
+		);
+		assert.match(
+			ruleBody(css, ":root:has(.chat-float) .site-footer"),
+			/padding-block-end:\s*calc\(6rem \+ env\(safe-area-inset-bottom, 0px\)\)/,
+		);
+		assert.match(
+			wide,
+			/\.inquiry-aside\s*\{[^}]*inset-block-start:\s*calc\(var\(--site-bar-height\) \+ 1\.5rem\)/,
+		);
+	});
+
+	// An old `/artists/<slug>#inquiry` link lands on the open artist's request
+	// row (render.test.ts pins its class), which is neither a .section nor the
+	// .inquiry section: the root's scroll padding clears it for any target, and
+	// it gets the same extra room the other two have.
+	test("every #inquiry landing place has room under the bar", () => {
+		for (const selector of [".section", ".inquiry", ".artist-request"]) {
+			assert.match(
+				ruleBody(css, selector),
+				/scroll-margin-block-start:\s*1\.5rem/,
+				selector,
+			);
+		}
+	});
+
+	test("the chat button floats in the corner above the bar's layer, with a 48 px toggle and no marker", () => {
+		const float = ruleBody(css, ".chat-float");
+		assert.match(float, /position:\s*fixed/);
+		assert.match(float, /z-index:\s*2\b/);
+		assert.match(float, /inset-block-end:[^;]*env\(safe-area-inset-bottom/);
+		assert.match(float, /inset-inline-end:\s*1rem/);
+		// .action is 3rem tall; the toggle adds nothing that shrinks it.
+		assert.match(ruleBody(css, ".action"), /min-height:\s*3rem/);
+		assert.match(ruleBody(css, ".chat-float-toggle"), /list-style:\s*none/);
+		assert.match(
+			ruleBody(css, ".chat-float-toggle::-webkit-details-marker"),
+			/display:\s*none/,
+		);
+		const links = ruleBody(css, ".chat-float-links");
+		assert.match(links, /position:\s*absolute/);
+		assert.match(links, /inset-block-end:\s*calc\(100% \+ 0\.5rem\)/);
+		assert.match(links, /background:\s*var\(--paper\)/);
+		assert.match(links, /border:[^;]*var\(--line-strong\)/);
+	});
+
+	// The bar's height is the scroll padding's arithmetic: a name that wrapped
+	// to three lines or more would put focus targets under it, so the artist's
+	// name in the Request button and the studio's own name stop at two lines.
+	const CLAMP = [
+		/display:\s*-webkit-box/,
+		/-webkit-box-orient:\s*vertical/,
+		/-webkit-line-clamp:\s*2\b/,
+		/(?<!-webkit-)line-clamp:\s*2\b/,
+		/overflow:\s*hidden/,
+	];
+
+	test("the Request button's text stops at two lines, so the bar is never taller than the scroll padding allows", () => {
+		const body = ruleWith(css, ".site-bar-request > span");
+		for (const pattern of CLAMP) assert.match(body, pattern, String(pattern));
+	});
+
+	test("the studio's name in the bar stops at two lines too, with or without a logo", () => {
+		// With a logo the name is a <span> beside the image; without one it is the link's own text.
+		for (const selector of [
+			".site-bar-home > span",
+			".site-bar-home:not(:has(.site-bar-logo))",
+		]) {
+			const body = ruleWith(css, selector);
+			for (const pattern of CLAMP) {
+				assert.match(body, pattern, `${selector} ${pattern}`);
+			}
+		}
+	});
+
+	test("a name without a logo stays centred in the bar though its clamp is a block (Chrome computes -webkit-box with a line clamp as flow-root, which ignores -webkit-box-pack)", () => {
+		assert.match(
+			ruleWith(css, ".site-bar-home:not(:has(.site-bar-logo))"),
+			/align-content:\s*center/,
+		);
+	});
+
+	test("the bar's Request button shrinks and wraps inside the bar instead of widening the page", () => {
+		const request = ruleBody(css, ".site-bar-request");
+		assert.match(request, /flex:\s*0 1 auto/);
+		assert.match(request, /max-inline-size:\s*60%/);
+		assert.match(ruleBody(css, ".site-bar-home"), /min-inline-size:\s*0/);
+		assert.match(ruleBody(css, ".site-bar-inner"), /display:\s*flex/);
+	});
+
+	test("the layers use the theme's tokens only, no colour of their own", () => {
+		for (const selector of [
+			".site-bar",
+			".site-bar-inner",
+			".site-bar-home",
+			".site-bar-request",
+			".chat-float",
+			".chat-float-toggle",
+			".chat-float-links",
+		]) {
+			assert.doesNotMatch(
+				ruleBody(css, selector),
+				/#[0-9a-f]{3,8}\b|rgb\(|hsl\(/i,
+				selector,
+			);
+		}
 	});
 });
 

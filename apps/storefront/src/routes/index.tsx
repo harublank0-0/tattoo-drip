@@ -5,7 +5,7 @@ import { statusHead } from "../studio/seo.ts";
 import { themedHeadTags } from "../studio/theme/head.ts";
 import { ThemedStudioPage } from "../studio/theme/registry.tsx";
 
-/** The studio page (TAT-48): profile, contact links, artists and the inquiry section. */
+/** The studio page (TAT-48): profile, contact links, artists and the invitation to /request. */
 export const Route = createFileRoute("/")({
 	loader: ({ context }) => loadStudioPage(context),
 	head: ({ loaderData, match }) =>
@@ -17,13 +17,5 @@ export const Route = createFileRoute("/")({
 });
 
 function StudioRoute() {
-	const challengeSiteKey = Route.useRouteContext({
-		select: (context) => context.site.challengeSiteKey,
-	});
-	return (
-		<ThemedStudioPage
-			data={Route.useLoaderData()}
-			challengeSiteKey={challengeSiteKey}
-		/>
-	);
+	return <ThemedStudioPage data={Route.useLoaderData()} />;
 }

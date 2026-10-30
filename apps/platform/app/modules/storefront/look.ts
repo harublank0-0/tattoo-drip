@@ -18,8 +18,9 @@ export const DEFAULT_FONT: FontKey = "eczar";
 /**
  * The studio page's sections an owner can show, hide and order: the newest
  * photos, the artists, Good to know (`info`, TAT-128: hours and what clients
- * ask) and the idea form. The storefront's SECTION_KEYS is the same list in
- * the same order (look.spec.ts compares them, and the contract's
+ * ask) and the "Got an idea?" invitation to the request page (`inquiry`).
+ * The storefront's SECTION_KEYS is the same list in the same order
+ * (look.spec.ts compares them, and the contract's
  * `StorefrontSection` list and `sections` `maxItems`). A new section is a key
  * here and there, its place in the storefront theme's `order`, a line in the
  * dashboard's SECTION_WORDS (inertia/components/page_look.ts), the contract's
@@ -112,7 +113,7 @@ function isOneOf<T extends string>(
 /**
  * A section list the page can use (the storefront's readSections): the known
  * keys, each once, in the order given, then "inquiry" if it was left out, so
- * the idea form is always on the page.
+ * the invitation to the request page is always on the page.
  */
 export function sectionList(keys: readonly string[]): SectionKey[] {
 	const sections: SectionKey[] = [];

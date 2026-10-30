@@ -5,7 +5,8 @@
 // studio's name, the API's origin and its own origin but never the key, the
 // API got one keyed lookup and one keyed artists read per page (the studio
 // page, an artist's page and /work add one gallery read, TAT-126), each with
-// the visitor's address (X-Visitor-IP, TAT-38), a failed
+// the visitor's address (X-Visitor-IP, TAT-38; /request, TAT-127, reads the
+// lookup and the list alone), a failed
 // read is an error page inside the document (never a not-found, never
 // cached) and a failed lookup is a 503. The deposit page (TAT-65b) is its
 // shell only: one lookup, no-store, no Referer, noindex. Run `pnpm build` first, then
@@ -300,6 +301,62 @@ try {
 				call.authorization === `Bearer ${CANARY}` && call.cookie === null,
 		),
 		"An artist's page made an API call without the key, or with a cookie.",
+	);
+
+	// The request page (TAT-127): the form on a page of its own, with the
+	// artist from the address. It asks for the lookup and the list alone (no
+	// work read), carries the public site key for its form, and answers as every
+	// page does.
+	apiLog.length = 0;
+	page = await get("/request?artist=sita");
+	expect(
+		page.status === 200 &&
+			page.body.includes(
+				"<title>Send your idea to Sita Rai at Canary Ink &lt;Studio&gt;</title>",
+			) &&
+			page.body.includes(
+				`href="http://${SLUG}.localhost:${storefrontPort}/request?artist=sita"`,
+			),
+		`/request?artist=sita is ${page.status}, or lacks its own title and canonical link.`,
+	);
+	expect(
+		page.cacheControl ===
+			"public, max-age=0, s-maxage=60, stale-while-revalidate=600",
+		`/request's Cache-Control is "${page.cacheControl}".`,
+	);
+	expect(
+		page.body.includes(`challengeSiteKey:"${SITE_KEY}"`) &&
+			page.body.includes("your idea for") &&
+			!page.body.includes(CANARY),
+		"/request does not carry the public Turnstile site key and the artist's form, or shows the server key.",
+	);
+	expect(
+		apiLog
+			.map((call) => call.url)
+			.sort()
+			.join(",") ===
+			[`/api/v1/tenants/${SLUG}`, `/api/v1/tenants/${SLUG}/artists`].join(
+				",",
+			) &&
+			apiLog.every(
+				(call) =>
+					call.authorization === `Bearer ${CANARY}` &&
+					call.visitor === VISITOR &&
+					call.cookie === null,
+			),
+		`/request asked the API for ${apiLog.map((call) => call.url).join(", ")} instead of the lookup and the list alone, each keyed, cookie-less and carrying the visitor's address.`,
+	);
+	// An address that is not what we wrote is still the form, never a not-found.
+	page = await get("/request?artist=Nobody&fbclid=IwAR0");
+	expect(
+		page.status === 200 &&
+			page.body.includes(
+				"<title>Send your idea to Canary Ink &lt;Studio&gt;</title>",
+			) &&
+			page.body.includes(
+				`href="http://${SLUG}.localhost:${storefrontPort}/request"`,
+			),
+		`/request?artist=Nobody&fbclid=… is ${page.status}, not the general form at /request.`,
 	);
 
 	// All work (TAT-126): the lookup, the list and the first page of photos.

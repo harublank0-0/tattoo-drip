@@ -59,12 +59,25 @@ describe("inquiryState", () => {
 			studioName: "Black Needle",
 			artistName: "अर्जुन थापा",
 			studioOpen: true,
+			closedMessage: "Books open in March.",
 		});
 		assert.deepEqual(inquiryState(closedStudio, [arjun], arjun), {
 			kind: "artist-closed",
 			studioName: "Black Needle",
 			artistName: "अर्जुन थापा",
 			studioOpen: false,
+			closedMessage: "Books open in March.",
+		});
+	});
+
+	test("a closed artist with no message of their own has none", () => {
+		const [quiet] = artistViewModels([{ ...ARJUN, closedMessage: null }]);
+		assert.deepEqual(inquiryState(studio, [quiet], quiet), {
+			kind: "artist-closed",
+			studioName: "Black Needle",
+			artistName: "अर्जुन थापा",
+			studioOpen: true,
+			closedMessage: null,
 		});
 	});
 

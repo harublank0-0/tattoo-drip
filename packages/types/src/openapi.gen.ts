@@ -495,8 +495,9 @@ export interface components {
              * @description `work` (Recent work: the newest photos), `artists` (the artists
              *     list), `info` (Good to know: hours, closed days and what clients
              *     ask, shown only when the studio filled something in) or
-             *     `inquiry` (the idea form, always listed). More will come: treat
-             *     an unknown value as one to leave out.
+             *     `inquiry` (the "Got an idea?" invitation to the request page,
+             *     always listed). More will come: treat an unknown value as one to
+             *     leave out.
              * @enum {string}
              */
             type: "work" | "artists" | "info" | "inquiry";
@@ -544,7 +545,10 @@ export interface components {
                  */
                 font: "eczar" | "serif" | "sans";
             };
-            /** @description The sections to show, in order. The form is always there. */
+            /**
+             * @description The sections to show, in order. The `inquiry` section (the
+             *     "Got an idea?" invitation to the request page) is always listed.
+             */
             sections: components["schemas"]["StorefrontSection"][];
         };
         /**

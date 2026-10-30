@@ -3,6 +3,7 @@ import { describe, test } from "node:test";
 import {
 	artistPageSeo,
 	headTags,
+	requestPageSeo,
 	serializeJsonLd,
 	statusHead,
 	studioPageSeo,
@@ -179,6 +180,115 @@ describe("workPageSeo (TAT-126)", () => {
 		);
 		assert.ok(
 			!head.meta.some((m) => "property" in m && m.property === "og:image"),
+		);
+	});
+});
+
+describe("requestPageSeo (TAT-127)", () => {
+	test("the general request page asks for the idea and names the studio", () => {
+		const seo = requestPageSeo(studio, null, ORIGIN, true);
+
+		assert.equal(seo.title, "Send your idea to Black Needle");
+		assert.equal(
+			seo.description,
+			"Tell Black Needle about the tattoo you'd like: the idea, where it goes and the dates that suit you.",
+		);
+		assert.equal(seo.canonical, `${ORIGIN}/request`);
+		assert.equal(seo.type, "website");
+		assert.equal(seo.siteName, "Black Needle");
+		assert.equal(seo.image, null);
+		assert.equal(seo.jsonLd, null);
+	});
+
+	test("with an artist, the title and description name them, and the artist stays in the canonical address", () => {
+		const seo = requestPageSeo(studio, sita, ORIGIN, true);
+
+		assert.equal(seo.title, "Send your idea to Sita Rai at Black Needle");
+		assert.equal(
+			seo.description,
+			"Tell Sita Rai about the tattoo you'd like: the idea, where it goes and the dates that suit you.",
+		);
+		// Facebook keys a shared link by its canonical og:url.
+		assert.equal(seo.canonical, `${ORIGIN}/request?artist=sita`);
+		assert.deepEqual(seo.image, sita.photo);
+		assert.equal(seo.jsonLd, null);
+	});
+
+	test("an independent artist named like their studio isn't named twice", () => {
+		const [same] = artistViewModels([{ ...SITA, name: "Black Needle" }]);
+		const seo = requestPageSeo(studio, same, ORIGIN, true);
+
+		assert.equal(seo.title, "Send your idea to Black Needle");
+	});
+
+	test("a closed artist's page does not invite: the title and description say what the page says", () => {
+		const seo = requestPageSeo(studio, arjun, ORIGIN, false);
+
+		assert.equal(seo.title, "Inquiries for अर्जुन थापा at Black Needle");
+		assert.equal(
+			seo.description,
+			"अर्जुन थापा isn't taking new inquiries right now.",
+		);
+		// The address is the same as an open page's: the artist stays in it.
+		assert.equal(seo.canonical, `${ORIGIN}/request?artist=arjun`);
+		assert.doesNotMatch(
+			`${seo.title} ${seo.description}`,
+			/Send your idea|Tell /,
+		);
+	});
+
+	test("a closed studio's general page does not invite either", () => {
+		const seo = requestPageSeo(studio, null, ORIGIN, false);
+
+		assert.equal(seo.title, "Inquiries at Black Needle");
+		assert.equal(
+			seo.description,
+			"Black Needle isn't taking new inquiries right now.",
+		);
+		assert.equal(seo.canonical, `${ORIGIN}/request`);
+		assert.equal(seo.image, null);
+	});
+
+	test("a closed artist named like their studio is named once", () => {
+		const [same] = artistViewModels([{ ...ARJUN, name: "Black Needle" }]);
+		const seo = requestPageSeo(studio, same, ORIGIN, false);
+
+		assert.equal(seo.title, "Inquiries at Black Needle");
+		assert.equal(
+			seo.description,
+			"Black Needle isn't taking new inquiries right now.",
+		);
+	});
+
+	// `open` has no default: a caller that forgets it fails typecheck instead of inviting.
+	test("an open page keeps its inviting title, and a closed one differs from it", () => {
+		assert.equal(
+			requestPageSeo(studio, sita, ORIGIN, true).title,
+			"Send your idea to Sita Rai at Black Needle",
+		);
+		assert.notDeepEqual(
+			requestPageSeo(studio, sita, ORIGIN, true),
+			requestPageSeo(studio, sita, ORIGIN, false),
+		);
+	});
+
+	test("writes its head like the other pages, with the artist's photo for the card", () => {
+		const head = headTags(requestPageSeo(studio, sita, ORIGIN, true));
+
+		assert.deepEqual(head.scripts, []);
+		assert.deepEqual(head.links, [
+			{ rel: "canonical", href: `${ORIGIN}/request?artist=sita` },
+		]);
+		assert.ok(
+			head.meta.some(
+				(m) =>
+					"property" in m &&
+					m.property === "og:url" &&
+					m.content === `${ORIGIN}/request?artist=sita`,
+			),
+		);
+		assert.ok(
+			head.meta.some((m) => "property" in m && m.property === "og:image"),
 		);
 	});
 });

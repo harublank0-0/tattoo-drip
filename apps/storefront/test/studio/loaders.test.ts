@@ -12,10 +12,12 @@ import { EMPTY_GALLERY, galleryView } from "../../src/studio/gallery.ts";
 import {
 	artistPageData,
 	loadArtistPage,
+	loadRequestPage,
 	loadStudioPage,
 	loadWorkPage,
 	logReadFailed,
 	moreWork,
+	requestPageData,
 	studioPageData,
 	workPageData,
 } from "../../src/studio/loaders.ts";
@@ -341,6 +343,33 @@ describe("loadStudioPage", () => {
 		});
 	});
 
+	test("the studio page's data keeps the invitation's state and holds no inquiry channels; the header and chat button are its own", async () => {
+		const { fetch } = listing();
+		const data = await loadStudioPage(pageContext(fetch));
+
+		assert.deepEqual(Object.keys(data).sort(), [
+			"artists",
+			"chat",
+			"goodToKnow",
+			"inquiry",
+			"openNow",
+			"recentWork",
+			"requestLink",
+			"seo",
+			"studio",
+			"theme",
+		]);
+		assert.deepEqual(data.requestLink, {
+			href: "/request",
+			artistName: null,
+		});
+		assert.equal(
+			data.chat?.whatsapp,
+			"https://wa.me/9779812345678?text=Hi%2C%20I'm%20asking%20about%20a%20tattoo",
+		);
+		assert.equal(data.chat?.viber, "viber://chat?number=%2B9779812345678");
+	});
+
 	test("sets today's steady state from the clock; studioPageData has none", async () => {
 		const { fetch } = listing();
 		const context = pageContext(fetch, GOOD_TO_KNOW_STUDIO);
@@ -414,7 +443,45 @@ describe("loadArtistPage", () => {
 		);
 		assert.equal(data.artist.name, "Sita Rai");
 		assert.equal(data.seo.canonical, `${ORIGIN}/artists/sita`);
-		assert.equal(data.inquiry.kind, "open");
+		assert.equal(data.artist.requestHref, "/request?artist=sita");
+	});
+
+	test("the artist page's data holds no inquiry state and no inquiry channels: the form is on /request", async () => {
+		const { fetch } = listing();
+		const data = await loadArtistPage(pageContext(fetch), "sita", {});
+
+		assert.deepEqual(Object.keys(data).sort(), [
+			"artist",
+			"chat",
+			"portfolio",
+			"requestLink",
+			"seo",
+			"studio",
+			"theme",
+		]);
+	});
+
+	test("the header asks for the artist while they take new work, else for the studio, else for nothing; the chat names them", async () => {
+		const { fetch } = listing();
+		const sita = await loadArtistPage(pageContext(fetch), "sita", {});
+		const arjun = await loadArtistPage(pageContext(fetch), "arjun", {});
+		const closed = await loadArtistPage(
+			pageContext(fetch, CLOSED_STUDIO),
+			"arjun",
+			{},
+		);
+
+		assert.deepEqual(sita.requestLink, {
+			href: "/request?artist=sita",
+			artistName: "Sita Rai",
+		});
+		assert.ok(sita.chat?.whatsapp.endsWith("about%20Sita%20Rai"));
+		// A closed artist, the studio open: the studio's request.
+		assert.deepEqual(arjun.requestLink, { href: "/request", artistName: null });
+		assert.ok(arjun.chat?.whatsapp.endsWith(encodeURIComponent("अर्जुन थापा")));
+		// Both closed: nothing to lead to.
+		assert.equal(closed.requestLink, null);
+		assert.ok(closed.chat);
 	});
 
 	test("an unknown, hidden or renamed artist is a not-found", async () => {
@@ -450,16 +517,12 @@ describe("loadArtistPage", () => {
 		assert.equal(calls.length, 0);
 	});
 
-	test("a closed artist's page points to the studio", async () => {
+	test("a closed artist's page carries their status words", async () => {
 		const { fetch } = listing();
 		const data = await loadArtistPage(pageContext(fetch), "arjun", {});
 
-		assert.deepEqual(data.inquiry, {
-			kind: "artist-closed",
-			studioName: "Black Needle",
-			artistName: "अर्जुन थापा",
-			studioOpen: true,
-		});
+		assert.equal(data.artist.accepting, false);
+		assert.equal(data.artist.closedMessage, "Books open in March.");
 	});
 });
 
@@ -913,6 +976,159 @@ describe("the All work page's loader (TAT-126)", () => {
 					error instanceof TattooApiError && !isNotFound(error),
 			);
 		}
+	});
+});
+
+describe("loadRequestPage (TAT-127)", () => {
+	const TENANT = `${API}/api/v1/tenants/${STUDIO.slug}`;
+
+	test("reads the artists once (the studio from the cache) and picks the address's artist", async () => {
+		const { calls, fetch } = listing();
+		const context = pageContext(fetch);
+		const search = { artist: "sita" };
+
+		const data = await loadRequestPage(context, search);
+
+		assert.deepEqual(
+			data,
+			requestPageData(STUDIO, [SITA, ARJUN], search, ORIGIN),
+		);
+		assert.equal(data.inquiry.kind, "open");
+		assert.equal(
+			data.inquiry.kind === "open" && data.inquiry.preferredArtist?.id,
+			SITA.id,
+		);
+		assert.equal(data.seo.canonical, `${ORIGIN}/request?artist=sita`);
+		// The artists alone: no studio read (cached), no gallery read.
+		assert.deepEqual(
+			calls.map((call) => call.url),
+			[`${TENANT}/artists`],
+		);
+		await loadRequestPage(context, search);
+		assert.equal(calls.length, 1);
+	});
+
+	test("the chat button names the picked artist, open or closed, else asks about a tattoo; the page has no Request button", async () => {
+		const { fetch } = listing();
+		const context = pageContext(fetch);
+		const chatOf = async (search: { artist?: string }) =>
+			(await loadRequestPage(context, search)).chat?.whatsapp;
+
+		assert.ok(
+			(await chatOf({ artist: "sita" }))?.endsWith("about%20Sita%20Rai"),
+		);
+		assert.ok(
+			(await chatOf({ artist: "arjun" }))?.endsWith(
+				encodeURIComponent("अर्जुन थापा"),
+			),
+		);
+		for (const search of [{}, { artist: "nobody" }]) {
+			assert.ok((await chatOf(search))?.endsWith("about%20a%20tattoo"));
+		}
+		assert.equal("requestLink" in (await loadRequestPage(context, {})), false);
+	});
+
+	test("an unknown, hidden or renamed artist is the general form, never a not-found", async () => {
+		const { fetch } = listing();
+		// Hidden and deleted artists, and old slugs, aren't in the list the API sends.
+		for (const search of [{ artist: "nobody" }, { artist: "sita-old" }, {}]) {
+			const data = await loadRequestPage(pageContext(fetch), search);
+
+			assert.equal(data.inquiry.kind, "open", JSON.stringify(search));
+			assert.equal(
+				data.inquiry.kind === "open" && data.inquiry.preferredArtist,
+				null,
+				JSON.stringify(search),
+			);
+			assert.equal(data.seo.canonical, `${ORIGIN}/request`);
+		}
+	});
+
+	test("a closed artist is their own closed page, with the studio's general request still open", async () => {
+		const { fetch } = listing();
+		const data = await loadRequestPage(pageContext(fetch), {
+			artist: "arjun",
+		});
+
+		assert.deepEqual(data.inquiry, {
+			kind: "artist-closed",
+			studioName: "Black Needle",
+			artistName: "अर्जुन थापा",
+			studioOpen: true,
+			closedMessage: "Books open in March.",
+		});
+	});
+
+	test("an open artist's page works while the studio as a whole is closed", async () => {
+		const { fetch } = listing();
+		const closed = pageContext(fetch, CLOSED_STUDIO);
+
+		const sita = await loadRequestPage(closed, { artist: "sita" });
+		assert.equal(sita.inquiry.kind, "open");
+		assert.equal(
+			sita.inquiry.kind === "open" && sita.inquiry.preferredArtist?.id,
+			SITA.id,
+		);
+		assert.ok(sita.channels.whatsapp?.includes("Sita%20Rai"));
+
+		// The general form and the closed artist's page say so, and offer no form.
+		assert.deepEqual((await loadRequestPage(closed, {})).inquiry, {
+			kind: "studio-closed",
+			studioName: "Black Needle",
+		});
+		const arjun = await loadRequestPage(closed, { artist: "arjun" });
+		assert.equal(arjun.inquiry.kind, "artist-closed");
+		assert.equal(
+			arjun.inquiry.kind === "artist-closed" && arjun.inquiry.studioOpen,
+			false,
+		);
+	});
+
+	test("its head agrees with the page: a refusal never invites, an open artist's page always does", async () => {
+		const { fetch } = listing();
+
+		// A closed artist, the studio open.
+		const arjun = await loadRequestPage(pageContext(fetch), {
+			artist: "arjun",
+		});
+		assert.equal(arjun.seo.title, "Inquiries for अर्जुन थापा at Black Needle");
+		assert.equal(
+			arjun.seo.description,
+			"अर्जुन थापा isn't taking new inquiries right now.",
+		);
+		assert.equal(arjun.seo.canonical, `${ORIGIN}/request?artist=arjun`);
+
+		// The studio closed: the general page declines, an open artist's page does not.
+		const closed = pageContext(fetch, CLOSED_STUDIO);
+		const general = await loadRequestPage(closed, {});
+		assert.equal(general.seo.title, "Inquiries at Black Needle");
+		assert.equal(
+			general.seo.description,
+			"Black Needle isn't taking new inquiries right now.",
+		);
+		const sita = await loadRequestPage(closed, { artist: "sita" });
+		assert.equal(sita.seo.title, "Send your idea to Sita Rai at Black Needle");
+		assert.match(sita.seo.description, /^Tell Sita Rai about the tattoo/);
+
+		// The open general page.
+		const open = await loadRequestPage(pageContext(fetch), {});
+		assert.equal(open.seo.title, "Send your idea to Black Needle");
+	});
+
+	test("a failed artists read fails it like the other pages", async () => {
+		const { fetch } = fakeFetch(() =>
+			json(500, { error: { code: "internal_error", message: "Boom." } }),
+		);
+		await assert.rejects(
+			loadRequestPage(pageContext(fetch), { artist: "sita" }),
+			(error: unknown) => error instanceof TattooApiError && !isNotFound(error),
+		);
+
+		const missing = fakeFetch(() => json(404, NOT_FOUND));
+		await assert.rejects(
+			loadRequestPage(pageContext(missing.fetch), {}),
+			notFound,
+		);
 	});
 });
 
