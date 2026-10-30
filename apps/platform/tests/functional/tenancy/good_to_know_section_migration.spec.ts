@@ -162,9 +162,10 @@ test.group("the Good to know section migration (TAT-128)", () => {
 				"inquiry",
 				"inquiry,artists",
 				"artists,artists,flash,inquiry",
-				// 95 characters: a hundred once `work,` is in front, a hundred and five with `info,` too.
-				`artists,${"x".repeat(79)},inquiry`,
+				// A hundred characters: `work,` in front would make a hundred and five (the migration rebuilds the list).
+				`artists,${"x".repeat(84)},inquiry`,
 				"artists,artists,artists,artists,artists,flash,inquiry", // seven keys
+				"artists,artists,flash,flash,zzz,zzz,www,inquiry", // eight keys, repeats and unknown ones
 			];
 			await seed(trx, before);
 
@@ -175,6 +176,7 @@ test.group("the Good to know section migration (TAT-128)", () => {
 				"work,artists,info,inquiry",
 				"work,info,inquiry",
 				"work,info,inquiry,artists",
+				"work,artists,info,inquiry",
 				"work,artists,info,inquiry",
 				"work,artists,info,inquiry",
 				"work,artists,info,inquiry",
@@ -190,6 +192,7 @@ test.group("the Good to know section migration (TAT-128)", () => {
 				"work,artists,inquiry",
 				"work,inquiry",
 				"work,inquiry,artists",
+				"work,artists,inquiry",
 				"work,artists,inquiry",
 				"work,artists,inquiry",
 				"work,artists,inquiry",
