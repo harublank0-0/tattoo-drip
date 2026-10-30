@@ -28,10 +28,11 @@ import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
  * Real concurrency (TAT-129 part 4b): the claim (a verified deposit or a
  * booking, under the project's row lock) and what the studio does to the same
  * design (hide it, remove it, mark it by hand) on two connections. The lock
- * order is artist, then design, then project, and the claim holds the project
- * first: so nothing the studio does may take the design's row and then wait
- * for the project, or the two would wait for each other. The studios are
- * committed and removed again in the group's teardown.
+ * orders are: a claim, the project and then the design; the studio's writes,
+ * the artist and then the design. They share only the design's row, so
+ * nothing the studio does may take the design's row and then wait for a
+ * project, or the two would wait for each other. The studios are committed
+ * and removed again in the group's teardown.
  */
 
 const slugs: string[] = [];
