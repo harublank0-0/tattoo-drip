@@ -362,9 +362,12 @@ describe("the header and the chat button (TAT-127)", () => {
 		);
 	});
 
-	test("the bar's Request button shrinks and wraps inside the bar instead of widening the page", () => {
+	test("the bar's Request button keeps its width up to 60% of the row and the studio's name takes the squeeze, so no word breaks mid-word and the page never widens", () => {
 		const request = ruleBody(css, ".site-bar-request");
-		assert.match(request, /flex:\s*0 1 auto/);
+		// A shrinking button (flex-shrink 1) would fall to its min-content, which
+		// .action's overflow-wrap: anywhere makes one letter wide, and "Request"
+		// would break as "Reque/st" beside a wide logo.
+		assert.match(request, /flex:\s*0 0 auto/);
 		assert.match(request, /max-inline-size:\s*60%/);
 		assert.match(ruleBody(css, ".site-bar-home"), /min-inline-size:\s*0/);
 		assert.match(ruleBody(css, ".site-bar-inner"), /display:\s*flex/);

@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
-import { afterEach, describe, test } from "node:test";
-import { PHOTO_ENTRY, showPhoto } from "../../src/studio/lightbox.ts";
+import { afterEach, describe, mock, test } from "node:test";
+import {
+	LEAVE_WAIT_MS,
+	PHOTO_ENTRY,
+	showPhoto,
+} from "../../src/studio/lightbox.ts";
 
 /**
  * Back closes the work photo viewer (TAT-123). lightbox.ts reads the browser's
@@ -20,6 +24,7 @@ const saved = {
 };
 
 afterEach(() => {
+	mock.timers.reset();
 	for (const [name, value] of Object.entries(saved)) {
 		if (value === undefined) delete globals[name];
 		else globals[name] = value;
@@ -192,6 +197,52 @@ describe("Back closes the work photo viewer (TAT-123)", () => {
 			...ROUTER_STATE,
 			[PHOTO_ENTRY]: "work-photo-2",
 		});
+	});
+
+	test("a back() that moves nowhere (the marked entry is the session's first) does not lock the viewer", () => {
+		mock.timers.enable({ apis: ["setTimeout"] });
+		const { window, history, dialogs } = page({
+			...ROUTER_STATE,
+			[PHOTO_ENTRY]: "work-photo-1",
+		});
+		showPhoto("work-photo-2"); // reuses the entry a duplicated tab carried over
+		dialogs["work-photo-2"].close();
+		assert.deepEqual(history.calls, ["replace", "back"]);
+
+		showPhoto("work-photo-1");
+		assert.equal(dialogs["work-photo-1"].open, false, "it waits for the back");
+
+		// No popstate comes: there is no earlier entry to go back to.
+		mock.timers.tick(LEAVE_WAIT_MS);
+		assert.equal(window.count("popstate"), 0, "no listener is left");
+
+		showPhoto("work-photo-1");
+		assert.ok(
+			dialogs["work-photo-1"].open,
+			"a photo opens again without a reload",
+		);
+		assert.deepEqual(history.calls, ["replace", "back", "replace"]);
+		assert.equal(history.entries.length, 1);
+		assert.deepEqual(history.state, {
+			...ROUTER_STATE,
+			[PHOTO_ENTRY]: "work-photo-1",
+		});
+		history.pop(0);
+		assert.equal(dialogs["work-photo-1"].open, false, "Back still closes it");
+	});
+
+	test("a back() that lands in time clears the wait, and the timeout does nothing later", () => {
+		mock.timers.enable({ apis: ["setTimeout"] });
+		const { history, dialogs } = page();
+		showPhoto("work-photo-1");
+		dialogs["work-photo-1"].close();
+		history.pop();
+
+		showPhoto("work-photo-2");
+		assert.ok(dialogs["work-photo-2"].open);
+		mock.timers.tick(LEAVE_WAIT_MS * 2);
+		assert.ok(dialogs["work-photo-2"].open, "the old timeout was cleared");
+		assert.deepEqual(history.calls, ["push", "back", "push"]);
 	});
 
 	test("an open photo is not opened or pushed again", () => {

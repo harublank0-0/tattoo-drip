@@ -400,8 +400,10 @@
    * the right, stuck to the top of the screen over the content (z-index 1;
    * the chat button's 2 is above it, the open photo viewer's top layer above
    * both). It takes the theme's paper and line, so a themed page keeps its
-   * look. The name wraps inside its share and the button is capped at 60% of
-   * the row, so a long Devanagari name wraps and the page never scrolls sideways.
+   * look. The button keeps its width up to 60% of the row (no flex-shrink: .action's
+   * overflow-wrap: anywhere would let it fall to one letter and break "Request"
+   * mid-word beside a wide logo) and the name takes the squeeze, wrapping inside its
+   * share, so a long Devanagari name wraps and the page never scrolls sideways.
    * Each text stops at two lines (-webkit-line-clamp: an ellipsis, not a cut
    * mid-line) so the bar stays within the height the scroll padding allows; the
    * full names are elsewhere on the page and in the links' accessible names. The
@@ -411,7 +413,7 @@
   .site-bar { position: sticky; inset-block-start: 0; z-index: 1; border-block-end: 1px solid var(--line); background: var(--paper); }
   .site-bar-inner { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; width: min(72rem, 100% - 2.5rem); min-block-size: var(--site-bar-height); margin-inline: auto; padding-block: 0.375rem; }
   .site-bar-home { display: inline-flex; align-items: center; min-height: 2.75rem; min-inline-size: 0; font-family: var(--display-face); font-size: 1.25rem; font-weight: 700; text-decoration: none; overflow-wrap: anywhere; }
-  .site-bar-request { flex: 0 1 auto; max-inline-size: 60%; text-align: center; }
+  .site-bar-request { flex: 0 0 auto; max-inline-size: 60%; text-align: center; }
   .site-bar-home > span, .site-bar-request > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
   /* align-content: current Chrome computes a clamped -webkit-box as flow-root, where -webkit-box-pack no longer centres the text in the link's 44 px; older engines still use the pack. */
   .site-bar-home:not(:has(.site-bar-logo)) { display: -webkit-box; -webkit-box-orient: vertical; -webkit-box-pack: center; align-content: center; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
