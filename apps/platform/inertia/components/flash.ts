@@ -39,6 +39,10 @@ export type FlashCardProps = {
 	thumbnailUrl: string;
 	imageUrl: string;
 	hidden: boolean;
+	/** One of a kind (part 4b). */
+	oneOfAKind: boolean;
+	/** `here`: this project claimed it; `taken`: somebody else did and this record is open; else `none`. */
+	claim: "none" | "here" | "taken";
 };
 
 /** The line under a card's name: the artist, the size and the price, whichever it has. */
@@ -160,4 +164,37 @@ export const MAKE_AVAILABLE = "Make available";
 /** The claim button names its design for a screen reader, like Edit and Remove. */
 export function claimDesignLabel(name: string, claimed: boolean): string {
 	return `${claimed ? MAKE_AVAILABLE : MARK_CLAIMED}: ${name}`;
+}
+
+/** Every warning below starts with this sentence. */
+const TAKEN_BY_ANOTHER = "This design is already claimed by another client.";
+
+/** The label on a request or a project whose design somebody else claimed: nothing is cancelled, the studio talks to the client. */
+export const TAKEN_LABEL = "Design taken: offer something similar";
+
+/** On the project that claimed the design. */
+export const CLAIMED_HERE = "Claimed for this client";
+
+/** Above the quote form's submit, first quote and revision. */
+export const QUOTE_TAKEN_WARNING = `${TAKEN_BY_ANOTHER} Talk to this client about something similar before you send a price.`;
+
+/** The first "Make deposit link" asks while the design is taken; "New link"'s question starts with the same sentence. */
+export const LINK_TAKEN_QUESTION = `${TAKEN_BY_ANOTHER} Make a deposit link anyway?`;
+
+export const LINK_TAKEN_CONFIRM = "Make the link anyway";
+
+export const LINK_TAKEN_KEEP = "Not yet";
+
+/** The start of the verify panel's question while the design is taken. */
+export const VERIFY_TAKEN_NOTE = `${TAKEN_BY_ANOTHER.slice(0, -1)}: talk to this client before you verify.`;
+
+/** The sentence "New link" asks, with the warning in front while the design is taken. */
+export function newLinkQuestion(designTaken: boolean): string {
+	const question = "Make a new link? The link you sent before stops working.";
+	return designTaken ? `${TAKEN_BY_ANOTHER} ${question}` : question;
+}
+
+/** The verify panel's question, with the warning in front while the design is taken. */
+export function verifyQuestion(designTaken: boolean, question: string): string {
+	return designTaken ? `${VERIFY_TAKEN_NOTE} ${question}` : question;
 }

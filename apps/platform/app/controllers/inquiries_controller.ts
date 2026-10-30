@@ -6,6 +6,7 @@ import { tenantContext } from "#middleware/tenant_middleware";
 import ArtistService from "#modules/artists/services/artist_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ClientService from "#modules/clients/services/client_service";
+import { claimStateOf } from "#modules/flash/claims";
 import { flashCard } from "#modules/flash/flash_card";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import FlashService from "#modules/flash/services/flash_service";
@@ -92,6 +93,12 @@ export default class InquiriesController {
 			return design
 				? {
 						name: design.name,
+						// A new request for a design somebody has claimed (nothing is cancelled).
+						taken:
+							claimStateOf(design, {
+								projectId: null,
+								open: inquiry.status === "new",
+							}) === "taken",
 						thumbnailUrl: await this.images.urlFor(
 							"flash_design",
 							design.imageKey,
@@ -166,6 +173,7 @@ export default class InquiriesController {
 					tenant,
 					design,
 					artists.find(({ id }) => id === design.artistId)?.name ?? null,
+					{ projectId: null, open: inquiry.status === "new" },
 				)
 			: null;
 

@@ -40,6 +40,13 @@ type FlashModule = {
 	ONE_OF_A_KIND_HELP: string;
 	MARK_CLAIMED: string;
 	MAKE_AVAILABLE: string;
+	TAKEN_LABEL: string;
+	CLAIMED_HERE: string;
+	QUOTE_TAKEN_WARNING: string;
+	LINK_TAKEN_QUESTION: string;
+	LINK_TAKEN_CONFIRM: string;
+	LINK_TAKEN_KEEP: string;
+	VERIFY_TAKEN_NOTE: string;
 };
 const flash = flashModule as FlashModule;
 
@@ -198,6 +205,26 @@ test.group("flash design words (TAT-129)", () => {
 				claimed: false,
 			}),
 			"About 3 in · One of a kind",
+		);
+	});
+	test("the words of a design taken: the label, the claimed-here note and the three warnings", ({
+		assert,
+	}) => {
+		assert.equal(flash.TAKEN_LABEL, "Design taken: offer something similar");
+		assert.equal(flash.CLAIMED_HERE, "Claimed for this client");
+		assert.equal(
+			flash.QUOTE_TAKEN_WARNING,
+			"This design is already claimed by another client. Talk to this client about something similar before you send a price.",
+		);
+		assert.equal(
+			flash.LINK_TAKEN_QUESTION,
+			"This design is already claimed by another client. Make a deposit link anyway?",
+		);
+		assert.equal(flash.LINK_TAKEN_CONFIRM, "Make the link anyway");
+		assert.equal(flash.LINK_TAKEN_KEEP, "Not yet");
+		assert.equal(
+			flash.VERIFY_TAKEN_NOTE,
+			"This design is already claimed by another client: talk to this client before you verify.",
 		);
 	});
 });

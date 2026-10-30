@@ -335,6 +335,10 @@ export default class ProjectsController {
 					tenant,
 					design,
 					artists.find(({ id }) => id === design.artistId)?.name ?? null,
+					{
+						projectId: project.id,
+						open: !CLOSED_STATUSES.includes(project.status),
+					},
 				)
 			: null;
 

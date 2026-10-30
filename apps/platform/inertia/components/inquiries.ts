@@ -15,7 +15,7 @@ export type InquiryRow = {
 	approximateSize: string;
 	preferredArtistName: string | null;
 	/** The flash design it asks for, with its 320 px picture; null for a custom request (TAT-129). */
-	flash: { name: string; thumbnailUrl: string } | null;
+	flash: { name: string; thumbnailUrl: string; taken: boolean } | null;
 	receivedText: string;
 	/** How many reference images came with it. */
 	references: number;

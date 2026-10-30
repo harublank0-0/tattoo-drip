@@ -1,3 +1,4 @@
+import { type ClaimState, claimStateOf } from "#modules/flash/claims";
 import type FlashDesign from "#modules/flash/models/flash_design";
 import type ImageService from "#modules/media/services/image_service";
 import { THUMBNAIL_WIDTH } from "#modules/media/services/image_service";
@@ -24,14 +25,28 @@ export type FlashCardProps = {
 	imageUrl: string;
 	/** The studio took it off its page since; a request that names it still shows it. */
 	hidden: boolean;
+	/** One of a kind: the studio will tattoo it only once. */
+	oneOfAKind: boolean;
+	/**
+	 * What the claim means for this request or project (claimStateOf): `here`
+	 * when this project claimed the design, `taken` when anything else did
+	 * and this record is still open ("Design taken: offer something
+	 * similar"), else `none`.
+	 */
+	claim: ClaimState;
 };
 
-/** The card for `design`: the picture's two addresses and the price as words. */
+/**
+ * The card for `design`: the picture's two addresses and the price as words.
+ * `at` is the record the card is for: an inquiry (`projectId` null, `open`
+ * while it is `new`) or a project (its id, `open` while it is not closed).
+ */
 export async function flashCard(
 	images: ImageService,
 	tenant: Pick<Tenant, "id">,
 	design: FlashDesign,
 	artistName: string | null,
+	at: { projectId: string | null; open: boolean },
 ): Promise<FlashCardProps> {
 	return {
 		name: design.name,
@@ -51,5 +66,7 @@ export async function flashCard(
 			LARGE_WIDTH,
 		),
 		hidden: design.hidden,
+		oneOfAKind: design.oneOfAKind,
+		claim: claimStateOf(design, at),
 	};
 }

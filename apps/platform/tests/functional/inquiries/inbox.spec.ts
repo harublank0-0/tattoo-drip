@@ -240,7 +240,12 @@ test.group("Inbox pages", (group) => {
 		const flash = rows.find(
 			(row: { idea: string }) => row.idea === "The Moth flash",
 		);
-		assert.deepEqual(Object.keys(flash.flash).sort(), ["name", "thumbnailUrl"]);
+		assert.deepEqual(Object.keys(flash.flash).sort(), [
+			"name",
+			"taken",
+			"thumbnailUrl",
+		]);
+		assert.isFalse(flash.flash.taken);
 		assert.equal(flash.flash.name, "Moth");
 		assert.match(flash.flash.thumbnailUrl, /\.320w\.png$/);
 		assert.equal(
@@ -252,6 +257,73 @@ test.group("Inbox pages", (group) => {
 			(row: { idea: string }) => row.idea === "A custom idea",
 		);
 		assert.isNull(custom.flash);
+	});
+
+	test("a new request for a claimed design is marked taken, a decided one is not", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const { open, decided, free, repeatable } = await inTenant(
+			tenant,
+			async () => {
+				const artist = await makeArtist(tenant);
+				const taken = await addFlashDesign(tenant, artist, {
+					name: "Taken",
+					oneOfAKind: true,
+					claimedAt: DateTime.now().minus({ days: 1 }),
+				});
+				const unclaimed = await addFlashDesign(tenant, artist, {
+					name: "Free",
+					oneOfAKind: true,
+				});
+				const again = await addFlashDesign(tenant, artist, { name: "Again" });
+				const request = async (
+					design: { id: string },
+					over: Parameters<typeof makeInquiry>[2] = {},
+				) =>
+					makeInquiry(tenant, await makeClient(tenant), {
+						flashDesignId: design.id,
+						preferredArtistId: artist.id,
+						...over,
+					});
+				return {
+					open: await request(taken),
+					decided: await request(taken, {
+						status: "declined",
+						decidedAt: DateTime.utc(),
+					}),
+					free: await request(unclaimed),
+					repeatable: await request(again),
+				};
+			},
+		);
+		const row = (
+			rows: { id: string; flash: { taken: boolean } }[],
+			id: string,
+		) => rows.find((candidate) => candidate.id === id)?.flash.taken;
+		const claimOf = async (id: string) =>
+			(
+				await client
+					.get(inbox(`/${id}`))
+					.withInertia()
+					.loginAs(owner)
+			).inertiaProps.flash.claim;
+
+		const newRows = (await client.get(inbox()).withInertia().loginAs(owner))
+			.inertiaProps.inquiries;
+		const decidedRows = (
+			await client.get(inbox("?view=decided")).withInertia().loginAs(owner)
+		).inertiaProps.inquiries;
+
+		assert.isTrue(row(newRows, open.id));
+		assert.isFalse(row(newRows, free.id));
+		assert.isFalse(row(newRows, repeatable.id));
+		assert.isFalse(row(decidedRows, decided.id));
+		assert.equal(await claimOf(open.id), "taken");
+		assert.equal(await claimOf(decided.id), "none");
+		assert.equal(await claimOf(free.id), "none");
+		assert.equal(await claimOf(repeatable.id), "none");
 	});
 
 	test("the inbox costs the same queries for one flash row as for three", async ({
@@ -315,13 +387,17 @@ test.group("Inbox pages", (group) => {
 
 		assert.deepEqual(Object.keys(props.flash).sort(), [
 			"artistName",
+			"claim",
 			"hidden",
 			"imageUrl",
 			"name",
+			"oneOfAKind",
 			"priceText",
 			"size",
 			"thumbnailUrl",
 		]);
+		assert.equal(props.flash.claim, "none");
+		assert.isFalse(props.flash.oneOfAKind);
 		assert.equal(props.flash.name, "Moth");
 		assert.equal(props.flash.artistName, "Sita");
 		assert.equal(props.flash.size, "About 3 in");

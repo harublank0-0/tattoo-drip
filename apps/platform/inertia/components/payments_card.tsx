@@ -9,6 +9,8 @@ import {
 	useState,
 } from "react";
 import { urlFor } from "~/client";
+import { useDesignTaken } from "~/components/design_taken";
+import { verifyQuestion } from "~/components/flash";
 import {
 	FormSheetActions,
 	FormSheetPanel,
@@ -211,6 +213,7 @@ export function PendingProof({
 	compact?: boolean;
 }) {
 	const tenant = useTenant();
+	const designTaken = useDesignTaken();
 	const [open, setOpen] = useState<"verify" | "reject" | null>(null);
 	const verifyButton = useRef<HTMLButtonElement>(null);
 	const rejectButton = useRef<HTMLButtonElement>(null);
@@ -315,7 +318,10 @@ export function PendingProof({
 			{open === "verify" && (
 				<ConfirmPanel
 					action={urlFor("tenant.payments.verify", params)}
-					question={`Verify ${proof.expectedText}? Do it only if it reached your account${proof.referenceCode ? ` with code ${proof.referenceCode}` : ""}.`}
+					question={verifyQuestion(
+						designTaken,
+						`Verify ${proof.expectedText}? Do it only if it reached your account${proof.referenceCode ? ` with code ${proof.referenceCode}` : ""}.`,
+					)}
 					noteLabel="Note (optional, only your team sees it)"
 					submitLabel="Verify payment"
 					onCancel={close}
