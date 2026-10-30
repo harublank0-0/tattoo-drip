@@ -12,15 +12,18 @@ import {
 	ArtistPage,
 	ErrorPage,
 	NotFoundPage,
+	RequestPage,
 	StudioPage,
 	WorkPage,
 } from "../../src/studio/components/pages.tsx";
 import type { PortfolioSearch, WorkSearch } from "../../src/studio/gallery.ts";
 import {
 	artistPageData,
+	requestPageData,
 	studioPageData,
 	workPageData,
 } from "../../src/studio/loaders.ts";
+import type { RequestSearch } from "../../src/studio/request.ts";
 import { headTags } from "../../src/studio/seo.ts";
 import {
 	ARJUN,
@@ -601,7 +604,8 @@ describe("the artist page", () => {
 		const links = hrefs(html);
 
 		assertSafePage(html);
-		assert.ok(links.includes("/#inquiry"));
+		assert.ok(links.includes("/request"));
+		assert.ok(!links.includes("/#inquiry"));
 		assert.ok(!links.includes("#inquiry"));
 		assert.match(html, /Books open in March\./);
 		// The section refuses, so its heading doesn't invite.
@@ -618,6 +622,108 @@ describe("the artist page", () => {
 			/<a class="action action-primary" href="#inquiry">Send your idea<\/a>/,
 		);
 		assert.doesNotMatch(html, /Send an inquiry/);
+	});
+});
+
+/** `/request` for `search`: the page rendered from the loader's data. */
+function requestHtml(
+	search: RequestSearch,
+	studio: Studio = STUDIO,
+	artists: Artist[] = [SITA, ARJUN],
+) {
+	return renderToStaticMarkup(
+		createElement(RequestPage, {
+			data: requestPageData(studio, artists, search, ORIGIN),
+		}),
+	);
+}
+
+describe("the request page (TAT-127)", () => {
+	test("is the form's own page: one h1, the steps, the panel and the studio's contacts", () => {
+		const html = requestHtml({});
+
+		assertSafePage(html);
+		assert.match(
+			html,
+			/<h1 id="inquiry-title" class="section-title">Send your idea<\/h1>/,
+		);
+		// h1; the steps strip; the panel beside the form; the studio block.
+		assert.deepEqual(headings(html), [1, 2, 2, 2]);
+		assert.equal(count(html, /<aside class="inquiry-aside"/g), 1);
+		assert.ok(hrefs(html).includes("/"));
+		assert.match(html, /See the studio page/);
+		// The form mounts after hydration.
+		assert.doesNotMatch(html, /<form/);
+		assert.match(html, /<header class="site-bar">/);
+		assert.match(html, /<main class="page request-page">/);
+	});
+
+	test("?artist=sita picks Sita", () => {
+		const html = requestHtml({ artist: "sita" });
+		const whatsapp = hrefs(html).find((href) =>
+			href.startsWith("https://wa.me/9779812345678?text="),
+		);
+
+		assertSafePage(html);
+		assert.match(html, /your idea for <bdi>Sita Rai<\/bdi>/);
+		assert.ok(whatsapp, "the WhatsApp link");
+		assert.ok(
+			decodeURIComponent(whatsapp.split("?text=")[1]).includes("Sita Rai"),
+		);
+	});
+
+	test("an artist who is not in the list is the general form", () => {
+		const html = requestHtml({ artist: "nobody" });
+
+		assert.doesNotMatch(html, /your idea for/);
+		assert.match(html, /Send <bdi>Black Needle<\/bdi> your idea/);
+		assert.match(
+			html,
+			/<h1 id="inquiry-title" class="section-title">Send your idea<\/h1>/,
+		);
+	});
+
+	test("a closed artist's request page says so, with their own words, and offers the studio's general request", () => {
+		const html = requestHtml({ artist: "arjun" });
+
+		assertSafePage(html);
+		assert.match(
+			html,
+			/<h1 id="inquiry-title" class="section-title">Inquiries<\/h1>/,
+		);
+		assert.match(html, /isn&#x27;t taking new inquiries right now/);
+		assert.match(
+			html,
+			/<p class="note user-text measure" dir="auto">Books open in March\.<\/p>/,
+		);
+		assert.ok(hrefs(html).includes("/request"));
+		assert.doesNotMatch(html, /inquiry-aside/);
+	});
+
+	test("a closed studio's request page says so and offers no form", () => {
+		const html = requestHtml({}, CLOSED_STUDIO, [ARJUN]);
+
+		assertSafePage(html);
+		assert.match(
+			html,
+			/<bdi>Black Needle<\/bdi> isn&#x27;t taking new inquiries right now\./,
+		);
+		assert.doesNotMatch(html, /Message on WhatsApp/);
+		assert.doesNotMatch(html, /inquiry-aside/);
+	});
+
+	test("an open artist's request page works while the studio as a whole is closed", () => {
+		const html = requestHtml({ artist: "sita" }, CLOSED_STUDIO, [SITA, ARJUN]);
+
+		assertSafePage(html);
+		assert.match(
+			html,
+			/<h1 id="inquiry-title" class="section-title">Send your idea<\/h1>/,
+		);
+		assert.match(html, /your idea for <bdi>Sita Rai<\/bdi>/);
+		assert.match(html, /Message on WhatsApp/);
+		assert.doesNotMatch(html, /isn&#x27;t taking new inquiries/);
+		assert.equal(count(html, /<aside class="inquiry-aside"/g), 1);
 	});
 });
 

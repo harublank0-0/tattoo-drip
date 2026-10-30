@@ -3,6 +3,7 @@ import { describe, test } from "node:test";
 import {
 	artistPageSeo,
 	headTags,
+	requestPageSeo,
 	serializeJsonLd,
 	statusHead,
 	studioPageSeo,
@@ -179,6 +180,64 @@ describe("workPageSeo (TAT-126)", () => {
 		);
 		assert.ok(
 			!head.meta.some((m) => "property" in m && m.property === "og:image"),
+		);
+	});
+});
+
+describe("requestPageSeo (TAT-127)", () => {
+	test("the general request page asks for the idea and names the studio", () => {
+		const seo = requestPageSeo(studio, null, ORIGIN);
+
+		assert.equal(seo.title, "Send your idea to Black Needle");
+		assert.equal(
+			seo.description,
+			"Tell Black Needle about the tattoo you'd like: the idea, where it goes and the dates that suit you.",
+		);
+		assert.equal(seo.canonical, `${ORIGIN}/request`);
+		assert.equal(seo.type, "website");
+		assert.equal(seo.siteName, "Black Needle");
+		assert.equal(seo.image, null);
+		assert.equal(seo.jsonLd, null);
+	});
+
+	test("with an artist, the title and description name them, and the artist stays in the canonical address", () => {
+		const seo = requestPageSeo(studio, sita, ORIGIN);
+
+		assert.equal(seo.title, "Send your idea to Sita Rai at Black Needle");
+		assert.equal(
+			seo.description,
+			"Tell Sita Rai about the tattoo you'd like: the idea, where it goes and the dates that suit you.",
+		);
+		// Facebook keys a shared link by its canonical og:url.
+		assert.equal(seo.canonical, `${ORIGIN}/request?artist=sita`);
+		assert.deepEqual(seo.image, sita.photo);
+		assert.equal(seo.jsonLd, null);
+	});
+
+	test("an independent artist named like their studio isn't named twice", () => {
+		const [same] = artistViewModels([{ ...SITA, name: "Black Needle" }]);
+		const seo = requestPageSeo(studio, same, ORIGIN);
+
+		assert.equal(seo.title, "Send your idea to Black Needle");
+	});
+
+	test("writes its head like the other pages, with the artist's photo for the card", () => {
+		const head = headTags(requestPageSeo(studio, sita, ORIGIN));
+
+		assert.deepEqual(head.scripts, []);
+		assert.deepEqual(head.links, [
+			{ rel: "canonical", href: `${ORIGIN}/request?artist=sita` },
+		]);
+		assert.ok(
+			head.meta.some(
+				(m) =>
+					"property" in m &&
+					m.property === "og:url" &&
+					m.content === `${ORIGIN}/request?artist=sita`,
+			),
+		);
+		assert.ok(
+			head.meta.some((m) => "property" in m && m.property === "og:image"),
 		);
 	});
 });

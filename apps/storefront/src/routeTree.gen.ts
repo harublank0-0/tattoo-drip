@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DepositRouteImport } from './routes/deposit'
+import { Route as RequestRouteImport } from './routes/request'
 import { Route as WorkRouteImport } from './routes/work'
 import { Route as ArtistsSlugRouteImport } from './routes/artists/$slug'
 
@@ -22,6 +23,11 @@ const IndexRoute = IndexRouteImport.update({
 const DepositRoute = DepositRouteImport.update({
   id: '/deposit',
   path: '/deposit',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RequestRoute = RequestRouteImport.update({
+  id: '/request',
+  path: '/request',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WorkRoute = WorkRouteImport.update({
@@ -38,12 +44,14 @@ const ArtistsSlugRoute = ArtistsSlugRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/deposit': typeof DepositRoute
+  '/request': typeof RequestRoute
   '/work': typeof WorkRoute
   '/artists/$slug': typeof ArtistsSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/deposit': typeof DepositRoute
+  '/request': typeof RequestRoute
   '/work': typeof WorkRoute
   '/artists/$slug': typeof ArtistsSlugRoute
 }
@@ -51,20 +59,22 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/deposit': typeof DepositRoute
+  '/request': typeof RequestRoute
   '/work': typeof WorkRoute
   '/artists/$slug': typeof ArtistsSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/deposit' | '/work' | '/artists/$slug'
+  fullPaths: '/' | '/deposit' | '/request' | '/work' | '/artists/$slug'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/deposit' | '/work' | '/artists/$slug'
-  id: '__root__' | '/' | '/deposit' | '/work' | '/artists/$slug'
+  to: '/' | '/deposit' | '/request' | '/work' | '/artists/$slug'
+  id: '__root__' | '/' | '/deposit' | '/request' | '/work' | '/artists/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DepositRoute: typeof DepositRoute
+  RequestRoute: typeof RequestRoute
   WorkRoute: typeof WorkRoute
   ArtistsSlugRoute: typeof ArtistsSlugRoute
 }
@@ -83,6 +93,13 @@ declare module '@tanstack/react-router' {
       path: '/deposit'
       fullPath: '/deposit'
       preLoaderRoute: typeof DepositRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/request': {
+      id: '/request'
+      path: '/request'
+      fullPath: '/request'
+      preLoaderRoute: typeof RequestRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/work': {
@@ -105,6 +122,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DepositRoute: DepositRoute,
+  RequestRoute: RequestRoute,
   WorkRoute: WorkRoute,
   ArtistsSlugRoute: ArtistsSlugRoute,
 }

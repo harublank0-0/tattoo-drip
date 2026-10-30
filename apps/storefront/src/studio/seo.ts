@@ -1,5 +1,6 @@
 import { rootRouteId } from "@tanstack/react-router";
 import { studioCopy } from "./copy.ts";
+import { requestHref } from "./links.ts";
 import { trimDescription } from "./text.ts";
 import type { ArtistPhoto, ArtistView, StudioView } from "./view-model.ts";
 
@@ -91,6 +92,34 @@ export function workPageSeo(studio: StudioView, origin: string): PageSeo {
 		type: "website",
 		siteName: studio.name,
 		image: null,
+		jsonLd: null,
+	};
+}
+
+/**
+ * The request page's head (TAT-127). With an artist the title and description
+ * name them, as the artist page's do (one name when they are named like their
+ * studio); the canonical address keeps the artist (`/request?artist=<slug>`),
+ * because Facebook keys a shared link by its canonical `og:url`. A page for
+ * the general form is `/request`, whatever else the address carried.
+ */
+export function requestPageSeo(
+	studio: StudioView,
+	artist: ArtistView | null,
+	origin: string,
+): PageSeo {
+	const sameName = artist?.name === studio.name;
+	const who = artist?.name ?? studio.name;
+	return {
+		title:
+			artist && !sameName
+				? `${studioCopy.sendIdea} to ${artist.name} at ${studio.name}`
+				: `${studioCopy.sendIdea} to ${who}`,
+		description: `Tell ${who} about the tattoo you'd like: the idea, where it goes and the dates that suit you.`,
+		canonical: `${origin}${requestHref(artist ? { artist: artist.slug } : {})}`,
+		type: "website",
+		siteName: studio.name,
+		image: artist?.photo ?? null,
 		jsonLd: null,
 	};
 }

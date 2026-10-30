@@ -382,6 +382,13 @@
   .inquiry-aside .steps-title { font-size: 1.5rem; }
 }
 
+/*
+ * The request page (TAT-127): its first section is the page's h1, so it sits
+ * under the site bar and not 4.5rem (6rem from 60rem) down. Unlayered, like the
+ * 60rem block above, so it outranks `.section` at both widths.
+ */
+.request-page > .section:first-child { margin-block-start: 0; }
+
 @media (prefers-reduced-motion: reduce) {
   .action, .link-chip, .work-filter-nav a { transition: none; }
 }

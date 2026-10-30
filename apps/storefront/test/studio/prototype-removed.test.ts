@@ -41,6 +41,7 @@ test("the storefront has exactly its four routes", () => {
 			"routes/artists/$slug.tsx",
 			"routes/deposit.tsx",
 			"routes/index.tsx",
+			"routes/request.tsx",
 			"routes/work.tsx",
 		],
 	);

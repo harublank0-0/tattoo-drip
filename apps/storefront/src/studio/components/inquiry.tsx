@@ -1,7 +1,7 @@
 import { IntakeMount } from "../../intake/components/intake-mount.tsx";
 import { studioCopy } from "../copy.ts";
 import type { InquiryChannels, InquiryState } from "../inquiry.ts";
-import { linkRel } from "../links.ts";
+import { linkRel, requestHref } from "../links.ts";
 import { BookingPanel, BookingStrip } from "./steps.tsx";
 
 type OpenInquiry = Extract<InquiryState, { kind: "open" }>;
@@ -15,15 +15,17 @@ type OpenInquiry = Extract<InquiryState, { kind: "open" }>;
  * invite above a refusal.
  *
  * Open (TAT-105), the section is the form's column and "How booking works"
- * is a sticky panel beside it from 60rem (hidden below that). The artist's
- * page, whose hero has no steps of its own, shows the compact strip above its
- * form on a phone (`stripAbove`).
+ * is a sticky panel beside it from 60rem (hidden below that). A page whose
+ * hero has no steps of its own shows the compact strip above the form on a
+ * phone (`stripAbove`). On the request page (TAT-127) the section is the
+ * page: its heading is the page's `h1` (`level` 1) and the strip an `h2`.
  */
 export function InquirySection({
 	state,
 	channels,
 	challengeSiteKey = null,
 	stripAbove = false,
+	level = 2,
 }: {
 	state: InquiryState;
 	channels: InquiryChannels;
@@ -31,18 +33,24 @@ export function InquirySection({
 	challengeSiteKey?: string | null;
 	/** Show the four steps as a strip under the heading (on a phone). */
 	stripAbove?: boolean;
+	/** The heading's level: 1 on the page whose `h1` it is, else 2. */
+	level?: 1 | 2;
 }) {
+	const Heading = level === 1 ? "h1" : "h2";
 	return (
 		<div
 			className={state.kind === "open" ? "section inquiry-split" : "section"}
 		>
 			<section id="inquiry" className="inquiry" aria-labelledby="inquiry-title">
 				{/* An invitation only while the section offers one. */}
-				<h2 id="inquiry-title" className="section-title">
+				<Heading id="inquiry-title" className="section-title">
 					{state.kind === "open" ? studioCopy.sendIdea : "Inquiries"}
-				</h2>
+				</Heading>
 				{state.kind === "open" && stripAbove ? (
-					<BookingStrip studioName={state.studioName} level={3} />
+					<BookingStrip
+						studioName={state.studioName}
+						level={level === 1 ? 2 : 3}
+					/>
 				) : null}
 				<div className="stack measure">
 					{state.kind === "open" ? (
@@ -65,8 +73,13 @@ export function InquirySection({
 								<bdi>{state.artistName}</bdi> isn't taking new inquiries right
 								now.
 							</p>
+							{state.closedMessage ? (
+								<p className="note user-text measure" dir="auto">
+									{state.closedMessage}
+								</p>
+							) : null}
 							{state.studioOpen ? (
-								<a className="text-link" href="/#inquiry">
+								<a className="text-link" href={requestHref({})}>
 									<span>
 										Send <bdi>{state.studioName}</bdi> a general inquiry
 									</span>

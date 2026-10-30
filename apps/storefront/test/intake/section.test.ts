@@ -63,8 +63,39 @@ describe("the #inquiry section on the server", () => {
 			artist,
 			/<bdi>Sita Rai<\/bdi> isn&#x27;t taking new inquiries right/,
 		);
-		assert.match(artist, /href="\/#inquiry"/);
+		assert.match(artist, /href="\/request"/);
+		assert.doesNotMatch(artist, /href="\/#inquiry"/);
 		assert.doesNotMatch(artist, /<form/);
+		// No message from the artist, no note.
+		assert.doesNotMatch(artist, /class="note/);
+
+		const said = section({
+			kind: "artist-closed",
+			studioName: "Black Needle",
+			artistName: "Sita Rai",
+			studioOpen: true,
+			closedMessage: "Books open in March.",
+		});
+		assert.match(
+			said,
+			/<p class="note user-text measure" dir="auto">Books open in March\.<\/p>/,
+		);
+		// Under the artist's line, before the way to the studio's general request.
+		assert.ok(said.indexOf("isn&#x27;t taking") < said.indexOf("note"));
+		assert.ok(said.indexOf("note") < said.indexOf('href="/request"'));
+	});
+
+	test("a closed artist's section with the studio closed too offers no link", () => {
+		const html = section({
+			kind: "artist-closed",
+			studioName: "Black Needle",
+			artistName: "Sita Rai",
+			studioOpen: false,
+			closedMessage: "Books open in March.",
+		});
+
+		assert.doesNotMatch(html, /href=/);
+		assert.match(html, /Books open in March\./);
 	});
 });
 
@@ -103,6 +134,48 @@ describe("the #inquiry section's panel (TAT-105)", () => {
 			html.indexOf("inquiry-title") < html.indexOf("steps-strip-title"),
 		);
 		assert.equal((html.match(/<li class="step">/g) ?? []).length, 8);
+	});
+
+	test("level 1 makes the heading the page's h1 and the strip under it an h2", () => {
+		const html = renderToStaticMarkup(
+			createElement(InquirySection, {
+				state: OPEN,
+				channels: CHANNELS,
+				challengeSiteKey: SITE_KEY,
+				level: 1,
+				stripAbove: true,
+			}),
+		);
+
+		assert.match(
+			html,
+			/<h1 id="inquiry-title" class="section-title">Send your idea<\/h1>/,
+		);
+		assert.match(
+			html,
+			/<h2 id="steps-strip-title"[^>]*>How booking works<\/h2>/,
+		);
+		assert.doesNotMatch(html, /<h3/);
+		assert.ok(
+			html.indexOf("inquiry-title") < html.indexOf("steps-strip-title"),
+		);
+	});
+
+	test("level 1 is also the heading of a closed section, and level 2 stays the default", () => {
+		const closed = renderToStaticMarkup(
+			createElement(InquirySection, {
+				state: { kind: "studio-closed", studioName: "Black Needle" },
+				channels: CHANNELS,
+				level: 1,
+			}),
+		);
+
+		assert.match(
+			closed,
+			/<h1 id="inquiry-title" class="section-title">Inquiries<\/h1>/,
+		);
+		assert.doesNotMatch(section(OPEN), /<h1/);
+		assert.match(section(OPEN), /<h2 id="inquiry-title"/);
 	});
 
 	test("the steps are a list even where the sheet hides the numbers' list style (WebKit drops the semantics otherwise)", () => {

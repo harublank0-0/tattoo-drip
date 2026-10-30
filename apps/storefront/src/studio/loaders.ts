@@ -25,9 +25,11 @@ import {
 	inquiryChannels,
 	inquiryState,
 } from "./inquiry.ts";
+import type { RequestSearch } from "./request.ts";
 import {
 	artistPageSeo,
 	type PageSeo,
+	requestPageSeo,
 	studioPageSeo,
 	workPageSeo,
 } from "./seo.ts";
@@ -112,6 +114,20 @@ export interface WorkPageData {
 }
 
 /**
+ * `/request` (TAT-127): the intake form on a page of its own. The address's
+ * artist is picked when the list has them; any other address is the general
+ * form.
+ */
+export interface RequestPageData {
+	readonly studio: StudioView;
+	readonly inquiry: InquiryState;
+	readonly channels: InquiryChannels;
+	readonly seo: PageSeo;
+	/** The studio's theme (TAT-54): its key, sections and checked branding. */
+	readonly theme: ThemeConfig;
+}
+
+/**
  * The studio page's data. `imageOrigin` is the API's origin, the only one a
  * logo, cover or work photo may come from (TAT-54, TAT-116); null accepts
  * none. `recentWork` is the gallery read for the newest photos, as the API
@@ -169,6 +185,35 @@ export function artistPageData(
 			gallery: galleryView(portfolio.page, imageOrigin),
 			search: portfolio.search,
 		},
+	};
+}
+
+/**
+ * The request page's data. The artist is `search.artist` when the list has
+ * them (exact slug, as the artist page finds one); none found is the general
+ * form, never a not-found: a client with an old or mistyped link must still
+ * reach the studio. An open artist's page works while the studio as a whole is
+ * closed (each artist has their own switch, as `inquiryState` says), and a
+ * closed one says so and offers the studio's general request.
+ */
+export function requestPageData(
+	studio: Studio,
+	artists: readonly Artist[],
+	search: RequestSearch,
+	origin: string,
+	imageOrigin: string | null = null,
+): RequestPageData {
+	const studioView = studioViewModel(studio);
+	const artistViews = artistViewModels(artists, imageOrigin);
+	const artist =
+		search.artist === undefined ? null : findArtist(artistViews, search.artist);
+	const inquiry = inquiryState(studioView, artistViews, artist);
+	return {
+		studio: studioView,
+		inquiry,
+		channels: channelsFor(studioView, inquiry),
+		seo: requestPageSeo(studioView, artist, origin),
+		theme: parseThemeConfig(storefrontInput(studio), imageOrigin),
 	};
 }
 
@@ -253,6 +298,30 @@ export async function loadArtistPage(
 	);
 	if (!data) throw notFound();
 	return data;
+}
+
+/**
+ * `/request`: the studio (from the cache) and its artists, read together; no
+ * work read. `search` is what `readRequestSearch` gave (the route's
+ * `loaderDeps` re-reads the merged search through it, so a stray key never
+ * reaches here). The artists are read as on the other pages: a failure is an
+ * error page, a list the API does not know the not-found.
+ */
+export async function loadRequestPage(
+	context: PageContext,
+	search: RequestSearch,
+): Promise<RequestPageData> {
+	const [studio, artists] = await Promise.all([
+		loadStudio(context),
+		loadArtists(context),
+	]);
+	return requestPageData(
+		studio,
+		artists,
+		search,
+		context.site.origin,
+		context.tattoo.connection.apiUrl,
+	);
 }
 
 /**

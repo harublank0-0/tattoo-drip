@@ -4,6 +4,7 @@ import { studioCopy } from "../copy.ts";
 import { isAllowedHref, linkRel, portfolioHref, workHref } from "../links.ts";
 import type {
 	ArtistPageData,
+	RequestPageData,
 	StudioPageData,
 	WorkPageData,
 } from "../loaders.ts";
@@ -163,6 +164,40 @@ export function ArtistPage({
 					state={inquiry}
 					channels={channels}
 					challengeSiteKey={challengeSiteKey}
+					stripAbove
+				/>
+				<StudioAside studio={studio} />
+			</main>
+			<SiteFooter studioName={studio.name} />
+		</>
+	);
+}
+
+/**
+ * `/request` (TAT-127): the intake form on a page of its own, with "How
+ * booking works" above it on a phone and beside it from 60rem. The section's
+ * heading is the page's h1; the studio's contacts follow, so a closed
+ * artist's or studio's page still says what is possible. The site bar and the
+ * studio block are the artist page's.
+ */
+export function RequestPage({
+	data,
+	challengeSiteKey = null,
+}: {
+	data: RequestPageData;
+	/** The intake form's public Turnstile site key (TAT-57). */
+	challengeSiteKey?: string | null;
+}) {
+	const { studio, theme, inquiry, channels } = data;
+	return (
+		<>
+			<SiteBar studio={studio} theme={theme} />
+			<main className="page request-page">
+				<InquirySection
+					state={inquiry}
+					channels={channels}
+					challengeSiteKey={challengeSiteKey}
+					level={1}
 					stripAbove
 				/>
 				<StudioAside studio={studio} />
