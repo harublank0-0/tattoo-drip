@@ -1518,6 +1518,32 @@ describe("the All work page (TAT-126)", () => {
 		assert.match(form(html), /name="style"/);
 	});
 
+	test("a style that no photo of the chosen artist has is still shown, selected, beside the message", () => {
+		// What the API answers for ?artist=sita&style=fine-line when sita has only
+		// blackwork: an empty page whose filters include the style asked for.
+		const html = workHtml(
+			galleryPage(0, {
+				filters: { styles: FACETED.filters.styles, healed: false },
+			}),
+			{ artist: "sita", style: "fine-line" },
+			[sitaWithWork(2), { ...BINA, workPhotos: sitaWithWork(1).workPhotos }],
+		);
+		const filters = form(html);
+
+		assertSafePage(html);
+		assert.match(
+			filters,
+			/<select id="work-style" name="style"><option value="">All styles<\/option><option value="blackwork">Blackwork<\/option><option value="fine-line" selected="">Fine line<\/option><\/select>/,
+		);
+		assert.match(
+			filters,
+			/<option value="sita" selected="">Sita Rai<\/option>/,
+		);
+		assert.match(html, /<p[^>]*>No photos match these filters\.<\/p>/);
+		assert.match(html, /<a class="text-link" href="\/work">Show all work<\/a>/);
+		assert.equal(count(html, /work-grid|<dialog/g), 0);
+	});
+
 	test("a hostile artist, style or description is text, never markup", () => {
 		const page = galleryPage(1);
 		const html = workHtml(
