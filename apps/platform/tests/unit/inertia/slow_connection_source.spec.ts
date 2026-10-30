@@ -106,6 +106,18 @@ test.group(
 			assert.include(source, "onFinish:");
 		});
 
+		test("the recording is an async partial visit: it interrupts no other save and is not cut off by a tap elsewhere", async ({
+			assert,
+		}) => {
+			// Without `optimistic` (which implied async) a plain post is a sync visit: it would abort
+			// the save in flight (an "Accept and create project", a payment) and be aborted by the
+			// next navigation. `only` keeps a late answer from restoring any other prop; both pages
+			// read the contact line and the leading channel from these two props.
+			const source = await read("hooks/use-contact-recording.ts");
+			assert.include(source, "async: true,");
+			assert.include(source, 'only: ["contactedText", "lastChannel"],');
+		});
+
 		test("the project and inquiry pages record every contact through the hook, scoped to their own id", async ({
 			assert,
 		}) => {
