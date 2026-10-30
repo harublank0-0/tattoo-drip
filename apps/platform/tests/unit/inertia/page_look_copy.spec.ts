@@ -162,13 +162,14 @@ test.group("page look words (TAT-56)", () => {
 		assert.deepEqual(Object.keys(words.SECTION_WORDS), [...SECTION_KEYS]);
 		assert.deepEqual(
 			SECTION_KEYS.map((key) => words.SECTION_WORDS[key].title),
-			["Recent work", "Artists", "Good to know", "Got an idea?"],
+			["Recent work", "Artists", "Flash", "Good to know", "Got an idea?"],
 		);
 		assert.deepEqual(
 			SECTION_KEYS.map((key) => words.SECTION_WORDS[key].description),
 			[
 				"The newest photos from all your artists, with a link to all of them.",
 				"Each artist with their photo, styles and status. Their own pages work either way.",
+				"A few of your newest flash designs, with a link to all of them.",
 				"Your hours, closed days, walk-ins, age rule, deposit policy, and what to do before and after a session. Shows only what you filled in.",
 				"A short invitation with a button to the page where clients send their idea. Always on your page.",
 			],

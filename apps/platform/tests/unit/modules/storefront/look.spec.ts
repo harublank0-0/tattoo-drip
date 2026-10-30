@@ -204,14 +204,30 @@ test.group("lookOf", () => {
 });
 
 test.group("sections", () => {
-	test("the default is Recent work, the artists, Good to know, then the form", ({
+	test("the default is Recent work, the artists, Flash, Good to know, then the form", ({
 		assert,
 	}) => {
-		assert.deepEqual([...SECTION_KEYS], ["work", "artists", "info", "inquiry"]);
-		assert.deepEqual(
-			[...DEFAULT_SECTIONS],
-			["work", "artists", "info", "inquiry"],
-		);
+		const all = ["work", "artists", "flash", "info", "inquiry"];
+		assert.deepEqual([...SECTION_KEYS], all);
+		assert.deepEqual([...DEFAULT_SECTIONS], all);
+	});
+
+	test("sectionList keeps Flash once, where it was put", ({ assert }) => {
+		assert.deepEqual(sectionList(["flash", "artists", "flash"]), [
+			"flash",
+			"artists",
+			"inquiry",
+		]);
+		assert.deepEqual(sectionsOf("work,artists,inquiry"), [
+			"work",
+			"artists",
+			"inquiry",
+		]);
+		assert.deepEqual(sectionsOf("work,flash,inquiry"), [
+			"work",
+			"flash",
+			"inquiry",
+		]);
 	});
 
 	test("sectionList keeps Good to know once, where it was put", ({
@@ -237,7 +253,7 @@ test.group("sections", () => {
 	test("sectionList keeps known keys once, in order, and adds the form at the end", ({
 		assert,
 	}) => {
-		assert.deepEqual(sectionList(["artists", "work", "artists", "flash"]), [
+		assert.deepEqual(sectionList(["artists", "work", "artists", "zzz"]), [
 			"artists",
 			"work",
 			"inquiry",
@@ -250,7 +266,7 @@ test.group("sections", () => {
 	test("sectionsOf reads a stored list: known keys once, then the form if it was left out", ({
 		assert,
 	}) => {
-		assert.deepEqual(sectionsOf("inquiry,artists,inquiry,flash"), [
+		assert.deepEqual(sectionsOf("inquiry,artists,inquiry,zzz"), [
 			"inquiry",
 			"artists",
 		]);

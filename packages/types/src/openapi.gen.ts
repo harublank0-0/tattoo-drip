@@ -565,14 +565,16 @@ export interface components {
         StorefrontSection: {
             /**
              * @description `work` (Recent work: the newest photos), `artists` (the artists
-             *     list), `info` (Good to know: hours, closed days and what clients
-             *     ask, shown only when the studio filled something in) or
+             *     list), `flash` (a few of the newest flash designs, shown only
+             *     when there are some), `info` (Good to know: hours, closed days
+             *     and what clients ask, shown only when the studio filled something
+             *     in) or
              *     `inquiry` (the "Got an idea?" invitation to the request page,
              *     always listed). More will come: treat an unknown value as one to
              *     leave out.
              * @enum {string}
              */
-            type: "work" | "artists" | "info" | "inquiry";
+            type: "work" | "artists" | "flash" | "info" | "inquiry";
         };
         /**
          * @description How the studio page looks (TAT-56): the owner's choices, as checked

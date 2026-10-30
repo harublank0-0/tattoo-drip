@@ -143,6 +143,7 @@ describe("loadStudioPage", () => {
 		await loadStudioPage(context);
 		assert.deepEqual(calls.map((call) => call.url).sort(), [
 			`${TENANT}/artists`,
+			`${TENANT}/flash?limit=6`,
 			`${TENANT}/work?limit=9`,
 		]);
 	});
@@ -204,6 +205,7 @@ describe("loadStudioPage", () => {
 
 		assert.deepEqual(calls.map((call) => call.url).sort(), [
 			`${IMAGE_ORIGIN}/api/v1/tenants/${STUDIO.slug}/artists`,
+			`${IMAGE_ORIGIN}/api/v1/tenants/${STUDIO.slug}/flash?limit=6`,
 			`${IMAGE_ORIGIN}/api/v1/tenants/${STUDIO.slug}/work?limit=9`,
 		]);
 		assert.equal(data.recentWork.photos.length, 9);
@@ -212,6 +214,110 @@ describe("loadStudioPage", () => {
 			galleryView(galleryPage(9), IMAGE_ORIGIN),
 		);
 		assert.equal(data.recentWork.photos[0].artist?.href, "/artists/sita");
+	});
+
+	describe("Flash is read only when the page shows it (TAT-129)", () => {
+		const sections = (...types: string[]) =>
+			withStorefront({ sections: types.map((type) => ({ type, props: {} })) });
+		const ROOT = `${IMAGE_ORIGIN}/api/v1/tenants/${STUDIO.slug}`;
+
+		test("sections without flash make no /flash read, and the page has no designs", async () => {
+			const { calls, fetch } = listing([SITA, ARJUN], EMPTY_PAGE, flashPage(6));
+			const data = await loadStudioPage(
+				pageContext(fetch, sections("artists", "inquiry"), IMAGE_ORIGIN),
+			);
+
+			assert.deepEqual(
+				calls.map((call) => call.url),
+				[`${ROOT}/artists`],
+			);
+			assert.deepEqual(data.flash.designs, []);
+		});
+
+		test("the studio page also reads the newest 6 designs, wherever flash sits", async () => {
+			for (const order of [
+				["flash", "artists", "inquiry"],
+				["inquiry", "artists", "flash"],
+			]) {
+				const { calls, fetch } = listing(
+					[SITA, ARJUN],
+					EMPTY_PAGE,
+					flashPage(6, { nextCursor: "c2" }),
+				);
+				const data = await loadStudioPage(
+					pageContext(fetch, sections(...order), IMAGE_ORIGIN),
+				);
+
+				assert.deepEqual(
+					calls.map((call) => call.url).sort(),
+					[`${ROOT}/artists`, `${ROOT}/flash?limit=6`],
+					order.join(),
+				);
+				assert.equal(data.flash.designs.length, 6, order.join());
+				assert.equal(data.flash.designs[0].name, "Moth");
+			}
+		});
+
+		for (const { name, respond, logged } of [
+			{
+				name: "a platform without /flash (404)",
+				respond: () => json(404, NOT_FOUND),
+				logged: { status: 404, code: "not_found" },
+			},
+			{
+				name: "a 500",
+				respond: () =>
+					json(500, {
+						error: { code: "internal_error", message: "Boom in /secret." },
+					}),
+				logged: { status: 500, code: "internal_error" },
+			},
+			{
+				name: "a network error",
+				respond: (): Response => {
+					throw new TypeError("fetch failed: http://api.test/secret");
+				},
+				logged: { status: 0, code: "network_error" },
+			},
+		]) {
+			test(`${name} still gives the studio page, without Flash, and logs 'Flash read failed' once`, async (t) => {
+				const log = t.mock.method(console, "error", () => {});
+				const { fetch } = fakeFetch(({ url }) =>
+					url.endsWith("/artists")
+						? json(200, { data: [SITA, ARJUN] })
+						: url.includes("/flash?")
+							? respond()
+							: json(200, EMPTY_PAGE),
+				);
+
+				const data = await loadStudioPage(pageContext(fetch));
+
+				assert.equal(data.artists.length, 2);
+				assert.deepEqual(data.flash.designs, []);
+				assert.deepEqual(
+					log.mock.calls.map((call) => call.arguments),
+					[["Flash read failed", { slug: STUDIO.slug, ...logged }]],
+				);
+			});
+		}
+	});
+
+	test("studioPageData takes the flash answer as it came, and none is no designs", () => {
+		const page = flashPage(3);
+
+		assert.equal(
+			studioPageData(STUDIO, [SITA], ORIGIN, IMAGE_ORIGIN, null, page).flash
+				.designs.length,
+			3,
+		);
+		for (const none of [undefined, null, "broken", {}, { data: "x" }]) {
+			assert.deepEqual(
+				studioPageData(STUDIO, [SITA], ORIGIN, IMAGE_ORIGIN, null, none).flash
+					.designs,
+				[],
+				String(none),
+			);
+		}
 	});
 
 	test("studioPageData takes the work answer as it came, and none is no photos", () => {
@@ -272,7 +378,9 @@ describe("loadStudioPage", () => {
 			fakeFetch(({ url }) =>
 				url.endsWith("/artists")
 					? json(200, { data: [SITA, ARJUN] })
-					: respondToWork(),
+					: url.includes("/flash?")
+						? json(200, EMPTY_FLASH_PAGE)
+						: respondToWork(),
 			);
 
 		for (const { name, respond, logged } of FAILURES) {
@@ -369,6 +477,7 @@ describe("loadStudioPage", () => {
 		assert.deepEqual(Object.keys(data).sort(), [
 			"artists",
 			"chat",
+			"flash",
 			"goodToKnow",
 			"inquiry",
 			"openNow",

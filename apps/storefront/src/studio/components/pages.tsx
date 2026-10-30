@@ -28,7 +28,7 @@ import { ArtistProfile, ArtistRoster } from "./artists.tsx";
 import { BrandCover, BrandLogo } from "./brand.tsx";
 import { ChatButton } from "./chat.tsx";
 import { ContactBlock } from "./contact.tsx";
-import { ArtistFlash, FlashGrid } from "./flash.tsx";
+import { ArtistFlash, FlashGrid, FlashSection } from "./flash.tsx";
 import { HealedFilter, RecentWork, WorkFilters } from "./gallery.tsx";
 import { GoodToKnowSection } from "./good-to-know.tsx";
 import { InquirySection, RequestInvite } from "./inquiry.tsx";
@@ -115,7 +115,8 @@ export function StudioPage({ data }: { data: StudioPageData }) {
 
 /**
  * One of the studio page's sections, in the order the theme's config gives
- * (TAT-54): Recent work (TAT-126), the artists, Good to know (TAT-128, which
+ * (TAT-54): Recent work (TAT-126), the artists, Flash (TAT-129, which renders
+ * nothing until an artist adds a design), Good to know (TAT-128, which
  * renders nothing until the studio filled something in) and the inquiry
  * section, which is always one of them (readSections) and, since TAT-127, only
  * invites: the form is on /request.
@@ -137,6 +138,8 @@ function StudioSection({
 					studioAccepting={data.studio.accepting}
 				/>
 			);
+		case "flash":
+			return <FlashSection list={data.flash} artists={data.artists} />;
 		case "info":
 			return <GoodToKnowSection view={data.goodToKnow} />;
 		case "inquiry":

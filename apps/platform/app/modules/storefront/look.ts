@@ -17,8 +17,9 @@ export const DEFAULT_FONT: FontKey = "eczar";
 
 /**
  * The studio page's sections an owner can show, hide and order: the newest
- * photos, the artists, Good to know (`info`, TAT-128: hours and what clients
- * ask) and the "Got an idea?" invitation to the request page (`inquiry`).
+ * photos, the artists, Flash (`flash`, TAT-129: the newest flash designs),
+ * Good to know (`info`, TAT-128: hours and what clients ask) and the "Got an
+ * idea?" invitation to the request page (`inquiry`).
  * The storefront's SECTION_KEYS is the same list in the same order
  * (look.spec.ts compares them, and the contract's
  * `StorefrontSection` list and `sections` `maxItems`). A new section is a key
@@ -27,7 +28,13 @@ export const DEFAULT_FONT: FontKey = "eczar";
  * enum and `maxItems`, and a migration for the column's default and for the
  * lists already stored.
  */
-export const SECTION_KEYS = ["work", "artists", "info", "inquiry"] as const;
+export const SECTION_KEYS = [
+	"work",
+	"artists",
+	"flash",
+	"info",
+	"inquiry",
+] as const;
 export type SectionKey = (typeof SECTION_KEYS)[number];
 
 /**
@@ -38,6 +45,7 @@ export type SectionKey = (typeof SECTION_KEYS)[number];
 export const DEFAULT_SECTIONS: readonly SectionKey[] = [
 	"work",
 	"artists",
+	"flash",
 	"info",
 	"inquiry",
 ];

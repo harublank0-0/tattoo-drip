@@ -15,6 +15,7 @@ export const DEFAULT_STOREFRONT: Studio["storefront"] = {
 	sections: [
 		{ type: "work" },
 		{ type: "artists" },
+		{ type: "flash" },
 		{ type: "info" },
 		{ type: "inquiry" },
 	],

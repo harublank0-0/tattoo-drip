@@ -23,6 +23,7 @@ import {
 	flashDesignView,
 	flashListView,
 	flashQuery,
+	HOME_FLASH_COUNT,
 } from "./flash.ts";
 import {
 	type GalleryView,
@@ -99,6 +100,12 @@ export interface StudioPageData {
 	 * leaves the section out.
 	 */
 	readonly recentWork: GalleryView;
+	/**
+	 * The studio's newest flash designs for the Flash section (TAT-129), at
+	 * most HOME_FLASH_COUNT. Empty when there are none, the page hides Flash
+	 * or the read failed, which leaves the section out.
+	 */
+	readonly flash: FlashListView;
 	/** The Good to know section's parts (TAT-128); empty when the studio filled in nothing. */
 	readonly goodToKnow: GoodToKnowView;
 	/** The cover's state line (TAT-128), or null when the studio set no hours or closed days. */
@@ -224,6 +231,7 @@ export function studioPageData(
 	origin: string,
 	imageOrigin: string | null = null,
 	recentWork: unknown = null,
+	flash: unknown = null,
 	theme: ThemeConfig = parseThemeConfig(storefrontInput(studio), imageOrigin),
 ): StudioPageData {
 	const studioView = studioViewModel(studio);
@@ -237,6 +245,7 @@ export function studioPageData(
 		seo: studioPageSeo(studioView, artistViews, origin),
 		theme,
 		recentWork: galleryView(recentWork, imageOrigin),
+		flash: flashListView(flash, imageOrigin),
 		goodToKnow: goodToKnowView(studio),
 		// No clock here (pure, deterministic): loadStudioPage sets the server's.
 		openNow: openNowView(studio, null),
@@ -398,8 +407,10 @@ export function workPageData(
 /**
  * `/`: the studio (already cached by the tenant middleware), then its artists
  * and, only when the studio's sections include Recent work, its newest photos
- * (loadRecentWork: a failed read leaves the section out, never the page). A
- * studio that hid Recent work costs the API no `/work` read.
+ * (loadRecentWork: a failed read leaves the section out, never the page), and
+ * likewise, when they include Flash, its newest 6 flash designs
+ * (loadHomeFlash). A studio that hid Recent work costs the API no `/work`
+ * read, and one that hid Flash no `/flash` read.
  */
 export async function loadStudioPage(
 	context: PageContext,
@@ -407,9 +418,10 @@ export async function loadStudioPage(
 	const studio = await loadStudio(context);
 	const imageOrigin = context.tattoo.connection.apiUrl;
 	const theme = parseThemeConfig(storefrontInput(studio), imageOrigin);
-	const [artists, recentWork] = await Promise.all([
+	const [artists, recentWork, flash] = await Promise.all([
 		loadArtists(context),
 		theme.sections.includes("work") ? loadRecentWork(context) : null,
+		theme.sections.includes("flash") ? loadHomeFlash(context) : null,
 	]);
 	const data = studioPageData(
 		studio,
@@ -417,6 +429,7 @@ export async function loadStudioPage(
 		context.site.origin,
 		imageOrigin,
 		recentWork,
+		flash,
 		theme,
 	);
 	// Today's state at this server's clock, only when it holds for the page's
@@ -638,6 +651,28 @@ async function loadRecentWork(context: ApiContext): Promise<unknown> {
 		});
 	} catch (error) {
 		logReadFailed("Recent work", context, error);
+		return null;
+	}
+}
+
+/**
+ * The studio's newest flash designs for the home page's Flash section, as the
+ * API sent them (null when the read failed). Any failure is logged and leaves
+ * the section out and the page standing, like Recent work (it also makes the
+ * deploy order safe: this storefront can run against a platform without
+ * `/flash`).
+ */
+async function loadHomeFlash(context: ApiContext): Promise<unknown> {
+	try {
+		return await context.queryClient.query({
+			...tattooQueries.flash(
+				context.tattoo.client,
+				flashQuery({}, HOME_FLASH_COUNT),
+			),
+			staleTime: "static",
+		});
+	} catch (error) {
+		logReadFailed("Flash", context, error);
 		return null;
 	}
 }

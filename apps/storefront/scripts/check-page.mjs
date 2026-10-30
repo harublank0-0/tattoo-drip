@@ -265,6 +265,7 @@ try {
 			[
 				`/api/v1/tenants/${SLUG}`,
 				`/api/v1/tenants/${SLUG}/artists`,
+				`/api/v1/tenants/${SLUG}/flash?limit=6`,
 				`/api/v1/tenants/${SLUG}/work?limit=9`,
 			].join(",") &&
 			apiLog.every(
@@ -273,7 +274,7 @@ try {
 					call.visitor === VISITOR &&
 					call.cookie === null,
 			),
-		`The page made the API calls ${apiLog.map((call) => call.url).join(", ")} instead of one keyed, cookie-less lookup, one artists read and the newest 9 photos, each carrying the visitor's address.`,
+		`The page made the API calls ${apiLog.map((call) => call.url).join(", ")} instead of one keyed, cookie-less lookup, one artists read, the newest 6 flash designs and the newest 9 photos, each carrying the visitor's address.`,
 	);
 	expect(
 		!page.body.includes("Recent work") && !page.body.includes("All work"),

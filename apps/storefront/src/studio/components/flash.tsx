@@ -1,9 +1,11 @@
+import { ArrowRight } from "lucide-react";
 import { Fill } from "../../intake/components/fill.tsx";
 import { studioCopy } from "../copy.ts";
 import {
 	closedNoteFor,
 	type FlashDesignView,
 	type FlashListView,
+	HOME_FLASH_COUNT,
 } from "../flash.ts";
 import { flashHref, isAllowedHref } from "../links.ts";
 import { flashGridSizes } from "../srcset.ts";
@@ -85,6 +87,36 @@ export function FlashGrid({
 				);
 			})}
 		</ul>
+	);
+}
+
+/**
+ * The home page's Flash section (TAT-129): the studio's newest designs, at
+ * most six, each with its artist, and the way to all of them. Nothing when
+ * there are no designs (no empty heading, no All flash link).
+ */
+export function FlashSection({
+	list,
+	artists,
+}: {
+	list: FlashListView;
+	artists: readonly ArtistView[];
+}) {
+	const designs = list.designs.slice(0, HOME_FLASH_COUNT);
+	if (designs.length === 0) return null;
+	return (
+		<section id="flash" className="section" aria-labelledby="flash-title">
+			<h2 id="flash-title" className="section-title">
+				{studioCopy.flash.title}
+			</h2>
+			<FlashGrid designs={designs} showArtist artists={artists} />
+			<p className="flash-all">
+				<a className="text-link" href={flashHref({})}>
+					<span>{studioCopy.flash.allFlash}</span>
+					<ArrowRight aria-hidden="true" />
+				</a>
+			</p>
+		</section>
 	);
 }
 

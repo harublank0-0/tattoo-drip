@@ -2518,3 +2518,69 @@ describe("flash on the artist page, /flash and a design's page (TAT-129)", () =>
 		assert.match(first, /loading="lazy"/);
 	});
 });
+
+describe("the Flash section on the studio page (TAT-129)", () => {
+	const homeHtml = (flash: unknown, studio: Studio = STUDIO) =>
+		renderToStaticMarkup(
+			createElement(StudioPage, {
+				data: studioPageData(
+					studio,
+					[SITA, ARJUN],
+					ORIGIN,
+					IMAGE_ORIGIN,
+					null,
+					flash,
+				),
+			}),
+		);
+
+	test("shows six designs with their artists and All flash, between the artists and the form", () => {
+		const html = homeHtml(flashPage(8, { nextCursor: "c2" }));
+
+		assertSafePage(html);
+		assert.match(
+			html,
+			/<section id="flash" class="section" aria-labelledby="flash-title"><h2 id="flash-title" class="section-title">Flash<\/h2>/,
+		);
+		assert.ok(html.indexOf('id="artists"') < html.indexOf('id="flash"'));
+		assert.ok(html.indexOf('id="flash"') < html.indexOf('id="inquiry"'));
+		assert.equal(count(html, /class="flash-card"/g), 6);
+		assert.match(html, /class="flash-card-artist">by <bdi>Sita Rai<\/bdi>/);
+		assert.match(
+			html,
+			/<a class="text-link" href="\/flash"><span>All flash<\/span><svg/,
+		);
+		assert.ok(hrefs(html).includes(`/flash/${flashId(1)}`));
+	});
+
+	test("no designs, no Flash section and no All flash link", () => {
+		for (const none of [EMPTY_FLASH_PAGE, null, "broken"]) {
+			const html = homeHtml(none);
+			assert.doesNotMatch(html, /id="flash"/);
+			assert.doesNotMatch(html, /All flash/);
+			assertSafePage(html);
+		}
+	});
+
+	test("a studio that hides Flash shows none even with designs", () => {
+		const hidden = withStorefront({
+			sections: [
+				{ type: "artists", props: {} },
+				{ type: "inquiry", props: {} },
+			],
+		});
+		const html = homeHtml(flashPage(6), hidden);
+
+		assert.doesNotMatch(html, /id="flash"/);
+		assert.doesNotMatch(html, /class="flash-card"/);
+	});
+
+	test("a design that can't be requested is greyed with its words on the home page too", () => {
+		const html = homeHtml(
+			flashPage(1, { data: [{ ...flashPage(1).data[0], requestable: false }] }),
+		);
+
+		assert.match(html, /class="flash-card flash-card-closed"/);
+		assert.match(html, /Not taking flash requests right now/);
+	});
+});
