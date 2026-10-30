@@ -401,6 +401,27 @@ describe("inquiries.create", () => {
 		assert.equal(form.get("idea"), "Fine-line peony");
 	});
 
+	test("it sends flashDesignId as a form field", async () => {
+		const { calls, fetch } = fakeFetch(() => json(201, { data: { id: ID } }));
+
+		await client(fetch).inquiries.create({
+			...input,
+			flashDesignId: "0199f000-0000-7000-8000-000000000001",
+		});
+
+		const form = calls[0].init.body as FormData;
+		assert.equal(
+			form.get("flashDesignId"),
+			"0199f000-0000-7000-8000-000000000001",
+		);
+		const plain = fakeFetch(() => json(201, { data: { id: ID } }));
+		await client(plain.fetch).inquiries.create(input);
+		assert.equal(
+			(plain.calls[0].init.body as FormData).has("flashDesignId"),
+			false,
+		);
+	});
+
 	test("a refusal is a TattooApiError with its code, and fields on validation_failed", async () => {
 		const full = fakeFetch(() =>
 			json(409, {
@@ -997,6 +1018,61 @@ describe("lists with query parameters", () => {
 		await client(fetch).work.list();
 
 		assert.equal(calls[0].url, `${T}/work`);
+	});
+
+	test("flash.list sends the filters like a form and returns the whole page", async () => {
+		const page = { data: [], nextCursor: null, filters: { artists: [] } };
+		const { calls, fetch } = fakeFetch(() => json(200, page));
+
+		const result = await client(fetch).flash.list({
+			artist: "sita",
+			cursor: "next page",
+			limit: 6,
+		});
+
+		assert.equal(
+			calls[0].url,
+			`${T}/flash?artist=sita&cursor=next+page&limit=6`,
+		);
+		assert.equal(calls[0].init.credentials, "omit");
+		assert.deepEqual(result, page);
+
+		const { calls: plain, fetch: plainFetch } = fakeFetch(() =>
+			json(200, page),
+		);
+		await client(plainFetch).flash.list();
+		assert.equal(plain[0].url, `${T}/flash`);
+	});
+
+	test("flash.get reads one design by id, encoded", async () => {
+		const design = {
+			id: "0199f000-0000-7000-8000-000000000001",
+			name: "Moth",
+			size: "About 3 in",
+			price: { amount: 300000, currency: "NPR", text: "NPR 3,000" },
+			image: {
+				url: "https://api.example.com/uploads/moth.png",
+				width: 1200,
+				height: 1200,
+				variants: [],
+			},
+			artist: { slug: "sita", name: "Sita Rai" },
+			requestable: true,
+		};
+		const { calls, fetch } = fakeFetch(() => json(200, { data: design }));
+
+		const result = await client(fetch).flash.get(design.id);
+
+		assert.equal(calls[0].url, `${T}/flash/${design.id}`);
+		assert.deepEqual(result, design);
+
+		const missing = fakeFetch(() =>
+			json(404, { error: { code: "not_found", message: "Not found." } }),
+		);
+		const error = await rejection(client(missing.fetch).flash.get("a/b?c"));
+		assert.ok(error instanceof TattooApiError);
+		assert.equal(error.code, "not_found");
+		assert.equal(missing.calls[0].url, `${T}/flash/a%2Fb%3Fc`);
 	});
 
 	test("availability.list sends all four parameters in the given order", async () => {

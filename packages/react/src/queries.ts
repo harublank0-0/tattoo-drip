@@ -8,6 +8,7 @@ import {
 	type CreateInquiryInput,
 	isTattooApiError,
 	type ListAvailabilityQuery,
+	type ListFlashQuery,
 	type ListServicesQuery,
 	type ListWorkQuery,
 	type SubmitDepositProofInput,
@@ -31,6 +32,12 @@ export const tattooKeys = {
 		[...tattooKeys.tenant(tenant), "services", query ?? {}] as const,
 	work: (tenant: string, query?: ListWorkQuery) =>
 		[...tattooKeys.tenant(tenant), "work", query ?? {}] as const,
+	flash: (tenant: string, query?: ListFlashQuery) =>
+		[...tattooKeys.tenant(tenant), "flash", query ?? {}] as const,
+	flashDesigns: (tenant: string) =>
+		[...tattooKeys.tenant(tenant), "flash-design"] as const,
+	flashDesign: (tenant: string, id: string) =>
+		[...tattooKeys.flashDesigns(tenant), id] as const,
 	availability: (tenant: string, query: ListAvailabilityQuery | null) =>
 		[...tattooKeys.tenant(tenant), "availability", query] as const,
 	deposit: (tenant: string, token: string) =>
@@ -46,7 +53,7 @@ export const tattooKeys = {
  * one fetch: TanStack Query 5.104's replacement for `ensureQueryData`).
  * Each forwards TanStack Query's `signal`, so a query nobody needs any more
  * cancels its request.
- * `studio`, `artists`, `artist` and `work` set no `staleTime` or `retry`: the app's defaults decide (TAT-44).
+ * `studio`, `artists`, `artist`, `work`, `flash` and `flashDesign` set no `staleTime` or `retry`: the app's defaults decide (TAT-44).
  */
 export const tattooQueries = {
 	studio: (client: TattooClient) =>
@@ -73,6 +80,16 @@ export const tattooQueries = {
 		queryOptions({
 			queryKey: tattooKeys.work(client.tenant, query),
 			queryFn: ({ signal }) => client.work.list(query, { signal }),
+		}),
+	flash: (client: TattooClient, query?: ListFlashQuery) =>
+		queryOptions({
+			queryKey: tattooKeys.flash(client.tenant, query),
+			queryFn: ({ signal }) => client.flash.list(query, { signal }),
+		}),
+	flashDesign: (client: TattooClient, id: string) =>
+		queryOptions({
+			queryKey: tattooKeys.flashDesign(client.tenant, id),
+			queryFn: ({ signal }) => client.flash.get(id, { signal }),
 		}),
 	availability: (client: TattooClient, query: ListAvailabilityQuery | null) =>
 		queryOptions({

@@ -22,6 +22,9 @@ export type Artist = Schemas["Artist"];
 export type Service = Schemas["Service"];
 export type GalleryPhoto = Schemas["GalleryPhoto"];
 export type WorkFilters = Schemas["WorkFilters"];
+export type FlashDesign = Schemas["FlashDesign"];
+export type Price = Schemas["Price"];
+export type FlashFilters = Schemas["FlashFilters"];
 export type Slot = Schemas["Slot"];
 export type SourceChannel = Schemas["SourceChannel"];
 export type InquiryInput = Schemas["InquiryInput"];
@@ -38,7 +41,12 @@ export type ListServicesQuery = NonNullable<
 export type ListWorkQuery = NonNullable<
 	operations["listWork"]["parameters"]["query"]
 >;
+export type ListFlashQuery = NonNullable<
+	operations["listFlash"]["parameters"]["query"]
+>;
 export type ListAvailabilityQuery =
 	operations["listAvailability"]["parameters"]["query"];
 export type WorkPage =
 	operations["listWork"]["responses"][200]["content"]["application/json"];
+export type FlashPage =
+	operations["listFlash"]["responses"][200]["content"]["application/json"];
