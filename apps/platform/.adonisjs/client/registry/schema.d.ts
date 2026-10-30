@@ -691,6 +691,42 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/work_photos_controller').default['destroy']>>>
     }
   }
+  'tenant.artists.flash.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/artists/:id/flash'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/flash/validators/flash_design').addFlashDesignValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/flash/validators/flash_design').addFlashDesignValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/flash_designs_controller').default['store']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/flash_designs_controller').default['store']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.artists.flash.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/artists/flash/:id'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/flash/validators/flash_design').updateFlashDesignValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/flash/validators/flash_design').updateFlashDesignValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/flash_designs_controller').default['update']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/flash_designs_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.artists.flash.destroy': {
+    methods: ["DELETE"]
+    pattern: '/t/:tenant/artists/flash/:id'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/flash_designs_controller').default['destroy']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/flash_designs_controller').default['destroy']>>>
+    }
+  }
   'tenant.inbox.index': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/inbox'

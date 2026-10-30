@@ -2,6 +2,7 @@ import { DateTime } from "luxon";
 import Artist from "#modules/artists/models/artist";
 import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
 import Client from "#modules/clients/models/client";
+import FlashDesign from "#modules/flash/models/flash_design";
 import Inquiry from "#modules/inquiries/models/inquiry";
 import ReferenceImage from "#modules/inquiries/models/reference_image";
 import { DEFAULT_TEMPLATES } from "#modules/notifications/messages";
@@ -48,6 +49,7 @@ export type IsolationCase = {
 		| "paymentMethod"
 		| "artistProfile"
 		| "workPhoto"
+		| "flashDesign"
 		| "project"
 		| "quotedProject"
 		| "pricelessProject"
@@ -131,6 +133,19 @@ const workPhotoRows = (target: Studio) =>
 				.orderBy("created_at")
 				.orderBy("id")
 		).map((photo) => photo.serialize()),
+	);
+
+// The artists' flash designs, every column, in the list's order (TAT-129):
+// what the flash routes could change.
+const flashDesignRows = (target: Studio) =>
+	inTenant(target.tenant, async () =>
+		(
+			await FlashDesign.query()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("artist_id")
+				.orderBy("created_at")
+				.orderBy("id")
+		).map((design) => design.serialize()),
 	);
 
 /** A PNG upload as the part of a multipart form named `field`. */
@@ -597,6 +612,35 @@ export const isolationCases: IsolationCase[] = [
 		actor: "owner",
 		ownStatus: 302,
 		snapshot: workPhotoRows,
+	},
+	// An artist's flash designs (TAT-129): the upload names the artist, the
+	// others name the design.
+	{
+		method: "POST",
+		pattern: "/t/:tenant/artists/:id/flash",
+		resource: "artistProfile",
+		actor: "owner",
+		files: async () => [await imagePart("picture")],
+		body: () => ({ name: "Moth", size: "About 3 in", price: "3000" }),
+		ownStatus: 302,
+		snapshot: flashDesignRows,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/artists/flash/:id",
+		resource: "flashDesign",
+		actor: "owner",
+		body: () => ({ name: "Moth, smaller", size: "About 2 in", shown: "1" }),
+		ownStatus: 302,
+		snapshot: flashDesignRows,
+	},
+	{
+		method: "DELETE",
+		pattern: "/t/:tenant/artists/flash/:id",
+		resource: "flashDesign",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: flashDesignRows,
 	},
 	{
 		method: "GET",

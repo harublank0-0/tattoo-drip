@@ -3,6 +3,7 @@ import { DateTime } from "luxon";
 import User from "#models/user";
 import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
 import ArtistService from "#modules/artists/services/artist_service";
+import FlashDesign from "#modules/flash/models/flash_design";
 import ImageService from "#modules/media/services/image_service";
 import MessageTemplate from "#modules/notifications/models/message_template";
 import StaffAlert from "#modules/notifications/models/staff_alert";
@@ -175,6 +176,9 @@ export async function seededStudio(slug: string, name: string) {
 		await seedWorkPhoto(tenant, artistProfile),
 		await seedWorkPhoto(tenant, artistProfile),
 	]);
+	const flashDesign = await inTenant(tenant, () =>
+		seedFlashDesign(tenant, artistProfile, name),
+	);
 	const pipeline = await inTenant(tenant, () => seedPipeline(tenant));
 	// A second project waiting for the client's answer, for the accept route.
 	const quoted = await inTenant(tenant, async () => {
@@ -384,7 +388,30 @@ export async function seededStudio(slug: string, name: string) {
 		// The work photo routes' :id resource (TAT-116): the artist profile's
 		// first photo (it has a second one).
 		workPhoto,
+		// The flash routes' :id resource and the public flash reads' (TAT-129):
+		// a shown design of the artist profile.
+		flashDesign,
 	};
+}
+
+/** A shown flash design with a made-up key, NPR 3,000; call it in the tenant's context. */
+function seedFlashDesign(
+	tenant: Tenant,
+	artist: { id: string },
+	studioName: string,
+) {
+	return FlashDesign.create({
+		tenantId: tenant.id,
+		artistId: artist.id,
+		imageKey: `tenants/${tenant.id}/flash_design/${randomUUID()}.320-640-1280.png`,
+		width: 1200,
+		height: 1200,
+		name: `${studioName} Moth`,
+		size: "About 3 in",
+		price: 300_000,
+		currency: "NPR",
+		hidden: false,
+	});
 }
 
 /** A work photo row with a made-up key; call it in the tenant's context. */

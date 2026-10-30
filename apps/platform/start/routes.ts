@@ -270,6 +270,21 @@ router
 					.delete("photos/:id", [controllers.WorkPhotos, "destroy"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.artists.photos.destroy");
+				// An artist's flash designs (TAT-129), the same shape: the upload
+				// names the artist, the others name the design. A design a request
+				// names can't be removed; hiding it is a save.
+				router
+					.post(":id/flash", [controllers.FlashDesigns, "store"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.artists.flash.store");
+				router
+					.put("flash/:id", [controllers.FlashDesigns, "update"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.artists.flash.update");
+				router
+					.delete("flash/:id", [controllers.FlashDesigns, "destroy"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.artists.flash.destroy");
 			})
 			.prefix("/artists");
 

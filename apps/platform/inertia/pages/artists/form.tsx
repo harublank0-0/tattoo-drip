@@ -1,6 +1,7 @@
 import { Form, Link } from "@adonisjs/inertia/react";
 import { useState } from "react";
 import type { ArtistProps, StyleOption } from "~/components/artists";
+import type { FlashDesignProps } from "~/components/flash";
 import {
 	TRAY_CREATE_NOTE,
 	trayIntro,
@@ -50,6 +51,7 @@ export default function ArtistForm({
 	artist: ArtistProps | null;
 	canLink: boolean;
 	workPhotos: WorkPhotoProps[];
+	flashDesigns: FlashDesignProps[];
 	styleOptions: StyleOption[];
 }) {
 	const tenant = useTenant();

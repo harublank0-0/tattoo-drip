@@ -348,6 +348,24 @@ const routes = {
     tokens: [{"old":"/t/:tenant/artists/photos/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/photos/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/photos/:id","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/photos/:id","type":0,"val":"photos","end":""},{"old":"/t/:tenant/artists/photos/:id","type":1,"val":"id","end":""}],
     types: placeholder as Registry['tenant.artists.photos.destroy']['types'],
   },
+  'tenant.artists.flash.store': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/artists/:id/flash',
+    tokens: [{"old":"/t/:tenant/artists/:id/flash","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/:id/flash","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/:id/flash","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/:id/flash","type":1,"val":"id","end":""},{"old":"/t/:tenant/artists/:id/flash","type":0,"val":"flash","end":""}],
+    types: placeholder as Registry['tenant.artists.flash.store']['types'],
+  },
+  'tenant.artists.flash.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/artists/flash/:id',
+    tokens: [{"old":"/t/:tenant/artists/flash/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/flash/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/flash/:id","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/flash/:id","type":0,"val":"flash","end":""},{"old":"/t/:tenant/artists/flash/:id","type":1,"val":"id","end":""}],
+    types: placeholder as Registry['tenant.artists.flash.update']['types'],
+  },
+  'tenant.artists.flash.destroy': {
+    methods: ["DELETE"],
+    pattern: '/t/:tenant/artists/flash/:id',
+    tokens: [{"old":"/t/:tenant/artists/flash/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/flash/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/flash/:id","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/flash/:id","type":0,"val":"flash","end":""},{"old":"/t/:tenant/artists/flash/:id","type":1,"val":"id","end":""}],
+    types: placeholder as Registry['tenant.artists.flash.destroy']['types'],
+  },
   'tenant.inbox.index': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/inbox',

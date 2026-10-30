@@ -80,6 +80,26 @@ test.group("An artist's own profile (TAT-30)", (group) => {
 		assert.equal(saved.userId, member.id);
 	});
 
+	test("an artist switches their own flash requests off", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, member, asha } = await studio();
+		assert.isTrue(asha.acceptingFlash);
+
+		const response = await client
+			.put(`${base}/${asha.id}`)
+			.fields({ name: "Asha", slug: "asha", visible: "on" })
+			.withCsrfToken()
+			.loginAs(member)
+			.redirects(0);
+
+		response.assertStatus(302);
+		const saved = await inTenant(tenant, () => Artist.findOrFail(asha.id));
+		assert.isFalse(saved.acceptingFlash);
+		assert.equal(saved.userId, member.id);
+	});
+
 	test("an artist sets their own styles and TikTok link", async ({
 		client,
 		assert,

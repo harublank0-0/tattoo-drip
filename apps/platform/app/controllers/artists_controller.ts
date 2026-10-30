@@ -19,11 +19,14 @@ import {
 	createArtistValidator,
 	updateArtistValidator,
 } from "#modules/artists/validators/artist";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import FlashService from "#modules/flash/services/flash_service";
 import { InvalidImageError } from "#modules/media/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService, {
 	THUMBNAIL_WIDTH,
 } from "#modules/media/services/image_service";
+import { formatMoney } from "#modules/projects/quotes";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { artistLink } from "#services/studio_links";
 
@@ -43,6 +46,7 @@ export default class ArtistsController {
 		private artists: ArtistService,
 		private images: ImageService,
 		private workPhotos: WorkPhotoService,
+		private flash: FlashService,
 	) {}
 
 	async index(ctx: HttpContext) {
@@ -94,6 +98,8 @@ export default class ArtistsController {
 			canLink: !(await this.hasProfile(tenant, userId)),
 			// Photos come once the artist is saved (TAT-116).
 			workPhotos: [],
+			// Flash designs too (TAT-129).
+			flashDesigns: [],
 			styleOptions: STYLE_OPTIONS,
 		});
 	}
@@ -148,10 +154,32 @@ export default class ArtistsController {
 			})),
 		);
 
+		// The artist's flash designs (TAT-129), newest first, hidden ones too,
+		// loaded after findEditable like the photos: the price in whole rupees
+		// for the form and as words, the 320 px copy for the list.
+		const designs = await this.flash.list(tenant, artist);
+		const flashDesigns = await Promise.all(
+			designs.map(async (design) => ({
+				id: design.id,
+				name: design.name,
+				size: design.size,
+				price: design.price === null ? null : design.price / 100,
+				priceText: design.price === null ? null : formatMoney(design.price),
+				hidden: design.hidden,
+				thumbnailUrl: await this.images.urlFor(
+					"flash_design",
+					design.imageKey,
+					tenant,
+					THUMBNAIL_WIDTH,
+				),
+			})),
+		);
+
 		return ctx.inertia.render("artists/form", {
 			artist: await this.toProps(tenant, artist, userId),
 			canLink,
 			workPhotos,
+			flashDesigns,
 			styleOptions: STYLE_OPTIONS,
 		});
 	}
@@ -238,6 +266,7 @@ export default class ArtistsController {
 			...(await this.toRowProps(tenant, artist, userId)),
 			slug: artist.slug,
 			bio: artist.bio,
+			acceptingFlash: artist.acceptingFlash,
 			closedMessage: artist.closedMessage,
 			// Only listed styles: a slug that left the list has no box to show.
 			styles: knownStyles(artist.styles).map(({ slug }) => slug),
@@ -260,8 +289,7 @@ function toInput(data: Infer<typeof updateArtistValidator>): ArtistInput {
 		bio: data.bio ?? null,
 		visible: data.visible ?? false,
 		acceptingInquiries: data.acceptingInquiries ?? false,
-		// The form has no flash switch yet: a save leaves every artist taking requests.
-		acceptingFlash: true,
+		acceptingFlash: data.acceptingFlash ?? false,
 		closedMessage: data.closedMessage ?? null,
 		styles: data.styles ?? [],
 		instagramUrl: data.instagramUrl ?? null,

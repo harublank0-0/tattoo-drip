@@ -14,6 +14,7 @@ export const controllers = {
   DepositLinks: () => import('#controllers/deposit_links_controller'),
   DepositSettings: () => import('#controllers/deposit_settings_controller'),
   EmailVerification: () => import('#controllers/email_verification_controller'),
+  FlashDesigns: () => import('#controllers/flash_designs_controller'),
   GoodToKnow: () => import('#controllers/good_to_know_controller'),
   Inquiries: () => import('#controllers/inquiries_controller'),
   Invitations: () => import('#controllers/invitations_controller'),

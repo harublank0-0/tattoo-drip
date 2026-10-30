@@ -96,6 +96,37 @@ test.group("Adding an artist", (group) => {
 		assert.isNull(artist.userId);
 	});
 
+	test("Taking flash requests saves; unchecked means not taking them", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const sita = await addArtist(tenant, owner);
+		assert.isTrue(sita.acceptingFlash);
+		const edit = (fields: Record<string, string>) =>
+			client
+				.put(`${base}/${sita.id}`)
+				.fields({ name: "Sita Rai", slug: "sita", ...fields })
+				.withCsrfToken()
+				.loginAs(owner)
+				.redirects(0);
+		const open = async () =>
+			(await client.get(`${base}/${sita.id}/edit`).withInertia().loginAs(owner))
+				.inertiaProps.artist.acceptingFlash;
+
+		await edit({ visible: "on" });
+		assert.isFalse(
+			(await inTenant(tenant, () => Artist.findOrFail(sita.id))).acceptingFlash,
+		);
+		assert.isFalse(await open());
+
+		await edit({ visible: "on", acceptingFlash: "1" });
+		assert.isTrue(
+			(await inTenant(tenant, () => Artist.findOrFail(sita.id))).acceptingFlash,
+		);
+		assert.isTrue(await open());
+	});
+
 	test("checked boxes mean on, and 'this is my profile' links the owner", async ({
 		client,
 		assert,

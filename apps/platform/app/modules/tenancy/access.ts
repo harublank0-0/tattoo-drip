@@ -81,6 +81,11 @@ export const TENANT_ROUTE_ROLES = {
 	"tenant.artists.photos.store": MEMBERS,
 	"tenant.artists.photos.update": MEMBERS,
 	"tenant.artists.photos.destroy": MEMBERS,
+	// An artist's flash designs (TAT-129): the same rule as the work photos
+	// (FlashService.findEditable, re-checked under the artist's row lock).
+	"tenant.artists.flash.store": MEMBERS,
+	"tenant.artists.flash.update": MEMBERS,
+	"tenant.artists.flash.destroy": MEMBERS,
 
 	// The inquiry inbox: reference images stay private to owners until a
 	// project is assigned.
