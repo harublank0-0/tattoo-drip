@@ -102,8 +102,15 @@
    * background would vanish over the cover photo and on the dark paper. The
    * studio's ink on it is 15.8:1. The dashboard keeps a copy for its preview
    * (apps/platform/inertia/css/app.css).
+   *
+   * TAT-123: a white or light logo with a see-through background would vanish
+   * on that tile, so the platform picks the dark one for it when the logo is
+   * uploaded (LOGO_TILE_COLOURS) and the owner can switch it: the logo's
+   * `data-tile="dark"` gives it --logo-plate-dark, the dark paper in both
+   * schemes (not repeated in the dark block), with white on it at 18.8:1.
    */
   --logo-plate: #f7f3ee;
+  --logo-plate-dark: #14110f;
   /*
    * The sticky header's one-line height (TAT-127): a 48 px button, 0.375rem
    * above and below. It is the bar's minimum, and the scroll padding that keeps
@@ -202,6 +209,8 @@
    */
   /* `left center` is physical: the page is LTR. A mirrored (RTL) page would need `right center`; object-position has no logical keywords. */
   .profile-logo { display: block; inline-size: auto; max-inline-size: min(12rem, calc(100% - 0.5rem)); block-size: 4rem; object-fit: contain; object-position: left center; box-sizing: content-box; padding: 0.25rem; background: var(--logo-plate); border-radius: var(--radius); }
+  /* TAT-123: a logo on the dark tile. 0,2,0 beats each logo's own rule (0,1,0) wherever it sits in this layer. */
+  .profile-logo[data-tile="dark"], .site-bar-logo[data-tile="dark"], .deposit-logo[data-tile="dark"] { background: var(--logo-plate-dark); }
   /*
    * The cover (TAT-116): the studio's photo with its name over it, inside the
    * page margins with the stencil frame. 4:3 on a phone, 21:9 from 60rem. A

@@ -60,7 +60,8 @@ const BRANDED_THEME = {
 	accent: "#b91c1c",
 	accentDark: null,
 	font: "serif",
-	logo: { src: LOGO.url, width: 600, height: 200 },
+	logo: { src: LOGO.url, width: 600, height: 200, tile: "light" },
+	icon: null,
 	heroImage: { src: COVER.url, width: 2048, height: 1024, alt: "" },
 };
 

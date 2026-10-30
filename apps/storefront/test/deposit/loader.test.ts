@@ -62,6 +62,7 @@ describe("the deposit page's loader", () => {
 			src: LOGO.url,
 			width: LOGO.width,
 			height: LOGO.height,
+			tile: "light",
 		});
 		assert.deepEqual(Object.keys(depositShell(branded, IMAGE_ORIGIN)).sort(), [
 			"logo",
@@ -69,6 +70,23 @@ describe("the deposit page's loader", () => {
 			"studioName",
 			"timezone",
 		]);
+	});
+
+	test("carries the logo's tile, never its icon (TAT-123)", () => {
+		const dark = withStorefront({
+			branding: {
+				logo: {
+					...LOGO,
+					tile: "dark",
+					icon: { ...LOGO, width: 180, height: 180 },
+				},
+			},
+		});
+
+		const shell = depositShell(dark, IMAGE_ORIGIN);
+
+		assert.equal(shell.logo?.tile, "dark");
+		assert.doesNotMatch(JSON.stringify(shell), /icon/);
 	});
 
 	test("a logo from another origin, or with no origin to check, is no logo; a cover alone is none either", () => {

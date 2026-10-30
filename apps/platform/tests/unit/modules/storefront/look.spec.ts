@@ -363,6 +363,28 @@ test.group("a logo's tile (TAT-123)", () => {
 		});
 	});
 
+	test("the tile colours are the storefront's and the dashboard's tile tokens", ({
+		assert,
+	}) => {
+		const css = storefront("src/styles.css");
+		assert.include(css, `--logo-plate: ${LOGO_TILE_COLOURS.light};`);
+		assert.include(css, `--logo-plate-dark: ${LOGO_TILE_COLOURS.dark};`);
+		const dashboard = readFileSync(
+			new URL("../../../../inertia/css/app.css", import.meta.url),
+			"utf8",
+		);
+		assert.include(dashboard, `--logo-plate: ${LOGO_TILE_COLOURS.light};`);
+		assert.include(dashboard, `--logo-plate-dark: ${LOGO_TILE_COLOURS.dark};`);
+	});
+
+	test("the storefront reads the same two tiles", ({ assert }) => {
+		const config = storefront("src/studio/theme/config.ts");
+		assert.include(
+			config,
+			`export type LogoTile = ${LOGO_TILES.map((tile) => `"${tile}"`).join(" | ")};`,
+		);
+	});
+
 	test("logoTileOf reads the exact word and anything else as light", ({
 		assert,
 	}) => {
