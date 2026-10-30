@@ -6,6 +6,7 @@ import Inquiry from "#modules/inquiries/models/inquiry";
 import ImageService from "#modules/media/services/image_service";
 import { excerpt } from "#modules/notifications/alerts";
 import TattooProject from "#modules/projects/models/tattoo_project";
+import { addFlashDesign } from "#tests/helpers/artists";
 import { testImages } from "#tests/helpers/images";
 import {
 	makeArtist,
@@ -14,6 +15,7 @@ import {
 	makeProject,
 	makeReferenceImage,
 } from "#tests/helpers/pipeline";
+import { recordQueries } from "#tests/helpers/query_count";
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 import { assertValidationError } from "#tests/helpers/validation";
 
@@ -210,6 +212,146 @@ test.group("Inbox pages", (group) => {
 		assert.deepEqual(props.accept.artistId, artist.id);
 		assert.deepInclude(props.accept.choices, { id: artist.id, name: "Sita" });
 		assert.isNull(props.projectId);
+	});
+
+	test("a flash request's row names the design with its thumbnail; other rows have none", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const { moth } = await inTenant(tenant, async () => {
+			const artist = await makeArtist(tenant);
+			const moth = await addFlashDesign(tenant, artist, { name: "Moth" });
+			const sita = await makeClient(tenant, { name: "Sita Rai" });
+			await makeInquiry(tenant, sita, {
+				idea: "The Moth flash",
+				flashDesignId: moth.id,
+				preferredArtistId: artist.id,
+			});
+			await makeInquiry(tenant, await makeClient(tenant), {
+				idea: "A custom idea",
+			});
+			return { moth };
+		});
+
+		const rows = (await client.get(inbox()).withInertia().loginAs(owner))
+			.inertiaProps.inquiries;
+
+		const flash = rows.find(
+			(row: { idea: string }) => row.idea === "The Moth flash",
+		);
+		assert.deepEqual(Object.keys(flash.flash).sort(), ["name", "thumbnailUrl"]);
+		assert.equal(flash.flash.name, "Moth");
+		assert.match(flash.flash.thumbnailUrl, /\.320w\.png$/);
+		assert.equal(
+			new URL(flash.flash.thumbnailUrl).pathname.includes(moth.id),
+			false,
+			"the file's name is not the design's id",
+		);
+		const custom = rows.find(
+			(row: { idea: string }) => row.idea === "A custom idea",
+		);
+		assert.isNull(custom.flash);
+	});
+
+	test("the inbox costs the same queries for one flash row as for three", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const artist = await inTenant(tenant, () => makeArtist(tenant));
+		const add = (count: number) =>
+			inTenant(tenant, async () => {
+				for (let n = 0; n < count; n++) {
+					const design = await addFlashDesign(tenant, artist, {
+						name: `Moth ${n}`,
+					});
+					await makeInquiry(tenant, await makeClient(tenant), {
+						flashDesignId: design.id,
+					});
+				}
+			});
+		const queriesFor = async () =>
+			(
+				await recordQueries(() =>
+					client.get(inbox()).withInertia().loginAs(owner),
+				)
+			).queries.length;
+
+		await add(1);
+		const one = await queriesFor();
+		await add(2);
+		const three = await queriesFor();
+
+		assert.equal(three, one);
+	});
+
+	test("the inquiry page shows the design: picture, name, artist, size and price", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const { inquiry, moth } = await inTenant(tenant, async () => {
+			const artist = await makeArtist(tenant);
+			const moth = await addFlashDesign(tenant, artist, {
+				name: "Moth",
+				price: 300_000,
+			});
+			const inquiry = await makeInquiry(tenant, await makeClient(tenant), {
+				flashDesignId: moth.id,
+				preferredArtistId: artist.id,
+			});
+			return { inquiry, moth };
+		});
+		const read = async () =>
+			(
+				await client
+					.get(inbox(`/${inquiry.id}`))
+					.withInertia()
+					.loginAs(owner)
+			).inertiaProps;
+
+		const props = await read();
+
+		assert.deepEqual(Object.keys(props.flash).sort(), [
+			"artistName",
+			"hidden",
+			"imageUrl",
+			"name",
+			"priceText",
+			"size",
+			"thumbnailUrl",
+		]);
+		assert.equal(props.flash.name, "Moth");
+		assert.equal(props.flash.artistName, "Sita");
+		assert.equal(props.flash.size, "About 3 in");
+		assert.equal(props.flash.priceText, "NPR 3,000");
+		assert.isFalse(props.flash.hidden);
+		assert.match(props.flash.thumbnailUrl, /\.320w\.png$/);
+		assert.match(props.flash.imageUrl, /\.1280w\.png$/);
+		// The payload the page already had is untouched.
+		assert.notProperty(props.inquiry, "flash");
+
+		// Hiding the design afterwards keeps it on the page, marked.
+		await inTenant(tenant, async () => {
+			moth.hidden = true;
+			await moth.save();
+		});
+		const hidden = await read();
+		assert.isTrue(hidden.flash.hidden);
+		assert.equal(hidden.flash.name, "Moth");
+
+		// An ordinary inquiry has no design.
+		const custom = await inTenant(tenant, async () =>
+			makeInquiry(tenant, await makeClient(tenant)),
+		);
+		const plain = (
+			await client
+				.get(inbox(`/${custom.id}`))
+				.withInertia()
+				.loginAs(owner)
+		).inertiaProps;
+		assert.isNull(plain.flash);
 	});
 
 	test("a long idea is two lines' worth in the inbox and whole on its page (TAT-84)", async ({

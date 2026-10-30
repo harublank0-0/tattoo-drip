@@ -22,6 +22,44 @@ export type FlashDesignProps = {
 	thumbnailUrl: string;
 };
 
+/**
+ * The flash design a request or a project names, as the inquiry page and the
+ * project page get it (the dashboard's copy of the server's FlashCardProps):
+ * the 320 px picture and the widest copy a tap opens.
+ */
+export type FlashCardProps = {
+	name: string;
+	artistName: string | null;
+	size: string;
+	priceText: string | null;
+	thumbnailUrl: string;
+	imageUrl: string;
+	hidden: boolean;
+};
+
+/** The line under a card's name: the artist, the size and the price, whichever it has. */
+export function flashCardLine(card: {
+	artistName: string | null;
+	size: string;
+	priceText: string | null;
+}): string {
+	return [
+		card.artistName ? `By ${card.artistName}` : null,
+		card.size,
+		card.priceText,
+	]
+		.filter((part): part is string => part !== null)
+		.join(" · ");
+}
+
+/** Shown on the card while the studio has taken the design off its page. */
+export const FLASH_CARD_HIDDEN = "Hidden from the studio page.";
+
+/** The inbox row's label for the design a request asks for. */
+export function flashRowLabel(name: string): string {
+	return `Flash: ${name}`;
+}
+
 /** How many designs the artist offers, out of the most there is room for. */
 export function flashCount(count: number): string {
 	return `${count} of ${MAX_FLASH_DESIGNS} designs`;

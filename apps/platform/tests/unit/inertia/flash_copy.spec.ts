@@ -12,6 +12,11 @@ type FlashModule = {
 		priceText: string | null;
 		hidden: boolean;
 	}): string;
+	flashCardLine(card: {
+		artistName: string | null;
+		size: string;
+		priceText: string | null;
+	}): string;
 	editDesignLabel(name: string): string;
 	removeDesignLabel(name: string): string;
 	FLASH_CREATE_NOTE: string;
@@ -116,6 +121,27 @@ test.group("flash design words (TAT-129)", () => {
 		assert.equal(
 			flash.SHOWN_HELP,
 			"Uncheck to take it off the studio page for now. Requests already sent keep it.",
+		);
+	});
+
+	test("a design card's line is the artist, the size and the price, whichever it has", ({
+		assert,
+	}) => {
+		assert.equal(
+			flash.flashCardLine({
+				artistName: "Sita Rai",
+				size: "About 3 in",
+				priceText: "NPR 3,000",
+			}),
+			"By Sita Rai · About 3 in · NPR 3,000",
+		);
+		assert.equal(
+			flash.flashCardLine({
+				artistName: null,
+				size: "About 3 in",
+				priceText: null,
+			}),
+			"About 3 in",
 		);
 	});
 });
