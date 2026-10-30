@@ -183,6 +183,29 @@ export default class ArtistService {
 	}
 
 	/**
+	 * Holds the live, visible profile `artistId` until the transaction ends
+	 * (`FOR KEY SHARE`: the lock a row naming the artist takes through its
+	 * foreign key anyway, taken here early), or null when it is not one. A
+	 * request that names one of the artist's flash designs takes it before the
+	 * design's own lock (FlashService.holdShown): the owner removing a design
+	 * takes the artist's `FOR UPDATE` (`lockEditable`) and then the design's,
+	 * so both go artist first and neither can wait for the other. Call it
+	 * inside a transaction.
+	 */
+	async holdVisible(
+		trx: QueryClientContract,
+		tenant: TenantRef,
+		artistId: string,
+	): Promise<Artist | null> {
+		const query = Artist.query({ client: trx })
+			.where("tenant_id", tenant.id)
+			.where("id", artistId)
+			.where("visible", true);
+		query.knexQuery.forKeyShare();
+		return query.first();
+	}
+
+	/**
 	 * Adds a profile. Throws ArtistSlugTakenError or ArtistProfileExistsError
 	 * (after rolling back its own savepoint, so the request stays usable) and
 	 * InvalidImageError for a photo we can't accept.

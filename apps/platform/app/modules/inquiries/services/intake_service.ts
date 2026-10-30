@@ -89,6 +89,16 @@ export default class IntakeService {
 				tenant,
 				submission.referenceImages ?? [],
 			);
+			// `target` looked the design up without a lock, to refuse early. An
+			// owner may have removed it while the pictures were processed: hold
+			// it (and its artist) now, so a removal waits for this request, and
+			// a design already gone is the same refusal, not a database error.
+			if (flashDesignId !== null) {
+				const held =
+					artistId !== null &&
+					(await this.flash.holdShown(trx, tenant, artistId, flashDesignId));
+				if (!held) throw new InquiryRuleError("flash_unavailable");
+			}
 
 			const inquiry = await Inquiry.create(
 				{

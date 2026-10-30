@@ -324,6 +324,33 @@ export default class FlashService {
 	}
 
 	/**
+	 * Holds the design for a request about to name it: the artist's row, then
+	 * the design's own, each `FOR KEY SHARE` until the transaction ends (the
+	 * locks the request's foreign keys take anyway, taken before the slow work
+	 * is over). It returns the design when it is still shown and its artist is
+	 * still visible, else null. An owner removing the design (`remove`) then
+	 * waits for the request and finds it named (FlashInUseError), or has
+	 * removed it first and the request finds nothing. Artist first, like
+	 * `remove`, so neither waits for the other while holding what it needs.
+	 * Call it inside the request's transaction.
+	 */
+	async holdShown(
+		trx: QueryClientContract,
+		tenant: TenantRef,
+		artistId: string,
+		designId: string,
+	): Promise<FlashDesign | null> {
+		if (!(await this.artists.holdVisible(trx, tenant, artistId))) return null;
+		const query = FlashDesign.query({ client: trx })
+			.where("tenant_id", tenant.id)
+			.where("id", designId)
+			.where("artist_id", artistId)
+			.where("hidden", false);
+		query.knexQuery.forKeyShare();
+		return query.first();
+	}
+
+	/**
 	 * Any of the tenant's designs by id, hidden ones too: what the dashboard's
 	 * inbox and pages show for the design a request or a project names. No
 	 * query for [].
