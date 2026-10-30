@@ -29,6 +29,24 @@ const PURPOSE = "flash_design";
 const INQUIRY_KEY = "inquiries_flash_design_fk";
 const PROJECT_KEY = "tattoo_projects_flash_design_fk";
 
+/**
+ * Keeps a design only while its artist is, in this very statement, a live
+ * visible artist of the tenant (one `?`: the tenant's id). The public reads
+ * get artist ids that were read earlier, and under READ COMMITTED an artist
+ * can be hidden or deleted between that read and the designs'; asking again
+ * in the same SQL means a cacheable response never carries a design of an
+ * artist who is no longer shown. `artists` is soft-deleted, so `deleted_at`
+ * is said here (the model's scope is a fetch hook and does not reach a
+ * subquery).
+ */
+const VISIBLE_ARTIST = `exists (
+	select 1 from artists
+	where artists.id = flash_designs.artist_id
+		and artists.tenant_id = ?
+		and artists.visible
+		and artists.deleted_at is null
+)`;
+
 /** What a new design needs besides the picture; `price` is in paisa, null for none. */
 export type NewFlashDesign = {
 	name: string;
@@ -56,7 +74,10 @@ export type FlashFilter = { artistIds: readonly string[] };
  * ACTION): `remove` then throws FlashInUseError and the studio hides the
  * design instead. A hidden design stays in the dashboard and in what the
  * requests name; the public reads (`page`, `findShown`, `artistsWithDesigns`)
- * show shown designs only, and the caller passes only visible artists' ids.
+ * show shown designs of visible artists only: the caller narrows them to the
+ * artist ids it read, and the same query checks again that each artist is
+ * still visible and live (VISIBLE_ARTIST), so an id list that went stale
+ * shows nothing of an artist hidden or deleted since.
  */
 @inject()
 export default class FlashService {
@@ -218,8 +239,9 @@ export default class FlashService {
 	/**
 	 * One page of the shown designs of `filter.artistIds`, newest first
 	 * (`created_at desc, id desc`), starting after the cursor `after`. The
-	 * caller passes the ids of artists it may show (the public reads pass only
-	 * visible ones); no query for []. `next` is the cursor of the last design
+	 * caller passes the ids of artists it may show; only those still visible
+	 * and live in this query count (VISIBLE_ARTIST); no query for []. `next`
+	 * is the cursor of the last design
 	 * returned when more remain, else null: one more is read to know that.
 	 * The cursor's time is read from and compared in the database, as text
 	 * with its microseconds (see WorkCursor).
@@ -243,7 +265,8 @@ export default class FlashService {
 			)
 			.where("tenant_id", tenant.id)
 			.where("hidden", false)
-			.whereIn("artist_id", [...filter.artistIds]);
+			.whereIn("artist_id", [...filter.artistIds])
+			.whereRaw(VISIBLE_ARTIST, [tenant.id]);
 		if (after) {
 			query.whereRaw("(created_at, id) < (?::timestamptz, ?::uuid)", [
 				after.at,
@@ -264,8 +287,8 @@ export default class FlashService {
 	}
 
 	/**
-	 * Which of these artists have a shown design (the filter a page offers).
-	 * One query; none for [].
+	 * Which of these artists, still visible and live in this query, have a
+	 * shown design (the filter a page offers). One query; none for [].
 	 */
 	async artistsWithDesigns(
 		tenant: TenantRef,
@@ -276,11 +299,15 @@ export default class FlashService {
 			.where("tenant_id", tenant.id)
 			.where("hidden", false)
 			.whereIn("artist_id", [...artistIds])
+			.whereRaw(VISIBLE_ARTIST, [tenant.id])
 			.distinct("artist_id");
 		return new Set(rows.map((row) => row.artistId));
 	}
 
-	/** The design when it is shown and its artist is one of `artistIds`, else null. */
+	/**
+	 * The design when it is shown and its artist is one of `artistIds` and
+	 * still visible and live in this query, else null.
+	 */
 	async findShown(
 		tenant: TenantRef,
 		designId: string,
@@ -292,6 +319,7 @@ export default class FlashService {
 			.where("id", designId)
 			.where("hidden", false)
 			.whereIn("artist_id", [...artistIds])
+			.whereRaw(VISIBLE_ARTIST, [tenant.id])
 			.first();
 	}
 

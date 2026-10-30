@@ -50,16 +50,27 @@ class FailingImageService extends RecordingImageService {
 
 function makeIntake(
 	images: RecordingImageService = new RecordingImageService(),
+	artists: ArtistService = new ArtistService(images),
+	flash: FlashService = new FlashService(images, new ArtistService(images)),
 ) {
 	return {
 		images,
-		intake: new IntakeService(
-			new ArtistService(images),
-			new ClientService(),
-			images,
-			new FlashService(images, new ArtistService(images)),
-		),
+		intake: new IntakeService(artists, new ClientService(), images, flash),
 	};
+}
+
+/** An ArtistService whose visible list was read earlier: what a request racing a hide still holds. */
+class StaleArtists extends ArtistService {
+	constructor(
+		images: RecordingImageService,
+		private stale: Artist[],
+	) {
+		super(images);
+	}
+
+	override async listVisible() {
+		return this.stale;
+	}
 }
 
 const submission = (over: Partial<Submission> = {}): Submission => ({
@@ -396,6 +407,67 @@ test.group("IntakeService.submit", (group) => {
 			assert.equal(inquiry.flashDesignId, shown.id);
 			assert.equal(inquiry.preferredArtistId, open.id);
 		}
+	});
+
+	test("an artist hidden or deleted after the list of visible artists was read: their design is flash_unavailable, with no row and no file", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("intake-flash-stale-129");
+		const plain = new RecordingImageService();
+		const { hiding, leaving, ofHiding, ofLeaving, stale } = await inTenant(
+			tenant,
+			async () => {
+				const hiding = await Artist.create({
+					tenantId: tenant.id,
+					name: "Hiding",
+					slug: "hiding",
+				});
+				const leaving = await Artist.create({
+					tenantId: tenant.id,
+					name: "Leaving",
+					slug: "leaving",
+				});
+				return {
+					hiding,
+					leaving,
+					ofHiding: await addFlashDesign(tenant, hiding),
+					ofLeaving: await addFlashDesign(tenant, leaving),
+					// What the intake's own read gave a moment before the hide.
+					stale: await new ArtistService(plain).listVisible(tenant),
+				};
+			},
+		);
+		await inTenant(tenant, async () => {
+			await Artist.query().where("id", hiding.id).update({ visible: false });
+			await new ArtistService(plain).delete(tenant, leaving);
+		});
+		const { intake, images } = makeIntake(
+			plain,
+			new StaleArtists(plain, stale),
+			new FlashService(plain, new ArtistService(plain)),
+		);
+
+		for (const [label, design] of [
+			["hidden", ofHiding],
+			["deleted", ofLeaving],
+		] as const) {
+			const refused = await reasonOf(async () =>
+				inTenant(tenant, async () =>
+					intake.submit(
+						tenant,
+						submission({
+							flashDesignId: design.id,
+							referenceImages: await pngs(1),
+						}),
+					),
+				),
+			);
+			assert.equal(refused, "flash_unavailable", label);
+		}
+
+		assert.deepEqual(images.keys, [], "no image was decoded");
+		const rows = await rowsIn(tenant);
+		assert.deepEqual([rows.clients.length, rows.inquiries.length], [0, 0]);
 	});
 
 	test("an open artist can be chosen, and no artist is fine while one is open", async ({

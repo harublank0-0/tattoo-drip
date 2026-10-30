@@ -3,6 +3,7 @@ import { errors as lucidErrors } from "@adonisjs/lucid";
 import type { QueryClientContract } from "@adonisjs/lucid/types/database";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
+import Artist from "#modules/artists/models/artist";
 import ArtistService, {
 	type ProfileEditor,
 } from "#modules/artists/services/artist_service";
@@ -526,6 +527,60 @@ test.group("FlashService (TAT-129)", (group) => {
 			assert.deepEqual([...all.keys()].sort(), [shown.id, hidden.id].sort());
 			assert.isTrue(all.get(hidden.id)?.hidden);
 			assert.equal((await flash.forIds(tenant, [])).size, 0);
+		});
+	});
+
+	test("an artist hidden or deleted after the caller read the visible ids, with a design added since, is in no page, no filter and no design read", async ({
+		assert,
+	}) => {
+		const { tenant, owner: user } = await studioWithOwner();
+		const staying = await addArtist(tenant, user);
+		const hiding = await addArtist(tenant, user, {
+			name: "Hiding",
+			slug: "hiding",
+		});
+		const leaving = await addArtist(tenant, user, {
+			name: "Leaving",
+			slug: "leaving",
+		});
+		const { flash, artists } = makeService();
+		// What the caller read: all three were visible then.
+		const stale = [staying.id, hiding.id, leaving.id];
+		const designs = await inTenant(tenant, async () => {
+			await Artist.query().where("id", hiding.id).update({ visible: false });
+			await artists.delete(tenant, leaving);
+			return {
+				staying: await addFlashDesign(tenant, staying),
+				hiding: await addFlashDesign(tenant, hiding),
+				leaving: await addFlashDesign(tenant, leaving),
+			};
+		});
+
+		await inTenant(tenant, async () => {
+			const page = await flash.page(tenant, { artistIds: stale }, null, 10);
+			assert.deepEqual(
+				page.designs.map((design) => design.id),
+				[designs.staying.id],
+			);
+			for (const gone of [hiding, leaving]) {
+				const own = await flash.page(
+					tenant,
+					{ artistIds: [gone.id] },
+					null,
+					10,
+				);
+				assert.lengthOf(own.designs, 0);
+			}
+			assert.deepEqual(
+				[...(await flash.artistsWithDesigns(tenant, stale))],
+				[staying.id],
+			);
+			assert.equal(
+				(await flash.findShown(tenant, designs.staying.id, stale))?.id,
+				designs.staying.id,
+			);
+			assert.isNull(await flash.findShown(tenant, designs.hiding.id, stale));
+			assert.isNull(await flash.findShown(tenant, designs.leaving.id, stale));
 		});
 	});
 
