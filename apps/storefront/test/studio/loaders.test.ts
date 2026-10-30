@@ -975,6 +975,37 @@ describe("loadRequestPage (TAT-127)", () => {
 		);
 	});
 
+	test("its head agrees with the page: a refusal never invites, an open artist's page always does", async () => {
+		const { fetch } = listing();
+
+		// A closed artist, the studio open.
+		const arjun = await loadRequestPage(pageContext(fetch), {
+			artist: "arjun",
+		});
+		assert.equal(arjun.seo.title, "Inquiries for अर्जुन थापा at Black Needle");
+		assert.equal(
+			arjun.seo.description,
+			"अर्जुन थापा isn't taking new inquiries right now.",
+		);
+		assert.equal(arjun.seo.canonical, `${ORIGIN}/request?artist=arjun`);
+
+		// The studio closed: the general page declines, an open artist's page does not.
+		const closed = pageContext(fetch, CLOSED_STUDIO);
+		const general = await loadRequestPage(closed, {});
+		assert.equal(general.seo.title, "Inquiries at Black Needle");
+		assert.equal(
+			general.seo.description,
+			"Black Needle isn't taking new inquiries right now.",
+		);
+		const sita = await loadRequestPage(closed, { artist: "sita" });
+		assert.equal(sita.seo.title, "Send your idea to Sita Rai at Black Needle");
+		assert.match(sita.seo.description, /^Tell Sita Rai about the tattoo/);
+
+		// The open general page.
+		const open = await loadRequestPage(pageContext(fetch), {});
+		assert.equal(open.seo.title, "Send your idea to Black Needle");
+	});
+
 	test("a failed artists read fails it like the other pages", async () => {
 		const { fetch } = fakeFetch(() =>
 			json(500, { error: { code: "internal_error", message: "Boom." } }),

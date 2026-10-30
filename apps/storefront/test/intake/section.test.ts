@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { describe, test } from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { intakeFormKey } from "../../src/intake/components/intake-mount.tsx";
 import { InquirySection } from "../../src/studio/components/inquiry.tsx";
 import type { InquiryState } from "../../src/studio/inquiry.ts";
 
@@ -250,6 +251,40 @@ describe("the #inquiry section's panel (TAT-105)", () => {
 			assert.doesNotMatch(html, /<aside|How booking works|step-title/);
 			assert.match(html, /<section id="inquiry" class="inquiry" /);
 		}
+	});
+});
+
+describe("the mounted form belongs to the artist it is for (TAT-127)", () => {
+	const SITA = { id: "0199f000-0000-7000-8000-000000000048", name: "Sita Rai" };
+	const open = (preferredArtist: typeof SITA | null): typeof OPEN & object => ({
+		...OPEN,
+		preferredArtist,
+	});
+
+	test("a different artist, or none, is a different form", () => {
+		const general = intakeFormKey(open(null));
+		const sita = intakeFormKey(open(SITA));
+		const other = intakeFormKey(
+			open({ id: "0199f000-0000-7000-8000-000000000049", name: "Arjun" }),
+		);
+
+		assert.equal(general, "");
+		assert.equal(sita, SITA.id);
+		assert.equal(new Set([general, sita, other]).size, 3);
+		// The same artist on a later render is the same form (nothing typed is lost).
+		assert.equal(intakeFormKey(open(SITA)), sita);
+	});
+
+	test("IntakeMount keys the lazy form by it, so moving between /request addresses mounts a fresh one", () => {
+		const text = readFileSync(
+			new URL("../../src/intake/components/intake-mount.tsx", import.meta.url),
+			"utf8",
+		);
+
+		assert.match(
+			text,
+			/<LazyIntakeForm key=\{intakeFormKey\(props\.state\)\} \{\.\.\.props\} \/>/,
+		);
 	});
 });
 

@@ -212,7 +212,7 @@ export function requestPageData(
 		studio: studioView,
 		inquiry,
 		channels: channelsFor(studioView, inquiry),
-		seo: requestPageSeo(studioView, artist, origin),
+		seo: requestPageSeo(studioView, artist, origin, inquiry.kind === "open"),
 		theme: parseThemeConfig(storefrontInput(studio), imageOrigin),
 	};
 }

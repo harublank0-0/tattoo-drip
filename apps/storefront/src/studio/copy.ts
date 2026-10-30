@@ -74,7 +74,7 @@ export const studioCopy = {
 	},
 	/**
 	 * The request page, its buttons and the invitation to it (TAT-127).
-	 * Templates hold {name} and {studio}.
+	 * Templates hold {name}, {studio} and {who}.
 	 */
 	request: {
 		/** The header's button, and on an artist's page the one that names them. */
@@ -84,6 +84,15 @@ export const studioCopy = {
 		inviteTitle: "Got an idea?",
 		inviteLine:
 			"Tell {studio} what you'd like and where it goes. Add photos if you have them.",
+		/**
+		 * The request page's title and description while it declines (the page
+		 * says "Inquiries" and that nobody is taking new ones, so its tab, search
+		 * snippet and share card must not invite). {who} is the artist's name when
+		 * one is picked, else the studio's.
+		 */
+		closedTitle: "Inquiries at {studio}",
+		closedTitleArtist: "Inquiries for {name} at {studio}",
+		closedDescription: "{who} isn't taking new inquiries right now.",
 	},
 	/** The studio's flag in words; a closed artist's own message comes first. */
 	status: {
