@@ -1,20 +1,19 @@
 import { readFileSync } from "node:fs";
 import { test } from "@japa/runner";
 import {
-	ARTIST_PLACEMENT_KEYS,
-	ARTIST_PLACEMENTS,
 	contrastRatio,
 	DARK_PAPER,
 	DEFAULT_FONT,
+	DEFAULT_SECTIONS,
 	DEFAULT_THEME,
 	FONT_KEYS,
 	FONTS,
 	LIGHT_PAPER,
 	lookOf,
 	MIN_TEXT_CONTRAST,
-	placementOf,
 	readsOn,
 	SECTION_KEYS,
+	sectionList,
 	sectionsOf,
 	THEME_ACCENT,
 	THEME_ACCENT_DARK,
@@ -51,6 +50,12 @@ test.group("the page look rules match the storefront's own", () => {
 		assert.deepEqual([...SECTION_KEYS], listOf(config, "SECTION_KEYS"));
 		assert.deepEqual([...FONT_KEYS], listOf(config, "FONT_KEYS"));
 		assert.match(config, /required: sectionList\("inquiry"\)/);
+		// A studio that set nothing shows the storefront theme's own default order.
+		const order = /order: sectionList\(([^)]*)\)/.exec(config)?.[1] ?? "";
+		assert.deepEqual(
+			[...DEFAULT_SECTIONS],
+			[...order.matchAll(/"([^"]+)"/g)].map((item) => item[1]),
+		);
 		assert.equal(DEFAULT_THEME, "stencil-and-ink");
 		assert.match(config, /DEFAULT_FONT: FontKey = "eczar"/);
 		assert.equal(DEFAULT_FONT, "eczar");
@@ -107,7 +112,7 @@ test.group("contrast", () => {
 test.group("lookOf", () => {
 	const good = {
 		storefrontTheme: "stencil-and-ink",
-		storefrontSections: "inquiry,artists",
+		storefrontSections: "inquiry,artists,work",
 		brandAccent: "#0f766e",
 		brandAccentDark: "#a99cff",
 		brandFont: "serif",
@@ -121,7 +126,7 @@ test.group("lookOf", () => {
 			accent: "#0f766e",
 			accentDark: "#a99cff",
 			font: "serif",
-			sections: ["inquiry", "artists"],
+			sections: ["inquiry", "artists", "work"],
 		});
 	});
 
@@ -142,7 +147,7 @@ test.group("lookOf", () => {
 		// One bad value leaves the others as they were.
 		const onlyFont = lookOf({ ...good, brandFont: "mono" });
 		assert.equal(onlyFont.accent, "#0f766e");
-		assert.deepEqual(onlyFont.sections, ["inquiry", "artists"]);
+		assert.deepEqual(onlyFont.sections, ["inquiry", "artists", "work"]);
 	});
 
 	test("an unset colour stays unset", ({ assert }) => {
@@ -160,7 +165,27 @@ test.group("lookOf", () => {
 });
 
 test.group("sections", () => {
-	test("sectionsOf keeps known keys once and adds the form if it is missing", ({
+	test("the default is Recent work, the artists, then the form", ({
+		assert,
+	}) => {
+		assert.deepEqual([...SECTION_KEYS], ["work", "artists", "inquiry"]);
+		assert.deepEqual([...DEFAULT_SECTIONS], ["work", "artists", "inquiry"]);
+	});
+
+	test("sectionList keeps known keys once, in order, and adds the form at the end", ({
+		assert,
+	}) => {
+		assert.deepEqual(sectionList(["artists", "work", "artists", "flash"]), [
+			"artists",
+			"work",
+			"inquiry",
+		]);
+		assert.deepEqual(sectionList(["inquiry", "work"]), ["inquiry", "work"]);
+		assert.deepEqual(sectionList([]), ["inquiry"]);
+		assert.deepEqual(sectionList(["work"]), ["work", "inquiry"]);
+	});
+
+	test("sectionsOf reads a stored list: known keys once, then the form if it was left out", ({
 		assert,
 	}) => {
 		assert.deepEqual(sectionsOf("inquiry,artists,inquiry,flash"), [
@@ -169,23 +194,30 @@ test.group("sections", () => {
 		]);
 		assert.deepEqual(sectionsOf("artists"), ["artists", "inquiry"]);
 		assert.deepEqual(sectionsOf(""), ["inquiry"]);
+		assert.deepEqual(sectionsOf("work,artists,inquiry"), [
+			"work",
+			"artists",
+			"inquiry",
+		]);
+	});
+
+	test("a stored list without work stays without it", ({ assert }) => {
 		assert.deepEqual(sectionsOf("artists,inquiry"), ["artists", "inquiry"]);
+		assert.deepEqual(
+			lookOf({
+				storefrontTheme: "stencil-and-ink",
+				storefrontSections: "artists,inquiry",
+				brandAccent: null,
+				brandAccentDark: null,
+				brandFont: "eczar",
+			}).sections,
+			["artists", "inquiry"],
+		);
 	});
 
-	test("placementOf reads back every placement", ({ assert }) => {
-		for (const key of ARTIST_PLACEMENT_KEYS) {
-			assert.equal(placementOf(ARTIST_PLACEMENTS[key]), key);
-			assert.equal(
-				placementOf(sectionsOf(ARTIST_PLACEMENTS[key].join(","))),
-				key,
-			);
-		}
-		assert.deepEqual(ARTIST_PLACEMENT_KEYS, ["first", "last", "hidden"]);
-	});
-
-	test("every placement keeps the form", ({ assert }) => {
-		for (const key of ARTIST_PLACEMENT_KEYS) {
-			assert.include([...ARTIST_PLACEMENTS[key]], "inquiry");
+	test("every list keeps the form", ({ assert }) => {
+		for (const keys of [[], ["work"], ["artists", "work"], ["flash"]]) {
+			assert.include(sectionList(keys), "inquiry");
 		}
 	});
 });

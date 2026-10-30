@@ -50,7 +50,7 @@ const DEFAULT_LOOK = {
 	accent: null,
 	accentDark: null,
 	font: "eczar",
-	sections: ["artists", "inquiry"],
+	sections: ["work", "artists", "inquiry"],
 };
 
 const PROFILE: TenantProfile = {
@@ -488,7 +488,7 @@ test.group("StudioPageService: page look and logo (TAT-56)", (group) => {
 				accent: "#0f766e",
 				accentDark: null,
 				font: "sans",
-				artists: "last",
+				sections: ["inquiry", "artists"],
 			}),
 		);
 		const withLogo = await inTenant(tenant, async () =>

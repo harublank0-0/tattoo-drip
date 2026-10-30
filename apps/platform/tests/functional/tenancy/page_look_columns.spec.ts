@@ -1,5 +1,6 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
+import { DEFAULT_SECTIONS } from "#modules/storefront/look";
 import { withDbContext, withTransaction } from "#services/db_context";
 import { studioWithOwner } from "#tests/helpers/tenants";
 
@@ -82,7 +83,7 @@ test.group("tenants page look columns (TAT-56)", (group) => {
 
 		assert.deepEqual(row, {
 			storefront_theme: "stencil-and-ink",
-			storefront_sections: "artists,inquiry",
+			storefront_sections: "work,artists,inquiry",
 			brand_accent: null,
 			brand_accent_dark: null,
 			brand_font: "eczar",
@@ -103,7 +104,7 @@ test.group("tenants page look columns (TAT-56)", (group) => {
 				);
 				// The failed update left the look as it was.
 				const { rows } = await trx.rawQuery(READ, [tenant.id]);
-				assert.equal(rows[0].storefront_sections, "artists,inquiry");
+				assert.equal(rows[0].storefront_sections, "work,artists,inquiry");
 				assert.isNull(rows[0].brand_accent);
 			});
 		});
@@ -128,6 +129,20 @@ test.group("tenants page look columns (TAT-56)", (group) => {
 		});
 	});
 
+	test("a new studio's sections are work, artists, then the form", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		const row = await withDbContext({ tenantId: tenant.id }, async (trx) => {
+			const { rows } = await trx.rawQuery(READ, [tenant.id]);
+			return rows[0];
+		});
+
+		assert.equal(row.storefront_sections, "work,artists,inquiry");
+		assert.equal(row.storefront_sections, DEFAULT_SECTIONS.join(","));
+	});
+
 	test("lowercase hex colours, the form alone and a whole logo pass", async ({
 		assert,
 	}) => {
@@ -148,7 +163,7 @@ test.group("tenants page look columns (TAT-56)", (group) => {
 			assert.equal(rows[0].logo_image_width, 600);
 			// Both orders of the two sections pass; clearing a colour passes.
 			await trx.rawQuery(
-				"update tenants set storefront_sections = 'inquiry,artists', brand_accent = null where id = ?",
+				"update tenants set storefront_sections = 'work,inquiry,artists', brand_accent = null where id = ?",
 				[tenant.id],
 			);
 		});

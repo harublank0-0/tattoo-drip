@@ -17,8 +17,14 @@ export const THEME_KEYS = ["stencil-and-ink"] as const;
 export type ThemeKey = (typeof THEME_KEYS)[number];
 export const DEFAULT_THEME_KEY: ThemeKey = "stencil-and-ink";
 
-/** The studio page's sections that a theme can order and hide. */
-export const SECTION_KEYS = ["artists", "inquiry"] as const;
+/**
+ * The studio page's sections that a theme can order and hide: the newest
+ * photos (Recent work), the artists and the idea form. The platform keeps the
+ * same list (apps/platform/app/modules/storefront/look.ts, same order;
+ * look.spec.ts compares them). A new section is a key here and there, its
+ * place in each theme's `order` and a case in `StudioSection`.
+ */
+export const SECTION_KEYS = ["work", "artists", "inquiry"] as const;
 export type SectionKey = (typeof SECTION_KEYS)[number];
 
 export interface ThemeSections {
@@ -38,7 +44,7 @@ const sectionList = (...keys: SectionKey[]): readonly SectionKey[] =>
  */
 export const THEME_SECTIONS: Record<ThemeKey, ThemeSections> = Object.freeze({
 	"stencil-and-ink": Object.freeze({
-		order: sectionList("artists", "inquiry"),
+		order: sectionList("work", "artists", "inquiry"),
 		required: sectionList("inquiry"),
 	}),
 });

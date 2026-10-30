@@ -36,7 +36,7 @@ import {
 	sitaWithWork,
 } from "./fixtures.ts";
 import { assertSafePage } from "./safety.ts";
-import { IMAGE_ORIGIN } from "./theme-fixtures.ts";
+import { IMAGE_ORIGIN, withStorefront } from "./theme-fixtures.ts";
 
 /** The first element of `type` in a component's returned tree (the component is called, not rendered). */
 function findElement(node: ReactNode, type: string): ReactElement | undefined {
@@ -783,6 +783,178 @@ describe("the roster's work strip (TAT-116)", () => {
 		assertSafePage(html);
 		assert.doesNotMatch(html, /<script>alert/);
 		assert.doesNotMatch(html, /alert\(1\)/);
+	});
+});
+
+describe("Recent work on the studio page (TAT-126)", () => {
+	const SECTION = /<section id="recent-work"[\s\S]*?<\/section>/;
+	const homeWith = (
+		recentWork: unknown,
+		studio: Studio = STUDIO,
+		artists: Artist[] = [SITA, ARJUN],
+	) =>
+		renderToStaticMarkup(
+			createElement(StudioPage, {
+				data: studioPageData(studio, artists, ORIGIN, IMAGE_ORIGIN, recentWork),
+			}),
+		);
+	const recent = (html: string) => html.match(SECTION)?.[0] ?? "";
+	const sectionsConfig = (...types: string[]) =>
+		withStorefront({
+			theme: "stencil-and-ink",
+			sections: types.map((type) => ({ type })),
+		});
+
+	test("comes after the intro and before the artists, with the newest photos and All work", () => {
+		const html = homeWith(galleryPage(12));
+
+		assertSafePage(html);
+		const work = html.indexOf('<section id="recent-work"');
+		assert.ok(work > html.indexOf("profile-intro"), "after the intro");
+		assert.ok(
+			work < html.indexOf('<section id="artists"'),
+			"before the artists",
+		);
+		assert.ok(work < html.indexOf('id="inquiry"'), "before the form");
+		const section = recent(html);
+		assert.match(
+			section,
+			/^<section id="recent-work" class="section" aria-labelledby="recent-work-title"><h2 id="recent-work-title" class="section-title">Recent work<\/h2>/,
+		);
+		// The newest nine of the twelve, each opening its own viewer.
+		assert.equal(count(section, /<button [^>]*class="work-open"/g), 9);
+		assert.equal(count(section, /<dialog /g), 9);
+		assert.equal(count(html, /<ul class="work-grid" role="list">/g), 1);
+		// All work: a link to /work after the grid, its arrow hidden from screen readers.
+		const link = section.match(
+			/<a class="text-link" href="\/work">[\s\S]*?<\/a>/,
+		)?.[0];
+		assert.ok(link, "a link to /work");
+		assert.match(
+			link,
+			/^<a class="text-link" href="\/work"><span>All work<\/span><svg[^>]* aria-hidden="true"/,
+		);
+		assert.equal(
+			link.replace(/<svg[\s\S]*?<\/svg>/, "").replace(/<[^>]+>/g, ""),
+			"All work",
+		);
+		assert.ok(section.indexOf("</ul>") < section.indexOf('href="/work"'));
+		assert.equal(count(html, /href="\/work"/g), 1);
+	});
+
+	test("the photos load the copy that fits, lazily, like every grid", () => {
+		const grid =
+			recent(homeWith(galleryPage(3))).match(
+				/<img class="work-photo"[^>]*>/g,
+			) ?? [];
+
+		assert.equal(grid.length, 3);
+		for (const image of grid) {
+			assert.match(image, / loading="lazy"/);
+			assert.match(image, / sizes="/);
+			assert.match(image, / srcSet="/i);
+		}
+	});
+
+	test("no photos, no Recent work and no All work link", () => {
+		for (const none of [
+			null,
+			undefined,
+			galleryPage(0),
+			{ data: [] },
+			"broken",
+		]) {
+			const html = homeWith(none);
+			assertSafePage(html);
+			assert.equal(recent(html), "");
+			assert.doesNotMatch(html, /Recent work|All work/);
+			assert.equal(count(html, /href="\/work"/g), 0);
+		}
+		// An empty gallery leaves the page as it is without one.
+		assert.equal(homeWith(galleryPage(0)), homeWith(undefined));
+	});
+
+	test("a studio that hides Recent work shows none even with photos", () => {
+		const html = homeWith(galleryPage(5), sectionsConfig("artists", "inquiry"));
+
+		assertSafePage(html);
+		assert.equal(recent(html), "");
+		assert.doesNotMatch(html, /Recent work|All work|work-open|<dialog /);
+		assert.ok(html.includes('<section id="artists"'));
+	});
+
+	test("artists before Recent work when the configuration says so", () => {
+		const html = homeWith(
+			galleryPage(4),
+			sectionsConfig("artists", "work", "inquiry"),
+		);
+
+		const artists = html.indexOf('<section id="artists"');
+		const work = html.indexOf('<section id="recent-work"');
+		const form = html.indexOf('id="inquiry"');
+		assert.ok(artists > 0 && artists < work && work < form);
+	});
+
+	test("Recent work can come after the form", () => {
+		const html = homeWith(
+			galleryPage(4),
+			sectionsConfig("inquiry", "work", "artists"),
+		);
+
+		const order = ['id="inquiry"', 'id="recent-work"', 'id="artists"'].map(
+			(marker) => html.indexOf(marker),
+		);
+		assert.ok(order[0] > 0 && order[0] < order[1] && order[1] < order[2]);
+	});
+
+	test("an older API's configuration, [artists, inquiry], shows no Recent work even with photos", () => {
+		const html = homeWith(
+			galleryPage(5),
+			withStorefront({
+				theme: "stencil-and-ink",
+				sections: [{ type: "artists" }, { type: "inquiry" }],
+			}),
+		);
+
+		assert.equal(recent(html), "");
+	});
+
+	test("the viewer names the artist with a link, and the styles and healed mark", () => {
+		const html = homeWith(galleryPage(3));
+		const [first = ""] =
+			recent(html).match(/<dialog [^>]*>[\s\S]*?<\/dialog>/g) ?? [];
+
+		assert.match(
+			first,
+			/<div class="work-dialog-meta"><p><a class="text-link" href="\/artists\/sita"><bdi>Sita Rai<\/bdi><\/a><\/p><p>Fine line<\/p><p>Healed<\/p><\/div>/,
+		);
+		// A later photo has the artist link but no style and no healed mark.
+		const [, second = ""] =
+			recent(html).match(/<dialog [^>]*>[\s\S]*?<\/dialog>/g) ?? [];
+		assert.match(second, /<a class="text-link" href="\/artists\/sita">/);
+		assert.doesNotMatch(second, /Healed/);
+	});
+
+	test("a hostile description or artist name is text, never markup", () => {
+		const page = galleryPage(2);
+		const html = homeWith({
+			...page,
+			data: page.data.map((photo) => ({
+				...photo,
+				alt: '"><script>alert(1)</script>',
+				artist: { slug: "sita", name: "<img src=x onerror=alert(1)>" },
+			})),
+		});
+
+		assertSafePage(html);
+		assert.doesNotMatch(html, /<script>alert|<img src=x/);
+	});
+
+	test("the section never has more than nine photos, whatever the API sent", () => {
+		const section = recent(homeWith(galleryPage(30)));
+
+		assert.equal(count(section, /<button [^>]*class="work-open"/g), 9);
+		assert.equal(count(section, /<dialog /g), 9);
 	});
 });
 

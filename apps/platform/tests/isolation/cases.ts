@@ -389,7 +389,7 @@ export const isolationCases: IsolationCase[] = [
 			accent: "#0f766e",
 			accentDark: "",
 			font: "serif",
-			artists: "last",
+			"sections[]": ["inquiry", "artists"],
 		}),
 		ownStatus: 302,
 		snapshot: tenantRow,

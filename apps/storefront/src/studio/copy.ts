@@ -36,6 +36,8 @@ export const studioCopy = {
 		fallbackAlt: "Tattoo by {name}, photo {n} of {count}",
 		photoOf: "Photo {n} of {count}",
 		close: "Close",
+		/** The home page's section of the newest photos. */
+		recentTitle: "Recent work",
 		/** The link to the All work page (the home page's Recent work). */
 		allWork: "All work",
 		/** The All work page's heading. */

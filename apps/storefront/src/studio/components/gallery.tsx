@@ -1,7 +1,13 @@
+import { ArrowRight } from "lucide-react";
 import { studioCopy } from "../copy.ts";
-import type { GalleryPhotoView, GalleryView, WorkSearch } from "../gallery.ts";
+import {
+	type GalleryPhotoView,
+	type GalleryView,
+	RECENT_WORK_COUNT,
+	type WorkSearch,
+} from "../gallery.ts";
 import { showPhoto } from "../lightbox.ts";
-import { isAllowedHref } from "../links.ts";
+import { isAllowedHref, workHref } from "../links.ts";
 import { workGridSizes } from "../srcset.ts";
 
 /**
@@ -84,6 +90,34 @@ export function GalleryGrid({
 				</li>
 			))}
 		</ul>
+	);
+}
+
+/**
+ * The home page's Recent work (TAT-126): the studio's newest photos, at most
+ * nine, each with its artist in the viewer, and the way to all of them.
+ * Nothing when there are no photos (no empty heading, no All work link).
+ */
+export function RecentWork({ gallery }: { gallery: GalleryView }) {
+	const photos = gallery.photos.slice(0, RECENT_WORK_COUNT);
+	if (photos.length === 0) return null;
+	return (
+		<section
+			id="recent-work"
+			className="section"
+			aria-labelledby="recent-work-title"
+		>
+			<h2 id="recent-work-title" className="section-title">
+				{studioCopy.work.recentTitle}
+			</h2>
+			<GalleryGrid photos={photos} showArtist />
+			<p className="work-all">
+				<a className="text-link" href={workHref({})}>
+					<span>{studioCopy.work.allWork}</span>
+					<ArrowRight aria-hidden="true" />
+				</a>
+			</p>
+		</section>
 	);
 }
 

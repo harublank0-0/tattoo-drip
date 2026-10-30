@@ -745,11 +745,11 @@ components:
       properties:
         type:
           description: |
-            `artists` (the artists list) or `inquiry` (the idea form, always
-            listed). More will come: treat an unknown value as one to leave
-            out.
+            `work` (Recent work: the newest photos), `artists` (the artists
+            list) or `inquiry` (the idea form, always listed). More will
+            come: treat an unknown value as one to leave out.
           type: string
-          enum: [artists, inquiry]
+          enum: [work, artists, inquiry]
 
     StorefrontConfiguration:
       description: |
@@ -809,7 +809,7 @@ components:
           description: The sections to show, in order. The form is always there.
           type: array
           minItems: 1
-          maxItems: 2
+          maxItems: 3
           items: { $ref: "#/components/schemas/StorefrontSection" }
 
     Studio:

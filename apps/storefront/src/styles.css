@@ -251,6 +251,9 @@
   .work-filter-check { display: inline-flex; align-items: center; gap: 0.5rem; min-block-size: 3rem; font-weight: 600; overflow-wrap: anywhere; }
   .work-filter-check input { flex: none; inline-size: 1.25rem; block-size: 1.25rem; accent-color: var(--stencil); }
   .work-newest { margin-block-end: 1rem; }
+  .work-all { margin-block-start: 1rem; }
+  .work-all .text-link { gap: 0.5rem; }
+  .work-all svg { flex: none; inline-size: 1.25rem; block-size: 1.25rem; }
   .work-more-bar { display: grid; justify-items: start; margin-block-start: 1.5rem; }
   .work-more-bar .note { margin-block-start: 0.75rem; }
   .site-bar-logo { display: block; inline-size: auto; max-inline-size: 6rem; block-size: 2rem; margin-inline-end: 0.75rem; object-fit: contain; box-sizing: content-box; padding: 0.25rem; background: var(--logo-plate); border-radius: var(--radius); }

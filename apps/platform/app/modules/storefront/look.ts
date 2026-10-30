@@ -15,20 +15,26 @@ export const FONT_KEYS = ["eczar", "serif", "sans"] as const;
 export type FontKey = (typeof FONT_KEYS)[number];
 export const DEFAULT_FONT: FontKey = "eczar";
 
-export const SECTION_KEYS = ["artists", "inquiry"] as const;
+/**
+ * The studio page's sections an owner can show, hide and order: the newest
+ * photos, the artists and the idea form. The storefront's SECTION_KEYS is the
+ * same list in the same order (look.spec.ts compares them). A new section is
+ * a key here and there, its place in the storefront theme's `order`, and a
+ * line in the dashboard's SECTION_WORDS (inertia/components/page_look.ts).
+ */
+export const SECTION_KEYS = ["work", "artists", "inquiry"] as const;
 export type SectionKey = (typeof SECTION_KEYS)[number];
 
-/** Where the artists list goes; the inquiry section is always shown. */
-export const ARTIST_PLACEMENTS = {
-	first: ["artists", "inquiry"],
-	last: ["inquiry", "artists"],
-	hidden: ["inquiry"],
-} as const satisfies Record<string, readonly SectionKey[]>;
-export type ArtistPlacement = keyof typeof ARTIST_PLACEMENTS;
-export const ARTIST_PLACEMENT_KEYS = Object.keys(
-	ARTIST_PLACEMENTS,
-) as ArtistPlacement[];
-export const DEFAULT_SECTIONS = ARTIST_PLACEMENTS.first;
+/**
+ * What a new studio shows, in this order: the column's default
+ * (tenants.storefront_sections; the columns spec compares them) and the
+ * storefront theme's default order.
+ */
+export const DEFAULT_SECTIONS: readonly SectionKey[] = [
+	"work",
+	"artists",
+	"inquiry",
+];
 
 /** The themes an owner can pick, with the words the settings page shows. */
 export const THEMES: { key: ThemeKey; label: string; description: string }[] = [
@@ -98,10 +104,14 @@ function isOneOf<T extends string>(
 	);
 }
 
-/** A stored section list: known keys, each once, then "inquiry" if it was left out (the storefront's readSections). */
-export function sectionsOf(stored: string): SectionKey[] {
+/**
+ * A section list the page can use (the storefront's readSections): the known
+ * keys, each once, in the order given, then "inquiry" if it was left out, so
+ * the idea form is always on the page.
+ */
+export function sectionList(keys: readonly string[]): SectionKey[] {
 	const sections: SectionKey[] = [];
-	for (const key of stored.split(",")) {
+	for (const key of keys) {
 		if (isOneOf(SECTION_KEYS, key) && !sections.includes(key))
 			sections.push(key);
 	}
@@ -109,10 +119,9 @@ export function sectionsOf(stored: string): SectionKey[] {
 	return sections;
 }
 
-export function placementOf(sections: readonly SectionKey[]): ArtistPlacement {
-	const artists = sections.indexOf("artists");
-	if (artists === -1) return "hidden";
-	return artists < sections.indexOf("inquiry") ? "first" : "last";
+/** A stored section list (a comma list) as the page can use it. */
+export function sectionsOf(stored: string): SectionKey[] {
+	return sectionList(stored.split(","));
 }
 
 export type StoredLook = {

@@ -90,12 +90,47 @@ describe("readSections (TAT-54)", () => {
 	const items = (...types: unknown[]) =>
 		types.map((type) => ({ type, props: {} }));
 
-	test("the default theme orders and hides the artists; the inquiry section is required", () => {
-		assert.deepEqual(SECTION_KEYS, ["artists", "inquiry"]);
+	test("work is a section: the default order is work, artists, then inquiry", () => {
+		assert.deepEqual(SECTION_KEYS, ["work", "artists", "inquiry"]);
 		assert.deepEqual(THEME_SECTIONS["stencil-and-ink"], {
-			order: ["artists", "inquiry"],
+			order: ["work", "artists", "inquiry"],
 			required: ["inquiry"],
 		});
+		assert.deepEqual(readSections(undefined, "stencil-and-ink"), [
+			"work",
+			"artists",
+			"inquiry",
+		]);
+	});
+
+	test("an older API's [artists, inquiry] shows no Recent work", () => {
+		assert.deepEqual(
+			readSections(items("artists", "inquiry"), "stencil-and-ink"),
+			["artists", "inquiry"],
+		);
+		assert.deepEqual(readSections(items("artists"), "stencil-and-ink"), [
+			"artists",
+			"inquiry",
+		]);
+	});
+
+	test("work can be moved anywhere and hidden; the inquiry section stays", () => {
+		assert.deepEqual(
+			readSections(items("artists", "work", "inquiry"), "stencil-and-ink"),
+			["artists", "work", "inquiry"],
+		);
+		assert.deepEqual(
+			readSections(items("inquiry", "work"), "stencil-and-ink"),
+			["inquiry", "work"],
+		);
+		assert.deepEqual(readSections(items("work"), "stencil-and-ink"), [
+			"work",
+			"inquiry",
+		]);
+		assert.deepEqual(
+			readSections(items("work", "work", "inquiry"), "stencil-and-ink"),
+			["work", "inquiry"],
+		);
 	});
 
 	test("not a list: the theme's default order", () => {
@@ -108,7 +143,7 @@ describe("readSections (TAT-54)", () => {
 		]) {
 			assert.deepEqual(
 				readSections(value, "stencil-and-ink"),
-				["artists", "inquiry"],
+				["work", "artists", "inquiry"],
 				String(value),
 			);
 		}
@@ -518,7 +553,7 @@ describe("parseThemeConfig (TAT-54)", () => {
 	test("nothing sent (every studio today) is the default theme", () => {
 		assert.deepEqual(DEFAULT_THEME_CONFIG, {
 			key: "stencil-and-ink",
-			sections: ["artists", "inquiry"],
+			sections: ["work", "artists", "inquiry"],
 			accent: null,
 			accentDark: null,
 			font: "eczar",
@@ -545,7 +580,7 @@ describe("parseThemeConfig (TAT-54)", () => {
 	test("the default theme and the lists it points at can't be changed by whoever holds them", () => {
 		const defaults = {
 			key: "stencil-and-ink",
-			sections: ["artists", "inquiry"],
+			sections: ["work", "artists", "inquiry"],
 			accent: null,
 			accentDark: null,
 			font: "eczar",
@@ -581,6 +616,7 @@ describe("parseThemeConfig (TAT-54)", () => {
 		}, TypeError);
 		assert.deepEqual(parseThemeConfig(undefined, API), defaults);
 		assert.deepEqual(readSections(undefined, "stencil-and-ink"), [
+			"work",
 			"artists",
 			"inquiry",
 		]);

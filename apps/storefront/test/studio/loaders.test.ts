@@ -8,7 +8,7 @@ import {
 	seedStudio,
 } from "../../src/api/context.ts";
 import { SiteRef } from "../../src/site/context.ts";
-import { EMPTY_GALLERY } from "../../src/studio/gallery.ts";
+import { EMPTY_GALLERY, galleryView } from "../../src/studio/gallery.ts";
 import {
 	artistPageData,
 	loadArtistPage,
@@ -76,7 +76,9 @@ const VALIDATION_FAILED = {
 };
 
 describe("loadStudioPage", () => {
-	test("reads the artists once and the studio from the cache", async () => {
+	const TENANT = `${API}/api/v1/tenants/${STUDIO.slug}`;
+
+	test("reads the artists and the newest 9 photos once, and the studio from the cache", async () => {
 		const { calls, fetch } = listing();
 		const context = pageContext(fetch);
 
@@ -85,10 +87,174 @@ describe("loadStudioPage", () => {
 			studioPageData(STUDIO, [SITA, ARJUN], ORIGIN),
 		);
 		await loadStudioPage(context);
+		assert.deepEqual(calls.map((call) => call.url).sort(), [
+			`${TENANT}/artists`,
+			`${TENANT}/work?limit=9`,
+		]);
+	});
+
+	test("the studio page reads the artists and the newest 9 photos", async () => {
+		const { calls, fetch } = listing([SITA, ARJUN], galleryPage(9));
+		const data = await loadStudioPage(pageContext(fetch, STUDIO, IMAGE_ORIGIN));
+
+		assert.deepEqual(calls.map((call) => call.url).sort(), [
+			`${IMAGE_ORIGIN}/api/v1/tenants/${STUDIO.slug}/artists`,
+			`${IMAGE_ORIGIN}/api/v1/tenants/${STUDIO.slug}/work?limit=9`,
+		]);
+		assert.equal(data.recentWork.photos.length, 9);
 		assert.deepEqual(
-			calls.map((call) => call.url),
-			[`${API}/api/v1/tenants/${STUDIO.slug}/artists`],
+			data.recentWork,
+			galleryView(galleryPage(9), IMAGE_ORIGIN),
 		);
+		assert.equal(data.recentWork.photos[0].artist?.href, "/artists/sita");
+	});
+
+	test("studioPageData takes the work answer as it came, and none is no photos", () => {
+		const page = galleryPage(4);
+
+		assert.deepEqual(
+			studioPageData(STUDIO, [SITA], ORIGIN, IMAGE_ORIGIN, page).recentWork,
+			galleryView(page, IMAGE_ORIGIN),
+		);
+		for (const none of [undefined, null, "broken", {}, { data: "x" }]) {
+			assert.deepEqual(
+				studioPageData(STUDIO, [SITA], ORIGIN, IMAGE_ORIGIN, none).recentWork,
+				EMPTY_GALLERY,
+				String(none),
+			);
+		}
+		// Without the API's origin no photo is kept.
+		assert.deepEqual(
+			studioPageData(STUDIO, [SITA], ORIGIN, null, page).recentWork.photos,
+			[],
+		);
+	});
+
+	describe("a work read that fails still gives the studio page, with an empty Recent work", () => {
+		/** What each failure is logged as: the studio, the status and the code. */
+		const FAILURES: Array<{
+			name: string;
+			respond: () => Response;
+			logged: { status: number; code: string };
+		}> = [
+			{
+				name: "a platform without /work (404)",
+				respond: () => json(404, NOT_FOUND),
+				logged: { status: 404, code: "not_found" },
+			},
+			{
+				name: "a 500",
+				respond: () =>
+					json(500, {
+						error: { code: "internal_error", message: "Boom in /secret/path." },
+					}),
+				logged: { status: 500, code: "internal_error" },
+			},
+			{
+				name: "a refused read (422)",
+				respond: () => json(422, VALIDATION_FAILED),
+				logged: { status: 422, code: "validation_failed" },
+			},
+			{
+				name: "a network error",
+				respond: () => {
+					throw new TypeError("fetch failed: http://api.test/secret");
+				},
+				logged: { status: 0, code: "network_error" },
+			},
+		];
+		const withArtists = (respondToWork: () => Response) =>
+			fakeFetch(({ url }) =>
+				url.endsWith("/artists")
+					? json(200, { data: [SITA, ARJUN] })
+					: respondToWork(),
+			);
+
+		for (const { name, respond, logged } of FAILURES) {
+			test(`${name} logs the studio, status and code once, and the page still has its artists`, async (t) => {
+				const log = t.mock.method(console, "error", () => {});
+				const data = await loadStudioPage(
+					pageContext(withArtists(respond).fetch),
+				);
+
+				assert.equal(data.artists.length, 2);
+				assert.equal(data.inquiry.kind, "open");
+				assert.deepEqual(data.recentWork, EMPTY_GALLERY);
+				assert.deepEqual(
+					log.mock.calls.map((call) => call.arguments),
+					[["Recent work read failed", { slug: STUDIO.slug, ...logged }]],
+				);
+			});
+		}
+
+		test("what is not an API error is logged without its status, code or text", async (t) => {
+			const log = t.mock.method(console, "error", () => {});
+			const { fetch } = listing();
+			const context = pageContext(fetch);
+			const query = context.queryClient.query.bind(context.queryClient);
+			t.mock.method(
+				context.queryClient,
+				"query",
+				(options: { queryKey: readonly unknown[] }) => {
+					// Only the gallery read breaks; the studio and the artists read as before.
+					if (options.queryKey.includes("work")) {
+						throw new TypeError("a bug at http://api.test/secret");
+					}
+					return query(options as never);
+				},
+			);
+			const data = await loadStudioPage(context);
+
+			assert.deepEqual(data.recentWork, EMPTY_GALLERY);
+			assert.deepEqual(
+				log.mock.calls.map((call) => call.arguments),
+				[
+					[
+						"Recent work read failed",
+						{ slug: STUDIO.slug, status: undefined, code: undefined },
+					],
+				],
+			);
+		});
+
+		test("the line holds no error, address or key", async (t) => {
+			const log = t.mock.method(console, "error", () => {});
+			for (const { respond } of FAILURES) {
+				await loadStudioPage(pageContext(withArtists(respond).fetch));
+			}
+
+			const written = JSON.stringify(log.mock.calls.map((c) => c.arguments));
+			assert.equal(log.mock.calls.length, FAILURES.length);
+			for (const secret of ["secret", "api.test", "Boom", "cursor"]) {
+				assert.ok(!written.includes(secret), secret);
+			}
+		});
+
+		test("a work read that works logs nothing", async (t) => {
+			const log = t.mock.method(console, "error", () => {});
+			const { fetch } = listing([SITA, ARJUN], galleryPage(5));
+			const data = await loadStudioPage(
+				pageContext(fetch, STUDIO, IMAGE_ORIGIN),
+			);
+
+			assert.equal(data.recentWork.photos.length, 5);
+			assert.equal(log.mock.calls.length, 0);
+		});
+
+		test("the artists failing is still an error: only the work read degrades", async (t) => {
+			t.mock.method(console, "error", () => {});
+			const { fetch } = fakeFetch(({ url }) =>
+				url.endsWith("/artists")
+					? json(500, { error: { code: "internal_error", message: "Boom." } })
+					: json(200, galleryPage(3)),
+			);
+
+			await assert.rejects(
+				loadStudioPage(pageContext(fetch, STUDIO, IMAGE_ORIGIN)),
+				(error: unknown) =>
+					error instanceof TattooApiError && !isNotFound(error),
+			);
+		});
 	});
 
 	test("a closed studio's page takes no inquiry", async () => {
@@ -99,7 +265,8 @@ describe("loadStudioPage", () => {
 		assert.equal(data.inquiry.kind, "studio-closed");
 	});
 
-	test("the API failing is an error, not a not-found", async () => {
+	test("the API failing is an error, not a not-found", async (t) => {
+		t.mock.method(console, "error", () => {});
 		for (const respond of [
 			() => json(500, { error: { code: "internal_error", message: "Boom." } }),
 			() =>
@@ -117,7 +284,8 @@ describe("loadStudioPage", () => {
 		}
 	});
 
-	test("the list's own not_found (the studio went away) is a not-found", async () => {
+	test("the list's own not_found (the studio went away) is a not-found", async (t) => {
+		t.mock.method(console, "error", () => {});
 		const { fetch } = fakeFetch(() => json(404, NOT_FOUND));
 		await assert.rejects(loadStudioPage(pageContext(fetch)), notFound);
 	});

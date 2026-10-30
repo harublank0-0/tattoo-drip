@@ -2,7 +2,9 @@ import testUtils from "@adonisjs/core/services/test_utils";
 import { errors as lucidErrors } from "@adonisjs/lucid";
 import { test } from "@japa/runner";
 import Tenant from "#modules/tenancy/models/tenant";
-import TenancyService from "#modules/tenancy/services/tenancy_service";
+import TenancyService, {
+	type PageLookInput,
+} from "#modules/tenancy/services/tenancy_service";
 import { withDbContext } from "#services/db_context";
 import {
 	inTenant,
@@ -14,18 +16,18 @@ import {
 const reload = (tenant: { id: string }) =>
 	inTenant(tenant, () => Tenant.findOrFail(tenant.id));
 
-const LOOK = {
+const LOOK: PageLookInput = {
 	theme: "stencil-and-ink",
 	accent: "#0f766e",
 	accentDark: "#a99cff",
 	font: "serif",
-	artists: "hidden",
-} as const;
+	sections: ["inquiry"],
+};
 
 test.group("TenancyService.updateLook (TAT-56)", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 
-	test("writes the five look columns; an artists placement becomes its section list", async ({
+	test("writes the five look columns; the sections become their comma list", async ({
 		assert,
 	}) => {
 		const { tenant } = await studioWithOwner();
@@ -42,17 +44,32 @@ test.group("TenancyService.updateLook (TAT-56)", (group) => {
 		await inTenant(tenant, () =>
 			new TenancyService().updateLook(tenant, {
 				...LOOK,
-				artists: "last",
+				sections: ["inquiry", "artists"],
 			}),
 		);
 		assert.equal((await reload(tenant)).storefrontSections, "inquiry,artists");
 		await inTenant(tenant, () =>
 			new TenancyService().updateLook(tenant, {
 				...LOOK,
-				artists: "first",
+				sections: ["work", "artists", "inquiry"],
 			}),
 		);
-		assert.equal((await reload(tenant)).storefrontSections, "artists,inquiry");
+		assert.equal(
+			(await reload(tenant)).storefrontSections,
+			"work,artists,inquiry",
+		);
+	});
+
+	test("a list without the form is stored with it at the end", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+
+		await inTenant(tenant, () =>
+			new TenancyService().updateLook(tenant, { ...LOOK, sections: ["work"] }),
+		);
+
+		assert.equal((await reload(tenant)).storefrontSections, "work,inquiry");
 	});
 
 	test("null colours clear the stored ones", async ({ assert }) => {
@@ -115,7 +132,7 @@ test.group("TenancyService.updateLook (TAT-56)", (group) => {
 		const row = await reload(a.tenant);
 		assert.equal(row.brandFont, "eczar");
 		assert.isNull(row.brandAccent);
-		assert.equal(row.storefrontSections, "artists,inquiry");
+		assert.equal(row.storefrontSections, "work,artists,inquiry");
 		assert.equal((await reload(b.tenant)).brandFont, "eczar");
 	});
 });

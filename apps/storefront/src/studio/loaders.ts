@@ -13,6 +13,7 @@ import {
 	type GalleryView,
 	galleryView,
 	type PortfolioSearch,
+	RECENT_WORK_COUNT,
 	WORK_PAGE_SIZE,
 	type WorkSearch,
 	workQuery,
@@ -58,6 +59,12 @@ export interface StudioPageData {
 	readonly seo: PageSeo;
 	/** The studio's theme (TAT-54): its key, sections and checked branding. */
 	readonly theme: ThemeConfig;
+	/**
+	 * The studio's newest photos for the Recent work section (TAT-126), at most
+	 * RECENT_WORK_COUNT. Empty when there are none or the read failed, which
+	 * leaves the section out.
+	 */
+	readonly recentWork: GalleryView;
 }
 
 export interface ArtistPageData {
@@ -106,13 +113,15 @@ export interface WorkPageData {
 /**
  * The studio page's data. `imageOrigin` is the API's origin, the only one a
  * logo, cover or work photo may come from (TAT-54, TAT-116); null accepts
- * none.
+ * none. `recentWork` is the gallery read for the newest photos, as the API
+ * sent it (galleryView checks it); none is an empty Recent work.
  */
 export function studioPageData(
 	studio: Studio,
 	artists: readonly Artist[],
 	origin: string,
 	imageOrigin: string | null = null,
+	recentWork: unknown = null,
 ): StudioPageData {
 	const studioView = studioViewModel(studio);
 	const artistViews = artistViewModels(artists, imageOrigin);
@@ -124,6 +133,7 @@ export function studioPageData(
 		channels: channelsFor(studioView, inquiry),
 		seo: studioPageSeo(studioView, artistViews, origin),
 		theme: parseThemeConfig(storefrontInput(studio), imageOrigin),
+		recentWork: galleryView(recentWork, imageOrigin),
 	};
 }
 
@@ -185,19 +195,25 @@ export function workPageData(
 	};
 }
 
-/** `/`: the studio (already cached by the tenant middleware) and its artists. */
+/**
+ * `/`: the studio (already cached by the tenant middleware), its artists and
+ * its newest photos for Recent work (loadRecentWork: a failed read leaves the
+ * section out, never the page).
+ */
 export async function loadStudioPage(
 	context: PageContext,
 ): Promise<StudioPageData> {
-	const [studio, artists] = await Promise.all([
+	const [studio, artists, recentWork] = await Promise.all([
 		loadStudio(context),
 		loadArtists(context),
+		loadRecentWork(context),
 	]);
 	return studioPageData(
 		studio,
 		artists,
 		context.site.origin,
 		context.tattoo.connection.apiUrl,
+		recentWork,
 	);
 }
 
@@ -294,14 +310,14 @@ function refusedTheAddress(error: unknown): boolean {
  * that won't load is no reason to lose it.
  */
 async function loadPortfolio(
-	{ queryClient, tattoo }: ApiContext,
+	context: ApiContext,
 	slug: string,
 	search: PortfolioSearch,
 ): Promise<PortfolioRead> {
 	try {
-		const page = await queryClient.query({
+		const page = await context.queryClient.query({
 			...tattooQueries.work(
-				tattoo.client,
+				context.tattoo.client,
 				workQuery({ artist: slug, ...search }, WORK_PAGE_SIZE),
 			),
 			staleTime: "static",
@@ -309,18 +325,51 @@ async function loadPortfolio(
 		return { page, search };
 	} catch (error) {
 		if (refusedTheAddress(error)) throw notFound();
-		// The page stands without its portfolio, so say so where an operator
-		// looks: a platform without `/work`, a timeout or a bug here would
-		// otherwise leave every artist page without one, all of them 200s. Like
-		// the tenant lookup's line (src/tenancy/handle.ts): the studio, the
-		// status and the code, never the error, the address, a cursor or a key.
-		console.error("Portfolio read failed", {
-			slug: tattoo.connection.tenant,
-			status: isTattooApiError(error) ? error.status : undefined,
-			code: isTattooApiError(error) ? error.code : undefined,
-		});
+		logReadFailed("Portfolio", context, error);
 		return NO_PORTFOLIO;
 	}
+}
+
+/**
+ * The studio's newest photos for the home page's Recent work, as the API sent
+ * them (null when the read failed). Any failure (an older platform's 404, a
+ * 422, a 5xx, the network) is logged and leaves Recent work out and the page
+ * standing: the studio page is how a client reaches the studio, and a gallery
+ * that won't load is no reason to lose it (it also makes the deploy order
+ * safe: this storefront can run against a platform without `/work`).
+ */
+async function loadRecentWork(context: ApiContext): Promise<unknown> {
+	try {
+		return await context.queryClient.query({
+			...tattooQueries.work(
+				context.tattoo.client,
+				workQuery({}, RECENT_WORK_COUNT),
+			),
+			staleTime: "static",
+		});
+	} catch (error) {
+		logReadFailed("Recent work", context, error);
+		return null;
+	}
+}
+
+/**
+ * Says where an operator looks that a page is standing without a read: a
+ * platform without `/work`, a timeout or a bug here would otherwise leave
+ * every page without its photos, all of them 200s. Like the tenant lookup's
+ * line (src/tenancy/handle.ts): the studio, the status and the code, never
+ * the error, the address, a cursor or a key.
+ */
+function logReadFailed(
+	what: string,
+	{ tattoo }: ApiContext,
+	error: unknown,
+): void {
+	console.error(`${what} read failed`, {
+		slug: tattoo.connection.tenant,
+		status: isTattooApiError(error) ? error.status : undefined,
+		code: isTattooApiError(error) ? error.code : undefined,
+	});
 }
 
 async function loadWork(

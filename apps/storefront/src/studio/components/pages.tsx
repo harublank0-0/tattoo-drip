@@ -14,7 +14,7 @@ import type { StudioView } from "../view-model.ts";
 import { ArtistProfile, ArtistRoster } from "./artists.tsx";
 import { BrandCover, BrandLogo } from "./brand.tsx";
 import { ContactBlock } from "./contact.tsx";
-import { HealedFilter, WorkFilters } from "./gallery.tsx";
+import { HealedFilter, RecentWork, WorkFilters } from "./gallery.tsx";
 import { InquirySection } from "./inquiry.tsx";
 import { BookingStrip } from "./steps.tsx";
 
@@ -108,7 +108,8 @@ export function StudioPage({
 
 /**
  * One of the studio page's sections, in the order the theme's config gives
- * (TAT-54). The inquiry section is always one of them (readSections).
+ * (TAT-54): Recent work (TAT-126), the artists and the inquiry section, which
+ * is always one of them (readSections).
  */
 function StudioSection({
 	section,
@@ -120,6 +121,8 @@ function StudioSection({
 	challengeSiteKey: string | null;
 }) {
 	switch (section) {
+		case "work":
+			return <RecentWork gallery={data.recentWork} />;
 		case "artists":
 			return <ArtistRoster artists={data.artists} />;
 		case "inquiry":

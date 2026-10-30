@@ -4,10 +4,9 @@ import { tenantContext } from "#middleware/tenant_middleware";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
 import {
-	ARTIST_PLACEMENT_KEYS,
 	FONTS,
 	lookOf,
-	placementOf,
+	SECTION_KEYS,
 	THEME_ACCENT,
 	THEME_ACCENT_DARK,
 	THEMES,
@@ -50,11 +49,11 @@ export default class PageLookController {
 				accent: look.accent,
 				accentDark: look.accentDark,
 				font: look.font,
-				artists: placementOf(look.sections),
+				sections: look.sections,
 			},
 			themes: THEMES,
 			fonts: FONTS,
-			placements: ARTIST_PLACEMENT_KEYS,
+			sectionKeys: [...SECTION_KEYS],
 			// Where an empty colour box starts its swatch.
 			swatches: { light: THEME_ACCENT, dark: THEME_ACCENT_DARK },
 			// The logo's 640 px copy for the preview, never the key or the columns.
