@@ -47,7 +47,7 @@ const DEFAULT_STOREFRONT = {
 		colors: { accent: null, accentDark: null },
 		font: "eczar",
 	},
-	sections: [{ type: "artists" }, { type: "inquiry" }],
+	sections: [{ type: "work" }, { type: "artists" }, { type: "inquiry" }],
 };
 
 const PROFILE: TenantProfile = {
@@ -333,7 +333,7 @@ test.group("GET /api/v1/tenants/:tenant (getStudio)", (group) => {
 				accent: "#0f766e",
 				accentDark: "#a99cff",
 				font: "serif",
-				artists: "hidden",
+				sections: ["inquiry"],
 			}),
 		);
 
@@ -362,7 +362,7 @@ test.group("GET /api/v1/tenants/:tenant (getStudio)", (group) => {
 				accent: null,
 				accentDark: null,
 				font: "eczar",
-				artists: "last",
+				sections: ["inquiry", "artists"],
 			}),
 		);
 
@@ -440,7 +440,7 @@ test.group("GET /api/v1/tenants/:tenant (getStudio)", (group) => {
 				accent: "#0f766e",
 				accentDark: null,
 				font: "eczar",
-				artists: "first",
+				sections: ["work", "artists", "inquiry"],
 			}),
 		);
 		const saved = await client.get(url).header("if-none-match", bareTag);

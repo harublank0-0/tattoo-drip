@@ -17,7 +17,8 @@ export type StorefrontConfiguration = Schemas["StorefrontConfiguration"];
 export type Studio = Schemas["Studio"];
 export type Artist = Schemas["Artist"];
 export type Service = Schemas["Service"];
-export type PortfolioProject = Schemas["PortfolioProject"];
+export type GalleryPhoto = Schemas["GalleryPhoto"];
+export type WorkFilters = Schemas["WorkFilters"];
 export type Slot = Schemas["Slot"];
 export type SourceChannel = Schemas["SourceChannel"];
 export type InquiryInput = Schemas["InquiryInput"];
@@ -31,10 +32,10 @@ export type DepositProofForm = Schemas["DepositProofForm"];
 export type ListServicesQuery = NonNullable<
 	operations["listServices"]["parameters"]["query"]
 >;
-export type ListPortfolioQuery = NonNullable<
-	operations["listPortfolio"]["parameters"]["query"]
+export type ListWorkQuery = NonNullable<
+	operations["listWork"]["parameters"]["query"]
 >;
 export type ListAvailabilityQuery =
 	operations["listAvailability"]["parameters"]["query"];
-export type PortfolioPage =
-	operations["listPortfolio"]["responses"][200]["content"]["application/json"];
+export type WorkPage =
+	operations["listWork"]["responses"][200]["content"]["application/json"];

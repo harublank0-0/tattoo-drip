@@ -118,7 +118,6 @@ test.group("The page look components (TAT-56)", () => {
 		for (const [name, stored] of [
 			["theme", "look.theme"],
 			["font", "look.font"],
-			["artists", "look.artists"],
 		]) {
 			const group = new RegExp(`<RadioGroup\\s[^>]*name="${name}"[^>]*>`).exec(
 				page,
@@ -198,7 +197,7 @@ test.group("The page look components (TAT-56)", () => {
 	// takes aria-describedby and aria-invalid), as the colour boxes tie theirs to the input.
 	test("each radio group's error is tied to the group", async ({ assert }) => {
 		const page = await read("pages/settings/look.tsx");
-		for (const name of ["theme", "font", "artists"]) {
+		for (const name of ["theme", "font"]) {
 			const group = new RegExp(`<RadioGroup\\s[^>]*name="${name}"[^>]*>`).exec(
 				page,
 			)?.[0];
@@ -222,11 +221,47 @@ test.group("The page look components (TAT-56)", () => {
 				`${name}'s error has the id the group points at`,
 			);
 		}
-		// The two groups with a sentence under their legend point at it too.
-		for (const name of ["font", "artists"]) {
-			assert.include(page, `id="${name}-help"`);
-			assert.include(page, `${name}-help`);
-		}
+		// The group with a sentence under its legend points at it too.
+		assert.include(page, 'id="font-help"');
+		assert.include(page, "font-help");
+	});
+
+	// TAT-126: the sections list is rows, not a radio group. It follows its stored list in place
+	// like the groups (no key), sends one hidden `sections[]` per shown row in the rows' order,
+	// names each move button for its section and puts focus back on a button after a move.
+	test("the sections list follows its stored list in place and sends the shown rows in order", async ({
+		assert,
+	}) => {
+		const page = await read("pages/settings/look.tsx");
+		assert.include(page, "useStoredRows(look.sections, sectionKeys)");
+		assert.notMatch(page, /<RadioGroup\s[^>]*name="artists"/);
+		assert.notInclude(page, "PLACEMENT");
+		const hidden =
+			/<input\s[^>]*type="hidden"[^>]*name="sections\[\]"[^>]*\/>/.exec(
+				page,
+			)?.[0];
+		assert.isDefined(hidden, "each shown row sends a hidden sections[]");
+		assert.include(page, "sentSections(rows)");
+		assert.include(page, "moveSectionLabel(");
+		assert.include(page, "focusAfterMove(");
+		assert.include(page, "toggleRow(");
+		assert.include(page, "moveRow(");
+		// Rows are keyed by their section, so a move reorders the same nodes.
+		assert.match(page, /<li\s[^>]*key=\{row\.key\}/);
+		assert.notMatch(page, /\bkey=\{`?(look|JSON)/);
+	});
+
+	test("the sections list's error is tied to the list, and the form row cannot be unchecked", async ({
+		assert,
+	}) => {
+		const page = await read("pages/settings/look.tsx");
+		assert.match(
+			page,
+			/<FieldError\s+id="sections-error">\s*\{error\}\s*<\/FieldError>/,
+		);
+		assert.include(page, "sections-help sections-error");
+		assert.include(page, "REQUIRED_SECTION");
+		assert.include(page, "Always shown");
 	});
 
 	test("Remove logo asks first, and says what happens", async ({ assert }) => {

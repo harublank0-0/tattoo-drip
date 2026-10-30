@@ -26,13 +26,51 @@ export const studioCopy = {
 		visit: "Visit",
 		map: "Open in Google Maps",
 	},
-	/** The artists' work photos (TAT-116). Templates hold {name}, {n} and {count}. */
+	/**
+	 * The artists' work photos (TAT-116) and the gallery of them (TAT-126).
+	 * Templates hold {name}, {n} and {count}.
+	 */
 	work: {
 		title: "Work",
 		seeWork: "See work by {name}",
 		fallbackAlt: "Tattoo by {name}, photo {n} of {count}",
 		photoOf: "Photo {n} of {count}",
 		close: "Close",
+		/** The home page's section of the newest photos. */
+		recentTitle: "Recent work",
+		/** The link to the All work page (the home page's Recent work). */
+		allWork: "All work",
+		/** The All work page's heading. */
+		pageTitle: "All work",
+		showMore: "Show more",
+		loadingMore: "Loading…",
+		moreFailed: "Couldn't load more photos. Try again.",
+		/** From a later page back to the first. */
+		newest: "Back to the newest",
+		empty: "No photos yet.",
+		noMatch: "No photos match these filters.",
+		showAll: "Show all work",
+		noHealed: "No healed photos yet.",
+		/** The mark in the viewer, and the artist page's second filter. */
+		healed: "Healed",
+		/** The artist page's All / Healed links, named for screen readers. */
+		filterNav: "Which photos",
+		all: "All",
+		/** A gallery photo's alt when the studio wrote none; the second has no usable artist. */
+		galleryAlt: "Tattoo by {name}, photo {n}",
+		galleryAltNoName: "Tattoo, photo {n}",
+		/** The gallery viewer's label (no total: more may be on the way). */
+		photoN: "Photo {n}",
+		/** The All work page's form. */
+		filters: {
+			label: "Filter the photos",
+			artist: "Artist",
+			anyArtist: "All artists",
+			style: "Style",
+			anyStyle: "All styles",
+			healedOnly: "Healed only",
+			apply: "Show photos",
+		},
 	},
 	/** The artist page's two lists, named for screen readers (TAT-125). */
 	artist: {

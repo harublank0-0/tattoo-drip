@@ -74,7 +74,6 @@ export const TENANT_ROUTE_ROLES = {
 	// (WorkPhotoService.findEditable, re-checked under the artist's row lock).
 	"tenant.artists.photos.store": MEMBERS,
 	"tenant.artists.photos.update": MEMBERS,
-	"tenant.artists.photos.move": MEMBERS,
 	"tenant.artists.photos.destroy": MEMBERS,
 
 	// The inquiry inbox: reference images stay private to owners until a

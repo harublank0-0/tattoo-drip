@@ -11,6 +11,7 @@ import {
 } from "./site/context.ts";
 import { createRequestSite } from "./site/request.ts";
 import { NotFoundPage, RouteErrorPage } from "./studio/components/pages.tsx";
+import { parsePlainSearch, stringifyPlainSearch } from "./studio/search.ts";
 
 type Dehydrated = DehydratedApi & DehydratedSite;
 
@@ -32,6 +33,10 @@ export function getRouter() {
 	const router = createTanStackRouter({
 		routeTree,
 		context: { queryClient: api.queryClient, tattoo: api.tattoo, site },
+		// The address's values stay the strings they are: the default reads them as
+		// JSON, so a slug like `true` or `1e2` arrived as a boolean or another number.
+		parseSearch: parsePlainSearch,
+		stringifySearch: stringifyPlainSearch,
 		scrollRestoration: true,
 		// Never the href: a deposit link's token is in its fragment (TAT-65b).
 		getScrollRestorationKey: scrollRestorationKey,

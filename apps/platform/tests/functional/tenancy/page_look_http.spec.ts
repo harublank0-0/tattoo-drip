@@ -3,8 +3,8 @@ import type { ApiClient } from "@japa/api-client";
 import { test } from "@japa/runner";
 import type User from "#models/user";
 import {
-	ARTIST_PLACEMENT_KEYS,
 	FONTS,
+	SECTION_KEYS,
 	THEME_ACCENT,
 	THEME_ACCENT_DARK,
 	THEMES,
@@ -31,7 +31,9 @@ const BODY = {
 	accent: "#0f766e",
 	accentDark: "#a99cff",
 	font: "serif",
-	artists: "last",
+	// What the page posts: one `sections[]` for each shown row, in order. (A single value would
+	// be read as a string, not a list: the field name carries the brackets.)
+	"sections[]": ["inquiry", "artists"],
 };
 
 const putLook = (
@@ -69,11 +71,12 @@ test.group("Settings, Page look: the page (TAT-56)", (group) => {
 			accent: null,
 			accentDark: null,
 			font: "eczar",
-			artists: "first",
+			sections: ["work", "artists", "inquiry"],
 		});
 		assert.deepEqual(props.themes, THEMES);
 		assert.deepEqual(props.fonts, FONTS);
-		assert.deepEqual(props.placements, ARTIST_PLACEMENT_KEYS);
+		assert.deepEqual(props.sectionKeys, [...SECTION_KEYS]);
+		assert.notProperty(props, "placements");
 		assert.deepEqual(props.swatches, {
 			light: THEME_ACCENT,
 			dark: THEME_ACCENT_DARK,
@@ -101,8 +104,41 @@ test.group("Settings, Page look: the page (TAT-56)", (group) => {
 			accent: "#0f766e",
 			accentDark: "#a99cff",
 			font: "serif",
-			artists: "last",
+			sections: ["inquiry", "artists"],
 		});
+	});
+
+	test("the page offers every section and the stored order", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		await putLook(client, owner, tenant, {
+			...BODY,
+			"sections[]": ["artists", "work", "inquiry"],
+		});
+
+		const props = (await lookPage(client, owner, tenant)).inertiaProps;
+
+		assert.deepEqual(props.sectionKeys, ["work", "artists", "inquiry"]);
+		assert.deepEqual(props.look.sections, ["artists", "work", "inquiry"]);
+	});
+
+	test("a stored list from before Recent work shows without it", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		await inTenant(tenant, () =>
+			Tenant.query()
+				.where("id", tenant.id)
+				.update({ storefrontSections: "artists,inquiry" }),
+		);
+
+		const props = (await lookPage(client, owner, tenant)).inertiaProps;
+
+		assert.deepEqual(props.look.sections, ["artists", "inquiry"]);
+		assert.deepEqual(props.sectionKeys, ["work", "artists", "inquiry"]);
 	});
 
 	test("a stored value off today's list shows as its default", async ({
@@ -169,23 +205,114 @@ test.group("Settings, Page look: saving (TAT-56)", (group) => {
 		assert.isNull(row.brandAccentDark);
 	});
 
-	test("every artists placement is stored as its section list", async ({
+	test("saves the sections in the order sent", async ({ client, assert }) => {
+		const { owner, tenant } = await studioWithOwner();
+
+		const response = await putLook(client, owner, tenant, {
+			...BODY,
+			"sections[]": ["artists", "work", "inquiry"],
+		});
+
+		response.assertStatus(302);
+		assert.equal(
+			(await reload(tenant)).storefrontSections,
+			"artists,work,inquiry",
+		);
+	});
+
+	test("reads sections[] sent as a multipart form too", async ({
 		client,
 		assert,
 	}) => {
 		const { owner, tenant } = await studioWithOwner();
-		const stored: Record<string, string> = {};
 
-		for (const artists of ARTIST_PLACEMENT_KEYS) {
-			await putLook(client, owner, tenant, { ...BODY, artists });
-			stored[artists] = (await reload(tenant)).storefrontSections;
-		}
+		const response = await client
+			.put(`/t/${tenant.slug}/settings/look`)
+			.fields({
+				theme: "stencil-and-ink",
+				accent: "",
+				accentDark: "",
+				font: "eczar",
+				"sections[]": ["inquiry", "work"],
+			})
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
 
-		assert.deepEqual(stored, {
-			first: "artists,inquiry",
-			last: "inquiry,artists",
-			hidden: "inquiry",
+		response.assertStatus(302);
+		assert.equal((await reload(tenant)).storefrontSections, "inquiry,work");
+	});
+
+	test("a list without the form gets it at the end", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+
+		const response = await putLook(client, owner, tenant, {
+			...BODY,
+			"sections[]": ["work"],
 		});
+
+		response.assertStatus(302);
+		assert.equal((await reload(tenant)).storefrontSections, "work,inquiry");
+	});
+
+	test("showing only the form hides Recent work and artists", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+
+		await putLook(client, owner, tenant, {
+			...BODY,
+			"sections[]": ["inquiry"],
+		});
+
+		assert.equal((await reload(tenant)).storefrontSections, "inquiry");
+		const { look } = (await lookPage(client, owner, tenant)).inertiaProps;
+		assert.deepEqual(look.sections, ["inquiry"]);
+	});
+
+	test("an unknown or repeated section is a field error and nothing changes", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const cases: [string, string[], string, string][] = [
+			[
+				"an unknown section",
+				["flash", "inquiry"],
+				"sections.0",
+				"Choose sections from the list.",
+			],
+			[
+				"a section twice",
+				["work", "work", "inquiry"],
+				"sections",
+				"Show each section once.",
+			],
+			[
+				"the form twice",
+				["inquiry", "inquiry"],
+				"sections",
+				"Show each section once.",
+			],
+		];
+
+		for (const [name, sections, field, message] of cases) {
+			const response = await putLook(client, owner, tenant, {
+				...BODY,
+				"sections[]": sections,
+			});
+			// Not assertValidationError: it reads "sections.0" as a nested path.
+			const errors = response.flashMessage("inputErrorsBag") ?? {};
+			assert.deepEqual(Object.keys(errors), [field], name);
+			assert.deepEqual(errors[field], [message], name);
+			const row = await reload(tenant);
+			assert.equal(row.storefrontSections, "work,artists,inquiry", name);
+			assert.equal(row.brandFont, "eczar", name);
+		}
 	});
 
 	test("a refused value is a field error and nothing is stored", async ({
@@ -245,12 +372,6 @@ test.group("Settings, Page look: saving (TAT-56)", (group) => {
 				"theme",
 				"Choose one of the themes.",
 			],
-			[
-				"an unknown placement",
-				{ artists: "middle" },
-				"artists",
-				"Choose where the artists list goes.",
-			],
 		];
 
 		for (const [name, change, field, message] of cases) {
@@ -263,7 +384,7 @@ test.group("Settings, Page look: saving (TAT-56)", (group) => {
 			assert.equal(row.brandFont, "eczar", name);
 			assert.isNull(row.brandAccent, name);
 			assert.isNull(row.brandAccentDark, name);
-			assert.equal(row.storefrontSections, "artists,inquiry", name);
+			assert.equal(row.storefrontSections, "work,artists,inquiry", name);
 		}
 	});
 
@@ -283,6 +404,26 @@ test.group("Settings, Page look: saving (TAT-56)", (group) => {
 		const row = await reload(tenant);
 		assert.equal(row.brandFont, "eczar");
 		assert.isNull(row.brandAccent);
+	});
+
+	test("a request that leaves the sections out gets a plain message, and nothing is stored", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const { "sections[]": _left, ...rest } = BODY;
+
+		const response = await putLook(client, owner, tenant, rest);
+
+		assertValidationError(
+			response,
+			"sections",
+			"Choose sections from the list.",
+		);
+		assert.equal(
+			(await reload(tenant)).storefrontSections,
+			"work,artists,inquiry",
+		);
 	});
 
 	test("the borderline colours: 4.62:1 passes, 4.05:1 does not", async ({

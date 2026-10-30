@@ -103,7 +103,7 @@ export interface ArtistView {
 	readonly closedMessage: string | null;
 	readonly pageHref: string;
 	readonly inquiryHref: string;
-	/** Up to six photos of the artist's work, in the studio's order (TAT-116). */
+	/** The artist's six newest work photos, newest first (TAT-116, TAT-126); the whole portfolio is the gallery's. */
 	readonly workPhotos: readonly WorkPhotoView[];
 	/** The names of up to five tattoo styles, in the API's order; [] when none. */
 	readonly styles: readonly string[];

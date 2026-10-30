@@ -34,11 +34,18 @@ import {
 
 /** A server render's context against an API at `apiUrl`, the studio seeded. */
 function pageContext(studio: Studio, apiUrl: string) {
-	const { fetch } = fakeFetch(({ url }) =>
-		url.endsWith("/artists")
-			? json(200, { data: [SITA, ARJUN] })
-			: json(404, { error: { code: "not_found", message: "Not found." } }),
-	);
+	const { fetch } = fakeFetch(({ url }) => {
+		if (url.endsWith("/artists")) return json(200, { data: [SITA, ARJUN] });
+		// The gallery reads (the home page's Recent work, an artist's portfolio): no photos.
+		if (url.includes("/work?")) {
+			return json(200, {
+				data: [],
+				nextCursor: null,
+				filters: { styles: [], healed: false },
+			});
+		}
+		return json(404, { error: { code: "not_found", message: "Not found." } });
+	});
 	const api = createApiContext("server");
 	connectServer(api, { config: { apiUrl }, studio, fetch });
 	seedStudio(api, studio);
@@ -258,6 +265,7 @@ describe("the page data's theme (TAT-54)", () => {
 		const artist = await loadArtistPage(
 			pageContext(studio, IMAGE_ORIGIN),
 			"sita",
+			{},
 		);
 		assert.deepEqual(artist.theme.heroImage, BRANDED_THEME.heroImage);
 		// The same images, served from an API somewhere else: refused.

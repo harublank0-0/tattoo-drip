@@ -1,13 +1,20 @@
 import { useLocation } from "@tanstack/react-router";
 import { MessageCircle } from "lucide-react";
 import { studioCopy } from "../copy.ts";
-import { isAllowedHref, linkRel } from "../links.ts";
-import type { ArtistPageData, StudioPageData } from "../loaders.ts";
+import { isAllowedHref, linkRel, portfolioHref, workHref } from "../links.ts";
+import type {
+	ArtistPageData,
+	StudioPageData,
+	WorkPageData,
+} from "../loaders.ts";
+import { type MoreWork, PagedGallery } from "../paging.tsx";
 import { logoSizes } from "../srcset.ts";
-import type { SectionKey } from "../theme/config.ts";
-import { ArtistProfile, ArtistRoster, WorkGrid } from "./artists.tsx";
+import type { SectionKey, ThemeConfig } from "../theme/config.ts";
+import type { StudioView } from "../view-model.ts";
+import { ArtistProfile, ArtistRoster } from "./artists.tsx";
 import { BrandCover, BrandLogo } from "./brand.tsx";
 import { ContactBlock } from "./contact.tsx";
+import { HealedFilter, RecentWork, WorkFilters } from "./gallery.tsx";
 import { InquirySection } from "./inquiry.tsx";
 import { BookingStrip } from "./steps.tsx";
 
@@ -101,7 +108,8 @@ export function StudioPage({
 
 /**
  * One of the studio page's sections, in the order the theme's config gives
- * (TAT-54). The inquiry section is always one of them (readSections).
+ * (TAT-54): Recent work (TAT-126), the artists and the inquiry section, which
+ * is always one of them (readSections).
  */
 function StudioSection({
 	section,
@@ -113,6 +121,8 @@ function StudioSection({
 	challengeSiteKey: string | null;
 }) {
 	switch (section) {
+		case "work":
+			return <RecentWork gallery={data.recentWork} />;
 		case "artists":
 			return <ArtistRoster artists={data.artists} />;
 		case "inquiry":
@@ -129,54 +139,202 @@ function StudioSection({
 export function ArtistPage({
 	data,
 	challengeSiteKey = null,
+	more,
 }: {
 	data: ArtistPageData;
 	/** The intake form's public Turnstile site key (TAT-57). */
 	challengeSiteKey?: string | null;
+	/** The browser's "Show more" (TAT-126); without it the link loads the next page. */
+	more?: MoreWork;
 }) {
-	const { studio, artist, inquiry, channels, theme } = data;
+	const { studio, artist, inquiry, channels, theme, portfolio } = data;
 	return (
 		<>
-			<header className="site-bar">
-				<a href="/" dir="auto">
-					{theme.logo ? (
-						<>
-							<BrandLogo
-								image={theme.logo}
-								className="site-bar-logo"
-								sizes={logoSizes(theme.logo, "siteBar")}
-							/>
-							<span>{studio.name}</span>
-						</>
-					) : (
-						studio.name
-					)}
-				</a>
-			</header>
+			<SiteBar studio={studio} theme={theme} />
 			<main className="page">
 				<ArtistProfile artist={artist} studio={studio} />
-				<WorkGrid artist={artist} />
+				<PortfolioSection
+					slug={artist.slug}
+					gallery={portfolio.gallery}
+					search={portfolio.search}
+					more={more}
+				/>
 				<InquirySection
 					state={inquiry}
 					channels={channels}
 					challengeSiteKey={challengeSiteKey}
 					stripAbove
 				/>
-				<section className="section" aria-labelledby="studio-title">
-					<h2 id="studio-title" className="section-title" dir="auto">
-						{studio.name}
-					</h2>
-					<div className="stack">
-						<p className="profile-type">{studio.typeLabel}</p>
-						<ContactBlock studio={studio} />
-						<a className="text-link" href="/">
-							See the studio page
-						</a>
-					</div>
-				</section>
+				<StudioAside studio={studio} />
 			</main>
 			<SiteFooter studioName={studio.name} />
 		</>
+	);
+}
+
+/**
+ * An artist's whole portfolio (TAT-126): the Work section after their
+ * profile. All and Healed when some photo has healed (or the address asked for
+ * Healed, so it can be left), the photos a page at a time, and the way back
+ * to the newest from a later page. Nothing for an artist with no photos and no
+ * filter or page asked for, and nothing when the portfolio could not be read
+ * (the loader then hands over an empty gallery and no filters).
+ */
+function PortfolioSection({
+	slug,
+	gallery,
+	search,
+	more,
+}: {
+	slug: string;
+	gallery: ArtistPageData["portfolio"]["gallery"];
+	search: ArtistPageData["portfolio"]["search"];
+	more: MoreWork | undefined;
+}) {
+	const healed = search.healed === true;
+	if (gallery.photos.length === 0 && !healed && search.cursor === undefined) {
+		return null;
+	}
+	const filter = healed ? { healed: true as const } : {};
+	return (
+		<section id="work" className="section" aria-labelledby="work-title">
+			<h2 id="work-title" className="section-title">
+				{studioCopy.work.title}
+			</h2>
+			{gallery.healed || healed ? (
+				<HealedFilter
+					allHref={portfolioHref(slug, {})}
+					healedHref={portfolioHref(slug, { healed: true })}
+					healed={healed}
+				/>
+			) : null}
+			{search.cursor !== undefined ? (
+				<p className="work-newest">
+					<a className="text-link" href={portfolioHref(slug, filter)}>
+						{studioCopy.work.newest}
+					</a>
+				</p>
+			) : null}
+			{gallery.photos.length > 0 ? (
+				<PagedGallery
+					key={portfolioHref(slug, search)}
+					first={gallery}
+					showArtist={false}
+					moreHref={(cursor) => portfolioHref(slug, { ...filter, cursor })}
+					more={more}
+				/>
+			) : healed ? (
+				<p>{studioCopy.work.noHealed}</p>
+			) : null}
+		</section>
+	);
+}
+
+/**
+ * `/work` (TAT-126): every visible artist's photos, newest first, narrowed by
+ * the address (artist, style, healed) and shown a page at a time. The site bar
+ * and the studio block are the artist page's.
+ */
+export function WorkPage({
+	data,
+	more,
+}: {
+	data: WorkPageData;
+	/** The browser's "Show more"; without it the link loads the next page. */
+	more?: MoreWork;
+}) {
+	const { studio, theme, artists, search, gallery } = data;
+	const { cursor: _page, ...firstPage } = search;
+	const filtered = Boolean(
+		search.artist || search.style || search.healed === true,
+	);
+	return (
+		<>
+			<SiteBar studio={studio} theme={theme} />
+			<main className="page">
+				<section aria-labelledby="work-page-title">
+					<h1 id="work-page-title" className="section-title">
+						{studioCopy.work.pageTitle}
+					</h1>
+					<WorkFilters artists={artists} gallery={gallery} search={search} />
+					{search.cursor !== undefined ? (
+						<p className="work-newest">
+							<a className="text-link" href={workHref(firstPage)}>
+								{studioCopy.work.newest}
+							</a>
+						</p>
+					) : null}
+					{gallery.photos.length > 0 ? (
+						<PagedGallery
+							key={workHref(search)}
+							first={gallery}
+							showArtist
+							moreHref={(cursor) => workHref({ ...search, cursor })}
+							more={more}
+						/>
+					) : (
+						<div className="stack">
+							<p>
+								{filtered ? studioCopy.work.noMatch : studioCopy.work.empty}
+							</p>
+							{filtered ? (
+								<a className="text-link" href={workHref({})}>
+									{studioCopy.work.showAll}
+								</a>
+							) : null}
+						</div>
+					)}
+				</section>
+				<StudioAside studio={studio} />
+			</main>
+			<SiteFooter studioName={studio.name} />
+		</>
+	);
+}
+
+/** The slim bar above the artist page and the All work page: the studio's name (and logo), back to its page. */
+function SiteBar({
+	studio,
+	theme,
+}: {
+	studio: StudioView;
+	theme: ThemeConfig;
+}) {
+	return (
+		<header className="site-bar">
+			<a href="/" dir="auto">
+				{theme.logo ? (
+					<>
+						<BrandLogo
+							image={theme.logo}
+							className="site-bar-logo"
+							sizes={logoSizes(theme.logo, "siteBar")}
+						/>
+						<span>{studio.name}</span>
+					</>
+				) : (
+					studio.name
+				)}
+			</a>
+		</header>
+	);
+}
+
+/** The studio under an artist's page and the All work page: its contacts and the way to its page. */
+function StudioAside({ studio }: { studio: StudioView }) {
+	return (
+		<section className="section" aria-labelledby="studio-title">
+			<h2 id="studio-title" className="section-title" dir="auto">
+				{studio.name}
+			</h2>
+			<div className="stack">
+				<p className="profile-type">{studio.typeLabel}</p>
+				<ContactBlock studio={studio} />
+				<a className="text-link" href="/">
+					See the studio page
+				</a>
+			</div>
+		</section>
 	);
 }
 

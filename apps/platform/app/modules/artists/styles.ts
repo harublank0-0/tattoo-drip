@@ -38,6 +38,17 @@ export const STYLE_SLUGS: readonly StyleSlug[] = TATTOO_STYLES.map(
 /** The most styles one artist can pick; the database checks it too. */
 export const MAX_ARTIST_STYLES = 5;
 
+/** The most styles one work photo can carry (TAT-126); the database checks it too. */
+export const MAX_PHOTO_STYLES = 3;
+
+/**
+ * The shape every style slug has: lowercase letters and digits in groups
+ * joined by single hyphens. It says nothing about the list: code that takes
+ * a slug from outside (a URL, say) can refuse garbage with it before
+ * looking anything up.
+ */
+export const STYLE_SLUG_SHAPE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
 /**
  * The listed styles among `slugs`, in the list's order. Unknown and repeated
  * slugs are dropped, so a slug that later leaves the list just disappears.

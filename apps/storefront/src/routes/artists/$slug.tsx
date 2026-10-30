@@ -1,16 +1,27 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { pageCacheHeaders } from "../../studio/cache.ts";
-import { loadArtistPage } from "../../studio/loaders.ts";
+import {
+	portfolioQuery,
+	readPortfolioSearch,
+	WORK_PAGE_SIZE,
+} from "../../studio/gallery.ts";
+import { loadArtistPage, moreWork } from "../../studio/loaders.ts";
 import { statusHead } from "../../studio/seo.ts";
 import { themedHeadTags } from "../../studio/theme/head.ts";
 import { ThemedArtistPage } from "../../studio/theme/registry.tsx";
 
 /**
  * One visible artist (TAT-48): the link an artist shares to be asked for by
- * name. A hidden, unknown or renamed artist is the not-found page.
+ * name. A hidden, unknown or renamed artist is the not-found page. Their whole
+ * portfolio (TAT-126) is read a page at a time: `?healed=1` and `&cursor=` in
+ * the address, each checked (readPortfolioSearch), "Show more" a link that
+ * works without JavaScript.
  */
 export const Route = createFileRoute("/artists/$slug")({
-	loader: ({ context, params }) => loadArtistPage(context, params.slug),
+	validateSearch: readPortfolioSearch,
+	loaderDeps: ({ search }) => ({ search }),
+	loader: ({ context, params, deps }) =>
+		loadArtistPage(context, params.slug, deps.search),
 	head: ({ loaderData, match }) =>
 		loaderData
 			? themedHeadTags(loaderData.seo, loaderData.theme)
@@ -20,13 +31,27 @@ export const Route = createFileRoute("/artists/$slug")({
 });
 
 function ArtistRoute() {
-	const challengeSiteKey = Route.useRouteContext({
-		select: (context) => context.site.challengeSiteKey,
-	});
+	const data = Route.useLoaderData();
+	const { queryClient, tattoo, site } = Route.useRouteContext();
+	// The same read as the loader's (portfolioQuery), for Show more.
+	const query = portfolioQuery(
+		data.artist.slug,
+		data.portfolio.search,
+		WORK_PAGE_SIZE,
+	);
 	return (
 		<ThemedArtistPage
-			data={Route.useLoaderData()}
-			challengeSiteKey={challengeSiteKey}
+			data={data}
+			challengeSiteKey={site.challengeSiteKey}
+			more={(cursor, offset) =>
+				moreWork(
+					{ queryClient, tattoo },
+					query,
+					cursor,
+					offset,
+					tattoo.connection.apiUrl,
+				)
+			}
 		/>
 	);
 }

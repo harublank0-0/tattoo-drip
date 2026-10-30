@@ -55,7 +55,6 @@ export type ScannedRoutes = {
     'tenant.artists.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.photos.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.photos.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
-    'tenant.artists.photos.move': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.photos.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inbox.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.inbox.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
@@ -108,9 +107,11 @@ export type ScannedRoutes = {
     'account.show': { paramsTuple?: []; params?: {} }
     'account.password.update': { paramsTuple?: []; params?: {} }
     'account.sign_out_others': { paramsTuple?: []; params?: {} }
+    'api.v1.styles.index': { paramsTuple?: []; params?: {} }
     'api.v1.studio': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.artists.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.artists.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'artist': ParamValue} }
+    'api.v1.work.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.inquiries.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.deposits.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'token': ParamValue} }
     'api.v1.deposits.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'token': ParamValue} }
@@ -158,9 +159,11 @@ export type ScannedRoutes = {
     'email_verification.notice': { paramsTuple?: []; params?: {} }
     'onboarding.create': { paramsTuple?: []; params?: {} }
     'account.show': { paramsTuple?: []; params?: {} }
+    'api.v1.styles.index': { paramsTuple?: []; params?: {} }
     'api.v1.studio': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.artists.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.artists.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'artist': ParamValue} }
+    'api.v1.work.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.deposits.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'token': ParamValue} }
   }
   HEAD: {
@@ -206,9 +209,11 @@ export type ScannedRoutes = {
     'email_verification.notice': { paramsTuple?: []; params?: {} }
     'onboarding.create': { paramsTuple?: []; params?: {} }
     'account.show': { paramsTuple?: []; params?: {} }
+    'api.v1.styles.index': { paramsTuple?: []; params?: {} }
     'api.v1.studio': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.artists.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.artists.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'artist': ParamValue} }
+    'api.v1.work.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.deposits.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'token': ParamValue} }
   }
   POST: {
@@ -222,7 +227,6 @@ export type ScannedRoutes = {
     'tenant.settings.members.invitations.renew': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists.photos.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
-    'tenant.artists.photos.move': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inbox.accept': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inbox.decline': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inbox.contacted.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }

@@ -39,10 +39,11 @@ export class ArtistWorkPhotoSchema extends BaseModel {
 		"alt",
 		"artistId",
 		"createdAt",
+		"healed",
 		"height",
 		"id",
 		"imageKey",
-		"position",
+		"styles",
 		"tenantId",
 		"updatedAt",
 		"width",
@@ -55,13 +56,15 @@ export class ArtistWorkPhotoSchema extends BaseModel {
 	@column.dateTime({ autoCreate: true })
 	declare createdAt: DateTime;
 	@column()
+	declare healed: boolean;
+	@column()
 	declare height: number;
 	@column({ isPrimary: true })
 	declare id: string;
 	@column()
 	declare imageKey: string;
 	@column()
-	declare position: number;
+	declare styles: string[];
 	@column()
 	declare tenantId: string;
 	@column.dateTime({ autoCreate: true, autoUpdate: true })

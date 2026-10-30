@@ -4,9 +4,9 @@ import User from "#models/user";
 import ArtistService from "#modules/artists/services/artist_service";
 import ImageService from "#modules/media/services/image_service";
 import {
-	ARTIST_PLACEMENTS,
-	type ArtistPlacement,
 	type FontKey,
+	type SectionKey,
+	sectionList,
 	type ThemeKey,
 } from "#modules/storefront/look";
 import {
@@ -96,7 +96,8 @@ export type PageLookInput = {
 	accent: string | null;
 	accentDark: string | null;
 	font: FontKey;
-	artists: ArtistPlacement;
+	/** The sections to show, in order; stored through `sectionList`, so the form is always there. */
+	sections: SectionKey[];
 };
 
 /**
@@ -203,7 +204,7 @@ export default class TenancyService {
 				brandAccent: input.accent,
 				brandAccentDark: input.accentDark,
 				brandFont: input.font,
-				storefrontSections: ARTIST_PLACEMENTS[input.artists].join(","),
+				storefrontSections: sectionList(input.sections).join(","),
 			});
 			await live.save();
 			return live;

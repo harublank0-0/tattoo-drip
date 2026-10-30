@@ -26,7 +26,6 @@ const ARTIST_ROUTES = [
 	"tenant.artists.edit",
 	"tenant.artists.mine",
 	"tenant.artists.photos.destroy",
-	"tenant.artists.photos.move",
 	"tenant.artists.photos.store",
 	"tenant.artists.photos.update",
 	"tenant.artists.update",

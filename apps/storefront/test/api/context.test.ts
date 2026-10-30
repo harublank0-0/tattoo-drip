@@ -281,7 +281,7 @@ describe("what the browser keeps", () => {
 		);
 	}
 
-	test("the studio and artists queries live as long as the page, other tenants' do not", () => {
+	test("the studio, artists and work queries live as long as the page, other tenants' do not", () => {
 		const browser = createApiContext("browser");
 		hydrateApi(browser, { tattoo: { apiUrl: API, tenant: "studio-a" } });
 		const defaults = (key: readonly unknown[]) =>
@@ -291,6 +291,13 @@ describe("what the browser keeps", () => {
 		assert.equal(defaults(tattooKeys.artists("studio-a")), Infinity);
 		// An artist's own query sits under the artists key.
 		assert.equal(defaults(tattooKeys.artist("studio-a", "sita")), Infinity);
+		// Every gallery read (TAT-126) sits under the work key, whatever its filters.
+		assert.equal(defaults(tattooKeys.work("studio-a")), Infinity);
+		assert.equal(
+			defaults(tattooKeys.work("studio-a", { artist: "sita", limit: 24 })),
+			Infinity,
+		);
+		assert.equal(defaults(tattooKeys.work("studio-b")), undefined);
 		assert.equal(defaults(tattooKeys.artists("studio-b")), undefined);
 		assert.equal(defaults(tattooKeys.services("studio-a")), undefined);
 	});

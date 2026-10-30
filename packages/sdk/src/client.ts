@@ -7,13 +7,13 @@ import type {
 	InquiryInput,
 	InquiryReceipt,
 	ListAvailabilityQuery,
-	ListPortfolioQuery,
 	ListServicesQuery,
-	PortfolioPage,
+	ListWorkQuery,
 	Service,
 	Slot,
 	Studio,
 	TattooStyle,
+	WorkPage,
 } from "@tattoo-drip/types";
 import { TattooApiError } from "./errors.js";
 
@@ -87,7 +87,7 @@ export interface SubmitDepositProofInput {
 	expectedAmount: number;
 }
 
-type Query = Record<string, string | number | undefined>;
+type Query = Record<string, string | number | boolean | undefined>;
 
 type ResponseBody = { data?: unknown; error?: Partial<ApiError> };
 
@@ -194,13 +194,15 @@ export function createTattooClient(options: TattooClientOptions) {
 			list: (query?: ListServicesQuery, call?: RequestOptions) =>
 				getData<Service[]>(withQuery(`${tenantRoot}/services`, query), call),
 		},
-		portfolio: {
-			list: (query?: ListPortfolioQuery, call?: RequestOptions) =>
-				request<PortfolioPage>(
-					withQuery(`${tenantRoot}/portfolio`, query),
-					{},
-					call,
-				),
+		work: {
+			/**
+			 * A page of the studio's work photos, newest first (TAT-126): the
+			 * whole body, `{ data, nextCursor, filters }`. Pass `nextCursor` back
+			 * as `cursor`, with the same filters, for the next page. A malformed
+			 * parameter or cursor is a 422 TattooApiError (`validation_failed`).
+			 */
+			list: (query?: ListWorkQuery, call?: RequestOptions) =>
+				request<WorkPage>(withQuery(`${tenantRoot}/work`, query), {}, call),
 		},
 		availability: {
 			list: (query: ListAvailabilityQuery, call?: RequestOptions) =>

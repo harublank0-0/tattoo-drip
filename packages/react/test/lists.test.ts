@@ -52,7 +52,7 @@ function clientAnswering(
 const noRetries = () =>
 	new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
-describe("tattooQueries.services, portfolio and availability", () => {
+describe("tattooQueries.services, work and availability", () => {
 	test("their keys start with the tenant", () => {
 		const { client } = clientAnswering(200, { data: [] });
 		const tenant = ["tattoo-drip", "tenant", TENANT];
@@ -66,14 +66,14 @@ describe("tattooQueries.services, portfolio and availability", () => {
 			tattooQueries.services(client, { artistId: "a1" }).queryKey,
 			[...tenant, "services", { artistId: "a1" }],
 		);
-		assert.deepEqual(tattooQueries.portfolio(client).queryKey, [
+		assert.deepEqual(tattooQueries.work(client).queryKey, [
 			...tenant,
-			"portfolio",
+			"work",
 			{},
 		]);
 		assert.deepEqual(
-			tattooQueries.portfolio(client, { artistId: "a1" }).queryKey,
-			[...tenant, "portfolio", { artistId: "a1" }],
+			tattooQueries.work(client, { artist: "sita", healed: true }).queryKey,
+			[...tenant, "work", { artist: "sita", healed: true }],
 		);
 		assert.deepEqual(
 			tattooQueries.availability(client, { artistId: "a1", serviceId: "s1" })
@@ -112,10 +112,12 @@ describe("tattooQueries.services, portfolio and availability", () => {
 
 	test("they load through the SDK with the query", async () => {
 		const services = clientAnswering(200, { data: [] });
-		const portfolio = clientAnswering(200, {
+		const page = {
 			data: [],
 			nextCursor: null,
-		});
+			filters: { styles: [], healed: false },
+		};
+		const work = clientAnswering(200, page);
 		const availability = clientAnswering(200, {
 			data: [
 				{
@@ -137,13 +139,11 @@ describe("tattooQueries.services, portfolio and availability", () => {
 		assert.equal(services.calls[0], `${base}/services?artistId=a1`);
 
 		assert.deepEqual(
-			await queryClient.fetchQuery(
-				tattooQueries.portfolio(portfolio.client, { style: "fine line" }),
-			),
-			{ data: [], nextCursor: null },
+			await queryClient.fetchQuery(tattooQueries.work(work.client)),
+			page,
 		);
-		assert.equal(portfolio.calls.length, 1);
-		assert.equal(portfolio.calls[0], `${base}/portfolio?style=fine+line`);
+		assert.equal(work.calls.length, 1);
+		assert.equal(work.calls[0], `${base}/work`);
 
 		assert.deepEqual(
 			await queryClient.fetchQuery(

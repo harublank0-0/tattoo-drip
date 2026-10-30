@@ -13,13 +13,20 @@ import {
 	ErrorPage,
 	NotFoundPage,
 	StudioPage,
+	WorkPage,
 } from "../../src/studio/components/pages.tsx";
-import { artistPageData, studioPageData } from "../../src/studio/loaders.ts";
+import type { PortfolioSearch, WorkSearch } from "../../src/studio/gallery.ts";
+import {
+	artistPageData,
+	studioPageData,
+	workPageData,
+} from "../../src/studio/loaders.ts";
 import { headTags } from "../../src/studio/seo.ts";
 import {
 	ARJUN,
 	CLOSED_STUDIO,
 	EMPTY_STUDIO,
+	galleryPage,
 	ORIGIN,
 	SITA,
 	SITA_PHOTO_URL,
@@ -29,7 +36,7 @@ import {
 	sitaWithWork,
 } from "./fixtures.ts";
 import { assertSafePage } from "./safety.ts";
-import { IMAGE_ORIGIN } from "./theme-fixtures.ts";
+import { IMAGE_ORIGIN, withStorefront } from "./theme-fixtures.ts";
 
 /** The first element of `type` in a component's returned tree (the component is called, not rendered). */
 function findElement(node: ReactNode, type: string): ReactElement | undefined {
@@ -715,7 +722,7 @@ describe("the roster's work strip (TAT-116)", () => {
 				/ srcSet="[^"]*320w, [^"]*640w, [^"]*1280w, [^"]*2048w"/i,
 			);
 		}
-		// The first three, in the studio's order.
+		// The first three of the artist's newest photos, newest first.
 		assert.deepEqual(
 			thumbs(html).map((image) => /w(\d)\.320-640-1280/.exec(image)?.[1]),
 			["1", "2", "3"],
@@ -779,24 +786,209 @@ describe("the roster's work strip (TAT-116)", () => {
 	});
 });
 
-describe("the artist page's work grid and viewer (TAT-116)", () => {
-	const ALTS = ["Koi on the forearm", null, "कालो माछा"];
-	const withWork = (count = 5, alts: (string | null)[] = ALTS) => {
-		const data = artistPageData(
-			STUDIO,
-			[sitaWithWork(count, alts), ARJUN],
-			"sita",
-			ORIGIN,
-			IMAGE_ORIGIN,
+describe("Recent work on the studio page (TAT-126)", () => {
+	const SECTION = /<section id="recent-work"[\s\S]*?<\/section>/;
+	const homeWith = (
+		recentWork: unknown,
+		studio: Studio = STUDIO,
+		artists: Artist[] = [SITA, ARJUN],
+	) =>
+		renderToStaticMarkup(
+			createElement(StudioPage, {
+				data: studioPageData(studio, artists, ORIGIN, IMAGE_ORIGIN, recentWork),
+			}),
 		);
+	const recent = (html: string) => html.match(SECTION)?.[0] ?? "";
+	const sectionsConfig = (...types: string[]) =>
+		withStorefront({
+			theme: "stencil-and-ink",
+			sections: types.map((type) => ({ type })),
+		});
+
+	test("comes after the intro and before the artists, with the newest photos and All work", () => {
+		const html = homeWith(galleryPage(12));
+
+		assertSafePage(html);
+		const work = html.indexOf('<section id="recent-work"');
+		assert.ok(work > html.indexOf("profile-intro"), "after the intro");
+		assert.ok(
+			work < html.indexOf('<section id="artists"'),
+			"before the artists",
+		);
+		assert.ok(work < html.indexOf('id="inquiry"'), "before the form");
+		const section = recent(html);
+		assert.match(
+			section,
+			/^<section id="recent-work" class="section" aria-labelledby="recent-work-title"><h2 id="recent-work-title" class="section-title">Recent work<\/h2>/,
+		);
+		// The newest nine of the twelve, each opening its own viewer.
+		assert.equal(count(section, /<button [^>]*class="work-open"/g), 9);
+		assert.equal(count(section, /<dialog /g), 9);
+		assert.equal(count(html, /<ul class="work-grid" role="list">/g), 1);
+		// All work: a link to /work after the grid, its arrow hidden from screen readers.
+		const link = section.match(
+			/<a class="text-link" href="\/work">[\s\S]*?<\/a>/,
+		)?.[0];
+		assert.ok(link, "a link to /work");
+		assert.match(
+			link,
+			/^<a class="text-link" href="\/work"><span>All work<\/span><svg[^>]* aria-hidden="true"/,
+		);
+		assert.equal(
+			link.replace(/<svg[\s\S]*?<\/svg>/, "").replace(/<[^>]+>/g, ""),
+			"All work",
+		);
+		assert.ok(section.indexOf("</ul>") < section.indexOf('href="/work"'));
+		assert.equal(count(html, /href="\/work"/g), 1);
+	});
+
+	test("the photos load the copy that fits, lazily, like every grid", () => {
+		const grid =
+			recent(homeWith(galleryPage(3))).match(
+				/<img class="work-photo"[^>]*>/g,
+			) ?? [];
+
+		assert.equal(grid.length, 3);
+		for (const image of grid) {
+			assert.match(image, / loading="lazy"/);
+			assert.match(image, / sizes="/);
+			assert.match(image, / srcSet="/i);
+		}
+	});
+
+	test("no photos, no Recent work and no All work link", () => {
+		for (const none of [
+			null,
+			undefined,
+			galleryPage(0),
+			{ data: [] },
+			"broken",
+		]) {
+			const html = homeWith(none);
+			assertSafePage(html);
+			assert.equal(recent(html), "");
+			assert.doesNotMatch(html, /Recent work|All work/);
+			assert.equal(count(html, /href="\/work"/g), 0);
+		}
+		// An empty gallery leaves the page as it is without one.
+		assert.equal(homeWith(galleryPage(0)), homeWith(undefined));
+	});
+
+	test("a studio that hides Recent work shows none even with photos", () => {
+		const html = homeWith(galleryPage(5), sectionsConfig("artists", "inquiry"));
+
+		assertSafePage(html);
+		assert.equal(recent(html), "");
+		assert.doesNotMatch(html, /Recent work|All work|work-open|<dialog /);
+		assert.ok(html.includes('<section id="artists"'));
+	});
+
+	test("artists before Recent work when the configuration says so", () => {
+		const html = homeWith(
+			galleryPage(4),
+			sectionsConfig("artists", "work", "inquiry"),
+		);
+
+		const artists = html.indexOf('<section id="artists"');
+		const work = html.indexOf('<section id="recent-work"');
+		const form = html.indexOf('id="inquiry"');
+		assert.ok(artists > 0 && artists < work && work < form);
+	});
+
+	test("Recent work can come after the form", () => {
+		const html = homeWith(
+			galleryPage(4),
+			sectionsConfig("inquiry", "work", "artists"),
+		);
+
+		const order = ['id="inquiry"', 'id="recent-work"', 'id="artists"'].map(
+			(marker) => html.indexOf(marker),
+		);
+		assert.ok(order[0] > 0 && order[0] < order[1] && order[1] < order[2]);
+	});
+
+	test("an older API's configuration, [artists, inquiry], shows no Recent work even with photos", () => {
+		const html = homeWith(
+			galleryPage(5),
+			withStorefront({
+				theme: "stencil-and-ink",
+				sections: [{ type: "artists" }, { type: "inquiry" }],
+			}),
+		);
+
+		assert.equal(recent(html), "");
+	});
+
+	test("the viewer names the artist with a link, and the styles and healed mark", () => {
+		const html = homeWith(galleryPage(3));
+		const [first = ""] =
+			recent(html).match(/<dialog [^>]*>[\s\S]*?<\/dialog>/g) ?? [];
+
+		assert.match(
+			first,
+			/<div class="work-dialog-meta"><p><a class="text-link" href="\/artists\/sita"><bdi>Sita Rai<\/bdi><\/a><\/p><p>Fine line<\/p><p>Healed<\/p><\/div>/,
+		);
+		// A later photo has the artist link but no style and no healed mark.
+		const [, second = ""] =
+			recent(html).match(/<dialog [^>]*>[\s\S]*?<\/dialog>/g) ?? [];
+		assert.match(second, /<a class="text-link" href="\/artists\/sita">/);
+		assert.doesNotMatch(second, /Healed/);
+	});
+
+	test("a hostile description or artist name is text, never markup", () => {
+		const page = galleryPage(2);
+		const html = homeWith({
+			...page,
+			data: page.data.map((photo) => ({
+				...photo,
+				alt: '"><script>alert(1)</script>',
+				artist: { slug: "sita", name: "<img src=x onerror=alert(1)>" },
+			})),
+		});
+
+		assertSafePage(html);
+		assert.doesNotMatch(html, /<script>alert|<img src=x/);
+	});
+
+	test("the section never has more than nine photos, whatever the API sent", () => {
+		const section = recent(homeWith(galleryPage(30)));
+
+		assert.equal(count(section, /<button [^>]*class="work-open"/g), 9);
+		assert.equal(count(section, /<dialog /g), 9);
+	});
+});
+
+describe("the artist page's portfolio and viewer (TAT-126)", () => {
+	const portfolioOf = (
+		page: unknown,
+		search: PortfolioSearch = {},
+		artists: Artist[] = [SITA, ARJUN],
+		slug = "sita",
+	) => {
+		const data = artistPageData(STUDIO, artists, slug, ORIGIN, IMAGE_ORIGIN, {
+			page,
+			search,
+		});
 		assert.ok(data);
 		return renderToStaticMarkup(createElement(ArtistPage, { data }));
 	};
 	const dialogs = (html: string) =>
 		html.match(/<dialog [^>]*>[\s\S]*?<\/dialog>/g) ?? [];
+	const section = (html: string) =>
+		html.match(/<section id="work"[\s\S]*?<\/section>/)?.[0] ?? "";
+	const withAlts = (alts: (string | null)[]) => {
+		const page = galleryPage(alts.length);
+		return {
+			...page,
+			data: page.data.map((photo, index) => ({
+				...photo,
+				alt: alts[index],
+			})),
+		};
+	};
 
 	test("a Work section follows the profile and comes before the inquiry", () => {
-		const html = withWork();
+		const html = portfolioOf(galleryPage(5));
 
 		assertSafePage(html);
 		const work = html.indexOf('<section id="work"');
@@ -810,41 +1002,118 @@ describe("the artist page's work grid and viewer (TAT-116)", () => {
 		assert.deepEqual(headings(html), [1, 2, 2, 3, 2, 2]);
 	});
 
-	test("each photo is a button that names its own dialog; the grid holds at most six", () => {
-		const html = withWork(5);
+	test("the artist page shows the whole portfolio with All and Healed", () => {
+		const html = portfolioOf(galleryPage(3));
+		const work = section(html);
+		const nav = work.match(/<nav [^>]*>[\s\S]*?<\/nav>/)?.[0] ?? "";
+
+		assert.match(
+			nav,
+			/^<nav class="work-filter-nav" aria-label="Which photos">/,
+		);
+		assert.match(
+			nav,
+			/<a href="\/artists\/sita#work" aria-current="page">All<\/a>/,
+		);
+		assert.match(nav, /<a href="\/artists\/sita\?healed=1#work">Healed<\/a>/);
+		assert.equal(count(nav, /aria-current/g), 1);
+		assert.equal(count(work, /class="work-open"/g), 3);
+
+		const healed = section(portfolioOf(galleryPage(3), { healed: true }));
+		assert.match(healed, /<a href="\/artists\/sita#work">All<\/a>/);
+		assert.match(
+			healed,
+			/<a href="\/artists\/sita\?healed=1#work" aria-current="page">Healed<\/a>/,
+		);
+	});
+
+	test("without a healed photo there is no filter", () => {
+		const page = galleryPage(3, { filters: { styles: [], healed: false } });
+		const html = portfolioOf(page);
+
+		assertSafePage(html);
+		assert.equal(count(section(html), /<nav/g), 0);
+		assert.equal(count(section(html), /class="work-open"/g), 3);
+	});
+
+	test("healed asked for with none: the filter stays, and the page says so", () => {
+		const page = galleryPage(0, { filters: { styles: [], healed: false } });
+		const work = section(portfolioOf(page, { healed: true }));
+
+		assert.match(work, /<nav /);
+		assert.match(work, /aria-current="page">Healed<\/a>/);
+		assert.match(work, /<p[^>]*>No healed photos yet\.<\/p>/);
+		assert.equal(count(work, /work-grid|<dialog/g), 0);
+	});
+
+	test("Show more links to the next page with the same filter", () => {
+		const page = galleryPage(3, { nextCursor: "c2" });
+		const html = portfolioOf(page, { healed: true });
+		const more =
+			html.match(/<a [^>]*class="[^"]*work-more[^"]*"[^>]*>[^<]*<\/a>/g) ?? [];
+
+		assert.equal(more.length, 1);
+		assert.match(
+			more[0],
+			/^<a class="action action-secondary work-more" href="\/artists\/sita\?healed=1&amp;cursor=c2#work">Show more<\/a>$/,
+		);
+		assertSafePage(html);
+		// No next page, no link.
+		assert.equal(count(portfolioOf(galleryPage(3)), /work-more/g), 0);
+		// Unfiltered, the cursor is the only parameter.
+		assert.match(
+			portfolioOf(page),
+			/href="\/artists\/sita\?cursor=c2#work">Show more/,
+		);
+	});
+
+	test("a cursor page offers the way back to the newest, keeping the filter", () => {
+		const page = galleryPage(3);
+		const back = (html: string) =>
+			html.match(/<a [^>]*>Back to the newest<\/a>/g) ?? [];
+
+		assert.deepEqual(back(portfolioOf(page, { healed: true, cursor: "c2" })), [
+			'<a class="text-link" href="/artists/sita?healed=1#work">Back to the newest</a>',
+		]);
+		assert.deepEqual(back(portfolioOf(page, { cursor: "c2" })), [
+			'<a class="text-link" href="/artists/sita#work">Back to the newest</a>',
+		]);
+		assert.deepEqual(back(portfolioOf(page)), []);
+	});
+
+	test("each photo is a button that names its own dialog", () => {
+		const html = portfolioOf(galleryPage(5));
 		const buttons = html.match(/<button [^>]*class="work-open"[^>]*>/g) ?? [];
 
 		assert.equal(buttons.length, 5);
 		buttons.forEach((button, index) => {
+			const n = index + 1;
 			assert.match(button, / type="button"/);
 			assert.match(button, / aria-haspopup="dialog"/);
-			assert.match(
-				button,
-				new RegExp(` aria-controls="work-photo-${index + 1}"`),
-			);
-			assert.ok(html.includes(` id="work-photo-${index + 1}"`));
+			assert.match(button, new RegExp(` id="work-open-${n}"`));
+			assert.match(button, new RegExp(` aria-controls="work-photo-${n}"`));
+			assert.ok(html.includes(` id="work-photo-${n}"`));
 		});
-		assert.equal(count(withWork(9, []), /class="work-open"/g), 6);
 		assert.equal(count(html, /<ul class="work-grid" role="list">/g), 1);
 	});
 
-	test("a dialog has its label, a Close form, the large copy (lazy) and the description", () => {
-		const html = withWork();
+	test("a dialog has its label, a Close form, the large copy (lazy) and its facts", () => {
+		const html = portfolioOf(galleryPage(3));
 		const all = dialogs(html);
 
-		assert.equal(all.length, 5);
+		assert.equal(all.length, 3);
 		all.forEach((dialog, index) => {
 			const n = index + 1;
 			assert.match(
 				dialog,
 				new RegExp(
-					`^<dialog id="work-photo-${n}" class="work-dialog" aria-label="Photo ${n} of 5">`,
+					`^<dialog id="work-photo-${n}" class="work-dialog" aria-label="Photo ${n}">`,
 				),
 			);
 			assert.match(
 				dialog,
 				new RegExp(
-					`<form class="work-dialog-bar" method="dialog"><p>Photo ${n} of 5</p><button type="submit" class="action action-secondary">Close</button></form>`,
+					`<form class="work-dialog-bar" method="dialog"><p>Photo ${n}</p><button type="submit" class="action action-secondary">Close</button></form>`,
 				),
 			);
 			const large = dialog.match(/<img class="work-large"[^>]*>/g) ?? [];
@@ -863,8 +1132,24 @@ describe("the artist page's work grid and viewer (TAT-116)", () => {
 		assert.doesNotMatch(html, /<dialog[^>]* open/);
 	});
 
+	test("the grid's photos load the copy that fits, lazily", () => {
+		const grid =
+			portfolioOf(galleryPage(3)).match(/<img class="work-photo"[^>]*>/g) ?? [];
+
+		assert.equal(grid.length, 3);
+		for (const image of grid) {
+			assert.match(image, / loading="lazy"/);
+			assert.match(image, / decoding="async"/);
+			assert.match(image, / sizes="/);
+			assert.match(image, / srcSet="/i);
+			assert.match(image, / src="https:\/\/api\.example\.com\//);
+		}
+	});
+
 	test("a description is the alt of the grid photo and the large one, and the caption; without one the alt names the artist", () => {
-		const html = withWork();
+		const html = portfolioOf(
+			withAlts(["Koi on the forearm", null, "कालो माछा"]),
+		);
 		const [first = "", second = "", third = ""] = dialogs(html);
 
 		assert.match(first, /alt="Koi on the forearm"/);
@@ -872,7 +1157,7 @@ describe("the artist page's work grid and viewer (TAT-116)", () => {
 			first,
 			/<p class="work-dialog-caption user-text" dir="auto">Koi on the forearm<\/p>/,
 		);
-		assert.match(second, /alt="Tattoo by Sita Rai, photo 2 of 5"/);
+		assert.match(second, /alt="Tattoo by Sita Rai, photo 2"/);
 		assert.doesNotMatch(second, /work-dialog-caption/);
 		assert.match(
 			third,
@@ -880,44 +1165,409 @@ describe("the artist page's work grid and viewer (TAT-116)", () => {
 		);
 		const grid = html.match(/<img class="work-photo"[^>]*>/g) ?? [];
 		assert.match(grid[0] ?? "", / alt="Koi on the forearm"/);
-		assert.match(grid[1] ?? "", / alt="Tattoo by Sita Rai, photo 2 of 5"/);
-		for (const image of grid) {
-			assert.match(image, / loading="lazy"/);
-			assert.match(image, / decoding="async"/);
-			assert.match(image, / sizes="/);
-			assert.match(image, / srcSet="/i);
-		}
+		assert.match(grid[1] ?? "", / alt="Tattoo by Sita Rai, photo 2"/);
 	});
 
 	test("a hostile description is text, never markup", () => {
-		const html = withWork(1, ['"><script>alert(1)</script>']);
+		const html = portfolioOf(withAlts(['"><script>alert(1)</script>']));
 
 		assertSafePage(html);
 		assert.doesNotMatch(html, /<script>alert/);
 		assert.match(html, /&quot;&gt;&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
 	});
 
-	test("without work photos the page has no Work section and no dialog", () => {
-		const html = artistHtml("sita");
+	test("on the artist's own page the viewer names the styles and Healed but has no link to that page", () => {
+		const dialog = dialogs(portfolioOf(galleryPage(2)))[0] ?? "";
 
-		assert.equal(count(html, /work-|<dialog/g), 0);
-		assert.deepEqual(headings(html), [1, 2, 3, 2, 2]);
+		assert.match(
+			dialog,
+			/<div class="work-dialog-meta"><p>Fine line<\/p><p>Healed<\/p><\/div>/,
+		);
+		assert.doesNotMatch(dialog, /href=/);
+		// The second photo has neither, so no empty block.
+		assert.doesNotMatch(
+			dialogs(portfolioOf(galleryPage(2)))[1] ?? "",
+			/work-dialog-meta/,
+		);
+	});
+
+	test("the viewer's styles are joined, and a hostile style name is text", () => {
+		const page = galleryPage(1);
+		const styled = {
+			...page,
+			data: [
+				{
+					...page.data[0],
+					healed: false,
+					styles: [
+						{ slug: "a", name: "Blackwork" },
+						{ slug: "b", name: "<b>Realism</b>" },
+					],
+				},
+			],
+		};
+		const html = portfolioOf(styled);
+
+		assertSafePage(html);
+		assert.match(
+			dialogs(html)[0] ?? "",
+			/<div class="work-dialog-meta"><p>Blackwork · &lt;b&gt;Realism&lt;\/b&gt;<\/p><\/div>/,
+		);
+	});
+
+	test("without photos, and no filter asked, the page has no Work section and no dialog", () => {
+		for (const page of [null, galleryPage(0), undefined, { data: "x" }]) {
+			const html = portfolioOf(page);
+
+			assert.equal(count(html, /work-|<dialog/g), 0);
+			assert.deepEqual(headings(html), [1, 2, 3, 2, 2]);
+		}
+	});
+
+	test("the artist's six newest do not make a portfolio: the section is the portfolio read's", () => {
+		const html = portfolioOf(null, {}, [sitaWithWork(5), ARJUN]);
+
+		assert.equal(count(html, /class="work-open"/g), 0);
+		assert.equal(count(html, /id="work"/g), 0);
 	});
 
 	test("a closed artist's page still shows their work", () => {
-		const data = artistPageData(
-			STUDIO,
-			[{ ...ARJUN, workPhotos: sitaWithWork(2).workPhotos }],
+		const page = galleryPage(2);
+		const html = portfolioOf(
+			{
+				...page,
+				data: page.data.map((photo) => ({
+					...photo,
+					artist: { slug: "arjun", name: "अर्जुन थापा" },
+				})),
+			},
+			{},
+			[ARJUN],
 			"arjun",
-			ORIGIN,
-			IMAGE_ORIGIN,
 		);
-		assert.ok(data);
-		const html = renderToStaticMarkup(createElement(ArtistPage, { data }));
 
 		assertSafePage(html);
 		assert.equal(count(html, /class="work-open"/g), 2);
-		assert.match(html, /alt="Tattoo by अर्जुन थापा, photo 1 of 2"/);
+		assert.match(html, /alt="Tattoo by अर्जुन थापा, photo 1"/);
+	});
+});
+
+describe("the All work page (TAT-126)", () => {
+	const BINA: Artist = {
+		...SITA,
+		id: "0199f000-0000-7000-8000-000000000050",
+		slug: "bina",
+		name: "Bina Gurung",
+	};
+	const workHtml = (
+		page: unknown,
+		search: WorkSearch = {},
+		artists: Artist[] = [sitaWithWork(2), ARJUN],
+	) =>
+		renderToStaticMarkup(
+			createElement(WorkPage, {
+				data: workPageData(STUDIO, artists, page, search, ORIGIN, IMAGE_ORIGIN),
+			}),
+		);
+	const form = (html: string) =>
+		html.match(/<form [^>]*role="search"[\s\S]*?<\/form>/)?.[0] ?? "";
+	const checkbox = (html: string) =>
+		html.match(/<input type="checkbox"[^>]*>/)?.[0] ?? "";
+	const dialogs = (html: string) =>
+		html.match(/<dialog [^>]*>[\s\S]*?<\/dialog>/g) ?? [];
+	const FACETED = galleryPage(3, {
+		filters: {
+			styles: [
+				{ slug: "blackwork", name: "Blackwork" },
+				{ slug: "fine-line", name: "Fine line" },
+			],
+			healed: true,
+		},
+	});
+
+	test("is the studio's All work page: the site bar, the h1, the gallery, the studio", () => {
+		const html = workHtml(FACETED);
+
+		assertSafePage(html);
+		assert.deepEqual(headings(html), [1, 2]);
+		assert.match(html, /<h1 [^>]*>All work<\/h1>/);
+		assert.match(
+			html,
+			/^<header class="site-bar"><a href="\/" dir="auto">Black Needle<\/a><\/header><main class="page">/,
+		);
+		assert.equal(count(html, /class="work-open"/g), 3);
+		assert.match(html, /<footer class="site-footer">/);
+		assert.ok(hrefs(html).includes("/"));
+		// The studio block and the way back, as on the artist's page.
+		assert.match(html, /<h2 id="studio-title"[^>]*>Black Needle<\/h2>/);
+		assert.match(html, />See the studio page<\/a>/);
+	});
+
+	test("shares its site bar and studio block with the artist page, byte for byte", () => {
+		const artist = artistPageData(STUDIO, [SITA], "sita", ORIGIN);
+		assert.ok(artist);
+		const artistHtml = renderToStaticMarkup(
+			createElement(ArtistPage, { data: artist }),
+		);
+		const bar = (html: string) =>
+			html.match(/<header class="site-bar">[\s\S]*?<\/header>/)?.[0];
+		const studio = (html: string) =>
+			html.match(
+				/<section class="section" aria-labelledby="studio-title">[\s\S]*?<\/section>/,
+			)?.[0];
+
+		assert.ok(bar(artistHtml));
+		assert.ok(studio(artistHtml));
+		assert.equal(bar(workHtml(FACETED)), bar(artistHtml));
+		assert.equal(studio(workHtml(FACETED)), studio(artistHtml));
+	});
+
+	test("the viewer names the artist with a link, the styles and Healed", () => {
+		const [first = "", second = ""] = dialogs(workHtml(FACETED));
+
+		assert.match(
+			first,
+			/<div class="work-dialog-meta"><p><a class="text-link" href="\/artists\/sita"><bdi>Sita Rai<\/bdi><\/a><\/p><p>Fine line<\/p><p>Healed<\/p><\/div>/,
+		);
+		// Every photo names whose it is; the second has no style and no healed mark.
+		assert.match(
+			second,
+			/<div class="work-dialog-meta"><p><a class="text-link" href="\/artists\/sita"><bdi>Sita Rai<\/bdi><\/a><\/p><\/div>/,
+		);
+	});
+
+	test("a photo with no usable artist has no link in its viewer", () => {
+		const page = galleryPage(1);
+		const html = workHtml({
+			...page,
+			data: [{ ...page.data[0], artist: null }],
+		});
+
+		assertSafePage(html);
+		assert.doesNotMatch(dialogs(html)[0] ?? "", /href=/);
+		assert.match(html, /alt="Tattoo, photo 1"/);
+	});
+
+	test("Show more links to the next page with the same filters", () => {
+		const search: WorkSearch = {
+			artist: "sita",
+			style: "fine-line",
+			healed: true,
+		};
+		const html = workHtml(galleryPage(3, { nextCursor: "c2" }), search);
+
+		assertSafePage(html);
+		assert.match(
+			html,
+			/<a class="action action-secondary work-more" href="\/work\?artist=sita&amp;style=fine-line&amp;healed=1&amp;cursor=c2">Show more<\/a>/,
+		);
+		assert.match(
+			workHtml(galleryPage(3, { nextCursor: "c2" })),
+			/href="\/work\?cursor=c2">Show more/,
+		);
+		assert.equal(count(workHtml(galleryPage(3)), /work-more/g), 0);
+	});
+
+	test("a cursor page offers the way back to the newest, keeping the filters", () => {
+		const html = workHtml(galleryPage(3), {
+			artist: "sita",
+			healed: true,
+			cursor: "c2",
+		});
+
+		assert.match(
+			html,
+			/<a class="text-link" href="\/work\?artist=sita&amp;healed=1">Back to the newest<\/a>/,
+		);
+		assert.equal(count(workHtml(galleryPage(3)), /Back to the newest/g), 0);
+		assert.match(
+			workHtml(galleryPage(3), { cursor: "c2" }),
+			/<a class="text-link" href="\/work">Back to the newest<\/a>/,
+		);
+	});
+
+	test("the filters are a GET form to /work with the artists, styles and Healed that apply", () => {
+		const html = workHtml(FACETED, {}, [
+			sitaWithWork(2),
+			{ ...BINA, workPhotos: sitaWithWork(1).workPhotos },
+			ARJUN,
+		]);
+		const filters = form(html);
+
+		const tag = filters.match(/^<form [^>]*>/)?.[0] ?? "";
+		assert.match(tag, / class="work-filters"/);
+		assert.match(tag, / role="search"/);
+		assert.match(tag, / aria-label="Filter the photos"/);
+		assert.match(tag, / method="get"/);
+		assert.match(tag, / action="\/work"/);
+		assert.match(filters, /<label [^>]*for="work-artist"[^>]*>Artist<\/label>/);
+		assert.match(
+			filters,
+			/<select id="work-artist" name="artist"><option value="" selected="">All artists<\/option><option value="bina">Bina Gurung<\/option><option value="sita">Sita Rai<\/option><\/select>/,
+		);
+		assert.match(filters, /<label [^>]*for="work-style"[^>]*>Style<\/label>/);
+		assert.match(
+			filters,
+			/<select id="work-style" name="style"><option value="" selected="">All styles<\/option><option value="blackwork">Blackwork<\/option><option value="fine-line">Fine line<\/option><\/select>/,
+		);
+		assert.match(
+			checkbox(filters),
+			/^<input type="checkbox" name="healed" value="1"\/>$/,
+		);
+		assert.match(filters, />Healed only<\/span>/);
+		assert.match(
+			filters,
+			/<button type="submit" class="action action-secondary">Show photos<\/button><\/form>$/,
+		);
+		assertSafePage(html);
+	});
+
+	test("the selects and the checkbox start where the address is", () => {
+		const html = workHtml(
+			FACETED,
+			{ artist: "sita", style: "fine-line", healed: true },
+			[sitaWithWork(2), { ...BINA, workPhotos: sitaWithWork(1).workPhotos }],
+		);
+		const filters = form(html);
+
+		assert.match(
+			filters,
+			/<option value="sita" selected="">Sita Rai<\/option>/,
+		);
+		assert.match(
+			filters,
+			/<option value="fine-line" selected="">Fine line<\/option>/,
+		);
+		assert.match(checkbox(filters), / checked=""/);
+		assert.equal(count(filters, /selected=""/g), 2);
+		assert.match(filters, /<option value="bina">Bina Gurung<\/option>/);
+	});
+
+	test("shows only the filters that apply", () => {
+		const one = form(workHtml(FACETED));
+		// One artist with photos: nothing to choose between.
+		assert.doesNotMatch(one, /name="artist"/);
+		assert.match(one, /name="style"/);
+		assert.match(one, /name="healed"/);
+
+		// No facet styles: no style select.
+		const noStyles = form(
+			workHtml(galleryPage(3, { filters: { styles: [], healed: true } })),
+		);
+		assert.doesNotMatch(noStyles, /name="style"/);
+		assert.match(noStyles, /name="healed"/);
+
+		// No healed photo and not asked: no checkbox.
+		const noHealed = form(
+			workHtml(
+				galleryPage(3, {
+					filters: { styles: FACETED.filters.styles, healed: false },
+				}),
+			),
+		);
+		assert.doesNotMatch(noHealed, /name="healed"/);
+		assert.match(noHealed, /name="style"/);
+
+		// Healed asked for: the checkbox stays, to be unticked.
+		const asked = form(
+			workHtml(galleryPage(0, { filters: { styles: [], healed: false } }), {
+				healed: true,
+			}),
+		);
+		assert.match(checkbox(asked), / checked=""/);
+	});
+
+	test("with nothing to filter by there is no form", () => {
+		const html = workHtml(
+			galleryPage(3, { filters: { styles: [], healed: false } }),
+		);
+
+		assertSafePage(html);
+		assert.equal(count(html, /<form [^>]*role="search"/g), 0);
+		assert.equal(count(html, /<select/g), 0);
+		assert.equal(count(html, /class="work-open"/g), 3);
+	});
+
+	test("with no photos it says so, and links home", () => {
+		const none = galleryPage(0, { filters: { styles: [], healed: false } });
+		for (const page of [none, null, { data: "x" }]) {
+			const html = workHtml(page, {}, [ARJUN]);
+
+			assertSafePage(html);
+			assert.match(html, /<p[^>]*>No photos yet\.<\/p>/);
+			assert.equal(count(html, /work-grid|<dialog|<form /g), 0);
+			assert.ok(hrefs(html).includes("/"));
+			assert.doesNotMatch(html, /No photos match/);
+		}
+	});
+
+	test("with filters and no match it says so, and links to all work", () => {
+		const html = workHtml(
+			galleryPage(0, {
+				filters: { styles: FACETED.filters.styles, healed: true },
+			}),
+			{ artist: "sita", style: "blackwork" },
+		);
+
+		assertSafePage(html);
+		assert.match(html, /<p[^>]*>No photos match these filters\.<\/p>/);
+		assert.match(html, /<a class="text-link" href="\/work">Show all work<\/a>/);
+		assert.doesNotMatch(html, /No photos yet/);
+		assert.equal(count(html, /work-grid|<dialog/g), 0);
+		// The form is still there to change the filters.
+		assert.match(form(html), /name="style"/);
+	});
+
+	test("a style that no photo of the chosen artist has is still shown, selected, beside the message", () => {
+		// What the API answers for ?artist=sita&style=fine-line when sita has only
+		// blackwork: an empty page whose filters include the style asked for.
+		const html = workHtml(
+			galleryPage(0, {
+				filters: { styles: FACETED.filters.styles, healed: false },
+			}),
+			{ artist: "sita", style: "fine-line" },
+			[sitaWithWork(2), { ...BINA, workPhotos: sitaWithWork(1).workPhotos }],
+		);
+		const filters = form(html);
+
+		assertSafePage(html);
+		assert.match(
+			filters,
+			/<select id="work-style" name="style"><option value="">All styles<\/option><option value="blackwork">Blackwork<\/option><option value="fine-line" selected="">Fine line<\/option><\/select>/,
+		);
+		assert.match(
+			filters,
+			/<option value="sita" selected="">Sita Rai<\/option>/,
+		);
+		assert.match(html, /<p[^>]*>No photos match these filters\.<\/p>/);
+		assert.match(html, /<a class="text-link" href="\/work">Show all work<\/a>/);
+		assert.equal(count(html, /work-grid|<dialog/g), 0);
+	});
+
+	test("a hostile artist, style or description is text, never markup", () => {
+		const page = galleryPage(1);
+		const html = workHtml(
+			{
+				...page,
+				data: [
+					{
+						...page.data[0],
+						alt: '"><script>alert(1)</script>',
+						styles: [{ slug: "a", name: "<b>x</b>" }],
+						artist: { slug: "sita", name: "<i>Sita</i>" },
+					},
+				],
+				filters: {
+					healed: false,
+					styles: [{ slug: "a", name: "<u>y</u>" }],
+				},
+			},
+			{},
+			[{ ...sitaWithWork(1), name: "<s>Sita</s>" }],
+		);
+
+		assertSafePage(html);
+		assert.doesNotMatch(html, /<script>alert|<b>x|<i>Sita|<u>y|<s>Sita/);
 	});
 });
 

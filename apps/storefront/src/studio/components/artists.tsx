@@ -1,11 +1,9 @@
 import { Fill } from "../../intake/components/fill.tsx";
 import { studioCopy } from "../copy.ts";
-import { showPhoto } from "../lightbox.ts";
 import { isAllowedHref, linkRel } from "../links.ts";
 import {
 	profilePhotoSizes,
 	rosterPhotoSizes,
-	workGridSizes,
 	workStripSizes,
 } from "../srcset.ts";
 import type { ArtistPhoto, ArtistView, StudioView } from "../view-model.ts";
@@ -49,9 +47,10 @@ function PhotoFigure({
 const STRIP_PHOTOS = 3;
 
 /**
- * The first three work photos of an artist (TAT-116), as small squares in one
- * link to their page's work grid. The squares are decorative (`alt=""`): the
- * link's own text names where it goes.
+ * An artist's three newest work photos (`workPhotos` are their six newest,
+ * newest first: TAT-116, TAT-126), as small squares in one link to their
+ * page's portfolio. The squares are decorative (`alt=""`): the link's own
+ * text names where it goes.
  */
 function WorkStrip({ artist }: { artist: ArtistView }) {
 	if (artist.workPhotos.length === 0) return null;
@@ -264,77 +263,5 @@ export function ArtistProfile({
 				) : null}
 			</div>
 		</article>
-	);
-}
-
-/**
- * The artist page's work (TAT-116): the photos in a square grid, each a
- * button that opens that photo's own `<dialog>` (the browser's modal: Escape,
- * focus and the inert page behind are its own; showPhoto is the one DOM call).
- * The dialog holds a Close form (`method="dialog"`), "Photo n of m", the large
- * copy (lazy, inside a closed dialog it is not fetched until opened) and the
- * description. Nothing when the artist shows no photos.
- */
-export function WorkGrid({ artist }: { artist: ArtistView }) {
-	if (artist.workPhotos.length === 0) return null;
-	return (
-		<section id="work" className="section" aria-labelledby="work-title">
-			<h2 id="work-title" className="section-title">
-				{studioCopy.work.title}
-			</h2>
-			{/* biome-ignore lint/a11y/useSemanticElements: it is a <ul>; the role repairs WebKit's reading of list-style: none */}
-			{/* biome-ignore lint/a11y/noRedundantRoles: redundant for the spec, needed for WebKit with list-style: none */}
-			<ul className="work-grid" role="list">
-				{artist.workPhotos.map((photo) => (
-					<li key={photo.dialogId}>
-						<button
-							type="button"
-							className="work-open"
-							aria-haspopup="dialog"
-							aria-controls={photo.dialogId}
-							onClick={() => showPhoto(photo.dialogId)}
-						>
-							<img
-								className="work-photo"
-								src={photo.src}
-								srcSet={photo.srcSet}
-								sizes={photo.srcSet ? workGridSizes(photo) : undefined}
-								width={photo.width}
-								height={photo.height}
-								alt={photo.alt}
-								loading="lazy"
-								decoding="async"
-							/>
-						</button>
-						<dialog
-							id={photo.dialogId}
-							className="work-dialog"
-							aria-label={photo.label}
-						>
-							<form method="dialog" className="work-dialog-bar">
-								<p>{photo.label}</p>
-								<button type="submit" className="action action-secondary">
-									{studioCopy.work.close}
-								</button>
-							</form>
-							<img
-								className="work-large"
-								src={photo.largeSrc}
-								width={photo.width}
-								height={photo.height}
-								alt={photo.alt}
-								loading="lazy"
-								decoding="async"
-							/>
-							{photo.caption ? (
-								<p className="work-dialog-caption user-text" dir="auto">
-									{photo.caption}
-								</p>
-							) : null}
-						</dialog>
-					</li>
-				))}
-			</ul>
-		</section>
 	);
 }

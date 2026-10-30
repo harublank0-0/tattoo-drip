@@ -230,6 +230,32 @@
   .work-dialog-bar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; inline-size: 100%; max-inline-size: 64rem; }
   .work-large { display: block; inline-size: auto; block-size: auto; max-inline-size: 100%; max-block-size: calc(100dvh - 8rem); object-fit: contain; background: var(--stencil-wash); }
   .work-dialog-caption { max-inline-size: 36rem; }
+  /* Whose photo it is, its styles and Healed (TAT-126): under the caption, one short line each. */
+  .work-dialog-meta { display: grid; gap: 0.25rem; justify-items: center; max-inline-size: 36rem; color: var(--ink-muted); text-align: center; overflow-wrap: anywhere; }
+  /*
+   * The whole portfolio and the All work page (TAT-126). The artist page's
+   * All / Healed links and the filter form are 3rem tall, like the buttons;
+   * the current link is filled with the stencil. "Show more" is a link styled
+   * as a secondary button, with its status line under it; the status line is
+   * always in the page (empty), so a screen reader hears it when it fills.
+   */
+  .work-filter-nav { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-block-end: 1.5rem; }
+  .work-filter-nav a { display: inline-flex; align-items: center; min-block-size: 3rem; padding: 0.25rem 1.25rem; border: 1.5px solid var(--stencil); border-radius: var(--radius); color: var(--stencil); font-weight: 600; text-decoration: none; transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease; }
+  .work-filter-nav a:hover { background: var(--stencil-wash); }
+  .work-filter-nav a[aria-current="page"] { background: var(--stencil); color: var(--on-stencil); }
+  .work-filter-nav a[aria-current="page"]:hover { background: var(--stencil-strong); border-color: var(--stencil-strong); }
+  .work-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 1rem; margin-block-end: 2rem; }
+  .work-filter-field { display: grid; flex: 1 1 12rem; gap: 0.25rem; min-inline-size: 0; max-inline-size: 20rem; }
+  .work-filter-field label { font-weight: 600; }
+  .work-filter-field select { inline-size: 100%; min-block-size: 3rem; padding: 0.5rem 0.75rem; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--paper); color: var(--ink); font: inherit; }
+  .work-filter-check { display: inline-flex; align-items: center; gap: 0.5rem; min-block-size: 3rem; font-weight: 600; overflow-wrap: anywhere; }
+  .work-filter-check input { flex: none; inline-size: 1.25rem; block-size: 1.25rem; accent-color: var(--stencil); }
+  .work-newest { margin-block-end: 1rem; }
+  .work-all { margin-block-start: 1rem; }
+  .work-all .text-link { gap: 0.5rem; }
+  .work-all svg { flex: none; inline-size: 1.25rem; block-size: 1.25rem; }
+  .work-more-bar { display: grid; justify-items: start; margin-block-start: 1.5rem; }
+  .work-more-bar .note { margin-block-start: 0.75rem; }
   .site-bar-logo { display: block; inline-size: auto; max-inline-size: 6rem; block-size: 2rem; margin-inline-end: 0.75rem; object-fit: contain; box-sizing: content-box; padding: 0.25rem; background: var(--logo-plate); border-radius: var(--radius); }
   .profile-actions { display: grid; gap: 1.5rem; align-content: start; }
   /* On a phone the two buttons share a row when they fit (each grows to fill it), else stack at full width. */
@@ -357,7 +383,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .action, .link-chip { transition: none; }
+  .action, .link-chip, .work-filter-nav a { transition: none; }
 }
 
 /*

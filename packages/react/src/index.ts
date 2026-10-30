@@ -5,11 +5,11 @@ export {
 	useCreateInquiry,
 	useDeposit,
 	usePlacements,
-	usePortfolio,
 	useServices,
 	useStudio,
 	useStyles,
 	useSubmitDepositProof,
+	useWork,
 } from "./hooks.js";
 export {
 	TattooProvider,

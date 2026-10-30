@@ -4,12 +4,12 @@ import { IANAZone } from "luxon";
 import { IMAGE_FORMAT_MESSAGE } from "#modules/media/errors";
 import { imageFile } from "#modules/media/validators/image_file";
 import {
-	ARTIST_PLACEMENT_KEYS,
 	DARK_PAPER,
 	FONT_KEYS,
 	HEX_COLOR,
 	LIGHT_PAPER,
 	readsOn,
+	SECTION_KEYS,
 	THEME_KEYS,
 } from "#modules/storefront/look";
 import { TENANT_TYPES } from "#modules/tenancy/models/tenant";
@@ -241,7 +241,7 @@ const colour = (paper: string) =>
 
 /**
  * The studio's page look (TAT-56): every value is a key from the app's list or
- * a checked colour, never markup. The theme, font and artists list are
+ * a checked colour, never markup. The theme, font and sections are
  * required (the form always sends them); a colour left empty clears it.
  */
 export const updateLookValidator = vine.create({
@@ -249,7 +249,12 @@ export const updateLookValidator = vine.create({
 	accent: colour(LIGHT_PAPER),
 	accentDark: colour(DARK_PAPER),
 	font: vine.enum(FONT_KEYS),
-	artists: vine.enum(ARTIST_PLACEMENT_KEYS),
+	// The shown sections in order (the form sends one `sections[]` per shown row). The
+	// service adds the form at the end if it is missing.
+	sections: vine
+		.array(vine.enum(SECTION_KEYS))
+		.distinct()
+		.maxLength(SECTION_KEYS.length),
 });
 
 const COLOUR_FORMAT =
@@ -270,7 +275,13 @@ updateLookValidator.messagesProvider = new SimpleMessagesProvider({
 		"This colour is hard to read in dark mode. Pick a lighter one.",
 	"theme.enum": "Choose one of the themes.",
 	"font.enum": "Choose one of the fonts.",
-	"artists.enum": "Choose where the artists list goes.",
+	// An item off the list is "sections.0" (the page shows the first section error under the list).
+	"sections.*.enum": "Choose sections from the list.",
+	"sections.distinct": "Show each section once.",
+	"sections.array.maxLength": "Show each section once.",
+	// The form always sends the list (the form row at least); only a hand-made request leaves it out.
+	"sections.required": "Choose sections from the list.",
+	"sections.array": "Choose sections from the list.",
 });
 
 /**

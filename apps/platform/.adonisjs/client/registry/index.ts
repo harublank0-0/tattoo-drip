@@ -312,12 +312,6 @@ const routes = {
     tokens: [{"old":"/t/:tenant/artists/photos/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/photos/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/photos/:id","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/photos/:id","type":0,"val":"photos","end":""},{"old":"/t/:tenant/artists/photos/:id","type":1,"val":"id","end":""}],
     types: placeholder as Registry['tenant.artists.photos.update']['types'],
   },
-  'tenant.artists.photos.move': {
-    methods: ["POST"],
-    pattern: '/t/:tenant/artists/photos/:id/move',
-    tokens: [{"old":"/t/:tenant/artists/photos/:id/move","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/photos/:id/move","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/photos/:id/move","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/photos/:id/move","type":0,"val":"photos","end":""},{"old":"/t/:tenant/artists/photos/:id/move","type":1,"val":"id","end":""},{"old":"/t/:tenant/artists/photos/:id/move","type":0,"val":"move","end":""}],
-    types: placeholder as Registry['tenant.artists.photos.move']['types'],
-  },
   'tenant.artists.photos.destroy': {
     methods: ["DELETE"],
     pattern: '/t/:tenant/artists/photos/:id',
@@ -630,6 +624,12 @@ const routes = {
     tokens: [{"old":"/account/sign-out-others","type":0,"val":"account","end":""},{"old":"/account/sign-out-others","type":0,"val":"sign-out-others","end":""}],
     types: placeholder as Registry['account.sign_out_others']['types'],
   },
+  'api.v1.styles.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/styles',
+    tokens: [{"old":"/api/v1/styles","type":0,"val":"api","end":""},{"old":"/api/v1/styles","type":0,"val":"v1","end":""},{"old":"/api/v1/styles","type":0,"val":"styles","end":""}],
+    types: placeholder as Registry['api.v1.styles.index']['types'],
+  },
   'api.v1.studio': {
     methods: ["GET","HEAD"],
     pattern: '/api/v1/tenants/:tenant',
@@ -647,6 +647,12 @@ const routes = {
     pattern: '/api/v1/tenants/:tenant/artists/:artist',
     tokens: [{"old":"/api/v1/tenants/:tenant/artists/:artist","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/artists/:artist","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/artists/:artist","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/artists/:artist","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/artists/:artist","type":0,"val":"artists","end":""},{"old":"/api/v1/tenants/:tenant/artists/:artist","type":1,"val":"artist","end":""}],
     types: placeholder as Registry['api.v1.artists.show']['types'],
+  },
+  'api.v1.work.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/tenants/:tenant/work',
+    tokens: [{"old":"/api/v1/tenants/:tenant/work","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/work","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/work","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/work","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/work","type":0,"val":"work","end":""}],
+    types: placeholder as Registry['api.v1.work.index']['types'],
   },
   'api.v1.inquiries.store': {
     methods: ["POST"],

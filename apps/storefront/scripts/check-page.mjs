@@ -3,7 +3,8 @@
 // STOREFRONT_SERVER_KEY, and checks what a visitor and the log can see
 // (TAT-23, spec ruling 8; the studio page since TAT-48): the page carries the
 // studio's name, the API's origin and its own origin but never the key, the
-// API got one keyed lookup and one keyed artists read per page, each with
+// API got one keyed lookup and one keyed artists read per page (the studio
+// page, an artist's page and /work add one gallery read, TAT-126), each with
 // the visitor's address (X-Visitor-IP, TAT-38), a failed
 // read is an error page inside the document (never a not-found, never
 // cached) and a failed lookup is a 503. The deposit page (TAT-65b) is its
@@ -52,6 +53,13 @@ const ARTISTS = [
 	},
 ];
 
+// The gallery read (TAT-126) with no photo in it: the stand-in has none.
+const EMPTY_WORK = {
+	data: [],
+	nextCursor: null,
+	filters: { styles: [], healed: false },
+};
+
 if (!existsSync(SERVER)) {
 	console.error("There is no build to run. Run pnpm build first.");
 	process.exit(1);
@@ -68,7 +76,8 @@ const freePort = () =>
 	});
 
 // The stand-in API: answers the studio lookup and the artists read as `mode`
-// says ("artists-5xx" fails only the artists read), and keeps a log.
+// says ("artists-5xx" fails only the artists read, "work-5xx" only the gallery
+// read), and keeps a log.
 let mode = "ok";
 const apiLog = [];
 const api = http.createServer((request, response) => {
@@ -86,14 +95,29 @@ const api = http.createServer((request, response) => {
 	if (mode === "5xx") {
 		return send(500, { error: { code: "internal", message: API_DETAIL } });
 	}
-	if (mode === "ok" || mode === "artists-5xx") {
+	if (mode === "ok" || mode === "artists-5xx" || mode === "work-5xx") {
 		if (request.url === `/api/v1/tenants/${SLUG}`) {
 			return send(200, { data: STUDIO });
 		}
 		if (request.url === `/api/v1/tenants/${SLUG}/artists`) {
-			return mode === "ok"
-				? send(200, { data: ARTISTS })
-				: send(500, { error: { code: "internal", message: API_DETAIL } });
+			return mode === "artists-5xx"
+				? send(500, { error: { code: "internal", message: API_DETAIL } })
+				: send(200, { data: ARTISTS });
+		}
+		if (request.url.startsWith(`/api/v1/tenants/${SLUG}/work?`)) {
+			if (mode === "work-5xx") {
+				return send(500, { error: { code: "internal", message: API_DETAIL } });
+			}
+			// A cursor the platform would refuse is a 422, as the real API says.
+			return request.url.includes("cursor=bogus")
+				? send(422, {
+						error: {
+							code: "validation_failed",
+							message: "That is not a cursor from this list.",
+							fields: { cursor: ["That is not a cursor from this list."] },
+						},
+					})
+				: send(200, EMPTY_WORK);
 		}
 	}
 	return send(404, { error: { code: "not_found", message: "Not found." } });
@@ -219,20 +243,33 @@ try {
 		!page.body.includes(CANARY) && !page.headers.includes(CANARY),
 		"THE SERVER KEY IS IN THE PAGE OR ITS HEADERS.",
 	);
+	// The studio page asks for the lookup, the artists and the newest 9 photos
+	// (Recent work, TAT-126), and shows no Recent work when there are none.
 	expect(
-		apiLog.length === 2 &&
-			apiLog[0].url === `/api/v1/tenants/${SLUG}` &&
-			apiLog[1].url === `/api/v1/tenants/${SLUG}/artists` &&
+		apiLog
+			.map((call) => call.url)
+			.sort()
+			.join(",") ===
+			[
+				`/api/v1/tenants/${SLUG}`,
+				`/api/v1/tenants/${SLUG}/artists`,
+				`/api/v1/tenants/${SLUG}/work?limit=9`,
+			].join(",") &&
 			apiLog.every(
 				(call) =>
 					call.authorization === `Bearer ${CANARY}` &&
 					call.visitor === VISITOR &&
 					call.cookie === null,
 			),
-		`The page made ${apiLog.length} API calls instead of one keyed, cookie-less lookup and one artists read, each carrying the visitor's address.`,
+		`The page made the API calls ${apiLog.map((call) => call.url).join(", ")} instead of one keyed, cookie-less lookup, one artists read and the newest 9 photos, each carrying the visitor's address.`,
+	);
+	expect(
+		!page.body.includes("Recent work") && !page.body.includes("All work"),
+		"The page shows Recent work, or a link to all work, with no photos.",
 	);
 
-	// An artist's page asks the API once more for the same list, never for the artist.
+	// An artist's page asks the API once more for the same list, never for the
+	// artist, and for that artist's newest photos (TAT-126).
 	apiLog.length = 0;
 	page = await get("/artists/sita");
 	expect(
@@ -246,9 +283,103 @@ try {
 		"An artist's page is not 200 with its own title and canonical link.",
 	);
 	expect(
-		apiLog.map((call) => call.url).join(",") ===
-			`/api/v1/tenants/${SLUG},/api/v1/tenants/${SLUG}/artists`,
-		"An artist's page asked the API for more than the lookup and the list.",
+		apiLog
+			.map((call) => call.url)
+			.sort()
+			.join(",") ===
+			[
+				`/api/v1/tenants/${SLUG}`,
+				`/api/v1/tenants/${SLUG}/artists`,
+				`/api/v1/tenants/${SLUG}/work?artist=sita&limit=24`,
+			].join(","),
+		`An artist's page asked the API for ${apiLog.map((call) => call.url).join(", ")} instead of the lookup, the list and the artist's newest 24 photos.`,
+	);
+	expect(
+		apiLog.every(
+			(call) =>
+				call.authorization === `Bearer ${CANARY}` && call.cookie === null,
+		),
+		"An artist's page made an API call without the key, or with a cookie.",
+	);
+
+	// All work (TAT-126): the lookup, the list and the first page of photos.
+	apiLog.length = 0;
+	page = await get("/work");
+	expect(
+		page.status === 200 &&
+			page.body.includes(
+				"<title>All work at Canary Ink &lt;Studio&gt;</title>",
+			) &&
+			page.body.includes(
+				`href="http://${SLUG}.localhost:${storefrontPort}/work"`,
+			),
+		`/work is ${page.status}, or lacks its own title and canonical link.`,
+	);
+	expect(
+		page.cacheControl ===
+			"public, max-age=0, s-maxage=60, stale-while-revalidate=600",
+		`/work's Cache-Control is "${page.cacheControl}".`,
+	);
+	expect(
+		page.body.includes("No photos yet.") && !page.body.includes(CANARY),
+		"/work does not say there are no photos, or shows the server key.",
+	);
+	expect(
+		apiLog
+			.map((call) => call.url)
+			.sort()
+			.join(",") ===
+			[
+				`/api/v1/tenants/${SLUG}`,
+				`/api/v1/tenants/${SLUG}/artists`,
+				`/api/v1/tenants/${SLUG}/work?limit=24`,
+			].join(","),
+		`/work asked the API for ${apiLog.map((call) => call.url).join(", ")} instead of the lookup, the list and the first 24 photos.`,
+	);
+
+	// The router's own spelling of the address is ours: ?healed=1 is no redirect.
+	page = await get("/work?artist=sita&healed=1");
+	expect(
+		page.status === 200,
+		`/work?artist=sita&healed=1 is ${page.status}, not 200 (the router redirects an address it spells otherwise).`,
+	);
+
+	// The router reads the search as plain strings: an artist whose slug looks
+	// like JSON (true, null, 1e2, 2025) is no redirect and reaches the API as typed.
+	for (const slug of ["true", "false", "null", "1e2", "2025"]) {
+		apiLog.length = 0;
+		page = await get(`/work?artist=${slug}&healed=1`);
+		expect(
+			page.status === 200,
+			`/work?artist=${slug}&healed=1 is ${page.status}, not 200 (a redirect, or the router read the slug as JSON).`,
+		);
+		expect(
+			apiLog.some(
+				(call) =>
+					call.url ===
+					`/api/v1/tenants/${SLUG}/work?artist=${slug}&healed=true&limit=24`,
+			),
+			`/work?artist=${slug}&healed=1 asked the API for ${apiLog.map((call) => call.url).join(", ")}, not for artist ${slug} healed.`,
+		);
+	}
+	page = await get("/artists/sita?healed=1");
+	expect(
+		page.status === 200,
+		`/artists/sita?healed=1 is ${page.status}, not 200.`,
+	);
+
+	// A cursor the API refuses (a hand-edited link) is the not-found page.
+	page = await get("/work?cursor=bogus");
+	expect(
+		page.status === 404 &&
+			page.body.includes("Page not found") &&
+			page.cacheControl === "public, max-age=0, s-maxage=60",
+		`/work with a cursor the API refuses is ${page.status} (Cache-Control "${page.cacheControl}"), not the cached 404 page.`,
+	);
+	page = await get("/artists/sita?cursor=bogus");
+	expect(
+		page.status === 404 && page.body.includes("Page not found"),
+		`An artist's page with a cursor the API refuses is ${page.status}, not the 404 page.`,
 	);
 
 	// The deposit page (TAT-65b): the server renders its shell from the cached
@@ -333,6 +464,28 @@ try {
 		"A failed artists read shows the server key.",
 	);
 
+	// The photos fail but the studio and the artists do not: the page stands,
+	// cacheable as ever and without Recent work, and the log says what failed
+	// (without the API's message).
+	mode = "work-5xx";
+	page = await get();
+	expect(
+		page.status === 200 &&
+			page.cacheControl ===
+				"public, max-age=0, s-maxage=60, stale-while-revalidate=600" &&
+			page.body.includes("Sita Rai") &&
+			!page.body.includes("Recent work"),
+		`A failed gallery read is ${page.status} with Cache-Control "${page.cacheControl}", not the studio page without Recent work.`,
+	);
+	expect(
+		/Recent work read failed/.test(output),
+		"A failed gallery read left no log line.",
+	);
+	expect(
+		!page.body.includes(CANARY) && !page.body.includes(API_DETAIL),
+		"A failed gallery read shows the key or the API's error message.",
+	);
+
 	for (const [name, wanted] of [
 		["5xx", 503],
 		["hang", 503],
@@ -373,5 +526,5 @@ if (problems.length > 0) {
 	process.exit(1);
 }
 console.log(
-	"Page check passed: the key is in no page, header or log line; one keyed lookup and one artists read per page, each carrying the visitor's address; a failed read is an uncached error page, a failed lookup a 503; the deposit page is an uncached, unindexed shell from the lookup alone; the public site key is in the page.",
+	"Page check passed: the key is in no page, header or log line; one keyed lookup and one artists read per page (the studio page, an artist's page and /work add one gallery read), each carrying the visitor's address; a failed read is an uncached error page (a failed gallery read only leaves the photos out), a failed lookup a 503; the deposit page is an uncached, unindexed shell from the lookup alone; the public site key is in the page.",
 );
