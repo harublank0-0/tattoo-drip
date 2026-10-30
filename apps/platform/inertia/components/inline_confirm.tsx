@@ -20,7 +20,9 @@ import { Button } from "~/components/ui/button";
  * button says while the request is out ("Saving…" unless the action has a better word).
  * `ariaLabel` is the trigger's accessible name when its visible `label` is not unique on the page
  * (a list of rows each with "Remove"); omitted, the label names it. Never inside a sheet: Escape
- * would close the sheet.
+ * would close the sheet. `disabled` holds the trigger and the confirm button while something else on the
+ * page has a request out that this one would cancel (the flash tray's upload); the safe button still closes
+ * the panel.
  */
 export default function InlineConfirm({
 	label,
@@ -32,6 +34,7 @@ export default function InlineConfirm({
 	busyLabel = "Saving…",
 	onConfirm,
 	fallback,
+	disabled = false,
 }: {
 	label: string;
 	ariaLabel?: string;
@@ -42,6 +45,7 @@ export default function InlineConfirm({
 	busyLabel?: string;
 	onConfirm: (finished: () => void) => void;
 	fallback: RefObject<HTMLElement | null>;
+	disabled?: boolean;
 }) {
 	const panelId = useId();
 	const [state, setState] = useState<ConfirmState>(CONFIRM_CLOSED);
@@ -86,6 +90,7 @@ export default function InlineConfirm({
 					aria-label={ariaLabel}
 					aria-expanded={state.open}
 					aria-controls={panelId}
+					disabled={disabled}
 					onKeyDown={ignoreHeldEnter}
 					onClick={ask}
 				>
@@ -105,7 +110,7 @@ export default function InlineConfirm({
 						<Button
 							type="button"
 							className="h-11"
-							disabled={state.saving}
+							disabled={state.saving || disabled}
 							onClick={confirm}
 						>
 							{state.saving ? busyLabel : confirmLabel}

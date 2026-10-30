@@ -70,13 +70,20 @@ export default function FlashTray({
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 	// Where focus goes when a removed design took its row with it.
 	const countLine = useRef<HTMLOutputElement>(null);
+	// A design is going up: every other write of the tray (a row's Remove, the
+	// sheet's Save) waits, since each starts a visit that would cancel the upload's.
+	const [uploading, setUploading] = useState(false);
 
 	const selected = designs.find((design) => design.id === selectedId) ?? null;
 
 	return (
 		<div className="flex flex-col gap-4">
 			{count < MAX_FLASH_DESIGNS ? (
-				<AddDesign tenantSlug={tenantSlug} artistId={artistId} />
+				<AddDesign
+					tenantSlug={tenantSlug}
+					artistId={artistId}
+					onBusyChange={setUploading}
+				/>
 			) : (
 				<p className="text-sm text-muted-foreground">{FLASH_FULL}</p>
 			)}
@@ -136,6 +143,7 @@ export default function FlashTray({
 										keepLabel={REMOVE_FLASH_KEEP}
 										busyLabel="Removing…"
 										fallback={countLine}
+										disabled={uploading}
 										onConfirm={(finished) =>
 											router.delete(
 												urlFor("tenant.artists.flash.destroy", {
@@ -165,6 +173,7 @@ export default function FlashTray({
 						tenantSlug={tenantSlug}
 						sheet={sheet}
 						design={selected}
+						uploading={uploading}
 					/>
 				)}
 			</FormSheetPanel>
@@ -177,14 +186,17 @@ export default function FlashTray({
  * design clears this form (the file input too) and nothing else: the visit
  * keeps the page's state (`preserveState: true`, as the work photos do), so
  * the profile form above keeps its unsaved edits and chosen photo. A refusal
- * shows under its field and keeps what was typed.
+ * shows under its field and keeps what was typed. `onBusyChange` tells the
+ * tray while the visit is out, so the tray's other writes wait for it.
  */
 function AddDesign({
 	tenantSlug,
 	artistId,
+	onBusyChange,
 }: {
 	tenantSlug: string;
 	artistId: string;
+	onBusyChange: (busy: boolean) => void;
 }) {
 	return (
 		<Form
@@ -192,6 +204,8 @@ function AddDesign({
 			routeParams={{ tenant: tenantSlug, id: artistId }}
 			options={{ preserveScroll: true, preserveState: true }}
 			resetOnSuccess
+			onStart={() => onBusyChange(true)}
+			onFinish={() => onBusyChange(false)}
 		>
 			{({ errors, processing }) => (
 				<FieldGroup>
@@ -287,10 +301,12 @@ function DesignDetails({
 	tenantSlug,
 	sheet,
 	design,
+	uploading,
 }: {
 	tenantSlug: string;
 	sheet: FormSheetState;
 	design: FlashDesignProps;
+	uploading: boolean;
 }) {
 	return (
 		<>
@@ -342,7 +358,11 @@ function DesignDetails({
 								{errors.shown && <FieldError>{errors.shown}</FieldError>}
 							</FieldContent>
 						</Field>
-						<FormSheetActions submit="Save design" processing={processing} />
+						<FormSheetActions
+							submit="Save design"
+							processing={processing}
+							held={uploading}
+						/>
 					</FieldGroup>
 				)}
 			</Form>
