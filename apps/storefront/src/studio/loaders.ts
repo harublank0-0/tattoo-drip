@@ -114,7 +114,9 @@ export interface WorkPageData {
  * The studio page's data. `imageOrigin` is the API's origin, the only one a
  * logo, cover or work photo may come from (TAT-54, TAT-116); null accepts
  * none. `recentWork` is the gallery read for the newest photos, as the API
- * sent it (galleryView checks it); none is an empty Recent work.
+ * sent it (galleryView checks it); none is an empty Recent work. `theme` is
+ * the studio's parsed theme when the caller already has it (loadStudioPage
+ * parses it to see whether the page shows Recent work at all).
  */
 export function studioPageData(
 	studio: Studio,
@@ -122,6 +124,7 @@ export function studioPageData(
 	origin: string,
 	imageOrigin: string | null = null,
 	recentWork: unknown = null,
+	theme: ThemeConfig = parseThemeConfig(storefrontInput(studio), imageOrigin),
 ): StudioPageData {
 	const studioView = studioViewModel(studio);
 	const artistViews = artistViewModels(artists, imageOrigin);
@@ -132,7 +135,7 @@ export function studioPageData(
 		inquiry,
 		channels: channelsFor(studioView, inquiry),
 		seo: studioPageSeo(studioView, artistViews, origin),
-		theme: parseThemeConfig(storefrontInput(studio), imageOrigin),
+		theme,
 		recentWork: galleryView(recentWork, imageOrigin),
 	};
 }
@@ -196,24 +199,28 @@ export function workPageData(
 }
 
 /**
- * `/`: the studio (already cached by the tenant middleware), its artists and
- * its newest photos for Recent work (loadRecentWork: a failed read leaves the
- * section out, never the page).
+ * `/`: the studio (already cached by the tenant middleware), then its artists
+ * and, only when the studio's sections include Recent work, its newest photos
+ * (loadRecentWork: a failed read leaves the section out, never the page). A
+ * studio that hid Recent work costs the API no `/work` read.
  */
 export async function loadStudioPage(
 	context: PageContext,
 ): Promise<StudioPageData> {
-	const [studio, artists, recentWork] = await Promise.all([
-		loadStudio(context),
+	const studio = await loadStudio(context);
+	const imageOrigin = context.tattoo.connection.apiUrl;
+	const theme = parseThemeConfig(storefrontInput(studio), imageOrigin);
+	const [artists, recentWork] = await Promise.all([
 		loadArtists(context),
-		loadRecentWork(context),
+		theme.sections.includes("work") ? loadRecentWork(context) : null,
 	]);
 	return studioPageData(
 		studio,
 		artists,
 		context.site.origin,
-		context.tattoo.connection.apiUrl,
+		imageOrigin,
 		recentWork,
+		theme,
 	);
 }
 
@@ -358,9 +365,10 @@ async function loadRecentWork(context: ApiContext): Promise<unknown> {
  * platform without `/work`, a timeout or a bug here would otherwise leave
  * every page without its photos, all of them 200s. Like the tenant lookup's
  * line (src/tenancy/handle.ts): the studio, the status and the code, never
- * the error, the address, a cursor or a key.
+ * the error, the address, a cursor or a key. Exported so any other read that
+ * lets its page stand without its data says it the same way.
  */
-function logReadFailed(
+export function logReadFailed(
 	what: string,
 	{ tattoo }: ApiContext,
 	error: unknown,

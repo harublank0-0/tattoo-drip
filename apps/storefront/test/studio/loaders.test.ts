@@ -14,6 +14,7 @@ import {
 	loadArtistPage,
 	loadStudioPage,
 	loadWorkPage,
+	logReadFailed,
 	moreWork,
 	studioPageData,
 	workPageData,
@@ -28,7 +29,7 @@ import {
 	STUDIO,
 	sitaWithWork,
 } from "./fixtures.ts";
-import { IMAGE_ORIGIN } from "./theme-fixtures.ts";
+import { IMAGE_ORIGIN, withStorefront } from "./theme-fixtures.ts";
 
 const API = "http://api.test";
 const NOT_FOUND = { error: { code: "not_found", message: "Not found." } };
@@ -75,6 +76,37 @@ const VALIDATION_FAILED = {
 	},
 };
 
+describe("logReadFailed (shared by the pages whose reads may fail)", () => {
+	test("says what failed, for which studio, with the status and code and nothing else", (t) => {
+		const log = t.mock.method(console, "error", () => {});
+		const context = pageContext(listing().fetch);
+
+		logReadFailed(
+			"Gallery",
+			context,
+			new TattooApiError(502, {
+				code: "bad_gateway",
+				message: "secret detail",
+			}),
+		);
+		logReadFailed("Gallery", context, new Error("secret detail"));
+
+		assert.deepEqual(
+			log.mock.calls.map((call) => call.arguments),
+			[
+				[
+					"Gallery read failed",
+					{ slug: STUDIO.slug, status: 502, code: "bad_gateway" },
+				],
+				[
+					"Gallery read failed",
+					{ slug: STUDIO.slug, status: undefined, code: undefined },
+				],
+			],
+		);
+	});
+});
+
 describe("loadStudioPage", () => {
 	const TENANT = `${API}/api/v1/tenants/${STUDIO.slug}`;
 
@@ -91,6 +123,57 @@ describe("loadStudioPage", () => {
 			`${TENANT}/artists`,
 			`${TENANT}/work?limit=9`,
 		]);
+	});
+
+	describe("Recent work is read only when the page shows it", () => {
+		const sections = (...types: string[]) =>
+			withStorefront({ sections: types.map((type) => ({ type, props: {} })) });
+
+		test("sections without work make no /work read, and the page has no recent photos", async () => {
+			const { calls, fetch } = listing([SITA, ARJUN], galleryPage(9));
+			const data = await loadStudioPage(
+				pageContext(fetch, sections("artists", "inquiry"), IMAGE_ORIGIN),
+			);
+
+			assert.deepEqual(
+				calls.map((call) => call.url),
+				[`${IMAGE_ORIGIN}/api/v1/tenants/${STUDIO.slug}/artists`],
+			);
+			assert.deepEqual(data.theme.sections, ["artists", "inquiry"]);
+			assert.deepEqual(data.recentWork, EMPTY_GALLERY);
+			assert.equal(data.artists.length, 2);
+		});
+
+		test("sections with work, wherever it sits, make one /work?limit=9 read", async () => {
+			for (const order of [
+				["work", "artists", "inquiry"],
+				["inquiry", "artists", "work"],
+			]) {
+				const { calls, fetch } = listing([SITA, ARJUN], galleryPage(9));
+				const data = await loadStudioPage(
+					pageContext(fetch, sections(...order), IMAGE_ORIGIN),
+				);
+
+				assert.deepEqual(
+					calls.map((call) => call.url).sort(),
+					[
+						`${IMAGE_ORIGIN}/api/v1/tenants/${STUDIO.slug}/artists`,
+						`${IMAGE_ORIGIN}/api/v1/tenants/${STUDIO.slug}/work?limit=9`,
+					],
+					order.join(),
+				);
+				assert.deepEqual(data.theme.sections, order);
+				assert.equal(data.recentWork.photos.length, 9, order.join());
+			}
+		});
+
+		test("a studio with no storefront configuration (the default order) reads it too", async () => {
+			const { calls, fetch } = listing([SITA, ARJUN], galleryPage(2));
+			const data = await loadStudioPage(pageContext(fetch));
+
+			assert.ok(data.theme.sections.includes("work"));
+			assert.ok(calls.some((call) => call.url.endsWith("/work?limit=9")));
+		});
 	});
 
 	test("the studio page reads the artists and the newest 9 photos", async () => {
@@ -452,7 +535,9 @@ describe("the artist page's portfolio (TAT-126)", () => {
 		assert.deepEqual(data.portfolio, { gallery: EMPTY_GALLERY, search: {} });
 	});
 
-	test("a portfolio read that fails still renders the page, without the Work section", async () => {
+	test("a portfolio read that fails still renders the page, without the Work section", async (t) => {
+		// Each failure is logged (pinned below); this test is about the page.
+		t.mock.method(console, "error", () => {});
 		const failures: Array<() => Response> = [
 			() => json(404, NOT_FOUND),
 			() => json(500, { error: { code: "internal_error", message: "Boom." } }),
