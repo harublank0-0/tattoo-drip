@@ -1044,6 +1044,17 @@ describe("lists with query parameters", () => {
 		assert.equal(plain[0].url, `${T}/flash`);
 	});
 
+	test("flash.list sends available as true or false", async () => {
+		const page = { data: [], nextCursor: null, filters: { artists: [] } };
+		const { calls, fetch } = fakeFetch(() => json(200, page));
+
+		await client(fetch).flash.list({ available: true, limit: 6 });
+		await client(fetch).flash.list({ available: false });
+
+		assert.equal(calls[0].url, `${T}/flash?available=true&limit=6`);
+		assert.equal(calls[1].url, `${T}/flash?available=false`);
+	});
+
 	test("flash.get reads one design by id, encoded", async () => {
 		const design = {
 			id: "0199f000-0000-7000-8000-000000000001",

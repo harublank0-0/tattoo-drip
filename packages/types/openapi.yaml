@@ -281,11 +281,18 @@ paths:
       description: |
         Every shown design of every visible artist (one whose books are
         closed too), newest first. `requestable` says whether `createInquiry`
-        takes a request for the design now. An artist that matches nothing is
-        an empty page. Hidden designs, and hidden or deleted artists' designs,
-        never appear. Cacheable. Under an old studio slug it answers like
-        under the current one.
+        takes a request for the design now. A one-of-a-kind design someone
+        has claimed is listed with `status` `claimed` while the studio shows
+        claimed designs, and not at all when it hides them or when
+        `available=true`. An artist that matches nothing is an empty page.
+        Hidden designs, and hidden or deleted artists' designs, never appear.
+        Cacheable. Under an old studio slug it answers like under the current
+        one.
       parameters:
+        - name: available
+          in: query
+          description: "`true`: only designs nobody has claimed. Left out or `false`: claimed designs too, unless the studio hides them."
+          schema: { type: boolean }
         - name: artist
           in: query
           description: An artist's slug (`getArtist`)
@@ -338,7 +345,8 @@ paths:
       summary: One shown flash design of a visible artist
       description: |
         A hidden design, a hidden or deleted artist's design, an unknown id
-        and another studio's design are all a 404. Cacheable. Under an old
+        and another studio's design are all a 404, and so is a claimed design
+        when the studio hides claimed designs. Cacheable. Under an old
         studio slug it answers like under the current one.
       responses:
         "200":
@@ -421,7 +429,10 @@ paths:
         phone number already has 3 inquiries the studio hasn't answered).
         A request for a flash design (`flashDesignId`) is also a 409
         `flash_unavailable` when the design is hidden, its artist is hidden
-        or deleted, or the id is unknown; a request for a design whose artist
+        or deleted, or the id is unknown, and `flash_claimed` when the design
+        was one of a kind and someone has claimed it (the studio shows or
+        hides claimed designs: either way it takes no request; offer to ask
+        for something similar as a plain request); a request for a design whose artist
         takes no flash requests is `artist_not_accepting`, though their books
         may be open. A `preferredArtistId` other than the design's artist is
         `validation_failed` on `preferredArtistId`.
@@ -466,7 +477,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "408": { $ref: "#/components/responses/Error" }
         "409":
-          description: The studio takes no such inquiry now (`artist_not_accepting`, `studio_not_accepting`, `too_many_open_inquiries`, `flash_unavailable`)
+          description: The studio takes no such inquiry now (`artist_not_accepting`, `studio_not_accepting`, `too_many_open_inquiries`, `flash_unavailable`, `flash_claimed`)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -685,12 +696,13 @@ components:
                 (500), `request_timeout` (408, an upload that took too long)
                 and `service_busy` (503, with `Retry-After`: too many uploads
                 in progress, or no database connection free). Endpoint codes: `artist_not_accepting`,
-                `studio_not_accepting`, `too_many_open_inquiries`, `flash_unavailable` (409),
+                `studio_not_accepting`, `too_many_open_inquiries`, `flash_unavailable`,
+                `flash_claimed` (409),
                 `challenge_failed` (403) and `challenge_unavailable` (503),
                 all `createInquiry`; `deposit_not_due`, `deposit_changed`
                 (409, `submitDepositProof`). Treat an unknown code by its HTTP
                 status.
-              examples: [not_found, validation_failed, rate_limited, service_busy, too_many_open_inquiries, flash_unavailable, challenge_failed, deposit_changed]
+              examples: [not_found, validation_failed, rate_limited, service_busy, too_many_open_inquiries, flash_unavailable, flash_claimed, challenge_failed, deposit_changed]
             message:
               type: string
               description: A sentence for people. Never parse it.
@@ -1177,7 +1189,7 @@ components:
         A flash design an artist offers (TAT-129). Every property is always
         there. All text is plain text: render it as text. It carries no key,
         hidden flag or timestamp: the list's order is newest first.
-      required: [id, name, size, price, image, artist, requestable]
+      required: [id, name, size, price, image, artist, requestable, status]
       additionalProperties: false
       properties:
         id:
@@ -1207,9 +1219,17 @@ components:
         requestable:
           type: boolean
           description: |
-            Whether `createInquiry` takes a request for it now: the artist
-            takes flash requests, whatever their books say. False: show it
-            greyed with the artist's `closedMessage`.
+            Whether `createInquiry` takes a request for it now: `status` is
+            `available` and the artist takes flash requests, whatever their
+            books say. False: show it greyed (a claimed design is marked
+            Claimed; otherwise use the artist's `closedMessage`).
+        status:
+          type: string
+          enum: [available, claimed]
+          description: |
+            `claimed`: one of a kind and taken. Listed only while the studio
+            shows claimed designs: show it greyed, marked Claimed; it is never
+            requestable. Treat an unknown value as `claimed`.
 
     Price:
       type: object

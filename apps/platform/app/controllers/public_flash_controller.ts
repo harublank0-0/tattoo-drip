@@ -39,6 +39,7 @@ export default class PublicFlashController {
 		}
 		const page = await this.pages.flash(tenant, {
 			artist: query.artist ?? null,
+			available: query.available ?? false,
 			cursor,
 			limit: query.limit ?? WORK_PAGE_SIZE,
 		});

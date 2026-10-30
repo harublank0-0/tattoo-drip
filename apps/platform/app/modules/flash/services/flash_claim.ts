@@ -40,8 +40,11 @@ type TenantRef = Pick<Tenant, "id">;
  * names the design (`isNamed`, a plain read) before it deletes the row. A
  * hide or a hand claim (`update`, `setClaimed`) waits for an in-flight claim
  * on the design's row and then changes only its own columns, never the
- * claim's. An intake holds the design `FOR KEY SHARE`, which a claim (a
- * non-key update) does not wait for, nor the other way round.
+ * claim's. An intake holds the design `FOR SHARE` (FlashService.holdShown):
+ * a claim waits for a request that holds it, and a request waits for a claim
+ * in flight and then sees the design claimed, so a request that gets in is
+ * stored before the claim and one that comes after is refused. The request
+ * holds nothing a claim needs, so neither can wait for the other for long.
  */
 export async function claimFlashFor(
 	tenant: TenantRef,

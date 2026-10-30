@@ -236,6 +236,7 @@ export function flashPage(
 			image: flashImage(index + 1),
 			artist: { slug: "sita", name: "Sita Rai" },
 			requestable: true,
+			status: "available" as const,
 		})),
 		nextCursor: null,
 		filters: { artists: [{ slug: "sita", name: "Sita Rai" }] },

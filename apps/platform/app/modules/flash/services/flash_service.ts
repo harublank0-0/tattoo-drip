@@ -419,14 +419,22 @@ export default class FlashService {
 	 * Holds the design for a request about to name it: the artist's row
 	 * `FOR SHARE` (so the artist cannot be hidden or deleted until the
 	 * request ends, ArtistService.holdVisible), then the design's own
-	 * `FOR KEY SHARE`, the lock the request's foreign key takes anyway. It
-	 * returns the design when it is still shown and its artist is still
-	 * visible, else null. An owner removing the design (`remove`) then waits
-	 * for the request and finds it named (FlashInUseError), or has removed it
-	 * first and the request finds nothing; a design hidden meanwhile
-	 * (`update`) waits behind the artist's hold too. Artist first, like
-	 * `remove`, so neither waits for the other while holding what it needs.
-	 * Call it inside the request's transaction, as late as possible.
+	 * `FOR SHARE`. It returns the design when it is still shown and its
+	 * artist is still visible, else null, as the row stands after any change
+	 * in flight: the lock waits for a claim or a change that has not
+	 * committed and reads what it left, and a claim that comes later waits
+	 * for the request. So the caller can refuse a claimed design on the
+	 * returned row (`claimed_at`) and no claim slips in between that check
+	 * and the request's insert (a claim is a non-key update, which a
+	 * `FOR KEY SHARE`, the lock the foreign key takes, would not wait for).
+	 * An owner removing the design (`remove`) then waits for the request and
+	 * finds it named (FlashInUseError), or has removed it first and the
+	 * request finds nothing; a design hidden meanwhile (`update`) waits behind
+	 * the artist's hold too. Artist first, like `remove`, so neither waits
+	 * for the other while holding what it needs. A claim holds a project and
+	 * then takes this row, and the request holds nothing a claim needs: they
+	 * wait for each other only for the request's inserts. Call it inside the
+	 * request's transaction, as late as possible.
 	 */
 	async holdShown(
 		trx: QueryClientContract,
@@ -440,7 +448,7 @@ export default class FlashService {
 			.where("id", designId)
 			.where("artist_id", artistId)
 			.where("hidden", false);
-		query.knexQuery.forKeyShare();
+		query.knexQuery.forShare();
 		return query.first();
 	}
 

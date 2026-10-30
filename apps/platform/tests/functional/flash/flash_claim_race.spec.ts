@@ -1,14 +1,19 @@
 import { randomBytes } from "node:crypto";
+import queue from "@adonisjs/queue/services/main";
 import { test } from "@japa/runner";
 import ArtistService from "#modules/artists/services/artist_service";
+import ClientService from "#modules/clients/services/client_service";
 import { FlashInUseError } from "#modules/flash/errors";
 import FlashDesign from "#modules/flash/models/flash_design";
 import { claimFlashFor } from "#modules/flash/services/flash_claim";
 import FlashService from "#modules/flash/services/flash_service";
+import { InquiryRuleError } from "#modules/inquiries/errors";
+import Inquiry from "#modules/inquiries/models/inquiry";
+import IntakeService from "#modules/inquiries/services/intake_service";
 import TattooProject from "#modules/projects/models/tattoo_project";
 import { addArtist, addFlashDesign } from "#tests/helpers/artists";
 import { RecordingImageService } from "#tests/helpers/images";
-import { makeClient, makeProject } from "#tests/helpers/pipeline";
+import { makeClient, makeProject, nextPhone } from "#tests/helpers/pipeline";
 import {
 	deferred,
 	errorOf,
@@ -47,9 +52,11 @@ async function studioWithProject() {
 		}),
 	);
 	const images = new RecordingImageService();
-	const flash = new FlashService(images, new ArtistService(images));
+	const artists = new ArtistService(images);
+	const flash = new FlashService(images, artists);
+	const intake = new IntakeService(artists, new ClientService(), images, flash);
 	const editor = { userId: owner.id, role: "owner" as const };
-	return { tenant, design, project, flash, editor };
+	return { tenant, design, project, flash, intake, editor };
 }
 
 /** The claim as the verifying transaction makes it: the project's row first, then the claim. */
@@ -74,10 +81,30 @@ function claiming(
 const designOf = (tenant: { id: string }, id: string) =>
 	inTenant(tenant, () => FlashDesign.query().where("id", id).first());
 
+const submission = (flashDesignId: string) => ({
+	idea: "The moth, small, on the wrist",
+	placement: "Left wrist",
+	approximateSize: "About 3 in",
+	preferredDates: "Any weekday in November",
+	sourceChannel: "other" as const,
+	contactName: "Maya Gurung",
+	contactPhone: nextPhone(),
+	contactEmail: null,
+	flashDesignId,
+});
+
+const inquiriesOf = (tenant: { id: string }) =>
+	inTenant(tenant, () => Inquiry.query().where("tenant_id", tenant.id));
+
 test.group(
 	"A claim and the studio's changes to the design (TAT-129)",
 	(group) => {
+		group.each.setup(() => {
+			// The alert job would be committed to the shared queue table.
+			queue.fake();
+		});
 		group.each.teardown(async () => {
+			queue.restore();
 			for (const slug of slugs.splice(0)) await forgetStudio(slug);
 		});
 
@@ -169,6 +196,65 @@ test.group(
 			assert.isTrue(waited, "the hand claim waited for the claim's row lock");
 			assert.deepEqual(claimed, { value: true });
 			assert.isUndefined(errorOf(marked), String(errorOf(marked)));
+			const stored = await designOf(tenant, design.id);
+			assert.equal(stored?.claimedProjectId, project.id);
+		}).timeout(30000);
+
+		test("a claim in flight when a request comes: the request waits for it, then is refused flash_claimed", async ({
+			assert,
+		}) => {
+			const { tenant, design, project, intake } = await studioWithProject();
+			const claim = claiming(tenant, project, deferred());
+			claim.startClaim.resolve();
+			await claim.locked;
+			await claim.reached;
+
+			const requesting = await onItsOwnConnection(tenant, () =>
+				intake.submit(tenant, submission(design.id)),
+			);
+			const waited = await waitUntilBlocked(requesting.pid, requesting.outcome);
+			claim.release();
+			const [claimed, outcome] = await Promise.all([
+				claim.outcome,
+				requesting.outcome,
+			]);
+
+			assert.isTrue(waited, "the request waited for the claim's row lock");
+			assert.deepEqual(claimed, { value: true });
+			const refusal = errorOf(outcome);
+			assert.instanceOf(refusal, InquiryRuleError, String(refusal));
+			assert.equal((refusal as InquiryRuleError).reason, "flash_claimed");
+			assert.lengthOf(await inquiriesOf(tenant), 0);
+		}).timeout(30000);
+
+		test("a request in flight when a claim comes: the claim waits for it, and the request is stored before the claim", async ({
+			assert,
+		}) => {
+			const { tenant, design, project, intake } = await studioWithProject();
+			const requesting = heldOpen(tenant, () =>
+				intake.submit(tenant, submission(design.id)),
+			);
+			await requesting.reached;
+
+			const claimer = await onItsOwnConnection(tenant, async () => {
+				const live = await TattooProject.query()
+					.where("id", project.id)
+					.forUpdate()
+					.firstOrFail();
+				return claimFlashFor(tenant, live);
+			});
+			const waited = await waitUntilBlocked(claimer.pid, claimer.outcome);
+			requesting.release();
+			const [submitted, claimed] = await Promise.all([
+				requesting.outcome,
+				claimer.outcome,
+			]);
+
+			assert.isTrue(waited, "the claim waited for the request's hold");
+			assert.isUndefined(errorOf(submitted), String(errorOf(submitted)));
+			assert.deepEqual(claimed, { value: true });
+			const [inquiry] = await inquiriesOf(tenant);
+			assert.equal(inquiry.flashDesignId, design.id);
 			const stored = await designOf(tenant, design.id);
 			assert.equal(stored?.claimedProjectId, project.id);
 		}).timeout(30000);
