@@ -28,6 +28,7 @@ const EXPECTED_POLICIES: Record<string, string[]> = {
 	clients: ["tenant_isolation:ALL"],
 	deposit_links: ["tenant_isolation:ALL"],
 	deposit_outcomes: ["tenant_isolation:ALL"],
+	flash_designs: ["tenant_isolation:ALL"],
 	inquiries: ["tenant_isolation:ALL"],
 	message_templates: ["tenant_isolation:ALL"],
 	payment_methods: ["tenant_isolation:ALL"],

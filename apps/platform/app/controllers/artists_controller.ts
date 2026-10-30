@@ -260,6 +260,8 @@ function toInput(data: Infer<typeof updateArtistValidator>): ArtistInput {
 		bio: data.bio ?? null,
 		visible: data.visible ?? false,
 		acceptingInquiries: data.acceptingInquiries ?? false,
+		// The form has no flash switch yet: a save leaves every artist taking requests.
+		acceptingFlash: true,
 		closedMessage: data.closedMessage ?? null,
 		styles: data.styles ?? [],
 		instagramUrl: data.instagramUrl ?? null,

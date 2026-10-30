@@ -1,6 +1,7 @@
 import { inject } from "@adonisjs/core";
 import type { MultipartFile } from "@adonisjs/core/bodyparser";
 import { errors as lucidErrors } from "@adonisjs/lucid";
+import type { QueryClientContract } from "@adonisjs/lucid/types/database";
 import {
 	ArtistProfileExistsError,
 	ArtistSlugTakenError,
@@ -33,6 +34,8 @@ export type ArtistInput = {
 	bio: string | null;
 	visible: boolean;
 	acceptingInquiries: boolean;
+	/** The "Taking flash requests" switch (TAT-129); on for everyone by default. */
+	acceptingFlash: boolean;
 	closedMessage: string | null;
 	/** Up to MAX_ARTIST_STYLES slugs from the list, in the order given. */
 	styles: StyleSlug[];
@@ -153,6 +156,30 @@ export default class ArtistService {
 			.where("id", id)
 			.where("user_id", editor.userId)
 			.firstOrFail();
+	}
+
+	/**
+	 * Locks the artist's live row (`FOR UPDATE`, the lock `save` takes too, so
+	 * an upload and a profile save never interleave) and checks `editor` may
+	 * still change it: a profile deleted since the page loaded, or unlinked
+	 * from an artist member, is a 404 (E_ROW_NOT_FOUND). Call it inside a
+	 * transaction; the work photos and the flash designs share it (TAT-129).
+	 */
+	async lockEditable(
+		trx: QueryClientContract,
+		tenant: TenantRef,
+		editor: ProfileEditor,
+		artistId: string,
+	): Promise<Artist> {
+		const live = await Artist.query({ client: trx })
+			.where("tenant_id", tenant.id)
+			.where("id", artistId)
+			.forUpdate()
+			.firstOrFail();
+		if (!mayEdit(editor, live.userId)) {
+			throw new lucidErrors.E_ROW_NOT_FOUND(Artist);
+		}
+		return live;
 	}
 
 	/**
@@ -332,6 +359,7 @@ export default class ArtistService {
 			bio: null,
 			visible: true,
 			acceptingInquiries: true,
+			acceptingFlash: true,
 			closedMessage: null,
 			styles: [],
 			instagramUrl: null,
@@ -365,6 +393,7 @@ function profileFields(input: OwnProfileInput) {
 		bio: input.bio,
 		visible: input.visible,
 		acceptingInquiries: input.acceptingInquiries,
+		acceptingFlash: input.acceptingFlash,
 		closedMessage: input.closedMessage,
 		styles: input.styles,
 		instagramUrl: input.instagramUrl,
@@ -407,6 +436,14 @@ function rethrowConflict(error: unknown, slug: string): never {
 	if (isUniqueViolation(error, USER_INDEX))
 		throw new ArtistProfileExistsError();
 	throw error;
+}
+
+/** ArtistService.findEditable's rule: an owner any profile, anyone else their own linked one. */
+export function mayEdit(
+	editor: ProfileEditor,
+	linkedUserId: string | null,
+): boolean {
+	return editor.role === "owner" || linkedUserId === editor.userId;
 }
 
 /**

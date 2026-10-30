@@ -32,3 +32,24 @@ export function isExclusionViolation(
 		error.constraint === constraint
 	);
 }
+
+/**
+ * Whether `error` is PostgreSQL's foreign key violation (23503) of the named
+ * constraint: a delete of a row that another table's key still points at
+ * (`NO ACTION`), or an insert pointing at a row that is not there. Recover
+ * from it after the savepoint that raised it has rolled back
+ * (withTransaction does that).
+ */
+export function isForeignKeyViolation(
+	error: unknown,
+	constraint: string,
+): boolean {
+	return (
+		typeof error === "object" &&
+		error !== null &&
+		"code" in error &&
+		error.code === "23503" &&
+		"constraint" in error &&
+		error.constraint === constraint
+	);
+}
