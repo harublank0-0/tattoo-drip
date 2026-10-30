@@ -446,6 +446,16 @@ export const isolationCases: IsolationCase[] = [
 		ownStatus: 302,
 		snapshot: tenantRow,
 	},
+	// TAT-123: seededStudio's logo is on the dark tile, so the owner's own
+	// request (light) changes the row.
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/settings/logo/tile",
+		actor: "owner",
+		body: () => ({ tile: "light" }),
+		ownStatus: 302,
+		snapshot: tenantRow,
+	},
 	{
 		method: "GET",
 		pattern: "/t/:tenant/settings/payments",

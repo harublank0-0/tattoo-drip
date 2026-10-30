@@ -42,6 +42,7 @@ export const TENANT_ROUTE_ROLES = {
 	"tenant.settings.look.update": OWNERS,
 	"tenant.settings.logo.update": OWNERS,
 	"tenant.settings.logo.destroy": OWNERS,
+	"tenant.settings.logo.tile.update": OWNERS,
 	"tenant.settings.payments": OWNERS,
 	"tenant.settings.deposits.update": OWNERS,
 	"tenant.settings.payments.create": OWNERS,

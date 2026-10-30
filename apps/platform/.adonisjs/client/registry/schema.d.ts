@@ -319,6 +319,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/studio_logo_controller').default['destroy']>>>
     }
   }
+  'tenant.settings.logo.tile.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/settings/logo/tile'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/tenancy/validators/tenant').logoTileValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/tenancy/validators/tenant').logoTileValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/studio_logo_controller').default['tile']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/studio_logo_controller').default['tile']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
   'tenant.settings.payments': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/settings/payments'

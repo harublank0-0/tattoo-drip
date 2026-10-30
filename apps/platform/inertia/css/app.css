@@ -137,8 +137,14 @@
    * the dashboard's preview shows what clients see. Light in dark mode on
    * purpose (not repeated in the dark block): a dark logo with a see-through
    * background would vanish on a dark surface. Ink on it is 15.8:1.
+   *
+   * TAT-123: the dark tile, for a white or light logo (picked when it is
+   * uploaded, switchable under Logo): the dark paper in both schemes, as the
+   * light tile is the light paper in both. White on it is 18.8:1. The
+   * storefront's --logo-plate-dark is the same colour.
    */
   --logo-plate: #f7f3ee;
+  --logo-plate-dark: #14110f;
 }
 
 [data-theme='dark'] {
@@ -202,6 +208,7 @@
   --color-stencil-wash: var(--stencil-wash);
   --color-marigold: var(--marigold);
   --color-logo-plate: var(--logo-plate);
+  --color-logo-plate-dark: var(--logo-plate-dark);
   --color-status-studio-fg: var(--status-studio-fg);
   --color-status-studio-bg: var(--status-studio-bg);
   --color-status-client-fg: var(--status-client-fg);

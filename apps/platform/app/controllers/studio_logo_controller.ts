@@ -3,13 +3,23 @@ import type { HttpContext } from "@adonisjs/core/http";
 import { errors } from "@vinejs/vine";
 import { tenantContext } from "#middleware/tenant_middleware";
 import { ImageDeleteError, InvalidImageError } from "#modules/media/errors";
+import {
+	LOGO_SAVED,
+	LOGO_SAVED_ON_DARK_TILE,
+	LOGO_TILE_SAVED,
+} from "#modules/tenancy/look_messages";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import TenancyService from "#modules/tenancy/services/tenancy_service";
-import { logoValidator } from "#modules/tenancy/validators/tenant";
+import {
+	logoTileValidator,
+	logoValidator,
+} from "#modules/tenancy/validators/tenant";
 
 /**
  * The studio's logo (TAT-56), set, replaced and removed by owners on
  * Settings, Page look (TENANT_ROUTE_ROLES: owners only). The cover's twin.
+ * TAT-123: an upload also picks the tile the logo sits on (and says so when it
+ * picked the dark one), and `tile` lets the owner switch it.
  */
 @inject()
 export default class StudioLogoController {
@@ -19,8 +29,9 @@ export default class StudioLogoController {
 		const { tenant } = tenantContext(ctx);
 		const data = await ctx.request.validateUsing(logoValidator);
 
+		let saved: Awaited<ReturnType<TenancyService["setLogo"]>>;
 		try {
-			await this.tenancy.setLogo(tenant, data.logo);
+			saved = await this.tenancy.setLogo(tenant, data.logo);
 		} catch (error) {
 			if (error instanceof InvalidImageError) {
 				throw new errors.E_VALIDATION_ERROR([
@@ -30,7 +41,22 @@ export default class StudioLogoController {
 			throw error;
 		}
 
-		ctx.session.flash("success", "Logo saved.");
+		ctx.session.flash(
+			"success",
+			saved.logoTile === "dark" ? LOGO_SAVED_ON_DARK_TILE : LOGO_SAVED,
+		);
+		return ctx.response
+			.redirect()
+			.toRoute("tenant.settings.look", { tenant: tenant.slug });
+	}
+
+	async tile(ctx: HttpContext) {
+		const { tenant } = tenantContext(ctx);
+		const data = await ctx.request.validateUsing(logoTileValidator);
+
+		await this.tenancy.setLogoTile(tenant, data.tile);
+
+		ctx.session.flash("success", LOGO_TILE_SAVED);
 		return ctx.response
 			.redirect()
 			.toRoute("tenant.settings.look", { tenant: tenant.slug });

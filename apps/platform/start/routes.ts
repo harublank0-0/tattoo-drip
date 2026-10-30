@@ -141,6 +141,10 @@ router
 				router
 					.delete("logo", [controllers.StudioLogo, "destroy"])
 					.as("tenant.settings.logo.destroy");
+				// Which tile the logo sits on (TAT-123).
+				router
+					.put("logo/tile", [controllers.StudioLogo, "tile"])
+					.as("tenant.settings.logo.tile.update");
 				router
 					.get("payments", [controllers.PaymentMethods, "index"])
 					.as("tenant.settings.payments");

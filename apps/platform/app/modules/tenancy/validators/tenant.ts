@@ -8,6 +8,7 @@ import {
 	FONT_KEYS,
 	HEX_COLOR,
 	LIGHT_PAPER,
+	LOGO_TILES,
 	readsOn,
 	SECTION_KEYS,
 	THEME_KEYS,
@@ -295,4 +296,15 @@ logoValidator.messagesProvider = new SimpleMessagesProvider({
 	"logo.file": IMAGE_FORMAT_MESSAGE,
 	"logo.file.extname": IMAGE_FORMAT_MESSAGE,
 	"logo.file.size": "Use an image of 10 MB or less.",
+});
+
+/**
+ * The tile an owner puts the logo on (TAT-123): a word from the app's list.
+ * The button always sends one; only a hand-made request leaves it out.
+ */
+export const logoTileValidator = vine.create({ tile: vine.enum(LOGO_TILES) });
+
+logoTileValidator.messagesProvider = new SimpleMessagesProvider({
+	"tile.required": "Choose a light or a dark tile.",
+	"tile.enum": "Choose a light or a dark tile.",
 });
