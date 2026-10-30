@@ -24,6 +24,7 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "~/components/ui/sheet";
+import { firstInvalidField, focusField } from "~/components/visits";
 
 /**
  * The state of one form sheet (TAT-108): `sheetStep` (components/sheets.ts, unit-tested) decides
@@ -95,11 +96,11 @@ export type PageSheets = ReturnType<typeof usePageSheets>;
 /**
  * After a refused save the submit button was disabled while saving, which drops keyboard focus
  * to the page (and Escape stops working), so focus goes to the first field that needs fixing.
+ * It shares the rule with the one that now covers every form (`visits.ts`, TAT-84) and stays for
+ * the sheets, the session move form and the account page, which scope focus to their own box.
  */
 export function focusFirstInvalid(container: HTMLElement | null) {
-	setTimeout(() => {
-		container?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
-	}, 0);
+	setTimeout(() => focusField(firstInvalidField(container)), 0);
 }
 
 /**

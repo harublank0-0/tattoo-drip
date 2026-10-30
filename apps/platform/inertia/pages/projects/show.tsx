@@ -1,5 +1,4 @@
 import { Form, Link } from "@adonisjs/inertia/react";
-import { router } from "@inertiajs/react";
 import { cn } from "cn";
 import { useRef } from "react";
 import { urlFor } from "~/client";
@@ -9,7 +8,6 @@ import { FinishCard } from "~/components/finish_card";
 import { usePageSheets } from "~/components/form_sheet";
 import { SOURCE_LABELS } from "~/components/inquiries";
 import MessageCard from "~/components/message_card";
-import { type ContactVia, justContacted } from "~/components/messages";
 import NextStepCard from "~/components/next_step_card";
 import Page from "~/components/page";
 import PaymentsCard, {
@@ -27,6 +25,7 @@ import { Button, buttonVariants } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Field, FieldError } from "~/components/ui/field";
 import { Textarea } from "~/components/ui/textarea";
+import { useContactRecording } from "~/hooks/use-contact-recording";
 import { useTenant } from "~/hooks/use-tenant";
 import AppLayout from "~/layouts/app";
 
@@ -62,8 +61,6 @@ export default function ProjectShow(props: ProjectPageProps) {
 		sessionDates,
 		scheduling,
 		notes,
-		contactedText,
-		lastChannel,
 		assignment,
 		request,
 		clientId,
@@ -79,15 +76,17 @@ export default function ProjectShow(props: ProjectPageProps) {
 	// A save or a finished step can remove the button that had focus: focus goes
 	// to the page heading instead of <body>.
 	const heading = useRef<HTMLHeadingElement>(null);
-	// Every chat link, Call and "Copy message" record the contact in the
-	// background (TAT-46), with the channel and the message (TAT-52); the
-	// footer says so at once (optimistic, TAT-84).
-	const markContacted = (via: ContactVia = {}) =>
-		router.post(urlFor("tenant.projects.contacted.store", params), via, {
-			preserveScroll: true,
-			preserveState: true,
-			optimistic: () => justContacted(via),
-		});
+	// Every chat link, Call, "Copy message" and "Mark contacted" record the contact (TAT-46,
+	// TAT-52); the card says so at once, from state scoped to this project (TAT-84).
+	const {
+		contactedText,
+		lastChannel,
+		record: markContacted,
+	} = useContactRecording(
+		project.id,
+		urlFor("tenant.projects.contacted.store", params),
+		{ contactedText: props.contactedText, lastChannel: props.lastChannel },
+	);
 
 	return (
 		<Page
@@ -350,7 +349,13 @@ function NotesForm({
 		<Form
 			route="tenant.projects.notes.update"
 			routeParams={{ tenant: tenant.slug, id: projectId }}
-			options={{ preserveScroll: true }}
+			// An async partial visit (TAT-84): a tap on another tab while the save is out does not
+			// interrupt it (only sync visits do), and Inertia does not apply its answer to another
+			// page, so nothing from it reaches the page the person went to. `only: ["notes"]`
+			// (the headers survive the redirect to this page, and the answer then carries `notes`
+			// and the always-shared props) keeps an older answer, which can land after a later
+			// one, from putting any other prop back to its old value.
+			options={{ preserveScroll: true, async: true, only: ["notes"] }}
 		>
 			{({ errors, processing }) => (
 				<Field data-invalid={!!errors.notes}>

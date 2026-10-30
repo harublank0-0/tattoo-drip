@@ -4,6 +4,7 @@ import { DateTime } from "luxon";
 import { chatLinks } from "#modules/clients/contact_links";
 import Inquiry from "#modules/inquiries/models/inquiry";
 import ImageService from "#modules/media/services/image_service";
+import { excerpt } from "#modules/notifications/alerts";
 import TattooProject from "#modules/projects/models/tattoo_project";
 import { testImages } from "#tests/helpers/images";
 import {
@@ -209,6 +210,33 @@ test.group("Inbox pages", (group) => {
 		assert.deepEqual(props.accept.artistId, artist.id);
 		assert.deepInclude(props.accept.choices, { id: artist.id, name: "Sita" });
 		assert.isNull(props.projectId);
+	});
+
+	test("a long idea is two lines' worth in the inbox and whole on its page (TAT-84)", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const idea = Array.from({ length: 60 }, () => "सीता wants a koi").join(" ");
+		const inquiry = await inTenant(tenant, async () =>
+			makeInquiry(tenant, await makeClient(tenant, { name: "सीता थापा" }), {
+				idea,
+			}),
+		);
+
+		const row = (await client.get(inbox()).withInertia().loginAs(owner))
+			.inertiaProps.inquiries[0];
+		assert.equal(row.idea, excerpt(idea, 280));
+		assert.isBelow(row.idea.length, idea.length);
+		assert.isTrue(row.idea.endsWith("…"));
+
+		const page = (
+			await client
+				.get(inbox(`/${inquiry.id}`))
+				.withInertia()
+				.loginAs(owner)
+		).inertiaProps;
+		assert.equal(page.inquiry.idea, idea);
 	});
 
 	test("the inquiry page's grid shows the signed 320 px copy and opens the original", async ({

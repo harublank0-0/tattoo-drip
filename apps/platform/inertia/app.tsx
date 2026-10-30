@@ -1,9 +1,16 @@
 import "./css/app.css";
 import { resolvePageComponent } from "@adonisjs/inertia/helpers";
 import { TuyauProvider } from "@adonisjs/inertia/react";
-import { createInertiaApp, type ResolvedComponent } from "@inertiajs/react";
+import { HttpNetworkError } from "@inertiajs/core";
+import {
+	createInertiaApp,
+	type ResolvedComponent,
+	router,
+} from "@inertiajs/react";
 import { createRoot } from "react-dom/client";
+import { toast } from "sonner";
 import { client } from "./client";
+import { watchVisits } from "./components/visits";
 
 const appName = import.meta.env.VITE_APP_NAME || "Tattoo Drip";
 
@@ -27,6 +34,16 @@ createInertiaApp({
 		color: "var(--primary)",
 	},
 });
+
+// The dashboard's visit rules (TAT-84), installed once for every layout: a visit the network cut
+// off says so (the toasts render in each layout's FlashToasts).
+watchVisits(
+	// Inertia's `router.on` is generic per event name; the narrowed union is the same call.
+	(type, callback) => router.on(type as "finish", callback as never),
+	document,
+	(text) => toast.error(text),
+	(error) => error instanceof HttpNetworkError,
+);
 
 // The installed app's service worker (TAT-67): production builds only, so
 // it never caches anything around Vite's dev server.

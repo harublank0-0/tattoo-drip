@@ -18,7 +18,7 @@ test.group("Page head", () => {
 			'<meta name="theme-color" content="#f7f3ee" media="(prefers-color-scheme: light)" />',
 			'<meta name="theme-color" content="#14110f" media="(prefers-color-scheme: dark)" />',
 			'<meta name="apple-mobile-web-app-title" content="Tattoo Drip" />',
-			"viewport-fit=cover",
+			'<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-visual" />',
 		]) {
 			assert.include(html, tag);
 		}

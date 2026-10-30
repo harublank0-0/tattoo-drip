@@ -14,6 +14,7 @@ import InquiryService from "#modules/inquiries/services/inquiry_service";
 import { acceptInquiryValidator } from "#modules/inquiries/validators/inquiry";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
+import { excerpt } from "#modules/notifications/alerts";
 import { chatMessage, contactLinks } from "#modules/notifications/chat";
 import {
 	firstName,
@@ -31,6 +32,9 @@ import { formatDay } from "#modules/projects/quotes";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ProjectService from "#modules/projects/services/project_service";
 import { studioLinks } from "#services/studio_links";
+
+/** The Inbox row shows two lines of the idea (line-clamp-2): enough to fill both at 1280 px. */
+const IDEA_PREVIEW_LENGTH = 280;
 
 /**
  * The inquiry inbox (TAT-46): owners only (the route group's role check).
@@ -78,7 +82,7 @@ export default class InquiriesController {
 			inquiries: inquiries.map((inquiry) => ({
 				id: inquiry.id,
 				contactName: inquiry.contactName,
-				idea: inquiry.idea,
+				idea: excerpt(inquiry.idea, IDEA_PREVIEW_LENGTH),
 				placement: inquiry.placement,
 				approximateSize: inquiry.approximateSize,
 				preferredArtistName: inquiry.preferredArtistId
