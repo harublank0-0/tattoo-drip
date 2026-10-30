@@ -48,7 +48,6 @@ export default class CalendarController {
 		return ctx.inertia.render("calendar/index", {
 			view,
 			date,
-			today,
 			timezone,
 			rangeText: rangeText(days),
 			previous: shiftDate(view, date, -1),

@@ -5,13 +5,13 @@ import { urlFor } from "~/client";
 import InlineConfirm from "~/components/inline_confirm";
 import { type InquiryPageProps, SOURCE_LABELS } from "~/components/inquiries";
 import MessageCard from "~/components/message_card";
-import type { ContactVia } from "~/components/messages";
 import Page from "~/components/page";
 import ReferenceGrid from "~/components/references";
 import StatusBadge from "~/components/status_badge";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Field, FieldError, FieldLabel } from "~/components/ui/field";
+import { useContactRecording } from "~/hooks/use-contact-recording";
 import { useTenant } from "~/hooks/use-tenant";
 import AppLayout from "~/layouts/app";
 
@@ -29,16 +29,20 @@ export default function InquiryShow({
 	const tenant = useTenant();
 	// A decline that finishes may remove its button: focus goes to the heading.
 	const heading = useRef<HTMLHeadingElement>(null);
-	// The chat links record the contact in the background (TAT-52).
-	const markContacted = (via: ContactVia = {}) =>
-		router.post(
-			urlFor("tenant.inbox.contacted.store", {
-				tenant: tenant.slug,
-				id: inquiry.id,
-			}),
-			via,
-			{ preserveScroll: true, preserveState: true },
-		);
+	// The chat links record the contact (TAT-52); the footer says so at once, from state
+	// scoped to this inquiry (TAT-84).
+	const {
+		contactedText: shownText,
+		lastChannel: shownChannel,
+		record: markContacted,
+	} = useContactRecording(
+		inquiry.id,
+		urlFor("tenant.inbox.contacted.store", {
+			tenant: tenant.slug,
+			id: inquiry.id,
+		}),
+		{ contactedText, lastChannel },
+	);
 	// The same link as the Message card's Call button (`contact.callUrl`), and
 	// the same record of the contact.
 	const phone =
@@ -144,9 +148,9 @@ export default function InquiryShow({
 					contact={contact}
 					messages={message ? [message] : []}
 					initialKind={message?.kind ?? null}
-					lastChannel={lastChannel}
+					lastChannel={shownChannel}
 					onContact={markContacted}
-					footer={contactedText}
+					footer={shownText}
 				/>
 
 				{accept && (

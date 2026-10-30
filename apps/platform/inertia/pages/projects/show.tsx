@@ -1,7 +1,6 @@
 import { Form, Link } from "@adonisjs/inertia/react";
-import { router } from "@inertiajs/react";
 import { cn } from "cn";
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { urlFor } from "~/client";
 import ChangeCard from "~/components/change_card";
 import { DepositCard } from "~/components/deposit_panel";
@@ -9,7 +8,6 @@ import { FinishCard } from "~/components/finish_card";
 import { usePageSheets } from "~/components/form_sheet";
 import { SOURCE_LABELS } from "~/components/inquiries";
 import MessageCard from "~/components/message_card";
-import { type ContactVia, shownContact } from "~/components/messages";
 import NextStepCard from "~/components/next_step_card";
 import Page from "~/components/page";
 import PaymentsCard, {
@@ -27,6 +25,7 @@ import { Button, buttonVariants } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Field, FieldError } from "~/components/ui/field";
 import { Textarea } from "~/components/ui/textarea";
+import { useContactRecording } from "~/hooks/use-contact-recording";
 import { useTenant } from "~/hooks/use-tenant";
 import AppLayout from "~/layouts/app";
 
@@ -77,39 +76,17 @@ export default function ProjectShow(props: ProjectPageProps) {
 	// A save or a finished step can remove the button that had focus: focus goes
 	// to the page heading instead of <body>.
 	const heading = useRef<HTMLHeadingElement>(null);
-	// Every chat link, Call and "Copy message" record the contact in the
-	// background (TAT-46), with the channel and the message (TAT-52).
-	const markContacted = (via: ContactVia = {}) =>
-		router.post(urlFor("tenant.projects.contacted.store", params), via, {
-			preserveScroll: true,
-			preserveState: true,
-		});
-	// "Mark contacted" (TAT-84): the contact line and the leading chat button change at once, as
-	// the server's answer will. The mark is state held here for the project it was tapped on, so
-	// no other project's page shows it, and it is cleared when the visit ends: by then the answer
-	// carries the truth, or the request failed and the old words come back.
-	const [markedFor, setMarkedFor] = useState<string | null>(null);
-	const latestMark = useRef(0);
-	const { contactedText, lastChannel } = shownContact(markedFor, project.id, {
-		contactedText: props.contactedText,
-		lastChannel: props.lastChannel,
-	});
-	const markContactedAtOnce = () => {
-		const mine = ++latestMark.current;
-		setMarkedFor(project.id);
-		router.post(
-			urlFor("tenant.projects.contacted.store", params),
-			{},
-			{
-				preserveScroll: true,
-				preserveState: true,
-				// Only the latest tap clears the mark: a second tap interrupts the first visit.
-				onFinish: () => {
-					if (latestMark.current === mine) setMarkedFor(null);
-				},
-			},
-		);
-	};
+	// Every chat link, Call, "Copy message" and "Mark contacted" record the contact (TAT-46,
+	// TAT-52); the card says so at once, from state scoped to this project (TAT-84).
+	const {
+		contactedText,
+		lastChannel,
+		record: markContacted,
+	} = useContactRecording(
+		project.id,
+		urlFor("tenant.projects.contacted.store", params),
+		{ contactedText: props.contactedText, lastChannel: props.lastChannel },
+	);
 
 	return (
 		<Page
@@ -185,7 +162,7 @@ export default function ProjectShow(props: ProjectPageProps) {
 						lastChannel={lastChannel}
 						onContact={markContacted}
 						footer={contactedText}
-						onMarkContacted={closed ? undefined : markContactedAtOnce}
+						onMarkContacted={closed ? undefined : () => markContacted()}
 					/>
 
 					<RequestCard

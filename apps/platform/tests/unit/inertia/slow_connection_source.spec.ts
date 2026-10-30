@@ -1,19 +1,12 @@
 import { readdir, readFile } from "node:fs/promises";
 import { test } from "@japa/runner";
-import { DateTime } from "luxon";
-import { NO_VIA } from "#modules/notifications/messages";
-import { lastContactText } from "#modules/projects/contact";
 // @ts-expect-error TS6305: the server project only references the inertia project, so it cannot read its sources and the module is untyped here; the type below restates its one export and the inertia project type-checks the real one.
 import * as messagesModule from "../../../inertia/components/messages.js";
 
 type Shown = { contactedText: string; lastChannel: string | null };
-const { MARKED_CONTACTED_TEXT, shownContact } = messagesModule as {
-	MARKED_CONTACTED_TEXT: string;
-	shownContact(
-		markedFor: string | null,
-		projectId: string,
-		server: Shown,
-	): Shown;
+type Mark = { id: string; via: { channel?: string; kind?: string } };
+const { shownContact } = messagesModule as {
+	shownContact(mark: Mark | null, recordId: string, server: Shown): Shown;
 };
 
 const read = (file: string) =>
@@ -60,56 +53,77 @@ test.group("One-tap moves send once (TAT-84)", () => {
 	});
 });
 
-// TAT-84, fix round 1: Inertia's own optimistic visits are not used anywhere. While one is pending
-// Inertia swaps every page's props that share a name with the current page's for the CURRENT
-// page's values, so a save on project A that is still out would leave project B's notes and
-// contact line empty (or A's). "Mark contacted" shows its words from state held in the page
-// instead, scoped to the project it was tapped on; the notes save is an async visit.
+// TAT-84, fix round 1 (and the merge with main's contact recording): Inertia's own optimistic
+// visits are not used anywhere. While one is pending Inertia swaps every page's props that share a
+// name with the current page's for the CURRENT page's values, so a save on project A that is still
+// out would leave project B's notes and contact line empty (or A's). A recorded contact shows its
+// words from state held in the page, scoped to the project or inquiry it was tapped on; the notes
+// save is an async partial visit.
 test.group(
-	"Mark contacted and notes without optimistic visits (TAT-84)",
+	"Recorded contacts and notes without optimistic visits (TAT-84)",
 	() => {
 		const server = {
 			contactedText: "contacted 2 days ago on Viber",
 			lastChannel: "viber",
 		};
 
-		test("the words shown at once are the server's words for a contact now with no channel", ({
+		test("the record it was tapped on shows what the server will say, and the channel it leads with", ({
 			assert,
 		}) => {
-			assert.equal(
-				MARKED_CONTACTED_TEXT,
-				lastContactText(DateTime.now(), "Asia/Kathmandu", NO_VIA),
+			assert.deepEqual(
+				shownContact(
+					{ id: "a", via: { channel: "whatsapp", kind: "quote" } },
+					"a",
+					server,
+				),
+				{
+					contactedText: "contacted today on WhatsApp (Quote)",
+					lastChannel: "whatsapp",
+				},
 			);
-		});
-
-		test("the project it was tapped on shows them, and the lead channel is no longer the last one", ({
-			assert,
-		}) => {
-			assert.deepEqual(shownContact("a", "a", server), {
-				contactedText: MARKED_CONTACTED_TEXT,
+			assert.deepEqual(shownContact({ id: "a", via: {} }, "a", server), {
+				contactedText: "contacted today",
 				lastChannel: null,
 			});
 		});
 
-		test("another project, or none marked, shows the server's own values", ({
+		test("another record, or none being recorded, shows the server's own values", ({
 			assert,
 		}) => {
-			assert.deepEqual(shownContact("a", "b", server), server);
+			const mark = { id: "a", via: { channel: "call" } };
+			assert.deepEqual(shownContact(mark, "b", server), server);
 			assert.deepEqual(shownContact(null, "a", server), server);
 		});
 
-		test("the project page keeps the mark in state scoped to the project and clears it when the visit ends", async ({
+		test("the hook keeps the mark in state scoped to the record and clears it when the visit ends", async ({
 			assert,
 		}) => {
-			const source = await read("pages/projects/show.tsx");
-			assert.include(source, "useState<string | null>(null)");
-			assert.include(source, "setMarkedFor(project.id)");
-			assert.include(source, "shownContact(");
-			assert.include(source, "setMarkedFor(null)");
+			const source = await read("hooks/use-contact-recording.ts");
+			assert.include(source, "useState<ContactMark | null>(null)");
+			assert.include(source, "setMark({ id: recordId, via })");
+			assert.include(source, "shownContact(mark, recordId, server)");
+			assert.include(source, "setMark(null)");
+			assert.include(source, "onFinish:");
+		});
+
+		test("the project and inquiry pages record every contact through the hook, scoped to their own id", async ({
+			assert,
+		}) => {
+			const project = await read("pages/projects/show.tsx");
+			assert.include(project, "useContactRecording(");
+			assert.include(project, "project.id,");
 			assert.include(
-				source,
-				"onMarkContacted={closed ? undefined : markContactedAtOnce}",
+				project,
+				"onMarkContacted={closed ? undefined : () => markContacted()}",
 			);
+			const inquiry = await read("pages/inquiries/show.tsx");
+			assert.include(inquiry, "useContactRecording(");
+			assert.include(inquiry, "inquiry.id,");
+			assert.include(inquiry, "footer={shownText}");
+			for (const source of [project, inquiry]) {
+				assert.notInclude(source, "justContacted(");
+				assert.notInclude(source, 'contacted.store", params), via');
+			}
 		});
 
 		test("the notes save is an async partial visit that still says Saving…", async ({

@@ -29,36 +29,73 @@ export type CardMessageProps = {
 	viberUrl: string;
 };
 
-/**
- * The contact line once "Mark contacted" is tapped (TAT-84), before the server answers: the
- * server's `lastContactText` for a contact now with no channel (pinned by
- * slow_connection_source.spec.ts).
- */
-export const MARKED_CONTACTED_TEXT = "contacted today";
-
-/**
- * What the Message card shows for the last contact: while "Mark contacted" is out for
- * `projectId` (`markedFor`, state held by the page) the words the server will answer with and
- * no last channel, which is what the server stores for it (so the leading chat button becomes
- * WhatsApp at once); every other project, and no mark, shows the server's own values. It is
- * state held in the page, not an Inertia optimistic visit: while one of those is pending
- * Inertia puts the current page's values into the next page's props of the same names.
- */
-export function shownContact(
-	markedFor: string | null,
-	projectId: string,
-	server: { contactedText: string; lastChannel: ContactChannelName | null },
-): { contactedText: string; lastChannel: ContactChannelName | null } {
-	return markedFor === projectId
-		? { contactedText: MARKED_CONTACTED_TEXT, lastChannel: null }
-		: server;
-}
-
 /** What the contact routes take: the link tapped and the message it carried. */
 export type ContactVia = {
 	channel?: ContactChannelName;
 	kind?: MessageKindName;
 };
+
+/** How the last contact names its channel; the server's `CHANNEL_TEXT`. */
+export const CHANNEL_TEXT: Record<ContactChannelName, string> = {
+	whatsapp: "on WhatsApp",
+	viber: "on Viber",
+	call: "by phone",
+	copy: "with a copied message",
+};
+
+/** How the last contact names its message; the server's `MESSAGE_LABELS`. */
+export const MESSAGE_LABELS: Record<MessageKindName, string> = {
+	inquiry_received: "Inquiry received",
+	quote: "Quote",
+	deposit_link: "Deposit link",
+	booking_confirmation: "Booking confirmation",
+	session_reminder: "Session reminder",
+	aftercare: "Aftercare",
+};
+
+/**
+ * What the server will say about a contact recorded now (`lastContactText`):
+ * "contacted today on WhatsApp (Quote)". The page shows it while the record
+ * is out (`shownContact`, ui.md), so the answer doesn't change the text.
+ */
+export function justContactedText(via: ContactVia): string {
+	const channel = via.channel ? ` ${CHANNEL_TEXT[via.channel]}` : "";
+	const kind = via.kind ? ` (${MESSAGE_LABELS[via.kind]})` : "";
+	return `contacted today${channel}${kind}`;
+}
+
+/**
+ * The page props a contact recorded now changes, as the server will send
+ * them back: the last contact's words and channel (null for "Mark contacted").
+ */
+export function justContacted(via: ContactVia): {
+	contactedText: string;
+	lastChannel: ContactChannelName | null;
+} {
+	return {
+		contactedText: justContactedText(via),
+		lastChannel: via.channel ?? null,
+	};
+}
+
+/** A contact being recorded (TAT-84): the project or inquiry it was tapped on, and what it carried. */
+export type ContactMark = { id: string; via: ContactVia };
+
+/**
+ * What a project's or inquiry's Message card shows for the last contact: while a contact is
+ * being recorded for `recordId` (`mark`, state held by the page) what the server will answer
+ * with (`justContacted`, so the leading chat button changes at once too); any other record, and
+ * no mark, shows the server's own values. It is state held in the page, not an Inertia
+ * optimistic visit: while one of those is pending Inertia puts the current page's values into
+ * the next page's props of the same names (a pending record on A leaves B's contact line empty).
+ */
+export function shownContact(
+	mark: ContactMark | null,
+	recordId: string,
+	server: { contactedText: string; lastChannel: ContactChannelName | null },
+): { contactedText: string; lastChannel: ContactChannelName | null } {
+	return mark?.id === recordId ? justContacted(mark.via) : server;
+}
 
 /** The two channels a message can lead with. */
 export type PrimaryChannel = "whatsapp" | "viber";
