@@ -51,8 +51,9 @@ paths:
   /styles:
     get:
       operationId: listStyles
-      tags: [V1]
+      tags: [MVP]
       summary: Platform-wide tattoo styles
+      description: The platform's fixed list of tattoo styles, in its order. Cacheable.
       responses:
         "200":
           description: Styles
@@ -200,39 +201,65 @@ paths:
                   data: { type: array, items: { $ref: "#/components/schemas/Service" } }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /tenants/{tenant}/portfolio:
+  /tenants/{tenant}/work:
     parameters:
       - $ref: "#/components/parameters/Tenant"
     get:
-      operationId: listPortfolio
-      tags: [V1]
-      summary: Portfolio projects, newest first
+      operationId: listWork
+      tags: [MVP]
+      summary: Photos of the studio's work, newest first, a page at a time
+      description: |
+        Every photo of every visible artist (a closed artist's too), newest
+        first. The filters combine; an artist or style that matches nothing
+        is an empty page. Hidden and deleted artists never appear, nor do
+        their photos. Cacheable. Under an old studio slug it answers like
+        under the current one.
       parameters:
-        - name: artistId
+        - name: artist
           in: query
-          schema: { type: string, format: uuid }
+          description: An artist's slug (`getArtist`)
+          schema: { type: string, pattern: "^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$" }
         - name: style
           in: query
-          description: Style slug
-          schema: { type: string }
+          description: A style's slug (`listStyles`)
+          schema: { type: string, maxLength: 40, pattern: "^[a-z0-9]+(-[a-z0-9]+)*$" }
+        - name: healed
+          in: query
+          description: "`true`: only photos marked healed. Leave it out for all."
+          schema: { type: boolean }
         - name: cursor
           in: query
-          schema: { type: string }
+          description: The previous page's `nextCursor`, as sent, with the same filters
+          schema: { type: string, maxLength: 200, pattern: "^[A-Za-z0-9_-]+$" }
         - name: limit
           in: query
-          schema: { type: integer, minimum: 1, maximum: 50, default: 24 }
+          schema: { type: integer, minimum: 1, maximum: 48, default: 24 }
       responses:
         "200":
-          description: A page of projects
+          description: A page of photos
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            ETag: { $ref: "#/components/headers/ETag" }
           content:
             application/json:
               schema:
                 type: object
-                required: [data, nextCursor]
+                required: [data, nextCursor, filters]
+                additionalProperties: false
                 properties:
-                  data: { type: array, items: { $ref: "#/components/schemas/PortfolioProject" } }
-                  nextCursor: { type: [string, "null"] }
+                  data:
+                    type: array
+                    maxItems: 48
+                    items: { $ref: "#/components/schemas/GalleryPhoto" }
+                  nextCursor:
+                    type: [string, "null"]
+                    description: Pass it as `cursor` for the next page; null on the last.
+                  filters: { $ref: "#/components/schemas/WorkFilters" }
+        "304": { $ref: "#/components/responses/NotModified" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
 
   /tenants/{tenant}/availability:
     parameters:
@@ -902,20 +929,72 @@ components:
         startingPrice:
           oneOf: [{ $ref: "#/components/schemas/Money" }, { type: "null" }]
 
-    PortfolioProject:
+    GalleryPhoto:
       type: object
-      required: [id, artistId, title, images]
+      description: |
+        A photo in the studio's gallery (`listWork`): a `WorkPhoto` with its
+        styles, its healed mark and whose work it is. Every property is
+        always there. All text is plain text: render it as text.
+      required: [url, width, height, alt, variants, styles, healed, artist]
+      additionalProperties: false
       properties:
-        id: { type: string, format: uuid }
-        artistId: { type: string, format: uuid }
-        title: { type: string }
-        description: { type: [string, "null"] }
-        style: { type: [string, "null"], description: Style slug }
-        placement: { type: [string, "null"], description: Placement slug }
-        completedOn: { type: [string, "null"], format: date }
-        images:
+        url:
+          type: string
+          format: uri
+          description: Public and absolute.
+        width: { type: integer, minimum: 1 }
+        height: { type: integer, minimum: 1 }
+        alt:
+          type: [string, "null"]
+          maxLength: 200
+          description: |
+            The studio's own description of the photo, one line of plain
+            text, or null: then build one from the artist's name, such as
+            "Tattoo by Sita Rai".
+        variants:
           type: array
-          items: { $ref: "#/components/schemas/Image" }
+          maxItems: 8
+          description: |
+            Smaller copies, narrowest first, each narrower than `width`
+            (320, 640 and 1280 px, those below the photo's own width). Empty
+            for a photo too small to have any: then show `url` alone. Build
+            `srcset` from these and `url` at `width`.
+          items: { $ref: "#/components/schemas/ImageVariant" }
+        styles:
+          type: array
+          maxItems: 3
+          description: The photo's styles from the platform's list, in the list's order; [] when none.
+          items: { $ref: "#/components/schemas/TattooStyle" }
+        healed:
+          type: boolean
+          description: True when the studio marked the photo as healed.
+        artist:
+          type: object
+          description: "Whose work it is: the artist's page is `getArtist(slug)`."
+          required: [slug, name]
+          additionalProperties: false
+          properties:
+            slug: { type: string, examples: [sita-rai] }
+            name: { type: string, maxLength: 120, examples: [Sita Rai] }
+
+    WorkFilters:
+      type: object
+      description: |
+        What the gallery can be narrowed by. Offer only these: a filter that
+        matches no photo would show an empty page.
+      required: [styles, healed]
+      additionalProperties: false
+      properties:
+        styles:
+          type: array
+          description: |
+            The styles at least one photo carries, among the visible artists'
+            photos (only `artist`'s when it is given), in the list's order:
+            offer only these.
+          items: { $ref: "#/components/schemas/TattooStyle" }
+        healed:
+          type: boolean
+          description: Whether one of those photos is marked healed.
 
     Slot:
       type: object

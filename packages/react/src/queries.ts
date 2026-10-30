@@ -8,8 +8,8 @@ import {
 	type CreateInquiryInput,
 	isTattooApiError,
 	type ListAvailabilityQuery,
-	type ListPortfolioQuery,
 	type ListServicesQuery,
+	type ListWorkQuery,
 	type SubmitDepositProofInput,
 	type TattooClient,
 } from "@tattoo-drip/sdk";
@@ -29,8 +29,8 @@ export const tattooKeys = {
 		[...tattooKeys.artists(tenant), slug] as const,
 	services: (tenant: string, query?: ListServicesQuery) =>
 		[...tattooKeys.tenant(tenant), "services", query ?? {}] as const,
-	portfolio: (tenant: string, query?: ListPortfolioQuery) =>
-		[...tattooKeys.tenant(tenant), "portfolio", query ?? {}] as const,
+	work: (tenant: string, query?: ListWorkQuery) =>
+		[...tattooKeys.tenant(tenant), "work", query ?? {}] as const,
 	availability: (tenant: string, query: ListAvailabilityQuery | null) =>
 		[...tattooKeys.tenant(tenant), "availability", query] as const,
 	deposit: (tenant: string, token: string) =>
@@ -46,7 +46,7 @@ export const tattooKeys = {
  * one fetch: TanStack Query 5.104's replacement for `ensureQueryData`).
  * Each forwards TanStack Query's `signal`, so a query nobody needs any more
  * cancels its request.
- * `studio`, `artists` and `artist` set no `staleTime` or `retry`: the app's defaults decide (TAT-44).
+ * `studio`, `artists`, `artist` and `work` set no `staleTime` or `retry`: the app's defaults decide (TAT-44).
  */
 export const tattooQueries = {
 	studio: (client: TattooClient) =>
@@ -69,10 +69,10 @@ export const tattooQueries = {
 			queryKey: tattooKeys.services(client.tenant, query),
 			queryFn: ({ signal }) => client.services.list(query, { signal }),
 		}),
-	portfolio: (client: TattooClient, query?: ListPortfolioQuery) =>
+	work: (client: TattooClient, query?: ListWorkQuery) =>
 		queryOptions({
-			queryKey: tattooKeys.portfolio(client.tenant, query),
-			queryFn: ({ signal }) => client.portfolio.list(query, { signal }),
+			queryKey: tattooKeys.work(client.tenant, query),
+			queryFn: ({ signal }) => client.work.list(query, { signal }),
 		}),
 	availability: (client: TattooClient, query: ListAvailabilityQuery | null) =>
 		queryOptions({

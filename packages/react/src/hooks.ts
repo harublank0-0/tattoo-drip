@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
 	ListAvailabilityQuery,
-	ListPortfolioQuery,
 	ListServicesQuery,
+	ListWorkQuery,
 } from "@tattoo-drip/sdk";
 import { useTattooClient } from "./provider.js";
 import { tattooMutations, tattooQueries } from "./queries.js";
@@ -23,8 +23,9 @@ export function useServices(query?: ListServicesQuery) {
 	return useQuery(tattooQueries.services(useTattooClient(), query));
 }
 
-export function usePortfolio(query?: ListPortfolioQuery) {
-	return useQuery(tattooQueries.portfolio(useTattooClient(), query));
+/** A page of the studio's work photos (`client.work.list`). */
+export function useWork(query?: ListWorkQuery) {
+	return useQuery(tattooQueries.work(useTattooClient(), query));
 }
 
 /** Pass `null` until both an artist and a service are chosen. */

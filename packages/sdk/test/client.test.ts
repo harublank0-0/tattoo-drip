@@ -952,22 +952,42 @@ describe("lists with query parameters", () => {
 		assert.equal(calls[0].init.credentials, "omit");
 	});
 
-	test("portfolio.list encodes the query like a form and returns the whole page", async () => {
-		const page = { data: [], nextCursor: null };
+	test("work.list sends the filters like a form and returns the whole page", async () => {
+		const page = {
+			data: [],
+			nextCursor: null,
+			filters: { styles: [], healed: false },
+		};
 		const { calls, fetch } = fakeFetch(() => json(200, page));
 
-		const result = await client(fetch).portfolio.list({
-			style: "fine line",
-			limit: 12,
+		const result = await client(fetch).work.list({
+			artist: "sita",
+			style: "fine-line",
+			healed: true,
 			cursor: "next page",
+			limit: 12,
 		});
 
 		assert.equal(
 			calls[0].url,
-			`${T}/portfolio?style=fine+line&limit=12&cursor=next+page`,
+			`${T}/work?artist=sita&style=fine-line&healed=true&cursor=next+page&limit=12`,
 		);
 		assert.equal(calls[0].init.credentials, "omit");
 		assert.deepEqual(result, page);
+	});
+
+	test("work.list() asks for the first page with no question mark", async () => {
+		const { calls, fetch } = fakeFetch(() =>
+			json(200, {
+				data: [],
+				nextCursor: null,
+				filters: { styles: [], healed: false },
+			}),
+		);
+
+		await client(fetch).work.list();
+
+		assert.equal(calls[0].url, `${T}/work`);
 	});
 
 	test("availability.list sends all four parameters in the given order", async () => {
