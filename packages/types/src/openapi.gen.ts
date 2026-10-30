@@ -545,7 +545,10 @@ export interface components {
                  */
                 font: "eczar" | "serif" | "sans";
             };
-            /** @description The sections to show, in order. The form is always there. */
+            /**
+             * @description The sections to show, in order. The `inquiry` section (the
+             *     "Got an idea?" invitation to the request page) is always listed.
+             */
             sections: components["schemas"]["StorefrontSection"][];
         };
         /**

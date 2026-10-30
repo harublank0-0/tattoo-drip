@@ -812,7 +812,9 @@ components:
               type: string
               enum: [eczar, serif, sans]
         sections:
-          description: The sections to show, in order. The form is always there.
+          description: |
+            The sections to show, in order. The `inquiry` section (the
+            "Got an idea?" invitation to the request page) is always listed.
           type: array
           minItems: 1
           maxItems: 4
