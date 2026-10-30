@@ -7,6 +7,7 @@
  */
 
 import type { PortfolioSearch, WorkSearch } from "./gallery.ts";
+import type { RequestSearch } from "./request.ts";
 
 /** E.164, as the platform stores contact phones (TAT-26). */
 const E164 = /^\+[1-9]\d{6,14}$/;
@@ -117,6 +118,17 @@ export function portfolioHref(slug: string, search: PortfolioSearch): string {
 		["healed", search.healed === true ? "1" : undefined],
 		["cursor", search.cursor],
 	])}#work`;
+}
+
+/**
+ * The request page (TAT-127): `/request`, or `/request?artist=<slug>` to ask
+ * for one artist. Every Request button leads here.
+ */
+export function requestHref(search: RequestSearch): string {
+	const query = new URLSearchParams();
+	if (search.artist !== undefined) query.set("artist", search.artist);
+	const text = query.toString();
+	return text === "" ? "/request" : `/request?${text}`;
 }
 
 /** "?a=1&b=2" from the pairs that have a value, else "". */

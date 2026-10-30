@@ -72,6 +72,33 @@ export const studioCopy = {
 			apply: "Show photos",
 		},
 	},
+	/**
+	 * The request page, its buttons and the invitation to it (TAT-127).
+	 * Templates hold {name} and {studio}.
+	 */
+	request: {
+		/** The header's button, and on an artist's page the one that names them. */
+		bar: "Request",
+		barArtist: "Request {name}",
+		artistButton: "Request a tattoo from {name}",
+		inviteTitle: "Got an idea?",
+		inviteLine:
+			"Tell {studio} what you'd like and where it goes. Add photos if you have them.",
+	},
+	/** The studio's flag in words; a closed artist's own message comes first. */
+	status: {
+		open: "Taking new work",
+		closed: "Not taking new work right now",
+	},
+	/** The chat button (TAT-127). The message holds {subject}. */
+	chat: {
+		toggle: "Chat",
+		label: "Chat with {studio}",
+		whatsapp: "WhatsApp",
+		viber: "Viber",
+		message: "Hi, I'm asking about {subject}",
+		anyTattoo: "a tattoo",
+	},
 	/** The artist page's two lists, named for screen readers (TAT-125). */
 	artist: {
 		styles: "Styles",

@@ -430,6 +430,7 @@ describe("loadArtistPage", () => {
 			studioName: "Black Needle",
 			artistName: "अर्जुन थापा",
 			studioOpen: true,
+			closedMessage: "Books open in March.",
 		});
 	});
 });

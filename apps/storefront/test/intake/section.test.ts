@@ -57,6 +57,7 @@ describe("the #inquiry section on the server", () => {
 			studioName: "Black Needle",
 			artistName: "Sita Rai",
 			studioOpen: true,
+			closedMessage: null,
 		});
 		assert.match(
 			artist,
@@ -169,6 +170,7 @@ describe("the #inquiry section's panel (TAT-105)", () => {
 				studioName: "Black Needle",
 				artistName: "Sita Rai",
 				studioOpen: true,
+				closedMessage: null,
 			},
 		] as const) {
 			const html = section(state);

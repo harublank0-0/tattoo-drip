@@ -28,6 +28,8 @@ export type InquiryState =
 			readonly artistName: string;
 			/** Whether a general inquiry (no artist) would be taken. */
 			readonly studioOpen: boolean;
+			/** What the artist said about being closed, or null. */
+			readonly closedMessage: string | null;
 	  };
 
 /** How an open inquiry is sent until TAT-57's form exists. */
@@ -66,6 +68,7 @@ export function inquiryState(
 					studioName: studio.name,
 					artistName: selected.name,
 					studioOpen: studio.accepting,
+					closedMessage: selected.closedMessage,
 				};
 	}
 	return studio.accepting

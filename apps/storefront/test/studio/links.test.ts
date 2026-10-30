@@ -6,6 +6,7 @@ import {
 	linkRel,
 	mailtoLink,
 	mapsLink,
+	requestHref,
 	safeHttpsUrl,
 	safeImageUrl,
 	telLink,
@@ -161,6 +162,15 @@ describe("linkHostname and linkRel", () => {
 		]) {
 			assert.equal(linkRel(href), undefined, href);
 		}
+	});
+});
+
+describe("requestHref", () => {
+	test("is the request page, with the artist when given", () => {
+		assert.equal(requestHref({}), "/request");
+		assert.equal(requestHref({ artist: "sita" }), "/request?artist=sita");
+		assert.ok(isAllowedHref(requestHref({})));
+		assert.ok(isAllowedHref(requestHref({ artist: "sita" })));
 	});
 });
 
