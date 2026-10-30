@@ -19,8 +19,8 @@ export const DEFAULT_THEME_KEY: ThemeKey = "stencil-and-ink";
 
 /**
  * The studio page's sections that a theme can order and hide: the newest
- * photos (Recent work), the artists, Good to know (`info`) and the idea form.
- * The platform keeps the
+ * photos (Recent work), the artists, Good to know (`info`) and the "Got an
+ * idea?" invitation to the request page (`inquiry`). The platform keeps the
  * same list (apps/platform/app/modules/storefront/look.ts, same order;
  * look.spec.ts compares them). A new section is a key here and there, its
  * place in each theme's `order` and a case in `StudioSection`.
