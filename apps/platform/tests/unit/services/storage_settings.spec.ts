@@ -190,6 +190,11 @@ test.group("R2 disks (TAT-27)", () => {
 		accessKeyId: "access-key-id",
 		secretAccessKey: "secret-access-key",
 	};
+	/** The SDK's default checksums, off unless an operation needs one. */
+	const CHECKSUMS = {
+		requestChecksumCalculation: "WHEN_REQUIRED",
+		responseChecksumValidation: "WHEN_REQUIRED",
+	};
 
 	test("public disk: the bucket, R2's endpoint, no ACLs and the media origin", ({
 		assert,
@@ -201,6 +206,7 @@ test.group("R2 disks (TAT-27)", () => {
 			bucket: "tattoo-drip-public",
 			visibility: "public",
 			supportsACL: false,
+			...CHECKSUMS,
 			cdnUrl: "https://media.tattoodrip.app/",
 		});
 	});
@@ -215,6 +221,7 @@ test.group("R2 disks (TAT-27)", () => {
 			bucket: "tattoo-drip-private",
 			visibility: "private",
 			supportsACL: false,
+			...CHECKSUMS,
 		});
 		assert.notProperty(options, "cdnUrl");
 	});
@@ -245,5 +252,7 @@ test.group("R2 disks (TAT-27)", () => {
 		);
 		assert.equal(url.pathname, "/tenants/t1/reference_image/a.jpg");
 		assert.equal(url.searchParams.get("X-Amz-Expires"), "300");
+		// No default checksum asked of R2 (see CHECKSUMS).
+		assert.isFalse(url.searchParams.has("x-amz-checksum-mode"));
 	});
 });

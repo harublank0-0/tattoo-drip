@@ -119,6 +119,9 @@ export function r2DiskOptions(
 			visibility === "public" ? settings.publicBucket : settings.privateBucket,
 		visibility,
 		supportsACL: false,
+		// R2 compatibility with the SDK's default checksums: only where required.
+		requestChecksumCalculation: "WHEN_REQUIRED" as const,
+		responseChecksumValidation: "WHEN_REQUIRED" as const,
 	};
 	return visibility === "public"
 		? { ...options, cdnUrl: settings.publicUrl }
