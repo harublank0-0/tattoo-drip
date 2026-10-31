@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 # Checks deploy/backup (the image and backup.sh) against a throwaway Postgres:
 # the dump is readable, restores to the same row counts, old dumps are removed
-# and others kept, a failure exits non-zero without a success ping, and no
-# secret reaches the output.
+# and others kept, every failure (bad config, refused login, truncated dump,
+# unknown remote, failed listing, hung step) exits non-zero at the right step,
+# with one failure line and one /fail ping and no success ping, and no secret
+# reaches the output.
+#
+# Failures that cannot be caused from outside are injected with two stand-in
+# scripts mounted over pg_dump and rclone in the test container only (they call
+# the real tool, then misbehave as SHIM_MODE says); backup.sh has no test hooks.
 #
 # Everything runs in containers on a private network the engine numbers itself
 # (no fixed subnet, so it cannot collide with the production stack's
@@ -151,6 +157,37 @@ for _ in $(seq 1 60); do
 	sleep 0.5
 done
 
+# Stand-ins for pg_dump and rclone, mounted at /usr/local/bin (ahead of /usr/bin in PATH).
+cat >"$work/shim-pg_dump" <<'SHIM'
+#!/bin/sh
+# SHIM_MODE=dump-hang: never finishes. truncate: dumps, then cuts the end off the file.
+# backdate: dumps, then makes the file 40 days old.
+if [ "${SHIM_MODE:-}" = dump-hang ]; then exec sleep 120; fi
+/usr/bin/pg_dump "$@" || exit $?
+for arg in "$@"; do
+	case "$arg" in
+	--file=*)
+		[ "${SHIM_MODE:-}" != truncate ] || truncate --size=-64 "${arg#--file=}"
+		[ "${SHIM_MODE:-}" != backdate ] || touch -d '40 days ago' "${arg#--file=}"
+		;;
+	esac
+done
+SHIM
+cat >"$work/shim-rclone" <<'SHIM'
+#!/bin/sh
+# SHIM_MODE=lsf-fail: "rclone lsf" fails. copyto-hang: "rclone copyto" never finishes.
+case "${SHIM_MODE:-}:$1" in
+lsf-fail:lsf)
+	echo "rclone: injected failure" >&2
+	exit 3
+	;;
+copyto-hang:copyto) exec sleep 120 ;;
+esac
+exec /usr/bin/rclone "$@"
+SHIM
+chmod 755 "$work/shim-pg_dump" "$work/shim-rclone"
+shims=(-v "$work/shim-pg_dump:/usr/local/bin/pg_dump:ro" -v "$work/shim-rclone:/usr/local/bin/rclone:ro")
+
 # Runs the job once. Sets $out and $rc; the output is also kept for the secret scan.
 # Extra arguments are passed to "run" (-e NAME=value).
 run_backup() {
@@ -162,6 +199,32 @@ run_backup() {
 }
 dumps() { tool find /backups/db -maxdepth 1 -type f -name '*.dump'; }
 files() { tool find /backups/db -maxdepth 1 -type f; }
+
+# Checks on the run just made ($rc, $out): it failed, once, at the given step, and said
+# nothing that means success.
+expect_failed_run() { # label, step
+	local label=$1 step=$2 lines pattern
+	if [ "$rc" -ne 0 ]; then ok "$label: non-zero exit ($rc)"; else bad "$label: exited 0"; fi
+	lines=$(printf '%s\n' "$out" | grep -c '^backup: failed' || true)
+	if [ "$lines" -eq 1 ]; then ok "$label: exactly one 'backup: failed' line"; else bad "$label: $lines 'backup: failed' lines"; fi
+	if printf '%s\n' "$out" | grep -q "^backup: failed at step '$step' "; then
+		ok "$label: failed at step '$step'"
+	else
+		bad "$label: did not fail at step '$step'"
+	fi
+	for pattern in 'backup: ok' 'heartbeat: ok'; do
+		if printf '%s\n' "$out" | grep -q "^$pattern"; then bad "$label: '$pattern' was printed"; else ok "$label: no '$pattern' line"; fi
+	done
+}
+# The heartbeat listener saw exactly one ping of <path>/fail and none of <path>.
+expect_fail_ping_once() { # label, path
+	local hits fails oks
+	hits=$("$CONTAINER" logs "$hb" 2>&1)
+	fails=$(printf '%s\n' "$hits" | grep -Fxc "hit GET $2/fail" || true)
+	oks=$(printf '%s\n' "$hits" | grep -Fxc "hit GET $2" || true)
+	if [ "$fails" -eq 1 ]; then ok "$1: one /fail ping"; else bad "$1: $fails /fail pings"; fi
+	if [ "$oks" -eq 0 ]; then ok "$1: no success ping"; else bad "$1: $oks success pings"; fi
+}
 
 # --- Success case ------------------------------------------------------------
 run_backup -e BACKUP_DEST=/backups/db -e "HEARTBEAT_URL=http://hb:8080/ok-$token"
@@ -213,11 +276,14 @@ restored_note=$(psql_src -d restore_check -c "select note from clients where id 
 if [ "$source_note" = "$restored_note" ]; then ok "non-ASCII text survives the round trip"; else bad "text differs after the restore"; fi
 
 # --- Retention case -------------------------------------------------------------
-# 40 days old: removed. 29 days old: kept. Not a dump: kept, however old.
+# 40 days old: removed. 29 days old: kept. Not a dump: kept, however old. A dump in a
+# subfolder: kept (only the folder itself is the job's).
 tool bash -c "cd /backups/db \
 	&& touch -d '40 days ago' tattoo_drip-20200101T000000Z.dump \
 	&& touch -d '29 days ago' tattoo_drip-20200102T000000Z.dump \
-	&& touch -d '40 days ago' notes.txt"
+	&& touch -d '40 days ago' notes.txt \
+	&& mkdir -p sub && touch -d '40 days ago' sub/tattoo_drip-20200103T000000Z.dump \
+	&& chown -R backupjob /backups"
 sleep 1 # file names have a one-second resolution
 run_backup -e BACKUP_DEST=/backups/db -e "HEARTBEAT_URL=http://hb:8080/ok-$token"
 if [ "$rc" -eq 0 ]; then ok "second run exits 0"; else bad "second run exited $rc"; fi
@@ -233,34 +299,74 @@ for kept in tattoo_drip-20200102T000000Z.dump notes.txt "$first_name"; do
 done
 count=$(dumps | wc -l)
 if [ "$count" -eq 3 ]; then ok "three dumps remain (two new, one 29 days old)"; else bad "expected three dumps, found $count"; fi
+check "an old dump in a subfolder stays" tool test -f /backups/db/sub/tattoo_drip-20200103T000000Z.dump
 
-# --- Bad retention setting: refused, and nothing is deleted ----------------------
+# The dump just written is never removed, even when its modification time says it is old
+# (a skewed clock): the stand-in backdates the file before it is uploaded.
+sleep 1 # file names have a one-second resolution
+run_backup -e BACKUP_DEST=/backups/db -e SHIM_MODE=backdate "${shims[@]}"
+if [ "$rc" -eq 0 ]; then ok "backdated run exits 0"; else bad "backdated run exited $rc"; fi
+backdated=$(printf '%s\n' "$out" | tail -n 1 | awk '{ print $3 }')
+if printf '%s\n' "$out" | grep -q '^retention: removed 0'; then ok "retention removes nothing else"; else bad "retention removed something"; fi
+check "the backdated dump just written stays ($backdated)" tool test -f "/backups/db/$backdated"
+
+# --- Bad settings: refused at the setup step, and nothing is deleted ------------------
 before=$(files | sort | md5sum)
 for days in 0 abc; do
 	run_backup -e BACKUP_DEST=/backups/db -e "BACKUP_KEEP_DAYS=$days"
-	if [ "$rc" -ne 0 ]; then ok "BACKUP_KEEP_DAYS='$days' is refused"; else bad "BACKUP_KEEP_DAYS='$days' was accepted"; fi
+	expect_failed_run "BACKUP_KEEP_DAYS='$days'" setup
 done
 if [ "$before" = "$(files | sort | md5sum)" ]; then ok "a refused run changes nothing in the destination"; else bad "a refused run changed the destination"; fi
 
 # --- Failure cases ------------------------------------------------------------
+# Unknown remote, heartbeat unreachable (nothing listens on port 9): the upload step fails.
 run_backup -e BACKUP_DEST=nosuchremote:x -e HEARTBEAT_URL=http://127.0.0.1:9/hb
-if [ "$rc" -ne 0 ]; then ok "unknown remote: non-zero exit ($rc)"; else bad "unknown remote: exit 0"; fi
-if printf '%s\n' "$out" | grep -q '^heartbeat: ok'; then bad "unknown remote: 'heartbeat: ok' was printed"; else ok "unknown remote: no 'heartbeat: ok' line"; fi
-if printf '%s\n' "$out" | grep -q '^backup: ok'; then bad "unknown remote: 'backup: ok' was printed"; else ok "unknown remote: no 'backup: ok' line"; fi
-if printf '%s\n' "$out" | grep -q '^backup: failed'; then ok "unknown remote: 'backup: failed' names the step"; else bad "unknown remote: no 'backup: failed' line"; fi
+expect_failed_run "unknown remote, unreachable heartbeat" upload
 
-run_backup -e BACKUP_DEST=nosuchremote:x -e "HEARTBEAT_URL=http://hb:8080/bad-$token"
-if [ "$rc" -ne 0 ]; then ok "a failure with a reachable heartbeat exits non-zero"; else bad "a failure with a reachable heartbeat exited 0"; fi
-hits=$("$CONTAINER" logs "$hb" 2>&1)
-if printf '%s\n' "$hits" | grep -Fxq "hit GET /bad-$token/fail"; then ok "a failure pings <URL>/fail"; else bad "a failure did not ping <URL>/fail"; fi
-if printf '%s\n' "$hits" | grep -Fxq "hit GET /bad-$token"; then bad "a failure sent the success ping"; else ok "a failure does not send the success ping"; fi
-ok_hits=$(printf '%s\n' "$hits" | grep -Fxc "hit GET /ok-$token" || true)
-if [ "$ok_hits" -eq 2 ]; then ok "the success ping came once per successful run (2)"; else bad "expected 2 success pings, found $ok_hits"; fi
+# The same with a reachable heartbeat: one /fail ping, no success ping.
+run_backup -e BACKUP_DEST=nosuchremote:x -e "HEARTBEAT_URL=http://hb:8080/f-upload-$token"
+expect_failed_run "unknown remote" upload
+expect_fail_ping_once "unknown remote" "/f-upload-$token"
 
+# A refused database login fails the dump step and uploads nothing.
 before=$(files | sort | md5sum)
-run_backup -e BACKUP_DEST=/backups/db -e PGPASSWORD=not-the-password -e "HEARTBEAT_URL=http://hb:8080/bad-$token"
-if [ "$rc" -ne 0 ]; then ok "a refused database login: non-zero exit"; else bad "a refused database login exited 0"; fi
+run_backup -e BACKUP_DEST=/backups/db -e PGPASSWORD=not-the-password -e "HEARTBEAT_URL=http://hb:8080/f-dump-$token"
+expect_failed_run "refused database login" dump
+expect_fail_ping_once "refused database login" "/f-dump-$token"
 if [ "$before" = "$(files | sort | md5sum)" ]; then ok "a failed dump uploads nothing"; else bad "a failed dump changed the destination"; fi
+
+# A dump cut off in its data still lists fine; only reading it all catches it.
+tool bash -c "cp /backups/db/$first_name /backups/cut.dump && truncate --size=-64 /backups/cut.dump"
+check "a truncated dump still passes pg_restore --list (so --list alone is not enough)" tool pg_restore --list /backups/cut.dump
+if tool pg_restore -f /dev/null /backups/cut.dump >/dev/null 2>&1; then
+	bad "a full read of the truncated dump succeeded"
+else
+	ok "a full read of the truncated dump fails"
+fi
+tool rm -f /backups/cut.dump
+before=$(files | sort | md5sum)
+run_backup -e BACKUP_DEST=/backups/db -e SHIM_MODE=truncate -e "HEARTBEAT_URL=http://hb:8080/f-verify-$token" "${shims[@]}"
+expect_failed_run "truncated dump" verify
+expect_fail_ping_once "truncated dump" "/f-verify-$token"
+if [ "$before" = "$(files | sort | md5sum)" ]; then ok "a truncated dump is not uploaded"; else bad "a truncated dump reached the destination"; fi
+
+# A failure after the upload (the listing for retention): reported once, at its step.
+run_backup -e BACKUP_DEST=/backups/db -e SHIM_MODE=lsf-fail -e "HEARTBEAT_URL=http://hb:8080/f-retention-$token" "${shims[@]}"
+expect_failed_run "failed retention listing" retention
+expect_fail_ping_once "failed retention listing" "/f-retention-$token"
+
+# Hung steps are cut off by the timeouts (exit 124) instead of holding the container.
+run_backup -e BACKUP_DEST=/backups/db -e SHIM_MODE=dump-hang -e BACKUP_DUMP_TIMEOUT=2s -e "HEARTBEAT_URL=http://hb:8080/f-hangdump-$token" "${shims[@]}"
+expect_failed_run "hung dump" dump
+if printf '%s\n' "$out" | grep -q "^backup: failed at step 'dump' (exit 124)"; then ok "hung dump: timed out (exit 124)"; else bad "hung dump: not a timeout"; fi
+expect_fail_ping_once "hung dump" "/f-hangdump-$token"
+run_backup -e BACKUP_DEST=/backups/db -e SHIM_MODE=copyto-hang -e BACKUP_UPLOAD_TIMEOUT=2s -e "HEARTBEAT_URL=http://hb:8080/f-hangup-$token" "${shims[@]}"
+expect_failed_run "hung upload" upload
+if printf '%s\n' "$out" | grep -q "^backup: failed at step 'upload' (exit 124)"; then ok "hung upload: timed out (exit 124)"; else bad "hung upload: not a timeout"; fi
+expect_fail_ping_once "hung upload" "/f-hangup-$token"
+
+ok_hits=$("$CONTAINER" logs "$hb" 2>&1 | grep -Fxc "hit GET /ok-$token" || true)
+if [ "$ok_hits" -eq 2 ]; then ok "the success ping came once per successful run with a heartbeat (2)"; else bad "expected 2 success pings, found $ok_hits"; fi
 
 # --- No secret in any output ----------------------------------------------------
 if grep -Fq -e "$password" -e "$token" "$outputs"; then

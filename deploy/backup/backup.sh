@@ -4,16 +4,25 @@
 # deploy/env/backup.env.example for their meaning. Prints one line per step and
 # never an environment value.
 #
+# A hung call must not hold the job (and the next night's) up forever, and systemd's
+# TimeoutStartSec stops only the "docker compose run" client, not this container. So
+# every external call runs under timeout(1): 90m covers pg_dump of a database far
+# larger than the pilot's, 30m one upload. A timeout exits 124, which fails the step
+# like any other error.
+#
 #   PGHOST (default postgres), PGUSER, PGPASSWORD, PGDATABASE   the database (read by pg_dump itself)
 #   BACKUP_DEST        rclone path for the dumps, default r2:tattoo-drip-backups/db
 #   BACKUP_KEEP_DAYS   days of dumps to keep, default 30
 #   HEARTBEAT_URL      optional; pinged on success, and "<URL>/fail" on failure
+#   BACKUP_DUMP_TIMEOUT    optional, default 90m: limit for pg_dump and for reading the dump back
+#   BACKUP_UPLOAD_TIMEOUT  optional, default 30m: limit for each rclone call
 #   RCLONE_CONFIG_R2_* the "r2" remote (rclone reads them from the environment)
 set -euo pipefail
 set -o errtrace
 
 step=setup
 work=
+main_pid=$$
 
 ping_fail() {
 	[ -n "${HEARTBEAT_URL:-}" ] || return 0
@@ -24,6 +33,9 @@ ping_fail() {
 on_error() {
 	local status=$?
 	trap - ERR
+	# A command substitution or a pipeline runs in a subshell that inherits this trap
+	# (errtrace). It only hands the failure up; the main shell reports it, once.
+	[ "$BASHPID" = "$main_pid" ] || exit "$status"
 	echo "backup: failed at step '$step' (exit $status)" >&2
 	ping_fail
 	exit "$status"
@@ -51,6 +63,8 @@ dest=${dest%/}
 keep_days=${BACKUP_KEEP_DAYS:-30}
 # Positive whole days: "0d" would match every file and empty the destination.
 [[ $keep_days =~ ^[1-9][0-9]*$ ]] || fail "BACKUP_KEEP_DAYS must be a whole number of days, 1 or more"
+dump_timeout=${BACKUP_DUMP_TIMEOUT:-90m}
+upload_timeout=${BACKUP_UPLOAD_TIMEOUT:-30m}
 
 # A token limited to one bucket cannot create or look up buckets; rclone must not try.
 export RCLONE_S3_NO_CHECK_BUCKET=true
@@ -65,26 +79,32 @@ file=$work/$name
 human() { numfmt --to=iec-i --suffix=B "$1"; }
 
 step=dump
-pg_dump --format=custom --no-password --file="$file"
-echo "dump: ok $(human "$(stat -c %s "$file")")"
+timeout "$dump_timeout" pg_dump --format=custom --no-password --file="$file"
+bytes=$(stat -c %s "$file")
+size=$(human "$bytes")
+echo "dump: ok $size"
 
 step=verify
-# Reading the archive's table of contents catches a truncated or empty dump.
-pg_restore --list "$file" >/dev/null
+# Read the whole archive, not only its table of contents (pg_restore --list): a dump cut
+# off in its data still lists fine. A bad dump must fail the night before it is uploaded.
+timeout "$dump_timeout" pg_restore -f /dev/null "$file"
 echo "verify: ok"
 
 step=upload
-rclone copyto "$file" "$dest/$name"
+timeout "$upload_timeout" rclone copyto "$file" "$dest/$name"
 echo "upload: ok"
 
 step=retention
-# Only this job's own files, and only past the age: a wrong BACKUP_DEST cannot reach other objects.
-older=(--min-age "${keep_days}d" --include 'tattoo_drip-*.dump')
-removed=$(rclone lsf "${older[@]}" "$dest" | wc -l)
-rclone delete "${older[@]}" "$dest"
+# Only this job's own old dumps, directly in the destination folder: a wrong BACKUP_DEST
+# cannot reach other objects or subfolders. The dump just written is never a candidate.
+# One ordered list of --filter rules (rclone 1.60 warns that mixing --include and --exclude has no
+# defined order): the first matching rule wins, so the exclude comes before the include.
+old=(--max-depth 1 --min-age "${keep_days}d" --filter "- /$name" --filter '+ tattoo_drip-*.dump' --filter '- *')
+timeout "$upload_timeout" rclone lsf --files-only "${old[@]}" "$dest" >"$work/old.list"
+removed=$(wc -l <"$work/old.list")
+timeout "$upload_timeout" rclone delete "${old[@]}" "$dest"
 echo "retention: removed $removed older than ${keep_days}d"
 
-size=$(human "$(stat -c %s "$file")")
 rm -f "$file"
 
 if [ -n "${HEARTBEAT_URL:-}" ]; then
