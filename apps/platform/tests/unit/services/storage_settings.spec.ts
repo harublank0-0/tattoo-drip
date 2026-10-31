@@ -1,5 +1,9 @@
+import { S3Driver } from "@adonisjs/drive/drivers/s3";
 import { test } from "@japa/runner";
-import { checkStorageSettings } from "#services/storage_settings";
+import {
+	checkStorageSettings,
+	r2DiskOptions,
+} from "#services/storage_settings";
 
 const ACCOUNT_ID = "0123456789abcdef0123456789abcdef";
 
@@ -172,5 +176,74 @@ test.group("R2 settings at boot (TAT-27)", () => {
 			assert.isNotEmpty(message, JSON.stringify(override));
 			assert.notInclude(message, secret);
 		}
+	});
+});
+
+test.group("R2 disks (TAT-27)", () => {
+	const settings = (() => {
+		const checked = checkStorageSettings(VALID, true);
+		if (checked.kind !== "r2") throw new Error("the valid settings are R2");
+		return checked;
+	})();
+	const endpoint = `https://${ACCOUNT_ID}.r2.cloudflarestorage.com`;
+	const credentials = {
+		accessKeyId: "access-key-id",
+		secretAccessKey: "secret-access-key",
+	};
+
+	test("public disk: the bucket, R2's endpoint, no ACLs and the media origin", ({
+		assert,
+	}) => {
+		assert.deepEqual(r2DiskOptions(settings, "public"), {
+			credentials,
+			region: "auto",
+			endpoint,
+			bucket: "tattoo-drip-public",
+			visibility: "public",
+			supportsACL: false,
+			cdnUrl: "https://media.tattoodrip.app/",
+		});
+	});
+
+	test("private disk: the private bucket and no public URL", ({ assert }) => {
+		const options = r2DiskOptions(settings, "private");
+
+		assert.deepEqual(options, {
+			credentials,
+			region: "auto",
+			endpoint,
+			bucket: "tattoo-drip-private",
+			visibility: "private",
+			supportsACL: false,
+		});
+		assert.notProperty(options, "cdnUrl");
+	});
+
+	test("a public URL is on the media origin", async ({ assert }) => {
+		const driver = new S3Driver(r2DiskOptions(settings, "public"));
+
+		assert.equal(
+			await driver.getUrl("tenants/t1/artist_work_photo/a.jpg"),
+			"https://media.tattoodrip.app/tenants/t1/artist_work_photo/a.jpg",
+		);
+	});
+
+	test("a private signed URL is R2's, for 5 minutes", async ({ assert }) => {
+		const driver = new S3Driver(r2DiskOptions(settings, "private"));
+
+		const url = new URL(
+			await driver.getSignedUrl("tenants/t1/reference_image/a.jpg", {
+				expiresIn: "5 minutes",
+			}),
+		);
+
+		// The SDK's default is virtual-hosted style, which R2 accepts: the
+		// bucket is a subdomain of the account's host, the path is the key.
+		assert.equal(
+			url.host,
+			`tattoo-drip-private.${ACCOUNT_ID}.r2.cloudflarestorage.com`,
+		);
+		assert.equal(url.pathname, "/tenants/t1/reference_image/a.jpg");
+		assert.equal(url.searchParams.get("X-Amz-Expires"), "300");
 	});
 });

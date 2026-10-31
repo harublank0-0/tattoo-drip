@@ -1,3 +1,5 @@
+import type { S3DriverOptions } from "@adonisjs/drive/drivers/s3/types";
+
 /**
  * The R2 settings as start/env.ts reads them (TAT-27): where the two drive
  * disks (`public` and `private`, config/drive.ts) keep photos. None of the
@@ -6,7 +8,7 @@
  * the local folders, because a photo stored on the server's disk is lost
  * with the server. A partial set is always an error. An error names the
  * setting, never its value: the secret key must not reach a log. Imports
- * nothing from the app.
+ * nothing from the app (only a drive type).
  */
 export const R2_SETTINGS = [
 	"R2_ACCOUNT_ID",
@@ -92,6 +94,35 @@ export function checkStorageSettings(
 		privateBucket,
 		publicUrl: httpsOrigin(publicUrl),
 	};
+}
+
+/**
+ * The flydrive S3 options for one of the two disks, on R2. R2 has no ACLs, so
+ * `supportsACL` is false (the driver then makes no ACL calls and takes the
+ * visibility from here). The public bucket is served from the media origin
+ * (`cdnUrl`: `getUrl` builds `<origin>/<key>`); the private one has no public
+ * URL at all, its photos are reached only through signed URLs. Presigning is
+ * local: no request to R2.
+ */
+export function r2DiskOptions(
+	settings: R2Settings,
+	visibility: "public" | "private",
+): S3DriverOptions {
+	const options = {
+		credentials: {
+			accessKeyId: settings.accessKeyId,
+			secretAccessKey: settings.secretAccessKey,
+		},
+		region: "auto",
+		endpoint: `https://${settings.accountId}.r2.cloudflarestorage.com`,
+		bucket:
+			visibility === "public" ? settings.publicBucket : settings.privateBucket,
+		visibility,
+		supportsACL: false,
+	};
+	return visibility === "public"
+		? { ...options, cdnUrl: settings.publicUrl }
+		: options;
 }
 
 function httpsOrigin(value: string): string {

@@ -79,6 +79,8 @@
 		"@adonisjs/shield": "^9.0.0",
 		"@adonisjs/static": "^2.0.1",
 		"@adonisjs/vite": "^6.0.2",
+		"@aws-sdk/client-s3": "3.1160.0",
+		"@aws-sdk/s3-request-presigner": "3.1160.0",
 		"@boringnode/queue": "0.6.0",
 		"@inertiajs/core": "^3.7.1",
 		"@inertiajs/react": "^3.7.1",
