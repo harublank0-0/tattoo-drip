@@ -13,6 +13,7 @@ import { Env } from "@adonisjs/core/env";
 import { checkAppOrigin } from "#services/app_origin";
 import { checkChallengeSecret } from "#services/challenge_secret";
 import { checkServerKeys } from "#services/server_keys";
+import { checkStorageSettings } from "#services/storage_settings";
 import { checkStorefrontUrl } from "#services/storefront_url";
 import { checkTrustProxy } from "#services/trust_proxy";
 
@@ -59,6 +60,17 @@ const env = await Env.create(new URL("../", import.meta.url), {
 	DB_MIGRATION_PASSWORD: Env.schema.string.optional(),
 	DB_DATABASE: Env.schema.string(),
 
+	// Photo storage (TAT-27): production keeps both drive disks on Cloudflare
+	// R2, two buckets under one account. All six settings, or none: unset in
+	// development and tests, photos go to local folders; production refuses
+	// to start without them (checked below, once all six are read).
+	R2_ACCOUNT_ID: Env.schema.string.optional(),
+	R2_ACCESS_KEY_ID: Env.schema.string.optional(),
+	R2_SECRET_ACCESS_KEY: Env.schema.secret.optional(),
+	R2_PUBLIC_BUCKET: Env.schema.string.optional(),
+	R2_PRIVATE_BUCKET: Env.schema.string.optional(),
+	R2_PUBLIC_URL: Env.schema.string.optional(),
+
 	// Mail (Mailpit in development; any provider's SMTP endpoint in production)
 	MAIL_MAILER: Env.schema.enum(["smtp"] as const),
 	MAIL_FROM_NAME: Env.schema.string(),
@@ -78,6 +90,20 @@ const env = await Env.create(new URL("../", import.meta.url), {
 checkAppOrigin(
 	env.get("APP_URL"),
 	env.get("STOREFRONT_URL"),
+	env.get("NODE_ENV") === "production",
+);
+
+// All six R2 settings or none; production needs them (TAT-27). Checked once
+// all are read, since a partial set is an error.
+checkStorageSettings(
+	{
+		R2_ACCOUNT_ID: env.get("R2_ACCOUNT_ID"),
+		R2_ACCESS_KEY_ID: env.get("R2_ACCESS_KEY_ID"),
+		R2_SECRET_ACCESS_KEY: env.get("R2_SECRET_ACCESS_KEY")?.release(),
+		R2_PUBLIC_BUCKET: env.get("R2_PUBLIC_BUCKET"),
+		R2_PRIVATE_BUCKET: env.get("R2_PRIVATE_BUCKET"),
+		R2_PUBLIC_URL: env.get("R2_PUBLIC_URL"),
+	},
 	env.get("NODE_ENV") === "production",
 );
 
