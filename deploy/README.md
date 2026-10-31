@@ -42,15 +42,9 @@ backup      --> R2 bucket  tattoo-drip-backups
 - A step ends with **You should see** when there is something to compare. If you see something else, stop and look at [When something is wrong](#8-when-something-is-wrong).
 - Never paste the contents of a settings file into a chat, an issue or a commit. When this page says "put it in `platform.env`", you open the file on the server and paste the value there.
 - Section 4 has the checks for deploy day.
-- The `deploy/` folder (this page, the settings templates, `deploy.sh`) must be on the branch the server follows, which is `main`. Until the work that added it is merged, update the clone to the branch that holds it and name that branch when you deploy (after the merge, plain `deploy.sh` is right):
+- The server deploys only what is merged to `main`. Merge first, then run the deploy command.
 
-  ```bash
-  git -C /srv/tattoo-drip/app fetch origin
-  git -C /srv/tattoo-drip/app checkout --detach origin/harublank00/deploy-single-server
-  /srv/tattoo-drip/app/deploy/deploy.sh origin/harublank00/deploy-single-server
-  ```
-
-If you followed the setup in chat on 2026-11-01, these are done: sections 1.1 to 1.11 (server, SSH, firewall, updates, Docker, swap, folders, deploy key, clone) and 3.2 (the three R2 buckets and `media.tattoodrip.app`). Run the quick check in 1.12, then start at section 2.
+If you followed the setup in chat on 2026-11-01, these are done: sections 1.1 to 1.11 (server, SSH, firewall, updates, Docker, swap, folders, deploy key, clone) and 3.2 (the three R2 buckets and `media.tattoodrip.app`). Run the quick check in 1.12, then start at section 2. Its first step updates the clone: it was made before the `deploy/` folder was merged to `main`, so it does not have the settings templates yet.
 
 ---
 
@@ -131,7 +125,15 @@ passwordauthentication no
 permitrootlogin no
 ```
 
-On your computer, check that a password login is now refused, then close the root session:
+Before you close anything, open a **new** terminal on your computer and log in as `haru` again, from scratch:
+
+```bash
+ssh -i ~/.ssh/tattoo_drip_vps haru@<server-ip>
+```
+
+**You should see:** a prompt on the server. A session that was already open survives the restart and proves nothing; only a new login shows that you can still get in. If it fails, fix it from a session you still have open (`sudo rm /etc/ssh/sshd_config.d/01-hardening.conf && sudo systemctl restart ssh` undoes this step).
+
+Then check that a password login is refused, and close the root session:
 
 ```bash
 ssh -o PubkeyAuthentication=no -o PreferredAuthentications=password haru@<server-ip>
@@ -147,7 +149,9 @@ sudo ufw enable
 sudo ufw status
 ```
 
-**You should see:** `Status: active` and `OpenSSH ALLOW` (port 22). Nothing else is allowed in. The site needs no open port: Cloudflare's tunnel connects out from the server. (Docker changes the firewall itself for ports it publishes, and ufw does not see them. This stack publishes none.) If hPanel has its own firewall switched on, it must allow SSH.
+`sudo ufw enable` warns that it "may disrupt existing ssh connections" and asks to proceed: answer `y`. The rule you just added allows SSH, so your session stays up.
+
+**You should see:** `Status: active` and `OpenSSH ALLOW` (port 22). Nothing else is allowed in. Again, before you go on, open a **new** terminal on your computer and log in with `ssh -i ~/.ssh/tattoo_drip_vps haru@<server-ip>`. If it fails, run `sudo ufw disable` in the session you still have, and look at `sudo ufw status` again. The site needs no open port: Cloudflare's tunnel connects out from the server. (Docker changes the firewall itself for ports it publishes, and ufw does not see them. This stack publishes none.) If hPanel has its own firewall switched on, it must allow SSH.
 
 ### 1.7 Automatic security updates
 
@@ -280,22 +284,38 @@ git -C /srv/tattoo-drip/app log -1 --oneline
 
 Each part of the stack reads its own file from `/srv/tattoo-drip/env`. The templates are in `deploy/env/*.env.example`; they carry a comment for every setting. A value that still says `CHANGE_ME` is yours to fill in, and `deploy.sh` refuses to start while any is left.
 
-### 2.1 Make the six files
+### 2.1 Update the clone and make the six files
+
+The clone on the server was made before the `deploy/` folder was merged, so bring it up to date first (only before the first deploy; after that `deploy.sh` does it):
+
+```bash
+git -C /srv/tattoo-drip/app pull --ff-only
+ls /srv/tattoo-drip/app/deploy/env
+```
+
+**You should see:** the six `*.env.example` templates. If `ls` says there is no such folder, the work is not merged to `main` yet: stop and merge it first.
+
+Then make the files. The loop never overwrites a file that exists, so running it again is safe:
 
 ```bash
 for name in postgres platform migrate storefront backup tunnel; do
-  install -m 600 /srv/tattoo-drip/app/deploy/env/$name.env.example /srv/tattoo-drip/env/$name.env
+  if [ -e /srv/tattoo-drip/env/$name.env ]; then
+    echo "$name.env exists, skipped"
+  else
+    install -m 600 /srv/tattoo-drip/app/deploy/env/$name.env.example /srv/tattoo-drip/env/$name.env
+    echo "$name.env created"
+  fi
 done
 ls -l /srv/tattoo-drip/env
 ```
 
 `install -m 600` makes each file readable by you alone from the start.
 
-**You should see:** six files, each `-rw-------` and owned by `haru`.
+**You should see:** `... created` six times (on a second run, `... exists, skipped`), then six files, each `-rw-------` and owned by `haru`.
 
 ### 2.2 Make the secrets you generate yourself
 
-Some values must be the same in two or three files: the database owner's password (`postgres.env`, `migrate.env`, `backup.env`), the app role's password (`postgres.env`, `platform.env`) and the storefront's key (`platform.env`, `storefront.env`). This block makes each one once and writes it to every file, so you never type a secret and the copies cannot differ:
+Some values must be the same in two or three files: the database owner's password (`postgres.env`, `migrate.env`, `backup.env`), the app role's password (`postgres.env`, `platform.env`) and the storefront's key (`platform.env`, `storefront.env`). This block makes each one once and writes it to every file, so you never type a secret and the copies cannot differ. Run it once, right after 2.1 made the files. It only replaces a `CHANGE_ME`, so a second run changes nothing in a file that is filled in; but never use it to repair one file (for example after deleting it): that file would get a password the other files and the existing database do not have.
 
 ```bash
 cd /srv/tattoo-drip/env
@@ -310,13 +330,13 @@ sed -i "s|^STOREFRONT_SERVER_KEY=CHANGE_ME$|STOREFRONT_SERVER_KEY=$store_key|" s
 unset owner_pw app_pw store_key
 ```
 
-Nothing is printed. Check that the generated lines are no longer placeholders (this lists what is left, which at this point is only what Cloudflare gives you):
+Nothing is printed. Check that the generated lines are no longer placeholders. This lists the names of what is left, which at this point is only what Cloudflare gives you (the `cut` keeps values out of the output):
 
 ```bash
-grep -n 'CHANGE_ME' /srv/tattoo-drip/env/*.env | grep -v ':[0-9]*:[[:space:]]*#'
+grep -n 'CHANGE_ME' /srv/tattoo-drip/env/*.env | grep -v ':[0-9]*:[[:space:]]*#' | cut -d= -f1
 ```
 
-**You should see:** exactly these nine lines (the numbers can differ): `TURNSTILE_SECRET_KEY`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` in `platform.env`; `TUNNEL_TOKEN` in `tunnel.env`; `TURNSTILE_SITE_KEY` in `storefront.env`; and `RCLONE_CONFIG_R2_ACCESS_KEY_ID`, `RCLONE_CONFIG_R2_SECRET_ACCESS_KEY` and `RCLONE_CONFIG_R2_ENDPOINT` in `backup.env`. No `APP_KEY`, no password, no `STOREFRONT_SERVER_KEY` line.
+**You should see:** exactly these nine names, each as `<file>:<line number>:<name>` (the numbers can differ): `TURNSTILE_SECRET_KEY`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` in `platform.env`; `TUNNEL_TOKEN` in `tunnel.env`; `TURNSTILE_SITE_KEY` in `storefront.env`; and `RCLONE_CONFIG_R2_ACCESS_KEY_ID`, `RCLONE_CONFIG_R2_SECRET_ACCESS_KEY` and `RCLONE_CONFIG_R2_ENDPOINT` in `backup.env`. No `APP_KEY`, no password, no `STOREFRONT_SERVER_KEY` line.
 
 About the keys this made:
 
@@ -336,7 +356,14 @@ nano /srv/tattoo-drip/env/platform.env
 
 Press Ctrl+W, type `CHANGE_ME`, Enter, to jump to the next placeholder. Delete `CHANGE_ME` and paste the value in its place (right-click in most terminals). Paste only the value: no quotes, no spaces, nothing after it. Ctrl+O then Enter saves; Ctrl+X leaves.
 
-Keep a copy of all six files in your password manager once they are complete. They are not in git and not in the backups, and a rebuilt server needs them, `APP_KEY` above all.
+Keep a copy of all six files in your password manager once they are complete (section 4.12 asks for it). They are not in git and not in the backups, and a rebuilt server needs them, `APP_KEY` above all. On your computer:
+
+```bash
+mkdir -m 700 ~/tattoo-drip-env
+scp -i ~/.ssh/tattoo_drip_vps 'haru@<server-ip>:/srv/tattoo-drip/env/*.env' ~/tattoo-drip-env/
+```
+
+Attach the six files in the manager (or paste each file's text into a secure note), then delete the copies on your computer: `rm -r ~/tattoo-drip-env`.
 
 ---
 
@@ -420,7 +447,7 @@ Then add three public hostnames to the tunnel (the list is called Public Hostnam
 
 Do not add `media.tattoodrip.app` here: R2 serves that one.
 
-Cloudflare adds the DNS records for these itself. If it says a record already exists, open that domain's **DNS** page, delete the old record (for example a parking page's), and add the hostname again. If it does not add the wildcard record, add it by hand under that domain's **DNS**: type CNAME, name `*`, target `<tunnel id>.cfargotunnel.com` (the tunnel's ID is on its page), proxied (orange cloud).
+Cloudflare adds the DNS records for these itself. If it says a record already exists, open that domain's **DNS** page and delete only the A, AAAA or CNAME record that has exactly that name (for example a parking page's), then add the hostname again. Never touch the `media` record of `tattoodrip.app`: R2 manages it. If it does not add the wildcard record, add it by hand under that domain's **DNS**: type CNAME, name `*`, target `<tunnel id>.cfargotunnel.com` (the tunnel's ID is on its page), proxied (orange cloud).
 
 The tunnel shows as inactive until the server runs `cloudflared` (4.3).
 
@@ -435,7 +462,7 @@ The free plan allows one. The app already limits requests per address by itself 
 ### 3.9 Everything from Cloudflare is in
 
 ```bash
-grep -n 'CHANGE_ME' /srv/tattoo-drip/env/*.env | grep -v ':[0-9]*:[[:space:]]*#'
+grep -n 'CHANGE_ME' /srv/tattoo-drip/env/*.env | grep -v ':[0-9]*:[[:space:]]*#' | cut -d= -f1
 ```
 
 **You should see:** nothing. (A commented-out `HEARTBEAT_URL` line in `backup.env` is fine: 6.2 deals with it.)
@@ -446,9 +473,10 @@ grep -n 'CHANGE_ME' /srv/tattoo-drip/env/*.env | grep -v ':[0-9]*:[[:space:]]*#'
 
 ### 4.1 On your computer: the storefront page check
 
-From your copy of the repo, with Node 24.3.0 (`.nvmrc`) and pnpm:
+From your copy of the repo, with Node 24.3.0 (`.nvmrc`) and pnpm, on an up-to-date `main` (the merged commit that you are about to deploy):
 
 ```bash
+git switch main && git pull --ff-only
 cd apps/storefront
 pnpm build
 pnpm check:page
@@ -491,7 +519,7 @@ docker compose -f /srv/tattoo-drip/app/deploy/compose.yml logs --tail 20 cloudfl
 Then, from your computer:
 
 ```bash
-curl -sI http://tattoodrip.app/login | head -3
+curl -sI http://tattoodrip.app/login | grep -i -E '^(HTTP|location)'
 curl -sI https://tattoodrip.app/login | head -1
 curl -s -o /dev/null -w '%{http_code}\n' https://tattoodrip.page/
 curl -s -o /dev/null -w '%{http_code}\n' https://nosuch.tattoodrip.page/
@@ -568,10 +596,10 @@ curl -4 -s https://ifconfig.me; echo
 On the server:
 
 ```bash
-docker compose -f /srv/tattoo-drip/app/deploy/compose.yml logs --tail 6 nginx
+docker compose -f /srv/tattoo-drip/app/deploy/compose.yml logs --tail 200 nginx | grep -E '"GET /(login)? HTTP' | tail -n 6
 ```
 
-**You should see:** the two lines for `/login` and for `/` start with your own address, the one `ifconfig.me` printed, and `203.0.113.9` is nowhere. nginx hands both apps exactly the address it logs here, as the only value of `X-Forwarded-For`. `deploy/test/nginx/run.sh` checks that part against stand-in apps.
+**You should see:** the two requests you just made (`GET /login` and `GET /`) show your own address, the one `ifconfig.me` printed, right after the `|`, and `203.0.113.9` is nowhere. (In the unfiltered log you will also see `GET /api/v1/...` lines that show the server's own public address: that is the storefront's server asking the API while it renders your page. They are not visitors.) nginx hands both apps exactly the address it logs here, as the only value of `X-Forwarded-For`. `deploy/test/nginx/run.sh` checks that part against stand-in apps.
 
 ### 4.9 Backups and a practice restore
 
@@ -693,7 +721,7 @@ The images were built by the first deploy. Start the job as systemd would:
 
 ```bash
 sudo systemctl start tattoo-drip-backup.service
-journalctl -u tattoo-drip-backup.service -n 30 --no-pager
+sudo journalctl -u tattoo-drip-backup.service -n 30 --no-pager
 ```
 
 **You should see:** `systemctl start` returns after a few seconds without an error, and the journal ends with these lines (sizes differ):
@@ -714,7 +742,7 @@ Then check both ends: the file is in R2 (7.1 lists it, or open the bucket in the
 The job prints one line naming the step it failed at (`dump`, `verify`, `upload`, `retention` or `heartbeat`). Read it, run the job again by hand as in 6.4, and look at the journal:
 
 ```bash
-journalctl -u tattoo-drip-backup.service -n 50 --no-pager
+sudo journalctl -u tattoo-drip-backup.service -n 50 --no-pager
 ```
 
 The usual causes: the backups token was deleted or lost its bucket (3.4), the database is down (8), or R2 is unreachable. A night that failed is not retried by itself: fix the cause and run 6.4.
@@ -725,7 +753,7 @@ The usual causes: the backups token was deleted or lost its bucket (3.4), the da
 
 What a restore does: it puts the database back as it was at the time of a dump, which is up to a day old. Everything after the dump is lost. The dump has the tables, rows, policies and the grants to the app role, but not the roles themselves (`pg_dump` leaves roles out). So restore into a Postgres that was started by this runbook: its first start created the roles `postgres` and `tattoo_drip_app`, and their passwords come from your current settings files.
 
-Do not add `--no-acl` or `--no-owner` to `pg_restore`: they would throw away the app role's grants.
+Do not add `--no-acl` to `pg_restore`: it skips the `GRANT` lines of the dump, and the app role would lose its access to every table. (`--no-owner` would be harmless here, since the owner is `postgres` either way, but it is not needed.)
 
 ### 7.1 List the backups
 
@@ -810,8 +838,17 @@ That also deletes the downloaded dump, which holds clients' phone numbers. The p
 Use this when the data is lost or wrong. It restores into the scratch database as in 7.3 and then swaps the names, so the live database is kept as `tattoo_drip_old` until you delete it. It is a swap and not `pg_restore --clean` into the live database on purpose: after a `--clean` restore, a table that exists now but not in the older dump stays, while the list of finished migrations goes back, and the next deploy then fails on "already exists". After the swap the database is exactly the dump, and `deploy.sh` brings it up to date.
 
 1. If the live database still works and its newest data matters, take a backup of it first (6.4). It stays in R2 as a way back.
-2. Download the dump you want (7.1, 7.2) and restore it into the scratch database (the three commands of 7.3). Run the comparison only if you want to; with a dump from before a disaster it will differ.
-3. Stop the web server and the worker, so nothing is connected:
+2. Download the dump you want (7.1, 7.2) and restore it into the scratch database (the three commands of 7.3; the first one drops a scratch database left from an earlier try).
+3. **Check the restored database before you swap. This step is required.** A `pg_restore` that failed leaves an empty database, and swapping that in would replace your data with nothing:
+
+   ```bash
+   docker compose -f /srv/tattoo-drip/app/deploy/compose.yml exec -T postgres psql -U postgres -d tattoo_drip_restore -v ON_ERROR_STOP=1 -At \
+     -c "select (select count(*) from users) as users, (select count(*) from tenants) as studios" \
+     -c "DO \$\$ BEGIN IF (SELECT count(*) FROM users) = 0 OR (SELECT count(*) FROM tenants) = 0 THEN RAISE EXCEPTION 'the restored database has no users or no studios'; END IF; END \$\$"
+   ```
+
+   **You should see:** one line like `5|2` (users, then studios) and `DO`, with no error. Do the numbers look like your site: at least the pilot's account and one studio? If you see an error (`relation "users" does not exist` means the restore left nothing; `the restored database has no users or no studios` means empty tables), or numbers that are wrong, **stop**. The live database has not been touched; go back to step 2 or pick another dump.
+4. Stop the web server and the worker, so nothing is connected:
 
    ```bash
    docker compose -f /srv/tattoo-drip/app/deploy/compose.yml stop web worker
@@ -819,44 +856,68 @@ Use this when the data is lost or wrong. It restores into the scratch database a
    ```
 
    **You should see:** `0`. Do this away from 02:00 Nepal time; the backup job also connects.
-4. Swap:
+5. List the databases:
 
    ```bash
-   docker compose -f /srv/tattoo-drip/app/deploy/compose.yml exec -T postgres psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+   docker compose -f /srv/tattoo-drip/app/deploy/compose.yml exec -T postgres psql -U postgres -d postgres -Atc "select datname from pg_database where datname like 'tattoo_drip%' order by 1"
+   ```
+
+   **You should see:** `tattoo_drip` and `tattoo_drip_restore`. If `tattoo_drip_old` is also listed, it is left from an earlier restore and the swap would fail on that name (changing nothing). Drop it first if you no longer need it: `docker compose -f /srv/tattoo-drip/app/deploy/compose.yml exec -T postgres dropdb -U postgres tattoo_drip_old`.
+6. Swap, in one transaction (`-1`), so either both renames happen or neither:
+
+   ```bash
+   docker compose -f /srv/tattoo-drip/app/deploy/compose.yml exec -T postgres psql -U postgres -d postgres -v ON_ERROR_STOP=1 -1 \
      -c "ALTER DATABASE tattoo_drip RENAME TO tattoo_drip_old" \
      -c "ALTER DATABASE tattoo_drip_restore RENAME TO tattoo_drip" \
      -c "GRANT CONNECT ON DATABASE tattoo_drip TO tattoo_drip_app"
    ```
 
-   **You should see:** `ALTER DATABASE`, `ALTER DATABASE`, `GRANT`. If the first one says the database "is being accessed by other users", something is still connected. See who, stop it, and repeat the swap:
+   The command connects to the `postgres` database because a database cannot be renamed while you are connected to it.
+
+   **You should see:** `ALTER DATABASE`, `ALTER DATABASE`, `GRANT`. If it prints `ERROR` instead, **nothing was renamed**: the live database is still `tattoo_drip`, with its old data. The usual errors: `database "tattoo_drip" is being accessed by other users` (something is still connected: look at who with the command below, stop it, repeat), and `database "tattoo_drip_old" already exists` (step 5). If you cannot fix it, do step 7 anyway: it starts the old site again.
 
    ```bash
    docker compose -f /srv/tattoo-drip/app/deploy/compose.yml exec -T postgres psql -U postgres -d postgres -c "select pid, usename, application_name from pg_stat_activity where datname = 'tattoo_drip'"
    ```
-5. Start everything with the current code. This also runs any migration the dump predates:
+7. Start everything again on the commit that was running, not on whatever is newest on `main`. This also runs any migration the dump predates:
 
    ```bash
-   /srv/tattoo-drip/app/deploy/deploy.sh
+   /srv/tattoo-drip/app/deploy/deploy.sh "$(git -C /srv/tattoo-drip/app rev-parse HEAD)"
    ```
 
    **You should see:** `deployed <short commit>`. Sign in and look at the data.
-6. When you are sure (give it a week), delete the old database and the downloaded dump:
+8. When you are sure (give it a week), delete the old database and the downloaded dump:
 
    ```bash
    docker compose -f /srv/tattoo-drip/app/deploy/compose.yml exec -T postgres dropdb -U postgres tattoo_drip_old
    rm -f /srv/tattoo-drip/restore/*
    ```
 
-**To undo the swap** before step 6: stop web and worker as in step 3, run the two `RENAME` commands the other way round (`tattoo_drip` to `tattoo_drip_restore`, then `tattoo_drip_old` to `tattoo_drip`), and run `deploy.sh`.
+**To undo the swap** before step 8: stop web and worker as in step 4, put the databases back in one transaction, and start again as in step 7:
+
+```bash
+docker compose -f /srv/tattoo-drip/app/deploy/compose.yml exec -T postgres psql -U postgres -d postgres -v ON_ERROR_STOP=1 -1 \
+  -c "ALTER DATABASE tattoo_drip RENAME TO tattoo_drip_restore" \
+  -c "ALTER DATABASE tattoo_drip_old RENAME TO tattoo_drip"
+```
+
+If `tattoo_drip_restore` exists again (you made a scratch database since), that fails and changes nothing: drop that scratch database, or use any other free name in place of `tattoo_drip_restore`.
 
 ### 7.6 A restore on a new server
 
 If the server is gone:
 
-1. Buy and set up a new one: section 1.
-2. Make the settings files (section 2). Fill them from your password manager copy: above all `APP_KEY`, so that sessions and deposit links keep working. The database passwords can be new ones: the roles are created again, with these passwords, when Postgres starts the first time. Reuse the same tunnel token, the R2 tokens and the Turnstile keys; if the backups token or the other values are lost, make new ones in section 3. Start the new server's `cloudflared` only once the old one is off.
+1. Buy and set up a new one: section 1, and the clone update of 2.1 (the first command and the `ls`).
+2. Do not run 2.2: it would make a new `APP_KEY` and new database passwords. Put the six settings files from your password manager into `/srv/tattoo-drip/env`, so that sessions and deposit links keep working and the passwords match. From your computer, with the saved copies in `~/tattoo-drip-env` (2.4):
+
+   ```bash
+   scp -i ~/.ssh/tattoo_drip_vps ~/tattoo-drip-env/*.env haru@<new-server-ip>:/srv/tattoo-drip/env/
+   ssh -i ~/.ssh/tattoo_drip_vps haru@<new-server-ip> 'chmod 600 /srv/tattoo-drip/env/*.env'
+   ```
+
+   Reuse the same tunnel token (start the new server's `cloudflared` only once the old one is off), the R2 tokens and the Turnstile keys. If you have no saved copy, make the files with 2.1 and 2.2 and the values of section 3 again, with a new `APP_KEY`: everyone must sign in again and the deposit links already handed out stop working. If only the backups token is lost, make a new one (3.4).
 3. Run the first deploy (4.3). It starts an empty, migrated database.
-4. Restore the newest dump with 7.1, 7.2, 7.3 and 7.5 (step 1 does not apply).
+4. Restore the newest dump with 7.1, 7.2, 7.3 and then 7.5 from step 2 on (step 1 does not apply).
 5. Repeat 6.3 to install the timer.
 
 ---
@@ -906,7 +967,7 @@ docker builder prune -f
 docker image prune -f
 ```
 
-Never add `--volumes` or run `docker volume prune`: the database lives in a volume. Also delete anything left in `/srv/tattoo-drip/restore`. The logs rotate by themselves.
+Never add `--volumes` or run `docker volume prune`: the database lives in a volume. Also delete anything left in `/srv/tattoo-drip/restore`, and, once a restore is confirmed good, the database it left behind (7.5, step 8): `docker compose -f /srv/tattoo-drip/app/deploy/compose.yml exec -T postgres dropdb -U postgres --if-exists tattoo_drip_old`. The logs rotate by themselves.
 
 ### 8.4 Out of memory during a build
 

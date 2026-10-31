@@ -370,7 +370,7 @@ export default class ImageService {
 	 * with its purpose and key, never thrown, so cleanup can't fail a request.
 	 * Use it for what no record points at any more or what a rollback leaves
 	 * (a replaced image after the commit); a file that fails stays unreferenced
-	 * until the orphan sweep of TAT-27. A removal that must not report success
+	 * until the orphan sweep (TAT-140). A removal that must not report success
 	 * while a file is still reachable uses `deleteOrThrow`.
 	 */
 	async delete(purpose: ImagePurpose, key: string): Promise<void> {
