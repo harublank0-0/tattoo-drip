@@ -199,11 +199,13 @@ export default class FlashService {
 	 * Saves the design's name, size, price, whether it is one of a kind and
 	 * whether it is hidden, from a fresh read under the artist's lock. The
 	 * picture never changes: a new picture is a new design. Switching a design
-	 * to "can be tattooed again" clears its claim in the same transaction (the
-	 * claim goes first, in its own statement, before the design is read, so a
-	 * claim that committed meanwhile is cleared too and the database's check
-	 * `flash_designs_claim_one_of_a_kind` never sees a claimed repeatable
-	 * design); saving it still one of a kind keeps the claim.
+	 * to "can be tattooed again" clears its claim in the same UPDATE. The
+	 * design's row is locked first (after the artist's, the order every write
+	 * of the studio's keeps), so a claim in flight is waited for and read: a
+	 * claim that commits meanwhile is cleared with the switch, and one that
+	 * comes after finds the design repeatable. The database's check
+	 * `flash_designs_claim_one_of_a_kind` therefore never sees a claimed
+	 * repeatable design. Saving it still one of a kind keeps the claim.
 	 */
 	async update(
 		tenant: TenantRef,
@@ -214,20 +216,16 @@ export default class FlashService {
 		assertDesignOf(tenant, design);
 		return withTransaction(async (trx) => {
 			await this.artists.lockEditable(trx, tenant, editor, design.artistId);
-			if (!details.oneOfAKind) {
-				await trx.rawQuery(
-					`update flash_designs set claimed_at = null, claimed_project_id = null, updated_at = now()
-					where tenant_id = ? and id = ? and claimed_at is not null`,
-					[tenant.id, design.id],
-				);
-			}
-			const live = await this.lockedDesign(trx, tenant, design);
+			const live = await this.lockedDesign(trx, tenant, design, true);
 			live.merge({
 				name: details.name.trim(),
 				size: details.size.trim(),
 				price: details.price,
 				oneOfAKind: details.oneOfAKind,
 				hidden: details.hidden,
+				...(details.oneOfAKind
+					? {}
+					: { claimedAt: null, claimedProjectId: null }),
 			});
 			await live.save();
 			return live;
@@ -501,16 +499,21 @@ export default class FlashService {
 		return Number(row.$extras.total);
 	}
 
-	/** The design's row, read again under the artist's lock: gone meanwhile is a 404. */
+	/**
+	 * The design's row, read again under the artist's lock: gone meanwhile is a
+	 * 404. `forUpdate` also takes the row's lock (waiting for a claim in flight
+	 * and reading what it stored), always after the artist's.
+	 */
 	private async lockedDesign(
 		trx: QueryClientContract,
 		tenant: TenantRef,
 		design: FlashDesign,
+		forUpdate = false,
 	): Promise<FlashDesign> {
-		return FlashDesign.query({ client: trx })
+		const query = FlashDesign.query({ client: trx })
 			.where("tenant_id", tenant.id)
-			.where("id", design.id)
-			.firstOrFail();
+			.where("id", design.id);
+		return (forUpdate ? query.forUpdate() : query).firstOrFail();
 	}
 }
 

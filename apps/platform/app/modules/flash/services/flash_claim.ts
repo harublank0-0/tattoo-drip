@@ -11,10 +11,16 @@ type TenantRef = Pick<Tenant, "id">;
  * It returns true when it changed a row.
  *
  * The rules, in one place:
- * - The claim moments are the project's first verified deposit (verified from
- *   a screenshot or recorded at the desk) and the project becoming booked,
- *   whichever comes first. PaymentService.afterPayment and
- *   SessionService.moveToBooked call this; nothing else does.
+ * - The claim moment is the project's first qualifying event: its first
+ *   verified deposit (verified from a screenshot or recorded at the desk)
+ *   or its becoming booked, whichever comes first. PaymentService.afterPayment
+ *   and SessionService.moveToBooked call this at every such event; nothing
+ *   else does. Only the first one tries: it marks the project
+ *   (`tattoo_projects.flash_claimed_once_at`, one conditional UPDATE under the
+ *   project's lock) whatever the outcome, and a later call finds the mark and
+ *   returns false. So the rest of a split deposit, or the booking after the
+ *   first deposit, never takes back a design the studio made available
+ *   (FlashService.setClaimed) after the first event claimed it.
  * - A design that can be tattooed again (`one_of_a_kind` false) is never
  *   claimed; neither is a design someone already claimed, by a project or by
  *   hand (FlashService.setClaimed). A project with no design costs no query.
@@ -51,6 +57,16 @@ export async function claimFlashFor(
 	project: Pick<TattooProject, "id" | "flashDesignId">,
 ): Promise<boolean> {
 	if (!project.flashDesignId) return false;
+	// The project's own row, locked by the caller: the first qualifying event
+	// takes the mark, a later one gets no row back. A SQL gate, not the
+	// caller's copy of the row, which a first call made in the same
+	// transaction has already made stale.
+	const first = await dbClient().rawQuery(
+		`update tattoo_projects set flash_claimed_once_at = now()
+		where tenant_id = ? and id = ? and flash_claimed_once_at is null`,
+		[tenant.id, project.id],
+	);
+	if (first.rowCount === 0) return false;
 	const result = await dbClient().rawQuery(
 		`update flash_designs
 		set claimed_at = now(), claimed_project_id = ?, updated_at = now()

@@ -829,6 +829,7 @@ export class TattooProjectSchema extends BaseModel {
 		"clientId",
 		"createdAt",
 		"deletedAt",
+		"flashClaimedOnceAt",
 		"flashDesignId",
 		"id",
 		"inquiryId",
@@ -851,6 +852,8 @@ export class TattooProjectSchema extends BaseModel {
 	declare createdAt: DateTime;
 	@column.dateTime()
 	declare deletedAt: DateTime | null;
+	@column.dateTime()
+	declare flashClaimedOnceAt: DateTime | null;
 	@column()
 	declare flashDesignId: string | null;
 	@column({ isPrimary: true })

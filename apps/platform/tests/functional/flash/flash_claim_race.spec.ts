@@ -174,6 +174,79 @@ test.group(
 			);
 		}).timeout(30000);
 
+		test("switching the design to can be tattooed again while a claim is in flight waits for it, then releases that claim: no check violation", async ({
+			assert,
+		}) => {
+			const { tenant, design, project, flash, editor } =
+				await studioWithProject();
+			const claim = claiming(tenant, project, deferred());
+			claim.startClaim.resolve();
+			await claim.locked;
+			await claim.reached;
+
+			const editing = await onItsOwnConnection(tenant, () =>
+				flash.update(tenant, editor, design, {
+					name: "Moth",
+					size: "About 3 in",
+					price: null,
+					oneOfAKind: false,
+					hidden: false,
+				}),
+			);
+			const waited = await waitUntilBlocked(editing.pid, editing.outcome);
+			claim.release();
+			const [claimed, edited] = await Promise.all([
+				claim.outcome,
+				editing.outcome,
+			]);
+
+			assert.isTrue(waited, "the edit waited for the claim's row lock");
+			assert.deepEqual(claimed, { value: true });
+			assert.isUndefined(errorOf(edited), String(errorOf(edited)));
+			const stored = await designOf(tenant, design.id);
+			assert.isFalse(stored?.oneOfAKind);
+			assert.isNull(stored?.claimedAt, "the claim was released with it");
+			assert.isNull(stored?.claimedProjectId);
+		}).timeout(30000);
+
+		test("a claim that comes while the design is being switched to can be tattooed again waits for the edit and claims nothing", async ({
+			assert,
+		}) => {
+			const { tenant, design, project, flash, editor } =
+				await studioWithProject();
+			const edit = heldOpen(tenant, () =>
+				flash.update(tenant, editor, design, {
+					name: "Moth",
+					size: "About 3 in",
+					price: null,
+					oneOfAKind: false,
+					hidden: false,
+				}),
+			);
+			await edit.reached;
+
+			const claimer = await onItsOwnConnection(tenant, async () => {
+				const live = await TattooProject.query()
+					.where("id", project.id)
+					.forUpdate()
+					.firstOrFail();
+				return claimFlashFor(tenant, live);
+			});
+			const waited = await waitUntilBlocked(claimer.pid, claimer.outcome);
+			edit.release();
+			const [edited, claimed] = await Promise.all([
+				edit.outcome,
+				claimer.outcome,
+			]);
+
+			assert.isTrue(waited, "the claim waited for the edit's row lock");
+			assert.isUndefined(errorOf(edited), String(errorOf(edited)));
+			assert.deepEqual(claimed, { value: false });
+			const stored = await designOf(tenant, design.id);
+			assert.isFalse(stored?.oneOfAKind);
+			assert.isNull(stored?.claimedAt);
+		}).timeout(30000);
+
 		test("marking the design claimed by hand while a project's claim is in flight leaves the project's claim", async ({
 			assert,
 		}) => {
