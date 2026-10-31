@@ -4,6 +4,10 @@
 # kept out of the access log. Starts compose.yml under its own project name
 # and removes it afterwards, also when a check fails.
 #
+# It uses the production subnet, 172.30.42.0/24, because the addresses are part
+# of what it checks: it cannot run on a host where the production stack (or
+# anything else on that subnet) is up.
+#
 #   bash deploy/test/nginx/run.sh                       # docker compose
 #   COMPOSE=podman-compose bash deploy/test/nginx/run.sh
 #
@@ -46,13 +50,41 @@ failed=0
 compose exec -T trusted node /check.mjs trusted || failed=1
 compose exec -T outsider node /check.mjs outsider || failed=1
 
+# The static values, read back from the running nginx (nginx -T prints the
+# whole configuration, includes too). Whole lines, so a comment cannot match.
+logs=$(mktemp)
+conf=$(mktemp)
+trap 'rm -f "$logs" "$conf"; cleanup' EXIT
+if compose exec -T nginx nginx -T >"$conf" 2>&1; then
+	echo "ok   nginx -T accepts the configuration"
+else
+	echo "FAIL nginx -T rejects the configuration"
+	failed=1
+fi
+expect_lines() { # directive (without its ;), expected number of lines
+	local found
+	found=$(sed 's/^[[:space:]]*//; s/[[:space:]]*$//' "$conf" | grep -Fxc "$1;" || true)
+	if [ "$found" = "$2" ]; then
+		echo "ok   nginx -T: $1 ($found)"
+	else
+		echo "FAIL nginx -T: expected $2 line(s) '$1;', found $found"
+		failed=1
+	fi
+}
+expect_lines 'client_max_body_size 21m' 1
+expect_lines 'client_header_timeout 15s' 1
+expect_lines 'client_body_timeout 30s' 1
+expect_lines 'send_timeout 30s' 1
+expect_lines 'proxy_read_timeout 130s' 1
+expect_lines 'proxy_request_buffering on' 1
+expect_lines 'keepalive_timeout 4s' 2 # one in each upstream
+
 # Tokens stay out of the access log; ordinary requests are logged, with the
 # visitor's address. The log can lag the request a little: wait for the last line.
-logs=$(mktemp)
-trap 'rm -f "$logs"; cleanup' EXIT
 for _ in $(seq 1 40); do
 	compose logs nginx >"$logs" 2>&1 || true
 	grep -q 'GET /login' "$logs" && break
+	sleep 0.25
 done
 
 if grep -q 'GET /login' "$logs"; then
@@ -84,5 +116,5 @@ fi
 
 cleanup
 trap - EXIT
-rm -f "$logs"
+rm -f "$logs" "$conf"
 echo "nginx: all checks passed"

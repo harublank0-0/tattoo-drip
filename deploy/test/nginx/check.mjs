@@ -7,10 +7,13 @@
 // Prints one line per check and exits 1 when any failed. run.sh starts it from
 // each client and then checks nginx's access log.
 import http from "node:http";
+import { isIP } from "node:net";
 
 const NGINX = "172.30.42.10";
 const CLIENTS = { trusted: "172.30.42.20", outsider: "172.30.42.99" };
 const MiB = 1024 * 1024;
+/** What the client reports when the server closes the connection without answering. */
+const CLOSED = ["ECONNRESET", "socket hang up"];
 
 const mode = process.argv[2];
 const self = CLIENTS[mode];
@@ -93,7 +96,14 @@ async function waitForNginx() {
 const SPOOF = {
 	"CF-Connecting-IP": "203.0.113.7",
 	"X-Forwarded-For": "1.2.3.4, 5.6.7.8",
+	"X-Forwarded-Host": "evil.example",
+	Forwarded: "for=1.2.3.4;host=evil.example",
 };
+
+/** What the visitor sent in X-Forwarded-Host and Forwarded must not reach the app. */
+function forwardingIsClean(seen, host) {
+	return seen["x-forwarded-host"] === host && seen.forwarded === undefined;
+}
 
 /** The address both apps must see: the visitor behind cloudflared, else the peer's own. */
 const expectedVisitor = mode === "trusted" ? "203.0.113.7" : self;
@@ -120,6 +130,16 @@ async function checkVisitorAddress() {
 			seen["x-forwarded-proto"] === "https" && seen.host === host,
 			`proto ${seen["x-forwarded-proto"]}, host ${seen.host}`,
 		);
+		check(
+			`${upstream}: a visitor's X-Forwarded-Host and Forwarded are replaced and dropped`,
+			forwardingIsClean(seen, host),
+			`x-forwarded-host ${seen["x-forwarded-host"]}, forwarded ${seen.forwarded}`,
+		);
+		check(
+			`${upstream}: the app's peer is nginx (${NGINX})`,
+			json?.remote === NGINX,
+			`remote ${json?.remote}`,
+		);
 	}
 }
 
@@ -143,25 +163,53 @@ async function checkHosts() {
 		"tattoodrip.page.evil.example",
 	]) {
 		const answer = await send({ host });
+		// nginx's 444 closes the connection: the client sees a reset or a hang-up,
+		// not a response and not a wait until its own timeout.
 		check(
 			`Host ${host} is closed without a response`,
-			answer.status === undefined && answer.error !== undefined,
+			answer.status === undefined && CLOSED.includes(answer.error),
 			`status ${answer.status}, error ${answer.error}`,
 		);
 	}
 }
 
 async function checkWithoutCloudflareHeader() {
-	// cloudflared always sets CF-Connecting-IP; if it ever did not, a spoofed
-	// X-Forwarded-For must still not get through.
+	// cloudflared always sets CF-Connecting-IP; if it ever did not, or sent
+	// something that is not an address, a spoofed X-Forwarded-For must still not
+	// get through: the app sees the peer's own address.
+	for (const [name, headers] of [
+		["no CF-Connecting-IP", {}],
+		["CF-Connecting-IP: not-an-ip", { "CF-Connecting-IP": "not-an-ip" }],
+	]) {
+		const { json } = await send({
+			host: "tattoodrip.app",
+			headers: { "X-Forwarded-For": "1.2.3.4", ...headers },
+		});
+		check(
+			`${name}: x-forwarded-for is the peer, ${self}`,
+			json?.headers?.["x-forwarded-for"] === self,
+			`x-forwarded-for ${json?.headers?.["x-forwarded-for"]}`,
+		);
+	}
+}
+
+async function checkAddressList() {
+	// Cloudflare sets one address, but if the header ever held a list, the app
+	// must still get exactly one valid address. Without real_ip_recursive nginx
+	// takes the last entry of the list (198.51.100.2): an address Cloudflare's
+	// own proxy chain put there, if anyone did.
 	const { json } = await send({
 		host: "tattoodrip.app",
-		headers: { "X-Forwarded-For": "1.2.3.4" },
+		headers: {
+			"CF-Connecting-IP": "198.51.100.1, 198.51.100.2",
+			"X-Forwarded-For": "1.2.3.4",
+		},
 	});
+	const seen = json?.headers?.["x-forwarded-for"];
 	check(
-		`no CF-Connecting-IP: x-forwarded-for is the peer, ${self}`,
-		json?.headers?.["x-forwarded-for"] === self,
-		`x-forwarded-for ${json?.headers?.["x-forwarded-for"]}`,
+		"CF-Connecting-IP with two addresses: x-forwarded-for is one valid address, the last (198.51.100.2)",
+		isIP(seen ?? "") !== 0 && seen === "198.51.100.2",
+		`x-forwarded-for ${seen}`,
 	);
 }
 
@@ -212,8 +260,9 @@ async function checkTokenPaths() {
 				json?.url === path &&
 				seen["x-forwarded-for"] === expectedVisitor &&
 				seen["x-forwarded-proto"] === "https" &&
-				seen.host === "tattoodrip.app",
-			`status ${status}, url ${json?.url}, x-forwarded-for ${seen["x-forwarded-for"]}, proto ${seen["x-forwarded-proto"]}, host ${seen.host}`,
+				seen.host === "tattoodrip.app" &&
+				forwardingIsClean(seen, "tattoodrip.app"),
+			`status ${status}, url ${json?.url}, x-forwarded-for ${seen["x-forwarded-for"]}, proto ${seen["x-forwarded-proto"]}, host ${seen.host}, x-forwarded-host ${seen["x-forwarded-host"]}, forwarded ${seen.forwarded}`,
 		);
 	}
 	// nginx also writes request lines into warn and error log lines: a body
@@ -239,6 +288,23 @@ async function checkTokenPaths() {
 		failing.status === 502,
 		`status ${failing.status}, error ${failing.error}`,
 	);
+	// nginx rejects some requests before it picks a location, so the locations'
+	// own access_log off does not apply: a header larger than a buffer is a 400.
+	for (const path of [
+		"/reset-password/tok-canary-7",
+		"/api/v1/tenants/x/deposits/tok-canary-8",
+	]) {
+		const rejected = await send({
+			host: "tattoodrip.app",
+			path,
+			headers: { "X-Padding": "a".repeat(20_000) },
+		});
+		check(
+			`${path} with an oversized header is rejected with 400`,
+			rejected.status === 400,
+			`status ${rejected.status}, error ${rejected.error}`,
+		);
+	}
 	// The one request that must be logged (run.sh looks for it, and for its address).
 	const login = await send({
 		host: "tattoodrip.app",
@@ -257,6 +323,7 @@ await checkVisitorAddress();
 if (mode === "trusted") {
 	await checkHosts();
 	await checkWithoutCloudflareHeader();
+	await checkAddressList();
 	await checkBodyLimit();
 	await checkTokenPaths();
 } else {
