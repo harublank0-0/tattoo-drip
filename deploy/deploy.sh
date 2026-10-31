@@ -162,8 +162,8 @@ main() {
 		fail_started "starting the services failed"
 	fi
 
-	# 8. nginx looks the upstreams up only when it starts or reloads, and a recreated
-	# container can have a new address: reload once both are up, or it answers 502.
+	# 8. Reload nginx once both are up, so it picks up a config this commit changed (web and
+	# storefront have fixed addresses, so a recreated container needs no reload).
 	# -c: deploy/compose.yml starts nginx from the mounted directory, not the image's file.
 	say "waiting for web and storefront"
 	wait_healthy 120 web storefront || fail_started "web or storefront is not healthy"

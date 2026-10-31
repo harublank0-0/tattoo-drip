@@ -672,10 +672,9 @@ Edit the file (2.4), then recreate the services that read it. The settings of `w
 
 ```bash
 docker compose -f /srv/tattoo-drip/app/deploy/compose.yml up -d --force-recreate web worker
-docker compose -f /srv/tattoo-drip/app/deploy/compose.yml exec -T nginx nginx -c /etc/nginx/td/nginx.conf -s reload
 ```
 
-The second command matters: nginx looks the apps up only when it starts or reloads, and a recreated container can have a new address. For the storefront use `storefront` in place of `web worker`. For the tunnel (`tunnel.env`) use `cloudflared`, and no reload. `postgres.env` only counts when the database is first created; changing it later changes nothing.
+Nothing else is needed: nginx reaches `web` and `storefront` by fixed addresses (`172.30.42.11` and `172.30.42.12`, set in `deploy/compose.yml` and `deploy/nginx/nginx.conf`), so it finds a recreated or restarted container at once, and after a reboot too. The site answers `502` for the few seconds the new container takes to start. For the storefront use `storefront` in place of `web worker`. For the tunnel (`tunnel.env`) use `cloudflared`. `postgres.env` only counts when the database is first created; changing it later changes nothing.
 
 ---
 
@@ -941,7 +940,7 @@ Replace `web` with `worker`, `storefront`, `nginx`, `cloudflared` or `postgres`.
 | Everyone is locked out of sign-in or the request form after a few tries | `TRUST_PROXY` is not nginx's address, so every visitor looks like one. It must be `172.30.42.10`. |
 | Photos do not upload, or the log says R2 | The R2 token, the bucket names or `R2_ACCOUNT_ID` (3.1 to 3.3). |
 | The request form always says the check failed | The Turnstile widget's hostname or keys (3.5). |
-| `502` right after you recreated a service by hand | nginx has the old address: run the `nginx ... -s reload` command of section 5. |
+| `502` for a few seconds after you recreated or restarted `web` or `storefront` | The new container is still starting (`web` can take 30 s); nginx finds it by its fixed address. Wait until `ps` says `healthy`; if it never does, `logs web` (or `logs storefront`). |
 | `deploy.sh` says the build failed | Often memory or disk: 8.3 and 8.4. |
 | A "backup failed" email | 6.5. |
 

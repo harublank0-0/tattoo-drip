@@ -3,7 +3,8 @@
 # the production stack; run.sh starts it under its own project name and
 # removes it afterwards.
 #
-#   web, storefront  echo.mjs: answers with the request it got, as JSON
+#   web, storefront  echo.mjs: answers with the request it got, as JSON, at the fixed
+#                    addresses nginx's upstreams name (172.30.42.11, .12)
 #   nginx            the pinned image from deploy/compose.yml, at 172.30.42.10
 #   trusted          client at 172.30.42.20, cloudflared's address
 #   outsider         client at 172.30.42.99, any other address
@@ -22,6 +23,9 @@ services:
       PORT: "3333"
     volumes:
       - ./echo.mjs:/echo.mjs:ro
+    networks:
+      tattoo_drip:
+        ipv4_address: 172.30.42.11
 
   storefront:
     <<: *node
@@ -31,6 +35,9 @@ services:
       PORT: "3000"
     volumes:
       - ./echo.mjs:/echo.mjs:ro
+    networks:
+      tattoo_drip:
+        ipv4_address: 172.30.42.12
 
   nginx:
     image: ${NGINX_IMAGE:?run.sh sets this from deploy/compose.yml}

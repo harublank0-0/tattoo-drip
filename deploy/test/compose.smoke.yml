@@ -24,3 +24,5 @@ services:
   cloudflared:
     image: docker.io/library/node:24.3.0-bookworm-slim
     command: ["node", "-e", "setInterval(() => {}, 1 << 30)"]
+    # node as PID 1 ignores SIGTERM; init forwards it, so teardown does not wait 10 s.
+    init: true

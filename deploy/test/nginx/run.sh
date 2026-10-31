@@ -80,6 +80,8 @@ expect_lines 'send_timeout 30s' 1
 expect_lines 'proxy_read_timeout 130s' 1
 expect_lines 'proxy_request_buffering on' 1
 expect_lines 'keepalive_timeout 4s' 2 # one in each upstream
+expect_lines 'server 172.30.42.11:3333' 1 # web, by its fixed address (deploy/compose.yml)
+expect_lines 'server 172.30.42.12:3000' 1 # storefront
 
 # Tokens stay out of the access log; ordinary requests are logged, with the
 # visitor's address. The log can lag the request a little: wait for the last line.
