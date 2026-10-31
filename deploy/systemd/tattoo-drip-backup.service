@@ -1,0 +1,13 @@
+[Unit]
+Description=Tattoo Drip nightly database backup
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/tattoo-drip/app
+# Absolute compose path: the unit does not depend on the working directory.
+ExecStart=/usr/bin/docker compose -f /srv/tattoo-drip/app/deploy/compose.yml --profile tools run --rm backup
+# A hung upload must not block every later night; a oneshot has no limit by default.
+TimeoutStartSec=2h

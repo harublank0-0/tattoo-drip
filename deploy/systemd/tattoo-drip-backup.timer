@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the Tattoo Drip database backup every night at 02:00 Nepal time
+
+[Timer]
+OnCalendar=*-*-* 02:00:00 Asia/Kathmandu
+# A night the server was off runs once at the next boot.
+Persistent=true
+RandomizedDelaySec=5m
+
+[Install]
+WantedBy=timers.target

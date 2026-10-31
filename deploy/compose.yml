@@ -144,8 +144,8 @@ services:
         # nginx trusts CF-Connecting-IP from this address only (set_real_ip_from).
         ipv4_address: 172.30.42.20
 
-  # One-off. With backup (a later addition), the only service that gets the owner's
-  # password; web and worker never do:
+  # One-off. With backup, the only app-side services given the owner's password
+  # (postgres holds it too); web and worker never get it:
   #   docker compose -f deploy/compose.yml --profile tools run --rm migrate
   migrate:
     <<: *platform
@@ -158,6 +158,26 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  # One-off, started every night at 02:00 Nepal time by systemd (deploy/systemd/
+  # tattoo-drip-backup.timer): pg_dump as the owner, copied to the private R2 backups
+  # bucket, the heartbeat pinged. Its Dockerfile starts FROM the same postgres pin as above.
+  #   docker compose -f deploy/compose.yml --profile tools run --rm backup
+  backup:
+    build:
+      context: ./backup
+    image: tattoo-drip-backup
+    init: true
+    logging: *logging
+    profiles:
+      - tools
+    env_file:
+      - ${TD_ENV_DIR:-/srv/tattoo-drip/env}/backup.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - tattoo_drip
 
 # Private to this stack, with a fixed subnet so nginx and cloudflared have fixed
 # addresses. The other services get theirs from the upper half (ip_range), so
