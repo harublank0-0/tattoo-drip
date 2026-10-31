@@ -1,0 +1,26 @@
+# Production-mode smoke run on a development machine: the real deploy/compose.yml
+# with two changes, applied by deploy/deploy.sh through TD_COMPOSE_FILES:
+#
+#   TD_ENV_DIR=<scratch settings> \
+#   TD_COMPOSE_FILES=deploy/compose.yml:deploy/test/compose.smoke.yml \
+#   COMPOSE=podman-compose deploy/deploy.sh HEAD
+#
+#   nginx        also published on 127.0.0.1:8088, so curl can reach it with a Host header
+#   cloudflared  replaced by an idle stand-in at the same address. A fake tunnel token would
+#                crash-loop the real one, and compose starts a service that deploy.sh names
+#                even when its profile is inactive, so a profile cannot switch it off.
+#
+# The stack keeps its project name (tattoo-drip-prod) and subnet, so it cannot run beside a
+# real one. Take it down with its data volume when done:
+#   podman-compose -p tattoo-drip-prod -f deploy/compose.yml -f deploy/test/compose.smoke.yml down -v
+#
+# This file exists only for that run. Never pass it to the production deploy.
+
+services:
+  nginx:
+    ports:
+      - "127.0.0.1:8088:80"
+
+  cloudflared:
+    image: docker.io/library/node:24.3.0-bookworm-slim
+    command: ["node", "-e", "setInterval(() => {}, 1 << 30)"]
