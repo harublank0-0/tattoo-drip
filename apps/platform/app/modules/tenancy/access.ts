@@ -42,6 +42,7 @@ export const TENANT_ROUTE_ROLES = {
 	"tenant.settings.look.update": OWNERS,
 	"tenant.settings.logo.update": OWNERS,
 	"tenant.settings.logo.destroy": OWNERS,
+	"tenant.settings.logo.tile.update": OWNERS,
 	"tenant.settings.payments": OWNERS,
 	"tenant.settings.deposits.update": OWNERS,
 	"tenant.settings.payments.create": OWNERS,
@@ -52,6 +53,12 @@ export const TENANT_ROUTE_ROLES = {
 	"tenant.settings.payments.destroy": OWNERS,
 	"tenant.settings.messages": OWNERS,
 	"tenant.settings.messages.update": OWNERS,
+	// Good to know and opening hours (TAT-128).
+	"tenant.settings.good_to_know": OWNERS,
+	"tenant.settings.good_to_know.update": OWNERS,
+	"tenant.settings.hours.update": OWNERS,
+	"tenant.settings.closed_days.store": OWNERS,
+	"tenant.settings.closed_days.destroy": OWNERS,
 	"tenant.settings.members": OWNERS,
 	"tenant.settings.members.invitations.store": OWNERS,
 	"tenant.settings.members.invitations.renew": OWNERS,
@@ -74,8 +81,13 @@ export const TENANT_ROUTE_ROLES = {
 	// (WorkPhotoService.findEditable, re-checked under the artist's row lock).
 	"tenant.artists.photos.store": MEMBERS,
 	"tenant.artists.photos.update": MEMBERS,
-	"tenant.artists.photos.move": MEMBERS,
 	"tenant.artists.photos.destroy": MEMBERS,
+	// An artist's flash designs (TAT-129): the same rule as the work photos
+	// (FlashService.findEditable, re-checked under the artist's row lock).
+	"tenant.artists.flash.store": MEMBERS,
+	"tenant.artists.flash.update": MEMBERS,
+	"tenant.artists.flash.claim.update": MEMBERS,
+	"tenant.artists.flash.destroy": MEMBERS,
 
 	// The inquiry inbox: reference images stay private to owners until a
 	// project is assigned.

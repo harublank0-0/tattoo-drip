@@ -1,7 +1,7 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import User from "#models/user";
-import type Artist from "#modules/artists/models/artist";
+import Artist from "#modules/artists/models/artist";
 import ArtistService from "#modules/artists/services/artist_service";
 import WorkPhotoService from "#modules/artists/services/work_photo_service";
 import ImageService from "#modules/media/services/image_service";
@@ -31,12 +31,14 @@ const ARTIST_FIELDS = [
 	"name",
 	"photo",
 	"slug",
+	"socialLinks",
+	"styles",
 	"workPhotos",
 ];
 const WORK_PHOTO_FIELDS = ["alt", "height", "url", "variants", "width"];
 const PHOTO_FIELDS = ["height", "url", "variants", "width"];
 
-/** The public Artist of a profile without a photo. */
+/** The public Artist of a profile without a photo, styles or links. */
 const shown = (artist: Artist) => ({
 	id: artist.id,
 	slug: artist.slug,
@@ -46,6 +48,8 @@ const shown = (artist: Artist) => ({
 	acceptingInquiries: artist.acceptingInquiries,
 	closedMessage: artist.acceptingInquiries ? null : artist.closedMessage,
 	workPhotos: [],
+	styles: [],
+	socialLinks: [],
 });
 
 function changeSlug(tenant: Tenant, slug: string) {
@@ -152,38 +156,34 @@ test.group("GET /api/v1/tenants/:tenant/artists (listArtists)", (group) => {
 		}
 	});
 
-	test("work photos come in the studio's order with exactly url, width, height, alt and variants", async ({
+	test("work photos are the six newest, newest first, with exactly url, width, height, alt and variants", async ({
 		client,
 		assert,
 	}) => {
 		const { owner, tenant } = await studioWithOwner("api-work-116");
 		const sita = await addArtist(tenant, owner);
 		const photos = new WorkPhotoService(images, artists);
-		const added = await inTenant(tenant, async () => [
-			await photos.add(
-				tenant,
-				{ userId: owner.id, role: "owner" },
-				sita,
-				await uploadOf(await testImages.jpeg(1600, 1200)),
-			),
-			await photos.add(
-				tenant,
-				{ userId: owner.id, role: "owner" },
-				sita,
-				await uploadOf(await testImages.jpeg(300, 400)),
-			),
-		]);
+		const editor = { userId: owner.id, role: "owner" } as const;
+		const added = await inTenant(tenant, async () => {
+			const rows = [];
+			for (let n = 0; n < 8; n++) {
+				// One narrow photo (no smaller copies); the rest are wide.
+				const bytes =
+					n === 6
+						? await testImages.jpeg(300, 400)
+						: await testImages.jpeg(1600, 1200);
+				rows.push(
+					await photos.add(tenant, editor, sita, await uploadOf(bytes)),
+				);
+			}
+			return rows;
+		});
 		await inTenant(tenant, () =>
-			photos.describe(
-				tenant,
-				{ userId: owner.id, role: "owner" },
-				added[0],
-				"Koi on the forearm",
-			),
-		);
-		// The studio's order: the second photo first.
-		await inTenant(tenant, () =>
-			photos.move(tenant, { userId: owner.id, role: "owner" }, added[1], "up"),
+			photos.updateDetails(tenant, editor, added[7], {
+				alt: "Koi on the forearm",
+				styles: ["realism"],
+				healed: true,
+			}),
 		);
 
 		const { data } = (
@@ -194,8 +194,16 @@ test.group("GET /api/v1/tenants/:tenant/artists (listArtists)", (group) => {
 		).body().data;
 
 		const work = data[0].workPhotos;
-		assert.lengthOf(work, 2);
+		assert.lengthOf(work, 6);
 		assert.deepEqual(one.workPhotos, work);
+		// The six newest (added 7 down to 2), newest first: the URLs hold the keys.
+		assert.deepEqual(
+			work.map((photo: { url: string }) => new URL(photo.url).pathname),
+			added
+				.slice(2)
+				.reverse()
+				.map((row) => `/uploads/${row.imageKey}`),
+		);
 		for (const photo of work) {
 			assert.deepEqual(Object.keys(photo).sort(), WORK_PHOTO_FIELDS);
 			assert.match(
@@ -204,28 +212,109 @@ test.group("GET /api/v1/tenants/:tenant/artists (listArtists)", (group) => {
 			);
 			(await client.get(new URL(photo.url).pathname)).assertStatus(200);
 		}
-		assert.equal(work[0].width, 300);
-		assert.isNull(work[0].alt);
-		assert.deepEqual(work[0].variants, []);
-		assert.equal(work[1].width, 1600);
-		assert.equal(work[1].alt, "Koi on the forearm");
+		assert.equal(work[0].alt, "Koi on the forearm");
 		assert.deepEqual(
-			work[1].variants.map((variant: { width: number }) => variant.width),
+			work[0].variants.map((variant: { width: number }) => variant.width),
 			[320, 640, 1280],
 		);
-		// Never the row: no id, key, position, artist id or timestamp.
+		assert.equal(work[1].width, 300);
+		assert.isNull(work[1].alt);
+		assert.deepEqual(work[1].variants, []);
+		// Never the row: no id, key, position, styles, healed, artist id or timestamp.
 		const text = JSON.stringify(work);
 		for (const word of [
 			"position",
+			"styles",
+			"healed",
 			"artist_id",
 			"artistId",
 			"created",
 			"imageKey",
+			"realism",
 		]) {
 			assert.notInclude(text, word);
 		}
-		assert.notInclude(text, added[0].id);
-		assert.notInclude(text, added[1].id);
+		for (const row of added) assert.notInclude(text, row.id);
+	});
+
+	test("styles come in the list's order as slug and name, an unknown one dropped", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("api-styles-site1");
+		const sita = await addArtist(tenant, owner);
+		// A slug that has since left the list, written past the validator.
+		await inTenant(tenant, () =>
+			Artist.query()
+				.where("id", sita.id)
+				.update({ styles: ["realism", "retired-style", "blackwork"] }),
+		);
+
+		const list = (
+			await client.get("/api/v1/tenants/api-styles-site1/artists")
+		).body().data;
+		const one = (
+			await client.get("/api/v1/tenants/api-styles-site1/artists/sita")
+		).body().data;
+
+		const expected = [
+			{ slug: "blackwork", name: "Blackwork" },
+			{ slug: "realism", name: "Realism" },
+		];
+		assert.deepEqual(list[0].styles, expected);
+		assert.deepEqual(one.styles, expected);
+		for (const style of list[0].styles) {
+			assert.deepEqual(Object.keys(style).sort(), ["name", "slug"]);
+		}
+	});
+
+	test("social links are the set https ones, in order", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("api-links-site1");
+		const sita = await addArtist(tenant, owner, {
+			tiktokUrl: "https://www.tiktok.com/@sita",
+			instagramUrl: "https://instagram.com/sita",
+		});
+		// A plain-http link, written past the validator: never sent.
+		await inTenant(tenant, () =>
+			Artist.query()
+				.where("id", sita.id)
+				.update({ facebookUrl: "http://facebook.com/sita" }),
+		);
+
+		const list = (
+			await client.get("/api/v1/tenants/api-links-site1/artists")
+		).body().data;
+		const one = (
+			await client.get("/api/v1/tenants/api-links-site1/artists/sita")
+		).body().data;
+
+		const expected = [
+			{ platform: "instagram", url: "https://instagram.com/sita" },
+			{ platform: "tiktok", url: "https://www.tiktok.com/@sita" },
+		];
+		assert.deepEqual(list[0].socialLinks, expected);
+		assert.deepEqual(one.socialLinks, expected);
+		for (const link of list[0].socialLinks) {
+			assert.deepEqual(Object.keys(link).sort(), ["platform", "url"]);
+		}
+	});
+
+	test("an artist with no styles or links has empty lists", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("api-bare-site1");
+		await addArtist(tenant, owner);
+
+		const { data } = (
+			await client.get("/api/v1/tenants/api-bare-site1/artists")
+		).body();
+
+		assert.deepEqual(data[0].styles, []);
+		assert.deepEqual(data[0].socialLinks, []);
 	});
 
 	test("a closed artist shows their work, and the list is the one-artist answer", async ({
@@ -253,7 +342,7 @@ test.group("GET /api/v1/tenants/:tenant/artists (listArtists)", (group) => {
 		);
 	});
 
-	test("adding a photo, describing it and moving it each change the list's ETag", async ({
+	test("adding a photo or saving its details changes the list's ETag", async ({
 		client,
 		assert,
 	}) => {
@@ -283,10 +372,12 @@ test.group("GET /api/v1/tenants/:tenant/artists (listArtists)", (group) => {
 		);
 		etags.push((await client.get(url)).header("etag"));
 		await inTenant(tenant, () =>
-			photos.describe(tenant, editor, second, "Koi"),
+			photos.updateDetails(tenant, editor, second, {
+				alt: "Koi",
+				styles: [],
+				healed: false,
+			}),
 		);
-		etags.push((await client.get(url)).header("etag"));
-		await inTenant(tenant, () => photos.move(tenant, editor, second, "up"));
 		etags.push((await client.get(url)).header("etag"));
 		await inTenant(tenant, () => photos.remove(tenant, editor, first));
 		etags.push((await client.get(url)).header("etag"));

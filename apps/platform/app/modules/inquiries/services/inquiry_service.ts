@@ -259,6 +259,7 @@ export default class InquiryService {
 				inquiryId: live.id,
 				brief: live.idea,
 				artistId,
+				flashDesignId: live.flashDesignId,
 				lastContact: {
 					at: live.lastContactedAt,
 					channel: live.lastContactChannel,

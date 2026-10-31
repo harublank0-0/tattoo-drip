@@ -17,8 +17,21 @@ export const THEME_KEYS = ["stencil-and-ink"] as const;
 export type ThemeKey = (typeof THEME_KEYS)[number];
 export const DEFAULT_THEME_KEY: ThemeKey = "stencil-and-ink";
 
-/** The studio page's sections that a theme can order and hide. */
-export const SECTION_KEYS = ["artists", "inquiry"] as const;
+/**
+ * The studio page's sections that a theme can order and hide: the newest
+ * photos (Recent work), the artists, Flash (`flash`, TAT-129), Good to know
+ * (`info`) and the "Got an idea?" invitation to the request page (`inquiry`). The platform keeps the
+ * same list (apps/platform/app/modules/storefront/look.ts, same order;
+ * look.spec.ts compares them). A new section is a key here and there, its
+ * place in each theme's `order` and a case in `StudioSection`.
+ */
+export const SECTION_KEYS = [
+	"work",
+	"artists",
+	"flash",
+	"info",
+	"inquiry",
+] as const;
 export type SectionKey = (typeof SECTION_KEYS)[number];
 
 export interface ThemeSections {
@@ -38,7 +51,7 @@ const sectionList = (...keys: SectionKey[]): readonly SectionKey[] =>
  */
 export const THEME_SECTIONS: Record<ThemeKey, ThemeSections> = Object.freeze({
 	"stencil-and-ink": Object.freeze({
-		order: sectionList("artists", "inquiry"),
+		order: sectionList("work", "artists", "flash", "info", "inquiry"),
 		required: sectionList("inquiry"),
 	}),
 });
@@ -57,6 +70,19 @@ export interface BrandImage {
 	readonly srcSet?: string;
 }
 
+/**
+ * The small tile a studio's logo sits on (TAT-123), in both colour schemes:
+ * the light paper (`--logo-plate`) or the dark one (`--logo-plate-dark`). The
+ * platform picks it when the logo is uploaded (a light logo with a
+ * see-through background gets the dark one) and the owner can switch it.
+ */
+export type LogoTile = "light" | "dark";
+
+/** A logo and the tile it sits on. */
+export interface LogoImage extends BrandImage {
+	readonly tile: LogoTile;
+}
+
 /** The cover: a BrandImage and its description, "" when the API gave none. A photograph, so it may say what it shows. */
 export interface CoverImage extends BrandImage {
 	readonly alt: string;
@@ -71,7 +97,9 @@ export interface ThemeConfig {
 	/** The dark scheme's accent, "#rrggbb", or null: then it comes from `accent` (branding.ts). */
 	readonly accentDark: string | null;
 	readonly font: FontKey;
-	readonly logo: BrandImage | null;
+	readonly logo: LogoImage | null;
+	/** The logo's square icon (TAT-123), for the root head only: the tab's and home screen's icon. Null without a logo or a usable icon. */
+	readonly icon: BrandImage | null;
 	/** The hero's cover photo with the name over it: the studio's `Studio.cover` (TAT-116, merged in at the seam), or a configuration's own. */
 	readonly heroImage: CoverImage | null;
 }
@@ -89,6 +117,7 @@ export const DEFAULT_THEME_CONFIG: ThemeConfig = Object.freeze({
 	accentDark: null,
 	font: DEFAULT_FONT,
 	logo: null,
+	icon: null,
 	heroImage: null,
 });
 
@@ -192,6 +221,15 @@ export function readBrandImage(
 	return { src, width, height, ...(srcSet ? { srcSet } : {}) };
 }
 
+/**
+ * A logo's tile from the API's `branding.logo.tile` (TAT-123): "dark" only for
+ * exactly "dark"; anything else, or nothing (an older API), is the light tile
+ * a logo has always sat on.
+ */
+export function readLogoTile(value: unknown): LogoTile {
+	return value === "dark" ? "dark" : "light";
+}
+
 /** The longest cover description kept, in characters; a longer one is no description. */
 const MAX_ALT_CHARACTERS = 300;
 
@@ -247,13 +285,20 @@ export function parseThemeConfig(
 	const key = readThemeKey(own(input, "theme"));
 	const branding = own(input, "branding");
 	const colors = own(branding, "colors");
+	const logoValue = own(branding, "logo");
+	const logo = readBrandImage(logoValue, imageOrigin);
+	// The icon belongs to a usable logo, and must be square (it is drawn in a square slot).
+	const icon = logo
+		? readBrandImage(own(logoValue, "icon"), imageOrigin)
+		: null;
 	return {
 		key,
 		sections: readSections(own(input, "sections"), key),
 		accent: readHexColor(own(colors, "accent")),
 		accentDark: readHexColor(own(colors, "accentDark")),
 		font: readFontKey(own(branding, "font")),
-		logo: readBrandImage(own(branding, "logo"), imageOrigin),
+		logo: logo ? { ...logo, tile: readLogoTile(own(logoValue, "tile")) } : null,
+		icon: icon && icon.width === icon.height ? icon : null,
 		heroImage: readCoverImage(own(branding, "heroImage"), imageOrigin),
 	};
 }

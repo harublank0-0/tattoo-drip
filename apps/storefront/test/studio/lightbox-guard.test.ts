@@ -6,12 +6,14 @@ import { showPhoto } from "../../src/studio/lightbox.ts";
  * showPhoto (TAT-116 fix round 1) must not throw where `<dialog>` does not
  * exist (iOS before 15.4, Firefox before 98, old WebViews): there the photo
  * opens by itself, in its own page. The DOM is stood in by plain objects
- * because lightbox.ts reads the globals when it is called.
+ * because lightbox.ts reads the globals when it is called. (The history entry
+ * an open photo adds, TAT-123, is in lightbox-history.test.ts.)
  */
 const globals = globalThis as Record<string, unknown>;
 const saved = {
 	document: globals.document,
 	HTMLDialogElement: globals.HTMLDialogElement,
+	History: globals.History,
 	window: globals.window,
 };
 
@@ -28,8 +30,22 @@ function page(element: unknown, dialogSupport: boolean) {
 	globals.document = {
 		getElementById: (id: string) => (id === "work-photo-1" ? element : null),
 	};
+	// The history an open photo adds an entry to (TAT-123).
+	class FakeHistory {
+		state: unknown = {};
+		pushState(state: unknown) {
+			this.state = state;
+		}
+		replaceState(state: unknown) {
+			this.state = state;
+		}
+	}
+	globals.History = FakeHistory;
 	globals.window = {
 		location: { assign: (url: string) => assigned.push(url) },
+		history: new FakeHistory(),
+		addEventListener: () => {},
+		removeEventListener: () => {},
 	};
 	if (dialogSupport) {
 		globals.HTMLDialogElement = class {};
@@ -48,6 +64,8 @@ describe("showPhoto without <dialog> support (TAT-116 fix round 1)", () => {
 				opened++;
 				this.open = true;
 			}
+			addEventListener() {}
+			removeEventListener() {}
 		}
 		const dialog = new FakeDialog();
 		const assigned = page(dialog, true);

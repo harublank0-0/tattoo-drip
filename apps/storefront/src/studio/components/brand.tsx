@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { coverSizes } from "../srcset.ts";
-import type { BrandImage, CoverImage } from "../theme/config.ts";
+import type { CoverImage, LogoImage } from "../theme/config.ts";
 
 /**
  * A studio's logo and cover image (TAT-54), from parseThemeConfig's checked
@@ -16,13 +16,17 @@ import type { BrandImage, CoverImage } from "../theme/config.ts";
  * `fetchPriority="low"`: that also stops React from adding a
  * `<link rel="preload">` for it, which would compete with the cover and the
  * font.
+ *
+ * TAT-123: a logo whose tile is dark carries `data-tile="dark"`, which the
+ * stylesheet answers with `--logo-plate-dark` behind it. A light logo has no
+ * attribute: it renders exactly as before.
  */
 export function BrandLogo({
 	image,
 	className,
 	sizes,
 }: {
-	image: BrandImage;
+	image: LogoImage;
 	className: string;
 	/** The width this logo is drawn at (logoSizes, srcset.ts). */
 	sizes: string;
@@ -38,6 +42,7 @@ export function BrandLogo({
 			alt=""
 			decoding="async"
 			fetchPriority="low"
+			data-tile={image.tile === "dark" ? "dark" : undefined}
 		/>
 	);
 }

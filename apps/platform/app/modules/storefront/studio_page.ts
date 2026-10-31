@@ -17,15 +17,19 @@ export type PublicSocialLink = {
 };
 
 /**
- * The studio's links for the public Studio: the set ones, in a fixed order,
- * and only https URLs. The settings form already refuses anything else;
- * checking again here means a row written another way can never put a
- * `javascript:` or plain-http link on the page. The URL is sent as stored.
+ * The links of a studio (the public Studio) or an artist (the public
+ * Artist, which has no website): the set ones, in a fixed order, and only
+ * https URLs. The forms already refuse anything else; checking again here
+ * means a row written another way can never put a `javascript:` or
+ * plain-http link on the page. The URL is sent as stored. A field the
+ * source has not got is unset.
  */
 export function socialLinks(
-	profile: Pick<
-		TenantProfile,
-		"instagramUrl" | "facebookUrl" | "tiktokUrl" | "websiteUrl"
+	profile: Partial<
+		Pick<
+			TenantProfile,
+			"instagramUrl" | "facebookUrl" | "tiktokUrl" | "websiteUrl"
+		>
 	>,
 ): PublicSocialLink[] {
 	return SOCIAL_PLATFORMS.flatMap(([platform, field]) => {

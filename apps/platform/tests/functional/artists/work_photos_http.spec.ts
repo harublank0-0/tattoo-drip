@@ -1,6 +1,7 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import type { ApiClient } from "@japa/api-client";
 import { test } from "@japa/runner";
+import { DateTime } from "luxon";
 import type User from "#models/user";
 import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
 import ArtistService from "#modules/artists/services/artist_service";
@@ -20,16 +21,20 @@ import { assertValidationError } from "#tests/helpers/validation";
 
 const PURPOSE = "artist_work_photo";
 const LIMIT_MESSAGE =
-	"This artist already has 6 photos. Remove one to add another.";
+	"This artist already has 100 photos. Remove one to add another.";
 const ALT_MESSAGE = "Keep the description to one line, up to 200 characters.";
 
 const images = new ImageService();
 const artistService = new ArtistService(images);
 const photoService = new WorkPhotoService(images, artistService);
 
+/** The artist's rows, newest first. */
 const rows = (tenant: Tenant, artistId: string) =>
 	inTenant(tenant, () =>
-		ArtistWorkPhoto.query().where("artist_id", artistId).orderBy("position"),
+		ArtistWorkPhoto.query()
+			.where("artist_id", artistId)
+			.orderBy("created_at", "desc")
+			.orderBy("id", "desc"),
 	);
 
 /** POST a file as `photo` to an artist's photos. */
@@ -88,9 +93,10 @@ test.group("Work photo uploads (TAT-116)", (group) => {
 		);
 		response.assertFlashMessage("success", "Photo added.");
 		const [photo] = await rows(tenant, sita.id);
-		assert.equal(photo.position, 0);
 		assert.equal(photo.width, 1600);
 		assert.isNull(photo.alt);
+		assert.deepEqual(photo.styles, []);
+		assert.isFalse(photo.healed);
 		assert.lengthOf(await storedImages(tenant, PURPOSE), 4);
 	});
 
@@ -116,14 +122,14 @@ test.group("Work photo uploads (TAT-116)", (group) => {
 		assert.equal(photo.height, 1500);
 	});
 
-	test("a seventh photo gets a field error and stores nothing", async ({
+	test("the 101st photo gets a field error and stores nothing", async ({
 		client,
 		assert,
 	}) => {
 		const { tenant, owner } = await studioWithOwner();
 		const sita = await addArtist(tenant, owner);
 		await inTenant(tenant, async () => {
-			for (let n = 0; n < 6; n++) await addWorkPhoto(tenant, sita);
+			for (let n = 0; n < 100; n++) await addWorkPhoto(tenant, sita);
 		});
 		const before = await tempUploads();
 
@@ -136,7 +142,7 @@ test.group("Work photo uploads (TAT-116)", (group) => {
 		);
 
 		assertValidationError(response, "photo", LIMIT_MESSAGE);
-		assert.lengthOf(await rows(tenant, sita.id), 6);
+		assert.lengthOf(await rows(tenant, sita.id), 100);
 		assert.deepEqual(await storedImages(tenant, PURPOSE), []);
 		await new Promise((resolve) => setTimeout(resolve, 100));
 		assert.deepEqual(await newTempUploads(before), []);
@@ -368,9 +374,10 @@ test.group("Work photo uploads (TAT-116)", (group) => {
 	});
 });
 
-test.group("Work photo descriptions, order and removal (TAT-116)", (group) => {
+test.group("Work photo details and removal (TAT-116, TAT-126)", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 
+	/** A save of the description alone: no style box and no healed box are sent. */
 	const describe = (
 		client: ApiClient,
 		user: User,
@@ -381,6 +388,25 @@ test.group("Work photo descriptions, order and removal (TAT-116)", (group) => {
 		client
 			.put(`/t/${tenant.slug}/artists/photos/${id}`)
 			.form({ alt })
+			.withCsrfToken()
+			.loginAs(user)
+			.redirects(0);
+
+	/** A save as the tray sends it: the style boxes that are ticked and, ticked, the healed box. */
+	const saveDetails = (
+		client: ApiClient,
+		user: User,
+		tenant: Tenant,
+		id: string,
+		fields: { alt: string; styles?: string[]; healed?: string },
+	) =>
+		client
+			.put(`/t/${tenant.slug}/artists/photos/${id}`)
+			.fields({
+				alt: fields.alt,
+				...(fields.styles ? { "styles[]": fields.styles } : {}),
+				...(fields.healed ? { healed: fields.healed } : {}),
+			})
 			.withCsrfToken()
 			.loginAs(user)
 			.redirects(0);
@@ -402,7 +428,7 @@ test.group("Work photo descriptions, order and removal (TAT-116)", (group) => {
 		);
 		saved.assertStatus(302);
 		saved.assertHeader("location", `/t/${tenant.slug}/artists/${sita.id}/edit`);
-		saved.assertFlashMessage("success", "Description saved.");
+		saved.assertFlashMessage("success", "Photo saved.");
 		assert.equal((await rows(tenant, sita.id))[0].alt, "कालो माछा, बाहुलामा");
 
 		for (const empty of ["", " ", "   "]) {
@@ -473,42 +499,188 @@ test.group("Work photo descriptions, order and removal (TAT-116)", (group) => {
 		);
 	});
 
-	test("move swaps neighbours and goes back to the edit page; at the end it does nothing", async ({
+	test("an owner saves a photo's description, two styles and the healed mark", async ({
 		client,
 		assert,
 	}) => {
 		const { tenant, owner } = await studioWithOwner();
 		const sita = await addArtist(tenant, owner);
-		const [one, two] = await inTenant(tenant, async () => [
-			await addWorkPhoto(tenant, sita),
-			await addWorkPhoto(tenant, sita),
-		]);
-		const move = (id: string, direction: string) =>
-			client
-				.post(`/t/${tenant.slug}/artists/photos/${id}/move`)
-				.form({ direction })
-				.withCsrfToken()
-				.loginAs(owner)
-				.redirects(0);
+		const photo = await inTenant(tenant, () => addWorkPhoto(tenant, sita));
 
-		const down = await move(one.id, "down");
-		down.assertStatus(302);
-		down.assertHeader("location", `/t/${tenant.slug}/artists/${sita.id}/edit`);
-		assert.deepEqual(
-			(await rows(tenant, sita.id)).map((row) => row.id),
-			[two.id, one.id],
+		const response = await saveDetails(client, owner, tenant, photo.id, {
+			alt: "Koi",
+			styles: ["realism", "blackwork"],
+			healed: "1",
+		});
+
+		response.assertStatus(302);
+		response.assertHeader(
+			"location",
+			`/t/${tenant.slug}/artists/${sita.id}/edit`,
 		);
-		const end = await move(one.id, "down");
-		end.assertStatus(302);
-		assert.deepEqual(
-			(await rows(tenant, sita.id)).map((row) => row.id),
-			[two.id, one.id],
-		);
-		const bad = await move(one.id, "sideways");
-		assertValidationError(bad, "direction");
+		response.assertFlashMessage("success", "Photo saved.");
+		const [saved] = await rows(tenant, sita.id);
+		assert.equal(saved.alt, "Koi");
+		// As sent, not in the list's order.
+		assert.deepEqual(saved.styles, ["realism", "blackwork"]);
+		assert.isTrue(saved.healed);
 	});
 
-	test("removing a photo deletes the row and its files, and the rest move up", async ({
+	test("a save without style boxes or the healed box clears them", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+		const sita = await addArtist(tenant, owner);
+		const photo = await inTenant(tenant, () =>
+			addWorkPhoto(tenant, sita, {
+				alt: "Koi",
+				styles: ["realism"],
+				healed: true,
+			}),
+		);
+
+		const response = await saveDetails(client, owner, tenant, photo.id, {
+			alt: "Koi",
+		});
+
+		response.assertStatus(302);
+		const [saved] = await rows(tenant, sita.id);
+		assert.equal(saved.alt, "Koi");
+		assert.deepEqual(saved.styles, []);
+		assert.isFalse(saved.healed);
+	});
+
+	test("exactly three styles are accepted", async ({ client, assert }) => {
+		const { tenant, owner } = await studioWithOwner();
+		const sita = await addArtist(tenant, owner);
+		const photo = await inTenant(tenant, () => addWorkPhoto(tenant, sita));
+
+		const response = await saveDetails(client, owner, tenant, photo.id, {
+			alt: "Koi",
+			styles: ["realism", "blackwork", "colour"],
+		});
+
+		response.assertStatus(302);
+		assert.lengthOf((await rows(tenant, sita.id))[0].styles, 3);
+	});
+
+	test("a fourth style is a field error and changes nothing", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+		const sita = await addArtist(tenant, owner);
+		const photo = await inTenant(tenant, () =>
+			addWorkPhoto(tenant, sita, {
+				alt: "Koi",
+				styles: ["realism"],
+				healed: true,
+			}),
+		);
+
+		const response = await saveDetails(client, owner, tenant, photo.id, {
+			alt: "Changed",
+			styles: ["realism", "blackwork", "colour", "japanese"],
+		});
+
+		assertValidationError(response, "styles", "Pick up to 3 styles.");
+		const [saved] = await rows(tenant, sita.id);
+		assert.equal(saved.alt, "Koi");
+		assert.deepEqual(saved.styles, ["realism"]);
+		assert.isTrue(saved.healed);
+	});
+
+	test("an unknown style is a field error and changes nothing", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+		const sita = await addArtist(tenant, owner);
+		const photo = await inTenant(tenant, () =>
+			addWorkPhoto(tenant, sita, { alt: "Koi", styles: ["realism"] }),
+		);
+
+		// The error sits under "styles", not "styles.1", as on the artist form.
+		const response = await saveDetails(client, owner, tenant, photo.id, {
+			alt: "Changed",
+			styles: ["realism", "nope"],
+		});
+
+		assertValidationError(response, "styles", "Pick styles from the list.");
+		const [saved] = await rows(tenant, sita.id);
+		assert.equal(saved.alt, "Koi");
+		assert.deepEqual(saved.styles, ["realism"]);
+	});
+
+	test("the move route is gone", async ({ client }) => {
+		const { tenant, owner } = await studioWithOwner();
+		const sita = await addArtist(tenant, owner);
+		const photo = await inTenant(tenant, () => addWorkPhoto(tenant, sita));
+
+		const response = await client
+			.post(`/t/${tenant.slug}/artists/photos/${photo.id}/move`)
+			.form({ direction: "down" })
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		response.assertStatus(404);
+	});
+
+	test("the edit page lists the photos newest first with their styles and healed mark", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+		const sita = await addArtist(tenant, owner);
+		const now = DateTime.now();
+		// Added out of date order: the dates decide, not the order of creation.
+		const [middle, oldest, newest] = await inTenant(tenant, async () => [
+			await addWorkPhoto(tenant, sita, {
+				alt: "middle",
+				createdAt: now.minus({ days: 2 }),
+			}),
+			await addWorkPhoto(tenant, sita, {
+				alt: "oldest",
+				createdAt: now.minus({ days: 3 }),
+			}),
+			await addWorkPhoto(tenant, sita, {
+				alt: "newest",
+				createdAt: now.minus({ days: 1 }),
+				styles: ["realism", "retired-style"],
+				healed: true,
+			}),
+		]);
+
+		const response = await client
+			.get(`/t/${tenant.slug}/artists/${sita.id}/edit`)
+			.withInertia()
+			.loginAs(owner);
+
+		const { workPhotos } = response.inertiaProps;
+		assert.deepEqual(
+			workPhotos.map((photo: { id: string }) => photo.id),
+			[newest.id, middle.id, oldest.id],
+		);
+		for (const photo of workPhotos) {
+			assert.deepEqual(Object.keys(photo).sort(), [
+				"alt",
+				"healed",
+				"id",
+				"styles",
+				"thumbnailUrl",
+			]);
+		}
+		// Only listed styles reach the form, like the artist's own: a slug that
+		// left the list has no box and is dropped on the next save. Then the defaults.
+		assert.deepEqual(workPhotos[0].styles, ["realism"]);
+		assert.isTrue(workPhotos[0].healed);
+		assert.deepEqual(workPhotos[1].styles, []);
+		assert.isFalse(workPhotos[1].healed);
+	});
+
+	test("removing a photo deletes the row and its files; the others keep their place", async ({
 		client,
 		assert,
 	}) => {
@@ -532,8 +704,8 @@ test.group("Work photo descriptions, order and removal (TAT-116)", (group) => {
 		response.assertFlashMessage("success", "Photo removed.");
 		const left = await rows(tenant, sita.id);
 		assert.deepEqual(
-			left.map((row) => [row.id, row.position]),
-			[[second.id, 0]],
+			left.map((row) => row.id),
+			[second.id],
 		);
 		assert.lengthOf(await storedImages(tenant, PURPOSE), 4);
 	});
@@ -553,7 +725,7 @@ test.group("Work photo descriptions, order and removal (TAT-116)", (group) => {
 			name: "Mira",
 			slug: "mira",
 		});
-		const [mine, mine2, theirs, theirs2] = await inTenant(tenant, async () => [
+		const [older, newer, theirs, theirs2] = await inTenant(tenant, async () => [
 			await addWorkPhoto(tenant, own),
 			await addWorkPhoto(tenant, own),
 			await addWorkPhoto(tenant, other, { alt: "Theirs" }),
@@ -563,12 +735,11 @@ test.group("Work photo descriptions, order and removal (TAT-116)", (group) => {
 
 		const attempts = [
 			await describe(client, member, tenant, theirs.id, "Hijacked"),
-			await client
-				.post(`/t/${tenant.slug}/artists/photos/${theirs.id}/move`)
-				.form({ direction: "down" })
-				.withCsrfToken()
-				.loginAs(member)
-				.redirects(0),
+			await saveDetails(client, member, tenant, theirs.id, {
+				alt: "Hijacked",
+				styles: ["realism"],
+				healed: "1",
+			}),
 			await client
 				.delete(`/t/${tenant.slug}/artists/photos/${theirs2.id}`)
 				.withCsrfToken()
@@ -581,21 +752,17 @@ test.group("Work photo descriptions, order and removal (TAT-116)", (group) => {
 			before.map((row) => row.serialize()),
 		);
 
-		const own1 = await describe(client, member, tenant, mine.id, "Mine");
+		const own1 = await describe(client, member, tenant, newer.id, "Mine");
 		own1.assertStatus(302);
-		const moved = await client
-			.post(`/t/${tenant.slug}/artists/photos/${mine.id}/move`)
-			.form({ direction: "down" })
-			.withCsrfToken()
-			.loginAs(member)
-			.redirects(0);
-		moved.assertStatus(302);
 		assert.deepEqual(
-			(await rows(tenant, own.id)).map((row) => row.id),
-			[mine2.id, mine.id],
+			(await rows(tenant, own.id)).map((row) => [row.id, row.alt]),
+			[
+				[newer.id, "Mine"],
+				[older.id, null],
+			],
 		);
 		const removed = await client
-			.delete(`/t/${tenant.slug}/artists/photos/${mine2.id}`)
+			.delete(`/t/${tenant.slug}/artists/photos/${older.id}`)
 			.withCsrfToken()
 			.loginAs(member)
 			.redirects(0);
@@ -636,12 +803,11 @@ test.group("Work photo descriptions, order and removal (TAT-116)", (group) => {
 
 		const responses = [
 			await describe(client, a.owner, a.tenant, photoB.id, "Hijacked"),
-			await client
-				.post(`/t/${a.tenant.slug}/artists/photos/${photoB.id}/move`)
-				.form({ direction: "down" })
-				.withCsrfToken()
-				.loginAs(a.owner)
-				.redirects(0),
+			await saveDetails(client, a.owner, a.tenant, photoB.id, {
+				alt: "Hijacked",
+				styles: ["realism"],
+				healed: "1",
+			}),
 			await client
 				.delete(`/t/${a.tenant.slug}/artists/photos/${photoB.id}`)
 				.withCsrfToken()
@@ -652,6 +818,8 @@ test.group("Work photo descriptions, order and removal (TAT-116)", (group) => {
 		for (const response of responses) response.assertStatus(404);
 		const [still] = await rows(b.tenant, artistB.id);
 		assert.equal(still.alt, "B");
+		assert.deepEqual(still.styles, []);
+		assert.isFalse(still.healed);
 	});
 });
 

@@ -141,6 +141,10 @@ router
 				router
 					.delete("logo", [controllers.StudioLogo, "destroy"])
 					.as("tenant.settings.logo.destroy");
+				// Which tile the logo sits on (TAT-123).
+				router
+					.put("logo/tile", [controllers.StudioLogo, "tile"])
+					.as("tenant.settings.logo.tile.update");
 				router
 					.get("payments", [controllers.PaymentMethods, "index"])
 					.as("tenant.settings.payments");
@@ -177,6 +181,27 @@ router
 				router
 					.put("messages", [controllers.MessageTemplates, "update"])
 					.as("tenant.settings.messages.update");
+				// Good to know and opening hours (TAT-128): one page, three forms
+				// (the texts, the week, closed days), so the writes redirect back.
+				router
+					.get("good-to-know", [controllers.GoodToKnow, "show"])
+					.as("tenant.settings.good_to_know");
+				router
+					.put("good-to-know", [controllers.GoodToKnow, "update"])
+					.as("tenant.settings.good_to_know.update");
+				router
+					.put("hours", [controllers.GoodToKnow, "updateHours"])
+					.as("tenant.settings.hours.update");
+				router
+					.post("closed-days", [controllers.GoodToKnow, "storeClosedDays"])
+					.as("tenant.settings.closed_days.store");
+				router
+					.delete("closed-days/:id", [
+						controllers.GoodToKnow,
+						"destroyClosedDays",
+					])
+					.where("id", router.matchers.uuid())
+					.as("tenant.settings.closed_days.destroy");
 				// Members and invitations (TAT-33). A new invitation's link is
 				// shown once, on the members page.
 				router
@@ -246,13 +271,30 @@ router
 					.where("id", router.matchers.uuid())
 					.as("tenant.artists.photos.update");
 				router
-					.post("photos/:id/move", [controllers.WorkPhotos, "move"])
-					.where("id", router.matchers.uuid())
-					.as("tenant.artists.photos.move");
-				router
 					.delete("photos/:id", [controllers.WorkPhotos, "destroy"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.artists.photos.destroy");
+				// An artist's flash designs (TAT-129), the same shape: the upload
+				// names the artist, the others name the design. A design a request
+				// names can't be removed; hiding it is a save.
+				router
+					.post(":id/flash", [controllers.FlashDesigns, "store"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.artists.flash.store");
+				router
+					.put("flash/:id", [controllers.FlashDesigns, "update"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.artists.flash.update");
+				// One tap: mark a one-of-a-kind design claimed, or make it available
+				// again (a body of `claimed`).
+				router
+					.put("flash/:id/claim", [controllers.FlashDesigns, "claim"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.artists.flash.claim.update");
+				router
+					.delete("flash/:id", [controllers.FlashDesigns, "destroy"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.artists.flash.destroy");
 			})
 			.prefix("/artists");
 
@@ -572,6 +614,13 @@ router
  */
 router
 	.group(() => {
+		// The platform's tattoo styles (TAT-126): the fixed list, the same for
+		// everyone and under no studio, so it is cached like the studio's reads.
+		router
+			.get("/styles", [controllers.PublicStyles, "index"])
+			.use(middleware.publicCache())
+			.as("api.v1.styles.index");
+
 		/**
 		 * One tenant's public data. The tenant is the path's slug, current or
 		 * old, matched exactly; handlers run in its database context. Every
@@ -596,6 +645,29 @@ router
 					.where("artist", ARTIST_SLUG)
 					.use(middleware.publicCache())
 					.as("api.v1.artists.show");
+				// The studio's gallery (TAT-126): every visible artist's photos
+				// (a closed artist's too), newest first, a page at a time. Only the
+				// query string is read; a refused parameter or cursor is the 422
+				// validation_failed, and an artist or style that matches nothing is
+				// an empty page.
+				router
+					.get("/work", [controllers.PublicWork, "index"])
+					.use(middleware.publicCache())
+					.as("api.v1.work.index");
+				// The studio's flash (TAT-129): every shown design of every visible
+				// artist (a closed artist's too), newest first, a page at a time,
+				// like the gallery; and one design. A hidden design, a hidden or
+				// deleted artist's and an unknown id are the handler's 404; an id
+				// that is not a UUID is the router's, without a query.
+				router
+					.get("/flash", [controllers.PublicFlash, "index"])
+					.use(middleware.publicCache())
+					.as("api.v1.flash.index");
+				router
+					.get("/flash/:design", [controllers.PublicFlash, "show"])
+					.where("design", router.matchers.uuid())
+					.use(middleware.publicCache())
+					.as("api.v1.flash.show");
 				// The intake (TAT-51). intakeGuard counts the address, checks the
 				// bot challenge and counts the studio before its multipart body is
 				// read (TAT-55); the controller does the honeypot and the phone count.

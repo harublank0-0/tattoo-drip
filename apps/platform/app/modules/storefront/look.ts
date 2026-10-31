@@ -15,20 +15,60 @@ export const FONT_KEYS = ["eczar", "serif", "sans"] as const;
 export type FontKey = (typeof FONT_KEYS)[number];
 export const DEFAULT_FONT: FontKey = "eczar";
 
-export const SECTION_KEYS = ["artists", "inquiry"] as const;
+/**
+ * The studio page's sections an owner can show, hide and order: the newest
+ * photos, the artists, Flash (`flash`, TAT-129: the newest flash designs),
+ * Good to know (`info`, TAT-128: hours and what clients ask) and the "Got an
+ * idea?" invitation to the request page (`inquiry`).
+ * The storefront's SECTION_KEYS is the same list in the same order
+ * (look.spec.ts compares them, and the contract's
+ * `StorefrontSection` list and `sections` `maxItems`). A new section is a key
+ * here and there, its place in the storefront theme's `order`, a line in the
+ * dashboard's SECTION_WORDS (inertia/components/page_look.ts), the contract's
+ * enum and `maxItems`, and a migration for the column's default and for the
+ * lists already stored.
+ */
+export const SECTION_KEYS = [
+	"work",
+	"artists",
+	"flash",
+	"info",
+	"inquiry",
+] as const;
 export type SectionKey = (typeof SECTION_KEYS)[number];
 
-/** Where the artists list goes; the inquiry section is always shown. */
-export const ARTIST_PLACEMENTS = {
-	first: ["artists", "inquiry"],
-	last: ["inquiry", "artists"],
-	hidden: ["inquiry"],
-} as const satisfies Record<string, readonly SectionKey[]>;
-export type ArtistPlacement = keyof typeof ARTIST_PLACEMENTS;
-export const ARTIST_PLACEMENT_KEYS = Object.keys(
-	ARTIST_PLACEMENTS,
-) as ArtistPlacement[];
-export const DEFAULT_SECTIONS = ARTIST_PLACEMENTS.first;
+/**
+ * What a new studio shows, in this order: the column's default
+ * (tenants.storefront_sections; the columns spec compares them) and the
+ * storefront theme's default order.
+ */
+export const DEFAULT_SECTIONS: readonly SectionKey[] = [
+	"work",
+	"artists",
+	"flash",
+	"info",
+	"inquiry",
+];
+
+/**
+ * What the studio page does with one-of-a-kind flash designs somebody has
+ * claimed (TAT-129, part 4b): `show` them greyed and marked Claimed (the
+ * default), or `hide` them from every public answer. Not part of `PageLook`
+ * (the public `Studio.storefront` is unchanged): the flash reads apply it on
+ * the platform, so the storefront only ever sees what to show.
+ */
+export const CLAIMED_FLASH_CHOICES = ["show", "hide"] as const;
+export type ClaimedFlash = (typeof CLAIMED_FLASH_CHOICES)[number];
+export const DEFAULT_CLAIMED_FLASH: ClaimedFlash = "show";
+
+/** The stored choice, or `show` for anything off today's list (the database checks only the shape). */
+export function claimedFlashOf(row: {
+	storefrontClaimedFlash: string;
+}): ClaimedFlash {
+	return isOneOf(CLAIMED_FLASH_CHOICES, row.storefrontClaimedFlash)
+		? row.storefrontClaimedFlash
+		: DEFAULT_CLAIMED_FLASH;
+}
 
 /** The themes an owner can pick, with the words the settings page shows. */
 export const THEMES: { key: ThemeKey; label: string; description: string }[] = [
@@ -53,6 +93,27 @@ export const MIN_TEXT_CONTRAST = 4.5;
 /** The theme's own violets (styles.css --stencil, light and dark): where an empty colour picker starts. */
 export const THEME_ACCENT = "#43389a";
 export const THEME_ACCENT_DARK = "#a99cff";
+
+/**
+ * The small tile a studio's logo sits on (TAT-123), in both colour schemes:
+ * the light paper or the dark one. Picked when the logo is uploaded (a light
+ * logo with a see-through background gets the dark one); the owner can switch
+ * it. The storefront reads the same two words (`branding.logo.tile`; an
+ * unknown one is "light") and keeps the colours as `--logo-plate` and
+ * `--logo-plate-dark`; look.spec.ts compares them.
+ */
+export const LOGO_TILES = ["light", "dark"] as const;
+export type LogoTile = (typeof LOGO_TILES)[number];
+export const DEFAULT_LOGO_TILE: LogoTile = "light";
+export const LOGO_TILE_COLOURS: Record<LogoTile, string> = {
+	light: LIGHT_PAPER,
+	dark: DARK_PAPER,
+};
+
+/** A stored tile as the page can use it: the word while it is on the list, else the light tile. The database checks only the shape. */
+export function logoTileOf(stored: string): LogoTile {
+	return isOneOf(LOGO_TILES, stored) ? stored : DEFAULT_LOGO_TILE;
+}
 
 export const HEX_COLOR = /^#[0-9a-f]{6}$/;
 
@@ -98,10 +159,14 @@ function isOneOf<T extends string>(
 	);
 }
 
-/** A stored section list: known keys, each once, then "inquiry" if it was left out (the storefront's readSections). */
-export function sectionsOf(stored: string): SectionKey[] {
+/**
+ * A section list the page can use (the storefront's readSections): the known
+ * keys, each once, in the order given, then "inquiry" if it was left out, so
+ * the invitation to the request page is always on the page.
+ */
+export function sectionList(keys: readonly string[]): SectionKey[] {
 	const sections: SectionKey[] = [];
-	for (const key of stored.split(",")) {
+	for (const key of keys) {
 		if (isOneOf(SECTION_KEYS, key) && !sections.includes(key))
 			sections.push(key);
 	}
@@ -109,10 +174,9 @@ export function sectionsOf(stored: string): SectionKey[] {
 	return sections;
 }
 
-export function placementOf(sections: readonly SectionKey[]): ArtistPlacement {
-	const artists = sections.indexOf("artists");
-	if (artists === -1) return "hidden";
-	return artists < sections.indexOf("inquiry") ? "first" : "last";
+/** A stored section list (a comma list) as the page can use it. */
+export function sectionsOf(stored: string): SectionKey[] {
+	return sectionList(stored.split(","));
 }
 
 export type StoredLook = {

@@ -1,4 +1,6 @@
 import Artist from "#modules/artists/models/artist";
+import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
+import FlashDesign from "#modules/flash/models/flash_design";
 import DepositLink from "#modules/payments/models/deposit_link";
 import Payment from "#modules/payments/models/payment";
 import Tenant from "#modules/tenancy/models/tenant";
@@ -49,6 +51,16 @@ const artistRows = (target: Studio) =>
 		(await Artist.query().orderBy("id")).map((row) => row.serialize()),
 	);
 
+const workPhotoRows = (target: Studio) =>
+	inTenant(target.tenant, async () =>
+		(await ArtistWorkPhoto.query().orderBy("id")).map((row) => row.serialize()),
+	);
+
+const flashRows = (target: Studio) =>
+	inTenant(target.tenant, async () =>
+		(await FlashDesign.query().orderBy("id")).map((row) => row.serialize()),
+	);
+
 const depositRows = (target: Studio) =>
 	inTenant(target.tenant, async () => ({
 		links: (await DepositLink.query().orderBy("id")).map((row) =>
@@ -83,6 +95,34 @@ export const publicIsolationCases: PublicIsolationCase[] = [
 		ownStatus: 200,
 		ownMarkers: (own) => [own.closedArtist.id, own.closedArtist.name],
 		snapshot: artistRows,
+	},
+	{
+		method: "GET",
+		pattern: "/api/v1/tenants/:tenant/work",
+		// twoStudios seeds two photos of artistProfile in each studio. Its
+		// slug is the same in both, so its name (the studio's own) shows the
+		// answer is A's.
+		ownStatus: 200,
+		ownMarkers: (own) => [own.artistProfile.slug, own.artistProfile.name],
+		snapshot: workPhotoRows,
+	},
+	{
+		method: "GET",
+		pattern: "/api/v1/tenants/:tenant/flash",
+		// twoStudios seeds one shown design of artistProfile in each studio,
+		// named after the studio: its id shows the answer is A's.
+		ownStatus: 200,
+		ownMarkers: (own) => [own.flashDesign.id],
+		snapshot: flashRows,
+	},
+	{
+		method: "GET",
+		pattern: "/api/v1/tenants/:tenant/flash/:design",
+		// B's design id under A's slug must be the 404.
+		params: (studio) => ({ design: studio.flashDesign.id }),
+		ownStatus: 200,
+		ownMarkers: (own) => [own.flashDesign.id, own.flashDesign.name],
+		snapshot: flashRows,
 	},
 	{
 		method: "POST",

@@ -4,6 +4,7 @@ import { test } from "@japa/runner";
 import { DateTime } from "luxon";
 import type User from "#models/user";
 import { chatLinks } from "#modules/clients/contact_links";
+import { claimFlashFor } from "#modules/flash/services/flash_claim";
 import { expiresAtFor, todayIn } from "#modules/projects/quotes";
 import { sessionStartText, sessionTimeText } from "#modules/scheduling/times";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
@@ -12,6 +13,7 @@ import {
 	figuresOf,
 	newFigures,
 } from "#tests/helpers/artist_money";
+import { addFlashDesign } from "#tests/helpers/artists";
 import { proofFor } from "#tests/helpers/payments";
 import {
 	makeArtist,
@@ -506,6 +508,118 @@ test.group("Project page: the original request", (group) => {
 		assert.lengthOf(props.request.references, 1);
 		assert.include(props.request.references[0].url, "reference_image/");
 		assert.match(props.request.references[0].thumbnailUrl, /signature=/);
+	});
+
+	test("a project made from a flash request shows its design, to the owner and to its assigned artist; another project has none", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const asha = await artistIn(tenant, "asha@example.com");
+		const { flashProject, plainProject } = await inTenant(tenant, async () => {
+			const profile = await makeArtist(tenant, "asha");
+			profile.userId = asha.id;
+			await profile.save();
+			const design = await addFlashDesign(tenant, profile, {
+				name: "Moth",
+				price: 300_000,
+			});
+			const customer = await makeClient(tenant);
+			const inquiry = await makeInquiry(tenant, customer, {
+				status: "accepted",
+				decidedAt: DateTime.utc(),
+				flashDesignId: design.id,
+			});
+			return {
+				flashProject: await makeProject(tenant, customer, {
+					inquiryId: inquiry.id,
+					artistId: profile.id,
+					flashDesignId: design.id,
+				}),
+				plainProject: await makeProject(tenant, customer),
+			};
+		});
+
+		for (const who of [owner, asha]) {
+			const props = (
+				await client.get(page(flashProject.id)).withInertia().loginAs(who)
+			).inertiaProps;
+			assert.equal(props.flash.name, "Moth");
+			assert.equal(props.flash.artistName, "Sita");
+			assert.equal(props.flash.priceText, "NPR 3,000");
+			assert.deepEqual(Object.keys(props.project).sort(), [
+				"artistName",
+				"brief",
+				"clientName",
+				"id",
+				"piece",
+				"status",
+			]);
+		}
+		const plain = (
+			await client.get(page(plainProject.id)).withInertia().loginAs(owner)
+		).inertiaProps;
+		assert.isNull(plain.flash);
+	});
+
+	test("the claiming project shows 'here'; another open project for the design 'taken'; a closed one 'none'; a repeatable design 'none'", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const asha = await artistIn(tenant, "asha@example.com");
+		const made = await inTenant(tenant, async () => {
+			const profile = await makeArtist(tenant, "asha");
+			profile.userId = asha.id;
+			await profile.save();
+			const single = await addFlashDesign(tenant, profile, {
+				name: "Moth",
+				oneOfAKind: true,
+			});
+			const again = await addFlashDesign(tenant, profile, { name: "Again" });
+			const project = async (
+				design: { id: string },
+				over: Parameters<typeof makeProject>[2] = {},
+			) =>
+				makeProject(tenant, await makeClient(tenant), {
+					artistId: profile.id,
+					flashDesignId: design.id,
+					status: "deposit_pending",
+					...over,
+				});
+			const claiming = await project(single);
+			await claimFlashFor(tenant, claiming);
+			return {
+				claiming,
+				other: await project(single),
+				closed: await project(single, { status: "cancelled" }),
+				repeatable: await project(again),
+			};
+		});
+		const claimOf = async (id: string, who: typeof owner) =>
+			(await client.get(page(id)).withInertia().loginAs(who)).inertiaProps;
+
+		for (const who of [owner, asha]) {
+			assert.equal((await claimOf(made.claiming.id, who)).flash.claim, "here");
+			assert.equal((await claimOf(made.other.id, who)).flash.claim, "taken");
+			assert.equal((await claimOf(made.closed.id, who)).flash.claim, "none");
+			assert.equal(
+				(await claimOf(made.repeatable.id, who)).flash.claim,
+				"none",
+			);
+		}
+		// A claim changes no status: both projects stay as they were.
+		const props = await claimOf(made.other.id, owner);
+		assert.equal(props.project.status, "deposit_pending");
+		assert.deepEqual(Object.keys(props.project).sort(), [
+			"artistName",
+			"brief",
+			"clientName",
+			"id",
+			"piece",
+			"status",
+		]);
+		assert.isTrue(props.flash.oneOfAKind);
 	});
 
 	test("a project made directly has no request", async ({ client, assert }) => {

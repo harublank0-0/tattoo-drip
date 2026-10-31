@@ -1,20 +1,25 @@
 import { readFileSync } from "node:fs";
 import { test } from "@japa/runner";
 import {
-	ARTIST_PLACEMENT_KEYS,
-	ARTIST_PLACEMENTS,
+	CLAIMED_FLASH_CHOICES,
+	claimedFlashOf,
 	contrastRatio,
 	DARK_PAPER,
 	DEFAULT_FONT,
+	DEFAULT_LOGO_TILE,
+	DEFAULT_SECTIONS,
 	DEFAULT_THEME,
 	FONT_KEYS,
 	FONTS,
 	LIGHT_PAPER,
+	LOGO_TILE_COLOURS,
+	LOGO_TILES,
+	logoTileOf,
 	lookOf,
 	MIN_TEXT_CONTRAST,
-	placementOf,
 	readsOn,
 	SECTION_KEYS,
+	sectionList,
 	sectionsOf,
 	THEME_ACCENT,
 	THEME_ACCENT_DARK,
@@ -28,6 +33,23 @@ function storefront(path: string): string {
 		new URL(`../../../../../storefront/${path}`, import.meta.url),
 		"utf8",
 	);
+}
+
+/** The API contract as text, read like the storefront's source: no YAML parser needed for two lines. */
+function contract(): string {
+	return readFileSync(
+		new URL("../../../../../../packages/types/openapi.yaml", import.meta.url),
+		"utf8",
+	);
+}
+
+/** A schema's lines in the contract: from its name (4 spaces in) to the next schema. */
+function schemaOf(yaml: string, name: string): string {
+	const match = new RegExp(`\n {4}${name}:\n([\\s\\S]*?)\n {4}[A-Za-z]`).exec(
+		yaml,
+	);
+	if (!match) throw new Error(`${name} is not in the contract.`);
+	return match[1];
 }
 
 /** The strings of `export const NAME = [ ... ] as const` in a source file. */
@@ -51,9 +73,54 @@ test.group("the page look rules match the storefront's own", () => {
 		assert.deepEqual([...SECTION_KEYS], listOf(config, "SECTION_KEYS"));
 		assert.deepEqual([...FONT_KEYS], listOf(config, "FONT_KEYS"));
 		assert.match(config, /required: sectionList\("inquiry"\)/);
+		// A studio that set nothing shows the storefront theme's own default order.
+		const order = /order: sectionList\(([^)]*)\)/.exec(config)?.[1] ?? "";
+		assert.deepEqual(
+			[...DEFAULT_SECTIONS],
+			[...order.matchAll(/"([^"]+)"/g)].map((item) => item[1]),
+		);
 		assert.equal(DEFAULT_THEME, "stencil-and-ink");
 		assert.match(config, /DEFAULT_FONT: FontKey = "eczar"/);
 		assert.equal(DEFAULT_FONT, "eczar");
+	});
+
+	test("the contract lists the same sections, so a new key cannot forget it", ({
+		assert,
+	}) => {
+		const yaml = contract();
+		const listed = /enum: \[([^\]]*)\]/.exec(
+			schemaOf(yaml, "StorefrontSection"),
+		);
+		assert.deepEqual(
+			(listed?.[1] ?? "").split(",").map((key) => key.trim()),
+			[...SECTION_KEYS],
+			"StorefrontSection's enum is SECTION_KEYS",
+		);
+		const room = /\n {8}sections:\n[\s\S]*?maxItems: (\d+)/.exec(
+			schemaOf(yaml, "StorefrontConfiguration"),
+		);
+		assert.equal(
+			Number(room?.[1]),
+			SECTION_KEYS.length,
+			"StorefrontConfiguration.sections.maxItems is SECTION_KEYS.length",
+		);
+	});
+
+	test("the contract's Logo lists the same tiles, light first, and a logo is a Logo", ({
+		assert,
+	}) => {
+		const yaml = contract();
+		const logo = schemaOf(yaml, "Logo");
+		const listed = /tile:\n\s+type: string\n\s+enum: \[([^\]]*)\]/.exec(logo);
+		assert.deepEqual(
+			(listed?.[1] ?? "").split(",").map((key) => key.trim()),
+			[...LOGO_TILES],
+			"Logo.tile's enum is LOGO_TILES",
+		);
+		assert.match(
+			schemaOf(yaml, "StorefrontConfiguration"),
+			/logo:[\s\S]*?oneOf: \[\{ \$ref: "#\/components\/schemas\/Logo" \}, \{ type: "null" \}\]/,
+		);
 	});
 
 	test("the two papers and the minimum contrast are the storefront's", ({
@@ -107,7 +174,7 @@ test.group("contrast", () => {
 test.group("lookOf", () => {
 	const good = {
 		storefrontTheme: "stencil-and-ink",
-		storefrontSections: "inquiry,artists",
+		storefrontSections: "inquiry,artists,work",
 		brandAccent: "#0f766e",
 		brandAccentDark: "#a99cff",
 		brandFont: "serif",
@@ -121,7 +188,7 @@ test.group("lookOf", () => {
 			accent: "#0f766e",
 			accentDark: "#a99cff",
 			font: "serif",
-			sections: ["inquiry", "artists"],
+			sections: ["inquiry", "artists", "work"],
 		});
 	});
 
@@ -142,7 +209,7 @@ test.group("lookOf", () => {
 		// One bad value leaves the others as they were.
 		const onlyFont = lookOf({ ...good, brandFont: "mono" });
 		assert.equal(onlyFont.accent, "#0f766e");
-		assert.deepEqual(onlyFont.sections, ["inquiry", "artists"]);
+		assert.deepEqual(onlyFont.sections, ["inquiry", "artists", "work"]);
 	});
 
 	test("an unset colour stays unset", ({ assert }) => {
@@ -160,32 +227,98 @@ test.group("lookOf", () => {
 });
 
 test.group("sections", () => {
-	test("sectionsOf keeps known keys once and adds the form if it is missing", ({
+	test("the default is Recent work, the artists, Flash, Good to know, then the form", ({
 		assert,
 	}) => {
-		assert.deepEqual(sectionsOf("inquiry,artists,inquiry,flash"), [
+		const all = ["work", "artists", "flash", "info", "inquiry"];
+		assert.deepEqual([...SECTION_KEYS], all);
+		assert.deepEqual([...DEFAULT_SECTIONS], all);
+	});
+
+	test("sectionList keeps Flash once, where it was put", ({ assert }) => {
+		assert.deepEqual(sectionList(["flash", "artists", "flash"]), [
+			"flash",
+			"artists",
+			"inquiry",
+		]);
+		assert.deepEqual(sectionsOf("work,artists,inquiry"), [
+			"work",
+			"artists",
+			"inquiry",
+		]);
+		assert.deepEqual(sectionsOf("work,flash,inquiry"), [
+			"work",
+			"flash",
+			"inquiry",
+		]);
+	});
+
+	test("sectionList keeps Good to know once, where it was put", ({
+		assert,
+	}) => {
+		assert.deepEqual(sectionList(["info", "work", "info", "inquiry"]), [
+			"info",
+			"work",
+			"inquiry",
+		]);
+		assert.deepEqual(sectionList(["work", "info"]), [
+			"work",
+			"info",
+			"inquiry",
+		]);
+		assert.deepEqual(sectionsOf("artists,info,inquiry"), [
+			"artists",
+			"info",
+			"inquiry",
+		]);
+	});
+
+	test("sectionList keeps known keys once, in order, and adds the form at the end", ({
+		assert,
+	}) => {
+		assert.deepEqual(sectionList(["artists", "work", "artists", "zzz"]), [
+			"artists",
+			"work",
+			"inquiry",
+		]);
+		assert.deepEqual(sectionList(["inquiry", "work"]), ["inquiry", "work"]);
+		assert.deepEqual(sectionList([]), ["inquiry"]);
+		assert.deepEqual(sectionList(["work"]), ["work", "inquiry"]);
+	});
+
+	test("sectionsOf reads a stored list: known keys once, then the form if it was left out", ({
+		assert,
+	}) => {
+		assert.deepEqual(sectionsOf("inquiry,artists,inquiry,zzz"), [
 			"inquiry",
 			"artists",
 		]);
 		assert.deepEqual(sectionsOf("artists"), ["artists", "inquiry"]);
 		assert.deepEqual(sectionsOf(""), ["inquiry"]);
+		assert.deepEqual(sectionsOf("work,artists,inquiry"), [
+			"work",
+			"artists",
+			"inquiry",
+		]);
+	});
+
+	test("a stored list without work stays without it", ({ assert }) => {
 		assert.deepEqual(sectionsOf("artists,inquiry"), ["artists", "inquiry"]);
+		assert.deepEqual(
+			lookOf({
+				storefrontTheme: "stencil-and-ink",
+				storefrontSections: "artists,inquiry",
+				brandAccent: null,
+				brandAccentDark: null,
+				brandFont: "eczar",
+			}).sections,
+			["artists", "inquiry"],
+		);
 	});
 
-	test("placementOf reads back every placement", ({ assert }) => {
-		for (const key of ARTIST_PLACEMENT_KEYS) {
-			assert.equal(placementOf(ARTIST_PLACEMENTS[key]), key);
-			assert.equal(
-				placementOf(sectionsOf(ARTIST_PLACEMENTS[key].join(","))),
-				key,
-			);
-		}
-		assert.deepEqual(ARTIST_PLACEMENT_KEYS, ["first", "last", "hidden"]);
-	});
-
-	test("every placement keeps the form", ({ assert }) => {
-		for (const key of ARTIST_PLACEMENT_KEYS) {
-			assert.include([...ARTIST_PLACEMENTS[key]], "inquiry");
+	test("every list keeps the form", ({ assert }) => {
+		for (const keys of [[], ["work"], ["artists", "work"], ["flash"]]) {
+			assert.include(sectionList(keys), "inquiry");
 		}
 	});
 });
@@ -217,5 +350,62 @@ test.group("the lists the dashboard shows", () => {
 			FONTS.map((font) => font.key),
 			[...FONT_KEYS],
 		);
+	});
+});
+
+test.group("a logo's tile (TAT-123)", () => {
+	test("the tiles are the light and the dark paper, light by default", ({
+		assert,
+	}) => {
+		assert.deepEqual([...LOGO_TILES], ["light", "dark"]);
+		assert.equal(DEFAULT_LOGO_TILE, "light");
+		assert.deepEqual(LOGO_TILE_COLOURS, {
+			light: LIGHT_PAPER,
+			dark: DARK_PAPER,
+		});
+	});
+
+	test("the tile colours are the storefront's and the dashboard's tile tokens", ({
+		assert,
+	}) => {
+		const css = storefront("src/styles.css");
+		assert.include(css, `--logo-plate: ${LOGO_TILE_COLOURS.light};`);
+		assert.include(css, `--logo-plate-dark: ${LOGO_TILE_COLOURS.dark};`);
+		const dashboard = readFileSync(
+			new URL("../../../../inertia/css/app.css", import.meta.url),
+			"utf8",
+		);
+		assert.include(dashboard, `--logo-plate: ${LOGO_TILE_COLOURS.light};`);
+		assert.include(dashboard, `--logo-plate-dark: ${LOGO_TILE_COLOURS.dark};`);
+	});
+
+	test("the storefront reads the same two tiles", ({ assert }) => {
+		const config = storefront("src/studio/theme/config.ts");
+		assert.include(
+			config,
+			`export type LogoTile = ${LOGO_TILES.map((tile) => `"${tile}"`).join(" | ")};`,
+		);
+	});
+
+	test("logoTileOf reads the exact word and anything else as light", ({
+		assert,
+	}) => {
+		assert.equal(logoTileOf("dark"), "dark");
+		assert.equal(logoTileOf("light"), "light");
+		for (const stored of ["Dark", "", "accent", "dark "]) {
+			assert.equal(logoTileOf(stored), "light", stored);
+		}
+	});
+});
+
+test.group("the claimed-flash setting (TAT-129)", () => {
+	test("the choices are show and hide, and a stored value off the list reads as show", ({
+		assert,
+	}) => {
+		assert.deepEqual([...CLAIMED_FLASH_CHOICES], ["show", "hide"]);
+		assert.equal(claimedFlashOf({ storefrontClaimedFlash: "hide" }), "hide");
+		assert.equal(claimedFlashOf({ storefrontClaimedFlash: "show" }), "show");
+		assert.equal(claimedFlashOf({ storefrontClaimedFlash: "nope" }), "show");
+		assert.equal(claimedFlashOf({ storefrontClaimedFlash: "" }), "show");
 	});
 });

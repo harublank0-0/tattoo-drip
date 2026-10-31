@@ -4,7 +4,9 @@ import { useRef } from "react";
 import { urlFor } from "~/client";
 import ChangeCard from "~/components/change_card";
 import { DepositCard } from "~/components/deposit_panel";
+import { DesignTakenProvider } from "~/components/design_taken";
 import { FinishCard } from "~/components/finish_card";
+import FlashDesignCard from "~/components/flash_design_card";
 import { usePageSheets } from "~/components/form_sheet";
 import { SOURCE_LABELS } from "~/components/inquiries";
 import MessageCard from "~/components/message_card";
@@ -41,6 +43,7 @@ export default function ProjectShow(props: ProjectPageProps) {
 	const {
 		project,
 		nextStep,
+		flash,
 		quote,
 		history,
 		canSetPrice,
@@ -67,6 +70,8 @@ export default function ProjectShow(props: ProjectPageProps) {
 		deposit,
 	} = props;
 	const tenant = useTenant();
+	// The design is claimed by another client: the quote form, the deposit link and Verify warn first.
+	const designTaken = flash?.claim === "taken";
 	// Where each control is drawn: in the Next step card when it names it, else in its own card, so
 	// nothing the page offers is out of reach.
 	const place = placementsOf(props);
@@ -120,144 +125,148 @@ export default function ProjectShow(props: ProjectPageProps) {
 				</div>
 			}
 		>
-			<div className="grid gap-6 lg:grid-cols-12 lg:items-start">
-				<div className="flex min-w-0 flex-col gap-6 lg:col-span-7">
-					<NextStepCard
-						projectId={project.id}
-						step={nextStep}
-						quote={quote}
-						form={form}
-						message={message}
-						deposit={deposit}
-						payments={payments}
-						finish={finish}
-						lastChannel={lastChannel}
-						onContact={markContacted}
-						sheets={sheets}
-						fallback={heading}
-					/>
-
-					{finish && place.finish === "card" && (
-						<FinishCard
-							key={finish.step}
+			<DesignTakenProvider value={designTaken}>
+				<div className="grid gap-6 lg:grid-cols-12 lg:items-start">
+					<div className="flex min-w-0 flex-col gap-6 lg:col-span-7">
+						<NextStepCard
 							projectId={project.id}
-							finish={finish}
-							onDone={() => heading.current?.focus()}
-						/>
-					)}
-
-					<SessionsCard
-						sessions={sessions}
-						dates={sessionDates}
-						scheduling={scheduling}
-						schedule={sheets.schedule}
-						anchor={nextStep.anchor}
-						showSchedule={place.schedule === "card"}
-					/>
-
-					<MessageCard
-						contact={contact}
-						messages={messages}
-						initialKind={messageKind}
-						lastChannel={lastChannel}
-						onContact={markContacted}
-						footer={contactedText}
-						onMarkContacted={closed ? undefined : () => markContacted()}
-					/>
-
-					<RequestCard
-						brief={project.brief}
-						request={request}
-						fromInquiry={request !== null}
-					/>
-
-					<NotesCard projectId={project.id} notes={notes} />
-
-					<ChangeCard
-						projectId={project.id}
-						moves={moves}
-						scheduledSessionCount={scheduledSessionCount}
-						depositHeldText={depositHeldText}
-						assignment={assignment}
-						resumeInNextStep={place.resume === "step"}
-						fallback={heading}
-					/>
-				</div>
-
-				{/* From lg the right column stays in view while the left scrolls, and
-				    scrolls inside itself when an opened ledger is taller than the screen. */}
-				<div className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-6 lg:-m-1 lg:col-span-5 lg:max-h-[calc(100dvh-3rem)] lg:self-start lg:overflow-y-auto lg:p-1">
-					<PaymentsCard
-						projectId={project.id}
-						payments={payments}
-						canSetPrice={canSetPrice}
-						place={place}
-						nextStep={nextStep}
-						sheets={sheets}
-					/>
-
-					{deposit && place.deposit_link === "card" && (
-						<DepositCard
-							projectId={project.id}
+							step={nextStep}
+							quote={quote}
+							form={form}
+							message={message}
 							deposit={deposit}
+							payments={payments}
+							finish={finish}
 							lastChannel={lastChannel}
 							onContact={markContacted}
-							anchor={nextStep.anchor}
+							sheets={sheets}
 							fallback={heading}
 						/>
-					)}
 
-					<QuoteCard
-						projectId={project.id}
-						quote={quote}
-						history={history}
-						form={form}
-						showExpiry={quoteExpiryShown}
-						ownerAccepts={ownerAccepts}
-						message={message}
-						lastChannel={lastChannel}
-						onContact={markContacted}
-						place={place}
-						nextStep={nextStep}
-						sheets={sheets}
-					/>
+						{finish && place.finish === "card" && (
+							<FinishCard
+								key={finish.step}
+								projectId={project.id}
+								finish={finish}
+								onDone={() => heading.current?.focus()}
+							/>
+						)}
+
+						<SessionsCard
+							sessions={sessions}
+							dates={sessionDates}
+							scheduling={scheduling}
+							schedule={sheets.schedule}
+							anchor={nextStep.anchor}
+							showSchedule={place.schedule === "card"}
+						/>
+
+						<MessageCard
+							contact={contact}
+							messages={messages}
+							initialKind={messageKind}
+							lastChannel={lastChannel}
+							onContact={markContacted}
+							footer={contactedText}
+							onMarkContacted={closed ? undefined : () => markContacted()}
+						/>
+
+						{flash && <FlashDesignCard flash={flash} />}
+
+						<RequestCard
+							brief={project.brief}
+							request={request}
+							fromInquiry={request !== null}
+						/>
+
+						<NotesCard projectId={project.id} notes={notes} />
+
+						<ChangeCard
+							projectId={project.id}
+							moves={moves}
+							scheduledSessionCount={scheduledSessionCount}
+							depositHeldText={depositHeldText}
+							assignment={assignment}
+							resumeInNextStep={place.resume === "step"}
+							fallback={heading}
+						/>
+					</div>
+
+					{/* From lg the right column stays in view while the left scrolls, and
+				    scrolls inside itself when an opened ledger is taller than the screen. */}
+					<div className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-6 lg:-m-1 lg:col-span-5 lg:max-h-[calc(100dvh-3rem)] lg:self-start lg:overflow-y-auto lg:p-1">
+						<PaymentsCard
+							projectId={project.id}
+							payments={payments}
+							canSetPrice={canSetPrice}
+							place={place}
+							nextStep={nextStep}
+							sheets={sheets}
+						/>
+
+						{deposit && place.deposit_link === "card" && (
+							<DepositCard
+								projectId={project.id}
+								deposit={deposit}
+								lastChannel={lastChannel}
+								onContact={markContacted}
+								anchor={nextStep.anchor}
+								fallback={heading}
+							/>
+						)}
+
+						<QuoteCard
+							projectId={project.id}
+							quote={quote}
+							history={history}
+							form={form}
+							showExpiry={quoteExpiryShown}
+							ownerAccepts={ownerAccepts}
+							message={message}
+							lastChannel={lastChannel}
+							onContact={markContacted}
+							place={place}
+							nextStep={nextStep}
+							sheets={sheets}
+						/>
+					</div>
 				</div>
-			</div>
 
-			{/* The sheets: one instance each, whichever card draws the trigger. */}
-			<RevisePanel
-				sheet={sheets.revise}
-				projectId={project.id}
-				quote={quote}
-				form={form}
-				available={place.revise_quote !== null}
-				fallback={heading}
-			/>
-			<PricePanel
-				sheet={sheets.price}
-				projectId={project.id}
-				available={place.set_price !== null}
-				fallback={heading}
-			/>
-			<RecordPaymentPanel
-				sheet={sheets.record}
-				projectId={project.id}
-				actions={payments.actions}
-				fallback={heading}
-			/>
-			<RefundPanel
-				sheet={sheets.refund}
-				projectId={project.id}
-				maxText={payments.actions?.refundMaxText ?? null}
-				fallback={heading}
-			/>
-			<SchedulePanel
-				sheet={sheets.schedule}
-				projectId={project.id}
-				scheduling={scheduling}
-				dates={sessionDates}
-				fallback={heading}
-			/>
+				{/* The sheets: one instance each, whichever card draws the trigger. */}
+				<RevisePanel
+					sheet={sheets.revise}
+					projectId={project.id}
+					quote={quote}
+					form={form}
+					available={place.revise_quote !== null}
+					fallback={heading}
+				/>
+				<PricePanel
+					sheet={sheets.price}
+					projectId={project.id}
+					available={place.set_price !== null}
+					fallback={heading}
+				/>
+				<RecordPaymentPanel
+					sheet={sheets.record}
+					projectId={project.id}
+					actions={payments.actions}
+					fallback={heading}
+				/>
+				<RefundPanel
+					sheet={sheets.refund}
+					projectId={project.id}
+					maxText={payments.actions?.refundMaxText ?? null}
+					fallback={heading}
+				/>
+				<SchedulePanel
+					sheet={sheets.schedule}
+					projectId={project.id}
+					scheduling={scheduling}
+					dates={sessionDates}
+					fallback={heading}
+				/>
+			</DesignTakenProvider>
 		</Page>
 	);
 }

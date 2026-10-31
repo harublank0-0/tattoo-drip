@@ -67,6 +67,32 @@ describe("the server's client", () => {
 		}
 	});
 
+	// TAT-128: the page's reads ask every cache on the way for a fresh answer
+	// (see tenancy/lookup.ts); the browser's client never does, because its
+	// requests are cross-origin and the API allows only a few request headers.
+	test("the server's reads ask for a fresh answer, the browser's don't", async () => {
+		const { calls, fetch } = fakeFetch(() => json(200, { data: STUDIO_A }));
+		await serverApi(STUDIO_A, fetch).tattoo.client.studio.get();
+		await serverApi(STUDIO_A, fetch, {
+			apiUrl: API,
+		}).tattoo.client.studio.get();
+
+		const browser = createApiContext("browser");
+		hydrateApi(
+			browser,
+			{ tattoo: { apiUrl: API, tenant: "studio-a" } },
+			{ fetch },
+		);
+		await browser.tattoo.client.studio.get();
+
+		const cacheControl = (init: RequestInit) =>
+			new Headers(init.headers).get("cache-control");
+		assert.deepEqual(
+			calls.map((call) => cacheControl(call.init)),
+			["no-cache", "no-cache", null],
+		);
+	});
+
 	test("sends no Authorization when no key is set", async () => {
 		const { calls, fetch } = fakeFetch(() => json(200, { data: STUDIO_A }));
 		const api = serverApi(STUDIO_A, fetch, { apiUrl: API });
@@ -281,7 +307,7 @@ describe("what the browser keeps", () => {
 		);
 	}
 
-	test("the studio and artists queries live as long as the page, other tenants' do not", () => {
+	test("the studio, artists and work queries live as long as the page, other tenants' do not", () => {
 		const browser = createApiContext("browser");
 		hydrateApi(browser, { tattoo: { apiUrl: API, tenant: "studio-a" } });
 		const defaults = (key: readonly unknown[]) =>
@@ -291,6 +317,22 @@ describe("what the browser keeps", () => {
 		assert.equal(defaults(tattooKeys.artists("studio-a")), Infinity);
 		// An artist's own query sits under the artists key.
 		assert.equal(defaults(tattooKeys.artist("studio-a", "sita")), Infinity);
+		// Every gallery read (TAT-126) sits under the work key, whatever its filters.
+		assert.equal(defaults(tattooKeys.work("studio-a")), Infinity);
+		assert.equal(
+			defaults(tattooKeys.work("studio-a", { artist: "sita", limit: 24 })),
+			Infinity,
+		);
+		// Every flash read (TAT-129) and every design's own.
+		assert.equal(defaults(tattooKeys.flash("studio-a")), Infinity);
+		assert.equal(
+			defaults(tattooKeys.flash("studio-a", { artist: "sita", limit: 12 })),
+			Infinity,
+		);
+		assert.equal(defaults(tattooKeys.flashDesign("studio-a", "d1")), Infinity);
+		assert.equal(defaults(tattooKeys.flash("studio-b")), undefined);
+		assert.equal(defaults(tattooKeys.flashDesign("studio-b", "d1")), undefined);
+		assert.equal(defaults(tattooKeys.work("studio-b")), undefined);
 		assert.equal(defaults(tattooKeys.artists("studio-b")), undefined);
 		assert.equal(defaults(tattooKeys.services("studio-a")), undefined);
 	});

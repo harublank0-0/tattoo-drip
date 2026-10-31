@@ -43,14 +43,37 @@ describe("the photo viewer is the browser's dialog (TAT-116)", () => {
 		assert.deepEqual(callers, ["studio/lightbox.ts"]);
 	});
 
-	test("showPhoto opens a closed dialog by id, guards a browser without <dialog>, and touches nothing else", () => {
+	test("showPhoto opens a closed dialog by id, guards a browser without <dialog>, and adds one history entry at the same address (TAT-123)", () => {
 		const text = read("studio/lightbox.ts");
 		assert.match(text, /export function showPhoto\(id: string\): void/);
 		assert.match(text, /document\.getElementById\(id\)/);
 		assert.match(text, /typeof HTMLDialogElement/);
 		assert.match(text, /instanceof HTMLDialogElement/);
-		assert.match(text, /!dialog\.open/);
+		assert.match(text, /dialog\.open \|\| session \|\| leaving/);
 		assert.equal((text.match(/document\./g) ?? []).length, 1);
+		// The browser's own pushState with no URL: the address never changes, and
+		// TanStack's wrapper on window.history (which runs the loaders) is not used.
+		assert.match(
+			text,
+			/History\.prototype\.pushState\.call\(history, entry, ""\)/,
+		);
+		assert.match(
+			text,
+			/History\.prototype\.replaceState\.call\(history, entry, ""\)/,
+		);
+		assert.doesNotMatch(text, /history\.pushState\(|history\.replaceState\(/);
+		// A marker left on the entry the page loaded on is taken off the same way.
+		assert.match(
+			text,
+			/History\.prototype\.replaceState\.call\(history, router, ""\)/,
+		);
+		// One place calls back(), and refuses a second while one is in flight.
+		assert.equal((text.match(/window\.history\.back\(\)/g) ?? []).length, 1);
+		assert.match(text, /if \(leaving\) return;\n\tleaving = true;/);
+		// The wait for a closed photo's back() is its popstate, never a timer.
+		assert.doesNotMatch(text, /setTimeout|clearTimeout|LEAVE_WAIT_MS/);
+		assert.doesNotMatch(text, /location\.hash|location\.href|\.hash =/);
+		assert.doesNotMatch(text, /@tanstack/, "the router is never imported");
 	});
 
 	test("the components hold no focus code, listeners or DOM access", () => {
@@ -59,6 +82,7 @@ describe("the photo viewer is the browser's dialog (TAT-116)", () => {
 		const viewer = [
 			"studio/components/artists.tsx",
 			"studio/components/brand.tsx",
+			"studio/components/gallery.tsx",
 		];
 		for (const { file, text } of sources("studio/components/")) {
 			const forbidden = [
@@ -74,6 +98,35 @@ describe("the photo viewer is the browser's dialog (TAT-116)", () => {
 			for (const word of forbidden) {
 				assert.ok(!text.includes(word), `${file} uses ${word}`);
 			}
+		}
+	});
+
+	test("Show more's focus move is the only DOM access outside lightbox.ts", () => {
+		// The paging island (src/studio/paging.tsx) is the one stateful piece:
+		// after a click it moves focus to the first new photo, once.
+		const paging = read("studio/paging.tsx");
+		assert.equal((paging.match(/document\.getElementById/g) ?? []).length, 1);
+		assert.equal((paging.match(/\.focus\(/g) ?? []).length, 1);
+		const others = sources("studio/")
+			.filter(
+				({ file }) =>
+					file !== "studio/lightbox.ts" && file !== "studio/paging.tsx",
+			)
+			.filter(({ text }) => text.includes("document."))
+			.map(({ file }) => file);
+		assert.deepEqual(others, []);
+	});
+
+	test("open-now.tsx holds the cover's only timer and touches no DOM (TAT-128)", () => {
+		const text = read("studio/open-now.tsx");
+
+		assert.match(text, /setInterval/);
+		assert.match(text, /clearInterval/);
+		assert.ok(!text.includes("document."), "open-now.tsx uses document.");
+		assert.ok(!text.includes("window."), "open-now.tsx uses window.");
+		for (const { file, text: other } of sources("studio/")) {
+			if (file === "studio/open-now.tsx") continue;
+			assert.ok(!other.includes("setInterval"), `${file} uses setInterval`);
 		}
 	});
 

@@ -4,10 +4,12 @@ import { tenantContext } from "#middleware/tenant_middleware";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
 import {
-	ARTIST_PLACEMENT_KEYS,
+	CLAIMED_FLASH_CHOICES,
+	claimedFlashOf,
 	FONTS,
+	logoTileOf,
 	lookOf,
-	placementOf,
+	SECTION_KEYS,
 	THEME_ACCENT,
 	THEME_ACCENT_DARK,
 	THEMES,
@@ -50,11 +52,14 @@ export default class PageLookController {
 				accent: look.accent,
 				accentDark: look.accentDark,
 				font: look.font,
-				artists: placementOf(look.sections),
+				sections: look.sections,
+				// Not part of the served look (the flash reads apply it): the form's own.
+				claimedFlash: claimedFlashOf(tenant),
 			},
+			claimedFlashChoices: [...CLAIMED_FLASH_CHOICES],
 			themes: THEMES,
 			fonts: FONTS,
-			placements: ARTIST_PLACEMENT_KEYS,
+			sectionKeys: [...SECTION_KEYS],
 			// Where an empty colour box starts its swatch.
 			swatches: { light: THEME_ACCENT, dark: THEME_ACCENT_DARK },
 			// The logo's 640 px copy for the preview, never the key or the columns.
@@ -88,6 +93,8 @@ export default class PageLookController {
 	) {
 		const shownWidth = Math.min(LOGO_PREVIEW_WIDTH, width);
 		return {
+			// The tile it sits on (TAT-123), read from the row: no query.
+			tile: logoTileOf(tenant.logoTile),
 			previewUrl: await this.images.urlFor(
 				"studio_logo",
 				key,

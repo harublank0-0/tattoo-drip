@@ -1,4 +1,4 @@
-import type { Artist, Studio } from "@tattoo-drip/sdk";
+import type { Artist, FlashPage, Studio, WorkPage } from "@tattoo-drip/sdk";
 
 /** Shared by the studio page tests: whole TAT-44 objects. */
 
@@ -12,7 +12,13 @@ export const DEFAULT_STOREFRONT: Studio["storefront"] = {
 		colors: { accent: null, accentDark: null },
 		font: "eczar",
 	},
-	sections: [{ type: "artists" }, { type: "inquiry" }],
+	sections: [
+		{ type: "work" },
+		{ type: "artists" },
+		{ type: "flash" },
+		{ type: "info" },
+		{ type: "inquiry" },
+	],
 };
 
 export const STUDIO: Studio = {
@@ -35,6 +41,42 @@ export const STUDIO: Studio = {
 	acceptingInquiries: true,
 	cover: null,
 	storefront: DEFAULT_STOREFRONT,
+	openingHours: [],
+	closedDays: [],
+	goodToKnow: {
+		walkIns: null,
+		ageRule: null,
+		depositPolicy: null,
+		beforeSession: null,
+		aftercare: null,
+	},
+};
+
+/**
+ * A studio that filled in hours (Sunday to Friday 11:00 to 20:00, Saturday
+ * closed), a closed day with a Devanagari note and every Good to know text,
+ * one in Devanagari (TAT-128). 2 November 2026 is a Monday.
+ */
+export const GOOD_TO_KNOW_STUDIO: Studio = {
+	...STUDIO,
+	openingHours: (["sun", "mon", "tue", "wed", "thu", "fri"] as const).map(
+		(day) => ({ day, opens: "11:00", closes: "20:00" }),
+	),
+	closedDays: [
+		{
+			from: "2026-11-02",
+			to: "2026-11-04",
+			note: "दशैं बिदा, back on 5 November",
+		},
+	],
+	goodToKnow: {
+		walkIns: "Small flash welcome on Saturdays.",
+		ageRule: "18 and over, with a photo ID.",
+		depositPolicy:
+			"A deposit holds your date. It is not refunded after 48 hours.",
+		beforeSession: "Eat a good meal.\nWear clothes that leave the spot free.",
+		aftercare: "घाउ सफा राख्नुहोस्।\nKeep the wrap on for 2 hours.",
+	},
 };
 
 /** A studio that set nothing but its name. */
@@ -60,6 +102,10 @@ export const SITA: Artist = {
 	acceptingInquiries: true,
 	closedMessage: null,
 	workPhotos: [],
+	styles: [{ slug: "fine-line", name: "Fine line" }],
+	socialLinks: [
+		{ platform: "instagram", url: "https://instagram.com/sita.ink" },
+	],
 };
 
 /** The photo's smaller copies, as the API lists them (TAT-112). */
@@ -98,6 +144,8 @@ export const ARJUN: Artist = {
 	acceptingInquiries: false,
 	closedMessage: "Books open in March.",
 	workPhotos: [],
+	styles: [],
+	socialLinks: [],
 };
 
 /**
@@ -126,3 +174,79 @@ export const sitaWithWork = (
 	...SITA,
 	workPhotos: workPhotos(count, alts),
 });
+
+/**
+ * A page of the gallery read (TAT-126) as the API sends it: `count` photos by
+ * Sita, on the API's origin with their copies, the first tagged Fine line and
+ * healed, no next page, and the filters that go with it. `over` replaces any
+ * of the page's own keys.
+ */
+export function galleryPage(
+	count: number,
+	over: Partial<WorkPage> = {},
+): WorkPage {
+	const fineLine = { slug: "fine-line", name: "Fine line" };
+	return {
+		data: workPhotos(count).map((photo, index) => ({
+			...photo,
+			styles: index === 0 ? [fineLine] : [],
+			healed: index === 0,
+			artist: { slug: "sita", name: "Sita Rai" },
+		})),
+		nextCursor: null,
+		filters: { styles: [fineLine], healed: true },
+		...over,
+	};
+}
+
+/** A flash design's picture as the API sends it (TAT-129): on the API's origin, 1200 x 1200 with the photo copies. */
+export const flashImage = (n: number) => ({
+	url: `https://api.example.com/uploads/tenants/t/flash_design/f${n}.320-640-1280.png`,
+	width: 1200,
+	height: 1200,
+	variants: [320, 640].map((width) => ({
+		url: `https://api.example.com/uploads/tenants/t/flash_design/f${n}.${width}w.png`,
+		width,
+	})),
+});
+
+/** The design ids `flashPage` uses: lowercase UUIDs, the first one is `FLASH_ID_1`. */
+export const flashId = (n: number) =>
+	`0199f000-0000-7000-8000-${String(n).padStart(12, "0")}`;
+
+/**
+ * A page of the flash read (TAT-129) as the API sends it: `count` designs by
+ * Sita, the first named Moth, About 3 in and NPR 3,000, the rest unpriced, all
+ * requestable, no next page, and Sita as the only artist to filter by. `over`
+ * replaces any of the page's own keys.
+ */
+export function flashPage(
+	count: number,
+	over: Partial<FlashPage> = {},
+): FlashPage {
+	return {
+		data: Array.from({ length: count }, (_, index) => ({
+			id: flashId(index + 1),
+			name: index === 0 ? "Moth" : `Design ${index + 1}`,
+			size: "About 3 in",
+			price:
+				index === 0
+					? { amount: 300000, currency: "NPR" as const, text: "NPR 3,000" }
+					: null,
+			image: flashImage(index + 1),
+			artist: { slug: "sita", name: "Sita Rai" },
+			requestable: true,
+			status: "available" as const,
+		})),
+		nextCursor: null,
+		filters: { artists: [{ slug: "sita", name: "Sita Rai" }] },
+		...over,
+	};
+}
+
+/** The flash read with no design in it. */
+export const EMPTY_FLASH_PAGE: FlashPage = {
+	data: [],
+	nextCursor: null,
+	filters: { artists: [] },
+};

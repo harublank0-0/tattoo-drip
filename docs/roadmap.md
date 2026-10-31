@@ -28,7 +28,7 @@ Done only when an opportunity comes up:
 
 ## MVP: prove the inquiry-to-deposit loop
 
-The loop: intake link, inquiry inbox and project board, quote with deposit and QR proof, sessions with the balance due, clients matched by phone, studio page, installable mobile web app. It runs on the foundation already planned: auth, tenancy, row-level security, the API and hosting.
+The loop: intake link, inquiry inbox and project board, quote with deposit and QR proof, sessions with the balance due, clients matched by phone, studio website (gallery, artist portfolios, flash designs clients can ask for, Good to know with opening hours), installable mobile web app. It runs on the foundation already planned: auth, tenancy, row-level security, the API and hosting.
 
 **Gate 1:** for 6 weeks, the design-partner studio receives most new custom inquiries through the link, records every deposit in Tattoo Drip, and would pay the planned price for it. Any other pilot studios that join count the same way. If the studio keeps quoting in chat, narrow the wedge to a deposit-and-schedule tool.
 
@@ -37,9 +37,9 @@ The numbers come from `node build/ace.js metrics:pilot --days=42` (TAT-70): each
 ## V1: solid enough to pay for
 
 - Automatic deposit confirmation (Khalti, or Fonepay through an aggregator)
-- Flash and bookable consultation and piercing slots (availability and slot engine)
+- Flash with instant booking, and bookable consultation and piercing slots (availability and slot engine)
 - SMS reminders, aftercare and healing-check messages
-- Studio site with portfolio, flash, themes and a custom domain
+- More studio site themes and a custom domain
 - Tourist mode, reports, client data deletion, security review
 
 **Gate 2:** 20+ paying studios who stay past 3 months.

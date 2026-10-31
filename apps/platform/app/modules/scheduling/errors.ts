@@ -42,3 +42,15 @@ export class SessionOverlapError extends Error {
 		this.name = "SessionOverlapError";
 	}
 }
+
+/**
+ * The studio already lists the most closed-days entries it may have ahead
+ * (MAX_UPCOMING_CLOSURES). The message is for developers; show your own to
+ * the user.
+ */
+export class ClosureLimitError extends Error {
+	constructor() {
+		super("The studio already lists the most closed days it may have ahead");
+		this.name = "ClosureLimitError";
+	}
+}

@@ -5,13 +5,17 @@ import logger from "@adonisjs/core/services/logger";
 import drive from "@adonisjs/drive/services/main";
 import { ImageDeleteError } from "#modules/media/errors";
 import {
+	logoTile,
 	makeVariants,
 	type ProcessedImage,
 	type ProcessedVariant,
 	processImage,
+	squareIcon,
+	type TileColours,
 } from "#modules/media/services/image_processor";
 import {
 	COVER_WIDTHS,
+	ICON_WIDTHS,
 	type ImageExtension,
 	NO_VARIANTS,
 	originalKey,
@@ -37,10 +41,17 @@ export const IMAGE_PURPOSES = {
 	studio_cover: { visibility: "public", variants: COVER_WIDTHS }, // TAT-116
 	artist_work_photo: { visibility: "public", variants: VARIANT_WIDTHS }, // TAT-116
 	studio_logo: { visibility: "public", variants: VARIANT_WIDTHS }, // TAT-56
+	studio_icon: { visibility: "public", variants: ICON_WIDTHS }, // TAT-123
+	flash_design: { visibility: "public", variants: VARIANT_WIDTHS }, // TAT-129
 } as const;
 
 export type ImagePurpose = keyof typeof IMAGE_PURPOSES;
 export type StoredImage = { key: string; width: number; height: number };
+/** A stored logo (TAT-123): the image, the tile it shows on, and its square icon or null. */
+export type StoredLogo = StoredImage & {
+	tile: "light" | "dark";
+	icon: StoredImage | null;
+};
 /** The copy that dashboard lists and grids show (ui.md: never the full-size file). */
 export const THUMBNAIL_WIDTH = 320;
 /** A smaller copy of an image, for `srcset`. */
@@ -97,6 +108,21 @@ async function link(purpose: ImagePurpose, key: string): Promise<string> {
 		: disk.getUrl(key);
 }
 
+/**
+ * An upload's bytes, and the temp file removed: the raw upload still has its
+ * EXIF and GPS, so none is left in tmp.
+ */
+async function takeUpload(
+	file: Pick<MultipartFile, "tmpPath">,
+): Promise<Buffer> {
+	if (!file.tmpPath) {
+		throw new Error("The upload has no tmpPath; was it already moved?");
+	}
+	const input = await readFile(file.tmpPath);
+	await rm(file.tmpPath, { force: true });
+	return input;
+}
+
 export default class ImageService {
 	/**
 	 * Checks and re-encodes an upload (see processImage), then writes it to
@@ -108,13 +134,47 @@ export default class ImageService {
 		file: Pick<MultipartFile, "tmpPath">,
 		{ tenant, purpose }: { tenant: Pick<Tenant, "id">; purpose: ImagePurpose },
 	): Promise<StoredImage> {
-		if (!file.tmpPath) {
-			throw new Error("The upload has no tmpPath; was it already moved?");
+		return this.storeBytes(await takeUpload(file), { tenant, purpose });
+	}
+
+	/**
+	 * Stores a studio's logo (TAT-123): `store`'s checks and copies under
+	 * `studio_logo`, then, best effort, its tile (logoTile) and its square icon
+	 * on that tile's colour under `studio_icon`, with the icon's copy. A failure
+	 * after the logo is stored is logged and leaves the light tile or no icon;
+	 * the caller registers the cleanup of the logo and of the icon it returns.
+	 */
+	async storeLogo(
+		file: Pick<MultipartFile, "tmpPath">,
+		{ tenant, tiles }: { tenant: Pick<Tenant, "id">; tiles: TileColours },
+	): Promise<StoredLogo> {
+		const image = await processImage(await takeUpload(file));
+		const logo = await this.storeProcessed(image, {
+			tenant,
+			purpose: "studio_logo",
+		});
+		let tile: "light" | "dark" = "light";
+		try {
+			tile = await logoTile(image, tiles);
+		} catch (error) {
+			logger.warn(
+				{ err: error },
+				"a logo's tile could not be picked; using the light one",
+			);
 		}
-		const input = await readFile(file.tmpPath);
-		// The raw upload still has its EXIF and GPS; don't leave it in tmp.
-		await rm(file.tmpPath, { force: true });
-		return this.storeBytes(input, { tenant, purpose });
+		let icon: StoredImage | null = null;
+		try {
+			icon = await this.storeBytes(await squareIcon(image, tiles[tile]), {
+				tenant,
+				purpose: "studio_icon",
+			});
+		} catch (error) {
+			logger.warn(
+				{ err: error },
+				"a logo's icon could not be stored; keeping the logo without it",
+			);
+		}
+		return { ...logo, tile, icon };
 	}
 
 	/**
@@ -126,7 +186,14 @@ export default class ImageService {
 		bytes: Buffer,
 		{ tenant, purpose }: { tenant: Pick<Tenant, "id">; purpose: ImagePurpose },
 	): Promise<StoredImage> {
-		const image = await processImage(bytes);
+		return this.storeProcessed(await processImage(bytes), { tenant, purpose });
+	}
+
+	/** Writes an image processImage has accepted, with the purpose's copies. */
+	private async storeProcessed(
+		image: ProcessedImage,
+		{ tenant, purpose }: { tenant: Pick<Tenant, "id">; purpose: ImagePurpose },
+	): Promise<StoredImage> {
 		const extension: ImageExtension = image.format === "png" ? "png" : "jpg";
 		const base = `tenants/${tenant.id}/${purpose}/${randomUUID()}`;
 		const widths = await this.storeVariants(purpose, base, extension, image);

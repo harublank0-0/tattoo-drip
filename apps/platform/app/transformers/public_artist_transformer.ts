@@ -28,7 +28,7 @@ export default class PublicArtistTransformer extends BaseTransformer<ShownArtist
 				: null,
 			acceptingInquiries: artist.acceptingInquiries,
 			closedMessage: artist.closedMessage,
-			// Up to six, in the studio's order: no id, key, position or
+			// The six newest, newest first: no id, key, styles, healed mark or
 			// timestamp (openapi.yaml, WorkPhoto).
 			workPhotos: artist.workPhotos.map((photo) => ({
 				url: photo.url,
@@ -36,6 +36,13 @@ export default class PublicArtistTransformer extends BaseTransformer<ShownArtist
 				height: photo.height,
 				alt: photo.alt,
 				variants: photo.variants.map(({ url, width }) => ({ url, width })),
+			})),
+			// Slug and name only; links are platform and https URL only
+			// (openapi.yaml, TattooStyle and SocialLink).
+			styles: artist.styles.map(({ slug, name }) => ({ slug, name })),
+			socialLinks: artist.socialLinks.map(({ platform, url }) => ({
+				platform,
+				url,
 			})),
 		};
 	}

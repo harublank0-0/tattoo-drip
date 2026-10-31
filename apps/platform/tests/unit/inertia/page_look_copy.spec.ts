@@ -1,12 +1,18 @@
 import { test } from "@japa/runner";
 import {
-	ARTIST_PLACEMENT_KEYS,
+	CLAIMED_FLASH_CHOICES,
 	FONT_KEYS,
 	FONTS,
+	SECTION_KEYS,
 	THEME_ACCENT,
 	THEMES,
 } from "#modules/storefront/look";
-import { LOOK_SAVED_MESSAGE } from "#modules/tenancy/look_messages";
+import {
+	LOGO_SAVED,
+	LOGO_SAVED_ON_DARK_TILE,
+	LOGO_TILE_SAVED,
+	LOOK_SAVED_MESSAGE,
+} from "#modules/tenancy/look_messages";
 // @ts-expect-error TS6305: the server project only references the inertia project, so it cannot read its sources and the module is untyped here; `PageLookModule` below restates its shape and the inertia project type-checks the real one.
 import * as pageLookModule from "../../../inertia/components/page_look.js";
 
@@ -25,12 +31,36 @@ type PageLookModule = {
 		processing: boolean,
 		percentage?: number,
 	): string;
+	tileLine(tile: "light" | "dark"): string;
+	tileButton(tile: "light" | "dark", processing: boolean): string;
+	LOGO_TILE_CLASS: Record<string, string>;
 	coverLine(hasCover: boolean): string;
 	coverLink(hasCover: boolean): string;
-	PLACEMENT_WORDS: Record<
-		string,
-		{ title: string; description: string | null }
-	>;
+	SECTION_WORDS: Record<string, { title: string; description: string }>;
+	REQUIRED_SECTION: string;
+	sectionRows(
+		shown: readonly string[],
+		all: readonly string[],
+	): { key: string; shown: boolean }[];
+	moveRow(
+		rows: { key: string; shown: boolean }[],
+		index: number,
+		direction: "up" | "down",
+	): { key: string; shown: boolean }[];
+	toggleRow(
+		rows: { key: string; shown: boolean }[],
+		index: number,
+		shown: boolean,
+	): { key: string; shown: boolean }[];
+	sentSections(rows: { key: string; shown: boolean }[]): string[];
+	moveSectionLabel(title: string, direction: "up" | "down"): string;
+	sectionsError(errors: Record<string, string>): string | undefined;
+	canMove(index: number, count: number, direction: "up" | "down"): boolean;
+	focusAfterMove(
+		index: number,
+		count: number,
+		direction: "up" | "down",
+	): "up" | "down";
 	FONT_SAMPLE_CLASS: Record<string, string>;
 	PREVIEW_NOTE: string;
 	SAVED_NOTE: string;
@@ -41,7 +71,10 @@ type PageLookModule = {
 	LOGO_FILE_HELP: string;
 	REMOVE_LOGO_QUESTION: string;
 	COVER_INTRO_LINE: string;
-	PLACEMENT_INTRO: string;
+	SECTIONS_INTRO: string;
+	CLAIMED_FLASH_WORDS: Record<string, string>;
+	CLAIMED_FLASH_LEGEND: string;
+	CLAIMED_FLASH_HELP: string;
 };
 const words = pageLookModule as PageLookModule;
 
@@ -135,24 +168,164 @@ test.group("page look words (TAT-56)", () => {
 		assert.equal(words.coverLink(false), "Add one in Studio profile");
 	});
 
-	test("there are words for exactly the server's placements, in its order", ({
+	test("there are words for exactly the server's sections, in its order", ({
 		assert,
 	}) => {
-		assert.deepEqual(Object.keys(words.PLACEMENT_WORDS), ARTIST_PLACEMENT_KEYS);
+		assert.deepEqual(Object.keys(words.SECTION_WORDS), [...SECTION_KEYS]);
 		assert.deepEqual(
-			ARTIST_PLACEMENT_KEYS.map((key) => words.PLACEMENT_WORDS[key].title),
+			SECTION_KEYS.map((key) => words.SECTION_WORDS[key].title),
+			["Recent work", "Artists", "Flash", "Good to know", "Got an idea?"],
+		);
+		assert.deepEqual(
+			SECTION_KEYS.map((key) => words.SECTION_WORDS[key].description),
 			[
-				"Artists, then the form",
-				"The form, then artists",
-				"Don't show the artists list",
+				"The newest photos from all your artists, with a link to all of them.",
+				"Each artist with their photo, styles and status. Their own pages work either way.",
+				"A few of your newest flash designs, with a link to all of them.",
+				"Your hours, closed days, walk-ins, age rule, deposit policy, and what to do before and after a session. Shows only what you filled in.",
+				"A short invitation with a button to the page where clients send their idea. Always on your page.",
 			],
 		);
-		assert.equal(
-			words.PLACEMENT_WORDS.hidden.description,
-			"Clients can still choose an artist in the form, and each artist's own page still works.",
+		assert.equal(words.REQUIRED_SECTION, "inquiry");
+		assert.include([...SECTION_KEYS], words.REQUIRED_SECTION);
+	});
+
+	const ALL = ["work", "artists", "inquiry"];
+
+	test("the rows are the shown sections in their order, then the hidden ones", ({
+		assert,
+	}) => {
+		assert.deepEqual(words.sectionRows(["artists", "inquiry"], ALL), [
+			{ key: "artists", shown: true },
+			{ key: "inquiry", shown: true },
+			{ key: "work", shown: false },
+		]);
+		assert.deepEqual(words.sectionRows(ALL, ALL), [
+			{ key: "work", shown: true },
+			{ key: "artists", shown: true },
+			{ key: "inquiry", shown: true },
+		]);
+		assert.deepEqual(words.sectionRows(["inquiry"], ALL), [
+			{ key: "inquiry", shown: true },
+			{ key: "work", shown: false },
+			{ key: "artists", shown: false },
+		]);
+	});
+
+	test("a row moves one place earlier or later, and not past either end", ({
+		assert,
+	}) => {
+		const rows = words.sectionRows(["artists", "inquiry"], ALL);
+		assert.deepEqual(
+			words.moveRow(rows, 2, "up").map((row) => row.key),
+			["artists", "work", "inquiry"],
 		);
-		assert.isNull(words.PLACEMENT_WORDS.first.description);
-		assert.isNull(words.PLACEMENT_WORDS.last.description);
+		assert.deepEqual(
+			words.moveRow(rows, 0, "down").map((row) => row.key),
+			["inquiry", "artists", "work"],
+		);
+		assert.deepEqual(words.moveRow(rows, 0, "up"), rows);
+		assert.deepEqual(words.moveRow(rows, 2, "down"), rows);
+		assert.deepEqual(words.moveRow(rows, 7, "up"), rows);
+		// A move keeps whether each row is shown, and leaves the list it was given alone.
+		const moved = words.moveRow(rows, 2, "up");
+		assert.isFalse(moved[1].shown);
+		assert.deepEqual(rows, words.sectionRows(["artists", "inquiry"], ALL));
+	});
+
+	test("a row can be shown or hidden, but the invitation is always shown", ({
+		assert,
+	}) => {
+		const rows = words.sectionRows(["artists", "inquiry"], ALL);
+		assert.deepEqual(words.toggleRow(rows, 2, true)[2], {
+			key: "work",
+			shown: true,
+		});
+		assert.deepEqual(words.toggleRow(rows, 0, false)[0], {
+			key: "artists",
+			shown: false,
+		});
+		// "Got an idea?" (index 1) cannot be hidden, whatever is asked.
+		assert.deepEqual(words.toggleRow(rows, 1, false), rows);
+		assert.isTrue(words.toggleRow(rows, 1, true)[1].shown);
+		assert.deepEqual(words.toggleRow(rows, 9, true), rows);
+		assert.deepEqual(rows, words.sectionRows(["artists", "inquiry"], ALL));
+	});
+
+	test("the form sends the shown sections, in order", ({ assert }) => {
+		assert.deepEqual(
+			words.sentSections([
+				{ key: "work", shown: true },
+				{ key: "artists", shown: false },
+				{ key: "inquiry", shown: true },
+			]),
+			["work", "inquiry"],
+		);
+		assert.deepEqual(
+			words.sentSections(words.sectionRows(["artists", "inquiry"], ALL)),
+			["artists", "inquiry"],
+		);
+	});
+
+	test("a move button is named for the section and the direction", ({
+		assert,
+	}) => {
+		assert.equal(
+			words.moveSectionLabel("Recent work", "up"),
+			"Move Recent work earlier",
+		);
+		assert.equal(
+			words.moveSectionLabel("Recent work", "down"),
+			"Move Recent work later",
+		);
+	});
+
+	test("the message under the list is the list's own, else the first on an item", ({
+		assert,
+	}) => {
+		assert.equal(words.sectionsError({}), undefined);
+		assert.equal(words.sectionsError({ theme: "x" }), undefined);
+		assert.equal(
+			words.sectionsError({ "sections.0": "Choose sections from the list." }),
+			"Choose sections from the list.",
+		);
+		assert.equal(
+			words.sectionsError({
+				"sections.1": "second",
+				sections: "Show each section once.",
+				"sections.0": "first",
+			}),
+			"Show each section once.",
+		);
+		assert.equal(
+			words.sectionsError({ "sections.2": "later", "sections.1": "sooner" }),
+			"later",
+		);
+		// Another field that merely starts with the word is not the list's.
+		assert.equal(words.sectionsError({ sectionsOther: "x" }), undefined);
+	});
+
+	test("a move button is disabled where the row has nowhere to go", ({
+		assert,
+	}) => {
+		assert.isFalse(words.canMove(0, 3, "up"));
+		assert.isTrue(words.canMove(0, 3, "down"));
+		assert.isTrue(words.canMove(1, 3, "up"));
+		assert.isTrue(words.canMove(1, 3, "down"));
+		assert.isTrue(words.canMove(2, 3, "up"));
+		assert.isFalse(words.canMove(2, 3, "down"));
+	});
+
+	test("after a move, focus stays on the pressed button, or goes to the row's other one when that is now disabled", ({
+		assert,
+	}) => {
+		// Moved earlier into the middle: Move earlier is still enabled.
+		assert.equal(words.focusAfterMove(1, 3, "up"), "up");
+		// Moved earlier to the top: Move earlier is disabled, so Move later takes focus.
+		assert.equal(words.focusAfterMove(0, 3, "up"), "down");
+		// Moved later to the bottom: Move later is disabled, so Move earlier takes focus.
+		assert.equal(words.focusAfterMove(2, 3, "down"), "up");
+		assert.equal(words.focusAfterMove(1, 3, "down"), "down");
 	});
 
 	test("every font has a sample face, and the server's list names each once", ({
@@ -199,12 +372,12 @@ test.group("page look words (TAT-56)", () => {
 			"For phones set to dark mode. Leave it empty to use a lighter shade of your colour.",
 		);
 		assert.equal(
-			words.PLACEMENT_INTRO,
-			"The form where clients send their idea is always on your page.",
+			words.SECTIONS_INTRO,
+			"What your page shows under its cover and intro, in this order.",
 		);
 		assert.equal(
 			words.LOGO_INTRO,
-			"Shown above your studio's name, on each artist's page and on the deposit page, on a light tile. A dark logo saved as a PNG with a see-through background works best.",
+			"Shown above your studio's name, on each artist's page and on the deposit page, on a small tile, and as your page's icon in the browser tab. A PNG with a see-through background works best.",
 		);
 		assert.equal(
 			words.NO_LOGO,
@@ -224,6 +397,41 @@ test.group("page look words (TAT-56)", () => {
 		);
 	});
 
+	test("the logo's tile words (TAT-123)", ({ assert }) => {
+		assert.equal(
+			words.tileLine("light"),
+			"It sits on a light tile. A white or light logo shows better on a dark one.",
+		);
+		assert.equal(
+			words.tileLine("dark"),
+			"It sits on a dark tile. A dark logo shows better on a light one.",
+		);
+		// The button offers the other tile.
+		assert.equal(words.tileButton("dark", false), "Use a dark tile");
+		assert.equal(words.tileButton("light", false), "Use a light tile");
+		assert.equal(words.tileButton("dark", true), "Saving…");
+		assert.equal(words.tileButton("light", true), "Saving…");
+		// Literal class names, so Tailwind finds them.
+		assert.deepEqual(words.LOGO_TILE_CLASS, {
+			light: "bg-logo-plate",
+			dark: "bg-logo-plate-dark",
+		});
+	});
+
+	test("the server's logo messages (TAT-123)", ({ assert }) => {
+		assert.equal(LOGO_SAVED, "Logo saved.");
+		assert.equal(
+			LOGO_SAVED_ON_DARK_TILE,
+			"Logo saved. It's light, so your page shows it on a dark tile. You can change that under Logo.",
+		);
+		assert.equal(
+			LOGO_TILE_SAVED,
+			"Tile saved. It can take up to 15 minutes to show on your page.",
+		);
+		// Like the look's flash, the tile's says how long a CDN may keep the page.
+		assert.include(LOGO_TILE_SAVED, "up to 15 minutes");
+	});
+
 	test("the theme and font lists the server sends have these exact words", ({
 		assert,
 	}) => {
@@ -240,5 +448,24 @@ test.group("page look words (TAT-56)", () => {
 			{ key: "serif", label: "Classic serif" },
 			{ key: "sans", label: "Plain" },
 		]);
+	});
+});
+
+test.group("claimed flash words (TAT-129)", () => {
+	test("there are words for exactly the server's choices, in its order", ({
+		assert,
+	}) => {
+		assert.deepEqual(Object.keys(words.CLAIMED_FLASH_WORDS), [
+			...CLAIMED_FLASH_CHOICES,
+		]);
+		assert.deepEqual(words.CLAIMED_FLASH_WORDS, {
+			show: "Show them, greyed out and marked Claimed",
+			hide: "Hide them",
+		});
+		assert.equal(words.CLAIMED_FLASH_LEGEND, "Claimed flash designs");
+		assert.equal(
+			words.CLAIMED_FLASH_HELP,
+			"One-of-a-kind designs that someone has claimed.",
+		);
 	});
 });

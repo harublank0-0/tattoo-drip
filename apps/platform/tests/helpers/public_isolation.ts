@@ -19,11 +19,15 @@ export function publicMarkers(studio: Studio): string[] {
 		studio.closedArtist.id,
 		studio.closedArtist.name,
 		studio.paymentMethod.id,
+		studio.flashDesign.id,
+		studio.flashDesign.name,
 		studio.client.id,
 		studio.project.id,
 		studio.newInquiry.id,
 		studio.depositProject.id,
 		studio.depositReferenceCode,
+		// Carries the studio's name; belt and braces for the public studio read.
+		studio.closedDay.note as string,
 	];
 }
 

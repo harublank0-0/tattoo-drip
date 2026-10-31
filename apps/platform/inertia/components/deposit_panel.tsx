@@ -3,7 +3,14 @@ import { type RefObject, useState } from "react";
 import { toast } from "sonner";
 import { urlFor } from "~/client";
 import ChatMessage from "~/components/chat_message";
+import { useDesignTaken } from "~/components/design_taken";
 import DevHostWarning from "~/components/dev_host_warning";
+import {
+	LINK_TAKEN_CONFIRM,
+	LINK_TAKEN_KEEP,
+	LINK_TAKEN_QUESTION,
+	newLinkQuestion,
+} from "~/components/flash";
 import InlineConfirm from "~/components/inline_confirm";
 import {
 	type ContactChannelName,
@@ -39,6 +46,7 @@ export default function DepositPanel({
 	fallback: RefObject<HTMLElement | null>;
 }) {
 	const tenant = useTenant();
+	const designTaken = useDesignTaken();
 	const [busy, setBusy] = useState(false);
 	const { link, problem, message, devHost } = deposit;
 
@@ -117,9 +125,21 @@ export default function DepositPanel({
 			) : link?.url ? (
 				<InlineConfirm
 					label="New link"
-					question="Make a new link? The link you sent before stops working."
+					question={newLinkQuestion(designTaken)}
 					confirmLabel="Make a new link"
 					keepLabel="Keep this link"
+					onConfirm={(finished) => issue(finished)}
+					fallback={fallback}
+				/>
+			) : designTaken ? (
+				// The design is claimed by another client: ask before a link is made (the
+				// studio may still want to send it), in the page and not in a sheet.
+				<InlineConfirm
+					label={link ? "New link" : "Make deposit link"}
+					variant="default"
+					question={LINK_TAKEN_QUESTION}
+					confirmLabel={LINK_TAKEN_CONFIRM}
+					keepLabel={LINK_TAKEN_KEEP}
 					onConfirm={(finished) => issue(finished)}
 					fallback={fallback}
 				/>

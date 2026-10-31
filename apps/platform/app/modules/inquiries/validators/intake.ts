@@ -11,6 +11,9 @@ export const MAX_REFERENCE_IMAGES = 5;
 /** For a `preferredArtistId` that isn't one of the studio's visible artists. */
 export const ARTIST_MESSAGE = "Choose an artist from the list, or none.";
 
+/** For a `flashDesignId` that isn't a design's id (TAT-129). */
+export const FLASH_MESSAGE = "Choose a design from the studio's page, or none.";
+
 const NUL_MESSAGE = "Remove the unsupported characters.";
 
 /** PostgreSQL text can't hold NUL: refuse it as a field error, not a 500. */
@@ -43,6 +46,7 @@ export const intakeValidator = vine.create({
 	approximateSize: text(120),
 	preferredDates: text(500),
 	preferredArtistId: vine.string().uuid().nullable().optional(),
+	flashDesignId: vine.string().uuid().nullable().optional(),
 	budget: optionalText(120),
 	sourceChannel: vine.enum(SOURCE_CHANNELS),
 	contactName: text(120),
@@ -73,6 +77,7 @@ intakeValidator.messagesProvider = new SimpleMessagesProvider({
 	"sourceChannel.required": CHANNEL,
 	"sourceChannel.enum": CHANNEL,
 	"preferredArtistId.uuid": ARTIST_MESSAGE,
+	"flashDesignId.uuid": FLASH_MESSAGE,
 	"contactEmail.email": "Enter a valid email address, or leave it empty.",
 	"contactPhone.required": PHONE_MESSAGE,
 	"referenceImages.array.maxLength": COUNT,

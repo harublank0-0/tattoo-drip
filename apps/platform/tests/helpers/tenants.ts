@@ -3,10 +3,12 @@ import { DateTime } from "luxon";
 import User from "#models/user";
 import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
 import ArtistService from "#modules/artists/services/artist_service";
+import FlashDesign from "#modules/flash/models/flash_design";
 import ImageService from "#modules/media/services/image_service";
 import MessageTemplate from "#modules/notifications/models/message_template";
 import StaffAlert from "#modules/notifications/models/staff_alert";
 import PaymentMethodService from "#modules/payments/services/payment_method_service";
+import OpeningHoursService from "#modules/scheduling/services/opening_hours_service";
 import type Tenant from "#modules/tenancy/models/tenant";
 import TenantInvitation from "#modules/tenancy/models/tenant_invitation";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
@@ -122,8 +124,13 @@ export async function seededStudio(slug: string, name: string) {
 				bio: null,
 				visible: true,
 				acceptingInquiries: true,
+				acceptingFlash: true,
 				closedMessage: null,
 				linkToMe: false,
+				styles: [],
+				instagramUrl: null,
+				facebookUrl: null,
+				tiktokUrl: null,
 			},
 			owner,
 		),
@@ -140,13 +147,18 @@ export async function seededStudio(slug: string, name: string) {
 				bio: null,
 				visible: true,
 				acceptingInquiries: false,
+				acceptingFlash: true,
 				closedMessage: `${name} Mira is booked until March.`,
 				linkToMe: false,
+				styles: [],
+				instagramUrl: null,
+				facebookUrl: null,
+				tiktokUrl: null,
 			},
 			owner,
 		),
 	);
-	// A cover photo and a logo for the studio (TAT-116, TAT-56) and two work
+	// A cover photo and a logo for the studio (TAT-116, TAT-56, TAT-123) and two work
 	// photos for the artist, with made-up keys (the drive ignores a delete of a
 	// missing file). Two photos, so that a move changes something.
 	await inTenant(tenant, async () => {
@@ -157,13 +169,20 @@ export async function seededStudio(slug: string, name: string) {
 			logoImageKey: `tenants/${tenant.id}/studio_logo/${randomUUID()}.320.png`,
 			logoImageWidth: 600,
 			logoImageHeight: 200,
+			// TAT-123: the dark tile and an icon, so the public isolation suite
+			// covers an icon URL and the tile switch's isolation case changes a row.
+			logoTile: "dark",
+			logoIconKey: `tenants/${tenant.id}/studio_icon/${randomUUID()}.32.png`,
 		});
 		await tenant.save();
 	});
 	const [workPhoto] = await inTenant(tenant, async () => [
-		await seedWorkPhoto(tenant, artistProfile, 0),
-		await seedWorkPhoto(tenant, artistProfile, 1),
+		await seedWorkPhoto(tenant, artistProfile),
+		await seedWorkPhoto(tenant, artistProfile),
 	]);
+	const flashDesign = await inTenant(tenant, () =>
+		seedFlashDesign(tenant, artistProfile, name),
+	);
 	const pipeline = await inTenant(tenant, () => seedPipeline(tenant));
 	// A second project waiting for the client's answer, for the accept route.
 	const quoted = await inTenant(tenant, async () => {
@@ -198,6 +217,29 @@ export async function seededStudio(slug: string, name: string) {
 			body: `Hi {client_name}, thank you for choosing ${name}. Take care of it!`,
 		}),
 	);
+	// Sunday to Friday 11:00 to 20:00 and one closed day 20 to 21 days out, so
+	// the Good to know settings routes' snapshots read real rows (TAT-128).
+	const openingHours = new OpeningHoursService();
+	const closedDay = await inTenant(tenant, async () => {
+		await openingHours.replaceWeek(
+			tenant,
+			(["sun", "mon", "tue", "wed", "thu", "fri"] as const).map((day) => ({
+				day,
+				opens: "11:00",
+				closes: "20:00",
+			})),
+		);
+		const today = DateTime.now().setZone(tenant.timezone);
+		return openingHours.addClosure(
+			tenant,
+			{
+				startsOn: today.plus({ days: 20 }).toFormat("yyyy-MM-dd"),
+				endsOn: today.plus({ days: 21 }).toFormat("yyyy-MM-dd"),
+				note: `${name} closed day`,
+			},
+			today.toFormat("yyyy-MM-dd"),
+		);
+	});
 	// A project booked directly with no price, for the price route (TAT-66).
 	const pricelessProject = await inTenant(tenant, () =>
 		makeProject(tenant, pipeline.client, { status: "booked" }),
@@ -327,6 +369,9 @@ export async function seededStudio(slug: string, name: string) {
 		// The studio's own aftercare text (TAT-52): the messages settings
 		// routes' snapshot.
 		messageTemplate,
+		// The Good to know settings routes' :id resource (TAT-128); the
+		// studio also has Sunday to Friday hours, which the snapshot reads.
+		closedDay,
 		// The :id resource of the clients routes' isolation cases.
 		client: pipeline.client,
 		// The deposit routes' resources (TAT-65): the project for the
@@ -347,22 +392,42 @@ export async function seededStudio(slug: string, name: string) {
 		// The work photo routes' :id resource (TAT-116): the artist profile's
 		// first photo (it has a second one).
 		workPhoto,
+		// The flash routes' :id resource and the public flash reads' (TAT-129):
+		// a shown design of the artist profile.
+		flashDesign,
 	};
 }
 
-/** A work photo row with a made-up key; call it in the tenant's context. */
-function seedWorkPhoto(
+/** A shown flash design with a made-up key, NPR 3,000; call it in the tenant's context. */
+function seedFlashDesign(
 	tenant: Tenant,
 	artist: { id: string },
-	position: number,
+	studioName: string,
 ) {
+	return FlashDesign.create({
+		tenantId: tenant.id,
+		artistId: artist.id,
+		imageKey: `tenants/${tenant.id}/flash_design/${randomUUID()}.320-640-1280.png`,
+		width: 1200,
+		height: 1200,
+		name: `${studioName} Moth`,
+		size: "About 3 in",
+		price: 300_000,
+		currency: "NPR",
+		hidden: false,
+		// One of a kind and free: the claim route's resource (TAT-129, part 4b).
+		oneOfAKind: true,
+	});
+}
+
+/** A work photo row with a made-up key; call it in the tenant's context. */
+function seedWorkPhoto(tenant: Tenant, artist: { id: string }) {
 	return ArtistWorkPhoto.create({
 		tenantId: tenant.id,
 		artistId: artist.id,
 		imageKey: `tenants/${tenant.id}/artist_work_photo/${randomUUID()}.320-640-1280.jpg`,
 		width: 2048,
 		height: 1536,
-		position,
 		alt: null,
 	});
 }
@@ -374,7 +439,7 @@ export type Studio = Awaited<ReturnType<typeof seededStudio>>;
  * (`paymentMethod` is the first), an artist profile (`artistProfile`), a visible artist who takes no inquiries with a slug only that studio has (`closedArtist`, `<slug>-mira`) and one
  * of each pipeline record (`pipeline`: client, accepted inquiry, project,
  * reference image, quote and a submitted payment), plus a quoted project
- * (`quotedProject`, `quotedQuote`), a new inquiry with a reference image (`newInquiry`) and a deposit_pending project with its deposit link (`depositProject`, `depositToken`, `depositReferenceCode`) and the eSewa method its page shows (`depositMethod`); `project` is the pipeline's project; a project booked without a price (`pricelessProject`), a booked project holding a verified deposit (`paidProject`, `verifiedPayment`) and a cancelled one holding a deposit without an outcome (`closedPaidProject`); `payment` is the pipeline's submitted payment. A booked project assigned to `artistProfile` with a scheduled tattoo session 60 days out (`sessionProject`, `session`) is the session routes' resource (TAT-85); an unread alert of the owner about the new inquiry (`alert`) is the alerts routes' (TAT-52), and the studio's own aftercare text (`messageTemplate`) is what the messages settings routes' snapshot reads. A pending invitation (`invitation`) and the artist's membership row (`artistMembership`) are the members routes' (TAT-33). An in-progress project with a done tattoo session and a project in its healing check, both assigned to `artistProfile` and without a quote (`finishProject`, `healingProject`), are the finish routes' resources (TAT-111). Later tickets add seed data
+ * (`quotedProject`, `quotedQuote`), a new inquiry with a reference image (`newInquiry`) and a deposit_pending project with its deposit link (`depositProject`, `depositToken`, `depositReferenceCode`) and the eSewa method its page shows (`depositMethod`); `project` is the pipeline's project; a project booked without a price (`pricelessProject`), a booked project holding a verified deposit (`paidProject`, `verifiedPayment`) and a cancelled one holding a deposit without an outcome (`closedPaidProject`); `payment` is the pipeline's submitted payment. A booked project assigned to `artistProfile` with a scheduled tattoo session 60 days out (`sessionProject`, `session`) is the session routes' resource (TAT-85); an unread alert of the owner about the new inquiry (`alert`) is the alerts routes' (TAT-52), and the studio's own aftercare text (`messageTemplate`) is what the messages settings routes' snapshot reads. Sunday to Friday hours and one closed day (`closedDay`) are the Good to know settings routes' (TAT-128). A pending invitation (`invitation`) and the artist's membership row (`artistMembership`) are the members routes' (TAT-33). An in-progress project with a done tattoo session and a project in its healing check, both assigned to `artistProfile` and without a quote (`finishProject`, `healingProject`), are the finish routes' resources (TAT-111). Later tickets add seed data
  * for their own tables here, so every isolation case sees it.
  */
 export async function twoStudios() {

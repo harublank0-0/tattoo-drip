@@ -8,6 +8,7 @@ import {
 	readCoverImage,
 	readFontKey,
 	readHexColor,
+	readLogoTile,
 	readSections,
 	readThemeKey,
 	SECTION_KEYS,
@@ -90,12 +91,84 @@ describe("readSections (TAT-54)", () => {
 	const items = (...types: unknown[]) =>
 		types.map((type) => ({ type, props: {} }));
 
-	test("the default theme orders and hides the artists; the inquiry section is required", () => {
-		assert.deepEqual(SECTION_KEYS, ["artists", "inquiry"]);
+	test("the default order is work, artists, Flash, Good to know, then inquiry", () => {
+		assert.deepEqual(SECTION_KEYS, [
+			"work",
+			"artists",
+			"flash",
+			"info",
+			"inquiry",
+		]);
 		assert.deepEqual(THEME_SECTIONS["stencil-and-ink"], {
-			order: ["artists", "inquiry"],
+			order: ["work", "artists", "flash", "info", "inquiry"],
 			required: ["inquiry"],
 		});
+		assert.deepEqual(readSections(undefined, "stencil-and-ink"), [
+			"work",
+			"artists",
+			"flash",
+			"info",
+			"inquiry",
+		]);
+	});
+
+	test("an older API's [work, artists, info, inquiry] shows no Flash", () => {
+		assert.deepEqual(
+			readSections(
+				items("work", "artists", "info", "inquiry"),
+				"stencil-and-ink",
+			),
+			["work", "artists", "info", "inquiry"],
+		);
+	});
+
+	test("an older API's list without info shows no Good to know; info can be moved and hidden", () => {
+		assert.deepEqual(
+			readSections(items("work", "artists", "inquiry"), "stencil-and-ink"),
+			["work", "artists", "inquiry"],
+		);
+		assert.deepEqual(
+			readSections(items("info", "work", "inquiry"), "stencil-and-ink"),
+			["info", "work", "inquiry"],
+		);
+		assert.deepEqual(readSections(items("info"), "stencil-and-ink"), [
+			"info",
+			"inquiry",
+		]);
+		assert.deepEqual(
+			readSections(items("info", "info", "inquiry"), "stencil-and-ink"),
+			["info", "inquiry"],
+		);
+	});
+
+	test("an older API's [artists, inquiry] shows no Recent work", () => {
+		assert.deepEqual(
+			readSections(items("artists", "inquiry"), "stencil-and-ink"),
+			["artists", "inquiry"],
+		);
+		assert.deepEqual(readSections(items("artists"), "stencil-and-ink"), [
+			"artists",
+			"inquiry",
+		]);
+	});
+
+	test("work can be moved anywhere and hidden; the inquiry section stays", () => {
+		assert.deepEqual(
+			readSections(items("artists", "work", "inquiry"), "stencil-and-ink"),
+			["artists", "work", "inquiry"],
+		);
+		assert.deepEqual(
+			readSections(items("inquiry", "work"), "stencil-and-ink"),
+			["inquiry", "work"],
+		);
+		assert.deepEqual(readSections(items("work"), "stencil-and-ink"), [
+			"work",
+			"inquiry",
+		]);
+		assert.deepEqual(
+			readSections(items("work", "work", "inquiry"), "stencil-and-ink"),
+			["work", "inquiry"],
+		);
 	});
 
 	test("not a list: the theme's default order", () => {
@@ -108,7 +181,7 @@ describe("readSections (TAT-54)", () => {
 		]) {
 			assert.deepEqual(
 				readSections(value, "stencil-and-ink"),
-				["artists", "inquiry"],
+				["work", "artists", "flash", "info", "inquiry"],
 				String(value),
 			);
 		}
@@ -482,7 +555,12 @@ describe("readCoverImage (TAT-54)", () => {
 			},
 			API,
 		);
-		assert.deepEqual(parsed.logo, { src: COVER, width: 600, height: 200 });
+		assert.deepEqual(parsed.logo, {
+			src: COVER,
+			width: 600,
+			height: 200,
+			tile: "light",
+		});
 		assert.equal(parsed.heroImage?.alt, "The studio");
 	});
 });
@@ -518,11 +596,12 @@ describe("parseThemeConfig (TAT-54)", () => {
 	test("nothing sent (every studio today) is the default theme", () => {
 		assert.deepEqual(DEFAULT_THEME_CONFIG, {
 			key: "stencil-and-ink",
-			sections: ["artists", "inquiry"],
+			sections: ["work", "artists", "flash", "info", "inquiry"],
 			accent: null,
 			accentDark: null,
 			font: "eczar",
 			logo: null,
+			icon: null,
 			heroImage: null,
 		});
 		for (const value of [
@@ -545,11 +624,12 @@ describe("parseThemeConfig (TAT-54)", () => {
 	test("the default theme and the lists it points at can't be changed by whoever holds them", () => {
 		const defaults = {
 			key: "stencil-and-ink",
-			sections: ["artists", "inquiry"],
+			sections: ["work", "artists", "flash", "info", "inquiry"],
 			accent: null,
 			accentDark: null,
 			font: "eczar",
 			logo: null,
+			icon: null,
 			heroImage: null,
 		};
 		assert.ok(Object.isFrozen(DEFAULT_THEME_CONFIG));
@@ -581,7 +661,10 @@ describe("parseThemeConfig (TAT-54)", () => {
 		}, TypeError);
 		assert.deepEqual(parseThemeConfig(undefined, API), defaults);
 		assert.deepEqual(readSections(undefined, "stencil-and-ink"), [
+			"work",
 			"artists",
+			"flash",
+			"info",
 			"inquiry",
 		]);
 	});
@@ -593,7 +676,8 @@ describe("parseThemeConfig (TAT-54)", () => {
 			accent: "#b91c1c",
 			accentDark: "#fca5a5",
 			font: "serif",
-			logo: { src: LOGO.url, width: 600, height: 200 },
+			logo: { src: LOGO.url, width: 600, height: 200, tile: "light" },
+			icon: null,
 			heroImage: { src: COVER.url, width: 2048, height: 1024, alt: "" },
 		});
 	});
@@ -775,5 +859,116 @@ describe("a logo's and cover's smaller copies (TAT-112)", () => {
 				JSON.stringify(variants),
 			);
 		}
+	});
+});
+
+describe("a logo's tile and icon (TAT-123)", () => {
+	const API = "https://api.example.com";
+	const LOGO =
+		"https://api.example.com/uploads/tenants/t/studio_logo/l.320.png";
+	const ICON = "https://api.example.com/uploads/tenants/t/studio_icon/i.32.png";
+	const ICON_COPY =
+		"https://api.example.com/uploads/tenants/t/studio_icon/i.32w.png";
+	const logo = (extra: Record<string, unknown> = {}) => ({
+		url: LOGO,
+		width: 600,
+		height: 200,
+		alt: null,
+		variants: [],
+		...extra,
+	});
+	const icon = (extra: Record<string, unknown> = {}) => ({
+		url: ICON,
+		width: 180,
+		height: 180,
+		alt: null,
+		variants: [{ url: ICON_COPY, width: 32 }],
+		...extra,
+	});
+	const parse = (value: unknown) =>
+		parseThemeConfig({ branding: { logo: value } }, API);
+
+	test('only the exact word "dark" reads as dark; anything else is the light tile', () => {
+		assert.equal(readLogoTile("dark"), "dark");
+		assert.equal(readLogoTile("light"), "light");
+		for (const value of [
+			undefined,
+			null,
+			1,
+			true,
+			"Dark",
+			"accent",
+			"",
+			" dark",
+			["dark"],
+			{ toString: () => "dark" },
+		]) {
+			assert.equal(readLogoTile(value), "light", String(value));
+		}
+	});
+
+	test("a logo carries its tile; a missing or odd one is light", () => {
+		assert.equal(parse(logo({ tile: "dark" })).logo?.tile, "dark");
+		assert.equal(parse(logo({ tile: "light" })).logo?.tile, "light");
+		for (const tile of [undefined, "Dark", "accent", 1, null]) {
+			assert.equal(parse(logo({ tile })).logo?.tile, "light", String(tile));
+		}
+		// The image itself is read as before.
+		assert.deepEqual(parse(logo({ tile: "dark" })).logo, {
+			src: LOGO,
+			width: 600,
+			height: 200,
+			tile: "dark",
+		});
+	});
+
+	test("a square icon on the API's origin is read, with its 32 px copy", () => {
+		assert.deepEqual(parse(logo({ icon: icon() })).icon, {
+			src: ICON,
+			width: 180,
+			height: 180,
+			srcSet: `${ICON_COPY} 32w, ${ICON} 180w`,
+		});
+	});
+
+	test("an icon on another origin, not square, not an object or hostile is no icon", () => {
+		for (const bad of [
+			icon({ url: "https://evil.example/i.png" }),
+			icon({ url: "javascript:alert(1)" }),
+			icon({ width: 180, height: 120 }),
+			icon({ width: 0, height: 0 }),
+			"https://api.example.com/i.png",
+			42,
+			[icon()],
+			null,
+		]) {
+			assert.equal(parse(logo({ icon: bad })).icon, null, JSON.stringify(bad));
+			assert.ok(parse(logo({ icon: bad })).logo, "the logo stays");
+		}
+		// A copy from another origin is dropped, the icon stays.
+		const hostile = parse(
+			logo({
+				icon: icon({
+					variants: [{ url: "https://evil.example/i.32w.png", width: 32 }],
+				}),
+			}),
+		).icon;
+		assert.deepEqual(hostile, { src: ICON, width: 180, height: 180 });
+	});
+
+	test("an icon without a usable logo is no icon", () => {
+		assert.equal(parse({ icon: icon() }).icon, null, "no logo fields");
+		assert.equal(
+			parse(logo({ url: "https://evil.example/l.png", icon: icon() })).icon,
+			null,
+			"the logo is on another origin",
+		);
+		assert.equal(parse(null).icon, null);
+		assert.equal(parseThemeConfig({}, API).icon, null);
+		assert.equal(parseThemeConfig(logo({ icon: icon() }), null).icon, null);
+	});
+
+	test("the default theme has no icon", () => {
+		assert.equal(DEFAULT_THEME_CONFIG.icon, null);
 	});
 });

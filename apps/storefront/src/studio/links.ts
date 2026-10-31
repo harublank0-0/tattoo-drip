@@ -6,6 +6,10 @@
  * which the storefront may not import.
  */
 
+import type { FlashSearch } from "./flash.ts";
+import type { PortfolioSearch, WorkSearch } from "./gallery.ts";
+import type { RequestSearch } from "./request.ts";
+
 /** E.164, as the platform stores contact phones (TAT-26). */
 const E164 = /^\+[1-9]\d{6,14}$/;
 
@@ -89,6 +93,69 @@ export function safeImageUrl(value: unknown): string | null {
 /** The host a link goes to, without "www.": the label of an unknown platform. */
 export function linkHostname(href: string): string {
 	return new URL(href).hostname.replace(/^www\./, "");
+}
+
+/**
+ * The All work page with these filters (TAT-126): `artist`, `style`,
+ * `healed=1` and `cursor`, in that order, absent ones left out. The filters
+ * are checked values (readWorkSearch), but each is encoded anyway.
+ */
+export function workHref(search: WorkSearch): string {
+	return `/work${queryOf([
+		["artist", search.artist],
+		["style", search.style],
+		["healed", search.healed === true ? "1" : undefined],
+		["cursor", search.cursor],
+	])}`;
+}
+
+/**
+ * An artist's portfolio (TAT-126): their page, `healed=1` and `cursor` when
+ * set, and the Work section's fragment, so a page of photos opens on the
+ * photos and not on the profile above them.
+ */
+export function portfolioHref(slug: string, search: PortfolioSearch): string {
+	return `/artists/${slug}${queryOf([
+		["healed", search.healed === true ? "1" : undefined],
+		["cursor", search.cursor],
+	])}#work`;
+}
+
+/** The flash page (TAT-129) with this filter: `artist` then `cursor`, absent ones left out. */
+export function flashHref(search: FlashSearch): string {
+	return `/flash${queryOf([
+		["artist", search.artist],
+		["cursor", search.cursor],
+	])}`;
+}
+
+/** One flash design's page (TAT-129); `id` is a checked UUID. */
+export function flashDesignHref(id: string): string {
+	return `/flash/${encodeURIComponent(id)}`;
+}
+
+/**
+ * The request page (TAT-127): `/request`, `/request?artist=<slug>` to ask
+ * for one artist, or (TAT-129) `/request?flash=<id>` to ask for a flash
+ * design, which names its artist, so `artist` is then left out. Every Request
+ * button leads here.
+ */
+export function requestHref(search: RequestSearch): string {
+	const query = new URLSearchParams();
+	if (search.flash !== undefined) query.set("flash", search.flash);
+	else if (search.artist !== undefined) query.set("artist", search.artist);
+	const text = query.toString();
+	return text === "" ? "/request" : `/request?${text}`;
+}
+
+/** "?a=1&b=2" from the pairs that have a value, else "". */
+function queryOf(
+	pairs: readonly (readonly [key: string, value: string | undefined])[],
+): string {
+	const set = pairs.flatMap(([key, value]) =>
+		value === undefined ? [] : [`${key}=${encodeURIComponent(value)}`],
+	);
+	return set.length === 0 ? "" : `?${set.join("&")}`;
 }
 
 /** Web links never tell the next site which page sent the visitor. */

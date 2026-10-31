@@ -1,33 +1,49 @@
 import { Form } from "@adonisjs/inertia/react";
 import { Link } from "@inertiajs/react";
 import { cn } from "cn";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { urlFor } from "~/client";
 import ColourField from "~/components/colour_field";
 import DevHostWarning from "~/components/dev_host_warning";
 import LogoForm from "~/components/logo_form";
 import {
+	CLAIMED_FLASH_HELP,
+	CLAIMED_FLASH_LEGEND,
+	CLAIMED_FLASH_WORDS,
+	type ClaimedFlashKey,
 	COLOUR_HELP,
 	COVER_INTRO_LINE,
+	canMove,
 	coverLine,
 	coverLink,
 	DARK_COLOUR_HELP,
 	FONT_SAMPLE_CLASS,
 	type FontOption,
+	focusAfterMove,
 	type LogoProps,
+	type MoveDirection,
+	moveRow,
+	moveSectionLabel,
 	type PageLookProps,
-	PLACEMENT_INTRO,
-	PLACEMENT_WORDS,
-	type PlacementKey,
 	PREVIEW_NOTE,
+	REQUIRED_SECTION,
+	SECTION_WORDS,
+	SECTIONS_INTRO,
+	type SectionKey,
+	type SectionRow,
 	type Swatches,
+	sectionsError,
+	sentSections,
 	type ThemeOption,
 	takesFocusBack,
+	toggleRow,
 } from "~/components/page_look";
 import Section from "~/components/section";
-import { useStoredChoice } from "~/components/stored_choice";
+import { useStoredChoice, useStoredRows } from "~/components/stored_choice";
 import type { StudioPageProps } from "~/components/studio_link";
 import { Button, buttonVariants } from "~/components/ui/button";
+import { Checkbox } from "~/components/ui/checkbox";
 import {
 	Field,
 	FieldContent,
@@ -46,30 +62,32 @@ import SettingsLayout from "~/layouts/settings";
 
 /**
  * Settings, Page look (TAT-56): how the studio page looks. The server sends
- * every list (themes, fonts, placements), the stored look already filtered
+ * every list (themes, fonts, sections), the stored look already filtered
  * to what the page can use, and the logo's preview; this page holds only the
- * colour text while it is typed. Nothing here is markup or CSS: the form
+ * colour text while it is typed and the sections' order and visibility. Nothing here is markup or CSS: the form
  * sends keys and "#rrggbb" codes, and the server refuses the rest. Nothing is
- * keyed to the stored look (a remount drops focus): the colour boxes and the
- * radio groups follow a changed stored value in place (`ColourField`,
- * `useStoredChoice`: fresher data from another tab must not be sent back) and the Save button, which is
+ * keyed to the stored look (a remount drops focus): the colour boxes, the
+ * radio groups and the sections list follow a changed stored value in place (`ColourField`,
+ * `useStoredChoice`, `useStoredRows`: fresher data from another tab must not be sent back) and the Save button, which is
  * disabled while it saves, takes its focus back when the save ends (`SaveButton`),
  * so a keyboard user does not land on <body> after a save or a refusal.
  */
 export default function PageLook({
 	look,
+	claimedFlashChoices,
 	themes,
 	fonts,
-	placements,
+	sectionKeys,
 	swatches,
 	logo,
 	hasCover,
 	studioPage,
 }: {
 	look: PageLookProps;
+	claimedFlashChoices: ClaimedFlashKey[];
 	themes: ThemeOption[];
 	fonts: FontOption[];
-	placements: PlacementKey[];
+	sectionKeys: SectionKey[];
 	swatches: Swatches;
 	logo: LogoProps | null;
 	hasCover: boolean;
@@ -79,7 +97,8 @@ export default function PageLook({
 	// Each group follows the stored value in place when it changes (no keys).
 	const [pickedTheme, pickTheme] = useStoredChoice(look.theme);
 	const [pickedFont, pickFont] = useStoredChoice(look.font);
-	const [pickedArtists, pickArtists] = useStoredChoice(look.artists);
+	const [pickedClaimed, pickClaimed] = useStoredChoice(look.claimedFlash);
+	const [rows, setRows] = useStoredRows(look.sections, sectionKeys);
 
 	return (
 		<>
@@ -215,50 +234,53 @@ export default function PageLook({
 										)}
 									</FieldSet>
 
-									<FieldSet data-invalid={!!errors.artists}>
-										<FieldLegend variant="label">Artists list</FieldLegend>
-										<FieldDescription id="artists-help">
-											{PLACEMENT_INTRO}
+									<SectionsField
+										rows={rows}
+										setRows={setRows}
+										errors={errors}
+									/>
+
+									<FieldSet data-invalid={!!errors.claimedFlash}>
+										<FieldLegend variant="label">
+											{CLAIMED_FLASH_LEGEND}
+										</FieldLegend>
+										<FieldDescription id="claimed-flash-help">
+											{CLAIMED_FLASH_HELP}
 										</FieldDescription>
 										<RadioGroup
-											name="artists"
-											value={pickedArtists}
-											onValueChange={pickArtists}
-											aria-invalid={!!errors.artists}
+											name="claimedFlash"
+											value={pickedClaimed}
+											onValueChange={pickClaimed}
+											aria-invalid={!!errors.claimedFlash}
 											aria-describedby={
-												errors.artists
-													? "artists-help artists-error"
-													: "artists-help"
+												errors.claimedFlash
+													? "claimed-flash-help claimed-flash-error"
+													: "claimed-flash-help"
 											}
 										>
-											{placements.map((placement) => (
+											{claimedFlashChoices.map((choice) => (
 												<FieldLabel
-													key={placement}
-													htmlFor={`artists-${placement}`}
+													key={choice}
+													htmlFor={`claimed-flash-${choice}`}
 												>
 													<Field orientation="horizontal">
 														<FieldContent>
 															<FieldTitle>
-																{PLACEMENT_WORDS[placement].title}
+																{CLAIMED_FLASH_WORDS[choice]}
 															</FieldTitle>
-															{PLACEMENT_WORDS[placement].description && (
-																<FieldDescription>
-																	{PLACEMENT_WORDS[placement].description}
-																</FieldDescription>
-															)}
 														</FieldContent>
 														<RadioGroupItem
-															value={placement}
-															id={`artists-${placement}`}
-															aria-invalid={!!errors.artists}
+															value={choice}
+															id={`claimed-flash-${choice}`}
+															aria-invalid={!!errors.claimedFlash}
 														/>
 													</Field>
 												</FieldLabel>
 											))}
 										</RadioGroup>
-										{errors.artists && (
-											<FieldError id="artists-error">
-												{errors.artists}
+										{errors.claimedFlash && (
+											<FieldError id="claimed-flash-error">
+												{errors.claimedFlash}
 											</FieldError>
 										)}
 									</FieldSet>
@@ -290,6 +312,141 @@ export default function PageLook({
 				</Section>
 			</div>
 		</>
+	);
+}
+
+/**
+ * The sections list (TAT-126): one row for each section with its words, a
+ * "Show on your page" box (the "Got an idea?" row says "Always shown" instead) and
+ * two buttons that move it a place earlier or later. Each shown row sends a
+ * hidden `sections[]`, in the rows' order, which is how the server learns the
+ * order and what is hidden. A moved row's node moves in the DOM and a moved
+ * node loses focus, so the pressed button gets it back (`focusAfterMove`:
+ * its other button when the move left the pressed one disabled at an end).
+ * The error is the list's own, else the first one on an item.
+ */
+function SectionsField({
+	rows,
+	setRows,
+	errors,
+}: {
+	rows: SectionRow[];
+	setRows: (rows: SectionRow[]) => void;
+	errors: Record<string, string>;
+}) {
+	const buttons = useRef(new Map<string, HTMLButtonElement>());
+	const refocus = useRef<{ key: SectionKey; direction: MoveDirection } | null>(
+		null,
+	);
+	const error = sectionsError(errors);
+
+	// After the rows have moved on screen, not before: the node is the moved one.
+	useEffect(() => {
+		const pending = refocus.current;
+		if (!pending) return;
+		refocus.current = null;
+		const direction = focusAfterMove(
+			rows.findIndex((row) => row.key === pending.key),
+			rows.length,
+			pending.direction,
+		);
+		buttons.current.get(`${pending.key}-${direction}`)?.focus();
+	}, [rows]);
+
+	function move(index: number, direction: MoveDirection) {
+		refocus.current = { key: rows[index].key, direction };
+		setRows(moveRow(rows, index, direction));
+	}
+
+	return (
+		<FieldSet
+			data-invalid={!!error}
+			aria-describedby={
+				error ? "sections-help sections-error" : "sections-help"
+			}
+		>
+			<FieldLegend variant="label">Sections</FieldLegend>
+			<FieldDescription id="sections-help">{SECTIONS_INTRO}</FieldDescription>
+			<ol className="flex flex-col gap-3">
+				{rows.map((row, index) => {
+					const words = SECTION_WORDS[row.key];
+					return (
+						<li
+							key={row.key}
+							className="flex flex-col gap-2 rounded-lg border p-3"
+						>
+							<div className="flex items-start justify-between gap-3">
+								<div className="flex min-w-0 flex-col gap-1">
+									<p
+										id={`section-${row.key}-title`}
+										className="text-sm leading-snug font-medium"
+									>
+										{words.title}
+									</p>
+									<p className="text-sm text-muted-foreground">
+										{words.description}
+									</p>
+								</div>
+								<div className="flex shrink-0 gap-1">
+									{(["up", "down"] as const).map((direction) => (
+										<Button
+											key={direction}
+											ref={(node) => {
+												const id = `${row.key}-${direction}`;
+												if (node) buttons.current.set(id, node);
+												else buttons.current.delete(id);
+											}}
+											type="button"
+											variant="outline"
+											size="icon"
+											aria-label={moveSectionLabel(words.title, direction)}
+											disabled={!canMove(index, rows.length, direction)}
+											onClick={() => move(index, direction)}
+										>
+											{direction === "up" ? (
+												<ArrowUp aria-hidden="true" />
+											) : (
+												<ArrowDown aria-hidden="true" />
+											)}
+										</Button>
+									))}
+								</div>
+							</div>
+							{row.key === REQUIRED_SECTION ? (
+								<p className="flex min-h-11 items-center text-sm text-muted-foreground">
+									Always shown
+								</p>
+							) : (
+								<Field
+									orientation="horizontal"
+									className="min-h-11 items-center"
+								>
+									<Checkbox
+										id={`section-${row.key}-shown`}
+										checked={row.shown}
+										onCheckedChange={(checked) =>
+											setRows(toggleRow(rows, index, checked === true))
+										}
+										aria-labelledby={`section-${row.key}-shown-label section-${row.key}-title`}
+									/>
+									<FieldLabel
+										id={`section-${row.key}-shown-label`}
+										htmlFor={`section-${row.key}-shown`}
+										className="font-normal"
+									>
+										Show on your page
+									</FieldLabel>
+								</Field>
+							)}
+						</li>
+					);
+				})}
+			</ol>
+			{sentSections(rows).map((key) => (
+				<input key={key} type="hidden" name="sections[]" value={key} />
+			))}
+			{error && <FieldError id="sections-error">{error}</FieldError>}
+		</FieldSet>
 	);
 }
 

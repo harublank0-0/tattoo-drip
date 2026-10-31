@@ -1,3 +1,4 @@
+import type { FlashCardProps } from "~/components/flash";
 import type { ReferenceProps } from "~/components/inquiries";
 import type {
 	CardMessageProps,
@@ -110,6 +111,8 @@ export type ProjectPageProps = {
 		artistName: string | null;
 	};
 	nextStep: NextStepProps;
+	/** The flash design the project came from, or null (TAT-129). */
+	flash: FlashCardProps | null;
 	/** The current quote (the highest version), or null. */
 	quote: QuoteProps | null;
 	/** Earlier versions, newest first. */

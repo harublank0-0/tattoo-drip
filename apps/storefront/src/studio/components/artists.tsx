@@ -1,10 +1,9 @@
 import { Fill } from "../../intake/components/fill.tsx";
 import { studioCopy } from "../copy.ts";
-import { showPhoto } from "../lightbox.ts";
+import { isAllowedHref, linkRel } from "../links.ts";
 import {
 	profilePhotoSizes,
 	rosterPhotoSizes,
-	workGridSizes,
 	workStripSizes,
 } from "../srcset.ts";
 import type { ArtistPhoto, ArtistView, StudioView } from "../view-model.ts";
@@ -48,9 +47,10 @@ function PhotoFigure({
 const STRIP_PHOTOS = 3;
 
 /**
- * The first three work photos of an artist (TAT-116), as small squares in one
- * link to their page's work grid. The squares are decorative (`alt=""`): the
- * link's own text names where it goes.
+ * An artist's three newest work photos (`workPhotos` are their six newest,
+ * newest first: TAT-116, TAT-126), as small squares in one link to their
+ * page's portfolio. The squares are decorative (`alt=""`): the link's own
+ * text names where it goes.
  */
 function WorkStrip({ artist }: { artist: ArtistView }) {
 	if (artist.workPhotos.length === 0) return null;
@@ -86,11 +86,54 @@ function WorkStrip({ artist }: { artist: ArtistView }) {
 	);
 }
 
-function ArtistStatus({ accepting }: { accepting: boolean }) {
-	return accepting ? (
-		<p className="status status-open">Taking new inquiries</p>
+/**
+ * Whether the artist takes new work (TAT-127): "Taking new work", else their
+ * own closed message, else "Not taking new work right now". The message is
+ * said here and nowhere else on the page.
+ */
+function ArtistStatus({ artist }: { artist: ArtistView }) {
+	if (artist.accepting) {
+		return <p className="status status-open">{studioCopy.status.open}</p>;
+	}
+	return artist.closedMessage ? (
+		<p className="status status-closed user-text" dir="auto">
+			{artist.closedMessage}
+		</p>
 	) : (
-		<p className="status status-closed">Not taking new inquiries</p>
+		<p className="status status-closed">{studioCopy.status.closed}</p>
+	);
+}
+
+/**
+ * The artist page's styles as small outlined chips, and (ArtistLinks) their
+ * links as the studio's link chips. Nothing at all while a list is empty, so
+ * an artist who set none has no empty row. The roster card shows the styles
+ * as one line instead.
+ */
+function StyleList({ styles }: { styles: readonly string[] }) {
+	if (styles.length === 0) return null;
+	return (
+		<ul className="style-list" aria-label={studioCopy.artist.styles}>
+			{styles.map((name) => (
+				<li key={name}>{name}</li>
+			))}
+		</ul>
+	);
+}
+
+function ArtistLinks({ links }: { links: ArtistView["links"] }) {
+	const allowed = links.filter((link) => isAllowedHref(link.href));
+	if (allowed.length === 0) return null;
+	return (
+		<ul className="artist-links" aria-label={studioCopy.artist.links}>
+			{allowed.map((link) => (
+				<li key={`${link.kind}:${link.href}`}>
+					<a className="link-chip" href={link.href} rel={linkRel(link.href)}>
+						{link.label}
+					</a>
+				</li>
+			))}
+		</ul>
 	);
 }
 
@@ -118,7 +161,10 @@ function ArtistEntry({
 				<h3 id={titleId} className="artist-name" dir="auto">
 					{artist.name}
 				</h3>
-				<ArtistStatus accepting={artist.accepting} />
+				{artist.styles.length > 0 ? (
+					<p className="artist-styles">{artist.styles.join(" · ")}</p>
+				) : null}
+				<ArtistStatus artist={artist} />
 			</div>
 			<div className="artist-body">
 				{artist.bio ? (
@@ -126,15 +172,10 @@ function ArtistEntry({
 						{artist.bio}
 					</p>
 				) : null}
-				{artist.closedMessage ? (
-					<p className="note user-text measure" dir="auto">
-						{artist.closedMessage}
-					</p>
-				) : null}
 				<WorkStrip artist={artist} />
 				{askLink ? (
 					<div className="actions">
-						<a className="action action-secondary" href={artist.inquiryHref}>
+						<a className="action action-secondary" href={artist.requestHref}>
 							<span>
 								Ask for <bdi>{artist.name}</bdi>
 							</span>
@@ -146,11 +187,24 @@ function ArtistEntry({
 	);
 }
 
-/** The studio page's artists (TAT-48). Nothing when the studio shows none. */
-export function ArtistRoster({ artists }: { artists: readonly ArtistView[] }) {
+/**
+ * The studio page's artists (TAT-48). Nothing when the studio shows none.
+ * Each artist who takes new work has an "Ask for" link to their own form
+ * (TAT-127) when there is more than one artist, or while the studio as a
+ * whole is closed: a closed studio has no "Send your idea" and no Request
+ * button, so a lone open artist's card is the client's way to her form.
+ */
+export function ArtistRoster({
+	artists,
+	studioAccepting,
+}: {
+	artists: readonly ArtistView[];
+	/** Whether the studio takes new inquiries (its own switch, not the artists'). */
+	studioAccepting: boolean;
+}) {
 	if (artists.length === 0) return null;
-	// With one artist, "Send your idea" already asks for them.
-	const askLinks = artists.length > 1;
+	// With one artist in an open studio, "Send your idea" already asks for them.
+	const askLinks = artists.length > 1 || !studioAccepting;
 	return (
 		<section id="artists" className="section" aria-labelledby="artists-title">
 			<h2 id="artists-title" className="section-title">
@@ -205,97 +259,28 @@ export function ArtistProfile({
 						</>
 					)}
 				</p>
-				<ArtistStatus accepting={artist.accepting} />
+				<StyleList styles={artist.styles} />
+				<ArtistStatus artist={artist} />
 				{artist.bio ? (
 					<p className="user-text measure" dir="auto">
 						{artist.bio}
 					</p>
 				) : null}
-				{artist.closedMessage ? (
-					<p className="note user-text measure" dir="auto">
-						{artist.closedMessage}
-					</p>
-				) : null}
+				<ArtistLinks links={artist.links} />
+				{/* The id keeps an old `/artists/<slug>#inquiry` link landing here, one tap from the form. */}
 				{artist.accepting ? (
-					<div className="actions">
-						<a className="action action-primary" href="#inquiry">
-							{studioCopy.sendIdea}
+					<div id="inquiry" className="actions artist-request">
+						<a className="action action-primary" href={artist.requestHref}>
+							<span>
+								<Fill
+									template={studioCopy.request.artistButton}
+									values={{ name: artist.name }}
+								/>
+							</span>
 						</a>
 					</div>
 				) : null}
 			</div>
 		</article>
-	);
-}
-
-/**
- * The artist page's work (TAT-116): the photos in a square grid, each a
- * button that opens that photo's own `<dialog>` (the browser's modal: Escape,
- * focus and the inert page behind are its own; showPhoto is the one DOM call).
- * The dialog holds a Close form (`method="dialog"`), "Photo n of m", the large
- * copy (lazy, inside a closed dialog it is not fetched until opened) and the
- * description. Nothing when the artist shows no photos.
- */
-export function WorkGrid({ artist }: { artist: ArtistView }) {
-	if (artist.workPhotos.length === 0) return null;
-	return (
-		<section id="work" className="section" aria-labelledby="work-title">
-			<h2 id="work-title" className="section-title">
-				{studioCopy.work.title}
-			</h2>
-			{/* biome-ignore lint/a11y/useSemanticElements: it is a <ul>; the role repairs WebKit's reading of list-style: none */}
-			{/* biome-ignore lint/a11y/noRedundantRoles: redundant for the spec, needed for WebKit with list-style: none */}
-			<ul className="work-grid" role="list">
-				{artist.workPhotos.map((photo) => (
-					<li key={photo.dialogId}>
-						<button
-							type="button"
-							className="work-open"
-							aria-haspopup="dialog"
-							aria-controls={photo.dialogId}
-							onClick={() => showPhoto(photo.dialogId)}
-						>
-							<img
-								className="work-photo"
-								src={photo.src}
-								srcSet={photo.srcSet}
-								sizes={photo.srcSet ? workGridSizes(photo) : undefined}
-								width={photo.width}
-								height={photo.height}
-								alt={photo.alt}
-								loading="lazy"
-								decoding="async"
-							/>
-						</button>
-						<dialog
-							id={photo.dialogId}
-							className="work-dialog"
-							aria-label={photo.label}
-						>
-							<form method="dialog" className="work-dialog-bar">
-								<p>{photo.label}</p>
-								<button type="submit" className="action action-secondary">
-									{studioCopy.work.close}
-								</button>
-							</form>
-							<img
-								className="work-large"
-								src={photo.largeSrc}
-								width={photo.width}
-								height={photo.height}
-								alt={photo.alt}
-								loading="lazy"
-								decoding="async"
-							/>
-							{photo.caption ? (
-								<p className="work-dialog-caption user-text" dir="auto">
-									{photo.caption}
-								</p>
-							) : null}
-						</dialog>
-					</li>
-				))}
-			</ul>
-		</section>
 	);
 }

@@ -319,6 +319,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/studio_logo_controller').default['destroy']>>>
     }
   }
+  'tenant.settings.logo.tile.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/settings/logo/tile'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/tenancy/validators/tenant').logoTileValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/tenancy/validators/tenant').logoTileValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/studio_logo_controller').default['tile']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/studio_logo_controller').default['tile']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
   'tenant.settings.payments': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/settings/payments'
@@ -437,6 +449,66 @@ export interface Registry {
       query: ExtractQuery<InferInput<(typeof import('#modules/notifications/validators/message_templates').messageTemplatesValidator)>>
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/message_templates_controller').default['update']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/message_templates_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.settings.good_to_know': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/settings/good-to-know'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/good_to_know_controller').default['show']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/good_to_know_controller').default['show']>>>
+    }
+  }
+  'tenant.settings.good_to_know.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/settings/good-to-know'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/tenancy/validators/good_to_know').updateGoodToKnowValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/tenancy/validators/good_to_know').updateGoodToKnowValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/good_to_know_controller').default['update']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/good_to_know_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.settings.hours.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/settings/hours'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/scheduling/validators/opening_hours').openingHoursValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/scheduling/validators/opening_hours').openingHoursValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/good_to_know_controller').default['updateHours']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/good_to_know_controller').default['updateHours']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.settings.closed_days.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/settings/closed-days'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/scheduling/validators/opening_hours').closedDaysValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/scheduling/validators/opening_hours').closedDaysValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/good_to_know_controller').default['storeClosedDays']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/good_to_know_controller').default['storeClosedDays']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.settings.closed_days.destroy': {
+    methods: ["DELETE"]
+    pattern: '/t/:tenant/settings/closed-days/:id'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/good_to_know_controller').default['destroyClosedDays']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/good_to_know_controller').default['destroyClosedDays']>>>
     }
   }
   'tenant.settings.members': {
@@ -611,24 +683,12 @@ export interface Registry {
     methods: ["PUT"]
     pattern: '/t/:tenant/artists/photos/:id'
     types: {
-      body: ExtractBody<InferInput<(typeof import('#modules/artists/validators/work_photo').describeWorkPhotoValidator)>>
+      body: ExtractBody<InferInput<(typeof import('#modules/artists/validators/work_photo').updateWorkPhotoValidator)>>
       paramsTuple: [ParamValue, ParamValue]
       params: { tenant: ParamValue; id: ParamValue }
-      query: ExtractQuery<InferInput<(typeof import('#modules/artists/validators/work_photo').describeWorkPhotoValidator)>>
+      query: ExtractQuery<InferInput<(typeof import('#modules/artists/validators/work_photo').updateWorkPhotoValidator)>>
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/work_photos_controller').default['update']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/work_photos_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
-    }
-  }
-  'tenant.artists.photos.move': {
-    methods: ["POST"]
-    pattern: '/t/:tenant/artists/photos/:id/move'
-    types: {
-      body: ExtractBody<InferInput<(typeof import('#modules/artists/validators/work_photo').moveWorkPhotoValidator)>>
-      paramsTuple: [ParamValue, ParamValue]
-      params: { tenant: ParamValue; id: ParamValue }
-      query: ExtractQuery<InferInput<(typeof import('#modules/artists/validators/work_photo').moveWorkPhotoValidator)>>
-      response: ExtractResponse<Awaited<ReturnType<import('#controllers/work_photos_controller').default['move']>>>
-      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/work_photos_controller').default['move']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
   'tenant.artists.photos.destroy': {
@@ -641,6 +701,54 @@ export interface Registry {
       query: {}
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/work_photos_controller').default['destroy']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/work_photos_controller').default['destroy']>>>
+    }
+  }
+  'tenant.artists.flash.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/artists/:id/flash'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/flash/validators/flash_design').addFlashDesignValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/flash/validators/flash_design').addFlashDesignValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/flash_designs_controller').default['store']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/flash_designs_controller').default['store']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.artists.flash.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/artists/flash/:id'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/flash/validators/flash_design').updateFlashDesignValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/flash/validators/flash_design').updateFlashDesignValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/flash_designs_controller').default['update']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/flash_designs_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.artists.flash.claim.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/artists/flash/:id/claim'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/flash/validators/flash_design').claimFlashDesignValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/flash/validators/flash_design').claimFlashDesignValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/flash_designs_controller').default['claim']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/flash_designs_controller').default['claim']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.artists.flash.destroy': {
+    methods: ["DELETE"]
+    pattern: '/t/:tenant/artists/flash/:id'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/flash_designs_controller').default['destroy']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/flash_designs_controller').default['destroy']>>>
     }
   }
   'tenant.inbox.index': {
@@ -1255,6 +1363,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/account_controller').default['signOutOthers']>>>
     }
   }
+  'api.v1.styles.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/styles'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_styles_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_styles_controller').default['index']>>>
+    }
+  }
   'api.v1.studio': {
     methods: ["GET","HEAD"]
     pattern: '/api/v1/tenants/:tenant'
@@ -1289,6 +1409,42 @@ export interface Registry {
       query: {}
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_artists_controller').default['show']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_artists_controller').default['show']>>>
+    }
+  }
+  'api.v1.work.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/tenants/:tenant/work'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQueryForGet<InferInput<(typeof import('#modules/storefront/validators/work').listWorkValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_work_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_work_controller').default['index']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'api.v1.flash.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/tenants/:tenant/flash'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQueryForGet<InferInput<(typeof import('#modules/storefront/validators/flash').listFlashValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_flash_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_flash_controller').default['index']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'api.v1.flash.show': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/tenants/:tenant/flash/:design'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; design: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_flash_controller').default['show']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_flash_controller').default['show']>>>
     }
   }
   'api.v1.inquiries.store': {

@@ -2,6 +2,7 @@ import { DateTime } from "luxon";
 import Artist from "#modules/artists/models/artist";
 import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
 import Client from "#modules/clients/models/client";
+import FlashDesign from "#modules/flash/models/flash_design";
 import Inquiry from "#modules/inquiries/models/inquiry";
 import ReferenceImage from "#modules/inquiries/models/reference_image";
 import { DEFAULT_TEMPLATES } from "#modules/notifications/messages";
@@ -14,6 +15,8 @@ import PaymentMethod from "#modules/payments/models/payment_method";
 import Quote from "#modules/projects/models/quote";
 import TattooProject from "#modules/projects/models/tattoo_project";
 import ProjectSession from "#modules/scheduling/models/project_session";
+import StudioClosure from "#modules/scheduling/models/studio_closure";
+import StudioHour from "#modules/scheduling/models/studio_hour";
 import Tenant from "#modules/tenancy/models/tenant";
 import TenantInvitation from "#modules/tenancy/models/tenant_invitation";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
@@ -46,6 +49,7 @@ export type IsolationCase = {
 		| "paymentMethod"
 		| "artistProfile"
 		| "workPhoto"
+		| "flashDesign"
 		| "project"
 		| "quotedProject"
 		| "pricelessProject"
@@ -61,6 +65,7 @@ export type IsolationCase = {
 		| "newInquiry"
 		| "client"
 		| "alert"
+		| "closedDay"
 		| "invitation"
 		| "artistMembership";
 	/** Who sends the request. Every settings route is owner-only. */
@@ -118,17 +123,29 @@ const artistRows = (target: Studio) =>
 		).map((artist) => artist.serialize()),
 	);
 
-// The artists' work photos, every column, in the studio's order (TAT-116):
-// what the photo routes could change.
+// The artists' work photos, every column, oldest first (TAT-116): what the
+// photo routes could change.
 const workPhotoRows = (target: Studio) =>
 	inTenant(target.tenant, async () =>
 		(
 			await ArtistWorkPhoto.query()
 				.where("tenant_id", target.tenant.id)
-				.orderBy("artist_id")
-				.orderBy("position")
+				.orderBy("created_at")
 				.orderBy("id")
 		).map((photo) => photo.serialize()),
+	);
+
+// The artists' flash designs, every column, in the list's order (TAT-129):
+// what the flash routes could change.
+const flashDesignRows = (target: Studio) =>
+	inTenant(target.tenant, async () =>
+		(
+			await FlashDesign.query()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("artist_id")
+				.orderBy("created_at")
+				.orderBy("id")
+		).map((design) => design.serialize()),
 	);
 
 /** A PNG upload as the part of a multipart form named `field`. */
@@ -287,6 +304,25 @@ const templateRows = (target: Studio) =>
 		).map((row) => row.serialize()),
 	);
 
+// What the Good to know routes could change (TAT-128): the tenant row (its
+// four texts and the rest of the profile), the week by weekday and the
+// closed days by first day.
+const goodToKnowRows = (target: Studio) =>
+	inTenant(target.tenant, async () => ({
+		tenant: (await Tenant.findOrFail(target.tenant.id)).serialize(),
+		hours: (
+			await StudioHour.query()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("weekday")
+		).map((row) => row.serialize()),
+		closures: (
+			await StudioClosure.query()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("starts_on")
+				.orderBy("id")
+		).map((row) => row.serialize()),
+	}));
+
 // Every member's alerts (TAT-52): what reading or opening one could change.
 const alertRows = (target: Studio) =>
 	inTenant(target.tenant, async () =>
@@ -390,7 +426,8 @@ export const isolationCases: IsolationCase[] = [
 			accent: "#0f766e",
 			accentDark: "",
 			font: "serif",
-			artists: "last",
+			claimedFlash: "show",
+			"sections[]": ["inquiry", "artists"],
 		}),
 		ownStatus: 302,
 		snapshot: tenantRow,
@@ -407,6 +444,16 @@ export const isolationCases: IsolationCase[] = [
 		method: "DELETE",
 		pattern: "/t/:tenant/settings/logo",
 		actor: "owner",
+		ownStatus: 302,
+		snapshot: tenantRow,
+	},
+	// TAT-123: seededStudio's logo is on the dark tile, so the owner's own
+	// request (light) changes the row.
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/settings/logo/tile",
+		actor: "owner",
+		body: () => ({ tile: "light" }),
 		ownStatus: 302,
 		snapshot: tenantRow,
 	},
@@ -559,16 +606,13 @@ export const isolationCases: IsolationCase[] = [
 		pattern: "/t/:tenant/artists/photos/:id",
 		resource: "workPhoto",
 		actor: "owner",
-		body: () => ({ alt: "Koi on the forearm" }),
-		ownStatus: 302,
-		snapshot: workPhotoRows,
-	},
-	{
-		method: "POST",
-		pattern: "/t/:tenant/artists/photos/:id/move",
-		resource: "workPhoto",
-		actor: "owner",
-		body: () => ({ direction: "down" }),
+		// "styles[]" as a browser names it: a form body with one "styles" value
+		// would arrive as a string, not a list.
+		body: () => ({
+			alt: "Koi on the forearm",
+			"styles[]": ["blackwork"],
+			healed: "1",
+		}),
 		ownStatus: 302,
 		snapshot: workPhotoRows,
 	},
@@ -579,6 +623,44 @@ export const isolationCases: IsolationCase[] = [
 		actor: "owner",
 		ownStatus: 302,
 		snapshot: workPhotoRows,
+	},
+	// An artist's flash designs (TAT-129): the upload names the artist, the
+	// others name the design.
+	{
+		method: "POST",
+		pattern: "/t/:tenant/artists/:id/flash",
+		resource: "artistProfile",
+		actor: "owner",
+		files: async () => [await imagePart("picture")],
+		body: () => ({ name: "Moth", size: "About 3 in", price: "3000" }),
+		ownStatus: 302,
+		snapshot: flashDesignRows,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/artists/flash/:id",
+		resource: "flashDesign",
+		actor: "owner",
+		body: () => ({ name: "Moth, smaller", size: "About 2 in", shown: "1" }),
+		ownStatus: 302,
+		snapshot: flashDesignRows,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/artists/flash/:id/claim",
+		resource: "flashDesign",
+		actor: "owner",
+		body: () => ({ claimed: "1" }),
+		ownStatus: 302,
+		snapshot: flashDesignRows,
+	},
+	{
+		method: "DELETE",
+		pattern: "/t/:tenant/artists/flash/:id",
+		resource: "flashDesign",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: flashDesignRows,
 	},
 	{
 		method: "GET",
@@ -918,6 +1000,60 @@ export const isolationCases: IsolationCase[] = [
 		}),
 		ownStatus: 302,
 		snapshot: templateRows,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/settings/good-to-know",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: goodToKnowRows,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/settings/good-to-know",
+		actor: "owner",
+		body: () => ({
+			walkIns: "Isolation walk-ins",
+			ageRule: "",
+			beforeSession: "",
+			aftercare: "",
+		}),
+		ownStatus: 302,
+		snapshot: goodToKnowRows,
+	},
+	{
+		// Replaces the seeded week, so the control changes A's snapshot.
+		method: "PUT",
+		pattern: "/t/:tenant/settings/hours",
+		actor: "owner",
+		body: () => ({
+			hours: { sun: { open: "1", opens: "10:00", closes: "18:00" } },
+		}),
+		ownStatus: 302,
+		snapshot: goodToKnowRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/settings/closed-days",
+		actor: "owner",
+		body: (own) => ({
+			closedFrom: DateTime.now()
+				.setZone(own.tenant.timezone)
+				.plus({ days: 30 })
+				.toFormat("yyyy-MM-dd"),
+			closedTo: "",
+			closedNote: "Isolation",
+		}),
+		ownStatus: 302,
+		snapshot: goodToKnowRows,
+	},
+	{
+		method: "DELETE",
+		pattern: "/t/:tenant/settings/closed-days/:id",
+		resource: "closedDay",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: goodToKnowRows,
 	},
 	{
 		method: "POST",

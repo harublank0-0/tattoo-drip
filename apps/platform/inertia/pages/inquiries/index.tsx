@@ -1,5 +1,6 @@
 import { Link } from "@inertiajs/react";
 import { urlFor } from "~/client";
+import { flashRowLabel, TAKEN_LABEL } from "~/components/flash";
 import type { InboxListProps } from "~/components/inquiries";
 import Page from "~/components/page";
 import StatusBadge from "~/components/status_badge";
@@ -104,6 +105,33 @@ export default function InboxIndex({
 								</span>
 								{view === "new" && (
 									<>
+										{inquiry.flash && (
+											<>
+												<span className="flex items-center gap-2 text-sm font-medium">
+													<img
+														src={inquiry.flash.thumbnailUrl}
+														alt=""
+														width={40}
+														height={40}
+														loading="lazy"
+														decoding="async"
+														className="size-10 shrink-0 rounded-md border bg-muted object-contain"
+													/>
+													<span className="min-w-0 wrap-anywhere" dir="auto">
+														{flashRowLabel(inquiry.flash.name)}
+													</span>
+												</span>
+												{inquiry.flash.taken && (
+													<span className="flex items-center gap-2 text-sm font-medium">
+														<span
+															aria-hidden="true"
+															className="size-2 shrink-0 rounded-full bg-marigold"
+														/>
+														{TAKEN_LABEL}
+													</span>
+												)}
+											</>
+										)}
 										<span className="line-clamp-2 text-sm">{inquiry.idea}</span>
 										<span className="text-sm text-muted-foreground">
 											{inquiry.placement} · {inquiry.approximateSize} ·{" "}

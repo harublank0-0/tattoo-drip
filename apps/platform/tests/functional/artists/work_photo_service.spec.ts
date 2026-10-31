@@ -2,6 +2,7 @@ import testUtils from "@adonisjs/core/services/test_utils";
 import { errors as lucidErrors } from "@adonisjs/lucid";
 import type { QueryClientContract } from "@adonisjs/lucid/types/database";
 import { test } from "@japa/runner";
+import { DateTime } from "luxon";
 import { WorkPhotoLimitError } from "#modules/artists/errors";
 import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
 import ArtistService, {
@@ -9,10 +10,14 @@ import ArtistService, {
 } from "#modules/artists/services/artist_service";
 import WorkPhotoService, {
 	MAX_WORK_PHOTOS,
+	type WorkFilter,
 } from "#modules/artists/services/work_photo_service";
+import type { WorkCursor } from "#modules/artists/work_cursor";
+import FlashService from "#modules/flash/services/flash_service";
 import { ImageDeleteError, InvalidImageError } from "#modules/media/errors";
+import OpeningHoursService from "#modules/scheduling/services/opening_hours_service";
 import StudioPageService from "#modules/storefront/services/studio_page_service";
-import { withDbContext } from "#services/db_context";
+import { dbClient, withDbContext, withTransaction } from "#services/db_context";
 import { addArtist, addWorkPhoto } from "#tests/helpers/artists";
 import {
 	RecordingImageService,
@@ -67,40 +72,73 @@ const asArtist = (userId: string): ProfileEditor => ({
 	role: "artist",
 });
 
+/** The artist's rows, newest first (the order every read uses). */
 const order = async (tenant: { id: string }, artistId: string) =>
 	inTenant(tenant, async () =>
 		(
 			await ArtistWorkPhoto.query()
 				.where("artist_id", artistId)
-				.orderBy("position")
-		).map((photo) => ({ id: photo.id, position: photo.position })),
+				.orderBy("created_at", "desc")
+				.orderBy("id", "desc")
+		).map((photo) => ({ id: photo.id, createdAt: photo.createdAt })),
 	);
+
+/**
+ * `count` photo rows for the artist, dated one second apart in the past (an
+ * hour ago and after), the oldest first. Returned in that order.
+ */
+const seedPhotos = (
+	tenant: { id: string },
+	artist: { id: string },
+	count: number,
+	start: DateTime = DateTime.now().minus({ hours: 1 }),
+) =>
+	inTenant(tenant, async () => {
+		const added: ArtistWorkPhoto[] = [];
+		for (let n = 0; n < count; n++) {
+			added.push(
+				await addWorkPhoto(tenant, artist, {
+					alt: `p${n}`,
+					createdAt: start.plus({ seconds: n }),
+				}),
+			);
+		}
+		return added;
+	});
 
 test.group("WorkPhotoService (TAT-116)", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 
-	test("an owner adds photos to any artist in order; the seventh is refused before it is decoded", async ({
+	test("an owner adds photos, the newest listed first; the 101st is refused before it is decoded", async ({
 		assert,
 	}) => {
 		const { tenant, owner: user } = await studioWithOwner();
 		const sita = await addArtist(tenant, user);
 		const { images, photos } = makeService();
 		const editor = owner(user.id);
+		assert.equal(MAX_WORK_PHOTOS, 100);
+		await seedPhotos(tenant, sita, MAX_WORK_PHOTOS - 1);
 
-		for (let n = 0; n < MAX_WORK_PHOTOS; n++) {
-			const added = await inTenant(tenant, async () =>
-				photos.add(tenant, editor, sita, await upload()),
-			);
-			assert.equal(added.position, n);
-			assert.equal(added.width, 1600);
-			assert.match(
-				added.imageKey,
-				new RegExp(`^tenants/${tenant.id}/${PURPOSE}/`),
-			);
-		}
+		const added = await inTenant(tenant, async () =>
+			photos.add(tenant, editor, sita, await upload()),
+		);
+		assert.equal(added.width, 1600);
+		assert.match(
+			added.imageKey,
+			new RegExp(`^tenants/${tenant.id}/${PURPOSE}/`),
+		);
+		// The returned instance matches what the database stores for a new photo.
+		assert.isNull(added.alt);
+		assert.deepEqual(added.styles, []);
+		assert.isFalse(added.healed);
+		const listed = await inTenant(tenant, () => photos.list(tenant, sita));
+		assert.lengthOf(listed, MAX_WORK_PHOTOS);
+		assert.equal(listed[0].id, added.id, "the new photo is the newest");
+		assert.equal(listed[1].alt, `p${MAX_WORK_PHOTOS - 2}`);
+		assert.equal(listed.at(-1)?.alt, "p0");
 		const filesBefore = await storedImages(tenant, PURPOSE);
 		const storedBefore = images.keys.length;
-		assert.lengthOf(filesBefore, MAX_WORK_PHOTOS * 4);
+		assert.lengthOf(filesBefore, 4);
 
 		const file = await upload();
 		await assert.rejects(
@@ -108,12 +146,11 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 			WorkPhotoLimitError,
 		);
 
-		assert.equal(images.keys.length, storedBefore, "no seventh store");
+		assert.equal(images.keys.length, storedBefore, "no 101st store");
 		assert.deepEqual(await storedImages(tenant, PURPOSE), filesBefore);
-		const listed = await inTenant(tenant, () => photos.list(tenant, sita));
-		assert.deepEqual(
-			listed.map((photo) => photo.position),
-			[0, 1, 2, 3, 4, 5],
+		assert.lengthOf(
+			await inTenant(tenant, () => photos.list(tenant, sita)),
+			MAX_WORK_PHOTOS,
 		);
 	});
 
@@ -135,7 +172,7 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 		assert.lengthOf(await inTenant(tenant, () => photos.list(tenant, sita)), 0);
 	});
 
-	test("two uploads racing for the sixth place: the second is refused under the lock and its file is deleted", async ({
+	test("two uploads racing for the 100th place: the second is refused under the lock and its file is deleted", async ({
 		assert,
 	}) => {
 		const { tenant, owner: user } = await studioWithOwner();
@@ -143,16 +180,14 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 		const images = new RecordingImageService();
 		const artists = new ArtistService(images);
 		const racing = new RacingService(images, artists, () =>
-			// The other upload lands its sixth photo after the first count.
+			// The other upload lands the 100th photo after the first count.
 			addWorkPhoto(tenant, sita),
 		);
-		for (let n = 0; n < 5; n++) {
-			await inTenant(tenant, () => addWorkPhoto(tenant, sita));
-		}
+		await seedPhotos(tenant, sita, MAX_WORK_PHOTOS - 1);
 
 		const file = await upload();
 		// Caught inside the context, as the controller does: the failed level
-		// rolls back by itself, and the other upload's sixth photo stays.
+		// rolls back by itself, and the other upload's photo stays.
 		await inTenant(tenant, async () => {
 			await assert.rejects(
 				() => racing.add(tenant, owner(user.id), sita, file),
@@ -165,13 +200,8 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 				[],
 				"...and took it away again",
 			);
-			const rows = await ArtistWorkPhoto.query()
-				.where("artist_id", sita.id)
-				.orderBy("position");
-			assert.deepEqual(
-				rows.map((row) => row.position),
-				[0, 1, 2, 3, 4, 5],
-			);
+			const rows = await ArtistWorkPhoto.query().where("artist_id", sita.id);
+			assert.lengthOf(rows, MAX_WORK_PHOTOS);
 		});
 	});
 
@@ -194,7 +224,7 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 		const added = await inTenantAs(tenant, member, async () =>
 			photos.add(tenant, asArtist(member.id), own, await upload()),
 		);
-		assert.equal(added.position, 0);
+		assert.equal(added.artistId, own.id);
 
 		const before = images.keys.length;
 		const file = await upload();
@@ -243,7 +273,7 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 		assert.lengthOf(await order(tenant, own.id), 0);
 	});
 
-	test("describe, move and remove by an artist unlinked meanwhile are refused too", async ({
+	test("updateDetails and remove by an artist unlinked meanwhile are refused too", async ({
 		assert,
 	}) => {
 		const { tenant } = await studioWithOwner();
@@ -254,16 +284,17 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 			linkToMe: true,
 		});
 		const { artists, photos } = makeService();
-		const [first, second] = await inTenant(tenant, async () => [
-			await addWorkPhoto(tenant, own),
-			await addWorkPhoto(tenant, own),
-		]);
+		const [first, second] = await seedPhotos(tenant, own, 2);
 		await inTenant(tenant, () => artists.unlinkUser(tenant, member.id));
 		const editor = asArtist(member.id);
 
 		const changes: (() => Promise<unknown>)[] = [
-			() => photos.describe(tenant, editor, first, "Koi"),
-			() => photos.move(tenant, editor, first, "down"),
+			() =>
+				photos.updateDetails(tenant, editor, first, {
+					alt: "Koi",
+					styles: ["realism"],
+					healed: true,
+				}),
 			() => photos.remove(tenant, editor, first),
 		];
 		for (const change of changes) {
@@ -276,12 +307,14 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 		const rows = await order(tenant, own.id);
 		assert.deepEqual(
 			rows.map((row) => row.id),
-			[first.id, second.id],
+			[second.id, first.id],
 		);
 		const after = await inTenant(tenant, () =>
 			ArtistWorkPhoto.findOrFail(first.id),
 		);
-		assert.isNull(after.alt);
+		assert.equal(after.alt, "p0");
+		assert.deepEqual(after.styles, []);
+		assert.isFalse(after.healed);
 	});
 
 	test("another tenant's artist or photo is not found from this tenant's context", async ({
@@ -324,71 +357,71 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 		assert.deepEqual(await storedImages(b.tenant, PURPOSE), []);
 	});
 
-	test("describe stores the text; empty text becomes null", async ({
+	test("updateDetails stores the description, the styles as given and the healed mark; empty text becomes null", async ({
 		assert,
 	}) => {
 		const { tenant, owner: user } = await studioWithOwner();
 		const sita = await addArtist(tenant, user);
 		const { photos } = makeService();
 		const photo = await inTenant(tenant, () => addWorkPhoto(tenant, sita));
+		const read = () =>
+			inTenant(tenant, () => ArtistWorkPhoto.findOrFail(photo.id));
 
 		const saved = await inTenant(tenant, () =>
-			photos.describe(tenant, owner(user.id), photo, "Koi on the forearm"),
+			photos.updateDetails(tenant, owner(user.id), photo, {
+				alt: "  Koi  ",
+				styles: ["realism", "blackwork"],
+				healed: true,
+			}),
 		);
-		assert.equal(saved.alt, "Koi on the forearm");
-		assert.equal(
-			(await inTenant(tenant, () => ArtistWorkPhoto.findOrFail(photo.id))).alt,
-			"Koi on the forearm",
-		);
+		assert.equal(saved.alt, "Koi");
+		const stored = await read();
+		assert.equal(stored.alt, "Koi");
+		// As given: not the list's order.
+		assert.deepEqual(stored.styles, ["realism", "blackwork"]);
+		assert.isTrue(stored.healed);
 
 		for (const empty of ["", "  ", null]) {
 			await inTenant(tenant, () =>
-				photos.describe(tenant, owner(user.id), photo, empty),
+				photos.updateDetails(tenant, owner(user.id), photo, {
+					alt: empty,
+					styles: [],
+					healed: false,
+				}),
 			);
-			assert.isNull(
-				(await inTenant(tenant, () => ArtistWorkPhoto.findOrFail(photo.id)))
-					.alt,
-			);
+			const cleared = await read();
+			assert.isNull(cleared.alt, JSON.stringify(empty));
+			assert.deepEqual(cleared.styles, []);
+			assert.isFalse(cleared.healed);
 		}
 	});
 
-	test("move swaps neighbours and does nothing at either end", async ({
-		assert,
-	}) => {
+	test("the database refuses a fourth style", async ({ assert }) => {
 		const { tenant, owner: user } = await studioWithOwner();
 		const sita = await addArtist(tenant, user);
-		const { photos } = makeService();
-		const [one, two, three] = await inTenant(tenant, async () => [
-			await addWorkPhoto(tenant, sita),
-			await addWorkPhoto(tenant, sita),
-			await addWorkPhoto(tenant, sita),
-		]);
-		const editor = owner(user.id);
-		const ids = async () => (await order(tenant, sita.id)).map((row) => row.id);
+		const photo = await inTenant(tenant, () => addWorkPhoto(tenant, sita));
+		const setStyles = (slugs: string) =>
+			inTenant(tenant, () =>
+				withTransaction((trx) =>
+					trx.rawQuery(
+						"update artist_work_photos set styles = ?::varchar[] where id = ?",
+						[slugs, photo.id],
+					),
+				),
+			);
 
-		await inTenant(tenant, () => photos.move(tenant, editor, three, "up"));
-		assert.deepEqual(await ids(), [one.id, three.id, two.id]);
-		await inTenant(tenant, () => photos.move(tenant, editor, one, "up"));
-		assert.deepEqual(
-			await ids(),
-			[one.id, three.id, two.id],
-			"first stays first",
+		await assert.rejects(
+			() => setStyles("{blackwork,fine-line,realism,colour}"),
+			/artist_work_photos_styles_max/,
 		);
-		await inTenant(tenant, () => photos.move(tenant, editor, two, "down"));
-		assert.deepEqual(
-			await ids(),
-			[one.id, three.id, two.id],
-			"last stays last",
+		await setStyles("{blackwork,fine-line,realism}");
+		const stored = await inTenant(tenant, () =>
+			ArtistWorkPhoto.findOrFail(photo.id),
 		);
-		await inTenant(tenant, () => photos.move(tenant, editor, one, "down"));
-		assert.deepEqual(await ids(), [three.id, one.id, two.id]);
-		assert.deepEqual(
-			(await order(tenant, sita.id)).map((row) => row.position),
-			[0, 1, 2],
-		);
+		assert.lengthOf(stored.styles, 3);
 	});
 
-	test("remove deletes the file and its copies first, then the row, and compacts the positions", async ({
+	test("remove deletes the file and its copies first, then the row; the other photos keep their dates", async ({
 		assert,
 	}) => {
 		const { tenant, owner: user } = await studioWithOwner();
@@ -404,6 +437,9 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 			);
 		}
 		assert.lengthOf(await storedImages(tenant, PURPOSE), 12);
+		const datesBefore = new Map(
+			(await order(tenant, sita.id)).map((row) => [row.id, row.createdAt]),
+		);
 
 		await withDbContext({ tenantId: tenant.id }, async () => {
 			await photos.remove(tenant, editor, added[0]);
@@ -417,12 +453,16 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 		assert.lengthOf(await storedImages(tenant, PURPOSE), 8);
 		const rows = await order(tenant, sita.id);
 		assert.deepEqual(
-			rows.map((row) => [row.id, row.position]),
-			[
-				[added[1].id, 0],
-				[added[2].id, 1],
-			],
+			rows.map((row) => row.id),
+			[added[2].id, added[1].id],
 		);
+		for (const row of rows) {
+			assert.equal(
+				row.createdAt.toMillis(),
+				datesBefore.get(row.id)?.toMillis(),
+				"a removal rewrites no date",
+			);
+		}
 	});
 
 	test("a later failure in the same request restores the row but the files are already gone; removing again finishes", async ({
@@ -453,7 +493,7 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 		assert.lengthOf(await order(tenant, sita.id), 0);
 	});
 
-	test("a deleted artist's photos cannot be found, edited, moved or removed", async ({
+	test("a deleted artist's photos cannot be found, edited or removed", async ({
 		assert,
 	}) => {
 		const { tenant, owner: user } = await studioWithOwner();
@@ -471,8 +511,12 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 			lucidErrors.E_ROW_NOT_FOUND,
 		);
 		const changes: (() => Promise<unknown>)[] = [
-			() => photos.describe(tenant, editor, photo, "x"),
-			() => photos.move(tenant, editor, photo, "up"),
+			() =>
+				photos.updateDetails(tenant, editor, photo, {
+					alt: "x",
+					styles: [],
+					healed: false,
+				}),
 			() => photos.remove(tenant, editor, photo),
 		];
 		for (const change of changes) {
@@ -495,7 +539,14 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 		await inTenant(tenant, () => photos.remove(tenant, editor, photo));
 
 		await assert.rejects(
-			() => inTenant(tenant, () => photos.describe(tenant, editor, photo, "x")),
+			() =>
+				inTenant(tenant, () =>
+					photos.updateDetails(tenant, editor, photo, {
+						alt: "x",
+						styles: [],
+						healed: false,
+					}),
+				),
 			lucidErrors.E_ROW_NOT_FOUND,
 		);
 		await assert.rejects(
@@ -504,7 +555,7 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 		);
 	});
 
-	test("forArtists reads every listed artist's photos in one query and none for no artists", async ({
+	test("forArtists reads each listed artist's newest perArtist photos, newest first, in one query, and none for no artists", async ({
 		assert,
 	}) => {
 		const { tenant, owner: user } = await studioWithOwner();
@@ -512,16 +563,19 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 		const mira = await addArtist(tenant, user, { name: "Mira", slug: "mira" });
 		const empty = await addArtist(tenant, user, { name: "Zed", slug: "zed" });
 		const { photos } = makeService();
-		await inTenant(tenant, async () => {
-			await addWorkPhoto(tenant, mira, { alt: "m0" });
-			await addWorkPhoto(tenant, sita, { alt: "s0" });
-			await addWorkPhoto(tenant, sita, { alt: "s1" });
-			await addWorkPhoto(tenant, mira, { alt: "m1" });
-		});
+		const start = DateTime.now().minus({ hours: 1 });
+		const sitaPhotos = await seedPhotos(tenant, sita, 8, start);
+		// Mira's dates fall among Sita's: each artist is ranked on their own.
+		const miraPhotos = await seedPhotos(
+			tenant,
+			mira,
+			2,
+			start.plus({ seconds: 3 }),
+		);
 
 		const { result, queries } = await recordQueries(() =>
 			inTenant(tenant, () =>
-				photos.forArtists(tenant, [sita.id, mira.id, empty.id]),
+				photos.forArtists(tenant, [sita.id, mira.id, empty.id], 6),
 			),
 		);
 		const photoQueries = queries.filter((sql) =>
@@ -529,23 +583,77 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 		);
 		assert.lengthOf(photoQueries, 1);
 		assert.deepEqual(
-			result.get(sita.id)?.map((photo) => photo.alt),
-			["s0", "s1"],
+			result.get(sita.id)?.map((photo) => photo.id),
+			sitaPhotos
+				.slice(2)
+				.reverse()
+				.map((photo) => photo.id),
+			"Sita's six newest, newest first",
 		);
 		assert.deepEqual(
-			result.get(mira.id)?.map((photo) => photo.alt),
-			["m0", "m1"],
+			result.get(mira.id)?.map((photo) => photo.id),
+			miraPhotos
+				.slice()
+				.reverse()
+				.map((photo) => photo.id),
 		);
 		assert.isUndefined(result.get(empty.id));
 
+		const one = await inTenant(tenant, () =>
+			photos.forArtists(tenant, [sita.id], 3),
+		);
+		assert.deepEqual(
+			one.get(sita.id)?.map((photo) => photo.alt),
+			["p7", "p6", "p5"],
+		);
+
 		const none = await recordQueries(() =>
-			inTenant(tenant, () => photos.forArtists(tenant, [])),
+			inTenant(tenant, () => photos.forArtists(tenant, [], 6)),
 		);
 		assert.lengthOf(
 			none.queries.filter((sql) => sql.includes("artist_work_photos")),
 			0,
 		);
 		assert.equal(none.result.size, 0);
+	});
+
+	test("forArtists breaks a tie in dates by id, so the same photos come back every time", async ({
+		assert,
+	}) => {
+		const { tenant, owner: user } = await studioWithOwner();
+		const sita = await addArtist(tenant, user);
+		const { photos } = makeService();
+		const sameMoment = DateTime.now().minus({ hours: 1 });
+		const added = await inTenant(tenant, async () => {
+			const rows: ArtistWorkPhoto[] = [];
+			for (let n = 0; n < 4; n++) {
+				rows.push(await addWorkPhoto(tenant, sita, { createdAt: sameMoment }));
+			}
+			return rows;
+		});
+		// The ids come in creation order, so the newest by id is the last added.
+		const newestTwo = added
+			.slice(2)
+			.reverse()
+			.map((photo) => photo.id);
+
+		const read = await inTenant(tenant, () =>
+			photos.forArtists(tenant, [sita.id], 2),
+		);
+
+		assert.deepEqual(
+			read.get(sita.id)?.map((photo) => photo.id),
+			newestTwo,
+		);
+		assert.deepEqual(
+			(await inTenant(tenant, () => photos.list(tenant, sita))).map(
+				(photo) => photo.id,
+			),
+			added
+				.slice()
+				.reverse()
+				.map((photo) => photo.id),
+		);
 	});
 
 	test("forArtists never returns another studio's photos", async ({
@@ -558,13 +666,13 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 		const { photos } = makeService();
 
 		const fromB = await inTenant(b.tenant, () =>
-			photos.forArtists(b.tenant, [artistA.id]),
+			photos.forArtists(b.tenant, [artistA.id], 6),
 		);
 
 		assert.equal(fromB.size, 0);
 	});
 
-	test("a replayed upload adds a second photo; replaying past six is refused and stores nothing", async ({
+	test("a replayed upload adds a second photo; replaying past 100 is refused and stores nothing", async ({
 		assert,
 	}) => {
 		const { tenant, owner: user } = await studioWithOwner();
@@ -572,19 +680,17 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 		const { images, photos } = makeService();
 		const editor = owner(user.id);
 		const bytes = await testImages.jpeg(1600, 1200);
+		await seedPhotos(tenant, sita, MAX_WORK_PHOTOS - 2);
 
-		for (let n = 0; n < MAX_WORK_PHOTOS; n++) {
+		for (let n = 0; n < 2; n++) {
 			await inTenant(tenant, async () =>
 				photos.add(tenant, editor, sita, await uploadOf(bytes)),
 			);
 		}
 		const stored = images.keys.length;
 		const rows = await order(tenant, sita.id);
-		assert.lengthOf(
-			rows,
-			MAX_WORK_PHOTOS,
-			"the same bytes six times: no dedupe",
-		);
+		assert.lengthOf(rows, MAX_WORK_PHOTOS);
+		assert.equal(stored, 2, "the same bytes twice: no dedupe");
 
 		const again = await uploadOf(bytes);
 		await assert.rejects(
@@ -633,11 +739,20 @@ test.group("removing a photo is durable (TAT-116 fix round 1)", (group) => {
 		assert.instanceOf(thrown, ImageDeleteError);
 		// The row is still there, in its place, and the public read still lists it.
 		assert.deepEqual(
-			(await order(tenant, sita.id)).map((row) => [row.id, row.position]),
-			added.map((photo, index) => [photo.id, index]),
+			(await order(tenant, sita.id)).map((row) => row.id),
+			added
+				.slice()
+				.reverse()
+				.map((photo) => photo.id),
 		);
 		const listed = await inTenant(tenant, () =>
-			new StudioPageService(artists, images, photos).visibleArtists(tenant),
+			new StudioPageService(
+				artists,
+				images,
+				photos,
+				new OpeningHoursService(),
+				new FlashService(images, artists),
+			).visibleArtists(tenant),
 		);
 		assert.lengthOf(listed[0].workPhotos, 3);
 		// The other files of the photo were tried and are gone; the failed one is left.
@@ -645,15 +760,12 @@ test.group("removing a photo is durable (TAT-116 fix round 1)", (group) => {
 		assert.lengthOf(left, 12 - 3);
 		assert.include(left, copies(added[0].imageKey).split("/").pop() ?? "");
 
-		// Storage is back: the retry removes every copy and closes the gap.
+		// Storage is back: the retry removes every copy.
 		await inTenant(tenant, () => photos.remove(tenant, editor, added[0]));
 		assert.lengthOf(await storedImages(tenant, PURPOSE), 8);
 		assert.deepEqual(
-			(await order(tenant, sita.id)).map((row) => [row.id, row.position]),
-			[
-				[added[1].id, 0],
-				[added[2].id, 1],
-			],
+			(await order(tenant, sita.id)).map((row) => row.id),
+			[added[2].id, added[1].id],
 		);
 	});
 
@@ -724,9 +836,326 @@ test.group(
 				left.every((file) => file.startsWith(idOf(other.imageKey))),
 			);
 			assert.deepEqual(
-				(await order(tenant, sita.id)).map((row) => [row.id, row.position]),
-				[[other.id, 0]],
+				(await order(tenant, sita.id)).map((row) => row.id),
+				[other.id],
 			);
 		});
 	},
 );
+
+test.group("the paged read (TAT-126)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	const base = DateTime.fromISO("2026-10-30T04:00:00Z");
+	const filterOf = (
+		artistIds: string[],
+		over: Partial<WorkFilter> = {},
+	): WorkFilter => ({ artistIds, style: null, healed: false, ...over });
+	/** `created_at desc, id desc`, worked out here and not by the database. */
+	const newestFirst = (rows: ArtistWorkPhoto[]) =>
+		rows
+			.slice()
+			.sort(
+				(a, b) =>
+					b.createdAt.toMillis() - a.createdAt.toMillis() ||
+					(a.id < b.id ? 1 : -1),
+			)
+			.map((photo) => photo.id);
+	const ids = (rows: ArtistWorkPhoto[]) => rows.map((photo) => photo.id);
+	const onPhotos = (queries: string[]) =>
+		queries.filter((sql) => sql.includes("artist_work_photos"));
+
+	test("page lists the given artists' photos newest first; nothing and no query for no artists", async ({
+		assert,
+	}) => {
+		const { tenant, owner: user } = await studioWithOwner();
+		const sita = await addArtist(tenant, user);
+		const mira = await addArtist(tenant, user, { name: "Mira", slug: "mira" });
+		const zed = await addArtist(tenant, user, { name: "Zed", slug: "zed" });
+		const { photos } = makeService();
+		const [s1, m1, s2] = await inTenant(tenant, async () => [
+			await addWorkPhoto(tenant, sita, { createdAt: base }),
+			await addWorkPhoto(tenant, mira, {
+				createdAt: base.plus({ minutes: 1 }),
+			}),
+			await addWorkPhoto(tenant, sita, {
+				createdAt: base.plus({ minutes: 2 }),
+			}),
+		]);
+		await inTenant(tenant, () =>
+			addWorkPhoto(tenant, zed, { createdAt: base.plus({ minutes: 3 }) }),
+		);
+
+		const { result, queries } = await recordQueries(() =>
+			inTenant(tenant, () =>
+				photos.page(tenant, filterOf([sita.id, mira.id]), null, 10),
+			),
+		);
+
+		assert.deepEqual(ids(result.photos), [s2.id, m1.id, s1.id]);
+		assert.isNull(result.next);
+		assert.lengthOf(onPhotos(queries), 1);
+
+		const none = await recordQueries(() =>
+			inTenant(tenant, () => photos.page(tenant, filterOf([]), null, 10)),
+		);
+		assert.deepEqual(none.result, { photos: [], next: null });
+		assert.lengthOf(onPhotos(none.queries), 0);
+
+		await assert.rejects(
+			() =>
+				inTenant(tenant, () =>
+					photos.page(tenant, filterOf([sita.id]), null, 0),
+				),
+			/limit/,
+		);
+	});
+
+	test("paging by cursor visits every photo once, also across photos created in the same instant", async ({
+		assert,
+	}) => {
+		const { tenant, owner: user } = await studioWithOwner();
+		const sita = await addArtist(tenant, user);
+		const { photos } = makeService();
+		const added = await inTenant(tenant, async () => {
+			const rows: ArtistWorkPhoto[] = [];
+			// One newer, three in the same instant, one older.
+			for (const at of [
+				base.plus({ hours: 1 }),
+				base,
+				base,
+				base,
+				base.minus({ hours: 1 }),
+			]) {
+				rows.push(await addWorkPhoto(tenant, sita, { createdAt: at }));
+			}
+			return rows;
+		});
+		const filter = filterOf([sita.id]);
+
+		const first = await inTenant(tenant, () =>
+			photos.page(tenant, filter, null, 2),
+		);
+		assert.isNotNull(first.next);
+		const second = await inTenant(tenant, () =>
+			photos.page(tenant, filter, first.next, 2),
+		);
+		assert.isNotNull(second.next);
+		const third = await inTenant(tenant, () =>
+			photos.page(tenant, filter, second.next, 2),
+		);
+
+		assert.deepEqual(
+			[first, second, third].map((page) => page.photos.length),
+			[2, 2, 1],
+		);
+		assert.deepEqual(
+			[...ids(first.photos), ...ids(second.photos), ...ids(third.photos)],
+			newestFirst(added),
+		);
+		assert.isNull(third.next);
+		// The cursor names the last photo of its page.
+		assert.equal(first.next?.id, first.photos[1].id);
+		assert.equal(second.next?.id, second.photos[1].id);
+
+		// Exactly a page's worth left is not "more".
+		const whole = await inTenant(tenant, () =>
+			photos.page(tenant, filter, null, 5),
+		);
+		assert.lengthOf(whole.photos, 5);
+		assert.isNull(whole.next);
+	});
+
+	test("the cursor keeps the microseconds, so photos within one millisecond are not skipped", async ({
+		assert,
+	}) => {
+		const { tenant, owner: user } = await studioWithOwner();
+		const sita = await addArtist(tenant, user);
+		const { photos } = makeService();
+		// A JavaScript date holds milliseconds: these three share one, and
+		// only the database can tell them apart.
+		const stamps = [
+			"2026-10-30T04:05:06.123123Z",
+			"2026-10-30T04:05:06.123456Z",
+			"2026-10-30T04:05:06.123789Z",
+		];
+		const added = await inTenant(tenant, async () => {
+			const rows: ArtistWorkPhoto[] = [];
+			for (const stamp of stamps) {
+				const row = await addWorkPhoto(tenant, sita);
+				await dbClient().rawQuery(
+					"update artist_work_photos set created_at = ?::timestamptz where id = ?",
+					[stamp, row.id],
+				);
+				rows.push(row);
+			}
+			return rows;
+		});
+		const filter = filterOf([sita.id]);
+
+		const seen: string[] = [];
+		const cursors: WorkCursor[] = [];
+		let after: WorkCursor | null = null;
+		for (let n = 0; n < 3; n++) {
+			const page = await inTenant(tenant, () =>
+				photos.page(tenant, filter, after, 1),
+			);
+			seen.push(...ids(page.photos));
+			if (page.next) cursors.push(page.next);
+			after = page.next;
+		}
+
+		assert.deepEqual(seen, [added[2].id, added[1].id, added[0].id]);
+		assert.deepEqual(
+			cursors.map((cursor) => cursor.at),
+			[stamps[2], stamps[1]],
+		);
+		assert.isNull(after);
+	});
+
+	test("a photo removed between pages: the next page still starts after the cursor", async ({
+		assert,
+	}) => {
+		const { tenant, owner: user } = await studioWithOwner();
+		const sita = await addArtist(tenant, user);
+		const { photos } = makeService();
+		const [p1, p2, p3, p4] = await seedPhotos(tenant, sita, 4, base);
+		const filter = filterOf([sita.id]);
+		const first = await inTenant(tenant, () =>
+			photos.page(tenant, filter, null, 2),
+		);
+		assert.deepEqual(ids(first.photos), [p4.id, p3.id]);
+
+		// The photo the cursor names, and one already shown, go meanwhile.
+		await inTenant(tenant, async () => {
+			await p3.delete();
+			await p4.delete();
+		});
+		const second = await inTenant(tenant, () =>
+			photos.page(tenant, filter, first.next, 2),
+		);
+
+		assert.deepEqual(ids(second.photos), [p2.id, p1.id]);
+		assert.isNull(second.next);
+	});
+
+	test("style and healed filter, and combine", async ({ assert }) => {
+		const { tenant, owner: user } = await studioWithOwner();
+		const sita = await addArtist(tenant, user);
+		const { photos } = makeService();
+		const [plain, both, healedOnly] = await inTenant(tenant, async () => [
+			await addWorkPhoto(tenant, sita, {
+				styles: ["realism"],
+				createdAt: base,
+			}),
+			await addWorkPhoto(tenant, sita, {
+				styles: ["realism", "blackwork"],
+				healed: true,
+				createdAt: base.plus({ minutes: 1 }),
+			}),
+			await addWorkPhoto(tenant, sita, {
+				styles: [],
+				healed: true,
+				createdAt: base.plus({ minutes: 2 }),
+			}),
+		]);
+		const read = async (over: Partial<WorkFilter>) =>
+			ids(
+				(
+					await inTenant(tenant, () =>
+						photos.page(tenant, filterOf([sita.id], over), null, 10),
+					)
+				).photos,
+			);
+
+		assert.deepEqual(await read({ style: "realism" }), [both.id, plain.id]);
+		assert.deepEqual(await read({ healed: true }), [healedOnly.id, both.id]);
+		assert.deepEqual(await read({ style: "realism", healed: true }), [both.id]);
+		assert.deepEqual(await read({ style: "blackwork" }), [both.id]);
+		assert.deepEqual(await read({ style: "japanese" }), []);
+		// A style matches whole slugs only, and is only ever a value.
+		assert.deepEqual(await read({ style: "real" }), []);
+		assert.deepEqual(await read({ style: 'realism","blackwork' }), []);
+		assert.deepEqual(await read({ style: "{realism}" }), []);
+	});
+
+	test("facets: the styles the given artists' photos carry and whether one is healed; another artist's are not counted; none for no artists", async ({
+		assert,
+	}) => {
+		const { tenant, owner: user } = await studioWithOwner();
+		const sita = await addArtist(tenant, user);
+		const mira = await addArtist(tenant, user, { name: "Mira", slug: "mira" });
+		const zed = await addArtist(tenant, user, { name: "Zed", slug: "zed" });
+		const empty = await addArtist(tenant, user, { name: "Eve", slug: "eve" });
+		const { photos } = makeService();
+		await inTenant(tenant, async () => {
+			await addWorkPhoto(tenant, sita, { styles: ["realism"] });
+			await addWorkPhoto(tenant, sita, {
+				styles: ["realism", "blackwork"],
+			});
+			await addWorkPhoto(tenant, sita, { styles: [] });
+			await addWorkPhoto(tenant, mira, { styles: ["japanese"], healed: true });
+			await addWorkPhoto(tenant, zed, { styles: ["tribal"], healed: true });
+		});
+		const facets = async (artistIds: string[]) => {
+			const { styles, healed } = await inTenant(tenant, () =>
+				photos.facets(tenant, artistIds),
+			);
+			return { styles: styles.slice().sort(), healed };
+		};
+
+		assert.deepEqual(await facets([sita.id]), {
+			styles: ["blackwork", "realism"],
+			healed: false,
+		});
+		assert.deepEqual(await facets([sita.id, mira.id]), {
+			styles: ["blackwork", "japanese", "realism"],
+			healed: true,
+		});
+		assert.deepEqual(await facets([empty.id]), { styles: [], healed: false });
+
+		const { queries } = await recordQueries(() => facets([sita.id, mira.id]));
+		assert.lengthOf(onPhotos(queries), 1);
+		const none = await recordQueries(() => facets([]));
+		assert.deepEqual(none.result, { styles: [], healed: false });
+		assert.lengthOf(onPhotos(none.queries), 0);
+	});
+
+	test("another tenant's photos never appear, from this tenant's context", async ({
+		assert,
+	}) => {
+		const a = await studioWithOwner("paged-a", "Paged A");
+		const b = await studioWithOwner("paged-b", "Paged B");
+		const artistA = await addArtist(a.tenant, a.owner);
+		await inTenant(a.tenant, () =>
+			addWorkPhoto(a.tenant, artistA, { styles: ["realism"], healed: true }),
+		);
+		const { photos } = makeService();
+		const filter = filterOf([artistA.id]);
+
+		// Asked as studio B for studio A's artist: the tenant filter and the
+		// row-level security each keep the photo out.
+		const asB = await inTenant(b.tenant, () =>
+			photos.page(b.tenant, filter, null, 10),
+		);
+		const forgedAsB = await inTenant(b.tenant, () =>
+			photos.page(a.tenant, filter, null, 10),
+		);
+		const facetsAsB = await inTenant(b.tenant, () =>
+			photos.facets(b.tenant, [artistA.id]),
+		);
+		const forgedFacets = await inTenant(b.tenant, () =>
+			photos.facets(a.tenant, [artistA.id]),
+		);
+
+		assert.deepEqual(asB, { photos: [], next: null });
+		assert.deepEqual(forgedAsB, { photos: [], next: null });
+		assert.deepEqual(facetsAsB, { styles: [], healed: false });
+		assert.deepEqual(forgedFacets, { styles: [], healed: false });
+		// And its own studio still sees it.
+		const own = await inTenant(a.tenant, () =>
+			photos.page(a.tenant, filter, null, 10),
+		);
+		assert.lengthOf(own.photos, 1);
+	});
+});

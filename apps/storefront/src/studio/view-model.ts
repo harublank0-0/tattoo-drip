@@ -7,6 +7,7 @@ import {
 	linkHostname,
 	mailtoLink,
 	mapsLink,
+	requestHref,
 	safeHttpsUrl,
 	safeImageUrl,
 	telLink,
@@ -102,10 +103,18 @@ export interface ArtistView {
 	/** Only while the artist isn't accepting inquiries. */
 	readonly closedMessage: string | null;
 	readonly pageHref: string;
-	readonly inquiryHref: string;
-	/** Up to six photos of the artist's work, in the studio's order (TAT-116). */
+	/** `/request?artist=<slug>`: asks for this artist (TAT-127). */
+	readonly requestHref: string;
+	/** The artist's six newest work photos, newest first (TAT-116, TAT-126); the whole portfolio is the gallery's. */
 	readonly workPhotos: readonly WorkPhotoView[];
+	/** The names of up to five tattoo styles, in the API's order; [] when none. */
+	readonly styles: readonly string[];
+	/** The artist's Instagram, Facebook and TikTok links that pass the checks; [] when none. */
+	readonly links: readonly ContactLink[];
 }
+
+/** The most styles an artist shows (the contract's maxItems). */
+const MAX_STYLES = 5;
 
 const TYPE_LABELS: Record<Studio["type"], string> = {
 	studio: "Tattoo studio",
@@ -144,19 +153,7 @@ export function studioViewModel(studio: Studio): StudioView {
 	const email = isEmail(studio.contact.email) ? studio.contact.email : null;
 	const addressText = cleanText(studio.contact.address);
 
-	const social: ContactLink[] = [];
-	for (const link of studio.socialLinks) {
-		const href = safeHttpsUrl(link.url);
-		if (!href) continue;
-		const known = Object.hasOwn(SOCIAL, link.platform)
-			? SOCIAL[link.platform]
-			: undefined;
-		social.push({
-			kind: known?.kind ?? "other",
-			label: known?.label ?? linkHostname(href),
-			href,
-		});
-	}
+	const social = socialContactLinks(studio.socialLinks);
 
 	const contact: ContactLink[] = [];
 	const whatsapp = whatsappLink(phone);
@@ -198,6 +195,51 @@ export function studioViewModel(studio: Studio): StudioView {
 }
 
 /**
+ * The social links as links a visitor can follow, in the API's order: an https
+ * URL without credentials (safeHttpsUrl), a known platform named ("Instagram"),
+ * any other labelled by its host. An item that is not a link is dropped, and
+ * anything but a list (an older API sends none) is []. Pure.
+ */
+export function socialContactLinks(value: unknown): ContactLink[] {
+	if (!Array.isArray(value)) return [];
+	const links: ContactLink[] = [];
+	for (const item of value) {
+		if (typeof item !== "object" || item === null) continue;
+		const { platform, url } = item as { platform?: unknown; url?: unknown };
+		const href = safeHttpsUrl(url);
+		if (!href) continue;
+		const known =
+			typeof platform === "string" && Object.hasOwn(SOCIAL, platform)
+				? SOCIAL[platform]
+				: undefined;
+		links.push({
+			kind: known?.kind ?? "other",
+			label: known?.label ?? linkHostname(href),
+			href,
+		});
+	}
+	return links;
+}
+
+/**
+ * An artist's tattoo style names from the API's `styles`: one line of plain
+ * text each (cleanLine), in the API's order, at most five. An item without a
+ * text name is dropped, and anything but a list (an older API sends none) is
+ * []. Pure.
+ */
+export function styleNames(value: unknown): string[] {
+	if (!Array.isArray(value)) return [];
+	const names: string[] = [];
+	for (const item of value) {
+		if (typeof item !== "object" || item === null) continue;
+		const { name } = item as { name?: unknown };
+		const line = typeof name === "string" ? cleanLine(name) : null;
+		if (line) names.push(line);
+	}
+	return names.slice(0, MAX_STYLES);
+}
+
+/**
  * The visible artists as the page shows them; one whose slug can't be a link
  * is left out. `imageOrigin` is the API's origin, the only one a work photo
  * may come from (TAT-116); null accepts none.
@@ -235,12 +277,14 @@ function artistViewModel(
 		accepting,
 		closedMessage: accepting ? null : cleanText(artist.closedMessage),
 		pageHref: `/artists/${artist.slug}`,
-		inquiryHref: `/artists/${artist.slug}#inquiry`,
+		requestHref: requestHref({ artist: artist.slug }),
 		workPhotos: workPhotoViews(
 			(artist as { readonly workPhotos?: unknown }).workPhotos,
 			name,
 			imageOrigin,
 		),
+		styles: styleNames(artist.styles),
+		links: socialContactLinks(artist.socialLinks),
 	};
 }
 

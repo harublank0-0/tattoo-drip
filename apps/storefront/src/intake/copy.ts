@@ -13,6 +13,9 @@ import type { IntakeField } from "./rules.ts";
 export const NOTICE_CODES = [
 	"already-waiting",
 	"studio-closed",
+	"flash-unavailable",
+	"flash-closed",
+	"flash-claimed",
 	"challenge-failed",
 	"challenge-unavailable",
 	"challenge-blocked",
@@ -114,6 +117,18 @@ const notices: Readonly<Record<NoticeCode, Notice>> = {
 	"studio-closed": {
 		title: "{studio} isn't taking new inquiries right now",
 		body: "They closed their inquiries while you were writing. You can still message them.",
+	},
+	"flash-unavailable": {
+		title: "This design isn't available any more",
+		body: "{studio} took it off their page while you were writing. You can still message them about it.",
+	},
+	"flash-closed": {
+		title: "This artist just stopped taking flash requests",
+		body: "Your request wasn't sent. You can still message {studio} about it.",
+	},
+	"flash-claimed": {
+		title: "Someone just claimed this design",
+		body: "It was one of a kind, so your request wasn't sent. Message {studio} to ask for something similar.",
 	},
 	"challenge-failed": {
 		title: "We couldn't confirm you're a person",

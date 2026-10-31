@@ -80,7 +80,6 @@ test.group("Studio page reads: nothing private", (group) => {
 			owner.email,
 			member.id,
 			member.email,
-			"canary-policy-44",
 			method.id,
 			"canary-method-44",
 			"canary-holder-44",
@@ -108,6 +107,26 @@ test.group("Studio page reads: nothing private", (group) => {
 			other.tenant.id,
 			otherArtist.id,
 		].filter((canary) => canary !== "");
+
+		// The deposit policy is shown in Good to know since TAT-128 (the spec's
+		// call), exactly once, and only by the studio read: never by the
+		// artists reads. The percentage stays private.
+		const studioText = JSON.stringify(
+			(await client.get("/api/v1/tenants/api-private-44")).body(),
+		);
+		assert.equal(studioText.split("canary-policy-44").length - 1, 1);
+		assert.include(
+			studioText,
+			'"goodToKnow":{"walkIns":null,"ageRule":null,"depositPolicy":"canary-policy-44"',
+		);
+		for (const path of ["/artists", "/artists/shown"]) {
+			const text = JSON.stringify(
+				(await client.get(`/api/v1/tenants/api-private-44${path}`)).body(),
+			);
+			assert.notInclude(text, "canary-policy-44", `${path} names the policy`);
+		}
+		assert.notInclude(studioText, "defaultDepositPercent");
+		assert.notInclude(studioText, "default_deposit_percent");
 
 		for (const path of ["", "/artists", "/artists/shown"]) {
 			const response = await client.get(

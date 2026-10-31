@@ -7,6 +7,7 @@ import {
 } from "@tattoo-drip/sdk";
 import type { StorefrontConfig } from "../tenancy/config.ts";
 import { STORED_SLUG } from "../tenancy/host.ts";
+import { withRevalidation } from "../tenancy/revalidate.ts";
 import { withVisitorAddress } from "../tenancy/visitor.ts";
 import {
 	createStorefrontQueryClient,
@@ -97,7 +98,8 @@ export interface ServerConnectOptions {
 /**
  * Connects a server render's client: API_URL, the confirmed studio's slug,
  * and the server key when set (sent as Authorization: Bearer) and, with the
- * key, the visitor's address (X-Visitor-IP).
+ * key, the visitor's address (X-Visitor-IP). Its reads ask every cache on the
+ * way for a fresh answer (`withRevalidation`).
  */
 export function connectServer(
 	api: ApiContext,
@@ -108,7 +110,10 @@ export function connectServer(
 		tenant: studio.slug,
 		key: config.serverKey,
 		timeoutMs: SERVER_TIMEOUT_MS,
-		fetch: config.serverKey ? withVisitorAddress(fetch, visitorAddress) : fetch,
+		// A render's reads ask every cache for a fresh answer (TAT-128).
+		fetch: withRevalidation(
+			config.serverKey ? withVisitorAddress(fetch, visitorAddress) : fetch,
+		),
 	});
 	api.tattoo.connect({ apiUrl: config.apiUrl, tenant: studio.slug }, client);
 }
@@ -134,15 +139,17 @@ export function dehydrateApi(api: ApiContext): DehydratedApi {
  * The router's hydrate: connects the browser's client from the connection
  * the server sent. No key; the SDK never sends cookies.
  *
- * Also keeps the studio and the artists in the cache for as long as the page
- * lives. The page's loaders read them, but nothing observes them, and a
- * browser drops an unobserved query after 5 minutes: a later reload of the
- * loaders (a repeat navigation to the identical URL, such as a second tap on
- * the same `#inquiry` link) would fetch them again, and a failure would
- * replace the page with the route's error. The artists key is a prefix of
- * each artist's own key, so one default covers both. A query takes its
- * defaults when it is built, so this comes before the cache is hydrated (a
- * gcTime passed to the loader's query() would not reach a query that
+ * Also keeps the studio, the artists and the gallery pages in the cache for
+ * as long as the page lives. The page's loaders read them, but nothing
+ * observes them, and a browser drops an unobserved query after 5 minutes: a
+ * later reload of the loaders (a repeat navigation to the identical URL, such
+ * as a second tap on the same `#inquiry` link) would fetch them again, and a
+ * failure would replace the page with the route's error. The artists key is a
+ * prefix of each artist's own key, so one default covers both, and the work
+ * key (TAT-126) of every gallery read, whatever its filters, and the flash
+ * keys (TAT-129): every flash read and every design's own. A query takes
+ * its defaults when it is built, so this comes before the cache is hydrated
+ * (a gcTime passed to the loader's query() would not reach a query that
  * already exists).
  */
 export function hydrateApi(
@@ -154,6 +161,9 @@ export function hydrateApi(
 	for (const key of [
 		tattooKeys.studio(connection.tenant),
 		tattooKeys.artists(connection.tenant),
+		tattooKeys.work(connection.tenant),
+		tattooKeys.flash(connection.tenant),
+		tattooKeys.flashDesigns(connection.tenant),
 	]) {
 		api.queryClient.setQueryDefaults(key, {
 			gcTime: Number.POSITIVE_INFINITY,

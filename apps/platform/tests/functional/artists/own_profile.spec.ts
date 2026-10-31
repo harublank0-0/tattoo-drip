@@ -80,6 +80,68 @@ test.group("An artist's own profile (TAT-30)", (group) => {
 		assert.equal(saved.userId, member.id);
 	});
 
+	test("an artist switches their own flash requests off", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, member, asha } = await studio();
+		assert.isTrue(asha.acceptingFlash);
+
+		const response = await client
+			.put(`${base}/${asha.id}`)
+			.fields({ name: "Asha", slug: "asha", visible: "on" })
+			.withCsrfToken()
+			.loginAs(member)
+			.redirects(0);
+
+		response.assertStatus(302);
+		const saved = await inTenant(tenant, () => Artist.findOrFail(asha.id));
+		assert.isFalse(saved.acceptingFlash);
+		assert.equal(saved.userId, member.id);
+	});
+
+	test("an artist sets their own styles and TikTok link", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, member, asha } = await studio();
+
+		const response = await client
+			.put(`${base}/${asha.id}`)
+			.fields({
+				name: "Asha",
+				slug: "asha",
+				visible: "on",
+				"styles[]": ["fine-line", "japanese"],
+				tiktokUrl: "https://tiktok.com/@asha",
+			})
+			.withCsrfToken()
+			.loginAs(member)
+			.redirects(0);
+
+		response.assertHeader("location", `${base}/${asha.id}/edit`);
+		const saved = await inTenant(tenant, () => Artist.findOrFail(asha.id));
+		assert.deepEqual(saved.styles, ["fine-line", "japanese"]);
+		assert.equal(saved.tiktokUrl, "https://tiktok.com/@asha");
+		assert.isNull(saved.instagramUrl);
+		assert.equal(saved.userId, member.id);
+
+		const edit = await client
+			.get(`${base}/${asha.id}/edit`)
+			.withInertia()
+			.loginAs(member);
+		assert.deepEqual(edit.inertiaProps.artist.styles, [
+			"fine-line",
+			"japanese",
+		]);
+		assert.equal(
+			edit.inertiaProps.artist.tiktokUrl,
+			"https://tiktok.com/@asha",
+		);
+		assert.isNull(edit.inertiaProps.artist.instagramUrl);
+		assert.isNull(edit.inertiaProps.artist.facebookUrl);
+	});
+
 	test("an artist gets 404 on a profile that isn't theirs, which stays as it was", async ({
 		client,
 		assert,

@@ -51,18 +51,26 @@ paths:
   /styles:
     get:
       operationId: listStyles
-      tags: [V1]
+      tags: [MVP]
       summary: Platform-wide tattoo styles
+      description: The platform's fixed list of tattoo styles, in its order. Cacheable.
       responses:
         "200":
           description: Styles
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            ETag: { $ref: "#/components/headers/ETag" }
           content:
             application/json:
               schema:
                 type: object
                 required: [data]
+                additionalProperties: false
                 properties:
                   data: { type: array, items: { $ref: "#/components/schemas/TattooStyle" } }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
 
   /placements:
     get:
@@ -90,7 +98,9 @@ paths:
       description: |
         What the studio page shows about the studio: its name, intro,
         contact details, links, timezone, whether it takes inquiries
-        (TAT-44) and its cover photo (TAT-116). Never its deposit policy, payment details, members or
+        (TAT-44), its cover photo (TAT-116), and its opening hours, closed
+        days and Good to know texts, among them its deposit policy (TAT-128).
+        Never its default deposit percentage, payment details, members or
         anything about clients, inquiries or payments. Cacheable. Under an
         old slug it answers like under the current one, and `slug` is the
         current slug.
@@ -121,8 +131,9 @@ paths:
       tags: [MVP]
       summary: The studio's visible artists
       description: |
-        Every visible artist, by name (ignoring case), each with up to six
-        photos of their work (TAT-116); hidden and deleted artists never
+        Every visible artist, by name (ignoring case), each with their six
+        newest photos of work, newest first (TAT-116, TAT-126; the whole
+        portfolio is `listWork`); hidden and deleted artists never
         appear, nor do their photos, and a studio with no visible artist
         answers an empty list. Cacheable. Under an old slug it answers like under
         the current one.
@@ -200,39 +211,161 @@ paths:
                   data: { type: array, items: { $ref: "#/components/schemas/Service" } }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /tenants/{tenant}/portfolio:
+  /tenants/{tenant}/work:
     parameters:
       - $ref: "#/components/parameters/Tenant"
     get:
-      operationId: listPortfolio
-      tags: [V1]
-      summary: Portfolio projects, newest first
+      operationId: listWork
+      tags: [MVP]
+      summary: Photos of the studio's work, newest first, a page at a time
+      description: |
+        Every photo of every visible artist (a closed artist's too), newest
+        first. The filters combine; an artist or style that matches nothing
+        is an empty page. Hidden and deleted artists never appear, nor do
+        their photos. Cacheable. Under an old studio slug it answers like
+        under the current one.
       parameters:
-        - name: artistId
+        - name: artist
           in: query
-          schema: { type: string, format: uuid }
+          description: An artist's slug (`getArtist`)
+          schema: { type: string, pattern: "^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$" }
         - name: style
           in: query
-          description: Style slug
-          schema: { type: string }
+          description: A style's slug (`listStyles`)
+          schema: { type: string, maxLength: 40, pattern: "^[a-z0-9]+(-[a-z0-9]+)*$" }
+        - name: healed
+          in: query
+          description: "`true`: only photos marked healed. `false` is the same as leaving it out: all photos."
+          schema: { type: boolean }
         - name: cursor
           in: query
-          schema: { type: string }
+          description: The previous page's `nextCursor`, as sent, with the same filters
+          schema: { type: string, maxLength: 200, pattern: "^[A-Za-z0-9_-]+$" }
         - name: limit
           in: query
-          schema: { type: integer, minimum: 1, maximum: 50, default: 24 }
+          schema: { type: integer, minimum: 1, maximum: 48, default: 24 }
       responses:
         "200":
-          description: A page of projects
+          description: A page of photos
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            ETag: { $ref: "#/components/headers/ETag" }
           content:
             application/json:
               schema:
                 type: object
-                required: [data, nextCursor]
+                required: [data, nextCursor, filters]
+                additionalProperties: false
                 properties:
-                  data: { type: array, items: { $ref: "#/components/schemas/PortfolioProject" } }
-                  nextCursor: { type: [string, "null"] }
+                  data:
+                    type: array
+                    maxItems: 48
+                    items: { $ref: "#/components/schemas/GalleryPhoto" }
+                  nextCursor:
+                    type: [string, "null"]
+                    description: Pass it as `cursor` for the next page; null on the last.
+                  filters: { $ref: "#/components/schemas/WorkFilters" }
+        "304": { $ref: "#/components/responses/NotModified" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /tenants/{tenant}/flash:
+    parameters:
+      - $ref: "#/components/parameters/Tenant"
+    get:
+      operationId: listFlash
+      tags: [MVP]
+      summary: The studio's flash designs, newest first, a page at a time
+      description: |
+        Every shown design of every visible artist (one whose books are
+        closed too), newest first. `requestable` says whether `createInquiry`
+        takes a request for the design now. A one-of-a-kind design someone
+        has claimed is listed with `status` `claimed` while the studio shows
+        claimed designs, and not at all when it hides them or when
+        `available=true`. An artist that matches nothing is an empty page.
+        Hidden designs, and hidden or deleted artists' designs, never appear.
+        Cacheable. Under an old studio slug it answers like under the current
+        one.
+      parameters:
+        - name: available
+          in: query
+          description: "`true`: only designs nobody has claimed. Left out or `false`: claimed designs too, unless the studio hides them."
+          schema: { type: boolean }
+        - name: artist
+          in: query
+          description: An artist's slug (`getArtist`)
+          schema: { type: string, pattern: "^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$" }
+        - name: cursor
+          in: query
+          description: The previous page's `nextCursor`, as sent, with the same filter
+          schema: { type: string, maxLength: 200, pattern: "^[A-Za-z0-9_-]+$" }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 48, default: 24 }
+      responses:
+        "200":
+          description: A page of flash designs
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            ETag: { $ref: "#/components/headers/ETag" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, nextCursor, filters]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: array
+                    maxItems: 48
+                    items: { $ref: "#/components/schemas/FlashDesign" }
+                  nextCursor:
+                    type: [string, "null"]
+                    description: Pass it as `cursor` for the next page; null on the last.
+                  filters: { $ref: "#/components/schemas/FlashFilters" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /tenants/{tenant}/flash/{design}:
+    parameters:
+      - $ref: "#/components/parameters/Tenant"
+      - name: design
+        in: path
+        required: true
+        description: A design's `id` (`listFlash`)
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getFlashDesign
+      tags: [MVP]
+      summary: One shown flash design of a visible artist
+      description: |
+        A hidden design, a hidden or deleted artist's design, an unknown id
+        and another studio's design are all a 404, and so is a claimed design
+        when the studio hides claimed designs. Cacheable. Under an old
+        studio slug it answers like under the current one.
+      responses:
+        "200":
+          description: The design
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            ETag: { $ref: "#/components/headers/ETag" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data: { $ref: "#/components/schemas/FlashDesign" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
 
   /tenants/{tenant}/availability:
     parameters:
@@ -294,6 +427,15 @@ paths:
         new inquiries), `studio_not_accepting` (no artist chosen, and every
         artist of the studio is closed), `too_many_open_inquiries` (this
         phone number already has 3 inquiries the studio hasn't answered).
+        A request for a flash design (`flashDesignId`) is also a 409
+        `flash_unavailable` when the design is hidden, its artist is hidden
+        or deleted, or the id is unknown, and `flash_claimed` when the design
+        was one of a kind and someone has claimed it (the studio shows or
+        hides claimed designs: either way it takes no request; offer to ask
+        for something similar as a plain request); a request for a design whose artist
+        takes no flash requests is `artist_not_accepting`, though their books
+        may be open. A `preferredArtistId` other than the design's artist is
+        `validation_failed` on `preferredArtistId`.
         An unknown or hidden `preferredArtistId` is `validation_failed` on
         `preferredArtistId`; an image that isn't a JPEG, PNG or WebP is
         `validation_failed` on `referenceImages.<index>`.
@@ -335,7 +477,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "408": { $ref: "#/components/responses/Error" }
         "409":
-          description: The studio takes no such inquiry now (`artist_not_accepting`, `studio_not_accepting`, `too_many_open_inquiries`)
+          description: The studio takes no such inquiry now (`artist_not_accepting`, `studio_not_accepting`, `too_many_open_inquiries`, `flash_unavailable`, `flash_claimed`)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -554,12 +696,13 @@ components:
                 (500), `request_timeout` (408, an upload that took too long)
                 and `service_busy` (503, with `Retry-After`: too many uploads
                 in progress, or no database connection free). Endpoint codes: `artist_not_accepting`,
-                `studio_not_accepting`, `too_many_open_inquiries` (409),
+                `studio_not_accepting`, `too_many_open_inquiries`, `flash_unavailable`,
+                `flash_claimed` (409),
                 `challenge_failed` (403) and `challenge_unavailable` (503),
                 all `createInquiry`; `deposit_not_due`, `deposit_changed`
                 (409, `submitDepositProof`). Treat an unknown code by its HTTP
                 status.
-              examples: [not_found, validation_failed, rate_limited, service_busy, too_many_open_inquiries, challenge_failed, deposit_changed]
+              examples: [not_found, validation_failed, rate_limited, service_busy, too_many_open_inquiries, flash_unavailable, flash_claimed, challenge_failed, deposit_changed]
             message:
               type: string
               description: A sentence for people. Never parse it.
@@ -573,7 +716,7 @@ components:
       required: [slug, name]
       properties:
         slug: { type: string, examples: [fine-line] }
-        name: { type: string, examples: [Fine Line] }
+        name: { type: string, examples: [Fine line] }
 
     BodyPlacement:
       type: object
@@ -606,6 +749,47 @@ components:
             these and `url` at `width`.
           items: { $ref: "#/components/schemas/ImageVariant" }
 
+    Logo:
+      type: object
+      description: |
+        The studio's logo (TAT-56) as an `Image` (`alt` is always null: it
+        sits beside the studio's name; a PNG keeps its transparency), with the
+        tile it sits on and its square icon (TAT-123).
+      required: [url, width, height, alt, variants, tile, icon]
+      additionalProperties: false
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Public and absolute.
+        width: { type: integer, minimum: 1 }
+        height: { type: integer, minimum: 1 }
+        alt: { type: [string, "null"] }
+        variants:
+          type: array
+          maxItems: 8
+          description: |
+            Smaller copies, narrowest first (320, 640 and 1280 px, those below
+            the logo's own width), `[]` when it has none. Build `srcset` from
+            these and `url` at `width`.
+          items: { $ref: "#/components/schemas/ImageVariant" }
+        tile:
+          type: string
+          enum: [light, dark]
+          description: |
+            The small tile the logo sits on, in both colour schemes: `light`
+            (#f7f3ee) or `dark` (#14110f). Picked when the logo is uploaded (a
+            light logo with a see-through background gets the dark one); the
+            owner can change it. Treat an unknown value as `light`.
+        icon:
+          description: |
+            A square copy of the logo for the browser tab and a phone's home
+            screen, or null (a logo saved before TAT-123, or one whose icon
+            could not be made): a 180 x 180 PNG of the logo on the tile picked
+            at upload, never see-through, with its 32 px copy in `variants`.
+            `alt` is always null.
+          oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }]
+
     Photo:
       type: object
       description: |
@@ -635,8 +819,8 @@ components:
       type: object
       description: |
         A photo of an artist's work (TAT-116) and its smaller copies. Every
-        property is always there. It carries no id, key, position or
-        timestamp: the list's order is the studio's order.
+        property is always there. It carries no id, key, styles, healed mark
+        or timestamp: the list's order is newest first.
       required: [url, width, height, alt, variants]
       additionalProperties: false
       properties:
@@ -711,11 +895,16 @@ components:
       properties:
         type:
           description: |
-            `artists` (the artists list) or `inquiry` (the idea form, always
-            listed). More will come: treat an unknown value as one to leave
-            out.
+            `work` (Recent work: the newest photos), `artists` (the artists
+            list), `flash` (a few of the newest flash designs, shown only
+            when there are some), `info` (Good to know: hours, closed days
+            and what clients ask, shown only when the studio filled something
+            in) or
+            `inquiry` (the "Got an idea?" invitation to the request page,
+            always listed). More will come: treat an unknown value as one to
+            leave out.
           type: string
-          enum: [artists, inquiry]
+          enum: [work, artists, flash, info, inquiry]
 
     StorefrontConfiguration:
       description: |
@@ -742,8 +931,9 @@ components:
             logo:
               description: |
                 The studio's logo, or null. `alt` is always null (it sits
-                beside the studio's name). A PNG keeps its transparency.
-              oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }]
+                beside the studio's name). A PNG keeps its transparency. It
+                comes with the tile it sits on and its square icon (`Logo`).
+              oneOf: [{ $ref: "#/components/schemas/Logo" }, { type: "null" }]
             colors:
               type: object
               required: [accent, accentDark]
@@ -772,10 +962,12 @@ components:
               type: string
               enum: [eczar, serif, sans]
         sections:
-          description: The sections to show, in order. The form is always there.
+          description: |
+            The sections to show, in order. The `inquiry` section (the
+            "Got an idea?" invitation to the request page) is always listed.
           type: array
           minItems: 1
-          maxItems: 2
+          maxItems: 5
           items: { $ref: "#/components/schemas/StorefrontSection" }
 
     Studio:
@@ -785,7 +977,7 @@ components:
         studio page shows. Every property is always there; an empty one is
         `null` or `[]`. All text is plain text: render it as text, never as
         HTML.
-      required: [slug, name, type, intro, timezone, contact, socialLinks, acceptingInquiries, cover, storefront]
+      required: [slug, name, type, intro, timezone, contact, socialLinks, acceptingInquiries, cover, storefront, openingHours, closedDays, goodToKnow]
       additionalProperties: false
       properties:
         slug:
@@ -843,13 +1035,75 @@ components:
           oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }]
         storefront:
           $ref: "#/components/schemas/StorefrontConfiguration"
+        openingHours:
+          type: array
+          maxItems: 7
+          description: |
+            The weekdays the studio opens (TAT-128), Sunday first; a weekday
+            not listed is closed. [] when the studio set no hours.
+          items: { $ref: "#/components/schemas/OpeningHours" }
+        closedDays:
+          type: array
+          maxItems: 20
+          description: |
+            Closed days that haven't ended in the studio's timezone,
+            earliest first (TAT-128). [] when there are none.
+          items: { $ref: "#/components/schemas/ClosedDays" }
+        goodToKnow:
+          $ref: "#/components/schemas/GoodToKnow"
+
+    OpeningHours:
+      type: object
+      description: |
+        One weekday the studio opens (TAT-128): one opening and one closing time,
+        24-hour, in the studio's `timezone`. Hours never run past midnight.
+      required: [day, opens, closes]
+      additionalProperties: false
+      properties:
+        day: { type: string, enum: [sun, mon, tue, wed, thu, fri, sat] }
+        opens: { type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$", examples: ["11:00"] }
+        closes:
+          type: string
+          pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+          description: Later than `opens`, on the same day
+          examples: ["20:00"]
+
+    ClosedDays:
+      type: object
+      description: |
+        Days the studio is closed whatever its hours say (TAT-128), from `from`
+        to `to`, both included, in the studio's `timezone`.
+      required: [from, to, note]
+      additionalProperties: false
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date, description: "The last closed day; the same as `from` for one day" }
+        note:
+          type: [string, "null"]
+          maxLength: 120
+          description: The studio's words, one line, plain text
+          examples: ["Closed for Dashain, back on 28 October"]
+
+    GoodToKnow:
+      type: object
+      description: |
+        What clients ask before they come (TAT-128), as plain text the studio
+        wrote; null when not set. Show each only when set.
+      required: [walkIns, ageRule, depositPolicy, beforeSession, aftercare]
+      additionalProperties: false
+      properties:
+        walkIns: { type: [string, "null"], maxLength: 300 }
+        ageRule: { type: [string, "null"], maxLength: 200 }
+        depositPolicy: { type: [string, "null"], maxLength: 2000, description: The policy the deposit page also shows }
+        beforeSession: { type: [string, "null"], maxLength: 2000 }
+        aftercare: { type: [string, "null"], maxLength: 2000 }
 
     Artist:
       type: object
       description: |
         A visible artist of the studio (TAT-44). Every property is always
         there. All text is plain text: render it as text.
-      required: [id, slug, name, bio, photo, acceptingInquiries, closedMessage, workPhotos]
+      required: [id, slug, name, bio, photo, acceptingInquiries, closedMessage, workPhotos, styles, socialLinks]
       additionalProperties: false
       properties:
         id:
@@ -877,10 +1131,19 @@ components:
           type: array
           maxItems: 6
           description: |
-            Up to six photos of the artist's work, in the studio's order; []
-            when none. An artist who is closed for inquiries still shows
-            theirs.
+            The artist's six newest photos, newest first; [] when none. An
+            artist who is closed for inquiries still shows theirs. All of them
+            are in `listWork`.
           items: { $ref: "#/components/schemas/WorkPhoto" }
+        styles:
+          type: array
+          maxItems: 5
+          description: The artist's styles from the platform's list, in the list's order; [] when none.
+          items: { $ref: "#/components/schemas/TattooStyle" }
+        socialLinks:
+          type: array
+          description: "The links the artist set, in this order: instagram, facebook, tiktok. Only https links."
+          items: { $ref: "#/components/schemas/SocialLink" }
 
     Service:
       type: object
@@ -893,20 +1156,153 @@ components:
         startingPrice:
           oneOf: [{ $ref: "#/components/schemas/Money" }, { type: "null" }]
 
-    PortfolioProject:
+    GalleryPhoto:
       type: object
-      required: [id, artistId, title, images]
+      description: |
+        A photo in the studio's gallery (`listWork`): a `WorkPhoto` with its
+        styles, its healed mark and whose work it is. Every property is
+        always there. All text is plain text: render it as text.
+      required: [url, width, height, alt, variants, styles, healed, artist]
+      additionalProperties: false
       properties:
-        id: { type: string, format: uuid }
-        artistId: { type: string, format: uuid }
-        title: { type: string }
-        description: { type: [string, "null"] }
-        style: { type: [string, "null"], description: Style slug }
-        placement: { type: [string, "null"], description: Placement slug }
-        completedOn: { type: [string, "null"], format: date }
-        images:
+        url:
+          type: string
+          format: uri
+          description: Public and absolute.
+        width: { type: integer, minimum: 1 }
+        height: { type: integer, minimum: 1 }
+        alt:
+          type: [string, "null"]
+          maxLength: 200
+          description: |
+            The studio's own description of the photo, one line of plain
+            text, or null: then build one from the artist's name, such as
+            "Tattoo by Sita Rai".
+        variants:
           type: array
-          items: { $ref: "#/components/schemas/Image" }
+          maxItems: 8
+          description: |
+            Smaller copies, narrowest first, each narrower than `width`
+            (320, 640 and 1280 px, those below the photo's own width). Empty
+            for a photo too small to have any: then show `url` alone. Build
+            `srcset` from these and `url` at `width`.
+          items: { $ref: "#/components/schemas/ImageVariant" }
+        styles:
+          type: array
+          maxItems: 3
+          description: The photo's styles from the platform's list, in the list's order; [] when none.
+          items: { $ref: "#/components/schemas/TattooStyle" }
+        healed:
+          type: boolean
+          description: True when the studio marked the photo as healed.
+        artist:
+          type: object
+          description: "Whose work it is: the artist's page is `getArtist(slug)`."
+          required: [slug, name]
+          additionalProperties: false
+          properties:
+            slug: { type: string, examples: [sita-rai] }
+            name: { type: string, maxLength: 120, examples: [Sita Rai] }
+
+    WorkFilters:
+      type: object
+      description: |
+        What the gallery can be narrowed by. Offer only these: a filter that
+        matches no photo would show an empty page.
+      required: [styles, healed]
+      additionalProperties: false
+      properties:
+        styles:
+          type: array
+          description: |
+            The styles at least one photo carries, among the visible artists'
+            photos (only `artist`'s when it is given), in the list's order:
+            offer only these. Plus the listed `style` the request asked for,
+            even when none of those photos carries it, so the control that
+            is on is always among them.
+          items: { $ref: "#/components/schemas/TattooStyle" }
+        healed:
+          type: boolean
+          description: Whether one of those photos is marked healed.
+
+    FlashDesign:
+      type: object
+      description: |
+        A flash design an artist offers (TAT-129). Every property is always
+        there. All text is plain text: render it as text. It carries no key,
+        hidden flag or timestamp: the list's order is newest first.
+      required: [id, name, size, price, image, artist, requestable, status]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: What `createInquiry` takes as `flashDesignId`. The design's page is `/flash/<id>`.
+        name: { type: string, maxLength: 80, examples: [Moth] }
+        size:
+          type: string
+          maxLength: 60
+          description: In words, such as About 3 in
+          examples: [About 3 in]
+        price:
+          oneOf: [{ $ref: "#/components/schemas/Price" }, { type: "null" }]
+          description: null when the studio keeps the price to itself.
+        image:
+          description: The picture. The page builds the `alt` text from the name and the artist.
+          $ref: "#/components/schemas/Photo"
+        artist:
+          type: object
+          description: "Whose design it is: the artist's page is `getArtist(slug)`."
+          required: [slug, name]
+          additionalProperties: false
+          properties:
+            slug: { type: string, examples: [sita-rai] }
+            name: { type: string, maxLength: 120, examples: [Sita Rai] }
+        requestable:
+          type: boolean
+          description: |
+            Whether `createInquiry` takes a request for it now: `status` is
+            `available` and the artist takes flash requests, whatever their
+            books say. False: show it greyed (a claimed design is marked
+            Claimed; otherwise use the artist's `closedMessage`).
+        status:
+          type: string
+          enum: [available, claimed]
+          description: |
+            `claimed`: one of a kind and taken. Listed only while the studio
+            shows claimed designs: show it greyed, marked Claimed; it is never
+            requestable. Treat an unknown value as `claimed`.
+
+    Price:
+      type: object
+      description: A price with the words to show for it. Not `Money`, which has no text.
+      required: [amount, currency, text]
+      additionalProperties: false
+      properties:
+        amount: { type: integer, minimum: 1, description: In the currency's smallest unit (paisa) }
+        currency: { type: string, enum: [NPR] }
+        text: { type: string, description: "Show it as it is.", examples: ["NPR 3,000"] }
+
+    FlashFilters:
+      type: object
+      description: |
+        What the flash list can be narrowed by. Offer only these: an artist
+        with no shown design would give an empty page.
+      required: [artists]
+      additionalProperties: false
+      properties:
+        artists:
+          type: array
+          description: |
+            The visible artists with a shown design, by name, whatever
+            `artist` asks: offer only these.
+          items:
+            type: object
+            required: [slug, name]
+            additionalProperties: false
+            properties:
+              slug: { type: string, examples: [sita-rai] }
+              name: { type: string, maxLength: 120, examples: [Sita Rai] }
 
     Slot:
       type: object
@@ -936,6 +1332,13 @@ components:
           type: [string, "null"]
           format: uuid
           description: A visible artist of this studio who takes inquiries. Leave it out for any artist.
+        flashDesignId:
+          type: [string, "null"]
+          format: uuid
+          description: |
+            A flash design from `listFlash`. The inquiry then asks for that
+            design and its artist: leave `preferredArtistId` out or give the
+            design's artist.
         budget: { type: [string, "null"], maxLength: 120, description: Free text, examples: [NPR 15000] }
         sourceChannel: { $ref: "#/components/schemas/SourceChannel" }
         contactName: { type: string, minLength: 1, maxLength: 120 }

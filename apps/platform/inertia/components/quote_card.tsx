@@ -1,6 +1,9 @@
 import { Form } from "@adonisjs/inertia/react";
+import { TriangleAlert } from "lucide-react";
 import { type RefObject, useId, useState } from "react";
 import ChatMessage from "~/components/chat_message";
+import { useDesignTaken } from "~/components/design_taken";
+import { QUOTE_TAKEN_WARNING } from "~/components/flash";
 import {
 	FormSheetActions,
 	FormSheetPanel,
@@ -433,6 +436,7 @@ export function QuoteForm({
 	sheet?: FormSheetState;
 }) {
 	const tenant = useTenant();
+	const designTaken = useDesignTaken();
 	const [kind, setKind] = useState<Kind>(quote?.kind ?? "fixed");
 	const [fixedPrice, setFixedPrice] = useState(
 		quote?.fixedPrice?.toString() ?? "",
@@ -618,6 +622,16 @@ export function QuoteForm({
 						</FieldDescription>
 						{errors.expiresOn && <FieldError>{errors.expiresOn}</FieldError>}
 					</Field>
+
+					{designTaken && (
+						<p className="flex items-start gap-2 rounded-md border border-marigold bg-marigold/10 p-3 text-sm">
+							<TriangleAlert
+								aria-hidden="true"
+								className="mt-0.5 size-4 shrink-0"
+							/>
+							<span>{QUOTE_TAKEN_WARNING}</span>
+						</p>
+					)}
 
 					{sheet ? (
 						<FormSheetActions submit="Revise quote" processing={processing} />

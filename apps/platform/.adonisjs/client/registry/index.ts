@@ -162,6 +162,12 @@ const routes = {
     tokens: [{"old":"/t/:tenant/settings/logo","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/logo","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/logo","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/logo","type":0,"val":"logo","end":""}],
     types: placeholder as Registry['tenant.settings.logo.destroy']['types'],
   },
+  'tenant.settings.logo.tile.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/settings/logo/tile',
+    tokens: [{"old":"/t/:tenant/settings/logo/tile","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/logo/tile","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/logo/tile","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/logo/tile","type":0,"val":"logo","end":""},{"old":"/t/:tenant/settings/logo/tile","type":0,"val":"tile","end":""}],
+    types: placeholder as Registry['tenant.settings.logo.tile.update']['types'],
+  },
   'tenant.settings.payments': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/settings/payments',
@@ -221,6 +227,36 @@ const routes = {
     pattern: '/t/:tenant/settings/messages',
     tokens: [{"old":"/t/:tenant/settings/messages","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/messages","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/messages","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/messages","type":0,"val":"messages","end":""}],
     types: placeholder as Registry['tenant.settings.messages.update']['types'],
+  },
+  'tenant.settings.good_to_know': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/settings/good-to-know',
+    tokens: [{"old":"/t/:tenant/settings/good-to-know","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/good-to-know","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/good-to-know","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/good-to-know","type":0,"val":"good-to-know","end":""}],
+    types: placeholder as Registry['tenant.settings.good_to_know']['types'],
+  },
+  'tenant.settings.good_to_know.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/settings/good-to-know',
+    tokens: [{"old":"/t/:tenant/settings/good-to-know","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/good-to-know","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/good-to-know","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/good-to-know","type":0,"val":"good-to-know","end":""}],
+    types: placeholder as Registry['tenant.settings.good_to_know.update']['types'],
+  },
+  'tenant.settings.hours.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/settings/hours',
+    tokens: [{"old":"/t/:tenant/settings/hours","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/hours","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/hours","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/hours","type":0,"val":"hours","end":""}],
+    types: placeholder as Registry['tenant.settings.hours.update']['types'],
+  },
+  'tenant.settings.closed_days.store': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/settings/closed-days',
+    tokens: [{"old":"/t/:tenant/settings/closed-days","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/closed-days","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/closed-days","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/closed-days","type":0,"val":"closed-days","end":""}],
+    types: placeholder as Registry['tenant.settings.closed_days.store']['types'],
+  },
+  'tenant.settings.closed_days.destroy': {
+    methods: ["DELETE"],
+    pattern: '/t/:tenant/settings/closed-days/:id',
+    tokens: [{"old":"/t/:tenant/settings/closed-days/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/closed-days/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/closed-days/:id","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/closed-days/:id","type":0,"val":"closed-days","end":""},{"old":"/t/:tenant/settings/closed-days/:id","type":1,"val":"id","end":""}],
+    types: placeholder as Registry['tenant.settings.closed_days.destroy']['types'],
   },
   'tenant.settings.members': {
     methods: ["GET","HEAD"],
@@ -312,17 +348,35 @@ const routes = {
     tokens: [{"old":"/t/:tenant/artists/photos/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/photos/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/photos/:id","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/photos/:id","type":0,"val":"photos","end":""},{"old":"/t/:tenant/artists/photos/:id","type":1,"val":"id","end":""}],
     types: placeholder as Registry['tenant.artists.photos.update']['types'],
   },
-  'tenant.artists.photos.move': {
-    methods: ["POST"],
-    pattern: '/t/:tenant/artists/photos/:id/move',
-    tokens: [{"old":"/t/:tenant/artists/photos/:id/move","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/photos/:id/move","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/photos/:id/move","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/photos/:id/move","type":0,"val":"photos","end":""},{"old":"/t/:tenant/artists/photos/:id/move","type":1,"val":"id","end":""},{"old":"/t/:tenant/artists/photos/:id/move","type":0,"val":"move","end":""}],
-    types: placeholder as Registry['tenant.artists.photos.move']['types'],
-  },
   'tenant.artists.photos.destroy': {
     methods: ["DELETE"],
     pattern: '/t/:tenant/artists/photos/:id',
     tokens: [{"old":"/t/:tenant/artists/photos/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/photos/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/photos/:id","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/photos/:id","type":0,"val":"photos","end":""},{"old":"/t/:tenant/artists/photos/:id","type":1,"val":"id","end":""}],
     types: placeholder as Registry['tenant.artists.photos.destroy']['types'],
+  },
+  'tenant.artists.flash.store': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/artists/:id/flash',
+    tokens: [{"old":"/t/:tenant/artists/:id/flash","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/:id/flash","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/:id/flash","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/:id/flash","type":1,"val":"id","end":""},{"old":"/t/:tenant/artists/:id/flash","type":0,"val":"flash","end":""}],
+    types: placeholder as Registry['tenant.artists.flash.store']['types'],
+  },
+  'tenant.artists.flash.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/artists/flash/:id',
+    tokens: [{"old":"/t/:tenant/artists/flash/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/flash/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/flash/:id","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/flash/:id","type":0,"val":"flash","end":""},{"old":"/t/:tenant/artists/flash/:id","type":1,"val":"id","end":""}],
+    types: placeholder as Registry['tenant.artists.flash.update']['types'],
+  },
+  'tenant.artists.flash.claim.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/artists/flash/:id/claim',
+    tokens: [{"old":"/t/:tenant/artists/flash/:id/claim","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/flash/:id/claim","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/flash/:id/claim","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/flash/:id/claim","type":0,"val":"flash","end":""},{"old":"/t/:tenant/artists/flash/:id/claim","type":1,"val":"id","end":""},{"old":"/t/:tenant/artists/flash/:id/claim","type":0,"val":"claim","end":""}],
+    types: placeholder as Registry['tenant.artists.flash.claim.update']['types'],
+  },
+  'tenant.artists.flash.destroy': {
+    methods: ["DELETE"],
+    pattern: '/t/:tenant/artists/flash/:id',
+    tokens: [{"old":"/t/:tenant/artists/flash/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/flash/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/flash/:id","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/flash/:id","type":0,"val":"flash","end":""},{"old":"/t/:tenant/artists/flash/:id","type":1,"val":"id","end":""}],
+    types: placeholder as Registry['tenant.artists.flash.destroy']['types'],
   },
   'tenant.inbox.index': {
     methods: ["GET","HEAD"],
@@ -630,6 +684,12 @@ const routes = {
     tokens: [{"old":"/account/sign-out-others","type":0,"val":"account","end":""},{"old":"/account/sign-out-others","type":0,"val":"sign-out-others","end":""}],
     types: placeholder as Registry['account.sign_out_others']['types'],
   },
+  'api.v1.styles.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/styles',
+    tokens: [{"old":"/api/v1/styles","type":0,"val":"api","end":""},{"old":"/api/v1/styles","type":0,"val":"v1","end":""},{"old":"/api/v1/styles","type":0,"val":"styles","end":""}],
+    types: placeholder as Registry['api.v1.styles.index']['types'],
+  },
   'api.v1.studio': {
     methods: ["GET","HEAD"],
     pattern: '/api/v1/tenants/:tenant',
@@ -647,6 +707,24 @@ const routes = {
     pattern: '/api/v1/tenants/:tenant/artists/:artist',
     tokens: [{"old":"/api/v1/tenants/:tenant/artists/:artist","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/artists/:artist","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/artists/:artist","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/artists/:artist","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/artists/:artist","type":0,"val":"artists","end":""},{"old":"/api/v1/tenants/:tenant/artists/:artist","type":1,"val":"artist","end":""}],
     types: placeholder as Registry['api.v1.artists.show']['types'],
+  },
+  'api.v1.work.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/tenants/:tenant/work',
+    tokens: [{"old":"/api/v1/tenants/:tenant/work","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/work","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/work","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/work","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/work","type":0,"val":"work","end":""}],
+    types: placeholder as Registry['api.v1.work.index']['types'],
+  },
+  'api.v1.flash.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/tenants/:tenant/flash',
+    tokens: [{"old":"/api/v1/tenants/:tenant/flash","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/flash","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/flash","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/flash","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/flash","type":0,"val":"flash","end":""}],
+    types: placeholder as Registry['api.v1.flash.index']['types'],
+  },
+  'api.v1.flash.show': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/tenants/:tenant/flash/:design',
+    tokens: [{"old":"/api/v1/tenants/:tenant/flash/:design","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/flash/:design","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/flash/:design","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/flash/:design","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/flash/:design","type":0,"val":"flash","end":""},{"old":"/api/v1/tenants/:tenant/flash/:design","type":1,"val":"design","end":""}],
+    types: placeholder as Registry['api.v1.flash.show']['types'],
   },
   'api.v1.inquiries.store': {
     methods: ["POST"],

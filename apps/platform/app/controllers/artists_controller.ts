@@ -14,17 +14,24 @@ import ArtistService, {
 } from "#modules/artists/services/artist_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import WorkPhotoService from "#modules/artists/services/work_photo_service";
+import { knownStyles, TATTOO_STYLES } from "#modules/artists/styles";
 import {
 	createArtistValidator,
 	updateArtistValidator,
 } from "#modules/artists/validators/artist";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import FlashService from "#modules/flash/services/flash_service";
 import { InvalidImageError } from "#modules/media/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService, {
 	THUMBNAIL_WIDTH,
 } from "#modules/media/services/image_service";
+import { formatMoney } from "#modules/projects/quotes";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { artistLink } from "#services/studio_links";
+
+/** The styles the form offers, in the list's order. */
+const STYLE_OPTIONS = TATTOO_STYLES.map(({ slug, name }) => ({ slug, name }));
 
 /**
  * The studio's artist profiles. Owners manage every one; an artist edits
@@ -39,6 +46,7 @@ export default class ArtistsController {
 		private artists: ArtistService,
 		private images: ImageService,
 		private workPhotos: WorkPhotoService,
+		private flash: FlashService,
 	) {}
 
 	async index(ctx: HttpContext) {
@@ -90,6 +98,9 @@ export default class ArtistsController {
 			canLink: !(await this.hasProfile(tenant, userId)),
 			// Photos come once the artist is saved (TAT-116).
 			workPhotos: [],
+			// Flash designs too (TAT-129).
+			flashDesigns: [],
+			styleOptions: STYLE_OPTIONS,
 		});
 	}
 
@@ -123,8 +134,10 @@ export default class ArtistsController {
 			(artist.userId === userId ||
 				(artist.userId === null && !(await this.hasProfile(tenant, userId))));
 
-		// The artist's work photos (TAT-116), loaded after findEditable: only
-		// what the tray draws, each as its 320 px copy.
+		// The artist's work photos (TAT-116), newest first, loaded after
+		// findEditable: only what the tray draws, each as its 320 px copy. Only
+		// listed styles reach the form, like the artist's own: a slug that left
+		// the list has no box and is dropped on the next save.
 		const photos = await this.workPhotos.list(tenant, artist);
 		const workPhotos = await Promise.all(
 			photos.map(async (photo) => ({
@@ -136,6 +149,31 @@ export default class ArtistsController {
 					THUMBNAIL_WIDTH,
 				),
 				alt: photo.alt,
+				styles: knownStyles(photo.styles).map(({ slug }) => slug),
+				healed: photo.healed,
+			})),
+		);
+
+		// The artist's flash designs (TAT-129), newest first, hidden ones too,
+		// loaded after findEditable like the photos: the price in whole rupees
+		// for the form and as words, the 320 px copy for the list.
+		const designs = await this.flash.list(tenant, artist);
+		const flashDesigns = await Promise.all(
+			designs.map(async (design) => ({
+				id: design.id,
+				name: design.name,
+				size: design.size,
+				price: design.price === null ? null : design.price / 100,
+				priceText: design.price === null ? null : formatMoney(design.price),
+				hidden: design.hidden,
+				oneOfAKind: design.oneOfAKind,
+				claimed: design.claimedAt !== null,
+				thumbnailUrl: await this.images.urlFor(
+					"flash_design",
+					design.imageKey,
+					tenant,
+					THUMBNAIL_WIDTH,
+				),
 			})),
 		);
 
@@ -143,6 +181,8 @@ export default class ArtistsController {
 			artist: await this.toProps(tenant, artist, userId),
 			canLink,
 			workPhotos,
+			flashDesigns,
+			styleOptions: STYLE_OPTIONS,
 		});
 	}
 
@@ -228,14 +268,21 @@ export default class ArtistsController {
 			...(await this.toRowProps(tenant, artist, userId)),
 			slug: artist.slug,
 			bio: artist.bio,
+			acceptingFlash: artist.acceptingFlash,
 			closedMessage: artist.closedMessage,
+			// Only listed styles: a slug that left the list has no box to show.
+			styles: knownStyles(artist.styles).map(({ slug }) => slug),
+			instagramUrl: artist.instagramUrl,
+			facebookUrl: artist.facebookUrl,
+			tiktokUrl: artist.tiktokUrl,
 		};
 	}
 }
 
 /**
  * The service's input from the validated body. A checkbox that is not
- * checked is not sent at all, so a missing boolean means off.
+ * checked is not sent at all, so a missing boolean means off and no style
+ * box means no styles.
  */
 function toInput(data: Infer<typeof updateArtistValidator>): ArtistInput {
 	return {
@@ -244,7 +291,12 @@ function toInput(data: Infer<typeof updateArtistValidator>): ArtistInput {
 		bio: data.bio ?? null,
 		visible: data.visible ?? false,
 		acceptingInquiries: data.acceptingInquiries ?? false,
+		acceptingFlash: data.acceptingFlash ?? false,
 		closedMessage: data.closedMessage ?? null,
+		styles: data.styles ?? [],
+		instagramUrl: data.instagramUrl ?? null,
+		facebookUrl: data.facebookUrl ?? null,
+		tiktokUrl: data.tiktokUrl ?? null,
 		linkToMe: data.linkToMe ?? false,
 		photo: data.photo,
 		removePhoto: data.removePhoto ?? false,

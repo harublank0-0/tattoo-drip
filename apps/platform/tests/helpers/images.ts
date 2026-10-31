@@ -4,7 +4,7 @@ import app from "@adonisjs/core/services/app";
 import sharp from "sharp";
 import ImageService from "#modules/media/services/image_service";
 
-type Rgba = { r: number; g: number; b: number; alpha?: number };
+export type Rgba = { r: number; g: number; b: number; alpha?: number };
 
 function canvas(
 	width: number,
@@ -26,6 +26,32 @@ export const testImages = {
 		canvas(width, height, { r: 20, g: 120, b: 60, alpha: 0.5 })
 			.png()
 			.toBuffer(),
+	/**
+	 * A logo on a see-through background (TAT-123): `bands` of opaque colour
+	 * side by side, each an equal share of a box with a clear margin around it,
+	 * so a test can say how much of a logo is light.
+	 */
+	logoOnClear: (bands: Rgba[], width = 600, height = 200) => {
+		const margin = Math.round(height / 10);
+		const bandWidth = Math.floor((width - 2 * margin) / bands.length);
+		return canvas(width, height, { r: 0, g: 0, b: 0, alpha: 0 })
+			.composite(
+				bands.map((colour, index) => ({
+					input: {
+						create: {
+							width: bandWidth,
+							height: height - 2 * margin,
+							channels: 4,
+							background: { ...colour, alpha: 1 },
+						},
+					},
+					top: margin,
+					left: margin + index * bandWidth,
+				})),
+			)
+			.png()
+			.toBuffer();
+	},
 	transparentWebp: () =>
 		canvas(20, 20, { r: 0, g: 0, b: 0, alpha: 0 }).webp().toBuffer(),
 	gif: () => canvas(10, 10).gif().toBuffer(),

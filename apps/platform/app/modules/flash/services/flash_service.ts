@@ -1,0 +1,531 @@
+import { inject } from "@adonisjs/core";
+import type { MultipartFile } from "@adonisjs/core/bodyparser";
+import { errors as lucidErrors } from "@adonisjs/lucid";
+import type { QueryClientContract } from "@adonisjs/lucid/types/database";
+import Artist from "#modules/artists/models/artist";
+import ArtistService, {
+	mayEdit,
+	type ProfileEditor,
+} from "#modules/artists/services/artist_service";
+import type { WorkCursor } from "#modules/artists/work_cursor";
+import {
+	FlashInUseError,
+	FlashLimitError,
+	FlashRuleError,
+} from "#modules/flash/errors";
+import FlashDesign from "#modules/flash/models/flash_design";
+import { ImageDeleteError } from "#modules/media/errors";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import ImageService from "#modules/media/services/image_service";
+import type Tenant from "#modules/tenancy/models/tenant";
+import { afterRollback, dbClient, withTransaction } from "#services/db_context";
+import { isForeignKeyViolation } from "#services/db_errors";
+
+type Upload = Pick<MultipartFile, "tmpPath">;
+type TenantRef = Pick<Tenant, "id">;
+
+/**
+ * The most flash designs an artist offers. The database does not hold this
+ * limit: the count under the artist's row lock (`add`) is the only guard.
+ */
+export const MAX_FLASH_DESIGNS = 100;
+
+const PURPOSE = "flash_design";
+const INQUIRY_KEY = "inquiries_flash_design_fk";
+const PROJECT_KEY = "tattoo_projects_flash_design_fk";
+
+/**
+ * Keeps a design only while its artist is, in this very statement, a live
+ * visible artist of the tenant (one `?`: the tenant's id). The public reads
+ * get artist ids that were read earlier, and under READ COMMITTED an artist
+ * can be hidden or deleted between that read and the designs'; asking again
+ * in the same SQL means a cacheable response never carries a design of an
+ * artist who is no longer shown. `artists` is soft-deleted, so `deleted_at`
+ * is said here (the model's scope is a fetch hook and does not reach a
+ * subquery).
+ */
+const VISIBLE_ARTIST = `exists (
+	select 1 from artists
+	where artists.id = flash_designs.artist_id
+		and artists.tenant_id = ?
+		and artists.visible
+		and artists.deleted_at is null
+)`;
+
+/**
+ * What a new design needs besides the picture; `price` is in paisa, null for
+ * none. `oneOfAKind`: the studio will tattoo it only once, so it is claimed
+ * (never by `add` itself) when a client's deposit is verified or their
+ * project is booked.
+ */
+export type NewFlashDesign = {
+	name: string;
+	size: string;
+	price: number | null;
+	oneOfAKind: boolean;
+};
+
+/** What an owner or an artist can change on a design: its words, price, whether it is one of a kind and whether it is shown. */
+export type FlashDetails = NewFlashDesign & { hidden: boolean };
+
+/**
+ * What a page of designs shows: these artists' shown designs, claimed ones
+ * too when `withClaimed` (the studio shows them greyed), else only the
+ * designs nobody has claimed.
+ */
+export type FlashFilter = {
+	artistIds: readonly string[];
+	withClaimed: boolean;
+};
+
+/**
+ * The flash designs of an artist (TAT-129): up to 100, newest first
+ * (`created_at desc, id desc`, nothing reorders them), each a picture, a
+ * name, a size and an optional price. Every call is scoped to the tenant.
+ * Who may change an artist's designs is ArtistService.findEditable (an owner
+ * any live artist's, an artist their own linked profile's), and every write
+ * checks that again under the artist's row lock, the lock ArtistService.save
+ * takes too. Pictures are stored through ImageService and deleted here.
+ *
+ * A design is deleted for good, row and files, like a work photo, except
+ * that an inquiry or a project naming it keeps it (their keys are NO
+ * ACTION): `remove` then throws FlashInUseError and the studio hides the
+ * design instead. A hidden design stays in the dashboard and in what the
+ * requests name; the public reads (`page`, `findShown`, `artistsWithDesigns`)
+ * show shown designs of visible artists only: the caller narrows them to the
+ * artist ids it read, and the same query checks again that each artist is
+ * still visible and live (VISIBLE_ARTIST), so an id list that went stale
+ * shows nothing of an artist hidden or deleted since.
+ */
+@inject()
+export default class FlashService {
+	constructor(
+		private images: ImageService,
+		private artists: ArtistService,
+	) {}
+
+	/** The artist's designs, hidden ones too, newest first. */
+	async list(tenant: TenantRef, artist: Artist): Promise<FlashDesign[]> {
+		assertOwnedBy(tenant, artist);
+		return FlashDesign.query()
+			.where("tenant_id", tenant.id)
+			.where("artist_id", artist.id)
+			.orderBy("created_at", "desc")
+			.orderBy("id", "desc");
+	}
+
+	/**
+	 * The design and its artist, if `editor` may change them: the design is
+	 * the tenant's, and the artist is live and `editor`'s to edit
+	 * (ArtistService.findEditable). Another tenant's design, a deleted
+	 * artist's, another artist's for an artist member and an unknown id all
+	 * throw E_ROW_NOT_FOUND (a 404), so callers can't tell them apart.
+	 */
+	async findEditable(
+		tenant: TenantRef,
+		editor: ProfileEditor,
+		designId: string,
+	): Promise<{ design: FlashDesign; artist: Artist }> {
+		const design = await FlashDesign.query()
+			.where("tenant_id", tenant.id)
+			.where("id", designId)
+			.firstOrFail();
+		const artist = await this.artists.findEditable(
+			tenant,
+			editor,
+			design.artistId,
+		);
+		return { design, artist };
+	}
+
+	/**
+	 * Adds a design, dated now, so it is the artist's newest and shown.
+	 * Throws FlashLimitError when the artist already offers 100 (also when
+	 * two uploads race for the last place: the second is refused under the
+	 * lock and its file is deleted) and InvalidImageError for a file we can't
+	 * accept.
+	 *
+	 * The order matters, as for a work photo. The editor check and the
+	 * unlocked count refuse a profile that isn't theirs or a full set before
+	 * any decode; the file is stored inside the transaction with its cleanup
+	 * registered at once and before the row lock (so the lock is not held
+	 * while the image is processed); the lock then serializes uploads, and
+	 * the count under it is the one that counts.
+	 */
+	async add(
+		tenant: TenantRef,
+		editor: ProfileEditor,
+		artist: Artist,
+		upload: Upload,
+		details: NewFlashDesign,
+	): Promise<FlashDesign> {
+		assertOwnedBy(tenant, artist);
+		if (!mayEdit(editor, artist.userId)) {
+			throw new lucidErrors.E_ROW_NOT_FOUND(Artist);
+		}
+		if ((await this.countDesigns(tenant, artist.id)) >= MAX_FLASH_DESIGNS) {
+			throw new FlashLimitError();
+		}
+		return withTransaction(async (trx) => {
+			const stored = await this.images.store(upload, {
+				tenant,
+				purpose: PURPOSE,
+			});
+			afterRollback(() => this.images.delete(PURPOSE, stored.key));
+			await this.artists.lockEditable(trx, tenant, editor, artist.id);
+			// Again under the lock: another upload may have landed meanwhile.
+			const count = await this.countDesigns(tenant, artist.id, trx);
+			if (count >= MAX_FLASH_DESIGNS) throw new FlashLimitError();
+			return FlashDesign.create(
+				{
+					tenantId: tenant.id,
+					artistId: artist.id,
+					imageKey: stored.key,
+					width: stored.width,
+					height: stored.height,
+					name: details.name.trim(),
+					size: details.size.trim(),
+					price: details.price,
+					currency: "NPR",
+					hidden: false,
+					oneOfAKind: details.oneOfAKind,
+				},
+				{ client: trx },
+			);
+		});
+	}
+
+	/**
+	 * Saves the design's name, size, price, whether it is one of a kind and
+	 * whether it is hidden, from a fresh read under the artist's lock. The
+	 * picture never changes: a new picture is a new design. Switching a design
+	 * to "can be tattooed again" clears its claim in the same UPDATE. The
+	 * design's row is locked first (after the artist's, the order every write
+	 * of the studio's keeps), so a claim in flight is waited for and read: a
+	 * claim that commits meanwhile is cleared with the switch, and one that
+	 * comes after finds the design repeatable. The database's check
+	 * `flash_designs_claim_one_of_a_kind` therefore never sees a claimed
+	 * repeatable design. Saving it still one of a kind keeps the claim.
+	 */
+	async update(
+		tenant: TenantRef,
+		editor: ProfileEditor,
+		design: FlashDesign,
+		details: FlashDetails,
+	): Promise<FlashDesign> {
+		assertDesignOf(tenant, design);
+		return withTransaction(async (trx) => {
+			await this.artists.lockEditable(trx, tenant, editor, design.artistId);
+			const live = await this.lockedDesign(trx, tenant, design, true);
+			live.merge({
+				name: details.name.trim(),
+				size: details.size.trim(),
+				price: details.price,
+				oneOfAKind: details.oneOfAKind,
+				hidden: details.hidden,
+				...(details.oneOfAKind
+					? {}
+					: { claimedAt: null, claimedProjectId: null }),
+			});
+			await live.save();
+			return live;
+		});
+	}
+
+	/**
+	 * Marks a one-of-a-kind design claimed by hand (`claimed` true: the claim
+	 * has no project) or available again (`false`: both claim columns
+	 * cleared, whoever made the claim). Under the artist's lock, like every
+	 * change by the studio, and as a conditional UPDATE: claiming an already
+	 * claimed design changes nothing (a project's claim stays the project's)
+	 * and a claim made by a project in the same instant is never overwritten
+	 * by a stale copy. A design that can be tattooed again is
+	 * FlashRuleError("repeatable"); an artist unlinked meanwhile or a deleted
+	 * one is E_ROW_NOT_FOUND (lockEditable). Returns the design as stored.
+	 */
+	async setClaimed(
+		tenant: TenantRef,
+		editor: ProfileEditor,
+		design: FlashDesign,
+		claimed: boolean,
+	): Promise<FlashDesign> {
+		assertDesignOf(tenant, design);
+		return withTransaction(async (trx) => {
+			await this.artists.lockEditable(trx, tenant, editor, design.artistId);
+			const live = await this.lockedDesign(trx, tenant, design);
+			if (!live.oneOfAKind) throw new FlashRuleError("repeatable");
+			await trx.rawQuery(
+				claimed
+					? `update flash_designs set claimed_at = now(), claimed_project_id = null, updated_at = now()
+						where tenant_id = ? and id = ? and one_of_a_kind and claimed_at is null`
+					: `update flash_designs set claimed_at = null, claimed_project_id = null, updated_at = now()
+						where tenant_id = ? and id = ? and claimed_at is not null`,
+				[tenant.id, live.id],
+			);
+			return this.lockedDesign(trx, tenant, design);
+		});
+	}
+
+	/**
+	 * Deletes the design for good: under the artist's lock a design that a
+	 * request or a project names is FlashInUseError at once (a plain read,
+	 * so the delete never holds the design's row while it waits for a
+	 * project's lock: see `isNamed`). Otherwise the row goes first, in its
+	 * own savepoint, so one named in the meantime (the database's `NO ACTION`
+	 * keys) becomes FlashInUseError too, before any file is touched. Then, in
+	 * the same savepoint, the files and every copy are deleted ("removed"). A design a client asked to take down must
+	 * not stay fetchable while the studio is told it is gone, and a file
+	 * delete can fail after others succeeded: if any file cannot be deleted
+	 * the savepoint rolls the row back, but the design is then damaged (some
+	 * files gone), so it is hidden at once, in the caller's transaction
+	 * ("hidden", not an error, so the hide is committed with it): no longer
+	 * on the public pages and not requestable (`findShown`, `holdShown`), and
+	 * the owner is told to try again. A retry finishes the job: a missing file
+	 * counts as deleted.
+	 */
+	async remove(
+		tenant: TenantRef,
+		editor: ProfileEditor,
+		design: FlashDesign,
+	): Promise<"removed" | "hidden"> {
+		assertDesignOf(tenant, design);
+		return withTransaction(async (trx) => {
+			await this.artists.lockEditable(trx, tenant, editor, design.artistId);
+			const live = await this.lockedDesign(trx, tenant, design);
+			// Before the design's row is touched: deleting it would take the row and
+			// then wait, in the foreign keys' check, for the lock of a project that is
+			// being claimed (it holds the project first, then wants this row).
+			if (await this.isNamed(trx, tenant, live.id)) {
+				throw new FlashInUseError();
+			}
+			try {
+				await withTransaction(async (savepoint) => {
+					await live.useTransaction(savepoint).delete();
+					await this.images.deleteOrThrow(PURPOSE, live.imageKey);
+				});
+				return "removed";
+			} catch (error) {
+				if (
+					isForeignKeyViolation(error, INQUIRY_KEY) ||
+					isForeignKeyViolation(error, PROJECT_KEY)
+				) {
+					throw new FlashInUseError();
+				}
+				if (!(error instanceof ImageDeleteError)) throw error;
+			}
+			// The row is back (and `live` still says deleted): read it again to hide it.
+			const damaged = await this.lockedDesign(trx, tenant, design);
+			damaged.hidden = true;
+			await damaged.save();
+			return "hidden";
+		});
+	}
+
+	/**
+	 * One page of the shown designs of `filter.artistIds`, newest first
+	 * (`created_at desc, id desc`), starting after the cursor `after`. The
+	 * caller passes the ids of artists it may show; only those still visible
+	 * and live in this query count (VISIBLE_ARTIST); no query for []. `next`
+	 * is the cursor of the last design
+	 * returned when more remain, else null: one more is read to know that.
+	 * The cursor's time is read from and compared in the database, as text
+	 * with its microseconds (see WorkCursor).
+	 */
+	async page(
+		tenant: TenantRef,
+		filter: FlashFilter,
+		after: WorkCursor | null,
+		limit: number,
+	): Promise<{ designs: FlashDesign[]; next: WorkCursor | null }> {
+		if (!Number.isInteger(limit) || limit < 1) {
+			throw new Error(`A page needs a limit of 1 or more, got ${limit}`);
+		}
+		if (filter.artistIds.length === 0) return { designs: [], next: null };
+		const query = FlashDesign.query()
+			.select("*")
+			.select(
+				dbClient().raw(
+					`to_char(created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as cursor_at`,
+				),
+			)
+			.where("tenant_id", tenant.id)
+			.where("hidden", false)
+			.whereIn("artist_id", [...filter.artistIds])
+			.whereRaw(VISIBLE_ARTIST, [tenant.id]);
+		if (!filter.withClaimed) query.whereNull("claimed_at");
+		if (after) {
+			query.whereRaw("(created_at, id) < (?::timestamptz, ?::uuid)", [
+				after.at,
+				after.id,
+			]);
+		}
+		const rows = await query
+			.orderBy("created_at", "desc")
+			.orderBy("id", "desc")
+			.limit(limit + 1);
+		const designs = rows.slice(0, limit);
+		const last = designs[limit - 1];
+		const next =
+			rows.length > limit
+				? { at: String(last.$extras.cursor_at), id: last.id }
+				: null;
+		return { designs, next };
+	}
+
+	/**
+	 * Which of these artists, still visible and live in this query, have a
+	 * shown design (the filter a page offers), a claimed one only when
+	 * `withClaimed`. One query; none for [].
+	 */
+	async artistsWithDesigns(
+		tenant: TenantRef,
+		artistIds: readonly string[],
+		withClaimed: boolean,
+	): Promise<Set<string>> {
+		if (artistIds.length === 0) return new Set();
+		const query = FlashDesign.query()
+			.where("tenant_id", tenant.id)
+			.where("hidden", false)
+			.whereIn("artist_id", [...artistIds])
+			.whereRaw(VISIBLE_ARTIST, [tenant.id]);
+		if (!withClaimed) query.whereNull("claimed_at");
+		const rows = await query.distinct("artist_id");
+		return new Set(rows.map((row) => row.artistId));
+	}
+
+	/**
+	 * The design when it is shown and its artist is one of `artistIds` and
+	 * still visible and live in this query, else null. A claimed design is
+	 * returned too (its caller decides what a claim means there).
+	 */
+	async findShown(
+		tenant: TenantRef,
+		designId: string,
+		artistIds: readonly string[],
+	): Promise<FlashDesign | null> {
+		if (artistIds.length === 0) return null;
+		return FlashDesign.query()
+			.where("tenant_id", tenant.id)
+			.where("id", designId)
+			.where("hidden", false)
+			.whereIn("artist_id", [...artistIds])
+			.whereRaw(VISIBLE_ARTIST, [tenant.id])
+			.first();
+	}
+
+	/**
+	 * Holds the design for a request about to name it: the artist's row
+	 * `FOR SHARE` (so the artist cannot be hidden or deleted until the
+	 * request ends, ArtistService.holdVisible), then the design's own
+	 * `FOR SHARE`. It returns the design when it is still shown and its
+	 * artist is still visible, else null, as the row stands after any change
+	 * in flight: the lock waits for a claim or a change that has not
+	 * committed and reads what it left, and a claim that comes later waits
+	 * for the request. So the caller can refuse a claimed design on the
+	 * returned row (`claimed_at`) and no claim slips in between that check
+	 * and the request's insert (a claim is a non-key update, which a
+	 * `FOR KEY SHARE`, the lock the foreign key takes, would not wait for).
+	 * An owner removing the design (`remove`) then waits for the request and
+	 * finds it named (FlashInUseError), or has removed it first and the
+	 * request finds nothing; a design hidden meanwhile (`update`) waits behind
+	 * the artist's hold too. Artist first, like `remove`, so neither waits
+	 * for the other while holding what it needs. A claim holds a project and
+	 * then takes this row, and the request holds nothing a claim needs: they
+	 * wait for each other only for the request's inserts. Call it inside the
+	 * request's transaction, as late as possible.
+	 */
+	async holdShown(
+		trx: QueryClientContract,
+		tenant: TenantRef,
+		artistId: string,
+		designId: string,
+	): Promise<FlashDesign | null> {
+		if (!(await this.artists.holdVisible(trx, tenant, artistId))) return null;
+		const query = FlashDesign.query({ client: trx })
+			.where("tenant_id", tenant.id)
+			.where("id", designId)
+			.where("artist_id", artistId)
+			.where("hidden", false);
+		query.knexQuery.forShare();
+		return query.first();
+	}
+
+	/**
+	 * Any of the tenant's designs by id, hidden ones too: what the dashboard's
+	 * inbox and pages show for the design a request or a project names. No
+	 * query for [].
+	 */
+	async forIds(
+		tenant: TenantRef,
+		ids: readonly string[],
+	): Promise<Map<string, FlashDesign>> {
+		const found = new Map<string, FlashDesign>();
+		if (ids.length === 0) return found;
+		const rows = await FlashDesign.query()
+			.where("tenant_id", tenant.id)
+			.whereIn("id", [...ids]);
+		for (const row of rows) found.set(row.id, row);
+		return found;
+	}
+
+	/**
+	 * Whether an inquiry or a project (a deleted one too: the keys count every
+	 * row) names the design. A plain read, no lock: it never waits for the
+	 * transaction that holds a project's row.
+	 */
+	private async isNamed(
+		trx: QueryClientContract,
+		tenant: TenantRef,
+		designId: string,
+	): Promise<boolean> {
+		const { rows } = await trx.rawQuery(
+			`select exists (select 1 from inquiries where tenant_id = ? and flash_design_id = ?)
+				or exists (select 1 from tattoo_projects where tenant_id = ? and flash_design_id = ?) as named`,
+			[tenant.id, designId, tenant.id, designId],
+		);
+		return rows[0].named === true;
+	}
+
+	/** How many designs the artist has now. A hook so a test can stage a racing upload. */
+	protected async countDesigns(
+		tenant: TenantRef,
+		artistId: string,
+		client?: QueryClientContract,
+	): Promise<number> {
+		const [row] = await FlashDesign.query(client ? { client } : undefined)
+			.where("tenant_id", tenant.id)
+			.where("artist_id", artistId)
+			.count("* as total");
+		return Number(row.$extras.total);
+	}
+
+	/**
+	 * The design's row, read again under the artist's lock: gone meanwhile is a
+	 * 404. `forUpdate` also takes the row's lock (waiting for a claim in flight
+	 * and reading what it stored), always after the artist's.
+	 */
+	private async lockedDesign(
+		trx: QueryClientContract,
+		tenant: TenantRef,
+		design: FlashDesign,
+		forUpdate = false,
+	): Promise<FlashDesign> {
+		const query = FlashDesign.query({ client: trx })
+			.where("tenant_id", tenant.id)
+			.where("id", design.id);
+		return (forUpdate ? query.forUpdate() : query).firstOrFail();
+	}
+}
+
+/** A caller bug, not a user error: artists come from findEditable(tenant, editor, id). */
+function assertOwnedBy(tenant: TenantRef, artist: Artist) {
+	if (artist.tenantId !== tenant.id) {
+		throw new Error(`Artist ${artist.id} belongs to another tenant`);
+	}
+}
+
+function assertDesignOf(tenant: TenantRef, design: FlashDesign) {
+	if (design.tenantId !== tenant.id) {
+		throw new Error(`Flash design ${design.id} belongs to another tenant`);
+	}
+}

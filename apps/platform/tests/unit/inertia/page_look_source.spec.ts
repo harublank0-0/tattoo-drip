@@ -51,11 +51,14 @@ test.group("The page look components (TAT-56)", () => {
 		}
 	});
 
-	test("the logo is drawn on the plate token, which is light in both schemes", async ({
+	test("the logo is drawn on the plate tokens, the same in both schemes", async ({
 		assert,
 	}) => {
 		const form = await read("components/logo_form.tsx");
-		assert.include(form, "bg-logo-plate");
+		assert.include(form, "LOGO_TILE_CLASS[logo.tile]");
+		const words = await read("components/page_look.ts");
+		assert.include(words, '"bg-logo-plate"');
+		assert.include(words, '"bg-logo-plate-dark"');
 		const css = await read("css/app.css");
 		const dark = css.indexOf("\n[data-theme='dark'] {");
 		assert.isAbove(dark, 0);
@@ -64,6 +67,15 @@ test.group("The page look components (TAT-56)", () => {
 		assert.isBelow(css.indexOf("--logo-plate:"), dark, "in the light :root");
 		assert.include(css, "--logo-plate: #f7f3ee;");
 		assert.include(css, "--color-logo-plate: var(--logo-plate);");
+		// TAT-123: the dark tile is the dark paper, defined once, in the light :root.
+		assert.lengthOf(css.match(/--logo-plate-dark:/g) ?? [], 1, "defined once");
+		assert.isBelow(
+			css.indexOf("--logo-plate-dark:"),
+			dark,
+			"in the light :root, so it is the same in dark mode",
+		);
+		assert.include(css, "--logo-plate-dark: #14110f;");
+		assert.include(css, "--color-logo-plate-dark: var(--logo-plate-dark);");
 	});
 
 	test("the cover form has the anchor the page links to, clear of the top bar", async ({
@@ -118,7 +130,6 @@ test.group("The page look components (TAT-56)", () => {
 		for (const [name, stored] of [
 			["theme", "look.theme"],
 			["font", "look.font"],
-			["artists", "look.artists"],
 		]) {
 			const group = new RegExp(`<RadioGroup\\s[^>]*name="${name}"[^>]*>`).exec(
 				page,
@@ -198,7 +209,7 @@ test.group("The page look components (TAT-56)", () => {
 	// takes aria-describedby and aria-invalid), as the colour boxes tie theirs to the input.
 	test("each radio group's error is tied to the group", async ({ assert }) => {
 		const page = await read("pages/settings/look.tsx");
-		for (const name of ["theme", "font", "artists"]) {
+		for (const name of ["theme", "font"]) {
 			const group = new RegExp(`<RadioGroup\\s[^>]*name="${name}"[^>]*>`).exec(
 				page,
 			)?.[0];
@@ -222,11 +233,47 @@ test.group("The page look components (TAT-56)", () => {
 				`${name}'s error has the id the group points at`,
 			);
 		}
-		// The two groups with a sentence under their legend point at it too.
-		for (const name of ["font", "artists"]) {
-			assert.include(page, `id="${name}-help"`);
-			assert.include(page, `${name}-help`);
-		}
+		// The group with a sentence under its legend points at it too.
+		assert.include(page, 'id="font-help"');
+		assert.include(page, "font-help");
+	});
+
+	// TAT-126: the sections list is rows, not a radio group. It follows its stored list in place
+	// like the groups (no key), sends one hidden `sections[]` per shown row in the rows' order,
+	// names each move button for its section and puts focus back on a button after a move.
+	test("the sections list follows its stored list in place and sends the shown rows in order", async ({
+		assert,
+	}) => {
+		const page = await read("pages/settings/look.tsx");
+		assert.include(page, "useStoredRows(look.sections, sectionKeys)");
+		assert.notMatch(page, /<RadioGroup\s[^>]*name="artists"/);
+		assert.notInclude(page, "PLACEMENT");
+		const hidden =
+			/<input\s[^>]*type="hidden"[^>]*name="sections\[\]"[^>]*\/>/.exec(
+				page,
+			)?.[0];
+		assert.isDefined(hidden, "each shown row sends a hidden sections[]");
+		assert.include(page, "sentSections(rows)");
+		assert.include(page, "moveSectionLabel(");
+		assert.include(page, "focusAfterMove(");
+		assert.include(page, "toggleRow(");
+		assert.include(page, "moveRow(");
+		// Rows are keyed by their section, so a move reorders the same nodes.
+		assert.match(page, /<li\s[^>]*key=\{row\.key\}/);
+		assert.notMatch(page, /\bkey=\{`?(look|JSON)/);
+	});
+
+	test("the sections list's error is tied to the list, and the form row cannot be unchecked", async ({
+		assert,
+	}) => {
+		const page = await read("pages/settings/look.tsx");
+		assert.match(
+			page,
+			/<FieldError\s+id="sections-error">\s*\{error\}\s*<\/FieldError>/,
+		);
+		assert.include(page, "sections-help sections-error");
+		assert.include(page, "REQUIRED_SECTION");
+		assert.include(page, "Always shown");
 	});
 
 	test("Remove logo asks first, and says what happens", async ({ assert }) => {

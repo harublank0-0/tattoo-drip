@@ -4,16 +4,19 @@ import type {
 	BodyPlacement,
 	DepositPage,
 	DepositPaymentMethod,
+	FlashDesign,
+	FlashPage,
 	InquiryInput,
 	InquiryReceipt,
 	ListAvailabilityQuery,
-	ListPortfolioQuery,
+	ListFlashQuery,
 	ListServicesQuery,
-	PortfolioPage,
+	ListWorkQuery,
 	Service,
 	Slot,
 	Studio,
 	TattooStyle,
+	WorkPage,
 } from "@tattoo-drip/types";
 import { TattooApiError } from "./errors.js";
 
@@ -87,7 +90,7 @@ export interface SubmitDepositProofInput {
 	expectedAmount: number;
 }
 
-type Query = Record<string, string | number | undefined>;
+type Query = Record<string, string | number | boolean | undefined>;
 
 type ResponseBody = { data?: unknown; error?: Partial<ApiError> };
 
@@ -194,11 +197,33 @@ export function createTattooClient(options: TattooClientOptions) {
 			list: (query?: ListServicesQuery, call?: RequestOptions) =>
 				getData<Service[]>(withQuery(`${tenantRoot}/services`, query), call),
 		},
-		portfolio: {
-			list: (query?: ListPortfolioQuery, call?: RequestOptions) =>
-				request<PortfolioPage>(
-					withQuery(`${tenantRoot}/portfolio`, query),
-					{},
+		work: {
+			/**
+			 * A page of the studio's work photos, newest first (TAT-126): the
+			 * whole body, `{ data, nextCursor, filters }`. Pass `nextCursor` back
+			 * as `cursor`, with the same filters, for the next page. A malformed
+			 * parameter or cursor is a 422 TattooApiError (`validation_failed`).
+			 */
+			list: (query?: ListWorkQuery, call?: RequestOptions) =>
+				request<WorkPage>(withQuery(`${tenantRoot}/work`, query), {}, call),
+		},
+		flash: {
+			/**
+			 * A page of the studio's flash designs, newest first (TAT-129): the
+			 * whole body, `{ data, nextCursor, filters }`. Pass `nextCursor` back
+			 * as `cursor`, with the same `artist`, for the next page. A malformed
+			 * parameter or cursor is a 422 TattooApiError (`validation_failed`).
+			 */
+			list: (query?: ListFlashQuery, call?: RequestOptions) =>
+				request<FlashPage>(withQuery(`${tenantRoot}/flash`, query), {}, call),
+			/**
+			 * One shown flash design by id. A hidden design, a hidden artist's, an
+			 * unknown id and another studio's are a 404 TattooApiError
+			 * (`not_found`).
+			 */
+			get: (id: string, call?: RequestOptions) =>
+				getData<FlashDesign>(
+					`${tenantRoot}/flash/${encodeURIComponent(id)}`,
 					call,
 				),
 		},
@@ -213,7 +238,9 @@ export function createTattooClient(options: TattooClientOptions) {
 			 * (an upload) unless `call.timeoutMs` says otherwise. Fails with a
 			 * TattooApiError such as `validation_failed` (with `fields` by
 			 * input name), `artist_not_accepting`, `studio_not_accepting`,
-			 * `too_many_open_inquiries`, `payload_too_large`,
+			 * `too_many_open_inquiries`, `flash_unavailable` (a request for a flash
+			 * design that is no longer offered), `flash_claimed` (a one-of-a-kind
+			 * design that someone has claimed), `payload_too_large`,
 			 * `challenge_failed` (403: get a new token), `challenge_unavailable`
 			 * (503) or `rate_limited` (429, with `retryAfter`). Never retried.
 			 */

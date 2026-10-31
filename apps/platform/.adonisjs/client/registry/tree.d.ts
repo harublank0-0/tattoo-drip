@@ -49,6 +49,9 @@ export interface ApiDefinition {
       logo: {
         update: typeof routes['tenant.settings.logo.update']
         destroy: typeof routes['tenant.settings.logo.destroy']
+        tile: {
+          update: typeof routes['tenant.settings.logo.tile.update']
+        }
       }
       payments: typeof routes['tenant.settings.payments'] & {
         create: typeof routes['tenant.settings.payments.create']
@@ -63,6 +66,16 @@ export interface ApiDefinition {
       }
       messages: typeof routes['tenant.settings.messages'] & {
         update: typeof routes['tenant.settings.messages.update']
+      }
+      goodToKnow: typeof routes['tenant.settings.good_to_know'] & {
+        update: typeof routes['tenant.settings.good_to_know.update']
+      }
+      hours: {
+        update: typeof routes['tenant.settings.hours.update']
+      }
+      closedDays: {
+        store: typeof routes['tenant.settings.closed_days.store']
+        destroy: typeof routes['tenant.settings.closed_days.destroy']
       }
       members: typeof routes['tenant.settings.members'] & {
         invitations: {
@@ -86,8 +99,15 @@ export interface ApiDefinition {
       photos: {
         store: typeof routes['tenant.artists.photos.store']
         update: typeof routes['tenant.artists.photos.update']
-        move: typeof routes['tenant.artists.photos.move']
         destroy: typeof routes['tenant.artists.photos.destroy']
+      }
+      flash: {
+        store: typeof routes['tenant.artists.flash.store']
+        update: typeof routes['tenant.artists.flash.update']
+        claim: {
+          update: typeof routes['tenant.artists.flash.claim.update']
+        }
+        destroy: typeof routes['tenant.artists.flash.destroy']
       }
     }
     inbox: {
@@ -195,10 +215,20 @@ export interface ApiDefinition {
   }
   api: {
     v1: {
+      styles: {
+        index: typeof routes['api.v1.styles.index']
+      }
       studio: typeof routes['api.v1.studio']
       artists: {
         index: typeof routes['api.v1.artists.index']
         show: typeof routes['api.v1.artists.show']
+      }
+      work: {
+        index: typeof routes['api.v1.work.index']
+      }
+      flash: {
+        index: typeof routes['api.v1.flash.index']
+        show: typeof routes['api.v1.flash.show']
       }
       inquiries: {
         store: typeof routes['api.v1.inquiries.store']

@@ -4,12 +4,14 @@ export {
 	useAvailability,
 	useCreateInquiry,
 	useDeposit,
+	useFlash,
+	useFlashDesign,
 	usePlacements,
-	usePortfolio,
 	useServices,
 	useStudio,
 	useStyles,
 	useSubmitDepositProof,
+	useWork,
 } from "./hooks.js";
 export {
 	TattooProvider,

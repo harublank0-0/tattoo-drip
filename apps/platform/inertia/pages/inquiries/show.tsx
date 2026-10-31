@@ -2,6 +2,7 @@ import { Form } from "@adonisjs/inertia/react";
 import { Link, router } from "@inertiajs/react";
 import { type ReactNode, type RefObject, useRef } from "react";
 import { urlFor } from "~/client";
+import FlashDesignCard from "~/components/flash_design_card";
 import InlineConfirm from "~/components/inline_confirm";
 import { type InquiryPageProps, SOURCE_LABELS } from "~/components/inquiries";
 import MessageCard from "~/components/message_card";
@@ -18,6 +19,7 @@ import AppLayout from "~/layouts/app";
 /** One inquiry, exactly as the client sent it (TAT-46). Owners only. */
 export default function InquiryShow({
 	inquiry,
+	flash,
 	references,
 	accept,
 	projectId,
@@ -110,6 +112,8 @@ export default function InquiryShow({
 				{/* Read first, decide last (TAT-100): the idea, then the references
 				    an artist wants to see, then the details, the message and the
 				    decision. */}
+				{flash && <FlashDesignCard flash={flash} />}
+
 				<Card>
 					<CardHeader>
 						<CardTitle>Idea</CardTitle>

@@ -349,8 +349,13 @@ test.group("TenancyService.membershipFor", (group) => {
 					bio: null,
 					visible: true,
 					acceptingInquiries: true,
+					acceptingFlash: true,
 					closedMessage: null,
 					linkToMe: false,
+					styles: [],
+					instagramUrl: null,
+					facebookUrl: null,
+					tiktokUrl: null,
 				},
 				owner,
 			);
@@ -714,6 +719,48 @@ test.group("TenancyService profile and deposits", (group) => {
 		saved = await inTenant(tenant, () => Tenant.findOrFail(tenant.id));
 		assert.isNull(saved.defaultDepositPercent);
 		assert.isNull(saved.depositPolicy);
+	});
+
+	test("updateGoodToKnow stores the four texts and clears a null one, leaving the profile alone", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+		await inTenant(tenant, () =>
+			tenancy.updateDepositSettings(tenant, {
+				defaultDepositPercent: 25,
+				depositPolicy: "Deposits hold your date.",
+			}),
+		);
+
+		await inTenant(tenant, () =>
+			tenancy.updateGoodToKnow(tenant, {
+				walkInsText: "Small flash only.",
+				ageRuleText: "18 and over, with a photo ID.",
+				beforeSessionText: "Eat a good meal.",
+				aftercareText: "दिनमा दुई पटक सफा गर्नुहोस्।",
+			}),
+		);
+		let saved = await inTenant(tenant, () => Tenant.findOrFail(tenant.id));
+		assert.equal(saved.walkInsText, "Small flash only.");
+		assert.equal(saved.ageRuleText, "18 and over, with a photo ID.");
+		assert.equal(saved.beforeSessionText, "Eat a good meal.");
+		assert.equal(saved.aftercareText, "दिनमा दुई पटक सफा गर्नुहोस्।");
+
+		await inTenant(tenant, () =>
+			tenancy.updateGoodToKnow(tenant, {
+				walkInsText: null,
+				ageRuleText: "18 and over.",
+				beforeSessionText: "Eat a good meal.",
+				aftercareText: null,
+			}),
+		);
+		saved = await inTenant(tenant, () => Tenant.findOrFail(tenant.id));
+		assert.isNull(saved.walkInsText);
+		assert.equal(saved.ageRuleText, "18 and over.");
+		assert.isNull(saved.aftercareText);
+		assert.equal(saved.name, tenant.name);
+		assert.equal(saved.defaultDepositPercent, 25);
+		assert.equal(saved.depositPolicy, "Deposits hold your date.");
 	});
 
 	test("the database refuses a deposit over 100%", async ({ assert }) => {

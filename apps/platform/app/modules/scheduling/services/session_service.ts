@@ -4,6 +4,7 @@ import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
 import { DateTime } from "luxon";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
+import { claimFlashFor } from "#modules/flash/services/flash_claim";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import DepositService from "#modules/payments/services/deposit_service";
 import TattooProject, {
@@ -597,6 +598,11 @@ export default class SessionService {
 		if (!tattoo) return false;
 		if (!(await this.deposits.isSettled(tenant, project))) return false;
 		await setStatus(project, "booked");
+		// Claim rule (claimFlashFor): the project becoming booked claims its
+		// one-of-a-kind design when no deposit did before (a quote with no
+		// deposit books without one). Every move to booked passes here, in the
+		// caller's transaction and under the project's lock.
+		await claimFlashFor(tenant, project);
 		return true;
 	}
 }

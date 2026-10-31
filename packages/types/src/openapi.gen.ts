@@ -11,7 +11,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Platform-wide tattoo styles */
+        /**
+         * Platform-wide tattoo styles
+         * @description The platform's fixed list of tattoo styles, in its order. Cacheable.
+         */
         get: operations["listStyles"];
         put?: never;
         post?: never;
@@ -57,7 +60,9 @@ export interface paths {
          * The studio's public profile
          * @description What the studio page shows about the studio: its name, intro,
          *     contact details, links, timezone, whether it takes inquiries
-         *     (TAT-44) and its cover photo (TAT-116). Never its deposit policy, payment details, members or
+         *     (TAT-44), its cover photo (TAT-116), and its opening hours, closed
+         *     days and Good to know texts, among them its deposit policy (TAT-128).
+         *     Never its default deposit percentage, payment details, members or
          *     anything about clients, inquiries or payments. Cacheable. Under an
          *     old slug it answers like under the current one, and `slug` is the
          *     current slug.
@@ -88,8 +93,9 @@ export interface paths {
         };
         /**
          * The studio's visible artists
-         * @description Every visible artist, by name (ignoring case), each with up to six
-         *     photos of their work (TAT-116); hidden and deleted artists never
+         * @description Every visible artist, by name (ignoring case), each with their six
+         *     newest photos of work, newest first (TAT-116, TAT-126; the whole
+         *     portfolio is `listWork`); hidden and deleted artists never
          *     appear, nor do their photos, and a studio with no visible artist
          *     answers an empty list. Cacheable. Under an old slug it answers like under
          *     the current one.
@@ -163,7 +169,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/tenants/{tenant}/portfolio": {
+    "/tenants/{tenant}/work": {
         parameters: {
             query?: never;
             header?: never;
@@ -178,8 +184,84 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** Portfolio projects, newest first */
-        get: operations["listPortfolio"];
+        /**
+         * Photos of the studio's work, newest first, a page at a time
+         * @description Every photo of every visible artist (a closed artist's too), newest
+         *     first. The filters combine; an artist or style that matches nothing
+         *     is an empty page. Hidden and deleted artists never appear, nor do
+         *     their photos. Cacheable. Under an old studio slug it answers like
+         *     under the current one.
+         */
+        get: operations["listWork"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tenants/{tenant}/flash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The studio's flash designs, newest first, a page at a time
+         * @description Every shown design of every visible artist (one whose books are
+         *     closed too), newest first. `requestable` says whether `createInquiry`
+         *     takes a request for the design now. A one-of-a-kind design someone
+         *     has claimed is listed with `status` `claimed` while the studio shows
+         *     claimed designs, and not at all when it hides them or when
+         *     `available=true`. An artist that matches nothing is an empty page.
+         *     Hidden designs, and hidden or deleted artists' designs, never appear.
+         *     Cacheable. Under an old studio slug it answers like under the current
+         *     one.
+         */
+        get: operations["listFlash"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tenants/{tenant}/flash/{design}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+                /** @description A design's `id` (`listFlash`) */
+                design: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * One shown flash design of a visible artist
+         * @description A hidden design, a hidden or deleted artist's design, an unknown id
+         *     and another studio's design are all a 404, and so is a claimed design
+         *     when the studio hides claimed designs. Cacheable. Under an old
+         *     studio slug it answers like under the current one.
+         */
+        get: operations["getFlashDesign"];
         put?: never;
         post?: never;
         delete?: never;
@@ -247,6 +329,15 @@ export interface paths {
          *     new inquiries), `studio_not_accepting` (no artist chosen, and every
          *     artist of the studio is closed), `too_many_open_inquiries` (this
          *     phone number already has 3 inquiries the studio hasn't answered).
+         *     A request for a flash design (`flashDesignId`) is also a 409
+         *     `flash_unavailable` when the design is hidden, its artist is hidden
+         *     or deleted, or the id is unknown, and `flash_claimed` when the design
+         *     was one of a kind and someone has claimed it (the studio shows or
+         *     hides claimed designs: either way it takes no request; offer to ask
+         *     for something similar as a plain request); a request for a design whose artist
+         *     takes no flash requests is `artist_not_accepting`, though their books
+         *     may be open. A `preferredArtistId` other than the design's artist is
+         *     `validation_failed` on `preferredArtistId`.
          *     An unknown or hidden `preferredArtistId` is `validation_failed` on
          *     `preferredArtistId`; an image that isn't a JPEG, PNG or WebP is
          *     `validation_failed` on `referenceImages.<index>`.
@@ -337,7 +428,8 @@ export interface components {
                  *     (500), `request_timeout` (408, an upload that took too long)
                  *     and `service_busy` (503, with `Retry-After`: too many uploads
                  *     in progress, or no database connection free). Endpoint codes: `artist_not_accepting`,
-                 *     `studio_not_accepting`, `too_many_open_inquiries` (409),
+                 *     `studio_not_accepting`, `too_many_open_inquiries`, `flash_unavailable`,
+                 *     `flash_claimed` (409),
                  *     `challenge_failed` (403) and `challenge_unavailable` (503),
                  *     all `createInquiry`; `deposit_not_due`, `deposit_changed`
                  *     (409, `submitDepositProof`). Treat an unknown code by its HTTP
@@ -347,6 +439,8 @@ export interface components {
                  * @example rate_limited
                  * @example service_busy
                  * @example too_many_open_inquiries
+                 * @example flash_unavailable
+                 * @example flash_claimed
                  * @example challenge_failed
                  * @example deposit_changed
                  */
@@ -362,7 +456,7 @@ export interface components {
         TattooStyle: {
             /** @example fine-line */
             slug: string;
-            /** @example Fine Line */
+            /** @example Fine line */
             name: string;
         };
         BodyPlacement: {
@@ -391,6 +485,43 @@ export interface components {
             variants: components["schemas"]["ImageVariant"][];
         };
         /**
+         * @description The studio's logo (TAT-56) as an `Image` (`alt` is always null: it
+         *     sits beside the studio's name; a PNG keeps its transparency), with the
+         *     tile it sits on and its square icon (TAT-123).
+         */
+        Logo: {
+            /**
+             * Format: uri
+             * @description Public and absolute.
+             */
+            url: string;
+            width: number;
+            height: number;
+            alt: string | null;
+            /**
+             * @description Smaller copies, narrowest first (320, 640 and 1280 px, those below
+             *     the logo's own width), `[]` when it has none. Build `srcset` from
+             *     these and `url` at `width`.
+             */
+            variants: components["schemas"]["ImageVariant"][];
+            /**
+             * @description The small tile the logo sits on, in both colour schemes: `light`
+             *     (#f7f3ee) or `dark` (#14110f). Picked when the logo is uploaded (a
+             *     light logo with a see-through background gets the dark one); the
+             *     owner can change it. Treat an unknown value as `light`.
+             * @enum {string}
+             */
+            tile: "light" | "dark";
+            /**
+             * @description A square copy of the logo for the browser tab and a phone's home
+             *     screen, or null (a logo saved before TAT-123, or one whose icon
+             *     could not be made): a 180 x 180 PNG of the logo on the tile picked
+             *     at upload, never see-through, with its 32 px copy in `variants`.
+             *     `alt` is always null.
+             */
+            icon: components["schemas"]["Image"] | null;
+        };
+        /**
          * @description An artist's photo (TAT-44) and its smaller copies: an `Image`
          *     without `alt`, so every property is always there. The page builds the
          *     `alt` text from the artist's name.
@@ -413,8 +544,8 @@ export interface components {
         };
         /**
          * @description A photo of an artist's work (TAT-116) and its smaller copies. Every
-         *     property is always there. It carries no id, key, position or
-         *     timestamp: the list's order is the studio's order.
+         *     property is always there. It carries no id, key, styles, healed mark
+         *     or timestamp: the list's order is newest first.
          */
         WorkPhoto: {
             /**
@@ -479,12 +610,17 @@ export interface components {
          */
         StorefrontSection: {
             /**
-             * @description `artists` (the artists list) or `inquiry` (the idea form, always
-             *     listed). More will come: treat an unknown value as one to leave
-             *     out.
+             * @description `work` (Recent work: the newest photos), `artists` (the artists
+             *     list), `flash` (a few of the newest flash designs, shown only
+             *     when there are some), `info` (Good to know: hours, closed days
+             *     and what clients ask, shown only when the studio filled something
+             *     in) or
+             *     `inquiry` (the "Got an idea?" invitation to the request page,
+             *     always listed). More will come: treat an unknown value as one to
+             *     leave out.
              * @enum {string}
              */
-            type: "artists" | "inquiry";
+            type: "work" | "artists" | "flash" | "info" | "inquiry";
         };
         /**
          * @description How the studio page looks (TAT-56): the owner's choices, as checked
@@ -503,9 +639,10 @@ export interface components {
             branding: {
                 /**
                  * @description The studio's logo, or null. `alt` is always null (it sits
-                 *     beside the studio's name). A PNG keeps its transparency.
+                 *     beside the studio's name). A PNG keeps its transparency. It
+                 *     comes with the tile it sits on and its square icon (`Logo`).
                  */
-                logo: components["schemas"]["Image"] | null;
+                logo: components["schemas"]["Logo"] | null;
                 colors: {
                     /**
                      * @description The studio's colour for buttons, links and the frame
@@ -529,7 +666,10 @@ export interface components {
                  */
                 font: "eczar" | "serif" | "sans";
             };
-            /** @description The sections to show, in order. The form is always there. */
+            /**
+             * @description The sections to show, in order. The `inquiry` section (the
+             *     "Got an idea?" invitation to the request page) is always listed.
+             */
             sections: components["schemas"]["StorefrontSection"][];
         };
         /**
@@ -589,6 +729,62 @@ export interface components {
              */
             cover: components["schemas"]["Image"] | null;
             storefront: components["schemas"]["StorefrontConfiguration"];
+            /**
+             * @description The weekdays the studio opens (TAT-128), Sunday first; a weekday
+             *     not listed is closed. [] when the studio set no hours.
+             */
+            openingHours: components["schemas"]["OpeningHours"][];
+            /**
+             * @description Closed days that haven't ended in the studio's timezone,
+             *     earliest first (TAT-128). [] when there are none.
+             */
+            closedDays: components["schemas"]["ClosedDays"][];
+            goodToKnow: components["schemas"]["GoodToKnow"];
+        };
+        /**
+         * @description One weekday the studio opens (TAT-128): one opening and one closing time,
+         *     24-hour, in the studio's `timezone`. Hours never run past midnight.
+         */
+        OpeningHours: {
+            /** @enum {string} */
+            day: "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
+            /** @example 11:00 */
+            opens: string;
+            /**
+             * @description Later than `opens`, on the same day
+             * @example 20:00
+             */
+            closes: string;
+        };
+        /**
+         * @description Days the studio is closed whatever its hours say (TAT-128), from `from`
+         *     to `to`, both included, in the studio's `timezone`.
+         */
+        ClosedDays: {
+            /** Format: date */
+            from: string;
+            /**
+             * Format: date
+             * @description The last closed day; the same as `from` for one day
+             */
+            to: string;
+            /**
+             * @description The studio's words, one line, plain text
+             * @example Closed for Dashain, back on 28 October
+             */
+            note: string | null;
+        };
+        /**
+         * @description What clients ask before they come (TAT-128), as plain text the studio
+         *     wrote; null when not set. Show each only when set.
+         */
+        GoodToKnow: {
+            walkIns: string | null;
+            ageRule: string | null;
+            /** @description The policy the deposit page also shows */
+            depositPolicy: string | null;
+            beforeSession: string | null;
+            aftercare: string | null;
         };
         /**
          * @description A visible artist of the studio (TAT-44). Every property is always
@@ -614,11 +810,15 @@ export interface components {
             /** @description The artist's words to show instead of the inquiry form; null while they accept inquiries */
             closedMessage: string | null;
             /**
-             * @description Up to six photos of the artist's work, in the studio's order; []
-             *     when none. An artist who is closed for inquiries still shows
-             *     theirs.
+             * @description The artist's six newest photos, newest first; [] when none. An
+             *     artist who is closed for inquiries still shows theirs. All of them
+             *     are in `listWork`.
              */
             workPhotos: components["schemas"]["WorkPhoto"][];
+            /** @description The artist's styles from the platform's list, in the list's order; [] when none. */
+            styles: components["schemas"]["TattooStyle"][];
+            /** @description The links the artist set, in this order: instagram, facebook, tiktok. Only https links. */
+            socialLinks: components["schemas"]["SocialLink"][];
         };
         Service: {
             /** Format: uuid */
@@ -629,20 +829,131 @@ export interface components {
             durationMinutes: number;
             startingPrice?: components["schemas"]["Money"] | null;
         };
-        PortfolioProject: {
-            /** Format: uuid */
+        /**
+         * @description A photo in the studio's gallery (`listWork`): a `WorkPhoto` with its
+         *     styles, its healed mark and whose work it is. Every property is
+         *     always there. All text is plain text: render it as text.
+         */
+        GalleryPhoto: {
+            /**
+             * Format: uri
+             * @description Public and absolute.
+             */
+            url: string;
+            width: number;
+            height: number;
+            /**
+             * @description The studio's own description of the photo, one line of plain
+             *     text, or null: then build one from the artist's name, such as
+             *     "Tattoo by Sita Rai".
+             */
+            alt: string | null;
+            /**
+             * @description Smaller copies, narrowest first, each narrower than `width`
+             *     (320, 640 and 1280 px, those below the photo's own width). Empty
+             *     for a photo too small to have any: then show `url` alone. Build
+             *     `srcset` from these and `url` at `width`.
+             */
+            variants: components["schemas"]["ImageVariant"][];
+            /** @description The photo's styles from the platform's list, in the list's order; [] when none. */
+            styles: components["schemas"]["TattooStyle"][];
+            /** @description True when the studio marked the photo as healed. */
+            healed: boolean;
+            /** @description Whose work it is: the artist's page is `getArtist(slug)`. */
+            artist: {
+                /** @example sita-rai */
+                slug: string;
+                /** @example Sita Rai */
+                name: string;
+            };
+        };
+        /**
+         * @description What the gallery can be narrowed by. Offer only these: a filter that
+         *     matches no photo would show an empty page.
+         */
+        WorkFilters: {
+            /**
+             * @description The styles at least one photo carries, among the visible artists'
+             *     photos (only `artist`'s when it is given), in the list's order:
+             *     offer only these. Plus the listed `style` the request asked for,
+             *     even when none of those photos carries it, so the control that
+             *     is on is always among them.
+             */
+            styles: components["schemas"]["TattooStyle"][];
+            /** @description Whether one of those photos is marked healed. */
+            healed: boolean;
+        };
+        /**
+         * @description A flash design an artist offers (TAT-129). Every property is always
+         *     there. All text is plain text: render it as text. It carries no key,
+         *     hidden flag or timestamp: the list's order is newest first.
+         */
+        FlashDesign: {
+            /**
+             * Format: uuid
+             * @description What `createInquiry` takes as `flashDesignId`. The design's page is `/flash/<id>`.
+             */
             id: string;
-            /** Format: uuid */
-            artistId: string;
-            title: string;
-            description?: string | null;
-            /** @description Style slug */
-            style?: string | null;
-            /** @description Placement slug */
-            placement?: string | null;
-            /** Format: date */
-            completedOn?: string | null;
-            images: components["schemas"]["Image"][];
+            /** @example Moth */
+            name: string;
+            /**
+             * @description In words, such as About 3 in
+             * @example About 3 in
+             */
+            size: string;
+            /** @description null when the studio keeps the price to itself. */
+            price: components["schemas"]["Price"] | null;
+            /** @description The picture. The page builds the `alt` text from the name and the artist. */
+            image: components["schemas"]["Photo"];
+            /** @description Whose design it is: the artist's page is `getArtist(slug)`. */
+            artist: {
+                /** @example sita-rai */
+                slug: string;
+                /** @example Sita Rai */
+                name: string;
+            };
+            /**
+             * @description Whether `createInquiry` takes a request for it now: `status` is
+             *     `available` and the artist takes flash requests, whatever their
+             *     books say. False: show it greyed (a claimed design is marked
+             *     Claimed; otherwise use the artist's `closedMessage`).
+             */
+            requestable: boolean;
+            /**
+             * @description `claimed`: one of a kind and taken. Listed only while the studio
+             *     shows claimed designs: show it greyed, marked Claimed; it is never
+             *     requestable. Treat an unknown value as `claimed`.
+             * @enum {string}
+             */
+            status: "available" | "claimed";
+        };
+        /** @description A price with the words to show for it. Not `Money`, which has no text. */
+        Price: {
+            /** @description In the currency's smallest unit (paisa) */
+            amount: number;
+            /** @enum {string} */
+            currency: "NPR";
+            /**
+             * @description Show it as it is.
+             * @example NPR 3,000
+             */
+            text: string;
+        };
+        /**
+         * @description What the flash list can be narrowed by. Offer only these: an artist
+         *     with no shown design would give an empty page.
+         */
+        FlashFilters: {
+            /**
+             * @description The visible artists with a shown design, by name, whatever
+             *     `artist` asks: offer only these.
+             */
+            artists: {
+                /** @example sita-rai */
+                slug: string;
+                /** @example Sita Rai */
+                name: string;
+            }[];
         };
         Slot: {
             /** Format: date-time */
@@ -674,6 +985,13 @@ export interface components {
              * @description A visible artist of this studio who takes inquiries. Leave it out for any artist.
              */
             preferredArtistId?: string | null;
+            /**
+             * Format: uuid
+             * @description A flash design from `listFlash`. The inquiry then asks for that
+             *     design and its artist: leave `preferredArtistId` out or give the
+             *     design's artist.
+             */
+            flashDesignId?: string | null;
             /**
              * @description Free text
              * @example NPR 15000
@@ -906,6 +1224,8 @@ export interface operations {
             /** @description Styles */
             200: {
                 headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -914,6 +1234,9 @@ export interface operations {
                     };
                 };
             };
+            304: components["responses"]["NotModified"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
         };
     };
     listPlacements: {
@@ -1085,12 +1408,16 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
-    listPortfolio: {
+    listWork: {
         parameters: {
             query?: {
-                artistId?: string;
-                /** @description Style slug */
+                /** @description An artist's slug (`getArtist`) */
+                artist?: string;
+                /** @description A style's slug (`listStyles`) */
                 style?: string;
+                /** @description `true`: only photos marked healed. `false` is the same as leaving it out: all photos. */
+                healed?: boolean;
+                /** @description The previous page's `nextCursor`, as sent, with the same filters */
                 cursor?: string;
                 limit?: number;
             };
@@ -1108,19 +1435,113 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description A page of projects */
+            /** @description A page of photos */
             200: {
                 headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        data: components["schemas"]["PortfolioProject"][];
+                        data: components["schemas"]["GalleryPhoto"][];
+                        /** @description Pass it as `cursor` for the next page; null on the last. */
                         nextCursor: string | null;
+                        filters: components["schemas"]["WorkFilters"];
                     };
                 };
             };
+            304: components["responses"]["NotModified"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listFlash: {
+        parameters: {
+            query?: {
+                /** @description `true`: only designs nobody has claimed. Left out or `false`: claimed designs too, unless the studio hides them. */
+                available?: boolean;
+                /** @description An artist's slug (`getArtist`) */
+                artist?: string;
+                /** @description The previous page's `nextCursor`, as sent, with the same filter */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of flash designs */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["FlashDesign"][];
+                        /** @description Pass it as `cursor` for the next page; null on the last. */
+                        nextCursor: string | null;
+                        filters: components["schemas"]["FlashFilters"];
+                    };
+                };
+            };
+            304: components["responses"]["NotModified"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getFlashDesign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+                /** @description A design's `id` (`listFlash`) */
+                design: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The design */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["FlashDesign"];
+                    };
+                };
+            };
+            304: components["responses"]["NotModified"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
         };
     };
     listAvailability: {
@@ -1217,7 +1638,7 @@ export interface operations {
             };
             404: components["responses"]["NotFound"];
             408: components["responses"]["Error"];
-            /** @description The studio takes no such inquiry now (`artist_not_accepting`, `studio_not_accepting`, `too_many_open_inquiries`) */
+            /** @description The studio takes no such inquiry now (`artist_not_accepting`, `studio_not_accepting`, `too_many_open_inquiries`, `flash_unavailable`, `flash_claimed`) */
             409: {
                 headers: {
                     [name: string]: unknown;

@@ -76,6 +76,21 @@ describe("cleanText", () => {
 			assert.equal(cleanText(value), null, JSON.stringify(value));
 		}
 	});
+
+	// A lone surrogate (a JSON "\ud800" the API passed on) makes
+	// encodeURIComponent throw, and the chat link on every page encodes a name.
+	test("a lone surrogate becomes U+FFFD, so a name can always be URL-encoded (TAT-127)", () => {
+		for (const lone of ["\ud800", "\udbff", "\udc00", "\udfff"]) {
+			const name = cleanLine(`Sita ${lone} Rai`);
+			assert.equal(name, "Sita � Rai", lone.charCodeAt(0).toString(16));
+			assert.doesNotThrow(() => encodeURIComponent(name ?? ""));
+		}
+		// A high surrogate at the end of the text, and a low one at the start.
+		assert.equal(cleanText("Sita\ud83d"), "Sita�");
+		assert.equal(cleanText("\ude00Sita"), "�Sita");
+		// A real pair (an emoji) is left whole.
+		assert.equal(cleanLine("Sita 😀 Rai"), "Sita 😀 Rai");
+	});
 });
 
 describe("cleanLine", () => {

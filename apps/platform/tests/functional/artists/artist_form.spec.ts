@@ -5,6 +5,7 @@ import Artist from "#modules/artists/models/artist";
 import ArtistService, {
 	type ArtistInput,
 } from "#modules/artists/services/artist_service";
+import { TATTOO_STYLES } from "#modules/artists/styles";
 import ImageService from "#modules/media/services/image_service";
 import { addArtist, addWorkPhoto } from "#tests/helpers/artists";
 import { testImages } from "#tests/helpers/images";
@@ -21,8 +22,13 @@ const input = (over: Partial<ArtistInput> = {}): ArtistInput => ({
 	bio: null,
 	visible: true,
 	acceptingInquiries: true,
+	acceptingFlash: true,
 	closedMessage: null,
 	linkToMe: false,
+	styles: [],
+	instagramUrl: null,
+	facebookUrl: null,
+	tiktokUrl: null,
 	...over,
 });
 
@@ -88,6 +94,37 @@ test.group("Adding an artist", (group) => {
 		assert.isFalse(artist.visible);
 		assert.isFalse(artist.acceptingInquiries);
 		assert.isNull(artist.userId);
+	});
+
+	test("Taking flash requests saves; unchecked means not taking them", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const sita = await addArtist(tenant, owner);
+		assert.isTrue(sita.acceptingFlash);
+		const edit = (fields: Record<string, string>) =>
+			client
+				.put(`${base}/${sita.id}`)
+				.fields({ name: "Sita Rai", slug: "sita", ...fields })
+				.withCsrfToken()
+				.loginAs(owner)
+				.redirects(0);
+		const open = async () =>
+			(await client.get(`${base}/${sita.id}/edit`).withInertia().loginAs(owner))
+				.inertiaProps.artist.acceptingFlash;
+
+		await edit({ visible: "on" });
+		assert.isFalse(
+			(await inTenant(tenant, () => Artist.findOrFail(sita.id))).acceptingFlash,
+		);
+		assert.isFalse(await open());
+
+		await edit({ visible: "on", acceptingFlash: "1" });
+		assert.isTrue(
+			(await inTenant(tenant, () => Artist.findOrFail(sita.id))).acceptingFlash,
+		);
+		assert.isTrue(await open());
 	});
 
 	test("checked boxes mean on, and 'this is my profile' links the owner", async ({
@@ -484,16 +521,246 @@ test.group("Editing an artist", (group) => {
 	});
 });
 
+test.group("An artist's styles and social links", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("an owner saves two styles and an Instagram link", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+
+		const response = await client
+			.post(base)
+			.fields({
+				name: "Sita Rai",
+				slug: "sita",
+				"styles[]": ["blackwork", "fine-line"],
+				instagramUrl: "https://instagram.com/sita",
+				// The form sends every box: an empty one is no link.
+				facebookUrl: "",
+				tiktokUrl: "",
+			})
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		response.assertHeader("location", base);
+		const [artist] = await listOf(tenant);
+		assert.deepEqual(artist.styles, ["blackwork", "fine-line"]);
+		assert.equal(artist.instagramUrl, "https://instagram.com/sita");
+		assert.isNull(artist.facebookUrl);
+		assert.isNull(artist.tiktokUrl);
+	});
+
+	test("no style boxes sent means none", async ({ client, assert }) => {
+		const { owner, tenant } = await studioWithOwner();
+		const artist = await inTenant(tenant, () =>
+			artists.create(
+				tenant,
+				input({
+					styles: ["blackwork", "realism"],
+					tiktokUrl: "https://tiktok.com/@sita",
+				}),
+				owner,
+			),
+		);
+
+		await client
+			.put(`${base}/${artist.id}`)
+			.fields({ name: "Sita Rai", slug: "sita" })
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		const [saved] = await listOf(tenant);
+		assert.deepEqual(saved.styles, []);
+		assert.isNull(saved.tiktokUrl);
+	});
+
+	test("a sixth style is a field error on styles", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const artist = await inTenant(tenant, () =>
+			artists.create(tenant, input({ styles: ["blackwork"] }), owner),
+		);
+
+		const response = await client
+			.put(`${base}/${artist.id}`)
+			.fields({
+				name: "Renamed",
+				slug: "sita",
+				"styles[]": [
+					"blackwork",
+					"fine-line",
+					"traditional",
+					"realism",
+					"colour",
+					"japanese",
+				],
+			})
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		assertValidationError(response, "styles", "Pick up to 5 styles.");
+		const saved = await inTenant(tenant, () => Artist.findOrFail(artist.id));
+		assert.deepEqual(saved.styles, ["blackwork"]);
+		assert.equal(saved.name, "Sita Rai");
+	});
+
+	test("exactly five styles are accepted", async ({ client, assert }) => {
+		const { owner, tenant } = await studioWithOwner();
+		// Not the list's order: the order sent is the order stored.
+		const sent = ["realism", "blackwork", "colour", "fine-line", "japanese"];
+
+		const response = await client
+			.post(base)
+			.fields({ name: "Sita Rai", slug: "sita", "styles[]": sent })
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		response.assertHeader("location", base);
+		const [artist] = await listOf(tenant);
+		assert.deepEqual(artist.styles, sent);
+	});
+
+	test("an unknown style is a field error", async ({ client, assert }) => {
+		const { owner, tenant } = await studioWithOwner();
+		const artist = await inTenant(tenant, () =>
+			artists.create(tenant, input({ styles: ["blackwork"] }), owner),
+		);
+
+		const response = await client
+			.put(`${base}/${artist.id}`)
+			.fields({ name: "Renamed", slug: "sita", "styles[]": ["nope"] })
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		assertValidationError(response, "styles", "Pick styles from the list.");
+		const saved = await inTenant(tenant, () => Artist.findOrFail(artist.id));
+		assert.deepEqual(saved.styles, ["blackwork"]);
+		assert.equal(saved.name, "Sita Rai");
+	});
+
+	test("a plain-http link is a field error", async ({ client, assert }) => {
+		const { owner, tenant } = await studioWithOwner();
+
+		const response = await client
+			.post(base)
+			.fields({
+				name: "Sita Rai",
+				slug: "sita",
+				facebookUrl: "http://facebook.com/sita",
+			})
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		assertValidationError(
+			response,
+			"facebookUrl",
+			"Enter a full link that starts with https://",
+		);
+		assert.isEmpty(await listOf(tenant));
+	});
+
+	test("styles survive a save that also uploads a photo", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+
+		await client
+			.post(base)
+			.fields({
+				name: "Sita Rai",
+				slug: "sita",
+				"styles[]": ["blackwork", "fine-line"],
+			})
+			.file("photo", await testImages.png(), { filename: "p.png" })
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		const [artist] = await listOf(tenant);
+		assert.isNotNull(artist.photoKey);
+		assert.deepEqual(artist.styles, ["blackwork", "fine-line"]);
+	});
+
+	test("the edit form offers every style and shows a dropped one unchecked", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const artist = await inTenant(tenant, () =>
+			artists.create(tenant, input(), owner),
+		);
+		// A slug that has since left the list, written past the validator.
+		await inTenant(tenant, () =>
+			Artist.query()
+				.where("id", artist.id)
+				.update({ styles: ["blackwork", "retired-style"] }),
+		);
+
+		const edit = await client
+			.get(`${base}/${artist.id}/edit`)
+			.withInertia()
+			.loginAs(owner);
+
+		const { styleOptions } = edit.inertiaProps;
+		assert.lengthOf(styleOptions, 18);
+		assert.deepEqual(styleOptions[0], { slug: "blackwork", name: "Blackwork" });
+		assert.notInclude(
+			styleOptions.map((option: { slug: string }) => option.slug),
+			"retired-style",
+		);
+		// Only listed styles reach the form, so the dropped one has no box to check.
+		assert.deepEqual(edit.inertiaProps.artist.styles, ["blackwork"]);
+
+		await client
+			.put(`${base}/${artist.id}`)
+			.fields({ name: "Sita Rai", slug: "sita", "styles[]": "blackwork" })
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		const saved = await inTenant(tenant, () => Artist.findOrFail(artist.id));
+		assert.deepEqual(saved.styles, ["blackwork"]);
+	});
+
+	test("the add form offers every style, in order", async ({
+		client,
+		assert,
+	}) => {
+		const { owner } = await studioWithOwner();
+
+		const response = await client
+			.get(`${base}/new`)
+			.withInertia()
+			.loginAs(owner);
+
+		assert.deepEqual(
+			response.inertiaProps.styleOptions,
+			TATTOO_STYLES.map(({ slug, name }) => ({ slug, name })),
+		);
+	});
+});
+
 test.group("The work photos on the artist form (TAT-116)", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 
-	test("the edit page carries the photos in order, each with only its id, thumbnail and description", async ({
+	test("the edit page carries the photos newest first, each with only its id, thumbnail, description, styles and healed mark", async ({
 		client,
 		assert,
 	}) => {
 		const { owner, tenant } = await studioWithOwner();
 		const sita = await addArtist(tenant, owner);
-		const [first, second] = await inTenant(tenant, async () => [
+		const [older, newer] = await inTenant(tenant, async () => [
 			await addWorkPhoto(tenant, sita, { alt: "Koi on the forearm" }),
 			await addWorkPhoto(tenant, sita),
 		]);
@@ -507,20 +774,22 @@ test.group("The work photos on the artist form (TAT-116)", (group) => {
 		assert.lengthOf(workPhotos, 2);
 		assert.deepEqual(
 			workPhotos.map((photo: { id: string }) => photo.id),
-			[first.id, second.id],
+			[newer.id, older.id],
 		);
 		for (const photo of workPhotos) {
 			assert.deepEqual(Object.keys(photo).sort(), [
 				"alt",
+				"healed",
 				"id",
+				"styles",
 				"thumbnailUrl",
 			]);
 		}
-		assert.equal(workPhotos[0].alt, "Koi on the forearm");
-		assert.isNull(workPhotos[1].alt);
+		assert.isNull(workPhotos[0].alt);
+		assert.equal(workPhotos[1].alt, "Koi on the forearm");
 		// The 320 px copy, in the studio's own folder.
 		assert.match(
-			new URL(workPhotos[0].thumbnailUrl).pathname,
+			new URL(workPhotos[1].thumbnailUrl).pathname,
 			new RegExp(
 				`^/uploads/tenants/${tenant.id}/artist_work_photo/.+\\.320w\\.jpg$`,
 			),

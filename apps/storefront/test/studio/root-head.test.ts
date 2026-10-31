@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, test } from "node:test";
 import {
 	createMemoryHistory,
@@ -12,7 +13,7 @@ import { rootMeta, statusHead } from "../../src/studio/seo.ts";
 /**
  * The root route's head on the installed router, with the root's own `head`
  * the way src/routes/__root.tsx wires it: a path no page route matches (the
- * prototype's /flash, /admin/bookings) is the not-found page, so its head
+ * prototype's /admin/bookings) is the not-found page, so its head
  * says so and is noindex, not the studio's name as a page title.
  */
 async function rootMetaFor(
@@ -88,5 +89,19 @@ describe("the root route's head", () => {
 			},
 		});
 		assert.deepEqual(meta, statusHead("error").meta);
+	});
+});
+
+describe("the root route's icon links (TAT-123)", () => {
+	const root = readFileSync(
+		new URL("../../src/routes/__root.tsx", import.meta.url),
+		"utf8",
+	);
+
+	test("come from the studio's logo; the stop lives beside them, not in the route", () => {
+		assert.match(root, /studioIconLinks\(/);
+		assert.doesNotMatch(root, /["']data:,["']/);
+		// Only the API's origin, which the root loader's success has connected.
+		assert.match(root, /match\.context\.tattoo\.connection\.apiUrl/);
 	});
 });

@@ -6,6 +6,10 @@ import { tenantContext } from "#middleware/tenant_middleware";
 import ArtistService from "#modules/artists/services/artist_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ClientService from "#modules/clients/services/client_service";
+import { claimStateOf } from "#modules/flash/claims";
+import { flashCard } from "#modules/flash/flash_card";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import FlashService from "#modules/flash/services/flash_service";
 import { InquiryRuleError } from "#modules/inquiries/errors";
 import type Inquiry from "#modules/inquiries/models/inquiry";
 import { referenceView } from "#modules/inquiries/reference_view";
@@ -13,7 +17,9 @@ import { referenceView } from "#modules/inquiries/reference_view";
 import InquiryService from "#modules/inquiries/services/inquiry_service";
 import { acceptInquiryValidator } from "#modules/inquiries/validators/inquiry";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
-import ImageService from "#modules/media/services/image_service";
+import ImageService, {
+	THUMBNAIL_WIDTH,
+} from "#modules/media/services/image_service";
 import { excerpt } from "#modules/notifications/alerts";
 import { chatMessage, contactLinks } from "#modules/notifications/chat";
 import {
@@ -50,6 +56,7 @@ export default class InquiriesController {
 		private images: ImageService,
 		private clients: ClientService,
 		private templates: MessageTemplateService,
+		private flash: FlashService,
 	) {}
 
 	async index(ctx: HttpContext) {
@@ -72,6 +79,36 @@ export default class InquiriesController {
 				? await this.projects.projectIdsForInquiries(tenant, ids)
 				: new Map<string, string>();
 		const artistName = await this.artistNames(tenant);
+		// The flash designs the page's requests name (TAT-129): one query.
+		const designs = await this.flash.forIds(
+			tenant,
+			inquiries.flatMap(({ flashDesignId }) =>
+				flashDesignId ? [flashDesignId] : [],
+			),
+		);
+		const flashOf = async (inquiry: Inquiry) => {
+			const design = inquiry.flashDesignId
+				? designs.get(inquiry.flashDesignId)
+				: undefined;
+			return design
+				? {
+						name: design.name,
+						// A new request for a design somebody has claimed (nothing is cancelled).
+						taken:
+							claimStateOf(design, {
+								projectId: null,
+								open: inquiry.status === "new",
+							}) === "taken",
+						thumbnailUrl: await this.images.urlFor(
+							"flash_design",
+							design.imageKey,
+							tenant,
+							THUMBNAIL_WIDTH,
+						),
+					}
+				: null;
+		};
+		const flashRows = await Promise.all(inquiries.map(flashOf));
 
 		return ctx.inertia.render("inquiries/index", {
 			view,
@@ -79,7 +116,7 @@ export default class InquiriesController {
 			// and the pilot numbers moved to Today (TAT-107).
 			studioPage: view === "new" ? studioLinks(tenant.slug) : null,
 			newCount: await this.inquiries.countNew(tenant),
-			inquiries: inquiries.map((inquiry) => ({
+			inquiries: inquiries.map((inquiry, index) => ({
 				id: inquiry.id,
 				contactName: inquiry.contactName,
 				idea: excerpt(inquiry.idea, IDEA_PREVIEW_LENGTH),
@@ -88,6 +125,8 @@ export default class InquiriesController {
 				preferredArtistName: inquiry.preferredArtistId
 					? (artistName.get(inquiry.preferredArtistId) ?? null)
 					: null,
+				// The flash design asked for, with its picture (TAT-129).
+				flash: flashRows[index],
 				receivedText: receivedText(inquiry, tenant.timezone),
 				references: counts.get(inquiry.id) ?? 0,
 				status: inquiry.status,
@@ -122,6 +161,22 @@ export default class InquiriesController {
 					).get(inquiry.id) ?? null)
 				: null;
 
+		// The flash design the request names (TAT-129), hidden or not.
+		const design = inquiry.flashDesignId
+			? (await this.flash.forIds(tenant, [inquiry.flashDesignId])).get(
+					inquiry.flashDesignId,
+				)
+			: undefined;
+		const flash = design
+			? await flashCard(
+					this.images,
+					tenant,
+					design,
+					artists.find(({ id }) => id === design.artistId)?.name ?? null,
+					{ projectId: null, open: inquiry.status === "new" },
+				)
+			: null;
+
 		// "Message the client" (TAT-52): the client's stored phone (an owner
 		// may have corrected it since), and while the inquiry is new the
 		// "received" message, greeting the name it was sent with.
@@ -147,6 +202,7 @@ export default class InquiriesController {
 				receivedText: receivedText(inquiry, tenant.timezone),
 				decidedOn: decidedOn(inquiry, tenant.timezone),
 			},
+			flash,
 			references: await Promise.all(
 				images.map((image) => referenceView(this.images, tenant, image)),
 			),

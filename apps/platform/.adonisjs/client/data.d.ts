@@ -9,7 +9,10 @@ import type { InferSharedProps, InferFlashData } from '@adonisjs/inertia/types'
 import type InquiryReceiptTransformer from '#transformers/inquiry_receipt_transformer'
 import type PublicArtistTransformer from '#transformers/public_artist_transformer'
 import type PublicDepositTransformer from '#transformers/public_deposit_transformer'
+import type PublicFlashDesignTransformer from '#transformers/public_flash_design_transformer'
+import type PublicGalleryPhotoTransformer from '#transformers/public_gallery_photo_transformer'
 import type PublicStudioTransformer from '#transformers/public_studio_transformer'
+import type PublicStyleTransformer from '#transformers/public_style_transformer'
 import type UserTransformer from '#transformers/user_transformer'
 import type InertiaMiddleware from '#middleware/inertia_middleware'
 
@@ -26,9 +29,21 @@ export namespace Data {
   export namespace PublicDeposit {
     export type Variants = InferVariants<PublicDepositTransformer>
   }
+  export type PublicFlashDesign = InferData<PublicFlashDesignTransformer>
+  export namespace PublicFlashDesign {
+    export type Variants = InferVariants<PublicFlashDesignTransformer>
+  }
+  export type PublicGalleryPhoto = InferData<PublicGalleryPhotoTransformer>
+  export namespace PublicGalleryPhoto {
+    export type Variants = InferVariants<PublicGalleryPhotoTransformer>
+  }
   export type PublicStudio = InferData<PublicStudioTransformer>
   export namespace PublicStudio {
     export type Variants = InferVariants<PublicStudioTransformer>
+  }
+  export type PublicStyle = InferData<PublicStyleTransformer>
+  export namespace PublicStyle {
+    export type Variants = InferVariants<PublicStyleTransformer>
   }
   export type User = InferData<UserTransformer>
   export namespace User {

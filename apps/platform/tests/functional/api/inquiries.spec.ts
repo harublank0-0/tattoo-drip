@@ -2,19 +2,33 @@ import testUtils from "@adonisjs/core/services/test_utils";
 import drive from "@adonisjs/drive/services/main";
 import queue from "@adonisjs/queue/services/main";
 import { test } from "@japa/runner";
+import { DateTime } from "luxon";
+import ArtistService from "#modules/artists/services/artist_service";
 import Client from "#modules/clients/models/client";
 import NewInquiryAlertJob from "#modules/inquiries/jobs/new_inquiry_alert_job";
 import Inquiry from "#modules/inquiries/models/inquiry";
 import ReferenceImage from "#modules/inquiries/models/reference_image";
+import ImageService from "#modules/media/services/image_service";
+import Tenant from "#modules/tenancy/models/tenant";
 import {
 	assertApiData,
 	assertApiError,
 	assertApiHeaders,
 } from "#tests/helpers/api";
-import { intakeFields, png, postInquiry } from "#tests/helpers/intake";
+import { addArtist, addFlashDesign } from "#tests/helpers/artists";
+import {
+	intakeFields,
+	intakeRows,
+	png,
+	postInquiry,
+} from "#tests/helpers/intake";
 import { makeClient } from "#tests/helpers/pipeline";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
-import { newTempUploads, tempUploads } from "#tests/helpers/uploads";
+import {
+	newTempUploads,
+	storedReferenceImages,
+	tempUploads,
+} from "#tests/helpers/uploads";
 
 const SLUG = "intake-needle-51";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -201,3 +215,286 @@ test.group("Public API: POST /inquiries", (group) => {
 		assert.deepEqual(await newTempUploads(before), []);
 	});
 });
+
+test.group(
+	"Public API: POST /inquiries for a flash design (TAT-129)",
+	(group) => {
+		group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+		group.each.teardown(() => queue.restore());
+
+		test("a flash request stores the design and names its artist, even while their books are closed", async ({
+			client,
+			assert,
+		}) => {
+			const { tenant, owner } = await studioWithOwner("intake-flash-129a");
+			queue.fake();
+			const closed = await addArtist(tenant, owner, {
+				name: "Closed",
+				slug: "closed",
+				acceptingInquiries: false,
+				acceptingFlash: true,
+			});
+			const design = await inTenant(tenant, () =>
+				addFlashDesign(tenant, closed),
+			);
+
+			const response = await postInquiry(
+				client,
+				"intake-flash-129a",
+				intakeFields({ flashDesignId: design.id }),
+			);
+
+			response.assertStatus(201);
+			const { inquiries } = await saved(tenant);
+			assert.lengthOf(inquiries, 1);
+			assert.equal(inquiries[0].flashDesignId, design.id);
+			assert.equal(inquiries[0].preferredArtistId, closed.id);
+			// Naming the same artist is fine too.
+			const again = await postInquiry(
+				client,
+				"intake-flash-129a",
+				intakeFields({
+					flashDesignId: design.id,
+					preferredArtistId: closed.id,
+					contactPhone: "9812345679",
+				}),
+			);
+			again.assertStatus(201);
+		});
+
+		test("a custom request naming that artist is still artist_not_accepting", async ({
+			client,
+			assert,
+		}) => {
+			const { tenant, owner } = await studioWithOwner("intake-flash-129b");
+			const closed = await addArtist(tenant, owner, {
+				name: "Closed",
+				slug: "closed",
+				acceptingInquiries: false,
+			});
+			const before = await intakeRows({ tenant });
+
+			const response = await postInquiry(
+				client,
+				"intake-flash-129b",
+				intakeFields({ preferredArtistId: closed.id }),
+			);
+
+			assertApiError(response, 409, "artist_not_accepting");
+			assert.deepEqual(await intakeRows({ tenant }), before);
+		});
+
+		test("a request for a design whose artist takes no flash requests is artist_not_accepting and stores nothing", async ({
+			client,
+			assert,
+		}) => {
+			const { tenant, owner } = await studioWithOwner("intake-flash-129c");
+			const off = await addArtist(tenant, owner, {
+				name: "Off",
+				slug: "off",
+				acceptingFlash: false,
+			});
+			const design = await inTenant(tenant, () => addFlashDesign(tenant, off));
+			const before = await intakeRows({ tenant });
+
+			const response = await postInquiry(
+				client,
+				"intake-flash-129c",
+				intakeFields({ flashDesignId: design.id }),
+			);
+
+			assertApiError(response, 409, "artist_not_accepting");
+			assert.deepEqual(await intakeRows({ tenant }), before);
+		});
+
+		test("a hidden design, a hidden or deleted artist's design, an unknown id and another studio's design are flash_unavailable, store nothing and keep no file", async ({
+			client,
+			assert,
+		}) => {
+			const { tenant, owner } = await studioWithOwner("intake-flash-129d");
+			const other = await studioWithOwner("intake-flash-129e");
+			const sita = await addArtist(tenant, owner);
+			const hiddenArtist = await addArtist(tenant, owner, {
+				name: "Hidden",
+				slug: "hidden",
+				visible: false,
+			});
+			const gone = await addArtist(tenant, owner, {
+				name: "Gone",
+				slug: "gone",
+			});
+			const theirs = await addArtist(other.tenant, other.owner);
+			const designs = await inTenant(tenant, async () => [
+				await addFlashDesign(tenant, sita, { hidden: true }),
+				await addFlashDesign(tenant, hiddenArtist),
+				await addFlashDesign(tenant, gone),
+			]);
+			const foreign = await inTenant(other.tenant, () =>
+				addFlashDesign(other.tenant, theirs),
+			);
+			await inTenant(tenant, () =>
+				new ArtistService(new ImageService()).delete(tenant, gone),
+			);
+			const before = await intakeRows({ tenant });
+
+			for (const id of [
+				...designs.map((design) => design.id),
+				foreign.id,
+				"0199f000-0000-7000-8000-000000000001",
+			]) {
+				const response = await postInquiry(
+					client,
+					"intake-flash-129d",
+					intakeFields({ flashDesignId: id }),
+					[await png()],
+				);
+				assertApiError(response, 409, "flash_unavailable");
+				assert.equal(
+					response.body().error.message,
+					"This flash design isn't available any more.",
+				);
+			}
+
+			assert.deepEqual(await intakeRows({ tenant }), before);
+			assert.deepEqual(await storedReferenceImages(tenant), []);
+		});
+
+		test("a preferredArtistId other than the design's artist is a field error on preferredArtistId", async ({
+			client,
+			assert,
+		}) => {
+			const { tenant, owner } = await studioWithOwner("intake-flash-129f");
+			const sita = await addArtist(tenant, owner);
+			const mira = await addArtist(tenant, owner, {
+				name: "Mira",
+				slug: "mira",
+			});
+			const design = await inTenant(tenant, () => addFlashDesign(tenant, sita));
+			const before = await intakeRows({ tenant });
+
+			const response = await postInquiry(
+				client,
+				"intake-flash-129f",
+				intakeFields({ flashDesignId: design.id, preferredArtistId: mira.id }),
+			);
+
+			assertApiError(response, 422, "validation_failed");
+			assert.deepEqual(Object.keys(response.body().error.fields), [
+				"preferredArtistId",
+			]);
+			assert.deepEqual(await intakeRows({ tenant }), before);
+		});
+
+		test("a flashDesignId that isn't a UUID is a field error on flashDesignId", async ({
+			client,
+			assert,
+		}) => {
+			const { tenant } = await studioWithOwner("intake-flash-129g");
+			const before = await intakeRows({ tenant });
+
+			const response = await postInquiry(
+				client,
+				"intake-flash-129g",
+				intakeFields({ flashDesignId: "the moth" }),
+			);
+
+			assertApiError(response, 422, "validation_failed");
+			assert.deepEqual(Object.keys(response.body().error.fields), [
+				"flashDesignId",
+			]);
+			assert.deepEqual(response.body().error.fields.flashDesignId, [
+				"Choose a design from the studio's page, or none.",
+			]);
+			assert.deepEqual(await intakeRows({ tenant }), before);
+		});
+		test("a request for a claimed design is flash_claimed and stores nothing, under either setting", async ({
+			client,
+			assert,
+		}) => {
+			const { tenant, owner } = await studioWithOwner("intake-flash-129h");
+			const sita = await addArtist(tenant, owner);
+			const claimed = await inTenant(tenant, () =>
+				addFlashDesign(tenant, sita, {
+					oneOfAKind: true,
+					claimedAt: DateTime.now().minus({ hours: 1 }),
+				}),
+			);
+			const before = await intakeRows({ tenant });
+
+			for (const setting of ["show", "hide"]) {
+				await inTenant(tenant, () =>
+					Tenant.query()
+						.where("id", tenant.id)
+						.update({ storefrontClaimedFlash: setting }),
+				);
+				const response = await postInquiry(
+					client,
+					"intake-flash-129h",
+					intakeFields({ flashDesignId: claimed.id }),
+					[await png()],
+				);
+
+				assertApiError(response, 409, "flash_claimed");
+				assert.equal(
+					response.body().error.message,
+					"Someone has claimed this design: it was one of a kind.",
+				);
+			}
+
+			assert.deepEqual(await intakeRows({ tenant }), before);
+			assert.deepEqual(await storedReferenceImages(tenant), []);
+		});
+
+		test("a request for a design claimed by hand is refused the same way, before the artist's switches are looked at", async ({
+			client,
+			assert,
+		}) => {
+			const { tenant, owner } = await studioWithOwner("intake-flash-129i");
+			const off = await addArtist(tenant, owner, {
+				name: "Off",
+				slug: "off",
+				acceptingFlash: false,
+			});
+			const byHand = await inTenant(tenant, () =>
+				addFlashDesign(tenant, off, {
+					oneOfAKind: true,
+					claimedAt: DateTime.now(),
+				}),
+			);
+			const before = await intakeRows({ tenant });
+
+			const response = await postInquiry(
+				client,
+				"intake-flash-129i",
+				intakeFields({ flashDesignId: byHand.id }),
+			);
+
+			// The artist takes no flash requests, but the design's being taken is the answer.
+			assertApiError(response, 409, "flash_claimed");
+			assert.deepEqual(await intakeRows({ tenant }), before);
+		});
+
+		test("a one-of-a-kind design nobody has claimed, and a repeatable one, are still requested", async ({
+			client,
+			assert,
+		}) => {
+			const { tenant, owner } = await studioWithOwner("intake-flash-129j");
+			const sita = await addArtist(tenant, owner);
+			const [single, repeatable] = await inTenant(tenant, async () => [
+				await addFlashDesign(tenant, sita, { oneOfAKind: true }),
+				await addFlashDesign(tenant, sita),
+			]);
+
+			for (const design of [single, repeatable]) {
+				const response = await postInquiry(
+					client,
+					"intake-flash-129j",
+					intakeFields({ flashDesignId: design.id }),
+				);
+				response.assertStatus(201);
+			}
+
+			assert.lengthOf((await intakeRows({ tenant })).inquiries, 2);
+		});
+	},
+);

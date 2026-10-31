@@ -3,12 +3,17 @@ import type { ApiClient } from "@japa/api-client";
 import { test } from "@japa/runner";
 import type User from "#models/user";
 import {
-	ARTIST_PLACEMENT_KEYS,
 	FONTS,
+	SECTION_KEYS,
 	THEME_ACCENT,
 	THEME_ACCENT_DARK,
 	THEMES,
 } from "#modules/storefront/look";
+import {
+	LOGO_SAVED,
+	LOGO_SAVED_ON_DARK_TILE,
+	LOGO_TILE_SAVED,
+} from "#modules/tenancy/look_messages";
 import Tenant from "#modules/tenancy/models/tenant";
 import { studioLinks } from "#services/studio_links";
 import { polyglot, testImages } from "#tests/helpers/images";
@@ -31,7 +36,10 @@ const BODY = {
 	accent: "#0f766e",
 	accentDark: "#a99cff",
 	font: "serif",
-	artists: "last",
+	claimedFlash: "show",
+	// What the page posts: one `sections[]` for each shown row, in order. (A single value would
+	// be read as a string, not a list: the field name carries the brackets.)
+	"sections[]": ["inquiry", "artists"],
 };
 
 const putLook = (
@@ -69,11 +77,14 @@ test.group("Settings, Page look: the page (TAT-56)", (group) => {
 			accent: null,
 			accentDark: null,
 			font: "eczar",
-			artists: "first",
+			sections: ["work", "artists", "flash", "info", "inquiry"],
+			claimedFlash: "show",
 		});
+		assert.deepEqual(props.claimedFlashChoices, ["show", "hide"]);
 		assert.deepEqual(props.themes, THEMES);
 		assert.deepEqual(props.fonts, FONTS);
-		assert.deepEqual(props.placements, ARTIST_PLACEMENT_KEYS);
+		assert.deepEqual(props.sectionKeys, [...SECTION_KEYS]);
+		assert.notProperty(props, "placements");
 		assert.deepEqual(props.swatches, {
 			light: THEME_ACCENT,
 			dark: THEME_ACCENT_DARK,
@@ -82,7 +93,14 @@ test.group("Settings, Page look: the page (TAT-56)", (group) => {
 		assert.isFalse(props.hasCover);
 		assert.deepEqual(props.studioPage, studioLinks(tenant.slug));
 		const text = JSON.stringify(props);
-		for (const secret of ["logoImage", "logo_image", "coverImage"]) {
+		for (const secret of [
+			"logoImage",
+			"logo_image",
+			"logoIcon",
+			"logo_icon",
+			"studio_icon",
+			"coverImage",
+		]) {
 			assert.notInclude(text, secret);
 		}
 	});
@@ -101,8 +119,54 @@ test.group("Settings, Page look: the page (TAT-56)", (group) => {
 			accent: "#0f766e",
 			accentDark: "#a99cff",
 			font: "serif",
-			artists: "last",
+			sections: ["inquiry", "artists"],
+			claimedFlash: "show",
 		});
+	});
+
+	test("the page offers every section and the stored order", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		await putLook(client, owner, tenant, {
+			...BODY,
+			"sections[]": ["artists", "work", "inquiry"],
+		});
+
+		const props = (await lookPage(client, owner, tenant)).inertiaProps;
+
+		assert.deepEqual(props.sectionKeys, [
+			"work",
+			"artists",
+			"flash",
+			"info",
+			"inquiry",
+		]);
+		assert.deepEqual(props.look.sections, ["artists", "work", "inquiry"]);
+	});
+
+	test("a stored list from before Recent work shows without it", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		await inTenant(tenant, () =>
+			Tenant.query()
+				.where("id", tenant.id)
+				.update({ storefrontSections: "artists,inquiry" }),
+		);
+
+		const props = (await lookPage(client, owner, tenant)).inertiaProps;
+
+		assert.deepEqual(props.look.sections, ["artists", "inquiry"]);
+		assert.deepEqual(props.sectionKeys, [
+			"work",
+			"artists",
+			"flash",
+			"info",
+			"inquiry",
+		]);
 	});
 
 	test("a stored value off today's list shows as its default", async ({
@@ -111,15 +175,18 @@ test.group("Settings, Page look: the page (TAT-56)", (group) => {
 	}) => {
 		const { owner, tenant } = await studioWithOwner();
 		await inTenant(tenant, () =>
-			Tenant.query()
-				.where("id", tenant.id)
-				.update({ brandFont: "mono", brandAccent: "#e8a317" }),
+			Tenant.query().where("id", tenant.id).update({
+				brandFont: "mono",
+				brandAccent: "#e8a317",
+				storefrontClaimedFlash: "banish",
+			}),
 		);
 
 		const { look } = (await lookPage(client, owner, tenant)).inertiaProps;
 
 		assert.equal(look.font, "eczar");
 		assert.isNull(look.accent);
+		assert.equal(look.claimedFlash, "show");
 	});
 });
 
@@ -169,23 +236,181 @@ test.group("Settings, Page look: saving (TAT-56)", (group) => {
 		assert.isNull(row.brandAccentDark);
 	});
 
-	test("every artists placement is stored as its section list", async ({
+	test("saves the sections in the order sent", async ({ client, assert }) => {
+		const { owner, tenant } = await studioWithOwner();
+
+		const response = await putLook(client, owner, tenant, {
+			...BODY,
+			"sections[]": ["artists", "work", "inquiry"],
+		});
+
+		response.assertStatus(302);
+		assert.equal(
+			(await reload(tenant)).storefrontSections,
+			"artists,work,inquiry",
+		);
+	});
+
+	test("saves Flash in the order sent, and hiding it stores the list without it", async ({
 		client,
 		assert,
 	}) => {
 		const { owner, tenant } = await studioWithOwner();
-		const stored: Record<string, string> = {};
 
-		for (const artists of ARTIST_PLACEMENT_KEYS) {
-			await putLook(client, owner, tenant, { ...BODY, artists });
-			stored[artists] = (await reload(tenant)).storefrontSections;
-		}
-
-		assert.deepEqual(stored, {
-			first: "artists,inquiry",
-			last: "inquiry,artists",
-			hidden: "inquiry",
+		await putLook(client, owner, tenant, {
+			...BODY,
+			"sections[]": ["flash", "work", "inquiry"],
 		});
+		assert.equal(
+			(await reload(tenant)).storefrontSections,
+			"flash,work,inquiry",
+		);
+		assert.deepEqual(
+			(await lookPage(client, owner, tenant)).inertiaProps.look.sections,
+			["flash", "work", "inquiry"],
+		);
+
+		await putLook(client, owner, tenant, {
+			...BODY,
+			"sections[]": ["work", "artists", "inquiry"],
+		});
+		assert.deepEqual(
+			(await lookPage(client, owner, tenant)).inertiaProps.look.sections,
+			["work", "artists", "inquiry"],
+		);
+	});
+
+	test("hiding Good to know stores the list without it, and moving it keeps its place", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+
+		await putLook(client, owner, tenant, {
+			...BODY,
+			"sections[]": ["work", "artists", "inquiry"],
+		});
+		assert.equal(
+			(await reload(tenant)).storefrontSections,
+			"work,artists,inquiry",
+		);
+		assert.deepEqual(
+			(await lookPage(client, owner, tenant)).inertiaProps.look.sections,
+			["work", "artists", "inquiry"],
+		);
+
+		await putLook(client, owner, tenant, {
+			...BODY,
+			"sections[]": ["info", "work", "artists", "inquiry"],
+		});
+		assert.equal(
+			(await reload(tenant)).storefrontSections,
+			"info,work,artists,inquiry",
+		);
+		assert.deepEqual(
+			(await lookPage(client, owner, tenant)).inertiaProps.look.sections,
+			["info", "work", "artists", "inquiry"],
+		);
+	});
+
+	test("reads sections[] sent as a multipart form too", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+
+		const response = await client
+			.put(`/t/${tenant.slug}/settings/look`)
+			.fields({
+				theme: "stencil-and-ink",
+				accent: "",
+				accentDark: "",
+				font: "eczar",
+				claimedFlash: "show",
+				"sections[]": ["inquiry", "work"],
+			})
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+
+		response.assertStatus(302);
+		assert.equal((await reload(tenant)).storefrontSections, "inquiry,work");
+	});
+
+	test("a list without the form gets it at the end", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+
+		const response = await putLook(client, owner, tenant, {
+			...BODY,
+			"sections[]": ["work"],
+		});
+
+		response.assertStatus(302);
+		assert.equal((await reload(tenant)).storefrontSections, "work,inquiry");
+	});
+
+	test("showing only the form hides Recent work and artists", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+
+		await putLook(client, owner, tenant, {
+			...BODY,
+			"sections[]": ["inquiry"],
+		});
+
+		assert.equal((await reload(tenant)).storefrontSections, "inquiry");
+		const { look } = (await lookPage(client, owner, tenant)).inertiaProps;
+		assert.deepEqual(look.sections, ["inquiry"]);
+	});
+
+	test("an unknown or repeated section is a field error and nothing changes", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const cases: [string, string[], string, string][] = [
+			[
+				"an unknown section",
+				["zzz", "inquiry"],
+				"sections.0",
+				"Choose sections from the list.",
+			],
+			[
+				"a section twice",
+				["work", "work", "inquiry"],
+				"sections",
+				"Show each section once.",
+			],
+			[
+				"the form twice",
+				["inquiry", "inquiry"],
+				"sections",
+				"Show each section once.",
+			],
+		];
+
+		for (const [name, sections, field, message] of cases) {
+			const response = await putLook(client, owner, tenant, {
+				...BODY,
+				"sections[]": sections,
+			});
+			// Not assertValidationError: it reads "sections.0" as a nested path.
+			const errors = response.flashMessage("inputErrorsBag") ?? {};
+			assert.deepEqual(Object.keys(errors), [field], name);
+			assert.deepEqual(errors[field], [message], name);
+			const row = await reload(tenant);
+			assert.equal(
+				row.storefrontSections,
+				"work,artists,flash,info,inquiry",
+				name,
+			);
+			assert.equal(row.brandFont, "eczar", name);
+		}
 	});
 
 	test("a refused value is a field error and nothing is stored", async ({
@@ -245,12 +470,6 @@ test.group("Settings, Page look: saving (TAT-56)", (group) => {
 				"theme",
 				"Choose one of the themes.",
 			],
-			[
-				"an unknown placement",
-				{ artists: "middle" },
-				"artists",
-				"Choose where the artists list goes.",
-			],
 		];
 
 		for (const [name, change, field, message] of cases) {
@@ -263,7 +482,11 @@ test.group("Settings, Page look: saving (TAT-56)", (group) => {
 			assert.equal(row.brandFont, "eczar", name);
 			assert.isNull(row.brandAccent, name);
 			assert.isNull(row.brandAccentDark, name);
-			assert.equal(row.storefrontSections, "artists,inquiry", name);
+			assert.equal(
+				row.storefrontSections,
+				"work,artists,flash,info,inquiry",
+				name,
+			);
 		}
 	});
 
@@ -283,6 +506,26 @@ test.group("Settings, Page look: saving (TAT-56)", (group) => {
 		const row = await reload(tenant);
 		assert.equal(row.brandFont, "eczar");
 		assert.isNull(row.brandAccent);
+	});
+
+	test("a request that leaves the sections out gets a plain message, and nothing is stored", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const { "sections[]": _left, ...rest } = BODY;
+
+		const response = await putLook(client, owner, tenant, rest);
+
+		assertValidationError(
+			response,
+			"sections",
+			"Choose sections from the list.",
+		);
+		assert.equal(
+			(await reload(tenant)).storefrontSections,
+			"work,artists,flash,info,inquiry",
+		);
 	});
 
 	test("the borderline colours: 4.62:1 passes, 4.05:1 does not", async ({
@@ -328,6 +571,12 @@ test.group("Settings, Page look: saving (TAT-56)", (group) => {
 				.withCsrfToken()
 				.loginAs(member)
 				.redirects(0),
+			await client
+				.put(`/t/${tenant.slug}/settings/logo/tile`)
+				.form({ tile: "dark" })
+				.withCsrfToken()
+				.loginAs(member)
+				.redirects(0),
 		];
 
 		for (const response of responses) response.assertStatus(404);
@@ -349,6 +598,19 @@ const setLogo = (
 	client
 		.put(`/t/${tenant.slug}/settings/logo`)
 		.file("logo", data, { filename })
+		.withCsrfToken()
+		.loginAs(user)
+		.redirects(0);
+
+const putTile = (
+	client: ApiClient,
+	user: User,
+	tenant: { slug: string },
+	body: Record<string, unknown>,
+) =>
+	client
+		.put(`/t/${tenant.slug}/settings/logo/tile`)
+		.form(body)
 		.withCsrfToken()
 		.loginAs(user)
 		.redirects(0);
@@ -377,7 +639,7 @@ test.group("Settings, Page look: the logo (TAT-56)", (group) => {
 		);
 		set.assertStatus(302);
 		set.assertHeader("location", `/t/${tenant.slug}/settings/look`);
-		set.assertFlashMessage("success", "Logo saved.");
+		set.assertFlashMessage("success", LOGO_SAVED);
 		const first = await reload(tenant);
 		assert.match(
 			first.logoImageKey ?? "",
@@ -422,8 +684,10 @@ test.group("Settings, Page look: the logo (TAT-56)", (group) => {
 		assert.deepEqual(Object.keys(logo).sort(), [
 			"height",
 			"previewUrl",
+			"tile",
 			"width",
 		]);
+		assert.equal(logo.tile, "light");
 		assert.match(
 			new URL(logo.previewUrl).pathname,
 			new RegExp(`^/uploads/tenants/${tenant.id}/${LOGO}/.+\\.640w\\.png$`),
@@ -436,6 +700,86 @@ test.group("Settings, Page look: the logo (TAT-56)", (group) => {
 		assert.equal(narrow.width, 500);
 		assert.equal(narrow.height, 250);
 		assert.notMatch(narrow.previewUrl, /640w/);
+	});
+
+	test("uploading a light logo says it went on the dark tile; a dark one says only that it is saved", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+
+		const white = await setLogo(
+			client,
+			owner,
+			tenant,
+			await testImages.logoOnClear([{ r: 255, g: 255, b: 255 }]),
+		);
+		const whiteTile = (await reload(tenant)).logoTile;
+		const dark = await setLogo(
+			client,
+			owner,
+			tenant,
+			await testImages.logoOnClear([{ r: 0, g: 0, b: 0 }]),
+		);
+
+		white.assertStatus(302);
+		white.assertFlashMessage("success", LOGO_SAVED_ON_DARK_TILE);
+		assert.equal(whiteTile, "dark");
+		dark.assertFlashMessage("success", LOGO_SAVED);
+		assert.equal((await reload(tenant)).logoTile, "light");
+	});
+
+	test("the preview carries the tile, and never the icon", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+		await setLogo(
+			client,
+			owner,
+			tenant,
+			await testImages.logoOnClear([{ r: 255, g: 255, b: 255 }]),
+		);
+
+		const { logo } = (await lookPage(client, owner, tenant)).inertiaProps;
+
+		assert.equal(logo.tile, "dark");
+		assert.notInclude(JSON.stringify(logo), "studio_icon");
+	});
+
+	test("an owner switches the tile, and back", async ({ client, assert }) => {
+		const { tenant, owner } = await studioWithOwner();
+		await setLogo(client, owner, tenant, await testImages.png(600, 200));
+		const before = await reload(tenant);
+
+		const dark = await putTile(client, owner, tenant, { tile: "dark" });
+		const darkRow = await reload(tenant);
+		const light = await putTile(client, owner, tenant, { tile: "light" });
+
+		dark.assertStatus(302);
+		dark.assertHeader("location", `/t/${tenant.slug}/settings/look`);
+		dark.assertFlashMessage("success", LOGO_TILE_SAVED);
+		assert.equal(darkRow.logoTile, "dark");
+		assert.equal(darkRow.logoImageKey, before.logoImageKey);
+		assert.equal(darkRow.logoIconKey, before.logoIconKey);
+		light.assertStatus(302);
+		assert.equal((await reload(tenant)).logoTile, "light");
+	});
+
+	test("an unknown or missing tile is a field error and nothing changes", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner();
+		await setLogo(client, owner, tenant, await testImages.png(600, 200));
+		const before = (await reload(tenant)).serialize();
+
+		for (const body of [{ tile: "blue" }, { tile: "Dark" }, {}]) {
+			const response = await putTile(client, owner, tenant, body);
+			assertValidationError(response, "tile", "Choose a light or a dark tile.");
+		}
+
+		assert.deepEqual((await reload(tenant)).serialize(), before);
 	});
 
 	test("the cover is separate: hasCover follows the cover, not the logo", async ({
@@ -582,5 +926,53 @@ test.group("Settings, Page look: the logo (TAT-56)", (group) => {
 		retry.assertFlashMessage("success", "Logo removed.");
 		assert.isNull((await reload(tenant)).logoImageKey);
 		assert.deepEqual(await storedImages(tenant, LOGO), []);
+	});
+});
+
+test.group("Settings, Page look: claimed flash designs (TAT-129)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("saves the claimed flash choice, and the page shows it with both choices", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		assert.equal((await reload(tenant)).storefrontClaimedFlash, "show");
+
+		const hidden = await putLook(client, owner, tenant, {
+			...BODY,
+			claimedFlash: "hide",
+		});
+		hidden.assertStatus(302);
+		assert.equal((await reload(tenant)).storefrontClaimedFlash, "hide");
+		const props = (await lookPage(client, owner, tenant)).inertiaProps;
+		assert.equal(props.look.claimedFlash, "hide");
+		assert.deepEqual(props.claimedFlashChoices, ["show", "hide"]);
+
+		(
+			await putLook(client, owner, tenant, { ...BODY, claimedFlash: "show" })
+		).assertStatus(302);
+		assert.equal((await reload(tenant)).storefrontClaimedFlash, "show");
+	});
+
+	test("an unknown or missing choice is a field error and nothing changes", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		await putLook(client, owner, tenant, { ...BODY, claimedFlash: "hide" });
+
+		assertValidationError(
+			await putLook(client, owner, tenant, { ...BODY, claimedFlash: "banish" }),
+			"claimedFlash",
+		);
+		const { claimedFlash: _left, ...without } = BODY;
+		assertValidationError(
+			await putLook(client, owner, tenant, without),
+			"claimedFlash",
+		);
+		const row = await reload(tenant);
+		assert.equal(row.storefrontClaimedFlash, "hide");
+		assert.equal(row.brandFont, "serif", "the rest of the save did not land");
 	});
 });

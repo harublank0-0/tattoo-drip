@@ -401,6 +401,27 @@ describe("inquiries.create", () => {
 		assert.equal(form.get("idea"), "Fine-line peony");
 	});
 
+	test("it sends flashDesignId as a form field", async () => {
+		const { calls, fetch } = fakeFetch(() => json(201, { data: { id: ID } }));
+
+		await client(fetch).inquiries.create({
+			...input,
+			flashDesignId: "0199f000-0000-7000-8000-000000000001",
+		});
+
+		const form = calls[0].init.body as FormData;
+		assert.equal(
+			form.get("flashDesignId"),
+			"0199f000-0000-7000-8000-000000000001",
+		);
+		const plain = fakeFetch(() => json(201, { data: { id: ID } }));
+		await client(plain.fetch).inquiries.create(input);
+		assert.equal(
+			(plain.calls[0].init.body as FormData).has("flashDesignId"),
+			false,
+		);
+	});
+
 	test("a refusal is a TattooApiError with its code, and fields on validation_failed", async () => {
 		const full = fakeFetch(() =>
 			json(409, {
@@ -732,11 +753,33 @@ describe("studio and artists", () => {
 							width: 320,
 						},
 					],
+					tile: "dark",
+					icon: {
+						url: "https://api.example.com/uploads/tenants/t/studio_icon/i.32.png",
+						width: 180,
+						height: 180,
+						alt: null,
+						variants: [
+							{
+								url: "https://api.example.com/uploads/tenants/t/studio_icon/i.32w.png",
+								width: 32,
+							},
+						],
+					},
 				},
 				colors: { accent: "#0f766e", accentDark: null },
 				font: "serif",
 			},
 			sections: [{ type: "inquiry" }, { type: "artists" }],
+		},
+		openingHours: [],
+		closedDays: [],
+		goodToKnow: {
+			walkIns: null,
+			ageRule: null,
+			depositPolicy: null,
+			beforeSession: null,
+			aftercare: null,
 		},
 	};
 	const ARTIST: Artist = {
@@ -762,7 +805,7 @@ describe("studio and artists", () => {
 		},
 		acceptingInquiries: false,
 		closedMessage: "Books open in March.",
-		// Up to six photos of the artist's work (TAT-116), in the studio's order.
+		// The artist's six newest photos of work (TAT-116, TAT-126), newest first.
 		workPhotos: [
 			{
 				url: "https://api.example.com/uploads/tenants/t/artist_work_photo/w1.320-640.jpg",
@@ -788,6 +831,8 @@ describe("studio and artists", () => {
 				variants: [],
 			},
 		],
+		styles: [],
+		socialLinks: [],
 	};
 
 	test("studio.get returns the whole profile", async () => {
@@ -950,22 +995,108 @@ describe("lists with query parameters", () => {
 		assert.equal(calls[0].init.credentials, "omit");
 	});
 
-	test("portfolio.list encodes the query like a form and returns the whole page", async () => {
-		const page = { data: [], nextCursor: null };
+	test("work.list sends the filters like a form and returns the whole page", async () => {
+		const page = {
+			data: [],
+			nextCursor: null,
+			filters: { styles: [], healed: false },
+		};
 		const { calls, fetch } = fakeFetch(() => json(200, page));
 
-		const result = await client(fetch).portfolio.list({
-			style: "fine line",
-			limit: 12,
+		const result = await client(fetch).work.list({
+			artist: "sita",
+			style: "fine-line",
+			healed: true,
 			cursor: "next page",
+			limit: 12,
 		});
 
 		assert.equal(
 			calls[0].url,
-			`${T}/portfolio?style=fine+line&limit=12&cursor=next+page`,
+			`${T}/work?artist=sita&style=fine-line&healed=true&cursor=next+page&limit=12`,
 		);
 		assert.equal(calls[0].init.credentials, "omit");
 		assert.deepEqual(result, page);
+	});
+
+	test("work.list() asks for the first page with no question mark", async () => {
+		const { calls, fetch } = fakeFetch(() =>
+			json(200, {
+				data: [],
+				nextCursor: null,
+				filters: { styles: [], healed: false },
+			}),
+		);
+
+		await client(fetch).work.list();
+
+		assert.equal(calls[0].url, `${T}/work`);
+	});
+
+	test("flash.list sends the filters like a form and returns the whole page", async () => {
+		const page = { data: [], nextCursor: null, filters: { artists: [] } };
+		const { calls, fetch } = fakeFetch(() => json(200, page));
+
+		const result = await client(fetch).flash.list({
+			artist: "sita",
+			cursor: "next page",
+			limit: 6,
+		});
+
+		assert.equal(
+			calls[0].url,
+			`${T}/flash?artist=sita&cursor=next+page&limit=6`,
+		);
+		assert.equal(calls[0].init.credentials, "omit");
+		assert.deepEqual(result, page);
+
+		const { calls: plain, fetch: plainFetch } = fakeFetch(() =>
+			json(200, page),
+		);
+		await client(plainFetch).flash.list();
+		assert.equal(plain[0].url, `${T}/flash`);
+	});
+
+	test("flash.list sends available as true or false", async () => {
+		const page = { data: [], nextCursor: null, filters: { artists: [] } };
+		const { calls, fetch } = fakeFetch(() => json(200, page));
+
+		await client(fetch).flash.list({ available: true, limit: 6 });
+		await client(fetch).flash.list({ available: false });
+
+		assert.equal(calls[0].url, `${T}/flash?available=true&limit=6`);
+		assert.equal(calls[1].url, `${T}/flash?available=false`);
+	});
+
+	test("flash.get reads one design by id, encoded", async () => {
+		const design = {
+			id: "0199f000-0000-7000-8000-000000000001",
+			name: "Moth",
+			size: "About 3 in",
+			price: { amount: 300000, currency: "NPR", text: "NPR 3,000" },
+			image: {
+				url: "https://api.example.com/uploads/moth.png",
+				width: 1200,
+				height: 1200,
+				variants: [],
+			},
+			artist: { slug: "sita", name: "Sita Rai" },
+			requestable: true,
+		};
+		const { calls, fetch } = fakeFetch(() => json(200, { data: design }));
+
+		const result = await client(fetch).flash.get(design.id);
+
+		assert.equal(calls[0].url, `${T}/flash/${design.id}`);
+		assert.deepEqual(result, design);
+
+		const missing = fakeFetch(() =>
+			json(404, { error: { code: "not_found", message: "Not found." } }),
+		);
+		const error = await rejection(client(missing.fetch).flash.get("a/b?c"));
+		assert.ok(error instanceof TattooApiError);
+		assert.equal(error.code, "not_found");
+		assert.equal(missing.calls[0].url, `${T}/flash/a%2Fb%3Fc`);
 	});
 
 	test("availability.list sends all four parameters in the given order", async () => {

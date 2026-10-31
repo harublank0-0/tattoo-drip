@@ -39,10 +39,11 @@ export class ArtistWorkPhotoSchema extends BaseModel {
 		"alt",
 		"artistId",
 		"createdAt",
+		"healed",
 		"height",
 		"id",
 		"imageKey",
-		"position",
+		"styles",
 		"tenantId",
 		"updatedAt",
 		"width",
@@ -55,13 +56,15 @@ export class ArtistWorkPhotoSchema extends BaseModel {
 	@column.dateTime({ autoCreate: true })
 	declare createdAt: DateTime;
 	@column()
+	declare healed: boolean;
+	@column()
 	declare height: number;
 	@column({ isPrimary: true })
 	declare id: string;
 	@column()
 	declare imageKey: string;
 	@column()
-	declare position: number;
+	declare styles: string[];
 	@column()
 	declare tenantId: string;
 	@column.dateTime({ autoCreate: true, autoUpdate: true })
@@ -72,23 +75,30 @@ export class ArtistWorkPhotoSchema extends BaseModel {
 
 export class ArtistSchema extends BaseModel {
 	static $columns = [
+		"acceptingFlash",
 		"acceptingInquiries",
 		"bio",
 		"closedMessage",
 		"createdAt",
 		"deletedAt",
+		"facebookUrl",
 		"id",
+		"instagramUrl",
 		"name",
 		"photoHeight",
 		"photoKey",
 		"photoWidth",
 		"slug",
+		"styles",
 		"tenantId",
+		"tiktokUrl",
 		"updatedAt",
 		"userId",
 		"visible",
 	] as const;
 	$columns = ArtistSchema.$columns;
+	@column()
+	declare acceptingFlash: boolean;
 	@column()
 	declare acceptingInquiries: boolean;
 	@column()
@@ -99,8 +109,12 @@ export class ArtistSchema extends BaseModel {
 	declare createdAt: DateTime;
 	@column.dateTime()
 	declare deletedAt: DateTime | null;
+	@column()
+	declare facebookUrl: string | null;
 	@column({ isPrimary: true })
 	declare id: string;
+	@column()
+	declare instagramUrl: string | null;
 	@column()
 	declare name: string;
 	@column()
@@ -112,7 +126,11 @@ export class ArtistSchema extends BaseModel {
 	@column()
 	declare slug: string;
 	@column()
+	declare styles: string[];
+	@column()
 	declare tenantId: string;
+	@column()
+	declare tiktokUrl: string | null;
 	@column.dateTime({ autoCreate: true, autoUpdate: true })
 	declare updatedAt: DateTime | null;
 	@column()
@@ -232,6 +250,60 @@ export class DepositOutcomeSchema extends BaseModel {
 	declare updatedAt: DateTime | null;
 }
 
+export class FlashDesignSchema extends BaseModel {
+	static $columns = [
+		"artistId",
+		"claimedAt",
+		"claimedProjectId",
+		"createdAt",
+		"currency",
+		"height",
+		"hidden",
+		"id",
+		"imageKey",
+		"name",
+		"oneOfAKind",
+		"price",
+		"size",
+		"tenantId",
+		"updatedAt",
+		"width",
+	] as const;
+	$columns = FlashDesignSchema.$columns;
+	@column()
+	declare artistId: string;
+	@column.dateTime()
+	declare claimedAt: DateTime | null;
+	@column()
+	declare claimedProjectId: string | null;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column()
+	declare currency: string;
+	@column()
+	declare height: number;
+	@column()
+	declare hidden: boolean;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare imageKey: string;
+	@column()
+	declare name: string;
+	@column()
+	declare oneOfAKind: boolean;
+	@column()
+	declare price: number | null;
+	@column()
+	declare size: string;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+	@column()
+	declare width: number;
+}
+
 export class InquirySchema extends BaseModel {
 	static $columns = [
 		"anonymizedAt",
@@ -244,6 +316,7 @@ export class InquirySchema extends BaseModel {
 		"createdAt",
 		"decidedAt",
 		"deletedAt",
+		"flashDesignId",
 		"id",
 		"idea",
 		"lastContactChannel",
@@ -278,6 +351,8 @@ export class InquirySchema extends BaseModel {
 	declare decidedAt: DateTime | null;
 	@column.dateTime()
 	declare deletedAt: DateTime | null;
+	@column()
+	declare flashDesignId: string | null;
 	@column({ isPrimary: true })
 	declare id: string;
 	@column()
@@ -693,6 +768,60 @@ export class StaffAlertSchema extends BaseModel {
 	declare userId: string;
 }
 
+export class StudioClosureSchema extends BaseModel {
+	static $columns = [
+		"createdAt",
+		"endsOn",
+		"id",
+		"note",
+		"startsOn",
+		"tenantId",
+		"updatedAt",
+	] as const;
+	$columns = StudioClosureSchema.$columns;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.date()
+	declare endsOn: DateTime;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare note: string | null;
+	@column.date()
+	declare startsOn: DateTime;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
+export class StudioHourSchema extends BaseModel {
+	static $columns = [
+		"closesAt",
+		"createdAt",
+		"id",
+		"opensAt",
+		"tenantId",
+		"updatedAt",
+		"weekday",
+	] as const;
+	$columns = StudioHourSchema.$columns;
+	@column()
+	declare closesAt: string;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare opensAt: string;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+	@column()
+	declare weekday: number;
+}
+
 export class TattooProjectSchema extends BaseModel {
 	static $columns = [
 		"artistId",
@@ -700,6 +829,8 @@ export class TattooProjectSchema extends BaseModel {
 		"clientId",
 		"createdAt",
 		"deletedAt",
+		"flashClaimedOnceAt",
+		"flashDesignId",
 		"id",
 		"inquiryId",
 		"lastContactChannel",
@@ -721,6 +852,10 @@ export class TattooProjectSchema extends BaseModel {
 	declare createdAt: DateTime;
 	@column.dateTime()
 	declare deletedAt: DateTime | null;
+	@column.dateTime()
+	declare flashClaimedOnceAt: DateTime | null;
+	@column()
+	declare flashDesignId: string | null;
 	@column({ isPrimary: true })
 	declare id: string;
 	@column()
@@ -820,6 +955,9 @@ export class TenantSlugSchema extends BaseModel {
 export class TenantSchema extends BaseModel {
 	static $columns = [
 		"address",
+		"aftercareText",
+		"ageRuleText",
+		"beforeSessionText",
 		"brandAccent",
 		"brandAccentDark",
 		"brandFont",
@@ -836,22 +974,32 @@ export class TenantSchema extends BaseModel {
 		"id",
 		"instagramUrl",
 		"intro",
+		"logoIconKey",
 		"logoImageHeight",
 		"logoImageKey",
 		"logoImageWidth",
+		"logoTile",
 		"name",
 		"slug",
+		"storefrontClaimedFlash",
 		"storefrontSections",
 		"storefrontTheme",
 		"tiktokUrl",
 		"timezone",
 		"type",
 		"updatedAt",
+		"walkInsText",
 		"websiteUrl",
 	] as const;
 	$columns = TenantSchema.$columns;
 	@column()
 	declare address: string | null;
+	@column()
+	declare aftercareText: string | null;
+	@column()
+	declare ageRuleText: string | null;
+	@column()
+	declare beforeSessionText: string | null;
 	@column()
 	declare brandAccent: string | null;
 	@column()
@@ -885,15 +1033,21 @@ export class TenantSchema extends BaseModel {
 	@column()
 	declare intro: string | null;
 	@column()
+	declare logoIconKey: string | null;
+	@column()
 	declare logoImageHeight: number | null;
 	@column()
 	declare logoImageKey: string | null;
 	@column()
 	declare logoImageWidth: number | null;
 	@column()
+	declare logoTile: string;
+	@column()
 	declare name: string;
 	@column()
 	declare slug: string;
+	@column()
+	declare storefrontClaimedFlash: string;
 	@column()
 	declare storefrontSections: string;
 	@column()
@@ -906,6 +1060,8 @@ export class TenantSchema extends BaseModel {
 	declare type: string;
 	@column.dateTime({ autoCreate: true, autoUpdate: true })
 	declare updatedAt: DateTime | null;
+	@column()
+	declare walkInsText: string | null;
 	@column()
 	declare websiteUrl: string | null;
 }

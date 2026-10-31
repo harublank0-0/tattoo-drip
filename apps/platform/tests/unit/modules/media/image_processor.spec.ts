@@ -6,10 +6,13 @@ import {
 	InvalidImageError,
 } from "#modules/media/errors";
 import {
+	logoTile,
 	makeVariants,
 	processImage,
+	squareIcon,
 } from "#modules/media/services/image_processor";
 import { NO_VARIANTS, VARIANT_WIDTHS } from "#modules/media/variants";
+import type { Rgba } from "#tests/helpers/images";
 import { POLYGLOT_MARKERS, polyglot, testImages } from "#tests/helpers/images";
 
 test.group("processImage", () => {
@@ -332,5 +335,141 @@ test.group("makeVariants (TAT-112)", () => {
 		).catch((e) => e);
 
 		assert.instanceOf(error, Error);
+	});
+});
+
+test.group("logoTile and squareIcon (TAT-123)", () => {
+	const TILES = { light: "#f7f3ee", dark: "#14110f" };
+	const WHITE = { r: 255, g: 255, b: 255 };
+	const BLACK = { r: 0, g: 0, b: 0 };
+
+	/** What ImageService passes in: the processed upload. */
+	async function tileOf(upload: Promise<Buffer>) {
+		return logoTile(await processImage(await upload), TILES);
+	}
+
+	for (const [name, colour] of [
+		["white", WHITE],
+		["yellow", { r: 255, g: 204, b: 0 }],
+		["orange", { r: 230, g: 126, b: 34 }],
+	] as [string, Rgba][]) {
+		test(`a ${name} logo on a see-through background goes on the dark tile`, async ({
+			assert,
+		}) => {
+			assert.equal(await tileOf(testImages.logoOnClear([colour])), "dark");
+		});
+	}
+
+	for (const [name, colour] of [
+		["black", BLACK],
+		["red", { r: 221, g: 0, b: 0 }],
+		["grey", { r: 128, g: 128, b: 128 }],
+	] as [string, Rgba][]) {
+		test(`a ${name} logo on a see-through background stays on the light tile`, async ({
+			assert,
+		}) => {
+			assert.equal(await tileOf(testImages.logoOnClear([colour])), "light");
+		});
+	}
+
+	test("more than half of the logo must be hidden on the light tile", async ({
+		assert,
+	}) => {
+		const W = WHITE;
+		const B = BLACK;
+
+		assert.equal(await tileOf(testImages.logoOnClear([W, W, W, B, B])), "dark");
+		assert.equal(
+			await tileOf(testImages.logoOnClear([W, W, B, B, B])),
+			"light",
+		);
+	});
+
+	test("an opaque PNG, a half see-through one and a fully clear one stay light", async ({
+		assert,
+	}) => {
+		assert.equal(await tileOf(testImages.png()), "light");
+		assert.equal(await tileOf(testImages.transparentPng()), "light");
+		const clear = sharp({
+			create: {
+				width: 40,
+				height: 20,
+				channels: 4,
+				background: { ...WHITE, alpha: 0 },
+			},
+		})
+			.png()
+			.toBuffer();
+		assert.equal(await tileOf(clear), "light");
+	});
+
+	test("a JPEG is light without being decoded", async ({ assert }) => {
+		const tile = await logoTile(
+			{
+				data: Buffer.from("not an image"),
+				format: "jpeg",
+				width: 1,
+				height: 1,
+			},
+			TILES,
+		);
+
+		assert.equal(tile, "light");
+	});
+
+	test("squareIcon pads a wide logo on the tile's colour, never see-through", async ({
+		assert,
+	}) => {
+		const logo = await processImage(
+			await testImages.logoOnClear([WHITE], 600, 200),
+		);
+
+		const icon = await squareIcon(logo, TILES.dark);
+
+		const meta = await sharp(icon).metadata();
+		assert.deepEqual([meta.format, meta.width, meta.height], ["png", 180, 180]);
+		assert.isTrue((await sharp(icon).stats()).isOpaque);
+		const { data, info } = await sharp(icon)
+			.toColourspace("srgb")
+			.removeAlpha()
+			.raw()
+			.toBuffer({ resolveWithObject: true });
+		const pixel = (x: number, y: number) => [
+			...data.subarray((y * info.width + x) * info.channels).subarray(0, 3),
+		];
+		assert.deepEqual(pixel(0, 0), [20, 17, 15]);
+		// The 600 x 200 logo is fitted to 144 x 48, centred; the pixel above it is margin.
+		assert.deepEqual(pixel(90, 90), [255, 255, 255]);
+		assert.deepEqual(pixel(90, 40), [20, 17, 15]);
+	});
+
+	test("squareIcon enlarges a small logo to fit the margin", async ({
+		assert,
+	}) => {
+		const logo = await processImage(
+			await sharp({
+				create: {
+					width: 40,
+					height: 20,
+					channels: 3,
+					background: { r: 0, g: 0, b: 0 },
+				},
+			})
+				.png()
+				.toBuffer(),
+		);
+
+		const icon = await squareIcon(logo, TILES.light);
+
+		const { data, info } = await sharp(icon)
+			.toColourspace("srgb")
+			.removeAlpha()
+			.raw()
+			.toBuffer({ resolveWithObject: true });
+		const pixel = (x: number, y: number) => [
+			...data.subarray((y * info.width + x) * info.channels).subarray(0, 3),
+		];
+		assert.deepEqual(pixel(20, 90), [0, 0, 0]);
+		assert.deepEqual(pixel(90, 50), [247, 243, 238]);
 	});
 });

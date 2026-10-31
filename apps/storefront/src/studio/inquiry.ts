@@ -1,3 +1,6 @@
+import { fill } from "../intake/template.ts";
+import { studioCopy } from "./copy.ts";
+import type { FlashDesignView } from "./flash.ts";
 import { mailtoLink, whatsappLink } from "./links.ts";
 import type { ArtistView, StudioView } from "./view-model.ts";
 
@@ -20,6 +23,16 @@ export type InquiryState =
 			readonly studioName: string;
 			readonly preferredArtist: InquiryArtist | null;
 			readonly artists: readonly InquiryArtist[];
+			/**
+			 * What a flash request starts with (TAT-129): the idea and the size,
+			 * filled in and still editable. Absent for a custom request.
+			 */
+			readonly start?: {
+				readonly idea: string;
+				readonly approximateSize: string;
+			};
+			/** The flash design the request asks for (sent as `flashDesignId`); absent for a custom request. */
+			readonly flashDesignId?: string;
 	  }
 	| { readonly kind: "studio-closed"; readonly studioName: string }
 	| {
@@ -28,6 +41,8 @@ export type InquiryState =
 			readonly artistName: string;
 			/** Whether a general inquiry (no artist) would be taken. */
 			readonly studioOpen: boolean;
+			/** What the artist said about being closed, or null. */
+			readonly closedMessage: string | null;
 	  };
 
 /** How an open inquiry is sent until TAT-57's form exists. */
@@ -66,6 +81,7 @@ export function inquiryState(
 					studioName: studio.name,
 					artistName: selected.name,
 					studioOpen: studio.accepting,
+					closedMessage: selected.closedMessage,
 				};
 	}
 	return studio.accepting
@@ -78,17 +94,78 @@ export function inquiryState(
 		: { kind: "studio-closed", studioName: studio.name };
 }
 
+/**
+ * A request for a flash design (TAT-129): open for the design's artist alone,
+ * whatever their books say (the design is judged by their flash switch), with
+ * the idea ("The Moth flash") and the size filled in, and the design's id for
+ * `flashDesignId`. The loader calls it only for a requestable design.
+ */
+export function flashInquiryState(
+	studio: StudioView,
+	design: FlashDesignView,
+	artist: ArtistView,
+): InquiryState {
+	const asked = { id: artist.id, name: artist.name };
+	return {
+		kind: "open",
+		studioName: studio.name,
+		preferredArtist: asked,
+		artists: [asked],
+		start: {
+			idea: fill(studioCopy.flash.ideaStart, { name: design.name }),
+			approximateSize: design.size,
+		},
+		flashDesignId: design.id,
+	};
+}
+
+/**
+ * A request for something similar to a claimed design (part 4b): not a flash
+ * request (no `flashDesignId`: the design is taken). While the design's artist
+ * takes new work it is open for them, with the idea ("Something similar to the
+ * Moth flash") and the size started; otherwise it is the artist's own state
+ * (`inquiryState`: their closed words, and the studio's general request when
+ * the studio still takes work). `artists` is the studio's whole list.
+ */
+export function similarInquiryState(
+	studio: StudioView,
+	design: FlashDesignView,
+	artist: ArtistView,
+	artists: readonly ArtistView[],
+): InquiryState {
+	const state = inquiryState(studio, artists, artist);
+	if (state.kind !== "open") return state;
+	return {
+		...state,
+		start: {
+			idea: fill(studioCopy.flash.similarStart, { name: design.name }),
+			approximateSize: design.size,
+		},
+	};
+}
+
+/**
+ * The fallback's chat and email, prefilled. With a `flashName` (TAT-129) they
+ * ask about that flash design.
+ */
 export function inquiryChannels(
 	studio: StudioView,
 	artist: InquiryArtist | null,
+	flashName: string | null = null,
 ): InquiryChannels {
 	const ask = artist ? `ask ${artist.name}` : "ask";
 	const whatsapp = whatsappLink(
 		studio.phone,
-		`Hi ${studio.name}, I'd like to ${ask} about a tattoo.`,
+		flashName
+			? `Hi ${studio.name}, I'd like to ask about the ${flashName} flash.`
+			: `Hi ${studio.name}, I'd like to ${ask} about a tattoo.`,
 	);
 	const email = mailtoLink(studio.email, {
-		subject: artist ? `Tattoo inquiry for ${artist.name}` : "Tattoo inquiry",
+		subject: flashName
+			? `Flash request: ${flashName}`
+			: artist
+				? `Tattoo inquiry for ${artist.name}`
+				: "Tattoo inquiry",
 		body: `Hi ${studio.name},\r\n\r\nMy idea:\r\nPlacement and size:\r\nPreferred dates:\r\n`,
 	});
 	const instagram =

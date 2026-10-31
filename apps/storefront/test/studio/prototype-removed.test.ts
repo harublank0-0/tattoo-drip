@@ -33,14 +33,18 @@ test("the prototype's mock data, pages and images are gone", () => {
 	assert.ok(existsSync(new URL("public/robots.txt", APP)), "public/robots.txt");
 });
 
-test("the storefront has exactly its three routes", () => {
+test("the storefront has exactly its routes", () => {
 	assert.deepEqual(
 		sourceFiles().filter((file) => file.startsWith("routes/")),
 		[
 			"routes/__root.tsx",
 			"routes/artists/$slug.tsx",
 			"routes/deposit.tsx",
+			"routes/flash/$id.tsx",
+			"routes/flash/index.tsx",
 			"routes/index.tsx",
+			"routes/request.tsx",
+			"routes/work.tsx",
 		],
 	);
 });
