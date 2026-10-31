@@ -5,6 +5,11 @@
 # settings never enter an image or its build cache
 **/.env*
 
+# The deploy files (compose, nginx, env templates and tests) are not image
+# inputs: editing them must not rebuild the app, and a settings file named
+# deploy/env/platform.env does not match **/.env* above
+deploy
+
 # Version control and agent/tooling state
 .git
 .github
