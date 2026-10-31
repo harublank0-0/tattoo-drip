@@ -113,12 +113,15 @@ services:
     image: docker.io/library/nginx:1.30.6-alpine
     restart: unless-stopped
     logging: *logging
+    # The whole directory, not its two files: git replaces a changed file with a new one,
+    # and a bind-mounted single file would keep showing the old one, so a reload would
+    # read stale settings. -c points nginx (and deploy.sh's nginx -t / -s reload) at it.
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/proxy.conf:/etc/nginx/proxy.conf:ro
+      - ./nginx:/etc/nginx/td:ro
+    command: ["nginx", "-c", "/etc/nginx/td/nginx.conf", "-g", "daemon off;"]
     # nginx looks web and storefront up once, when it starts or reloads, and
     # refuses to start without them. After either is recreated (new address),
-    # reload it: nginx -s reload.
+    # reload it: nginx -c /etc/nginx/td/nginx.conf -s reload (deploy.sh does).
     depends_on:
       web:
         condition: service_healthy

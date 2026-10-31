@@ -34,9 +34,10 @@ services:
 
   nginx:
     image: ${NGINX_IMAGE:?run.sh sets this from deploy/compose.yml}
+    # As in deploy/compose.yml: the directory, started with -c.
     volumes:
-      - ../../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ../../nginx/proxy.conf:/etc/nginx/proxy.conf:ro
+      - ../../nginx:/etc/nginx/td:ro
+    command: ["nginx", "-c", "/etc/nginx/td/nginx.conf", "-g", "daemon off;"]
     depends_on:
       - web
       - storefront

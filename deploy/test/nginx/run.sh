@@ -36,7 +36,8 @@ trap cleanup EXIT
 trap 'exit 130' INT TERM
 cleanup # a leftover from an interrupted run
 
-# Without the config, Docker would create a directory where the file should be.
+# The directory is mounted whole; a missing file would otherwise only show up as an
+# nginx that cannot start.
 for file in nginx.conf proxy.conf; do
 	if [ ! -f "$deploy/nginx/$file" ]; then
 		echo "nginx: deploy/nginx/$file does not exist" >&2
@@ -55,7 +56,8 @@ compose exec -T outsider node /check.mjs outsider || failed=1
 logs=$(mktemp)
 conf=$(mktemp)
 trap 'rm -f "$logs" "$conf"; cleanup' EXIT
-if compose exec -T nginx nginx -T >"$conf" 2>&1; then
+# -c: the stack's config, not the image's default one at /etc/nginx/nginx.conf.
+if compose exec -T nginx nginx -c /etc/nginx/td/nginx.conf -T >"$conf" 2>&1; then
 	echo "ok   nginx -T accepts the configuration"
 else
 	echo "FAIL nginx -T rejects the configuration"
