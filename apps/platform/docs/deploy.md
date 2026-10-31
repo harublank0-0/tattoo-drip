@@ -2,6 +2,18 @@
 
 Read before a deploy or when changing production settings. The hosting itself is TAT-14's; this page is what the platform needs from it. Nothing here is covered by the test suite: check it against your deploy.
 
+## This deploy: one server
+
+The first production deploy runs on one server behind a Cloudflare Tunnel. The step-by-step runbook (server, Cloudflare, settings, first start, updates, nightly backups, restore, what to do when something is wrong) is [`deploy/README.md`](../../../deploy/README.md); this page keeps the rules it follows. Docker Compose (`deploy/compose.yml`) runs Postgres 18, the web server, the worker, the storefront, nginx and `cloudflared`; photos are on Cloudflare R2; `deploy/deploy.sh` builds, migrates and restarts; a nightly `pg_dump` goes to R2. Hosts: `tattoodrip.app` (dashboard and API), `media.tattoodrip.app` (public photos), `tattoodrip.page` and `*.tattoodrip.page` (studio pages).
+
+Where this setup differs from the general advice below:
+
+- `TRUST_PROXY` is nginx's fixed address (`172.30.42.10`), not Cloudflare's ranges: the tunnel connects from inside the Docker network.
+- nginx replaces `X-Forwarded-For` with the visitor's address instead of appending to it ([Reverse proxy](#reverse-proxy)).
+- The storefront runs on the same server, not on a separate host.
+- Settings live in one file per role in `/srv/tattoo-drip/env/` (templates: `deploy/env/*.env.example`), not in a host's dashboard.
+- Mail is off (`ALERT_EMAILS=false`) until the sending domain exists (TAT-20): accounts are confirmed by hand ([Account email](#account-email)).
+
 ## Public API production checklist
 
 ### Platform settings
@@ -11,8 +23,9 @@ Read before a deploy or when changing production settings. The hosting itself is
 - `STOREFRONT_URL`: the studio pages' origin with `{tenant}` for the slug, e.g. `https://{tenant}.example.com` (deposit links).
 - `TURNSTILE_SECRET_KEY` (the bot challenge, TAT-55), with outbound HTTPS to `challenges.cloudflare.com` allowed.
 - `STOREFRONT_SERVER_KEYS`: the storefront's key ([below](#the-storefronts-server-key)).
-- `TRUST_PROXY`: the addresses of the reverse proxy in front of the app, as a list: `loopback` when it runs on the same host, its address or CIDR when it is a load balancer, plus Cloudflare's ranges if Cloudflare fronts the API. Never every address. Wrong, every visitor shares the proxy's address, and one person's attempts lock everyone out of login, signup, the intake and the deposit page.
+- `TRUST_PROXY`: the addresses of the reverse proxy in front of the app, as a list: `loopback` when it runs on the same host, its address or CIDR when it is a load balancer, plus Cloudflare's ranges if Cloudflare fronts the API. Never every address. Wrong, every visitor shares the proxy's address, and one person's attempts lock everyone out of login, signup, the intake and the deposit page. This setup: `172.30.42.10`, nginx's fixed address in `deploy/compose.yml`, and nothing else. Cloudflare never connects to the app: `cloudflared` (`172.30.42.20`) reaches nginx from inside the network, and nginx takes the visitor's address from `CF-Connecting-IP` only when the request comes from that address, so Cloudflare's ranges do not belong in `TRUST_PROXY` here.
 - `DB_USER` / `DB_PASSWORD` are the app role. `DB_MIGRATION_PASSWORD` belongs only in the migration step's environment.
+- Photos (TAT-27): `R2_ACCOUNT_ID` (32 lowercase hex characters), `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_PUBLIC_BUCKET`, `R2_PRIVATE_BUCKET` and `R2_PUBLIC_URL` (the public bucket's custom domain: an https origin with no path), all six or none. With `NODE_ENV=production` none is an error: the web server, the worker and every `ace` command refuse to start, because a photo on the server's own disk is lost with the server. The token needs object read and write on the two buckets only, the two buckets must differ, and the private one has no public access (its photos are reached through 5-minute signed URLs). Every object is stored with its `Cache-Control` (`no-cache` public, `private, no-store` private); see [backend development](backend.md).
 - Mail (TAT-52, TAT-88): new inquiries email the studio's owners and the asked-for artist, and deposit screenshots the owners and the project's artist, from the worker. `MAIL_FROM_ADDRESS` must be on the platform's own sending domain with SPF, DKIM and DMARC (TAT-20), and `SMTP_*` a provider allowed to send for it. Until then set `ALERT_EMAILS=false`: the alerts reach the dashboard only, and every process logs one warning at boot. With mail on and SMTP failing, each email fails after 3 retries with one "Sending email failed." log line; the dashboard alerts don't depend on it.
 
 ### Account email
@@ -23,9 +36,9 @@ Read before a deploy or when changing production settings. The hosting itself is
 - A send that fails retries 3 times, then logs one "Sending email failed." line with the recipient and the subject, never the link. The account is untouched; the person asks for a new link ("Send a new link", or a new reset request).
 - Every signed-in session signs out once after this release: sessions now carry the account's session version.
 
-### Storefront settings (Vercel, TAT-13)
+### Storefront settings (the storefront's host, TAT-13)
 
-- `API_URL`: the API's public https origin (browsers call it too). `STOREFRONT_URL`, `TURNSTILE_SITE_KEY`, and `STOREFRONT_SERVER_KEY`: one of the platform's keys. With `NODE_ENV=production` a missing key makes every page a 500 that names the variable.
+- `API_URL`: the API's public https origin (browsers call it too). `STOREFRONT_URL`, `TURNSTILE_SITE_KEY`, and `STOREFRONT_SERVER_KEY`: one of the platform's keys. With `NODE_ENV=production` a missing key makes every page a 500 that names the variable. This setup: `storefront.env` on the server.
 
 ### Processes
 
@@ -40,9 +53,10 @@ Read before a deploy or when changing production settings. The hosting itself is
 Values for nginx; set the equivalent on the host's proxy.
 
 - Keep request buffering on (`proxy_request_buffering on`, nginx's default): the proxy then receives a slow upload whole before the app holds anything for it.
-- `client_max_body_size 21m` (the parser's 20 MB plus multipart overhead), `client_header_timeout 15s`, `client_body_timeout 30s` (between two reads), `send_timeout 30s`, `proxy_read_timeout 130s` (above the app's 120 s dashboard upload deadline, so its 408 reaches the client), and `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for`.
+- `client_max_body_size 21m` (the parser's 20 MB plus multipart overhead), `client_header_timeout 15s`, `client_body_timeout 30s` (between two reads), `send_timeout 30s` and `proxy_read_timeout 130s` (above the app's 120 s dashboard upload deadline, so its 408 reaches the client).
+- `X-Forwarded-For`: `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for` (it appends the connecting address to what the client sent) is right where only the platform is behind the proxy: `TRUST_PROXY` makes it believe the first address from the right that is not a trusted proxy. The storefront reads the *first* value as the visitor (`apps/storefront/src/tenancy/visitor.ts`), so wherever it is behind the proxy, or Cloudflare is in front of the proxy, the proxy must replace the header, not append: whatever a visitor sends in it would stay first and let them pick the address the rate limits count. This setup replaces it: nginx (`deploy/nginx`) trusts `CF-Connecting-IP` only from `cloudflared`'s address (`set_real_ip_from`, `real_ip_header`), sets `X-Forwarded-For` to that one address (`$remote_addr`), `X-Forwarded-Proto` to `https`, pins `X-Forwarded-Host` to the host it routed on and clears `Forwarded`, so nothing the visitor sent reaches the apps. `deploy/test/nginx/run.sh` checks it.
 - Keep-alive: the app closes an idle connection after 5 s (Node's default). Keep the proxy's upstream keep-alive below that, or raise `keepAliveTimeout` in `config/app.ts` above the proxy's.
-- No access log for the deposit paths, `/api/v1/tenants/<slug>/deposits/<token>` (GET and POST), and no APM URL capture there: the path holds a deposit link's token for 30 days. In nginx that is a regex location with the same `proxy_pass` and headers as the API's: `location ~ ^/api/v1/tenants/[^/]+/deposits/ { access_log off; ... }`. A prefix location written with a glob, `location /api/v1/tenants/*/deposits/*`, matches nothing (nginx reads the `*` literally), so the tokens would stay in the log; after changing it, send one request and check that it is not logged. Keep `/files` request URLs (signed) out of logs too.
+- No access log for the deposit paths, `/api/v1/tenants/<slug>/deposits/<token>` (GET and POST), and no APM URL capture there: the path holds a deposit link's token for 30 days. In nginx that is a regex location with the same `proxy_pass` and headers as the API's: `location ~ ^/api/v1/tenants/[^/]+/deposits/ { access_log off; ... }`. A prefix location written with a glob, `location /api/v1/tenants/*/deposits/*`, matches nothing (nginx reads the `*` literally), so the tokens would stay in the log; after changing it, send one request and check that it is not logged. Keep `/files` request URLs (signed) out of logs too. This setup: nginx suppresses both with a `map $uri` plus per-location rules, so a request nginx rejects before it picks a location is covered too, and sets `error_log` to `crit` in those locations.
 - No access log for the account links either: `GET /reset-password/<token>`, `GET /verify-email/<token>` and `GET /invitations/<token>` carry a single-use token for up to an hour, a day or (an invitation link, TAT-33) 7 days. In nginx: `location ~ ^/(reset-password|verify-email|invitations)/ { access_log off; ... }` with the same `proxy_pass` and headers as the dashboard's. The pages they open have no token in their URL.
 - What the app does itself (TAT-38): every API request counts per caller before its body is read, reads per studio too; at most 4 API writes at once per process (2 per address); an upload must arrive within 90 s (120 s on the dashboard); Node drops a request not fully received after 120 s, but it checks only every 30 s (`connectionsCheckingInterval`), so the drop lands between 120 and about 150 s; the 90 s and 120 s upload deadlines are the app's own timers and are exact.
 
@@ -61,9 +75,9 @@ Values for nginx; set the equivalent on the host's proxy.
 
 ### Recommended, not required
 
-- Cloudflare in front of the API: add its IP ranges (cloudflare.com/ips) to `TRUST_PROXY`, let only Cloudflare reach the origin, and add a coarse rate-limiting rule as an outer layer. Without that `TRUST_PROXY` entry every visitor shares a Cloudflare address.
+- Cloudflare in front of the API: add its IP ranges (cloudflare.com/ips) to `TRUST_PROXY`, let only Cloudflare reach the origin, and add a coarse rate-limiting rule as an outer layer. Without that `TRUST_PROXY` entry every visitor shares a Cloudflare address. This setup is the other case: a Cloudflare Tunnel that ends at your own proxy. Only the tunnel can reach the origin, and the proxy turns `CF-Connecting-IP` into the address it passes on, so `TRUST_PROXY` stays the proxy's own address. Do not point a Cloudflare rate-limiting rule at `/api/` here: the studio pages call the API from the server's own address, and Cloudflare would count all their visitors as one.
 - A shared cache (Cloudflare, a CDN) in front of the API must honour a request's `Cache-Control: no-cache` for the storefront's server reads, or bypass the cache for requests that carry an `Authorization` header (the server key). The storefront asks every API read of a page render for a fresh answer (TAT-128): the studio page is cached for up to 11 minutes after it is rendered, and the dashboard tells owners that a change shows within 15; a cache that answers the render from a copy it holds for up to 11 minutes (`max-age=60, stale-while-revalidate=600`) makes that up to about 22. Some caches ignore request cache directives: check yours (below).
-- Vercel's firewall rate limiting for the storefront: each random studio subdomain or query string costs a function run before the API sees it.
+- Rate limiting at the storefront's host (a firewall rule): each random studio subdomain or query string costs a server render before the API sees it.
 
 ### Accepted denial costs
 
@@ -87,7 +101,7 @@ Known and accepted for the pilot. The owner gets no signal for any of them (429s
 - With `ALERT_EMAILS` on, send one inquiry to your own studio and check the owner's mailbox, spam folder included, for "New inquiry for …"; its button opens the inquiry.
 - With `ALERT_EMAILS` on, send one deposit screenshot to your own studio's deposit link and check the owner's mailbox for "Deposit screenshot for …"; its button opens the project at the Payments card.
 - Run the storefront's `pnpm check:page` against the production build before the first deploy (TAT-13).
-- Still required before any public deploy: object storage (TAT-27: the local disks must never deploy). The intake form (TAT-57) and the deposit page (TAT-65b) must be merged too.
+- Object storage (TAT-27) is done: production keeps both disks on R2 and refuses to start on the local ones. The intake form (TAT-57) and the deposit page (TAT-65b) must be merged before any public deploy. The one-server deploy-day checks (the visitor's address, photos on R2, backups, restore, reboot, closed ports) are in the [runbook](../../../deploy/README.md#4-first-start).
 
 ## Dashboard cookies and domains
 
@@ -98,6 +112,6 @@ The dashboard's session cookie is `__Host-td-session`: host-only, `Secure`, `Htt
 - `SESSION_DRIVER=cookie`: `memory` loses every session on restart and between processes, and `database` needs a `sessions` table this app doesn't have. `APP_KEY` signs and encrypts the session and CSRF cookies: rotating it signs everyone out.
 - The storefront's `API_URL` is on the platform's domain (`api.<platform>` or `APP_URL`'s host), never on a studio domain.
 - The proxy terminates TLS for the platform's hosts and redirects http to https: the app never redirects, and over plain http the browser drops the `Secure` cookie, so every sign-in would end on "Invalid or expired CSRF token". Shield sends HSTS (180 days). The cookies need no `TRUST_PROXY`: the app writes `Secure` whatever protocol it sees.
-- DNS: the studio domain's apex and wildcard go to Vercel only (TAT-13); the platform's names go to the platform. No wildcard on the platform's domain.
+- DNS: the studio domain's apex and wildcard go to the storefront's host only (TAT-13); the platform's names go to the platform. No wildcard on the platform's domain.
 - Custom studio domains (TAT-79) are never the platform's hosts or on its domain.
 - After the first deploy: sign in at `https://app.<platform>`; in DevTools, Application, Cookies, `__Host-td-session` shows Secure, HttpOnly, SameSite Lax and no Domain; `curl -sI http://app.<platform>/login` answers a redirect to https.

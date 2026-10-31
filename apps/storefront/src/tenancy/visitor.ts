@@ -19,10 +19,13 @@ function isIpLiteral(value: string): boolean {
 }
 
 /**
- * This request's visitor: the first X-Forwarded-For value (Vercel's edge
- * sets that header itself, overwriting what a client sent; TAT-13 confirms
- * it on the first deploy), else the socket address the server exposes
- * (srvx's `request.ip`), else none.
+ * This request's visitor: the first X-Forwarded-For value, which can be
+ * believed only because the edge in front of the server replaces the header
+ * with the address it saw instead of appending to what a client sent:
+ * Vercel's edge, or this deploy's nginx (`deploy/nginx`, which takes the
+ * address from CF-Connecting-IP). A host that appends would let a visitor
+ * pick the address the rate limits count. Else the socket address the
+ * server exposes (srvx's `request.ip`), else none.
  */
 export function visitorAddress(request: Request): string | undefined {
 	const forwarded = request.headers
