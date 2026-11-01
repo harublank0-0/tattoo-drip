@@ -21,11 +21,11 @@ export interface DepositShell {
 	readonly timezone: string;
 	/** E.164, checked; null when the studio set none. */
 	readonly phone: string | null;
-	/** The studio's logo when it passes the theme's checks (the API's own origin), else null: the header then shows the initial. */
+	/** The studio's logo when it passes the theme's checks (the image origin, MEDIA_URL), else null: the header then shows the initial. */
 	readonly logo: LogoImage | null;
 }
 
-/** `imageOrigin` is the API's origin, the only one a logo may come from; null accepts none. */
+/** `imageOrigin` is the image origin (MEDIA_URL), the only one a logo may come from; null accepts none. */
 export function depositShell(
 	studio: Studio,
 	imageOrigin: string | null = null,
@@ -44,6 +44,6 @@ export async function loadDepositShell(
 ): Promise<DepositShell> {
 	return depositShell(
 		await loadStudio(context),
-		context.tattoo.connection.apiUrl,
+		context.tattoo.connection.mediaUrl,
 	);
 }

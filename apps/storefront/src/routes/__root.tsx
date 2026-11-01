@@ -48,11 +48,11 @@ export const Route = createRootRouteWithContext<ApiContext & SiteContext>()({
 				href: appCss,
 			},
 			// The studio's icon, made from its logo at upload (TAT-123); without one,
-			// a stop for the /favicon.ico request. Its API's origin is connected once
-			// the root loader has read the studio.
+			// a stop for the /favicon.ico request. Its image origin (MEDIA_URL) is
+			// connected once the root loader has read the studio.
 			...studioIconLinks(
 				loaderData,
-				loaderData ? match.context.tattoo.connection.apiUrl : null,
+				loaderData ? match.context.tattoo.connection.mediaUrl : null,
 			),
 		],
 	}),

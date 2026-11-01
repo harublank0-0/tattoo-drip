@@ -22,6 +22,7 @@ const SERVER_ONLY = [
 	"TURNSTILE_SITE_KEY",
 	"TURNSTILE_SECRET_KEY",
 	"API_URL",
+	"MEDIA_URL",
 	"serverKey",
 	"requestStudio",
 	// The visitor's address as the tenant middleware read it (TAT-38); the

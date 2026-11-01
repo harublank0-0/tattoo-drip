@@ -241,7 +241,7 @@ export function styleNames(value: unknown): string[] {
 
 /**
  * The visible artists as the page shows them; one whose slug can't be a link
- * is left out. `imageOrigin` is the API's origin, the only one a work photo
+ * is left out. `imageOrigin` is MEDIA_URL's origin, the only one a work photo
  * may come from (TAT-116); null accepts none.
  */
 export function artistViewModels(
@@ -290,7 +290,7 @@ function artistViewModel(
 
 /**
  * An artist's work photos from the API's `workPhotos` (TAT-116): at most six,
- * each passing the brand images' rule (readBrandImage: the API's origin only,
+ * each passing the brand images' rule (readBrandImage: the image origin only,
  * sides from 1 to 10000, copies on the same origin), the rest dropped and the
  * others renumbered. Anything but a list (an older API sends none) is []. The
  * description is plain text on one line, up to 200 characters, else

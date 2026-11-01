@@ -233,7 +233,7 @@ export interface RequestPageData {
 }
 
 /**
- * The studio page's data. `imageOrigin` is the API's origin, the only one a
+ * The studio page's data. `imageOrigin` is MEDIA_URL's origin, the only one a
  * logo, cover or work photo may come from (TAT-54, TAT-116); null accepts
  * none. `recentWork` is the gallery read for the newest photos, as the API
  * sent it (galleryView checks it); none is an empty Recent work. `theme` is
@@ -535,7 +535,7 @@ export async function loadStudioPage(
 	context: PageContext,
 ): Promise<StudioPageData> {
 	const studio = await loadStudio(context);
-	const imageOrigin = context.tattoo.connection.apiUrl;
+	const imageOrigin = context.tattoo.connection.mediaUrl;
 	const theme = parseThemeConfig(storefrontInput(studio), imageOrigin);
 	const [artists, recentWork, flash] = await Promise.all([
 		loadArtists(context),
@@ -584,7 +584,7 @@ export async function loadArtistPage(
 		artists,
 		slug,
 		context.site.origin,
-		context.tattoo.connection.apiUrl,
+		context.tattoo.connection.mediaUrl,
 		portfolio,
 		flash,
 	);
@@ -614,7 +614,7 @@ export async function loadRequestPage(
 		artists,
 		search,
 		context.site.origin,
-		context.tattoo.connection.apiUrl,
+		context.tattoo.connection.mediaUrl,
 		flash,
 	);
 }
@@ -640,7 +640,7 @@ export async function loadWorkPage(
 		page,
 		search,
 		context.site.origin,
-		context.tattoo.connection.apiUrl,
+		context.tattoo.connection.mediaUrl,
 	);
 }
 
@@ -665,7 +665,7 @@ export async function loadFlashPage(
 		page,
 		search,
 		context.site.origin,
-		context.tattoo.connection.apiUrl,
+		context.tattoo.connection.mediaUrl,
 	);
 }
 
@@ -690,7 +690,7 @@ export async function loadFlashDesignPage(
 		artists,
 		design,
 		context.site.origin,
-		context.tattoo.connection.apiUrl,
+		context.tattoo.connection.mediaUrl,
 	);
 	if (!data) throw notFound();
 	return data;

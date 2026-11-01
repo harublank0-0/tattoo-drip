@@ -28,6 +28,7 @@ describe("parseStorefrontConfig", () => {
 	test("reads the development settings", () => {
 		assert.deepEqual(parseStorefrontConfig(DEV), {
 			apiUrl: "http://localhost:3333",
+			mediaUrl: "http://localhost:3333",
 			protocol: "http:",
 			baseHost: "localhost",
 			port: ":3000",
@@ -37,6 +38,7 @@ describe("parseStorefrontConfig", () => {
 	test("reads the production settings", () => {
 		assert.deepEqual(parseStorefrontConfig(PROD), {
 			apiUrl: "https://api.tattoodrip.app",
+			mediaUrl: "https://api.tattoodrip.app",
 			protocol: "https:",
 			baseHost: "tattoodrip.com",
 			port: "",
@@ -103,6 +105,65 @@ describe("parseStorefrontConfig", () => {
 			assert.ok(!message.includes(apiUrl), apiUrl);
 			assert.ok(!message.includes("secret"), apiUrl);
 		}
+	});
+
+	test("MEDIA_URL, when set, is the photos' origin; unset or blank, the API's", () => {
+		assert.equal(
+			parseStorefrontConfig({
+				...PROD,
+				MEDIA_URL: " https://Media.TattooDrip.app/ ",
+			}).mediaUrl,
+			"https://media.tattoodrip.app",
+		);
+		assert.equal(
+			parseStorefrontConfig({
+				...PROD,
+				MEDIA_URL: "https://media.tattoodrip.app",
+			}).apiUrl,
+			"https://api.tattoodrip.app",
+		);
+		for (const mediaUrl of [undefined, "", "   "]) {
+			assert.equal(
+				parseStorefrontConfig({ ...PROD, MEDIA_URL: mediaUrl }).mediaUrl,
+				"https://api.tattoodrip.app",
+				JSON.stringify(mediaUrl),
+			);
+		}
+		for (const mediaUrl of [
+			"http://localhost:3399",
+			"http://127.0.0.1:3399",
+			"http://[::1]:3399",
+		]) {
+			assert.equal(
+				parseStorefrontConfig({ ...DEV, MEDIA_URL: mediaUrl }).mediaUrl,
+				mediaUrl,
+			);
+		}
+	});
+
+	test("refuses a MEDIA_URL that isn't an https origin, without echoing it", () => {
+		for (const mediaUrl of [
+			"media.tattoodrip.app",
+			"ftp://media.tattoodrip.app",
+			"http://media.tattoodrip.app",
+			"https://media.tattoodrip.app/tenants",
+			"https://media.tattoodrip.app?x=1",
+			"https://media.tattoodrip.app#x",
+			"https://user:secret@media.tattoodrip.app",
+		]) {
+			const message = failure({ ...PROD, MEDIA_URL: mediaUrl });
+			assert.match(message, /MEDIA_URL is invalid/, mediaUrl);
+			assert.match(message, /R2_PUBLIC_URL/, mediaUrl);
+			assert.doesNotMatch(message, /API_URL|STOREFRONT_URL/, mediaUrl);
+			assert.ok(!message.includes(mediaUrl), mediaUrl);
+			assert.ok(!message.includes("secret"), mediaUrl);
+		}
+	});
+
+	test("a bad API_URL with no MEDIA_URL is one problem, the API_URL's", () => {
+		const message = failure({ ...PROD, API_URL: "http://api.tattoodrip.app" });
+		assert.match(message, /API_URL is invalid/);
+		assert.doesNotMatch(message, /MEDIA_URL/);
 	});
 
 	test("refuses a STOREFRONT_URL without {tenant} as its first label, without echoing it", () => {

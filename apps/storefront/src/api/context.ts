@@ -15,11 +15,15 @@ import {
 } from "./query-client.ts";
 
 /**
- * All the browser learns about the API (TAT-23): its origin and the studio's
- * current slug, the one the server confirmed from the Host header (TAT-12).
+ * All the browser learns about the API (TAT-23): its origin, the origin its
+ * public photos are served from (MEDIA_URL, by default the API's), and the
+ * studio's current slug, the one the server confirmed from the Host header
+ * (TAT-12).
  */
 export interface TattooConnection {
 	readonly apiUrl: string;
+	/** The one origin a page shows a studio's image from (readBrandImage). */
+	readonly mediaUrl: string;
 	readonly tenant: string;
 }
 
@@ -63,7 +67,11 @@ export class TattooClientRef {
 		if (client.tenant !== connection.tenant) {
 			throw new Error("The client's tenant must be the connection's tenant.");
 		}
-		this.#connection = { apiUrl: connection.apiUrl, tenant: connection.tenant };
+		this.#connection = {
+			apiUrl: connection.apiUrl,
+			mediaUrl: connection.mediaUrl,
+			tenant: connection.tenant,
+		};
 		this.#client = client;
 	}
 
@@ -86,7 +94,7 @@ export function createApiContext(environment: QueryEnvironment): ApiContext {
 }
 
 export interface ServerConnectOptions {
-	config: Pick<StorefrontConfig, "apiUrl" | "serverKey">;
+	config: Pick<StorefrontConfig, "apiUrl" | "mediaUrl" | "serverKey">;
 	/** The studio the tenant middleware confirmed (TAT-12's requestStudio()). */
 	studio: Studio;
 	/** The visitor's address (requestVisitorAddress()), sent as X-Visitor-IP with the key only (TAT-38). */
@@ -97,7 +105,7 @@ export interface ServerConnectOptions {
 
 /**
  * Connects a server render's client: API_URL, the confirmed studio's slug,
- * and the server key when set (sent as Authorization: Bearer) and, with the
+ * MEDIA_URL for its images, and the server key when set (sent as Authorization: Bearer) and, with the
  * key, the visitor's address (X-Visitor-IP). Its reads ask every cache on the
  * way for a fresh answer (`withRevalidation`).
  */
@@ -115,7 +123,10 @@ export function connectServer(
 			config.serverKey ? withVisitorAddress(fetch, visitorAddress) : fetch,
 		),
 	});
-	api.tattoo.connect({ apiUrl: config.apiUrl, tenant: studio.slug }, client);
+	api.tattoo.connect(
+		{ apiUrl: config.apiUrl, mediaUrl: config.mediaUrl, tenant: studio.slug },
+		client,
+	);
 }
 
 /**
@@ -131,8 +142,8 @@ export function seedStudio(api: ApiContext, studio: Studio): void {
 
 /** The router's dehydrate: the connection, and nothing else. */
 export function dehydrateApi(api: ApiContext): DehydratedApi {
-	const { apiUrl, tenant } = api.tattoo.connection;
-	return { tattoo: { apiUrl, tenant } };
+	const { apiUrl, mediaUrl, tenant } = api.tattoo.connection;
+	return { tattoo: { apiUrl, mediaUrl, tenant } };
 }
 
 /**
@@ -179,21 +190,23 @@ export function hydrateApi(
 	);
 }
 
-/** An http(s) origin and a stored-shape slug, or a fixed error. */
+/** Two http(s) origins and a stored-shape slug, or a fixed error. */
 export function parseConnection(value: unknown): TattooConnection {
 	if (typeof value !== "object" || value === null) {
 		throw new Error(INVALID_CONNECTION);
 	}
-	const { apiUrl, tenant } = value as Record<string, unknown>;
+	const { apiUrl, mediaUrl, tenant } = value as Record<string, unknown>;
 	if (
 		typeof apiUrl !== "string" ||
 		!isOrigin(apiUrl) ||
+		typeof mediaUrl !== "string" ||
+		!isOrigin(mediaUrl) ||
 		typeof tenant !== "string" ||
 		!STORED_SLUG.test(tenant)
 	) {
 		throw new Error(INVALID_CONNECTION);
 	}
-	return { apiUrl, tenant };
+	return { apiUrl, mediaUrl, tenant };
 }
 
 function isOrigin(value: string): boolean {

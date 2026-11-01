@@ -66,7 +66,11 @@ function context(studio = STUDIO) {
 		return json(404, { error: { code: "not_found", message: "No." } });
 	});
 	const api = createApiContext("server");
-	connectServer(api, { config: { apiUrl: API }, studio, fetch });
+	connectServer(api, {
+		config: { apiUrl: API, mediaUrl: API },
+		studio,
+		fetch,
+	});
 	seedStudio(api, studio);
 	const site = new SiteRef();
 	site.connect(ORIGIN);

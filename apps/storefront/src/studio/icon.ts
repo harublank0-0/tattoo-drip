@@ -14,7 +14,7 @@ const NO_ICON: IconLink[] = [{ rel: "icon", href: "data:," }];
 
 /**
  * The browser tab's and home screen's icon (TAT-123): the logo's square icon,
- * checked by parseThemeConfig (the API's origin, square). Its narrowest copy
+ * checked by parseThemeConfig (the image origin, square). Its narrowest copy
  * (the 32 px one) for the tab, the icon itself for larger screens and as the
  * Apple touch icon; without an icon, the stop. Pure.
  */

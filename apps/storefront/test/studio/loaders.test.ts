@@ -29,6 +29,7 @@ import { fakeFetch, json } from "../tenancy/helpers.ts";
 import {
 	ARJUN,
 	CLOSED_STUDIO,
+	DEFAULT_STOREFRONT,
 	EMPTY_FLASH_PAGE,
 	flashId,
 	flashPage,
@@ -39,20 +40,32 @@ import {
 	STUDIO,
 	sitaWithWork,
 } from "./fixtures.ts";
-import { IMAGE_ORIGIN, withStorefront } from "./theme-fixtures.ts";
+import {
+	IMAGE_ORIGIN,
+	LOGO,
+	MEDIA_ORIGIN,
+	movedTo,
+	withCover,
+	withStorefront,
+} from "./theme-fixtures.ts";
 
 const API = "http://api.test";
 const NOT_FOUND = { error: { code: "not_found", message: "Not found." } };
 const notFound = (error: unknown) => isNotFound(error);
 
-/** A server render's context, as getRouter() builds it: studio seeded, origin set. */
+/**
+ * A server render's context, as getRouter() builds it: studio seeded, origin
+ * set. The photos' origin is the API's unless `mediaUrl` says otherwise (as
+ * MEDIA_URL does).
+ */
 function pageContext(
 	fetch: typeof globalThis.fetch,
 	studio: Studio = STUDIO,
 	apiUrl: string = API,
+	mediaUrl: string = apiUrl,
 ) {
 	const api = createApiContext("server");
-	connectServer(api, { config: { apiUrl }, studio, fetch });
+	connectServer(api, { config: { apiUrl, mediaUrl }, studio, fetch });
 	seedStudio(api, studio);
 	const site = new SiteRef();
 	site.connect(ORIGIN);
@@ -1734,5 +1747,147 @@ describe("loadRequestPage with ?flash= (TAT-129)", () => {
 			[`${ROOT}/artists`],
 		);
 		assert.equal(data.flash, null);
+	});
+});
+
+describe("photos come from MEDIA_URL's origin only, not the API's (split origins)", () => {
+	// Production: the API on tattoodrip.app, its photos on media.tattoodrip.app
+	// (R2). The fixtures' photos are on the API's origin; movedTo puts them
+	// elsewhere.
+	const API_AT = IMAGE_ORIGIN;
+	const ELSEWHERE = "https://evil.example";
+	// The default sections (Recent work and Flash included), a logo and a cover.
+	const studio = withCover(
+		withStorefront({
+			...DEFAULT_STOREFRONT,
+			branding: { ...DEFAULT_STOREFRONT?.branding, logo: LOGO },
+		}),
+	);
+
+	/** Every kind of photo the studio page shows, its fixtures on `origin`. */
+	async function studioPagePhotos(origin: string) {
+		const { fetch } = listing(
+			movedTo(origin, [sitaWithWork(2), ARJUN]),
+			movedTo(origin, galleryPage(3)),
+			movedTo(origin, flashPage(2)),
+		);
+		const data = await loadStudioPage(
+			pageContext(fetch, movedTo(origin, studio), API_AT, MEDIA_ORIGIN),
+		);
+		return {
+			logo: data.theme.logo?.src ?? null,
+			cover: data.theme.heroImage?.src ?? null,
+			workPhotos: data.artists[0]?.workPhotos.map((photo) => photo.src),
+			recentWork: data.recentWork.photos.map((photo) => photo.src),
+			flash: data.flash.designs.map((design) => design.image.src),
+		};
+	}
+
+	test("the studio page keeps every photo on MEDIA_URL's origin, with its copies", async () => {
+		const photos = await studioPagePhotos(MEDIA_ORIGIN);
+		assert.equal(photos.logo, movedTo(MEDIA_ORIGIN, LOGO.url));
+		assert.ok(photos.cover?.startsWith(`${MEDIA_ORIGIN}/`));
+		assert.equal(photos.workPhotos?.length, 2);
+		assert.equal(photos.recentWork.length, 3);
+		assert.equal(photos.flash.length, 2);
+		for (const src of [
+			...(photos.workPhotos ?? []),
+			...photos.recentWork,
+			...photos.flash,
+		]) {
+			assert.ok(src.startsWith(`${MEDIA_ORIGIN}/`), src);
+		}
+		// The copies came along: they share the photo's (the media) origin.
+		const { fetch } = listing(
+			[SITA],
+			movedTo(MEDIA_ORIGIN, galleryPage(1)),
+			EMPTY_FLASH_PAGE,
+		);
+		const data = await loadStudioPage(
+			pageContext(fetch, STUDIO, API_AT, MEDIA_ORIGIN),
+		);
+		assert.ok(data.recentWork.photos[0]?.srcSet?.includes(`${MEDIA_ORIGIN}/`));
+	});
+
+	test("a photo on the API's own origin is dropped once MEDIA_URL names another", async () => {
+		assert.deepEqual(await studioPagePhotos(API_AT), {
+			logo: null,
+			cover: null,
+			workPhotos: [],
+			recentWork: [],
+			flash: [],
+		});
+	});
+
+	test("a photo anywhere else is dropped", async () => {
+		assert.deepEqual(await studioPagePhotos(ELSEWHERE), {
+			logo: null,
+			cover: null,
+			workPhotos: [],
+			recentWork: [],
+			flash: [],
+		});
+	});
+
+	test("an artist's portfolio, /work and /flash follow the same rule", async () => {
+		for (const [origin, kept] of [
+			[MEDIA_ORIGIN, true],
+			[API_AT, false],
+		] as const) {
+			const { fetch } = listing(
+				movedTo(origin, [sitaWithWork(2), ARJUN]),
+				movedTo(origin, galleryPage(2)),
+				movedTo(origin, flashPage(2)),
+			);
+			const context = pageContext(fetch, STUDIO, API_AT, MEDIA_ORIGIN);
+			const artist = await loadArtistPage(context, "sita", {});
+			const work = await loadWorkPage(context, {});
+			const flash = await loadFlashPage(context, {});
+			const counts = [
+				artist.portfolio.gallery.photos.length,
+				artist.flash.designs.length,
+				work.gallery.photos.length,
+				flash.list.designs.length,
+			];
+			assert.deepEqual(counts, kept ? [2, 2, 2, 2] : [0, 0, 0, 0], origin);
+		}
+	});
+
+	test("a flash design's own page is there with its picture on MEDIA_URL's origin, a not-found without", async () => {
+		const design = flashPage(1).data[0];
+		const onMedia = listing(
+			[SITA, ARJUN],
+			EMPTY_PAGE,
+			EMPTY_FLASH_PAGE,
+			movedTo(MEDIA_ORIGIN, design),
+		);
+		const page = await loadFlashDesignPage(
+			pageContext(onMedia.fetch, STUDIO, API_AT, MEDIA_ORIGIN),
+			flashId(1),
+		);
+		assert.ok(page.design.image.src.startsWith(`${MEDIA_ORIGIN}/`));
+
+		const onApi = listing([SITA, ARJUN], EMPTY_PAGE, EMPTY_FLASH_PAGE, design);
+		await assert.rejects(
+			loadFlashDesignPage(
+				pageContext(onApi.fetch, STUDIO, API_AT, MEDIA_ORIGIN),
+				flashId(1),
+			),
+			notFound,
+		);
+	});
+
+	test("Show more checks the next page against the origin it is given", async () => {
+		const { fetch } = listing([SITA], movedTo(MEDIA_ORIGIN, galleryPage(2)));
+		const context = pageContext(fetch, STUDIO, API_AT, MEDIA_ORIGIN);
+		const query = { limit: 24 };
+		assert.equal(
+			(await moreWork(context, query, "c2", 0, MEDIA_ORIGIN)).photos.length,
+			2,
+		);
+		assert.equal(
+			(await moreWork(context, query, "c3", 0, API_AT)).photos.length,
+			0,
+		);
 	});
 });

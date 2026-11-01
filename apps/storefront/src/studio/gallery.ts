@@ -73,7 +73,7 @@ function own(value: unknown, key: string): unknown {
 /**
  * A page of the gallery (`WorkPage`, whatever the API really sent) as the
  * photos to show. At most 48 photos are read; each passes the brand images'
- * rule (`readBrandImage`: the API's origin only, sides from 1 to 10000,
+ * rule (`readBrandImage`: the image origin only, sides from 1 to 10000,
  * copies on the same origin), the rest are dropped and the others numbered
  * on from `offset` (the photos already shown). The description is one line of
  * plain text up to 200 characters, else "Tattoo by {name}, photo {n}" ("Tattoo,
