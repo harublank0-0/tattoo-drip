@@ -70,6 +70,11 @@ main() {
 		first=${first##*/}
 		CONTAINER=${first%-compose}
 	fi
+	# A commit given but empty, e.g. "$(cat .../deployed)" with the record
+	# missing, must not fall back to origin/main.
+	if [ "$#" -gt 0 ] && [ -z "$1" ]; then
+		fail "the commit to deploy is empty (is ${TD_STATE_DIR:-/srv/tattoo-drip}/deployed missing?); nothing was changed"
+	fi
 	ref=${1:-origin/main}
 	case $ref in
 	-*) fail "usage: deploy/deploy.sh [commit|tag|origin/branch]   (default origin/main)" ;;
