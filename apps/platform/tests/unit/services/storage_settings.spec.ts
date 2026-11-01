@@ -1,4 +1,7 @@
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { S3Driver } from "@adonisjs/drive/drivers/s3";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { test } from "@japa/runner";
 import {
 	checkStorageSettings,
@@ -195,6 +198,15 @@ test.group("R2 disks (TAT-27)", () => {
 		requestChecksumCalculation: "WHEN_REQUIRED",
 		responseChecksumValidation: "WHEN_REQUIRED",
 	};
+	/** Every request bounded: uploads run inside a database transaction. */
+	const LIMITS = {
+		requestHandler: {
+			connectionTimeout: 5_000,
+			requestTimeout: 30_000,
+			throwOnRequestTimeout: true,
+		},
+		maxAttempts: 3,
+	};
 
 	test("public disk: the bucket, R2's endpoint, no ACLs and the media origin", ({
 		assert,
@@ -207,6 +219,7 @@ test.group("R2 disks (TAT-27)", () => {
 			visibility: "public",
 			supportsACL: false,
 			...CHECKSUMS,
+			...LIMITS,
 			cdnUrl: "https://media.tattoodrip.app/",
 		});
 	});
@@ -222,6 +235,7 @@ test.group("R2 disks (TAT-27)", () => {
 			visibility: "private",
 			supportsACL: false,
 			...CHECKSUMS,
+			...LIMITS,
 		});
 		assert.notProperty(options, "cdnUrl");
 	});
@@ -254,5 +268,90 @@ test.group("R2 disks (TAT-27)", () => {
 		assert.equal(url.searchParams.get("X-Amz-Expires"), "300");
 		// No default checksum asked of R2 (see CHECKSUMS).
 		assert.isFalse(url.searchParams.has("x-amz-checksum-mode"));
+	});
+
+	test("the timeouts and the tries reach the S3 client the options make", async ({
+		assert,
+		cleanup,
+	}) => {
+		// A stand-in for R2 on this machine (the real endpoint is never called):
+		// the handler resolves its settings on its first request.
+		const server = createServer((request, response) => {
+			request.resume();
+			request.on("end", () => {
+				response.writeHead(200, { etag: '"stand-in"' });
+				response.end();
+			});
+		});
+		await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+		cleanup(() => new Promise<void>((done) => server.close(() => done())));
+		const { port } = server.address() as AddressInfo;
+		const client = new S3Client({
+			...r2DiskOptions(settings, "public"),
+			endpoint: `http://127.0.0.1:${port}`,
+			forcePathStyle: true,
+		});
+		cleanup(() => client.destroy());
+
+		await client.send(
+			new PutObjectCommand({
+				Bucket: "tattoo-drip-public",
+				Key: "tenants/t1/artist_work_photo/a.jpg",
+				Body: "x",
+			}),
+		);
+
+		assert.equal(await client.config.maxAttempts(), 3);
+		const handler = client.config.requestHandler as unknown as {
+			httpHandlerConfigs(): Record<string, unknown>;
+		};
+		assert.containsSubset(handler.httpHandlerConfigs(), {
+			connectionTimeout: 5_000,
+			requestTimeout: 30_000,
+			throwOnRequestTimeout: true,
+		});
+	});
+
+	test("a put's content type and Cache-Control reach R2's PutObject (flydrive's S3 driver)", async ({
+		assert,
+	}) => {
+		const inputs: Record<string, unknown>[] = [];
+		const client = {
+			async send(command: { input: Record<string, unknown> }) {
+				inputs.push(command.input);
+				return {};
+			},
+		} as unknown as S3Client;
+
+		for (const [visibility, cacheControl] of [
+			["public", "no-cache"],
+			["private", "private, no-store"],
+		] as const) {
+			const options = r2DiskOptions(settings, visibility);
+			const driver = new S3Driver({
+				client,
+				bucket: options.bucket,
+				visibility,
+				supportsACL: false,
+			});
+			await driver.put("tenants/t1/artist_work_photo/a.jpg", "bytes", {
+				contentType: "image/jpeg",
+				cacheControl,
+			});
+		}
+
+		assert.lengthOf(inputs, 2);
+		assert.containsSubset(inputs[0], {
+			Bucket: "tattoo-drip-public",
+			Key: "tenants/t1/artist_work_photo/a.jpg",
+			ContentType: "image/jpeg",
+			CacheControl: "no-cache",
+		});
+		assert.containsSubset(inputs[1], {
+			Bucket: "tattoo-drip-private",
+			CacheControl: "private, no-store",
+		});
+		// No ACL call or ACL header: R2 has none.
+		assert.notProperty(inputs[0], "ACL");
 	});
 });

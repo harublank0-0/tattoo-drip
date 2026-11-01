@@ -122,6 +122,19 @@ export function r2DiskOptions(
 		// R2 compatibility with the SDK's default checksums: only where required.
 		requestChecksumCalculation: "WHEN_REQUIRED" as const,
 		responseChecksumValidation: "WHEN_REQUIRED" as const,
+		// Uploads and deletes run inside the request's database transaction, so a
+		// stalled R2 must fail the request, not hold it and its pooled connection
+		// without end (the SDK's default is no timeout). 5 s to connect, 30 s for
+		// a whole request (a photo is a few MB), 3 tries in all: a write gives up
+		// after about 90 s, inside the app role's 3-minute
+		// idle_in_transaction_session_timeout (deploy.md, Database). Without
+		// throwOnRequestTimeout the SDK only logs a warning at 30 s.
+		requestHandler: {
+			connectionTimeout: 5_000,
+			requestTimeout: 30_000,
+			throwOnRequestTimeout: true,
+		},
+		maxAttempts: 3,
 	};
 	return visibility === "public"
 		? { ...options, cdnUrl: settings.publicUrl }
