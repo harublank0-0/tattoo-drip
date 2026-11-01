@@ -2,7 +2,9 @@
 // Runs the built storefront against a stand-in API with a canary
 // STOREFRONT_SERVER_KEY, and checks what a visitor and the log can see
 // (TAT-23, spec ruling 8; the studio page since TAT-48): the page carries the
-// studio's name, the API's origin and its own origin but never the key, the
+// studio's name, the API's origin and its own origin but never the key, shows
+// the studio's photos from their own origin (MEDIA_URL, apart from the API's
+// as R2's is in production) and none from the API's, the
 // API got one keyed lookup and one keyed artists read per page (the studio
 // page, an artist's page and /work add one gallery read, TAT-126), each with
 // the visitor's address (X-Visitor-IP, TAT-38; /request, TAT-127, reads the
@@ -30,6 +32,15 @@ const SITE_KEY = "1x00000000000000000000AA";
 const API_DETAIL = "api-internal-detail-must-not-leak";
 const SLUG = "canary-ink";
 const STUDIO_NAME = "Canary Ink <Studio>";
+// The photos' own origin (MEDIA_URL), as R2's custom domain is in production:
+// another origin than the API's. Nothing listens there; the page only names it.
+const MEDIA = "http://127.0.0.1:9";
+const LOGO_URL = `${MEDIA}/tenants/t/studio_logo/logo.png`;
+const WORK_URL = `${MEDIA}/tenants/t/artist_work_photo/w1.jpg`;
+const WORK_COPY_URL = `${MEDIA}/tenants/t/artist_work_photo/w1.640w.jpg`;
+// The same kind of photo on the API's own origin, which the page must not show
+// once MEDIA_URL names another: a photo is on exactly one origin.
+const STRAY_PATH = "/tenants/t/artist_work_photo/stray.jpg";
 const STUDIO = {
 	slug: SLUG,
 	name: STUDIO_NAME,
@@ -39,6 +50,10 @@ const STUDIO = {
 	contact: { phone: "+9779812345678", email: null, address: null },
 	socialLinks: [],
 	acceptingInquiries: true,
+	storefront: {
+		theme: "stencil-and-ink",
+		branding: { logo: { url: LOGO_URL, width: 600, height: 200 } },
+	},
 };
 const ARTISTS = [
 	{
@@ -51,6 +66,17 @@ const ARTISTS = [
 		closedMessage: null,
 		styles: [],
 		socialLinks: [],
+		workPhotos: [
+			{
+				url: WORK_URL,
+				width: 2048,
+				height: 1536,
+				alt: null,
+				variants: [{ url: WORK_COPY_URL, width: 640 }],
+			},
+			// apiPort is not known yet: the stand-in puts the API's origin in front.
+			{ url: STRAY_PATH, width: 2048, height: 1536, alt: null, variants: [] },
+		],
 	},
 ];
 
@@ -110,7 +136,14 @@ const api = http.createServer((request, response) => {
 		if (request.url === `/api/v1/tenants/${SLUG}/artists`) {
 			return mode === "artists-5xx"
 				? send(500, { error: { code: "internal", message: API_DETAIL } })
-				: send(200, { data: ARTISTS });
+				: send(200, {
+						data: JSON.parse(
+							JSON.stringify(ARTISTS).replace(
+								`"${STRAY_PATH}"`,
+								`"http://localhost:${apiPort}${STRAY_PATH}"`,
+							),
+						),
+					});
 		}
 		// Flash (TAT-129): the list is empty; a design is the API's 404 below.
 		if (request.url.startsWith(`/api/v1/tenants/${SLUG}/flash?`)) {
@@ -147,6 +180,7 @@ const child = spawn(process.execPath, [SERVER], {
 		NODE_ENV: "production",
 		PORT: String(storefrontPort),
 		API_URL: `http://localhost:${apiPort}`,
+		MEDIA_URL: MEDIA,
 		STOREFRONT_URL: `http://{tenant}.localhost:${storefrontPort}`,
 		STOREFRONT_SERVER_KEY: CANARY,
 		TURNSTILE_SITE_KEY: SITE_KEY,
@@ -219,10 +253,26 @@ try {
 		"The page's <title> is not the studio's name, escaped.",
 	);
 	expect(
-		new RegExp(`apiUrl:"http://localhost:${apiPort}",tenant:"${SLUG}"`).test(
-			page.body,
+		page.body.includes(
+			`apiUrl:"http://localhost:${apiPort}",mediaUrl:"${MEDIA}",tenant:"${SLUG}"`,
 		),
-		"The page does not carry the API's origin and the studio's slug.",
+		"The page does not carry the API's origin, the photos' origin and the studio's slug.",
+	);
+	// The photos the page shows: every <img>'s src and srcset addresses.
+	const shown = [...page.body.matchAll(/<img\b[^>]*>/g)].flatMap(([tag]) =>
+		[...tag.matchAll(/\b(?:src|srcSet|srcset)="([^"]*)"/g)].flatMap(
+			([, value]) => value.split(",").map((part) => part.trim().split(" ")[0]),
+		),
+	);
+	expect(
+		shown.includes(LOGO_URL) &&
+			shown.includes(WORK_URL) &&
+			shown.includes(WORK_COPY_URL),
+		`The page does not show the logo and the work photo (with its copy) from MEDIA_URL; it shows ${shown.join(", ") || "no image"}.`,
+	);
+	expect(
+		!shown.some((url) => url.startsWith(`http://localhost:${apiPort}/`)),
+		`The page shows a photo from the API's origin although MEDIA_URL names another: ${shown.join(", ")}.`,
 	);
 	expect(
 		page.body.includes(`challengeSiteKey:"${SITE_KEY}"`),
@@ -672,5 +722,5 @@ if (problems.length > 0) {
 	process.exit(1);
 }
 console.log(
-	"Page check passed: the key is in no page, header or log line; one keyed lookup and one artists read per page (the studio page, an artist's page and /work add one gallery read, /flash and an artist's page one flash read), each carrying the visitor's address; a failed read is an uncached error page (a failed gallery read only leaves the photos out), a failed lookup a 503; the deposit page is an uncached, unindexed shell from the lookup alone; the public site key is in the page.",
+	"Page check passed: the key is in no page, header or log line; the photos are shown from MEDIA_URL's origin only; one keyed lookup and one artists read per page (the studio page, an artist's page and /work add one gallery read, /flash and an artist's page one flash read), each carrying the visitor's address; a failed read is an uncached error page (a failed gallery read only leaves the photos out), a failed lookup a 503; the deposit page is an uncached, unindexed shell from the lookup alone; the public site key is in the page.",
 );

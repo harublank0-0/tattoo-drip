@@ -5,6 +5,13 @@ import { isDnsName, STORED_SLUG } from "./host.ts";
 export interface StorefrontConfig {
 	/** The API's origin, e.g. https://api.example.com; the SDK appends /api/v1. */
 	apiUrl: string;
+	/**
+	 * MEDIA_URL: the origin the studios' public photos are served from, e.g.
+	 * https://media.example.com (the platform's R2_PUBLIC_URL), the only one a
+	 * page shows an image from. Unset, the API's origin: the platform serves
+	 * them itself (/uploads) in development.
+	 */
+	mediaUrl: string;
 	/** The studio pages' scheme. */
 	protocol: "http:" | "https:";
 	/** The domain studios are subdomains of, lowercase: "tattoodrip.com", "localhost". */
@@ -30,6 +37,8 @@ type Env = Readonly<Record<string, string | undefined>>;
 
 const API_URL_RULE =
 	"the API's origin over https (http only on localhost), with no path, query or credentials, e.g. https://api.example.com";
+const MEDIA_URL_RULE =
+	"the origin the studios' photos are served from (the platform's R2_PUBLIC_URL) over https (http only on localhost), with no path, query or credentials, e.g. https://media.example.com; or unset when the API serves them itself";
 const STOREFRONT_URL_RULE =
 	"the studio pages' origin with {tenant} as its first label, over https (http only on localhost), e.g. https://{tenant}.example.com";
 
@@ -52,13 +61,22 @@ const LOOPBACK_HOSTS = ["localhost", "127.0.0.1", "[::1]"];
 
 /**
  * Reads API_URL and STOREFRONT_URL (the platform's setting of the same name
- * and value, TAT-65), and STOREFRONT_SERVER_KEY when set (TAT-23). Throws one
- * error naming every bad variable and its rule, never a value, so a secret
- * can't end up in a log.
+ * and value, TAT-65), MEDIA_URL when set, and STOREFRONT_SERVER_KEY when set
+ * (TAT-23). Throws one error naming every bad variable and its rule, never a
+ * value, so a secret can't end up in a log.
  */
 export function parseStorefrontConfig(env: Env): StorefrontConfig {
 	const problems: string[] = [];
-	const apiUrl = readApiUrl(env.API_URL?.trim(), problems);
+	const apiUrl = readOrigin(
+		"API_URL",
+		env.API_URL?.trim(),
+		API_URL_RULE,
+		problems,
+	);
+	const mediaValue = env.MEDIA_URL?.trim();
+	const mediaUrl = mediaValue
+		? readOrigin("MEDIA_URL", mediaValue, MEDIA_URL_RULE, problems)
+		: apiUrl;
 	const site = readStorefrontUrl(env.STOREFRONT_URL?.trim(), problems);
 	const production = env.NODE_ENV === "production";
 	const serverKey = readServerKey(
@@ -71,7 +89,7 @@ export function parseStorefrontConfig(env: Env): StorefrontConfig {
 		production,
 		problems,
 	);
-	if (!apiUrl || !site || problems.length > 0) {
+	if (!apiUrl || !mediaUrl || !site || problems.length > 0) {
 		const list = problems.map((problem) => `- ${problem}`).join("\n");
 		throw new Error(
 			`The storefront's settings are invalid (see apps/storefront/.env.local.example):\n${list}`,
@@ -79,6 +97,7 @@ export function parseStorefrontConfig(env: Env): StorefrontConfig {
 	}
 	return {
 		apiUrl,
+		mediaUrl,
 		...site,
 		...(serverKey ? { serverKey } : {}),
 		...(challengeSiteKey ? { challengeSiteKey } : {}),
@@ -114,8 +133,11 @@ function problem(
 		: `${name} is not set: set it to ${rule}.`;
 }
 
-function readApiUrl(
+/** An http(s) origin: https, or http on this machine; no path, query, fragment or credentials. */
+function readOrigin(
+	name: string,
 	value: string | undefined,
+	rule: string,
 	problems: string[],
 ): string | undefined {
 	const url = value ? parseUrl(value) : undefined;
@@ -131,7 +153,7 @@ function readApiUrl(
 		url.search ||
 		url.hash
 	) {
-		problems.push(problem("API_URL", value, API_URL_RULE));
+		problems.push(problem(name, value, rule));
 		return undefined;
 	}
 	return url.origin;
@@ -140,7 +162,7 @@ function readApiUrl(
 function readStorefrontUrl(
 	value: string | undefined,
 	problems: string[],
-): Omit<StorefrontConfig, "apiUrl"> | undefined {
+): Pick<StorefrontConfig, "protocol" | "baseHost" | "port"> | undefined {
 	const match = value ? STOREFRONT_URL_SHAPE.exec(value) : null;
 	const protocol = match?.[1] === "http" ? "http:" : "https:";
 	const baseHost = match?.[2]?.toLowerCase() ?? "";

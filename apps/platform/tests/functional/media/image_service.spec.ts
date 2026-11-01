@@ -14,7 +14,11 @@ import { variantsOfKey } from "#modules/media/variants";
 import env from "#start/env";
 import { POLYGLOT_MARKERS, polyglot, testImages } from "#tests/helpers/images";
 import { captureLogs } from "#tests/helpers/logs";
-import { failDeletes, withStrayCopy } from "#tests/helpers/storage_failures";
+import {
+	failDeletes,
+	recordPuts,
+	withStrayCopy,
+} from "#tests/helpers/storage_failures";
 import { storedImages } from "#tests/helpers/uploads";
 
 const images = new ImageService();
@@ -1042,3 +1046,50 @@ test.group(
 		});
 	},
 );
+
+test.group("stored Cache-Control (TAT-27)", () => {
+	test("a public image and its copies are stored with Cache-Control no-cache (TAT-27)", async ({
+		assert,
+	}) => {
+		const studio = { id: randomUUID() };
+		const recorded = recordPuts("public");
+
+		try {
+			await images.store(await upload(await testImages.jpeg(2000, 1500)), {
+				tenant: studio,
+				purpose: "artist_work_photo",
+			});
+		} finally {
+			recorded.restore();
+		}
+
+		// The image and its 320, 640 and 1280 px copies.
+		assert.lengthOf(recorded.puts, 4);
+		for (const put of recorded.puts) {
+			assert.include(put.options as object, { cacheControl: "no-cache" });
+		}
+	});
+
+	test("a private image and its copies are stored with Cache-Control private, no-store (TAT-27)", async ({
+		assert,
+	}) => {
+		const studio = { id: randomUUID() };
+		const recorded = recordPuts("private");
+
+		try {
+			await images.store(await upload(await testImages.jpeg(2000, 1500)), {
+				tenant: studio,
+				purpose: "reference_image",
+			});
+		} finally {
+			recorded.restore();
+		}
+
+		assert.lengthOf(recorded.puts, 4);
+		for (const put of recorded.puts) {
+			assert.include(put.options as object, {
+				cacheControl: "private, no-store",
+			});
+		}
+	});
+});

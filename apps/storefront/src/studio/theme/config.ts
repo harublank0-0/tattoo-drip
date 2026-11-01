@@ -7,7 +7,7 @@ import { cleanLine } from "../text.ts";
  * uses it, after every value has passed an allow-list. Pure. A studio never
  * sends markup, CSS or scripts: its theme is one of this app's React
  * components, picked by key; colours are "#rrggbb"; the font is a key into a
- * fixed list; images are URLs on the API's own origin; sections are known
+ * fixed list; images are URLs on the image origin (MEDIA_URL); sections are known
  * keys. A value that is missing, of the wrong type or not on its list falls
  * back to the default for that value alone.
  */
@@ -197,11 +197,12 @@ const MAX_IMAGE_SIDE = 10_000;
  * readCoverImage reads the cover's), or null. The URL
  * has no space or control character, passes safeImageUrl (http or https, no
  * credentials, at most 2048 characters) and is on exactly `imageOrigin`, the
- * API's origin: the same scheme, host and port. That one comparison is the
- * rule: the tenancy settings already allow http only for an API on this
- * machine. Without an origin no image is accepted. Its `variants` (smaller
- * copies, TAT-112) pass readSrcSet: on the image's own origin, which is the
- * API's, so a copy from anywhere else is dropped and the image stays.
+ * image origin (MEDIA_URL, by default the API's): the same scheme, host and
+ * port. That one comparison is the rule: the tenancy settings already allow
+ * http only for an origin on this machine. Without an origin no image is
+ * accepted. Its `variants` (smaller copies, TAT-112) pass readSrcSet: on the
+ * image's own origin, which is that one, so a copy from anywhere else is
+ * dropped and the image stays.
  */
 export function readBrandImage(
 	value: unknown,
@@ -275,7 +276,7 @@ function isImageSide(value: unknown): value is number {
  * accentDark }, font }, sections }`. Not an object (today: the API sends
  * nothing) is the default theme; each value is checked on its own, and one
  * that fails is that value's default. Images are accepted only from
- * `imageOrigin` (the API's origin; null accepts none).
+ * `imageOrigin` (MEDIA_URL; null accepts none).
  */
 export function parseThemeConfig(
 	input: unknown,

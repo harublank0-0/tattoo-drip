@@ -42,7 +42,7 @@ export interface FlashDesignView {
 	readonly size: string;
 	/** "NPR 3,000", as the API words it, or null when the studio keeps the price to itself. */
 	readonly priceText: string | null;
-	/** The picture, checked: the API's origin only, with its copies. */
+	/** The picture, checked: the image origin only, with its copies. */
 	readonly image: BrandImage;
 	/** The widest copy up to 1280 px, for the design's own page. */
 	readonly largeSrc: string;
@@ -105,7 +105,7 @@ function readSlugName(value: unknown): { slug: string; name: string } | null {
  * A design (`FlashDesign`, whatever the API really sent) as the view to show,
  * or null when it can't be shown: no lowercase-UUID `id`, a name of 1 to 80
  * characters or a size of 1 to 60 (one line of plain text each) missing, or
- * no usable picture (readBrandImage: the API's origin only). The artist is
+ * no usable picture (readBrandImage: the image origin only). The artist is
  * kept only with a slug that can be an artist's and a name; `requestable`
  * only for `true` and never for a claimed design. A `status` other than
  * `available` is claimed (the contract: an unknown value is `claimed`); a

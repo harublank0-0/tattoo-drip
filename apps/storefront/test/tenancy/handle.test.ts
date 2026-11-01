@@ -10,6 +10,7 @@ import { fakeFetch, hangUntilAborted, json } from "./helpers.ts";
 
 const CONFIG: StorefrontConfig = {
 	apiUrl: "http://api.test",
+	mediaUrl: "http://api.test",
 	protocol: "https:",
 	baseHost: "tattoodrip.com",
 	port: "",

@@ -1,0 +1,80 @@
+# The nginx test (run.sh): the real deploy/nginx config in front of two
+# stand-in upstreams, with two clients on the production subnet. Not part of
+# the production stack; run.sh starts it under its own project name and
+# removes it afterwards.
+#
+#   web, storefront  echo.mjs: answers with the request it got, as JSON, at the fixed
+#                    addresses nginx's upstreams name (172.30.42.11, .12)
+#   nginx            the pinned image from deploy/compose.yml, at 172.30.42.10
+#   trusted          client at 172.30.42.20, cloudflared's address
+#   outsider         client at 172.30.42.99, any other address
+
+x-node: &node
+  image: docker.io/library/node:24.3.0-bookworm-slim
+  networks:
+    - tattoo_drip
+
+services:
+  web:
+    <<: *node
+    command: ["node", "/echo.mjs"]
+    environment:
+      UPSTREAM: web
+      PORT: "3333"
+    volumes:
+      - ./echo.mjs:/echo.mjs:ro
+    networks:
+      tattoo_drip:
+        ipv4_address: 172.30.42.11
+
+  storefront:
+    <<: *node
+    command: ["node", "/echo.mjs"]
+    environment:
+      UPSTREAM: storefront
+      PORT: "3000"
+    volumes:
+      - ./echo.mjs:/echo.mjs:ro
+    networks:
+      tattoo_drip:
+        ipv4_address: 172.30.42.12
+
+  nginx:
+    image: ${NGINX_IMAGE:?run.sh sets this from deploy/compose.yml}
+    # As in deploy/compose.yml: the directory, started with -c.
+    volumes:
+      - ../../nginx:/etc/nginx/td:ro
+    command: ["nginx", "-c", "/etc/nginx/td/nginx.conf", "-g", "daemon off;"]
+    depends_on:
+      - web
+      - storefront
+    networks:
+      tattoo_drip:
+        ipv4_address: 172.30.42.10
+
+  trusted:
+    <<: *node
+    command: ["sleep", "infinity"]
+    volumes:
+      - ./check.mjs:/check.mjs:ro
+    networks:
+      tattoo_drip:
+        ipv4_address: 172.30.42.20
+
+  outsider:
+    <<: *node
+    command: ["sleep", "infinity"]
+    volumes:
+      - ./check.mjs:/check.mjs:ro
+    networks:
+      tattoo_drip:
+        ipv4_address: 172.30.42.99
+
+# Same subnet as production. Containers without a fixed address get one from
+# the upper half only, so they can never take a fixed address first.
+networks:
+  tattoo_drip:
+    ipam:
+      config:
+        - subnet: 172.30.42.0/24
+          ip_range: 172.30.42.128/25

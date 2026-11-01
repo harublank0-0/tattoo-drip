@@ -50,6 +50,29 @@ export function failPuts(
 }
 
 /**
+ * Records every `put` on a disk: the key and the options it was given (what
+ * an object store would keep as metadata, such as the Cache-Control of
+ * TAT-27). Every write still happens for real; `restore()` stops recording,
+ * and the test must call it (use `finally`) because the disk is shared by
+ * the whole run.
+ */
+export function recordPuts(visibility: "public" | "private") {
+	const disk = drive.use(visibility);
+	const original = disk.put.bind(disk);
+	const puts: { key: string; options: unknown }[] = [];
+	disk.put = (async (key: string, ...rest: unknown[]) => {
+		puts.push({ key, options: rest[1] });
+		return (original as (...args: unknown[]) => Promise<void>)(key, ...rest);
+	}) as typeof disk.put;
+	return {
+		puts,
+		restore() {
+			disk.put = original;
+		},
+	};
+}
+
+/**
  * The state a failed upload can leave (TAT-116 fix round 2): the first copy
  * is written, a later copy fails, and the cleanup of the first fails too, so
  * the image is stored under its plain key (`<id>.jpg`, naming no copies) while

@@ -11,6 +11,8 @@ import {
 	COVER,
 	IMAGE_ORIGIN,
 	LOGO,
+	MEDIA_ORIGIN,
+	movedTo,
 	withStorefront,
 } from "../studio/theme-fixtures.ts";
 import { fakeFetch, json } from "../tenancy/helpers.ts";
@@ -22,7 +24,7 @@ describe("the deposit page's loader", () => {
 		);
 		const api = createApiContext("server");
 		connectServer(api, {
-			config: { apiUrl: "http://api.test" },
+			config: { apiUrl: "http://api.test", mediaUrl: "http://api.test" },
 			studio: STUDIO,
 			fetch,
 		});
@@ -101,5 +103,22 @@ describe("the deposit page's loader", () => {
 			).logo,
 			null,
 		);
+	});
+
+	test("the loader checks the logo against MEDIA_URL's origin, not the API's", async () => {
+		for (const [logo, expected] of [
+			[movedTo(MEDIA_ORIGIN, LOGO), movedTo(MEDIA_ORIGIN, LOGO.url)],
+			[LOGO, null],
+		] as const) {
+			const studio = withStorefront({ branding: { logo } });
+			const api = createApiContext("server");
+			connectServer(api, {
+				config: { apiUrl: IMAGE_ORIGIN, mediaUrl: MEDIA_ORIGIN },
+				studio,
+				fetch: fakeFetch(() => json(500, {})).fetch,
+			});
+			seedStudio(api, studio);
+			assert.equal((await loadDepositShell(api)).logo?.src ?? null, expected);
+		}
 	});
 });

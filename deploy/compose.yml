@@ -1,0 +1,212 @@
+# Production stack for one server, behind a Cloudflare Tunnel. No service
+# publishes a port: cloudflared reaches nginx over the network below, and
+# nginx reaches web and storefront. Run from the repo root:
+#
+#   docker compose -f deploy/compose.yml ...
+#
+# Settings come from env files outside the repo, one per role, in
+# ${TD_ENV_DIR:-/srv/tattoo-drip/env} (templates: deploy/env/*.env.example).
+# Images for web, worker, migrate and storefront are built from the repo's
+# Dockerfile on the server.
+
+# A fixed project name keeps the data volume's name (tattoo-drip-prod_postgres_data)
+# whatever the checkout's folder is called, and apart from the development
+# compose file's volume.
+name: tattoo-drip-prod
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
+# web, worker and migrate: one image, different commands.
+x-platform: &platform
+  build:
+    context: ..
+    target: platform
+  image: tattoo-drip-platform
+  init: true
+  logging: *logging
+  env_file:
+    - ${TD_ENV_DIR:-/srv/tattoo-drip/env}/platform.env
+  networks:
+    - tattoo_drip
+
+services:
+  postgres:
+    image: docker.io/library/postgres:18.6
+    restart: unless-stopped
+    logging: *logging
+    env_file:
+      - ${TD_ENV_DIR:-/srv/tattoo-drip/env}/postgres.env
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      # Run once, on an empty data volume: the restricted app role, then its timeout.
+      - ../docker/postgres/init/10-setup-roles.sh:/docker-entrypoint-initdb.d/10-setup-roles.sh:ro
+      - ./postgres/20-app-role-timeout.sh:/docker-entrypoint-initdb.d/20-app-role-timeout.sh:ro
+      - ../apps/platform/database/setup_roles.sql:/opt/setup_roles.sql:ro
+    healthcheck:
+      # Over TCP: while the image initialises the data volume it runs a temporary server
+      # that listens on the socket only, and that must not count as healthy.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - tattoo_drip
+
+  # Exactly one: it upserts the recurring schedules when it boots.
+  web:
+    <<: *platform
+    restart: unless-stopped
+    command: ["node", "bin/server.js"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      tattoo_drip:
+        # nginx's upstream (deploy/nginx/nginx.conf) names this address.
+        ipv4_address: 172.30.42.11
+    healthcheck:
+      # Up when it answers anything below 500 (the front door redirects, so
+      # redirects are not followed). It reads PORT from platform.env.
+      test:
+        - CMD-SHELL
+        - >-
+          node -e 'fetch("http://127.0.0.1:" + (process.env.PORT || 3333) + "/", { redirect: "manual", signal: AbortSignal.timeout(4000) }).then((res) => process.exit(res.status < 500 ? 0 : 1), () => process.exit(1))'
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Alerts, quote expiry and the expiry sweep run only here. No port, so no healthcheck.
+  worker:
+    <<: *platform
+    restart: unless-stopped
+    command: ["node", "ace.js", "queue:work"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  storefront:
+    build:
+      context: ..
+      target: storefront
+    image: tattoo-drip-storefront
+    init: true
+    restart: unless-stopped
+    logging: *logging
+    env_file:
+      - ${TD_ENV_DIR:-/srv/tattoo-drip/env}/storefront.env
+    healthcheck:
+      # Up when it answers anything below 500. PORT is 3000, set by the image.
+      test:
+        - CMD-SHELL
+        - >-
+          node -e 'fetch("http://127.0.0.1:" + (process.env.PORT || 3000) + "/", { redirect: "manual", signal: AbortSignal.timeout(4000) }).then((res) => process.exit(res.status < 500 ? 0 : 1), () => process.exit(1))'
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      tattoo_drip:
+        # nginx's upstream (deploy/nginx/nginx.conf) names this address.
+        ipv4_address: 172.30.42.12
+
+  nginx:
+    image: docker.io/library/nginx:1.30.6-alpine
+    restart: unless-stopped
+    logging: *logging
+    # The whole directory, not its two files: git replaces a changed file with a new one,
+    # and a bind-mounted single file would keep showing the old one, so a reload would
+    # read stale settings. -c points nginx (and deploy.sh's nginx -t / -s reload) at it.
+    volumes:
+      - ./nginx:/etc/nginx/td:ro
+    command: ["nginx", "-c", "/etc/nginx/td/nginx.conf", "-g", "daemon off;"]
+    # nginx reaches web and storefront by their fixed addresses (below), so it needs
+    # no reload after either is restarted or recreated, and starts without them.
+    # deploy.sh still reloads it, to pick up a changed config:
+    #   nginx -c /etc/nginx/td/nginx.conf -s reload
+    depends_on:
+      web:
+        condition: service_healthy
+      storefront:
+        condition: service_healthy
+    networks:
+      tattoo_drip:
+        # TRUST_PROXY in platform.env names this address.
+        ipv4_address: 172.30.42.10
+
+  cloudflared:
+    image: docker.io/cloudflare/cloudflared:2026.10.7
+    restart: unless-stopped
+    logging: *logging
+    # TUNNEL_TOKEN comes from tunnel.env. The tunnel's public hostnames point at http://172.30.42.10:80.
+    # --loglevel fatal: at error level cloudflared logs the full URL of a request it could
+    # not hand to nginx (while nginx restarts, say), and those URLs carry the reset,
+    # verification, invitation and deposit tokens. So its log is empty unless it cannot
+    # start (a bad token still prints its error). Tunnel health is on the Cloudflare
+    # dashboard; to debug, raise it for a while (deploy/README.md 8.9). The separate
+    # --transport-loglevel no longer does anything in this version.
+    command: ["tunnel", "--no-autoupdate", "--loglevel", "fatal", "run"]
+    env_file:
+      - ${TD_ENV_DIR:-/srv/tattoo-drip/env}/tunnel.env
+    depends_on:
+      - nginx
+    networks:
+      tattoo_drip:
+        # nginx trusts CF-Connecting-IP from this address only (set_real_ip_from).
+        ipv4_address: 172.30.42.20
+
+  # One-off. migrate and backup are the only app services given the database owner's
+  # password (postgres itself holds it too); web and worker never get it:
+  #   docker compose -f deploy/compose.yml --profile tools run --rm migrate
+  # account:verify (deploy/README.md 4.6) runs through this one-off on purpose: a
+  # "run web" container would ask for web's fixed address, which web itself holds.
+  migrate:
+    <<: *platform
+    profiles:
+      - tools
+    command: ["node", "ace.js", "migration:run", "--connection=owner", "--force"]
+    env_file:
+      - ${TD_ENV_DIR:-/srv/tattoo-drip/env}/platform.env
+      - ${TD_ENV_DIR:-/srv/tattoo-drip/env}/migrate.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # One-off, started every night at 02:00 Nepal time by systemd (deploy/systemd/
+  # tattoo-drip-backup.timer): pg_dump as the owner, copied to the private R2 backups
+  # bucket, the heartbeat pinged. Its Dockerfile starts FROM the same postgres pin as above.
+  #   docker compose -f deploy/compose.yml --profile tools run --rm backup
+  backup:
+    build:
+      context: ./backup
+    image: tattoo-drip-backup
+    init: true
+    logging: *logging
+    profiles:
+      - tools
+    env_file:
+      - ${TD_ENV_DIR:-/srv/tattoo-drip/env}/backup.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - tattoo_drip
+
+# Private to this stack, with a fixed subnet so nginx, web, storefront and cloudflared
+# have fixed addresses (.10 nginx, .11 web, .12 storefront, .20 cloudflared). The other
+# services get theirs from the upper half (ip_range), so they can never take a fixed
+# address first. Not "internal": cloudflared, web and storefront reach the internet.
+networks:
+  tattoo_drip:
+    ipam:
+      config:
+        - subnet: 172.30.42.0/24
+          ip_range: 172.30.42.128/25
+
+volumes:
+  postgres_data:

@@ -11,12 +11,14 @@ import {
 
 const PROD: StorefrontConfig = {
 	apiUrl: "https://api.tattoodrip.app",
+	mediaUrl: "https://media.tattoodrip.app",
 	protocol: "https:",
 	baseHost: "tattoodrip.com",
 	port: "",
 };
 const DEV: StorefrontConfig = {
 	apiUrl: "http://localhost:3333",
+	mediaUrl: "http://localhost:3333",
 	protocol: "http:",
 	baseHost: "localhost",
 	port: ":3000",

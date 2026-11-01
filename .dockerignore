@@ -1,0 +1,44 @@
+# The build context holds sources and lockfiles only: no settings, no secrets,
+# no build output, no tooling state.
+
+# Every .env file at any depth (.env, .env.local, .env.example, .env.test ...):
+# settings never enter an image or its build cache
+**/.env*
+
+# The deploy files (compose, nginx, env templates and tests) are not image
+# inputs: editing them must not rebuild the app, and a settings file named
+# deploy/env/platform.env does not match **/.env* above
+deploy
+
+# Version control and agent/tooling state
+.git
+.github
+.husky
+**/.claude
+**/.agents
+.superpowers
+.vscode
+
+# Dependencies and build output are made inside the image
+**/node_modules
+apps/platform/build
+apps/storefront/.output
+**/dist
+**/.nitro
+**/.tanstack
+**/.vinxi
+**/*.tsbuildinfo
+
+# Local state
+tmp
+storage
+apps/*/tmp
+apps/*/storage
+apps/platform/.neon
+**/*.log
+**/.DS_Store
+
+# Not needed to build an image
+docs
+docker
+docker-compose.yml

@@ -15,10 +15,11 @@ import {
 import { fakeFetch, json, studioOf } from "../tenancy/helpers.ts";
 
 const API = "http://api.test";
+const MEDIA = "http://media.test";
 const KEY = "test-server-key-0123456789abcdefghijklmnop";
 const STUDIO_A: Studio = studioOf("studio-a", "Studio A");
 const STUDIO_B: Studio = studioOf("studio-b", "Studio B");
-const CONFIG = { apiUrl: API, serverKey: KEY };
+const CONFIG = { apiUrl: API, mediaUrl: MEDIA, serverKey: KEY };
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 const authorization = (init: RequestInit) =>
@@ -28,7 +29,7 @@ const authorization = (init: RequestInit) =>
 function serverApi(
 	studio: Studio,
 	fetch: typeof globalThis.fetch,
-	config: { apiUrl: string; serverKey?: string } = CONFIG,
+	config: { apiUrl: string; mediaUrl: string; serverKey?: string } = CONFIG,
 ) {
 	const api = createApiContext("server");
 	connectServer(api, { config, studio, fetch });
@@ -49,7 +50,7 @@ describe("the server's client", () => {
 	test("sends the visitor's address with the key, and never without it", async () => {
 		for (const [config, expected] of [
 			[CONFIG, "203.0.113.7"],
-			[{ apiUrl: API }, null],
+			[{ apiUrl: API, mediaUrl: MEDIA }, null],
 		] as const) {
 			const { calls, fetch } = fakeFetch(() => json(200, { data: STUDIO_A }));
 			const api = createApiContext("server");
@@ -75,12 +76,13 @@ describe("the server's client", () => {
 		await serverApi(STUDIO_A, fetch).tattoo.client.studio.get();
 		await serverApi(STUDIO_A, fetch, {
 			apiUrl: API,
+			mediaUrl: MEDIA,
 		}).tattoo.client.studio.get();
 
 		const browser = createApiContext("browser");
 		hydrateApi(
 			browser,
-			{ tattoo: { apiUrl: API, tenant: "studio-a" } },
+			{ tattoo: { apiUrl: API, mediaUrl: MEDIA, tenant: "studio-a" } },
 			{ fetch },
 		);
 		await browser.tattoo.client.studio.get();
@@ -95,7 +97,7 @@ describe("the server's client", () => {
 
 	test("sends no Authorization when no key is set", async () => {
 		const { calls, fetch } = fakeFetch(() => json(200, { data: STUDIO_A }));
-		const api = serverApi(STUDIO_A, fetch, { apiUrl: API });
+		const api = serverApi(STUDIO_A, fetch, { apiUrl: API, mediaUrl: MEDIA });
 
 		await api.tattoo.client.studio.get();
 		assert.equal(authorization(calls[0].init), null);
@@ -127,7 +129,7 @@ describe("TattooClientRef", () => {
 		assert.throws(
 			() =>
 				api.tattoo.connect(
-					{ apiUrl: API, tenant: "studio-a" },
+					{ apiUrl: API, mediaUrl: MEDIA, tenant: "studio-a" },
 					api.tattoo.client,
 				),
 			/already connected/,
@@ -137,7 +139,7 @@ describe("TattooClientRef", () => {
 		assert.throws(
 			() =>
 				other.tattoo.connect(
-					{ apiUrl: API, tenant: "studio-b" },
+					{ apiUrl: API, mediaUrl: MEDIA, tenant: "studio-b" },
 					api.tattoo.client,
 				),
 			/tenant must be the connection's tenant/,
@@ -146,10 +148,10 @@ describe("TattooClientRef", () => {
 });
 
 describe("what the browser gets", () => {
-	test("only the API's origin and the studio's slug", () => {
+	test("only the API's origin, the photos' origin and the studio's slug", () => {
 		const { fetch } = fakeFetch(() => json(200, { data: STUDIO_A }));
 		assert.deepEqual(dehydrateApi(serverApi(STUDIO_A, fetch)), {
-			tattoo: { apiUrl: API, tenant: "studio-a" },
+			tattoo: { apiUrl: API, mediaUrl: MEDIA, tenant: "studio-a" },
 		});
 	});
 
@@ -182,32 +184,43 @@ describe("what the browser gets", () => {
 		assert.ok(!failure.message.includes(KEY));
 	});
 
-	test("parseConnection accepts an origin and a stored slug, nothing else", () => {
-		assert.deepEqual(parseConnection({ apiUrl: API, tenant: "studio-a" }), {
-			apiUrl: API,
-			tenant: "studio-a",
-		});
+	test("parseConnection accepts two origins and a stored slug, nothing else", () => {
+		assert.deepEqual(
+			parseConnection({ apiUrl: API, mediaUrl: MEDIA, tenant: "studio-a" }),
+			{ apiUrl: API, mediaUrl: MEDIA, tenant: "studio-a" },
+		);
 		assert.deepEqual(
 			parseConnection({
 				apiUrl: "https://api.tattoodrip.app",
+				mediaUrl: "https://media.tattoodrip.app",
 				tenant: "studio-a",
 				extra: 1,
 			}),
-			{ apiUrl: "https://api.tattoodrip.app", tenant: "studio-a" },
+			{
+				apiUrl: "https://api.tattoodrip.app",
+				mediaUrl: "https://media.tattoodrip.app",
+				tenant: "studio-a",
+			},
 		);
+		const good = { apiUrl: API, mediaUrl: MEDIA, tenant: "studio-a" };
 		for (const value of [
 			undefined,
 			null,
 			"studio-a",
 			{ tenant: "studio-a" },
 			{ apiUrl: API },
-			{ apiUrl: `${API}/api`, tenant: "studio-a" },
-			{ apiUrl: `${API}/`, tenant: "studio-a" },
-			{ apiUrl: "javascript:alert(1)", tenant: "studio-a" },
-			{ apiUrl: "ftp://api.test", tenant: "studio-a" },
-			{ apiUrl: API, tenant: "Studio-A" },
-			{ apiUrl: API, tenant: "a.b" },
-			{ apiUrl: API, tenant: 42 },
+			// A page from before MEDIA_URL, or one that lost it.
+			{ apiUrl: API, tenant: "studio-a" },
+			{ ...good, apiUrl: `${API}/api` },
+			{ ...good, apiUrl: `${API}/` },
+			{ ...good, apiUrl: "javascript:alert(1)" },
+			{ ...good, apiUrl: "ftp://api.test" },
+			{ ...good, mediaUrl: `${MEDIA}/tenants` },
+			{ ...good, mediaUrl: "javascript:alert(1)" },
+			{ ...good, mediaUrl: 7 },
+			{ ...good, tenant: "Studio-A" },
+			{ ...good, tenant: "a.b" },
+			{ ...good, tenant: 42 },
 		]) {
 			assert.throws(
 				() => parseConnection(value),
@@ -222,7 +235,7 @@ describe("what the browser gets", () => {
 		const { calls, fetch } = fakeFetch(() => json(200, { data: STUDIO_A }));
 		hydrateApi(
 			browser,
-			{ tattoo: { apiUrl: API, tenant: "studio-a" } },
+			{ tattoo: { apiUrl: API, mediaUrl: MEDIA, tenant: "studio-a" } },
 			{ fetch },
 		);
 
@@ -234,7 +247,12 @@ describe("what the browser gets", () => {
 	});
 
 	test("a page without a valid connection can't hydrate", () => {
-		for (const dehydrated of [undefined, {}, { tattoo: { apiUrl: API } }]) {
+		for (const dehydrated of [
+			undefined,
+			{},
+			{ tattoo: { apiUrl: API } },
+			{ tattoo: { apiUrl: API, tenant: "studio-a" } },
+		]) {
 			assert.throws(
 				() => hydrateApi(createApiContext("browser"), dehydrated),
 				/API connection is missing or invalid/,
@@ -309,7 +327,9 @@ describe("what the browser keeps", () => {
 
 	test("the studio, artists and work queries live as long as the page, other tenants' do not", () => {
 		const browser = createApiContext("browser");
-		hydrateApi(browser, { tattoo: { apiUrl: API, tenant: "studio-a" } });
+		hydrateApi(browser, {
+			tattoo: { apiUrl: API, mediaUrl: MEDIA, tenant: "studio-a" },
+		});
 		const defaults = (key: readonly unknown[]) =>
 			browser.queryClient.getQueryDefaults(key).gcTime;
 

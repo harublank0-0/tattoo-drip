@@ -101,7 +101,10 @@ describe("the root route's icon links (TAT-123)", () => {
 	test("come from the studio's logo; the stop lives beside them, not in the route", () => {
 		assert.match(root, /studioIconLinks\(/);
 		assert.doesNotMatch(root, /["']data:,["']/);
-		// Only the API's origin, which the root loader's success has connected.
-		assert.match(root, /match\.context\.tattoo\.connection\.apiUrl/);
+		// Only the photos' origin (MEDIA_URL), which the root loader's success
+		// has connected; never the API's, which is not where photos live in
+		// production.
+		assert.match(root, /match\.context\.tattoo\.connection\.mediaUrl/);
+		assert.doesNotMatch(root, /connection\.apiUrl/);
 	});
 });

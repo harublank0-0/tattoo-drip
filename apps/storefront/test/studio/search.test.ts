@@ -353,7 +353,11 @@ describe("a healed value the reader rejects is no filter anywhere", () => {
 			return json(404, { error: { code: "not_found", message: "No." } });
 		});
 		const api = createApiContext("server");
-		connectServer(api, { config: { apiUrl: API }, studio: STUDIO, fetch });
+		connectServer(api, {
+			config: { apiUrl: API, mediaUrl: API },
+			studio: STUDIO,
+			fetch,
+		});
 		seedStudio(api, STUDIO);
 		const site = new SiteRef();
 		site.connect(ORIGIN);

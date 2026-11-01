@@ -28,12 +28,18 @@ import {
 	COVER,
 	IMAGE_ORIGIN,
 	LOGO,
+	MEDIA_ORIGIN,
+	movedTo,
 	withCover,
 	withStorefront,
 } from "./theme-fixtures.ts";
 
-/** A server render's context against an API at `apiUrl`, the studio seeded. */
-function pageContext(studio: Studio, apiUrl: string) {
+/**
+ * A server render's context against an API at `apiUrl` whose photos are
+ * served from `mediaUrl` (MEDIA_URL; by default the API's origin), the studio
+ * seeded.
+ */
+function pageContext(studio: Studio, apiUrl: string, mediaUrl = apiUrl) {
 	const { fetch } = fakeFetch(({ url }) => {
 		if (url.endsWith("/artists")) return json(200, { data: [SITA, ARJUN] });
 		// The gallery reads (the home page's Recent work, an artist's portfolio): no photos.
@@ -47,7 +53,7 @@ function pageContext(studio: Studio, apiUrl: string) {
 		return json(404, { error: { code: "not_found", message: "Not found." } });
 	});
 	const api = createApiContext("server");
-	connectServer(api, { config: { apiUrl }, studio, fetch });
+	connectServer(api, { config: { apiUrl, mediaUrl }, studio, fetch });
 	seedStudio(api, studio);
 	const site = new SiteRef();
 	site.connect(ORIGIN);
@@ -259,7 +265,29 @@ describe("the page data's theme (TAT-54)", () => {
 		assert.deepEqual({ ...branded, theme: null }, { ...plain, theme: null });
 	});
 
-	test("the loaders check images against the API's own origin", async () => {
+	test("with MEDIA_URL set, the loaders check images against it, never the API's origin", async () => {
+		const onMedia = withStorefront(movedTo(MEDIA_ORIGIN, BRANDED));
+		const page = await loadStudioPage(
+			pageContext(onMedia, IMAGE_ORIGIN, MEDIA_ORIGIN),
+		);
+		assert.deepEqual(
+			page.theme.logo,
+			movedTo(MEDIA_ORIGIN, BRANDED_THEME.logo),
+		);
+		assert.deepEqual(
+			page.theme.heroImage,
+			movedTo(MEDIA_ORIGIN, BRANDED_THEME.heroImage),
+		);
+		// The same images on the API's own origin: refused, the rest of the theme kept.
+		const onApi = await loadStudioPage(
+			pageContext(withStorefront(BRANDED), IMAGE_ORIGIN, MEDIA_ORIGIN),
+		);
+		assert.equal(onApi.theme.logo, null);
+		assert.equal(onApi.theme.heroImage, null);
+		assert.equal(onApi.theme.accent, "#b91c1c");
+	});
+
+	test("without MEDIA_URL, the loaders check images against the API's own origin", async () => {
 		const studio = withStorefront(BRANDED);
 		const onApi = await loadStudioPage(pageContext(studio, IMAGE_ORIGIN));
 		assert.deepEqual(onApi.theme.logo, BRANDED_THEME.logo);

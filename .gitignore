@@ -5,6 +5,8 @@ dist-ssr
 build
 *.local
 .env
+# Real settings never go in the repo; the templates are deploy/env/*.env.example
+deploy/env/*.env
 .nitro
 .tanstack
 .wrangler

@@ -41,7 +41,7 @@ function WorkRoute() {
 					query,
 					cursor,
 					offset,
-					tattoo.connection.apiUrl,
+					tattoo.connection.mediaUrl,
 				)
 			}
 		/>

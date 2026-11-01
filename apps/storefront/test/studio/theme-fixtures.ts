@@ -13,6 +13,16 @@ export function withStorefront(storefront: unknown, studio = STUDIO): Studio {
 /** The origin of the fixtures' photos: the API's, the only one images may come from. */
 export const IMAGE_ORIGIN = "https://api.example.com";
 
+/** The photos' own origin when it is not the API's (MEDIA_URL: R2's custom domain in production). */
+export const MEDIA_ORIGIN = "https://media.example.com";
+
+/** `value` (plain data) with every URL on IMAGE_ORIGIN moved to `origin`. */
+export function movedTo<T>(origin: string, value: T): T {
+	return JSON.parse(
+		JSON.stringify(value).replaceAll(IMAGE_ORIGIN, origin),
+	) as T;
+}
+
 export const LOGO = {
 	url: "https://api.example.com/uploads/tenants/t/brand_logo/logo.png",
 	width: 600,

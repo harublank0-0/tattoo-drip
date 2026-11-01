@@ -4,7 +4,9 @@ import { boot } from "#tests/helpers/boot";
 /**
  * What production requires besides APP_URL and STOREFRONT_URL, which each
  * test sets. Every other setting comes from the platform's `.env`, as in
- * role_guard.spec.ts.
+ * role_guard.spec.ts. The R2 values are made up and well formed: production
+ * refuses the local photo folders (TAT-27), and `.env.test` blanks R2 for the
+ * tests. Booting never calls R2.
  */
 const PRODUCTION = {
 	NODE_ENV: "production",
@@ -12,6 +14,12 @@ const PRODUCTION = {
 	STOREFRONT_SERVER_KEYS:
 		"td9-test-key-one-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,td9-test-key-two-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 	TRUST_PROXY: "loopback",
+	R2_ACCOUNT_ID: "0123456789abcdef0123456789abcdef",
+	R2_ACCESS_KEY_ID: "td9-test-access-key",
+	R2_SECRET_ACCESS_KEY: "td9-test-secret-key",
+	R2_PUBLIC_BUCKET: "td9-test-public",
+	R2_PRIVATE_BUCKET: "td9-test-private",
+	R2_PUBLIC_URL: "https://media.tattoodrip.app",
 };
 
 const APART = {

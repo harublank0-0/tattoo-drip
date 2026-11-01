@@ -73,6 +73,20 @@ const SIGNED_URL_TTL = "5 minutes";
  */
 export const PRIVATE_CACHE_CONTROL = "private, no-store";
 
+/**
+ * The Cache-Control each object is stored with (TAT-27), so an object store
+ * serves it the same way the local /uploads and /files routes do. A public
+ * image may be kept but must be revalidated on every use, so a removed
+ * photo stops loading at once (its URL is permanent, so it can't be
+ * versioned away). A private image is never kept, as its signed URL says.
+ * The S3 driver ignores the `cacheControl` that `link()` signs into a URL
+ * (only the local drive's route reads it), so this is what R2 sends.
+ */
+export const STORED_CACHE_CONTROL = {
+	public: "no-cache",
+	private: PRIVATE_CACHE_CONTROL,
+} as const;
+
 const diskFor = (purpose: ImagePurpose) =>
 	drive.use(IMAGE_PURPOSES[purpose].visibility);
 
@@ -201,6 +215,7 @@ export default class ImageService {
 		try {
 			await diskFor(purpose).put(key, image.data, {
 				contentType: `image/${image.format}`,
+				cacheControl: STORED_CACHE_CONTROL[IMAGE_PURPOSES[purpose].visibility],
 			});
 		} catch (error) {
 			// No record will point at the copies: take them (and any partial
@@ -235,6 +250,8 @@ export default class ImageService {
 				written.push(key); // before the put: a half-written file goes too
 				await diskFor(purpose).put(key, variant.data, {
 					contentType: `image/${image.format}`,
+					cacheControl:
+						STORED_CACHE_CONTROL[IMAGE_PURPOSES[purpose].visibility],
 				});
 			}
 			return variants.map((variant) => variant.width);
@@ -353,7 +370,7 @@ export default class ImageService {
 	 * with its purpose and key, never thrown, so cleanup can't fail a request.
 	 * Use it for what no record points at any more or what a rollback leaves
 	 * (a replaced image after the commit); a file that fails stays unreferenced
-	 * until the orphan sweep of TAT-27. A removal that must not report success
+	 * until the orphan sweep (TAT-140). A removal that must not report success
 	 * while a file is still reachable uses `deleteOrThrow`.
 	 */
 	async delete(purpose: ImagePurpose, key: string): Promise<void> {

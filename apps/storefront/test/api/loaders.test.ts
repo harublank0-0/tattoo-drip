@@ -19,7 +19,11 @@ const STUDIO: Studio = studioOf("studio-a", "Studio A");
 
 function serverApi(fetch: typeof globalThis.fetch) {
 	const api = createApiContext("server");
-	connectServer(api, { config: { apiUrl: API }, studio: STUDIO, fetch });
+	connectServer(api, {
+		config: { apiUrl: API, mediaUrl: API },
+		studio: STUDIO,
+		fetch,
+	});
 	return api;
 }
 
