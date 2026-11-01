@@ -30,6 +30,7 @@ backup      --> R2 bucket  tattoo-drip-backups
 |---|---|
 | `/srv/tattoo-drip/app` | The git clone of the repo (read-only deploy key). Never edit files in it. |
 | `/srv/tattoo-drip/env` | The six settings files, `postgres.env` `platform.env` `migrate.env` `storefront.env` `backup.env` `tunnel.env`. Folder mode 700, files mode 600. |
+| `/srv/tattoo-drip/deployed` | One line: the commit of the last successful deploy, written by `deploy.sh`. Going back (5) and a restore (7.5) read it. |
 | `/srv/tattoo-drip/restore` | Downloaded backups, only while you restore. They hold clients' data: delete them afterwards. |
 | Docker volume `tattoo-drip-prod_postgres_data` | The database. |
 | R2 `tattoo-drip-backups/db` | Last 30 nightly dumps. |
@@ -346,7 +347,7 @@ About the keys this made:
 
 ### 2.3 What the templates already have right
 
-You change nothing else for production. For reference: `NODE_ENV=production`, `TZ=UTC`, `HOST=0.0.0.0`, `PORT=3333`, `APP_URL=https://tattoodrip.app`, `STOREFRONT_URL=https://{tenant}.tattoodrip.page` (keep `{tenant}` as it is), `TRUST_PROXY=172.30.42.10` (nginx's address inside the Docker network), `SESSION_DRIVER=cookie`, the database host `postgres` and the names `tattoo_drip` and `tattoo_drip_app`, the bucket names and `R2_PUBLIC_URL=https://media.tattoodrip.app`, `ALERT_EMAILS=false`, and placeholder `MAIL_*` / `SMTP_*` values until email exists (TAT-20). The storefront's `API_URL` is `https://tattoodrip.app`.
+You change nothing else for production. For reference: `NODE_ENV=production`, `TZ=UTC`, `HOST=0.0.0.0`, `PORT=3333`, `APP_URL=https://tattoodrip.app`, `STOREFRONT_URL=https://{tenant}.tattoodrip.page` (keep `{tenant}` as it is), `TRUST_PROXY=172.30.42.10` (nginx's address inside the Docker network), `SESSION_DRIVER=cookie`, the database host `postgres` and the names `tattoo_drip` and `tattoo_drip_app`, the bucket names and `R2_PUBLIC_URL=https://media.tattoodrip.app`, `ALERT_EMAILS=false`, and placeholder `MAIL_*` / `SMTP_*` values until email exists (TAT-20). The storefront's `API_URL` is `https://tattoodrip.app` and its `MEDIA_URL` is `https://media.tattoodrip.app`, the same origin as `R2_PUBLIC_URL`: the studio pages show photos from that origin only, so with any other value (or none) they show no logo, cover, work photo or flash design.
 
 ### 2.4 Editing a value with nano
 
@@ -455,9 +456,11 @@ The tunnel shows as inactive until the server runs `cloudflared` (4.3).
 
 For each of the two domains, open the domain, then **SSL/TLS**, **Edge Certificates**, and switch **Always Use HTTPS** on. Cloudflare's free certificate covers each domain and its first-level wildcard (`*.tattoodrip.page`), and `.app` and `.page` are HTTPS-only in browsers anyway.
 
+Never switch on **Bot Fight Mode**, **I'm Under Attack** or any rule that challenges requests (a WAF custom rule with a challenge action, a challenge for a country or an address range) on `tattoodrip.app`. The studio pages' server asks the API at `https://tattoodrip.app`, from the server's own address, for every page it renders, and it cannot solve a challenge: every studio page would answer "This page can't load right now" (8.1). The one rule of 3.8 is the exception: it blocks, and only on the sign-in pages.
+
 ### 3.8 Optional: one rate-limiting rule
 
-The free plan allows one. The app already limits requests per address by itself (see deploy.md, "What the app does itself"), so this is an outer layer, not a need. If you add one, aim it at the sign-in pages only: host `tattoodrip.app`, path starting with `/login`, `/signup` or `/forgot-password`, counted per address, with the longest period and block time the free plan offers. Do not aim it at `/api/`: the studio pages call the API from the server's own address, and Cloudflare would count all their visitors as one.
+The free plan allows one. The app already limits requests per address by itself (see deploy.md, "What the app does itself"), so this is an outer layer, not a need. If you add one, aim it at the sign-in pages only: host `tattoodrip.app`, path starting with `/login`, `/signup` or `/forgot-password`, counted per address, with the longest period and block time the free plan offers. Do not aim it at `/api/`: the studio pages call the API from the server's own address, and Cloudflare would count all their visitors as one. Its action is **Block**, never a challenge (3.7).
 
 ### 3.9 Everything from Cloudflare is in
 
@@ -494,7 +497,7 @@ Run the `grep` of 3.9 again. **You should see:** nothing.
 /srv/tattoo-drip/app/deploy/deploy.sh
 ```
 
-This is the same command for every later update. It refuses to start while the checkout has local changes or a settings file is missing, unreadable or unfinished, and says which file and variable, before it changes anything. Then it fetches `origin/main`, builds the images, starts Postgres (which creates the database and the restricted app role on its first start), runs the migrations, starts the services, waits for web and storefront to be healthy and reloads nginx.
+This is the same command for every later update. It refuses to start while the checkout has local changes or a settings file is missing, unreadable or unfinished, and says which file and variable, before it changes anything. Then it fetches `origin/main`, builds the images, starts Postgres (which creates the database and the restricted app role on its first start), runs the migrations, starts the services, waits for web and storefront to be healthy and reloads nginx. Last, it writes the commit it deployed to `/srv/tattoo-drip/deployed` (one line, the full commit id) and deletes the images the build replaced. That file always names the last release that got through every step: a deploy that fails leaves it as it was, although the checkout already sits on the failed commit. Going back (section 5) and a restore (7.5) use it. Until the first deploy succeeds there is no such file.
 
 The first build downloads every dependency and can take 5 to 15 minutes; later ones are faster. Lines that begin with `deploy:` say which step it is on.
 
@@ -510,11 +513,13 @@ docker compose -f /srv/tattoo-drip/app/deploy/compose.yml ps
 
 ### 4.5 The tunnel and the site
 
+In the Cloudflare dashboard (Zero Trust, **Networks**, **Tunnels**) the tunnel `tattoo-drip` shows as **Healthy**. Its own log stays empty on purpose: `cloudflared` runs with `--loglevel fatal`, because its error lines carry the full address of a request it could not hand on, and the account and deposit links have their token in the address. Only a failure to start shows:
+
 ```bash
 docker compose -f /srv/tattoo-drip/app/deploy/compose.yml logs --tail 20 cloudflared
 ```
 
-**You should see:** `Registered tunnel connection` lines, and in the Cloudflare dashboard the tunnel as Healthy.
+**You should see:** nothing (a wrong `TUNNEL_TOKEN` shows as `Provided Tunnel token is not valid.`). To look closer at a tunnel problem, see 8.9.
 
 Then, from your computer:
 
@@ -561,7 +566,7 @@ With a studio created (its address is `https://<slug>.tattoodrip.page`):
    ```
 
    **You should see:** `200`, `cache-control: public...`, no `x-ratelimit` header, and in both answers no `age` header and a `cf-cache-status` of `DYNAMIC` or `BYPASS`, never `HIT`. (Cloudflare does not store JSON unless told to; if you ever see `HIT`, add the cache rule deploy.md describes.)
-4. **A public photo.** In the dashboard add a work photo to an artist. On the studio page right-click it and copy the image address; it starts with `https://media.tattoodrip.app/tenants/`.
+4. **A public photo.** In the dashboard add a work photo to an artist, and a logo under Page look. **You should see** both on the studio page (reload it). If the dashboard shows them and the studio page does not, the storefront's `MEDIA_URL` is wrong (2.3). On the studio page right-click the work photo and copy the image address; it starts with `https://media.tattoodrip.app/tenants/`.
 
    ```bash
    curl -sI '<photo address>' | grep -i -E '^(HTTP|cache-control|content-type)'
@@ -620,6 +625,16 @@ systemctl list-timers tattoo-drip-backup.timer
 
 **You should see:** the same six containers up (the three with checks `healthy` after a minute), the timer listed with a next run, and the site answering again. Nothing was started by hand.
 
+Still at the quiet hour, check that Docker Compose gives a recreated `web` and `storefront` their fixed addresses back (nginx looks for them only there; section 5, "Changing a setting"). The dashboard is down for the half minute `web` takes to start:
+
+```bash
+docker compose -f /srv/tattoo-drip/app/deploy/compose.yml up -d --force-recreate --no-deps web
+docker compose -f /srv/tattoo-drip/app/deploy/compose.yml ps web
+docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$(docker compose -f /srv/tattoo-drip/app/deploy/compose.yml ps -q web)"
+```
+
+**You should see:** `ps` shows `web` as `Up ... (healthy)` within a minute (repeat it until it does), and the address is `172.30.42.11`. Then the same three commands with `storefront` in place of `web`: `healthy`, and `172.30.42.12`. Open `https://tattoodrip.app/login` and a studio page: both answer. If an address differs, nginx cannot reach that app (`502` or `504`): run `docker compose -f /srv/tattoo-drip/app/deploy/compose.yml down`, then `/srv/tattoo-drip/app/deploy/deploy.sh "$(cat /srv/tattoo-drip/deployed)"`, and report it: every later recreate would hit the same.
+
 ### 4.11 Nothing else answers
 
 From your computer:
@@ -635,7 +650,7 @@ for port in 22 80 443 3333 3000 5432; do nc -z -w 5 <server-ip> $port && echo "p
 - 4.3 to 4.8 gave what they should.
 - A backup is in R2 and the heartbeat registered (6.4).
 - A practice restore matched (7.3).
-- The reboot test passed (4.10) and only port 22 answers (4.11).
+- The reboot test and the recreate check passed (4.10) and only port 22 answers (4.11).
 - You have a copy of the six settings files in your password manager (2.4).
 
 ---
@@ -654,10 +669,16 @@ It is the command of 4.3: build, migrate, restart. Pages can be slow while it bu
 
 If a step fails, `deploy.sh` says which one, what state that leaves (a failed build or migration leaves the old services running) and the command to go back.
 
-**Going back:** the failure message names the previous commit; any earlier commit works the same way:
+**Going back** after a failed deploy means the last release that deployed successfully, which `deploy.sh` keeps in `/srv/tattoo-drip/deployed` (the failure message names the same commit). Never use the checkout's own commit (`git rev-parse HEAD`) for this: after a failed deploy it is the failed one.
 
 ```bash
-/srv/tattoo-drip/app/deploy/deploy.sh <previous commit>
+/srv/tattoo-drip/app/deploy/deploy.sh "$(cat /srv/tattoo-drip/deployed)"
+```
+
+After a deploy that worked but turned out bad, the file names that bad release; the deploy's own last lines named the one before it ("to go back to the release before"). Any earlier commit works the same way (`git -C /srv/tattoo-drip/app log --oneline origin/main` lists them):
+
+```bash
+/srv/tattoo-drip/app/deploy/deploy.sh <earlier commit>
 ```
 
 This is safe because migrations are written to only add things (a rule of the project, not something the server checks): older code runs on the newer database. (`deploy.sh <ref>` also takes a tag or `origin/<branch>`.) A deploy runs the copy of `deploy.sh` it started with, so a change to the script itself takes effect from the next deploy.
@@ -674,13 +695,15 @@ Edit the file (2.4), then recreate the services that read it. The settings of `w
 docker compose -f /srv/tattoo-drip/app/deploy/compose.yml up -d --force-recreate web worker
 ```
 
-Nothing else is needed: nginx reaches `web` and `storefront` by fixed addresses (`172.30.42.11` and `172.30.42.12`, set in `deploy/compose.yml` and `deploy/nginx/nginx.conf`), so it finds a recreated or restarted container at once, and after a reboot too. The site answers `502` for the few seconds the new container takes to start. For the storefront use `storefront` in place of `web worker`. For the tunnel (`tunnel.env`) use `cloudflared`. `postgres.env` only counts when the database is first created; changing it later changes nothing.
+Nothing else is needed: nginx reaches `web` and `storefront` by fixed addresses (`172.30.42.11` and `172.30.42.12`, set in `deploy/compose.yml` and `deploy/nginx/nginx.conf`), so it finds a recreated or restarted container at once, and after a reboot too (4.10 checks both). The site answers `502` (or `504`) for the few seconds the new container takes to start. For the storefront use `storefront` in place of `web worker`. For the tunnel (`tunnel.env`) use `cloudflared`. `postgres.env` only counts when the database is first created; changing it later changes nothing.
 
 ---
 
 ## 6. Backups
 
 Every night at 02:00 Nepal time a job dumps the database (`pg_dump --format=custom`, as the owner role), reads the dump back to check it, copies it to `tattoo-drip-backups/db` in R2 as `tattoo_drip-<UTC time>.dump`, deletes dumps older than 30 days, and pings a heartbeat so you hear when a night is missed. A night the server was off runs at the next boot. Not backed up: the photos in R2 (R2 itself is durable; a bug that deletes files cannot be undone) and the settings files (keep your own copy, 2.4).
+
+A known limit: the dumps are plain database dumps, not encrypted by us, and they hold every client's name, phone number and messages. What protects them is the bucket: it is private, only the backups token (3.4) can reach it, and R2 encrypts what it stores. Anyone with that token or with the Cloudflare account can read every dump. A later step is an rclone `crypt` remote in front of the bucket, with its passphrase kept away from the server (in the password manager); not done yet.
 
 ### 6.1 The heartbeat on healthchecks.io
 
@@ -878,10 +901,10 @@ Use this when the data is lost or wrong. It restores into the scratch database a
    ```bash
    docker compose -f /srv/tattoo-drip/app/deploy/compose.yml exec -T postgres psql -U postgres -d postgres -c "select pid, usename, application_name from pg_stat_activity where datname = 'tattoo_drip'"
    ```
-7. Start everything again on the commit that was running, not on whatever is newest on `main`. This also runs any migration the dump predates:
+7. Start everything again on the release that was running, not on whatever is newest on `main`: the last successful deploy, which `deploy.sh` keeps in `/srv/tattoo-drip/deployed` (not the checkout's own commit, which names the failed one if the last deploy failed). This also runs any migration the dump predates:
 
    ```bash
-   /srv/tattoo-drip/app/deploy/deploy.sh "$(git -C /srv/tattoo-drip/app rev-parse HEAD)"
+   /srv/tattoo-drip/app/deploy/deploy.sh "$(cat /srv/tattoo-drip/deployed)"
    ```
 
    **You should see:** `deployed <short commit>`. Sign in and look at the data.
@@ -934,13 +957,15 @@ Replace `web` with `worker`, `storefront`, `nginx`, `cloudflared` or `postgres`.
 
 | What you see | Likely cause |
 |---|---|
-| The site shows a Cloudflare error page (for example 1033 or 502) | The tunnel is not connected: `logs cloudflared`. A 502 with a connected tunnel means nginx cannot reach `web` or `storefront`: check `ps`. |
+| The site shows a Cloudflare error page (for example 1033 or 502) | The tunnel is not connected: look at its status in the Cloudflare dashboard (4.5). `logs cloudflared` shows only an error that kept it from starting; to see more, 8.9. A 502 or 504 with a connected tunnel means nginx cannot reach `web` or `storefront`: check `ps`. |
 | `web`, `worker` or `storefront` keeps restarting, and the log names a variable | A setting is missing or malformed. The message names the variable, never its value; fix it in the file (2.4) and recreate the service (section 5, "Changing a setting"). |
 | Studio pages show "try again" or a 500 | `logs storefront`; then `logs web` for "server key this API does not accept": `STOREFRONT_SERVER_KEY` and `STOREFRONT_SERVER_KEYS` must hold the same value. |
+| Every studio page says "This page can't load right now" (a 503), and `logs storefront` has `Studio lookup failed` lines with `status: 403` (or `503`) and `code: 'unknown_error'` | A Cloudflare security setting on `tattoodrip.app` challenges the storefront's own server: Bot Fight Mode, I'm Under Attack, or a challenge or WAF rule. Switch it off (3.7). |
+| Studio pages show no photos (logo, cover, work, flash) while the dashboard shows them | The storefront's `MEDIA_URL` is not `https://media.tattoodrip.app` (2.3). Fix it in `storefront.env` and recreate `storefront` (section 5, "Changing a setting"). |
 | Everyone is locked out of sign-in or the request form after a few tries | `TRUST_PROXY` is not nginx's address, so every visitor looks like one. It must be `172.30.42.10`. |
 | Photos do not upload, or the log says R2 | The R2 token, the bucket names or `R2_ACCOUNT_ID` (3.1 to 3.3). |
 | The request form always says the check failed | The Turnstile widget's hostname or keys (3.5). |
-| `502` for a few seconds after you recreated or restarted `web` or `storefront` | The new container is still starting (`web` can take 30 s); nginx finds it by its fixed address. Wait until `ps` says `healthy`; if it never does, `logs web` (or `logs storefront`). |
+| `502` or `504` for a few seconds after you recreated or restarted `web` or `storefront` | The new container is still starting (`web` can take 30 s); nginx finds it by its fixed address. Wait until `ps` says `healthy`; if it never does, `logs web` (or `logs storefront`). |
 | `deploy.sh` says the build failed | Often memory or disk: 8.3 and 8.4. |
 | A "backup failed" email | 6.5. |
 
@@ -959,12 +984,14 @@ df -h /
 docker system df
 ```
 
-Clear build leftovers and unused images, which are safe to delete (the next deploy rebuilds what it needs):
+Each deploy already deletes the images its build replaced. What grows is the build cache. Trim it to its newest 10 GB, which keeps the next build fast (newer Docker versions also name the option `--reserved-space`):
 
 ```bash
-docker builder prune -f
+docker builder prune --keep-storage 10GB -f
 docker image prune -f
 ```
+
+If the disk is still full, `docker builder prune -f` empties the whole cache (the next build then downloads everything again: 5 to 15 minutes).
 
 Never add `--volumes` or run `docker volume prune`: the database lives in a volume. Also delete anything left in `/srv/tattoo-drip/restore`, and, once a restore is confirmed good, the database it left behind (7.5, step 8): `docker compose -f /srv/tattoo-drip/app/deploy/compose.yml exec -T postgres dropdb -U postgres --if-exists tattoo_drip_old`. The logs rotate by themselves.
 
@@ -995,6 +1022,25 @@ The Card Ledger stack, or anything else, must use a different Compose project na
 - One server is one point of failure. If it dies, the way back is 7.6: up to a day of data lost, an hour or two of work.
 - Clients' phone numbers and reference photos are stored outside Nepal. The legal check (TAT-63) should cover that under the Individual Privacy Act 2075.
 - To be told when the site is down, add a free uptime monitor (any that emails you) on `https://tattoodrip.app/login` and `https://tattoodrip.page/`.
+
+### 8.9 Looking closer at the tunnel
+
+`cloudflared` logs only what keeps it from starting (`--loglevel fatal` in `deploy/compose.yml`): its error lines name the full address of a request it could not hand to nginx, and the reset, confirmation, invitation and deposit links carry their token in the address. The tunnel's health is on the Cloudflare dashboard (4.5), and the checks of 4.5 and 4.7 show whether the site works. To read its log for a while, start it with `--loglevel info` from a file outside the repo (never edit files in `/srv/tattoo-drip/app`):
+
+```bash
+printf '%s\n' 'services:' '  cloudflared:' '    command: ["tunnel", "--no-autoupdate", "--loglevel", "info", "run"]' > /srv/tattoo-drip/cloudflared-debug.yml
+docker compose -f /srv/tattoo-drip/app/deploy/compose.yml -f /srv/tattoo-drip/cloudflared-debug.yml up -d --no-deps cloudflared
+docker compose -f /srv/tattoo-drip/app/deploy/compose.yml logs -f cloudflared
+```
+
+Ctrl+C stops following. When you are done, put `fatal` back at once: recreating the container also deletes its log, with any token addresses in it. (The next deploy would put it back too; do not wait for it.)
+
+```bash
+docker compose -f /srv/tattoo-drip/app/deploy/compose.yml up -d --force-recreate --no-deps cloudflared
+rm /srv/tattoo-drip/cloudflared-debug.yml
+```
+
+Never paste that log anywhere without removing the addresses first.
 
 ## The commands you will use most
 
