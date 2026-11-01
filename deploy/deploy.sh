@@ -4,23 +4,33 @@
 #
 #   deploy/deploy.sh                 # deploy origin/main
 #   deploy/deploy.sh <commit|tag>    # deploy that one; going back is the same command
+#   deploy/deploy.sh "$(cat /srv/tattoo-drip/deployed)"   # the last successful release
 #
 # Steps:
 #   1. refuse while the checkout has local changes
-#   2. refuse while the settings are missing, unreadable or unfinished (CHANGE_ME left in an env file)
+#   2. refuse while the settings are missing, unreadable or unfinished (CHANGE_ME left in
+#      an env file), or the release record (below) cannot be read or written
 #   3. git fetch origin, check out the requested commit (detached)
 #   4. build the web, storefront and backup images (worker and migrate share web's image)
 #   5. start postgres and wait for it to be healthy (60 s)
 #   6. run the migrations; if they fail, stop: the old app containers are still serving
 #   7. recreate web, worker, storefront, nginx and cloudflared with the new images
 #   8. wait for web and storefront to be healthy (120 s), then reload nginx
-#   9. print what is running and "deployed <short sha>"
+#   9. record the commit in TD_STATE_DIR/deployed, print what is running,
+#      "deployed <short sha>" and the release before it, then delete dangling images
+#      (never volumes)
 #
 # Steps 1 and 2 come before anything touches git or the containers, so they can be
 # tried safely (a scratch TD_ENV_DIR with copies of deploy/env/*.env.example shows both
 # refusals). Migrations are additive by convention, so after going back to an older
-# commit the older code runs on the newer schema. A failure after step 3 names the
-# commit the checkout was on before, and "deploy/deploy.sh <that commit>" goes back.
+# commit the older code runs on the newer schema.
+#
+# The release record, TD_STATE_DIR/deployed, holds one line: the full sha of the last
+# deploy that got through every step. Only step 9 writes it, so a failed deploy leaves
+# it as it was, while the checkout (HEAD) already names the failed commit. A failure
+# after step 3 says "to go back: deploy/deploy.sh <that sha>"; before the first
+# successful deploy there is no record, and it names the commit the checkout was on
+# before this run instead (and says so).
 #
 # The script is read by bash while it runs, and step 3 replaces files in the checkout,
 # deploy.sh included. So all of it sits in main(), which bash reads whole before running
@@ -29,7 +39,8 @@
 #
 # Settings (environment variables):
 #   COMPOSE           compose command, default "docker compose" (podman-compose works too)
-#   CONTAINER         container engine that matches it, used to read the containers' health;
+#   CONTAINER         container engine that matches it, used to read the containers' health
+#                     and to delete dangling images;
 #                     default: the first word of COMPOSE without "-compose" ("docker",
 #                     "podman")
 #   TD_ENV_DIR        absolute path of the env files, default /srv/tattoo-drip/env;
@@ -37,6 +48,8 @@
 #   TD_COMPOSE_FILES  colon-separated compose files, default deploy/compose.yml; relative
 #                     entries are relative to the repo root. Compose gets them as absolute
 #                     paths (podman-compose cannot handle relative ones).
+#   TD_STATE_DIR      absolute path of the folder that holds the release record
+#                     ("deployed"), default /srv/tattoo-drip
 #
 # Never prints an env value: the settings checks name files and variable names only.
 set -euo pipefail
@@ -45,7 +58,7 @@ set -euo pipefail
 NGINX_CONF=/etc/nginx/td/nginx.conf
 
 main() {
-	local root ref sha envdir entry file name out keys rc first
+	local root ref sha envdir statedir entry file name out keys rc first had_record=
 	local -a entries=() missing=() unreadable=() unfinished=()
 
 	root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -63,10 +76,16 @@ main() {
 	esac
 	envdir=${TD_ENV_DIR:-/srv/tattoo-drip/env}
 	export TD_ENV_DIR=$envdir
+	statedir=${TD_STATE_DIR:-/srv/tattoo-drip}
+	DEPLOYED=$statedir/deployed
 
 	case $envdir in
 	/*) ;;
 	*) fail "TD_ENV_DIR must be an absolute path (it is '$envdir')" ;;
+	esac
+	case $statedir in
+	/*) ;;
+	*) fail "TD_STATE_DIR must be an absolute path (it is '$statedir')" ;;
 	esac
 
 	IFS=: read -ra entries <<<"${TD_COMPOSE_FILES:-deploy/compose.yml}"
@@ -100,7 +119,12 @@ main() {
 	done
 	for file in "$envdir"/*.env; do
 		[ -f "$file" ] || continue
-		# awk: 0 = a placeholder is left, 1 = none, 2 = it could not read the file.
+		# Tested first: awk's exit code on an unreadable file differs between awks.
+		if [ ! -r "$file" ]; then
+			unreadable+=("$file")
+			continue
+		fi
+		# awk: 0 = a placeholder is left, 1 = none, anything else = it failed.
 		rc=0
 		awk '!/^[ \t]*#/ && /CHANGE_ME/ { found = 1 } END { exit !found }' "$file" 2>/dev/null || rc=$?
 		case $rc in
@@ -123,8 +147,24 @@ main() {
 		fail "fix the settings files above (templates: deploy/env/*.env.example); nothing was changed"
 	fi
 
+	# The release record: what "to go back" names, and where step 9 writes. Checked here,
+	# so a deploy that could not record its success never starts.
+	[ -d "$statedir" ] && [ -w "$statedir" ] ||
+		fail "the folder for the release record, $statedir (TD_STATE_DIR), is missing or not writable; nothing was changed"
+	if [ -e "$DEPLOYED" ]; then
+		[ -f "$DEPLOYED" ] && [ -r "$DEPLOYED" ] ||
+			fail "cannot read the release record $DEPLOYED; nothing was changed"
+		PREV_SHA=$(head -n 1 "$DEPLOYED")
+		[[ $PREV_SHA =~ ^[0-9a-f]{40}$ ]] ||
+			fail "$DEPLOYED does not hold one full commit sha; put back the sha of the release that is running (or delete the file); nothing was changed"
+		say "last successful deploy: $PREV_SHA ($DEPLOYED)"
+		had_record=1
+	else
+		PREV_SHA=$(git rev-parse HEAD)
+		say "no successful deploy recorded yet ($DEPLOYED); \"to go back\" names the commit the checkout is on now, $PREV_SHA"
+	fi
+
 	# 3. The requested commit.
-	PREV_SHA=$(git rev-parse --short HEAD)
 	say "checkout is at: $(git log -1 --format='%h %s')"
 	say "fetching origin"
 	git fetch origin || fail "git fetch origin failed (network, or the deploy key?); nothing was changed"
@@ -136,12 +176,12 @@ main() {
 	# compose run does not rebuild an existing image, so a changed backup.sh would never
 	# reach the nightly job).
 	say "building images"
-	compose --profile tools build web storefront backup || fail "the build failed; nothing was restarted (the checkout is on the new commit; to put it back: deploy/deploy.sh $PREV_SHA)"
+	compose --profile tools build web storefront backup || fail "the build failed; nothing was restarted (the checkout is on the new commit; to go back: deploy/deploy.sh $PREV_SHA)"
 
 	# 5. The database first: the migrations need it, and web and worker wait for it.
 	say "starting postgres"
-	compose up -d postgres || fail "postgres could not be started; the app containers were not restarted"
-	wait_healthy 60 postgres || fail "postgres is not healthy, so the migrations did not run; the app containers were not restarted"
+	compose up -d postgres || fail "postgres could not be started; the app containers were not restarted (to go back: deploy/deploy.sh $PREV_SHA)"
+	wait_healthy 60 postgres || fail "postgres is not healthy, so the migrations did not run; the app containers were not restarted (to go back: deploy/deploy.sh $PREV_SHA)"
 
 	# 6. Migrations, before the new code starts. The old containers keep serving while
 	# they run, which is why they must stay compatible with the new schema.
@@ -149,8 +189,8 @@ main() {
 	if ! compose --profile tools run --rm -T migrate; then
 		echo "deploy: the migrations failed. The app containers (web, worker, storefront, nginx, cloudflared)" >&2
 		echo "deploy: were not restarted and still serve the old code; postgres may have been (re)started." >&2
-		echo "deploy: fix the cause and run this again. To put the checkout back on the running code:" >&2
-		echo "deploy: deploy/deploy.sh $PREV_SHA" >&2
+		echo "deploy: fix the cause and run this again. The checkout is on the new commit;" >&2
+		echo "deploy: to go back: deploy/deploy.sh $PREV_SHA" >&2
 		exit 1
 	fi
 
@@ -170,14 +210,26 @@ main() {
 	say "reloading nginx"
 	if ! out=$(compose exec -T nginx nginx -c "$NGINX_CONF" -t 2>&1); then
 		echo "$out" >&2
-		fail_started "nginx does not accept its configuration, so it keeps serving the old addresses"
+		fail_started "nginx does not accept its configuration, so it keeps serving the old configuration"
 	fi
 	compose exec -T nginx nginx -c "$NGINX_CONF" -s reload || fail_started "nginx could not be reloaded"
 
-	# 9.
+	# 9. Recorded only now, when every step got through (written whole, then renamed over
+	# the old record, so it is never half a line).
+	sha=$(git rev-parse HEAD)
+	if ! { printf '%s\n' "$sha" >"$DEPLOYED.tmp" && mv -f "$DEPLOYED.tmp" "$DEPLOYED"; }; then
+		fail "$sha is running, but recording it in $DEPLOYED failed; write that sha into the file yourself"
+	fi
 	compose ps
-	sha=$(git rev-parse --short HEAD)
-	echo "deployed $sha"
+	echo "deployed $(git rev-parse --short HEAD)"
+	if [ -n "$had_record" ] && [ "$PREV_SHA" != "$sha" ]; then
+		say "to go back to the release before: deploy/deploy.sh $PREV_SHA"
+	fi
+
+	# The images this build replaced are left untagged ("dangling"): delete them, or they
+	# fill the disk deploy by deploy. Never volumes (the database is one). The build cache
+	# stays, so going back still builds fast.
+	$CONTAINER image prune -f >/dev/null || say "could not delete the old images (harmless; see README 8.3)"
 }
 
 say() { echo "deploy: $*"; }

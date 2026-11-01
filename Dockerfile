@@ -11,8 +11,9 @@
 # storefront /app holds .output plus the production modules its server needs
 #            (Nitro keeps @sentry/* external). Listens on PORT, 3000 by default.
 #
-# Built on the production server (4 GB of memory plus swap), so the compiling
-# stage runs its steps one after the other and caps the Node heap at 2 GB.
+# Built on the production server (8 GB of memory, 2 GB of swap) beside the running
+# stack, so the compiling stage runs its steps one after the other and caps the Node
+# heap at 2 GB: the build fits in about 3 GB.
 # Settings are runtime-only: no .env file enters the context (.dockerignore) and
 # the build needs none.
 
@@ -42,8 +43,8 @@ RUN pnpm fetch
 # ---------------------------------------------------------------------------
 # build: install from the store, compile both apps, make each app's production
 # node_modules. The two builds run in this one stage, one after the other: two
-# stages would let BuildKit run them together (both targets built at once) and
-# two 2 GB heaps do not fit a 4 GB server.
+# stages would let BuildKit run them together (both targets built at once), and
+# two 2 GB heaps would take the build past the 3 GB it gets beside the running stack.
 # ---------------------------------------------------------------------------
 FROM fetch AS build
 # husky (root `prepare`) has no .git here and nothing to install

@@ -40,6 +40,5 @@ apps/platform/.neon
 
 # Not needed to build an image
 docs
-deploy
 docker
 docker-compose.yml

@@ -144,7 +144,13 @@ services:
     restart: unless-stopped
     logging: *logging
     # TUNNEL_TOKEN comes from tunnel.env. The tunnel's public hostnames point at http://172.30.42.10:80.
-    command: ["tunnel", "--no-autoupdate", "run"]
+    # --loglevel fatal: at error level cloudflared logs the full URL of a request it could
+    # not hand to nginx (while nginx restarts, say), and those URLs carry the reset,
+    # verification, invitation and deposit tokens. So its log is empty unless it cannot
+    # start (a bad token still prints its error). Tunnel health is on the Cloudflare
+    # dashboard; to debug, raise it for a while (deploy/README.md 8.9). The separate
+    # --transport-loglevel no longer does anything in this version.
+    command: ["tunnel", "--no-autoupdate", "--loglevel", "fatal", "run"]
     env_file:
       - ${TD_ENV_DIR:-/srv/tattoo-drip/env}/tunnel.env
     depends_on:
@@ -154,9 +160,11 @@ services:
         # nginx trusts CF-Connecting-IP from this address only (set_real_ip_from).
         ipv4_address: 172.30.42.20
 
-  # One-off. With backup, the only app-side services given the owner's password
-  # (postgres holds it too); web and worker never get it:
+  # One-off. migrate and backup are the only app services given the database owner's
+  # password (postgres itself holds it too); web and worker never get it:
   #   docker compose -f deploy/compose.yml --profile tools run --rm migrate
+  # account:verify (deploy/README.md 4.6) runs through this one-off on purpose: a
+  # "run web" container would ask for web's fixed address, which web itself holds.
   migrate:
     <<: *platform
     profiles:
@@ -192,8 +200,7 @@ services:
 # Private to this stack, with a fixed subnet so nginx, web, storefront and cloudflared
 # have fixed addresses (.10 nginx, .11 web, .12 storefront, .20 cloudflared). The other
 # services get theirs from the upper half (ip_range), so they can never take a fixed
-# address first. Not "internal": cloudflared, web
-# and storefront reach the internet.
+# address first. Not "internal": cloudflared, web and storefront reach the internet.
 networks:
   tattoo_drip:
     ipam:

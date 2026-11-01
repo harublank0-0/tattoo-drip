@@ -1,7 +1,7 @@
 # Production-mode smoke run on a development machine: the real deploy/compose.yml
 # with two changes, applied by deploy/deploy.sh through TD_COMPOSE_FILES:
 #
-#   TD_ENV_DIR=<scratch settings> \
+#   TD_ENV_DIR=<scratch settings> TD_STATE_DIR=<scratch folder> \
 #   TD_COMPOSE_FILES=deploy/compose.yml:deploy/test/compose.smoke.yml \
 #   COMPOSE=podman-compose deploy/deploy.sh HEAD
 #

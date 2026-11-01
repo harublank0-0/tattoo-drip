@@ -78,6 +78,7 @@ expect_lines 'client_header_timeout 15s' 1
 expect_lines 'client_body_timeout 30s' 1
 expect_lines 'send_timeout 30s' 1
 expect_lines 'proxy_read_timeout 130s' 1
+expect_lines 'proxy_connect_timeout 3s' 1
 expect_lines 'proxy_request_buffering on' 1
 expect_lines 'keepalive_timeout 4s' 2 # one in each upstream
 expect_lines 'server 172.30.42.11:3333' 1 # web, by its fixed address (deploy/compose.yml)
