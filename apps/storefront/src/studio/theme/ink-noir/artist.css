@@ -1,0 +1,316 @@
+/*
+ * Ink Noir's artist page (src/studio/theme/ink-noir/artist/). Only classes
+ * that page renders, plus `.ink-artist-page`-scoped rules for the shared
+ * gallery; the label, headings, actions, styles index and closing invitation
+ * are home.css's. Colours are the theme's tokens; nothing is downloaded.
+ * Hover only leans a photo in, and that stops for prefers-reduced-motion.
+ *
+ * Unlayered, so these rules outrank styles.css's layered ones.
+ */
+
+/* ---- The opening ------------------------------------------------------ */
+
+.ink-artist-hero {
+	padding-block: clamp(2rem, 1.5rem + 2vw, 3.5rem) 0;
+}
+.ink-artist-hero-grid {
+	display: grid;
+	gap: 2rem;
+}
+.ink-breadcrumb ol {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	color: var(--ink-muted);
+	font-size: 0.875rem;
+}
+.ink-breadcrumb li {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	min-inline-size: 0;
+	overflow-wrap: anywhere;
+}
+/* The separator is a drawn slash, not a character: nothing for a screen reader to say. */
+.ink-breadcrumb li + li::before {
+	content: "";
+	inline-size: 1px;
+	block-size: 0.875rem;
+	background: var(--line-strong);
+	rotate: 20deg;
+}
+.ink-breadcrumb a {
+	display: inline-flex;
+	align-items: center;
+	min-block-size: 2.75rem;
+	color: var(--ink-muted);
+	text-decoration: underline;
+	text-decoration-color: var(--line-strong);
+	text-underline-offset: 0.25em;
+}
+.ink-breadcrumb a:hover {
+	color: var(--ink);
+	text-decoration-color: var(--stencil);
+}
+.ink-breadcrumb [aria-current] {
+	color: var(--ink);
+}
+
+.ink-artist-hero-portrait {
+	position: relative;
+	margin: 0;
+	aspect-ratio: 4 / 5;
+	overflow: hidden;
+	background: var(--paper-raised);
+}
+.ink-artist-hero-portrait img {
+	display: block;
+	inline-size: 100%;
+	block-size: 100%;
+	object-fit: cover;
+	object-position: 50% 25%;
+}
+.ink-artist-hero-text-col {
+	display: grid;
+	gap: 1.5rem;
+	justify-items: start;
+	align-content: end;
+	min-inline-size: 0;
+}
+.ink-artist-hero-text-col .ink-label {
+	margin: 0;
+}
+.ink-artist-hero-name {
+	position: relative;
+	z-index: 1;
+	margin: 0;
+	color: var(--ink);
+	font-size: clamp(3rem, 1rem + 8vw, 8.5rem);
+	line-height: 0.9;
+	letter-spacing: -0.04em;
+	overflow-wrap: anywhere;
+}
+.ink-artist-hero-meta {
+	margin: 0;
+}
+.ink-open-text {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 0.5rem;
+}
+.ink-open-text::before {
+	content: "";
+	flex: none;
+	inline-size: 0.4375rem;
+	block-size: 0.4375rem;
+	border-radius: 50%;
+	background: var(--stencil);
+	translate: 0 -0.0625rem;
+}
+.ink-artist-links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0 1.5rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+@media (min-width: 60rem) {
+	.ink-artist-hero-grid {
+		grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+		column-gap: clamp(2rem, 4vw, 4rem);
+		align-items: end;
+	}
+	.ink-breadcrumb {
+		grid-column: 1 / -1;
+	}
+	.ink-artist-hero-portrait {
+		grid-column: 2;
+		grid-row: 2;
+	}
+	.ink-artist-hero-text-col {
+		grid-column: 1;
+		grid-row: 2;
+		padding-block-end: 1rem;
+	}
+	/* No portrait: the name takes the whole width. */
+	.ink-artist-hero-text .ink-artist-hero-text-col {
+		grid-column: 1 / -1;
+	}
+}
+
+/* ---- About ------------------------------------------------------------ */
+
+.ink-artist-about-grid {
+	display: grid;
+	gap: 0;
+}
+.ink-artist-bio-lead {
+	margin: 0;
+	max-inline-size: 40rem;
+	color: var(--ink);
+	font-size: clamp(1.25rem, 1.05rem + 0.8vw, 1.625rem);
+	line-height: 1.55;
+}
+@media (min-width: 60rem) {
+	.ink-artist-about-grid {
+		grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+		column-gap: clamp(3rem, 5vw, 5rem);
+		align-items: start;
+	}
+}
+
+/*
+ * ---- The portfolio: the shared paged gallery, uncropped ----------------
+ *
+ * Square cells in rows, each photo drawn whole inside its cell on the raised
+ * surface: a tattoo is never cut to fit. The square is the shared grid's own
+ * (`.work-photo` is 1:1), so every cell has its height before its photo
+ * arrives: nothing shifts, lazy loading stays lazy, and "Show more" only adds
+ * rows below, so no photo already seen moves and the first new one (which
+ * takes focus) starts a row.
+ */
+.ink-artist-page .work-grid {
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.75rem;
+	max-inline-size: none;
+}
+.ink-artist-page .work-open {
+	position: relative;
+	display: block;
+	overflow: hidden;
+	background: var(--paper-raised);
+}
+.ink-artist-page .work-photo {
+	object-fit: contain;
+	background: none;
+	transition: scale 700ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.ink-artist-page .work-open:hover .work-photo,
+.ink-artist-page .work-open:focus-visible .work-photo {
+	scale: 1.03;
+}
+.ink-artist-page .work-open:focus-visible {
+	outline: 2px solid var(--stencil);
+	outline-offset: 3px;
+}
+/* All / Healed as the directory's text filters, not the shared page's filled buttons: ink, heavier and on a rule when current, never colour alone. */
+.ink-artist-page .work-filter-nav {
+	gap: 0.25rem;
+	margin: 0 -0.5rem 1.5rem;
+}
+.ink-artist-page .work-filter-nav a {
+	position: relative;
+	min-block-size: 2.75rem;
+	padding: 0.625rem 0.5rem;
+	border: 0;
+	border-radius: 0;
+	background: none;
+	color: var(--ink-muted);
+	font-size: 0.9375rem;
+	font-weight: 500;
+}
+.ink-artist-page .work-filter-nav a::after {
+	content: "";
+	position: absolute;
+	inset-inline: 0.5rem;
+	inset-block-end: 0.25rem;
+	block-size: 2px;
+	background: var(--stencil);
+	scale: 0 1;
+	transform-origin: left center;
+	transition: scale 200ms ease;
+}
+.ink-artist-page .work-filter-nav a:hover {
+	background: none;
+	color: var(--ink);
+}
+.ink-artist-page .work-filter-nav a[aria-current="page"],
+.ink-artist-page .work-filter-nav a[aria-current="page"]:hover {
+	background: none;
+	color: var(--ink);
+	font-weight: 600;
+}
+.ink-artist-page .work-filter-nav a[aria-current="page"]::after {
+	scale: 1 1;
+}
+.ink-artist-page .work-filter-nav a:focus-visible {
+	outline: 2px solid var(--stencil);
+	outline-offset: -2px;
+}
+@media (min-width: 48rem) {
+	.ink-artist-page .work-grid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}
+
+/* ---- The artists either side ------------------------------------------ */
+
+.ink-neighbours {
+	display: grid;
+	gap: 0;
+	margin-block-start: clamp(4rem, 3rem + 4vw, 6rem);
+	border-block-start: 1px solid var(--line);
+}
+.ink-neighbour {
+	display: grid;
+	gap: 0.375rem;
+	padding-block: 1.5rem;
+	border-block-end: 1px solid var(--line);
+	color: var(--ink);
+	text-decoration: none;
+}
+.ink-neighbour-label {
+	color: var(--ink-muted);
+	font-size: 0.8125rem;
+}
+.ink-neighbour-name {
+	font-family: var(--display-face);
+	font-size: clamp(1.75rem, 1.3rem + 1.8vw, 3rem);
+	font-weight: 700;
+	line-height: 1.05;
+	letter-spacing: -0.02em;
+	overflow-wrap: anywhere;
+	transition: color 200ms ease;
+}
+.ink-neighbour:hover .ink-neighbour-name,
+.ink-neighbour:focus-visible .ink-neighbour-name {
+	color: var(--stencil);
+}
+.ink-neighbour:focus-visible {
+	outline: 2px solid var(--stencil);
+	outline-offset: 2px;
+}
+@media (min-width: 48rem) {
+	.ink-neighbours {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		column-gap: 2rem;
+	}
+	.ink-neighbour {
+		border-block-end: 0;
+	}
+	/* The next artist sits on the right even when there is no previous one. */
+	.ink-neighbour-next {
+		grid-column: 2;
+		justify-items: end;
+		text-align: end;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.ink-artist-page .work-filter-nav a::after {
+		transition: none;
+	}
+	.ink-artist-page .work-photo,
+	.ink-neighbour-name {
+		transition: none;
+	}
+	.ink-artist-page .work-open:hover .work-photo,
+	.ink-artist-page .work-open:focus-visible .work-photo {
+		scale: none;
+	}
+}

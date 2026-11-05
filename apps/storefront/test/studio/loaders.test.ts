@@ -595,10 +595,12 @@ describe("loadArtistPage", () => {
 			"artist",
 			"chat",
 			"flash",
+			"neighbours",
 			"portfolio",
 			"requestLink",
 			"seo",
 			"studio",
+			"styles",
 			"theme",
 		]);
 	});

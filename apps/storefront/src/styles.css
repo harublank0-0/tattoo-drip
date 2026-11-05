@@ -6,6 +6,8 @@
 @import './studio/theme/ink-noir/home.css';
 /* Ink Noir's artists directory (src/studio/theme/ink-noir/artists/). */
 @import './studio/theme/ink-noir/artists.css';
+/* Ink Noir's artist page (src/studio/theme/ink-noir/artist/). */
+@import './studio/theme/ink-noir/artist.css';
 @plugin '@tailwindcss/typography';
 
 /*
