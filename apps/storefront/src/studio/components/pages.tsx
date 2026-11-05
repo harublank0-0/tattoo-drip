@@ -345,7 +345,7 @@ function PortfolioSection({
 }
 
 /**
- * `/work` (TAT-126): every visible artist's photos, newest first, narrowed by
+ * `/gallery` (TAT-126): every visible artist's photos, newest first, narrowed by
  * the address (artist, style, healed) and shown a page at a time. The site bar
  * and the studio block are the artist page's.
  */

@@ -39,8 +39,8 @@ export function ArtistAbout({ artist }: { artist: ArtistView }) {
 
 /**
  * The styles the artist lists, as large names on hairlines, each a link to
- * the gallery filtered by that style and this artist (`/work?artist=&style=`,
- * which /work already reads). Nothing when they list none.
+ * the gallery filtered by that style and this artist (`/gallery?artist=&style=`,
+ * which /gallery already reads). Nothing when they list none.
  */
 export function ArtistSpecialties({
 	artist,

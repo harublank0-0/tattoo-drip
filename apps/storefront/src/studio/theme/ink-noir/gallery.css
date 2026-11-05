@@ -142,6 +142,16 @@
 .ink-collection-status {
 	margin: 0;
 }
+/* "Clear search" as a button for a search only typed: it reads as the link it replaces. */
+.ink-clear-search {
+	min-block-size: 2.75rem;
+	padding: 0;
+	border: 0;
+	background: none;
+	font-family: inherit;
+	font-size: inherit;
+	cursor: pointer;
+}
 
 /*
  * ---- The collection: justified rows, every photo whole -------------------
@@ -330,7 +340,7 @@
 .ink-piece-meta a {
 	display: inline-flex;
 	align-items: center;
-	min-block-size: 2rem;
+	min-block-size: 2.75rem;
 	color: var(--ink-muted);
 	text-decoration: none;
 	overflow-wrap: anywhere;

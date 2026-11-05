@@ -40,7 +40,7 @@ export interface NavItem {
  * studio shows that section on its page (a studio that hides its roster or
  * its flash has nothing to point at there), and Artists only while an artist
  * is visible (with none the directory only says so); Home and Gallery
- * (/work) always.
+ * (/gallery) always.
  */
 export function navItems(
 	sections: readonly SectionKey[],

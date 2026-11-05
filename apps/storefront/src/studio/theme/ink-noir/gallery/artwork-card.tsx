@@ -16,7 +16,14 @@ import { pieceSizes, shapeClass } from "./sizes.ts";
  * photo's `openId`, so "Show more" can put the keyboard on the first new
  * piece. Nothing for a photo without its own page.
  */
-export function ArtworkCard({ photo }: { photo: GalleryPhotoView }) {
+export function ArtworkCard({
+	photo,
+	withId = true,
+}: {
+	photo: GalleryPhotoView;
+	/** Whether the link carries the photo's `openId` (the gallery's, for "Show more"); related pieces don't: their numbers can repeat the page's own. */
+	withId?: boolean;
+}) {
 	if (!photo.href || !isAllowedHref(photo.href)) return null;
 	const artist =
 		photo.artist && isAllowedHref(photo.artist.href) ? photo.artist : null;
@@ -25,7 +32,7 @@ export function ArtworkCard({ photo }: { photo: GalleryPhotoView }) {
 			<RouterAnchor
 				className="ink-piece-link"
 				href={photo.href}
-				id={photo.openId}
+				id={withId ? photo.openId : undefined}
 			>
 				<span className="ink-piece-frame">
 					<img
@@ -62,11 +69,13 @@ export function ArtworkCard({ photo }: { photo: GalleryPhotoView }) {
 	);
 }
 
-/** Pieces as the collection's justified rows; nothing for none. */
+/** Pieces as the collection's justified rows; nothing for none. `withIds` as ArtworkCard's `withId`. */
 export function ArtworkRows({
 	photos,
+	withIds = true,
 }: {
 	photos: readonly GalleryPhotoView[];
+	withIds?: boolean;
 }) {
 	if (photos.length === 0) return null;
 	return (
@@ -74,7 +83,11 @@ export function ArtworkRows({
 		// biome-ignore lint/a11y/noRedundantRoles: redundant for the spec, needed for WebKit with list-style: none
 		<ul className="ink-collection" role="list">
 			{photos.map((photo) => (
-				<ArtworkCard key={photo.href ?? photo.openId} photo={photo} />
+				<ArtworkCard
+					key={photo.href ?? photo.openId}
+					photo={photo}
+					withId={withIds}
+				/>
 			))}
 		</ul>
 	);

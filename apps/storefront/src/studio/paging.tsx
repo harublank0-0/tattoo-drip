@@ -48,13 +48,18 @@ export function PagedGallery({
 	const [photos, setPhotos] = useState(first.photos);
 	const [cursor, setCursor] = useState(first.nextCursor);
 	const [status, setStatus] = useState<Status>("idle");
-	const [focusId, setFocusId] = useState<string | null>(null);
+	const [focusIds, setFocusIds] = useState<readonly string[] | null>(null);
 
 	// The photos just added are below the link that was clicked: put the
-	// keyboard on the first of them, or it would be left on the link.
+	// keyboard on the first of them, or it would be left on the link (and lost
+	// with it on the last page). A theme's layout may leave some out (Ink
+	// Noir's search shows only the matching), so the first that is there.
 	useEffect(() => {
-		if (focusId) document.getElementById(focusId)?.focus();
-	}, [focusId]);
+		focusIds
+			?.map((id) => document.getElementById(id))
+			.find((element) => element !== null)
+			?.focus();
+	}, [focusIds]);
 
 	async function showMore(event: MouseEvent<HTMLAnchorElement>) {
 		// A new tab, window or download is the link's own business.
@@ -68,7 +73,9 @@ export function PagedGallery({
 			setPhotos((shown) => [...shown, ...next.photos]);
 			setCursor(next.nextCursor);
 			setStatus("idle");
-			if (next.photos.length > 0) setFocusId(next.photos[0].openId);
+			if (next.photos.length > 0) {
+				setFocusIds(next.photos.map((photo) => photo.openId));
+			}
 		} catch {
 			setStatus("failed");
 		}

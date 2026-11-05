@@ -1,6 +1,8 @@
-import { fill } from "../intake/template.ts";
-import { studioCopy } from "./copy.ts";
-import type { GalleryPhotoView, GalleryView } from "./gallery.ts";
+import {
+	artworkTitle,
+	type GalleryPhotoView,
+	type GalleryView,
+} from "./gallery.ts";
 import { requestHref } from "./links.ts";
 import { type ArtistView, findArtist, type StudioView } from "./view-model.ts";
 
@@ -35,17 +37,8 @@ export interface ArtworkView {
 	readonly artist: ArtistView | null;
 }
 
-/** A piece's title (artworkView's rule): for the page, its head and every card that links to it. */
-export function artworkTitle(photo: GalleryPhotoView): string {
-	if (photo.caption) return photo.caption;
-	const style = photo.styles[0];
-	const name = photo.artist?.name;
-	const words = studioCopy.artwork;
-	if (style && name) return fill(words.styleBy, { style, name });
-	if (name) return fill(words.by, { name });
-	if (style) return fill(words.style, { style });
-	return words.untitled;
-}
+/** A piece's title (gallery.ts's artworkTitle), for the page, its head and every card that links to it. */
+export { artworkTitle } from "./gallery.ts";
 
 /** The piece's view: the photo (with an id: galleryPhotoView refuses one without) and its artist from the visible list. */
 export function artworkView(

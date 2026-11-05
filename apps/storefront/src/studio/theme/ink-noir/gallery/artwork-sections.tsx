@@ -263,7 +263,7 @@ export function RelatedArtwork({
 						{copy.related.all}
 					</RouterAnchor>
 				</div>
-				<ArtworkRows photos={related} />
+				<ArtworkRows photos={related} withIds={false} />
 			</div>
 		</section>
 	);

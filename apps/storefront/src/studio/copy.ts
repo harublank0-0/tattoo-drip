@@ -106,7 +106,7 @@ export const studioCopy = {
 	 */
 	/**
 	 * The site navigation of themes that have one (Ink Noir's header, menu and
-	 * footer). Each label names a page that exists: Gallery is /work, Artists
+	 * footer). Each label names a page that exists: Gallery is /gallery, Artists
 	 * the studio page's roster.
 	 */
 	nav: {

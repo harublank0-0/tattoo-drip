@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Fill } from "../../../../intake/components/fill.tsx";
 import { RouterAnchor } from "../../../components/router-anchor.tsx";
 import {
@@ -40,7 +40,17 @@ export function ArtworkCollection({
 	more?: MoreWork;
 }) {
 	const [query, setQuery] = useState(search.q ?? "");
+	const field = useRef<HTMLInputElement>(null);
 	const text = query.trim();
+	// A search only typed is cleared here, and the keyboard goes back to the
+	// field; one in the address is cleared by a link (also without JavaScript).
+	const clear =
+		search.q === undefined
+			? () => {
+					setQuery("");
+					field.current?.focus();
+				}
+			: null;
 	return (
 		<div className="ink-container ink-collection-wrap">
 			{/* biome-ignore lint/a11y/useSemanticElements: a form with the search role is the pattern; <search> is not supported by the browsers we serve */}
@@ -62,6 +72,7 @@ export function ArtworkCollection({
 					{copy.search.field}
 				</label>
 				<input
+					ref={field}
 					id="ink-gallery-q"
 					className="ink-search-input"
 					type="search"
@@ -88,6 +99,7 @@ export function ArtworkCollection({
 						query={text}
 						hasMore={hasMore}
 						clearHref={workHref({ ...search, q: undefined, cursor: undefined })}
+						onClear={clear}
 					/>
 				)}
 			/>
@@ -101,11 +113,14 @@ function Matches({
 	query,
 	hasMore,
 	clearHref,
+	onClear,
 }: {
 	photos: readonly GalleryPhotoView[];
 	query: string;
 	hasMore: boolean;
 	clearHref: string;
+	/** Clears a search that is not in the address; null when it is (the link clears it). */
+	onClear: (() => void) | null;
 }) {
 	const shown = photos.filter((photo) => matchesSearch(photo, query));
 	const n = photos.length;
@@ -139,13 +154,19 @@ function Matches({
 						<Fill template={copy.empty.searched} values={{ q: query }} />
 					</p>
 					<p>
-						<RouterAnchor
-							className="ink-link"
-							href={clearHref}
-							resetScroll={false}
-						>
-							{copy.search.clear}
-						</RouterAnchor>
+						{onClear ? (
+							<button
+								type="button"
+								className="ink-link ink-clear-search"
+								onClick={onClear}
+							>
+								{copy.search.clear}
+							</button>
+						) : (
+							<RouterAnchor className="ink-link" href={clearHref}>
+								{copy.search.clear}
+							</RouterAnchor>
+						)}
 					</p>
 				</div>
 			)}

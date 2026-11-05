@@ -642,3 +642,35 @@ describe("gallery.css", () => {
 		assert.match(reduced, /\.ink-piece-photo/);
 	});
 });
+
+describe("review fixes (Prompt 5)", () => {
+	test("the tattoo page's ids are each once when its related pieces start elsewhere", () => {
+		// The style read starts after the piece: its first photo is numbered 1, as the piece is.
+		const later = page(5);
+		const reads = [{ ...later, data: later.data.slice(1) }, null, null];
+		const html = artworkHtml(artwork({ reads }));
+		const seen = ids(html);
+		assert.deepEqual(seen, [...new Set(seen)], "every id once");
+		assert.equal((html.match(/class="ink-piece /g) ?? []).length, 4);
+	});
+
+	test("a piece without a description is found by the title it shows", () => {
+		const [, plain] = galleryView(page(2), IMAGE_ORIGIN).photos;
+		assert.ok(matchesSearch(plain, "tattoo by sita"));
+	});
+
+	test("the page's one photo has no number in its description", () => {
+		const data = artwork({ photo: page(2).data[1] });
+		assert.equal(data.artwork.photo.alt, "Tattoo by Sita Rai");
+		assert.equal(data.seo.image?.alt, "Tattoo by Sita Rai");
+	});
+
+	test("Clear search is a link while the search is in the address", () => {
+		const html = mainOf(galleryHtml(gallery(page(2), { q: "rose" })));
+		assert.match(
+			html,
+			/<a class="ink-link" href="\/gallery">Clear search<\/a>/,
+		);
+		assert.doesNotMatch(html, /ink-clear-search/);
+	});
+});

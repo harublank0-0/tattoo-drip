@@ -132,7 +132,16 @@ export function galleryPhotoView(
 	const image = readBrandImage(item, imageOrigin);
 	if (!image) return null;
 	const photo = shownPhoto(item, image, 1);
-	return photo.id ? photo : null;
+	if (!photo.id) return null;
+	// The page's one photo: no number in its description.
+	return photo.caption
+		? photo
+		: {
+				...photo,
+				alt: photo.artist
+					? fill(studioCopy.artwork.by, { name: photo.artist.name })
+					: studioCopy.artwork.untitled,
+			};
 }
 
 /** A photo the brand images' rule kept, numbered `n` (the dialog and button ids, the label and the fallback description). */
@@ -171,16 +180,32 @@ export function readPhotoId(value: unknown): string | null {
 }
 
 /**
+ * A piece's title: the studio's own description, else built from its first
+ * style and its artist ("Fine line tattoo by Sita Rai"), never invented.
+ */
+export function artworkTitle(photo: GalleryPhotoView): string {
+	if (photo.caption) return photo.caption;
+	const style = photo.styles[0];
+	const name = photo.artist?.name;
+	const words = studioCopy.artwork;
+	if (style && name) return fill(words.styleBy, { style, name });
+	if (name) return fill(words.by, { name });
+	if (style) return fill(words.style, { style });
+	return words.untitled;
+}
+
+/**
  * Whether a photo answers the gallery's search text: every word of `query`
- * is in its description, one of its style names or its artist's name,
- * ignoring case and accents. The API has no text search, so this runs on the
+ * is in its title (artworkTitle: its description, else the one built from
+ * its data), one of its style names or its artist's name, ignoring case and
+ * accents. The API has no text search, so this runs on the
  * photos a page has loaded; an empty query matches everything. Pure.
  */
 export function matchesSearch(photo: GalleryPhotoView, query: string): boolean {
 	const words = folded(query).split(/\s+/).filter(Boolean);
 	if (words.length === 0) return true;
 	const text = folded(
-		[photo.caption ?? "", ...photo.styles, photo.artist?.name ?? ""].join(" "),
+		[artworkTitle(photo), ...photo.styles, photo.artist?.name ?? ""].join(" "),
 	);
 	return words.every((word) => text.includes(word));
 }

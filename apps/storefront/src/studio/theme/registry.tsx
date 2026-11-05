@@ -105,7 +105,7 @@ export function ThemedArtistsPage(props: ComponentProps<typeof ArtistsPage>) {
 	return <theme.ArtistsPage {...props} Shell={theme.Shell} />;
 }
 
-/** `/work` in the studio's theme. */
+/** `/gallery` in the studio's theme. */
 export function ThemedWorkPage(props: ComponentProps<typeof WorkPage>) {
 	const theme = themeFor(props.data.theme.key);
 	return <theme.WorkPage {...props} Shell={theme.Shell} />;
