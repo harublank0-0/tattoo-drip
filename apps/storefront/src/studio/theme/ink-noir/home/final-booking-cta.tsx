@@ -77,7 +77,7 @@ export function FinalBookingCta({
 							</ol>
 						</>
 					) : (
-						<p className="ink-close-line">
+						<p className="ink-close-detail">
 							<Fill
 								template={studioCopy.request.closedDescription}
 								values={{ who: state.studioName }}

@@ -39,14 +39,14 @@ export function StudioExperience({
 		rows.push({
 			label: labels.hours,
 			body: (
-				<Lines>
+				<VisitLines>
 					{view.hours.map((line) => (
 						<li key={line.days}>
 							<span className="ink-when">{line.days}</span>{" "}
 							<span>{line.hours}</span>
 						</li>
 					))}
-				</Lines>
+				</VisitLines>
 			),
 		});
 	}
@@ -54,7 +54,7 @@ export function StudioExperience({
 		rows.push({
 			label: labels.closedDays,
 			body: (
-				<Lines>
+				<VisitLines>
 					{view.closedDays.map((day, index) => (
 						// The list never reorders in the browser: the index is stable.
 						// biome-ignore lint/suspicious/noArrayIndexKey: two entries may read the same
@@ -69,7 +69,7 @@ export function StudioExperience({
 							)}
 						</li>
 					))}
-				</Lines>
+				</VisitLines>
 			),
 		});
 	}
@@ -151,7 +151,7 @@ export function StudioExperience({
 }
 
 /** A few lines in a row: a plain list with no bullets, so WebKit needs its role back. */
-function Lines({ children }: { children: ReactNode }) {
+function VisitLines({ children }: { children: ReactNode }) {
 	return (
 		// biome-ignore lint/a11y/useSemanticElements: it is a <ul>; the role repairs WebKit's reading of list-style: none
 		// biome-ignore lint/a11y/noRedundantRoles: redundant for the spec, needed for WebKit with list-style: none

@@ -41,8 +41,8 @@ export const inkNoirHomeCopy = {
 		eyebrow: "Portfolio",
 		title: "Selected work",
 		all: "View full gallery",
-		emptyTitle: "New work is on its way.",
-		emptyLine: "{studio} hasn't published photos here yet.",
+		/** Also what a failed gallery read shows, so it claims nothing about the studio. */
+		emptyTitle: "No photos to show here yet.",
 		follow: "See the latest on Instagram",
 	},
 	artists: {
@@ -70,7 +70,8 @@ export const inkNoirHomeCopy = {
 		lines: ["Your next story", "starts here."],
 		line: "Have an idea? Let's bring it to life.",
 		closedEyebrow: "Inquiries",
-		closedLines: ["Books are", "closed for now."],
+		/** The studio's own switch is off; an artist may still take requests (the artists section says so). */
+		closedLines: ["Not taking", "new inquiries."],
 		exploreArtists: "Explore the artists",
 		exploreWork: "Explore the work",
 	},

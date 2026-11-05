@@ -1,4 +1,3 @@
-import { Fill } from "../../../../intake/components/fill.tsx";
 import { PhotoDialog } from "../../../components/gallery.tsx";
 import { RouterAnchor } from "../../../components/router-anchor.tsx";
 import type { GalleryPhotoView } from "../../../gallery.ts";
@@ -19,9 +18,10 @@ const copy = inkNoirHomeCopy.work;
  * hover and focus where there is a pointer, always on a touch screen, and
  * always part of the button's name. "View full gallery" leads to /work.
  *
- * With no photos (the studio shows the section but has published none) it
- * says so and points to its Instagram when it has one, rather than show
- * anyone else's work. The `recent-work` id keeps old `/#recent-work` links
+ * With no photos it says there are none to show and points to the studio's
+ * Instagram when it has one, rather than show anyone else's work. It does
+ * not say the studio has published none: a failed gallery read also comes
+ * here as no photos (loadStudioPage). The `recent-work` id keeps old `/#recent-work` links
  * landing here.
  */
 export function FeaturedWork({
@@ -106,12 +106,6 @@ export function FeaturedWork({
 				) : (
 					<div className="ink-work-empty">
 						<p className="ink-work-empty-title">{copy.emptyTitle}</p>
-						<p>
-							<Fill
-								template={copy.emptyLine}
-								values={{ studio: studio.name }}
-							/>
-						</p>
 						{instagram ? (
 							<p>
 								<a

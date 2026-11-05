@@ -231,9 +231,11 @@ describe("the featured work", () => {
 		);
 	});
 
-	test("with no photos says so, and shows nobody else's work", () => {
+	test("with no photos says there are none to show, and shows nobody else's work", () => {
 		const page = html(inkNoir(), [SITA, ARJUN]);
-		assert.match(page, /New work is on its way\./);
+		assert.match(page, /No photos to show here yet\./);
+		// A failed gallery read reaches the page as no photos too: claim nothing about the studio.
+		assert.doesNotMatch(page, /hasn&#x27;t published|hasn't published/);
 		assert.doesNotMatch(page, /class="ink-tile/);
 		assert.doesNotMatch(page, /View full gallery/);
 		assert.match(page, /href="https:\/\/instagram\.com\/blackneedle"/);
@@ -282,6 +284,21 @@ describe("the artists", () => {
 			/<span class="ink-artist-initial" aria-hidden="true">अ<\/span>/,
 		);
 		assert.match(page, /Books open in March\./);
+	});
+
+	test("a lone artist's portrait is shown once: in the artists section, not beside the introduction", () => {
+		const solo = { ...STUDIO, type: "independent" as const };
+		const page = html(inkNoir(solo), [SITA]);
+		assert.equal(page.split(` src="${SITA.photo?.url}"`).length - 1, 1);
+		assert.equal(inkNoirHome(data(inkNoir(solo), [SITA])).introPhoto, null);
+		// With the artists hidden, the introduction may show it instead.
+		const hidden = inkNoirHome(
+			data(inkNoir(solo, ["work", "inquiry"]), [SITA]),
+		);
+		assert.equal(hidden.introPhoto?.src, SITA.photo?.url);
+		// And a newest photo nobody else shows comes first.
+		const withWork = inkNoirHome(data(inkNoir(solo), [SITA], 9));
+		assert.notEqual(withWork.introPhoto?.src, SITA.photo?.url);
 	});
 
 	test("give one artist the whole width, with their portfolio", () => {
@@ -403,6 +420,8 @@ describe("the studio's sections", () => {
 			/<bdi>Black Needle<\/bdi> isn&#x27;t taking new inquiries right now\./,
 		);
 		assert.doesNotMatch(closed, /class="ink-steps"/);
+		// The studio's own switch is off, but an artist may still take requests: no "books are closed".
+		assert.doesNotMatch(closed, /[Bb]ooks are/);
 	});
 });
 

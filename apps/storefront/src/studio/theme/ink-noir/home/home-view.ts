@@ -12,9 +12,10 @@ import type { SectionKey } from "../../config.ts";
 /**
  * What Ink Noir's home page shows, worked out from the studio page's data
  * (loadStudioPage: no read of its own). Pure. Every photo shown is the
- * studio's own, each at most once on the page: the cover, else a large enough
- * portfolio photo, opens the page; the next ones are the featured work; the
- * one after that sits beside the introduction. Nothing here is invented: a
+ * studio's own. The large ones appear once each: the cover, else a large
+ * enough portfolio photo, opens the page; the next ones are the featured
+ * work; the one after that sits beside the introduction. (The styles index
+ * reuses the newest photos as small previews.) Nothing here is invented: a
  * part without data is null or empty, and the component leaves it out.
  */
 
@@ -54,7 +55,7 @@ export interface InkNoirHome {
 	readonly hero: HeroImage | null;
 	/** The photos of the featured work, at most FEATURED_COUNT. */
 	readonly featured: readonly GalleryPhotoView[];
-	/** The photo beside the introduction: a single artist's portrait, else an unused work photo. */
+	/** The photo beside the introduction: an unused work photo, else a lone artist's portrait the page doesn't show elsewhere. */
 	readonly introPhoto: HomePhoto | null;
 	readonly styles: readonly StyleEntry[];
 	/** The sections to render after the hero and introduction, in order. */
@@ -74,7 +75,7 @@ export function inkNoirHome(data: StudioPageData): InkNoirHome {
 	return {
 		hero,
 		featured,
-		introPhoto: introPhoto(data, recent, used),
+		introPhoto: introPhoto(data, recent, used, shown.has("artists")),
 		styles: styleEntries(recent, data.recentWork.styles, artists),
 		sections: homeSections(data.theme.sections),
 	};
@@ -101,19 +102,21 @@ function heroImage(
 }
 
 /**
- * Beside the introduction: an independent artist's (or a lone artist's)
- * portrait, who is the studio; else the first newest photo not already on
- * the page; else null, and the introduction is text alone.
+ * Beside the introduction: the first newest photo not already on the page;
+ * else a lone artist's portrait (an independent artist is the studio), but
+ * only while the artists section is hidden, since that section shows it large;
+ * else null, and the introduction is text alone.
  */
 function introPhoto(
 	data: StudioPageData,
 	recent: readonly GalleryPhotoView[],
 	used: ReadonlySet<string | null>,
+	artistsShown: boolean,
 ): HomePhoto | null {
-	const lone = data.artists.length === 1 ? data.artists[0] : null;
-	if (lone?.photo) return portrait(lone.photo);
 	const unused = recent.find((photo) => !used.has(photo.src));
-	return unused ? photoOf(unused, unused.alt) : null;
+	if (unused) return photoOf(unused, unused.alt);
+	const lone = data.artists.length === 1 ? data.artists[0] : null;
+	return lone?.photo && !artistsShown ? portrait(lone.photo) : null;
 }
 
 function portrait(photo: ArtistPhoto): HomePhoto {
@@ -153,7 +156,8 @@ export function styleEntries(
 			artists: { name: string; href: string }[];
 		}
 	>();
-	const key = (name: string) => name.toLocaleLowerCase();
+	// Not toLocaleLowerCase: the server's and the browser's locales may differ.
+	const key = (name: string) => name.toLowerCase();
 	for (const style of galleryStyles) {
 		if (entries.has(key(style.name))) continue;
 		entries.set(key(style.name), {
