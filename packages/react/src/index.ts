@@ -12,6 +12,7 @@ export {
 	useStyles,
 	useSubmitDepositProof,
 	useWork,
+	useWorkPhoto,
 } from "./hooks.js";
 export {
 	TattooProvider,

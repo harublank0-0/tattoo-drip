@@ -6,6 +6,7 @@ import type {
 	DepositPaymentMethod,
 	FlashDesign,
 	FlashPage,
+	GalleryPhoto,
 	InquiryInput,
 	InquiryReceipt,
 	ListAvailabilityQuery,
@@ -206,6 +207,16 @@ export function createTattooClient(options: TattooClientOptions) {
 			 */
 			list: (query?: ListWorkQuery, call?: RequestOptions) =>
 				request<WorkPage>(withQuery(`${tenantRoot}/work`, query), {}, call),
+			/**
+			 * One photo by its `id`, as the gallery lists it. A hidden or deleted
+			 * artist's, a removed photo, an unknown id and another studio's are a
+			 * 404 TattooApiError (`not_found`).
+			 */
+			get: (id: string, call?: RequestOptions) =>
+				getData<GalleryPhoto>(
+					`${tenantRoot}/work/${encodeURIComponent(id)}`,
+					call,
+				),
 		},
 		flash: {
 			/**

@@ -90,6 +90,8 @@ export type ShownWorkPhoto = ShownImage & { alt: string | null };
 
 /** A photo of the gallery as the public API shows it (openapi.yaml, GalleryPhoto). */
 export type ShownGalleryPhoto = ShownWorkPhoto & {
+	/** The photo's id: `getWorkPhoto` takes it, and the page's cursor already carries it. */
+	id: string;
 	styles: TattooStyleRef[];
 	healed: boolean;
 	artist: { slug: string; name: string };
@@ -288,17 +290,12 @@ export default class StudioPageService {
 		const owners = new Map(artists.map((artist) => [artist.id, artist]));
 		return {
 			photos: await Promise.all(
-				photos.map(async (photo) => {
+				photos.map((photo) => {
 					const owner = owners.get(photo.artistId);
 					if (!owner) {
 						throw new Error(`Work photo ${photo.id} is of an artist not read`);
 					}
-					return {
-						...(await this.shownWorkPhoto(tenant, photo)),
-						styles: knownStyles(photo.styles),
-						healed: photo.healed,
-						artist: { slug: owner.slug, name: owner.name },
-					};
+					return this.shownGalleryPhoto(tenant, photo, owner);
 				}),
 			),
 			nextCursor: next ? encodeWorkCursor(next) : null,
@@ -307,6 +304,28 @@ export default class StudioPageService {
 				healed: facets.healed,
 			},
 		};
+	}
+
+	/**
+	 * One photo of a visible artist's work, as the gallery shows it; null for
+	 * a hidden or deleted artist's, a removed or unknown photo and another
+	 * studio's (the API's 404). The visible artists are one read, the photo
+	 * another.
+	 */
+	async workPhoto(
+		tenant: Tenant,
+		id: string,
+	): Promise<ShownGalleryPhoto | null> {
+		const visible = await this.artists.listVisible(tenant);
+		const photo = await this.workPhotos.findShown(
+			tenant,
+			id,
+			visible.map((artist) => artist.id),
+		);
+		if (!photo) return null;
+		const owner = visible.find((artist) => artist.id === photo.artistId);
+		if (!owner) return null;
+		return this.shownGalleryPhoto(tenant, photo, owner);
 	}
 
 	/**
@@ -436,6 +455,20 @@ export default class StudioPageService {
 			),
 			styles: knownStyles(artist.styles),
 			socialLinks: socialLinks(artist),
+		};
+	}
+
+	private async shownGalleryPhoto(
+		tenant: Tenant,
+		photo: ArtistWorkPhoto,
+		artist: Artist,
+	): Promise<ShownGalleryPhoto> {
+		return {
+			...(await this.shownWorkPhoto(tenant, photo)),
+			id: photo.id,
+			styles: knownStyles(photo.styles),
+			healed: photo.healed,
+			artist: { slug: artist.slug, name: artist.name },
 		};
 	}
 

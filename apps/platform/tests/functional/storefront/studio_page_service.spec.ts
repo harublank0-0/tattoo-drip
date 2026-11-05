@@ -670,12 +670,13 @@ test.group("StudioPageService.work (TAT-126)", (group) => {
 			],
 			healed: true,
 		});
-		// The photos carry only the shown fields, not the row or its cursor.
+		// The photos carry only the shown fields (the id is getWorkPhoto's), not the row or its cursor.
 		assert.deepEqual(Object.keys(page.photos[0]).sort(), [
 			"alt",
 			"artist",
 			"healed",
 			"height",
+			"id",
 			"styles",
 			"url",
 			"variants",

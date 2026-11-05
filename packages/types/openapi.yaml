@@ -271,6 +271,42 @@ paths:
         "429": { $ref: "#/components/responses/RateLimited" }
         default: { $ref: "#/components/responses/Error" }
 
+  /tenants/{tenant}/work/{photo}:
+    parameters:
+      - $ref: "#/components/parameters/Tenant"
+      - name: photo
+        in: path
+        required: true
+        description: A photo's `id` (`listWork`)
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getWorkPhoto
+      tags: [MVP]
+      summary: One photo of a visible artist's work
+      description: |
+        The same photo `listWork` shows, with its styles, healed mark and
+        artist. A hidden or deleted artist's photo, a removed photo, an
+        unknown id and another studio's photo are all a 404. Cacheable.
+        Under an old studio slug it answers like under the current one.
+      responses:
+        "200":
+          description: The photo
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            ETag: { $ref: "#/components/headers/ETag" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data: { $ref: "#/components/schemas/GalleryPhoto" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
   /tenants/{tenant}/flash:
     parameters:
       - $ref: "#/components/parameters/Tenant"
@@ -1161,12 +1197,19 @@ components:
     GalleryPhoto:
       type: object
       description: |
-        A photo in the studio's gallery (`listWork`): a `WorkPhoto` with its
-        styles, its healed mark and whose work it is. Every property is
-        always there. All text is plain text: render it as text.
-      required: [url, width, height, alt, variants, styles, healed, artist]
+        A photo in the studio's gallery (`listWork`, `getWorkPhoto`): a
+        `WorkPhoto` with its id, its styles, its healed mark and whose work
+        it is. Every property is always there. All text is plain text:
+        render it as text.
+      required: [id, url, width, height, alt, variants, styles, healed, artist]
       additionalProperties: false
       properties:
+        id:
+          type: string
+          format: uuid
+          description: |
+            What `getWorkPhoto` takes: the photo's own page. The same id the
+            page's `nextCursor` already carries, so it reveals nothing new.
         url:
           type: string
           format: uri

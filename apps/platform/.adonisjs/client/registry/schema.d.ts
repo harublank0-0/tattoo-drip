@@ -1423,6 +1423,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_work_controller').default['index']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
+  'api.v1.work.show': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/tenants/:tenant/work/:photo'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; photo: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_work_controller').default['show']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_work_controller').default['show']>>>
+    }
+  }
   'api.v1.flash.index': {
     methods: ["GET","HEAD"]
     pattern: '/api/v1/tenants/:tenant/flash'

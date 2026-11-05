@@ -108,6 +108,15 @@ export const publicIsolationCases: PublicIsolationCase[] = [
 	},
 	{
 		method: "GET",
+		pattern: "/api/v1/tenants/:tenant/work/:photo",
+		// B's photo id under A's slug must be the 404.
+		params: (studio) => ({ photo: studio.workPhoto.id }),
+		ownStatus: 200,
+		ownMarkers: (own) => [own.workPhoto.id, own.artistProfile.name],
+		snapshot: workPhotoRows,
+	},
+	{
+		method: "GET",
 		pattern: "/api/v1/tenants/:tenant/flash",
 		// twoStudios seeds one shown design of artistProfile in each studio,
 		// named after the studio: its id shows the answer is A's.

@@ -206,6 +206,28 @@ describe("tattooQueries.services, work and availability", () => {
 		assert.equal(tattooQueries.flashDesign(client, id).staleTime, undefined);
 	});
 
+	test("a work photo has its own key under the tenant and loads through the SDK", async () => {
+		const id = "0199f000-0000-7000-8000-000000000002";
+		const photo = clientAnswering(200, { data: { id } });
+		const tenant = tattooKeys.tenant(TENANT);
+		assert.deepEqual(tattooQueries.workPhoto(photo.client, id).queryKey, [
+			...tenant,
+			"work-photo",
+			id,
+		]);
+		assert.equal(
+			tattooQueries.workPhoto(photo.client, id).staleTime,
+			undefined,
+		);
+		assert.deepEqual(
+			await noRetries().fetchQuery(tattooQueries.workPhoto(photo.client, id)),
+			{ id },
+		);
+		assert.deepEqual(photo.calls, [
+			`https://api.example.com/api/v1/tenants/${TENANT}/work/${id}`,
+		]);
+	});
+
 	test("flash and a flash design load through the SDK", async () => {
 		const page = { data: [], nextCursor: null, filters: { artists: [] } };
 		const flash = clientAnswering(200, page);

@@ -649,11 +649,19 @@ router
 				// (a closed artist's too), newest first, a page at a time. Only the
 				// query string is read; a refused parameter or cursor is the 422
 				// validation_failed, and an artist or style that matches nothing is
-				// an empty page.
+				// an empty page. And one photo: a hidden or deleted artist's, a
+				// removed photo, an unknown id and another studio's are the
+				// handler's 404; an id that is not a UUID is the router's, without a
+				// query.
 				router
 					.get("/work", [controllers.PublicWork, "index"])
 					.use(middleware.publicCache())
 					.as("api.v1.work.index");
+				router
+					.get("/work/:photo", [controllers.PublicWork, "show"])
+					.where("photo", router.matchers.uuid())
+					.use(middleware.publicCache())
+					.as("api.v1.work.show");
 				// The studio's flash (TAT-129): every shown design of every visible
 				// artist (a closed artist's too), newest first, a page at a time,
 				// like the gallery; and one design. A hidden design, a hidden or

@@ -29,6 +29,11 @@ export function useWork(query?: ListWorkQuery) {
 	return useQuery(tattooQueries.work(useTattooClient(), query));
 }
 
+/** One photo of the studio's work by id (`client.work.get`). */
+export function useWorkPhoto(id: string) {
+	return useQuery(tattooQueries.workPhoto(useTattooClient(), id));
+}
+
 /** A page of the studio's flash designs (`client.flash.list`). */
 export function useFlash(query?: ListFlashQuery) {
 	return useQuery(tattooQueries.flash(useTattooClient(), query));

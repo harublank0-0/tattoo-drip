@@ -1099,6 +1099,34 @@ describe("lists with query parameters", () => {
 		assert.equal(missing.calls[0].url, `${T}/flash/a%2Fb%3Fc`);
 	});
 
+	test("work.get reads one photo by id, encoded", async () => {
+		const photo = {
+			id: "0199f000-0000-7000-8000-000000000002",
+			url: "https://api.example.com/uploads/koi.jpg",
+			width: 1200,
+			height: 1600,
+			alt: null,
+			variants: [],
+			styles: [{ slug: "japanese", name: "Japanese" }],
+			healed: false,
+			artist: { slug: "sita", name: "Sita Rai" },
+		};
+		const { calls, fetch } = fakeFetch(() => json(200, { data: photo }));
+
+		const result = await client(fetch).work.get(photo.id);
+
+		assert.equal(calls[0].url, `${T}/work/${photo.id}`);
+		assert.deepEqual(result, photo);
+
+		const missing = fakeFetch(() =>
+			json(404, { error: { code: "not_found", message: "Not found." } }),
+		);
+		const error = await rejection(client(missing.fetch).work.get("a/b?c"));
+		assert.ok(error instanceof TattooApiError);
+		assert.equal(error.code, "not_found");
+		assert.equal(missing.calls[0].url, `${T}/work/a%2Fb%3Fc`);
+	});
+
 	test("availability.list sends all four parameters in the given order", async () => {
 		const slot = {
 			startsAt: "2026-11-02T04:00:00Z",

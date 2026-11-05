@@ -21,6 +21,8 @@ export function publicMarkers(studio: Studio): string[] {
 		studio.paymentMethod.id,
 		studio.flashDesign.id,
 		studio.flashDesign.name,
+		// Public since getWorkPhoto (the gallery's photos carry their id).
+		studio.workPhoto.id,
 		studio.client.id,
 		studio.project.id,
 		studio.newInquiry.id,

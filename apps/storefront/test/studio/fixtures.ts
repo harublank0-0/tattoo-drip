@@ -175,10 +175,15 @@ export const sitaWithWork = (
 	workPhotos: workPhotos(count, alts),
 });
 
+/** The id of the gallery fixture's photo `n` (1-based): a UUID, as the API writes them. */
+export const photoId = (n: number) =>
+	`0199f000-0000-7000-8000-${String(n).padStart(12, "0")}`;
+
 /**
  * A page of the gallery read (TAT-126) as the API sends it: `count` photos by
  * Sita, on the API's origin with their copies, the first tagged Fine line and
- * healed, no next page, and the filters that go with it. `over` replaces any
+ * healed, each with its id (photoId), no next page, and the filters that go
+ * with it. `over` replaces any
  * of the page's own keys.
  */
 export function galleryPage(
@@ -188,6 +193,7 @@ export function galleryPage(
 	const fineLine = { slug: "fine-line", name: "Fine line" };
 	return {
 		data: workPhotos(count).map((photo, index) => ({
+			id: photoId(index + 1),
 			...photo,
 			styles: index === 0 ? [fineLine] : [],
 			healed: index === 0,
