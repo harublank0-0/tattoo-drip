@@ -27,6 +27,8 @@ export interface ShellProps {
 	readonly chat: ChatLinks | null;
 	/** Which page this is: the navigation's current item follows from it. */
 	readonly page: ShellPage;
+	/** Whether any artist is visible, so a navigation's Artists link has a roster to land on. */
+	readonly artistsShown: boolean;
 	/** The `<main>` element's class: "page" unless the page needs more. */
 	readonly mainClassName?: string;
 	readonly children: ReactNode;

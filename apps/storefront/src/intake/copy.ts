@@ -235,6 +235,8 @@ export const copy = {
 		sendingPhotos: "Sending your inquiry with {photos} ({size})…",
 		stillSending:
 			"Still sending. On a slow connection this can take up to 2 minutes; keep this page open.",
+		/** The confirm before an in-app link leaves the page mid-send (LeaveGuard). */
+		leaveWhileSending: "Your inquiry is still sending. Leave this page anyway?",
 		photoOne: "1 photo",
 		photoMany: "{count} photos",
 	},

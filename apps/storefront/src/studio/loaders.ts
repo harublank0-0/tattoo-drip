@@ -157,6 +157,8 @@ const NO_PORTFOLIO: PortfolioRead = { page: null, search: {} };
 /** `/work` (TAT-126): the whole studio's photos, filtered by the address. */
 export interface WorkPageData {
 	readonly studio: StudioView;
+	/** Whether any artist is visible: the navigation's Artists link has somewhere to land. */
+	readonly hasArtists: boolean;
 	/** The studio's theme (TAT-54): its key, sections and checked branding. */
 	readonly theme: ThemeConfig;
 	/** The header's Request button (TAT-127): the studio's, or none while it is closed. */
@@ -191,6 +193,8 @@ export interface FlashPageData {
 /** One flash design's page (TAT-129). */
 export interface FlashDesignPageData {
 	readonly studio: StudioView;
+	/** Whether any artist is visible: the navigation's Artists link has somewhere to land. */
+	readonly hasArtists: boolean;
 	readonly theme: ThemeConfig;
 	/** The header's Request button: the studio's general one, or none while it is closed. */
 	readonly requestLink: RequestLink | null;
@@ -215,6 +219,8 @@ export interface FlashDesignPageData {
  */
 export interface RequestPageData {
 	readonly studio: StudioView;
+	/** Whether any artist is visible: the navigation's Artists link has somewhere to land. */
+	readonly hasArtists: boolean;
 	readonly inquiry: InquiryState;
 	readonly channels: InquiryChannels;
 	/**
@@ -352,6 +358,7 @@ export function requestPageData(
 				: inquiryState(studioView, artistViews, owner);
 		return {
 			studio: studioView,
+			hasArtists: artistViews.length > 0,
 			inquiry,
 			channels: channelsFor(studioView, inquiry, design.name),
 			chat: chatLinks(
@@ -374,6 +381,7 @@ export function requestPageData(
 	const inquiry = inquiryState(studioView, artistViews, artist);
 	return {
 		studio: studioView,
+		hasArtists: artistViews.length > 0,
 		inquiry,
 		channels: channelsFor(studioView, inquiry, null),
 		chat: chatLinks(studioView, artist?.name ?? null),
@@ -460,6 +468,7 @@ export function flashDesignPageData(
 	const artistViews = artistViewModels(artists, imageOrigin);
 	return {
 		studio: studioView,
+		hasArtists: artistViews.length > 0,
 		theme: parseThemeConfig(storefrontInput(studio), imageOrigin),
 		requestLink: requestLink(studioView, null),
 		chat: chatLinks(
@@ -504,7 +513,8 @@ export function workPageData(
 	imageOrigin: string | null = null,
 ): WorkPageData {
 	const studioView = studioViewModel(studio);
-	const withWork = artistViewModels(artists, imageOrigin)
+	const visible = artistViewModels(artists, imageOrigin);
+	const withWork = visible
 		.filter((artist) => artist.workPhotos.length > 0)
 		.map(({ slug, name }) => ({ slug, name }))
 		.sort((a, b) => a.name.localeCompare(b.name, "en"));
@@ -513,6 +523,7 @@ export function workPageData(
 	const filtered = withWork.find(({ slug }) => slug === search.artist);
 	return {
 		studio: studioView,
+		hasArtists: visible.length > 0,
 		theme: parseThemeConfig(storefrontInput(studio), imageOrigin),
 		requestLink: requestLink(studioView, null),
 		chat: chatLinks(studioView, filtered?.name ?? null),

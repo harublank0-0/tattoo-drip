@@ -36,11 +36,14 @@ export interface NavItem {
  * The navigation for `page`, given the sections the studio shows. Artists
  * links to the studio page's roster and Flash to /flash, each only while the
  * studio shows that section on its page (a studio that hides its roster or
- * its flash has nothing to point at there); Home and Gallery (/work) always.
+ * its flash has nothing to point at there), and Artists only while an artist
+ * is visible (with none the roster renders nothing, so `/#artists` would land
+ * nowhere); Home and Gallery (/work) always.
  */
 export function navItems(
 	sections: readonly SectionKey[],
 	page: ShellPage,
+	hasArtists: boolean,
 ): NavItem[] {
 	const items: NavItem[] = [
 		{
@@ -50,7 +53,7 @@ export function navItems(
 			current: page === "home" ? "page" : undefined,
 		},
 	];
-	if (sections.includes("artists")) {
+	if (sections.includes("artists") && hasArtists) {
 		items.push({
 			key: "artists",
 			label: studioCopy.nav.artists,

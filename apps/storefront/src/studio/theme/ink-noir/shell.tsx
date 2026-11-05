@@ -17,10 +17,11 @@ export function InkNoirShell({
 	requestLink,
 	chat,
 	page,
+	artistsShown,
 	mainClassName = "page",
 	children,
 }: ShellProps) {
-	const items = navItems(theme.sections, page);
+	const items = navItems(theme.sections, page, artistsShown);
 	return (
 		<>
 			<a className="ink-skip" href="#main">
