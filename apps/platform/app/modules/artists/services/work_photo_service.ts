@@ -163,6 +163,25 @@ export default class WorkPhotoService {
 	}
 
 	/**
+	 * One photo of `artistIds` by id, or null (TAT-126's photo page): the
+	 * caller passes the ids of artists it may show (the public read passes
+	 * only visible ones), so another artist's, another tenant's, a removed
+	 * and an unknown photo are all null; no query for [].
+	 */
+	async findShown(
+		tenant: TenantRef,
+		photoId: string,
+		artistIds: readonly string[],
+	): Promise<ArtistWorkPhoto | null> {
+		if (artistIds.length === 0) return null;
+		return ArtistWorkPhoto.query()
+			.where("tenant_id", tenant.id)
+			.where("id", photoId)
+			.whereIn("artist_id", [...artistIds])
+			.first();
+	}
+
+	/**
 	 * What the gallery can filter by for these artists: the distinct style
 	 * slugs their photos carry (as stored, unordered: the caller orders and
 	 * filters them) and whether any photo is healed. One query; none for [].

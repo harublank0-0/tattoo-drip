@@ -10,6 +10,7 @@ import {
 	listWorkValidator,
 	WORK_PAGE_SIZE,
 } from "#modules/storefront/validators/work";
+import { ApiException } from "#services/public_api_errors";
 import PublicGalleryPhotoTransformer from "#transformers/public_gallery_photo_transformer";
 
 /**
@@ -17,7 +18,8 @@ import PublicGalleryPhotoTransformer from "#transformers/public_gallery_photo_tr
  * TAT-126): a page of the visible artists' photos, newest first, with the
  * cursor of the next page and the filters the gallery can offer. Only the
  * query string is read; a refused parameter or cursor is the 422
- * validation_failed with that field.
+ * validation_failed with that field. And one photo (getWorkPhoto), the 404
+ * for anything but a visible artist's photo of this studio.
  */
 @inject()
 export default class PublicWorkController {
@@ -54,5 +56,12 @@ export default class PublicWorkController {
 				healed: page.filters.healed,
 			},
 		};
+	}
+
+	async show(ctx: HttpContext) {
+		const { tenant } = publicTenantContext(ctx);
+		const photo = await this.pages.workPhoto(tenant, ctx.params.photo);
+		if (!photo) throw ApiException.notFound();
+		return ctx.serialize(PublicGalleryPhotoTransformer.transform(photo));
 	}
 }

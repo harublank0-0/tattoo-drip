@@ -714,6 +714,12 @@ const routes = {
     tokens: [{"old":"/api/v1/tenants/:tenant/work","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/work","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/work","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/work","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/work","type":0,"val":"work","end":""}],
     types: placeholder as Registry['api.v1.work.index']['types'],
   },
+  'api.v1.work.show': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/tenants/:tenant/work/:photo',
+    tokens: [{"old":"/api/v1/tenants/:tenant/work/:photo","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/work/:photo","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/work/:photo","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/work/:photo","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/work/:photo","type":0,"val":"work","end":""},{"old":"/api/v1/tenants/:tenant/work/:photo","type":1,"val":"photo","end":""}],
+    types: placeholder as Registry['api.v1.work.show']['types'],
+  },
   'api.v1.flash.index': {
     methods: ["GET","HEAD"],
     pattern: '/api/v1/tenants/:tenant/flash',

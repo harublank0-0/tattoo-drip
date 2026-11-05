@@ -225,6 +225,7 @@ export interface ApiDefinition {
       }
       work: {
         index: typeof routes['api.v1.work.index']
+        show: typeof routes['api.v1.work.show']
       }
       flash: {
         index: typeof routes['api.v1.flash.index']

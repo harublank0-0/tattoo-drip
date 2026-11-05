@@ -4,7 +4,8 @@ import type { ShownGalleryPhoto } from "#modules/storefront/services/studio_page
 /**
  * A photo of the studio's gallery as the public API shows it (openapi.yaml,
  * GalleryPhoto; TAT-126). Every field is written out here: a new one needs
- * the contract, a ruling and the exact-fields test. Never the photo's id or
+ * the contract, a ruling and the exact-fields test. The photo's id is shown
+ * (getWorkPhoto takes it; the page's cursor already carried it); never its
  * key, the artist's id or the timestamps (the page's cursor is the only
  * trace of the time).
  */
@@ -12,6 +13,7 @@ export default class PublicGalleryPhotoTransformer extends BaseTransformer<Shown
 	toObject() {
 		const photo = this.resource;
 		return {
+			id: photo.id,
 			url: photo.url,
 			width: photo.width,
 			height: photo.height,

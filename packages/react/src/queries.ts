@@ -32,6 +32,10 @@ export const tattooKeys = {
 		[...tattooKeys.tenant(tenant), "services", query ?? {}] as const,
 	work: (tenant: string, query?: ListWorkQuery) =>
 		[...tattooKeys.tenant(tenant), "work", query ?? {}] as const,
+	workPhotos: (tenant: string) =>
+		[...tattooKeys.tenant(tenant), "work-photo"] as const,
+	workPhoto: (tenant: string, id: string) =>
+		[...tattooKeys.workPhotos(tenant), id] as const,
 	flash: (tenant: string, query?: ListFlashQuery) =>
 		[...tattooKeys.tenant(tenant), "flash", query ?? {}] as const,
 	flashDesigns: (tenant: string) =>
@@ -53,7 +57,7 @@ export const tattooKeys = {
  * one fetch: TanStack Query 5.104's replacement for `ensureQueryData`).
  * Each forwards TanStack Query's `signal`, so a query nobody needs any more
  * cancels its request.
- * `studio`, `artists`, `artist`, `work`, `flash` and `flashDesign` set no `staleTime` or `retry`: the app's defaults decide (TAT-44).
+ * `studio`, `artists`, `artist`, `work`, `workPhoto`, `flash` and `flashDesign` set no `staleTime` or `retry`: the app's defaults decide (TAT-44).
  */
 export const tattooQueries = {
 	studio: (client: TattooClient) =>
@@ -80,6 +84,11 @@ export const tattooQueries = {
 		queryOptions({
 			queryKey: tattooKeys.work(client.tenant, query),
 			queryFn: ({ signal }) => client.work.list(query, { signal }),
+		}),
+	workPhoto: (client: TattooClient, id: string) =>
+		queryOptions({
+			queryKey: tattooKeys.workPhoto(client.tenant, id),
+			queryFn: ({ signal }) => client.work.get(id, { signal }),
 		}),
 	flash: (client: TattooClient, query?: ListFlashQuery) =>
 		queryOptions({

@@ -20,13 +20,14 @@ const CACHED = "public, max-age=60, stale-while-revalidate=600";
 const images = new ImageService();
 const tenancy = new TenancyService();
 
-/** The documented fields (openapi.yaml, GalleryPhoto, WorkFilters). A new one needs the contract and a ruling first. */
+/** The documented fields (openapi.yaml, GalleryPhoto, WorkFilters). A new one needs the contract and a ruling first; `id` had both (getWorkPhoto). */
 const BODY_FIELDS = ["data", "filters", "nextCursor"];
 const PHOTO_FIELDS = [
 	"alt",
 	"artist",
 	"healed",
 	"height",
+	"id",
 	"styles",
 	"url",
 	"variants",
@@ -89,6 +90,11 @@ test.group("GET /api/v1/tenants/:tenant/work (listWork)", (group) => {
 		const body = response.body();
 		assert.deepEqual(Object.keys(body).sort(), BODY_FIELDS);
 		assert.deepEqual(keysOf(body.data), rowKeys([second, third, first]));
+		// The photo's id (getWorkPhoto takes it); the cursor already carried it.
+		assert.deepEqual(
+			body.data.map((photo: { id: string }) => photo.id),
+			[second, third, first].map((row) => row.id),
+		);
 		assert.isNull(body.nextCursor);
 		assert.deepEqual(Object.keys(body.filters).sort(), ["healed", "styles"]);
 		assert.deepEqual(body.filters, {
@@ -129,7 +135,7 @@ test.group("GET /api/v1/tenants/:tenant/work (listWork)", (group) => {
 			oldest.variants.map((variant: { width: number }) => variant.width),
 			[320, 640, 1280],
 		);
-		// Never the row: no id, key column, artist id, tenant id or timestamp.
+		// Never the rest of the row: no key column, artist id, tenant id or timestamp.
 		const text = JSON.stringify(body);
 		for (const word of [
 			"created",
@@ -145,7 +151,6 @@ test.group("GET /api/v1/tenants/:tenant/work (listWork)", (group) => {
 		]) {
 			assert.notInclude(text, word);
 		}
-		for (const row of [first, second, third]) assert.notInclude(text, row.id);
 		for (const artist of [sita, bina]) assert.notInclude(text, artist.id);
 	});
 
@@ -618,3 +623,159 @@ test.group("GET /api/v1/tenants/:tenant/work (listWork)", (group) => {
 		});
 	});
 });
+
+test.group(
+	"GET /api/v1/tenants/:tenant/work/:photo (getWorkPhoto)",
+	(group) => {
+		group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+		const photoUrl = (slug: string, id: string) =>
+			`/api/v1/tenants/${slug}/work/${id}`;
+
+		test("is the photo as listWork shows it, with exactly the documented fields", async ({
+			client,
+			assert,
+		}) => {
+			const { owner, tenant } = await studioWithOwner("api-work-photo-a");
+			const sita = await addArtist(tenant, owner);
+			const photo = await inTenant(tenant, () =>
+				addWorkPhoto(tenant, sita, {
+					alt: "Koi on the forearm",
+					styles: ["realism", "blackwork"],
+					healed: true,
+				}),
+			);
+
+			const response = await client.get(photoUrl("api-work-photo-a", photo.id));
+			const listed = (await client.get(work("api-work-photo-a"))).body()
+				.data[0];
+
+			response.assertStatus(200);
+			assertApiHeaders(response);
+			response.assertHeader("cache-control", CACHED);
+			const body = response.body();
+			assert.deepEqual(Object.keys(body), ["data"]);
+			assert.deepEqual(Object.keys(body.data).sort(), PHOTO_FIELDS);
+			assert.deepEqual(body.data, listed);
+			assert.equal(body.data.id, photo.id);
+			assert.deepEqual(body.data.artist, { slug: "sita", name: "Sita Rai" });
+			const text = JSON.stringify(body);
+			for (const word of [
+				"created",
+				"artist_id",
+				"artistId",
+				"image_key",
+				"imageKey",
+				"tenantId",
+				"tenant_id",
+			]) {
+				assert.notInclude(text, word);
+			}
+			assert.notInclude(text, sita.id);
+		});
+
+		test("a closed artist's photo is shown; a hidden or deleted artist's, a removed and an unknown photo are the 404", async ({
+			client,
+		}) => {
+			const { owner, tenant } = await studioWithOwner("api-work-photo-b");
+			const closed = await addArtist(tenant, owner, {
+				name: "Closed",
+				slug: "closed",
+				acceptingInquiries: false,
+				closedMessage: "Books open in March.",
+			});
+			const hidden = await addArtist(tenant, owner, {
+				name: "Hidden",
+				slug: "hidden",
+				visible: false,
+			});
+			const gone = await addArtist(tenant, owner, {
+				name: "Gone",
+				slug: "gone",
+			});
+			const [shown, ofHidden, ofGone] = await inTenant(tenant, async () => [
+				await addWorkPhoto(tenant, closed),
+				await addWorkPhoto(tenant, hidden),
+				await addWorkPhoto(tenant, gone),
+			]);
+			await inTenant(tenant, () =>
+				new ArtistService(images).delete(tenant, gone),
+			);
+
+			(await client.get(photoUrl("api-work-photo-b", shown.id))).assertStatus(
+				200,
+			);
+			for (const id of [
+				ofHidden.id,
+				ofGone.id,
+				"0192f0a0-0000-7000-8000-000000000000",
+			]) {
+				assertApiError(
+					await client.get(photoUrl("api-work-photo-b", id)),
+					404,
+					"not_found",
+				);
+			}
+		});
+
+		test("another studio's photo is the 404, under its own slug it is shown", async ({
+			client,
+		}) => {
+			const mine = await studioWithOwner("api-work-photo-c");
+			const theirs = await studioWithOwner("api-work-photo-d");
+			await addArtist(mine.tenant, mine.owner);
+			const theirSita = await addArtist(theirs.tenant, theirs.owner);
+			const photo = await inTenant(theirs.tenant, () =>
+				addWorkPhoto(theirs.tenant, theirSita),
+			);
+
+			assertApiError(
+				await client.get(photoUrl("api-work-photo-c", photo.id)),
+				404,
+				"not_found",
+			);
+			(await client.get(photoUrl("api-work-photo-d", photo.id))).assertStatus(
+				200,
+			);
+		});
+
+		test("an id that is not a UUID is the router's 404, and a POST a 405", async ({
+			client,
+		}) => {
+			await studioWithOwner("api-work-photo-e");
+
+			assertApiError(
+				await client.get(photoUrl("api-work-photo-e", "not-a-uuid")),
+				404,
+				"not_found",
+			);
+			const post = await client
+				.post(
+					photoUrl("api-work-photo-e", "0192f0a0-0000-7000-8000-000000000000"),
+				)
+				.json({});
+			assertApiError(post, 405, "method_not_allowed");
+		});
+
+		test("is cacheable: an ETag and a 304, and under an old studio slug it answers like under the current one", async ({
+			client,
+			assert,
+		}) => {
+			const { owner, tenant } = await studioWithOwner("api-work-photo-f");
+			const sita = await addArtist(tenant, owner);
+			const photo = await inTenant(tenant, () => addWorkPhoto(tenant, sita));
+			await changeSlug(tenant, "api-work-photo-g");
+
+			const current = await client.get(photoUrl("api-work-photo-g", photo.id));
+			const etag = current.header("etag") ?? "";
+			assert.isNotEmpty(etag);
+			const again = await client
+				.get(photoUrl("api-work-photo-g", photo.id))
+				.header("if-none-match", etag);
+			again.assertStatus(304);
+			assertNoCookies(again);
+			const old = await client.get(photoUrl("api-work-photo-f", photo.id));
+			assert.deepEqual(old.body(), current.body());
+		});
+	},
+);

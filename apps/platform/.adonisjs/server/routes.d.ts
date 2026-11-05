@@ -122,6 +122,7 @@ export type ScannedRoutes = {
     'api.v1.artists.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.artists.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'artist': ParamValue} }
     'api.v1.work.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.work.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'photo': ParamValue} }
     'api.v1.flash.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.flash.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'design': ParamValue} }
     'api.v1.inquiries.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -177,6 +178,7 @@ export type ScannedRoutes = {
     'api.v1.artists.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.artists.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'artist': ParamValue} }
     'api.v1.work.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.work.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'photo': ParamValue} }
     'api.v1.flash.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.flash.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'design': ParamValue} }
     'api.v1.deposits.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'token': ParamValue} }
@@ -230,6 +232,7 @@ export type ScannedRoutes = {
     'api.v1.artists.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.artists.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'artist': ParamValue} }
     'api.v1.work.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.work.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'photo': ParamValue} }
     'api.v1.flash.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.flash.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'design': ParamValue} }
     'api.v1.deposits.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'token': ParamValue} }

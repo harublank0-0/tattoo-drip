@@ -201,6 +201,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tenants/{tenant}/work/{photo}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+                /** @description A photo's `id` (`listWork`) */
+                photo: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * One photo of a visible artist's work
+         * @description The same photo `listWork` shows, with its styles, healed mark and
+         *     artist. A hidden or deleted artist's photo, a removed photo, an
+         *     unknown id and another studio's photo are all a 404. Cacheable.
+         *     Under an old studio slug it answers like under the current one.
+         */
+        get: operations["getWorkPhoto"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tenants/{tenant}/flash": {
         parameters: {
             query?: never;
@@ -832,11 +865,18 @@ export interface components {
             startingPrice?: components["schemas"]["Money"] | null;
         };
         /**
-         * @description A photo in the studio's gallery (`listWork`): a `WorkPhoto` with its
-         *     styles, its healed mark and whose work it is. Every property is
-         *     always there. All text is plain text: render it as text.
+         * @description A photo in the studio's gallery (`listWork`, `getWorkPhoto`): a
+         *     `WorkPhoto` with its id, its styles, its healed mark and whose work
+         *     it is. Every property is always there. All text is plain text:
+         *     render it as text.
          */
         GalleryPhoto: {
+            /**
+             * Format: uuid
+             * @description What `getWorkPhoto` takes: the photo's own page. The same id the
+             *     page's `nextCursor` already carries, so it reveals nothing new.
+             */
+            id: string;
             /**
              * Format: uri
              * @description Public and absolute.
@@ -1456,6 +1496,44 @@ export interface operations {
             304: components["responses"]["NotModified"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["ValidationError"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getWorkPhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+                /** @description A photo's `id` (`listWork`) */
+                photo: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The photo */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["GalleryPhoto"];
+                    };
+                };
+            };
+            304: components["responses"]["NotModified"];
+            404: components["responses"]["NotFound"];
             429: components["responses"]["RateLimited"];
             default: components["responses"]["Error"];
         };
