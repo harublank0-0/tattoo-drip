@@ -29,9 +29,12 @@ import { workGridSizes } from "../srcset.ts";
 export function GalleryGrid({
 	photos,
 	showArtist,
+	sizes = workGridSizes,
 }: {
 	photos: readonly GalleryPhotoView[];
 	showArtist: boolean;
+	/** The photos' `sizes` for a theme that lays the grid out differently; the square grid's by default. */
+	sizes?: (photo: GalleryPhotoView) => string;
 }) {
 	if (photos.length === 0) return null;
 	return (
@@ -52,7 +55,7 @@ export function GalleryGrid({
 							className="work-photo"
 							src={photo.src}
 							srcSet={photo.srcSet}
-							sizes={photo.srcSet ? workGridSizes(photo) : undefined}
+							sizes={photo.srcSet ? sizes(photo) : undefined}
 							width={photo.width}
 							height={photo.height}
 							alt={photo.alt}

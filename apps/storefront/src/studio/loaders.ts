@@ -33,6 +33,7 @@ import {
 	HOME_FLASH_COUNT,
 } from "./flash.ts";
 import {
+	filterStyles,
 	type GalleryView,
 	galleryView,
 	type PortfolioSearch,
@@ -147,6 +148,23 @@ export interface ArtistPageData {
 	 * read failed, which leaves the Flash section out.
 	 */
 	readonly flash: FlashListView;
+	/**
+	 * The styles the artist lists as the gallery's filter reads them (a checked
+	 * slug and a one-line name, each slug once, at most five), so a theme can
+	 * link each to the gallery filtered by it and this artist.
+	 */
+	readonly styles: readonly { readonly slug: string; readonly name: string }[];
+	/** The artists before and after this one in the API's order (the directory's), or null at either end. */
+	readonly neighbours: {
+		readonly previous: NeighbourArtist | null;
+		readonly next: NeighbourArtist | null;
+	};
+}
+
+/** A neighbouring artist: enough for a link to their page. */
+export interface NeighbourArtist {
+	readonly name: string;
+	readonly href: string;
 }
 
 /** `/artists`: every visible artist, filtered by the address's style. */
@@ -177,6 +195,9 @@ export interface PortfolioRead {
 }
 
 const NO_PORTFOLIO: PortfolioRead = { page: null, search: {} };
+
+/** The most styles an artist lists (the contract's maxItems), as the views keep. */
+const MAX_ARTIST_STYLES = 5;
 
 /** `/work` (TAT-126): the whole studio's photos, filtered by the address. */
 export interface WorkPageData {
@@ -315,9 +336,19 @@ export function artistPageData(
 	const artistViews = artistViewModels(artists, imageOrigin);
 	const artist = findArtist(artistViews, slug);
 	if (!artist) return null;
+	const index = artistViews.indexOf(artist);
+	const neighbour = (other: ArtistView | undefined): NeighbourArtist | null =>
+		other ? { name: other.name, href: other.pageHref } : null;
 	return {
 		studio: studioView,
 		artist,
+		styles: filterStyles(
+			artists.find((raw) => raw.slug === artist.slug)?.styles,
+		).slice(0, MAX_ARTIST_STYLES),
+		neighbours: {
+			previous: neighbour(artistViews[index - 1]),
+			next: neighbour(artistViews[index + 1]),
+		},
 		requestLink: requestLink(studioView, artist),
 		chat: chatLinks(studioView, artist.name),
 		seo: artistPageSeo(studioView, artist, origin),

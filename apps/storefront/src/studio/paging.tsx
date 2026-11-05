@@ -1,7 +1,7 @@
 import { type MouseEvent, useEffect, useState } from "react";
 import { GalleryGrid } from "./components/gallery.tsx";
 import { studioCopy } from "./copy.ts";
-import type { GalleryView } from "./gallery.ts";
+import type { GalleryPhotoView, GalleryView } from "./gallery.ts";
 
 /**
  * "Show more" (TAT-126), the gallery's one stateful island. The components
@@ -24,10 +24,13 @@ export function PagedGallery({
 	showArtist,
 	moreHref,
 	more,
+	sizes,
 }: {
 	/** The page the server rendered. */
 	first: GalleryView;
 	showArtist: boolean;
+	/** The grid's `sizes` (GalleryGrid), for a theme that lays it out differently. */
+	sizes?: (photo: GalleryPhotoView) => string;
 	/** Where "Show more" goes without JavaScript. */
 	moreHref: (cursor: string) => string;
 	more?: MoreWork;
@@ -63,7 +66,7 @@ export function PagedGallery({
 
 	return (
 		<>
-			<GalleryGrid photos={photos} showArtist={showArtist} />
+			<GalleryGrid photos={photos} showArtist={showArtist} sizes={sizes} />
 			{cursor !== null ? (
 				<div className="work-more-bar">
 					<a
