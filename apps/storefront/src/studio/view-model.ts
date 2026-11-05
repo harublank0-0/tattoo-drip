@@ -106,7 +106,7 @@ export interface ArtistView {
 	/** Only while the artist isn't accepting inquiries. */
 	readonly closedMessage: string | null;
 	readonly pageHref: string;
-	/** `/request?artist=<slug>`: asks for this artist (TAT-127). */
+	/** `/book?artist=<slug>`: asks for this artist (TAT-127). */
 	readonly requestHref: string;
 	/** The artist's six newest work photos, newest first (TAT-116, TAT-126); the whole portfolio is the gallery's. */
 	readonly workPhotos: readonly WorkPhotoView[];

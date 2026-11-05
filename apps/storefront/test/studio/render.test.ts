@@ -145,10 +145,10 @@ describe("the studio page", () => {
 		const links = hrefs(studioHtml());
 
 		// The header, the hero and the invitation lead to /request; Sita's card asks for her.
-		assert.equal(links.filter((href) => href === "/request").length, 3);
-		assert.ok(links.includes("/request?artist=sita"));
+		assert.equal(links.filter((href) => href === "/book").length, 3);
+		assert.ok(links.includes("/book?artist=sita"));
 		assert.ok(
-			!links.includes("/request?artist=arjun"),
+			!links.includes("/book?artist=arjun"),
 			"no Ask link for a closed artist",
 		);
 		for (const html of [
@@ -197,7 +197,7 @@ describe("the studio page", () => {
 		);
 		assert.match(
 			invite,
-			/<div class="actions"><a class="action action-primary" href="\/request">Send your idea<\/a><\/div>/,
+			/<div class="actions"><a class="action action-primary" href="\/book">Send your idea<\/a><\/div>/,
 		);
 		assert.doesNotMatch(html, /inquiry-aside|Message on WhatsApp|<form/);
 		assert.deepEqual(headings(html), [1, 2, 2, 3, 3, 2]);
@@ -218,7 +218,7 @@ describe("the studio page", () => {
 			/<bdi>Black Needle<\/bdi> isn&#x27;t taking new inquiries right now\./,
 		);
 		assert.doesNotMatch(invite, /href=/);
-		assert.doesNotMatch(html, /href="\/request/);
+		assert.doesNotMatch(html, /href="\/book/);
 		assert.doesNotMatch(html, /Got an idea/);
 		// The same section, so an old #inquiry link still lands somewhere.
 		assert.match(
@@ -343,7 +343,7 @@ describe("the studio page", () => {
 		const html = studioHtml(CLOSED_STUDIO, [ARJUN]);
 
 		assertSafePage(html);
-		assert.ok(hrefs(html).every((href) => !href.startsWith("/request")));
+		assert.ok(hrefs(html).every((href) => !href.startsWith("/book")));
 		assert.match(html, /Not taking new inquiries right now/);
 		assert.match(html, /isn(&#x27;|')t taking new inquiries right now\./);
 		assert.match(
@@ -465,7 +465,7 @@ describe("the studio page's first screen (TAT-105)", () => {
 
 		assert.match(
 			top,
-			/<a class="action action-primary" href="\/request">Send your idea<\/a>/,
+			/<a class="action action-primary" href="\/book">Send your idea<\/a>/,
 		);
 		assert.match(
 			top,
@@ -574,7 +574,7 @@ describe("the studio page's first screen (TAT-105)", () => {
 			}),
 		);
 
-		assert.match(top, /action-primary" href="\/request">Send your idea/);
+		assert.match(top, /action-primary" href="\/book">Send your idea/);
 		assert.doesNotMatch(top, /action-secondary/);
 		assert.doesNotMatch(top, /wa\.me/);
 	});
@@ -588,7 +588,7 @@ describe("the studio page's first screen (TAT-105)", () => {
 			top,
 			/<p class="profile-location user-text" dir="auto">Tattoo studio<\/p>/,
 		);
-		assert.match(top, /action-primary" href="\/request">Send your idea/);
+		assert.match(top, /action-primary" href="\/book">Send your idea/);
 		assert.doesNotMatch(
 			top,
 			/action-secondary|class="contact"|class="profile-intro/,
@@ -635,7 +635,7 @@ describe("the artist page", () => {
 		);
 		assert.match(html, /Tattoo artist at <bdi>Black Needle<\/bdi>/);
 		assert.ok(links.includes("/"));
-		assert.ok(links.includes("/request?artist=sita"));
+		assert.ok(links.includes("/book?artist=sita"));
 		assert.doesNotMatch(html, /inquiry-aside|steps-strip|<form/);
 	});
 
@@ -693,7 +693,7 @@ describe("the artist page", () => {
 		assertSafePage(html);
 		assert.ok(
 			html.includes(
-				'<div id="inquiry" class="actions artist-request"><a class="action action-primary" href="/request?artist=sita"><span>Request a tattoo from <bdi>Sita Rai</bdi></span></a></div>',
+				'<div id="inquiry" class="actions artist-request"><a class="action action-primary" href="/book?artist=sita"><span>Request a tattoo from <bdi>Sita Rai</bdi></span></a></div>',
 			),
 		);
 		assert.equal(count(html, / id="inquiry"/g), 1);
@@ -732,7 +732,7 @@ function requestHtml(
 }
 
 describe("the request page (TAT-127)", () => {
-	test("is the form's own page: one h1, the steps, the panel and the studio's contacts", () => {
+	test("is the booking flow's own page: one h1, the steps strip and the studio's contacts (Prompt 6: the flow's summary replaced the panel)", () => {
 		const html = requestHtml({});
 
 		assertSafePage(html);
@@ -740,52 +740,33 @@ describe("the request page (TAT-127)", () => {
 			html,
 			/<h1 id="inquiry-title" class="section-title">Send your idea<\/h1>/,
 		);
-		// h1; the steps strip; the panel beside the form; the studio block.
-		assert.deepEqual(headings(html), [1, 2, 2, 2]);
-		assert.equal(count(html, /<aside class="inquiry-aside"/g), 1);
+		// h1; the steps strip; the studio block.
+		assert.deepEqual(headings(html), [1, 2, 2]);
+		assert.equal(count(html, /<aside class="inquiry-aside"/g), 0);
 		assert.ok(hrefs(html).includes("/"));
 		assert.match(html, /See the studio page/);
-		// The form mounts after hydration.
+		// The flow mounts after hydration.
 		assert.doesNotMatch(html, /<form/);
 		assert.match(html, /<header class="site-bar">/);
 		assert.match(html, /<main class="page request-page">/);
 	});
 
-	test("has the 4-step strip under the h1 and the same steps, with a line each, in the panel beside the form", () => {
+	test("has the 4-step strip under the h1", () => {
 		const html = requestHtml({});
-		const panel = html.match(/<aside [\s\S]*?<\/aside>/)?.[0] ?? "";
-		const strip = html.slice(
-			html.indexOf('<section class="steps-strip"'),
-			html.indexOf("<aside"),
-		);
+		const strip = html.slice(html.indexOf('<section class="steps-strip"'));
 
-		assert.deepEqual(stepTitles(strip), BOOKING_STEPS);
-		assert.deepEqual(stepTitles(panel), BOOKING_STEPS);
+		assert.deepEqual(stepTitles(strip).slice(0, 4), BOOKING_STEPS);
 		assert.match(
 			strip,
 			/<h2 id="steps-strip-title"[^>]*>How booking works<\/h2>/,
 		);
-		assert.match(
-			panel,
-			/^<aside class="inquiry-aside" aria-labelledby="steps-panel-title">/,
-		);
-		assert.match(
-			panel,
-			/<h2 id="steps-panel-title"[^>]*>How booking works<\/h2>/,
-		);
-		// The panel says more than the strip: a line for each step, the studio's name in <bdi>.
-		assert.match(panel, /<bdi>Black Needle<\/bdi> replies/);
-		assert.match(panel, /Tattoo Drip never handles your money\./);
-		assert.match(panel, /<ol class="steps" role="list">/);
 		assert.equal(count(strip, /step-detail/g), 0);
-		assert.equal(count(panel, /step-detail/g), 4);
 	});
 
-	test("the panel beside the form also offers the chat links", () => {
-		const panel = requestHtml({}).match(/<aside [\s\S]*?<\/aside>/)?.[0] ?? "";
+	test("the chat links are offered until the flow mounts", () => {
+		const html = requestHtml({});
 
-		assert.match(panel, /Prefer to chat\?/);
-		assert.match(panel, /href="https:\/\/wa\.me\/9779812345678\?text=/);
+		assert.match(html, /href="https:\/\/wa\.me\/9779812345678\?text=/);
 	});
 
 	test("?artist=sita picks Sita", () => {
@@ -826,7 +807,7 @@ describe("the request page (TAT-127)", () => {
 			html,
 			/<p class="note user-text measure" dir="auto">Books open in March\.<\/p>/,
 		);
-		assert.ok(hrefs(html).includes("/request"));
+		assert.ok(hrefs(html).includes("/book"));
 		assert.doesNotMatch(html, /inquiry-aside/);
 	});
 
@@ -853,7 +834,6 @@ describe("the request page (TAT-127)", () => {
 		assert.match(html, /your idea for <bdi>Sita Rai<\/bdi>/);
 		assert.match(html, /Message on WhatsApp/);
 		assert.doesNotMatch(html, /isn&#x27;t taking new inquiries/);
-		assert.equal(count(html, /<aside class="inquiry-aside"/g), 1);
 	});
 });
 
@@ -1531,7 +1511,7 @@ describe("the All work page (TAT-126)", () => {
 		assert.match(html, /<h1 [^>]*>All work<\/h1>/);
 		assert.match(
 			html,
-			/^<header class="site-bar"><div class="site-bar-inner"><a class="site-bar-home" href="\/" dir="auto">Black Needle<\/a><a class="action action-primary site-bar-request" href="\/request">Request<\/a><\/div><\/header><main class="page">/,
+			/^<header class="site-bar"><div class="site-bar-inner"><a class="site-bar-home" href="\/" dir="auto">Black Needle<\/a><a class="action action-primary site-bar-request" href="\/book">Request<\/a><\/div><\/header><main class="page">/,
 		);
 		assert.equal(count(html, /class="work-open"/g), 3);
 		assert.match(html, /<footer class="site-footer">/);
@@ -2021,16 +2001,16 @@ describe("the header and the chat button (TAT-127)", () => {
 		const request = requestHtml({});
 
 		assert.ok(bar(studio).includes(homeLink("Black Needle")));
-		assert.ok(bar(studio).includes(`${REQUEST} href="/request">Request</a>`));
+		assert.ok(bar(studio).includes(`${REQUEST} href="/book">Request</a>`));
 		assert.ok(bar(sita).includes(homeLink("Black Needle")));
 		assert.ok(
 			bar(sita).includes(
-				`${REQUEST} href="/request?artist=sita"><span>Request <bdi>Sita Rai</bdi></span></a>`,
+				`${REQUEST} href="/book?artist=sita"><span>Request <bdi>Sita Rai</bdi></span></a>`,
 			),
 		);
 		// Arjun is closed and the studio is open: the general request.
-		assert.ok(bar(arjun).includes(`${REQUEST} href="/request">Request</a>`));
-		assert.ok(bar(work).includes(`${REQUEST} href="/request">Request</a>`));
+		assert.ok(bar(arjun).includes(`${REQUEST} href="/book">Request</a>`));
+		assert.ok(bar(work).includes(`${REQUEST} href="/book">Request</a>`));
 		// The request page is where the button leads: it has none.
 		assert.ok(bar(request).includes(homeLink("Black Needle")));
 		assert.doesNotMatch(bar(request), /site-bar-request/);
@@ -2079,11 +2059,11 @@ describe("the header and the chat button (TAT-127)", () => {
 		assertSafePage(openArtist);
 		assert.ok(
 			bar(openArtist).includes(
-				`${REQUEST} href="/request?artist=sita"><span>Request <bdi>Sita Rai</bdi></span></a>`,
+				`${REQUEST} href="/book?artist=sita"><span>Request <bdi>Sita Rai</bdi></span></a>`,
 			),
 		);
 		// The studio's own Request is not offered anywhere on that page.
-		assert.doesNotMatch(bar(openArtist), /href="\/request"/);
+		assert.doesNotMatch(bar(openArtist), /href="\/book"/);
 		// The All work page is the studio's, too: nothing to lead to while it is closed.
 		const work = workOn(CLOSED_STUDIO);
 		assertSafePage(work);
@@ -2237,33 +2217,33 @@ describe("the header and the chat button (TAT-127)", () => {
 
 describe("the roster's 'Ask for' links while the studio is closed (TAT-127)", () => {
 	const askLinks = (html: string) =>
-		hrefs(html).filter((href) => href.startsWith("/request?artist="));
+		hrefs(html).filter((href) => href.startsWith("/book?artist="));
 
 	test("a closed studio with exactly one open artist still has a way from / to her form", () => {
 		const html = studioHtml(CLOSED_STUDIO, [SITA]);
 
 		assertSafePage(html);
-		assert.deepEqual(askLinks(html), ["/request?artist=sita"]);
+		assert.deepEqual(askLinks(html), ["/book?artist=sita"]);
 		assert.match(
 			html,
-			/<a class="action action-secondary" href="\/request\?artist=sita"><span>Ask for <bdi>Sita Rai<\/bdi><\/span><\/a>/,
+			/<a class="action action-secondary" href="\/book\?artist=sita"><span>Ask for <bdi>Sita Rai<\/bdi><\/span><\/a>/,
 		);
 		// The studio's own invitation and Request stay closed.
-		assert.doesNotMatch(html, /href="\/request"/);
+		assert.doesNotMatch(html, /href="\/book"/);
 		assert.match(html, /isn&#x27;t taking new inquiries right now/);
 	});
 
 	test("a closed studio offers it for each open artist and for no closed one", () => {
 		const html = studioHtml(CLOSED_STUDIO, [SITA, ARJUN]);
 
-		assert.deepEqual(askLinks(html), ["/request?artist=sita"]);
+		assert.deepEqual(askLinks(html), ["/book?artist=sita"]);
 		assert.deepEqual(askLinks(studioHtml(CLOSED_STUDIO, [ARJUN])), []);
 	});
 
 	test("an open studio keeps the 2+ rule: one artist is asked for by 'Send your idea' alone", () => {
 		assert.deepEqual(askLinks(studioHtml(STUDIO, [SITA])), []);
 		assert.deepEqual(askLinks(studioHtml(STUDIO, [SITA, ARJUN])), [
-			"/request?artist=sita",
+			"/book?artist=sita",
 		]);
 		assert.doesNotMatch(studioHtml(STUDIO, [SITA]), /Ask for/);
 	});
@@ -2381,7 +2361,7 @@ describe("flash on the artist page, /flash and a design's page (TAT-129)", () =>
 		// The site bar's Request is the studio's general one; the chat button is there.
 		assert.match(
 			one,
-			/^<header class="site-bar"><div class="site-bar-inner"><a class="site-bar-home" href="\/" dir="auto">Black Needle<\/a><a class="action action-primary site-bar-request" href="\/request">Request<\/a>/,
+			/^<header class="site-bar"><div class="site-bar-inner"><a class="site-bar-home" href="\/" dir="auto">Black Needle<\/a><a class="action action-primary site-bar-request" href="\/book">Request<\/a>/,
 		);
 		assert.match(one, /class="chat/);
 
@@ -2488,7 +2468,7 @@ describe("flash on the artist page, /flash and a design's page (TAT-129)", () =>
 		assert.match(
 			html,
 			new RegExp(
-				`<a class="action action-primary" href="/request\\?flash=${flashId(1)}">Request this design</a>`,
+				`<a class="action action-primary" href="/book\\?flash=${flashId(1)}">Request this design</a>`,
 			),
 		);
 		const image = images(html).find((tag) =>
@@ -2564,7 +2544,7 @@ describe("flash on the artist page, /flash and a design's page (TAT-129)", () =>
 		assert.match(
 			html,
 			new RegExp(
-				`<a class="action action-primary" href="/request\\?flash=${flashId(1)}">Ask for something similar</a>`,
+				`<a class="action action-primary" href="/book\\?flash=${flashId(1)}">Ask for something similar</a>`,
 			),
 		);
 
@@ -2576,7 +2556,7 @@ describe("flash on the artist page, /flash and a design's page (TAT-129)", () =>
 		assert.doesNotMatch(arjun, /Ask for something similar/);
 		assert.match(
 			arjun,
-			/<a class="action action-primary" href="\/request">Send your idea<\/a>/,
+			/<a class="action action-primary" href="\/book">Send your idea<\/a>/,
 		);
 		assert.match(arjun, /<dt>Status<\/dt><dd[^>]*>Claimed<\/dd>/);
 

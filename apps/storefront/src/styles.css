@@ -10,6 +10,8 @@
 @import './studio/theme/ink-noir/artist.css';
 /* Ink Noir's gallery and tattoo pages (Prompt 5). */
 @import './studio/theme/ink-noir/gallery.css';
+/* Ink Noir's booking page (Prompt 6). */
+@import './studio/theme/ink-noir/book.css';
 @plugin '@tailwindcss/typography';
 
 /*
@@ -608,6 +610,121 @@
 
 @media (prefers-reduced-motion: reduce) {
   .intake-progress::before { animation: none; inline-size: 100%; opacity: 0.5; }
+}
+
+/*
+ * The booking flow (Prompt 6, src/booking/ and the intake form): the steps'
+ * progress, the steps, the artist cards, the preference calendar, the
+ * review, the running summary (folded above the form on a phone, beside it
+ * from 60rem) and the "received" screen. Tokens only, so every theme's palette
+ * reaches it; a theme adds its own touches (Ink Noir's book.css). Nothing
+ * moves, so there is nothing to stop for reduced motion.
+ */
+@layer components {
+  .booking { gap: 1.5rem; }
+  .booking-progress { display: grid; gap: 0.5rem; }
+  .booking-progress-count { margin: 0; color: var(--ink-muted); font-size: 0.875rem; }
+  .booking-progress-list { display: none; margin: 0; padding: 0; list-style: none; }
+  .booking-progress-step button, .booking-progress-label { display: inline-flex; align-items: center; gap: 0.5rem; min-block-size: 2.75rem; padding: 0; border: 0; background: none; color: var(--ink-muted); font: inherit; font-size: 0.9375rem; }
+  .booking-progress-step button { cursor: pointer; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 0.25em; }
+  .booking-progress-step button:focus-visible { outline: 2px solid var(--stencil); outline-offset: 2px; }
+  .booking-progress-step[aria-current] .booking-progress-label { color: var(--ink); font-weight: 600; }
+  .booking-progress-n { display: inline-grid; place-items: center; inline-size: 1.75rem; block-size: 1.75rem; border: 1px solid var(--line-strong); border-radius: 50%; font-size: 0.8125rem; text-decoration: none; }
+  .booking-progress-step[data-state="done"] .booking-progress-n { border-color: var(--stencil); color: var(--ink); }
+  .booking-progress-step[aria-current] .booking-progress-n { border-color: var(--stencil); background: var(--stencil); color: var(--on-stencil); }
+  .booking-layout { display: grid; gap: 2rem; }
+  .booking-main { display: grid; gap: 1.5rem; align-content: start; min-inline-size: 0; }
+  .booking-step { display: grid; gap: 1.5rem; }
+  .booking-step[hidden] { display: none; }
+  .booking-step-title { margin: 0; font-family: var(--display-face); font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2.25rem); line-height: 1.15; }
+  .booking-step-title:focus { outline: none; }
+  .booking-fields { display: grid; gap: 1.75rem; }
+  .booking-legend { margin-block-end: 0.5rem; padding: 0; font-weight: 600; font-size: 1rem; }
+  .booking-hint { margin: 0; color: var(--ink-muted); font-size: 0.9375rem; }
+  .booking-error { margin: 0; color: var(--destructive); font-size: 0.9375rem; }
+  .booking-artists { display: grid; gap: 0.75rem; min-inline-size: 0; margin: 0; padding: 0; border: 0; }
+  .booking-artist-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); gap: 0.75rem; margin: 0; padding: 0; list-style: none; }
+  .booking-artist { position: relative; display: grid; grid-template-columns: 4rem minmax(0, 1fr); align-items: center; gap: 1rem; min-block-size: 5.5rem; padding: 0.75rem 2rem 0.75rem 0.75rem; border: 1px solid var(--line); cursor: pointer; }
+  .booking-artist input { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; margin: 0; opacity: 0; cursor: pointer; }
+  .booking-artist:hover { border-color: var(--line-strong); }
+  .booking-artist:has(input:checked) { border-color: var(--stencil); box-shadow: inset 0 0 0 1px var(--stencil); }
+  /* Chosen is a ring and a dot, never colour alone. */
+  .booking-artist:has(input:checked)::after { content: ""; position: absolute; inset-block-start: 0.875rem; inset-inline-end: 0.875rem; inline-size: 0.625rem; block-size: 0.625rem; border-radius: 50%; background: var(--stencil); }
+  .booking-artist:has(input:focus-visible) { outline: 2px solid var(--stencil); outline-offset: 2px; }
+  .booking-artist-photo { display: block; inline-size: 4rem; block-size: 5rem; object-fit: cover; object-position: 50% 25%; background: var(--stencil-wash); }
+  .booking-artist-text { display: grid; gap: 0.125rem; min-inline-size: 0; }
+  .booking-artist-name { font-weight: 600; overflow-wrap: anywhere; }
+  .booking-artist-style { color: var(--ink-muted); font-size: 0.875rem; }
+  .booking-calendar { display: grid; gap: 1rem; max-inline-size: 26rem; }
+  .booking-calendar-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.5rem; }
+  .booking-calendar-title { margin: 0; font-size: 1.0625rem; font-weight: 600; text-align: center; }
+  .booking-calendar-step { inline-size: 2.75rem; block-size: 2.75rem; border: 1px solid var(--line); background: none; color: var(--ink); font-size: 1.25rem; cursor: pointer; }
+  .booking-calendar-step:disabled { opacity: 0.35; cursor: not-allowed; }
+  .booking-calendar-step:focus-visible { outline: 2px solid var(--stencil); outline-offset: 2px; }
+  .booking-calendar-grid { inline-size: 100%; border-collapse: collapse; table-layout: fixed; }
+  .booking-calendar-grid th { padding-block-end: 0.5rem; color: var(--ink-muted); font-size: 0.75rem; font-weight: 500; text-align: center; }
+  .booking-calendar-grid td { padding: 0.125rem; text-align: center; }
+  .booking-day { inline-size: 100%; min-block-size: 2.75rem; padding: 0; border: 1px solid transparent; background: none; color: var(--ink); font: inherit; cursor: pointer; }
+  .booking-day[data-state="open"] { border-color: var(--line); }
+  .booking-day[data-state="open"]:hover { border-color: var(--stencil); }
+  .booking-day[data-state="chosen"] { border-color: var(--stencil); background: var(--stencil); color: var(--on-stencil); font-weight: 600; }
+  /* A day that can't be named is faint, and struck through when the studio is closed: never colour alone. */
+  .booking-day[data-state="past"], .booking-day[data-state="beyond"] { color: var(--ink-muted); opacity: 0.4; cursor: not-allowed; }
+  .booking-day[data-state="closed"], .booking-day[data-state="closure"] { color: var(--ink-muted); opacity: 0.5; text-decoration: line-through; cursor: not-allowed; }
+  .booking-day[aria-disabled="true"] { cursor: not-allowed; }
+  .booking-day:focus-visible { outline: 2px solid var(--stencil); outline-offset: 1px; }
+  .booking-chosen { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
+  .booking-chosen li { display: inline-flex; align-items: center; padding-inline-start: 0.75rem; border: 1px solid var(--stencil); }
+  .booking-chosen button { inline-size: 2.75rem; block-size: 2.75rem; border: 0; background: none; color: var(--ink); font-size: 1.25rem; cursor: pointer; }
+  .booking-chosen button:focus-visible { outline: 2px solid var(--stencil); outline-offset: -2px; }
+  .booking-check { display: flex; align-items: center; gap: 0.75rem; min-block-size: 2.75rem; cursor: pointer; }
+  .booking-check input { flex: none; inline-size: 1.25rem; block-size: 1.25rem; accent-color: var(--stencil); }
+  .booking-nav { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+  .booking-next, .booking-send { margin-inline-start: auto; }
+  .booking-notice { margin: 0; padding: 1rem 1.25rem; border-inline-start: 2px solid var(--stencil); background: var(--stencil-wash); }
+  .booking-review { display: grid; gap: 1.25rem; }
+  .booking-review-list { display: grid; margin: 0; border-block-start: 1px solid var(--line); }
+  .booking-review-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.25rem 1rem; padding-block: 1rem; border-block-end: 1px solid var(--line); }
+  .booking-review-row dt { grid-column: 1; color: var(--ink-muted); font-size: 0.875rem; }
+  .booking-review-row dd { grid-column: 1; margin: 0; overflow-wrap: anywhere; }
+  .booking-review-row .booking-review-action { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+  .booking-review-idea { white-space: pre-line; }
+  .booking-review-contact { display: grid; }
+  .booking-edit { min-block-size: 2.75rem; padding: 0 0.5rem; border: 0; background: none; color: var(--ink); font: inherit; text-decoration: underline; text-decoration-color: var(--stencil); text-underline-offset: 0.25em; cursor: pointer; }
+  .booking-edit:focus-visible { outline: 2px solid var(--stencil); outline-offset: 2px; }
+  .booking-artwork { display: grid; grid-template-columns: 4rem minmax(0, 1fr); align-items: center; gap: 1rem; margin-block-end: 1rem; color: var(--ink); text-decoration: none; }
+  .booking-artwork-photo { display: block; inline-size: 4rem; block-size: 4rem; object-fit: cover; background: var(--stencil-wash); }
+  .booking-artwork-text { overflow-wrap: anywhere; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 0.25em; }
+  .booking-summary { min-inline-size: 0; }
+  .booking-summary-fold { padding: 0 1rem; border: 1px solid var(--line); }
+  .booking-summary-fold summary { display: flex; align-items: center; min-block-size: 2.75rem; font-weight: 600; cursor: pointer; }
+  .booking-summary-fold[open] { padding-block-end: 1rem; }
+  .booking-summary-panel { display: none; }
+  .booking-summary-title { margin: 0 0 1rem; font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+  .booking-summary-list { display: grid; gap: 0.75rem; margin: 0; }
+  .booking-summary-list > div { display: grid; gap: 0.125rem; }
+  .booking-summary-list dt { color: var(--ink-muted); font-size: 0.8125rem; }
+  .booking-summary-list dd { margin: 0; overflow-wrap: anywhere; }
+  .booking-summary-note { margin: 1rem 0 0; color: var(--ink-muted); font-size: 0.875rem; }
+  .booking-sent { display: grid; gap: 1.25rem; justify-items: start; }
+  /* A drawn tick in a ring: nothing for a screen reader to say. */
+  .booking-sent-mark { inline-size: 3rem; block-size: 3rem; margin: 0; border: 1px solid var(--stencil); border-radius: 50%; }
+  .booking-sent-mark::after { content: ""; display: block; inline-size: 0.75rem; block-size: 1.375rem; margin: 0.625rem auto 0; border-inline-end: 2px solid var(--stencil); border-block-end: 2px solid var(--stencil); rotate: 45deg; }
+  .booking-sent-title { margin: 0; font-family: var(--display-face); font-size: clamp(2rem, 1.5rem + 2vw, 3rem); line-height: 1.05; }
+  .booking-sent-title:focus { outline: none; }
+  .booking-sent-body { max-inline-size: 36rem; margin: 0; }
+  .booking-sent-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 1.5rem; margin: 0; }
+  @media (min-width: 48rem) {
+    .booking-progress-count { display: none; }
+    .booking-progress-list { display: flex; flex-wrap: wrap; gap: 0.25rem 1.5rem; }
+  }
+  @media (min-width: 60rem) {
+    .booking-layout { grid-template-columns: minmax(0, 1fr) 18rem; align-items: start; column-gap: 3rem; }
+    .booking-main { grid-column: 1; grid-row: 1; }
+    .booking-summary { position: sticky; inset-block-start: calc(var(--site-bar-height, 4rem) + 1.5rem); grid-column: 2; grid-row: 1; }
+    .booking-summary-fold { display: none; }
+    .booking-summary-panel { display: block; padding: 1.5rem; border: 1px solid var(--line); }
+  }
 }
 
 /*

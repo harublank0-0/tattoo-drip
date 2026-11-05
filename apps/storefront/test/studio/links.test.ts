@@ -169,8 +169,8 @@ describe("linkHostname and linkRel", () => {
 
 describe("requestHref", () => {
 	test("is the request page, with the artist when given", () => {
-		assert.equal(requestHref({}), "/request");
-		assert.equal(requestHref({ artist: "sita" }), "/request?artist=sita");
+		assert.equal(requestHref({}), "/book");
+		assert.equal(requestHref({ artist: "sita" }), "/book?artist=sita");
 		assert.ok(isAllowedHref(requestHref({})));
 		assert.ok(isAllowedHref(requestHref({ artist: "sita" })));
 	});
@@ -225,13 +225,13 @@ describe("the flash addresses (TAT-129)", () => {
 
 	test("flashDesignHref and the request link for a design", () => {
 		assert.equal(flashDesignHref(ID), `/flash/${ID}`);
-		assert.equal(requestHref({ flash: ID }), `/request?flash=${ID}`);
+		assert.equal(requestHref({ flash: ID }), `/book?flash=${ID}`);
 		// The design names the artist: the artist is left out.
 		assert.equal(
 			requestHref({ flash: ID, artist: "sita" }),
-			`/request?flash=${ID}`,
+			`/book?flash=${ID}`,
 		);
-		assert.equal(requestHref({ artist: "sita" }), "/request?artist=sita");
+		assert.equal(requestHref({ artist: "sita" }), "/book?artist=sita");
 	});
 
 	test("each passes isAllowedHref", () => {

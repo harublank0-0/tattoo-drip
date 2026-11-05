@@ -83,7 +83,7 @@ export function relatedArtwork(
 /**
  * Where "Request a similar tattoo" goes: the artist's own request while they
  * take new work, else the studio's general one while it takes any, else
- * nowhere. Either carries the piece (`similar=<id>`), so the form starts with
+ * nowhere. Either carries the piece (`artwork=<id>`), so the form starts with
  * a link to it; nothing is sent until the client sends the form.
  */
 export function similarRequest(
@@ -92,11 +92,11 @@ export function similarRequest(
 ): { readonly href: string; readonly artist: ArtistView | null } | null {
 	if (artwork.artist?.accepting) {
 		return {
-			href: requestHref({ artist: artwork.artist.slug, similar: artwork.id }),
+			href: requestHref({ artist: artwork.artist.slug, artwork: artwork.id }),
 			artist: artwork.artist,
 		};
 	}
 	return studio.accepting
-		? { href: requestHref({ similar: artwork.id }), artist: null }
+		? { href: requestHref({ artwork: artwork.id }), artist: null }
 		: null;
 }

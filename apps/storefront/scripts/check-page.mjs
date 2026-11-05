@@ -371,27 +371,27 @@ try {
 	// work read), carries the public site key for its form, and answers as every
 	// page does.
 	apiLog.length = 0;
-	page = await get("/request?artist=sita");
+	page = await get("/book?artist=sita");
 	expect(
 		page.status === 200 &&
 			page.body.includes(
 				"<title>Send your idea to Sita Rai at Canary Ink &lt;Studio&gt;</title>",
 			) &&
 			page.body.includes(
-				`href="http://${SLUG}.localhost:${storefrontPort}/request?artist=sita"`,
+				`href="http://${SLUG}.localhost:${storefrontPort}/book?artist=sita"`,
 			),
-		`/request?artist=sita is ${page.status}, or lacks its own title and canonical link.`,
+		`/book?artist=sita is ${page.status}, or lacks its own title and canonical link.`,
 	);
 	expect(
 		page.cacheControl ===
 			"public, max-age=0, s-maxage=60, stale-while-revalidate=600",
-		`/request's Cache-Control is "${page.cacheControl}".`,
+		`/book's Cache-Control is "${page.cacheControl}".`,
 	);
 	expect(
 		page.body.includes(`challengeSiteKey:"${SITE_KEY}"`) &&
 			page.body.includes("your idea for") &&
 			!page.body.includes(CANARY),
-		"/request does not carry the public Turnstile site key and the artist's form, or shows the server key.",
+		"/book does not carry the public Turnstile site key and the artist's form, or shows the server key.",
 	);
 	expect(
 		apiLog
@@ -407,26 +407,34 @@ try {
 					call.visitor === VISITOR &&
 					call.cookie === null,
 			),
-		`/request asked the API for ${apiLog.map((call) => call.url).join(", ")} instead of the lookup and the list alone, each keyed, cookie-less and carrying the visitor's address.`,
+		`/book asked the API for ${apiLog.map((call) => call.url).join(", ")} instead of the lookup and the list alone, each keyed, cookie-less and carrying the visitor's address.`,
 	);
 	// An address that is not what we wrote is still the form, never a not-found.
-	page = await get("/request?artist=Nobody&fbclid=IwAR0");
+	// The request page's old address is a permanent redirect with its query (Prompt 6).
+	page = await get("/request?artist=sita");
+	expect(
+		page.status === 301 &&
+			JSON.parse(page.headers).location === "/book?artist=sita",
+		`/request?artist=sita is ${page.status} to ${JSON.parse(page.headers).location}, not a 301 to /book with the same query.`,
+	);
+
+	page = await get("/book?artist=Nobody&fbclid=IwAR0");
 	expect(
 		page.status === 200 &&
 			page.body.includes(
 				"<title>Send your idea to Canary Ink &lt;Studio&gt;</title>",
 			) &&
 			page.body.includes(
-				`href="http://${SLUG}.localhost:${storefrontPort}/request"`,
+				`href="http://${SLUG}.localhost:${storefrontPort}/book"`,
 			),
-		`/request?artist=Nobody&fbclid=… is ${page.status}, not the general form at /request.`,
+		`/book?artist=Nobody&fbclid=… is ${page.status}, not the general form at /book.`,
 	);
 
 	// A flash design the API doesn't know (the stand-in 404s every design): the
 	// general form with a note, never a not-found, and the design is read once.
 	const FLASH_ID = "0199f000-0000-7000-8000-000000000001";
 	apiLog.length = 0;
-	page = await get(`/request?flash=${FLASH_ID}&fbclid=IwAR0`);
+	page = await get(`/book?flash=${FLASH_ID}&fbclid=IwAR0`);
 	expect(
 		page.status === 200 &&
 			page.body.includes(
@@ -434,7 +442,7 @@ try {
 			) &&
 			page.body.includes("page any more") &&
 			!page.body.includes(CANARY),
-		`/request?flash=<unknown id> is ${page.status}, or lacks the general form and the note that the design isn't on the page.`,
+		`/book?flash=<unknown id> is ${page.status}, or lacks the general form and the note that the design isn't on the page.`,
 	);
 	expect(
 		apiLog
@@ -446,14 +454,14 @@ try {
 				`/api/v1/tenants/${SLUG}/artists`,
 				`/api/v1/tenants/${SLUG}/flash/${FLASH_ID}`,
 			].join(","),
-		`/request?flash=<id> asked the API for ${apiLog.map((call) => call.url).join(", ")} instead of the lookup, the list and the design.`,
+		`/book?flash=<id> asked the API for ${apiLog.map((call) => call.url).join(", ")} instead of the lookup, the list and the design.`,
 	);
 	// A well-formed request for an artist still reads the lookup and the list alone.
 	apiLog.length = 0;
-	page = await get("/request?artist=sita");
+	page = await get("/book?artist=sita");
 	expect(
 		page.status === 200 && apiLog.every((call) => !call.url.includes("/flash")),
-		`/request?artist=sita read a flash design (${apiLog.map((call) => call.url).join(", ")}).`,
+		`/book?artist=sita read a flash design (${apiLog.map((call) => call.url).join(", ")}).`,
 	);
 
 	// The gallery (TAT-126; /gallery since Prompt 5): the lookup, the list and

@@ -6,12 +6,43 @@ import {
 	type InquiryReceipt,
 } from "@tattoo-drip/sdk";
 import { useEffect, useReducer, useRef, useState } from "react";
+import {
+	BOOKING_LIMITS,
+	BOOKING_WORDS,
+	type BookingContext,
+	type BookingField,
+	type BookingStep,
+	type BookingValues,
+	bookingFieldOf,
+	bookingSteps,
+	bookingValues,
+	COLOURS,
+	ideaFits,
+	intakeValuesOf,
+	SIZES,
+	STEP_FIELDS,
+	sizeText,
+	TIMES_OF_DAY,
+} from "../../booking/booking.ts";
+import {
+	BookingReview,
+	BookingSent,
+	BookingSummary,
+	type RequestSnapshot,
+} from "../../booking/components/booking-review.tsx";
+import {
+	ArtistChoice,
+	BookingProgress,
+	PreferredDates,
+} from "../../booking/components/booking-steps.tsx";
+import { bookingCopy } from "../../booking/copy.ts";
 import { useAppForm } from "../../components/ui/form.tsx";
+import { zonedNow } from "../../studio/hours.ts";
 import type { InquiryChannels, InquiryState } from "../../studio/inquiry.ts";
 import { browserCodec } from "../browser-codec.ts";
 import { Challenge, TURNSTILE_PRIVACY_URL } from "../challenge.ts";
 import { browserChallengeHost } from "../challenge-host.ts";
-import { copy } from "../copy.ts";
+import { copy, fill as fillTemplate } from "../copy.ts";
 import { prepareReference } from "../images.ts";
 import {
 	afterBlockEnds,
@@ -36,7 +67,6 @@ import {
 	FIELD_ORDER,
 	INTAKE_LIMITS,
 	type IntakeField,
-	type IntakeValues,
 	initialValues,
 	SOURCE_CHANNELS,
 	validateIntake,
@@ -50,7 +80,6 @@ import {
 	ErrorSummary,
 	type FormPhase,
 	hasChannels,
-	IntakeSent,
 	type NoticeProblem,
 	ProblemNotice,
 	SubmitStatus,
@@ -65,6 +94,8 @@ export interface IntakeFormProps {
 	readonly channels: InquiryChannels;
 	/** The public Turnstile site key, or null in development (no check, no token). */
 	readonly challengeSiteKey: string | null;
+	/** What the booking flow knows of the studio, its artists and the piece asked about (Prompt 6). */
+	readonly booking: BookingContext;
 }
 
 /** After this long sending, the status line says a slow connection can take 2 minutes. */
@@ -89,6 +120,7 @@ export function IntakeForm({
 	state,
 	channels,
 	challengeSiteKey,
+	booking,
 }: IntakeFormProps) {
 	const { studioName, preferredArtist, artists } = state;
 	// A flash request is for the design's artist alone: no picker (TAT-129).
@@ -96,6 +128,46 @@ export function IntakeForm({
 	const showArtists =
 		flashDesignId === null && (artists.length >= 2 || preferredArtist !== null);
 	const createInquiry = useCreateInquiry();
+	// Prompt 6's steps. The cards are the artists the intake may name, with
+	// what the page knows of them; "today" is the studio's, not the device's.
+	const rules = booking.calendar;
+	const [today] = useState(
+		() =>
+			zonedNow(new Date(), rules.timeZone)?.date ??
+			new Date().toISOString().slice(0, 10),
+	);
+	const steps = bookingSteps(showArtists);
+	const [step, setStep] = useState<BookingStep>(steps[0]);
+	const [reached, setReached] = useState(0);
+	const [summaryFields, setSummaryFields] = useState<readonly BookingField[]>(
+		[],
+	);
+	const checked = useRef(false);
+	const stepTitle = useRef<HTMLHeadingElement>(null);
+	const cards = booking.artists.filter((artist) =>
+		artists.some((open) => open.id === artist.id),
+	);
+	const errorsOf = (values: BookingValues) =>
+		bookingErrors(values, today, booking, {
+			studioName,
+			artistIds: artists.map((artist) => artist.id),
+		});
+	// The steps reached so far, for the form's validator (it is created once):
+	// a later step's fields are not judged before the client gets there.
+	const shownUpTo = useRef(0);
+	shownUpTo.current = steps.indexOf(step);
+	const judged = (errors: ReturnType<typeof errorsOf>) => {
+		const fields = new Set(
+			steps
+				.slice(0, shownUpTo.current + 1)
+				.flatMap((each) => STEP_FIELDS[each]),
+		);
+		return Object.fromEntries(
+			Object.entries(errors).filter(([field]) =>
+				fields.has(field as BookingField),
+			),
+		);
+	};
 
 	const [references, dispatch] = useReducer(
 		referencesReducer,
@@ -112,9 +184,13 @@ export function IntakeForm({
 	const [photosStopped, setPhotosStopped] = useState(false);
 	const [blockedUntil, setBlockedUntil] = useState<number | null>(null);
 	const [sentTo, setSentTo] = useState<string | null>(null);
-	const [focus, setFocus] = useState<"summary" | "notice" | "sent" | null>(
-		null,
-	);
+	const [focus, setFocus] = useState<
+		"summary" | "notice" | "sent" | "step" | null
+	>(null);
+	const [sent, setSent] = useState<{
+		artistName: string | null;
+		dates: string;
+	} | null>(null);
 
 	const honeypot = useRef<HTMLInputElement>(null);
 	const challengeBox = useRef<HTMLDivElement>(null);
@@ -152,34 +228,117 @@ export function IntakeForm({
 	);
 
 	const form = useAppForm({
-		defaultValues: initialValues(
-			preferredArtist?.id ?? null,
-			state.start ?? null,
+		defaultValues: bookingValues(
+			initialValues(preferredArtist?.id ?? null, state.start ?? null),
 		),
 		validationLogic: revalidateLogic({
 			mode: "submit",
 			modeAfterSubmission: "change",
 		}),
 		validators: {
-			onDynamic: ({ value }: { value: IntakeValues }) => {
-				const fields = validateIntake(value, {
-					studioName,
-					artistIds: artists.map((artist) => artist.id),
-				});
+			onDynamic: ({ value }: { value: BookingValues }) => {
+				const fields = judged(errorsOf(value));
 				return Object.keys(fields).length > 0 ? { fields } : undefined;
 			},
 		},
 		listeners: {
-			onChange: ({ fieldApi }) => clearServerError(fieldApi),
+			onChange: ({ fieldApi }) => {
+				clearServerError(fieldApi);
+				// A refusal shown on a field the flow composes goes when any of its parts changes.
+				const composed = COMPOSED_FROM[fieldApi.name as BookingInput];
+				if (composed) {
+					form.setFieldMeta(composed, (meta) =>
+						meta.errorMap.onServer === undefined
+							? meta
+							: {
+									...meta,
+									errorMap: { ...meta.errorMap, onServer: undefined },
+								},
+					);
+				}
+				// Once a step was checked, its messages follow what is typed.
+				if (checked.current) void form.validate("submit");
+			},
 		},
 		onSubmit: ({ value }) => send(value),
-		onSubmitInvalid: () => {
-			setShowSummary(true);
-			setFocus("summary");
-		},
+		// Something on an earlier step is wrong (the review step's Send checks
+		// them all): go to the first such step and say what.
+		onSubmitInvalid: ({ value }) => showErrorsOn(firstStepWithErrors(value)),
 	});
 
-	async function send(values: IntakeValues): Promise<void> {
+	/** The first step, in order, with a field that is wrong; the current one when none is. */
+	function firstStepWithErrors(values: BookingValues): BookingStep {
+		const errors = errorsOf(values);
+		return (
+			steps.find((each) =>
+				STEP_FIELDS[each].some((field) => hasProblem(field, errors)),
+			) ?? step
+		);
+	}
+
+	/** Whether a field is wrong: by the flow's rules, or refused by the API and not changed since. */
+	function hasProblem(
+		field: BookingField,
+		errors: ReturnType<typeof errorsOf>,
+	): boolean {
+		return (
+			errors[field] !== undefined ||
+			form.state.fieldMeta[field]?.errorMap?.onServer !== undefined
+		);
+	}
+
+	/** Shows `target`'s problems: its fields marked touched, the summary of them, the keyboard on it. */
+	function showErrorsOn(target: BookingStep) {
+		checked.current = true;
+		for (const field of STEP_FIELDS[target]) {
+			form.setFieldMeta(field, (meta) => ({ ...meta, isTouched: true }));
+		}
+		void form.validate("submit");
+		setStep(target);
+		setSummaryFields(STEP_FIELDS[target]);
+		setShowSummary(true);
+		setFocus("summary");
+	}
+
+	/** Continue: the step's fields checked, then the next step, its heading focused. */
+	function goNext() {
+		const errors = errorsOf(form.state.values);
+		const problem = STEP_FIELDS[step].some((field) =>
+			hasProblem(field, errors),
+		);
+		const photoProblem = step === "tattoo" && hasPhotoErrors(latest.current);
+		if (problem || photoProblem) {
+			showErrorsOn(step);
+			return;
+		}
+		goTo(steps[Math.min(steps.indexOf(step) + 1, steps.length - 1)]);
+	}
+
+	function goTo(target: BookingStep) {
+		const index = steps.indexOf(target);
+		setReached((furthest) => Math.max(furthest, index));
+		setStep(target);
+		setShowSummary(false);
+		setFocus("step");
+	}
+
+	/** What the review and the summary show: the values and what they become. */
+	function snapshotOf(values: BookingValues): RequestSnapshot {
+		const intake = intakeValuesOf(values, today, rules);
+		return {
+			values,
+			artistName:
+				cards.find((artist) => artist.id === values.preferredArtistId)?.name ??
+				artists.find((artist) => artist.id === values.preferredArtistId)
+					?.name ??
+				null,
+			dates: intake.preferredDates,
+			photoCount: readyItems(references).length,
+			artwork: booking.artwork,
+		};
+	}
+
+	async function send(values: BookingValues): Promise<void> {
 		if (inFlight.current) return;
 		if (blockedUntil !== null && Date.now() < blockedUntil) return;
 		inFlight.current = true;
@@ -188,6 +347,8 @@ export function IntakeForm({
 			setShowSummary(false);
 			setPhotosStopped(false);
 			if (hasPhotoErrors(latest.current)) {
+				setStep("tattoo");
+				setSummaryFields(STEP_FIELDS.tattoo);
 				setShowSummary(true);
 				setFocus("summary");
 				return;
@@ -201,22 +362,29 @@ export function IntakeForm({
 				// photos while Send waits, so a photo that vanished was refused.
 				if (lostPhotos(asked, latest.current).length > 0) {
 					setPhotosStopped(true);
+					setStep("tattoo");
+					setSummaryFields(STEP_FIELDS.tattoo);
 					setShowSummary(true);
 					setFocus("summary");
 					return;
 				}
 			}
-			const sent = readyItems(latest.current);
+			const photos = readyItems(latest.current);
+			const intake = intakeValuesOf(values, today, rules);
 			const result = await submit(
 				toInquiryInput(
-					values,
-					sent.map((item) => item.file),
+					intake,
+					photos.map((item) => item.file),
 					honeypot.current?.value ?? "",
 					flashDesignId,
 				),
 			);
 			if (result.kind === "busy") return;
 			if (result.kind === "sent") {
+				setSent({
+					artistName: snapshotOf(values).artistName,
+					dates: intake.preferredDates,
+				});
 				setSentTo(values.contactPhone.trim());
 				form.reset();
 				dispatch({ type: "cleared" });
@@ -233,8 +401,11 @@ export function IntakeForm({
 								artists.find((artist) => artist.id === id)?.name ?? null,
 						});
 			if (problem.kind === "fields") {
+				const named = Object.keys(problem.fields).map((name) =>
+					bookingFieldOf(name as IntakeField),
+				);
 				for (const [name, message] of Object.entries(problem.fields)) {
-					form.setFieldMeta(name as IntakeField, (meta) => ({
+					form.setFieldMeta(bookingFieldOf(name as IntakeField), (meta) => ({
 						...meta,
 						isTouched: true,
 						errorMap: { ...meta.errorMap, onServer: message },
@@ -242,10 +413,20 @@ export function IntakeForm({
 				}
 				dispatch({
 					type: "rejected",
-					sentIds: sent.map((item) => item.id),
+					sentIds: photos.map((item) => item.id),
 					byIndex: problem.photos,
 					error: problem.photosError,
 				});
+				// The API refused a field: go to its step (a refused photo is the tattoo's).
+				const target =
+					steps.find((each) =>
+						STEP_FIELDS[each].some((field) => named.includes(field)),
+					) ??
+					(problem.photosError || Object.keys(problem.photos).length > 0
+						? "tattoo"
+						: step);
+				setStep(target);
+				setSummaryFields(STEP_FIELDS[target]);
 				setShowSummary(true);
 				setFocus("summary");
 				return;
@@ -323,7 +504,9 @@ export function IntakeForm({
 				? summaryRef.current
 				: focus === "notice"
 					? noticeRef.current
-					: sentRef.current;
+					: focus === "step"
+						? stepTitle.current
+						: sentRef.current;
 		target?.focus();
 		setFocus(null);
 	}, [focus]);
@@ -362,11 +545,12 @@ export function IntakeForm({
 
 	if (sentTo !== null) {
 		return (
-			<IntakeSent
+			<BookingSent
 				ref={sentRef}
 				studioName={studioName}
 				phone={sentTo}
-				channels={channels}
+				artistName={sent?.artistName ?? null}
+				dates={sent?.dates ?? ""}
 			/>
 		);
 	}
@@ -374,10 +558,12 @@ export function IntakeForm({
 	const busy = phase !== "idle";
 	const blocked = blockedUntil !== null;
 	const warm = () => challenge?.preload();
+	const index = steps.indexOf(step);
+	const words = bookingCopy;
 
 	return (
 		<form
-			className="intake"
+			className="intake booking"
 			method="post"
 			noValidate
 			aria-labelledby="inquiry-title"
@@ -386,6 +572,11 @@ export function IntakeForm({
 			onSubmit={(event) => {
 				event.preventDefault();
 				event.stopPropagation();
+				// Enter in a field continues; only the review step sends.
+				if (step !== "review") {
+					goNext();
+					return;
+				}
 				if (!busy && !blocked) void form.handleSubmit();
 			}}
 		>
@@ -397,239 +588,528 @@ export function IntakeForm({
 			<p className="intake-note intake-reassure">
 				<Fill template={copy.reassurance} values={{ studio: studioName }} />
 			</p>
-			<p className="intake-note">{copy.required}</p>
-
-			<form.Subscribe selector={(formState) => formState.fieldMeta}>
-				{(fieldMeta) => {
-					const items = summaryItems(
-						fieldMeta,
-						references,
-						studioName,
-						photosStopped,
-					);
-					return showSummary && items.length > 0 ? (
-						<ErrorSummary ref={summaryRef} items={items} />
-					) : null;
-				}}
-			</form.Subscribe>
-			{notice ? (
-				<ProblemNotice
-					ref={noticeRef}
-					problem={notice}
-					studioName={studioName}
-					channels={channels}
-				/>
-			) : null}
-
-			<fieldset className="intake-group">
-				<legend className="intake-legend">{copy.tattooLegend}</legend>
-				<form.AppField name="idea">
-					{(field) => (
-						<field.TextareaField
-							label={copy.fields.idea.label}
-							description={copy.fields.idea.hint}
-							rows={5}
-							dir="auto"
-							required
-							aria-required="true"
+			<BookingProgress
+				steps={steps}
+				current={step}
+				reached={reached}
+				onGo={goTo}
+				disabled={busy}
+			/>
+			<div className="booking-layout">
+				<form.Subscribe selector={(formState) => formState.values}>
+					{(values) => (
+						<BookingSummary
+							snapshot={snapshotOf(values)}
+							studioName={studioName}
+							showArtist={showArtists}
 						/>
 					)}
-				</form.AppField>
-				<ReferencePicker
-					state={references}
-					previews={previews}
-					studioName={studioName}
-					disabled={busy}
-					onPick={(files) => {
-						setPhotosStopped(false);
-						dispatch({
-							type: "picked",
-							files: files.map((file) => ({
-								id: `photo-${nextPhotoId.current++}`,
-								file,
-							})),
-						});
-					}}
-					onRemove={(id) => {
-						setPhotosStopped(false);
-						dispatch({ type: "removed", id });
-					}}
-				/>
-				<div className="intake-pair">
-					<form.AppField name="placement">
-						{(field) => (
-							<field.TextField
-								label={copy.fields.placement.label}
-								description={copy.fields.placement.hint}
-								maxLength={INTAKE_LIMITS.placement}
-								dir="auto"
-								required
-								aria-required="true"
-							/>
+				</form.Subscribe>
+				<div className="booking-main">
+					<form.Subscribe selector={(formState) => formState.fieldMeta}>
+						{(fieldMeta) => {
+							const items = bookingSummaryItems(
+								fieldMeta,
+								summaryFields,
+								references,
+								studioName,
+								photosStopped,
+							);
+							return showSummary && items.length > 0 ? (
+								<ErrorSummary ref={summaryRef} items={items} />
+							) : null;
+						}}
+					</form.Subscribe>
+					{notice ? (
+						<ProblemNotice
+							ref={noticeRef}
+							problem={notice}
+							studioName={studioName}
+							channels={channels}
+						/>
+					) : null}
+
+					{steps.map((each) => (
+						<section
+							key={each}
+							className="booking-step"
+							hidden={each !== step}
+							aria-labelledby={`booking-step-${each}`}
+						>
+							<h2
+								id={`booking-step-${each}`}
+								ref={each === step ? stepTitle : undefined}
+								className="booking-step-title"
+								tabIndex={-1}
+							>
+								{words.titles[each]}
+							</h2>
+							{each === "artist" ? (
+								<form.Field name="preferredArtistId">
+									{(field) => (
+										<ArtistChoice
+											artists={cards}
+											studioName={studioName}
+											value={field.state.value}
+											onChange={(id) => field.handleChange(id)}
+											invalid={
+												field.state.meta.isTouched && !field.state.meta.isValid
+											}
+											error={firstMessage(field.state.meta.errors) ?? null}
+										/>
+									)}
+								</form.Field>
+							) : null}
+							{each === "when" ? (
+								<div className="booking-fields">
+									<form.Field name="days">
+										{(field) => (
+											<form.Subscribe
+												selector={(formState) => formState.values.flexible}
+											>
+												{(flexible) =>
+													flexible ? null : (
+														<PreferredDates
+															value={field.state.value}
+															onChange={(days) => field.handleChange(days)}
+															today={today}
+															rules={rules}
+															studioName={studioName}
+															invalid={
+																field.state.meta.isTouched &&
+																!field.state.meta.isValid
+															}
+															error={
+																firstMessage(field.state.meta.errors) ?? null
+															}
+														/>
+													)
+												}
+											</form.Subscribe>
+										)}
+									</form.Field>
+									<form.Field name="flexible">
+										{(field) => (
+											<label className="booking-check" htmlFor="flexible">
+												<input
+													id="flexible"
+													type="checkbox"
+													checked={field.state.value}
+													onChange={(event) => {
+														field.handleChange(event.target.checked);
+														// The days' message goes with the days.
+														form.setFieldMeta("days", (meta) => ({
+															...meta,
+															isTouched: false,
+														}));
+													}}
+												/>
+												<span>
+													<Fill
+														template={words.when.flexible}
+														values={{ studio: studioName }}
+													/>
+												</span>
+											</label>
+										)}
+									</form.Field>
+									<form.AppField name="timeOfDay">
+										{(field) => (
+											<field.ChoiceField
+												legend={words.when.timeOfDay}
+												options={TIMES_OF_DAY.map((time) => ({
+													value: time,
+													label: BOOKING_WORDS.timeOfDay[time],
+												}))}
+											/>
+										)}
+									</form.AppField>
+								</div>
+							) : null}
+							{each === "tattoo" ? (
+								<div className="booking-fields">
+									<form.AppField name="idea">
+										{(field) => (
+											<field.TextareaField
+												label={copy.fields.idea.label}
+												description={copy.fields.idea.hint}
+												rows={5}
+												dir="auto"
+												required
+												aria-required="true"
+											/>
+										)}
+									</form.AppField>
+									{booking.styles.length > 0 ? (
+										<form.AppField name="style">
+											{(field) => (
+												<field.ChoiceField
+													legend={words.tattoo.style}
+													description={words.tattoo.styleHint}
+													options={[
+														{ value: "", label: words.tattoo.anyStyle },
+														...booking.styles.map((name) => ({
+															value: name,
+															label: name,
+														})),
+													]}
+												/>
+											)}
+										</form.AppField>
+									) : null}
+									<form.AppField name="colour">
+										{(field) => (
+											<field.ChoiceField
+												legend={words.tattoo.colour}
+												options={COLOURS.map((colour) => ({
+													value: colour,
+													label: BOOKING_WORDS.colour[colour],
+												}))}
+											/>
+										)}
+									</form.AppField>
+									<ReferencePicker
+										state={references}
+										previews={previews}
+										studioName={studioName}
+										disabled={busy}
+										onPick={(files) => {
+											setPhotosStopped(false);
+											dispatch({
+												type: "picked",
+												files: files.map((file) => ({
+													id: `photo-${nextPhotoId.current++}`,
+													file,
+												})),
+											});
+										}}
+										onRemove={(id) => {
+											setPhotosStopped(false);
+											dispatch({ type: "removed", id });
+										}}
+									/>
+									<form.AppField name="size">
+										{(field) => (
+											<field.ChoiceField
+												legend={words.tattoo.size}
+												description={words.tattoo.sizeHint}
+												options={SIZES.map((size) => ({
+													value: size,
+													label: BOOKING_WORDS.size[size],
+												}))}
+												required
+											/>
+										)}
+									</form.AppField>
+									<form.AppField name="approximateSize">
+										{(field) => (
+											<field.TextField
+												label={words.tattoo.sizeDetails}
+												description={words.tattoo.sizeDetailsHint}
+												maxLength={INTAKE_LIMITS.approximateSize}
+												dir="auto"
+											/>
+										)}
+									</form.AppField>
+									<form.AppField name="placement">
+										{(field) => (
+											<field.TextField
+												label={copy.fields.placement.label}
+												description={copy.fields.placement.hint}
+												maxLength={INTAKE_LIMITS.placement}
+												dir="auto"
+												required
+												aria-required="true"
+											/>
+										)}
+									</form.AppField>
+									<form.AppField name="budget">
+										{(field) => (
+											<field.TextField
+												label={copy.fields.budget.label}
+												description={copy.fields.budget.hint}
+												maxLength={INTAKE_LIMITS.budget}
+												dir="auto"
+											/>
+										)}
+									</form.AppField>
+									<form.AppField name="notes">
+										{(field) => (
+											<field.TextareaField
+												label={words.tattoo.notes}
+												description={words.tattoo.notesHint}
+												rows={3}
+												maxLength={BOOKING_LIMITS.notes}
+												dir="auto"
+											/>
+										)}
+									</form.AppField>
+								</div>
+							) : null}
+							{each === "details" ? (
+								<div className="booking-fields">
+									<p className="intake-note">{copy.required}</p>
+									<form.AppField name="contactName">
+										{(field) => (
+											<field.TextField
+												label={copy.fields.contactName.label}
+												autoComplete="name"
+												maxLength={INTAKE_LIMITS.contactName}
+												dir="auto"
+												required
+												aria-required="true"
+											/>
+										)}
+									</form.AppField>
+									<form.AppField name="contactPhone">
+										{(field) => (
+											<field.TextField
+												label={copy.fields.contactPhone.label}
+												description={
+													<Fill
+														template={copy.fields.contactPhone.hint ?? ""}
+														values={{ studio: studioName }}
+													/>
+												}
+												type="tel"
+												inputMode="tel"
+												autoComplete="tel"
+												maxLength={INTAKE_LIMITS.contactPhone}
+												required
+												aria-required="true"
+											/>
+										)}
+									</form.AppField>
+									<form.AppField name="contactEmail">
+										{(field) => (
+											<field.TextField
+												label={copy.fields.contactEmail.label}
+												type="email"
+												inputMode="email"
+												autoComplete="email"
+												maxLength={INTAKE_LIMITS.contactEmail}
+											/>
+										)}
+									</form.AppField>
+									<form.AppField name="sourceChannel">
+										{(field) => (
+											<field.ChoiceField
+												legend={
+													<Fill
+														template={copy.fields.sourceChannel.label}
+														values={{ studio: studioName }}
+													/>
+												}
+												options={SOURCE_CHANNELS.map((channel) => ({
+													value: channel,
+													label: copy.channels[channel],
+												}))}
+												required
+											/>
+										)}
+									</form.AppField>
+								</div>
+							) : null}
+							{each === "review" && step === "review" ? (
+								<form.Subscribe selector={(formState) => formState.values}>
+									{(values) => (
+										<BookingReview
+											snapshot={snapshotOf(values)}
+											studioName={studioName}
+											steps={steps}
+											onEdit={goTo}
+											disabled={busy}
+										/>
+									)}
+								</form.Subscribe>
+							) : null}
+						</section>
+					))}
+
+					{/* TAT-55's honeypot: off-screen (not display: none), never filled by the form. */}
+					<div className="intake-trap" aria-hidden="true">
+						<label htmlFor="intake-website">{copy.honeypot}</label>
+						<input
+							ref={honeypot}
+							id="intake-website"
+							type="text"
+							name={INQUIRY_HONEYPOT_FIELD}
+							tabIndex={-1}
+							autoComplete="off"
+							defaultValue=""
+						/>
+					</div>
+
+					{step === "review" ? (
+						<p className="booking-notice">{words.review.notice}</p>
+					) : null}
+					<div ref={challengeBox} className="intake-challenge" />
+
+					<div className="booking-nav">
+						{index > 0 ? (
+							<button
+								type="button"
+								className="action action-secondary booking-back"
+								onClick={() => goTo(steps[index - 1])}
+								disabled={busy}
+							>
+								{words.nav.back}
+							</button>
+						) : null}
+						{step === "review" ? (
+							<button
+								type="submit"
+								className="action action-primary booking-send"
+								aria-disabled={busy || blocked ? true : undefined}
+							>
+								{busy ? words.review.sending : words.review.submit}
+							</button>
+						) : (
+							<button
+								type="submit"
+								className="action action-primary booking-next"
+							>
+								{words.nav.next}
+							</button>
 						)}
-					</form.AppField>
-					<form.AppField name="approximateSize">
-						{(field) => (
-							<field.TextField
-								label={copy.fields.approximateSize.label}
-								description={copy.fields.approximateSize.hint}
-								maxLength={INTAKE_LIMITS.approximateSize}
-								dir="auto"
-								required
-								aria-required="true"
-							/>
-						)}
-					</form.AppField>
+					</div>
+					{step === "details" || step === "review" ? (
+						// Who sees what, and the bot check, where the details are given and sent.
+						<p className="intake-fine">
+							<Fill template={copy.privacy} values={{ studio: studioName }} />{" "}
+							<a href={TURNSTILE_PRIVACY_URL} rel="noopener noreferrer">
+								{copy.privacyLink}
+							</a>
+						</p>
+					) : null}
+					{step === "review" ? (
+						<SubmitStatus
+							phase={phase}
+							slow={slow}
+							photoCount={readyItems(references).length}
+							bytes={totalBytes(references)}
+						/>
+					) : null}
+					{hasChannels(channels) ? (
+						<p className="intake-chat">
+							{copy.chat} <ChatLinks channels={channels} />
+						</p>
+					) : null}
 				</div>
-				<form.AppField name="preferredDates">
-					{(field) => (
-						<field.TextField
-							label={copy.fields.preferredDates.label}
-							description={copy.fields.preferredDates.hint}
-							maxLength={INTAKE_LIMITS.preferredDates}
-							dir="auto"
-							required
-							aria-required="true"
-						/>
-					)}
-				</form.AppField>
-				{showArtists ? (
-					<form.AppField name="preferredArtistId">
-						{(field) => (
-							<field.ChoiceField
-								legend={copy.fields.preferredArtistId.label}
-								options={[
-									{ value: "", label: copy.noPreference },
-									...artists.map((artist) => ({
-										value: artist.id,
-										label: artist.name,
-									})),
-								]}
-							/>
-						)}
-					</form.AppField>
-				) : null}
-				<form.AppField name="budget">
-					{(field) => (
-						<field.TextField
-							label={copy.fields.budget.label}
-							description={copy.fields.budget.hint}
-							maxLength={INTAKE_LIMITS.budget}
-							dir="auto"
-						/>
-					)}
-				</form.AppField>
-				<form.AppField name="sourceChannel">
-					{(field) => (
-						<field.ChoiceField
-							legend={
-								<Fill
-									template={copy.fields.sourceChannel.label}
-									values={{ studio: studioName }}
-								/>
-							}
-							options={SOURCE_CHANNELS.map((channel) => ({
-								value: channel,
-								label: copy.channels[channel],
-							}))}
-							required
-						/>
-					)}
-				</form.AppField>
-			</fieldset>
-
-			<fieldset className="intake-group">
-				<legend className="intake-legend">
-					<Fill template={copy.contactLegend} values={{ studio: studioName }} />
-				</legend>
-				<form.AppField name="contactName">
-					{(field) => (
-						<field.TextField
-							label={copy.fields.contactName.label}
-							autoComplete="name"
-							maxLength={INTAKE_LIMITS.contactName}
-							dir="auto"
-							required
-							aria-required="true"
-						/>
-					)}
-				</form.AppField>
-				<form.AppField name="contactPhone">
-					{(field) => (
-						<field.TextField
-							label={copy.fields.contactPhone.label}
-							description={
-								<Fill
-									template={copy.fields.contactPhone.hint ?? ""}
-									values={{ studio: studioName }}
-								/>
-							}
-							type="tel"
-							inputMode="tel"
-							autoComplete="tel"
-							maxLength={INTAKE_LIMITS.contactPhone}
-							required
-							aria-required="true"
-						/>
-					)}
-				</form.AppField>
-				<form.AppField name="contactEmail">
-					{(field) => (
-						<field.TextField
-							label={copy.fields.contactEmail.label}
-							type="email"
-							inputMode="email"
-							autoComplete="email"
-							maxLength={INTAKE_LIMITS.contactEmail}
-						/>
-					)}
-				</form.AppField>
-			</fieldset>
-
-			{/* TAT-55's honeypot: off-screen (not display: none), never filled by the form. */}
-			<div className="intake-trap" aria-hidden="true">
-				<label htmlFor="intake-website">{copy.honeypot}</label>
-				<input
-					ref={honeypot}
-					id="intake-website"
-					type="text"
-					name={INQUIRY_HONEYPOT_FIELD}
-					tabIndex={-1}
-					autoComplete="off"
-					defaultValue=""
-				/>
 			</div>
-
-			<div ref={challengeBox} className="intake-challenge" />
-
-			<div className="intake-submit">
-				<button
-					type="submit"
-					className="action action-primary"
-					aria-disabled={busy || blocked ? true : undefined}
-				>
-					{busy ? copy.sending : copy.send}
-				</button>
-				<SubmitStatus
-					phase={phase}
-					slow={slow}
-					photoCount={readyItems(references).length}
-					bytes={totalBytes(references)}
-				/>
-				<p className="intake-fine">
-					<Fill template={copy.privacy} values={{ studio: studioName }} />{" "}
-					<a href={TURNSTILE_PRIVACY_URL} rel="noopener noreferrer">
-						{copy.privacyLink}
-					</a>
-				</p>
-			</div>
-			{hasChannels(channels) ? (
-				<p className="intake-chat">
-					{copy.chat} <ChatLinks channels={channels} />
-				</p>
-			) : null}
 		</form>
 	);
+}
+
+/**
+ * Every problem with the values, by the flow's fields: the intake's own rules
+ * on what will be sent (intakeValuesOf), the dates' and size's messages on
+ * their choices, and the idea's when the choices written into it make it
+ * longer than the API takes.
+ */
+export function bookingErrors(
+	values: BookingValues,
+	today: string,
+	booking: BookingContext,
+	rules: { studioName: string; artistIds: readonly string[] },
+): Partial<Record<BookingField, string>> {
+	const errors: Partial<Record<BookingField, string>> = {};
+	const intake = validateIntake(
+		intakeValuesOf(values, today, booking.calendar),
+		rules,
+	);
+	for (const [field, message] of Object.entries(intake)) {
+		if (!message) continue;
+		// Too long with the choice: the client's own words are what to shorten.
+		const ownWords =
+			field === "approximateSize" &&
+			values.approximateSize.trim() !== "" &&
+			sizeText(values).length > INTAKE_LIMITS.approximateSize;
+		errors[
+			ownWords ? "approximateSize" : bookingFieldOf(field as IntakeField)
+		] = message;
+	}
+	if (!errors.idea && values.idea.trim() && !ideaFits(values)) {
+		errors.idea = fillTemplate(copy.errors.tooLong, {
+			max: INTAKE_LIMITS.idea,
+		});
+	}
+	return errors;
+}
+
+/** The flow's fields in the order a step shows them, for the summary. */
+const BOOKING_FIELD_ORDER: readonly BookingField[] = [
+	"preferredArtistId",
+	"days",
+	"idea",
+	"size",
+	"approximateSize",
+	"placement",
+	"budget",
+	"contactName",
+	"contactPhone",
+	"contactEmail",
+	"sourceChannel",
+];
+
+const BOOKING_LABELS: Partial<Record<BookingField, string>> = {
+	days: bookingCopy.steps.when,
+	size: bookingCopy.tattoo.size,
+	approximateSize: bookingCopy.tattoo.sizeDetails,
+};
+
+/** The flow's inputs, by form field name. */
+type BookingInput = keyof BookingValues;
+
+/** The field whose refusal the API reports for a composed value: its parts clear it when they change. */
+const COMPOSED_FROM: Partial<Record<BookingInput, BookingField>> = {
+	approximateSize: "size",
+	flexible: "days",
+	timeOfDay: "days",
+	style: "idea",
+	colour: "idea",
+	notes: "idea",
+};
+
+/** The summary for the fields of one step: each one's first error, then (on the tattoo step) the photos'. */
+export function bookingSummaryItems(
+	fieldMeta: FieldMetaMap,
+	fields: readonly BookingField[],
+	references: ReferencesState,
+	studioName: string,
+	photosStopped = false,
+): SummaryItem[] {
+	const items: SummaryItem[] = [];
+	for (const field of BOOKING_FIELD_ORDER) {
+		if (!fields.includes(field)) continue;
+		const message = firstMessage(fieldMeta[field]?.errors);
+		if (message) {
+			const own = BOOKING_LABELS[field];
+			items.push({
+				target:
+					CHOICE_FIELDS.has(field as IntakeField) || field === "size"
+						? `${field}-0`
+						: field,
+				label: own ?? (
+					<Fill
+						template={copy.fields[field as IntakeField].label}
+						values={{ studio: studioName }}
+					/>
+				),
+				message,
+			});
+		}
+		if (field === "idea" && (hasPhotoErrors(references) || photosStopped)) {
+			items.push({
+				target: canAdd(references) ? "references-input" : "references",
+				label: copy.photos.legend,
+				message: hasPhotoErrors(references)
+					? (references.error ?? copy.photos.fixPhotos)
+					: copy.photos.stopped,
+			});
+		}
+	}
+	return items;
 }
 
 /** A field's API error goes as soon as the person changes that field. */

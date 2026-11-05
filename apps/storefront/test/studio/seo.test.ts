@@ -204,7 +204,7 @@ describe("requestPageSeo (TAT-127)", () => {
 			seo.description,
 			"Tell Black Needle about the tattoo you'd like: the idea, where it goes and the dates that suit you.",
 		);
-		assert.equal(seo.canonical, `${ORIGIN}/request`);
+		assert.equal(seo.canonical, `${ORIGIN}/book`);
 		assert.equal(seo.type, "website");
 		assert.equal(seo.siteName, "Black Needle");
 		assert.equal(seo.image, null);
@@ -220,7 +220,7 @@ describe("requestPageSeo (TAT-127)", () => {
 			"Tell Sita Rai about the tattoo you'd like: the idea, where it goes and the dates that suit you.",
 		);
 		// Facebook keys a shared link by its canonical og:url.
-		assert.equal(seo.canonical, `${ORIGIN}/request?artist=sita`);
+		assert.equal(seo.canonical, `${ORIGIN}/book?artist=sita`);
 		assert.deepEqual(seo.image, sita.photo);
 		assert.equal(seo.jsonLd, null);
 	});
@@ -241,7 +241,7 @@ describe("requestPageSeo (TAT-127)", () => {
 			"अर्जुन थापा isn't taking new inquiries right now.",
 		);
 		// The address is the same as an open page's: the artist stays in it.
-		assert.equal(seo.canonical, `${ORIGIN}/request?artist=arjun`);
+		assert.equal(seo.canonical, `${ORIGIN}/book?artist=arjun`);
 		assert.doesNotMatch(
 			`${seo.title} ${seo.description}`,
 			/Send your idea|Tell /,
@@ -256,7 +256,7 @@ describe("requestPageSeo (TAT-127)", () => {
 			seo.description,
 			"Black Needle isn't taking new inquiries right now.",
 		);
-		assert.equal(seo.canonical, `${ORIGIN}/request`);
+		assert.equal(seo.canonical, `${ORIGIN}/book`);
 		assert.equal(seo.image, null);
 	});
 
@@ -288,14 +288,14 @@ describe("requestPageSeo (TAT-127)", () => {
 
 		assert.deepEqual(head.scripts, []);
 		assert.deepEqual(head.links, [
-			{ rel: "canonical", href: `${ORIGIN}/request?artist=sita` },
+			{ rel: "canonical", href: `${ORIGIN}/book?artist=sita` },
 		]);
 		assert.ok(
 			head.meta.some(
 				(m) =>
 					"property" in m &&
 					m.property === "og:url" &&
-					m.content === `${ORIGIN}/request?artist=sita`,
+					m.content === `${ORIGIN}/book?artist=sita`,
 			),
 		);
 		assert.ok(
@@ -470,7 +470,7 @@ describe("requestPageSeo for a flash design (TAT-129)", () => {
 			seo.description,
 			"Ask Black Needle for the Moth flash by Sita Rai: say where it goes and the dates that suit you.",
 		);
-		assert.equal(seo.canonical, `${ORIGIN}/request?flash=${flashId(1)}`);
+		assert.equal(seo.canonical, `${ORIGIN}/book?flash=${flashId(1)}`);
 		assert.equal(seo.image, null);
 		assert.equal(seo.jsonLd, null);
 	});
@@ -482,7 +482,7 @@ describe("requestPageSeo for a flash design (TAT-129)", () => {
 		);
 		assert.equal(
 			requestPageSeo(studio, sita, ORIGIN, true).canonical,
-			`${ORIGIN}/request?artist=sita`,
+			`${ORIGIN}/book?artist=sita`,
 		);
 	});
 });

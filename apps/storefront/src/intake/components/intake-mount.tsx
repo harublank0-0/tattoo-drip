@@ -57,7 +57,10 @@ export function IntakeMount({
 	return (
 		<FallbackOnError fallback={fallback}>
 			<Suspense fallback={fallback}>
-				<LazyIntakeForm key={intakeFormKey(props.state)} {...props} />
+				<LazyIntakeForm
+					key={`${intakeFormKey(props.state)}|${props.booking.artwork?.id ?? ""}`}
+					{...props}
+				/>
 			</Suspense>
 		</FallbackOnError>
 	);

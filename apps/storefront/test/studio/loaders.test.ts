@@ -501,7 +501,7 @@ describe("loadStudioPage", () => {
 			"theme",
 		]);
 		assert.deepEqual(data.requestLink, {
-			href: "/request",
+			href: "/book",
 			artistName: null,
 		});
 		assert.equal(
@@ -584,7 +584,7 @@ describe("loadArtistPage", () => {
 		);
 		assert.equal(data.artist.name, "Sita Rai");
 		assert.equal(data.seo.canonical, `${ORIGIN}/artists/sita`);
-		assert.equal(data.artist.requestHref, "/request?artist=sita");
+		assert.equal(data.artist.requestHref, "/book?artist=sita");
 	});
 
 	test("the artist page's data holds no inquiry state and no inquiry channels: the form is on /request", async () => {
@@ -616,12 +616,12 @@ describe("loadArtistPage", () => {
 		);
 
 		assert.deepEqual(sita.requestLink, {
-			href: "/request?artist=sita",
+			href: "/book?artist=sita",
 			artistName: "Sita Rai",
 		});
 		assert.ok(sita.chat?.whatsapp.endsWith("about%20Sita%20Rai"));
 		// A closed artist, the studio open: the studio's request.
-		assert.deepEqual(arjun.requestLink, { href: "/request", artistName: null });
+		assert.deepEqual(arjun.requestLink, { href: "/book", artistName: null });
 		assert.ok(arjun.chat?.whatsapp.endsWith(encodeURIComponent("अर्जुन थापा")));
 		// Both closed: nothing to lead to.
 		assert.equal(closed.requestLink, null);
@@ -1145,7 +1145,7 @@ describe("loadRequestPage (TAT-127)", () => {
 			data.inquiry.kind === "open" && data.inquiry.preferredArtist?.id,
 			SITA.id,
 		);
-		assert.equal(data.seo.canonical, `${ORIGIN}/request?artist=sita`);
+		assert.equal(data.seo.canonical, `${ORIGIN}/book?artist=sita`);
 		// The artists alone: no studio read (cached), no gallery read.
 		assert.deepEqual(
 			calls.map((call) => call.url),
@@ -1187,7 +1187,7 @@ describe("loadRequestPage (TAT-127)", () => {
 				null,
 				JSON.stringify(search),
 			);
-			assert.equal(data.seo.canonical, `${ORIGIN}/request`);
+			assert.equal(data.seo.canonical, `${ORIGIN}/book`);
 		}
 	});
 
@@ -1243,7 +1243,7 @@ describe("loadRequestPage (TAT-127)", () => {
 			arjun.seo.description,
 			"अर्जुन थापा isn't taking new inquiries right now.",
 		);
-		assert.equal(arjun.seo.canonical, `${ORIGIN}/request?artist=arjun`);
+		assert.equal(arjun.seo.canonical, `${ORIGIN}/book?artist=arjun`);
 
 		// The studio closed: the general page declines, an open artist's page does not.
 		const closed = pageContext(fetch, CLOSED_STUDIO);
@@ -1426,7 +1426,7 @@ describe("the flash page's loader (TAT-129)", () => {
 		assert.deepEqual(data.search, search);
 		assert.equal(data.list.designs.length, 3);
 		assert.equal(data.seo.canonical, `${ORIGIN}/flash`);
-		assert.equal(data.requestLink?.href, "/request");
+		assert.equal(data.requestLink?.href, "/book");
 		// The chat names the artist the address filters by.
 		assert.ok(data.chat?.whatsapp.includes("Sita%20Rai"));
 	});
@@ -1595,7 +1595,7 @@ describe("loadRequestPage with ?flash= (TAT-129)", () => {
 		assert.deepEqual(data.inquiry.kind === "open" && data.inquiry.artists, [
 			{ id: SITA.id, name: "Sita Rai" },
 		]);
-		assert.equal(data.seo.canonical, `${ORIGIN}/request?flash=${ID}`);
+		assert.equal(data.seo.canonical, `${ORIGIN}/book?flash=${ID}`);
 		assert.equal(data.seo.title, "Ask for the Moth flash at Black Needle");
 		assert.ok(data.chat?.whatsapp.endsWith("about%20the%20Moth%20flash"));
 		assert.match(
@@ -1621,7 +1621,7 @@ describe("loadRequestPage with ?flash= (TAT-129)", () => {
 			undefined,
 		);
 		// The artist's head, not the design's; the chat still names the design.
-		assert.equal(data.seo.canonical, `${ORIGIN}/request?artist=sita`);
+		assert.equal(data.seo.canonical, `${ORIGIN}/book?artist=sita`);
 		assert.ok(data.chat?.whatsapp.endsWith("about%20the%20Moth%20flash"));
 
 		// An artist with closed books and flash off: their words, and their closed state.
@@ -1672,7 +1672,7 @@ describe("loadRequestPage with ?flash= (TAT-129)", () => {
 		assert.equal("flashDesignId" in data.inquiry, false);
 		// The chat still names the design; the page's head is the artist's, not the design's.
 		assert.ok(data.chat?.whatsapp.endsWith("about%20the%20Moth%20flash"));
-		assert.equal(data.seo.canonical, `${ORIGIN}/request?artist=sita`);
+		assert.equal(data.seo.canonical, `${ORIGIN}/book?artist=sita`);
 
 		// An artist whose books are closed: their own closed state below the summary.
 		const arjun = {
@@ -1700,7 +1700,7 @@ describe("loadRequestPage with ?flash= (TAT-129)", () => {
 			unknown.inquiry.kind === "open" && unknown.inquiry.preferredArtist,
 			null,
 		);
-		assert.equal(unknown.seo.canonical, `${ORIGIN}/request`);
+		assert.equal(unknown.seo.canonical, `${ORIGIN}/book`);
 		assert.equal(log.mock.calls.length, 0, "a 404 is not a failure");
 
 		for (const respond of [

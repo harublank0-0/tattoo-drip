@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
+import type { BookingContext } from "../../booking/booking.ts";
 import { Fill } from "../../intake/components/fill.tsx";
 import { IntakeMount } from "../../intake/components/intake-mount.tsx";
 import { studioCopy } from "../copy.ts";
 import type { InquiryChannels, InquiryState } from "../inquiry.ts";
 import { linkRel, requestHref } from "../links.ts";
-import { BookingPanel, BookingStrip } from "./steps.tsx";
+import { BookingStrip } from "./steps.tsx";
 
 type OpenInquiry = Extract<InquiryState, { kind: "open" }>;
 
@@ -16,9 +17,10 @@ type OpenInquiry = Extract<InquiryState, { kind: "open" }>;
  * (`inquiry-title`) in every state; its heading, the page's `h1`, says
  * "Inquiries" while closed, so it doesn't invite above a refusal.
  *
- * Open (TAT-105), the section is the form's column with the compact "How
- * booking works" strip (an `h2`) under the heading on a phone, and the
- * sticky panel beside it from 60rem.
+ * Open, the section is the compact "How booking works" strip (an `h2`) under
+ * the heading, then the booking flow (Prompt 6), which lays out its own steps
+ * and, from 60rem, its running summary beside them (the sticky "How booking
+ * works" panel of TAT-105 gave way to it).
  *
  * `intro` (TAT-129) is what the request page shows right under the heading
  * and above the steps strip: the flash design asked for. Asking for a design
@@ -29,36 +31,49 @@ export function InquirySection({
 	channels,
 	challengeSiteKey = null,
 	intro = null,
+	booking,
+	headed = true,
 }: {
 	state: InquiryState;
 	channels: InquiryChannels;
+	/** The booking flow's context (Prompt 6): its artists, styles, calendar and piece. */
+	booking: BookingContext;
+	/**
+	 * Whether the section brings its own h1 (`inquiry-title`), the steps strip
+	 * and the "How booking works" panel; a theme with its own opening (Ink
+	 * Noir's booking page, Prompt 6) gives the page's h1 that id and leaves
+	 * them out: its flow has its own progress and summary.
+	 */
+	headed?: boolean;
 	/** The public Turnstile site key (null: no bot check, development). */
 	challengeSiteKey?: string | null;
 	intro?: ReactNode;
 }) {
 	return (
-		<div
-			className={state.kind === "open" ? "section inquiry-split" : "section"}
-		>
+		<div className="section">
 			<section id="inquiry" className="inquiry" aria-labelledby="inquiry-title">
 				{/* An invitation only while the section offers one. */}
-				<h1 id="inquiry-title" className="section-title">
-					{state.kind === "open"
-						? state.flashDesignId === undefined
-							? studioCopy.sendIdea
-							: studioCopy.flash.requestTitle
-						: "Inquiries"}
-				</h1>
+				{headed ? (
+					<h1 id="inquiry-title" className="section-title">
+						{state.kind === "open"
+							? state.flashDesignId === undefined
+								? studioCopy.sendIdea
+								: studioCopy.flash.requestTitle
+							: "Inquiries"}
+					</h1>
+				) : null}
 				{intro}
-				{state.kind === "open" ? (
+				{headed && state.kind === "open" ? (
 					<BookingStrip studioName={state.studioName} />
 				) : null}
-				<div className="stack measure">
+				{/* Open, the flow lays out its own column and summary (Prompt 6). */}
+				<div className={state.kind === "open" ? "stack" : "stack measure"}>
 					{state.kind === "open" ? (
 						<IntakeMount
 							state={state}
 							channels={channels}
 							challengeSiteKey={challengeSiteKey}
+							booking={booking}
 							fallback={<InquiryFallback state={state} channels={channels} />}
 						/>
 					) : null}
@@ -94,9 +109,6 @@ export function InquirySection({
 					) : null}
 				</div>
 			</section>
-			{state.kind === "open" ? (
-				<BookingPanel studioName={state.studioName} channels={channels} />
-			) : null}
 		</div>
 	);
 }

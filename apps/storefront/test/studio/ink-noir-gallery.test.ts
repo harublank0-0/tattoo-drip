@@ -355,13 +355,13 @@ describe("Ink Noir's gallery", () => {
 	test("invites a request only while someone takes new work", () => {
 		assert.match(
 			mainOf(galleryHtml(gallery(page(1)))),
-			/<a class="action action-primary ink-cta" href="\/request">Request a session<\/a>/,
+			/<a class="action action-primary ink-cta" href="\/book">Request a session<\/a>/,
 		);
 		assert.doesNotMatch(
 			mainOf(
 				galleryHtml(gallery(page(1), {}, inkNoir(CLOSED_STUDIO), [ARJUN])),
 			),
-			/ink-gallery-close|href="\/request/,
+			/ink-gallery-close|href="\/book/,
 		);
 	});
 });
@@ -443,54 +443,101 @@ describe("one tattoo's page", () => {
 	test("asks for something similar from the artist while they take new work, else the studio, else nobody", () => {
 		const id = photoId(1);
 		const open = artwork();
-		assert.equal(open.similar?.href, `/request?artist=sita&similar=${id}`);
+		assert.equal(open.similar?.href, `/book?artist=sita&artwork=${id}`);
 		assert.match(
 			mainOf(artworkHtml(open)),
 			new RegExp(
-				`<a class="action action-primary ink-cta" href="/request\\?artist=sita&amp;similar=${id}">Request a similar tattoo</a>`,
+				`<a class="action action-primary ink-cta" href="/book\\?artist=sita&amp;artwork=${id}">Request a similar tattoo</a>`,
 			),
 		);
 		const artistClosed = artwork({
 			artists: [{ ...SITA, acceptingInquiries: false }],
 		});
-		assert.equal(artistClosed.similar?.href, `/request?similar=${id}`);
+		assert.equal(artistClosed.similar?.href, `/book?artwork=${id}`);
 		const nobody = artwork({
 			studio: inkNoir(CLOSED_STUDIO),
 			artists: [{ ...SITA, acceptingInquiries: false }],
 		});
 		assert.equal(nobody.similar, null);
 		const html = mainOf(artworkHtml(nobody));
-		assert.doesNotMatch(html, /Request a similar tattoo|similar=/);
+		assert.doesNotMatch(html, /Request a similar tattoo|artwork=/);
 		assert.match(
 			html,
 			/<bdi>Sita Rai<\/bdi> isn&#x27;t taking new work right now\./,
 		);
 	});
 
-	test("the request page starts its idea with a link to the piece, and only while it takes a request", () => {
+	test("the booking page checks the piece with the API, then names its artist and starts the idea with a link to it", () => {
 		const id = photoId(1);
-		assert.deepEqual(readRequestSearch({ artist: "sita", similar: id }), {
+		const photo = page(1).data[0];
+		assert.deepEqual(readRequestSearch({ artist: "sita", artwork: id }), {
 			artist: "sita",
-			similar: id,
+			artwork: id,
 		});
-		assert.deepEqual(readRequestSearch({ similar: "nope" }), {});
-		assert.equal(requestHref({ similar: id }), `/request?similar=${id}`);
+		assert.deepEqual(readRequestSearch({ artwork: "nope" }), {});
+		assert.equal(requestHref({ artwork: id }), `/book?artwork=${id}`);
 		const data = requestPageData(
 			STUDIO,
 			[SITA, ARJUN],
-			{ artist: "sita", similar: id },
+			{ artwork: id },
 			ORIGIN,
+			IMAGE_ORIGIN,
+			null,
+			photo,
 		);
 		assert.equal(data.inquiry.kind, "open");
+		assert.equal(
+			data.inquiry.kind === "open" ? data.inquiry.preferredArtist?.name : null,
+			"Sita Rai",
+		);
 		assert.equal(
 			data.inquiry.kind === "open" ? data.inquiry.start?.idea : null,
 			`Inspired by this piece in your gallery: ${ORIGIN}/gallery/${id}`,
 		);
+		assert.equal(data.booking.artwork?.title, "Koi on the forearm");
+		assert.equal(data.booking.artwork?.href, `/gallery/${id}`);
+		// A piece the API didn't show (or another id) starts nothing and names no one.
+		for (const shown of [null, page(2).data[1]]) {
+			const none = requestPageData(
+				STUDIO,
+				[SITA, ARJUN],
+				{ artwork: id },
+				ORIGIN,
+				IMAGE_ORIGIN,
+				null,
+				shown,
+			);
+			assert.equal(none.booking.artwork, null);
+			assert.equal(
+				none.inquiry.kind === "open" ? none.inquiry.start : null,
+				undefined,
+			);
+		}
+		// The piece of an artist who takes no new work is the studio's general request (review fix).
+		const general = requestPageData(
+			STUDIO,
+			[{ ...SITA, acceptingInquiries: false }, ARJUN],
+			{ artwork: id },
+			ORIGIN,
+			IMAGE_ORIGIN,
+			null,
+			photo,
+		);
+		assert.equal(general.inquiry.kind, "open");
+		assert.equal(
+			general.inquiry.kind === "open"
+				? general.inquiry.preferredArtist
+				: undefined,
+			null,
+		);
 		const closed = requestPageData(
 			CLOSED_STUDIO,
 			[ARJUN],
-			{ similar: id },
+			{ artwork: id },
 			ORIGIN,
+			IMAGE_ORIGIN,
+			null,
+			photo,
 		);
 		assert.notEqual(closed.inquiry.kind, "open");
 	});
