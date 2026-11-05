@@ -1,0 +1,177 @@
+/*
+ * Ink Noir: a dark, photography-first theme (src/studio/theme/ink-noir/).
+ * Everything here applies only under `<html class="theme-ink-noir">`, which
+ * the root route sets for a studio that picked the theme
+ * (src/studio/theme/html.ts), so a Stencil & Ink page is untouched.
+ *
+ * One colour scheme, whatever the device prefers. The values are theme.ts's
+ * INK_NOIR_SCHEME and the accent tokens accentTokens() gives for #e05f5b on
+ * that paper (test/studio/ink-noir.test.ts pins both). Measured on the paper
+ * #101112: ink 16.6:1, ink-muted 7.7:1, accent 5.4:1 (5.0:1 on the raised
+ * surface, 4.7:1 on the wash), line-strong 4.3:1 (3:1 is the floor for a
+ * control's border). Text on an accent fill is the paper (5.4:1). A studio's
+ * own accent replaces the three accent tokens through brandingCss, checked
+ * against this paper.
+ *
+ * `:root.theme-ink-noir` (0,2,0) outranks styles.css's `:root` and its dark
+ * scheme; the brand's `html:root.theme-ink-noir` (0,2,1) outranks this.
+ */
+:root.theme-ink-noir {
+  color-scheme: dark;
+  --paper: #101112;
+  /* The raised surface: the settled header, the menu, the footer. */
+  --paper-raised: #18191b;
+  --ink: #f4f0ea;
+  --ink-muted: #a5a5a5;
+  --stencil: #e05f5b;
+  --stencil-strong: #e5837f;
+  --on-stencil: #101112;
+  --stencil-wash: #291a1b;
+  --line: #343638;
+  --line-strong: #75787c;
+  --destructive: #f2b8b5;
+  --card: var(--paper-raised);
+  --popover: var(--paper-raised);
+  /* Corners barely softened: a print's edge, not a card's. */
+  --radius: 0.125rem;
+  /* The header's one-line height: a 44 px control and 0.625rem above and below. */
+  --site-bar-height: 4rem;
+  /* The page column: the pages' own `.page` width, shared by the header and footer. */
+  --ink-column: min(72rem, 100% - 2.5rem);
+}
+
+/*
+ * The shared pages, quieted for a photograph-led look. The Stencil & Ink
+ * frame (an accent line offset behind each photo and the booking panel) is
+ * that theme's signature; here photos stand on their own and panels take a
+ * hairline. Unlayered and two classes deep, so they outrank styles.css's
+ * component rules and its unlayered 60rem block.
+ */
+:root.theme-ink-noir .artist-photo::after,
+:root.theme-ink-noir .profile-cover::after,
+:root.theme-ink-noir .inquiry-aside::after { display: none; }
+:root.theme-ink-noir .inquiry-aside { border-color: var(--line); background: var(--paper-raised); }
+:root.theme-ink-noir .section-title { font-size: clamp(2rem, 1.4rem + 2.4vw, 3.25rem); line-height: 1.1; }
+:root.theme-ink-noir .profile-name { line-height: 1.02; }
+:root.theme-ink-noir .action:active { translate: 0 1px; }
+
+/* Keyboard users skip the header: hidden above the top until it has focus. */
+.ink-skip { position: absolute; inset-inline-start: 1rem; inset-block-start: 0.75rem; z-index: 3; padding: 0.75rem 1rem; border-radius: var(--radius); background: var(--stencil); color: var(--on-stencil); font-weight: 600; text-decoration: none; translate: 0 -200%; }
+.ink-skip:focus { translate: 0 0; }
+/* The skip link moves focus to <main> (tabindex -1): no ring around the whole page. */
+#main:focus { outline: none; }
+
+.ink-container { width: var(--ink-column); margin-inline: auto; }
+
+/*
+ * The header. Sticky; settled (the raised surface at 94%, a line under it)
+ * by default. Where scroll-driven animation runs, it starts clear over the
+ * page and settles across the first 5rem of scroll, so nothing runs on the
+ * main thread and nothing moves: only the colours change. No blur: at 94%
+ * the page behind barely shows, and a backdrop filter costs every frame.
+ */
+.ink-header { position: sticky; inset-block-start: 0; z-index: 1; border-block-end: 1px solid var(--line); background: color-mix(in srgb, var(--paper-raised) 94%, transparent); }
+@supports (animation-timeline: scroll()) {
+  .ink-header { animation: ink-header-settle linear both; animation-timeline: scroll(root); animation-range: 0 5rem; }
+}
+@keyframes ink-header-settle {
+  from { border-block-end-color: transparent; background-color: transparent; }
+}
+.ink-header-inner { display: flex; align-items: center; gap: 0.75rem; min-block-size: var(--site-bar-height); padding-block: 0.625rem; }
+/*
+ * The studio's mark: the name in the display face, two lines at most (the
+ * full name is the page's h1 and the link's accessible name), taking the
+ * squeeze before the booking link does, so a long Devanagari name wraps and
+ * the page never scrolls sideways.
+ */
+.ink-brand { display: inline-flex; align-items: center; min-block-size: 2.75rem; min-inline-size: 0; margin-inline-end: auto; color: var(--ink); font-family: var(--display-face); font-size: 1.25rem; font-weight: 700; line-height: 1.15; text-decoration: none; overflow-wrap: anywhere; }
+.ink-brand .brand-name, .ink-header-cta > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+/* The logo keeps the site bar's box (logoSizes "siteBar"); only its tile's corners follow the theme. */
+.ink-brand .site-bar-logo, .ink-sheet-title .site-bar-logo { border-radius: var(--radius); }
+
+/* The links: muted, the current one in ink over a short accent rule that draws in from the start edge on hover. */
+.ink-nav { display: none; }
+.ink-nav-list { display: flex; gap: 0.25rem; margin: 0; padding: 0; list-style: none; }
+.ink-nav-list a { position: relative; display: inline-flex; align-items: center; min-block-size: 2.75rem; padding-inline: 0.875rem; color: var(--ink-muted); font-size: 0.9375rem; font-weight: 500; text-decoration: none; transition: color 150ms ease; }
+.ink-nav-list a::after { content: ''; position: absolute; inset-inline: 0.875rem; inset-block-end: 0.375rem; block-size: 2px; background: var(--stencil); scale: 0 1; transform-origin: left center; transition: scale 200ms ease; }
+.ink-nav-list a:hover { color: var(--ink); }
+.ink-nav-list a:hover::after { scale: 1 1; }
+.ink-nav-list a[aria-current] { color: var(--ink); }
+.ink-nav-list a[aria-current]::after { scale: 1 1; }
+
+.ink-header-cta { flex: 0 0 auto; max-inline-size: 55%; min-block-size: 2.75rem; padding: 0.375rem 0.875rem; font-size: 0.9375rem; }
+
+/* The phone's menu button: a 44 px square, outlined like the controls. */
+.ink-menu-button { display: inline-grid; place-items: center; flex: none; inline-size: 2.75rem; block-size: 2.75rem; padding: 0; border: 1px solid var(--line-strong); border-radius: var(--radius); background: transparent; color: var(--ink); cursor: pointer; transition: border-color 150ms ease, color 150ms ease; }
+.ink-menu-button:hover { border-color: var(--ink); }
+.ink-menu-button svg { inline-size: 1.25rem; block-size: 1.25rem; }
+
+@media (min-width: 60rem) {
+  .ink-header-inner { gap: 1.5rem; }
+  .ink-brand { margin-inline-end: 0; }
+  .ink-nav { display: block; margin-inline-start: auto; }
+  .ink-menu-button { display: none; }
+  .ink-header-cta { max-inline-size: 16rem; }
+}
+
+/*
+ * The menu (shadcn's Sheet): the full width of a phone, at most 24rem, on
+ * the raised surface. The pages in the display face, large enough to tap
+ * without aiming; the current one marked with the accent at its start edge.
+ * The way to book sits at the foot.
+ */
+.ink-sheet { inline-size: 100%; max-inline-size: 24rem; gap: 2rem; padding: 1.25rem 1.25rem max(1.5rem, env(safe-area-inset-bottom)); border-color: var(--line); background: var(--paper-raised); overflow-y: auto; }
+.ink-sheet-title { display: flex; align-items: center; min-block-size: 2.75rem; padding-inline-end: 3.5rem; color: var(--ink); font-family: var(--display-face); font-size: 1.25rem; font-weight: 700; line-height: 1.15; overflow-wrap: anywhere; }
+.ink-sheet-list { display: grid; margin: 0; padding: 0; list-style: none; border-block-start: 1px solid var(--line); }
+.ink-sheet-list li { border-block-end: 1px solid var(--line); }
+.ink-sheet-list a { display: flex; align-items: center; min-block-size: 3.5rem; padding-inline: 1rem 0; border-inline-start: 2px solid transparent; color: var(--ink); font-family: var(--display-face); font-size: 1.625rem; font-weight: 700; line-height: 1.2; text-decoration: none; transition: border-color 150ms ease, color 150ms ease; }
+.ink-sheet-list a:hover { color: var(--stencil); }
+.ink-sheet-list a[aria-current] { border-inline-start-color: var(--stencil); }
+.ink-sheet-cta { inline-size: 100%; margin-block-start: auto; }
+/* The sheet's Close button takes focus when it opens (Radix); its ring is for the keyboard, not for a tap. */
+.ink-sheet > button:focus:not(:focus-visible) { box-shadow: none; }
+
+/*
+ * The footer. The studio's name, set as large as the display face goes, is
+ * the page's sign-off; everything after it is small and quiet. Columns stack
+ * on a phone, sit two across from 40rem and four from 60rem beside the name.
+ */
+.ink-footer { margin-block-start: 6rem; border-block-start: 1px solid var(--line); background: var(--paper-raised); color: var(--ink-muted); font-size: 0.9375rem; line-height: 1.55; overflow-wrap: anywhere; }
+.ink-footer-inner { display: grid; gap: 3rem; padding-block: 3.5rem 2rem; }
+.ink-footer-lead { display: grid; gap: 1rem; align-content: start; justify-items: start; }
+.ink-footer-name { color: var(--ink); font-family: var(--display-face); font-size: clamp(2.75rem, 1.25rem + 6vw, 6.5rem); font-weight: 700; line-height: 1; text-wrap: balance; }
+.ink-footer-about { color: var(--ink-muted); font-size: 1rem; }
+.ink-footer-cta { margin-block-start: 0.5rem; }
+.ink-footer-columns { display: grid; gap: 2.5rem 2rem; }
+.ink-footer-column { display: grid; gap: 0.75rem; align-content: start; justify-items: start; }
+/* Column titles are the body face, not the display face: labels, not headings to read. */
+.ink-footer-heading { margin: 0; color: var(--ink); font-family: var(--body-face); font-size: 0.9375rem; font-weight: 600; line-height: 1.4; }
+.ink-footer-links { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.ink-footer-links a, .ink-footer-map { display: inline-flex; align-items: center; gap: 0.5rem; min-block-size: 2.75rem; color: var(--ink-muted); text-decoration: none; transition: color 150ms ease; }
+.ink-footer-links a:hover, .ink-footer-map:hover { color: var(--ink); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.2em; }
+.ink-footer-links a[aria-current] { color: var(--ink); }
+.ink-footer-links svg, .ink-footer-map svg { flex: none; inline-size: 1rem; block-size: 1rem; color: var(--stencil); }
+.ink-footer-address { display: grid; gap: 0.25rem; justify-items: start; }
+.ink-footer-address p { color: var(--ink); }
+.ink-footer-hours { display: grid; gap: 0.25rem; margin: 0.5rem 0 0; }
+.ink-footer-hours dt { color: var(--ink); font-weight: 600; }
+.ink-footer-hours dd { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 1.5rem; margin: 0; min-inline-size: min(100%, 15rem); }
+.ink-footer-legal { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem 2rem; padding-block-start: 1.5rem; border-block-start: 1px solid var(--line); font-size: 0.875rem; }
+/* The chat button stands over the footer's last line: clear it, as styles.css does for the site footer. */
+:root:has(.chat-float) .ink-footer-inner { padding-block-end: calc(6rem + env(safe-area-inset-bottom, 0px)); }
+
+@media (min-width: 40rem) {
+  .ink-footer-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 60rem) {
+  .ink-footer-inner { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); column-gap: 4rem; padding-block-start: 5rem; }
+  .ink-footer-columns { grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); }
+  .ink-footer-legal { grid-column: 1 / -1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ink-nav-list a, .ink-nav-list a::after, .ink-menu-button, .ink-sheet-list a, .ink-footer-links a, .ink-footer-map { transition: none; }
+  :root.theme-ink-noir .action:active { translate: none; }
+  /* The menu appears and leaves at once; Radix unmounts it when no animation runs. */
+  .ink-sheet, :root.theme-ink-noir [data-slot="sheet-overlay"] { animation: none; }
+}

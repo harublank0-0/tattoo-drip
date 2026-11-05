@@ -12,8 +12,12 @@ import { cleanLine } from "../text.ts";
  * back to the default for that value alone.
  */
 
-/** The themes this app has, by key. */
-export const THEME_KEYS = ["stencil-and-ink"] as const;
+/**
+ * The themes this app has, by key: Stencil & Ink (TAT-97, TAT-105), and Ink
+ * Noir, a dark, photography-first look with its own header and footer
+ * (src/studio/theme/ink-noir/).
+ */
+export const THEME_KEYS = ["stencil-and-ink", "ink-noir"] as const;
 export type ThemeKey = (typeof THEME_KEYS)[number];
 export const DEFAULT_THEME_KEY: ThemeKey = "stencil-and-ink";
 
@@ -51,6 +55,11 @@ const sectionList = (...keys: SectionKey[]): readonly SectionKey[] =>
  */
 export const THEME_SECTIONS: Record<ThemeKey, ThemeSections> = Object.freeze({
 	"stencil-and-ink": Object.freeze({
+		order: sectionList("work", "artists", "flash", "info", "inquiry"),
+		required: sectionList("inquiry"),
+	}),
+	// The same sections: a theme changes how a page looks, not what it holds.
+	"ink-noir": Object.freeze({
 		order: sectionList("work", "artists", "flash", "info", "inquiry"),
 		required: sectionList("inquiry"),
 	}),
@@ -145,6 +154,15 @@ function isOneOf<T extends string>(
 /** A theme this app has, else the default. */
 export function readThemeKey(value: unknown): ThemeKey {
 	return isOneOf(THEME_KEYS, value) ? value : DEFAULT_THEME_KEY;
+}
+
+/**
+ * The theme key of a studio as the API sent it (`Studio.storefront.theme`),
+ * else the default: what the root route needs to theme the whole page, `<html>`
+ * included, before any page loader has parsed the rest (src/studio/theme/html.ts).
+ */
+export function studioThemeKey(studio: unknown): ThemeKey {
+	return readThemeKey(own(own(studio, "storefront"), "theme"));
 }
 
 /** A font key from FONT_KEYS, else the default (Eczar). */

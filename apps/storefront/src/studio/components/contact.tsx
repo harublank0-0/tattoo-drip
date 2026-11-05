@@ -50,15 +50,31 @@ function LinkGroup({
 	);
 }
 
-export function ContactBlock({ studio }: { studio: StudioView }) {
+/** The studio's links and address as a client looks for them, every href checked once more. */
+export interface ContactGroups {
+	/** WhatsApp, Viber, call and email. */
+	readonly chat: readonly ContactLink[];
+	/** Instagram, Facebook, TikTok, the website and other places. */
+	readonly follow: readonly ContactLink[];
+	readonly address: StudioView["address"];
+}
+
+/** The Chat, Follow and Visit groups (TAT-105): the contact block's, and a theme footer's. */
+export function contactGroups(studio: StudioView): ContactGroups {
 	const links = studio.links.filter((link) => isAllowedHref(link.href));
-	const chat = links.filter((link) => CHAT_KINDS.has(link.kind));
-	const follow = links.filter((link) => !CHAT_KINDS.has(link.kind));
-	const address =
-		studio.address && isAllowedHref(studio.address.mapsHref)
-			? studio.address
-			: null;
-	if (links.length === 0 && !address) return null;
+	return {
+		chat: links.filter((link) => CHAT_KINDS.has(link.kind)),
+		follow: links.filter((link) => !CHAT_KINDS.has(link.kind)),
+		address:
+			studio.address && isAllowedHref(studio.address.mapsHref)
+				? studio.address
+				: null,
+	};
+}
+
+export function ContactBlock({ studio }: { studio: StudioView }) {
+	const { chat, follow, address } = contactGroups(studio);
+	if (chat.length === 0 && follow.length === 0 && !address) return null;
 	return (
 		<address className="contact">
 			<LinkGroup

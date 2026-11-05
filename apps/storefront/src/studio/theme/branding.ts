@@ -1,5 +1,6 @@
 import { contrastRatio, MIN_TEXT_CONTRAST, mixColors } from "./color.ts";
 import type { FontKey, ThemeConfig } from "./config.ts";
+import { THEME_HTML } from "./html.ts";
 
 /**
  * The CSS a studio's brand adds to its two pages (TAT-54): src/styles.css's
@@ -78,21 +79,26 @@ function washFor(accent: string, scheme: Scheme): string {
 /**
  * The dark scheme's accent: `accentDark` when it can be read on the dark
  * paper; else `accent`, lightened toward white a tenth at a time until it
- * can (white always can); else null, the theme's own.
+ * can (white always can); else null, the theme's own. `scheme` is the dark
+ * paper it must read on: Stencil & Ink's dark scheme, or a dark theme's one
+ * scheme (Ink Noir's).
  */
 export function darkAccent(
 	config: Pick<ThemeConfig, "accent" | "accentDark">,
+	scheme: Scheme = DARK,
 ): string | null {
 	if (
 		config.accentDark !== null &&
-		contrastRatio(config.accentDark, DARK.paper) >= MIN_TEXT_CONTRAST
+		contrastRatio(config.accentDark, scheme.paper) >= MIN_TEXT_CONTRAST
 	) {
 		return config.accentDark;
 	}
 	if (config.accent === null) return null;
 	for (let step = 0; step <= 10; step += 1) {
 		const lighter = mixColors(config.accent, "#ffffff", step / 10);
-		if (contrastRatio(lighter, DARK.paper) >= MIN_TEXT_CONTRAST) return lighter;
+		if (contrastRatio(lighter, scheme.paper) >= MIN_TEXT_CONTRAST) {
+			return lighter;
+		}
 	}
 	return null;
 }
@@ -127,26 +133,39 @@ export function isSafeCss(css: string): boolean {
 	return SAFE_CSS.test(css) && !LOADS_OR_RUNS.test(css);
 }
 
-function tokenRule(tokens: AccentTokens): string {
-	return `html:root{--stencil:${tokens.stencil};--stencil-strong:${tokens.stencilStrong};--stencil-wash:${tokens.stencilWash}}`;
+function tokenRule(tokens: AccentTokens, selector = "html:root"): string {
+	return `${selector}{--stencil:${tokens.stencil};--stencil-strong:${tokens.stencilStrong};--stencil-wash:${tokens.stencilWash}}`;
 }
 
 /**
  * The brand's CSS, or null for none. Each scheme's tokens sit in that
  * scheme's media query and the face in a plain rule, all on `html:root`,
  * which outranks src/styles.css's `:root` wherever the router puts the tag.
+ *
+ * A theme with one fixed scheme (THEME_HTML's `scheme`: Ink Noir is always
+ * dark) gets one rule instead, with no media query: the accent as the dark
+ * scheme takes it (`accentDark`, else the accent lightened), checked against
+ * that theme's own paper, on `html:root.<the theme's class>`, which outranks
+ * the theme's tokens (`:root.<class>`).
  */
 export function brandingCss(config: ThemeConfig): string | null {
 	const rules: string[] = [];
-	const light =
-		config.accent === null ? null : accentTokens(config.accent, LIGHT);
-	if (light) {
-		rules.push(`@media (prefers-color-scheme: light){${tokenRule(light)}}`);
-	}
-	const darkColor = darkAccent(config);
-	const dark = darkColor === null ? null : accentTokens(darkColor, DARK);
-	if (dark) {
-		rules.push(`@media (prefers-color-scheme: dark){${tokenRule(dark)}}`);
+	const { scheme, className } = THEME_HTML[config.key];
+	if (scheme !== null && className !== null) {
+		const color = darkAccent(config, scheme);
+		const tokens = color === null ? null : accentTokens(color, scheme);
+		if (tokens) rules.push(tokenRule(tokens, `html:root.${className}`));
+	} else {
+		const light =
+			config.accent === null ? null : accentTokens(config.accent, LIGHT);
+		if (light) {
+			rules.push(`@media (prefers-color-scheme: light){${tokenRule(light)}}`);
+		}
+		const darkColor = darkAccent(config);
+		const dark = darkColor === null ? null : accentTokens(darkColor, DARK);
+		if (dark) {
+			rules.push(`@media (prefers-color-scheme: dark){${tokenRule(dark)}}`);
+		}
 	}
 	const face = DISPLAY_FACES[config.font];
 	if (face !== null) rules.push(`html:root{--display-face:${face}}`);

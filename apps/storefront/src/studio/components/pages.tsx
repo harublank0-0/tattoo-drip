@@ -20,13 +20,11 @@ import type {
 } from "../loaders.ts";
 import { OpenNow } from "../open-now.tsx";
 import { type MoreWork, PagedGallery } from "../paging.tsx";
-import type { RequestLink } from "../request.ts";
 import { flashDesignSizes, logoSizes } from "../srcset.ts";
-import type { SectionKey, ThemeConfig } from "../theme/config.ts";
+import type { SectionKey } from "../theme/config.ts";
 import type { StudioView } from "../view-model.ts";
 import { ArtistProfile, ArtistRoster } from "./artists.tsx";
 import { BrandCover, BrandLogo } from "./brand.tsx";
-import { ChatButton } from "./chat.tsx";
 import { ContactBlock } from "./contact.tsx";
 import {
 	ArtistFlash,
@@ -37,6 +35,7 @@ import {
 import { HealedFilter, RecentWork, WorkFilters } from "./gallery.tsx";
 import { GoodToKnowSection } from "./good-to-know.tsx";
 import { InquirySection, RequestInvite } from "./inquiry.tsx";
+import { type Shell, StencilShell } from "./shell.tsx";
 import { BookingStrip } from "./steps.tsx";
 
 /**
@@ -45,7 +44,14 @@ import { BookingStrip } from "./steps.tsx";
  * router's glue), so test/studio/render.test.ts renders them on their own.
  */
 
-export function StudioPage({ data }: { data: StudioPageData }) {
+export function StudioPage({
+	data,
+	Shell = StencilShell,
+}: {
+	data: StudioPageData;
+	/** The theme's frame around the page (header, footer); Stencil & Ink's by default. */
+	Shell?: Shell;
+}) {
 	const { studio, theme } = data;
 	// The hero's WhatsApp button is the plain chat link the Chat group lists.
 	const whatsapp = studio.links.find(
@@ -70,51 +76,52 @@ export function StudioPage({ data }: { data: StudioPageData }) {
 		</div>
 	);
 	return (
-		<>
-			<SiteBar studio={studio} theme={theme} requestLink={data.requestLink} />
-			<main className="page">
-				<header className="profile">
-					{theme.heroImage ? (
-						<BrandCover image={theme.heroImage}>{heading}</BrandCover>
-					) : (
-						heading
-					)}
-					<div className="profile-actions">
-						{studio.accepting ? (
-							<div className="actions">
-								<a className="action action-primary" href={requestHref({})}>
-									{studioCopy.sendIdea}
+		<Shell
+			studio={studio}
+			theme={theme}
+			requestLink={data.requestLink}
+			chat={data.chat}
+			page="home"
+		>
+			<header className="profile">
+				{theme.heroImage ? (
+					<BrandCover image={theme.heroImage}>{heading}</BrandCover>
+				) : (
+					heading
+				)}
+				<div className="profile-actions">
+					{studio.accepting ? (
+						<div className="actions">
+							<a className="action action-primary" href={requestHref({})}>
+								{studioCopy.sendIdea}
+							</a>
+							{whatsapp ? (
+								<a
+									className="action action-secondary"
+									href={whatsapp.href}
+									rel={linkRel(whatsapp.href)}
+								>
+									<MessageCircle aria-hidden="true" />
+									<span>{studioCopy.whatsapp}</span>
 								</a>
-								{whatsapp ? (
-									<a
-										className="action action-secondary"
-										href={whatsapp.href}
-										rel={linkRel(whatsapp.href)}
-									>
-										<MessageCircle aria-hidden="true" />
-										<span>{studioCopy.whatsapp}</span>
-									</a>
-								) : null}
-							</div>
-						) : (
-							<p className="status status-closed">{studioCopy.notTaking}</p>
-						)}
-					</div>
-					{studio.accepting ? <BookingStrip studioName={studio.name} /> : null}
-					{studio.intro ? (
-						<p className="profile-intro user-text measure" dir="auto">
-							{studio.intro}
-						</p>
-					) : null}
-					<ContactBlock studio={studio} />
-				</header>
-				{theme.sections.map((section) => (
-					<StudioSection key={section} section={section} data={data} />
-				))}
-			</main>
-			<SiteFooter studioName={studio.name} />
-			<ChatButton chat={data.chat} studioName={studio.name} />
-		</>
+							) : null}
+						</div>
+					) : (
+						<p className="status status-closed">{studioCopy.notTaking}</p>
+					)}
+				</div>
+				{studio.accepting ? <BookingStrip studioName={studio.name} /> : null}
+				{studio.intro ? (
+					<p className="profile-intro user-text measure" dir="auto">
+						{studio.intro}
+					</p>
+				) : null}
+				<ContactBlock studio={studio} />
+			</header>
+			{theme.sections.map((section) => (
+				<StudioSection key={section} section={section} data={data} />
+			))}
+		</Shell>
 	);
 }
 
@@ -155,29 +162,32 @@ function StudioSection({
 export function ArtistPage({
 	data,
 	more,
+	Shell = StencilShell,
 }: {
 	data: ArtistPageData;
 	/** The browser's "Show more" (TAT-126); without it the link loads the next page. */
 	more?: MoreWork;
+	Shell?: Shell;
 }) {
 	const { studio, artist, theme, portfolio } = data;
 	return (
-		<>
-			<SiteBar studio={studio} theme={theme} requestLink={data.requestLink} />
-			<main className="page">
-				<ArtistProfile artist={artist} studio={studio} />
-				<PortfolioSection
-					slug={artist.slug}
-					gallery={portfolio.gallery}
-					search={portfolio.search}
-					more={more}
-				/>
-				<ArtistFlash artist={artist} list={data.flash} />
-				<StudioAside studio={studio} />
-			</main>
-			<SiteFooter studioName={studio.name} />
-			<ChatButton chat={data.chat} studioName={studio.name} />
-		</>
+		<Shell
+			studio={studio}
+			theme={theme}
+			requestLink={data.requestLink}
+			chat={data.chat}
+			page="artist"
+		>
+			<ArtistProfile artist={artist} studio={studio} />
+			<PortfolioSection
+				slug={artist.slug}
+				gallery={portfolio.gallery}
+				search={portfolio.search}
+				more={more}
+			/>
+			<ArtistFlash artist={artist} list={data.flash} />
+			<StudioAside studio={studio} />
+		</Shell>
 	);
 }
 
@@ -191,31 +201,35 @@ export function ArtistPage({
 export function RequestPage({
 	data,
 	challengeSiteKey = null,
+	Shell = StencilShell,
 }: {
 	data: RequestPageData;
 	/** The intake form's public Turnstile site key (TAT-57). */
 	challengeSiteKey?: string | null;
+	Shell?: Shell;
 }) {
 	const { studio, theme, inquiry, channels } = data;
 	return (
-		<>
-			<SiteBar studio={studio} theme={theme} requestLink={null} />
-			<main className="page request-page">
-				<InquirySection
-					state={inquiry}
-					channels={channels}
-					challengeSiteKey={challengeSiteKey}
-					intro={
-						data.flash ? (
-							<FlashSummary request={data.flash} studioName={studio.name} />
-						) : null
-					}
-				/>
-				<StudioAside studio={studio} />
-			</main>
-			<SiteFooter studioName={studio.name} />
-			<ChatButton chat={data.chat} studioName={studio.name} />
-		</>
+		<Shell
+			studio={studio}
+			theme={theme}
+			requestLink={null}
+			chat={data.chat}
+			page="request"
+			mainClassName="page request-page"
+		>
+			<InquirySection
+				state={inquiry}
+				channels={channels}
+				challengeSiteKey={challengeSiteKey}
+				intro={
+					data.flash ? (
+						<FlashSummary request={data.flash} studioName={studio.name} />
+					) : null
+				}
+			/>
+			<StudioAside studio={studio} />
+		</Shell>
 	);
 }
 
@@ -285,10 +299,12 @@ function PortfolioSection({
 export function WorkPage({
 	data,
 	more,
+	Shell = StencilShell,
 }: {
 	data: WorkPageData;
 	/** The browser's "Show more"; without it the link loads the next page. */
 	more?: MoreWork;
+	Shell?: Shell;
 }) {
 	const { studio, theme, artists, search, gallery } = data;
 	const { cursor: _page, ...firstPage } = search;
@@ -296,47 +312,46 @@ export function WorkPage({
 		search.artist || search.style || search.healed === true,
 	);
 	return (
-		<>
-			<SiteBar studio={studio} theme={theme} requestLink={data.requestLink} />
-			<main className="page">
-				<section aria-labelledby="work-page-title">
-					<h1 id="work-page-title" className="section-title">
-						{studioCopy.work.pageTitle}
-					</h1>
-					<WorkFilters artists={artists} gallery={gallery} search={search} />
-					{search.cursor !== undefined ? (
-						<p className="work-newest">
-							<a className="text-link" href={workHref(firstPage)}>
-								{studioCopy.work.newest}
+		<Shell
+			studio={studio}
+			theme={theme}
+			requestLink={data.requestLink}
+			chat={data.chat}
+			page="work"
+		>
+			<section aria-labelledby="work-page-title">
+				<h1 id="work-page-title" className="section-title">
+					{studioCopy.work.pageTitle}
+				</h1>
+				<WorkFilters artists={artists} gallery={gallery} search={search} />
+				{search.cursor !== undefined ? (
+					<p className="work-newest">
+						<a className="text-link" href={workHref(firstPage)}>
+							{studioCopy.work.newest}
+						</a>
+					</p>
+				) : null}
+				{gallery.photos.length > 0 ? (
+					<PagedGallery
+						key={workHref(search)}
+						first={gallery}
+						showArtist
+						moreHref={(cursor) => workHref({ ...search, cursor })}
+						more={more}
+					/>
+				) : (
+					<div className="stack">
+						<p>{filtered ? studioCopy.work.noMatch : studioCopy.work.empty}</p>
+						{filtered ? (
+							<a className="text-link" href={workHref({})}>
+								{studioCopy.work.showAll}
 							</a>
-						</p>
-					) : null}
-					{gallery.photos.length > 0 ? (
-						<PagedGallery
-							key={workHref(search)}
-							first={gallery}
-							showArtist
-							moreHref={(cursor) => workHref({ ...search, cursor })}
-							more={more}
-						/>
-					) : (
-						<div className="stack">
-							<p>
-								{filtered ? studioCopy.work.noMatch : studioCopy.work.empty}
-							</p>
-							{filtered ? (
-								<a className="text-link" href={workHref({})}>
-									{studioCopy.work.showAll}
-								</a>
-							) : null}
-						</div>
-					)}
-				</section>
-				<StudioAside studio={studio} />
-			</main>
-			<SiteFooter studioName={studio.name} />
-			<ChatButton chat={data.chat} studioName={studio.name} />
-		</>
+						) : null}
+					</div>
+				)}
+			</section>
+			<StudioAside studio={studio} />
+		</Shell>
 	);
 }
 
@@ -347,85 +362,92 @@ export function WorkPage({
  * The artist filter shows only when two or more artists have a design. The
  * site bar's Request button is the studio's general one.
  */
-export function FlashPage({ data }: { data: FlashPageData }) {
+export function FlashPage({
+	data,
+	Shell = StencilShell,
+}: {
+	data: FlashPageData;
+	Shell?: Shell;
+}) {
 	const { studio, theme, artists, search, list } = data;
 	const filtered = search.artist !== undefined;
 	const firstPage = filtered ? { artist: search.artist } : {};
 	return (
-		<>
-			<SiteBar studio={studio} theme={theme} requestLink={data.requestLink} />
-			<main className="page">
-				<section aria-labelledby="flash-page-title">
-					<h1 id="flash-page-title" className="section-title">
-						{studioCopy.flash.pageTitle}
-					</h1>
-					{list.artists.length >= 2 ? (
-						<nav
-							aria-label={studioCopy.flash.filterNav}
-							className="work-filter-nav"
+		<Shell
+			studio={studio}
+			theme={theme}
+			requestLink={data.requestLink}
+			chat={data.chat}
+			page="flash"
+		>
+			<section aria-labelledby="flash-page-title">
+				<h1 id="flash-page-title" className="section-title">
+					{studioCopy.flash.pageTitle}
+				</h1>
+				{list.artists.length >= 2 ? (
+					<nav
+						aria-label={studioCopy.flash.filterNav}
+						className="work-filter-nav"
+					>
+						<a
+							href={flashHref({})}
+							aria-current={filtered ? undefined : "page"}
 						>
+							{studioCopy.flash.all}
+						</a>
+						{list.artists.map((artist) => (
 							<a
-								href={flashHref({})}
-								aria-current={filtered ? undefined : "page"}
+								key={artist.slug}
+								href={flashHref({ artist: artist.slug })}
+								aria-current={
+									search.artist === artist.slug ? "page" : undefined
+								}
 							>
-								{studioCopy.flash.all}
+								<bdi>{artist.name}</bdi>
 							</a>
-							{list.artists.map((artist) => (
+						))}
+					</nav>
+				) : null}
+				{search.cursor !== undefined ? (
+					<p className="work-newest">
+						<a className="text-link" href={flashHref(firstPage)}>
+							{studioCopy.flash.newest}
+						</a>
+					</p>
+				) : null}
+				{list.designs.length > 0 ? (
+					<>
+						<FlashGrid designs={list.designs} showArtist artists={artists} />
+						{list.nextCursor !== null ? (
+							<p className="flash-more-bar">
 								<a
-									key={artist.slug}
-									href={flashHref({ artist: artist.slug })}
-									aria-current={
-										search.artist === artist.slug ? "page" : undefined
-									}
+									className="action action-secondary flash-more"
+									href={flashHref({ ...firstPage, cursor: list.nextCursor })}
 								>
-									<bdi>{artist.name}</bdi>
+									{studioCopy.flash.showMore}
 								</a>
-							))}
-						</nav>
-					) : null}
-					{search.cursor !== undefined ? (
-						<p className="work-newest">
-							<a className="text-link" href={flashHref(firstPage)}>
-								{studioCopy.flash.newest}
-							</a>
-						</p>
-					) : null}
-					{list.designs.length > 0 ? (
-						<>
-							<FlashGrid designs={list.designs} showArtist artists={artists} />
-							{list.nextCursor !== null ? (
-								<p className="flash-more-bar">
-									<a
-										className="action action-secondary flash-more"
-										href={flashHref({ ...firstPage, cursor: list.nextCursor })}
-									>
-										{studioCopy.flash.showMore}
-									</a>
-								</p>
-							) : null}
-						</>
-					) : (
-						<div className="stack">
-							<p>
-								{filtered ? studioCopy.flash.noMatch : studioCopy.flash.empty}
 							</p>
-							{filtered ? (
-								<a className="text-link" href={flashHref({})}>
-									{studioCopy.flash.showAll}
-								</a>
-							) : (
-								<a className="text-link" href="/">
-									{studioCopy.goToStudio}
-								</a>
-							)}
-						</div>
-					)}
-				</section>
-				<StudioAside studio={studio} />
-			</main>
-			<SiteFooter studioName={studio.name} />
-			<ChatButton chat={data.chat} studioName={studio.name} />
-		</>
+						) : null}
+					</>
+				) : (
+					<div className="stack">
+						<p>
+							{filtered ? studioCopy.flash.noMatch : studioCopy.flash.empty}
+						</p>
+						{filtered ? (
+							<a className="text-link" href={flashHref({})}>
+								{studioCopy.flash.showAll}
+							</a>
+						) : (
+							<a className="text-link" href="/">
+								{studioCopy.goToStudio}
+							</a>
+						)}
+					</div>
+				)}
+			</section>
+			<StudioAside studio={studio} />
+		</Shell>
 	);
 }
 
@@ -438,159 +460,109 @@ const BY = studioCopy.flash.by.replace("{name}", "");
  * ("Available", or why it can't be requested now), and Request this design
  * while it can be. The site bar's Request button is the studio's general one.
  */
-export function FlashDesignPage({ data }: { data: FlashDesignPageData }) {
+export function FlashDesignPage({
+	data,
+	Shell = StencilShell,
+}: {
+	data: FlashDesignPageData;
+	Shell?: Shell;
+}) {
 	const { studio, theme, design, closedNote, similar } = data;
 	const artist = design.artist;
 	return (
-		<>
-			<SiteBar studio={studio} theme={theme} requestLink={data.requestLink} />
-			<main className="page">
-				<article className="flash-design" aria-labelledby="flash-design-title">
-					<img
-						className="flash-design-picture"
-						src={design.largeSrc}
-						srcSet={design.image.srcSet}
-						sizes={design.image.srcSet ? flashDesignSizes() : undefined}
-						width={design.image.width}
-						height={design.image.height}
-						alt={design.alt}
-						loading="eager"
-						decoding="async"
-						fetchPriority="high"
-					/>
-					<div className="flash-design-body">
-						<h1
-							id="flash-design-title"
-							className="section-title user-text"
-							dir="auto"
-						>
-							{design.name}
-						</h1>
-						{artist ? (
-							<p className="flash-design-by">
-								{BY}
-								<a className="text-link" href={artist.href}>
-									<bdi>{artist.name}</bdi>
-								</a>
-							</p>
-						) : null}
-						<dl className="flash-facts">
-							<div>
-								<dt>{studioCopy.flash.size}</dt>
-								<dd className="user-text" dir="auto">
-									{design.size}
-								</dd>
-							</div>
-							{design.priceText ? (
-								<div>
-									<dt>{studioCopy.flash.price}</dt>
-									<dd>{design.priceText}</dd>
-								</div>
-							) : null}
-							<div>
-								<dt>{studioCopy.flash.status}</dt>
-								<dd className="user-text" dir="auto">
-									{design.claimed
-										? studioCopy.flash.claimed
-										: (closedNote ?? studioCopy.flash.available)}
-								</dd>
-							</div>
-						</dl>
-						{design.claimed ? (
-							// Taken: ask the artist for something like it, else the studio.
-							similar === "artist" ? (
-								<a className="action action-primary" href={design.requestHref}>
-									{studioCopy.flash.similar}
-								</a>
-							) : similar === "studio" ? (
-								<a className="action action-primary" href={requestHref({})}>
-									{studioCopy.sendIdea}
-								</a>
-							) : null
-						) : closedNote === null ? (
-							<a className="action action-primary" href={design.requestHref}>
-								{studioCopy.flash.request}
-							</a>
-						) : null}
-						{artist ? (
-							<p>
-								<a
-									className="text-link"
-									href={flashHref({ artist: artist.slug })}
-								>
-									<span>
-										<Fill
-											template={studioCopy.flash.allBy}
-											values={{ name: artist.name }}
-										/>
-									</span>
-								</a>
-							</p>
-						) : null}
-					</div>
-				</article>
-				<StudioAside studio={studio} />
-			</main>
-			<SiteFooter studioName={studio.name} />
-			<ChatButton chat={data.chat} studioName={studio.name} />
-		</>
-	);
-}
-
-/**
- * The header at the top of the studio, artist, work and request pages
- * (TAT-127): the studio's name (and logo), back to its page, and the Request button, which
- * stays on screen as the page scrolls (it is `position: sticky`; no script).
- * `requestLink` is the button, null for none (a closed studio, or the request
- * page itself, where the button would lead to where the client is): on an
- * artist's page it names them, otherwise it asks the studio.
- */
-function SiteBar({
-	studio,
-	theme,
-	requestLink,
-}: {
-	studio: StudioView;
-	theme: ThemeConfig;
-	requestLink: RequestLink | null;
-}) {
-	return (
-		<header className="site-bar">
-			<div className="site-bar-inner">
-				<a className="site-bar-home" href="/" dir="auto">
-					{theme.logo ? (
-						<>
-							<BrandLogo
-								image={theme.logo}
-								className="site-bar-logo"
-								sizes={logoSizes(theme.logo, "siteBar")}
-							/>
-							<span>{studio.name}</span>
-						</>
-					) : (
-						studio.name
-					)}
-				</a>
-				{requestLink && isAllowedHref(requestLink.href) ? (
-					<a
-						className="action action-primary site-bar-request"
-						href={requestLink.href}
+		<Shell
+			studio={studio}
+			theme={theme}
+			requestLink={data.requestLink}
+			chat={data.chat}
+			page="flash-design"
+		>
+			<article className="flash-design" aria-labelledby="flash-design-title">
+				<img
+					className="flash-design-picture"
+					src={design.largeSrc}
+					srcSet={design.image.srcSet}
+					sizes={design.image.srcSet ? flashDesignSizes() : undefined}
+					width={design.image.width}
+					height={design.image.height}
+					alt={design.alt}
+					loading="eager"
+					decoding="async"
+					fetchPriority="high"
+				/>
+				<div className="flash-design-body">
+					<h1
+						id="flash-design-title"
+						className="section-title user-text"
+						dir="auto"
 					>
-						{requestLink.artistName === null ? (
-							studioCopy.request.bar
-						) : (
-							// One <span>: a link is a flex container, and text beside a <bdi> would become two items and lose the space.
-							<span>
-								<Fill
-									template={studioCopy.request.barArtist}
-									values={{ name: requestLink.artistName }}
-								/>
-							</span>
-						)}
-					</a>
-				) : null}
-			</div>
-		</header>
+						{design.name}
+					</h1>
+					{artist ? (
+						<p className="flash-design-by">
+							{BY}
+							<a className="text-link" href={artist.href}>
+								<bdi>{artist.name}</bdi>
+							</a>
+						</p>
+					) : null}
+					<dl className="flash-facts">
+						<div>
+							<dt>{studioCopy.flash.size}</dt>
+							<dd className="user-text" dir="auto">
+								{design.size}
+							</dd>
+						</div>
+						{design.priceText ? (
+							<div>
+								<dt>{studioCopy.flash.price}</dt>
+								<dd>{design.priceText}</dd>
+							</div>
+						) : null}
+						<div>
+							<dt>{studioCopy.flash.status}</dt>
+							<dd className="user-text" dir="auto">
+								{design.claimed
+									? studioCopy.flash.claimed
+									: (closedNote ?? studioCopy.flash.available)}
+							</dd>
+						</div>
+					</dl>
+					{design.claimed ? (
+						// Taken: ask the artist for something like it, else the studio.
+						similar === "artist" ? (
+							<a className="action action-primary" href={design.requestHref}>
+								{studioCopy.flash.similar}
+							</a>
+						) : similar === "studio" ? (
+							<a className="action action-primary" href={requestHref({})}>
+								{studioCopy.sendIdea}
+							</a>
+						) : null
+					) : closedNote === null ? (
+						<a className="action action-primary" href={design.requestHref}>
+							{studioCopy.flash.request}
+						</a>
+					) : null}
+					{artist ? (
+						<p>
+							<a
+								className="text-link"
+								href={flashHref({ artist: artist.slug })}
+							>
+								<span>
+									<Fill
+										template={studioCopy.flash.allBy}
+										values={{ name: artist.name }}
+									/>
+								</span>
+							</a>
+						</p>
+					) : null}
+				</div>
+			</article>
+			<StudioAside studio={studio} />
+		</Shell>
 	);
 }
 
@@ -609,16 +581,6 @@ function StudioAside({ studio }: { studio: StudioView }) {
 				</a>
 			</div>
 		</section>
-	);
-}
-
-/** Who runs the page clients' details go through (no link until a marketing site exists). */
-export function SiteFooter({ studioName }: { studioName: string }) {
-	return (
-		<footer className="site-footer">
-			<p dir="auto">{studioName}</p>
-			<p>Studio page by Tattoo Drip</p>
-		</footer>
 	);
 }
 
