@@ -39,10 +39,11 @@ export const infoWords = {
 	closed: "Closed days",
 	reach: "Reach",
 	follow: "Follow",
-	noLocation:
+	noLocation: "The studio hasn't published an address.",
+	noLocationAsk:
 		"The studio hasn't published an address. Message them to ask where to find them.",
 	aftercareNote:
-		"These are {studio}'s own instructions. For anything that worries you while it heals, ask your artist, or a doctor if it looks infected.",
+		"These are {studio}'s own instructions. For anything that worries you while it heals, ask your artist or a healthcare professional.",
 	fromStudio: "From {studio}",
 } as const;
 
@@ -210,7 +211,9 @@ export function ContactDetails({
 						</p>
 					</>
 				) : (
-					<p>{infoWords.noLocation}</p>
+					<p>
+						{chat.length > 0 ? infoWords.noLocationAsk : infoWords.noLocation}
+					</p>
 				)}
 			</section>
 			{studio.hours.length > 0 ? (
@@ -226,19 +229,21 @@ export function ContactDetails({
 							</div>
 						))}
 					</dl>
-					{contact.closedDays.length > 0 ? (
-						<>
-							<h3 className="contact-part-subtitle">{infoWords.closed}</h3>
-							<ul className="contact-closed">
-								{contact.closedDays.map((day) => (
-									<li key={day.when} className="user-text" dir="auto">
-										{day.when}
-										{day.note ? `: ${day.note}` : ""}
-									</li>
-								))}
-							</ul>
-						</>
-					) : null}
+				</section>
+			) : null}
+			{contact.closedDays.length > 0 ? (
+				<section className="contact-part" aria-labelledby="contact-closed">
+					<h2 id="contact-closed" className="contact-part-title">
+						{infoWords.closed}
+					</h2>
+					<ul className="contact-closed">
+						{contact.closedDays.map((day) => (
+							<li key={day.when} className="user-text" dir="auto">
+								{day.when}
+								{day.note ? `: ${day.note}` : ""}
+							</li>
+						))}
+					</ul>
 				</section>
 			) : null}
 			{follow.length > 0 ? (
@@ -331,7 +336,7 @@ function InfoBody({ data }: { data: InfoPageData }) {
 				</>
 			);
 		case "services":
-			return (
+			return content.styles.length === 0 ? null : (
 				<ul className="info-styles">
 					{content.styles.map((style) => (
 						<li key={style.name}>

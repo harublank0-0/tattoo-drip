@@ -214,6 +214,38 @@ describe("what each page says, and only that", () => {
 		assert.equal(data("aftercare", inkNoir(STUDIO)), null);
 	});
 
+	test("review fixes: nothing leads to a closed booking, empty pages are not-founds, closed days stand alone", () => {
+		// Closed studio: Services offers flash only, and says no custom work.
+		const closed = data("services", inkNoir(CLOSED_STUDIO));
+		assert.ok(closed && closed.content.kind === "services");
+		assert.equal(closed.content.requestHref, null);
+		assert.doesNotMatch(closed.seo.description, /custom work/);
+		assert.doesNotMatch(mainOf(html(closed)), /href="\/book/);
+		// Closed and no flash: nothing to offer, a not-found.
+		assert.equal(
+			data("services", inkNoir(CLOSED_STUDIO, ["work", "artists", "info"])),
+			null,
+		);
+		// The FAQ's "How do I book?" links the booking page only while it takes requests.
+		const faq = data("faq", inkNoir(CLOSED_STUDIO));
+		assert.ok(faq && faq.content.kind === "faq");
+		assert.equal(faq.content.groups[0].items[0].link, null);
+		// No introduction and no artist: no About.
+		assert.equal(data("about", inkNoir(EMPTY_STUDIO), []), null);
+		// Closed days show even without opening hours.
+		const contact = data(
+			"contact",
+			inkNoir({ ...GOOD_TO_KNOW_STUDIO, openingHours: [] }),
+		);
+		assert.ok(contact);
+		assert.match(mainOf(html(contact)), /Closed days/);
+		// The h1 names the page for heading navigation.
+		assert.match(
+			mainOf(html(data("faq") as InfoPageData)),
+			/<h1 class="ink-info-title"><span class="sr-only">FAQ: <\/span>/,
+		);
+	});
+
 	test("each page has its own title and description from the studio's data", () => {
 		const titles = INFO_PAGES.map((kind) => data(kind)?.seo.title);
 		assert.deepEqual(titles, [

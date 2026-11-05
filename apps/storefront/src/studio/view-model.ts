@@ -49,6 +49,10 @@ export interface ContactLink {
 
 /** Which informational pages have the studio's own content (shownPages). */
 export interface StudioPages {
+	/** The studio wrote an introduction (About also shows with a visible artist). */
+	readonly about: boolean;
+	/** The studio takes new work, so Services can offer custom work (or flash). */
+	readonly takingWork: boolean;
 	readonly policies: boolean;
 	readonly aftercare: boolean;
 	readonly contact: boolean;
@@ -219,6 +223,8 @@ function shownPages(studio: Studio, reachable: boolean): StudioPages {
 	const texts = (studio.goodToKnow ?? {}) as Partial<Studio["goodToKnow"]>;
 	const set = (value: string | null | undefined) => cleanText(value) !== null;
 	return {
+		about: set(studio.intro),
+		takingWork: studio.acceptingInquiries === true,
 		policies:
 			set(texts.depositPolicy) ||
 			set(texts.ageRule) ||

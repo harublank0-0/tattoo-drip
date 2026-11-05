@@ -362,7 +362,13 @@ describe("navItems: the pages a theme's navigation lists", () => {
 });
 describe("the informational pages in the navigation (Prompt 7)", () => {
 	const all = [...SECTION_KEYS];
-	const pages = { policies: true, aftercare: true, contact: true };
+	const pages = {
+		about: true,
+		takingWork: true,
+		policies: true,
+		aftercare: true,
+		contact: true,
+	};
 
 	test("Services, About and Contact join the main links, each marking its own page", () => {
 		const items = navItems(all, "services", true, pages);
@@ -389,6 +395,28 @@ describe("the informational pages in the navigation (Prompt 7)", () => {
 			),
 			["/", "/gallery", "/flash", "/about"],
 		);
+	});
+
+	test("no link leads to a not-found: About needs words or an artist, Services something to offer (review fix)", () => {
+		const hrefs = (
+			over: Partial<typeof pages>,
+			artists = true,
+			sections = all,
+		) =>
+			navItems(sections, "home", artists, { ...pages, ...over }).map(
+				(item) => item.href,
+			);
+		assert.ok(!hrefs({ about: false }, false).includes("/about"));
+		assert.ok(hrefs({ about: false }, true).includes("/about"));
+		// Closed and no flash: nothing to offer.
+		assert.ok(
+			!hrefs(
+				{ takingWork: false },
+				true,
+				all.filter((key) => key !== "flash"),
+			).includes("/services"),
+		);
+		assert.ok(hrefs({ takingWork: false }, true).includes("/services"));
 	});
 
 	test("the footer lists the FAQ always, Policies and Aftercare only with content and Good to know shown", () => {

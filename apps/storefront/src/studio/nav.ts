@@ -1,5 +1,5 @@
 import { studioCopy } from "./copy.ts";
-import { artistsHref, flashHref, workHref } from "./links.ts";
+import { artistsHref, flashHref, infoHref, workHref } from "./links.ts";
 import type { SectionKey } from "./theme/config.ts";
 import type { StudioPages } from "./view-model.ts";
 
@@ -105,9 +105,12 @@ export function navItems(
 	// Services and About always have something true to say (Services needs an
 	// artist), Contact needs a way to reach the studio.
 	if (pages !== null) {
-		if (hasArtists) items.push(link("services", "/services", page));
-		items.push(link("about", "/about", page));
-		if (pages.contact) items.push(link("contact", "/contact", page));
+		// The same checks as infoContent's, so no link leads to a not-found.
+		if (hasArtists && (pages.takingWork || sections.includes("flash"))) {
+			items.push(link("services", page));
+		}
+		if (pages.about || hasArtists) items.push(link("about", page));
+		if (pages.contact) items.push(link("contact", page));
 	}
 	return items;
 }
@@ -123,23 +126,20 @@ export function moreNavItems(
 ): NavItem[] {
 	const shown = sections.includes("info");
 	return [
-		link("faq", "/faq", page),
-		...(shown && pages.policies ? [link("policies", "/policies", page)] : []),
-		...(shown && pages.aftercare
-			? [link("aftercare", "/aftercare", page)]
-			: []),
+		link("faq", page),
+		...(shown && pages.policies ? [link("policies", page)] : []),
+		...(shown && pages.aftercare ? [link("aftercare", page)] : []),
 	];
 }
 
 function link(
 	key: "services" | "about" | "contact" | "faq" | "policies" | "aftercare",
-	href: string,
 	page: ShellPage,
 ): NavItem {
 	return {
 		key,
 		label: studioCopy.nav[key],
-		href,
+		href: infoHref(key),
 		current: page === key ? "page" : undefined,
 	};
 }

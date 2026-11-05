@@ -11,7 +11,12 @@ import { RouterAnchor } from "../../../components/router-anchor.tsx";
 import type { Shell } from "../../../components/shell.tsx";
 import { BookingCta } from "../../../components/storefront.tsx";
 import type { InfoContent } from "../../../info.ts";
-import { artistsHref, flashHref, isAllowedHref } from "../../../links.ts";
+import {
+	artistsHref,
+	flashHref,
+	infoHref,
+	isAllowedHref,
+} from "../../../links.ts";
 import type { InfoPageData } from "../../../loaders.ts";
 import type { ArtistView } from "../../../view-model.ts";
 import { Lines, SectionHead } from "../home/parts.tsx";
@@ -57,7 +62,7 @@ const copy = {
 		},
 		custom: {
 			title: "Custom work",
-			line: "A design drawn for you, from your idea, references and placement.",
+			line: "Ask for a design of your own: describe your idea, add references and say where it goes.",
 			link: "Request a session",
 		},
 		pricing:
@@ -124,6 +129,8 @@ export function InkNoirInfoPage({
 							)}
 						</p>
 						<h1 className="ink-info-title">
+							{/* The page's name first, for heading navigation; the headline is what shows. */}
+							<span className="sr-only">{copy.label[content.kind]}: </span>
 							<Lines lines={copy.lines[content.kind]} />
 						</h1>
 					</div>
@@ -487,7 +494,10 @@ function Close({ data }: { data: InfoPageData }) {
 	if (contact) {
 		return (
 			<CloseSection lines={copy.close.questions.lines}>
-				<RouterAnchor className="action action-primary ink-cta" href="/contact">
+				<RouterAnchor
+					className="action action-primary ink-cta"
+					href={infoHref("contact")}
+				>
 					{copy.close.questions.button}
 				</RouterAnchor>
 			</CloseSection>

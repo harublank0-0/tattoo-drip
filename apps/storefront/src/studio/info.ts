@@ -2,7 +2,7 @@ import type { Artist, Studio } from "@tattoo-drip/sdk";
 import { fill } from "../intake/template.ts";
 import { filterStyles } from "./gallery.ts";
 import { closedDaysText, readClosures } from "./hours.ts";
-import { artistsHref, requestHref, workHref } from "./links.ts";
+import { artistsHref, infoHref, requestHref, workHref } from "./links.ts";
 import { cleanText } from "./text.ts";
 import type { SectionKey } from "./theme/config.ts";
 import type { ArtistView, StudioView } from "./view-model.ts";
@@ -140,7 +140,7 @@ export const infoCopy = {
 		confirmed: {
 			question: "Is my session booked when I send a request?",
 			answer:
-				"Not yet. {studio} reviews every request first. Your session is booked once you agree a time with them.",
+				"No. {studio} reviews every request first and replies. Nothing is booked until they confirm it with you.",
 		},
 		references: {
 			question: "Can I bring my own design or reference photos?",
@@ -190,11 +190,16 @@ export function infoContent(
 		: {};
 	switch (kind) {
 		case "about":
-			return aboutContent(view, artists);
-		case "services":
-			return artists.length > 0
-				? servicesContent(view, raw, artists, sections)
+			// The studio's own words or its artists; neither is a not-found.
+			return view.intro !== null || artists.length > 0
+				? aboutContent(view, artists)
 				: null;
+		case "services": {
+			// Something to offer: custom work while the studio takes it, or flash.
+			if (artists.length === 0) return null;
+			const services = servicesContent(view, raw, artists, sections);
+			return services.requestHref !== null || services.flash ? services : null;
+		}
 		case "faq":
 			return faqContent(view, texts);
 		case "contact":
@@ -279,10 +284,8 @@ function servicesContent(
 			artists: style.artists,
 		})),
 		flash: sections.includes("flash"),
-		requestHref:
-			view.accepting || artists.some((a) => a.accepting)
-				? requestHref({})
-				: null,
+		// The general request takes work exactly while the studio does (inquiryState).
+		requestHref: view.accepting ? requestHref({}) : null,
 	};
 }
 
@@ -317,7 +320,10 @@ function faqContent(
 					id: "how-to-book",
 					question: words.how.question,
 					answer: [fill(words.how.answer, studio)],
-					link: { href: requestHref({}), label: words.how.link },
+					// Only while the studio takes requests: never a link to a refusal.
+					link: view.accepting
+						? { href: requestHref({}), label: words.how.link }
+						: null,
 					source: "product" as const,
 				},
 				{
@@ -354,7 +360,7 @@ function faqContent(
 			id: "healing",
 			title: words.healing,
 			items: own("aftercare", words.aftercare, texts.aftercare, {
-				href: "/aftercare",
+				href: infoHref("aftercare"),
 				label: words.aftercareLink,
 			}),
 		},

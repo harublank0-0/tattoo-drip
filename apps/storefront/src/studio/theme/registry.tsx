@@ -137,12 +137,13 @@ export function ThemedFlashDesignPage(
 	return <theme.FlashDesignPage {...props} Shell={theme.Shell} />;
 }
 
-/** `/book` in the studio's theme. */
+/** `/about`, `/services`, `/faq`, `/contact`, `/policies` and `/aftercare` in the studio's theme. */
 export function ThemedInfoPage(props: ComponentProps<typeof InfoPage>) {
 	const theme = themeFor(props.data.theme.key);
 	return <theme.InfoPage {...props} Shell={theme.Shell} />;
 }
 
+/** `/book` in the studio's theme. */
 export function ThemedRequestPage(props: ComponentProps<typeof RequestPage>) {
 	const theme = themeFor(props.data.theme.key);
 	return <theme.RequestPage {...props} Shell={theme.Shell} />;

@@ -237,9 +237,11 @@ export function infoPageSeo(
 			case "services":
 				return [
 					solo ? `What ${name} tattoos` : `What we tattoo at ${name}`,
-					content.styles.length > 0
-						? `${content.styles.map((style) => style.name).join(", ")}${content.flash ? ", flash" : ""} and custom work at ${name}.`
-						: `Custom work at ${name}.`,
+					`${[
+						...content.styles.map((style) => style.name),
+						...(content.flash ? ["flash"] : []),
+						...(content.requestHref ? ["custom work"] : []),
+					].join(", ")} at ${name}.`,
 					"/services",
 				];
 			case "faq":
