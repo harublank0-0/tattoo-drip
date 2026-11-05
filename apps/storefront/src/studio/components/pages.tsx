@@ -244,7 +244,7 @@ export function ArtistsPage({
 }
 
 /**
- * `/request` (TAT-127): the intake form on a page of its own, with "How
+ * `/book` (TAT-127, Prompt 6): the request flow on a page of its own, with "How
  * booking works" above it on a phone and beside it from 60rem. The section's
  * heading is the page's h1; the studio's contacts follow, so a closed
  * artist's or studio's page still says what is possible. The site bar and the
@@ -275,6 +275,7 @@ export function RequestPage({
 				state={inquiry}
 				channels={channels}
 				challengeSiteKey={challengeSiteKey}
+				booking={data.booking}
 				intro={
 					data.flash ? (
 						<FlashSummary request={data.flash} studioName={studio.name} />

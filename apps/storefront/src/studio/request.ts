@@ -17,8 +17,8 @@ import { ARTIST_SLUG, type ArtistView, type StudioView } from "./view-model.ts";
 export type RequestSearch = {
 	artist?: string;
 	flash?: string;
-	/** A gallery photo's id (Prompt 5): "Request a similar tattoo", the form starts with a link to it. */
-	similar?: string;
+	/** A gallery photo's id (Prompt 5): "Request a similar tattoo"; the loader checks it with the API. */
+	artwork?: string;
 };
 
 /** An own property only, never one inherited from Object.prototype. */
@@ -38,8 +38,9 @@ function own(value: unknown, key: string): unknown {
  * find out. A well-formed `flash` (a lowercase UUID, TAT-129) is kept instead:
  * the design names the artist, so a request page has one spelling and `artist`
  * is then dropped; whether the design exists is the loader's to find out.
- * Beside `artist`, a well-formed `similar` (a gallery photo's lowercase UUID,
- * Prompt 5) is kept: the form then starts with a link to that piece.
+ * Beside `artist`, a well-formed `artwork` (a gallery photo's lowercase UUID,
+ * Prompt 5) is kept; the loader asks the API for that piece, and only a piece
+ * it shows starts the form with a link to it and names its artist.
  */
 export function readRequestSearch(
 	search: Record<string, unknown>,
@@ -47,12 +48,12 @@ export function readRequestSearch(
 	const flash = own(search, "flash");
 	if (typeof flash === "string" && FLASH_ID.test(flash)) return { flash };
 	const artist = own(search, "artist");
-	const similar = readPhotoId(own(search, "similar"));
+	const artwork = readPhotoId(own(search, "artwork"));
 	return {
 		...(typeof artist === "string" && ARTIST_SLUG.test(artist)
 			? { artist }
 			: {}),
-		...(similar ? { similar } : {}),
+		...(artwork ? { artwork } : {}),
 	};
 }
 

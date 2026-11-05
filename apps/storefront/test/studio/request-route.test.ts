@@ -13,7 +13,7 @@ import {
 	seedStudio,
 } from "../../src/api/context.ts";
 import { loadStudio } from "../../src/api/loaders.ts";
-import { Route as RequestRoute } from "../../src/routes/request.tsx";
+import { Route as RequestRoute } from "../../src/routes/book.tsx";
 import { type SiteContext, SiteRef } from "../../src/site/context.ts";
 import type { PageContext, RequestPageData } from "../../src/studio/loaders.ts";
 import {
@@ -87,7 +87,7 @@ async function visit(url: string, studio = STUDIO) {
 	});
 	const request = createRoute({
 		getParentRoute: () => root,
-		path: "/request",
+		path: "/book",
 		validateSearch: RequestRoute.options.validateSearch,
 		loaderDeps: RequestRoute.options.loaderDeps,
 		loader: async (args) => {
@@ -131,7 +131,7 @@ describe("/request through the router", () => {
 	});
 
 	test("?artist=sita picks Sita, and reads the artists and nothing else", async () => {
-		const result = await visit("/request?artist=sita");
+		const result = await visit("/book?artist=sita");
 
 		assert.deepEqual(result.deps, { artist: "sita" });
 		assert.equal(picked(result.data), "Sita Rai");
@@ -143,11 +143,11 @@ describe("/request through the router", () => {
 
 	test("stray keys (fbclid, utm_*, anything) never reach the loader or change the artist", async () => {
 		for (const url of [
-			"/request?fbclid=IwAR0abc&artist=sita",
-			"/request?artist=sita&utm_source=ig&utm_medium=bio&ref=x",
-			"/request?utm_source=ig",
-			"/request?fbclid=IwAR0abc",
-			"/request?__proto__=x&constructor=y&artist=sita",
+			"/book?fbclid=IwAR0abc&artist=sita",
+			"/book?artist=sita&utm_source=ig&utm_medium=bio&ref=x",
+			"/book?utm_source=ig",
+			"/book?fbclid=IwAR0abc",
+			"/book?__proto__=x&constructor=y&artist=sita",
 		]) {
 			const result = await visit(url);
 			const wanted = url.includes("artist=sita") ? "Sita Rai" : null;
@@ -159,12 +159,12 @@ describe("/request through the router", () => {
 	});
 
 	test("a second artist never changes which is picked", async () => {
-		const first = await visit("/request?artist=sita&artist=arjun");
+		const first = await visit("/book?artist=sita&artist=arjun");
 		assert.deepEqual(first.deps, { artist: "sita" });
 		assert.equal(picked(first.data), "Sita Rai");
 
 		// The first value is not a slug, so the second is not reached for either.
-		const bad = await visit("/request?artist=a&artist=sita");
+		const bad = await visit("/book?artist=a&artist=sita");
 		assert.deepEqual(bad.deps, {});
 		assert.equal(picked(bad.data), null);
 	});
@@ -183,22 +183,22 @@ describe("/request through the router", () => {
 			"..%2Fadmin",
 			"",
 		]) {
-			const result = await visit(`/request?artist=${artist}`);
+			const result = await visit(`/book?artist=${artist}`);
 
 			assert.equal(result.status, "success", artist);
 			assert.equal(picked(result.data), null, artist);
-			assert.equal(result.data?.seo.canonical, `${ORIGIN}/request`, artist);
+			assert.equal(result.data?.seo.canonical, `${ORIGIN}/book`, artist);
 		}
 	});
 
 	test("an open artist's address serves the working form while the studio as a whole is closed", async () => {
-		const result = await visit("/request?artist=sita", CLOSED_STUDIO);
+		const result = await visit("/book?artist=sita", CLOSED_STUDIO);
 
 		assert.equal(result.status, "success");
 		assert.equal(picked(result.data), "Sita Rai");
 		assert.ok(result.data?.channels.whatsapp);
 		// And the general address says the studio is closed, still a page.
-		const general = await visit("/request", CLOSED_STUDIO);
+		const general = await visit("/book", CLOSED_STUDIO);
 		assert.equal(general.status, "success");
 		assert.equal(general.data?.inquiry.kind, "studio-closed");
 	});
@@ -206,9 +206,9 @@ describe("/request through the router", () => {
 	test("?flash=<id>&fbclid=x reaches the loader as { flash }, and ?flash=<id>&artist=sita too", async () => {
 		const ID = flashId(1);
 		for (const url of [
-			`/request?flash=${ID}&fbclid=x`,
-			`/request?flash=${ID}&artist=sita`,
-			`/request?artist=arjun&flash=${ID}`,
+			`/book?flash=${ID}&fbclid=x`,
+			`/book?flash=${ID}&artist=sita`,
+			`/book?artist=arjun&flash=${ID}`,
 		]) {
 			const result = await visit(url);
 
@@ -225,7 +225,7 @@ describe("/request through the router", () => {
 
 	test("a malformed flash id is the general form and makes no design read", async () => {
 		for (const flash of [flashId(1).toUpperCase(), "moth", "12", ""]) {
-			const result = await visit(`/request?flash=${flash}`);
+			const result = await visit(`/book?flash=${flash}`);
 
 			assert.deepEqual(result.deps, {}, flash);
 			assert.equal(result.data?.flash, null, flash);

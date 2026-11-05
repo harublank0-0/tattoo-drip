@@ -148,10 +148,11 @@ export function flashDesignHref(id: string): string {
 }
 
 /**
- * The request page (TAT-127): `/request`, `/request?artist=<slug>` to ask
- * for one artist, or (TAT-129) `/request?flash=<id>` to ask for a flash
+ * The booking page (TAT-127; `/book` since Prompt 6, `/request` redirects):
+ * `/book`, `/book?artist=<slug>` to ask for one artist, or (TAT-129)
+ * `/book?flash=<id>` to ask for a flash
  * design, which names its artist, so `artist` is then left out; and (Prompt 5)
- * `similar=<photo id>` beside the artist, for a tattoo like a gallery piece.
+ * `artwork=<photo id>` beside the artist, for a tattoo like a gallery piece.
  * Every Request button leads here.
  */
 export function requestHref(search: RequestSearch): string {
@@ -159,10 +160,10 @@ export function requestHref(search: RequestSearch): string {
 	if (search.flash !== undefined) query.set("flash", search.flash);
 	else {
 		if (search.artist !== undefined) query.set("artist", search.artist);
-		if (search.similar !== undefined) query.set("similar", search.similar);
+		if (search.artwork !== undefined) query.set("artwork", search.artwork);
 	}
 	const text = query.toString();
-	return text === "" ? "/request" : `/request?${text}`;
+	return text === "" ? "/book" : `/book?${text}`;
 }
 
 /** "?a=1&b=2" from the pairs that have a value, else "". */

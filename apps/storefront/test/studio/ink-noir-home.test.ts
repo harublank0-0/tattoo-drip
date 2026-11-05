@@ -155,7 +155,7 @@ describe("Ink Noir's home page", () => {
 			} else if (href.startsWith("/")) {
 				assert.match(
 					href,
-					/^\/(request(\?artist=[a-z0-9-]+)?|gallery(\?style=[a-z0-9-]+)?|artists\/[a-z0-9-]+(#work)?|flash)$/,
+					/^\/(book(\?artist=[a-z0-9-]+)?|gallery(\?style=[a-z0-9-]+)?|artists\/[a-z0-9-]+(#work)?|flash)$/,
 					href,
 				);
 			}
@@ -195,14 +195,14 @@ describe("the first screen", () => {
 		const open = mainOf(html(inkNoir()));
 		assert.match(
 			open,
-			/<a class="action action-primary ink-cta" href="\/request">Request a session<\/a>/,
+			/<a class="action action-primary ink-cta" href="\/book">Request a session<\/a>/,
 		);
 		assert.match(
 			open,
 			/<a class="action ink-action-quiet" href="\/gallery">Explore the work<\/a>/,
 		);
 		const closed = mainOf(html(inkNoir(CLOSED_STUDIO)));
-		assert.ok(!hrefs(closed).includes("/request"), "no general request link");
+		assert.ok(!hrefs(closed).includes("/book"), "no general request link");
 		assert.equal(
 			closed.match(/Not taking new inquiries right now/g)?.length,
 			1,
@@ -310,13 +310,13 @@ describe("the artists", () => {
 		);
 		assert.match(page, />Meet the artist</);
 		// In an open studio "Request a session" already asks for its one artist.
-		assert.doesNotMatch(page, /href="\/request\?artist=sita"/);
+		assert.doesNotMatch(page, /href="\/book\?artist=sita"/);
 	});
 
 	test("offer each open artist's own request while the studio is closed", () => {
 		const page = mainOf(html(inkNoir(CLOSED_STUDIO), [SITA, ARJUN]));
-		assert.match(page, /href="\/request\?artist=sita"/);
-		assert.doesNotMatch(page, /href="\/request\?artist=arjun"/);
+		assert.match(page, /href="\/book\?artist=sita"/);
+		assert.doesNotMatch(page, /href="\/book\?artist=arjun"/);
 	});
 
 	test("are gone when the studio hides them, and nothing points at them", () => {

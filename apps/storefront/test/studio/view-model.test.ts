@@ -175,7 +175,7 @@ describe("artistViewModels", () => {
 			accepting: true,
 			closedMessage: null,
 			pageHref: "/artists/sita",
-			requestHref: "/request?artist=sita",
+			requestHref: "/book?artist=sita",
 			workPhotos: [],
 			styles: ["Fine line"],
 			links: [

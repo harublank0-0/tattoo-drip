@@ -42,7 +42,7 @@ describe("flash designs (TAT-129)", () => {
 			href: "/artists/sita",
 		});
 		assert.equal(view.href, `/flash/${flashId(1)}`);
-		assert.equal(view.requestHref, `/request?flash=${flashId(1)}`);
+		assert.equal(view.requestHref, `/book?flash=${flashId(1)}`);
 		assert.equal(view.requestable, true);
 		assert.ok(view.image.srcSet);
 		assert.ok(view.largeSrc.endsWith(".png"));

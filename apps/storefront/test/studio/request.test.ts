@@ -84,21 +84,21 @@ describe("readRequestSearch with a flash design (TAT-129)", () => {
 describe("requestLink", () => {
 	test("the header's Request: the artist while they take new work, else the studio while it does, else none", () => {
 		assert.deepEqual(requestLink(studio, null), {
-			href: "/request",
+			href: "/book",
 			artistName: null,
 		});
 		assert.deepEqual(requestLink(studio, sita), {
-			href: "/request?artist=sita",
+			href: "/book?artist=sita",
 			artistName: "Sita Rai",
 		});
 		assert.deepEqual(requestLink(studio, arjun), {
-			href: "/request",
+			href: "/book",
 			artistName: null,
 		});
 		assert.equal(requestLink(closedStudio, arjun), null);
 		assert.equal(requestLink(closedStudio, null), null);
 		assert.deepEqual(requestLink(closedStudio, sita), {
-			href: "/request?artist=sita",
+			href: "/book?artist=sita",
 			artistName: "Sita Rai",
 		});
 	});

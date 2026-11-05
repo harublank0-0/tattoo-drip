@@ -129,13 +129,10 @@ describe("Ink Noir's artist page", () => {
 		const open = mainOf(html(data("sita")));
 		assert.match(
 			open,
-			/<a class="action action-primary ink-cta" href="\/request\?artist=sita">Book a session<\/a>/,
+			/<a class="action action-primary ink-cta" href="\/book\?artist=sita">Book a session<\/a>/,
 		);
 		const closed = mainOf(html(data("arjun")));
-		assert.doesNotMatch(
-			closed,
-			/Book a session|href="\/request\?artist=arjun"/,
-		);
+		assert.doesNotMatch(closed, /Book a session|href="\/book\?artist=arjun"/);
 		assert.match(closed, /Books open in March\./);
 	});
 
@@ -176,7 +173,7 @@ describe("Ink Noir's artist page", () => {
 		assert.match(open, /<bdi>Sita Rai<\/bdi> is taking new work\./);
 		assert.match(
 			open,
-			/<a class="action action-primary ink-cta" href="\/request\?artist=sita"><span>Request <bdi>Sita Rai<\/bdi><\/span><\/a>/,
+			/<a class="action action-primary ink-cta" href="\/book\?artist=sita"><span>Request <bdi>Sita Rai<\/bdi><\/span><\/a>/,
 		);
 
 		const artistClosed = mainOf(html(data("arjun")));
@@ -184,12 +181,12 @@ describe("Ink Noir's artist page", () => {
 			artistClosed,
 			/You can still send <bdi>Black Needle<\/bdi> a general inquiry\./,
 		);
-		assert.match(artistClosed, /href="\/request">Request a session</);
+		assert.match(artistClosed, /href="\/book">Request a session</);
 
 		const nobody = mainOf(
 			html(data("arjun", { studio: inkNoir(CLOSED_STUDIO) })),
 		);
-		assert.doesNotMatch(nobody, /href="\/request/);
+		assert.doesNotMatch(nobody, /href="\/book/);
 		assert.doesNotMatch(nobody, /class="ink-steps"/);
 	});
 

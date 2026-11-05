@@ -1,0 +1,58 @@
+/*
+ * Ink Noir's booking page (src/studio/theme/ink-noir/book/): the editorial
+ * opening, and the flow (styles.css's booking rules) set on the theme's
+ * raised surfaces with its display face. Colours are the theme's tokens;
+ * nothing is downloaded; nothing moves.
+ *
+ * Unlayered, so these rules outrank styles.css's layered ones.
+ */
+
+.ink-book-hero {
+	padding-block: clamp(3rem, 2rem + 4vw, 6rem) clamp(2rem, 1.5rem + 2vw, 3rem);
+	border-block-end: 1px solid var(--line);
+}
+.ink-book-hero .ink-label {
+	margin: 0 0 1.5rem;
+}
+.ink-book-title {
+	max-inline-size: 16ch;
+	margin: 0;
+	color: var(--ink);
+	font-size: clamp(2.75rem, 1.25rem + 6vw, 6.5rem);
+	line-height: 0.95;
+	letter-spacing: -0.03em;
+	text-transform: uppercase;
+	overflow-wrap: anywhere;
+}
+.ink-book-lede {
+	max-inline-size: 34rem;
+	margin: 1.5rem 0 0;
+	color: var(--ink-muted);
+	font-size: clamp(1.0625rem, 1rem + 0.4vw, 1.25rem);
+	line-height: 1.6;
+}
+.ink-book-body {
+	padding-block: clamp(2rem, 1.5rem + 2vw, 3.5rem) clamp(4rem, 3rem + 4vw, 6rem);
+}
+.ink-book-body .section {
+	padding: 0;
+}
+.ink-book-page .booking-step-title,
+.ink-book-page .booking-sent-title {
+	letter-spacing: -0.02em;
+}
+.ink-book-page .booking-artist,
+.ink-book-page .booking-summary-panel,
+.ink-book-page .booking-summary-fold {
+	background: var(--paper-raised);
+	border-color: var(--line);
+}
+.ink-book-page .booking-artist:has(input:checked) {
+	border-color: var(--stencil);
+}
+.ink-book-page .booking-summary {
+	inset-block-start: calc(var(--site-bar-height) + 2rem);
+}
+.ink-book-page .booking-notice {
+	background: var(--paper-raised);
+}

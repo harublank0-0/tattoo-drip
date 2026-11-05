@@ -3,11 +3,19 @@ import { readdirSync, readFileSync } from "node:fs";
 import { describe, test } from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { EMPTY_CALENDAR } from "../../src/booking/booking.ts";
 import { intakeFormKey } from "../../src/intake/components/intake-mount.tsx";
 import { InquirySection } from "../../src/studio/components/inquiry.tsx";
 import type { InquiryState } from "../../src/studio/inquiry.ts";
 
 const SITE_KEY = "1x00000000000000000000AA";
+/** The booking flow's context (Prompt 6); the section renders the flow only in the browser. */
+const BOOKING = {
+	artists: [],
+	styles: [],
+	calendar: EMPTY_CALENDAR,
+	artwork: null,
+};
 const CHANNELS = {
 	whatsapp: "https://wa.me/9779812345678?text=Hi",
 	email: "mailto:hello@black-needle.example?subject=Tattoo%20inquiry",
@@ -26,6 +34,7 @@ const section = (state: InquiryState) =>
 			state,
 			channels: CHANNELS,
 			challengeSiteKey: SITE_KEY,
+			booking: BOOKING,
 		}),
 	);
 
@@ -64,7 +73,7 @@ describe("the #inquiry section on the server", () => {
 			artist,
 			/<bdi>Sita Rai<\/bdi> isn&#x27;t taking new inquiries right/,
 		);
-		assert.match(artist, /href="\/request"/);
+		assert.match(artist, /href="\/book"/);
 		assert.doesNotMatch(artist, /href="\/#inquiry"/);
 		assert.doesNotMatch(artist, /<form/);
 		// No message from the artist, no note.
@@ -83,7 +92,7 @@ describe("the #inquiry section on the server", () => {
 		);
 		// Under the artist's line, before the way to the studio's general request.
 		assert.ok(said.indexOf("isn&#x27;t taking") < said.indexOf("note"));
-		assert.ok(said.indexOf("note") < said.indexOf('href="/request"'));
+		assert.ok(said.indexOf("note") < said.indexOf('href="/book"'));
 	});
 
 	test("a closed artist's section with the studio closed too offers no link", () => {
@@ -101,22 +110,20 @@ describe("the #inquiry section on the server", () => {
 });
 
 describe("the #inquiry section's panel (TAT-105)", () => {
-	test("an open section is the form's column and a panel of the four steps beside it", () => {
+	test("an open section is one column: the booking flow brings its own summary, so there is no panel (Prompt 6)", () => {
 		const html = section(OPEN);
 
-		assert.match(html, /^<div class="section inquiry-split">/);
+		assert.match(html, /^<div class="section">/);
 		assert.match(
 			html,
 			/<section id="inquiry" class="inquiry" aria-labelledby="inquiry-title">/,
 		);
-		assert.equal((html.match(/<aside /g) ?? []).length, 1);
-		// The strip's four titles and the panel's four steps.
-		assert.equal((html.match(/<li class="step">/g) ?? []).length, 8);
-		// The panel follows the section, so a phone, where it is hidden, reads the form first.
-		assert.ok(html.indexOf("</section>") < html.indexOf("<aside "));
+		assert.doesNotMatch(html, /<aside |steps-panel-title/);
+		// The strip's four titles only.
+		assert.equal((html.match(/<li class="step">/g) ?? []).length, 4);
 	});
 
-	test("the section is the request page's: the h1, the strip under it as an h2, the panel beside it", () => {
+	test("the section is the booking page's: the h1, the strip under it as an h2", () => {
 		const html = section(OPEN);
 
 		assert.match(
@@ -127,17 +134,27 @@ describe("the #inquiry section's panel (TAT-105)", () => {
 			html,
 			/<h2 id="steps-strip-title"[^>]*>How booking works<\/h2>/,
 		);
-		assert.match(
-			html,
-			/<h2 id="steps-panel-title"[^>]*>How booking works<\/h2>/,
-		);
 		assert.doesNotMatch(html, /<h3/);
 		assert.ok(
 			html.indexOf("inquiry-title") < html.indexOf("steps-strip-title"),
 			"the strip is under the h1",
 		);
-		assert.ok(html.indexOf("</section>") < html.indexOf("<aside "));
 		assert.equal((html.match(/<h1/g) ?? []).length, 1);
+	});
+
+	test("without its heading (a theme's own opening names the form) it has no h1 and no strip", () => {
+		const html = renderToStaticMarkup(
+			createElement(InquirySection, {
+				state: OPEN,
+				channels: CHANNELS,
+				challengeSiteKey: SITE_KEY,
+				booking: BOOKING,
+				headed: false,
+			}),
+		);
+
+		assert.doesNotMatch(html, /<h1|steps-strip/);
+		assert.match(html, /aria-labelledby="inquiry-title"/);
 	});
 
 	test("a closed section is headed by the h1 too, with no strip or panel", () => {
@@ -159,54 +176,15 @@ describe("the #inquiry section's panel (TAT-105)", () => {
 				state: OPEN,
 				channels: CHANNELS,
 				challengeSiteKey: SITE_KEY,
+				booking: BOOKING,
 			}),
 		);
 
 		assert.equal(
 			(html.match(/<ol class="steps" role="list">/g) ?? []).length,
-			2,
+			1,
 		);
-		assert.equal((html.match(/<ol /g) ?? []).length, 2);
-	});
-
-	test("the panel checks every chat link once more: a link the page may not render is left out", () => {
-		const html = renderToStaticMarkup(
-			createElement(InquirySection, {
-				state: OPEN,
-				channels: {
-					whatsapp: "javascript:alert(1)",
-					email: "mailto:hello@black-needle.example?subject=Hi",
-					instagram: "data:text/html,hi",
-				},
-				challengeSiteKey: SITE_KEY,
-			}),
-		);
-		const panel = html.match(/<aside [\s\S]*?<\/aside>/)?.[0] ?? "";
-
-		assert.match(
-			panel,
-			/href="mailto:hello@black-needle\.example\?subject=Hi"/,
-		);
-		assert.doesNotMatch(panel, /javascript:|data:/);
-		assert.equal((panel.match(/<a /g) ?? []).length, 1);
-	});
-
-	test("a panel with no chat link to offer says nothing about chatting", () => {
-		const html = renderToStaticMarkup(
-			createElement(InquirySection, {
-				state: OPEN,
-				channels: {
-					whatsapp: "javascript:alert(1)",
-					email: null,
-					instagram: null,
-				},
-				challengeSiteKey: SITE_KEY,
-			}),
-		);
-		const panel = html.match(/<aside [\s\S]*?<\/aside>/)?.[0] ?? "";
-
-		assert.doesNotMatch(panel, /Prefer to chat/);
-		assert.equal((panel.match(/<a /g) ?? []).length, 0);
+		assert.equal((html.match(/<ol /g) ?? []).length, 1);
 	});
 
 	test("a closed section has no panel and no steps", () => {
@@ -337,6 +315,7 @@ describe("a flash request's section (TAT-129)", () => {
 				state: FLASH_STATE,
 				channels: CHANNELS,
 				challengeSiteKey: SITE_KEY,
+				booking: BOOKING,
 				intro: createElement("div", { className: "flash-summary" }, "Moth"),
 			}),
 		);

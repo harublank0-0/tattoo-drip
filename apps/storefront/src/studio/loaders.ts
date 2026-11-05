@@ -8,6 +8,7 @@ import {
 } from "@tattoo-drip/sdk";
 import type { ApiContext } from "../api/context.ts";
 import { loadStudio, rethrowAsNotFound } from "../api/loaders.ts";
+import type { BookingArtwork, BookingContext } from "../booking/booking.ts";
 import { fill } from "../intake/template.ts";
 import type { SiteContext } from "../site/context.ts";
 import {
@@ -17,6 +18,7 @@ import {
 } from "./artists.ts";
 import {
 	type ArtworkView,
+	artworkTitle,
 	artworkView,
 	RELATED_READ,
 	relatedArtwork,
@@ -59,6 +61,7 @@ import {
 	type OpenNowView,
 	openNowView,
 } from "./good-to-know.ts";
+import { readClosures, readWeek } from "./hours.ts";
 import {
 	flashInquiryState,
 	type InquiryChannels,
@@ -291,7 +294,7 @@ export interface FlashDesignPageData {
 }
 
 /**
- * `/request` (TAT-127): the intake form on a page of its own. The address's
+ * `/book` (TAT-127, Prompt 6): the request flow on a page of its own. The address's
  * artist is picked when the list has them; any other address is the general
  * form.
  */
@@ -314,6 +317,8 @@ export interface RequestPageData {
 	 * page can do with it; null for any other address.
 	 */
 	readonly flash: FlashRequestView | null;
+	/** What the booking flow knows of the studio, its artists and the piece asked about (Prompt 6). */
+	readonly booking: BookingContext;
 }
 
 /**
@@ -420,9 +425,14 @@ export function requestPageData(
 	origin: string,
 	imageOrigin: string | null = null,
 	flash: FlashLookup | null = null,
+	artworkPhoto: unknown = null,
 ): RequestPageData {
 	const studioView = studioViewModel(studio);
 	const artistViews = artistViewModels(artists, imageOrigin);
+	const artwork =
+		search.artwork === undefined
+			? null
+			: bookingArtworkOf(artworkPhoto, search.artwork, origin, imageOrigin);
 	const found = flash
 		? flashRequestView(flash, artistViews, imageOrigin)
 		: null;
@@ -462,21 +472,22 @@ export function requestPageData(
 			),
 			theme,
 			flash: view,
+			booking: bookingContextOf(studio, artistViews, null),
 		};
 	}
-	const artist =
-		search.artist === undefined ? null : findArtist(artistViews, search.artist);
+	// The artist asked for, else the piece's own (Prompt 6: "inspired by" keeps its artist).
+	const slug = search.artist ?? artwork?.artistSlug;
+	const artist = slug === undefined ? null : findArtist(artistViews, slug);
 	const asked = inquiryState(studioView, artistViews, artist);
 	// "Request a similar tattoo" (Prompt 5): the idea starts with a link to the
-	// piece, which the client edits or keeps; the form sends only what it shows.
+	// piece the API showed, which the client edits or keeps; the form sends only
+	// what it shows. A piece the API doesn't show starts nothing.
 	const inquiry =
-		asked.kind === "open" && search.similar !== undefined
+		asked.kind === "open" && artwork
 			? {
 					...asked,
 					start: {
-						idea: fill(studioCopy.artwork.similarStart, {
-							url: `${origin}${galleryPhotoHref(search.similar)}`,
-						}),
+						idea: fill(studioCopy.artwork.similarStart, { url: artwork.url }),
 						approximateSize: "",
 					},
 				}
@@ -490,6 +501,68 @@ export function requestPageData(
 		seo: requestPageSeo(studioView, artist, origin, inquiry.kind === "open"),
 		theme,
 		flash: found ? found.view : null,
+		booking: bookingContextOf(studio, artistViews, artwork),
+	};
+}
+
+/**
+ * The booking flow's context (Prompt 6): the artists who take new work, with
+ * their portrait and first style; the styles the studio's artists list; the
+ * studio's published week and closures for the preference calendar; and the
+ * piece asked about. All from the reads the page already makes.
+ */
+function bookingContextOf(
+	studio: Studio,
+	artists: readonly ArtistView[],
+	artwork: (BookingArtwork & { artistSlug?: string }) | null,
+): BookingContext {
+	const styles: string[] = [];
+	for (const artist of artists) {
+		for (const style of artist.styles) {
+			if (!styles.includes(style)) styles.push(style);
+		}
+	}
+	const { artistSlug: _slug, ...piece } = artwork ?? { artistSlug: undefined };
+	return {
+		artists: artists
+			.filter((artist) => artist.accepting)
+			.map((artist) => ({
+				id: artist.id,
+				slug: artist.slug,
+				name: artist.name,
+				specialty: artist.styles[0] ?? null,
+				photo: artist.photo,
+			})),
+		styles,
+		calendar: {
+			week: readWeek(studio.openingHours),
+			closures: readClosures(studio.closedDays),
+			timeZone: typeof studio.timezone === "string" ? studio.timezone : "UTC",
+		},
+		artwork: artwork ? (piece as BookingArtwork) : null,
+	};
+}
+
+/** The piece the address names, when the API showed exactly it (getWorkPhoto), as the flow shows it. */
+function bookingArtworkOf(
+	photo: unknown,
+	id: string,
+	origin: string,
+	imageOrigin: string | null,
+): (BookingArtwork & { artistSlug?: string }) | null {
+	const view = galleryPhotoView(photo, imageOrigin);
+	if (!view?.id || view.id !== id || !view.href) return null;
+	const slug = view.artist?.href.slice("/artists/".length);
+	return {
+		id: view.id,
+		title: artworkTitle(view),
+		href: view.href,
+		url: `${origin}${galleryPhotoHref(view.id)}`,
+		src: view.src,
+		width: view.width,
+		height: view.height,
+		artistName: view.artist?.name ?? null,
+		...(slug ? { artistSlug: slug } : {}),
 	};
 }
 
@@ -803,7 +876,7 @@ export async function loadArtistPage(
 }
 
 /**
- * `/request`: the studio (from the cache) and its artists, read together; no
+ * `/book`: the studio (from the cache) and its artists, read together; no
  * work read. With `?flash=` (TAT-129) the design is read at the same time,
  * and never throws: see loadFlashLookup. `search` is what `readRequestSearch` gave (the route's
  * `loaderDeps` re-reads the merged search through it, so a stray key never
@@ -814,10 +887,13 @@ export async function loadRequestPage(
 	context: PageContext,
 	search: RequestSearch,
 ): Promise<RequestPageData> {
-	const [studio, artists, flash] = await Promise.all([
+	const [studio, artists, flash, artwork] = await Promise.all([
 		loadStudio(context),
 		loadArtists(context),
 		search.flash === undefined ? null : loadFlashLookup(context, search.flash),
+		search.artwork === undefined || search.flash !== undefined
+			? null
+			: loadArtworkLookup(context, search.artwork),
 	]);
 	return requestPageData(
 		studio,
@@ -826,7 +902,30 @@ export async function loadRequestPage(
 		context.site.origin,
 		context.tattoo.connection.mediaUrl,
 		flash,
+		artwork,
 	);
+}
+
+/**
+ * The piece a booking is "inspired by" (`?artwork=`, Prompt 6), checked with
+ * the API: the photo, or null when the API doesn't show it (a 404) or the read
+ * failed (logged). Never throws: the request page stands without the piece.
+ */
+async function loadArtworkLookup(
+	context: ApiContext,
+	id: string,
+): Promise<unknown> {
+	try {
+		return await context.queryClient.query({
+			...tattooQueries.workPhoto(context.tattoo.client, id),
+			staleTime: "static",
+		});
+	} catch (error) {
+		if (!(isTattooApiError(error) && error.status === 404)) {
+			logReadFailed("Artwork", context, error);
+		}
+		return null;
+	}
 }
 
 /**

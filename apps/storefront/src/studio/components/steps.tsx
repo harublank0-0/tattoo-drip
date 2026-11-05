@@ -1,7 +1,5 @@
 import { Fill } from "../../intake/components/fill.tsx";
 import { studioCopy } from "../copy.ts";
-import type { InquiryChannels } from "../inquiry.ts";
-import { isAllowedHref, linkRel } from "../links.ts";
 
 /**
  * "How booking works" (TAT-105), once for a phone and once for a desktop:
@@ -47,50 +45,5 @@ export function BookingStrip({ studioName }: { studioName: string }) {
 			</h2>
 			<Steps studioName={studioName} detailed={false} />
 		</section>
-	);
-}
-
-/** The sticky panel beside the form: the four steps with a line each, and the chat links. */
-export function BookingPanel({
-	studioName,
-	channels,
-}: {
-	studioName: string;
-	channels: InquiryChannels;
-}) {
-	const { whatsapp, email, instagram } = channels;
-	// Every href is checked once more here, like the hero's and the contacts'.
-	const links: { href: string; label: string }[] = [];
-	for (const [href, label] of [
-		[whatsapp, studioCopy.booking.chatLinks.whatsapp],
-		[email, studioCopy.booking.chatLinks.email],
-		[instagram, studioCopy.booking.chatLinks.instagram],
-	] as const) {
-		if (href && isAllowedHref(href)) links.push({ href, label });
-	}
-	return (
-		<aside className="inquiry-aside" aria-labelledby="steps-panel-title">
-			<h2 id="steps-panel-title" className="steps-title">
-				{studioCopy.booking.title}
-			</h2>
-			<Steps studioName={studioName} detailed />
-			{links.length > 0 ? (
-				<p className="steps-chat">
-					{studioCopy.booking.chat}
-					<span className="steps-chat-links">
-						{links.map((link) => (
-							<a
-								key={link.href}
-								className="text-link"
-								href={link.href}
-								rel={linkRel(link.href)}
-							>
-								{link.label}
-							</a>
-						))}
-					</span>
-				</p>
-			) : null}
-		</aside>
 	);
 }

@@ -306,7 +306,7 @@ describe("the artists directory in Ink Noir", () => {
 			page,
 			/<a class="action ink-action-quiet" href="\/artists\/sita">View portfolio<\/a>/,
 		);
-		assert.match(page, /href="\/request\?artist=sita"/);
+		assert.match(page, /href="\/book\?artist=sita"/);
 		assert.match(page, /Found your <\/span><span class="ink-line">artist\?/);
 		// The feature's portrait is the page's main image.
 		assert.match(
@@ -327,7 +327,7 @@ describe("the artists directory in Ink Noir", () => {
 
 	test("never offers a session nobody takes", () => {
 		const closed = mainOf(html(data([ARJUN], {}, inkNoir(CLOSED_STUDIO))));
-		assert.doesNotMatch(closed, /href="\/request/);
+		assert.doesNotMatch(closed, /href="\/book/);
 		// The invitation's words are the studio's, as on its home page.
 		assert.match(
 			closed,
@@ -372,7 +372,7 @@ describe("the closing invitation and the page's outline (review fixes)", () => {
 		const page = mainOf(html(data([SITA_CLOSED])));
 		assert.match(
 			page,
-			/<a class="action action-primary ink-cta" href="\/request">Request a session<\/a>/,
+			/<a class="action action-primary ink-cta" href="\/book">Request a session<\/a>/,
 		);
 		// The close invites; only the artist's own card says she is closed.
 		assert.doesNotMatch(page, /Not taking new inquiries/);
@@ -381,20 +381,20 @@ describe("the closing invitation and the page's outline (review fixes)", () => {
 
 	test("Ink Noir: a closed studio whose lone artist is open invites, to that artist", () => {
 		const page = mainOf(html(data([SITA_WORK], {}, inkNoir(CLOSED_STUDIO))));
-		assert.match(page, /href="\/request\?artist=sita"/);
-		assert.doesNotMatch(page, /href="\/request"/);
+		assert.match(page, /href="\/book\?artist=sita"/);
+		assert.doesNotMatch(page, /href="\/book"/);
 	});
 
 	test("Stencil & Ink: the invitation is the studio's, never a link to a refusal", () => {
 		// Open studio, closed lone artist: it invites to the studio's form.
 		assert.match(
 			stencil(STUDIO, [SITA_CLOSED]),
-			/Got an idea\?[\s\S]*href="\/request">Send your idea</,
+			/Got an idea\?[\s\S]*href="\/book">Send your idea</,
 		);
 		// Closed studio, open lone artist: no general link; the roster asks for her.
 		const closed = mainOf(stencil(CLOSED_STUDIO, [SITA_WORK]));
-		assert.doesNotMatch(closed, /href="\/request"/);
-		assert.match(closed, /href="\/request\?artist=sita"/);
+		assert.doesNotMatch(closed, /href="\/book"/);
+		assert.match(closed, /href="\/book\?artist=sita"/);
 	});
 
 	test("Stencil & Ink: the entries are h2 under the page's h1", () => {

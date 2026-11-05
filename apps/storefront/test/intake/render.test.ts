@@ -4,6 +4,7 @@ import { createTattooClient } from "@tattoo-drip/sdk";
 import * as React from "react";
 import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { EMPTY_CALENDAR } from "../../src/booking/booking.ts";
 import {
 	IntakeForm,
 	type IntakeFormProps,
@@ -35,6 +36,16 @@ const CHANNELS = {
 	instagram: null,
 };
 const SITE_KEY = "1x00000000000000000000AA";
+/** The booking flow's context (Prompt 6): both artists as cards, two styles, an open week. */
+const BOOKING: IntakeFormProps["booking"] = {
+	artists: [
+		{ ...SITA, slug: "sita", specialty: "Fine line", photo: null },
+		{ ...MINA, slug: "mina", specialty: null, photo: null },
+	],
+	styles: ["Fine line", "Blackwork"],
+	calendar: { ...EMPTY_CALENDAR, timeZone: "Asia/Kathmandu" },
+	artwork: null,
+};
 
 type Open = IntakeFormProps["state"];
 const open = (overrides: Partial<Open> = {}): Open => ({
@@ -60,7 +71,12 @@ const formHtml = (
 	challengeSiteKey: string | null = SITE_KEY,
 ) =>
 	render(
-		createElement(IntakeForm, { state, channels: CHANNELS, challengeSiteKey }),
+		createElement(IntakeForm, {
+			state,
+			channels: CHANNELS,
+			challengeSiteKey,
+			booking: BOOKING,
+		}),
 	);
 
 const count = (html: string, pattern: RegExp) =>
@@ -86,7 +102,7 @@ const radiosOf = (html: string, name: string) =>
 	);
 
 describe("the intake form", () => {
-	test("is one form, named by the section's heading, in two groups", () => {
+	test("is one form, named by the section's heading, in five steps with the first showing (Prompt 6)", () => {
 		const html = formHtml();
 		const [form] = tags(html, "form");
 
@@ -95,44 +111,50 @@ describe("the intake form", () => {
 		assert.match(form, / novalidate=""/i);
 		assert.equal(attr(form, "aria-labelledby"), "inquiry-title");
 		assert.doesNotMatch(form, / action=/);
-		assert.match(html, /<legend class="intake-legend">Your tattoo<\/legend>/);
+		const sections = tags(html, "section");
+		assert.deepEqual(
+			sections.map((tag) => attr(tag, "aria-labelledby")),
+			[
+				"booking-step-artist",
+				"booking-step-when",
+				"booking-step-tattoo",
+				"booking-step-details",
+				"booking-step-review",
+			],
+		);
+		assert.doesNotMatch(sections[0], / hidden/);
+		for (const later of sections.slice(1)) assert.match(later, / hidden=""/);
 		assert.match(
 			html,
-			/<legend class="intake-legend">How <bdi>Black Needle<\/bdi> reaches you<\/legend>/,
+			/<h2 id="booking-step-artist" class="booking-step-title" tabindex="-1">Choose your artist<\/h2>/,
 		);
+		assert.match(
+			html,
+			/<li class="booking-progress-step" data-state="current" aria-current="step">/,
+		);
+		assert.match(html, /Step <bdi>1<\/bdi> of <bdi>5<\/bdi>/);
+		assert.match(
+			html,
+			/<button type="submit" class="action action-primary booking-next">Continue<\/button>/,
+		);
+		assert.doesNotMatch(html, /booking-back/, "no Back on the first step");
 		assert.match(html, /Everything is needed unless it says \(optional\)\./);
 	});
 
-	test("opens on one reassuring line and keeps the Cloudflare notice for under Send (TAT-105)", () => {
+	test("opens on one reassuring line and keeps the Cloudflare notice for the details and Send (TAT-105)", () => {
 		const html = formHtml();
-		const at = (text: string) => {
-			const index = html.indexOf(text);
-			assert.ok(index >= 0, text);
-			return index;
-		};
 
 		assert.match(
 			html,
 			/<p class="intake-note intake-reassure">Only <bdi>Black Needle<\/bdi> sees what you send\.<\/p>/,
 		);
-		// Nothing about spam bots or Cloudflare until the person has reached Send.
 		assert.ok(
-			at("Only <bdi>Black Needle</bdi> sees what you send.") <
-				at("Your tattoo"),
+			html.indexOf("Only <bdi>Black Needle</bdi> sees what you send.") <
+				html.indexOf("booking-progress"),
 		);
-		assert.ok(at("Your tattoo") < at(">Send inquiry<"));
-		assert.ok(at(">Send inquiry<") < at("Cloudflare"));
-		assert.ok(html.lastIndexOf("Cloudflare") < at("Prefer to chat?"));
-		assert.match(
-			html,
-			/<p class="intake-fine">Tattoo Drip runs this page for <bdi>Black Needle<\/bdi>\./,
-		);
-		assert.doesNotMatch(html, /begin filling this in/);
-		assert.doesNotMatch(
-			html.slice(0, at("Your tattoo")),
-			/Cloudflare|spam/,
-			"the top of the form",
-		);
+		// Nothing about spam bots or Cloudflare until the person gives their details.
+		assert.doesNotMatch(html, /Cloudflare|spam|begin filling this in/);
+		assert.match(html, /Prefer to chat\?/);
 	});
 
 	test("labels every control", () => {
@@ -163,19 +185,16 @@ describe("the intake form", () => {
 	test("marks what is needed and what is optional", () => {
 		const html = formHtml();
 
-		for (const id of [
-			"idea",
-			"placement",
-			"approximateSize",
-			"preferredDates",
-			"contactName",
-			"contactPhone",
-		]) {
+		for (const id of ["idea", "placement", "contactName", "contactPhone"]) {
 			assert.match(control(html, id), / required=""/, id);
 			assert.match(control(html, id), / aria-required="true"/, id);
 		}
-		for (const id of ["budget", "contactEmail"]) {
+		// The size is a choice (required) with the client's own words beside it (optional).
+		for (const id of ["budget", "contactEmail", "approximateSize", "notes"]) {
 			assert.doesNotMatch(control(html, id), / required/, id);
+		}
+		for (const radio of radiosOf(html, "size")) {
+			assert.match(radio, / required=""/);
 		}
 		for (const label of [
 			"Budget (optional)",
@@ -195,7 +214,7 @@ describe("the intake form", () => {
 		for (const [id, max] of [
 			["placement", 120],
 			["approximateSize", 120],
-			["preferredDates", 500],
+			["notes", 1000],
 			["budget", 120],
 			["contactName", 120],
 			["contactPhone", 40],
@@ -213,7 +232,7 @@ describe("the intake form", () => {
 			"idea",
 			"placement",
 			"approximateSize",
-			"preferredDates",
+			"notes",
 			"budget",
 			"contactName",
 		]) {
@@ -262,23 +281,29 @@ describe("the intake form", () => {
 		);
 	});
 
-	test("offers an artist only with two or more, or on an artist's page", () => {
+	test('offers an artist only with two or more, or on an artist\'s page, as cards with "No preference" last', () => {
 		const studioPage = radiosOf(formHtml(), "preferredArtistId");
 		assert.deepEqual(
 			studioPage.map((tag) => attr(tag, "value")),
-			["", SITA.id, MINA.id],
+			[SITA.id, MINA.id, ""],
 		);
-		assert.match(studioPage[0], / checked=""/);
-		assert.match(formHtml(), /<span dir="auto">मीना गुरुङ<\/span>/);
+		assert.match(studioPage[2], / checked=""/);
+		assert.match(
+			formHtml(),
+			/<span class="booking-artist-name" dir="auto">मीना गुरुङ<\/span>/,
+		);
+		assert.match(
+			formHtml(),
+			/<span class="booking-artist-style">Fine line<\/span>/,
+		);
 
-		assert.deepEqual(
-			radiosOf(formHtml(open({ artists: [SITA] })), "preferredArtistId"),
-			[],
-		);
-		assert.deepEqual(
-			radiosOf(formHtml(open({ artists: [] })), "preferredArtistId"),
-			[],
-		);
+		// One artist or none: no choice, so no artist step.
+		for (const artists of [[SITA], []]) {
+			const html = formHtml(open({ artists }));
+			assert.deepEqual(radiosOf(html, "preferredArtistId"), []);
+			assert.doesNotMatch(html, /booking-step-artist/);
+			assert.match(html, /Step <bdi>1<\/bdi> of <bdi>4<\/bdi>/);
+		}
 
 		const artistPage = radiosOf(
 			formHtml(open({ preferredArtist: SITA, artists: [SITA] })),
@@ -286,10 +311,10 @@ describe("the intake form", () => {
 		);
 		assert.deepEqual(
 			artistPage.map((tag) => attr(tag, "value")),
-			["", SITA.id],
+			[SITA.id, ""],
 		);
-		assert.match(artistPage[1], / checked=""/);
-		assert.doesNotMatch(artistPage[0], / checked/);
+		assert.match(artistPage[0], / checked=""/);
+		assert.doesNotMatch(artistPage[1], / checked/);
 	});
 
 	test("asks how they found the studio: six choices, none picked", () => {
@@ -351,21 +376,10 @@ describe("the intake form", () => {
 				assert.match(anchor, / rel="noopener noreferrer"/, anchor);
 			}
 		}
-		assert.ok(
-			hrefs(html).includes(
-				"https://www.cloudflare.com/turnstile-privacy-policy/",
-			),
-		);
 		assert.match(html, /Prefer to chat\?/);
 		assert.ok(hrefs(html).includes(CHANNELS.whatsapp));
-		assert.match(
-			html,
-			/<button type="submit" class="action action-primary">Send inquiry<\/button>/,
-		);
-		assert.match(
-			html,
-			/Cloudflare sees your connection and device, not your answers\./,
-		);
+		// Only the review step sends; the first step continues.
+		assert.doesNotMatch(html, /Request your session|Send inquiry/);
 	});
 
 	test("keeps hostile names as text", () => {

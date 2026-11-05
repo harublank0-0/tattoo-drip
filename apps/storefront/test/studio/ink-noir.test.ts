@@ -27,6 +27,7 @@ import {
 } from "../../src/studio/theme/config.ts";
 import { matchedThemeKey, THEME_HTML } from "../../src/studio/theme/html.ts";
 import { InkNoirArtistPage } from "../../src/studio/theme/ink-noir/artist/artist-page.tsx";
+import { InkNoirBookPage } from "../../src/studio/theme/ink-noir/book/book-page.tsx";
 import { InkNoirArtworkPage } from "../../src/studio/theme/ink-noir/gallery/artwork-page.tsx";
 import { InkNoirGalleryPage } from "../../src/studio/theme/ink-noir/gallery/gallery-page.tsx";
 import { InkNoirStudioPage } from "../../src/studio/theme/ink-noir/home/home-page.tsx";
@@ -398,11 +399,8 @@ describe("Ink Noir's pages", () => {
 		assert.equal(THEMES["ink-noir"].ArtistPage, InkNoirArtistPage);
 		assert.equal(THEMES["ink-noir"].WorkPage, InkNoirGalleryPage);
 		assert.equal(THEMES["ink-noir"].ArtworkPage, InkNoirArtworkPage);
-		for (const page of [
-			"FlashPage",
-			"FlashDesignPage",
-			"RequestPage",
-		] as const) {
+		assert.equal(THEMES["ink-noir"].RequestPage, InkNoirBookPage);
+		for (const page of ["FlashPage", "FlashDesignPage"] as const) {
 			assert.equal(
 				THEMES["ink-noir"][page],
 				THEMES["stencil-and-ink"][page],
@@ -440,7 +438,7 @@ describe("Ink Noir's pages", () => {
 			mainOf(artistHtml(inkNoir())),
 			mainOf(artistHtml(stencil())),
 		);
-		assert.equal(
+		assert.notEqual(
 			mainOf(requestHtml(inkNoir())),
 			mainOf(requestHtml(stencil())),
 		);
@@ -492,13 +490,13 @@ describe("Ink Noir's pages", () => {
 		const home = studioHtml(inkNoir());
 		assert.equal(
 			home.match(
-				/<a class="action action-primary ink-(header|footer)-cta" href="\/request">Request a session<\/a>/g,
+				/<a class="action action-primary ink-(header|footer)-cta" href="\/book">Request a session<\/a>/g,
 			)?.length,
 			2,
 		);
 		assert.match(
 			artistHtml(inkNoir()),
-			/class="action action-primary ink-header-cta" href="\/request\?artist=sita"><span>Request <bdi>Sita Rai<\/bdi><\/span>/,
+			/class="action action-primary ink-header-cta" href="\/book\?artist=sita"><span>Request <bdi>Sita Rai<\/bdi><\/span>/,
 		);
 	});
 

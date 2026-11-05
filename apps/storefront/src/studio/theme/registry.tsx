@@ -13,6 +13,7 @@ import { type Shell, StencilShell } from "../components/shell.tsx";
 import { DEFAULT_THEME_KEY, type ThemeKey } from "./config.ts";
 import { InkNoirArtistPage } from "./ink-noir/artist/artist-page.tsx";
 import { InkNoirArtistsPage } from "./ink-noir/artists/artists-page.tsx";
+import { InkNoirBookPage } from "./ink-noir/book/book-page.tsx";
 import { InkNoirArtworkPage } from "./ink-noir/gallery/artwork-page.tsx";
 import { InkNoirGalleryPage } from "./ink-noir/gallery/gallery-page.tsx";
 import { InkNoirStudioPage } from "./ink-noir/home/home-page.tsx";
@@ -76,7 +77,7 @@ export const THEMES: Record<ThemeKey, Theme> = {
 		ArtworkPage: InkNoirArtworkPage,
 		FlashPage,
 		FlashDesignPage,
-		RequestPage,
+		RequestPage: InkNoirBookPage,
 	},
 };
 
@@ -130,7 +131,7 @@ export function ThemedFlashDesignPage(
 	return <theme.FlashDesignPage {...props} Shell={theme.Shell} />;
 }
 
-/** `/request` in the studio's theme. */
+/** `/book` in the studio's theme. */
 export function ThemedRequestPage(props: ComponentProps<typeof RequestPage>) {
 	const theme = themeFor(props.data.theme.key);
 	return <theme.RequestPage {...props} Shell={theme.Shell} />;
