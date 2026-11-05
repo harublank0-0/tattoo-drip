@@ -6,7 +6,10 @@ import type { ApiContext } from "./context.ts";
 /**
  * For a loader's catch: the API's own 404 (a studio or record that no longer
  * exists) becomes the router's not-found, so the route's notFoundComponent
- * shows; anything else is rethrown as it is, for the error component.
+ * shows; anything else is the error component's, as a PageReadError (Prompt
+ * 8): the router serializes a failed match's error into the page's state for
+ * the browser, so it must carry nothing of the API's (its message, the URL,
+ * a stack). The log line says what failed, with the status and code only.
  */
 export function rethrowAsNotFound(error: unknown): never {
 	if (
@@ -16,7 +19,19 @@ export function rethrowAsNotFound(error: unknown): never {
 	) {
 		throw notFound();
 	}
-	throw error;
+	console.error("Page read failed", {
+		status: isTattooApiError(error) ? error.status : undefined,
+		code: isTattooApiError(error) ? error.code : undefined,
+	});
+	throw new PageReadError();
+}
+
+/** A read the page could not do, as the browser may see it: one fixed sentence, nothing of the cause. */
+export class PageReadError extends Error {
+	constructor() {
+		super("The page could not be loaded.");
+		this.name = "PageReadError";
+	}
 }
 
 /**

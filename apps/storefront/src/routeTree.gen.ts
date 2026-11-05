@@ -18,7 +18,9 @@ import { Route as DepositRouteImport } from './routes/deposit'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as PoliciesRouteImport } from './routes/policies'
 import { Route as RequestRouteImport } from './routes/request'
+import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as ServicesRouteImport } from './routes/services'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as WorkRouteImport } from './routes/work'
 import { Route as ArtistsIndexRouteImport } from './routes/artists/index'
 import { Route as ArtistsSlugRouteImport } from './routes/artists/$slug'
@@ -72,9 +74,19 @@ const RequestRoute = RequestRouteImport.update({
   path: '/request',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
+  id: '/robots.txt',
+  path: '/robots.txt',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ServicesRoute = ServicesRouteImport.update({
   id: '/services',
   path: '/services',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WorkRoute = WorkRouteImport.update({
@@ -123,7 +135,9 @@ export interface FileRoutesByFullPath {
   '/faq': typeof FaqRoute
   '/policies': typeof PoliciesRoute
   '/request': typeof RequestRoute
+  '/robots.txt': typeof RobotsDottxtRoute
   '/services': typeof ServicesRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/work': typeof WorkRoute
   '/artists/$slug': typeof ArtistsSlugRoute
   '/flash/$id': typeof FlashIdRoute
@@ -142,7 +156,9 @@ export interface FileRoutesByTo {
   '/faq': typeof FaqRoute
   '/policies': typeof PoliciesRoute
   '/request': typeof RequestRoute
+  '/robots.txt': typeof RobotsDottxtRoute
   '/services': typeof ServicesRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/work': typeof WorkRoute
   '/artists/$slug': typeof ArtistsSlugRoute
   '/flash/$id': typeof FlashIdRoute
@@ -162,7 +178,9 @@ export interface FileRoutesById {
   '/faq': typeof FaqRoute
   '/policies': typeof PoliciesRoute
   '/request': typeof RequestRoute
+  '/robots.txt': typeof RobotsDottxtRoute
   '/services': typeof ServicesRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/work': typeof WorkRoute
   '/artists/$slug': typeof ArtistsSlugRoute
   '/flash/$id': typeof FlashIdRoute
@@ -183,7 +201,9 @@ export interface FileRouteTypes {
     | '/faq'
     | '/policies'
     | '/request'
+    | '/robots.txt'
     | '/services'
+    | '/sitemap.xml'
     | '/work'
     | '/artists/$slug'
     | '/flash/$id'
@@ -202,7 +222,9 @@ export interface FileRouteTypes {
     | '/faq'
     | '/policies'
     | '/request'
+    | '/robots.txt'
     | '/services'
+    | '/sitemap.xml'
     | '/work'
     | '/artists/$slug'
     | '/flash/$id'
@@ -221,7 +243,9 @@ export interface FileRouteTypes {
     | '/faq'
     | '/policies'
     | '/request'
+    | '/robots.txt'
     | '/services'
+    | '/sitemap.xml'
     | '/work'
     | '/artists/$slug'
     | '/flash/$id'
@@ -241,7 +265,9 @@ export interface RootRouteChildren {
   FaqRoute: typeof FaqRoute
   PoliciesRoute: typeof PoliciesRoute
   RequestRoute: typeof RequestRoute
+  RobotsDottxtRoute: typeof RobotsDottxtRoute
   ServicesRoute: typeof ServicesRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   WorkRoute: typeof WorkRoute
   ArtistsSlugRoute: typeof ArtistsSlugRoute
   FlashIdRoute: typeof FlashIdRoute
@@ -316,11 +342,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RequestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/robots.txt': {
+      id: '/robots.txt'
+      path: '/robots.txt'
+      fullPath: '/robots.txt'
+      preLoaderRoute: typeof RobotsDottxtRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/services': {
       id: '/services'
       path: '/services'
       fullPath: '/services'
       preLoaderRoute: typeof ServicesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/work': {
@@ -385,7 +425,9 @@ const rootRouteChildren: RootRouteChildren = {
   FaqRoute: FaqRoute,
   PoliciesRoute: PoliciesRoute,
   RequestRoute: RequestRoute,
+  RobotsDottxtRoute: RobotsDottxtRoute,
   ServicesRoute: ServicesRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   WorkRoute: WorkRoute,
   ArtistsSlugRoute: ArtistsSlugRoute,
   FlashIdRoute: FlashIdRoute,

@@ -89,6 +89,7 @@ import {
 	studioPageSeo,
 	workPageSeo,
 } from "./seo.ts";
+import { sitemapPaths } from "./sitemap.ts";
 import { parseThemeConfig, type ThemeConfig } from "./theme/config.ts";
 import { storefrontInput } from "./theme/source.ts";
 import {
@@ -1034,6 +1035,19 @@ export async function loadInfoPage(
 	);
 	if (!data) throw notFound();
 	return data;
+}
+
+/**
+ * The sitemap's paths (Prompt 8): the studio (from the cache) and its
+ * artists, the reads every page makes. A failed read is thrown, so the route
+ * answers an error, never a sitemap missing pages.
+ */
+export async function loadSitemapPaths(context: ApiContext): Promise<string[]> {
+	const [studio, artists] = await Promise.all([
+		loadStudio(context),
+		loadArtists(context),
+	]);
+	return sitemapPaths(studio, artists, context.tattoo.connection.mediaUrl);
 }
 
 /**

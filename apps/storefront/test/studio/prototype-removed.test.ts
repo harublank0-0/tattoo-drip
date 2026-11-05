@@ -30,7 +30,11 @@ test("the prototype's mock data, pages and images are gone", () => {
 		"public/prisma.svg",
 	);
 	assert.ok(!existsSync(new URL("features", SRC)), "src/features");
-	assert.ok(existsSync(new URL("public/robots.txt", APP)), "public/robots.txt");
+	// robots.txt is a route since Prompt 8 (it names the studio's own sitemap).
+	assert.ok(
+		existsSync(new URL("routes/robots[.]txt.ts", SRC)),
+		"routes/robots[.]txt.ts",
+	);
 });
 
 test("the storefront has exactly its routes", () => {
@@ -53,7 +57,9 @@ test("the storefront has exactly its routes", () => {
 			"routes/index.tsx",
 			"routes/policies.tsx",
 			"routes/request.tsx",
+			"routes/robots[.]txt.ts",
 			"routes/services.tsx",
+			"routes/sitemap[.]xml.ts",
 			"routes/work.tsx",
 		],
 	);
