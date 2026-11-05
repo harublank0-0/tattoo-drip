@@ -44,8 +44,13 @@ export function isRouterClick(
 export function RouterAnchor({
 	href,
 	onClick,
+	resetScroll,
 	...props
-}: ComponentProps<"a"> & { href: string }) {
+}: ComponentProps<"a"> & {
+	href: string;
+	/** False keeps the scroll position (a filter on the same page); the router's default resets it. */
+	resetScroll?: boolean;
+}) {
 	// The hook's type says a router is always there; outside one it is undefined.
 	const router: RegisteredRouter | undefined = useRouter({ warn: false });
 	return (
@@ -56,7 +61,9 @@ export function RouterAnchor({
 				onClick?.(event);
 				if (!router || !isRouterClick(event, href)) return;
 				event.preventDefault();
-				void router.navigate({ href });
+				void router.navigate(
+					resetScroll === undefined ? { href } : { href, resetScroll },
+				);
 			}}
 		/>
 	);

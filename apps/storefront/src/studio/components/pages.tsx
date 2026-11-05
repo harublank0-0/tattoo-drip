@@ -12,6 +12,7 @@ import {
 } from "../links.ts";
 import type {
 	ArtistPageData,
+	ArtistsPageData,
 	FlashDesignPageData,
 	FlashPageData,
 	RequestPageData,
@@ -189,6 +190,48 @@ export function ArtistPage({
 			/>
 			<ArtistFlash artist={artist} list={data.flash} />
 			<StudioAside studio={studio} />
+		</Shell>
+	);
+}
+
+/**
+ * `/artists` in Stencil & Ink: the roster as the page, every visible artist
+ * (its h1 the roster's title), then the "Got an idea?" invitation. Stencil &
+ * Ink's navigation is its site bar, which has no directory link; the page is
+ * there for an address that names it. The style filter is Ink Noir's.
+ */
+export function ArtistsPage({
+	data,
+	Shell = StencilShell,
+}: {
+	data: ArtistsPageData;
+	Shell?: Shell;
+}) {
+	const { studio, theme, directory } = data;
+	return (
+		<Shell
+			studio={studio}
+			theme={theme}
+			requestLink={data.requestLink}
+			chat={data.chat}
+			page="artists"
+			artistsShown={directory.artists.length > 0}
+		>
+			{directory.artists.length > 0 ? (
+				<ArtistRoster
+					artists={directory.artists}
+					studioAccepting={studio.accepting}
+					asPage
+				/>
+			) : (
+				<section className="section" aria-labelledby="artists-title">
+					<h1 id="artists-title" className="section-title">
+						Artists
+					</h1>
+					<p>{studioCopy.artistsEmpty}</p>
+				</section>
+			)}
+			<RequestInvite state={data.inquiry} />
 		</Shell>
 	);
 }

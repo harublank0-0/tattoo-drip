@@ -153,7 +153,7 @@ function photoStyleNames(value: unknown): string[] {
 }
 
 /** The styles the filter offers: a slug the address can carry and a one-line name, each slug once, in the API's order. */
-function filterStyles(value: unknown): GalleryView["styles"] {
+export function filterStyles(value: unknown): GalleryView["styles"] {
 	if (!Array.isArray(value)) return [];
 	const styles: { slug: string; name: string }[] = [];
 	for (const item of value) {
@@ -205,7 +205,8 @@ function readSlug(value: unknown): string | undefined {
 		: undefined;
 }
 
-function readStyle(value: unknown): string | undefined {
+/** A style slug from the address, as the platform writes them, else undefined. */
+export function readStyle(value: unknown): string | undefined {
 	return typeof value === "string" && isStyleSlug(value) ? value : undefined;
 }
 

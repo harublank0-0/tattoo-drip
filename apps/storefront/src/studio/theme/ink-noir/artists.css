@@ -1,0 +1,461 @@
+/*
+ * Ink Noir's artists directory (src/studio/theme/ink-noir/artists/). Only
+ * `ink-dir-` and `ink-filter` classes, which only that page renders; the
+ * label, links, actions and the closing invitation are home.css's. Colours
+ * are the theme's tokens. Nothing moves on its own: hover and focus zoom a
+ * portrait and show its arrow, and that stops for prefers-reduced-motion.
+ *
+ * Unlayered, so these rules outrank styles.css's layered ones.
+ */
+
+/* ---- The opening ------------------------------------------------------ */
+
+.ink-dir-hero {
+	padding-block: clamp(4.5rem, 3rem + 6vw, 8rem)
+		clamp(2.5rem, 2rem + 3vw, 4.5rem);
+	border-block-end: 1px solid var(--line);
+}
+.ink-dir-hero-grid {
+	display: grid;
+	gap: 0;
+}
+.ink-dir-title {
+	margin: 0;
+	color: var(--ink);
+	font-size: clamp(3rem, 1rem + 8.5vw, 9rem);
+	line-height: 0.88;
+	letter-spacing: -0.04em;
+}
+.ink-dir-lede {
+	margin: clamp(1.75rem, 1.5rem + 1.5vw, 2.5rem) 0 0;
+	max-inline-size: 30ch;
+	color: var(--ink-muted);
+	font-family: var(--display-face);
+	font-size: clamp(1.25rem, 1.05rem + 0.9vw, 1.75rem);
+	font-weight: 700;
+	line-height: 1.25;
+}
+
+@media (min-width: 60rem) {
+	/* The headline runs from the left on its two lines; the description answers it beneath, on the right. */
+	.ink-dir-hero-grid {
+		grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+		column-gap: clamp(2rem, 5vw, 5rem);
+	}
+	.ink-dir-hero-grid .ink-label,
+	.ink-dir-title {
+		grid-column: 1 / -1;
+	}
+	.ink-dir-lede {
+		grid-column: 2;
+		margin-block-start: clamp(2rem, 1rem + 2vw, 3rem);
+	}
+}
+
+/* ---- The style filter ------------------------------------------------- */
+
+.ink-filters {
+	display: grid;
+	gap: 0.75rem;
+	padding-block: 1.5rem 0;
+}
+/* The row scrolls inside itself on a narrow screen; the page never does. */
+.ink-filter-bar {
+	margin-inline: -0.5rem;
+	overflow-x: auto;
+	scrollbar-width: none;
+	overscroll-behavior-x: contain;
+}
+.ink-filter-bar::-webkit-scrollbar {
+	display: none;
+}
+.ink-filter-list {
+	display: flex;
+	gap: 0.25rem;
+	inline-size: max-content;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+/* Where the row can overflow, its end fades out: more styles are a swipe away. The last one scrolls clear of the fade. */
+@media (max-width: 59.99rem) {
+	.ink-filter-bar {
+		mask-image: linear-gradient(
+			to right,
+			black calc(100% - 2.5rem),
+			transparent
+		);
+	}
+	.ink-filter-list {
+		padding-inline-end: 2.5rem;
+	}
+}
+.ink-filter {
+	position: relative;
+	display: inline-flex;
+	align-items: baseline;
+	gap: 0.375rem;
+	min-block-size: 2.75rem;
+	padding: 0.625rem 0.5rem;
+	color: var(--ink-muted);
+	font-size: 0.9375rem;
+	font-weight: 500;
+	text-decoration: none;
+	white-space: nowrap;
+	transition: color 150ms ease;
+}
+.ink-filter-count {
+	color: var(--ink-muted);
+	font-size: 0.75rem;
+	font-variant-numeric: tabular-nums;
+}
+/* The current filter: in ink, heavier, and on a rule, so it never rests on colour alone. */
+.ink-filter::after {
+	content: "";
+	position: absolute;
+	inset-inline: 0.5rem;
+	inset-block-end: 0.25rem;
+	block-size: 2px;
+	background: var(--stencil);
+	scale: 0 1;
+	transform-origin: left center;
+	transition: scale 200ms ease;
+}
+.ink-filter:hover {
+	color: var(--ink);
+}
+.ink-filter:hover::after {
+	scale: 0.4 1;
+}
+.ink-filter[aria-current] {
+	color: var(--ink);
+	font-weight: 600;
+}
+.ink-filter[aria-current]::after {
+	scale: 1 1;
+}
+.ink-filter:focus-visible {
+	outline: 2px solid var(--stencil);
+	outline-offset: -2px;
+}
+.ink-filter-status {
+	margin: 0;
+	color: var(--ink-muted);
+	font-size: 0.875rem;
+}
+
+/* ---- The grid --------------------------------------------------------- */
+
+.ink-dir-list {
+	padding-block-start: clamp(2.5rem, 2rem + 3vw, 4.5rem);
+}
+.ink-dir-grid {
+	display: grid;
+	gap: 3.5rem 1.5rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+@media (min-width: 40rem) {
+	.ink-dir-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+	/* Every second card a step lower: a contact sheet, still read row by row. */
+	.ink-dir-grid > li:nth-child(even) {
+		margin-block-start: 3rem;
+	}
+}
+@media (min-width: 64rem) {
+	.ink-dir-grid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		column-gap: 2rem;
+	}
+	.ink-dir-grid > li:nth-child(even) {
+		margin-block-start: 0;
+	}
+	.ink-dir-grid > li:nth-child(3n + 2) {
+		margin-block-start: 4.5rem;
+	}
+	/* Two artists share the width: larger portraits, no empty third column. */
+	.ink-dir-grid-2 {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		column-gap: clamp(2rem, 5vw, 5rem);
+	}
+	.ink-dir-grid-2 > li:nth-child(3n + 2) {
+		margin-block-start: 0;
+	}
+	.ink-dir-grid-2 > li:nth-child(even) {
+		margin-block-start: 5rem;
+	}
+}
+
+.ink-dir-card {
+	position: relative;
+	display: grid;
+	gap: 1.25rem;
+	align-content: start;
+}
+.ink-dir-portrait {
+	position: relative;
+	margin: 0;
+	aspect-ratio: 4 / 5;
+	overflow: hidden;
+	background: var(--paper-raised);
+}
+.ink-dir-portrait img {
+	display: block;
+	inline-size: 100%;
+	block-size: 100%;
+	object-fit: cover;
+	object-position: 50% 25%;
+	transition: scale 700ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+/* A dark veil over the portrait, deepened on hover. */
+.ink-dir-portrait::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(
+		to top,
+		color-mix(in srgb, var(--paper) 45%, transparent),
+		transparent 45%
+	);
+	opacity: 0.6;
+	transition: opacity 300ms ease;
+	pointer-events: none;
+}
+.ink-dir-initial {
+	position: absolute;
+	inset: 0;
+	display: grid;
+	place-items: center;
+	color: var(--line-strong);
+	font-family: var(--display-face);
+	font-size: clamp(6rem, 4rem + 10vw, 11rem);
+	font-weight: 700;
+	line-height: 1;
+}
+.ink-dir-arrow {
+	position: absolute;
+	inset-block-start: 1rem;
+	inset-inline-end: 1rem;
+	z-index: 1;
+	display: grid;
+	place-items: center;
+	inline-size: 2.75rem;
+	block-size: 2.75rem;
+	border-radius: 50%;
+	background: var(--paper);
+	color: var(--ink);
+	opacity: 0;
+	translate: -0.375rem 0.375rem;
+	transition:
+		opacity 250ms ease,
+		translate 250ms ease;
+}
+.ink-dir-arrow svg {
+	inline-size: 1.25rem;
+	block-size: 1.25rem;
+}
+
+.ink-dir-text {
+	display: grid;
+	gap: 0.5rem;
+	justify-items: start;
+	align-content: start;
+	min-inline-size: 0;
+}
+.ink-dir-name {
+	margin: 0;
+	font-size: clamp(1.75rem, 1.4rem + 1.2vw, 2.5rem);
+	line-height: 1.02;
+	letter-spacing: -0.02em;
+	overflow-wrap: anywhere;
+}
+/* The name is the card's one link; it stretches over the whole card. */
+.ink-dir-link {
+	color: var(--ink);
+	text-decoration: underline;
+	text-decoration-color: transparent;
+	text-decoration-thickness: 2px;
+	text-underline-offset: 0.18em;
+	transition: text-decoration-color 200ms ease;
+}
+.ink-dir-link::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: 2;
+}
+.ink-dir-link:focus-visible {
+	outline: none;
+}
+.ink-dir-card:has(.ink-dir-link:focus-visible) .ink-dir-portrait {
+	outline: 2px solid var(--stencil);
+	outline-offset: 4px;
+}
+.ink-dir-styles {
+	margin: 0;
+	color: var(--ink);
+	font-size: 0.9375rem;
+	overflow-wrap: anywhere;
+}
+.ink-dir-status {
+	display: flex;
+	align-items: baseline;
+	gap: 0.5rem;
+	margin: 0;
+	color: var(--ink-muted);
+	font-size: 0.875rem;
+}
+.ink-dir-status.ink-open::before {
+	content: "";
+	flex: none;
+	inline-size: 0.4375rem;
+	block-size: 0.4375rem;
+	border-radius: 50%;
+	background: var(--stencil);
+	translate: 0 -0.0625rem;
+}
+.ink-dir-bio {
+	display: -webkit-box;
+	margin: 0.25rem 0 0;
+	max-inline-size: 34rem;
+	color: var(--ink-muted);
+	font-size: 0.9375rem;
+	line-height: 1.6;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 3;
+	line-clamp: 3;
+	overflow: hidden;
+}
+.ink-dir-work {
+	display: flex;
+	gap: 0.375rem;
+	margin-block-start: 0.5rem;
+}
+.ink-dir-work img {
+	inline-size: 4.5rem;
+	block-size: 4.5rem;
+	object-fit: cover;
+	background: var(--paper-raised);
+}
+
+/* Hover and keyboard focus: the portrait leans in, the veil deepens, the name is underlined, the arrow arrives. */
+.ink-dir-card:hover .ink-dir-portrait img,
+.ink-dir-card:has(.ink-dir-link:focus-visible) .ink-dir-portrait img {
+	scale: 1.04;
+}
+.ink-dir-card:hover .ink-dir-portrait::after,
+.ink-dir-card:has(.ink-dir-link:focus-visible) .ink-dir-portrait::after {
+	opacity: 1;
+}
+.ink-dir-card:hover .ink-dir-link,
+.ink-dir-link:focus-visible {
+	text-decoration-color: var(--stencil);
+}
+.ink-dir-card:hover .ink-dir-arrow,
+.ink-dir-card:has(.ink-dir-link:focus-visible) .ink-dir-arrow {
+	opacity: 1;
+	translate: 0 0;
+}
+/* No hover on a touch screen: the arrow stays, so the card still says it opens. */
+@media (hover: none) {
+	.ink-dir-arrow {
+		opacity: 1;
+		translate: 0 0;
+	}
+}
+
+/* ---- One artist ------------------------------------------------------- */
+
+.ink-dir-feature {
+	display: grid;
+	gap: 2rem;
+}
+.ink-dir-feature-text {
+	display: grid;
+	gap: 0.75rem;
+	justify-items: start;
+	align-content: end;
+	min-inline-size: 0;
+}
+.ink-dir-feature-name {
+	margin: 0;
+	color: var(--ink);
+	font-size: clamp(3rem, 1.5rem + 6vw, 7rem);
+	line-height: 0.92;
+	letter-spacing: -0.035em;
+	overflow-wrap: anywhere;
+}
+.ink-dir-feature .ink-dir-styles {
+	font-size: 1.0625rem;
+}
+.ink-dir-feature-bio {
+	margin: 0.75rem 0 0;
+	max-inline-size: 38rem;
+	color: var(--ink);
+	font-size: clamp(1.0625rem, 1rem + 0.35vw, 1.25rem);
+	line-height: 1.65;
+}
+.ink-dir-feature-work {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 0.375rem;
+	inline-size: 100%;
+	margin-block-start: 1rem;
+}
+.ink-dir-feature-work img {
+	inline-size: 100%;
+	block-size: auto;
+	aspect-ratio: 1;
+	object-fit: cover;
+	background: var(--paper-raised);
+}
+.ink-dir-feature-actions {
+	margin: 1rem 0 0;
+}
+@media (min-width: 48rem) {
+	.ink-dir-feature {
+		grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+		column-gap: clamp(2.5rem, 6vw, 6rem);
+		align-items: end;
+	}
+}
+
+/* ---- Nobody to show --------------------------------------------------- */
+
+.ink-dir-empty {
+	display: grid;
+	gap: 0.75rem;
+	justify-items: start;
+	padding-block: clamp(2.5rem, 2rem + 4vw, 5rem);
+	border-block-end: 1px solid var(--line);
+	color: var(--ink-muted);
+}
+.ink-dir-empty p {
+	margin: 0;
+}
+.ink-dir-empty-title {
+	max-inline-size: 22ch;
+	color: var(--ink);
+	font-family: var(--display-face);
+	font-size: clamp(1.75rem, 1.2rem + 2vw, 2.75rem);
+	font-weight: 700;
+	line-height: 1.1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.ink-filter,
+	.ink-filter::after,
+	.ink-dir-portrait img,
+	.ink-dir-portrait::after,
+	.ink-dir-link,
+	.ink-dir-arrow {
+		transition: none;
+	}
+	.ink-dir-card:hover .ink-dir-portrait img,
+	.ink-dir-card:has(.ink-dir-link:focus-visible) .ink-dir-portrait img {
+		scale: none;
+	}
+}

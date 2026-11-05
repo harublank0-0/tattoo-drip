@@ -11,27 +11,24 @@ import type { AnyRouter } from "@tanstack/react-router";
  * (Ink Noir's, `tabIndex={-1}`), else the page's first `<main>`. Without moving the page: the router's own
  * scroll restoration and fragment scrolling stay in charge of that.
  *
- * Only real page changes count: a new path or a new query (a filter on
- * /work). The first load is the browser's, and a change of fragment alone is
- * a jump within the page, which the browser handles. Nothing else on the
+ * Only a new page counts: a new path. The first load is the browser's, a
+ * change of fragment alone is a jump within the page, which the browser
+ * handles, and a new query alone is the same page filtered (the artists
+ * directory's style links), where focus stays on the filter just used. Nothing else on the
  * page navigates through the router ("Show more" and the photo viewer use
  * the history API directly), so this never takes focus from them.
  */
 
 /** What `onResolved` says of a navigation (the router's NavigationEventInfo). */
 export interface NavigationChange {
-	readonly fromLocation?: { readonly searchStr: string };
-	readonly toLocation: { readonly searchStr: string; readonly hash: string };
+	readonly fromLocation?: unknown;
+	readonly toLocation: { readonly hash: string };
 	readonly pathChanged: boolean;
 }
 
 /** Whether this navigation showed a new page, so focus belongs to its content. Pure. */
 export function movesFocus(change: NavigationChange): boolean {
-	if (!change.fromLocation) return false;
-	return (
-		change.pathChanged ||
-		change.fromLocation.searchStr !== change.toLocation.searchStr
-	);
+	return change.fromLocation !== undefined && change.pathChanged;
 }
 
 /** The id to focus: the fragment's target when there is one, else the page's `<main>`. Pure. */

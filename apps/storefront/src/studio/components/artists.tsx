@@ -197,19 +197,23 @@ function ArtistEntry({
 export function ArtistRoster({
 	artists,
 	studioAccepting,
+	asPage = false,
 }: {
 	artists: readonly ArtistView[];
 	/** Whether the studio takes new inquiries (its own switch, not the artists'). */
 	studioAccepting: boolean;
+	/** The roster is the page (`/artists`): its title is the page's h1. */
+	asPage?: boolean;
 }) {
+	const Title = asPage ? "h1" : "h2";
 	if (artists.length === 0) return null;
 	// With one artist in an open studio, "Send your idea" already asks for them.
 	const askLinks = artists.length > 1 || !studioAccepting;
 	return (
 		<section id="artists" className="section" aria-labelledby="artists-title">
-			<h2 id="artists-title" className="section-title">
+			<Title id="artists-title" className="section-title">
 				{artists.length === 1 ? "Artist" : "Artists"}
-			</h2>
+			</Title>
 			<ul className="roster">
 				{artists.map((artist) => (
 					<li key={artist.id}>

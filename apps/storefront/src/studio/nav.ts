@@ -1,17 +1,19 @@
 import { studioCopy } from "./copy.ts";
-import { flashHref, workHref } from "./links.ts";
+import { artistsHref, flashHref, workHref } from "./links.ts";
 import type { SectionKey } from "./theme/config.ts";
 
 /**
  * The site navigation of a theme that has one (Ink Noir's header, menu and
  * footer). Pure: every item is a page this app already serves, and its href
- * comes from links.ts like every other link. The page a theme's shell wraps
+ * comes from links.ts like every other link. Artists is the directory
+ * (`/artists`). The page a theme's shell wraps
  * says which item is current, so nothing reads the address.
  */
 
 /** The page a shell wraps: which nav item is current follows from it. */
 export type ShellPage =
 	| "home"
+	| "artists"
 	| "artist"
 	| "work"
 	| "flash"
@@ -34,11 +36,11 @@ export interface NavItem {
 
 /**
  * The navigation for `page`, given the sections the studio shows. Artists
- * links to the studio page's roster and Flash to /flash, each only while the
+ * links to the directory and Flash to /flash, each only while the
  * studio shows that section on its page (a studio that hides its roster or
  * its flash has nothing to point at there), and Artists only while an artist
- * is visible (with none the roster renders nothing, so `/#artists` would land
- * nowhere); Home and Gallery (/work) always.
+ * is visible (with none the directory only says so); Home and Gallery
+ * (/work) always.
  */
 export function navItems(
 	sections: readonly SectionKey[],
@@ -57,8 +59,9 @@ export function navItems(
 		items.push({
 			key: "artists",
 			label: studioCopy.nav.artists,
-			href: "/#artists",
-			current: page === "artist" ? "true" : undefined,
+			href: artistsHref({}),
+			current:
+				page === "artists" ? "page" : page === "artist" ? "true" : undefined,
 		});
 	}
 	items.push({

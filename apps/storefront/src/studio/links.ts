@@ -1,3 +1,4 @@
+import type { ArtistsSearch } from "./artists.ts";
 /**
  * The links the studio page builds (TAT-48). Pure. Only these ever reach an
  * href: the page's own paths and fragments, https: (from the API, parsed
@@ -119,6 +120,11 @@ export function portfolioHref(slug: string, search: PortfolioSearch): string {
 		["healed", search.healed === true ? "1" : undefined],
 		["cursor", search.cursor],
 	])}#work`;
+}
+
+/** The artists directory, filtered by a style (`/artists?style=<slug>`) or whole. */
+export function artistsHref(search: ArtistsSearch): string {
+	return `/artists${queryOf([["style", search.style]])}`;
 }
 
 /** The flash page (TAT-129) with this filter: `artist` then `cursor`, absent ones left out. */

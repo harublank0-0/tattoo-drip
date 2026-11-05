@@ -12,7 +12,7 @@ import { focusTargetIds, movesFocus } from "../src/navigation-focus.ts";
 const at = (searchStr: string, hash = "") => ({ searchStr, hash });
 
 describe("movesFocus: which navigations show a new page", () => {
-	test("a new path or a new query does", () => {
+	test("a new path does", () => {
 		assert.equal(
 			movesFocus({
 				fromLocation: at(""),
@@ -21,22 +21,23 @@ describe("movesFocus: which navigations show a new page", () => {
 			}),
 			true,
 		);
-		assert.equal(
-			movesFocus({
-				fromLocation: at(""),
-				toLocation: at("?style=fine-line"),
-				pathChanged: false,
-			}),
-			true,
-		);
 	});
 
-	test("the first load and a jump within the page do not", () => {
+	test("the first load, a jump within the page and a new filter do not", () => {
 		assert.equal(movesFocus({ toLocation: at(""), pathChanged: true }), false);
 		assert.equal(
 			movesFocus({
 				fromLocation: at(""),
 				toLocation: at("", "artists"),
+				pathChanged: false,
+			}),
+			false,
+		);
+		// /artists?style=fine-line from /artists: focus stays on the filter just used.
+		assert.equal(
+			movesFocus({
+				fromLocation: at(""),
+				toLocation: at("?style=fine-line"),
 				pathChanged: false,
 			}),
 			false,
