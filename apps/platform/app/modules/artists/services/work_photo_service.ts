@@ -19,6 +19,15 @@ import { afterRollback, dbClient, withTransaction } from "#services/db_context";
 type Upload = Pick<MultipartFile, "tmpPath">;
 type TenantRef = Pick<Tenant, "id">;
 
+/** The photo's artist is visible and live, asked in the photo's own query (see findShown). */
+const VISIBLE_ARTIST = `exists (
+	select 1 from artists
+	where artists.id = artist_work_photos.artist_id
+		and artists.tenant_id = ?
+		and artists.visible
+		and artists.deleted_at is null
+)`;
+
 /**
  * The most work photos an artist shows. The database no longer holds this
  * limit: the count under the artist's row lock (`add`) is the only guard.
@@ -163,10 +172,14 @@ export default class WorkPhotoService {
 	}
 
 	/**
-	 * One photo of `artistIds` by id, or null (TAT-126's photo page): the
+	 * One photo of `artistIds` by id, or null (the photo's own page): the
 	 * caller passes the ids of artists it may show (the public read passes
 	 * only visible ones), so another artist's, another tenant's, a removed
-	 * and an unknown photo are all null; no query for [].
+	 * and an unknown photo are all null; no query for []. The same query asks
+	 * again that its artist is visible and live (VISIBLE_ARTIST, as
+	 * FlashService.findShown does): under READ COMMITTED an artist can be
+	 * hidden between the caller's read and this one, and the answer is
+	 * cacheable.
 	 */
 	async findShown(
 		tenant: TenantRef,
@@ -178,6 +191,7 @@ export default class WorkPhotoService {
 			.where("tenant_id", tenant.id)
 			.where("id", photoId)
 			.whereIn("artist_id", [...artistIds])
+			.whereRaw(VISIBLE_ARTIST, [tenant.id])
 			.first();
 	}
 

@@ -1,8 +1,10 @@
+import app from "@adonisjs/core/services/app";
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
 import type ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
 import ArtistService from "#modules/artists/services/artist_service";
+import WorkPhotoService from "#modules/artists/services/work_photo_service";
 import { encodeWorkCursor } from "#modules/artists/work_cursor";
 import ImageService from "#modules/media/services/image_service";
 import { CURSOR_MESSAGE } from "#modules/storefront/validators/work";
@@ -693,14 +695,19 @@ test.group(
 				name: "Gone",
 				slug: "gone",
 			});
-			const [shown, ofHidden, ofGone] = await inTenant(tenant, async () => [
-				await addWorkPhoto(tenant, closed),
-				await addWorkPhoto(tenant, hidden),
-				await addWorkPhoto(tenant, gone),
-			]);
-			await inTenant(tenant, () =>
-				new ArtistService(images).delete(tenant, gone),
+			const [shown, ofHidden, ofGone, removed] = await inTenant(
+				tenant,
+				async () => [
+					await addWorkPhoto(tenant, closed),
+					await addWorkPhoto(tenant, hidden),
+					await addWorkPhoto(tenant, gone),
+					await addWorkPhoto(tenant, closed),
+				],
 			);
+			await inTenant(tenant, async () => {
+				await new ArtistService(images).delete(tenant, gone);
+				await removed.delete();
+			});
 
 			(await client.get(photoUrl("api-work-photo-b", shown.id))).assertStatus(
 				200,
@@ -708,6 +715,7 @@ test.group(
 			for (const id of [
 				ofHidden.id,
 				ofGone.id,
+				removed.id,
 				"0192f0a0-0000-7000-8000-000000000000",
 			]) {
 				assertApiError(
@@ -716,6 +724,26 @@ test.group(
 					"not_found",
 				);
 			}
+		});
+
+		test("findShown asks again in its own query that the artist is visible: a stale id list shows nothing of an artist hidden since", async ({
+			assert,
+		}) => {
+			const { owner, tenant } = await studioWithOwner("api-work-photo-h");
+			const hidden = await addArtist(tenant, owner, {
+				name: "Hidden",
+				slug: "hidden",
+				visible: false,
+			});
+			const photo = await inTenant(tenant, () => addWorkPhoto(tenant, hidden));
+			const service = await app.container.make(WorkPhotoService);
+
+			// As if the caller read the visible artists before Hidden was hidden.
+			const found = await inTenant(tenant, () =>
+				service.findShown(tenant, photo.id, [hidden.id]),
+			);
+
+			assert.isNull(found);
 		});
 
 		test("another studio's photo is the 404, under its own slug it is shown", async ({
