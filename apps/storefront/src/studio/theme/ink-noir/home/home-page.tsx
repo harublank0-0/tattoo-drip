@@ -52,6 +52,7 @@ export function InkNoirStudioPage({
 			requestLink={data.requestLink}
 			chat={data.chat}
 			page="home"
+			artistsShown={data.artists.length > 0}
 			mainClassName="ink-home"
 		>
 			<CinematicHero

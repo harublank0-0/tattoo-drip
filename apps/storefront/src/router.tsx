@@ -3,6 +3,7 @@ import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query
 import { type DehydratedApi, dehydrateApi, hydrateApi } from "./api/context.ts";
 import { createRequestApi } from "./api/request.ts";
 import { scrollRestorationKey } from "./deposit/token.ts";
+import { focusAfterNavigation } from "./navigation-focus.ts";
 import { routeTree } from "./routeTree.gen";
 import {
 	type DehydratedSite,
@@ -54,6 +55,10 @@ export function getRouter() {
 
 	// Wraps the router in the QueryClientProvider and streams the cache.
 	setupRouterSsrQueryIntegration({ router, queryClient: api.queryClient });
+
+	// A client-side navigation moves focus to the new page's content, as a
+	// page load would (src/navigation-focus.ts). The browser's router only.
+	if (typeof document !== "undefined") focusAfterNavigation(router);
 
 	return router;
 }

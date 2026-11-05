@@ -44,6 +44,7 @@ import {
 import { toInquiryInput } from "../submission.ts";
 import { createSubmitter } from "../submit-flow.ts";
 import { Fill } from "./fill.tsx";
+import { LeaveGuard } from "./leave-guard.tsx";
 import {
 	ChatLinks,
 	ErrorSummary,
@@ -388,6 +389,11 @@ export function IntakeForm({
 				if (!busy && !blocked) void form.handleSubmit();
 			}}
 		>
+			{/* The same rule as the beforeunload listener above, for in-app links. */}
+			<LeaveGuard
+				active={phase !== "idle" && phase !== "preparing"}
+				message={copy.status.leaveWhileSending}
+			/>
 			<p className="intake-note intake-reassure">
 				<Fill template={copy.reassurance} values={{ studio: studioName }} />
 			</p>

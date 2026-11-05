@@ -82,6 +82,7 @@ export function StudioPage({
 			requestLink={data.requestLink}
 			chat={data.chat}
 			page="home"
+			artistsShown={data.artists.length > 0}
 		>
 			<header className="profile">
 				{theme.heroImage ? (
@@ -177,6 +178,7 @@ export function ArtistPage({
 			requestLink={data.requestLink}
 			chat={data.chat}
 			page="artist"
+			artistsShown={true}
 		>
 			<ArtistProfile artist={artist} studio={studio} />
 			<PortfolioSection
@@ -216,6 +218,7 @@ export function RequestPage({
 			requestLink={null}
 			chat={data.chat}
 			page="request"
+			artistsShown={data.hasArtists}
 			mainClassName="page request-page"
 		>
 			<InquirySection
@@ -318,6 +321,7 @@ export function WorkPage({
 			requestLink={data.requestLink}
 			chat={data.chat}
 			page="work"
+			artistsShown={data.hasArtists}
 		>
 			<section aria-labelledby="work-page-title">
 				<h1 id="work-page-title" className="section-title">
@@ -379,6 +383,7 @@ export function FlashPage({
 			requestLink={data.requestLink}
 			chat={data.chat}
 			page="flash"
+			artistsShown={data.artists.length > 0}
 		>
 			<section aria-labelledby="flash-page-title">
 				<h1 id="flash-page-title" className="section-title">
@@ -476,6 +481,7 @@ export function FlashDesignPage({
 			requestLink={data.requestLink}
 			chat={data.chat}
 			page="flash-design"
+			artistsShown={data.hasArtists}
 		>
 			<article className="flash-design" aria-labelledby="flash-design-title">
 				<img

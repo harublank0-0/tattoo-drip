@@ -313,7 +313,7 @@ describe("navItems: the pages a theme's navigation lists", () => {
 			request: [],
 		};
 		for (const [page, current] of Object.entries(expected)) {
-			const items = navItems(all, page as ShellPage);
+			const items = navItems(all, page as ShellPage, true);
 			assert.deepEqual(
 				items.map((item) => item.href),
 				["/", "/#artists", "/work", "/flash"],
@@ -331,8 +331,17 @@ describe("navItems: the pages a theme's navigation lists", () => {
 
 	test("Artists and Flash only while the studio shows those sections", () => {
 		assert.deepEqual(
-			navItems(["work", "info", "inquiry"], "home").map((item) => item.key),
+			navItems(["work", "info", "inquiry"], "home", true).map(
+				(item) => item.key,
+			),
 			["home", "gallery"],
+		);
+	});
+
+	test("Artists only while an artist is visible: with none, /#artists lands nowhere", () => {
+		assert.deepEqual(
+			navItems(all, "home", false).map((item) => item.key),
+			["home", "gallery", "flash"],
 		);
 	});
 });
@@ -530,6 +539,48 @@ describe("Ink Noir's pages", () => {
 		]) {
 			assert.doesNotMatch(footer, new RegExp(id), id);
 		}
+	});
+
+	test("drop Artists from the header and footer of every page when no artist is visible", () => {
+		const studio = inkNoir();
+		const empty = (artists: Artist[]) =>
+			renderToStaticMarkup(
+				createElement(ThemedStudioPage, {
+					data: studioPageData(studio, artists, ORIGIN, IMAGE_ORIGIN),
+				}),
+			);
+		for (const html of [
+			empty([]),
+			renderToStaticMarkup(
+				createElement(ThemedRequestPage, {
+					data: requestPageData(studio, [], {}, ORIGIN, IMAGE_ORIGIN),
+				}),
+			),
+			renderToStaticMarkup(
+				createElement(ThemedWorkPage, {
+					data: workPageData(studio, [], null, {}, ORIGIN, IMAGE_ORIGIN),
+				}),
+			),
+			renderToStaticMarkup(
+				createElement(ThemedFlashPage, {
+					data: flashPageData(
+						studio,
+						[],
+						EMPTY_FLASH_PAGE,
+						{},
+						ORIGIN,
+						IMAGE_ORIGIN,
+					),
+				}),
+			),
+		]) {
+			assert.doesNotMatch(html, /href="\/#artists"/);
+			assert.doesNotMatch(html, /id="artists"/);
+		}
+		// With an artist, the link is back and lands on the roster.
+		const one = empty([SITA]);
+		assert.match(one, /href="\/#artists"/);
+		assert.match(one, /id="artists"/);
 	});
 
 	test("drop Artists and Flash from the navigation when the studio hides them", () => {
