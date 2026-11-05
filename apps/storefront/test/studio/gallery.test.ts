@@ -417,11 +417,15 @@ describe("workQuery (TAT-126)", () => {
 });
 
 describe("workHref and portfolioHref keep the filters (TAT-126)", () => {
-	test("/work", () => {
-		assert.equal(workHref({}), "/work");
+	test("/gallery (Prompt 5; /work redirects), with the search text before the cursor", () => {
+		assert.equal(workHref({}), "/gallery");
+		assert.equal(
+			workHref({ style: "fine-line", q: "koi & rose", cursor: "c2" }),
+			"/gallery?style=fine-line&q=koi%20%26%20rose&cursor=c2",
+		);
 		assert.equal(
 			workHref({ artist: "sita", healed: true }),
-			"/work?artist=sita&healed=1",
+			"/gallery?artist=sita&healed=1",
 		);
 		assert.equal(
 			workHref({
@@ -430,13 +434,13 @@ describe("workHref and portfolioHref keep the filters (TAT-126)", () => {
 				healed: true,
 				cursor: "c2",
 			}),
-			"/work?artist=sita&style=fine-line&healed=1&cursor=c2",
+			"/gallery?artist=sita&style=fine-line&healed=1&cursor=c2",
 		);
 		assert.equal(
 			workHref({ artist: "sita", healed: true, cursor: "c2" }),
-			"/work?artist=sita&healed=1&cursor=c2",
+			"/gallery?artist=sita&healed=1&cursor=c2",
 		);
-		assert.equal(workHref({ cursor: "c2" }), "/work?cursor=c2");
+		assert.equal(workHref({ cursor: "c2" }), "/gallery?cursor=c2");
 	});
 
 	test("an artist's portfolio", () => {

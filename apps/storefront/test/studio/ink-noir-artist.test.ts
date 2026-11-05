@@ -146,7 +146,7 @@ describe("Ink Noir's artist page", () => {
 		assert.match(page, / sizes="\(min-width: 74\.5rem\) 23\.5rem, /);
 		assert.match(
 			page,
-			/<a class="ink-link" href="\/work\?artist=sita">See it in the full gallery<\/a>/,
+			/<a class="ink-link" href="\/gallery\?artist=sita">See it in the full gallery<\/a>/,
 		);
 		assert.match(
 			page,
@@ -165,7 +165,7 @@ describe("Ink Noir's artist page", () => {
 		const page = mainOf(html(data("sita")));
 		assert.match(
 			page,
-			/<a class="ink-style-link" aria-label="See Fine line work by Sita Rai" href="\/work\?artist=sita&amp;style=fine-line">Fine line<\/a>/,
+			/<a class="ink-style-link" aria-label="See Fine line work by Sita Rai" href="\/gallery\?artist=sita&amp;style=fine-line">Fine line<\/a>/,
 		);
 		assert.doesNotMatch(mainOf(html(data("arjun"))), /id="styles"/);
 	});

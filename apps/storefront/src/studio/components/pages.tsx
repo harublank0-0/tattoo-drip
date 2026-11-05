@@ -1,6 +1,7 @@
 import { useLocation } from "@tanstack/react-router";
 import { MessageCircle } from "lucide-react";
 import { Fill } from "../../intake/components/fill.tsx";
+import { artworkTitle } from "../artwork.ts";
 import { studioCopy } from "../copy.ts";
 import {
 	flashHref,
@@ -13,6 +14,7 @@ import {
 import type {
 	ArtistPageData,
 	ArtistsPageData,
+	ArtworkPageData,
 	FlashDesignPageData,
 	FlashPageData,
 	RequestPageData,
@@ -21,7 +23,7 @@ import type {
 } from "../loaders.ts";
 import { OpenNow } from "../open-now.tsx";
 import { type MoreWork, PagedGallery } from "../paging.tsx";
-import { flashDesignSizes, logoSizes } from "../srcset.ts";
+import { flashDesignSizes, logoSizes, workGridSizes } from "../srcset.ts";
 import type { SectionKey } from "../theme/config.ts";
 import type { StudioView } from "../view-model.ts";
 import { ArtistProfile, ArtistRoster } from "./artists.tsx";
@@ -33,7 +35,12 @@ import {
 	FlashSection,
 	FlashSummary,
 } from "./flash.tsx";
-import { HealedFilter, RecentWork, WorkFilters } from "./gallery.tsx";
+import {
+	ArtworkFigure,
+	HealedFilter,
+	RecentWork,
+	WorkFilters,
+} from "./gallery.tsx";
 import { GoodToKnowSection } from "./good-to-know.tsx";
 import { InquirySection, RequestInvite } from "./inquiry.tsx";
 import { type Shell, StencilShell } from "./shell.tsx";
@@ -610,6 +617,129 @@ export function FlashDesignPage({
 					) : null}
 				</div>
 			</article>
+			<StudioAside studio={studio} />
+		</Shell>
+	);
+}
+
+/**
+ * One tattoo's page (Prompt 5): the photo large (it opens the viewer), its
+ * title, whose it is, its styles and healed mark, "Request a similar tattoo"
+ * while someone takes new work, and up to six related pieces, each a link to
+ * its own page. Only what the API knows of the piece: no placement,
+ * technique or date.
+ */
+export function ArtworkPage({
+	data,
+	Shell = StencilShell,
+}: {
+	data: ArtworkPageData;
+	Shell?: Shell;
+}) {
+	const { studio, theme, artwork, similar, related } = data;
+	const words = studioCopy.artwork;
+	const photo = artwork.photo;
+	const artist =
+		photo.artist && isAllowedHref(photo.artist.href) ? photo.artist : null;
+	return (
+		<Shell
+			studio={studio}
+			theme={theme}
+			requestLink={data.requestLink}
+			chat={data.chat}
+			page="work"
+			artistsShown={data.hasArtists}
+		>
+			<article className="artwork" aria-labelledby="artwork-title">
+				<p>
+					<a className="text-link" href={workHref({})}>
+						{words.back}
+					</a>
+				</p>
+				<ArtworkFigure
+					photo={photo}
+					sizes={flashDesignSizes()}
+					className="artwork-figure"
+				/>
+				<div className="flash-design-body">
+					<h1 id="artwork-title" className="section-title user-text" dir="auto">
+						{artwork.title}
+					</h1>
+					<dl className="flash-facts">
+						{artist ? (
+							<div>
+								<dt>{words.artist}</dt>
+								<dd>
+									<a className="text-link" href={artist.href}>
+										<bdi>{artist.name}</bdi>
+									</a>
+								</dd>
+							</div>
+						) : null}
+						{photo.styles.length > 0 ? (
+							<div>
+								<dt>{words.styles}</dt>
+								<dd>{photo.styles.join(" · ")}</dd>
+							</div>
+						) : null}
+						{photo.healed ? (
+							<div>
+								<dt>{studioCopy.work.healed}</dt>
+								<dd>{words.healed}</dd>
+							</div>
+						) : null}
+					</dl>
+					{similar && isAllowedHref(similar.href) ? (
+						<div className="stack">
+							<p>{words.inspired}</p>
+							<a className="action action-primary" href={similar.href}>
+								{words.similar}
+							</a>
+						</div>
+					) : null}
+				</div>
+			</article>
+			{related.length > 0 ? (
+				<section className="section" aria-labelledby="artwork-related-title">
+					<h2 id="artwork-related-title" className="section-title">
+						{words.related}
+					</h2>
+					{/* biome-ignore lint/a11y/useSemanticElements: it is a list; the role repairs WebKit's reading of list-style: none */}
+					<ul
+						className="artwork-related"
+						// biome-ignore lint/a11y/noRedundantRoles: redundant for the spec, needed for WebKit with list-style: none
+						role="list"
+					>
+						{related.map((piece) =>
+							piece.href ? (
+								<li key={piece.href}>
+									<a className="work-link" href={piece.href}>
+										<img
+											className="work-thumb"
+											src={piece.src}
+											srcSet={piece.srcSet}
+											sizes={piece.srcSet ? workGridSizes(piece) : undefined}
+											width={piece.width}
+											height={piece.height}
+											alt=""
+											loading="lazy"
+											decoding="async"
+										/>
+										<span className="work-link-text user-text" dir="auto">
+											{artworkTitle(piece)}
+										</span>
+									</a>
+								</li>
+							) : null,
+						)}
+					</ul>
+					<p className="work-all">
+						<a className="text-link" href={workHref({})}>
+							{words.viewAll}
+						</a>
+					</p>
+				</section>
+			) : null}
 			<StudioAside studio={studio} />
 		</Shell>
 	);

@@ -1,4 +1,4 @@
-import { type MouseEvent, useEffect, useState } from "react";
+import { type MouseEvent, type ReactNode, useEffect, useState } from "react";
 import { GalleryGrid } from "./components/gallery.tsx";
 import { studioCopy } from "./copy.ts";
 import type { GalleryPhotoView, GalleryView } from "./gallery.ts";
@@ -25,6 +25,7 @@ export function PagedGallery({
 	moreHref,
 	more,
 	sizes,
+	renderPhotos,
 }: {
 	/** The page the server rendered. */
 	first: GalleryView;
@@ -34,6 +35,15 @@ export function PagedGallery({
 	/** Where "Show more" goes without JavaScript. */
 	moreHref: (cursor: string) => string;
 	more?: MoreWork;
+	/**
+	 * A theme's own layout of the photos so far (Ink Noir's gallery), told
+	 * whether more remain; the square grid with its viewer by default. Each
+	 * photo's element carries `openId`, so the focus move still lands.
+	 */
+	renderPhotos?: (
+		photos: readonly GalleryPhotoView[],
+		hasMore: boolean,
+	) => ReactNode;
 }) {
 	const [photos, setPhotos] = useState(first.photos);
 	const [cursor, setCursor] = useState(first.nextCursor);
@@ -66,7 +76,11 @@ export function PagedGallery({
 
 	return (
 		<>
-			<GalleryGrid photos={photos} showArtist={showArtist} sizes={sizes} />
+			{renderPhotos ? (
+				renderPhotos(photos, cursor !== null)
+			) : (
+				<GalleryGrid photos={photos} showArtist={showArtist} sizes={sizes} />
+			)}
 			{cursor !== null ? (
 				<div className="work-more-bar">
 					<a

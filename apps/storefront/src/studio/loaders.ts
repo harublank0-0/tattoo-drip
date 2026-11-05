@@ -15,6 +15,13 @@ import {
 	type ArtistsSearch,
 	artistsDirectory,
 } from "./artists.ts";
+import {
+	type ArtworkView,
+	artworkView,
+	RELATED_READ,
+	relatedArtwork,
+	similarRequest,
+} from "./artwork.ts";
 import { type ChatLinks, chatLinks } from "./chat.ts";
 import { studioCopy } from "./copy.ts";
 import {
@@ -34,11 +41,14 @@ import {
 } from "./flash.ts";
 import {
 	filterStyles,
+	type GalleryPhotoView,
 	type GalleryView,
+	galleryPhotoView,
 	galleryView,
 	type PortfolioSearch,
 	portfolioQuery,
 	RECENT_WORK_COUNT,
+	readPhotoId,
 	WORK_PAGE_SIZE,
 	type WorkSearch,
 	workQuery,
@@ -57,6 +67,7 @@ import {
 	inquiryState,
 	similarInquiryState,
 } from "./inquiry.ts";
+import { galleryPhotoHref } from "./links.ts";
 import {
 	type RequestLink,
 	type RequestSearch,
@@ -65,6 +76,7 @@ import {
 import {
 	artistPageSeo,
 	artistsPageSeo,
+	artworkPageSeo,
 	flashDesignSeo,
 	flashPageSeo,
 	type PageSeo,
@@ -216,6 +228,27 @@ export interface WorkPageData {
 	/** The address's filters, checked. */
 	readonly search: WorkSearch;
 	readonly gallery: GalleryView;
+}
+
+/** One tattoo's page (`/gallery/$photo`, Prompt 5): the piece, its artist and related work. */
+export interface ArtworkPageData {
+	readonly studio: StudioView;
+	/** Whether any artist is visible: the navigation's Artists link has somewhere to land. */
+	readonly hasArtists: boolean;
+	readonly theme: ThemeConfig;
+	/** The header's Request button: the piece's artist's while they take new work, else the studio's, else none. */
+	readonly requestLink: RequestLink | null;
+	/** The chat button's links; its message names the artist. */
+	readonly chat: ChatLinks | null;
+	readonly seo: PageSeo;
+	readonly artwork: ArtworkView;
+	/** "Request a similar tattoo" (similarRequest): where it goes and whom it asks, or null when nobody takes new work. */
+	readonly similar: {
+		readonly href: string;
+		readonly artist: ArtistView | null;
+	} | null;
+	/** At most six other pieces (relatedArtwork): links to their pages. */
+	readonly related: readonly GalleryPhotoView[];
 }
 
 /** `/flash` (TAT-129): every shown design of the visible artists, newest first, filtered by the address. */
@@ -433,7 +466,21 @@ export function requestPageData(
 	}
 	const artist =
 		search.artist === undefined ? null : findArtist(artistViews, search.artist);
-	const inquiry = inquiryState(studioView, artistViews, artist);
+	const asked = inquiryState(studioView, artistViews, artist);
+	// "Request a similar tattoo" (Prompt 5): the idea starts with a link to the
+	// piece, which the client edits or keeps; the form sends only what it shows.
+	const inquiry =
+		asked.kind === "open" && search.similar !== undefined
+			? {
+					...asked,
+					start: {
+						idea: fill(studioCopy.artwork.similarStart, {
+							url: `${origin}${galleryPhotoHref(search.similar)}`,
+						}),
+						approximateSize: "",
+					},
+				}
+			: asked;
 	return {
 		studio: studioView,
 		hasArtists: artistViews.length > 0,
@@ -555,7 +602,45 @@ function similarFor(
 }
 
 /**
- * `/work`'s data (TAT-126). `page` is the gallery read for `search`, as the
+ * One tattoo's data (Prompt 5), or null when the API's photo can't be shown
+ * (galleryPhotoView refuses it). `reads` are the related reads as the API sent
+ * them (by style, by artist, newest; null for one not made or failed). Pure.
+ */
+export function artworkPageData(
+	studio: Studio,
+	artists: readonly Artist[],
+	photo: unknown,
+	reads: readonly unknown[],
+	origin: string,
+	imageOrigin: string | null = null,
+): ArtworkPageData | null {
+	const view = galleryPhotoView(photo, imageOrigin);
+	if (!view?.id) return null;
+	const studioView = studioViewModel(studio);
+	const artistViews = artistViewModels(artists, imageOrigin);
+	const artwork = artworkView({ ...view, id: view.id }, artistViews);
+	return {
+		studio: studioView,
+		hasArtists: artistViews.length > 0,
+		theme: parseThemeConfig(storefrontInput(studio), imageOrigin),
+		requestLink: requestLink(studioView, artwork.artist),
+		chat: chatLinks(studioView, artwork.artist?.name ?? null),
+		seo: artworkPageSeo(studioView, artwork, origin),
+		artwork,
+		similar: similarRequest(studioView, artwork),
+		related: relatedArtwork(
+			artwork.id,
+			reads.map((read, index) =>
+				read === null
+					? null
+					: galleryView(read, imageOrigin, index * RELATED_READ),
+			),
+		),
+	};
+}
+
+/**
+ * `/gallery`'s data (TAT-126). `page` is the gallery read for `search`, as the
  * API sent it. The artist filter offers the visible artists who have a work
  * photo, by name.
  */
@@ -822,6 +907,46 @@ export async function loadFlashDesignPage(
 }
 
 /**
+ * `/gallery/<id>` (Prompt 5): the studio, its artists and the photo, read
+ * together, then the related reads (its first style's, its artist's and the
+ * newest, seven each, together). An id that can't be a photo's is a not-found
+ * before any API call; the API not knowing the photo (a hidden artist's,
+ * removed, unknown, an older platform without the read) is the same
+ * not-found, and so is a photo the page can't show. A related read that
+ * fails is logged and leaves fewer related pieces: the piece itself stands.
+ */
+export async function loadArtworkPage(
+	context: PageContext,
+	id: string,
+): Promise<ArtworkPageData> {
+	if (readPhotoId(id) === null) throw notFound();
+	const [studio, artists, photo] = await Promise.all([
+		loadStudio(context),
+		loadArtists(context),
+		loadWorkPhoto(context, id),
+	]);
+	const view = galleryPhotoView(photo, context.tattoo.connection.mediaUrl);
+	if (!view) throw notFound();
+	const style = view.styleRefs[0]?.slug;
+	const slug = view.artist?.href.slice("/artists/".length);
+	const reads = await Promise.all([
+		style ? loadRelated(context, { style }) : null,
+		slug ? loadRelated(context, { artist: slug }) : null,
+		loadRelated(context, {}),
+	]);
+	const data = artworkPageData(
+		studio,
+		artists,
+		photo,
+		reads,
+		context.site.origin,
+		context.tattoo.connection.mediaUrl,
+	);
+	if (!data) throw notFound();
+	return data;
+}
+
+/**
  * The browser's "Show more" (TAT-126): the page after `cursor` with the same
  * filters, as photos numbered on from `offset`. A failure is thrown, for the
  * button to say so.
@@ -1001,6 +1126,39 @@ async function loadFlash(
 			throw notFound();
 		}
 		return rethrowAsNotFound(error);
+	}
+}
+
+async function loadWorkPhoto(
+	{ queryClient, tattoo }: ApiContext,
+	id: string,
+): Promise<unknown> {
+	try {
+		return await queryClient.query({
+			...tattooQueries.workPhoto(tattoo.client, id),
+			staleTime: "static",
+		});
+	} catch (error) {
+		return rethrowAsNotFound(error);
+	}
+}
+
+/** A related read (loadArtworkPage): seven of the newest with these filters, or null after a logged failure. */
+async function loadRelated(
+	context: ApiContext,
+	search: WorkSearch,
+): Promise<unknown> {
+	try {
+		return await context.queryClient.query({
+			...tattooQueries.work(
+				context.tattoo.client,
+				workQuery(search, RELATED_READ),
+			),
+			staleTime: "static",
+		});
+	} catch (error) {
+		logReadFailed("Related work", context, error);
+		return null;
 	}
 }
 

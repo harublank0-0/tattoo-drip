@@ -71,6 +71,52 @@ export function GalleryGrid({
 }
 
 /**
+ * One tattoo's main photo (its own page, Prompt 5): large, eager and high
+ * priority (the page's main image), a button that opens the same viewer as
+ * the grid (PhotoDialog: the browser's modal, Escape and focus its own, Back
+ * closes it), with a visible hint saying so. The photo has no other pictures
+ * in the API, so the viewer has no previous or next.
+ */
+export function ArtworkFigure({
+	photo,
+	sizes,
+	className,
+}: {
+	photo: GalleryPhotoView;
+	/** The photo's `sizes`, for the theme's layout. */
+	sizes: string;
+	className: string;
+}) {
+	return (
+		<figure className={className}>
+			<button
+				type="button"
+				className="artwork-open"
+				id={photo.openId}
+				aria-haspopup="dialog"
+				aria-controls={photo.dialogId}
+				onClick={() => showPhoto(photo.dialogId)}
+			>
+				<img
+					className="artwork-photo"
+					src={photo.src}
+					srcSet={photo.srcSet}
+					sizes={photo.srcSet ? sizes : undefined}
+					width={photo.width}
+					height={photo.height}
+					alt={photo.alt}
+					loading="eager"
+					decoding="async"
+					fetchPriority="high"
+				/>
+				<span className="artwork-open-hint">{studioCopy.work.enlarge}</span>
+			</button>
+			<PhotoDialog photo={photo} showArtist />
+		</figure>
+	);
+}
+
+/**
  * The home page's Recent work (TAT-126): the studio's newest photos, at most
  * nine, each with its artist in the viewer, and the way to all of them.
  * Nothing when there are no photos (no empty heading, no All work link).
@@ -194,7 +240,7 @@ export function HealedFilter({
 }
 
 /**
- * The All work page's filters: a plain GET form to `/work`, so it works
+ * The All work page's filters: a plain GET form to `/gallery`, so it works
  * without JavaScript and every filtered view is an address that can be
  * shared. It offers only what applies: the artists when there is more than
  * one with photos, the styles some photo carries, and Healed when a photo has
@@ -222,7 +268,7 @@ export function WorkFilters({
 			role="search"
 			aria-label={words.label}
 			method="get"
-			action="/work"
+			action="/gallery"
 		>
 			{showArtists ? (
 				<div className="work-filter-field">

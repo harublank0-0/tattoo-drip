@@ -73,8 +73,16 @@ export function assertSafePage(html: string, options: SafePageOptions = {}) {
 			// (TAT-116): it must have an empty alt, and sit inside a work link.
 			assert.match(image, / alt=""/, image);
 			assert.ok(
-				insideWorkLink(html, image),
+				insideLink(html, image, "work-link"),
 				`a work thumbnail outside a work link: ${image}`,
+			);
+		} else if (/class="ink-piece-photo"/.test(image)) {
+			// Ink Noir's gallery card (Prompt 5): the same, inside the card's
+			// link, which its title names.
+			assert.match(image, / alt=""/, image);
+			assert.ok(
+				insideLink(html, image, "ink-piece-link"),
+				`a gallery card's photo outside its link: ${image}`,
 			);
 		} else {
 			assert.match(image, / alt="[^"]+"/, image);
@@ -100,12 +108,14 @@ function assertSrcSet(image: string) {
 	}
 }
 
-/** Whether this exact image tag sits inside an `<a class="work-link">` in `html`. */
-function insideWorkLink(html: string, image: string): boolean {
+/** Whether this exact image tag sits inside an `<a class="{className}">` in `html` whose own text names it. */
+function insideLink(html: string, image: string, className: string): boolean {
 	for (const link of html.matchAll(
-		/<a class="work-link"[^>]*>[\s\S]*?<\/a>/g,
+		new RegExp(`<a class="${className}"[^>]*>[\\s\\S]*?<\\/a>`, "g"),
 	)) {
-		if (link[0].includes(image)) return true;
+		if (link[0].includes(image) && /<span[^>]*>\s*[^<\s]/.test(link[0])) {
+			return true;
+		}
 	}
 	return false;
 }

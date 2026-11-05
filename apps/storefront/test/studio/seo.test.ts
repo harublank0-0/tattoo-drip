@@ -146,7 +146,7 @@ describe("workPageSeo (TAT-126)", () => {
 			seo.description,
 			"Tattoos by the artists of Black Needle, newest first.",
 		);
-		assert.equal(seo.canonical, `${ORIGIN}/work`);
+		assert.equal(seo.canonical, `${ORIGIN}/gallery`);
 		assert.equal(seo.type, "website");
 		assert.equal(seo.siteName, "Black Needle");
 		assert.equal(seo.image, null);
@@ -168,7 +168,7 @@ describe("workPageSeo (TAT-126)", () => {
 	test("the canonical address is /work whatever the filters or page", () => {
 		// The head takes the studio and the origin alone, never the address's search.
 		assert.equal(workPageSeo.length, 2);
-		assert.equal(workPageSeo(studio, ORIGIN).canonical, `${ORIGIN}/work`);
+		assert.equal(workPageSeo(studio, ORIGIN).canonical, `${ORIGIN}/gallery`);
 	});
 
 	test("writes its head like the other pages, with no image card and no JSON-LD", () => {
@@ -176,7 +176,7 @@ describe("workPageSeo (TAT-126)", () => {
 
 		assert.deepEqual(head.scripts, []);
 		assert.deepEqual(head.links, [
-			{ rel: "canonical", href: `${ORIGIN}/work` },
+			{ rel: "canonical", href: `${ORIGIN}/gallery` },
 		]);
 		assert.ok(
 			head.meta.some(

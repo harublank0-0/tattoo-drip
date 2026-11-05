@@ -97,17 +97,24 @@ export function linkHostname(href: string): string {
 }
 
 /**
- * The All work page with these filters (TAT-126): `artist`, `style`,
- * `healed=1` and `cursor`, in that order, absent ones left out. The filters
- * are checked values (readWorkSearch), but each is encoded anyway.
+ * The gallery (TAT-126; `/gallery` since Prompt 5, where `/work` redirects)
+ * with these filters: `artist`, `style`, `healed=1`, the search text `q` and
+ * `cursor`, in that order, absent ones left out. The filters are checked
+ * values (readWorkSearch), but each is encoded anyway.
  */
 export function workHref(search: WorkSearch): string {
-	return `/work${queryOf([
+	return `/gallery${queryOf([
 		["artist", search.artist],
 		["style", search.style],
 		["healed", search.healed === true ? "1" : undefined],
+		["q", search.q],
 		["cursor", search.cursor],
 	])}`;
+}
+
+/** One gallery photo's own page; `id` is a checked lowercase UUID (readPhotoId). */
+export function galleryPhotoHref(id: string): string {
+	return `/gallery/${encodeURIComponent(id)}`;
 }
 
 /**
@@ -143,13 +150,17 @@ export function flashDesignHref(id: string): string {
 /**
  * The request page (TAT-127): `/request`, `/request?artist=<slug>` to ask
  * for one artist, or (TAT-129) `/request?flash=<id>` to ask for a flash
- * design, which names its artist, so `artist` is then left out. Every Request
- * button leads here.
+ * design, which names its artist, so `artist` is then left out; and (Prompt 5)
+ * `similar=<photo id>` beside the artist, for a tattoo like a gallery piece.
+ * Every Request button leads here.
  */
 export function requestHref(search: RequestSearch): string {
 	const query = new URLSearchParams();
 	if (search.flash !== undefined) query.set("flash", search.flash);
-	else if (search.artist !== undefined) query.set("artist", search.artist);
+	else {
+		if (search.artist !== undefined) query.set("artist", search.artist);
+		if (search.similar !== undefined) query.set("similar", search.similar);
+	}
 	const text = query.toString();
 	return text === "" ? "/request" : `/request?${text}`;
 }

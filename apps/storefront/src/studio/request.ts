@@ -1,4 +1,5 @@
 import { FLASH_ID } from "./flash.ts";
+import { readPhotoId } from "./gallery.ts";
 import { requestHref } from "./links.ts";
 import { ARTIST_SLUG, type ArtistView, type StudioView } from "./view-model.ts";
 
@@ -13,7 +14,12 @@ import { ARTIST_SLUG, type ArtistView, type StudioView } from "./view-model.ts";
  * `/request` reads which artist to ask for and, since TAT-129, which flash
  * design. Absent, never null, so the router writes nothing back.
  */
-export type RequestSearch = { artist?: string; flash?: string };
+export type RequestSearch = {
+	artist?: string;
+	flash?: string;
+	/** A gallery photo's id (Prompt 5): "Request a similar tattoo", the form starts with a link to it. */
+	similar?: string;
+};
 
 /** An own property only, never one inherited from Object.prototype. */
 function own(value: unknown, key: string): unknown {
@@ -32,6 +38,8 @@ function own(value: unknown, key: string): unknown {
  * find out. A well-formed `flash` (a lowercase UUID, TAT-129) is kept instead:
  * the design names the artist, so a request page has one spelling and `artist`
  * is then dropped; whether the design exists is the loader's to find out.
+ * Beside `artist`, a well-formed `similar` (a gallery photo's lowercase UUID,
+ * Prompt 5) is kept: the form then starts with a link to that piece.
  */
 export function readRequestSearch(
 	search: Record<string, unknown>,
@@ -39,9 +47,13 @@ export function readRequestSearch(
 	const flash = own(search, "flash");
 	if (typeof flash === "string" && FLASH_ID.test(flash)) return { flash };
 	const artist = own(search, "artist");
-	return typeof artist === "string" && ARTIST_SLUG.test(artist)
-		? { artist }
-		: {};
+	const similar = readPhotoId(own(search, "similar"));
+	return {
+		...(typeof artist === "string" && ARTIST_SLUG.test(artist)
+			? { artist }
+			: {}),
+		...(similar ? { similar } : {}),
+	};
 }
 
 /** Where a Request button leads, and the artist it names, if any. */

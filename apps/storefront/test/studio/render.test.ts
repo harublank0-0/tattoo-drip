@@ -1063,19 +1063,19 @@ describe("Recent work on the studio page (TAT-126)", () => {
 		assert.equal(count(html, /<ul class="work-grid" role="list">/g), 1);
 		// All work: a link to /work after the grid, its arrow hidden from screen readers.
 		const link = section.match(
-			/<a class="text-link" href="\/work">[\s\S]*?<\/a>/,
+			/<a class="text-link" href="\/gallery">[\s\S]*?<\/a>/,
 		)?.[0];
 		assert.ok(link, "a link to /work");
 		assert.match(
 			link,
-			/^<a class="text-link" href="\/work"><span>All work<\/span><svg[^>]* aria-hidden="true"/,
+			/^<a class="text-link" href="\/gallery"><span>All work<\/span><svg[^>]* aria-hidden="true"/,
 		);
 		assert.equal(
 			link.replace(/<svg[\s\S]*?<\/svg>/, "").replace(/<[^>]+>/g, ""),
 			"All work",
 		);
-		assert.ok(section.indexOf("</ul>") < section.indexOf('href="/work"'));
-		assert.equal(count(html, /href="\/work"/g), 1);
+		assert.ok(section.indexOf("</ul>") < section.indexOf('href="/gallery"'));
+		assert.equal(count(html, /href="\/gallery"/g), 1);
 	});
 
 	test("the photos load the copy that fits, lazily, like every grid", () => {
@@ -1104,7 +1104,7 @@ describe("Recent work on the studio page (TAT-126)", () => {
 			assertSafePage(html);
 			assert.equal(recent(html), "");
 			assert.doesNotMatch(html, /Recent work|All work/);
-			assert.equal(count(html, /href="\/work"/g), 0);
+			assert.equal(count(html, /href="\/gallery"/g), 0);
 		}
 		// An empty gallery leaves the page as it is without one.
 		assert.equal(homeWith(galleryPage(0)), homeWith(undefined));
@@ -1598,11 +1598,11 @@ describe("the All work page (TAT-126)", () => {
 		assertSafePage(html);
 		assert.match(
 			html,
-			/<a class="action action-secondary work-more" href="\/work\?artist=sita&amp;style=fine-line&amp;healed=1&amp;cursor=c2">Show more<\/a>/,
+			/<a class="action action-secondary work-more" href="\/gallery\?artist=sita&amp;style=fine-line&amp;healed=1&amp;cursor=c2">Show more<\/a>/,
 		);
 		assert.match(
 			workHtml(galleryPage(3, { nextCursor: "c2" })),
-			/href="\/work\?cursor=c2">Show more/,
+			/href="\/gallery\?cursor=c2">Show more/,
 		);
 		assert.equal(count(workHtml(galleryPage(3)), /work-more/g), 0);
 	});
@@ -1616,12 +1616,12 @@ describe("the All work page (TAT-126)", () => {
 
 		assert.match(
 			html,
-			/<a class="text-link" href="\/work\?artist=sita&amp;healed=1">Back to the newest<\/a>/,
+			/<a class="text-link" href="\/gallery\?artist=sita&amp;healed=1">Back to the newest<\/a>/,
 		);
 		assert.equal(count(workHtml(galleryPage(3)), /Back to the newest/g), 0);
 		assert.match(
 			workHtml(galleryPage(3), { cursor: "c2" }),
-			/<a class="text-link" href="\/work">Back to the newest<\/a>/,
+			/<a class="text-link" href="\/gallery">Back to the newest<\/a>/,
 		);
 	});
 
@@ -1638,7 +1638,7 @@ describe("the All work page (TAT-126)", () => {
 		assert.match(tag, / role="search"/);
 		assert.match(tag, / aria-label="Filter the photos"/);
 		assert.match(tag, / method="get"/);
-		assert.match(tag, / action="\/work"/);
+		assert.match(tag, / action="\/gallery"/);
 		assert.match(filters, /<label [^>]*for="work-artist"[^>]*>Artist<\/label>/);
 		assert.match(
 			filters,
@@ -1750,7 +1750,10 @@ describe("the All work page (TAT-126)", () => {
 
 		assertSafePage(html);
 		assert.match(html, /<p[^>]*>No photos match these filters\.<\/p>/);
-		assert.match(html, /<a class="text-link" href="\/work">Show all work<\/a>/);
+		assert.match(
+			html,
+			/<a class="text-link" href="\/gallery">Show all work<\/a>/,
+		);
 		assert.doesNotMatch(html, /No photos yet/);
 		assert.equal(count(html, /work-grid|<dialog/g), 0);
 		// The form is still there to change the filters.
@@ -1779,7 +1782,10 @@ describe("the All work page (TAT-126)", () => {
 			/<option value="sita" selected="">Sita Rai<\/option>/,
 		);
 		assert.match(html, /<p[^>]*>No photos match these filters\.<\/p>/);
-		assert.match(html, /<a class="text-link" href="\/work">Show all work<\/a>/);
+		assert.match(
+			html,
+			/<a class="text-link" href="\/gallery">Show all work<\/a>/,
+		);
 		assert.equal(count(html, /work-grid|<dialog/g), 0);
 	});
 

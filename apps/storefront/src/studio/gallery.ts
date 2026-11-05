@@ -1,6 +1,7 @@
 import type { ListWorkQuery } from "@tattoo-drip/sdk";
 import { fill } from "../intake/template.ts";
 import { studioCopy } from "./copy.ts";
+import { galleryPhotoHref } from "./links.ts";
 import { largeSource } from "./srcset.ts";
 import { cleanLine } from "./text.ts";
 import { readBrandImage } from "./theme/config.ts";
@@ -15,7 +16,7 @@ import { ARTIST_SLUG, type WorkPhotoView } from "./view-model.ts";
 
 /** The home page's Recent work shows this many of the newest photos. */
 export const RECENT_WORK_COUNT = 9;
-/** `/work` and an artist's portfolio load this many photos a page. */
+/** `/gallery` and an artist's portfolio load this many photos a page. */
 export const WORK_PAGE_SIZE = 24;
 /** The most photos read from one answer (the contract's `limit` maximum). */
 export const MAX_GALLERY_PAGE = 48;
@@ -28,6 +29,11 @@ const MAX_ALT = 200;
 
 /** A cursor as the API writes it: base64url, at most 200 characters. */
 const CURSOR = /^[A-Za-z0-9_-]{1,200}$/;
+/** A photo's id, as the API writes it: a lowercase UUID (getWorkPhoto takes it). */
+export const PHOTO_ID =
+	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+/** The longest search text the gallery reads from its address, in characters. */
+export const MAX_SEARCH = 80;
 /** A style slug, as the platform's list writes them (copy of its STYLE_SLUG_SHAPE, at most 40 characters). */
 const STYLE_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const MAX_STYLE_SLUG = 40;
@@ -36,10 +42,19 @@ const MAX_STYLE_SLUG = 40;
 export interface GalleryPhotoView extends WorkPhotoView {
 	/** The grid button's id, so "Show more" can move focus to the first new photo. */
 	readonly openId: string;
+	/** The photo's id (a checked UUID), or null from an API that sends none. */
+	readonly id: string | null;
+	/** The photo's own page (`/gallery/<id>`), or null without an id. */
+	readonly href: string | null;
 	/** Whose work it is, with their page, or null when the API named no usable artist. */
 	readonly artist: { readonly name: string; readonly href: string } | null;
 	/** The names of up to three styles, in the API's order; [] when none. */
 	readonly styles: readonly string[];
+	/** The same styles with their slugs, for those whose slug the address can carry (a link to the gallery filtered by it). */
+	readonly styleRefs: readonly {
+		readonly slug: string;
+		readonly name: string;
+	}[];
 	readonly healed: boolean;
 }
 
@@ -91,27 +106,9 @@ export function galleryView(
 	const kept = (Array.isArray(data) ? data.slice(0, MAX_GALLERY_PAGE) : [])
 		.map((item) => ({ item, image: readBrandImage(item, imageOrigin) }))
 		.flatMap(({ item, image }) => (image ? [{ item, image }] : []));
-	const photos = kept.map(({ item, image }, index): GalleryPhotoView => {
-		const n = first + index + 1;
-		const artist = readArtist(own(item, "artist"));
-		const description = readDescription(own(item, "alt"));
-		return {
-			...image,
-			alt:
-				description ??
-				(artist
-					? fill(studioCopy.work.galleryAlt, { name: artist.name, n })
-					: fill(studioCopy.work.galleryAltNoName, { n })),
-			caption: description,
-			largeSrc: largeSource(image),
-			dialogId: `work-photo-${n}`,
-			label: fill(studioCopy.work.photoN, { n }),
-			openId: `work-open-${n}`,
-			artist,
-			styles: photoStyleNames(own(item, "styles")),
-			healed: own(item, "healed") === true,
-		};
-	});
+	const photos = kept.map(({ item, image }, index) =>
+		shownPhoto(item, image, first + index + 1),
+	);
 	const filters = own(page, "filters");
 	const cursor = own(page, "nextCursor");
 	return {
@@ -121,6 +118,76 @@ export function galleryView(
 		styles: filterStyles(own(filters, "styles")),
 		healed: own(filters, "healed") === true,
 	};
+}
+
+/**
+ * One photo as the API sent it (`getWorkPhoto`'s `data`, whatever it really
+ * is) as the photo its page shows, numbered 1; null when it can't be shown
+ * (galleryView's rules), or has no id a page could be addressed by. Pure.
+ */
+export function galleryPhotoView(
+	item: unknown,
+	imageOrigin: string | null,
+): GalleryPhotoView | null {
+	const image = readBrandImage(item, imageOrigin);
+	if (!image) return null;
+	const photo = shownPhoto(item, image, 1);
+	return photo.id ? photo : null;
+}
+
+/** A photo the brand images' rule kept, numbered `n` (the dialog and button ids, the label and the fallback description). */
+function shownPhoto(
+	item: unknown,
+	image: NonNullable<ReturnType<typeof readBrandImage>>,
+	n: number,
+): GalleryPhotoView {
+	const artist = readArtist(own(item, "artist"));
+	const description = readDescription(own(item, "alt"));
+	const id = readPhotoId(own(item, "id"));
+	return {
+		...image,
+		alt:
+			description ??
+			(artist
+				? fill(studioCopy.work.galleryAlt, { name: artist.name, n })
+				: fill(studioCopy.work.galleryAltNoName, { n })),
+		caption: description,
+		largeSrc: largeSource(image),
+		dialogId: `work-photo-${n}`,
+		label: fill(studioCopy.work.photoN, { n }),
+		openId: `work-open-${n}`,
+		id,
+		href: id ? galleryPhotoHref(id) : null,
+		artist,
+		styles: photoStyleNames(own(item, "styles")),
+		styleRefs: filterStyles(own(item, "styles")).slice(0, MAX_PHOTO_STYLES),
+		healed: own(item, "healed") === true,
+	};
+}
+
+/** A photo's id when it is a lowercase UUID, else null. */
+export function readPhotoId(value: unknown): string | null {
+	return typeof value === "string" && PHOTO_ID.test(value) ? value : null;
+}
+
+/**
+ * Whether a photo answers the gallery's search text: every word of `query`
+ * is in its description, one of its style names or its artist's name,
+ * ignoring case and accents. The API has no text search, so this runs on the
+ * photos a page has loaded; an empty query matches everything. Pure.
+ */
+export function matchesSearch(photo: GalleryPhotoView, query: string): boolean {
+	const words = folded(query).split(/\s+/).filter(Boolean);
+	if (words.length === 0) return true;
+	const text = folded(
+		[photo.caption ?? "", ...photo.styles, photo.artist?.name ?? ""].join(" "),
+	);
+	return words.every((word) => text.includes(word));
+}
+
+/** Lowercase, without accents, for matching only (never shown). */
+function folded(text: string): string {
+	return text.normalize("NFKD").replace(/\p{M}/gu, "").toLocaleLowerCase("en");
 }
 
 /** Whose work it is, when the API named an artist whose slug can be a link; the name is their slug when it is not text. */
@@ -183,8 +250,12 @@ export interface PortfolioSearch {
 	cursor?: string;
 }
 
-/** `/work` reads the same two and which artist and style to show. */
-export type WorkSearch = PortfolioSearch & { artist?: string; style?: string };
+/** `/gallery` reads the same two, which artist and style to show and the search text (`q`, the page's own: the API never sees it). */
+export type WorkSearch = PortfolioSearch & {
+	artist?: string;
+	style?: string;
+	q?: string;
+};
 
 /**
  * The router hands over each value as the string in the address (search.ts),
@@ -226,17 +297,25 @@ export function readPortfolioSearch(
 	};
 }
 
-/** `/work`'s filters from its address, strictly (see readPortfolioSearch), in the order the address writes them. */
+/** `/gallery`'s filters from its address, strictly (see readPortfolioSearch), in the order the address writes them. */
 export function readWorkSearch(search: Record<string, unknown>): WorkSearch {
 	const artist = readSlug(own(search, "artist"));
 	const style = readStyle(own(search, "style"));
+	const q = readSearchText(own(search, "q"));
 	const { healed, cursor } = readPortfolioSearch(search);
 	return {
 		...(artist ? { artist } : {}),
 		...(style ? { style } : {}),
 		...(healed ? { healed } : {}),
+		...(q ? { q } : {}),
 		...(cursor ? { cursor } : {}),
 	};
+}
+
+/** The search text: one line of plain text up to 80 characters, else none (an empty or blank one included). */
+function readSearchText(value: unknown): string | undefined {
+	const line = typeof value === "string" ? cleanLine(value) : null;
+	return line && Array.from(line).length <= MAX_SEARCH ? line : undefined;
 }
 
 /**

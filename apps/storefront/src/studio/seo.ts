@@ -1,8 +1,9 @@
 import { rootRouteId } from "@tanstack/react-router";
 import { fill } from "../intake/template.ts";
+import type { ArtworkView } from "./artwork.ts";
 import { studioCopy } from "./copy.ts";
 import type { FlashDesignView } from "./flash.ts";
-import { flashDesignHref, requestHref } from "./links.ts";
+import { flashDesignHref, galleryPhotoHref, requestHref } from "./links.ts";
 import { trimDescription } from "./text.ts";
 import type { ArtistPhoto, ArtistView, StudioView } from "./view-model.ts";
 
@@ -121,7 +122,7 @@ export function workPageSeo(studio: StudioView, origin: string): PageSeo {
 	return {
 		title: `${studioCopy.work.pageTitle} ${independent ? "by" : "at"} ${studio.name}`,
 		description: `Tattoos by ${independent ? studio.name : `the artists of ${studio.name}`}, newest first.`,
-		canonical: `${origin}/work`,
+		canonical: `${origin}/gallery`,
 		type: "website",
 		siteName: studio.name,
 		image: null,
@@ -170,6 +171,42 @@ export function flashDesignSeo(
 		type: "website",
 		siteName: studio.name,
 		image: null,
+		jsonLd: null,
+	};
+}
+
+/**
+ * One tattoo's head (Prompt 5): the piece's title (the studio's description,
+ * else built from its styles and artist) with its artist and studio, a
+ * description from the same data, its own canonical address and the photo
+ * as the share image (the page's main picture, its description as alt).
+ */
+export function artworkPageSeo(
+	studio: StudioView,
+	artwork: ArtworkView,
+	origin: string,
+): PageSeo {
+	const name = artwork.photo.artist?.name ?? null;
+	const sameName = name === studio.name;
+	const by = artwork.titleIsCaption && name ? `, by ${name}` : "";
+	const where = sameName ? "" : ` at ${studio.name}`;
+	const styles = artwork.photo.styles;
+	const kind =
+		styles.length > 0 ? `A ${styles.join(" and ")} tattoo` : "A tattoo";
+	return {
+		title: `${artwork.title}${by}${where}`,
+		description: trimDescription(
+			`${kind}${name ? ` by ${name}` : ""}${sameName ? "" : ` at ${studio.name}`}.${artwork.titleIsCaption ? ` ${artwork.title}` : ""}`,
+		),
+		canonical: `${origin}${galleryPhotoHref(artwork.id)}`,
+		type: "website",
+		siteName: studio.name,
+		image: {
+			src: artwork.photo.src,
+			width: artwork.photo.width,
+			height: artwork.photo.height,
+			alt: artwork.photo.alt,
+		},
 		jsonLd: null,
 	};
 }
