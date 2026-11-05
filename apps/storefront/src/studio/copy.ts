@@ -116,6 +116,12 @@ export const studioCopy = {
 		artists: "Artists",
 		gallery: "Gallery",
 		flash: "Flash",
+		services: "Services",
+		about: "About",
+		faq: "FAQ",
+		policies: "Policies",
+		aftercare: "Aftercare",
+		more: "Studio",
 		menu: "Menu",
 		skip: "Skip to content",
 		/** The header's and footer's Request button, when it asks the studio (an artist's page names them: `request.barArtist`). */

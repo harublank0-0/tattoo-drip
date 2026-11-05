@@ -1,7 +1,7 @@
 import { ChatButton } from "../../components/chat.tsx";
 import type { ShellProps } from "../../components/shell.tsx";
 import { studioCopy } from "../../copy.ts";
-import { navItems } from "../../nav.ts";
+import { moreNavItems, navItems } from "../../nav.ts";
 import { InkNoirFooter } from "./footer.tsx";
 import { InkNoirHeader } from "./header.tsx";
 
@@ -21,7 +21,8 @@ export function InkNoirShell({
 	mainClassName = "page",
 	children,
 }: ShellProps) {
-	const items = navItems(theme.sections, page, artistsShown);
+	const items = navItems(theme.sections, page, artistsShown, studio.pages);
+	const more = moreNavItems(theme.sections, page, studio.pages);
 	return (
 		<>
 			<a className="ink-skip" href="#main">
@@ -36,7 +37,12 @@ export function InkNoirShell({
 			<main id="main" tabIndex={-1} className={mainClassName}>
 				{children}
 			</main>
-			<InkNoirFooter studio={studio} items={items} requestLink={requestLink} />
+			<InkNoirFooter
+				studio={studio}
+				items={items}
+				more={more}
+				requestLink={requestLink}
+			/>
 			<ChatButton chat={chat} studioName={studio.name} />
 		</>
 	);

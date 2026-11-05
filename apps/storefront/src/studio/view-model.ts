@@ -1,7 +1,7 @@
 import type { Artist, Studio } from "@tattoo-drip/sdk";
 import { fill } from "../intake/template.ts";
 import { studioCopy } from "./copy.ts";
-import { type HoursLine, hoursLines, readWeek } from "./hours.ts";
+import { type HoursLine, hoursLines, readClosures, readWeek } from "./hours.ts";
 import {
 	isEmail,
 	isPhone,
@@ -47,6 +47,13 @@ export interface ContactLink {
 	readonly href: string;
 }
 
+/** Which informational pages have the studio's own content (shownPages). */
+export interface StudioPages {
+	readonly policies: boolean;
+	readonly aftercare: boolean;
+	readonly contact: boolean;
+}
+
 export interface StudioView {
 	readonly slug: string;
 	readonly name: string;
@@ -66,6 +73,8 @@ export interface StudioView {
 	readonly socialUrls: readonly string[];
 	/** The weekly opening hours as Good to know lists them (TAT-128), for a theme's footer; [] when no day is open. */
 	readonly hours: readonly HoursLine[];
+	/** Which informational pages have content (Prompt 7). */
+	readonly pages: StudioPages;
 }
 
 export interface ArtistPhoto {
@@ -195,6 +204,28 @@ export function studioViewModel(studio: Studio): StudioView {
 		links,
 		socialUrls: social.map((link) => link.href),
 		hours: hoursLines(readWeek(studio.openingHours)),
+		pages: shownPages(studio, links.length > 0 || addressText !== null),
+	};
+}
+
+/**
+ * Which informational pages have the studio's own content (Prompt 7): the
+ * policies (a deposit policy, an age rule, walk-ins or a closure), aftercare
+ * (before a session or after it) and contact (a way to reach it, an address
+ * or opening hours). About, Services and the FAQ always have something true to
+ * say. The navigation links only these; a page without content is a not-found.
+ */
+function shownPages(studio: Studio, reachable: boolean): StudioPages {
+	const texts = (studio.goodToKnow ?? {}) as Partial<Studio["goodToKnow"]>;
+	const set = (value: string | null | undefined) => cleanText(value) !== null;
+	return {
+		policies:
+			set(texts.depositPolicy) ||
+			set(texts.ageRule) ||
+			set(texts.walkIns) ||
+			readClosures(studio.closedDays).length > 0,
+		aftercare: set(texts.beforeSession) || set(texts.aftercare),
+		contact: reachable || readWeek(studio.openingHours).some(Boolean),
 	};
 }
 

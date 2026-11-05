@@ -1,4 +1,5 @@
 import type { ComponentProps, ComponentType } from "react";
+import { InfoPage } from "../components/info.tsx";
 import {
 	ArtistPage,
 	ArtistsPage,
@@ -17,6 +18,7 @@ import { InkNoirBookPage } from "./ink-noir/book/book-page.tsx";
 import { InkNoirArtworkPage } from "./ink-noir/gallery/artwork-page.tsx";
 import { InkNoirGalleryPage } from "./ink-noir/gallery/gallery-page.tsx";
 import { InkNoirStudioPage } from "./ink-noir/home/home-page.tsx";
+import { InkNoirInfoPage } from "./ink-noir/info/info-page.tsx";
 import { InkNoirShell } from "./ink-noir/shell.tsx";
 
 /**
@@ -46,6 +48,8 @@ export interface Theme {
 		ComponentProps<typeof FlashDesignPage>
 	>;
 	readonly RequestPage: ComponentType<ComponentProps<typeof RequestPage>>;
+	/** `/about`, `/services`, `/faq`, `/contact`, `/policies`, `/aftercare` (Prompt 7). */
+	readonly InfoPage: ComponentType<ComponentProps<typeof InfoPage>>;
 }
 
 /**
@@ -67,6 +71,7 @@ export const THEMES: Record<ThemeKey, Theme> = {
 		FlashPage,
 		FlashDesignPage,
 		RequestPage,
+		InfoPage,
 	},
 	"ink-noir": {
 		Shell: InkNoirShell,
@@ -78,6 +83,7 @@ export const THEMES: Record<ThemeKey, Theme> = {
 		FlashPage,
 		FlashDesignPage,
 		RequestPage: InkNoirBookPage,
+		InfoPage: InkNoirInfoPage,
 	},
 };
 
@@ -132,6 +138,11 @@ export function ThemedFlashDesignPage(
 }
 
 /** `/book` in the studio's theme. */
+export function ThemedInfoPage(props: ComponentProps<typeof InfoPage>) {
+	const theme = themeFor(props.data.theme.key);
+	return <theme.InfoPage {...props} Shell={theme.Shell} />;
+}
+
 export function ThemedRequestPage(props: ComponentProps<typeof RequestPage>) {
 	const theme = themeFor(props.data.theme.key);
 	return <theme.RequestPage {...props} Shell={theme.Shell} />;

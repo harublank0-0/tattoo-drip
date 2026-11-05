@@ -62,6 +62,7 @@ import {
 	openNowView,
 } from "./good-to-know.ts";
 import { readClosures, readWeek } from "./hours.ts";
+import { type InfoContent, type InfoKind, infoContent } from "./info.ts";
 import {
 	flashInquiryState,
 	type InquiryChannels,
@@ -82,6 +83,7 @@ import {
 	artworkPageSeo,
 	flashDesignSeo,
 	flashPageSeo,
+	infoPageSeo,
 	type PageSeo,
 	requestPageSeo,
 	studioPageSeo,
@@ -252,6 +254,19 @@ export interface ArtworkPageData {
 	} | null;
 	/** At most six other pieces (relatedArtwork): links to their pages. */
 	readonly related: readonly GalleryPhotoView[];
+}
+
+/** An informational page (Prompt 7): About, Services, FAQ, Contact, Policies or Aftercare. */
+export interface InfoPageData {
+	readonly studio: StudioView;
+	/** Whether any artist is visible: the navigation's Artists link has somewhere to land. */
+	readonly hasArtists: boolean;
+	readonly theme: ThemeConfig;
+	/** The header's Request button: the studio's, or none while it is closed. */
+	readonly requestLink: RequestLink | null;
+	readonly chat: ChatLinks | null;
+	readonly seo: PageSeo;
+	readonly content: InfoContent;
 }
 
 /** `/flash` (TAT-129): every shown design of the visible artists, newest first, filtered by the address. */
@@ -723,6 +738,40 @@ export function artworkPageData(
 }
 
 /**
+ * An informational page's data (Prompt 7), or null when the studio has
+ * nothing of its own for it (infoContent): the route's not-found. Pure.
+ */
+export function infoPageData(
+	kind: InfoKind,
+	studio: Studio,
+	artists: readonly Artist[],
+	origin: string,
+	imageOrigin: string | null = null,
+): InfoPageData | null {
+	const studioView = studioViewModel(studio);
+	const artistViews = artistViewModels(artists, imageOrigin);
+	const theme = parseThemeConfig(storefrontInput(studio), imageOrigin);
+	const content = infoContent(
+		kind,
+		studio,
+		studioView,
+		artists,
+		artistViews,
+		theme.sections,
+	);
+	if (!content) return null;
+	return {
+		studio: studioView,
+		hasArtists: artistViews.length > 0,
+		theme,
+		requestLink: requestLink(studioView, null),
+		chat: chatLinks(studioView, null),
+		seo: infoPageSeo(studioView, content, origin),
+		content,
+	};
+}
+
+/**
  * `/gallery`'s data (TAT-126). `page` is the gallery read for `search`, as the
  * API sent it. The artist filter offers the visible artists who have a work
  * photo, by name.
@@ -961,6 +1010,30 @@ export async function loadWorkPage(
 		context.site.origin,
 		context.tattoo.connection.mediaUrl,
 	);
+}
+
+/**
+ * An informational page (Prompt 7): the studio (from the cache) and its
+ * artists, the reads every page makes; nothing else. A page the studio has no
+ * content for is the not-found.
+ */
+export async function loadInfoPage(
+	context: PageContext,
+	kind: InfoKind,
+): Promise<InfoPageData> {
+	const [studio, artists] = await Promise.all([
+		loadStudio(context),
+		loadArtists(context),
+	]);
+	const data = infoPageData(
+		kind,
+		studio,
+		artists,
+		context.site.origin,
+		context.tattoo.connection.mediaUrl,
+	);
+	if (!data) throw notFound();
+	return data;
 }
 
 /**

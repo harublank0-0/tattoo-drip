@@ -3,6 +3,7 @@ import { fill } from "../intake/template.ts";
 import type { ArtworkView } from "./artwork.ts";
 import { studioCopy } from "./copy.ts";
 import type { FlashDesignView } from "./flash.ts";
+import type { InfoContent } from "./info.ts";
 import { flashDesignHref, galleryPhotoHref, requestHref } from "./links.ts";
 import { trimDescription } from "./text.ts";
 import type { ArtistPhoto, ArtistView, StudioView } from "./view-model.ts";
@@ -207,6 +208,73 @@ export function artworkPageSeo(
 			height: artwork.photo.height,
 			alt: artwork.photo.alt,
 		},
+		jsonLd: null,
+	};
+}
+
+/**
+ * An informational page's head (Prompt 7): a title and a description from the
+ * studio's own name and words (its introduction on About, its artists' styles
+ * on Services, its section titles on Policies), its own canonical address, no
+ * image and no JSON-LD (the studio page carries the studio's).
+ */
+export function infoPageSeo(
+	studio: StudioView,
+	content: InfoContent,
+	origin: string,
+): PageSeo {
+	const name = studio.name;
+	const solo = studio.type === "independent";
+	const [title, description, path] = ((): [string, string, string] => {
+		switch (content.kind) {
+			case "about":
+				return [
+					`About ${name}`,
+					content.story[0] ??
+						`${studio.typeLabel}${studio.location ? `, ${studio.location}` : ""}.`,
+					"/about",
+				];
+			case "services":
+				return [
+					solo ? `What ${name} tattoos` : `What we tattoo at ${name}`,
+					content.styles.length > 0
+						? `${content.styles.map((style) => style.name).join(", ")}${content.flash ? ", flash" : ""} and custom work at ${name}.`
+						: `Custom work at ${name}.`,
+					"/services",
+				];
+			case "faq":
+				return [
+					`Questions about ${name}`,
+					`How to book with ${name}, and what to know before your session.`,
+					"/faq",
+				];
+			case "contact":
+				return [
+					`Contact ${name}`,
+					`How to reach ${name}${studio.location ? ` in ${studio.location}` : ""}.`,
+					"/contact",
+				];
+			case "policies":
+				return [
+					`Policies at ${name}`,
+					`${content.sections.map((section) => section.title).join(", ")} at ${name}.`,
+					"/policies",
+				];
+			case "aftercare":
+				return [
+					`Aftercare from ${name}`,
+					`How ${name} asks you to prepare for a session and care for a new tattoo.`,
+					"/aftercare",
+				];
+		}
+	})();
+	return {
+		title,
+		description: trimDescription(description),
+		canonical: `${origin}${path}`,
+		type: "website",
+		siteName: name,
+		image: null,
 		jsonLd: null,
 	};
 }

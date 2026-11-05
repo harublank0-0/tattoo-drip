@@ -1,6 +1,7 @@
 import { studioCopy } from "./copy.ts";
 import { artistsHref, flashHref, workHref } from "./links.ts";
 import type { SectionKey } from "./theme/config.ts";
+import type { StudioPages } from "./view-model.ts";
 
 /**
  * The site navigation of a theme that has one (Ink Noir's header, menu and
@@ -18,9 +19,25 @@ export type ShellPage =
 	| "work"
 	| "flash"
 	| "flash-design"
-	| "request";
+	| "request"
+	| "about"
+	| "services"
+	| "faq"
+	| "contact"
+	| "policies"
+	| "aftercare";
 
-export type NavKey = "home" | "artists" | "gallery" | "flash";
+export type NavKey =
+	| "home"
+	| "artists"
+	| "gallery"
+	| "flash"
+	| "services"
+	| "about"
+	| "contact"
+	| "faq"
+	| "policies"
+	| "aftercare";
 
 export interface NavItem {
 	readonly key: NavKey;
@@ -46,6 +63,7 @@ export function navItems(
 	sections: readonly SectionKey[],
 	page: ShellPage,
 	hasArtists: boolean,
+	pages: StudioPages | null = null,
 ): NavItem[] {
 	const items: NavItem[] = [
 		{
@@ -83,5 +101,45 @@ export function navItems(
 						: undefined,
 		});
 	}
+	// The informational pages (Prompt 7), each only where it has content:
+	// Services and About always have something true to say (Services needs an
+	// artist), Contact needs a way to reach the studio.
+	if (pages !== null) {
+		if (hasArtists) items.push(link("services", "/services", page));
+		items.push(link("about", "/about", page));
+		if (pages.contact) items.push(link("contact", "/contact", page));
+	}
 	return items;
+}
+
+/**
+ * The footer's further pages (Prompt 7): the FAQ always, Policies and
+ * Aftercare only where the studio wrote them and shows its Good to know.
+ */
+export function moreNavItems(
+	sections: readonly SectionKey[],
+	page: ShellPage,
+	pages: StudioPages,
+): NavItem[] {
+	const shown = sections.includes("info");
+	return [
+		link("faq", "/faq", page),
+		...(shown && pages.policies ? [link("policies", "/policies", page)] : []),
+		...(shown && pages.aftercare
+			? [link("aftercare", "/aftercare", page)]
+			: []),
+	];
+}
+
+function link(
+	key: "services" | "about" | "contact" | "faq" | "policies" | "aftercare",
+	href: string,
+	page: ShellPage,
+): NavItem {
+	return {
+		key,
+		label: studioCopy.nav[key],
+		href,
+		current: page === key ? "page" : undefined,
+	};
 }
