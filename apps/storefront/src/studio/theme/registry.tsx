@@ -9,6 +9,7 @@ import {
 } from "../components/pages.tsx";
 import { type Shell, StencilShell } from "../components/shell.tsx";
 import { DEFAULT_THEME_KEY, type ThemeKey } from "./config.ts";
+import { InkNoirStudioPage } from "./ink-noir/home/home-page.tsx";
 import { InkNoirShell } from "./ink-noir/shell.tsx";
 
 /**
@@ -39,7 +40,8 @@ export interface Theme {
 /**
  * Every theme, by key. Stencil & Ink is the page TAT-97 and TAT-105 built;
  * Ink Noir (theme/ink-noir/) is the same pages in its own dark shell, with a
- * site navigation and a full footer. Its colours come from the `<html>`
+ * site navigation and a full footer, and its own home page
+ * (theme/ink-noir/home/: the same data, laid out as an editorial portfolio). Its colours come from the `<html>`
  * class the root route sets (theme/html.ts), not from here.
  */
 export const THEMES: Record<ThemeKey, Theme> = {
@@ -54,7 +56,7 @@ export const THEMES: Record<ThemeKey, Theme> = {
 	},
 	"ink-noir": {
 		Shell: InkNoirShell,
-		StudioPage,
+		StudioPage: InkNoirStudioPage,
 		ArtistPage,
 		WorkPage,
 		FlashPage,

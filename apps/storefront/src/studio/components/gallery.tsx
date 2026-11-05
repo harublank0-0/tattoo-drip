@@ -60,33 +60,7 @@ export function GalleryGrid({
 							decoding="async"
 						/>
 					</button>
-					<dialog
-						id={photo.dialogId}
-						className="work-dialog"
-						aria-label={photo.label}
-					>
-						<form method="dialog" className="work-dialog-bar">
-							<p>{photo.label}</p>
-							<button type="submit" className="action action-secondary">
-								{studioCopy.work.close}
-							</button>
-						</form>
-						<img
-							className="work-large"
-							src={photo.largeSrc}
-							width={photo.width}
-							height={photo.height}
-							alt={photo.alt}
-							loading="lazy"
-							decoding="async"
-						/>
-						{photo.caption ? (
-							<p className="work-dialog-caption user-text" dir="auto">
-								{photo.caption}
-							</p>
-						) : null}
-						<PhotoFacts photo={photo} showArtist={showArtist} />
-					</dialog>
+					<PhotoDialog photo={photo} showArtist={showArtist} />
 				</li>
 			))}
 		</ul>
@@ -118,6 +92,51 @@ export function RecentWork({ gallery }: { gallery: GalleryView }) {
 				</a>
 			</p>
 		</section>
+	);
+}
+
+/**
+ * One photo's viewer: the browser's modal `<dialog>` that `showPhoto(id)`
+ * opens, with its Close form, label, large copy (lazy: not fetched until
+ * opened), description and facts. GalleryGrid puts one after each button; a
+ * theme that lays its photos out differently (Ink Noir's home page) puts the
+ * same one after its own.
+ */
+export function PhotoDialog({
+	photo,
+	showArtist,
+}: {
+	photo: GalleryPhotoView;
+	showArtist: boolean;
+}) {
+	return (
+		<dialog
+			id={photo.dialogId}
+			className="work-dialog"
+			aria-label={photo.label}
+		>
+			<form method="dialog" className="work-dialog-bar">
+				<p>{photo.label}</p>
+				<button type="submit" className="action action-secondary">
+					{studioCopy.work.close}
+				</button>
+			</form>
+			<img
+				className="work-large"
+				src={photo.largeSrc}
+				width={photo.width}
+				height={photo.height}
+				alt={photo.alt}
+				loading="lazy"
+				decoding="async"
+			/>
+			{photo.caption ? (
+				<p className="work-dialog-caption user-text" dir="auto">
+					{photo.caption}
+				</p>
+			) : null}
+			<PhotoFacts photo={photo} showArtist={showArtist} />
+		</dialog>
 	);
 }
 

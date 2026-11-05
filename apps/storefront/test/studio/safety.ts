@@ -5,7 +5,8 @@ export interface SafePageOptions {
 	/**
 	 * A studio's logo and cover (TAT-54) are decoration beside its name: the
 	 * logo (class `profile-logo` or `site-bar-logo`) must have `alt=""`, and
-	 * the cover (the `<img>` inside `profile-cover`) may have an empty alt.
+	 * the cover (the `<img>` inside `profile-cover`, or inside Ink Noir's
+	 * `ink-hero-media`) may have an empty alt.
 	 * Every other image still needs its alt text.
 	 */
 	brandImages?: boolean;
@@ -50,7 +51,9 @@ export function assertSafePage(html: string, options: SafePageOptions = {}) {
 	assert.doesNotMatch(html, /javascript:/i);
 	const covers = options.brandImages
 		? Array.from(
-				html.matchAll(/<div class="profile-cover">(<img [^>]*>)/g),
+				html.matchAll(
+					/<div class="(?:profile-cover|ink-hero-media)">(<img [^>]*>)/g,
+				),
 				(match) => match[1],
 			)
 		: [];

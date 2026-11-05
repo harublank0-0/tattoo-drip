@@ -1,0 +1,1157 @@
+/*
+ * Ink Noir's home page (src/studio/theme/ink-noir/home/). Everything is under
+ * `:root.theme-ink-noir` or uses `ink-` classes only that page renders, so a
+ * Stencil & Ink page and every other Ink Noir page are untouched. Colours are
+ * the theme's tokens (./styles.css); nothing is downloaded.
+ *
+ * The page is left-aligned on an asymmetric 12-column idea. Its one motif is
+ * the drip: a hairline in the accent, falling to a drop, under the hero's
+ * scroll cue and over the closing invitation. Section labels carry a short
+ * accent stroke. Motion: one load sequence on the first screen and the
+ * responses to a pointer; nothing moves on scroll, and all of it stops for
+ * prefers-reduced-motion.
+ *
+ * Unlayered, so these rules outrank styles.css's layered ones.
+ */
+
+:root.theme-ink-noir .ink-home {
+	display: block;
+	overflow-x: clip;
+}
+
+/* ---- Shared pieces --------------------------------------------------- */
+
+.ink-section {
+	padding-block-start: clamp(5.5rem, 3rem + 8vw, 10rem);
+}
+
+.ink-label {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	margin: 0 0 1.25rem;
+	color: var(--ink-muted);
+	font-size: 0.75rem;
+	font-weight: 600;
+	letter-spacing: 0.16em;
+	line-height: 1rem;
+	text-transform: uppercase;
+}
+.ink-label::before {
+	content: "";
+	flex: none;
+	inline-size: 2rem;
+	block-size: 1px;
+	background: var(--stencil);
+}
+
+.ink-head {
+	margin-block-end: clamp(2.25rem, 1.5rem + 3vw, 4rem);
+}
+.ink-title {
+	margin: 0;
+	max-inline-size: 15ch;
+	font-size: clamp(2.5rem, 1.5rem + 4vw, 5.25rem);
+	line-height: 0.98;
+	letter-spacing: -0.025em;
+}
+.ink-line {
+	display: block;
+}
+
+/* A text link: the accent underline sits low and closes in on hover. */
+.ink-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	min-block-size: 2.75rem;
+	color: var(--ink);
+	font-weight: 600;
+	text-decoration: underline;
+	text-decoration-color: var(--stencil);
+	text-decoration-thickness: 1px;
+	text-underline-offset: 0.45em;
+	transition:
+		text-underline-offset 200ms ease,
+		color 150ms ease;
+}
+.ink-link:hover {
+	text-decoration-thickness: 2px;
+	text-underline-offset: 0.25em;
+}
+.ink-link svg {
+	flex: none;
+	inline-size: 1rem;
+	block-size: 1rem;
+	color: var(--stencil);
+}
+
+/* The quiet action beside the accent one: an ink outline, filled faintly on hover. */
+.ink-action-quiet {
+	border-color: color-mix(in srgb, var(--ink) 45%, transparent);
+	color: var(--ink);
+}
+.ink-action-quiet:hover {
+	border-color: var(--ink);
+	background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+.ink-cta {
+	min-block-size: 3.25rem;
+	padding-inline: 1.75rem;
+}
+
+/* ---- 1. The first screen --------------------------------------------- */
+
+.ink-hero {
+	position: relative;
+	isolation: isolate;
+	display: grid;
+	align-items: end;
+	min-block-size: calc(100svh - var(--site-bar-height));
+	padding-block: 7rem 2.5rem;
+	overflow: hidden;
+}
+.ink-hero-media {
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	background: var(--paper-raised);
+}
+.ink-hero-media img {
+	display: block;
+	inline-size: 100%;
+	block-size: 100%;
+	object-fit: cover;
+	object-position: 50% 30%;
+}
+/* On a phone the photo is the whole screen; the scrim deepens toward the foot, where the words are. */
+.ink-hero-media::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(
+		to bottom,
+		color-mix(in srgb, var(--paper) 20%, transparent) 0%,
+		color-mix(in srgb, var(--paper) 15%, transparent) 25%,
+		color-mix(in srgb, var(--paper) 78%, transparent) 52%,
+		color-mix(in srgb, var(--paper) 94%, transparent) 72%,
+		var(--paper) 100%
+	);
+}
+
+.ink-hero-inner {
+	display: grid;
+	gap: 1.75rem;
+	justify-items: start;
+	inline-size: var(--ink-column);
+	margin-inline: auto;
+}
+.ink-hero-title {
+	display: grid;
+	gap: 1.25rem;
+	margin: 0;
+	text-wrap: initial;
+}
+/* The studio's name, as the line the headline hangs from. */
+.ink-hero-name {
+	display: flex;
+	align-items: center;
+	gap: 0.875rem;
+	color: var(--ink);
+	font-family: var(--body-face);
+	font-size: 1rem;
+	font-weight: 600;
+	letter-spacing: 0.01em;
+	line-height: 1.35;
+}
+.ink-hero-name::before {
+	content: "";
+	flex: none;
+	inline-size: 2.5rem;
+	block-size: 1px;
+	background: var(--stencil);
+}
+.ink-hero-line {
+	color: var(--ink);
+	font-size: clamp(3.25rem, 1rem + 10.5vw, 11rem);
+	font-weight: 700;
+	line-height: 0.86;
+	letter-spacing: -0.04em;
+}
+.ink-hero-support {
+	margin: 0;
+	max-inline-size: 26ch;
+	color: var(--ink);
+	font-family: var(--display-face);
+	font-size: clamp(1.25rem, 1rem + 1vw, 1.75rem);
+	line-height: 1.25;
+}
+.ink-hero-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.75rem;
+	inline-size: 100%;
+}
+.ink-hero-actions .status {
+	margin: 0;
+}
+
+/* The facts along the foot, on a hairline. */
+.ink-hero-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1rem 2.5rem;
+	inline-size: 100%;
+	margin: 0.75rem 0 0;
+	padding-block-start: 1.25rem;
+	border-block-start: 1px solid color-mix(in srgb, var(--ink) 18%, transparent);
+}
+.ink-hero-meta div {
+	display: grid;
+	gap: 0.125rem;
+	min-inline-size: 0;
+}
+.ink-hero-meta dt {
+	color: var(--ink-muted);
+	font-size: 0.8125rem;
+}
+.ink-hero-meta dd {
+	margin: 0;
+	color: var(--ink);
+	font-size: 0.9375rem;
+	font-weight: 500;
+	overflow-wrap: anywhere;
+}
+.ink-hero-meta .profile-hours {
+	min-block-size: 1.4em;
+	color: var(--ink);
+	font-size: 0.9375rem;
+}
+.ink-hero-meta .profile-hours strong {
+	font-weight: 500;
+}
+
+/* The scroll cue (from 60rem): a word on its side and the drip below it. */
+.ink-hero-scroll {
+	display: none;
+}
+
+@media (max-width: 29.99rem) {
+	/* A phone: both buttons the full width, the primary first. */
+	.ink-hero-actions .action {
+		flex: 1 1 100%;
+	}
+}
+
+@media (min-width: 60rem) {
+	.ink-hero {
+		padding-block: 8rem 3rem;
+	}
+	/* The photo takes the right of the screen; the headline crosses its edge. */
+	.ink-hero-photo .ink-hero-media {
+		inset-inline-start: 38%;
+	}
+	.ink-hero-media::after {
+		background:
+			linear-gradient(
+				to right,
+				var(--paper) 0%,
+				color-mix(in srgb, var(--paper) 82%, transparent) 18%,
+				color-mix(in srgb, var(--paper) 25%, transparent) 50%,
+				transparent 72%
+			),
+			linear-gradient(to top, var(--paper) 0%, transparent 30%);
+	}
+	.ink-hero-inner {
+		gap: 2rem;
+	}
+	.ink-hero-support {
+		max-inline-size: 22ch;
+	}
+	.ink-hero-meta {
+		max-inline-size: 40rem;
+	}
+	.ink-hero-scroll {
+		position: absolute;
+		inset-inline-end: max(1.25rem, calc((100% - 72rem) / 2 - 3rem));
+		inset-block-end: 3rem;
+		display: grid;
+		justify-items: center;
+		gap: 1rem;
+		padding: 0.5rem;
+		color: var(--ink-muted);
+		font-size: 0.75rem;
+		font-weight: 600;
+		letter-spacing: 0.16em;
+		text-decoration: none;
+		text-transform: uppercase;
+		transition: color 150ms ease;
+	}
+	.ink-hero-scroll > span {
+		writing-mode: vertical-rl;
+	}
+	.ink-hero-scroll::after {
+		content: "";
+		inline-size: 1px;
+		block-size: 4.5rem;
+		background: linear-gradient(var(--line-strong), var(--stencil));
+	}
+	.ink-hero-scroll:hover {
+		color: var(--ink);
+	}
+}
+
+/* The one load sequence: the photo settles, the headline rises line by line, the rest follows. */
+@media (prefers-reduced-motion: no-preference) {
+	.ink-hero-media img {
+		animation: ink-settle 1600ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+	}
+	.ink-hero-name {
+		animation: ink-rise 600ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+	}
+	.ink-hero-line .ink-line {
+		animation: ink-rise 700ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+	}
+	.ink-hero-line .ink-line:nth-child(2) {
+		animation-delay: 90ms;
+	}
+	.ink-hero-support,
+	.ink-hero-actions,
+	.ink-hero-meta {
+		animation: ink-fade 600ms ease both 220ms;
+	}
+	.ink-hero-scroll::after {
+		transform-origin: top;
+		animation: ink-drip 2400ms cubic-bezier(0.6, 0, 0.3, 1) infinite 1200ms;
+	}
+}
+@keyframes ink-settle {
+	from {
+		scale: 1.06;
+	}
+}
+@keyframes ink-rise {
+	from {
+		opacity: 0;
+		translate: 0 0.35em;
+	}
+}
+@keyframes ink-fade {
+	from {
+		opacity: 0;
+	}
+}
+@keyframes ink-drip {
+	0% {
+		scale: 1 0;
+	}
+	45% {
+		scale: 1 1;
+	}
+	100% {
+		scale: 1 1;
+		opacity: 0;
+	}
+}
+
+/* ---- 2. The introduction --------------------------------------------- */
+
+.ink-intro-grid {
+	display: grid;
+	gap: 3rem;
+}
+.ink-intro-title {
+	max-inline-size: 17ch;
+	font-size: clamp(2.25rem, 1.4rem + 3.4vw, 4.5rem);
+	line-height: 1.02;
+}
+.ink-intro-text-body {
+	margin: 2rem 0 0;
+	max-inline-size: 36rem;
+	color: var(--ink);
+	font-size: clamp(1.0625rem, 1rem + 0.35vw, 1.25rem);
+	line-height: 1.65;
+}
+.ink-facts {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+	gap: 1.5rem 2rem;
+	margin: 3rem 0 0;
+	padding-block-start: 1.5rem;
+	border-block-start: 1px solid var(--line);
+}
+.ink-facts dt {
+	color: var(--ink-muted);
+	font-size: 0.8125rem;
+}
+.ink-facts dd {
+	margin: 0.25rem 0 0;
+	color: var(--ink);
+	font-family: var(--display-face);
+	font-size: 1.25rem;
+	font-weight: 700;
+	line-height: 1.25;
+	overflow-wrap: anywhere;
+}
+.ink-intro-next {
+	margin: 2rem 0 0;
+}
+.ink-intro-photo {
+	position: relative;
+	margin: 0;
+	background: var(--paper-raised);
+}
+.ink-intro-photo img {
+	display: block;
+	inline-size: 100%;
+	block-size: auto;
+	/* Across the column below 60rem, so landscape; beside the words, a portrait. */
+	aspect-ratio: 4 / 3;
+	object-fit: cover;
+	object-position: 50% 30%;
+}
+
+@media (min-width: 60rem) {
+	.ink-intro-grid {
+		grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+		column-gap: clamp(3rem, 6vw, 7rem);
+		align-items: end;
+	}
+	/* The photo sits lower than the words, so the two columns don't line up like a card. */
+	.ink-intro-photo {
+		margin-block-end: -3rem;
+	}
+	.ink-intro-photo img {
+		aspect-ratio: 4 / 5;
+	}
+	.ink-intro-text .ink-intro-grid {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.ink-intro-text .ink-intro-title {
+		font-size: clamp(3rem, 1.5rem + 4.5vw, 6rem);
+		max-inline-size: 18ch;
+	}
+	.ink-intro-text .ink-intro-copy {
+		display: grid;
+		grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+		column-gap: clamp(3rem, 6vw, 7rem);
+	}
+	.ink-intro-text .ink-intro-copy > * {
+		grid-column: 1 / -1;
+	}
+	.ink-intro-text .ink-intro-text-body,
+	.ink-intro-text .ink-facts,
+	.ink-intro-text .ink-intro-next {
+		grid-column: 2;
+	}
+}
+
+/* ---- 3. The featured work -------------------------------------------- */
+
+.ink-work-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: end;
+	justify-content: space-between;
+	gap: 1rem 2rem;
+	margin-block-end: clamp(2rem, 1.5rem + 2.5vw, 3.5rem);
+}
+.ink-work-head .ink-head {
+	margin: 0;
+}
+.ink-work-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.5rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.ink-tile {
+	position: relative;
+	min-inline-size: 0;
+	aspect-ratio: 1;
+}
+.ink-tile-m2x2 {
+	grid-column: span 2;
+}
+.ink-tile-m2x1 {
+	grid-column: span 2;
+	aspect-ratio: 2 / 1;
+}
+
+.ink-tile-open {
+	position: relative;
+	display: block;
+	inline-size: 100%;
+	block-size: 100%;
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	background: var(--paper-raised);
+	color: inherit;
+	font: inherit;
+	text-align: start;
+	cursor: zoom-in;
+	overflow: hidden;
+}
+.ink-tile-open img {
+	display: block;
+	inline-size: 100%;
+	block-size: 100%;
+	object-fit: cover;
+	transition: scale 700ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.ink-tile-open:focus-visible {
+	outline: 2px solid var(--stencil);
+	outline-offset: 3px;
+}
+/* Whose work and its styles, on a scrim at the foot of the photo. */
+.ink-tile-facts {
+	position: absolute;
+	inset-inline: 0;
+	inset-block-end: 0;
+	display: grid;
+	gap: 0.125rem;
+	padding: 2.5rem 0.875rem 0.75rem;
+	background: linear-gradient(
+		to top,
+		color-mix(in srgb, var(--paper) 90%, transparent) 0%,
+		color-mix(in srgb, var(--paper) 60%, transparent) 55%,
+		transparent 100%
+	);
+	overflow-wrap: anywhere;
+}
+.ink-tile-artist {
+	color: var(--ink);
+	font-family: var(--display-face);
+	font-size: 1rem;
+	font-weight: 700;
+	line-height: 1.2;
+}
+.ink-tile-styles {
+	color: color-mix(in srgb, var(--ink) 82%, transparent);
+	font-size: 0.8125rem;
+	line-height: 1.35;
+}
+
+@media (min-width: 48rem) {
+	.ink-work-grid {
+		grid-template-columns: repeat(12, minmax(0, 1fr));
+		grid-auto-rows: clamp(12rem, 22vw, 20rem);
+		gap: 0.75rem;
+	}
+	.ink-tile,
+	.ink-tile-m2x1 {
+		aspect-ratio: auto;
+	}
+	.ink-tile-4x1 {
+		grid-column: span 4;
+	}
+	.ink-tile-5x1 {
+		grid-column: span 5;
+	}
+	.ink-tile-7x1 {
+		grid-column: span 7;
+	}
+	.ink-tile-5x2 {
+		grid-column: span 5;
+		grid-row: span 2;
+	}
+	.ink-tile-7x2 {
+		grid-column: span 7;
+		grid-row: span 2;
+	}
+	.ink-tile-12x2 {
+		grid-column: span 12;
+		grid-row: span 2;
+	}
+	.ink-tile-artist {
+		font-size: 1.125rem;
+	}
+	.ink-tile-facts {
+		padding: 3rem 1.25rem 1rem;
+	}
+}
+
+/* With a pointer the facts wait for hover or focus; on a touch screen they stay. */
+@media (hover: hover) and (pointer: fine) {
+	.ink-tile-facts {
+		opacity: 0;
+		translate: 0 0.5rem;
+		transition:
+			opacity 250ms ease,
+			translate 250ms ease;
+	}
+	.ink-tile-open:hover .ink-tile-facts,
+	.ink-tile-open:focus-visible .ink-tile-facts {
+		opacity: 1;
+		translate: 0 0;
+	}
+	.ink-tile-open:hover img,
+	.ink-tile-open:focus-visible img {
+		scale: 1.04;
+	}
+}
+
+.ink-work-empty {
+	display: grid;
+	gap: 0.75rem;
+	justify-items: start;
+	padding-block: clamp(2.5rem, 2rem + 4vw, 5rem);
+	border-block: 1px solid var(--line);
+	color: var(--ink-muted);
+}
+.ink-work-empty p {
+	margin: 0;
+}
+.ink-work-empty-title {
+	max-inline-size: 20ch;
+	color: var(--ink);
+	font-family: var(--display-face);
+	font-size: clamp(1.75rem, 1.2rem + 2vw, 2.75rem);
+	font-weight: 700;
+	line-height: 1.1;
+}
+
+/* ---- 4. The artists -------------------------------------------------- */
+
+.ink-artist-list {
+	display: grid;
+	gap: 3.5rem 1.25rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.ink-artist {
+	position: relative;
+	display: grid;
+	gap: 1.25rem;
+	align-content: start;
+}
+.ink-artist-photo {
+	position: relative;
+	margin: 0;
+	aspect-ratio: 4 / 5;
+	overflow: hidden;
+	background: var(--paper-raised);
+}
+.ink-artist-photo img {
+	display: block;
+	inline-size: 100%;
+	block-size: 100%;
+	object-fit: cover;
+	object-position: 50% 25%;
+	transition:
+		scale 700ms cubic-bezier(0.2, 0.7, 0.2, 1),
+		filter 500ms ease;
+}
+.ink-artist-initial {
+	position: absolute;
+	inset: 0;
+	display: grid;
+	place-items: center;
+	color: var(--line-strong);
+	font-family: var(--display-face);
+	font-size: clamp(6rem, 4rem + 10vw, 11rem);
+	font-weight: 700;
+	line-height: 1;
+}
+.ink-artist-text {
+	display: grid;
+	gap: 0.5rem;
+	align-content: start;
+	justify-items: start;
+}
+.ink-artist-name {
+	margin: 0;
+	font-size: clamp(1.625rem, 1.3rem + 1vw, 2.125rem);
+	line-height: 1.05;
+	letter-spacing: -0.015em;
+}
+/* The name is the card's link; it stretches over the portrait too. */
+.ink-artist-link {
+	color: var(--ink);
+	text-decoration: none;
+}
+.ink-artist-link::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: 1;
+}
+.ink-artist-link:hover,
+.ink-artist-link:focus-visible {
+	text-decoration: underline;
+	text-decoration-color: var(--stencil);
+	text-decoration-thickness: 2px;
+	text-underline-offset: 0.2em;
+}
+.ink-artist-link:focus-visible {
+	outline: none;
+}
+.ink-artist:has(.ink-artist-link:focus-visible) .ink-artist-photo {
+	outline: 2px solid var(--stencil);
+	outline-offset: 4px;
+}
+.ink-artist-styles {
+	margin: 0;
+	color: var(--ink);
+	font-size: 0.9375rem;
+}
+.ink-artist-status {
+	display: flex;
+	align-items: baseline;
+	gap: 0.5rem;
+	margin: 0;
+	color: var(--ink-muted);
+	font-size: 0.875rem;
+}
+.ink-artist-status.ink-open::before {
+	content: "";
+	flex: none;
+	inline-size: 0.4375rem;
+	block-size: 0.4375rem;
+	border-radius: 50%;
+	background: var(--stencil);
+	translate: 0 -0.0625rem;
+}
+.ink-artist-bio {
+	display: -webkit-box;
+	margin: 0.25rem 0 0;
+	max-inline-size: 34rem;
+	color: var(--ink-muted);
+	font-size: 0.9375rem;
+	line-height: 1.6;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 3;
+	line-clamp: 3;
+	overflow: hidden;
+}
+/* Above the stretched link, so they are their own targets. */
+.ink-artist-actions {
+	position: relative;
+	z-index: 2;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	margin-block-start: 0.75rem;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	/* Portraits wait in monochrome, as one set; the one under the pointer takes its colour. */
+	.ink-artist-photo img {
+		filter: grayscale(1) contrast(1.05);
+	}
+	.ink-artist:hover .ink-artist-photo img,
+	.ink-artist:focus-within .ink-artist-photo img {
+		filter: none;
+		scale: 1.03;
+	}
+}
+
+@media (min-width: 36rem) {
+	.ink-artist-list {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+	/* Every second portrait drops a step: a contact sheet, not a directory. */
+	.ink-artist-list > li:nth-child(even) {
+		margin-block-start: 4rem;
+	}
+}
+@media (min-width: 60rem) {
+	.ink-artist-list-3 {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+	.ink-artist-list-4 {
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+	}
+	.ink-artist-list-3 > li,
+	.ink-artist-list-4 > li {
+		margin-block-start: 0;
+	}
+	.ink-artist-list-3 > li:nth-child(3n + 2),
+	.ink-artist-list-4 > li:nth-child(even) {
+		margin-block-start: 5rem;
+	}
+}
+
+/* One artist: the portrait and the words side by side, the name set large. */
+.ink-artist-feature .ink-artist-name {
+	font-size: clamp(2.75rem, 1.5rem + 5vw, 6rem);
+	line-height: 0.95;
+	letter-spacing: -0.03em;
+}
+.ink-artist-feature .ink-artist-styles {
+	font-size: 1.0625rem;
+}
+.ink-artist-feature .ink-artist-bio {
+	display: block;
+	margin-block-start: 1rem;
+	color: var(--ink);
+	font-size: clamp(1.0625rem, 1rem + 0.35vw, 1.25rem);
+	line-height: 1.65;
+	-webkit-line-clamp: unset;
+	line-clamp: none;
+}
+@media (min-width: 48rem) {
+	.ink-artist-feature {
+		grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+		column-gap: clamp(2.5rem, 6vw, 6rem);
+		align-items: end;
+	}
+	.ink-artist-feature .ink-artist-text {
+		padding-block-end: 1rem;
+	}
+}
+
+/* ---- 5. The styles index --------------------------------------------- */
+
+.ink-styles-grid {
+	display: grid;
+	gap: 0;
+}
+.ink-style-list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	border-block-start: 1px solid var(--line);
+}
+.ink-style {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	grid-template-areas: "name preview" "artists preview";
+	column-gap: 1.25rem;
+	align-items: center;
+	padding-block: 1.25rem;
+	border-block-end: 1px solid var(--line);
+}
+.ink-style-name {
+	grid-area: name;
+	margin: 0;
+	color: var(--ink);
+	font-size: clamp(2rem, 1.2rem + 3.5vw, 4.25rem);
+	line-height: 1.02;
+	letter-spacing: -0.025em;
+}
+.ink-style-link {
+	display: inline-block;
+	color: var(--ink);
+	text-decoration: none;
+	transition:
+		color 200ms ease,
+		translate 300ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.ink-style-link:hover,
+.ink-style-link:focus-visible {
+	color: var(--stencil);
+}
+.ink-style-artists {
+	grid-area: artists;
+	margin: 0.375rem 0 0;
+	color: var(--ink-muted);
+	font-size: 0.9375rem;
+	overflow-wrap: anywhere;
+}
+.ink-style-artists a {
+	color: var(--ink);
+	text-decoration: underline;
+	text-decoration-color: var(--line-strong);
+	text-decoration-thickness: 1px;
+	text-underline-offset: 0.2em;
+}
+.ink-style-artists a:hover {
+	text-decoration-color: var(--stencil);
+}
+.ink-style-preview {
+	grid-area: preview;
+	inline-size: 4.5rem;
+	block-size: 4.5rem;
+	object-fit: cover;
+	background: var(--paper-raised);
+	transition: scale 500ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@media (min-width: 48rem) {
+	.ink-style {
+		padding-block: 1.75rem;
+		column-gap: 2rem;
+	}
+	.ink-style-preview {
+		inline-size: 7rem;
+		block-size: 7rem;
+	}
+	.ink-style:hover .ink-style-link {
+		translate: 0.5rem 0;
+	}
+	.ink-style:hover .ink-style-preview {
+		scale: 1.06;
+	}
+}
+@media (min-width: 60rem) {
+	.ink-styles-grid {
+		grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+		column-gap: clamp(3rem, 5vw, 5rem);
+		align-items: start;
+	}
+	.ink-styles .ink-head {
+		position: sticky;
+		inset-block-start: calc(var(--site-bar-height) + 2rem);
+	}
+}
+
+/* ---- Flash (the shared section, in the page's column) ---------------- */
+
+:root.theme-ink-noir .ink-flash > .section {
+	margin-block-start: 0;
+	padding-block-start: clamp(5.5rem, 3rem + 8vw, 10rem);
+}
+
+/* ---- 6. The visit ---------------------------------------------------- */
+
+.ink-visit-grid {
+	display: grid;
+	gap: 2.5rem;
+}
+.ink-visit-lead .ink-head {
+	margin-block-end: 0;
+}
+.ink-visit-address {
+	display: grid;
+	gap: 0.375rem;
+	justify-items: start;
+	margin-block-start: 2rem;
+	color: var(--ink);
+	font-size: 1.0625rem;
+	line-height: 1.5;
+}
+.ink-visit-address p {
+	margin: 0;
+}
+.ink-visit-find {
+	color: var(--ink-muted);
+	font-size: 0.8125rem;
+}
+.ink-visit-map {
+	margin-block-start: 0.25rem;
+}
+.ink-visit-list {
+	margin: 0;
+	border-block-start: 1px solid var(--line);
+}
+.ink-visit-row {
+	display: grid;
+	gap: 0.5rem;
+	padding-block: 1.5rem;
+	border-block-end: 1px solid var(--line);
+}
+.ink-visit-row dt {
+	color: var(--ink-muted);
+	font-size: 0.875rem;
+}
+.ink-visit-row dd {
+	margin: 0;
+	color: var(--ink);
+	font-size: 1.0625rem;
+	line-height: 1.55;
+	overflow-wrap: anywhere;
+}
+.ink-visit-lines {
+	display: grid;
+	gap: 0.25rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.ink-when {
+	display: inline-block;
+	min-inline-size: 9rem;
+	color: var(--ink-muted);
+}
+.ink-visit-more {
+	border-block-end: 1px solid var(--line);
+}
+.ink-visit-more summary {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	min-block-size: 4rem;
+	color: var(--ink);
+	font-family: var(--display-face);
+	font-size: 1.375rem;
+	font-weight: 700;
+	line-height: 1.2;
+	list-style: none;
+	cursor: pointer;
+}
+.ink-visit-more summary::-webkit-details-marker {
+	display: none;
+}
+.ink-visit-more summary:hover {
+	color: var(--stencil);
+}
+.ink-visit-more summary svg {
+	flex: none;
+	inline-size: 1.25rem;
+	block-size: 1.25rem;
+	color: var(--stencil);
+	transition: rotate 200ms ease;
+}
+.ink-visit-more[open] summary svg {
+	rotate: 180deg;
+}
+.ink-visit-more p {
+	margin: 0;
+	padding-block-end: 1.75rem;
+	max-inline-size: 40rem;
+	color: var(--ink-muted);
+	line-height: 1.65;
+}
+
+@media (min-width: 40rem) {
+	.ink-visit-row {
+		grid-template-columns: 10rem minmax(0, 1fr);
+		gap: 2rem;
+	}
+	.ink-visit-row dt {
+		padding-block-start: 0.1875rem;
+	}
+}
+@media (min-width: 60rem) {
+	.ink-visit-grid {
+		grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+		column-gap: clamp(3rem, 6vw, 6rem);
+		align-items: start;
+	}
+	.ink-visit-lead {
+		position: sticky;
+		inset-block-start: calc(var(--site-bar-height) + 2rem);
+	}
+}
+
+/* ---- 7. The close ---------------------------------------------------- */
+
+.ink-close {
+	padding-block-start: clamp(6rem, 4rem + 9vw, 12rem);
+}
+/* The drip: a hairline falling to a drop, from the section above into the headline. */
+.ink-close::before {
+	content: "";
+	display: block;
+	inline-size: var(--ink-column);
+	block-size: clamp(4rem, 2rem + 6vw, 7rem);
+	margin: calc(-1 * clamp(2rem, 1rem + 4vw, 5rem)) auto
+		clamp(2rem, 1rem + 2vw, 3rem);
+	background:
+		linear-gradient(var(--line), var(--stencil)) 0.25rem 0 / 1px
+		calc(100% - 0.375rem) no-repeat,
+		radial-gradient(circle, var(--stencil) 0 0.25rem, transparent 0.27rem) 0
+		100% / 0.5625rem 0.5625rem no-repeat;
+}
+.ink-close-grid {
+	display: grid;
+}
+.ink-close-title {
+	margin: 0;
+	color: var(--ink);
+	font-size: clamp(3rem, 0.9rem + 9vw, 10rem);
+	line-height: 0.88;
+	letter-spacing: -0.04em;
+}
+.ink-close-body {
+	display: grid;
+	gap: 1.5rem;
+	justify-items: start;
+	margin-block-start: clamp(2rem, 1.5rem + 3vw, 4rem);
+	max-inline-size: 38rem;
+}
+.ink-close-body p {
+	margin: 0;
+}
+.ink-close-line {
+	color: var(--ink);
+	font-family: var(--display-face);
+	font-size: clamp(1.375rem, 1.1rem + 1.1vw, 2rem);
+	font-weight: 700;
+	line-height: 1.2;
+}
+.ink-close-detail {
+	color: var(--ink-muted);
+}
+.ink-steps {
+	counter-reset: ink-step;
+	display: grid;
+	gap: 0.75rem 2rem;
+	inline-size: 100%;
+	margin: 0.5rem 0 0;
+	padding: 1.5rem 0 0;
+	border-block-start: 1px solid var(--line);
+	list-style: none;
+}
+.ink-steps li {
+	counter-increment: ink-step;
+	display: grid;
+	grid-template-columns: 2rem minmax(0, 1fr);
+	align-items: baseline;
+	color: var(--ink);
+	font-size: 0.9375rem;
+	line-height: 1.45;
+}
+.ink-steps li::before {
+	content: counter(ink-step, decimal-leading-zero);
+	color: var(--stencil);
+	font-family: var(--display-face);
+	font-size: 0.875rem;
+	font-weight: 700;
+}
+.ink-close-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	inline-size: 100%;
+	margin-block-start: 0.5rem;
+}
+
+@media (max-width: 29.99rem) {
+	.ink-close-actions .action {
+		flex: 1 1 100%;
+	}
+}
+@media (min-width: 40rem) {
+	.ink-steps {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+@media (min-width: 60rem) {
+	/* The headline spans the page; the words and the buttons answer it from the right. */
+	.ink-close-body {
+		margin-inline-start: calc(100% * 5 / 12);
+	}
+}
+
+/* ---- Reduced motion -------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+	.ink-link,
+	.ink-tile-open img,
+	.ink-tile-facts,
+	.ink-artist-photo img,
+	.ink-style-link,
+	.ink-style-preview,
+	.ink-visit-more summary svg,
+	.ink-hero-scroll {
+		transition: none;
+	}
+	.ink-tile-open:hover img,
+	.ink-tile-open:focus-visible img,
+	.ink-artist:hover .ink-artist-photo img,
+	.ink-artist:focus-within .ink-artist-photo img,
+	.ink-style:hover .ink-style-preview {
+		scale: none;
+	}
+	.ink-style:hover .ink-style-link {
+		translate: none;
+	}
+}

@@ -26,6 +26,7 @@ import {
 	type ThemeConfig,
 } from "../../src/studio/theme/config.ts";
 import { matchedThemeKey, THEME_HTML } from "../../src/studio/theme/html.ts";
+import { InkNoirStudioPage } from "../../src/studio/theme/ink-noir/home/home-page.tsx";
 import {
 	INK_NOIR_CLASS,
 	INK_NOIR_SCHEME,
@@ -377,10 +378,11 @@ describe("isRouterClick: which clicks the router takes over", () => {
 });
 
 describe("Ink Noir's pages", () => {
-	test("is registered with its own shell and the shared pages", () => {
+	test("is registered with its own shell, its own home page and the shared pages", () => {
 		assert.notEqual(THEMES["ink-noir"].Shell, THEMES["stencil-and-ink"].Shell);
+		// The home page is Ink Noir's own (theme/ink-noir/home/, test/studio/ink-noir-home.test.ts).
+		assert.equal(THEMES["ink-noir"].StudioPage, InkNoirStudioPage);
 		for (const page of [
-			"StudioPage",
 			"ArtistPage",
 			"WorkPage",
 			"FlashPage",
@@ -415,8 +417,11 @@ describe("Ink Noir's pages", () => {
 		}
 	});
 
-	test("frame the very content Stencil & Ink renders: only the shell differs", () => {
-		assert.equal(mainOf(studioHtml(inkNoir())), mainOf(studioHtml(stencil())));
+	test("frame the very content Stencil & Ink renders, except the home page: only the shell differs", () => {
+		assert.notEqual(
+			mainOf(studioHtml(inkNoir())),
+			mainOf(studioHtml(stencil())),
+		);
 		assert.equal(mainOf(artistHtml(inkNoir())), mainOf(artistHtml(stencil())));
 		assert.equal(
 			mainOf(requestHtml(inkNoir())),
@@ -432,7 +437,8 @@ describe("Ink Noir's pages", () => {
 			html,
 			/^<a class="ink-skip" href="#main">Skip to content<\/a><header class="ink-header">/,
 		);
-		assert.match(html, /<main id="main" tabindex="-1" class="page">/);
+		// The home page lays out its own full-width sections (theme/ink-noir/home.css).
+		assert.match(html, /<main id="main" tabindex="-1" class="ink-home">/);
 		assert.match(html, /<nav class="ink-nav" aria-label="Main">/);
 		const button =
 			/<button [^>]*class="ink-menu-button"[^>]*>/.exec(html)?.[0] ?? "";
