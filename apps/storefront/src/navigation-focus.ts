@@ -11,7 +11,7 @@ import type { AnyRouter } from "@tanstack/react-router";
  * (Ink Noir's, `tabIndex={-1}`), else the page's first `<main>`. Without moving the page: the router's own
  * scroll restoration and fragment scrolling stay in charge of that.
  *
- * A new path moves it, and so does a new query (a filtered /work, or a nav
+ * A new path moves it, and so does a new query (a filtered /gallery, or a nav
  * link from one): the content changed and the router reset the scroll. The
  * first load is the browser's, and a change of fragment alone is a jump
  * within the page, which the browser handles. One exception: a link that

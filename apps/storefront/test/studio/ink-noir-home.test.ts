@@ -155,7 +155,7 @@ describe("Ink Noir's home page", () => {
 			} else if (href.startsWith("/")) {
 				assert.match(
 					href,
-					/^\/(request(\?artist=[a-z0-9-]+)?|work(\?style=[a-z0-9-]+)?|artists\/[a-z0-9-]+(#work)?|flash)$/,
+					/^\/(request(\?artist=[a-z0-9-]+)?|gallery(\?style=[a-z0-9-]+)?|artists\/[a-z0-9-]+(#work)?|flash)$/,
 					href,
 				);
 			}
@@ -199,7 +199,7 @@ describe("the first screen", () => {
 		);
 		assert.match(
 			open,
-			/<a class="action ink-action-quiet" href="\/work">Explore the work<\/a>/,
+			/<a class="action ink-action-quiet" href="\/gallery">Explore the work<\/a>/,
 		);
 		const closed = mainOf(html(inkNoir(CLOSED_STUDIO)));
 		assert.ok(!hrefs(closed).includes("/request"), "no general request link");
@@ -227,7 +227,7 @@ describe("the featured work", () => {
 		}
 		assert.match(
 			page,
-			/<a class="ink-link" href="\/work">View full gallery<\/a>/,
+			/<a class="ink-link" href="\/gallery">View full gallery<\/a>/,
 		);
 	});
 
@@ -324,7 +324,7 @@ describe("the artists", () => {
 		assert.doesNotMatch(mainOf(page), /id="artists"|href="#artists"/);
 		assert.match(
 			page,
-			/<a class="action ink-action-quiet" href="\/work">Explore the work<\/a><\/div><\/div><\/div><\/section>/,
+			/<a class="action ink-action-quiet" href="\/gallery">Explore the work<\/a><\/div><\/div><\/div><\/section>/,
 		);
 	});
 });
@@ -340,7 +340,7 @@ describe("the styles index", () => {
 		const page = html(inkNoir(), [SITA, blackwork], 3);
 		assert.match(
 			page,
-			/<h3 class="ink-style-name" dir="auto"><a class="ink-style-link" aria-label="See Fine line work" href="\/work\?style=fine-line">Fine line<\/a><\/h3>/,
+			/<h3 class="ink-style-name" dir="auto"><a class="ink-style-link" aria-label="See Fine line work" href="\/gallery\?style=fine-line">Fine line<\/a><\/h3>/,
 		);
 		assert.match(page, /<h3 class="ink-style-name" dir="auto">Blackwork<\/h3>/);
 		assert.match(page, /By <a href="\/artists\/bina"><bdi>Bina<\/bdi><\/a>/);

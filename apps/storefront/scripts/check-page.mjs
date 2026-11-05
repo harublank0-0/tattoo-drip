@@ -6,7 +6,7 @@
 // the studio's photos from their own origin (MEDIA_URL, apart from the API's
 // as R2's is in production) and none from the API's, the
 // API got one keyed lookup and one keyed artists read per page (the studio
-// page, an artist's page and /work add one gallery read, TAT-126), each with
+// page, an artist's page and /gallery add one gallery read, TAT-126), each with
 // the visitor's address (X-Visitor-IP, TAT-38; /request, TAT-127, reads the
 // lookup and the list alone), a failed
 // read is an error page inside the document (never a not-found, never
@@ -456,27 +456,28 @@ try {
 		`/request?artist=sita read a flash design (${apiLog.map((call) => call.url).join(", ")}).`,
 	);
 
-	// All work (TAT-126): the lookup, the list and the first page of photos.
+	// The gallery (TAT-126; /gallery since Prompt 5): the lookup, the list and
+	// the first page of photos.
 	apiLog.length = 0;
-	page = await get("/work");
+	page = await get("/gallery");
 	expect(
 		page.status === 200 &&
 			page.body.includes(
 				"<title>All work at Canary Ink &lt;Studio&gt;</title>",
 			) &&
 			page.body.includes(
-				`href="http://${SLUG}.localhost:${storefrontPort}/work"`,
+				`href="http://${SLUG}.localhost:${storefrontPort}/gallery"`,
 			),
-		`/work is ${page.status}, or lacks its own title and canonical link.`,
+		`/gallery is ${page.status}, or lacks its own title and canonical link.`,
 	);
 	expect(
 		page.cacheControl ===
 			"public, max-age=0, s-maxage=60, stale-while-revalidate=600",
-		`/work's Cache-Control is "${page.cacheControl}".`,
+		`/gallery's Cache-Control is "${page.cacheControl}".`,
 	);
 	expect(
 		page.body.includes("No photos yet.") && !page.body.includes(CANARY),
-		"/work does not say there are no photos, or shows the server key.",
+		"/gallery does not say there are no photos, or shows the server key.",
 	);
 	expect(
 		apiLog
@@ -488,7 +489,7 @@ try {
 				`/api/v1/tenants/${SLUG}/artists`,
 				`/api/v1/tenants/${SLUG}/work?limit=24`,
 			].join(","),
-		`/work asked the API for ${apiLog.map((call) => call.url).join(", ")} instead of the lookup, the list and the first 24 photos.`,
+		`/gallery asked the API for ${apiLog.map((call) => call.url).join(", ")} instead of the lookup, the list and the first 24 photos.`,
 	);
 
 	// Flash (TAT-129): the lookup, the list and the first page of designs.
@@ -533,21 +534,40 @@ try {
 		`/flash/NOT-A-UUID is ${page.status}, or asked the API for ${apiLog.map((call) => call.url).join(", ")}.`,
 	);
 
-	// The router's own spelling of the address is ours: ?healed=1 is no redirect.
+	// One tattoo's page (Prompt 5): an id that is not a UUID is the not-found
+	// with no call but the lookup.
+	apiLog.length = 0;
+	page = await get("/gallery/NOT-A-UUID");
+	expect(
+		page.status === 404 &&
+			page.body.includes("Page not found") &&
+			apiLog.every((call) => call.url === `/api/v1/tenants/${SLUG}`),
+		`/gallery/NOT-A-UUID is ${page.status}, or asked the API for ${apiLog.map((call) => call.url).join(", ")}.`,
+	);
+
+	// The gallery's old address is a permanent redirect with its query as it was.
 	page = await get("/work?artist=sita&healed=1");
 	expect(
+		page.status === 301 &&
+			JSON.parse(page.headers).location === "/gallery?artist=sita&healed=1",
+		`/work?artist=sita&healed=1 is ${page.status} to ${JSON.parse(page.headers).location}, not a 301 to /gallery with the same query.`,
+	);
+
+	// The router's own spelling of the address is ours: ?healed=1 is no redirect.
+	page = await get("/gallery?artist=sita&healed=1");
+	expect(
 		page.status === 200,
-		`/work?artist=sita&healed=1 is ${page.status}, not 200 (the router redirects an address it spells otherwise).`,
+		`/gallery?artist=sita&healed=1 is ${page.status}, not 200 (the router redirects an address it spells otherwise).`,
 	);
 
 	// The router reads the search as plain strings: an artist whose slug looks
 	// like JSON (true, null, 1e2, 2025) is no redirect and reaches the API as typed.
 	for (const slug of ["true", "false", "null", "1e2", "2025"]) {
 		apiLog.length = 0;
-		page = await get(`/work?artist=${slug}&healed=1`);
+		page = await get(`/gallery?artist=${slug}&healed=1`);
 		expect(
 			page.status === 200,
-			`/work?artist=${slug}&healed=1 is ${page.status}, not 200 (a redirect, or the router read the slug as JSON).`,
+			`/gallery?artist=${slug}&healed=1 is ${page.status}, not 200 (a redirect, or the router read the slug as JSON).`,
 		);
 		expect(
 			apiLog.some(
@@ -555,7 +575,7 @@ try {
 					call.url ===
 					`/api/v1/tenants/${SLUG}/work?artist=${slug}&healed=true&limit=24`,
 			),
-			`/work?artist=${slug}&healed=1 asked the API for ${apiLog.map((call) => call.url).join(", ")}, not for artist ${slug} healed.`,
+			`/gallery?artist=${slug}&healed=1 asked the API for ${apiLog.map((call) => call.url).join(", ")}, not for artist ${slug} healed.`,
 		);
 	}
 	page = await get("/artists/sita?healed=1");
@@ -565,12 +585,12 @@ try {
 	);
 
 	// A cursor the API refuses (a hand-edited link) is the not-found page.
-	page = await get("/work?cursor=bogus");
+	page = await get("/gallery?cursor=bogus");
 	expect(
 		page.status === 404 &&
 			page.body.includes("Page not found") &&
 			page.cacheControl === "public, max-age=0, s-maxage=60",
-		`/work with a cursor the API refuses is ${page.status} (Cache-Control "${page.cacheControl}"), not the cached 404 page.`,
+		`/gallery with a cursor the API refuses is ${page.status} (Cache-Control "${page.cacheControl}"), not the cached 404 page.`,
 	);
 	page = await get("/artists/sita?cursor=bogus");
 	expect(
@@ -722,5 +742,5 @@ if (problems.length > 0) {
 	process.exit(1);
 }
 console.log(
-	"Page check passed: the key is in no page, header or log line; the photos are shown from MEDIA_URL's origin only; one keyed lookup and one artists read per page (the studio page, an artist's page and /work add one gallery read, /flash and an artist's page one flash read), each carrying the visitor's address; a failed read is an uncached error page (a failed gallery read only leaves the photos out), a failed lookup a 503; the deposit page is an uncached, unindexed shell from the lookup alone; the public site key is in the page.",
+	"Page check passed: the key is in no page, header or log line; the photos are shown from MEDIA_URL's origin only; one keyed lookup and one artists read per page (the studio page, an artist's page and /gallery add one gallery read, /flash and an artist's page one flash read), each carrying the visitor's address; a failed read is an uncached error page (a failed gallery read only leaves the photos out), a failed lookup a 503; the deposit page is an uncached, unindexed shell from the lookup alone; the public site key is in the page.",
 );

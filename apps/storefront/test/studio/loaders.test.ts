@@ -1031,7 +1031,7 @@ describe("the All work page's loader (TAT-126)", () => {
 		);
 		assert.deepEqual(data.search, search);
 		assert.equal(data.gallery.photos.length, 3);
-		assert.equal(data.seo.canonical, `${ORIGIN}/work`);
+		assert.equal(data.seo.canonical, `${ORIGIN}/gallery`);
 	});
 
 	test("asks for the next page of the address's cursor", async () => {

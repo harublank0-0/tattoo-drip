@@ -43,6 +43,8 @@ test("the storefront has exactly its routes", () => {
 			"routes/deposit.tsx",
 			"routes/flash/$id.tsx",
 			"routes/flash/index.tsx",
+			"routes/gallery/$photo.tsx",
+			"routes/gallery/index.tsx",
 			"routes/index.tsx",
 			"routes/request.tsx",
 			"routes/work.tsx",

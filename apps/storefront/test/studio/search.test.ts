@@ -137,7 +137,7 @@ describe("stringifyPlainSearch", () => {
 		for (const search of searches) {
 			assert.equal(
 				workHref(search),
-				`/work${stringifyPlainSearch(search)}`,
+				`/gallery${stringifyPlainSearch(search)}`,
 				JSON.stringify(search),
 			);
 		}
@@ -190,7 +190,7 @@ async function visit(url: string) {
 	});
 	const work = createRoute({
 		getParentRoute: () => root,
-		path: "/work",
+		path: "/gallery",
 		validateSearch: readWorkSearch,
 		loaderDeps: ({ search }) => ({ search }),
 		loader: ({ deps }) => {
@@ -257,8 +257,8 @@ describe("a full round trip through the router: parse, validate, write", () => {
 	const SLUGS = ["true", "false", "null", "1e2", "2025", "sita-rai"];
 
 	for (const slug of SLUGS) {
-		test(`/work?artist=${slug} reaches the loader as that slug and is not redirected`, async () => {
-			const result = await visit(`/work?artist=${slug}`);
+		test(`/gallery?artist=${slug} reaches the loader as that slug and is not redirected`, async () => {
+			const result = await visit(`/gallery?artist=${slug}`);
 
 			assert.deepEqual(result.work, { artist: slug });
 			assert.equal(result.redirectedTo, null);
@@ -266,8 +266,8 @@ describe("a full round trip through the router: parse, validate, write", () => {
 		});
 	}
 
-	test("/work with every filter, healed=1 included, is the same address back", async () => {
-		const url = "/work?artist=1e2&style=fine-line&healed=1&cursor=c2_-";
+	test("/gallery with every filter, healed=1 included, is the same address back", async () => {
+		const url = "/gallery?artist=1e2&style=fine-line&healed=1&cursor=c2_-";
 		const result = await visit(url);
 
 		assert.deepEqual(result.work, {
@@ -292,7 +292,7 @@ describe("a full round trip through the router: parse, validate, write", () => {
 	});
 
 	test("a page with no search, and one that carries search no reader knows, is not redirected", async () => {
-		for (const url of ["/", "/work", "/artists/sita", "/?ref=true&x=1e2"]) {
+		for (const url of ["/", "/gallery", "/artists/sita", "/?ref=true&x=1e2"]) {
 			const result = await visit(url);
 
 			assert.equal(result.redirectedTo, null, url);
@@ -380,9 +380,9 @@ describe("a healed value the reader rejects is no filter anywhere", () => {
 	const OFF = ["false", "0", "true", "yes"];
 
 	for (const value of OFF) {
-		test(`/work?healed=${value} asks the API for no healed filter and shows the box unticked`, async () => {
+		test(`/gallery?healed=${value} asks the API for no healed filter and shows the box unticked`, async () => {
 			const { context: ctx, workReads } = context(page());
-			const { work } = await visit(`/work?healed=${value}`);
+			const { work } = await visit(`/gallery?healed=${value}`);
 			const data = await loadWorkPage(ctx, work as WorkSearch);
 			const html = renderToStaticMarkup(createElement(WorkPage, { data }));
 
@@ -394,7 +394,7 @@ describe("a healed value the reader rejects is no filter anywhere", () => {
 				0,
 				"no link carries healed",
 			);
-			assert.ok(hrefsOf(html).includes("/work?cursor=c2"), "Show more");
+			assert.ok(hrefsOf(html).includes("/gallery?cursor=c2"), "Show more");
 		});
 
 		test(`/artists/sita?healed=${value} asks for no healed filter and shows All`, async () => {
@@ -422,15 +422,18 @@ describe("a healed value the reader rejects is no filter anywhere", () => {
 		});
 	}
 
-	test("/work?healed=1 asks for healed photos and says so: the box ticked, the links keep it", async () => {
+	test("/gallery?healed=1 asks for healed photos and says so: the box ticked, the links keep it", async () => {
 		const { context: ctx, workReads } = context(page());
-		const { work } = await visit("/work?healed=1");
+		const { work } = await visit("/gallery?healed=1");
 		const data = await loadWorkPage(ctx, work as WorkSearch);
 		const html = renderToStaticMarkup(createElement(WorkPage, { data }));
 
 		assert.deepEqual(workReads(), [`${WORK}?healed=true&limit=24`]);
 		assert.match(checkboxOf(html), /name="healed"[^>]* checked=""/);
-		assert.ok(hrefsOf(html).includes("/work?healed=1&cursor=c2"), "Show more");
+		assert.ok(
+			hrefsOf(html).includes("/gallery?healed=1&cursor=c2"),
+			"Show more",
+		);
 	});
 
 	test("/artists/sita?healed=1 asks for healed photos and marks Healed", async () => {
@@ -453,7 +456,7 @@ describe("a healed value the reader rejects is no filter anywhere", () => {
 
 	test("a malformed cursor still goes to the API as typed, so it is still the not-found page", async () => {
 		const { context: ctx, workReads } = context(page());
-		const { work } = await visit("/work?cursor=bogus&healed=false");
+		const { work } = await visit("/gallery?cursor=bogus&healed=false");
 		await loadWorkPage(ctx, work as WorkSearch);
 
 		assert.deepEqual(workReads(), [`${WORK}?cursor=bogus&limit=24`]);

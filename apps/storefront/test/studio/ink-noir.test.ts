@@ -27,6 +27,8 @@ import {
 } from "../../src/studio/theme/config.ts";
 import { matchedThemeKey, THEME_HTML } from "../../src/studio/theme/html.ts";
 import { InkNoirArtistPage } from "../../src/studio/theme/ink-noir/artist/artist-page.tsx";
+import { InkNoirArtworkPage } from "../../src/studio/theme/ink-noir/gallery/artwork-page.tsx";
+import { InkNoirGalleryPage } from "../../src/studio/theme/ink-noir/gallery/gallery-page.tsx";
 import { InkNoirStudioPage } from "../../src/studio/theme/ink-noir/home/home-page.tsx";
 import {
 	INK_NOIR_CLASS,
@@ -318,7 +320,7 @@ describe("navItems: the pages a theme's navigation lists", () => {
 			const items = navItems(all, page as ShellPage, true);
 			assert.deepEqual(
 				items.map((item) => item.href),
-				["/", "/artists", "/work", "/flash"],
+				["/", "/artists", "/gallery", "/flash"],
 			);
 			for (const item of items) assert.ok(isAllowedHref(item.href), item.href);
 			assert.deepEqual(
@@ -389,13 +391,14 @@ describe("isRouterClick: which clicks the router takes over", () => {
 });
 
 describe("Ink Noir's pages", () => {
-	test("is registered with its own shell, its own home, directory and artist pages, and the shared pages", () => {
+	test("is registered with its own shell, its own home, directory, artist, gallery and tattoo pages, and the shared pages", () => {
 		assert.notEqual(THEMES["ink-noir"].Shell, THEMES["stencil-and-ink"].Shell);
-		// Ink Noir's own pages (theme/ink-noir/home/, artists/, artist/; their tests are ink-noir-*.test.ts).
+		// Ink Noir's own pages (theme/ink-noir/home/, artists/, artist/, gallery/; their tests are ink-noir-*.test.ts).
 		assert.equal(THEMES["ink-noir"].StudioPage, InkNoirStudioPage);
 		assert.equal(THEMES["ink-noir"].ArtistPage, InkNoirArtistPage);
+		assert.equal(THEMES["ink-noir"].WorkPage, InkNoirGalleryPage);
+		assert.equal(THEMES["ink-noir"].ArtworkPage, InkNoirArtworkPage);
 		for (const page of [
-			"WorkPage",
 			"FlashPage",
 			"FlashDesignPage",
 			"RequestPage",
@@ -441,7 +444,7 @@ describe("Ink Noir's pages", () => {
 			mainOf(requestHtml(inkNoir())),
 			mainOf(requestHtml(stencil())),
 		);
-		assert.equal(mainOf(workHtml(inkNoir())), mainOf(workHtml(stencil())));
+		assert.notEqual(mainOf(workHtml(inkNoir())), mainOf(workHtml(stencil())));
 		assert.equal(mainOf(flashHtml(inkNoir())), mainOf(flashHtml(stencil())));
 	});
 

@@ -11,8 +11,8 @@ const copy = inkNoirHomeCopy.styles;
 /**
  * The styles index: the studio's styles as a list of large names on hairlines,
  * the quiet counterpart to the photo sections around it. A style some newest
- * photo carries links to the gallery filtered by it (`/work?style=<slug>`,
- * which /work already reads) and shows that photo small; each style names the
+ * photo carries links to the gallery filtered by it (`/gallery?style=<slug>`,
+ * which /gallery already reads) and shows that photo small; each style names the
  * artists who list it, linking to their pages. A style only an artist lists
  * has no gallery link (the page knows no slug for it), so its name is text.
  * Nothing when nobody named a style.

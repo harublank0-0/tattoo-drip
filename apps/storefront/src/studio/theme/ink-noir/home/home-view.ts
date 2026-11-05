@@ -41,7 +41,7 @@ export interface HeroImage extends HomePhoto {
 /** A style in the index: its gallery when photos carry it, the artists who list it. */
 export interface StyleEntry {
 	readonly name: string;
-	/** `/work?style=<slug>` when a photo of the newest carries this style, else null. */
+	/** `/gallery?style=<slug>` when a photo of the newest carries this style, else null. */
 	readonly workHref: string | null;
 	/** The newest photo carrying it, as its preview, or null. */
 	readonly photo: GalleryPhotoView | null;

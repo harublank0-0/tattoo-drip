@@ -40,6 +40,8 @@ export const studioCopy = {
 		fallbackAlt: "Tattoo by {name}, photo {n} of {count}",
 		photoOf: "Photo {n} of {count}",
 		close: "Close",
+		/** A tattoo page's photo button (Prompt 5): it opens the viewer. */
+		enlarge: "View full screen",
 		/** The home page's section of the newest photos. */
 		recentTitle: "Recent work",
 		/** The link to the All work page (the home page's Recent work). */
@@ -77,12 +79,34 @@ export const studioCopy = {
 		},
 	},
 	/**
+	 * One tattoo's page (`/gallery/$photo`, Prompt 5): its title when the
+	 * studio wrote no description (from the photo's styles and artist), and
+	 * the idea a "Request a similar tattoo" form starts with.
+	 */
+	artwork: {
+		styleBy: "{style} tattoo by {name}",
+		by: "Tattoo by {name}",
+		style: "{style} tattoo",
+		untitled: "Tattoo",
+		/** The request form's idea, started (editable): a link to the piece, never a claim it can be copied. */
+		similarStart: "Inspired by this piece in your gallery: {url}",
+		/** Stencil & Ink's page (Ink Noir has its own words). */
+		artist: "Artist",
+		styles: "Style",
+		healed: "Photographed healed",
+		inspired: "Inspired by this piece?",
+		similar: "Request a similar tattoo",
+		related: "More work",
+		viewAll: "View all work",
+		back: "Back to the gallery",
+	},
+	/**
 	 * The request page, its buttons and the invitation to it (TAT-127).
 	 * Templates hold {name}, {studio} and {who}.
 	 */
 	/**
 	 * The site navigation of themes that have one (Ink Noir's header, menu and
-	 * footer). Each label names a page that exists: Gallery is /work, Artists
+	 * footer). Each label names a page that exists: Gallery is /gallery, Artists
 	 * the studio page's roster.
 	 */
 	nav: {

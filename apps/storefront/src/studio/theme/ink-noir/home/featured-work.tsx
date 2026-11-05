@@ -13,10 +13,10 @@ const copy = inkNoirHomeCopy.work;
 /**
  * The featured work: the studio's newest photos as a mosaic, the first one
  * large. Each tile is a button that opens the photo in the gallery's own
- * viewer (PhotoDialog and showPhoto, as on /work: the browser's `<dialog>`),
+ * viewer (PhotoDialog and showPhoto, as on Stencil & Ink's gallery: the browser's `<dialog>`),
  * with whose work it is and its styles over the photo's foot: shown on
  * hover and focus where there is a pointer, always on a touch screen, and
- * always part of the button's name. "View full gallery" leads to /work.
+ * always part of the button's name. "View full gallery" leads to /gallery.
  *
  * With no photos it says there are none to show and points to the studio's
  * Instagram when it has one, rather than show anyone else's work. It does

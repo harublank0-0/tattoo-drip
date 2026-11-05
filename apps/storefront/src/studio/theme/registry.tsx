@@ -2,6 +2,7 @@ import type { ComponentProps, ComponentType } from "react";
 import {
 	ArtistPage,
 	ArtistsPage,
+	ArtworkPage,
 	FlashDesignPage,
 	FlashPage,
 	RequestPage,
@@ -12,6 +13,8 @@ import { type Shell, StencilShell } from "../components/shell.tsx";
 import { DEFAULT_THEME_KEY, type ThemeKey } from "./config.ts";
 import { InkNoirArtistPage } from "./ink-noir/artist/artist-page.tsx";
 import { InkNoirArtistsPage } from "./ink-noir/artists/artists-page.tsx";
+import { InkNoirArtworkPage } from "./ink-noir/gallery/artwork-page.tsx";
+import { InkNoirGalleryPage } from "./ink-noir/gallery/gallery-page.tsx";
 import { InkNoirStudioPage } from "./ink-noir/home/home-page.tsx";
 import { InkNoirShell } from "./ink-noir/shell.tsx";
 
@@ -35,6 +38,8 @@ export interface Theme {
 	/** `/artists`, the directory. */
 	readonly ArtistsPage: ComponentType<ComponentProps<typeof ArtistsPage>>;
 	readonly WorkPage: ComponentType<ComponentProps<typeof WorkPage>>;
+	/** `/gallery/$photo`, one tattoo (Prompt 5). */
+	readonly ArtworkPage: ComponentType<ComponentProps<typeof ArtworkPage>>;
 	readonly FlashPage: ComponentType<ComponentProps<typeof FlashPage>>;
 	readonly FlashDesignPage: ComponentType<
 		ComponentProps<typeof FlashDesignPage>
@@ -57,6 +62,7 @@ export const THEMES: Record<ThemeKey, Theme> = {
 		ArtistPage,
 		ArtistsPage,
 		WorkPage,
+		ArtworkPage,
 		FlashPage,
 		FlashDesignPage,
 		RequestPage,
@@ -66,7 +72,8 @@ export const THEMES: Record<ThemeKey, Theme> = {
 		StudioPage: InkNoirStudioPage,
 		ArtistPage: InkNoirArtistPage,
 		ArtistsPage: InkNoirArtistsPage,
-		WorkPage,
+		WorkPage: InkNoirGalleryPage,
+		ArtworkPage: InkNoirArtworkPage,
 		FlashPage,
 		FlashDesignPage,
 		RequestPage,
@@ -98,13 +105,18 @@ export function ThemedArtistsPage(props: ComponentProps<typeof ArtistsPage>) {
 	return <theme.ArtistsPage {...props} Shell={theme.Shell} />;
 }
 
-/** `/work` in the studio's theme. */
+/** `/gallery` in the studio's theme. */
 export function ThemedWorkPage(props: ComponentProps<typeof WorkPage>) {
 	const theme = themeFor(props.data.theme.key);
 	return <theme.WorkPage {...props} Shell={theme.Shell} />;
 }
 
 /** `/flash` in the studio's theme (TAT-129). */
+export function ThemedArtworkPage(props: ComponentProps<typeof ArtworkPage>) {
+	const theme = themeFor(props.data.theme.key);
+	return <theme.ArtworkPage {...props} Shell={theme.Shell} />;
+}
+
 export function ThemedFlashPage(props: ComponentProps<typeof FlashPage>) {
 	const theme = themeFor(props.data.theme.key);
 	return <theme.FlashPage {...props} Shell={theme.Shell} />;
