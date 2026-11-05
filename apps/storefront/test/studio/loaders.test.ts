@@ -7,6 +7,7 @@ import {
 	createApiContext,
 	seedStudio,
 } from "../../src/api/context.ts";
+import { PageReadError } from "../../src/api/loaders.ts";
 import { SiteRef } from "../../src/site/context.ts";
 import { EMPTY_GALLERY, galleryView } from "../../src/studio/gallery.ts";
 import {
@@ -478,7 +479,7 @@ describe("loadStudioPage", () => {
 			await assert.rejects(
 				loadStudioPage(pageContext(fetch, STUDIO, IMAGE_ORIGIN)),
 				(error: unknown) =>
-					error instanceof TattooApiError && !isNotFound(error),
+					error instanceof PageReadError && !isNotFound(error),
 			);
 		});
 	});
@@ -561,7 +562,7 @@ describe("loadStudioPage", () => {
 			await assert.rejects(
 				loadStudioPage(pageContext(fetch)),
 				(error: unknown) =>
-					error instanceof TattooApiError && !isNotFound(error),
+					error instanceof PageReadError && !isNotFound(error),
 			);
 		}
 	});
@@ -1120,7 +1121,7 @@ describe("the All work page's loader (TAT-126)", () => {
 			await assert.rejects(
 				loadWorkPage(pageContext(fetch), {}),
 				(error: unknown) =>
-					error instanceof TattooApiError && !isNotFound(error),
+					error instanceof PageReadError && !isNotFound(error),
 			);
 		}
 	});
@@ -1268,7 +1269,7 @@ describe("loadRequestPage (TAT-127)", () => {
 		);
 		await assert.rejects(
 			loadRequestPage(pageContext(fetch), { artist: "sita" }),
-			(error: unknown) => error instanceof TattooApiError && !isNotFound(error),
+			(error: unknown) => error instanceof PageReadError && !isNotFound(error),
 		);
 
 		const missing = fakeFetch(() => json(404, NOT_FOUND));
@@ -1463,7 +1464,7 @@ describe("the flash page's loader (TAT-129)", () => {
 			await assert.rejects(
 				loadFlashPage(pageContext(read(respond)), {}),
 				(error: unknown) =>
-					error instanceof TattooApiError && !isNotFound(error),
+					error instanceof PageReadError && !isNotFound(error),
 			);
 		}
 	});

@@ -11,7 +11,11 @@ import {
 	hydrateApi,
 	seedStudio,
 } from "../../src/api/context.ts";
-import { loadStudio, rethrowAsNotFound } from "../../src/api/loaders.ts";
+import {
+	loadStudio,
+	PageReadError,
+	rethrowAsNotFound,
+} from "../../src/api/loaders.ts";
 import { fakeFetch, json, studioOf } from "../tenancy/helpers.ts";
 
 const API = "http://api.test";
@@ -84,7 +88,7 @@ describe("loadStudio", () => {
 			await assert.rejects(
 				loadStudio(serverApi(fetch)),
 				(error: unknown) =>
-					error instanceof TattooApiError && !isNotFound(error),
+					error instanceof PageReadError && !isNotFound(error),
 			);
 			assert.equal(calls.length, 1);
 		}
@@ -120,20 +124,38 @@ describe("loadStudio in the browser", () => {
 });
 
 describe("rethrowAsNotFound", () => {
-	test("rethrows anything else as it is", () => {
+	test("anything else is a PageReadError that carries nothing of the cause; the log keeps the status and code (Prompt 8)", (t) => {
+		const log = t.mock.method(console, "error", () => {});
 		const bug = new TypeError("x is undefined");
 		assert.throws(
 			() => rethrowAsNotFound(bug),
-			(error: unknown) => error === bug,
+			(error: unknown) =>
+				error instanceof PageReadError &&
+				error.message === "The page could not be loaded.",
 		);
 
-		const conflict = new TattooApiError(409, {
-			code: "deposit_changed",
-			message: "Changed.",
+		const conflict = new TattooApiError(502, {
+			code: "bad_gateway",
+			message: "db timeout at pg://secret-host:5432",
 		});
 		assert.throws(
-			() => rethrowAsNotFound(conflict),
-			(error: unknown) => error === conflict,
+			() => rethrowAsNotFound(conflict, "black-needle"),
+			(error: unknown) =>
+				error instanceof PageReadError &&
+				!String(error.message).includes("secret-host"),
+		);
+		assert.deepEqual(log.mock.calls.at(-1)?.arguments, [
+			"Page read failed",
+			{ slug: "black-needle", status: 502, code: "bad_gateway" },
+		]);
+		// A bug keeps its name and stack for the log, never in the page.
+		const first = log.mock.calls[0]?.arguments[1] as Record<string, unknown>;
+		assert.equal(first.error, "TypeError");
+		assert.match(String(first.stack), /TypeError: x is undefined/);
+		assert.ok(
+			!JSON.stringify(log.mock.calls.map((call) => call.arguments)).includes(
+				"secret-host",
+			),
 		);
 	});
 });

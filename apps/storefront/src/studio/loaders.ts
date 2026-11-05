@@ -89,6 +89,7 @@ import {
 	studioPageSeo,
 	workPageSeo,
 } from "./seo.ts";
+import { sitemapPaths } from "./sitemap.ts";
 import { parseThemeConfig, type ThemeConfig } from "./theme/config.ts";
 import { storefrontInput } from "./theme/source.ts";
 import {
@@ -1037,6 +1038,19 @@ export async function loadInfoPage(
 }
 
 /**
+ * The sitemap's paths (Prompt 8): the studio (from the cache) and its
+ * artists, the reads every page makes. A failed read is thrown, so the route
+ * answers an error, never a sitemap missing pages.
+ */
+export async function loadSitemapPaths(context: ApiContext): Promise<string[]> {
+	const [studio, artists] = await Promise.all([
+		loadStudio(context),
+		loadArtists(context),
+	]);
+	return sitemapPaths(studio, artists, context.tattoo.connection.mediaUrl);
+}
+
+/**
  * `/flash` (TAT-129): the studio, its artists and the first page of flash
  * with the address's filter. The API refusing the address (a hand-edited
  * cursor is a 422 `validation_failed`) or not knowing the read (a 404) is the
@@ -1307,7 +1321,7 @@ async function loadFlash(
 		) {
 			throw notFound();
 		}
-		return rethrowAsNotFound(error);
+		return rethrowAsNotFound(error, tattoo.connection.tenant);
 	}
 }
 
@@ -1321,7 +1335,7 @@ async function loadWorkPhoto(
 			staleTime: "static",
 		});
 	} catch (error) {
-		return rethrowAsNotFound(error);
+		return rethrowAsNotFound(error, tattoo.connection.tenant);
 	}
 }
 
@@ -1354,7 +1368,7 @@ async function loadFlashDesign(
 			staleTime: "static",
 		});
 	} catch (error) {
-		return rethrowAsNotFound(error);
+		return rethrowAsNotFound(error, tattoo.connection.tenant);
 	}
 }
 
@@ -1395,7 +1409,7 @@ async function loadWork(
 		) {
 			throw notFound();
 		}
-		return rethrowAsNotFound(error);
+		return rethrowAsNotFound(error, tattoo.connection.tenant);
 	}
 }
 
@@ -1409,7 +1423,7 @@ async function loadArtists({
 			staleTime: "static",
 		});
 	} catch (error) {
-		return rethrowAsNotFound(error);
+		return rethrowAsNotFound(error, tattoo.connection.tenant);
 	}
 }
 

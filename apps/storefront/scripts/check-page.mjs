@@ -464,6 +464,29 @@ try {
 		`/book?artist=sita read a flash design (${apiLog.map((call) => call.url).join(", ")}).`,
 	);
 
+	// The studio's sitemap and robots.txt (Prompt 8): on its own origin, cached
+	// like a page, never a deposit page.
+	page = await get("/sitemap.xml");
+	expect(
+		page.status === 200 &&
+			JSON.parse(page.headers)["content-type"]?.startsWith("application/xml") &&
+			page.body.includes(
+				`<loc>http://${SLUG}.localhost:${storefrontPort}/</loc>`,
+			) &&
+			!page.body.includes("/deposit") &&
+			page.cacheControl ===
+				"public, max-age=0, s-maxage=60, stale-while-revalidate=600",
+		`/sitemap.xml is ${page.status} (Cache-Control "${page.cacheControl}"), or lacks the studio's own page on its origin.`,
+	);
+	page = await get("/robots.txt");
+	expect(
+		page.status === 200 &&
+			page.body.includes(
+				`Sitemap: http://${SLUG}.localhost:${storefrontPort}/sitemap.xml`,
+			),
+		`/robots.txt is ${page.status}, or does not name the studio's sitemap.`,
+	);
+
 	// The gallery (TAT-126; /gallery since Prompt 5): the lookup, the list and
 	// the first page of photos.
 	apiLog.length = 0;
@@ -668,9 +691,9 @@ try {
 	}
 
 	// The studio is known but the artists read fails: an error page inside the
-	// document, never a not-found, never stored. (The router's state carries the
-	// failed match's error message, which is the API's public envelope text, so
-	// only the key is checked here, not that text.)
+	// document, never a not-found, never stored. The router's state carries the
+	// failed match's error, which is a fixed sentence (PageReadError, Prompt 8),
+	// never the API's message; the log says what failed.
 	mode = "artists-5xx";
 	page = await get();
 	expect(
@@ -684,8 +707,14 @@ try {
 		"A failed artists read is not an error page inside the document.",
 	);
 	expect(
-		!page.body.includes(CANARY) && !page.headers.includes(CANARY),
-		"A failed artists read shows the server key.",
+		!page.body.includes(CANARY) &&
+			!page.headers.includes(CANARY) &&
+			!page.body.includes(API_DETAIL),
+		"A failed artists read shows the server key or the API's error message.",
+	);
+	expect(
+		/Page read failed/.test(output),
+		"A failed artists read left no log line.",
 	);
 
 	// The photos fail but the studio and the artists do not: the page stands,
