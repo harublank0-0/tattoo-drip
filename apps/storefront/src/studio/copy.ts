@@ -78,6 +78,29 @@ export const studioCopy = {
 	 * The request page, its buttons and the invitation to it (TAT-127).
 	 * Templates hold {name}, {studio} and {who}.
 	 */
+	/**
+	 * The site navigation of themes that have one (Ink Noir's header, menu and
+	 * footer). Each label names a page that exists: Gallery is /work, Artists
+	 * the studio page's roster.
+	 */
+	nav: {
+		label: "Main",
+		footerLabel: "Site",
+		home: "Home",
+		artists: "Artists",
+		gallery: "Gallery",
+		flash: "Flash",
+		menu: "Menu",
+		skip: "Skip to content",
+		/** The header's and footer's Request button, when it asks the studio (an artist's page names them: `request.barArtist`). */
+		requestSession: "Request a session",
+		explore: "Explore",
+		contact: "Contact",
+		visit: "Visit",
+		hours: "Hours",
+		follow: "Follow",
+		credit: "Studio page by Tattoo Drip",
+	},
 	request: {
 		/** The header's button, and on an artist's page the one that names them. */
 		bar: "Request",

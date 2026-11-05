@@ -1,6 +1,7 @@
 import type { Artist, Studio } from "@tattoo-drip/sdk";
 import { fill } from "../intake/template.ts";
 import { studioCopy } from "./copy.ts";
+import { type HoursLine, hoursLines, readWeek } from "./hours.ts";
 import {
 	isEmail,
 	isPhone,
@@ -63,6 +64,8 @@ export interface StudioView {
 	readonly links: readonly ContactLink[];
 	/** The social links' https URLs, in the API's order (JSON-LD `sameAs`). */
 	readonly socialUrls: readonly string[];
+	/** The weekly opening hours as Good to know lists them (TAT-128), for a theme's footer; [] when no day is open. */
+	readonly hours: readonly HoursLine[];
 }
 
 export interface ArtistPhoto {
@@ -191,6 +194,7 @@ export function studioViewModel(studio: Studio): StudioView {
 		location: locationLine(addressText),
 		links,
 		socialUrls: social.map((link) => link.href),
+		hours: hoursLines(readWeek(studio.openingHours)),
 	};
 }
 

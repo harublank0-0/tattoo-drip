@@ -7,7 +7,9 @@ import {
 	StudioPage,
 	WorkPage,
 } from "../components/pages.tsx";
+import { type Shell, StencilShell } from "../components/shell.tsx";
 import { DEFAULT_THEME_KEY, type ThemeKey } from "./config.ts";
+import { InkNoirShell } from "./ink-noir/shell.tsx";
 
 /**
  * A theme (TAT-54): the studio page's pages as React components of this
@@ -15,8 +17,15 @@ import { DEFAULT_THEME_KEY, type ThemeKey } from "./config.ts";
  * markup. Every theme renders the inquiry section as it is (the invitation
  * to /request on the studio page, InquirySection with the intake form on
  * /request), and never the deposit page.
+ *
+ * `Shell` is what the theme puts around every page (header, footer, chat
+ * button; components/shell.tsx). A theme that only frames the shared pages
+ * differently, like Ink Noir, lists the shared page components and its own
+ * shell; one that lays a page out differently gives its own component for it.
+ * Data, links and booking stay the same whichever is picked.
  */
 export interface Theme {
+	readonly Shell: Shell;
 	readonly StudioPage: ComponentType<ComponentProps<typeof StudioPage>>;
 	readonly ArtistPage: ComponentType<ComponentProps<typeof ArtistPage>>;
 	readonly WorkPage: ComponentType<ComponentProps<typeof WorkPage>>;
@@ -27,9 +36,24 @@ export interface Theme {
 	readonly RequestPage: ComponentType<ComponentProps<typeof RequestPage>>;
 }
 
-/** Every theme, by key. Stencil & Ink is the page TAT-97 and TAT-105 built. */
+/**
+ * Every theme, by key. Stencil & Ink is the page TAT-97 and TAT-105 built;
+ * Ink Noir (theme/ink-noir/) is the same pages in its own dark shell, with a
+ * site navigation and a full footer. Its colours come from the `<html>`
+ * class the root route sets (theme/html.ts), not from here.
+ */
 export const THEMES: Record<ThemeKey, Theme> = {
 	"stencil-and-ink": {
+		Shell: StencilShell,
+		StudioPage,
+		ArtistPage,
+		WorkPage,
+		FlashPage,
+		FlashDesignPage,
+		RequestPage,
+	},
+	"ink-noir": {
+		Shell: InkNoirShell,
 		StudioPage,
 		ArtistPage,
 		WorkPage,
@@ -48,38 +72,38 @@ export function themeFor(key: string): Theme {
 
 /** `/` in the studio's theme. */
 export function ThemedStudioPage(props: ComponentProps<typeof StudioPage>) {
-	const Page = themeFor(props.data.theme.key).StudioPage;
-	return <Page {...props} />;
+	const theme = themeFor(props.data.theme.key);
+	return <theme.StudioPage {...props} Shell={theme.Shell} />;
 }
 
 /** `/artists/$slug` in the studio's theme. */
 export function ThemedArtistPage(props: ComponentProps<typeof ArtistPage>) {
-	const Page = themeFor(props.data.theme.key).ArtistPage;
-	return <Page {...props} />;
+	const theme = themeFor(props.data.theme.key);
+	return <theme.ArtistPage {...props} Shell={theme.Shell} />;
 }
 
 /** `/work` in the studio's theme. */
 export function ThemedWorkPage(props: ComponentProps<typeof WorkPage>) {
-	const Page = themeFor(props.data.theme.key).WorkPage;
-	return <Page {...props} />;
+	const theme = themeFor(props.data.theme.key);
+	return <theme.WorkPage {...props} Shell={theme.Shell} />;
 }
 
 /** `/flash` in the studio's theme (TAT-129). */
 export function ThemedFlashPage(props: ComponentProps<typeof FlashPage>) {
-	const Page = themeFor(props.data.theme.key).FlashPage;
-	return <Page {...props} />;
+	const theme = themeFor(props.data.theme.key);
+	return <theme.FlashPage {...props} Shell={theme.Shell} />;
 }
 
 /** `/flash/$id` in the studio's theme (TAT-129). */
 export function ThemedFlashDesignPage(
 	props: ComponentProps<typeof FlashDesignPage>,
 ) {
-	const Page = themeFor(props.data.theme.key).FlashDesignPage;
-	return <Page {...props} />;
+	const theme = themeFor(props.data.theme.key);
+	return <theme.FlashDesignPage {...props} Shell={theme.Shell} />;
 }
 
 /** `/request` in the studio's theme. */
 export function ThemedRequestPage(props: ComponentProps<typeof RequestPage>) {
-	const Page = themeFor(props.data.theme.key).RequestPage;
-	return <Page {...props} />;
+	const theme = themeFor(props.data.theme.key);
+	return <theme.RequestPage {...props} Shell={theme.Shell} />;
 }

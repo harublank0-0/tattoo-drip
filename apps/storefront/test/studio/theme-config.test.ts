@@ -12,6 +12,7 @@ import {
 	readSections,
 	readThemeKey,
 	SECTION_KEYS,
+	studioThemeKey,
 	THEME_KEYS,
 	THEME_SECTIONS,
 } from "../../src/studio/theme/config.ts";
@@ -47,8 +48,9 @@ const WRONG_TYPES = [
 
 describe("readThemeKey (TAT-54)", () => {
 	test("a theme this app has is kept", () => {
-		assert.deepEqual(THEME_KEYS, ["stencil-and-ink"]);
+		assert.deepEqual(THEME_KEYS, ["stencil-and-ink", "ink-noir"]);
 		assert.equal(readThemeKey("stencil-and-ink"), "stencil-and-ink");
+		assert.equal(readThemeKey("ink-noir"), "ink-noir");
 	});
 
 	test("anything else is the default theme", () => {
@@ -60,8 +62,42 @@ describe("readThemeKey (TAT-54)", () => {
 			"Stencil-and-ink",
 			" stencil-and-ink",
 			"stencil-and-ink ",
+			"Ink-Noir",
+			"ink noir",
+			"inknoir",
+			"ink-noir\u0000",
 		]) {
 			assert.equal(readThemeKey(value), "stencil-and-ink", String(value));
+		}
+	});
+});
+
+describe("studioThemeKey: the theme the root reads before any page parses the rest", () => {
+	test("reads the API studio's storefront.theme, own properties only", () => {
+		assert.equal(
+			studioThemeKey({ storefront: { theme: "ink-noir" } }),
+			"ink-noir",
+		);
+		assert.equal(
+			studioThemeKey({ storefront: { theme: "stencil-and-ink" } }),
+			"stencil-and-ink",
+		);
+		const inherited = Object.create({ theme: "ink-noir" });
+		assert.equal(studioThemeKey({ storefront: inherited }), "stencil-and-ink");
+	});
+
+	test("no studio, no configuration or an unknown theme is the default", () => {
+		for (const value of [
+			undefined,
+			null,
+			"ink-noir",
+			{},
+			{ storefront: null },
+			{ storefront: "ink-noir" },
+			{ storefront: { theme: "classic" } },
+			{ storefront: { theme: ["ink-noir"] } },
+		]) {
+			assert.equal(studioThemeKey(value), "stencil-and-ink", String(value));
 		}
 	});
 });
@@ -103,6 +139,11 @@ describe("readSections (TAT-54)", () => {
 			order: ["work", "artists", "flash", "info", "inquiry"],
 			required: ["inquiry"],
 		});
+		// A theme changes how the page looks, not what it holds.
+		assert.deepEqual(
+			THEME_SECTIONS["ink-noir"],
+			THEME_SECTIONS["stencil-and-ink"],
+		);
 		assert.deepEqual(readSections(undefined, "stencil-and-ink"), [
 			"work",
 			"artists",

@@ -631,11 +631,13 @@ export interface components {
          */
         StorefrontConfiguration: {
             /**
-             * @description The studio's theme. More will come: treat an unknown value as
-             *     `stencil-and-ink`.
+             * @description The studio's theme: `stencil-and-ink` (paper, ink and a violet
+             *     stencil line) or `ink-noir` (dark and photo-first, with a site
+             *     navigation and a full footer). More will come: treat an unknown
+             *     value as `stencil-and-ink`.
              * @enum {string}
              */
-            theme: "stencil-and-ink";
+            theme: "stencil-and-ink" | "ink-noir";
             branding: {
                 /**
                  * @description The studio's logo, or null. `alt` is always null (it sits

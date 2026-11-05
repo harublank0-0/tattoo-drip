@@ -1,5 +1,7 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
+/* Ink Noir's tokens and shell, all under `<html class="theme-ink-noir">` (src/studio/theme/html.ts). */
+@import './studio/theme/ink-noir/styles.css';
 @plugin '@tailwindcss/typography';
 
 /*
@@ -39,8 +41,6 @@
   src: url('./assets/fonts/eczar/eczar-devanagari-700-normal.woff2') format('woff2');
   unicode-range: U+0900-097F, U+1CD0-1CF9, U+200C-200D, U+20A8, U+20B9, U+20F0, U+25CC, U+A830-A839, U+A8E0-A8FF, U+11B00-11B09;
 }
-
-@custom-variant dark (@media (prefers-color-scheme: dark));
 
 /*
  * The studio page's palette (TAT-48): stencil paper, tattoo ink, and the
@@ -136,6 +136,20 @@
     --line: #342d27;
     --line-strong: #6d645c;
     --destructive: #f2b8b5;
+  }
+}
+
+/*
+ * Tailwind's `dark:` (the shadcn components use it): the device's dark scheme,
+ * and a theme that is always dark (Ink Noir). After the dark block above:
+ * the tests find that block as the file's first dark media query.
+ */
+@custom-variant dark {
+  @media (prefers-color-scheme: dark) {
+    @slot;
+  }
+  &:where(.theme-ink-noir, .theme-ink-noir *) {
+    @slot;
   }
 }
 

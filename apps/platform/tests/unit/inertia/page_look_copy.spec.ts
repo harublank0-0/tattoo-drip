@@ -442,6 +442,12 @@ test.group("page look words (TAT-56)", () => {
 				description:
 					"Paper, black ink and a violet stencil line. Made for phones.",
 			},
+			{
+				key: "ink-noir",
+				label: "Ink Noir",
+				description:
+					"Dark and photo-first, with a menu of your pages and a full footer.",
+			},
 		]);
 		assert.deepEqual(FONTS, [
 			{ key: "eczar", label: "Eczar (the stencil look)" },

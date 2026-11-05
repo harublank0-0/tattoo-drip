@@ -3,6 +3,7 @@ import {
 	createRootRouteWithContext,
 	HeadContent,
 	Scripts,
+	useMatches,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TattooProvider } from "@tattoo-drip/react";
@@ -14,6 +15,7 @@ import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import type { SiteContext } from "../site/context.ts";
 import { studioIconLinks } from "../studio/icon.ts";
 import { rootMeta } from "../studio/seo.ts";
+import { matchedThemeKey, THEME_HTML } from "../studio/theme/html.ts";
 import appCss from "../styles.css?url";
 
 export const Route = createRootRouteWithContext<ApiContext & SiteContext>()({
@@ -64,22 +66,23 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 	// @tattoo-drip/react hooks. The QueryClientProvider around the whole
 	// router comes from setupRouterSsrQueryIntegration (src/router.tsx).
 	const { tattoo } = Route.useRouteContext();
+	// The studio's theme sets the page's colours on <html> (src/studio/theme/html.ts):
+	// read from this request's matches, so the server and the browser agree.
+	const html = THEME_HTML[useMatches({ select: matchedThemeKey })];
 
 	return (
-		<html lang="en">
+		<html lang="en" className={html.className ?? undefined}>
 			<head>
 				<HeadContent />
-				{/* The router's head keeps one meta per name, so the two theme colours are written here. */}
-				<meta
-					name="theme-color"
-					content="#f7f3ee"
-					media="(prefers-color-scheme: light)"
-				/>
-				<meta
-					name="theme-color"
-					content="#14110f"
-					media="(prefers-color-scheme: dark)"
-				/>
+				{/* The router's head keeps one meta per name, so the theme's colours are written here. */}
+				{html.themeColors.map((color) => (
+					<meta
+						key={color.media ?? "all"}
+						name="theme-color"
+						content={color.content}
+						media={color.media}
+					/>
+				))}
 			</head>
 			<body>
 				<TattooProvider client={tattoo.client}>
