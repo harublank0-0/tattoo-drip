@@ -79,10 +79,13 @@ function LinkList({
 export function InkNoirFooter({
 	studio,
 	items,
+	more = [],
 	requestLink,
 }: {
 	studio: StudioView;
 	items: readonly NavItem[];
+	/** The further pages: FAQ, Policies, Aftercare (Prompt 7). */
+	more?: readonly NavItem[];
 	requestLink: RequestLink | null;
 }) {
 	const { chat, follow, address } = contactGroups(studio);
@@ -107,6 +110,17 @@ export function InkNoirFooter({
 						</h2>
 						<NavList items={items} className="ink-footer-links" />
 					</nav>
+					{more.length > 0 ? (
+						<nav
+							className="ink-footer-column"
+							aria-labelledby="ink-footer-more"
+						>
+							<h2 className="ink-footer-heading" id="ink-footer-more">
+								{studioCopy.nav.more}
+							</h2>
+							<NavList items={more} className="ink-footer-links" />
+						</nav>
+					) : null}
 					{chat.length > 0 ? (
 						<Column id="ink-footer-contact" title={studioCopy.nav.contact}>
 							<LinkList links={chat} icons />

@@ -13,7 +13,11 @@ import {
 	studioPageData,
 	workPageData,
 } from "../../src/studio/loaders.ts";
-import { navItems, type ShellPage } from "../../src/studio/nav.ts";
+import {
+	moreNavItems,
+	navItems,
+	type ShellPage,
+} from "../../src/studio/nav.ts";
 import {
 	accentTokens,
 	brandingCss,
@@ -316,6 +320,12 @@ describe("navItems: the pages a theme's navigation lists", () => {
 			flash: ["Flash=page"],
 			"flash-design": ["Flash=true"],
 			request: [],
+			about: [],
+			services: [],
+			faq: [],
+			contact: [],
+			policies: [],
+			aftercare: [],
 		};
 		for (const [page, current] of Object.entries(expected)) {
 			const items = navItems(all, page as ShellPage, true);
@@ -347,6 +357,92 @@ describe("navItems: the pages a theme's navigation lists", () => {
 		assert.deepEqual(
 			navItems(all, "home", false).map((item) => item.key),
 			["home", "gallery", "flash"],
+		);
+	});
+});
+describe("the informational pages in the navigation (Prompt 7)", () => {
+	const all = [...SECTION_KEYS];
+	const pages = {
+		about: true,
+		takingWork: true,
+		policies: true,
+		aftercare: true,
+		contact: true,
+	};
+
+	test("Services, About and Contact join the main links, each marking its own page", () => {
+		const items = navItems(all, "services", true, pages);
+		assert.deepEqual(
+			items.map((item) => item.href),
+			[
+				"/",
+				"/artists",
+				"/gallery",
+				"/flash",
+				"/services",
+				"/about",
+				"/contact",
+			],
+		);
+		assert.deepEqual(
+			items.filter((item) => item.current).map((item) => item.key),
+			["services"],
+		);
+		// No artist: no Services; nothing to reach the studio by: no Contact.
+		assert.deepEqual(
+			navItems(all, "home", false, { ...pages, contact: false }).map(
+				(item) => item.href,
+			),
+			["/", "/gallery", "/flash", "/about"],
+		);
+	});
+
+	test("no link leads to a not-found: About needs words or an artist, Services something to offer (review fix)", () => {
+		const hrefs = (
+			over: Partial<typeof pages>,
+			artists = true,
+			sections = all,
+		) =>
+			navItems(sections, "home", artists, { ...pages, ...over }).map(
+				(item) => item.href,
+			);
+		assert.ok(!hrefs({ about: false }, false).includes("/about"));
+		assert.ok(hrefs({ about: false }, true).includes("/about"));
+		// Closed and no flash: nothing to offer.
+		assert.ok(
+			!hrefs(
+				{ takingWork: false },
+				true,
+				all.filter((key) => key !== "flash"),
+			).includes("/services"),
+		);
+		assert.ok(hrefs({ takingWork: false }, true).includes("/services"));
+	});
+
+	test("the footer lists the FAQ always, Policies and Aftercare only with content and Good to know shown", () => {
+		assert.deepEqual(
+			moreNavItems(all, "faq", pages).map((item) => [item.href, item.current]),
+			[
+				["/faq", "page"],
+				["/policies", undefined],
+				["/aftercare", undefined],
+			],
+		);
+		assert.deepEqual(
+			moreNavItems(
+				all.filter((key) => key !== "info"),
+				"home",
+				pages,
+			).map((item) => item.href),
+			["/faq"],
+		);
+		assert.deepEqual(
+			moreNavItems(all, "home", {
+				...pages,
+				policies: false,
+				aftercare: false,
+			}).map((item) => item.href),
+			["/faq"],
 		);
 	});
 });

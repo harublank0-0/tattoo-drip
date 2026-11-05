@@ -112,6 +112,13 @@ export function workHref(search: WorkSearch): string {
 	])}`;
 }
 
+/** One of the studio's informational pages (Prompt 7). */
+export function infoHref(
+	page: "about" | "services" | "faq" | "contact" | "policies" | "aftercare",
+): string {
+	return `/${page}`;
+}
+
 /** One gallery photo's own page; `id` is a checked lowercase UUID (readPhotoId). */
 export function galleryPhotoHref(id: string): string {
 	return `/gallery/${encodeURIComponent(id)}`;

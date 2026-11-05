@@ -10,9 +10,15 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AboutRouteImport } from './routes/about'
+import { Route as AftercareRouteImport } from './routes/aftercare'
 import { Route as BookRouteImport } from './routes/book'
+import { Route as ContactRouteImport } from './routes/contact'
 import { Route as DepositRouteImport } from './routes/deposit'
+import { Route as FaqRouteImport } from './routes/faq'
+import { Route as PoliciesRouteImport } from './routes/policies'
 import { Route as RequestRouteImport } from './routes/request'
+import { Route as ServicesRouteImport } from './routes/services'
 import { Route as WorkRouteImport } from './routes/work'
 import { Route as ArtistsIndexRouteImport } from './routes/artists/index'
 import { Route as ArtistsSlugRouteImport } from './routes/artists/$slug'
@@ -26,9 +32,24 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AftercareRoute = AftercareRouteImport.update({
+  id: '/aftercare',
+  path: '/aftercare',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BookRoute = BookRouteImport.update({
   id: '/book',
   path: '/book',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DepositRoute = DepositRouteImport.update({
@@ -36,9 +57,24 @@ const DepositRoute = DepositRouteImport.update({
   path: '/deposit',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FaqRoute = FaqRouteImport.update({
+  id: '/faq',
+  path: '/faq',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PoliciesRoute = PoliciesRouteImport.update({
+  id: '/policies',
+  path: '/policies',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RequestRoute = RequestRouteImport.update({
   id: '/request',
   path: '/request',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ServicesRoute = ServicesRouteImport.update({
+  id: '/services',
+  path: '/services',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WorkRoute = WorkRouteImport.update({
@@ -79,9 +115,15 @@ const GalleryPhotoRoute = GalleryPhotoRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/aftercare': typeof AftercareRoute
   '/book': typeof BookRoute
+  '/contact': typeof ContactRoute
   '/deposit': typeof DepositRoute
+  '/faq': typeof FaqRoute
+  '/policies': typeof PoliciesRoute
   '/request': typeof RequestRoute
+  '/services': typeof ServicesRoute
   '/work': typeof WorkRoute
   '/artists/$slug': typeof ArtistsSlugRoute
   '/flash/$id': typeof FlashIdRoute
@@ -92,9 +134,15 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/aftercare': typeof AftercareRoute
   '/book': typeof BookRoute
+  '/contact': typeof ContactRoute
   '/deposit': typeof DepositRoute
+  '/faq': typeof FaqRoute
+  '/policies': typeof PoliciesRoute
   '/request': typeof RequestRoute
+  '/services': typeof ServicesRoute
   '/work': typeof WorkRoute
   '/artists/$slug': typeof ArtistsSlugRoute
   '/flash/$id': typeof FlashIdRoute
@@ -106,9 +154,15 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/aftercare': typeof AftercareRoute
   '/book': typeof BookRoute
+  '/contact': typeof ContactRoute
   '/deposit': typeof DepositRoute
+  '/faq': typeof FaqRoute
+  '/policies': typeof PoliciesRoute
   '/request': typeof RequestRoute
+  '/services': typeof ServicesRoute
   '/work': typeof WorkRoute
   '/artists/$slug': typeof ArtistsSlugRoute
   '/flash/$id': typeof FlashIdRoute
@@ -121,9 +175,15 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/about'
+    | '/aftercare'
     | '/book'
+    | '/contact'
     | '/deposit'
+    | '/faq'
+    | '/policies'
     | '/request'
+    | '/services'
     | '/work'
     | '/artists/$slug'
     | '/flash/$id'
@@ -134,9 +194,15 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/about'
+    | '/aftercare'
     | '/book'
+    | '/contact'
     | '/deposit'
+    | '/faq'
+    | '/policies'
     | '/request'
+    | '/services'
     | '/work'
     | '/artists/$slug'
     | '/flash/$id'
@@ -147,9 +213,15 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/about'
+    | '/aftercare'
     | '/book'
+    | '/contact'
     | '/deposit'
+    | '/faq'
+    | '/policies'
     | '/request'
+    | '/services'
     | '/work'
     | '/artists/$slug'
     | '/flash/$id'
@@ -161,9 +233,15 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AboutRoute: typeof AboutRoute
+  AftercareRoute: typeof AftercareRoute
   BookRoute: typeof BookRoute
+  ContactRoute: typeof ContactRoute
   DepositRoute: typeof DepositRoute
+  FaqRoute: typeof FaqRoute
+  PoliciesRoute: typeof PoliciesRoute
   RequestRoute: typeof RequestRoute
+  ServicesRoute: typeof ServicesRoute
   WorkRoute: typeof WorkRoute
   ArtistsSlugRoute: typeof ArtistsSlugRoute
   FlashIdRoute: typeof FlashIdRoute
@@ -182,11 +260,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/aftercare': {
+      id: '/aftercare'
+      path: '/aftercare'
+      fullPath: '/aftercare'
+      preLoaderRoute: typeof AftercareRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/book': {
       id: '/book'
       path: '/book'
       fullPath: '/book'
       preLoaderRoute: typeof BookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/deposit': {
@@ -196,11 +295,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DepositRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/faq': {
+      id: '/faq'
+      path: '/faq'
+      fullPath: '/faq'
+      preLoaderRoute: typeof FaqRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/policies': {
+      id: '/policies'
+      path: '/policies'
+      fullPath: '/policies'
+      preLoaderRoute: typeof PoliciesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/request': {
       id: '/request'
       path: '/request'
       fullPath: '/request'
       preLoaderRoute: typeof RequestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/services': {
+      id: '/services'
+      path: '/services'
+      fullPath: '/services'
+      preLoaderRoute: typeof ServicesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/work': {
@@ -257,9 +377,15 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AboutRoute: AboutRoute,
+  AftercareRoute: AftercareRoute,
   BookRoute: BookRoute,
+  ContactRoute: ContactRoute,
   DepositRoute: DepositRoute,
+  FaqRoute: FaqRoute,
+  PoliciesRoute: PoliciesRoute,
   RequestRoute: RequestRoute,
+  ServicesRoute: ServicesRoute,
   WorkRoute: WorkRoute,
   ArtistsSlugRoute: ArtistsSlugRoute,
   FlashIdRoute: FlashIdRoute,
