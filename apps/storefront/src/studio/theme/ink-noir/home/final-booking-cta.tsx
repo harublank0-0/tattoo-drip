@@ -33,7 +33,9 @@ export function FinalBookingCta({
 	/** The open invitation's headline lines and line; the home page's by default. */
 	invite?: { readonly lines: readonly string[]; readonly line: string };
 }) {
-	const open = state.kind === "open" && requestLink !== null;
+	// It invites while there is someone to ask: the page's request link (the
+	// home page's is the studio's, which exists exactly while it is open).
+	const open = requestLink !== null;
 	const explore = artistsShown ? (
 		<RouterAnchor className="action ink-action-quiet" href="#artists">
 			{copy.exploreArtists}
@@ -84,13 +86,7 @@ export function FinalBookingCta({
 						<p className="ink-close-detail">
 							<Fill
 								template={studioCopy.request.closedDescription}
-								values={{
-									// A lone artist's page is about them: say who is closed.
-									who:
-										state.kind === "artist-closed"
-											? state.artistName
-											: state.studioName,
-								}}
+								values={{ who: state.studioName }}
 							/>
 						</p>
 					)}

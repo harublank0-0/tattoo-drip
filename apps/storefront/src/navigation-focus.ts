@@ -11,24 +11,56 @@ import type { AnyRouter } from "@tanstack/react-router";
  * (Ink Noir's, `tabIndex={-1}`), else the page's first `<main>`. Without moving the page: the router's own
  * scroll restoration and fragment scrolling stay in charge of that.
  *
- * Only a new page counts: a new path. The first load is the browser's, a
- * change of fragment alone is a jump within the page, which the browser
- * handles, and a new query alone is the same page filtered (the artists
- * directory's style links), where focus stays on the filter just used. Nothing else on the
- * page navigates through the router ("Show more" and the photo viewer use
+ * A new path moves it, and so does a new query (a filtered /work, or a nav
+ * link from one): the content changed and the router reset the scroll. The
+ * first load is the browser's, and a change of fragment alone is a jump
+ * within the page, which the browser handles. One exception: a link that
+ * filters the page in place (RouterAnchor with `resetScroll={false}`, the
+ * artists directory's styles) calls keepFocusOn(href) first, and focus stays
+ * on it, unless the link went away with the old content ("Show all
+ * artists"), in which case focus goes to the content as usual. Nothing else on
+ * the page navigates through the router ("Show more" and the photo viewer use
  * the history API directly), so this never takes focus from them.
  */
 
 /** What `onResolved` says of a navigation (the router's NavigationEventInfo). */
 export interface NavigationChange {
-	readonly fromLocation?: unknown;
-	readonly toLocation: { readonly hash: string };
+	readonly fromLocation?: { readonly searchStr: string };
+	readonly toLocation: {
+		readonly href: string;
+		readonly searchStr: string;
+		readonly hash: string;
+	};
 	readonly pathChanged: boolean;
 }
 
-/** Whether this navigation showed a new page, so focus belongs to its content. Pure. */
-export function movesFocus(change: NavigationChange): boolean {
-	return change.fromLocation !== undefined && change.pathChanged;
+/**
+ * What to do with focus after this navigation. Pure. "move": to the new
+ * content. "keep": leave it on the link that filtered the page in place, if
+ * that link is still there (else move). "none": the browser's business.
+ */
+export function focusAction(
+	change: NavigationChange,
+	keptHref: string | null,
+): "move" | "keep" | "none" {
+	if (!change.fromLocation) return "none";
+	if (change.pathChanged) return "move";
+	if (change.fromLocation.searchStr === change.toLocation.searchStr) {
+		return "none";
+	}
+	return keptHref === change.toLocation.href ? "keep" : "move";
+}
+
+/** The address a filter link is opening in place; read and cleared by the next navigation. */
+let keptHref: string | null = null;
+
+/**
+ * Called by a link that changes only the page's query in place, just before
+ * the router navigates to `href`: focus stays on that link (focusAction).
+ * Browser only: set by a click, never during a render.
+ */
+export function keepFocusOn(href: string): void {
+	keptHref = href;
 }
 
 /** The id to focus: the fragment's target when there is one, else the page's `<main>`. Pure. */
@@ -44,10 +76,22 @@ export function focusTargetIds(hash: string): readonly string[] {
  */
 export function focusAfterNavigation(router: AnyRouter): () => void {
 	return router.subscribe("onResolved", (event) => {
-		if (!movesFocus(event)) return;
+		const action = focusAction(event, keptHref);
+		keptHref = null;
+		if (action === "none") return;
 		const ids = focusTargetIds(event.toLocation.hash);
 		requestAnimationFrame(() =>
 			requestAnimationFrame(() => {
+				const current = document.activeElement;
+				// The filter link is still on the page with focus on it: leave it there.
+				if (
+					action === "keep" &&
+					current !== null &&
+					current !== document.body &&
+					current.isConnected
+				) {
+					return;
+				}
 				// Stencil & Ink's and the status pages' <main> has no id: the first <main> then.
 				const target =
 					ids

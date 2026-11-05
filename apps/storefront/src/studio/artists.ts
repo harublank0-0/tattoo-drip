@@ -33,9 +33,17 @@ export interface DirectoryStyle {
 	readonly count: number;
 }
 
-/** An artist in the directory: the page's view and the slugs of the styles they list. */
+/**
+ * An artist in the directory: the page's view and the styles they list as the
+ * filter reads them (checked slug, one-line name, each slug once, at most
+ * five), which is what the card shows, so a card always names the style that
+ * selected it.
+ */
 export interface DirectoryArtist extends ArtistView {
-	readonly styleSlugs: readonly string[];
+	readonly styleRefs: readonly {
+		readonly slug: string;
+		readonly name: string;
+	}[];
 }
 
 export interface ArtistsDirectory {
@@ -89,7 +97,7 @@ export function artistsDirectory(
 				count: (entry?.count ?? 0) + 1,
 			});
 		}
-		return { ...view, styleSlugs: styles.map((style) => style.slug) };
+		return { ...view, styleRefs: styles };
 	});
 	const styles = [...counts]
 		.map(([slug, { name, count }]) => ({ slug, name, count }))
@@ -109,7 +117,9 @@ export function artistsDirectory(
 		shown:
 			wanted === undefined
 				? artists
-				: artists.filter((artist) => artist.styleSlugs.includes(wanted)),
+				: artists.filter((artist) =>
+						artist.styleRefs.some((style) => style.slug === wanted),
+					),
 		filterable:
 			artists.length > 1 &&
 			styles.some((style) => style.count < artists.length),

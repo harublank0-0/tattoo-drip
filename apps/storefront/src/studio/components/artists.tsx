@@ -140,11 +140,15 @@ function ArtistLinks({ links }: { links: ArtistView["links"] }) {
 function ArtistEntry({
 	artist,
 	askLink,
+	asPage,
 }: {
 	artist: ArtistView;
 	askLink: boolean;
+	/** Under the page's h1 (`/artists`) an entry is an h2, else an h3 under the roster's h2. */
+	asPage: boolean;
 }) {
 	const titleId = `artist-${artist.slug}`;
+	const Name = asPage ? "h2" : "h3";
 	return (
 		<article
 			className={artist.photo ? "artist" : "artist artist-no-photo"}
@@ -158,9 +162,9 @@ function ArtistEntry({
 				/>
 			) : null}
 			<div className="artist-head">
-				<h3 id={titleId} className="artist-name" dir="auto">
+				<Name id={titleId} className="artist-name" dir="auto">
 					{artist.name}
-				</h3>
+				</Name>
 				{artist.styles.length > 0 ? (
 					<p className="artist-styles">{artist.styles.join(" · ")}</p>
 				) : null}
@@ -220,6 +224,7 @@ export function ArtistRoster({
 						<ArtistEntry
 							artist={artist}
 							askLink={askLinks && artist.accepting}
+							asPage={asPage}
 						/>
 					</li>
 				))}

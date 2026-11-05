@@ -160,7 +160,7 @@ export interface ArtistsPageData {
 	 * new work (the page is about them), else the header's.
 	 */
 	readonly ctaLink: RequestLink | null;
-	/** The closing invitation's state, as on the studio page. */
+	/** The studio's own inquiry state, as on its home page (not a lone artist's): the invitation's words. */
 	readonly inquiry: InquiryState;
 	readonly chat: ChatLinks | null;
 	readonly seo: PageSeo;
@@ -561,8 +561,9 @@ export function workPageData(
 /**
  * `/artists`'s data: the studio and its visible artists, the directory
  * filtered by `search` (artistsDirectory). Pure. The header asks the studio;
- * the closing invitation asks a lone artist by name while they take new
- * work, as their own page does.
+ * the closing invitation (`ctaLink`) asks a lone artist by name while they
+ * take new work, as their own page does, else the studio while it does, else
+ * nobody. `inquiry` is the studio's own state, as on its home page.
  */
 export function artistsPageData(
 	studio: Studio,
@@ -580,7 +581,8 @@ export function artistsPageData(
 		theme: parseThemeConfig(storefrontInput(studio), imageOrigin),
 		requestLink: requestLink(studioView, null),
 		ctaLink: requestLink(studioView, lone),
-		inquiry: inquiryState(studioView, views, lone),
+		// The studio's own state, as on its home page: the invitation's words.
+		inquiry: inquiryState(studioView, views, null),
 		chat: chatLinks(studioView, lone?.name ?? null),
 		seo: artistsPageSeo(
 			studioView,

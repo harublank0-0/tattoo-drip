@@ -328,9 +328,10 @@ describe("the artists directory in Ink Noir", () => {
 	test("never offers a session nobody takes", () => {
 		const closed = mainOf(html(data([ARJUN], {}, inkNoir(CLOSED_STUDIO))));
 		assert.doesNotMatch(closed, /href="\/request/);
+		// The invitation's words are the studio's, as on its home page.
 		assert.match(
 			closed,
-			/<bdi>अर्जुन थापा<\/bdi> isn&#x27;t taking new inquiries right now\./,
+			/<bdi>Black Needle<\/bdi> isn&#x27;t taking new inquiries right now\./,
 		);
 	});
 
@@ -351,6 +352,72 @@ describe("the artists directory in Ink Noir", () => {
 	test("the navigation's Artists is this page, and current on it", () => {
 		const page = html(data([SITA_WORK, BINA]));
 		assert.match(page, /<a aria-current="page" href="\/artists">Artists<\/a>/);
+	});
+});
+
+describe("the closing invitation and the page's outline (review fixes)", () => {
+	const SITA_CLOSED: Artist = { ...SITA_WORK, acceptingInquiries: false };
+	const stencil = (studio: Studio, artists: Artist[]) =>
+		html(
+			artistsPageData(
+				withStorefront(DEFAULT_STOREFRONT, studio),
+				artists,
+				{},
+				ORIGIN,
+				IMAGE_ORIGIN,
+			),
+		);
+
+	test("Ink Noir: an open studio whose lone artist is closed still invites, to the studio", () => {
+		const page = mainOf(html(data([SITA_CLOSED])));
+		assert.match(
+			page,
+			/<a class="action action-primary ink-cta" href="\/request">Request a session<\/a>/,
+		);
+		// The close invites; only the artist's own card says she is closed.
+		assert.doesNotMatch(page, /Not taking new inquiries/);
+		assert.match(page, /Not taking new work right now/);
+	});
+
+	test("Ink Noir: a closed studio whose lone artist is open invites, to that artist", () => {
+		const page = mainOf(html(data([SITA_WORK], {}, inkNoir(CLOSED_STUDIO))));
+		assert.match(page, /href="\/request\?artist=sita"/);
+		assert.doesNotMatch(page, /href="\/request"/);
+	});
+
+	test("Stencil & Ink: the invitation is the studio's, never a link to a refusal", () => {
+		// Open studio, closed lone artist: it invites to the studio's form.
+		assert.match(
+			stencil(STUDIO, [SITA_CLOSED]),
+			/Got an idea\?[\s\S]*href="\/request">Send your idea</,
+		);
+		// Closed studio, open lone artist: no general link; the roster asks for her.
+		const closed = mainOf(stencil(CLOSED_STUDIO, [SITA_WORK]));
+		assert.doesNotMatch(closed, /href="\/request"/);
+		assert.match(closed, /href="\/request\?artist=sita"/);
+	});
+
+	test("Stencil & Ink: the entries are h2 under the page's h1", () => {
+		const outline = Array.from(
+			mainOf(stencil(STUDIO, [SITA, ARJUN])).matchAll(/<(h[1-6])[^>]*>/g),
+			(match) => match[1],
+		);
+		assert.deepEqual(outline, ["h1", "h2", "h2", "h2"]);
+	});
+
+	test("a card names exactly the styles the filter reads, so it names the one that kept it", () => {
+		const messy = {
+			...SITA_WORK,
+			styles: [
+				{ slug: "Fine Line", name: "Realism" },
+				FINE,
+				FINE,
+				{ slug: "c", name: "C" },
+			],
+		} as Artist;
+		const page = mainOf(html(data([messy, BINA], { style: "c" })));
+		assert.match(page, /<p class="ink-dir-styles">Fine line, C<\/p>/);
+		assert.doesNotMatch(page, /Realism/);
 	});
 });
 

@@ -1,5 +1,6 @@
 import { type RegisteredRouter, useRouter } from "@tanstack/react-router";
 import type { ComponentProps, MouseEvent } from "react";
+import { keepFocusOn } from "../../navigation-focus.ts";
 
 /** One of the page's own paths: "/…", never "//…" or "/\\…". */
 const OWN_PATH = /^\/(?![/\\])/;
@@ -48,7 +49,11 @@ export function RouterAnchor({
 	...props
 }: ComponentProps<"a"> & {
 	href: string;
-	/** False keeps the scroll position (a filter on the same page); the router's default resets it. */
+	/**
+	 * False filters the page in place (the artists directory's styles): the
+	 * scroll position stays, and so does focus, on this link
+	 * (navigation-focus.ts). The router's default resets the scroll.
+	 */
 	resetScroll?: boolean;
 }) {
 	// The hook's type says a router is always there; outside one it is undefined.
@@ -61,6 +66,7 @@ export function RouterAnchor({
 				onClick?.(event);
 				if (!router || !isRouterClick(event, href)) return;
 				event.preventDefault();
+				if (resetScroll === false) keepFocusOn(href);
 				void router.navigate(
 					resetScroll === undefined ? { href } : { href, resetScroll },
 				);

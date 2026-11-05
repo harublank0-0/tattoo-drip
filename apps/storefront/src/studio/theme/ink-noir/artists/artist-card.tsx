@@ -51,8 +51,10 @@ export function DirectoryCard({
 						{artist.name}
 					</RouterAnchor>
 				</h3>
-				{artist.styles.length > 0 ? (
-					<p className="ink-dir-styles">{artist.styles.join(", ")}</p>
+				{artist.styleRefs.length > 0 ? (
+					<p className="ink-dir-styles">
+						{artist.styleRefs.map((style) => style.name).join(", ")}
+					</p>
 				) : null}
 				<Status artist={artist} />
 				{artist.bio ? (
@@ -87,8 +89,10 @@ export function ArtistFeature({ artist }: { artist: DirectoryArtist }) {
 				<h3 id={titleId} className="ink-dir-feature-name" dir="auto">
 					{artist.name}
 				</h3>
-				{artist.styles.length > 0 ? (
-					<p className="ink-dir-styles">{artist.styles.join(", ")}</p>
+				{artist.styleRefs.length > 0 ? (
+					<p className="ink-dir-styles">
+						{artist.styleRefs.map((style) => style.name).join(", ")}
+					</p>
 				) : null}
 				<Status artist={artist} />
 				{artist.bio ? (
