@@ -224,6 +224,20 @@ describe("Ink Noir's artist page", () => {
 		);
 	});
 
+	test("labels hold the visible text exactly, whatever the names contain (review fix)", () => {
+		const odd = {
+			...SITA,
+			name: "Ana $& Lee",
+			styles: [{ slug: "neo-trad", name: "Neo {name} $' trad" }],
+		} as Artist;
+		const page = mainOf(html(data("sita", { artists: [odd] })));
+		assert.match(page, /aria-label="Ana \$&amp; Lee elsewhere"/);
+		assert.match(
+			page,
+			/aria-label="See Neo \{name\} \$&#x27; trad work by Ana \$&amp; Lee"/,
+		);
+	});
+
 	test("invents nothing: no experience, awards, quote or availability", () => {
 		const page = mainOf(html(data("sita")));
 		assert.doesNotMatch(
@@ -245,9 +259,15 @@ describe("artist.css", () => {
 	});
 
 	test("keeps photos whole and stops its motion for people who asked for less", () => {
-		assert.match(
+		const rule =
+			/\.ink-artist-page \.work-photo \{([^}]*)\}/.exec(css)?.[1] ?? "";
+		assert.match(rule, /object-fit: contain/);
+		// The 1:1 box is styles.css's: overriding aspect-ratio here left unloaded photos 0 px tall (review fix).
+		assert.doesNotMatch(rule, /aspect-ratio|block-size/);
+		assert.doesNotMatch(
 			css,
-			/\.ink-artist-page \.work-photo \{[^}]*aspect-ratio: auto/,
+			/(?<![-\w])columns:/,
+			"no multi-column masonry: Show more must not reshuffle",
 		);
 		const reduced = css.slice(
 			css.indexOf("@media (prefers-reduced-motion: reduce)"),

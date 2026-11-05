@@ -1,4 +1,5 @@
 import { Fill } from "../../../../intake/components/fill.tsx";
+import { fill } from "../../../../intake/template.ts";
 import { RouterAnchor } from "../../../components/router-anchor.tsx";
 import { BookingCta } from "../../../components/storefront.tsx";
 import { studioCopy } from "../../../copy.ts";
@@ -74,9 +75,10 @@ export function ArtistSpecialties({
 										<RouterAnchor
 											className="ink-style-link"
 											href={href}
-											aria-label={copy.specialties.seeWork
-												.replace("{style}", style.name)
-												.replace("{name}", artist.name)}
+											aria-label={fill(copy.specialties.seeWork, {
+												style: style.name,
+												name: artist.name,
+											})}
 										>
 											{style.name}
 										</RouterAnchor>

@@ -21,15 +21,15 @@ export function portraitSizes(image: ImageSize): string {
 	return `(min-width: ${WIDE_FROM_REM}rem) ${round(COLUMN_REM * (5 / 12) * factor)}rem, (min-width: 60rem) calc((100vw - ${GUTTER_REM}rem) * ${round((5 / 12) * factor)}), calc((100vw - ${GUTTER_REM}rem) * ${round(factor)})`;
 }
 
-/** The masonry's gap between columns, in rem (artist.css). */
-const MASONRY_GAP_REM = 0.75;
+/** The portfolio grid's gap between columns, in rem (artist.css). */
+const GRID_GAP_REM = 0.75;
 
 /**
- * A portfolio photo in the masonry: drawn whole at its own proportions (never
- * cropped), so it needs only its column's width. Three columns from 48rem,
- * two below.
+ * A portfolio photo in its square cell: drawn whole (`object-fit: contain`,
+ * never cropped), so it needs at most the cell's width. Three columns from
+ * 48rem, two below.
  */
-export function masonrySizes(): string {
-	const wide = (COLUMN_REM - 2 * MASONRY_GAP_REM) / 3;
-	return `(min-width: ${WIDE_FROM_REM}rem) ${round(wide)}rem, (min-width: 48rem) calc((100vw - ${GUTTER_REM + 2 * MASONRY_GAP_REM}rem) / 3), calc((100vw - ${GUTTER_REM + MASONRY_GAP_REM}rem) / 2)`;
+export function portfolioSizes(): string {
+	const wide = (COLUMN_REM - 2 * GRID_GAP_REM) / 3;
+	return `(min-width: ${WIDE_FROM_REM}rem) ${round(wide)}rem, (min-width: 48rem) calc((100vw - ${GUTTER_REM + 2 * GRID_GAP_REM}rem) / 3), calc((100vw - ${GUTTER_REM + GRID_GAP_REM}rem) / 2)`;
 }

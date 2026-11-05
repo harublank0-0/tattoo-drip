@@ -12,16 +12,15 @@ import { type MoreWork, PagedGallery } from "../../../paging.tsx";
 import type { ArtistView } from "../../../view-model.ts";
 import { SectionHead } from "../home/parts.tsx";
 import { inkNoirArtistCopy } from "./copy.ts";
-import { masonrySizes } from "./sizes.ts";
+import { portfolioSizes } from "./sizes.ts";
 
 const copy = inkNoirArtistCopy.portfolio;
 
 /**
  * The artist's whole portfolio, a page at a time: the shared paged gallery
  * (PagedGallery: "Show more" a link without JavaScript, the browser's
- * `<dialog>` viewer for each photo, its tested focus moves), laid out here as
- * a masonry of uncropped photos (artist.css), so a tattoo is never cut to a
- * square. The All / Healed links and "Back to the newest" are the shared
+ * `<dialog>` viewer for each photo, its tested focus moves), each photo drawn
+ * whole in a square cell (artist.css), so a tattoo is never cut to fit. The All / Healed links and "Back to the newest" are the shared
  * page's, and so is the `work` id every portfolio link carries. With no
  * photos it says there are none to show (a failed read looks the same, so it
  * claims nothing more) and points to the artist's Instagram when they have
@@ -86,7 +85,7 @@ export function ArtistPortfolio({
 						showArtist={false}
 						moreHref={(cursor) => portfolioHref(slug, { ...filter, cursor })}
 						more={more}
-						sizes={masonrySizes}
+						sizes={portfolioSizes}
 					/>
 				) : (
 					<div className="ink-work-empty">

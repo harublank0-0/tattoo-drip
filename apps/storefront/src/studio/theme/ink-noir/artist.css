@@ -34,9 +34,13 @@
 	min-inline-size: 0;
 	overflow-wrap: anywhere;
 }
+/* The separator is a drawn slash, not a character: nothing for a screen reader to say. */
 .ink-breadcrumb li + li::before {
-	content: "/";
-	color: var(--line-strong);
+	content: "";
+	inline-size: 1px;
+	block-size: 0.875rem;
+	background: var(--line-strong);
+	rotate: 20deg;
 }
 .ink-breadcrumb a {
 	display: inline-flex;
@@ -160,17 +164,20 @@
 	}
 }
 
-/* ---- The portfolio: the shared paged gallery as an uncropped masonry -- */
-
+/*
+ * ---- The portfolio: the shared paged gallery, uncropped ----------------
+ *
+ * Square cells in rows, each photo drawn whole inside its cell on the raised
+ * surface: a tattoo is never cut to fit. The square is the shared grid's own
+ * (`.work-photo` is 1:1), so every cell has its height before its photo
+ * arrives: nothing shifts, lazy loading stays lazy, and "Show more" only adds
+ * rows below, so no photo already seen moves and the first new one (which
+ * takes focus) starts a row.
+ */
 .ink-artist-page .work-grid {
-	display: block;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.75rem;
 	max-inline-size: none;
-	columns: 2;
-	column-gap: 0.75rem;
-}
-.ink-artist-page .work-grid > li {
-	break-inside: avoid;
-	margin-block-end: 0.75rem;
 }
 .ink-artist-page .work-open {
 	position: relative;
@@ -178,10 +185,7 @@
 	overflow: hidden;
 	background: var(--paper-raised);
 }
-/* The photo at its own proportions: a tattoo is never cut to a square. */
 .ink-artist-page .work-photo {
-	aspect-ratio: auto;
-	block-size: auto;
 	object-fit: contain;
 	background: none;
 	transition: scale 700ms cubic-bezier(0.2, 0.7, 0.2, 1);
@@ -240,7 +244,7 @@
 }
 @media (min-width: 48rem) {
 	.ink-artist-page .work-grid {
-		columns: 3;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
 	}
 }
 

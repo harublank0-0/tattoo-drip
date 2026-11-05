@@ -1,3 +1,4 @@
+import { fill } from "../../../../intake/template.ts";
 import { RouterAnchor } from "../../../components/router-anchor.tsx";
 import { studioCopy } from "../../../copy.ts";
 import { artistsHref, isAllowedHref, linkRel } from "../../../links.ts";
@@ -124,7 +125,7 @@ export function ArtistHero({
 					{links.length > 0 ? (
 						<ul
 							className="ink-artist-links"
-							aria-label={copy.links.replace("{name}", artist.name)}
+							aria-label={fill(copy.links, { name: artist.name })}
 						>
 							{links.map((link) => (
 								<li key={`${link.kind}:${link.href}`}>

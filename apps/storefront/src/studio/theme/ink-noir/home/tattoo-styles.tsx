@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { fill } from "../../../../intake/template.ts";
 import { RouterAnchor } from "../../../components/router-anchor.tsx";
 import { isAllowedHref } from "../../../links.ts";
 import { inkNoirHomeCopy } from "./copy.ts";
@@ -41,7 +42,7 @@ export function TattooStyles({ styles }: { styles: readonly StyleEntry[] }) {
 									<RouterAnchor
 										className="ink-style-link"
 										href={style.workHref}
-										aria-label={copy.seeWork.replace("{style}", style.name)}
+										aria-label={fill(copy.seeWork, { style: style.name })}
 									>
 										{style.name}
 									</RouterAnchor>
