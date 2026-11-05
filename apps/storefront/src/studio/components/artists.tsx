@@ -140,11 +140,15 @@ function ArtistLinks({ links }: { links: ArtistView["links"] }) {
 function ArtistEntry({
 	artist,
 	askLink,
+	asPage,
 }: {
 	artist: ArtistView;
 	askLink: boolean;
+	/** Under the page's h1 (`/artists`) an entry is an h2, else an h3 under the roster's h2. */
+	asPage: boolean;
 }) {
 	const titleId = `artist-${artist.slug}`;
+	const Name = asPage ? "h2" : "h3";
 	return (
 		<article
 			className={artist.photo ? "artist" : "artist artist-no-photo"}
@@ -158,9 +162,9 @@ function ArtistEntry({
 				/>
 			) : null}
 			<div className="artist-head">
-				<h3 id={titleId} className="artist-name" dir="auto">
+				<Name id={titleId} className="artist-name" dir="auto">
 					{artist.name}
-				</h3>
+				</Name>
 				{artist.styles.length > 0 ? (
 					<p className="artist-styles">{artist.styles.join(" · ")}</p>
 				) : null}
@@ -197,25 +201,30 @@ function ArtistEntry({
 export function ArtistRoster({
 	artists,
 	studioAccepting,
+	asPage = false,
 }: {
 	artists: readonly ArtistView[];
 	/** Whether the studio takes new inquiries (its own switch, not the artists'). */
 	studioAccepting: boolean;
+	/** The roster is the page (`/artists`): its title is the page's h1. */
+	asPage?: boolean;
 }) {
+	const Title = asPage ? "h1" : "h2";
 	if (artists.length === 0) return null;
 	// With one artist in an open studio, "Send your idea" already asks for them.
 	const askLinks = artists.length > 1 || !studioAccepting;
 	return (
 		<section id="artists" className="section" aria-labelledby="artists-title">
-			<h2 id="artists-title" className="section-title">
+			<Title id="artists-title" className="section-title">
 				{artists.length === 1 ? "Artist" : "Artists"}
-			</h2>
+			</Title>
 			<ul className="roster">
 				{artists.map((artist) => (
 					<li key={artist.id}>
 						<ArtistEntry
 							artist={artist}
 							askLink={askLinks && artist.accepting}
+							asPage={asPage}
 						/>
 					</li>
 				))}

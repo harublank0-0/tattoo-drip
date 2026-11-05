@@ -10,6 +10,11 @@ import type { ApiContext } from "../api/context.ts";
 import { loadStudio, rethrowAsNotFound } from "../api/loaders.ts";
 import { fill } from "../intake/template.ts";
 import type { SiteContext } from "../site/context.ts";
+import {
+	type ArtistsDirectory,
+	type ArtistsSearch,
+	artistsDirectory,
+} from "./artists.ts";
 import { type ChatLinks, chatLinks } from "./chat.ts";
 import { studioCopy } from "./copy.ts";
 import {
@@ -58,6 +63,7 @@ import {
 } from "./request.ts";
 import {
 	artistPageSeo,
+	artistsPageSeo,
 	flashDesignSeo,
 	flashPageSeo,
 	type PageSeo,
@@ -141,6 +147,24 @@ export interface ArtistPageData {
 	 * read failed, which leaves the Flash section out.
 	 */
 	readonly flash: FlashListView;
+}
+
+/** `/artists`: every visible artist, filtered by the address's style. */
+export interface ArtistsPageData {
+	readonly studio: StudioView;
+	readonly theme: ThemeConfig;
+	/** The header's Request button: the studio's, or none while it is closed. */
+	readonly requestLink: RequestLink | null;
+	/**
+	 * The closing invitation's request: a lone artist's own while they take
+	 * new work (the page is about them), else the header's.
+	 */
+	readonly ctaLink: RequestLink | null;
+	/** The studio's own inquiry state, as on its home page (not a lone artist's): the invitation's words. */
+	readonly inquiry: InquiryState;
+	readonly chat: ChatLinks | null;
+	readonly seo: PageSeo;
+	readonly directory: ArtistsDirectory;
 }
 
 /**
@@ -532,6 +556,65 @@ export function workPageData(
 		search,
 		gallery: galleryView(page, imageOrigin),
 	};
+}
+
+/**
+ * `/artists`'s data: the studio and its visible artists, the directory
+ * filtered by `search` (artistsDirectory). Pure. The header asks the studio;
+ * the closing invitation (`ctaLink`) asks a lone artist by name while they
+ * take new work, as their own page does, else the studio while it does, else
+ * nobody. `inquiry` is the studio's own state, as on its home page.
+ */
+export function artistsPageData(
+	studio: Studio,
+	artists: readonly Artist[],
+	search: ArtistsSearch,
+	origin: string,
+	imageOrigin: string | null = null,
+): ArtistsPageData {
+	const studioView = studioViewModel(studio);
+	const views = artistViewModels(artists, imageOrigin);
+	const directory = artistsDirectory(artists, views, search);
+	const lone = views.length === 1 ? views[0] : null;
+	return {
+		studio: studioView,
+		theme: parseThemeConfig(storefrontInput(studio), imageOrigin),
+		requestLink: requestLink(studioView, null),
+		ctaLink: requestLink(studioView, lone),
+		// The studio's own state, as on its home page: the invitation's words.
+		inquiry: inquiryState(studioView, views, null),
+		chat: chatLinks(studioView, lone?.name ?? null),
+		seo: artistsPageSeo(
+			studioView,
+			views,
+			directory.styles.map((style) => style.name),
+			origin,
+		),
+		directory,
+	};
+}
+
+/**
+ * `/artists`: the studio (cached by the tenant middleware) and the artist
+ * list, the same cached read every page makes, so moving between filters
+ * re-runs only the pure filter and asks the API nothing. A failed artists
+ * read is the error page, as everywhere.
+ */
+export async function loadArtistsPage(
+	context: PageContext,
+	search: ArtistsSearch,
+): Promise<ArtistsPageData> {
+	const [studio, artists] = await Promise.all([
+		loadStudio(context),
+		loadArtists(context),
+	]);
+	return artistsPageData(
+		studio,
+		artists,
+		search,
+		context.site.origin,
+		context.tattoo.connection.mediaUrl,
+	);
 }
 
 /**

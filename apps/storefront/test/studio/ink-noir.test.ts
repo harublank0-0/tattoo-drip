@@ -306,6 +306,7 @@ describe("navItems: the pages a theme's navigation lists", () => {
 	test("every href is allowed, and each page marks its own item", () => {
 		const expected: Record<ShellPage, string[]> = {
 			home: ["Home=page"],
+			artists: ["Artists=page"],
 			artist: ["Artists=true"],
 			work: ["Gallery=page"],
 			flash: ["Flash=page"],
@@ -316,7 +317,7 @@ describe("navItems: the pages a theme's navigation lists", () => {
 			const items = navItems(all, page as ShellPage, true);
 			assert.deepEqual(
 				items.map((item) => item.href),
-				["/", "/#artists", "/work", "/flash"],
+				["/", "/artists", "/work", "/flash"],
 			);
 			for (const item of items) assert.ok(isAllowedHref(item.href), item.href);
 			assert.deepEqual(
@@ -574,12 +575,12 @@ describe("Ink Noir's pages", () => {
 				}),
 			),
 		]) {
-			assert.doesNotMatch(html, /href="\/#artists"/);
+			assert.doesNotMatch(html, /href="\/artists"/);
 			assert.doesNotMatch(html, /id="artists"/);
 		}
 		// With an artist, the link is back and lands on the roster.
 		const one = empty([SITA]);
-		assert.match(one, /href="\/#artists"/);
+		assert.match(one, /href="\/artists"/);
 		assert.match(one, /id="artists"/);
 	});
 
@@ -587,7 +588,7 @@ describe("Ink Noir's pages", () => {
 		const html = studioHtml(
 			inkNoir({ sections: [{ type: "work" }, { type: "inquiry" }] }),
 		);
-		assert.doesNotMatch(html, /href="\/#artists"/);
+		assert.doesNotMatch(html, /href="\/artists"/);
 		assert.doesNotMatch(html, /href="\/flash"/);
 	});
 });

@@ -1,6 +1,7 @@
 import type { ComponentProps, ComponentType } from "react";
 import {
 	ArtistPage,
+	ArtistsPage,
 	FlashDesignPage,
 	FlashPage,
 	RequestPage,
@@ -9,6 +10,7 @@ import {
 } from "../components/pages.tsx";
 import { type Shell, StencilShell } from "../components/shell.tsx";
 import { DEFAULT_THEME_KEY, type ThemeKey } from "./config.ts";
+import { InkNoirArtistsPage } from "./ink-noir/artists/artists-page.tsx";
 import { InkNoirStudioPage } from "./ink-noir/home/home-page.tsx";
 import { InkNoirShell } from "./ink-noir/shell.tsx";
 
@@ -29,6 +31,8 @@ export interface Theme {
 	readonly Shell: Shell;
 	readonly StudioPage: ComponentType<ComponentProps<typeof StudioPage>>;
 	readonly ArtistPage: ComponentType<ComponentProps<typeof ArtistPage>>;
+	/** `/artists`, the directory. */
+	readonly ArtistsPage: ComponentType<ComponentProps<typeof ArtistsPage>>;
 	readonly WorkPage: ComponentType<ComponentProps<typeof WorkPage>>;
 	readonly FlashPage: ComponentType<ComponentProps<typeof FlashPage>>;
 	readonly FlashDesignPage: ComponentType<
@@ -40,8 +44,9 @@ export interface Theme {
 /**
  * Every theme, by key. Stencil & Ink is the page TAT-97 and TAT-105 built;
  * Ink Noir (theme/ink-noir/) is the same pages in its own dark shell, with a
- * site navigation and a full footer, and its own home page
- * (theme/ink-noir/home/: the same data, laid out as an editorial portfolio). Its colours come from the `<html>`
+ * site navigation and a full footer, and its own home page and artists
+ * directory (theme/ink-noir/home/ and artists/: the same data, laid out as an
+ * editorial portfolio). Its colours come from the `<html>`
  * class the root route sets (theme/html.ts), not from here.
  */
 export const THEMES: Record<ThemeKey, Theme> = {
@@ -49,6 +54,7 @@ export const THEMES: Record<ThemeKey, Theme> = {
 		Shell: StencilShell,
 		StudioPage,
 		ArtistPage,
+		ArtistsPage,
 		WorkPage,
 		FlashPage,
 		FlashDesignPage,
@@ -58,6 +64,7 @@ export const THEMES: Record<ThemeKey, Theme> = {
 		Shell: InkNoirShell,
 		StudioPage: InkNoirStudioPage,
 		ArtistPage,
+		ArtistsPage: InkNoirArtistsPage,
 		WorkPage,
 		FlashPage,
 		FlashDesignPage,
@@ -82,6 +89,12 @@ export function ThemedStudioPage(props: ComponentProps<typeof StudioPage>) {
 export function ThemedArtistPage(props: ComponentProps<typeof ArtistPage>) {
 	const theme = themeFor(props.data.theme.key);
 	return <theme.ArtistPage {...props} Shell={theme.Shell} />;
+}
+
+/** `/artists` in the studio's theme. */
+export function ThemedArtistsPage(props: ComponentProps<typeof ArtistsPage>) {
+	const theme = themeFor(props.data.theme.key);
+	return <theme.ArtistsPage {...props} Shell={theme.Shell} />;
 }
 
 /** `/work` in the studio's theme. */

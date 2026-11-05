@@ -4,6 +4,8 @@
 @import './studio/theme/ink-noir/styles.css';
 /* Ink Noir's home page (src/studio/theme/ink-noir/home/): `ink-` classes only that page renders. */
 @import './studio/theme/ink-noir/home.css';
+/* Ink Noir's artists directory (src/studio/theme/ink-noir/artists/). */
+@import './studio/theme/ink-noir/artists.css';
 @plugin '@tailwindcss/typography';
 
 /*

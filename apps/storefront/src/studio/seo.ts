@@ -81,6 +81,37 @@ export function artistPageSeo(
 }
 
 /**
+ * The artists directory's head. One canonical address whatever the style
+ * filter, so a search engine indexes the directory and not each filter. The
+ * description names the styles the artists list (the studio's own data); a
+ * lone artist's photo is the share image, as on the studio page; no JSON-LD.
+ */
+export function artistsPageSeo(
+	studio: StudioView,
+	artists: readonly ArtistView[],
+	styles: readonly string[],
+	origin: string,
+): PageSeo {
+	const one = artists.length === 1;
+	const who = one ? artists[0].name : `the artists of ${studio.name}`;
+	const listed = styles.slice(0, 4).join(", ");
+	return {
+		title: `${one ? "The artist" : "Artists"} at ${studio.name}`,
+		// Names and styles are the studio's: trimmed like any description.
+		description: trimDescription(
+			listed
+				? `Meet ${who}: ${listed}. See their work and send an inquiry.`
+				: `Meet ${who}. See their work and send an inquiry.`,
+		),
+		canonical: `${origin}/artists`,
+		type: "website",
+		siteName: studio.name,
+		image: one ? artists[0].photo : null,
+		jsonLd: null,
+	};
+}
+
+/**
  * The All work page's head (TAT-126). One canonical address whatever the
  * filters or page, so a search engine indexes the page and not each filter;
  * no image (the page has many) and no JSON-LD.
