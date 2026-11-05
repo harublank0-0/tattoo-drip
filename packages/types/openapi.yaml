@@ -919,10 +919,12 @@ components:
       properties:
         theme:
           description: |
-            The studio's theme. More will come: treat an unknown value as
-            `stencil-and-ink`.
+            The studio's theme: `stencil-and-ink` (paper, ink and a violet
+            stencil line) or `ink-noir` (dark and photo-first, with a site
+            navigation and a full footer). More will come: treat an unknown
+            value as `stencil-and-ink`.
           type: string
-          enum: [stencil-and-ink]
+          enum: [stencil-and-ink, ink-noir]
         branding:
           type: object
           required: [logo, colors, font]

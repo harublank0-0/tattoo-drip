@@ -7,7 +7,7 @@
  * checked "#rrggbb" colours.
  */
 
-export const THEME_KEYS = ["stencil-and-ink"] as const;
+export const THEME_KEYS = ["stencil-and-ink", "ink-noir"] as const;
 export type ThemeKey = (typeof THEME_KEYS)[number];
 export const DEFAULT_THEME: ThemeKey = "stencil-and-ink";
 
@@ -76,6 +76,12 @@ export const THEMES: { key: ThemeKey; label: string; description: string }[] = [
 		key: "stencil-and-ink",
 		label: "Stencil & Ink",
 		description: "Paper, black ink and a violet stencil line. Made for phones.",
+	},
+	{
+		key: "ink-noir",
+		label: "Ink Noir",
+		description:
+			"Dark and photo-first, with a menu of your pages and a full footer.",
 	},
 ];
 
