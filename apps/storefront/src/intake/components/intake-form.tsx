@@ -21,6 +21,7 @@ import {
 	intakeValuesOf,
 	SIZES,
 	STEP_FIELDS,
+	sizeText,
 	TIMES_OF_DAY,
 } from "../../booking/booking.ts";
 import {
@@ -151,6 +152,22 @@ export function IntakeForm({
 			studioName,
 			artistIds: artists.map((artist) => artist.id),
 		});
+	// The steps reached so far, for the form's validator (it is created once):
+	// a later step's fields are not judged before the client gets there.
+	const shownUpTo = useRef(0);
+	shownUpTo.current = steps.indexOf(step);
+	const judged = (errors: ReturnType<typeof errorsOf>) => {
+		const fields = new Set(
+			steps
+				.slice(0, shownUpTo.current + 1)
+				.flatMap((each) => STEP_FIELDS[each]),
+		);
+		return Object.fromEntries(
+			Object.entries(errors).filter(([field]) =>
+				fields.has(field as BookingField),
+			),
+		);
+	};
 
 	const [references, dispatch] = useReducer(
 		referencesReducer,
@@ -220,13 +237,25 @@ export function IntakeForm({
 		}),
 		validators: {
 			onDynamic: ({ value }: { value: BookingValues }) => {
-				const fields = errorsOf(value);
+				const fields = judged(errorsOf(value));
 				return Object.keys(fields).length > 0 ? { fields } : undefined;
 			},
 		},
 		listeners: {
 			onChange: ({ fieldApi }) => {
 				clearServerError(fieldApi);
+				// A refusal shown on a field the flow composes goes when any of its parts changes.
+				const composed = COMPOSED_FROM[fieldApi.name as BookingInput];
+				if (composed) {
+					form.setFieldMeta(composed, (meta) =>
+						meta.errorMap.onServer === undefined
+							? meta
+							: {
+									...meta,
+									errorMap: { ...meta.errorMap, onServer: undefined },
+								},
+					);
+				}
 				// Once a step was checked, its messages follow what is typed.
 				if (checked.current) void form.validate("submit");
 			},
@@ -242,8 +271,19 @@ export function IntakeForm({
 		const errors = errorsOf(values);
 		return (
 			steps.find((each) =>
-				STEP_FIELDS[each].some((field) => errors[field] !== undefined),
+				STEP_FIELDS[each].some((field) => hasProblem(field, errors)),
 			) ?? step
+		);
+	}
+
+	/** Whether a field is wrong: by the flow's rules, or refused by the API and not changed since. */
+	function hasProblem(
+		field: BookingField,
+		errors: ReturnType<typeof errorsOf>,
+	): boolean {
+		return (
+			errors[field] !== undefined ||
+			form.state.fieldMeta[field]?.errorMap?.onServer !== undefined
 		);
 	}
 
@@ -263,8 +303,8 @@ export function IntakeForm({
 	/** Continue: the step's fields checked, then the next step, its heading focused. */
 	function goNext() {
 		const errors = errorsOf(form.state.values);
-		const problem = STEP_FIELDS[step].some(
-			(field) => errors[field] !== undefined,
+		const problem = STEP_FIELDS[step].some((field) =>
+			hasProblem(field, errors),
 		);
 		const photoProblem = step === "tattoo" && hasPhotoErrors(latest.current);
 		if (problem || photoProblem) {
@@ -307,6 +347,8 @@ export function IntakeForm({
 			setShowSummary(false);
 			setPhotosStopped(false);
 			if (hasPhotoErrors(latest.current)) {
+				setStep("tattoo");
+				setSummaryFields(STEP_FIELDS.tattoo);
 				setShowSummary(true);
 				setFocus("summary");
 				return;
@@ -320,6 +362,8 @@ export function IntakeForm({
 				// photos while Send waits, so a photo that vanished was refused.
 				if (lostPhotos(asked, latest.current).length > 0) {
 					setPhotosStopped(true);
+					setStep("tattoo");
+					setSummaryFields(STEP_FIELDS.tattoo);
 					setShowSummary(true);
 					setFocus("summary");
 					return;
@@ -549,8 +593,18 @@ export function IntakeForm({
 				current={step}
 				reached={reached}
 				onGo={goTo}
+				disabled={busy}
 			/>
 			<div className="booking-layout">
+				<form.Subscribe selector={(formState) => formState.values}>
+					{(values) => (
+						<BookingSummary
+							snapshot={snapshotOf(values)}
+							studioName={studioName}
+							showArtist={showArtists}
+						/>
+					)}
+				</form.Subscribe>
 				<div className="booking-main">
 					<form.Subscribe selector={(formState) => formState.fieldMeta}>
 						{(fieldMeta) => {
@@ -864,6 +918,7 @@ export function IntakeForm({
 											studioName={studioName}
 											steps={steps}
 											onEdit={goTo}
+											disabled={busy}
 										/>
 									)}
 								</form.Subscribe>
@@ -941,15 +996,6 @@ export function IntakeForm({
 						</p>
 					) : null}
 				</div>
-				<form.Subscribe selector={(formState) => formState.values}>
-					{(values) => (
-						<BookingSummary
-							snapshot={snapshotOf(values)}
-							studioName={studioName}
-							showArtist={showArtists}
-						/>
-					)}
-				</form.Subscribe>
 			</div>
 		</form>
 	);
@@ -973,7 +1019,15 @@ export function bookingErrors(
 		rules,
 	);
 	for (const [field, message] of Object.entries(intake)) {
-		if (message) errors[bookingFieldOf(field as IntakeField)] = message;
+		if (!message) continue;
+		// Too long with the choice: the client's own words are what to shorten.
+		const ownWords =
+			field === "approximateSize" &&
+			values.approximateSize.trim() !== "" &&
+			sizeText(values).length > INTAKE_LIMITS.approximateSize;
+		errors[
+			ownWords ? "approximateSize" : bookingFieldOf(field as IntakeField)
+		] = message;
 	}
 	if (!errors.idea && values.idea.trim() && !ideaFits(values)) {
 		errors.idea = fillTemplate(copy.errors.tooLong, {
@@ -989,6 +1043,7 @@ const BOOKING_FIELD_ORDER: readonly BookingField[] = [
 	"days",
 	"idea",
 	"size",
+	"approximateSize",
 	"placement",
 	"budget",
 	"contactName",
@@ -1000,6 +1055,20 @@ const BOOKING_FIELD_ORDER: readonly BookingField[] = [
 const BOOKING_LABELS: Partial<Record<BookingField, string>> = {
 	days: bookingCopy.steps.when,
 	size: bookingCopy.tattoo.size,
+	approximateSize: bookingCopy.tattoo.sizeDetails,
+};
+
+/** The flow's inputs, by form field name. */
+type BookingInput = keyof BookingValues;
+
+/** The field whose refusal the API reports for a composed value: its parts clear it when they change. */
+const COMPOSED_FROM: Partial<Record<BookingInput, BookingField>> = {
+	approximateSize: "size",
+	flexible: "days",
+	timeOfDay: "days",
+	style: "idea",
+	colour: "idea",
+	notes: "idea",
 };
 
 /** The summary for the fields of one step: each one's first error, then (on the tattoo step) the photos'. */

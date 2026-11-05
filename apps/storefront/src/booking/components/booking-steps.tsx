@@ -36,12 +36,15 @@ export function BookingProgress({
 	current,
 	reached,
 	onGo,
+	disabled = false,
 }: {
 	steps: readonly BookingStep[];
 	current: BookingStep;
 	/** The furthest step reached: every step up to it can be gone back to. */
 	reached: number;
 	onGo: (step: BookingStep) => void;
+	/** While the request is on its way: no step can be left. */
+	disabled?: boolean;
 }) {
 	const index = steps.indexOf(current);
 	return (
@@ -67,7 +70,11 @@ export function BookingProgress({
 						aria-current={i === index ? "step" : undefined}
 					>
 						{i !== index && i <= reached ? (
-							<button type="button" onClick={() => onGo(step)}>
+							<button
+								type="button"
+								onClick={() => onGo(step)}
+								disabled={disabled}
+							>
 								<span className="booking-progress-n" aria-hidden="true">
 									{i + 1}
 								</span>
@@ -286,6 +293,7 @@ export function PreferredDates({
 		<div
 			id="days"
 			className="booking-calendar"
+			tabIndex={-1}
 			aria-describedby={invalid ? "days-hint days-error" : "days-hint"}
 		>
 			<p id="days-hint" className="booking-hint">

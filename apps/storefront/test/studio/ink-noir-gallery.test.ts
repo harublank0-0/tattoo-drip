@@ -513,6 +513,23 @@ describe("one tattoo's page", () => {
 				undefined,
 			);
 		}
+		// The piece of an artist who takes no new work is the studio's general request (review fix).
+		const general = requestPageData(
+			STUDIO,
+			[{ ...SITA, acceptingInquiries: false }, ARJUN],
+			{ artwork: id },
+			ORIGIN,
+			IMAGE_ORIGIN,
+			null,
+			photo,
+		);
+		assert.equal(general.inquiry.kind, "open");
+		assert.equal(
+			general.inquiry.kind === "open"
+				? general.inquiry.preferredArtist
+				: undefined,
+			null,
+		);
 		const closed = requestPageData(
 			CLOSED_STUDIO,
 			[ARJUN],

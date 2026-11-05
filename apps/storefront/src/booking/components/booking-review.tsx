@@ -38,11 +38,14 @@ export function BookingReview({
 	studioName,
 	steps,
 	onEdit,
+	disabled = false,
 }: {
 	snapshot: RequestSnapshot;
 	studioName: string;
 	steps: readonly BookingStep[];
 	onEdit: (step: BookingStep) => void;
+	/** While the request is on its way: nothing can be edited. */
+	disabled?: boolean;
 }) {
 	const { values } = snapshot;
 	const edit = (step: BookingStep) =>
@@ -51,6 +54,7 @@ export function BookingReview({
 				type="button"
 				className="booking-edit"
 				onClick={() => onEdit(step)}
+				disabled={disabled}
 				aria-label={fill(copy.review.editStep, { name: copy.steps[step] })}
 			>
 				{copy.review.edit}

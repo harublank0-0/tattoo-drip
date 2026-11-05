@@ -475,9 +475,19 @@ export function requestPageData(
 			booking: bookingContextOf(studio, artistViews, null),
 		};
 	}
-	// The artist asked for, else the piece's own (Prompt 6: "inspired by" keeps its artist).
-	const slug = search.artist ?? artwork?.artistSlug;
-	const artist = slug === undefined ? null : findArtist(artistViews, slug);
+	// The artist asked for, else the piece's own while they take new work
+	// (Prompt 6: "inspired by" keeps its artist; a closed one's piece is the
+	// studio's general request, as its "Request a similar tattoo" link says).
+	const ofPiece =
+		artwork?.artistSlug === undefined
+			? null
+			: findArtist(artistViews, artwork.artistSlug);
+	const artist =
+		search.artist !== undefined
+			? findArtist(artistViews, search.artist)
+			: ofPiece?.accepting
+				? ofPiece
+				: null;
 	const asked = inquiryState(studioView, artistViews, artist);
 	// "Request a similar tattoo" (Prompt 5): the idea starts with a link to the
 	// piece the API showed, which the client edits or keeps; the form sends only

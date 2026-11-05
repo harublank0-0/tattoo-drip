@@ -151,7 +151,7 @@ export function bookingSteps(choice: boolean): readonly BookingStep[] {
 export const STEP_FIELDS: Record<BookingStep, readonly BookingField[]> = {
 	artist: ["preferredArtistId"],
 	when: ["days"],
-	tattoo: ["idea", "size", "placement", "budget"],
+	tattoo: ["idea", "size", "approximateSize", "placement", "budget"],
 	details: ["contactName", "contactPhone", "contactEmail", "sourceChannel"],
 	review: [],
 };

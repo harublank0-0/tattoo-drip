@@ -268,6 +268,29 @@ describe("the steps", () => {
 	});
 });
 
+describe("review fixes (Prompt 6)", () => {
+	test("a size too long with its choice is the client's words to shorten, not the choice", () => {
+		const rules = { studioName: "Black Needle", artistIds: [] };
+		const long = values({
+			size: "extra-large",
+			approximateSize: "x".repeat(100),
+		});
+		const errors = bookingErrors(long, TODAY, CONTEXT, rules);
+		assert.ok(errors.approximateSize);
+		assert.equal(errors.size, undefined);
+		assert.ok(STEP_FIELDS.tattoo.includes("approximateSize"));
+		// Nothing at all: the choice is what is missing.
+		const none = bookingErrors(
+			values({ size: "", approximateSize: "" }),
+			TODAY,
+			CONTEXT,
+			rules,
+		);
+		assert.ok(none.size);
+		assert.equal(none.approximateSize, undefined);
+	});
+});
+
 describe("what it never claims", () => {
 	test("no appointment slots are offered: the platform serves none, and there is no mock", async () => {
 		assert.equal(NO_AVAILABILITY.supported, false);

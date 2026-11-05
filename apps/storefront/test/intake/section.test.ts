@@ -226,7 +226,7 @@ describe("the mounted form belongs to the artist it is for (TAT-127)", () => {
 		assert.equal(intakeFormKey(open(SITA)), sita);
 	});
 
-	test("IntakeMount keys the lazy form by it, so moving between /request addresses mounts a fresh one", () => {
+	test("IntakeMount keys the lazy form by it and by the piece asked about, so moving between /book addresses mounts a fresh one", () => {
 		const text = readFileSync(
 			new URL("../../src/intake/components/intake-mount.tsx", import.meta.url),
 			"utf8",
@@ -234,7 +234,7 @@ describe("the mounted form belongs to the artist it is for (TAT-127)", () => {
 
 		assert.match(
 			text,
-			/<LazyIntakeForm key=\{intakeFormKey\(props\.state\)\} \{\.\.\.props\} \/>/,
+			/key=\{`\$\{intakeFormKey\(props\.state\)\}\|\$\{props\.booking\.artwork\?\.id \?\? ""\}`\}/,
 		);
 	});
 });
