@@ -139,15 +139,19 @@ describe("rethrowAsNotFound", () => {
 			message: "db timeout at pg://secret-host:5432",
 		});
 		assert.throws(
-			() => rethrowAsNotFound(conflict),
+			() => rethrowAsNotFound(conflict, "black-needle"),
 			(error: unknown) =>
 				error instanceof PageReadError &&
 				!String(error.message).includes("secret-host"),
 		);
 		assert.deepEqual(log.mock.calls.at(-1)?.arguments, [
 			"Page read failed",
-			{ status: 502, code: "bad_gateway" },
+			{ slug: "black-needle", status: 502, code: "bad_gateway" },
 		]);
+		// A bug keeps its name and stack for the log, never in the page.
+		const first = log.mock.calls[0]?.arguments[1] as Record<string, unknown>;
+		assert.equal(first.error, "TypeError");
+		assert.match(String(first.stack), /TypeError: x is undefined/);
 		assert.ok(
 			!JSON.stringify(log.mock.calls.map((call) => call.arguments)).includes(
 				"secret-host",

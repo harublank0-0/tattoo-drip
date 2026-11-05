@@ -58,6 +58,13 @@ describe("the studio's sitemap", () => {
 				"/book",
 			),
 		);
+		// A hidden roster is not advertised (review fix).
+		const hidden = sitemapPaths(
+			studio(GOOD_TO_KNOW_STUDIO, ["work", "flash", "info", "inquiry"]),
+			[SITA, ARJUN],
+			IMAGE_ORIGIN,
+		);
+		assert.ok(!hidden.some((path) => path.startsWith("/artists")));
 	});
 
 	test("is valid XML on the studio's own origin, every URL escaped; robots.txt points to it", () => {

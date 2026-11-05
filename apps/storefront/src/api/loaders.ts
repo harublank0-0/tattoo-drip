@@ -9,9 +9,10 @@ import type { ApiContext } from "./context.ts";
  * shows; anything else is the error component's, as a PageReadError (Prompt
  * 8): the router serializes a failed match's error into the page's state for
  * the browser, so it must carry nothing of the API's (its message, the URL,
- * a stack). The log line says what failed, with the status and code only.
+ * a stack). The log line says which studio and what failed: the API's status
+ * and code (never its message), or a bug's name and stack.
  */
-export function rethrowAsNotFound(error: unknown): never {
+export function rethrowAsNotFound(error: unknown, slug?: string): never {
 	if (
 		isTattooApiError(error) &&
 		error.status === 404 &&
@@ -19,10 +20,19 @@ export function rethrowAsNotFound(error: unknown): never {
 	) {
 		throw notFound();
 	}
-	console.error("Page read failed", {
-		status: isTattooApiError(error) ? error.status : undefined,
-		code: isTattooApiError(error) ? error.code : undefined,
-	});
+	// Like the other read lines: the studio, the API's status and code, never
+	// its message; a failure that is not the API's (a bug, a parse error, an
+	// abort) keeps its name and stack, which are this code's, for the log.
+	console.error(
+		"Page read failed",
+		isTattooApiError(error)
+			? { slug, status: error.status, code: error.code }
+			: {
+					slug,
+					error: error instanceof Error ? error.name : typeof error,
+					stack: error instanceof Error ? error.stack : undefined,
+				},
+	);
 	throw new PageReadError();
 }
 
@@ -50,6 +60,6 @@ export async function loadStudio({
 			staleTime: "static",
 		});
 	} catch (error) {
-		return rethrowAsNotFound(error);
+		return rethrowAsNotFound(error, tattoo.connection.tenant);
 	}
 }

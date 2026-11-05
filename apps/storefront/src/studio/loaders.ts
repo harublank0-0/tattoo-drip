@@ -1321,7 +1321,7 @@ async function loadFlash(
 		) {
 			throw notFound();
 		}
-		return rethrowAsNotFound(error);
+		return rethrowAsNotFound(error, tattoo.connection.tenant);
 	}
 }
 
@@ -1335,7 +1335,7 @@ async function loadWorkPhoto(
 			staleTime: "static",
 		});
 	} catch (error) {
-		return rethrowAsNotFound(error);
+		return rethrowAsNotFound(error, tattoo.connection.tenant);
 	}
 }
 
@@ -1368,7 +1368,7 @@ async function loadFlashDesign(
 			staleTime: "static",
 		});
 	} catch (error) {
-		return rethrowAsNotFound(error);
+		return rethrowAsNotFound(error, tattoo.connection.tenant);
 	}
 }
 
@@ -1409,7 +1409,7 @@ async function loadWork(
 		) {
 			throw notFound();
 		}
-		return rethrowAsNotFound(error);
+		return rethrowAsNotFound(error, tattoo.connection.tenant);
 	}
 }
 
@@ -1423,7 +1423,7 @@ async function loadArtists({
 			staleTime: "static",
 		});
 	} catch (error) {
-		return rethrowAsNotFound(error);
+		return rethrowAsNotFound(error, tattoo.connection.tenant);
 	}
 }
 

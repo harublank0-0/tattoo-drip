@@ -14,7 +14,8 @@ import { artistViewModels, studioViewModel } from "./view-model.ts";
 /**
  * The studio's sitemap and robots.txt (Prompt 8). Pure. The sitemap lists the
  * pages the studio's own data makes real, on its own origin: the studio page,
- * its artists (the directory and each visible artist), the gallery, flash
+ * its artists (the directory and each visible artist, while its Artists
+ * section is shown), the gallery, flash
  * while the Flash section is shown, the booking page while the studio takes
  * requests, and the informational pages with content of their own (the same
  * check as their routes, infoContent). Never a deposit page, a filtered or
@@ -30,7 +31,8 @@ export function sitemapPaths(
 	const visible = artistViewModels(artists, imageOrigin);
 	const { sections } = parseThemeConfig(storefrontInput(studio), imageOrigin);
 	const paths = ["/"];
-	if (visible.length > 0) {
+	// A roster the studio hides is not advertised, as the navigation doesn't link it.
+	if (sections.includes("artists") && visible.length > 0) {
 		paths.push(artistsHref({}));
 		for (const artist of visible) paths.push(artist.pageHref);
 	}

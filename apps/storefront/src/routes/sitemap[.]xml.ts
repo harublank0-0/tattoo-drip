@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, isNotFound } from "@tanstack/react-router";
 import { createRequestApi } from "../api/request.ts";
 import { createRequestSite } from "../site/request.ts";
 import { PAGE_CACHE } from "../studio/cache.ts";
@@ -17,13 +17,27 @@ export const Route = createFileRoute("/sitemap.xml")({
 			GET: async () => {
 				const api = createRequestApi();
 				const site = createRequestSite();
-				const paths = await loadSitemapPaths(api);
-				return new Response(sitemapXml(site.origin, paths), {
-					headers: {
-						"Content-Type": "application/xml; charset=utf-8",
-						"Cache-Control": PAGE_CACHE,
-					},
-				});
+				try {
+					const paths = await loadSitemapPaths(api);
+					return new Response(sitemapXml(site.origin, paths), {
+						headers: {
+							"Content-Type": "application/xml; charset=utf-8",
+							"Cache-Control": PAGE_CACHE,
+						},
+					});
+				} catch (error) {
+					// The read logged itself (rethrowAsNotFound). A crawler retries a
+					// 503 later; nothing here is cached or says why.
+					const missing = isNotFound(error);
+					return new Response(missing ? "Not found\n" : "Unavailable\n", {
+						status: missing ? 404 : 503,
+						headers: {
+							"Content-Type": "text/plain; charset=utf-8",
+							"Cache-Control": "no-store",
+							...(missing ? {} : { "Retry-After": "30" }),
+						},
+					});
+				}
 			},
 		},
 	},
