@@ -10,6 +10,7 @@ import ArtistService, {
 	type ProfileEditor,
 } from "#modules/artists/services/artist_service";
 import type { StyleSlug } from "#modules/artists/styles";
+import { visibleArtistSql } from "#modules/artists/visibility";
 import type { WorkCursor } from "#modules/artists/work_cursor";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
@@ -19,18 +20,8 @@ import { afterRollback, dbClient, withTransaction } from "#services/db_context";
 type Upload = Pick<MultipartFile, "tmpPath">;
 type TenantRef = Pick<Tenant, "id">;
 
-/**
- * The photo's artist is visible and live, asked in the photo's own query (see
- * findShown); `photos` is the name the query gives artist_work_photos.
- */
-const visibleArtist = (photos = "artist_work_photos") => `exists (
-	select 1 from artists
-	where artists.id = ${photos}.artist_id
-		and artists.tenant_id = ?
-		and artists.visible
-		and artists.deleted_at is null
-)`;
-const VISIBLE_ARTIST = visibleArtist();
+/** The photo's artist is still shown (see visibleArtistSql). */
+const VISIBLE_ARTIST = visibleArtistSql("artist_work_photos");
 
 /**
  * The most work photos an artist shows. The database no longer holds this
@@ -85,8 +76,9 @@ export default class WorkPhotoService {
 	/**
 	 * Many artists' newest `perArtist` photos in one query, each artist's
 	 * newest first; an artist with none has no entry. The caller passes the
-	 * ids of artists it may show (the public reads pass only visible ones); no
-	 * query for []. The cut is made in the database by ranking each artist's
+	 * ids of artists it may show (the public reads pass only visible ones);
+	 * only those still visible and live in this query count (VISIBLE_ARTIST);
+	 * no query for []. The cut is made in the database by ranking each artist's
 	 * photos in the order of `list`, so a tie in dates is broken by id and the
 	 * same photos come back every time.
 	 */
@@ -107,10 +99,11 @@ export default class WorkPhotoService {
 						) as place
 						from artist_work_photos
 						where tenant_id = ? and artist_id in (${artistIds.map(() => "?").join(", ")})
+							and ${VISIBLE_ARTIST}
 					) as ranked
 					where place <= ?
 				)`,
-				[tenant.id, ...artistIds, perArtist],
+				[tenant.id, ...artistIds, tenant.id, perArtist],
 			)
 			.orderBy("artist_id", "asc")
 			.orderBy("created_at", "desc")
@@ -219,7 +212,7 @@ export default class WorkPhotoService {
 			from artist_work_photos p
 			left join lateral unnest(p.styles) as s(style) on true
 			where p.tenant_id = ? and p.artist_id in (${artistIds.map(() => "?").join(", ")})
-				and ${visibleArtist("p")}`,
+				and ${visibleArtistSql("p")}`,
 			[tenant.id, ...artistIds, tenant.id],
 		);
 		return { styles: rows[0].styles, healed: rows[0].healed };

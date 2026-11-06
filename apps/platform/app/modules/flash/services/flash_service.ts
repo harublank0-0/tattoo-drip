@@ -7,6 +7,7 @@ import ArtistService, {
 	mayEdit,
 	type ProfileEditor,
 } from "#modules/artists/services/artist_service";
+import { visibleArtistSql } from "#modules/artists/visibility";
 import type { WorkCursor } from "#modules/artists/work_cursor";
 import {
 	FlashInUseError,
@@ -34,23 +35,8 @@ const PURPOSE = "flash_design";
 const INQUIRY_KEY = "inquiries_flash_design_fk";
 const PROJECT_KEY = "tattoo_projects_flash_design_fk";
 
-/**
- * Keeps a design only while its artist is, in this very statement, a live
- * visible artist of the tenant (one `?`: the tenant's id). The public reads
- * get artist ids that were read earlier, and under READ COMMITTED an artist
- * can be hidden or deleted between that read and the designs'; asking again
- * in the same SQL means a cacheable response never carries a design of an
- * artist who is no longer shown. `artists` is soft-deleted, so `deleted_at`
- * is said here (the model's scope is a fetch hook and does not reach a
- * subquery).
- */
-const VISIBLE_ARTIST = `exists (
-	select 1 from artists
-	where artists.id = flash_designs.artist_id
-		and artists.tenant_id = ?
-		and artists.visible
-		and artists.deleted_at is null
-)`;
+/** The design's artist is still shown (see visibleArtistSql). */
+const VISIBLE_ARTIST = visibleArtistSql("flash_designs");
 
 /**
  * What a new design needs besides the picture; `price` is in paisa, null for

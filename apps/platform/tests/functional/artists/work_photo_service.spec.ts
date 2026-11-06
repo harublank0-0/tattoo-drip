@@ -1160,7 +1160,7 @@ test.group("the paged read (TAT-126)", (group) => {
 		assert.lengthOf(own.photos, 1);
 	});
 
-	test("an artist hidden or deleted after the caller read the visible ids, with a photo added since, is in no page and no filter", async ({
+	test("an artist hidden or deleted after the caller read the visible ids, with a photo added since, is in no page, no filter and no artist read", async ({
 		assert,
 	}) => {
 		const { tenant, owner: user } = await studioWithOwner();
@@ -1203,6 +1203,8 @@ test.group("the paged read (TAT-126)", (group) => {
 				styles: ["realism"],
 				healed: false,
 			});
+			const byArtist = await photos.forArtists(tenant, stale, 6);
+			assert.deepEqual([...byArtist.keys()], [staying.id]);
 		});
 	});
 });

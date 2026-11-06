@@ -64,7 +64,7 @@ A protected `newCode()` lets a test force a collision. The service must run insi
 `DepositLinkService.insertWithCode` (the project's first link):
 
 - **The project has an inquiry, and the inquiry has a code that no other link of the studio holds:** the link uses that code, which is already in `reference_codes`.
-  - The check is the existing `deposit_links (tenant_id, reference_code)` unique constraint. On that violation, fall back to a fresh code.
+  - The check is the existing `deposit_links (tenant_id, reference_code)` unique constraint. The insert runs in its own savepoint (`withTransaction`, as `insertWithCode` does today), because a failed statement otherwise aborts the request transaction. On that violation, roll back to the savepoint and fall back to a fresh code.
   - That covers a deleted earlier project's link that still holds it.
 - **Otherwise** (a desk project, an inquiry with no code, or the fallback): `ReferenceCodeService.claim` draws a code, and the link uses it.
 - A replaced link keeps its code, as today.
