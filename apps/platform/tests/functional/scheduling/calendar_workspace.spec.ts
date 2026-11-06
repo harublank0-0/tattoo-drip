@@ -1,3 +1,4 @@
+import app from "@adonisjs/core/services/app";
 import testUtils from "@adonisjs/core/services/test_utils";
 import type { ApiClient } from "@japa/api-client";
 import { test } from "@japa/runner";
@@ -5,8 +6,9 @@ import { DateTime } from "luxon";
 import { AGENDA_DAYS, MONTH_CELL_ROWS } from "#modules/scheduling/calendar";
 import ProjectSession from "#modules/scheduling/models/project_session";
 import OpeningHoursService from "#modules/scheduling/services/opening_hours_service";
+import SessionService from "#modules/scheduling/services/session_service";
 import { makeClient, makeProject, makeSession } from "#tests/helpers/pipeline";
-import { inTenant } from "#tests/helpers/tenants";
+import { inTenant, inTenantAs } from "#tests/helpers/tenants";
 import { KTM, studio } from "#tests/helpers/waiting_fixtures";
 
 type Who = Parameters<ReturnType<ApiClient["get"]>["loginAs"]>[0];
@@ -384,5 +386,46 @@ test.group("Calendar workspace (Studio OS)", (group) => {
 		assert.deepEqual(byDate["2026-11-03"].closure, { note: "Tihar" });
 		assert.deepEqual(byDate["2026-11-04"].closure, { note: "Tihar" });
 		assert.isNull(byDate["2026-11-05"].closure);
+	});
+
+	test("the new reads never cross studios: closed days and sessions by status", async ({
+		assert,
+	}) => {
+		const a = await booked("cal-iso-a");
+		const b = await booked("cal-iso-b");
+		const date = dayFrom(3);
+		const hours = new OpeningHoursService();
+		const sessions = await app.container.make(SessionService);
+		await inTenant(a.tenant, async () => {
+			await hours.addClosure(
+				a.tenant,
+				{ startsOn: date, endsOn: date, note: "A's holiday" },
+				dayFrom(0),
+			);
+			await makeSession(a.tenant, a.ashas, a.ashaProfile, {
+				startsAt: at(date, 10),
+				endsAt: at(date, 11),
+				status: "cancelled",
+			});
+		});
+		const window = {
+			from: at(date, 0),
+			to: at(date, 23, 59),
+			artistId: null,
+			statuses: ["cancelled", "no_show"] as const,
+		};
+
+		// From B's context, asking for B's rows and for A's: nothing of A's.
+		await inTenantAs(b.tenant, b.owner, async () => {
+			assert.deepEqual(await hours.closuresBetween(b.tenant, date, date), []);
+			assert.deepEqual(await hours.closuresBetween(a.tenant, date, date), []);
+			assert.deepEqual(await sessions.listInRange(b.tenant, window), []);
+			assert.deepEqual(await sessions.listInRange(a.tenant, window), []);
+		});
+		// The positive control: A sees its own.
+		await inTenantAs(a.tenant, a.owner, async () => {
+			assert.lengthOf(await hours.closuresBetween(a.tenant, date, date), 1);
+			assert.lengthOf(await sessions.listInRange(a.tenant, window), 1);
+		});
 	});
 });
