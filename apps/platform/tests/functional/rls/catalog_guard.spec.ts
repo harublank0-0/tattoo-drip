@@ -17,14 +17,28 @@ const EXEMPT: Record<string, string> = {
 		"rate-limit counters keyed by HMAC digests (TAT-8), not tenant-owned",
 	account_tokens:
 		"single-use account links (TAT-18): SHA-256 digests only, read before any context exists by a link anyone may open, not tenant-owned",
+	places:
+		"platform reference data (Discover D02): the cities a studio can name, the same for everyone; the app role may only read it",
 	adonis_schema: "migration bookkeeping",
 	adonis_schema_versions: "migration bookkeeping",
 };
 
-/** The exact policies each protected table has, as "name:COMMAND". */
+/**
+ * The exact policies each protected table has, as "name:COMMAND". The
+ * discovery_* ones apply to the discovery role only (Discover D02,
+ * tests/functional/rls/discovery.spec.ts checks their roles).
+ */
 const EXPECTED_POLICIES: Record<string, string[]> = {
-	artist_work_photos: ["tenant_isolation:ALL"],
-	artists: ["tenant_isolation:ALL"],
+	artist_work_photos: [
+		"discovery_only:SELECT",
+		"discovery_select:SELECT",
+		"tenant_isolation:ALL",
+	],
+	artists: [
+		"discovery_only:SELECT",
+		"discovery_select:SELECT",
+		"tenant_isolation:ALL",
+	],
 	clients: ["tenant_isolation:ALL"],
 	deposit_links: ["tenant_isolation:ALL"],
 	deposit_outcomes: ["tenant_isolation:ALL"],
@@ -45,6 +59,7 @@ const EXPECTED_POLICIES: Record<string, string[]> = {
 	tattoo_projects: ["tenant_isolation:ALL"],
 	tenant_invitations: ["tenant_isolation:ALL"],
 	tenant_memberships: [
+		"discovery_none:SELECT",
 		"tenant_memberships_delete:DELETE",
 		"tenant_memberships_insert:INSERT",
 		"tenant_memberships_select:SELECT",
@@ -52,6 +67,8 @@ const EXPECTED_POLICIES: Record<string, string[]> = {
 	],
 	tenant_slugs: ["tenant_slugs_insert:INSERT", "tenant_slugs_select:SELECT"],
 	tenants: [
+		"discovery_only:SELECT",
+		"discovery_select:SELECT",
 		"tenants_insert:INSERT",
 		"tenants_select:SELECT",
 		"tenants_update:UPDATE",

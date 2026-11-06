@@ -12,7 +12,8 @@ This file is the plan Discover prompts work from. The dated `docs/superpowers/sp
 | Product boundaries and domains | Decided |
 | Roadmap D01–D11 | Defined |
 | D01: domain migration preparation | Done: [domain migration](domain-migration.md); the production cutover is D11 |
-| D02: discovery database foundation | Next |
+| D02: discovery database foundation | Done: [database security](database-security.md) |
+| D03: public Discover API, SDK client, React hooks | Next |
 
 Status legend: **Done** = in code, with tests where noted. **Partial** = exists, but not in the form Discover needs. **Planned** = only in docs. **Missing** = searched for and absent. **Unverified** = not checked against a running system.
 
@@ -196,6 +197,20 @@ profile CTA ─► https://<slug>.tattoodrip.page/book?artist=…&ref=<signed>  
     - A visibility parity test compares storefront and Discover on the same fixtures (a hidden artist or photo disappears from both).
 
 ---
+
+### C.3 As built in D02 (deviations from C.2 and D.1)
+
+The implementation follows C.2, adjusted where the code or measurements required. Each change is explained in [database security](database-security.md).
+
+- **Where the role comes from.** `tattoo_drip_discovery` is created by `setup_roles.sql`, the repository's place for roles, not by a migration. The migration refuses to run without it.
+- **Policy shape.** A restrictive policy carries the full rule. The permissive policy checks only the row's own columns. A photo's rule reads `artists`, whose own restrictive policy brings the studio's rule with it. With the full rule in both, the newest-photos page took 340 ms instead of 2 ms.
+- **No `security_barrier` on the views.** RLS makes it redundant, and it cost the newest-first index (145 ms against 2 ms).
+- **No trigram or GIN indexes.** Under RLS, a caller's non-leakproof condition cannot be an index condition, and trial indexes were ignored. Name search scans listed rows (under 1 ms). The style filter scans too (~117 ms at 50,000 photos), which D03 must measure.
+- **Studios.** No `discovery.places` view and no derived studio-styles column. The app reads `places` directly; a studio's styles come from its shown artists in `discovery.artists`.
+- **Contact details are not in the views.** Phone, email and address stay on the studio page.
+- **Listing consent.** `discovery_listed_at` doubles as the consent timestamp: a listing requires it, by CHECK constraint.
+- **Takedowns.** Per studio and per photo, as planned. The artist flag is the artist's own opt-out.
+- **Styles.** They stay the code list `TATTOO_STYLES` with slug arrays. No second taxonomy table.
 
 ## D. Data model gap analysis
 

@@ -699,6 +699,18 @@ Nothing else is needed: nginx reaches `web` and `storefront` by fixed addresses 
 
 ---
 
+### Once, before deploying the Discover database (D02)
+
+The Discover migrations need the database role `tattoo_drip_discovery`, which `setup_roles.sql` creates. A new server's database gets it at its first start; this one ran the older script, so run the current one once before `deploy.sh` (it is safe to run again, and changes nothing else):
+
+```bash
+cd /srv/tattoo-drip/app && git pull --ff-only
+docker compose -f deploy/compose.yml exec -T postgres sh -c \
+  'psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v app_user="$APP_DB_USER" -v app_password="$APP_DB_PASSWORD" -v owner_user="$POSTGRES_USER" -f /opt/setup_roles.sql'
+```
+
+**You should see:** no `ERROR`. Without it, the migration stops with "the role tattoo_drip_discovery is missing" and the old release keeps running. Details: [Discover database security](../docs/discover/database-security.md).
+
 ## 6. Backups
 
 Every night at 02:00 Nepal time a job dumps the database (`pg_dump --format=custom`, as the owner role), reads the dump back to check it, copies it to `tattoo-drip-backups/db` in R2 as `tattoo_drip-<UTC time>.dump`, deletes dumps older than 30 days, and pings a heartbeat so you hear when a night is missed. A night the server was off runs at the next boot. Not backed up: the photos in R2 (R2 itself is durable; a bug that deletes files cannot be undone) and the settings files (keep your own copy, 2.4).

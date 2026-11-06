@@ -39,6 +39,7 @@ export class ArtistWorkPhotoSchema extends BaseModel {
 		"alt",
 		"artistId",
 		"createdAt",
+		"discoverySuspendedAt",
 		"healed",
 		"height",
 		"hidden",
@@ -56,6 +57,8 @@ export class ArtistWorkPhotoSchema extends BaseModel {
 	declare artistId: string;
 	@column.dateTime({ autoCreate: true })
 	declare createdAt: DateTime;
+	@column.dateTime()
+	declare discoverySuspendedAt: DateTime | null;
 	@column()
 	declare healed: boolean;
 	@column()
@@ -84,6 +87,7 @@ export class ArtistSchema extends BaseModel {
 		"closedMessage",
 		"createdAt",
 		"deletedAt",
+		"discoveryListed",
 		"facebookUrl",
 		"id",
 		"instagramUrl",
@@ -112,6 +116,8 @@ export class ArtistSchema extends BaseModel {
 	declare createdAt: DateTime;
 	@column.dateTime()
 	declare deletedAt: DateTime | null;
+	@column()
+	declare discoveryListed: boolean;
 	@column()
 	declare facebookUrl: string | null;
 	@column({ isPrimary: true })
@@ -518,6 +524,30 @@ export class PaymentSchema extends BaseModel {
 	declare verifiedAt: DateTime | null;
 	@column()
 	declare verifiedByUserId: string | null;
+}
+
+export class PlaceSchema extends BaseModel {
+	static $columns = [
+		"countryCode",
+		"createdAt",
+		"id",
+		"name",
+		"region",
+		"slug",
+	] as const;
+	$columns = PlaceSchema.$columns;
+	@column()
+	declare countryCode: string;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare name: string;
+	@column()
+	declare region: string | null;
+	@column()
+	declare slug: string;
 }
 
 export class ProjectSessionSchema extends BaseModel {
@@ -1052,6 +1082,10 @@ export class TenantSchema extends BaseModel {
 		"defaultDepositPercent",
 		"deletedAt",
 		"depositPolicy",
+		"discoveryListed",
+		"discoveryListedAt",
+		"discoverySuspendedAt",
+		"discoverySuspensionNote",
 		"facebookUrl",
 		"id",
 		"instagramUrl",
@@ -1062,6 +1096,7 @@ export class TenantSchema extends BaseModel {
 		"logoImageWidth",
 		"logoTile",
 		"name",
+		"placeId",
 		"policiesUpdatedAt",
 		"slug",
 		"storefrontClaimedFlash",
@@ -1108,6 +1143,14 @@ export class TenantSchema extends BaseModel {
 	@column()
 	declare depositPolicy: string | null;
 	@column()
+	declare discoveryListed: boolean;
+	@column.dateTime()
+	declare discoveryListedAt: DateTime | null;
+	@column.dateTime()
+	declare discoverySuspendedAt: DateTime | null;
+	@column()
+	declare discoverySuspensionNote: string | null;
+	@column()
 	declare facebookUrl: string | null;
 	@column({ isPrimary: true })
 	declare id: string;
@@ -1127,6 +1170,8 @@ export class TenantSchema extends BaseModel {
 	declare logoTile: string;
 	@column()
 	declare name: string;
+	@column()
+	declare placeId: string | null;
 	@column.dateTime()
 	declare policiesUpdatedAt: DateTime | null;
 	@column()

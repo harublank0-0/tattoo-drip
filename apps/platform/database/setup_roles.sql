@@ -36,3 +36,23 @@ ALTER DEFAULT PRIVILEGES FOR ROLE :"owner_user" IN SCHEMA public
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO :"app_user";
 ALTER DEFAULT PRIVILEGES FOR ROLE :"owner_user" IN SCHEMA public
   GRANT USAGE, SELECT ON SEQUENCES TO :"app_user";
+
+-- The discovery role (Discover D02, docs/discover/database-security.md): it
+-- owns the public views in the `discovery` schema, so they read the tenant
+-- tables as this role, under row-level security and column grants, never
+-- as the owner (who bypasses RLS). Nobody logs in as it, it belongs to no
+-- role and no role belongs to it; the migrations give it column-level
+-- SELECT and its policies. The name is fixed: the migrations and policies
+-- name it.
+SELECT 'CREATE ROLE tattoo_drip_discovery NOLOGIN'
+WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'tattoo_drip_discovery')
+\gexec
+ALTER ROLE tattoo_drip_discovery NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOREPLICATION NOINHERIT;
+-- Neither a member of any role nor holding members (a member could act as
+-- it). Every membership either way is revoked, the app role's included.
+SELECT format('REVOKE %I FROM %I', r.rolname, m.rolname)
+FROM pg_auth_members am
+JOIN pg_roles r ON r.oid = am.roleid
+JOIN pg_roles m ON m.oid = am.member
+WHERE r.rolname = 'tattoo_drip_discovery' OR m.rolname = 'tattoo_drip_discovery'
+\gexec
