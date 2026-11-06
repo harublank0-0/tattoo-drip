@@ -1,10 +1,4 @@
-import {
-	createHash,
-	createHmac,
-	hkdfSync,
-	randomBytes,
-	randomInt,
-} from "node:crypto";
+import { createHash, createHmac, hkdfSync, randomBytes } from "node:crypto";
 import {
 	DEFAULT_TEMPLATES,
 	firstName,
@@ -22,12 +16,13 @@ export const DEPOSIT_LINK_DAYS = 30;
  */
 export const DEPOSIT_TOKEN = /^[A-Za-z0-9_-]{43}$/;
 
-/**
- * The reference code's symbols: digits and capitals that can't be misread
- * when typed into a payment remark (no 0, 1, I, L, O or U).
- */
-export const REFERENCE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTVWXYZ";
-export const REFERENCE_LENGTH = 6;
+// The reference code moved to the references module (one code from request
+// to deposit); its names stay importable from here.
+export {
+	newReferenceCode,
+	REFERENCE_ALPHABET,
+	REFERENCE_LENGTH,
+} from "#modules/references/reference_codes";
 
 /** Where deposit links point without STOREFRONT_URL: TAT-12's dev host. */
 export const DEV_STOREFRONT_URL = "http://{tenant}.localhost:3000";
@@ -68,15 +63,6 @@ export function tokenFor(nonce: string): string {
 /** What a token is looked up by: its SHA-256 in hex. */
 export function hashToken(token: string): string {
 	return createHash("sha256").update(token).digest("hex");
-}
-
-/** A random reference code: REFERENCE_LENGTH symbols of REFERENCE_ALPHABET. */
-export function newReferenceCode(): string {
-	let code = "";
-	for (let i = 0; i < REFERENCE_LENGTH; i++) {
-		code += REFERENCE_ALPHABET[randomInt(REFERENCE_ALPHABET.length)];
-	}
-	return code;
 }
 
 /** The template deposit links are built from: STOREFRONT_URL, else the dev host. */

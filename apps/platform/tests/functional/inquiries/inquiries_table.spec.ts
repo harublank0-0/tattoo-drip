@@ -468,6 +468,109 @@ test.group("inquiries table", (group) => {
 		});
 	});
 
+	test("style, colour and reference_code cannot change after insert; notes only in the anonymising update", async ({
+		assert,
+	}) => {
+		const { a, clientA } = await twoTenants();
+
+		await withDbContext({ tenantId: a.id }, async (trx) => {
+			const id = idOf(
+				await insertRow(
+					trx,
+					"inquiries",
+					newInquiry(a.id, clientA.id, {
+						style: "fine-line",
+						colour: "black-grey",
+						notes: "A cover-up",
+						reference_code: "K7MP3Q",
+					}),
+				),
+			);
+			const frozen: [string, unknown][] = [
+				["style", "realism"],
+				["colour", "colour"],
+				["reference_code", "K7MP3R"],
+				["notes", "Changed"],
+			];
+			for (const [column, value] of frozen) {
+				await assert.rejects(
+					() =>
+						withTransaction((inner) =>
+							updateRow(inner, "inquiries", id, { [column]: value }),
+						),
+					new RegExp(`inquiries_guard_update: ${column} cannot change`),
+				);
+			}
+			// The client's notes are free text: the anonymising update may clear them.
+			await updateRow(trx, "inquiries", id, {
+				notes: null,
+				anonymized_at: new Date(),
+			});
+		});
+	});
+
+	test("the database refuses a bad colour, notes over 1000 characters, a bad style slug and a bad code", async ({
+		assert,
+	}) => {
+		const { a, clientA } = await twoTenants();
+		const bad: [Record<string, unknown>, RegExp][] = [
+			[{ colour: "red" }, /inquiries_colour_known/],
+			[{ notes: "x".repeat(1001) }, /inquiries_notes_length/],
+			[{ style: "Fine Line" }, /inquiries_style_shape/],
+			[{ reference_code: "ABC12O" }, /inquiries_reference_code_format/],
+		];
+
+		await withDbContext({ tenantId: a.id }, async () => {
+			for (const [over, constraint] of bad) {
+				await assert.rejects(
+					() =>
+						withTransaction((inner) =>
+							insertRow(inner, "inquiries", newInquiry(a.id, clientA.id, over)),
+						),
+					constraint,
+				);
+			}
+			// The longest notes, and none of the four, are fine.
+			await withTransaction((inner) =>
+				insertRow(
+					inner,
+					"inquiries",
+					newInquiry(a.id, clientA.id, { notes: "x".repeat(1000) }),
+				),
+			);
+			await withTransaction((inner) =>
+				insertRow(inner, "inquiries", newInquiry(a.id, clientA.id)),
+			);
+		});
+	});
+
+	test("two inquiries of one studio cannot share a reference code", async ({
+		assert,
+	}) => {
+		const { a, clientA } = await twoTenants();
+
+		await withDbContext({ tenantId: a.id }, async () => {
+			await withTransaction((inner) =>
+				insertRow(
+					inner,
+					"inquiries",
+					newInquiry(a.id, clientA.id, { reference_code: "K7MP3Q" }),
+				),
+			);
+			await assert.rejects(
+				() =>
+					withTransaction((inner) =>
+						insertRow(
+							inner,
+							"inquiries",
+							newInquiry(a.id, clientA.id, { reference_code: "K7MP3Q" }),
+						),
+					),
+				/inquiries_tenant_id_reference_code_unique/,
+			);
+		});
+	});
+
 	test("row-level security", async ({ assert }) => {
 		await assertRowLevelSecurity(
 			assert,

@@ -26,6 +26,7 @@ import ProjectService, {
 } from "#modules/projects/services/project_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import QuoteService from "#modules/projects/services/quote_service";
+import { REFERENCE_TRIES } from "#modules/references/reference_codes";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { withTransaction } from "#services/db_context";
 import { isUniqueViolation } from "#services/db_errors";
@@ -34,11 +35,8 @@ type TenantRef = Pick<Tenant, "id">;
 type ProjectRef = Pick<TattooProject, "id">;
 type Fresh = Pick<DepositLink, "tokenNonce" | "tokenHash" | "expiresAt">;
 
-/**
- * Draws of a reference code before giving up. Each existing code makes a
- * collision a 1 in 729 million event, so a studio never gets here.
- */
-export const REFERENCE_TRIES = 5;
+// How many codes are drawn before a collision surfaces (references module).
+export { REFERENCE_TRIES };
 
 const CODE_TAKEN = "deposit_links_tenant_id_reference_code_unique";
 

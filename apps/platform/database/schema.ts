@@ -310,6 +310,7 @@ export class InquirySchema extends BaseModel {
 		"approximateSize",
 		"budget",
 		"clientId",
+		"colour",
 		"contactEmail",
 		"contactName",
 		"contactPhone",
@@ -322,11 +323,14 @@ export class InquirySchema extends BaseModel {
 		"lastContactChannel",
 		"lastContactKind",
 		"lastContactedAt",
+		"notes",
 		"placement",
 		"preferredArtistId",
 		"preferredDates",
+		"referenceCode",
 		"sourceChannel",
 		"status",
+		"style",
 		"tenantId",
 		"updatedAt",
 	] as const;
@@ -339,6 +343,8 @@ export class InquirySchema extends BaseModel {
 	declare budget: string | null;
 	@column()
 	declare clientId: string;
+	@column()
+	declare colour: string | null;
 	@column()
 	declare contactEmail: string | null;
 	@column()
@@ -364,15 +370,21 @@ export class InquirySchema extends BaseModel {
 	@column.dateTime()
 	declare lastContactedAt: DateTime | null;
 	@column()
+	declare notes: string | null;
+	@column()
 	declare placement: string;
 	@column()
 	declare preferredArtistId: string | null;
 	@column()
 	declare preferredDates: string;
 	@column()
+	declare referenceCode: string | null;
+	@column()
 	declare sourceChannel: string;
 	@column()
 	declare status: string;
+	@column()
+	declare style: string | null;
 	@column()
 	declare tenantId: string;
 	@column.dateTime({ autoCreate: true, autoUpdate: true })
@@ -694,6 +706,19 @@ export class RateLimitSchema extends BaseModel {
 	declare key: string;
 	@column()
 	declare points: number;
+}
+
+export class ReferenceCodeSchema extends BaseModel {
+	static $columns = ["code", "createdAt", "id", "tenantId"] as const;
+	$columns = ReferenceCodeSchema.$columns;
+	@column()
+	declare code: string;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare tenantId: string;
 }
 
 export class ReferenceImageSchema extends BaseModel {
