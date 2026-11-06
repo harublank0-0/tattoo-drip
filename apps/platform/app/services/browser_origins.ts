@@ -33,7 +33,7 @@ function escapeRegExp(text: string): string {
 /** A matcher for the origins of every studio page under `template`. */
 function studioPages(template: string): RegExp {
 	const origin = new URL(template.replaceAll("{tenant}", MARKER)).origin;
-	const pattern = escapeRegExp(origin).replace(MARKER, SLUG_LABEL);
+	const pattern = escapeRegExp(origin).replaceAll(MARKER, SLUG_LABEL);
 	return new RegExp(`^${pattern}$`);
 }
 

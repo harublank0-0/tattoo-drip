@@ -1,6 +1,7 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import { assertApiError, assertNoCookies } from "#tests/helpers/api";
+import { rawRequest, readResponse } from "#tests/helpers/raw_http";
 import { studioWithOwner } from "#tests/helpers/tenants";
 
 /**
@@ -90,6 +91,41 @@ test.group("API-only hosts (Discover D01)", () => {
 		const response = await client
 			.get("/login")
 			.header("x-forwarded-host", "api.localhost");
+
+		assertApiError(response, 404, "not_found");
+	});
+
+	test("a path that only starts with /api and leaves it with dot segments is not the API", async ({
+		assert,
+	}) => {
+		// Sent raw: an HTTP client would normalise the dot segments itself. The
+		// forwarded host names the API's host (loopback is a trusted proxy).
+		for (const target of [
+			"/api/../sw.js",
+			"/api/../manifest.webmanifest",
+			"/api/%2e%2e/sw.js",
+			"/api/v1/../../login",
+		]) {
+			const socket = await rawRequest([
+				`GET ${target} HTTP/1.1`,
+				"X-Forwarded-Host: api.localhost",
+				"Connection: close",
+			]);
+			const response = await readResponse(socket);
+			socket.destroy();
+
+			assert.equal(response.status, 404, target);
+			assert.include(response.body, '"not_found"', target);
+			assert.notProperty(response.headers, "set-cookie", target);
+		}
+	});
+
+	test("behind a trusted proxy, the first forwarded host decides", async ({
+		client,
+	}) => {
+		const response = await client
+			.get("/login")
+			.header("x-forwarded-host", "api.localhost, localhost");
 
 		assertApiError(response, 404, "not_found");
 	});

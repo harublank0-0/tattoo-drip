@@ -70,7 +70,7 @@ media.tattoodrip.app → R2 public bucket (Cloudflare, not through the server)
 ## D. Rehearsal
 
 **Proxy layouts.** Both layouts are checked against stand-in apps:
-- 171 checks, covering host routing, visitor address, body limits, tokens kept out of logs, legacy redirects and the API-only host.
+- 174 checks, covering host routing, visitor address, body limits, tokens kept out of logs, legacy redirects and the API-only host.
 - It needs Docker or Podman, and the production subnet free.
 
 ```bash
@@ -129,7 +129,7 @@ This rehearsal was run for D01; see "J. D01 verification" below.
 | Old address (`tattoodrip.app`) | After D11 | Why |
 |---|---|---|
 | `/login`, `/logout`, `/signup[/…]`, `/forgot-password[/…]`, `/reset-password[/…]`, `/verify-email[/…]`, `/confirm-email`, `/invitations[/…]`, `/dashboard`, `/onboarding`, `/account[/…]`, `/t/*` | **307** to `https://app.tattoodrip.app` + same path and query | Bookmarks, emailed links, the installed app. 307 keeps the method and body and is not cached for good, so a rollback is not stuck behind it. Switch to 308 when the rollback window closes |
-| `/api/*` | **Proxied** to web (Host `tattoodrip.app`, which the platform answers as an API-only host) | Pages cached with the old dehydrated `apiUrl`, and any SDK user. A redirected multipart POST or preflight is not reliably followed. **Retire** after ≥30 days without traffic in the nginx log |
+| `/api`, `/api/*` | **Proxied** to web (Host `tattoodrip.app`, which the platform answers as an API-only host) | Pages cached with the old dehydrated `apiUrl`, and any SDK user. A redirected multipart POST or preflight is not reliably followed. **Retire** after ≥30 days without traffic in the nginx log |
 | `/sw.js` | Unregistering worker (nginx) | Removes the dashboard's worker from the apex |
 | `/assets/*`, `/uploads/*`, `/files/*`, `/manifest.webmanifest`, `/icons/*`, `/offline.html` | **Discover's** (not redirected) | Vite serves Discover's build at `/assets/`; R2 serves photos in production; the old shell files only matter to the retired worker |
 | Everything else | Discover | Discover routes (`/`, `/tattoos`, `/artists`, `/studios`, `/styles`, `/places`, `/for-studios`, `/pricing`, `/terms`, `/privacy`, sitemaps) do not collide with the list above |
@@ -146,6 +146,7 @@ The legacy redirects and the proxy are prepared in `deploy/nginx/hosts.split.con
 5. In Cloudflare, add tunnel public hostnames `app.tattoodrip.app` and `api.tattoodrip.app` → `http://nginx:80`. Check that the edge certificate covers them (Universal SSL covers `*.tattoodrip.app`).
    - Then `curl -sI https://app.tattoodrip.app` should be closed without an answer: the live layout's 444 proves the tunnel reaches nginx and nothing is served yet.
    - Do not touch the apex hostname.
+   - Add no Cloudflare cache rule for `/api` on any host (see I, "Edge caching of `/api`").
 
 **Cutover** (one deploy):
 
@@ -210,6 +211,8 @@ The legacy redirects and the proxy are prepared in `deploy/nginx/hosts.split.con
 | Production-mode rehearsal not run in D01 | It needs built images and scratch secrets. It is D11's first step; local rehearsal and the proxy harness passed |
 | Cloudflare settings | Tunnel hostnames, certificate coverage and any WAF or rate-limit rule (runbook §3.8 targets `tattoodrip.app` sign-in paths: move it to `app.`) are manual. None changed in D01 |
 | Turnstile | Bound to the studio pages' hostname: unaffected |
+| Edge caching of `/api` | Before D01 every answer carried `Access-Control-Allow-Origin: *`, so an edge copy worked for any studio page. Now the header names one origin, and Cloudflare ignores `Vary: Origin` for JSON. Cloudflare does not cache `/api` today (runbook §4.7 checks `DYNAMIC`/`BYPASS`). **Never add a cache rule for `/api`** on the apex or `api.`: it would serve one studio's allow-origin to another studio's browser |
+| `/api/../file` tricks | The platform decides "API path" on the dot-segment-resolved path, so `/api/../sw.js` on an API-only host is the 404, not the static file (tested); nginx matches on the normalised `$uri` too |
 | Installed PWAs and open tabs | One-time disruption, documented in E |
 
 ## J. D01 verification (2026-11-06)
@@ -218,10 +221,10 @@ Run in a cloud workspace with Node 24.3.0, PostgreSQL 18.6 (Docker), nginx 1.30.
 
 | Check | Result |
 |---|---|
-| Platform suite (`node ace test`) | 3479 passed, including the new `api_host`, `cors`, `platform_origins`, `browser_origins` and production-boot cases. The baseline before D01 was 3449 tests, 3 failing only because the shell's `APP_URL` port differed from the test port |
+| Platform suite (`node ace test`) | 3482 passed, including the new `api_host`, `cors`, `platform_origins`, `browser_origins` and production-boot cases. The baseline before D01 was 3449 tests, 3 failing only because the shell's `APP_URL` port differed from the test port |
 | SDK / React / storefront tests | 51 / 23 / 1574 passed |
 | `pnpm check`, `pnpm typecheck`, `pnpm build` | Pass. Biome's remaining warnings are in files D01 did not touch |
-| `deploy/test/nginx/run.sh` | Both layouts pass (171 checks) |
+| `deploy/test/nginx/run.sh` | Both layouts pass (174 checks) |
 | `deploy/test/split-hosts/rehearse.cjs` | 18/18 against the real platform and storefront on `app.` / `api.localhost` |
 | Production-mode rehearsal (smoke run + `compose.split.yml`) | **Not run** (needs built images and scratch secrets): the first D11 step |
 | Live DNS, Cloudflare, production env or deploy | **Unchanged** |

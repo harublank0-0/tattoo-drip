@@ -1,7 +1,12 @@
 import type { HttpContext } from "@adonisjs/core/http";
 import type { NextFn } from "@adonisjs/core/types/http";
 import { apiOnlyHosts } from "#services/platform_origins";
-import { API_ERRORS, isApiRequest, setApiHeaders } from "#services/public_api";
+import {
+	API_ERRORS,
+	API_PREFIX,
+	isApiRequest,
+	setApiHeaders,
+} from "#services/public_api";
 import env from "#start/env";
 
 /**
@@ -26,9 +31,20 @@ const API_ONLY = apiOnlyHosts({
  * honours X-Forwarded-Host only from a trusted proxy (TRUST_PROXY): nginx
  * sets it to the Host it routed on.
  */
+/**
+ * Whether the request is the API's, judged on its path with dot segments
+ * resolved (`%2e` included), the way static files resolve it: `/api/../sw.js`
+ * starts with /api but is the static `sw.js`, so it is not.
+ */
+function isApiPath(ctx: HttpContext): boolean {
+	if (!isApiRequest(ctx)) return false;
+	const path = new URL(ctx.request.url(), "http://host.invalid").pathname;
+	return path === API_PREFIX || path.startsWith(`${API_PREFIX}/`);
+}
+
 export default class ApiHostMiddleware {
 	handle(ctx: HttpContext, next: NextFn) {
-		if (API_ONLY.size === 0 || isApiRequest(ctx)) return next();
+		if (API_ONLY.size === 0 || isApiPath(ctx)) return next();
 		const host = ctx.request.hostname()?.toLowerCase().replace(/\.$/, "");
 		if (!host || !API_ONLY.has(host)) return next();
 

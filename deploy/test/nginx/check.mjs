@@ -403,6 +403,7 @@ async function checkLegacy() {
 		);
 	}
 	for (const path of [
+		"/api",
 		"/api/v1/tenants/needle",
 		"/api/v1/tenants/needle/deposits/tok-canary-14",
 	]) {
@@ -429,7 +430,13 @@ async function checkLegacy() {
 			post.json?.bytes === 64 * 1024,
 		`status ${post.status}, bytes ${post.json?.bytes}`,
 	);
-	for (const path of ["/", "/login", "/t/needle/today", "/sw.js"]) {
+	const bare = await send({ host: API, path: "/api" });
+	check(
+		"api host /api (no slash) reaches web, as the platform counts it",
+		bare.status === 200 && bare.json?.upstream === "web",
+		`status ${bare.status}, upstream ${bare.json?.upstream}`,
+	);
+	for (const path of ["/", "/login", "/t/needle/today", "/sw.js", "/apix"]) {
 		const { status, json } = await send({ host: API, path });
 		check(
 			`api host ${path} is nginx's 404, never the dashboard`,

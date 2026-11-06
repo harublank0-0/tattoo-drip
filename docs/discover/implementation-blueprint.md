@@ -73,12 +73,12 @@ Status legend: **Done** = in code, with tests where noted. **Partial** = exists,
 | `packages/types` / `sdk` / `react` | Contract + generated types; one-tenant client; TanStack Query hooks | Done | `packages/*/src` |
 | `packages/ui` | Shared UI | Missing ("added when the first component is actually shared", `docs/architecture.md`) | — |
 | CI | Biome, typecheck, types drift, build, migrate, schema drift, tests | Done | `.github/workflows/ci.yml` |
-| Deploy | Compose `postgres`, `web`, `worker`, `storefront`, `nginx`, `cloudflared`. nginx sends `tattoodrip.app` to web and `tattoodrip.page` / `*.tattoodrip.page` to storefront. Media on `media.tattoodrip.app` (R2) | Done | `deploy/compose.yml`, `deploy/nginx/nginx.conf`, `deploy/README.md` |
+| Deploy | Compose `postgres`, `web`, `worker`, `storefront`, `nginx`, `cloudflared`. nginx sends `tattoodrip.app` to web and `tattoodrip.page` / `*.tattoodrip.page` to storefront. Media on `media.tattoodrip.app` (R2) | Done | `deploy/compose.yml`, `deploy/nginx/` (`common.conf`, `hosts.current.conf`), `deploy/README.md` |
 | Vercel | `apps/storefront/vercel.json`, a row in `docs/architecture.md` | Stale | Replaced by `docs/superpowers/specs/2026-10-31-single-server-deploy-design.md` |
 
 **How the parts communicate:**
 - The storefront SSR calls `API_URL/api/v1/tenants/<slug>/…` through the SDK. It sends `STOREFRONT_SERVER_KEY` (rate limiting only) and `X-Visitor-IP`.
-- The browser posts inquiries and deposit proofs directly to the API (CORS `*`, no credentials).
+- The browser posts inquiries and deposit proofs directly to the API (CORS allowlist of the studio pages, the dashboard and Discover since D01; never credentials).
 - The dashboard is Inertia over the host-only `__Host-td-session` cookie (cookie session store).
 
 ### Backend
@@ -465,7 +465,7 @@ Prompts are prefixed **D** to avoid confusion with the Studio OS redesign prompt
 
 | # | Objective | Major tasks | Depends on | Acceptance criteria |
 |---|---|---|---|---|
-| **D01** | Domain architecture and migration preparation (no live DNS or traffic change) | Inventory every host assumption (`APP_URL` consumers, `checkAppOrigin`, cookie policy, Shield/CSRF, CORS, email and chat links, `config/drive.ts`, storefront `API_URL`, `MEDIA_URL`, Turnstile hostnames, nginx, cloudflared); nginx server blocks for `app.` (dashboard, no `/api`) and `api.` (`/api` only), apex legacy redirect map and `/api` proxy window prepared but inactive; env examples; a local/staging rehearsal with the new hostnames; cutover and rollback runbook draft; fix stale host and Vercel docs | Approved | All suites pass; a local rehearsal on new hosts covers login, CSRF writes, invitations, password reset, storefront SSR, browser intake and deposit upload, and old-URL redirects; production config unchanged and still valid |
+| **D01** | Domain architecture and migration preparation (no live DNS or traffic change) | Inventory every host assumption (`APP_URL` consumers, `checkAppOrigin`, cookie policy, Shield/CSRF, CORS, email and chat links, `config/drive.ts`, storefront `API_URL`, `MEDIA_URL`, Turnstile hostnames, nginx, cloudflared); nginx server blocks for `app.` (dashboard; the platform still answers `/api` there, unused) and `api.` (`/api` only), apex legacy redirect map and `/api` proxy window prepared but inactive; env examples; a local/staging rehearsal with the new hostnames; cutover and rollback runbook draft; fix stale host and Vercel docs | Approved | All suites pass; a local rehearsal on new hosts covers login, CSRF writes, invitations, password reset, storefront SSR, browser intake and deposit upload, and old-URL redirects; production config unchanged and still valid |
 | **D02** | Discovery database foundation | Migrations (D.1), `tattoo_drip_discovery` role in `setup_roles.sql` and the runbook, views, column grants, `TO`-scoped policies, `pg_trgm` + indexes, `places` seed, catalog guard + privilege/RLS tests (C.2), visibility parity test, volume seeder + EXPLAIN, DB README update | D01 not required | Every C.2 verification passes; app-role privileges unchanged; DB p95 budget met on seeded data |
 | **D03** | Public Discover API, SDK client, React hooks | Contract; `app/modules/discovery`; controllers and transformers; validation; limits; named server keys; read-only transaction; `bookingUrl` + signed `ref`; isolation cases; `createDiscoverClient`; keys, queries, hooks; tests | D02 | Responses match the contract; no private field reachable; cursor ordering deterministic; limits enforced; SDK and React tests green |
 | **D04** | Studio OS publication controls | Settings "TattooDrip listing" (opt-in + terms consent, place picker, completeness checklist from the API, preview); artist opt-out (owner or linked artist); independent single switch; setup-checklist item; `discover:suspend` / `discover:restore` (studio, artwork); storefront `/book` keeps `ref`, the intake stores verified referral | D03 | Off by default; changes reflected immediately in the API; role and cross-tenant tests; forged, expired or other-tenant `ref` stored as null without blocking the inquiry |
@@ -481,14 +481,14 @@ Prompts are prefixed **D** to avoid confusion with the Studio OS redesign prompt
 
 | Area | What to verify |
 |---|---|
-| Cookies | `__Host-td-session`, `XSRF-TOKEN`, `remember_web` and `app_theme` on `app.`: host-only, `Secure`, `SameSite=Lax`, `Path=/`, no `Domain` (`#services/cookie_policy`); none of them set on `api.` or the apex |
+| Cookies | `__Host-td-session`, `XSRF-TOKEN` and `app_theme` on `app.` (`remember_web` is only ever cleared): host-only, `Secure`, `SameSite=Lax`, `Path=/`, no `Domain` (`#services/cookie_policy`); none of them set on `api.` or the apex |
 | CSRF | Shield accepts dashboard writes on `app.` and refuses cross-origin ones; Inertia's `X-XSRF-TOKEN` round trip; the API group stays CSRF-free and cookieless |
 | OAuth redirects | None exist today (email + password; no `@adonisjs/ally`). Confirm that, and record that any future OAuth callback registers on `app.` |
-| API origins | Storefront `API_URL` (server) and the dehydrated browser `apiUrl`; Discover's API base; CORS on `api.` (any origin, no credentials, the existing headers); `MEDIA_URL` unchanged; any CSP `connect-src` |
+| API origins | Storefront `API_URL` (server) and the dehydrated browser `apiUrl`; Discover's API base; CORS on `api.`: an allowlist of the studio pages, `APP_URL` and `DISCOVER_URL`, `Vary: Origin`, never credentials, the existing headers; `MEDIA_URL` unchanged; any CSP `connect-src` |
 | `APP_URL` consumers | `checkAppOrigin` with the new hosts; email, invitation, alert and chat links; `config/drive.ts` |
 | Cloudflare and proxy | Tunnel public hostnames for `app.` and `api.` (prepared, not created); Always Use HTTPS; the edge certificate covers them; cache keyed by Host, with no caching of dashboard responses; `CF-Connecting-IP` → `X-Forwarded-For` trust (`TRUST_PROXY`, nginx `set_real_ip_from`); Turnstile hostnames unchanged (`tattoodrip.page`) |
 | Redirect compatibility | Apex legacy paths 301 to `app.`; `/api/*` proxied, not redirected, on the apex during the window |
-| Rollback | Restoring the previous nginx and env files returns today's behaviour, rehearsed locally |
+| Rollback | Restoring the previous nginx include and env values returns today's behaviour: the live layout is `nginx.conf` unchanged, checked by the nginx harness; a rollback on a real stack is part of the D11 production-mode rehearsal |
 
 **Sessions at cutover:**
 - `__Host-td-session` is host-only and production sessions live in the cookie, so a session cannot move from `tattoodrip.app` to `app.tattoodrip.app` without handing credentials across hosts.

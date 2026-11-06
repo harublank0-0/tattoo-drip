@@ -83,4 +83,16 @@ test.group("The API's browser origins (Discover D01)", () => {
 		assert.isFalse(suffixed("https://needle.example-studios.com"));
 		assert.isFalse(suffixed("https://needle-inkxexample-studios.com"));
 	});
+
+	test("a template naming {tenant} twice matches only both labels filled", ({
+		assert,
+	}) => {
+		const twice = browserOriginPolicy({
+			appUrl: "https://app.example.com",
+			storefrontTemplate: "https://{tenant}.{tenant}.example-studios.com",
+		});
+
+		assert.isTrue(twice("https://needle.needle.example-studios.com"));
+		assert.isFalse(twice("https://needle.example-studios.com"));
+	});
 });
