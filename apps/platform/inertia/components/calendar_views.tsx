@@ -396,7 +396,7 @@ export function MonthGrid({
 																isOwner,
 															})}
 															className={cn(
-																"flex min-w-0 gap-1 rounded-sm px-1 py-0.5 text-[0.6875rem] leading-snug outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50",
+																"flex min-h-6 min-w-0 items-center gap-1 rounded-sm px-1 py-0.5 text-[0.6875rem] leading-snug outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50",
 																session.status !== "scheduled" &&
 																	"text-muted-foreground",
 															)}

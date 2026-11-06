@@ -289,6 +289,7 @@ export default function PortfolioIndex({
 							onSelectAll={() => setPicked(photos.map(({ id }) => id))}
 							onClear={() => setPicked([])}
 							onDone={setPicked}
+							fallback={galleryHeading}
 						/>
 					)}
 

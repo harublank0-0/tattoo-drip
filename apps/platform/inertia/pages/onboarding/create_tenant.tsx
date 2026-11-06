@@ -108,12 +108,18 @@ export default function CreateTenant({
 										<FieldLabel key={type.value} htmlFor={`type-${type.value}`}>
 											<Field orientation="horizontal">
 												<FieldContent>
-													<FieldTitle>{type.title}</FieldTitle>
-													<FieldDescription>
+													<FieldTitle id={`type-${type.value}-title`}>
+														{type.title}
+													</FieldTitle>
+													<FieldDescription
+														id={`type-${type.value}-description`}
+													>
 														{type.description}
 													</FieldDescription>
 												</FieldContent>
 												<RadioGroupItem
+													aria-labelledby={`type-${type.value}-title`}
+													aria-describedby={`type-${type.value}-description`}
 													value={type.value}
 													id={`type-${type.value}`}
 													aria-invalid={!!errors.type}

@@ -644,14 +644,27 @@ function RecordPaymentForm({
 								<FieldLabel key={value} htmlFor={`record-kind-${value}`}>
 									<Field orientation="horizontal" className="min-h-11">
 										<FieldContent>
-											<FieldTitle>{DESK_KIND_TEXT[value].title}</FieldTitle>
+											<FieldTitle id={`record-kind-${value}-title`}>
+												{DESK_KIND_TEXT[value].title}
+											</FieldTitle>
 											{DESK_KIND_TEXT[value].description && (
-												<FieldDescription>
+												<FieldDescription
+													id={`record-kind-${value}-description`}
+												>
 													{DESK_KIND_TEXT[value].description}
 												</FieldDescription>
 											)}
 										</FieldContent>
-										<RadioGroupItem value={value} id={`record-kind-${value}`} />
+										<RadioGroupItem
+											aria-labelledby={`record-kind-${value}-title`}
+											aria-describedby={
+												DESK_KIND_TEXT[value].description
+													? `record-kind-${value}-description`
+													: undefined
+											}
+											value={value}
+											id={`record-kind-${value}`}
+										/>
 									</Field>
 								</FieldLabel>
 							))}
@@ -824,9 +837,15 @@ export function OutcomeForm({
 								<FieldLabel key={value} htmlFor={`outcome-${value}`}>
 									<Field orientation="horizontal" className="min-h-11">
 										<FieldContent>
-											<FieldTitle>{title}</FieldTitle>
+											<FieldTitle id={`outcome-${value}-title`}>
+												{title}
+											</FieldTitle>
 										</FieldContent>
-										<RadioGroupItem value={value} id={`outcome-${value}`} />
+										<RadioGroupItem
+											aria-labelledby={`outcome-${value}-title`}
+											value={value}
+											id={`outcome-${value}`}
+										/>
 									</Field>
 								</FieldLabel>
 							))}
@@ -888,9 +907,12 @@ function MethodField({
 					<FieldLabel key={method} htmlFor={`${idPrefix}-method-${method}`}>
 						<Field orientation="horizontal" className="min-h-11">
 							<FieldContent>
-								<FieldTitle>{METHOD_LABELS[method]}</FieldTitle>
+								<FieldTitle id={`${idPrefix}-method-${method}-title`}>
+									{METHOD_LABELS[method]}
+								</FieldTitle>
 							</FieldContent>
 							<RadioGroupItem
+								aria-labelledby={`${idPrefix}-method-${method}-title`}
 								value={method}
 								id={`${idPrefix}-method-${method}`}
 							/>

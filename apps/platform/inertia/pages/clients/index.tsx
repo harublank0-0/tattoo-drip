@@ -23,7 +23,7 @@ const FILTERS = [
  * The studio's clients (TAT-41, Studio OS): a CRM directory, newest first,
  * searched on the server by name, phone or email and filtered to those with
  * a session to come; the address holds the search, the filter and the page,
- * so a view can be kept or shared. A table from `md`, rows on a phone; each
+ * so a view can be kept or shared. A table from `lg`, rows on phones and tablets; each
  * client opens their profile. Clients come from requests and bookings, so
  * there is no "add client": "Book a session" makes one. Owners only.
  */
@@ -52,7 +52,7 @@ export default function ClientsIndex({
 		<Page
 			title="Clients"
 			description={
-				page.total === 0
+				page.total === 0 && !search && filter === "all"
 					? "Everyone who sends a request or is booked."
 					: `${page.total} client${page.total === 1 ? "" : "s"}${search || filter !== "all" ? " match" : ""}`
 			}
@@ -117,7 +117,7 @@ export default function ClientsIndex({
 				</p>
 			) : (
 				<>
-					<div className="hidden overflow-hidden rounded-lg border bg-card md:block">
+					<div className="hidden overflow-hidden rounded-lg border bg-card lg:block">
 						<table className="w-full text-sm">
 							<caption className="sr-only">
 								Clients, newest first. Each name opens the client's profile.
@@ -208,7 +208,7 @@ export default function ClientsIndex({
 						</table>
 					</div>
 
-					<ul className="flex flex-col divide-y overflow-hidden rounded-lg border bg-card md:hidden">
+					<ul className="flex flex-col divide-y overflow-hidden rounded-lg border bg-card lg:hidden">
 						{clients.map((row) => (
 							<li key={row.id}>
 								<Link

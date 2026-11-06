@@ -1,6 +1,6 @@
 import { router } from "@inertiajs/react";
 import { ArrowRightLeft, Eye, EyeOff, Trash2, X } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { type RefObject, useEffect, useId, useRef, useState } from "react";
 import { urlFor } from "~/client";
 import {
 	BULK_BUSY,
@@ -37,6 +37,7 @@ export default function PortfolioBulkBar({
 	onSelectAll,
 	onClear,
 	onDone,
+	fallback,
 }: {
 	tenantSlug: string;
 	selectedIds: string[];
@@ -50,6 +51,8 @@ export default function PortfolioBulkBar({
 	onClear: () => void;
 	/** What stays selected after a change: the photos it didn't change. */
 	onDone: (remaining: string[]) => void;
+	/** Where focus goes when Delete can't take it back: the gallery's heading. */
+	fallback: RefObject<HTMLElement | null>;
 }) {
 	const id = useId();
 	const [busy, setBusy] = useState<BulkAction | null>(null);
@@ -66,9 +69,20 @@ export default function PortfolioBulkBar({
 	const count = selectedIds.length;
 	const off = busy !== null || held || count === 0;
 
+	// Focus follows the question: onto "Keep them" when it opens, and back to
+	// Delete when it closes (Escape, Keep, or the answer), once Delete is on
+	// the page again. An effect, not a timer, so it runs after the commit.
+	const wasAsking = useRef(false);
 	useEffect(() => {
 		if (asking) keep.current?.focus();
-	}, [asking]);
+		else if (wasAsking.current) {
+			// After a delete that emptied the selection, Delete is disabled (or the
+			// bar is gone with the photos): focus goes to the gallery's heading.
+			const button = deleteButton.current;
+			(button && !button.disabled ? button : fallback.current)?.focus();
+		}
+		wasAsking.current = asking;
+	}, [asking, fallback]);
 	// A new selection is a new question.
 	useEffect(() => {
 		if (count === 0) setAsking(false);
@@ -158,7 +172,6 @@ export default function PortfolioBulkBar({
 						if (event.key === "Escape" && busy === null) {
 							event.stopPropagation();
 							setAsking(false);
-							requestAnimationFrame(() => deleteButton.current?.focus());
 						}
 					}}
 				>
@@ -182,10 +195,7 @@ export default function PortfolioBulkBar({
 							type="button"
 							variant="outline"
 							disabled={busy !== null}
-							onClick={() => {
-								setAsking(false);
-								requestAnimationFrame(() => deleteButton.current?.focus());
-							}}
+							onClick={() => setAsking(false)}
 						>
 							Keep {count === 1 ? "it" : "them"}
 						</Button>

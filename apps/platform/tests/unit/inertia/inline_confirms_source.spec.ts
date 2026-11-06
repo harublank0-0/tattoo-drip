@@ -57,6 +57,8 @@ test.group(
 				"pages/projects/show.tsx",
 				"pages/inquiries/show.tsx",
 				"pages/account/show.tsx",
+				// Studio OS: deleting an artist asks in its card.
+				"pages/artists/index.tsx",
 				...components,
 			];
 			assert.isAbove(components.length, 10);
