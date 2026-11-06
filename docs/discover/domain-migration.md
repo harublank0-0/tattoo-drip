@@ -84,9 +84,10 @@ LAYOUTS=nginx.split.conf bash deploy/test/nginx/run.sh # one
 127.0.0.1 app.localhost api.localhost <your-studio-slug>.localhost
 ```
 
-1. Platform (`apps/platform`): `APP_URL=http://app.localhost:3333 API_URL=http://api.localhost:3333 DISCOVER_URL=http://localhost:3100 pnpm dev`.
-2. Storefront (`apps/storefront`): `API_URL=http://api.localhost:3333 STOREFRONT_URL=http://{tenant}.localhost:3000 pnpm dev`.
-3. Check each of these:
+1. Use a throwaway database: run `setup_roles.sql`, then `pnpm migrate`.
+2. Platform (`apps/platform`): `APP_URL=http://app.localhost:3333 API_URL=http://api.localhost:3333 DISCOVER_URL=http://localhost:3100 pnpm dev`, plus `pnpm worker` (emails go through the queue). Mailpit from the root `docker-compose.yml`.
+3. Storefront (`apps/storefront`): `PORT=3000 API_URL=http://api.localhost:3333 STOREFRONT_URL=http://{tenant}.localhost:3000 pnpm dev`. Set `PORT` explicitly: an exported `PORT=3333` makes it take the platform's port.
+4. Run `node deploy/test/split-hosts/rehearse.cjs`. It needs Playwright resolvable through `NODE_PATH` (it is not a repo dependency) and the platform's environment in the shell. It checks each of these:
    - Sign up, confirm (`node ace account:verify <email>`), sign in and onboard at `http://app.localhost:3333`, making CSRF-protected writes along the way.
    - The cookies are host-only on `app.localhost`.
    - `http://api.localhost:3333/login` is the API's 404 and sets no cookie.
@@ -94,9 +95,10 @@ LAYOUTS=nginx.split.conf bash deploy/test/nginx/run.sh # one
    - `http://<slug>.localhost:3000` renders from the API.
    - From that page, a cross-origin read and a preflighted inquiry POST to `api.localhost` succeed.
    - From an unlisted origin, the read is blocked.
-   - Sign out returns to `/login`.
+   - Sign out returns to `/login`, and a signed-out tenant page sends the guest there.
+   - A password reset email links to `http://app.localhost:3333/reset-password/…`.
 
-This rehearsal was run for D01; see "D01 verification" below.
+This rehearsal was run for D01; see "J. D01 verification" below.
 
 **Production-mode rehearsal, before D11.** This is the smoke run in `deploy/test/compose.smoke.yml`, plus `deploy/test/compose.split.yml` (nginx on `nginx.split.conf`). Use scratch settings with the D11 values from C, then curl `127.0.0.1:8088` with each `Host`. It needs the production images built, and checks `__Host-` cookies and the https rules under `NODE_ENV=production`. It was not run in D01; it is the first D11 step.
 
@@ -209,3 +211,17 @@ The legacy redirects and the proxy are prepared in `deploy/nginx/hosts.split.con
 | Cloudflare settings | Tunnel hostnames, certificate coverage and any WAF or rate-limit rule (runbook §3.8 targets `tattoodrip.app` sign-in paths: move it to `app.`) are manual. None changed in D01 |
 | Turnstile | Bound to the studio pages' hostname: unaffected |
 | Installed PWAs and open tabs | One-time disruption, documented in E |
+
+## J. D01 verification (2026-11-06)
+
+Run in a cloud workspace with Node 24.3.0, PostgreSQL 18.6 (Docker), nginx 1.30.6 (Docker) and Chromium (Playwright).
+
+| Check | Result |
+|---|---|
+| Platform suite (`node ace test`) | 3479 passed, including the new `api_host`, `cors`, `platform_origins`, `browser_origins` and production-boot cases. The baseline before D01 was 3449 tests, 3 failing only because the shell's `APP_URL` port differed from the test port |
+| SDK / React / storefront tests | 51 / 23 / 1574 passed |
+| `pnpm check`, `pnpm typecheck`, `pnpm build` | Pass. Biome's remaining warnings are in files D01 did not touch |
+| `deploy/test/nginx/run.sh` | Both layouts pass (171 checks) |
+| `deploy/test/split-hosts/rehearse.cjs` | 18/18 against the real platform and storefront on `app.` / `api.localhost` |
+| Production-mode rehearsal (smoke run + `compose.split.yml`) | **Not run** (needs built images and scratch secrets): the first D11 step |
+| Live DNS, Cloudflare, production env or deploy | **Unchanged** |

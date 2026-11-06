@@ -11,7 +11,8 @@ This file is the plan Discover prompts work from. The dated `docs/superpowers/sp
 | Repository audit | Complete |
 | Product boundaries and domains | Decided |
 | Roadmap D01–D11 | Defined |
-| D01: domain migration preparation | Next |
+| D01: domain migration preparation | Done: [domain migration](domain-migration.md); the production cutover is D11 |
+| D02: discovery database foundation | Next |
 
 Status legend: **Done** = in code, with tests where noted. **Partial** = exists, but not in the form Discover needs. **Planned** = only in docs. **Missing** = searched for and absent. **Unverified** = not checked against a running system.
 
