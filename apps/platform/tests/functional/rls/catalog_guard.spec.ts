@@ -36,6 +36,8 @@ const EXPECTED_POLICIES: Record<string, string[]> = {
 	project_sessions: ["tenant_isolation:ALL"],
 	quotes: ["tenant_isolation:ALL"],
 	reference_codes: ["tenant_isolation:ALL"],
+	studio_faq_entries: ["tenant_isolation:ALL"],
+	studio_policy_sections: ["tenant_isolation:ALL"],
 	reference_images: ["tenant_isolation:ALL"],
 	staff_alerts: ["tenant_isolation:ALL"],
 	studio_closures: ["tenant_isolation:ALL"],
