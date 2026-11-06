@@ -48,6 +48,7 @@ export default class WorkPhotosController {
 				alt: data.alt ?? null,
 				styles: data.styles ?? [],
 				healed: data.healed ?? false,
+				hidden: data.hidden ?? false,
 			}),
 		);
 

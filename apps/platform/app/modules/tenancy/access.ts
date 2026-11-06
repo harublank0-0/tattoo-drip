@@ -154,6 +154,9 @@ export const TENANT_ROUTE_ROLES = {
 	// The portfolio (Studio OS): an owner sees every live artist's work
 	// photos, an artist only their own linked profile's (PortfolioController).
 	"tenant.portfolio": MEMBERS,
+	// Bulk changes: each photo is checked through WorkPhotoService.findEditable
+	// (an artist only their own); moving work is owners only (the controller).
+	"tenant.portfolio.bulk": MEMBERS,
 
 	// Each member's own alerts (AlertService scopes every read and write).
 	"tenant.alerts.index": MEMBERS,

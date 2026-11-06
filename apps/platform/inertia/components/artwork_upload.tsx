@@ -127,6 +127,7 @@ export default function ArtworkUpload({
 	const [artistId, setArtistId] = useState<string>(defaultArtistId ?? "");
 	const [styles, setStyles] = useState<string[]>([]);
 	const [healed, setHealed] = useState(false);
+	const [publish, setPublish] = useState(true);
 	const [sending, setSending] = useState<{
 		index: number;
 		total: number;
@@ -230,6 +231,7 @@ export default function ArtworkUpload({
 			if (item.alt.trim()) data.alt = item.alt.trim();
 			if (styles.length > 0) data.styles = styles;
 			if (healed) data.healed = "1";
+			if (!publish) data.hidden = "1";
 			const outcome = await sendPhoto(url, data, (percentage) => {
 				setSending({ ...position, percentage });
 				update(item.key, { percentage });
@@ -341,9 +343,7 @@ export default function ArtworkUpload({
 							))}
 						</select>
 						<FieldDescription>
-							{artist && !artist.visible
-								? `${artist.name} is hidden from your page, so this work stays hidden until they're shown.`
-								: "Each photo belongs to one artist, and shows on their page."}
+							Each photo belongs to one artist, and shows on their page.
 						</FieldDescription>
 					</Field>
 
@@ -460,6 +460,28 @@ export default function ArtworkUpload({
 							</Field>
 						</div>
 					</details>
+
+					<Field orientation="horizontal" className="min-h-11 items-center">
+						<Checkbox
+							id={`${id}-publish`}
+							checked={publish}
+							disabled={busy}
+							onCheckedChange={(next) => setPublish(next === true)}
+							aria-describedby={`${id}-publish-help`}
+						/>
+						<FieldContent>
+							<FieldLabel htmlFor={`${id}-publish`} className="font-normal">
+								Publish on your page
+							</FieldLabel>
+							<FieldDescription id={`${id}-publish-help`}>
+								{publish
+									? artist && !artist.visible
+										? `Published, but shown only once ${artist.name} is on your page.`
+										: "Clients see these photos on your page and in your gallery."
+									: "Only the studio sees them until you publish them."}
+							</FieldDescription>
+						</FieldContent>
+					</Field>
 
 					<div className="flex flex-col gap-2">
 						{problem && <FieldError>{problem}</FieldError>}

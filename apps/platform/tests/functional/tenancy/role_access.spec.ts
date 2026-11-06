@@ -36,6 +36,7 @@ const ARTIST_ROUTES = [
 	"tenant.calendar.index",
 	"tenant.dashboard",
 	"tenant.portfolio",
+	"tenant.portfolio.bulk",
 	"tenant.projects.contacted.store",
 	"tenant.projects.create",
 	"tenant.projects.index",

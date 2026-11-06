@@ -1,8 +1,11 @@
 import { Link, router } from "@inertiajs/react";
 import { cn } from "cn";
 import {
+	Check,
+	CheckSquare,
 	ChevronLeft,
 	ChevronRight,
+	ExternalLink,
 	EyeOff,
 	ImageOff,
 	Plus,
@@ -30,6 +33,7 @@ import {
 	tileLabel,
 	tileMeta,
 } from "~/components/portfolio";
+import PortfolioBulkBar from "~/components/portfolio_bulk_bar";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { useTenant } from "~/hooks/use-tenant";
@@ -55,6 +59,7 @@ export default function PortfolioIndex({
 	page,
 	maxPhotos,
 	isOwner,
+	storefront,
 }: PortfolioPageProps) {
 	const tenant = useTenant();
 	const base = urlFor("tenant.portfolio", { tenant: tenant.slug });
@@ -82,6 +87,23 @@ export default function PortfolioIndex({
 	const galleryHeading = useRef<HTMLHeadingElement>(null);
 	const selected = photos.find((photo) => photo.id === selectedId) ?? null;
 
+	// Selecting several photos (this page's only: a new page or filter keeps
+	// the ones still listed).
+	const [selecting, setSelecting] = useState(false);
+	const [picked, setPicked] = useState<string[]>([]);
+	const listed = useMemo(() => new Set(photos.map(({ id }) => id)), [photos]);
+	const pickedHere = picked.filter((id) => listed.has(id));
+	const toggle = (id: string) =>
+		setPicked((current) =>
+			current.includes(id)
+				? current.filter((other) => other !== id)
+				: [...current, id],
+		);
+	const stopSelecting = () => {
+		setSelecting(false);
+		setPicked([]);
+	};
+
 	const upload = (
 		<Button
 			size="sm"
@@ -98,7 +120,23 @@ export default function PortfolioIndex({
 		<Page
 			title="Portfolio"
 			description={PAGE_DESCRIPTION}
-			actions={artists.length > 0 ? upload : undefined}
+			actions={
+				artists.length > 0 ? (
+					<>
+						<a
+							href={storefront.galleryUrl}
+							target="_blank"
+							rel="noreferrer"
+							className={buttonVariants({ variant: "outline", size: "sm" })}
+						>
+							<ExternalLink aria-hidden="true" />
+							View your gallery
+							<span className="sr-only"> (opens in a new tab)</span>
+						</a>
+						{upload}
+					</>
+				) : undefined
+			}
 		>
 			{artists.length === 0 ? (
 				<NoArtists isOwner={isOwner} tenantSlug={tenant.slug} />
@@ -120,19 +158,50 @@ export default function PortfolioIndex({
 						>
 							{resultLine(page.total, everything, filtered)}
 						</h2>
-						{filtered && (
-							<Link
-								href={portfolioHref(base, {
-									...NO_FILTERS,
-									sort: filters.sort,
-								})}
-								preserveScroll
-								className="inline-flex items-center text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground max-lg:min-h-11"
-							>
-								Clear filters
-							</Link>
-						)}
+						<div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+							{filtered && (
+								<Link
+									href={portfolioHref(base, {
+										...NO_FILTERS,
+										sort: filters.sort,
+									})}
+									preserveScroll
+									className="inline-flex items-center text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground max-lg:min-h-11"
+								>
+									Clear filters
+								</Link>
+							)}
+							{photos.length > 0 && (
+								<Button
+									type="button"
+									variant={selecting ? "secondary" : "outline"}
+									size="sm"
+									aria-pressed={selecting}
+									onClick={() =>
+										selecting ? stopSelecting() : setSelecting(true)
+									}
+								>
+									{selecting ? (
+										<>
+											<Check aria-hidden="true" />
+											Done selecting
+										</>
+									) : (
+										<>
+											<CheckSquare aria-hidden="true" />
+											Select
+										</>
+									)}
+								</Button>
+							)}
+						</div>
 					</div>
+					{storefront.devHost && (
+						<p className="text-xs text-muted-foreground">
+							Your page's address opens on this computer only until the studio
+							site's address is set.
+						</p>
+					)}
 
 					{photos.length === 0 ? (
 						<p className="rounded-lg border border-dashed px-4 py-8 text-sm text-muted-foreground">
@@ -145,13 +214,21 @@ export default function PortfolioIndex({
 							aria-label="Work"
 							className="grid grid-cols-2 gap-x-3 gap-y-5 max-[22rem]:grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5"
 						>
-							{photos.map((photo) => (
+							{photos.map((photo, index) => (
 								<Tile
 									key={photo.id}
+									// The first row is on screen at once: load it now, the rest lazily.
+									eager={index < 4}
 									photo={photo}
 									styleNames={styleNames}
 									selected={detailsOpen && photo.id === selectedId}
+									picking={selecting}
+									picked={pickedHere.includes(photo.id)}
 									onOpen={() => {
+										if (selecting) {
+											toggle(photo.id);
+											return;
+										}
 										setSelectedId(photo.id);
 										setDetailsOpen(true);
 									}}
@@ -191,6 +268,21 @@ export default function PortfolioIndex({
 								<span />
 							)}
 						</nav>
+					)}
+
+					{selecting && photos.length > 0 && (
+						<PortfolioBulkBar
+							tenantSlug={tenant.slug}
+							selectedIds={pickedHere}
+							photos={photos}
+							artists={artists}
+							isOwner={isOwner}
+							back={here}
+							held={uploading}
+							onSelectAll={() => setPicked(photos.map(({ id }) => id))}
+							onClear={() => setPicked([])}
+							onDone={setPicked}
+						/>
 					)}
 
 					<ArtworkDetails
@@ -345,11 +437,18 @@ function Tile({
 	photo,
 	styleNames,
 	selected,
+	picking,
+	picked,
+	eager,
 	onOpen,
 }: {
+	eager: boolean;
 	photo: PortfolioPhoto;
 	styleNames: Record<string, string>;
 	selected: boolean;
+	/** The page is selecting: a tap picks the photo instead of opening it. */
+	picking: boolean;
+	picked: boolean;
 	onOpen: () => void;
 }) {
 	const [failed, setFailed] = useState(false);
@@ -359,15 +458,16 @@ function Tile({
 			<button
 				id={`artwork-${photo.id}`}
 				type="button"
-				aria-haspopup="dialog"
-				aria-label={tileLabel(photo)}
+				aria-haspopup={picking ? undefined : "dialog"}
+				aria-pressed={picking ? picked : undefined}
+				aria-label={picking ? `Select ${tileLabel(photo)}` : tileLabel(photo)}
 				onClick={onOpen}
 				className="group flex w-full flex-col gap-2 rounded-md text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
 			>
 				<span
 					className={cn(
 						"relative flex aspect-[3/4] w-full items-center justify-center overflow-hidden rounded-md bg-muted/60 ring-1 ring-border transition-shadow duration-150 group-hover:ring-foreground/30",
-						selected && "ring-2 ring-brand group-hover:ring-brand",
+						(selected || picked) && "ring-2 ring-brand group-hover:ring-brand",
 					)}
 				>
 					{failed ? (
@@ -383,7 +483,7 @@ function Tile({
 							alt=""
 							width={photo.width}
 							height={photo.height}
-							loading="lazy"
+							loading={eager ? "eager" : "lazy"}
 							decoding="async"
 							onError={() => setFailed(true)}
 							className="size-full object-contain transition-opacity duration-150 group-hover:opacity-90 motion-reduce:transition-none"
@@ -392,7 +492,20 @@ function Tile({
 					{!photo.shown && (
 						<span className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-sm bg-background/90 px-1.5 py-0.5 text-xs font-medium text-foreground">
 							<EyeOff aria-hidden="true" className="size-3.5" />
-							{statusText(false)}
+							{statusText(photo)}
+						</span>
+					)}
+					{picking && (
+						<span
+							aria-hidden="true"
+							className={cn(
+								"absolute top-2 right-2 flex size-6 items-center justify-center rounded-sm border-2 shadow-sm",
+								picked
+									? "border-brand bg-brand text-on-brand"
+									: "border-foreground/40 bg-background/90",
+							)}
+						>
+							{picked && <Check className="size-4" />}
 						</span>
 					)}
 				</span>

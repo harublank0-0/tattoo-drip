@@ -1195,6 +1195,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/portfolio_controller').default['index']>>>
     }
   }
+  'tenant.portfolio.bulk': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/portfolio/bulk'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/artists/validators/work_photo').bulkWorkPhotosValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/artists/validators/work_photo').bulkWorkPhotosValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/portfolio_controller').default['bulk']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/portfolio_controller').default['bulk']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
   'tenant.alerts.index': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/alerts'

@@ -9,8 +9,17 @@ import { STYLE_SLUGS, type StyleSlug } from "#modules/artists/styles";
 /** Photos on one page of the portfolio: four or five full rows on a desktop. */
 export const PORTFOLIO_PAGE_SIZE = 40;
 
-/** Whether a photo is on the studio page: its artist is shown or hidden. */
-export const PORTFOLIO_STATUSES = ["all", "shown", "hidden"] as const;
+/**
+ * Where a photo stands on the studio page: published and its artist shown
+ * (on the page), unpublished by the studio, or published while its artist
+ * is hidden (not on the page until the artist is shown).
+ */
+export const PORTFOLIO_STATUSES = [
+	"all",
+	"published",
+	"unpublished",
+	"artist_hidden",
+] as const;
 export type PortfolioStatus = (typeof PORTFOLIO_STATUSES)[number];
 
 export const PORTFOLIO_SORTS = ["newest", "oldest"] as const;
@@ -81,4 +90,69 @@ export function portfolioBack(value: unknown, slug: string): string | null {
 	const page = `/t/${slug}/portfolio`;
 	if (value !== page && !value.startsWith(`${page}?`)) return null;
 	return /^[\w\-./?=&%]*$/.test(value) ? value : null;
+}
+
+/** What the portfolio can do to several photos at once. */
+export const BULK_ACTIONS = [
+	"publish",
+	"unpublish",
+	"reassign",
+	"delete",
+] as const;
+export type BulkAction = (typeof BULK_ACTIONS)[number];
+
+/** Why one photo of a bulk change was not changed. */
+export type BulkFailure = "gone" | "full" | "files";
+
+const BULK_DONE: Record<BulkAction, string> = {
+	publish: "published",
+	unpublish: "unpublished",
+	reassign: "moved",
+	delete: "deleted",
+};
+
+const photos = (n: number) => `${n} ${n === 1 ? "photo" : "photos"}`;
+
+/**
+ * What a bulk change says when it ends: how many were changed and, for
+ * those that weren't, how many and why, so no failure goes unsaid. `artist`
+ * is the artist a move went to. `ok` is false when any photo failed: the
+ * message is then an error flash.
+ */
+export function bulkSummary(
+	action: BulkAction,
+	done: number,
+	failures: readonly BulkFailure[],
+	artist?: string,
+): { ok: boolean; message: string } {
+	const verb =
+		action === "reassign" && artist ? `moved to ${artist}` : BULK_DONE[action];
+	if (failures.length === 0) {
+		return { ok: true, message: `${upperFirst(photos(done))} ${verb}.` };
+	}
+	const count = (kind: BulkFailure) =>
+		failures.filter((failure) => failure === kind).length;
+	const reasons = [
+		count("gone") > 0
+			? `${photos(count("gone"))} removed or changed meanwhile`
+			: "",
+		count("full") > 0
+			? `${photos(count("full"))} over ${artist ?? "the artist"}'s limit of 100`
+			: "",
+		count("files") > 0
+			? `${photos(count("files"))} whose files couldn't be removed (try again)`
+			: "",
+	].filter(Boolean);
+	const head =
+		done > 0
+			? `${upperFirst(photos(done))} ${verb}.`
+			: `No photos were ${BULK_DONE[action]}.`;
+	return {
+		ok: false,
+		message: `${head} Not changed: ${reasons.join("; ")}.`,
+	};
+}
+
+function upperFirst(text: string): string {
+	return text.charAt(0).toUpperCase() + text.slice(1);
 }

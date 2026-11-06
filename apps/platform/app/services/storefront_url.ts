@@ -100,6 +100,27 @@ export function artistPageUrl(
 }
 
 /**
+ * The studio's gallery (Studio OS): `/gallery` on the studio's origin, a
+ * route every storefront theme has (the theme registry's GalleryPage).
+ */
+export function galleryPageUrl(template: string, studioSlug: string): string {
+	return `${studioPageUrl(template, studioSlug)}/gallery`;
+}
+
+/**
+ * One photo's own page (Studio OS): `/gallery/<id>` on the studio's origin
+ * (every theme's ArtworkPage). Link it only for a photo the public reads
+ * show (published, its artist visible): any other is the page's 404.
+ */
+export function artworkPageUrl(
+	template: string,
+	studioSlug: string,
+	photoId: string,
+): string {
+	return `${galleryPageUrl(template, studioSlug)}/${photoId}`;
+}
+
+/**
  * The host of a studio page as what comes before and after its slug
  * (`.example.com` after it, for https://{tenant}.example.com): the onboarding
  * and settings forms draw their slug box between the two.

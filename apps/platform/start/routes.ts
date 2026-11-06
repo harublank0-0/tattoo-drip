@@ -511,12 +511,16 @@ router
 
 		/**
 		 * The portfolio (Studio OS): every work photo an owner may see, or an
-		 * artist's own. Its writes are the artist work photo routes, with a
-		 * `back` to this page.
+		 * artist's own. Its writes are the artist work photo routes and the
+		 * bulk route, with a `back` to this page.
 		 */
 		router
 			.get("/portfolio", [controllers.Portfolio, "index"])
 			.as("tenant.portfolio");
+		// Several photos at once: publish, unpublish, move or delete.
+		router
+			.post("/portfolio/bulk", [controllers.Portfolio, "bulk"])
+			.as("tenant.portfolio.bulk");
 
 		/**
 		 * Each member's own alerts (TAT-52): owners and artists; AlertService

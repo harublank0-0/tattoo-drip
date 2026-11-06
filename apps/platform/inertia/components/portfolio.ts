@@ -11,8 +11,12 @@ export type PortfolioPhoto = {
 	id: string;
 	artistId: string;
 	artistName: string;
-	/** On the studio page: its artist is shown there. */
+	/** Published by the studio (not unpublished). */
+	published: boolean;
+	/** On the studio page: published and its artist shown. */
 	shown: boolean;
+	/** Its page on the studio's site, while it is shown there. */
+	pageUrl: string | null;
 	alt: string | null;
 	/** The stored style slugs, in the list's order. */
 	styles: string[];
@@ -35,7 +39,11 @@ export type PortfolioArtist = {
 	photoCount: number;
 };
 
-export type PortfolioStatus = "all" | "shown" | "hidden";
+export type PortfolioStatus =
+	| "all"
+	| "published"
+	| "unpublished"
+	| "artist_hidden";
 export type PortfolioSort = "newest" | "oldest";
 
 export type PortfolioFilters = {
@@ -55,6 +63,7 @@ export type PortfolioPageProps = {
 	page: { current: number; last: number; total: number; size: number };
 	maxPhotos: number;
 	isOwner: boolean;
+	storefront: { galleryUrl: string; devHost: boolean };
 };
 
 export const NO_FILTERS: PortfolioFilters = {
@@ -110,9 +119,10 @@ export function isFiltered(filters: PortfolioFilters): boolean {
 }
 
 export const STATUS_OPTIONS: { value: PortfolioStatus; label: string }[] = [
-	{ value: "all", label: "Shown and hidden" },
-	{ value: "shown", label: "On your page" },
-	{ value: "hidden", label: "Hidden" },
+	{ value: "all", label: "Any status" },
+	{ value: "published", label: "On your page" },
+	{ value: "unpublished", label: "Unpublished" },
+	{ value: "artist_hidden", label: "Artist hidden" },
 ];
 
 export const SORT_OPTIONS: { value: PortfolioSort; label: string }[] = [
@@ -135,20 +145,42 @@ export function resultLine(
 		: `${matching} photos match, of ${everything}`;
 }
 
-/** What a photo's status says, in the panel and on its tile. */
-export function statusText(shown: boolean): string {
-	return shown ? "On your page" : "Hidden";
+/**
+ * Where a photo stands, in the panel, on its tile and in its name: on the
+ * page, unpublished by the studio, or published while its artist is hidden.
+ */
+export function statusText(photo: {
+	published: boolean;
+	shown: boolean;
+}): string {
+	if (!photo.published) return "Unpublished";
+	return photo.shown ? "On your page" : "Artist hidden";
 }
 
-/** Why a hidden photo is hidden: photos follow their artist. */
-export const HIDDEN_NOTE =
-	"Hidden from your page because its artist is. Show the artist on your page to publish their work.";
+/** Under the status, when the photo is not on the page: why, and what changes it. */
+export function statusNote(photo: {
+	published: boolean;
+	shown: boolean;
+}): string | null {
+	if (!photo.published) {
+		return "Only the studio sees it. Publish it to show it on your page.";
+	}
+	if (!photo.shown) {
+		return "Published, but its artist is hidden from your page, so it isn't shown. Show the artist on your page to show their work.";
+	}
+	return null;
+}
 
-/** A tile's accessible name: what it shows, by whom, and when it is hidden. */
+/** Public pages are cached: what a change on them takes (the look's "up to 15 minutes"). */
+export const PAGE_DELAY_NOTE =
+	"Changes to your page can take up to 15 minutes to appear.";
+
+/** A tile's accessible name: what it shows, by whom, and its status when it is not on the page. */
 export function tileLabel(photo: PortfolioPhoto): string {
 	const what = photo.alt ? photo.alt : `Photo by ${photo.artistName}`;
 	const by = photo.alt ? `, by ${photo.artistName}` : "";
-	return `${what}${by}${photo.shown ? "" : ", hidden"}`;
+	const status = photo.shown ? "" : `, ${statusText(photo).toLowerCase()}`;
+	return `${what}${by}${status}`;
 }
 
 /** The small line under a tile: its styles' names and the healed mark, or null. */
@@ -263,9 +295,59 @@ export const STYLES_LIMIT_NOTE = (max: number) =>
 	`Up to ${max}. They apply to every photo in this upload.`;
 
 export const UPLOAD_INTRO =
-	"Photos of finished and healed work. They show on your studio page, newest first, while their artist is on it.";
+	"Photos of finished and healed work. Published ones show on your studio page, newest first, while their artist is on it.";
 
 export const DROP_HINT = "JPEG, PNG or WebP, up to 10 MB each.";
 
 export const REMOVE_QUESTION =
 	"Remove this photo? Clients won't see it any more, and it can't be brought back.";
+
+// Selecting several photos.
+
+export type BulkAction = "publish" | "unpublish" | "reassign" | "delete";
+
+/** "3 selected". */
+export function selectedText(count: number): string {
+	return `${count} selected`;
+}
+
+/** What each bulk button says while its request is out. */
+export const BULK_BUSY: Record<BulkAction, string> = {
+	publish: "Publishing…",
+	unpublish: "Unpublishing…",
+	reassign: "Moving…",
+	delete: "Deleting…",
+};
+
+/** The question before a bulk delete, which can't be undone. */
+export function deleteQuestion(count: number): string {
+	return count === 1
+		? "Delete this photo? Clients won't see it any more, and it can't be brought back."
+		: `Delete these ${count} photos? Clients won't see them any more, and they can't be brought back.`;
+}
+
+/**
+ * The selected photos a bulk change did not change, judged from the page it
+ * came back with: still there after a delete, still unpublished after a
+ * publish (and the other way round), still with another artist after a
+ * move. A photo the answer no longer lists left the view (it was changed
+ * out of the filter, or deleted), so it counts as done; the server's
+ * message gives the real counts. They stay selected so they can be tried
+ * again.
+ */
+export function stillUnchanged(
+	action: BulkAction,
+	ids: readonly string[],
+	photos: readonly Pick<PortfolioPhoto, "id" | "published" | "artistId">[],
+	artistId: string | null,
+): string[] {
+	const byId = new Map(photos.map((photo) => [photo.id, photo]));
+	return ids.filter((id) => {
+		const photo = byId.get(id);
+		if (!photo) return false;
+		if (action === "delete") return true;
+		if (action === "publish") return !photo.published;
+		if (action === "unpublish") return photo.published;
+		return photo.artistId !== artistId;
+	});
+}

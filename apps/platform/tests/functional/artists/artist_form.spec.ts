@@ -754,7 +754,7 @@ test.group("An artist's styles and social links", (group) => {
 test.group("The work photos on the artist form (TAT-116)", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 
-	test("the edit page carries the photos newest first, each with only its id, thumbnail, description, styles and healed mark", async ({
+	test("the edit page carries the photos newest first, each with only its id, thumbnail, description, styles, healed mark and unpublished mark", async ({
 		client,
 		assert,
 	}) => {
@@ -780,6 +780,7 @@ test.group("The work photos on the artist form (TAT-116)", (group) => {
 			assert.deepEqual(Object.keys(photo).sort(), [
 				"alt",
 				"healed",
+				"hidden",
 				"id",
 				"styles",
 				"thumbnailUrl",

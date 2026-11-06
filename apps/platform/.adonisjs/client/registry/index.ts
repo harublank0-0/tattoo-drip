@@ -600,6 +600,12 @@ const routes = {
     tokens: [{"old":"/t/:tenant/portfolio","type":0,"val":"t","end":""},{"old":"/t/:tenant/portfolio","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/portfolio","type":0,"val":"portfolio","end":""}],
     types: placeholder as Registry['tenant.portfolio']['types'],
   },
+  'tenant.portfolio.bulk': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/portfolio/bulk',
+    tokens: [{"old":"/t/:tenant/portfolio/bulk","type":0,"val":"t","end":""},{"old":"/t/:tenant/portfolio/bulk","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/portfolio/bulk","type":0,"val":"portfolio","end":""},{"old":"/t/:tenant/portfolio/bulk","type":0,"val":"bulk","end":""}],
+    types: placeholder as Registry['tenant.portfolio.bulk']['types'],
+  },
   'tenant.alerts.index': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/alerts',

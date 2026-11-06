@@ -31,8 +31,18 @@ type PortfolioModule = {
 	tileLabel(photo: {
 		alt: string | null;
 		artistName: string;
+		published: boolean;
 		shown: boolean;
 	}): string;
+	statusText(photo: { published: boolean; shown: boolean }): string;
+	statusNote(photo: { published: boolean; shown: boolean }): string | null;
+	stillUnchanged(
+		action: "publish" | "unpublish" | "reassign" | "delete",
+		ids: string[],
+		photos: { id: string; published: boolean; artistId: string }[],
+		artistId: string | null,
+	): string[];
+	deleteQuestion(count: number): string;
 	tileMeta(
 		styles: string[],
 		healed: boolean,
@@ -99,22 +109,90 @@ test.group("Portfolio: the address", () => {
 });
 
 test.group("Portfolio: tiles", () => {
-	test("a tile is named by what it shows, by whom, and hidden when it is", ({
+	test("a tile is named by what it shows, by whom, and its status when it is off the page", ({
 		assert,
 	}) => {
 		assert.equal(
-			p.tileLabel({ alt: "Koi", artistName: "Sita", shown: true }),
+			p.tileLabel({
+				alt: "Koi",
+				artistName: "Sita",
+				published: true,
+				shown: true,
+			}),
 			"Koi, by Sita",
 		);
 		assert.equal(
-			p.tileLabel({ alt: null, artistName: "Sita", shown: false }),
-			"Photo by Sita, hidden",
+			p.tileLabel({
+				alt: null,
+				artistName: "Sita",
+				published: false,
+				shown: false,
+			}),
+			"Photo by Sita, unpublished",
+		);
+		assert.equal(
+			p.tileLabel({
+				alt: null,
+				artistName: "Sita",
+				published: true,
+				shown: false,
+			}),
+			"Photo by Sita, artist hidden",
 		);
 		assert.equal(
 			p.tileMeta(["blackwork", "unknown"], true, { blackwork: "Blackwork" }),
 			"Blackwork · unknown · Healed",
 		);
 		assert.isNull(p.tileMeta([], false, {}));
+	});
+
+	test("the status and why a photo is off the page", ({ assert }) => {
+		assert.equal(
+			p.statusText({ published: true, shown: true }),
+			"On your page",
+		);
+		assert.isNull(p.statusNote({ published: true, shown: true }));
+		assert.equal(
+			p.statusText({ published: false, shown: false }),
+			"Unpublished",
+		);
+		assert.match(
+			p.statusNote({ published: false, shown: false }) ?? "",
+			/Publish it/,
+		);
+		assert.equal(
+			p.statusText({ published: true, shown: false }),
+			"Artist hidden",
+		);
+		assert.match(
+			p.statusNote({ published: true, shown: false }) ?? "",
+			/Show the artist/,
+		);
+	});
+});
+
+test.group("Portfolio: selecting", () => {
+	test("what a bulk change left unchanged stays selected", ({ assert }) => {
+		const photos = [
+			{ id: "a", published: true, artistId: "s" },
+			{ id: "b", published: false, artistId: "h" },
+		];
+		// "c" left the view: changed out of the filter, or deleted.
+		assert.deepEqual(
+			p.stillUnchanged("publish", ["a", "b", "c"], photos, null),
+			["b"],
+		);
+		assert.deepEqual(p.stillUnchanged("unpublish", ["a", "b"], photos, null), [
+			"a",
+		]);
+		assert.deepEqual(p.stillUnchanged("delete", ["a", "c"], photos, null), [
+			"a",
+		]);
+		assert.deepEqual(p.stillUnchanged("reassign", ["a", "b"], photos, "h"), [
+			"a",
+		]);
+		assert.match(p.deleteQuestion(1), /^Delete this photo\?/);
+		assert.match(p.deleteQuestion(3), /^Delete these 3 photos\?/);
 	});
 });
 

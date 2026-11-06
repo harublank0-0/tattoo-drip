@@ -144,8 +144,8 @@ test.group("Portfolio (Studio OS)", (group) => {
 		]);
 		assert.deepEqual(await of("style=blackwork"), [s.koi.id]);
 		assert.deepEqual(await of("healed=1"), [s.koi.id]);
-		assert.deepEqual(await of("status=hidden"), [s.hidden.id]);
-		assert.deepEqual(await of("status=shown&sort=oldest"), [
+		assert.deepEqual(await of("status=artist_hidden"), [s.hidden.id]);
+		assert.deepEqual(await of("status=published&sort=oldest"), [
 			s.koi.id,
 			s.rose.id,
 			s.plain.id,
@@ -356,7 +356,7 @@ test.group("Portfolio query rules (Studio OS)", () => {
 				q: "  koi  ",
 				artist: "0F8FAD5B-D9CB-469F-A165-70867728950E",
 				style: "blackwork",
-				status: "hidden",
+				status: "unpublished",
 				healed: "1",
 				sort: "oldest",
 				page: "3",
@@ -365,7 +365,7 @@ test.group("Portfolio query rules (Studio OS)", () => {
 				search: "koi",
 				artist: "0f8fad5b-d9cb-469f-a165-70867728950e",
 				style: "blackwork",
-				status: "hidden",
+				status: "unpublished",
 				healed: true,
 				sort: "oldest",
 				page: 3,

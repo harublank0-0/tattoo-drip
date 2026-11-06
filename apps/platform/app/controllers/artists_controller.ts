@@ -79,10 +79,17 @@ export default class ArtistsController {
 		// Studio OS: each artist's scheduled sessions in the next
 		// UPCOMING_WINDOW_DAYS days, one grouped query for the whole list.
 		const now = DateTime.now();
-		const upcoming = await this.sessions.upcomingByArtist(tenant, {
-			from: now,
-			to: now.plus({ days: UPCOMING_WINDOW_DAYS }),
-		});
+		const [upcoming, photoCounts] = await Promise.all([
+			this.sessions.upcomingByArtist(tenant, {
+				from: now,
+				to: now.plus({ days: UPCOMING_WINDOW_DAYS }),
+			}),
+			// Each artist's work photos, one grouped query (the portfolio link).
+			this.workPhotos.counts(
+				tenant,
+				list.map(({ id }) => id),
+			),
+		]);
 
 		return ctx.inertia.render("artists/index", {
 			upcomingDays: UPCOMING_WINDOW_DAYS,
@@ -95,6 +102,7 @@ export default class ArtistsController {
 						// A login is a member linked to the profile; many artists have none.
 						hasLogin: artist.userId !== null,
 						upcomingCount: next?.count ?? 0,
+						photoCount: photoCounts.get(artist.id) ?? 0,
 						nextText: next
 							? sessionStartText(next.first, tenant.timezone, now)
 							: null,
@@ -196,6 +204,8 @@ export default class ArtistsController {
 				alt: photo.alt,
 				styles: knownStyles(photo.styles).map(({ slug }) => slug),
 				healed: photo.healed,
+				// Unpublished in the portfolio (Studio OS): kept off every public read.
+				hidden: photo.hidden,
 			})),
 		);
 

@@ -667,6 +667,7 @@ test.group("Work photo details and removal (TAT-116, TAT-126)", (group) => {
 			assert.deepEqual(Object.keys(photo).sort(), [
 				"alt",
 				"healed",
+				"hidden",
 				"id",
 				"styles",
 				"thumbnailUrl",

@@ -1,5 +1,8 @@
 import { Form, Link } from "@adonisjs/inertia/react";
+import { cn } from "cn";
+import { Images } from "lucide-react";
 import { useState } from "react";
+import { urlFor } from "~/client";
 import ArtistProfileHeader, {
 	ArtistScheduleView,
 } from "~/components/artist_profile";
@@ -187,12 +190,24 @@ export default function ArtistForm({
 					description={artist ? trayIntro(owner) : undefined}
 				>
 					{artist ? (
-						<WorkPhotoTray
-							tenantSlug={tenant.slug}
-							artistId={artist.id}
-							photos={workPhotos}
-							styleOptions={styleOptions}
-						/>
+						<>
+							<Link
+								href={`${urlFor("tenant.portfolio", { tenant: tenant.slug })}?artist=${artist.id}`}
+								className={cn(
+									buttonVariants({ variant: "outline", size: "sm" }),
+									"self-start",
+								)}
+							>
+								<Images aria-hidden="true" />
+								Open in Portfolio
+							</Link>
+							<WorkPhotoTray
+								tenantSlug={tenant.slug}
+								artistId={artist.id}
+								photos={workPhotos}
+								styleOptions={styleOptions}
+							/>
+						</>
 					) : (
 						<p className="text-sm text-muted-foreground">{TRAY_CREATE_NOTE}</p>
 					)}

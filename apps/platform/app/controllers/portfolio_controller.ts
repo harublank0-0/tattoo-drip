@@ -1,10 +1,16 @@
 import { inject } from "@adonisjs/core";
 import type { HttpContext } from "@adonisjs/core/http";
+import { errors as lucidErrors } from "@adonisjs/lucid";
+import { errors } from "@vinejs/vine";
 import { tenantContext } from "#middleware/tenant_middleware";
+import { WorkPhotoLimitError } from "#modules/artists/errors";
 import type Artist from "#modules/artists/models/artist";
 import {
+	type BulkFailure,
+	bulkSummary,
 	PORTFOLIO_PAGE_SIZE,
 	parsePortfolioQuery,
+	portfolioBack,
 } from "#modules/artists/portfolio";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
@@ -13,8 +19,16 @@ import WorkPhotoService, {
 	MAX_WORK_PHOTOS,
 } from "#modules/artists/services/work_photo_service";
 import { knownStyles, TATTOO_STYLES } from "#modules/artists/styles";
+import { bulkWorkPhotosValidator } from "#modules/artists/validators/work_photo";
+import { ImageDeleteError } from "#modules/media/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
+import { storefrontTemplate } from "#modules/payments/deposit_links";
+import {
+	artworkPageUrl,
+	galleryPageUrl,
+	pointsAtThisMachine,
+} from "#services/storefront_url";
 
 const PURPOSE = "artist_work_photo";
 
@@ -59,6 +73,7 @@ export default class PortfolioController {
 				: [];
 
 		const query = parsePortfolioQuery(ctx.request.qs());
+		const template = storefrontTemplate();
 		const artistIds = artists.map(({ id }) => id);
 		const artist =
 			query.artist !== null && artistIds.includes(query.artist)
@@ -83,8 +98,13 @@ export default class PortfolioController {
 					id: photo.id,
 					artistId: photo.artistId,
 					artistName: of?.name ?? "",
-					// A photo is on the studio page while its artist is.
-					shown: of?.visible ?? false,
+					// Published by the studio; on the page while its artist is shown too.
+					published: !photo.hidden,
+					shown: !photo.hidden && (of?.visible ?? false),
+					pageUrl:
+						!photo.hidden && of?.visible
+							? artworkPageUrl(template, tenant.slug, photo.id)
+							: null,
 					alt: photo.alt,
 					styles: knownStyles(photo.styles).map(({ slug }) => slug),
 					healed: photo.healed,
@@ -129,6 +149,95 @@ export default class PortfolioController {
 			},
 			maxPhotos: MAX_WORK_PHOTOS,
 			isOwner: owner,
+			storefront: {
+				galleryUrl: galleryPageUrl(template, tenant.slug),
+				devHost: pointsAtThisMachine(template),
+			},
 		});
 	}
+
+	/**
+	 * Publish, unpublish, move to another artist or delete several photos at
+	 * once (Studio OS). Each photo is loaded and checked on its own
+	 * (WorkPhotoService.findEditable: the tenant's, and its artist the
+	 * member's to edit), then changed in its own savepoint, so one that
+	 * can't be changed (removed meanwhile, another studio's or artist's id,
+	 * the new artist full, files that couldn't be deleted) is counted and
+	 * named in the answer and the others still go. Moving needs an owner and
+	 * an artist of this studio (ArtistService.findEditable). Goes back to the
+	 * portfolio as it was (`back`, portfolioBack).
+	 */
+	async bulk(ctx: HttpContext) {
+		const { tenant, membership } = tenantContext(ctx);
+		const data = await ctx.request.validateUsing(bulkWorkPhotosValidator);
+
+		let target: Artist | null = null;
+		if (data.action === "reassign") {
+			if (membership.role !== "owner") {
+				throw fieldError(
+					"artistId",
+					"Only the studio's owners can move work between artists.",
+				);
+			}
+			if (!data.artistId) {
+				throw fieldError("artistId", "Choose the artist to move them to.");
+			}
+			try {
+				target = await this.artists.findEditable(
+					tenant,
+					membership,
+					data.artistId,
+				);
+			} catch (error) {
+				if (!(error instanceof lucidErrors.E_ROW_NOT_FOUND)) throw error;
+				throw fieldError("artistId", "Choose an artist of this studio.");
+			}
+		}
+
+		let done = 0;
+		const failures: BulkFailure[] = [];
+		for (const id of data.ids) {
+			try {
+				const { photo } = await this.photos.findEditable(
+					tenant,
+					membership,
+					id,
+				);
+				if (data.action === "publish" || data.action === "unpublish") {
+					await this.photos.setHidden(
+						tenant,
+						membership,
+						photo,
+						data.action === "unpublish",
+					);
+				} else if (data.action === "reassign" && target) {
+					await this.photos.reassign(tenant, membership, photo, target.id);
+				} else {
+					await this.photos.remove(tenant, membership, photo);
+				}
+				done += 1;
+			} catch (error) {
+				if (error instanceof lucidErrors.E_ROW_NOT_FOUND) {
+					failures.push("gone");
+				} else if (error instanceof WorkPhotoLimitError) {
+					failures.push("full");
+				} else if (error instanceof ImageDeleteError) {
+					failures.push("files");
+				} else {
+					throw error;
+				}
+			}
+		}
+
+		const summary = bulkSummary(data.action, done, failures, target?.name);
+		ctx.session.flash(summary.ok ? "success" : "error", summary.message);
+		const back =
+			portfolioBack(ctx.request.input("back"), tenant.slug) ??
+			`/t/${tenant.slug}/portfolio`;
+		return ctx.response.redirect().withQs(false).toPath(back);
+	}
+}
+
+function fieldError(field: string, message: string) {
+	return new errors.E_VALIDATION_ERROR([{ field, message, rule: "bulk" }]);
 }

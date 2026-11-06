@@ -2,6 +2,8 @@ import { Form } from "@adonisjs/inertia/react";
 import { Link, router } from "@inertiajs/react";
 import {
 	ExternalLink,
+	Eye,
+	EyeOff,
 	ImageOff,
 	Pencil,
 	Trash2,
@@ -19,10 +21,11 @@ import {
 } from "~/components/photos";
 import {
 	detailsTitle,
-	HIDDEN_NOTE,
+	PAGE_DELAY_NOTE,
 	type PortfolioPhoto,
 	REMOVE_QUESTION,
 	sizeText,
+	statusNote,
 	statusText,
 } from "~/components/portfolio";
 import StylePicker from "~/components/style_picker";
@@ -210,6 +213,28 @@ function Body({
 		else if (was === "remove") removeButton.current?.focus();
 	}, [mode]);
 
+	const publishButton = useRef<HTMLButtonElement>(null);
+	const setPublished = (published: boolean) => {
+		router.post(
+			urlFor("tenant.portfolio.bulk", { tenant: tenantSlug }),
+			{ action: published ? "publish" : "unpublish", ids: [photo.id], back },
+			{
+				preserveScroll: true,
+				preserveState: true,
+				onStart: () => setBusy(true),
+				onSuccess: (page) => {
+					const flash = page.flash as { error?: string } | undefined;
+					setError(flash?.error ?? null);
+				},
+				onFinish: () => {
+					setBusy(false);
+					// The button's words changed under it: keep focus on it.
+					requestAnimationFrame(() => publishButton.current?.focus());
+				},
+			},
+		);
+	};
+
 	const remove = () => {
 		router.delete(
 			`${urlFor("tenant.artists.photos.destroy", params)}?back=${encodeURIComponent(back)}`,
@@ -304,11 +329,11 @@ function Body({
 						<dt className="text-muted-foreground">Status</dt>
 						<dd className="flex flex-col items-start gap-1">
 							<Badge variant={photo.shown ? "secondary" : "outline"}>
-								{statusText(photo.shown)}
+								{statusText(photo)}
 							</Badge>
-							{!photo.shown && (
+							{statusNote(photo) && (
 								<span className="text-xs text-muted-foreground">
-									{HIDDEN_NOTE}
+									{statusNote(photo)}
 								</span>
 							)}
 						</dd>
@@ -362,36 +387,77 @@ function Body({
 							</div>
 						</div>
 					) : (
-						<div className="flex flex-wrap items-center gap-2">
-							<Button
-								ref={editButton}
-								type="button"
-								onClick={() => setMode("edit")}
-							>
-								<Pencil aria-hidden="true" />
-								Edit details
-							</Button>
-							<Link
-								href={urlFor("tenant.artists.edit", {
-									tenant: tenantSlug,
-									id: photo.artistId,
-								})}
-								className={buttonVariants({ variant: "outline" })}
-							>
-								<UserRound aria-hidden="true" />
-								Artist profile
-							</Link>
-							<Button
-								ref={removeButton}
-								type="button"
-								variant="ghost"
-								className="ml-auto text-muted-foreground hover:text-destructive"
-								disabled={held}
-								onClick={() => setMode("remove")}
-							>
-								<Trash2 aria-hidden="true" />
-								Remove
-							</Button>
+						<div className="flex flex-col gap-3">
+							<div className="flex flex-wrap items-center gap-2 border-b pb-4">
+								<Button
+									ref={publishButton}
+									type="button"
+									variant={photo.published ? "outline" : "default"}
+									aria-disabled={busy || held}
+									onClick={() => {
+										if (!busy && !held) setPublished(!photo.published);
+									}}
+								>
+									{photo.published ? (
+										<EyeOff aria-hidden="true" />
+									) : (
+										<Eye aria-hidden="true" />
+									)}
+									{busy
+										? photo.published
+											? "Unpublishing…"
+											: "Publishing…"
+										: photo.published
+											? "Unpublish"
+											: "Publish"}
+								</Button>
+								{photo.pageUrl && (
+									<a
+										href={photo.pageUrl}
+										target="_blank"
+										rel="noreferrer"
+										className={buttonVariants({ variant: "ghost" })}
+									>
+										<ExternalLink aria-hidden="true" />
+										View on your page
+										<span className="sr-only"> (opens in a new tab)</span>
+									</a>
+								)}
+								<p className="w-full text-xs text-muted-foreground">
+									{PAGE_DELAY_NOTE}
+								</p>
+							</div>
+							<div className="flex flex-wrap items-center gap-2">
+								<Button
+									ref={editButton}
+									type="button"
+									onClick={() => setMode("edit")}
+								>
+									<Pencil aria-hidden="true" />
+									Edit details
+								</Button>
+								<Link
+									href={urlFor("tenant.artists.edit", {
+										tenant: tenantSlug,
+										id: photo.artistId,
+									})}
+									className={buttonVariants({ variant: "outline" })}
+								>
+									<UserRound aria-hidden="true" />
+									Artist profile
+								</Link>
+								<Button
+									ref={removeButton}
+									type="button"
+									variant="ghost"
+									className="ml-auto text-muted-foreground hover:text-destructive"
+									disabled={held}
+									onClick={() => setMode("remove")}
+								>
+									<Trash2 aria-hidden="true" />
+									Remove
+								</Button>
+							</div>
 						</div>
 					)}
 				</div>

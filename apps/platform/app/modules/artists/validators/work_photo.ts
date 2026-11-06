@@ -1,4 +1,5 @@
 import vine, { SimpleMessagesProvider } from "@vinejs/vine";
+import { BULK_ACTIONS, PORTFOLIO_PAGE_SIZE } from "#modules/artists/portfolio";
 import { MAX_PHOTO_STYLES, STYLE_SLUGS } from "#modules/artists/styles";
 import { StylesErrorReporter } from "#modules/artists/validators/artist";
 import { IMAGE_FORMAT_MESSAGE } from "#modules/media/errors";
@@ -44,6 +45,8 @@ export const addWorkPhotoValidator = vine.create({
 	photo: imageFile(),
 	...detailFields(),
 	alt: detailFields().alt.optional(),
+	// Studio OS: "Publish on your page" unticked uploads it unpublished.
+	hidden: vine.boolean().optional(),
 });
 
 const ALT_MESSAGE = `Keep the description to one line, up to ${MAX_WORK_PHOTO_ALT} characters.`;
@@ -71,3 +74,27 @@ addWorkPhotoValidator.messagesProvider = new SimpleMessagesProvider({
 	"styles.*.enum": "Pick styles from the list.",
 });
 addWorkPhotoValidator.errorReporter = () => new StylesErrorReporter();
+
+/**
+ * A change to several work photos at once from the portfolio (Studio OS):
+ * what to do, the photos (at most a page of them, each named once) and, to
+ * move them, the artist. Each photo is still loaded and checked on its own
+ * (PortfolioController.bulk).
+ */
+export const bulkWorkPhotosValidator = vine.create({
+	action: vine.enum(BULK_ACTIONS),
+	ids: vine
+		.array(vine.string().uuid())
+		.minLength(1)
+		.maxLength(PORTFOLIO_PAGE_SIZE)
+		.distinct(),
+	artistId: vine.string().uuid().optional(),
+});
+
+bulkWorkPhotosValidator.messagesProvider = new SimpleMessagesProvider({
+	"action.enum": "Choose what to do with the photos.",
+	"ids.array.minLength": "Select a photo first.",
+	"ids.array.maxLength": `Select up to ${PORTFOLIO_PAGE_SIZE} photos at a time.`,
+	"ids.*.uuid": "Select photos from the portfolio.",
+	"artistId.uuid": "Choose an artist of this studio.",
+});

@@ -103,6 +103,7 @@ export type ScannedRoutes = {
     'tenant.sessions.move': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.calendar.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.portfolio': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.portfolio.bulk': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.alerts.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.alerts.read': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.alerts.open': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
@@ -279,6 +280,7 @@ export type ScannedRoutes = {
     'tenant.payments.reverse': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.sessions.outcome': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.sessions.move': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.portfolio.bulk': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.alerts.read': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.alerts.open': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'email_verification.confirm': { paramsTuple?: []; params?: {} }

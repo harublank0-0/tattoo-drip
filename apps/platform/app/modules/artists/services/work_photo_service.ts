@@ -63,15 +63,18 @@ export type WorkFilter = {
 };
 
 /**
- * The photos of an artist's work (TAT-116, TAT-126): up to 100 public
- * photos, newest first (`created_at desc, id desc`, nothing reorders them),
+ * The photos of an artist's work (TAT-116, TAT-126): up to 100 photos,
+ * newest first (`created_at desc, id desc`, nothing reorders them),
  * each with an optional description, up to three styles and a healed mark.
  * Every call is scoped to the tenant. Who may change an artist's photos is
  * ArtistService.findEditable (an owner any live artist's, an artist their
  * own linked profile's), and every write checks that again under the
  * artist's row lock, the lock ArtistService.save takes too, so an upload and
  * a profile save never interleave. Files are stored through ImageService and deleted here, after
- * the real commit or rollback.
+ * the real commit or rollback. A photo is public while it is not `hidden`
+ * (Studio OS: unpublished by the studio, `setHidden`) and its artist is
+ * visible and live: every public read (`forArtists`, `page`, `findShown`,
+ * `facets`) asks both in its own query; the dashboard's reads show all.
  */
 @inject()
 export default class WorkPhotoService {
@@ -117,6 +120,7 @@ export default class WorkPhotoService {
 						from artist_work_photos
 						where tenant_id = ? and artist_id in (${artistIds.map(() => "?").join(", ")})
 							and ${VISIBLE_ARTIST}
+							and not hidden
 					) as ranked
 					where place <= ?
 				)`,
@@ -163,7 +167,8 @@ export default class WorkPhotoService {
 			)
 			.where("tenant_id", tenant.id)
 			.whereIn("artist_id", [...filter.artistIds])
-			.whereRaw(VISIBLE_ARTIST, [tenant.id]);
+			.whereRaw(VISIBLE_ARTIST, [tenant.id])
+			.where("hidden", false);
 		if (filter.style !== null) {
 			query.whereRaw("styles @> array[?]::varchar[]", [filter.style]);
 		}
@@ -208,6 +213,7 @@ export default class WorkPhotoService {
 			.where("id", photoId)
 			.whereIn("artist_id", [...artistIds])
 			.whereRaw(VISIBLE_ARTIST, [tenant.id])
+			.where("hidden", false)
 			.first();
 	}
 
@@ -229,7 +235,8 @@ export default class WorkPhotoService {
 			from artist_work_photos p
 			left join lateral unnest(p.styles) as s(style) on true
 			where p.tenant_id = ? and p.artist_id in (${artistIds.map(() => "?").join(", ")})
-				and ${visibleArtistSql("p")}`,
+				and ${visibleArtistSql("p")}
+				and not p.hidden`,
 			[tenant.id, ...artistIds, tenant.id],
 		);
 		return { styles: rows[0].styles, healed: rows[0].healed };
@@ -267,10 +274,18 @@ export default class WorkPhotoService {
 			const rows = ArtistWorkPhoto.query()
 				.where("tenant_id", tenant.id)
 				.whereIn("artist_id", [...artistIds]);
-			if (query.status === "shown") {
-				rows.whereRaw(artistWhere(" and artists.visible"), [tenant.id]);
-			} else if (query.status === "hidden") {
-				rows.whereRaw(artistWhere(" and not artists.visible"), [tenant.id]);
+			// On the page: published and its artist shown. Unpublished: hidden
+			// by the studio. Artist hidden: published, but its artist is not.
+			if (query.status === "published") {
+				rows
+					.where("hidden", false)
+					.whereRaw(artistWhere(" and artists.visible"), [tenant.id]);
+			} else if (query.status === "unpublished") {
+				rows.where("hidden", true).whereRaw(artistWhere(""), [tenant.id]);
+			} else if (query.status === "artist_hidden") {
+				rows
+					.where("hidden", false)
+					.whereRaw(artistWhere(" and not artists.visible"), [tenant.id]);
 			} else {
 				rows.whereRaw(artistWhere(""), [tenant.id]);
 			}
@@ -374,7 +389,7 @@ export default class WorkPhotoService {
 		editor: ProfileEditor,
 		artist: Artist,
 		upload: Upload,
-		details: WorkPhotoDetails = NO_DETAILS,
+		details: WorkPhotoDetails & { hidden?: boolean } = NO_DETAILS,
 	): Promise<ArtistWorkPhoto> {
 		assertOwnedBy(tenant, artist);
 		const alt = details.alt?.trim();
@@ -406,6 +421,7 @@ export default class WorkPhotoService {
 					alt: alt ? alt : null,
 					styles: [...details.styles],
 					healed: details.healed,
+					hidden: details.hidden ?? false,
 				},
 				{ client: trx },
 			);
@@ -459,6 +475,72 @@ export default class WorkPhotoService {
 			const live = await this.lockedPhoto(trx, tenant, photo);
 			await this.images.deleteOrThrow(PURPOSE, live.imageKey);
 			await live.delete();
+		});
+	}
+
+	/**
+	 * Publishes (`hidden` false) or unpublishes the photo (Studio OS), under
+	 * its artist's lock like every write. An unpublished photo leaves every
+	 * public read at once (each asks `not hidden`); a studio page or API
+	 * answer cached before can still list it for its cache lifetime (up to
+	 * about 12 minutes, the work read's `publicCache`), and its files stay
+	 * where they are, at the same unguessable URLs, as a hidden flash
+	 * design's do. Publishing a photo of a hidden artist changes nothing on
+	 * the page until the artist is shown.
+	 */
+	async setHidden(
+		tenant: TenantRef,
+		editor: ProfileEditor,
+		photo: ArtistWorkPhoto,
+		hidden: boolean,
+	): Promise<ArtistWorkPhoto> {
+		assertPhotoOf(tenant, photo);
+		return withTransaction(async (trx) => {
+			await this.artists.lockEditable(trx, tenant, editor, photo.artistId);
+			const live = await this.lockedPhoto(trx, tenant, photo);
+			if (live.hidden !== hidden) {
+				live.hidden = hidden;
+				await live.save();
+			}
+			return live;
+		});
+	}
+
+	/**
+	 * Gives the photo to another artist of the tenant (Studio OS): both
+	 * artists must be `editor`'s to edit (an owner any live artist; an artist
+	 * only their own, so for them this only ever names the same profile) and
+	 * the new one must have room. Both artists' rows are locked, in id order
+	 * so two moves the other way round can't deadlock, and the count is taken
+	 * under the new artist's lock, as `add` does, so a move and an upload
+	 * never take the 101st place. The photo keeps its date, so it takes its
+	 * place among the new artist's photos; its files don't move (their keys
+	 * name the tenant, not the artist). Another tenant's or a deleted artist
+	 * is E_ROW_NOT_FOUND; a full artist is WorkPhotoLimitError.
+	 */
+	async reassign(
+		tenant: TenantRef,
+		editor: ProfileEditor,
+		photo: ArtistWorkPhoto,
+		artistId: string,
+	): Promise<ArtistWorkPhoto> {
+		assertPhotoOf(tenant, photo);
+		return withTransaction(async (trx) => {
+			const ids = [...new Set([photo.artistId, artistId])].sort();
+			for (const id of ids) {
+				await this.artists.lockEditable(trx, tenant, editor, id);
+			}
+			const live = await this.lockedPhoto(trx, tenant, photo);
+			// Moved meanwhile: the artist it is with now was not locked here.
+			if (live.artistId !== photo.artistId) {
+				throw new lucidErrors.E_ROW_NOT_FOUND(ArtistWorkPhoto);
+			}
+			if (live.artistId === artistId) return live;
+			const count = await this.countPhotos(tenant, artistId, trx);
+			if (count >= MAX_WORK_PHOTOS) throw new WorkPhotoLimitError();
+			live.artistId = artistId;
+			await live.save();
+			return live;
 		});
 	}
 

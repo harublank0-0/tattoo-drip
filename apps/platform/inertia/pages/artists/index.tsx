@@ -6,6 +6,7 @@ import {
 	ExternalLink,
 	Eye,
 	EyeOff,
+	Images,
 	Inbox,
 	KeyRound,
 	Pencil,
@@ -222,6 +223,16 @@ function ArtistCard({
 					>
 						<Pencil aria-hidden="true" />
 						Profile
+					</Link>
+					<Link
+						href={`${urlFor("tenant.portfolio", { tenant: tenantSlug })}?artist=${artist.id}`}
+						className={buttonVariants({ variant: "ghost", size: "sm" })}
+					>
+						<Images aria-hidden="true" />
+						Work
+						<span className="text-muted-foreground tabular-nums">
+							{artist.photoCount}
+						</span>
 					</Link>
 					<Link
 						href={`${urlFor("tenant.calendar.index", { tenant: tenantSlug })}?view=week&artist=${artist.id}`}
