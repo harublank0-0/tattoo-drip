@@ -1,6 +1,6 @@
 import type { Artist, Studio } from "@tattoo-drip/sdk";
 import { fill } from "../intake/template.ts";
-import { sectionId } from "./anchors.ts";
+import { PAGE_IDS, reserveSection, sectionId } from "./anchors.ts";
 import { filterStyles } from "./gallery.ts";
 import { closedDaysText, readClosures } from "./hours.ts";
 import { artistsHref, infoHref, requestHref, workHref } from "./links.ts";
@@ -83,6 +83,8 @@ export interface FaqContent {
 	readonly groups: readonly {
 		readonly id: string;
 		readonly title: string;
+		/** The studio's name when the title is "From {studio}" (its own group): rendered in <bdi>, never as a label. */
+		readonly studioName?: string;
 		readonly items: readonly FaqItem[];
 	}[];
 }
@@ -377,6 +379,7 @@ function faqContent(
 		{
 			id: "studio",
 			title: fill(words.fromStudio, studio),
+			studioName: view.name,
 			items: ownEntries.map(
 				(entry, n): FaqItem => ({
 					id: `studio-${n + 1}`,
@@ -424,7 +427,8 @@ function policiesContent(
 	// The studio's own sections follow, in its order; titles never merge with
 	// the Good to know ones (the deposit policy keeps its one source).
 	const own = studioPolicies(studio);
-	const used = new Set(sections.map((section) => section.id));
+	const used = new Set(PAGE_IDS);
+	for (const section of sections) reserveSection(section.id, used);
 	for (const section of own.sections) {
 		sections.push({
 			id: sectionId(section.title, used, sections.length + 1),

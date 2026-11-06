@@ -320,6 +320,58 @@ describe("the studio's own FAQ and policies (2026-11-06 spec)", () => {
 		}
 	});
 
+	test("the studio's own FAQ group names the studio in <bdi>, never uppercased or letter-spaced", () => {
+		const named = { ...CONTENT_STUDIO, name: "कालो सुई" };
+		for (const make of [inkNoir, stencil]) {
+			const page = data("faq", make(named));
+			assert.ok(page);
+			const markup = mainOf(html(page));
+			assert.match(
+				markup,
+				/<h2 id="faq-studio-title" class="faq-group-title faq-group-title-studio">From <bdi>कालो सुई<\/bdi><\/h2>/,
+			);
+		}
+		// Ink Noir's contents list names it the same way.
+		const ink = mainOf(html(data("faq", inkNoir(named)) as InfoPageData));
+		assert.match(ink, /<a href="#faq-studio">From <bdi>कालो सुई<\/bdi><\/a>/);
+	});
+
+	test("a section's anchor never takes an id the page already uses, its heading's included", () => {
+		const clashing = {
+			...CONTENT_STUDIO,
+			policies: {
+				updatedAt: null,
+				sections: [
+					"Main",
+					"Info",
+					"Info title",
+					"Info close title",
+					"Deposits title",
+					"Ink footer more",
+					"Cancellations",
+					"Cancellations title",
+				].map((title) => ({ title, text: `About ${title}.` })),
+			},
+		};
+		for (const make of [inkNoir, stencil]) {
+			const page = data("policies", make(clashing));
+			assert.ok(page && page.content.kind === "policies");
+			const markup = html(page);
+			const ids = Array.from(markup.matchAll(/ id="([^"]*)"/g), (m) => m[1]);
+			assert.deepEqual(ids, [...new Set(ids)], "every id on the page once");
+			// Each contents link leads to its own section.
+			for (const section of page.content.sections) {
+				assert.match(
+					markup,
+					new RegExp(
+						`<section id="${section.id}"[^>]*aria-labelledby="${section.id}-title"`,
+					),
+					section.title,
+				);
+			}
+		}
+	});
+
 	test("a studio with only its own sections has a Policies page; one with neither is a not-found", () => {
 		const own = data(
 			"policies",

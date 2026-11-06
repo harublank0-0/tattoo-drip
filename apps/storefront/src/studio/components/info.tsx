@@ -1,11 +1,13 @@
+import { Fill } from "../../intake/components/fill.tsx";
 import { fill } from "../../intake/template.ts";
 import { studioCopy } from "../copy.ts";
-import type {
-	ContactContent,
-	FaqContent,
-	InfoContent,
-	Paragraphs,
-	PolicySection,
+import {
+	type ContactContent,
+	type FaqContent,
+	type InfoContent,
+	infoCopy,
+	type Paragraphs,
+	type PolicySection,
 } from "../info.ts";
 import { isAllowedHref, linkRel } from "../links.ts";
 import type { InfoPageData } from "../loaders.ts";
@@ -95,8 +97,15 @@ export function FaqGroups({
 					className="faq-group"
 					aria-labelledby={`faq-${group.id}-title`}
 				>
-					<h2 id={`faq-${group.id}-title`} className="faq-group-title">
-						{group.title}
+					<h2
+						id={`faq-${group.id}-title`}
+						className={
+							group.studioName
+								? "faq-group-title faq-group-title-studio"
+								: "faq-group-title"
+						}
+					>
+						<FaqGroupTitle group={group} />
 					</h2>
 					{group.items.map((item) => (
 						<details key={item.id} id={item.id} className="faq-item">
@@ -118,6 +127,26 @@ export function FaqGroups({
 				</section>
 			))}
 		</div>
+	);
+}
+
+/**
+ * A FAQ group's title: the studio's own group names the studio in <bdi>
+ * (its name may be Devanagari or right-to-left), the others are product
+ * words.
+ */
+export function FaqGroupTitle({
+	group,
+}: {
+	group: FaqContent["groups"][number];
+}) {
+	return group.studioName ? (
+		<Fill
+			template={infoCopy.faq.fromStudio}
+			values={{ studio: group.studioName }}
+		/>
+	) : (
+		group.title
 	);
 }
 

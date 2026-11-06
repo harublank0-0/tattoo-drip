@@ -741,6 +741,8 @@
   .faq { display: grid; gap: 2.5rem; }
   .faq-group { display: grid; gap: 0; }
   .faq-group-title { margin: 0 0 0.75rem; font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
+  /* The studio's own group names the studio: never letter-spacing or uppercase on a name (it may be Devanagari). */
+  .faq-group-title-studio { letter-spacing: normal; text-transform: none; }
   .faq-item { border-block-end: 1px solid var(--line); }
   .faq-item:first-of-type { border-block-start: 1px solid var(--line); }
   .faq-question { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-block-size: 3rem; padding-block: 0.75rem; font-weight: 600; cursor: pointer; list-style: none; }
