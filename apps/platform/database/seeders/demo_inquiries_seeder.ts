@@ -1,5 +1,6 @@
 import logger from "@adonisjs/core/services/logger";
 import { BaseSeeder } from "@adonisjs/lucid/seeders";
+import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
 import sharp from "sharp";
 import Artist from "#modules/artists/models/artist";
 import Client from "#modules/clients/models/client";
@@ -7,12 +8,8 @@ import Inquiry from "#modules/inquiries/models/inquiry";
 import ReferenceImage from "#modules/inquiries/models/reference_image";
 import ImageService from "#modules/media/services/image_service";
 import ReferenceCode from "#modules/references/models/reference_code";
-import {
-	newReferenceCode,
-	REFERENCE_TRIES,
-} from "#modules/references/reference_codes";
+import { claimFreeCode } from "#modules/references/reference_codes";
 import Tenant from "#modules/tenancy/models/tenant";
-import { isUniqueViolation } from "#services/db_errors";
 
 /** Three demo inquiries; fixed phones, so a second run reuses the clients. */
 const DEMOS = [
@@ -69,8 +66,7 @@ const DEMOS = [
 /**
  * Development only: gives every tenant the three demo inquiries below (`new`,
  * each with its reference code, with generated placeholder references stored
- * like real uploads), whatever
- * else the tenant already has. A demo whose phone already has an inquiry in
+ * like real uploads), whatever else the tenant already has. A demo whose phone already has an inquiry in
  * that tenant, accepted or not, is skipped, so a second run adds nothing.
  * Run as the owner role: `pnpm seed:dev`.
  */
@@ -106,27 +102,30 @@ export default class DemoInquiriesSeeder extends BaseSeeder {
 				if (existing) {
 					continue;
 				}
-				const inquiry = await Inquiry.create(
-					{
-						tenantId: tenant.id,
-						clientId: person.id,
-						idea: demo.idea,
-						placement: demo.placement,
-						approximateSize: demo.size,
-						preferredDates: demo.dates,
-						preferredArtistId: demo.namesArtist ? (artist?.id ?? null) : null,
-						budget: demo.budget,
-						style: demo.style,
-						colour: demo.colour,
-						notes: demo.notes,
-						referenceCode: await this.claimCode(tenant),
-						sourceChannel: "instagram",
-						contactName: person.name,
-						contactPhone: person.phone,
-						contactEmail: null,
-						status: "new",
-					},
-					{ connection: client.connectionName },
+				// The code and its inquiry together: a failed insert registers no code.
+				const inquiry = await client.transaction(async (trx) =>
+					Inquiry.create(
+						{
+							tenantId: tenant.id,
+							clientId: person.id,
+							idea: demo.idea,
+							placement: demo.placement,
+							approximateSize: demo.size,
+							preferredDates: demo.dates,
+							preferredArtistId: demo.namesArtist ? (artist?.id ?? null) : null,
+							budget: demo.budget,
+							style: demo.style,
+							colour: demo.colour,
+							notes: demo.notes,
+							referenceCode: await this.claimCode(trx, tenant),
+							sourceChannel: "instagram",
+							contactName: person.name,
+							contactPhone: person.phone,
+							contactEmail: null,
+							status: "new",
+						},
+						{ client: trx },
+					),
 				);
 				for (const [position, [r, g, b]] of demo.colours.entries()) {
 					const bytes = await sharp({
@@ -161,27 +160,21 @@ export default class DemoInquiriesSeeder extends BaseSeeder {
 	}
 
 	/**
-	 * A new reference code registered for the tenant, as
-	 * ReferenceCodeService.claim draws one; written here on the owner
-	 * connection, since a seeder has no request transaction.
+	 * A new reference code registered for the tenant in `trx`, drawn as
+	 * ReferenceCodeService.claim draws one (each try its own savepoint); on
+	 * the owner connection, since a seeder has no request transaction.
 	 */
-	private async claimCode(tenant: Tenant): Promise<string> {
-		for (let attempt = 1; ; attempt++) {
-			const code = newReferenceCode();
-			try {
-				await ReferenceCode.create(
+	private claimCode(
+		trx: TransactionClientContract,
+		tenant: Tenant,
+	): Promise<string> {
+		return claimFreeCode((code) =>
+			trx.transaction((savepoint) =>
+				ReferenceCode.create(
 					{ tenantId: tenant.id, code },
-					{ connection: this.client.connectionName },
-				);
-				return code;
-			} catch (error) {
-				if (
-					attempt >= REFERENCE_TRIES ||
-					!isUniqueViolation(error, "reference_codes_tenant_id_code_unique")
-				) {
-					throw error;
-				}
-			}
-		}
+					{ client: savepoint },
+				),
+			),
+		);
 	}
 }

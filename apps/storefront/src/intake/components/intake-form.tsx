@@ -1107,7 +1107,8 @@ export function bookingSummaryItems(
 				message,
 			});
 		}
-		if (field === "idea" && (hasPhotoErrors(references) || photosStopped)) {
+		// The photo picker follows the colour choice on the tattoo step.
+		if (field === "colour" && (hasPhotoErrors(references) || photosStopped)) {
 			items.push({
 				target: canAdd(references) ? "references-input" : "references",
 				label: copy.photos.legend,
