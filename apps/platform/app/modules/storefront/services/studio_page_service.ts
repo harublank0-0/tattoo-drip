@@ -1,4 +1,5 @@
 import { inject } from "@adonisjs/core";
+import type { DateTime } from "luxon";
 import { studioTakesInquiries } from "#modules/artists/accepting";
 import type Artist from "#modules/artists/models/artist";
 import type ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
@@ -38,6 +39,11 @@ import {
 	type PublicSocialLink,
 	socialLinks,
 } from "#modules/storefront/studio_page";
+// A value import: the constructor's default builds one.
+import StudioContentService, {
+	type FaqEntry,
+	type PolicySection,
+} from "#modules/studio_content/services/studio_content_service";
 import type Tenant from "#modules/tenancy/models/tenant";
 import type { TenantProfile } from "#modules/tenancy/services/tenancy_service";
 
@@ -83,6 +89,10 @@ export type StudioPage = {
 		beforeSession: string | null;
 		aftercare: string | null;
 	};
+	/** The studio's own FAQ entries, in order; [] while its page hides Good to know. */
+	faq: FaqEntry[];
+	/** Its own policy sections and when the policies last changed; empty while Good to know is hidden. */
+	policies: { updatedAt: DateTime | null; sections: PolicySection[] };
 };
 
 /** A work photo as the public API shows it (openapi.yaml, WorkPhoto). */
@@ -191,6 +201,7 @@ export default class StudioPageService {
 		private workPhotos: WorkPhotoService,
 		private hours: OpeningHoursService,
 		private flashDesigns: FlashService,
+		private content: StudioContentService = new StudioContentService(),
 	) {}
 
 	async studio(tenant: Tenant): Promise<StudioPage> {
@@ -212,6 +223,26 @@ export default class StudioPageService {
 				depositPolicy: tenant.depositPolicy,
 				beforeSession: tenant.beforeSessionText,
 				aftercare: tenant.aftercareText,
+			},
+			...(await this.studioContent(tenant)),
+		};
+	}
+
+	/**
+	 * The studio's own FAQ and policies (one query each), shown with its Good
+	 * to know: while the page hides that section, none of it is public.
+	 */
+	private async studioContent(
+		tenant: Tenant,
+	): Promise<Pick<StudioPage, "faq" | "policies">> {
+		if (!lookOf(tenant).sections.includes("info")) {
+			return { faq: [], policies: { updatedAt: null, sections: [] } };
+		}
+		return {
+			faq: await this.content.faq(tenant),
+			policies: {
+				updatedAt: tenant.policiesUpdatedAt,
+				sections: await this.content.policySections(tenant),
 			},
 		};
 	}

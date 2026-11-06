@@ -8,7 +8,8 @@ import { socialLinks } from "#modules/storefront/studio_page";
  * (also for a request made under an old one), the type and whether it
  * takes inquiries, plus its cover photo (TAT-116), its page look
  * (`storefront`, TAT-56: checked values only), and its opening hours, closed
- * days and Good to know texts (TAT-128). Every field is written out here: a
+ * days and Good to know texts (TAT-128), and its own FAQ and policies
+ * (2026-11-06 spec). Every field is written out here: a
  * new one needs the contract, a ruling and the exact-fields test.
  * The deposit policy is shown (in Good to know, as the spec decided); never
  * the default deposit percentage, the tenant id, payment methods or members
@@ -25,6 +26,8 @@ export default class PublicStudioTransformer extends BaseTransformer<StudioPage>
 			openingHours,
 			closedDays,
 			goodToKnow,
+			faq,
+			policies,
 		} = this.resource;
 		const { look, logo } = storefront;
 		return {
@@ -98,6 +101,12 @@ export default class PublicStudioTransformer extends BaseTransformer<StudioPage>
 				depositPolicy: text(goodToKnow.depositPolicy),
 				beforeSession: text(goodToKnow.beforeSession),
 				aftercare: text(goodToKnow.aftercare),
+			},
+			// The studio's own FAQ and policies, as stored (the editor trims them).
+			faq: faq.map(({ question, answer }) => ({ question, answer })),
+			policies: {
+				updatedAt: policies.updatedAt?.toUTC().toISO() ?? null,
+				sections: policies.sections.map(({ title, text }) => ({ title, text })),
 			},
 		};
 	}

@@ -50,6 +50,8 @@ export const STUDIO: Studio = {
 		beforeSession: null,
 		aftercare: null,
 	},
+	faq: [],
+	policies: { updatedAt: null, sections: [] },
 };
 
 /**
@@ -77,6 +79,8 @@ export const GOOD_TO_KNOW_STUDIO: Studio = {
 		beforeSession: "Eat a good meal.\nWear clothes that leave the spot free.",
 		aftercare: "घाउ सफा राख्नुहोस्।\nKeep the wrap on for 2 hours.",
 	},
+	faq: [],
+	policies: { updatedAt: null, sections: [] },
 };
 
 /** A studio that set nothing but its name. */

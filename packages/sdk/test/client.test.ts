@@ -781,6 +781,8 @@ describe("studio and artists", () => {
 			beforeSession: null,
 			aftercare: null,
 		},
+		faq: [],
+		policies: { updatedAt: null, sections: [] },
 	};
 	const ARTIST: Artist = {
 		id: "0199f000-0000-7000-8000-000000000044",
