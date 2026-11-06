@@ -938,6 +938,13 @@ export const isolationCases: IsolationCase[] = [
 		snapshot: none,
 	},
 	{
+		method: "GET",
+		pattern: "/t/:tenant/portfolio",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: none,
+	},
+	{
 		method: "POST",
 		pattern: "/t/:tenant/sessions/:id/outcome",
 		resource: "session",

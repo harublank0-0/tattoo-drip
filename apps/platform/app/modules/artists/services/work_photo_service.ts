@@ -5,6 +5,10 @@ import type { QueryClientContract } from "@adonisjs/lucid/types/database";
 import { WorkPhotoLimitError } from "#modules/artists/errors";
 import Artist from "#modules/artists/models/artist";
 import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
+import {
+	PORTFOLIO_PAGE_SIZE,
+	type PortfolioQuery,
+} from "#modules/artists/portfolio";
 import ArtistService, {
 	mayEdit,
 	type ProfileEditor,
@@ -37,6 +41,19 @@ export type WorkPhotoDetails = {
 	styles: readonly StyleSlug[];
 	healed: boolean;
 };
+
+/** The most pages of the portfolio that are read; a later page is the last one. */
+const MAX_PORTFOLIO_PAGE = 1000;
+
+/** One page of the portfolio: the photos, how many match, the page shown and the last. */
+export type PortfolioPage = {
+	photos: ArtistWorkPhoto[];
+	total: number;
+	page: number;
+	lastPage: number;
+};
+
+const NO_DETAILS: WorkPhotoDetails = { alt: null, styles: [], healed: false };
 
 /** What the gallery shows: these artists' photos, optionally one style and healed ones only. */
 export type WorkFilter = {
@@ -219,6 +236,101 @@ export default class WorkPhotoService {
 	}
 
 	/**
+	 * One page of the studio's portfolio (Studio OS): the photos of
+	 * `artistIds` (the caller passes the live artists the member may see: an
+	 * owner every one, an artist their own profile), matching the query, newest
+	 * or oldest first (`created_at`, then `id`, the order of `list`). Unlike the
+	 * public reads, a hidden artist's photos count: `status` keeps those of
+	 * shown artists or of hidden ones. The search matches the description or
+	 * the artist's name, with LIKE's wildcards taken literally. Each query asks
+	 * again that the artist is live and the tenant's (`artists` is soft-deleted
+	 * and a subquery skips the model's hook, so `deleted_at` is said here). A
+	 * page past the last is the last. No query for [].
+	 */
+	async studioPage(
+		tenant: TenantRef,
+		artistIds: readonly string[],
+		query: Omit<PortfolioQuery, "artist">,
+	): Promise<PortfolioPage> {
+		if (artistIds.length === 0) {
+			return { photos: [], total: 0, page: 1, lastPage: 1 };
+		}
+		const wanted = Math.min(query.page, MAX_PORTFOLIO_PAGE);
+		const artistWhere = (extra: string) =>
+			`exists (
+				select 1 from artists
+				where artists.id = artist_work_photos.artist_id
+					and artists.tenant_id = ?
+					and artists.deleted_at is null${extra}
+			)`;
+		const find = (at: number) => {
+			const rows = ArtistWorkPhoto.query()
+				.where("tenant_id", tenant.id)
+				.whereIn("artist_id", [...artistIds]);
+			if (query.status === "shown") {
+				rows.whereRaw(artistWhere(" and artists.visible"), [tenant.id]);
+			} else if (query.status === "hidden") {
+				rows.whereRaw(artistWhere(" and not artists.visible"), [tenant.id]);
+			} else {
+				rows.whereRaw(artistWhere(""), [tenant.id]);
+			}
+			if (query.style !== null) {
+				rows.whereRaw("styles @> array[?]::varchar[]", [query.style]);
+			}
+			if (query.healed) rows.where("healed", true);
+			if (query.search) {
+				const pattern = `%${escapeLike(query.search)}%`;
+				rows.where((group) => {
+					group
+						.whereRaw("alt ilike ? escape '\\'", [pattern])
+						.orWhereRaw(artistWhere(" and artists.name ilike ? escape '\\'"), [
+							tenant.id,
+							pattern,
+						]);
+				});
+			}
+			const direction = query.sort === "oldest" ? "asc" : "desc";
+			return rows
+				.orderBy("created_at", direction)
+				.orderBy("id", direction)
+				.paginate(at, PORTFOLIO_PAGE_SIZE);
+		};
+		let result = await find(wanted);
+		if (wanted > result.lastPage && result.total > 0) {
+			result = await find(result.lastPage);
+		}
+		return {
+			photos: result.all(),
+			total: result.total,
+			page: Math.max(1, Math.min(wanted, result.lastPage)),
+			lastPage: Math.max(1, result.lastPage),
+		};
+	}
+
+	/**
+	 * How many photos each of `artistIds` has (an artist with none has no
+	 * entry), so an upload knows the room left before it sends anything. The
+	 * count under the artist's lock in `add` is still the one that counts.
+	 */
+	async counts(
+		tenant: TenantRef,
+		artistIds: readonly string[],
+	): Promise<Map<string, number>> {
+		const counts = new Map<string, number>();
+		if (artistIds.length === 0) return counts;
+		const rows = await ArtistWorkPhoto.query()
+			.where("tenant_id", tenant.id)
+			.whereIn("artist_id", [...artistIds])
+			.groupBy("artist_id")
+			.select("artist_id")
+			.count("* as total");
+		for (const row of rows) {
+			counts.set(row.artistId, Number(row.$extras.total));
+		}
+		return counts;
+	}
+
+	/**
 	 * The photo and its artist, if `editor` may change them: the photo is the
 	 * tenant's, and the artist is live and `editor`'s to edit
 	 * (ArtistService.findEditable). Another tenant's photo, a deleted artist's,
@@ -243,7 +355,9 @@ export default class WorkPhotoService {
 	}
 
 	/**
-	 * Adds a photo, dated now, so it is the artist's newest. Throws
+	 * Adds a photo, dated now, so it is the artist's newest, with the
+	 * `details` given at upload (none by default; the portfolio's upload
+	 * sends them, the same rules as updateDetails). Throws
 	 * WorkPhotoLimitError when the artist already shows 100 (also when two
 	 * uploads race for the last place: the second is refused under the lock
 	 * and its file is deleted) and InvalidImageError for a file we can't
@@ -260,8 +374,10 @@ export default class WorkPhotoService {
 		editor: ProfileEditor,
 		artist: Artist,
 		upload: Upload,
+		details: WorkPhotoDetails = NO_DETAILS,
 	): Promise<ArtistWorkPhoto> {
 		assertOwnedBy(tenant, artist);
+		const alt = details.alt?.trim();
 		// Before any decode: an upload to a profile that isn't the editor's, or
 		// to a full set, costs nothing. (The lock below checks both again.)
 		if (!mayEdit(editor, artist.userId)) {
@@ -287,9 +403,9 @@ export default class WorkPhotoService {
 					imageKey: stored.key,
 					width: stored.width,
 					height: stored.height,
-					alt: null,
-					styles: [],
-					healed: false,
+					alt: alt ? alt : null,
+					styles: [...details.styles],
+					healed: details.healed,
 				},
 				{ client: trx },
 			);
@@ -383,4 +499,9 @@ function assertPhotoOf(tenant: TenantRef, photo: ArtistWorkPhoto) {
 	if (photo.tenantId !== tenant.id) {
 		throw new Error(`Work photo ${photo.id} belongs to another tenant`);
 	}
+}
+
+/** Escapes LIKE's wildcards and its escape character. */
+function escapeLike(value: string): string {
+	return value.replace(/[\\%_]/g, (char) => `\\${char}`);
 }

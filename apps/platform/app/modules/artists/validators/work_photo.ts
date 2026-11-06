@@ -8,20 +8,6 @@ import { imageFile } from "#modules/media/validators/image_file";
 export const MAX_WORK_PHOTO_ALT = 200;
 
 /**
- * One work photo, as the multipart body gives it (TAT-116). The image is
- * only filtered here (size, extension): ImageService checks what it really
- * is.
- */
-export const addWorkPhotoValidator = vine.create({ photo: imageFile() });
-
-addWorkPhotoValidator.messagesProvider = new SimpleMessagesProvider({
-	"photo.required": "Choose a photo to upload.",
-	"photo.file": IMAGE_FORMAT_MESSAGE,
-	"photo.file.extname": IMAGE_FORMAT_MESSAGE,
-	"photo.file.size": "Use an image of 10 MB or less.",
-});
-
-/**
  * What the photo's form saves (TAT-126): the description (its alt text, read
  * aloud to clients who can't see it: one line, no control characters or line
  * and paragraph separators, the studio name's rule, up to 200 characters;
@@ -30,7 +16,7 @@ addWorkPhotoValidator.messagesProvider = new SimpleMessagesProvider({
  * `healed` means false and missing `styles` means none (the controller reads
  * both).
  */
-export const updateWorkPhotoValidator = vine.create({
+const detailFields = () => ({
 	alt: vine
 		.string()
 		.trim()
@@ -45,6 +31,21 @@ export const updateWorkPhotoValidator = vine.create({
 	healed: vine.boolean().optional(),
 });
 
+export const updateWorkPhotoValidator = vine.create(detailFields());
+
+/**
+ * One work photo, as the multipart body gives it (TAT-116), and from the
+ * portfolio's upload (Studio OS) its details too, by the rules of
+ * updateWorkPhotoValidator; the artist's tray sends none, and a missing
+ * `alt` is none. The image is only filtered here (size, extension):
+ * ImageService checks what it really is.
+ */
+export const addWorkPhotoValidator = vine.create({
+	photo: imageFile(),
+	...detailFields(),
+	alt: detailFields().alt.optional(),
+});
+
 const ALT_MESSAGE = `Keep the description to one line, up to ${MAX_WORK_PHOTO_ALT} characters.`;
 updateWorkPhotoValidator.messagesProvider = new SimpleMessagesProvider({
 	"alt.maxLength": ALT_MESSAGE,
@@ -57,3 +58,16 @@ updateWorkPhotoValidator.messagesProvider = new SimpleMessagesProvider({
 });
 // An error on one style is shown under "styles", as on the artist form.
 updateWorkPhotoValidator.errorReporter = () => new StylesErrorReporter();
+
+addWorkPhotoValidator.messagesProvider = new SimpleMessagesProvider({
+	"photo.required": "Choose a photo to upload.",
+	"photo.file": IMAGE_FORMAT_MESSAGE,
+	"photo.file.extname": IMAGE_FORMAT_MESSAGE,
+	"photo.file.size": "Use an image of 10 MB or less.",
+	"alt.maxLength": ALT_MESSAGE,
+	"alt.regex": ALT_MESSAGE,
+	"alt.string": ALT_MESSAGE,
+	"styles.array.maxLength": `Pick up to ${MAX_PHOTO_STYLES} styles.`,
+	"styles.*.enum": "Pick styles from the list.",
+});
+addWorkPhotoValidator.errorReporter = () => new StylesErrorReporter();

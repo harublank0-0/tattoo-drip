@@ -510,6 +510,15 @@ router
 			.prefix("/calendar");
 
 		/**
+		 * The portfolio (Studio OS): every work photo an owner may see, or an
+		 * artist's own. Its writes are the artist work photo routes, with a
+		 * `back` to this page.
+		 */
+		router
+			.get("/portfolio", [controllers.Portfolio, "index"])
+			.as("tenant.portfolio");
+
+		/**
 		 * Each member's own alerts (TAT-52): owners and artists; AlertService
 		 * scopes every read and write to the member. Every alerts route goes
 		 * in this group (a test checks).

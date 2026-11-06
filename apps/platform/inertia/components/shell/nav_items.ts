@@ -11,6 +11,7 @@ export type NavKey =
 	| "calendar"
 	| "clients"
 	| "artists"
+	| "portfolio"
 	| "settings";
 
 export type ShellNavItem = {
@@ -23,6 +24,7 @@ export type ShellNavItem = {
 		| "tenant.calendar.index"
 		| "tenant.clients.index"
 		| "tenant.artists"
+		| "tenant.portfolio"
 		| "tenant.settings";
 	/** "bar": its own tab on the phone; "more": under More on the phone. The sidebar lists both. */
 	place: "bar" | "more";
@@ -44,7 +46,8 @@ const counted = (count: number | null, badgeLabel?: string) =>
 
 /**
  * What `tenant`'s member sees (TAT-107): Today, Inbox (owners), Projects and
- * Calendar, and for owners Clients, Artists and Settings under More. Nothing
+ * Calendar, and for owners Clients, Artists, Portfolio and Settings under
+ * More. An artist has Portfolio (their own work) as a fourth tab. Nothing
  * is counted twice: the Inbox counts new requests, Today the projects that
  * need the member, and the bell (not an item) the alerts neither counts. The
  * server 404s the rest anyway.
@@ -86,6 +89,13 @@ export function navItems(
 			place: "bar",
 		},
 	);
+	const portfolio: ShellNavItem = {
+		key: "portfolio",
+		label: "Portfolio",
+		route: "tenant.portfolio",
+		place: owner ? "more" : "bar",
+	};
+	if (!owner) items.push(portfolio);
 	if (owner) {
 		items.push(
 			{
@@ -100,6 +110,7 @@ export function navItems(
 				route: "tenant.artists",
 				place: "more",
 			},
+			portfolio,
 			{
 				key: "settings",
 				label: "Settings",

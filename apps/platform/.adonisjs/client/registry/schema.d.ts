@@ -1183,6 +1183,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/calendar_controller').default['index']>>>
     }
   }
+  'tenant.portfolio': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/portfolio'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/portfolio_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/portfolio_controller').default['index']>>>
+    }
+  }
   'tenant.alerts.index': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/alerts'

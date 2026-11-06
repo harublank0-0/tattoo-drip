@@ -102,7 +102,11 @@ export function trackUpload() {
 				outcome = { kind: "added" };
 			},
 			onError: (errors: Record<string, string | undefined>) => {
-				outcome = { kind: "refused", message: errors.photo || UPLOAD_FAILED };
+				// The file's own error first; the portfolio's upload also sends details.
+				outcome = {
+					kind: "refused",
+					message: errors.photo || errors.alt || errors.styles || UPLOAD_FAILED,
+				};
 			},
 			onCancel: () => {
 				outcome = { kind: "cancelled" };
