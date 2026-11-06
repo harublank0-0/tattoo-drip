@@ -21,6 +21,8 @@ import IntakeService, {
 	type Submission,
 } from "#modules/inquiries/services/intake_service";
 import { IMAGE_FORMAT_MESSAGE } from "#modules/media/errors";
+import ReferenceCode from "#modules/references/models/reference_code";
+import { REFERENCE_CODE_PATTERN } from "#modules/references/reference_codes";
 import { withDbContext } from "#services/db_context";
 import { addFlashDesign } from "#tests/helpers/artists";
 import {
@@ -215,6 +217,94 @@ test.group("IntakeService.submit", (group) => {
 			assert.match(key, new RegExp(`^tenants/${tenant.id}/reference_image/`));
 			assert.isTrue(await exists(key), key);
 		}
+	});
+
+	test("the style, colour and notes are stored as sent, and the inquiry gets a reference", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("intake-details");
+		const { intake } = makeIntake();
+
+		const inquiry = await inTenant(tenant, () =>
+			intake.submit(
+				tenant,
+				submission({
+					style: "fine-line",
+					colour: "black-grey",
+					notes: "Cover-up",
+				}),
+			),
+		);
+
+		const [row] = (await rowsIn(tenant)).inquiries;
+		assert.deepEqual(
+			[row.style, row.colour, row.notes],
+			["fine-line", "black-grey", "Cover-up"],
+		);
+		assert.equal(row.idea, "A fine-line peony with two leaves");
+		assert.match(row.referenceCode ?? "", REFERENCE_CODE_PATTERN);
+		assert.equal(inquiry.referenceCode, row.referenceCode);
+		const codes = await inTenant(tenant, () => ReferenceCode.query());
+		assert.deepEqual(
+			codes.map((code) => code.code),
+			[row.referenceCode],
+		);
+		// None of the three sent: none stored.
+		await inTenant(tenant, () => intake.submit(tenant, submission()));
+		const plain = (await rowsIn(tenant)).inquiries.find(
+			(each) => each.id !== row.id,
+		);
+		assert.deepEqual(
+			[plain?.style, plain?.colour, plain?.notes],
+			[null, null, null],
+		);
+	});
+
+	test("two inquiries in one studio get different references", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("intake-refs");
+		const { intake } = makeIntake();
+		const first = await inTenant(tenant, () =>
+			intake.submit(tenant, submission()),
+		);
+		const second = await inTenant(tenant, () =>
+			intake.submit(tenant, submission()),
+		);
+		assert.notEqual(first.referenceCode, second.referenceCode);
+	});
+
+	test("a submission rolled back after its code was drawn leaves no registered code", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("intake-ref-rollback");
+		const { intake } = makeIntake();
+
+		await assert.rejects(
+			() =>
+				withDbContext({ tenantId: tenant.id }, async () => {
+					await intake.submit(tenant, submission());
+					throw new Error("later failure");
+				}),
+			"later failure",
+		);
+
+		assert.lengthOf(await inTenant(tenant, () => ReferenceCode.query()), 0);
+		// And a refusal before the insert draws no code either.
+		const phone = nextPhone();
+		await inTenant(tenant, async () => {
+			const client = await makeClient(tenant, { phone });
+			for (let n = 0; n < 3; n++) await makeInquiry(tenant, client);
+		});
+		assert.equal(
+			await reasonOf(() =>
+				inTenant(tenant, () =>
+					intake.submit(tenant, submission({ contactPhone: phone })),
+				),
+			),
+			"too_many_open_inquiries",
+		);
+		assert.lengthOf(await inTenant(tenant, () => ReferenceCode.query()), 0);
 	});
 
 	test("a returning client keeps their details; the inquiry keeps what was sent", async ({

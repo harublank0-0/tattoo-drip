@@ -4,6 +4,7 @@ import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
 import { studioTakesInquiries } from "#modules/artists/accepting";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
+import type { StyleSlug } from "#modules/artists/styles";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ClientService from "#modules/clients/services/client_service";
 import { isClaimed } from "#modules/flash/claims";
@@ -14,13 +15,18 @@ import {
 	InvalidReferenceImageError,
 } from "#modules/inquiries/errors";
 import NewInquiryAlertJob from "#modules/inquiries/jobs/new_inquiry_alert_job";
-import Inquiry, { type SourceChannel } from "#modules/inquiries/models/inquiry";
+import Inquiry, {
+	type InquiryColour,
+	type SourceChannel,
+} from "#modules/inquiries/models/inquiry";
 import ReferenceImage from "#modules/inquiries/models/reference_image";
 import { InvalidImageError } from "#modules/media/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService, {
 	type StoredImage,
 } from "#modules/media/services/image_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import ReferenceCodeService from "#modules/references/services/reference_code_service";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { afterRollback, withTransaction } from "#services/db_context";
 import { dispatchInTransaction } from "#services/queue";
@@ -46,6 +52,10 @@ export type Submission = {
 	/** A flash design from the public list (TAT-129): the inquiry then asks for it and its artist. */
 	flashDesignId?: string | null;
 	budget?: string | null;
+	/** A style's slug from the platform's list (TATTOO_STYLES). */
+	style?: StyleSlug | null;
+	colour?: InquiryColour | null;
+	notes?: string | null;
 	sourceChannel: SourceChannel;
 	contactName: string;
 	contactPhone: string;
@@ -74,6 +84,7 @@ export default class IntakeService {
 		private clients: ClientService,
 		private images: ImageService,
 		private flash: FlashService,
+		private references: ReferenceCodeService = new ReferenceCodeService(),
 	) {}
 
 	async submit(tenant: TenantRef, submission: Submission): Promise<Inquiry> {
@@ -109,6 +120,9 @@ export default class IntakeService {
 				if (isClaimed(held)) throw new InquiryRuleError("flash_claimed");
 			}
 
+			// The request's reference, in this transaction: a refusal or a
+			// rollback below gives the code back.
+			const referenceCode = await this.references.claim(tenant);
 			const inquiry = await Inquiry.create(
 				{
 					tenantId: tenant.id,
@@ -120,6 +134,10 @@ export default class IntakeService {
 					preferredArtistId: artistId,
 					flashDesignId,
 					budget: submission.budget ?? null,
+					style: submission.style ?? null,
+					colour: submission.colour ?? null,
+					notes: submission.notes ?? null,
+					referenceCode,
 					sourceChannel: submission.sourceChannel,
 					// What was sent, frozen: never the client's stored details.
 					contactName: submission.contactName,
