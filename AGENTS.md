@@ -18,6 +18,8 @@ pnpm monorepo. Start in the affected area; use the root for work spanning areas.
 - Root gates: `pnpm check` (Biome), `pnpm typecheck`, `pnpm build`, `pnpm test`. Narrow checks to changed behavior first; prerequisites, hooks and CI are in [README](README.md). Use Biome, not ESLint/Prettier. Conventional Commits use area scopes.
 - Search filenames (`rg --files <area> -g '<pattern>'`) and symbols (`rg -n '<symbol>' <directory>`) first; read bounded sections. Skip dependencies, generated files, build outputs, logs, screenshots, archives and lockfiles during routine exploration; inspect them when needed. Bound output, batch independent reads, and reuse findings until evidence changes.
 - Preserve user edits. Test changed behavior; retain necessary debugging, security and tenant-isolation checks. Repeat checks only after relevant changes or new evidence.
+- Name branches descriptively (`feat/studio-dashboard-nav`); rename an auto-created `claude/<words>-<id>` branch before committing.
+- Before opening a PR the user asked for, review the diff with Fable on high effort (Opus on max if Fable is at its limit) and fix findings.
 
 ## Generated files
 
