@@ -531,10 +531,6 @@ export default class WorkPhotoService {
 				await this.artists.lockEditable(trx, tenant, editor, id);
 			}
 			const live = await this.lockedPhoto(trx, tenant, photo);
-			// Moved meanwhile: the artist it is with now was not locked here.
-			if (live.artistId !== photo.artistId) {
-				throw new lucidErrors.E_ROW_NOT_FOUND(ArtistWorkPhoto);
-			}
 			if (live.artistId === artistId) return live;
 			const count = await this.countPhotos(tenant, artistId, trx);
 			if (count >= MAX_WORK_PHOTOS) throw new WorkPhotoLimitError();
@@ -557,16 +553,50 @@ export default class WorkPhotoService {
 		return Number(row.$extras.total);
 	}
 
-	/** The photo's row, read again under the artist's lock: gone meanwhile is a 404. */
+	/**
+	 * The photo's row, read again under the artist's lock: gone meanwhile is
+	 * a 404, and so is one moved to another artist meanwhile (Studio OS,
+	 * `reassign`), whose artist the caller did not lock.
+	 */
 	private async lockedPhoto(
 		trx: QueryClientContract,
 		tenant: TenantRef,
 		photo: ArtistWorkPhoto,
 	): Promise<ArtistWorkPhoto> {
-		return ArtistWorkPhoto.query({ client: trx })
+		const live = await ArtistWorkPhoto.query({ client: trx })
 			.where("tenant_id", tenant.id)
 			.where("id", photo.id)
 			.firstOrFail();
+		if (live.artistId !== photo.artistId) {
+			throw new lucidErrors.E_ROW_NOT_FOUND(ArtistWorkPhoto);
+		}
+		return live;
+	}
+
+	/**
+	 * Locks these artists' live rows `FOR UPDATE` in id order, for the rest
+	 * of the caller's transaction (a released savepoint keeps its locks), each
+	 * one `editor`'s to edit, skipping one that isn't (its photos then fail
+	 * on their own). The portfolio's bulk change takes them all first, so two
+	 * bulk changes, or one and a `reassign` (which locks in id order too),
+	 * never wait for each other in opposite orders.
+	 */
+	async lockArtists(
+		tenant: TenantRef,
+		editor: ProfileEditor,
+		artistIds: readonly string[],
+	): Promise<void> {
+		const ids = [...new Set(artistIds)].sort();
+		if (ids.length === 0) return;
+		await withTransaction(async (trx) => {
+			for (const id of ids) {
+				try {
+					await this.artists.lockEditable(trx, tenant, editor, id);
+				} catch (error) {
+					if (!(error instanceof lucidErrors.E_ROW_NOT_FOUND)) throw error;
+				}
+			}
+		});
 	}
 }
 

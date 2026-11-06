@@ -83,7 +83,11 @@ export default function PortfolioBulkBar({
 				? chosen.filter((photo) => !photo.published).map(({ id }) => id)
 				: action === "unpublish"
 					? chosen.filter((photo) => photo.published).map(({ id }) => id)
-					: [...selectedIds];
+					: action === "reassign"
+						? chosen
+								.filter((photo) => photo.artistId !== moveTo)
+								.map(({ id }) => id)
+						: [...selectedIds];
 		if (ids.length === 0) return;
 		const artistId = action === "reassign" ? moveTo : null;
 		setError(null);

@@ -52,7 +52,11 @@ export default class WorkPhotosController {
 			}),
 		);
 
-		ctx.session.flash("success", "Photo added.");
+		// The portfolio's upload says what its queue added in its own panel,
+		// so one toast per file would only pile up over it.
+		if (!portfolioBack(ctx.request.input("back"), tenant.slug)) {
+			ctx.session.flash("success", "Photo added.");
+		}
 		return this.toEditPage(ctx, tenant.slug, artist.id);
 	}
 

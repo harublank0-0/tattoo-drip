@@ -86,6 +86,13 @@ export default function PortfolioIndex({
 	const [uploading, setUploading] = useState(false);
 	const galleryHeading = useRef<HTMLHeadingElement>(null);
 	const selected = photos.find((photo) => photo.id === selectedId) ?? null;
+	// The photo left the list (unpublished out of the filter, deleted): the
+	// panel closes for good, so a later view that lists it again doesn't
+	// open it by itself.
+	if (detailsOpen && selectedId !== null && selected === null) {
+		setDetailsOpen(false);
+		setSelectedId(null);
+	}
 
 	// Selecting several photos (this page's only: a new page or filter keeps
 	// the ones still listed).

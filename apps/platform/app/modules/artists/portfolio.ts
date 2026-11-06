@@ -102,7 +102,7 @@ export const BULK_ACTIONS = [
 export type BulkAction = (typeof BULK_ACTIONS)[number];
 
 /** Why one photo of a bulk change was not changed. */
-export type BulkFailure = "gone" | "full" | "files";
+export type BulkFailure = "gone" | "full" | "files" | "same";
 
 const BULK_DONE: Record<BulkAction, string> = {
 	publish: "published",
@@ -141,6 +141,9 @@ export function bulkSummary(
 			: "",
 		count("files") > 0
 			? `${photos(count("files"))} whose files couldn't be removed (try again)`
+			: "",
+		count("same") > 0
+			? `${photos(count("same"))} already with ${artist ?? "that artist"}`
 			: "",
 	].filter(Boolean);
 	const head =

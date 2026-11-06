@@ -54,7 +54,12 @@ type Item = {
 	file: File;
 	previewUrl: string;
 	alt: string;
-	state: "ready" | "invalid" | "sending" | "failed";
+	/**
+	 * `unsure`: its request was cut off, and the server may have stored it
+	 * anyway (a cancelled visit only stops the browser waiting), so it is not
+	 * sent again unless asked ("Send again"), which would add it twice.
+	 */
+	state: "ready" | "invalid" | "sending" | "failed" | "unsure";
 	message?: string;
 	percentage?: number;
 };
@@ -163,27 +168,27 @@ export default function ArtworkUpload({
 		if (!files || busy) return;
 		setSummary(null);
 		setProblem(null);
-		setItems((current) => {
-			const known = new Set(current.map(({ key }) => key));
-			const added: Item[] = [];
-			for (const file of Array.from(files)) {
-				const key = fileKey(file);
-				if (known.has(key)) continue;
-				known.add(key);
-				const wrong = fileProblem(file);
-				const previewUrl = wrong ? "" : URL.createObjectURL(file);
-				if (previewUrl) previews.current.add(previewUrl);
-				added.push({
-					key,
-					file,
-					previewUrl,
-					alt: "",
-					state: wrong ? "invalid" : "ready",
-					message: wrong ?? undefined,
-				});
-			}
-			return [...current, ...added];
-		});
+		// Built outside the state updater: it may run twice (StrictMode), and
+		// each run would make object URLs that nothing revokes.
+		const known = new Set(items.map(({ key }) => key));
+		const added: Item[] = [];
+		for (const file of Array.from(files)) {
+			const key = fileKey(file);
+			if (known.has(key)) continue;
+			known.add(key);
+			const wrong = fileProblem(file);
+			const previewUrl = wrong ? "" : URL.createObjectURL(file);
+			if (previewUrl) previews.current.add(previewUrl);
+			added.push({
+				key,
+				file,
+				previewUrl,
+				alt: "",
+				state: wrong ? "invalid" : "ready",
+				message: wrong ?? undefined,
+			});
+		}
+		setItems((current) => [...current, ...added]);
 	};
 
 	const drop = (key: string) => {
@@ -240,8 +245,14 @@ export default function ArtworkUpload({
 				added += 1;
 				drop(item.key);
 			} else if (outcome.kind === "cancelled") {
-				// The cut-off file and every one after it stay, to go next time.
-				for (const unsent of queue.slice(index)) {
+				// The cut-off file may have gone through; the ones after it didn't.
+				update(item.key, {
+					state: "unsure",
+					message:
+						"The upload was interrupted while this photo was going, so it may have been added. Check the gallery before sending it again.",
+					percentage: undefined,
+				});
+				for (const unsent of queue.slice(index + 1)) {
 					update(unsent.key, {
 						state: "failed",
 						message: "Not sent: the upload was interrupted.",
@@ -272,10 +283,11 @@ export default function ArtworkUpload({
 				.join(" "),
 		);
 		if (refused === 0 && added > 0) {
-			// Everything went: start the next upload fresh, the artist kept.
+			// Everything went: the summary says so (the server sends no toast per
+			// photo for the portfolio) and the gallery behind already shows them.
+			// The next upload starts fresh, the artist kept.
 			setStyles([]);
 			setHealed(false);
-			onOpenChange(false);
 		}
 	};
 
@@ -409,6 +421,12 @@ export default function ArtworkUpload({
 									busy={busy}
 									onAlt={(alt) => update(item.key, { alt })}
 									onRemove={() => drop(item.key)}
+									onRetry={() =>
+										update(item.key, {
+											state: "failed",
+											message: "Goes again with the next upload.",
+										})
+									}
 								/>
 							))}
 						</ul>
@@ -513,15 +531,20 @@ function QueueRow({
 	busy,
 	onAlt,
 	onRemove,
+	onRetry,
 }: {
 	item: Item;
 	busy: boolean;
 	onAlt: (alt: string) => void;
 	onRemove: () => void;
+	onRetry: () => void;
 }) {
 	const altId = `queue-alt-${item.key.replace(/[^\w-]/g, "_")}`;
 	const sendingNow = item.state === "sending";
-	const bad = item.state === "invalid" || item.state === "failed";
+	const bad =
+		item.state === "invalid" ||
+		item.state === "failed" ||
+		item.state === "unsure";
 	return (
 		<li className="flex gap-3 p-3">
 			<div className="size-16 shrink-0 overflow-hidden rounded-md border bg-muted">
@@ -590,10 +613,23 @@ function QueueRow({
 							<RotateCcw aria-hidden="true" className="size-3.5" />
 						)}
 						{item.message}
-						{item.state === "failed"
+						{item.state === "failed" &&
+						item.message !== "Goes again with the next upload."
 							? " It goes again with the next upload."
 							: ""}
 					</p>
+				)}
+				{item.state === "unsure" && (
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						className="self-start"
+						disabled={busy}
+						onClick={onRetry}
+					>
+						Send again
+					</Button>
 				)}
 			</div>
 		</li>

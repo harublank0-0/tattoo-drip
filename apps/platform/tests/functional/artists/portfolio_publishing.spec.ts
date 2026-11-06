@@ -392,6 +392,82 @@ test.group("Portfolio publishing (Studio OS)", (group) => {
 	});
 });
 
+test.group("Portfolio review fixes (Studio OS)", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("a write on a photo moved to another artist meanwhile is a 404, not a change under the wrong lock", async ({
+		assert,
+	}) => {
+		const s = await studio("pub-moved");
+		const photos = await app.container.make(WorkPhotoService);
+		const owner = { userId: s.owner.id, role: "owner" as const };
+		await inTenantAs(s.tenant, s.owner, async () => {
+			// Read before the move, as a page opened earlier would have it.
+			const stale = await ArtistWorkPhoto.findOrFail(s.koi.id);
+			await photos.reassign(s.tenant, owner, stale, s.hari.id);
+			await assert.rejects(() =>
+				photos.setHidden(s.tenant, owner, stale, true),
+			);
+			await assert.rejects(() => photos.remove(s.tenant, owner, stale));
+			await assert.rejects(() =>
+				photos.updateDetails(s.tenant, owner, stale, {
+					alt: "x",
+					styles: [],
+					healed: false,
+				}),
+			);
+		});
+		const live = await row(s.tenant, s.koi.id);
+		assert.equal(live?.artistId, s.hari.id);
+		assert.isFalse(live?.hidden);
+	});
+
+	test("moving work to a deleted artist is refused, and to the artist it is with is said so", async ({
+		client,
+		assert,
+	}) => {
+		const s = await studio("pub-move-edge");
+		await inTenant(s.tenant, async () => {
+			await (await Artist.findOrFail(s.hari.id)).softDelete();
+		});
+		const deleted = await bulk(client, s.tenant, s.owner, {
+			action: "reassign",
+			ids: [s.koi.id],
+			artistId: s.hari.id,
+		});
+		assert.deepInclude(
+			deleted.flashMessage("inputErrorsBag") as Record<string, unknown>,
+			{ artistId: ["Choose an artist of this studio."] },
+		);
+		const same = await bulk(client, s.tenant, s.owner, {
+			action: "reassign",
+			ids: [s.koi.id],
+			artistId: s.sita.id,
+		});
+		assert.equal(
+			flashOf(same).error,
+			"No photos were moved. Not changed: 1 photo already with Sita Rai.",
+		);
+	});
+
+	test("an upload from the portfolio sends no toast per photo; one from the profile still does", async ({
+		client,
+		assert,
+	}) => {
+		const s = await studio("pub-toast");
+		const { testImages } = await import("#tests/helpers/images");
+		const send = async (back?: string) => {
+			const request = client
+				.post(`/t/pub-toast/artists/${s.sita.id}/photos`)
+				.file("photo", await testImages.jpeg(300, 300), { filename: "a.jpg" });
+			if (back) request.field("back", back);
+			return request.withCsrfToken().loginAs(s.owner).redirects(0);
+		};
+		assert.isUndefined(flashOf(await send("/t/pub-toast/portfolio")).success);
+		assert.equal(flashOf(await send()).success, "Photo added.");
+	});
+});
+
 test.group("Portfolio bulk summary (Studio OS)", () => {
 	test("every failure is counted and named", ({ assert }) => {
 		assert.deepEqual(bulkSummary("publish", 3, []), {
@@ -407,6 +483,10 @@ test.group("Portfolio bulk summary (Studio OS)", () => {
 			message:
 				"2 photos deleted. Not changed: 1 photo removed or changed meanwhile; 2 photos whose files couldn't be removed (try again).",
 		});
+		assert.equal(
+			bulkSummary("reassign", 1, ["same"], "Asha").message,
+			"1 photo moved to Asha. Not changed: 1 photo already with Asha.",
+		);
 		assert.equal(
 			bulkSummary("unpublish", 0, ["gone"]).message,
 			"No photos were unpublished. Not changed: 1 photo removed or changed meanwhile.",

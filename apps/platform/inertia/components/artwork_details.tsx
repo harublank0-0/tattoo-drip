@@ -208,7 +208,10 @@ function Body({
 		const was = previous.current;
 		previous.current = mode;
 		if (mode === "remove") keep.current?.focus();
-		else if (mode === "edit") form.current?.querySelector("input")?.focus();
+		else if (mode === "edit")
+			form.current
+				?.querySelector<HTMLInputElement>('input:not([type="hidden"])')
+				?.focus();
 		else if (was === "edit") editButton.current?.focus();
 		else if (was === "remove") removeButton.current?.focus();
 	}, [mode]);

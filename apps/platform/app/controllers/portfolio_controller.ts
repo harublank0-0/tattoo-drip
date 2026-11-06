@@ -5,6 +5,7 @@ import { errors } from "@vinejs/vine";
 import { tenantContext } from "#middleware/tenant_middleware";
 import { WorkPhotoLimitError } from "#modules/artists/errors";
 import type Artist from "#modules/artists/models/artist";
+import type ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
 import {
 	type BulkFailure,
 	bulkSummary,
@@ -196,13 +197,29 @@ export default class PortfolioController {
 
 		let done = 0;
 		const failures: BulkFailure[] = [];
+		// Every photo first, then every artist involved locked in id order, so
+		// two bulk changes never take the same artists in opposite orders.
+		const found: ArtistWorkPhoto[] = [];
 		for (const id of data.ids) {
 			try {
-				const { photo } = await this.photos.findEditable(
-					tenant,
-					membership,
-					id,
+				found.push(
+					(await this.photos.findEditable(tenant, membership, id)).photo,
 				);
+			} catch (error) {
+				if (!(error instanceof lucidErrors.E_ROW_NOT_FOUND)) throw error;
+				failures.push("gone");
+			}
+		}
+		await this.photos.lockArtists(tenant, membership, [
+			...found.map(({ artistId }) => artistId),
+			...(target ? [target.id] : []),
+		]);
+		for (const photo of found) {
+			if (target && photo.artistId === target.id) {
+				failures.push("same");
+				continue;
+			}
+			try {
 				if (data.action === "publish" || data.action === "unpublish") {
 					await this.photos.setHidden(
 						tenant,
