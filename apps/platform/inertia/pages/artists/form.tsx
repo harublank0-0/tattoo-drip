@@ -1,6 +1,13 @@
 import { Form, Link } from "@adonisjs/inertia/react";
 import { useState } from "react";
-import type { ArtistProps, StyleOption } from "~/components/artists";
+import ArtistProfileHeader, {
+	ArtistScheduleView,
+} from "~/components/artist_profile";
+import type {
+	ArtistProps,
+	ArtistSchedule,
+	StyleOption,
+} from "~/components/artists";
 import {
 	FLASH_CREATE_NOTE,
 	FLASH_OPEN_HELP,
@@ -9,6 +16,7 @@ import {
 	flashIntro,
 } from "~/components/flash";
 import FlashTray from "~/components/flash_tray";
+import Page from "~/components/page";
 import {
 	TRAY_CREATE_NOTE,
 	trayIntro,
@@ -32,7 +40,6 @@ import { Textarea } from "~/components/ui/textarea";
 import WorkPhotoTray from "~/components/work_photo_tray";
 import { useTenant } from "~/hooks/use-tenant";
 import AppLayout from "~/layouts/app";
-import SettingsLayout from "~/layouts/settings";
 import { slugify } from "~/lib/slugify";
 
 type Errors = Partial<Record<string, string>>;
@@ -55,97 +62,161 @@ export default function ArtistForm({
 	workPhotos,
 	flashDesigns,
 	styleOptions,
+	schedule,
 }: {
 	artist: ArtistProps | null;
 	canLink: boolean;
 	workPhotos: WorkPhotoProps[];
 	flashDesigns: FlashDesignProps[];
 	styleOptions: StyleOption[];
+	/** The next days' sessions and the studio's hours (Studio OS); null while adding. */
+	schedule: ArtistSchedule | null;
 }) {
 	const tenant = useTenant();
 	const params = { tenant: tenant.slug };
 	const owner = tenant.role === "owner";
+	const pageTitle = artist
+		? owner
+			? artist.name
+			: "Your artist profile"
+		: "Add an artist";
 
 	return (
-		<>
-			<Section
-				title={owner ? (artist ? "Edit artist" : "Add an artist") : "Profile"}
-			>
-				{artist ? (
-					// An artist's save redirects back to this same page, and Inertia
-					// keeps a same-page form's state after a non-GET visit: the chosen
-					// photo would stay in the file input and ride along on every later
-					// save (silently winning over "Remove this photo"). Keep the state
-					// only when the save failed, so the form is fresh after a success.
-					<Form
-						route="tenant.artists.update"
-						routeParams={{ ...params, id: artist.id }}
-						options={{ preserveState: "errors" }}
+		<Page title={pageTitle} hideTitle={Boolean(artist)}>
+			{artist && schedule && (
+				<ArtistProfileHeader
+					artist={artist}
+					owner={owner}
+					tenantSlug={tenant.slug}
+					title={pageTitle}
+				/>
+			)}
+			{artist && (
+				<nav
+					aria-label="Sections"
+					className="-mx-4 flex gap-1 overflow-x-auto border-y px-4 py-1.5 sm:mx-0 sm:px-0"
+				>
+					{[
+						{ id: "profile", label: "Profile" },
+						{ id: "schedule", label: "Schedule" },
+						{
+							id: "work-photos",
+							label: "Work photos",
+							count: workPhotos.length,
+						},
+						{ id: "flash", label: "Flash", count: flashDesigns.length },
+					].map((section) => (
+						<a
+							key={section.id}
+							href={`#${section.id}`}
+							className="inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-sm px-2.5 text-sm font-medium text-muted-foreground outline-none hover:bg-accent/60 hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 max-lg:min-h-11"
+						>
+							{section.label}
+							{section.count !== undefined && (
+								<span className="text-xs tabular-nums">{section.count}</span>
+							)}
+						</a>
+					))}
+				</nav>
+			)}
+			<div className="flex max-w-3xl flex-col">
+				<Section
+					id="profile"
+					title={owner ? (artist ? "Profile" : "The artist") : "Profile"}
+				>
+					{artist ? (
+						// An artist's save redirects back to this same page, and Inertia
+						// keeps a same-page form's state after a non-GET visit: the chosen
+						// photo would stay in the file input and ride along on every later
+						// save (silently winning over "Remove this photo"). Keep the state
+						// only when the save failed, so the form is fresh after a success.
+						<Form
+							route="tenant.artists.update"
+							routeParams={{ ...params, id: artist.id }}
+							options={{ preserveState: "errors" }}
+						>
+							{({ errors, processing }) => (
+								<ArtistFields
+									artist={artist}
+									canLink={canLink}
+									errors={errors}
+									owner={owner}
+									processing={processing}
+									styleOptions={styleOptions}
+									tenantSlug={tenant.slug}
+								/>
+							)}
+						</Form>
+					) : (
+						<Form route="tenant.artists.store" routeParams={params}>
+							{({ errors, processing }) => (
+								<ArtistFields
+									artist={null}
+									canLink={canLink}
+									errors={errors}
+									owner={owner}
+									processing={processing}
+									styleOptions={styleOptions}
+									tenantSlug={tenant.slug}
+								/>
+							)}
+						</Form>
+					)}
+				</Section>
+
+				{artist && schedule && (
+					<Section
+						id="schedule"
+						title="Schedule"
+						description={`The next ${schedule.days} days of sessions, and the studio's hours.`}
 					>
-						{({ errors, processing }) => (
-							<ArtistFields
-								artist={artist}
-								canLink={canLink}
-								errors={errors}
-								owner={owner}
-								processing={processing}
-								styleOptions={styleOptions}
-								tenantSlug={tenant.slug}
-							/>
-						)}
-					</Form>
-				) : (
-					<Form route="tenant.artists.store" routeParams={params}>
-						{({ errors, processing }) => (
-							<ArtistFields
-								artist={null}
-								canLink={canLink}
-								errors={errors}
-								owner={owner}
-								processing={processing}
-								styleOptions={styleOptions}
-								tenantSlug={tenant.slug}
-							/>
-						)}
-					</Form>
+						<ArtistScheduleView
+							artistId={artist.id}
+							schedule={schedule}
+							owner={owner}
+							tenantSlug={tenant.slug}
+						/>
+					</Section>
 				)}
-			</Section>
 
-			{/* Outside the profile's <Form>: forms can't nest, and a photo is
+				{/* Outside the profile's <Form>: forms can't nest, and a photo is
 			    saved by its own request (TAT-116). */}
-			<Section
-				title="Work photos"
-				description={artist ? trayIntro(owner) : undefined}
-			>
-				{artist ? (
-					<WorkPhotoTray
-						tenantSlug={tenant.slug}
-						artistId={artist.id}
-						photos={workPhotos}
-						styleOptions={styleOptions}
-					/>
-				) : (
-					<p className="text-sm text-muted-foreground">{TRAY_CREATE_NOTE}</p>
-				)}
-			</Section>
+				<Section
+					id="work-photos"
+					title="Work photos"
+					description={artist ? trayIntro(owner) : undefined}
+				>
+					{artist ? (
+						<WorkPhotoTray
+							tenantSlug={tenant.slug}
+							artistId={artist.id}
+							photos={workPhotos}
+							styleOptions={styleOptions}
+						/>
+					) : (
+						<p className="text-sm text-muted-foreground">{TRAY_CREATE_NOTE}</p>
+					)}
+				</Section>
 
-			{/* Flash designs (TAT-129): also outside the profile's <Form>, each
+				{/* Flash designs (TAT-129): also outside the profile's <Form>, each
 			    design is saved by its own request. */}
-			<Section
-				title="Flash"
-				description={artist ? flashIntro(owner) : undefined}
-			>
-				{artist ? (
-					<FlashTray
-						tenantSlug={tenant.slug}
-						artistId={artist.id}
-						designs={flashDesigns}
-					/>
-				) : (
-					<p className="text-sm text-muted-foreground">{FLASH_CREATE_NOTE}</p>
-				)}
-			</Section>
-		</>
+				<Section
+					id="flash"
+					title="Flash"
+					description={artist ? flashIntro(owner) : undefined}
+				>
+					{artist ? (
+						<FlashTray
+							tenantSlug={tenant.slug}
+							artistId={artist.id}
+							designs={flashDesigns}
+						/>
+					) : (
+						<p className="text-sm text-muted-foreground">{FLASH_CREATE_NOTE}</p>
+					)}
+				</Section>
+			</div>
+		</Page>
 	);
 }
 
@@ -423,4 +494,4 @@ function ArtistFields({
 	);
 }
 
-ArtistForm.layout = [AppLayout, SettingsLayout];
+ArtistForm.layout = [AppLayout];

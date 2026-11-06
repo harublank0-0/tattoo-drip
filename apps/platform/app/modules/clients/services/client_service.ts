@@ -152,14 +152,29 @@ export default class ClientService {
 	 */
 	async list(
 		tenant: TenantRef,
-		{ search, page }: { search: string; page: number },
+		{
+			search,
+			page,
+			within,
+		}: {
+			search: string;
+			page: number;
+			/**
+			 * Only these clients: a subquery of client ids from another module
+			 * (Studio OS's "Upcoming sessions" filter, ProjectService.clientsOf).
+			 */
+			within?: Parameters<ReturnType<typeof Client.query>["whereIn"]>[1];
+		},
 	): Promise<ClientPage> {
 		const wanted = Math.min(Math.max(1, Math.trunc(page) || 1), MAX_PAGE);
-		const find = (at: number) =>
-			this.searchQuery(tenant, search)
+		const find = (at: number) => {
+			const query = this.searchQuery(tenant, search);
+			if (within !== undefined) query.whereIn("id", within);
+			return query
 				.orderBy("created_at", "desc")
 				.orderBy("id", "desc")
 				.paginate(at, CLIENTS_PER_PAGE);
+		};
 
 		let result = await find(wanted);
 		if (wanted > result.lastPage && result.total > 0) {
@@ -183,6 +198,10 @@ export default class ClientService {
 			// both branches.
 			query.where((group) => {
 				group.whereRaw("name ilike ? escape '\\'", [`%${escapeLike(term)}%`]);
+				// Studio OS: the email too, for a client who wrote from it.
+				group.orWhereRaw("email ilike ? escape '\\'", [
+					`%${escapeLike(term)}%`,
+				]);
 				if (digits.length >= 3) {
 					group.orWhereRaw("replace(phone, '+', '') like ?", [`%${digits}%`]);
 				}

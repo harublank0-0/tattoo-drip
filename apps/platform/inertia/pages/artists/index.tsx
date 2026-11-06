@@ -1,82 +1,127 @@
 import { Link } from "@adonisjs/inertia/react";
 import { router } from "@inertiajs/react";
-import { Pencil, Plus, Trash2, User, Users } from "lucide-react";
+import { cn } from "cn";
+import {
+	CalendarDays,
+	ExternalLink,
+	Eye,
+	EyeOff,
+	Inbox,
+	KeyRound,
+	Pencil,
+	Plus,
+	Trash2,
+	UserPlus,
+} from "lucide-react";
 import { urlFor } from "~/client";
-import type { ArtistRowProps } from "~/components/artists";
-import CopyLinkButton from "~/components/copy_link_button";
-import Section from "~/components/section";
+import type { ArtistListRow } from "~/components/artists";
+import Initials from "~/components/initials";
+import Page from "~/components/page";
 import { Badge } from "~/components/ui/badge";
 import { Button, buttonVariants } from "~/components/ui/button";
-import {
-	Empty,
-	EmptyContent,
-	EmptyDescription,
-	EmptyHeader,
-	EmptyMedia,
-	EmptyTitle,
-} from "~/components/ui/empty";
 import { useTenant } from "~/hooks/use-tenant";
 import AppLayout from "~/layouts/app";
-import SettingsLayout from "~/layouts/settings";
 
-export default function Artists({ artists }: { artists: ArtistRowProps[] }) {
+/**
+ * The studio's artists (Studio OS): a team workspace, people first. A card
+ * per artist with their portrait, styles, whether they're on the studio page
+ * and taking requests, whether a member's login is linked to them, and their
+ * sessions in the next `upcomingDays` days, with the ways into their profile,
+ * their week in the calendar and their public page. An artist profile is not
+ * an account: a member logs in (Settings, Members, where invitations live)
+ * and may be linked to one profile; many artists have no login. Owners only.
+ */
+export default function Artists({
+	artists,
+	upcomingDays,
+}: {
+	artists: ArtistListRow[];
+	upcomingDays: number;
+}) {
 	const tenant = useTenant();
 	const params = { tenant: tenant.slug };
-	const add = (
-		<Link
-			route="tenant.artists.create"
-			routeParams={params}
-			className={buttonVariants()}
-		>
-			<Plus data-icon="inline-start" />
-			Add an artist
-		</Link>
-	);
+	const onPage = artists.filter(({ visible }) => visible).length;
+	const taking = artists.filter(
+		({ visible, acceptingInquiries }) => visible && acceptingInquiries,
+	).length;
+	const logins = artists.filter(({ hasLogin }) => hasLogin).length;
 
 	return (
-		<Section
+		<Page
 			title="Artists"
-			description="The artists clients can book. A hidden artist doesn't show anywhere public."
+			description="Your artists, their sessions and their pages."
+			actions={
+				<>
+					<Link
+						route="tenant.settings.members"
+						routeParams={params}
+						className={buttonVariants({ variant: "outline", size: "sm" })}
+					>
+						<UserPlus aria-hidden="true" />
+						Invite a member
+					</Link>
+					<Link
+						route="tenant.artists.create"
+						routeParams={params}
+						className={buttonVariants({ size: "sm" })}
+					>
+						<Plus aria-hidden="true" />
+						Add an artist
+					</Link>
+				</>
+			}
 		>
 			{artists.length === 0 ? (
-				<Empty className="border">
-					<EmptyHeader>
-						<EmptyMedia variant="icon">
-							<Users />
-						</EmptyMedia>
-						<EmptyTitle>No artists yet</EmptyTitle>
-						<EmptyDescription>
-							Add the artists who work here, each with their own photo, bio and
-							link.
-						</EmptyDescription>
-					</EmptyHeader>
-					<EmptyContent>{add}</EmptyContent>
-				</Empty>
-			) : (
-				<div className="flex flex-col gap-3">
-					<div>{add}</div>
-					{artists.map((artist) => (
-						<ArtistRow
-							key={artist.id}
-							artist={artist}
-							tenantSlug={tenant.slug}
-						/>
-					))}
+				<div className="flex flex-col items-start gap-3 rounded-lg border border-dashed px-5 py-8">
+					<h2 className="text-base font-semibold">No artists yet</h2>
+					<p className="max-w-prose text-sm text-muted-foreground">
+						Add the artists who work here, each with their own photo, bio and
+						page. Sessions are booked with an artist, so add one before your
+						first booking.
+					</p>
+					<Link
+						route="tenant.artists.create"
+						routeParams={params}
+						className={buttonVariants({ size: "sm" })}
+					>
+						<Plus aria-hidden="true" />
+						Add an artist
+					</Link>
 				</div>
+			) : (
+				<>
+					<p className="border-y py-2.5 text-sm text-muted-foreground">
+						{artists.length} artist{artists.length === 1 ? "" : "s"}, {onPage}{" "}
+						on your page, {taking} taking requests, {logins} with a login.
+					</p>
+					<ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+						{artists.map((artist) => (
+							<ArtistCard
+								key={artist.id}
+								artist={artist}
+								tenantSlug={tenant.slug}
+								upcomingDays={upcomingDays}
+							/>
+						))}
+					</ul>
+				</>
 			)}
-		</Section>
+		</Page>
 	);
 }
 
-function ArtistRow({
+Artists.layout = [AppLayout];
+
+function ArtistCard({
 	artist,
 	tenantSlug,
+	upcomingDays,
 }: {
-	artist: ArtistRowProps;
+	artist: ArtistListRow;
 	tenantSlug: string;
+	upcomingDays: number;
 }) {
 	const params = { tenant: tenantSlug, id: artist.id };
-
 	const remove = () => {
 		if (
 			window.confirm(
@@ -90,70 +135,145 @@ function ArtistRow({
 	};
 
 	return (
-		<div className="flex flex-wrap items-center gap-4 rounded-lg border bg-card p-3">
-			{artist.photoUrl ? (
-				<img
-					src={artist.photoUrl}
-					alt={artist.name}
-					loading="lazy"
-					decoding="async"
-					className="size-16 rounded-md border object-cover"
-				/>
-			) : (
-				<div className="flex size-16 items-center justify-center rounded-md border bg-muted text-muted-foreground">
-					<User />
-				</div>
-			)}
-			{/* min-w-40: on narrow screens the actions wrap below instead. */}
-			<div className="flex min-w-40 flex-1 flex-col gap-1">
-				<div className="flex flex-wrap items-center gap-2">
-					<span className="font-medium">{artist.name}</span>
-					{artist.isMine && <Badge>You</Badge>}
-					{!artist.visible && <Badge variant="secondary">Hidden</Badge>}
-					{!artist.acceptingInquiries && (
-						<Badge variant="outline">Not accepting inquiries</Badge>
-					)}
-				</div>
-			</div>
-			<div className="ml-auto flex items-center gap-1">
-				<Link
-					route="tenant.artists.edit"
-					routeParams={params}
-					aria-label={`Edit ${artist.name}`}
-					className={buttonVariants({ variant: "ghost", size: "icon" })}
-				>
-					<Pencil />
-				</Link>
-				<Button
-					variant="ghost"
-					size="icon"
-					aria-label={`Delete ${artist.name}`}
-					onClick={remove}
-				>
-					<Trash2 />
-				</Button>
-			</div>
-			{/* The artist's own page (TAT-101): shown as text to select, with Copy. */}
-			<div className="flex w-full flex-wrap items-center gap-2">
-				{artist.pageUrl ? (
-					<>
-						<p className="min-w-0 flex-1 text-sm break-all text-muted-foreground select-all">
-							{artist.pageUrl}
-						</p>
-						<CopyLinkButton
-							text={artist.pageUrl}
-							variant="outline"
-							className="h-11"
-						/>
-					</>
+		<li className="flex min-w-0 flex-col overflow-hidden rounded-lg border bg-card">
+			<div className="relative aspect-[4/3] bg-muted">
+				{artist.photoUrl ? (
+					<img
+						src={artist.photoUrl}
+						alt=""
+						loading="lazy"
+						decoding="async"
+						className="size-full object-cover"
+					/>
 				) : (
-					<p className="text-sm text-muted-foreground">
-						Hidden: this artist has no public page.
-					</p>
+					<div className="flex size-full items-center justify-center">
+						<Initials name={artist.name} className="size-16 text-lg" />
+					</div>
+				)}
+				{artist.isMine && (
+					<Badge className="absolute top-2.5 left-2.5">You</Badge>
 				)}
 			</div>
-		</div>
+			<div className="flex flex-1 flex-col gap-3 p-4">
+				<div className="flex flex-col gap-0.5">
+					<h2 className="text-base leading-snug font-semibold wrap-anywhere">
+						<Link
+							route="tenant.artists.edit"
+							routeParams={params}
+							className="rounded-sm outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
+						>
+							{artist.name}
+						</Link>
+					</h2>
+					<p className="text-sm text-muted-foreground">
+						{artist.styleNames.length > 0
+							? artist.styleNames.join(", ")
+							: "No styles listed"}
+					</p>
+				</div>
+
+				<ul className="flex flex-col gap-1.5 text-sm">
+					<Status
+						on={artist.visible}
+						icon={artist.visible ? Eye : EyeOff}
+						text={artist.visible ? "On your page" : "Hidden from your page"}
+					/>
+					<Status
+						on={artist.visible && artist.acceptingInquiries}
+						icon={Inbox}
+						text={
+							artist.acceptingInquiries
+								? "Taking requests"
+								: "Not taking requests"
+						}
+					/>
+					<Status
+						on={artist.hasLogin}
+						icon={KeyRound}
+						text={artist.hasLogin ? "Logs in to the studio" : "No login"}
+					/>
+				</ul>
+
+				<p className="border-t pt-3 text-sm">
+					{artist.upcomingCount > 0 ? (
+						<>
+							<span className="font-medium tabular-nums">
+								{artist.upcomingCount} session
+								{artist.upcomingCount === 1 ? "" : "s"}
+							</span>{" "}
+							<span className="text-muted-foreground">
+								in the next {upcomingDays} days, next {artist.nextText}
+							</span>
+						</>
+					) : (
+						<span className="text-muted-foreground">
+							Nothing booked in the next {upcomingDays} days
+						</span>
+					)}
+				</p>
+
+				<div className="mt-auto flex flex-wrap items-center gap-1.5">
+					<Link
+						route="tenant.artists.edit"
+						routeParams={params}
+						className={buttonVariants({ variant: "outline", size: "sm" })}
+					>
+						<Pencil aria-hidden="true" />
+						Profile
+					</Link>
+					<Link
+						href={`${urlFor("tenant.calendar.index", { tenant: tenantSlug })}?view=week&artist=${artist.id}`}
+						className={buttonVariants({ variant: "ghost", size: "sm" })}
+					>
+						<CalendarDays aria-hidden="true" />
+						Calendar
+					</Link>
+					{artist.pageUrl && (
+						<a
+							href={artist.pageUrl}
+							target="_blank"
+							rel="noreferrer"
+							className={buttonVariants({ variant: "ghost", size: "sm" })}
+						>
+							<ExternalLink aria-hidden="true" />
+							Their page
+							<span className="sr-only"> (opens in a new tab)</span>
+						</a>
+					)}
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						className="ml-auto text-muted-foreground hover:text-destructive"
+						aria-label={`Delete ${artist.name}`}
+						onClick={remove}
+					>
+						<Trash2 />
+					</Button>
+				</div>
+			</div>
+		</li>
 	);
 }
 
-Artists.layout = [AppLayout, SettingsLayout];
+/** A status line: its words always, its mark quieter when it is off. */
+function Status({
+	on,
+	icon: Icon,
+	text,
+}: {
+	on: boolean;
+	icon: typeof Eye;
+	text: string;
+}) {
+	return (
+		<li
+			className={cn(
+				"flex items-center gap-2",
+				on ? "text-foreground" : "text-muted-foreground",
+			)}
+		>
+			<Icon aria-hidden="true" className="size-4 shrink-0" />
+			{text}
+		</li>
+	);
+}
