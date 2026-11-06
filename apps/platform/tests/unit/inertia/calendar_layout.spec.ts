@@ -15,7 +15,11 @@ type CalendarModule = {
 	gridHours(
 		days: {
 			hours?: { opens: string; closes: string } | null;
-			sessions: { startMinute: number; endMinute: number }[];
+			sessions: {
+				startMinute: number;
+				endMinute: number;
+				dayMinutes?: number;
+			}[];
 		}[],
 	): { first: number; last: number };
 	calendarHref(base: string, query: Query): string;
@@ -91,6 +95,28 @@ test.group("Calendar time grid: hours", () => {
 				},
 			]),
 			{ first: 7, last: 24 },
+		);
+	});
+});
+
+test.group("Calendar time grid: a clock-change day", () => {
+	test("the day the clocks go back runs to its 25th hour", ({ assert }) => {
+		assert.deepEqual(
+			gridHours([
+				{
+					sessions: [{ startMinute: 1380, endMinute: 1500, dayMinutes: 1500 }],
+				},
+			]),
+			{ first: 8, last: 25 },
+		);
+		// A plain day still ends at midnight.
+		assert.deepEqual(
+			gridHours([
+				{
+					sessions: [{ startMinute: 1380, endMinute: 1440, dayMinutes: 1440 }],
+				},
+			]),
+			{ first: 8, last: 24 },
 		);
 	});
 });

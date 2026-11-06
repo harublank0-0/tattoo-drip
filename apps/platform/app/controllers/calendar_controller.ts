@@ -134,6 +134,8 @@ export default class CalendarController {
 					closure: closureOf(day),
 				};
 			}),
+			// Each session once, though one past midnight is listed on both days.
+			total: entries.length,
 			selected: (() => {
 				const entry = entries.find(({ session }) => session.id === selectedId);
 				if (!entry) return null;

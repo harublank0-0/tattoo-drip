@@ -113,6 +113,8 @@ export type CalendarPageProps = {
 	/** Whether "Book session" shows: owners of a studio with an artist, and artists with a profile. */
 	canBook: boolean;
 	days: CalendarDay[];
+	/** How many sessions the range holds, each once (one past midnight is on two days). */
+	total: number;
 	/** The session the drawer shows, or null. */
 	selected: SelectedSession | null;
 };
@@ -165,12 +167,13 @@ export function layoutLanes<
 /**
  * The hours a time grid shows: from the earlier of the opening time and the
  * first session, to the later of the closing time and the last session,
- * whole hours, at least 8 to 20 when nothing says otherwise.
+ * whole hours, at least 8 to 20 when nothing says otherwise, and never past
+ * the day's end (25 hours on the day the clocks go back).
  */
 export function gridHours(
 	days: {
 		hours?: { opens: string; closes: string } | null;
-		sessions: { startMinute: number; endMinute: number }[];
+		sessions: { startMinute: number; endMinute: number; dayMinutes?: number }[];
 	}[],
 ): { first: number; last: number } {
 	const minute = (time: string) => {
@@ -179,6 +182,8 @@ export function gridHours(
 	};
 	let start = 8 * 60;
 	let end = 20 * 60;
+	// A day is 24 hours, or 25 on the day the clocks go back.
+	let longest = 24 * 60;
 	for (const day of days) {
 		if (day.hours) {
 			start = Math.min(start, minute(day.hours.opens));
@@ -187,11 +192,12 @@ export function gridHours(
 		for (const session of day.sessions) {
 			start = Math.min(start, session.startMinute);
 			end = Math.max(end, session.endMinute);
+			longest = Math.max(longest, session.dayMinutes ?? 0);
 		}
 	}
 	return {
 		first: Math.max(0, Math.floor(start / 60)),
-		last: Math.min(24, Math.ceil(end / 60)),
+		last: Math.min(Math.ceil(longest / 60), Math.ceil(end / 60)),
 	};
 }
 

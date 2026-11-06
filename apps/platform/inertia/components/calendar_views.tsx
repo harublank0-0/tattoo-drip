@@ -39,7 +39,7 @@ export function sessionLabel(
 }
 
 /**
- * The day and week views from `md` (Studio OS): a time axis, one column per
+ * The day and week views from `lg` (Studio OS): a time axis, one column per
  * day, each session a block at its real time and length (the server's
  * minutes on that day, so a session past midnight shows on both days),
  * overlapping ones side by side (`layoutLanes`). The opening hours are the
@@ -230,7 +230,7 @@ function DayColumn({
 					<span className="h-px flex-1 bg-brand-text" />
 				</div>
 			)}
-			<ol className="contents">
+			<ol className="absolute inset-0">
 				{placed.map(({ item: session, lane, lanes }) => {
 					const blockTop = top(session.startMinute);
 					const blockHeight = Math.max(
@@ -363,7 +363,7 @@ export function MonthGrid({
 												href={dayHref(day.date)}
 												aria-label={`${day.label}${isToday ? ", today" : ""}: ${count === 0 ? "no sessions" : `${count} session${count === 1 ? "" : "s"}`}. Open the day.`}
 												className={cn(
-													"inline-flex size-7 items-center justify-center self-start rounded-sm text-xs font-semibold tabular-nums outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 max-lg:size-9",
+													"inline-flex size-7 items-center justify-center self-start rounded-sm text-xs font-semibold tabular-nums outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 max-lg:size-11",
 													day.inMonth === false && "text-muted-foreground",
 													isToday &&
 														"bg-primary text-primary-foreground hover:bg-primary",
@@ -416,7 +416,7 @@ export function MonthGrid({
 											{more > 0 && (
 												<Link
 													href={dayHref(day.date)}
-													className="hidden rounded-sm px-1 text-[0.6875rem] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:inline"
+													className="hidden items-center rounded-sm px-1 text-[0.6875rem] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 max-lg:min-h-11 sm:inline-flex"
 												>
 													+{more} more
 												</Link>

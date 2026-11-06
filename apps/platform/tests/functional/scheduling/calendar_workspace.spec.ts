@@ -91,6 +91,34 @@ test.group("Calendar workspace (Studio OS)", (group) => {
 		assert.isFalse((props.days.at(-1) as Day).inMonth, "5 December");
 	});
 
+	test("a session past midnight shows on both days and is counted once", async ({
+		client,
+		assert,
+	}) => {
+		const s = await booked("cal-total");
+		const date = "2026-11-03";
+		const late = await inTenant(s.tenant, () =>
+			makeSession(s.tenant, s.ashas, s.ashaProfile, {
+				startsAt: at(date, 22),
+				endsAt: at(date, 22).plus({ hours: 4 }),
+			}),
+		);
+
+		const props = await propsOf(
+			client,
+			calendar("cal-total", `?view=week&date=${date}`),
+			s.owner,
+		);
+
+		const on = (day: string) =>
+			(props.days.find((entry) => entry.date === day) as Day).sessions.map(
+				({ id }) => id,
+			);
+		assert.deepEqual(on("2026-11-03"), [late.id]);
+		assert.deepEqual(on("2026-11-04"), [late.id]);
+		assert.equal(props.total, 1);
+	});
+
 	test("the list is two weeks from its date", async ({ client, assert }) => {
 		const s = await booked("cal-agenda");
 		const props = await propsOf(

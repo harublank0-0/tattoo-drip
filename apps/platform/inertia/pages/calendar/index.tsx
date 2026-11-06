@@ -31,8 +31,9 @@ const UNITS = { day: "day", week: "week", month: "month", agenda: "two weeks" };
  * one artist, by status. Owners pick the artist; artists see their own. A
  * session opens the drawer, where the member reschedules it or records its
  * outcome by the project page's own rules; requests stay in the Inbox, and
- * booking is "Book session". Below `md` the day and the week are lists: a
- * seven-column grid doesn't fit a phone.
+ * booking is "Book session". Below `lg` the day and the week are lists: a
+ * seven-column grid doesn't fit a phone, and a tablet's touch targets stay
+ * 44px (TAT-103), which a half-hour block on the grid is not.
  */
 export default function CalendarIndex(props: CalendarPageProps) {
 	const {
@@ -45,6 +46,7 @@ export default function CalendarIndex(props: CalendarPageProps) {
 		artistFilter,
 		canBook,
 		days,
+		total,
 		selected,
 	} = props;
 	const tenant = useTenant();
@@ -79,10 +81,6 @@ export default function CalendarIndex(props: CalendarPageProps) {
 		);
 	}
 
-	const total = days.reduce(
-		(sum, day) => sum + (day.count ?? day.sessions.length),
-		0,
-	);
 	const filtered = status !== "active" || Boolean(artistFilter?.selected);
 	const agenda = (day: CalendarDay) => (
 		<DayAgenda
@@ -186,7 +184,7 @@ export default function CalendarIndex(props: CalendarPageProps) {
 						<AgendaList days={days} agenda={agenda} today={today} />
 					) : (
 						<>
-							<div className="hidden md:block">
+							<div className="hidden lg:block">
 								<TimeGrid
 									days={days}
 									today={today}
@@ -197,7 +195,7 @@ export default function CalendarIndex(props: CalendarPageProps) {
 									hrefFor={sessionHref}
 								/>
 							</div>
-							<div className="md:hidden">
+							<div className="lg:hidden">
 								{view === "day" ? (
 									agenda(days[0])
 								) : (

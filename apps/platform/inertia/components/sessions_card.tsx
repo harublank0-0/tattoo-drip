@@ -214,6 +214,7 @@ export function OutcomePanel({
 	outcome,
 	whenText,
 	back,
+	onBusyChange,
 	onCancel,
 	onDone,
 }: {
@@ -222,6 +223,8 @@ export function OutcomePanel({
 	whenText: string;
 	/** The calendar page the server sends the member back to; absent for the project page. */
 	back?: string;
+	/** Told when the save starts and ends: the calendar's drawer can't be closed meanwhile. */
+	onBusyChange?: (busy: boolean) => void;
 	onCancel: () => void;
 	onDone: () => void;
 }) {
@@ -237,8 +240,14 @@ export function OutcomePanel({
 			back ? { status: outcome, back } : { status: outcome },
 			{
 				preserveScroll: true,
-				onStart: () => setSaving(true),
-				onFinish: () => setSaving(false),
+				onStart: () => {
+					setSaving(true);
+					onBusyChange?.(true);
+				},
+				onFinish: () => {
+					setSaving(false);
+					onBusyChange?.(false);
+				},
 				onSuccess: onDone,
 			},
 		);
@@ -290,6 +299,7 @@ export function MoveForm({
 	values,
 	dates,
 	back,
+	onBusyChange,
 	onCancel,
 	onDone,
 }: {
@@ -298,6 +308,7 @@ export function MoveForm({
 	values: NonNullable<SessionRow["move"]>;
 	dates: Dates;
 	back?: string;
+	onBusyChange?: (busy: boolean) => void;
 	onCancel: () => void;
 	onDone: () => void;
 }) {
@@ -315,6 +326,8 @@ export function MoveForm({
 			route="tenant.sessions.move"
 			routeParams={{ tenant: tenant.slug, id: sessionId }}
 			options={{ preserveScroll: true }}
+			onStart={() => onBusyChange?.(true)}
+			onFinish={() => onBusyChange?.(false)}
 			onSuccess={onDone}
 			onError={() => focusFirstInvalid(fieldset.current)}
 		>

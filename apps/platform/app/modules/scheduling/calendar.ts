@@ -11,7 +11,8 @@ import type { CalendarEntry } from "#modules/scheduling/services/calendar_servic
 
 /**
  * The calendar's views (Studio OS): a day or a week on a time grid, a month
- * of whole weeks (Sunday before the 1st to Saturday after the last), and a
+ * of whole weeks (Sunday before the 1st to Saturday after the last: 28, 35
+ * or 42 days), and a
  * list of the AGENDA_DAYS days from the date.
  */
 export const CALENDAR_VIEWS = ["day", "week", "month", "agenda"] as const;
@@ -88,7 +89,7 @@ const sundayOf = (day: DateTime) => day.minus({ days: day.weekday % 7 });
 
 /**
  * The days a view shows: the day itself; its week from Sunday to Saturday;
- * its month as whole weeks (35 or 42 days); or AGENDA_DAYS days from it.
+ * its month as whole weeks (28, 35 or 42 days); or AGENDA_DAYS days from it.
  */
 export function calendarDays(view: CalendarView, date: string): string[] {
 	const day = plain(date);

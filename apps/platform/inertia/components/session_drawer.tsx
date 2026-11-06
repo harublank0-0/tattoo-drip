@@ -47,16 +47,48 @@ export default function SessionDrawer({
 	const shown = useRef(selected);
 	if (selected) shown.current = selected;
 	const session = shown.current;
+	// The panel open in the drawer (a confirmation or the move form): Escape
+	// closes it, not the drawer. And while its save is out nothing closes the
+	// drawer, so the visit that answers it is never cancelled (TAT-108).
+	const [panel, setPanel] = useState<SessionAction | null>(null);
+	const [busy, setBusy] = useState(false);
+	// Another session, or none: no panel open, nothing saving.
+	const selectedId = selected?.id ?? null;
+	useEffect(() => {
+		void selectedId;
+		setPanel(null);
+		setBusy(false);
+	}, [selectedId]);
 
 	return (
-		<Sheet open={selected !== null} onOpenChange={(open) => !open && onClose()}>
+		<Sheet
+			open={selected !== null}
+			onOpenChange={(open) => {
+				if (!open && !busy) onClose();
+			}}
+		>
 			<SheetContent
 				side="right"
+				busy={busy}
 				overlayClassName="bg-background/30"
 				className="w-full gap-0 p-0 sm:max-w-md lg:max-w-[28rem]"
+				onEscapeKeyDown={(event) => {
+					// The panel's own Escape (its fieldset's onKeyDown) closes the panel.
+					if (panel !== null || busy) event.preventDefault();
+				}}
+				onInteractOutside={(event) => {
+					if (busy) event.preventDefault();
+				}}
 			>
 				{session && (
-					<DrawerBody key={session.id} session={session} back={back} />
+					<DrawerBody
+						key={session.id}
+						session={session}
+						back={back}
+						open={panel}
+						setOpen={setPanel}
+						onBusyChange={setBusy}
+					/>
 				)}
 			</SheetContent>
 		</Sheet>
@@ -66,12 +98,17 @@ export default function SessionDrawer({
 function DrawerBody({
 	session,
 	back,
+	open,
+	setOpen,
+	onBusyChange,
 }: {
 	session: SelectedSession;
 	back: string;
+	open: SessionAction | null;
+	setOpen: (panel: SessionAction | null) => void;
+	onBusyChange: (busy: boolean) => void;
 }) {
 	const tenant = useTenant();
-	const [open, setOpen] = useState<SessionAction | null>(null);
 	const title = useRef<HTMLHeadingElement>(null);
 	useEffect(() => {
 		if (open === null) title.current?.focus();
@@ -168,6 +205,7 @@ function DrawerBody({
 							values={session.move}
 							dates={session.dates}
 							back={back}
+							onBusyChange={onBusyChange}
 							onCancel={() => setOpen(null)}
 							onDone={() => setOpen(null)}
 						/>
@@ -177,6 +215,7 @@ function DrawerBody({
 							outcome={open}
 							whenText={session.whenText}
 							back={back}
+							onBusyChange={onBusyChange}
 							onCancel={() => setOpen(null)}
 							onDone={() => setOpen(null)}
 						/>
