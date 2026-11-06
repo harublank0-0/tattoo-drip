@@ -17,11 +17,11 @@ import {
 	bookingSteps,
 	bookingValues,
 	COLOURS,
-	ideaFits,
 	intakeValuesOf,
 	SIZES,
 	STEP_FIELDS,
 	sizeText,
+	styleName,
 	TIMES_OF_DAY,
 } from "../../booking/booking.ts";
 import {
@@ -42,7 +42,7 @@ import type { InquiryChannels, InquiryState } from "../../studio/inquiry.ts";
 import { browserCodec } from "../browser-codec.ts";
 import { Challenge, TURNSTILE_PRIVACY_URL } from "../challenge.ts";
 import { browserChallengeHost } from "../challenge-host.ts";
-import { copy, fill as fillTemplate } from "../copy.ts";
+import { copy } from "../copy.ts";
 import { prepareReference } from "../images.ts";
 import {
 	afterBlockEnds,
@@ -190,6 +190,7 @@ export function IntakeForm({
 	const [sent, setSent] = useState<{
 		artistName: string | null;
 		dates: string;
+		reference: string;
 	} | null>(null);
 
 	const honeypot = useRef<HTMLInputElement>(null);
@@ -333,6 +334,7 @@ export function IntakeForm({
 					?.name ??
 				null,
 			dates: intake.preferredDates,
+			styleName: styleName(booking.styles, values.style),
 			photoCount: readyItems(references).length,
 			artwork: booking.artwork,
 		};
@@ -384,6 +386,7 @@ export function IntakeForm({
 				setSent({
 					artistName: snapshotOf(values).artistName,
 					dates: intake.preferredDates,
+					reference: result.receipt.reference,
 				});
 				setSentTo(values.contactPhone.trim());
 				form.reset();
@@ -551,6 +554,7 @@ export function IntakeForm({
 				phone={sentTo}
 				artistName={sent?.artistName ?? null}
 				dates={sent?.dates ?? ""}
+				reference={sent?.reference ?? null}
 			/>
 		);
 	}
@@ -748,9 +752,9 @@ export function IntakeForm({
 													description={words.tattoo.styleHint}
 													options={[
 														{ value: "", label: words.tattoo.anyStyle },
-														...booking.styles.map((name) => ({
-															value: name,
-															label: name,
+														...booking.styles.map((style) => ({
+															value: style.slug,
+															label: style.name,
 														})),
 													]}
 												/>
@@ -1028,11 +1032,6 @@ export function bookingErrors(
 		errors[
 			ownWords ? "approximateSize" : bookingFieldOf(field as IntakeField)
 		] = message;
-	}
-	if (!errors.idea && values.idea.trim() && !ideaFits(values)) {
-		errors.idea = fillTemplate(copy.errors.tooLong, {
-			max: INTAKE_LIMITS.idea,
-		});
 	}
 	return errors;
 }
