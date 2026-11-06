@@ -10,7 +10,12 @@ type More = {
 type TodayModule = {
 	GROUP_TITLES: Record<string, string>;
 	moreText(group: { count: number; more: More }): string;
-	emptyText(section: Section, role: string, scope?: string): string;
+	emptyText(
+		section: Section,
+		role: string,
+		scope?: string,
+		days?: number,
+	): string;
 	setupFirst(page: { setup: unknown; needsYou: unknown[] }): boolean;
 	GROUP_ACTIONS: Record<string, string>;
 	attentionTotal(groups: { count: number }[]): number;
@@ -104,6 +109,10 @@ test.group("Today copy", () => {
 		assert.equal(
 			emptyText("upcoming", "artist", "unlinked"),
 			"No sessions to show.",
+		);
+		assert.equal(
+			emptyText("upcoming", "owner", "studio", 14),
+			"Nothing booked in the next 14 days.",
 		);
 	});
 

@@ -271,6 +271,8 @@ export default class TodayController {
 			upcoming: {
 				count: ahead.length,
 				days: UPCOMING_DAYS,
+				// The first day ahead: the calendar's week from it holds the list.
+				from: shiftDate("day", date, 1),
 				rows: ahead.slice(0, UPCOMING_ROWS).map((entry) => {
 					const day = entry.session.startsAt
 						.setZone(timezone)

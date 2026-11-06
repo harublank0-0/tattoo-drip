@@ -95,14 +95,18 @@ export function OverviewSection({
 			className={cn("flex min-w-0 flex-col gap-3", className)}
 		>
 			<header className="flex min-h-8 items-center gap-2">
-				<h2 id={id} className="text-base leading-snug font-semibold">
+				<h2
+					id={id}
+					className="flex items-baseline gap-2 text-base leading-snug font-semibold"
+				>
 					{title}
+					{count !== undefined && count > 0 && (
+						<span className="text-sm font-normal text-muted-foreground tabular-nums">
+							<span className="sr-only">, </span>
+							{count}
+						</span>
+					)}
 				</h2>
-				{count !== undefined && count > 0 && (
-					<span className="text-sm text-muted-foreground tabular-nums">
-						{count}
-					</span>
-				)}
 				{action && (
 					<Link
 						href={action.href}

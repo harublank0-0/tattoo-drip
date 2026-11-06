@@ -67,7 +67,13 @@ export type TodayPageProps = {
 	/** The summary strip, in order. */
 	metrics: TodayMetric[];
 	/** The sessions after today: the first few, and how many there are in `days` days. */
-	upcoming: { count: number; days: number; rows: UpcomingSession[] };
+	upcoming: {
+		count: number;
+		days: number;
+		/** yyyy-MM-dd, tomorrow: the calendar week that holds the list starts there. */
+		from: string;
+		rows: UpcomingSession[];
+	};
 	/** "Thursday 22 October", the studio's date. */
 	dateText: string;
 	/** yyyy-MM-dd, the studio's date when the page loaded. */
@@ -132,6 +138,8 @@ export function emptyText(
 	section: "needsYou" | "sessions" | "waiting" | "upcoming",
 	role: string,
 	scope?: string,
+	/** "upcoming": how many days ahead the list covers. */
+	days = 7,
 ): string {
 	const owner = role === "owner";
 	switch (section) {
@@ -142,8 +150,8 @@ export function emptyText(
 		case "upcoming":
 			if (scope === "unlinked") return "No sessions to show.";
 			return owner
-				? "Nothing booked in the next 7 days."
-				: "Nothing booked for you in the next 7 days.";
+				? `Nothing booked in the next ${days} days.`
+				: `Nothing booked for you in the next ${days} days.`;
 		case "sessions":
 			if (scope === "unlinked") {
 				return "Your account isn't linked to an artist profile yet, so no sessions show here. Ask an owner to link it.";

@@ -2,7 +2,12 @@ import testUtils from "@adonisjs/core/services/test_utils";
 import type { ApiClient } from "@japa/api-client";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
-import { makeClient, makeProject, makeSession } from "#tests/helpers/pipeline";
+import {
+	makeClient,
+	makeInquiry,
+	makeProject,
+	makeSession,
+} from "#tests/helpers/pipeline";
 import { recordQueries } from "#tests/helpers/query_count";
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 import { KTM, studio } from "#tests/helpers/waiting_fixtures";
@@ -12,6 +17,7 @@ type Metric = { key: string; label: string; value: string; detail: string };
 type Upcoming = {
 	count: number;
 	days: number;
+	from: string;
 	rows: {
 		id: string;
 		date: string;
@@ -85,6 +91,7 @@ test.group("Today: the overview (Studio OS)", (group) => {
 			[made.today.id, made.overnight.id],
 		);
 		assert.equal(upcoming.days, 7);
+		assert.equal(upcoming.from, local(1, 0).toFormat("yyyy-MM-dd"));
 		assert.equal(upcoming.count, 2);
 		assert.deepEqual(
 			upcoming.rows.map(({ id }) => id),
@@ -177,7 +184,12 @@ test.group("Today: the overview (Studio OS)", (group) => {
 
 		const props = await propsOf(client, "overview-unlinked", stranger);
 
-		assert.deepEqual(props.upcoming, { count: 0, days: 7, rows: [] });
+		assert.deepEqual(props.upcoming, {
+			count: 0,
+			days: 7,
+			from: local(1, 0).toFormat("yyyy-MM-dd"),
+			rows: [],
+		});
 		assert.equal(metric(props, "upcoming")?.value, "0");
 	});
 
@@ -187,12 +199,14 @@ test.group("Today: the overview (Studio OS)", (group) => {
 	}) => {
 		const { owner, tenant } = await studioWithOwner("overview-needs");
 		await inTenant(tenant, async () => {
-			const project = await makeProject(
+			await makeProject(
 				tenant,
 				await makeClient(tenant, { name: "To price" }),
-				{ status: "reviewing" },
+				{
+					status: "reviewing",
+				},
 			);
-			return project;
+			await makeInquiry(tenant, await makeClient(tenant, { name: "Asker" }));
 		});
 
 		const props = await propsOf(client, "overview-needs", owner);
@@ -201,8 +215,16 @@ test.group("Today: the overview (Studio OS)", (group) => {
 			0,
 		);
 
-		assert.isAbove(total, 0);
+		const requests = (props.needsYou as { key: string; count: number }[]).find(
+			({ key }) => key === "requests",
+		)?.count;
+		assert.equal(requests, 1);
+		assert.isAbove(total, requests ?? 0);
 		assert.equal(metric(props, "needs")?.value, String(total));
+		assert.equal(
+			metric(props, "needs")?.detail,
+			`1 request, ${total - 1} project${total - 1 === 1 ? "" : "s"}`,
+		);
 	});
 
 	test("the days ahead cost no more queries as sessions are added", async ({

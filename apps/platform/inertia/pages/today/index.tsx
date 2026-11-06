@@ -139,13 +139,21 @@ export default function TodayIndex({
 						count={upcoming.count}
 						action={
 							upcoming.count > 0
-								? { href: `${calendar}?view=week`, label: "Week" }
+								? {
+										href: `${calendar}?view=week&date=${upcoming.from}`,
+										label: "Calendar",
+									}
 								: undefined
 						}
 					>
 						{upcoming.rows.length === 0 ? (
 							<QuietEmpty>
-								{emptyText("upcoming", tenant.role, sessions.scope)}
+								{emptyText(
+									"upcoming",
+									tenant.role,
+									sessions.scope,
+									upcoming.days,
+								)}
 							</QuietEmpty>
 						) : (
 							<UpcomingList
