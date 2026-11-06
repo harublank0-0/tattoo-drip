@@ -50,7 +50,7 @@ Same shape as the FAQ table, with `title` varchar(80) and `text` varchar(4000) i
 
 **`tenants.policies_updated_at`**
 
-A nullable `timestamptz`. It is set to now when the policy sections are saved with a change (added, removed, reordered or edited). It is also set when a Good to know save changes `deposit_policy`, `age_rule_text` or `walk_ins_text`: the three texts `/policies` shows. It is not set for a save that changes nothing. Existing studios start null, and the page then shows no date.
+A nullable `timestamptz`. It is set to now when the policy sections are saved with a change (added, removed, reordered or edited). A `before update` trigger on `tenants` also sets it whenever `deposit_policy`, `age_rule_text` or `walk_ins_text` changes value: the three texts `/policies` shows. A trigger is used because the deposit policy is edited on the Payments page and the other two on Good to know, so one rule covers both and any later path. It is not set for a save that changes nothing. Existing studios start null, and the page then shows no date.
 
 ### Service (`#modules/studio_content`)
 
@@ -59,7 +59,7 @@ A nullable `timestamptz`. It is set to now when the policy sections are saved wi
 - `saveFaq(tenant, entries)` and `savePolicies(tenant, sections)` replace a whole list in one transaction. Each locks the studio's `tenants` row (`FOR UPDATE`) so two saves never interleave, deletes the old rows, and inserts the new ones with positions 0..n-1. `savePolicies` also sets `policies_updated_at` when the list differs from the stored one.
 - Every query is scoped by tenant.
 
-The Good to know save (`GoodToKnowController.update` and its service) sets `policies_updated_at` when one of its three policy texts changes value.
+The three Good to know policy texts need no service change: the `tenants` trigger above dates them.
 
 ### Dashboard (Settings → FAQ & policies)
 
@@ -124,7 +124,7 @@ The schema description says "plain text: render it as text". The read stays one 
   - saving replaces the list in order;
   - the limits refuse a list that is too long;
   - an unchanged save leaves `policies_updated_at` as it was, and a changed one sets it;
-  - Good to know saves set it only when one of the three texts changes;
+  - the trigger sets it only when one of the three texts changes (a Good to know or Payments save that changes nothing leaves it);
   - another tenant's rows are invisible.
 - **Dashboard HTTP:**
   - owner-only access;
@@ -147,3 +147,5 @@ The schema description says "plain text: render it as text". The read stays one 
 - A date per entry or per section.
 - Translations.
 - Letting a studio hide the fixed product answers.
+
+Later: rich text for answers and sections comes next, and the text columns stay plain text for now. A date per section waits until it is clear what it is for.
