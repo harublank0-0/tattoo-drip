@@ -777,6 +777,13 @@ export interface components {
              */
             closedDays: components["schemas"]["ClosedDays"][];
             goodToKnow: components["schemas"]["GoodToKnow"];
+            /**
+             * @description The studio's own questions and answers, in its order. Show them
+             *     after the answers about how requesting works. [] when it wrote
+             *     none, and while its page hides Good to know.
+             */
+            faq: components["schemas"]["StudioFaqEntry"][];
+            policies: components["schemas"]["StudioPolicies"];
         };
         /**
          * @description One weekday the studio opens (TAT-128): one opening and one closing time,
@@ -810,6 +817,27 @@ export interface components {
              * @example Closed for Dashain, back on 28 October
              */
             note: string | null;
+        };
+        /** @description One of the studio's own FAQ answers. Plain text, line breaks kept; render it as text. */
+        StudioFaqEntry: {
+            question: string;
+            answer: string;
+        };
+        /**
+         * @description The studio's own policy sections, in its order, shown after the
+         *     Good to know ones (deposit policy, age rule, walk-ins, closed days).
+         *     `updatedAt` is when the policies last changed: these sections, or
+         *     the deposit policy, age rule or walk-ins text; null when never.
+         *     `{ updatedAt: null, sections: [] }` while its page hides Good to
+         *     know.
+         */
+        StudioPolicies: {
+            /** Format: date-time */
+            updatedAt: string | null;
+            sections: {
+                title: string;
+                text: string;
+            }[];
         };
         /**
          * @description What clients ask before they come (TAT-128), as plain text the studio

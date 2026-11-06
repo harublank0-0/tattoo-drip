@@ -77,6 +77,14 @@ export interface ApiDefinition {
         store: typeof routes['tenant.settings.closed_days.store']
         destroy: typeof routes['tenant.settings.closed_days.destroy']
       }
+      faqPolicies: typeof routes['tenant.settings.faq_policies'] & {
+        faq: {
+          update: typeof routes['tenant.settings.faq_policies.faq.update']
+        }
+        policies: {
+          update: typeof routes['tenant.settings.faq_policies.policies.update']
+        }
+      }
       members: typeof routes['tenant.settings.members'] & {
         invitations: {
           store: typeof routes['tenant.settings.members.invitations.store']

@@ -3,6 +3,7 @@ import { Fill } from "../../../../intake/components/fill.tsx";
 import {
 	ContactDetails,
 	FaqGroups,
+	FaqGroupTitle,
 	infoWords,
 	PolicySections,
 	Prose,
@@ -310,7 +311,9 @@ function InfoBody({
 								>
 									{content.groups.map((group) => (
 										<li key={group.id}>
-											<a href={`#faq-${group.id}`}>{group.title}</a>
+											<a href={`#faq-${group.id}`}>
+												<FaqGroupTitle group={group} />
+											</a>
 										</li>
 									))}
 								</ol>
@@ -334,7 +337,10 @@ function InfoBody({
 			return (
 				<div className="ink-section">
 					<div className="ink-container ink-info-policies">
-						<PolicySections sections={content.sections} />
+						<PolicySections
+							sections={content.sections}
+							updatedAt={content.updatedAt}
+						/>
 					</div>
 				</div>
 			);

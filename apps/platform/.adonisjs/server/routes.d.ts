@@ -46,6 +46,9 @@ export type ScannedRoutes = {
     'tenant.settings.hours.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.closed_days.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.closed_days.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.settings.faq_policies': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.faq_policies.faq.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.faq_policies.policies.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.members': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.members.invitations.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.members.invitations.renew': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
@@ -150,6 +153,7 @@ export type ScannedRoutes = {
     'tenant.settings.payments.edit': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.messages': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.good_to_know': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.faq_policies': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.members': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists.mine': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -204,6 +208,7 @@ export type ScannedRoutes = {
     'tenant.settings.payments.edit': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.messages': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.good_to_know': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.faq_policies': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.members': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists.mine': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -294,6 +299,8 @@ export type ScannedRoutes = {
     'tenant.settings.messages.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.good_to_know.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.hours.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.faq_policies.faq.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.faq_policies.policies.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.members.role.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.photos.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }

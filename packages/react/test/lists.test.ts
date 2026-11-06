@@ -34,6 +34,8 @@ const STUDIO: Studio = {
 		beforeSession: null,
 		aftercare: null,
 	},
+	faq: [],
+	policies: { updatedAt: null, sections: [] },
 };
 
 /** A client whose fetch answers every call with `status` and `body`. */

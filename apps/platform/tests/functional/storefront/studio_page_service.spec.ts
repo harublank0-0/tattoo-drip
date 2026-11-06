@@ -106,6 +106,8 @@ test.group("StudioPageService.studio", (group) => {
 				beforeSession: null,
 				aftercare: null,
 			},
+			faq: [],
+			policies: { updatedAt: null, sections: [] },
 		});
 	});
 
@@ -466,7 +468,8 @@ test.group("StudioPageService: cover and work photos (TAT-116)", (group) => {
 
 		assert.equal(
 			await queries({ tenant }, () => pagesWith().studio(tenant)),
-			3,
+			// The artists, the hours, the closed days, the FAQ and the policy sections.
+			5,
 			"studio",
 		);
 		assert.equal(

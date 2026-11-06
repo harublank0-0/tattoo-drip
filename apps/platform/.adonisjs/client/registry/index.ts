@@ -258,6 +258,24 @@ const routes = {
     tokens: [{"old":"/t/:tenant/settings/closed-days/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/closed-days/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/closed-days/:id","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/closed-days/:id","type":0,"val":"closed-days","end":""},{"old":"/t/:tenant/settings/closed-days/:id","type":1,"val":"id","end":""}],
     types: placeholder as Registry['tenant.settings.closed_days.destroy']['types'],
   },
+  'tenant.settings.faq_policies': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/settings/faq-policies',
+    tokens: [{"old":"/t/:tenant/settings/faq-policies","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/faq-policies","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/faq-policies","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/faq-policies","type":0,"val":"faq-policies","end":""}],
+    types: placeholder as Registry['tenant.settings.faq_policies']['types'],
+  },
+  'tenant.settings.faq_policies.faq.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/settings/faq-policies/faq',
+    tokens: [{"old":"/t/:tenant/settings/faq-policies/faq","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/faq-policies/faq","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/faq-policies/faq","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/faq-policies/faq","type":0,"val":"faq-policies","end":""},{"old":"/t/:tenant/settings/faq-policies/faq","type":0,"val":"faq","end":""}],
+    types: placeholder as Registry['tenant.settings.faq_policies.faq.update']['types'],
+  },
+  'tenant.settings.faq_policies.policies.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/settings/faq-policies/policies',
+    tokens: [{"old":"/t/:tenant/settings/faq-policies/policies","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/faq-policies/policies","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/faq-policies/policies","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/faq-policies/policies","type":0,"val":"faq-policies","end":""},{"old":"/t/:tenant/settings/faq-policies/policies","type":0,"val":"policies","end":""}],
+    types: placeholder as Registry['tenant.settings.faq_policies.policies.update']['types'],
+  },
   'tenant.settings.members': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/settings/members',

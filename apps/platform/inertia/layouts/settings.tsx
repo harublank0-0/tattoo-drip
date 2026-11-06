@@ -2,6 +2,7 @@ import { usePage } from "@inertiajs/react";
 import { cn } from "cn";
 import {
 	Clock,
+	MessageCircleQuestion,
 	MessageSquareText,
 	Palette,
 	Store,
@@ -39,6 +40,12 @@ function settingsNav(tenantSlug: string): NavItem[] {
 			route: "tenant.settings.good_to_know",
 			params,
 			icon: Clock,
+		},
+		{
+			label: "FAQ & policies",
+			route: "tenant.settings.faq_policies",
+			params,
+			icon: MessageCircleQuestion,
 		},
 		{
 			label: "Payments",

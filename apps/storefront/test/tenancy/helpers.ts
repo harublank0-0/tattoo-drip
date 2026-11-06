@@ -93,5 +93,7 @@ export function studioOf(slug: string, name: string): Studio {
 			beforeSession: null,
 			aftercare: null,
 		},
+		faq: [],
+		policies: { updatedAt: null, sections: [] },
 	};
 }

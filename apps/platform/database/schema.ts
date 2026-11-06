@@ -820,6 +820,33 @@ export class StudioClosureSchema extends BaseModel {
 	declare updatedAt: DateTime | null;
 }
 
+export class StudioFaqEntrySchema extends BaseModel {
+	static $columns = [
+		"answer",
+		"createdAt",
+		"id",
+		"position",
+		"question",
+		"tenantId",
+		"updatedAt",
+	] as const;
+	$columns = StudioFaqEntrySchema.$columns;
+	@column()
+	declare answer: string;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare position: number;
+	@column()
+	declare question: string;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
 export class StudioHourSchema extends BaseModel {
 	static $columns = [
 		"closesAt",
@@ -845,6 +872,33 @@ export class StudioHourSchema extends BaseModel {
 	declare updatedAt: DateTime | null;
 	@column()
 	declare weekday: number;
+}
+
+export class StudioPolicySectionSchema extends BaseModel {
+	static $columns = [
+		"createdAt",
+		"id",
+		"position",
+		"tenantId",
+		"text",
+		"title",
+		"updatedAt",
+	] as const;
+	$columns = StudioPolicySectionSchema.$columns;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare position: number;
+	@column()
+	declare tenantId: string;
+	@column()
+	declare text: string;
+	@column()
+	declare title: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
 }
 
 export class TattooProjectSchema extends BaseModel {
@@ -1005,6 +1059,7 @@ export class TenantSchema extends BaseModel {
 		"logoImageWidth",
 		"logoTile",
 		"name",
+		"policiesUpdatedAt",
 		"slug",
 		"storefrontClaimedFlash",
 		"storefrontSections",
@@ -1069,6 +1124,8 @@ export class TenantSchema extends BaseModel {
 	declare logoTile: string;
 	@column()
 	declare name: string;
+	@column.dateTime()
+	declare policiesUpdatedAt: DateTime | null;
 	@column()
 	declare slug: string;
 	@column()

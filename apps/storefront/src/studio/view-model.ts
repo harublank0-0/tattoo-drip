@@ -2,6 +2,7 @@ import type { Artist, Studio } from "@tattoo-drip/sdk";
 import { fill } from "../intake/template.ts";
 import { studioCopy } from "./copy.ts";
 import { type HoursLine, hoursLines, readClosures, readWeek } from "./hours.ts";
+import { studioPolicies } from "./info.ts";
 import {
 	isEmail,
 	isPhone,
@@ -229,7 +230,8 @@ function shownPages(studio: Studio, reachable: boolean): StudioPages {
 			set(texts.depositPolicy) ||
 			set(texts.ageRule) ||
 			set(texts.walkIns) ||
-			readClosures(studio.closedDays).length > 0,
+			readClosures(studio.closedDays).length > 0 ||
+			studioPolicies(studio).sections.length > 0,
 		aftercare: set(texts.beforeSession) || set(texts.aftercare),
 		contact: reachable || readWeek(studio.openingHours).some(Boolean),
 	};

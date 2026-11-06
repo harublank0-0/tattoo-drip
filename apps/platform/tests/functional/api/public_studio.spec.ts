@@ -6,7 +6,8 @@ import User from "#models/user";
 import ArtistService from "#modules/artists/services/artist_service";
 import ImageService from "#modules/media/services/image_service";
 import OpeningHoursService from "#modules/scheduling/services/opening_hours_service";
-import type Tenant from "#modules/tenancy/models/tenant";
+import StudioContentService from "#modules/studio_content/services/studio_content_service";
+import Tenant from "#modules/tenancy/models/tenant";
 import TenancyService, {
 	type TenantProfile,
 } from "#modules/tenancy/services/tenancy_service";
@@ -25,6 +26,7 @@ const CACHED = "public, max-age=60, stale-while-revalidate=600";
 const images = new ImageService();
 const tenancy = new TenancyService(undefined, images);
 const artists = new ArtistService(images);
+const content = new StudioContentService();
 
 /** The documented fields (openapi.yaml, Studio). A new one needs the contract and a ruling first. */
 const STUDIO_FIELDS = [
@@ -32,10 +34,12 @@ const STUDIO_FIELDS = [
 	"closedDays",
 	"contact",
 	"cover",
+	"faq",
 	"goodToKnow",
 	"intro",
 	"name",
 	"openingHours",
+	"policies",
 	"slug",
 	"socialLinks",
 	"storefront",
@@ -93,6 +97,9 @@ const EMPTY_GOOD_TO_KNOW = {
 	aftercare: null,
 };
 
+/** What a studio that wrote no policy sections answers. */
+const NO_POLICIES = { updatedAt: null, sections: [] };
+
 /** The public Studio of a studioWithOwner() studio: no profile filled in, no artists. */
 const bareStudio = (slug: string, name: string) => ({
 	slug,
@@ -108,6 +115,8 @@ const bareStudio = (slug: string, name: string) => ({
 	openingHours: [],
 	closedDays: [],
 	goodToKnow: EMPTY_GOOD_TO_KNOW,
+	faq: [],
+	policies: NO_POLICIES,
 });
 
 function changeSlug(tenant: Tenant, slug: string) {
@@ -150,6 +159,8 @@ test.group("GET /api/v1/tenants/:tenant (getStudio)", (group) => {
 			openingHours: [],
 			closedDays: [],
 			goodToKnow: EMPTY_GOOD_TO_KNOW,
+			faq: [],
+			policies: NO_POLICIES,
 		});
 		assertApiHeaders(response);
 	});
@@ -895,5 +906,67 @@ test.group("GET /api/v1/tenants/:tenant (getStudio)", (group) => {
 		const post = await client.post("/api/v1/tenants/api-needle-32").json({});
 		assertApiError(post, 405, "method_not_allowed");
 		post.assertHeader("allow", "GET, HEAD");
+	});
+});
+
+test.group("getStudio: the studio's own FAQ and policies", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("getStudio carries the studio's FAQ and policy sections in order, with the policies date", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("api-content");
+		await inTenant(tenant, async () => {
+			await content.saveFaq(tenant, [
+				{ question: "Second?", answer: "Two." },
+				{ question: "First?", answer: "One." },
+			]);
+			await content.savePolicies(tenant, [
+				{ title: "Cancellations", text: "A day before." },
+			]);
+			await Tenant.query()
+				.where("id", tenant.id)
+				.update({ policies_updated_at: new Date("2026-11-06T05:00:00Z") });
+		});
+
+		const { data } = (await client.get("/api/v1/tenants/api-content")).body();
+		assert.deepEqual(data.faq, [
+			{ question: "Second?", answer: "Two." },
+			{ question: "First?", answer: "One." },
+		]);
+		assert.deepEqual(data.policies, {
+			updatedAt: "2026-11-06T05:00:00.000Z",
+			sections: [{ title: "Cancellations", text: "A day before." }],
+		});
+		assert.deepEqual(Object.keys(data.faq[0]).sort(), ["answer", "question"]);
+		assert.deepEqual(Object.keys(data.policies).sort(), [
+			"sections",
+			"updatedAt",
+		]);
+		assert.deepEqual(Object.keys(data.policies.sections[0]).sort(), [
+			"text",
+			"title",
+		]);
+	});
+
+	test("with Good to know hidden, faq is [] and policies is { updatedAt: null, sections: [] }", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("api-content-hidden");
+		await inTenant(tenant, async () => {
+			await content.saveFaq(tenant, [{ question: "Q?", answer: "A." }]);
+			await content.savePolicies(tenant, [{ title: "T", text: "X." }]);
+			const row = await Tenant.findOrFail(tenant.id);
+			row.merge({ storefrontSections: "work,artists,inquiry" });
+			await row.save();
+		});
+
+		const { data } = (
+			await client.get("/api/v1/tenants/api-content-hidden")
+		).body();
+		assert.deepEqual(data.faq, []);
+		assert.deepEqual(data.policies, NO_POLICIES);
 	});
 });

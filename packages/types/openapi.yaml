@@ -1017,7 +1017,7 @@ components:
         studio page shows. Every property is always there; an empty one is
         `null` or `[]`. All text is plain text: render it as text, never as
         HTML.
-      required: [slug, name, type, intro, timezone, contact, socialLinks, acceptingInquiries, cover, storefront, openingHours, closedDays, goodToKnow]
+      required: [slug, name, type, intro, timezone, contact, socialLinks, acceptingInquiries, cover, storefront, openingHours, closedDays, goodToKnow, faq, policies]
       additionalProperties: false
       properties:
         slug:
@@ -1091,6 +1091,16 @@ components:
           items: { $ref: "#/components/schemas/ClosedDays" }
         goodToKnow:
           $ref: "#/components/schemas/GoodToKnow"
+        faq:
+          type: array
+          maxItems: 20
+          description: |
+            The studio's own questions and answers, in its order. Show them
+            after the answers about how requesting works. [] when it wrote
+            none, and while its page hides Good to know.
+          items: { $ref: "#/components/schemas/StudioFaqEntry" }
+        policies:
+          $ref: "#/components/schemas/StudioPolicies"
 
     OpeningHours:
       type: object
@@ -1123,6 +1133,40 @@ components:
           maxLength: 120
           description: The studio's words, one line, plain text
           examples: ["Closed for Dashain, back on 28 October"]
+
+    StudioFaqEntry:
+      type: object
+      description: One of the studio's own FAQ answers. Plain text, line breaks kept; render it as text.
+      required: [question, answer]
+      additionalProperties: false
+      properties:
+        question: { type: string, minLength: 1, maxLength: 200 }
+        answer: { type: string, minLength: 1, maxLength: 2000 }
+
+    StudioPolicies:
+      type: object
+      description: |
+        The studio's own policy sections, in its order, shown after the
+        Good to know ones (deposit policy, age rule, walk-ins, closed days).
+        `updatedAt` is when the policies last changed: these sections, or
+        the deposit policy, age rule or walk-ins text; null when never.
+        `{ updatedAt: null, sections: [] }` while its page hides Good to
+        know.
+      required: [updatedAt, sections]
+      additionalProperties: false
+      properties:
+        updatedAt: { type: [string, "null"], format: date-time }
+        sections:
+          type: array
+          maxItems: 12
+          items:
+            type: object
+            description: A titled section. Plain text, line breaks kept; render it as text.
+            required: [title, text]
+            additionalProperties: false
+            properties:
+              title: { type: string, minLength: 1, maxLength: 80 }
+              text: { type: string, minLength: 1, maxLength: 4000 }
 
     GoodToKnow:
       type: object

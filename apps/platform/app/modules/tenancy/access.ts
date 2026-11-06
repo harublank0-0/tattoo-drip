@@ -56,6 +56,9 @@ export const TENANT_ROUTE_ROLES = {
 	// Good to know and opening hours (TAT-128).
 	"tenant.settings.good_to_know": OWNERS,
 	"tenant.settings.good_to_know.update": OWNERS,
+	"tenant.settings.faq_policies": OWNERS,
+	"tenant.settings.faq_policies.faq.update": OWNERS,
+	"tenant.settings.faq_policies.policies.update": OWNERS,
 	"tenant.settings.hours.update": OWNERS,
 	"tenant.settings.closed_days.store": OWNERS,
 	"tenant.settings.closed_days.destroy": OWNERS,

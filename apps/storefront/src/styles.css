@@ -453,6 +453,9 @@
   .site-bar-home > span, .site-bar-request > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
   /* align-content: current Chrome computes a clamped -webkit-box as flow-root, where -webkit-box-pack no longer centres the text in the link's 44 px; older engines still use the pack. */
   .site-bar-home:not(:has(.site-bar-logo)) { display: -webkit-box; -webkit-box-orient: vertical; -webkit-box-pack: center; align-content: center; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+  .site-footer-nav { flex-basis: 100%; }
+  .site-footer-nav ul { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem 1.25rem; margin: 0 0 0.75rem; padding: 0; list-style: none; }
+  .site-footer-nav a { display: inline-block; padding-block: 0.6rem; color: inherit; text-underline-offset: 0.2em; }
   .site-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem 2rem; width: min(72rem, 100% - 2.5rem); margin: 5rem auto 0; padding-block: 1.5rem 2.5rem; border-top: 1px solid var(--line); color: var(--ink-muted); font-size: 0.9375rem; overflow-wrap: anywhere; }
   .status-page { display: grid; gap: 1rem; justify-items: start; padding-block: 4rem; }
 
@@ -738,6 +741,8 @@
   .faq { display: grid; gap: 2.5rem; }
   .faq-group { display: grid; gap: 0; }
   .faq-group-title { margin: 0 0 0.75rem; font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
+  /* The studio's own group names the studio: never letter-spacing or uppercase on a name (it may be Devanagari). */
+  .faq-group-title-studio { letter-spacing: normal; text-transform: none; }
   .faq-item { border-block-end: 1px solid var(--line); }
   .faq-item:first-of-type { border-block-start: 1px solid var(--line); }
   .faq-question { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-block-size: 3rem; padding-block: 0.75rem; font-weight: 600; cursor: pointer; list-style: none; }

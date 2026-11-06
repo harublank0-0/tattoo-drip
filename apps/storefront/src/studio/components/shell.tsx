@@ -1,15 +1,22 @@
 import type { ComponentType, ReactNode } from "react";
 import { Fill } from "../../intake/components/fill.tsx";
+import { fill } from "../../intake/template.ts";
 import type { ChatLinks } from "../chat.ts";
 import { studioCopy } from "../copy.ts";
 import { isAllowedHref } from "../links.ts";
-import type { ShellPage } from "../nav.ts";
+import {
+	moreNavItems,
+	type NavItem,
+	navItems,
+	type ShellPage,
+} from "../nav.ts";
 import type { RequestLink } from "../request.ts";
 import { logoSizes } from "../srcset.ts";
 import type { ThemeConfig } from "../theme/config.ts";
 import type { StudioView } from "../view-model.ts";
 import { BrandLogo } from "./brand.tsx";
 import { ChatButton } from "./chat.tsx";
+import { infoWords } from "./info.tsx";
 
 /**
  * What a theme puts around a page: its header, the `<main>` the page's
@@ -46,14 +53,25 @@ export function StencilShell({
 	theme,
 	requestLink,
 	chat,
+	page,
+	artistsShown,
 	mainClassName = "page",
 	children,
 }: ShellProps) {
+	// The informational pages that have content, by the rules Ink Noir's
+	// navigation uses, so no link leads to a not-found.
+	const info = new Set(["services", "about", "contact"]);
+	const links = [
+		...navItems(theme.sections, page, artistsShown, studio.pages).filter(
+			(item) => info.has(item.key),
+		),
+		...moreNavItems(theme.sections, page, studio.pages),
+	];
 	return (
 		<>
 			<SiteBar studio={studio} theme={theme} requestLink={requestLink} />
 			<main className={mainClassName}>{children}</main>
-			<SiteFooter studioName={studio.name} />
+			<SiteFooter studioName={studio.name} links={links} />
 			<ChatButton chat={chat} studioName={studio.name} />
 		</>
 	);
@@ -117,9 +135,38 @@ function SiteBar({
 }
 
 /** Who runs the page clients' details go through (no link until a marketing site exists). */
-export function SiteFooter({ studioName }: { studioName: string }) {
+export function SiteFooter({
+	studioName,
+	links = [],
+}: {
+	studioName: string;
+	/** The studio's informational pages to link, in order; none for no list. */
+	links?: readonly NavItem[];
+}) {
 	return (
 		<footer className="site-footer">
+			{links.length > 0 ? (
+				<nav
+					className="site-footer-nav"
+					aria-label={fill(infoWords.more, { studio: studioName })}
+				>
+					{/* biome-ignore lint/a11y/useSemanticElements: it is a list; the role repairs WebKit's reading of list-style: none */}
+					<ul
+						// biome-ignore lint/a11y/noRedundantRoles: redundant for the spec, needed for WebKit with list-style: none
+						role="list"
+					>
+						{links.map((link) =>
+							isAllowedHref(link.href) ? (
+								<li key={link.key}>
+									<a href={link.href} aria-current={link.current}>
+										{link.label}
+									</a>
+								</li>
+							) : null,
+						)}
+					</ul>
+				</nav>
+			) : null}
 			<p dir="auto">{studioName}</p>
 			<p>{studioCopy.nav.credit}</p>
 		</footer>

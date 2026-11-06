@@ -202,6 +202,19 @@ router
 					])
 					.where("id", router.matchers.uuid())
 					.as("tenant.settings.closed_days.destroy");
+				// The studio's own FAQ and policies: one page, two lists saved whole.
+				router
+					.get("faq-policies", [controllers.StudioContent, "show"])
+					.as("tenant.settings.faq_policies");
+				router
+					.put("faq-policies/faq", [controllers.StudioContent, "updateFaq"])
+					.as("tenant.settings.faq_policies.faq.update");
+				router
+					.put("faq-policies/policies", [
+						controllers.StudioContent,
+						"updatePolicies",
+					])
+					.as("tenant.settings.faq_policies.policies.update");
 				// Members and invitations (TAT-33). A new invitation's link is
 				// shown once, on the members page.
 				router
