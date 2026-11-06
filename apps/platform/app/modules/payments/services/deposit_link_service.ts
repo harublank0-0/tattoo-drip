@@ -241,7 +241,9 @@ export default class DepositLinkService {
 		project: LockedProject,
 	): Promise<string | null> {
 		if (project.inquiryId === null) return null;
-		const inquiry = await Inquiry.query()
+		// A deleted inquiry's code stays registered and is still the one the
+		// client was given.
+		const inquiry = await Inquiry.withTrashed()
 			.where("tenant_id", tenant.id)
 			.where("id", project.inquiryId)
 			.select("reference_code")

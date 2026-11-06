@@ -4,7 +4,7 @@ import {
 	REFERENCE_TRIES,
 } from "#modules/references/reference_codes";
 import type Tenant from "#modules/tenancy/models/tenant";
-import { withTransaction } from "#services/db_context";
+import { currentClient, withTransaction } from "#services/db_context";
 import { isUniqueViolation } from "#services/db_errors";
 
 type TenantRef = Pick<Tenant, "id">;
@@ -13,8 +13,8 @@ const CODE_TAKEN = "reference_codes_tenant_id_code_unique";
 
 /**
  * Draws a studio's new reference codes. A claim runs in the caller's
- * transaction (the request's): a rolled-back intake or link gives its code
- * back. Each draw is its own savepoint, so a collision leaves the caller's
+ * transaction (the request's), and refuses to run without one: a rolled-back
+ * intake or link gives its code back. Each draw is its own savepoint, so a collision leaves the caller's
  * transaction usable.
  */
 export default class ReferenceCodeService {
@@ -24,6 +24,13 @@ export default class ReferenceCodeService {
 	 * violation surfaces.
 	 */
 	async claim(tenant: TenantRef): Promise<string> {
+		// Outside a transaction a draw would commit on its own, and the caller's
+		// failure could no longer give the code back.
+		if (!currentClient()) {
+			throw new Error(
+				"ReferenceCodeService.claim must run inside a transaction",
+			);
+		}
 		for (let attempt = 1; ; attempt++) {
 			const code = this.newCode();
 			try {

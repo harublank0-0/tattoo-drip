@@ -90,4 +90,15 @@ test.group("ReferenceCodeService", (group) => {
 			inTenant(b.tenant, () => new ScriptedService(["ZZZZZ2"]).claim(a.tenant)),
 		);
 	});
+
+	test("claim refuses to run outside a transaction, so a caller's failure can always give its code back", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+		await assert.rejects(
+			() => new ReferenceCodeService().claim(tenant),
+			/inside a transaction/,
+		);
+		assert.lengthOf(await inTenant(tenant, () => ReferenceCode.query()), 0);
+	});
 });
