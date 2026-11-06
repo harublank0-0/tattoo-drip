@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readdir } from "node:fs/promises";
 import app from "@adonisjs/core/services/app";
 import type { ApiClient } from "@japa/api-client";
+import { DateTime } from "luxon";
 import ArtistService from "#modules/artists/services/artist_service";
 import ImageService from "#modules/media/services/image_service";
 import DepositLinkService from "#modules/payments/services/deposit_link_service";
@@ -12,7 +13,12 @@ import ProjectService from "#modules/projects/services/project_service";
 import QuoteService from "#modules/projects/services/quote_service";
 import SessionService from "#modules/scheduling/services/session_service";
 import { testImages } from "#tests/helpers/images";
-import { makeClient, makeProject, makeQuote } from "#tests/helpers/pipeline";
+import {
+	makeClient,
+	makeInquiry,
+	makeProject,
+	makeQuote,
+} from "#tests/helpers/pipeline";
 
 type TenantRef = { id: string };
 
@@ -64,6 +70,8 @@ export function depositServices(images: ImageService = new ImageService()) {
 export async function depositReady(
 	tenant: TenantRef,
 	quote: Parameters<typeof makeQuote>[2] = {},
+	/** The project comes from an inquiry with this reference (null for none); left out, a desk project. */
+	from: { inquiryReference?: string | null } = {},
 ) {
 	const method = await new PaymentMethodService(new ImageService()).create(
 		tenant,
@@ -76,12 +84,22 @@ export async function depositReady(
 		},
 	);
 	const client = await makeClient(tenant, { name: "Sita Rai" });
+	const inquiry =
+		"inquiryReference" in from
+			? await makeInquiry(tenant, client, {
+					status: "accepted",
+					decidedAt: DateTime.utc(),
+					referenceCode: from.inquiryReference ?? null,
+				})
+			: null;
 	const project = await makeProject(tenant, client, {
 		status: "deposit_pending",
+		inquiryId: inquiry?.id ?? null,
 	});
 	return {
 		method,
 		client,
+		inquiry,
 		project,
 		quote: await makeQuote(tenant, project, quote),
 	};

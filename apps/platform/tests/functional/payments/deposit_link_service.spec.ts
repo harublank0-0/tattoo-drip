@@ -14,22 +14,40 @@ import {
 import { DepositLinkRuleError } from "#modules/payments/errors";
 import DepositLink from "#modules/payments/models/deposit_link";
 import DepositLinkService from "#modules/payments/services/deposit_link_service";
+import ReferenceCode from "#modules/references/models/reference_code";
+import { REFERENCE_CODE_PATTERN } from "#modules/references/reference_codes";
+import ReferenceCodeService from "#modules/references/services/reference_code_service";
 import { depositReady, depositServices, OWNER } from "#tests/helpers/deposits";
-import { makePayment } from "#tests/helpers/pipeline";
+import { makePayment, makeProject, makeQuote } from "#tests/helpers/pipeline";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
 const services = depositServices();
 const { links } = services;
 const ARTIST = { userId: randomUUID(), role: "artist" as const };
 
-/** A DepositLinkService whose first codes are the ones a test gives it. */
-class ScriptedCodes extends DepositLinkService {
+/** A ReferenceCodeService whose first codes are the ones a test gives it. */
+class ScriptedCodes extends ReferenceCodeService {
 	codes: string[] = [];
 
 	protected override newCode() {
 		return this.codes.shift() ?? super.newCode();
 	}
 }
+
+/** The links service, drawing its fresh codes from `codes`. */
+const scriptedLinks = (codes: ScriptedCodes) =>
+	new DepositLinkService(
+		services.projects,
+		services.quotes,
+		services.deposits,
+		services.methods,
+		codes,
+	);
+
+const registered = (tenant: { id: string }) =>
+	inTenant(tenant, async () =>
+		(await ReferenceCode.query().orderBy("code")).map((row) => row.code),
+	);
 
 /** The DepositLinkRuleError reason a refused issue gives, or null if it went through. */
 async function reasonOf(work: () => Promise<unknown>) {
@@ -181,12 +199,8 @@ test.group("DepositLinkService.issue", (group) => {
 		assert,
 	}) => {
 		const { tenant } = await studioWithOwner("links-code-65");
-		const scripted = new ScriptedCodes(
-			services.projects,
-			services.quotes,
-			services.deposits,
-			services.methods,
-		);
+		const codes = new ScriptedCodes();
+		const scripted = scriptedLinks(codes);
 		const [one, two] = await inTenant(tenant, async () => [
 			await depositReady(tenant),
 			await depositReady(tenant),
@@ -195,7 +209,7 @@ test.group("DepositLinkService.issue", (group) => {
 			scripted.issue(tenant, OWNER, one.project),
 		);
 		const fresh = first.link.referenceCode === "ABCDEF" ? "ABCDEG" : "ABCDEF";
-		scripted.codes = [first.link.referenceCode, fresh];
+		codes.codes = [first.link.referenceCode, fresh];
 
 		const second = await inTenant(tenant, () =>
 			scripted.issue(tenant, OWNER, two.project),
@@ -207,12 +221,8 @@ test.group("DepositLinkService.issue", (group) => {
 
 	test("after five taken codes in a row it gives up", async ({ assert }) => {
 		const { tenant } = await studioWithOwner("links-code-full-65");
-		const scripted = new ScriptedCodes(
-			services.projects,
-			services.quotes,
-			services.deposits,
-			services.methods,
-		);
+		const codes = new ScriptedCodes();
+		const scripted = scriptedLinks(codes);
 		const [one, two] = await inTenant(tenant, async () => [
 			await depositReady(tenant),
 			await depositReady(tenant),
@@ -220,13 +230,97 @@ test.group("DepositLinkService.issue", (group) => {
 		const first = await inTenant(tenant, () =>
 			scripted.issue(tenant, OWNER, one.project),
 		);
-		scripted.codes = Array(5).fill(first.link.referenceCode);
+		codes.codes = Array(5).fill(first.link.referenceCode);
 
 		await assert.rejects(
 			() => inTenant(tenant, () => scripted.issue(tenant, OWNER, two.project)),
-			/deposit_links_tenant_id_reference_code_unique/,
+			/reference_codes_tenant_id_code_unique/,
 		);
 		assert.lengthOf(await rows(tenant), 1);
+	});
+
+	test("an inquiry-born project's first link has the inquiry's reference", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("links-reuse");
+		const { project } = await inTenant(tenant, async () => {
+			// The intake registered the code with the inquiry.
+			await ReferenceCode.create({ tenantId: tenant.id, code: "K7MP3Q" });
+			return depositReady(tenant, {}, { inquiryReference: "K7MP3Q" });
+		});
+
+		const { link } = await inTenant(tenant, () =>
+			links.issue(tenant, OWNER, project),
+		);
+
+		assert.equal(link.referenceCode, "K7MP3Q");
+		assert.deepEqual(await registered(tenant), ["K7MP3Q"]);
+	});
+
+	test("a desk project's link has a fresh code, registered for the studio", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("links-desk");
+		const { project } = await inTenant(tenant, () => depositReady(tenant));
+
+		const { link } = await inTenant(tenant, () =>
+			links.issue(tenant, OWNER, project),
+		);
+
+		assert.match(link.referenceCode, REFERENCE_CODE_PATTERN);
+		assert.deepEqual(await registered(tenant), [link.referenceCode]);
+	});
+
+	test("an inquiry without a reference (an older one) gives its project a fresh code", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("links-old-inquiry");
+		const { project } = await inTenant(tenant, () =>
+			depositReady(tenant, {}, { inquiryReference: null }),
+		);
+
+		const { link } = await inTenant(tenant, () =>
+			links.issue(tenant, OWNER, project),
+		);
+
+		assert.match(link.referenceCode, REFERENCE_CODE_PATTERN);
+		assert.deepEqual(await registered(tenant), [link.referenceCode]);
+	});
+
+	test("when another link already holds the inquiry's code, the link gets a fresh code and the request goes on", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("links-reuse-taken");
+		const { project, inquiry, client } = await inTenant(tenant, async () => {
+			await ReferenceCode.create({ tenantId: tenant.id, code: "K7MP3Q" });
+			return depositReady(tenant, {}, { inquiryReference: "K7MP3Q" });
+		});
+		await inTenant(tenant, () => links.issue(tenant, OWNER, project));
+		// The first project is deleted; a second one comes from the same inquiry.
+		const second = await inTenant(tenant, async () => {
+			await project.softDelete();
+			const again = await makeProject(tenant, client, {
+				status: "deposit_pending",
+				inquiryId: inquiry?.id ?? null,
+			});
+			await makeQuote(tenant, again);
+			return again;
+		});
+
+		const { link, links: after } = await inTenant(tenant, async () => {
+			const issued = await links.issue(tenant, OWNER, second);
+			// The fallback rolled back only its own savepoint: the request's
+			// transaction still answers.
+			return { link: issued.link, links: await DepositLink.query() };
+		});
+
+		assert.notEqual(link.referenceCode, "K7MP3Q");
+		assert.match(link.referenceCode, REFERENCE_CODE_PATTERN);
+		assert.lengthOf(after, 2);
+		assert.sameMembers(await registered(tenant), [
+			"K7MP3Q",
+			link.referenceCode,
+		]);
 	});
 });
 
