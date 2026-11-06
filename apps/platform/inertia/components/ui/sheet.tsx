@@ -47,15 +47,18 @@ function SheetContent({
 	children,
 	side = "bottom",
 	busy = false,
+	overlayClassName,
 	...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
 	side?: "top" | "right" | "bottom" | "left";
+	/** The overlay's classes: a lighter one keeps the page readable behind a side panel. */
+	overlayClassName?: string;
 	/** A save is out: the sheet can't be dismissed, and the close button says so. */
 	busy?: boolean;
 }) {
 	return (
 		<SheetPortal>
-			<SheetOverlay />
+			<SheetOverlay className={overlayClassName} />
 			<SheetPrimitive.Content
 				data-slot="sheet-content"
 				className={cn(

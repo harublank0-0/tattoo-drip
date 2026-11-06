@@ -1,15 +1,21 @@
 import { test } from "@japa/runner";
 import { DateTime, Settings } from "luxon";
 import {
+	AGENDA_DAYS,
 	briefPreview,
+	calendarBack,
 	calendarDays,
 	dayBounds,
 	dayLabel,
+	minutesOnDay,
+	monthText,
 	overlapsDay,
 	rangeText,
+	STATUSES_OF,
 	shiftDate,
 	timesOnDay,
 	toCalendarDate,
+	toCalendarStatus,
 	toCalendarView,
 } from "#modules/scheduling/calendar";
 import { localDateTime } from "#modules/scheduling/times";
@@ -27,11 +33,13 @@ const local = (day: string, time: string, zone = KTM) =>
 const utcIso = (at: DateTime) => at.toUTC().toISO();
 
 test.group("calendar query values", () => {
-	test("the week view only when asked for, the day view otherwise", ({
+	test("the week, month and list views only when asked for, the day view otherwise", ({
 		assert,
 	}) => {
 		assert.equal(toCalendarView("week"), "week");
-		for (const value of ["day", "month", "", undefined, ["week"]]) {
+		assert.equal(toCalendarView("month"), "month");
+		assert.equal(toCalendarView("agenda"), "agenda");
+		for (const value of ["day", "year", "", undefined, ["week"]]) {
 			assert.equal(toCalendarView(value), "day", String(value));
 		}
 	});
@@ -286,5 +294,116 @@ test.group("calendar labels", () => {
 		assert.equal(briefPreview("x".repeat(100)), "x".repeat(100));
 		assert.equal(briefPreview("x".repeat(101)), `${"x".repeat(99)}…`);
 		assert.equal(briefPreview(""), "");
+	});
+});
+
+test.group("calendar (Studio OS): month, list, status and the grid", () => {
+	test("a month is whole weeks, Sunday before the 1st to Saturday after the last", ({
+		assert,
+	}) => {
+		// November 2026 starts on a Sunday and ends on a Monday: five weeks.
+		const november = calendarDays("month", "2026-11-18");
+		assert.lengthOf(november, 35);
+		assert.equal(november[0], "2026-11-01");
+		assert.equal(november[34], "2026-12-05");
+		// August 2026 starts on a Saturday and ends on a Monday: six weeks.
+		const august = calendarDays("month", "2026-08-10");
+		assert.lengthOf(august, 42);
+		assert.equal(august[0], "2026-07-26");
+		assert.equal(august[41], "2026-09-05");
+		assert.equal(monthText("2026-11-18"), "November 2026");
+	});
+
+	test("the list is AGENDA_DAYS days from its date, and steps by them", ({
+		assert,
+	}) => {
+		const days = calendarDays("agenda", "2026-11-06");
+		assert.lengthOf(days, AGENDA_DAYS);
+		assert.equal(days[0], "2026-11-06");
+		assert.equal(days[AGENDA_DAYS - 1], "2026-11-19");
+		assert.equal(shiftDate("agenda", "2026-11-06", 1), "2026-11-20");
+		assert.equal(shiftDate("agenda", "2026-11-06", -1), "2026-10-23");
+	});
+
+	test("a month steps by calendar months, keeping a day that exists", ({
+		assert,
+	}) => {
+		assert.equal(shiftDate("month", "2026-11-18", 1), "2026-12-18");
+		assert.equal(shiftDate("month", "2026-01-31", 1), "2026-02-28");
+		assert.equal(shiftDate("month", "2026-01-15", -1), "2025-12-15");
+	});
+
+	test("the status filter: the active sessions by default, the freed ones together", ({
+		assert,
+	}) => {
+		assert.equal(toCalendarStatus(undefined), "active");
+		assert.equal(toCalendarStatus("everything"), "active");
+		assert.equal(toCalendarStatus(["cancelled"]), "active");
+		assert.equal(toCalendarStatus("cancelled"), "cancelled");
+		assert.deepEqual([...STATUSES_OF.active], ["scheduled", "completed"]);
+		assert.deepEqual([...STATUSES_OF.cancelled], ["cancelled", "no_show"]);
+	});
+
+	test("a session sits on the grid at its minutes from local midnight, clipped to the day", ({
+		assert,
+	}) => {
+		const zone = "Asia/Kathmandu";
+		assert.deepEqual(
+			minutesOnDay(
+				local("2026-11-02", "14:00", zone),
+				local("2026-11-02", "16:30", zone),
+				"2026-11-02",
+				zone,
+			),
+			{ startMinute: 840, endMinute: 990, dayMinutes: 1440 },
+		);
+		// 22:00 to 01:30: the evening on its first day, the night on the next.
+		const start = local("2026-11-02", "22:00", zone);
+		const end = local("2026-11-03", "01:30", zone);
+		assert.deepEqual(minutesOnDay(start, end, "2026-11-02", zone), {
+			startMinute: 1320,
+			endMinute: 1440,
+			dayMinutes: 1440,
+		});
+		assert.deepEqual(minutesOnDay(start, end, "2026-11-03", zone), {
+			startMinute: 0,
+			endMinute: 90,
+			dayMinutes: 1440,
+		});
+	});
+
+	test("on a clock-change day the grid keeps elapsed time", ({ assert }) => {
+		const zone = "America/New_York";
+		// 1 Nov 2026: the clocks go back at 02:00, so the day is 25 hours long.
+		const start = local("2026-11-01", "00:30", zone);
+		const end = start.plus({ hours: 3 });
+		assert.deepEqual(minutesOnDay(start, end, "2026-11-01", zone), {
+			startMinute: 30,
+			endMinute: 210,
+			dayMinutes: 1500,
+		});
+	});
+
+	test("a drawer form goes back only to this studio's calendar", ({
+		assert,
+	}) => {
+		assert.equal(
+			calendarBack("/t/bn/calendar?view=week&date=2026-11-02", "bn"),
+			"/t/bn/calendar?view=week&date=2026-11-02",
+		);
+		assert.equal(calendarBack("/t/bn/calendar", "bn"), "/t/bn/calendar");
+		for (const value of [
+			"/t/other/calendar?view=day",
+			"/t/bn/calendarx",
+			"/t/bn/projects/1",
+			"https://evil.example/t/bn/calendar",
+			"//evil.example/t/bn/calendar",
+			"/t/bn/calendar?next=<script>",
+			"/t/bn/calendar?a=b c",
+			undefined,
+			["/t/bn/calendar"],
+		]) {
+			assert.isNull(calendarBack(value, "bn"), String(value));
+		}
 	});
 });

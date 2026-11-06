@@ -42,6 +42,11 @@ export type SessionWindow = {
 	from: DateTime;
 	to: DateTime;
 	artistId: string | null;
+	/**
+	 * The statuses to list (the calendar's status filter, Studio OS); absent
+	 * for the active ones, the time sessions take.
+	 */
+	statuses?: readonly SessionStatus[];
 };
 
 /**
@@ -180,19 +185,20 @@ export default class SessionService {
 	 * take time in the half-open window, earliest first: the calendar
 	 * (TAT-50). The overlap is the no-overlap constraint's own expression, so
 	 * its gist index (artist, time range, where active) serves one artist's
-	 * window; no other index was added.
+	 * window; no other index was added. With `statuses` (the calendar's
+	 * filter) it lists those statuses instead, deleted sessions never.
 	 */
 	async listInRange(
 		tenant: TenantRef,
-		{ from, to, artistId }: SessionWindow,
+		{ from, to, artistId, statuses }: SessionWindow,
 	): Promise<ProjectSession[]> {
-		const query = ProjectSession.query()
-			.where("tenant_id", tenant.id)
-			.where("active", true)
-			.whereRaw(
-				"tstzrange(starts_at, ends_at) && tstzrange(?::timestamptz, ?::timestamptz)",
-				[from.toJSDate(), to.toJSDate()],
-			);
+		const query = ProjectSession.query().where("tenant_id", tenant.id);
+		if (statuses === undefined) query.where("active", true);
+		else query.whereIn("status", [...statuses]);
+		query.whereRaw(
+			"tstzrange(starts_at, ends_at) && tstzrange(?::timestamptz, ?::timestamptz)",
+			[from.toJSDate(), to.toJSDate()],
+		);
 		if (artistId !== null) query.where("artist_id", artistId);
 		return query.orderBy("starts_at", "asc").orderBy("id", "asc");
 	}

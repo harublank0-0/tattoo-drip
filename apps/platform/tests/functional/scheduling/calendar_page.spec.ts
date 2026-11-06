@@ -156,6 +156,9 @@ test.group("Calendar page", (group) => {
 				endsAt: at("2026-11-02", "09:30").toMillis(),
 				startText: "09:00",
 				endText: "09:30",
+				startMinute: 540,
+				endMinute: 570,
+				dayMinutes: 1440,
 				kind: "consultation",
 				status: "scheduled",
 				artistName: "Ram",
@@ -167,6 +170,9 @@ test.group("Calendar page", (group) => {
 				endsAt: DateTime.utc(2026, 11, 2, 12).toMillis(),
 				startText: "15:45",
 				endText: "17:45",
+				startMinute: 945,
+				endMinute: 1065,
+				dayMinutes: 1440,
 				kind: "tattoo",
 				status: "scheduled",
 				artistName: "Sita",
@@ -263,7 +269,7 @@ test.group("Calendar page", (group) => {
 		const today = todayIn(KTM);
 
 		for (const query of [
-			"?view=month&date=2026-02-30",
+			"?view=year&date=2026-02-30",
 			"?view=week&view=day&date=soon",
 			"?artist=",
 		]) {

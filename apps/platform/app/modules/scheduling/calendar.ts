@@ -1,4 +1,5 @@
 import { DateTime } from "luxon";
+import type { SessionStatus } from "#modules/scheduling/models/project_session";
 import type { CalendarEntry } from "#modules/scheduling/services/calendar_service";
 
 /**
@@ -8,7 +9,47 @@ import type { CalendarEntry } from "#modules/scheduling/services/calendar_servic
  * run Sunday to Saturday (the launch market's week).
  */
 
-export type CalendarView = "day" | "week";
+/**
+ * The calendar's views (Studio OS): a day or a week on a time grid, a month
+ * of whole weeks (Sunday before the 1st to Saturday after the last), and a
+ * list of the AGENDA_DAYS days from the date.
+ */
+export const CALENDAR_VIEWS = ["day", "week", "month", "agenda"] as const;
+export type CalendarView = (typeof CALENDAR_VIEWS)[number];
+
+/** How many days the list view covers from its date. */
+export const AGENDA_DAYS = 14;
+
+/** How many sessions a month cell lists before "+N more". */
+export const MONTH_CELL_ROWS = 3;
+
+/**
+ * `?status=`: which sessions the calendar shows (Studio OS). The default is
+ * the active ones (scheduled or completed: the time they take), as before;
+ * "cancelled" lists the cancelled and the no-shows, whose time is free.
+ */
+export const CALENDAR_STATUSES = [
+	"active",
+	"scheduled",
+	"completed",
+	"cancelled",
+] as const;
+export type CalendarStatus = (typeof CALENDAR_STATUSES)[number];
+
+/** The session statuses a `?status=` filter reads. */
+export const STATUSES_OF: Record<CalendarStatus, readonly SessionStatus[]> = {
+	active: ["scheduled", "completed"],
+	scheduled: ["scheduled"],
+	completed: ["completed"],
+	cancelled: ["cancelled", "no_show"],
+};
+
+/** `?status=`: one of CALENDAR_STATUSES, else the active sessions. */
+export function toCalendarStatus(value: unknown): CalendarStatus {
+	return CALENDAR_STATUSES.includes(value as CalendarStatus)
+		? (value as CalendarStatus)
+		: "active";
+}
 
 /** The longest brief preview a calendar row shows, in characters. */
 export const BRIEF_PREVIEW_LENGTH = 100;
@@ -26,9 +67,11 @@ const plain = (date: string) =>
 	DateTime.fromISO(date, { zone: "utc", locale: "en-GB" });
 const iso = (date: DateTime) => date.toFormat("yyyy-MM-dd");
 
-/** `?view=`: the week view when asked for, else the day view. */
+/** `?view=`: one of CALENDAR_VIEWS when asked for, else the day view. */
 export function toCalendarView(value: unknown): CalendarView {
-	return value === "week" ? "week" : "day";
+	return CALENDAR_VIEWS.includes(value as CalendarView)
+		? (value as CalendarView)
+		: "day";
 }
 
 /** `?date=`: a real yyyy-MM-dd date from 1900 to 2100, else `today`. */
@@ -40,24 +83,35 @@ export function toCalendarDate(value: unknown, today: string): string {
 		: today;
 }
 
-/** The days a view shows: the day itself, or its week from Sunday to Saturday. */
+/** Luxon numbers weekdays from Monday (1) to Sunday (7): this day's Sunday. */
+const sundayOf = (day: DateTime) => day.minus({ days: day.weekday % 7 });
+
+/**
+ * The days a view shows: the day itself; its week from Sunday to Saturday;
+ * its month as whole weeks (35 or 42 days); or AGENDA_DAYS days from it.
+ */
 export function calendarDays(view: CalendarView, date: string): string[] {
-	if (view === "day") return [date];
 	const day = plain(date);
-	// Luxon numbers weekdays from Monday (1) to Sunday (7).
-	const sunday = day.minus({ days: day.weekday % 7 });
-	return Array.from({ length: 7 }, (_, offset) =>
-		iso(sunday.plus({ days: offset })),
-	);
+	const run = (first: DateTime, length: number) =>
+		Array.from({ length }, (_, offset) => iso(first.plus({ days: offset })));
+	if (view === "day") return [date];
+	if (view === "week") return run(sundayOf(day), 7);
+	if (view === "agenda") return run(day, AGENDA_DAYS);
+	const first = sundayOf(day.startOf("month"));
+	const lastSunday = sundayOf(day.endOf("month").startOf("day"));
+	const weeks = Math.round(lastSunday.diff(first, "days").days / 7) + 1;
+	return run(first, weeks * 7);
 }
 
-/** The same view `steps` days or weeks away. */
+/** The same view `steps` days, weeks, months or list pages away. */
 export function shiftDate(
 	view: CalendarView,
 	date: string,
 	steps: number,
 ): string {
-	return iso(plain(date).plus({ days: steps * (view === "week" ? 7 : 1) }));
+	if (view === "month") return iso(plain(date).plus({ months: steps }));
+	const days = { day: 1, week: 7, agenda: AGENDA_DAYS }[view];
+	return iso(plain(date).plus({ days: steps * days }));
 }
 
 /** The first of the instants a local time can mean (one, unless the clocks pass it twice). */
@@ -122,6 +176,37 @@ export function dayLabel(day: string): string {
 	return plain(day).toFormat("ccc d LLL");
 }
 
+/** A month view's title: "November 2026", the month of its date. */
+export function monthText(date: string): string {
+	return plain(date).toFormat("LLLL yyyy");
+}
+
+/**
+ * Where a session sits on `day`'s time grid: minutes from the day's local
+ * midnight to its start and end, clipped to the day, and the day's length
+ * (1440, or 1380 or 1500 on a clock-change day). Elapsed time, so a session
+ * keeps its real length across a clock change.
+ */
+export function minutesOnDay(
+	startsAt: DateTime,
+	endsAt: DateTime,
+	day: string,
+	timezone: string,
+): { startMinute: number; endMinute: number; dayMinutes: number } {
+	const { from, to } = dayBounds(day, timezone);
+	const dayMinutes = Math.round(to.diff(from, "minutes").minutes);
+	const at = (time: DateTime) =>
+		Math.min(
+			dayMinutes,
+			Math.max(0, Math.round(time.diff(from, "minutes").minutes)),
+		);
+	return {
+		startMinute: at(startsAt),
+		endMinute: at(endsAt),
+		dayMinutes,
+	};
+}
+
 /**
  * The range a view shows: "Mon 2 Nov 2026" for a day; a week as "1–7 Nov
  * 2026", "29 Nov – 5 Dec 2026" or "27 Dec 2026 – 2 Jan 2027".
@@ -165,6 +250,7 @@ export function sessionRow(
 		startsAt: session.startsAt.toMillis(),
 		endsAt: session.endsAt.toMillis(),
 		...timesOnDay(session.startsAt, session.endsAt, day, timezone),
+		...minutesOnDay(session.startsAt, session.endsAt, day, timezone),
 		kind: session.kind,
 		status: session.status,
 		artistName,
@@ -174,4 +260,17 @@ export function sessionRow(
 			brief: briefPreview(project.brief),
 		},
 	};
+}
+
+/**
+ * Where a form sent from the calendar's session drawer goes back to (Studio
+ * OS): the `back` field, only when it is this studio's calendar page with a
+ * plain query string, so the field can never send anyone off the site or to
+ * another studio's page.
+ */
+export function calendarBack(value: unknown, slug: string): string | null {
+	if (typeof value !== "string") return null;
+	const page = `/t/${slug}/calendar`;
+	if (value !== page && !value.startsWith(`${page}?`)) return null;
+	return /^[\w\-./?=&%]*$/.test(value) ? value : null;
 }

@@ -6,11 +6,13 @@ import type Artist from "#modules/artists/models/artist";
 import ArtistService from "#modules/artists/services/artist_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ClientService from "#modules/clients/services/client_service";
+import type { ProjectStatus } from "#modules/projects/models/tattoo_project";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ProjectService, {
 	type Member,
 } from "#modules/projects/services/project_service";
 import type ProjectSession from "#modules/scheduling/models/project_session";
+import type { SessionStatus } from "#modules/scheduling/models/project_session";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import SessionService from "#modules/scheduling/services/session_service";
 import type Tenant from "#modules/tenancy/models/tenant";
@@ -29,7 +31,15 @@ export type CalendarEntry = {
 	/** The session's artist; null when their profile was deleted. */
 	artistName: string | null;
 	/** Null when the member can't open the project (ProjectService.findManyFor). */
-	project: { id: string; brief: string; clientName: string | null } | null;
+	project: {
+		id: string;
+		brief: string;
+		clientName: string | null;
+		/** What the session drawer needs (Studio OS): the rules read them. */
+		status: ProjectStatus;
+		artistId: string | null;
+		clientId: string;
+	} | null;
 };
 
 export type Calendar = {
@@ -69,7 +79,14 @@ export default class CalendarService {
 			artistId,
 			from,
 			to,
-		}: { artistId: string | null; from: DateTime; to: DateTime },
+			statuses,
+		}: {
+			artistId: string | null;
+			from: DateTime;
+			to: DateTime;
+			/** The calendar's status filter; absent for the active sessions. */
+			statuses?: readonly SessionStatus[];
+		},
 	): Promise<Calendar> {
 		const all = await this.artists.list(tenant);
 		const scope = scopeFor(all, member, artistId);
@@ -80,6 +97,7 @@ export default class CalendarService {
 			from,
 			to,
 			artistId: scope.kind === "artist" ? scope.artist.id : null,
+			statuses,
 		});
 		const projects = await this.projects.findManyFor(
 			tenant,
@@ -99,6 +117,9 @@ export default class CalendarService {
 					id: project.id,
 					brief: project.brief,
 					clientName: clientName.get(project.clientId) ?? null,
+					status: project.status,
+					artistId: project.artistId,
+					clientId: project.clientId,
 				},
 			]),
 		);
