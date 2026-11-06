@@ -11,6 +11,8 @@ export type CalendarSession = {
 	id: string;
 	/** Epoch milliseconds, for the Now marker. */
 	startsAt: number;
+	/** Epoch milliseconds: whether the session is in the chair now. */
+	endsAt: number;
 	/** "14:00", or "Mon 01:30" for a time on another day. */
 	startText: string;
 	endText: string;

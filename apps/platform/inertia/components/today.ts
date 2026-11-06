@@ -45,7 +45,29 @@ export type TodayGroup = {
 	more: TodayMore | null;
 };
 
+/** A number in the summary strip, worded by the server (#modules/reports/overview). */
+export type TodayMetric = {
+	key: "sessions" | "needs" | "upcoming" | "artists";
+	label: string;
+	value: string;
+	detail: string;
+};
+
+/** A session after today: a calendar row with its own day. */
+export type UpcomingSession = CalendarSession & {
+	/** yyyy-MM-dd, the studio's day it starts on. */
+	date: string;
+	/** "Sat 8 Nov". */
+	dayText: string;
+};
+
 export type TodayPageProps = {
+	/** "Good afternoon, Priya", by the studio's clock. */
+	greeting: string;
+	/** The summary strip, in order. */
+	metrics: TodayMetric[];
+	/** The sessions after today: the first few, and how many there are in `days` days. */
+	upcoming: { count: number; days: number; rows: UpcomingSession[] };
 	/** "Thursday 22 October", the studio's date. */
 	dateText: string;
 	/** yyyy-MM-dd, the studio's date when the page loaded. */
@@ -76,6 +98,24 @@ export const GROUP_TITLES: Record<TodayGroupKey, string> = {
 	sessions: "Sessions to book",
 };
 
+/**
+ * What the member does on a row's page, by group: the word at the end of the
+ * row (Studio OS). The row is the link; this says where it leads.
+ */
+export const GROUP_ACTIONS: Record<TodayGroupKey, string> = {
+	proofs: "Check",
+	requests: "Review",
+	prices: "Send price",
+	ending: "Follow up",
+	deposits: "Chase",
+	sessions: "Book",
+};
+
+/** How many rows "Needs you" holds in all: the requests and projects of every group. */
+export function attentionTotal(groups: { count: number }[]): number {
+	return groups.reduce((sum, { count }) => sum + count, 0);
+}
+
 /** "See all 7 in the Inbox" / "See all 7 on Projects": where a long group goes on. */
 export function moreText({
 	count,
@@ -89,7 +129,7 @@ export function moreText({
 
 /** What an empty section says, in plain words, for the member's role. */
 export function emptyText(
-	section: "needsYou" | "sessions" | "waiting",
+	section: "needsYou" | "sessions" | "waiting" | "upcoming",
 	role: string,
 	scope?: string,
 ): string {
@@ -97,8 +137,13 @@ export function emptyText(
 	switch (section) {
 		case "needsYou":
 			return owner
-				? "Nothing needs you right now. New requests and payment screenshots show up here."
-				: "Nothing needs you right now. Your projects show up here when they need a price or a session.";
+				? "You're all caught up. New requests and payment screenshots show up here."
+				: "You're all caught up. Your projects show up here when they need a price or a session.";
+		case "upcoming":
+			if (scope === "unlinked") return "No sessions to show.";
+			return owner
+				? "Nothing booked in the next 7 days."
+				: "Nothing booked for you in the next 7 days.";
 		case "sessions":
 			if (scope === "unlinked") {
 				return "Your account isn't linked to an artist profile yet, so no sessions show here. Ask an owner to link it.";

@@ -1,46 +1,48 @@
 import { Link } from "@inertiajs/react";
 import { cn } from "cn";
-import { ChevronRight } from "lucide-react";
-import type { ReactNode } from "react";
+import { CalendarDays, Plus } from "lucide-react";
 import { urlFor } from "~/client";
 import { studioDate } from "~/components/calendar";
 import { DayAgenda, useNow } from "~/components/day_agenda";
+import {
+	AttentionQueue,
+	MetricsStrip,
+	moreHref,
+	OverviewSection,
+	QuietEmpty,
+	RowList,
+	UpcomingList,
+} from "~/components/overview";
 import Page from "~/components/page";
 import PilotMetricsCard from "~/components/pilot_metrics_card";
 import SetupChecklist from "~/components/setup_checklist";
 import {
+	attentionTotal,
 	emptyText,
-	GROUP_TITLES,
 	moreText,
 	setupFirst,
-	type TodayGroup,
-	type TodayMore,
 	type TodayPageProps,
-	type TodayRow,
 } from "~/components/today";
 import { buttonVariants } from "~/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { useTenant } from "~/hooks/use-tenant";
 import AppLayout from "~/layouts/app";
 
-/** A row's address: the page it opens, and the card on it where the member acts. */
-function rowHref(slug: string, { route, id, hash }: TodayRow["target"]) {
-	return `${urlFor(route, { tenant: slug, id })}${hash ? `#${hash}` : ""}`;
-}
-
-/** "See all" opens the Inbox, or the Projects view that holds exactly the group (`?waiting=`). */
-function moreHref(slug: string, more: TodayMore) {
-	const base = urlFor(more.route, { tenant: slug });
-	return more.waiting ? `${base}?waiting=${more.waiting}` : base;
-}
-
 /**
- * Today (TAT-107): what needs you right now, who is in the chair today and
- * which clients you are waiting on. Every member's home. The server decides
- * every group, row, count, word and target; this only lays them out. A new
- * studio sees its setup checklist first.
+ * Today (TAT-107, Studio OS): every member's home, answering three things in
+ * order. What is happening today (the summary strip and the day's
+ * timeline), what needs the member (one queue with an action per row), and
+ * how the studio is doing (the next seven days, the clients being waited
+ * on, and for owners the last 30 days' numbers). The server decides every
+ * group, row, count, word and target; this only lays them out. A new studio
+ * sees its setup checklist in place of the numbers.
+ *
+ * From `lg` it is two columns, the day's work at the left and what comes
+ * next at the right; a phone reads the same order top to bottom.
  */
 export default function TodayIndex({
+	greeting,
+	metrics,
+	upcoming,
 	dateText,
 	date,
 	timezone,
@@ -54,6 +56,7 @@ export default function TodayIndex({
 	const tenant = useTenant();
 	const now = useNow();
 	const isOwner = tenant.role === "owner";
+	const calendar = urlFor("tenant.calendar.index", { tenant: tenant.slug });
 	const checklist =
 		setup && studioPage ? (
 			<SetupChecklist setup={setup} studioUrl={studioPage.url} />
@@ -61,40 +64,52 @@ export default function TodayIndex({
 	const checklistFirst = setupFirst({ setup, needsYou });
 	// Once something needs the owner, the checklist moves below the sections.
 	const lateChecklist = checklist && !checklistFirst;
+	const attention = attentionTotal(needsYou);
 
 	return (
-		<Page title="Today" description={dateText}>
-			{checklistFirst && checklist}
-			<div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
-				<TodaySection
-					id="today-needs"
-					title="Needs you"
-					className="lg:col-span-7"
-				>
-					{needsYou.length === 0 ? (
-						<CardContent className="px-4 py-4 text-sm text-muted-foreground">
-							{emptyText("needsYou", tenant.role)}
-						</CardContent>
-					) : (
-						needsYou.map((group) => (
-							<NeedsYouGroup key={group.key} group={group} slug={tenant.slug} />
-						))
-					)}
-				</TodaySection>
+		<Page title="Today" hideTitle>
+			<header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+				<div className="flex min-w-0 flex-col gap-1">
+					<h1 className="text-[1.625rem] leading-[1.35] font-semibold text-balance wrap-anywhere sm:text-[1.75rem]">
+						{greeting}
+					</h1>
+					<p className="text-sm text-muted-foreground">
+						<time dateTime={date}>{dateText}</time>
+					</p>
+				</div>
+				<div className="flex items-center gap-2">
+					<Link
+						href={`${calendar}?view=week`}
+						className={buttonVariants({ variant: "outline", size: "sm" })}
+					>
+						<CalendarDays aria-hidden="true" />
+						This week
+					</Link>
+					{/* From `lg` the top bar holds it. */}
+					<Link
+						href={urlFor("tenant.projects.create", { tenant: tenant.slug })}
+						className={cn(buttonVariants({ size: "sm" }), "lg:hidden")}
+					>
+						<Plus aria-hidden="true" />
+						Book a session
+					</Link>
+				</div>
+			</header>
 
-				<TodaySection
-					id="today-sessions"
-					title="Today's sessions"
-					className={cn(
-						"lg:col-span-5",
-						lateChecklist ? "lg:row-span-3" : "lg:row-span-2",
-					)}
-				>
-					<CardContent className="flex flex-col gap-4 px-4 py-4">
+			{checklistFirst ? checklist : <MetricsStrip metrics={metrics} />}
+
+			<div className="grid grid-cols-1 items-start gap-x-10 gap-y-10 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
+				<div className="flex min-w-0 flex-col gap-10">
+					<OverviewSection
+						id="today-sessions"
+						title="Today's schedule"
+						count={sessions.rows.length}
+						action={{ href: calendar, label: "Calendar" }}
+					>
 						{sessions.rows.length === 0 ? (
-							<p className="text-sm text-muted-foreground">
+							<QuietEmpty>
 								{emptyText("sessions", tenant.role, sessions.scope)}
-							</p>
+							</QuietEmpty>
 						) : (
 							<DayAgenda
 								day={{ date, label: "", sessions: sessions.rows }}
@@ -106,160 +121,79 @@ export default function TodayIndex({
 								tenantSlug={tenant.slug}
 							/>
 						)}
-						<Link
-							href={urlFor("tenant.calendar.index", { tenant: tenant.slug })}
-							className={cn(
-								buttonVariants({ variant: "outline", size: "sm" }),
-								"self-start",
-							)}
-						>
-							Open the calendar
-						</Link>
-					</CardContent>
-				</TodaySection>
+					</OverviewSection>
 
-				<TodaySection
-					id="today-waiting"
-					title="Waiting on clients"
-					count={waiting.count}
-					className="lg:col-span-7"
-				>
-					{waiting.rows.length === 0 ? (
-						<CardContent className="px-4 py-4 text-sm text-muted-foreground">
-							{emptyText("waiting", tenant.role)}
-						</CardContent>
-					) : (
-						<>
-							<RowList rows={waiting.rows} slug={tenant.slug} />
-							{waiting.more && (
-								<SeeAll
-									href={moreHref(tenant.slug, waiting.more)}
-									text={moreText({ count: waiting.count, more: waiting.more })}
-								/>
-							)}
-						</>
-					)}
-				</TodaySection>
+					<OverviewSection id="today-needs" title="Needs you" count={attention}>
+						{needsYou.length === 0 ? (
+							<QuietEmpty>{emptyText("needsYou", tenant.role)}</QuietEmpty>
+						) : (
+							<AttentionQueue groups={needsYou} slug={tenant.slug} />
+						)}
+					</OverviewSection>
+				</div>
 
-				{lateChecklist && <div className="lg:col-span-7">{checklist}</div>}
+				<div className="flex min-w-0 flex-col gap-10">
+					<OverviewSection
+						id="today-upcoming"
+						title={`Next ${upcoming.days} days`}
+						count={upcoming.count}
+						action={
+							upcoming.count > 0
+								? { href: `${calendar}?view=week`, label: "Week" }
+								: undefined
+						}
+					>
+						{upcoming.rows.length === 0 ? (
+							<QuietEmpty>
+								{emptyText("upcoming", tenant.role, sessions.scope)}
+							</QuietEmpty>
+						) : (
+							<UpcomingList
+								rows={upcoming.rows}
+								showArtist={isOwner}
+								isOwner={isOwner}
+								slug={tenant.slug}
+							/>
+						)}
+						{upcoming.count > upcoming.rows.length && (
+							<p className="text-xs text-muted-foreground">
+								{upcoming.rows.length} of {upcoming.count} shown. The calendar
+								has the rest.
+							</p>
+						)}
+					</OverviewSection>
+
+					<OverviewSection
+						id="today-waiting"
+						title="Waiting on clients"
+						count={waiting.count}
+						action={
+							waiting.more
+								? {
+										href: moreHref(tenant.slug, waiting.more),
+										label: moreText({
+											count: waiting.count,
+											more: waiting.more,
+										}),
+									}
+								: undefined
+						}
+					>
+						{waiting.rows.length === 0 ? (
+							<QuietEmpty>{emptyText("waiting", tenant.role)}</QuietEmpty>
+						) : (
+							<div className="overflow-hidden rounded-lg border bg-card [&>ul]:border-t-0">
+								<RowList rows={waiting.rows} slug={tenant.slug} />
+							</div>
+						)}
+					</OverviewSection>
+
+					{lateChecklist && checklist}
+					{pilotMetrics && <PilotMetricsCard metrics={pilotMetrics} />}
+				</div>
 			</div>
-			{pilotMetrics && <PilotMetricsCard metrics={pilotMetrics} />}
 		</Page>
 	);
 }
 
 TodayIndex.layout = [AppLayout];
-
-/**
- * A titled section: a labelled region whose card has no padding of its
- * own, so its rows reach the card's edges. The count, when given, sits
- * at the right of the title.
- */
-function TodaySection({
-	id,
-	title,
-	count,
-	className,
-	children,
-}: {
-	id: string;
-	title: string;
-	count?: number;
-	className?: string;
-	children: ReactNode;
-}) {
-	return (
-		<section aria-labelledby={id} className={className}>
-			<Card className="gap-0 py-0">
-				<CardHeader className="px-4 pt-4">
-					<CardTitle className="flex items-center gap-2">
-						<h2 id={id}>{title}</h2>
-						{count !== undefined && count > 0 && (
-							<span className="ml-auto text-sm font-normal text-muted-foreground tabular-nums">
-								{count}
-							</span>
-						)}
-					</CardTitle>
-				</CardHeader>
-				{children}
-			</Card>
-		</section>
-	);
-}
-
-/** One group of "Needs you": its title with a marigold dot and its count, its rows, and where to see the rest. */
-function NeedsYouGroup({ group, slug }: { group: TodayGroup; slug: string }) {
-	const headingId = `today-group-${group.key}`;
-
-	return (
-		<section aria-labelledby={headingId} className="border-t first:border-t-0">
-			<h3
-				id={headingId}
-				className="flex items-center gap-2 px-4 pt-4 text-sm font-semibold"
-			>
-				<span
-					aria-hidden="true"
-					className="size-2 shrink-0 rounded-full bg-marigold"
-				/>
-				{GROUP_TITLES[group.key]}
-				<span className="ml-auto font-normal text-muted-foreground tabular-nums">
-					{group.count}
-				</span>
-			</h3>
-			<RowList rows={group.rows} slug={slug} />
-			{group.more && (
-				<SeeAll
-					href={moreHref(slug, group.more)}
-					text={moreText({ count: group.count, more: group.more })}
-				/>
-			)}
-		</section>
-	);
-}
-
-/** The rows of a group: each one a link that opens the card where the member acts. */
-function RowList({ rows, slug }: { rows: TodayRow[]; slug: string }) {
-	return (
-		<ul className="flex flex-col divide-y">
-			{rows.map((row) => (
-				<li key={`${row.target.route}-${row.id}`}>
-					<Link
-						href={rowHref(slug, row.target)}
-						className="flex min-h-11 items-start gap-3 px-4 py-3 outline-none hover:bg-muted/50 focus-visible:ring-[3px] focus-visible:ring-ring/50"
-					>
-						<span className="flex min-w-0 flex-1 flex-col gap-0.5 leading-normal">
-							<span className="font-medium wrap-anywhere">{row.name}</span>
-							<span className="text-sm wrap-anywhere">{row.detail}</span>
-							{row.meta && (
-								<span className="text-sm text-muted-foreground wrap-anywhere">
-									{row.meta}
-								</span>
-							)}
-						</span>
-						<ChevronRight
-							aria-hidden="true"
-							className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-						/>
-					</Link>
-				</li>
-			))}
-		</ul>
-	);
-}
-
-/** "See all 7 in the Inbox": a link under a group that has more rows than are shown. Violet, as actions are, so it reads as a link. */
-function SeeAll({ href, text }: { href: string; text: string }) {
-	return (
-		<div className="px-4 pb-3">
-			<Link
-				href={href}
-				className={cn(
-					buttonVariants({ variant: "link", size: "sm" }),
-					"px-0 has-[>svg]:px-0",
-				)}
-			>
-				{text}
-			</Link>
-		</div>
-	);
-}

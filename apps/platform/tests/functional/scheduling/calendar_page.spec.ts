@@ -153,6 +153,7 @@ test.group("Calendar page", (group) => {
 			{
 				id: rows.consultation.id,
 				startsAt: at("2026-11-02", "09:00").toMillis(),
+				endsAt: at("2026-11-02", "09:30").toMillis(),
 				startText: "09:00",
 				endText: "09:30",
 				kind: "consultation",
@@ -163,6 +164,7 @@ test.group("Calendar page", (group) => {
 			{
 				id: rows.tattoo.id,
 				startsAt: DateTime.utc(2026, 11, 2, 10).toMillis(),
+				endsAt: DateTime.utc(2026, 11, 2, 12).toMillis(),
 				startText: "15:45",
 				endText: "17:45",
 				kind: "tattoo",

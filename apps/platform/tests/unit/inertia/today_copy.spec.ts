@@ -2,7 +2,7 @@ import { test } from "@japa/runner";
 // @ts-expect-error TS6305: the server project only references the inertia project, so it cannot read its sources and the module is untyped here; `TodayModule` below restates its shape and the inertia project type-checks the real one.
 import * as todayModule from "../../../inertia/components/today.js";
 
-type Section = "needsYou" | "sessions" | "waiting";
+type Section = "needsYou" | "sessions" | "waiting" | "upcoming";
 type More = {
 	route: "tenant.inbox.index" | "tenant.projects.index";
 	waiting: string | null;
@@ -12,9 +12,17 @@ type TodayModule = {
 	moreText(group: { count: number; more: More }): string;
 	emptyText(section: Section, role: string, scope?: string): string;
 	setupFirst(page: { setup: unknown; needsYou: unknown[] }): boolean;
+	GROUP_ACTIONS: Record<string, string>;
+	attentionTotal(groups: { count: number }[]): number;
 };
-const { GROUP_TITLES, moreText, emptyText, setupFirst } =
-	todayModule as TodayModule;
+const {
+	GROUP_TITLES,
+	GROUP_ACTIONS,
+	attentionTotal,
+	moreText,
+	emptyText,
+	setupFirst,
+} = todayModule as TodayModule;
 
 test.group("Today copy", () => {
 	test("the six groups are titled in page order", ({ assert }) => {
@@ -26,6 +34,15 @@ test.group("Today copy", () => {
 			["deposits", "Deposits to chase"],
 			["sessions", "Sessions to book"],
 		]);
+	});
+
+	test("every group says what its rows lead to, and the total counts them all", ({
+		assert,
+	}) => {
+		assert.sameMembers(Object.keys(GROUP_ACTIONS), Object.keys(GROUP_TITLES));
+		assert.equal(GROUP_ACTIONS.requests, "Review");
+		assert.equal(attentionTotal([{ count: 3 }, { count: 2 }]), 5);
+		assert.equal(attentionTotal([]), 0);
 	});
 
 	test("See all names where it goes", ({ assert }) => {
@@ -50,11 +67,11 @@ test.group("Today copy", () => {
 	}) => {
 		assert.equal(
 			emptyText("needsYou", "owner"),
-			"Nothing needs you right now. New requests and payment screenshots show up here.",
+			"You're all caught up. New requests and payment screenshots show up here.",
 		);
 		assert.equal(
 			emptyText("needsYou", "artist"),
-			"Nothing needs you right now. Your projects show up here when they need a price or a session.",
+			"You're all caught up. Your projects show up here when they need a price or a session.",
 		);
 		assert.equal(
 			emptyText("sessions", "owner", "studio"),
@@ -75,6 +92,18 @@ test.group("Today copy", () => {
 		assert.equal(
 			emptyText("waiting", "artist"),
 			"Nobody to chase. Prices you send wait here until the client answers.",
+		);
+		assert.equal(
+			emptyText("upcoming", "owner", "studio"),
+			"Nothing booked in the next 7 days.",
+		);
+		assert.equal(
+			emptyText("upcoming", "artist", "artist"),
+			"Nothing booked for you in the next 7 days.",
+		);
+		assert.equal(
+			emptyText("upcoming", "artist", "unlinked"),
+			"No sessions to show.",
 		);
 	});
 
