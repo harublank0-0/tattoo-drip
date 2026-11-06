@@ -125,12 +125,19 @@ function MethodFields({
 							<FieldLabel key={value} htmlFor={`kind-${value}`}>
 								<Field orientation="horizontal">
 									<FieldContent>
-										<FieldTitle>{kindCopy(value).name}</FieldTitle>
-										<FieldDescription>
+										<FieldTitle id={`kind-${value}-title`}>
+											{kindCopy(value).name}
+										</FieldTitle>
+										<FieldDescription id={`kind-${value}-description`}>
 											{kindCopy(value).description}
 										</FieldDescription>
 									</FieldContent>
-									<RadioGroupItem value={value} id={`kind-${value}`} />
+									<RadioGroupItem
+										aria-labelledby={`kind-${value}-title`}
+										aria-describedby={`kind-${value}-description`}
+										value={value}
+										id={`kind-${value}`}
+									/>
 								</Field>
 							</FieldLabel>
 						))}

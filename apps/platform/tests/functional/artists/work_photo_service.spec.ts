@@ -632,11 +632,15 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 			}
 			return rows;
 		});
-		// The ids come in creation order, so the newest by id is the last added.
-		const newestTwo = added
-			.slice(2)
-			.reverse()
-			.map((photo) => photo.id);
+		// The tie is broken by id, descending. Ids made in the same millisecond
+		// are not in creation order (a UUIDv7's random bits), so the expected
+		// order is the ids sorted, as Postgres compares them (lowercase hex
+		// compares the same as uuid bytes).
+		const byId = added
+			.map((photo) => photo.id)
+			.sort()
+			.reverse();
+		const newestTwo = byId.slice(0, 2);
 
 		const read = await inTenant(tenant, () =>
 			photos.forArtists(tenant, [sita.id], 2),
@@ -650,10 +654,7 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 			(await inTenant(tenant, () => photos.list(tenant, sita))).map(
 				(photo) => photo.id,
 			),
-			added
-				.slice()
-				.reverse()
-				.map((photo) => photo.id),
+			byId,
 		);
 	});
 

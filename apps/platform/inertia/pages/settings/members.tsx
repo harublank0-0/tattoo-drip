@@ -110,10 +110,16 @@ export default function Members({
 										<FieldLabel key={role} htmlFor={`role-${role}`}>
 											<Field orientation="horizontal">
 												<FieldContent>
-													<FieldTitle>{ROLE_LABELS[role]}</FieldTitle>
-													<FieldDescription>{ROLE_COPY[role]}</FieldDescription>
+													<FieldTitle id={`role-${role}-title`}>
+														{ROLE_LABELS[role]}
+													</FieldTitle>
+													<FieldDescription id={`role-${role}-description`}>
+														{ROLE_COPY[role]}
+													</FieldDescription>
 												</FieldContent>
 												<RadioGroupItem
+													aria-labelledby={`role-${role}-title`}
+													aria-describedby={`role-${role}-description`}
 													value={role}
 													id={`role-${role}`}
 													aria-invalid={!!errors.role}

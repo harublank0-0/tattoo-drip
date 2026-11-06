@@ -66,8 +66,14 @@ export default function PortfolioBulkBar({
 	const count = selectedIds.length;
 	const off = busy !== null || held || count === 0;
 
+	// Focus follows the question: onto "Keep them" when it opens, and back to
+	// Delete when it closes (Escape, Keep, or the answer), once Delete is on
+	// the page again. An effect, not a timer, so it runs after the commit.
+	const wasAsking = useRef(false);
 	useEffect(() => {
 		if (asking) keep.current?.focus();
+		else if (wasAsking.current) deleteButton.current?.focus();
+		wasAsking.current = asking;
 	}, [asking]);
 	// A new selection is a new question.
 	useEffect(() => {
@@ -158,7 +164,6 @@ export default function PortfolioBulkBar({
 						if (event.key === "Escape" && busy === null) {
 							event.stopPropagation();
 							setAsking(false);
-							requestAnimationFrame(() => deleteButton.current?.focus());
 						}
 					}}
 				>
@@ -182,10 +187,7 @@ export default function PortfolioBulkBar({
 							type="button"
 							variant="outline"
 							disabled={busy !== null}
-							onClick={() => {
-								setAsking(false);
-								requestAnimationFrame(() => deleteButton.current?.focus());
-							}}
+							onClick={() => setAsking(false)}
 						>
 							Keep {count === 1 ? "it" : "them"}
 						</Button>

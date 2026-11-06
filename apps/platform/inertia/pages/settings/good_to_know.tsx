@@ -304,7 +304,7 @@ function HoursForm({ week }: { week: WeekRow[] }) {
 		>
 			{({ errors, processing }) => (
 				<FieldGroup>
-					<fieldset className="flex min-w-0 flex-col gap-3">
+					<fieldset className="@container flex min-w-0 flex-col gap-3">
 						<legend className="sr-only">Opening hours</legend>
 						{rows.map((row, index) => {
 							const name = DAY_NAMES[row.day];
@@ -312,7 +312,9 @@ function HoursForm({ week }: { week: WeekRow[] }) {
 							const errorId = `hours-${row.day}-error`;
 							return (
 								<div key={row.day} className="flex flex-col gap-1">
-									<div className="grid gap-2 lg:grid-cols-[10rem_1fr_1fr] lg:items-center">
+									{/* Three columns once the form itself is wide enough (a container query: the
+									    settings menu and the sidebar take their share of a 1024px screen). */}
+									<div className="grid gap-2 @2xl:grid-cols-[9rem_minmax(0,1fr)_minmax(0,1fr)] @2xl:items-center">
 										<Field orientation="horizontal">
 											<Checkbox
 												id={`open-${row.day}`}
@@ -359,7 +361,7 @@ function HoursForm({ week }: { week: WeekRow[] }) {
 												/>
 											</>
 										) : (
-											<p className="text-sm text-muted-foreground lg:col-span-2">
+											<p className="text-sm text-muted-foreground @2xl:col-span-2">
 												Closed
 											</p>
 										)}
@@ -402,8 +404,8 @@ function TimeBox({
 }) {
 	const id = `${kind}-${day}`;
 	return (
-		<Field orientation="horizontal" data-invalid={invalid}>
-			<FieldLabel htmlFor={id} className="w-16 font-normal">
+		<Field orientation="horizontal" data-invalid={invalid} className="min-w-0">
+			<FieldLabel htmlFor={id} className="w-16 shrink-0 font-normal">
 				<span aria-hidden="true">{visible}</span>
 				<span className="sr-only">
 					{visible} {name}

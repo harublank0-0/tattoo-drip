@@ -22,7 +22,8 @@ import { Button } from "~/components/ui/button";
  * (a list of rows each with "Remove"); omitted, the label names it. Never inside a sheet: Escape
  * would close the sheet. `disabled` holds the trigger and the confirm button while something else on the
  * page has a request out that this one would cancel (the flash tray's upload); the safe button still closes
- * the panel.
+ * the panel. `size` and `triggerClassName` style the trigger only (Studio OS: a quiet "Delete" at the
+ * end of a card); the panel's buttons stay 44 px.
  */
 export default function InlineConfirm({
 	label,
@@ -35,10 +36,12 @@ export default function InlineConfirm({
 	onConfirm,
 	fallback,
 	disabled = false,
+	size = "default",
+	triggerClassName,
 }: {
 	label: string;
 	ariaLabel?: string;
-	variant?: "default" | "outline" | "secondary";
+	variant?: "default" | "outline" | "secondary" | "ghost";
 	question: string;
 	confirmLabel: string;
 	keepLabel: string;
@@ -46,6 +49,8 @@ export default function InlineConfirm({
 	onConfirm: (finished: () => void) => void;
 	fallback: RefObject<HTMLElement | null>;
 	disabled?: boolean;
+	size?: "default" | "sm";
+	triggerClassName?: string;
 }) {
 	const panelId = useId();
 	const [state, setState] = useState<ConfirmState>(CONFIRM_CLOSED);
@@ -87,6 +92,8 @@ export default function InlineConfirm({
 					ref={trigger}
 					type="button"
 					variant={variant}
+					size={size}
+					className={triggerClassName}
 					aria-label={ariaLabel}
 					aria-expanded={state.open}
 					aria-controls={panelId}

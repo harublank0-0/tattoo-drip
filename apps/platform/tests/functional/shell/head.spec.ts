@@ -6,6 +6,14 @@ test.group("Page head", () => {
 		assert.include(html, "<title data-inertia>Tattoo Drip</title>");
 	});
 
+	test("names the page's language, for screen readers and translation (Studio OS, WCAG 3.1.1)", async ({
+		client,
+		assert,
+	}) => {
+		const html = (await client.get("/login")).text();
+		assert.match(html, /<html lang="en" data-theme=/);
+	});
+
 	test("links the manifest, icons and theme colors", async ({
 		client,
 		assert,
@@ -45,7 +53,7 @@ test.group("Theme", () => {
 		assert,
 	}) => {
 		const html = (await client.get("/login")).text();
-		assert.include(html, '<html data-theme="system">');
+		assert.include(html, '<html lang="en" data-theme="system">');
 		// The script sits in <head> before the stylesheet and the app, so the
 		// theme is settled before anything paints.
 		const script = html.indexOf("prefers-color-scheme: dark)'");
@@ -62,7 +70,7 @@ test.group("Theme", () => {
 			const html = (
 				await withRawThemeCookie(client.get("/login"), theme)
 			).text();
-			assert.include(html, `<html data-theme="${theme}">`);
+			assert.include(html, `<html lang="en" data-theme="${theme}">`);
 		}
 	});
 

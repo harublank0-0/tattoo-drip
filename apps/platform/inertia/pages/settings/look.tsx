@@ -153,12 +153,18 @@ export default function PageLook({
 												>
 													<Field orientation="horizontal">
 														<FieldContent>
-															<FieldTitle>{theme.label}</FieldTitle>
-															<FieldDescription>
+															<FieldTitle id={`theme-${theme.key}-title`}>
+																{theme.label}
+															</FieldTitle>
+															<FieldDescription
+																id={`theme-${theme.key}-description`}
+															>
 																{theme.description}
 															</FieldDescription>
 														</FieldContent>
 														<RadioGroupItem
+															aria-labelledby={`theme-${theme.key}-title`}
+															aria-describedby={`theme-${theme.key}-description`}
 															value={theme.key}
 															id={`theme-${theme.key}`}
 															aria-invalid={!!errors.theme}
@@ -210,6 +216,7 @@ export default function PageLook({
 													<Field orientation="horizontal">
 														<FieldContent>
 															<FieldTitle
+																id={`font-${font.key}-title`}
 																dir="auto"
 																className={cn(
 																	"wrap-anywhere text-lg leading-[1.35]",
@@ -218,9 +225,15 @@ export default function PageLook({
 															>
 																{tenant.name}
 															</FieldTitle>
-															<FieldDescription>{font.label}</FieldDescription>
+															<FieldDescription
+																id={`font-${font.key}-description`}
+															>
+																{font.label}
+															</FieldDescription>
 														</FieldContent>
 														<RadioGroupItem
+															aria-labelledby={`font-${font.key}-title`}
+															aria-describedby={`font-${font.key}-description`}
 															value={font.key}
 															id={`font-${font.key}`}
 															aria-invalid={!!errors.font}
@@ -265,11 +278,12 @@ export default function PageLook({
 												>
 													<Field orientation="horizontal">
 														<FieldContent>
-															<FieldTitle>
+															<FieldTitle id={`claimed-flash-${choice}-title`}>
 																{CLAIMED_FLASH_WORDS[choice]}
 															</FieldTitle>
 														</FieldContent>
 														<RadioGroupItem
+															aria-labelledby={`claimed-flash-${choice}-title`}
 															value={choice}
 															id={`claimed-flash-${choice}`}
 															aria-invalid={!!errors.claimedFlash}

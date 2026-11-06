@@ -496,10 +496,19 @@ export function QuoteForm({
 								<FieldLabel key={value} htmlFor={`kind-${value}`}>
 									<Field orientation="horizontal">
 										<FieldContent>
-											<FieldTitle>{title}</FieldTitle>
-											<FieldDescription>{description}</FieldDescription>
+											<FieldTitle id={`kind-${value}-title`}>
+												{title}
+											</FieldTitle>
+											<FieldDescription id={`kind-${value}-description`}>
+												{description}
+											</FieldDescription>
 										</FieldContent>
-										<RadioGroupItem value={value} id={`kind-${value}`} />
+										<RadioGroupItem
+											aria-labelledby={`kind-${value}-title`}
+											aria-describedby={`kind-${value}-description`}
+											value={value}
+											id={`kind-${value}`}
+										/>
 									</Field>
 								</FieldLabel>
 							))}

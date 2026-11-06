@@ -525,10 +525,19 @@ function PriceCard({
 								<FieldLabel key={value} htmlFor={`priceKind-${value}`}>
 									<Field orientation="horizontal">
 										<FieldContent>
-											<FieldTitle>{title}</FieldTitle>
-											<FieldDescription>{description}</FieldDescription>
+											<FieldTitle id={`priceKind-${value}-title`}>
+												{title}
+											</FieldTitle>
+											<FieldDescription id={`priceKind-${value}-description`}>
+												{description}
+											</FieldDescription>
 										</FieldContent>
-										<RadioGroupItem value={value} id={`priceKind-${value}`} />
+										<RadioGroupItem
+											aria-labelledby={`priceKind-${value}-title`}
+											aria-describedby={`priceKind-${value}-description`}
+											value={value}
+											id={`priceKind-${value}`}
+										/>
 									</Field>
 								</FieldLabel>
 							))}

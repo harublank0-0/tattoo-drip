@@ -11,15 +11,16 @@ import {
 	KeyRound,
 	Pencil,
 	Plus,
-	Trash2,
 	UserPlus,
 } from "lucide-react";
+import { type RefObject, useRef } from "react";
 import { urlFor } from "~/client";
 import type { ArtistListRow } from "~/components/artists";
 import Initials from "~/components/initials";
+import InlineConfirm from "~/components/inline_confirm";
 import Page from "~/components/page";
 import { Badge } from "~/components/ui/badge";
-import { Button, buttonVariants } from "~/components/ui/button";
+import { buttonVariants } from "~/components/ui/button";
 import { useTenant } from "~/hooks/use-tenant";
 import AppLayout from "~/layouts/app";
 
@@ -40,6 +41,7 @@ export default function Artists({
 	upcomingDays: number;
 }) {
 	const tenant = useTenant();
+	const heading = useRef<HTMLHeadingElement>(null);
 	const params = { tenant: tenant.slug };
 	const onPage = artists.filter(({ visible }) => visible).length;
 	const taking = artists.filter(
@@ -50,6 +52,7 @@ export default function Artists({
 	return (
 		<Page
 			title="Artists"
+			titleRef={heading}
 			description="Your artists, their sessions and their pages."
 			actions={
 				<>
@@ -102,6 +105,7 @@ export default function Artists({
 								artist={artist}
 								tenantSlug={tenant.slug}
 								upcomingDays={upcomingDays}
+								fallback={heading}
 							/>
 						))}
 					</ul>
@@ -117,24 +121,15 @@ function ArtistCard({
 	artist,
 	tenantSlug,
 	upcomingDays,
+	fallback,
 }: {
 	artist: ArtistListRow;
 	tenantSlug: string;
 	upcomingDays: number;
+	/** Where focus goes when the deleted artist's card is gone: the page heading. */
+	fallback: RefObject<HTMLElement | null>;
 }) {
 	const params = { tenant: tenantSlug, id: artist.id };
-	const remove = () => {
-		if (
-			window.confirm(
-				`Delete "${artist.name}"? Their link stops working and clients won't see them.`,
-			)
-		) {
-			router.delete(urlFor("tenant.artists.destroy", params), {
-				preserveScroll: true,
-			});
-		}
-	};
-
 	return (
 		<li className="flex min-w-0 flex-col overflow-hidden rounded-lg border bg-card">
 			<div className="relative aspect-[4/3] bg-muted">
@@ -253,15 +248,28 @@ function ArtistCard({
 							<span className="sr-only"> (opens in a new tab)</span>
 						</a>
 					)}
-					<Button
+				</div>
+				{/* Asked in the card, not in the browser's box (Studio OS): its own row,
+				    so the question has the card's width. */}
+				<div className="border-t pt-3">
+					<InlineConfirm
+						label="Delete artist"
+						ariaLabel={`Delete ${artist.name}`}
 						variant="ghost"
-						size="icon-sm"
-						className="ml-auto text-muted-foreground hover:text-destructive"
-						aria-label={`Delete ${artist.name}`}
-						onClick={remove}
-					>
-						<Trash2 />
-					</Button>
+						size="sm"
+						triggerClassName="-ml-2 text-muted-foreground hover:text-destructive"
+						question={`Delete "${artist.name}"? Their link stops working and clients won't see them.`}
+						confirmLabel="Delete artist"
+						keepLabel="Keep the artist"
+						busyLabel="Deleting…"
+						fallback={fallback}
+						onConfirm={(finished) =>
+							router.delete(urlFor("tenant.artists.destroy", params), {
+								preserveScroll: true,
+								onFinish: finished,
+							})
+						}
+					/>
 				</div>
 			</div>
 		</li>
