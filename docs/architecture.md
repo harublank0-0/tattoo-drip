@@ -90,7 +90,7 @@ Which role may use each dashboard route is one table (`TENANT_ROUTE_ROLES`), rea
 
 - Studio pages run on `{slug}.<studio domain>` (later also a studio's own domain, TAT-79). The dashboard (`app.`) and the API (`api.`) run on a **separate** registrable domain, so no studio page is ever same-site with the dashboard and none can read or set its cookies. With `NODE_ENV=production` the platform refuses to start when `APP_URL` is not https, or sits on, under or above the studio pages' domain (`STOREFRONT_URL`); a sibling under a shared parent can't be detected and is a checklist item.
 - The dashboard session cookie is `__Host-td-session` in production: host-only (no `Domain`), `Path=/`, `HttpOnly`, `Secure` and `SameSite=Lax`. Development and tests use `td-session` without `Secure`, since they run over plain http. CSRF protection (Shield) is on for every dashboard write; its `XSRF-TOKEN` cookie keeps the name Shield and Inertia use, and a token is valid only with its own session.
-- The public API is stateless and cookieless. CORS is open on its public endpoints, without credentials.
+- The public API is stateless and cookieless. CORS allows only the platform's own browser origins (the studio pages, the dashboard and Discover), never with credentials. The [domain migration](discover/domain-migration.md) prepares the dashboard on `app.`, the API on `api.` and Discover on the apex (Discover D01); the cutover is D11.
 - Auth uses AdonisJS's session guard with email and password. The session holds the account's session version as well as its id, so a password reset, a password change or "sign out of other devices" (TAT-95) signs out sessions although production keeps sessions in cookies. Email confirmation and password reset use single-use links (a token stored only as its SHA-256, one per account and purpose); creating a tenant or accepting an invitation needs a confirmed address. Login, signup, password reset and the links are rate-limited, and neither signup nor a reset request reveals whether an address has an account (TAT-18).
 
 ## Request flows
@@ -124,10 +124,10 @@ Which role may use each dashboard route is one table (`TENANT_ROUTE_ROLES`), rea
 
 | Part | Where |
 |---|---|
-| Storefront | Vercel, root directory `apps/storefront`, wildcard domain |
-| Platform web + worker | Containers on a managed host, in the same region as the database |
-| PostgreSQL | Managed, with backups and point-in-time recovery |
-| Files | Cloudflare R2 (S3 API, no egress fees) + CDN |
+| Storefront | A container on the one server, behind nginx and a Cloudflare Tunnel, for `tattoodrip.page` and `*.tattoodrip.page` ([server runbook](../deploy/README.md)) |
+| Platform web + worker | Containers on the same server; `tattoodrip.app` today, `app.` and `api.tattoodrip.app` after the Discover cutover ([domain migration](discover/domain-migration.md)) |
+| PostgreSQL | A container on the same server, with nightly backups to R2 |
+| Files | Cloudflare R2 (S3 API, no egress fees) + CDN (`media.tattoodrip.app`) |
 
 ## Payments and messaging
 
