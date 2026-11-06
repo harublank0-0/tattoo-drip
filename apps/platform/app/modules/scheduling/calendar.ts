@@ -163,6 +163,7 @@ export function sessionRow(
 	return {
 		id: session.id,
 		startsAt: session.startsAt.toMillis(),
+		endsAt: session.endsAt.toMillis(),
 		...timesOnDay(session.startsAt, session.endsAt, day, timezone),
 		kind: session.kind,
 		status: session.status,

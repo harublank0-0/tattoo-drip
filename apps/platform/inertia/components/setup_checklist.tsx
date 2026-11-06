@@ -2,14 +2,6 @@ import { Link } from "@adonisjs/inertia/react";
 import { cn } from "cn";
 import { Circle, CircleCheck } from "lucide-react";
 import type { SetupProps, SetupStepKey } from "~/components/studio_link";
-import { Badge } from "~/components/ui/badge";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "~/components/ui/card";
 import { useTenant } from "~/hooks/use-tenant";
 
 const COPY: Record<SetupStepKey, { title: string; hint: string }> = {
@@ -38,13 +30,16 @@ const LINKS = {
 	policy: "tenant.settings.payments",
 } as const;
 
-const ROW = "flex min-h-11 items-center gap-3 px-3 py-2";
+const ROW =
+	"flex min-h-11 items-center gap-3 px-4 py-3 outline-none transition-colors duration-150 hover:bg-accent/50 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:ring-inset";
 
 /**
  * The new-studio checklist (TAT-101): four steps, the first open one
  * highlighted and marked "Next". Done steps are ticked with a check icon
  * and read "done" to a screen reader, so colour is never the only signal.
  * Each step is a link to where it gets done; the last opens the studio page.
+ * Studio OS: one titled section with the steps as a single list, split by
+ * hairlines, the next step raised and named "Next" in words.
  */
 export default function SetupChecklist({
 	setup,
@@ -57,15 +52,17 @@ export default function SetupChecklist({
 	const params = { tenant: tenant.slug };
 
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>Set up your studio</CardTitle>
-				<CardDescription>
+		<section aria-labelledby="setup-title" className="flex flex-col gap-3">
+			<header className="flex min-h-8 items-center gap-2">
+				<h2 id="setup-title" className="text-base leading-snug font-semibold">
+					Set up your studio
+				</h2>
+				<span className="text-sm text-muted-foreground tabular-nums">
 					{setup.doneCount} of {setup.total} done
-				</CardDescription>
-			</CardHeader>
-			<CardContent>
-				<ol className="flex flex-col gap-2">
+				</span>
+			</header>
+			<div className="overflow-hidden rounded-lg border bg-card">
+				<ol className="flex flex-col divide-y">
 					{setup.steps.map(({ key, done, next }) => {
 						const { title, hint } = COPY[key];
 						const Icon = done ? CircleCheck : Circle;
@@ -90,14 +87,14 @@ export default function SetupChecklist({
 									</span>
 									<span className="text-sm text-muted-foreground">{hint}</span>
 								</span>
-								{next && <Badge>Next</Badge>}
+								{next && (
+									<span className="shrink-0 text-xs font-semibold text-brand-text">
+										Next
+									</span>
+								)}
 							</>
 						);
-						const className = cn(
-							ROW,
-							"rounded-md border hover:bg-accent",
-							next && "border-primary bg-accent",
-						);
+						const className = cn(ROW, next && "bg-accent/60");
 						return (
 							<li key={key} aria-current={next ? "step" : undefined}>
 								{key === "inquiry" ? (
@@ -122,7 +119,7 @@ export default function SetupChecklist({
 						);
 					})}
 				</ol>
-			</CardContent>
-		</Card>
+			</div>
+		</section>
 	);
 }

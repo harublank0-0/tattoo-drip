@@ -21,10 +21,22 @@ import {
 	TODAY_ROWS,
 	type TodayGroupKey,
 } from "#modules/projects/waiting";
+import {
+	greetingText,
+	overviewMetrics,
+	UPCOMING_DAYS,
+	UPCOMING_ROWS,
+} from "#modules/reports/overview";
 import { CARD_DAYS, lastDays, pilotCard } from "#modules/reports/pilot_metrics";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import PilotMetricsService from "#modules/reports/services/pilot_metrics_service";
-import { dayBounds, sessionRow } from "#modules/scheduling/calendar";
+import {
+	dayBounds,
+	dayLabel,
+	overlapsDay,
+	sessionRow,
+	shiftDate,
+} from "#modules/scheduling/calendar";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import CalendarService from "#modules/scheduling/services/calendar_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -97,10 +109,21 @@ export default class TodayController {
 		const date = todayIn(timezone, now);
 
 		const work = await this.waiting.work(tenant, membership, now);
+		// One read for today and the next UPCOMING_DAYS days (Studio OS), split
+		// below: a session belongs to today if it takes any of today's time,
+		// else to the days ahead, so nothing is listed twice.
+		const tomorrow = dayBounds(shiftDate("day", date, 1), timezone);
 		const agenda = await this.calendar.load(tenant, membership, {
 			artistId: null,
-			...dayBounds(date, timezone),
+			from: dayBounds(date, timezone).from,
+			to: dayBounds(shiftDate("day", date, UPCOMING_DAYS), timezone).to,
 		});
+		const todays = agenda.entries.filter(({ session }) =>
+			overlapsDay(session.startsAt, session.endsAt, date, timezone),
+		);
+		const ahead = agenda.entries.filter(
+			({ session }) => session.startsAt.toMillis() >= tomorrow.from.toMillis(),
+		);
 		// Owners get the artist list with the calendar; an artist sees no artist names.
 		const artistName = new Map(
 			agenda.artists.map(({ id, name }) => [id, name]),
@@ -205,7 +228,34 @@ export default class TodayController {
 		const checklist = isOwner ? await this.setup.checklist(tenant) : null;
 		const setup = checklist && !checklist.complete ? checklist : null;
 
+		const busy = new Set(todays.map(({ session }) => session.artistId));
+		const projectsNeedingYou = needsYou
+			.filter(({ key }) => key !== "requests")
+			.reduce((sum, { count }) => sum + count, 0);
+		const user = ctx.auth.getUserOrFail();
+
 		return ctx.inertia.render("today/index", {
+			greeting: greetingText(now.setZone(timezone).hour, user.fullName),
+			metrics: overviewMetrics({
+				isOwner,
+				today: todays.map(({ session }) => session),
+				now,
+				timezone,
+				needs: {
+					requests: requests?.total ?? 0,
+					projects: projectsNeedingYou,
+				},
+				upcoming: {
+					count: ahead.length,
+					first: ahead[0]?.session.startsAt ?? null,
+				},
+				artists: isOwner
+					? {
+							total: agenda.artists.length,
+							busy: agenda.artists.filter(({ id }) => busy.has(id)).length,
+						}
+					: null,
+			}),
 			dateText: now
 				.setZone(timezone)
 				.setLocale("en-GB")
@@ -215,7 +265,24 @@ export default class TodayController {
 			needsYou,
 			sessions: {
 				scope: agenda.scope.kind,
-				rows: agenda.entries.map((entry) => sessionRow(entry, date, timezone)),
+				rows: todays.map((entry) => sessionRow(entry, date, timezone)),
+			},
+			// The next sessions after today (Studio OS), each with its own day.
+			upcoming: {
+				count: ahead.length,
+				days: UPCOMING_DAYS,
+				// The first day ahead: the calendar's week from it holds the list.
+				from: shiftDate("day", date, 1),
+				rows: ahead.slice(0, UPCOMING_ROWS).map((entry) => {
+					const day = entry.session.startsAt
+						.setZone(timezone)
+						.toFormat("yyyy-MM-dd");
+					return {
+						...sessionRow(entry, day, timezone),
+						date: day,
+						dayText: dayLabel(day),
+					};
+				}),
 			},
 			waiting: {
 				count: work.onClient.length,
