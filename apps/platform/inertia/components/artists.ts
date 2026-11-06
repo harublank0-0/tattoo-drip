@@ -14,6 +14,28 @@ export type ArtistRowProps = {
 	pageUrl: string | null;
 };
 
+/** A card of the Artists workspace (Studio OS): the row, and what the list adds. */
+export type ArtistListRow = ArtistRowProps & {
+	/** The artist's styles' names, in the list's order. */
+	styleNames: string[];
+	/** A member's account is linked to the profile; many artists have none. */
+	hasLogin: boolean;
+	/** Scheduled sessions in the next `upcomingDays` days. */
+	upcomingCount: number;
+	/** "Sat 8 Nov, 14:00": the first of them; null for none. */
+	nextText: string | null;
+};
+
+/** The profile's schedule (Studio OS): the next days' sessions and the studio's hours. */
+export type ArtistSchedule = {
+	days: number;
+	sessions: (import("~/components/today").UpcomingSession & {
+		whenText: string;
+	})[];
+	/** The studio's open weekdays, Sunday first ("HH:mm"). */
+	hours: { day: string; opens: string; closes: string }[];
+};
+
 /** An artist profile as the edit form gets it: the row and what it edits. */
 export type ArtistProps = ArtistRowProps & {
 	slug: string;

@@ -6,16 +6,22 @@ import type { ReactNode } from "react";
  * separated by a divider.
  */
 export default function Section({
+	id,
 	title,
 	description,
 	children,
 }: {
+	/** An anchor a page's section links point at (it clears the top bar). */
+	id?: string;
 	title?: string;
 	description?: ReactNode;
 	children: ReactNode;
 }) {
 	return (
-		<section className="flex flex-col gap-4 [section+&]:mt-6 [section+&]:border-t [section+&]:pt-6">
+		<section
+			id={id}
+			className="flex scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)] flex-col gap-4 [section+&]:mt-8 [section+&]:border-t [section+&]:pt-8"
+		>
 			{(title || description) && (
 				<header className="flex flex-col gap-1">
 					{title && (

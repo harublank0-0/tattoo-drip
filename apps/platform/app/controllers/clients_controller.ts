@@ -1,7 +1,7 @@
 import { inject } from "@adonisjs/core";
 import type { HttpContext } from "@adonisjs/core/http";
 import { errors } from "@vinejs/vine";
-import type { DateTime } from "luxon";
+import { DateTime } from "luxon";
 import { tenantContext } from "#middleware/tenant_middleware";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
@@ -26,6 +26,9 @@ import { daysAgoText } from "#modules/projects/contact";
 import { formatDay, formatMoney } from "#modules/projects/quotes";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ProjectService from "#modules/projects/services/project_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import SessionService from "#modules/scheduling/services/session_service";
+import { sessionTimeText } from "#modules/scheduling/times";
 
 /**
  * The clients pages (TAT-41): owners only (the route group's role check).
@@ -42,6 +45,7 @@ export default class ClientsController {
 		private artists: ArtistService,
 		private images: ImageService,
 		private payments: PaymentService,
+		private sessions: SessionService,
 	) {}
 
 	async index(ctx: HttpContext) {
@@ -49,13 +53,26 @@ export default class ClientsController {
 		const query = ctx.request.qs();
 		const search = typeof query.q === "string" ? query.q.trim() : "";
 		const page = Math.max(1, Number.parseInt(String(query.page ?? 1), 10) || 1);
+		// Studio OS: `?filter=upcoming`, the clients with a session to come.
+		const filter = query.filter === "upcoming" ? "upcoming" : "all";
+		const now = DateTime.now();
 
 		const {
 			clients,
 			total,
 			page: current,
 			lastPage,
-		} = await this.clients.list(tenant, { search, page });
+		} = await this.clients.list(tenant, {
+			search,
+			page,
+			within:
+				filter === "upcoming"
+					? this.projects.clientsOf(
+							tenant,
+							this.sessions.projectsWithUpcoming(tenant, now),
+						)
+					: undefined,
+		});
 		const ids = clients.map(({ id }) => id);
 		const counts = await this.projects.countsForClients(tenant, ids);
 		const projectChanges = await this.projects.lastChangeForClients(
@@ -63,14 +80,35 @@ export default class ClientsController {
 			ids,
 		);
 		const inquiryTimes = await this.inquiries.latestForClients(tenant, ids);
+		// Each client's next session (Studio OS): their projects, then the
+		// first scheduled session of any of them. Two queries for the page.
+		const projectIds = await this.projects.idsByClient(tenant, ids);
+		const nextByProject = await this.sessions.nextScheduledFor(
+			tenant,
+			[...projectIds.values()].flat(),
+			now,
+		);
+		const nextOf = (clientId: string) =>
+			(projectIds.get(clientId) ?? [])
+				.map((id) => nextByProject.get(id))
+				.filter((session) => session !== undefined)
+				.sort((a, b) => a.startsAt.toMillis() - b.startsAt.toMillis())[0];
 
 		return ctx.inertia.render("clients/index", {
 			search,
+			filter,
 			clients: clients.map((client) => ({
 				id: client.id,
 				name: client.name,
 				phone: client.phone,
+				email: client.anonymizedAt ? null : client.email,
 				projects: counts.get(client.id) ?? 0,
+				nextSessionText: (() => {
+					const next = nextOf(client.id);
+					return next
+						? sessionTimeText(next.startsAt, next.endsAt, tenant.timezone)
+						: null;
+				})(),
 				lastActivityText: daysAgoText(
 					latest([
 						client.createdAt,
@@ -112,6 +150,13 @@ export default class ClientsController {
 					: sum;
 			}, 0n);
 		const briefs = new Map(projects.map(({ id, brief }) => [id, brief]));
+		// The client's sessions (Studio OS), every status, newest first and
+		// bounded: the profile's history, each a link to its calendar drawer.
+		const history = await this.sessions.historyFor(
+			tenant,
+			projects.map(({ id }) => id),
+			SESSION_HISTORY_ROWS,
+		);
 		const anonymized = client.anonymizedAt !== null;
 		const day = (time: DateTime) =>
 			formatDay(time.setZone(tenant.timezone).toFormat("yyyy-MM-dd"));
@@ -149,6 +194,24 @@ export default class ClientsController {
 				status: inquiry.status,
 				receivedText: day(inquiry.createdAt),
 			})),
+			sessions: history.map((session) => ({
+				id: session.id,
+				projectId: session.projectId,
+				whenText: sessionTimeText(
+					session.startsAt,
+					session.endsAt,
+					tenant.timezone,
+				),
+				// The calendar day it opens on, in the studio's timezone.
+				date: session.startsAt.setZone(tenant.timezone).toFormat("yyyy-MM-dd"),
+				kind: session.kind,
+				status: session.status,
+				artistName: artistName.get(session.artistId) ?? null,
+				upcoming:
+					session.status === "scheduled" &&
+					session.startsAt.toMillis() > Date.now(),
+			})),
+			sessionsCapped: history.length === SESSION_HISTORY_ROWS,
 			references: await Promise.all(
 				images.map((image) => referenceView(this.images, tenant, image)),
 			),
@@ -209,6 +272,9 @@ export default class ClientsController {
 			.toRoute("tenant.clients.show", { tenant: tenant.slug, id: client.id });
 	}
 }
+
+/** How many of a client's sessions the profile lists, newest first. */
+const SESSION_HISTORY_ROWS = 50;
 
 /** The latest of these times (the first one is always set). */
 function latest(times: [DateTime, ...(DateTime | undefined)[]]): DateTime {

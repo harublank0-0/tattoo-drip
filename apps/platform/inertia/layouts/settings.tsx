@@ -7,7 +7,6 @@ import {
 	Palette,
 	Store,
 	UserPlus,
-	Users,
 	Wallet,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -58,12 +57,6 @@ function settingsNav(tenantSlug: string): NavItem[] {
 			route: "tenant.settings.messages",
 			params,
 			icon: MessageSquareText,
-		},
-		{
-			label: "Artists",
-			route: "tenant.artists",
-			params,
-			icon: Users,
 		},
 		{
 			label: "Members",

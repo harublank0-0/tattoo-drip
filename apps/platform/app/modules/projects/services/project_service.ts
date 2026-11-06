@@ -386,6 +386,43 @@ export default class ProjectService {
 		);
 	}
 
+	/**
+	 * Each of these clients' live project ids, by client id (Studio OS: the
+	 * Clients list's next session). One query; a client without projects has
+	 * no entry.
+	 */
+	async idsByClient(
+		tenant: TenantRef,
+		clientIds: string[],
+	): Promise<Map<string, string[]>> {
+		if (clientIds.length === 0) return new Map();
+		const rows = await TattooProject.query()
+			.where("tenant_id", tenant.id)
+			.whereIn("client_id", clientIds)
+			.select("id", "client_id");
+		const byClient = new Map<string, string[]>();
+		for (const { id, clientId } of rows) {
+			byClient.set(clientId, [...(byClient.get(clientId) ?? []), id]);
+		}
+		return byClient;
+	}
+
+	/**
+	 * The client ids of the live projects among `projectIds` (a subquery of
+	 * project ids), as a subquery: for ClientService to nest (Studio OS's
+	 * "Upcoming sessions" filter). Deleted projects never count.
+	 */
+	clientsOf(
+		tenant: TenantRef,
+		projectIds: ReturnType<SessionService["projectsWithUpcoming"]>,
+	) {
+		return TattooProject.query()
+			.where("tenant_id", tenant.id)
+			.whereNull("deleted_at")
+			.whereIn("id", projectIds)
+			.select("client_id");
+	}
+
 	/** When each of these clients' live projects last changed. */
 	async lastChangeForClients(
 		tenant: TenantRef,

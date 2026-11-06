@@ -249,6 +249,70 @@ export default class SessionService {
 	}
 
 	/**
+	 * The ids of projects with a scheduled session that has not started yet,
+	 * as a subquery (Studio OS): the Clients list's "Upcoming sessions"
+	 * filter nests it through ProjectService, so no module reads another's
+	 * table. Deleted sessions never count (a subquery skips the model hooks).
+	 */
+	projectsWithUpcoming(tenant: TenantRef, now: DateTime = DateTime.now()) {
+		return ProjectSession.query()
+			.where("tenant_id", tenant.id)
+			.whereNull("deleted_at")
+			.where("status", "scheduled")
+			.where("starts_at", ">", now.toJSDate())
+			.select("project_id");
+	}
+
+	/**
+	 * The live sessions of `projectIds`, every status, newest first, at most
+	 * `limit`: a client's session history (Studio OS). One query. Pass only
+	 * projects the member may open.
+	 */
+	async historyFor(
+		tenant: TenantRef,
+		projectIds: string[],
+		limit: number,
+	): Promise<ProjectSession[]> {
+		if (projectIds.length === 0) return [];
+		return ProjectSession.query()
+			.where("tenant_id", tenant.id)
+			.whereIn("project_id", projectIds)
+			.orderBy("starts_at", "desc")
+			.orderBy("id", "desc")
+			.limit(limit);
+	}
+
+	/**
+	 * Per artist id, how many scheduled sessions start in the half-open
+	 * window [from, to) and the first one's start: the Artists list's
+	 * "upcoming" line (Studio OS). One grouped query; an artist with none has
+	 * no entry.
+	 */
+	async upcomingByArtist(
+		tenant: TenantRef,
+		{ from, to }: { from: DateTime; to: DateTime },
+	): Promise<Map<string, { count: number; first: DateTime }>> {
+		const rows = await ProjectSession.query()
+			.where("tenant_id", tenant.id)
+			.where("status", "scheduled")
+			.where("starts_at", ">=", from.toJSDate())
+			.where("starts_at", "<", to.toJSDate())
+			.select("artist_id")
+			.count("* as total")
+			.min("starts_at as first")
+			.groupBy("artist_id");
+		return new Map(
+			rows.map((row) => [
+				row.artistId,
+				{
+					count: Number(row.$extras.total),
+					first: DateTime.fromJSDate(new Date(row.$extras.first)),
+				},
+			]),
+		);
+	}
+
+	/**
 	 * How many of the tenant's live sessions start in the half-open window
 	 * [from, to), per status, for the studio and per artist: the pilot's
 	 * no-show rate (TAT-70) and the no-show report (TAT-76). Counted by

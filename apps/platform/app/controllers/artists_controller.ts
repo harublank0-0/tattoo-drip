@@ -2,6 +2,7 @@ import { inject } from "@adonisjs/core";
 import type { HttpContext } from "@adonisjs/core/http";
 import { errors } from "@vinejs/vine";
 import type { Infer } from "@vinejs/vine/types";
+import { DateTime } from "luxon";
 import { tenantContext } from "#middleware/tenant_middleware";
 import {
 	ArtistProfileExistsError,
@@ -26,9 +27,28 @@ import { InvalidImageError } from "#modules/media/errors";
 import ImageService, {
 	THUMBNAIL_WIDTH,
 } from "#modules/media/services/image_service";
-import { formatMoney } from "#modules/projects/quotes";
+import { formatMoney, todayIn } from "#modules/projects/quotes";
+import {
+	dayBounds,
+	dayLabel,
+	sessionRow,
+	shiftDate,
+} from "#modules/scheduling/calendar";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import CalendarService from "#modules/scheduling/services/calendar_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import OpeningHoursService from "#modules/scheduling/services/opening_hours_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import SessionService from "#modules/scheduling/services/session_service";
+import { sessionStartText, sessionTimeText } from "#modules/scheduling/times";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { artistLink } from "#services/studio_links";
+
+/** How far ahead the Artists list counts each artist's sessions. */
+const UPCOMING_WINDOW_DAYS = 30;
+
+/** How many days of sessions an artist's profile lists, from today. */
+const SCHEDULE_DAYS = 14;
 
 /** The styles the form offers, in the list's order. */
 const STYLE_OPTIONS = TATTOO_STYLES.map(({ slug, name }) => ({ slug, name }));
@@ -47,16 +67,39 @@ export default class ArtistsController {
 		private images: ImageService,
 		private workPhotos: WorkPhotoService,
 		private flash: FlashService,
+		private sessions: SessionService,
+		private calendar: CalendarService,
+		private hours: OpeningHoursService,
 	) {}
 
 	async index(ctx: HttpContext) {
 		const { tenant } = tenantContext(ctx);
 		const userId = ctx.auth.getUserOrFail().id;
 		const list = await this.artists.list(tenant);
+		// Studio OS: each artist's scheduled sessions in the next
+		// UPCOMING_WINDOW_DAYS days, one grouped query for the whole list.
+		const now = DateTime.now();
+		const upcoming = await this.sessions.upcomingByArtist(tenant, {
+			from: now,
+			to: now.plus({ days: UPCOMING_WINDOW_DAYS }),
+		});
 
 		return ctx.inertia.render("artists/index", {
+			upcomingDays: UPCOMING_WINDOW_DAYS,
 			artists: await Promise.all(
-				list.map((artist) => this.toRowProps(tenant, artist, userId)),
+				list.map(async (artist) => {
+					const next = upcoming.get(artist.id);
+					return {
+						...(await this.toRowProps(tenant, artist, userId)),
+						styleNames: knownStyles(artist.styles).map(({ name }) => name),
+						// A login is a member linked to the profile; many artists have none.
+						hasLogin: artist.userId !== null,
+						upcomingCount: next?.count ?? 0,
+						nextText: next
+							? sessionStartText(next.first, tenant.timezone, now)
+							: null,
+					};
+				}),
 			),
 		});
 	}
@@ -101,6 +144,8 @@ export default class ArtistsController {
 			// Flash designs too (TAT-129).
 			flashDesigns: [],
 			styleOptions: STYLE_OPTIONS,
+			// A new artist has no sessions yet (Studio OS).
+			schedule: null,
 		});
 	}
 
@@ -177,12 +222,45 @@ export default class ArtistsController {
 			})),
 		);
 
+		// The profile's schedule (Studio OS): the next SCHEDULE_DAYS days of this
+		// artist's sessions through the calendar's own read and rules (an artist
+		// on their own profile sees no client on a project that isn't theirs),
+		// and the studio's opening hours, which bookings show but don't enforce.
+		const today = todayIn(tenant.timezone);
+		const agenda = await this.calendar.load(tenant, membership, {
+			artistId: artist.id,
+			// From now: a session already over today is the calendar's, not "next".
+			from: DateTime.now(),
+			to: dayBounds(shiftDate("day", today, SCHEDULE_DAYS - 1), tenant.timezone)
+				.to,
+		});
+		const schedule = {
+			days: SCHEDULE_DAYS,
+			sessions: agenda.entries.map((entry) => {
+				const day = entry.session.startsAt
+					.setZone(tenant.timezone)
+					.toFormat("yyyy-MM-dd");
+				return {
+					...sessionRow(entry, day, tenant.timezone),
+					date: day,
+					dayText: dayLabel(day),
+					whenText: sessionTimeText(
+						entry.session.startsAt,
+						entry.session.endsAt,
+						tenant.timezone,
+					),
+				};
+			}),
+			hours: await this.hours.week(tenant),
+		};
+
 		return ctx.inertia.render("artists/form", {
 			artist: await this.toProps(tenant, artist, userId),
 			canLink,
 			workPhotos,
 			flashDesigns,
 			styleOptions: STYLE_OPTIONS,
+			schedule,
 		});
 	}
 
