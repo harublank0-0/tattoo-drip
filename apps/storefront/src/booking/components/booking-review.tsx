@@ -4,6 +4,7 @@ import { copy as intakeCopy } from "../../intake/copy.ts";
 import { fill } from "../../intake/template.ts";
 import { artistsHref } from "../../studio/links.ts";
 import {
+	BOOKING_WORDS,
 	type BookingArtwork,
 	type BookingStep,
 	type BookingValues,
@@ -25,6 +26,8 @@ export interface RequestSnapshot {
 	readonly artistName: string | null;
 	/** The preferred dates exactly as they will be sent; "" while none. */
 	readonly dates: string;
+	/** The chosen style's name (the slug is what is sent); null for none. */
+	readonly styleName: string | null;
 	readonly photoCount: number;
 	readonly artwork: BookingArtwork | null;
 }
@@ -85,6 +88,23 @@ export function BookingReview({
 						{ideaText(values)}
 					</span>
 				</ReviewRow>
+				{snapshot.styleName ? (
+					<ReviewRow label={copy.review.style} action={null}>
+						{snapshot.styleName}
+					</ReviewRow>
+				) : null}
+				{values.colour ? (
+					<ReviewRow label={copy.review.colour} action={null}>
+						{BOOKING_WORDS.colour[values.colour]}
+					</ReviewRow>
+				) : null}
+				{values.notes.trim() ? (
+					<ReviewRow label={copy.review.notes} action={null}>
+						<span className="booking-review-idea user-text" dir="auto">
+							{values.notes.trim()}
+						</span>
+					</ReviewRow>
+				) : null}
 				<ReviewRow label={copy.review.placement} action={null}>
 					{values.placement.trim()}
 				</ReviewRow>
@@ -185,7 +205,7 @@ export function BookingSummary({
 	showArtist: boolean;
 }) {
 	const { values } = snapshot;
-	const tattoo = [values.style, sizeText(values), values.placement.trim()]
+	const tattoo = [snapshot.styleName, sizeText(values), values.placement.trim()]
 		.filter(Boolean)
 		.join(" · ");
 	const body = (
@@ -245,22 +265,25 @@ export function BookingSummary({
 
 /**
  * After the API took the request (and only then): "Your story starts here.",
- * that it was received and is not a confirmed appointment, whom and when it
- * asked for, where the studio will reply, and the ways on. The API's answer
- * is the new inquiry's id, which nothing shows the client back, so no
- * reference is shown.
+ * that it was received and is not a confirmed appointment, its reference
+ * (the API's: the code the client quotes, which the deposit page shows
+ * again), whom and when it asked for, where the studio will reply, and the
+ * ways on.
  */
 export function BookingSent({
 	studioName,
 	phone,
 	artistName,
 	dates,
+	reference,
 	ref,
 }: {
 	studioName: string;
 	phone: string;
 	artistName: string | null;
 	dates: string;
+	/** The API's reference for the request; null only if none came back. */
+	reference: string | null;
 	ref?: Ref<HTMLHeadingElement>;
 }) {
 	return (
@@ -273,6 +296,11 @@ export function BookingSent({
 				<Fill template={copy.sent.body} values={{ studio: studioName }} />{" "}
 				<Fill template={copy.sent.reply} values={{ phone }} />
 			</p>
+			{reference ? (
+				<p className="booking-sent-reference">
+					<ReferenceLine reference={reference} studioName={studioName} />
+				</p>
+			) : null}
 			<dl className="booking-summary-list">
 				{artistName ? (
 					<div>
@@ -297,5 +325,23 @@ export function BookingSent({
 				</a>
 			</p>
 		</div>
+	);
+}
+
+/** "Your request reference: K7MP3Q. Quote it when …": the code strong, the studio's name in <bdi>. */
+function ReferenceLine({
+	reference,
+	studioName,
+}: {
+	reference: string;
+	studioName: string;
+}) {
+	const [before, after = ""] = copy.sent.reference.split("{reference}");
+	return (
+		<>
+			{before}
+			<strong>{reference}</strong>
+			<Fill template={after} values={{ studio: studioName }} />
+		</>
 	);
 }

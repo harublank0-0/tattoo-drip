@@ -57,6 +57,32 @@ describe("toInquiryInput", () => {
 		assert.deepEqual(input.referenceImages, []);
 	});
 
+	test("sends the booking's style, colour and notes as their own fields, trimmed, and leaves empty ones out", () => {
+		const input = toInquiryInput(
+			{
+				...FULL,
+				style: "fine-line",
+				colour: "black-grey",
+				notes: " A cover-up ",
+			},
+			[],
+			"",
+		);
+		assert.equal(input.style, "fine-line");
+		assert.equal(input.colour, "black-grey");
+		assert.equal(input.notes, "A cover-up");
+		const none = toInquiryInput(
+			{ ...FULL, style: "", colour: "", notes: "  " },
+			[],
+			"",
+		);
+		assert.equal("style" in none, false);
+		assert.equal("colour" in none, false);
+		assert.equal("notes" in none, false);
+		// The classic form has none of them.
+		assert.equal("style" in toInquiryInput(FULL, [], ""), false);
+	});
+
 	test("sends Devanagari digits as ASCII ones", () => {
 		assert.equal(
 			toInquiryInput({ ...FULL, contactPhone: "९८१२३४५६७८" }, [], "")

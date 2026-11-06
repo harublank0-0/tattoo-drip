@@ -146,18 +146,22 @@ describe("what the request says", () => {
 		);
 	});
 
-	test("the idea carries only the choices made, one line each; the size is the choice and the client's words", () => {
-		assert.equal(ideaText(values()), "A fine-line peony");
-		assert.equal(
-			ideaText(
-				values({
-					style: "Fine line",
-					colour: "black-grey",
-					notes: " A cover-up ",
-				}),
-			),
-			"A fine-line peony\n\nStyle: Fine line\nColour: Black and grey\nNotes: A cover-up",
-		);
+	test("the idea is the client's own words; style, colour and notes are their own fields; the size is the choice and the client's words", () => {
+		const chosen = values({
+			style: "fine-line",
+			colour: "black-grey",
+			notes: " A cover-up ",
+		});
+		assert.equal(ideaText(chosen), "A fine-line peony");
+		const sent = intakeValuesOf(chosen, TODAY, RULES);
+		assert.equal(sent.idea, "A fine-line peony");
+		assert.equal(sent.style, "fine-line");
+		assert.equal(sent.colour, "black-grey");
+		assert.equal(sent.notes, "A cover-up");
+		const plain = intakeValuesOf(values(), TODAY, RULES);
+		for (const key of ["style", "colour", "notes"]) {
+			assert.equal(key in plain, false, key);
+		}
 		assert.equal(
 			sizeText(values({ approximateSize: "about 12 cm" })),
 			"Medium: about a hand, about 12 cm",
@@ -171,7 +175,7 @@ describe("what the request says", () => {
 
 	test("the inquiry sent is the intake's own fields, so the API, its rules and its errors are unchanged", () => {
 		const sent = intakeValuesOf(
-			values({ preferredArtistId: SITA_ID, style: "Fine line" }),
+			values({ preferredArtistId: SITA_ID, style: "fine-line" }),
 			TODAY,
 			RULES,
 		);
@@ -186,10 +190,13 @@ describe("what the request says", () => {
 			"preferredArtistId",
 			"preferredDates",
 			"sourceChannel",
+			"style",
 		]);
 		assert.equal(sent.preferredDates, "Friday, 6 November 2026");
 		assert.equal(sent.approximateSize, "Medium: about a hand");
-		assert.equal(sent.idea, "A fine-line peony\n\nStyle: Fine line");
+		// The slug is sent, not the name the client saw.
+		assert.equal(sent.style, "fine-line");
+		assert.equal(sent.idea, "A fine-line peony");
 	});
 });
 
@@ -258,13 +265,12 @@ describe("the steps", () => {
 		);
 	});
 
-	test("the idea with its added lines must still fit the API's 4000 characters", () => {
-		const long = values({ idea: "x".repeat(3990), notes: "y".repeat(40) });
-		const errors = bookingErrors(long, TODAY, CONTEXT, {
-			studioName: "Black Needle",
-			artistIds: [],
-		});
-		assert.match(errors.idea ?? "", /4000/);
+	test("the idea alone must fit the API's 4000 characters; the notes don't count against it", () => {
+		const rules = { studioName: "Black Needle", artistIds: [] };
+		const fits = values({ idea: "x".repeat(3990), notes: "y".repeat(40) });
+		assert.equal(bookingErrors(fits, TODAY, CONTEXT, rules).idea, undefined);
+		const long = values({ idea: "x".repeat(4001) });
+		assert.match(bookingErrors(long, TODAY, CONTEXT, rules).idea ?? "", /4000/);
 	});
 });
 
@@ -305,13 +311,14 @@ describe("what it never claims", () => {
 		);
 	});
 
-	test("the received screen says received and not confirmed, shows what was asked and invents no reference", () => {
+	test("the received screen says received and not confirmed, shows what was asked and the API's reference", () => {
 		const html = renderToStaticMarkup(
 			createElement(BookingSent, {
 				studioName: "Black Needle",
 				phone: "9800000000",
 				artistName: "Sita Rai",
 				dates: "Friday, 6 November 2026",
+				reference: "K7MP3Q",
 			}),
 		);
 		assert.match(html, />Your story starts here\.</);
@@ -322,7 +329,11 @@ describe("what it never claims", () => {
 		);
 		assert.match(html, /<dd dir="auto">Sita Rai<\/dd>/);
 		assert.match(html, /<dd>Friday, 6 November 2026<\/dd>/);
-		assert.doesNotMatch(html, /confirmed!|Booked|reference|#\d|0199f000/i);
+		assert.match(
+			html,
+			/Your request reference: <strong>K7MP3Q<\/strong>\. Quote it when you message <bdi>Black Needle<\/bdi>\./,
+		);
+		assert.doesNotMatch(html, /confirmed!|Booked|#\d|0199f000/i);
 	});
 
 	test("/request is a permanent redirect to /book with its query as it was", () => {

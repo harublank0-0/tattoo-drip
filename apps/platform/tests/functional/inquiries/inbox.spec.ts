@@ -161,6 +161,51 @@ test.group("Inbox pages", (group) => {
 		}
 	});
 
+	test("the inquiry page carries the reference, the style's name, the colour and the notes as sent", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const { detailed, older } = await inTenant(tenant, async () => {
+			const customer = await makeClient(tenant);
+			return {
+				detailed: await makeInquiry(tenant, customer, {
+					referenceCode: "K7MP3Q",
+					style: "fine-line",
+					colour: "black-grey",
+					notes: "<b>bold</b>\nsecond line",
+				}),
+				older: await makeInquiry(tenant, customer),
+			};
+		});
+
+		const props = (
+			await client
+				.get(inbox(`/${detailed.id}`))
+				.withInertia()
+				.loginAs(owner)
+		).inertiaProps;
+		assert.deepInclude(props.inquiry, {
+			referenceCode: "K7MP3Q",
+			style: "Fine line",
+			colour: "black-grey",
+			notes: "<b>bold</b>\nsecond line",
+		});
+
+		const plain = (
+			await client
+				.get(inbox(`/${older.id}`))
+				.withInertia()
+				.loginAs(owner)
+		).inertiaProps;
+		assert.deepInclude(plain.inquiry, {
+			referenceCode: null,
+			style: null,
+			colour: null,
+			notes: null,
+		});
+	});
+
 	test("the inquiry page shows everything, signed references, and the accept choices", async ({
 		client,
 		assert,

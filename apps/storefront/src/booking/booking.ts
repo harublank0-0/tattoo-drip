@@ -1,8 +1,4 @@
-import {
-	INTAKE_LIMITS,
-	type IntakeField,
-	type IntakeValues,
-} from "../intake/rules.ts";
+import type { IntakeField, IntakeValues } from "../intake/rules.ts";
 import type { Closure, Week } from "../studio/hours.ts";
 import {
 	type CalendarRules,
@@ -50,7 +46,7 @@ export interface BookingValues extends IntakeValues {
 	timeOfDay: TimeOfDay;
 	/** "Any date suits me": no day needed. */
 	flexible: boolean;
-	/** A style's name from the studio's list, or "" for none picked. */
+	/** A style's slug from the studio's list, or "" for none picked. */
 	style: string;
 	colour: Colour | "";
 	size: Size | "";
@@ -60,7 +56,7 @@ export interface BookingValues extends IntakeValues {
 /** The flow's own fields, beside the intake's. */
 export type BookingField = IntakeField | "days" | "size";
 
-/** The extra choices' limits: the idea they are written into holds 4000 characters. */
+/** The notes' limit: the API's (InquiryInput.notes). */
 export const BOOKING_LIMITS = { notes: 1000 } as const;
 
 /** The words the flow writes into the inquiry; labels the client sees too. */
@@ -83,17 +79,14 @@ export const BOOKING_WORDS = {
 		"extra-large": "Extra large: a sleeve, back or leg",
 	},
 	flexible: "Any date that suits the studio",
-	style: "Style",
-	colourLine: "Colour",
-	notes: "Notes",
 } as const satisfies Record<string, unknown>;
 
 /** What the flow knows of the studio and its artists (requestPageData builds it). */
 export interface BookingContext {
 	/** The artists a client can ask for: those who take new work, by name. */
 	readonly artists: readonly BookingArtist[];
-	/** The studio's styles: those its visible artists list, in the platform's order. */
-	readonly styles: readonly string[];
+	/** The studio's styles: those its visible artists list, each once, as the API names them. */
+	readonly styles: readonly { readonly slug: string; readonly name: string }[];
 	readonly calendar: CalendarRules & {
 		/** The studio's IANA timezone: "today" is its date, not the client's. */
 		readonly timeZone: string;
@@ -203,33 +196,27 @@ export function sizeText(
 	return choice || words;
 }
 
-/**
- * The idea as the studio reads it: the client's own words, then the choices
- * they made (style, colour, notes), one line each, only those made. Nothing
- * is added that the client didn't choose; the review step shows exactly this.
- */
-export function ideaText(
-	values: Pick<BookingValues, "idea" | "style" | "colour" | "notes">,
-): string {
-	const lines = [
-		values.style ? `${BOOKING_WORDS.style}: ${values.style}` : "",
-		values.colour
-			? `${BOOKING_WORDS.colourLine}: ${BOOKING_WORDS.colour[values.colour]}`
-			: "",
-		values.notes.trim() ? `${BOOKING_WORDS.notes}: ${values.notes.trim()}` : "",
-	].filter(Boolean);
-	const idea = values.idea.trim();
-	return lines.length === 0 ? idea : `${idea}\n\n${lines.join("\n")}`;
+/** The idea as the studio reads it: the client's own words, trimmed. */
+export function ideaText(values: Pick<BookingValues, "idea">): string {
+	return values.idea.trim();
 }
 
-/** The intake's values the API is sent: the flow's choices written into its fields. */
+/** What the flow sends beyond the intake's own fields: each only when chosen. */
+export interface BookingDetails {
+	readonly style?: string;
+	readonly colour?: Colour;
+	readonly notes?: string;
+}
+
+/** The intake's values the API is sent, with the style, colour and notes the client chose. */
 export function intakeValuesOf(
 	values: BookingValues,
 	today: string,
 	rules: CalendarRules,
-): IntakeValues {
+): IntakeValues & BookingDetails {
+	const notes = values.notes.trim();
 	return {
-		idea: values.idea.trim() ? ideaText(values) : "",
+		idea: ideaText(values),
 		placement: values.placement,
 		approximateSize: sizeText(values),
 		preferredDates: preferredDatesText(values, today, rules),
@@ -239,12 +226,18 @@ export function intakeValuesOf(
 		contactName: values.contactName,
 		contactPhone: values.contactPhone,
 		contactEmail: values.contactEmail,
+		...(values.style ? { style: values.style } : {}),
+		...(values.colour ? { colour: values.colour } : {}),
+		...(notes ? { notes } : {}),
 	};
 }
 
-/** Whether the written idea, with its added lines, still fits the API's 4000 characters. */
-export function ideaFits(values: BookingValues): boolean {
-	return ideaText(values).length <= INTAKE_LIMITS.idea;
+/** The name of the style a slug stands for, among the studio's; null for none. */
+export function styleName(
+	styles: BookingContext["styles"],
+	slug: string,
+): string | null {
+	return styles.find((style) => style.slug === slug)?.name ?? null;
 }
 
 /** A fresh form: the intake's start (an artist, a flash or "inspired by" idea), and nothing else chosen. */

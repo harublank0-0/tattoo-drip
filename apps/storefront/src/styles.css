@@ -714,7 +714,7 @@
   .booking-sent-mark::after { content: ""; display: block; inline-size: 0.75rem; block-size: 1.375rem; margin: 0.625rem auto 0; border-inline-end: 2px solid var(--stencil); border-block-end: 2px solid var(--stencil); rotate: 45deg; }
   .booking-sent-title { margin: 0; font-family: var(--display-face); font-size: clamp(2rem, 1.5rem + 2vw, 3rem); line-height: 1.05; }
   .booking-sent-title:focus { outline: none; }
-  .booking-sent-body { max-inline-size: 36rem; margin: 0; }
+  .booking-sent-body, .booking-sent-reference { max-inline-size: 36rem; margin: 0; }
   .booking-sent-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 1.5rem; margin: 0; }
   @media (min-width: 48rem) {
     .booking-progress-count { display: none; }

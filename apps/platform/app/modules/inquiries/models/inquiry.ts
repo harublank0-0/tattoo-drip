@@ -19,6 +19,10 @@ export const SOURCE_CHANNELS = [
 ] as const;
 export type SourceChannel = (typeof SOURCE_CHANNELS)[number];
 
+/** Black and grey, colour, or not decided yet: what a request may say about colour. */
+export const INQUIRY_COLOURS = ["black-grey", "colour", "undecided"] as const;
+export type InquiryColour = (typeof INQUIRY_COLOURS)[number];
+
 /**
  * What a person asked a studio for, exactly as submitted. A database
  * trigger freezes everything except the decision, the last contact (TAT-52)
@@ -30,6 +34,7 @@ export type SourceChannel = (typeof SOURCE_CHANNELS)[number];
  */
 export default class Inquiry extends compose(InquirySchema, withSoftDeletes) {
 	declare status: InquiryStatus;
+	declare colour: InquiryColour | null;
 	declare sourceChannel: SourceChannel;
 	declare lastContactChannel: ContactChannel | null;
 	declare lastContactKind: MessageKind | null;

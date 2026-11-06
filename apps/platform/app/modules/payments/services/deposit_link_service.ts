@@ -1,11 +1,11 @@
 import { inject } from "@adonisjs/core";
 import { errors as lucidErrors } from "@adonisjs/lucid";
 import { DateTime } from "luxon";
+import Inquiry from "#modules/inquiries/models/inquiry";
 import {
 	DEPOSIT_LINK_DAYS,
 	depositPageUrl,
 	hashToken,
-	newReferenceCode,
 	newTokenNonce,
 	tokenFor,
 } from "#modules/payments/deposit_links";
@@ -26,19 +26,16 @@ import ProjectService, {
 } from "#modules/projects/services/project_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import QuoteService from "#modules/projects/services/quote_service";
+// A value import: the constructor's default builds one.
+import ReferenceCodeService from "#modules/references/services/reference_code_service";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { withTransaction } from "#services/db_context";
 import { isUniqueViolation } from "#services/db_errors";
 
 type TenantRef = Pick<Tenant, "id">;
 type ProjectRef = Pick<TattooProject, "id">;
+type LockedProject = Pick<TattooProject, "id" | "inquiryId">;
 type Fresh = Pick<DepositLink, "tokenNonce" | "tokenHash" | "expiresAt">;
-
-/**
- * Draws of a reference code before giving up. Each existing code makes a
- * collision a 1 in 729 million event, so a studio never gets here.
- */
-export const REFERENCE_TRIES = 5;
 
 const CODE_TAKEN = "deposit_links_tenant_id_reference_code_unique";
 
@@ -68,6 +65,7 @@ export default class DepositLinkService {
 		private quotes: QuoteService,
 		private deposits: DepositService,
 		private methods: PaymentMethodService,
+		private references: ReferenceCodeService = new ReferenceCodeService(),
 	) {}
 
 	/**
@@ -202,39 +200,52 @@ export default class DepositLinkService {
 		);
 	}
 
-	/** A new reference code. Protected, so a test can force a collision. */
-	protected newCode(): string {
-		return newReferenceCode();
-	}
-
 	/**
-	 * Inserts the project's first link with a new reference code. A code
-	 * the studio already uses is drawn again, each try in its own savepoint,
-	 * up to REFERENCE_TRIES times; then the unique violation surfaces.
+	 * Inserts the project's first link. One code runs from the request to
+	 * its deposit: a project that came from an inquiry takes the inquiry's
+	 * reference (registered when the inquiry came in). When the inquiry has
+	 * none (an older one), or another link of the studio already holds it (a
+	 * deleted earlier project's), the link gets a fresh code, claimed for the
+	 * studio (ReferenceCodeService.claim, which retries and then surfaces a
+	 * collision). The reuse is tried in its own savepoint, so its failure
+	 * leaves the request's transaction usable.
 	 */
 	private async insertWithCode(
 		tenant: TenantRef,
-		project: ProjectRef,
+		project: LockedProject,
 		fresh: Fresh,
 	): Promise<DepositLink> {
-		for (let attempt = 1; ; attempt++) {
+		const create = (referenceCode: string) =>
+			withTransaction(() =>
+				DepositLink.create({
+					tenantId: tenant.id,
+					projectId: project.id,
+					referenceCode,
+					...fresh,
+				}),
+			);
+		const inquiryCode = await this.inquiryReference(tenant, project);
+		if (inquiryCode !== null) {
 			try {
-				return await withTransaction(() =>
-					DepositLink.create({
-						tenantId: tenant.id,
-						projectId: project.id,
-						referenceCode: this.newCode(),
-						...fresh,
-					}),
-				);
+				return await create(inquiryCode);
 			} catch (error) {
-				if (
-					attempt >= REFERENCE_TRIES ||
-					!isUniqueViolation(error, CODE_TAKEN)
-				) {
-					throw error;
-				}
+				if (!isUniqueViolation(error, CODE_TAKEN)) throw error;
 			}
 		}
+		return create(await this.references.claim(tenant));
+	}
+
+	/** The reference of the inquiry the project came from, or null. */
+	private async inquiryReference(
+		tenant: TenantRef,
+		project: LockedProject,
+	): Promise<string | null> {
+		if (project.inquiryId === null) return null;
+		const inquiry = await Inquiry.query()
+			.where("tenant_id", tenant.id)
+			.where("id", project.inquiryId)
+			.select("reference_code")
+			.first();
+		return inquiry?.referenceCode ?? null;
 	}
 }

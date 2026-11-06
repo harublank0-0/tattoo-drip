@@ -372,7 +372,9 @@ export interface paths {
          *     may be open. A `preferredArtistId` other than the design's artist is
          *     `validation_failed` on `preferredArtistId`.
          *     An unknown or hidden `preferredArtistId` is `validation_failed` on
-         *     `preferredArtistId`; an image that isn't a JPEG, PNG or WebP is
+         *     `preferredArtistId`; a `style` that isn't on `listStyles`, a `colour`
+         *     other than the three listed and `notes` over 1000 characters are each
+         *     `validation_failed` on that field; an image that isn't a JPEG, PNG or WebP is
          *     `validation_failed` on `referenceImages.<index>`.
          *
          *     Abuse protection (TAT-55): send the bot-challenge token in
@@ -1039,6 +1041,21 @@ export interface components {
              * @example NPR 15000
              */
             budget?: string | null;
+            /**
+             * @description A style's `slug` from `listStyles`, the platform's list. Leave it out for none.
+             * @example fine-line
+             */
+            style?: string | null;
+            /**
+             * @description Black and grey, colour, or not decided yet. Leave it out for none.
+             * @enum {string|null}
+             */
+            colour?: "black-grey" | "colour" | "undecided" | null;
+            /**
+             * @description Anything else the person wants the studio to know. Free text.
+             * @example A cover-up of an old name
+             */
+            notes?: string | null;
             sourceChannel: components["schemas"]["SourceChannel"];
             contactName: string;
             /**
@@ -1063,6 +1080,13 @@ export interface components {
              * @description The new inquiry. Nothing in the public API reads it back.
              */
             id: string;
+            /**
+             * @description The request's reference, unique within the studio. Quote it when
+             *     you message the studio. The deposit page shows the same code
+             *     later. Nothing in the public API reads an inquiry back by it.
+             * @example K7MP3Q
+             */
+            reference: string;
         };
         /**
          * @description What the deposit page says: `due` (pay, then send a screenshot),
@@ -1694,7 +1718,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Received. The studio replies on WhatsApp or Viber. */
+            /** @description Received. The studio replies on WhatsApp or Viber; the answer carries the request's reference. */
             201: {
                 headers: {
                     "Cache-Control": components["headers"]["CacheControl"];

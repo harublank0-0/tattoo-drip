@@ -488,7 +488,7 @@ export function requestPageData(
 			),
 			theme,
 			flash: view,
-			booking: bookingContextOf(studio, artistViews, null),
+			booking: bookingContextOf(studio, artistViews, artists, null),
 		};
 	}
 	// The artist asked for, else the piece's own while they take new work
@@ -527,7 +527,7 @@ export function requestPageData(
 		seo: requestPageSeo(studioView, artist, origin, inquiry.kind === "open"),
 		theme,
 		flash: found ? found.view : null,
-		booking: bookingContextOf(studio, artistViews, artwork),
+		booking: bookingContextOf(studio, artistViews, artists, artwork),
 	};
 }
 
@@ -540,12 +540,17 @@ export function requestPageData(
 function bookingContextOf(
 	studio: Studio,
 	artists: readonly ArtistView[],
+	raw: readonly Artist[],
 	artwork: (BookingArtwork & { artistSlug?: string }) | null,
 ): BookingContext {
-	const styles: string[] = [];
-	for (const artist of artists) {
-		for (const style of artist.styles) {
-			if (!styles.includes(style)) styles.push(style);
+	// The styles the shown artists list, each once (by slug, which is what is
+	// sent), checked as the gallery's filter reads them.
+	const shown = new Set(artists.map((artist) => artist.slug));
+	const styles: { slug: string; name: string }[] = [];
+	for (const artist of raw) {
+		if (!shown.has(artist.slug)) continue;
+		for (const style of filterStyles(artist.styles)) {
+			if (!styles.some((each) => each.slug === style.slug)) styles.push(style);
 		}
 	}
 	const { artistSlug: _slug, ...piece } = artwork ?? { artistSlug: undefined };

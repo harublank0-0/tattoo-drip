@@ -1,6 +1,10 @@
 import vine, { SimpleMessagesProvider } from "@vinejs/vine";
 import type { FieldContext, Infer } from "@vinejs/vine/types";
-import { SOURCE_CHANNELS } from "#modules/inquiries/models/inquiry";
+import { STYLE_SLUGS } from "#modules/artists/styles";
+import {
+	INQUIRY_COLOURS,
+	SOURCE_CHANNELS,
+} from "#modules/inquiries/models/inquiry";
 import { IMAGE_FORMAT_MESSAGE } from "#modules/media/errors";
 import { imageFile } from "#modules/media/validators/image_file";
 import { PHONE_MESSAGE, phoneNumber } from "#validators/phone";
@@ -48,6 +52,10 @@ export const intakeValidator = vine.create({
 	preferredArtistId: vine.string().uuid().nullable().optional(),
 	flashDesignId: vine.string().uuid().nullable().optional(),
 	budget: optionalText(120),
+	// A style of the platform's list (listStyles), not only the studio's.
+	style: vine.enum(STYLE_SLUGS).nullable().optional(),
+	colour: vine.enum(INQUIRY_COLOURS).nullable().optional(),
+	notes: optionalText(1000),
 	sourceChannel: vine.enum(SOURCE_CHANNELS),
 	contactName: text(120),
 	contactPhone: vine.string().trim().maxLength(40).use(phoneNumber()),
@@ -78,6 +86,8 @@ intakeValidator.messagesProvider = new SimpleMessagesProvider({
 	"sourceChannel.enum": CHANNEL,
 	"preferredArtistId.uuid": ARTIST_MESSAGE,
 	"flashDesignId.uuid": FLASH_MESSAGE,
+	"style.enum": "Choose a style from the list, or none.",
+	"colour.enum": "Choose black and grey, colour or not decided yet.",
 	"contactEmail.email": "Enter a valid email address, or leave it empty.",
 	"contactPhone.required": PHONE_MESSAGE,
 	"referenceImages.array.maxLength": COUNT,

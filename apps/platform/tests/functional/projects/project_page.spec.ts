@@ -510,6 +510,57 @@ test.group("Project page: the original request", (group) => {
 		assert.match(props.request.references[0].thumbnailUrl, /signature=/);
 	});
 
+	test("the request's style, colour and notes reach the project, for its assigned artist too", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner();
+		const asha = await artistIn(tenant, "asha@example.com");
+		const { detailed, plain } = await inTenant(tenant, async () => {
+			const profile = await makeArtist(tenant, "asha");
+			profile.userId = asha.id;
+			await profile.save();
+			const customer = await makeClient(tenant);
+			const accepted = {
+				status: "accepted" as const,
+				decidedAt: DateTime.utc(),
+			};
+			const withDetails = await makeInquiry(tenant, customer, {
+				...accepted,
+				style: "fine-line",
+				colour: "black-grey",
+				notes: "A cover-up of an old name.\nKeep it small.",
+			});
+			const without = await makeInquiry(tenant, customer, accepted);
+			return {
+				detailed: await makeProject(tenant, customer, {
+					inquiryId: withDetails.id,
+					artistId: profile.id,
+				}),
+				plain: await makeProject(tenant, customer, {
+					inquiryId: without.id,
+					artistId: profile.id,
+				}),
+			};
+		});
+
+		const props = (
+			await client.get(page(detailed.id)).withInertia().loginAs(asha)
+		).inertiaProps;
+		assert.deepInclude(props.request, {
+			style: "Fine line",
+			colour: "black-grey",
+			notes: "A cover-up of an old name.\nKeep it small.",
+		});
+		const none = (await client.get(page(plain.id)).withInertia().loginAs(asha))
+			.inertiaProps;
+		assert.deepInclude(none.request, {
+			style: null,
+			colour: null,
+			notes: null,
+		});
+	});
+
 	test("a project made from a flash request shows its design, to the owner and to its assigned artist; another project has none", async ({
 		client,
 		assert,

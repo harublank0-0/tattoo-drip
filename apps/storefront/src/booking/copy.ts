@@ -63,6 +63,9 @@ export const bookingCopy = {
 		anyArtist: "No preference",
 		dates: "Preferred dates",
 		idea: "Your idea, as {studio} will read it",
+		style: "Style",
+		colour: "Colour",
+		notes: "Notes",
 		placement: "Placement",
 		size: "Size",
 		budget: "Budget",
@@ -98,6 +101,8 @@ export const bookingCopy = {
 		artist: "Artist",
 		dates: "Preferred dates",
 		pending: "Not confirmed yet: {studio} replies with a time.",
+		reference:
+			"Your request reference: {reference}. Quote it when you message {studio}.",
 		artists: "View the artists",
 		home: "Back to the studio page",
 	},

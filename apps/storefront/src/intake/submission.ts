@@ -9,7 +9,12 @@ import { asciiDigits, type IntakeValues } from "./rules.ts";
  * token per attempt. Call it only after validateIntake passed.
  */
 export function toInquiryInput(
-	values: IntakeValues,
+	values: IntakeValues & {
+		/** The booking flow's choices (a style's slug, the colour, the notes); "" or missing for none. */
+		readonly style?: string;
+		readonly colour?: NonNullable<CreateInquiryInput["colour"]> | "";
+		readonly notes?: string;
+	},
 	referenceImages: readonly File[],
 	honeypot: string,
 	flashDesignId: string | null = null,
@@ -31,6 +36,10 @@ export function toInquiryInput(
 		contactName: values.contactName.trim(),
 		contactPhone: asciiDigits(values.contactPhone).trim(),
 		contactEmail: optional(values.contactEmail),
+		// The booking's choices as their own fields, only those made.
+		...(values.style?.trim() ? { style: values.style.trim() } : {}),
+		...(values.colour ? { colour: values.colour } : {}),
+		...(values.notes?.trim() ? { notes: values.notes.trim() } : {}),
 		referenceImages: [...referenceImages],
 		honeypot,
 	};

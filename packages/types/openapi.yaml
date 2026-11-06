@@ -473,7 +473,9 @@ paths:
         may be open. A `preferredArtistId` other than the design's artist is
         `validation_failed` on `preferredArtistId`.
         An unknown or hidden `preferredArtistId` is `validation_failed` on
-        `preferredArtistId`; an image that isn't a JPEG, PNG or WebP is
+        `preferredArtistId`; a `style` that isn't on `listStyles`, a `colour`
+        other than the three listed and `notes` over 1000 characters are each
+        `validation_failed` on that field; an image that isn't a JPEG, PNG or WebP is
         `validation_failed` on `referenceImages.<index>`.
 
         Abuse protection (TAT-55): send the bot-challenge token in
@@ -493,7 +495,7 @@ paths:
                 contentType: image/jpeg, image/png, image/webp
       responses:
         "201":
-          description: Received. The studio replies on WhatsApp or Viber.
+          description: Received. The studio replies on WhatsApp or Viber; the answer carries the request's reference.
           headers:
             Cache-Control: { $ref: "#/components/headers/CacheControl" }
           content:
@@ -1385,6 +1387,20 @@ components:
             design and its artist: leave `preferredArtistId` out or give the
             design's artist.
         budget: { type: [string, "null"], maxLength: 120, description: Free text, examples: [NPR 15000] }
+        style:
+          type: [string, "null"]
+          maxLength: 40
+          description: A style's `slug` from `listStyles`, the platform's list. Leave it out for none.
+          examples: [fine-line]
+        colour:
+          type: [string, "null"]
+          enum: [black-grey, colour, undecided, null]
+          description: Black and grey, colour, or not decided yet. Leave it out for none.
+        notes:
+          type: [string, "null"]
+          maxLength: 1000
+          description: Anything else the person wants the studio to know. Free text.
+          examples: [A cover-up of an old name]
         sourceChannel: { $ref: "#/components/schemas/SourceChannel" }
         contactName: { type: string, minLength: 1, maxLength: 120 }
         contactPhone:
@@ -1413,10 +1429,18 @@ components:
 
     InquiryReceipt:
       type: object
-      required: [id]
+      required: [id, reference]
       additionalProperties: false
       properties:
         id: { type: string, format: uuid, description: The new inquiry. Nothing in the public API reads it back. }
+        reference:
+          type: string
+          pattern: "^[2-9ABCDEFGHJKMNPQRSTVWXYZ]{6}$"
+          description: |
+            The request's reference, unique within the studio. Quote it when
+            you message the studio. The deposit page shows the same code
+            later. Nothing in the public API reads an inquiry back by it.
+          examples: [K7MP3Q]
 
     DepositState:
       type: string

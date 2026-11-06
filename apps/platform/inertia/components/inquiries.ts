@@ -48,6 +48,16 @@ export type ReferenceProps = {
 	height: number;
 };
 
+/** How a request's colour choice reads in the dashboard. */
+export const COLOUR_LABELS: Record<
+	NonNullable<InquiryPageProps["inquiry"]["colour"]>,
+	string
+> = {
+	"black-grey": "Black and grey",
+	colour: "Colour",
+	undecided: "Not decided yet",
+};
+
 export type InquiryPageProps = {
 	inquiry: {
 		id: string;
@@ -61,6 +71,13 @@ export type InquiryPageProps = {
 		approximateSize: string;
 		preferredDates: string;
 		budget: string | null;
+		/** The style's name, or null for none (or a retired one). */
+		style: string | null;
+		colour: "black-grey" | "colour" | "undecided" | null;
+		/** The client's notes, plain text with its line breaks. */
+		notes: string | null;
+		/** The request's reference (the one its deposit link reuses); null for an older inquiry. */
+		referenceCode: string | null;
 		source: string;
 		preferredArtistName: string | null;
 		receivedText: string;

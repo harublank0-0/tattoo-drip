@@ -9,6 +9,7 @@ import NewInquiryAlertJob from "#modules/inquiries/jobs/new_inquiry_alert_job";
 import Inquiry from "#modules/inquiries/models/inquiry";
 import ReferenceImage from "#modules/inquiries/models/reference_image";
 import ImageService from "#modules/media/services/image_service";
+import { REFERENCE_CODE_PATTERN } from "#modules/references/reference_codes";
 import Tenant from "#modules/tenancy/models/tenant";
 import {
 	assertApiData,
@@ -44,7 +45,7 @@ test.group("Public API: POST /inquiries", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 	group.each.teardown(() => queue.restore());
 
-	test("takes an inquiry: 201 with only the new id, no-store, no cookie, the alert queued", async ({
+	test("takes an inquiry: 201 with only the new id and its reference, no-store, no cookie, the alert queued", async ({
 		client,
 		assert,
 	}) => {
@@ -55,9 +56,10 @@ test.group("Public API: POST /inquiries", (group) => {
 			await png(),
 		]);
 
-		const { id } = response.body().data;
+		const { id, reference } = response.body().data;
 		assert.match(id, UUID);
-		assertApiData(response, { id }, 201);
+		assert.match(reference, REFERENCE_CODE_PATTERN);
+		assertApiData(response, { id, reference }, 201);
 		response.assertHeader("cache-control", "no-store");
 		assertApiHeaders(response);
 		const { inquiries, images } = await saved(tenant);
@@ -132,7 +134,7 @@ test.group("Public API: POST /inquiries", (group) => {
 
 		response.assertStatus(201);
 		// The same answer as for a new phone: nothing says the number was known.
-		assert.deepEqual(Object.keys(response.body().data), ["id"]);
+		assert.deepEqual(Object.keys(response.body().data), ["id", "reference"]);
 		const { inquiries } = await saved(tenant);
 		assert.equal(inquiries[0].clientId, existing.id);
 		assert.equal(inquiries[0].contactEmail, "maya@example.com");
@@ -159,6 +161,78 @@ test.group("Public API: POST /inquiries", (group) => {
 			],
 			[null, null, null, 0],
 		);
+	});
+
+	test("the reference is the one stored on the inquiry", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner(SLUG);
+		const response = await postInquiry(client, SLUG, intakeFields());
+		response.assertStatus(201);
+		const { inquiries } = await saved(tenant);
+		assert.deepEqual(Object.keys(response.body().data).sort(), [
+			"id",
+			"reference",
+		]);
+		assert.equal(response.body().data.reference, inquiries[0].referenceCode);
+	});
+
+	test("style, colour and notes are stored; empty means none", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner(SLUG);
+		// A style on the platform list that no artist of the studio lists.
+		(
+			await postInquiry(
+				client,
+				SLUG,
+				intakeFields({
+					style: "japanese",
+					colour: "undecided",
+					notes: "  Cover-up of an old name  ",
+				}),
+			)
+		).assertStatus(201);
+		(
+			await postInquiry(
+				client,
+				SLUG,
+				intakeFields({ style: "", colour: "", notes: "" }),
+			)
+		).assertStatus(201);
+
+		const { inquiries } = await saved(tenant);
+		assert.deepEqual(
+			inquiries.map((row) => [row.style, row.colour, row.notes]),
+			[
+				["japanese", "undecided", "Cover-up of an old name"],
+				[null, null, null],
+			],
+		);
+	});
+
+	test("an unlisted style, an unknown colour and notes over 1000 characters are each validation_failed on that field", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner(SLUG);
+		const before = await intakeRows({ tenant });
+		for (const [field, value] of [
+			["style", "watercolour-x"],
+			["colour", "red"],
+			["notes", "x".repeat(1001)],
+		] as const) {
+			const response = await postInquiry(
+				client,
+				SLUG,
+				intakeFields({ [field]: value }),
+			);
+			assertApiError(response, 422, "validation_failed");
+			assert.deepEqual(Object.keys(response.body().error.fields), [field]);
+		}
+		assert.deepEqual(await intakeRows({ tenant }), before);
 	});
 
 	test("a JSON body is 415, not a list of field errors", async ({ client }) => {

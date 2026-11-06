@@ -25,7 +25,10 @@ const INPUT: CreateInquiryInput = {
 	contactPhone: "9812345678",
 	honeypot: "",
 };
-const RECEIPT: InquiryReceipt = { id: "0199f000-0000-7000-8000-000000000057" };
+const RECEIPT: InquiryReceipt = {
+	id: "0199f000-0000-7000-8000-000000000057",
+	reference: "K7MP3Q",
+};
 
 function setup(
 	options: {

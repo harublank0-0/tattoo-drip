@@ -42,7 +42,10 @@ const BOOKING: IntakeFormProps["booking"] = {
 		{ ...SITA, slug: "sita", specialty: "Fine line", photo: null },
 		{ ...MINA, slug: "mina", specialty: null, photo: null },
 	],
-	styles: ["Fine line", "Blackwork"],
+	styles: [
+		{ slug: "fine-line", name: "Fine line" },
+		{ slug: "blackwork", name: "Blackwork" },
+	],
 	calendar: { ...EMPTY_CALENDAR, timeZone: "Asia/Kathmandu" },
 	artwork: null,
 };
