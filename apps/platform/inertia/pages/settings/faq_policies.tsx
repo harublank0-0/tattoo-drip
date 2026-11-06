@@ -3,7 +3,15 @@ import { type RefObject, useRef } from "react";
 import { urlFor } from "~/client";
 import { HIDDEN_LINK } from "~/components/good_to_know";
 import InlineConfirm from "~/components/inline_confirm";
+import { focusAfterMove, type MoveDirection } from "~/components/page_look";
 import Section from "~/components/section";
+import {
+	type ListRow,
+	moveListRow,
+	type Pair,
+	rowsFrom,
+	syncRows,
+} from "~/components/studio_content";
 import { Button } from "~/components/ui/button";
 import {
 	Field,
@@ -27,13 +35,13 @@ import SettingsLayout from "~/layouts/settings";
 const MAX_FAQ = 20;
 const MAX_SECTIONS = 12;
 
-type Pair = { a: string; b: string };
-
 /** What one list's card needs: its words, its limits and where it saves. */
 type ListKind = {
 	title: string;
 	description: string;
 	field: "entries" | "sections";
+	/** The page prop that holds the stored list. */
+	prop: "faq" | "policies";
 	a: { key: string; label: string; max: number };
 	b: { key: string; label: string; max: number };
 	add: string;
@@ -50,6 +58,7 @@ const FAQ: ListKind = {
 	description:
 		"Your own answers, shown on your FAQ page after the ones about how requesting works.",
 	field: "entries",
+	prop: "faq",
 	a: { key: "question", label: "Question", max: 200 },
 	b: { key: "answer", label: "Answer", max: 2000 },
 	add: "Add a question",
@@ -64,6 +73,7 @@ const POLICIES: ListKind = {
 	description:
 		"Your own sections, shown on your Policies page after your deposit policy, age rule, walk-ins and closed days.",
 	field: "sections",
+	prop: "policies",
 	a: { key: "title", label: "Title", max: 80 },
 	b: { key: "text", label: "Text", max: 4000 },
 	add: "Add a section",
@@ -104,14 +114,11 @@ export default function FaqPolicies({
 				</p>
 			)}
 			<ListCard
-				// Keyed by the stored list: a save remounts it with what was stored.
-				key={`faq:${JSON.stringify(faq)}`}
 				kind={FAQ}
 				initial={faq.map((row) => ({ a: row.question, b: row.answer }))}
 				heading={heading}
 			/>
 			<ListCard
-				key={`policies:${JSON.stringify(policies)}`}
 				kind={POLICIES}
 				initial={policies.map((row) => ({ a: row.title, b: row.text }))}
 				updatedOn={policiesUpdatedOn}
@@ -133,17 +140,34 @@ function ListCard({
 	heading: RefObject<HTMLElement | null>;
 }) {
 	const tenant = useTenant();
-	const form = useForm<{ rows: Pair[] }>({ rows: initial });
+	const counter = useRef(0);
+	const nextKey = () => counter.current++;
+	const form = useForm<{ rows: ListRow[] }>({
+		rows: rowsFrom(initial, nextKey),
+	});
 	const rows = form.data.rows;
 	const errors = form.errors as Record<string, string | undefined>;
-	const set = (next: Pair[]) => form.setData("rows", next);
-	const move = (from: number, to: number) => {
-		const next = rows.slice();
-		const [row] = next.splice(from, 1);
-		next.splice(to, 0, row);
-		set(next);
+	const set = (next: ListRow[]) => form.setData("rows", next);
+	const buttonId = (row: ListRow, direction: MoveDirection) =>
+		`${kind.field}-${row.key}-${direction}`;
+	// A move keeps focus on the moved row's button (or its other one at an
+	// edge); the errors were about places, so they go.
+	const move = (index: number, direction: MoveDirection) => {
+		const row = rows[index];
+		const moved = moveListRow(rows, index, direction);
+		if (moved === rows || !row) return;
+		form.clearErrors();
+		set(moved);
+		const at = moved.indexOf(row);
+		const focus = focusAfterMove(at, moved.length, direction);
+		setTimeout(() => document.getElementById(buttonId(row, focus))?.focus(), 0);
+	};
+	const remove = (index: number) => {
+		form.clearErrors();
+		set(rows.filter((_, m) => m !== index));
 	};
 	const save = () => {
+		if (form.processing) return;
 		form.transform(({ rows: list }) => ({
 			[kind.field]: list.map((row) => ({
 				[kind.a.key]: row.a,
@@ -152,6 +176,17 @@ function ListCard({
 		}));
 		form.put(urlFor(kind.saveRoute, { tenant: tenant.slug }), {
 			preserveScroll: true,
+			// The card stays mounted (focus stays on Save): the rows take what
+			// was stored, which the server trimmed, and that is the new clean state.
+			onSuccess: (page) => {
+				const props = page.props as unknown as Record<string, unknown>;
+				const stored = (props[kind.prop] as Record<string, string>[]).map(
+					(row) => ({ a: row[kind.a.key], b: row[kind.b.key] }),
+				);
+				const synced = syncRows(form.data.rows, stored, nextKey);
+				form.setDefaults({ rows: synced });
+				form.setData("rows", synced);
+			},
 		});
 	};
 
@@ -179,10 +214,10 @@ function ListCard({
 							const prefix = `${kind.field}.${n}`;
 							const aError = errors[`${prefix}.${kind.a.key}`];
 							const bError = errors[`${prefix}.${kind.b.key}`];
-							const id = `${kind.field}-${n}`;
+							// Ids follow the row, not its place, so a label stays with its box.
+							const id = `${kind.field}-${row.key}`;
 							return (
-								// biome-ignore lint/suspicious/noArrayIndexKey: rows have no id until saved; the index is their place
-								<li key={n} className="rounded-md border p-3">
+								<li key={row.key} className="rounded-md border p-3">
 									<FieldGroup>
 										<Field data-invalid={!!aError}>
 											<FieldLabel htmlFor={`${id}-a`}>
@@ -242,9 +277,10 @@ function ListCard({
 												type="button"
 												variant="outline"
 												size="sm"
+												id={buttonId(row, "up")}
 												disabled={n === 0}
 												aria-label={`Move ${kind.noun} ${n + 1} up`}
-												onClick={() => move(n, n - 1)}
+												onClick={() => move(n, "up")}
 											>
 												Move up
 											</Button>
@@ -252,9 +288,10 @@ function ListCard({
 												type="button"
 												variant="outline"
 												size="sm"
+												id={buttonId(row, "down")}
 												disabled={n === rows.length - 1}
 												aria-label={`Move ${kind.noun} ${n + 1} down`}
-												onClick={() => move(n, n + 1)}
+												onClick={() => move(n, "down")}
 											>
 												Move down
 											</Button>
@@ -267,7 +304,7 @@ function ListCard({
 												busyLabel="Removing…"
 												fallback={heading}
 												onConfirm={(finished) => {
-													set(rows.filter((_, m) => m !== n));
+													remove(n);
 													finished();
 												}}
 											/>
@@ -288,11 +325,12 @@ function ListCard({
 						type="button"
 						variant="outline"
 						disabled={rows.length >= kind.max}
-						onClick={() => set([...rows, { a: "", b: "" }])}
+						onClick={() => set([...rows, { key: nextKey(), a: "", b: "" }])}
 					>
 						{kind.add}
 					</Button>
-					<Button type="submit" disabled={form.processing || !form.isDirty}>
+					{/* Never disabled: a disabled button drops focus, and focus stays here across a save. */}
+					<Button type="submit" aria-busy={form.processing}>
 						{form.processing ? "Saving…" : "Save"}
 					</Button>
 				</div>
