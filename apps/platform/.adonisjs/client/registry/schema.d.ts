@@ -511,6 +511,42 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/good_to_know_controller').default['destroyClosedDays']>>>
     }
   }
+  'tenant.settings.faq_policies': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/settings/faq-policies'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/studio_content_controller').default['show']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/studio_content_controller').default['show']>>>
+    }
+  }
+  'tenant.settings.faq_policies.faq.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/settings/faq-policies/faq'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/studio_content/validators/studio_content').faqValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/studio_content/validators/studio_content').faqValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/studio_content_controller').default['updateFaq']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/studio_content_controller').default['updateFaq']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.settings.faq_policies.policies.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/settings/faq-policies/policies'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/studio_content/validators/studio_content').policiesValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/studio_content/validators/studio_content').policiesValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/studio_content_controller').default['updatePolicies']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/studio_content_controller').default['updatePolicies']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
   'tenant.settings.members': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/settings/members'

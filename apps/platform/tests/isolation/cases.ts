@@ -17,6 +17,8 @@ import TattooProject from "#modules/projects/models/tattoo_project";
 import ProjectSession from "#modules/scheduling/models/project_session";
 import StudioClosure from "#modules/scheduling/models/studio_closure";
 import StudioHour from "#modules/scheduling/models/studio_hour";
+import StudioFaqEntry from "#modules/studio_content/models/studio_faq_entry";
+import StudioPolicySection from "#modules/studio_content/models/studio_policy_section";
 import Tenant from "#modules/tenancy/models/tenant";
 import TenantInvitation from "#modules/tenancy/models/tenant_invitation";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
@@ -321,6 +323,24 @@ const goodToKnowRows = (target: Studio) =>
 				.orderBy("starts_on")
 				.orderBy("id")
 		).map((row) => row.serialize()),
+	}));
+
+// The studio's own FAQ and policy sections, and the policies date.
+const studioContentRows = (target: Studio) =>
+	inTenant(target.tenant, async () => ({
+		policiesUpdatedAt:
+			(await Tenant.findOrFail(target.tenant.id)).policiesUpdatedAt?.toISO() ??
+			null,
+		faq: (
+			await StudioFaqEntry.query()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("position")
+		).map((row) => [row.position, row.question, row.answer]),
+		policies: (
+			await StudioPolicySection.query()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("position")
+		).map((row) => [row.position, row.title, row.text]),
 	}));
 
 // Every member's alerts (TAT-52): what reading or opening one could change.
@@ -1000,6 +1020,36 @@ export const isolationCases: IsolationCase[] = [
 		}),
 		ownStatus: 302,
 		snapshot: templateRows,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/settings/faq-policies",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: studioContentRows,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/settings/faq-policies/faq",
+		actor: "owner",
+		// Form-encoded, as the harness sends bodies: the brackets make the list.
+		body: () => ({
+			"entries[0][question]": "Isolation question?",
+			"entries[0][answer]": "Isolation answer.",
+		}),
+		ownStatus: 302,
+		snapshot: studioContentRows,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/settings/faq-policies/policies",
+		actor: "owner",
+		body: () => ({
+			"sections[0][title]": "Isolation",
+			"sections[0][text]": "Isolation text.",
+		}),
+		ownStatus: 302,
+		snapshot: studioContentRows,
 	},
 	{
 		method: "GET",

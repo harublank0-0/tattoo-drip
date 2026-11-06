@@ -38,6 +38,7 @@ export const controllers = {
   PublicWork: () => import('#controllers/public_work_controller'),
   Quotes: () => import('#controllers/quotes_controller'),
   Session: () => import('#controllers/session_controller'),
+  StudioContent: () => import('#controllers/studio_content_controller'),
   StudioCover: () => import('#controllers/studio_cover_controller'),
   StudioLogo: () => import('#controllers/studio_logo_controller'),
   StudioProfile: () => import('#controllers/studio_profile_controller'),
