@@ -45,40 +45,83 @@
 }
 
 /*
- * Stencil & Ink (docs/superpowers/specs/2026-10-20-ux-stencil-and-ink-design.md,
- * direction C): warm paper, black ink and the violet of a transfer stencil
- * for everything you can tap. The storefront (apps/storefront/src/styles.css)
- * carries the same vocabulary; the two files are copies, because packages
- * can't import from apps. Measured contrast (WCAG), light, ink on paper
- * 15.8:1, ink-muted 6.5:1 (7.1:1 on a card), line-strong on a card 3.7:1,
- * stencil on paper 7.7:1, on-stencil on stencil 8.4:1; dark: ink on paper
- * 15.6:1, ink-muted 7.2:1 (6.8:1 on a card), line-strong on a card 3.05:1,
- * stencil on paper 8.0:1. Dark line-strong is #6d645c, a notch above the
- * spec's #6b625a, which measured 2.96:1 on the card an input sits on. Marigold
- * is a dot or a bar, never text on paper. shadcn's names are mapped onto the
- * palette below, so components keep using `bg-primary`,
- * `text-muted-foreground` and the rest.
+ * Geist (SIL OFL, inertia/assets/fonts/geist/OFL.txt), vendored from
+ * @fontsource-variable/geist 5.3.0: the interface face of Studio OS, one
+ * variable file per subset (weights 100 to 900). Latin and Latin Extended
+ * only: Devanagari text falls through to the system's Devanagari face in
+ * `--ui-face`, which is why the stack names one. font-display: optional,
+ * as for Eczar: a slow first view keeps the system face instead of
+ * reflowing, and the service worker serves the file from the next view.
+ */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: optional;
+  src: url('../assets/fonts/geist/geist-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: optional;
+  src: url('../assets/fonts/geist/geist-latin-ext-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/*
+ * Studio OS (the dashboard's design system): charcoal by default, a fully
+ * designed light appearance, and TattooDrip red kept for primary actions, the
+ * selected item's marker and the brand. The dashboard no longer shares the
+ * storefront's palette: a studio's public page has its own themes
+ * (apps/storefront/src/styles.css), and nothing here follows them. The two
+ * logo plates below still match the storefront's, because the Page look
+ * preview must show what clients see.
+ *
+ * Surfaces, darkest to lightest in dark (lightest to darkest in light):
+ * canvas (the page), sidebar, surface (cards, inputs, menus), elevated
+ * (hover, the selected nav row, muted fills). Measured contrast (WCAG):
+ * dark: ink on canvas 17.7:1, on surface 16.1:1; ink-muted on canvas 7.2:1,
+ * on surface 6.6:1, on elevated 5.9:1; line-strong (input borders) on
+ * surface 3.5:1; on-brand on brand 5.6:1; brand-text (red as text and focus
+ * ring) on canvas 6.2:1, on surface 5.6:1. Light: ink on canvas 16.9:1;
+ * ink-muted on canvas 5.8:1, on surface 6.0:1, on elevated 5.2:1;
+ * line-strong on surface 3.4:1; on-brand on brand 5.6:1; brand as text on
+ * canvas 5.4:1. Brand red is 3.5:1 on the dark canvas, too low for text, so
+ * red text uses `text-brand-text`, never `text-primary`. Marigold is a dot or
+ * a bar ("needs you"), never text.
  */
 :root {
   color-scheme: light;
 
-  --paper: #f7f3ee;
-  --surface: #fffdfa;
-  --ink: #1c1917;
-  --ink-muted: #5e5650;
-  --line: #e3dbd2;
-  --line-strong: #8c8279;
-  --stencil: #4b3ba6;
-  --stencil-strong: #3a2d88;
-  --stencil-wash: #ece8f7;
-  --on-stencil: #fffdfa;
+  --canvas: #fafafa;
+  --sidebar-bg: #f3f4f5;
+  --surface: #ffffff;
+  --elevated: #eceef1;
+  --line: #e1e3e8;
+  --line-strong: #868b95;
+  --ink: #17191d;
+  --ink-muted: #5f636d;
+  --brand: #c62835;
+  --brand-strong: #a8222e;
+  --brand-text: #c62835;
+  --on-brand: #ffffff;
   --marigold: #e8a317;
-  --paper-shade: #efe9e2;
   --destructive: #b42318;
-  --on-destructive: #fffdfa;
+  --on-destructive: #ffffff;
 
+  /*
+   * The interface face: Geist, then the system stack (and its Devanagari).
+   * `--body-face` is the storefront's plain face, kept for Page look's "Plain"
+   * font card (page_look_source.spec.ts pins it to the storefront's).
+   */
+  --ui-face: Geist, system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', 'Nirmala UI', 'Noto Sans Devanagari', sans-serif;
   --body-face: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', 'Nirmala UI', 'Noto Sans Devanagari', sans-serif;
+  /* Eczar: the wordmark and Page look's "Eczar" font card only (TAT-56). */
   --display-face: Eczar, 'Noto Serif Devanagari', 'Noto Serif', Georgia, 'Times New Roman', serif;
+  --mono-face: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
   /*
    * The studio page's "Classic serif" heading face (TAT-56), the same stack as
    * the storefront's (src/studio/theme/branding.ts), so the font cards in
@@ -86,39 +129,47 @@
    * the sign-in and error pages use Tailwind's own `font-serif` stack.
    */
   --serif-face: Georgia, 'Noto Serif', 'Noto Serif Devanagari', 'Times New Roman', serif;
-  --radius: 0.25rem;
+  /* 8px controls; `rounded-sm` is 6px and `rounded-lg`/`rounded-xl` 10px. */
+  --radius: 0.5rem;
 
-  --background: var(--paper);
+  /* The shell's measures (layouts/app.tsx). */
+  --shell-sidebar: 15.5rem;
+  --shell-sidebar-collapsed: 4.25rem;
+  --shell-top-bar: 3.5rem;
+  --shell-tab-bar: 3.5rem;
+
+  --background: var(--canvas);
   --foreground: var(--ink);
   --card: var(--surface);
   --card-foreground: var(--ink);
   --popover: var(--surface);
   --popover-foreground: var(--ink);
-  --primary: var(--stencil);
-  --primary-foreground: var(--on-stencil);
-  --secondary: var(--stencil-wash);
+  --primary: var(--brand);
+  --primary-foreground: var(--on-brand);
+  --secondary: var(--elevated);
   --secondary-foreground: var(--ink);
-  --muted: var(--paper-shade);
+  --muted: var(--elevated);
   --muted-foreground: var(--ink-muted);
-  --accent: var(--stencil-wash);
+  --accent: var(--elevated);
   --accent-foreground: var(--ink);
   --destructive-foreground: var(--on-destructive);
   --border: var(--line);
   --input: var(--line-strong);
-  --ring: var(--stencil);
-  --sidebar: var(--surface);
+  --ring: var(--brand-text);
+  --sidebar: var(--sidebar-bg);
   --sidebar-foreground: var(--ink);
-  --sidebar-primary: var(--stencil);
-  --sidebar-primary-foreground: var(--on-stencil);
-  --sidebar-accent: var(--stencil-wash);
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: var(--on-brand);
+  --sidebar-accent: var(--elevated);
   --sidebar-accent-foreground: var(--ink);
   --sidebar-border: var(--line);
-  --sidebar-ring: var(--stencil);
+  --sidebar-ring: var(--brand-text);
 
   /*
    * Status groups (TAT-98), text on its wash, always shown with a word:
    * waiting on the studio, waiting on the client, booked, in the chair, closed.
-   * Contrast of text on its wash: 5.2, 7.3, 5.6, 7.05 and 5.2:1.
+   * Contrast of text on its wash: 5.2, 7.3, 5.6, 7.05 and 5.2:1. "In the
+   * chair" keeps the violet it had as Stencil & Ink's accent.
    */
   --status-studio-fg: #8a5a00;
   --status-studio-bg: #fbf0d9;
@@ -126,22 +177,21 @@
   --status-client-bg: #e3edf7;
   --status-booked-fg: #1e6b45;
   --status-booked-bg: #e3f2e9;
-  --status-chair-fg: var(--stencil);
-  --status-chair-bg: var(--stencil-wash);
+  --status-chair-fg: #4b3ba6;
+  --status-chair-bg: #ece8f7;
   --status-closed-fg: var(--ink-muted);
-  --status-closed-bg: var(--line);
+  --status-closed-bg: var(--elevated);
 
   /*
    * The studio's logo tile (TAT-56): the storefront draws a logo on a small
-   * light tile in both schemes (its --logo-plate, the same paper colour), so
-   * the dashboard's preview shows what clients see. Light in dark mode on
+   * light tile in both schemes (its --logo-plate, the same colour), so the
+   * dashboard's preview shows what clients see. Light in dark mode on
    * purpose (not repeated in the dark block): a dark logo with a see-through
-   * background would vanish on a dark surface. Ink on it is 15.8:1.
+   * background would vanish on a dark surface.
    *
    * TAT-123: the dark tile, for a white or light logo (picked when it is
-   * uploaded, switchable under Logo): the dark paper in both schemes, as the
-   * light tile is the light paper in both. White on it is 18.8:1. The
-   * storefront's --logo-plate-dark is the same colour.
+   * uploaded, switchable under Logo), in both schemes. The storefront's
+   * --logo-plate-dark is the same colour.
    */
   --logo-plate: #f7f3ee;
   --logo-plate-dark: #14110f;
@@ -150,37 +200,53 @@
 [data-theme='dark'] {
   color-scheme: dark;
 
-  --paper: #14110f;
-  --surface: #1c1815;
-  --ink: #efe9e2;
-  --ink-muted: #a89f96;
-  --line: #342d27;
-  --line-strong: #6d645c;
-  --stencil: #a99cff;
-  --stencil-strong: #c4bbff;
-  --stencil-wash: #241f3a;
-  --on-stencil: #14110f;
+  --canvas: #0d0e10;
+  --sidebar-bg: #111215;
+  --surface: #17191d;
+  --elevated: #202228;
+  --line: #2a2c32;
+  --line-strong: #6b6f7a;
+  --ink: #f5f5f5;
+  --ink-muted: #9a9ea8;
+  --brand: #c62835;
+  --brand-strong: #d63a46;
+  --brand-text: #f0646e;
+  --on-brand: #ffffff;
   --marigold: #f2b53a;
-  --paper-shade: #26211d;
   --destructive: #f4a39a;
-  --on-destructive: #14110f;
+  --on-destructive: #0d0e10;
 
-  /* The same hues at about 80% lightness on 18% washes: 8.3, 7.9, 8.3, 6.7 and 5.2:1. */
+  /*
+   * Menus and dialogs sit one step above the surface they open over, so the
+   * highlighted row (hover, keyboard focus, `bg-accent`) takes the next step
+   * again: #2c2f36 is 1.2:1 on the elevated menu, ink on it 12.3:1 and
+   * ink-muted 5.0:1. The sidebar's current row stays on the elevated grey.
+   */
+  --popover: var(--elevated);
+  --muted: var(--elevated);
+  --accent: #2c2f36;
+  --secondary: #2c2f36;
+  --sidebar-accent: var(--elevated);
+
+  /* The same hues at about 80% lightness on 18% washes: 8.3, 7.9, 8.3, 8.9 and 5.9:1. */
   --status-studio-fg: #f9d694;
   --status-studio-bg: #473615;
   --status-client-fg: #a9c8e5;
   --status-client-bg: #1f2f3d;
   --status-booked-fg: #abe3c7;
   --status-booked-bg: #203c2e;
+  --status-chair-fg: #c4bbff;
+  --status-chair-bg: #241f3a;
 }
 
 @theme inline {
-  --font-sans: var(--body-face);
+  --font-sans: var(--ui-face);
   --font-display: var(--display-face);
-  --radius-sm: var(--radius);
+  --font-mono: var(--mono-face);
+  --radius-sm: calc(var(--radius) - 2px);
   --radius-md: var(--radius);
-  --radius-lg: var(--radius);
-  --radius-xl: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 2px);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -200,12 +266,13 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-paper: var(--paper);
+  --color-canvas: var(--canvas);
   --color-surface: var(--surface);
+  --color-elevated: var(--elevated);
   --color-ink: var(--ink);
-  --color-stencil: var(--stencil);
-  --color-stencil-strong: var(--stencil-strong);
-  --color-stencil-wash: var(--stencil-wash);
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-text: var(--brand-text);
   --color-marigold: var(--marigold);
   --color-logo-plate: var(--logo-plate);
   --color-logo-plate-dark: var(--logo-plate-dark);
@@ -227,6 +294,11 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --spacing-shell-sidebar: var(--shell-sidebar);
+  --spacing-shell-sidebar-collapsed: var(--shell-sidebar-collapsed);
+  --spacing-shell-top-bar: var(--shell-top-bar);
+  --spacing-shell-tab-bar: var(--shell-tab-bar);
+  --ease-shell: cubic-bezier(0.2, 0, 0, 1);
 }
 
 @layer base {
@@ -242,8 +314,28 @@
     /* Devanagari needs room for its matras: never below 1.5 in body text. */
     line-height: 1.5;
   }
+  /* Numbers line up in columns (counts, money, times) wherever they appear. */
+  table,
+  time {
+    font-variant-numeric: tabular-nums;
+  }
   button:not(:disabled),
   [role='button']:not(:disabled) {
     cursor: pointer;
+  }
+}
+
+/*
+ * Reduced motion: transitions and animations finish at once, everywhere
+ * (the sidebar's width, menus, sheets), so no component has to remember to.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

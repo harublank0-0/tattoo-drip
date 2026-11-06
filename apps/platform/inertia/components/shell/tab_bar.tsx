@@ -18,8 +18,11 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { useTyping } from "~/hooks/use-typing";
 
+// A tab: 56px tall, its label under its icon. The current one has full-strength
+// text, a heavier label and the sidebar's red marker, here on the bar's top
+// edge, so it never relies on colour alone.
 const TAB =
-	"flex min-h-14 w-full flex-col items-center justify-center gap-0.5 text-xs text-muted-foreground";
+	"relative flex min-h-14 w-full flex-col items-center justify-center gap-1 text-[0.6875rem] font-medium text-muted-foreground outline-none transition-colors duration-150 focus-visible:bg-accent before:absolute before:top-0 before:left-1/2 before:h-0.5 before:w-8 before:-translate-x-1/2 before:rounded-b-full before:bg-primary before:opacity-0";
 
 /**
  * The phone navigation (below 1024px): one tab per main destination, fixed
@@ -43,7 +46,7 @@ export default function TabBar({
 		<nav
 			aria-label="Main"
 			className={cn(
-				"fixed inset-x-0 bottom-0 z-40 border-t bg-card pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] lg:hidden",
+				"fixed inset-x-0 bottom-0 z-40 border-t bg-sidebar pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] lg:hidden",
 				typing && "pointer-coarse:hidden",
 			)}
 		>
@@ -56,7 +59,7 @@ export default function TabBar({
 								route={item.route}
 								params={{ tenant: tenantSlug }}
 								also={item.also}
-								className={`${TAB} aria-[current=page]:font-semibold aria-[current=page]:text-foreground`}
+								className={`${TAB} aria-[current=page]:font-semibold aria-[current=page]:text-foreground aria-[current=page]:before:opacity-100`}
 							>
 								<span className="relative">
 									<Icon className="size-5" aria-hidden="true" />
@@ -64,7 +67,7 @@ export default function TabBar({
 										<NavBadge
 											count={item.badge}
 											label={item.badgeLabel}
-											className="absolute -top-2 left-3.5"
+											className="absolute -top-1.5 left-3"
 										/>
 									) : null}
 								</span>
@@ -109,13 +112,18 @@ function MoreMenu({
 				<button
 					type="button"
 					aria-current={open ? "true" : undefined}
-					className={`${TAB} aria-[current=true]:font-semibold aria-[current=true]:text-foreground`}
+					className={`${TAB} data-[state=open]:text-foreground aria-[current=true]:font-semibold aria-[current=true]:text-foreground aria-[current=true]:before:opacity-100`}
 				>
 					<MoreIcon className="size-5" aria-hidden="true" />
 					More
 				</button>
 			</DropdownMenuTrigger>
-			<DropdownMenuContent side="top" align="end" className="w-56">
+			<DropdownMenuContent
+				side="top"
+				align="end"
+				sideOffset={8}
+				className="w-60"
+			>
 				{items.map((item) => {
 					const Icon = NAV_ICONS[item.key];
 					return (

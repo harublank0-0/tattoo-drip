@@ -17,7 +17,7 @@ const buttonVariants = cva(
 					"bg-secondary text-secondary-foreground hover:bg-secondary/80",
 				ghost:
 					"hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
-				link: "text-primary underline-offset-4 hover:underline",
+				link: "text-brand-text underline-offset-4 hover:underline",
 			},
 			// Below `lg` every size is at least 44px (docs/ui.md): `min-h-11` rather
 			// than `h-11`, so a call site that sets `h-auto` (a name that wraps) can

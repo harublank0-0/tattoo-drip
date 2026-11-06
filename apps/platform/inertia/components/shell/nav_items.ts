@@ -119,6 +119,29 @@ export function tabBarItems(items: ShellNavItem[]) {
 	};
 }
 
+/**
+ * The sidebar's groups (Studio OS): the daily work, then running the studio.
+ * They follow `place`, because the phone's split is the same one: what has a
+ * tab is the work of the day, what sits under More is the studio's set-up.
+ * A group with no items (an artist has no "Studio") is left out.
+ */
+export const NAV_GROUP_LABELS: Record<ShellNavItem["place"], string> = {
+	bar: "Workspace",
+	more: "Studio",
+};
+
+export function navGroups(
+	items: ShellNavItem[],
+): { key: ShellNavItem["place"]; label: string; items: ShellNavItem[] }[] {
+	return (["bar", "more"] as const)
+		.map((key) => ({
+			key,
+			label: NAV_GROUP_LABELS[key],
+			items: items.filter((item) => item.place === key),
+		}))
+		.filter((group) => group.items.length > 0);
+}
+
 /** The tab bar only earns its space with two or more destinations. */
 export function showTabBar(items: ShellNavItem[]): boolean {
 	return items.length >= 2;

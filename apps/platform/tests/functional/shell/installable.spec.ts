@@ -25,8 +25,8 @@ test.group("Installable app", () => {
 			start_url: "/dashboard",
 			scope: "/",
 			display: "standalone",
-			background_color: "#f7f3ee",
-			theme_color: "#f7f3ee",
+			background_color: "#0d0e10",
+			theme_color: "#0d0e10",
 		});
 		assert.sameMembers(
 			manifest.icons.map(({ purpose }: { purpose: string }) => purpose),
@@ -68,6 +68,6 @@ test.group("Installable app", () => {
 			"/icons/favicon.svg",
 			"/icons/icon-192.png",
 		]);
-		assert.include(source, 'const CACHE = "td-shell-v2";');
+		assert.include(source, 'const CACHE = "td-shell-v3";');
 	});
 });

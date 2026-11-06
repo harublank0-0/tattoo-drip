@@ -75,7 +75,7 @@ export default function SetupChecklist({
 									aria-hidden="true"
 									className={cn(
 										"size-5 shrink-0",
-										done ? "text-primary" : "text-muted-foreground",
+										done ? "text-brand-text" : "text-muted-foreground",
 									)}
 								/>
 								<span className="flex min-w-0 flex-1 flex-col">

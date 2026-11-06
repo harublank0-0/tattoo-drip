@@ -344,7 +344,10 @@ test.group("page look words (TAT-56)", () => {
 			words.FONT_SAMPLE_CLASS.serif,
 			"font-(family-name:--serif-face)",
 		);
-		assert.equal(words.FONT_SAMPLE_CLASS.sans, "font-sans");
+		assert.equal(
+			words.FONT_SAMPLE_CLASS.sans,
+			"font-(family-name:--body-face)",
+		);
 	});
 
 	test("the saved note and the preview note both say 15 minutes", ({

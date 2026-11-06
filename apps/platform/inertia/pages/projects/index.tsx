@@ -193,7 +193,7 @@ export default function ProjectsIndex({
 									"-my-3 flex min-h-11 items-center underline-offset-4 hover:underline",
 									key === sort
 										? "font-semibold text-foreground"
-										: "text-primary",
+										: "text-brand-text",
 								)}
 							>
 								{SORT_LABELS[key]}
@@ -215,7 +215,7 @@ export default function ProjectsIndex({
 								waiting,
 								sort: chosenSort,
 							})}
-							className="-my-3 flex min-h-11 items-center self-start text-sm text-primary underline-offset-4 hover:underline"
+							className="-my-3 flex min-h-11 items-center self-start text-sm text-brand-text underline-offset-4 hover:underline"
 						>
 							Back to the first page
 						</Link>

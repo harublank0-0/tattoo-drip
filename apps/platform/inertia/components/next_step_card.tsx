@@ -127,7 +127,7 @@ export default function NextStepCard({
 					deposit && (
 						<div
 							id={cardId("deposit", step.anchor)}
-							className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)] lg:scroll-mt-0"
+							className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)]"
 						>
 							<DepositPanel
 								projectId={projectId}
@@ -195,7 +195,7 @@ export default function NextStepCard({
 	return (
 		<Card
 			id={step.anchor ?? undefined}
-			className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)] max-sm:gap-3 max-sm:py-4 lg:scroll-mt-0"
+			className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)] max-sm:gap-3 max-sm:py-4"
 		>
 			<CardHeader className="gap-1">
 				<p className="flex items-center gap-2 text-sm text-muted-foreground">

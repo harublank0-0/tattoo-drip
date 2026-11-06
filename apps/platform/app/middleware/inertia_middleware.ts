@@ -4,6 +4,7 @@ import type { NextFn } from "@adonisjs/core/types/http";
 import BaseInertiaMiddleware from "@adonisjs/inertia/inertia_middleware";
 import type User from "#models/user";
 import InquiryService from "#modules/inquiries/services/inquiry_service";
+import ImageService from "#modules/media/services/image_service";
 import { bellKinds } from "#modules/notifications/alerts";
 import AlertService from "#modules/notifications/services/alert_service";
 import WaitingService from "#modules/projects/services/waiting_service";
@@ -17,6 +18,13 @@ import { ensureDbContext } from "#services/db_context";
 import { encryptsHistory } from "#services/history_encryption";
 import { isApiRequest } from "#services/public_api";
 import UserTransformer from "#transformers/user_transformer";
+
+/**
+ * The shell draws the studio's icon at 28 px, so it asks for a copy at least
+ * 56 px wide (2x). The icon keeps only a 32 px copy (ICON_WIDTHS), so this is
+ * the 180 px icon itself.
+ */
+const SHELL_ICON_WIDTH = 56;
 
 export default class InertiaMiddleware extends BaseInertiaMiddleware {
 	async share(ctx: HttpContext) {
@@ -101,6 +109,18 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 					)
 				: null;
 
+		// The studio's square icon (TAT-123) for the shell's studio identity,
+		// from the row the tenant middleware loaded: a URL, no query. The icon
+		// is drawn on its logo tile, so it shows as it is in either theme.
+		const logoUrl = tenant?.logoIconKey
+			? await (await ctx.containerResolver.make(ImageService)).urlFor(
+					"studio_icon",
+					tenant.logoIconKey,
+					tenant,
+					SHELL_ICON_WIDTH,
+				)
+			: null;
+
 		/**
 		 * Data shared with all Inertia pages. Make sure you are using
 		 * transformers for rich data-types like Models.
@@ -122,6 +142,7 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 							slug: tenant.slug,
 							type: tenant.type,
 							role: membership.role,
+							logoUrl,
 						}
 					: undefined,
 			),

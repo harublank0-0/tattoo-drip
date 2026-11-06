@@ -85,7 +85,7 @@ test.group("The page look components (TAT-56)", () => {
 		assert.match(cover, /id="cover-photo"/);
 		assert.include(
 			cover,
-			"scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)] lg:scroll-mt-0",
+			"scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)]",
 		);
 		const page = await read("pages/settings/look.tsx");
 		assert.include(page, "#cover-photo");

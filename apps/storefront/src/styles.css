@@ -57,9 +57,9 @@
 /*
  * The studio page's palette (TAT-48): stencil paper, tattoo ink, and the
  * violet of a transfer stencil for everything you can tap. The paper, ink and
- * line values are the warm ones of Stencil & Ink (TAT-97), the same as the
- * dashboard's (apps/platform/inertia/css/app.css, a copy: packages can't
- * import from apps); the violets are unchanged. Measured contrast on paper,
+ * line values are the warm ones of Stencil & Ink (TAT-97); the violets are
+ * unchanged. The dashboard has its own palette (Studio OS) and no longer
+ * copies these. Measured contrast on paper,
  * light: ink 15.8:1, ink-muted 6.5:1, stencil 8.4:1, line-strong 3.4:1;
  * dark: ink 15.6:1, ink-muted 7.2:1, stencil 8.0:1, line-strong 3.2:1.
  * Themes (TAT-54) override these tokens.

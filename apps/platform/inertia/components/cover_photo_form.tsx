@@ -45,7 +45,7 @@ export default function CoverPhotoForm({
 	return (
 		<div
 			id="cover-photo"
-			className="mt-8 border-t pt-6 scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)] lg:scroll-mt-0"
+			className="mt-8 border-t pt-6 scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)]"
 		>
 			<Section title="Cover photo" description={COVER_INTRO}>
 				<div className="flex flex-col gap-4">
