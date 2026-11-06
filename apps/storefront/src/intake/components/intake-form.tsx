@@ -64,6 +64,7 @@ import {
 	totalBytes,
 } from "../references.ts";
 import {
+	type DetailField,
 	FIELD_ORDER,
 	INTAKE_LIMITS,
 	type IntakeField,
@@ -405,14 +406,17 @@ export function IntakeForm({
 						});
 			if (problem.kind === "fields") {
 				const named = Object.keys(problem.fields).map((name) =>
-					bookingFieldOf(name as IntakeField),
+					bookingFieldOf(name as IntakeField | DetailField),
 				);
 				for (const [name, message] of Object.entries(problem.fields)) {
-					form.setFieldMeta(bookingFieldOf(name as IntakeField), (meta) => ({
-						...meta,
-						isTouched: true,
-						errorMap: { ...meta.errorMap, onServer: message },
-					}));
+					form.setFieldMeta(
+						bookingFieldOf(name as IntakeField | DetailField),
+						(meta) => ({
+							...meta,
+							isTouched: true,
+							errorMap: { ...meta.errorMap, onServer: message },
+						}),
+					);
 				}
 				dispatch({
 					type: "rejected",
@@ -1040,10 +1044,13 @@ const BOOKING_FIELD_ORDER: readonly BookingField[] = [
 	"preferredArtistId",
 	"days",
 	"idea",
+	"style",
+	"colour",
 	"size",
 	"approximateSize",
 	"placement",
 	"budget",
+	"notes",
 	"contactName",
 	"contactPhone",
 	"contactEmail",
@@ -1052,6 +1059,9 @@ const BOOKING_FIELD_ORDER: readonly BookingField[] = [
 
 const BOOKING_LABELS: Partial<Record<BookingField, string>> = {
 	days: bookingCopy.steps.when,
+	style: bookingCopy.tattoo.style,
+	colour: bookingCopy.tattoo.colour,
+	notes: bookingCopy.tattoo.notes,
 	size: bookingCopy.tattoo.size,
 	approximateSize: bookingCopy.tattoo.sizeDetails,
 };
@@ -1064,9 +1074,6 @@ const COMPOSED_FROM: Partial<Record<BookingInput, BookingField>> = {
 	approximateSize: "size",
 	flexible: "days",
 	timeOfDay: "days",
-	style: "idea",
-	colour: "idea",
-	notes: "idea",
 };
 
 /** The summary for the fields of one step: each one's first error, then (on the tattoo step) the photos'. */
@@ -1085,7 +1092,10 @@ export function bookingSummaryItems(
 			const own = BOOKING_LABELS[field];
 			items.push({
 				target:
-					CHOICE_FIELDS.has(field as IntakeField) || field === "size"
+					CHOICE_FIELDS.has(field as IntakeField) ||
+					field === "size" ||
+					field === "style" ||
+					field === "colour"
 						? `${field}-0`
 						: field,
 				label: own ?? (
@@ -1097,7 +1107,8 @@ export function bookingSummaryItems(
 				message,
 			});
 		}
-		if (field === "idea" && (hasPhotoErrors(references) || photosStopped)) {
+		// The photo picker follows the colour choice on the tattoo step.
+		if (field === "colour" && (hasPhotoErrors(references) || photosStopped)) {
 			items.push({
 				target: canAdd(references) ? "references-input" : "references",
 				label: copy.photos.legend,

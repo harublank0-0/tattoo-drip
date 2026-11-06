@@ -1,4 +1,5 @@
 import { randomInt } from "node:crypto";
+import { isUniqueViolation } from "#services/db_errors";
 
 /**
  * A studio's reference codes: one short code a client quotes from the
@@ -28,4 +29,30 @@ export function newReferenceCode(): string {
 		code += REFERENCE_ALPHABET[randomInt(REFERENCE_ALPHABET.length)];
 	}
 	return code;
+}
+
+/** The unique constraint a code the studio already holds hits. */
+export const CODE_TAKEN = "reference_codes_tenant_id_code_unique";
+
+/**
+ * Draws codes and hands each to `register` (which inserts it into
+ * `reference_codes`, in a savepoint of its own) until one is free: a code
+ * the studio already holds is drawn again, up to REFERENCE_TRIES times; then
+ * the unique violation surfaces.
+ */
+export async function claimFreeCode(
+	register: (code: string) => Promise<unknown>,
+	draw: () => string = newReferenceCode,
+): Promise<string> {
+	for (let attempt = 1; ; attempt++) {
+		const code = draw();
+		try {
+			await register(code);
+			return code;
+		} catch (error) {
+			if (attempt >= REFERENCE_TRIES || !isUniqueViolation(error, CODE_TAKEN)) {
+				throw error;
+			}
+		}
+	}
 }

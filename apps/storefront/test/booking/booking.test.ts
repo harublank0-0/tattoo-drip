@@ -23,7 +23,10 @@ import {
 	monthWeeks,
 	shiftMonth,
 } from "../../src/booking/calendar.ts";
-import { BookingSent } from "../../src/booking/components/booking-review.tsx";
+import {
+	BookingReview,
+	BookingSent,
+} from "../../src/booking/components/booking-review.tsx";
 import { bookingErrors } from "../../src/intake/components/intake-form.tsx";
 import { initialValues } from "../../src/intake/rules.ts";
 import { Route as RequestRedirect } from "../../src/routes/request.tsx";
@@ -233,6 +236,10 @@ describe("the steps", () => {
 		]);
 		assert.ok(STEP_FIELDS.when.includes("days"));
 		assert.ok(STEP_FIELDS.tattoo.includes("size"));
+		// A refusal of the booking's own fields goes back to the tattoo step.
+		for (const field of ["style", "colour", "notes"] as const) {
+			assert.ok(STEP_FIELDS.tattoo.includes(field), field);
+		}
 		assert.ok(STEP_FIELDS.details.includes("contactPhone"));
 		// Flexible needs no day; a size in the client's words needs no choice.
 		assert.deepEqual(
@@ -309,6 +316,35 @@ describe("what it never claims", () => {
 			}),
 			[],
 		);
+	});
+
+	test("the review shows the client's notes as text, markup and all, with their line breaks", () => {
+		const html = renderToStaticMarkup(
+			createElement(BookingReview, {
+				snapshot: {
+					values: values({
+						notes: '<script>alert("x")</script>\nA second line',
+						style: "fine-line",
+					}),
+					artistName: null,
+					dates: "Friday, 6 November 2026",
+					styleName: "Fine line",
+					photoCount: 0,
+					artwork: null,
+				},
+				studioName: "Black Needle",
+				steps: bookingSteps(false),
+				onEdit: () => {},
+			}),
+		);
+		assert.doesNotMatch(html, /<script>/);
+		assert.match(
+			html,
+			/<span class="booking-review-idea user-text" dir="auto">&lt;script&gt;alert\(&quot;x&quot;\)&lt;\/script&gt;\nA second line<\/span>/,
+		);
+		// The style by name; the slug is only what is sent.
+		assert.match(html, />Fine line</);
+		assert.doesNotMatch(html, />fine-line</);
 	});
 
 	test("the received screen says received and not confirmed, shows what was asked and the API's reference", () => {

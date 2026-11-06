@@ -271,6 +271,28 @@ test.group("DepositLinkService.issue", (group) => {
 		assert.deepEqual(await registered(tenant), [link.referenceCode]);
 	});
 
+	test("a soft-deleted inquiry's project still takes the inquiry's reference", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("links-reuse-trashed");
+		const { project } = await inTenant(tenant, async () => {
+			await ReferenceCode.create({ tenantId: tenant.id, code: "K7MP3Q" });
+			const ready = await depositReady(
+				tenant,
+				{},
+				{ inquiryReference: "K7MP3Q" },
+			);
+			await ready.inquiry?.softDelete();
+			return ready;
+		});
+
+		const { link } = await inTenant(tenant, () =>
+			links.issue(tenant, OWNER, project),
+		);
+
+		assert.equal(link.referenceCode, "K7MP3Q");
+	});
+
 	test("an inquiry without a reference (an older one) gives its project a fresh code", async ({
 		assert,
 	}) => {

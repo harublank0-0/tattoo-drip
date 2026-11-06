@@ -171,6 +171,29 @@ describe("describeSubmitError", () => {
 		});
 	});
 
+	test("the booking's style, colour and notes refused by the API land on their own fields", () => {
+		const problem = describeSubmitError(
+			apiError(422, "validation_failed", {
+				fields: {
+					style: ["Choose a style from the list, or none."],
+					colour: ["Choose black and grey, colour or not decided yet."],
+					notes: ["Use at most 1000 characters."],
+				},
+			}),
+			CONTEXT,
+		);
+		assert.deepEqual(problem, {
+			kind: "fields",
+			fields: {
+				style: "Choose a style from the list, or none.",
+				colour: "Choose black and grey, colour or not decided yet.",
+				notes: "Use at most 1000 characters.",
+			},
+			photos: {},
+			photosError: null,
+		});
+	});
+
 	test("a validation error the form can't place says some answers weren't accepted", () => {
 		assert.deepEqual(
 			describeSubmitError(
