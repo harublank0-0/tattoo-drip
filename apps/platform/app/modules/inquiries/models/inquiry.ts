@@ -34,6 +34,7 @@ export type InquiryColour = (typeof INQUIRY_COLOURS)[number];
  */
 export default class Inquiry extends compose(InquirySchema, withSoftDeletes) {
 	declare status: InquiryStatus;
+	declare colour: InquiryColour | null;
 	declare sourceChannel: SourceChannel;
 	declare lastContactChannel: ContactChannel | null;
 	declare lastContactKind: MessageKind | null;

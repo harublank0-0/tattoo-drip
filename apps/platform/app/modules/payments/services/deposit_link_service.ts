@@ -26,7 +26,7 @@ import ProjectService, {
 } from "#modules/projects/services/project_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import QuoteService from "#modules/projects/services/quote_service";
-// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+// A value import: the constructor's default builds one.
 import ReferenceCodeService from "#modules/references/services/reference_code_service";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { withTransaction } from "#services/db_context";

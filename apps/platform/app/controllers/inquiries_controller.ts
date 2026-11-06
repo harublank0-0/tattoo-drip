@@ -4,6 +4,7 @@ import { errors } from "@vinejs/vine";
 import { tenantContext } from "#middleware/tenant_middleware";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
+import { knownStyles } from "#modules/artists/styles";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ClientService from "#modules/clients/services/client_service";
 import { claimStateOf } from "#modules/flash/claims";
@@ -197,6 +198,12 @@ export default class InquiriesController {
 				approximateSize: inquiry.approximateSize,
 				preferredDates: inquiry.preferredDates,
 				budget: inquiry.budget,
+				// A retired style is shown as nothing, as everywhere else.
+				style:
+					knownStyles(inquiry.style ? [inquiry.style] : [])[0]?.name ?? null,
+				colour: inquiry.colour,
+				notes: inquiry.notes,
+				referenceCode: inquiry.referenceCode,
 				source: inquiry.sourceChannel,
 				preferredArtistName: preferred?.name ?? null,
 				receivedText: receivedText(inquiry, tenant.timezone),

@@ -25,7 +25,7 @@ import { InvalidImageError } from "#modules/media/errors";
 import ImageService, {
 	type StoredImage,
 } from "#modules/media/services/image_service";
-// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+// A value import: the constructor's default builds one.
 import ReferenceCodeService from "#modules/references/services/reference_code_service";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { afterRollback, withTransaction } from "#services/db_context";

@@ -4,7 +4,11 @@ import { type ReactNode, type RefObject, useRef } from "react";
 import { urlFor } from "~/client";
 import FlashDesignCard from "~/components/flash_design_card";
 import InlineConfirm from "~/components/inline_confirm";
-import { type InquiryPageProps, SOURCE_LABELS } from "~/components/inquiries";
+import {
+	COLOUR_LABELS,
+	type InquiryPageProps,
+	SOURCE_LABELS,
+} from "~/components/inquiries";
 import MessageCard from "~/components/message_card";
 import Page from "~/components/page";
 import ReferenceGrid from "~/components/references";
@@ -61,6 +65,21 @@ export default function InquiryShow({
 		["Preferred dates", inquiry.preferredDates],
 		["Preferred artist", inquiry.preferredArtistName ?? "Any artist"],
 		["Budget", inquiry.budget],
+		// What the client chose on the booking page: shown only when chosen.
+		...(inquiry.style ? [["Style", inquiry.style] as [string, ReactNode]] : []),
+		...(inquiry.colour
+			? [["Colour", COLOUR_LABELS[inquiry.colour]] as [string, ReactNode]]
+			: []),
+		...(inquiry.notes
+			? [
+					[
+						"Notes",
+						<span key="notes" className="whitespace-pre-line">
+							{inquiry.notes}
+						</span>,
+					] as [string, ReactNode],
+				]
+			: []),
 		[
 			"Found the studio through",
 			SOURCE_LABELS[inquiry.source] ?? inquiry.source,
@@ -74,6 +93,16 @@ export default function InquiryShow({
 			title={inquiry.contactName}
 			titleRef={heading}
 			description={inquiry.receivedText}
+			details={
+				inquiry.referenceCode ? (
+					<p className="text-sm">
+						Request{" "}
+						<span className="font-mono font-semibold tracking-wider">
+							{inquiry.referenceCode}
+						</span>
+					</p>
+				) : undefined
+			}
 			actions={
 				<Link
 					href={urlFor("tenant.clients.show", {

@@ -69,6 +69,9 @@ type InquiryOver = Partial<
 		| "decidedAt"
 		| "anonymizedAt"
 		| "referenceCode"
+		| "style"
+		| "colour"
+		| "notes"
 		| "createdAt"
 	>
 >;
