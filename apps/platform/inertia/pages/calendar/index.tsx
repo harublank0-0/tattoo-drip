@@ -1,56 +1,74 @@
-import { Link, router } from "@inertiajs/react";
+import { Link, router, usePage } from "@inertiajs/react";
 import { cn } from "cn";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { ChevronLeft, ChevronRight, Inbox, Plus } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { urlFor } from "~/client";
 import {
 	type CalendarDay,
 	type CalendarPageProps,
-	type CalendarView,
+	type CalendarQuery,
+	type CalendarSession,
+	calendarHref,
+	STATUS_CHOICES,
 	studioDate,
+	VIEW_CHOICES,
 } from "~/components/calendar";
+import { MonthGrid, TimeGrid } from "~/components/calendar_views";
 import { DayAgenda, useNow } from "~/components/day_agenda";
 import Page from "~/components/page";
-import { Badge } from "~/components/ui/badge";
+import SessionDrawer from "~/components/session_drawer";
+import NavBadge from "~/components/shell/nav_badge";
 import { buttonVariants } from "~/components/ui/button";
-import { Field, FieldLabel } from "~/components/ui/field";
 import { useTenant } from "~/hooks/use-tenant";
 import AppLayout from "~/layouts/app";
 
-/** A URL for this page with some of its state changed. */
-type HrefFor = (change: { view?: CalendarView; date?: string }) => string;
+/** The calendar's unit names, for the step buttons' names. */
+const UNITS = { day: "day", week: "week", month: "month", agenda: "two weeks" };
 
 /**
- * A day or a week of sessions (TAT-50), for the whole studio or one artist:
- * owners pick, artists see their own. Read-only; a session opens its
- * project.
+ * The calendar (TAT-50, Studio OS): the studio's sessions as a day or a week
+ * on a time grid, a month, or a list of two weeks, for the whole studio or
+ * one artist, by status. Owners pick the artist; artists see their own. A
+ * session opens the drawer, where the member reschedules it or records its
+ * outcome by the project page's own rules; requests stay in the Inbox, and
+ * booking is "Book session". Below `lg` the day and the week are lists: a
+ * seven-column grid doesn't fit a phone, and a tablet's touch targets stay
+ * 44px (TAT-103), which a half-hour block on the grid is not.
  */
-export default function CalendarIndex({
-	view,
-	date,
-	timezone,
-	rangeText,
-	previous,
-	next,
-	scope,
-	artistFilter,
-	canBook,
-	days,
-}: CalendarPageProps) {
+export default function CalendarIndex(props: CalendarPageProps) {
+	const {
+		view,
+		date,
+		timezone,
+		rangeText,
+		scope,
+		status,
+		artistFilter,
+		canBook,
+		days,
+		total,
+		selected,
+	} = props;
 	const tenant = useTenant();
+	const { inboxCount } = usePage().props;
 	const now = useNow();
 	// The studio's date, moving with the clock (a tab left open past midnight).
 	const today = studioDate(now, timezone);
 	const isOwner = tenant.role === "owner";
+	const showArtist = scope === "studio";
 	const base = urlFor("tenant.calendar.index", { tenant: tenant.slug });
-	const hrefFor: HrefFor = (change) => {
-		const params = new URLSearchParams({
-			view: change.view ?? view,
-			date: change.date ?? date,
-		});
-		if (artistFilter?.selected) params.set("artist", artistFilter.selected);
-		return `${base}?${params.toString()}`;
+	const query: CalendarQuery = {
+		view,
+		date,
+		artist: artistFilter?.selected ?? null,
+		status,
 	};
+	const hrefWith = (change: Partial<CalendarQuery>) =>
+		calendarHref(base, { ...query, session: null, ...change });
+	const sessionHref = (session: CalendarSession) =>
+		hrefWith({ session: session.id });
+	const back = hrefWith({});
+	const loading = useVisiting();
 
 	if (scope === "unlinked") {
 		return (
@@ -63,227 +81,375 @@ export default function CalendarIndex({
 		);
 	}
 
+	const filtered = status !== "active" || Boolean(artistFilter?.selected);
 	const agenda = (day: CalendarDay) => (
 		<DayAgenda
 			day={day}
 			isToday={day.date === today}
 			now={now}
 			timezone={timezone}
-			showArtist={scope === "studio"}
+			showArtist={showArtist}
 			isOwner={isOwner}
 			tenantSlug={tenant.slug}
+			hrefFor={sessionHref}
 		/>
 	);
 
 	return (
 		<Page
 			title="Calendar"
-			description={isOwner ? undefined : "Your sessions"}
+			description={
+				isOwner
+					? "Every session in the studio, by day, week or month."
+					: "Your sessions, by day, week or month."
+			}
 			actions={
-				canBook ? (
-					<Link
-						href={`${urlFor("tenant.projects.create", { tenant: tenant.slug })}?date=${date}`}
-						className={cn(buttonVariants(), "h-11")}
-					>
-						Book session
-					</Link>
-				) : undefined
+				<>
+					{isOwner && (
+						<Link
+							href={urlFor("tenant.inbox.index", { tenant: tenant.slug })}
+							className={buttonVariants({ variant: "outline", size: "sm" })}
+						>
+							<Inbox aria-hidden="true" />
+							Requests
+							{inboxCount ? <NavBadge count={inboxCount} /> : null}
+						</Link>
+					)}
+					{canBook && (
+						<Link
+							href={`${urlFor("tenant.projects.create", { tenant: tenant.slug })}?date=${date}`}
+							className={buttonVariants({ size: "sm" })}
+						>
+							<Plus aria-hidden="true" />
+							Book session
+						</Link>
+					)}
+				</>
 			}
 		>
-			<div className="flex max-w-3xl flex-col gap-6">
+			<div className="flex min-w-0 flex-col gap-4">
 				<Toolbar
-					view={view}
+					{...props}
 					today={today}
-					previous={previous}
-					next={next}
-					hrefFor={hrefFor}
+					hrefWith={hrefWith}
+					base={base}
+					query={query}
 				/>
-				{artistFilter &&
-					(artistFilter.artists.length > 0 ? (
-						<ArtistPicker
-							base={base}
-							view={view}
-							date={date}
-							filter={artistFilter}
-						/>
-					) : (
-						<p className="text-sm text-muted-foreground">
-							Every session belongs to an artist.{" "}
-							<Link
-								href={urlFor("tenant.artists.create", { tenant: tenant.slug })}
-								className="font-medium text-foreground underline"
-							>
-								Add an artist
-							</Link>{" "}
-							to start booking.
-						</p>
-					))}
-				<h2
-					aria-live="polite"
-					className="flex flex-wrap items-center gap-2 text-lg font-semibold"
-				>
-					{rangeText}
-					{view === "day" && date === today && (
-						<Badge variant="secondary">Today</Badge>
+				{artistFilter && artistFilter.artists.length === 0 && (
+					<p className="text-sm text-muted-foreground">
+						Every session belongs to an artist.{" "}
+						<Link
+							href={urlFor("tenant.artists.create", { tenant: tenant.slug })}
+							className="font-medium text-foreground underline"
+						>
+							Add an artist
+						</Link>{" "}
+						to start booking.
+					</p>
+				)}
+
+				<section
+					aria-labelledby="calendar-range"
+					aria-busy={loading}
+					className={cn(
+						"flex min-w-0 flex-col gap-3 transition-opacity duration-150",
+						loading && "opacity-60",
 					)}
-				</h2>
-				{view === "day"
-					? agenda(days[0])
-					: days.map((day) => (
-							<section
-								key={day.date}
-								aria-labelledby={`day-${day.date}`}
-								className="flex flex-col gap-2"
-							>
-								<h3
-									id={`day-${day.date}`}
-									className="flex items-center gap-2 text-sm font-semibold"
-								>
-									{day.label}
-									{day.date === today && (
-										<Badge variant="secondary">Today</Badge>
-									)}
-								</h3>
-								{agenda(day)}
-							</section>
-						))}
+				>
+					<h2
+						id="calendar-range"
+						aria-live="polite"
+						className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-lg font-semibold"
+					>
+						{rangeText}
+						<span className="text-sm font-normal text-muted-foreground tabular-nums">
+							{total === 0
+								? filtered
+									? "Nothing matches these filters"
+									: "No sessions"
+								: `${total} session${total === 1 ? "" : "s"}`}
+						</span>
+					</h2>
+
+					{view === "month" ? (
+						<MonthGrid
+							days={days}
+							today={today}
+							dayHref={(day) => hrefWith({ view: "day", date: day })}
+							hrefFor={sessionHref}
+							showArtist={showArtist}
+							isOwner={isOwner}
+						/>
+					) : view === "agenda" ? (
+						<AgendaList days={days} agenda={agenda} today={today} />
+					) : (
+						<>
+							<div className="hidden lg:block">
+								<TimeGrid
+									days={days}
+									today={today}
+									now={now}
+									timezone={timezone}
+									showArtist={showArtist}
+									isOwner={isOwner}
+									hrefFor={sessionHref}
+								/>
+							</div>
+							<div className="lg:hidden">
+								{view === "day" ? (
+									agenda(days[0])
+								) : (
+									<AgendaList days={days} agenda={agenda} today={today} all />
+								)}
+							</div>
+						</>
+					)}
+				</section>
 			</div>
+
+			<SessionDrawer
+				selected={selected}
+				back={back}
+				onClose={() =>
+					router.get(back, {}, { preserveScroll: true, preserveState: true })
+				}
+			/>
 		</Page>
 	);
 }
 
 CalendarIndex.layout = [AppLayout];
 
-/** Day or week, and one step back, today, one step on. */
+/** Whether an Inertia visit is out: the calendar dims while the next range loads. */
+function useVisiting(): boolean {
+	const [visiting, setVisiting] = useState(false);
+	useEffect(() => {
+		const offStart = router.on("start", () => setVisiting(true));
+		const offFinish = router.on("finish", () => setVisiting(false));
+		return () => {
+			offStart();
+			offFinish();
+		};
+	}, []);
+	return visiting;
+}
+
+/**
+ * Days as lists, each under its heading: the list view's days with sessions
+ * (or a sentence when there are none), and a phone's week (`all`: every
+ * day, an empty one saying so).
+ */
+function AgendaList({
+	days,
+	agenda,
+	today,
+	all = false,
+}: {
+	days: CalendarDay[];
+	agenda: (day: CalendarDay) => React.ReactNode;
+	today: string;
+	all?: boolean;
+}) {
+	const shown = all ? days : days.filter((day) => day.sessions.length > 0);
+	if (shown.length === 0) {
+		return (
+			<p className="rounded-lg border border-dashed px-4 py-5 text-sm text-muted-foreground">
+				No sessions in these two weeks.
+			</p>
+		);
+	}
+	return (
+		<div className="flex flex-col gap-6">
+			{shown.map((day) => (
+				<section
+					key={day.date}
+					aria-labelledby={`day-${day.date}`}
+					className="flex flex-col gap-1"
+				>
+					<h3
+						id={`day-${day.date}`}
+						className="flex items-center gap-2 border-b pb-1.5 text-sm font-semibold"
+					>
+						{day.label}
+						{day.date === today && (
+							<span className="rounded-sm bg-primary px-1.5 text-xs text-primary-foreground">
+								Today
+							</span>
+						)}
+						{day.closure && (
+							<span className="text-xs font-normal text-muted-foreground">
+								Closed{day.closure.note ? `: ${day.closure.note}` : ""}
+							</span>
+						)}
+					</h3>
+					{agenda(day)}
+				</section>
+			))}
+		</div>
+	);
+}
+
+/**
+ * The calendar's controls: the view, one step back, today, one step on, and
+ * the filters (owners pick the artist; every member the status). On a phone
+ * they wrap into two rows, the filters full width.
+ */
 function Toolbar({
 	view,
-	today,
 	previous,
 	next,
-	hrefFor,
-}: {
-	view: CalendarView;
+	today,
+	artistFilter,
+	status,
+	hrefWith,
+	base,
+	query,
+}: CalendarPageProps & {
 	today: string;
-	previous: string;
-	next: string;
-	hrefFor: HrefFor;
+	hrefWith: (change: Partial<CalendarQuery>) => string;
+	base: string;
+	query: CalendarQuery;
 }) {
-	const unit = view === "day" ? "day" : "week";
-	const step = cn(
-		buttonVariants({ variant: "outline", size: "icon" }),
-		"size-11",
-	);
+	const unit = UNITS[view];
+	const step = buttonVariants({ variant: "outline", size: "icon-sm" });
+	const visit = (change: Partial<CalendarQuery>) =>
+		router.get(
+			calendarHref(base, { ...query, session: null, ...change }),
+			{},
+			{ preserveScroll: true, preserveState: true },
+		);
 
 	return (
-		<nav
-			aria-label="Calendar"
-			className="flex flex-wrap items-center justify-between gap-2"
-		>
-			{/* No overflow-hidden: it would clip the links' focus rings. */}
-			<div className="inline-flex rounded-md border bg-background">
-				{(["day", "week"] as const).map((option) => (
-					<Link
-						key={option}
-						href={hrefFor({ view: option })}
-						aria-current={option === view ? "page" : undefined}
-						className={cn(
-							buttonVariants({
-								variant: option === view ? "secondary" : "ghost",
-							}),
-							"relative min-h-11 rounded-none px-4 first:rounded-l-sm last:rounded-r-sm focus-visible:z-10 aria-[current=page]:font-semibold",
-						)}
-					>
-						{option === "day" ? "Day" : "Week"}
-					</Link>
-				))}
-			</div>
-			<div className="flex items-center gap-2">
+		<div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-y py-2.5">
+			<nav aria-label="Calendar dates" className="flex items-center gap-1.5">
 				<Link
-					href={hrefFor({ date: previous })}
+					href={hrefWith({ date: today })}
+					className={buttonVariants({ variant: "outline", size: "sm" })}
+				>
+					Today
+				</Link>
+				<Link
+					href={hrefWith({ date: previous })}
 					aria-label={`Previous ${unit}`}
 					className={step}
 				>
 					<ChevronLeft aria-hidden="true" />
 				</Link>
 				<Link
-					href={hrefFor({ date: today })}
-					className={cn(buttonVariants({ variant: "outline" }), "min-h-11")}
-				>
-					Today
-				</Link>
-				<Link
-					href={hrefFor({ date: next })}
+					href={hrefWith({ date: next })}
 					aria-label={`Next ${unit}`}
 					className={step}
 				>
 					<ChevronRight aria-hidden="true" />
 				</Link>
+			</nav>
+
+			{/* No overflow-hidden: it would clip the links' focus rings. */}
+			<nav
+				aria-label="Calendar view"
+				className="inline-flex rounded-md border bg-background p-0.5"
+			>
+				{VIEW_CHOICES.map((option) => (
+					<Link
+						key={option.value}
+						href={hrefWith({ view: option.value })}
+						aria-current={option.value === view ? "page" : undefined}
+						className="relative inline-flex min-h-8 items-center rounded-sm px-3 text-sm font-medium text-muted-foreground outline-none transition-colors duration-150 hover:text-foreground focus-visible:z-10 focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-[current=page]:bg-accent aria-[current=page]:text-foreground max-lg:min-h-11"
+					>
+						{option.label}
+					</Link>
+				))}
+			</nav>
+
+			<div className="flex w-full flex-wrap gap-2 sm:ml-auto sm:w-auto">
+				{artistFilter && artistFilter.artists.length > 0 && (
+					<FilterSelect
+						id="artist"
+						label="Artist"
+						value={artistFilter.selected ?? ""}
+						options={[
+							{ value: "", label: "All artists" },
+							...artistFilter.artists.map(({ id, name }) => ({
+								value: id,
+								label: name,
+							})),
+						]}
+						onApply={(value) => visit({ artist: value || null })}
+					/>
+				)}
+				<FilterSelect
+					id="status"
+					label="Status"
+					value={status}
+					options={STATUS_CHOICES}
+					onApply={(value) =>
+						visit({ status: value as CalendarQuery["status"] })
+					}
+				/>
 			</div>
-		</nav>
+		</div>
 	);
 }
 
 /**
- * Owners: one artist or all. A pick with the mouse or a finger applies at
- * once (TAT-103), with no button: it visits the same page with the new
- * `artist`, keeping the view and the date. The visit keeps the page's state,
- * so the select stays mounted and keeps focus. A closed native select also
- * changes its value on every arrow key, and loading the calendar at each step
- * would be a change of context the person didn't ask for (WCAG 3.2.2): a
- * change made with the keyboard waits for Enter or for focus to leave. A page
- * needs scripts to show at all (no server rendering), so there is no form to
- * fall back on.
+ * A filter (TAT-103): a pick with the mouse or a finger applies at once,
+ * with no button, keeping the rest of the calendar's address; the visit
+ * keeps the page's state, so the select stays mounted and keeps focus. A
+ * closed native select also changes its value on every arrow key, and
+ * loading the calendar at each step would be a change of context the person
+ * didn't ask for (WCAG 3.2.2): a change made with the keyboard waits for
+ * Enter or for focus to leave. Its label is visually hidden: the first
+ * option names the filter's default.
  */
-function ArtistPicker({
-	base,
-	view,
-	date,
-	filter,
+function FilterSelect({
+	id,
+	label,
+	value,
+	options,
+	onApply,
 }: {
-	base: string;
-	view: CalendarView;
-	date: string;
-	filter: NonNullable<CalendarPageProps["artistFilter"]>;
+	id: string;
+	label: string;
+	value: string;
+	options: { value: string; label: string }[];
+	onApply: (value: string) => void;
 }) {
 	const select = useRef<HTMLSelectElement>(null);
-	const selected = filter.selected ?? "";
 	// What the last key press means: arrows move the value, Enter confirms.
 	const viaKeys = useRef(false);
 	const waiting = useRef(false);
 	// A back or forward step changes the prop, not what the person chose.
 	useEffect(() => {
-		if (select.current) select.current.value = selected;
+		if (select.current) select.current.value = value;
 		waiting.current = false;
-	}, [selected]);
+	}, [value]);
 
-	const apply = (value: string) => {
+	const apply = (next: string) => {
 		waiting.current = false;
-		router.get(
-			base,
-			{ view, date, ...(value ? { artist: value } : {}) },
-			{ preserveScroll: true, preserveState: true },
-		);
+		onApply(next);
 	};
 	// Enter or blur: apply a keyboard change that is still waiting.
 	const confirm = (element: HTMLSelectElement) => {
-		if (waiting.current && element.value !== selected) apply(element.value);
+		if (waiting.current && element.value !== value) apply(element.value);
 		waiting.current = false;
 	};
 
 	return (
-		<Field>
-			<FieldLabel htmlFor="artist">Artist</FieldLabel>
+		<div className="min-w-0 flex-1 sm:flex-none">
+			<label htmlFor={id} className="sr-only">
+				{label}
+			</label>
 			<select
 				ref={select}
-				id="artist"
-				defaultValue={selected}
+				id={id}
+				defaultValue={value}
 				onPointerDown={() => {
 					viaKeys.current = false;
 				}}
 				onKeyDown={(event) => {
 					if (event.key === "Enter" && waiting.current) {
 						// Chromium opens the picker on Enter, which would also
-						// swallow the key's release: apply the chosen artist instead.
+						// swallow the key's release: apply the choice instead.
 						event.preventDefault();
 						confirm(event.currentTarget);
 					} else if (event.key !== "Enter" && event.key !== "Tab") {
@@ -300,15 +466,14 @@ function ArtistPicker({
 					if (event.key === "Enter") confirm(event.currentTarget);
 				}}
 				onBlur={(event) => confirm(event.currentTarget)}
-				className="h-11 w-full min-w-0 rounded-md border bg-transparent px-3 text-sm"
+				className="h-8 w-full min-w-0 rounded-md border border-input bg-card px-2.5 text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 max-lg:min-h-11 sm:w-auto"
 			>
-				<option value="">All artists</option>
-				{filter.artists.map(({ id, name }) => (
-					<option key={id} value={id}>
-						{name}
+				{options.map((option) => (
+					<option key={option.value} value={option.value}>
+						{option.label}
 					</option>
 				))}
 			</select>
-		</Field>
+		</div>
 	);
 }

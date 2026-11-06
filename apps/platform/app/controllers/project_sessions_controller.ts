@@ -12,6 +12,7 @@ import BookingService from "#modules/projects/services/booking_service";
 import ProjectService from "#modules/projects/services/project_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import QuoteService from "#modules/projects/services/quote_service";
+import { calendarBack } from "#modules/scheduling/calendar";
 import {
 	SessionOverlapError,
 	SessionRuleError,
@@ -219,6 +220,8 @@ function fieldError(field: string, message: string, rule: string) {
 }
 
 function backTo(ctx: HttpContext, tenant: { slug: string }, projectId: string) {
+	const back = calendarBack(ctx.request.input("back"), tenant.slug);
+	if (back) return ctx.response.redirect().toPath(back);
 	return ctx.response
 		.redirect()
 		.toRoute("tenant.projects.show", { tenant: tenant.slug, id: projectId });

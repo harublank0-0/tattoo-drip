@@ -174,11 +174,17 @@ test.group("CalendarService entries", (group) => {
 		});
 		const maya = { id: project.id, brief: BRIEF, clientName: "Maya Gurung" };
 		const nima = { id: rows.nimas.id, brief: BRIEF, clientName: "Nima" };
+		// What the member sees of the project: its client and brief (the drawer's
+		// other fields, Studio OS, come from the same read and vanish with it).
 		const shown = (entries: CalendarEntry[]) =>
 			entries.map(({ session, artistName, project: details }) => [
 				session.id,
 				artistName,
-				details,
+				details && {
+					id: details.id,
+					brief: details.brief,
+					clientName: details.clientName,
+				},
 			]);
 
 		await inTenant(tenant, async () => {

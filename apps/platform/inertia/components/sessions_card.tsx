@@ -206,18 +206,25 @@ function SessionItem({
 /**
  * Confirms an outcome: the question names the session and says it's final.
  * Focus starts on "Keep it scheduled", so pressing Enter right away changes
- * nothing; Escape closes the panel.
+ * nothing; Escape closes the panel. Also the calendar's session drawer's
+ * (Studio OS), which passes `back`: the calendar page to return to.
  */
-function OutcomePanel({
+export function OutcomePanel({
 	sessionId,
 	outcome,
 	whenText,
+	back,
+	onBusyChange,
 	onCancel,
 	onDone,
 }: {
 	sessionId: string;
 	outcome: SessionOutcomeName;
 	whenText: string;
+	/** The calendar page the server sends the member back to; absent for the project page. */
+	back?: string;
+	/** Told when the save starts and ends: the calendar's drawer can't be closed meanwhile. */
+	onBusyChange?: (busy: boolean) => void;
 	onCancel: () => void;
 	onDone: () => void;
 }) {
@@ -230,11 +237,17 @@ function OutcomePanel({
 	const confirm = () =>
 		router.post(
 			urlFor("tenant.sessions.outcome", { tenant: tenant.slug, id: sessionId }),
-			{ status: outcome },
+			back ? { status: outcome, back } : { status: outcome },
 			{
 				preserveScroll: true,
-				onStart: () => setSaving(true),
-				onFinish: () => setSaving(false),
+				onStart: () => {
+					setSaving(true);
+					onBusyChange?.(true);
+				},
+				onFinish: () => {
+					setSaving(false);
+					onBusyChange?.(false);
+				},
 				onSuccess: onDone,
 			},
 		);
@@ -277,13 +290,16 @@ function OutcomePanel({
  * The new time: the booking form's three fields, prefilled with the
  * session's own. Focus starts on Date; Escape closes the form. After a
  * refused save it stays open with what was typed and the errors under
- * their fields.
+ * their fields (an overlap: "Asha already has a session at that time").
+ * Also the calendar drawer's, with `back` as for OutcomePanel.
  */
-function MoveForm({
+export function MoveForm({
 	sessionId,
 	whenText,
 	values,
 	dates,
+	back,
+	onBusyChange,
 	onCancel,
 	onDone,
 }: {
@@ -291,6 +307,8 @@ function MoveForm({
 	whenText: string;
 	values: NonNullable<SessionRow["move"]>;
 	dates: Dates;
+	back?: string;
+	onBusyChange?: (busy: boolean) => void;
 	onCancel: () => void;
 	onDone: () => void;
 }) {
@@ -308,19 +326,23 @@ function MoveForm({
 			route="tenant.sessions.move"
 			routeParams={{ tenant: tenant.slug, id: sessionId }}
 			options={{ preserveScroll: true }}
+			onStart={() => onBusyChange?.(true)}
+			onFinish={() => onBusyChange?.(false)}
 			onSuccess={onDone}
 			onError={() => focusFirstInvalid(fieldset.current)}
 		>
 			{({ errors, processing }) => (
 				<fieldset
 					ref={fieldset}
-					className="min-w-0 rounded-md bg-muted/50 p-3"
+					className="@container min-w-0 rounded-md bg-muted/50 p-3"
 					onKeyDown={(event) => {
 						if (event.key === "Escape") onCancel();
 					}}
 				>
 					<legend className="sr-only">Move the session on {whenText}</legend>
-					<div className="grid gap-4 sm:grid-cols-3">
+					{back && <input type="hidden" name="back" value={back} />}
+					{/* By the form's own width: the project page's card or the calendar's drawer. */}
+					<div className="grid gap-4 @sm:grid-cols-2 @lg:grid-cols-3">
 						<Field data-invalid={!!errors.date}>
 							<FieldLabel htmlFor={field("date")}>Date</FieldLabel>
 							<Input

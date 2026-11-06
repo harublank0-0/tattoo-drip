@@ -81,6 +81,24 @@ export default class OpeningHoursService {
 	}
 
 	/**
+	 * The entries that take any day from `first` to `last` (yyyy-MM-dd,
+	 * both included): the calendar's closed days (Studio OS). Bounded by
+	 * the range; one query.
+	 */
+	async closuresBetween(
+		tenant: TenantRef,
+		first: string,
+		last: string,
+	): Promise<StudioClosure[]> {
+		return StudioClosure.query()
+			.where("tenant_id", tenant.id)
+			.where("starts_on", "<=", last)
+			.where("ends_on", ">=", first)
+			.orderBy("starts_on", "asc")
+			.orderBy("id", "asc");
+	}
+
+	/**
 	 * Adds an entry (validated: toClosure). Throws ClosureLimitError when the
 	 * studio already has MAX_UPCOMING_CLOSURES that have not ended on
 	 * `today`; ended ones don't count.

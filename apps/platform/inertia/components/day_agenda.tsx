@@ -33,6 +33,7 @@ export function DayAgenda({
 	showArtist,
 	isOwner,
 	tenantSlug,
+	hrefFor,
 }: {
 	day: CalendarDay;
 	isToday: boolean;
@@ -41,6 +42,11 @@ export function DayAgenda({
 	showArtist: boolean;
 	isOwner: boolean;
 	tenantSlug: string;
+	/**
+	 * Where a session opens: the calendar passes its drawer's address; by
+	 * default the project's Sessions card.
+	 */
+	hrefFor?: (session: Session) => string;
 }) {
 	if (day.sessions.length === 0) {
 		return <p className="text-sm text-muted-foreground">No sessions.</p>;
@@ -64,6 +70,7 @@ export function DayAgenda({
 						showArtist={showArtist}
 						isOwner={isOwner}
 						tenantSlug={tenantSlug}
+						hrefFor={hrefFor}
 					/>
 				</Fragment>
 			))}
@@ -105,8 +112,10 @@ function SessionItem({
 	showArtist,
 	isOwner,
 	tenantSlug,
+	hrefFor,
 }: {
 	session: Session;
+	hrefFor?: (session: Session) => string;
 	inChair: boolean;
 	/** Over by now (today only): drawn quieter, whatever its outcome. */
 	ended: boolean;
@@ -178,14 +187,23 @@ function SessionItem({
 		</>
 	);
 
+	// The calendar opens its drawer for any session the member can see; elsewhere
+	// a session opens its project, so one the member can't open has no link.
+	const href = hrefFor
+		? hrefFor(session)
+		: project
+			? `${urlFor("tenant.projects.show", {
+					tenant: tenantSlug,
+					id: project.id,
+				})}#sessions`
+			: null;
 	return (
 		<li>
-			{project ? (
+			{href ? (
 				<Link
-					href={`${urlFor("tenant.projects.show", {
-						tenant: tenantSlug,
-						id: project.id,
-					})}#sessions`}
+					href={href}
+					preserveScroll={Boolean(hrefFor)}
+					preserveState={Boolean(hrefFor)}
 					className="-mx-2 flex min-h-11 gap-3 rounded-md px-2 py-2.5 outline-none transition-colors duration-150 hover:bg-accent/60 focus-visible:ring-[3px] focus-visible:ring-ring/50"
 				>
 					{content}
