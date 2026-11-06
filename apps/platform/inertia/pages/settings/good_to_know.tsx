@@ -314,7 +314,7 @@ function HoursForm({ week }: { week: WeekRow[] }) {
 								<div key={row.day} className="flex flex-col gap-1">
 									{/* Three columns once the form itself is wide enough (a container query: the
 									    settings menu and the sidebar take their share of a 1024px screen). */}
-									<div className="grid gap-2 @2xl:grid-cols-[9rem_minmax(0,1fr)_minmax(0,1fr)] @2xl:items-center">
+									<div className="grid gap-2 @xl:grid-cols-[9rem_minmax(0,1fr)_minmax(0,1fr)] @xl:items-center">
 										<Field orientation="horizontal">
 											<Checkbox
 												id={`open-${row.day}`}
@@ -361,7 +361,7 @@ function HoursForm({ week }: { week: WeekRow[] }) {
 												/>
 											</>
 										) : (
-											<p className="text-sm text-muted-foreground @2xl:col-span-2">
+											<p className="text-sm text-muted-foreground @xl:col-span-2">
 												Closed
 											</p>
 										)}

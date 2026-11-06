@@ -232,8 +232,9 @@ export default function PageLook({
 															</FieldDescription>
 														</FieldContent>
 														<RadioGroupItem
-															aria-labelledby={`font-${font.key}-title`}
-															aria-describedby={`font-${font.key}-description`}
+															// Named by the font's name: the title is the studio's own
+															// name set in that face, the same on every card.
+															aria-labelledby={`font-${font.key}-description`}
 															value={font.key}
 															id={`font-${font.key}`}
 															aria-invalid={!!errors.font}

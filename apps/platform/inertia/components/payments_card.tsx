@@ -657,7 +657,11 @@ function RecordPaymentForm({
 										</FieldContent>
 										<RadioGroupItem
 											aria-labelledby={`record-kind-${value}-title`}
-											aria-describedby={`record-kind-${value}-description`}
+											aria-describedby={
+												DESK_KIND_TEXT[value].description
+													? `record-kind-${value}-description`
+													: undefined
+											}
 											value={value}
 											id={`record-kind-${value}`}
 										/>

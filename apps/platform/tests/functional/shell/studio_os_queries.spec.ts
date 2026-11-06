@@ -66,6 +66,8 @@ test.group("Studio OS pages: no query per row", (group) => {
 
 		await grow(tenant, owner, { artists: 4, photos: 6, clients: 8 }, 10);
 		for (const [index, url] of pages.entries()) {
+			// The recorder sees the page's reads at all (else 0 = 0 would pass).
+			assert.isAbove(small[index], 0, url);
 			assert.equal(await cost(client, url, owner), small[index], url);
 		}
 	});
