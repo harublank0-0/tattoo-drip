@@ -4,6 +4,15 @@ Prompt 00 output. It covers the repository audit, the architecture and the promp
 
 This file is the plan Discover prompts work from. The dated `docs/superpowers/specs/` files are per-feature history, and this is a multi-prompt plan, so it lives at the requested path. Each Discover prompt still writes its own dated spec and plan there, as usual.
 
+**Status:**
+
+| Item | State |
+|---|---|
+| Repository audit | Complete |
+| Product boundaries and domains | Decided |
+| Roadmap D01–D11 | Defined |
+| D01: domain migration preparation | Next |
+
 Status legend: **Done** = in code, with tests where noted. **Partial** = exists, but not in the form Discover needs. **Planned** = only in docs. **Missing** = searched for and absent. **Unverified** = not checked against a running system.
 
 ---
@@ -26,7 +35,7 @@ Status legend: **Done** = in code, with tests where noted. **Partial** = exists,
 | Booking | Storefront booking only; Discover attribution that can't be forged | [E.2](#e2-booking-hand-off-and-attribution) |
 | Pricing / monetisation | Informational pricing page; no paid listings | [G](#g-uiux-blueprint) |
 | Analytics | First-party only; no third-party scripts | [E.2](#e2-booking-hand-off-and-attribution) |
-| Legal | Privacy, terms, listing consent, takedown process | D06, D04 |
+| Legal | Privacy, terms, listing consent, takedown process. Claude drafts clearly marked text from product requirements; it is not legally approved and is published only after the product owner reviews it | D04, D06 |
 | Domain migration | D01 prepares and tests without touching live DNS or traffic; D11 cuts over after E2E | [I](#i-implementation-prompts) |
 
 ---
@@ -460,12 +469,25 @@ Prompts are prefixed **D** to avoid confusion with the Studio OS redesign prompt
 | **D03** | Public Discover API, SDK client, React hooks | Contract; `app/modules/discovery`; controllers and transformers; validation; limits; named server keys; read-only transaction; `bookingUrl` + signed `ref`; isolation cases; `createDiscoverClient`; keys, queries, hooks; tests | D02 | Responses match the contract; no private field reachable; cursor ordering deterministic; limits enforced; SDK and React tests green |
 | **D04** | Studio OS publication controls | Settings "TattooDrip listing" (opt-in + terms consent, place picker, completeness checklist from the API, preview); artist opt-out (owner or linked artist); independent single switch; setup-checklist item; `discover:suspend` / `discover:restore` (studio, artwork); storefront `/book` keeps `ref`, the intake stores verified referral | D03 | Off by default; changes reflected immediately in the API; role and cross-tenant tests; forged, expired or other-tenant `ref` stored as null without blocking the inquiry |
 | **D05** | Discover app scaffold and premium design system | `apps/discover` (TanStack Start, Tailwind v4, tokens, Eczar/Geist, message catalog); env validation; per-request client; layout, nav, footer; SEO and JSON-LD helpers; robots and sitemap skeleton; `DISCOVER_INDEXING`; 404/503; loading and empty-state primitives; Dockerfile target, compose service and nginx block (inactive); CI; browser-bundle secret check; minimal `packages/ui`; `apps/discover/AGENTS.md` | D03 | Builds, typechecks and tests in CI; SSR heads correct; no secret in the client bundle |
-| **D06** | Homepage and SaaS marketing | Home IA (G) with real data and graceful small-data states; `/for-studios`; `/pricing` (informational); `/terms`, `/privacy` (content from the product owner) | D05 | Mobile Lighthouse ≥ 90 performance and accessibility; renders well with 0, 3 and 20 studios; no fabricated numbers |
+| **D06** | Homepage and SaaS marketing | Home IA (G) with real data and graceful small-data states; `/for-studios`; `/pricing` (informational); `/terms`, `/privacy` (Claude drafts them, marked as drafts, from product requirements; published only after review) | D05 | Mobile Lighthouse ≥ 90 performance and accessibility; renders well with 0, 3 and 20 studios; no fabricated numbers |
 | **D07** | Studio and artist directories; style and location pages | Shared list and filter pattern; `/studios`, `/artists`; `/styles/:style`; `/places/:country/:city`; URL-synced filters; cursor "Show more" | D05 | Filters round-trip via URL; noindex and canonical rules (H); keyboard-operable filters |
 | **D08** | Public profiles and storefront booking hand-off | Studio, studio-artist and independent-artist profiles; old-slug 301s; JSON-LD; booking CTAs with signed `ref` | D07, D04 | Every CTA lands on a working storefront page; a Discover-originated inquiry records `referral_source = discover` |
 | **D09** | Tattoo gallery and artwork details | `/tattoos` masonry and filters; `/tattoos/:id` with the canonical rule; "request similar"; related work | D07 | Zero CLS; lazy-loading verified; canonical per H |
 | **D10** | SEO, accessibility, performance | Sitemap index, structured-data validation, OG images, budgets, WCAG 2.1 AA audit, reduced motion; artwork canonical decision | D06–D09 | Rich-results validation passes; budgets met; axe clean |
 | **D11** | E2E QA, production domain cutover, launch readiness | Playwright journeys (search, filter, profile, booking hand-off, delist, suspend); load test; staged cutover per the runbook: add `app.` / `api.` hostnames, then storefront `API_URL`, then `APP_URL`, then deploy Discover and switch the apex with legacy redirects and the `/api` proxy; smoke tests; monitoring; rollback (restore the old apex server block and envs); indexing flag left to the business decision | D01–D10 | Journeys green; smoke tests pass on new hosts; old links redirect; rollback rehearsed; the sign-in impact matches the runbook |
+
+**D01 verification checklist** (each item is recorded with evidence: a file reference, a test or a rehearsal result):
+
+| Area | What to verify |
+|---|---|
+| Cookies | `__Host-td-session`, `XSRF-TOKEN`, `remember_web` and `app_theme` on `app.`: host-only, `Secure`, `SameSite=Lax`, `Path=/`, no `Domain` (`#services/cookie_policy`); none of them set on `api.` or the apex |
+| CSRF | Shield accepts dashboard writes on `app.` and refuses cross-origin ones; Inertia's `X-XSRF-TOKEN` round trip; the API group stays CSRF-free and cookieless |
+| OAuth redirects | None exist today (email + password; no `@adonisjs/ally`). Confirm that, and record that any future OAuth callback registers on `app.` |
+| API origins | Storefront `API_URL` (server) and the dehydrated browser `apiUrl`; Discover's API base; CORS on `api.` (any origin, no credentials, the existing headers); `MEDIA_URL` unchanged; any CSP `connect-src` |
+| `APP_URL` consumers | `checkAppOrigin` with the new hosts; email, invitation, alert and chat links; `config/drive.ts` |
+| Cloudflare and proxy | Tunnel public hostnames for `app.` and `api.` (prepared, not created); Always Use HTTPS; the edge certificate covers them; cache keyed by Host, with no caching of dashboard responses; `CF-Connecting-IP` → `X-Forwarded-For` trust (`TRUST_PROXY`, nginx `set_real_ip_from`); Turnstile hostnames unchanged (`tattoodrip.page`) |
+| Redirect compatibility | Apex legacy paths 301 to `app.`; `/api/*` proxied, not redirected, on the apex during the window |
+| Rollback | Restoring the previous nginx and env files returns today's behaviour, rehearsed locally |
 
 **Sessions at cutover:**
 - `__Host-td-session` is host-only and production sessions live in the cookie, so a session cannot move from `tattoodrip.app` to `app.tattoodrip.app` without handing credentials across hosts.
@@ -505,5 +527,5 @@ Prompts are prefixed **D** to avoid confusion with the Studio OS redesign prompt
 1. **Completeness thresholds.** Default: ≥6 published photos per studio, ≥3 per shown artist, plus a logo or cover and a city.
 2. **The curated Nepal city list.** Default: seeded from current pilot studios plus the major cities; the operator adds more on request.
 3. **Session handoff at cutover.** Default: none, one announced sign-in.
-4. **Legal texts and listing consent wording.** Needed before D06 and D04 ship; the product owner provides the content.
+4. **Legal texts and listing consent wording.** The product owner provides requirements. Claude prepares draft terms, privacy and consent text, each marked "Draft: not legally reviewed". The wording is reviewed before D04 and D06 make it public; until then drafts ship behind the indexing flag or stay unpublished.
 5. **Referral token lifetime.** Default: 30 days.
