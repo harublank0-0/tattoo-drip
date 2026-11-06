@@ -1007,9 +1007,8 @@ export function IntakeForm({
 
 /**
  * Every problem with the values, by the flow's fields: the intake's own rules
- * on what will be sent (intakeValuesOf), the dates' and size's messages on
- * their choices, and the idea's when the choices written into it make it
- * longer than the API takes.
+ * on what will be sent (intakeValuesOf) and the dates' and size's messages on
+ * their choices.
  */
 export function bookingErrors(
 	values: BookingValues,

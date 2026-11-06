@@ -245,7 +245,8 @@ export function createTattooClient(options: TattooClientOptions) {
 		inquiries: {
 			/**
 			 * Sends an inquiry with its reference images as one multipart
-			 * request and returns the new inquiry's id. Waits up to 2 minutes
+			 * request and returns the new inquiry's id and its reference, the code
+			 * the client quotes. Waits up to 2 minutes
 			 * (an upload) unless `call.timeoutMs` says otherwise. Fails with a
 			 * TattooApiError such as `validation_failed` (with `fields` by
 			 * input name), `artist_not_accepting`, `studio_not_accepting`,

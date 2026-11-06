@@ -187,6 +187,11 @@ export type ProjectPageProps = {
 		approximateSize: string;
 		preferredDates: string;
 		budget: string | null;
+		/** The style's name, or null for none (or a retired one). */
+		style: string | null;
+		colour: "black-grey" | "colour" | "undecided" | null;
+		/** The client's notes, plain text with its line breaks. */
+		notes: string | null;
 		source: string;
 		references: ReferenceProps[];
 	} | null;

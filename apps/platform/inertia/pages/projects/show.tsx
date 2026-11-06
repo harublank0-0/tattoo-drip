@@ -8,7 +8,7 @@ import { DesignTakenProvider } from "~/components/design_taken";
 import { FinishCard } from "~/components/finish_card";
 import FlashDesignCard from "~/components/flash_design_card";
 import { usePageSheets } from "~/components/form_sheet";
-import { SOURCE_LABELS } from "~/components/inquiries";
+import { COLOUR_LABELS, SOURCE_LABELS } from "~/components/inquiries";
 import MessageCard from "~/components/message_card";
 import NextStepCard from "~/components/next_step_card";
 import Page from "~/components/page";
@@ -308,6 +308,28 @@ function RequestCard({
 							</dd>
 							<dt className="text-muted-foreground">Budget</dt>
 							<dd className="min-w-0 wrap-anywhere">{request.budget ?? "—"}</dd>
+							{request.style && (
+								<>
+									<dt className="text-muted-foreground">Style</dt>
+									<dd className="min-w-0 wrap-anywhere">{request.style}</dd>
+								</>
+							)}
+							{request.colour && (
+								<>
+									<dt className="text-muted-foreground">Colour</dt>
+									<dd className="min-w-0 wrap-anywhere">
+										{COLOUR_LABELS[request.colour]}
+									</dd>
+								</>
+							)}
+							{request.notes && (
+								<>
+									<dt className="text-muted-foreground">Notes</dt>
+									<dd className="min-w-0 whitespace-pre-line wrap-anywhere">
+										{request.notes}
+									</dd>
+								</>
+							)}
 							<dt className="text-muted-foreground">
 								Found the studio through
 							</dt>

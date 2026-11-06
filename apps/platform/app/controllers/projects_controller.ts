@@ -4,6 +4,7 @@ import { DateTime } from "luxon";
 import { tenantContext } from "#middleware/tenant_middleware";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
+import { knownStyles } from "#modules/artists/styles";
 import type Client from "#modules/clients/models/client";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ClientService from "#modules/clients/services/client_service";
@@ -313,6 +314,11 @@ export default class ProjectsController {
 					approximateSize: inquiry.approximateSize,
 					preferredDates: inquiry.preferredDates,
 					budget: inquiry.budget,
+					// What the client chose on the booking page, for whoever does the work.
+					style:
+						knownStyles(inquiry.style ? [inquiry.style] : [])[0]?.name ?? null,
+					colour: inquiry.colour,
+					notes: inquiry.notes,
 					source: inquiry.sourceChannel,
 					references: await Promise.all(
 						(
