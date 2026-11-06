@@ -64,6 +64,7 @@ test.group("Tenant routes", (group) => {
 			slug: "black-needle",
 			type: "studio",
 			role: "owner",
+			logoUrl: null,
 		});
 		assert.deepEqual(response.inertiaProps.tenants, [
 			{ name: "Black Needle", slug: "black-needle", role: "owner" },
