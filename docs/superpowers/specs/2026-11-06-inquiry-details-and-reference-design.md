@@ -35,8 +35,8 @@ The migration adds these columns to `inquiries`, all nullable:
 
 The migration also adds a new table `reference_codes`:
 
-- `tenant_id` (FK to tenants), `code` (`varchar(6)`, same format check), `created_at`, primary key `(tenant_id, code)`.
-- Row-level security comes from `enableTenantRls`. The app role may insert and select, never update or delete.
+- `id` (uuid, `uuidv7()`), `tenant_id` (FK to tenants, on delete cascade), `code` (`varchar(6)`, same format check), `created_at`. Unique `(tenant_id, code)`: the constraint `reference_codes_tenant_id_code_unique` is what a collision hits.
+- Row-level security comes from `enableTenantRls` (which needs the `id`). Nothing updates or deletes a row; the repo has no grant-level restriction for that, and none is added.
 - The migration copies in every existing `deposit_links.reference_code`.
 - It has no other columns and no link back. Its only job is to make a code unique per studio across inquiries and deposit links, which a unique constraint on either table can't do alone.
 
@@ -46,7 +46,7 @@ A new module function, `ReferenceCodeService.claim(tenant)`:
 
 1. Draws `newReferenceCode()` (moved from `payments/deposit_links.ts` into a shared `#modules/references/reference_codes.ts`; payments re-exports it).
 2. Inserts it into `reference_codes` in a savepoint.
-3. On the primary-key violation, draws again, up to `REFERENCE_TRIES`. After that the violation surfaces, as `insertWithCode` does today.
+3. On the unique violation, draws again, up to `REFERENCE_TRIES`. After that the violation surfaces, as `insertWithCode` does today.
 
 A protected `newCode()` lets a test force a collision. The service must run inside the caller's request transaction, so a rolled-back intake gives its code back.
 
@@ -109,7 +109,7 @@ A protected `newCode()` lets a test force a collision. The service must run insi
   - a desk project's link has a fresh code that is registered;
   - an inquiry whose code another link already holds falls back to a fresh code;
   - a replaced link keeps its code.
-- **Isolation and RLS** for `reference_codes`: another tenant's codes are invisible, and the app role can't update or delete.
+- **Isolation and RLS** for `reference_codes`: another tenant's codes are invisible and can't be inserted from this tenant's context; the catalog guard lists the table.
 - **API contract:** the receipt matches the schema.
 - **Storefront:**
   - booking tests: the idea is the client's own words, the three fields are sent, the slug is sent and not the name;
