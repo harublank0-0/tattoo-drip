@@ -67,7 +67,7 @@ services:
         condition: service_healthy
     networks:
       tattoo_drip:
-        # nginx's upstream (deploy/nginx/nginx.conf) names this address.
+        # nginx's upstream (deploy/nginx/common.conf) names this address.
         ipv4_address: 172.30.42.11
     healthcheck:
       # Up when it answers anything below 500 (the front door redirects, so
@@ -112,7 +112,7 @@ services:
       start_period: 30s
     networks:
       tattoo_drip:
-        # nginx's upstream (deploy/nginx/nginx.conf) names this address.
+        # nginx's upstream (deploy/nginx/common.conf) names this address.
         ipv4_address: 172.30.42.12
 
   nginx:

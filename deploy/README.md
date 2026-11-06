@@ -695,7 +695,7 @@ Edit the file (2.4), then recreate the services that read it. The settings of `w
 docker compose -f /srv/tattoo-drip/app/deploy/compose.yml up -d --force-recreate web worker
 ```
 
-Nothing else is needed: nginx reaches `web` and `storefront` by fixed addresses (`172.30.42.11` and `172.30.42.12`, set in `deploy/compose.yml` and `deploy/nginx/nginx.conf`), so it finds a recreated or restarted container at once, and after a reboot too (4.10 checks both). The site answers `502` (or `504`) for the few seconds the new container takes to start. For the storefront use `storefront` in place of `web worker`. For the tunnel (`tunnel.env`) use `cloudflared`. `postgres.env` only counts when the database is first created; changing it later changes nothing.
+Nothing else is needed: nginx reaches `web` and `storefront` by fixed addresses (`172.30.42.11` and `172.30.42.12`, set in `deploy/compose.yml` and `deploy/nginx/common.conf`), so it finds a recreated or restarted container at once, and after a reboot too (4.10 checks both). The site answers `502` (or `504`) for the few seconds the new container takes to start. For the storefront use `storefront` in place of `web worker`. For the tunnel (`tunnel.env`) use `cloudflared`. `postgres.env` only counts when the database is first created; changing it later changes nothing.
 
 ---
 
