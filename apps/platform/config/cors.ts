@@ -1,18 +1,35 @@
 import { defineConfig } from "@adonisjs/cors";
+import { browserOriginPolicy } from "#services/browser_origins";
 import { isApiRequest } from "#services/public_api";
+import { DEV_STOREFRONT_URL } from "#services/storefront_url";
+import env from "#start/env";
 
 /**
- * CORS for the public API only (TAT-32): any origin, never credentials, the
- * methods and request headers the SDK sends. The dashboard is same-origin
- * and answers no cross-origin request. The publicApi middleware also sends
- * Access-Control-Allow-Origin: * without an Origin header, for CDN copies.
+ * The browser origins the API answers (Discover D01): every studio page, the
+ * dashboard and Discover, from the configured origins
+ * (#services/browser_origins). An allowed origin is echoed back, and every
+ * API answer carries Vary: Origin (#services/public_api); any other origin
+ * gets no allow-origin header at all.
+ */
+const allowedOrigin = browserOriginPolicy({
+	appUrl: env.get("APP_URL"),
+	discoverUrl: env.get("DISCOVER_URL"),
+	storefrontTemplate: env.get("STOREFRONT_URL") ?? DEV_STOREFRONT_URL,
+});
+
+/**
+ * CORS for the public API only (TAT-32): the allowed browser origins above,
+ * never credentials, the methods and request headers the SDK sends. The
+ * dashboard is same-origin and answers no cross-origin request. A
+ * server-side caller (the storefront's server, later Discover's) sends no
+ * Origin and needs no CORS.
  *
  * https://docs.adonisjs.com/guides/security/cors
  */
 const corsConfig = defineConfig({
 	enabled: (ctx) => isApiRequest(ctx),
 
-	origin: "*",
+	origin: (requestOrigin) => allowedOrigin(requestOrigin),
 
 	methods: ["GET", "HEAD", "POST"],
 

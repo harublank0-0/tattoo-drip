@@ -4,7 +4,7 @@ import type { HttpContext } from "@adonisjs/core/http";
 /**
  * The public API (TAT-32). Everything under this prefix is stateless and
  * cookieless (the session, CSRF, auth and Inertia middleware skip it), has
- * CORS open without credentials, and answers with the { data } / { error }
+ * CORS for the allowed browser origins without credentials, and answers with the { data } / { error }
  * envelopes. Type imports only: config/app.ts and config/cors.ts load this
  * file at boot, before the router and the other services exist.
  */
@@ -27,13 +27,14 @@ export function isApiRequest(ctx: HttpContext): boolean {
 /**
  * Headers every API response carries, errors included. Nothing is cacheable
  * unless its route opts in (the publicCache middleware). The allow-origin
- * header is also sent without an Origin, so a CDN copy fetched server-side
- * works in a browser; the value never varies, so no Vary: Origin. Shield,
- * which sets nosniff on pages, does not run on the API.
+ * header is the CORS middleware's, set only for an allowed browser origin
+ * (config/cors.ts, Discover D01), so every answer varies by Origin: no cache
+ * may hand one origin's copy to another. Shield, which sets nosniff on
+ * pages, does not run on the API.
  */
 export const API_HEADERS = {
 	"Cache-Control": "no-store",
-	"Access-Control-Allow-Origin": "*",
+	Vary: "Origin",
 	"X-Content-Type-Options": "nosniff",
 } as const;
 

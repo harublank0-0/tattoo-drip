@@ -25,12 +25,12 @@ function parsed(value: string): URL | undefined {
 }
 
 /** A hostname without its one trailing dot. */
-function bare(hostname: string): string {
+export function bare(hostname: string): string {
 	return hostname.endsWith(".") ? hostname.slice(0, -1) : hostname;
 }
 
 /** Whether `inner` is `outer` or one of its subdomains. */
-function within(inner: string, outer: string): boolean {
+export function within(inner: string, outer: string): boolean {
 	return inner === outer || inner.endsWith(`.${outer}`);
 }
 

@@ -20,6 +20,10 @@ const PRODUCTION = {
 	R2_PUBLIC_BUCKET: "td9-test-public",
 	R2_PRIVATE_BUCKET: "td9-test-private",
 	R2_PUBLIC_URL: "https://media.tattoodrip.app",
+	// .env.test's development values reach the child through the environment:
+	// the live layout sets neither (a test that needs them sets both).
+	API_URL: "",
+	DISCOVER_URL: "",
 };
 
 const APART = {
@@ -65,6 +69,66 @@ test.group("Production boot: the dashboard's origin (TAT-9)", () => {
 		assert.isFalse(killed);
 		assert.equal(exitCode, 0, output);
 	}).timeout(40_000);
+});
+
+/** The D11 layout (docs/discover/domain-migration.md), on made-up domains. */
+const SPLIT = {
+	APP_URL: "https://app.tattoodrip.app",
+	API_URL: "https://api.tattoodrip.app",
+	DISCOVER_URL: "https://tattoodrip.app",
+	STOREFRONT_URL: "https://{tenant}.tattoodrip.studio",
+};
+
+test.group("Production boot: the split hosts (Discover D01)", () => {
+	test("the D11 layout boots", async ({ assert }) => {
+		const { exitCode, killed, output } = await boot(["ace.js", "list:routes"], {
+			...PRODUCTION,
+			...SPLIT,
+		});
+
+		assert.isFalse(killed);
+		assert.equal(exitCode, 0, output);
+	}).timeout(40_000);
+
+	test("an http API_URL or DISCOVER_URL stops the app", async ({ assert }) => {
+		for (const [key, value] of [
+			["API_URL", "http://api.tattoodrip.app"],
+			["DISCOVER_URL", "http://tattoodrip.app"],
+		]) {
+			const { exitCode, killed, output } = await boot(
+				["ace.js", "list:routes"],
+				{ ...PRODUCTION, ...SPLIT, [key]: value },
+			);
+
+			assert.isFalse(killed, key);
+			assert.equal(exitCode, 1, key);
+			assert.include(output, `${key} must be an https origin in production`);
+		}
+	}).timeout(80_000);
+
+	test("an API on the studio pages' domain, or Discover on the dashboard's host, stops the app", async ({
+		assert,
+	}) => {
+		for (const [settings, message] of [
+			[
+				{ API_URL: "https://api.tattoodrip.studio" },
+				/API_URL \(api\.tattoodrip\.studio\) and the studio pages .* must be on separate domains/,
+			],
+			[
+				{ DISCOVER_URL: "https://app.tattoodrip.app" },
+				/DISCOVER_URL \(app\.tattoodrip\.app\) must be a host of its own/,
+			],
+		] as const) {
+			const { exitCode, killed, output } = await boot(
+				["ace.js", "list:routes"],
+				{ ...PRODUCTION, ...SPLIT, ...settings },
+			);
+
+			assert.isFalse(killed);
+			assert.equal(exitCode, 1);
+			assert.match(output, message);
+		}
+	}).timeout(80_000);
 });
 
 /** What tests/helpers/print_cookie_config.ts prints before its JSON. */

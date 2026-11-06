@@ -7,6 +7,9 @@
 
 const EXAMPLE = "https://{tenant}.example.com";
 
+/** The studio pages' template while STOREFRONT_URL is unset: TAT-12's dev host. */
+export const DEV_STOREFRONT_URL = "http://{tenant}.localhost:3000";
+
 /** A studio's slug for checking a template's shape. */
 function originOf(template: string, slug: string): URL {
 	return new URL(template.replaceAll("{tenant}", slug));

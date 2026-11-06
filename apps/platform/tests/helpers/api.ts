@@ -45,7 +45,10 @@ export function assertApiError(
 /** Headers every API response has, and the cookie it never has. */
 export function assertApiHeaders(response: ApiResponse) {
 	const assert = assertOf(response);
-	assert.equal(response.header("access-control-allow-origin"), "*");
+	// Never a wildcard: only an allowed browser origin is echoed (Discover D01),
+	// so every answer varies by Origin.
+	assert.notEqual(response.header("access-control-allow-origin"), "*");
+	assert.match(response.header("vary") ?? "", /\borigin\b/i);
 	assert.isUndefined(response.header("access-control-allow-credentials"));
 	assert.equal(response.header("x-content-type-options"), "nosniff");
 	assertNoCookies(response);

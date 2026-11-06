@@ -5,6 +5,7 @@ import {
 	renderMessage,
 } from "#modules/notifications/messages";
 import type { DepositLinkRuleReason } from "#modules/payments/errors";
+import { DEV_STOREFRONT_URL } from "#services/storefront_url";
 import env from "#start/env";
 
 /** How long a deposit link works after it is made or replaced (TAT-65). */
@@ -25,7 +26,7 @@ export {
 } from "#modules/references/reference_codes";
 
 /** Where deposit links point without STOREFRONT_URL: TAT-12's dev host. */
-export const DEV_STOREFRONT_URL = "http://{tenant}.localhost:3000";
+export { DEV_STOREFRONT_URL };
 
 /** A fresh nonce for a link: 16 random bytes in base64url (22 characters). */
 export function newTokenNonce(): string {

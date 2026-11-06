@@ -10,10 +10,13 @@ info:
 
     - **Stateless and cookieless.** No session and no CSRF token; no
       response ever sets a cookie.
-    - **CORS** is open to any origin without credentials:
-      `Access-Control-Allow-Origin: *` on every response, for GET, HEAD and
-      POST with the `Accept`, `Content-Type` and `X-Challenge-Token` request
-      headers. `Retry-After` is readable.
+    - **CORS** allows the platform's own browser origins, never with
+      credentials: every studio page, the dashboard and Discover. An allowed
+      `Origin` is echoed in `Access-Control-Allow-Origin` (never `*`), and
+      every response carries `Vary: Origin`; GET, HEAD and POST with the
+      `Accept`, `Content-Type` and `X-Challenge-Token` request headers.
+      `Retry-After` is readable. A server-side caller sends no `Origin` and
+      needs no CORS.
     - **Tenant from the path.** Tenant endpoints live under
       `/tenants/{tenant}`; the slug is matched exactly, never case-folded.
     - **Envelopes.** A success body is `{ "data": … }`; an error body is
