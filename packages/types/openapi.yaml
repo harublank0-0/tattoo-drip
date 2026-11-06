@@ -219,10 +219,11 @@ paths:
       tags: [MVP]
       summary: Photos of the studio's work, newest first, a page at a time
       description: |
-        Every photo of every visible artist (a closed artist's too), newest
-        first. The filters combine; an artist or style that matches nothing
-        is an empty page. Hidden and deleted artists never appear, nor do
-        their photos. Cacheable. Under an old studio slug it answers like
+        Every published photo of every visible artist (a closed artist's
+        too), newest first. The filters combine; an artist or style that
+        matches nothing is an empty page. Hidden and deleted artists never
+        appear, nor do their photos, nor do photos the studio unpublished.
+        Cacheable. Under an old studio slug it answers like
         under the current one.
       parameters:
         - name: artist
@@ -285,8 +286,9 @@ paths:
       summary: One photo of a visible artist's work
       description: |
         The same photo `listWork` shows, with its styles, healed mark and
-        artist. A hidden or deleted artist's photo, a removed photo, an
-        unknown id and another studio's photo are all a 404. Cacheable.
+        artist. A hidden or deleted artist's photo, a photo the studio
+        unpublished, a removed photo, an unknown id and another studio's
+        photo are all a 404. Cacheable.
         Under an old studio slug it answers like under the current one.
       responses:
         "200":
@@ -1215,9 +1217,9 @@ components:
           type: array
           maxItems: 6
           description: |
-            The artist's six newest photos, newest first; [] when none. An
-            artist who is closed for inquiries still shows theirs. All of them
-            are in `listWork`.
+            The artist's six newest published photos, newest first; [] when
+            none. An artist who is closed for inquiries still shows theirs.
+            All of them are in `listWork`.
           items: { $ref: "#/components/schemas/WorkPhoto" }
         styles:
           type: array
@@ -1307,7 +1309,7 @@ components:
           type: array
           description: |
             The styles at least one photo carries, among the visible artists'
-            photos (only `artist`'s when it is given), in the list's order:
+            published photos (only `artist`'s when it is given), in the list's order:
             offer only these. Plus the listed `style` the request asked for,
             even when none of those photos carries it, so the control that
             is on is always among them.

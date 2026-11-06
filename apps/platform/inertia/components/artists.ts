@@ -22,6 +22,8 @@ export type ArtistListRow = ArtistRowProps & {
 	hasLogin: boolean;
 	/** Scheduled sessions in the next `upcomingDays` days. */
 	upcomingCount: number;
+	/** Work photos in the portfolio, published or not. */
+	photoCount: number;
 	/** "Sat 8 Nov, 14:00": the first of them; null for none. */
 	nextText: string | null;
 };

@@ -26,6 +26,7 @@ export const controllers = {
   PasswordReset: () => import('#controllers/password_reset_controller'),
   PaymentMethods: () => import('#controllers/payment_methods_controller'),
   Payments: () => import('#controllers/payments_controller'),
+  Portfolio: () => import('#controllers/portfolio_controller'),
   ProjectChanges: () => import('#controllers/project_changes_controller'),
   ProjectSessions: () => import('#controllers/project_sessions_controller'),
   Projects: () => import('#controllers/projects_controller'),

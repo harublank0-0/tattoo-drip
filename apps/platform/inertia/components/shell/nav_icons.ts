@@ -4,6 +4,7 @@ import {
 	Contact,
 	Ellipsis,
 	House,
+	Images,
 	Inbox,
 	type LucideIcon,
 	Settings,
@@ -19,6 +20,7 @@ export const NAV_ICONS: Record<NavKey, LucideIcon> = {
 	calendar: CalendarDays,
 	clients: Contact,
 	artists: Users,
+	portfolio: Images,
 	settings: Settings,
 };
 

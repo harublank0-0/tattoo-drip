@@ -191,6 +191,9 @@ export interface ApiDefinition {
     calendar: {
       index: typeof routes['tenant.calendar.index']
     }
+    portfolio: typeof routes['tenant.portfolio'] & {
+      bulk: typeof routes['tenant.portfolio.bulk']
+    }
     alerts: {
       index: typeof routes['tenant.alerts.index']
       read: typeof routes['tenant.alerts.read']

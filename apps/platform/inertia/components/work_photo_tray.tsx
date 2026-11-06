@@ -103,7 +103,11 @@ export default function WorkPhotoTray({
 			) : (
 				<ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
 					{photos.map((photo, index) => {
-						const note = tileNote(photo.styles.length, photo.healed);
+						const note = tileNote(
+							photo.styles.length,
+							photo.healed,
+							photo.hidden,
+						);
 						return (
 							<li key={photo.id}>
 								<Button

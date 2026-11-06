@@ -23,6 +23,8 @@ export type WorkPhotoProps = {
 	alt: string | null;
 	styles: string[];
 	healed: boolean;
+	/** Unpublished from the portfolio: only the studio sees it. */
+	hidden: boolean;
 };
 
 /** The studio's cover as Settings, Profile gets it: the 960 px copy and its own size. */
@@ -102,7 +104,11 @@ export function trackUpload() {
 				outcome = { kind: "added" };
 			},
 			onError: (errors: Record<string, string | undefined>) => {
-				outcome = { kind: "refused", message: errors.photo || UPLOAD_FAILED };
+				// The file's own error first; the portfolio's upload also sends details.
+				outcome = {
+					kind: "refused",
+					message: errors.photo || errors.alt || errors.styles || UPLOAD_FAILED,
+				};
 			},
 			onCancel: () => {
 				outcome = { kind: "cancelled" };
@@ -186,9 +192,17 @@ export function editLabel(n: number, alt: string | null): string {
 	return alt ? `Edit photo ${n}: ${alt}` : `Edit photo ${n}`;
 }
 
-/** The small note under a tile: how many styles it carries and whether it is healed, or null when neither. */
-export function tileNote(styleCount: number, healed: boolean): string | null {
+/**
+ * The small note under a tile: unpublished (Studio OS), how many styles it
+ * carries and whether it is healed, or null when none of these.
+ */
+export function tileNote(
+	styleCount: number,
+	healed: boolean,
+	hidden = false,
+): string | null {
 	const parts: string[] = [];
+	if (hidden) parts.push("Unpublished");
 	if (styleCount > 0) {
 		parts.push(`${styleCount} ${styleCount === 1 ? "style" : "styles"}`);
 	}

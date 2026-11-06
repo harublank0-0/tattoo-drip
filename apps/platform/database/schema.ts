@@ -41,6 +41,7 @@ export class ArtistWorkPhotoSchema extends BaseModel {
 		"createdAt",
 		"healed",
 		"height",
+		"hidden",
 		"id",
 		"imageKey",
 		"styles",
@@ -59,6 +60,8 @@ export class ArtistWorkPhotoSchema extends BaseModel {
 	declare healed: boolean;
 	@column()
 	declare height: number;
+	@column()
+	declare hidden: boolean;
 	@column({ isPrimary: true })
 	declare id: string;
 	@column()

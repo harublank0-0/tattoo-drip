@@ -33,7 +33,11 @@ type PhotosModule = {
 		};
 	};
 	editLabel(n: number, alt: string | null): string;
-	tileNote(styleCount: number, healed: boolean): string | null;
+	tileNote(
+		styleCount: number,
+		healed: boolean,
+		hidden?: boolean,
+	): string | null;
 	UPLOAD_LABEL: string;
 	UPLOAD_HELP: string;
 	UPLOAD_FAILED: string;
@@ -172,6 +176,10 @@ test.group("work photo words (TAT-116)", () => {
 		assert.equal(photos.tileNote(1, false), "1 style");
 		assert.equal(photos.tileNote(0, true), "Healed");
 		assert.isNull(photos.tileNote(0, false));
+		assert.equal(
+			photos.tileNote(1, true, true),
+			"Unpublished · 1 style · Healed",
+		);
 	});
 
 	test("the upload and details words", ({ assert }) => {

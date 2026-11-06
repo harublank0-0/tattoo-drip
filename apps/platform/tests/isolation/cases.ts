@@ -938,6 +938,23 @@ export const isolationCases: IsolationCase[] = [
 		snapshot: none,
 	},
 	{
+		method: "GET",
+		pattern: "/t/:tenant/portfolio",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: none,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/portfolio/bulk",
+		actor: "owner",
+		// The studio's own photo: the URL is what is crossed here. Another
+		// studio's ids in the body are portfolio.spec.ts's.
+		body: (own) => ({ action: "unpublish", "ids[]": [own.workPhoto.id] }),
+		ownStatus: 302,
+		snapshot: workPhotoRows,
+	},
+	{
 		method: "POST",
 		pattern: "/t/:tenant/sessions/:id/outcome",
 		resource: "session",

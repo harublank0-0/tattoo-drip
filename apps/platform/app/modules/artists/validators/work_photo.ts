@@ -1,4 +1,5 @@
 import vine, { SimpleMessagesProvider } from "@vinejs/vine";
+import { BULK_ACTIONS, PORTFOLIO_PAGE_SIZE } from "#modules/artists/portfolio";
 import { MAX_PHOTO_STYLES, STYLE_SLUGS } from "#modules/artists/styles";
 import { StylesErrorReporter } from "#modules/artists/validators/artist";
 import { IMAGE_FORMAT_MESSAGE } from "#modules/media/errors";
@@ -6,20 +7,6 @@ import { imageFile } from "#modules/media/validators/image_file";
 
 /** The description of a work photo: one line, up to this many characters. */
 export const MAX_WORK_PHOTO_ALT = 200;
-
-/**
- * One work photo, as the multipart body gives it (TAT-116). The image is
- * only filtered here (size, extension): ImageService checks what it really
- * is.
- */
-export const addWorkPhotoValidator = vine.create({ photo: imageFile() });
-
-addWorkPhotoValidator.messagesProvider = new SimpleMessagesProvider({
-	"photo.required": "Choose a photo to upload.",
-	"photo.file": IMAGE_FORMAT_MESSAGE,
-	"photo.file.extname": IMAGE_FORMAT_MESSAGE,
-	"photo.file.size": "Use an image of 10 MB or less.",
-});
 
 /**
  * What the photo's form saves (TAT-126): the description (its alt text, read
@@ -30,7 +17,7 @@ addWorkPhotoValidator.messagesProvider = new SimpleMessagesProvider({
  * `healed` means false and missing `styles` means none (the controller reads
  * both).
  */
-export const updateWorkPhotoValidator = vine.create({
+const detailFields = () => ({
 	alt: vine
 		.string()
 		.trim()
@@ -45,6 +32,23 @@ export const updateWorkPhotoValidator = vine.create({
 	healed: vine.boolean().optional(),
 });
 
+export const updateWorkPhotoValidator = vine.create(detailFields());
+
+/**
+ * One work photo, as the multipart body gives it (TAT-116), and from the
+ * portfolio's upload (Studio OS) its details too, by the rules of
+ * updateWorkPhotoValidator; the artist's tray sends none, and a missing
+ * `alt` is none. The image is only filtered here (size, extension):
+ * ImageService checks what it really is.
+ */
+export const addWorkPhotoValidator = vine.create({
+	photo: imageFile(),
+	...detailFields(),
+	alt: detailFields().alt.optional(),
+	// Studio OS: "Publish on your page" unticked uploads it unpublished.
+	hidden: vine.boolean().optional(),
+});
+
 const ALT_MESSAGE = `Keep the description to one line, up to ${MAX_WORK_PHOTO_ALT} characters.`;
 updateWorkPhotoValidator.messagesProvider = new SimpleMessagesProvider({
 	"alt.maxLength": ALT_MESSAGE,
@@ -57,3 +61,40 @@ updateWorkPhotoValidator.messagesProvider = new SimpleMessagesProvider({
 });
 // An error on one style is shown under "styles", as on the artist form.
 updateWorkPhotoValidator.errorReporter = () => new StylesErrorReporter();
+
+addWorkPhotoValidator.messagesProvider = new SimpleMessagesProvider({
+	"photo.required": "Choose a photo to upload.",
+	"photo.file": IMAGE_FORMAT_MESSAGE,
+	"photo.file.extname": IMAGE_FORMAT_MESSAGE,
+	"photo.file.size": "Use an image of 10 MB or less.",
+	"alt.maxLength": ALT_MESSAGE,
+	"alt.regex": ALT_MESSAGE,
+	"alt.string": ALT_MESSAGE,
+	"styles.array.maxLength": `Pick up to ${MAX_PHOTO_STYLES} styles.`,
+	"styles.*.enum": "Pick styles from the list.",
+});
+addWorkPhotoValidator.errorReporter = () => new StylesErrorReporter();
+
+/**
+ * A change to several work photos at once from the portfolio (Studio OS):
+ * what to do, the photos (at most a page of them, each named once) and, to
+ * move them, the artist. Each photo is still loaded and checked on its own
+ * (PortfolioController.bulk).
+ */
+export const bulkWorkPhotosValidator = vine.create({
+	action: vine.enum(BULK_ACTIONS),
+	ids: vine
+		.array(vine.string().uuid())
+		.minLength(1)
+		.maxLength(PORTFOLIO_PAGE_SIZE)
+		.distinct(),
+	artistId: vine.string().uuid().optional(),
+});
+
+bulkWorkPhotosValidator.messagesProvider = new SimpleMessagesProvider({
+	"action.enum": "Choose what to do with the photos.",
+	"ids.array.minLength": "Select a photo first.",
+	"ids.array.maxLength": `Select up to ${PORTFOLIO_PAGE_SIZE} photos at a time.`,
+	"ids.*.uuid": "Select photos from the portfolio.",
+	"artistId.uuid": "Choose an artist of this studio.",
+});

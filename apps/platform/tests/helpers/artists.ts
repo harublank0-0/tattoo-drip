@@ -59,6 +59,7 @@ export async function addWorkPhoto(
 		height: number;
 		styles: string[];
 		healed: boolean;
+		hidden: boolean;
 		createdAt: DateTime;
 	}> = {},
 ) {
@@ -73,6 +74,7 @@ export async function addWorkPhoto(
 		alt: over.alt ?? null,
 		styles: over.styles ?? [],
 		healed: over.healed ?? false,
+		hidden: over.hidden ?? false,
 		// Left out, the model dates it now.
 		...(over.createdAt ? { createdAt: over.createdAt } : {}),
 	});

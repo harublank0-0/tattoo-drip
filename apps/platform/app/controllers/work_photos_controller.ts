@@ -3,6 +3,7 @@ import type { HttpContext } from "@adonisjs/core/http";
 import { errors } from "@vinejs/vine";
 import { tenantContext } from "#middleware/tenant_middleware";
 import { WorkPhotoLimitError } from "#modules/artists/errors";
+import { portfolioBack } from "#modules/artists/portfolio";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -22,7 +23,8 @@ import { ImageDeleteError, InvalidImageError } from "#modules/media/errors";
  * WorkPhotoService / ArtistService.findEditable decide whose photos. Each
  * route loads first and validates after, so another tenant's artist or
  * photo, or another artist's for an artist member, is a 404 with any body.
- * Every write goes back to the edit page.
+ * Every write goes back to the edit page, or to the portfolio (Studio OS)
+ * when the body's `back` is this studio's portfolio address (portfolioBack).
  */
 @inject()
 export default class WorkPhotosController {
@@ -42,10 +44,19 @@ export default class WorkPhotosController {
 		const data = await ctx.request.validateUsing(addWorkPhotoValidator);
 
 		await asFieldErrors(() =>
-			this.photos.add(tenant, membership, artist, data.photo),
+			this.photos.add(tenant, membership, artist, data.photo, {
+				alt: data.alt ?? null,
+				styles: data.styles ?? [],
+				healed: data.healed ?? false,
+				hidden: data.hidden ?? false,
+			}),
 		);
 
-		ctx.session.flash("success", "Photo added.");
+		// The portfolio's upload says what its queue added in its own panel,
+		// so one toast per file would only pile up over it.
+		if (!portfolioBack(ctx.request.input("back"), tenant.slug)) {
+			ctx.session.flash("success", "Photo added.");
+		}
 		return this.toEditPage(ctx, tenant.slug, artist.id);
 	}
 
@@ -97,6 +108,10 @@ export default class WorkPhotosController {
 	}
 
 	private toEditPage(ctx: HttpContext, tenantSlug: string, artistId: string) {
+		const back = portfolioBack(ctx.request.input("back"), tenantSlug);
+		// The address is the whole answer: this request's own query (a delete
+		// names `back` there) is not carried over.
+		if (back) return ctx.response.redirect().withQs(false).toPath(back);
 		return ctx.response
 			.redirect()
 			.toRoute("tenant.artists.edit", { tenant: tenantSlug, id: artistId });
