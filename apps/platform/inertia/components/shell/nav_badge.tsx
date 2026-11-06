@@ -2,7 +2,8 @@ import { cn } from "cn";
 
 /**
  * The count on a destination, e.g. new inquiries; read out as "3 new", or
- * with `label` ("2 to check").
+ * with `label` ("2 to check"). Brand red: a count is the one thing in the
+ * navigation that asks for attention.
  */
 export default function NavBadge({
 	count,
@@ -16,7 +17,7 @@ export default function NavBadge({
 	return (
 		<span
 			className={cn(
-				"rounded-full bg-primary px-1.5 text-xs leading-5 text-primary-foreground tabular-nums",
+				"inline-flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-primary px-1 text-[0.6875rem] leading-none font-semibold text-primary-foreground tabular-nums",
 				className,
 			)}
 		>

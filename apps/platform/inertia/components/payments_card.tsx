@@ -104,7 +104,7 @@ export default function PaymentsCard({
 		// studio name wraps, so it publishes its height (TopBar).
 		<Card
 			id={cardId("payments", nextStep.anchor)}
-			className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)] lg:scroll-mt-0"
+			className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)]"
 		>
 			<CardHeader>
 				<CardTitle className="leading-snug">

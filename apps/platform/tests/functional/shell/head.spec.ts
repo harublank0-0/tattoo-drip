@@ -15,8 +15,8 @@ test.group("Page head", () => {
 			'<link rel="manifest" href="/manifest.webmanifest" />',
 			'<link rel="icon" href="/icons/favicon.svg" type="image/svg+xml" />',
 			'<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />',
-			'<meta name="theme-color" content="#f7f3ee" media="(prefers-color-scheme: light)" />',
-			'<meta name="theme-color" content="#14110f" media="(prefers-color-scheme: dark)" />',
+			'<meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />',
+			'<meta name="theme-color" content="#0d0e10" media="(prefers-color-scheme: dark)" />',
 			'<meta name="apple-mobile-web-app-title" content="Tattoo Drip" />',
 			'<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-visual" />',
 		]) {

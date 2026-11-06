@@ -18,7 +18,9 @@ export default function Section({
 		<section className="flex flex-col gap-4 [section+&]:mt-6 [section+&]:border-t [section+&]:pt-6">
 			{(title || description) && (
 				<header className="flex flex-col gap-1">
-					{title && <h2 className="text-sm font-semibold">{title}</h2>}
+					{title && (
+						<h2 className="text-base leading-snug font-semibold">{title}</h2>
+					)}
 					{description && (
 						<p className="text-sm text-muted-foreground">{description}</p>
 					)}

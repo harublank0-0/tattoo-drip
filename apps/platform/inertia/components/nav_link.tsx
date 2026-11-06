@@ -1,7 +1,7 @@
 import { Link } from "@adonisjs/inertia/react";
 import { usePage } from "@inertiajs/react";
 import type { LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 import { urlFor } from "~/client";
 import { isCurrentPath } from "~/components/shell/nav_items";
 
@@ -24,7 +24,8 @@ export type NavItem = {
  * A link that marks itself with `aria-current="page"` when the current URL
  * matches its route. By default nested URLs count as a match, so a
  * "Settings" link stays active on "/settings/security". Pass `exact` to
- * only match the route itself.
+ * only match the route itself. Other props reach the anchor, so a tooltip
+ * or menu trigger (`asChild`) can wrap it.
  */
 export default function NavLink({
 	route,
@@ -34,7 +35,8 @@ export default function NavLink({
 	label,
 	className,
 	children,
-}: {
+	...rest
+}: Omit<HTMLAttributes<Element>, "children" | "onError" | "onProgress"> & {
 	route: NavRoute;
 	params?: NavParams;
 	exact?: boolean;
@@ -51,6 +53,7 @@ export default function NavLink({
 
 	return (
 		<Link
+			{...rest}
 			href={href}
 			className={className}
 			aria-current={isActive ? "page" : undefined}

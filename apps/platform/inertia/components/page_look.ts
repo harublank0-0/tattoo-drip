@@ -242,7 +242,7 @@ export function focusAfterMove(
 export const FONT_SAMPLE_CLASS: Record<FontKey, string> = {
 	eczar: "font-display",
 	serif: "font-(family-name:--serif-face)",
-	sans: "font-sans",
+	sans: "font-(family-name:--body-face)",
 };
 
 /**

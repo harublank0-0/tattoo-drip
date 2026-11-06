@@ -107,7 +107,7 @@ export function QuoteCard({
 	return (
 		<Card
 			id={cardId("quote", nextStep.anchor)}
-			className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)] lg:scroll-mt-0"
+			className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)]"
 		>
 			<CardHeader>
 				<CardTitle className="leading-snug">
@@ -149,7 +149,7 @@ export function QuoteCard({
 				{place.issue_quote === "card" && (
 					<div
 						id={cardId("quote-form", nextStep.anchor)}
-						className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)] lg:scroll-mt-0"
+						className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)]"
 					>
 						<QuoteForm
 							key="first"
@@ -365,7 +365,7 @@ export function ReviseTrigger({
 	return (
 		<div
 			id={id}
-			className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)] lg:scroll-mt-0"
+			className="scroll-mt-[calc(var(--top-bar-height,3.5rem)+0.5rem)]"
 		>
 			<FormSheetTrigger
 				sheet={sheet}

@@ -8,38 +8,53 @@ import SideNav from "~/components/shell/side_nav";
 import TabBar from "~/components/shell/tab_bar";
 import TopBar from "~/components/shell/top_bar";
 import VerifyEmailBar from "~/components/shell/verify_email_bar";
+import { TooltipProvider } from "~/components/ui/tooltip";
+import { useSidebarCollapsed } from "~/hooks/use-sidebar";
 
 /**
- * The dashboard shell (TAT-67) for every tenant page. Below 1024px: a top
- * bar (studio switcher, account menu) and a bottom tab bar with a More
- * menu; from 1024px: a left sidebar. Both list the destinations from
- * `navItems`; add new areas there.
+ * The Studio OS shell (TAT-67) for every tenant page. Below 1024px: a top
+ * bar (studio switcher, bell, account menu) and a bottom tab bar with a More
+ * menu; from 1024px: a sidebar that collapses to an icon rail, and a top bar
+ * with the breadcrumbs. The page scrolls the window, so the sidebar and the
+ * top bar are sticky rather than scroll boxes of their own. Every list of
+ * destinations comes from `navItems`; add new areas there.
  */
 export default function AppLayout({ children }: { children: ReactNode }) {
 	const { tenant, inboxCount, todayCount } = usePage().props;
+	const [collapsed, setCollapsed] = useSidebarCollapsed();
 	const items = tenant
 		? navItems(tenant, { inbox: inboxCount, today: todayCount })
 		: [];
 	const tabs = showTabBar(items);
 
 	return (
-		<div className="flex min-h-svh">
-			{tenant && <SideNav items={items} tenantSlug={tenant.slug} />}
-			<div className="flex min-w-0 flex-1 flex-col">
-				<TopBar />
-				<OfflineBar />
-				<VerifyEmailBar />
-				<main
-					className={cn(
-						"flex flex-1 bg-background pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]",
-						tabs && "pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pb-0",
-					)}
-				>
-					{children}
-				</main>
+		<TooltipProvider delayDuration={300}>
+			<div className="flex min-h-svh bg-background">
+				{tenant && (
+					<SideNav
+						items={items}
+						tenantSlug={tenant.slug}
+						collapsed={collapsed}
+						onCollapsedChange={setCollapsed}
+					/>
+				)}
+				<div className="flex min-w-0 flex-1 flex-col">
+					<TopBar items={items} />
+					<OfflineBar />
+					<VerifyEmailBar />
+					<main
+						className={cn(
+							"flex flex-1 pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]",
+							tabs &&
+								"pb-[calc(var(--shell-tab-bar)+env(safe-area-inset-bottom))] lg:pb-0",
+						)}
+					>
+						{children}
+					</main>
+				</div>
+				{tenant && tabs && <TabBar items={items} tenantSlug={tenant.slug} />}
+				<FlashToasts />
 			</div>
-			{tenant && tabs && <TabBar items={items} tenantSlug={tenant.slug} />}
-			<FlashToasts />
-		</div>
+		</TooltipProvider>
 	);
 }

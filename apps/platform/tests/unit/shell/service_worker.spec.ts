@@ -120,7 +120,7 @@ function loadWorker() {
 }
 
 const cached = (stores: Map<string, Map<string, Response>>) => [
-	...(stores.get("td-shell-v2")?.keys() ?? []),
+	...(stores.get("td-shell-v3")?.keys() ?? []),
 ];
 
 test.group("Service worker", () => {
@@ -138,7 +138,7 @@ test.group("Service worker", () => {
 
 		stores.set("td-shell-v0", new Map());
 		await dispatch("activate");
-		assert.deepEqual([...stores.keys()], ["td-shell-v2"]);
+		assert.deepEqual([...stores.keys()], ["td-shell-v3"]);
 	});
 
 	test("leaves everything but navigations and build files alone", async ({
