@@ -1,7 +1,13 @@
 import { isTattooApiError } from "@tattoo-drip/sdk";
 import type { ChallengeFailure } from "./challenge.ts";
 import { copy, fill, type NoticeCode } from "./copy.ts";
-import { FIELD_ORDER, type FieldErrors, type IntakeField } from "./rules.ts";
+import {
+	DETAIL_FIELDS,
+	type DetailField,
+	FIELD_ORDER,
+	type IntakeField,
+	type SentFieldErrors,
+} from "./rules.ts";
 
 /*
  * What the form says when a send doesn't go through (TAT-57, spec ruling
@@ -14,7 +20,7 @@ import { FIELD_ORDER, type FieldErrors, type IntakeField } from "./rules.ts";
 export type SubmitProblem =
 	| {
 			readonly kind: "fields";
-			readonly fields: FieldErrors;
+			readonly fields: SentFieldErrors;
 			/** The API's message per sent photo index (`referenceImages.<i>`). */
 			readonly photos: Readonly<Record<number, string>>;
 			/** The API's message about the photos as a whole (`referenceImages`). */
@@ -45,7 +51,7 @@ export interface ProblemContext {
 export const DEFAULT_WAIT_SECONDS = 60;
 /** The most of an API field message the form shows. */
 const MAX_MESSAGE = 300;
-const FIELDS = new Set<string>(FIELD_ORDER);
+const FIELDS = new Set<string>([...FIELD_ORDER, ...DETAIL_FIELDS]);
 const PHOTO_KEY = /^referenceImages\.(\d+)$/;
 
 type Flags = {
@@ -166,7 +172,7 @@ export function describeChallengeFailure(
 }
 
 function fieldProblem(apiFields: unknown): SubmitProblem {
-	const fields: FieldErrors = {};
+	const fields: SentFieldErrors = {};
 	const photos: Record<number, string> = {};
 	let photosError: string | null = null;
 	const entries =
@@ -178,7 +184,7 @@ function fieldProblem(apiFields: unknown): SubmitProblem {
 		if (!message) continue;
 		const photo = PHOTO_KEY.exec(key);
 		if (FIELDS.has(key)) {
-			fields[key as IntakeField] ??= message;
+			fields[key as IntakeField | DetailField] ??= message;
 		} else if (key === "referenceImages") {
 			photosError ??= message;
 		} else if (photo) {

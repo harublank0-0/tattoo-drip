@@ -1,4 +1,8 @@
-import type { IntakeField, IntakeValues } from "../intake/rules.ts";
+import type {
+	DetailField,
+	IntakeField,
+	IntakeValues,
+} from "../intake/rules.ts";
 import type { Closure, Week } from "../studio/hours.ts";
 import {
 	type CalendarRules,
@@ -54,7 +58,7 @@ export interface BookingValues extends IntakeValues {
 }
 
 /** The flow's own fields, beside the intake's. */
-export type BookingField = IntakeField | "days" | "size";
+export type BookingField = IntakeField | DetailField | "days" | "size";
 
 /** The notes' limit: the API's (InquiryInput.notes). */
 export const BOOKING_LIMITS = { notes: 1000 } as const;
@@ -144,13 +148,22 @@ export function bookingSteps(choice: boolean): readonly BookingStep[] {
 export const STEP_FIELDS: Record<BookingStep, readonly BookingField[]> = {
 	artist: ["preferredArtistId"],
 	when: ["days"],
-	tattoo: ["idea", "size", "approximateSize", "placement", "budget"],
+	tattoo: [
+		"idea",
+		"style",
+		"colour",
+		"size",
+		"approximateSize",
+		"placement",
+		"budget",
+		"notes",
+	],
 	details: ["contactName", "contactPhone", "contactEmail", "sourceChannel"],
 	review: [],
 };
 
 /** The flow's field an intake field's error belongs to: the dates are the days, the size its choice. */
-export function bookingFieldOf(field: IntakeField): BookingField {
+export function bookingFieldOf(field: IntakeField | DetailField): BookingField {
 	if (field === "preferredDates") return "days";
 	if (field === "approximateSize") return "size";
 	return field;

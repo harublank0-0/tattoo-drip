@@ -47,6 +47,14 @@ export interface IntakeValues {
 export type IntakeField = keyof IntakeValues;
 export type FieldErrors = Partial<Record<IntakeField, string>>;
 
+/** The booking flow's own inquiry fields (InquiryInput's style, colour and notes): the API may refuse them too. */
+export const DETAIL_FIELDS = ["style", "colour", "notes"] as const;
+export type DetailField = (typeof DETAIL_FIELDS)[number];
+/** The fields an API refusal can name: the intake's and the booking's. */
+export type SentFieldErrors = Partial<
+	Record<IntakeField | DetailField, string>
+>;
+
 /** The fields in the order the form shows them (the error summary keeps it). */
 export const FIELD_ORDER: readonly IntakeField[] = [
 	"idea",
