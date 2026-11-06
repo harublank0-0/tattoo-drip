@@ -1,7 +1,6 @@
 import db from "@adonisjs/lucid/services/db";
 import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
 import { test } from "@japa/runner";
-import { withDbContext } from "#services/db_context";
 import env from "#start/env";
 
 /**
@@ -1153,22 +1152,48 @@ test.group("Discover database: data rules (D02)", () => {
 });
 
 test.group("Discover database: no leak between requests (D02)", () => {
-	test("reading the views in a request leaves no role or context on the pooled connection", async ({
+	test("a caller's own function in a view's WHERE only ever sees rows the view shows (no security_barrier needed)", async ({
 		assert,
 	}) => {
-		// The app's own path: a request transaction with a tenant context.
-		await withDbContext(
-			{ tenantId: "00000000-0000-7000-8000-000000000001" },
-			(trx) => trx.rawQuery("select count(*) from discovery.studios"),
-		);
-		const [after] = (
-			await withDbContext({}, (trx) =>
-				trx.rawQuery(
-					"select current_user as role, session_user as session, coalesce(current_setting('app.tenant_id', true), '') as tenant",
-				),
-			)
-		).rows;
-		assert.deepEqual(after, { role: APP, session: APP, tenant: "" });
+		await rolledBack(async (trx) => {
+			const seeded = await seed(trx);
+			const { t, a, p } = seeded;
+			// As the app role, with an unlisted studio's context forged: a
+			// volatile, very cheap function that records every row it is given,
+			// so the planner would call it as early as it is allowed to. RLS
+			// filters before any condition of the caller's, so it can only see
+			// what the view shows anyway.
+			await trx.rawQuery("savepoint td_d02_leak");
+			try {
+				await trx.rawQuery(`set local role "${APP}"`);
+				await trx.rawQuery("select set_config('app.tenant_id', ?, true)", [
+					t.never,
+				]);
+				await trx.rawQuery("create temp table td_d02_seen (id uuid)");
+				await trx.rawQuery(
+					"create function pg_temp.td_d02_leak(seen uuid) returns boolean language plpgsql volatile cost 0.0001 as $$ begin insert into td_d02_seen values (seen); return true; end $$",
+				);
+				for (const view of VIEWS) {
+					await trx.rawQuery(
+						`select count(*) from discovery.${view} where pg_temp.td_d02_leak(id)`,
+					);
+				}
+				const seen = (
+					await trx.rawQuery("select distinct id from td_d02_seen")
+				).rows.map(({ id }: { id: string }) => id);
+				const all = new Set([
+					...Object.values(t),
+					...Object.values(a),
+					...Object.values(p),
+				]);
+				assert.sameMembers(
+					seen.filter((id: string) => all.has(id)),
+					[t.studio, t.independent, a.shown, a.solo, p.shown, p.solo],
+				);
+			} finally {
+				await trx.rawQuery("rollback to savepoint td_d02_leak");
+			}
+		});
 	});
 
 	test("the owner transactions these tests use end as the owner, with nothing set", async ({

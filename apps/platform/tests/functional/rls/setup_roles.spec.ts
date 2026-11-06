@@ -109,6 +109,23 @@ test.group("setup_roles.sql", (group) => {
 		});
 	});
 
+	test("run again on a migrated database, it leaves places read-only (Discover D02)", async ({
+		assert,
+	}) => {
+		await setupRoles(ROLE);
+		await setupRoles(ROLE);
+
+		const { rows } = await owner().rawQuery(
+			`select has_table_privilege(?, 'public.places', 'SELECT') as can_select,
+			        has_table_privilege(?, 'public.places', 'INSERT')
+			          or has_table_privilege(?, 'public.places', 'UPDATE')
+			          or has_table_privilege(?, 'public.places', 'DELETE')
+			          or has_table_privilege(?, 'public.places', 'TRUNCATE') as can_change`,
+			[ROLE, ROLE, ROLE, ROLE, ROLE],
+		);
+		assert.deepEqual(rows[0], { can_select: true, can_change: false });
+	});
+
 	test("puts the discovery role back to a powerless, memberless role (Discover D02)", async ({
 		assert,
 	}) => {

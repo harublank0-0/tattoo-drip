@@ -229,7 +229,9 @@ where ${photoShown("p")} and ${artistShown("a")} and ${tenantListed("t")}`);
 
 		// The orders Discover pages by, newest first or by name, each with the id
 		// as tie-breaker, and the city filter (docs/discover/database-security.md,
-		// "Search"). Partial: only rows Discover can show.
+		// "Search"). Partial: only rows Discover can show. The tenant predicates
+		// leave out `discovery_listed_at is not null`, which the
+		// tenants_discovery_listed_at CHECK makes true of every listed row.
 		this.schema.raw(
 			"create index tenants_discovery_place on tenants (place_id) where discovery_listed and discovery_suspended_at is null and deleted_at is null",
 		);

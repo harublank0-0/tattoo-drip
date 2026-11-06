@@ -20,14 +20,14 @@ app role ──SELECT──► discovery.studios / artists / artworks   (views, 
 | Layer | What it is | What it stops |
 |---|---|---|
 | **Role** | `tattoo_drip_discovery`: NOLOGIN, NOSUPERUSER, NOBYPASSRLS, NOINHERIT, NOCREATEDB/ROLE, NOREPLICATION; member of no role and no role is its member. Created and normalised by `setup_roles.sql`. The migration refuses to run if it is missing or has any of those powers | Nobody can log in as it or act as it; the app role cannot `SET ROLE` to it (tested on a real app-role session) |
-| **View ownership** | The views belong to the role, not to the table owner. Views that are not `security_invoker` read their tables with the *owner's* privileges and RLS, so they read as the role, which RLS binds | The classic hole: a view owned by the table owner bypasses RLS and leaves only its WHERE |
+| **View ownership** | The views belong to the role, not to the table owner. Views that are not `security_invoker` read their tables with the *owner's* privileges and RLS, so they read as the role, which RLS binds. The role has no USAGE (and, after the migration, no CREATE) on schema `discovery`, so even as owner it cannot rename, alter or replace its views | The classic hole: a view owned by the table owner bypasses RLS and leaves only its WHERE |
 | **Column grants** | The role has column-level SELECT on public columns of `tenants`, `artists` and `artist_work_photos`, plus three `tenant_memberships` columns that a policy reads (§3). Nothing else on any table, no write privilege anywhere, no CREATE on the schema after the migration | Contact details, deposit settings, members, the artist's login, the takedown note, clients, inquiries, money: "permission denied" even through a new view or a mistaken `select *` |
 | **Policies** | `discovery_only` (RESTRICTIVE, the full rule) and `discovery_select` (PERMISSIVE, the row's own flags) on the three tables, `TO tattoo_drip_discovery` only; `discovery_none` (RESTRICTIVE, `false`) on `tenant_memberships` | Unlisted, taken-down, deleted, hidden, opted-out or unpublished rows, whatever tenant or user context a session sets |
 | **View WHERE** | Each view repeats the rules and selects explicit columns | Defence in depth; the views' columns are the public contract |
 
 The app role gets `USAGE` on schema `discovery` and `SELECT` on the three views. It gets nothing new on any table.
 - `PUBLIC` has no access to the schema or the views.
-- `places` is readable by the app role; its write privileges are revoked.
+- `places` is readable by the app role; its write privileges are revoked, by the migration and again by `setup_roles.sql`, whose broad table grant would otherwise give them back on a re-run (tested).
 
 **Why restrictive.** The existing tenant policies apply to every role (`TO public`), and permissive policies are OR-ed. So with only a permissive discovery policy, a session that sets `app.tenant_id` of an unlisted studio would let the role see that studio's rows. The restrictive `discovery_only` is AND-ed with all of them: the role sees a row only if it passes the full rule. The permissive `discovery_select` exists because a row also needs one permissive policy to pass. It checks only the row's own columns, which is cheap (see §6).
 
@@ -142,7 +142,12 @@ The style filter is the one slow shape. D03 should measure its real query and ma
 1. **Before migrating**, run `setup_roles.sql` again on each database, as a superuser. It is safe to run again. It creates `tattoo_drip_discovery` and strips any power or membership it must not have. The migration stops with a clear error until then.
    - Dev Compose volumes, CI and new servers run it already.
    - An existing production database needs it once.
-2. **Migrations run as the owner** (`pnpm migrate`; production `node build/ace.js migration:run --connection=owner --force`). The owner must be a superuser, or be able to `SET ROLE tattoo_drip_discovery`, to give it the views. That is the case in dev, CI and the single-server deploy, where the owner is the Postgres superuser. A managed Postgres without a superuser needs checking.
+2. **Migrations run as the owner** (`pnpm migrate`; production `node build/ace.js migration:run --connection=owner --force`), and **for D02 the owner must be a superuser**.
+   - Giving the views to the role (`ALTER VIEW … OWNER TO`) needs a caller who can `SET ROLE tattoo_drip_discovery`.
+   - `setup_roles.sql` strips every membership of the role, and the migration refuses to run while it has one, so only a superuser can do that.
+   - `setup_roles.sql` itself needs a superuser too, because its `ALTER ROLE`s set attributes only a superuser may change.
+   - Dev, CI and the single-server deploy all migrate as the Postgres superuser.
+   - On a managed Postgres without one, the migration cannot be applied as written. Options: grant the owner membership for the one migration and revoke it afterwards (then re-run `setup_roles.sql`), or create the views with `SET ROLE` in that window.
 3. **Rollback** (`migration:rollback --connection=owner`):
    - It drops the views, schema, policies, grants and indexes, then the new columns and `places`.
    - Studios' listing state, takedowns and places are lost. Everything else is untouched; checksums of existing tenants, artists and photos were identical before and after a rollback and re-migration.
@@ -157,7 +162,7 @@ node ace test functional --files=discovery.spec.ts      # the boundary, rules an
 node ace test functional --files=catalog_guard.spec.ts --files=setup_roles.spec.ts --files=policies.spec.ts
 ```
 
-They use a real PostgreSQL. Each test writes fixtures as the owner in a transaction that is rolled back, and reads with `SET LOCAL ROLE` as the app role or the discovery role. A savepoint that is always rolled back keeps a role or context from outliving its statement. Impersonation is tested on a real app-role session, because `SET ROLE` is checked against the session user.
+They use a real PostgreSQL. One test plants a volatile, near-free function (it records every row it is given) in a view's WHERE, as the app role with an unlisted studio's context forged. It sees only rows the view shows. That is the proof that the views need no `security_barrier`. Each test writes fixtures as the owner in a transaction that is rolled back, and reads with `SET LOCAL ROLE` as the app role or the discovery role. A savepoint that is always rolled back keeps a role or context from outliving its statement. Impersonation is tested on a real app-role session, because `SET ROLE` is checked against the session user.
 
 ## 7. Known limitations
 

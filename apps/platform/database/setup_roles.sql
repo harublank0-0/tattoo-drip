@@ -8,7 +8,8 @@
 --     -f database/setup_roles.sql
 --
 -- Role creation and grants stay out of migrations: they are infrastructure
--- and need privileges a managed Postgres owner role may not have.
+-- and need privileges a managed Postgres owner role may not have. Run it as
+-- a superuser: its ALTER ROLEs set attributes only a superuser may change.
 
 \set ON_ERROR_STOP on
 
@@ -36,6 +37,11 @@ ALTER DEFAULT PRIVILEGES FOR ROLE :"owner_user" IN SCHEMA public
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO :"app_user";
 ALTER DEFAULT PRIVILEGES FOR ROLE :"owner_user" IN SCHEMA public
   GRANT USAGE, SELECT ON SEQUENCES TO :"app_user";
+-- Platform reference data the app only reads (Discover D02): the grant above
+-- would give it writes again on a database that already has the table.
+SELECT format('REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public.places FROM %I', :'app_user')
+WHERE to_regclass('public.places') IS NOT NULL
+\gexec
 
 -- The discovery role (Discover D02, docs/discover/database-security.md): it
 -- owns the public views in the `discovery` schema, so they read the tenant
@@ -49,10 +55,13 @@ WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'tattoo_drip_discovery'
 \gexec
 ALTER ROLE tattoo_drip_discovery NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOREPLICATION NOINHERIT;
 -- Neither a member of any role nor holding members (a member could act as
--- it). Every membership either way is revoked, the app role's included.
-SELECT format('REVOKE %I FROM %I', r.rolname, m.rolname)
+-- it). Every membership either way is revoked, the app role's included,
+-- whoever granted it (GRANTED BY names that grant; CASCADE takes the grants
+-- that depend on it).
+SELECT format('REVOKE %I FROM %I GRANTED BY %I CASCADE', r.rolname, m.rolname, g.rolname)
 FROM pg_auth_members am
 JOIN pg_roles r ON r.oid = am.roleid
 JOIN pg_roles m ON m.oid = am.member
+JOIN pg_roles g ON g.oid = am.grantor
 WHERE r.rolname = 'tattoo_drip_discovery' OR m.rolname = 'tattoo_drip_discovery'
 \gexec
