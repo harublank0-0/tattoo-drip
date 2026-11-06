@@ -4,6 +4,7 @@ import type { QueryClientContract } from "@adonisjs/lucid/types/database";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
 import { WorkPhotoLimitError } from "#modules/artists/errors";
+import Artist from "#modules/artists/models/artist";
 import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
 import ArtistService, {
 	type ProfileEditor,
@@ -1157,5 +1158,53 @@ test.group("the paged read (TAT-126)", (group) => {
 			photos.page(a.tenant, filter, null, 10),
 		);
 		assert.lengthOf(own.photos, 1);
+	});
+
+	test("an artist hidden or deleted after the caller read the visible ids, with a photo added since, is in no page, no filter and no artist read", async ({
+		assert,
+	}) => {
+		const { tenant, owner: user } = await studioWithOwner();
+		const staying = await addArtist(tenant, user);
+		const hiding = await addArtist(tenant, user, {
+			name: "Hiding",
+			slug: "hiding",
+		});
+		const leaving = await addArtist(tenant, user, {
+			name: "Leaving",
+			slug: "leaving",
+		});
+		const { photos, artists } = makeService();
+		// What the caller read: all three were visible then.
+		const stale = [staying.id, hiding.id, leaving.id];
+		const added = await inTenant(tenant, async () => {
+			await Artist.query().where("id", hiding.id).update({ visible: false });
+			await artists.delete(tenant, leaving);
+			return {
+				staying: await addWorkPhoto(tenant, staying, { styles: ["realism"] }),
+				hiding: await addWorkPhoto(tenant, hiding, {
+					styles: ["japanese"],
+					healed: true,
+				}),
+				leaving: await addWorkPhoto(tenant, leaving, {
+					styles: ["tribal"],
+					healed: true,
+				}),
+			};
+		});
+
+		await inTenant(tenant, async () => {
+			const page = await photos.page(tenant, filterOf(stale), null, 10);
+			assert.deepEqual(ids(page.photos), [added.staying.id]);
+			for (const gone of [hiding, leaving]) {
+				const own = await photos.page(tenant, filterOf([gone.id]), null, 10);
+				assert.lengthOf(own.photos, 0);
+			}
+			assert.deepEqual(await photos.facets(tenant, stale), {
+				styles: ["realism"],
+				healed: false,
+			});
+			const byArtist = await photos.forArtists(tenant, stale, 6);
+			assert.deepEqual([...byArtist.keys()], [staying.id]);
+		});
 	});
 });

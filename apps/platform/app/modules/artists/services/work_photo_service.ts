@@ -10,6 +10,7 @@ import ArtistService, {
 	type ProfileEditor,
 } from "#modules/artists/services/artist_service";
 import type { StyleSlug } from "#modules/artists/styles";
+import { visibleArtistSql } from "#modules/artists/visibility";
 import type { WorkCursor } from "#modules/artists/work_cursor";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
@@ -19,14 +20,8 @@ import { afterRollback, dbClient, withTransaction } from "#services/db_context";
 type Upload = Pick<MultipartFile, "tmpPath">;
 type TenantRef = Pick<Tenant, "id">;
 
-/** The photo's artist is visible and live, asked in the photo's own query (see findShown). */
-const VISIBLE_ARTIST = `exists (
-	select 1 from artists
-	where artists.id = artist_work_photos.artist_id
-		and artists.tenant_id = ?
-		and artists.visible
-		and artists.deleted_at is null
-)`;
+/** The photo's artist is still shown (see visibleArtistSql). */
+const VISIBLE_ARTIST = visibleArtistSql("artist_work_photos");
 
 /**
  * The most work photos an artist shows. The database no longer holds this
@@ -81,8 +76,9 @@ export default class WorkPhotoService {
 	/**
 	 * Many artists' newest `perArtist` photos in one query, each artist's
 	 * newest first; an artist with none has no entry. The caller passes the
-	 * ids of artists it may show (the public reads pass only visible ones); no
-	 * query for []. The cut is made in the database by ranking each artist's
+	 * ids of artists it may show (the public reads pass only visible ones);
+	 * only those still visible and live in this query count (VISIBLE_ARTIST);
+	 * no query for []. The cut is made in the database by ranking each artist's
 	 * photos in the order of `list`, so a tie in dates is broken by id and the
 	 * same photos come back every time.
 	 */
@@ -103,10 +99,11 @@ export default class WorkPhotoService {
 						) as place
 						from artist_work_photos
 						where tenant_id = ? and artist_id in (${artistIds.map(() => "?").join(", ")})
+							and ${VISIBLE_ARTIST}
 					) as ranked
 					where place <= ?
 				)`,
-				[tenant.id, ...artistIds, perArtist],
+				[tenant.id, ...artistIds, tenant.id, perArtist],
 			)
 			.orderBy("artist_id", "asc")
 			.orderBy("created_at", "desc")
@@ -123,7 +120,8 @@ export default class WorkPhotoService {
 	 * One page of the photos of `filter.artistIds`, newest first
 	 * (`created_at desc, id desc`), starting after the cursor `after`. The
 	 * caller passes the ids of artists it may show (the public reads pass only
-	 * visible ones); no query for []. `style` keeps the photos tagged with
+	 * visible ones); only those still visible and live in this query count
+	 * (VISIBLE_ARTIST, as in findShown); no query for []. `style` keeps the photos tagged with
 	 * that slug and `healed` the healed ones. `next` is the cursor of the
 	 * last photo returned when more remain, else null: one more photo is read
 	 * to know that. The cursor's time is read from and compared in the
@@ -147,7 +145,8 @@ export default class WorkPhotoService {
 				),
 			)
 			.where("tenant_id", tenant.id)
-			.whereIn("artist_id", [...filter.artistIds]);
+			.whereIn("artist_id", [...filter.artistIds])
+			.whereRaw(VISIBLE_ARTIST, [tenant.id]);
 		if (filter.style !== null) {
 			query.whereRaw("styles @> array[?]::varchar[]", [filter.style]);
 		}
@@ -198,7 +197,8 @@ export default class WorkPhotoService {
 	/**
 	 * What the gallery can filter by for these artists: the distinct style
 	 * slugs their photos carry (as stored, unordered: the caller orders and
-	 * filters them) and whether any photo is healed. One query; none for [].
+	 * filters them) and whether any photo is healed, counting only artists
+	 * still visible and live (VISIBLE_ARTIST). One query; none for [].
 	 */
 	async facets(
 		tenant: TenantRef,
@@ -211,8 +211,9 @@ export default class WorkPhotoService {
 				coalesce(bool_or(p.healed), false) as healed
 			from artist_work_photos p
 			left join lateral unnest(p.styles) as s(style) on true
-			where p.tenant_id = ? and p.artist_id in (${artistIds.map(() => "?").join(", ")})`,
-			[tenant.id, ...artistIds],
+			where p.tenant_id = ? and p.artist_id in (${artistIds.map(() => "?").join(", ")})
+				and ${visibleArtistSql("p")}`,
+			[tenant.id, ...artistIds, tenant.id],
 		);
 		return { styles: rows[0].styles, healed: rows[0].healed };
 	}
