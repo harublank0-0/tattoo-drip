@@ -1,462 +1,509 @@
 # TattooDrip Discover: implementation blueprint
 
-Prompt 00 output (2026-11-06). It covers the repository audit, the architecture decision and the prompt roadmap. Nothing here is implemented. This file is the plan Discover prompts work from. The dated `docs/superpowers/specs/` files are per-feature history, and this is a multi-prompt plan, so it lives at the requested path. Each Discover prompt still writes its own dated spec and plan there, as usual.
+Prompt 00 output. It covers the repository audit, the architecture and the prompt roadmap; it is revised with the product owner's approved decisions (2026-11-06). Nothing here is implemented.
+
+This file is the plan Discover prompts work from. The dated `docs/superpowers/specs/` files are per-feature history, and this is a multi-prompt plan, so it lives at the requested path. Each Discover prompt still writes its own dated spec and plan there, as usual.
 
 Status legend: **Done** = in code, with tests where noted. **Partial** = exists, but not in the form Discover needs. **Planned** = only in docs. **Missing** = searched for and absent. **Unverified** = not checked against a running system.
+
+---
+
+## Approved decisions
+
+| Area | Decision | Where this plan applies it |
+|---|---|---|
+| Apps | `apps/platform`, `apps/storefront`, new `apps/discover`; `packages/{types,sdk,react}` | [C](#c-architecture) |
+| Domains | `tattoodrip.app` Discover and marketing; `app.tattoodrip.app` Studio OS; `api.tattoodrip.app` API; `*.tattoodrip.page` storefronts | [C](#c-architecture), D01/D11 |
+| Data access | Discover has no database access; it reads only through the public Discover API. Studio OS data stays the source of truth; no duplicate authoritative records | [C](#c-architecture), [D](#d-data-model-gap-analysis) |
+| Cross-tenant security | A dedicated, read-only, minimum-privilege discovery boundary. Its privileges and RLS behaviour are verified by tests; a view is not assumed to be secure | [C.2](#c2-cross-tenant-read-boundary) |
+| Launch | Build now. Promote at about 15–20 eligible studios (a business target, never coded). Handle few studios gracefully. No fake listings, reviews, popularity or statistics | [J](#j-launch-strategy-risks-and-open-questions) |
+| Market | Nepal first; country-aware schema; English first, i18n-ready | [D](#d-data-model-gap-analysis), [H](#h-seo-and-routing-strategy) |
+| Studio listing | Explicit owner opt-in; completeness validation; platform takedown | [D.3](#d3-publication-rules) |
+| Artist listing | Inherits studio eligibility; individual opt-out; owner-controlled equivalent for independents | [D.3](#d3-publication-rules) |
+| Artist identity | Stable internal ids; affiliations preserved; studio-scoped slugs; no global social network | [D.2](#d2-artist-identity-and-affiliation) |
+| Search | PostgreSQL for the MVP | [F](#f-search-strategy) |
+| Artwork SEO | Canonical to the storefront only when content is substantially duplicated | [H](#h-seo-and-routing-strategy) |
+| Booking | Storefront booking only; Discover attribution that can't be forged | [E.2](#e2-booking-hand-off-and-attribution) |
+| Pricing / monetisation | Informational pricing page; no paid listings | [G](#g-uiux-blueprint) |
+| Analytics | First-party only; no third-party scripts | [E.2](#e2-booking-hand-off-and-attribution) |
+| Legal | Privacy, terms, listing consent, takedown process | D06, D04 |
+| Domain migration | D01 prepares and tests without touching live DNS or traffic; D11 cuts over after E2E | [I](#i-implementation-prompts) |
 
 ---
 
 ## A. Executive summary
 
 - **Today:**
-  - The repo is a pnpm monorepo with one AdonisJS 7 modular monolith (`apps/platform`). It owns all data and serves the Studio OS dashboard (Inertia + React, SSR **disabled**), the public REST API `/api/v1` and a queue worker.
+  - The repo is a pnpm monorepo. One AdonisJS 7 modular monolith (`apps/platform`) owns all data and serves the Studio OS dashboard (Inertia + React, SSR off), the public REST API `/api/v1` and a queue worker.
   - A TanStack Start storefront (`apps/storefront`) serves `*.tattoodrip.page`.
-  - `packages/{types,sdk,react}` hold the OpenAPI contract, the client and the hooks.
-  - Production runs on one self-hosted server: Docker Compose + nginx behind a Cloudflare Tunnel (`deploy/`). **`tattoodrip.app` is already the dashboard *and* API host.**
-- **The constraint that shapes everything:**
-  - Every public read is single-tenant. PostgreSQL row-level security scopes the app role to one `app.tenant_id` per transaction.
+  - `packages/{types,sdk,react}` hold the contract, the client and the hooks.
+  - Production is one self-hosted server: Docker Compose + nginx behind a Cloudflare Tunnel (`deploy/`). `tattoodrip.app` currently serves the dashboard and the API.
+- **The constraint:**
+  - Every public read is single-tenant: PostgreSQL row-level security scopes the app role to one `app.tenant_id` per transaction.
   - The SDK client is bound to one tenant.
-  - The storefront resolves one studio per request before any route runs.
-  - Discover is the first feature that must read *across* tenants.
-- **Recommendation:**
-  1. **New app `apps/discover` (TanStack Start, SSR) on the apex `tattoodrip.app`.**
-  2. **Move the dashboard to `app.tattoodrip.app` and the API to `api.tattoodrip.app`.**
-  3. **Give the API a small, explicit cross-tenant read surface.** These are owner-owned `security_barrier` views in a `discovery` schema. They expose only whitelisted public columns of opted-in, live, visible rows. A new platform `discovery` module serves them under `/api/v1/discover/*`.
-  4. **Add a separate `createDiscoverClient` to the SDK, plus `discover*` hooks.**
-  5. **Use PostgreSQL search (pg_trgm + GIN arrays) for the MVP, with no external search engine.**
-  6. **Discover profiles summarise and link out.** Booking stays on the storefront (`/book?artist=…`, `?artwork=…`, `?flash=…`), and the storefront keeps canonical ownership of full studio content.
-- **Product tension to resolve first:** the current docs defer this direction. `docs/requirements.md` lists "Marketplace" under "Not yet"; `docs/roadmap.md` lists it under "Later, maybe never". `docs/research.md` says discovery needs "hundreds of active studio pages" first. See [J](#j-architectural-risks-and-decisions).
+  - The storefront resolves one studio per request.
+  - Discover is the first cross-tenant reader.
+- **Plan:**
+  - A new `apps/discover` reads a new platform-wide `/api/v1/discover/*` API through a new SDK client.
+  - The API reads a `discovery` schema of views. A dedicated NOLOGIN role that is subject to RLS owns them, and that role is limited by column grants and by RLS policies scoped to it. The app role's existing policies are untouched.
+  - Booking stays on the storefront, with signed referral attribution.
+  - The domain split is prepared in D01 and cut over in D11.
 
 ---
 
 ## B. Existing architecture inventory
 
-### Workspace
+### Workspace and deploy
 
 | Area | What it is | Status | Evidence |
 |---|---|---|---|
 | Tooling | pnpm 12.8.1 workspaces, Node 24.3.0, TypeScript 6, Biome 2.4, husky + commitlint | Done | `package.json`, `pnpm-workspace.yaml`, `.nvmrc` |
-| Root scripts | `dev`, `build`, `typecheck`, `test`, `check` (all recursive) | Done | `package.json` |
-| `apps/platform` | AdonisJS 7, Lucid/Postgres 18, VineJS, session auth, Tuyau, Japa. Inertia SSR off | Done | `adonisrc.ts`, `config/inertia.ts` (`ssr.enabled: false`) |
-| `apps/storefront` | TanStack Start/Router/Query/Form, React 19, Tailwind v4, shadcn (new-york) | Done | `apps/storefront/src/**` |
-| `packages/types` | `openapi.yaml` and generated `openapi.gen.ts` | Done | CI checks that the generated file does not drift |
-| `packages/sdk` | `createTattooClient({ baseUrl, tenant, key?, fetch?, timeoutMs? })`, `TattooApiError` | Done | `packages/sdk/src/client.ts`, `errors.ts` |
-| `packages/react` | `TattooProvider`, `tattooQueries`, `tattooKeys`, hooks | Done | `packages/react/src/{provider,queries,hooks}.tsx?` |
-| `packages/ui` | Shared UI | Missing (docs: "added when the first component is actually shared") | `docs/architecture.md` |
-| CI | One job: Biome, typecheck, types drift, build, migrate, schema drift, tests | Done | `.github/workflows/ci.yml` |
-| Deploy | Compose: `postgres`, `web`, `worker`, `storefront`, `nginx`, `cloudflared`. nginx routes `tattoodrip.app` to web and `tattoodrip.page` / `*.tattoodrip.page` to storefront. Media on `media.tattoodrip.app` (R2) | Done | `deploy/compose.yml`, `deploy/nginx/nginx.conf`, `deploy/README.md` |
-| Vercel | `apps/storefront/vercel.json` and a row in `docs/architecture.md` | Stale: replaced by the single-server deploy | `docs/superpowers/specs/2026-10-31-single-server-deploy-design.md` |
+| `apps/platform` | AdonisJS 7, Lucid/Postgres 18, VineJS, session auth (email + password; no OAuth), Japa | Done | `adonisrc.ts`, `config/inertia.ts` (`ssr.enabled: false`) |
+| `apps/storefront` | TanStack Start/Router/Query/Form, React 19, Tailwind v4, shadcn | Done | `apps/storefront/src/**` |
+| `packages/types` / `sdk` / `react` | Contract + generated types; one-tenant client; TanStack Query hooks | Done | `packages/*/src` |
+| `packages/ui` | Shared UI | Missing ("added when the first component is actually shared", `docs/architecture.md`) | — |
+| CI | Biome, typecheck, types drift, build, migrate, schema drift, tests | Done | `.github/workflows/ci.yml` |
+| Deploy | Compose `postgres`, `web`, `worker`, `storefront`, `nginx`, `cloudflared`. nginx sends `tattoodrip.app` to web and `tattoodrip.page` / `*.tattoodrip.page` to storefront. Media on `media.tattoodrip.app` (R2) | Done | `deploy/compose.yml`, `deploy/nginx/nginx.conf`, `deploy/README.md` |
+| Vercel | `apps/storefront/vercel.json`, a row in `docs/architecture.md` | Stale | Replaced by `docs/superpowers/specs/2026-10-31-single-server-deploy-design.md` |
 
 **How the parts communicate:**
-- The storefront server calls `API_URL/api/v1/tenants/<slug>/…` through the SDK. It sends `STOREFRONT_SERVER_KEY` (rate limiting only) and `X-Visitor-IP`.
-- The browser calls the API directly for inquiries and deposits (CORS `*`, no credentials).
-- The dashboard is Inertia over session cookies (`__Host-td-session`, host-only).
-- Nothing else talks to the database.
+- The storefront SSR calls `API_URL/api/v1/tenants/<slug>/…` through the SDK. It sends `STOREFRONT_SERVER_KEY` (rate limiting only) and `X-Visitor-IP`.
+- The browser posts inquiries and deposit proofs directly to the API (CORS `*`, no credentials).
+- The dashboard is Inertia over the host-only `__Host-td-session` cookie (cookie session store).
 
-### Backend (apps/platform)
+### Backend
 
-| Capability | Status | Evidence / notes |
+| Capability | Status | Evidence |
 |---|---|---|
-| Modules | Done | `app/modules/{artists,clients,flash,identity,inquiries,media,notifications,payments,projects,references,reports,scheduling,storefront,studio_content,tenancy}`. Controllers and transformers stay flat in `app/controllers`, `app/transformers` |
-| Routes | Done | `start/routes.ts`: guest auth pages; `/t/:tenant/*` (auth + dbContext + tenant + role, `TENANT_ROUTE_ROLES`); account pages; `/api/v1` (`publicApi`) with platform-wide `/styles` and a tenant group `/tenants/:tenant/{,artists,artists/:artist,work,work/:photo,flash,flash/:design,inquiries,deposits/:token}` |
-| Public vs authenticated | Done | The API is stateless and cookieless; `auth`/`tenant`/`dbContext` must never be added to API routes (`docs/backend.md`, Public API) |
-| Tenant resolution (API) | Done | `PublicTenantMiddleware`: `STORED_SLUG` shape check, then `tenant_for_slug()` SECURITY DEFINER, then one transaction with `app.tenant_id` set. Old slugs work for reads only |
-| RLS | Done | `database/helpers/tenant_rls.ts`, `tenant_isolation` policy on every tenant-owned table. `tenants_select` allows only the current tenant or the user's memberships. Three SECURITY DEFINER functions are the only cross-tenant paths (`database/README.md`) |
-| Responses and errors | Done | `{ data }` / `{ error: { code, message, fields? } }`, `ApiException`, `API_ERRORS` (`app/services/public_api.ts`) |
-| Pagination | Done | Keyset cursor `(created_at, id)`, base64url, 24 a page by default and 48 at most, `{ data, nextCursor, filters }` (`app/modules/artists/work_cursor.ts`, `WorkPhotoService.page`) |
-| Caching | Done | `middleware.publicCache()`: `public, max-age=60, stale-while-revalidate=600` + ETag. Everything else is `no-store` |
-| Rate limits | Done | `PublicGateMiddleware` per caller, `apiLimit({ name: "tenantReads" })` per studio, server keys `STOREFRONT_SERVER_KEYS` (`app/services/server_keys.ts`, `api_limits.ts`) |
-| Isolation tests | Done | `tests/isolation/public_cases.ts`: every `/api` tenant route needs a case |
-| Public link builders | Done | `app/services/storefront_url.ts`: `studioPageUrl`, `artistPageUrl`, `galleryPageUrl`, `artworkPageUrl`, the only place links are built |
-| Images | Done | `ImageService` purposes (`artist_photo`, `artist_work_photo`, `studio_cover`, `studio_logo`, `studio_icon`, `flash_design` are public). Keys are `tenants/<id>/<purpose>/…`. Variants at 320/640/1280 are made in the request |
-| Search extensions (`pg_trgm`, `unaccent`, FTS) | Missing | No migration mentions them |
-| Billing / subscriptions | Missing | No code; `/pricing` would be marketing copy only |
-| Platform admin / moderation | Missing | The only operator tool is the `metrics:pilot` ace command |
-| Marketing / landing page | Missing | `/` redirects to `/dashboard` or `/login` ("TAT-100: there is no landing page") |
+| Modules | Done | `app/modules/{artists,clients,flash,identity,inquiries,media,notifications,payments,projects,references,reports,scheduling,storefront,studio_content,tenancy}` |
+| Routes | Done | `start/routes.ts`: guest auth; `/t/:tenant/*` (auth, dbContext, tenant, role, `TENANT_ROUTE_ROLES`); account; `/api/v1` with platform-wide `/styles` and `/tenants/:tenant/{,artists,artists/:artist,work,work/:photo,flash,flash/:design,inquiries,deposits/:token}` |
+| API tenant resolution | Done | `PublicTenantMiddleware`: `STORED_SLUG`, then `tenant_for_slug()` SECURITY DEFINER, then a transaction with `app.tenant_id` |
+| RLS | Done | `database/helpers/tenant_rls.ts`; tables `ENABLE` (not `FORCE`) RLS. App role `NOSUPERUSER NOBYPASSRLS` (`database/setup_roles.sql`). Three SECURITY DEFINER functions are the only cross-tenant paths (`database/README.md`) |
+| Envelopes, errors, cache, limits | Done | `app/services/public_api.ts`, `publicCache()` (60 s + SWR 600 + ETag), `PublicGateMiddleware`, `apiLimit({ name: "tenantReads" })`, `STOREFRONT_SERVER_KEYS` |
+| Pagination | Done | Keyset `(created_at, id)` cursor (`app/modules/artists/work_cursor.ts`); `{ data, nextCursor, filters }`, 24 by default and 48 at most |
+| Isolation tests | Done | `tests/isolation/public_cases.ts`, `tests/functional/rls/catalog_guard.spec.ts` |
+| Link builders | Done | `app/services/storefront_url.ts` (`studioPageUrl`, `artistPageUrl`, `galleryPageUrl`, `artworkPageUrl`): the only place studio links are built |
+| `APP_URL` consumers | Done | `start/env.ts`, `app/services/app_origin.ts` (production host rules), `config/app.ts`, `config/drive.ts`, invitation, alert and chat links, emails |
+| Search extensions | Missing | No `pg_trgm`, `unaccent` or FTS |
+| Billing, admin/moderation, marketing pages | Missing | `/` redirects to `/dashboard` or `/login` (TAT-100) |
 
 ### Studio OS data relevant to Discover
 
 | Need | Status | Where |
 |---|---|---|
-| Studio vs independent artist | Done | `tenants.type` enum `studio`/`independent`, chosen at onboarding (`inertia/pages/onboarding/create_tenant.tsx`) |
-| Studio name, slug, intro, cover, logo, social links, contact, timezone | Done | `tenants` columns (`database/schema.ts` `TenantSchema`); settings pages `profile`, `look` |
-| Slug history and redirects | Done | `tenant_slugs` (one platform namespace; old slugs redirect) |
-| Structured location (country / region / city / coordinates) | **Missing** | `tenants.address` is one free-text `varchar(300)`; `Contact.address` in the contract is a string |
-| Whole-studio publish or discovery switch | **Missing** | Every live tenant's storefront is public; there is no tenant-level visibility column |
-| Artists: name, slug, bio, photo, `visible`, accepting inquiries and flash, `styles[]` (≤5), social links, optional `user_id` | Done | `artists` (+ `1791700000000_add_styles_and_social_links_to_artists.ts`) |
-| Artist slug global uniqueness | **No**: unique per tenant (`artists_tenant_slug_live_unique`) | Needed for Discover URLs |
-| One person across tenants | Partial | One `User`, one `Artist` row per tenant; no global artist identity (`docs/data-model.md`) |
-| Portfolio: work photos with `alt`, `styles[]` (≤3), `healed`, `hidden` (publish), newest first, ≤100 per artist | Done | `artist_work_photos`; Portfolio workspace with bulk publish/unpublish/move (`inertia/pages/portfolio/index.tsx`, `tenant.portfolio.bulk`) |
-| Style taxonomy | Done (code list) | `app/modules/artists/styles.ts`: 18 fixed styles; `GET /api/v1/styles` |
-| Studio specialties | Derivable | Union of visible artists' and published photos' styles; no column needed |
-| Flash designs | Done | `flash_designs`, public flash reads (docs list FlashDesign as V1 entity; stale) |
-| Booking | Done (request-first) | Storefront `/book` with `?artist=`, `?flash=`, `?artwork=`; inquiry → quote → deposit. Instant slots are V1 (contract operations tagged `V1`, no routes) |
-| Inquiry source | Done | `SOURCE_CHANNELS = instagram, facebook, tiktok, google, friend, other` (`app/modules/inquiries/models/inquiry.ts`); no TattooDrip/Discover channel, no referral param |
-| Reserved slugs | Done | `RESERVED_SLUGS` has `explore`, `studios`, `artists`, `search`; **not** `discover` or `tattoos` |
+| Studio vs independent | Done | `tenants.type` (`studio` / `independent`), chosen at onboarding |
+| Name, slug (+ history), intro, cover, logo, socials, contact, timezone | Done | `tenants`, `tenant_slugs`; settings `profile`, `look` |
+| Structured location | **Missing** | `tenants.address` is free text (300) |
+| Whole-studio listing switch, takedown | **Missing** | No tenant visibility column |
+| Artist profile: `id` (UUIDv7), name, slug, bio, photo, `visible`, accepting flags, `styles[]` ≤5, socials, optional `user_id` | Done | `artists` |
+| Artist slug uniqueness | Per tenant only | `artists_tenant_slug_live_unique`; no slug history |
+| Same person across tenants | Partial | One `User`, one `artists` row per tenant (`docs/data-model.md`) |
+| Portfolio: `alt`, `styles[]` ≤3, `healed`, `hidden` (publish), ≤100 per artist | Done | `artist_work_photos`; Portfolio workspace with bulk publish/unpublish (`inertia/pages/portfolio/index.tsx`) |
+| Styles | Done | `app/modules/artists/styles.ts` (18), `GET /api/v1/styles` |
+| Booking | Done (request-first) | Storefront `/book?artist=&flash=&artwork=`; inquiry, quote, deposit |
+| Inquiry source | Partial | `SOURCE_CHANNELS` (self-reported: instagram…other); no referral field |
+| Reserved slugs | Partial | Has `explore`, `studios`, `artists`, `search`; lacks `discover`, `tattoos` |
 
-### Storefront (apps/storefront)
+### Storefront and SDK
 
 | Capability | Status | Evidence |
 |---|---|---|
-| Routes | Done | `/`, `/artists`, `/artists/:slug`, `/gallery`, `/gallery/:photo`, `/flash`, `/flash/:id`, `/book`, `/deposit`, `/about`, `/services`, `/faq`, `/contact`, `/policies`, `/aftercare`, `/sitemap.xml`, `/robots.txt`; 301s from `/work` and `/request` |
-| Host → tenant | Done | `src/tenancy/host.ts` (`landing` / `tenant` / `none` / `foreign`), `src/tenancy/handle.ts`. Apex and `www` serve a static landing at `/` and 404 elsewhere; old slugs 302 |
-| Custom domains (TAT-79) | Planned | `foreign` branch placeholder only |
-| Themes | Done | `stencil-and-ink` (default) and **`ink-noir`** (`src/studio/theme/{config,registry}.tsx`, `ink-noir/`); accent, font, logo, hero, section order |
-| Data | Done | A per-request SDK client and QueryClient (`src/api/context.ts`); loaders use `tattooQueries` with `staleTime: "static"`; page `Cache-Control: public, max-age=0, s-maxage=60, stale-while-revalidate=600` |
-| SEO | Done | `src/studio/seo.ts`: title, description, OG, Twitter, absolute canonical on the studio origin; `TattooParlor` JSON-LD on home only; per-studio sitemap and robots; noindex on 404s and the deposit page |
-| Images | Done | `readSrcSet` (`src/studio/srcset.ts`) from API variants; lazy grids, eager hero |
-| Not reusable for Discover as-is | — | The middleware, router context, root loader, `SiteRef`, root head and theme `<html>` all assume exactly one studio |
-
-### SDK
-
-| Capability | Status |
-|---|---|
-| One tenant per client, `tenantRoot` computed eagerly | Done |
-| Platform-wide methods `styles.list` (and V1 `placements.list`) on `apiRoot` | Done; this is the precedent for non-tenant resources |
-| React keys `["tattoo-drip","tenant",tenant,…]`; non-tenant `["tattoo-drip","styles"]`; `baseUrl` not in keys | Done |
-| Discover, directory or search resources | Missing |
+| Routes, host→tenant, old-slug 302 | Done | `src/routes/*`, `src/tenancy/{host,handle,lookup}.ts` |
+| Themes `stencil-and-ink`, `ink-noir` | Done | `src/studio/theme/*` |
+| SEO (head, canonical, OG, `TattooParlor` JSON-LD, sitemap/robots per studio) | Done | `src/studio/seo.ts`, `src/studio/sitemap.ts` |
+| Booking deep links | Done | `src/studio/request.ts` (`artist`, `flash`, `artwork`); other params dropped |
+| Custom domains (TAT-79) | Planned | `foreign` branch placeholder |
+| SDK: one tenant per client; `styles.list` platform-wide; `TattooApiError` | Done | `packages/sdk/src/client.ts`, `errors.ts` |
+| React keys `["tattoo-drip","tenant",…]` and `["tattoo-drip","styles"]` | Done | `packages/react/src/queries.ts` |
 
 ---
 
-## C. Architecture recommendation
+## C. Architecture
 
-### Options
+### C.1 Applications and communication
 
-| | A. New `apps/discover` (TanStack Start) | B. Extend `apps/storefront` | C. Inertia pages in `apps/platform` |
-|---|---|---|---|
-| Separation | Clean: no tenant context | Every root concern gets a "no studio" branch; a tenant-leak risk in shared context | Mixes the public crawler surface with the cookie/session app |
-| SEO / SSR | Full SSR, own origin | Full SSR, but on `tattoodrip.page` (the studio domain) | Inertia SSR is off; enabling it affects the whole dashboard |
-| Shared UI | Storefront patterns copied or extracted to `packages/ui` | Direct reuse | Studio OS components (wrong look for a public site) |
-| SDK fit | New `createDiscoverClient` | Needs a tenant-optional client anyway | Calls services directly, so Discover would bypass the API (against "studio page = external storefront") |
-| Deploy | +1 container, nginx server block, Docker target | None new | None new |
-| Domain | `tattoodrip.app` apex (needs the dashboard move) | `tattoodrip.page` apex, or path carve-outs | `tattoodrip.app`, but colliding with `/login`, `/t/*`… |
-| Effort | Medium (scaffold) | Medium-high (risky refactor of tenancy core) | Low to start, high to make it a good public site |
-| Scalability | Independent caching, scaling, release cadence | Couples Discover releases to every studio page | Couples it to the dashboard |
+**`apps/discover`** (TanStack Start, SSR) on `tattoodrip.app`:
+- No database, no auth, no cookies.
+- Reads only `/api/v1/discover/*` and `/api/v1/styles`, via `createDiscoverClient`.
+- Sends a server key and `X-Visitor-IP` on SSR, like the storefront.
+- "Sign in" and "Register" link to `app.tattoodrip.app`; onboarding already asks studio vs independent.
 
-**Recommendation: Option A.** Option B is the "no new app" instinct, but the storefront's tenant-per-request design is a deliberate security property (`src/tenancy/*`). Bolting a tenantless mode onto it costs about as much as a scaffold and weakens that property. Option C loses SSR and puts anonymous crawler traffic on the session host.
-
-### Shape
+The storefront was rejected as Discover's home: its middleware, router context, root loader, head and theme all require one studio, and that is a security property. The platform's Inertia pages were rejected too: SSR is off, and it would put crawler traffic on the session host.
 
 ```text
-browser ─► tattoodrip.app            apps/discover (TanStack Start SSR, no auth, no DB)
-                │ createDiscoverClient (server key + X-Visitor-IP on SSR)
-                ▼
-           api.tattoodrip.app/api/v1/discover/*   platform: discovery module
-                │ reads discovery.* views (cross-tenant, public columns only)
-                ▼
-           PostgreSQL (tenants, artists, artist_work_photos remain the source of truth)
+browser ─► tattoodrip.app         apps/discover (SSR, CDN-cached)
+             │ createDiscoverClient
+             ▼
+          api.tattoodrip.app/api/v1/discover/*   platform: discovery module (read-only tx, no tenant/user context)
+             │ SELECT on discovery.* views only
+             ▼
+          discovery views ─(owned by tattoo_drip_discovery: NOLOGIN, NOBYPASSRLS, column grants, RLS TO itself)─► tenants, artists, artist_work_photos
 
-Discover profile ─► https://<slug>.tattoodrip.page/book?artist=…  (storefront booking, unchanged)
-"For studios" / "Sign in" ─► app.tattoodrip.app/signup | /login  (Studio OS, unchanged)
+profile CTA ─► https://<slug>.tattoodrip.page/book?artist=…&ref=<signed>   (storefront booking, unchanged)
 ```
 
-- **Domains.**
-  - Discover takes the apex `tattoodrip.app` (and `www` → apex 301).
-  - The dashboard moves to `app.tattoodrip.app` (`APP_URL`). The API moves to `api.tattoodrip.app` (storefront and Discover `API_URL`). Both are served by the same `web` container through two nginx `server_name`s.
-  - Keep apex redirects for legacy dashboard paths for at least 30 days: `/login`, `/signup`, `/dashboard`, `/onboarding`, `/account`, `/t/*`, `/verify-email*`, `/confirm-email`, `/forgot-password*`, `/reset-password*`, `/invitations*`. Invitation links live 7 days, verification 24 h, resets 60 min.
-  - Keep `/api/v1/*` *proxied*, not redirected, on the apex for the same window: multipart POSTs and CORS don't follow redirects well.
-  - `__Host-td-session` is host-only, so the move signs everyone out once.
-  - The `checkAppOrigin` rule (APP_URL not on, under or above `tattoodrip.page`) still holds.
-  - Turnstile stays on `tattoodrip.page`; Discover has no forms in the MVP.
-- **No auth in Discover.** "Register as studio / artist" links to `app.tattoodrip.app/signup`; onboarding already asks studio vs independent. Discover sets no cookies and renders tenant text as text, as the storefront rules require.
-- **Shared code.** Discover owns its own design tokens; the storefront already accepts token copies. Extract `packages/ui` only for what both apps actually use: a responsive image primitive with srcset from `variants`, and the JSON-LD serializer. That fits the architecture doc's "first component actually shared" trigger. Do not move storefront themes.
-- **Storefront integration.**
-  - Discover never re-hosts booking.
-  - Deep links come from the API, built by `storefront_url.ts` (the one link builder). Add a `bookingUrl(template, slug, { artist?, artwork?, flash? })` helper there.
-  - Add an attribution parameter (for example `?via=tattoodrip`) that the storefront maps to a new `tattoodrip` source channel. This gives measurable evidence of Discover's value for the roadmap gates.
+**Shared code.** Discover owns its design tokens. Extract `packages/ui` only for primitives both apps use: a responsive image from API `variants`, and the JSON-LD serializer.
 
-### Cross-tenant data access (the core backend decision)
+### C.2 Cross-tenant read boundary
 
-| Approach | Verdict |
+**How PostgreSQL behaves here** (to be proven by tests in D02, not assumed):
+- A view without `security_invoker` reads its base tables with the **view owner's** privileges, and RLS is evaluated **for the view owner**.
+- The table owner is exempt from RLS: tables use `ENABLE`, not `FORCE`.
+- So a view owned by the migration owner would bypass RLS entirely, and its `WHERE` clause would be the only boundary. **That is not acceptable.**
+- With `security_invoker = true`, the caller's RLS applies. The app role has no tenant context in a discovery request and would see nothing, unless permissive policies are added for the app role. That would widen every app-role query, so it is also rejected.
+
+**Design: three independent layers.** Each layer alone stops the obvious leaks.
+
+| Layer | Mechanism |
 |---|---|
-| Permissive RLS `SELECT` policies keyed by a new `app.discovery` setting | Rejected: whole rows (deposit %, `user_id`, private texts) become reachable to any code that sets the flag; easy to misuse from existing services |
-| SECURITY DEFINER functions returning ids, then per-tenant hydration | Rejected: N tenant transactions per page; the house rule "returns ids only" makes listing impractical |
-| Denormalised `discovery_*` tables kept in sync by services or triggers | Deferred: duplicates authoritative data and adds sync bugs. Revisit only if view performance fails (see [F](#f-search-strategy)) |
-| **Owner-owned `security_barrier` views in a `discovery` schema; the app role gets `USAGE` on the schema and `SELECT` on the views only** | **Recommended.** Live data with no duplication. The column whitelist and the eligibility predicate live in one SQL place. A non-`security_invoker` view runs with its owner's rights, and the owner bypasses RLS (`ENABLE`, not `FORCE`). There are no write grants. This parallels the existing definer-function exception and is auditable |
+| 1. A dedicated owner role | `tattoo_drip_discovery`: `NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT`, owns every `discovery.*` view. The views are `security_barrier`, not `security_invoker`, and RLS on the base tables applies to it |
+| 2. Column privileges | The role gets column-level `SELECT` on public columns only: tenants (id, slug, type, name, intro, place, cover/logo keys and sizes, socials, public contact, timezone, listing and suspension columns, `deleted_at`), artists (public profile + `visible`, `discovery_listed`, `deleted_at`), photos (public fields + `hidden`, suspension). No grant on deposit settings, payment methods, members, `user_id`, clients, inquiries, projects, payments, references, alerts or any other table |
+| 3. RLS policies scoped `TO tattoo_drip_discovery`, `FOR SELECT` only | tenants: listed, not suspended, not deleted. artists: visible, `discovery_listed`, not deleted, tenant passes. photos: not hidden, not suspended, artist passes. Policies `TO` this role do not apply to the app role, so its tenant isolation is unchanged. Keep the policies acyclic (artists → tenants, photos → artists → tenants, never back) to avoid RLS recursion |
+| View predicates | Each view repeats the same eligibility predicate. That is defence in depth, and it lets the planner use the indexes |
+| Caller | The app role gets `USAGE` on schema `discovery` and `SELECT` on its views. Nothing new on base tables, no write grants. Discover requests run in a `READ ONLY` transaction with neither `app.tenant_id` nor `app.user_id` set, so a stray tenant-model query returns no rows |
 
-Rules to add to `database/README.md` (Prompt D02):
-- Views are created only by migrations and owned by the owner role.
-- Every view is `security_barrier`, lists columns explicitly (never `*`), and repeats every visibility predicate: tenant listed, not suspended, not deleted; artist visible, listed, not deleted; photo not hidden.
-- The app role gets `SELECT` on the views only.
-- `tests/functional/rls/catalog_guard.spec.ts` asserts the exact view list, its grants and its column lists.
-- An isolation spec proves that hidden, unlisted, deleted and suspended rows never appear.
+- **Product rules are kept out of the security layer.** Completeness thresholds live in the `discovery` service (tunable in code). Visibility, listing and suspension (what may never leak) live in the database.
+- **A separate LOGIN role** for discovery reads was considered. It is not needed: the app role with no context already reads zero tenant rows. Revisit if the Discover API ever moves to its own process.
+- **Operational notes:**
+  - Roles are cluster objects. Create `tattoo_drip_discovery` in `database/setup_roles.sql` (dev, CI) and in the deploy runbook.
+  - Migrations fail with a clear error when the role is missing.
+  - The migration owner must be able to `ALTER VIEW … OWNER TO tattoo_drip_discovery` (membership or superuser; check on managed Postgres).
+  - Update `database/README.md`: SECURITY DEFINER functions are no longer the only cross-tenant path, and add the discovery-view rules.
+- **Automated verification (D02):**
+  - **Catalog checks:**
+    - View owner.
+    - `reloptions` contain `security_barrier` and not `security_invoker`.
+    - Role attributes (`rolbypassrls = false`, `rolsuper = false`, `rolcanlogin = false`).
+    - `has_column_privilege` true only for the whitelist and false for sensitive columns.
+    - The app role's privileges on base tables are unchanged.
+    - `EXPECTED_POLICIES` includes the `TO tattoo_drip_discovery` policies.
+  - **Behaviour checks:**
+    - `SET ROLE tattoo_drip_discovery` (in tests) cannot read unlisted, suspended, deleted, hidden or unpublished rows, even from base tables directly.
+    - It cannot read any non-whitelisted column or any other table.
+    - The app role still sees no base rows without a tenant context.
+    - Writes through the views fail.
+    - Every `/api/v1/discover/*` route has an isolation case.
+    - A visibility parity test compares storefront and Discover on the same fixtures (a hidden artist or photo disappears from both).
 
 ---
 
 ## D. Data model gap analysis
 
-All changes are additive migrations, specified conceptually here.
+### D.1 Changes (conceptual; additive migrations)
 
-| Change | Table | Rationale |
-|---|---|---|
-| `discovery_listed boolean not null default false`, `discovery_listed_at timestamptz` | `tenants` | Explicit owner opt-in. Default **off** for existing and new tenants |
-| `discovery_suspended_at timestamptz`, `discovery_suspension_note varchar(300)` | `tenants` | Platform takedown switch, set by an operator ace command (there is no admin UI). Wins over the owner's opt-in |
-| `discovery_listed boolean not null default true` | `artists` | An artist can stay on their studio page but leave Discover. Owner and the linked artist may switch it (same rule as the profile edit). Only effective while the tenant is listed |
-| `places` (platform reference data, not tenant-owned, no RLS): `id`, `country_code char(2)` (ISO 3166-1), `region` (nullable), `slug`, `name`, `unique (country_code, slug)`; seeded for Nepal (Kathmandu, Lalitpur, Bhaktapur, Pokhara, Chitwan, Butwal, Biratnagar, Dharan…) | new | City browsing needs stable URL slugs and international growth. A code list like `TATTOO_STYLES` doesn't scale across countries. Read-only for the app role |
-| `place_id uuid null references places`, `country_code char(2) null` | `tenants` | Structured location for studios *and* independent artists (an artist inherits the tenant's place). Keep free-text `address` for display |
-| Latitude / longitude | — | **Defer** (advanced geospatial is out of MVP scope); add nullable `numeric` columns only when distance search is planned |
-| Derived studio specialties | view, not column | Union of listed artists' `styles` plus published photos' `styles` |
-| Profile completeness | view predicate, not column | Eligible = listed, `place_id` set, ≥1 listed visible artist with ≥3 published photos, cover or logo present. Proposed defaults; product to confirm |
-| `discover` and `tattoos` in `RESERVED_SLUGS` | code | Cheap safety if Discover ever uses a `.page` subdomain |
-| `tattoodrip` in `SOURCE_CHANNELS` | code + migration if the column is constrained | Attribution of Discover-originated inquiries; extend `metrics:pilot` |
-
-**Indexes and extensions** (owner role; check the managed-Postgres allowlist, as was done for `btree_gist`):
-
-- `create extension pg_trgm`. GIN trigram indexes on `lower(tenants.name)` and `lower(artists.name)`.
-- GIN on `artists.styles` and `artist_work_photos.styles`. The existing array filters run inside one tenant; cross-tenant filters need GIN.
-- A global feed index on `artist_work_photos (created_at desc, id desc) where not hidden`. Existing indexes lead with `tenant_id`.
-- A partial index on `tenants (place_id) where discovery_listed and deleted_at is null and discovery_suspended_at is null`.
-
-**Views** (`discovery` schema):
-
-| View | Columns (public only) |
+| Change | Rationale |
 |---|---|
-| `discovery.studios` | id, slug, type, name, intro, place, cover/logo keys and sizes, social links, `contact` (already public on the studio page), timezone, derived styles, listed_at |
-| `discovery.artists` | id, tenant_id, tenant slug and type, slug, name, bio, photo, styles, accepting_inquiries, social links |
-| `discovery.artworks` | id, tenant_id, artist_id, image key and size, alt, styles, healed, created_at |
+| `tenants.discovery_listed boolean not null default false`, `discovery_listed_at` | Explicit opt-in; existing tenants stay unlisted |
+| `tenants.discovery_suspended_at`, `discovery_suspension_note` | Platform takedown, overrides opt-in |
+| `artist_work_photos.discovery_suspended_at` | Takedown of one image (e.g. a copyright complaint) without suspending the studio |
+| `artists.discovery_listed boolean not null default true` | Individual opt-out; effective only while the studio is eligible |
+| `places` (platform reference data, no RLS, read-only for app roles): `id`, `country_code char(2)`, `region`, `slug`, `name`, `unique (country_code, slug)`; seeded with curated Nepal cities | Country-aware, curated locations; URL slugs. Translations later in `place_names (place_id, locale, name)` |
+| `tenants.place_id` (nullable) | Studio and independent location; keep free-text `address` for display. Lat/long deferred |
+| `inquiries.referral_source`, `referral_surface` (nullable, frozen like other submitted fields by `inquiries_guard_update`) | Verified Discover attribution, separate from the self-reported `source_channel` |
+| `RESERVED_SLUGS` + `discover`, `tattoos` | Avoid confusing `.page` subdomains |
+| `pg_trgm`; GIN trigram on `lower(tenants.name)`, `lower(artists.name)`; GIN on `artists.styles`, `artist_work_photos.styles`; global `artist_work_photos (created_at desc, id desc) where not hidden`; partial `tenants (place_id) where discovery_listed and deleted_at is null and discovery_suspended_at is null` | Cross-tenant filters and search; existing indexes lead with `tenant_id` |
+| Derived studio styles | From listed artists and published photos in a view, not a column |
 
-Never expose deposit settings, payment methods, members, `user_id`, clients, inquiries, projects or reference images.
+Views: `discovery.studios`, `discovery.artists`, `discovery.artworks`, `discovery.places` (places with ≥1 eligible studio). They are read live from the authoritative tables, with no copies.
 
-**Identifiers:**
-- Tenant slugs are one global namespace with history, so they work as Discover studio and independent-artist ids.
-- Artist slugs are unique per tenant only, so a studio artist is identified by `(studioSlug, artistSlug)`.
-- A renamed artist slug has no history (the storefront 404s), and Discover inherits that.
-- One person in two studios has two Discover profiles. That is acceptable for the MVP; a global artist identity is a later decision.
+### D.2 Artist identity and affiliation
+
+**What exists:**
+- An `artists` row is one person's profile *within one tenant*. Its `id` is a stable UUIDv7, its slug is unique only per tenant, and it has no slug history.
+- `user_id` optionally links the profile to a login. The same user can hold profiles in several tenants.
+- An independent artist is a tenant with `type = independent` and its own artist row(s).
+
+**MVP model:**
+- **An `artists` row is an affiliation profile.** Its `id` is the stable public identifier in the API. URLs use slugs.
+  - Studio artist: `/studios/:studioSlug/artists/:artistSlug`.
+  - Independent artist: `/artists/:tenantSlug`. Tenant slugs are one global namespace with history.
+  - Never assume a global artist slug.
+- **Life events with today's data:**
+
+  | Event | What happens |
+  |---|---|
+  | Works at two studios | Two affiliation profiles |
+  | Moves studio | The old affiliation is hidden or deleted (its URL 404s); a new one is created in the new tenant |
+  | Becomes independent | A new `independent` tenant with its own profile |
+
+  None of this needs a conventional multi-artist studio, and Discover shows each affiliation honestly.
+- **Not in the MVP:** a global person identity, linking profiles across studios, follower or social features.
+- **Future, additive (not built now):**
+  - A platform-owned `artist_identities` table (`id`, `handle`), referenced by `artists.identity_id`.
+  - It is linked only by the person themself (a signed-in user who is linked to each profile), never inferred from `user_id`, which is private.
+  - Handles come from the same global slug registry, so `/artists/:handle` can never collide with independent tenants' `/artists/:tenantSlug`.
+  - With it, old affiliation URLs can redirect to the person. Artist slug history can be added then if renames become an issue.
+
+### D.3 Publication rules
+
+| Subject | Rule |
+|---|---|
+| Studio eligible (security, in the database) | `discovery_listed` and not suspended and not deleted |
+| Studio shown (product, in the service) | Eligible **and** complete: `place_id` set; branding (logo or cover); a meaningful published portfolio. Proposed default: ≥6 published photos across listed artists, with ≥1 listed artist having ≥3. Constants in the `discovery` module |
+| Artist shown | The studio is shown; the artist is `visible`, `discovery_listed` and not deleted; ≥3 published photos (default) |
+| Artwork shown | Its artist is shown; not `hidden`; not suspended |
+| Independent artist | The tenant's owner controls `discovery_listed`. With one artist row, the Studio OS UI shows a single "List me on TattooDrip" switch, and the artist-level switch is hidden. The same completeness rules apply |
+| Who can change what | Studio listing, place, branding: owners (`TENANT_ROUTE_ROLES`). Artist opt-out: owners, or the linked artist on their own profile (same rule as `ArtistService.findEditable`). Suspension: operator only (`node ace discover:suspend` / `discover:restore`, no admin UI) |
+| Not eligible / unpublished / suspended / deleted | Absent from lists, filters and sitemaps; its pages are a 404 (never 403/410, so they don't reveal existence). The storefront is unaffected by a Discover suspension |
+| Propagation | Immediate at the API. Caches (60 s + SWR 600 s, Discover pages likewise) mean up to about 11 minutes; the suspend command can purge the Cloudflare cache when configured |
+| Consent | Turning listing on records `discovery_listed_at` after the owner accepts the listing terms (the right to publish the photos, clients' consent for recognisable bodies or faces) |
 
 ---
 
 ## E. API gap analysis
 
-**Reuse unchanged:**
-- `GET /api/v1/styles`
-- Every `/tenants/:tenant/*` read, still used by the storefront.
-- The storefront `/book` deep-link params.
-- `storefront_url.ts` builders.
-- `ImageService` URL and variant shaping.
-- `publicCache()`, `PublicGateMiddleware`, `ApiException`.
-- The cursor helpers, generalised.
+### E.1 Discover API
 
-**New, platform-wide group `/api/v1/discover`.** Outside the tenant group, no `publicTenant`, `publicCache()`, its own `apiLimit({ name: "discoverReads" })`. Contract first:
+**Reuse:**
+- `GET /api/v1/styles`.
+- Envelopes, `ApiException`, `publicCache()`, `PublicGateMiddleware`, server keys.
+- The cursor encoding pattern.
+- `ImageService` URL and variant shaping.
+- `storefront_url.ts`. Add `bookingUrl(template, slug, { artist?, artwork?, flash?, ref? })` there.
+
+**New group `/api/v1/discover`** (outside the tenant group; contract first in `openapi.yaml`):
 
 | Operation | Path | Notes |
 |---|---|---|
-| `listDiscoverStudios` | `GET /discover/studios?q&place&style&type&sort&cursor&limit` | `sort`: `relevance` (only with `q`), `newest`, `name`. Returns `{ data, nextCursor, filters }`; `filters` = the places and styles that actually match |
-| `getDiscoverStudio` | `GET /discover/studios/{slug}` | Summary + listed artists + 12 newest artworks + `links` (`site`, `book`, `gallery`); an old slug answers with the current `slug` so Discover can 301 |
-| `listDiscoverArtists` | `GET /discover/artists?q&place&style&independent&cursor&limit` | Each item carries `studio: { slug, name, type }` |
-| `getDiscoverArtist` | `GET /discover/studios/{slug}/artists/{artist}` | Independent tenants: `GET /discover/studios/{slug}` with `type: independent` gives the artist view (see routes) |
-| `listDiscoverArtworks` | `GET /discover/artworks?style&place&healed&studio&cursor&limit` | Newest first, keyset `(created_at, id)` |
-| `getDiscoverArtwork` | `GET /discover/artworks/{id}` | Includes `links.page` (storefront artwork page, the canonical) and `links.requestSimilar` (`/book?artwork=`) |
-| `listDiscoverPlaces` | `GET /discover/places` | Places with ≥1 eligible studio, with counts; drives the city hubs |
+| `listDiscoverStudios` | `GET /discover/studios?q&place&style&type&sort&cursor&limit` | `filters` = matching places and styles |
+| `getDiscoverStudio` | `GET /discover/studios/{slug}` | Summary, shown artists, ≤12 newest works, `links` (`site`, `book`, `gallery`); an old slug returns the current `slug` (Discover 301s) |
+| `listDiscoverArtists` | `GET /discover/artists?q&place&style&independent&cursor&limit` | Item: `id`, `slug`, `name`, `studio { slug, name, type }`, styles, photo, place |
+| `getDiscoverArtist` | `GET /discover/studios/{slug}/artists/{artist}` | An independent tenant's artist view comes from `getDiscoverStudio` with `type: independent` |
+| `listDiscoverArtworks` | `GET /discover/artworks?style&place&healed&studio&cursor&limit` | Newest first |
+| `getDiscoverArtwork` | `GET /discover/artworks/{id}` | `links.page` (storefront artwork page), `links.requestSimilar` |
+| `listDiscoverPlaces` | `GET /discover/places` | Places with eligible studios and counts |
 
-**Conventions:**
-- Same envelopes and codes.
-- Every string is plain text.
-- 404 for anything not eligible: never 403, never reveal unlisted existence.
-- The opaque cursor may wrap an offset for `relevance` sorting, capped (for example 10 pages).
-- `limit` 1–48, default 24.
+**Validation:**
+- `q`: trimmed, NFC-normalised, 2–80 characters, no control characters.
+- `place`: `country/city` slugs, shape-checked, then looked up.
+- `style`: from `STYLE_SLUGS`.
+- `sort`: an enum.
+- `limit`: 1–48.
+- `cursor`: opaque, length- and shape-checked.
+- Malformed input is `validation_failed` (422); an unknown place or style is an empty page (matching the work filters' behaviour). Pages of things that don't exist or aren't shown are 404.
 
-**Platform internals:**
-- A new `app/modules/discovery/` (services over the views, read-only Lucid models or `dbClient()` queries).
-- Transformers in `app/transformers/discover_*`.
-- `DISCOVER_SERVER_KEYS`, or generalise `STOREFRONT_SERVER_KEYS` to named server keys.
-- Isolation cases in `tests/isolation/public_cases.ts` (extend it for non-tenant routes).
-- Studio OS Inertia routes for the listing settings, each with a `TENANT_ROUTE_ROLES` entry and cross-tenant tests.
+**Limits:**
+- `apiLimit({ name: "discoverReads" })` per caller.
+- A stricter `discoverSearch` limit when `q` is present.
+- The existing gate counts every call.
+- Discover SSR uses its own server key: generalise `STOREFRONT_SERVER_KEYS` to named keys.
+
+**Caching and execution:**
+- `publicCache()` on every read.
+- Requests run in a read-only transaction without tenant or user context.
+
+**Responses:** schemas with `additionalProperties: false`; every string is plain text.
 
 **SDK / React:**
-- Add `createDiscoverClient({ baseUrl, key?, fetch?, timeoutMs? })` in `packages/sdk`, reusing the request, error, timeout and browser-key internals.
-- Don't make `tenant` optional in `createTattooClient`: that would weaken the one-tenant type guarantee the storefront relies on.
-- Add `discoverQueries` / `discoverKeys` (`["tattoo-drip","discover",…]`) and `useDiscover*` hooks in `packages/react`.
-- Generalise `TattooProvider` to accept either client, or add a `DiscoverProvider`; decide in D03, preferring the smaller diff.
+- `createDiscoverClient({ baseUrl, key?, fetch?, timeoutMs? })` in `packages/sdk`, sharing the request, error, timeout and browser-key internals. `createTattooClient` stays one-tenant.
+- `discoverKeys` (`["tattoo-drip","discover",…]`), `discoverQueries` and `useDiscover*` in `packages/react`.
+- D03 chooses between a `DiscoverProvider` and generalising `TattooProvider`, by the smaller diff.
+
+**Studio OS:**
+- Settings routes for listing, each with a `TENANT_ROUTE_ROLES` entry and cross-tenant tests.
+- An artist-form field.
+- Preview via the Discover API.
+
+### E.2 Booking hand-off and attribution
+
+- **One booking system.** Discover links to storefront routes only:
+  - `/book?artist=<slug>`
+  - `/book?artwork=<id>&artist=<slug>`
+  - `/book?flash=<id>`
+  - `/artists/<slug>`, `/gallery/<id>`
+- **Signed referral.**
+  - The platform builds every booking link in Discover API responses with `ref=<token>`.
+  - The token is HMAC-SHA256 (with a key id, for rotation) over `{ src: "discover", surface: "studio"|"artist"|"artwork", tenant, iat }`. The key is a platform-only secret; Discover never holds it.
+  - The storefront `/book` keeps `ref` (today it drops unknown params) and sends it with `inquiries.create`.
+  - The platform verifies the signature, the tenant match and its age (≤30 days, which tolerates cached pages and shared links). Only then does it record `referral_source = discover` and `referral_surface`. Anything else is stored as null; it is never rejected, so it never blocks a booking.
+  - The token holds no personal data, sets no cookie and does no cross-site tracking.
+  - It proves only "arrived through a link TattooDrip generated". It is labelled as such in Studio OS and is not used for billing or commissions.
+  - The customer's self-reported `source_channel` stays separate.
+- **Analytics (first-party):**
+  - Inquiry referral counts per studio, which `metrics:pilot` and future Studio OS analytics can read.
+  - Aggregate page and search counts from nginx/Cloudflare logs.
+  - No third-party scripts, no per-visitor identifiers in the MVP.
 
 ---
 
 ## F. Search strategy
 
 **MVP: PostgreSQL only.**
-- **Names:** `lower(name) % lower(:q)` or `ilike '%' || :q || '%'`, backed by trigram GIN, ranked by `similarity()` and then name.
-  - These are proper nouns, often mixed Latin and Devanagari. Trigrams handle partial matches and typos better than FTS here.
-  - Verify Devanagari behaviour with seed data in D02.
-- **Filters:**
-  - `place_id =` (city).
-  - `styles && array[...]` (GIN) for style.
-  - `tenants.type` for independent.
-  - A studio matches a style through its derived styles.
-- **Full-text search on intro and bio:** defer. Use the `simple` config if it's added later; there is no Nepali stemmer.
-- **Facets:** `filters` lists the styles and places with ≥1 match (unnest + distinct over the views). Exact counts are optional.
-- **Performance gate (D02/D03):**
-  - `EXPLAIN ANALYZE` on seeded data: 500 studios, 2,000 artists, 50,000 artworks.
-  - Target p95 < 100 ms for list endpoints at the DB.
-  - If the derived-styles predicate is slow, add an indexed materialized view refreshed by a job. That is the first sanctioned denormalisation step.
-- **When a search engine becomes worthwhile:**
-  - Thousands of studios across several countries.
-  - Multilingual relevance (transliteration of Nepali names), typo-tolerant instant search, geo-radius ranking blended with relevance, or personalised ranking.
-  - Sustained search p95 above budget after indexing.
-  - Then Meilisearch or Typesense would be fed from the views, which stay the source of truth.
+
+| Concern | Approach |
+|---|---|
+| Name search | `pg_trgm` GIN on `lower(name)`; match by `%`/`ilike`, rank by `similarity()` |
+| Full-text | Optional over intro and bio with the `simple` config (no Nepali stemmer); only if trigram on names proves insufficient |
+| Filters | `place_id =`, `styles && array[…]` (GIN), `type`, `healed` |
+| Facets | `filters` lists the places and styles with ≥1 match; counts optional |
+| Sorting (deterministic) | Browse: `newest` → `(listed_at or created_at desc, id desc)`; `name` → `(lower(name), id)`; both keyset-paginated. Relevance (`q` only): `(similarity desc, lower(name), id)`, offset inside an opaque cursor, capped at 10 pages |
+| No fake signals | No popularity, rating or "trending" ordering in the MVP |
+| Performance gate (D02/D03) | Seed 500 studios, 2,000 artists and 50,000 artworks; `EXPLAIN ANALYZE`; DB p95 < 100 ms per list call. If the derived-styles predicate is slow, add an indexed materialized view refreshed by a job: the first sanctioned denormalisation |
+| Mixed scripts | Seed Devanagari and Latin names; verify trigram behaviour in D02 |
+
+**A search engine becomes worthwhile when:**
+- Thousands of studios span several countries.
+- Transliteration or typo-tolerant instant search, geo-radius ranking or personalisation is needed.
+- p95 stays over budget after indexing.
+
+It would then be fed from the discovery views, which stay authoritative.
 
 ---
 
 ## G. UI/UX blueprint
 
-**Design-system direction ("editorial ink"):**
-- **Surfaces:** near-black canvas (`#0f0f10`-ish) for immersive gallery and hero sections; warm paper (`#f6f3ee`-ish) for reading sections (profiles, marketing copy, footer).
-- **Brand:** TattooDrip red (`--brand #c62835`, the Studio OS token; `#f0646e` text on dark) used *only* for primary actions, the active nav marker and focus. Never for decoration or large fills.
-- **Type:** Eczar (already the wordmark and studio face; supports Devanagari) for display headings at large sizes with tight leading. Geist for UI and body, as in Studio OS. A fluid type scale.
-- **Shape:** radius 4–8 px, hairline borders, no shadows, no glass, no gradients except a single image scrim for legibility.
-- **Motion:** 150–200 ms, opacity and transform only, honour `prefers-reduced-motion`.
-- **Accessibility:** contrast targets carried over from the Stencil & Ink spec (4.5:1 body, 3:1 large and UI). 24 px minimum targets (Studio OS convention), 44 px on touch.
-- **Imagery leads:** true aspect ratios from API `width`/`height` (zero CLS), masonry or justified rows for artwork, never uniform crop grids for portfolios.
+**Identity ("editorial ink"):**
+- Near-black immersive surfaces for imagery and warm paper surfaces for reading.
+- TattooDrip red (`#c62835`; `#f0646e` text on dark) only for primary actions, the active nav marker and focus.
+- Eczar display (Devanagari-capable) with Geist UI and body.
+- Hairline borders, 4–8 px radius, no shadows, glass or decorative gradients (one image scrim at most).
+- 150–200 ms motion that respects reduced motion.
+- WCAG 2.1 AA; 44 px touch targets.
 
-**Global navigation:**
-- Wordmark, then Tattoos · Artists · Studios, then a search field (a full-screen sheet on mobile), then "For studios" and "Sign in" (both to `app.`).
-- A sticky, compact bar on scroll.
-- Footer: cities, styles, for studios, pricing, terms and privacy.
+**Navigation:**
+- Header: wordmark, then Tattoos · Artists · Studios, then a prominent search (a full-screen sheet on mobile), then "For studios" and "Sign in" (to `app.`).
+- Footer: cities, styles, for studios, pricing, terms, privacy.
 
-**Homepage information architecture:**
-1. Hero: a mosaic of recent real artwork, a single search ("style, artist or studio") and a city selector.
-2. Browse by style: a horizontal rail of style tiles, each using a real photo.
-3. Cities: text-led list or rail, from `listDiscoverPlaces`.
-4. Fresh ink: a masonry of the newest artworks, linking to `/tattoos`.
-5. Studios to know: an editorial list row (cover strip, name, city, styles), ordered by "recently listed" or "most complete". No paid placement.
-6. Independent artists: a portrait row.
-7. How booking works: three steps (request, quote and deposit, session), linking to studios' own booking pages.
-8. A Studio OS band on dark: value proposition and CTA to `/for-studios`.
+**Homepage (discovery first; marketing is one band, not the page):**
+1. Hero: search (style, artist or studio) and a city picker over a mosaic of real recent work.
+2. Styles rail (real photos).
+3. Cities.
+4. Fresh work (masonry).
+5. Studios: an editorial list rows ordered by recently listed; no "featured" or paid placement.
+6. Independent artists.
+7. How booking works (request, quote and deposit, session; on the studio's own site).
+8. A Studio OS band linking to `/for-studios`.
 9. Footer.
+
+Every section hides itself when it has too little real data. A Discover with 3 studios must still look intentional.
 
 **Page patterns:**
 
 | Pattern | Design |
 |---|---|
-| Directories (`/studios`, `/artists`) | Title + result count; a filter bar (style chips, city select, sort) synced to the URL; a sheet of filters on mobile; *list rows* with an image strip (3 recent works) instead of uniform cards; SSR first page + "Show more" by cursor; designed empty states |
-| Tattoo gallery (`/tattoos`) | Full-bleed masonry, style chips, healed toggle; detail opens as its own page (shareable URL), no modal-only state |
-| Studio profile | Cover band, logo, name, city, derived styles, open-now (client-side, from hours), primary CTA **Request a tattoo** (storefront `/book`), secondary **Visit studio site**; artists strip; 12 works plus "Full gallery on {studio}'s site"; address text with a maps link (no embeds, no third-party scripts) |
-| Artist profile | Portrait, name, studio affiliation (or "Independent artist" + city), styles, bio excerpt, works, CTA `/book?artist=` |
-| Artwork detail | Large image, artist, studio, styles, healed; **Request something similar** (`/book?artwork=&artist=`); more by this artist, more in this style |
-| Marketing (`/for-studios`, `/pricing`) | Paper surfaces, product screenshots of Studio OS, the Studio OS dark/red identity in framed shots only |
+| Directories | Count, a URL-synced filter bar (style chips, city, sort), a filters sheet on mobile, list rows with a strip of recent work (not uniform cards), SSR first page + cursor "Show more", skeleton loading matching the final layout, helpful empty states |
+| Gallery | Masonry with true aspect ratios (zero CLS); detail is its own URL |
+| Studio profile | Cover, logo, name, city, styles, open-now (client side); **Request a tattoo** and **Visit studio site**; artists; ≤12 works linking to the full gallery on the storefront; address text with a maps link (no embeds) |
+| Artist profile | Portrait, affiliation ("at {studio}" or "Independent · {city}"), styles, bio excerpt, works, booking CTA |
+| Artwork | Large image, artist, studio, styles, healed; **Request something similar**; more by the artist, more in the style |
+| Marketing | `/for-studios`, `/pricing` (informational; no checkout; "billing coming" wording only if true), `/terms`, `/privacy` |
 
 **Mobile:**
-- Single column, thumb-reach primary CTA (a sticky bottom "Request a tattoo" on profiles).
-- Filters in a sheet; 2-column masonry.
-- Images from 320/640 variants, the first image eager and the rest lazy.
+- Single column, 2-column masonry.
+- A sticky bottom booking CTA on profiles.
+- 320/640 variants; first image eager, the rest lazy.
 
 **Branding:**
-- Discover and Studio OS share the wordmark, the red and Geist.
-- Studio OS is a dense charcoal tool; Discover is an image-first editorial surface. Never reuse dashboard layouts (sidebars, stat cards, tables) on Discover.
-- Studio storefronts keep their own themes. Discover shows studio content in Discover's frame, never the studio's theme colours.
+- Shared wordmark, red and Geist with Studio OS, but no dashboard layouts (no sidebars, stat cards or tables).
+- Studio themes stay on storefronts.
 
 ---
 
 ## H. SEO and routing strategy
 
-**Final routes** (`apps/discover`):
-
-| Route | Purpose | Index |
+| Route | Purpose | Indexing |
 |---|---|---|
-| `/` | Discover home | yes |
-| `/tattoos` | Artwork gallery | page 1 only |
-| `/tattoos/:id` | Artwork detail | `canonical` → storefront `/gallery/:id`; not in the Discover sitemap |
-| `/artists` | Artist directory | page 1 only |
-| `/artists/:slug` | Independent artist (tenant `type = independent`, tenant slug) | yes |
-| `/studios` | Studio directory | page 1 only |
+| `/` | Discover home | yes (when launch flag on) |
+| `/tattoos`, `/artists`, `/studios` | Directories | page 1, unfiltered |
 | `/studios/:slug` | Studio profile (an independent tenant 301s to `/artists/:slug`) | yes |
 | `/studios/:slug/artists/:artist` | Studio-affiliated artist | yes |
-| `/styles`, `/styles/:style` | Style hubs (artworks, artists and studios for a style) | yes |
-| `/places/:country/:city` | City hub (e.g. `/places/np/kathmandu`) | yes |
-| `/for-studios`, `/pricing` | Studio OS marketing | yes |
-| `/terms`, `/privacy` | Legal (absent today; needed for a public site) | yes |
+| `/artists/:slug` | Independent artist (tenant slug) | yes |
+| `/tattoos/:id` | Artwork detail | see the canonical rule |
+| `/styles`, `/styles/:style` | Style hubs | yes |
+| `/places/:country/:city` | City hubs (`/places/np/kathmandu`) | yes |
+| `/for-studios`, `/pricing`, `/terms`, `/privacy` | Marketing and legal | yes |
 | `/sitemap.xml` (index), `/robots.txt` | Crawl | — |
-| `/login`, `/signup`, `/dashboard`, `/t/*`, account-link paths | 301 to `app.tattoodrip.app` (transition), never Discover pages | no |
 
-**Changes from the proposal:**
-- `/explore/*` is dropped: a segment that adds no meaning, with the directories at `/studios`, `/artists` and `/tattoos`.
-- `/artists/:slug` alone can't name a studio artist (slugs are per tenant), hence the nested route.
-- `/auth/*` is replaced by links to the existing platform auth pages. Discover has no auth layer.
-- Location and style landing pages are added: they are the highest-value search entry points ("tattoo studio in Kathmandu").
-
-**Canonical and duplicate-content policy:**
-
-| Content | Canonical owner | How |
-|---|---|---|
-| Full studio site (gallery, FAQ, policies, flash, booking) | `<slug>.tattoodrip.page` | Discover never reproduces the full gallery, FAQ, policies or flash; it links out |
-| Studio and artist *discovery profiles* | `tattoodrip.app` (self) | A distinct page type: location, derived styles, comparison context, ≤12 works, ≤300-character intro excerpt. JSON-LD `TattooParlor` / `Person` with `url` = the storefront and `sameAs` = the socials |
-| Individual artwork | Storefront `/gallery/:id` | Discover's `/tattoos/:id` sets a cross-domain `rel=canonical` to the storefront, so the studio earns the image ranking |
-| Filtered, sorted or cursor pages | The unfiltered hub | `noindex, follow` + canonical to page 1 or hub. Crawl coverage comes from sitemaps, not deep pagination |
-
-- **Other head tags:** unique `<title>`/description per page, OG and Twitter cards (cover or photo 1280 variant), `BreadcrumbList` on hubs and profiles, `ItemList` on directories. `lang="en"` for the MVP; hreflang when a second language ships.
-- **Sitemaps:** an index with `studios.xml`, `artists.xml`, `places.xml`, `styles.xml` and static pages, generated from paged API reads (cached 1 h), with `lastmod` where known. No artwork URLs (they canonicalise to storefronts, whose own sitemaps could add artwork pages later).
-- **Eligibility:**
-  - Only eligible profiles render. Everything else is a 404: unlisted, suspended, incomplete, hidden or deleted.
-  - The existing 60 s + 600 s SWR caching means a delisting can take up to about 11 minutes to disappear. Document it, and add a Cloudflare purge to the suspension command if needed.
-- **Performance:**
-  - SSR with page cache headers like the storefront's (`s-maxage=60, stale-while-revalidate=600`), keyed by Host at Cloudflare.
-  - srcset from existing variants; no on-the-fly image service.
-  - Budgets: LCP < 2.5 s on 4G, CLS < 0.05, JS < 150 kB gzipped on content pages.
-
----
-
-## I. Revised implementation prompts
-
-Prefix **D** to avoid confusion with the Studio OS redesign prompts. Order: backend before frontend data pages, and the domain move before launch.
-
-| # | Objective | Major tasks | Depends on | Deliverables | Acceptance criteria |
-|---|---|---|---|---|---|
-| **D01** | Domain split | nginx server blocks for `app.` and `api.`; cloudflared hostnames; `APP_URL` and `API_URL` env; apex legacy redirects and an `/api` proxy window; runbook and `docs/architecture.md`/`deploy.md` updates (incl. removing the stale Vercel row) | Product sign-off | Config + docs | Dashboard, email links, storefront SSR, browser intake and deposit upload all work on new hosts; old links redirect; the platform's `checkAppOrigin` boots in production mode |
-| **D02** | Discovery data foundation | Migrations: tenant listing and suspension, artist `discovery_listed`, `places` + Nepal seed, `place_id`; `pg_trgm`; indexes; `discovery` views + grants; DB README rules; catalog guard; isolation specs; seeders for volume tests; `RESERVED_SLUGS` additions | D00 decisions | Migrations, regenerated `schema.ts`, tests | Hidden, unlisted, suspended and deleted rows absent from every view (tests); app role can't write or read beyond the views; EXPLAIN on seeded data within budget |
-| **D03** | Discover API + SDK | Contract first; `discovery` module services, controllers, transformers; `bookingUrl` link builder; cache and limits; server key; SDK `createDiscoverClient`; React keys and hooks; SDK/React tests | D02 | API, types, SDK, hooks | Every operation matches `openapi.yaml`; isolation cases pass; cursors stable; no private field in any response (schema `additionalProperties: false`) |
-| **D04** | Studio OS publication controls | Settings page "TattooDrip listing" (owner): opt-in switch, place picker, completeness checklist, preview link; artist form switch; setup checklist item; optional place step in onboarding; `discover:suspend` / `discover:restore` ace commands | D02 (D03 for preview links) | Inertia pages, routes, `TENANT_ROUTE_ROLES`, tests | Listing is off by default; toggling it changes API results immediately; artists can only change their own switch; cross-tenant tests |
-| **D05** | Discover app foundation + design system | `apps/discover` scaffold (TanStack Start, Tailwind v4, tokens, fonts); config/env validation; SDK wiring per request; layout, nav, footer; SEO head and JSON-LD helpers; robots, sitemap skeleton; 404/503; Dockerfile target, compose service, nginx; CI; minimal `packages/ui` extraction (image + srcset) | D01 (deploy), D03 (client) | App skeleton, design tokens, docs (`apps/discover/AGENTS.md`) | Builds, typechecks and tests in CI; SSR pages with correct heads; no secret in the browser bundle (port the storefront's bundle check) |
-| **D06** | Homepage + marketing | Home IA from G; `/for-studios`, `/pricing` (content from product), `/terms`, `/privacy` | D05, D03 | Pages | Lighthouse ≥ 90 performance and accessibility on mobile; content renders with empty or small data sets gracefully |
-| **D07** | Directories + hubs | `/studios`, `/artists` (shared list/filter pattern), `/styles/:style`, `/places/:country/:city`; URL-synced filters; cursor "Show more" | D05 | Pages | Filters round-trip via URL; noindex and canonical rules from H; keyboard-operable filters |
-| **D08** | Profiles + storefront hand-off | Studio, studio-artist and independent-artist profiles; old-slug 301s; JSON-LD; booking deep links with attribution; storefront `?via=` → `tattoodrip` source channel; `metrics:pilot` attribution | D07, D03 | Pages, small storefront and platform change | Every CTA lands on a working storefront page; an inquiry made via Discover records the `tattoodrip` channel |
-| **D09** | Tattoo gallery + artwork detail | `/tattoos` masonry, filters, `/tattoos/:id` with cross-domain canonical, "request similar", related works | D07 | Pages | Zero CLS; lazy-loading verified; canonical points at the storefront |
-| **D10** | SEO, performance, accessibility pass | Sitemap index, structured-data validation, OG images, budgets, WCAG 2.1 AA audit, reduced motion | D06–D09 | Fixes + checklist | Rich-results test passes; budgets met; axe clean |
-| **D11** | QA and launch readiness | Playwright journeys (find, filter, profile, book hand-off, delist), load test of discover endpoints, runbook (suspension, cache purge), launch gate on listed-studio count | All | Tests, runbook | Journeys green in CI; delisting verified end to end within the documented TTL |
-
-**Changes from the proposed sequence:**
-- The data model and API move ahead of every data-driven page; the proposal had the homepage before the data.
-- The domain split is added as an explicit prompt; it was missing and is a launch blocker.
-- Publication controls move from 08 to D04, so real opted-in data exists while the UI is built.
-- The studio and artist directories are combined (same pattern).
-- Hubs join the directories.
-- Storefront attribution is folded into profiles.
-- Marketing pages stay with the homepage. They have no data dependency, so they could ship first if a marketing launch is wanted before Discover is live.
+- **Changes from the original proposal:**
+  - `/explore/*` is dropped.
+  - `/auth/*` is replaced by links to `app.tattoodrip.app`.
+  - Studio artists are nested, because slugs are per tenant.
+  - No 2-letter top-level segments, which keeps `/{locale}/…` free for i18n later.
+- **Canonicals:**
+  - Profiles and hubs are self-canonical. They are distinct pages (location, styles, comparison context, ≤12 works, intro excerpt) and never re-host the full gallery, FAQ, policies or flash.
+  - **Artwork detail rule:** if the page is substantially the storefront's (the same image and caption with little else), it sets `rel=canonical` to the storefront `/gallery/:id` and stays out of Discover's sitemap. That is the default at launch.
+  - Once Discover adds substantial unique context (style and location hub context, related work), D10 may switch it to self-canonical by an explicit decision.
+  - Filtered, sorted or paged URLs are `noindex, follow` with a canonical to the hub.
+- **Structured data:**
+  - `TattooParlor` (`url` = the storefront, `sameAs` = the socials).
+  - `Person` with `worksFor`.
+  - `BreadcrumbList`, `ItemList`.
+  - No `AggregateRating` or reviews (none exist; none are invented).
+- **Sitemaps:** an index of `studios.xml`, `artists.xml`, `places.xml`, `styles.xml` and static pages, from paged API reads, cached 1 h.
+- **Launch control:**
+  - `DISCOVER_INDEXING=off|on` (an environment flag, not a count) sends `noindex` and a disallowing `robots.txt` until the business decides to launch.
+  - The pages work either way.
+- **i18n readiness:**
+  - All copy goes through a message catalog from D05 (English only).
+  - `lang`, `og:locale` and hreflang come from one locale setting.
+  - Place names are translatable through `place_names`.
+- **Performance budgets:**
+  - SSR with `s-maxage=60, stale-while-revalidate=600`, keyed by Host.
+  - srcset from existing variants.
+  - LCP < 2.5 s on 4G, CLS < 0.05, ≤150 kB gzipped JS on content pages.
 
 ---
 
-## J. Architectural risks and decisions
+## I. Implementation prompts
 
-**Decisions requiring product-owner approval:**
+Prompts are prefixed **D** to avoid confusion with the Studio OS redesign prompts. Each prompt follows the house workflow:
+- Contract first.
+- Narrow checks, then the relevant gates.
+- Isolation tests for tenant data.
+- Regenerated files committed.
+- Stop at the end; never start the next prompt.
 
-1. **Strategy change.** The docs defer a marketplace or discovery site ("Not yet" / "Later, maybe never"; research: "hundreds of active studio pages" first). The default is to proceed, but gate *public launch and indexing* on a minimum number of eligible studios (proposed 15–20). Until then, ship `/`, `/for-studios` and `/pricing` with directories `noindex`. Update `roadmap.md` and `requirements.md` when approved.
-2. **Domain move.** Dashboard to `app.tattoodrip.app`, API to `api.tattoodrip.app`, Discover on the apex. The alternative, path carve-outs on one host, is fragile and gets more so with every dashboard route.
-3. **Opt-in defaults.** Tenant listing off by default (recommended) vs on; artist switch default on under a listed studio.
-4. **Completeness rule.** ≥1 listed artist with ≥3 published photos, a city, and a cover or logo.
-5. **Locations.** A curated `places` list seeded for Nepal; owners pick from it, and a missing city is added by the operator. The other option is free text plus normalisation.
-6. **Artist identity.** One Discover profile per tenant-artist (no global person). Independent tenants are presented as artists at `/artists/:tenantSlug`.
-7. **Artwork pages.** Discover artwork pages canonicalise to storefronts, so Discover gives up image-search ranking to the studios.
-8. **Pricing page.** No billing exists. Pricing is static copy until billing is built (and the price is still being validated per `roadmap.md`).
-9. **Analytics.** Storefronts forbid third-party scripts. Should Discover follow (recommended: yes, using server-side counts and source attribution), or allow a privacy-friendly analytics script?
-10. **Legal and moderation.** Terms and privacy for tattoodrip.app; listing consent text (studios confirm they may publish the photos, including clients' bodies); takedown via `discover:suspend`; no review queue in the MVP.
-11. **Language.** English only for the MVP; Nepali later (Eczar and Geist fallbacks cover Devanagari).
+| # | Objective | Major tasks | Depends on | Acceptance criteria |
+|---|---|---|---|---|
+| **D01** | Domain architecture and migration preparation (no live DNS or traffic change) | Inventory every host assumption (`APP_URL` consumers, `checkAppOrigin`, cookie policy, Shield/CSRF, CORS, email and chat links, `config/drive.ts`, storefront `API_URL`, `MEDIA_URL`, Turnstile hostnames, nginx, cloudflared); nginx server blocks for `app.` (dashboard, no `/api`) and `api.` (`/api` only), apex legacy redirect map and `/api` proxy window prepared but inactive; env examples; a local/staging rehearsal with the new hostnames; cutover and rollback runbook draft; fix stale host and Vercel docs | Approved | All suites pass; a local rehearsal on new hosts covers login, CSRF writes, invitations, password reset, storefront SSR, browser intake and deposit upload, and old-URL redirects; production config unchanged and still valid |
+| **D02** | Discovery database foundation | Migrations (D.1), `tattoo_drip_discovery` role in `setup_roles.sql` and the runbook, views, column grants, `TO`-scoped policies, `pg_trgm` + indexes, `places` seed, catalog guard + privilege/RLS tests (C.2), visibility parity test, volume seeder + EXPLAIN, DB README update | D01 not required | Every C.2 verification passes; app-role privileges unchanged; DB p95 budget met on seeded data |
+| **D03** | Public Discover API, SDK client, React hooks | Contract; `app/modules/discovery`; controllers and transformers; validation; limits; named server keys; read-only transaction; `bookingUrl` + signed `ref`; isolation cases; `createDiscoverClient`; keys, queries, hooks; tests | D02 | Responses match the contract; no private field reachable; cursor ordering deterministic; limits enforced; SDK and React tests green |
+| **D04** | Studio OS publication controls | Settings "TattooDrip listing" (opt-in + terms consent, place picker, completeness checklist from the API, preview); artist opt-out (owner or linked artist); independent single switch; setup-checklist item; `discover:suspend` / `discover:restore` (studio, artwork); storefront `/book` keeps `ref`, the intake stores verified referral | D03 | Off by default; changes reflected immediately in the API; role and cross-tenant tests; forged, expired or other-tenant `ref` stored as null without blocking the inquiry |
+| **D05** | Discover app scaffold and premium design system | `apps/discover` (TanStack Start, Tailwind v4, tokens, Eczar/Geist, message catalog); env validation; per-request client; layout, nav, footer; SEO and JSON-LD helpers; robots and sitemap skeleton; `DISCOVER_INDEXING`; 404/503; loading and empty-state primitives; Dockerfile target, compose service and nginx block (inactive); CI; browser-bundle secret check; minimal `packages/ui`; `apps/discover/AGENTS.md` | D03 | Builds, typechecks and tests in CI; SSR heads correct; no secret in the client bundle |
+| **D06** | Homepage and SaaS marketing | Home IA (G) with real data and graceful small-data states; `/for-studios`; `/pricing` (informational); `/terms`, `/privacy` (content from the product owner) | D05 | Mobile Lighthouse ≥ 90 performance and accessibility; renders well with 0, 3 and 20 studios; no fabricated numbers |
+| **D07** | Studio and artist directories; style and location pages | Shared list and filter pattern; `/studios`, `/artists`; `/styles/:style`; `/places/:country/:city`; URL-synced filters; cursor "Show more" | D05 | Filters round-trip via URL; noindex and canonical rules (H); keyboard-operable filters |
+| **D08** | Public profiles and storefront booking hand-off | Studio, studio-artist and independent-artist profiles; old-slug 301s; JSON-LD; booking CTAs with signed `ref` | D07, D04 | Every CTA lands on a working storefront page; a Discover-originated inquiry records `referral_source = discover` |
+| **D09** | Tattoo gallery and artwork details | `/tattoos` masonry and filters; `/tattoos/:id` with the canonical rule; "request similar"; related work | D07 | Zero CLS; lazy-loading verified; canonical per H |
+| **D10** | SEO, accessibility, performance | Sitemap index, structured-data validation, OG images, budgets, WCAG 2.1 AA audit, reduced motion; artwork canonical decision | D06–D09 | Rich-results validation passes; budgets met; axe clean |
+| **D11** | E2E QA, production domain cutover, launch readiness | Playwright journeys (search, filter, profile, booking hand-off, delist, suspend); load test; staged cutover per the runbook: add `app.` / `api.` hostnames, then storefront `API_URL`, then `APP_URL`, then deploy Discover and switch the apex with legacy redirects and the `/api` proxy; smoke tests; monitoring; rollback (restore the old apex server block and envs); indexing flag left to the business decision | D01–D10 | Journeys green; smoke tests pass on new hosts; old links redirect; rollback rehearsed; the sign-in impact matches the runbook |
 
-**Technical risks:**
+**Sessions at cutover:**
+- `__Host-td-session` is host-only and production sessions live in the cookie, so a session cannot move from `tattoodrip.app` to `app.tattoodrip.app` without handing credentials across hosts.
+- A single-use, short-lived handoff token is technically possible, but it adds a credential-transfer endpoint.
+- Default: one planned sign-in, announced in the dashboard beforehand, at a low-traffic time.
+- A handoff is built only if the product owner wants it, with a security review.
+- A shared `Domain=tattoodrip.app` cookie is rejected: it would expose sessions to Discover and every subdomain.
+
+---
+
+## J. Launch strategy, risks and open questions
+
+**Launch strategy:**
+- Build now. Discover may be deployed, dark or unpromoted, once D11 cuts over.
+- Promotion and `DISCOVER_INDEXING=on` are business decisions, made at about 15–20 eligible studios whose listings are verified.
+- No technical rule depends on a studio count.
+- No fake listings, reviews, popularity, statistics or "featured" placements.
+- No paid listings in the MVP.
+- Before launch, update `docs/roadmap.md` and `docs/requirements.md`: Discover replaces the "Marketplace: not yet" stance.
+
+**Risks:**
 
 | Risk | Mitigation |
 |---|---|
-| The cross-tenant views widen the RLS model | Explicit column lists, `security_barrier`, `SELECT`-only grants, catalog guard on view definitions and grants, isolation specs, a README rule. A security review in D02 |
-| Visibility rules duplicated between `visibleArtistSql` and the views | One SQL predicate per view; a test that compares storefront and Discover visibility on the same fixtures |
-| Domain move breaks live links or sessions | Redirect and proxy window, one-time sign-out notice, staged deploy with rollback (keep the old `server_name` until verified) |
-| Cold start: empty directories look broken | Launch gate (decision 1); designs that read well with 5 studios; city and style hubs only render when non-empty |
-| Stale caches after delisting | Documented 11-minute worst case; optional Cloudflare purge in the suspension command |
-| Search quality on mixed scripts | Trigram + seed tests in D02; documented upgrade path to a search engine |
-| Single-server capacity (one box runs everything) | Discover pages are CDN-cacheable; discover API cached 60 s; measure in D11 |
-| Doc drift | `docs/architecture.md` (Vercel row, `app.`/`api.` hosts, Portfolio as V1) and `docs/data-model.md` (FlashDesign as V1) are already stale; fix them in D01/D02 |
+| The new cross-tenant path widens the security model | Three-layer boundary (C.2), catalog and privilege tests, `TO`-scoped policies that leave app-role isolation unchanged, a security review at D02 |
+| RLS policy recursion or performance with nested `exists` | Acyclic policies; EXPLAIN on seeded data; indexes on predicate columns |
+| Visibility drift between storefront and Discover | A parity test on shared fixtures |
+| Referral forgery or privacy | HMAC token minted and verified only by the platform; null on failure; no personal data; not used for money |
+| Domain cutover breaks links or sessions | D01 rehearsal, staged D11 cutover, redirect and proxy window (≥30 days: invitations live 7 d), rollback plan |
+| Cold start | Sections hide without data; small-data designs; promotion gated by the business target |
+| Stale caches after delisting or takedown | Documented ~11-minute worst case; optional Cloudflare purge in `discover:suspend` |
+| Mixed-script search quality | Seeded tests; documented upgrade path |
+| Managed Postgres limits (extensions, role creation, `ALTER … OWNER`) | Checked in D02 against the provider, as was done for `btree_gist` |
+| Doc drift | Fix `docs/architecture.md` (Vercel, hosts, Portfolio as V1) and `docs/data-model.md` (FlashDesign as V1) in D01/D02 |
 
-**Recommended defaults when no answer arrives:**
-- Listing off by default.
-- Artist switch on.
-- Curated places.
-- Artwork canonicals to storefronts.
-- No third-party scripts.
-- English only.
-- Domain split in D01.
-- Indexing held until the launch gate.
+**Open questions (defaults apply if unanswered):**
+1. **Completeness thresholds.** Default: ≥6 published photos per studio, ≥3 per shown artist, plus a logo or cover and a city.
+2. **The curated Nepal city list.** Default: seeded from current pilot studios plus the major cities; the operator adds more on request.
+3. **Session handoff at cutover.** Default: none, one announced sign-in.
+4. **Legal texts and listing consent wording.** Needed before D06 and D04 ship; the product owner provides the content.
+5. **Referral token lifetime.** Default: 30 days.
