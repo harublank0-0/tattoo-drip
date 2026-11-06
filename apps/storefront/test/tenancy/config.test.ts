@@ -72,7 +72,12 @@ describe("parseStorefrontConfig", () => {
 	});
 
 	test("allows http for an API on this machine", () => {
-		for (const apiUrl of ["http://127.0.0.1:3333", "http://[::1]:3333"]) {
+		for (const apiUrl of [
+			"http://127.0.0.1:3333",
+			"http://[::1]:3333",
+			// The split hosts' rehearsal (Discover D01): the API on its own loopback name.
+			"http://api.localhost:3333",
+		]) {
 			assert.equal(
 				parseStorefrontConfig({ ...DEV, API_URL: apiUrl }).apiUrl,
 				apiUrl,
@@ -94,6 +99,8 @@ describe("parseStorefrontConfig", () => {
 			"api.tattoodrip.app",
 			"ftp://api.tattoodrip.app",
 			"http://api.tattoodrip.app",
+			"http://api.localhost.tattoodrip.app",
+			"http://localhost.evil.example",
 			"https://api.tattoodrip.app/api",
 			"https://api.tattoodrip.app?x=1",
 			"https://api.tattoodrip.app#x",

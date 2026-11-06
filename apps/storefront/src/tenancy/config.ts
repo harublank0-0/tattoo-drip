@@ -133,7 +133,12 @@ function problem(
 		: `${name} is not set: set it to ${rule}.`;
 }
 
-/** An http(s) origin: https, or http on this machine; no path, query, fragment or credentials. */
+/**
+ * An http(s) origin: https, or http on this machine; no path, query, fragment
+ * or credentials. "This machine" includes `*.localhost` (RFC 6761: always
+ * loopback), so a rehearsal of the split hosts can run the API at
+ * http://api.localhost:3333 (docs/discover/domain-migration.md).
+ */
 function readOrigin(
 	name: string,
 	value: string | undefined,
@@ -141,7 +146,10 @@ function readOrigin(
 	problems: string[],
 ): string | undefined {
 	const url = value ? parseUrl(value) : undefined;
-	const loopback = url ? LOOPBACK_HOSTS.includes(url.hostname) : false;
+	const loopback = url
+		? LOOPBACK_HOSTS.includes(url.hostname) ||
+			url.hostname.endsWith(".localhost")
+		: false;
 	const scheme =
 		url?.protocol === "https:" || (url?.protocol === "http:" && loopback);
 	if (
