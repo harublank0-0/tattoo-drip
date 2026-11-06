@@ -60,8 +60,6 @@ export default function SideNav({
 							size="icon-sm"
 							className="text-muted-foreground hover:text-foreground"
 							aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-							aria-expanded={!collapsed}
-							aria-controls="studio-sidebar"
 							onClick={() => onCollapsedChange(!collapsed)}
 						>
 							{collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
@@ -73,10 +71,7 @@ export default function SideNav({
 				</Tooltip>
 			</div>
 
-			<div
-				id="studio-sidebar"
-				className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-3 pt-1 pb-3"
-			>
+			<div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-3 pt-1 pb-3">
 				<div className={cn(collapsed && "flex justify-center")}>
 					<TenantSwitcher variant={collapsed ? "rail" : "sidebar"} />
 				</div>

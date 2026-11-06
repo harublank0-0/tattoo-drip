@@ -15,14 +15,15 @@ function TooltipProvider({
 	);
 }
 
+/**
+ * Needs a `TooltipProvider` above it: `AppLayout` holds the one shared by the
+ * shell, so the rail's tooltips share one delay and open at once while the
+ * pointer moves from one to the next.
+ */
 function Tooltip({
 	...props
 }: React.ComponentProps<typeof TooltipPrimitive.Root>) {
-	return (
-		<TooltipProvider>
-			<TooltipPrimitive.Root data-slot="tooltip" {...props} />
-		</TooltipProvider>
-	);
+	return <TooltipPrimitive.Root data-slot="tooltip" {...props} />;
 }
 
 function TooltipTrigger({

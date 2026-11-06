@@ -90,7 +90,7 @@
  * ink-muted on canvas 5.8:1, on surface 6.0:1, on elevated 5.2:1;
  * line-strong on surface 3.4:1; on-brand on brand 5.6:1; brand as text on
  * canvas 5.4:1. Brand red is 3.5:1 on the dark canvas, too low for text, so
- * red text uses `text-brand-text`, never `text-brand-text`. Marigold is a dot or
+ * red text uses `text-brand-text`, never `text-primary`. Marigold is a dot or
  * a bar ("needs you"), never text.
  */
 :root {
@@ -216,9 +216,17 @@
   --destructive: #f4a39a;
   --on-destructive: #0d0e10;
 
-  /* Menus and dialogs sit one step above the surface they open over. */
+  /*
+   * Menus and dialogs sit one step above the surface they open over, so the
+   * highlighted row (hover, keyboard focus, `bg-accent`) takes the next step
+   * again: #2c2f36 is 1.2:1 on the elevated menu, ink on it 12.3:1 and
+   * ink-muted 5.0:1. The sidebar's current row stays on the elevated grey.
+   */
   --popover: var(--elevated);
   --muted: var(--elevated);
+  --accent: #2c2f36;
+  --secondary: #2c2f36;
+  --sidebar-accent: var(--elevated);
 
   /* The same hues at about 80% lightness on 18% washes: 8.3, 7.9, 8.3, 8.9 and 5.9:1. */
   --status-studio-fg: #f9d694;

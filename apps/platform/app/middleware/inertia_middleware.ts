@@ -19,7 +19,11 @@ import { encryptsHistory } from "#services/history_encryption";
 import { isApiRequest } from "#services/public_api";
 import UserTransformer from "#transformers/user_transformer";
 
-/** The shell shows the studio's icon at 28 px: the narrowest copy for a 2x screen. */
+/**
+ * The shell draws the studio's icon at 28 px, so it asks for a copy at least
+ * 56 px wide (2x). The icon keeps only a 32 px copy (ICON_WIDTHS), so this is
+ * the 180 px icon itself.
+ */
 const SHELL_ICON_WIDTH = 56;
 
 export default class InertiaMiddleware extends BaseInertiaMiddleware {
