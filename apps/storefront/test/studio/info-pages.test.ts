@@ -3,13 +3,22 @@ import { describe, test } from "node:test";
 import type { Artist, Studio } from "@tattoo-drip/sdk";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { sectionId } from "../../src/studio/anchors.ts";
 import { INFO_PAGES, type InfoKind } from "../../src/studio/info.ts";
-import { type InfoPageData, infoPageData } from "../../src/studio/loaders.ts";
-import { ThemedInfoPage } from "../../src/studio/theme/registry.tsx";
+import {
+	type InfoPageData,
+	infoPageData,
+	studioPageData,
+} from "../../src/studio/loaders.ts";
+import {
+	ThemedInfoPage,
+	ThemedStudioPage,
+} from "../../src/studio/theme/registry.tsx";
 import { studioViewModel } from "../../src/studio/view-model.ts";
 import {
 	ARJUN,
 	CLOSED_STUDIO,
+	CONTENT_STUDIO,
 	DEFAULT_STOREFRONT,
 	EMPTY_STUDIO,
 	GOOD_TO_KNOW_STUDIO,
@@ -261,5 +270,106 @@ describe("what each page says, and only that", () => {
 				?.seo.title,
 			"What Black Needle tattoos",
 		);
+	});
+});
+
+describe("the studio's own FAQ and policies (2026-11-06 spec)", () => {
+	test("the FAQ ends with the studio's own entries under From {studio}, in order, as text", () => {
+		for (const make of [inkNoir, stencil]) {
+			const page = data("faq", make(CONTENT_STUDIO));
+			assert.ok(page && page.content.kind === "faq");
+			const last = page.content.groups.at(-1);
+			assert.equal(last?.id, "studio");
+			assert.equal(last?.title, "From Black Needle");
+			assert.deepEqual(
+				last?.items.map((item) => [item.id, item.question, item.source]),
+				[
+					["studio-1", "Do you do cover-ups?", "studio"],
+					["studio-2", "Can I bring a friend?", "studio"],
+				],
+			);
+			const markup = mainOf(html(page));
+			assert.doesNotMatch(markup, /<script>/);
+			assert.match(
+				markup,
+				/<p class="user-text" dir="auto">&lt;script&gt;x&lt;\/script&gt;\nsecond<\/p>/,
+			);
+		}
+	});
+
+	test("Policies lists the Good to know sections first, then the studio's, with unique anchors and the date", () => {
+		for (const make of [inkNoir, stencil]) {
+			const page = data("policies", make(CONTENT_STUDIO));
+			assert.ok(page && page.content.kind === "policies");
+			const ids = page.content.sections.map((section) => section.id);
+			assert.deepEqual(ids, [
+				"deposits",
+				"age",
+				"walk-ins",
+				"closed-days",
+				"section-5",
+				"cancellations",
+				"cancellations-2",
+			]);
+			const markup = mainOf(html(page));
+			for (const id of ids) {
+				assert.match(markup, new RegExp(`<a href="#${id}">`), id);
+				assert.match(markup, new RegExp(` id="${id}"`), id);
+			}
+			assert.match(markup, /Last updated 6 November 2026/);
+		}
+	});
+
+	test("a studio with only its own sections has a Policies page; one with neither is a not-found", () => {
+		const own = data(
+			"policies",
+			inkNoir({ ...STUDIO, policies: CONTENT_STUDIO.policies }),
+		);
+		assert.ok(own && own.content.kind === "policies");
+		assert.equal(own.content.sections.length, 3);
+		assert.equal(
+			studioViewModel({ ...STUDIO, policies: CONTENT_STUDIO.policies }).pages
+				.policies,
+			true,
+		);
+		assert.equal(data("policies", inkNoir(STUDIO)), null);
+	});
+
+	test("with Good to know hidden the studio's FAQ entries and sections show nowhere", () => {
+		const hidden = inkNoir(CONTENT_STUDIO, ["work", "artists"]);
+		const faq = data("faq", hidden);
+		assert.ok(faq && faq.content.kind === "faq");
+		assert.ok(faq.content.groups.every((group) => group.id !== "studio"));
+		assert.equal(data("policies", hidden), null);
+	});
+
+	test("section anchors: an ASCII slug, a number on a repeat, section-<n> for a title with no ASCII letter", () => {
+		const used = new Set<string>(["deposits"]);
+		assert.equal(
+			sectionId("Touch-ups & Healing!", used, 1),
+			"touch-ups-healing",
+		);
+		assert.equal(sectionId("Deposits", used, 2), "deposits-2");
+		assert.equal(sectionId("Deposits", used, 3), "deposits-3");
+		assert.equal(sectionId("नीति", used, 4), "section-4");
+		assert.equal(sectionId("नीति", used, 5), "section-5");
+	});
+
+	test("Stencil & Ink's footer links each informational page that has content, and none that doesn't", () => {
+		const footerOf = (studio: Studio) => {
+			const page = renderToStaticMarkup(
+				createElement(ThemedStudioPage, {
+					data: studioPageData(stencil(studio), [SITA, ARJUN], ORIGIN),
+				}),
+			);
+			return /<footer[^>]*>([\s\S]*)<\/footer>/.exec(page)?.[1] ?? "";
+		};
+		const full = footerOf(CONTENT_STUDIO);
+		assert.match(full, /<nav [^>]*aria-label="More about Black Needle">/);
+		assert.match(full, /href="\/faq"/);
+		assert.match(full, /href="\/policies"/);
+		const empty = footerOf(EMPTY_STUDIO);
+		assert.match(empty, /href="\/faq"/);
+		assert.doesNotMatch(empty, /href="\/policies"|href="\/aftercare"/);
 	});
 });

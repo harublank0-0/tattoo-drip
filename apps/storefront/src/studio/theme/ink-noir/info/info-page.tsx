@@ -334,7 +334,10 @@ function InfoBody({
 			return (
 				<div className="ink-section">
 					<div className="ink-container ink-info-policies">
-						<PolicySections sections={content.sections} />
+						<PolicySections
+							sections={content.sections}
+							updatedAt={content.updatedAt}
+						/>
 					</div>
 				</div>
 			);

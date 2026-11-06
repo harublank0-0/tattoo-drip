@@ -1,5 +1,6 @@
 import type { Artist, Studio } from "@tattoo-drip/sdk";
 import { fill } from "../intake/template.ts";
+import { sectionId } from "./anchors.ts";
 import { filterStyles } from "./gallery.ts";
 import { closedDaysText, readClosures } from "./hours.ts";
 import { artistsHref, infoHref, requestHref, workHref } from "./links.ts";
@@ -106,6 +107,8 @@ export interface PolicySection {
 export interface PoliciesContent {
 	readonly kind: "policies";
 	readonly sections: readonly PolicySection[];
+	/** When the policies last changed, as "6 November 2026" in the studio's timezone; null when unknown. */
+	readonly updatedAt: string | null;
 }
 
 export interface AftercareContent {
@@ -131,6 +134,7 @@ export const infoCopy = {
 		before: "Before your session",
 		pricing: "Pricing and deposits",
 		healing: "Healing",
+		fromStudio: "From {studio}",
 		how: {
 			question: "How do I book a session?",
 			answer:
@@ -201,7 +205,11 @@ export function infoContent(
 			return services.requestHref !== null || services.flash ? services : null;
 		}
 		case "faq":
-			return faqContent(view, texts);
+			return faqContent(
+				view,
+				texts,
+				sections.includes("info") ? studioFaq(studio) : [],
+			);
 		case "contact":
 			return view.pages.contact
 				? {
@@ -297,6 +305,7 @@ function servicesContent(
 function faqContent(
 	view: StudioView,
 	texts: Partial<Studio["goodToKnow"]>,
+	ownEntries: readonly { question: string; answer: string }[],
 ): FaqContent {
 	const words = infoCopy.faq;
 	const studio = { studio: view.name };
@@ -364,6 +373,20 @@ function faqContent(
 				label: words.aftercareLink,
 			}),
 		},
+		// The studio's own questions, last, in its order (2026-11-06 spec).
+		{
+			id: "studio",
+			title: fill(words.fromStudio, studio),
+			items: ownEntries.map(
+				(entry, n): FaqItem => ({
+					id: `studio-${n + 1}`,
+					question: entry.question,
+					answer: paragraphs(entry.answer),
+					link: null,
+					source: "studio",
+				}),
+			),
+		},
 	];
 	return {
 		kind: "faq",
@@ -398,5 +421,79 @@ function policiesContent(
 			),
 		});
 	}
-	return sections.length > 0 ? { kind: "policies", sections } : null;
+	// The studio's own sections follow, in its order; titles never merge with
+	// the Good to know ones (the deposit policy keeps its one source).
+	const own = studioPolicies(studio);
+	const used = new Set(sections.map((section) => section.id));
+	for (const section of own.sections) {
+		sections.push({
+			id: sectionId(section.title, used, sections.length + 1),
+			title: section.title,
+			text: paragraphs(section.text),
+		});
+	}
+	return sections.length > 0
+		? {
+				kind: "policies",
+				sections,
+				updatedAt: own.updatedAt
+					? formatDay(own.updatedAt, studio.timezone)
+					: null,
+			}
+		: null;
+}
+
+/** The studio's own FAQ entries, as the API sent them: anything else is none, an entry missing a text dropped. */
+export function studioFaq(
+	studio: Studio,
+): { question: string; answer: string }[] {
+	const list: unknown = (studio as Partial<Studio>).faq;
+	if (!Array.isArray(list)) return [];
+	return list.flatMap((item) => {
+		const question = cleanText(item?.question);
+		const answer = cleanText(item?.answer);
+		return question && answer ? [{ question, answer }] : [];
+	});
+}
+
+/** The studio's own policy sections and when its policies last changed, read the same way. */
+export function studioPolicies(studio: Studio): {
+	updatedAt: string | null;
+	sections: { title: string; text: string }[];
+} {
+	const policies: unknown = (studio as Partial<Studio>).policies;
+	const value = (policies ?? {}) as { updatedAt?: unknown; sections?: unknown };
+	const sections = Array.isArray(value.sections)
+		? value.sections.flatMap((item) => {
+				const title = cleanText(item?.title);
+				const text = cleanText(item?.text);
+				return title && text ? [{ title, text }] : [];
+			})
+		: [];
+	const updatedAt =
+		typeof value.updatedAt === "string" &&
+		!Number.isNaN(Date.parse(value.updatedAt))
+			? value.updatedAt
+			: null;
+	return { updatedAt, sections };
+}
+
+/** A moment as "6 November 2026" in `timeZone` (UTC when it isn't one). */
+function formatDay(iso: string, timeZone: unknown): string {
+	const options: Intl.DateTimeFormatOptions = {
+		day: "numeric",
+		month: "long",
+		year: "numeric",
+	};
+	try {
+		return new Intl.DateTimeFormat("en-GB", {
+			...options,
+			timeZone: typeof timeZone === "string" ? timeZone : "UTC",
+		}).format(new Date(iso));
+	} catch {
+		return new Intl.DateTimeFormat("en-GB", {
+			...options,
+			timeZone: "UTC",
+		}).format(new Date(iso));
+	}
 }

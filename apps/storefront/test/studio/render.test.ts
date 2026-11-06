@@ -2357,7 +2357,8 @@ describe("flash on the artist page, /flash and a design's page (TAT-129)", () =>
 		assert.match(one, /<h1 [^>]*>Flash<\/h1>/);
 		assert.equal(count(one, /class="flash-card"/g), 3);
 		assert.match(one, /class="flash-card-artist">by <bdi>Sita Rai<\/bdi>/);
-		assert.doesNotMatch(one, /<nav /);
+		// No artist filter (the footer's "More about" list is another nav).
+		assert.doesNotMatch(one, /<nav aria-label="Whose flash"/);
 		// The site bar's Request is the studio's general one; the chat button is there.
 		assert.match(
 			one,

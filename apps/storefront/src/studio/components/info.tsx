@@ -1,3 +1,4 @@
+import { fill } from "../../intake/template.ts";
 import { studioCopy } from "../copy.ts";
 import type {
 	ContactContent,
@@ -45,6 +46,8 @@ export const infoWords = {
 	aftercareNote:
 		"These are {studio}'s own instructions. For anything that worries you while it heals, ask your artist or a healthcare professional.",
 	fromStudio: "From {studio}",
+	updated: "Last updated {date}",
+	more: "More about {studio}",
 } as const;
 
 /** The studio's own text, one paragraph per block, line breaks kept. */
@@ -121,11 +124,19 @@ export function FaqGroups({
 /** The policies: a contents list of anchors, then a section per policy. */
 export function PolicySections({
 	sections,
+	updatedAt = null,
 }: {
 	sections: readonly PolicySection[];
+	/** "6 November 2026", or null for no date line. */
+	updatedAt?: string | null;
 }) {
 	return (
 		<div className="policies">
+			{updatedAt ? (
+				<p className="policies-updated">
+					{fill(infoWords.updated, { date: updatedAt })}
+				</p>
+			) : null}
 			{sections.length > 1 ? (
 				<nav className="policies-contents" aria-label={infoWords.contents}>
 					{/* biome-ignore lint/a11y/useSemanticElements: it is a list; the role repairs WebKit's reading of list-style: none */}
@@ -356,7 +367,12 @@ function InfoBody({ data }: { data: InfoPageData }) {
 		case "contact":
 			return <ContactDetails studio={studio} contact={content} />;
 		case "policies":
-			return <PolicySections sections={content.sections} />;
+			return (
+				<PolicySections
+					sections={content.sections}
+					updatedAt={content.updatedAt}
+				/>
+			);
 		case "aftercare":
 			return (
 				<>

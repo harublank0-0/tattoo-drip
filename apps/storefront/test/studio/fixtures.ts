@@ -83,6 +83,30 @@ export const GOOD_TO_KNOW_STUDIO: Studio = {
 	policies: { updatedAt: null, sections: [] },
 };
 
+/**
+ * GOOD_TO_KNOW_STUDIO plus the studio's own FAQ entries and policy sections:
+ * one section titled in Devanagari (no ASCII letter for an anchor) and two
+ * with the same title. Policies last changed 6 November 2026 in Kathmandu.
+ */
+export const CONTENT_STUDIO: Studio = {
+	...GOOD_TO_KNOW_STUDIO,
+	faq: [
+		{
+			question: "Do you do cover-ups?",
+			answer: "Yes.\nSend a photo of the old tattoo.",
+		},
+		{ question: "Can I bring a friend?", answer: "<script>x</script>\nsecond" },
+	],
+	policies: {
+		updatedAt: "2026-11-06T05:00:00Z",
+		sections: [
+			{ title: "नीति", text: "हाम्रो नीति।" },
+			{ title: "Cancellations", text: "Tell us a day before." },
+			{ title: "Cancellations", text: "A second note on cancelling." },
+		],
+	},
+};
+
 /** A studio that set nothing but its name. */
 export const EMPTY_STUDIO: Studio = {
 	...STUDIO,
