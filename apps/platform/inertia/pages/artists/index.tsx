@@ -182,9 +182,11 @@ function ArtistCard({
 						on={artist.visible && artist.acceptingInquiries}
 						icon={Inbox}
 						text={
-							artist.acceptingInquiries
-								? "Taking requests"
-								: "Not taking requests"
+							!artist.acceptingInquiries
+								? "Not taking requests"
+								: artist.visible
+									? "Taking requests"
+									: "Taking requests once on your page"
 						}
 					/>
 					<Status

@@ -40,7 +40,7 @@ import CalendarService from "#modules/scheduling/services/calendar_service";
 import OpeningHoursService from "#modules/scheduling/services/opening_hours_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import SessionService from "#modules/scheduling/services/session_service";
-import { sessionTimeText } from "#modules/scheduling/times";
+import { sessionStartText, sessionTimeText } from "#modules/scheduling/times";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { artistLink } from "#services/studio_links";
 
@@ -96,10 +96,7 @@ export default class ArtistsController {
 						hasLogin: artist.userId !== null,
 						upcomingCount: next?.count ?? 0,
 						nextText: next
-							? next.first
-									.setZone(tenant.timezone)
-									.setLocale("en-GB")
-									.toFormat("ccc d LLL, HH:mm")
+							? sessionStartText(next.first, tenant.timezone, now)
 							: null,
 					};
 				}),
@@ -232,7 +229,8 @@ export default class ArtistsController {
 		const today = todayIn(tenant.timezone);
 		const agenda = await this.calendar.load(tenant, membership, {
 			artistId: artist.id,
-			from: dayBounds(today, tenant.timezone).from,
+			// From now: a session already over today is the calendar's, not "next".
+			from: DateTime.now(),
 			to: dayBounds(shiftDate("day", today, SCHEDULE_DAYS - 1), tenant.timezone)
 				.to,
 		});

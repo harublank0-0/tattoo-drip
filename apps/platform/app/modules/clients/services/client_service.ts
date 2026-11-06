@@ -144,11 +144,13 @@ export default class ClientService {
 
 	/**
 	 * Live clients, newest first, 25 per page. A search matches part of the
-	 * name in any case (literally: `%` and `_` are not wildcards) or, with
+	 * name or (Studio OS) of the email, never a deleted client's, in any case
+	 * (literally: `%` and `_` are not wildcards) or, with
 	 * at least 3 digits in it, part of the phone's digits however the
 	 * number was typed ("981-234", "+977 981…"). A page past the last one
 	 * (a bookmark after clients were deleted, a typed-in number) gives the
-	 * last page instead of an empty one.
+	 * last page instead of an empty one. `within` (another module's subquery
+	 * of client ids) narrows the list, the count too.
 	 */
 	async list(
 		tenant: TenantRef,
@@ -198,10 +200,13 @@ export default class ClientService {
 			// both branches.
 			query.where((group) => {
 				group.whereRaw("name ilike ? escape '\\'", [`%${escapeLike(term)}%`]);
-				// Studio OS: the email too, for a client who wrote from it.
-				group.orWhereRaw("email ilike ? escape '\\'", [
-					`%${escapeLike(term)}%`,
-				]);
+				// Studio OS: the email too, for a client who wrote from it; never a
+				// deleted client's, whose address is gone from the page.
+				group.orWhere((email) =>
+					email
+						.whereNull("anonymized_at")
+						.whereRaw("email ilike ? escape '\\'", [`%${escapeLike(term)}%`]),
+				);
 				if (digits.length >= 3) {
 					group.orWhereRaw("replace(phone, '+', '') like ?", [`%${digits}%`]);
 				}

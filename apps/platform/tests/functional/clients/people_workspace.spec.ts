@@ -122,6 +122,27 @@ test.group("Clients workspace (Studio OS)", (group) => {
 		assert.lengthOf(none.clients as Row[], 1);
 	});
 
+	test("an email search never finds a client whose details were deleted", async ({
+		client,
+		assert,
+	}) => {
+		const s = await people("people-scrub");
+		await inTenant(s.tenant, async () => {
+			const gone = await makeClient(s.tenant, {
+				name: "Scrubbed",
+				email: "gone@example.com",
+			});
+			gone.anonymizedAt = DateTime.now();
+			await gone.save();
+		});
+		const props = await propsOf(
+			client,
+			"/t/people-scrub/clients?q=gone%40example",
+			s.owner,
+		);
+		assert.deepEqual(props.clients, []);
+	});
+
 	test("a client's profile lists their sessions, every status, newest first", async ({
 		client,
 		assert,

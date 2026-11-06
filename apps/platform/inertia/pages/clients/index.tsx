@@ -151,16 +151,16 @@ export default function ClientsIndex({
 								{clients.map((row) => (
 									<tr
 										key={row.id}
-										className="relative transition-colors duration-150 hover:bg-accent/40 focus-within:bg-accent/40"
+										className="transition-colors duration-150 hover:bg-accent/40 focus-within:bg-accent/40"
 									>
 										<td className="px-4 py-3">
 											<div className="flex items-center gap-3">
 												<Initials name={row.name} />
 												<div className="flex min-w-0 flex-col">
-													{/* The name is the row's link: its box covers the row. */}
+													{/* The name is the row's link (no clickable row, as on Projects). */}
 													<Link
 														href={profile(row)}
-														className="font-medium wrap-anywhere outline-none after:absolute after:inset-0 focus-visible:underline"
+														className="rounded-sm font-medium wrap-anywhere underline-offset-4 outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
 													>
 														{row.name}
 													</Link>
@@ -195,7 +195,7 @@ export default function ClientsIndex({
 															variant: "ghost",
 															size: "icon-sm",
 														}),
-														"relative z-10 text-muted-foreground hover:text-foreground",
+														"text-muted-foreground hover:text-foreground",
 													)}
 												>
 													<CalendarPlus aria-hidden="true" />
