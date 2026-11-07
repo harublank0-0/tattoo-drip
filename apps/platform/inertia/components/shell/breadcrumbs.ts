@@ -27,6 +27,8 @@ export const PAGE_LABELS: Record<string, string> = {
 	"settings/look": "Page look",
 	"settings/good_to_know": "Good to know",
 	"settings/faq_policies": "FAQ & policies",
+	"settings/discover": "Discover",
+	"settings/discover_preview": "Discover preview",
 	"settings/payments": "Payments",
 	"settings/payment_method_form": "Payment method",
 	"settings/messages": "Messages",

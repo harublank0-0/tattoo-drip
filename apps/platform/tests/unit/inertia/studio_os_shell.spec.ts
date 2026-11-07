@@ -127,6 +127,8 @@ test.group("Studio OS shell: breadcrumbs", () => {
 			"settings/look",
 			"settings/good_to_know",
 			"settings/faq_policies",
+			"settings/discover",
+			"settings/discover_preview",
 			"settings/payments",
 			"settings/payment_method_form",
 			"settings/messages",

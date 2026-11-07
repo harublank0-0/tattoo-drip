@@ -59,6 +59,9 @@ test.group(
 				"pages/account/show.tsx",
 				// Studio OS: deleting an artist asks in its card.
 				"pages/artists/index.tsx",
+				// Discover D04: turning the listing off asks in the page.
+				"pages/settings/discover.tsx",
+				"pages/settings/discover_preview.tsx",
 				...components,
 			];
 			assert.isAbove(components.length, 10);

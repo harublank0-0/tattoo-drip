@@ -21,6 +21,9 @@ import WorkPhotoService, {
 } from "#modules/artists/services/work_photo_service";
 import { knownStyles, TATTOO_STYLES } from "#modules/artists/styles";
 import { bulkWorkPhotosValidator } from "#modules/artists/validators/work_photo";
+import { ARTWORK_STATE_WORDS } from "#modules/discovery/publication";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import PublicationService from "#modules/discovery/services/publication_service";
 import { ImageDeleteError } from "#modules/media/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
@@ -59,6 +62,7 @@ export default class PortfolioController {
 		private artists: ArtistService,
 		private photos: WorkPhotoService,
 		private images: ImageService,
+		private publication: PublicationService,
 	) {}
 
 	async index(ctx: HttpContext) {
@@ -85,6 +89,12 @@ export default class PortfolioController {
 			this.photos.counts(tenant, artistIds),
 		]);
 		const byId = new Map(artists.map((row) => [row.id, row]));
+		// Each photo's Discover state (D04), from the same rules as the views.
+		const discover = await this.publication.artworkStates(
+			tenant,
+			artists,
+			found.photos,
+		);
 
 		const photos = await Promise.all(
 			found.photos.map(async (photo) => {
@@ -107,6 +117,9 @@ export default class PortfolioController {
 							? artworkPageUrl(template, tenant.slug, photo.id)
 							: null,
 					alt: photo.alt,
+					discover:
+						ARTWORK_STATE_WORDS[discover.get(photo.id) ?? "studio_not_listed"],
+					discoverState: discover.get(photo.id) ?? "studio_not_listed",
 					styles: knownStyles(photo.styles).map(({ slug }) => slug),
 					healed: photo.healed,
 					width: photo.width,

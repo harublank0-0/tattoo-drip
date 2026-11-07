@@ -240,6 +240,24 @@ router
 					.delete("members/:id", [controllers.Members, "remove"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.settings.members.destroy");
+				// Discover (D04, docs/discover/publication-controls.md): the
+				// listing, its consent and city, and a preview. One page; the
+				// writes redirect back to it.
+				router
+					.get("discover", [controllers.DiscoverSettings, "show"])
+					.as("tenant.settings.discover");
+				router
+					.get("discover/preview", [controllers.DiscoverSettings, "preview"])
+					.as("tenant.settings.discover.preview");
+				router
+					.put("discover/place", [controllers.DiscoverSettings, "updatePlace"])
+					.as("tenant.settings.discover.place.update");
+				router
+					.post("discover/listing", [controllers.DiscoverSettings, "enable"])
+					.as("tenant.settings.discover.listing.store");
+				router
+					.delete("discover/listing", [controllers.DiscoverSettings, "disable"])
+					.as("tenant.settings.discover.listing.destroy");
 			})
 			.prefix("/settings");
 
@@ -274,6 +292,12 @@ router
 					.delete(":id", [controllers.Artists, "destroy"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.artists.destroy");
+				// The artist's own Discover switch (D04): an owner any profile, an
+				// artist their own (ArtistService.findEditable).
+				router
+					.put(":id/discover", [controllers.ArtistDiscover, "update"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.artists.discover.update");
 				// An artist's work photos (TAT-116): the upload names the artist,
 				// the others name the photo. One :id per route.
 				router

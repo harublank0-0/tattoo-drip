@@ -2,6 +2,7 @@ import { DateTime } from "luxon";
 import Artist from "#modules/artists/models/artist";
 import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
 import Client from "#modules/clients/models/client";
+import { LISTING_CONSENT_VERSION } from "#modules/discovery/publication";
 import FlashDesign from "#modules/flash/models/flash_design";
 import Inquiry from "#modules/inquiries/models/inquiry";
 import ReferenceImage from "#modules/inquiries/models/reference_image";
@@ -610,6 +611,17 @@ export const isolationCases: IsolationCase[] = [
 		ownStatus: 302,
 		snapshot: artistRows,
 	},
+	// The artist's own Discover switch (D04): the seeded profile is on, so
+	// turning it off changes it.
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/artists/:id/discover",
+		resource: "artistProfile",
+		actor: "owner",
+		body: () => ({ listed: "0" }),
+		ownStatus: 302,
+		snapshot: artistRows,
+	},
 	// An artist's work photos (TAT-116): the upload names the artist, the
 	// others name the photo.
 	{
@@ -1067,6 +1079,46 @@ export const isolationCases: IsolationCase[] = [
 		}),
 		ownStatus: 302,
 		snapshot: studioContentRows,
+	},
+	// Discover (D04). The seeded studio is listed under an older consent
+	// version with a city (seededStudio), so accepting the current version,
+	// turning the listing off and choosing another city each change its row.
+	{
+		method: "GET",
+		pattern: "/t/:tenant/settings/discover",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: tenantRow,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/settings/discover/preview",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: tenantRow,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/settings/discover/place",
+		actor: "owner",
+		body: (own) => ({ placeId: own.discoverPlaceId }),
+		ownStatus: 302,
+		snapshot: tenantRow,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/settings/discover/listing",
+		actor: "owner",
+		body: () => ({ consent: "on", consentVersion: LISTING_CONSENT_VERSION }),
+		ownStatus: 302,
+		snapshot: tenantRow,
+	},
+	{
+		method: "DELETE",
+		pattern: "/t/:tenant/settings/discover/listing",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: tenantRow,
 	},
 	{
 		method: "GET",

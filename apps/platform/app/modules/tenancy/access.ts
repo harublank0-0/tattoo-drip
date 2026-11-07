@@ -68,6 +68,12 @@ export const TENANT_ROUTE_ROLES = {
 	"tenant.settings.members.invitations.destroy": OWNERS,
 	"tenant.settings.members.role.update": OWNERS,
 	"tenant.settings.members.destroy": OWNERS,
+	// Discover (D04): the listing, its consent, city and preview.
+	"tenant.settings.discover": OWNERS,
+	"tenant.settings.discover.preview": OWNERS,
+	"tenant.settings.discover.place.update": OWNERS,
+	"tenant.settings.discover.listing.store": OWNERS,
+	"tenant.settings.discover.listing.destroy": OWNERS,
 
 	// Artist profiles: owners manage every one; an artist edits only the
 	// live profile linked to them, never its link (ArtistService.findEditable,
@@ -79,6 +85,10 @@ export const TENANT_ROUTE_ROLES = {
 	"tenant.artists.edit": MEMBERS,
 	"tenant.artists.update": MEMBERS,
 	"tenant.artists.destroy": OWNERS,
+	// The artist's own Discover switch (D04): the same rule as the profile
+	// (ArtistService.lockEditable); turning a profile someone else manages
+	// back on is refused (PublicationService.setArtistListed).
+	"tenant.artists.discover.update": MEMBERS,
 	// An artist's work photos (TAT-116): an owner changes any live artist's,
 	// an artist only their own linked profile's
 	// (WorkPhotoService.findEditable, re-checked under the artist's row lock).

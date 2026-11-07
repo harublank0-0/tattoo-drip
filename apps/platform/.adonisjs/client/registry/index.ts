@@ -312,6 +312,36 @@ const routes = {
     tokens: [{"old":"/t/:tenant/settings/members/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/members/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/members/:id","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/members/:id","type":0,"val":"members","end":""},{"old":"/t/:tenant/settings/members/:id","type":1,"val":"id","end":""}],
     types: placeholder as Registry['tenant.settings.members.destroy']['types'],
   },
+  'tenant.settings.discover': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/settings/discover',
+    tokens: [{"old":"/t/:tenant/settings/discover","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/discover","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/discover","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/discover","type":0,"val":"discover","end":""}],
+    types: placeholder as Registry['tenant.settings.discover']['types'],
+  },
+  'tenant.settings.discover.preview': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/settings/discover/preview',
+    tokens: [{"old":"/t/:tenant/settings/discover/preview","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/discover/preview","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/discover/preview","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/discover/preview","type":0,"val":"discover","end":""},{"old":"/t/:tenant/settings/discover/preview","type":0,"val":"preview","end":""}],
+    types: placeholder as Registry['tenant.settings.discover.preview']['types'],
+  },
+  'tenant.settings.discover.place.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/settings/discover/place',
+    tokens: [{"old":"/t/:tenant/settings/discover/place","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/discover/place","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/discover/place","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/discover/place","type":0,"val":"discover","end":""},{"old":"/t/:tenant/settings/discover/place","type":0,"val":"place","end":""}],
+    types: placeholder as Registry['tenant.settings.discover.place.update']['types'],
+  },
+  'tenant.settings.discover.listing.store': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/settings/discover/listing',
+    tokens: [{"old":"/t/:tenant/settings/discover/listing","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/discover/listing","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/discover/listing","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/discover/listing","type":0,"val":"discover","end":""},{"old":"/t/:tenant/settings/discover/listing","type":0,"val":"listing","end":""}],
+    types: placeholder as Registry['tenant.settings.discover.listing.store']['types'],
+  },
+  'tenant.settings.discover.listing.destroy': {
+    methods: ["DELETE"],
+    pattern: '/t/:tenant/settings/discover/listing',
+    tokens: [{"old":"/t/:tenant/settings/discover/listing","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/discover/listing","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/discover/listing","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/discover/listing","type":0,"val":"discover","end":""},{"old":"/t/:tenant/settings/discover/listing","type":0,"val":"listing","end":""}],
+    types: placeholder as Registry['tenant.settings.discover.listing.destroy']['types'],
+  },
   'tenant.artists': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/artists',
@@ -353,6 +383,12 @@ const routes = {
     pattern: '/t/:tenant/artists/:id',
     tokens: [{"old":"/t/:tenant/artists/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/:id","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/:id","type":1,"val":"id","end":""}],
     types: placeholder as Registry['tenant.artists.destroy']['types'],
+  },
+  'tenant.artists.discover.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/artists/:id/discover',
+    tokens: [{"old":"/t/:tenant/artists/:id/discover","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/:id/discover","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/:id/discover","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/:id/discover","type":1,"val":"id","end":""},{"old":"/t/:tenant/artists/:id/discover","type":0,"val":"discover","end":""}],
+    types: placeholder as Registry['tenant.artists.discover.update']['types'],
   },
   'tenant.artists.photos.store': {
     methods: ["POST"],

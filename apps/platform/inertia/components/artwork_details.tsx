@@ -340,6 +340,13 @@ function Body({
 								</span>
 							)}
 						</dd>
+						<dt className="text-muted-foreground">Discover</dt>
+						<dd className="flex flex-col items-start gap-1">
+							<span>{photo.discover.label}</span>
+							<span className="text-xs text-muted-foreground">
+								{photo.discover.note}
+							</span>
+						</dd>
 						<dt className="text-muted-foreground">Styles</dt>
 						<dd>
 							{photo.styles.length > 0 ? (

@@ -40,6 +40,7 @@ export class ArtistWorkPhotoSchema extends BaseModel {
 		"artistId",
 		"createdAt",
 		"discoverySuspendedAt",
+		"discoverySuspensionNote",
 		"healed",
 		"height",
 		"hidden",
@@ -59,6 +60,8 @@ export class ArtistWorkPhotoSchema extends BaseModel {
 	declare createdAt: DateTime;
 	@column.dateTime()
 	declare discoverySuspendedAt: DateTime | null;
+	@column()
+	declare discoverySuspensionNote: string | null;
 	@column()
 	declare healed: boolean;
 	@column()
@@ -1088,6 +1091,8 @@ export class TenantSchema extends BaseModel {
 		"defaultDepositPercent",
 		"deletedAt",
 		"depositPolicy",
+		"discoveryConsentVersion",
+		"discoveryConsentedByUserId",
 		"discoveryListed",
 		"discoveryListedAt",
 		"discoverySuspendedAt",
@@ -1148,6 +1153,10 @@ export class TenantSchema extends BaseModel {
 	declare deletedAt: DateTime | null;
 	@column()
 	declare depositPolicy: string | null;
+	@column()
+	declare discoveryConsentVersion: string | null;
+	@column()
+	declare discoveryConsentedByUserId: string | null;
 	@column()
 	declare discoveryListed: boolean;
 	@column.dateTime()

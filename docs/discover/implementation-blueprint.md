@@ -14,6 +14,7 @@ This file is the plan Discover prompts work from. The dated `docs/superpowers/sp
 | D01: domain migration preparation | Done: [domain migration](domain-migration.md); the production cutover is D11 |
 | D02: discovery database foundation | Done: [database security](database-security.md) |
 | D03: public Discover API, SDK client, React hooks | Done: [Discover API](api.md); deviations in C.4 below |
+| D04: Studio OS publication controls | Done: [publication controls](publication-controls.md); deviations in C.5 below |
 
 Status legend: **Done** = in code, with tests where noted. **Partial** = exists, but not in the form Discover needs. **Planned** = only in docs. **Missing** = searched for and absent. **Unverified** = not checked against a running system.
 
@@ -223,6 +224,16 @@ Details and measurements are in [Discover API](api.md).
 - **Isolation cases.** Discover routes have no tenant, so instead of `public_cases.ts` entries they have a route-stack test (`api_routes.spec.ts`) and the visibility tests of `discover.spec.ts`. A storefront parity test was not added: both sides are tested against the same rules (`visible`, `hidden`, `deleted_at`) on their own fixtures.
 - **Tattoo feed query.** The page is read from `discovery.artworks` alone and only its rows are joined (3.8 ms instead of 119 ms). The style filter (~85 ms) stays under the 100 ms target; a country-wide filter matching every listed studio (90–105 ms) is at or just over it. Neither justified a materialised view (see [Discover API](api.md#performance)).
 - **Providers.** A separate `DiscoverProvider`, since generalising `TattooProvider` would change every studio hook.
+
+### C.5 As built in D04 (deviations from D.3 and the D04 row)
+
+Details in [publication controls](publication-controls.md).
+
+- **"Shown" is "listed".** D.3's product rule (a studio shown only when complete: city, branding, ≥6 photos) is not applied: the D03 API shows every listed business. Only the city is required to list; branding, a description and the photo thresholds are recommendations in the readiness checklist.
+- **Status from the views.** The five product statuses are derived on each read; "listed" also requires the public view to return the business.
+- **Consent version.** `tenants.discovery_consent_version` and `discovery_consented_by_user_id` are new (migration `1791890000000`), beside `discovery_listed_at`; `artist_work_photos.discovery_suspension_note` records a photo takedown's reason.
+- **Artist re-listing.** An owner may turn any artist's Discover switch off, but turn it back on only for a profile no login manages (or their own).
+- **No setup-checklist step**, since Discover is optional; **no `ref` forwarding on `/book`** (D08, as the D03 notes say); **no Cloudflare purge** in `discover:suspend`.
 
 ## D. Data model gap analysis
 
