@@ -5,6 +5,7 @@ How Discover reads public data across studios without loosening tenant isolation
 - **Role setup:** `apps/platform/database/setup_roles.sql`.
 - **Proof:** `apps/platform/tests/functional/rls/discovery.spec.ts`.
 - **Plan:** [implementation blueprint](implementation-blueprint.md).
+- **Reader:** the public Discover API (D03) reads these views, with no context and read-only: [Discover API](api.md).
 
 ## 1. The boundary
 

@@ -92,6 +92,10 @@ const createInquiry = useCreateInquiry();
 
 For SSR prefetching in route loaders, use `tattooQueries.*` with `queryClient.query({ ...tattooQueries.artists(client), staleTime: "static" })`: cached data, else one fetch (TanStack Query 5.104 deprecates `ensureQueryData` for this). The query options forward TanStack Query's `signal`, so a query nobody needs any more cancels its request. The options set no `staleTime` except where a resource needs one: the deposit page is always stale (`staleTime: 0`), so a focus refetches it whatever the app's default.
 
+## Discover client
+
+`createDiscoverClient({ baseUrl, key?, fetch?, timeoutMs? })` reads Discover's cross-studio API (`/api/v1/discover`, Discover D03): listed studios, their artists, independent artists, published photos, styles and places. It has no tenant, shares the studio client's transport (no cookies, timeout, `signal`, `TattooApiError`, no key in a browser) and leaves `createTattooClient` unchanged. React: `DiscoverProvider`, `discoverKeys` (`["tattoo-drip", "discover", …]`), `discoverQueries` and the `useDiscover*` hooks. Endpoints, rules, limits and the booking referral (`inquiries.create({ referral })`): [Discover API](discover/api.md).
+
 ## Studio page = external storefront
 
 The studio page gets **no special access**. It uses the same endpoints and packages. If it needs something the API doesn't expose, the fix is to add it to the API. The only differences:

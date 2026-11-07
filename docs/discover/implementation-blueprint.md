@@ -1,6 +1,6 @@
 # TattooDrip Discover: implementation blueprint
 
-Prompt 00 output. It covers the repository audit, the architecture and the prompt roadmap; it is revised with the product owner's approved decisions (2026-11-06). Nothing here is implemented.
+Prompt 00 output. It covers the repository audit, the architecture and the prompt roadmap; it is revised with the product owner's approved decisions (2026-11-06). The status table below says what has been implemented since.
 
 This file is the plan Discover prompts work from. The dated `docs/superpowers/specs/` files are per-feature history, and this is a multi-prompt plan, so it lives at the requested path. Each Discover prompt still writes its own dated spec and plan there, as usual.
 
@@ -13,7 +13,7 @@ This file is the plan Discover prompts work from. The dated `docs/superpowers/sp
 | Roadmap D01–D11 | Defined |
 | D01: domain migration preparation | Done: [domain migration](domain-migration.md); the production cutover is D11 |
 | D02: discovery database foundation | Done: [database security](database-security.md) |
-| D03: public Discover API, SDK client, React hooks | Next |
+| D03: public Discover API, SDK client, React hooks | Done: [Discover API](api.md); deviations in C.4 below |
 
 Status legend: **Done** = in code, with tests where noted. **Partial** = exists, but not in the form Discover needs. **Planned** = only in docs. **Missing** = searched for and absent. **Unverified** = not checked against a running system.
 
@@ -211,6 +211,18 @@ The implementation follows C.2, adjusted where the code or measurements required
 - **Listing consent.** `discovery_listed_at` doubles as the consent timestamp: a listing requires it, by CHECK constraint.
 - **Takedowns.** Per studio and per photo, as planned. The artist flag is the artist's own opt-out.
 - **Styles.** They stay the code list `TATTOO_STYLES` with slug arrays. No second taxonomy table.
+
+### C.4 As built in D03 (deviations from C.2, D.1 and the D03 row)
+
+Details and measurements are in [Discover API](api.md).
+
+- **Read transaction.** Each read runs in a savepoint of the request transaction that clears the context, sets `transaction_read_only` and is always rolled back (`readDiscovery`), not in a separate read-only transaction.
+- **No transformers.** `DiscoveryService` writes each answer field by field from the views' columns, so a new view column cannot reach a response.
+- **Referral columns.** `inquiries.referral_source` and `referral_issued_at` (when Discover made the link) instead of `referral_surface`; the token carries no surface. Both or neither, by CHECK. The intake half of the D04 row ("the intake stores verified referral") is done; the storefront keeping `ref` on `/book` is still D08.
+- **No named server keys.** Deferred to D05, which adds the app that needs one; D03's endpoints work with or without a storefront key.
+- **Isolation cases.** Discover routes have no tenant, so instead of `public_cases.ts` entries they have a route-stack test (`api_routes.spec.ts`) and the visibility tests of `discover.spec.ts`. A storefront parity test was not added: both sides are tested against the same rules (`visible`, `hidden`, `deleted_at`) on their own fixtures.
+- **Tattoo feed query.** The page is read from `discovery.artworks` alone and only its rows are joined (3.8 ms instead of 119 ms). The style filter (~80 ms) and a country-wide filter (~90 ms) stay under the 100 ms target, so no materialised view.
+- **Providers.** A separate `DiscoverProvider`, since generalising `TattooProvider` would change every studio hook.
 
 ## D. Data model gap analysis
 

@@ -3,8 +3,8 @@
 Public API contract and SDK, consumed from source in the workspace; no development build step.
 
 - `types`: `openapi.yaml` is canonical; `src/index.ts` re-exports friendly names. Generation command is in [root instructions](../AGENTS.md).
-- `sdk`: framework-independent client (`src/client.ts`, `src/errors.ts`); depends only on `@tattoo-drip/types`.
-- `react`: TanStack Query provider, keys and hooks (`src/provider.tsx`, `src/queries.ts`, `src/hooks.ts`) on the SDK.
+- `sdk`: framework-independent clients (`src/client.ts` one studio, `src/discover.ts` Discover, both on `src/transport.ts`; `src/errors.ts`); depends only on `@tattoo-drip/types`.
+- `react`: TanStack Query providers, keys and hooks on the SDK: studio (`src/provider.tsx`, `src/queries.ts`, `src/hooks.ts`) and Discover (`src/discover.tsx`, `src/discover_queries.ts`).
 
 ## Rules
 
