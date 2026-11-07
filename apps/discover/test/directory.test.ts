@@ -82,8 +82,15 @@ describe("the directories' address (D07)", () => {
 			"artists",
 		);
 		assert.deepEqual(bad, EMPTY);
-		// The router parses `?q=42` to a number: still a search text.
+		// A value read as JSON (`?q=42`, `?q=true`, `?q=null`) is still a search text.
 		assert.equal(readDirectorySearch({ q: 42 }, "studios").q, "42");
+		assert.equal(readDirectorySearch({ q: true }, "studios").q, "true");
+		assert.equal(readDirectorySearch({ q: null }, "studios").q, "null");
+		// A control character: the API refuses it, so it is never sent.
+		assert.equal(
+			readDirectorySearch({ q: "ab\u0001c" }, "studios").q,
+			undefined,
+		);
 	});
 
 	test("a city needs its country in the address", () => {

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
+	artistSiteNote,
 	PROFILE_PAGES,
 	profileDestination,
 	profilePath,
@@ -61,6 +62,17 @@ describe("profile destinations (D07; D08 flips them)", () => {
 		assert.equal(
 			profilePath(artist("a b", "c/d")),
 			"/studios/a%20b/artists/c%2Fd",
+		);
+	});
+
+	test("screen readers hear where an artist's link goes: their own site, or their page on the studio's", () => {
+		assert.equal(
+			artistSiteNote(artist("ink-house", "maya")),
+			"their page on the studio's site",
+		);
+		assert.equal(
+			artistSiteNote(artist("solo-ink", "maya", true)),
+			"their own site",
 		);
 	});
 });

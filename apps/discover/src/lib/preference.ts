@@ -13,7 +13,7 @@ const NO_STORE = { "Cache-Control": "no-store" } as const;
  * `td_country` cookie. Fields `country` (one of the markets) and `return`
  * (where the visitor was). A plain form post (no JavaScript) gets a 303 back
  * to that same-origin path, with the page's `country` replaced and `city`
- * dropped; the selector's fetch (`Accept: application/json`) gets
+ * and `cursor` dropped (`switchCountryPath`); the selector's fetch (`Accept: application/json`) gets
  * `{ country }`. A country that isn't a market is never saved (422 for the
  * fetch, back unchanged for the form). A cross-site post is refused: the
  * cookie is only a preference, but another site has no business setting it.

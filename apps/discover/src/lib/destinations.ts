@@ -58,3 +58,13 @@ export function profileDestination(
 		? { href: profile, external: false, profile }
 		: { href: entity.storefrontUrl, external: true, profile };
 }
+
+/**
+ * Where an artist's link leaves Discover for, for screen readers: an
+ * independent artist's own site, else their page on their studio's.
+ */
+export function artistSiteNote(artist: { independent: boolean }): string {
+	return artist.independent
+		? "their own site"
+		: "their page on the studio's site";
+}

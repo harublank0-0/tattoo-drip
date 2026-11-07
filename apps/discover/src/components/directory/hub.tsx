@@ -11,7 +11,7 @@ import {
 	SectionHeading,
 } from "#/components/discovery/layout";
 import { ResponsiveImage } from "#/components/discovery/responsive-image";
-import { profileDestination } from "#/lib/destinations";
+import { artistSiteNote, profileDestination } from "#/lib/destinations";
 import { tattooAlt, tattooCredit } from "#/lib/home";
 
 /** A link to a full directory (or another page), with an arrow. */
@@ -73,11 +73,17 @@ function workDestination(
 	tattoo: DiscoverTattooSummary,
 	artists: readonly DiscoverArtistSummary[],
 	studios: readonly DiscoverStudioSummary[],
-): string | undefined {
+): { href: string; note: string } | undefined {
 	const artist = artists.find((each) => each.id === tattoo.artist.id);
-	if (artist) return profileDestination(artist).href;
+	if (artist)
+		return {
+			href: profileDestination(artist).href,
+			note: artistSiteNote(artist),
+		};
 	const studio = studios.find((each) => each.slug === tattoo.studio.slug);
-	return studio ? profileDestination(studio).href : undefined;
+	return studio
+		? { href: profileDestination(studio).href, note: "the studio's own site" }
+		: undefined;
 }
 
 /**
@@ -97,7 +103,7 @@ export function WorkColumns({
 	return (
 		<ul className="columns-2 gap-3 sm:columns-3 sm:gap-4 lg:columns-4 lg:gap-6">
 			{tattoos.map((tattoo) => {
-				const href = workDestination(tattoo, artists, studios);
+				const destination = workDestination(tattoo, artists, studios);
 				const ratio =
 					tattoo.image.width > 0 && tattoo.image.height > 0
 						? `${tattoo.image.width} / ${tattoo.image.height}`
@@ -118,12 +124,10 @@ export function WorkColumns({
 				);
 				return (
 					<li key={tattoo.id} className="mb-6 break-inside-avoid">
-						{href ? (
-							<a href={href} className="group block">
+						{destination ? (
+							<a href={destination.href} className="group block">
 								{body}
-								<span className="sr-only">
-									(their page on the studio's site)
-								</span>
+								<span className="sr-only">{`(${destination.note})`}</span>
 							</a>
 						) : (
 							body

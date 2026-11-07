@@ -24,8 +24,9 @@ const MIN_WORK = 3;
  * segment is the market's slug (`countrySlug`); a country that isn't a
  * configured market is the 404 page. Its own country, always: the
  * visitor's cookie, geolocation or `?country=` never change what it lists.
- * Its places (from `/locations`) link to their city pages; studios and
- * artists are short previews linking on to the country's directories.
+ * Its places (from `/locations`, optional) link to their city pages;
+ * studios and artists are short previews linking on to the country's
+ * directories.
  */
 export const Route = createFileRoute("/locations/$country/")({
 	loader: async ({ context, params }) => {
@@ -33,8 +34,12 @@ export const Route = createFileRoute("/locations/$country/")({
 		const country = countryFromSlug(params.country, discover.settings.markets);
 		if (!country) throw notFound();
 		const queries = locationQueries(discover.client, country);
+		// Its places are optional: without `/locations` the page has no
+		// Cities section (the city page needs them, to confirm its city).
 		const [, studios, artists] = await Promise.all([
-			queryClient.ensureQueryData(discoverQueries.locations(discover.client)),
+			queryClient
+				.ensureQueryData(discoverQueries.locations(discover.client))
+				.catch((): undefined => undefined),
 			queryClient.ensureQueryData(queries.studios),
 			queryClient.ensureQueryData(queries.artists),
 			queryClient
@@ -64,7 +69,7 @@ function CountryPage() {
 	const queries = locationQueries(discover.client, country);
 	const places =
 		placesIn(
-			useSuspenseQuery(discoverQueries.locations(discover.client)).data,
+			useQuery(discoverQueries.locations(discover.client)).data,
 			country,
 		) ?? [];
 	const studios = useSuspenseQuery(queries.studios).data.data;

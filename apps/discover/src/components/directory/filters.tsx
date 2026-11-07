@@ -178,9 +178,11 @@ function FilterFields({
 
 /**
  * The desktop toolbar above the results (from `lg`; at every width without
- * JavaScript): each control applies at once with JavaScript; without it the
- * form submits with Apply. The search text and country ride along as
- * hidden fields (the country always, since a city needs it).
+ * JavaScript): the controls apply together with Apply, with or without
+ * JavaScript, so choosing an option (arrowing through a closed select
+ * fires a change per key) never navigates away from it (WCAG 3.2.2). The
+ * search text and country ride along as hidden fields (the country always,
+ * since a city needs it).
  */
 export function FilterToolbar({
 	kind,
@@ -199,8 +201,8 @@ export function FilterToolbar({
 	onApply: (draft: FilterDraft) => void;
 	resetSearch: DirectorySearch | undefined;
 }) {
-	// The selects show the chosen value at once, while the page loads it;
-	// the page's filters win again once it has (or after back/forward).
+	// The selects keep the visitor's choices until Apply; the page's filters
+	// win again once it has loaded them (or after a chip, Reset, back/forward).
 	const current = draftOf(filters);
 	const [draft, setDraft] = useState<FilterDraft>(current);
 	const key = JSON.stringify(current);
@@ -229,13 +231,10 @@ export function FilterToolbar({
 				kind={kind}
 				country={filters.country}
 				draft={draft}
-				onChange={(next) => {
-					setDraft(next);
-					onApply(next);
-				}}
+				onChange={setDraft}
 				lists={lists}
 			/>
-			<Button type="submit" className="hidden noscript:inline-flex">
+			<Button type="submit" className="lg:min-h-11">
 				Apply
 			</Button>
 			{resetSearch && (

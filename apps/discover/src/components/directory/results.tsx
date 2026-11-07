@@ -5,7 +5,7 @@ import type {
 } from "@tattoo-drip/sdk";
 import { ArrowUpRightIcon } from "lucide-react";
 import { ResponsiveImage } from "#/components/discovery/responsive-image";
-import { profileDestination } from "#/lib/destinations";
+import { artistSiteNote, profileDestination } from "#/lib/destinations";
 import { artistWorks, studioWorks } from "#/lib/directory";
 import { artistAffiliation, tattooAlt } from "#/lib/home";
 import { cn } from "#/lib/utils";
@@ -289,55 +289,12 @@ export function ArtistResults({
 							</span>
 							<Leaves
 								external={destination.external}
-								what="their page on the studio's site"
+								what={artistSiteNote(artist)}
 							/>
 						</a>
 					</li>
 				);
 			})}
 		</ul>
-	);
-}
-
-/** Placeholder rows shaped like the results, while a directory loads. */
-export function ResultsSkeleton({ kind }: { kind: "studios" | "artists" }) {
-	const blocks = Array.from({ length: kind === "studios" ? 3 : 4 });
-	return (
-		<output aria-live="polite" className="block">
-			<span className="sr-only">{`Loading ${kind}…`}</span>
-			{kind === "studios" ? (
-				<span className="block border-t border-ink" aria-hidden="true">
-					{blocks.map((_, index) => (
-						<span
-							// biome-ignore lint/suspicious/noArrayIndexKey: identical placeholders.
-							key={index}
-							className="grid gap-4 border-b border-line py-6 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] sm:gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-12"
-						>
-							<span className="block aspect-[3/2] animate-pulse bg-paper-sunk motion-reduce:animate-none" />
-							<span className="flex flex-col gap-3">
-								<span className="block h-8 w-2/3 animate-pulse bg-paper-sunk motion-reduce:animate-none" />
-								<span className="block h-4 w-1/3 animate-pulse bg-paper-sunk motion-reduce:animate-none" />
-							</span>
-						</span>
-					))}
-				</span>
-			) : (
-				<span
-					className="grid grid-cols-1 gap-x-4 gap-y-10 min-[26rem]:grid-cols-2 lg:grid-cols-3 lg:gap-x-6 xl:grid-cols-4"
-					aria-hidden="true"
-				>
-					{blocks.map((_, index) => (
-						<span
-							// biome-ignore lint/suspicious/noArrayIndexKey: identical placeholders.
-							key={index}
-							className="flex flex-col gap-3"
-						>
-							<span className="block aspect-[4/5] animate-pulse bg-paper-sunk motion-reduce:animate-none" />
-							<span className="block h-6 w-2/3 animate-pulse bg-paper-sunk motion-reduce:animate-none" />
-						</span>
-					))}
-				</span>
-			)}
-		</output>
 	);
 }

@@ -66,6 +66,7 @@ export function DirectoryPage({
 	markets,
 	rows,
 	nextCursor,
+	styleUnchecked = false,
 	children,
 }: {
 	kind: DirectoryKind;
@@ -78,6 +79,8 @@ export function DirectoryPage({
 	/** How many rows this page has. */
 	rows: number;
 	nextCursor: string | null;
+	/** The address named a style the loader couldn't check (`/styles` failed), so it dropped it. */
+	styleUnchecked?: boolean;
 	children: ReactNode;
 }) {
 	const copy = COPY[kind];
@@ -143,6 +146,12 @@ export function DirectoryPage({
 						onReset={() => go(cleared)}
 					/>
 					<ActiveFilters action={action} chips={chips} clearAll={cleared} />
+					{styleUnchecked && (
+						<p className="text-sm text-ink-muted">
+							Styles are unavailable right now, so this list isn't filtered by
+							style.
+						</p>
+					)}
 				</div>
 				<section
 					aria-labelledby="results-title"

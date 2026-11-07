@@ -12,7 +12,8 @@ import type { AddressInfo } from "node:net";
  * case-insensitive substring of the name), `independent` (artists),
  * `studio` (tattoos), `sort` (`newest`: the fixtures' order; `name`,
  * `-name`: lower-cased name, ties by id), `limit` (1–48, default 24) and
- * `cursor`, and answer a malformed parameter with a 422 as the API does.
+ * `cursor`, and answer a malformed parameter with a 422 as the API does
+ * (`q`: 2 to 80 characters once trimmed, no control character).
  * Places cycle Pokhara, Kathmandu, Lalitpur (NP), New Delhi (IN): rows 3,
  * 7, 11… are India's, so 3 of each are all Nepal's and India has none.
  *
@@ -223,7 +224,13 @@ export async function stubApi(count = 1): Promise<StubApi> {
 			return invalid("city");
 		if (style !== null && !STYLES.some((each) => each.slug === style))
 			return invalid("style");
-		if (q !== null && (q.trim().length < 2 || q.trim().length > 80))
+		if (
+			q !== null &&
+			(q.trim().length < 2 ||
+				q.trim().length > 80 ||
+				// biome-ignore lint/suspicious/noControlCharactersInRegex: the API's NO_CONTROL rule.
+				/[\u0000-\u001f\u007f]/.test(q.trim()))
+		)
 			return invalid("q");
 		if (independent !== null && !["true", "false"].includes(independent))
 			return invalid("independent");

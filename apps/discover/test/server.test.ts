@@ -750,6 +750,15 @@ describe("the built Discover server, country-aware (D06.5)", { skip }, () => {
 			switched.headers.get("location"),
 			"/explore/studios?q=stub&country=IN&style=blackwork",
 		);
+		// A cursor belongs to the old country's list: the new one starts at its first page.
+		const paged = await form({
+			country: "IN",
+			return: "/explore/studios?country=NP&sort=name&cursor=abc",
+		});
+		assert.equal(
+			paged.headers.get("location"),
+			"/explore/studios?country=IN&sort=name",
+		);
 		// DISCOVER_URL is http://localhost here, so no Secure; https adds it (unit test).
 		assert.equal(
 			switched.headers.get("set-cookie"),

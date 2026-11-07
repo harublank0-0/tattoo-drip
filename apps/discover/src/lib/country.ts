@@ -222,17 +222,41 @@ export function safeReturnPath(value: unknown): string {
 	}
 }
 
+/** A same-origin path with its query re-encoded, so two spellings of one address compare equal. */
+function spelled(url: URL): string {
+	const search = url.searchParams.toString();
+	return `${url.pathname}${search ? `?${search}` : ""}${url.hash}`;
+}
+
 /**
  * The address to show after switching to `country`: a page whose address
- * names a country gets the new one; a city (which belongs to a country) is
- * dropped; everything else (`q`, `style`, the path) stays. A page without
- * a country in its address is unchanged: it follows the preference.
+ * names a country gets the new one; a city (which belongs to a country) and
+ * a page cursor (the API ties it to the sort only, so it would start the
+ * new country's list part-way through) are dropped; everything else (`q`,
+ * `style`, the path) stays. A page without a country in its address keeps
+ * its address otherwise: it follows the preference.
  */
 export function switchCountryPath(path: string, country: string): string {
 	const url = new URL(safeReturnPath(path), RETURN_BASE);
 	url.searchParams.delete("city");
+	url.searchParams.delete("cursor");
 	if (url.searchParams.has("country")) url.searchParams.set("country", country);
-	return `${url.pathname}${url.search}${url.hash}`;
+	return spelled(url);
+}
+
+/**
+ * Where the selector goes after a switch (in-app): the new address when it
+ * differs from `href` (another country, or no city or cursor), else
+ * undefined: the page stays and is read again for the new preference.
+ */
+export function countrySwitchTarget(
+	href: string,
+	country: string,
+): string | undefined {
+	const next = switchCountryPath(href, country);
+	return next === spelled(new URL(safeReturnPath(href), RETURN_BASE))
+		? undefined
+		: next;
 }
 
 /* Location slugs (D07) ------------------------------------------------------ */

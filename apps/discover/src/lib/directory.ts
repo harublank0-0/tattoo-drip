@@ -71,9 +71,17 @@ export function readIndependent(value: unknown): boolean | undefined {
 	return undefined;
 }
 
-/** The search text; a number the router parsed from `?q=42` is still text. */
+/**
+ * The search text. The router keeps search values as text
+ * (`parseSearchText`); a number, boolean or null from elsewhere (`?q=42`,
+ * `?q=true`, `?q=null` read as JSON) is still that text.
+ */
 function readSearchText(value: unknown): string | undefined {
-	return readQuery(typeof value === "number" ? String(value) : value);
+	return readQuery(
+		typeof value === "number" || typeof value === "boolean" || value === null
+			? String(value)
+			: value,
+	);
 }
 
 /**

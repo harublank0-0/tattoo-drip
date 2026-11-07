@@ -15,7 +15,7 @@ import {
 } from "#/components/discovery/layout";
 import { ResponsiveImage } from "#/components/discovery/responsive-image";
 import { buttonVariants } from "#/components/ui/button";
-import { profileDestination } from "#/lib/destinations";
+import { artistSiteNote, profileDestination } from "#/lib/destinations";
 import {
 	artistAffiliation,
 	artistWork,
@@ -226,7 +226,7 @@ export function StudiosSection({
 /**
  * Artists, studio-affiliated and independent: work first (their newest
  * recent photo, else their portrait), then name, styles and where they
- * work. Each links to the artist's page on their studio's site.
+ * work. Each links to the artist's own site, or their page on their studio's.
  */
 export function ArtistsSection({
 	artists,
@@ -291,7 +291,7 @@ export function ArtistsSection({
 										</span>
 									)}
 								</span>
-								<OwnSite>(their page on the studio's site)</OwnSite>
+								<OwnSite>{`(${artistSiteNote(artist)})`}</OwnSite>
 							</a>
 						</li>
 					);
@@ -345,7 +345,7 @@ export function InspirationSection({
 							{href ? (
 								<a href={href} className="group block">
 									{body}
-									<OwnSite>(their page on the studio's site)</OwnSite>
+									<OwnSite>(the artist's or studio's own site)</OwnSite>
 								</a>
 							) : (
 								body

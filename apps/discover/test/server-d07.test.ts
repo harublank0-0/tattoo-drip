@@ -178,9 +178,18 @@ describe("D07 directories on the built server", { skip }, () => {
 		assert.match(search, /name="sort" value="name"/);
 		assert.doesNotMatch(search, /type="hidden" name="q"/);
 		assert.match(search, /<label[^>]*>Search studios by name<\/label>/);
-		// The mobile Filters button (JavaScript) and the toolbar's Apply (none).
+		// The mobile Filters button (JavaScript) and the toolbar's Apply, shown
+		// with or without JavaScript: a select's change never navigates.
 		assert.match(page, />Filters \(1\)</);
-		assert.match(page, /noscript:inline-flex[^>]*>Apply</);
+		const toolbar = page.slice(
+			page.indexOf('<form aria-label="Filter studios"'),
+			page.indexOf(
+				"</form>",
+				page.indexOf('<form aria-label="Filter studios"'),
+			),
+		);
+		assert.match(toolbar, /<button[^>]*type="submit"[^>]*>Apply<\/button>/);
+		assert.doesNotMatch(toolbar, /noscript:inline-flex/);
 		// A GET submission without JavaScript (empty selects) is read as the filters.
 		api.requests.length = 0;
 		await discover.get(
@@ -285,6 +294,67 @@ describe("D07 directories on the built server", { skip }, () => {
 		});
 	});
 
+	test("search text stays text: ?q=true, ?q=null, ?q=007 are searches, never a redirect", async () => {
+		for (const q of ["true", "null", "007", "1e3"]) {
+			api.requests.length = 0;
+			const response = await discover.get(`/explore/studios?q=${q}`, {
+				redirect: "manual",
+			});
+			assert.equal(response.status, 200, q);
+			assert.deepEqual(sentTo(api.requests, "studios"), [
+				{ q, country: "NP", limit: "24" },
+			]);
+			assert.match(
+				await html(response),
+				new RegExp(`<title>Studios matching &quot;${q}&quot;`),
+			);
+		}
+		// Booleans still read as the filter they are.
+		api.requests.length = 0;
+		const independent = await discover.get(
+			"/explore/artists?independent=true",
+			{
+				redirect: "manual",
+			},
+		);
+		assert.equal(independent.status, 200);
+		assert.equal(sentTo(api.requests, "artists")[0]?.independent, "true");
+	});
+
+	test("a search with a control character is dropped, never sent (the API refuses it)", async () => {
+		const response = await discover.get("/explore/studios?q=ab%01c");
+		assert.equal(response.status, 200);
+		assert.deepEqual(sentTo(api.requests, "studios"), [
+			{ country: "NP", limit: "24" },
+		]);
+		// The stub refuses it as the API does.
+		const direct = await fetch(`${api.url}/api/v1/discover/studios?q=ab%01c`);
+		assert.equal(direct.status, 422);
+	});
+
+	test("a style that can't be checked (/styles down) is dropped, and the page says so", async () => {
+		api.scenario.fail.add("styles");
+		const response = await discover.get("/explore/studios?style=blackwork");
+		assert.equal(response.status, 200);
+		assert.deepEqual(sentTo(api.requests, "studios"), [
+			{ country: "NP", limit: "24" },
+		]);
+		assert.match(
+			await html(response),
+			/Styles are unavailable right now, so this list isn(’|'|&#x27;)t filtered by style\./,
+		);
+		// No style asked for: nothing to say.
+		assert.doesNotMatch(
+			await html(await discover.get("/explore/studios")),
+			/Styles are unavailable/,
+		);
+		api.scenario.fail.clear();
+		assert.doesNotMatch(
+			await html(await discover.get("/explore/studios?style=blackwork")),
+			/Styles are unavailable/,
+		);
+	});
+
 	test("an API failure is the error state with Try again (500, noindex)", async () => {
 		api.scenario.fail.add("artists");
 		const response = await discover.get("/explore/artists?style=realism");
@@ -309,6 +379,20 @@ describe("D07 directories on the built server", { skip }, () => {
 			india,
 			/href="http:\/\/stub-solo-3\.localhost:3000\/artists\/stub-artist-3"/,
 		);
+		// Screen readers hear where each link goes: an independent's own site,
+		// a studio artist's page on the studio's site (India's are all independent).
+		assert.match(
+			india,
+			/stub-artist-3"[^>]*>[\s\S]*?<span class="sr-only">\(their own site\)<\/span><\/a>/,
+		);
+		assert.doesNotMatch(india, /their page on the studio/);
+		assert.match(nepal, /\(their page on the studio(’|'|&#x27;)s site\)/);
+		assert.doesNotMatch(nepal, /their own site/);
+		// The location pages' recent work says the same.
+		const indiaHub = await html(await discover.get("/locations/india"));
+		assert.match(indiaHub, /Fresh from India/);
+		assert.match(indiaHub, /<span class="sr-only">\(their own site\)<\/span>/);
+		assert.doesNotMatch(indiaHub, /their page on the studio/);
 		// No Discover profile route exists yet, so none is linked.
 		for (const page of [nepal, india])
 			assert.doesNotMatch(page, /href="\/(studios|artists|tattoos)\//);
@@ -556,8 +640,14 @@ describe("D07 style and location pages on the built server", { skip }, () => {
 			/No studios or artists are listed in Bhaktapur right now\./,
 		);
 		assert.doesNotMatch(text(page), /Stub /);
-		// The places list failing can't confirm a city: an error page, not a guess.
+		// The places list failing can't confirm a city: an error page, not a
+		// guess. The country page does without its Cities section.
 		api.scenario.fail.add("locations");
+		const country = await discover.get("/locations/nepal");
+		assert.equal(country.status, 200);
+		const countryPage = await html(country);
+		assert.doesNotMatch(countryPage, /Cities in Nepal/);
+		assert.match(countryPage, /Recently listed studios in Nepal/);
 		assert.equal(
 			(await discover.get("/locations/nepal/kathmandu")).status,
 			500,

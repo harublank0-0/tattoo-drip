@@ -11,8 +11,8 @@ import {
 import {
 	countryName,
 	countryOptions,
+	countrySwitchTarget,
 	type ResolvedCountry,
-	switchCountryPath,
 } from "#/lib/country";
 import { paths } from "#/lib/routes";
 import { cn } from "#/lib/utils";
@@ -22,8 +22,9 @@ import { buttonVariants } from "../ui/button.tsx";
  * Switches the visitor's country (D06.5): saves the cookie through
  * `POST /preferences/country`, updates this tab's preference, then shows the
  * page again for the new country: a page whose address names a country gets
- * the new one (its city dropped), any other page is re-read (loaders run
- * again; each country has its own query keys). Resolves false when the save
+ * the new one (its city and cursor dropped), a page with a cursor goes to
+ * its first page, any other page is re-read (loaders run again; each
+ * country has its own query keys). Resolves false when the save
  * failed, so the caller can fall back to the plain form post.
  */
 function useCountrySwitch() {
@@ -42,8 +43,8 @@ function useCountrySwitch() {
 			return false;
 		}
 		router.options.context.preference.set({ country, source: "cookie" });
-		const next = switchCountryPath(href, country);
-		if (next !== href) await router.navigate({ href: next });
+		const next = countrySwitchTarget(href, country);
+		if (next) await router.navigate({ href: next });
 		else await router.invalidate();
 		return true;
 	};

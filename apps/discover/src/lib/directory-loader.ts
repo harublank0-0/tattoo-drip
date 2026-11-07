@@ -42,8 +42,8 @@ export function directoryList(
  * A directory's loader (D07). Reads the places and the style list beside
  * the page; only a `style` makes the page wait for the list, which drops a
  * style it doesn't have (the API answers an unknown one with a 422; a style
- * that can't be checked is dropped too). The page's recent photos (same
- * country, city and style) are optional. A cursor the API refuses (a 422:
+ * that can't be checked is dropped too, and `styleUnchecked` says so). The
+ * page's recent photos (same country, city and style) are optional. A cursor the API refuses (a 422:
  * from another sort, edited by hand) sends the visitor to the first page
  * of the same filters; any other failure is the route's error state.
  * Returns the filters it read with (the component reads the same
@@ -62,9 +62,11 @@ export async function loadDirectory(
 	const styles = optional(
 		queryClient.ensureQueryData(discoverQueries.styles(client)),
 	);
-	const style = search.style
-		? knownStyle(search.style, (await styles) ?? [])
-		: undefined;
+	// A style that can't be checked (no list) is dropped too, or the API
+	// could answer a 422; the page says so (`styleUnchecked`).
+	const checked = search.style ? await styles : undefined;
+	const style = checked ? knownStyle(search.style, checked) : undefined;
+	const styleUnchecked = Boolean(search.style) && !checked;
 	// The address's country, else the visitor's: never no country.
 	const filters = resolveDirectory(search, context.country.country, style);
 	const works = optional(
@@ -89,6 +91,7 @@ export async function loadDirectory(
 	const [placeList, styleList] = await Promise.all([places, styles, works]);
 	return {
 		filters,
+		styleUnchecked,
 		labels: {
 			city: filters.city
 				? placeName(placeList, filters.country, filters.city)
