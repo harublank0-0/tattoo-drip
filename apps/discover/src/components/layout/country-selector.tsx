@@ -305,9 +305,11 @@ export function EmptyMarket({
 	id?: string;
 	country: string;
 	markets: readonly string[];
-	noun: "studios" | "artists";
+	noun: "studios" | "artists" | "tattoos";
 	className?: string;
 }) {
+	const Noun =
+		noun === "studios" ? "Studios" : noun === "artists" ? "Artists" : "Tattoos";
 	const others = countryOptions(markets, country).filter(
 		(code) => code !== country,
 	);
@@ -318,7 +320,7 @@ export function EmptyMarket({
 				{`No ${noun} are listed in ${name} yet.`}
 			</h2>
 			<p className="max-w-xl text-ink-muted">
-				{`${noun === "studios" ? "Studios" : "Artists"} appear here once they choose to list on Discover.${others.length > 0 ? " You can browse another country instead." : ""}`}
+				{`${noun === "tattoos" ? "Work appears here once studios and artists list on Discover and publish it." : `${Noun} appear here once they choose to list on Discover.`}${others.length > 0 ? " You can browse another country instead." : ""}`}
 			</p>
 			{others.length > 0 && (
 				<CountryForm className="flex flex-wrap gap-3">
@@ -330,7 +332,7 @@ export function EmptyMarket({
 							value={code}
 							className={buttonVariants({ variant: "outline" })}
 						>
-							{`${noun === "studios" ? "Studios" : "Artists"} in ${countryName(code)}`}
+							{`${Noun} in ${countryName(code)}`}
 						</button>
 					))}
 				</CountryForm>

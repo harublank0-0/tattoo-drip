@@ -30,11 +30,32 @@ describe("Discover SEO foundation", () => {
 			name: "robots",
 			content: NOINDEX,
 		});
-		// Not in INDEXABLE_PATHS: noindex even with indexing on and no opt-out.
+		// Not in INDEXABLE_PATHS (D09: a 301 to /tattoos): noindex even with indexing on.
 		assert.deepEqual(robots(headTags(ON, "/explore/tattoos").meta), {
 			name: "robots",
 			content: NOINDEX,
 		});
+		// D09: the bare gallery and an artwork at its canonical slug may be
+		// indexed; another spelling (a 301) or a filtered gallery never.
+		assert.equal(robots(headTags(ON, "/tattoos").meta), undefined);
+		assert.equal(
+			robots(
+				headTags(ON, "/tattoos/0b6f8e2c-6a4a-4f1e-9a51-1b0c2d3e4f50").meta,
+			),
+			undefined,
+		);
+		for (const path of [
+			"/tattoos/0B6F8E2C-6A4A-4F1E-9A51-1B0C2D3E4F50",
+			"/tattoos/koi-0b6f8e2c-6a4a-4f1e-9a51-1b0c2d3e4f50",
+			"/tattoos/nope",
+		])
+			assert.ok(robots(headTags(ON, path).meta), path);
+		assert.ok(robots(headTags(ON, "/tattoos", { noindex: true }).meta));
+		assert.ok(
+			robots(
+				headTags(OFF, "/tattoos/0b6f8e2c-6a4a-4f1e-9a51-1b0c2d3e4f50").meta,
+			),
+		);
 		// D07: the directories' bare pages may be indexed; a filtered one opts out.
 		assert.equal(robots(headTags(ON, "/explore/studios").meta), undefined);
 		assert.equal(robots(headTags(ON, "/explore/artists").meta), undefined);
@@ -141,6 +162,7 @@ describe("Discover SEO foundation", () => {
 			"https://tattoodrip.app/for-studios",
 			"https://tattoodrip.app/explore/studios",
 			"https://tattoodrip.app/explore/artists",
+			"https://tattoodrip.app/tattoos",
 		]);
 		assert.match(
 			sitemapXml(["https://x.test/?a=1&b=2"]),

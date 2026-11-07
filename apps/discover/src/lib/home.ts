@@ -3,11 +3,9 @@ import type {
 	DiscoverArtistSummary,
 	DiscoverClient,
 	DiscoverLocation,
-	DiscoverStudioSummary,
 	DiscoverStyle,
 	DiscoverTattooSummary,
 } from "@tattoo-drip/sdk";
-import { profileDestination, tattooProfile } from "./destinations.ts";
 
 /**
  * The homepage's reads (D06, docs/discover/frontend.md): modest first pages,
@@ -145,25 +143,6 @@ export function artistWork(
 	tattoos: readonly DiscoverTattooSummary[],
 ): DiscoverTattooSummary | undefined {
 	return tattoos.find((each) => each.artist.id === artist.id);
-}
-
-/**
- * Where a photo's tile may link: its artist's Discover profile, from the
- * photo's own data (D08). With `PROFILE_PAGES` off (D07): the artist's
- * page, else the studio's page, when the homepage's own data holds it. A
- * photo has no public page of its own on Discover yet (D09).
- */
-export function tattooDestination(
-	tattoo: DiscoverTattooSummary,
-	artists: readonly DiscoverArtistSummary[] | undefined,
-	studios: readonly DiscoverStudioSummary[] | undefined,
-): string | undefined {
-	const profile = tattooProfile(tattoo);
-	if (profile) return profile;
-	const artist = artists?.find((each) => each.id === tattoo.artist.id);
-	if (artist) return profileDestination(artist).href;
-	const studio = studios?.find((each) => each.slug === tattoo.studio.slug);
-	return studio ? profileDestination(studio).href : undefined;
 }
 
 /** Who made a photo: "artist · studio", or the artist alone for an independent. */

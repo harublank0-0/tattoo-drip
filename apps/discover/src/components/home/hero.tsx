@@ -5,6 +5,7 @@ import { DiscoverySearch } from "#/components/discovery/discovery-search";
 import { PageContainer } from "#/components/discovery/layout";
 import { ResponsiveImage } from "#/components/discovery/responsive-image";
 import { Button, buttonVariants } from "#/components/ui/button";
+import { tattooDestination } from "#/lib/destinations";
 import { tattooAlt, tattooCredit } from "#/lib/home";
 import { PRIMARY_NAV, paths } from "#/lib/routes";
 
@@ -113,7 +114,7 @@ export function HomeHero({
 /**
  * Four photos in two offset columns: a tall one leading, the others in
  * other proportions. Fixed frames (no layout shift); the first loads at
- * once with high priority, the rest lazily.
+ * once with high priority, the rest lazily. Each opens its artwork page (D09).
  */
 function Collage({ photos }: { photos: DiscoverTattooSummary[] }) {
 	const [first, second, third, fourth] = photos;
@@ -125,13 +126,19 @@ function Collage({ photos }: { photos: DiscoverTattooSummary[] }) {
 	) =>
 		tattoo ? (
 			<figure className="flex flex-col gap-2">
-				<ResponsiveImage
-					image={tattoo.image}
-					alt={tattooAlt(tattoo)}
-					ratio={ratio}
-					sizes={sizes}
-					priority={priority}
-				/>
+				<Link
+					to={tattooDestination(tattoo)}
+					preload={false}
+					className="group block"
+				>
+					<ResponsiveImage
+						image={tattoo.image}
+						alt={tattooAlt(tattoo)}
+						ratio={ratio}
+						sizes={sizes}
+						priority={priority}
+					/>
+				</Link>
 				<figcaption className="truncate text-xs text-ink-muted">
 					{tattooCredit(tattoo)}
 				</figcaption>

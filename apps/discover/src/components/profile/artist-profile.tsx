@@ -195,7 +195,12 @@ export function ArtistProfile({
 					title={`Work by ${artist.name}`}
 					intro="Their newest published photos."
 					tattoos={artist.tattoos}
-					caption={(tattoo) => ({ text: workCaption(tattoo) })}
+					caption={(tattoo) => workCaption(tattoo)}
+					more={
+						<MoreLink to={paths.tattoos()} search={{ artist: artist.id }}>
+							{`All work by ${artist.name}`}
+						</MoreLink>
+					}
 				/>
 			)}
 

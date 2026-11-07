@@ -6,6 +6,7 @@ import type {
 	DiscoverTattooSummary,
 } from "@tattoo-drip/sdk";
 import { createDiscoverClient } from "@tattoo-drip/sdk";
+import { tattooDestination, tattooProfile } from "../src/lib/destinations.ts";
 import {
 	artistAffiliation,
 	artistWork,
@@ -19,7 +20,6 @@ import {
 	placesIn,
 	tattooAlt,
 	tattooCredit,
-	tattooDestination,
 } from "../src/lib/home.ts";
 import { fixtures, STYLES } from "./stub-api.ts";
 
@@ -93,18 +93,16 @@ describe("the homepage's section rules", () => {
 		assert.equal(enough([1, 2], HOME_THRESHOLDS.locations), true);
 	});
 
-	test("a photo links to its artist's Discover profile, from its own data (D08)", () => {
-		const { tattoos, artists, studios } = data(4);
+	test("a photo links to its artwork page (D09); its artist's profile is a separate link", () => {
+		const { tattoos } = data(4);
 		const [tattoo, , , solo] = tattoos;
 		assert.ok(tattoo && solo);
-		const profile = `/studios/${tattoo.studio.slug}/artists/${tattoo.artist.slug}`;
-		assert.equal(tattooDestination(tattoo, artists, studios), profile);
-		// The homepage's own lists aren't needed any more.
-		assert.equal(tattooDestination(tattoo, undefined, undefined), profile);
+		assert.equal(tattooDestination(tattoo), `/tattoos/${tattoo.id}`);
 		assert.equal(
-			tattooDestination(solo, undefined, undefined),
-			`/artists/${solo.studio.slug}`,
+			tattooProfile(tattoo),
+			`/studios/${tattoo.studio.slug}/artists/${tattoo.artist.slug}`,
 		);
+		assert.equal(tattooProfile(solo), `/artists/${solo.studio.slug}`);
 	});
 
 	test("alt text and credits come from the data", () => {

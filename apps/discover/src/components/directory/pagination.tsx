@@ -2,7 +2,6 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { ArrowLeftIcon, ArrowRightIcon } from "lucide-react";
 import { useSyncExternalStore } from "react";
 import { buttonVariants } from "#/components/ui/button";
-import type { DirectorySearch } from "#/lib/directory";
 
 const subscribe = () => () => {};
 /** False on the server and while hydrating, true after: for what only the browser knows. */
@@ -38,7 +37,8 @@ export function Pagination({
 	noun,
 }: {
 	action: string;
-	search: DirectorySearch;
+	/** The address (a directory's or, D09, the gallery's): only its cursor is read. */
+	search: { cursor?: string };
 	nextCursor: string | null;
 	noun: string;
 }) {

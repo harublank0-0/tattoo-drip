@@ -87,7 +87,7 @@ describe("the built Discover server, indexing off", { skip }, () => {
 			"/",
 			"/explore/studios",
 			"/explore/artists",
-			"/explore/tattoos",
+			"/tattoos",
 			"/for-studios",
 			"/pricing",
 		]) {
@@ -168,10 +168,13 @@ describe("the built Discover server, indexing off", { skip }, () => {
 		// Only the page's country's places (the API's list has every country).
 		assert.doesNotMatch(html, /href="[^"]*new-delhi/);
 		assert.match(html, />Nepal</);
-		assert.match(html, /href="\/explore\/tattoos"/);
-		// Never a Discover page that doesn't exist yet (artwork pages are D09);
-		// photos lead to their artists' profiles (D08).
-		assert.doesNotMatch(html, /href="\/tattoos\//);
+		assert.match(html, /href="\/tattoos"/);
+		// D09: photos open their artwork pages; their artists' names link
+		// their profiles (D08), beside the image, never around it.
+		assert.match(
+			html,
+			/href="\/tattoos\/00000000-0000-4000-8000-000300000000"/,
+		);
 		assert.match(
 			html,
 			/href="\/studios\/stub-studio-0\/artists\/stub-artist-0"/,
@@ -420,7 +423,7 @@ describe("the built Discover server, indexing off", { skip }, () => {
 			"/pricing",
 			"/explore/studios",
 			"/explore/artists",
-			"/explore/tattoos",
+			"/tattoos",
 		]) {
 			const response = await discover.get(path);
 			assert.equal(
@@ -508,7 +511,7 @@ describe("the built Discover server, indexing on", { skip }, () => {
 		}
 		for (const path of [
 			"/pricing",
-			"/explore/tattoos",
+			"/tattoos?q=stub",
 			// Any parameter: filters, search, sort, cursor, country.
 			"/explore/studios?style=blackwork",
 			"/explore/studios?q=stub",
@@ -542,6 +545,7 @@ describe("the built Discover server, indexing on", { skip }, () => {
 			`${SITE}/for-studios`,
 			`${SITE}/explore/studios`,
 			`${SITE}/explore/artists`,
+			`${SITE}/tattoos`,
 		]);
 	});
 });

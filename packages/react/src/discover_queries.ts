@@ -3,8 +3,8 @@ import type {
 	DiscoverArtistsListQuery,
 	DiscoverClient,
 	DiscoverStudiosListQuery,
+	DiscoverTattoosListQuery,
 } from "@tattoo-drip/sdk";
-import type { DiscoverTattoosQuery } from "@tattoo-drip/types";
 
 /**
  * Discover's query keys (D03). All of them start with
@@ -29,7 +29,7 @@ export const discoverKeys = {
 		[...discoverKeys.all, "artists", query ?? {}] as const,
 	independentArtist: (slug: string) =>
 		[...discoverKeys.all, "independent-artist", slug] as const,
-	tattoos: (query?: DiscoverTattoosQuery) =>
+	tattoos: (query?: DiscoverTattoosListQuery) =>
 		[...discoverKeys.all, "tattoos", query ?? {}] as const,
 	tattoo: (id: string) => [...discoverKeys.all, "tattoo", id] as const,
 	styles: () => [...discoverKeys.all, "styles"] as const,
@@ -80,7 +80,7 @@ export const discoverQueries = {
 			queryKey: discoverKeys.independentArtist(slug),
 			queryFn: ({ signal }) => client.artists.independent(slug, { signal }),
 		}),
-	tattoos: (client: DiscoverClient, query?: DiscoverTattoosQuery) =>
+	tattoos: (client: DiscoverClient, query?: DiscoverTattoosListQuery) =>
 		queryOptions({
 			queryKey: discoverKeys.tattoos(query),
 			queryFn: ({ signal }) => client.tattoos.list(query, { signal }),

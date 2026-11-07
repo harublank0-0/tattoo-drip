@@ -2,8 +2,8 @@ import { countrySlug } from "./country.ts";
 
 /**
  * Discover's addresses (D05, docs/discover/frontend.md). Pages link with
- * these, never with hand-written strings. Planned pages (D06–D09) are listed
- * so later prompts reuse one shape; only the ones in ROUTE_FILES exist yet.
+ * these, never with hand-written strings. Every builder here has a route
+ * (ROUTE_FILES, ROUTE_PATTERNS; a test checks).
  *
  * Never use the legacy Studio OS paths (/login, /signup, /dashboard, /t/…,
  * /sw.js…): on tattoodrip.app nginx redirects them to Studio OS
@@ -13,7 +13,8 @@ export const paths = {
 	home: () => "/",
 	studios: () => "/explore/studios",
 	artists: () => "/explore/artists",
-	tattoos: () => "/explore/tattoos",
+	/** The tattoo gallery (D09; `/explore/tattoos` is a 301 to it). */
+	tattoos: () => "/tattoos",
 	forStudios: () => "/for-studios",
 	pricing: () => "/pricing",
 	/** The country selector's form target (POST only; D06.5). */
@@ -32,9 +33,19 @@ export const paths = {
 		`/studios/${encodeURIComponent(studioSlug)}/artists/${encodeURIComponent(artistSlug)}`,
 	independentArtist: (tenantSlug: string) =>
 		`/artists/${encodeURIComponent(tenantSlug)}`,
-	// Planned (D09): not a route yet.
-	tattoo: (id: string) => `/tattoos/${encodeURIComponent(id)}`,
+	/**
+	 * An artwork's page (D09), by the API's photo id: its canonical slug is
+	 * the id in lower case (src/lib/artwork.ts reads any other spelling and
+	 * 301s to this one).
+	 */
+	tattoo: (id: string) => `/tattoos/${encodeURIComponent(id.toLowerCase())}`,
 } as const;
+
+/**
+ * Addresses that only redirect (a 301 to their replacement, query kept):
+ * routes exist for them, but no page links to them.
+ */
+export const REDIRECT_FILES = ["/explore/tattoos"] as const;
 
 /** The paths that have a route today (checked against the route tree in a test). */
 export const ROUTE_FILES = [
@@ -48,7 +59,7 @@ export const ROUTE_FILES = [
 ] as const;
 
 /**
- * The dynamic routes that exist (D07, D08), as the route tree spells them,
+ * The dynamic routes that exist (D07–D09), as the route tree spells them,
  * and a test for an address they serve (the shape only: the page itself
  * 404s an unknown style, a country that isn't a market, an unknown city or
  * a profile the API doesn't show).
@@ -66,6 +77,8 @@ export const ROUTE_PATTERNS = [
 		matches: /^\/studios\/[^/]+\/artists\/[^/]+$/,
 	},
 	{ route: "/artists/$tenantSlug", matches: /^\/artists\/[^/]+$/ },
+	// D09: an artwork, by its id (src/lib/artwork.ts).
+	{ route: "/tattoos/$slug", matches: /^\/tattoos\/[^/]+$/ },
 ] as const;
 
 /** Whether an internal path (no query) has a route today. */

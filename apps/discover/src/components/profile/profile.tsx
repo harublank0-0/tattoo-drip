@@ -17,9 +17,9 @@ import {
 	type ImageSource,
 	ResponsiveImage,
 } from "#/components/discovery/responsive-image";
+import { ArtworkColumns } from "#/components/gallery/artwork-tile";
 import { buttonVariants } from "#/components/ui/button";
 import { safeSocialUrl, socialLabel } from "#/lib/booking";
-import { tattooAlt } from "#/lib/home";
 import { paths } from "#/lib/routes";
 import { cn } from "#/lib/utils";
 
@@ -30,12 +30,7 @@ import { cn } from "#/lib/utils";
  * tokens; every value comes from the API and renders as plain text.
  */
 
-/** A photo's frame at its own proportions (a bad size falls back to 4 / 5). */
-export function ratioOf(image: { width: number; height: number }): string {
-	return image.width > 0 && image.height > 0
-		? `${image.width} / ${image.height}`
-		: "4 / 5";
-}
+export { ratioOf } from "#/components/gallery/artwork-tile";
 
 /**
  * The top of a profile: breadcrumbs, then identity (eyebrow, the page's one
@@ -228,9 +223,10 @@ export function StickyBooking({
 
 /**
  * A portfolio preview: the newest published photos in columns at their true
- * proportions (lazy, fixed frames), each with its caption, linking to the
- * artist's profile when `href` gives one. A night band, as the other work
- * sections.
+ * proportions (lazy, fixed frames), each opening its artwork page (D09),
+ * with its caption (which may link the artist's profile beside it). A night
+ * band, as the other work sections; `more` links to all of the work in the
+ * gallery.
  */
 export function Portfolio({
 	id,
@@ -246,7 +242,7 @@ export function Portfolio({
 	title: string;
 	intro?: ReactNode;
 	tattoos: readonly DiscoverTattooSummary[];
-	caption: (tattoo: DiscoverTattooSummary) => { text: string; href?: string };
+	caption: (tattoo: DiscoverTattooSummary) => ReactNode;
 	more?: ReactNode;
 }) {
 	return (
@@ -255,36 +251,12 @@ export function Portfolio({
 				<SectionHeading id={id} eyebrow={eyebrow} title={title} intro={intro} />
 				{more}
 			</div>
-			<ul className="columns-2 gap-3 sm:columns-3 sm:gap-4 lg:gap-6">
-				{tattoos.map((tattoo) => {
-					const { text, href } = caption(tattoo);
-					const body = (
-						<figure className="flex flex-col gap-2">
-							<ResponsiveImage
-								image={tattoo.image}
-								alt={tattooAlt(tattoo)}
-								ratio={ratioOf(tattoo.image)}
-								sizes="(min-width: 40rem) 33vw, 50vw"
-								className="bg-night-raised"
-							/>
-							<figcaption className="text-sm text-night-muted">
-								{text}
-							</figcaption>
-						</figure>
-					);
-					return (
-						<li key={tattoo.id} className="mb-6 break-inside-avoid">
-							{href ? (
-								<Link to={href} preload={false} className="group block">
-									{body}
-								</Link>
-							) : (
-								body
-							)}
-						</li>
-					);
-				})}
-			</ul>
+			<ArtworkColumns
+				tattoos={tattoos}
+				caption={caption}
+				columns="lg:columns-3"
+				sizes="(min-width: 40rem) 33vw, 50vw"
+			/>
 		</EditorialSection>
 	);
 }

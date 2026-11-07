@@ -80,6 +80,15 @@ export function tattooProfile(
 }
 
 /**
+ * Where a photo's tile links (D09): its own artwork page on Discover, by
+ * the API's id. The artist's profile (`tattooProfile`) is a separate link
+ * beside it, never nested.
+ */
+export function tattooDestination(tattoo: { id: string }): string {
+	return paths.tattoo(tattoo.id);
+}
+
+/**
  * Where an artist's link leaves Discover for, for screen readers: an
  * independent artist's own site, else their page on their studio's.
  */

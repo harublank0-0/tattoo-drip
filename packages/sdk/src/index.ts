@@ -15,6 +15,7 @@ export {
 	type DiscoverClient,
 	type DiscoverClientOptions,
 	type DiscoverStudiosListQuery,
+	type DiscoverTattoosListQuery,
 } from "./discover.js";
 export {
 	isTattooApiError,

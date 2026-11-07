@@ -23,7 +23,6 @@ import {
 	inspirationPhotos,
 	pairStylesWithPhotos,
 	placesIn,
-	tattooDestination,
 } from "#/lib/home";
 import { pageMeta } from "#/lib/seo";
 
@@ -127,12 +126,7 @@ function Home() {
 			{enough(artists, HOME_THRESHOLDS.artists) && (
 				<ArtistsSection artists={artists} tattoos={photos} />
 			)}
-			{inspiration.length > 0 && (
-				<InspirationSection
-					tattoos={inspiration}
-					destination={(tattoo) => tattooDestination(tattoo, artists, studios)}
-				/>
-			)}
+			{inspiration.length > 0 && <InspirationSection tattoos={inspiration} />}
 			{enough(locations, HOME_THRESHOLDS.locations) && (
 				<LocationsSection locations={locations.slice(0, HOME_CAPS.locations)} />
 			)}

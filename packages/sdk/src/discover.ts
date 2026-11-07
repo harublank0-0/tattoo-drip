@@ -48,10 +48,17 @@ export type DiscoverStudiosListQuery = Omit<DiscoverStudiosQuery, "q"> & {
 export type DiscoverArtistsListQuery = Omit<DiscoverArtistsQuery, "q"> & {
 	query?: string;
 };
+/**
+ * The tattoo photos' query (D09: `query` searches alt text and the artist's,
+ * studio's and style's names, as the API's `q`).
+ */
+export type DiscoverTattoosListQuery = Omit<DiscoverTattoosQuery, "q"> & {
+	query?: string;
+};
 
 export type DiscoverClient = ReturnType<typeof createDiscoverClient>;
 
-/** `query` travels as the API's `q`. */
+/** `query` travels as the API's `q` (studios, artists and, since D09, tattoos). */
 function searchQuery<T extends { query?: string }>(input?: T) {
 	if (!input) return undefined;
 	const { query, ...rest } = input;
@@ -112,10 +119,10 @@ export function createDiscoverClient(options: DiscoverClientOptions) {
 				getData<DiscoverArtistDetail>(`${root}/artists/${segment(slug)}`, call),
 		},
 		tattoos: {
-			/** A page of published tattoo photos, newest first. */
-			list: (query?: DiscoverTattoosQuery, call?: RequestOptions) =>
+			/** A page of published tattoo photos, newest first (`query`: the gallery's search, D09). */
+			list: (query?: DiscoverTattoosListQuery, call?: RequestOptions) =>
 				request<DiscoverTattoosPage>(
-					withQuery(`${root}/tattoos`, query),
+					withQuery(`${root}/tattoos`, searchQuery(query)),
 					{},
 					call,
 				),

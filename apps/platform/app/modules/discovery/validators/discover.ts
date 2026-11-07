@@ -69,6 +69,8 @@ export const listDiscoverArtistsValidator = vine.create({
 });
 
 export const listDiscoverTattoosValidator = vine.create({
+	// D09: the gallery's search (alt text, artist, studio and style names).
+	q: q(),
 	country: country(),
 	city: vine.string().maxLength(63).regex(PLACE_SLUG).optional(),
 	style: style(),

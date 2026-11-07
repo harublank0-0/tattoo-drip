@@ -1,41 +1,16 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { PageHeader } from "#/components/discovery/layout";
-import { FoundationNotice } from "#/components/discovery/states";
-import { buttonVariants } from "#/components/ui/button";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { paths } from "#/lib/routes";
-import { pageMeta } from "#/lib/seo";
 
-/** `/explore/tattoos`: planned for D09, minimal until then (D05). Never indexed while unfinished. */
+/**
+ * `/explore/tattoos`: D05's placeholder address. Since D09 the gallery is
+ * `/tattoos`; this is a permanent redirect there, with the query string as
+ * it came (the gallery reads what it knows and ignores the rest).
+ */
 export const Route = createFileRoute("/explore/tattoos")({
-	head: () => ({
-		meta: pageMeta({ title: "Tattoo inspiration", noindex: true }),
-	}),
-	component: Page,
+	beforeLoad: ({ location }) => {
+		throw redirect({
+			href: `${paths.tattoos()}${location.searchStr}`,
+			statusCode: 301,
+		});
+	},
 });
-
-function Page() {
-	return (
-		<>
-			<PageHeader
-				title="Tattoo inspiration"
-				breadcrumbs={[
-					{ label: "Discover", to: paths.home() },
-					{ label: "Tattoo inspiration" },
-				]}
-			/>
-			<FoundationNotice
-				action={
-					<Link
-						to={paths.studios()}
-						className={buttonVariants({ variant: "primary" })}
-					>
-						Explore studios
-					</Link>
-				}
-			>
-				A gallery of published work from listed studios and artists is on its
-				way.
-			</FoundationNotice>
-		</>
-	);
-}

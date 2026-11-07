@@ -20,6 +20,7 @@ This file is the plan Discover prompts work from. The dated `docs/superpowers/sp
 | D06.5: country-aware discovery foundation | Done: [frontend](frontend.md#country); as built in C.8 below |
 | D07: studio and artist directories, style and location pages | Done: [frontend](frontend.md#directories-d07); as built in C.9 below |
 | D08: public profiles and storefront booking hand-off | Done: [frontend](frontend.md#profiles-d08); as built in C.10 below |
+| D09: tattoo inspiration gallery and artwork detail | Done: [frontend](frontend.md#gallery-d09), [artwork pages](frontend.md#artwork-pages-d09), [API](api.md#gallery-search-and-the-artwork-read-d09); as built in C.11 below |
 
 Status legend: **Done** = in code, with tests where noted. **Partial** = exists, but not in the form Discover needs. **Planned** = only in docs. **Missing** = searched for and absent. **Unverified** = not checked against a running system.
 
@@ -294,6 +295,17 @@ Details in [frontend](frontend.md#profiles-d08) and [booking hand-off](frontend.
 - **Custom domains** (TAT-79) are not served by the platform, so `storefrontUrl` is always the `{tenant}` host; the hand-off accepts whatever host the API names for both links.
 - **SEO:** self-canonical profiles (H: a distinct summary, never the storefront's canonical), OG image from the cover or newest work, indexable by shape when `DISCOVER_INDEXING=on`. **Deferred to D10:** JSON-LD (the D08 row) and profile sitemaps, built with D10's structured data and sitemaps.
 - **Design:** editorial hero (cover or work, else type), About only with real text, a night portfolio at true proportions, work-first artist tiles, a Booking band, related links by the profile's own place; a sticky phone booking bar that rests above the footer. No reviews, ratings, counts or favourites.
+
+### C.11 As built in D09 (deviations from G, H and the D09 row)
+
+Details in [gallery](frontend.md#gallery-d09), [artwork pages](frontend.md#artwork-pages-d09) and [API](api.md#gallery-search-and-the-artwork-read-d09).
+
+- **Routes** as H: the gallery is `/tattoos` (`paths.tattoos()`), and D05's `/explore/tattoos` is a 301 to it with the query kept; the nav, footer, homepage, hubs and profiles link `/tattoos`. Artwork pages are `/tattoos/:slug`, the slug being the photo's id (no title exists to make a readable one; `<readable>-<id>` and other letter cases resolve by the id and 301 to it).
+- **API:** two additive changes, no migration and no index. `/discover/tattoos` takes `q` (the studios' rule; alt text, artist, business and style names, through the D02 views; counted as a search), and `/discover/tattoos/:id` answers `artistAcceptingInquiries`. The D03 detail read and its `bookingUrl` (`/book?artwork=<id>&ref=…`, which the storefront already reads as "Request a similar tattoo") were enough otherwise. No related endpoint: related work is two list reads (the artist's, the style's in the page's country), merged and de-duplicated in Discover.
+- **Gallery:** D07's toolbar, sheet, chips and Next/First/Previous paging (not a "Show more"; no sort control: the API has one order), CSS-columns masonry at true proportions (first 4 eager), a debounced search (400 ms; first update of a burst pushes, the rest replace) that stays a GET form without JavaScript. One artist's or studio's work (`?artist=`, `?studio=`, from a profile's "All work" link) is global unless `?country=` is named.
+- **Artwork page:** artwork first, metadata only from the answer (no size, placement, duration or price), "Request a similar tattoo" through `bookingLinks` (now also keeping the page's own `artwork`), Share / Copy link, "View full size" instead of a lightbox, related work, history-based "Back to the gallery".
+- **Canonical:** self-canonical at the canonical slug, indexable by shape once `DISCOVER_INDEXING=on`, not H's launch default (a canonical to the storefront's `/gallery/:id`): the page adds related work and style and place context. D10's "artwork canonical decision" can still switch it. No artwork sitemap or structured data (D10).
+- **Not measured:** the search's cost on the D02 rehearsal data (D10's performance pass).
 
 ## D. Data model gap analysis
 

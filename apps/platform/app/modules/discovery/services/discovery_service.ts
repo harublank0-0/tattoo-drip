@@ -109,6 +109,8 @@ export type DiscoverArtistDetail = DiscoverArtistSummary & {
 };
 export type DiscoverTattooDetail = DiscoverTattooSummary & {
 	location: DiscoverLocation | null;
+	/** Whether the photo's artist takes new requests (D09: the artwork page's booking words). */
+	artistAcceptingInquiries: boolean;
 	storefrontUrl: string;
 	bookingUrl: string;
 };
@@ -127,6 +129,7 @@ export type ArtistQuery = StudioQuery & {
 	independent?: boolean;
 };
 export type TattooQuery = LocationFilter & {
+	q?: string;
 	style?: string;
 	studio?: string;
 	artist?: string;
@@ -477,6 +480,18 @@ export default class DiscoveryService {
 				}
 				where += ")";
 			}
+			if (query.q) {
+				// D09: the photo's own public text (its alt text), its artist's or
+				// business's name, or the name of a style it is tagged with, as a
+				// case-insensitive substring (strpos, so `%` and `_` are literal).
+				// Names come from the views; style names from the platform's fixed
+				// list, matched here and bound as an array of slugs.
+				where += ` and (strpos(lower(coalesce(w.alt, '')), lower(?)) > 0
+					or w.artist_id in (select x.id from discovery.artists x where strpos(lower(x.name), lower(?)) > 0)
+					or w.studio_id in (select y.id from discovery.studios y where strpos(lower(y.name), lower(?)) > 0)
+					or w.styles && ?::varchar[])`;
+				bindings.push(query.q, query.q, query.q, stylesNamed(query.q));
+			}
 			if (query.style) {
 				where += " and w.styles @> array[?]::varchar[]";
 				bindings.push(query.style);
@@ -511,9 +526,10 @@ export default class DiscoveryService {
 	/** One published photo by id, with where to see it and to ask for one like it. */
 	async tattoo(id: string): Promise<DiscoverTattooDetail | null> {
 		return readDiscovery(async (client) => {
-			const [row] = await rowsOf<TattooRow>(
+			const [row] = await rowsOf<TattooRow & { accepting_inquiries: boolean }>(
 				client,
-				`select ${TATTOO_COLUMNS} from ${TATTOO_FROM} where w.id = ?::uuid`,
+				`select ${TATTOO_COLUMNS}, a.accepting_inquiries
+				 from ${TATTOO_FROM} where w.id = ?::uuid`,
 				[id],
 			);
 			if (!row) return null;
@@ -521,6 +537,7 @@ export default class DiscoveryService {
 			return {
 				...(await this.tattooSummary(row)),
 				location: locationOf(row.place_id, places),
+				artistAcceptingInquiries: row.accepting_inquiries,
 				storefrontUrl: artworkPageUrl(
 					storefrontTemplate(),
 					row.studio_slug,
@@ -796,6 +813,18 @@ async function studioStylesOf(
 		styles.set(studio_id, [...(styles.get(studio_id) ?? []), style]);
 	}
 	return styles;
+}
+
+/**
+ * The slugs of the styles whose name contains `q`, whatever its case (the
+ * gallery search's style match, D09); none is an empty array, which
+ * overlaps nothing.
+ */
+export function stylesNamed(q: string): string[] {
+	const text = q.toLowerCase();
+	return TATTOO_STYLES.filter(({ name }) =>
+		name.toLowerCase().includes(text),
+	).map(({ slug }) => slug);
 }
 
 function locationFromRow(row: PlaceRow): DiscoverLocation {

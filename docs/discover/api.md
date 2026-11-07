@@ -1,6 +1,6 @@
 # Discover API
 
-Discover D03. The public, cross-studio read API that Discover (D05 onward) is built on, its SDK client and React hooks, and the booking referral. The contract is `packages/types/openapi.yaml` (the `Discover` tag); this page covers what the contract can't: the boundary, the rules behind each answer, and the limits.
+Discover D03 (D09 added the gallery's search and the artwork page's booking flag). The public, cross-studio read API that Discover (D05 onward) is built on, its SDK client and React hooks, and the booking referral. The contract is `packages/types/openapi.yaml` (the `Discover` tag); this page covers what the contract can't: the boundary, the rules behind each answer, and the limits.
 
 Nothing here changes a studio's own API (`/api/v1/tenants/:tenant/*`) or the storefront.
 
@@ -24,8 +24,8 @@ All `GET`, under `/api/v1/discover`, with the public API's envelopes (`{ data }`
 | `/studios/:studio/artists/:artist` | `getDiscoverStudioArtist` | One artist at that studio (an artist slug is unique per studio only), with bio, social links, 12 newest photos and a `bookingUrl` naming the artist |
 | `/artists` | `listDiscoverArtists` | Shown artists of every listed business. `q`, `country`, `city`, `style`, `studio` (slug), `independent`, `sort`, `cursor`, `limit` |
 | `/artists/:artist` | `getDiscoverIndependentArtist` | A listed independent artist by their business's slug (their first-made shown profile) |
-| `/tattoos` | `listDiscoverTattoos` | Published photos, newest first only. `country`, `city`, `style`, `studio`, `artist` (uuid), `healed`, `cursor`, `limit` |
-| `/tattoos/:tattoo` | `getDiscoverTattoo` | One published photo by id, with its place, its page on the studio's site and a `bookingUrl` naming it (`artwork`) |
+| `/tattoos` | `listDiscoverTattoos` | Published photos, newest first only. `q` (D09), `country`, `city`, `style`, `studio`, `artist` (uuid), `healed`, `cursor`, `limit` |
+| `/tattoos/:tattoo` | `getDiscoverTattoo` | One published photo by id (any letter case), with its place, `artistAcceptingInquiries` (D09), its page on the studio's site and a `bookingUrl` naming it (`artwork`) |
 | `/styles` | `listDiscoverStyles` | The platform's fixed style list, in its order |
 | `/locations` | `listDiscoverLocations` | The places at least one listed business is in, by country and name |
 
@@ -42,7 +42,7 @@ Vine validators (`#modules/discovery/validators/discover`) read the query string
 
 | Parameter | Rule |
 |---|---|
-| `q` | 2–80 characters, trimmed; a case-insensitive substring of the name (`strpos(lower(name), lower(q))`, so `%` and `_` are literal). Also counts against `discoverSearch` |
+| `q` | 2–80 characters, trimmed, no control character; a case-insensitive substring of the name (`strpos(lower(name), lower(q))`, so `%` and `_` are literal). Also counts against `discoverSearch`. On `/tattoos` (D09) it matches a photo whose alt text, artist's name, business's name (studio or independent) or style name contains it (see Gallery search) |
 | `country` | ISO 3166-1 alpha-2, upper-cased (`np` → `NP`) |
 | `city` | A place slug; needs `country` (a city slug is unique per country only: "Name the country of the city (country=NP).") |
 | `style` | A slug from the style list |
@@ -56,11 +56,19 @@ An unknown place, studio slug or artist is an empty page, not an error, as in th
 
 **Cursors** (`#modules/discovery/cursor`) use keyset paging: base64url of the JSON `[sort, value, id]`, where `value` is `lower(name)` or the instant as the database wrote it (UTC, microseconds, so a JavaScript date never rounds it). Only one spelling decodes. A cursor of another sort, a non-uuid id, an impossible date (31 February) or a control character is a 422 on `cursor`. Rows added while someone pages are never repeated or skipped. Rows that tie on the sort value (the same name under `lower()`, the same instant) are ordered by id. Pass `nextCursor` back with the same filters and sort; it is null on the last page.
 
+## Gallery search and the artwork read (D09)
+
+- **`q` on `/tattoos`.** The same validation as the studios' and artists' `q` (the shared `q()` rule: trimmed, 2–80, `NO_CONTROL`, 422 on `q`). A photo matches when `q` is a case-insensitive substring (`strpos(lower(…), lower(?))`, `%` and `_` literal) of its own alt text (the only public text a photo has: there is no title or caption column), of its artist's name (`discovery.artists`), of its business's name (`discovery.studios`, studios and independents) or of the name of a style it is tagged with. Style names are the platform's fixed list (`TATTOO_STYLES`): the slugs whose name contains `q` are found in the app (`stylesNamed`) and bound as one array (`w.styles && ?::varchar[]`; none is an empty array, which overlaps nothing). Every value is a bound parameter; the SQL is fixed text. It reads only the D02 views, combines with every other filter, keeps newest first with the id as tie-break, and its cursor is the same `newest` cursor (bound to the sort, as every cursor). A search counts against `discoverSearch`.
+- **No index.** Substring matching can't use a B-tree, and a trigram index would need `pg_trgm` and, under RLS, a leakproof operator (D02: a non-leakproof operator is never an index condition). The page is still read from `discovery.artworks` alone inside the `LIMIT` subquery, walking the newest-first index (`artist_work_photos_discovery_newest`) and checking each row; the name subqueries are uncorrelated, so PostgreSQL can evaluate each once (a hashed subplan). A rare match scans every published photo before the page fills. Not measured on the rehearsal data (D10's performance pass); the search budget and the 60-second cache sit in front.
+- **`artistAcceptingInquiries`** on `/tattoos/:tattoo`: the photo's artist's own `accepting_inquiries` (a column the view already exposes). The booking link still names the photo when it is false: the storefront then offers the studio's general request with the piece linked; Discover says the artist isn't taking requests (frontend, "Artwork pages").
+- **The artwork's `bookingUrl`** (D03, unchanged): the studio site's `/book?artwork=<photo id>&ref=<token>`. The storefront's `/book` reads `artwork` as a gallery photo's id (its "Request a similar tattoo"), checks it with the studio's own API and names the photo's artist; portfolio photos are not flash, so never `flash`.
+- Everything not shown is the same 404 as before (unknown, never listed, opted out, taken down, unpublished, a hidden, opted-out or deleted artist): `tests/functional/api/discover_gallery.spec.ts`.
+
 ## Limits and caching
 
 - The gate's generic per-caller budgets still apply (`callerReads`).
 - `discoverReads`: 200 reads per caller per 5 minutes (`apiLimit` on the whole group).
-- `discoverSearch`: 60 searches per caller per 5 minutes, counted only when `q` is present (each one scans the listed names).
+- `discoverSearch`: 60 searches per caller per 5 minutes, counted only when `q` is present (each one scans the listed names; on `/tattoos`, D09, the published photos). Discover's gallery searches as the visitor types (debounced, 400 ms, at least 2 characters), so a burst of typing can spend several.
 - Over budget: `429 rate_limited` with `Retry-After`.
 - Every read is `Cache-Control: public, max-age=60, stale-while-revalidate=60` with `Vary: Origin` and an `ETag` (`If-None-Match` gets a 304). Something unlisted or hidden can therefore still be served from a cache for up to 2 minutes. Takedowns that need to be faster need a CDN purge, which doesn't exist yet (see Limitations).
 - CORS comes from D01: only allowlisted origins (the studio sites, `APP_URL`, `DISCOVER_URL`) are echoed, never `*`, never with credentials.
@@ -87,7 +95,7 @@ const next = await discover.studios.list({ query: "ink", country: "NP", city: "k
 const studio = await discover.studios.get("black-needle");
 ```
 
-- `createDiscoverClient({ baseUrl, key?, fetch?, timeoutMs? })` (`packages/sdk/src/discover.ts`) has no tenant. Its resources are `studios.list/get/artists/artist`, `artists.list/independent`, `tattoos.list/get`, `styles.list` and `locations.list`. Lists return the whole page (`{ data, nextCursor }`); single reads unwrap `data`. `query` travels as the API's `q`. Path segments are encoded.
+- `createDiscoverClient({ baseUrl, key?, fetch?, timeoutMs? })` (`packages/sdk/src/discover.ts`) has no tenant. Its resources are `studios.list/get/artists/artist`, `artists.list/independent`, `tattoos.list/get`, `styles.list` and `locations.list`. Lists return the whole page (`{ data, nextCursor }`); single reads unwrap `data`. `query` travels as the API's `q` (studios, artists and, since D09, tattoos: `DiscoverTattoosListQuery`). Path segments are encoded.
 - It shares `createTransport` (`packages/sdk/src/transport.ts`) with `createTattooClient`: no cookies, a timeout (`timeout`), the caller's `signal` (rejects with its `AbortError`), `TattooApiError`, and the refusal of a `key` in a browser. `createTattooClient` is unchanged and still needs its tenant.
 - React (`packages/react`): `DiscoverProvider` / `useDiscoverClient` (separate from `TattooProvider`, which holds one studio's client); `discoverKeys`, all under `["tattoo-drip", "discover", …]`, so they never collide with a studio's `["tattoo-drip", "tenant", <slug>, …]` or the studio client's styles; `discoverQueries.*` for `useQuery` and SSR prefetch, each forwarding TanStack Query's `signal`; and the hooks `useDiscoverStudios`, `useDiscoverStudio`, `useDiscoverStudioArtists`, `useDiscoverStudioArtist`, `useDiscoverArtists`, `useDiscoverIndependentArtist`, `useDiscoverTattoos`, `useDiscoverTattoo`, `useDiscoverStyles`, `useDiscoverLocations`. A list's key holds its whole query (filters, sort, cursor), so each page is its own cache entry. Styles never go stale; everything else follows the app's defaults.
 
@@ -114,6 +122,7 @@ Measured with `EXPLAIN ANALYZE` as the app role, with no context, read-only, on 
 ## Tests
 
 - `tests/functional/api/discover.spec.ts`: every endpoint and its exact field sets; filters, search, both name sorts, cursor paging across every sort, including rows that tie on the sort value; profiles' ETags holding across seconds (304); old slugs; independents vs studios. Never shown: never listed, opted out, taken down, hidden or opted-out or deleted artist, hidden or taken-down photo, unknown and wrong-studio paths (each a 404 and absent from every list). Also no private words in any answer, no context and still writable after the reads, 422s for every malformed parameter and cursor, and both rate limits.
+- `tests/functional/api/discover_gallery.spec.ts` (D09): `q` on `/tattoos` (alt text, artist, studio and style names; case and `%`/`_` literal; no match; a never-listed studio's matching photo absent), combined with every filter and the country, cursor paging with ties and a stable order, the 422s (length, control characters), the search budget, and rows leaving the search when hidden, taken down or opted out; the detail's fields, attribution, place, `artistAcceptingInquiries`, the booking link's shape (`/book`, exactly `artwork` and `ref`, the studio's own origin, the token bound to that studio) and the same 404 body for every reason, plus cross-tenant isolation.
 - `tests/functional/api/discover_referral.spec.ts`: attribution persisted with `sourceChannel` intact; none, empty, garbage, oversized, forged, another studio's and expired tokens all still give a 201 with nothing stored; a query-string token ignored; the guard refusing a later change. D08: the hand-off end to end: a studio artist's `bookingUrl` from the profile API (the studio's host, `/book`, `artist`), its `ref` sent as `referral` records the attribution with the preferred artist; one studio's link used at another studio records nothing.
 - `tests/unit/modules/discovery/{referral,cursor}.spec.ts`: signing, hour-stable link tokens, expiry, studio binding, clock skew, tampering, a re-spelt signature, wrong key, version and purpose, malformed input; cursor round trips, cross-sort, canonical spelling, real instants.
 - `tests/functional/api/api_routes.spec.ts`: the ten Discover routes are GET-only, limited, cached and tenantless.
@@ -124,5 +133,5 @@ Measured with `EXPLAIN ANALYZE` as the app role, with no context, read-only, on 
 
 - **Discover SSR server key (D05).** The blueprint's "named server keys" are not built. Until D05, Discover's SSR can call with no key (anonymous, per address) or with a storefront key. D05 generalises `STOREFRONT_SERVER_KEYS` to named keys when `apps/discover` exists.
 - **Takedown latency.** The public cache can serve a removed row for up to 2 minutes; there is no purge.
-- **Search.** Substring search on names only (no bio, style text or ranking), as the D02 plan set out.
+- **Search.** Substring search on names only for studios and artists (no bio or ranking), as the D02 plan set out; photos (D09) also on their alt text and style names. No ranking: newest first.
 - **Profile caps.** A studio profile lists up to 100 artists and an artist's or studio's 12 newest photos. Use the list endpoints with `studio` or `artist` for the rest.
