@@ -173,6 +173,10 @@ The legacy redirects and the proxy are prepared in `deploy/nginx/hosts.split.con
     - `https://tattoodrip.app/sw.js` → the unregistering worker.
 13. A new password reset email links to `https://app.tattoodrip.app/...`. An old link opened from the apex still works.
 14. Runbook §4.8: the visitor address on the new hosts is still the real one.
+15. Country (D06.5, [frontend](frontend.md#country)):
+    - `curl -sI https://tattoodrip.app/`: `cache-control: private, no-store`, and `cf-cache-status` is `DYNAMIC` or `BYPASS`, never `HIT`. No Cloudflare cache rule may cover Discover's HTML until a keyed strategy exists (D10).
+    - Cloudflare's IP geolocation is on, and a request sent with a made-up `CF-IPCountry: IN` from outside Nepal reaches Discover with Cloudflare's own value (`DISCOVER_GEO_HEADER` stays unset until this is confirmed; then set it to `X-Discover-Country` in `discover.env` and recreate the service).
+    - Discover's port `3000` is not published on the host (`docker compose port discover 3000` prints nothing): only nginx, which overwrites `X-Discover-Country`, can reach it.
 15. Watch the logs for an hour: 5xx, CSRF failures beyond the expected sign-ins, `/api` traffic on the apex.
 
 **After:**
@@ -211,6 +215,7 @@ The legacy redirects and the proxy are prepared in `deploy/nginx/hosts.split.con
 | Production-mode rehearsal not run in D01 | It needs built images and scratch secrets. It is D11's first step; local rehearsal and the proxy harness passed |
 | Cloudflare settings | Tunnel hostnames, certificate coverage and any WAF or rate-limit rule (runbook §3.8 targets `tattoodrip.app` sign-in paths: move it to `app.`) are manual. None changed in D01 |
 | Turnstile | Bound to the studio pages' hostname: unaffected |
+| Discover's country header (D06.5) | nginx sets `X-Discover-Country` from `CF-IPCountry` only for connections from cloudflared (`172.30.42.20`, as for the visitor's address) and always replaces a visitor's own; the harness checks both. Unverified until D11: that Cloudflare overwrites a visitor's own `CF-IPCountry`. Geolocation is off until then (`DISCOVER_GEO_HEADER` unset); it is a relevance hint only, so a spoofed country changes nothing but the visitor's own listings |
 | Edge caching of `/api` | Before D01 every answer carried `Access-Control-Allow-Origin: *`, so an edge copy worked for any studio page. Now the header names one origin, and Cloudflare ignores `Vary: Origin` for JSON. Cloudflare does not cache `/api` today (runbook §4.7 checks `DYNAMIC`/`BYPASS`). **Never add a cache rule for `/api`** on the apex or `api.`: it would serve one studio's allow-origin to another studio's browser |
 | `/api/../file` tricks | The platform decides "API path" on the dot-segment-resolved path, so `/api/../sw.js` on an API-only host is the 404, not the static file (tested); nginx matches on the normalised `$uri` too |
 | Installed PWAs and open tabs | One-time disruption, documented in E |

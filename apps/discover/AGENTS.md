@@ -7,5 +7,6 @@ Boundaries are in the [root instructions](../../AGENTS.md): no database, no auth
 - Links use `paths` from `src/lib/routes.ts`. Never use the legacy Studio OS paths (`/login`, `/signup`, `/dashboard`, `/t/…`, `/sw.js`…): nginx sends them to Studio OS (`docs/discover/domain-migration.md`, "Legacy URLs"). Sign in and Get started link to Studio OS's own origin (`APP_URL`).
 - Indexing stays off unless `DISCOVER_INDEXING=on`; an unfinished page passes `noindex: true` to `pageMeta`. No fabricated listings, numbers or reviews; a page not built yet says so (`FoundationNotice`).
 - Colours, type and spacing come from the tokens in `src/styles.css`; no hex values in components.
+- Country (D06.5): loaders read the page's country from `context.country` and pass it to every country-aware query (it is then in the key). Never read `CF-IPCountry`, redirect or hide a profile by country; pages stay `private, no-store` (frontend guidance, "Country").
 
 Run from `apps/discover`: `pnpm dev` (port 3100, loads `.env.local`, see `.env.example`), `pnpm test` (`node:test` + `tsx`, `test/`; the server test needs a build), `pnpm typecheck`, `pnpm build` (ends with the browser-bundle secret check), `pnpm generate-routes`. `src/routeTree.gen.ts` is generated. Browser-check UI changes.

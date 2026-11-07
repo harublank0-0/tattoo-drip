@@ -17,6 +17,7 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ExploreArtistsRouteImport } from './routes/explore/artists'
 import { Route as ExploreStudiosRouteImport } from './routes/explore/studios'
 import { Route as ExploreTattoosRouteImport } from './routes/explore/tattoos'
+import { Route as PreferencesCountryRouteImport } from './routes/preferences/country'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -58,6 +59,11 @@ const ExploreTattoosRoute = ExploreTattoosRouteImport.update({
   path: '/explore/tattoos',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PreferencesCountryRoute = PreferencesCountryRouteImport.update({
+  id: '/preferences/country',
+  path: '/preferences/country',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -68,6 +74,7 @@ export interface FileRoutesByFullPath {
   '/explore/artists': typeof ExploreArtistsRoute
   '/explore/studios': typeof ExploreStudiosRoute
   '/explore/tattoos': typeof ExploreTattoosRoute
+  '/preferences/country': typeof PreferencesCountryRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -78,6 +85,7 @@ export interface FileRoutesByTo {
   '/explore/artists': typeof ExploreArtistsRoute
   '/explore/studios': typeof ExploreStudiosRoute
   '/explore/tattoos': typeof ExploreTattoosRoute
+  '/preferences/country': typeof PreferencesCountryRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -89,6 +97,7 @@ export interface FileRoutesById {
   '/explore/artists': typeof ExploreArtistsRoute
   '/explore/studios': typeof ExploreStudiosRoute
   '/explore/tattoos': typeof ExploreTattoosRoute
+  '/preferences/country': typeof PreferencesCountryRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -101,6 +110,7 @@ export interface FileRouteTypes {
     | '/explore/artists'
     | '/explore/studios'
     | '/explore/tattoos'
+    | '/preferences/country'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -111,6 +121,7 @@ export interface FileRouteTypes {
     | '/explore/artists'
     | '/explore/studios'
     | '/explore/tattoos'
+    | '/preferences/country'
   id:
     | '__root__'
     | '/'
@@ -121,6 +132,7 @@ export interface FileRouteTypes {
     | '/explore/artists'
     | '/explore/studios'
     | '/explore/tattoos'
+    | '/preferences/country'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -132,6 +144,7 @@ export interface RootRouteChildren {
   ExploreArtistsRoute: typeof ExploreArtistsRoute
   ExploreStudiosRoute: typeof ExploreStudiosRoute
   ExploreTattoosRoute: typeof ExploreTattoosRoute
+  PreferencesCountryRoute: typeof PreferencesCountryRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -192,6 +205,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ExploreTattoosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/preferences/country': {
+      id: '/preferences/country'
+      path: '/preferences/country'
+      fullPath: '/preferences/country'
+      preLoaderRoute: typeof PreferencesCountryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -204,6 +224,7 @@ const rootRouteChildren: RootRouteChildren = {
   ExploreArtistsRoute: ExploreArtistsRoute,
   ExploreStudiosRoute: ExploreStudiosRoute,
   ExploreTattoosRoute: ExploreTattoosRoute,
+  PreferencesCountryRoute: PreferencesCountryRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

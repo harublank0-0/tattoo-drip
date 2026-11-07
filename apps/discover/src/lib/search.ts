@@ -1,3 +1,7 @@
+import { normalizeCountry } from "./country.ts";
+
+export { countryName } from "./country.ts";
+
 /** The API's search length (docs/discover/api.md): the form asks for the same. */
 export const SEARCH_MIN = 2;
 export const SEARCH_MAX = 80;
@@ -22,12 +26,8 @@ function readSlug(value: unknown): string | undefined {
 	return value.length <= 63 && SLUG.test(value) ? value : undefined;
 }
 
-/** An ISO 3166-1 alpha-2 country code, upper-cased (`np` → `NP`), else none. */
-export function readCountry(value: unknown): string | undefined {
-	if (typeof value !== "string" || !/^[A-Za-z]{2}$/.test(value))
-		return undefined;
-	return value.toUpperCase();
-}
+/** An assigned ISO 3166-1 alpha-2 country code, upper-cased (`np` → `NP`), else none. */
+export const readCountry = normalizeCountry;
 
 /** A city's slug; the API needs its country too, so `readStudioSearch` drops a city without one. */
 export const readCity = readSlug;
@@ -90,17 +90,4 @@ export function studioQuery(search: StudioSearch) {
 export function humanizeSlug(slug: string): string {
 	const words = slug.replace(/-/g, " ");
 	return words.charAt(0).toUpperCase() + words.slice(1);
-}
-
-/** A country's English name from its code (`NP` → "Nepal"), or the code itself. */
-export function countryName(code: string): string {
-	try {
-		return (
-			new Intl.DisplayNames(["en"], { type: "region" }).of(
-				code.toUpperCase(),
-			) ?? code
-		);
-	} catch {
-		return code;
-	}
 }

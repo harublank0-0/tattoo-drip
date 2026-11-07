@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { parseDiscoverConfig } from "../src/lib/config.ts";
+import { parseDiscoverConfig, publicSettings } from "../src/lib/config.ts";
 import { readOrigin } from "../src/lib/origin.ts";
 
 const VALID = {
@@ -17,7 +17,68 @@ describe("Discover settings", () => {
 			siteUrl: "https://tattoodrip.app",
 			studioOsUrl: "https://app.tattoodrip.app",
 			indexing: false,
+			markets: ["NP"],
+			defaultCountry: "NP",
+			geoHeader: null,
 		});
+	});
+
+	test("markets: a comma list of assigned ISO codes, normalised and de-duplicated; the default is one of them", () => {
+		const config = parseDiscoverConfig({
+			...VALID,
+			DISCOVER_MARKETS: " np, IN ,np ",
+			DISCOVER_DEFAULT_COUNTRY: "in",
+		});
+		assert.deepEqual(config.markets, ["NP", "IN"]);
+		assert.equal(config.defaultCountry, "IN");
+		// Unset default: the first market.
+		assert.equal(
+			parseDiscoverConfig({ ...VALID, DISCOVER_MARKETS: "IN,NP" })
+				.defaultCountry,
+			"IN",
+		);
+		for (const markets of ["NP,XX", "NPL", "NP,,IN", ",", "EU", "UK"]) {
+			assert.throws(
+				() => parseDiscoverConfig({ ...VALID, DISCOVER_MARKETS: markets }),
+				(error: Error) => {
+					assert.match(error.message, /DISCOVER_MARKETS is not valid/);
+					if (/XX|NPL/.test(markets))
+						assert.doesNotMatch(error.message, /XX|NPL/);
+					return true;
+				},
+				markets,
+			);
+		}
+		assert.throws(
+			() => parseDiscoverConfig({ ...VALID, DISCOVER_DEFAULT_COUNTRY: "IN" }),
+			/DISCOVER_DEFAULT_COUNTRY is not valid/,
+		);
+		assert.throws(
+			() =>
+				parseDiscoverConfig({ ...VALID, DISCOVER_DEFAULT_COUNTRY: "Nepal" }),
+			/DISCOVER_DEFAULT_COUNTRY is not valid/,
+		);
+	});
+
+	test("geolocation is off unless a trusted header is named, and never CF-IPCountry; the browser never gets its name", () => {
+		assert.equal(parseDiscoverConfig(VALID).geoHeader, null);
+		assert.equal(
+			parseDiscoverConfig({ ...VALID, DISCOVER_GEO_HEADER: " " }).geoHeader,
+			null,
+		);
+		const config = parseDiscoverConfig({
+			...VALID,
+			DISCOVER_GEO_HEADER: "X-Discover-Country",
+		});
+		assert.equal(config.geoHeader, "x-discover-country");
+		assert.equal("geoHeader" in publicSettings(config), false);
+		for (const bad of ["CF-IPCountry", "cf-ipcountry", "X Country", "X:Y"]) {
+			assert.throws(
+				() => parseDiscoverConfig({ ...VALID, DISCOVER_GEO_HEADER: bad }),
+				/DISCOVER_GEO_HEADER is not valid/,
+				bad,
+			);
+		}
 	});
 
 	test("indexing is on only when it says so", () => {

@@ -5,6 +5,7 @@ import { ArrowUpRightIcon, XIcon } from "lucide-react";
 import { DiscoverySearch } from "#/components/discovery/discovery-search";
 import { PageContainer, PageHeader } from "#/components/discovery/layout";
 import { EmptyState } from "#/components/discovery/states";
+import { EmptyMarket } from "#/components/layout/country-selector";
 import { buttonVariants } from "#/components/ui/button";
 import { rethrowUnavailable } from "#/lib/api-errors";
 import { paths } from "#/lib/routes";
@@ -25,6 +26,12 @@ import { pageMeta } from "#/lib/seo";
  * query. D06 adds the parameters the homepage links with (`country`,
  * `city`, `style`, beside `q`), each validated and shown as a removable
  * chip; the filter UI, cards and paging are D07, profiles D08.
+ *
+ * Country-aware (D06.5): the list is always one country's, the address's
+ * `country` when it names one, else the visitor's (`context.country`). The
+ * country is stated, not a removable chip (there is no "every country"
+ * list); the header's selector changes it, dropping the city and keeping
+ * `q` and `style`.
  */
 export const Route = createFileRoute("/explore/studios")({
 	// Always returns every key, undefined when malformed: the router merges
@@ -55,7 +62,14 @@ export const Route = createFileRoute("/explore/studios")({
 		const style = deps.style
 			? knownStyle(deps.style, (await styles) ?? [])
 			: undefined;
-		const filters: StudioSearch = { ...deps, style };
+		// The address's country, else the visitor's: never no country.
+		const country = context.country.country;
+		const filters: StudioSearch = {
+			...deps,
+			country,
+			city: deps.country === country ? deps.city : undefined,
+			style,
+		};
 		await Promise.all([
 			queryClient
 				.ensureQueryData(
@@ -86,6 +100,10 @@ type Chip = { key: string; label: string; remove: StudioSearch };
 function Studios() {
 	const { discover } = Route.useRouteContext();
 	const { filters } = Route.useLoaderData();
+	// The address: removing a chip keeps what it names (an implicit country
+	// stays implicit), so links never add a country the visitor didn't choose.
+	const search = Route.useSearch();
+	const country = filters.country as string;
 	const { q } = filters;
 	const { data } = useSuspenseQuery(
 		discoverQueries.studios(discover.client, studioQuery(filters)),
@@ -102,15 +120,7 @@ function Studios() {
 		chips.push({
 			key: "city",
 			label: place?.name ?? humanizeSlug(filters.city),
-			remove: { ...filters, city: undefined },
-		});
-	}
-	if (filters.country) {
-		chips.push({
-			key: "country",
-			label: countryName(filters.country),
-			// A city needs its country: removing the country removes both.
-			remove: { ...filters, country: undefined, city: undefined },
+			remove: { ...search, city: undefined },
 		});
 	}
 	if (filters.style) {
@@ -119,7 +129,7 @@ function Studios() {
 			label:
 				styles?.find((each) => each.slug === filters.style)?.name ??
 				humanizeSlug(filters.style),
-			remove: { ...filters, style: undefined },
+			remove: { ...search, style: undefined },
 		});
 	}
 	const filtered = chips.length > 0;
@@ -128,7 +138,7 @@ function Studios() {
 		<>
 			<PageHeader
 				title="Explore studios"
-				intro="Studios that list themselves on Discover. More filters, profiles and more of each studio's work are on their way."
+				intro={`Studios in ${countryName(country)} that list themselves on Discover. More filters, profiles and more of each studio's work are on their way.`}
 				breadcrumbs={[
 					{ label: "Discover", to: paths.home() },
 					{ label: "Studios" },
@@ -170,22 +180,30 @@ function Studios() {
 						</ul>
 					</div>
 				)}
-				{data.data.length === 0 ? (
+				{data.data.length === 0 && !filtered && !q ? (
+					<EmptyMarket
+						country={country}
+						markets={discover.settings.markets}
+						noun="studios"
+						className="border-t border-line py-12"
+					/>
+				) : data.data.length === 0 ? (
 					<EmptyState
 						title={
 							q
 								? `No studios match "${q}"`
 								: filtered
 									? "No studios match these filters"
-									: "No studios listed yet"
+									: `No studios are listed in ${countryName(country)} yet.`
 						}
 						action={
 							q || filtered ? (
 								<Link
 									to={paths.studios()}
+									search={{ country: search.country }}
 									className={buttonVariants({ variant: "outline" })}
 								>
-									Show all studios
+									Show all studios in {countryName(country)}
 								</Link>
 							) : undefined
 						}

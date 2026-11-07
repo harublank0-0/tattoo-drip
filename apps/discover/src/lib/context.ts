@@ -1,6 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { createDiscoverClient, type DiscoverClient } from "@tattoo-drip/sdk";
 import type { PublicSettings } from "./config.ts";
+import { type CountryPreference, normalizeCountry } from "./country.ts";
 import { readOrigin } from "./origin.ts";
 import {
 	createDiscoverQueryClient,
@@ -43,28 +44,56 @@ export class DiscoverRef {
 }
 
 /**
+ * The visitor's country preference (D06.5): resolved once per server
+ * request (cookie, trusted geolocation header, default), sent to the
+ * browser with the settings, and changed in the browser's tab when the
+ * visitor switches country. A page's own `?country=` is applied on top by
+ * the root route (`pageCountry`). Per router, never module state.
+ */
+export class CountryPreferenceRef {
+	#value: CountryPreference | undefined;
+
+	get current(): CountryPreference {
+		if (!this.#value) throw new Error(NOT_CONNECTED);
+		return this.#value;
+	}
+
+	set(value: CountryPreference): void {
+		this.#value = value;
+	}
+}
+
+/**
  * The router context: one QueryClient and one Discover client per server
  * request, and one of each per browser tab. Loaders read
- * `context.discover.client`; nothing here goes into loader data.
+ * `context.discover.client`; nothing here goes into loader data. The root
+ * route adds `country` (this page's resolved country) for every route.
  */
 export interface DiscoverContext {
 	readonly queryClient: QueryClient;
 	readonly discover: DiscoverRef;
+	readonly preference: CountryPreferenceRef;
 }
 
 export function createContext(environment: QueryEnvironment): DiscoverContext {
 	return {
 		queryClient: createDiscoverQueryClient(environment),
 		discover: new DiscoverRef(),
+		preference: new CountryPreferenceRef(),
 	};
 }
 
-/** Connects a server render: the API from the settings, with a timeout. */
+/**
+ * Connects a server render: the API from the settings, with a timeout, and
+ * this request's country preference.
+ */
 export function connectServer(
 	context: DiscoverContext,
 	settings: PublicSettings,
+	preference: CountryPreference,
 	options: { fetch?: typeof fetch } = {},
 ): void {
+	context.preference.set(parsePreference(preference, settings));
 	context.discover.connect(
 		settings,
 		createDiscoverClient({
@@ -75,13 +104,17 @@ export function connectServer(
 	);
 }
 
-/** What the router's dehydrated state carries: the public settings only. */
+/** What the router's dehydrated state carries: the public settings and the request's country preference. */
 export interface Dehydrated {
 	settings: PublicSettings;
+	country: CountryPreference;
 }
 
 export function dehydrateContext(context: DiscoverContext): Dehydrated {
-	return { settings: context.discover.settings };
+	return {
+		settings: context.discover.settings,
+		country: context.preference.current,
+	};
 }
 
 /**
@@ -91,10 +124,11 @@ export function dehydrateContext(context: DiscoverContext): Dehydrated {
  */
 export function hydrateContext(
 	context: DiscoverContext,
-	dehydrated: { settings?: unknown } | undefined,
+	dehydrated: { settings?: unknown; country?: unknown } | undefined,
 	options: { fetch?: typeof fetch } = {},
 ): void {
 	const settings = parseSettings(dehydrated?.settings);
+	context.preference.set(parsePreference(dehydrated?.country, settings));
 	context.discover.connect(
 		settings,
 		createDiscoverClient({ baseUrl: settings.apiUrl, fetch: options.fetch }),
@@ -114,5 +148,39 @@ export function parseSettings(value: unknown): PublicSettings {
 		}),
 	) as Record<(typeof origins)[number], string>;
 	if (typeof raw.indexing !== "boolean") throw new Error(INVALID);
-	return { ...read, indexing: raw.indexing };
+	if (!Array.isArray(raw.markets) || raw.markets.length === 0)
+		throw new Error(INVALID);
+	const markets = raw.markets.map((code) => {
+		const country = normalizeCountry(code);
+		if (!country || country !== code) throw new Error(INVALID);
+		return country;
+	});
+	const defaultCountry = normalizeCountry(raw.defaultCountry);
+	if (!defaultCountry || !markets.includes(defaultCountry))
+		throw new Error(INVALID);
+	return { ...read, indexing: raw.indexing, markets, defaultCountry };
+}
+
+const PREFERENCE_SOURCES = new Set(["cookie", "geo", "fallback"]);
+
+/**
+ * A country preference, checked: an assigned code that is one of the
+ * markets (only market codes are ever saved, believed or defaulted to), and
+ * a known source.
+ */
+export function parsePreference(
+	value: unknown,
+	settings: Pick<PublicSettings, "markets">,
+): CountryPreference {
+	if (typeof value !== "object" || value === null) throw new Error(INVALID);
+	const raw = value as Record<string, unknown>;
+	const country = normalizeCountry(raw.country);
+	if (
+		!country ||
+		!settings.markets.includes(country) ||
+		typeof raw.source !== "string" ||
+		!PREFERENCE_SOURCES.has(raw.source)
+	)
+		throw new Error(INVALID);
+	return { country, source: raw.source as CountryPreference["source"] };
 }

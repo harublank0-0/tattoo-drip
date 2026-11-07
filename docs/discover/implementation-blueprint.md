@@ -17,6 +17,7 @@ This file is the plan Discover prompts work from. The dated `docs/superpowers/sp
 | D04: Studio OS publication controls | Done: [publication controls](publication-controls.md); deviations in C.5 below |
 | D05: Discover app scaffold and design system | Done: [frontend](frontend.md); deviations in C.6 below |
 | D06: homepage and Studio OS marketing | Done: [frontend](frontend.md#homepage-d06); deviations in C.7 below |
+| D06.5: country-aware discovery foundation | Done: [frontend](frontend.md#country); as built in C.8 below |
 
 Status legend: **Done** = in code, with tests where noted. **Partial** = exists, but not in the form Discover needs. **Planned** = only in docs. **Missing** = searched for and absent. **Unverified** = not checked against a running system.
 
@@ -257,6 +258,16 @@ Details in [frontend](frontend.md#homepage-d06).
 - **`/pricing` stays `noindex`**: no prices exist (no billing code in the platform). `/for-studios` is indexable.
 - **Token fix:** the semantic colour tokens were `@theme inline`, so `.night` never overrode them; they are a plain `@theme` now.
 - **Not measured:** the D06 row's Lighthouse targets need a deployed build with real images (D10).
+
+### C.8 As built in D06.5 (country-aware discovery; not in the original roadmap)
+
+Details in [frontend](frontend.md#country).
+
+- **Local-first, never restrictive.** Each page lists one country's studios, artists and photos: `?country=` (any assigned ISO code), else the `td_country` cookie, else the trusted geolocation header, else `DISCOVER_DEFAULT_COUNTRY`; cookie and header count only for `DISCOVER_MARKETS`. Country is a relevance filter only: no profile, tenant, currency, auth or residence rule depends on it.
+- **No API change.** `/discover/studios`, `/artists` and `/tattoos` already took `country`; `/locations` has none and stays as it is (small reference data, filtered in the app). Styles stay global.
+- **One cookie,** `td_country`, host-only, Lax, HttpOnly, a year, market codes only, set by `POST /preferences/country` (a no-JavaScript form with a same-origin redirect, or fetch).
+- **Geolocation off by default.** nginx (split layout) passes Cloudflare's country as `X-Discover-Country` only from cloudflared and always overwrites it; Discover reads it only when `DISCOVER_GEO_HEADER` names it, after D11 checks Cloudflare's overwriting and the closed origin port. No third-party geolocation, GPS or analytics.
+- **Caching:** HTML is now `private, no-store` with `Vary: Cookie` (it set nothing before); no edge caching of Discover's HTML until D10/D11 design a keyed strategy. **SEO:** canonicals stay path-only, explicit `?country=` pages are `noindex`, nothing redirects by country; location pages (D07/D10) are the crawlable geographic entry points.
 
 ## D. Data model gap analysis
 

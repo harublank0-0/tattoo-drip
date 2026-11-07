@@ -5,6 +5,7 @@ import type {
 	DiscoverStudioSummary,
 	DiscoverTattooSummary,
 } from "@tattoo-drip/sdk";
+import { createDiscoverClient } from "@tattoo-drip/sdk";
 import {
 	artistAffiliation,
 	artistWork,
@@ -12,8 +13,10 @@ import {
 	HOME_CAPS,
 	HOME_THRESHOLDS,
 	heroPhotos,
+	homeQueries,
 	inspirationPhotos,
 	pairStylesWithPhotos,
+	placesIn,
 	tattooAlt,
 	tattooCredit,
 	tattooDestination,
@@ -142,5 +145,27 @@ describe("the homepage's section rules", () => {
 			artistAffiliation(artists[3] as DiscoverArtistSummary),
 			"Independent · New Delhi",
 		);
+	});
+
+	test("the homepage's reads carry the page's country; styles and places stay global, places filtered in the page", () => {
+		const client = createDiscoverClient({ baseUrl: "https://api.example.com" });
+		const nepal = homeQueries(client, "NP");
+		const india = homeQueries(client, "IN");
+		for (const read of ["tattoos", "studios", "artists"] as const) {
+			assert.deepEqual(nepal[read].queryKey.at(-1), {
+				limit: read === "tattoos" ? 24 : 8,
+				country: "NP",
+			});
+			assert.notDeepEqual(nepal[read].queryKey, india[read].queryKey);
+		}
+		assert.deepEqual(nepal.styles.queryKey, india.styles.queryKey);
+		assert.deepEqual(nepal.locations.queryKey, india.locations.queryKey);
+		const places = fixtures(4).locations;
+		assert.deepEqual(
+			placesIn(places, "IN")?.map((place) => place.slug),
+			["new-delhi"],
+		);
+		assert.equal(placesIn(places, "NP")?.length, 3);
+		assert.equal(placesIn(undefined, "NP"), undefined);
 	});
 });

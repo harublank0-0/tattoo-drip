@@ -1,5 +1,6 @@
 import { MenuIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+import type { ResolvedCountry } from "#/lib/country";
 import { businessNav, PRIMARY_NAV } from "#/lib/routes";
 import { Button, buttonVariants } from "../ui/button.tsx";
 import {
@@ -9,6 +10,7 @@ import {
 	SheetTitle,
 	SheetTrigger,
 } from "../ui/sheet.tsx";
+import { MobileCountryGroup } from "./country-selector.tsx";
 import { NavLink } from "./nav-link.tsx";
 
 /** The `lg` breakpoint, where the header shows every link itself. */
@@ -19,9 +21,18 @@ const DESKTOP = "(min-width: 64rem)";
  * Dialog: focus moves in and is trapped, Escape and the close button close
  * it and focus returns to the menu button, the page behind is inert). It
  * closes when a link is followed and when the window grows to the desktop
- * header (a rotated tablet).
+ * header (a rotated tablet), and after a country switch (D06.5: the
+ * Country group, after Discover's links).
  */
-export function MobileNav({ studioOsUrl }: { studioOsUrl: string }) {
+export function MobileNav({
+	studioOsUrl,
+	country,
+	markets,
+}: {
+	studioOsUrl: string;
+	country: ResolvedCountry;
+	markets: readonly string[];
+}) {
 	const [open, setOpen] = useState(false);
 	const business = businessNav(studioOsUrl);
 	const close = () => setOpen(false);
@@ -54,7 +65,7 @@ export function MobileNav({ studioOsUrl }: { studioOsUrl: string }) {
 					</SheetTitle>
 				</div>
 				<SheetDescription className="sr-only">
-					Discover's pages and Studio OS for businesses.
+					Discover's pages, your country and Studio OS for businesses.
 				</SheetDescription>
 				<div className="page-gutter flex flex-1 flex-col gap-10 overflow-y-auto py-8">
 					<nav aria-label="Discover">
@@ -71,6 +82,11 @@ export function MobileNav({ studioOsUrl }: { studioOsUrl: string }) {
 							))}
 						</ul>
 					</nav>
+					<MobileCountryGroup
+						country={country}
+						markets={markets}
+						onSwitched={close}
+					/>
 					<nav aria-label="For businesses">
 						<p className="eyebrow mb-3 text-ink-muted">For businesses</p>
 						<ul>

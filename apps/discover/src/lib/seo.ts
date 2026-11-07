@@ -9,6 +9,18 @@ export const DEFAULT_DESCRIPTION =
 /** Header value and robots meta while Discover must stay out of search results. */
 export const NOINDEX = "noindex, nofollow";
 
+/**
+ * Every HTML page's caching (D06.5): its content depends on the visitor's
+ * country (cookie, geolocation), so only the visitor's own browser may keep
+ * it, and not even that (takedowns must show at once). `Vary: Cookie` is a
+ * second line for a cache that ignores `private`; nothing relies on it.
+ * Static assets, robots.txt and the sitemap keep their own headers.
+ */
+export const HTML_CACHE_HEADERS = {
+	"Cache-Control": "private, no-store",
+	Vary: "Cookie",
+} as const;
+
 export type PageSeo = {
 	/** The page's own title; the site name is appended. Omit for the default. */
 	title?: string;

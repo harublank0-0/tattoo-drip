@@ -6,6 +6,11 @@ import type { AddressInfo } from "node:net";
  * `count` studios, artists and photos (0, 3 or 20 in the tests), the style
  * list and the places, lets an endpoint fail (500) or hang, and records
  * every request. Names are recognisably the stub's ("Stub …").
+ *
+ * Like the API (D06.5), studios, artists and photos are filtered by
+ * `country` (a photo by its artist's place). Places cycle Pokhara,
+ * Kathmandu, Lalitpur (NP), New Delhi (IN): rows 3, 7, 11… are India's, so
+ * 3 of each are all Nepal's and India has none.
  */
 export type Endpoint =
 	| "studios"
@@ -70,6 +75,12 @@ export function fixtures(count: number) {
 				: `http://${studio?.slug}.localhost:3000/artists/stub-artist-${index}`,
 		};
 	});
+	/** Each photo's country, as the API knows it (its summary doesn't carry it). */
+	const tattooCountries = Array.from(
+		{ length: count },
+		(_, index) =>
+			artists[index % Math.max(artists.length, 1)]?.location?.country ?? null,
+	);
 	const tattoos = Array.from({ length: count }, (_, index) => {
 		const artist = artists[index % Math.max(artists.length, 1)];
 		return {
@@ -95,6 +106,7 @@ export function fixtures(count: number) {
 		tattoos,
 		styles: STYLES,
 		locations: PLACES.slice(0, Math.min(count, PLACES.length)),
+		tattooCountries,
 	};
 }
 
@@ -122,6 +134,8 @@ export async function stubApi(count = 1): Promise<StubApi> {
 		const limit = Number(address.searchParams.get("limit") ?? 24);
 		const endpoint = path.replace("/api/v1/discover/", "") as Endpoint;
 		response.setHeader("Content-Type", "application/json");
+		// For an ad hoc browser check against the stub (the real API allows DISCOVER_URL).
+		response.setHeader("Access-Control-Allow-Origin", "*");
 		if (scenario.hang.has(endpoint)) {
 			// Never answers; closed with the stub.
 			hanging.add(() => response.destroy());
@@ -141,14 +155,23 @@ export async function stubApi(count = 1): Promise<StubApi> {
 			response.end(JSON.stringify({ data: data[endpoint] }));
 			return;
 		}
-		const rows = data[endpoint];
-		if (!rows) {
+		const all = data[endpoint as "studios" | "artists" | "tattoos"];
+		if (!all) {
 			response.statusCode = 404;
 			response.end(
 				JSON.stringify({ error: { code: "not_found", message: "No" } }),
 			);
 			return;
 		}
+		const country = address.searchParams.get("country");
+		const rows = country
+			? (all as { location?: { country: string } | null }[]).filter(
+					(row, index) =>
+						(endpoint === "tattoos"
+							? data.tattooCountries[index]
+							: row.location?.country) === country,
+				)
+			: all;
 		response.end(
 			JSON.stringify({ data: rows.slice(0, limit), nextCursor: null }),
 		);

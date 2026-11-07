@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { PageContainer } from "#/components/discovery/layout";
 import { HomeHero } from "#/components/home/hero";
 import {
 	ArtistsSection,
@@ -11,6 +12,7 @@ import {
 	StudiosSection,
 	StylesSection,
 } from "#/components/home/sections";
+import { EmptyMarket } from "#/components/layout/country-selector";
 import {
 	enough,
 	HOME_CAPS,
@@ -20,6 +22,7 @@ import {
 	homeQueries,
 	inspirationPhotos,
 	pairStylesWithPhotos,
+	placesIn,
 	tattooDestination,
 } from "#/lib/home";
 import { pageMeta } from "#/lib/seo";
@@ -40,10 +43,18 @@ const READS: HomeRead[] = [
  * data section hides below its threshold (`HOME_THRESHOLDS`); with no
  * data the page is the hero, how booking works, the Studio OS band and the
  * closing call, and with every read failed the hero adds a quiet note.
+ *
+ * Country-aware (D06.5): studios, artists, photos and places are the page's
+ * country's (`context.country`: `?country=`, else the visitor's
+ * preference). A country with nothing listed says so and offers the other
+ * markets; it never borrows another country's listings. The country is a
+ * loader dependency, and a switch re-runs the loader (`router.invalidate`).
  */
 export const Route = createFileRoute("/")({
+	loaderDeps: ({ search }) => ({ country: search.country }),
 	loader: async ({ context }) => {
-		const queries = homeQueries(context.discover.client);
+		const { country } = context.country;
+		const queries = homeQueries(context.discover.client, country);
 		const { queryClient } = context;
 		const results = await Promise.allSettled([
 			queryClient.ensureQueryData(queries.tattoos),
@@ -54,6 +65,7 @@ export const Route = createFileRoute("/")({
 		]);
 		// Loader data travels to the browser, so both sides agree on the note.
 		return {
+			country,
 			failed: READS.filter((_, index) => results[index]?.status === "rejected"),
 		};
 	},
@@ -69,13 +81,14 @@ export const Route = createFileRoute("/")({
 function Home() {
 	const router = useRouter();
 	const { discover } = Route.useRouteContext();
-	const { failed } = Route.useLoaderData();
-	const queries = homeQueries(discover.client);
+	// The country the loader read: the queries below are the same ones.
+	const { country, failed } = Route.useLoaderData();
+	const queries = homeQueries(discover.client, country);
 	const tattoos = useQuery(queries.tattoos).data?.data;
 	const studios = useQuery(queries.studios).data?.data;
 	const artists = useQuery(queries.artists).data?.data;
 	const styles = useQuery(queries.styles).data;
-	const locations = useQuery(queries.locations).data;
+	const locations = placesIn(useQuery(queries.locations).data, country);
 
 	const photos = tattoos ?? [];
 	const hero = heroPhotos(photos);
@@ -92,6 +105,21 @@ function Home() {
 				unavailable={failed.length === READS.length && nothing}
 				onRetry={() => router.invalidate()}
 			/>
+			{studios?.length === 0 && (
+				<section
+					aria-labelledby="market-empty-title"
+					className="border-b border-line"
+				>
+					<PageContainer className="py-12">
+						<EmptyMarket
+							id="market-empty-title"
+							country={country}
+							markets={discover.settings.markets}
+							noun="studios"
+						/>
+					</PageContainer>
+				</section>
+			)}
 			{stylePairs.length > 0 && <StylesSection pairs={stylePairs} />}
 			{enough(studios, HOME_THRESHOLDS.studios) && (
 				<StudiosSection studios={studios} />

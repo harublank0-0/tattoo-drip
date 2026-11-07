@@ -9,6 +9,7 @@ import {
 	DiscoverRef,
 	dehydrateContext,
 	hydrateContext,
+	parsePreference,
 	parseSettings,
 } from "../src/lib/context.ts";
 import {
@@ -23,7 +24,10 @@ const SETTINGS: PublicSettings = {
 	siteUrl: "https://tattoodrip.app",
 	studioOsUrl: "https://app.tattoodrip.app",
 	indexing: false,
+	markets: ["NP", "IN"],
+	defaultCountry: "NP",
 };
+const PREFERENCE = { country: "IN", source: "geo" } as const;
 
 function recordingFetch() {
 	const calls: string[] = [];
@@ -85,7 +89,7 @@ describe("Discover's per-request context", () => {
 	test("the server's client calls the configured API origin, with the D03 query options", async () => {
 		const context = createContext("server");
 		const { calls, fetch } = recordingFetch();
-		connectServer(context, SETTINGS, { fetch });
+		connectServer(context, SETTINGS, PREFERENCE, { fetch });
 		await context.queryClient.fetchQuery(
 			discoverQueries.studios(context.discover.client, { query: "ink" }),
 		);
@@ -96,16 +100,18 @@ describe("Discover's per-request context", () => {
 
 	test("the browser is connected from the dehydrated settings only, and checks them", async () => {
 		const server = createContext("server");
-		connectServer(server, SETTINGS);
+		connectServer(server, SETTINGS, PREFERENCE);
 		const dehydrated = dehydrateContext(server);
-		assert.deepEqual(Object.keys(dehydrated), ["settings"]);
+		assert.deepEqual(Object.keys(dehydrated), ["settings", "country"]);
 		assert.deepEqual(JSON.parse(JSON.stringify(dehydrated)), {
 			settings: SETTINGS,
+			country: PREFERENCE,
 		});
 
 		const browser = createContext("browser");
 		const { calls, fetch } = recordingFetch();
 		hydrateContext(browser, JSON.parse(JSON.stringify(dehydrated)), { fetch });
+		assert.deepEqual(browser.preference.current, PREFERENCE);
 		await browser.discover.client.studios.list();
 		assert.deepEqual(calls, [
 			"https://api.tattoodrip.app/api/v1/discover/studios",
@@ -120,6 +126,55 @@ describe("Discover's per-request context", () => {
 			/invalid/,
 		);
 		assert.throws(() => parseSettings(undefined), /invalid/);
+		for (const markets of [[], ["np"], ["XX"], "NP"]) {
+			assert.throws(() => parseSettings({ ...SETTINGS, markets }), /invalid/);
+		}
+		assert.throws(
+			() => parseSettings({ ...SETTINGS, defaultCountry: "US" }),
+			/invalid/,
+		);
+	});
+
+	test("the country preference is checked: a market code and a known source only", () => {
+		for (const country of [
+			{ country: "US", source: "cookie" },
+			{ country: "IN", source: "url" },
+			{ country: "IN" },
+			"IN",
+			undefined,
+		]) {
+			const browser = createContext("browser");
+			assert.throws(
+				() => hydrateContext(browser, { settings: SETTINGS, country }),
+				/invalid/,
+				JSON.stringify(country),
+			);
+		}
+		const context = createContext("server");
+		assert.throws(() => context.preference.current, /not connected/);
+		assert.deepEqual(
+			parsePreference({ country: "NP", source: "fallback" }, SETTINGS),
+			{
+				country: "NP",
+				source: "fallback",
+			},
+		);
+		assert.equal(JSON.stringify(context.preference), "{}");
+	});
+
+	test("each country is its own cache entry: a late answer for one never fills another", () => {
+		assert.notDeepEqual(
+			discoverKeys.studios({ country: "NP" }),
+			discoverKeys.studios({ country: "IN" }),
+		);
+		assert.notDeepEqual(
+			discoverKeys.artists({ country: "NP" }),
+			discoverKeys.artists({ country: "IN" }),
+		);
+		assert.notDeepEqual(
+			discoverKeys.tattoos({ country: "NP", limit: 24 }),
+			discoverKeys.tattoos({ country: "IN", limit: 24 }),
+		);
 	});
 
 	test("a context connects once, and its ref serialises to nothing", () => {

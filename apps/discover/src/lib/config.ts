@@ -1,3 +1,4 @@
+import { normalizeCountry } from "./country.ts";
 import { readOrigin } from "./origin.ts";
 
 /**
@@ -21,10 +22,24 @@ export interface DiscoverConfig {
 	 * everything and there is no sitemap.
 	 */
 	indexing: boolean;
+	/**
+	 * DISCOVER_MARKETS (D06.5): the countries Discover is local-first for, in
+	 * the selector's order. Only these are saved in the preference cookie or
+	 * taken from geolocation. Default: NP.
+	 */
+	markets: string[];
+	/** DISCOVER_DEFAULT_COUNTRY: the country with no preference; one of the markets. */
+	defaultCountry: string;
+	/**
+	 * DISCOVER_GEO_HEADER: the request header the trusted proxy sets to the
+	 * visitor's country (nginx: X-Discover-Country, overwritten on every
+	 * request), lower-cased; null (unset) turns geolocation off. Server only.
+	 */
+	geoHeader: string | null;
 }
 
 /** What the browser may know: the router's dehydrated state carries it. */
-export type PublicSettings = DiscoverConfig;
+export type PublicSettings = Omit<DiscoverConfig, "geoHeader">;
 
 type Env = Readonly<Record<string, string | undefined>>;
 
@@ -36,7 +51,16 @@ const RULES = {
 	DISCOVER_URL: `Discover's own origin: ${ORIGIN_RULE}, e.g. https://tattoodrip.app`,
 	APP_URL: `Studio OS's origin (the platform's APP_URL): ${ORIGIN_RULE}, e.g. https://app.tattoodrip.app`,
 	DISCOVER_INDEXING: `"on" to let search engines index Discover, "off" or unset to keep it out of search results`,
+	DISCOVER_MARKETS:
+		"a comma-separated list of ISO 3166-1 alpha-2 country codes Discover serves first, e.g. NP or NP,IN; unset: NP",
+	DISCOVER_DEFAULT_COUNTRY:
+		"the ISO 3166-1 alpha-2 code of one of DISCOVER_MARKETS, e.g. NP; unset: the first market",
+	DISCOVER_GEO_HEADER:
+		"the name of the header the trusted proxy sets to the visitor's country (X-Discover-Country behind deploy/nginx), or unset to turn geolocation off; never CF-IPCountry, which a visitor can send",
 } as const;
+
+/** An HTTP header name (RFC 9110 token, letters, digits and hyphens here). */
+const HEADER_NAME = /^[A-Za-z0-9][A-Za-z0-9-]{0,63}$/;
 
 /**
  * Reads and checks every setting. Throws one error naming each missing or
@@ -65,6 +89,34 @@ export function parseDiscoverConfig(env: Env): DiscoverConfig {
 			`DISCOVER_INDEXING is not valid: ${RULES.DISCOVER_INDEXING}.`,
 		);
 	}
+	const marketsValue = env.DISCOVER_MARKETS?.trim() || "NP";
+	const marketCodes = marketsValue
+		.split(",")
+		.map((code) => normalizeCountry(code));
+	const markets = [
+		...new Set(marketCodes.filter((code): code is string => !!code)),
+	];
+	if (marketCodes.some((code) => !code) || markets.length === 0) {
+		problems.push(`DISCOVER_MARKETS is not valid: ${RULES.DISCOVER_MARKETS}.`);
+	}
+	const defaultValue = env.DISCOVER_DEFAULT_COUNTRY?.trim();
+	const defaultCountry = defaultValue
+		? normalizeCountry(defaultValue)
+		: markets[0];
+	if (!defaultCountry || !markets.includes(defaultCountry)) {
+		problems.push(
+			`DISCOVER_DEFAULT_COUNTRY is not valid: ${RULES.DISCOVER_DEFAULT_COUNTRY}.`,
+		);
+	}
+	const geoValue = env.DISCOVER_GEO_HEADER?.trim() ?? "";
+	if (
+		geoValue &&
+		(!HEADER_NAME.test(geoValue) || geoValue.toLowerCase() === "cf-ipcountry")
+	) {
+		problems.push(
+			`DISCOVER_GEO_HEADER is not valid: ${RULES.DISCOVER_GEO_HEADER}.`,
+		);
+	}
 	if (
 		siteUrl &&
 		studioOsUrl &&
@@ -75,7 +127,13 @@ export function parseDiscoverConfig(env: Env): DiscoverConfig {
 		);
 	}
 
-	if (problems.length > 0 || !apiUrl || !siteUrl || !studioOsUrl) {
+	if (
+		problems.length > 0 ||
+		!apiUrl ||
+		!siteUrl ||
+		!studioOsUrl ||
+		!defaultCountry
+	) {
 		throw new Error(
 			`Discover's settings are incomplete:\n- ${problems.join("\n- ")}`,
 		);
@@ -86,12 +144,19 @@ export function parseDiscoverConfig(env: Env): DiscoverConfig {
 		siteUrl,
 		studioOsUrl,
 		indexing: indexingValue === "on",
+		markets,
+		defaultCountry,
+		geoHeader: geoValue ? geoValue.toLowerCase() : null,
 	};
 }
 
-/** The settings a page may show: all of them today (nothing secret). */
+/**
+ * The settings a page may show: all but the geolocation header's name
+ * (not a secret, but the browser has no use for it).
+ */
 export function publicSettings(config: DiscoverConfig): PublicSettings {
-	return { ...config };
+	const { geoHeader: _serverOnly, ...settings } = config;
+	return { ...settings, markets: [...settings.markets] };
 }
 
 let cached: DiscoverConfig | undefined;

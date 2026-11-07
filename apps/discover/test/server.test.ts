@@ -61,7 +61,8 @@ async function startDiscover(
 		},
 		stdio: "ignore",
 	});
-	const get = (path: string) => fetch(`http://localhost:${port}${path}`);
+	const get = (path: string, init?: RequestInit) =>
+		fetch(`http://localhost:${port}${path}`, init);
 	for (let i = 0; i < 50; i++) {
 		try {
 			await get("/robots.txt");
@@ -210,10 +211,8 @@ describe("the built Discover server, indexing off", { skip }, () => {
 			html,
 			/href="\/explore\/studios\?country=NP&amp;city=pokhara"/,
 		);
-		assert.match(
-			html,
-			/href="\/explore\/studios\?country=IN&amp;city=new-delhi"/,
-		);
+		// Only the page's country's places (the API's list has every country).
+		assert.doesNotMatch(html, /city=new-delhi/);
 		assert.match(html, />Nepal</);
 		assert.match(html, /href="\/explore\/tattoos"/);
 		// Never a Discover page that doesn't exist yet.
@@ -222,12 +221,13 @@ describe("the built Discover server, indexing off", { skip }, () => {
 			/href="\/(tattoos|studios|artists|styles|locations)\//,
 		);
 		// One request per read, with the homepage's limits; none repeated.
+		// Studios, artists and photos are the default country's (NP).
 		assert.deepEqual([...api.requests].sort(), [
-			"/api/v1/discover/artists?limit=8",
+			"/api/v1/discover/artists?limit=8&country=NP",
 			"/api/v1/discover/locations",
-			"/api/v1/discover/studios?limit=8",
+			"/api/v1/discover/studios?limit=8&country=NP",
 			"/api/v1/discover/styles",
-			"/api/v1/discover/tattoos?limit=24",
+			"/api/v1/discover/tattoos?limit=24&country=NP",
 		]);
 		// The answers are dehydrated, so the browser reuses them.
 		assert.match(html, /"discover","tattoos"/);
@@ -281,7 +281,10 @@ describe("the built Discover server, indexing off", { skip }, () => {
 		assert.equal(response.status, 200);
 		assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow");
 		const html = await response.text();
-		assert.ok(api.requests.includes("/api/v1/discover/studios?q=stub"));
+		// The default country applies when the address names none.
+		assert.ok(
+			api.requests.includes("/api/v1/discover/studios?country=NP&q=stub"),
+		);
 		assert.equal(
 			api.requests.filter((url) => url.startsWith("/api/v1/discover/studios"))
 				.length,
@@ -346,7 +349,8 @@ describe("the built Discover server, indexing off", { skip }, () => {
 			assert.ok(!sent.has("city"), search);
 			assert.ok(!sent.has("style"), search);
 			assert.ok(!sent.has("q"), search);
-			if (search.startsWith("country=NPL")) assert.ok(!sent.has("country"));
+			// A malformed country is ignored: the visitor's (the default) applies.
+			assert.equal(sent.get("country"), "NP", search);
 		}
 	});
 
@@ -369,7 +373,7 @@ describe("the built Discover server, indexing off", { skip }, () => {
 		const response = await discover.get("/explore/artists");
 		assert.equal(response.status, 200);
 		const html = await response.text();
-		assert.deepEqual(api.requests, ["/api/v1/discover/artists"]);
+		assert.deepEqual(api.requests, ["/api/v1/discover/artists?country=NP"]);
 		assert.match(html, /Stub Artist 2/);
 		assert.match(
 			html,
@@ -560,5 +564,330 @@ describe("the built Discover server, indexing on", { skip }, () => {
 			...(await sitemap.text()).matchAll(/<loc>([^<]+)<\/loc>/g),
 		].map((match) => match[1]);
 		assert.deepEqual(locs, [`${SITE}/`, `${SITE}/for-studios`]);
+	});
+});
+
+/** The country part of each home read the API got (studios, artists, photos). */
+function homeCountries(requests: string[]): Record<string, string | null> {
+	const sent: Record<string, string | null> = {};
+	for (const url of requests) {
+		const address = new URL(url, "http://stub");
+		const endpoint = address.pathname.replace("/api/v1/discover/", "");
+		if (["studios", "artists", "tattoos"].includes(endpoint))
+			sent[endpoint] = address.searchParams.get("country");
+	}
+	return sent;
+}
+
+const NP_EVERYWHERE = { studios: "NP", artists: "NP", tattoos: "NP" };
+const IN_EVERYWHERE = { studios: "IN", artists: "IN", tattoos: "IN" };
+
+describe("the built Discover server, country-aware (D06.5)", { skip }, () => {
+	let api: StubApi;
+	/** Markets NP and IN, geolocation from X-Discover-Country. */
+	let geo: Awaited<ReturnType<typeof startDiscover>>;
+	/** Markets NP and IN, geolocation off (no DISCOVER_GEO_HEADER). */
+	let noGeo: Awaited<ReturnType<typeof startDiscover>>;
+	before(async () => {
+		api = await stubApi(20);
+		const markets = { DISCOVER_MARKETS: "NP,IN" };
+		geo = await startDiscover(api.url, {
+			...markets,
+			DISCOVER_GEO_HEADER: "X-Discover-Country",
+		});
+		noGeo = await startDiscover(api.url, markets);
+	});
+	beforeEach(() => {
+		api.requests.length = 0;
+		api.scenario.count = 20;
+	});
+	after(() => {
+		geo?.child.kill();
+		noGeo?.child.kill();
+		api?.close();
+	});
+
+	test("a first visit follows the trusted header: Nepal's or India's listings, never both", async () => {
+		const india = await geo.get("/", {
+			headers: { "X-Discover-Country": "IN" },
+		});
+		const indiaHtml = await india.text();
+		assert.deepEqual(homeCountries(api.requests), IN_EVERYWHERE);
+		const indiaText = text(indiaHtml);
+		// Rows 3, 7, 11… are India's; 0, 1, 2… Nepal's.
+		assert.match(indiaText, /Stub Studio 3\b/);
+		assert.doesNotMatch(indiaText, /Stub Studio 2\b|Stub Studio 0\b|Stub Ink/);
+		assert.doesNotMatch(indiaText, /Pokhara|Kathmandu/);
+		// The selector names the country; India is marked current.
+		assert.match(
+			indiaHtml,
+			/<summary[^>]*>.*?<span class="sr-only">Country: <\/span><span[^>]*>India<\/span>/,
+		);
+		assert.match(indiaHtml, /value="IN" aria-current="true"/);
+
+		api.requests.length = 0;
+		const nepalHtml = await (
+			await geo.get("/", { headers: { "X-Discover-Country": "np" } })
+		).text();
+		assert.deepEqual(homeCountries(api.requests), NP_EVERYWHERE);
+		assert.match(text(nepalHtml), /Stub Studio 2\b/);
+		assert.doesNotMatch(text(nepalHtml), /Stub Studio 3\b/);
+	});
+
+	test("the saved cookie beats the header; an explicit ?country= beats both", async () => {
+		await geo.get("/", {
+			headers: { "X-Discover-Country": "IN", Cookie: "td_country=NP" },
+		});
+		assert.deepEqual(homeCountries(api.requests), NP_EVERYWHERE);
+
+		api.requests.length = 0;
+		const explicit = await geo.get("/?country=in", {
+			headers: { "X-Discover-Country": "NP", Cookie: "td_country=NP" },
+		});
+		assert.deepEqual(homeCountries(api.requests), IN_EVERYWHERE);
+		const html = await explicit.text();
+		// A ?country= variant is never indexed and canonicalises to the bare path.
+		assert.equal(explicit.headers.get("x-robots-tag"), "noindex, nofollow");
+		assert.match(html, /<meta name="robots" content="noindex, nofollow"\/>/);
+		assert.match(html, new RegExp(`<link rel="canonical" href="${SITE}/"/>`));
+		assert.doesNotMatch(html, /rel="canonical" href="[^"]*\?/);
+	});
+
+	test("a malformed or unassigned ?country= is ignored, as is a cookie that isn't a market", async () => {
+		for (const search of ["?country=XX1", "?country=XX", "?country=nepal"]) {
+			api.requests.length = 0;
+			const response = await geo.get(`/${search}`, {
+				headers: { Cookie: "td_country=US", "X-Discover-Country": "IN" },
+			});
+			assert.equal(response.status, 200, search);
+			assert.deepEqual(homeCountries(api.requests), IN_EVERYWHERE, search);
+		}
+	});
+
+	test("with geolocation off, a spoofed CF-IPCountry or internal header changes nothing", async () => {
+		await noGeo.get("/", {
+			headers: { "CF-IPCountry": "IN", "X-Discover-Country": "IN" },
+		});
+		assert.deepEqual(homeCountries(api.requests), NP_EVERYWHERE);
+	});
+
+	test("the places are the page's country's; styles stay global", async () => {
+		await geo.get("/", { headers: { "X-Discover-Country": "IN" } });
+		assert.ok(api.requests.includes("/api/v1/discover/locations"));
+		assert.ok(api.requests.includes("/api/v1/discover/styles"));
+		const nepal = await (await geo.get("/")).text();
+		assert.match(nepal, /city=pokhara/);
+		assert.doesNotMatch(nepal, /city=new-delhi/);
+	});
+
+	test("a country with nothing listed says so, offers the other market, and shows no one else's listings", async () => {
+		api.scenario.count = 3; // all Nepal's
+		const response = await geo.get("/", {
+			headers: { "X-Discover-Country": "IN" },
+		});
+		assert.equal(response.status, 200);
+		const html = await response.text();
+		assert.match(
+			html,
+			/id="market-empty-title"[^>]*>No studios are listed in India yet\.</,
+		);
+		assert.match(
+			html,
+			/<button[^>]*value="NP"[^>]*>Studios in Nepal<\/button>/,
+		);
+		assert.doesNotMatch(text(html), /Stub /);
+		assert.deepEqual(sections(html), []);
+		for (const id of STATIC_BANDS) assert.match(html, new RegExp(`id="${id}"`));
+		// Nepal itself has listings and no note.
+		const nepal = await (await geo.get("/")).text();
+		assert.doesNotMatch(nepal, /market-empty-title/);
+	});
+
+	test("the dehydrated router state carries the country the page rendered", async () => {
+		const html = await (
+			await geo.get("/", { headers: { "X-Discover-Country": "IN" } })
+		).text();
+		assert.match(html, /country:\$R\[\d+\]=\{country:"IN",source:"geo"\}/);
+		assert.match(html, /markets:\$R\[\d+\]=\["NP","IN"\],defaultCountry:"NP"/);
+		assert.match(
+			html,
+			/\["tattoo-drip","discover","studios",\$R\[\d+\]=\{limit:8,country:"IN"\}\]/,
+		);
+		assert.doesNotMatch(html, /x-discover-country|geoHeader/i);
+		const explicit = await (
+			await geo.get("/?country=IN", { headers: { Cookie: "td_country=NP" } })
+		).text();
+		// The root match's context: this page's country; the preference beside it.
+		assert.match(
+			explicit,
+			/b:\$R\[\d+\]=\{country:\$R\[\d+\]=\{country:"IN",source:"url"\}\}/,
+		);
+		assert.match(explicit, /\{country:"NP",source:"cookie"\}/);
+	});
+
+	test("/explore/studios and /explore/artists use the resolved country when the address names none", async () => {
+		const studios = await (
+			await geo.get("/explore/studios?q=stub&style=blackwork", {
+				headers: { "X-Discover-Country": "IN" },
+			})
+		).text();
+		const sent = api.requests
+			.filter((url) => url.startsWith("/api/v1/discover/studios"))
+			.map((url) =>
+				Object.fromEntries(new URL(url, "http://stub").searchParams),
+			);
+		assert.deepEqual(sent, [{ country: "IN", style: "blackwork", q: "stub" }]);
+		assert.match(studios, /Studios in India that list themselves/);
+		// The form posts back to this very address.
+		assert.match(
+			studios,
+			/name="return" value="\/explore\/studios\?q=stub&amp;style=blackwork"/,
+		);
+		// Removing the style keeps the country implicit.
+		assert.match(studios, /href="\/explore\/studios\?q=stub"/);
+
+		api.requests.length = 0;
+		const artists = await (
+			await geo.get("/explore/artists", {
+				headers: { "X-Discover-Country": "IN" },
+			})
+		).text();
+		assert.deepEqual(api.requests, ["/api/v1/discover/artists?country=IN"]);
+		assert.match(text(artists), /Stub Artist 3\b/);
+		assert.doesNotMatch(text(artists), /Stub Artist 2\b/);
+
+		api.requests.length = 0;
+		api.scenario.count = 3;
+		const empty = await (await geo.get("/explore/artists?country=IN")).text();
+		assert.match(empty, /No artists are listed in India yet\./);
+	});
+
+	test("POST /preferences/country: the cookie's attributes, a same-origin redirect that swaps the country", async () => {
+		const form = (fields: Record<string, string>, headers = {}) =>
+			geo.get("/preferences/country", {
+				method: "POST",
+				redirect: "manual",
+				headers,
+				body: new URLSearchParams(fields),
+			});
+		const switched = await form({
+			country: "in",
+			return: "/explore/studios?q=stub&country=NP&city=pokhara&style=blackwork",
+		});
+		assert.equal(switched.status, 303);
+		assert.equal(
+			switched.headers.get("location"),
+			"/explore/studios?q=stub&country=IN&style=blackwork",
+		);
+		// DISCOVER_URL is http://localhost here, so no Secure; https adds it (unit test).
+		assert.equal(
+			switched.headers.get("set-cookie"),
+			"td_country=IN; Path=/; Max-Age=31536000; SameSite=Lax; HttpOnly",
+		);
+		assert.equal(switched.headers.get("cache-control"), "no-store");
+
+		for (const back of [
+			"https://evil.example/",
+			"//evil.example/x",
+			"/\\evil.example",
+			"/..//evil.example/",
+			"/.//evil.example",
+			"/a/..//evil.example",
+			"/%2e%2e//evil.example",
+		]) {
+			// Both answers: a saved market, and a country that isn't one.
+			for (const country of ["NP", "US"]) {
+				const answer = await form({ country, return: back });
+				assert.equal(answer.headers.get("location"), "/", `${country} ${back}`);
+			}
+		}
+		const notMarket = await form({ country: "US", return: "/pricing" });
+		assert.equal(notMarket.headers.get("location"), "/pricing");
+		assert.equal(notMarket.headers.get("set-cookie"), null);
+		const crossSite = await form(
+			{ country: "NP" },
+			{ "Sec-Fetch-Site": "cross-site" },
+		);
+		assert.equal(crossSite.status, 403);
+		const json = await form(
+			{ country: "NP", return: "/" },
+			{ Accept: "application/json" },
+		);
+		assert.deepEqual(await json.json(), { country: "NP" });
+
+		// The saved cookie is what the next page reads.
+		api.requests.length = 0;
+		await geo.get("/", {
+			headers: {
+				Cookie: (switched.headers.get("set-cookie") ?? "").split(";")[0] ?? "",
+				"X-Discover-Country": "NP",
+			},
+		});
+		assert.deepEqual(homeCountries(api.requests), IN_EVERYWHERE);
+	});
+
+	test("every HTML page is private and never stored; robots.txt and assets keep their caching", async () => {
+		for (const path of [
+			"/",
+			"/for-studios",
+			"/explore/studios",
+			"/no-such-page",
+		]) {
+			const response = await geo.get(path);
+			assert.equal(
+				response.headers.get("cache-control"),
+				"private, no-store",
+				path,
+			);
+			assert.match(response.headers.get("vary") ?? "", /Cookie/, path);
+		}
+		const robots = await geo.get("/robots.txt");
+		assert.equal(robots.headers.get("cache-control"), "public, max-age=300");
+		const html = await (await geo.get("/for-studios")).text();
+		const css = html.match(/href="(\/assets\/[^"]+\.css)"/)?.[1];
+		assert.ok(css, "a stylesheet");
+		const asset = await geo.get(css);
+		assert.equal(asset.status, 200);
+		assert.doesNotMatch(
+			asset.headers.get("cache-control") ?? "",
+			/no-store|private/,
+		);
+	});
+
+	test("storefront links carry no country, and nothing redirects by country", async () => {
+		const response = await geo.get("/", {
+			headers: { "X-Discover-Country": "IN" },
+			redirect: "manual",
+		});
+		assert.equal(response.status, 200);
+		const html = await response.text();
+		const external = [...html.matchAll(/href="(http:\/\/[^"]+)"/g)].map(
+			(match) => match[1] as string,
+		);
+		assert.ok(external.some((href) => href.includes("stub-studio-3")));
+		for (const href of external) assert.doesNotMatch(href, /country=/, href);
+	});
+});
+
+describe("the built Discover server, one market", { skip }, () => {
+	let api: StubApi;
+	let discover: Awaited<ReturnType<typeof startDiscover>>;
+	before(async () => {
+		api = await stubApi(3);
+		discover = await startDiscover(api.url);
+	});
+	after(() => {
+		discover?.child.kill();
+		api?.close();
+	});
+
+	test("the header names the country without a pointless picker; an explicit other country offers the market", async () => {
+		const html = await (await discover.get("/for-studios")).text();
+		assert.doesNotMatch(html, /<details/);
+		assert.match(html, /<span class="sr-only">Country: <\/span>Nepal/);
+		const india = await (await discover.get("/?country=IN")).text();
+		assert.match(india, /<details/);
+		assert.match(india, /No studios are listed in India yet\./);
+		assert.match(india, /value="NP"/);
 	});
 });
