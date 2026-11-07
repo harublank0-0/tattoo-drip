@@ -19,8 +19,8 @@ export const Route = createRootRouteWithContext<DiscoverContext>()({
 		// The canonical URL is the page's own path on DISCOVER_URL, whatever host
 		// the request came in on; pages add their title and description.
 		const page = matches[matches.length - 1] ?? match;
-		// No page matched (only the root), or a route threw notFound(): the
-		// storefront's rule (src/studio/seo.ts rootMeta).
+		// No page matched (only the root), or a page's loader threw notFound()
+		// (its match is then "notFound" before the root's head runs).
 		const notFound =
 			!matches.some((each) => each.routeId !== rootRouteId) ||
 			matches.some((each) => each.status === "notFound");

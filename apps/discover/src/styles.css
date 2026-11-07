@@ -166,8 +166,6 @@
 
 	/* One focus ring everywhere: visible on paper and on night. */
 	:focus-visible {
-		/* Shown at once: a colour transition on the element must not fade it in. */
-		transition-property: none;
 		outline: 2px solid var(--color-accent);
 		outline-offset: 3px;
 		border-radius: 2px;
@@ -206,6 +204,15 @@
 		--color-border: var(--color-night-line);
 		--color-ring: var(--color-accent-bright);
 	}
+}
+
+/*
+ * Outside every layer on purpose: unlayered rules beat Tailwind's utilities
+ * layer, whose transition-colors also animates outline-color. The focus ring
+ * appears at once instead of fading in.
+ */
+:focus-visible {
+	transition-property: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
