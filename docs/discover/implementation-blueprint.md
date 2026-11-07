@@ -15,6 +15,7 @@ This file is the plan Discover prompts work from. The dated `docs/superpowers/sp
 | D02: discovery database foundation | Done: [database security](database-security.md) |
 | D03: public Discover API, SDK client, React hooks | Done: [Discover API](api.md); deviations in C.4 below |
 | D04: Studio OS publication controls | Done: [publication controls](publication-controls.md); deviations in C.5 below |
+| D05: Discover app scaffold and design system | Done: [frontend](frontend.md); deviations in C.6 below |
 
 Status legend: **Done** = in code, with tests where noted. **Partial** = exists, but not in the form Discover needs. **Planned** = only in docs. **Missing** = searched for and absent. **Unverified** = not checked against a running system.
 
@@ -234,6 +235,15 @@ Details in [publication controls](publication-controls.md).
 - **Consent version.** `tenants.discovery_consent_version` and `discovery_consented_by_user_id` are new (migration `1791890000000`), beside `discovery_listed_at`; `artist_work_photos.discovery_suspension_note` records a photo takedown's reason.
 - **Artist re-listing.** An owner may turn any artist's Discover switch off, but turn it back on only for a profile no login manages (or their own).
 - **No setup-checklist step**, since Discover is optional; **no `ref` forwarding on `/book`** (D08, as the D03 notes say); **no Cloudflare purge** in `discover:suspend`.
+
+### C.6 As built in D05 (deviations from the D05 row)
+
+Details in [frontend](frontend.md).
+
+- **Routes** follow the D05 prompt: `/explore/studios`, `/explore/artists`, `/explore/tattoos`, `/locations/:slug` (not `/studios`, `/artists`, `/places`). `/explore/studios` reads live data as the loading pattern; the other unfinished pages say they are coming and are `noindex`.
+- **No named server keys yet**: server reads are anonymous (per-address limits); a key with visitor forwarding is needed before launch (D11).
+- **No message catalog, `packages/ui`, JSON-LD helpers or 503 page**: the copy lives in the components, the primitives in `apps/discover`, structured data is D10, and an API failure is the route's error state. `DISCOVER_INDEXING`, robots and the sitemap stub are in.
+- **Compose service** behind a `discover` profile and a separate Docker build stage, so production builds and starts nothing new before D11.
 
 ## D. Data model gap analysis
 
