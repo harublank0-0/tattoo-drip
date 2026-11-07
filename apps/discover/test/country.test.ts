@@ -3,8 +3,10 @@ import { describe, test } from "node:test";
 import {
 	COUNTRY_COOKIE_MAX_AGE,
 	countryCookie,
+	countryFromSlug,
 	countryName,
 	countryOptions,
+	countrySlug,
 	normalizeCountry,
 	pageCountry,
 	preferredCountry,
@@ -12,6 +14,7 @@ import {
 	requestPreference,
 	resolveCountry,
 	safeReturnPath,
+	slugify,
 	switchCountryPath,
 } from "../src/lib/country.ts";
 import { countryPreferenceResponse } from "../src/lib/preference.ts";
@@ -307,5 +310,27 @@ describe("POST /preferences/country", () => {
 			{ markets: MARKETS, siteUrl: "http://localhost:3100" },
 		);
 		assert.doesNotMatch(response.headers.get("set-cookie") ?? "", /Secure/);
+	});
+});
+
+describe("location slugs (D07)", () => {
+	test("a market's slug is pinned or its English name slugified; the reverse knows only markets", () => {
+		assert.equal(countrySlug("NP"), "nepal");
+		assert.equal(countrySlug("np"), "nepal");
+		assert.equal(countrySlug("IN"), "india");
+		assert.equal(countrySlug("US"), "united-states");
+		assert.equal(countrySlug("CI"), slugify("Côte d’Ivoire"));
+		assert.equal(slugify("Côte d’Ivoire"), "cote-d-ivoire");
+		assert.equal(slugify("  São Tomé & Príncipe "), "sao-tome-principe");
+		const markets = ["NP", "IN"];
+		assert.equal(countryFromSlug("nepal", markets), "NP");
+		assert.equal(countryFromSlug("india", markets), "IN");
+		// Not a market, a code, another spelling: no location page.
+		for (const slug of ["united-states", "np", "NP", "Nepal", "", 7, undefined])
+			assert.equal(countryFromSlug(slug, markets), undefined, String(slug));
+		assert.equal(countryFromSlug("united-states", ["US"]), "US");
+		// Every assigned code has a non-empty, URL-safe slug.
+		for (const code of ["AX", "CW", "BL", "KP", "HK"])
+			assert.match(countrySlug(code), /^[a-z0-9]+(-[a-z0-9]+)*$/, code);
 	});
 });

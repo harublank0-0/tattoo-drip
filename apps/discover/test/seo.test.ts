@@ -4,6 +4,7 @@ import {
 	canonicalUrl,
 	DEFAULT_TITLE,
 	headTags,
+	indexable,
 	NOINDEX,
 	pageMeta,
 	robotsTxt,
@@ -30,10 +31,14 @@ describe("Discover SEO foundation", () => {
 			content: NOINDEX,
 		});
 		// Not in INDEXABLE_PATHS: noindex even with indexing on and no opt-out.
-		assert.deepEqual(robots(headTags(ON, "/explore/studios").meta), {
+		assert.deepEqual(robots(headTags(ON, "/explore/tattoos").meta), {
 			name: "robots",
 			content: NOINDEX,
 		});
+		// D07: the directories' bare pages may be indexed; a filtered one opts out.
+		assert.equal(robots(headTags(ON, "/explore/studios").meta), undefined);
+		assert.equal(robots(headTags(ON, "/explore/artists").meta), undefined);
+		assert.ok(robots(headTags(ON, "/explore/studios", { noindex: true }).meta));
 		assert.deepEqual(robots(headTags(ON, "/", { noindex: true }).meta), {
 			name: "robots",
 			content: NOINDEX,
@@ -63,6 +68,32 @@ describe("Discover SEO foundation", () => {
 		assert.equal(canonicalUrl(OFF, ""), "https://tattoodrip.app/");
 	});
 
+	test("style and location pages may be indexed by shape (D07); nothing else dynamic", () => {
+		for (const path of [
+			"/styles/blackwork",
+			"/styles/fine-line",
+			"/locations/nepal",
+			"/locations/nepal/kathmandu",
+			"/locations/united-states/new-york",
+		]) {
+			assert.equal(indexable(ON, path), true, path);
+			assert.equal(indexable(OFF, path), false, path);
+			assert.equal(indexable(ON, path, { noindex: true }), false, path);
+		}
+		for (const path of [
+			"/styles",
+			"/styles/Blackwork",
+			"/styles/a/b",
+			"/locations",
+			"/locations/nepal/kathmandu/x",
+			"/locations/nepal/",
+			"/studios/x",
+			"/artists/x",
+			"/tattoos/x",
+		])
+			assert.equal(indexable(ON, path), false, path);
+	});
+
 	test("a page's own title, description and noindex", () => {
 		assert.deepEqual(pageMeta({ title: "Pricing", noindex: true }), [
 			{ title: "Pricing | Tattoo Drip" },
@@ -85,6 +116,8 @@ describe("Discover SEO foundation", () => {
 		assert.deepEqual(sitemapEntries(ON), [
 			"https://tattoodrip.app/",
 			"https://tattoodrip.app/for-studios",
+			"https://tattoodrip.app/explore/studios",
+			"https://tattoodrip.app/explore/artists",
 		]);
 		assert.match(
 			sitemapXml(["https://x.test/?a=1&b=2"]),

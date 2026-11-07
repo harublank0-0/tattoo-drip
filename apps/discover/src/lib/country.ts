@@ -234,3 +234,51 @@ export function switchCountryPath(path: string, country: string): string {
 	if (url.searchParams.has("country")) url.searchParams.set("country", country);
 	return `${url.pathname}${url.search}${url.hash}`;
 }
+
+/* Location slugs (D07) ------------------------------------------------------ */
+
+/**
+ * Countries whose location slug is pinned, so a renamed English name in a
+ * later ICU (Node, browsers) can never move their pages. Add a market here
+ * when it is configured; any other code falls back to its slugified name.
+ */
+const PINNED_COUNTRY_SLUGS: Readonly<Record<string, string>> = {
+	NP: "nepal",
+	IN: "india",
+};
+
+/** Lower-case ASCII words joined by hyphens (`Côte d’Ivoire` → `cote-d-ivoire`). */
+export function slugify(text: string): string {
+	return text
+		.normalize("NFD")
+		.replace(/\p{M}/gu, "")
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "");
+}
+
+/**
+ * A country's segment in a location page's path (`NP` → `nepal`): the
+ * pinned slug, else its English name slugified, else the code in lower case.
+ * The ISO code stays the identity; the slug is only its spelling in a URL.
+ */
+export function countrySlug(code: string): string {
+	const upper = code.toUpperCase();
+	return (
+		PINNED_COUNTRY_SLUGS[upper] ??
+		(slugify(countryName(upper)) || upper.toLowerCase())
+	);
+}
+
+/**
+ * The market a location page's country segment names (`nepal` → `NP`), or
+ * undefined: only configured markets have location pages, and only by
+ * their one slug (no codes, no other spellings).
+ */
+export function countryFromSlug(
+	slug: unknown,
+	markets: readonly string[],
+): string | undefined {
+	if (typeof slug !== "string") return undefined;
+	return markets.find((code) => countrySlug(code) === slug);
+}

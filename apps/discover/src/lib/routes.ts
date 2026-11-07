@@ -1,3 +1,5 @@
+import { countrySlug } from "./country.ts";
+
 /**
  * Discover's addresses (D05, docs/discover/frontend.md). Pages link with
  * these, never with hand-written strings. Planned pages (D06–D09) are listed
@@ -16,15 +18,21 @@ export const paths = {
 	pricing: () => "/pricing",
 	/** The country selector's form target (POST only; D06.5). */
 	countryPreference: () => "/preferences/country",
-	// Planned (D07–D09): not routes yet.
+	/** A style's page (D07): `slug` from `/styles`. */
+	style: (slug: string) => `/styles/${encodeURIComponent(slug)}`,
+	/** A market's location page (D07): the ISO code, spelt as its slug (`NP` → `/locations/nepal`). */
+	location: (country: string) => `/locations/${countrySlug(country)}`,
+	/** A city's page (D07): its country's ISO code and the API's place slug. */
+	city: (country: string, city: string) =>
+		`/locations/${countrySlug(country)}/${encodeURIComponent(city)}`,
+	// Planned (D08–D09): not routes yet. Profiles are reached through
+	// `profileDestination` (src/lib/destinations.ts), never linked directly.
 	studio: (slug: string) => `/studios/${encodeURIComponent(slug)}`,
 	studioArtist: (studioSlug: string, artistSlug: string) =>
 		`/studios/${encodeURIComponent(studioSlug)}/artists/${encodeURIComponent(artistSlug)}`,
 	independentArtist: (tenantSlug: string) =>
 		`/artists/${encodeURIComponent(tenantSlug)}`,
 	tattoo: (id: string) => `/tattoos/${encodeURIComponent(id)}`,
-	style: (slug: string) => `/styles/${encodeURIComponent(slug)}`,
-	location: (slug: string) => `/locations/${encodeURIComponent(slug)}`,
 } as const;
 
 /** The paths that have a route today (checked against the route tree in a test). */
@@ -37,6 +45,28 @@ export const ROUTE_FILES = [
 	paths.pricing(),
 	paths.countryPreference(),
 ] as const;
+
+/**
+ * The dynamic routes that exist (D07), as the route tree spells them, and a
+ * test for an address they serve (the shape only: the page itself 404s an
+ * unknown style, a country that isn't a market or an unknown city).
+ */
+export const ROUTE_PATTERNS = [
+	{ route: "/styles/$slug", matches: /^\/styles\/[^/]+$/ },
+	{ route: "/locations/$country", matches: /^\/locations\/[^/]+$/ },
+	{
+		route: "/locations/$country/$city",
+		matches: /^\/locations\/[^/]+\/[^/]+$/,
+	},
+] as const;
+
+/** Whether an internal path (no query) has a route today. */
+export function hasRoute(path: string): boolean {
+	return (
+		(ROUTE_FILES as readonly string[]).includes(path) ||
+		ROUTE_PATTERNS.some((pattern) => pattern.matches.test(path))
+	);
+}
 
 export type InternalLink = { kind: "internal"; label: string; to: string };
 export type ExternalLink = { kind: "external"; label: string; href: string };

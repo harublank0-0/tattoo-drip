@@ -29,7 +29,7 @@ function readSlug(value: unknown): string | undefined {
 /** An assigned ISO 3166-1 alpha-2 country code, upper-cased (`np` → `NP`), else none. */
 export const readCountry = normalizeCountry;
 
-/** A city's slug; the API needs its country too, so `readStudioSearch` drops a city without one. */
+/** A city's slug; the API needs its country too, so `readDirectorySearch` drops a city without one. */
 export const readCity = readSlug;
 
 /**
@@ -37,31 +37,6 @@ export const readCity = readSlug;
  * (422), so the loader also checks it against `/styles` (`knownStyle`).
  */
 export const readStyle = readSlug;
-
-/** `/explore/studios`'s search: every key, `undefined` when missing or malformed. */
-export type StudioSearch = {
-	q?: string;
-	country?: string;
-	city?: string;
-	style?: string;
-};
-
-/**
- * Reads `/explore/studios`'s address (its validateSearch). Returns every
- * key: the router merges the result over the raw search, so a key left
- * out would let a malformed value through.
- */
-export function readStudioSearch(
-	search: Record<string, unknown>,
-): StudioSearch {
-	const country = readCountry(search.country);
-	return {
-		q: readQuery(search.q),
-		country,
-		city: country ? readCity(search.city) : undefined,
-		style: readStyle(search.style),
-	};
-}
 
 /**
  * Drops a style the platform's list doesn't have (it would be a 422). When
@@ -73,21 +48,4 @@ export function knownStyle(
 ): string | undefined {
 	if (!style || !styles) return style;
 	return styles.some((each) => each.slug === style) ? style : undefined;
-}
-
-/** The studios list's API query for a search, or undefined for the plain first page. */
-export function studioQuery(search: StudioSearch) {
-	const query = {
-		...(search.q ? { query: search.q } : {}),
-		...(search.country ? { country: search.country } : {}),
-		...(search.country && search.city ? { city: search.city } : {}),
-		...(search.style ? { style: search.style } : {}),
-	};
-	return Object.keys(query).length > 0 ? query : undefined;
-}
-
-/** A slug as words, for a filter whose name Discover couldn't look up (`new-york` → "New york"). */
-export function humanizeSlug(slug: string): string {
-	const words = slug.replace(/-/g, " ");
-	return words.charAt(0).toUpperCase() + words.slice(1);
 }

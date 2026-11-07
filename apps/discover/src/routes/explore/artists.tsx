@@ -1,110 +1,71 @@
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { discoverQueries } from "@tattoo-drip/react";
-import { ArrowUpRightIcon } from "lucide-react";
-import { PageContainer, PageHeader } from "#/components/discovery/layout";
-import { EmptyMarket } from "#/components/layout/country-selector";
-import { rethrowUnavailable } from "#/lib/api-errors";
-import { countryName } from "#/lib/country";
-import { artistAffiliation } from "#/lib/home";
-import { paths } from "#/lib/routes";
-import { readCountry } from "#/lib/search";
-import { pageMeta } from "#/lib/seo";
+import { DirectoryPage } from "#/components/directory/directory-page";
+import { ArtistResults, ResultsSkeleton } from "#/components/directory/results";
+import { PageContainer } from "#/components/discovery/layout";
+import {
+	type DirectorySearch,
+	directoryQuery,
+	directoryWorkQuery,
+	readDirectorySearch,
+} from "#/lib/directory";
+import {
+	directoryHead,
+	loadDirectory,
+	usePageLists,
+} from "#/lib/directory-loader";
 
 /**
- * `/explore/artists` (D06): the API's first page of artists, studio-affiliated
- * and independent, in its own order (most recently added first), each
- * linking to their page on the studio's site. Search, filters and paging
- * are D07, Discover's own profiles D08. Never indexed while unfinished.
- *
- * Country-aware (D06.5): one country's artists, the address's `country`
- * (`?country=NP`) when it names one, else the visitor's (`context.country`).
+ * `/explore/artists` (D06; D07 the directory): shown artists of every listed
+ * business, studios' and independent, in the page's country (D06.5),
+ * searched by name (`q`), filtered by city, style and who (`independent`),
+ * sorted and paged by the API's own sort and cursor. Same address contract
+ * and loader as `/explore/studios`; work-first cards linking through
+ * `profileDestination` (tenant-scoped artist slugs).
  */
 export const Route = createFileRoute("/explore/artists")({
-	validateSearch: (search: Record<string, unknown>): { country?: string } => ({
-		country: readCountry(search.country),
-	}),
-	loaderDeps: ({ search }) => ({ country: search.country }),
-	loader: async ({ context }) => {
-		const { country } = context.country;
-		await context.queryClient
-			.ensureQueryData(
-				discoverQueries.artists(context.discover.client, { country }),
-			)
-			.catch(rethrowUnavailable);
-		return { country };
-	},
-	head: () => ({
-		meta: pageMeta({
-			title: "Find artists",
-			description:
-				"Tattoo artists listed on Tattoo Drip Discover, at studios and independent.",
-			noindex: true,
-		}),
-	}),
+	// Every key, undefined when malformed: the router merges this over the
+	// raw search, so leaving a key out would let a bad value through.
+	validateSearch: (search: Record<string, unknown>): DirectorySearch =>
+		readDirectorySearch(search, "artists"),
+	loaderDeps: ({ search }) => search,
+	loader: ({ context, deps }) => loadDirectory("artists", context, deps),
+	head: ({ match }) => directoryHead("artists", match),
+	pendingComponent: () => (
+		<PageContainer className="py-16">
+			<ResultsSkeleton kind="artists" />
+		</PageContainer>
+	),
 	component: Artists,
 });
 
 function Artists() {
 	const { discover } = Route.useRouteContext();
-	const { country } = Route.useLoaderData();
+	const { filters } = Route.useLoaderData();
+	const search = Route.useSearch();
 	const { data } = useSuspenseQuery(
-		discoverQueries.artists(discover.client, { country }),
+		discoverQueries.artists(
+			discover.client,
+			directoryQuery(filters, "artists"),
+		),
 	);
-
+	const works =
+		useQuery(
+			discoverQueries.tattoos(discover.client, directoryWorkQuery(filters)),
+		).data?.data ?? [];
+	const lists = usePageLists(discover.client, filters.country);
 	return (
-		<>
-			<PageHeader
-				title="Find artists"
-				intro={`Artists in ${countryName(country)}, at listed studios and independent, the most recently added first. Search and filters are on their way.`}
-				breadcrumbs={[
-					{ label: "Discover", to: paths.home() },
-					{ label: "Find artists" },
-				]}
-			/>
-			<PageContainer className="py-12">
-				{data.data.length === 0 ? (
-					<EmptyMarket
-						country={country}
-						markets={discover.settings.markets}
-						noun="artists"
-						className="border-t border-line py-12"
-					/>
-				) : (
-					<>
-						<h2 className="sr-only">Artists</h2>
-						<ul className="border-t border-ink">
-							{data.data.map((artist) => (
-								<li key={artist.id} className="border-b border-line">
-									<a
-										href={artist.storefrontUrl}
-										className="group grid min-h-20 gap-1 py-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-6"
-									>
-										<span className="flex flex-col gap-1">
-											<span className="font-display text-display-md font-bold">
-												{artist.name}
-											</span>
-											<span className="text-sm text-ink">
-												{artistAffiliation(artist)}
-											</span>
-										</span>
-										<span className="flex items-center gap-2 text-sm text-ink-muted">
-											{artist.styles
-												.slice(0, 3)
-												.map((style) => style.name)
-												.join(" · ")}
-											<ArrowUpRightIcon className="size-4" aria-hidden="true" />
-											<span className="sr-only">
-												(their page on the studio's site)
-											</span>
-										</span>
-									</a>
-								</li>
-							))}
-						</ul>
-					</>
-				)}
-			</PageContainer>
-		</>
+		<DirectoryPage
+			kind="artists"
+			search={search}
+			filters={filters}
+			lists={lists}
+			markets={discover.settings.markets}
+			rows={data.data.length}
+			nextCursor={data.nextCursor}
+		>
+			<ArtistResults artists={data.data} works={works} />
+		</DirectoryPage>
 	);
 }

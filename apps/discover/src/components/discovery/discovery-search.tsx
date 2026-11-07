@@ -25,6 +25,7 @@ export function DiscoverySearch({
 	pending = false,
 	size = "md",
 	tone = "paper",
+	hidden = [],
 	className,
 }: {
 	/** Where the search goes: a Discover path that exists (src/lib/routes.ts). */
@@ -42,6 +43,12 @@ export function DiscoverySearch({
 	pending?: boolean;
 	size?: "md" | "lg";
 	tone?: "paper" | "night";
+	/**
+	 * The rest of the address, as hidden fields, so a search without
+	 * JavaScript keeps the page's filters (D07 directories). With
+	 * JavaScript, `onSearch` decides.
+	 */
+	hidden?: readonly [string, string][];
 	className?: string;
 }) {
 	const id = useId();
@@ -74,6 +81,9 @@ export function DiscoverySearch({
 				onSubmit={submit}
 				className="flex flex-col gap-2"
 			>
+				{hidden.map(([field, fieldValue]) => (
+					<input key={field} type="hidden" name={field} value={fieldValue} />
+				))}
 				<label
 					htmlFor={id}
 					className={cn(
