@@ -14,6 +14,8 @@ export const paths = {
 	tattoos: () => "/explore/tattoos",
 	forStudios: () => "/for-studios",
 	pricing: () => "/pricing",
+	/** The country selector's form target (POST only; D06.5). */
+	countryPreference: () => "/preferences/country",
 	// Planned (D07–D09): not routes yet.
 	studio: (slug: string) => `/studios/${encodeURIComponent(slug)}`,
 	studioArtist: (studioSlug: string, artistSlug: string) =>
@@ -33,6 +35,7 @@ export const ROUTE_FILES = [
 	paths.tattoos(),
 	paths.forStudios(),
 	paths.pricing(),
+	paths.countryPreference(),
 ] as const;
 
 export type InternalLink = { kind: "internal"; label: string; to: string };

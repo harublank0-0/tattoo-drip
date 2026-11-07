@@ -2,6 +2,7 @@ import { discoverQueries } from "@tattoo-drip/react";
 import type {
 	DiscoverArtistSummary,
 	DiscoverClient,
+	DiscoverLocation,
 	DiscoverStudioSummary,
 	DiscoverStyle,
 	DiscoverTattooSummary,
@@ -18,16 +19,38 @@ export const HOME_LIMITS = { tattoos: 24, studios: 8, artists: 8 } as const;
  * The homepage's five query options, built one way for the loader and the
  * sections. Studios and artists come in the API's default order (`newest`:
  * most recently listed, or added), which is deterministic (ties by id): no
- * ranking, featuring or paid placement.
+ * ranking, featuring or paid placement. Studios, artists and photos are
+ * the page's country's (D06.5: the API filters each by `country`, and the
+ * country is part of each query key, so a late answer for the previous
+ * country never lands in the new one's). Styles are global; the places
+ * list has no country filter in the API (it is small reference data), so
+ * the page keeps its country's places (`placesIn`).
  */
-export function homeQueries(client: DiscoverClient) {
+export function homeQueries(client: DiscoverClient, country: string) {
 	return {
-		tattoos: discoverQueries.tattoos(client, { limit: HOME_LIMITS.tattoos }),
-		studios: discoverQueries.studios(client, { limit: HOME_LIMITS.studios }),
-		artists: discoverQueries.artists(client, { limit: HOME_LIMITS.artists }),
+		tattoos: discoverQueries.tattoos(client, {
+			limit: HOME_LIMITS.tattoos,
+			country,
+		}),
+		studios: discoverQueries.studios(client, {
+			limit: HOME_LIMITS.studios,
+			country,
+		}),
+		artists: discoverQueries.artists(client, {
+			limit: HOME_LIMITS.artists,
+			country,
+		}),
 		styles: discoverQueries.styles(client),
 		locations: discoverQueries.locations(client),
 	};
+}
+
+/** One country's places, in the API's order: a page never mixes countries. */
+export function placesIn(
+	locations: readonly DiscoverLocation[] | undefined,
+	country: string,
+): DiscoverLocation[] | undefined {
+	return locations?.filter((place) => place.country === country);
 }
 
 export type HomeRead = keyof ReturnType<typeof homeQueries>;

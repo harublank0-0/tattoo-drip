@@ -461,8 +461,50 @@ async function checkLegacy() {
 	);
 }
 
+/**
+ * D06.5: Discover's country header. nginx sets X-Discover-Country from
+ * CF-IPCountry only on a connection from cloudflared, only as two letters,
+ * and always replaces whatever the visitor sent (empty: not sent).
+ */
+async function checkDiscoverCountry() {
+	const cases =
+		mode === "trusted"
+			? [
+					[{ "CF-IPCountry": "np" }, "np", "CF-IPCountry from cloudflared"],
+					[
+						{ "CF-IPCountry": "IN", "X-Discover-Country": "US" },
+						"IN",
+						"a visitor's X-Discover-Country replaced by Cloudflare's",
+					],
+					[{ "X-Discover-Country": "US" }, undefined, "no CF-IPCountry: none"],
+					[{ "CF-IPCountry": "T1" }, undefined, "Tor's T1: none"],
+					[{ "CF-IPCountry": "NPL" }, undefined, "three letters: none"],
+				]
+			: [
+					[
+						{ "CF-IPCountry": "IN", "X-Discover-Country": "IN" },
+						undefined,
+						"not from cloudflared: neither header believed",
+					],
+				];
+	for (const [headers, expected, name] of cases) {
+		const { status, json } = await send({
+			host: "tattoodrip.app",
+			path: "/",
+			headers,
+		});
+		const seen = json?.headers?.["x-discover-country"];
+		check(
+			`discover country: ${name}`,
+			status === 200 && json?.upstream === "discover" && seen === expected,
+			`status ${status}, x-discover-country ${seen}`,
+		);
+	}
+}
+
 await waitForNginx();
 await checkVisitorAddress();
+if (split) await checkDiscoverCountry();
 if (mode === "trusted") {
 	await checkHosts();
 	await checkWithoutCloudflareHeader();

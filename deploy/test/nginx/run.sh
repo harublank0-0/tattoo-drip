@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Checks deploy/nginx against stand-in upstreams: host routing, the visitor's
-# address (trusted only from cloudflared's address), body limits, and tokens
-# kept out of the access log. Starts compose.yml under its own project name
+# address and Discover's country header (both trusted only from cloudflared's
+# address), body limits, and tokens kept out of the access log. Starts compose.yml under its own project name
 # and removes it afterwards, also when a check fails.
 #
 # Both layouts, one after the other: nginx.conf (live: dashboard and API on
@@ -86,9 +86,11 @@ check_layout() { # nginx.conf | nginx.split.conf
 	if [ "$layout" = nginx.split.conf ]; then
 		upstreams=3
 		expect_lines 'server 172.30.42.13:3000' 1 # Discover's reserved address
+		expect_lines 'proxy_set_header X-Discover-Country $discover_country' 1 # D06.5, Discover's location only
 	else
 		upstreams=2
 		expect_lines 'server 172.30.42.13:3000' 0 # the live layout never names Discover
+		expect_lines 'proxy_set_header X-Discover-Country $discover_country' 0
 	fi
 	expect_lines 'keepalive_timeout 4s' "$upstreams" # one in each upstream
 
