@@ -25,11 +25,13 @@ import {
 	relatedWork,
 } from "#/lib/artwork";
 import { bookingLinks } from "#/lib/booking";
+import { crumbs } from "#/lib/breadcrumbs";
 import { countryName } from "#/lib/country";
 import { tattooProfile } from "#/lib/destinations";
 import { placeLine, possessive } from "#/lib/profiles";
 import { paths } from "#/lib/routes";
 import { canonicalUrl, pageMeta } from "#/lib/seo";
+import { structuredData } from "#/lib/structured-data";
 
 /**
  * `/tattoos/:slug` (D09): one published photo, artwork first. The slug is
@@ -45,8 +47,13 @@ export const Route = createFileRoute("/tattoos/$slug")({
 		country: (search as { country?: string }).country,
 	}),
 	loader: ({ context, params }) => loadArtwork(context, params.slug),
-	head: ({ loaderData }) => ({
-		meta: loaderData ? pageMeta(loaderData.seo) : [],
+	head: (context) => ({
+		meta: context.loaderData
+			? [
+					...pageMeta(context.loaderData.seo),
+					...structuredData(context, context.loaderData.structured),
+				]
+			: [],
 	}),
 	component: Artwork,
 });
@@ -94,13 +101,7 @@ function Artwork() {
 	return (
 		<>
 			<PageContainer className="pt-6 lg:pt-10">
-				<Breadcrumbs
-					items={[
-						{ label: "Discover", to: paths.home() },
-						{ label: "Tattoo inspiration", to: paths.tattoos() },
-						{ label: title },
-					]}
-				/>
+				<Breadcrumbs items={crumbs.artwork(title)} />
 			</PageContainer>
 			<article aria-labelledby="artwork-title">
 				<PageContainer className="grid gap-8 pt-6 pb-12 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-12 lg:pt-10 lg:pb-20">

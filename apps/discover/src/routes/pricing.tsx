@@ -18,12 +18,13 @@ import { pageMeta } from "#/lib/seo";
  * would otherwise keep "being finalised" after prices exist.
  */
 export const Route = createFileRoute("/pricing")({
+	// Never indexed, whatever DISCOVER_INDEXING says (the root reads it).
+	staticData: { noindex: true },
 	head: () => ({
 		meta: pageMeta({
 			title: "Pricing",
 			description:
 				"Studio OS pricing for tattoo studios and independent artists is being finalised and will be published before billing starts.",
-			noindex: true,
 		}),
 	}),
 	component: Pricing,

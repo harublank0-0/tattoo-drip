@@ -725,6 +725,11 @@ router
 				router
 					.get("/locations", [controllers.Discover, "locations"])
 					.as("api.v1.discover.locations.index");
+				// D10: the sitemap lists (identifiers only, keyset-paged by id).
+				router
+					.get("/sitemap/:kind", [controllers.Discover, "sitemap"])
+					.where("kind", /^(studios|artists|tattoos)$/)
+					.as("api.v1.discover.sitemap.index");
 			})
 			.prefix("/discover")
 			.use([

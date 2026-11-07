@@ -21,6 +21,7 @@ This file is the plan Discover prompts work from. The dated `docs/superpowers/sp
 | D07: studio and artist directories, style and location pages | Done: [frontend](frontend.md#directories-d07); as built in C.9 below |
 | D08: public profiles and storefront booking hand-off | Done: [frontend](frontend.md#profiles-d08); as built in C.10 below |
 | D09: tattoo inspiration gallery and artwork detail | Done: [frontend](frontend.md#gallery-d09), [artwork pages](frontend.md#artwork-pages-d09), [API](api.md#gallery-search-and-the-artwork-read-d09); as built in C.11 below |
+| D10: SEO, accessibility, performance | In progress (phase A done: technical, international and structured-data SEO, sitemaps, robots, indexing and error semantics: [frontend](frontend.md#seo-and-indexing), [API](api.md#sitemap-lists-d10); as built in C.12 below). Phase B: performance, images, caching, accessibility, security |
 
 Status legend: **Done** = in code, with tests where noted. **Partial** = exists, but not in the form Discover needs. **Planned** = only in docs. **Missing** = searched for and absent. **Unverified** = not checked against a running system.
 
@@ -306,6 +307,17 @@ Details in [gallery](frontend.md#gallery-d09), [artwork pages](frontend.md#artwo
 - **Artwork page:** artwork first, metadata only from the answer (no size, placement, duration or price), "Request a similar tattoo" through `bookingLinks` (now also keeping the page's own `artwork`), Share / Copy link, "View full size" instead of a lightbox, related work, history-based "Back to the gallery".
 - **Canonical:** self-canonical at the canonical slug, indexable by shape once `DISCOVER_INDEXING=on`, not H's launch default (a canonical to the storefront's `/gallery/:id`): the page adds related work and style and place context. D10's "artwork canonical decision" can still switch it. No artwork sitemap or structured data (D10).
 - **Not measured:** the search's cost on the D02 rehearsal data (D10's performance pass).
+
+### C.12 As built in D10 phase A (deviations from H and the D10 row)
+
+Details in [SEO and indexing](frontend.md#seo-and-indexing) and [API](api.md#sitemap-lists-d10).
+
+- **Robots:** one decision per page, in the root route (`pageState`, `robotsValue`), from every match: a 404, an error, any query string, a route's `staticData.noindex` or a loader's `noindex`. Indexing off: `noindex, nofollow` (meta and `X-Robots-Tag`, as before). Indexing on: H's `noindex, follow` for every page that isn't indexable (filters, searches, sorts, cursors, `?country=`, empty hubs, `/pricing`, 404s, errors), in the meta and the header alike. Pages no longer emit their own robots tag.
+- **Canonicals** as H and D07–D09: `DISCOVER_URL` + the path, no query, no trailing slash but the root's; none on a 404 or an error page. **Artwork canonical decision: self-canonical** (C.11 kept): the page carries related work, style and place context the storefront's `/gallery/:id` hasn't, and is in the sitemaps.
+- **International:** no hreflang (no translations exist; `og:locale` omitted too). Location pages are the country entry points, self-canonical, indexable when populated, `noindex, follow` when empty.
+- **Structured data:** H's `TattooParlor`, `Person` with `worksFor`, `BreadcrumbList`; plus `WebSite` (with a `SearchAction` on `/explore/studios?q=`) and `Organization` on the home page, `ImageObject` on artwork pages. `url` is Discover's own profile (not H's storefront: the page's canonical); `sameAs` the https social links. No `ItemList` (list pages carry their breadcrumbs only). Only on indexable 200 pages.
+- **Sitemaps:** H's index, but its children are `static`, `styles`, `locations`, and paged `studios`, `artists` and `tattoos` (`places.xml` is `locations.xml`; artwork pages are listed, being self-canonical), read from a new API sitemap list (identifiers only, 5,000 a page, keyset by id) instead of the 48-row lists. Cached an hour (`public, max-age=3600`). No `lastmod`: the views expose no modification time.
+- **robots.txt** as before; nothing is disallowed while indexing is on (crawlers must see each page's noindex).
 
 ## D. Data model gap analysis
 

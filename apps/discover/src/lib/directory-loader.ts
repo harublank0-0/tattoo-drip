@@ -3,6 +3,8 @@ import { redirect } from "@tanstack/react-router";
 import { discoverQueries } from "@tattoo-drip/react";
 import { type DiscoverClient, isTattooApiError } from "@tattoo-drip/sdk";
 import { rethrowUnavailable } from "./api-errors.ts";
+import { crumbs } from "./breadcrumbs.ts";
+import type { PublicSettings } from "./config.ts";
 import type { DiscoverContext } from "./context.ts";
 import { countryName, type ResolvedCountry } from "./country.ts";
 import {
@@ -11,15 +13,16 @@ import {
 	type DirectorySearch,
 	directoryQuery,
 	directoryWorkQuery,
-	hasSearchParams,
 	placeName,
 	resolveDirectory,
 	styleName,
 } from "./directory.ts";
 import { placesIn } from "./home.ts";
+import { summary } from "./profiles.ts";
 import { paths } from "./routes.ts";
 import { knownStyle } from "./search.ts";
-import { pageMeta } from "./seo.ts";
+import { type HeadMatch, pageMeta } from "./seo.ts";
+import { breadcrumbLd, structuredData } from "./structured-data.ts";
 
 type LoaderContext = DiscoverContext & { country: ResolvedCountry };
 
@@ -112,8 +115,9 @@ export function usePageLists(client: DiscoverClient, country: string) {
 /**
  * A directory's title and description, rendered on the server: what the
  * page lists ("Blackwork tattoo studios in Kathmandu"). Any parameter makes
- * the page noindex (filters, searches, sorts, cursors, `?country=`); the
- * bare page may be indexed (INDEXABLE_PATHS, with DISCOVER_INDEXING on).
+ * the page noindex (the root's `pageState`: filters, searches, sorts,
+ * cursors, `?country=`); the bare page may be indexed (INDEXABLE_PATHS,
+ * with DISCOVER_INDEXING on), with its breadcrumbs as structured data.
  */
 export function directoryTitle(
 	kind: DirectoryKind,
@@ -131,28 +135,40 @@ export function directoryTitle(
 
 export function directoryHead(
 	kind: DirectoryKind,
-	match: {
-		search: DirectorySearch;
-		loaderData?: {
-			filters: DirectoryFilters;
-			labels: { city?: string; style?: string };
+	context: {
+		matches: readonly HeadMatch[];
+		match: {
+			context: { discover: { settings: PublicSettings } };
+			loaderData?: {
+				filters: DirectoryFilters;
+				labels: { city?: string; style?: string };
+			};
 		};
 	},
 ) {
-	const data = match.loaderData;
-	const title = data
-		? directoryTitle(kind, data.filters, data.labels)
-		: kind === "studios"
-			? "Explore studios"
-			: "Find artists";
+	const data = context.match.loaderData;
+	// No data: the error page, whose title the root gives.
+	if (!data) return { meta: [] };
+	const title = directoryTitle(kind, data.filters, data.labels);
+	const settings = context.match.context.discover.settings;
 	return {
-		meta: pageMeta({
-			title,
-			description:
-				kind === "studios"
-					? `${title}, listed on Tattoo Drip: their recent work and styles, with a link to each studio's own site to send a request.`
-					: `${title}, at studios and independent, listed on Tattoo Drip with their recent work and styles.`,
-			noindex: hasSearchParams(match.search),
-		}),
+		meta: [
+			...pageMeta({
+				title,
+				// Cut at a word when a long search makes it long.
+				description: summary(
+					kind === "studios"
+						? `${title}, listed on Tattoo Drip: their recent work and styles, with a link to each studio's own site to send a request.`
+						: `${title}, at studios and independent, listed on Tattoo Drip with their recent work and styles.`,
+				),
+			}),
+			...structuredData(context, [
+				breadcrumbLd(
+					settings,
+					crumbs.directory(kind),
+					kind === "studios" ? paths.studios() : paths.artists(),
+				),
+			]),
+		],
 	};
 }

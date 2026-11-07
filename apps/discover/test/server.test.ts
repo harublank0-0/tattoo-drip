@@ -524,9 +524,17 @@ describe("the built Discover server, indexing on", { skip }, () => {
 			"/styles/glitter",
 			"/locations/atlantis",
 		]) {
-			assert.match(
-				await (await discover.get(path)).text(),
-				/<meta name="robots" content="noindex, nofollow"\/>/,
+			// D10: not indexable while indexing is on: noindex, follow (meta and header).
+			const response = await discover.get(path);
+			assert.equal(
+				response.headers.get("x-robots-tag"),
+				"noindex, follow",
+				path,
+			);
+			const page = await response.text();
+			assert.equal(
+				page.match(/<meta name="robots" content="noindex, follow"\/>/g)?.length,
+				1,
 				path,
 			);
 		}
@@ -534,12 +542,15 @@ describe("the built Discover server, indexing on", { skip }, () => {
 			await (await discover.get("/robots.txt")).text(),
 			/Sitemap: http:\/\/localhost:3100\/sitemap\.xml/,
 		);
-		const sitemap = await discover.get("/sitemap.xml");
-		assert.equal(sitemap.status, 200);
+		// D10: the sitemap index; its static child lists the static indexable pages.
+		const index = await discover.get("/sitemap.xml");
+		assert.equal(index.status, 200);
+		assert.match(await index.text(), /<sitemapindex /);
 		const locs = [
-			...(await sitemap.text()).matchAll(/<loc>([^<]+)<\/loc>/g),
+			...(await (await discover.get("/sitemaps/static.xml")).text()).matchAll(
+				/<loc>([^<]+)<\/loc>/g,
+			),
 		].map((match) => match[1]);
-		// The static indexable pages; styles and places are D10's sitemaps.
 		assert.deepEqual(locs, [
 			`${SITE}/`,
 			`${SITE}/for-studios`,

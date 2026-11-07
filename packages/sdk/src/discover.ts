@@ -4,6 +4,11 @@ import type {
 	DiscoverArtistsPage,
 	DiscoverArtistsQuery,
 	DiscoverLocation,
+	DiscoverSitemapArtist,
+	DiscoverSitemapPage,
+	DiscoverSitemapQuery,
+	DiscoverSitemapStudio,
+	DiscoverSitemapTattoo,
 	DiscoverStudioDetail,
 	DiscoverStudiosPage,
 	DiscoverStudiosQuery,
@@ -139,6 +144,31 @@ export function createDiscoverClient(options: DiscoverClientOptions) {
 			/** The places at least one listed business is in. */
 			list: (call?: RequestOptions) =>
 				getData<DiscoverLocation[]>(`${root}/locations`, call),
+		},
+		/**
+		 * The sitemap lists (D10): every shown studio's, artist profile's and
+		 * photo's canonical identifiers, keyset-paged by id (up to 5,000 a
+		 * page; pass `nextCursor` back as `cursor`). For Discover's server.
+		 */
+		sitemap: {
+			studios: (query?: DiscoverSitemapQuery, call?: RequestOptions) =>
+				request<DiscoverSitemapPage<DiscoverSitemapStudio>>(
+					withQuery(`${root}/sitemap/studios`, query),
+					{},
+					call,
+				),
+			artists: (query?: DiscoverSitemapQuery, call?: RequestOptions) =>
+				request<DiscoverSitemapPage<DiscoverSitemapArtist>>(
+					withQuery(`${root}/sitemap/artists`, query),
+					{},
+					call,
+				),
+			tattoos: (query?: DiscoverSitemapQuery, call?: RequestOptions) =>
+				request<DiscoverSitemapPage<DiscoverSitemapTattoo>>(
+					withQuery(`${root}/sitemap/tattoos`, query),
+					{},
+					call,
+				),
 		},
 	};
 }

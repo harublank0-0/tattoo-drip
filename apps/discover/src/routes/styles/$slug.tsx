@@ -11,11 +11,13 @@ import { ArtistResults, StudioResults } from "#/components/directory/results";
 import { PageContainer, PageHeader } from "#/components/discovery/layout";
 import { EmptyState } from "#/components/discovery/states";
 import { rethrowUnavailable } from "#/lib/api-errors";
+import { crumbs } from "#/lib/breadcrumbs";
 import { countryName } from "#/lib/country";
 import { HUB_LIMITS, styleQueries } from "#/lib/hubs";
 import { paths } from "#/lib/routes";
 import { readStyle } from "#/lib/search";
 import { pageMeta } from "#/lib/seo";
+import { breadcrumbLd, structuredData } from "#/lib/structured-data";
 
 /** Photos needed before the page leads with a work grid. */
 const MIN_WORK = 3;
@@ -53,18 +55,30 @@ export const Route = createFileRoute("/styles/$slug")({
 			// An explicit `?country=` travels on in this page's links.
 			explicit: source === "url" ? country : undefined,
 			empty: studios.data.length === 0 && artists.data.length === 0,
+			// Nothing listed (in the page's country): not a page worth indexing
+			// yet (thin content); the root reads it (`pageState`).
+			noindex: studios.data.length === 0 && artists.data.length === 0,
 		};
 	},
-	head: ({ loaderData }) => ({
-		meta: loaderData
-			? pageMeta({
-					title: `${loaderData.style.name} tattoo studios and artists in ${countryName(loaderData.country)}`,
-					description: `${loaderData.style.name} tattoo studios and artists listed on Tattoo Drip in ${countryName(loaderData.country)}, with recent ${loaderData.style.name.toLowerCase()} work they have published.`,
-					// Nothing listed: not a page worth indexing yet.
-					noindex: loaderData.empty,
-				})
-			: [],
-	}),
+	head: (context) => {
+		const data = context.loaderData;
+		if (!data) return { meta: [] };
+		return {
+			meta: [
+				...pageMeta({
+					title: `${data.style.name} tattoo studios and artists in ${countryName(data.country)}`,
+					description: `${data.style.name} tattoo studios and artists listed on Tattoo Drip in ${countryName(data.country)}, with recent ${data.style.name.toLowerCase()} work they have published.`,
+				}),
+				...structuredData(context, [
+					breadcrumbLd(
+						context.match.context.discover.settings,
+						crumbs.style(data.style.name),
+						paths.style(data.style.slug),
+					),
+				]),
+			],
+		};
+	},
 	component: StylePage,
 });
 
@@ -87,10 +101,7 @@ function StylePage() {
 				eyebrow="Tattoo style"
 				title={style.name}
 				intro={`Studios and artists in ${where} who work in ${style.name.toLowerCase()}, and recent work they have tagged with it on Discover.`}
-				breadcrumbs={[
-					{ label: "Discover", to: paths.home() },
-					{ label: style.name },
-				]}
+				breadcrumbs={crumbs.style(style.name)}
 			/>
 			{empty ? (
 				<PageContainer className="py-12">

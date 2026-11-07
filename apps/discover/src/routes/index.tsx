@@ -25,6 +25,11 @@ import {
 	placesIn,
 } from "#/lib/home";
 import { pageMeta } from "#/lib/seo";
+import {
+	organizationLd,
+	structuredData,
+	websiteLd,
+} from "#/lib/structured-data";
 
 const READS: HomeRead[] = [
 	"tattoos",
@@ -68,11 +73,18 @@ export const Route = createFileRoute("/")({
 			failed: READS.filter((_, index) => results[index]?.status === "rejected"),
 		};
 	},
-	head: () => ({
-		meta: pageMeta({
-			description:
-				"Find a tattoo artist or studio: browse real studios, independent artists and their published work, then send your request on the studio's own site.",
-		}),
+	head: (context) => ({
+		meta: [
+			...pageMeta({
+				description:
+					"Find a tattoo artist or studio: browse real studios, independent artists and their published work, then send your request on the studio's own site.",
+			}),
+			// D10: the site and its organisation (only while indexable).
+			...structuredData(context, [
+				websiteLd(context.match.context.discover.settings),
+				organizationLd(context.match.context.discover.settings),
+			]),
+		],
 	}),
 	component: Home,
 });

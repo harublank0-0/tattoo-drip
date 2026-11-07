@@ -115,10 +115,29 @@ describe("artwork words and SEO (D09)", () => {
 		assert.match(seo.description, /in Kathmandu, Nepal\./);
 		assert.match(seo.description, /request a similar tattoo/);
 		assert.ok(seo.description.length <= 155);
-		assert.equal(seo.image, "https://media.example/p.jpg");
-		assert.equal(seo.imageAlt, "Blackwork tattoo by Sita Rai at Black Needle");
+		assert.equal(seo.image.url, "https://media.example/p.jpg");
+		assert.equal(seo.image.alt, "Blackwork tattoo by Sita Rai at Black Needle");
+		assert.ok(seo.image.width > 0 && seo.image.height > 0);
 		const nowhere = artworkSeo(photo({ location: null }));
 		assert.equal(nowhere.title, "Blackwork tattoo by Sita Rai at Black Needle");
+		// D10: the studio's own words first, cut at a word; whole parts dropped
+		// (place, then studio) when long, never the artist.
+		const own = artworkSeo(
+			photo({
+				image: {
+					url: "https://media.example/p.jpg",
+					width: 1200,
+					height: 1500,
+					alt: "A very detailed koi swimming up the forearm through waves and maple leaves",
+					variants: [],
+				},
+			}),
+		);
+		assert.match(
+			own.title,
+			/^A very detailed koi swimming up the forearm[^ ]*… — tattoo by Sita Rai$/,
+		);
+		assert.ok(own.title.length <= 70, own.title);
 	});
 });
 

@@ -1,6 +1,6 @@
 # Discover API
 
-Discover D03 (D09 added the gallery's search and the artwork page's booking flag). The public, cross-studio read API that Discover (D05 onward) is built on, its SDK client and React hooks, and the booking referral. The contract is `packages/types/openapi.yaml` (the `Discover` tag); this page covers what the contract can't: the boundary, the rules behind each answer, and the limits.
+Discover D03 (D09 added the gallery's search and the artwork page's booking flag; D10 the sitemap lists). The public, cross-studio read API that Discover (D05 onward) is built on, its SDK client and React hooks, and the booking referral. The contract is `packages/types/openapi.yaml` (the `Discover` tag); this page covers what the contract can't: the boundary, the rules behind each answer, and the limits.
 
 Nothing here changes a studio's own API (`/api/v1/tenants/:tenant/*`) or the storefront.
 
@@ -28,6 +28,7 @@ All `GET`, under `/api/v1/discover`, with the public API's envelopes (`{ data }`
 | `/tattoos/:tattoo` | `getDiscoverTattoo` | One published photo by id (any letter case), with its place, `artistAcceptingInquiries` (D09), its page on the studio's site and a `bookingUrl` naming it (`artwork`) |
 | `/styles` | `listDiscoverStyles` | The platform's fixed style list, in its order |
 | `/locations` | `listDiscoverLocations` | The places at least one listed business is in, by country and name |
+| `/sitemap/studios`, `/sitemap/artists`, `/sitemap/tattoos` | `listDiscoverSitemapStudios`, `…Artists`, `…Tattoos` | D10: the canonical identifiers of every shown studio, artist profile and photo, keyset-paged by id (see Sitemap lists) |
 
 Rules:
 
@@ -64,11 +65,28 @@ An unknown place, studio slug or artist is an empty page, not an error, as in th
 - **The artwork's `bookingUrl`** (D03, unchanged): the studio site's `/book?artwork=<photo id>&ref=<token>`. The storefront's `/book` reads `artwork` as a gallery photo's id (its "Request a similar tattoo"), checks it with the studio's own API and names the photo's artist; portfolio photos are not flash, so never `flash`.
 - Everything not shown is the same 404 as before (unknown, never listed, opted out, taken down, unpublished, a hidden, opted-out or deleted artist): `tests/functional/api/discover_gallery.spec.ts`.
 
+## Sitemap lists (D10)
+
+Discover's sitemaps (frontend, "Sitemaps") need every shown studio, artist profile and photo. Paging the lists 48 rows at a time would cost hundreds of reads an hour against the anonymous `discoverReads` budget (about 780 for the rehearsal data's 37,000 photos alone), so three small lists answer identifiers only:
+
+| Path | A row | Which rows |
+|---|---|---|
+| `/sitemap/studios` | `{ slug }` | `discovery.studios` of `type = 'studio'` (as `/studios`) |
+| `/sitemap/artists` | `{ slug, studio: { slug, type } }` | Every `discovery.artists` row at a studio; for an independent business only the profile `/artists/:slug` shows (its first-made shown artist, as `getDiscoverIndependentArtist`), so each profile address appears once |
+| `/sitemap/tattoos` | `{ id }` | Every `discovery.artworks` row (as `/tattoos`) |
+
+- **Same eligibility:** the same D02 views through `readDiscovery`, so a row the lists don't show (unlisted, opted out, hidden, taken down, deleted) is in no sitemap list either. Fixed SQL, bound values (`DiscoveryService.sitemapStudios/Artists/Tattoos`).
+- **Paging:** by id, `id > cursor` (keyset; the ids are uuidv7, so new rows land at the end and earlier pages keep their boundaries). `limit` 1–5,000 (default 5,000); `nextCursor` is the page's last id, null on the last page. A cursor that isn't a uuid, or a bad `limit`, is a 422.
+- **No modification time:** the views expose `listed_at` and `created_at` only, neither of which says when a page changed, so no `updatedAt` is returned and Discover's sitemaps have no `lastmod`. Adding one means a column in the views (D02's boundary) and is left for later.
+- **Cost:** each read counts against `discoverReads` and its own `discoverSitemap` budget (60 per caller per 5 minutes). Not measured on the rehearsal data yet (D10 phase B): the photos' list walks the `artist_work_photos` primary key with the view's rules as filters.
+- One route (`/discover/sitemap/:kind`, `kind` matched to the three names; anything else is the router's 404), GET only, cached like every Discover read. Specs: `tests/functional/api/discover_sitemap.spec.ts`.
+
 ## Limits and caching
 
 - The gate's generic per-caller budgets still apply (`callerReads`).
 - `discoverReads`: 200 reads per caller per 5 minutes (`apiLimit` on the whole group).
 - `discoverSearch`: 60 searches per caller per 5 minutes, counted only when `q` is present (each one scans the listed names; on `/tattoos`, D09, the published photos). Discover's gallery searches as the visitor types (debounced, 400 ms, at least 2 characters), so a burst of typing can spend several.
+- `discoverSitemap` (D10): 60 sitemap-list reads per caller per 5 minutes (up to 5,000 rows each).
 - Over budget: `429 rate_limited` with `Retry-After`.
 - Every read is `Cache-Control: public, max-age=60, stale-while-revalidate=60` with `Vary: Origin` and an `ETag` (`If-None-Match` gets a 304). Something unlisted or hidden can therefore still be served from a cache for up to 2 minutes. Takedowns that need to be faster need a CDN purge, which doesn't exist yet (see Limitations).
 - CORS comes from D01: only allowlisted origins (the studio sites, `APP_URL`, `DISCOVER_URL`) are echoed, never `*`, never with credentials.
@@ -95,7 +113,7 @@ const next = await discover.studios.list({ query: "ink", country: "NP", city: "k
 const studio = await discover.studios.get("black-needle");
 ```
 
-- `createDiscoverClient({ baseUrl, key?, fetch?, timeoutMs? })` (`packages/sdk/src/discover.ts`) has no tenant. Its resources are `studios.list/get/artists/artist`, `artists.list/independent`, `tattoos.list/get`, `styles.list` and `locations.list`. Lists return the whole page (`{ data, nextCursor }`); single reads unwrap `data`. `query` travels as the API's `q` (studios, artists and, since D09, tattoos: `DiscoverTattoosListQuery`). Path segments are encoded.
+- `createDiscoverClient({ baseUrl, key?, fetch?, timeoutMs? })` (`packages/sdk/src/discover.ts`) has no tenant. Its resources are `studios.list/get/artists/artist`, `artists.list/independent`, `tattoos.list/get`, `styles.list`, `locations.list` and (D10) `sitemap.studios/artists/tattoos` (a whole page, `{ data, nextCursor }`; no React hooks: only Discover's server reads them). Lists return the whole page (`{ data, nextCursor }`); single reads unwrap `data`. `query` travels as the API's `q` (studios, artists and, since D09, tattoos: `DiscoverTattoosListQuery`). Path segments are encoded.
 - It shares `createTransport` (`packages/sdk/src/transport.ts`) with `createTattooClient`: no cookies, a timeout (`timeout`), the caller's `signal` (rejects with its `AbortError`), `TattooApiError`, and the refusal of a `key` in a browser. `createTattooClient` is unchanged and still needs its tenant.
 - React (`packages/react`): `DiscoverProvider` / `useDiscoverClient` (separate from `TattooProvider`, which holds one studio's client); `discoverKeys`, all under `["tattoo-drip", "discover", …]`, so they never collide with a studio's `["tattoo-drip", "tenant", <slug>, …]` or the studio client's styles; `discoverQueries.*` for `useQuery` and SSR prefetch, each forwarding TanStack Query's `signal`; and the hooks `useDiscoverStudios`, `useDiscoverStudio`, `useDiscoverStudioArtists`, `useDiscoverStudioArtist`, `useDiscoverArtists`, `useDiscoverIndependentArtist`, `useDiscoverTattoos`, `useDiscoverTattoo`, `useDiscoverStyles`, `useDiscoverLocations`. A list's key holds its whole query (filters, sort, cursor), so each page is its own cache entry. Styles never go stale; everything else follows the app's defaults.
 
@@ -125,7 +143,8 @@ Measured with `EXPLAIN ANALYZE` as the app role, with no context, read-only, on 
 - `tests/functional/api/discover_gallery.spec.ts` (D09): `q` on `/tattoos` (alt text, artist, studio and style names; case and `%`/`_` literal; no match; a never-listed studio's matching photo absent), combined with every filter and the country, cursor paging with ties and a stable order, the 422s (length, control characters), the search budget, and rows leaving the search when hidden, taken down or opted out; the detail's fields, attribution, place, `artistAcceptingInquiries`, the booking link's shape (`/book`, exactly `artwork` and `ref`, the studio's own origin, the token bound to that studio) and the same 404 body for every reason, plus cross-tenant isolation.
 - `tests/functional/api/discover_referral.spec.ts`: attribution persisted with `sourceChannel` intact; none, empty, garbage, oversized, forged, another studio's and expired tokens all still give a 201 with nothing stored; a query-string token ignored; the guard refusing a later change. D08: the hand-off end to end: a studio artist's `bookingUrl` from the profile API (the studio's host, `/book`, `artist`), its `ref` sent as `referral` records the attribution with the preferred artist; one studio's link used at another studio records nothing.
 - `tests/unit/modules/discovery/{referral,cursor}.spec.ts`: signing, hour-stable link tokens, expiry, studio binding, clock skew, tampering, a re-spelt signature, wrong key, version and purpose, malformed input; cursor round trips, cross-sort, canonical spelling, real instants.
-- `tests/functional/api/api_routes.spec.ts`: the ten Discover routes are GET-only, limited, cached and tenantless.
+- `tests/functional/api/discover_sitemap.spec.ts` (D10): each sitemap list's rows and fields (identifiers only; one profile per independent, the one its detail read answers), unpublished, taken-down and hidden photos, hidden artists and suspended or never-listed studios absent, keyset paging (every row once, in id order, an upper-case cursor, a cursor past the end), the 422s, the `discoverSitemap` budget and no private field.
+- `tests/functional/api/api_routes.spec.ts`: the eleven Discover routes are GET-only, limited, cached and tenantless.
 - D02's `tests/functional/rls/discovery.spec.ts` still proves the boundary itself.
 - `packages/sdk/test/discover.test.ts` and `packages/react/test/discover.test.ts`: URLs, parameter serialisation, encoding, errors, timeout, cancellation, keys (stability, separation, no collisions), signal forwarding.
 

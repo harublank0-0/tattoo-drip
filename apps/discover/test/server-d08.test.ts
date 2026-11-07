@@ -146,7 +146,7 @@ describe("D08 profiles on the built server", { skip }, () => {
 		);
 		assert.match(
 			page,
-			/<title>Stub Studio 1, tattoo studio in Kathmandu, Nepal \| Tattoo Drip<\/title>/,
+			/<title>Stub Studio 1 — Tattoo studio in Kathmandu, Nepal \| Tattoo Drip<\/title>/,
 		);
 		assert.match(
 			page,
@@ -193,7 +193,7 @@ describe("D08 profiles on the built server", { skip }, () => {
 		assert.match(page, /<h1[^>]*>Stub Crew 1A<\/h1>/);
 		assert.match(
 			page,
-			/<title>Stub Crew 1A, tattoo artist at Stub Studio 1, Kathmandu \| Tattoo Drip<\/title>/,
+			/<title>Stub Crew 1A — Tattoo artist at Stub Studio 1 in Kathmandu \| Tattoo Drip<\/title>/,
 		);
 		// Affiliation back to the studio's profile, in the breadcrumbs too.
 		assert.match(
@@ -333,8 +333,13 @@ describe("D08 profiles on the built server", { skip }, () => {
 			assert.match(page, /<title>Page not found \| Tattoo Drip<\/title>/, path);
 			assert.match(page, /<meta name="robots" content="noindex, nofollow"\/>/);
 			assert.match(page, /no longer listed on Discover/);
-			// Nothing about what was asked for: no name, no image, no booking.
-			assert.doesNotMatch(page, /og:image|Request a session|\/book\?/, path);
+			// Nothing about what was asked for: no name, no image (only the
+			// brand's card), no booking.
+			assert.doesNotMatch(
+				page,
+				/og:image" content="http:\/\/media|Request a session|\/book\?/,
+				path,
+			);
 			assert.doesNotMatch(text(page), /Stub (Studio|Artist|Crew|Solo)/, path);
 		}
 		// Malformed slugs never reach the API.
@@ -495,18 +500,21 @@ describe("D08 profiles with indexing on", { skip }, () => {
 			assert.equal(response.headers.get("x-robots-tag"), null, path);
 			assert.doesNotMatch(await html(response), /<meta name="robots"/, path);
 		}
+		// D10: with indexing on, a page that isn't indexable is
+		// "noindex, follow" (its links still lead to profiles).
 		const variant = await discover.get("/studios/stub-studio-1?country=IN");
-		assert.equal(variant.headers.get("x-robots-tag"), "noindex, nofollow");
+		assert.equal(variant.headers.get("x-robots-tag"), "noindex, follow");
 		const missing = await discover.get("/studios/nope-studio");
 		assert.equal(missing.status, 404);
+		assert.equal(missing.headers.get("x-robots-tag"), "noindex, follow");
 		assert.match(
 			await html(missing),
-			/<meta name="robots" content="noindex, nofollow"\/>/,
+			/<meta name="robots" content="noindex, follow"\/>/,
 		);
-		// Profiles aren't in the sitemap yet (D10).
-		assert.doesNotMatch(
-			await html(await discover.get("/sitemap.xml")),
-			/\/studios\//,
+		// D10: profiles are in the sitemaps (server-d10.test.ts).
+		assert.match(
+			await html(await discover.get("/sitemaps/studios.xml")),
+			/\/studios\/stub-studio-1</,
 		);
 	});
 });

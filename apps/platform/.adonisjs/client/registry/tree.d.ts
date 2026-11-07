@@ -265,6 +265,9 @@ export interface ApiDefinition {
         locations: {
           index: typeof routes['api.v1.discover.locations.index']
         }
+        sitemap: {
+          index: typeof routes['api.v1.discover.sitemap.index']
+        }
       }
       studio: typeof routes['api.v1.studio']
       artists: {

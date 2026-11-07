@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ArtistProfile } from "#/components/profile/artist-profile";
 import { loadStudioArtistProfile, studioArtistQueries } from "#/lib/profiles";
 import { pageMeta } from "#/lib/seo";
+import { structuredData } from "#/lib/structured-data";
 
 /**
  * `/studios/:studioSlug/artists/:artistSlug` (D08): one artist at a listed
@@ -16,8 +17,13 @@ export const Route = createFileRoute(
 )({
 	loader: ({ context, params }) =>
 		loadStudioArtistProfile(context, params.studioSlug, params.artistSlug),
-	head: ({ loaderData }) => ({
-		meta: loaderData ? pageMeta(loaderData.seo) : [],
+	head: (context) => ({
+		meta: context.loaderData
+			? [
+					...pageMeta(context.loaderData.seo),
+					...structuredData(context, context.loaderData.structured),
+				]
+			: [],
 	}),
 	component: StudioArtistProfile,
 });

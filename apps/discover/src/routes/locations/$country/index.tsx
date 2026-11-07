@@ -11,11 +11,13 @@ import { ArtistResults, StudioResults } from "#/components/directory/results";
 import { PageContainer, PageHeader } from "#/components/discovery/layout";
 import { EmptyState } from "#/components/discovery/states";
 import { rethrowUnavailable } from "#/lib/api-errors";
+import { crumbs } from "#/lib/breadcrumbs";
 import { countryFromSlug, countryName } from "#/lib/country";
 import { placesIn } from "#/lib/home";
 import { locationQueries } from "#/lib/hubs";
 import { paths } from "#/lib/routes";
 import { pageMeta } from "#/lib/seo";
+import { breadcrumbLd, structuredData } from "#/lib/structured-data";
 
 const MIN_WORK = 3;
 
@@ -46,20 +48,30 @@ export const Route = createFileRoute("/locations/$country/")({
 				.ensureQueryData(queries.tattoos)
 				.catch((): undefined => undefined),
 		]).catch(rethrowUnavailable);
+		const empty = studios.data.length === 0 && artists.data.length === 0;
+		// An empty market is thin content: noindex (the root reads it).
+		return { country, empty, noindex: empty };
+	},
+	head: (context) => {
+		const data = context.loaderData;
+		if (!data) return { meta: [] };
+		const name = countryName(data.country);
 		return {
-			country,
-			empty: studios.data.length === 0 && artists.data.length === 0,
+			meta: [
+				...pageMeta({
+					title: `Tattoo studios and artists in ${name}`,
+					description: `Tattoo studios and artists listed on Tattoo Drip in ${name}, by city, with their recent work.`,
+				}),
+				...structuredData(context, [
+					breadcrumbLd(
+						context.match.context.discover.settings,
+						crumbs.country(data.country),
+						paths.location(data.country),
+					),
+				]),
+			],
 		};
 	},
-	head: ({ loaderData }) => ({
-		meta: loaderData
-			? pageMeta({
-					title: `Tattoo studios and artists in ${countryName(loaderData.country)}`,
-					description: `Tattoo studios and artists listed on Tattoo Drip in ${countryName(loaderData.country)}, by city, with their recent work.`,
-					noindex: loaderData.empty,
-				})
-			: [],
-	}),
 	component: CountryPage,
 });
 
@@ -85,7 +97,7 @@ function CountryPage() {
 				eyebrow="Location"
 				title={name}
 				intro={`Tattoo studios and artists listed on Discover in ${name}, by city.`}
-				breadcrumbs={[{ label: "Discover", to: paths.home() }, { label: name }]}
+				breadcrumbs={crumbs.country(country)}
 			/>
 			{studios.length === 0 && artists.length === 0 ? (
 				<PageContainer className="py-12">

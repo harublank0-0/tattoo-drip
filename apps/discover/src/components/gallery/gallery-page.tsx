@@ -16,6 +16,7 @@ import { PageContainer, PageHeader } from "#/components/discovery/layout";
 import { EmptyState } from "#/components/discovery/states";
 import { CountryForm, EmptyMarket } from "#/components/layout/country-selector";
 import { buttonVariants } from "#/components/ui/button";
+import { crumbs } from "#/lib/breadcrumbs";
 import { countryName, countryOptions } from "#/lib/country";
 import type { DirectorySearch } from "#/lib/directory";
 import {
@@ -89,10 +90,7 @@ export function GalleryPage({
 				eyebrow="Gallery"
 				title="Tattoo inspiration"
 				intro={`The newest work published by listed studios and independent artists${where ? ` in ${where}` : ""}. Open a piece to see who made it and ask for something similar.`}
-				breadcrumbs={[
-					{ label: "Discover", to: paths.home() },
-					{ label: "Tattoo inspiration" },
-				]}
+				breadcrumbs={crumbs.gallery()}
 			>
 				<GallerySearchBox search={search} q={filters.q} />
 			</PageHeader>

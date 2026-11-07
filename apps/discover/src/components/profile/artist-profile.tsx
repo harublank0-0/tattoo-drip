@@ -23,6 +23,7 @@ import {
 	workCaption,
 } from "#/components/profile/profile";
 import { bookingLinks, generalRequest, safeSocialUrl } from "#/lib/booking";
+import { crumbs } from "#/lib/breadcrumbs";
 import { nearbyLinks, placeLine, possessive } from "#/lib/profiles";
 import { paths } from "#/lib/routes";
 
@@ -88,20 +89,7 @@ export function ArtistProfile({
 	return (
 		<>
 			<ProfileHero
-				breadcrumbs={
-					artist.independent
-						? [
-								{ label: "Discover", to: paths.home() },
-								{ label: "Artists", to: paths.artists() },
-								{ label: artist.name },
-							]
-						: [
-								{ label: "Discover", to: paths.home() },
-								{ label: "Studios", to: paths.studios() },
-								{ label: artist.studio.name, to: studioPath },
-								{ label: artist.name },
-							]
-				}
+				breadcrumbs={crumbs.artist(artist)}
 				eyebrow={
 					artist.independent ? "Independent tattoo artist" : "Tattoo artist"
 				}

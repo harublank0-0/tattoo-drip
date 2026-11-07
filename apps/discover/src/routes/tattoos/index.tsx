@@ -26,7 +26,7 @@ export const Route = createFileRoute("/tattoos/")({
 		readGallerySearch(search),
 	loaderDeps: ({ search }) => search,
 	loader: ({ context, deps }) => loadGallery(context, deps),
-	head: ({ match }) => galleryHead(match),
+	head: (context) => galleryHead(context),
 	// No pendingComponent: a new search keeps the page (and the search box's
 	// focus) mounted; the photos dim and the section is aria-busy.
 	component: Gallery,

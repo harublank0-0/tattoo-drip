@@ -5,6 +5,7 @@ import { PageContainer, PageHeader } from "#/components/discovery/layout";
 import { EmptyState } from "#/components/discovery/states";
 import { CountryForm, EmptyMarket } from "#/components/layout/country-selector";
 import { buttonVariants } from "#/components/ui/button";
+import { crumbs } from "#/lib/breadcrumbs";
 import { countryName, countryOptions } from "#/lib/country";
 import {
 	activeFilterCount,
@@ -32,7 +33,6 @@ const COPY = {
 		title: "Explore studios",
 		noun: "studios",
 		Noun: "Studios",
-		crumb: "Studios",
 		searchLabel: "Search studios by name",
 		placeholder: "Studio name",
 		intro: (country: string) =>
@@ -42,7 +42,6 @@ const COPY = {
 		title: "Find artists",
 		noun: "artists",
 		Noun: "Artists",
-		crumb: "Find artists",
 		searchLabel: "Search artists by name",
 		placeholder: "Artist name",
 		intro: (country: string) =>
@@ -105,10 +104,7 @@ export function DirectoryPage({
 			<PageHeader
 				title={copy.title}
 				intro={copy.intro(country)}
-				breadcrumbs={[
-					{ label: "Discover", to: paths.home() },
-					{ label: copy.crumb },
-				]}
+				breadcrumbs={crumbs.directory(kind)}
 			>
 				<DiscoverySearch
 					// Remounted per search, so the box shows the address's text.

@@ -5,11 +5,14 @@ import type {
 	DiscoverTattooDetail,
 	DiscoverTattooSummary,
 } from "@tattoo-drip/sdk";
+import { crumbs } from "./breadcrumbs.ts";
 import type { DiscoverContext } from "./context.ts";
 import type { ResolvedCountry } from "./country.ts";
 import { tattooAlt } from "./home.ts";
 import { placeLine, rethrowMissing, summary } from "./profiles.ts";
 import { paths } from "./routes.ts";
+import { fitTitle } from "./seo.ts";
+import { artworkLd, breadcrumbLd, type JsonLd } from "./structured-data.ts";
 
 /**
  * The artwork page's address, reads and words (D09, `/tattoos/:slug`,
@@ -70,25 +73,41 @@ export function artworkCredit(tattoo: DiscoverTattooSummary): string {
 export type ArtworkSeo = {
 	title: string;
 	description: string;
-	image: string;
-	imageAlt: string;
+	image: { url: string; width: number; height: number; alt: string };
 };
 
-/** The page's title, description and social card, from the API's answer (server-rendered). */
+/**
+ * The page's title, description and social card, from the API's answer
+ * (server-rendered). A photo has no title (D09), so the title says what
+ * the data says, most important first, shortened at whole parts
+ * (`fitTitle`): the studio's own alt text (cut at a word) or its style,
+ * then who made it, then the studio and the city.
+ */
 export function artworkSeo(tattoo: DiscoverTattooDetail): ArtworkSeo {
 	const own = tattoo.image.alt?.trim();
 	const style = tattoo.styles[0];
+	const independent = tattoo.studio.type === "independent";
 	const what = own
 		? `${summary(own, 70)}, tattoo by ${artworkCredit(tattoo)}`
 		: `${style ? `${style.name} tattoo` : "Tattoo"} by ${artworkCredit(tattoo)}`;
 	const where = placeLine(tattoo.location);
 	return {
-		title: where ? `${what}, ${tattoo.location?.name}` : what,
+		title: fitTitle([
+			own
+				? `${summary(own, 50)} — tattoo by ${tattoo.artist.name}`
+				: `${style ? `${style.name} tattoo` : "Tattoo"} by ${tattoo.artist.name}`,
+			...(independent ? [] : [` at ${tattoo.studio.name}`]),
+			...(tattoo.location ? [`, ${tattoo.location.name}`] : []),
+		]),
 		description: summary(
-			`${what}${where ? ` in ${where}` : ""}. See more of ${tattoo.artist.name}'s work on Tattoo Drip and request a similar tattoo on ${tattoo.studio.type === "independent" ? "their own site" : "the studio's own site"}.`,
+			`${what}${where ? ` in ${where}` : ""}. See more of ${tattoo.artist.name}'s work on Tattoo Drip and request a similar tattoo on ${independent ? "their own site" : "the studio's own site"}.`,
 		),
-		image: tattoo.image.url,
-		imageAlt: tattooAlt(tattoo),
+		image: {
+			url: tattoo.image.url,
+			width: tattoo.image.width,
+			height: tattoo.image.height,
+			alt: tattooAlt(tattoo),
+		},
 	};
 }
 
@@ -159,7 +178,7 @@ type LoaderContext = Pick<DiscoverContext, "queryClient" | "discover"> & {
 export async function loadArtwork(
 	context: LoaderContext,
 	param: string,
-): Promise<{ seo: ArtworkSeo }> {
+): Promise<{ seo: ArtworkSeo; structured: JsonLd[] }> {
 	const slug = readArtworkSlug(param);
 	if (!slug) throw notFound();
 	const { queryClient, discover } = context;
@@ -180,7 +199,15 @@ export async function loadArtwork(
 				: undefined,
 		),
 	);
-	return { seo: artworkSeo(tattoo) };
+	const { settings } = discover;
+	const path = paths.tattoo(tattoo.id);
+	return {
+		seo: artworkSeo(tattoo),
+		structured: [
+			artworkLd(settings, tattoo, artworkTitle(tattoo)),
+			breadcrumbLd(settings, crumbs.artwork(artworkTitle(tattoo)), path),
+		],
+	};
 }
 
 /** The history state a gallery card's link leaves, so the artwork page can go back to that gallery. */

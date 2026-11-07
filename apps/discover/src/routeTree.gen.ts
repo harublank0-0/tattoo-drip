@@ -19,6 +19,12 @@ import { Route as ExploreArtistsRouteImport } from './routes/explore/artists'
 import { Route as ExploreStudiosRouteImport } from './routes/explore/studios'
 import { Route as ExploreTattoosRouteImport } from './routes/explore/tattoos'
 import { Route as PreferencesCountryRouteImport } from './routes/preferences/country'
+import { Route as SitemapsArtistsDotxmlRouteImport } from './routes/sitemaps/artists[.]xml'
+import { Route as SitemapsLocationsDotxmlRouteImport } from './routes/sitemaps/locations[.]xml'
+import { Route as SitemapsStaticDotxmlRouteImport } from './routes/sitemaps/static[.]xml'
+import { Route as SitemapsStudiosDotxmlRouteImport } from './routes/sitemaps/studios[.]xml'
+import { Route as SitemapsStylesDotxmlRouteImport } from './routes/sitemaps/styles[.]xml'
+import { Route as SitemapsTattoosDotxmlRouteImport } from './routes/sitemaps/tattoos[.]xml'
 import { Route as StylesSlugRouteImport } from './routes/styles/$slug'
 import { Route as TattoosIndexRouteImport } from './routes/tattoos/index'
 import { Route as TattoosSlugRouteImport } from './routes/tattoos/$slug'
@@ -77,6 +83,36 @@ const PreferencesCountryRoute = PreferencesCountryRouteImport.update({
   path: '/preferences/country',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SitemapsArtistsDotxmlRoute = SitemapsArtistsDotxmlRouteImport.update({
+  id: '/sitemaps/artists.xml',
+  path: '/sitemaps/artists.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapsLocationsDotxmlRoute = SitemapsLocationsDotxmlRouteImport.update({
+  id: '/sitemaps/locations.xml',
+  path: '/sitemaps/locations.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapsStaticDotxmlRoute = SitemapsStaticDotxmlRouteImport.update({
+  id: '/sitemaps/static.xml',
+  path: '/sitemaps/static.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapsStudiosDotxmlRoute = SitemapsStudiosDotxmlRouteImport.update({
+  id: '/sitemaps/studios.xml',
+  path: '/sitemaps/studios.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapsStylesDotxmlRoute = SitemapsStylesDotxmlRouteImport.update({
+  id: '/sitemaps/styles.xml',
+  path: '/sitemaps/styles.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapsTattoosDotxmlRoute = SitemapsTattoosDotxmlRouteImport.update({
+  id: '/sitemaps/tattoos.xml',
+  path: '/sitemaps/tattoos.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StylesSlugRoute = StylesSlugRouteImport.update({
   id: '/styles/$slug',
   path: '/styles/$slug',
@@ -125,6 +161,12 @@ export interface FileRoutesByFullPath {
   '/explore/studios': typeof ExploreStudiosRoute
   '/explore/tattoos': typeof ExploreTattoosRoute
   '/preferences/country': typeof PreferencesCountryRoute
+  '/sitemaps/artists.xml': typeof SitemapsArtistsDotxmlRoute
+  '/sitemaps/locations.xml': typeof SitemapsLocationsDotxmlRoute
+  '/sitemaps/static.xml': typeof SitemapsStaticDotxmlRoute
+  '/sitemaps/studios.xml': typeof SitemapsStudiosDotxmlRoute
+  '/sitemaps/styles.xml': typeof SitemapsStylesDotxmlRoute
+  '/sitemaps/tattoos.xml': typeof SitemapsTattoosDotxmlRoute
   '/styles/$slug': typeof StylesSlugRoute
   '/tattoos/$slug': typeof TattoosSlugRoute
   '/tattoos/': typeof TattoosIndexRoute
@@ -144,6 +186,12 @@ export interface FileRoutesByTo {
   '/explore/studios': typeof ExploreStudiosRoute
   '/explore/tattoos': typeof ExploreTattoosRoute
   '/preferences/country': typeof PreferencesCountryRoute
+  '/sitemaps/artists.xml': typeof SitemapsArtistsDotxmlRoute
+  '/sitemaps/locations.xml': typeof SitemapsLocationsDotxmlRoute
+  '/sitemaps/static.xml': typeof SitemapsStaticDotxmlRoute
+  '/sitemaps/studios.xml': typeof SitemapsStudiosDotxmlRoute
+  '/sitemaps/styles.xml': typeof SitemapsStylesDotxmlRoute
+  '/sitemaps/tattoos.xml': typeof SitemapsTattoosDotxmlRoute
   '/styles/$slug': typeof StylesSlugRoute
   '/tattoos/$slug': typeof TattoosSlugRoute
   '/tattoos': typeof TattoosIndexRoute
@@ -164,6 +212,12 @@ export interface FileRoutesById {
   '/explore/studios': typeof ExploreStudiosRoute
   '/explore/tattoos': typeof ExploreTattoosRoute
   '/preferences/country': typeof PreferencesCountryRoute
+  '/sitemaps/artists.xml': typeof SitemapsArtistsDotxmlRoute
+  '/sitemaps/locations.xml': typeof SitemapsLocationsDotxmlRoute
+  '/sitemaps/static.xml': typeof SitemapsStaticDotxmlRoute
+  '/sitemaps/studios.xml': typeof SitemapsStudiosDotxmlRoute
+  '/sitemaps/styles.xml': typeof SitemapsStylesDotxmlRoute
+  '/sitemaps/tattoos.xml': typeof SitemapsTattoosDotxmlRoute
   '/styles/$slug': typeof StylesSlugRoute
   '/tattoos/$slug': typeof TattoosSlugRoute
   '/tattoos/': typeof TattoosIndexRoute
@@ -185,6 +239,12 @@ export interface FileRouteTypes {
     | '/explore/studios'
     | '/explore/tattoos'
     | '/preferences/country'
+    | '/sitemaps/artists.xml'
+    | '/sitemaps/locations.xml'
+    | '/sitemaps/static.xml'
+    | '/sitemaps/studios.xml'
+    | '/sitemaps/styles.xml'
+    | '/sitemaps/tattoos.xml'
     | '/styles/$slug'
     | '/tattoos/$slug'
     | '/tattoos/'
@@ -204,6 +264,12 @@ export interface FileRouteTypes {
     | '/explore/studios'
     | '/explore/tattoos'
     | '/preferences/country'
+    | '/sitemaps/artists.xml'
+    | '/sitemaps/locations.xml'
+    | '/sitemaps/static.xml'
+    | '/sitemaps/studios.xml'
+    | '/sitemaps/styles.xml'
+    | '/sitemaps/tattoos.xml'
     | '/styles/$slug'
     | '/tattoos/$slug'
     | '/tattoos'
@@ -223,6 +289,12 @@ export interface FileRouteTypes {
     | '/explore/studios'
     | '/explore/tattoos'
     | '/preferences/country'
+    | '/sitemaps/artists.xml'
+    | '/sitemaps/locations.xml'
+    | '/sitemaps/static.xml'
+    | '/sitemaps/studios.xml'
+    | '/sitemaps/styles.xml'
+    | '/sitemaps/tattoos.xml'
     | '/styles/$slug'
     | '/tattoos/$slug'
     | '/tattoos/'
@@ -243,6 +315,12 @@ export interface RootRouteChildren {
   ExploreStudiosRoute: typeof ExploreStudiosRoute
   ExploreTattoosRoute: typeof ExploreTattoosRoute
   PreferencesCountryRoute: typeof PreferencesCountryRoute
+  SitemapsArtistsDotxmlRoute: typeof SitemapsArtistsDotxmlRoute
+  SitemapsLocationsDotxmlRoute: typeof SitemapsLocationsDotxmlRoute
+  SitemapsStaticDotxmlRoute: typeof SitemapsStaticDotxmlRoute
+  SitemapsStudiosDotxmlRoute: typeof SitemapsStudiosDotxmlRoute
+  SitemapsStylesDotxmlRoute: typeof SitemapsStylesDotxmlRoute
+  SitemapsTattoosDotxmlRoute: typeof SitemapsTattoosDotxmlRoute
   StylesSlugRoute: typeof StylesSlugRoute
   TattoosSlugRoute: typeof TattoosSlugRoute
   TattoosIndexRoute: typeof TattoosIndexRoute
@@ -324,6 +402,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PreferencesCountryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sitemaps/artists.xml': {
+      id: '/sitemaps/artists.xml'
+      path: '/sitemaps/artists.xml'
+      fullPath: '/sitemaps/artists.xml'
+      preLoaderRoute: typeof SitemapsArtistsDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemaps/locations.xml': {
+      id: '/sitemaps/locations.xml'
+      path: '/sitemaps/locations.xml'
+      fullPath: '/sitemaps/locations.xml'
+      preLoaderRoute: typeof SitemapsLocationsDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemaps/static.xml': {
+      id: '/sitemaps/static.xml'
+      path: '/sitemaps/static.xml'
+      fullPath: '/sitemaps/static.xml'
+      preLoaderRoute: typeof SitemapsStaticDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemaps/studios.xml': {
+      id: '/sitemaps/studios.xml'
+      path: '/sitemaps/studios.xml'
+      fullPath: '/sitemaps/studios.xml'
+      preLoaderRoute: typeof SitemapsStudiosDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemaps/styles.xml': {
+      id: '/sitemaps/styles.xml'
+      path: '/sitemaps/styles.xml'
+      fullPath: '/sitemaps/styles.xml'
+      preLoaderRoute: typeof SitemapsStylesDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemaps/tattoos.xml': {
+      id: '/sitemaps/tattoos.xml'
+      path: '/sitemaps/tattoos.xml'
+      fullPath: '/sitemaps/tattoos.xml'
+      preLoaderRoute: typeof SitemapsTattoosDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/styles/$slug': {
       id: '/styles/$slug'
       path: '/styles/$slug'
@@ -387,6 +507,12 @@ const rootRouteChildren: RootRouteChildren = {
   ExploreStudiosRoute: ExploreStudiosRoute,
   ExploreTattoosRoute: ExploreTattoosRoute,
   PreferencesCountryRoute: PreferencesCountryRoute,
+  SitemapsArtistsDotxmlRoute: SitemapsArtistsDotxmlRoute,
+  SitemapsLocationsDotxmlRoute: SitemapsLocationsDotxmlRoute,
+  SitemapsStaticDotxmlRoute: SitemapsStaticDotxmlRoute,
+  SitemapsStudiosDotxmlRoute: SitemapsStudiosDotxmlRoute,
+  SitemapsStylesDotxmlRoute: SitemapsStylesDotxmlRoute,
+  SitemapsTattoosDotxmlRoute: SitemapsTattoosDotxmlRoute,
   StylesSlugRoute: StylesSlugRoute,
   TattoosSlugRoute: TattoosSlugRoute,
   TattoosIndexRoute: TattoosIndexRoute,

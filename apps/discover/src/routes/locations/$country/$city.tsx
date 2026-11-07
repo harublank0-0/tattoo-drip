@@ -11,6 +11,7 @@ import { ArtistResults, StudioResults } from "#/components/directory/results";
 import { PageContainer, PageHeader } from "#/components/discovery/layout";
 import { EmptyState } from "#/components/discovery/states";
 import { rethrowUnavailable } from "#/lib/api-errors";
+import { crumbs } from "#/lib/breadcrumbs";
 import { countryFromSlug, countryName } from "#/lib/country";
 import { stylesIn } from "#/lib/directory";
 import { placesIn } from "#/lib/home";
@@ -18,6 +19,7 @@ import { locationQueries } from "#/lib/hubs";
 import { paths } from "#/lib/routes";
 import { readCity } from "#/lib/search";
 import { pageMeta } from "#/lib/seo";
+import { breadcrumbLd, structuredData } from "#/lib/structured-data";
 
 const MIN_WORK = 3;
 
@@ -53,21 +55,30 @@ export const Route = createFileRoute("/locations/$country/$city")({
 				.ensureQueryData(discoverQueries.styles(discover.client))
 				.catch((): undefined => undefined),
 		]).catch(rethrowUnavailable);
+		const empty = studios.data.length === 0 && artists.data.length === 0;
+		// A listed place whose rows have gone: thin content, noindex.
+		return { country, place, empty, noindex: empty };
+	},
+	head: (context) => {
+		const data = context.loaderData;
+		if (!data) return { meta: [] };
+		const where = `${data.place.name}, ${countryName(data.country)}`;
 		return {
-			country,
-			place,
-			empty: studios.data.length === 0 && artists.data.length === 0,
+			meta: [
+				...pageMeta({
+					title: `Tattoo studios and artists in ${where}`,
+					description: `Tattoo studios and artists listed on Tattoo Drip in ${where}, with the styles they work in and their recent work.`,
+				}),
+				...structuredData(context, [
+					breadcrumbLd(
+						context.match.context.discover.settings,
+						crumbs.city(data.country, data.place),
+						paths.city(data.country, data.place.slug),
+					),
+				]),
+			],
 		};
 	},
-	head: ({ loaderData }) => ({
-		meta: loaderData
-			? pageMeta({
-					title: `Tattoo studios and artists in ${loaderData.place.name}, ${countryName(loaderData.country)}`,
-					description: `Tattoo studios and artists listed on Tattoo Drip in ${loaderData.place.name}, ${countryName(loaderData.country)}, with the styles they work in and their recent work.`,
-					noindex: loaderData.empty,
-				})
-			: [],
-	}),
 	component: CityPage,
 });
 
@@ -98,11 +109,7 @@ function CityPage() {
 				eyebrow={place.region ? `${place.region}, ${name}` : name}
 				title={place.name}
 				intro={`Tattoo studios and artists listed on Discover in ${place.name}, ${name}.`}
-				breadcrumbs={[
-					{ label: "Discover", to: paths.home() },
-					{ label: name, to: paths.location(country) },
-					{ label: place.name },
-				]}
+				breadcrumbs={crumbs.city(country, place)}
 			/>
 			{studios.length === 0 && artists.length === 0 ? (
 				<PageContainer className="py-12">
