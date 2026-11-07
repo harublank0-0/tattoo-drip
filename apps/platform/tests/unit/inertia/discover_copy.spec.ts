@@ -36,7 +36,8 @@ type DiscoverModule = {
 		current: number | null,
 		recommended: number | null,
 	): string | null;
-	actionLabel(action: string, type: BusinessType): string;
+	actionLabel(action: string, type: BusinessType, met?: boolean): string;
+	offLine(type: BusinessType): string;
 	samePageHash(
 		target: { route: string; hash?: string },
 		currentRoute: string,
@@ -62,6 +63,25 @@ const TYPES: BusinessType[] = ["studio", "independent"];
 
 const read = (file: string) =>
 	readFile(new URL(`../../../inertia/${file}`, import.meta.url), "utf8");
+
+test.group("Discover words: city link and the off line", () => {
+	test("the city link says Change once a city is set; the off line isn't the button again", ({
+		assert,
+	}) => {
+		assert.equal(
+			words.actionLabel("discover_place", "studio"),
+			"Choose your city",
+		);
+		assert.equal(
+			words.actionLabel("discover_place", "studio", true),
+			"Change city",
+		);
+		for (const type of ["studio", "independent"] as const) {
+			assert.notEqual(words.offLine(type), words.listLabel(type));
+		}
+		assert.notMatch(words.offLine("independent"), /studio/i);
+	});
+});
 
 test.group("Discover words (D04): statuses and the badge", () => {
 	test("the page knows the server's statuses, in its order", ({ assert }) => {

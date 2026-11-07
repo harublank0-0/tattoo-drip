@@ -204,10 +204,14 @@ export default class PublicationService {
 			});
 			await live.save();
 			// An independent artist has one switch: listing the business shows
-			// their profile, whose own switch the page doesn't offer.
+			// their own profile, whose switch the page doesn't offer. A profile
+			// another login manages keeps its own choice (setArtistListed).
 			if (live.type === "independent") {
 				await Artist.query({ client: trx })
 					.where("tenant_id", live.id)
+					.where((query) =>
+						query.whereNull("user_id").orWhere("user_id", consentedBy.id),
+					)
 					.update({ discovery_listed: true });
 			}
 		});

@@ -586,9 +586,30 @@ test.group("Discover settings: artists", (group) => {
 				.update({ discovery_listed: false }),
 		);
 
+		// A second profile another login manages, opted out: their choice.
+		const member = await artistIn(solo, "guest@d04-asha-solo.example");
+		const guest = await addArtist(solo, member, {
+			name: "Guest",
+			slug: "guest",
+			linkToMe: true,
+		});
+		await inTenant(solo, () =>
+			Artist.query().where("id", guest.id).update({ discovery_listed: false }),
+		);
+
 		await listThroughDashboard(client, owner, solo.slug);
 
 		assert.equal(await publicStatus(client, `/artists/${solo.slug}`), 200);
+		const after = await inTenant(solo, () =>
+			Artist.query().where("tenant_id", solo.id).orderBy("name"),
+		);
+		assert.deepEqual(
+			after.map((row) => [row.name, row.discoveryListed]),
+			[
+				["Asha Solo", true],
+				["Guest", false],
+			],
+		);
 		assert.equal(await publicStatus(client, `/studios/${solo.slug}`), 404);
 		const props = (await settings(client, owner, solo.slug)).inertiaProps;
 		assert.equal(props.business.type, "independent");

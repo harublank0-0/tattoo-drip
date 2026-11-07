@@ -324,6 +324,10 @@ function ArtistDiscoverPanel({
 			route="tenant.artists.discover.update"
 			routeParams={{ tenant: tenantSlug, id: artistId }}
 			options={{ preserveScroll: true }}
+			// The answer is a new page: put focus back on the switch.
+			onSuccess={() =>
+				setTimeout(() => document.getElementById("discover-switch")?.focus(), 0)
+			}
 		>
 			{({ errors, processing }) => (
 				<div className="flex flex-col gap-3">
@@ -340,6 +344,7 @@ function ArtistDiscoverPanel({
 					</div>
 					<div>
 						<Button
+							id="discover-switch"
 							type="submit"
 							variant="outline"
 							size="sm"

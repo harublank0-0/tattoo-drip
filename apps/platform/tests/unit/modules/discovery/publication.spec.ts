@@ -166,6 +166,45 @@ test.group("Discover readiness", () => {
 	});
 });
 
+test.group("Discover readiness of an independent artist's profile", () => {
+	test("their profile must be shown on their page; an old opt-out counts until they list", ({
+		assert,
+	}) => {
+		const independent = (over: Partial<PublicationFacts>) =>
+			readiness(facts({ type: "independent", ...over }));
+		const profile = (ready: ReturnType<typeof readiness>) =>
+			ready.items.find((item) => item.key === "profile");
+
+		assert.include(profile(independent({})), { required: true, met: true });
+		const hidden = independent({ artists: [artist({ visible: false })] });
+		assert.isFalse(profile(hidden)?.met);
+		assert.isFalse(hidden.eligible);
+		assert.isTrue(
+			profile(independent({ artists: [artist({ discoveryListed: false })] }))
+				?.met,
+		);
+		// Listed but their profile is opted out: the step that explains
+		// "needs attention" is marked.
+		const listed = independent({
+			optedIn: true,
+			publiclyVisible: false,
+			artists: [artist({ discoveryListed: false })],
+		});
+		assert.isFalse(profile(listed)?.met);
+		assert.equal(
+			publicationStatus(
+				facts({
+					type: "independent",
+					optedIn: true,
+					publiclyVisible: false,
+					artists: [artist({ discoveryListed: false })],
+				}),
+			),
+			"needs_attention",
+		);
+	});
+});
+
 test.group("Discover state of an artist and a photo", () => {
 	const listed = { takenDown: false, publiclyVisible: true };
 

@@ -105,6 +105,7 @@ export type PublicationFacts = {
 };
 
 export type ReadinessKey =
+	| "profile"
 	| "location"
 	| "branding"
 	| "description"
@@ -213,6 +214,26 @@ export function readiness(facts: PublicationFacts): Readiness {
 			action: "portfolio",
 		},
 	];
+	if (!studio) {
+		// An independent artist's public page is their profile: it must be
+		// shown on their page. Before listing, an opted-out profile counts,
+		// since turning the listing on turns their own switch back on.
+		const met = facts.artists.some((artist) =>
+			facts.optedIn ? showsOnDiscover(artist) : artist.visible,
+		);
+		items.unshift({
+			key: "profile",
+			required: true,
+			met,
+			label: "Your profile",
+			detail: met
+				? "Your artist profile is shown on your page."
+				: "Show your artist profile on your page. Discover shows the same profile.",
+			current: null,
+			recommended: null,
+			action: "artists",
+		});
+	}
 	if (studio) {
 		const shown = facts.artists.filter(showsOnDiscover);
 		const strong = shown.filter(
@@ -228,7 +249,7 @@ export function readiness(facts: PublicationFacts): Readiness {
 					? "No artist is shown on Discover yet. Show an artist on your page and keep their Discover switch on."
 					: strong.length === shown.length
 						? `Every artist shown on Discover has at least ${DISCOVER_RECOMMENDED.artistPhotos} published photos.`
-						: `${shown.length - strong.length} of ${shown.length} artists shown on Discover have fewer than ${DISCOVER_RECOMMENDED.artistPhotos} published photos.`,
+						: fewerPhotos(shown.length - strong.length, shown.length),
 			current: strong.length,
 			recommended: shown.length,
 			action: "artists",
@@ -239,6 +260,16 @@ export function readiness(facts: PublicationFacts): Readiness {
 		complete: items.every((item) => item.met),
 		items,
 	};
+}
+
+function fewerPhotos(short: number, shown: number): string {
+	const target = DISCOVER_RECOMMENDED.artistPhotos;
+	if (shown === 1) {
+		return `Your artist shown on Discover has fewer than ${target} published photos.`;
+	}
+	return short === 1
+		? `1 of the ${shown} artists shown on Discover has fewer than ${target} published photos.`
+		: `${short} of the ${shown} artists shown on Discover have fewer than ${target} published photos.`;
 }
 
 /**
@@ -275,7 +306,7 @@ export const STATUS_WORDS: Record<
 	needs_attention: {
 		label: "Needs attention",
 		summary: () =>
-			"Your listing is turned on, but something it needs is missing. Fix the step marked below.",
+			"Your listing is turned on, but it isn't showing on Discover. Fix the required step marked below.",
 	},
 	eligible: {
 		label: "Ready to list",

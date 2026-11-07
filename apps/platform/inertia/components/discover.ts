@@ -60,6 +60,13 @@ export function previewLabel(type: BusinessType): string {
 }
 
 /** The main control, while the listing is off. */
+/** Beside the "Off" badge: what being off means, not the button's words again. */
+export function offLine(type: BusinessType): string {
+	return studio(type)
+		? "Your studio isn't on Discover."
+		: "Your artist profile isn't on Discover.";
+}
+
 export function listLabel(type: BusinessType): string {
 	return studio(type)
 		? "List my studio on TattooDrip Discover"
@@ -199,10 +206,11 @@ export type ReadinessAction =
 export function actionLabel(
 	action: ReadinessAction | string,
 	type: BusinessType,
+	met = false,
 ): string {
 	switch (action) {
 		case "discover_place":
-			return "Choose your city";
+			return met ? "Change city" : "Choose your city";
 		case "profile":
 			return studio(type) ? "Open Studio profile" : "Open your profile";
 		case "look":

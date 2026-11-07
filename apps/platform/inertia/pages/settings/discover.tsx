@@ -37,6 +37,7 @@ import {
 	metWords,
 	NO_ARTISTS,
 	NO_PLACES,
+	offLine,
 	onLine,
 	optionalNote,
 	PAGE_TITLE,
@@ -366,7 +367,7 @@ function ListingSection({
 							>
 								{LISTING_OFF}
 							</Badge>
-							<span className="text-muted-foreground">{listLabel(type)}</span>
+							<span className="text-muted-foreground">{offLine(type)}</span>
 						</p>
 						<div>
 							<Button
@@ -542,6 +543,11 @@ function CitySection({
 						clearing.current = false;
 						setClearSent(false);
 					}}
+					// A save remounts the form (its key is the stored city): give
+					// focus back to the picker instead of leaving it on <body>.
+					onSuccess={() =>
+						setTimeout(() => document.getElementById("placeId")?.focus(), 0)
+					}
 				>
 					{({ errors, processing }) => (
 						<FieldGroup>
@@ -656,14 +662,14 @@ function Checklist({
 										href={targetHref(item.target)}
 										className={CHECKLIST_LINK_CLASS}
 									>
-										{actionLabel(item.action, type)}
+										{actionLabel(item.action, type, item.met)}
 									</a>
 								) : (
 									<Link
 										href={targetHref(item.target)}
 										className={CHECKLIST_LINK_CLASS}
 									>
-										{actionLabel(item.action, type)}
+										{actionLabel(item.action, type, item.met)}
 									</Link>
 								)}
 							</div>

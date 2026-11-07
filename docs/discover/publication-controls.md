@@ -44,7 +44,7 @@ Derived on every read, never stored (`publicationStatus`). In order:
 
 ## Readiness checklist
 
-`readiness()`: one required item and recommendations, each with what is missing and a link to where it is fixed. No percentages.
+`readiness()`: required items (the city; for an independent artist also their profile) and recommendations, each with what is missing and a link to where it is fixed. No percentages.
 
 | Item | Rule | Required |
 |---|---|---|
@@ -53,6 +53,7 @@ Derived on every read, never stored (`publicationStatus`). In order:
 | Description | `intro` is not empty | No |
 | Published portfolio | Published photos (not hidden, not taken down) of the artists shown on Discover: 6 for a studio, 3 for an independent artist | No |
 | Artists (studios) | At least one artist shown on Discover, each with 3 published photos | No |
+| Your profile (independent artists) | Their artist profile is shown on their page (before listing, an opted-out profile counts: listing turns its switch on) | Yes |
 
 The thresholds are `DISCOVER_RECOMMENDED` in `#modules/discovery/publication`. They describe a strong profile; they don't block a listing, so a studio with fewer photos can list (the blueprint's "shown only when complete" rule is not applied: the D03 API shows every listed business).
 
@@ -61,7 +62,7 @@ The thresholds are `DISCOVER_RECOMMENDED` in `#modules/discovery/publication`. T
 - An artist shows on Discover while the studio is listed and visible, the artist is shown on the studio page (`visible`) and their own switch (`artists.discovery_listed`, on by default) is on. A takedown of the studio hides every artist.
 - **Who may change the switch:** whoever may edit the profile (`ArtistService.lockEditable`: an owner any profile, an artist only their own linked one) may turn it off. Turning it back on is the artist's own choice: an owner may do it only for a profile no login manages, or their own. Anything else is a field error.
 - Turning it off removes the artist and their photos from Discover only: the profile, its photos, the studio link and the studio page are unchanged.
-- **Independent artists** have one switch: the listing's. Turning it on also turns their profile's switch on (a business with one artist row; the profile page shows no switch of its own and points to Settings → Discover). The words say "your artist profile", never "studio".
+- **Independent artists** have one switch: the listing's. Turning it on also turns their own profile's switch on (their profile page shows no switch of its own and points to Settings → Discover). A profile another login manages keeps its own choice. The words say "your artist profile", never "studio".
 
 ## Photos
 
