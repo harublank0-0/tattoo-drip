@@ -165,7 +165,10 @@ describe("D10 head, robots and structured data (indexing on)", { skip }, () => {
 	let discover: Discover;
 	before(async () => {
 		api = await stubApi(20);
-		discover = await startDiscover(api.url, { DISCOVER_INDEXING: "on" });
+		discover = await startDiscover(api.url, {
+			DISCOVER_INDEXING: "on",
+			DISCOVER_SITEMAP_CACHE_SECONDS: "0",
+		});
 	});
 	beforeEach(() => {
 		api.scenario.count = 20;
@@ -481,7 +484,10 @@ describe("D10 sitemaps (indexing on)", { skip }, () => {
 	let discover: Discover;
 	before(async () => {
 		api = await stubApi(20);
-		discover = await startDiscover(api.url, { DISCOVER_INDEXING: "on" });
+		discover = await startDiscover(api.url, {
+			DISCOVER_INDEXING: "on",
+			DISCOVER_SITEMAP_CACHE_SECONDS: "0",
+		});
 	});
 	beforeEach(() => {
 		api.scenario.count = 20;
@@ -606,6 +612,42 @@ describe("D10 sitemaps (indexing on)", { skip }, () => {
 	});
 });
 
+describe("D10 sitemaps kept by the server (default cache)", { skip }, () => {
+	let api: StubApi;
+	let discover: Discover;
+	before(async () => {
+		api = await stubApi(20);
+		discover = await startDiscover(api.url, { DISCOVER_INDEXING: "on" });
+	});
+	after(() => {
+		discover?.child.kill();
+		api?.close();
+	});
+
+	test("a built sitemap is reused without reading the API again; a failed one is never kept", async () => {
+		api.scenario.fail.add("sitemap-tattoos");
+		assert.equal((await discover.get("/sitemaps/tattoos.xml")).status, 503);
+		api.scenario.fail.clear();
+		const first = await discover.get("/sitemaps/tattoos.xml");
+		assert.equal(first.status, 200);
+		const body = await first.text();
+		const styles = await (await discover.get("/sitemaps/styles.xml")).text();
+
+		api.requests.length = 0;
+		api.scenario.hidden.add(uuid(3, 0));
+		assert.equal(
+			await (await discover.get("/sitemaps/tattoos.xml")).text(),
+			body,
+		);
+		assert.equal(
+			await (await discover.get("/sitemaps/styles.xml")).text(),
+			styles,
+		);
+		assert.deepEqual(api.requests, []);
+		api.scenario.hidden.clear();
+	});
+});
+
 describe("D10 thin markets, country variants and the production origin", {
 	skip,
 }, () => {
@@ -617,10 +659,12 @@ describe("D10 thin markets, country variants and the production origin", {
 		api = await stubApi(3);
 		discover = await startDiscover(api.url, {
 			DISCOVER_INDEXING: "on",
+			DISCOVER_SITEMAP_CACHE_SECONDS: "0",
 			DISCOVER_MARKETS: "NP,IN",
 		});
 		production = await startDiscover(api.url, {
 			DISCOVER_INDEXING: "on",
+			DISCOVER_SITEMAP_CACHE_SECONDS: "0",
 			DISCOVER_URL: "https://tattoodrip.app",
 			APP_URL: "https://app.tattoodrip.app",
 		});
@@ -743,6 +787,7 @@ describe("D10 sitemaps, API unreachable", { skip }, () => {
 	before(async () => {
 		discover = await startDiscover(`http://localhost:${await freePort()}`, {
 			DISCOVER_INDEXING: "on",
+			DISCOVER_SITEMAP_CACHE_SECONDS: "0",
 		});
 	});
 	after(() => discover?.child.kill());

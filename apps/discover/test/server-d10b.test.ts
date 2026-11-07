@@ -59,6 +59,8 @@ describe("D10 phase B: headers, caching, structure", { skip }, () => {
 			["/nope", 404],
 			["/tattoos/nope", 404],
 			["/explore/tattoos", 301],
+			// Start answers a protocol-relative path before any middleware.
+			["//evil.example/x", 308],
 			["/robots.txt", 200],
 			["/sitemap.xml", 404],
 			["/favicon.svg", 200],
@@ -79,6 +81,13 @@ describe("D10 phase B: headers, caching, structure", { skip }, () => {
 			});
 			assert.equal(response.status, status, path);
 			assertSecurityHeaders(response, path);
+			const location = response.headers.get("location");
+			if (location)
+				assert.equal(
+					new URL(location, "http://localhost").hostname,
+					"localhost",
+					`${path} → ${location}`,
+				);
 		}
 	});
 

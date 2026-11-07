@@ -129,7 +129,9 @@ export const INDEXABLE_PATHS: readonly string[] = [
  * 404s an unknown slug and opts out (`noindex` in its loader data) when it
  * has nothing listed. The sitemaps (src/lib/sitemap.ts) list them from the API.
  */
-const SLUG = "[a-z0-9]+(?:-[a-z0-9]+)*";
+// The API's slugs: letters and digits, hyphens inside (artists' and legacy
+// studios' may hold "--"), never at either end.
+const SLUG = "[a-z0-9]+(?:-+[a-z0-9]+)*";
 export const INDEXABLE_PATTERNS: readonly RegExp[] = [
 	new RegExp(`^/styles/${SLUG}$`),
 	new RegExp(`^/locations/${SLUG}(?:/${SLUG})?$`),

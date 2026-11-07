@@ -119,6 +119,9 @@ describe("Discover SEO foundation", () => {
 			"/studios/black-needle",
 			"/studios/black-needle/artists/maya",
 			"/artists/maya-tattoo",
+			// The API allows "--" in artist and legacy studio slugs.
+			"/studios/black-needle/artists/sita--rai",
+			"/studios/a--b",
 		]) {
 			assert.equal(indexable(ON, path), true, path);
 			assert.equal(indexable(OFF, path), false, path);
@@ -132,6 +135,8 @@ describe("Discover SEO foundation", () => {
 			"/locations/nepal/kathmandu/x",
 			"/locations/nepal/",
 			"/studios/Black-Needle",
+			"/studios/-x",
+			"/studios/x-",
 			"/studios/x/artists",
 			"/studios/x/artists/y/z",
 			"/studios/x/other/y",

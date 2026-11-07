@@ -25,7 +25,7 @@ import { INDEXABLE_PATHS, siteUrl } from "./seo.ts";
 
 /** URLs per paged child sitemap: one API page (the API's maximum). */
 export const SITEMAP_PAGE = 5000;
-/** The most pages the index walks per list (a guard against a cursor that never ends: 5 million URLs). */
+/** The most pages the index walks per list (a guard against a cursor that never ends: 5 million URLs); past it the index is a 503. */
 export const MAX_SITEMAP_PAGES = 1000;
 /** Reads in flight at once while checking styles and markets. */
 export const SITEMAP_CONCURRENCY = 4;
@@ -128,6 +128,12 @@ export async function sitemapIndexUrls(
 			while (cursor && urls.length < MAX_SITEMAP_PAGES) {
 				urls.push(sitemapUrl(settings, kind, cursor));
 				cursor = (await list(client, kind, cursor)).nextCursor;
+			}
+			// Never a partial index: a list longer than the guard is an error (503).
+			if (cursor) {
+				throw new Error(
+					`The ${kind} sitemap has more than ${MAX_SITEMAP_PAGES} pages.`,
+				);
 			}
 			return urls;
 		}),

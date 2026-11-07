@@ -20,7 +20,37 @@ describe("Discover settings", () => {
 			markets: ["NP"],
 			defaultCountry: "NP",
 			geoHeader: null,
+			sitemapCacheSeconds: 600,
 		});
+	});
+
+	test("the sitemap cache: whole seconds from 0 (off) to 3600, server only", () => {
+		for (const [value, seconds] of [
+			["0", 0],
+			[" 120 ", 120],
+			["3600", 3600],
+		] as const) {
+			assert.equal(
+				parseDiscoverConfig({ ...VALID, DISCOVER_SITEMAP_CACHE_SECONDS: value })
+					.sitemapCacheSeconds,
+				seconds,
+			);
+		}
+		for (const bad of ["-1", "3601", "1.5", "ten", "1e3"]) {
+			assert.throws(
+				() =>
+					parseDiscoverConfig({
+						...VALID,
+						DISCOVER_SITEMAP_CACHE_SECONDS: bad,
+					}),
+				/DISCOVER_SITEMAP_CACHE_SECONDS is not valid/,
+				bad,
+			);
+		}
+		assert.equal(
+			"sitemapCacheSeconds" in publicSettings(parseDiscoverConfig(VALID)),
+			false,
+		);
 	});
 
 	test("markets: a comma list of assigned ISO codes, normalised and de-duplicated; the default is one of them", () => {
