@@ -6,7 +6,11 @@ import {
 	PageContainer,
 	SectionHeading,
 } from "../src/components/discovery/layout.tsx";
-import { ResponsiveImage } from "../src/components/discovery/responsive-image.tsx";
+import {
+	BadgeImage,
+	imageCandidates,
+	ResponsiveImage,
+} from "../src/components/discovery/responsive-image.tsx";
 import {
 	EmptyState,
 	ErrorState,
@@ -99,5 +103,51 @@ describe("Discover design-system primitives", () => {
 		);
 		assert.match(html, /role="note"/);
 		assert.match(html, /Coming soon/);
+	});
+	test("thumbnails offer copies up to 1280 px, never a 2048 px original; large images and old images keep it", () => {
+		const image = {
+			url: "https://media.test/a.jpg",
+			width: 2048,
+			height: 2560,
+			variants: [320, 640, 1280].map((width) => ({
+				url: `https://media.test/a.${width}w.jpg`,
+				width,
+			})),
+		};
+		assert.deepEqual(
+			imageCandidates(image, 1280).map((each) => each.width),
+			[320, 640, 1280],
+		);
+		assert.deepEqual(
+			imageCandidates(image).map((each) => each.width),
+			[320, 640, 1280, 2048],
+		);
+		// Stored before the copies: the original is all there is.
+		assert.deepEqual(
+			imageCandidates({ ...image, variants: [] }, 1280).map((each) => each.url),
+			["https://media.test/a.jpg"],
+		);
+		const thumb = renderToStaticMarkup(
+			<ResponsiveImage image={image} alt="Koi" />,
+		);
+		assert.doesNotMatch(thumb, /a\.jpg/);
+		assert.match(thumb, /src="https:\/\/media\.test\/a\.1280w\.jpg"/);
+		const large = renderToStaticMarkup(
+			<ResponsiveImage image={image} alt="Koi" large priority />,
+		);
+		assert.match(large, /a\.jpg 2048w/);
+		assert.match(large, /fetchPriority="high"/);
+		assert.match(large, /loading="eager"/);
+		const badge = renderToStaticMarkup(<BadgeImage image={image} size={80} />);
+		assert.match(badge, /sizes="80px"/);
+		assert.match(badge, /alt=""/);
+		assert.doesNotMatch(badge, /a\.jpg/);
+	});
+
+	test("the route's error page names itself in its one h1", () => {
+		assert.match(
+			renderToStaticMarkup(<ErrorState headingLevel={1} title="Down" />),
+			/<h1[^>]*>Down<\/h1>/,
+		);
 	});
 });

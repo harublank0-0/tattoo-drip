@@ -63,7 +63,7 @@ function Studios() {
 			nextCursor={data.nextCursor}
 			styleUnchecked={styleUnchecked}
 		>
-			<StudioResults studios={data.data} works={works} />
+			<StudioResults studios={data.data} works={works} lead />
 		</DirectoryPage>
 	);
 }

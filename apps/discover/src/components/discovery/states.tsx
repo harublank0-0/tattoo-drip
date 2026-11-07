@@ -46,12 +46,16 @@ export function ErrorState({
 	children,
 	onRetry,
 	className,
+	headingLevel = 2,
 }: {
 	title?: string;
 	children?: ReactNode;
 	onRetry?: () => void;
 	className?: string;
+	/** 1 when it is the whole page (the route's error page: its one h1, D10). */
+	headingLevel?: 1 | 2;
 }) {
+	const Heading = `h${headingLevel}` as const;
 	return (
 		<div
 			role="alert"
@@ -60,7 +64,9 @@ export function ErrorState({
 				className,
 			)}
 		>
-			<h2 className="font-display text-display-md font-bold">{title}</h2>
+			<Heading className="font-display text-display-md font-bold">
+				{title}
+			</Heading>
 			<div className="max-w-xl text-muted-foreground">
 				{children ??
 					"Discover couldn't reach its data just now. Try again in a moment."}
@@ -135,6 +141,7 @@ export function RouteErrorState({ error, reset }: ErrorComponentProps) {
 	return (
 		<PageContainer className="py-20 lg:py-32">
 			<ErrorState
+				headingLevel={1}
 				title={
 					unavailable
 						? "Discover is unavailable for a moment"

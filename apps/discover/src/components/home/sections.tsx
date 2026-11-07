@@ -14,7 +14,10 @@ import {
 	SectionHeading,
 } from "#/components/discovery/layout";
 import { ProfileLink } from "#/components/discovery/profile-link";
-import { ResponsiveImage } from "#/components/discovery/responsive-image";
+import {
+	BadgeImage,
+	ResponsiveImage,
+} from "#/components/discovery/responsive-image";
 import { ArtworkColumns } from "#/components/gallery/artwork-tile";
 import { buttonVariants } from "#/components/ui/button";
 import { artistSiteNote, profileDestination } from "#/lib/destinations";
@@ -128,13 +131,10 @@ function StudioLogo({
 				logo.tile === "dark" ? "bg-night" : "bg-paper-raised ring-1 ring-line",
 			)}
 		>
-			<img
-				src={logo.url}
-				width={logo.width}
-				height={logo.height}
-				alt=""
-				loading="lazy"
-				decoding="async"
+			<BadgeImage
+				image={logo}
+				size={64}
+				lazy
 				className="max-h-full max-w-full object-contain"
 			/>
 		</span>

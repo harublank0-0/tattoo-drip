@@ -9,6 +9,7 @@ import {
 	EditorialSection,
 	SectionHeading,
 } from "#/components/discovery/layout";
+import { BadgeImage } from "#/components/discovery/responsive-image";
 import {
 	BookingActions,
 	Facts,
@@ -97,12 +98,9 @@ export function ArtistProfile({
 				badge={
 					lead &&
 					artist.photo && (
-						<img
-							src={artist.photo.url}
-							width={artist.photo.width}
-							height={artist.photo.height}
-							alt=""
-							decoding="async"
+						<BadgeImage
+							image={artist.photo}
+							size={80}
 							className="size-16 shrink-0 rounded-[2px] object-cover sm:size-20"
 						/>
 					)

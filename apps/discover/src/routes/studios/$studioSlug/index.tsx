@@ -6,6 +6,7 @@ import {
 	EditorialSection,
 	SectionHeading,
 } from "#/components/discovery/layout";
+import { BadgeImage } from "#/components/discovery/responsive-image";
 import { ArtworkCredit } from "#/components/gallery/artwork-tile";
 import {
 	BookingActions,
@@ -98,12 +99,9 @@ function StudioProfile() {
 									: "bg-paper-raised ring-1 ring-line",
 							)}
 						>
-							<img
-								src={studio.logo.url}
-								width={studio.logo.width}
-								height={studio.logo.height}
-								alt=""
-								decoding="async"
+							<BadgeImage
+								image={studio.logo}
+								size={80}
 								className="max-h-full max-w-full object-contain"
 							/>
 						</span>

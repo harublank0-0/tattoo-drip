@@ -63,7 +63,7 @@ function Artists() {
 			nextCursor={data.nextCursor}
 			styleUnchecked={styleUnchecked}
 		>
-			<ArtistResults artists={data.data} works={works} />
+			<ArtistResults artists={data.data} works={works} lead />
 		</DirectoryPage>
 	);
 }

@@ -21,7 +21,7 @@ This file is the plan Discover prompts work from. The dated `docs/superpowers/sp
 | D07: studio and artist directories, style and location pages | Done: [frontend](frontend.md#directories-d07); as built in C.9 below |
 | D08: public profiles and storefront booking hand-off | Done: [frontend](frontend.md#profiles-d08); as built in C.10 below |
 | D09: tattoo inspiration gallery and artwork detail | Done: [frontend](frontend.md#gallery-d09), [artwork pages](frontend.md#artwork-pages-d09), [API](api.md#gallery-search-and-the-artwork-read-d09); as built in C.11 below |
-| D10: SEO, accessibility, performance | In progress (phase A done: technical, international and structured-data SEO, sitemaps, robots, indexing and error semantics: [frontend](frontend.md#seo-and-indexing), [API](api.md#sitemap-lists-d10); as built in C.12 below). Phase B: performance, images, caching, accessibility, security |
+| D10: SEO, accessibility, performance | Done: phase A (technical, international and structured-data SEO, sitemaps, robots, indexing and error semantics: [frontend](frontend.md#seo-and-indexing), [API](api.md#sitemap-lists-d10)) and phase B (performance, images, caching, accessibility, security headers: [performance and caching](frontend.md#performance-and-caching-d10-phase-b), [accessibility](frontend.md#accessibility-d10-phase-b), [security](frontend.md#security-headers-and-hardening-d10-phase-b)); as built and remaining items in C.12 below |
 
 Status legend: **Done** = in code, with tests where noted. **Partial** = exists, but not in the form Discover needs. **Planned** = only in docs. **Missing** = searched for and absent. **Unverified** = not checked against a running system.
 
@@ -318,6 +318,21 @@ Details in [SEO and indexing](frontend.md#seo-and-indexing) and [API](api.md#sit
 - **Structured data:** H's `TattooParlor`, `Person` with `worksFor`, `BreadcrumbList`; plus `WebSite` (with a `SearchAction` on `/explore/studios?q=`) and `Organization` on the home page, `ImageObject` on artwork pages. `url` is Discover's own profile (not H's storefront: the page's canonical); `sameAs` the https social links. No `ItemList` (list pages carry their breadcrumbs only). Only on indexable 200 pages.
 - **Sitemaps:** H's index, but its children are `static`, `styles`, `locations`, and paged `studios`, `artists` and `tattoos` (`places.xml` is `locations.xml`; artwork pages are listed, being self-canonical), read from a new API sitemap list (identifiers only, 5,000 a page, keyset by id) instead of the 48-row lists. Cached an hour (`public, max-age=3600`). No `lastmod`: the views expose no modification time.
 - **robots.txt** as before; nothing is disallowed while indexing is on (crawlers must see each page's noindex).
+
+**Phase B as built** (details and numbers in the frontend guidance's Performance and caching, Accessibility, and Security headers and hardening):
+
+- **Measurement:** Lighthouse (mobile, simulated slow 4G; one desktop check) on the built server with the stub API, before and after, medians of three; lab only. The "Lighthouse gets 500 on every page but home" seen first was a harness artefact (the in-process stub blocked by a synchronous child process), not a server bug.
+- **Performance:** static files stored pre-compressed (brotli, gzip); the directories' first image is eager and high-priority (every directory image was lazy, the LCP included); thumbnails offer copies up to 1280 px, never the 2048 px original; logos and portrait badges load a small copy; `sizes` fixed on studio strips and compact artist cards (single-column artist cards deliberately capped at the 640 px copy: the exact value doubled the photo bytes). The JS entry (122 KB gz) is framework code and was not split further (TBT ≈ 0). Budgets set.
+- **Images:** JPEG/PNG copies only (the media pipeline makes no WebP or AVIF; no image proxy added); a photo that failed before hydration now shows its placeholder.
+- **Caching:** unchanged policy, documented: HTML `private, no-store` (every page shows the visitor's country; an edge cache needs a country-keyed rule and a purge, D11); hashed assets immutable; favicon and brand mark a day (they had no `Cache-Control`).
+- **Accessibility (WCAG 2.2 AA):** axe on every route type and state at 375 and 1280 px, scripted keyboard, reflow, zoom and text-size, target-size and reduced-motion checks; one finding fixed (no h1 on the API-down error page).
+- **Security:** `nosniff`, `strict-origin-when-cross-origin`, `X-Frame-Options: DENY`, a CSP of `base-uri`, `object-src`, `frame-ancestors` and `form-action` only, and a minimal `Permissions-Policy` on every response; an undecodable path (`/%ff`) hung the request forever (h3 threw before any middleware) and is now a 400; input, redirects, error pages and the dehydrated state re-verified; a critical journey in both markets.
+
+**Remaining** (severity for launch):
+
+- **High:** no real-user or real-device data: field Core Web Vitals (CrUX or RUM), real phones and screen readers (VoiceOver, TalkBack, NVDA) must be checked on the deployed site (D11).
+- **Medium:** no `script-src` CSP (Start's inline hydration needs nonces: `ssr.nonce`, Report-Only first; D11). HTML compression and asset caching depend on Cloudflare's defaults (unverified until deployed). The API's sitemap photos page reads every published photo per page (76 ms at 36,800; quadratic for the index walk): give it an index-ordered plan before the photo count reaches the hundreds of thousands. Takedowns can stay visible for up to 2 minutes (API cache) and in sitemaps for an hour; no purge.
+- **Low:** WebP/AVIF copies (platform media pipeline); HSTS (domain decision); a lazily loaded menu sheet or a lighter `cn()` (under 10% of the JS); the gallery search is linear in published photos (33 ms worst case at 36,800); Rich Results validation and `lastmod` (from phase A).
 
 ## D. Data model gap analysis
 
