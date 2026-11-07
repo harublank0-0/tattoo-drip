@@ -17,12 +17,21 @@ const robots = (meta: Record<string, string>[]) =>
 	meta.find((tag) => tag.name === "robots");
 
 describe("Discover SEO foundation", () => {
-	test("indexing off: every page says noindex; on: only pages that opt out", () => {
+	test("indexing off: every page says noindex; on: only listed pages, and never one that opts out", () => {
 		assert.deepEqual(robots(headTags(OFF, "/").meta), {
 			name: "robots",
 			content: NOINDEX,
 		});
 		assert.equal(robots(headTags(ON, "/").meta), undefined);
+		// Not in INDEXABLE_PATHS: noindex even with indexing on and no opt-out.
+		assert.deepEqual(robots(headTags(ON, "/explore/studios").meta), {
+			name: "robots",
+			content: NOINDEX,
+		});
+		assert.deepEqual(robots(headTags(ON, "/", { noindex: true }).meta), {
+			name: "robots",
+			content: NOINDEX,
+		});
 		assert.deepEqual(robots(headTags(ON, "/pricing", { noindex: true }).meta), {
 			name: "robots",
 			content: NOINDEX,

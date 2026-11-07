@@ -1,6 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { createDiscoverClient, type DiscoverClient } from "@tattoo-drip/sdk";
-import { type PublicSettings, readOrigin } from "./config.ts";
+import type { PublicSettings } from "./config.ts";
+import { readOrigin } from "./origin.ts";
 import {
 	createDiscoverQueryClient,
 	type QueryEnvironment,

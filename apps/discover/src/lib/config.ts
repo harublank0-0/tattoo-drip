@@ -1,3 +1,5 @@
+import { readOrigin } from "./origin.ts";
+
 /**
  * Discover's settings (D05, docs/discover/frontend.md), read on the server
  * from process.env. Only what `publicSettings` returns ever reaches a
@@ -35,8 +37,6 @@ const RULES = {
 	APP_URL: `Studio OS's origin (the platform's APP_URL): ${ORIGIN_RULE}, e.g. https://app.tattoodrip.app`,
 	DISCOVER_INDEXING: `"on" to let search engines index Discover, "off" or unset to keep it out of search results`,
 } as const;
-
-const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
 /**
  * Reads and checks every setting. Throws one error naming each missing or
@@ -94,35 +94,14 @@ export function publicSettings(config: DiscoverConfig): PublicSettings {
 	return { ...config };
 }
 
-/** A bare http(s) origin, normalised (no trailing slash), or null. */
-export function readOrigin(value: string): string | null {
-	let url: URL;
-	try {
-		url = new URL(value);
-	} catch {
-		return null;
-	}
-	if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-	if (url.protocol === "http:" && !isLoopback(url.hostname)) return null;
-	if (url.username || url.password || url.search || url.hash) return null;
-	if (url.pathname !== "/" && url.pathname !== "") return null;
-	return url.origin;
-}
-
-function isLoopback(hostname: string): boolean {
-	return LOOPBACK.has(hostname) || hostname.endsWith(".localhost");
-}
-
-let cached: { env: Env; config: DiscoverConfig } | null = null;
+let cached: DiscoverConfig | undefined;
 
 /**
- * This server's settings, from process.env, parsed once per environment
- * object (tests pass their own). Server code only: the browser gets
- * `publicSettings` through the router.
+ * This server's settings, from process.env, parsed on first use and kept
+ * for the life of the process. Server code only: the browser gets
+ * `publicSettings` through the router. Tests call `parseDiscoverConfig`.
  */
-export function discoverConfig(env: Env = process.env): DiscoverConfig {
-	if (cached?.env === env) return cached.config;
-	const config = parseDiscoverConfig(env);
-	cached = { env, config };
-	return config;
+export function discoverConfig(): DiscoverConfig {
+	cached ??= parseDiscoverConfig(process.env);
+	return cached;
 }

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { parseDiscoverConfig, readOrigin } from "../src/lib/config.ts";
+import { parseDiscoverConfig } from "../src/lib/config.ts";
+import { readOrigin } from "../src/lib/origin.ts";
 
 const VALID = {
 	API_URL: "https://api.tattoodrip.app",

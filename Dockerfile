@@ -102,6 +102,11 @@ FROM fetch AS discover-build
 ENV HUSKY=0
 COPY . .
 RUN pnpm install --frozen-lockfile --offline
+# Capped like the build stage. Build this target on its own
+# (docker build --target discover, or compose --profile discover build
+# discover), never together with the platform and storefront images: two
+# stages at once would take the build past the server's 3 GB.
+ENV NODE_OPTIONS=--max-old-space-size=2048
 # vite build reads none of Discover's settings: they are runtime-only.
 RUN pnpm --filter @tattoo-drip/discover build
 

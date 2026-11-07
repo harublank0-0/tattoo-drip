@@ -10,7 +10,7 @@
  * Measured contrast (WCAG 2.2): ink on paper 17:1; ink-muted on paper 6.3:1;
  * accent (as text) on paper 5.8:1; white on accent 6.5:1; line-strong
  * (control borders) on paper 3.3:1. Night: night-ink on night 17:1;
- * night-muted on night 7.5:1; accent-bright (text, focus) on night 5.2:1.
+ * night-muted on night 7.5:1; accent-bright (text, focus) on night 4.8:1.
  * The plain accent is 2.9:1 on night: never text there.
  *
  * Fonts (SIL OFL, src/assets/fonts/OFL-*.txt, vendored from Studio OS):
@@ -166,6 +166,8 @@
 
 	/* One focus ring everywhere: visible on paper and on night. */
 	:focus-visible {
+		/* Shown at once: a colour transition on the element must not fade it in. */
+		transition-property: none;
 		outline: 2px solid var(--color-accent);
 		outline-offset: 3px;
 		border-radius: 2px;

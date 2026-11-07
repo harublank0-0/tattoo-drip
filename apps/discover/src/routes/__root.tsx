@@ -1,6 +1,7 @@
 import {
 	createRootRouteWithContext,
 	HeadContent,
+	rootRouteId,
 	Scripts,
 } from "@tanstack/react-router";
 import { DiscoverProvider } from "@tattoo-drip/react";
@@ -18,14 +19,21 @@ export const Route = createRootRouteWithContext<DiscoverContext>()({
 		// The canonical URL is the page's own path on DISCOVER_URL, whatever host
 		// the request came in on; pages add their title and description.
 		const page = matches[matches.length - 1] ?? match;
+		// No page matched (only the root), or a route threw notFound(): the
+		// storefront's rule (src/studio/seo.ts rootMeta).
+		const notFound =
+			!matches.some((each) => each.routeId !== rootRouteId) ||
+			matches.some((each) => each.status === "notFound");
 		const { meta, links } = headTags(
 			match.context.discover.settings,
 			page.pathname,
+			notFound ? { title: "Page not found", noindex: true } : {},
 		);
 		return {
 			meta: [
 				{ charSet: "utf-8" },
 				{ name: "viewport", content: "width=device-width, initial-scale=1" },
+				// The paper token's value: a meta tag can't read a CSS variable.
 				{ name: "theme-color", content: "#f5f2ec" },
 				...meta,
 			],

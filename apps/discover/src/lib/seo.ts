@@ -32,12 +32,22 @@ export function canonicalUrl(
 	return new URL(pathname || "/", settings.siteUrl).toString();
 }
 
-/** Whether a page may be indexed: only with DISCOVER_INDEXING on and the page not opted out. */
+/**
+ * The pages search engines may index once DISCOVER_INDEXING is on: an
+ * allow-list, so a new page stays noindex until it is finished and added
+ * here (and so to the sitemap). D06–D10 add theirs.
+ */
+export const INDEXABLE_PATHS: readonly string[] = ["/"];
+
+/** Whether a page may be indexed: indexing on, the path listed, and the page not opted out. */
 export function indexable(
 	settings: Pick<PublicSettings, "indexing">,
+	pathname: string,
 	page: PageSeo = {},
 ): boolean {
-	return settings.indexing && !page.noindex;
+	return (
+		settings.indexing && INDEXABLE_PATHS.includes(pathname) && !page.noindex
+	);
 }
 
 /**
@@ -63,7 +73,7 @@ export function headTags(
 		{ property: "og:url", content: url },
 		{ name: "twitter:card", content: "summary" },
 	];
-	if (!indexable(settings, page))
+	if (!indexable(settings, pathname, page))
 		meta.push({ name: "robots", content: NOINDEX });
 	return { meta, links: [{ rel: "canonical", href: url }] };
 }
@@ -84,7 +94,7 @@ export function sitemapEntries(
 	settings: Pick<PublicSettings, "siteUrl" | "indexing">,
 ): string[] {
 	if (!settings.indexing) return [];
-	return [canonicalUrl(settings, "/")];
+	return INDEXABLE_PATHS.map((path) => canonicalUrl(settings, path));
 }
 
 export function sitemapXml(urls: string[]): string {

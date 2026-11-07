@@ -1,10 +1,12 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { discoverQueries } from "@tattoo-drip/react";
 import { ArrowUpRightIcon } from "lucide-react";
 import { DiscoverySearch } from "#/components/discovery/discovery-search";
 import { PageContainer, PageHeader } from "#/components/discovery/layout";
 import { EmptyState } from "#/components/discovery/states";
+import { buttonVariants } from "#/components/ui/button";
+import { rethrowUnavailable } from "#/lib/api-errors";
 import { paths } from "#/lib/routes";
 import { readQuery } from "#/lib/search";
 import { pageMeta } from "#/lib/seo";
@@ -18,18 +20,21 @@ import { pageMeta } from "#/lib/seo";
  * page until Discover's profiles exist (D08).
  */
 export const Route = createFileRoute("/explore/studios")({
-	validateSearch: (search: Record<string, unknown>): { q?: string } => {
-		const q = readQuery(search.q);
-		return q ? { q } : {};
-	},
+	// Always returns q, undefined when malformed: the router merges this over
+	// the raw search, so leaving the key out would let a bad value through.
+	validateSearch: (search: Record<string, unknown>): { q?: string } => ({
+		q: readQuery(search.q),
+	}),
 	loaderDeps: ({ search }) => ({ q: search.q }),
 	loader: ({ context, deps }) =>
-		context.queryClient.ensureQueryData(
-			discoverQueries.studios(
-				context.discover.client,
-				deps.q ? { query: deps.q } : undefined,
-			),
-		),
+		context.queryClient
+			.ensureQueryData(
+				discoverQueries.studios(
+					context.discover.client,
+					deps.q ? { query: deps.q } : undefined,
+				),
+			)
+			.catch(rethrowUnavailable),
 	head: ({ match }) => ({
 		meta: pageMeta({
 			title: match.search.q
@@ -74,6 +79,16 @@ function Studios() {
 				{data.data.length === 0 ? (
 					<EmptyState
 						title={q ? `No studios match "${q}"` : "No studios listed yet"}
+						action={
+							q ? (
+								<Link
+									to={paths.studios()}
+									className={buttonVariants({ variant: "outline" })}
+								>
+									Show all studios
+								</Link>
+							) : undefined
+						}
 					>
 						{q
 							? "Try a shorter or different name."

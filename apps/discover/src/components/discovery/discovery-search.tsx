@@ -55,6 +55,10 @@ export function DiscoverySearch({
 	};
 
 	const submit = (event: FormEvent<HTMLFormElement>) => {
+		if (pending) {
+			event.preventDefault();
+			return;
+		}
 		const query = text.trim();
 		if (query.length < SEARCH_MIN) return; // the browser shows the minlength message
 		event.preventDefault();

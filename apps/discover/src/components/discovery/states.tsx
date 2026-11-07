@@ -3,8 +3,8 @@ import {
 	Link,
 	useRouter,
 } from "@tanstack/react-router";
-import { isTattooApiError } from "@tattoo-drip/sdk";
 import type { ReactNode } from "react";
+import { isUnavailable } from "#/lib/api-errors";
 import { cn } from "#/lib/utils";
 import { Button, buttonVariants } from "../ui/button.tsx";
 import { PageContainer } from "./layout.tsx";
@@ -129,9 +129,9 @@ export function NotFoundState() {
  */
 export function RouteErrorState({ error, reset }: ErrorComponentProps) {
 	const router = useRouter();
-	const unavailable =
-		isTattooApiError(error) &&
-		(error.status === 0 || error.status >= 500 || error.status === 429);
+	// The server's error arrives in the browser as a plain Error, so this
+	// reads the marked message too (src/lib/api-errors.ts).
+	const unavailable = isUnavailable(error);
 	return (
 		<PageContainer className="py-20 lg:py-32">
 			<ErrorState

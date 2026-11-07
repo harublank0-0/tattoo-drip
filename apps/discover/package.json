@@ -6,7 +6,7 @@
 		"#/*": "./src/*"
 	},
 	"scripts": {
-		"dev": "dotenv -e .env.local -- vite dev --port 3100",
+		"dev": "dotenv -e .env.local -- sh -c \"PORT=3100 vite dev --port 3100\"",
 		"generate-routes": "tsr generate",
 		"build": "vite build && node scripts/check-client-bundle.mjs",
 		"check:bundle": "node scripts/check-client-bundle.mjs",

@@ -64,10 +64,12 @@ function Home() {
 				</ul>
 			</EditorialSection>
 
-			<EditorialSection tone="night" labelledBy="studios-title">
+			<EditorialSection tone="sunk" labelledBy="studios-title">
 				<div className="flex flex-col items-start gap-6 lg:flex-row lg:items-end lg:justify-between">
 					<div className="flex max-w-2xl flex-col gap-4">
-						<p className="eyebrow text-night-muted">For studios and artists</p>
+						<p className="eyebrow text-muted-foreground">
+							For studios and artists
+						</p>
 						<h2
 							id="studios-title"
 							className="font-display text-display-lg font-bold"
