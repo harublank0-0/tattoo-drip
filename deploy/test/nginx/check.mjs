@@ -472,6 +472,14 @@ async function checkDiscoverCountry() {
 			? [
 					[{ "CF-IPCountry": "np" }, "np", "CF-IPCountry from cloudflared"],
 					[
+						// As cloudflared really sends it: real_ip rewrites $remote_addr
+						// to the visitor, and the trust must survive (it reads
+						// $realip_remote_addr, the tunnel's address).
+						{ "CF-IPCountry": "NP", "CF-Connecting-IP": "203.0.113.7" },
+						"NP",
+						"CF-IPCountry trusted after the real_ip rewrite",
+					],
+					[
 						{ "CF-IPCountry": "IN", "X-Discover-Country": "US" },
 						"IN",
 						"a visitor's X-Discover-Country replaced by Cloudflare's",

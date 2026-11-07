@@ -790,9 +790,16 @@ describe("the built Discover server, country-aware (D06.5)", { skip }, () => {
 			"https://evil.example/",
 			"//evil.example/x",
 			"/\\evil.example",
+			"/..//evil.example/",
+			"/.//evil.example",
+			"/a/..//evil.example",
+			"/%2e%2e//evil.example",
 		]) {
-			const answer = await form({ country: "NP", return: back });
-			assert.equal(answer.headers.get("location"), "/", back);
+			// Both answers: a saved market, and a country that isn't one.
+			for (const country of ["NP", "US"]) {
+				const answer = await form({ country, return: back });
+				assert.equal(answer.headers.get("location"), "/", `${country} ${back}`);
+			}
 		}
 		const notMarket = await form({ country: "US", return: "/pricing" });
 		assert.equal(notMarket.headers.get("location"), "/pricing");

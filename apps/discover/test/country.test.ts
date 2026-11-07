@@ -184,6 +184,11 @@ describe("switching country", () => {
 			"/\\evil.example",
 			"\\\\evil.example",
 			"javascript:alert(1)",
+			"/..//evil.example/x",
+			"/.//evil.example",
+			"/a/..//evil.example",
+			"/%2e%2e//evil.example",
+			"/%2E%2E//evil.example",
 			"/\t/evil.example",
 			"/\n/evil.example",
 			"explore",
@@ -247,9 +252,24 @@ describe("POST /preferences/country", () => {
 	});
 
 	test("never an open redirect", async () => {
-		for (const back of ["https://evil.example/", "//evil.example", "/\\x"]) {
-			const response = await post({ country: "NP", return: back });
-			assert.equal(response.headers.get("location"), "/", back);
+		for (const back of [
+			"https://evil.example/",
+			"//evil.example",
+			"/\\x",
+			// Dot segments the URL parser collapses into "//evil.example".
+			"/..//evil.example/x",
+			"/.//evil.example",
+			"/a/..//evil.example",
+			"/%2e%2e//evil.example",
+		]) {
+			for (const country of ["NP", "US"]) {
+				const response = await post({ country, return: back });
+				assert.equal(
+					response.headers.get("location"),
+					"/",
+					`${country} ${back}`,
+				);
+			}
 		}
 	});
 

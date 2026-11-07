@@ -186,6 +186,13 @@ export function CountrySelector({
 		<details
 			ref={details}
 			onToggle={(event) => setOpen(event.currentTarget.open)}
+			// Tabbing out of the panel closes it, so it never covers the links
+			// focus moved to (focus stays where it went; no return to the trigger).
+			onBlur={(event) => {
+				const next = event.relatedTarget as Node | null;
+				if (next && !event.currentTarget.contains(next))
+					event.currentTarget.open = false;
+			}}
 			onKeyDown={(event) => {
 				if (event.key === "Escape" && details.current?.open) {
 					event.preventDefault();

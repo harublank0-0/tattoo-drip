@@ -210,7 +210,13 @@ export function safeReturnPath(value: unknown): string {
 	try {
 		const url = new URL(value, RETURN_BASE);
 		if (url.origin !== RETURN_BASE) return "/";
-		return `${url.pathname}${url.search}${url.hash}`;
+		const path = `${url.pathname}${url.search}${url.hash}`;
+		// Checked again after the URL parser's normalisation: dot segments
+		// collapse "/..//evil.example" into "//evil.example", a
+		// scheme-relative address, which must never come out of here.
+		if (!path.startsWith("/") || path.startsWith("//") || CONTROL.test(path))
+			return "/";
+		return path;
 	} catch {
 		return "/";
 	}
