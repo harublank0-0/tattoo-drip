@@ -53,19 +53,22 @@ export function canonicalUrl(
  * here (and so to the sitemap). D06 added `/for-studios`; `/pricing` waits
  * for published prices. D07 added the directories' bare first pages (any
  * parameter makes a directory page noindex: filters, searches, sorts,
- * cursors and `?country=` are never indexed, blueprint H).
+ * cursors and `?country=` are never indexed, blueprint H). D09 added the
+ * gallery's bare first page, on the same rule.
  */
 export const INDEXABLE_PATHS: readonly string[] = [
 	"/",
 	"/for-studios",
 	"/explore/studios",
 	"/explore/artists",
+	"/tattoos",
 ];
 
 /**
  * Dynamic pages that may be indexed (D07): a style's page and a market's or
  * city's location page, the canonical discovery destinations (blueprint H),
- * and (D08) studio, studio-artist and independent-artist profiles.
+ * (D08) studio, studio-artist and independent-artist profiles, and (D09)
+ * artwork pages.
  * A slug can't be listed in INDEXABLE_PATHS, so they match by shape; the
  * page itself 404s (noindex) an unknown slug and opts out (`noindex`) when
  * it has nothing listed. They are not in the sitemap: listing them needs
@@ -80,6 +83,9 @@ export const INDEXABLE_PATTERNS: readonly RegExp[] = [
 	// profile at its current address answers here. Sitemaps of them are D10.
 	new RegExp(`^/studios/${SLUG}(?:/artists/${SLUG})?$`),
 	new RegExp(`^/artists/${SLUG}$`),
+	// D09: an artwork page, only at its canonical slug (the photo's id in
+	// lower case: any other spelling is a 301; anything not shown a 404).
+	/^\/tattoos\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
 ];
 
 /** Whether a page may be indexed: indexing on, the path listed or matched, and the page not opted out. */

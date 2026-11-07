@@ -154,6 +154,48 @@ describe("createDiscoverClient", () => {
 		});
 	});
 
+	test("tattoos.list sends the gallery search as q with the filters (D09)", async () => {
+		const { calls, fetch } = fakeFetch(() =>
+			json(200, { data: [], nextCursor: null }),
+		);
+		const discover = client(fetch);
+		await discover.tattoos.list({
+			query: "koi & lotus",
+			country: "NP",
+			city: "kathmandu",
+			style: "blackwork",
+			studio: "needle-house",
+			cursor: "next",
+			limit: 24,
+		});
+		await discover.tattoos.list({ query: undefined, country: "IN" });
+		assert.deepEqual(Object.fromEntries(new URL(calls[0].url).searchParams), {
+			q: "koi & lotus",
+			country: "NP",
+			city: "kathmandu",
+			style: "blackwork",
+			studio: "needle-house",
+			cursor: "next",
+			limit: "24",
+		});
+		assert.match(calls[0].url, /q=koi\+%26\+lotus|q=koi%20%26%20lotus/);
+		// No search: no `q` at all, never `q=undefined`.
+		assert.deepEqual(Object.fromEntries(new URL(calls[1].url).searchParams), {
+			country: "IN",
+		});
+	});
+
+	test("tattoos.get answers the detail with its booking fields (D09)", async () => {
+		const detail = {
+			id: "0b6f8e2c-6a4a-4f1e-9a51-1b0c2d3e4f50",
+			artistAcceptingInquiries: false,
+			bookingUrl: "https://needle.example/book?artwork=x&ref=a.b",
+		};
+		const { calls, fetch } = fakeFetch(() => json(200, { data: detail }));
+		assert.deepEqual(await client(fetch).tattoos.get(detail.id), detail);
+		assert.equal(calls[0].url, `${ROOT}/tattoos/${detail.id}`);
+	});
+
 	test("reads of one resource encode their path segments and unwrap { data }", async () => {
 		const { calls, fetch } = fakeFetch(() => json(200, { data: { id: "x" } }));
 		const discover = client(fetch);

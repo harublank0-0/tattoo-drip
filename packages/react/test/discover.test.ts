@@ -1,19 +1,23 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { QueryClient } from "@tanstack/react-query";
-import { createDiscoverClient, createTattooClient } from "@tattoo-drip/sdk";
+import {
+	createDiscoverClient,
+	createTattooClient,
+	isTattooApiError,
+} from "@tattoo-drip/sdk";
 import { discoverKeys, discoverQueries } from "../src/discover_queries.js";
 import { tattooKeys, tattooQueries } from "../src/queries.js";
 
 type Call = { url: string; signal: AbortSignal | null | undefined };
 
 /** A Discover client whose fetch answers every call with `body`. */
-function discoverAnswering(body: unknown) {
+function discoverAnswering(body: unknown, status = 200) {
 	const calls: Call[] = [];
 	const fetch = (async (input: RequestInfo | URL, init: RequestInit = {}) => {
 		calls.push({ url: String(input), signal: init.signal });
 		return new Response(JSON.stringify(body), {
-			status: 200,
+			status,
 			headers: { "content-type": "application/json" },
 		});
 	}) as typeof globalThis.fetch;
@@ -126,6 +130,52 @@ describe("discoverQueries", () => {
 		assert.equal(
 			calls[0].url,
 			"https://api.example.com/api/v1/discover/studios?style=blackwork&q=ink",
+		);
+	});
+
+	test("the gallery's search is in the tattoos key and travels as q (D09)", async () => {
+		const page = { data: [], nextCursor: null };
+		const { calls, client } = discoverAnswering(page);
+		const queryClient = noRetries();
+		const query = { query: "koi", country: "NP", style: "japanese" };
+		const options = discoverQueries.tattoos(client, query);
+		assert.deepEqual(options.queryKey, [...ROOT, "tattoos", query]);
+		// Another search, country or page is another entry.
+		assert.notDeepEqual(
+			discoverKeys.tattoos({ ...query, query: "lotus" }),
+			options.queryKey,
+		);
+		assert.notDeepEqual(
+			discoverKeys.tattoos({ ...query, country: "IN" }),
+			options.queryKey,
+		);
+		assert.notDeepEqual(
+			discoverKeys.tattoos({ ...query, cursor: "next" }),
+			options.queryKey,
+		);
+		await queryClient.fetchQuery(options);
+		assert.equal(
+			calls[0].url,
+			"https://api.example.com/api/v1/discover/tattoos?country=NP&style=japanese&q=koi",
+		);
+		// A list's key is never a prefix of the detail's.
+		assert.notDeepEqual(
+			discoverKeys.tattoo("t1").slice(0, 3),
+			discoverKeys.tattoos().slice(0, 3),
+		);
+	});
+
+	test("a detail's error reaches the query as the SDK's TattooApiError", async () => {
+		const { client } = discoverAnswering(
+			{ error: { code: "not_found", message: "Not found." } },
+			404,
+		);
+		await assert.rejects(
+			noRetries().fetchQuery(discoverQueries.tattoo(client, "gone")),
+			(error: unknown) =>
+				isTattooApiError(error) &&
+				error.status === 404 &&
+				error.code === "not_found",
 		);
 	});
 

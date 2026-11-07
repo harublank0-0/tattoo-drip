@@ -187,7 +187,8 @@ export interface paths {
          * Discover's tattoo photos, newest first, a page at a time
          * @description The published photos of every shown artist of every listed business,
          *     newest first. Never a photo the studio unpublished or Discover took
-         *     down. Filters, cache and limits as `listDiscoverStudios`.
+         *     down. Filters, cache and limits as `listDiscoverStudios`; a search
+         *     (`q`, D09) counts against the same search budget.
          */
         get: operations["listDiscoverTattoos"];
         put?: never;
@@ -1554,6 +1555,8 @@ export interface components {
         };
         DiscoverTattooDetail: components["schemas"]["DiscoverTattooSummary"] & {
             location: components["schemas"]["DiscoverLocation"] | null;
+            /** @description Whether the photo's artist takes new requests (their `acceptingInquiries`). The booking link still works when false; the studio site then offers its general request. */
+            artistAcceptingInquiries: boolean;
             /**
              * Format: uri
              * @description The photo's page on the studio's site
@@ -1925,6 +1928,13 @@ export interface operations {
     listDiscoverTattoos: {
         parameters: {
             query?: {
+                /**
+                 * @description Photos whose alt text, artist's name, studio's (or independent
+                 *     artist's business's) name or style name contains this text, whatever
+                 *     its case (2 to 80 characters, no control characters). Newest first,
+                 *     like every page.
+                 */
+                q?: string;
                 /** @description An ISO 3166-1 alpha-2 country code (`NP`), either case */
                 country?: components["parameters"]["DiscoverCountry"];
                 /** @description A city's `slug` (`listDiscoverLocations`); needs `country` */

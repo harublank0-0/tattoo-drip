@@ -20,6 +20,8 @@ import { Route as ExploreStudiosRouteImport } from './routes/explore/studios'
 import { Route as ExploreTattoosRouteImport } from './routes/explore/tattoos'
 import { Route as PreferencesCountryRouteImport } from './routes/preferences/country'
 import { Route as StylesSlugRouteImport } from './routes/styles/$slug'
+import { Route as TattoosIndexRouteImport } from './routes/tattoos/index'
+import { Route as TattoosSlugRouteImport } from './routes/tattoos/$slug'
 import { Route as LocationsCountryIndexRouteImport } from './routes/locations/$country/index'
 import { Route as LocationsCountryCityRouteImport } from './routes/locations/$country/$city'
 import { Route as StudiosStudioSlugIndexRouteImport } from './routes/studios/$studioSlug/index'
@@ -80,6 +82,16 @@ const StylesSlugRoute = StylesSlugRouteImport.update({
   path: '/styles/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TattoosIndexRoute = TattoosIndexRouteImport.update({
+  id: '/tattoos/',
+  path: '/tattoos/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TattoosSlugRoute = TattoosSlugRouteImport.update({
+  id: '/tattoos/$slug',
+  path: '/tattoos/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LocationsCountryIndexRoute = LocationsCountryIndexRouteImport.update({
   id: '/locations/$country/',
   path: '/locations/$country/',
@@ -114,6 +126,8 @@ export interface FileRoutesByFullPath {
   '/explore/tattoos': typeof ExploreTattoosRoute
   '/preferences/country': typeof PreferencesCountryRoute
   '/styles/$slug': typeof StylesSlugRoute
+  '/tattoos/$slug': typeof TattoosSlugRoute
+  '/tattoos/': typeof TattoosIndexRoute
   '/locations/$country/$city': typeof LocationsCountryCityRoute
   '/locations/$country/': typeof LocationsCountryIndexRoute
   '/studios/$studioSlug/': typeof StudiosStudioSlugIndexRoute
@@ -131,6 +145,8 @@ export interface FileRoutesByTo {
   '/explore/tattoos': typeof ExploreTattoosRoute
   '/preferences/country': typeof PreferencesCountryRoute
   '/styles/$slug': typeof StylesSlugRoute
+  '/tattoos/$slug': typeof TattoosSlugRoute
+  '/tattoos': typeof TattoosIndexRoute
   '/locations/$country/$city': typeof LocationsCountryCityRoute
   '/locations/$country': typeof LocationsCountryIndexRoute
   '/studios/$studioSlug': typeof StudiosStudioSlugIndexRoute
@@ -149,6 +165,8 @@ export interface FileRoutesById {
   '/explore/tattoos': typeof ExploreTattoosRoute
   '/preferences/country': typeof PreferencesCountryRoute
   '/styles/$slug': typeof StylesSlugRoute
+  '/tattoos/$slug': typeof TattoosSlugRoute
+  '/tattoos/': typeof TattoosIndexRoute
   '/locations/$country/$city': typeof LocationsCountryCityRoute
   '/locations/$country/': typeof LocationsCountryIndexRoute
   '/studios/$studioSlug/': typeof StudiosStudioSlugIndexRoute
@@ -168,6 +186,8 @@ export interface FileRouteTypes {
     | '/explore/tattoos'
     | '/preferences/country'
     | '/styles/$slug'
+    | '/tattoos/$slug'
+    | '/tattoos/'
     | '/locations/$country/$city'
     | '/locations/$country/'
     | '/studios/$studioSlug/'
@@ -185,6 +205,8 @@ export interface FileRouteTypes {
     | '/explore/tattoos'
     | '/preferences/country'
     | '/styles/$slug'
+    | '/tattoos/$slug'
+    | '/tattoos'
     | '/locations/$country/$city'
     | '/locations/$country'
     | '/studios/$studioSlug'
@@ -202,6 +224,8 @@ export interface FileRouteTypes {
     | '/explore/tattoos'
     | '/preferences/country'
     | '/styles/$slug'
+    | '/tattoos/$slug'
+    | '/tattoos/'
     | '/locations/$country/$city'
     | '/locations/$country/'
     | '/studios/$studioSlug/'
@@ -220,6 +244,8 @@ export interface RootRouteChildren {
   ExploreTattoosRoute: typeof ExploreTattoosRoute
   PreferencesCountryRoute: typeof PreferencesCountryRoute
   StylesSlugRoute: typeof StylesSlugRoute
+  TattoosSlugRoute: typeof TattoosSlugRoute
+  TattoosIndexRoute: typeof TattoosIndexRoute
   LocationsCountryCityRoute: typeof LocationsCountryCityRoute
   LocationsCountryIndexRoute: typeof LocationsCountryIndexRoute
   StudiosStudioSlugIndexRoute: typeof StudiosStudioSlugIndexRoute
@@ -305,6 +331,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StylesSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tattoos/': {
+      id: '/tattoos/'
+      path: '/tattoos'
+      fullPath: '/tattoos/'
+      preLoaderRoute: typeof TattoosIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tattoos/$slug': {
+      id: '/tattoos/$slug'
+      path: '/tattoos/$slug'
+      fullPath: '/tattoos/$slug'
+      preLoaderRoute: typeof TattoosSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/locations/$country/': {
       id: '/locations/$country/'
       path: '/locations/$country'
@@ -348,6 +388,8 @@ const rootRouteChildren: RootRouteChildren = {
   ExploreTattoosRoute: ExploreTattoosRoute,
   PreferencesCountryRoute: PreferencesCountryRoute,
   StylesSlugRoute: StylesSlugRoute,
+  TattoosSlugRoute: TattoosSlugRoute,
+  TattoosIndexRoute: TattoosIndexRoute,
   LocationsCountryCityRoute: LocationsCountryCityRoute,
   LocationsCountryIndexRoute: LocationsCountryIndexRoute,
   StudiosStudioSlugIndexRoute: StudiosStudioSlugIndexRoute,

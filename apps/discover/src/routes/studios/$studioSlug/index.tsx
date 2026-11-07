@@ -1,10 +1,12 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { MoreLink } from "#/components/directory/hub";
 import { ArtistResults } from "#/components/directory/results";
 import {
 	EditorialSection,
 	SectionHeading,
 } from "#/components/discovery/layout";
+import { ArtworkCredit } from "#/components/gallery/artwork-tile";
 import {
 	BookingActions,
 	Facts,
@@ -19,7 +21,6 @@ import {
 	workCaption,
 } from "#/components/profile/profile";
 import { bookingLinks, safeSocialUrl } from "#/lib/booking";
-import { tattooProfile } from "#/lib/destinations";
 import {
 	loadStudioProfile,
 	nearbyLinks,
@@ -168,10 +169,17 @@ function StudioProfile() {
 					title={`Recent work at ${studio.name}`}
 					intro="The newest photos its artists have published."
 					tattoos={studio.tattoos}
-					caption={(tattoo) => ({
-						text: `${tattoo.artist.name} · ${workCaption(tattoo)}`,
-						href: tattooProfile(tattoo),
-					})}
+					caption={(tattoo) => (
+						<>
+							<ArtworkCredit tattoo={tattoo} studio={false} />
+							{` · ${workCaption(tattoo)}`}
+						</>
+					)}
+					more={
+						<MoreLink to={paths.tattoos()} search={{ studio: studio.slug }}>
+							{`All work at ${studio.name}`}
+						</MoreLink>
+					}
 				/>
 			)}
 

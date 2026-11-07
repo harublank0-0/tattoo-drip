@@ -108,7 +108,9 @@ export default class DiscoverController {
 			},
 		);
 		checkCity(query);
+		if (query.q) await consumeApiLimit("discoverSearch", callerOf(ctx));
 		const page = await this.discovery.tattoos({
+			q: query.q,
 			country: query.country,
 			city: query.city,
 			style: query.style,

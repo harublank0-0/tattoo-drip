@@ -176,12 +176,13 @@ function CityPage() {
 							tone="night"
 							eyebrow="Recent work"
 							title={`Fresh from ${place.name}`}
+							more={
+								<MoreLink to={paths.tattoos()} search={here}>
+									{`All work from ${place.name}`}
+								</MoreLink>
+							}
 						>
-							<WorkColumns
-								tattoos={tattoos}
-								artists={artists}
-								studios={studios}
-							/>
+							<WorkColumns tattoos={tattoos} />
 						</HubSection>
 					)}
 				</>

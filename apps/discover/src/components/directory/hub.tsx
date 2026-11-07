@@ -1,23 +1,12 @@
 import { Link } from "@tanstack/react-router";
-import type {
-	DiscoverArtistSummary,
-	DiscoverStudioSummary,
-	DiscoverTattooSummary,
-} from "@tattoo-drip/sdk";
+import type { DiscoverTattooSummary } from "@tattoo-drip/sdk";
 import { ArrowRightIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import {
 	EditorialSection,
 	SectionHeading,
 } from "#/components/discovery/layout";
-import { ProfileLink } from "#/components/discovery/profile-link";
-import { ResponsiveImage } from "#/components/discovery/responsive-image";
-import {
-	artistSiteNote,
-	profileDestination,
-	tattooProfile,
-} from "#/lib/destinations";
-import { tattooAlt, tattooCredit } from "#/lib/home";
+import { ArtworkColumns } from "#/components/gallery/artwork-tile";
 
 /** A link to a full directory (or another page), with an arrow. */
 export function MoreLink({
@@ -74,88 +63,16 @@ export function HubSection({
 }
 
 /**
- * Where a photo links: its artist's Discover profile (D08; no note, it
- * stays on Discover), else (`PROFILE_PAGES` off) its artist's or studio's
- * page when the hub's own data holds it.
- */
-function workDestination(
-	tattoo: DiscoverTattooSummary,
-	artists: readonly DiscoverArtistSummary[],
-	studios: readonly DiscoverStudioSummary[],
-): { href: string; note?: string } | undefined {
-	const profile = tattooProfile(tattoo);
-	if (profile) return { href: profile };
-	const artist = artists.find((each) => each.id === tattoo.artist.id);
-	if (artist)
-		return {
-			href: profileDestination(artist).href,
-			note: artistSiteNote(artist),
-		};
-	const studio = studios.find((each) => each.slug === tattoo.studio.slug);
-	return studio
-		? { href: profileDestination(studio).href, note: "the studio's own site" }
-		: undefined;
-}
-
-/**
  * Recent published work in columns at each photo's true proportions (fixed
- * frames, lazy), credited "artist · studio". Discover's artwork pages are
- * D09: a photo links to its artist's profile.
+ * frames, lazy), credited "artist · studio": each photo opens its artwork
+ * page (D09), the artist's name their profile.
  */
 export function WorkColumns({
 	tattoos,
-	artists,
-	studios,
 }: {
 	tattoos: readonly DiscoverTattooSummary[];
-	artists: readonly DiscoverArtistSummary[];
-	studios: readonly DiscoverStudioSummary[];
 }) {
-	return (
-		<ul className="columns-2 gap-3 sm:columns-3 sm:gap-4 lg:columns-4 lg:gap-6">
-			{tattoos.map((tattoo) => {
-				const destination = workDestination(tattoo, artists, studios);
-				const ratio =
-					tattoo.image.width > 0 && tattoo.image.height > 0
-						? `${tattoo.image.width} / ${tattoo.image.height}`
-						: "4 / 5";
-				const body = (
-					<figure className="flex flex-col gap-2">
-						<ResponsiveImage
-							image={tattoo.image}
-							alt={tattooAlt(tattoo)}
-							ratio={ratio}
-							sizes="(min-width: 64rem) 22vw, (min-width: 40rem) 33vw, 50vw"
-							className="bg-night-raised"
-						/>
-						<figcaption className="text-sm text-night-muted">
-							{tattooCredit(tattoo)}
-						</figcaption>
-					</figure>
-				);
-				return (
-					<li key={tattoo.id} className="mb-6 break-inside-avoid">
-						{destination ? (
-							<ProfileLink
-								destination={{
-									href: destination.href,
-									external: destination.note !== undefined,
-								}}
-								className="group block"
-							>
-								{body}
-								{destination.note && (
-									<span className="sr-only">{`(${destination.note})`}</span>
-								)}
-							</ProfileLink>
-						) : (
-							body
-						)}
-					</li>
-				);
-			})}
-		</ul>
-	);
+	return <ArtworkColumns tattoos={tattoos} />;
 }
 
 /** A row of plain text links (styles, places): no counts. */

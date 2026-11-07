@@ -32,6 +32,17 @@ import type { AddressInfo } from "node:net";
  * taking requests. `scenario.links` overrides a profile's `bookingUrl` /
  * `storefrontUrl` (unsafe-link tests).
  *
+ * D09: `/tattoos/:id` (the artwork page's read) finds a photo of the list
+ * or of any profile, with its place, `artistAcceptingInquiries` (false for
+ * artist 9), its page on the studio's site and a booking link naming it
+ * (`/book?artwork=<id>&ref=…`); unknown, a malformed id, a hidden studio,
+ * a hidden artist (`<studio>/<artist>`) or a hidden photo (its id in
+ * `scenario.hidden`, standing for unpublished and taken down) is the same
+ * 404, and a hidden photo leaves the list too. An id in any letter case
+ * resolves (as the API's uuid matcher). `q` on `/tattoos` matches the
+ * photo's alt text, its artist's, studio's and style's names, as the API
+ * does since D09. `scenario.links[<id>]` overrides a photo's links.
+ *
  * Divergences from the real API: the cursor is base64url of
  * `["stub", sort, offset]` (an offset, not a keyset, so rows added while
  * paging would shift; the fixtures never change mid-test), and only the
@@ -48,7 +59,9 @@ export type Endpoint =
 	| "studio"
 	| "studio-artists"
 	| "studio-artist"
-	| "independent";
+	| "independent"
+	// D09's artwork read.
+	| "tattoo";
 
 /** The referral token the stub's booking links carry (shaped like the platform's; never verified here). */
 export const STUB_REF =
@@ -151,6 +164,72 @@ export function fixtures(count: number) {
 type Fixtures = ReturnType<typeof fixtures>;
 type StubArtist = Fixtures["artists"][number];
 type StubStudio = Fixtures["studios"][number];
+
+type StubPhoto = ReturnType<typeof profilePhotos>[number];
+
+/**
+ * Every photo the stub can show by id (D09): the list's, then every shown
+ * artist's profile photos (studios' and independents'), each with its place
+ * and its artist's request switch.
+ */
+function photoIndex(
+	data: Fixtures,
+	hidden: Set<string>,
+): Map<
+	string,
+	{ photo: StubPhoto; place: StubArtist["location"]; accepting: boolean }
+> {
+	const index = new Map<
+		string,
+		{ photo: StubPhoto; place: StubArtist["location"]; accepting: boolean }
+	>();
+	const accepting = (artistId: string | undefined) =>
+		data.artists.find((each) => each.id === artistId)?.acceptingInquiries ??
+		true;
+	data.tattoos.forEach((photo, at) => {
+		index.set(photo.id, {
+			photo: photo as StubPhoto,
+			place: data.tattooPlaces[at] ?? null,
+			accepting: accepting(photo.artist.id),
+		});
+	});
+	data.studios.forEach((studio, at) => {
+		if (hidden.has(studio.slug)) return;
+		profileArtists(data, studio)
+			.filter((artist) => !hidden.has(`${studio.slug}/${artist.slug}`))
+			.forEach((artist, n) => {
+				for (const photo of profilePhotos(artist, at * 100 + n))
+					index.set(photo.id, {
+						photo,
+						place: artist.location,
+						accepting: artist.acceptingInquiries,
+					});
+			});
+	});
+	data.artists.forEach((artist, at) => {
+		if (!artist.independent) return;
+		for (const photo of profilePhotos(artist, 5000 + at * 2))
+			index.set(photo.id, {
+				photo,
+				place: artist.location,
+				accepting: artist.acceptingInquiries,
+			});
+	});
+	return index;
+}
+
+/** Whether a photo is not shown: its studio, its artist or itself hidden. */
+function photoHidden(
+	photo: { id: string; artist: { slug?: string }; studio?: { slug?: string } },
+	hidden: Set<string>,
+): boolean {
+	const studio = photo.studio?.slug ?? "";
+	return (
+		hidden.has(photo.id) ||
+		hidden.has(studio) ||
+		hidden.has(`${studio}/${photo.artist.slug}`)
+	);
+}
 
 /** A studio's artists as its profile shows them: the list's, then (studios 1, 6, 11…) two more. */
 function profileArtists(data: Fixtures, studio: StubStudio): StubArtist[] {
@@ -326,7 +405,9 @@ export async function stubApi(count = 1): Promise<StubApi> {
 							: "studio-artist"
 						: segments[0] === "artists" && segments.length === 2
 							? "independent"
-							: "unknown"
+							: segments[0] === "tattoos" && segments.length === 2
+								? "tattoo"
+								: "unknown"
 		) as Endpoint;
 		response.setHeader("Content-Type", "application/json");
 		// For an ad hoc browser check against the stub (the real API allows DISCOVER_URL).
@@ -432,6 +513,31 @@ export async function stubApi(count = 1): Promise<StubApi> {
 				}),
 			);
 		}
+		if (endpoint === "tattoo") {
+			const id = (segments[1] ?? "").toLowerCase();
+			if (
+				!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(
+					id,
+				)
+			)
+				return missing();
+			const found = photoIndex(data, hidden).get(id);
+			if (!found || photoHidden(found.photo, hidden)) return missing();
+			const { photo, place, accepting } = found;
+			const origin = `http://${photo.studio.slug}.localhost:3000`;
+			return response.end(
+				JSON.stringify({
+					data: {
+						...photo,
+						location: place,
+						artistAcceptingInquiries: accepting,
+						storefrontUrl: `${origin}/gallery/${photo.id}`,
+						bookingUrl: `${origin}/book?artwork=${photo.id}&ref=${STUB_REF}`,
+						...scenario.links[photo.id],
+					},
+				}),
+			);
+		}
 		if (endpoint === "styles") {
 			response.end(JSON.stringify({ data: data.styles }));
 			return;
@@ -517,9 +623,23 @@ export async function stubApi(count = 1): Promise<StubApi> {
 			styles?: ({ slug: string } | undefined)[];
 			independent?: boolean;
 			slug?: string;
-			studio?: { slug?: string };
-			artist?: { id?: string };
+			studio?: { slug?: string; name?: string };
+			artist?: { id?: string; slug?: string; name?: string };
+			image?: { alt?: string | null };
 		};
+		/** D09: what `q` reads on a photo (alt text, artist, studio, style names). */
+		const photoText = (row: Row) =>
+			[
+				row.image?.alt ?? "",
+				row.artist?.name ?? "",
+				row.studio?.name ?? "",
+				...(row.styles ?? []).map(
+					(each) =>
+						STYLES.find((style) => style.slug === each?.slug)?.name ?? "",
+				),
+			]
+				.join("\n")
+				.toLowerCase();
 		const placeOf = (row: Row, index: number) =>
 			endpoint === "tattoos" ? data.tattooPlaces[index] : row.location;
 		let rows = (all as Row[])
@@ -530,13 +650,20 @@ export async function stubApi(count = 1): Promise<StubApi> {
 					(!city || place?.slug === city) &&
 					(!style || row.styles?.some((each) => each?.slug === style)) &&
 					(!q ||
-						(row.name ?? "").toLowerCase().includes(q.trim().toLowerCase())) &&
+						(endpoint === "tattoos" ? photoText(row) : (row.name ?? ""))
+							.toLowerCase()
+							.includes(q.trim().toLowerCase())) &&
 					(independent === null ||
 						row.independent === (independent === "true")) &&
 					(!studio || row.studio?.slug === studio) &&
 					(!artistId || row.artist?.id === artistId.toLowerCase()) &&
 					// Not shown (D08): gone from every list too.
 					!hidden.has(row.studio?.slug ?? "") &&
+					!(
+						endpoint === "tattoos" &&
+						(hidden.has(row.id) ||
+							hidden.has(`${row.studio?.slug}/${row.artist?.slug}`))
+					) &&
 					!(endpoint === "studios" && hidden.has(row.slug ?? "")) &&
 					!(
 						endpoint === "artists" &&

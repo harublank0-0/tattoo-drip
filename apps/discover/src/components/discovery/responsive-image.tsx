@@ -22,6 +22,7 @@ export function ResponsiveImage({
 	ratio = "4 / 5",
 	sizes = "(min-width: 64rem) 33vw, (min-width: 40rem) 50vw, 100vw",
 	priority = false,
+	eager = false,
 	fit = "cover",
 	className,
 }: {
@@ -31,8 +32,10 @@ export function ResponsiveImage({
 	/** The frame's aspect ratio; null when `className` sets it (e.g. per breakpoint). */
 	ratio?: string | null;
 	sizes?: string;
-	/** Above the fold: load at once instead of lazily. */
+	/** Above the fold: load at once instead of lazily, with high priority (the page's lead image). */
 	priority?: boolean;
+	/** Load at once, at normal priority (the rest of a gallery's first row, D09). */
+	eager?: boolean;
 	fit?: "cover" | "contain";
 	className?: string;
 }) {
@@ -56,7 +59,7 @@ export function ResponsiveImage({
 					width={image.width}
 					height={image.height}
 					alt={alt}
-					loading={priority ? "eager" : "lazy"}
+					loading={priority || eager ? "eager" : "lazy"}
 					decoding="async"
 					fetchPriority={priority ? "high" : undefined}
 					onError={() => setFailed(true)}

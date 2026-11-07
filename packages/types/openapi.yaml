@@ -295,8 +295,17 @@ paths:
       description: |
         The published photos of every shown artist of every listed business,
         newest first. Never a photo the studio unpublished or Discover took
-        down. Filters, cache and limits as `listDiscoverStudios`.
+        down. Filters, cache and limits as `listDiscoverStudios`; a search
+        (`q`, D09) counts against the same search budget.
       parameters:
+        - name: q
+          in: query
+          description: |
+            Photos whose alt text, artist's name, studio's (or independent
+            artist's business's) name or style name contains this text, whatever
+            its case (2 to 80 characters, no control characters). Newest first,
+            like every page.
+          schema: { type: string, minLength: 2, maxLength: 80 }
         - $ref: "#/components/parameters/DiscoverCountry"
         - $ref: "#/components/parameters/DiscoverCity"
         - $ref: "#/components/parameters/DiscoverStyle"
@@ -2119,10 +2128,13 @@ components:
       allOf:
         - $ref: "#/components/schemas/DiscoverTattooSummary"
         - type: object
-          required: [location, storefrontUrl, bookingUrl]
+          required: [location, artistAcceptingInquiries, storefrontUrl, bookingUrl]
           properties:
             location:
               oneOf: [{ $ref: "#/components/schemas/DiscoverLocation" }, { type: "null" }]
+            artistAcceptingInquiries:
+              type: boolean
+              description: Whether the photo's artist takes new requests (their `acceptingInquiries`). The booking link still works when false; the studio site then offers its general request.
             storefrontUrl: { type: string, format: uri, description: The photo's page on the studio's site }
             bookingUrl: { $ref: "#/components/schemas/DiscoverBookingUrl" }
 

@@ -16,8 +16,11 @@
  *   storefront's `/book`.
  * - Only the storefront's parameters survive: `artist` (an artist profile
  *   only, and only the profile's own slug: the storefront preselects by it,
- *   checked against that studio's artists) and `ref` (by shape: the
- *   platform verifies it; Discover only carries it).
+ *   checked against that studio's artists), `artwork` (D09: an artwork page
+ *   only, and only that photo's own id: the storefront's "Request a similar
+ *   tattoo", which it checks with the API and which names the photo's
+ *   artist) and `ref` (by shape: the platform verifies it; Discover only
+ *   carries it). Never `flash`: portfolio photos are not flash designs.
  *
  * Anything else is no link at all: the page then says booking isn't
  * available online here, never a guess.
@@ -28,6 +31,9 @@ export const BOOKING_PATH = "/book";
 
 /** An artist slug as the API and the storefront check it. */
 const ARTIST_SLUG = /^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/;
+/** A photo's id as the storefront's `artwork` takes it: a lowercase UUID. */
+const PHOTO_ID =
+	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /**
  * Discover's referral token as the platform writes it: base64url payload,
@@ -63,20 +69,22 @@ export function safeSiteUrl(value: unknown): URL | null {
 }
 
 export type BookingLinks = {
-	/** The storefront's request form, with `artist` and `ref` as the API gave them; null: no online booking. */
+	/** The storefront's request form, with `artist`/`artwork` and `ref` as the API gave them; null: no online booking. */
 	request: string | null;
 	/** The studio's (or artist's) page on its own site; null when it isn't safe to link. */
 	site: string | null;
 };
 
 /**
- * A profile's booking links from its API answer. `artist` is the artist
- * profile's own slug (none for a studio): the request asks for them only
- * when the API's link names exactly them.
+ * A profile's or an artwork's booking links from its API answer. `artist`
+ * is the artist profile's own slug (none for a studio), `artwork` the
+ * artwork page's own photo id: the request names them only when the API's
+ * link names exactly them.
  */
 export function bookingLinks(
 	profile: { bookingUrl: string; storefrontUrl: string },
 	artist?: string,
+	artwork?: string,
 ): BookingLinks {
 	const site = safeSiteUrl(profile.storefrontUrl);
 	const booking = safeSiteUrl(profile.bookingUrl);
@@ -92,6 +100,9 @@ export function bookingLinks(
 		const named = booking.searchParams.get("artist");
 		if (artist && named === artist && ARTIST_SLUG.test(artist))
 			out.searchParams.set("artist", artist);
+		const piece = booking.searchParams.get("artwork");
+		if (artwork && piece === artwork && PHOTO_ID.test(artwork))
+			out.searchParams.set("artwork", artwork);
 		const ref = booking.searchParams.get("ref");
 		if (isReferralShaped(ref)) out.searchParams.set("ref", ref);
 		request = out.toString();

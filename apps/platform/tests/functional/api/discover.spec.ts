@@ -69,6 +69,7 @@ const ARTIST_DETAIL_FIELDS = [
 const TATTOO_FIELDS = ["artist", "healed", "id", "image", "studio", "styles"];
 const TATTOO_DETAIL_FIELDS = [
 	...TATTOO_FIELDS,
+	"artistAcceptingInquiries",
 	"bookingUrl",
 	"location",
 	"storefrontUrl",

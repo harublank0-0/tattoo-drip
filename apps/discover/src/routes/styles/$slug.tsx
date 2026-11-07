@@ -115,14 +115,12 @@ function StylePage() {
 							eyebrow="Recent work"
 							title={`${style.name} from the studios`}
 							more={
-								<MoreLink to={paths.tattoos()}>Tattoo inspiration</MoreLink>
+								<MoreLink to={paths.tattoos()} search={filter}>
+									{`All ${style.name} tattoos`}
+								</MoreLink>
 							}
 						>
-							<WorkColumns
-								tattoos={tattoos}
-								artists={artists.data}
-								studios={studios.data}
-							/>
+							<WorkColumns tattoos={tattoos} />
 						</HubSection>
 					)}
 					{studios.data.length > 0 && (

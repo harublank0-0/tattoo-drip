@@ -15,14 +15,10 @@ import {
 } from "#/components/discovery/layout";
 import { ProfileLink } from "#/components/discovery/profile-link";
 import { ResponsiveImage } from "#/components/discovery/responsive-image";
+import { ArtworkColumns } from "#/components/gallery/artwork-tile";
 import { buttonVariants } from "#/components/ui/button";
 import { artistSiteNote, profileDestination } from "#/lib/destinations";
-import {
-	artistAffiliation,
-	artistWork,
-	tattooAlt,
-	tattooCredit,
-} from "#/lib/home";
+import { artistAffiliation, artistWork, tattooAlt } from "#/lib/home";
 import { paths } from "#/lib/routes";
 import { countryName } from "#/lib/search";
 import { cn } from "#/lib/utils";
@@ -34,13 +30,6 @@ function OwnSite({
 	children?: string;
 }) {
 	return <span className="sr-only">{children}</span>;
-}
-
-/** A photo's frame in its own proportions (a bad size falls back to 4 / 5). */
-function ratioOf(image: { width: number; height: number }): string {
-	return image.width > 0 && image.height > 0
-		? `${image.width} / ${image.height}`
-		: "4 / 5";
 }
 
 /** A section's heading with a link to the full page beside it from `lg`. */
@@ -306,16 +295,14 @@ export function ArtistsSection({
 
 /**
  * Recent work in columns at each photo's true proportions (fixed frames,
- * lazy below the fold), credited "artist · studio". A photo links to its
- * artist's Discover profile (`tattooDestination`); Discover's own artwork
- * pages are D09.
+ * lazy below the fold), credited "artist · studio". Each photo links to its
+ * artwork page (D09), the artist's name to their profile; "Explore artwork"
+ * opens the gallery.
  */
 export function InspirationSection({
 	tattoos,
-	destination,
 }: {
 	tattoos: readonly DiscoverTattooSummary[];
-	destination: (tattoo: DiscoverTattooSummary) => string | undefined;
 }) {
 	return (
 		<EditorialSection tone="night" labelledBy="inspiration-title">
@@ -326,42 +313,7 @@ export function InspirationSection({
 				intro="The newest work artists have published."
 				action={<MoreLink to={paths.tattoos()}>Explore artwork</MoreLink>}
 			/>
-			<ul className="columns-2 gap-3 sm:columns-3 sm:gap-4 lg:columns-4 lg:gap-6">
-				{tattoos.map((tattoo) => {
-					const href = destination(tattoo);
-					const body = (
-						<figure className="flex flex-col gap-2">
-							<ResponsiveImage
-								image={tattoo.image}
-								alt={tattooAlt(tattoo)}
-								ratio={ratioOf(tattoo.image)}
-								sizes="(min-width: 64rem) 22vw, (min-width: 40rem) 33vw, 50vw"
-								className="bg-night-raised"
-							/>
-							<figcaption className="text-sm text-night-muted">
-								{tattooCredit(tattoo)}
-							</figcaption>
-						</figure>
-					);
-					return (
-						<li key={tattoo.id} className="mb-6 break-inside-avoid">
-							{href ? (
-								<ProfileLink
-									destination={{ href, external: !href.startsWith("/") }}
-									className="group block"
-								>
-									{body}
-									{!href.startsWith("/") && (
-										<OwnSite>(the artist's or studio's own site)</OwnSite>
-									)}
-								</ProfileLink>
-							) : (
-								body
-							)}
-						</li>
-					);
-				})}
-			</ul>
+			<ArtworkColumns tattoos={tattoos} />
 		</EditorialSection>
 	);
 }

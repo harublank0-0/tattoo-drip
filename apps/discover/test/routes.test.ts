@@ -7,6 +7,7 @@ import {
 	hasRoute,
 	PRIMARY_NAV,
 	paths,
+	REDIRECT_FILES,
 	ROUTE_FILES,
 	ROUTE_PATTERNS,
 	studioOsLinks,
@@ -32,8 +33,9 @@ async function routeTreePaths(): Promise<Set<string>> {
 describe("Discover routes and navigation", () => {
 	test("every path listed as existing has a route in the generated tree", async () => {
 		const tree = await routeTreePaths();
-		for (const path of ROUTE_FILES)
-			assert.ok(tree.has(path), `${path} has no route`);
+		// An index route's full path ends in "/" (`/tattoos/`).
+		for (const path of [...ROUTE_FILES, ...REDIRECT_FILES])
+			assert.ok(tree.has(path) || tree.has(`${path}/`), `${path} has no route`);
 		// D07's dynamic routes (an index route's full path ends in "/").
 		for (const { route } of ROUTE_PATTERNS)
 			assert.ok(
@@ -48,7 +50,7 @@ describe("Discover routes and navigation", () => {
 		);
 	});
 
-	test("style, location and profile builders reach their routes; artwork pages don't yet (D09)", () => {
+	test("style, location, profile and artwork builders reach their routes", () => {
 		assert.equal(paths.style("fine-line"), "/styles/fine-line");
 		assert.equal(paths.location("NP"), "/locations/nepal");
 		assert.equal(paths.city("NP", "kathmandu"), "/locations/nepal/kathmandu");
@@ -61,10 +63,15 @@ describe("Discover routes and navigation", () => {
 			paths.studio("x"),
 			paths.studioArtist("x", "y"),
 			paths.independentArtist("x"),
+			paths.tattoos(),
+			paths.tattoo("0b6f8e2c-6a4a-4f1e-9a51-1b0c2d3e4f50"),
 		])
 			assert.ok(hasRoute(path), path);
+		// D09: the gallery is /tattoos; /explore/tattoos only redirects there.
+		assert.equal(paths.tattoos(), "/tattoos");
+		assert.equal(hasRoute("/explore/tattoos"), false);
 		for (const path of [
-			paths.tattoo("x"),
+			"/tattoos/x/y",
 			"/studios/x/artists",
 			"/studios/x/artists/y/z",
 			"/artists",

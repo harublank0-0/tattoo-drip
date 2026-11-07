@@ -161,12 +161,13 @@ function CountryPage() {
 							tone="night"
 							eyebrow="Recent work"
 							title={`Fresh from ${name}`}
+							more={
+								<MoreLink to={paths.tattoos()} search={inCountry}>
+									{`All work from ${name}`}
+								</MoreLink>
+							}
 						>
-							<WorkColumns
-								tattoos={tattoos}
-								artists={artists}
-								studios={studios}
-							/>
+							<WorkColumns tattoos={tattoos} />
 						</HubSection>
 					)}
 				</>

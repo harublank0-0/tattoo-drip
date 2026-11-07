@@ -18,7 +18,6 @@ import {
 	type DirectoryKind,
 	type DirectorySearch,
 	draftOf,
-	type FilterChip,
 	type FilterDraft,
 	SORTS,
 	searchFields,
@@ -67,6 +66,15 @@ function SelectField({
 	);
 }
 
+/** Who the controls filter: a directory's rows, or the gallery's photos (D09: no sort, no "who"). */
+export type FilterKind = DirectoryKind | "tattoos";
+
+const KIND_NOUN: Record<FilterKind, string> = {
+	studios: "Studios",
+	artists: "Artists",
+	tattoos: "Tattoos",
+};
+
 export type FilterLists = {
 	styles: readonly DiscoverStyle[] | undefined;
 	/** The page's country's places only. */
@@ -74,9 +82,10 @@ export type FilterLists = {
 };
 
 /**
- * The directory's filter controls: style, city (the page's country's
- * places), sort and, for artists, who (at a studio or independent). Each is
- * a real form field, so the toolbar is a GET form without JavaScript.
+ * The filter controls: style, city (the page's country's places), sort
+ * (directories only: the gallery has one order) and, for artists, who (at
+ * a studio or independent). Each is a real form field, so the toolbar is a
+ * GET form without JavaScript. No country (one artist's work): no city.
  */
 function FilterFields({
 	kind,
@@ -86,8 +95,8 @@ function FilterFields({
 	lists,
 	stacked = false,
 }: {
-	kind: DirectoryKind;
-	country: string;
+	kind: FilterKind;
+	country: string | undefined;
 	draft: FilterDraft;
 	onChange: (draft: FilterDraft) => void;
 	lists: FilterLists;
@@ -115,7 +124,7 @@ function FilterFields({
 					<option value={draft.style}>{draft.style}</option>
 				)}
 			</SelectField>
-			{(places.length > 0 || draft.city) && (
+			{country && (places.length > 0 || draft.city) && (
 				<SelectField
 					label="City"
 					name="city"
@@ -154,24 +163,26 @@ function FilterFields({
 					<option value="true">Independent</option>
 				</SelectField>
 			)}
-			<SelectField
-				label="Sort"
-				name="sort"
-				value={draft.sort ?? "newest"}
-				onChange={(value) =>
-					onChange({
-						...draft,
-						sort: value === "name" || value === "-name" ? value : undefined,
-					})
-				}
-				className={width}
-			>
-				{SORTS.map((sort) => (
-					<option key={sort} value={sort}>
-						{sortLabel(sort, kind)}
-					</option>
-				))}
-			</SelectField>
+			{kind !== "tattoos" && (
+				<SelectField
+					label="Sort"
+					name="sort"
+					value={draft.sort ?? "newest"}
+					onChange={(value) =>
+						onChange({
+							...draft,
+							sort: value === "name" || value === "-name" ? value : undefined,
+						})
+					}
+					className={width}
+				>
+					{SORTS.map((sort) => (
+						<option key={sort} value={sort}>
+							{sortLabel(sort, kind)}
+						</option>
+					))}
+				</SelectField>
+			)}
 		</>
 	);
 }
@@ -192,14 +203,17 @@ export function FilterToolbar({
 	lists,
 	onApply,
 	resetSearch,
+	hidden,
 }: {
-	kind: DirectoryKind;
+	kind: FilterKind;
 	action: string;
 	search: DirectorySearch;
-	filters: DirectorySearch & { country: string };
+	filters: DirectorySearch;
 	lists: FilterLists;
 	onApply: (draft: FilterDraft) => void;
-	resetSearch: DirectorySearch | undefined;
+	resetSearch: object | undefined;
+	/** The form's other fields (the gallery's own address); default: the directory's. */
+	hidden?: readonly [string, string][];
 }) {
 	// The selects keep the visitor's choices until Apply; the page's filters
 	// win again once it has loaded them (or after a chip, Reset, back/forward).
@@ -219,12 +233,13 @@ export function FilterToolbar({
 			}}
 			className="hidden flex-wrap items-end gap-4 noscript:flex lg:flex"
 		>
-			{searchFields({ ...search, country: search.country ?? filters.country }, [
-				"city",
-				"style",
-				"sort",
-				"independent",
-			]).map(([name, value]) => (
+			{(
+				hidden ??
+				searchFields(
+					{ ...search, country: search.country ?? filters.country },
+					["city", "style", "sort", "independent"],
+				)
+			).map(([name, value]) => (
 				<input key={name} type="hidden" name={name} value={value} />
 			))}
 			<FilterFields
@@ -262,8 +277,8 @@ export function MobileFilters({
 	onApply,
 	onReset,
 }: {
-	kind: DirectoryKind;
-	filters: DirectorySearch & { country: string };
+	kind: FilterKind;
+	filters: DirectorySearch;
 	lists: FilterLists;
 	onApply: (draft: FilterDraft) => void;
 	onReset: () => void;
@@ -294,7 +309,9 @@ export function MobileFilters({
 						Filters
 					</SheetTitle>
 					<SheetDescription>
-						{`${kind === "studios" ? "Studios" : "Artists"} in ${countryName(filters.country)}`}
+						{filters.country
+							? `${KIND_NOUN[kind]} in ${countryName(filters.country)}`
+							: KIND_NOUN[kind]}
 					</SheetDescription>
 				</SheetHeader>
 				<form
@@ -349,8 +366,8 @@ export function ActiveFilters({
 	clearAll,
 }: {
 	action: string;
-	chips: FilterChip[];
-	clearAll: DirectorySearch;
+	chips: readonly { key: string; label: string; remove: object }[];
+	clearAll: object;
 }) {
 	if (chips.length === 0) return null;
 	return (

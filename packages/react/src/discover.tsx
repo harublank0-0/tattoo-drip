@@ -3,8 +3,8 @@ import type {
 	DiscoverArtistsListQuery,
 	DiscoverClient,
 	DiscoverStudiosListQuery,
+	DiscoverTattoosListQuery,
 } from "@tattoo-drip/sdk";
-import type { DiscoverTattoosQuery } from "@tattoo-drip/types";
 import { createContext, type ReactNode, useContext } from "react";
 import { discoverQueries } from "./discover_queries.js";
 
@@ -74,7 +74,7 @@ export function useDiscoverIndependentArtist(slug: string) {
 }
 
 /** A page of published tattoo photos, newest first (`client.tattoos.list`). */
-export function useDiscoverTattoos(query?: DiscoverTattoosQuery) {
+export function useDiscoverTattoos(query?: DiscoverTattoosListQuery) {
 	return useQuery(discoverQueries.tattoos(useDiscoverClient(), query));
 }
 
