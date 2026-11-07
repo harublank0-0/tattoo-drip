@@ -53,6 +53,47 @@ describe("Discover routes and navigation", () => {
 		}
 	});
 
+	test("the header, the mobile menu and the footer reach every required destination", async () => {
+		const business = businessNav(STUDIO_OS);
+		assert.deepEqual(
+			[...PRIMARY_NAV, ...Object.values(business)].map((link) => link.label),
+			[
+				"Explore studios",
+				"Find artists",
+				"Tattoo inspiration",
+				"For studios",
+				"Pricing",
+				"Sign in",
+				"Get started",
+			],
+		);
+		// Desktop and mobile both render every business link (D06 added Pricing to the header).
+		for (const file of ["site-header.tsx", "mobile-nav.tsx"]) {
+			const source = await readFile(
+				new URL(`../src/components/layout/${file}`, import.meta.url),
+				"utf8",
+			);
+			assert.match(source, /PRIMARY_NAV\.map/, file);
+			for (const key of Object.keys(business))
+				assert.match(
+					source,
+					new RegExp(`business\\.${key}\\b`),
+					`${file}: ${key}`,
+				);
+		}
+		// Every footer link is a route or Studio OS's own origin.
+		for (const link of footerGroups(STUDIO_OS).flatMap(
+			(group) => group.links,
+		)) {
+			if (link.kind === "internal")
+				assert.ok(
+					(ROUTE_FILES as readonly string[]).includes(link.to),
+					link.to,
+				);
+			else assert.equal(new URL(link.href).origin, STUDIO_OS, link.label);
+		}
+	});
+
 	test("Sign in and Get started go to Studio OS's own origin", () => {
 		assert.deepEqual(studioOsLinks(STUDIO_OS), {
 			signIn: "https://app.tattoodrip.app/login",

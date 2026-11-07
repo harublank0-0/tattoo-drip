@@ -5,7 +5,7 @@ import { Wordmark } from "./wordmark.tsx";
 /**
  * The global footer (D05): a dark editorial band with the wordmark large,
  * then only destinations that exist. The privacy policy and terms are not
- * written yet (D06, after the product owner's review), so they are named
+ * published yet (they need the product owner's review), so they are named
  * as coming, never linked to a page that would look approved.
  */
 export function SiteFooter({ studioOsUrl }: { studioOsUrl: string }) {

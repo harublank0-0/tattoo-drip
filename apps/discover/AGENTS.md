@@ -1,6 +1,6 @@
 # Discover
 
-The public discovery site (`tattoodrip.app`, D05 onward): TanStack Start + Router + Query, React 19, Tailwind v4 and shadcn/ui. File routes: `src/routes`; UI primitives: `src/components/ui`; site shell: `src/components/layout`; discovery primitives: `src/components/discovery`; settings, context, routes, SEO: `src/lib`. Imports: `#/` maps to `src/`.
+The public discovery site (`tattoodrip.app`, D05 onward): TanStack Start + Router + Query, React 19, Tailwind v4 and shadcn/ui. File routes: `src/routes`; UI primitives: `src/components/ui`; site shell: `src/components/layout`; discovery primitives: `src/components/discovery`; homepage sections: `src/components/home`; settings, context, routes, SEO: `src/lib`. Imports: `#/` maps to `src/`.
 
 Boundaries are in the [root instructions](../../AGENTS.md): no database, no auth, no platform imports. Every read goes through `createDiscoverClient` (`@tattoo-drip/sdk`) and `discoverQueries` (`@tattoo-drip/react`) from the router context (`context.discover.client`, `context.queryClient`), one of each per request. Read [frontend guidance](../../docs/discover/frontend.md) before changing routes, data loading, settings, SEO or design tokens.
 

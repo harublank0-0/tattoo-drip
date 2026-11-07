@@ -16,6 +16,7 @@ This file is the plan Discover prompts work from. The dated `docs/superpowers/sp
 | D03: public Discover API, SDK client, React hooks | Done: [Discover API](api.md); deviations in C.4 below |
 | D04: Studio OS publication controls | Done: [publication controls](publication-controls.md); deviations in C.5 below |
 | D05: Discover app scaffold and design system | Done: [frontend](frontend.md); deviations in C.6 below |
+| D06: homepage and Studio OS marketing | Done: [frontend](frontend.md#homepage-d06); deviations in C.7 below |
 
 Status legend: **Done** = in code, with tests where noted. **Partial** = exists, but not in the form Discover needs. **Planned** = only in docs. **Missing** = searched for and absent. **Unverified** = not checked against a running system.
 
@@ -244,6 +245,18 @@ Details in [frontend](frontend.md).
 - **No named server keys yet**: server reads are anonymous (per-address limits); a key with visitor forwarding is needed before launch (D11).
 - **No message catalog, `packages/ui`, JSON-LD helpers or 503 page**: the copy lives in the components, the primitives in `apps/discover`, structured data is D10, and an API failure is the route's error state. `DISCOVER_INDEXING`, robots and the sitemap stub are in.
 - **Compose service** behind a `discover` profile and a separate Docker build stage, so production builds and starts nothing new before D11.
+
+### C.7 As built in D06 (deviations from G and the D06 row)
+
+Details in [frontend](frontend.md#homepage-d06).
+
+- **No legal pages.** `/terms` and `/privacy` were left out of D06 by the product owner's prompt; the footer still says they are coming.
+- **Homepage order** follows the D06 prompt: hero, styles, studios, artists, inspiration, places, how booking works, the Studio OS band, a closing call. No city picker in the hero (the places section does the job); the search covers studio names only, the one text search the API has.
+- **Artists** include studio artists and independents (G's "Independent artists" section is broader); studios and artists use the API's `newest` order, headed "Recently listed" / "Recently added".
+- **`/explore/studios`** takes `country`, `city` and `style` as plain parameters with chips (no D07 filter bar); `/explore/artists` is a live first page. Unknown styles are dropped before the API (it would 422).
+- **`/pricing` stays `noindex`**: no prices exist (no billing code in the platform). `/for-studios` is indexable.
+- **Token fix:** the semantic colour tokens were `@theme inline`, so `.night` never overrode them; they are a plain `@theme` now.
+- **Not measured:** the D06 row's Lighthouse targets need a deployed build with real images (D10).
 
 ## D. Data model gap analysis
 

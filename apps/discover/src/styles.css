@@ -102,8 +102,13 @@
 	}
 }
 
-/* Semantic tokens (shadcn names, so its components read them). */
-@theme inline {
+/*
+ * Semantic tokens (shadcn names, so its components read them). Not `inline`:
+ * the utilities must read these variables (text-muted-foreground is
+ * var(--color-muted-foreground)), so `.night` can redefine them for its
+ * section. Inlined, they would keep the paper values on night (D06 fix).
+ */
+@theme {
 	--color-background: var(--color-paper);
 	--color-foreground: var(--color-ink);
 	--color-muted: var(--color-paper-sunk);
