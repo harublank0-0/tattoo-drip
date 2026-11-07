@@ -35,6 +35,20 @@ export const API_LIMITS = {
 		anonymous: { requests: 60, duration: "1 hour" },
 		storefront: { requests: 60, duration: "1 hour" },
 	},
+	/** Discover's reads (D03), per caller, below the gate's callerReads: a page costs a few. */
+	discoverReads: {
+		scope: "caller",
+		methods: "reads",
+		anonymous: { requests: 200, duration: "5 mins" },
+		storefront: { requests: 200, duration: "5 mins" },
+	},
+	/** Discover's name searches (`q`, D03): each is a scan of the listed rows, so fewer. */
+	discoverSearch: {
+		scope: "caller",
+		methods: "reads",
+		anonymous: { requests: 60, duration: "5 mins" },
+		storefront: { requests: 60, duration: "5 mins" },
+	},
 	/** Containment: a flood aimed at one studio can't take the platform; the pages' bucket is the storefront's. */
 	tenantReads: {
 		scope: "tenant",

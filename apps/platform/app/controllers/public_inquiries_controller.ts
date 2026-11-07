@@ -61,7 +61,12 @@ export default class PublicInquiriesController {
 				"perPhone",
 				intakePhoneKey(tenant.id, submission.contactPhone),
 			);
-			const inquiry = await this.intake.submit(tenant, submission);
+			// Discover's referral token (D03), from the body only, unchecked here:
+			// the service verifies it for this studio, and a bad one never
+			// refuses the inquiry (so it is no validator field, whose errors would).
+			const inquiry = await this.intake.submit(tenant, submission, {
+				referral: request.body().referral,
+			});
 			response.status(201);
 			return await ctx.serialize(InquiryReceiptTransformer.transform(inquiry));
 		} catch (error) {

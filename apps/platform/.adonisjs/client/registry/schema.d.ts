@@ -1435,6 +1435,126 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_styles_controller').default['index']>>>
     }
   }
+  'api.v1.discover.studios.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/discover/studios'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: ExtractQueryForGet<InferInput<(typeof import('#modules/discovery/validators/discover').listDiscoverStudiosValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['studios']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['studios']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'api.v1.discover.studios.show': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/discover/studios/:studio'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { studio: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['studio']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['studio']>>>
+    }
+  }
+  'api.v1.discover.studios.artists.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/discover/studios/:studio/artists'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { studio: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['studioArtists']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['studioArtists']>>>
+    }
+  }
+  'api.v1.discover.studios.artists.show': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/discover/studios/:studio/artists/:artist'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { studio: ParamValue; artist: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['studioArtist']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['studioArtist']>>>
+    }
+  }
+  'api.v1.discover.artists.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/discover/artists'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: ExtractQueryForGet<InferInput<(typeof import('#modules/discovery/validators/discover').listDiscoverArtistsValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['artists']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['artists']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'api.v1.discover.artists.show': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/discover/artists/:artist'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { artist: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['independentArtist']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['independentArtist']>>>
+    }
+  }
+  'api.v1.discover.tattoos.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/discover/tattoos'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: ExtractQueryForGet<InferInput<(typeof import('#modules/discovery/validators/discover').listDiscoverTattoosValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['tattoos']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['tattoos']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'api.v1.discover.tattoos.show': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/discover/tattoos/:tattoo'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tattoo: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['tattoo']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['tattoo']>>>
+    }
+  }
+  'api.v1.discover.styles.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/discover/styles'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['styles']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['styles']>>>
+    }
+  }
+  'api.v1.discover.locations.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/discover/locations'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['locations']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['locations']>>>
+    }
+  }
   'api.v1.studio': {
     methods: ["GET","HEAD"]
     pattern: '/api/v1/tenants/:tenant'

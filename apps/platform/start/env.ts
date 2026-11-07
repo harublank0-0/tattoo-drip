@@ -12,6 +12,7 @@
 import { Env } from "@adonisjs/core/env";
 import { checkAppOrigin } from "#services/app_origin";
 import { checkChallengeSecret } from "#services/challenge_secret";
+import { checkPlatformOrigins } from "#services/platform_origins";
 import { checkServerKeys } from "#services/server_keys";
 import { checkStorageSettings } from "#services/storage_settings";
 import { checkStorefrontUrl } from "#services/storefront_url";
@@ -27,6 +28,15 @@ const env = await Env.create(new URL("../", import.meta.url), {
 	// App
 	APP_KEY: Env.schema.secret(),
 	APP_URL: Env.schema.string({ format: "url", tld: false }),
+	// The public API's origin (Discover D01), e.g. https://api.example.com.
+	// Unset, the API is served from APP_URL's host, as before. Set to another
+	// host, that host serves /api only. The storefront's API_URL names the same
+	// origin. Checked with DISCOVER_URL below.
+	API_URL: (_key: string, value?: string) => value?.trim() || undefined,
+	// The Discover site's origin (Discover D01), e.g. https://example.com: a
+	// browser origin the API allows, never the dashboard's or the API's host.
+	// Unset until Discover is deployed (docs/discover/domain-migration.md).
+	DISCOVER_URL: (_key: string, value?: string) => value?.trim() || undefined,
 	// The studio pages' origin with {tenant} for the slug, e.g.
 	// https://{tenant}.example.com: deposit links are built from it (TAT-65).
 	// Required in production; unset in development and tests it is
@@ -92,6 +102,16 @@ checkAppOrigin(
 	env.get("STOREFRONT_URL"),
 	env.get("NODE_ENV") === "production",
 );
+
+// API_URL and DISCOVER_URL: origins of their own shape; Discover on a host of
+// its own; in production https and off the studio pages' domain, like APP_URL.
+checkPlatformOrigins({
+	appUrl: env.get("APP_URL"),
+	apiUrl: env.get("API_URL"),
+	discoverUrl: env.get("DISCOVER_URL"),
+	storefrontTemplate: env.get("STOREFRONT_URL"),
+	production: env.get("NODE_ENV") === "production",
+});
 
 // All six R2 settings or none; production needs them (TAT-27). Checked once
 // all are read, since a partial set is an error.

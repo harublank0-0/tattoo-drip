@@ -10,6 +10,13 @@ export {
 	type TattooClientOptions,
 } from "./client.js";
 export {
+	createDiscoverClient,
+	type DiscoverArtistsListQuery,
+	type DiscoverClient,
+	type DiscoverClientOptions,
+	type DiscoverStudiosListQuery,
+} from "./discover.js";
+export {
 	isTattooApiError,
 	TattooApiError,
 	type TattooApiErrorOptions,

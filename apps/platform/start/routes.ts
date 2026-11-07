@@ -12,6 +12,7 @@ import { controllers } from "#generated/controllers";
 import { ARTIST_SLUG } from "#modules/artists/validators/artist";
 import { ACCOUNT_TOKEN } from "#modules/identity/account_tokens";
 import { DEPOSIT_TOKEN } from "#modules/payments/deposit_links";
+import { STORED_SLUG } from "#modules/tenancy/slugs";
 import { middleware } from "#start/kernel";
 import {
 	throttleAccountLinks,
@@ -646,6 +647,66 @@ router
 			.get("/styles", [controllers.PublicStyles, "index"])
 			.use(middleware.publicCache())
 			.as("api.v1.styles.index");
+
+		/**
+		 * Discover (D03, docs/discover/api.md): what every listed studio
+		 * publishes, under no studio and with no tenant or user context. The
+		 * reads go only through the `discovery` views (D02,
+		 * DiscoveryService). Slugs and ids of the wrong shape are the router's
+		 * 404 without a query. Cached for a minute, and a minute stale: a studio
+		 * that stops listing leaves every answer within two.
+		 */
+		router
+			.group(() => {
+				router
+					.get("/studios", [controllers.Discover, "studios"])
+					.as("api.v1.discover.studios.index");
+				router
+					.get("/studios/:studio", [controllers.Discover, "studio"])
+					.where("studio", STORED_SLUG)
+					.as("api.v1.discover.studios.show");
+				router
+					.get("/studios/:studio/artists", [
+						controllers.Discover,
+						"studioArtists",
+					])
+					.where("studio", STORED_SLUG)
+					.as("api.v1.discover.studios.artists.index");
+				router
+					.get("/studios/:studio/artists/:artist", [
+						controllers.Discover,
+						"studioArtist",
+					])
+					.where("studio", STORED_SLUG)
+					.where("artist", ARTIST_SLUG)
+					.as("api.v1.discover.studios.artists.show");
+				router
+					.get("/artists", [controllers.Discover, "artists"])
+					.as("api.v1.discover.artists.index");
+				// An independent artist, by their business's slug.
+				router
+					.get("/artists/:artist", [controllers.Discover, "independentArtist"])
+					.where("artist", STORED_SLUG)
+					.as("api.v1.discover.artists.show");
+				router
+					.get("/tattoos", [controllers.Discover, "tattoos"])
+					.as("api.v1.discover.tattoos.index");
+				router
+					.get("/tattoos/:tattoo", [controllers.Discover, "tattoo"])
+					.where("tattoo", router.matchers.uuid())
+					.as("api.v1.discover.tattoos.show");
+				router
+					.get("/styles", [controllers.Discover, "styles"])
+					.as("api.v1.discover.styles.index");
+				router
+					.get("/locations", [controllers.Discover, "locations"])
+					.as("api.v1.discover.locations.index");
+			})
+			.prefix("/discover")
+			.use([
+				middleware.apiLimit({ name: "discoverReads" }),
+				middleware.publicCache({ maxAge: 60, staleWhileRevalidate: 60 }),
+			]);
 
 		/**
 		 * One tenant's public data. The tenant is the path's slug, current or

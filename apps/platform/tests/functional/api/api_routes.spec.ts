@@ -146,6 +146,23 @@ test.group("Public API routes", () => {
 		);
 	});
 
+	test("every Discover route is a cached, limited read with no tenant (D03)", ({
+		assert,
+	}) => {
+		const routes = allRoutes().filter(({ pattern }) =>
+			pattern.startsWith("/api/v1/discover/"),
+		);
+		assert.lengthOf(routes, 10);
+
+		for (const { pattern, methods, named } of routes) {
+			assert.deepEqual(methods, ["GET"], pattern);
+			assert.include(named, "apiLimit", pattern);
+			assert.include(named, "publicCache", pattern);
+			assert.notInclude(named, "publicTenant", pattern);
+			assert.notInclude(named, "intakeGuard", pattern);
+		}
+	});
+
 	test("the body parser reads no multipart body itself", ({ assert }) => {
 		assert.isFalse(
 			bodyParserConfig.multipart.autoProcess,

@@ -51,3 +51,35 @@ export type WorkPage =
 	operations["listWork"]["responses"][200]["content"]["application/json"];
 export type FlashPage =
 	operations["listFlash"]["responses"][200]["content"]["application/json"];
+
+// Discover (D03): cross-studio public reads, under no studio.
+export type DiscoverLocation = Schemas["DiscoverLocation"];
+export type DiscoverStudioRef = Schemas["DiscoverStudioRef"];
+export type DiscoverStudioSummary = Schemas["DiscoverStudioSummary"];
+export type DiscoverStudioDetail = Schemas["DiscoverStudioDetail"];
+export type DiscoverArtistSummary = Schemas["DiscoverArtistSummary"];
+export type DiscoverArtistDetail = Schemas["DiscoverArtistDetail"];
+export type DiscoverTattooSummary = Schemas["DiscoverTattooSummary"];
+export type DiscoverTattooDetail = Schemas["DiscoverTattooDetail"];
+export type DiscoverStyle = Schemas["TattooStyle"];
+/** `sort` of the studio and artist lists. */
+export type DiscoverSort = NonNullable<
+	operations["listDiscoverStudios"]["parameters"]["query"]
+>["sort"];
+/** A page of a Discover list: its items and the cursor of the next page. */
+export type DiscoverListResponse<T> = { data: T[]; nextCursor: string | null };
+export type DiscoverStudiosQuery = NonNullable<
+	operations["listDiscoverStudios"]["parameters"]["query"]
+>;
+export type DiscoverArtistsQuery = NonNullable<
+	operations["listDiscoverArtists"]["parameters"]["query"]
+>;
+export type DiscoverTattoosQuery = NonNullable<
+	operations["listDiscoverTattoos"]["parameters"]["query"]
+>;
+export type DiscoverStudiosPage =
+	operations["listDiscoverStudios"]["responses"][200]["content"]["application/json"];
+export type DiscoverArtistsPage =
+	operations["listDiscoverArtists"]["responses"][200]["content"]["application/json"];
+export type DiscoverTattoosPage =
+	operations["listDiscoverTattoos"]["responses"][200]["content"]["application/json"];

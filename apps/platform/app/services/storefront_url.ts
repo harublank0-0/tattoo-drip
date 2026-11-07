@@ -7,6 +7,9 @@
 
 const EXAMPLE = "https://{tenant}.example.com";
 
+/** The studio pages' template while STOREFRONT_URL is unset: TAT-12's dev host. */
+export const DEV_STOREFRONT_URL = "http://{tenant}.localhost:3000";
+
 /** A studio's slug for checking a template's shape. */
 function originOf(template: string, slug: string): URL {
 	return new URL(template.replaceAll("{tenant}", slug));
@@ -118,6 +121,27 @@ export function artworkPageUrl(
 	photoId: string,
 ): string {
 	return `${galleryPageUrl(template, studioSlug)}/${photoId}`;
+}
+
+/**
+ * The studio page's booking form (Discover D03): `/book` on the studio's
+ * origin, optionally asking for one artist (`artist`, their slug) or a piece
+ * like one of the gallery's (`artwork`, its id: the storefront picks its
+ * artist), with Discover's referral token (`ref`). Every part is ours: the
+ * origin from the template, the values as query parameters, so no input can
+ * send the link elsewhere. The storefront's `/book` reads `artist`, `artwork`
+ * and `flash`, and drops what it does not know.
+ */
+export function bookingPageUrl(
+	template: string,
+	studioSlug: string,
+	options: { artist?: string; artwork?: string; ref?: string } = {},
+): string {
+	const url = new URL("/book", studioPageUrl(template, studioSlug));
+	if (options.artist) url.searchParams.set("artist", options.artist);
+	if (options.artwork) url.searchParams.set("artwork", options.artwork);
+	if (options.ref) url.searchParams.set("ref", options.ref);
+	return url.toString();
 }
 
 /**

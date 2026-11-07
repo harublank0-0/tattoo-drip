@@ -115,6 +115,49 @@ describe("createTattooClient", () => {
 		);
 	});
 
+	test("every read is rooted at the configured origin, the live single host or the split API host (Discover D01)", async () => {
+		for (const baseUrl of [
+			"https://tattoodrip.app",
+			"https://api.tattoodrip.app",
+			"http://api.localhost:3333",
+		]) {
+			const { calls, fetch } = fakeFetch((call) =>
+				json(
+					200,
+					call.url.includes("/work?") ||
+						call.url.endsWith("/work") ||
+						call.url.includes("/flash")
+						? { data: [], nextCursor: null, filters: {} }
+						: { data: {} },
+				),
+			);
+			const api = createTattooClient({ baseUrl, tenant: "needle", fetch });
+
+			await api.studio.get();
+			await api.artists.list();
+			await api.artists.get("ram");
+			await api.work.list({ style: "fine-line" });
+			await api.flash.list();
+			await api.styles.list();
+
+			assert.deepEqual(
+				calls.map((call) => call.url),
+				[
+					`${baseUrl}/api/v1/tenants/needle`,
+					`${baseUrl}/api/v1/tenants/needle/artists`,
+					`${baseUrl}/api/v1/tenants/needle/artists/ram`,
+					`${baseUrl}/api/v1/tenants/needle/work?style=fine-line`,
+					`${baseUrl}/api/v1/tenants/needle/flash`,
+					`${baseUrl}/api/v1/styles`,
+				],
+				baseUrl,
+			);
+			for (const call of calls) {
+				assert.equal(call.init.credentials, "omit", call.url);
+			}
+		}
+	});
+
 	test("turns the error envelope into a TattooApiError with its fields", async () => {
 		const { fetch } = fakeFetch(() =>
 			json(422, {

@@ -18,7 +18,8 @@ import {
 	tempUploads,
 } from "#tests/helpers/uploads";
 
-const ORIGIN = "https://intake-needle-51.tattoodrip.com";
+// The studio's own page (.env.test's STOREFRONT_URL): an allowed browser origin.
+const ORIGIN = "http://intake-needle-51.localhost:3000";
 
 test.group("Public API: POST /inquiries across studios", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
@@ -130,7 +131,7 @@ test.group("Public API: POST /inquiries across studios", (group) => {
 		);
 	});
 
-	test("CORS: a multipart POST from another origin is readable, and its preflight passes", async ({
+	test("CORS: a multipart POST from the studio's page is readable, and its preflight passes", async ({
 		client,
 		assert,
 	}) => {
@@ -150,10 +151,10 @@ test.group("Public API: POST /inquiries across studios", (group) => {
 			);
 
 		post.assertStatus(201);
-		post.assertHeader("access-control-allow-origin", "*");
+		post.assertHeader("access-control-allow-origin", ORIGIN);
 		assert.isUndefined(post.header("access-control-allow-credentials"));
 		preflight.assertStatus(204);
-		preflight.assertHeader("access-control-allow-origin", "*");
+		preflight.assertHeader("access-control-allow-origin", ORIGIN);
 		preflight.assertHeader("access-control-allow-methods", "GET,HEAD,POST");
 		preflight.assertHeader(
 			"access-control-allow-headers",

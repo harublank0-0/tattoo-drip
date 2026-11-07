@@ -24,6 +24,9 @@ server.errorHandler(() => import("#exceptions/handler"));
  */
 server.use([
 	() => import("#middleware/container_bindings_middleware"),
+	// On the API's own host and Discover's, only /api answers (Discover D01);
+	// before static files, so no page or file is served there either.
+	() => import("#middleware/api_host_middleware"),
 	() => import("@adonisjs/static/static_middleware"),
 	() => import("@adonisjs/cors/cors_middleware"),
 	() => import("@adonisjs/vite/vite_middleware"),

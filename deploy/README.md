@@ -695,9 +695,21 @@ Edit the file (2.4), then recreate the services that read it. The settings of `w
 docker compose -f /srv/tattoo-drip/app/deploy/compose.yml up -d --force-recreate web worker
 ```
 
-Nothing else is needed: nginx reaches `web` and `storefront` by fixed addresses (`172.30.42.11` and `172.30.42.12`, set in `deploy/compose.yml` and `deploy/nginx/nginx.conf`), so it finds a recreated or restarted container at once, and after a reboot too (4.10 checks both). The site answers `502` (or `504`) for the few seconds the new container takes to start. For the storefront use `storefront` in place of `web worker`. For the tunnel (`tunnel.env`) use `cloudflared`. `postgres.env` only counts when the database is first created; changing it later changes nothing.
+Nothing else is needed: nginx reaches `web` and `storefront` by fixed addresses (`172.30.42.11` and `172.30.42.12`, set in `deploy/compose.yml` and `deploy/nginx/common.conf`), so it finds a recreated or restarted container at once, and after a reboot too (4.10 checks both). The site answers `502` (or `504`) for the few seconds the new container takes to start. For the storefront use `storefront` in place of `web worker`. For the tunnel (`tunnel.env`) use `cloudflared`. `postgres.env` only counts when the database is first created; changing it later changes nothing.
 
 ---
+
+### Once, before deploying the Discover database (D02)
+
+The Discover migrations need the database role `tattoo_drip_discovery`, which `setup_roles.sql` creates. A new server's database gets it at its first start; this one ran the older script, so run the current one once before `deploy.sh` (it is safe to run again, and changes nothing else):
+
+```bash
+cd /srv/tattoo-drip/app && git pull --ff-only
+docker compose -f deploy/compose.yml exec -T postgres sh -c \
+  'psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v app_user="$APP_DB_USER" -v app_password="$APP_DB_PASSWORD" -v owner_user="$POSTGRES_USER" -f /opt/setup_roles.sql'
+```
+
+**You should see:** no `ERROR`. Without it, the migration stops with "the role tattoo_drip_discovery is missing" and the old release keeps running. Details: [Discover database security](../docs/discover/database-security.md).
 
 ## 6. Backups
 

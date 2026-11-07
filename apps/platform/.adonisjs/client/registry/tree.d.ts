@@ -229,6 +229,30 @@ export interface ApiDefinition {
       styles: {
         index: typeof routes['api.v1.styles.index']
       }
+      discover: {
+        studios: {
+          index: typeof routes['api.v1.discover.studios.index']
+          show: typeof routes['api.v1.discover.studios.show']
+          artists: {
+            index: typeof routes['api.v1.discover.studios.artists.index']
+            show: typeof routes['api.v1.discover.studios.artists.show']
+          }
+        }
+        artists: {
+          index: typeof routes['api.v1.discover.artists.index']
+          show: typeof routes['api.v1.discover.artists.show']
+        }
+        tattoos: {
+          index: typeof routes['api.v1.discover.tattoos.index']
+          show: typeof routes['api.v1.discover.tattoos.show']
+        }
+        styles: {
+          index: typeof routes['api.v1.discover.styles.index']
+        }
+        locations: {
+          index: typeof routes['api.v1.discover.locations.index']
+        }
+      }
       studio: typeof routes['api.v1.studio']
       artists: {
         index: typeof routes['api.v1.artists.index']

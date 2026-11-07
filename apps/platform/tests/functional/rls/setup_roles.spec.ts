@@ -109,6 +109,51 @@ test.group("setup_roles.sql", (group) => {
 		});
 	});
 
+	test("run again on a migrated database, it leaves places read-only (Discover D02)", async ({
+		assert,
+	}) => {
+		await setupRoles(ROLE);
+		await setupRoles(ROLE);
+
+		const { rows } = await owner().rawQuery(
+			`select has_table_privilege(?, 'public.places', 'SELECT') as can_select,
+			        has_table_privilege(?, 'public.places', 'INSERT')
+			          or has_table_privilege(?, 'public.places', 'UPDATE')
+			          or has_table_privilege(?, 'public.places', 'DELETE')
+			          or has_table_privilege(?, 'public.places', 'TRUNCATE') as can_change`,
+			[ROLE, ROLE, ROLE, ROLE, ROLE],
+		);
+		assert.deepEqual(rows[0], { can_select: true, can_change: false });
+	});
+
+	test("puts the discovery role back to a powerless, memberless role (Discover D02)", async ({
+		assert,
+	}) => {
+		await setupRoles(ROLE);
+		// Everything the role must never have, and a member who could act as it.
+		await owner().rawQuery(
+			"alter role tattoo_drip_discovery login bypassrls createrole inherit",
+		);
+		await owner().rawQuery(`grant tattoo_drip_discovery to ${ROLE}`);
+
+		await setupRoles(ROLE);
+
+		const { rows } = await owner().rawQuery(
+			`select rolcanlogin, rolsuper, rolbypassrls, rolcreaterole, rolinherit,
+			        (select count(*)::int from pg_auth_members m
+			         where m.roleid = r.oid or m.member = r.oid) as memberships
+			 from pg_roles r where rolname = 'tattoo_drip_discovery'`,
+		);
+		assert.deepEqual(rows[0], {
+			rolcanlogin: false,
+			rolsuper: false,
+			rolbypassrls: false,
+			rolcreaterole: false,
+			rolinherit: false,
+			memberships: 0,
+		});
+	});
+
 	test("refuses identical app and owner names", async ({ assert }) => {
 		await assert.rejects(
 			() => setupRoles(env.get("DB_MIGRATION_USER")),

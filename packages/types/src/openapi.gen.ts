@@ -24,6 +24,243 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/discover/studios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Discover's listed studios, a page at a time
+         * @description Studios (not independent artists: see `listDiscoverArtists`) whose
+         *     owners listed them on Discover, that are not taken down. Under no
+         *     studio and with no session. The filters combine; one that matches
+         *     nothing is an empty page. Cacheable for a minute (and a minute
+         *     stale): a studio that stops listing leaves the answers within two.
+         *     A request with `q` also counts against a smaller search limit.
+         */
+        get: operations["listDiscoverStudios"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/studios/{studio}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A studio's slug, current or old */
+                studio: components["parameters"]["DiscoverStudio"];
+            };
+            cookie?: never;
+        };
+        /**
+         * One listed studio, with its artists and newest photos
+         * @description By its current slug or an old one (the answer names the current
+         *     `slug`: link to that). A studio that is not listed, taken down,
+         *     deleted, unknown, or an independent artist (`getDiscoverIndependentArtist`)
+         *     is the same 404. Cacheable like the list.
+         */
+        get: operations["getDiscoverStudio"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/studios/{studio}/artists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A studio's slug, current or old */
+                studio: components["parameters"]["DiscoverStudio"];
+            };
+            cookie?: never;
+        };
+        /**
+         * A listed studio's artists on Discover, by name
+         * @description Every shown artist of the studio (at most 100), by name. 404 like `getDiscoverStudio`.
+         */
+        get: operations["listDiscoverStudioArtists"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/studios/{studio}/artists/{artist}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A studio's slug, current or old */
+                studio: components["parameters"]["DiscoverStudio"];
+                /**
+                 * @description The artist's slug, matched exactly: never case-folded. An artist's
+                 *     old slug is not kept: after a change it is a 404.
+                 */
+                artist: components["parameters"]["ArtistSlug"];
+            };
+            cookie?: never;
+        };
+        /**
+         * One artist at a listed studio
+         * @description An artist's slug is unique per studio only, so the studio's slug
+         *     comes first. An artist who opted out of Discover, is hidden on the
+         *     studio page or deleted, an unknown one, and any artist of a studio
+         *     that is not shown are the same 404.
+         */
+        get: operations["getDiscoverStudioArtist"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/artists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Discover's artists, a page at a time
+         * @description The shown artists of every listed business: studios' artists and
+         *     independent artists (`independent`). Filters, cache and limits as
+         *     `listDiscoverStudios`; a location is the artist's studio's.
+         */
+        get: operations["listDiscoverArtists"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/artists/{artist}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The independent artist's business slug (their studio page's) */
+                artist: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * One listed independent artist
+         * @description A business of type `independent`, by its current or an old slug:
+         *     its shown artist profile (the first made, if it has several). A
+         *     studio's slug, and anything not shown, are the same 404.
+         */
+        get: operations["getDiscoverIndependentArtist"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/tattoos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Discover's tattoo photos, newest first, a page at a time
+         * @description The published photos of every shown artist of every listed business,
+         *     newest first. Never a photo the studio unpublished or Discover took
+         *     down. Filters, cache and limits as `listDiscoverStudios`.
+         */
+        get: operations["listDiscoverTattoos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/tattoos/{tattoo}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A photo's `id` */
+                tattoo: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * One published tattoo photo
+         * @description The photo, where it is on the studio's page and how to ask for one like it. Anything not shown is a 404.
+         */
+        get: operations["getDiscoverTattoo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/styles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The styles Discover filters by
+         * @description The platform's fixed list of styles (`listStyles`), in its order. Cacheable.
+         */
+        get: operations["listDiscoverStyles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The places Discover's businesses are in
+         * @description The places at least one listed business names, by country and name. No counts. Cacheable.
+         */
+        get: operations["listDiscoverLocations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/placements": {
         parameters: {
             query?: never;
@@ -1096,6 +1333,15 @@ export interface components {
             contactPhone: string;
             /** Format: email */
             contactEmail?: string | null;
+            /**
+             * @description Discover's referral token (Discover D03): the `ref` parameter of a
+             *     booking link Discover made (`bookingUrl`), passed on unchanged.
+             *     When it verifies for this studio, the inquiry records Discover as
+             *     its verified referral, apart from `sourceChannel`. Anything else
+             *     (none, malformed, forged, expired, another studio's) records no
+             *     referral and never refuses the inquiry. Grants nothing.
+             */
+            referral?: string;
         };
         /** @description The multipart body of `createInquiry` */
         InquiryForm: components["schemas"]["InquiryInput"] & {
@@ -1217,6 +1463,113 @@ export interface components {
             /** @description The `deposit.due` the page showed, in paisa. */
             expectedAmount: number;
         };
+        /** @description Pass it as `cursor` for the next page, with the same filters and sort; null on the last. */
+        DiscoverNextCursor: string | null;
+        DiscoverLocation: {
+            /** @description ISO 3166-1 alpha-2 */
+            country: string;
+            /** @description Unique within its country */
+            slug: string;
+            name: string;
+            /** @description The first-level subdivision */
+            region: string | null;
+        };
+        DiscoverStudioRef: {
+            slug: string;
+            name: string;
+            /** @enum {string} */
+            type: "studio" | "independent";
+        };
+        DiscoverStudioSummary: {
+            /** Format: uuid */
+            id: string;
+            slug: string;
+            name: string;
+            /** @enum {string} */
+            type: "studio";
+            location: components["schemas"]["DiscoverLocation"] | null;
+            logo: components["schemas"]["Logo"] | null;
+            cover: components["schemas"]["Image"] | null;
+            /** @description The styles the studio's shown artists name, in the list's order */
+            styles: components["schemas"]["TattooStyle"][];
+            /**
+             * Format: uri
+             * @description The studio's own page
+             */
+            storefrontUrl: string;
+        };
+        DiscoverStudioDetail: components["schemas"]["DiscoverStudioSummary"] & {
+            /** @description Plain text */
+            intro: string | null;
+            /** @description IANA */
+            timezone: string;
+            socialLinks: components["schemas"]["SocialLink"][];
+            artists: components["schemas"]["DiscoverArtistSummary"][];
+            /** @description The newest published photos */
+            tattoos: components["schemas"]["DiscoverTattooSummary"][];
+            bookingUrl: components["schemas"]["DiscoverBookingUrl"];
+        };
+        DiscoverArtistSummary: {
+            /**
+             * Format: uuid
+             * @description Stable; the `artist` filter of `listDiscoverTattoos`
+             */
+            id: string;
+            /** @description Unique within the studio only */
+            slug: string;
+            name: string;
+            photo: components["schemas"]["Photo"] | null;
+            styles: components["schemas"]["TattooStyle"][];
+            acceptingInquiries: boolean;
+            /** @description An independent artist: `studio` is their own business */
+            independent: boolean;
+            studio: components["schemas"]["DiscoverStudioRef"];
+            location: components["schemas"]["DiscoverLocation"] | null;
+            /**
+             * Format: uri
+             * @description The artist's page on the studio's site
+             */
+            storefrontUrl: string;
+        };
+        DiscoverArtistDetail: components["schemas"]["DiscoverArtistSummary"] & {
+            /** @description Plain text */
+            bio: string | null;
+            socialLinks: components["schemas"]["SocialLink"][];
+            tattoos: components["schemas"]["DiscoverTattooSummary"][];
+            bookingUrl: components["schemas"]["DiscoverBookingUrl"];
+        };
+        DiscoverTattooSummary: {
+            /** Format: uuid */
+            id: string;
+            image: components["schemas"]["Image"];
+            styles: components["schemas"]["TattooStyle"][];
+            healed: boolean;
+            artist: {
+                /** Format: uuid */
+                id: string;
+                slug: string;
+                name: string;
+            };
+            studio: components["schemas"]["DiscoverStudioRef"];
+        };
+        DiscoverTattooDetail: components["schemas"]["DiscoverTattooSummary"] & {
+            location: components["schemas"]["DiscoverLocation"] | null;
+            /**
+             * Format: uri
+             * @description The photo's page on the studio's site
+             */
+            storefrontUrl: string;
+            bookingUrl: components["schemas"]["DiscoverBookingUrl"];
+        };
+        /**
+         * Format: uri
+         * @description The studio site's booking form (`/book` on the studio's origin), with
+         *     the artist (`artist`) or the photo to ask for one like (`artwork`)
+         *     where it applies, and Discover's referral token (`ref`, 30 days),
+         *     which the studio page passes to `createInquiry` as `referral`. Link
+         *     to it as it is.
+         */
+        DiscoverBookingUrl: string;
     };
     responses: {
         /** @description The `If-None-Match` tag still matches; no body */
@@ -1294,10 +1647,25 @@ export interface components {
          *     old slug is not kept: after a change it is a 404.
          */
         ArtistSlug: string;
+        /** @description A studio's slug, current or old */
+        DiscoverStudio: string;
+        /** @description Names containing this text, whatever its case (2 to 80 characters) */
+        DiscoverQuery: string;
+        /** @description An ISO 3166-1 alpha-2 country code (`NP`), either case */
+        DiscoverCountry: string;
+        /** @description A city's `slug` (`listDiscoverLocations`); needs `country` */
+        DiscoverCity: string;
+        /** @description A style's slug (`listDiscoverStyles`) */
+        DiscoverStyle: string;
+        /** @description `newest` (the default: most recently listed, or added), `name` (A to Z) or `-name` (Z to A). Ties go by id. */
+        DiscoverSort: "newest" | "name" | "-name";
+        /** @description The previous page's `nextCursor`, as sent, with the same filters and sort */
+        DiscoverCursor: string;
+        DiscoverLimit: number;
     };
     requestBodies: never;
     headers: {
-        /** @description `public, max-age=60, stale-while-revalidate=600` on a cacheable read; `no-store` on everything else. */
+        /** @description `public, max-age=60, stale-while-revalidate=600` on a cacheable read (`stale-while-revalidate=60` on Discover); `no-store` on everything else. */
         CacheControl: string;
         /** @description Strong entity tag of the body. Send it back as `If-None-Match` to get a 304 while it still matches. */
         ETag: string;
@@ -1327,6 +1695,355 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: components["schemas"]["TattooStyle"][];
+                    };
+                };
+            };
+            304: components["responses"]["NotModified"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listDiscoverStudios: {
+        parameters: {
+            query?: {
+                /** @description Names containing this text, whatever its case (2 to 80 characters) */
+                q?: components["parameters"]["DiscoverQuery"];
+                /** @description An ISO 3166-1 alpha-2 country code (`NP`), either case */
+                country?: components["parameters"]["DiscoverCountry"];
+                /** @description A city's `slug` (`listDiscoverLocations`); needs `country` */
+                city?: components["parameters"]["DiscoverCity"];
+                /** @description A style's slug (`listDiscoverStyles`) */
+                style?: components["parameters"]["DiscoverStyle"];
+                /** @description `newest` (the default: most recently listed, or added), `name` (A to Z) or `-name` (Z to A). Ties go by id. */
+                sort?: components["parameters"]["DiscoverSort"];
+                /** @description The previous page's `nextCursor`, as sent, with the same filters and sort */
+                cursor?: components["parameters"]["DiscoverCursor"];
+                limit?: components["parameters"]["DiscoverLimit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of studios */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["DiscoverStudioSummary"][];
+                        nextCursor: components["schemas"]["DiscoverNextCursor"];
+                    };
+                };
+            };
+            304: components["responses"]["NotModified"];
+            422: components["responses"]["ValidationError"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getDiscoverStudio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A studio's slug, current or old */
+                studio: components["parameters"]["DiscoverStudio"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The studio */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["DiscoverStudioDetail"];
+                    };
+                };
+            };
+            304: components["responses"]["NotModified"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listDiscoverStudioArtists: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A studio's slug, current or old */
+                studio: components["parameters"]["DiscoverStudio"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The artists */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["DiscoverArtistSummary"][];
+                    };
+                };
+            };
+            304: components["responses"]["NotModified"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getDiscoverStudioArtist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A studio's slug, current or old */
+                studio: components["parameters"]["DiscoverStudio"];
+                /**
+                 * @description The artist's slug, matched exactly: never case-folded. An artist's
+                 *     old slug is not kept: after a change it is a 404.
+                 */
+                artist: components["parameters"]["ArtistSlug"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The artist */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["DiscoverArtistDetail"];
+                    };
+                };
+            };
+            304: components["responses"]["NotModified"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listDiscoverArtists: {
+        parameters: {
+            query?: {
+                /** @description Names containing this text, whatever its case (2 to 80 characters) */
+                q?: components["parameters"]["DiscoverQuery"];
+                /** @description An ISO 3166-1 alpha-2 country code (`NP`), either case */
+                country?: components["parameters"]["DiscoverCountry"];
+                /** @description A city's `slug` (`listDiscoverLocations`); needs `country` */
+                city?: components["parameters"]["DiscoverCity"];
+                /** @description A style's slug (`listDiscoverStyles`) */
+                style?: components["parameters"]["DiscoverStyle"];
+                /** @description Only this studio's artists (its current slug) */
+                studio?: string;
+                /** @description `true`: only independent artists; `false`: only studios' artists. Leave it out for both. */
+                independent?: boolean;
+                /** @description `newest` (the default: most recently listed, or added), `name` (A to Z) or `-name` (Z to A). Ties go by id. */
+                sort?: components["parameters"]["DiscoverSort"];
+                /** @description The previous page's `nextCursor`, as sent, with the same filters and sort */
+                cursor?: components["parameters"]["DiscoverCursor"];
+                limit?: components["parameters"]["DiscoverLimit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of artists */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["DiscoverArtistSummary"][];
+                        nextCursor: components["schemas"]["DiscoverNextCursor"];
+                    };
+                };
+            };
+            304: components["responses"]["NotModified"];
+            422: components["responses"]["ValidationError"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getDiscoverIndependentArtist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The independent artist's business slug (their studio page's) */
+                artist: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The artist */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["DiscoverArtistDetail"];
+                    };
+                };
+            };
+            304: components["responses"]["NotModified"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listDiscoverTattoos: {
+        parameters: {
+            query?: {
+                /** @description An ISO 3166-1 alpha-2 country code (`NP`), either case */
+                country?: components["parameters"]["DiscoverCountry"];
+                /** @description A city's `slug` (`listDiscoverLocations`); needs `country` */
+                city?: components["parameters"]["DiscoverCity"];
+                /** @description A style's slug (`listDiscoverStyles`) */
+                style?: components["parameters"]["DiscoverStyle"];
+                /** @description Only this business's photos (its current slug) */
+                studio?: string;
+                /** @description Only this artist's photos (their `id`) */
+                artist?: string;
+                /** @description `true`: only photos marked healed. `false` is the same as leaving it out. */
+                healed?: boolean;
+                /** @description The previous page's `nextCursor`, as sent, with the same filters and sort */
+                cursor?: components["parameters"]["DiscoverCursor"];
+                limit?: components["parameters"]["DiscoverLimit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of photos */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["DiscoverTattooSummary"][];
+                        nextCursor: components["schemas"]["DiscoverNextCursor"];
+                    };
+                };
+            };
+            304: components["responses"]["NotModified"];
+            422: components["responses"]["ValidationError"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getDiscoverTattoo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A photo's `id` */
+                tattoo: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The photo */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["DiscoverTattooDetail"];
+                    };
+                };
+            };
+            304: components["responses"]["NotModified"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listDiscoverStyles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Styles */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["TattooStyle"][];
+                    };
+                };
+            };
+            304: components["responses"]["NotModified"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listDiscoverLocations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Places */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["DiscoverLocation"][];
                     };
                 };
             };

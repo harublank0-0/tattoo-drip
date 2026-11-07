@@ -1,0 +1,19 @@
+# The D11 domain layout in the production-mode smoke run (compose.smoke.yml):
+# nginx starts with nginx.split.conf instead of nginx.conf. With scratch
+# settings that use the split origins (docs/discover/domain-migration.md,
+# "Rehearsal"), add it after the smoke file:
+#
+#   TD_ENV_DIR=<scratch settings> TD_STATE_DIR=<scratch folder> \
+#   TD_COMPOSE_FILES=deploy/compose.yml:deploy/test/compose.smoke.yml:deploy/test/compose.split.yml \
+#   deploy/deploy.sh HEAD
+#
+# deploy.sh's own `nginx -t` and reload still name nginx.conf (both layouts are
+# valid; the reload makes the running master read the file it started with).
+#
+# This file exists only for that rehearsal. Never pass it to the production
+# deploy: the cutover changes nginx.conf's include instead.
+
+services:
+  nginx:
+    command:
+      ["nginx", "-c", "/etc/nginx/td/nginx.split.conf", "-g", "daemon off;"]

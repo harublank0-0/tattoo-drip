@@ -1,4 +1,20 @@
 export {
+	DiscoverProvider,
+	type DiscoverProviderProps,
+	useDiscoverArtists,
+	useDiscoverClient,
+	useDiscoverIndependentArtist,
+	useDiscoverLocations,
+	useDiscoverStudio,
+	useDiscoverStudioArtist,
+	useDiscoverStudioArtists,
+	useDiscoverStudios,
+	useDiscoverStyles,
+	useDiscoverTattoo,
+	useDiscoverTattoos,
+} from "./discover.js";
+export { discoverKeys, discoverQueries } from "./discover_queries.js";
+export {
 	useArtist,
 	useArtists,
 	useAvailability,
