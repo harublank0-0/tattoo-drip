@@ -55,6 +55,11 @@ export type ScannedRoutes = {
     'tenant.settings.members.invitations.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.members.role.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.members.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.settings.discover': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.discover.preview': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.discover.place.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.discover.listing.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.discover.listing.destroy': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists.mine': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists.create': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -62,6 +67,7 @@ export type ScannedRoutes = {
     'tenant.artists.edit': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.artists.discover.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.photos.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.photos.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.photos.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
@@ -167,6 +173,8 @@ export type ScannedRoutes = {
     'tenant.settings.good_to_know': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.faq_policies': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.members': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.discover': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.discover.preview': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists.mine': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists.create': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -233,6 +241,8 @@ export type ScannedRoutes = {
     'tenant.settings.good_to_know': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.faq_policies': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.members': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.discover': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.discover.preview': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists.mine': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists.create': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -286,6 +296,7 @@ export type ScannedRoutes = {
     'tenant.settings.closed_days.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.members.invitations.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.members.invitations.renew': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.settings.discover.listing.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists.photos.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.flash.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
@@ -337,7 +348,9 @@ export type ScannedRoutes = {
     'tenant.settings.faq_policies.faq.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.faq_policies.policies.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.members.role.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.settings.discover.place.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.artists.discover.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.photos.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.flash.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.flash.claim.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
@@ -353,6 +366,7 @@ export type ScannedRoutes = {
     'tenant.settings.closed_days.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.members.invitations.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.members.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.settings.discover.listing.destroy': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.photos.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.flash.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }

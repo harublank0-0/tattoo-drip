@@ -10,7 +10,7 @@ Select guidance for the current task. Follow ordinary links when needed; this in
 | System boundaries, backend modules, tenancy, auth, request flows | [Architecture](architecture.md) |
 | Conceptual entities and ownership | [Data model](data-model.md) |
 | API contract, SDK boundaries, React adapter | [SDK](sdk.md) |
-| Discover: plan and roadmap, domains, the cross-tenant database boundary, the public Discover API and booking referral | [Blueprint](discover/implementation-blueprint.md), [domain migration](discover/domain-migration.md), [database security](discover/database-security.md), [Discover API](discover/api.md) |
+| Discover: plan and roadmap, domains, the cross-tenant database boundary, the public Discover API and booking referral, Studio OS listing controls and takedowns | [Blueprint](discover/implementation-blueprint.md), [domain migration](discover/domain-migration.md), [database security](discover/database-security.md), [Discover API](discover/api.md), [publication controls](discover/publication-controls.md) |
 | Phase scope and release gates | [Roadmap](roadmap.md) |
 | Market evidence, only when requested | [Research](research.md) |
 | Platform services, controllers, tenancy, accounts, public API, database conventions | [Backend development](../apps/platform/docs/backend.md) |

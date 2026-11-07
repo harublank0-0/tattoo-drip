@@ -96,6 +96,16 @@ export interface ApiDefinition {
         }
         destroy: typeof routes['tenant.settings.members.destroy']
       }
+      discover: typeof routes['tenant.settings.discover'] & {
+        preview: typeof routes['tenant.settings.discover.preview']
+        place: {
+          update: typeof routes['tenant.settings.discover.place.update']
+        }
+        listing: {
+          store: typeof routes['tenant.settings.discover.listing.store']
+          destroy: typeof routes['tenant.settings.discover.listing.destroy']
+        }
+      }
     }
     artists: typeof routes['tenant.artists'] & {
       mine: typeof routes['tenant.artists.mine']
@@ -104,6 +114,9 @@ export interface ApiDefinition {
       edit: typeof routes['tenant.artists.edit']
       update: typeof routes['tenant.artists.update']
       destroy: typeof routes['tenant.artists.destroy']
+      discover: {
+        update: typeof routes['tenant.artists.discover.update']
+      }
       photos: {
         store: typeof routes['tenant.artists.photos.store']
         update: typeof routes['tenant.artists.photos.update']

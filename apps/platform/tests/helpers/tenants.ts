@@ -14,7 +14,7 @@ import TenantInvitation from "#modules/tenancy/models/tenant_invitation";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import InvitationService from "#modules/tenancy/services/invitation_service";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
-import { withDbContext } from "#services/db_context";
+import { dbClient, withDbContext } from "#services/db_context";
 import { depositServices } from "#tests/helpers/deposits";
 import {
 	makeInquiry,
@@ -175,6 +175,17 @@ export async function seededStudio(slug: string, name: string) {
 			logoIconKey: `tenants/${tenant.id}/studio_icon/${randomUUID()}.32.png`,
 		});
 		await tenant.save();
+		// Discover (D04): a city and a listing accepted under an older consent
+		// version, so each Discover write's positive control changes a row
+		// (accepting the current version re-records consent; turning it off
+		// unlists; a new city replaces this one).
+		await dbClient().rawQuery(
+			`update tenants set place_id = (select id from places where country_code = 'NP' and slug = 'kathmandu'),
+			 discovery_listed = true, discovery_listed_at = now(), discovery_consent_version = '2026-01-01.seed'
+			 where id = ?`,
+			[tenant.id],
+		);
+		await tenant.refresh();
 	});
 	const [workPhoto] = await inTenant(tenant, async () => [
 		await seedWorkPhoto(tenant, artistProfile),
@@ -344,10 +355,15 @@ export async function seededStudio(slug: string, name: string) {
 			.where("user_id", artist.id)
 			.firstOrFail(),
 	);
+	// Another city than the seeded one, for the Discover city route's case.
+	const { rows: otherCity } = await dbClient().rawQuery(
+		"select id from places where country_code = 'NP' and slug = 'pokhara'",
+	);
 	return {
 		tenant,
 		owner,
 		artist,
+		discoverPlaceId: otherCity[0].id as string,
 		paymentMethod,
 		artistProfile,
 		closedArtist,

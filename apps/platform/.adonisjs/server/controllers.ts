@@ -6,6 +6,7 @@
 export const controllers = {
   Account: () => import('#controllers/account_controller'),
   Alerts: () => import('#controllers/alerts_controller'),
+  ArtistDiscover: () => import('#controllers/artist_discover_controller'),
   Artists: () => import('#controllers/artists_controller'),
   Bookings: () => import('#controllers/bookings_controller'),
   Calendar: () => import('#controllers/calendar_controller'),
@@ -14,6 +15,7 @@ export const controllers = {
   DepositLinks: () => import('#controllers/deposit_links_controller'),
   DepositSettings: () => import('#controllers/deposit_settings_controller'),
   Discover: () => import('#controllers/discover_controller'),
+  DiscoverSettings: () => import('#controllers/discover_settings_controller'),
   EmailVerification: () => import('#controllers/email_verification_controller'),
   FlashDesigns: () => import('#controllers/flash_designs_controller'),
   GoodToKnow: () => import('#controllers/good_to_know_controller'),

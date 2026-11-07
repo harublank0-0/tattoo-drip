@@ -619,6 +619,66 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/members_controller').default['remove']>>>
     }
   }
+  'tenant.settings.discover': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/settings/discover'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/discover_settings_controller').default['show']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/discover_settings_controller').default['show']>>>
+    }
+  }
+  'tenant.settings.discover.preview': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/settings/discover/preview'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/discover_settings_controller').default['preview']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/discover_settings_controller').default['preview']>>>
+    }
+  }
+  'tenant.settings.discover.place.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/settings/discover/place'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/discovery/validators/publication').discoverPlaceValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/discovery/validators/publication').discoverPlaceValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/discover_settings_controller').default['updatePlace']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/discover_settings_controller').default['updatePlace']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.settings.discover.listing.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/settings/discover/listing'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/discovery/validators/publication').enableListingValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/discovery/validators/publication').enableListingValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/discover_settings_controller').default['enable']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/discover_settings_controller').default['enable']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.settings.discover.listing.destroy': {
+    methods: ["DELETE"]
+    pattern: '/t/:tenant/settings/discover/listing'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/discover_settings_controller').default['disable']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/discover_settings_controller').default['disable']>>>
+    }
+  }
   'tenant.artists': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/artists'
@@ -701,6 +761,18 @@ export interface Registry {
       query: {}
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['destroy']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['destroy']>>>
+    }
+  }
+  'tenant.artists.discover.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/artists/:id/discover'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/discovery/validators/publication').artistDiscoverValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/discovery/validators/publication').artistDiscoverValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/artist_discover_controller').default['update']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/artist_discover_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
   'tenant.artists.photos.store': {

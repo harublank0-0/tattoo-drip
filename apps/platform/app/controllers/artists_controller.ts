@@ -20,6 +20,12 @@ import {
 	createArtistValidator,
 	updateArtistValidator,
 } from "#modules/artists/validators/artist";
+import {
+	ARTIST_STATE_WORDS,
+	DISCOVER_RECOMMENDED,
+} from "#modules/discovery/publication";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import PublicationService from "#modules/discovery/services/publication_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import FlashService from "#modules/flash/services/flash_service";
 import { InvalidImageError } from "#modules/media/errors";
@@ -70,6 +76,7 @@ export default class ArtistsController {
 		private sessions: SessionService,
 		private calendar: CalendarService,
 		private hours: OpeningHoursService,
+		private publication: PublicationService,
 	) {}
 
 	async index(ctx: HttpContext) {
@@ -264,6 +271,21 @@ export default class ArtistsController {
 			hours: await this.hours.week(tenant),
 		};
 
+		// The profile's Discover state (D04). An independent artist has one
+		// switch, their listing's, in Settings: their profile shows no switch.
+		const discoverState = await this.publication.artistState(tenant, artist);
+		const discover = {
+			independent: tenant.type === "independent",
+			listed: artist.discoveryListed,
+			state: discoverState.state,
+			stateText: ARTIST_STATE_WORDS[discoverState.state],
+			publishedPhotos: discoverState.publishedPhotos,
+			recommendedPhotos: DISCOVER_RECOMMENDED.artistPhotos,
+			// Turning a profile someone else manages back on is theirs to do.
+			canTurnOn: artist.userId === null || artist.userId === userId,
+			owner: membership.role === "owner",
+		};
+
 		return ctx.inertia.render("artists/form", {
 			artist: await this.toProps(tenant, artist, userId),
 			canLink,
@@ -271,6 +293,7 @@ export default class ArtistsController {
 			flashDesigns,
 			styleOptions: STYLE_OPTIONS,
 			schedule,
+			discover,
 		});
 	}
 
