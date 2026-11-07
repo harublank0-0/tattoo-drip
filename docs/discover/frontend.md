@@ -43,7 +43,7 @@ The loader prefetches five reads in parallel with `Promise.allSettled(ensureQuer
 
 | Section (in order) | Data | Shown when (`HOME_THRESHOLDS`) |
 |---|---|---|
-| Hero: headline, `DiscoverySearch` (studio names, `?q=` on `/explore/studios`, the only text search the API has), Explore studios, Find artists, a quiet "For tattoo professionals" | tattoos | Always. A collage of the 4 newest photos when there are ≥4 (first eager, `fetchPriority="high"`, preloaded; fixed frames); else typographic, with the three explore links set large |
+| Hero: headline, `DiscoverySearch` (studio names, `?q=` on `/explore/studios`, the only text search the API has), Explore studios, Find artists, a quiet "For tattoo professionals" | tattoos | Always. A collage of the 4 newest photos when there are ≥4 (first eager, `fetchPriority="high"`, which React 19 turns into a `<link rel="preload">`; fixed frames); else typographic, with the three explore links set large |
 | Tattoo styles | styles + tattoos | ≥3 styles that each get a different recent photo tagged with them (`pairStylesWithPhotos`, list order, at most 6; no per-style request); each tile → `/explore/studios?style=` |
 | Recently listed studios | studios | ≥1. The API's order (`newest`, ties by id): no ranking or featuring. Rows link to `storefrontUrl` |
 | Recently added artists | artists + tattoos | ≥2. Work first (their newest recent photo, else their portrait, else their initial), "at Studio · City" or "Independent · City"; link = `storefrontUrl` |
@@ -55,7 +55,7 @@ Every read failed: one quiet `role="alert"` note with Try again (`router.invalid
 
 ## Search navigation
 
-`/explore/studios` reads `q` (2–80 characters), `country` (2 letters, upper-cased), `city` (a place slug, only with `country`) and `style` (a slug) with `readStudioSearch`; each is `undefined` when malformed. The loader also reads the style list (never stale) and drops a style it doesn't have, because the API answers an unknown style with a 422, and returns the filters it used as loader data, which the component reads. Chips name the city and style from `/locations` and `/styles` when they loaded, else the slug in words; removing the country removes the city. The search box keeps only `q` (D07 builds the filter bar).
+`/explore/studios` reads `q` (2–80 characters), `country` (2 letters, upper-cased), `city` (a place slug, only with `country`) and `style` (a slug) with `readStudioSearch`; each is `undefined` when malformed. The loader reads the places and the style list beside the studios; only a `style` makes the studios read wait for the list, which drops a style it doesn't have (the API answers an unknown style with a 422), and a style that can't be checked because the list failed is dropped too. It returns the filters it used as loader data, which the component reads. Chips name the city and style from `/locations` and `/styles` when they loaded, else the slug in words; removing the country removes the city. The search box keeps only `q` (D07 builds the filter bar).
 
 ## Marketing pages and calls to action
 

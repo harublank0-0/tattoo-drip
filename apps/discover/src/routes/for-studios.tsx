@@ -193,7 +193,7 @@ function ForStudios() {
 							id="website-title"
 							eyebrow="Your studio website"
 							title="A site that looks like your studio"
-							intro="Every studio gets its own public site at its own page link (yourstudio.tattoodrip.page), where clients see your work and send requests."
+							intro="Every studio gets its own public site at its own page link, where clients see your work and send requests."
 						/>
 						<ul className="flex flex-col gap-3 text-night-ink">
 							{[

@@ -39,24 +39,32 @@ export const Route = createFileRoute("/explore/studios")({
 	}),
 	loader: async ({ context, deps }) => {
 		const { queryClient, discover } = context;
-		// The style list (never stale) checks the style, since the API refuses
-		// an unknown one; the places name the city's chip. Neither is required.
-		const [styles] = await Promise.allSettled([
-			queryClient.ensureQueryData(discoverQueries.styles(discover.client)),
+		// The places name the city's chip and the style list checks the style
+		// (the API refuses an unknown one with a 422). Neither is required, and
+		// only a style makes the studios read wait: otherwise all run at once.
+		const optional = <T,>(read: Promise<T>) =>
+			read.catch((): undefined => undefined);
+		const places = optional(
 			queryClient.ensureQueryData(discoverQueries.locations(discover.client)),
+		);
+		const styles = optional(
+			queryClient.ensureQueryData(discoverQueries.styles(discover.client)),
+		);
+		// A style that can't be checked (the list failed) is dropped rather
+		// than risk the 422: the page then shows every studio, with no chip.
+		const style = deps.style
+			? knownStyle(deps.style, (await styles) ?? [])
+			: undefined;
+		const filters: StudioSearch = { ...deps, style };
+		await Promise.all([
+			queryClient
+				.ensureQueryData(
+					discoverQueries.studios(discover.client, studioQuery(filters)),
+				)
+				.catch(rethrowUnavailable),
+			places,
+			styles,
 		]);
-		const filters: StudioSearch = {
-			...deps,
-			style: knownStyle(
-				deps.style,
-				styles.status === "fulfilled" ? styles.value : undefined,
-			),
-		};
-		await queryClient
-			.ensureQueryData(
-				discoverQueries.studios(discover.client, studioQuery(filters)),
-			)
-			.catch(rethrowUnavailable);
 		// The filters the page was read with: the component asks for the same.
 		return { filters };
 	},

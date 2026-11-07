@@ -350,6 +350,20 @@ describe("the built Discover server, indexing off", { skip }, () => {
 		}
 	});
 
+	test("a style that can't be checked is dropped, not sent: the page still lists studios", async () => {
+		api.scenario.fail.add("styles");
+		const response = await discover.get("/explore/studios?style=blackwork");
+		assert.equal(response.status, 200);
+		const studios = api.requests.filter((url) =>
+			url.startsWith("/api/v1/discover/studios"),
+		);
+		assert.equal(studios.length, 1);
+		assert.ok(
+			!new URL(studios[0] ?? "", "http://stub").searchParams.has("style"),
+		);
+		assert.match(await response.text(), /Stub Ink/);
+	});
+
 	test("/explore/artists lists the API's artists, linking to their pages", async () => {
 		api.scenario.count = 3;
 		const response = await discover.get("/explore/artists");
