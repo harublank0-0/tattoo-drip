@@ -75,6 +75,341 @@ paths:
         "429": { $ref: "#/components/responses/RateLimited" }
         default: { $ref: "#/components/responses/Error" }
 
+  /discover/studios:
+    get:
+      operationId: listDiscoverStudios
+      tags: [MVP]
+      summary: Discover's listed studios, a page at a time
+      description: |
+        Studios (not independent artists: see `listDiscoverArtists`) whose
+        owners listed them on Discover, that are not taken down. Under no
+        studio and with no session. The filters combine; one that matches
+        nothing is an empty page. Cacheable for a minute (and a minute
+        stale): a studio that stops listing leaves the answers within two.
+        A request with `q` also counts against a smaller search limit.
+      parameters:
+        - $ref: "#/components/parameters/DiscoverQuery"
+        - $ref: "#/components/parameters/DiscoverCountry"
+        - $ref: "#/components/parameters/DiscoverCity"
+        - $ref: "#/components/parameters/DiscoverStyle"
+        - $ref: "#/components/parameters/DiscoverSort"
+        - $ref: "#/components/parameters/DiscoverCursor"
+        - $ref: "#/components/parameters/DiscoverLimit"
+      responses:
+        "200":
+          description: A page of studios
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            ETag: { $ref: "#/components/headers/ETag" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, nextCursor]
+                additionalProperties: false
+                properties:
+                  data: { type: array, maxItems: 48, items: { allOf: [{ $ref: "#/components/schemas/DiscoverStudioSummary" }], unevaluatedProperties: false } }
+                  nextCursor: { $ref: "#/components/schemas/DiscoverNextCursor" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /discover/studios/{studio}:
+    parameters:
+      - $ref: "#/components/parameters/DiscoverStudio"
+    get:
+      operationId: getDiscoverStudio
+      tags: [MVP]
+      summary: One listed studio, with its artists and newest photos
+      description: |
+        By its current slug or an old one (the answer names the current
+        `slug`: link to that). A studio that is not listed, taken down,
+        deleted, unknown, or an independent artist (`getDiscoverIndependentArtist`)
+        is the same 404. Cacheable like the list.
+      responses:
+        "200":
+          description: The studio
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            ETag: { $ref: "#/components/headers/ETag" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data: { $ref: "#/components/schemas/DiscoverStudioDetail" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /discover/studios/{studio}/artists:
+    parameters:
+      - $ref: "#/components/parameters/DiscoverStudio"
+    get:
+      operationId: listDiscoverStudioArtists
+      tags: [MVP]
+      summary: A listed studio's artists on Discover, by name
+      description: Every shown artist of the studio (at most 100), by name. 404 like `getDiscoverStudio`.
+      responses:
+        "200":
+          description: The artists
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            ETag: { $ref: "#/components/headers/ETag" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data: { type: array, maxItems: 100, items: { allOf: [{ $ref: "#/components/schemas/DiscoverArtistSummary" }], unevaluatedProperties: false } }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /discover/studios/{studio}/artists/{artist}:
+    parameters:
+      - $ref: "#/components/parameters/DiscoverStudio"
+      - $ref: "#/components/parameters/ArtistSlug"
+    get:
+      operationId: getDiscoverStudioArtist
+      tags: [MVP]
+      summary: One artist at a listed studio
+      description: |
+        An artist's slug is unique per studio only, so the studio's slug
+        comes first. An artist who opted out of Discover, is hidden on the
+        studio page or deleted, an unknown one, and any artist of a studio
+        that is not shown are the same 404.
+      responses:
+        "200":
+          description: The artist
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            ETag: { $ref: "#/components/headers/ETag" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data: { $ref: "#/components/schemas/DiscoverArtistDetail" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /discover/artists:
+    get:
+      operationId: listDiscoverArtists
+      tags: [MVP]
+      summary: Discover's artists, a page at a time
+      description: |
+        The shown artists of every listed business: studios' artists and
+        independent artists (`independent`). Filters, cache and limits as
+        `listDiscoverStudios`; a location is the artist's studio's.
+      parameters:
+        - $ref: "#/components/parameters/DiscoverQuery"
+        - $ref: "#/components/parameters/DiscoverCountry"
+        - $ref: "#/components/parameters/DiscoverCity"
+        - $ref: "#/components/parameters/DiscoverStyle"
+        - name: studio
+          in: query
+          description: Only this studio's artists (its current slug)
+          schema: { type: string, pattern: "^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$" }
+        - name: independent
+          in: query
+          description: "`true`: only independent artists; `false`: only studios' artists. Leave it out for both."
+          schema: { type: boolean }
+        - $ref: "#/components/parameters/DiscoverSort"
+        - $ref: "#/components/parameters/DiscoverCursor"
+        - $ref: "#/components/parameters/DiscoverLimit"
+      responses:
+        "200":
+          description: A page of artists
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            ETag: { $ref: "#/components/headers/ETag" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, nextCursor]
+                additionalProperties: false
+                properties:
+                  data: { type: array, maxItems: 48, items: { allOf: [{ $ref: "#/components/schemas/DiscoverArtistSummary" }], unevaluatedProperties: false } }
+                  nextCursor: { $ref: "#/components/schemas/DiscoverNextCursor" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /discover/artists/{artist}:
+    parameters:
+      - name: artist
+        in: path
+        required: true
+        description: The independent artist's business slug (their studio page's)
+        schema: { type: string, pattern: "^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$" }
+    get:
+      operationId: getDiscoverIndependentArtist
+      tags: [MVP]
+      summary: One listed independent artist
+      description: |
+        A business of type `independent`, by its current or an old slug:
+        its shown artist profile (the first made, if it has several). A
+        studio's slug, and anything not shown, are the same 404.
+      responses:
+        "200":
+          description: The artist
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            ETag: { $ref: "#/components/headers/ETag" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data: { $ref: "#/components/schemas/DiscoverArtistDetail" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /discover/tattoos:
+    get:
+      operationId: listDiscoverTattoos
+      tags: [MVP]
+      summary: Discover's tattoo photos, newest first, a page at a time
+      description: |
+        The published photos of every shown artist of every listed business,
+        newest first. Never a photo the studio unpublished or Discover took
+        down. Filters, cache and limits as `listDiscoverStudios`.
+      parameters:
+        - $ref: "#/components/parameters/DiscoverCountry"
+        - $ref: "#/components/parameters/DiscoverCity"
+        - $ref: "#/components/parameters/DiscoverStyle"
+        - name: studio
+          in: query
+          description: Only this business's photos (its current slug)
+          schema: { type: string, pattern: "^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$" }
+        - name: artist
+          in: query
+          description: Only this artist's photos (their `id`)
+          schema: { type: string, format: uuid }
+        - name: healed
+          in: query
+          description: "`true`: only photos marked healed. `false` is the same as leaving it out."
+          schema: { type: boolean }
+        - $ref: "#/components/parameters/DiscoverCursor"
+        - $ref: "#/components/parameters/DiscoverLimit"
+      responses:
+        "200":
+          description: A page of photos
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            ETag: { $ref: "#/components/headers/ETag" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, nextCursor]
+                additionalProperties: false
+                properties:
+                  data: { type: array, maxItems: 48, items: { allOf: [{ $ref: "#/components/schemas/DiscoverTattooSummary" }], unevaluatedProperties: false } }
+                  nextCursor: { $ref: "#/components/schemas/DiscoverNextCursor" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /discover/tattoos/{tattoo}:
+    parameters:
+      - name: tattoo
+        in: path
+        required: true
+        description: A photo's `id`
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getDiscoverTattoo
+      tags: [MVP]
+      summary: One published tattoo photo
+      description: The photo, where it is on the studio's page and how to ask for one like it. Anything not shown is a 404.
+      responses:
+        "200":
+          description: The photo
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            ETag: { $ref: "#/components/headers/ETag" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data: { $ref: "#/components/schemas/DiscoverTattooDetail" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /discover/styles:
+    get:
+      operationId: listDiscoverStyles
+      tags: [MVP]
+      summary: The styles Discover filters by
+      description: The platform's fixed list of styles (`listStyles`), in its order. Cacheable.
+      responses:
+        "200":
+          description: Styles
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            ETag: { $ref: "#/components/headers/ETag" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/TattooStyle" } }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /discover/locations:
+    get:
+      operationId: listDiscoverLocations
+      tags: [MVP]
+      summary: The places Discover's businesses are in
+      description: The places at least one listed business names, by country and name. No counts. Cacheable.
+      responses:
+        "200":
+          description: Places
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            ETag: { $ref: "#/components/headers/ETag" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/DiscoverLocation" } }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
   /placements:
     get:
       operationId: listPlacements
@@ -676,6 +1011,47 @@ components:
         minLength: 2
         maxLength: 63
         pattern: "^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$"
+
+    DiscoverStudio:
+      name: studio
+      in: path
+      required: true
+      description: A studio's slug, current or old
+      schema: { type: string, pattern: "^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$" }
+    DiscoverQuery:
+      name: q
+      in: query
+      description: Names containing this text, whatever its case (2 to 80 characters)
+      schema: { type: string, minLength: 2, maxLength: 80 }
+    DiscoverCountry:
+      name: country
+      in: query
+      description: An ISO 3166-1 alpha-2 country code (`NP`), either case
+      schema: { type: string, pattern: "^[A-Za-z]{2}$" }
+    DiscoverCity:
+      name: city
+      in: query
+      description: A city's `slug` (`listDiscoverLocations`); needs `country`
+      schema: { type: string, maxLength: 63, pattern: "^[a-z0-9]+(-[a-z0-9]+)*$" }
+    DiscoverStyle:
+      name: style
+      in: query
+      description: A style's slug (`listDiscoverStyles`)
+      schema: { type: string, maxLength: 40 }
+    DiscoverSort:
+      name: sort
+      in: query
+      description: "`newest` (the default: most recently listed, or added), `name` (A to Z) or `-name` (Z to A). Ties go by id."
+      schema: { type: string, enum: [newest, name, -name], default: newest }
+    DiscoverCursor:
+      name: cursor
+      in: query
+      description: The previous page's `nextCursor`, as sent, with the same filters and sort
+      schema: { type: string, maxLength: 1000, pattern: "^[A-Za-z0-9_-]+$" }
+    DiscoverLimit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 48, default: 24 }
 
   headers:
     CacheControl:
@@ -1459,6 +1835,16 @@ components:
           description: The person's WhatsApp or Viber number, as typed. A number without a country code is read as Nepali; it is stored in E.164.
           examples: ["9812345678", "+977 981-234-5678"]
         contactEmail: { type: [string, "null"], format: email, maxLength: 254 }
+        referral:
+          type: string
+          maxLength: 512
+          description: |
+            Discover's referral token (Discover D03): the `ref` parameter of a
+            booking link Discover made (`bookingUrl`), passed on unchanged.
+            When it verifies for this studio, the inquiry records Discover as
+            its verified referral, apart from `sourceChannel`. Anything else
+            (none, malformed, forged, expired, another studio's) records no
+            referral and never refuses the inquiry. Grants nothing.
 
     InquiryForm:
       description: The multipart body of `createInquiry`
@@ -1616,3 +2002,134 @@ components:
           type: integer
           minimum: 1
           description: The `deposit.due` the page showed, in paisa.
+
+    DiscoverNextCursor:
+      type: [string, "null"]
+      description: Pass it as `cursor` for the next page, with the same filters and sort; null on the last.
+
+    DiscoverLocation:
+      type: object
+      required: [country, slug, name, region]
+      additionalProperties: false
+      properties:
+        country: { type: string, pattern: "^[A-Z]{2}$", description: ISO 3166-1 alpha-2 }
+        slug: { type: string, description: Unique within its country }
+        name: { type: string }
+        region: { type: [string, "null"], description: The first-level subdivision, such as a province }
+
+    DiscoverStudioRef:
+      type: object
+      required: [slug, name, type]
+      additionalProperties: false
+      properties:
+        slug: { type: string }
+        name: { type: string }
+        type: { type: string, enum: [studio, independent] }
+
+    DiscoverStudioSummary:
+      type: object
+      required: [id, slug, name, type, location, logo, cover, styles, storefrontUrl]
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        type: { type: string, enum: [studio] }
+        location:
+          oneOf: [{ $ref: "#/components/schemas/DiscoverLocation" }, { type: "null" }]
+        logo:
+          oneOf: [{ $ref: "#/components/schemas/Logo" }, { type: "null" }]
+        cover:
+          oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }]
+        styles:
+          type: array
+          description: The styles the studio's shown artists name, in the list's order
+          items: { $ref: "#/components/schemas/TattooStyle" }
+        storefrontUrl: { type: string, format: uri, description: The studio's own page }
+
+    DiscoverStudioDetail:
+      unevaluatedProperties: false
+      allOf:
+        - $ref: "#/components/schemas/DiscoverStudioSummary"
+        - type: object
+          required: [intro, timezone, socialLinks, artists, tattoos, bookingUrl]
+          properties:
+            intro: { type: [string, "null"], description: Plain text }
+            timezone: { type: string, description: IANA, for "open now" on the studio page }
+            socialLinks: { type: array, items: { $ref: "#/components/schemas/SocialLink" } }
+            artists: { type: array, maxItems: 100, items: { allOf: [{ $ref: "#/components/schemas/DiscoverArtistSummary" }], unevaluatedProperties: false } }
+            tattoos:
+              type: array
+              maxItems: 12
+              description: The newest published photos
+              items: { allOf: [{ $ref: "#/components/schemas/DiscoverTattooSummary" }], unevaluatedProperties: false }
+            bookingUrl: { $ref: "#/components/schemas/DiscoverBookingUrl" }
+
+    DiscoverArtistSummary:
+      type: object
+      required: [id, slug, name, photo, styles, acceptingInquiries, independent, studio, location, storefrontUrl]
+      properties:
+        id: { type: string, format: uuid, description: Stable; the `artist` filter of `listDiscoverTattoos` }
+        slug: { type: string, description: Unique within the studio only }
+        name: { type: string }
+        photo:
+          oneOf: [{ $ref: "#/components/schemas/Photo" }, { type: "null" }]
+        styles: { type: array, maxItems: 5, items: { $ref: "#/components/schemas/TattooStyle" } }
+        acceptingInquiries: { type: boolean }
+        independent: { type: boolean, description: "An independent artist: `studio` is their own business" }
+        studio: { $ref: "#/components/schemas/DiscoverStudioRef" }
+        location:
+          oneOf: [{ $ref: "#/components/schemas/DiscoverLocation" }, { type: "null" }]
+        storefrontUrl: { type: string, format: uri, description: The artist's page on the studio's site }
+
+    DiscoverArtistDetail:
+      unevaluatedProperties: false
+      allOf:
+        - $ref: "#/components/schemas/DiscoverArtistSummary"
+        - type: object
+          required: [bio, socialLinks, tattoos, bookingUrl]
+          properties:
+            bio: { type: [string, "null"], description: Plain text }
+            socialLinks: { type: array, items: { $ref: "#/components/schemas/SocialLink" } }
+            tattoos: { type: array, maxItems: 12, items: { allOf: [{ $ref: "#/components/schemas/DiscoverTattooSummary" }], unevaluatedProperties: false } }
+            bookingUrl: { $ref: "#/components/schemas/DiscoverBookingUrl" }
+
+    DiscoverTattooSummary:
+      type: object
+      required: [id, image, styles, healed, artist, studio]
+      properties:
+        id: { type: string, format: uuid }
+        image: { $ref: "#/components/schemas/Image" }
+        styles: { type: array, maxItems: 3, items: { $ref: "#/components/schemas/TattooStyle" } }
+        healed: { type: boolean }
+        artist:
+          type: object
+          required: [id, slug, name]
+          additionalProperties: false
+          properties:
+            id: { type: string, format: uuid }
+            slug: { type: string }
+            name: { type: string }
+        studio: { $ref: "#/components/schemas/DiscoverStudioRef" }
+
+    DiscoverTattooDetail:
+      unevaluatedProperties: false
+      allOf:
+        - $ref: "#/components/schemas/DiscoverTattooSummary"
+        - type: object
+          required: [location, storefrontUrl, bookingUrl]
+          properties:
+            location:
+              oneOf: [{ $ref: "#/components/schemas/DiscoverLocation" }, { type: "null" }]
+            storefrontUrl: { type: string, format: uri, description: The photo's page on the studio's site }
+            bookingUrl: { $ref: "#/components/schemas/DiscoverBookingUrl" }
+
+    DiscoverBookingUrl:
+      type: string
+      format: uri
+      description: |
+        The studio site's booking form (`/book` on the studio's origin), with
+        the artist (`artist`) or the photo to ask for one like (`artwork`)
+        where it applies, and Discover's referral token (`ref`, 30 days),
+        which the studio page passes to `createInquiry` as `referral`. Link
+        to it as it is.
+

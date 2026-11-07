@@ -1,12 +1,14 @@
 import { inject } from "@adonisjs/core";
 import type { MultipartFile } from "@adonisjs/core/bodyparser";
 import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
+import { DateTime } from "luxon";
 import { studioTakesInquiries } from "#modules/artists/accepting";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
 import type { StyleSlug } from "#modules/artists/styles";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ClientService from "#modules/clients/services/client_service";
+import { verifyReferral } from "#modules/discovery/referral";
 import { isClaimed } from "#modules/flash/claims";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import FlashService from "#modules/flash/services/flash_service";
@@ -87,7 +89,25 @@ export default class IntakeService {
 		private references: ReferenceCodeService = new ReferenceCodeService(),
 	) {}
 
-	async submit(tenant: TenantRef, submission: Submission): Promise<Inquiry> {
+	/**
+	 * `referral` is what the request sent as Discover's referral token
+	 * (Discover D03), unchecked: a token that verifies for this studio records
+	 * the inquiry's referral source; anything else (none, malformed, forged,
+	 * expired, another studio's) records none and changes nothing else. It
+	 * never refuses an inquiry and is never read as permission.
+	 */
+	async submit(
+		tenant: TenantRef,
+		submission: Submission,
+		{ referral }: { referral?: unknown } = {},
+	): Promise<Inquiry> {
+		const check = verifyReferral(referral, tenant.id);
+		const attribution = check.valid
+			? {
+					referralSource: "discover" as const,
+					referralIssuedAt: DateTime.fromJSDate(check.issuedAt),
+				}
+			: { referralSource: null, referralIssuedAt: null };
 		return withTransaction(async (trx) => {
 			const { artistId, flashDesignId } = await this.target(tenant, submission);
 			// Locks the client (or, for a new phone, its index entry) until the
@@ -139,6 +159,8 @@ export default class IntakeService {
 					notes: submission.notes ?? null,
 					referenceCode,
 					sourceChannel: submission.sourceChannel,
+					// Verified by the token, apart from what the client said.
+					...attribution,
 					// What was sent, frozen: never the client's stored details.
 					contactName: submission.contactName,
 					contactPhone: submission.contactPhone,

@@ -337,6 +337,8 @@ export class InquirySchema extends BaseModel {
 		"preferredArtistId",
 		"preferredDates",
 		"referenceCode",
+		"referralIssuedAt",
+		"referralSource",
 		"sourceChannel",
 		"status",
 		"style",
@@ -388,6 +390,10 @@ export class InquirySchema extends BaseModel {
 	declare preferredDates: string;
 	@column()
 	declare referenceCode: string | null;
+	@column.dateTime()
+	declare referralIssuedAt: DateTime | null;
+	@column()
+	declare referralSource: string | null;
 	@column()
 	declare sourceChannel: string;
 	@column()

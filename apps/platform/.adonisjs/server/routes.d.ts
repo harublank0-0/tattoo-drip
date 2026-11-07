@@ -123,6 +123,16 @@ export type ScannedRoutes = {
     'account.password.update': { paramsTuple?: []; params?: {} }
     'account.sign_out_others': { paramsTuple?: []; params?: {} }
     'api.v1.styles.index': { paramsTuple?: []; params?: {} }
+    'api.v1.discover.studios.index': { paramsTuple?: []; params?: {} }
+    'api.v1.discover.studios.show': { paramsTuple: [ParamValue]; params: {'studio': ParamValue} }
+    'api.v1.discover.studios.artists.index': { paramsTuple: [ParamValue]; params: {'studio': ParamValue} }
+    'api.v1.discover.studios.artists.show': { paramsTuple: [ParamValue,ParamValue]; params: {'studio': ParamValue,'artist': ParamValue} }
+    'api.v1.discover.artists.index': { paramsTuple?: []; params?: {} }
+    'api.v1.discover.artists.show': { paramsTuple: [ParamValue]; params: {'artist': ParamValue} }
+    'api.v1.discover.tattoos.index': { paramsTuple?: []; params?: {} }
+    'api.v1.discover.tattoos.show': { paramsTuple: [ParamValue]; params: {'tattoo': ParamValue} }
+    'api.v1.discover.styles.index': { paramsTuple?: []; params?: {} }
+    'api.v1.discover.locations.index': { paramsTuple?: []; params?: {} }
     'api.v1.studio': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.artists.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.artists.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'artist': ParamValue} }
@@ -181,6 +191,16 @@ export type ScannedRoutes = {
     'onboarding.create': { paramsTuple?: []; params?: {} }
     'account.show': { paramsTuple?: []; params?: {} }
     'api.v1.styles.index': { paramsTuple?: []; params?: {} }
+    'api.v1.discover.studios.index': { paramsTuple?: []; params?: {} }
+    'api.v1.discover.studios.show': { paramsTuple: [ParamValue]; params: {'studio': ParamValue} }
+    'api.v1.discover.studios.artists.index': { paramsTuple: [ParamValue]; params: {'studio': ParamValue} }
+    'api.v1.discover.studios.artists.show': { paramsTuple: [ParamValue,ParamValue]; params: {'studio': ParamValue,'artist': ParamValue} }
+    'api.v1.discover.artists.index': { paramsTuple?: []; params?: {} }
+    'api.v1.discover.artists.show': { paramsTuple: [ParamValue]; params: {'artist': ParamValue} }
+    'api.v1.discover.tattoos.index': { paramsTuple?: []; params?: {} }
+    'api.v1.discover.tattoos.show': { paramsTuple: [ParamValue]; params: {'tattoo': ParamValue} }
+    'api.v1.discover.styles.index': { paramsTuple?: []; params?: {} }
+    'api.v1.discover.locations.index': { paramsTuple?: []; params?: {} }
     'api.v1.studio': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.artists.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.artists.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'artist': ParamValue} }
@@ -237,6 +257,16 @@ export type ScannedRoutes = {
     'onboarding.create': { paramsTuple?: []; params?: {} }
     'account.show': { paramsTuple?: []; params?: {} }
     'api.v1.styles.index': { paramsTuple?: []; params?: {} }
+    'api.v1.discover.studios.index': { paramsTuple?: []; params?: {} }
+    'api.v1.discover.studios.show': { paramsTuple: [ParamValue]; params: {'studio': ParamValue} }
+    'api.v1.discover.studios.artists.index': { paramsTuple: [ParamValue]; params: {'studio': ParamValue} }
+    'api.v1.discover.studios.artists.show': { paramsTuple: [ParamValue,ParamValue]; params: {'studio': ParamValue,'artist': ParamValue} }
+    'api.v1.discover.artists.index': { paramsTuple?: []; params?: {} }
+    'api.v1.discover.artists.show': { paramsTuple: [ParamValue]; params: {'artist': ParamValue} }
+    'api.v1.discover.tattoos.index': { paramsTuple?: []; params?: {} }
+    'api.v1.discover.tattoos.show': { paramsTuple: [ParamValue]; params: {'tattoo': ParamValue} }
+    'api.v1.discover.styles.index': { paramsTuple?: []; params?: {} }
+    'api.v1.discover.locations.index': { paramsTuple?: []; params?: {} }
     'api.v1.studio': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.artists.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.artists.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'artist': ParamValue} }

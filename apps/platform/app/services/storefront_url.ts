@@ -124,6 +124,27 @@ export function artworkPageUrl(
 }
 
 /**
+ * The studio page's booking form (Discover D03): `/book` on the studio's
+ * origin, optionally asking for one artist (`artist`, their slug) or a piece
+ * like one of the gallery's (`artwork`, its id: the storefront picks its
+ * artist), with Discover's referral token (`ref`). Every part is ours: the
+ * origin from the template, the values as query parameters, so no input can
+ * send the link elsewhere. The storefront's `/book` reads `artist`, `artwork`
+ * and `flash`, and drops what it does not know.
+ */
+export function bookingPageUrl(
+	template: string,
+	studioSlug: string,
+	options: { artist?: string; artwork?: string; ref?: string } = {},
+): string {
+	const url = new URL("/book", studioPageUrl(template, studioSlug));
+	if (options.artist) url.searchParams.set("artist", options.artist);
+	if (options.artwork) url.searchParams.set("artwork", options.artwork);
+	if (options.ref) url.searchParams.set("ref", options.ref);
+	return url.toString();
+}
+
+/**
  * The host of a studio page as what comes before and after its slug
  * (`.example.com` after it, for https://{tenant}.example.com): the onboarding
  * and settings forms draw their slug box between the two.
