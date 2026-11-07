@@ -340,12 +340,18 @@ test.group("GET /api/v1/tenants/:tenant (getStudio)", (group) => {
 		assert,
 	}) => {
 		const { tenant } = await studioWithOwner("api-policy-128");
-		await inTenant(tenant, () =>
-			new TenancyService().updateDepositSettings(tenant, {
+		await inTenant(tenant, async () => {
+			await new TenancyService().updateDepositSettings(tenant, {
 				defaultDepositPercent: 37,
 				depositPolicy: " \n ",
-			}),
-		);
+			});
+			// The policies' date is the database's clock, which can read
+			// 00:37 or .370 on its own: pin it to such a time, so the check
+			// below always meets the case instead of failing at random.
+			await Tenant.query()
+				.where("id", tenant.id)
+				.update({ policies_updated_at: new Date("2026-01-01T00:37:37.370Z") });
+		});
 
 		const { data } = (
 			await client.get("/api/v1/tenants/api-policy-128")
@@ -353,7 +359,10 @@ test.group("GET /api/v1/tenants/:tenant (getStudio)", (group) => {
 
 		assert.isNull(data.goodToKnow.depositPolicy);
 		assert.notProperty(data, "defaultDepositPercent");
-		assert.notInclude(JSON.stringify(data), "37");
+		assert.equal(data.policies.updatedAt, "2026-01-01T00:37:37.370Z");
+		// The date is the only place "37" may appear.
+		const rest = { ...data, policies: { ...data.policies, updatedAt: null } };
+		assert.notInclude(JSON.stringify(rest), "37");
 	});
 
 	test("saving the hours changes the ETag", async ({ client, assert }) => {
