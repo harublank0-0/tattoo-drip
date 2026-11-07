@@ -270,6 +270,7 @@ test.group("Discover words (D04): the checklist", () => {
 	}) => {
 		const items = readiness({
 			type: "studio",
+			viewerUserId: null,
 			optedIn: false,
 			takenDown: false,
 			publiclyVisible: false,

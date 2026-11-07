@@ -91,7 +91,10 @@ export default class PublicationService {
 	) {}
 
 	/** Everything the Discover settings page shows, read now. */
-	async overview(tenant: TenantRef): Promise<PublicationOverview> {
+	async overview(
+		tenant: TenantRef,
+		viewer: { id: string } | null = null,
+	): Promise<PublicationOverview> {
 		const live = await Tenant.findOrFail(tenant.id);
 		// One after another, never in parallel: readDiscovery runs in a
 		// savepoint of the same connection with the tenant context cleared,
@@ -108,6 +111,7 @@ export default class PublicationService {
 			hasLogo: live.logoImageKey !== null,
 			hasCover: live.coverImageKey !== null,
 			hasIntro: (live.intro ?? "").trim() !== "",
+			viewerUserId: viewer?.id ?? null,
 			artists,
 		};
 		const ready = readiness(facts);
@@ -246,6 +250,16 @@ export default class PublicationService {
 				editor,
 				artistId,
 			);
+			// An independent artist's one switch is the listing's (enable).
+			const business = await Tenant.query({ client: trx })
+				.where("id", tenant.id)
+				.firstOrFail();
+			if (business.type === "independent") {
+				throw new PublicationError(
+					"listed",
+					"Your Discover listing is managed in Settings, Discover.",
+				);
+			}
 			if (listed && artist.userId !== null && artist.userId !== editor.userId) {
 				throw new PublicationError(
 					"listed",
@@ -536,6 +550,7 @@ export default class PublicationService {
 			slug: artist.slug,
 			visible: artist.visible,
 			discoveryListed: artist.discoveryListed,
+			userId: artist.userId,
 			publishedPhotos: counts.get(artist.id) ?? 0,
 		}));
 	}

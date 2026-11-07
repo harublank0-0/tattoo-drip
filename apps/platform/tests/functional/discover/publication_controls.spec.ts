@@ -624,6 +624,18 @@ test.group("Discover settings: artists", (group) => {
 			.withInertia()
 			.loginAs(owner);
 		assert.isTrue(page.inertiaProps.discover.independent);
+		// Their one switch is the listing's: the profile switch is refused.
+		assertValidationError(
+			await artistSwitch(client, owner, solo.slug, profile.id, false),
+			"listed",
+		);
+		const still = await inTenant(solo, () => Artist.findOrFail(profile.id));
+		assert.isTrue(still.discoveryListed);
+		// "Your profile" links to the owner's own profile, not the guest's.
+		const ownLink = props.readiness.items.find(
+			(item: { key: string }) => item.key === "profile",
+		);
+		assert.equal(ownLink.target.params.id, profile.id);
 	});
 });
 

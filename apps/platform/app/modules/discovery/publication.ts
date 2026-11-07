@@ -83,6 +83,8 @@ export type ArtistFacts = {
 	visible: boolean;
 	/** Their own Discover switch (`artists.discovery_listed`). */
 	discoveryListed: boolean;
+	/** The login managing the profile, if any (`artists.user_id`). */
+	userId: string | null;
 	/** Published photos: not hidden and not taken down. */
 	publishedPhotos: number;
 };
@@ -100,6 +102,12 @@ export type PublicationFacts = {
 	hasLogo: boolean;
 	hasCover: boolean;
 	hasIntro: boolean;
+	/**
+	 * Who would turn the listing on (the owner viewing the page): turning it
+	 * on also turns on their own or an unlinked profile's switch, never one
+	 * another login manages. Null when nobody is asking.
+	 */
+	viewerUserId: string | null;
 	/** Live artists (deleted ones are not passed). */
 	artists: ArtistFacts[];
 };
@@ -216,10 +224,15 @@ export function readiness(facts: PublicationFacts): Readiness {
 	];
 	if (!studio) {
 		// An independent artist's public page is their profile: it must be
-		// shown on their page. Before listing, an opted-out profile counts,
-		// since turning the listing on turns their own switch back on.
+		// shown on their page. Before listing, an opted-out profile counts
+		// only if turning the listing on would turn its switch back on (the
+		// viewer's own or an unlinked profile: PublicationService.enable).
+		const relisted = (artist: ArtistFacts) =>
+			artist.userId === null || artist.userId === facts.viewerUserId;
 		const met = facts.artists.some((artist) =>
-			facts.optedIn ? showsOnDiscover(artist) : artist.visible,
+			facts.optedIn
+				? showsOnDiscover(artist)
+				: artist.visible && (artist.discoveryListed || relisted(artist)),
 		);
 		items.unshift({
 			key: "profile",
@@ -228,7 +241,9 @@ export function readiness(facts: PublicationFacts): Readiness {
 			label: "Your profile",
 			detail: met
 				? "Your artist profile is shown on your page."
-				: "Show your artist profile on your page. Discover shows the same profile.",
+				: facts.optedIn
+					? "Your artist profile isn't showing on Discover: it is hidden from your page, or its Discover switch is off. Show it on your page, or turn the listing off and on again to switch it back on."
+					: "Show your artist profile on your page. Discover shows the same profile.",
 			current: null,
 			recommended: null,
 			action: "artists",

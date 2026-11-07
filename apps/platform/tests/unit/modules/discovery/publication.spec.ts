@@ -20,6 +20,7 @@ const artist = (over: Partial<ArtistFacts> = {}): ArtistFacts => ({
 	slug: "sita",
 	visible: true,
 	discoveryListed: true,
+	userId: null,
 	publishedPhotos: 3,
 	...over,
 });
@@ -33,6 +34,7 @@ const facts = (over: Partial<PublicationFacts> = {}): PublicationFacts => ({
 	hasLogo: true,
 	hasCover: true,
 	hasIntro: true,
+	viewerUserId: "owner",
 	artists: [artist({ publishedPhotos: 6 })],
 	...over,
 });
@@ -182,6 +184,21 @@ test.group("Discover readiness of an independent artist's profile", () => {
 		assert.isTrue(
 			profile(independent({ artists: [artist({ discoveryListed: false })] }))
 				?.met,
+		);
+		// An opted-out profile another login manages: listing won't turn it on.
+		assert.isTrue(
+			profile(
+				independent({
+					artists: [artist({ discoveryListed: false, userId: "owner" })],
+				}),
+			)?.met,
+		);
+		assert.isFalse(
+			profile(
+				independent({
+					artists: [artist({ discoveryListed: false, userId: "guest" })],
+				}),
+			)?.met,
 		);
 		// Listed but their profile is opted out: the step that explains
 		// "needs attention" is marked.

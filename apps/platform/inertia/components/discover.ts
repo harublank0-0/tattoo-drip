@@ -59,7 +59,6 @@ export function previewLabel(type: BusinessType): string {
 	return studio(type) ? "Preview my studio" : "Preview my artist profile";
 }
 
-/** The main control, while the listing is off. */
 /** Beside the "Off" badge: what being off means, not the button's words again. */
 export function offLine(type: BusinessType): string {
 	return studio(type)
@@ -67,6 +66,7 @@ export function offLine(type: BusinessType): string {
 		: "Your artist profile isn't on Discover.";
 }
 
+/** The main control, while the listing is off. */
 export function listLabel(type: BusinessType): string {
 	return studio(type)
 		? "List my studio on TattooDrip Discover"

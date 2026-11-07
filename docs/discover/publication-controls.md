@@ -62,7 +62,7 @@ The thresholds are `DISCOVER_RECOMMENDED` in `#modules/discovery/publication`. T
 - An artist shows on Discover while the studio is listed and visible, the artist is shown on the studio page (`visible`) and their own switch (`artists.discovery_listed`, on by default) is on. A takedown of the studio hides every artist.
 - **Who may change the switch:** whoever may edit the profile (`ArtistService.lockEditable`: an owner any profile, an artist only their own linked one) may turn it off. Turning it back on is the artist's own choice: an owner may do it only for a profile no login manages, or their own. Anything else is a field error.
 - Turning it off removes the artist and their photos from Discover only: the profile, its photos, the studio link and the studio page are unchanged.
-- **Independent artists** have one switch: the listing's. Turning it on also turns their own profile's switch on (their profile page shows no switch of its own and points to Settings → Discover). A profile another login manages keeps its own choice. The words say "your artist profile", never "studio".
+- **Independent artists** have one switch: the listing's. Turning it on also turns their own profile's switch on (their profile page shows no switch of its own and points to Settings → Discover). A profile another login manages keeps its own choice, and the checklist counts an opted-out profile as ready only when listing would turn it on. The artist switch route refuses an independent artist's profiles. The words say "your artist profile", never "studio".
 
 ## Photos
 

@@ -325,8 +325,17 @@ function ArtistDiscoverPanel({
 			routeParams={{ tenant: tenantSlug, id: artistId }}
 			options={{ preserveScroll: true }}
 			// The answer is a new page: put focus back on the switch.
+			// A switch the answer disabled (a profile someone else manages, now
+			// off) can't take focus: the state sentence takes it instead.
 			onSuccess={() =>
-				setTimeout(() => document.getElementById("discover-switch")?.focus(), 0)
+				setTimeout(() => {
+					const button = document.getElementById("discover-switch");
+					if (button instanceof HTMLButtonElement && !button.disabled) {
+						button.focus();
+					} else {
+						document.getElementById("discover-state")?.focus();
+					}
+				}, 0)
 			}
 		>
 			{({ errors, processing }) => (
@@ -337,7 +346,7 @@ function ArtistDiscoverPanel({
 						value={discover.listed ? "false" : "true"}
 					/>
 					<div className="flex flex-col gap-1">
-						<p id="discover-state" className="text-sm">
+						<p id="discover-state" tabIndex={-1} className="text-sm">
 							{discover.stateText}
 						</p>
 						{photos}

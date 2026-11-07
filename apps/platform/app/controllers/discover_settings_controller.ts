@@ -34,10 +34,17 @@ export default class DiscoverSettingsController {
 
 	async show(ctx: HttpContext) {
 		const { tenant } = tenantContext(ctx);
-		const overview = await this.publication.overview(tenant);
+		const user = ctx.auth.getUserOrFail();
+		const overview = await this.publication.overview(tenant, user);
 		const places = await this.publication.places();
 		const consent = listingConsent(overview.type);
-		const firstArtist = overview.artists[0]?.id;
+		// The viewer's own profile, else an unlinked one: the one the listing
+		// turns on (an independent artist's "Your profile" link).
+		const ownProfile = (
+			overview.artists.find((artist) => artist.userId === user.id) ??
+			overview.artists.find((artist) => artist.userId === null) ??
+			overview.artists[0]
+		)?.id;
 		const target = (action: ReadinessAction): Target => {
 			const params = { tenant: tenant.slug };
 			switch (action) {
@@ -50,10 +57,10 @@ export default class DiscoverSettingsController {
 				case "portfolio":
 					return { route: "tenant.portfolio", params };
 				case "artists":
-					return overview.type === "independent" && firstArtist
+					return overview.type === "independent" && ownProfile
 						? {
 								route: "tenant.artists.edit",
-								params: { ...params, id: firstArtist },
+								params: { ...params, id: ownProfile },
 							}
 						: { route: "tenant.artists", params };
 			}
