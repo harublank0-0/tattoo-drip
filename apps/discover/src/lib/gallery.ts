@@ -23,6 +23,11 @@ import { readCity, readCountry, readQuery, readStyle } from "./search.ts";
 export const GALLERY_LIMIT = 24;
 /** How long the search box waits after the last keystroke before it searches. */
 export const SEARCH_DEBOUNCE_MS = 400;
+/**
+ * A pause in typing this long after the last keystroke ends a burst: the
+ * next search the box writes adds a history entry instead of replacing.
+ */
+export const SEARCH_BURST_GAP_MS = 1500;
 /** The first photos of a page that load at once (above the fold on a phone and a desktop). */
 export const GALLERY_EAGER = 4;
 
@@ -184,7 +189,11 @@ export type GalleryLabels = {
 	studio?: string;
 };
 
-/** The artist's and studio's names when the page's photos carry them. */
+/**
+ * The artist's and studio's names when the page's photos carry them, else
+ * none (the page then says "this artist" / "this studio": the address's
+ * text is never shown as a name).
+ */
 export function scopeNames(
 	filters: Pick<GalleryFilters, "artist" | "studio">,
 	tattoos: readonly DiscoverTattooSummary[],
@@ -194,8 +203,7 @@ export function scopeNames(
 			? tattoos.find((each) => each.artist.id === filters.artist)?.artist.name
 			: undefined,
 		studio: filters.studio
-			? (tattoos.find((each) => each.studio.slug === filters.studio)?.studio
-					.name ?? humanizeSlug(filters.studio))
+			? tattoos.find((each) => each.studio.slug === filters.studio)?.studio.name
 			: undefined,
 	};
 }
@@ -240,7 +248,7 @@ export function galleryChips(
 		});
 	if (filters.q) chip("q", `“${filters.q}”`);
 	if (filters.artist) chip("artist", `By ${labels.artist ?? "this artist"}`);
-	if (filters.studio) chip("studio", `At ${labels.studio ?? filters.studio}`);
+	if (filters.studio) chip("studio", `At ${labels.studio ?? "this studio"}`);
 	if (filters.city) chip("city", labels.city ?? humanizeSlug(filters.city));
 	if (filters.style) chip("style", labels.style ?? humanizeSlug(filters.style));
 	return chips;
@@ -270,6 +278,22 @@ export function nextSearch(
 }
 
 /**
+ * Whether a keystroke starts a new burst of typing (its search then adds a
+ * history entry; the rest of the burst replaces it): the first keystroke,
+ * or one after a pause of `SEARCH_BURST_GAP_MS`. Leaving the box (blur),
+ * Enter and Clear end a burst too (`GallerySearchBox`).
+ */
+export function startsBurst(
+	lastKeystrokeAt: number | undefined,
+	now: number,
+): boolean {
+	return (
+		lastKeystrokeAt === undefined ||
+		now - lastKeystrokeAt >= SEARCH_BURST_GAP_MS
+	);
+}
+
+/**
  * A gallery page's title, server-rendered: what it shows ("Blackwork
  * tattoos in Kathmandu", "Tattoos by Sita Rai", "Tattoos matching "koi"").
  */
@@ -282,7 +306,7 @@ export function galleryTitle(
 		labels.city ?? (filters.country ? countryName(filters.country) : undefined);
 	const what = labels.style ? `${labels.style} tattoos` : "Tattoos";
 	if (filters.artist) return `${what} by ${labels.artist ?? "one artist"}`;
-	if (filters.studio) return `${what} from ${labels.studio ?? filters.studio}`;
+	if (filters.studio) return `${what} from ${labels.studio ?? "this studio"}`;
 	if (labels.style) return where ? `${what} in ${where}` : what;
 	return where ? `Tattoo inspiration from ${where}` : "Tattoo inspiration";
 }

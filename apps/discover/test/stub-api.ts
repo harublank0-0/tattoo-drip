@@ -4,7 +4,8 @@ import type { AddressInfo } from "node:net";
 /**
  * A stub of the Discover API for the built-server test (D06): it serves
  * `count` studios, artists and photos (0, 3 or 20 in the tests), the style
- * list and the places, lets an endpoint fail (500) or hang, and records
+ * list and the places, lets an endpoint fail (500, or a chosen status:
+ * `scenario.status`, 429 as the API's `rate_limited`) or hang, and records
  * every request. Names are recognisably the stub's ("Stub …").
  *
  * Like the API (D06.5, D07), the lists honour `country` (a photo by its
@@ -362,6 +363,8 @@ export type StubApi = {
 	scenario: {
 		count: number;
 		fail: Set<Endpoint>;
+		/** Endpoints answering an error with this status (429: `rate_limited`, else as `fail`). */
+		status: Map<Endpoint, number>;
 		hang: Set<Endpoint>;
 		extraPlaces: {
 			country: string;
@@ -382,6 +385,7 @@ export async function stubApi(count = 1): Promise<StubApi> {
 	const scenario = {
 		count,
 		fail: new Set<Endpoint>(),
+		status: new Map<Endpoint, number>(),
 		hang: new Set<Endpoint>(),
 		extraPlaces: [] as StubApi["scenario"]["extraPlaces"],
 		hidden: new Set<string>(),
@@ -417,8 +421,19 @@ export async function stubApi(count = 1): Promise<StubApi> {
 			hanging.add(() => response.destroy());
 			return;
 		}
-		if (scenario.fail.has(endpoint)) {
-			response.statusCode = 500;
+		const status = scenario.status.get(endpoint);
+		if (status === 429) {
+			response.statusCode = 429;
+			response.setHeader("Retry-After", "30");
+			response.end(
+				JSON.stringify({
+					error: { code: "rate_limited", message: "Too many requests" },
+				}),
+			);
+			return;
+		}
+		if (scenario.fail.has(endpoint) || status) {
+			response.statusCode = status ?? 500;
 			response.end(
 				JSON.stringify({
 					error: { code: "internal_error", message: "Stub failure" },

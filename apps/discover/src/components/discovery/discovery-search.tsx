@@ -22,6 +22,7 @@ export function DiscoverySearch({
 	value,
 	onValueChange,
 	onSearch,
+	onBlur,
 	pending = false,
 	size = "md",
 	tone = "paper",
@@ -39,6 +40,8 @@ export function DiscoverySearch({
 	onValueChange?: (value: string) => void;
 	/** Instead of navigating: called with the trimmed text. */
 	onSearch?: (query: string) => void;
+	/** The field lost focus, with its text. */
+	onBlur?: (value: string) => void;
 	/** A search the page is loading: the button says so and waits. */
 	pending?: boolean;
 	size?: "md" | "lg";
@@ -106,6 +109,7 @@ export function DiscoverySearch({
 							type="search"
 							value={text}
 							onChange={(event) => setText(event.target.value)}
+							onBlur={(event) => onBlur?.(event.target.value)}
 							placeholder={placeholder}
 							minLength={SEARCH_MIN}
 							maxLength={SEARCH_MAX}

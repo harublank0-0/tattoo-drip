@@ -29,7 +29,11 @@ const optional = <T>(read: Promise<T>) =>
  * places beside the page (optional; only a `style` waits for the list,
  * which drops a style it doesn't have, as the API would 422 it), then the
  * page itself. A cursor the API refuses sends the visitor to the same
- * filters' first page; any other failure is the route's error state.
+ * filters' first page. A search the API rate-limits (429: server renders
+ * share one anonymous budget until D11's key, and typing reads often) is
+ * `busy`: the page keeps its search and filters and says so, with no
+ * results and nothing cached as an answer. Any other failure, and a 429
+ * without a search, is the route's error state.
  */
 export async function loadGallery(
 	context: LoaderContext,
@@ -38,6 +42,7 @@ export async function loadGallery(
 	filters: GalleryFilters;
 	labels: GalleryLabels;
 	styleUnchecked: boolean;
+	busy?: true;
 }> {
 	const { queryClient, discover } = context;
 	const client = discover.client;
@@ -51,7 +56,7 @@ export async function loadGallery(
 	const style = checked ? knownStyle(search.style, checked) : undefined;
 	const styleUnchecked = Boolean(search.style) && !checked;
 	const filters = resolveGallery(search, context.country.country, style);
-	let page: Awaited<ReturnType<typeof client.tattoos.list>>;
+	let page: Awaited<ReturnType<typeof client.tattoos.list>> | undefined;
 	try {
 		page = await queryClient.ensureQueryData(
 			discoverQueries.tattoos(client, galleryQuery(filters)),
@@ -62,7 +67,8 @@ export async function loadGallery(
 				to: paths.tattoos(),
 				search: { ...search, cursor: undefined } as never,
 			});
-		rethrowUnavailable(error);
+		if (!(filters.q && isTattooApiError(error) && error.status === 429))
+			rethrowUnavailable(error);
 	}
 	const [placeList, styleList] = await Promise.all([places, styles]);
 	return {
@@ -71,8 +77,9 @@ export async function loadGallery(
 		labels: galleryLabels(
 			filters,
 			{ styles: styleList, places: placeList },
-			page.data,
+			page?.data ?? [],
 		),
+		...(page ? {} : { busy: true as const }),
 	};
 }
 

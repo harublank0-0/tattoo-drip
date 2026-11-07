@@ -83,6 +83,7 @@ describe("D09 gallery and artwork pages on the built server", { skip }, () => {
 		api.requests.length = 0;
 		api.scenario.count = 20;
 		api.scenario.fail.clear();
+		api.scenario.status.clear();
 		api.scenario.hidden.clear();
 		api.scenario.links = {};
 	});
@@ -236,6 +237,13 @@ describe("D09 gallery and artwork pages on the built server", { skip }, () => {
 		]);
 		assert.match(text(studio), /At Stub Studio 2 \(remove this filter\)/);
 		assert.ok(hrefs(studio).includes("/tattoos"));
+		// No photo names the studio: a neutral label, never the address's text.
+		const unknown = await html(
+			await discover.get("/tattoos?studio=totally-fake"),
+		);
+		assert.match(unknown, /<title>Tattoos from this studio/);
+		assert.match(text(unknown), /At this studio \(remove this filter\)/);
+		assert.doesNotMatch(unknown, /totally fake/i);
 	});
 
 	test("cursor paging: Next page, then First page; a refused cursor goes back to the first page", async () => {
@@ -292,6 +300,48 @@ describe("D09 gallery and artwork pages on the built server", { skip }, () => {
 		const failedPage = text(await html(failed));
 		assert.match(failedPage, /Discover is unavailable for a moment/);
 		assert.match(failedPage, /Try again/);
+	});
+
+	test("a rate-limited search keeps the gallery with a notice; a rate-limited bare gallery is the error page", async () => {
+		api.scenario.status.set("tattoos", 429);
+		const response = await discover.get(
+			"/tattoos?q=koi%20fish&style=blackwork",
+		);
+		assert.equal(response.status, 200);
+		assert.equal(response.headers.get("cache-control"), "private, no-store");
+		const page = await html(response);
+		const words = text(page);
+		assert.match(
+			words,
+			/Searching is busy right now\. Try again in a moment\./,
+		);
+		assert.match(page, /<title>Tattoos matching &quot;koi fish&quot;/);
+		// The search box still holds the query, and its chip is there.
+		assert.match(page, /<input[^>]*name="q"[^>]*value="koi fish"/);
+		assert.match(words, /“koi fish” \(remove this filter\)/);
+		// Try again is the same address; no results, no paging.
+		const retry = new URL(linkNamed(page, /^Try again$/) ?? "", SITE);
+		assert.equal(retry.pathname, "/tattoos");
+		assert.deepEqual(Object.fromEntries(retry.searchParams), {
+			q: "koi fish",
+			style: "blackwork",
+		});
+		assert.deepEqual(artworkLinks(page), []);
+		assert.equal(linkNamed(page, /^Next page/), undefined);
+		assert.doesNotMatch(words, /No tattoos match/);
+		assert.doesNotMatch(words, /Discover is unavailable for a moment/);
+		// Without a search, the same 429 is the route's error state.
+		const bare = await discover.get("/tattoos?style=blackwork");
+		assert.equal(bare.status, 500);
+		assert.match(
+			text(await html(bare)),
+			/Discover is unavailable for a moment/,
+		);
+		// Answered again: the same search shows its results.
+		api.scenario.status.clear();
+		const again = await html(await discover.get("/tattoos?q=stub"));
+		assert.doesNotMatch(text(again), /Searching is busy/);
+		assert.ok(artworkLinks(again).length > 0);
 	});
 
 	test("/explore/tattoos is a 301 to /tattoos, its query kept", async () => {
@@ -613,6 +663,17 @@ describe("D09 indexing on", { skip }, () => {
 				path,
 			);
 		}
+		// A rate-limited search (the busy notice) is never indexed either.
+		api.scenario.status.set("tattoos", 429);
+		const busy = await discover.get("/tattoos?q=stub");
+		assert.equal(busy.status, 200);
+		const busyPage = await busy.text();
+		assert.match(busyPage, /Searching is busy/);
+		assert.match(
+			busyPage,
+			/<meta name="robots" content="noindex, nofollow"\/>/,
+		);
+		api.scenario.status.clear();
 		const sitemap = await (await discover.get("/sitemap.xml")).text();
 		assert.match(sitemap, /<loc>http:\/\/localhost:3100\/tattoos<\/loc>/);
 	});

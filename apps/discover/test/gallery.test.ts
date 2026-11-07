@@ -7,6 +7,7 @@ import {
 	galleryChips,
 	galleryFields,
 	galleryFilterCount,
+	galleryLabels,
 	galleryQuery,
 	galleryTitle,
 	isFiltered,
@@ -15,8 +16,10 @@ import {
 	readGallerySearch,
 	readStudioSlug,
 	resolveGallery,
+	SEARCH_BURST_GAP_MS,
 	SEARCH_DEBOUNCE_MS,
 	scopeNames,
+	startsBurst,
 } from "../src/lib/gallery.ts";
 import { fixtures } from "./stub-api.ts";
 
@@ -205,10 +208,20 @@ describe("the gallery's address (D09)", () => {
 			),
 			{ artist: first.artist.name, studio: first.studio.name },
 		);
+		// No photo names it: no name (never the address's text).
 		assert.deepEqual(scopeNames({ studio: "gone-studio" }, []), {
 			artist: undefined,
-			studio: "Gone studio",
+			studio: undefined,
 		});
+		const unnamed = resolveGallery({ studio: "totally-fake" }, "NP", undefined);
+		const labels = galleryLabels(unnamed, {}, []);
+		assert.equal(galleryTitle(unnamed, labels), "Tattoos from this studio");
+		assert.deepEqual(
+			galleryChips({ studio: "totally-fake" }, unnamed, labels).map(
+				(chip) => chip.label,
+			),
+			["At this studio"],
+		);
 	});
 
 	test("titles say what the page shows", () => {
@@ -253,6 +266,14 @@ describe("the gallery's address (D09)", () => {
 describe("the search box's rule (D09)", () => {
 	test("waits about 400 ms", () => {
 		assert.equal(SEARCH_DEBOUNCE_MS, 400);
+	});
+
+	test("a burst of typing starts with the first keystroke or after a pause", () => {
+		assert.equal(startsBurst(undefined, 1000), true);
+		assert.equal(startsBurst(1000, 1000 + SEARCH_DEBOUNCE_MS + 200), false);
+		assert.equal(startsBurst(1000, 1000 + SEARCH_BURST_GAP_MS - 1), false);
+		assert.equal(startsBurst(1000, 1000 + SEARCH_BURST_GAP_MS), true);
+		assert.ok(SEARCH_BURST_GAP_MS > SEARCH_DEBOUNCE_MS);
 	});
 
 	test("searches with 2 to 80 characters, clears when emptied, ignores the rest", () => {

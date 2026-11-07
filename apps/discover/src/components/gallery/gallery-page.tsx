@@ -1,4 +1,9 @@
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import {
+	Link,
+	useNavigate,
+	useRouter,
+	useRouterState,
+} from "@tanstack/react-router";
 import type { DiscoverTattooSummary } from "@tattoo-drip/sdk";
 import {
 	ActiveFilters,
@@ -48,6 +53,7 @@ export function GalleryPage({
 	tattoos,
 	nextCursor,
 	styleUnchecked,
+	busy = false,
 }: {
 	search: GallerySearch;
 	filters: GalleryFilters;
@@ -57,6 +63,8 @@ export function GalleryPage({
 	tattoos: readonly DiscoverTattooSummary[];
 	nextCursor: string | null;
 	styleUnchecked: boolean;
+	/** A search the API rate-limited: a notice instead of results. */
+	busy?: boolean;
 }) {
 	const action = paths.tattoos();
 	const navigate = useNavigate();
@@ -67,10 +75,8 @@ export function GalleryPage({
 	});
 	const cleared = clearedGallery(search);
 	const chips = galleryChips(search, filters, labels);
-	const filtered = isFiltered(filters);
 	const where = filters.country ? countryName(filters.country) : undefined;
 	const heading = galleryTitle(filters, labels);
-	const rows = tattoos.length;
 	const reset = Object.entries(search).some(
 		([key, value]) => key !== "country" && value !== undefined,
 	)
@@ -132,59 +138,124 @@ export function GalleryPage({
 					<h2 id="gallery-results-title" className="sr-only">
 						{heading}
 					</h2>
-					{/* Announced politely when new results arrive (typing, filters, paging). */}
-					<output className="sr-only">
-						{rows === 0
-							? "No tattoos found."
-							: `${rows} ${rows === 1 ? "tattoo" : "tattoos"} shown${nextCursor ? ", more on the next page" : ""}.`}
-					</output>
-					{rows > 0 ? (
-						<ArtworkColumns
-							tattoos={tattoos}
-							tone="paper"
-							eager={search.cursor ? 0 : GALLERY_EAGER}
-							fromGallery
-							sizes="(min-width: 64rem) 24vw, (min-width: 40rem) 33vw, 50vw"
-							caption={(tattoo) => <ArtworkCredit tattoo={tattoo} style />}
-						/>
-					) : search.cursor ? (
-						<EmptyState
-							title="No more tattoos"
-							action={
-								<Link
-									to={action}
-									search={{ ...search, cursor: undefined } as never}
-									className={buttonVariants({ variant: "outline" })}
-								>
-									First page
-								</Link>
-							}
-						>
-							That's every published piece for these filters.
-						</EmptyState>
-					) : filtered || !filters.country ? (
-						<GalleryEmpty
+					{busy ? (
+						<GalleryBusy />
+					) : (
+						<GalleryResults
 							search={search}
 							filters={filters}
 							lists={lists}
 							markets={markets}
-						/>
-					) : (
-						<EmptyMarket
-							country={filters.country}
-							markets={markets}
-							noun="tattoos"
-							className="border-t border-line py-12"
+							tattoos={tattoos}
+							nextCursor={nextCursor}
 						/>
 					)}
-					<Pagination
-						action={action}
-						search={search}
-						nextCursor={nextCursor}
-						noun="tattoos"
-					/>
 				</section>
 			</PageContainer>
+		</>
+	);
+}
+
+/**
+ * The API rate-limited this search (429): say so politely and offer the
+ * same address again; the search box, filters and chips stay above.
+ */
+function GalleryBusy() {
+	const router = useRouter();
+	const href = useRouterState({ select: (state) => state.location.href });
+	return (
+		<div className="flex flex-col items-start gap-4 border-t border-line py-12">
+			{/* Announced politely, as the results' count would be. */}
+			<output className="block max-w-xl text-lg">
+				Searching is busy right now. Try again in a moment.
+			</output>
+			<a
+				href={href}
+				onClick={(event) => {
+					// With JavaScript: read the same address again in place.
+					event.preventDefault();
+					router.invalidate();
+				}}
+				className={buttonVariants({ variant: "outline" })}
+			>
+				Try again
+			</a>
+		</div>
+	);
+}
+
+/** The photos, or what to do when there are none, and the paging. */
+function GalleryResults({
+	search,
+	filters,
+	lists,
+	markets,
+	tattoos,
+	nextCursor,
+}: {
+	search: GallerySearch;
+	filters: GalleryFilters;
+	lists: FilterLists;
+	markets: readonly string[];
+	tattoos: readonly DiscoverTattooSummary[];
+	nextCursor: string | null;
+}) {
+	const action = paths.tattoos();
+	const filtered = isFiltered(filters);
+	const rows = tattoos.length;
+	return (
+		<>
+			{/* Announced politely when new results arrive (typing, filters, paging). */}
+			<output className="sr-only">
+				{rows === 0
+					? "No tattoos found."
+					: `${rows} ${rows === 1 ? "tattoo" : "tattoos"} shown${nextCursor ? ", more on the next page" : ""}.`}
+			</output>
+			{rows > 0 ? (
+				<ArtworkColumns
+					tattoos={tattoos}
+					tone="paper"
+					eager={search.cursor ? 0 : GALLERY_EAGER}
+					fromGallery
+					sizes="(min-width: 64rem) 24vw, (min-width: 40rem) 33vw, 50vw"
+					caption={(tattoo) => <ArtworkCredit tattoo={tattoo} style />}
+				/>
+			) : search.cursor ? (
+				<EmptyState
+					title="No more tattoos"
+					action={
+						<Link
+							to={action}
+							search={{ ...search, cursor: undefined } as never}
+							className={buttonVariants({ variant: "outline" })}
+						>
+							First page
+						</Link>
+					}
+				>
+					That's every published piece for these filters.
+				</EmptyState>
+			) : filtered || !filters.country ? (
+				<GalleryEmpty
+					search={search}
+					filters={filters}
+					lists={lists}
+					markets={markets}
+				/>
+			) : (
+				<EmptyMarket
+					country={filters.country}
+					markets={markets}
+					noun="tattoos"
+					className="border-t border-line py-12"
+				/>
+			)}
+			<Pagination
+				action={action}
+				search={search}
+				nextCursor={nextCursor}
+				noun="tattoos"
+			/>
 		</>
 	);
 }
