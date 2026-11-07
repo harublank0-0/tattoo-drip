@@ -264,7 +264,7 @@ export function ArtistProfile({
 
 			{shownRequest && (
 				<StickyBooking
-					name={artist.name}
+					name={accepting ? artist.name : artist.studio.name}
 					request={shownRequest}
 					label={accepting ? "Request" : "Request at studio"}
 					owner={owner}
@@ -279,6 +279,7 @@ function MoreInline({ to, children }: { to: string; children: string }) {
 	return (
 		<Link
 			to={to}
+			preload={false}
 			className="underline decoration-accent decoration-2 underline-offset-4 hover:decoration-ink"
 		>
 			{children}

@@ -275,7 +275,7 @@ export function Portfolio({
 					return (
 						<li key={tattoo.id} className="mb-6 break-inside-avoid">
 							{href ? (
-								<Link to={href} className="group block">
+								<Link to={href} preload={false} className="group block">
 									{body}
 								</Link>
 							) : (

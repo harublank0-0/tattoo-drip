@@ -170,7 +170,12 @@ export async function loadStudioProfile(
 			if (isTattooApiError(error) && error.status === 404) {
 				const artist = await queryClient
 					.ensureQueryData(independentQueries(discover.client, slug).artist)
-					.catch(() => null);
+					.catch((second: unknown) => {
+						// Only a 404 means "no such artist either"; a transient
+						// failure is the error page (Try again), never a 404.
+						if (isTattooApiError(second) && second.status === 404) return null;
+						return rethrowMissing(second);
+					});
 				if (artist)
 					throw redirect({
 						href: paths.independentArtist(artist.studio.slug),
@@ -199,12 +204,15 @@ export async function loadStudioArtistProfile(
 	if (!studioSlug || !artistSlug) throw notFound();
 	const { queryClient, discover } = context;
 	const queries = studioArtistQueries(discover.client, studioSlug, artistSlug);
-	const [artist] = await Promise.all([
-		queryClient.ensureQueryData(queries.artist).catch(rethrowMissing),
-		queryClient
-			.ensureQueryData(queries.colleagues)
-			.catch((): undefined => undefined),
-	]);
+	// Both start now; only the artist is awaited first, so a slow optional
+	// read never delays the page's answer (or its 404).
+	const colleagues = queryClient
+		.ensureQueryData(queries.colleagues)
+		.catch((): undefined => undefined);
+	const artist = await queryClient
+		.ensureQueryData(queries.artist)
+		.catch(rethrowMissing);
+	await colleagues;
 	if (artist.studio.slug !== studioSlug || artist.slug !== artistSlug)
 		throw redirect({
 			href: paths.studioArtist(artist.studio.slug, artist.slug),

@@ -20,7 +20,9 @@ export function ProfileLink({
 			{children}
 		</a>
 	) : (
-		<Link to={destination.href} className={className}>
+		// No preload on hover: a page can hold dozens of profile links and each
+		// preload spends public API reads (rate-limited per address).
+		<Link to={destination.href} preload={false} className={className}>
 			{children}
 		</Link>
 	);

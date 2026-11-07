@@ -373,6 +373,17 @@ describe("D08 profiles on the built server", { skip }, () => {
 		assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow");
 	});
 
+	test("a failed independent read after a studio 404 is the error state, not a 404", async () => {
+		// /studios/stub-solo-3 is no studio (404); the independent read that
+		// would 301 it fails transiently: Try again, never a confident 404.
+		api.scenario.fail.add("independent");
+		const response = await discover.get("/studios/stub-solo-3", {
+			redirect: "manual",
+		});
+		assert.equal(response.status, 500);
+		assert.match(await html(response), />Try again</);
+	});
+
 	test("an unsafe booking or site link is no link: the page says booking isn't available online", async () => {
 		for (const links of [
 			{ bookingUrl: `https://evil.test/book?ref=${STUB_REF}` },
