@@ -378,6 +378,78 @@ test.group("Discover API: studios", (group) => {
 		}
 	});
 
+	test("rows that tie on the sort value page by id, none twice or missed", async ({
+		client,
+		assert,
+	}) => {
+		// Equal names under lower() and the same listing instant.
+		const twins = [];
+		for (const [index, name] of [
+			"Twin Ink",
+			"twin ink",
+			"TWIN INK",
+		].entries()) {
+			const twin = await studioWithOwner(`disc-twin-${index}`, name);
+			await list(twin.tenant, { listedAt: at(5) });
+			twins.push(twin);
+		}
+		const twinSlugs = twins.map((twin) => twin.tenant.slug).sort();
+		const page = async (url: string, params: Record<string, string> = {}) => {
+			const seen: string[] = [];
+			let cursor: string | null = null;
+			do {
+				const response: ApiResponse = await client.get(url).qs({
+					...params,
+					limit: 1,
+					...(cursor ? { cursor } : {}),
+				});
+				response.assertStatus(200);
+				seen.push(
+					...response
+						.body()
+						.data.map(
+							(row: { slug?: string; id: string }) => row.slug ?? row.id,
+						),
+				);
+				cursor = response.body().nextCursor;
+			} while (cursor);
+			return seen;
+		};
+		for (const sort of ["newest", "name", "-name"]) {
+			const seen = await page("/api/v1/discover/studios", { sort });
+			assert.lengthOf(seen, 3, sort);
+			assert.sameMembers(seen, twinSlugs, sort);
+		}
+
+		// Photos taken at the same microsecond.
+		const [first] = twins;
+		const artist = await addArtist(first.tenant, first.owner, {
+			name: "Twin Artist",
+			slug: "twin",
+			styles: ["blackwork"],
+		});
+		const photos = await inTenant(first.tenant, async () => [
+			await addWorkPhoto(first.tenant, artist, { createdAt: at(6) }),
+			await addWorkPhoto(first.tenant, artist, { createdAt: at(6) }),
+			await addWorkPhoto(first.tenant, artist, { createdAt: at(6) }),
+		]);
+		const seen = await page("/api/v1/discover/tattoos", {
+			studio: "disc-twin-0",
+		});
+		assert.lengthOf(seen, 3);
+		assert.sameMembers(
+			seen,
+			photos.map((photo) => photo.id),
+		);
+		for (const sort of ["newest", "name"]) {
+			const artists = await page("/api/v1/discover/artists", {
+				studio: "disc-twin-0",
+				sort,
+			});
+			assert.deepEqual(artists, ["twin"], sort);
+		}
+	});
+
 	test("a studio's profile: its artists, newest photos and a signed booking link", async ({
 		client,
 		assert,
@@ -411,6 +483,32 @@ test.group("Discover API: studios", (group) => {
 			verifyReferral(booking.searchParams.get("ref"), needle.tenant.id).valid,
 		);
 		assertNoPrivate(assert, response);
+	});
+
+	test("a profile's ETag holds from one second to the next, so a revalidation is a 304", async ({
+		client,
+		assert,
+	}) => {
+		const { photos } = await world();
+		const urls = [
+			"/api/v1/discover/studios/disc-black-needle",
+			"/api/v1/discover/studios/disc-black-needle/artists/sita",
+			`/api/v1/discover/tattoos/${photos.sitaOld.id}`,
+		];
+		const etags: [string, string][] = [];
+		for (const url of urls) {
+			const response = await client.get(url);
+			assertCached(response);
+			const etag = response.header("etag");
+			assert.isString(etag, url);
+			etags.push([url, etag ?? ""]);
+		}
+		// Past a second: a token signed to the second would change the body.
+		await new Promise((resolve) => setTimeout(resolve, 1100));
+		for (const [url, etag] of etags) {
+			const again = await client.get(url).header("if-none-match", etag);
+			again.assertStatus(304);
+		}
 	});
 
 	test("an old slug still finds a listed studio", async ({
@@ -555,6 +653,20 @@ test.group("Discover API: artists and tattoos", (group) => {
 			),
 			[photos.sitaNew.id, photos.sitaOld.id],
 		);
+		assert.deepEqual(
+			ids(
+				await client.get(
+					`/api/v1/discover/tattoos?artist=${artists.sita.id.toUpperCase()}`,
+				),
+			),
+			[photos.sitaNew.id, photos.sitaOld.id],
+			"a uuid in any case",
+		);
+		(
+			await client.get(
+				`/api/v1/discover/tattoos/${photos.sitaOld.id.toUpperCase()}`,
+			)
+		).assertStatus(200);
 		assert.deepEqual(
 			ids(await client.get("/api/v1/discover/tattoos?studio=disc-lotus-ink")),
 			[photos.ramPhoto.id],

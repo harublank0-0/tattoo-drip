@@ -1,6 +1,7 @@
 import { createHmac, hkdfSync } from "node:crypto";
 import { test } from "@japa/runner";
 import {
+	linkReferral,
 	MAX_REFERRAL_LENGTH,
 	REFERRAL_TTL_SECONDS,
 	signReferral,
@@ -191,5 +192,36 @@ test.group("Discover referral tokens", () => {
 				String(bad),
 			);
 		}
+	});
+	test("a booking link's token is the same for the whole hour, then changes", ({
+		assert,
+	}) => {
+		const hour = new Date("2026-11-06T10:00:00.000Z");
+		const token = linkReferral(STUDIO, hour);
+		assert.equal(token, signReferral(STUDIO, hour));
+		assert.equal(linkReferral(STUDIO, later(59 * 60 + 59)), token);
+		assert.notEqual(linkReferral(STUDIO, later(60 * 60)), token);
+		assert.deepEqual(verifyReferral(token, STUDIO, later(3599)), {
+			valid: true,
+			issuedAt: hour,
+		});
+	});
+
+	test("only one spelling of a signature verifies", ({ assert }) => {
+		const token = signReferral(STUDIO, NOW);
+		const [text, signature] = token.split(".");
+		// 32 bytes are 43 characters: the last carries 2 spare bits.
+		const last =
+			"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+		const index = last.indexOf(signature.at(-1) ?? "");
+		const respelt = `${signature.slice(0, -1)}${last[index ^ 1]}`;
+		assert.deepEqual(
+			Buffer.from(respelt, "base64url"),
+			Buffer.from(signature, "base64url"),
+		);
+		assert.deepEqual(verifyReferral(`${text}.${respelt}`, STUDIO, NOW), {
+			valid: false,
+			reason: "malformed",
+		});
 	});
 });

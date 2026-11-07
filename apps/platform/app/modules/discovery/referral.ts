@@ -84,6 +84,23 @@ export function signReferral(studioId: string, now = new Date()): string {
 }
 
 /**
+ * Booking links sign with the start of the hour, not the second: a profile's
+ * body, and so its ETag, then stays the same for the hour and a cache's
+ * revalidation gets a 304 instead of a fresh body every second. A link
+ * therefore keeps its attribution for 29 to 30 days.
+ */
+export const REFERRAL_LINK_STEP_SECONDS = 60 * 60;
+
+/** The referral token Discover puts on a booking link to `studioId` at `now`. */
+export function linkReferral(studioId: string, now = new Date()): string {
+	const step = REFERRAL_LINK_STEP_SECONDS * 1000;
+	return signReferral(
+		studioId,
+		new Date(Math.floor(now.getTime() / step) * step),
+	);
+}
+
+/**
  * Whether `token` (anything a client sent) is a live referral for
  * `studioId`. Never throws: every failure is a reason, which callers only
  * use to drop the attribution.
@@ -109,6 +126,10 @@ export function verifyReferral(
 	// The signature first, in constant time, before the payload is trusted.
 	if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
 		return { valid: false, reason: "signature" };
+	}
+	// One spelling only: base64url ignores the last character's spare bits.
+	if (expected.toString("base64url") !== signature) {
+		return { valid: false, reason: "malformed" };
 	}
 	let payload: Partial<Payload>;
 	try {

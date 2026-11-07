@@ -17,7 +17,8 @@ export const MAX_QUERY_LENGTH = 80;
 const STUDIO_SLUG = /^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/;
 /** A place's slug (places_slug_format). */
 const PLACE_SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+/** Any letter case, as `format: uuid` allows; compared lower-cased. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // biome-ignore lint/suspicious/noControlCharactersInRegex: refusing them is the point.
 const NO_CONTROL = /^[^\u0000-\u001f\u007f]*$/;
 
@@ -72,7 +73,11 @@ export const listDiscoverTattoosValidator = vine.create({
 	city: vine.string().maxLength(63).regex(PLACE_SLUG).optional(),
 	style: style(),
 	studio: vine.string().regex(STUDIO_SLUG).optional(),
-	artist: vine.string().regex(UUID).optional(),
+	artist: vine
+		.string()
+		.regex(UUID)
+		.transform((value) => value.toLowerCase())
+		.optional(),
 	healed: vine.boolean().optional(),
 	cursor: cursor(),
 	limit: limit(),

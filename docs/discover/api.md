@@ -50,11 +50,11 @@ Vine validators (`#modules/discovery/validators/discover`) read the query string
 | `cursor` | Opaque; at most 1000 characters; must be a canonical cursor of the same sort |
 | `limit` | 1–48, default 24 |
 | `independent`, `healed` | Booleans. `healed=false` is the same as leaving it out |
-| `artist` | A uuid |
+| `artist` | A uuid, in any letter case |
 
 An unknown place, studio slug or artist is an empty page, not an error, as in the studio gallery's filters.
 
-**Cursors** (`#modules/discovery/cursor`) use keyset paging: base64url of the JSON `[sort, value, id]`, where `value` is `lower(name)` or the instant as the database wrote it (UTC, microseconds, so a JavaScript date never rounds it). Only one spelling decodes. A cursor of another sort, a non-uuid id, an impossible date (31 February) or a control character is a 422 on `cursor`. Rows added while someone pages are never repeated or skipped. Pass `nextCursor` back with the same filters and sort; it is null on the last page.
+**Cursors** (`#modules/discovery/cursor`) use keyset paging: base64url of the JSON `[sort, value, id]`, where `value` is `lower(name)` or the instant as the database wrote it (UTC, microseconds, so a JavaScript date never rounds it). Only one spelling decodes. A cursor of another sort, a non-uuid id, an impossible date (31 February) or a control character is a 422 on `cursor`. Rows added while someone pages are never repeated or skipped. Rows that tie on the sort value (the same name under `lower()`, the same instant) are ordered by id. Pass `nextCursor` back with the same filters and sort; it is null on the last page.
 
 ## Limits and caching
 
@@ -62,7 +62,7 @@ An unknown place, studio slug or artist is an empty page, not an error, as in th
 - `discoverReads`: 200 reads per caller per 5 minutes (`apiLimit` on the whole group).
 - `discoverSearch`: 60 searches per caller per 5 minutes, counted only when `q` is present (each one scans the listed names).
 - Over budget: `429 rate_limited` with `Retry-After`.
-- Every read is `Cache-Control: public, max-age=60, stale-while-revalidate=60` with `Vary: Origin`. Something unlisted or hidden can therefore still be served from a cache for up to 2 minutes. Takedowns that need to be faster need a CDN purge, which doesn't exist yet (see Limitations).
+- Every read is `Cache-Control: public, max-age=60, stale-while-revalidate=60` with `Vary: Origin` and an `ETag` (`If-None-Match` gets a 304). Something unlisted or hidden can therefore still be served from a cache for up to 2 minutes. Takedowns that need to be faster need a CDN purge, which doesn't exist yet (see Limitations).
 - CORS comes from D01: only allowlisted origins (the studio sites, `APP_URL`, `DISCOVER_URL`) are echoed, never `*`, never with credentials.
 
 ## Referral
@@ -70,9 +70,9 @@ An unknown place, studio slug or artist is an empty page, not an error, as in th
 Discover's booking links carry a signed referral token, so an inquiry that came from Discover is attributed and the attribution can't be forged. It is attribution only: it never authorises anything, grants no access and never blocks an inquiry.
 
 - **Token** (`#modules/discovery/referral`): `<payload>.<signature>`, both base64url. The payload is the JSON `{ v: 1, p: "booking_referral", iss: "discover", sid: <studio id>, iat, exp }`, in whole seconds, 30 days (`REFERRAL_TTL_SECONDS`). Nothing about a person is in it. The signature is HMAC-SHA256 over the payload text, with a key derived from `APP_KEY` by HKDF for this purpose alone. Rotating `APP_KEY` invalidates every token, which only drops attribution.
-- **Where it appears:** every `bookingUrl` (studio, artist and tattoo details) is the studio site's `/book`, with `artist` or `artwork` where it applies and `ref=<token>`. Each read signs a fresh token. The token is not secret: it only says "Discover linked to studio X at time T".
-- **Verification:** `verifyReferral(token, studioId)` never throws. It checks length (≤ 512), shape, then the signature in constant time before parsing the payload, then version, purpose and issuer, then the times (`iat` up to 5 minutes ahead is tolerated, `exp` must be in the future), then the studio. Every failure is a reason, used only to drop the attribution.
-- **At the intake** (`createInquiry`): the form's `referral` field (body only, never the query string; not a validator field, so a bad one never produces a field error) is verified for the studio in the path. A valid one sets `inquiries.referral_source = 'discover'` and `referral_issued_at` (migration `1791880000000_add_inquiry_referral`; both or neither, checked by the database). Anything else, including another studio's token, an expired, forged or garbage one, or none, stores nulls and the inquiry goes through as usual (201). `inquiries_guard_update` freezes both columns, so the attribution is written once.
+- **Where it appears:** every `bookingUrl` (studio, artist and tattoo details) is the studio site's `/book`, with `artist` or `artwork` where it applies and `ref=<token>`. The token is signed with the start of the current hour (`linkReferral`), so a profile's body and ETag stay the same for the hour and a revalidation gets a 304; a link therefore keeps its attribution for 29 to 30 days. The token is not secret: it only says "Discover linked to studio X in hour T".
+- **Verification:** `verifyReferral(token, studioId)` never throws. It checks length (≤ 512), shape, then the signature in constant time before parsing the payload (and only its one canonical spelling), then version, purpose and issuer, then the times (`iat` up to 5 minutes ahead is tolerated, `exp` must be in the future), then the studio. Every failure is a reason, used only to drop the attribution.
+- **At the intake** (`createInquiry`): the form's `referral` field (body only, never the query string; not a validator field, so a bad one never produces a field error) is verified for the studio in the path. A valid one sets `inquiries.referral_source = 'discover'` and `referral_issued_at`, the hour the link was made (migration `1791880000000_add_inquiry_referral`; both or neither, checked by the database). Anything else, including another studio's token, an expired, forged or garbage one, or none, stores nulls and the inquiry goes through as usual (201). `inquiries_guard_update` freezes both columns, so the attribution is written once.
 - **Separate from `sourceChannel`,** which stays what the client said ("How did you hear about us?").
 - **Hand-off still to do (D08):** the storefront's `/book` route doesn't yet keep `ref`. It must forward `ref` from the URL to `inquiries.create({ referral })`. The SDK already sends `referral` as a form field.
 
@@ -103,19 +103,19 @@ Measured with `EXPLAIN ANALYZE` as the app role, with no context, read-only, on 
 | Tattoos, newest page 1 / a cursor page | 3.8 / 2.8 ms |
 | Tattoos in a city / of one studio / healed / of one artist | 4.5 / 0.8 / 1.7 / under 2 ms |
 | Tattoos with a style (common or rare) | about 80 ms |
-| Tattoos in a whole country where every listed studio is | about 90 ms |
+| Tattoos in a whole country where every listed studio is | 90–105 ms |
 | One tattoo by id; locations | 1.7; 0.1 ms |
 
 - The tattoo feed reads its page from `discovery.artworks` alone, inside a `LIMIT` subquery, and joins only those rows to their artist and studio. The first version joined the three views first. PostgreSQL then read every published photo before sorting: 119 ms for page 1.
-- The style filter (`styles @> array[?]`) can't use an index: under RLS a non-leakproof operator is never an index condition (D02). It is still under the 100 ms target.
-- A country-wide filter that matches every listed studio is as slow as the style filter, because the planner switches to a hash semi-join. Precomputing the ids as an array was slower (164 ms). A city filter, the selective case, takes 4.5 ms.
+- The style filter (`styles @> array[?]`) can't use an index: under RLS a non-leakproof operator is never an index condition (D02). It is still under the 100 ms target (about 85 ms, re-measured 2026-11-07).
+- A country-wide filter that matches every listed studio is the slowest case, because the planner switches to a hash semi-join: 90 to 105 ms across runs, so at or just over the 100 ms target. The rehearsal data puts all 450 listed studios in one country, the worst case; with businesses spread across countries the filter is selective. Precomputing the ids as an array was slower (164 ms). A city filter, the selective case, takes 4.5 ms.
 - No Redis or materialised view was added: nothing measured needs one, and the 60-second public cache sits in front.
 
 ## Tests
 
-- `tests/functional/api/discover.spec.ts`: every endpoint and its exact field sets; filters, search, both name sorts, cursor paging across every sort; old slugs; independents vs studios. Never shown: never listed, opted out, taken down, hidden or opted-out or deleted artist, hidden or taken-down photo, unknown and wrong-studio paths (each a 404 and absent from every list). Also no private words in any answer, no context and still writable after the reads, 422s for every malformed parameter and cursor, and both rate limits.
+- `tests/functional/api/discover.spec.ts`: every endpoint and its exact field sets; filters, search, both name sorts, cursor paging across every sort, including rows that tie on the sort value; profiles' ETags holding across seconds (304); old slugs; independents vs studios. Never shown: never listed, opted out, taken down, hidden or opted-out or deleted artist, hidden or taken-down photo, unknown and wrong-studio paths (each a 404 and absent from every list). Also no private words in any answer, no context and still writable after the reads, 422s for every malformed parameter and cursor, and both rate limits.
 - `tests/functional/api/discover_referral.spec.ts`: attribution persisted with `sourceChannel` intact; none, empty, garbage, oversized, forged, another studio's and expired tokens all still give a 201 with nothing stored; a query-string token ignored; the guard refusing a later change.
-- `tests/unit/modules/discovery/{referral,cursor}.spec.ts`: signing, expiry, studio binding, clock skew, tampering, wrong key, version and purpose, malformed input; cursor round trips, cross-sort, canonical spelling, real instants.
+- `tests/unit/modules/discovery/{referral,cursor}.spec.ts`: signing, hour-stable link tokens, expiry, studio binding, clock skew, tampering, a re-spelt signature, wrong key, version and purpose, malformed input; cursor round trips, cross-sort, canonical spelling, real instants.
 - `tests/functional/api/api_routes.spec.ts`: the ten Discover routes are GET-only, limited, cached and tenantless.
 - D02's `tests/functional/rls/discovery.spec.ts` still proves the boundary itself.
 - `packages/sdk/test/discover.test.ts` and `packages/react/test/discover.test.ts`: URLs, parameter serialisation, encoding, errors, timeout, cancellation, keys (stability, separation, no collisions), signal forwarding.

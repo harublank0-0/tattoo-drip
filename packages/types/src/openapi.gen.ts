@@ -1665,7 +1665,7 @@ export interface components {
     };
     requestBodies: never;
     headers: {
-        /** @description `public, max-age=60, stale-while-revalidate=600` on a cacheable read; `no-store` on everything else. */
+        /** @description `public, max-age=60, stale-while-revalidate=600` on a cacheable read (`stale-while-revalidate=60` on Discover); `no-store` on everything else. */
         CacheControl: string;
         /** @description Strong entity tag of the body. Send it back as `If-None-Match` to get a 304 while it still matches. */
         ETag: string;

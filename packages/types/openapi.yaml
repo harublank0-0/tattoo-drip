@@ -23,7 +23,8 @@ info:
       `{ "error": { "code", "message", "fields"? } }` (`ErrorResponse`). A
       path that exists answers other methods with 405 and `Allow`.
     - **Caching.** Reads that say so send
-      `Cache-Control: public, max-age=60, stale-while-revalidate=600` and an
+      `Cache-Control: public, max-age=60, stale-while-revalidate=600`
+      (Discover: `stale-while-revalidate=60`) and an
       `ETag` (`If-None-Match` gets a 304). Everything else, errors included,
       is `Cache-Control: no-store`.
     - **Rate limits (TAT-38).** Every request counts against its caller
@@ -47,6 +48,8 @@ servers:
 tags:
   - name: MVP
     description: What the pilot's studio page uses.
+  - name: Discover
+    description: The public, cross-studio Discover API (docs/discover/api.md). No tenant; reads only what listed studios publish.
   - name: V1
     description: Planned for the paid launch (docs/requirements.md, V1). Not implemented; the shapes may still change.
 
@@ -78,7 +81,7 @@ paths:
   /discover/studios:
     get:
       operationId: listDiscoverStudios
-      tags: [MVP]
+      tags: [Discover]
       summary: Discover's listed studios, a page at a time
       description: |
         Studios (not independent artists: see `listDiscoverArtists`) whose
@@ -120,7 +123,7 @@ paths:
       - $ref: "#/components/parameters/DiscoverStudio"
     get:
       operationId: getDiscoverStudio
-      tags: [MVP]
+      tags: [Discover]
       summary: One listed studio, with its artists and newest photos
       description: |
         By its current slug or an old one (the answer names the current
@@ -151,7 +154,7 @@ paths:
       - $ref: "#/components/parameters/DiscoverStudio"
     get:
       operationId: listDiscoverStudioArtists
-      tags: [MVP]
+      tags: [Discover]
       summary: A listed studio's artists on Discover, by name
       description: Every shown artist of the studio (at most 100), by name. 404 like `getDiscoverStudio`.
       responses:
@@ -179,7 +182,7 @@ paths:
       - $ref: "#/components/parameters/ArtistSlug"
     get:
       operationId: getDiscoverStudioArtist
-      tags: [MVP]
+      tags: [Discover]
       summary: One artist at a listed studio
       description: |
         An artist's slug is unique per studio only, so the studio's slug
@@ -208,7 +211,7 @@ paths:
   /discover/artists:
     get:
       operationId: listDiscoverArtists
-      tags: [MVP]
+      tags: [Discover]
       summary: Discover's artists, a page at a time
       description: |
         The shown artists of every listed business: studios' artists and
@@ -259,7 +262,7 @@ paths:
         schema: { type: string, pattern: "^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$" }
     get:
       operationId: getDiscoverIndependentArtist
-      tags: [MVP]
+      tags: [Discover]
       summary: One listed independent artist
       description: |
         A business of type `independent`, by its current or an old slug:
@@ -287,7 +290,7 @@ paths:
   /discover/tattoos:
     get:
       operationId: listDiscoverTattoos
-      tags: [MVP]
+      tags: [Discover]
       summary: Discover's tattoo photos, newest first, a page at a time
       description: |
         The published photos of every shown artist of every listed business,
@@ -340,7 +343,7 @@ paths:
         schema: { type: string, format: uuid }
     get:
       operationId: getDiscoverTattoo
-      tags: [MVP]
+      tags: [Discover]
       summary: One published tattoo photo
       description: The photo, where it is on the studio's page and how to ask for one like it. Anything not shown is a 404.
       responses:
@@ -365,7 +368,7 @@ paths:
   /discover/styles:
     get:
       operationId: listDiscoverStyles
-      tags: [MVP]
+      tags: [Discover]
       summary: The styles Discover filters by
       description: The platform's fixed list of styles (`listStyles`), in its order. Cacheable.
       responses:
@@ -389,7 +392,7 @@ paths:
   /discover/locations:
     get:
       operationId: listDiscoverLocations
-      tags: [MVP]
+      tags: [Discover]
       summary: The places Discover's businesses are in
       description: The places at least one listed business names, by country and name. No counts. Cacheable.
       responses:
@@ -1055,7 +1058,7 @@ components:
 
   headers:
     CacheControl:
-      description: "`public, max-age=60, stale-while-revalidate=600` on a cacheable read; `no-store` on everything else."
+      description: "`public, max-age=60, stale-while-revalidate=600` on a cacheable read (`stale-while-revalidate=60` on Discover); `no-store` on everything else."
       schema: { type: string }
     ETag:
       description: Strong entity tag of the body. Send it back as `If-None-Match` to get a 304 while it still matches.

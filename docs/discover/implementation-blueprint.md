@@ -221,7 +221,7 @@ Details and measurements are in [Discover API](api.md).
 - **Referral columns.** `inquiries.referral_source` and `referral_issued_at` (when Discover made the link) instead of `referral_surface`; the token carries no surface. Both or neither, by CHECK. The intake half of the D04 row ("the intake stores verified referral") is done; the storefront keeping `ref` on `/book` is still D08.
 - **No named server keys.** Deferred to D05, which adds the app that needs one; D03's endpoints work with or without a storefront key.
 - **Isolation cases.** Discover routes have no tenant, so instead of `public_cases.ts` entries they have a route-stack test (`api_routes.spec.ts`) and the visibility tests of `discover.spec.ts`. A storefront parity test was not added: both sides are tested against the same rules (`visible`, `hidden`, `deleted_at`) on their own fixtures.
-- **Tattoo feed query.** The page is read from `discovery.artworks` alone and only its rows are joined (3.8 ms instead of 119 ms). The style filter (~80 ms) and a country-wide filter (~90 ms) stay under the 100 ms target, so no materialised view.
+- **Tattoo feed query.** The page is read from `discovery.artworks` alone and only its rows are joined (3.8 ms instead of 119 ms). The style filter (~85 ms) stays under the 100 ms target; a country-wide filter matching every listed studio (90–105 ms) is at or just over it. Neither justified a materialised view (see [Discover API](api.md#performance)).
 - **Providers.** A separate `DiscoverProvider`, since generalising `TattooProvider` would change every studio hook.
 
 ## D. Data model gap analysis

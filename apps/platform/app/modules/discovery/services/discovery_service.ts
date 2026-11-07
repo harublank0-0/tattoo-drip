@@ -11,7 +11,7 @@ import {
 	encodeDiscoverCursor,
 } from "#modules/discovery/cursor";
 import { readDiscovery } from "#modules/discovery/read";
-import { signReferral } from "#modules/discovery/referral";
+import { linkReferral } from "#modules/discovery/referral";
 import { ICON_SIZE } from "#modules/media/services/image_processor";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService, {
@@ -347,7 +347,7 @@ export default class DiscoveryService {
 				artists,
 				tattoos,
 				bookingUrl: bookingPageUrl(storefrontTemplate(), row.slug, {
-					ref: signReferral(row.id),
+					ref: linkReferral(row.id),
 				}),
 			};
 		});
@@ -528,7 +528,7 @@ export default class DiscoveryService {
 				),
 				bookingUrl: bookingPageUrl(storefrontTemplate(), row.studio_slug, {
 					artwork: row.id,
-					ref: signReferral(row.studio_id),
+					ref: linkReferral(row.studio_id),
 				}),
 			};
 		});
@@ -607,7 +607,7 @@ export default class DiscoveryService {
 			tattoos,
 			bookingUrl: bookingPageUrl(storefrontTemplate(), row.studio_slug, {
 				artist: row.slug,
-				ref: signReferral(row.studio_id),
+				ref: linkReferral(row.studio_id),
 			}),
 		};
 	}
