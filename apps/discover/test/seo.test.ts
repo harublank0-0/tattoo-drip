@@ -23,6 +23,12 @@ describe("Discover SEO foundation", () => {
 			content: NOINDEX,
 		});
 		assert.equal(robots(headTags(ON, "/").meta), undefined);
+		// D06: the Studio OS page is finished; pricing waits for published prices.
+		assert.equal(robots(headTags(ON, "/for-studios").meta), undefined);
+		assert.deepEqual(robots(headTags(ON, "/pricing").meta), {
+			name: "robots",
+			content: NOINDEX,
+		});
 		// Not in INDEXABLE_PATHS: noindex even with indexing on and no opt-out.
 		assert.deepEqual(robots(headTags(ON, "/explore/studios").meta), {
 			name: "robots",
@@ -76,7 +82,10 @@ describe("Discover SEO foundation", () => {
 
 	test("no sitemap entry while indexing is off", () => {
 		assert.deepEqual(sitemapEntries(OFF), []);
-		assert.deepEqual(sitemapEntries(ON), ["https://tattoodrip.app/"]);
+		assert.deepEqual(sitemapEntries(ON), [
+			"https://tattoodrip.app/",
+			"https://tattoodrip.app/for-studios",
+		]);
 		assert.match(
 			sitemapXml(["https://x.test/?a=1&b=2"]),
 			/<loc>https:\/\/x\.test\/\?a=1&amp;b=2<\/loc>/,

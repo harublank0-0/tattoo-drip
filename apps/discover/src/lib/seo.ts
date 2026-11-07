@@ -35,9 +35,10 @@ export function canonicalUrl(
 /**
  * The pages search engines may index once DISCOVER_INDEXING is on: an
  * allow-list, so a new page stays noindex until it is finished and added
- * here (and so to the sitemap). D06–D10 add theirs.
+ * here (and so to the sitemap). D06 added `/for-studios`; `/pricing` waits
+ * for published prices; D07–D10 add theirs.
  */
-export const INDEXABLE_PATHS: readonly string[] = ["/"];
+export const INDEXABLE_PATHS: readonly string[] = ["/", "/for-studios"];
 
 /** Whether a page may be indexed: indexing on, the path listed, and the page not opted out. */
 export function indexable(
