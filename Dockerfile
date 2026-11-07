@@ -91,3 +91,25 @@ COPY --from=build /out/storefront/node_modules ./node_modules
 USER node
 EXPOSE 3000
 CMD ["node", "--import", "./.output/server/instrument.server.mjs", ".output/server/index.mjs"]
+
+# ---------------------------------------------------------------------------
+# discover (D05, docs/discover/frontend.md): its own build stage, built only
+# when this target is asked for (docker build --target discover), so the
+# platform and storefront images build exactly as before. Nitro bundles the
+# server into .output, which runs without node_modules.
+# ---------------------------------------------------------------------------
+FROM fetch AS discover-build
+ENV HUSKY=0
+COPY . .
+RUN pnpm install --frozen-lockfile --offline
+# vite build reads none of Discover's settings: they are runtime-only.
+RUN pnpm --filter @tattoo-drip/discover build
+
+FROM node:${NODE_VERSION}-bookworm-slim AS discover
+ENV NODE_ENV=production \
+    PORT=3000
+WORKDIR /app
+COPY --from=discover-build /repo/apps/discover/.output ./.output
+USER node
+EXPOSE 3000
+CMD ["node", ".output/server/index.mjs"]

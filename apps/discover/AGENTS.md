@@ -1,0 +1,11 @@
+# Discover
+
+The public discovery site (`tattoodrip.app`, D05 onward): TanStack Start + Router + Query, React 19, Tailwind v4 and shadcn/ui. File routes: `src/routes`; UI primitives: `src/components/ui`; site shell: `src/components/layout`; discovery primitives: `src/components/discovery`; settings, context, routes, SEO: `src/lib`. Imports: `#/` maps to `src/`.
+
+Boundaries are in the [root instructions](../../AGENTS.md): no database, no auth, no platform imports. Every read goes through `createDiscoverClient` (`@tattoo-drip/sdk`) and `discoverQueries` (`@tattoo-drip/react`) from the router context (`context.discover.client`, `context.queryClient`), one of each per request. Read [frontend guidance](../../docs/discover/frontend.md) before changing routes, data loading, settings, SEO or design tokens.
+
+- Links use `paths` from `src/lib/routes.ts`. Never use the legacy Studio OS paths (`/login`, `/signup`, `/dashboard`, `/t/…`, `/sw.js`…): nginx sends them to Studio OS (`docs/discover/domain-migration.md`, "Legacy URLs"). Sign in and Get started link to Studio OS's own origin (`APP_URL`).
+- Indexing stays off unless `DISCOVER_INDEXING=on`; an unfinished page passes `noindex: true` to `pageMeta`. No fabricated listings, numbers or reviews; a page not built yet says so (`FoundationNotice`).
+- Colours, type and spacing come from the tokens in `src/styles.css`; no hex values in components.
+
+Run from `apps/discover`: `pnpm dev` (port 3100, loads `.env.local`, see `.env.example`), `pnpm test` (`node:test` + `tsx`, `test/`; the server test needs a build), `pnpm typecheck`, `pnpm build` (ends with the browser-bundle secret check), `pnpm generate-routes`. `src/routeTree.gen.ts` is generated. Browser-check UI changes.

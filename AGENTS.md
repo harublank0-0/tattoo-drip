@@ -4,12 +4,13 @@ pnpm monorepo. Start in the affected area; use the root for work spanning areas.
 
 - `apps/platform`: AdonisJS + Inertia + React; data, business rules, REST API and worker.
 - `apps/storefront`: TanStack Start; hosted storefront.
+- `apps/discover`: TanStack Start; the public Discover site (`tattoodrip.app`).
 - `packages/{types,sdk,react}`: OpenAPI contract, framework-independent client, React hooks.
 
 ## Boundaries
 
-- The platform owns all data. Storefront has no database/auth layer; platform access only through `@tattoo-drip/sdk` / `@tattoo-drip/react`.
-- The storefront never imports from `apps/platform`, and `packages/*` never import from `apps/*`.
+- The platform owns all data. Storefront and Discover have no database/auth layer; platform access only through `@tattoo-drip/sdk` / `@tattoo-drip/react`.
+- The storefront and Discover never import from `apps/platform` (or each other), and `packages/*` never import from `apps/*`.
 - No framework, AdonisJS or app imports in `packages/sdk`.
 
 ## Work and validation
@@ -27,6 +28,7 @@ Never edit these; regenerate them instead:
 
 - `packages/types/src/openapi.gen.ts`: `pnpm --filter @tattoo-drip/types generate` after editing `openapi.yaml`
 - `apps/storefront/src/routeTree.gen.ts`: `pnpm --filter @tattoo-drip/storefront generate-routes` (also its dev server).
+- `apps/discover/src/routeTree.gen.ts`: `pnpm --filter @tattoo-drip/discover generate-routes` (also its dev server and build).
 - Platform `database/schema.ts`: new migration, then `pnpm migrate` in platform (migrations run as the owner role). `.adonisjs/`: `node ace codegen` after route/page/controller changes; include generated changes.
 
 ## Task guidance
