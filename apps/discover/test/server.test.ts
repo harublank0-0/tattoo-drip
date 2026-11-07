@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
-import { type ChildProcess, spawn } from "node:child_process";
-import { existsSync } from "node:fs";
-import { createServer } from "node:http";
-import type { AddressInfo } from "node:net";
 import { after, before, beforeEach, describe, test } from "node:test";
+import {
+	assertInternalLinksExist,
+	freePort,
+	SITE,
+	sentTo,
+	skip,
+	startDiscover,
+	text,
+} from "./built-server.ts";
 import { type Endpoint, type StubApi, stubApi } from "./stub-api.ts";
 
 /**
@@ -14,12 +19,6 @@ import { type Endpoint, type StubApi, stubApi } from "./stub-api.ts";
  * marketing pages. Needs `pnpm build` first (CI builds before testing);
  * skipped without a build.
  */
-const ENTRY = new URL("../.output/server/index.mjs", import.meta.url);
-const built = existsSync(ENTRY);
-const skip = !built && "no build (run pnpm build)";
-
-const APP = "http://app.localhost:3333";
-const SITE = "http://localhost:3100";
 const HOME_READS: Endpoint[] = [
 	"tattoos",
 	"studios",
@@ -36,56 +35,9 @@ const SECTIONS = [
 ];
 const STATIC_BANDS = ["booking-title", "studio-os-title", "final-title"];
 
-async function freePort(): Promise<number> {
-	const server = createServer();
-	await new Promise<void>((resolve) => server.listen(0, resolve));
-	const { port } = server.address() as AddressInfo;
-	await new Promise((resolve) => server.close(resolve));
-	return port;
-}
-
-async function startDiscover(
-	apiUrl: string,
-	extra: Record<string, string> = {},
-) {
-	const port = await freePort();
-	const child: ChildProcess = spawn(process.execPath, [ENTRY.pathname], {
-		env: {
-			...process.env,
-			API_URL: apiUrl,
-			DISCOVER_URL: SITE,
-			APP_URL: APP,
-			...extra,
-			PORT: String(port),
-			NODE_ENV: "production",
-		},
-		stdio: "ignore",
-	});
-	const get = (path: string, init?: RequestInit) =>
-		fetch(`http://localhost:${port}${path}`, init);
-	for (let i = 0; i < 50; i++) {
-		try {
-			await get("/robots.txt");
-			return { child, get };
-		} catch {
-			await new Promise((resolve) => setTimeout(resolve, 100));
-		}
-	}
-	child.kill();
-	throw new Error("The built server did not start.");
-}
-
 /** The sections a homepage rendered, by their headings' ids. */
 function sections(html: string): string[] {
 	return SECTIONS.filter((id) => html.includes(`id="${id}"`));
-}
-
-/** The visible text of a page, roughly: tags and the dehydrated script removed. */
-function text(html: string): string {
-	return html
-		.replace(/<script[\s\S]*?<\/script>/g, " ")
-		.replace(/<[^>]+>/g, " ")
-		.replace(/\s+/g, " ");
 }
 
 function assertHeroAndSearch(html: string) {
@@ -204,22 +156,20 @@ describe("the built Discover server, indexing off", { skip }, () => {
 		);
 		assert.match(html, /loading="lazy"/);
 		assert.doesNotMatch(html, /alt=""[^>]*src="http:\/\/media\.test/);
-		// Styles and places link to the studio list with their parameters.
-		assert.match(html, /href="\/explore\/studios\?style=blackwork"/);
-		assert.match(html, /href="\/explore\/studios\?style=fine-line"/);
-		assert.match(
-			html,
-			/href="\/explore\/studios\?country=NP&amp;city=pokhara"/,
-		);
+		// D07: styles link to their pages, places to their city pages, the
+		// country's name to its location page.
+		assert.match(html, /href="\/styles\/blackwork"/);
+		assert.match(html, /href="\/styles\/fine-line"/);
+		assert.match(html, /href="\/locations\/nepal\/pokhara"/);
+		assert.match(html, /href="\/locations\/nepal"/);
+		assert.doesNotMatch(html, /\?style=|city=/);
 		// Only the page's country's places (the API's list has every country).
-		assert.doesNotMatch(html, /city=new-delhi/);
+		assert.doesNotMatch(html, /href="[^"]*new-delhi/);
 		assert.match(html, />Nepal</);
 		assert.match(html, /href="\/explore\/tattoos"/);
 		// Never a Discover page that doesn't exist yet.
-		assert.doesNotMatch(
-			html,
-			/href="\/(tattoos|studios|artists|styles|locations)\//,
-		);
+		assert.doesNotMatch(html, /href="\/(tattoos|studios|artists)\//);
+		assertInternalLinksExist(html);
 		// One request per read, with the homepage's limits; none repeated.
 		// Studios, artists and photos are the default country's (NP).
 		assert.deepEqual([...api.requests].sort(), [
@@ -282,18 +232,14 @@ describe("the built Discover server, indexing off", { skip }, () => {
 		assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow");
 		const html = await response.text();
 		// The default country applies when the address names none.
-		assert.ok(
-			api.requests.includes("/api/v1/discover/studios?country=NP&q=stub"),
-		);
-		assert.equal(
-			api.requests.filter((url) => url.startsWith("/api/v1/discover/studios"))
-				.length,
-			1,
-		);
+		assert.deepEqual(sentTo(api.requests, "studios"), [
+			{ q: "stub", country: "NP", limit: "24" },
+		]);
 		// API text is text, never markup.
 		assert.match(html, /Stub Ink &lt;b&gt;Studio&lt;\/b&gt;/);
 		assert.match(html, /href="http:\/\/stub-studio-0\.localhost:3000\/"/);
-		assert.match(html, /Pokhara · Blackwork/);
+		assert.match(html, /Pokhara, Gandaki/);
+		assert.match(html, />Blackwork</);
 		assert.match(html, /"discover","studios"/);
 		assert.match(
 			html,
@@ -317,6 +263,7 @@ describe("the built Discover server, indexing off", { skip }, () => {
 			city: "pokhara",
 			style: "blackwork",
 			q: "stub ink",
+			limit: "24",
 		});
 		assert.match(studios[0] ?? "", /q=stub(\+|%20)ink/);
 		// Chips: names from the API's lists; each removes its own filter.
@@ -373,7 +320,9 @@ describe("the built Discover server, indexing off", { skip }, () => {
 		const response = await discover.get("/explore/artists");
 		assert.equal(response.status, 200);
 		const html = await response.text();
-		assert.deepEqual(api.requests, ["/api/v1/discover/artists?country=NP"]);
+		assert.deepEqual(sentTo(api.requests, "artists"), [
+			{ country: "NP", limit: "24" },
+		]);
 		assert.match(html, /Stub Artist 2/);
 		assert.match(
 			html,
@@ -536,17 +485,34 @@ describe("the built Discover server, indexing on", { skip }, () => {
 		api?.close();
 	});
 
-	test("only the home and Studio OS pages may be indexed; the rest still say noindex", async () => {
-		for (const path of ["/", "/for-studios"]) {
+	test("only listed pages may be indexed (D07: bare directories, styles, places); the rest still say noindex", async () => {
+		for (const path of [
+			"/",
+			"/for-studios",
+			"/explore/studios",
+			"/explore/artists",
+			"/styles/blackwork",
+			"/locations/nepal",
+			"/locations/nepal/pokhara",
+		]) {
 			const page = await discover.get(path);
 			assert.equal(page.headers.get("x-robots-tag"), null, path);
 			assert.doesNotMatch(await page.text(), /<meta name="robots"/, path);
 		}
 		for (const path of [
 			"/pricing",
-			"/explore/studios",
-			"/explore/artists",
 			"/explore/tattoos",
+			// Any parameter: filters, search, sort, cursor, country.
+			"/explore/studios?style=blackwork",
+			"/explore/studios?q=stub",
+			"/explore/studios?sort=name",
+			"/explore/artists?independent=true",
+			"/explore/artists?country=NP&city=pokhara",
+			"/styles/blackwork?country=NP",
+			// Nothing listed under it in Nepal (3 rows: blackwork, fine line, realism).
+			"/styles/geometric",
+			"/styles/glitter",
+			"/locations/atlantis",
 		]) {
 			assert.match(
 				await (await discover.get(path)).text(),
@@ -563,7 +529,13 @@ describe("the built Discover server, indexing on", { skip }, () => {
 		const locs = [
 			...(await sitemap.text()).matchAll(/<loc>([^<]+)<\/loc>/g),
 		].map((match) => match[1]);
-		assert.deepEqual(locs, [`${SITE}/`, `${SITE}/for-studios`]);
+		// The static indexable pages; styles and places are D10's sitemaps.
+		assert.deepEqual(locs, [
+			`${SITE}/`,
+			`${SITE}/for-studios`,
+			`${SITE}/explore/studios`,
+			`${SITE}/explore/artists`,
+		]);
 	});
 });
 
@@ -676,8 +648,8 @@ describe("the built Discover server, country-aware (D06.5)", { skip }, () => {
 		assert.ok(api.requests.includes("/api/v1/discover/locations"));
 		assert.ok(api.requests.includes("/api/v1/discover/styles"));
 		const nepal = await (await geo.get("/")).text();
-		assert.match(nepal, /city=pokhara/);
-		assert.doesNotMatch(nepal, /city=new-delhi/);
+		assert.match(nepal, /\/locations\/nepal\/pokhara/);
+		assert.doesNotMatch(nepal, /href="[^"]*new-delhi/);
 	});
 
 	test("a country with nothing listed says so, offers the other market, and shows no one else's listings", async () => {
@@ -731,13 +703,10 @@ describe("the built Discover server, country-aware (D06.5)", { skip }, () => {
 				headers: { "X-Discover-Country": "IN" },
 			})
 		).text();
-		const sent = api.requests
-			.filter((url) => url.startsWith("/api/v1/discover/studios"))
-			.map((url) =>
-				Object.fromEntries(new URL(url, "http://stub").searchParams),
-			);
-		assert.deepEqual(sent, [{ country: "IN", style: "blackwork", q: "stub" }]);
-		assert.match(studios, /Studios in India that list themselves/);
+		assert.deepEqual(sentTo(api.requests, "studios"), [
+			{ q: "stub", country: "IN", style: "blackwork", limit: "24" },
+		]);
+		assert.match(studios, /Tattoo studios in India that list themselves/);
 		// The form posts back to this very address.
 		assert.match(
 			studios,
@@ -752,7 +721,9 @@ describe("the built Discover server, country-aware (D06.5)", { skip }, () => {
 				headers: { "X-Discover-Country": "IN" },
 			})
 		).text();
-		assert.deepEqual(api.requests, ["/api/v1/discover/artists?country=IN"]);
+		assert.deepEqual(sentTo(api.requests, "artists"), [
+			{ country: "IN", limit: "24" },
+		]);
 		assert.match(text(artists), /Stub Artist 3\b/);
 		assert.doesNotMatch(text(artists), /Stub Artist 2\b/);
 
@@ -778,6 +749,15 @@ describe("the built Discover server, country-aware (D06.5)", { skip }, () => {
 		assert.equal(
 			switched.headers.get("location"),
 			"/explore/studios?q=stub&country=IN&style=blackwork",
+		);
+		// A cursor belongs to the old country's list: the new one starts at its first page.
+		const paged = await form({
+			country: "IN",
+			return: "/explore/studios?country=NP&sort=name&cursor=abc",
+		});
+		assert.equal(
+			paged.headers.get("location"),
+			"/explore/studios?country=IN&sort=name",
 		);
 		// DISCOVER_URL is http://localhost here, so no Secure; https adds it (unit test).
 		assert.equal(

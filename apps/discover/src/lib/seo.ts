@@ -48,18 +48,42 @@ export function canonicalUrl(
  * The pages search engines may index once DISCOVER_INDEXING is on: an
  * allow-list, so a new page stays noindex until it is finished and added
  * here (and so to the sitemap). D06 added `/for-studios`; `/pricing` waits
- * for published prices; D07–D10 add theirs.
+ * for published prices. D07 added the directories' bare first pages (any
+ * parameter makes a directory page noindex: filters, searches, sorts,
+ * cursors and `?country=` are never indexed, blueprint H).
  */
-export const INDEXABLE_PATHS: readonly string[] = ["/", "/for-studios"];
+export const INDEXABLE_PATHS: readonly string[] = [
+	"/",
+	"/for-studios",
+	"/explore/studios",
+	"/explore/artists",
+];
 
-/** Whether a page may be indexed: indexing on, the path listed, and the page not opted out. */
+/**
+ * Dynamic pages that may be indexed (D07): a style's page and a market's or
+ * city's location page, the canonical discovery destinations (blueprint H).
+ * A slug can't be listed in INDEXABLE_PATHS, so they match by shape; the
+ * page itself 404s (noindex) an unknown slug and opts out (`noindex`) when
+ * it has nothing listed. They are not in the sitemap: listing them needs
+ * the API's styles and places at request time (D10's sitemaps).
+ */
+const SLUG = "[a-z0-9]+(?:-[a-z0-9]+)*";
+export const INDEXABLE_PATTERNS: readonly RegExp[] = [
+	new RegExp(`^/styles/${SLUG}$`),
+	new RegExp(`^/locations/${SLUG}(?:/${SLUG})?$`),
+];
+
+/** Whether a page may be indexed: indexing on, the path listed or matched, and the page not opted out. */
 export function indexable(
 	settings: Pick<PublicSettings, "indexing">,
 	pathname: string,
 	page: PageSeo = {},
 ): boolean {
 	return (
-		settings.indexing && INDEXABLE_PATHS.includes(pathname) && !page.noindex
+		settings.indexing &&
+		(INDEXABLE_PATHS.includes(pathname) ||
+			INDEXABLE_PATTERNS.some((pattern) => pattern.test(pathname))) &&
+		!page.noindex
 	);
 }
 
@@ -100,8 +124,9 @@ export function robotsTxt(
 }
 
 /**
- * The sitemap's entries (D10 extends it): only finished, indexable pages.
- * Empty while indexing is off, and the route answers 404 then.
+ * The sitemap's entries (D10 extends it): only finished, indexable pages,
+ * the static ones (D10 adds styles and places from the API). Empty while
+ * indexing is off, and the route answers 404 then.
  */
 export function sitemapEntries(
 	settings: Pick<PublicSettings, "siteUrl" | "indexing">,

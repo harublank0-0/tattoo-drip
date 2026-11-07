@@ -3,8 +3,11 @@ import { describe, test } from "node:test";
 import {
 	COUNTRY_COOKIE_MAX_AGE,
 	countryCookie,
+	countryFromSlug,
 	countryName,
 	countryOptions,
+	countrySlug,
+	countrySwitchTarget,
 	normalizeCountry,
 	pageCountry,
 	preferredCountry,
@@ -12,6 +15,7 @@ import {
 	requestPreference,
 	resolveCountry,
 	safeReturnPath,
+	slugify,
 	switchCountryPath,
 } from "../src/lib/country.ts";
 import { countryPreferenceResponse } from "../src/lib/preference.ts";
@@ -217,6 +221,42 @@ describe("switching country", () => {
 		);
 		assert.equal(switchCountryPath("//evil.example", "IN"), "/");
 	});
+
+	test("a switch drops the page cursor: it belongs to the old country's list", () => {
+		// The API ties a cursor to the sort only, so India's list would start
+		// after Nepal's keyset position and skip rows.
+		assert.equal(
+			switchCountryPath(
+				"/explore/studios?country=NP&sort=name&cursor=abc_-1",
+				"IN",
+			),
+			"/explore/studios?country=IN&sort=name",
+		);
+		assert.equal(
+			switchCountryPath("/explore/studios?sort=name&cursor=abc", "IN"),
+			"/explore/studios?sort=name",
+		);
+	});
+
+	test("in the app: a new address when it changes, else the page is read again", () => {
+		assert.equal(
+			countrySwitchTarget("/explore/studios?country=NP&q=ink", "IN"),
+			"/explore/studios?country=IN&q=ink",
+		);
+		// No country in the address, but a cursor: its first page.
+		assert.equal(
+			countrySwitchTarget("/explore/studios?sort=name&cursor=abc", "IN"),
+			"/explore/studios?sort=name",
+		);
+		// Nothing to change (however the address spells it): read again.
+		for (const href of [
+			"/pricing",
+			"/explore/studios?q=ink",
+			"/explore/studios?q=fine%20line",
+			"/explore/studios?q=fine+line",
+		])
+			assert.equal(countrySwitchTarget(href, "IN"), undefined, href);
+	});
 });
 
 describe("POST /preferences/country", () => {
@@ -249,6 +289,12 @@ describe("POST /preferences/country", () => {
 			`td_country=IN; Path=/; Max-Age=${COUNTRY_COOKIE_MAX_AGE}; SameSite=Lax; HttpOnly; Secure`,
 		);
 		assert.equal(response.headers.get("cache-control"), "no-store");
+		// A page past the first: back to the new country's first page.
+		const paged = await post({
+			country: "IN",
+			return: "/explore/studios?sort=name&cursor=abc",
+		});
+		assert.equal(paged.headers.get("location"), "/explore/studios?sort=name");
 	});
 
 	test("never an open redirect", async () => {
@@ -307,5 +353,27 @@ describe("POST /preferences/country", () => {
 			{ markets: MARKETS, siteUrl: "http://localhost:3100" },
 		);
 		assert.doesNotMatch(response.headers.get("set-cookie") ?? "", /Secure/);
+	});
+});
+
+describe("location slugs (D07)", () => {
+	test("a market's slug is pinned or its English name slugified; the reverse knows only markets", () => {
+		assert.equal(countrySlug("NP"), "nepal");
+		assert.equal(countrySlug("np"), "nepal");
+		assert.equal(countrySlug("IN"), "india");
+		assert.equal(countrySlug("US"), "united-states");
+		assert.equal(countrySlug("CI"), slugify("Côte d’Ivoire"));
+		assert.equal(slugify("Côte d’Ivoire"), "cote-d-ivoire");
+		assert.equal(slugify("  São Tomé & Príncipe "), "sao-tome-principe");
+		const markets = ["NP", "IN"];
+		assert.equal(countryFromSlug("nepal", markets), "NP");
+		assert.equal(countryFromSlug("india", markets), "IN");
+		// Not a market, a code, another spelling: no location page.
+		for (const slug of ["united-states", "np", "NP", "Nepal", "", 7, undefined])
+			assert.equal(countryFromSlug(slug, markets), undefined, String(slug));
+		assert.equal(countryFromSlug("united-states", ["US"]), "US");
+		// Every assigned code has a non-empty, URL-safe slug.
+		for (const code of ["AX", "CW", "BL", "KP", "HK"])
+			assert.match(countrySlug(code), /^[a-z0-9]+(-[a-z0-9]+)*$/, code);
 	});
 });

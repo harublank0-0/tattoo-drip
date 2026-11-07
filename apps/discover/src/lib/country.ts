@@ -222,15 +222,87 @@ export function safeReturnPath(value: unknown): string {
 	}
 }
 
+/** A same-origin path with its query re-encoded, so two spellings of one address compare equal. */
+function spelled(url: URL): string {
+	const search = url.searchParams.toString();
+	return `${url.pathname}${search ? `?${search}` : ""}${url.hash}`;
+}
+
 /**
  * The address to show after switching to `country`: a page whose address
- * names a country gets the new one; a city (which belongs to a country) is
- * dropped; everything else (`q`, `style`, the path) stays. A page without
- * a country in its address is unchanged: it follows the preference.
+ * names a country gets the new one; a city (which belongs to a country) and
+ * a page cursor (the API ties it to the sort only, so it would start the
+ * new country's list part-way through) are dropped; everything else (`q`,
+ * `style`, the path) stays. A page without a country in its address keeps
+ * its address otherwise: it follows the preference.
  */
 export function switchCountryPath(path: string, country: string): string {
 	const url = new URL(safeReturnPath(path), RETURN_BASE);
 	url.searchParams.delete("city");
+	url.searchParams.delete("cursor");
 	if (url.searchParams.has("country")) url.searchParams.set("country", country);
-	return `${url.pathname}${url.search}${url.hash}`;
+	return spelled(url);
+}
+
+/**
+ * Where the selector goes after a switch (in-app): the new address when it
+ * differs from `href` (another country, or no city or cursor), else
+ * undefined: the page stays and is read again for the new preference.
+ */
+export function countrySwitchTarget(
+	href: string,
+	country: string,
+): string | undefined {
+	const next = switchCountryPath(href, country);
+	return next === spelled(new URL(safeReturnPath(href), RETURN_BASE))
+		? undefined
+		: next;
+}
+
+/* Location slugs (D07) ------------------------------------------------------ */
+
+/**
+ * Countries whose location slug is pinned, so a renamed English name in a
+ * later ICU (Node, browsers) can never move their pages. Add a market here
+ * when it is configured; any other code falls back to its slugified name.
+ */
+const PINNED_COUNTRY_SLUGS: Readonly<Record<string, string>> = {
+	NP: "nepal",
+	IN: "india",
+};
+
+/** Lower-case ASCII words joined by hyphens (`Côte d’Ivoire` → `cote-d-ivoire`). */
+export function slugify(text: string): string {
+	return text
+		.normalize("NFD")
+		.replace(/\p{M}/gu, "")
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "");
+}
+
+/**
+ * A country's segment in a location page's path (`NP` → `nepal`): the
+ * pinned slug, else its English name slugified, else the code in lower case.
+ * The ISO code stays the identity; the slug is only its spelling in a URL.
+ */
+export function countrySlug(code: string): string {
+	const upper = code.toUpperCase();
+	return (
+		PINNED_COUNTRY_SLUGS[upper] ??
+		(slugify(countryName(upper)) || upper.toLowerCase())
+	);
+}
+
+/**
+ * The market a location page's country segment names (`nepal` → `NP`), or
+ * undefined: only configured markets have location pages, and only by
+ * their one slug (no codes, no other spellings).
+ */
+export function countryFromSlug(
+	slug: unknown,
+	markets: readonly string[],
+): string | undefined {
+	if (typeof slug !== "string") return undefined;
+	return markets.find((code) => countrySlug(code) === slug);
 }

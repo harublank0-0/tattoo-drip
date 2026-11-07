@@ -2,6 +2,13 @@
 @import 'tw-animate-css';
 
 /*
+ * `noscript:` (D07): styles for a browser without JavaScript, where the
+ * directories' filter form shows at every width with its Apply button
+ * (the mobile sheet needs JavaScript).
+ */
+@custom-variant noscript (@media (scripting: none));
+
+/*
  * Discover's design system (D05, docs/discover/frontend.md): a warm light
  * editorial page with dark immersive sections ("night"), ink type, and
  * TattooDrip red kept for small accents, links in dark sections and focus.

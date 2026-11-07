@@ -40,9 +40,12 @@ export const Route = createRootRouteWithContext<DiscoverContext>()({
 			matches.some((each) => each.status === "notFound");
 		// A page with an explicit ?country= is a variant: never indexed, and its
 		// canonical (the path alone) points at the page without it.
+		// An index route's match path ends in "/" (`/locations/nepal/`); the
+		// address served (and canonical) has none.
+		const pathname = page.pathname.replace(/(.)\/$/, "$1");
 		const { meta, links } = headTags(
 			match.context.discover.settings,
-			page.pathname,
+			pathname,
 			notFound
 				? { title: "Page not found", noindex: true }
 				: { noindex: match.search.country !== undefined },

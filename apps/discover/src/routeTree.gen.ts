@@ -18,6 +18,9 @@ import { Route as ExploreArtistsRouteImport } from './routes/explore/artists'
 import { Route as ExploreStudiosRouteImport } from './routes/explore/studios'
 import { Route as ExploreTattoosRouteImport } from './routes/explore/tattoos'
 import { Route as PreferencesCountryRouteImport } from './routes/preferences/country'
+import { Route as StylesSlugRouteImport } from './routes/styles/$slug'
+import { Route as LocationsCountryIndexRouteImport } from './routes/locations/$country/index'
+import { Route as LocationsCountryCityRouteImport } from './routes/locations/$country/$city'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -64,6 +67,21 @@ const PreferencesCountryRoute = PreferencesCountryRouteImport.update({
   path: '/preferences/country',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StylesSlugRoute = StylesSlugRouteImport.update({
+  id: '/styles/$slug',
+  path: '/styles/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LocationsCountryIndexRoute = LocationsCountryIndexRouteImport.update({
+  id: '/locations/$country/',
+  path: '/locations/$country/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LocationsCountryCityRoute = LocationsCountryCityRouteImport.update({
+  id: '/locations/$country/$city',
+  path: '/locations/$country/$city',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -75,6 +93,9 @@ export interface FileRoutesByFullPath {
   '/explore/studios': typeof ExploreStudiosRoute
   '/explore/tattoos': typeof ExploreTattoosRoute
   '/preferences/country': typeof PreferencesCountryRoute
+  '/styles/$slug': typeof StylesSlugRoute
+  '/locations/$country/$city': typeof LocationsCountryCityRoute
+  '/locations/$country/': typeof LocationsCountryIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -86,6 +107,9 @@ export interface FileRoutesByTo {
   '/explore/studios': typeof ExploreStudiosRoute
   '/explore/tattoos': typeof ExploreTattoosRoute
   '/preferences/country': typeof PreferencesCountryRoute
+  '/styles/$slug': typeof StylesSlugRoute
+  '/locations/$country/$city': typeof LocationsCountryCityRoute
+  '/locations/$country': typeof LocationsCountryIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -98,6 +122,9 @@ export interface FileRoutesById {
   '/explore/studios': typeof ExploreStudiosRoute
   '/explore/tattoos': typeof ExploreTattoosRoute
   '/preferences/country': typeof PreferencesCountryRoute
+  '/styles/$slug': typeof StylesSlugRoute
+  '/locations/$country/$city': typeof LocationsCountryCityRoute
+  '/locations/$country/': typeof LocationsCountryIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -111,6 +138,9 @@ export interface FileRouteTypes {
     | '/explore/studios'
     | '/explore/tattoos'
     | '/preferences/country'
+    | '/styles/$slug'
+    | '/locations/$country/$city'
+    | '/locations/$country/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -122,6 +152,9 @@ export interface FileRouteTypes {
     | '/explore/studios'
     | '/explore/tattoos'
     | '/preferences/country'
+    | '/styles/$slug'
+    | '/locations/$country/$city'
+    | '/locations/$country'
   id:
     | '__root__'
     | '/'
@@ -133,6 +166,9 @@ export interface FileRouteTypes {
     | '/explore/studios'
     | '/explore/tattoos'
     | '/preferences/country'
+    | '/styles/$slug'
+    | '/locations/$country/$city'
+    | '/locations/$country/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -145,6 +181,9 @@ export interface RootRouteChildren {
   ExploreStudiosRoute: typeof ExploreStudiosRoute
   ExploreTattoosRoute: typeof ExploreTattoosRoute
   PreferencesCountryRoute: typeof PreferencesCountryRoute
+  StylesSlugRoute: typeof StylesSlugRoute
+  LocationsCountryCityRoute: typeof LocationsCountryCityRoute
+  LocationsCountryIndexRoute: typeof LocationsCountryIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -212,6 +251,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PreferencesCountryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/styles/$slug': {
+      id: '/styles/$slug'
+      path: '/styles/$slug'
+      fullPath: '/styles/$slug'
+      preLoaderRoute: typeof StylesSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/locations/$country/': {
+      id: '/locations/$country/'
+      path: '/locations/$country'
+      fullPath: '/locations/$country/'
+      preLoaderRoute: typeof LocationsCountryIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/locations/$country/$city': {
+      id: '/locations/$country/$city'
+      path: '/locations/$country/$city'
+      fullPath: '/locations/$country/$city'
+      preLoaderRoute: typeof LocationsCountryCityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -225,6 +285,9 @@ const rootRouteChildren: RootRouteChildren = {
   ExploreStudiosRoute: ExploreStudiosRoute,
   ExploreTattoosRoute: ExploreTattoosRoute,
   PreferencesCountryRoute: PreferencesCountryRoute,
+  StylesSlugRoute: StylesSlugRoute,
+  LocationsCountryCityRoute: LocationsCountryCityRoute,
+  LocationsCountryIndexRoute: LocationsCountryIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

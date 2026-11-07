@@ -4,9 +4,11 @@ import { describe, test } from "node:test";
 import {
 	businessNav,
 	footerGroups,
+	hasRoute,
 	PRIMARY_NAV,
 	paths,
 	ROUTE_FILES,
+	ROUTE_PATTERNS,
 	studioOsLinks,
 } from "../src/lib/routes.ts";
 
@@ -32,6 +34,40 @@ describe("Discover routes and navigation", () => {
 		const tree = await routeTreePaths();
 		for (const path of ROUTE_FILES)
 			assert.ok(tree.has(path), `${path} has no route`);
+		// D07's dynamic routes (an index route's full path ends in "/").
+		for (const { route } of ROUTE_PATTERNS)
+			assert.ok(
+				tree.has(route) || tree.has(`${route}/`),
+				`${route} has no route`,
+			);
+		// …and nothing dynamic exists that isn't listed (D08/D09 add theirs).
+		const dynamic = [...tree].filter((path) => path.includes("$"));
+		assert.deepEqual(
+			dynamic.map((path) => path.replace(/\/$/, "")).sort(),
+			ROUTE_PATTERNS.map((each) => each.route).sort(),
+		);
+	});
+
+	test("style and location builders reach their routes; profile builders don't yet (D08)", () => {
+		assert.equal(paths.style("fine-line"), "/styles/fine-line");
+		assert.equal(paths.location("NP"), "/locations/nepal");
+		assert.equal(paths.city("NP", "kathmandu"), "/locations/nepal/kathmandu");
+		assert.equal(paths.city("IN", "new delhi"), "/locations/india/new%20delhi");
+		for (const path of [
+			paths.style("blackwork"),
+			paths.location("NP"),
+			paths.city("NP", "pokhara"),
+			paths.studios(),
+		])
+			assert.ok(hasRoute(path), path);
+		for (const path of [
+			paths.studio("x"),
+			paths.studioArtist("x", "y"),
+			paths.independentArtist("x"),
+			paths.tattoo("x"),
+			"/locations/nepal/kathmandu/x",
+		])
+			assert.equal(hasRoute(path), false, path);
 	});
 
 	test("every internal navigation link points at an existing route, never a legacy path", async () => {

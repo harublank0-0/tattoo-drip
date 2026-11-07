@@ -2,75 +2,73 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
 	countryName,
-	humanizeSlug,
 	knownStyle,
+	parseSearchText,
+	readCity,
 	readCountry,
-	readStudioSearch,
-	studioQuery,
+	readQuery,
+	readStyle,
+	stringifySearchText,
 } from "../src/lib/search.ts";
 
-describe("/explore/studios's address", () => {
-	test("every key comes back, undefined when missing or malformed", () => {
-		assert.deepEqual(readStudioSearch({}), {
-			q: undefined,
-			country: undefined,
-			city: undefined,
-			style: undefined,
-		});
-		assert.deepEqual(
-			readStudioSearch({
-				q: " ink ",
-				country: "np",
-				city: "pokhara",
-				style: "fine-line",
-			}),
-			{ q: "ink", country: "NP", city: "pokhara", style: "fine-line" },
-		);
-		for (const country of ["NPL", "N", "1P", 12, ["NP"]])
+describe("search-parameter readers", () => {
+	test("text, countries and slugs: valid values only", () => {
+		assert.equal(readQuery(" ink "), "ink");
+		assert.equal(readQuery("a"), undefined);
+		assert.equal(readQuery("x".repeat(81)), undefined);
+		assert.equal(readQuery(42), undefined);
+		// The API refuses control characters (its NO_CONTROL rule): never sent.
+		for (const bad of ["ab\u0001c", "ink\u007f", "a\u0000b"])
+			assert.equal(readQuery(bad), undefined, JSON.stringify(bad));
+		// Surrounding whitespace (tabs, newlines) is trimmed first, as the API does.
+		assert.equal(readQuery("\tink\n"), "ink");
+		assert.equal(readCountry("np"), "NP");
+		for (const country of ["NPL", "N", "1P", 12, ["NP"], "XX"])
 			assert.equal(readCountry(country), undefined, String(country));
-		const bad = readStudioSearch({
-			country: "NP",
-			city: "Pokhara",
-			style: "fine_line",
-		});
-		assert.equal(bad.city, undefined);
-		assert.equal(bad.style, undefined);
-		assert.equal(readStudioSearch({ style: "x".repeat(64) }).style, undefined);
-		assert.equal(readStudioSearch({ style: 7 }).style, undefined);
+		assert.equal(readCity("new-delhi"), "new-delhi");
+		assert.equal(readCity("Pokhara"), undefined);
+		assert.equal(readStyle("fine_line"), undefined);
+		assert.equal(readStyle("x".repeat(64)), undefined);
+		assert.equal(readStyle(7), undefined);
 	});
 
-	test("a city needs its country", () => {
-		assert.equal(readStudioSearch({ city: "pokhara" }).city, undefined);
-		assert.equal(
-			readStudioSearch({ country: "xx1", city: "pokhara" }).city,
-			undefined,
+	test("search values stay text: the router never reads them as JSON", () => {
+		assert.deepEqual(
+			parseSearchText("?q=true&sort=name&independent=false&x=null&n=007&e=1e3"),
+			{
+				q: "true",
+				sort: "name",
+				independent: "false",
+				x: "null",
+				n: "007",
+				e: "1e3",
+			},
 		);
+		assert.deepEqual(parseSearchText("q=fine+line&q=last"), { q: "last" });
+		assert.equal(
+			stringifySearchText({
+				q: "true",
+				independent: true,
+				cursor: undefined,
+				n: "007",
+			}),
+			"?q=true&independent=true&n=007",
+		);
+		assert.equal(stringifySearchText({ q: "fine line" }), "?q=fine+line");
+		assert.equal(stringifySearchText({}), "");
+		// A round trip keeps every value's text.
+		const search = { q: "null", style: "fine-line", sort: "-name" };
+		assert.deepEqual(parseSearchText(stringifySearchText(search)), search);
 	});
 
 	test("an unknown style is dropped once the style list is known", () => {
 		const styles = [{ slug: "blackwork" }];
 		assert.equal(knownStyle("blackwork", styles), "blackwork");
 		assert.equal(knownStyle("glitter", styles), undefined);
-		assert.equal(knownStyle("glitter", undefined), "glitter");
 		assert.equal(knownStyle(undefined, styles), undefined);
 	});
 
-	test("the API query holds only the filters given (q travels as query)", () => {
-		assert.equal(studioQuery({}), undefined);
-		assert.deepEqual(
-			studioQuery({
-				q: "ink",
-				country: "NP",
-				city: "pokhara",
-				style: "realism",
-			}),
-			{ query: "ink", country: "NP", city: "pokhara", style: "realism" },
-		);
-		assert.deepEqual(studioQuery({ city: "pokhara" }), undefined);
-	});
-
-	test("filter labels: a humanised slug and a country's name", () => {
-		assert.equal(humanizeSlug("new-delhi"), "New delhi");
+	test("a country's name", () => {
 		assert.equal(countryName("NP"), "Nepal");
 		assert.equal(countryName("np"), "Nepal");
 	});

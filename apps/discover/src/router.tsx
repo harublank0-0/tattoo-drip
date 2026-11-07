@@ -10,6 +10,7 @@ import {
 	hydrateContext,
 } from "./lib/context.ts";
 import { createRequestContext } from "./lib/request.ts";
+import { parseSearchText, stringifySearchText } from "./lib/search.ts";
 import { routeTree } from "./routeTree.gen";
 
 /**
@@ -29,6 +30,9 @@ export function getRouter() {
 		defaultPreload: "intent",
 		defaultNotFoundComponent: NotFoundState,
 		defaultErrorComponent: RouteErrorState,
+		// Search values stay text (`?q=true` is a search for "true"), not JSON.
+		parseSearch: parseSearchText,
+		stringifySearch: stringifySearchText,
 		dehydrate: (): Dehydrated => dehydrateContext(context),
 		hydrate: (dehydrated: Dehydrated) => hydrateContext(context, dehydrated),
 	});

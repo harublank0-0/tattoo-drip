@@ -7,6 +7,7 @@ import type {
 	DiscoverStyle,
 	DiscoverTattooSummary,
 } from "@tattoo-drip/sdk";
+import { profileDestination } from "./destinations.ts";
 
 /**
  * The homepage's reads (D06, docs/discover/frontend.md): modest first pages,
@@ -156,10 +157,10 @@ export function tattooDestination(
 	artists: readonly DiscoverArtistSummary[] | undefined,
 	studios: readonly DiscoverStudioSummary[] | undefined,
 ): string | undefined {
-	return (
-		artists?.find((each) => each.id === tattoo.artist.id)?.storefrontUrl ??
-		studios?.find((each) => each.slug === tattoo.studio.slug)?.storefrontUrl
-	);
+	const artist = artists?.find((each) => each.id === tattoo.artist.id);
+	if (artist) return profileDestination(artist).href;
+	const studio = studios?.find((each) => each.slug === tattoo.studio.slug);
+	return studio ? profileDestination(studio).href : undefined;
 }
 
 /** Who made a photo: "artist · studio", or the artist alone for an independent. */

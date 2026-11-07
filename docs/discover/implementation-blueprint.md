@@ -18,6 +18,7 @@ This file is the plan Discover prompts work from. The dated `docs/superpowers/sp
 | D05: Discover app scaffold and design system | Done: [frontend](frontend.md); deviations in C.6 below |
 | D06: homepage and Studio OS marketing | Done: [frontend](frontend.md#homepage-d06); deviations in C.7 below |
 | D06.5: country-aware discovery foundation | Done: [frontend](frontend.md#country); as built in C.8 below |
+| D07: studio and artist directories, style and location pages | Done: [frontend](frontend.md#directories-d07); as built in C.9 below |
 
 Status legend: **Done** = in code, with tests where noted. **Partial** = exists, but not in the form Discover needs. **Planned** = only in docs. **Missing** = searched for and absent. **Unverified** = not checked against a running system.
 
@@ -268,6 +269,18 @@ Details in [frontend](frontend.md#country).
 - **One cookie,** `td_country`, host-only, Lax, HttpOnly, a year, market codes only, set by `POST /preferences/country` (a no-JavaScript form with a same-origin redirect, or fetch).
 - **Geolocation off by default.** nginx (split layout) passes Cloudflare's country as `X-Discover-Country` only from cloudflared and always overwrites it; Discover reads it only when `DISCOVER_GEO_HEADER` names it, after D11 checks Cloudflare's overwriting and the closed origin port. No third-party geolocation, GPS or analytics.
 - **Caching:** HTML is now `private, no-store` with `Vary: Cookie` (it set nothing before); no edge caching of Discover's HTML until D10/D11 design a keyed strategy. **SEO:** canonicals stay path-only, explicit `?country=` pages are `noindex`, nothing redirects by country; location pages (D07/D10) are the crawlable geographic entry points.
+
+### C.9 As built in D07 (deviations from G, H and the D07 row)
+
+Details in [frontend](frontend.md#directories-d07).
+
+- **No API change.** `/discover/studios` and `/artists` already took `q`, `country`, `city`, `style`, `sort` (`newest`, `name`, `-name`), `cursor` and `limit` (artists also `independent`), with keyset cursors and no totals.
+- **Routes** stay under `/explore/studios` and `/explore/artists` (C.6). Style pages are `/styles/:slug`; location pages are `/locations/:country` and `/locations/:country/:city` with a country slug (`nepal`, pinned per market, else the English name slugified) instead of H's `/places/np/kathmandu`: no two-letter segments (H's i18n rule). Only configured markets have location pages; an unknown city is a 404, never a guess.
+- **Paging:** "Next page" / "First page" links (and "Previous page" from the history entry) instead of a "Show more" that accumulates: each page is its own SSR address that survives reloads, sharing and back/forward. No count (the API has none).
+- **Filter bar:** native selects (style, city, sort; who for artists) above the results, a sheet on mobile, a plain GET form without JavaScript. No style chips row (the select is the chip-less equivalent; active filters are chips).
+- **Recent work in rows** comes from one shared photo read per filter set (48 newest), not a per-row read.
+- **Profiles stay on the storefront** (`profileDestination`) until D08 flips `PROFILE_PAGES`.
+- **Indexing:** bare directories, style and location pages become indexable once DISCOVER_INDEXING is on (H); any parameter, an empty hub or a 404 stays noindex. The sitemap still lists static pages only (styles and places are D10's).
 
 ## D. Data model gap analysis
 

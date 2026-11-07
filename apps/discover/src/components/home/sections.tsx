@@ -15,6 +15,7 @@ import {
 } from "#/components/discovery/layout";
 import { ResponsiveImage } from "#/components/discovery/responsive-image";
 import { buttonVariants } from "#/components/ui/button";
+import { artistSiteNote, profileDestination } from "#/lib/destinations";
 import {
 	artistAffiliation,
 	artistWork,
@@ -80,7 +81,7 @@ function MoreLink({ to, children }: { to: string; children: ReactNode }) {
 
 /**
  * Styles from the platform's list, each over a real recent photo tagged
- * with it, linking to the studios that name it. Staggered tiles; the name
+ * with it, linking to the style's page (D07). Staggered tiles; the name
  * sits on a solid plate, so it reads without hovering. No counts.
  */
 export function StylesSection({
@@ -102,11 +103,7 @@ export function StylesSection({
 						key={style.slug}
 						className="even:translate-y-8 lg:even:translate-y-0 lg:[&:nth-child(3n+2)]:translate-y-16"
 					>
-						<Link
-							to={paths.studios()}
-							search={{ style: style.slug }}
-							className="group relative block"
-						>
+						<Link to={paths.style(style.slug)} className="group relative block">
 							<ResponsiveImage
 								image={tattoo.image}
 								alt={tattooAlt(tattoo, style)}
@@ -195,7 +192,7 @@ export function StudiosSection({
 					{studios.map((studio) => (
 						<li key={studio.id} className="border-b border-line">
 							<a
-								href={studio.storefrontUrl}
+								href={profileDestination(studio).href}
 								className="group flex min-h-24 items-center gap-4 py-5 sm:gap-6"
 							>
 								{studio.logo && <StudioLogo logo={studio.logo} />}
@@ -229,7 +226,7 @@ export function StudiosSection({
 /**
  * Artists, studio-affiliated and independent: work first (their newest
  * recent photo, else their portrait), then name, styles and where they
- * work. Each links to the artist's page on their studio's site.
+ * work. Each links to the artist's own site, or their page on their studio's.
  */
 export function ArtistsSection({
 	artists,
@@ -254,7 +251,7 @@ export function ArtistsSection({
 					return (
 						<li key={artist.id} className="lg:even:pt-12">
 							<a
-								href={artist.storefrontUrl}
+								href={profileDestination(artist).href}
 								className="group flex flex-col gap-3"
 							>
 								{image ? (
@@ -294,7 +291,7 @@ export function ArtistsSection({
 										</span>
 									)}
 								</span>
-								<OwnSite>(their page on the studio's site)</OwnSite>
+								<OwnSite>{`(${artistSiteNote(artist)})`}</OwnSite>
 							</a>
 						</li>
 					);
@@ -348,7 +345,7 @@ export function InspirationSection({
 							{href ? (
 								<a href={href} className="group block">
 									{body}
-									<OwnSite>(their page on the studio's site)</OwnSite>
+									<OwnSite>(the artist's or studio's own site)</OwnSite>
 								</a>
 							) : (
 								body
@@ -363,7 +360,8 @@ export function InspirationSection({
 
 /**
  * The places listed businesses are in (the API's order: country, then
- * name), grouped by country, each linking to that city's studios. No
+ * name), grouped by country, each linking to its city page (D07; the
+ * country's name to its location page). No
  * counts: a short list should read as a list, not as a score.
  */
 export function LocationsSection({
@@ -389,13 +387,19 @@ export function LocationsSection({
 				<div className="flex flex-col gap-10">
 					{[...countries].map(([country, places]) => (
 						<div key={country} className="flex flex-col gap-4">
-							<h3 className="eyebrow text-ink-muted">{countryName(country)}</h3>
+							<h3 className="eyebrow text-ink-muted">
+								<Link
+									to={paths.location(country)}
+									className="inline-flex min-h-11 items-center underline-offset-4 hover:text-ink hover:underline"
+								>
+									{countryName(country)}
+								</Link>
+							</h3>
 							<ul className="flex flex-wrap gap-x-8 gap-y-1 border-t border-ink pt-4">
 								{places.map((place) => (
 									<li key={place.slug}>
 										<Link
-											to={paths.studios()}
-											search={{ country: place.country, city: place.slug }}
+											to={paths.city(place.country, place.slug)}
 											className="inline-flex min-h-11 items-baseline gap-2 font-display text-display-md font-bold underline-offset-[0.2em] decoration-accent decoration-2 hover:underline"
 										>
 											{place.name}
