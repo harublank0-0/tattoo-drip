@@ -1,7 +1,9 @@
 import { test } from "@japa/runner";
 import {
+	ARTIST_DISCOVER_STATES,
 	type ArtistFacts,
 	artistDiscoverState,
+	artistStateText,
 	artworkDiscoverState,
 	DISCOVER_RECOMMENDED,
 	LISTING_CONSENT_VERSION,
@@ -9,6 +11,7 @@ import {
 	type PublicationFacts,
 	publicationStatus,
 	readiness,
+	STATUS_WORDS,
 } from "#modules/discovery/publication";
 
 const artist = (over: Partial<ArtistFacts> = {}): ArtistFacts => ({
@@ -243,5 +246,18 @@ test.group("Discover listing consent", () => {
 		}
 		assert.include(listingConsent("studio").text, "studio");
 		assert.notInclude(listingConsent("independent").text, "studio");
+	});
+});
+
+test.group("Discover words for each business type", () => {
+	test("an independent artist is never called a studio", ({ assert }) => {
+		for (const state of ARTIST_DISCOVER_STATES) {
+			assert.notMatch(artistStateText(state, "independent"), /studio/i, state);
+			assert.isNotEmpty(artistStateText(state, "studio"));
+		}
+		for (const words of Object.values(STATUS_WORDS)) {
+			assert.notMatch(words.summary("independent"), /studio/i);
+		}
+		assert.include(STATUS_WORDS.taken_down.summary("studio"), "studio page");
 	});
 });

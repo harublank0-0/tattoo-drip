@@ -88,7 +88,8 @@ const artistSwitch = (
 	listed: boolean,
 ) =>
 	send(client, user, "put", `/t/${slug}/artists/${artistId}/discover`, {
-		listed: listed ? "1" : "0",
+		// As the profile form sends it.
+		listed: listed ? "true" : "false",
 	});
 
 /** The public Discover API's answer status for a path. */

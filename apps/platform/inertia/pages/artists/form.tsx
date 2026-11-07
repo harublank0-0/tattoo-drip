@@ -12,6 +12,15 @@ import type {
 	StyleOption,
 } from "~/components/artists";
 import {
+	ARTIST_ONLY_THEY,
+	ARTIST_SECTION_HEADING,
+	artistSectionIntro,
+	artistSwitchLabel,
+	INDEPENDENT_LINK,
+	INDEPENDENT_NOTE,
+	photosFigure,
+} from "~/components/discover";
+import {
 	FLASH_CREATE_NOTE,
 	FLASH_OPEN_HELP,
 	FLASH_OPEN_LABEL,
@@ -47,6 +56,18 @@ import { slugify } from "~/lib/slugify";
 
 type Errors = Partial<Record<string, string>>;
 
+/** The profile's Discover state (D04), from ArtistsController.edit. */
+type ArtistDiscover = {
+	independent: boolean;
+	listed: boolean;
+	state: string;
+	stateText: string;
+	publishedPhotos: number;
+	recommendedPhotos: number;
+	canTurnOn: boolean;
+	owner: boolean;
+};
+
 const SOCIAL_LINKS = [
 	{ name: "instagramUrl", label: "Instagram link" },
 	{ name: "facebookUrl", label: "Facebook link" },
@@ -66,6 +87,7 @@ export default function ArtistForm({
 	flashDesigns,
 	styleOptions,
 	schedule,
+	discover,
 }: {
 	artist: ArtistProps | null;
 	canLink: boolean;
@@ -74,6 +96,8 @@ export default function ArtistForm({
 	styleOptions: StyleOption[];
 	/** The next days' sessions and the studio's hours (Studio OS); null while adding. */
 	schedule: ArtistSchedule | null;
+	/** Its Discover switch and state (D04); absent while adding. */
+	discover?: ArtistDiscover;
 }) {
 	const tenant = useTenant();
 	const params = { tenant: tenant.slug };
@@ -108,6 +132,7 @@ export default function ArtistForm({
 							count: workPhotos.length,
 						},
 						{ id: "flash", label: "Flash", count: flashDesigns.length },
+						...(discover ? [{ id: "discover", label: "Discover" }] : []),
 					].map((section) => (
 						<a
 							key={section.id}
@@ -230,8 +255,115 @@ export default function ArtistForm({
 						<p className="text-sm text-muted-foreground">{FLASH_CREATE_NOTE}</p>
 					)}
 				</Section>
+
+				{artist && discover && (
+					<Section
+						id="discover"
+						title={ARTIST_SECTION_HEADING}
+						description={
+							discover.independent ? undefined : artistSectionIntro(owner)
+						}
+					>
+						<ArtistDiscoverPanel
+							artistId={artist.id}
+							discover={discover}
+							tenantSlug={tenant.slug}
+						/>
+					</Section>
+				)}
 			</div>
 		</Page>
+	);
+}
+
+/**
+ * The artist's own Discover switch (D04): one small form that sends the
+ * opposite of what the server holds, and the server's words for the state.
+ * Turning it off asks nothing (it is reversible and shown at once); turning
+ * a profile someone else's login manages back on is theirs to do. An
+ * independent artist has no switch here: their listing is in Settings.
+ */
+function ArtistDiscoverPanel({
+	artistId,
+	discover,
+	tenantSlug,
+}: {
+	artistId: string;
+	discover: ArtistDiscover;
+	tenantSlug: string;
+}) {
+	const photos = (
+		<p className="text-sm text-muted-foreground tabular-nums">
+			{photosFigure(discover.publishedPhotos, discover.recommendedPhotos)}
+		</p>
+	);
+	if (discover.independent) {
+		return (
+			<div className="flex flex-col gap-2">
+				<p className="text-sm">{discover.stateText}</p>
+				<p className="text-sm text-muted-foreground">{INDEPENDENT_NOTE}</p>
+				{photos}
+				{discover.owner && (
+					<Link
+						route="tenant.settings.discover"
+						routeParams={{ tenant: tenantSlug }}
+						className={cn(
+							buttonVariants({ variant: "outline", size: "sm" }),
+							"self-start",
+						)}
+					>
+						{INDEPENDENT_LINK}
+					</Link>
+				)}
+			</div>
+		);
+	}
+	const blocked = !discover.listed && !discover.canTurnOn;
+	return (
+		<Form
+			route="tenant.artists.discover.update"
+			routeParams={{ tenant: tenantSlug, id: artistId }}
+			options={{ preserveScroll: true }}
+		>
+			{({ errors, processing }) => (
+				<div className="flex flex-col gap-3">
+					<input
+						type="hidden"
+						name="listed"
+						value={discover.listed ? "false" : "true"}
+					/>
+					<div className="flex flex-col gap-1">
+						<p id="discover-state" className="text-sm">
+							{discover.stateText}
+						</p>
+						{photos}
+					</div>
+					<div>
+						<Button
+							type="submit"
+							variant="outline"
+							size="sm"
+							disabled={processing || blocked}
+							aria-describedby={
+								blocked ? "discover-state discover-blocked" : "discover-state"
+							}
+						>
+							{artistSwitchLabel(discover.listed, processing)}
+						</Button>
+					</div>
+					{blocked && (
+						<p id="discover-blocked" className="text-sm text-muted-foreground">
+							{ARTIST_ONLY_THEY}
+						</p>
+					)}
+					{errors.listed && (
+						<Field data-invalid>
+							<FieldError>{errors.listed}</FieldError>
+						</Field>
+					)}
+				</div>
+			)}
+		</Form>
 	);
 }
 

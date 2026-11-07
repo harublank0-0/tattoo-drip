@@ -21,7 +21,7 @@ import {
 	updateArtistValidator,
 } from "#modules/artists/validators/artist";
 import {
-	ARTIST_STATE_WORDS,
+	artistStateText,
 	DISCOVER_RECOMMENDED,
 } from "#modules/discovery/publication";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -278,7 +278,7 @@ export default class ArtistsController {
 			independent: tenant.type === "independent",
 			listed: artist.discoveryListed,
 			state: discoverState.state,
-			stateText: ARTIST_STATE_WORDS[discoverState.state],
+			stateText: artistStateText(discoverState.state, tenant.type),
 			publishedPhotos: discoverState.publishedPhotos,
 			recommendedPhotos: DISCOVER_RECOMMENDED.artistPhotos,
 			// Turning a profile someone else manages back on is theirs to do.

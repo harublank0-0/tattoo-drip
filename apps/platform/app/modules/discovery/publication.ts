@@ -293,8 +293,8 @@ export const STATUS_WORDS: Record<
 	},
 	taken_down: {
 		label: "Removed by TattooDrip",
-		summary: () =>
-			"TattooDrip has removed this listing from Discover. Your studio page and bookings are not affected. Contact TattooDrip support to have it reviewed.",
+		summary: (type) =>
+			`TattooDrip has removed this listing from Discover. Your ${type === "studio" ? "studio page" : "page"} and bookings are not affected. Contact TattooDrip support to have it reviewed.`,
 	},
 };
 
@@ -319,16 +319,41 @@ export function artistDiscoverState(
 	return "shown";
 }
 
-export const ARTIST_STATE_WORDS: Record<ArtistDiscoverState, string> = {
-	shown: "Shown on Discover.",
-	opted_out: "Not shown on Discover: this artist's Discover switch is off.",
-	hidden_from_page:
-		"Not shown on Discover: this artist is hidden from the studio page.",
-	studio_not_listed:
-		"Not shown on Discover yet: the studio isn't listed. The artist will show once it is.",
-	studio_taken_down:
-		"Not shown on Discover: TattooDrip has removed the studio's listing.",
+const ARTIST_STATE_WORDS: Record<
+	BusinessType,
+	Record<ArtistDiscoverState, string>
+> = {
+	studio: {
+		shown: "Shown on Discover.",
+		opted_out: "Not shown on Discover: this artist's Discover switch is off.",
+		hidden_from_page:
+			"Not shown on Discover: this artist is hidden from the studio page.",
+		studio_not_listed:
+			"Not shown on Discover yet: the studio isn't listed. The artist will show once it is.",
+		studio_taken_down:
+			"Not shown on Discover: TattooDrip has removed the studio's listing.",
+	},
+	// An independent artist's profile is their listing: "your", never "the studio".
+	independent: {
+		shown: "Your profile is shown on Discover.",
+		opted_out:
+			"Your profile isn't shown on Discover. Turn your listing off and on again in Settings, Discover.",
+		hidden_from_page:
+			"Your profile isn't shown on Discover: it's hidden from your page.",
+		studio_not_listed:
+			"Your profile isn't on Discover yet: your listing is off.",
+		studio_taken_down:
+			"Your profile isn't shown on Discover: TattooDrip has removed your listing.",
+	},
 };
+
+/** One artist's Discover state in words, for their business type. */
+export function artistStateText(
+	state: ArtistDiscoverState,
+	type: BusinessType,
+): string {
+	return ARTIST_STATE_WORDS[type][state];
+}
 
 export const ARTWORK_DISCOVER_STATES = [
 	"visible",

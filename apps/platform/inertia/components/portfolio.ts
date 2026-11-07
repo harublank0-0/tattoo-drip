@@ -30,6 +30,9 @@ export type PortfolioPhoto = {
 	largeUrl: string;
 	fullUrl: string;
 	addedText: string;
+	/** Whether it shows on Discover (D04), in the server's words. */
+	discover: { label: string; note: string };
+	discoverState: string;
 };
 
 export type PortfolioArtist = {

@@ -3,7 +3,7 @@ import type { HttpContext } from "@adonisjs/core/http";
 import { errors } from "@vinejs/vine";
 import { tenantContext } from "#middleware/tenant_middleware";
 import {
-	ARTIST_STATE_WORDS,
+	artistStateText,
 	DISCOVER_RECOMMENDED,
 	listingConsent,
 	type ReadinessAction,
@@ -108,7 +108,7 @@ export default class DiscoverSettingsController {
 							discoveryListed: artist.discoveryListed,
 							publishedPhotos: artist.publishedPhotos,
 							state: artist.state,
-							stateText: ARTIST_STATE_WORDS[artist.state],
+							stateText: artistStateText(artist.state, overview.type),
 						}))
 					: [],
 			recommended: DISCOVER_RECOMMENDED,

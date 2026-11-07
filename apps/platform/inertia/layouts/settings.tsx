@@ -2,6 +2,7 @@ import { usePage } from "@inertiajs/react";
 import { cn } from "cn";
 import {
 	Clock,
+	Compass,
 	MessageCircleQuestion,
 	MessageSquareText,
 	Palette,
@@ -45,6 +46,12 @@ function settingsNav(tenantSlug: string): NavItem[] {
 			route: "tenant.settings.faq_policies",
 			params,
 			icon: MessageCircleQuestion,
+		},
+		{
+			label: "Discover",
+			route: "tenant.settings.discover",
+			params,
+			icon: Compass,
 		},
 		{
 			label: "Payments",
