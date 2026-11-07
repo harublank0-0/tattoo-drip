@@ -127,7 +127,22 @@ describe("/request through the router", () => {
 		assert.deepEqual(headers({ match: { status: "success" } }), {
 			"Cache-Control":
 				"public, max-age=0, s-maxage=60, stale-while-revalidate=600",
+			// The address may hold Discover's referral: other sites get the origin only.
+			"Referrer-Policy": "strict-origin-when-cross-origin",
 		});
+	});
+
+	test("Discover's ?ref= reaches the booking flow beside the artist (Discover D08)", async () => {
+		const ref = "eyJ2IjoxfQ.c2lnbmF0dXJl";
+		const result = await visit(`/book?artist=sita&ref=${ref}&utm_source=x`);
+
+		assert.deepEqual(result.deps, { artist: "sita", ref });
+		assert.equal(picked(result.data), "Sita Rai");
+		assert.equal(
+			(result.data as { booking: { referral?: string } }).booking.referral,
+			ref,
+		);
+		assert.equal(result.status, "success");
 	});
 
 	test("?artist=sita picks Sita, and reads the artists and nothing else", async () => {

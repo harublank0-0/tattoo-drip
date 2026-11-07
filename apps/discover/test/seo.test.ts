@@ -68,13 +68,16 @@ describe("Discover SEO foundation", () => {
 		assert.equal(canonicalUrl(OFF, ""), "https://tattoodrip.app/");
 	});
 
-	test("style and location pages may be indexed by shape (D07); nothing else dynamic", () => {
+	test("style, location (D07) and profile (D08) pages may be indexed by shape; nothing else dynamic", () => {
 		for (const path of [
 			"/styles/blackwork",
 			"/styles/fine-line",
 			"/locations/nepal",
 			"/locations/nepal/kathmandu",
 			"/locations/united-states/new-york",
+			"/studios/black-needle",
+			"/studios/black-needle/artists/maya",
+			"/artists/maya-tattoo",
 		]) {
 			assert.equal(indexable(ON, path), true, path);
 			assert.equal(indexable(OFF, path), false, path);
@@ -87,8 +90,11 @@ describe("Discover SEO foundation", () => {
 			"/locations",
 			"/locations/nepal/kathmandu/x",
 			"/locations/nepal/",
-			"/studios/x",
-			"/artists/x",
+			"/studios/Black-Needle",
+			"/studios/x/artists",
+			"/studios/x/artists/y/z",
+			"/studios/x/other/y",
+			"/artists/x/y",
 			"/tattoos/x",
 		])
 			assert.equal(indexable(ON, path), false, path);
@@ -101,6 +107,23 @@ describe("Discover SEO foundation", () => {
 			{ name: "robots", content: NOINDEX },
 		]);
 		assert.deepEqual(pageMeta({}), []);
+	});
+
+	test("a profile's social card picture (D08)", () => {
+		assert.deepEqual(
+			pageMeta({
+				title: "Black Needle",
+				image: "https://media.test/cover.jpg",
+				imageAlt: "Black Needle's studio",
+			}),
+			[
+				{ title: "Black Needle | Tattoo Drip" },
+				{ property: "og:title", content: "Black Needle | Tattoo Drip" },
+				{ property: "og:image", content: "https://media.test/cover.jpg" },
+				{ name: "twitter:card", content: "summary_large_image" },
+				{ property: "og:image:alt", content: "Black Needle's studio" },
+			],
+		);
 	});
 
 	test("robots.txt disallows everything while off; allows and names the sitemap when on", () => {

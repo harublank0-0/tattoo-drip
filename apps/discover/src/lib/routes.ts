@@ -25,13 +25,14 @@ export const paths = {
 	/** A city's page (D07): its country's ISO code and the API's place slug. */
 	city: (country: string, city: string) =>
 		`/locations/${countrySlug(country)}/${encodeURIComponent(city)}`,
-	// Planned (D08–D09): not routes yet. Profiles are reached through
-	// `profileDestination` (src/lib/destinations.ts), never linked directly.
+	// Profiles (D08). Lists link to them through `profileDestination`
+	// (src/lib/destinations.ts); a profile page links its own relations.
 	studio: (slug: string) => `/studios/${encodeURIComponent(slug)}`,
 	studioArtist: (studioSlug: string, artistSlug: string) =>
 		`/studios/${encodeURIComponent(studioSlug)}/artists/${encodeURIComponent(artistSlug)}`,
 	independentArtist: (tenantSlug: string) =>
 		`/artists/${encodeURIComponent(tenantSlug)}`,
+	// Planned (D09): not a route yet.
 	tattoo: (id: string) => `/tattoos/${encodeURIComponent(id)}`,
 } as const;
 
@@ -47,9 +48,10 @@ export const ROUTE_FILES = [
 ] as const;
 
 /**
- * The dynamic routes that exist (D07), as the route tree spells them, and a
- * test for an address they serve (the shape only: the page itself 404s an
- * unknown style, a country that isn't a market or an unknown city).
+ * The dynamic routes that exist (D07, D08), as the route tree spells them,
+ * and a test for an address they serve (the shape only: the page itself
+ * 404s an unknown style, a country that isn't a market, an unknown city or
+ * a profile the API doesn't show).
  */
 export const ROUTE_PATTERNS = [
 	{ route: "/styles/$slug", matches: /^\/styles\/[^/]+$/ },
@@ -58,6 +60,12 @@ export const ROUTE_PATTERNS = [
 		route: "/locations/$country/$city",
 		matches: /^\/locations\/[^/]+\/[^/]+$/,
 	},
+	{ route: "/studios/$studioSlug", matches: /^\/studios\/[^/]+$/ },
+	{
+		route: "/studios/$studioSlug/artists/$artistSlug",
+		matches: /^\/studios\/[^/]+\/artists\/[^/]+$/,
+	},
+	{ route: "/artists/$tenantSlug", matches: /^\/artists\/[^/]+$/ },
 ] as const;
 
 /** Whether an internal path (no query) has a route today. */

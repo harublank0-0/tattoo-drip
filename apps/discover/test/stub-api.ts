@@ -17,6 +17,21 @@ import type { AddressInfo } from "node:net";
  * Places cycle Pokhara, Kathmandu, Lalitpur (NP), New Delhi (IN): rows 3,
  * 7, 11… are India's, so 3 of each are all Nepal's and India has none.
  *
+ * D08: the detail reads (`/studios/:slug`, `/studios/:slug/artists`,
+ * `/studios/:slug/artists/:artist`, `/artists/:slug`) follow the real
+ * API's 404 rules: unknown, the wrong kind (a studio's slug as an
+ * independent and the reverse, an independent's artist under /studios),
+ * another studio's artist and anything in `scenario.hidden` (standing in
+ * for never listed, opted out, hidden and taken down, which the real API
+ * answers alike) are the same 404, and hidden rows leave the lists too.
+ * `old-<slug>` is an old slug of a studio or an independent: the answer
+ * names the current one. Studios 1, 6, 11… have two more artists
+ * (`crew-<n>-a`, `-b`) on their profiles only, and every shown artist has
+ * five photos on their profile (`tattoos` in a detail), so profiles have
+ * a portfolio; `tattoos` also honours `artist` (a uuid). Artist 9 isn't
+ * taking requests. `scenario.links` overrides a profile's `bookingUrl` /
+ * `storefrontUrl` (unsafe-link tests).
+ *
  * Divergences from the real API: the cursor is base64url of
  * `["stub", sort, offset]` (an offset, not a keyset, so rows added while
  * paging would shift; the fixtures never change mid-test), and only the
@@ -28,7 +43,16 @@ export type Endpoint =
 	| "artists"
 	| "tattoos"
 	| "styles"
-	| "locations";
+	| "locations"
+	// D08's detail reads: one studio, its artists, one studio artist, one independent.
+	| "studio"
+	| "studio-artists"
+	| "studio-artist"
+	| "independent";
+
+/** The referral token the stub's booking links carry (shaped like the platform's; never verified here). */
+export const STUB_REF =
+	"eyJ2IjoxLCJwIjoiYm9va2luZ19yZWZlcnJhbCJ9.c3R1Yi1zaWduYXR1cmU";
 
 export const STYLES = [
 	{ slug: "blackwork", name: "Blackwork" },
@@ -112,6 +136,8 @@ export function fixtures(count: number) {
 			studio: artist?.studio,
 		};
 	});
+	for (const artist of artists)
+		if (artist.slug === "stub-artist-9") artist.acceptingInquiries = false;
 	return {
 		studios,
 		artists,
@@ -119,6 +145,129 @@ export function fixtures(count: number) {
 		styles: STYLES,
 		locations: PLACES.slice(0, Math.min(count, PLACES.length)),
 		tattooPlaces,
+	};
+}
+
+type Fixtures = ReturnType<typeof fixtures>;
+type StubArtist = Fixtures["artists"][number];
+type StubStudio = Fixtures["studios"][number];
+
+/** A studio's artists as its profile shows them: the list's, then (studios 1, 6, 11…) two more. */
+function profileArtists(data: Fixtures, studio: StubStudio): StubArtist[] {
+	const index = data.studios.indexOf(studio);
+	const own = data.artists.filter(
+		(artist) => !artist.independent && artist.studio.slug === studio.slug,
+	);
+	if (index % 5 !== 1) return own;
+	const crew = ["a", "b"].map((letter, n) => ({
+		id: uuid(5, index * 10 + n),
+		slug: `crew-${index}-${letter}`,
+		name: `Stub Crew ${index}${letter.toUpperCase()}`,
+		photo:
+			n === 0
+				? {
+						url: `http://media.test/crew-${index}-${letter}.jpg`,
+						width: 800,
+						height: 1000,
+						variants: [],
+					}
+				: null,
+		styles: [STYLES[(index + n + 1) % STYLES.length]],
+		acceptingInquiries: true,
+		independent: false,
+		studio: { slug: studio.slug, name: studio.name, type: "studio" },
+		location: studio.location,
+		storefrontUrl: `http://${studio.slug}.localhost:3000/artists/crew-${index}-${letter}`,
+	}));
+	return [...own, ...(crew as StubArtist[])];
+}
+
+/** An artist's five profile photos, of varied proportions. */
+function profilePhotos(artist: StubArtist, seed: number) {
+	return Array.from({ length: 5 }, (_, n) => ({
+		id: uuid(4, seed * 10 + n),
+		image: {
+			url: `http://media.test/work-${artist.slug}-${seed}-${n}.jpg`,
+			width: 1200,
+			height: [1500, 900, 1200, 1600, 1000][n] as number,
+			alt: n === 0 ? `Stub ${artist.name} piece ${n}` : null,
+			variants: [],
+		},
+		styles: [artist.styles[0]],
+		healed: n === 1,
+		artist: { id: artist.id, slug: artist.slug, name: artist.name },
+		studio: artist.studio,
+	}));
+}
+
+function artistDetail(
+	artist: StubArtist,
+	seed: number,
+	links: Record<string, { bookingUrl?: string; storefrontUrl?: string }>,
+) {
+	const origin = new URL(artist.storefrontUrl).origin;
+	const key = artist.independent
+		? artist.studio.slug
+		: `${artist.studio.slug}/${artist.slug}`;
+	return {
+		...artist,
+		bio:
+			seed % 2 === 0
+				? `Stub bio of ${artist.name}.\n\nSecond <i>line</i>.`
+				: null,
+		socialLinks: [
+			{ platform: "instagram", url: `https://instagram.com/${artist.slug}` },
+		],
+		tattoos: profilePhotos(artist, seed),
+		bookingUrl: `${origin}/book?artist=${artist.slug}&ref=${STUB_REF}`,
+		...links[key],
+	};
+}
+
+function studioDetail(
+	data: Fixtures,
+	studio: StubStudio,
+	links: Record<string, { bookingUrl?: string; storefrontUrl?: string }>,
+	hidden: Set<string>,
+) {
+	const index = data.studios.indexOf(studio);
+	const artists = profileArtists(data, studio).filter(
+		(artist) => !hidden.has(`${studio.slug}/${artist.slug}`),
+	);
+	const photos = artists.flatMap((artist, n) =>
+		profilePhotos(artist, index * 100 + n),
+	);
+	// Newest first across artists: interleaved, at most 12, as the API caps it.
+	const tattoos = Array.from({ length: 5 }, (_, n) =>
+		photos.filter((_, at) => at % 5 === n),
+	)
+		.flat()
+		.slice(0, 12);
+	return {
+		...studio,
+		cover:
+			index === 1
+				? {
+						url: "http://media.test/cover-1.jpg",
+						width: 1600,
+						height: 900,
+						alt: null,
+						variants: [],
+					}
+				: studio.cover,
+		intro:
+			index === 1
+				? "Stub intro about the studio.\n\nWe work by appointment. <script>alert(1)</script>"
+				: null,
+		timezone: "Asia/Kathmandu",
+		socialLinks: [
+			{ platform: "instagram", url: `https://instagram.com/${studio.slug}` },
+			{ platform: "website", url: "javascript:alert(1)" },
+		],
+		artists,
+		tattoos,
+		bookingUrl: `${new URL(studio.storefrontUrl).origin}/book?ref=${STUB_REF}`,
+		...links[studio.slug],
 	};
 }
 
@@ -141,6 +290,10 @@ export type StubApi = {
 			name: string;
 			region: string | null;
 		}[];
+		/** Not shown (D08): a studio's or independent's slug, or `<studio>/<artist>`. */
+		hidden: Set<string>;
+		/** A profile's booking and site links, replaced (D08): by studio slug or `<studio>/<artist>`. */
+		links: Record<string, { bookingUrl?: string; storefrontUrl?: string }>;
 	};
 	close: () => void;
 };
@@ -152,6 +305,8 @@ export async function stubApi(count = 1): Promise<StubApi> {
 		fail: new Set<Endpoint>(),
 		hang: new Set<Endpoint>(),
 		extraPlaces: [] as StubApi["scenario"]["extraPlaces"],
+		hidden: new Set<string>(),
+		links: {} as StubApi["scenario"]["links"],
 	};
 	const hanging = new Set<() => void>();
 	const server = createServer((request, response) => {
@@ -159,7 +314,20 @@ export async function stubApi(count = 1): Promise<StubApi> {
 		const address = new URL(request.url ?? "/", "http://stub");
 		const path = address.pathname;
 		const limit = Number(address.searchParams.get("limit") ?? 24);
-		const endpoint = path.replace("/api/v1/discover/", "") as Endpoint;
+		const segments = path.replace("/api/v1/discover/", "").split("/");
+		const endpoint = (
+			segments.length === 1
+				? segments[0]
+				: segments[0] === "studios" && segments.length === 2
+					? "studio"
+					: segments[0] === "studios" && segments[2] === "artists"
+						? segments.length === 3
+							? "studio-artists"
+							: "studio-artist"
+						: segments[0] === "artists" && segments.length === 2
+							? "independent"
+							: "unknown"
+		) as Endpoint;
 		response.setHeader("Content-Type", "application/json");
 		// For an ad hoc browser check against the stub (the real API allows DISCOVER_URL).
 		response.setHeader("Access-Control-Allow-Origin", "*");
@@ -178,6 +346,92 @@ export async function stubApi(count = 1): Promise<StubApi> {
 			return;
 		}
 		const data = fixtures(scenario.count);
+		const { hidden } = scenario;
+		const missing = () => {
+			response.statusCode = 404;
+			response.end(
+				JSON.stringify({
+					error: { code: "not_found", message: "Not found" },
+				}),
+			);
+		};
+		// D08's detail reads: an old slug is `old-<current>`.
+		const current = (slug: string | undefined) =>
+			slug?.startsWith("old-") ? slug.slice(4) : slug;
+		if (
+			endpoint === "studio" ||
+			endpoint === "studio-artists" ||
+			endpoint === "studio-artist"
+		) {
+			const slug = current(segments[1]);
+			const studio = data.studios.find(
+				(each) => each.slug === slug && !hidden.has(each.slug),
+			);
+			if (!studio) return missing();
+			const detail = studioDetail(data, studio, scenario.links, hidden);
+			if (endpoint === "studio")
+				return response.end(JSON.stringify({ data: detail }));
+			if (endpoint === "studio-artists")
+				return response.end(
+					JSON.stringify({
+						data: detail.artists.map(
+							({
+								id,
+								slug,
+								name,
+								photo,
+								styles,
+								acceptingInquiries,
+								independent,
+								studio,
+								location,
+								storefrontUrl,
+							}) => ({
+								id,
+								slug,
+								name,
+								photo,
+								styles,
+								acceptingInquiries,
+								independent,
+								studio,
+								location,
+								storefrontUrl,
+							}),
+						),
+					}),
+				);
+			const index = detail.artists.findIndex(
+				(each) => each.slug === segments[3],
+			);
+			const artist = detail.artists[index];
+			if (!artist) return missing();
+			return response.end(
+				JSON.stringify({
+					data: artistDetail(
+						artist,
+						data.studios.indexOf(studio) * 100 + index,
+						scenario.links,
+					),
+				}),
+			);
+		}
+		if (endpoint === "independent") {
+			const slug = current(segments[1]);
+			const index = data.artists.findIndex(
+				(each) =>
+					each.independent &&
+					each.studio.slug === slug &&
+					!hidden.has(each.studio.slug),
+			);
+			const artist = data.artists[index];
+			if (!artist) return missing();
+			return response.end(
+				JSON.stringify({
+					data: artistDetail(artist, 5000 + index * 2, scenario.links),
+				}),
+			);
+		}
 		if (endpoint === "styles") {
 			response.end(JSON.stringify({ data: data.styles }));
 			return;
@@ -217,6 +471,7 @@ export async function stubApi(count = 1): Promise<StubApi> {
 		const q = params.get("q");
 		const independent = params.get("independent");
 		const studio = params.get("studio");
+		const artistId = params.get("artist");
 		const sort = params.get("sort") ?? "newest";
 		if (country !== null && !/^[A-Za-z]{2}$/.test(country))
 			return invalid("country");
@@ -261,7 +516,9 @@ export async function stubApi(count = 1): Promise<StubApi> {
 			location?: { country: string; slug: string } | null;
 			styles?: ({ slug: string } | undefined)[];
 			independent?: boolean;
+			slug?: string;
 			studio?: { slug?: string };
+			artist?: { id?: string };
 		};
 		const placeOf = (row: Row, index: number) =>
 			endpoint === "tattoos" ? data.tattooPlaces[index] : row.location;
@@ -276,7 +533,15 @@ export async function stubApi(count = 1): Promise<StubApi> {
 						(row.name ?? "").toLowerCase().includes(q.trim().toLowerCase())) &&
 					(independent === null ||
 						row.independent === (independent === "true")) &&
-					(!studio || row.studio?.slug === studio),
+					(!studio || row.studio?.slug === studio) &&
+					(!artistId || row.artist?.id === artistId.toLowerCase()) &&
+					// Not shown (D08): gone from every list too.
+					!hidden.has(row.studio?.slug ?? "") &&
+					!(endpoint === "studios" && hidden.has(row.slug ?? "")) &&
+					!(
+						endpoint === "artists" &&
+						hidden.has(`${row.studio?.slug}/${row.slug}`)
+					),
 			)
 			.map(({ row }) => row);
 		if (sort !== "newest") {

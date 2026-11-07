@@ -5,6 +5,7 @@ import {
 	PROFILE_PAGES,
 	profileDestination,
 	profilePath,
+	tattooProfile,
 } from "../src/lib/destinations.ts";
 import { hasRoute } from "../src/lib/routes.ts";
 
@@ -15,21 +16,40 @@ const artist = (studio: string, slug: string, independent = false) => ({
 	storefrontUrl: `https://${studio}.example/artists/${slug}`,
 });
 
-describe("profile destinations (D07; D08 flips them)", () => {
-	test("today every destination is the storefront page the API names, never a missing route", () => {
-		assert.equal(PROFILE_PAGES, false);
+describe("profile destinations (D07; flipped in D08)", () => {
+	test("every destination is Discover's own profile, a route that exists", () => {
+		assert.equal(PROFILE_PAGES, true);
 		const studio = {
 			slug: "black-needle",
 			storefrontUrl: "https://black-needle.example/",
 		};
 		assert.deepEqual(profileDestination(studio), {
+			href: "/studios/black-needle",
+			external: false,
+			profile: "/studios/black-needle",
+		});
+		assert.ok(hasRoute(profilePath(studio)));
+		assert.ok(hasRoute(profilePath(artist("a", "maya"))));
+		assert.ok(hasRoute(profilePath(artist("a", "maya", true))));
+		// Off (D07's behaviour): the storefront page the API names.
+		assert.deepEqual(profileDestination(studio, false), {
 			href: "https://black-needle.example/",
 			external: true,
 			profile: "/studios/black-needle",
 		});
-		// The planned profile paths are not routes yet.
-		assert.equal(hasRoute(profilePath(studio)), false);
-		assert.equal(hasRoute(profilePath(artist("a", "maya"))), false);
+	});
+
+	test("a photo leads to its artist's profile from its own data", () => {
+		const photo = (type: "studio" | "independent") => ({
+			artist: { slug: "maya" },
+			studio: { slug: "ink-house", type },
+		});
+		assert.equal(
+			tattooProfile(photo("studio")),
+			"/studios/ink-house/artists/maya",
+		);
+		assert.equal(tattooProfile(photo("independent")), "/artists/ink-house");
+		assert.equal(tattooProfile(photo("studio"), false), undefined);
 	});
 
 	test("two artists with the same slug at different studios get different destinations", () => {
@@ -49,7 +69,11 @@ describe("profile destinations (D07; D08 flips them)", () => {
 	test("an independent artist is reached by their business's (tenant's) slug", () => {
 		const solo = profileDestination(artist("maya-tattoo", "maya", true));
 		assert.equal(solo.profile, "/artists/maya-tattoo");
-		assert.equal(solo.href, "https://maya-tattoo.example/artists/maya");
+		assert.equal(solo.href, "/artists/maya-tattoo");
+		assert.equal(
+			profileDestination(artist("maya-tattoo", "maya", true), false).href,
+			"https://maya-tattoo.example/artists/maya",
+		);
 		assert.deepEqual(
 			profileDestination(artist("maya-tattoo", "maya", true), true),
 			{

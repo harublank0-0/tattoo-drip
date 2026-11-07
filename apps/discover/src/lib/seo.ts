@@ -27,6 +27,9 @@ export type PageSeo = {
 	description?: string;
 	/** A page that must never be indexed, whatever DISCOVER_INDEXING says (errors, placeholders). */
 	noindex?: boolean;
+	/** The social card's picture (D08 profiles): an absolute URL from the API, and what it shows. */
+	image?: string;
+	imageAlt?: string;
 };
 
 type Meta = Record<string, string>;
@@ -61,7 +64,8 @@ export const INDEXABLE_PATHS: readonly string[] = [
 
 /**
  * Dynamic pages that may be indexed (D07): a style's page and a market's or
- * city's location page, the canonical discovery destinations (blueprint H).
+ * city's location page, the canonical discovery destinations (blueprint H),
+ * and (D08) studio, studio-artist and independent-artist profiles.
  * A slug can't be listed in INDEXABLE_PATHS, so they match by shape; the
  * page itself 404s (noindex) an unknown slug and opts out (`noindex`) when
  * it has nothing listed. They are not in the sitemap: listing them needs
@@ -71,6 +75,11 @@ const SLUG = "[a-z0-9]+(?:-[a-z0-9]+)*";
 export const INDEXABLE_PATTERNS: readonly RegExp[] = [
 	new RegExp(`^/styles/${SLUG}$`),
 	new RegExp(`^/locations/${SLUG}(?:/${SLUG})?$`),
+	// D08: public profiles. The API 404s anything not shown (so does the
+	// page, noindex) and an old studio slug is a 301, so only a listed
+	// profile at its current address answers here. Sitemaps of them are D10.
+	new RegExp(`^/studios/${SLUG}(?:/artists/${SLUG})?$`),
+	new RegExp(`^/artists/${SLUG}$`),
 ];
 
 /** Whether a page may be indexed: indexing on, the path listed or matched, and the page not opted out. */
@@ -160,6 +169,14 @@ export function pageMeta(page: PageSeo): Meta[] {
 			{ name: "description", content: page.description },
 			{ property: "og:description", content: page.description },
 		);
+	}
+	if (page.image) {
+		meta.push(
+			{ property: "og:image", content: page.image },
+			{ name: "twitter:card", content: "summary_large_image" },
+		);
+		if (page.imageAlt)
+			meta.push({ property: "og:image:alt", content: page.imageAlt });
 	}
 	if (page.noindex) meta.push({ name: "robots", content: NOINDEX });
 	return meta;

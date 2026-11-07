@@ -97,6 +97,8 @@ export interface BookingContext {
 	};
 	/** The gallery piece the request is "inspired by", checked with the API; null for none. */
 	readonly artwork: BookingArtwork | null;
+	/** Discover's referral token from the address (`?ref=`, Discover D08), sent as `referral`; absent for none. */
+	readonly referral?: string;
 }
 
 export interface BookingArtist {

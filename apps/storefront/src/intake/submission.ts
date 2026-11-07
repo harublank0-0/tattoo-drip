@@ -18,6 +18,8 @@ export function toInquiryInput(
 	referenceImages: readonly File[],
 	honeypot: string,
 	flashDesignId: string | null = null,
+	/** Discover's referral token from `/book?ref=` (Discover D08), passed on unchanged; the platform verifies it. */
+	referral?: string,
 ): CreateInquiryInput {
 	if (values.sourceChannel === "") {
 		throw new Error("toInquiryInput() needs answers validateIntake passed.");
@@ -42,5 +44,6 @@ export function toInquiryInput(
 		...(values.notes?.trim() ? { notes: values.notes.trim() } : {}),
 		referenceImages: [...referenceImages],
 		honeypot,
+		...(referral ? { referral } : {}),
 	};
 }

@@ -98,7 +98,6 @@ Owners only. Built from the business's own records in its own context, by Discov
 
 ## Limitations
 
-- **Booking attribution end to end** still needs the storefront's `/book` to forward `ref` to the intake (D08; the blueprint's D04 row lists it, D03 moved it to D08 with the hand-off pages).
 - **No setup-checklist step.** Discover is optional, so it is not one of the required setup steps; Settings → Discover is the entry point.
 - **Consent re-acceptance** after a new version is not forced; see Consent versions.
 - **Cache latency.** A change reaches the API at once, but public caches can serve the old answer for up to 2 minutes; there is no CDN purge.

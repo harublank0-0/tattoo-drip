@@ -10,8 +10,13 @@ import {
 	EditorialSection,
 	SectionHeading,
 } from "#/components/discovery/layout";
+import { ProfileLink } from "#/components/discovery/profile-link";
 import { ResponsiveImage } from "#/components/discovery/responsive-image";
-import { artistSiteNote, profileDestination } from "#/lib/destinations";
+import {
+	artistSiteNote,
+	profileDestination,
+	tattooProfile,
+} from "#/lib/destinations";
 import { tattooAlt, tattooCredit } from "#/lib/home";
 
 /** A link to a full directory (or another page), with an arrow. */
@@ -68,12 +73,18 @@ export function HubSection({
 	);
 }
 
-/** Where a photo links: its artist's or studio's page when the hub's own data holds it. */
+/**
+ * Where a photo links: its artist's Discover profile (D08; no note, it
+ * stays on Discover), else (`PROFILE_PAGES` off) its artist's or studio's
+ * page when the hub's own data holds it.
+ */
 function workDestination(
 	tattoo: DiscoverTattooSummary,
 	artists: readonly DiscoverArtistSummary[],
 	studios: readonly DiscoverStudioSummary[],
-): { href: string; note: string } | undefined {
+): { href: string; note?: string } | undefined {
+	const profile = tattooProfile(tattoo);
+	if (profile) return { href: profile };
 	const artist = artists.find((each) => each.id === tattoo.artist.id);
 	if (artist)
 		return {
@@ -89,7 +100,7 @@ function workDestination(
 /**
  * Recent published work in columns at each photo's true proportions (fixed
  * frames, lazy), credited "artist · studio". Discover's artwork pages are
- * D09: a photo links to its artist's or studio's page when the hub holds it.
+ * D09: a photo links to its artist's profile.
  */
 export function WorkColumns({
 	tattoos,
@@ -125,10 +136,18 @@ export function WorkColumns({
 				return (
 					<li key={tattoo.id} className="mb-6 break-inside-avoid">
 						{destination ? (
-							<a href={destination.href} className="group block">
+							<ProfileLink
+								destination={{
+									href: destination.href,
+									external: destination.note !== undefined,
+								}}
+								className="group block"
+							>
 								{body}
-								<span className="sr-only">{`(${destination.note})`}</span>
-							</a>
+								{destination.note && (
+									<span className="sr-only">{`(${destination.note})`}</span>
+								)}
+							</ProfileLink>
 						) : (
 							body
 						)}

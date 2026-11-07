@@ -47,6 +47,43 @@ describe("readRequestSearch", () => {
 	});
 });
 
+describe("readRequestSearch with Discover's referral (Discover D08)", () => {
+	const REF = "eyJ2IjoxfQ.c2lnbmF0dXJl";
+	const FLASH = "0199f000-0000-7000-8000-000000000001";
+
+	test("a well-formed ref rides along with the artist, the piece or the design", () => {
+		assert.deepEqual(readRequestSearch({ ref: REF }), { ref: REF });
+		assert.deepEqual(readRequestSearch({ artist: "sita", ref: REF }), {
+			artist: "sita",
+			ref: REF,
+		});
+		assert.deepEqual(readRequestSearch({ flash: FLASH, ref: REF }), {
+			flash: FLASH,
+			ref: REF,
+		});
+	});
+
+	test("anything not shaped like a token is dropped, and never costs the artist", () => {
+		for (const ref of [
+			"",
+			"no-dot",
+			"a.b.c",
+			"a.b c",
+			`${"a".repeat(500)}.${"b".repeat(20)}`,
+			"a.<script>",
+			[REF, REF],
+			12,
+			null,
+		])
+			assert.deepEqual(
+				readRequestSearch({ artist: "sita", ref }),
+				{ artist: "sita" },
+				String(ref),
+			);
+		assert.deepEqual(readRequestSearch(Object.create({ ref: REF })), {});
+	});
+});
+
 describe("readRequestSearch with a flash design (TAT-129)", () => {
 	const ID = "0199f000-0000-7000-8000-000000000001";
 

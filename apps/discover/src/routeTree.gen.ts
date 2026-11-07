@@ -14,6 +14,7 @@ import { Route as ForStudiosRouteImport } from './routes/for-studios'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as ArtistsTenantSlugRouteImport } from './routes/artists/$tenantSlug'
 import { Route as ExploreArtistsRouteImport } from './routes/explore/artists'
 import { Route as ExploreStudiosRouteImport } from './routes/explore/studios'
 import { Route as ExploreTattoosRouteImport } from './routes/explore/tattoos'
@@ -21,6 +22,8 @@ import { Route as PreferencesCountryRouteImport } from './routes/preferences/cou
 import { Route as StylesSlugRouteImport } from './routes/styles/$slug'
 import { Route as LocationsCountryIndexRouteImport } from './routes/locations/$country/index'
 import { Route as LocationsCountryCityRouteImport } from './routes/locations/$country/$city'
+import { Route as StudiosStudioSlugIndexRouteImport } from './routes/studios/$studioSlug/index'
+import { Route as StudiosStudioSlugArtistsArtistSlugRouteImport } from './routes/studios/$studioSlug/artists/$artistSlug'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -45,6 +48,11 @@ const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
   path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ArtistsTenantSlugRoute = ArtistsTenantSlugRouteImport.update({
+  id: '/artists/$tenantSlug',
+  path: '/artists/$tenantSlug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ExploreArtistsRoute = ExploreArtistsRouteImport.update({
@@ -82,6 +90,17 @@ const LocationsCountryCityRoute = LocationsCountryCityRouteImport.update({
   path: '/locations/$country/$city',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudiosStudioSlugIndexRoute = StudiosStudioSlugIndexRouteImport.update({
+  id: '/studios/$studioSlug/',
+  path: '/studios/$studioSlug/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudiosStudioSlugArtistsArtistSlugRoute =
+  StudiosStudioSlugArtistsArtistSlugRouteImport.update({
+    id: '/studios/$studioSlug/artists/$artistSlug',
+    path: '/studios/$studioSlug/artists/$artistSlug',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -89,6 +108,7 @@ export interface FileRoutesByFullPath {
   '/pricing': typeof PricingRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/artists/$tenantSlug': typeof ArtistsTenantSlugRoute
   '/explore/artists': typeof ExploreArtistsRoute
   '/explore/studios': typeof ExploreStudiosRoute
   '/explore/tattoos': typeof ExploreTattoosRoute
@@ -96,6 +116,8 @@ export interface FileRoutesByFullPath {
   '/styles/$slug': typeof StylesSlugRoute
   '/locations/$country/$city': typeof LocationsCountryCityRoute
   '/locations/$country/': typeof LocationsCountryIndexRoute
+  '/studios/$studioSlug/': typeof StudiosStudioSlugIndexRoute
+  '/studios/$studioSlug/artists/$artistSlug': typeof StudiosStudioSlugArtistsArtistSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -103,6 +125,7 @@ export interface FileRoutesByTo {
   '/pricing': typeof PricingRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/artists/$tenantSlug': typeof ArtistsTenantSlugRoute
   '/explore/artists': typeof ExploreArtistsRoute
   '/explore/studios': typeof ExploreStudiosRoute
   '/explore/tattoos': typeof ExploreTattoosRoute
@@ -110,6 +133,8 @@ export interface FileRoutesByTo {
   '/styles/$slug': typeof StylesSlugRoute
   '/locations/$country/$city': typeof LocationsCountryCityRoute
   '/locations/$country': typeof LocationsCountryIndexRoute
+  '/studios/$studioSlug': typeof StudiosStudioSlugIndexRoute
+  '/studios/$studioSlug/artists/$artistSlug': typeof StudiosStudioSlugArtistsArtistSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -118,6 +143,7 @@ export interface FileRoutesById {
   '/pricing': typeof PricingRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/artists/$tenantSlug': typeof ArtistsTenantSlugRoute
   '/explore/artists': typeof ExploreArtistsRoute
   '/explore/studios': typeof ExploreStudiosRoute
   '/explore/tattoos': typeof ExploreTattoosRoute
@@ -125,6 +151,8 @@ export interface FileRoutesById {
   '/styles/$slug': typeof StylesSlugRoute
   '/locations/$country/$city': typeof LocationsCountryCityRoute
   '/locations/$country/': typeof LocationsCountryIndexRoute
+  '/studios/$studioSlug/': typeof StudiosStudioSlugIndexRoute
+  '/studios/$studioSlug/artists/$artistSlug': typeof StudiosStudioSlugArtistsArtistSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -134,6 +162,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/robots.txt'
     | '/sitemap.xml'
+    | '/artists/$tenantSlug'
     | '/explore/artists'
     | '/explore/studios'
     | '/explore/tattoos'
@@ -141,6 +170,8 @@ export interface FileRouteTypes {
     | '/styles/$slug'
     | '/locations/$country/$city'
     | '/locations/$country/'
+    | '/studios/$studioSlug/'
+    | '/studios/$studioSlug/artists/$artistSlug'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -148,6 +179,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/robots.txt'
     | '/sitemap.xml'
+    | '/artists/$tenantSlug'
     | '/explore/artists'
     | '/explore/studios'
     | '/explore/tattoos'
@@ -155,6 +187,8 @@ export interface FileRouteTypes {
     | '/styles/$slug'
     | '/locations/$country/$city'
     | '/locations/$country'
+    | '/studios/$studioSlug'
+    | '/studios/$studioSlug/artists/$artistSlug'
   id:
     | '__root__'
     | '/'
@@ -162,6 +196,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/robots.txt'
     | '/sitemap.xml'
+    | '/artists/$tenantSlug'
     | '/explore/artists'
     | '/explore/studios'
     | '/explore/tattoos'
@@ -169,6 +204,8 @@ export interface FileRouteTypes {
     | '/styles/$slug'
     | '/locations/$country/$city'
     | '/locations/$country/'
+    | '/studios/$studioSlug/'
+    | '/studios/$studioSlug/artists/$artistSlug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -177,6 +214,7 @@ export interface RootRouteChildren {
   PricingRoute: typeof PricingRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  ArtistsTenantSlugRoute: typeof ArtistsTenantSlugRoute
   ExploreArtistsRoute: typeof ExploreArtistsRoute
   ExploreStudiosRoute: typeof ExploreStudiosRoute
   ExploreTattoosRoute: typeof ExploreTattoosRoute
@@ -184,6 +222,8 @@ export interface RootRouteChildren {
   StylesSlugRoute: typeof StylesSlugRoute
   LocationsCountryCityRoute: typeof LocationsCountryCityRoute
   LocationsCountryIndexRoute: typeof LocationsCountryIndexRoute
+  StudiosStudioSlugIndexRoute: typeof StudiosStudioSlugIndexRoute
+  StudiosStudioSlugArtistsArtistSlugRoute: typeof StudiosStudioSlugArtistsArtistSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -221,6 +261,13 @@ declare module '@tanstack/react-router' {
       path: '/sitemap.xml'
       fullPath: '/sitemap.xml'
       preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/artists/$tenantSlug': {
+      id: '/artists/$tenantSlug'
+      path: '/artists/$tenantSlug'
+      fullPath: '/artists/$tenantSlug'
+      preLoaderRoute: typeof ArtistsTenantSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/explore/artists': {
@@ -272,6 +319,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LocationsCountryCityRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studios/$studioSlug/': {
+      id: '/studios/$studioSlug/'
+      path: '/studios/$studioSlug'
+      fullPath: '/studios/$studioSlug/'
+      preLoaderRoute: typeof StudiosStudioSlugIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/studios/$studioSlug/artists/$artistSlug': {
+      id: '/studios/$studioSlug/artists/$artistSlug'
+      path: '/studios/$studioSlug/artists/$artistSlug'
+      fullPath: '/studios/$studioSlug/artists/$artistSlug'
+      preLoaderRoute: typeof StudiosStudioSlugArtistsArtistSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -281,6 +342,7 @@ const rootRouteChildren: RootRouteChildren = {
   PricingRoute: PricingRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  ArtistsTenantSlugRoute: ArtistsTenantSlugRoute,
   ExploreArtistsRoute: ExploreArtistsRoute,
   ExploreStudiosRoute: ExploreStudiosRoute,
   ExploreTattoosRoute: ExploreTattoosRoute,
@@ -288,6 +350,9 @@ const rootRouteChildren: RootRouteChildren = {
   StylesSlugRoute: StylesSlugRoute,
   LocationsCountryCityRoute: LocationsCountryCityRoute,
   LocationsCountryIndexRoute: LocationsCountryIndexRoute,
+  StudiosStudioSlugIndexRoute: StudiosStudioSlugIndexRoute,
+  StudiosStudioSlugArtistsArtistSlugRoute:
+    StudiosStudioSlugArtistsArtistSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -219,6 +219,16 @@
 }
 
 /*
+ * A profile's phone booking bar (D08) is sticky at the bottom below `lg`:
+ * scrolling a focused control into view keeps it clear of the bar.
+ */
+@media (width < 64rem) {
+	html:has([data-booking-bar]) {
+		scroll-padding-bottom: 5.5rem;
+	}
+}
+
+/*
  * Outside every layer on purpose: unlayered rules beat Tailwind's utilities
  * layer, whose transition-colors also animates outline-color. The focus ring
  * appears at once instead of fading in.

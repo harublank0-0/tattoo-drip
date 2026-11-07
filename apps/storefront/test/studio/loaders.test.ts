@@ -1156,6 +1156,26 @@ describe("loadRequestPage (TAT-127)", () => {
 		assert.equal(calls.length, 1);
 	});
 
+	test("Discover's referral reaches the booking flow, never the canonical (Discover D08)", async () => {
+		const { fetch } = listing();
+		const context = pageContext(fetch);
+		const ref = "eyJ2IjoxfQ.c2lnbmF0dXJl";
+
+		const data = await loadRequestPage(context, { artist: "sita", ref });
+
+		assert.equal(data.booking.referral, ref);
+		assert.equal(
+			data.inquiry.kind === "open" && data.inquiry.preferredArtist?.id,
+			SITA.id,
+		);
+		assert.equal(data.seo.canonical, `${ORIGIN}/book?artist=sita`);
+		assert.equal(
+			"referral" in
+				(await loadRequestPage(context, { artist: "sita" })).booking,
+			false,
+		);
+	});
+
 	test("the chat button names the picked artist, open or closed, else asks about a tattoo; the page has no Request button", async () => {
 		const { fetch } = listing();
 		const context = pageContext(fetch);

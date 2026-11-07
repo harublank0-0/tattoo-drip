@@ -19,6 +19,7 @@ This file is the plan Discover prompts work from. The dated `docs/superpowers/sp
 | D06: homepage and Studio OS marketing | Done: [frontend](frontend.md#homepage-d06); deviations in C.7 below |
 | D06.5: country-aware discovery foundation | Done: [frontend](frontend.md#country); as built in C.8 below |
 | D07: studio and artist directories, style and location pages | Done: [frontend](frontend.md#directories-d07); as built in C.9 below |
+| D08: public profiles and storefront booking hand-off | Done: [frontend](frontend.md#profiles-d08); as built in C.10 below |
 
 Status legend: **Done** = in code, with tests where noted. **Partial** = exists, but not in the form Discover needs. **Planned** = only in docs. **Missing** = searched for and absent. **Unverified** = not checked against a running system.
 
@@ -281,6 +282,18 @@ Details in [frontend](frontend.md#directories-d07).
 - **Recent work in rows** comes from one shared photo read per filter set (48 newest), not a per-row read.
 - **Profiles stay on the storefront** (`profileDestination`) until D08 flips `PROFILE_PAGES`.
 - **Indexing:** bare directories, style and location pages become indexable once DISCOVER_INDEXING is on (H); any parameter, an empty hub or a 404 stays noindex. The sitemap still lists static pages only (styles and places are D10's).
+
+### C.10 As built in D08 (deviations from E.2, G, H and the D08 row)
+
+Details in [frontend](frontend.md#profiles-d08) and [booking hand-off](frontend.md#booking-hand-off-d08).
+
+- **No API change.** The D03 detail reads already hold what a profile needs (a studio's artists and 12 newest photos; an artist's bio, links and 12 photos) and a signed `bookingUrl`, so each profile is one read (a studio's artist also reads the studio's artists, in parallel, optional). No tattoos or artists list is read for a profile.
+- **Routes** as H: `/studios/:studioSlug`, `/studios/:studioSlug/artists/:artistSlug`, `/artists/:tenantSlug`. Old slugs and an independent's slug under `/studios/` are 301s; everything the API doesn't show is the same 404 (noindex, no metadata). `PROFILE_PAGES` is on: every list, hub and homepage link goes to the profiles; photos link to their artist's profile.
+- **Booking hand-off:** "Request a session" / "Request with <artist>" (the storefront takes requests, not bookings) to the API's `bookingUrl`, accepted only on the studio's own host and `/book`, https (http on localhost), rebuilt with only `artist` (the profile's own) and `ref`; otherwise "Booking isn't available online". No `flash` or `artwork` from profiles (portfolio photos are not flash; "request similar" is D09). E.2's `/book?artist=<slug>` already existed in the storefront, so no preselection change was needed.
+- **Referral** as D03 built it (not E.2's key id and `surface`): Discover carries the platform's token and never signs one. The one missing hop, the storefront's `/book` dropping `ref`, is closed: it keeps a token-shaped `ref` and sends it as `referral` (URL only, no storage; `Referrer-Policy: strict-origin-when-cross-origin`). Verified end to end on PostgreSQL (`discover_referral.spec.ts`: profile API → intake → `referral_source = 'discover'`; another studio's link records nothing).
+- **Custom domains** (TAT-79) are not served by the platform, so `storefrontUrl` is always the `{tenant}` host; the hand-off accepts whatever host the API names for both links.
+- **SEO:** self-canonical profiles (H: a distinct summary, never the storefront's canonical), OG image from the cover or newest work, indexable by shape when `DISCOVER_INDEXING=on`. **Deferred to D10:** JSON-LD (the D08 row) and profile sitemaps, built with D10's structured data and sitemaps.
+- **Design:** editorial hero (cover or work, else type), About only with real text, a night portfolio at true proportions, work-first artist tiles, a Booking band, related links by the profile's own place; a sticky phone booking bar that rests above the footer. No reviews, ratings, counts or favourites.
 
 ## D. Data model gap analysis
 

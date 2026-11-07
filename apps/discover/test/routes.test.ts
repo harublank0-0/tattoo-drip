@@ -48,7 +48,7 @@ describe("Discover routes and navigation", () => {
 		);
 	});
 
-	test("style and location builders reach their routes; profile builders don't yet (D08)", () => {
+	test("style, location and profile builders reach their routes; artwork pages don't yet (D09)", () => {
 		assert.equal(paths.style("fine-line"), "/styles/fine-line");
 		assert.equal(paths.location("NP"), "/locations/nepal");
 		assert.equal(paths.city("NP", "kathmandu"), "/locations/nepal/kathmandu");
@@ -58,13 +58,16 @@ describe("Discover routes and navigation", () => {
 			paths.location("NP"),
 			paths.city("NP", "pokhara"),
 			paths.studios(),
-		])
-			assert.ok(hasRoute(path), path);
-		for (const path of [
 			paths.studio("x"),
 			paths.studioArtist("x", "y"),
 			paths.independentArtist("x"),
+		])
+			assert.ok(hasRoute(path), path);
+		for (const path of [
 			paths.tattoo("x"),
+			"/studios/x/artists",
+			"/studios/x/artists/y/z",
+			"/artists",
 			"/locations/nepal/kathmandu/x",
 		])
 			assert.equal(hasRoute(path), false, path);

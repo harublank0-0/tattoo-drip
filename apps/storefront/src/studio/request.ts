@@ -19,7 +19,26 @@ export type RequestSearch = {
 	flash?: string;
 	/** A gallery photo's id (Prompt 5): "Request a similar tattoo"; the loader checks it with the API. */
 	artwork?: string;
+	/**
+	 * Discover's referral token (Discover D08): the `ref` of a booking link
+	 * the Discover API made, kept by shape only and sent with the inquiry as
+	 * `referral`. The platform verifies it for this studio; a bad one only
+	 * records no referral, never refuses the request.
+	 */
+	ref?: string;
 };
+
+/** A referral token's shape (base64url payload, a dot, base64url signature; the intake takes at most 512). */
+const REFERRAL = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
+
+/** `ref` when it is shaped like Discover's token, else nothing. */
+export function readReferral(value: unknown): string | undefined {
+	return typeof value === "string" &&
+		value.length <= 512 &&
+		REFERRAL.test(value)
+		? value
+		: undefined;
+}
 
 /** An own property only, never one inherited from Object.prototype. */
 function own(value: unknown, key: string): unknown {
@@ -40,13 +59,18 @@ function own(value: unknown, key: string): unknown {
  * is then dropped; whether the design exists is the loader's to find out.
  * Beside `artist`, a well-formed `artwork` (a gallery photo's lowercase UUID,
  * Prompt 5) is kept; the loader asks the API for that piece, and only a piece
- * it shows starts the form with a link to it and names its artist.
+ * it shows starts the form with a link to it and names its artist. A
+ * well-formed `ref` (Discover's referral, D08) is kept beside any of them.
  */
 export function readRequestSearch(
 	search: Record<string, unknown>,
 ): RequestSearch {
+	// Discover's referral rides along with whichever request this is (D08).
+	const ref = readReferral(own(search, "ref"));
+	const referral = ref ? { ref } : {};
 	const flash = own(search, "flash");
-	if (typeof flash === "string" && FLASH_ID.test(flash)) return { flash };
+	if (typeof flash === "string" && FLASH_ID.test(flash))
+		return { flash, ...referral };
 	const artist = own(search, "artist");
 	const artwork = readPhotoId(own(search, "artwork"));
 	return {
@@ -54,6 +78,7 @@ export function readRequestSearch(
 			? { artist }
 			: {}),
 		...(artwork ? { artwork } : {}),
+		...referral,
 	};
 }
 
