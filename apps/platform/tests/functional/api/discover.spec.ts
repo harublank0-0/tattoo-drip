@@ -394,7 +394,11 @@ test.group("Discover API: studios", (group) => {
 			twins.push(twin);
 		}
 		const twinSlugs = twins.map((twin) => twin.tenant.slug).sort();
-		const page = async (url: string, params: Record<string, string> = {}) => {
+		const page = async (
+			url: string,
+			params: Record<string, string> = {},
+			field: "slug" | "id" = "slug",
+		) => {
 			const seen: string[] = [];
 			let cursor: string | null = null;
 			do {
@@ -408,7 +412,7 @@ test.group("Discover API: studios", (group) => {
 					...response
 						.body()
 						.data.map(
-							(row: { slug?: string; id: string }) => row.slug ?? row.id,
+							(row: { slug?: string; id: string }) => row[field] ?? row.id,
 						),
 				);
 				cursor = response.body().nextCursor;
@@ -441,12 +445,37 @@ test.group("Discover API: studios", (group) => {
 			seen,
 			photos.map((photo) => photo.id),
 		);
-		for (const sort of ["newest", "name"]) {
-			const artists = await page("/api/v1/discover/artists", {
-				studio: "disc-twin-0",
+		// Artists with the same name, made at the same instant, one per twin.
+		const twinArtists = [artist];
+		for (const twin of twins.slice(1)) {
+			twinArtists.push(
+				await addArtist(twin.tenant, twin.owner, {
+					name: "Twin Artist",
+					slug: "twin",
+					styles: ["blackwork"],
+				}),
+			);
+		}
+		for (const [index, twin] of twins.entries()) {
+			await inTenant(twin.tenant, () =>
+				dbClient().rawQuery("update artists set created_at = ? where id = ?", [
+					at(7).toJSDate(),
+					twinArtists[index]?.id ?? "",
+				]),
+			);
+		}
+		for (const sort of ["newest", "name", "-name"]) {
+			const seenArtists = await page(
+				"/api/v1/discover/artists",
+				{ sort },
+				"id",
+			);
+			assert.lengthOf(seenArtists, 3, sort);
+			assert.sameMembers(
+				seenArtists,
+				twinArtists.map((twinArtist) => twinArtist.id),
 				sort,
-			});
-			assert.deepEqual(artists, ["twin"], sort);
+			);
 		}
 	});
 
@@ -489,6 +518,11 @@ test.group("Discover API: studios", (group) => {
 		client,
 		assert,
 	}) => {
+		// Tokens change on the hour: start well clear of it.
+		const intoHour = Date.now() % 3_600_000;
+		if (intoHour > 3_595_000) {
+			await new Promise((resolve) => setTimeout(resolve, 3_600_000 - intoHour));
+		}
 		const { photos } = await world();
 		const urls = [
 			"/api/v1/discover/studios/disc-black-needle",
@@ -653,12 +687,12 @@ test.group("Discover API: artists and tattoos", (group) => {
 			),
 			[photos.sitaNew.id, photos.sitaOld.id],
 		);
+		const anyCase = await client.get(
+			`/api/v1/discover/tattoos?artist=${artists.sita.id.toUpperCase()}`,
+		);
+		anyCase.assertStatus(200);
 		assert.deepEqual(
-			ids(
-				await client.get(
-					`/api/v1/discover/tattoos?artist=${artists.sita.id.toUpperCase()}`,
-				),
-			),
+			ids(anyCase),
 			[photos.sitaNew.id, photos.sitaOld.id],
 			"a uuid in any case",
 		);

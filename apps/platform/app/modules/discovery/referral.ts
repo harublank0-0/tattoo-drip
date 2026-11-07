@@ -87,7 +87,8 @@ export function signReferral(studioId: string, now = new Date()): string {
  * Booking links sign with the start of the hour, not the second: a profile's
  * body, and so its ETag, then stays the same for the hour and a cache's
  * revalidation gets a 304 instead of a fresh body every second. A link
- * therefore keeps its attribution for 29 to 30 days.
+ * therefore keeps its attribution for just under 30 days (30 days less the
+ * time into the hour it was made).
  */
 export const REFERRAL_LINK_STEP_SECONDS = 60 * 60;
 
