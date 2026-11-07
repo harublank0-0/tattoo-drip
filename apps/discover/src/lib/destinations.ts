@@ -2,18 +2,18 @@ import { paths } from "./routes.ts";
 
 /**
  * Where a studio or an artist links (D07, docs/discover/frontend.md,
- * "Profile destinations"): one helper, so D08 changes every link at once.
+ * "Profile destinations"): one helper, so every link moved at once.
  *
- * Discover's own profile pages don't exist yet, so today every destination
- * is the page the API names on the studio's own site (`storefrontUrl`).
- * `profile` is the Discover path D08 will serve, built from the API's
- * authoritative identifiers: a studio by its (current) slug; a studio's
- * artist by the studio's slug and the artist's slug, which is unique within
- * that studio only (two studios may each have a `maya`); an independent
- * artist by their business's (tenant's) slug, never by the artist's own.
- * D08 sets `PROFILE_PAGES` to true once those routes exist.
+ * Since D08 every destination is Discover's own profile, built from the
+ * API's authoritative identifiers: a studio by its (current) slug; a
+ * studio's artist by the studio's slug and the artist's slug, which is
+ * unique within that studio only (two studios may each have a `maya`); an
+ * independent artist by their business's (tenant's) slug, never by the
+ * artist's own. The studio's own site (`storefrontUrl`) stays the profile's
+ * "Visit studio site" and booking action (src/lib/booking.ts). With
+ * `PROFILE_PAGES` false (D07) every link went to the storefront instead.
  */
-export const PROFILE_PAGES = false;
+export const PROFILE_PAGES = true;
 
 export type StudioLike = {
 	slug: string;
@@ -32,7 +32,7 @@ export type Destination = {
 	href: string;
 	/** Whether it leaves Discover (the studio's own site). */
 	external: boolean;
-	/** Discover's own profile path (D08); not linked while `PROFILE_PAGES` is false. */
+	/** Discover's own profile path (D08). */
 	profile: string;
 };
 
@@ -48,7 +48,7 @@ export function profilePath(entity: StudioLike | ArtistLike): string {
 		: paths.studioArtist(entity.studio.slug, entity.slug);
 }
 
-/** A studio's or an artist's link: the storefront page now, Discover's profile from D08. */
+/** A studio's or an artist's link: Discover's profile (D08; the storefront page while `PROFILE_PAGES` is false). */
 export function profileDestination(
 	entity: StudioLike | ArtistLike,
 	profilePages: boolean = PROFILE_PAGES,
@@ -57,6 +57,26 @@ export function profileDestination(
 	return profilePages
 		? { href: profile, external: false, profile }
 		: { href: entity.storefrontUrl, external: true, profile };
+}
+
+/**
+ * The profile of the artist who made a photo, from the photo's own data:
+ * the independent artist's (by their business's slug), else the studio
+ * artist's (studio slug and artist slug). The API shows a photo only while
+ * its artist is shown, so the profile exists. Undefined while
+ * `PROFILE_PAGES` is false (photos had no destination of their own then).
+ */
+export function tattooProfile(
+	tattoo: {
+		artist: { slug: string };
+		studio: { slug: string; type: "studio" | "independent" };
+	},
+	profilePages: boolean = PROFILE_PAGES,
+): string | undefined {
+	if (!profilePages) return undefined;
+	return tattoo.studio.type === "independent"
+		? paths.independentArtist(tattoo.studio.slug)
+		: paths.studioArtist(tattoo.studio.slug, tattoo.artist.slug);
 }
 
 /**

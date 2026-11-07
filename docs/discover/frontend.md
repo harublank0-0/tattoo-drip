@@ -1,6 +1,6 @@
 # Discover frontend
 
-Discover D05 (foundation), D06 (homepage, Studio OS marketing), D06.5 (country-aware discovery) and D07 (directories, style and location pages). The public site at `tattoodrip.app`: `apps/discover`, a TanStack Start app beside the storefront. It reads only the public [Discover API](api.md) and has no database, no auth and no platform imports. D08–D10 build the rest of its pages on this foundation.
+Discover D05 (foundation), D06 (homepage, Studio OS marketing), D06.5 (country-aware discovery), D07 (directories, style and location pages) and D08 (public profiles and the storefront booking hand-off). The public site at `tattoodrip.app`: `apps/discover`, a TanStack Start app beside the storefront. It reads only the public [Discover API](api.md) and has no database, no auth and no platform imports. D09–D10 build the rest of its pages on this foundation.
 
 ## Architecture
 
@@ -17,7 +17,9 @@ Discover D05 (foundation), D06 (homepage, Studio OS marketing), D06.5 (country-a
 | `src/lib/directory.ts` | The directories' URL contract (D07): `readDirectorySearch`, `directoryQuery`, `changeSearch`/`applyFilters`/`chooseCity`, chips, recent-work pairing (pure) |
 | `src/lib/directory-loader.ts` | The directories' shared loader, head and list hook |
 | `src/lib/hubs.ts` | The style and location pages' queries (`styleQueries`, `locationQueries`, `HUB_LIMITS`) |
-| `src/lib/destinations.ts` | `profileDestination`: where a studio or artist links (the storefront now, Discover's profile from D08) |
+| `src/lib/destinations.ts` | `profileDestination`: where a studio or artist links (Discover's profile since D08), `tattooProfile` (a photo's artist's profile) |
+| `src/lib/profiles.ts` | D08: the profiles' queries, loaders (404, 301), slug readers, head data, "near here" links |
+| `src/lib/booking.ts` | D08: the booking hand-off (`bookingLinks`): which API links may be linked, rebuilt from their checked parts |
 | `src/lib/home.ts` | The homepage's queries (`homeQueries`), limits, thresholds and pure section rules |
 | `src/lib/seo.ts` | Head tags, the canonical URL, robots and sitemap text |
 | `src/routes/` | File routes (`routeTree.gen.ts` is generated) |
@@ -26,6 +28,7 @@ Discover D05 (foundation), D06 (homepage, Studio OS marketing), D06.5 (country-a
 | `src/components/discovery` | Page primitives: `PageContainer`, `EditorialSection`, `SectionHeading`, `PageHeader`, `Breadcrumbs`, `ResponsiveImage`, `DiscoverySearch`, `EmptyState`, `ErrorState`, `LoadingSkeleton`, `NotFoundState`, `RouteErrorState`, `FoundationNotice` |
 | `src/components/home` | The homepage's hero and sections (D06) |
 | `src/components/directory` | D07: `DirectoryPage` (search, toolbar, chips, states, paging), `filters.tsx` (`FilterToolbar`, `MobileFilters`, `ActiveFilters`), `Pagination`, `StudioResults`, `ArtistResults`, and the hub pieces (`HubSection`, `WorkColumns`, `LinkList`, `MoreLink`) |
+| `src/components/profile` | D08: `profile.tsx` (`ProfileHero`, `HeroMedia`, `BookingActions`, `StickyBooking`, `Portfolio`, `StyleLinks`, `SocialLinks`, `Facts`, `PlainText`, `RelatedLinks`) and `artist-profile.tsx` (both artist pages) |
 
 The root route (`__root.tsx`) renders the document, the skip link, the header, `<main id="main">` and the footer for every page, inside `DiscoverProvider` (so `@tattoo-drip/react`'s `useDiscover*` hooks work); the QueryClientProvider comes from `setupRouterSsrQueryIntegration`.
 
@@ -41,11 +44,14 @@ The root route (`__root.tsx`) renders the document, the skip link, the header, `
 | `/explore/tattoos` | A `FoundationNotice`; `noindex` | D09 |
 | `/for-studios` | **D06**: Studio OS for professionals; indexable | D06 |
 | `/pricing` | **D06**: informational, no prices yet; `noindex` until prices are published | D06 (prices later) |
-| `/studios/:slug`, `/studios/:studioSlug/artists/:artistSlug`, `/artists/:tenantSlug`, `/tattoos/:id` | Not routes yet (404); their builders are in `paths`, reached only through `profileDestination` | D08–D09 |
+| `/studios/:studioSlug` | **D08 studio profile** (see Profiles) | D08 |
+| `/studios/:studioSlug/artists/:artistSlug` | **D08 studio artist profile** | D08 |
+| `/artists/:tenantSlug` | **D08 independent artist profile**, by their business's slug | D08 |
+| `/tattoos/:id` | Not a route yet (404); its builder is in `paths` | D09 |
 | `/robots.txt`, `/sitemap.xml` | Server routes, see SEO | D10 |
 | `/preferences/country` | Server route: `POST` saves the country preference (see Country); `GET` redirects home | D06.5 |
 
-Link with `paths`, never hand-written strings, and never with Studio OS's legacy paths (`/login`, `/signup`, `/dashboard`, `/t/…`, `/sw.js`…): on `tattoodrip.app` nginx sends them to Studio OS ([domain migration](domain-migration.md#f-legacy-urls)). A test checks every navigation link against the route tree and that list; the server tests check every internal `href` on the homepage, directories, style and location pages with `hasRoute` (static `ROUTE_FILES` plus the dynamic `ROUTE_PATTERNS`), and that the route tree has no dynamic route that isn't listed.
+Link with `paths`, never hand-written strings, and never with Studio OS's legacy paths (`/login`, `/signup`, `/dashboard`, `/t/…`, `/sw.js`…): on `tattoodrip.app` nginx sends them to Studio OS ([domain migration](domain-migration.md#f-legacy-urls)). A test checks every navigation link against the route tree and that list; the server tests check every internal `href` on the homepage, directories, style, location and profile pages with `hasRoute` (static `ROUTE_FILES` plus the dynamic `ROUTE_PATTERNS`), and that the route tree has no dynamic route that isn't listed.
 
 ## Homepage (D06)
 
@@ -55,9 +61,9 @@ The loader prefetches five reads in parallel with `Promise.allSettled(ensureQuer
 |---|---|---|
 | Hero: headline, `DiscoverySearch` (studio names, `?q=` on `/explore/studios`, the only text search the API has), Explore studios, Find artists, a quiet "For tattoo professionals" | tattoos | Always. A collage of the 4 newest photos when there are ≥4 (first eager, `fetchPriority="high"`, which React 19 turns into a `<link rel="preload">`; fixed frames); else typographic, with the three explore links set large |
 | Tattoo styles | styles + tattoos | ≥3 styles that each get a different recent photo tagged with them (`pairStylesWithPhotos`, list order, at most 6; no per-style request); each tile → `/styles/:slug` (D07) |
-| Recently listed studios | studios | ≥1. The API's order (`newest`, ties by id): no ranking or featuring. Rows link through `profileDestination` (the storefront today) |
+| Recently listed studios | studios | ≥1. The API's order (`newest`, ties by id): no ranking or featuring. Rows link through `profileDestination` (the studio's profile since D08) |
 | Recently added artists | artists + tattoos | ≥2. Work first (their newest recent photo, else their portrait, else their initial), "at Studio · City" or "Independent · City"; link = `profileDestination` |
-| Fresh from the studios | tattoos | ≥6 photos: those the hero didn't show when 6 remain, else all; at most 12, true proportions, lazy. A photo links to its artist's or studio's page when the homepage's data holds it, else it is not a link (no `/tattoos/:id` before D09). "Explore artwork" → `/explore/tattoos` |
+| Fresh from the studios | tattoos | ≥6 photos: those the hero didn't show when 6 remain, else all; at most 12, true proportions, lazy. A photo links to its artist's profile, from its own data (`tattooProfile`, D08; no `/tattoos/:id` before D09). "Explore artwork" → `/explore/tattoos` |
 | Find studios near you | locations | ≥2 of the page's country's places (at most 12), under its name (→ `/locations/:country`), each → `/locations/:country/:city` (D07); no counts |
 | How booking works, the Studio OS band (night, → `/for-studios`), the closing call (search, explore links, a small professional link) | static | Always |
 
@@ -92,7 +98,7 @@ Anything else (`page`, `limit`, `sort=rating`…) is ignored. Beside the list th
 
 **States.** While the next address loads, the current page stays mounted, its results dimmed and `aria-busy`. The directory routes have no `pendingComponent`: after `pendingMs` it would hide the page (Suspense) and take focus from the control that applied the change. An `<output>` announces "24 studios shown, more on the next page." politely. Empty with a search or filters: what matched nothing, Clear filters, All of <country> (with a city), style pages, other markets (the D06.5 country form). Empty with nothing chosen: `EmptyMarket` ("No studios are listed in India yet."). An empty later page: "No more studios" with First page. Never another country's listings.
 
-**Results.** Every link that leaves Discover tells screen readers where it goes: a studio's own site; an artist's page on the studio's site, or an independent artist's own site (`artistSiteNote`). Studios: editorial rows, picture first (a strip of three recent photos, else the cover, else one photo, else the logo, else the name's initial set in type; never stock), name, city and region, styles, "Visit studio site". No description, artist count or figures: the list has none. Artists: work first (one large photo and up to two more, else the portrait, else the initial), name, "at Studio · City" or "Independent · City", styles.
+**Results.** Rows link to the Discover profiles (D08, through the router: `ProfileLink`). While `PROFILE_PAGES` was off (D07) every link left Discover and told screen readers where it went (`artistSiteNote`); that note now appears only for an external destination. Studios: editorial rows, picture first (a strip of three recent photos, else the cover, else one photo, else the logo, else the name's initial set in type; never stock), name, city and region, styles, "View studio". No description, artist count or figures: the list has none. Artists: work first (one large photo and up to two more, else the portrait, else the initial), name, "at Studio · City" or "Independent · City", styles.
 
 ## Style and location pages (D07)
 
@@ -104,7 +110,34 @@ Anything else (`page`, `limit`, `sort=rating`…) is ignored. Beside the list th
 
 ## Profile destinations
 
-D08 builds `/studios/:slug`, `/studios/:studioSlug/artists/:artistSlug` and `/artists/:tenantSlug`; until then no Discover page links to them. Every studio and artist link goes through `profileDestination(entity)` (`src/lib/destinations.ts`): today `href` is the API's `storefrontUrl` (`external: true`); `profile` is the planned path from the API's identifiers: a studio's slug; a studio's artist by studio slug and artist slug (unique per studio only, so `maya` at two studios gets two destinations, tested); an independent artist by their business's (tenant's) slug, never their own. D08 sets `PROFILE_PAGES` to true and every link moves at once (homepage, directories, hubs, photo links).
+Every studio and artist link in a list goes through `profileDestination(entity)` (`src/lib/destinations.ts`), and since D08 `PROFILE_PAGES` is true: `href` is Discover's own profile, built from the API's identifiers: a studio's (current) slug; a studio's artist by studio slug and artist slug (unique per studio only, so `maya` at two studios is two profiles, tested); an independent artist by their business's (tenant's) slug, never their own. A photo links to its artist's profile from its own data (`tattooProfile`: `studio.type`, `studio.slug`, `artist.slug`), so the homepage and hubs no longer need the artist in their lists. Internal links go through the router (`ProfileLink`); the storefront stays the profile's booking and "Visit studio site" action. Setting `PROFILE_PAGES` false restores D07's storefront links (kept for a rollback; tests cover both).
+
+## Profiles (D08)
+
+**Data.** One detail read per page, by the address's identifiers, through `discoverQueries` (`src/lib/profiles.ts`), on the server with `ensureQueryData` and in the component with the same options:
+
+| Route | Read | Holds |
+|---|---|---|
+| `/studios/:studioSlug` | `getDiscoverStudio` | Summary, intro, social links, up to 100 artists, the 12 newest photos, `bookingUrl` |
+| `/studios/:studioSlug/artists/:artistSlug` | `getDiscoverStudioArtist` + `listDiscoverStudioArtists` (in parallel; the second optional: its failure hides "More artists") | Artist summary, bio, social links, 12 newest photos, `bookingUrl` (names the artist) |
+| `/artists/:tenantSlug` | `getDiscoverIndependentArtist` | The same as a studio's artist; `studio` is their own business |
+
+The detail answers already hold the portfolio (12) and a studio's artists, so no tattoos or artists list is read. No read sends `country`.
+
+**Visibility.** A slug the API can't take (studio: 3–63, `[a-z0-9-]`; artist 2–63) is the 404 page without a request. The API's 404 (unknown, never listed, opted out, hidden, taken down, deleted, another studio's artist, an independent under `/studios/:slug/artists/…`, a studio under `/artists/…`) is `notFound()` (`rethrowMissing`): HTTP 404, `noindex`, the generic "Nothing here" page with no title, image or name from the profile. A transient failure is `RouteErrorState` (500). An old slug (the answer names another) is a **301** to the current address; a listed independent's slug under `/studios/` is a 301 to `/artists/:slug` (blueprint H; one more read, only after the 404). The stub (`test/stub-api.ts`) mirrors these rules; the platform's own are in `tests/functional/api/discover.spec.ts`.
+
+**Freshness.** HTML stays `private, no-store` (as every page), so a withdrawn or taken-down profile is a 404 on the next request; the API's own `public, max-age=60, stale-while-revalidate=60` is the only delay (up to 2 minutes), and the browser's query cache keeps a profile 60 s within a tab.
+
+**Country.** Profiles are global: no country is read or sent, nothing is filtered or redirected by it; the place shown is the profile's own (`placeLine`). The header still shows the visitor's country. "Near here" links use the profile's place: for a market its city and country pages, else the directory filtered to that country and city (`nearbyLinks`); "Back to studios" / "Back to artists" go to the directories as they are (the visitor's country).
+
+**Design.** `ProfileHero`: breadcrumbs, eyebrow, the one h1 (with the logo, or the portrait when the hero shows work), the place and style links (→ `/styles/:slug`), then the picture and the booking actions. On a phone they stack identity, picture, booking; from `lg` the picture takes the right column. The picture is the cover (a studio), else the newest photo, else the portrait (an artist), else the name in type on night; it loads first (`fetchPriority="high"`, eager) in a fixed frame (4:5 phone, 3:2, then 4:3), no overlay. Then: About (intro or bio as plain text, paragraphs kept, beside `Facts`: where, artists or studio, https social links) only when there is an intro, bio or link; the portfolio (night, columns at true proportions, lazy; a studio's captions name the artist and link their profile); a studio's artists, work first (`ArtistResults` with the portfolio); an artist's "More artists at <studio>" (compact, optional read); a Booking band; Keep exploring. Empty sections are not rendered. Below `lg` a booking bar is `sticky` at the bottom of the page content (`StickyBooking`): it rests above the footer at the end, so it never covers content or the footer, comes last in the tab order, and `scroll-padding-bottom` (styles.css, only while it exists) keeps a focused control clear of it.
+
+## Booking hand-off (D08)
+
+- **Words.** The storefront takes requests, not instant bookings: "Request a session" (studio), "Request with <artist>", secondary "Visit studio site" / "View on studio site" / "Visit their site", and a note: "It's a request, not an instant booking". An artist with `acceptingInquiries` false says "<name> isn't taking new requests right now." and offers the studio's general request (the same link without `artist`); an independent then has none.
+- **Destination.** Only the API's `bookingUrl` and `storefrontUrl` (the platform builds both from `STOREFRONT_URL` for that studio: `bookingPageUrl`, `studioPageUrl`). `bookingLinks` (`src/lib/booking.ts`) accepts them only when both are https, or http on `localhost`/`*.localhost`; have no user name or password; share scheme and host (port included); and the booking path is the storefront's `/book`. It then rebuilds the link from those parts: the origin, `/book`, `artist` (only on an artist profile and only that artist's own slug, which is what the storefront's `?artist=` preselects, checked against that studio's artists), `ref` (by shape). Nothing else survives, nothing comes from the browser's address, and Discover has no redirect endpoint. Anything else is no link: "Booking isn't available online from Discover right now." No `flash` or `artwork`: profile photos are portfolio, not flash, and "request similar" is D09's.
+- **Custom domains** (TAT-79) are planned, not served: `storefrontUrl` is always the `{tenant}` subdomain. When the platform resolves verified custom domains into it, `bookingLinks` accepts them unchanged (it compares the booking host with the API's own site host, not with a pattern).
+- **Referral.** Discover never mints or holds a token or key: the platform signs `ref` into every profile's `bookingUrl` (`linkReferral`, hour-stable, 30 days, studio-bound; [API](api.md#referral)). Discover only carries it. The storefront keeps `?ref=` on `/book` (and through `/request`'s 301) and sends it as the inquiry's `referral`; the platform verifies it for that studio and stores `referral_source = 'discover'` apart from `sourceChannel`. A missing, malformed, expired, forged or other studio's token records nothing and never refuses the request. Nothing is stored in the browser; the token is in the URL only, so navigating elsewhere on the studio site before sending drops it (best-effort attribution by design). `/book` sends `Referrer-Policy: strict-origin-when-cross-origin`, so other sites (the bot challenge, chat links) see the origin only. The token is not secret (it says only "Discover linked to studio X in hour T") and is never logged by Discover.
 
 ## Marketing pages and calls to action
 
@@ -154,7 +187,7 @@ A malformed code (`XX1`, `nepal`) is ignored, never a 422 from the API. Names co
 
 **Directories vs location pages.** Directories and style pages follow the page's country (explicit `?country=`, else the visitor's); location pages always list their own. A crawler without a cookie sees the default country on a directory or style page, deterministically.
 
-**Profiles (D08).** No profile route exists yet. Storefront and profile links come from the API as they are (through `profileDestination`) and never carry `country`; a profile must never be hidden or redirected by country.
+**Profiles (D08).** Global: no profile is hidden, filtered or redirected by country, and profile links never carry `country` (see Profiles).
 
 **Local development.**
 
@@ -203,9 +236,10 @@ Server-side reads are anonymous for now: the API rate-limits them per address, s
 
 - Every page's head is rendered on the server: title (`Page | Tattoo Drip`, or the default), description, canonical (`DISCOVER_URL` + the path, whatever host the request came on), Open Graph and Twitter basics. A page adds its own with `pageMeta({ title, description, noindex })`; the deepest match wins for each tag.
 - **Indexing off** (the default): every page has `<meta name="robots" content="noindex, nofollow">` and an `X-Robots-Tag: noindex, nofollow` header, `/robots.txt` disallows everything, `/sitemap.xml` is a 404.
-- **Indexing on**: only the paths in `INDEXABLE_PATHS` (`src/lib/seo.ts`: `/`, `/for-studios` and, since D07, the bare `/explore/studios` and `/explore/artists`) and those matching `INDEXABLE_PATTERNS` (D07: `/styles/<slug>`, `/locations/<slug>` and `/locations/<slug>/<slug>`) may be indexed, and not if the page passes `noindex: true`; every other page still says noindex. `/robots.txt` allows and names the sitemap, which lists exactly `INDEXABLE_PATHS`. A finished page is added to that list (D06–D10).
+- **Indexing on**: only the paths in `INDEXABLE_PATHS` (`src/lib/seo.ts`: `/`, `/for-studios` and, since D07, the bare `/explore/studios` and `/explore/artists`) and those matching `INDEXABLE_PATTERNS` (D07: `/styles/<slug>`, `/locations/<slug>` and `/locations/<slug>/<slug>`; D08: the three profile shapes) may be indexed, and not if the page passes `noindex: true`; every other page still says noindex. `/robots.txt` allows and names the sitemap, which lists exactly `INDEXABLE_PATHS`. A finished page is added to that list (D06–D10).
 - **D07 rules.** A directory with any parameter (filters, search, sort, cursor, `?country=`) passes `noindex` (`hasSearchParams`): filter combinations are never indexable (blueprint H; the meta says `noindex, nofollow`, not H's `noindex, follow`: D10 decides). Style and location pages are the canonical discovery destinations, indexable by shape once DISCOVER_INDEXING is on; an unknown slug is a 404 (noindex), and a page with nothing listed passes `noindex`. Canonicals stay the path alone on `DISCOVER_URL` (an index route's trailing `/` is dropped: `/locations/nepal`). Titles say what the page lists ("Blackwork tattoo studios in Kathmandu", "Tattoo studios and artists in Kathmandu, Nepal"), server-rendered from loader data. With indexing off nothing changes.
 - **Sitemap.** Still the static `INDEXABLE_PATHS`; style and place URLs need the API's lists at request time, so D10 adds `styles.xml` and `places.xml`. A style page's listings follow the visitor's country (a crawler gets the default); D10 may add per-country style URLs if that proves thin.
+- **D08 profiles.** Title ("Black Needle, tattoo studio in Kathmandu, Nepal", "Maya, tattoo artist at Black Needle, Kathmandu", "…, independent tattoo artist in …"), description (the intro or bio cut at a word, else a plain sentence from the data), `og:image` (the cover, else the newest photo, else the portrait) with `twitter:card` `summary_large_image`, all server-rendered from loader data. The canonical is Discover's own path (no query), never the storefront's: a profile is a distinct discovery summary (place, styles, at most 12 works, the studio's other artists, Discover's links) and the studio site is the studio's full branded site (gallery, policies, flash, booking), so neither duplicates the other (blueprint H). Indexable by shape once `DISCOVER_INDEXING=on` (`INDEXABLE_PATTERNS`: `/studios/<slug>`, `/studios/<slug>/artists/<slug>`, `/artists/<slug>`); only a shown profile at its current address answers 200 there (404s and 301s otherwise); `?country=` variants stay noindex. Profile sitemaps and JSON-LD are D10's (structured data and sitemaps are built together there).
 
 ## Design system
 
@@ -231,7 +265,7 @@ From `apps/discover` (or `pnpm dev:discover` at the root):
 
 - `pnpm dev`: port 3100 (whatever `PORT` the shell has), reads `.env.local` (copy `.env.example`). The platform's `DISCOVER_URL` must be `http://localhost:3100` for the browser's API calls (CORS).
 - `pnpm build`: Vite + Nitro to `.output` (a self-contained Node server), then the bundle check. `pnpm start` runs it (`PORT`, default 3000).
-- `pnpm test`: `node:test` + `tsx` (`test/`): settings, SEO, routes and navigation, the per-request context, the primitives, the homepage rules (`home.test.ts`), the search readers (`search.test.ts`), the directories' address (`directory.test.ts`), destinations (`destinations.test.ts`), country resolution, location slugs, the cookie and the preference endpoint (`country.test.ts`), and the built server (`server.test.ts`, D07's `server-d07.test.ts`, helpers in `built-server.ts`) against a stub API serving 0, 3, 20 or 40 of everything, honouring `q`, `country`, `city`, `style`, `independent`, `studio`, `sort`, `limit` and `cursor` like the API (an offset cursor; divergences in `stub-api.ts`), with failing and hanging endpoints (skipped without a build).
+- `pnpm test`: `node:test` + `tsx` (`test/`): settings, SEO, routes and navigation, the per-request context, the primitives, the homepage rules (`home.test.ts`), the search readers (`search.test.ts`), the directories' address (`directory.test.ts`), destinations (`destinations.test.ts`), the booking hand-off (`booking.test.ts`), the profile rules (`profiles.test.ts`), country resolution, location slugs, the cookie and the preference endpoint (`country.test.ts`), and the built server (`server.test.ts`, D07's `server-d07.test.ts`, D08's `server-d08.test.ts`, helpers in `built-server.ts`) against a stub API serving 0, 3, 20 or 40 of everything (plus D08's detail reads with the API's 404 rules, old slugs, hidden rows and replaceable booking links), honouring `q`, `country`, `city`, `style`, `independent`, `studio`, `sort`, `limit` and `cursor` like the API (an offset cursor; divergences in `stub-api.ts`), with failing and hanging endpoints (skipped without a build).
 - `pnpm typecheck`, `pnpm generate-routes`. Biome from the root.
 
 ## Deployment
@@ -245,4 +279,4 @@ Not deployed in D05. Prepared for D11:
 
 ## Deferred
 
-Legal pages (privacy, terms: drafts need the product owner's review; not in D06); turning geolocation on (D11, after the checks above); a keyed edge cache for country pages (D10/D11); published prices on `/pricing`; a `/styles` index and per-country style URLs (D10, if needed); D08 profiles and booking hand-off (flip `PROFILE_PAGES`; Discover links to storefront pages until then); each directory row's own recent work by a per-row read, if the shared read (the filters' 48 newest photos) proves too thin; D09 the tattoo gallery and artwork pages (`/tattoos/:id`); D10 sitemaps, structured data, OG images, budgets and the Lighthouse targets; D11 the server key, deployment and cutover.
+Legal pages (privacy, terms: drafts need the product owner's review; not in D06); turning geolocation on (D11, after the checks above); a keyed edge cache for country pages (D10/D11); published prices on `/pricing`; a `/styles` index and per-country style URLs (D10, if needed); each directory row's own recent work by a per-row read, if the shared read (the filters' 48 newest photos) proves too thin; D09 the tattoo gallery and artwork pages (`/tattoos/:id`, "request similar" with `artwork`); profile JSON-LD and profile sitemaps (D10); keeping the referral across a visitor's navigation on the studio site (URL-only today); custom-domain storefront URLs (TAT-79, platform side); D10 sitemaps, structured data, OG images, budgets and the Lighthouse targets; D11 the server key, deployment and cutover.

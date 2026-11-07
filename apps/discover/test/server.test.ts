@@ -130,11 +130,13 @@ describe("the built Discover server, indexing off", { skip }, () => {
 		assert.match(html, /Stub Ink &lt;b&gt;Studio&lt;\/b&gt;/);
 		assert.match(html, /Stub Studio 2/);
 		assert.match(html, /Stub Artist 1/);
-		assert.match(html, /href="http:\/\/stub-studio-1\.localhost:3000\/"/);
+		// D08: studios and artists link to their Discover profiles.
+		assert.match(html, /href="\/studios\/stub-studio-1"/);
 		assert.match(
 			html,
-			/href="http:\/\/stub-studio-0\.localhost:3000\/artists\/stub-artist-0"/,
+			/href="\/studios\/stub-studio-0\/artists\/stub-artist-0"/,
 		);
+		assert.doesNotMatch(html, /href="http:\/\/stub-studio/);
 		assert.match(html, />Recently listed studios</);
 		assert.doesNotMatch(text(html), /\bfeatured\b|\btop-rated\b|\bpopular\b/i);
 	});
@@ -167,8 +169,13 @@ describe("the built Discover server, indexing off", { skip }, () => {
 		assert.doesNotMatch(html, /href="[^"]*new-delhi/);
 		assert.match(html, />Nepal</);
 		assert.match(html, /href="\/explore\/tattoos"/);
-		// Never a Discover page that doesn't exist yet.
-		assert.doesNotMatch(html, /href="\/(tattoos|studios|artists)\//);
+		// Never a Discover page that doesn't exist yet (artwork pages are D09);
+		// photos lead to their artists' profiles (D08).
+		assert.doesNotMatch(html, /href="\/tattoos\//);
+		assert.match(
+			html,
+			/href="\/studios\/stub-studio-0\/artists\/stub-artist-0"/,
+		);
 		assertInternalLinksExist(html);
 		// One request per read, with the homepage's limits; none repeated.
 		// Studios, artists and photos are the default country's (NP).
@@ -237,7 +244,7 @@ describe("the built Discover server, indexing off", { skip }, () => {
 		]);
 		// API text is text, never markup.
 		assert.match(html, /Stub Ink &lt;b&gt;Studio&lt;\/b&gt;/);
-		assert.match(html, /href="http:\/\/stub-studio-0\.localhost:3000\/"/);
+		assert.match(html, /href="\/studios\/stub-studio-0"/);
 		assert.match(html, /Pokhara, Gandaki/);
 		assert.match(html, />Blackwork</);
 		assert.match(html, /"discover","studios"/);
@@ -326,7 +333,7 @@ describe("the built Discover server, indexing off", { skip }, () => {
 		assert.match(html, /Stub Artist 2/);
 		assert.match(
 			html,
-			/href="http:\/\/stub-studio-2\.localhost:3000\/artists\/stub-artist-2"/,
+			/href="\/studios\/stub-studio-2\/artists\/stub-artist-2"/,
 		);
 		assert.match(html, /<meta name="robots" content="noindex, nofollow"\/>/);
 	});
@@ -834,18 +841,18 @@ describe("the built Discover server, country-aware (D06.5)", { skip }, () => {
 		);
 	});
 
-	test("storefront links carry no country, and nothing redirects by country", async () => {
+	test("profile links carry no country, and nothing redirects by country", async () => {
 		const response = await geo.get("/", {
 			headers: { "X-Discover-Country": "IN" },
 			redirect: "manual",
 		});
 		assert.equal(response.status, 200);
 		const html = await response.text();
-		const external = [...html.matchAll(/href="(http:\/\/[^"]+)"/g)].map(
-			(match) => match[1] as string,
-		);
-		assert.ok(external.some((href) => href.includes("stub-studio-3")));
-		for (const href of external) assert.doesNotMatch(href, /country=/, href);
+		const profiles = [
+			...html.matchAll(/href="(\/(?:studios|artists)\/[^"]+)"/g),
+		].map((match) => match[1] as string);
+		assert.ok(profiles.some((href) => href.includes("stub-studio-3")));
+		for (const href of profiles) assert.doesNotMatch(href, /country=/, href);
 	});
 });
 

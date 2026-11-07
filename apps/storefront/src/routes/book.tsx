@@ -10,7 +10,8 @@ import { ThemedRequestPage } from "../studio/theme/registry.tsx";
  * The booking page (TAT-127; `/book` since Prompt 6, where `/request`
  * redirects): the session request flow on a page of its own, which every
  * Request button leads to. `?artist=<slug>`
- * picks that artist; anything else in the address (an ad's `fbclid`, `utm_*`,
+ * picks that artist; `?ref=` (Discover's referral, D08) is kept and sent with
+ * the inquiry; anything else in the address (an ad's `fbclid`, `utm_*`,
  * a renamed artist's old slug, a repeated `artist`) is the general form or the
  * right artist, never a not-found. The router merges the raw search under the
  * checked one, so `loaderDeps` reads it through `readRequestSearch` again and
@@ -25,7 +26,12 @@ export const Route = createFileRoute("/book")({
 		loaderData
 			? themedHeadTags(loaderData.seo, loaderData.theme)
 			: statusHead(match.status),
-	headers: ({ match }) => pageCacheHeaders(match.status),
+	// The address may carry Discover's referral (`?ref=`, Discover D08): other
+	// sites (the bot challenge's frame, a chat link) get the origin only.
+	headers: ({ match }) => ({
+		...pageCacheHeaders(match.status),
+		"Referrer-Policy": "strict-origin-when-cross-origin",
+	}),
 	component: RequestRoute,
 });
 

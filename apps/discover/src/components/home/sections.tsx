@@ -6,13 +6,14 @@ import type {
 	DiscoverStyle,
 	DiscoverTattooSummary,
 } from "@tattoo-drip/sdk";
-import { ArrowRightIcon, ArrowUpRightIcon } from "lucide-react";
+import { ArrowRightIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { DiscoverySearch } from "#/components/discovery/discovery-search";
 import {
 	EditorialSection,
 	SectionHeading,
 } from "#/components/discovery/layout";
+import { ProfileLink } from "#/components/discovery/profile-link";
 import { ResponsiveImage } from "#/components/discovery/responsive-image";
 import { buttonVariants } from "#/components/ui/button";
 import { artistSiteNote, profileDestination } from "#/lib/destinations";
@@ -155,7 +156,7 @@ function StudioLogo({
  * Studios in the API's own order (most recently listed first): no ranking
  * and no featured or paid placement, so the heading says "recently listed".
  * The first studio with a cover photo leads with it; each row links to the
- * studio's own site, where booking happens.
+ * studio's Discover profile, which hands off to its own site for booking.
  */
 export function StudiosSection({
 	studios,
@@ -191,8 +192,8 @@ export function StudiosSection({
 				<ul className="self-start border-t border-ink">
 					{studios.map((studio) => (
 						<li key={studio.id} className="border-b border-line">
-							<a
-								href={profileDestination(studio).href}
+							<ProfileLink
+								destination={profileDestination(studio)}
 								className="group flex min-h-24 items-center gap-4 py-5 sm:gap-6"
 							>
 								{studio.logo && <StudioLogo logo={studio.logo} />}
@@ -209,12 +210,12 @@ export function StudiosSection({
 											.join(" · ")}
 									</span>
 								</span>
-								<ArrowUpRightIcon
-									className="size-5 shrink-0 transition-transform motion-safe:group-hover:-translate-y-0.5 motion-safe:group-hover:translate-x-0.5"
+								<ArrowRightIcon
+									className="size-5 shrink-0 transition-transform motion-safe:group-hover:translate-x-0.5"
 									aria-hidden="true"
 								/>
-								<OwnSite />
-							</a>
+								{profileDestination(studio).external && <OwnSite />}
+							</ProfileLink>
 						</li>
 					))}
 				</ul>
@@ -226,7 +227,7 @@ export function StudiosSection({
 /**
  * Artists, studio-affiliated and independent: work first (their newest
  * recent photo, else their portrait), then name, styles and where they
- * work. Each links to the artist's own site, or their page on their studio's.
+ * work. Each links to the artist's Discover profile.
  */
 export function ArtistsSection({
 	artists,
@@ -250,8 +251,8 @@ export function ArtistsSection({
 					const image = work?.image ?? artist.photo;
 					return (
 						<li key={artist.id} className="lg:even:pt-12">
-							<a
-								href={profileDestination(artist).href}
+							<ProfileLink
+								destination={profileDestination(artist)}
 								className="group flex flex-col gap-3"
 							>
 								{image ? (
@@ -274,7 +275,7 @@ export function ArtistsSection({
 								<span className="flex flex-col gap-1">
 									<span className="flex items-start justify-between gap-2 font-display text-xl font-bold sm:text-2xl">
 										<span className="min-w-0 break-words">{artist.name}</span>
-										<ArrowUpRightIcon
+										<ArrowRightIcon
 											className="mt-1 size-4 shrink-0"
 											aria-hidden="true"
 										/>
@@ -291,8 +292,10 @@ export function ArtistsSection({
 										</span>
 									)}
 								</span>
-								<OwnSite>{`(${artistSiteNote(artist)})`}</OwnSite>
-							</a>
+								{profileDestination(artist).external && (
+									<OwnSite>{`(${artistSiteNote(artist)})`}</OwnSite>
+								)}
+							</ProfileLink>
 						</li>
 					);
 				})}
@@ -304,8 +307,8 @@ export function ArtistsSection({
 /**
  * Recent work in columns at each photo's true proportions (fixed frames,
  * lazy below the fold), credited "artist · studio". A photo links to its
- * artist's or studio's page when the homepage's data holds one; Discover's
- * own artwork pages are D09.
+ * artist's Discover profile (`tattooDestination`); Discover's own artwork
+ * pages are D09.
  */
 export function InspirationSection({
 	tattoos,
@@ -343,10 +346,15 @@ export function InspirationSection({
 					return (
 						<li key={tattoo.id} className="mb-6 break-inside-avoid">
 							{href ? (
-								<a href={href} className="group block">
+								<ProfileLink
+									destination={{ href, external: !href.startsWith("/") }}
+									className="group block"
+								>
 									{body}
-									<OwnSite>(the artist's or studio's own site)</OwnSite>
-								</a>
+									{!href.startsWith("/") && (
+										<OwnSite>(the artist's or studio's own site)</OwnSite>
+									)}
+								</ProfileLink>
 							) : (
 								body
 							)}

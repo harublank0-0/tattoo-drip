@@ -224,7 +224,7 @@ describe("D07 directories on the built server", { skip }, () => {
 			{ ...next, country: "NP", limit: "24" },
 		]);
 		// 30 rows: 24, then 6.
-		assert.equal((second.match(/Visit studio site/g) ?? []).length, 6);
+		assert.equal((second.match(/View studio/g) ?? []).length, 6);
 		assert.doesNotMatch(text(second), /Next page/);
 		assert.deepEqual(linkQuery(second, /^First page$/), {
 			q: "stub",
@@ -367,35 +367,28 @@ describe("D07 directories on the built server", { skip }, () => {
 
 	test("destinations: tenant-scoped artist slugs stay apart; independents link to their own business", async () => {
 		const nepal = await html(await discover.get("/explore/artists"));
-		// Artists 5 and 6 are both `maya`, at two studios.
+		// Artists 5 and 6 are both `maya`, at two studios: two Discover profiles (D08).
 		const maya = hrefs(nepal).filter((href) => href.endsWith("/artists/maya"));
 		assert.deepEqual(maya, [
-			"http://stub-studio-5.localhost:3000/artists/maya",
-			"http://stub-studio-6.localhost:3000/artists/maya",
+			"/studios/stub-studio-5/artists/maya",
+			"/studios/stub-studio-6/artists/maya",
 		]);
 		const india = await html(await discover.get("/explore/artists?country=IN"));
 		assert.match(india, /Independent · New Delhi/);
-		assert.match(
-			india,
-			/href="http:\/\/stub-solo-3\.localhost:3000\/artists\/stub-artist-3"/,
-		);
-		// Screen readers hear where each link goes: an independent's own site,
-		// a studio artist's page on the studio's site (India's are all independent).
-		assert.match(
-			india,
-			/stub-artist-3"[^>]*>[\s\S]*?<span class="sr-only">\(their own site\)<\/span><\/a>/,
-		);
-		assert.doesNotMatch(india, /their page on the studio/);
-		assert.match(nepal, /\(their page on the studio(’|'|&#x27;)s site\)/);
-		assert.doesNotMatch(nepal, /their own site/);
-		// The location pages' recent work says the same.
+		// An independent by their business's slug, never their own.
+		assert.match(india, /href="\/artists\/stub-solo-3"/);
+		// The links stay on Discover now: no "leaves for" notes.
+		for (const page of [nepal, india]) {
+			assert.doesNotMatch(page, /their own site|their page on the studio/);
+			assert.doesNotMatch(page, /href="http:\/\/stub-(studio|solo)/);
+			assert.doesNotMatch(page, /href="\/tattoos\//);
+			assertInternalLinksExist(page);
+		}
+		// The location pages' recent work leads to the artists' profiles.
 		const indiaHub = await html(await discover.get("/locations/india"));
 		assert.match(indiaHub, /Fresh from India/);
-		assert.match(indiaHub, /<span class="sr-only">\(their own site\)<\/span>/);
-		assert.doesNotMatch(indiaHub, /their page on the studio/);
-		// No Discover profile route exists yet, so none is linked.
-		for (const page of [nepal, india])
-			assert.doesNotMatch(page, /href="\/(studios|artists|tattoos)\//);
+		assert.match(indiaHub, /href="\/artists\/stub-solo-3"/);
+		assert.doesNotMatch(indiaHub, /their own site/);
 	});
 
 	test("titles, canonicals and noindex: bare directory vs any parameter; pages stay private", async () => {

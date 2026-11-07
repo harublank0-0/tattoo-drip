@@ -83,6 +83,18 @@ describe("toInquiryInput", () => {
 		assert.equal("style" in toInquiryInput(FULL, [], ""), false);
 	});
 
+	test("sends Discover's referral unchanged as `referral`, and nothing without one (Discover D08)", () => {
+		const ref = "eyJ2IjoxfQ.c2lnbmF0dXJl";
+		assert.equal(toInquiryInput(FULL, [], "", null, ref).referral, ref);
+		assert.equal("referral" in toInquiryInput(FULL, [], ""), false);
+		assert.equal("referral" in toInquiryInput(FULL, [], "", null, ""), false);
+		// Apart from what the client said about how they found the studio.
+		assert.equal(
+			toInquiryInput(FULL, [], "", null, ref).sourceChannel,
+			FULL.sourceChannel,
+		);
+	});
+
 	test("sends Devanagari digits as ASCII ones", () => {
 		assert.equal(
 			toInquiryInput({ ...FULL, contactPhone: "९८१२३४५६७८" }, [], "")

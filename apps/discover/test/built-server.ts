@@ -68,7 +68,7 @@ export function sentTo(
 
 /**
  * Every internal link on a page points at a route that exists (D07: the
- * style and location pages; never a profile or artwork page before D08/D09).
+ * style and location pages; D08: profiles; never an artwork page before D09).
  */
 export function assertInternalLinksExist(html: string) {
 	const hrefs = [...html.matchAll(/href="(\/[^"]*)"/g)]

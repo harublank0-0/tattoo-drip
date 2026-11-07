@@ -488,7 +488,7 @@ export function requestPageData(
 			),
 			theme,
 			flash: view,
-			booking: bookingContextOf(studio, artistViews, artists, null),
+			booking: bookingContextOf(studio, artistViews, artists, null, search.ref),
 		};
 	}
 	// The artist asked for, else the piece's own while they take new work
@@ -527,21 +527,29 @@ export function requestPageData(
 		seo: requestPageSeo(studioView, artist, origin, inquiry.kind === "open"),
 		theme,
 		flash: found ? found.view : null,
-		booking: bookingContextOf(studio, artistViews, artists, artwork),
+		booking: bookingContextOf(
+			studio,
+			artistViews,
+			artists,
+			artwork,
+			search.ref,
+		),
 	};
 }
 
 /**
  * The booking flow's context (Prompt 6): the artists who take new work, with
  * their portrait and first style; the styles the studio's artists list; the
- * studio's published week and closures for the preference calendar; and the
- * piece asked about. All from the reads the page already makes.
+ * studio's published week and closures for the preference calendar; the
+ * piece asked about; and Discover's referral from the address (D08). All
+ * from the reads the page already makes.
  */
 function bookingContextOf(
 	studio: Studio,
 	artists: readonly ArtistView[],
 	raw: readonly Artist[],
 	artwork: (BookingArtwork & { artistSlug?: string }) | null,
+	referral?: string,
 ): BookingContext {
 	// The styles the shown artists list, each once (by slug, which is what is
 	// sent), checked as the gallery's filter reads them.
@@ -571,6 +579,7 @@ function bookingContextOf(
 			timeZone: typeof studio.timezone === "string" ? studio.timezone : "UTC",
 		},
 		artwork: artwork ? (piece as BookingArtwork) : null,
+		...(referral ? { referral } : {}),
 	};
 }
 

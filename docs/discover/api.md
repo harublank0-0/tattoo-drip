@@ -74,7 +74,7 @@ Discover's booking links carry a signed referral token, so an inquiry that came 
 - **Verification:** `verifyReferral(token, studioId)` never throws. It checks length (≤ 512), shape, then the signature in constant time before parsing the payload (and only its one canonical spelling), then version, purpose and issuer, then the times (`iat` up to 5 minutes ahead is tolerated, `exp` must be in the future), then the studio. Every failure is a reason, used only to drop the attribution.
 - **At the intake** (`createInquiry`): the form's `referral` field (body only, never the query string; not a validator field, so a bad one never produces a field error) is verified for the studio in the path. A valid one sets `inquiries.referral_source = 'discover'` and `referral_issued_at`, the hour the link was made (migration `1791880000000_add_inquiry_referral`; both or neither, checked by the database). Anything else, including another studio's token, an expired, forged or garbage one, or none, stores nulls and the inquiry goes through as usual (201). `inquiries_guard_update` freezes both columns, so the attribution is written once.
 - **Separate from `sourceChannel`,** which stays what the client said ("How did you hear about us?").
-- **Hand-off still to do (D08):** the storefront's `/book` route doesn't yet keep `ref`. It must forward `ref` from the URL to `inquiries.create({ referral })`. The SDK already sends `referral` as a form field.
+- **Hand-off (D08):** Discover's profiles link to `bookingUrl` as it is (after checking it, [frontend](frontend.md#booking-hand-off-d08)); the storefront's `/book` keeps a token-shaped `ref` and sends it as the inquiry's `referral` (the SDK sends it as a form field). No API change was needed.
 
 ## SDK and React
 
@@ -114,7 +114,7 @@ Measured with `EXPLAIN ANALYZE` as the app role, with no context, read-only, on 
 ## Tests
 
 - `tests/functional/api/discover.spec.ts`: every endpoint and its exact field sets; filters, search, both name sorts, cursor paging across every sort, including rows that tie on the sort value; profiles' ETags holding across seconds (304); old slugs; independents vs studios. Never shown: never listed, opted out, taken down, hidden or opted-out or deleted artist, hidden or taken-down photo, unknown and wrong-studio paths (each a 404 and absent from every list). Also no private words in any answer, no context and still writable after the reads, 422s for every malformed parameter and cursor, and both rate limits.
-- `tests/functional/api/discover_referral.spec.ts`: attribution persisted with `sourceChannel` intact; none, empty, garbage, oversized, forged, another studio's and expired tokens all still give a 201 with nothing stored; a query-string token ignored; the guard refusing a later change.
+- `tests/functional/api/discover_referral.spec.ts`: attribution persisted with `sourceChannel` intact; none, empty, garbage, oversized, forged, another studio's and expired tokens all still give a 201 with nothing stored; a query-string token ignored; the guard refusing a later change. D08: the hand-off end to end: a studio artist's `bookingUrl` from the profile API (the studio's host, `/book`, `artist`), its `ref` sent as `referral` records the attribution with the preferred artist; one studio's link used at another studio records nothing.
 - `tests/unit/modules/discovery/{referral,cursor}.spec.ts`: signing, hour-stable link tokens, expiry, studio binding, clock skew, tampering, a re-spelt signature, wrong key, version and purpose, malformed input; cursor round trips, cross-sort, canonical spelling, real instants.
 - `tests/functional/api/api_routes.spec.ts`: the ten Discover routes are GET-only, limited, cached and tenantless.
 - D02's `tests/functional/rls/discovery.spec.ts` still proves the boundary itself.
@@ -123,7 +123,6 @@ Measured with `EXPLAIN ANALYZE` as the app role, with no context, read-only, on 
 ## Limitations and follow-ups
 
 - **Discover SSR server key (D05).** The blueprint's "named server keys" are not built. Until D05, Discover's SSR can call with no key (anonymous, per address) or with a storefront key. D05 generalises `STOREFRONT_SERVER_KEYS` to named keys when `apps/discover` exists.
-- **`ref` forwarding (D08).** The storefront drops `ref` on `/book` today. Attribution works end to end only once it forwards it.
 - **Takedown latency.** The public cache can serve a removed row for up to 2 minutes; there is no purge.
 - **Search.** Substring search on names only (no bio, style text or ranking), as the D02 plan set out.
 - **Profile caps.** A studio profile lists up to 100 artists and an artist's or studio's 12 newest photos. Use the list endpoints with `studio` or `artist` for the rest.

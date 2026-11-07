@@ -3,7 +3,10 @@ import queue from "@adonisjs/queue/services/main";
 import { test } from "@japa/runner";
 import { signReferral } from "#modules/discovery/referral";
 import Inquiry from "#modules/inquiries/models/inquiry";
+import { storefrontTemplate } from "#modules/payments/deposit_links";
 import { dbClient } from "#services/db_context";
+import { studioHostname } from "#services/storefront_url";
+import { addArtist } from "#tests/helpers/artists";
 import { intakeFields, postInquiry } from "#tests/helpers/intake";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
@@ -139,5 +142,102 @@ test.group("Discover referral at POST /inquiries", (group) => {
 		);
 		assert.match(refusal ?? "", /inquiries_guard_update: .*referral/);
 		assert.isNull((await only(tenant)).referralSource);
+	});
+});
+
+/**
+ * The hand-off end to end (D08): the link Discover's profile pages use, as
+ * the API serves it, carried into the intake the way the storefront's
+ * `/book` does (`ref` → `referral`). Only the studio the link was made for
+ * records it.
+ */
+test.group("Discover booking hand-off, profile to inquiry", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+	group.each.setup(() => {
+		queue.fake();
+		return () => queue.restore();
+	});
+
+	async function listed(slug: string, name: string) {
+		const studio = await studioWithOwner(slug, name);
+		await inTenant(studio.tenant, () =>
+			dbClient().rawQuery(
+				`update tenants set discovery_listed = true, discovery_listed_at = now(),
+				 place_id = (select id from places where country_code = 'NP' and slug = 'kathmandu')
+				 where id = ?`,
+				[studio.tenant.id],
+			),
+		);
+		return studio;
+	}
+
+	test("a studio artist's bookingUrl: the studio's /book naming the artist, whose ref the intake records", async ({
+		client,
+		assert,
+	}) => {
+		const studio = await listed("handoff-needle-08", "Handoff Needle");
+		const maya = await addArtist(studio.tenant, studio.owner, {
+			name: "Maya Lama",
+			slug: "maya",
+			styles: ["fine-line"],
+		});
+
+		const profile = await client.get(
+			"/api/v1/discover/studios/handoff-needle-08/artists/maya",
+		);
+		profile.assertStatus(200);
+		const booking = new URL(profile.body().data.bookingUrl);
+		// Where Discover sends the visitor: this studio's own site, its /book,
+		// this artist by slug, and a referral.
+		assert.equal(
+			booking.hostname,
+			studioHostname(storefrontTemplate(), "handoff-needle-08"),
+		);
+		assert.equal(booking.pathname, "/book");
+		assert.equal(booking.searchParams.get("artist"), "maya");
+		const ref = booking.searchParams.get("ref");
+		assert.isString(ref);
+		// The studio profile's link carries the same kind of token, no artist.
+		const studioLink = new URL(
+			(await client.get("/api/v1/discover/studios/handoff-needle-08")).body()
+				.data.bookingUrl,
+		);
+		assert.isNull(studioLink.searchParams.get("artist"));
+
+		(
+			await postInquiry(
+				client,
+				"handoff-needle-08",
+				intakeFields({ referral: ref as string, preferredArtistId: maya.id }),
+			)
+		).assertStatus(201);
+
+		const inquiry = await only(studio.tenant);
+		assert.equal(inquiry.referralSource, "discover");
+		assert.isNotNull(inquiry.referralIssuedAt);
+		assert.equal(inquiry.sourceChannel, "instagram");
+		assert.equal(inquiry.preferredArtistId, maya.id);
+	});
+
+	test("one studio's link used at another studio: the inquiry goes through, with no referral", async ({
+		client,
+		assert,
+	}) => {
+		await listed("handoff-needle-08", "Handoff Needle");
+		const other = await studioWithOwner("handoff-other-08", "Handoff Other");
+		const link = new URL(
+			(await client.get("/api/v1/discover/studios/handoff-needle-08")).body()
+				.data.bookingUrl,
+		);
+
+		(
+			await postInquiry(
+				client,
+				"handoff-other-08",
+				intakeFields({ referral: link.searchParams.get("ref") as string }),
+			)
+		).assertStatus(201);
+
+		assert.isNull((await only(other.tenant)).referralSource);
 	});
 });

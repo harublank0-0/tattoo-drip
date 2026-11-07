@@ -28,7 +28,8 @@ export function ResponsiveImage({
 	image: ImageSource | null;
 	/** What the image shows; "" only when it is decorative. */
 	alt: string;
-	ratio?: string;
+	/** The frame's aspect ratio; null when `className` sets it (e.g. per breakpoint). */
+	ratio?: string | null;
 	sizes?: string;
 	/** Above the fold: load at once instead of lazily. */
 	priority?: boolean;
@@ -45,7 +46,7 @@ export function ResponsiveImage({
 	return (
 		<div
 			className={cn("relative overflow-hidden bg-paper-sunk", className)}
-			style={{ aspectRatio: ratio }}
+			style={ratio ? { aspectRatio: ratio } : undefined}
 		>
 			{image && !failed ? (
 				<img

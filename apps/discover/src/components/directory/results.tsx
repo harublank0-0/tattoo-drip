@@ -3,14 +3,15 @@ import type {
 	DiscoverStudioSummary,
 	DiscoverTattooSummary,
 } from "@tattoo-drip/sdk";
-import { ArrowUpRightIcon } from "lucide-react";
+import { ArrowRightIcon, ArrowUpRightIcon } from "lucide-react";
+import { ProfileLink } from "#/components/discovery/profile-link";
 import { ResponsiveImage } from "#/components/discovery/responsive-image";
 import { artistSiteNote, profileDestination } from "#/lib/destinations";
 import { artistWorks, studioWorks } from "#/lib/directory";
 import { artistAffiliation, tattooAlt } from "#/lib/home";
 import { cn } from "#/lib/utils";
 
-/** For screen readers: where a link goes while Discover has no profiles of its own (D08). */
+/** For screen readers: where a link goes when it leaves Discover (only while `PROFILE_PAGES` is off). */
 function Leaves({ external, what }: { external: boolean; what: string }) {
 	return external ? <span className="sr-only">{`(${what})`}</span> : null;
 }
@@ -110,7 +111,8 @@ function StudioMedia({
 /**
  * Studio results: editorial rows, picture first (recent work, cover, logo
  * or type), then the name, city, styles and the link to the studio. No
- * description, artist count or figures: the API's list has none.
+ * description, artist count or figures: the API's list has none. Each
+ * links to the studio's Discover profile (`profileDestination`).
  */
 export function StudioResults({
 	studios,
@@ -131,8 +133,8 @@ export function StudioResults({
 				const hasPicture = own.length > 0 || Boolean(studio.cover);
 				return (
 					<li key={studio.id} className="border-b border-line">
-						<a
-							href={destination.href}
+						<ProfileLink
+							destination={destination}
 							className="group grid gap-4 py-6 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] sm:items-center sm:gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-12"
 						>
 							<StudioMedia studio={studio} works={own} />
@@ -162,14 +164,18 @@ export function StudioResults({
 								)}
 								<span className="mt-2 inline-flex min-h-11 items-center gap-1.5 self-start text-sm font-medium underline-offset-4 group-hover:underline lg:min-h-0">
 									{destination.external ? "Visit studio site" : "View studio"}
-									<ArrowUpRightIcon className="size-4" aria-hidden="true" />
+									{destination.external ? (
+										<ArrowUpRightIcon className="size-4" aria-hidden="true" />
+									) : (
+										<ArrowRightIcon className="size-4" aria-hidden="true" />
+									)}
 								</span>
 							</span>
 							<Leaves
 								external={destination.external}
 								what="the studio's own site"
 							/>
-						</a>
+						</ProfileLink>
 					</li>
 				);
 			})}
@@ -251,29 +257,44 @@ export function ArtistResults({
 	artists,
 	works,
 	headingLevel = 3,
+	compact = false,
 }: {
 	artists: readonly DiscoverArtistSummary[];
 	works: readonly DiscoverTattooSummary[];
 	headingLevel?: 2 | 3;
+	/** Two columns from the smallest phone (a profile's "more artists"). */
+	compact?: boolean;
 }) {
 	const Heading = `h${headingLevel}` as const;
 	return (
-		<ul className="grid grid-cols-1 gap-x-4 gap-y-10 min-[26rem]:grid-cols-2 lg:grid-cols-3 lg:gap-x-6 xl:grid-cols-4">
+		<ul
+			className={cn(
+				"grid gap-x-4 gap-y-10 lg:gap-x-6",
+				compact
+					? "grid-cols-2 gap-x-3 gap-y-8 lg:grid-cols-4"
+					: "grid-cols-1 min-[26rem]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+			)}
+		>
 			{artists.map((artist) => {
 				const destination = profileDestination(artist);
 				return (
 					<li key={artist.id}>
-						<a href={destination.href} className="group flex flex-col gap-3">
+						<ProfileLink
+							destination={destination}
+							className="group flex flex-col gap-3"
+						>
 							<ArtistMedia artist={artist} works={artistWorks(artist, works)} />
 							<span className="flex flex-col gap-1">
 								<span className="flex items-start justify-between gap-2">
 									<Heading className="min-w-0 font-display text-xl font-bold break-words sm:text-2xl">
 										{artist.name}
 									</Heading>
-									<ArrowUpRightIcon
-										className="mt-1.5 size-4 shrink-0"
-										aria-hidden="true"
-									/>
+									{destination.external && (
+										<ArrowUpRightIcon
+											className="mt-1.5 size-4 shrink-0"
+											aria-hidden="true"
+										/>
+									)}
 								</span>
 								<span className="text-sm text-ink">
 									{artistAffiliation(artist)}
@@ -291,7 +312,7 @@ export function ArtistResults({
 								external={destination.external}
 								what={artistSiteNote(artist)}
 							/>
-						</a>
+						</ProfileLink>
 					</li>
 				);
 			})}
