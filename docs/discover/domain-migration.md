@@ -246,12 +246,16 @@ Any one of these stops the launch (stage D) or triggers the rollback (H):
 
 **Database:** the cutover runs no migration (B already ran them; every Discover migration only adds columns, tables, views and indexes, and the older code ignores them). Going back is a code and routing change only: never roll the database back. Restoring the A.2 dump is for data loss only (runbook 7.5).
 
-1. **Routing and code**, one command: the release before the cutover, which D.3's last line named (or `git -C /srv/tattoo-drip/app log --oneline` lists):
+**Settings first, always.** The release before the cutover already has the API-only host rule (D01): with `DISCOVER_URL=https://tattoodrip.app` still in `platform.env`, the platform answers every non-`/api` path on the apex with the API's 404, so once nginx sends the apex to `web` again nobody can sign in until the settings are fixed.
+
+1. **Settings:** `platform.env`: `APP_URL=https://tattoodrip.app`, delete `API_URL` and `DISCOVER_URL`; `storefront.env`: `API_URL=https://tattoodrip.app`. Keep `discover.env` (Discover keeps running unseen) or, to stop it after step 2, `dc --profile discover stop discover` and move `discover.env` away. Nothing reads the files until step 2 recreates the services.
+2. **Routing and code**, one command: the release before the cutover, which D.3's last line named (or `git -C /srv/tattoo-drip/app log --oneline` lists):
    ```bash
    /srv/tattoo-drip/app/deploy/deploy.sh <previous commit>
    ```
-   Do it after step 2 when you can, so the restarted services read the live values. In an emergency, edit the include on the server and run `dc exec -T nginx nginx -c /etc/nginx/td/nginx.conf -s reload` first, then fix the env files and recreate `web worker storefront`.
-2. **Settings:** `platform.env`: `APP_URL=https://tattoodrip.app`, delete `API_URL` and `DISCOVER_URL`; `storefront.env`: `API_URL=https://tattoodrip.app`. Keep `discover.env` (Discover keeps running unseen) or, to stop it, `dc --profile discover stop discover` and move `discover.env` away.
+   It recreates `web`, `worker` and `storefront` with the step 1 values and reloads nginx on the live layout.
+
+   **In an emergency** (the deploy's image build would take too long): after step 1, `dc up -d --force-recreate web worker storefront`; only then edit the include in `/srv/tattoo-drip/app/deploy/nginx/nginx.conf` back to `hosts.current.conf` and run `dc exec -T nginx nginx -c /etc/nginx/td/nginx.conf -s reload`. Then discard that edit (`git -C /srv/tattoo-drip/app checkout -- deploy/nginx/nginx.conf`: `deploy.sh` refuses a checkout with local changes) and run step 2 as soon as you can, so the server is on a recorded release again.
 3. **Verify:** `https://tattoodrip.app/login` is the dashboard's sign-in page; sign in and make one write; a studio page renders and names `https://tattoodrip.app`; `https://app.tattoodrip.app` closes again (444).
 4. **People:**
    - Users sign in again, on the apex.

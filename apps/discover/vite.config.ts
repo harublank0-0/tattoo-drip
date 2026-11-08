@@ -8,9 +8,9 @@ import { BRAND_CACHE_CONTROL, SECURITY_HEADERS } from "./src/lib/headers.ts";
 
 const config = defineConfig(({ command, isPreview }) => {
 	// The dev server refuses to start with missing or malformed settings
-	// (src/lib/config.ts). Builds and `vite preview` don't read them: they
-	// are runtime settings, which the built server checks when it starts
-	// (src/server/startup.ts).
+	// (src/lib/config.ts). Builds don't read them: they are runtime settings,
+	// which the built server (and so `vite preview`) checks when it starts,
+	// exiting on a missing or malformed one (src/server/startup.ts).
 	if (command === "serve" && !isPreview) parseDiscoverConfig(process.env);
 	return {
 		resolve: { tsconfigPaths: true },
