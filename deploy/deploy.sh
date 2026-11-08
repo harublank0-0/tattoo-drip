@@ -11,11 +11,13 @@
 #   2. refuse while the settings are missing, unreadable or unfinished (CHANGE_ME left in
 #      an env file), or the release record (below) cannot be read or written
 #   3. git fetch origin, check out the requested commit (detached)
-#   4. build the web, storefront and backup images (worker and migrate share web's image)
+#   4. build the web, storefront and backup images (worker and migrate share web's image),
+#      then Discover's on its own when TD_ENV_DIR has discover.env (D11)
 #   5. start postgres and wait for it to be healthy (60 s)
 #   6. run the migrations; if they fail, stop: the old app containers are still serving
-#   7. recreate web, worker, storefront, nginx and cloudflared with the new images
-#   8. wait for web and storefront to be healthy (120 s), then reload nginx
+#   7. recreate web, worker, storefront, nginx and cloudflared with the new images (and
+#      discover, with discover.env)
+#   8. wait for web and storefront (and discover) to be healthy (120 s), then reload nginx
 #   9. record the commit in TD_STATE_DIR/deployed, print what is running,
 #      "deployed <short sha>" and the release before it, then delete dangling images
 #      (never volumes)
@@ -51,6 +53,11 @@
 #   TD_STATE_DIR      absolute path of the folder that holds the release record
 #                     ("deployed"), default /srv/tattoo-drip
 #
+# Discover (D11): deployed only when TD_ENV_DIR has discover.env, so the stack is exactly
+# as before until that file is added (domain-migration.md, "D11 release plan", stage B).
+# A commit whose deploy/nginx/nginx.conf includes the split layout (hosts.split.conf)
+# is refused without it, before anything changes: its apex would answer 502.
+#
 # Never prints an env value: the settings checks name files and variable names only.
 set -euo pipefail
 
@@ -58,7 +65,7 @@ set -euo pipefail
 NGINX_CONF=/etc/nginx/td/nginx.conf
 
 main() {
-	local root ref sha envdir statedir entry file name out keys rc first had_record=
+	local root ref sha envdir statedir entry file name out keys rc first had_record= with_discover=
 	local -a entries=() missing=() unreadable=() unfinished=()
 
 	root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -152,6 +159,8 @@ main() {
 		fail "fix the settings files above (templates: deploy/env/*.env.example); nothing was changed"
 	fi
 
+	[ -f "$envdir/discover.env" ] && with_discover=1
+
 	# The release record: what "to go back" names, and where step 9 writes. Checked here,
 	# so a deploy that could not record its success never starts.
 	[ -d "$statedir" ] && [ -w "$statedir" ] ||
@@ -176,12 +185,21 @@ main() {
 	git rev-parse --verify --quiet "$ref^{commit}" >/dev/null || fail "'$ref' is not a commit, tag or origin branch"
 	git checkout --quiet --detach "$ref"
 	say "commit: $(git log -1 --format='%h %s')"
+	if [ -z "$with_discover" ] && grep -Eq '^[[:space:]]*include[[:space:]]+[^;]*hosts\.split\.conf' deploy/nginx/nginx.conf; then
+		fail "this commit's deploy/nginx/nginx.conf routes tattoodrip.app to Discover (hosts.split.conf), but $envdir/discover.env is missing, so Discover would not run; nothing was restarted (the checkout is on the new commit; to go back: deploy/deploy.sh $PREV_SHA)"
+	fi
 
 	# 4. Images. The "tools" profile is for backup, which is not otherwise built (docker
 	# compose run does not rebuild an existing image, so a changed backup.sh would never
 	# reach the nightly job).
 	say "building images"
 	compose --profile tools build web storefront backup || fail "the build failed; nothing was restarted (the checkout is on the new commit; to go back: deploy/deploy.sh $PREV_SHA)"
+	# On its own: building it beside the others would take the build past the server's memory
+	# (Dockerfile, discover-build).
+	if [ -n "$with_discover" ]; then
+		say "building the discover image"
+		compose --profile discover build discover || fail "the discover build failed; nothing was restarted (the checkout is on the new commit; to go back: deploy/deploy.sh $PREV_SHA)"
+	fi
 
 	# 5. The database first: the migrations need it, and web and worker wait for it.
 	say "starting postgres"
@@ -201,17 +219,23 @@ main() {
 
 	# 7. Recreate what changed.
 	say "restarting services"
-	if ! compose up -d --remove-orphans web worker storefront nginx cloudflared; then
+	local -a services=(web worker storefront nginx cloudflared) healthy=(web storefront) profiles=()
+	if [ -n "$with_discover" ]; then
+		services+=(discover)
+		healthy+=(discover)
+		profiles=(--profile discover)
+	fi
+	if ! compose "${profiles[@]}" up -d --remove-orphans "${services[@]}"; then
 		compose ps >&2 || true
-		show_logs web storefront
+		show_logs "${healthy[@]}"
 		fail_started "starting the services failed"
 	fi
 
 	# 8. Reload nginx once both are up, so it picks up a config this commit changed (web and
 	# storefront have fixed addresses, so a recreated container needs no reload).
 	# -c: deploy/compose.yml starts nginx from the mounted directory, not the image's file.
-	say "waiting for web and storefront"
-	wait_healthy 120 web storefront || fail_started "web or storefront is not healthy"
+	say "waiting for ${healthy[*]}"
+	wait_healthy 120 "${healthy[@]}" || fail_started "${healthy[*]}: not all healthy"
 	say "reloading nginx"
 	if ! out=$(compose exec -T nginx nginx -c "$NGINX_CONF" -t 2>&1); then
 		echo "$out" >&2
