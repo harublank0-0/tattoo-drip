@@ -17,6 +17,7 @@ export type ApiLimit = {
 	readonly scope: "caller" | "tenant";
 	readonly methods: "reads" | "writes";
 	readonly anonymous: Budget;
+	/** A keyed server's calls (the storefront's, and Discover's since D11), in each service's own buckets. */
 	readonly storefront: Budget;
 };
 
@@ -71,11 +72,18 @@ export const API_LIMITS = {
 
 export type ApiLimitName = keyof typeof API_LIMITS;
 
-/** Storefront calls with no usable visitor address: one budget for all of them. */
+/** A keyed server's calls with no usable visitor address: one budget per service. */
 export const SHARED_STOREFRONT_BUDGET: Budget = {
 	requests: 3000,
 	duration: "5 mins",
 };
+
+/** Each caller kind's part of a limiter key. */
+const CALLER_KEY = {
+	anonymous: "anon",
+	storefront: "sf",
+	discover: "dc",
+} as const;
 
 /** The limiter key and budget of one request: digests or a tenant id, never an address. */
 export function apiLimitFor(
@@ -84,8 +92,9 @@ export function apiLimitFor(
 	tenantId?: string,
 ): { key: string; budget: Budget } {
 	const limit: ApiLimit = API_LIMITS[name];
-	const kind = caller.kind === "storefront" ? "sf" : "anon";
-	const budget = limit[caller.kind];
+	const kind = CALLER_KEY[caller.kind];
+	const budget =
+		caller.kind === "anonymous" ? limit.anonymous : limit.storefront;
 	if (limit.scope === "tenant") {
 		if (!tenantId) {
 			throw new Error(
@@ -95,7 +104,13 @@ export function apiLimitFor(
 		return { key: `api_${name}_${kind}_${tenantId}`, budget };
 	}
 	if (caller.ip === null) {
-		return { key: "api_storefront_shared", budget: SHARED_STOREFRONT_BUDGET };
+		return {
+			key:
+				caller.kind === "discover"
+					? "api_discover_shared"
+					: "api_storefront_shared",
+			budget: SHARED_STOREFRONT_BUDGET,
+		};
 	}
 	return {
 		key: `api_${name}_${kind}_${digest(clientAddress(caller.ip))}`,

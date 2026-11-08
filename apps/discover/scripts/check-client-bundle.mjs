@@ -17,6 +17,8 @@ const SERVER_ONLY = [
 	"DISCOVER_DEFAULT_COUNTRY",
 	"DISCOVER_GEO_HEADER",
 	"DISCOVER_SITEMAP_CACHE_SECONDS",
+	"DISCOVER_SERVER_KEY",
+	"withServerKey",
 	"getRequest",
 	"APP_URL",
 	"parseDiscoverConfig",

@@ -365,6 +365,8 @@ export type StubApi = {
 	server: Server;
 	url: string;
 	requests: string[];
+	/** Each request's Authorization and X-Visitor-IP (D11), in order. */
+	callers: { authorization: string | null; visitor: string | null }[];
 	/**
 	 * What the stub answers now: how many rows, which endpoints fail or hang,
 	 * and places added to `/locations` with nothing listed in them (as after
@@ -394,6 +396,7 @@ export type StubApi = {
 
 export async function stubApi(count = 1): Promise<StubApi> {
 	const requests: string[] = [];
+	const callers: StubApi["callers"] = [];
 	const scenario = {
 		count,
 		fail: new Set<Endpoint>(),
@@ -407,6 +410,10 @@ export async function stubApi(count = 1): Promise<StubApi> {
 	const hanging = new Set<() => void>();
 	const server = createServer((request, response) => {
 		requests.push(request.url ?? "");
+		callers.push({
+			authorization: request.headers.authorization ?? null,
+			visitor: (request.headers["x-visitor-ip"] as string | undefined) ?? null,
+		});
 		const address = new URL(request.url ?? "/", "http://stub");
 		const path = address.pathname;
 		const limit = Number(address.searchParams.get("limit") ?? 24);
@@ -803,6 +810,7 @@ export async function stubApi(count = 1): Promise<StubApi> {
 		server,
 		url: `http://localhost:${(server.address() as AddressInfo).port}`,
 		requests,
+		callers,
 		scenario,
 		close: () => {
 			for (const end of hanging) end();

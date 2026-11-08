@@ -14,6 +14,8 @@ export const built = existsSync(ENTRY);
 export const skip = !built && "no build (run pnpm build)";
 
 export const APP = "http://app.localhost:3333";
+/** The server key every built server is started with (production requires one, D11). */
+export const SERVER_KEY = "test-discover-key-0123456789abcdefghijklmnopqr";
 export const SITE = "http://localhost:3100";
 export async function freePort(): Promise<number> {
 	const server = createServer();
@@ -34,6 +36,7 @@ export async function startDiscover(
 			API_URL: apiUrl,
 			DISCOVER_URL: SITE,
 			APP_URL: APP,
+			DISCOVER_SERVER_KEY: SERVER_KEY,
 			...extra,
 			PORT: String(port),
 			NODE_ENV: "production",

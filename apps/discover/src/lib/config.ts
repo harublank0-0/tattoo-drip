@@ -43,12 +43,20 @@ export interface DiscoverConfig {
 	 * crawlers asking for sitemaps must not use it up. Default 600. Server only.
 	 */
 	sitemapCacheSeconds: number;
+	/**
+	 * DISCOVER_SERVER_KEY (D11): the secret the server sends with its API
+	 * reads (Authorization: Bearer), with its visitor's address
+	 * (X-Visitor-IP), so the API counts every visitor apart (the platform's
+	 * DISCOVER_SERVER_KEYS). Grants nothing else. Required when NODE_ENV is
+	 * production; null elsewhere. Server only, never sent to the browser.
+	 */
+	serverKey: string | null;
 }
 
 /** What the browser may know: the router's dehydrated state carries it. */
 export type PublicSettings = Omit<
 	DiscoverConfig,
-	"geoHeader" | "sitemapCacheSeconds"
+	"geoHeader" | "sitemapCacheSeconds" | "serverKey"
 >;
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -69,7 +77,12 @@ const RULES = {
 		"the name of the header the trusted proxy sets to the visitor's country (X-Discover-Country behind deploy/nginx), or unset to turn geolocation off; never CF-IPCountry, which a visitor can send",
 	DISCOVER_SITEMAP_CACHE_SECONDS:
 		"a whole number of seconds from 0 (off) to 3600 that the server keeps a built sitemap; unset: 600",
+	DISCOVER_SERVER_KEY:
+		"the key the platform lists in DISCOVER_SERVER_KEYS: 32 to 256 letters, digits or -._~+/ characters, then at most two = (openssl rand -base64 32); required when NODE_ENV is production",
 } as const;
+
+/** A server key's shape (RFC 7235 token68), the platform's SERVER_KEY_SHAPE. */
+const SERVER_KEY = /^[A-Za-z0-9._~+/-]{32,256}={0,2}$/;
 
 /** How long a built sitemap is kept when DISCOVER_SITEMAP_CACHE_SECONDS is unset. */
 const SITEMAP_CACHE_SECONDS = 600;
@@ -154,6 +167,13 @@ export function parseDiscoverConfig(env: Env): DiscoverConfig {
 		);
 	}
 
+	const serverKey = env.DISCOVER_SERVER_KEY?.trim() || null;
+	if (serverKey ? !SERVER_KEY.test(serverKey) : env.NODE_ENV === "production") {
+		problems.push(
+			`DISCOVER_SERVER_KEY is ${serverKey ? "not valid" : "missing"}: ${RULES.DISCOVER_SERVER_KEY}.`,
+		);
+	}
+
 	if (
 		problems.length > 0 ||
 		!apiUrl ||
@@ -175,6 +195,7 @@ export function parseDiscoverConfig(env: Env): DiscoverConfig {
 		defaultCountry,
 		geoHeader: geoValue ? geoValue.toLowerCase() : null,
 		sitemapCacheSeconds,
+		serverKey,
 	};
 }
 
@@ -186,6 +207,7 @@ export function publicSettings(config: DiscoverConfig): PublicSettings {
 	const {
 		geoHeader: _serverOnly,
 		sitemapCacheSeconds: _alsoServerOnly,
+		serverKey: _secret,
 		...settings
 	} = config;
 	return { ...settings, markets: [...settings.markets] };
