@@ -8,8 +8,8 @@
 #   discover         the same stand-in at .13, the address nginx.split.conf reserves for
 #                    the Discover app (D05); nginx.conf never sends it anything
 #   nginx            the pinned image from deploy/compose.yml, at 172.30.42.10, started
-#                    with the layout run.sh names in NGINX_CONF (nginx.conf or
-#                    nginx.split.conf)
+#                    with the layout run.sh names in NGINX_CONF (nginx.conf,
+#                    nginx.current.conf or nginx.split.conf)
 #   trusted          client at 172.30.42.20, cloudflared's address
 #   outsider         client at 172.30.42.99, any other address
 

@@ -4,9 +4,10 @@
 //   node check.mjs trusted [layout]    from 172.30.42.20 (cloudflared's address)
 //   node check.mjs outsider [layout]   from 172.30.42.99 (anything else)
 //
-// layout is the file nginx was started with: nginx.conf (live: dashboard and
-// API on tattoodrip.app, the default) or nginx.split.conf (D11: app., api.,
-// Discover on the apex, legacy redirects).
+// layout is which hosts the file nginx was started with loads (run.sh works it
+// out): current (before the D11 cutover: dashboard and API on tattoodrip.app,
+// the default) or split (D11: app., api., Discover on the apex, legacy
+// redirects).
 //
 // Prints one line per check and exits 1 when any failed. run.sh starts it from
 // each client and then checks nginx's access log.
@@ -20,15 +21,13 @@ const MiB = 1024 * 1024;
 const CLOSED = ["ECONNRESET", "socket hang up"];
 
 const mode = process.argv[2];
-const layout = process.argv[3] ?? "nginx.conf";
+const layout = process.argv[3] ?? "current";
 const self = CLIENTS[mode];
-if (!self || !["nginx.conf", "nginx.split.conf"].includes(layout)) {
-	console.error(
-		"usage: node check.mjs trusted|outsider [nginx.conf|nginx.split.conf]",
-	);
+if (!self || !["current", "split"].includes(layout)) {
+	console.error("usage: node check.mjs trusted|outsider [current|split]");
 	process.exit(2);
 }
-const split = layout === "nginx.split.conf";
+const split = layout === "split";
 /** Where the dashboard (and its account links) and the API answer in this layout. */
 const DASHBOARD = split ? "app.tattoodrip.app" : "tattoodrip.app";
 const API = split ? "api.tattoodrip.app" : "tattoodrip.app";
