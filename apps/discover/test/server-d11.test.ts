@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, test } from "node:test";
-import { visitorAddress, withServerKey } from "../src/lib/visitor.ts";
+import {
+	visitorAddress,
+	withFailureLog,
+	withServerKey,
+} from "../src/lib/server-fetch.ts";
 import { SERVER_KEY, skip, startDiscover } from "./built-server.ts";
 import { type StubApi, stubApi } from "./stub-api.ts";
 
@@ -47,6 +51,54 @@ describe("visitorAddress and withServerKey", () => {
 		await withServerKey(base, "k".repeat(32), undefined)?.("http://x/");
 		assert.equal(seen[1]?.get("x-visitor-ip"), null);
 		assert.equal(withServerKey(base, null, "203.0.113.9"), base);
+	});
+});
+
+describe("withFailureLog", () => {
+	test("a 5xx, a 429 or no answer is logged on one line with the path only; anything else is not", async () => {
+		const lines: string[] = [];
+		const answer = (status: number) =>
+			(async () => new Response("{}", { status })) as typeof fetch;
+		for (const status of [200, 404, 422]) {
+			await withFailureLog(answer(status), (line) => lines.push(line))(
+				"http://api.test/api/v1/discover/studios?q=secret+search",
+			);
+		}
+		assert.equal(lines.length, 0);
+		await withFailureLog(answer(503), (line) => lines.push(line))(
+			"http://api.test/api/v1/discover/studios?q=secret+search",
+		);
+		await withFailureLog(answer(429), (line) => lines.push(line))(
+			"http://api.test/api/v1/discover/tattoos",
+		);
+		const refused = (async () => {
+			throw new TypeError("fetch failed", {
+				cause: { code: "ECONNREFUSED" },
+			});
+		}) as typeof fetch;
+		await assert.rejects(
+			withFailureLog(refused, (line) => lines.push(line))(
+				"http://api.test/api/v1/discover/styles",
+				{ headers: { authorization: "Bearer k" } },
+			),
+		);
+		const timedOut = (async () => {
+			throw new DOMException("timed out", "TimeoutError");
+		}) as typeof fetch;
+		await assert.rejects(
+			withFailureLog(timedOut, (line) => lines.push(line))(
+				"http://api.test/api/v1/discover/locations",
+			),
+		);
+		assert.equal(lines.length, 4);
+		assert.match(
+			lines[0] ?? "",
+			/^Discover API read failed: GET \/api\/v1\/discover\/studios answered 503 \(\d+ ms\)$/,
+		);
+		assert.match(lines[1] ?? "", /tattoos answered 429/);
+		assert.match(lines[2] ?? "", /styles: ECONNREFUSED/);
+		assert.match(lines[3] ?? "", /locations: no answer in time/);
+		assert.doesNotMatch(lines.join("\n"), /secret|Bearer|api\.test/);
 	});
 });
 

@@ -19,6 +19,7 @@ const SERVER_ONLY = [
 	"DISCOVER_SITEMAP_CACHE_SECONDS",
 	"DISCOVER_SERVER_KEY",
 	"withServerKey",
+	"Discover API read failed",
 	"getRequest",
 	"APP_URL",
 	"parseDiscoverConfig",

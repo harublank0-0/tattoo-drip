@@ -1,13 +1,13 @@
 import { createDiscoverClient, type DiscoverClient } from "@tattoo-drip/sdk";
 import { discoverConfig, publicSettings } from "./config.ts";
 import { SERVER_TIMEOUT_MS } from "./context.ts";
+import { serverFetch } from "./server-fetch.ts";
 import {
 	sitemapIndexUrls,
 	sitemapIndexXml,
 	sitemapUrls,
 	urlsetXml,
 } from "./sitemap.ts";
-import { visitorAddress, withServerKey } from "./visitor.ts";
 
 /**
  * The sitemap routes' responses (D10, server only): `/sitemap.xml` and
@@ -82,11 +82,7 @@ async function respond(
 		baseUrl: settings.apiUrl,
 		timeoutMs: SERVER_TIMEOUT_MS,
 		// The build is shared, so it counts against the request that started it.
-		fetch: withServerKey(
-			undefined,
-			config.serverKey,
-			visitorAddress(request.headers),
-		),
+		fetch: serverFetch(config.serverKey, request.headers),
 	});
 	let body: string | null;
 	try {

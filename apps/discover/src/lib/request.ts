@@ -7,7 +7,7 @@ import {
 	type DiscoverContext,
 } from "./context.ts";
 import { requestPreference } from "./country.ts";
-import { visitorAddress, withServerKey } from "./visitor.ts";
+import { serverFetch } from "./server-fetch.ts";
 
 /**
  * A new router's context. On the server: connected from process.env and
@@ -26,13 +26,7 @@ export const createRequestContext = createIsomorphicFn()
 			context,
 			publicSettings(config),
 			requestPreference(headers, config),
-			{
-				fetch: withServerKey(
-					undefined,
-					config.serverKey,
-					visitorAddress(headers),
-				),
-			},
+			{ fetch: serverFetch(config.serverKey, headers) },
 		);
 		return context;
 	})
