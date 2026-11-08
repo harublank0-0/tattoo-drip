@@ -13,6 +13,8 @@ visitor --https--> Cloudflare (DNS, TLS, Always Use HTTPS)
               the server (Docker Compose, project tattoo-drip-prod)
               cloudflared --> nginx --+--> web        (the dashboard and API, :3333)
                                       +--> storefront (the studio pages, :3000)
+                                      +--> discover   (Discover, :3000; only with discover.env, and
+                                                       public only after the D11 cutover)
               worker (alerts, quote expiry, queue)
               postgres 18 (not reachable from outside)
               backup (a job started by systemd every night)
@@ -22,14 +24,15 @@ backup      --> R2 bucket  tattoo-drip-backups
 
 | Name | Goes to |
 |---|---|
-| `tattoodrip.app` | The dashboard and the API |
+| `tattoodrip.app` | The dashboard and the API. After the D11 cutover: Discover, with old dashboard links sent on to `app.` |
+| `app.tattoodrip.app`, `api.tattoodrip.app` | After the D11 cutover: the dashboard, and the API ([domain migration](../docs/discover/domain-migration.md), "D11 release plan") |
 | `media.tattoodrip.app` | The public R2 bucket (public photos) |
 | `tattoodrip.page`, `*.tattoodrip.page` | The studio pages |
 
 | Where | What |
 |---|---|
 | `/srv/tattoo-drip/app` | The git clone of the repo (read-only deploy key). Never edit files in it. |
-| `/srv/tattoo-drip/env` | The six settings files, `postgres.env` `platform.env` `migrate.env` `storefront.env` `backup.env` `tunnel.env`. Folder mode 700, files mode 600. |
+| `/srv/tattoo-drip/env` | The six settings files, `postgres.env` `platform.env` `migrate.env` `storefront.env` `backup.env` `tunnel.env`, and from D11 a seventh, `discover.env` (its presence makes `deploy.sh` deploy Discover). Folder mode 700, files mode 600. Keep `discover.env` in the password manager with the others. |
 | `/srv/tattoo-drip/deployed` | One line: the commit of the last successful deploy, written by `deploy.sh`. Going back (5) and a restore (7.5) read it. |
 | `/srv/tattoo-drip/restore` | Downloaded backups, only while you restore. They hold clients' data: delete them afterwards. |
 | Docker volume `tattoo-drip-prod_postgres_data` | The database. |
@@ -456,11 +459,11 @@ The tunnel shows as inactive until the server runs `cloudflared` (4.3).
 
 For each of the two domains, open the domain, then **SSL/TLS**, **Edge Certificates**, and switch **Always Use HTTPS** on. Cloudflare's free certificate covers each domain and its first-level wildcard (`*.tattoodrip.page`), and `.app` and `.page` are HTTPS-only in browsers anyway.
 
-Never switch on **Bot Fight Mode**, **I'm Under Attack** or any rule that challenges requests (a WAF custom rule with a challenge action, a challenge for a country or an address range) on `tattoodrip.app`. The studio pages' server asks the API at `https://tattoodrip.app`, from the server's own address, for every page it renders, and it cannot solve a challenge: every studio page would answer "This page can't load right now" (8.1). The one rule of 3.8 is the exception: it blocks, and only on the sign-in pages.
+Never switch on **Bot Fight Mode**, **I'm Under Attack** or any rule that challenges requests (a WAF custom rule with a challenge action, a challenge for a country or an address range) on `tattoodrip.app` or, after the D11 cutover, `api.tattoodrip.app` and `app.tattoodrip.app` (Discover's server reads the API the same way). The studio pages' server asks the API at `https://tattoodrip.app`, from the server's own address, for every page it renders, and it cannot solve a challenge: every studio page would answer "This page can't load right now" (8.1). The one rule of 3.8 is the exception: it blocks, and only on the sign-in pages.
 
 ### 3.8 Optional: one rate-limiting rule
 
-The free plan allows one. The app already limits requests per address by itself (see deploy.md, "What the app does itself"), so this is an outer layer, not a need. If you add one, aim it at the sign-in pages only: host `tattoodrip.app`, path starting with `/login`, `/signup` or `/forgot-password`, counted per address, with the longest period and block time the free plan offers. Do not aim it at `/api/`: the studio pages call the API from the server's own address, and Cloudflare would count all their visitors as one. Its action is **Block**, never a challenge (3.7).
+The free plan allows one. The app already limits requests per address by itself (see deploy.md, "What the app does itself"), so this is an outer layer, not a need. If you add one, aim it at the sign-in pages only: host `tattoodrip.app` (and `app.tattoodrip.app` from the D11 cutover), path starting with `/login`, `/signup` or `/forgot-password`, counted per address, with the longest period and block time the free plan offers. Do not aim it at `/api/`: the studio pages call the API from the server's own address, and Cloudflare would count all their visitors as one. Its action is **Block**, never a challenge (3.7).
 
 ### 3.9 Everything from Cloudflare is in
 
@@ -695,7 +698,7 @@ Edit the file (2.4), then recreate the services that read it. The settings of `w
 docker compose -f /srv/tattoo-drip/app/deploy/compose.yml up -d --force-recreate web worker
 ```
 
-Nothing else is needed: nginx reaches `web` and `storefront` by fixed addresses (`172.30.42.11` and `172.30.42.12`, set in `deploy/compose.yml` and `deploy/nginx/common.conf`), so it finds a recreated or restarted container at once, and after a reboot too (4.10 checks both). The site answers `502` (or `504`) for the few seconds the new container takes to start. For the storefront use `storefront` in place of `web worker`. For the tunnel (`tunnel.env`) use `cloudflared`. `postgres.env` only counts when the database is first created; changing it later changes nothing.
+Nothing else is needed: nginx reaches `web` and `storefront` by fixed addresses (`172.30.42.11` and `172.30.42.12`, set in `deploy/compose.yml` and `deploy/nginx/common.conf`), so it finds a recreated or restarted container at once, and after a reboot too (4.10 checks both). The site answers `502` (or `504`) for the few seconds the new container takes to start. For the storefront use `storefront` in place of `web worker`. For the tunnel (`tunnel.env`) use `cloudflared`. For Discover (`discover.env`) add its profile: `docker compose -f /srv/tattoo-drip/app/deploy/compose.yml --profile discover up -d --force-recreate discover`. `postgres.env` only counts when the database is first created; changing it later changes nothing.
 
 ---
 
@@ -1053,6 +1056,25 @@ rm /srv/tattoo-drip/cloudflared-debug.yml
 ```
 
 Never paste that log anywhere without removing the addresses first.
+
+### 8.10 Discover
+
+Discover runs only when `/srv/tattoo-drip/env/discover.env` exists (D11). Its commands need `--profile discover`. With `dc` short for `docker compose -f /srv/tattoo-drip/app/deploy/compose.yml`:
+
+```bash
+dc --profile discover ps discover                               # Up … (healthy)
+dc exec -T nginx wget -qO- http://172.30.42.13:3000/healthz     # ok
+dc --profile discover logs --tail 50 discover
+```
+
+| What you see | What it means | What to do |
+|---|---|---|
+| `Restarting`, and the log says `Discover's settings are incomplete:` | A setting in `discover.env` is missing or malformed; the log names it (never the value) | Fix it (2.4), then recreate Discover (5, "Changing a setting") |
+| `Discover API read failed: … ECONNREFUSED` or `answered 503` | Discover can't read the API: `web` is down or restarting, or the tunnel or Cloudflare between them | `dc ps web`, `dc logs --tail 50 web`; Discover recovers by itself once the API answers |
+| `Discover API read failed: … answered 429` | Rate-limited: usually the key doesn't match | `dc logs web \| grep 'server key'`: "does not accept" means `DISCOVER_SERVER_KEY` (discover.env) and `DISCOVER_SERVER_KEYS` (platform.env) differ; make them equal, recreate both |
+| Pages answer 502 at `tattoodrip.app` after the cutover | Discover isn't running | `dc --profile discover up -d discover`; never switch the nginx layout back without the rollback (domain migration, H) |
+
+After the cutover, add `https://tattoodrip.app/healthz` to your uptime monitor (8.8) next to the sign-in page, which moves to `https://app.tattoodrip.app/login`.
 
 ## The commands you will use most
 

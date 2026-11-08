@@ -115,10 +115,12 @@ services:
         # nginx's upstream (deploy/nginx/common.conf) names this address.
         ipv4_address: 172.30.42.12
 
-  # Discover (D05). Not started by a plain `up`: it has a profile, so nothing
-  # changes in production until the D11 cutover runs it on purpose
-  # (docker compose --profile discover up -d discover). nginx's split layout
-  # (hosts.split.conf) names this address; the live layout doesn't use it.
+  # Discover (D05). Not started by a plain `up`: it has a profile. deploy.sh
+  # builds and starts it when TD_ENV_DIR has discover.env (D11, stage B of the
+  # release plan in docs/discover/domain-migration.md); by hand:
+  # docker compose --profile discover up -d discover. nginx's split layout
+  # (hosts.split.conf) names this address; the live layout doesn't use it, so
+  # Discover is reachable only from inside the stack until the cutover.
   discover:
     profiles: ["discover"]
     build:

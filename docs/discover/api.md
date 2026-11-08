@@ -150,7 +150,7 @@ Measured with `EXPLAIN ANALYZE` as the app role, with no context, read-only, on 
 
 ## Limitations and follow-ups
 
-- **Discover SSR server key (D05).** The blueprint's "named server keys" are not built. Until D05, Discover's SSR can call with no key (anonymous, per address) or with a storefront key. D05 generalises `STOREFRONT_SERVER_KEYS` to named keys when `apps/discover` exists.
+- **Discover's server key (D11).** `DISCOVER_SERVER_KEYS` (optional, one key or `old,new` while rotating, the storefront key's rules) is Discover's own list beside `STOREFRONT_SERVER_KEYS`: a matching `Authorization: Bearer` makes the call caller kind `discover`, counted by its `X-Visitor-IP` in buckets of its own (limiter keys `api_<limit>_dc_…`, the keyed budgets), with its own shared budget (`api_discover_shared`, 3000 per 5 minutes) and warning when no public address comes with it. Both lists are always checked. Unset or not matching, Discover's reads are anonymous (its one address) and the unknown-key warning names both settings.
 - **Takedown latency.** The public cache can serve a removed row for up to 2 minutes; there is no purge.
 - **Search.** Substring search on names only for studios and artists (no bio or ranking), as the D02 plan set out; photos (D09) also on their alt text and style names. No ranking: newest first.
 - **Profile caps.** A studio profile lists up to 100 artists and an artist's or studio's 12 newest photos. Use the list endpoints with `studio` or `artist` for the rest.

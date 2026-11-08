@@ -67,6 +67,11 @@ Values for nginx; set the equivalent on the host's proxy.
 - A request that waits 10 s for a connection fails; on the API it answers 503 `service_busy` and is logged. If that shows in the log, raise the pool and `max_connections` together.
 - Roles, migrations and seeders: [database conventions](../database/README.md#row-level-security).
 
+### Discover's server key (D11)
+
+- `DISCOVER_SERVER_KEYS` (optional): Discover's `DISCOVER_SERVER_KEY` (`openssl rand -hex 32`, never the storefront's), or `old,new` while rotating. Same rules and effect as the storefront's key below: Discover's server-side reads count per visitor (`X-Visitor-IP`) in Discover's own buckets; it opens no data.
+- Unset or mismatched, Discover still works but counts as one anonymous client (300 reads per 5 minutes for all its visitors), and the log says "server key this API does not accept" (at most every 10 minutes). Rotation is the storefront's three steps with Discover's two settings.
+
 ### The storefront's server key
 
 - Make one with `openssl rand -base64 32`, and set it as the storefront's `STOREFRONT_SERVER_KEY` and the platform's `STOREFRONT_SERVER_KEYS`.
