@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ForStudiosRouteImport } from './routes/for-studios'
+import { Route as HealthzRouteImport } from './routes/healthz'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
@@ -41,6 +42,11 @@ const IndexRoute = IndexRouteImport.update({
 const ForStudiosRoute = ForStudiosRouteImport.update({
   id: '/for-studios',
   path: '/for-studios',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HealthzRoute = HealthzRouteImport.update({
+  id: '/healthz',
+  path: '/healthz',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PricingRoute = PricingRouteImport.update({
@@ -153,6 +159,7 @@ const StudiosStudioSlugArtistsArtistSlugRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/for-studios': typeof ForStudiosRoute
+  '/healthz': typeof HealthzRoute
   '/pricing': typeof PricingRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -178,6 +185,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/for-studios': typeof ForStudiosRoute
+  '/healthz': typeof HealthzRoute
   '/pricing': typeof PricingRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -204,6 +212,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/for-studios': typeof ForStudiosRoute
+  '/healthz': typeof HealthzRoute
   '/pricing': typeof PricingRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -231,6 +240,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/for-studios'
+    | '/healthz'
     | '/pricing'
     | '/robots.txt'
     | '/sitemap.xml'
@@ -256,6 +266,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/for-studios'
+    | '/healthz'
     | '/pricing'
     | '/robots.txt'
     | '/sitemap.xml'
@@ -281,6 +292,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/for-studios'
+    | '/healthz'
     | '/pricing'
     | '/robots.txt'
     | '/sitemap.xml'
@@ -307,6 +319,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ForStudiosRoute: typeof ForStudiosRoute
+  HealthzRoute: typeof HealthzRoute
   PricingRoute: typeof PricingRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -344,6 +357,13 @@ declare module '@tanstack/react-router' {
       path: '/for-studios'
       fullPath: '/for-studios'
       preLoaderRoute: typeof ForStudiosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/healthz': {
+      id: '/healthz'
+      path: '/healthz'
+      fullPath: '/healthz'
+      preLoaderRoute: typeof HealthzRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pricing': {
@@ -499,6 +519,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ForStudiosRoute: ForStudiosRoute,
+  HealthzRoute: HealthzRoute,
   PricingRoute: PricingRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,

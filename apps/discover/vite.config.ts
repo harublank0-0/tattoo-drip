@@ -8,8 +8,9 @@ import { BRAND_CACHE_CONTROL, SECURITY_HEADERS } from "./src/lib/headers.ts";
 
 const config = defineConfig(({ command, isPreview }) => {
 	// The dev server refuses to start with missing or malformed settings
-	// (src/lib/config.ts). Builds and `vite preview` don't read them: they
-	// are runtime settings, read again by the server on each request.
+	// (src/lib/config.ts). Builds don't read them: they are runtime settings,
+	// which the built server (and so `vite preview`) checks when it starts,
+	// exiting on a missing or malformed one (src/server/startup.ts).
 	if (command === "serve" && !isPreview) parseDiscoverConfig(process.env);
 	return {
 		resolve: { tsconfigPaths: true },
@@ -26,8 +27,9 @@ const config = defineConfig(({ command, isPreview }) => {
 					"/brand/**": { headers: { "cache-control": BRAND_CACHE_CONTROL } },
 				},
 				compressPublicAssets: { gzip: true, brotli: true },
-				// A path that can't be decoded is a 400, not a hung request.
-				plugins: ["./src/server/malformed-path.ts"],
+				// A path that can't be decoded is a 400, not a hung request; the
+				// settings are checked when the server starts (D11).
+				plugins: ["./src/server/malformed-path.ts", "./src/server/startup.ts"],
 			}),
 			tailwindcss(),
 			tanstackStart(),

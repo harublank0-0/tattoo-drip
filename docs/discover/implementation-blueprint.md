@@ -22,6 +22,7 @@ This file is the plan Discover prompts work from. The dated `docs/superpowers/sp
 | D08: public profiles and storefront booking hand-off | Done: [frontend](frontend.md#profiles-d08); as built in C.10 below |
 | D09: tattoo inspiration gallery and artwork detail | Done: [frontend](frontend.md#gallery-d09), [artwork pages](frontend.md#artwork-pages-d09), [API](api.md#gallery-search-and-the-artwork-read-d09); as built in C.11 below |
 | D10: SEO, accessibility, performance | Done: phase A (technical, international and structured-data SEO, sitemaps, robots, indexing and error semantics: [frontend](frontend.md#seo-and-indexing), [API](api.md#sitemap-lists-d10)) and phase B (performance, images, caching, accessibility, security headers: [performance and caching](frontend.md#performance-and-caching-d10-phase-b), [accessibility](frontend.md#accessibility-d10-phase-b), [security](frontend.md#security-headers-and-hardening-d10-phase-b)); as built and remaining items in C.12 below |
+| D11: final QA, deployment and launch | Prepared, awaiting approval for the cutover: Discover's server key, the startup check, `/healthz` and failed-read logging; `deploy.sh` deploys Discover when `discover.env` exists and guards the split layout; the launch smoke test; the staged release plan, Cloudflare changes and rollback ([domain migration](domain-migration.md#g-d11-release-plan)), rehearsed in production mode (J2). Not done: the cutover itself (stage D), indexing on, geolocation on |
 
 Status legend: **Done** = in code, with tests where noted. **Partial** = exists, but not in the form Discover needs. **Planned** = only in docs. **Missing** = searched for and absent. **Unverified** = not checked against a running system.
 
@@ -247,7 +248,7 @@ Details in [publication controls](publication-controls.md).
 Details in [frontend](frontend.md).
 
 - **Routes** follow the D05 prompt: `/explore/studios`, `/explore/artists`, `/explore/tattoos`, `/locations/:slug` (not `/studios`, `/artists`, `/places`). `/explore/studios` reads live data as the loading pattern; the other unfinished pages say they are coming and are `noindex`.
-- **No named server keys yet**: server reads are anonymous (per-address limits); a key with visitor forwarding is needed before launch (D11).
+- **No named server keys yet**: server reads are anonymous (per-address limits); a key with visitor forwarding is needed before launch (D11: done, `DISCOVER_SERVER_KEYS`).
 - **No message catalog, `packages/ui`, JSON-LD helpers or 503 page**: the copy lives in the components, the primitives in `apps/discover`, structured data is D10, and an API failure is the route's error state. `DISCOVER_INDEXING`, robots and the sitemap stub are in.
 - **Compose service** behind a `discover` profile and a separate Docker build stage, so production builds and starts nothing new before D11.
 

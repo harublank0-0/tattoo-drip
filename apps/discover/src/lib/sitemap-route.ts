@@ -1,6 +1,7 @@
 import { createDiscoverClient, type DiscoverClient } from "@tattoo-drip/sdk";
 import { discoverConfig, publicSettings } from "./config.ts";
 import { SERVER_TIMEOUT_MS } from "./context.ts";
+import { serverFetch } from "./server-fetch.ts";
 import {
 	sitemapIndexUrls,
 	sitemapIndexXml,
@@ -67,6 +68,7 @@ function notFound(): Response {
 }
 
 async function respond(
+	request: Request,
 	key: string,
 	build: (
 		client: DiscoverClient,
@@ -79,6 +81,8 @@ async function respond(
 	const client = createDiscoverClient({
 		baseUrl: settings.apiUrl,
 		timeoutMs: SERVER_TIMEOUT_MS,
+		// The build is shared, so it counts against the request that started it.
+		fetch: serverFetch(config.serverKey, request.headers),
 	});
 	let body: string | null;
 	try {
@@ -110,8 +114,8 @@ async function respond(
 }
 
 /** `/sitemap.xml`: the index of every child sitemap. */
-export function sitemapIndexResponse(): Promise<Response> {
-	return respond("/sitemap.xml", async (client, settings) =>
+export function sitemapIndexResponse(request: Request): Promise<Response> {
+	return respond(request, "/sitemap.xml", async (client, settings) =>
 		sitemapIndexXml(await sitemapIndexUrls(client, settings)),
 	);
 }
@@ -123,7 +127,7 @@ export function sitemapChildResponse(
 ): Promise<Response> {
 	const after = new URL(request.url).searchParams.get("after");
 	const key = `/sitemaps/${kind}.xml${after === null ? "" : `?after=${after}`}`;
-	return respond(key, async (client, settings) => {
+	return respond(request, key, async (client, settings) => {
 		const urls = await sitemapUrls(client, settings, kind, after);
 		return urls ? urlsetXml(urls) : null;
 	});

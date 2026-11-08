@@ -21,3 +21,10 @@ export function testServerKeys(): [string, string] {
 	}
 	return [keys[0], keys[1]];
 }
+
+/** The DISCOVER_SERVER_KEYS of .env.test (D11). */
+export function testDiscoverServerKey(): string {
+	const [key] = env.get("DISCOVER_SERVER_KEYS")?.release() ?? [];
+	if (!key) throw new Error(".env.test must set DISCOVER_SERVER_KEYS");
+	return key;
+}

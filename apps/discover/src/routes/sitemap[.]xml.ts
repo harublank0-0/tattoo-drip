@@ -6,5 +6,5 @@ import { sitemapIndexResponse } from "#/lib/sitemap-route";
  * DISCOVER_INDEXING is off.
  */
 export const Route = createFileRoute("/sitemap.xml")({
-	server: { handlers: { GET: () => sitemapIndexResponse() } },
+	server: { handlers: { GET: ({ request }) => sitemapIndexResponse(request) } },
 });

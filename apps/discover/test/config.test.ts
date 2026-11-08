@@ -21,7 +21,41 @@ describe("Discover settings", () => {
 			defaultCountry: "NP",
 			geoHeader: null,
 			sitemapCacheSeconds: 600,
+			serverKey: null,
 		});
+	});
+
+	test("the server key (D11): required in production, a token68 of 32 to 256 characters, never public", () => {
+		const KEY = "a".repeat(32);
+		assert.equal(
+			parseDiscoverConfig({ ...VALID, DISCOVER_SERVER_KEY: ` ${KEY} ` })
+				.serverKey,
+			KEY,
+		);
+		assert.throws(
+			() => parseDiscoverConfig({ ...VALID, NODE_ENV: "production" }),
+			/DISCOVER_SERVER_KEY is missing/,
+		);
+		assert.equal(
+			parseDiscoverConfig({
+				...VALID,
+				NODE_ENV: "production",
+				DISCOVER_SERVER_KEY: `${KEY}==`,
+			}).serverKey,
+			`${KEY}==`,
+		);
+		for (const bad of ["short", "a".repeat(257), `${KEY} x`, `${KEY}===`]) {
+			assert.throws(
+				() => parseDiscoverConfig({ ...VALID, DISCOVER_SERVER_KEY: bad }),
+				(error: Error) =>
+					/DISCOVER_SERVER_KEY is not valid/.test(error.message) &&
+					!error.message.includes(bad),
+				bad.slice(0, 20),
+			);
+		}
+		const config = parseDiscoverConfig({ ...VALID, DISCOVER_SERVER_KEY: KEY });
+		assert.equal("serverKey" in publicSettings(config), false);
+		assert.doesNotMatch(JSON.stringify(publicSettings(config)), /aaaa/);
 	});
 
 	test("the sitemap cache: whole seconds from 0 (off) to 3600, server only", () => {

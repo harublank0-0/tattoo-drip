@@ -6,11 +6,12 @@ import env from "#start/env";
 
 /**
  * Who is calling the public API (TAT-38). A request with a valid server key
- * (Authorization: Bearer, STOREFRONT_SERVER_KEYS) is the hosted
- * storefront's server: it is counted by its visitor (X-Visitor-IP), each
- * kind in its own buckets. Anything else is an anonymous client, counted by
- * request.ip(). The key grants nothing else: no data, route, field, cache
- * variant or authorization. The dashboard never calls this.
+ * (Authorization: Bearer) is a hosted app's server: the storefront's
+ * (STOREFRONT_SERVER_KEYS) or Discover's (DISCOVER_SERVER_KEYS, D11). It is
+ * counted by its visitor (X-Visitor-IP), each kind in its own buckets.
+ * Anything else is an anonymous client, counted by request.ip(). A key
+ * grants nothing else: no data, route, field, cache variant or
+ * authorization. The dashboard never calls this.
  */
 export const VISITOR_IP_HEADER = "x-visitor-ip";
 
@@ -51,14 +52,23 @@ export class ServerKeys {
 	}
 }
 
-let configured: ServerKeys | undefined;
+/** The servers that may present a key: each has its own list and buckets. */
+export type KeyedService = "storefront" | "discover";
 
-/** STOREFRONT_SERVER_KEYS, read once per process. */
-function serverKeys(): ServerKeys {
-	configured ??= new ServerKeys(
-		env.get("STOREFRONT_SERVER_KEYS")?.release() ?? [],
-	);
-	return configured;
+const configured = new Map<KeyedService, ServerKeys>();
+
+/** STOREFRONT_SERVER_KEYS or DISCOVER_SERVER_KEYS, read once per process. */
+function serverKeys(service: KeyedService): ServerKeys {
+	let keys = configured.get(service);
+	if (!keys) {
+		const name =
+			service === "storefront"
+				? "STOREFRONT_SERVER_KEYS"
+				: "DISCOVER_SERVER_KEYS";
+		keys = new ServerKeys(env.get(name)?.release() ?? []);
+		configured.set(service, keys);
+	}
+	return keys;
 }
 
 /**
@@ -109,10 +119,10 @@ export function visitorIp(value: string | undefined): string | null {
 	return isPublicAddress(ip) ? ip : null;
 }
 
-/** A caller: an anonymous client by its address, or the storefront by its visitor (null: none usable). */
+/** A caller: an anonymous client by its address, or a keyed server by its visitor (null: none usable). */
 export type ApiCaller =
 	| { kind: "anonymous"; ip: string }
-	| { kind: "storefront"; ip: string | null };
+	| { kind: KeyedService; ip: string | null };
 
 declare module "@adonisjs/core/http" {
 	interface HttpContext {
@@ -126,9 +136,11 @@ const WARN_EVERY_MS = 10 * 60 * 1000;
 /** Fixed texts: never a key, a part of one, or an address. */
 export const CALLER_WARNINGS = {
 	unknownKey:
-		"A request presented a server key this API does not accept; it was counted as an anonymous client. Check STOREFRONT_SERVER_KEYS against the storefront's STOREFRONT_SERVER_KEY.",
+		"A request presented a server key this API does not accept; it was counted as an anonymous client. Check STOREFRONT_SERVER_KEYS against the storefront's STOREFRONT_SERVER_KEY, and DISCOVER_SERVER_KEYS against Discover's DISCOVER_SERVER_KEY.",
 	noVisitor:
 		"A request with the storefront's server key had no usable X-Visitor-IP; it was counted in the storefront's shared budget. Check that the storefront forwards its visitors' addresses.",
+	noDiscoverVisitor:
+		"A request with Discover's server key had no usable X-Visitor-IP; it was counted in Discover's shared budget. Check that Discover forwards its visitors' addresses.",
 } as const;
 
 const lastWarned = new Map<keyof typeof CALLER_WARNINGS, number>();
@@ -149,14 +161,26 @@ export function resetCallerWarnings() {
 /** The request's caller, worked out once (the gate, PublicGateMiddleware, asks first). */
 export function callerOf(ctx: HttpContext): ApiCaller {
 	if (ctx.apiCaller) return ctx.apiCaller;
-	const key = serverKeys().check(ctx.request.header("authorization"));
-	if (key === "unknown") warnAtMostEvery("unknownKey");
+	const authorization = ctx.request.header("authorization");
+	const storefront = serverKeys("storefront").check(authorization);
+	// Both lists are always checked, so the time doesn't say which matched.
+	const discover = serverKeys("discover").check(authorization);
+	const service: KeyedService | null =
+		storefront === "match"
+			? "storefront"
+			: discover === "match"
+				? "discover"
+				: null;
 	let caller: ApiCaller;
-	if (key === "match") {
+	if (service) {
 		const ip = visitorIp(ctx.request.header(VISITOR_IP_HEADER));
-		if (ip === null) warnAtMostEvery("noVisitor");
-		caller = { kind: "storefront", ip };
+		if (ip === null)
+			warnAtMostEvery(
+				service === "storefront" ? "noVisitor" : "noDiscoverVisitor",
+			);
+		caller = { kind: service, ip };
 	} else {
+		if (storefront === "unknown") warnAtMostEvery("unknownKey");
 		caller = { kind: "anonymous", ip: ctx.request.ip() };
 	}
 	ctx.apiCaller = caller;
@@ -164,7 +188,7 @@ export function callerOf(ctx: HttpContext): ApiCaller {
 }
 
 /**
- * The address a public throttle counts: the storefront's visitor, else
+ * The address a public throttle counts: a keyed server's visitor, else
  * request.ip(). Later throttles use this, never request.ip().
  */
 export function callerIp(ctx: HttpContext): string {

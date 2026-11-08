@@ -115,10 +115,12 @@ services:
         # nginx's upstream (deploy/nginx/common.conf) names this address.
         ipv4_address: 172.30.42.12
 
-  # Discover (D05). Not started by a plain `up`: it has a profile, so nothing
-  # changes in production until the D11 cutover runs it on purpose
-  # (docker compose --profile discover up -d discover). nginx's split layout
-  # (hosts.split.conf) names this address; the live layout doesn't use it.
+  # Discover (D05). Not started by a plain `up`: it has a profile. deploy.sh
+  # builds and starts it when TD_ENV_DIR has discover.env (D11, stage B of the
+  # release plan in docs/discover/domain-migration.md); by hand:
+  # docker compose --profile discover up -d discover. nginx's split layout
+  # (hosts.split.conf) names this address; the live layout doesn't use it, so
+  # Discover is reachable only from inside the stack until the cutover.
   discover:
     profiles: ["discover"]
     build:
@@ -131,11 +133,14 @@ services:
     env_file:
       - ${TD_ENV_DIR:-/srv/tattoo-drip/env}/discover.env
     healthcheck:
-      # Up when / answers below 500 (it reads no API data, so it doesn't depend on the API).
+      # Up when /healthz answers 200 (D11): it reads nothing from the API, so the
+      # check spends none of the API's budget and an API outage doesn't restart
+      # Discover. The server checks its settings when it starts and exits on a bad
+      # one, so a bad discover.env shows as a restart loop, never as healthy.
       test:
         - CMD-SHELL
         - >-
-          node -e 'fetch("http://127.0.0.1:" + (process.env.PORT || 3000) + "/", { redirect: "manual", signal: AbortSignal.timeout(4000) }).then((res) => process.exit(res.status < 500 ? 0 : 1), () => process.exit(1))'
+          node -e 'fetch("http://127.0.0.1:" + (process.env.PORT || 3000) + "/healthz", { signal: AbortSignal.timeout(4000) }).then((res) => process.exit(res.status === 200 ? 0 : 1), () => process.exit(1))'
       interval: 10s
       timeout: 5s
       retries: 5

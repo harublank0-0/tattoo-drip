@@ -7,7 +7,11 @@ import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { CALLER_WARNINGS, resetCallerWarnings } from "#services/api_caller";
 import { apiLimitFor } from "#services/api_limits";
 import { assertApiError } from "#tests/helpers/api";
-import { fillApiLimit, testServerKeys } from "#tests/helpers/api_limits";
+import {
+	fillApiLimit,
+	testDiscoverServerKey,
+	testServerKeys,
+} from "#tests/helpers/api_limits";
 import { intakeFields, png, postInquiry } from "#tests/helpers/intake";
 import { captureLogs } from "#tests/helpers/logs";
 import {
@@ -21,6 +25,7 @@ import { newTempUploads, tempUploads } from "#tests/helpers/uploads";
 const SLUG = "limits-38";
 const studio = `/api/v1/tenants/${SLUG}`;
 const [ONE, TWO] = testServerKeys();
+const DISCOVER = testDiscoverServerKey();
 /**
  * Everything logged at any level, the one debug line Lucid writes inside the
  * tests' global transaction aside: it is the harness's, not the app's.
@@ -205,6 +210,75 @@ test.group("Public API limits: the gate", (group) => {
 		// Every level: only the one fixed warning, and no key in it.
 		assert.deepEqual(appLogs(logs), [[CALLER_WARNINGS.noVisitor]]);
 		assert.notInclude(JSON.stringify(appLogs(logs)), ONE);
+	});
+
+	test("Discover's key (D11) counts under its visitor in Discover's own buckets, apart from the storefront's and anonymous calls", async ({
+		client,
+		assert,
+	}) => {
+		await studioWithOwner(SLUG);
+		const logs = captureLogs();
+		try {
+			await fillApiLimit("callerReads", {
+				kind: "discover",
+				ip: "203.0.113.48",
+			});
+			const keyed = (key: string, visitor: string) =>
+				client
+					.get(studio)
+					.header("authorization", `Bearer ${key}`)
+					.header("x-visitor-ip", visitor);
+
+			assertApiError(
+				await keyed(DISCOVER, "203.0.113.48"),
+				429,
+				"rate_limited",
+			);
+			(await keyed(DISCOVER, "203.0.113.49")).assertStatus(200);
+			(await keyed(ONE, "203.0.113.48")).assertStatus(200);
+			(
+				await client.get(studio).header("x-forwarded-for", "203.0.113.48")
+			).assertStatus(200);
+			assert.deepEqual(appLogs(logs), []);
+		} finally {
+			logs.restore();
+		}
+	});
+
+	test("Discover's key without a usable visitor spends Discover's shared budget, not the storefront's, and is warned about once", async ({
+		client,
+		assert,
+	}) => {
+		await studioWithOwner(SLUG);
+		const logs = captureLogs();
+		try {
+			const shared = apiLimitFor("callerReads", { kind: "discover", ip: null });
+			assert.notEqual(
+				shared.key,
+				apiLimitFor("callerReads", { kind: "storefront", ip: null }).key,
+			);
+			await limiter
+				.use({ ...shared.budget })
+				.increment(shared.key, shared.budget.requests);
+
+			for (const visitor of [undefined, "10.0.0.1"]) {
+				const request = client
+					.get(studio)
+					.header("authorization", `Bearer ${DISCOVER}`);
+				if (visitor) request.header("x-visitor-ip", visitor);
+				assertApiError(await request, 429, "rate_limited");
+			}
+			(
+				await client.get(studio).header("authorization", `Bearer ${ONE}`)
+			).assertStatus(200);
+			assert.deepEqual(appLogs(logs), [
+				[CALLER_WARNINGS.noDiscoverVisitor],
+				[CALLER_WARNINGS.noVisitor],
+			]);
+			assert.notInclude(JSON.stringify(appLogs(logs)), DISCOVER);
+		} finally {
+			logs.restore();
+		}
 	});
 
 	test("a cacheable 200 carries no per-caller header", async ({

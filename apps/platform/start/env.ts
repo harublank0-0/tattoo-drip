@@ -48,6 +48,12 @@ const env = await Env.create(new URL("../", import.meta.url), {
 	// Required in production; unset elsewhere, no key is accepted.
 	STOREFRONT_SERVER_KEYS: (key: string, value?: string) =>
 		checkServerKeys(key, value, process.env.NODE_ENV === "production"),
+	// Discover's server key(s) (D11): its DISCOVER_SERVER_KEY, or two while
+	// rotating. Like the storefront's, it only makes Discover's server-side
+	// calls count per visitor. Optional: unset (or a key that doesn't match),
+	// Discover's calls count as one anonymous client and a warning is logged.
+	DISCOVER_SERVER_KEYS: (key: string, value?: string) =>
+		checkServerKeys(key, value, false),
 	// The reverse proxy whose X-Forwarded-For the app believes (TAT-38).
 	// Required in production; unset elsewhere it is loopback.
 	TRUST_PROXY: (key: string, value?: string) =>
