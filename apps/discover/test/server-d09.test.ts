@@ -422,7 +422,8 @@ describe("D09 gallery and artwork pages on the built server", { skip }, () => {
 		);
 		assert.match(
 			page,
-			/<title>Blackwork tattoo by Stub Artist 0 at Stub Ink &lt;b&gt;Studio&lt;\/b&gt;, Pokhara \| Tattoo Drip<\/title>/,
+			// D10: whole parts within the title's budget (the city dropped here).
+			/<title>Blackwork tattoo by Stub Artist 0 at Stub Ink &lt;b&gt;Studio&lt;\/b&gt; \| Tattoo Drip<\/title>/,
 		);
 		assertNoNestedLinks(page);
 		assertInternalLinksExist(page);
@@ -553,7 +554,8 @@ describe("D09 gallery and artwork pages on the built server", { skip }, () => {
 				path,
 			);
 			assert.match(page, /Nothing here/, path);
-			assert.doesNotMatch(page, /og:image/, path);
+			// Only the brand's card, never the photo's.
+			assert.doesNotMatch(page, /og:image" content="http:\/\/media/, path);
 			assert.doesNotMatch(text(page), /Stub Artist/, path);
 		}
 		// A malformed slug never reaches the API.
@@ -659,7 +661,7 @@ describe("D09 indexing on", { skip }, () => {
 			const page = await (await discover.get(path)).text();
 			assert.match(
 				page,
-				/<meta name="robots" content="noindex, nofollow"\/>/,
+				/<meta name="robots" content="noindex, follow"\/>/,
 				path,
 			);
 		}
@@ -669,12 +671,9 @@ describe("D09 indexing on", { skip }, () => {
 		assert.equal(busy.status, 200);
 		const busyPage = await busy.text();
 		assert.match(busyPage, /Searching is busy/);
-		assert.match(
-			busyPage,
-			/<meta name="robots" content="noindex, nofollow"\/>/,
-		);
+		assert.match(busyPage, /<meta name="robots" content="noindex, follow"\/>/);
 		api.scenario.status.clear();
-		const sitemap = await (await discover.get("/sitemap.xml")).text();
+		const sitemap = await (await discover.get("/sitemaps/static.xml")).text();
 		assert.match(sitemap, /<loc>http:\/\/localhost:3100\/tattoos<\/loc>/);
 	});
 });

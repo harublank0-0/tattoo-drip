@@ -36,10 +36,20 @@ export interface DiscoverConfig {
 	 * request), lower-cased; null (unset) turns geolocation off. Server only.
 	 */
 	geoHeader: string | null;
+	/**
+	 * DISCOVER_SITEMAP_CACHE_SECONDS (D10): how long the server keeps a built
+	 * sitemap before reading the API again (0: never). A sitemap costs up to
+	 * twenty API reads, and every Discover page shares one API budget, so
+	 * crawlers asking for sitemaps must not use it up. Default 600. Server only.
+	 */
+	sitemapCacheSeconds: number;
 }
 
 /** What the browser may know: the router's dehydrated state carries it. */
-export type PublicSettings = Omit<DiscoverConfig, "geoHeader">;
+export type PublicSettings = Omit<
+	DiscoverConfig,
+	"geoHeader" | "sitemapCacheSeconds"
+>;
 
 type Env = Readonly<Record<string, string | undefined>>;
 
@@ -57,7 +67,12 @@ const RULES = {
 		"the ISO 3166-1 alpha-2 code of one of DISCOVER_MARKETS, e.g. NP; unset: the first market",
 	DISCOVER_GEO_HEADER:
 		"the name of the header the trusted proxy sets to the visitor's country (X-Discover-Country behind deploy/nginx), or unset to turn geolocation off; never CF-IPCountry, which a visitor can send",
+	DISCOVER_SITEMAP_CACHE_SECONDS:
+		"a whole number of seconds from 0 (off) to 3600 that the server keeps a built sitemap; unset: 600",
 } as const;
+
+/** How long a built sitemap is kept when DISCOVER_SITEMAP_CACHE_SECONDS is unset. */
+const SITEMAP_CACHE_SECONDS = 600;
 
 /** An HTTP header name (RFC 9110 token, letters, digits and hyphens here). */
 const HEADER_NAME = /^[A-Za-z0-9][A-Za-z0-9-]{0,63}$/;
@@ -127,6 +142,18 @@ export function parseDiscoverConfig(env: Env): DiscoverConfig {
 		);
 	}
 
+	const cacheValue = env.DISCOVER_SITEMAP_CACHE_SECONDS?.trim() ?? "";
+	const sitemapCacheSeconds =
+		cacheValue === "" ? SITEMAP_CACHE_SECONDS : Number(cacheValue);
+	if (
+		cacheValue !== "" &&
+		!(/^\d{1,4}$/.test(cacheValue) && sitemapCacheSeconds <= 3600)
+	) {
+		problems.push(
+			`DISCOVER_SITEMAP_CACHE_SECONDS is not valid: ${RULES.DISCOVER_SITEMAP_CACHE_SECONDS}.`,
+		);
+	}
+
 	if (
 		problems.length > 0 ||
 		!apiUrl ||
@@ -147,6 +174,7 @@ export function parseDiscoverConfig(env: Env): DiscoverConfig {
 		markets,
 		defaultCountry,
 		geoHeader: geoValue ? geoValue.toLowerCase() : null,
+		sitemapCacheSeconds,
 	};
 }
 
@@ -155,7 +183,11 @@ export function parseDiscoverConfig(env: Env): DiscoverConfig {
  * (not a secret, but the browser has no use for it).
  */
 export function publicSettings(config: DiscoverConfig): PublicSettings {
-	const { geoHeader: _serverOnly, ...settings } = config;
+	const {
+		geoHeader: _serverOnly,
+		sitemapCacheSeconds: _alsoServerOnly,
+		...settings
+	} = config;
 	return { ...settings, markets: [...settings.markets] };
 }
 

@@ -1627,6 +1627,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['locations']>>>
     }
   }
+  'api.v1.discover.sitemap.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/discover/sitemap/:kind'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { kind: ParamValue }
+      query: ExtractQueryForGet<InferInput<(typeof import('#modules/discovery/validators/discover').listDiscoverSitemapValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['sitemap']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['sitemap']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
   'api.v1.studio': {
     methods: ["GET","HEAD"]
     pattern: '/api/v1/tenants/:tenant'

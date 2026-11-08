@@ -5,7 +5,10 @@ import type {
 } from "@tattoo-drip/sdk";
 import { ArrowRightIcon, ArrowUpRightIcon } from "lucide-react";
 import { ProfileLink } from "#/components/discovery/profile-link";
-import { ResponsiveImage } from "#/components/discovery/responsive-image";
+import {
+	BadgeImage,
+	ResponsiveImage,
+} from "#/components/discovery/responsive-image";
 import { artistSiteNote, profileDestination } from "#/lib/destinations";
 import { artistWorks, studioWorks } from "#/lib/directory";
 import { artistAffiliation, tattooAlt } from "#/lib/home";
@@ -24,9 +27,12 @@ function initial(name: string): string {
 /** A studio's logo on the tile its owner chose (light or dark). */
 function Logo({
 	logo,
+	size,
 	className,
 }: {
 	logo: NonNullable<DiscoverStudioSummary["logo"]>;
+	/** Its tile's largest size in CSS px, for the copy it loads. */
+	size: number;
 	className?: string;
 }) {
 	return (
@@ -37,13 +43,10 @@ function Logo({
 				className,
 			)}
 		>
-			<img
-				src={logo.url}
-				width={logo.width}
-				height={logo.height}
-				alt=""
-				loading="lazy"
-				decoding="async"
+			<BadgeImage
+				image={logo}
+				size={size}
+				lazy
 				className="max-h-full max-w-full object-contain"
 			/>
 		</span>
@@ -58,20 +61,24 @@ function Logo({
 function StudioMedia({
 	studio,
 	works,
+	lead = false,
 }: {
 	studio: DiscoverStudioSummary;
 	works: DiscoverTattooSummary[];
+	/** The list's first row (D10): its first image loads at once with high priority (the page's likely LCP); the rest stay lazy, so nothing competes with it. */
+	lead?: boolean;
 }) {
 	if (works.length >= 3)
 		return (
 			<span className="grid grid-cols-3 gap-1">
-				{works.map((work) => (
+				{works.map((work, index) => (
 					<ResponsiveImage
 						key={work.id}
 						image={work.image}
 						alt={tattooAlt(work)}
 						ratio="4 / 5"
-						sizes="(min-width: 64rem) 13vw, 33vw"
+						sizes="(min-width: 64rem) 13vw, (min-width: 40rem) 14vw, 33vw"
+						priority={lead && index === 0}
 					/>
 				))}
 			</span>
@@ -89,13 +96,14 @@ function StudioMedia({
 							: ""
 				}
 				ratio="3 / 2"
-				sizes="(min-width: 64rem) 40vw, 100vw"
+				sizes="(min-width: 40rem) 40vw, 100vw"
+				priority={lead}
 			/>
 		);
 	if (studio.logo)
 		return (
 			<span className="flex aspect-[3/2] items-center justify-center bg-paper-sunk">
-				<Logo logo={studio.logo} className="size-24 sm:size-28" />
+				<Logo logo={studio.logo} size={112} className="size-24 sm:size-28" />
 			</span>
 		);
 	return (
@@ -118,16 +126,19 @@ export function StudioResults({
 	studios,
 	works,
 	headingLevel = 3,
+	lead = false,
 }: {
 	studios: readonly DiscoverStudioSummary[];
 	/** Recent photos of the same filters, for each studio's strip. */
 	works: readonly DiscoverTattooSummary[];
 	headingLevel?: 2 | 3;
+	/** The page's main list (a directory): the first row's picture loads first. */
+	lead?: boolean;
 }) {
 	const Heading = `h${headingLevel}` as const;
 	return (
 		<ul className="border-t border-ink">
-			{studios.map((studio) => {
+			{studios.map((studio, index) => {
 				const destination = profileDestination(studio);
 				const own = studioWorks(studio, works);
 				const hasPicture = own.length > 0 || Boolean(studio.cover);
@@ -137,11 +148,15 @@ export function StudioResults({
 							destination={destination}
 							className="group grid gap-4 py-6 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] sm:items-center sm:gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-12"
 						>
-							<StudioMedia studio={studio} works={own} />
+							<StudioMedia
+								studio={studio}
+								works={own}
+								lead={lead && index === 0}
+							/>
 							<span className="flex min-w-0 flex-col gap-2">
 								<span className="flex items-center gap-3">
 									{hasPicture && studio.logo && (
-										<Logo logo={studio.logo} className="size-12" />
+										<Logo logo={studio.logo} size={48} className="size-12" />
 									)}
 									<Heading className="min-w-0 font-display text-display-md font-bold break-words">
 										{studio.name}
@@ -191,12 +206,26 @@ export function StudioResults({
 function ArtistMedia({
 	artist,
 	works,
+	compact,
+	first = false,
 }: {
 	artist: DiscoverArtistSummary;
 	works: DiscoverTattooSummary[];
+	compact: boolean;
+	/** The list's first card (D10): its lead image loads at once with high priority; the smaller ones stay lazy. */
+	first?: boolean;
 }) {
 	const [lead, second, third] = works;
-	const sizes = "(min-width: 80rem) 22vw, (min-width: 64rem) 30vw, 50vw";
+	// Two columns to lg (one below 26rem: there 50vw caps the copy at about
+	// 1.7x density, the 640 px copy, instead of the 1280 px one: measured in
+	// D10, the sharper copy doubled the page's photo bytes and its LCP), three,
+	// then four from xl; compact: two, then four from lg.
+	const sizes = compact
+		? "(min-width: 64rem) 22vw, 50vw"
+		: "(min-width: 80rem) 22vw, (min-width: 64rem) 30vw, 50vw";
+	const small = compact
+		? "(min-width: 64rem) 11vw, 25vw"
+		: "(min-width: 64rem) 12vw, 25vw";
 	if (lead && second)
 		return (
 			<span className="flex flex-col gap-1">
@@ -205,6 +234,7 @@ function ArtistMedia({
 					alt={tattooAlt(lead)}
 					ratio="4 / 3"
 					sizes={sizes}
+					priority={first}
 				/>
 				{third ? (
 					<span className="grid grid-cols-2 gap-1">
@@ -214,7 +244,7 @@ function ArtistMedia({
 								image={work.image}
 								alt={tattooAlt(work)}
 								ratio="1 / 1"
-								sizes="(min-width: 64rem) 12vw, 25vw"
+								sizes={small}
 							/>
 						))}
 					</span>
@@ -236,6 +266,7 @@ function ArtistMedia({
 				alt={lead ? tattooAlt(lead) : `${artist.name}, tattoo artist`}
 				ratio="4 / 5"
 				sizes={sizes}
+				priority={first}
 			/>
 		);
 	return (
@@ -258,12 +289,15 @@ export function ArtistResults({
 	works,
 	headingLevel = 3,
 	compact = false,
+	lead = false,
 }: {
 	artists: readonly DiscoverArtistSummary[];
 	works: readonly DiscoverTattooSummary[];
 	headingLevel?: 2 | 3;
 	/** Two columns from the smallest phone (a profile's "more artists"). */
 	compact?: boolean;
+	/** The page's main list (a directory): the first card's work loads first. */
+	lead?: boolean;
 }) {
 	const Heading = `h${headingLevel}` as const;
 	return (
@@ -275,7 +309,7 @@ export function ArtistResults({
 					: "grid-cols-1 min-[26rem]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
 			)}
 		>
-			{artists.map((artist) => {
+			{artists.map((artist, index) => {
 				const destination = profileDestination(artist);
 				return (
 					<li key={artist.id}>
@@ -283,7 +317,12 @@ export function ArtistResults({
 							destination={destination}
 							className="group flex flex-col gap-3"
 						>
-							<ArtistMedia artist={artist} works={artistWorks(artist, works)} />
+							<ArtistMedia
+								artist={artist}
+								works={artistWorks(artist, works)}
+								compact={compact}
+								first={lead && index === 0}
+							/>
 							<span className="flex flex-col gap-1">
 								<span className="flex items-start justify-between gap-2">
 									<Heading className="min-w-0 font-display text-xl font-bold break-words sm:text-2xl">

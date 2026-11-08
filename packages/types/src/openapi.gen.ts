@@ -262,6 +262,73 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/discover/sitemap/studios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every listed studio's slug, for Discover's sitemaps (D10)
+         * @description The canonical identifiers of the studios `listDiscoverStudios` shows
+         *     (the same views, so the same eligibility), in a stable order (by id)
+         *     with keyset paging: up to 5,000 a page. No other field: Discover builds
+         *     each profile's address from them. Counts against `discoverSitemap`
+         *     as well as the Discover read budget.
+         */
+        get: operations["listDiscoverSitemapStudios"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/sitemap/artists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every shown artist profile's identifiers, for Discover's sitemaps (D10)
+         * @description Every shown artist at a listed studio, and one entry per listed
+         *     independent business (its profile artist, the one
+         *     `getDiscoverIndependentArtist` answers), by id, keyset-paged as
+         *     `listDiscoverSitemapStudios`.
+         */
+        get: operations["listDiscoverSitemapArtists"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/sitemap/tattoos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every published photo's id, for Discover's sitemaps (D10)
+         * @description The photos `listDiscoverTattoos` shows, by id, keyset-paged as `listDiscoverSitemapStudios`.
+         */
+        get: operations["listDiscoverSitemapTattoos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/placements": {
         parameters: {
             query?: never;
@@ -1475,6 +1542,24 @@ export interface components {
             /** @description The first-level subdivision */
             region: string | null;
         };
+        DiscoverSitemapStudio: {
+            /** @description The studio's current slug */
+            slug: string;
+        };
+        DiscoverSitemapArtist: {
+            /** @description The artist's slug (unique per studio only) */
+            slug: string;
+            studio: {
+                /** @description The business's current slug: an independent's profile address */
+                slug: string;
+                /** @enum {string} */
+                type: "studio" | "independent";
+            };
+        };
+        DiscoverSitemapTattoo: {
+            /** Format: uuid */
+            id: string;
+        };
         DiscoverStudioRef: {
             slug: string;
             name: string;
@@ -1665,6 +1750,9 @@ export interface components {
         /** @description The previous page's `nextCursor`, as sent, with the same filters and sort */
         DiscoverCursor: string;
         DiscoverLimit: number;
+        /** @description The previous page's `nextCursor`, as sent (the sitemap lists' keyset position) */
+        DiscoverSitemapCursor: string;
+        DiscoverSitemapLimit: number;
     };
     requestBodies: never;
     headers: {
@@ -2058,6 +2146,105 @@ export interface operations {
                 };
             };
             304: components["responses"]["NotModified"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listDiscoverSitemapStudios: {
+        parameters: {
+            query?: {
+                /** @description The previous page's `nextCursor`, as sent (the sitemap lists' keyset position) */
+                cursor?: components["parameters"]["DiscoverSitemapCursor"];
+                limit?: components["parameters"]["DiscoverSitemapLimit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of studios */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["DiscoverSitemapStudio"][];
+                        nextCursor: components["schemas"]["DiscoverNextCursor"];
+                    };
+                };
+            };
+            304: components["responses"]["NotModified"];
+            422: components["responses"]["ValidationError"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listDiscoverSitemapArtists: {
+        parameters: {
+            query?: {
+                /** @description The previous page's `nextCursor`, as sent (the sitemap lists' keyset position) */
+                cursor?: components["parameters"]["DiscoverSitemapCursor"];
+                limit?: components["parameters"]["DiscoverSitemapLimit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of artist profiles */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["DiscoverSitemapArtist"][];
+                        nextCursor: components["schemas"]["DiscoverNextCursor"];
+                    };
+                };
+            };
+            304: components["responses"]["NotModified"];
+            422: components["responses"]["ValidationError"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listDiscoverSitemapTattoos: {
+        parameters: {
+            query?: {
+                /** @description The previous page's `nextCursor`, as sent (the sitemap lists' keyset position) */
+                cursor?: components["parameters"]["DiscoverSitemapCursor"];
+                limit?: components["parameters"]["DiscoverSitemapLimit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of photos */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["DiscoverSitemapTattoo"][];
+                        nextCursor: components["schemas"]["DiscoverNextCursor"];
+                    };
+                };
+            };
+            304: components["responses"]["NotModified"];
+            422: components["responses"]["ValidationError"];
             429: components["responses"]["RateLimited"];
             default: components["responses"]["Error"];
         };

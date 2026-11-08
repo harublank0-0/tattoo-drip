@@ -139,6 +139,7 @@ export type ScannedRoutes = {
     'api.v1.discover.tattoos.show': { paramsTuple: [ParamValue]; params: {'tattoo': ParamValue} }
     'api.v1.discover.styles.index': { paramsTuple?: []; params?: {} }
     'api.v1.discover.locations.index': { paramsTuple?: []; params?: {} }
+    'api.v1.discover.sitemap.index': { paramsTuple: [ParamValue]; params: {'kind': ParamValue} }
     'api.v1.studio': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.artists.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.artists.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'artist': ParamValue} }
@@ -209,6 +210,7 @@ export type ScannedRoutes = {
     'api.v1.discover.tattoos.show': { paramsTuple: [ParamValue]; params: {'tattoo': ParamValue} }
     'api.v1.discover.styles.index': { paramsTuple?: []; params?: {} }
     'api.v1.discover.locations.index': { paramsTuple?: []; params?: {} }
+    'api.v1.discover.sitemap.index': { paramsTuple: [ParamValue]; params: {'kind': ParamValue} }
     'api.v1.studio': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.artists.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.artists.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'artist': ParamValue} }
@@ -277,6 +279,7 @@ export type ScannedRoutes = {
     'api.v1.discover.tattoos.show': { paramsTuple: [ParamValue]; params: {'tattoo': ParamValue} }
     'api.v1.discover.styles.index': { paramsTuple?: []; params?: {} }
     'api.v1.discover.locations.index': { paramsTuple?: []; params?: {} }
+    'api.v1.discover.sitemap.index': { paramsTuple: [ParamValue]; params: {'kind': ParamValue} }
     'api.v1.studio': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.artists.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.artists.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'artist': ParamValue} }

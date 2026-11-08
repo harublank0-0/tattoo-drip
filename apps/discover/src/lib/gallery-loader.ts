@@ -2,9 +2,10 @@ import { redirect } from "@tanstack/react-router";
 import { discoverQueries } from "@tattoo-drip/react";
 import { isTattooApiError } from "@tattoo-drip/sdk";
 import { rethrowUnavailable } from "./api-errors.ts";
+import { crumbs } from "./breadcrumbs.ts";
+import type { PublicSettings } from "./config.ts";
 import type { DiscoverContext } from "./context.ts";
 import type { ResolvedCountry } from "./country.ts";
-import { hasSearchParams } from "./directory.ts";
 import {
 	type GalleryFilters,
 	type GalleryLabels,
@@ -15,9 +16,11 @@ import {
 	resolveGallery,
 } from "./gallery.ts";
 import { placesIn } from "./home.ts";
+import { summary } from "./profiles.ts";
 import { paths } from "./routes.ts";
 import { knownStyle } from "./search.ts";
-import { pageMeta } from "./seo.ts";
+import { type HeadMatch, pageMeta } from "./seo.ts";
+import { breadcrumbLd, structuredData } from "./structured-data.ts";
 
 type LoaderContext = DiscoverContext & { country: ResolvedCountry };
 
@@ -93,22 +96,37 @@ export function galleryPlaces(
 
 /**
  * The gallery's title and description, server-rendered. Any parameter makes
- * the page noindex (search, filters, cursor, `?country=`); the bare page
- * may be indexed (INDEXABLE_PATHS, with DISCOVER_INDEXING on).
+ * the page noindex (the root's `pageState`: search, filters, cursor,
+ * `?country=`); the bare page may be indexed (INDEXABLE_PATHS, with
+ * DISCOVER_INDEXING on), with its breadcrumbs as structured data.
  */
-export function galleryHead(match: {
-	search: GallerySearch;
-	loaderData?: { filters: GalleryFilters; labels: GalleryLabels };
+export function galleryHead(context: {
+	matches: readonly HeadMatch[];
+	match: {
+		context: { discover: { settings: PublicSettings } };
+		loaderData?: { filters: GalleryFilters; labels: GalleryLabels };
+	};
 }) {
-	const data = match.loaderData;
-	const title = data
-		? galleryTitle(data.filters, data.labels)
-		: "Tattoo inspiration";
+	const data = context.match.loaderData;
+	// No data: the error page, whose title the root gives.
+	if (!data) return { meta: [] };
+	const title = galleryTitle(data.filters, data.labels);
 	return {
-		meta: pageMeta({
-			title,
-			description: `${title}: the newest work published by listed tattoo studios and independent artists on Tattoo Drip. Open a piece to see who made it and request something similar.`,
-			noindex: hasSearchParams(match.search),
-		}),
+		meta: [
+			...pageMeta({
+				title,
+				// Cut at a word when a long search makes it long.
+				description: summary(
+					`${title}: the newest work by listed tattoo studios and independent artists on Tattoo Drip. Open a piece to see who made it and request something similar.`,
+				),
+			}),
+			...structuredData(context, [
+				breadcrumbLd(
+					context.match.context.discover.settings,
+					crumbs.gallery(),
+					paths.tattoos(),
+				),
+			]),
+		],
 	};
 }

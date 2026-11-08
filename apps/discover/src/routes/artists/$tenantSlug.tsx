@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ArtistProfile } from "#/components/profile/artist-profile";
 import { independentQueries, loadIndependentProfile } from "#/lib/profiles";
 import { pageMeta } from "#/lib/seo";
+import { structuredData } from "#/lib/structured-data";
 
 /**
  * `/artists/:tenantSlug` (D08): an independent artist's profile, by their
@@ -12,8 +13,13 @@ import { pageMeta } from "#/lib/seo";
 export const Route = createFileRoute("/artists/$tenantSlug")({
 	loader: ({ context, params }) =>
 		loadIndependentProfile(context, params.tenantSlug),
-	head: ({ loaderData }) => ({
-		meta: loaderData ? pageMeta(loaderData.seo) : [],
+	head: (context) => ({
+		meta: context.loaderData
+			? [
+					...pageMeta(context.loaderData.seo),
+					...structuredData(context, context.loaderData.structured),
+				]
+			: [],
 	}),
 	component: IndependentProfile,
 });

@@ -10,9 +10,15 @@ import displayLatin from "../assets/fonts/eczar-latin-700-normal.woff2?url";
 import uiLatin from "../assets/fonts/geist-latin-wght-normal.woff2?url";
 import { SiteFooter } from "../components/layout/site-footer.tsx";
 import { SiteHeader } from "../components/layout/site-header.tsx";
+import { isUnavailable } from "../lib/api-errors.ts";
 import type { DiscoverContext } from "../lib/context.ts";
 import { normalizeCountry, pageCountry } from "../lib/country.ts";
-import { HTML_CACHE_HEADERS, headTags, NOINDEX } from "../lib/seo.ts";
+import {
+	HTML_CACHE_HEADERS,
+	headTags,
+	pageState,
+	robotsValue,
+} from "../lib/seo.ts";
 import appCss from "../styles.css?url";
 
 export const Route = createRootRouteWithContext<DiscoverContext>()({
@@ -31,24 +37,29 @@ export const Route = createRootRouteWithContext<DiscoverContext>()({
 	}),
 	head: ({ match, matches }) => {
 		// The canonical URL is the page's own path on DISCOVER_URL, whatever host
-		// the request came in on; pages add their title and description.
-		const page = matches[matches.length - 1] ?? match;
-		// No page matched (only the root), or a page's loader threw notFound()
-		// (its match is then "notFound" before the root's head runs).
-		const notFound =
-			!matches.some((each) => each.routeId !== rootRouteId) ||
-			matches.some((each) => each.status === "notFound");
-		// A page with an explicit ?country= is a variant: never indexed, and its
-		// canonical (the path alone) points at the page without it.
-		// An index route's match path ends in "/" (`/locations/nepal/`); the
-		// address served (and canonical) has none.
-		const pathname = page.pathname.replace(/(.)\/$/, "$1");
+		// the request came in on; pages add their title, description and
+		// picture. Robots are decided here, once, from every match (`pageState`:
+		// a 404, an error, any query such as `?country=` or a filter, or a page
+		// that opts out in its loader data or staticData), so a page has one
+		// robots tag and its X-Robots-Tag header (below) always agrees.
+		const page = pageState(matches, rootRouteId);
+		const failed = matches.find((each) => each.status === "error");
 		const { meta, links } = headTags(
 			match.context.discover.settings,
-			pathname,
-			notFound
-				? { title: "Page not found", noindex: true }
-				: { noindex: match.search.country !== undefined },
+			page.pathname,
+			page.notFound
+				? { title: "Page not found", noindex: true, canonical: false }
+				: failed
+					? {
+							// The error page's own heading (RouteErrorState).
+							title: isUnavailable(failed.error)
+								? "Discover is unavailable for a moment"
+								: "Something went wrong",
+							noindex: true,
+							// Not this address's content: no canonical.
+							canonical: false,
+						}
+					: { noindex: page.noindex },
 		);
 		return {
 			meta: [
@@ -82,16 +93,23 @@ export const Route = createRootRouteWithContext<DiscoverContext>()({
 	},
 	// Every page shows the visitor's country (the header's selector, the
 	// lists), so no shared cache may keep one visitor's page for another
-	// (HTML_CACHE_HEADERS). While DISCOVER_INDEXING is off, or on a page with
-	// an explicit ?country=, every answer also says noindex in a header: a
-	// crawler that ignores robots.txt still sees it.
-	headers: ({ match }): Record<string, string> => ({
-		...HTML_CACHE_HEADERS,
-		...(!match.context.discover.settings.indexing ||
-		match.search.country !== undefined
-			? { "X-Robots-Tag": NOINDEX }
-			: {}),
-	}),
+	// (HTML_CACHE_HEADERS). Every page that isn't indexable also says so in a
+	// header, the same value as its robots meta: `noindex, nofollow` while
+	// DISCOVER_INDEXING is off, `noindex, follow` for a variant, empty, 404
+	// or error page while it is on. A crawler that ignores robots.txt still
+	// sees it.
+	headers: ({ match, matches }): Record<string, string> => {
+		const page = pageState(matches, rootRouteId);
+		const robots = robotsValue(
+			match.context.discover.settings,
+			page.pathname,
+			page,
+		);
+		return {
+			...HTML_CACHE_HEADERS,
+			...(robots ? { "X-Robots-Tag": robots } : {}),
+		};
+	},
 	shellComponent: RootDocument,
 });
 

@@ -85,10 +85,28 @@ export const listDiscoverTattoosValidator = vine.create({
 	limit: limit(),
 });
 
+/** The sitemap lists' page (D10): identifiers only, so far more rows than a list's 48. */
+export const SITEMAP_PAGE_SIZE = 5000;
+
+export const listDiscoverSitemapValidator = vine.create({
+	cursor: vine
+		.string()
+		.regex(UUID)
+		.transform((value) => value.toLowerCase())
+		.optional(),
+	limit: vine
+		.number()
+		.withoutDecimals()
+		.min(1)
+		.max(SITEMAP_PAGE_SIZE)
+		.optional(),
+});
+
 export const CURSOR_MESSAGE =
 	"Pass a nextCursor exactly as the previous page sent it, with the same sort.";
 export const CITY_MESSAGE = "Name the country of the city (country=NP).";
 const LIMIT_MESSAGE = `Use a whole number from 1 to ${MAX_DISCOVER_PAGE}.`;
+const SITEMAP_LIMIT_MESSAGE = `Use a whole number from 1 to ${SITEMAP_PAGE_SIZE}.`;
 const QUERY_MESSAGE = `Search with ${MIN_QUERY_LENGTH} to ${MAX_QUERY_LENGTH} characters.`;
 
 const messages = new SimpleMessagesProvider({
@@ -120,3 +138,11 @@ const messages = new SimpleMessagesProvider({
 listDiscoverStudiosValidator.messagesProvider = messages;
 listDiscoverArtistsValidator.messagesProvider = messages;
 listDiscoverTattoosValidator.messagesProvider = messages;
+listDiscoverSitemapValidator.messagesProvider = new SimpleMessagesProvider({
+	"cursor.string": CURSOR_MESSAGE,
+	"cursor.regex": CURSOR_MESSAGE,
+	"limit.number": SITEMAP_LIMIT_MESSAGE,
+	"limit.withoutDecimals": SITEMAP_LIMIT_MESSAGE,
+	"limit.min": SITEMAP_LIMIT_MESSAGE,
+	"limit.max": SITEMAP_LIMIT_MESSAGE,
+});

@@ -48,4 +48,11 @@ declare module "@tanstack/react-router" {
 	interface Register {
 		router: ReturnType<typeof getRouter>;
 	}
+	/**
+	 * D10: a route that may never be indexed whatever DISCOVER_INDEXING says
+	 * (`/pricing`); the root's head reads it (`pageState`, src/lib/seo.ts).
+	 */
+	interface StaticDataRouteOption {
+		noindex?: boolean;
+	}
 }

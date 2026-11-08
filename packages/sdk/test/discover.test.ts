@@ -65,6 +65,28 @@ describe("createDiscoverClient", () => {
 		}
 	});
 
+	test("the sitemap lists (D10): their paths, cursor and limit, the whole page back", async () => {
+		const page = {
+			data: [{ id: "0190a6f0-0000-7000-8000-000000000001" }],
+			nextCursor: "0190a6f0-0000-7000-8000-000000000001",
+		};
+		const { calls, fetch } = fakeFetch(() => json(200, page));
+		const discover = client(fetch);
+		assert.deepEqual(await discover.sitemap.tattoos(), page);
+		await discover.sitemap.studios({ limit: 5000 });
+		await discover.sitemap.artists({
+			cursor: "0190a6f0-0000-7000-8000-000000000001",
+		});
+		assert.deepEqual(
+			calls.map((call) => call.url),
+			[
+				`${ROOT}/sitemap/tattoos`,
+				`${ROOT}/sitemap/studios?limit=5000`,
+				`${ROOT}/sitemap/artists?cursor=0190a6f0-0000-7000-8000-000000000001`,
+			],
+		);
+	});
+
 	test("trims the base URL's trailing slashes", async () => {
 		const { calls, fetch } = fakeFetch(() => json(200, { data: [] }));
 		await client(fetch, { baseUrl: "https://api.example.com//" }).styles.list();

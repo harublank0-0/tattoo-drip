@@ -152,7 +152,7 @@ test.group("Public API routes", () => {
 		const routes = allRoutes().filter(({ pattern }) =>
 			pattern.startsWith("/api/v1/discover/"),
 		);
-		assert.lengthOf(routes, 10);
+		assert.lengthOf(routes, 11);
 
 		for (const { pattern, methods, named } of routes) {
 			assert.deepEqual(methods, ["GET"], pattern);

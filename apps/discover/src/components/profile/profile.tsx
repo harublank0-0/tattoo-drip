@@ -102,6 +102,7 @@ export function HeroMedia({
 				alt={alt}
 				ratio={null}
 				priority
+				large
 				sizes="(min-width: 64rem) 55vw, 100vw"
 				className="aspect-[4/5] sm:aspect-[3/2] lg:aspect-[4/3]"
 			/>

@@ -44,6 +44,12 @@ import type { AddressInfo } from "node:net";
  * photo's alt text, its artist's, studio's and style's names, as the API
  * does since D09. `scenario.links[<id>]` overrides a photo's links.
  *
+ * D10: the sitemap lists (`/sitemap/{studios,artists,tattoos}`): the
+ * shown rows' identifiers (studios; every shown artist of a shown studio,
+ * its profile-only crew included, and each independent once; every photo
+ * `/tattoos/:id` shows), by id, paged by the last id (`limit` 1–5000,
+ * `scenario.sitemapPage` rows at most, a uuid cursor, else a 422).
+ *
  * Divergences from the real API: the cursor is base64url of
  * `["stub", sort, offset]` (an offset, not a keyset, so rows added while
  * paging would shift; the fixtures never change mid-test), and only the
@@ -62,7 +68,11 @@ export type Endpoint =
 	| "studio-artist"
 	| "independent"
 	// D09's artwork read.
-	| "tattoo";
+	| "tattoo"
+	// D10's sitemap lists.
+	| "sitemap-studios"
+	| "sitemap-artists"
+	| "sitemap-tattoos";
 
 /** The referral token the stub's booking links carry (shaped like the platform's; never verified here). */
 export const STUB_REF =
@@ -376,6 +386,8 @@ export type StubApi = {
 		hidden: Set<string>;
 		/** A profile's booking and site links, replaced (D08): by studio slug or `<studio>/<artist>`. */
 		links: Record<string, { bookingUrl?: string; storefrontUrl?: string }>;
+		/** The most rows a sitemap list's page holds (D10; the API's is 5,000). */
+		sitemapPage: number;
 	};
 	close: () => void;
 };
@@ -390,6 +402,7 @@ export async function stubApi(count = 1): Promise<StubApi> {
 		extraPlaces: [] as StubApi["scenario"]["extraPlaces"],
 		hidden: new Set<string>(),
 		links: {} as StubApi["scenario"]["links"],
+		sitemapPage: 5000,
 	};
 	const hanging = new Set<() => void>();
 	const server = createServer((request, response) => {
@@ -399,19 +412,21 @@ export async function stubApi(count = 1): Promise<StubApi> {
 		const limit = Number(address.searchParams.get("limit") ?? 24);
 		const segments = path.replace("/api/v1/discover/", "").split("/");
 		const endpoint = (
-			segments.length === 1
-				? segments[0]
-				: segments[0] === "studios" && segments.length === 2
-					? "studio"
-					: segments[0] === "studios" && segments[2] === "artists"
-						? segments.length === 3
-							? "studio-artists"
-							: "studio-artist"
-						: segments[0] === "artists" && segments.length === 2
-							? "independent"
-							: segments[0] === "tattoos" && segments.length === 2
-								? "tattoo"
-								: "unknown"
+			segments[0] === "sitemap" && segments.length === 2
+				? `sitemap-${segments[1]}`
+				: segments.length === 1
+					? segments[0]
+					: segments[0] === "studios" && segments.length === 2
+						? "studio"
+						: segments[0] === "studios" && segments[2] === "artists"
+							? segments.length === 3
+								? "studio-artists"
+								: "studio-artist"
+							: segments[0] === "artists" && segments.length === 2
+								? "independent"
+								: segments[0] === "tattoos" && segments.length === 2
+									? "tattoo"
+									: "unknown"
 		) as Endpoint;
 		response.setHeader("Content-Type", "application/json");
 		// For an ad hoc browser check against the stub (the real API allows DISCOVER_URL).
@@ -550,6 +565,80 @@ export async function stubApi(count = 1): Promise<StubApi> {
 						bookingUrl: `${origin}/book?artwork=${photo.id}&ref=${STUB_REF}`,
 						...scenario.links[photo.id],
 					},
+				}),
+			);
+		}
+		if (endpoint.startsWith("sitemap-")) {
+			const params = address.searchParams;
+			const cursor = params.get("cursor");
+			const uuidShape =
+				/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+			if (
+				!Number.isInteger(Number(params.get("limit") ?? 5000)) ||
+				Number(params.get("limit") ?? 5000) < 1 ||
+				Number(params.get("limit") ?? 5000) > 5000 ||
+				(cursor !== null && !uuidShape.test(cursor))
+			) {
+				response.statusCode = 422;
+				return response.end(
+					JSON.stringify({
+						error: { code: "validation_failed", message: "Stub validation" },
+					}),
+				);
+			}
+			const shownStudios = data.studios.filter(
+				(studio) => !hidden.has(studio.slug),
+			);
+			const rows: { id: string; item: unknown }[] =
+				endpoint === "sitemap-studios"
+					? shownStudios.map((studio) => ({
+							id: studio.id,
+							item: { slug: studio.slug },
+						}))
+					: endpoint === "sitemap-artists"
+						? [
+								...shownStudios.flatMap((studio) =>
+									profileArtists(data, studio)
+										.filter(
+											(artist) => !hidden.has(`${studio.slug}/${artist.slug}`),
+										)
+										.map((artist) => ({
+											id: artist.id,
+											item: {
+												slug: artist.slug,
+												studio: { slug: studio.slug, type: "studio" },
+											},
+										})),
+								),
+								...data.artists
+									.filter(
+										(artist) =>
+											artist.independent && !hidden.has(artist.studio.slug),
+									)
+									.map((artist) => ({
+										id: artist.id,
+										item: {
+											slug: artist.slug,
+											studio: { slug: artist.studio.slug, type: "independent" },
+										},
+									})),
+							]
+						: [...photoIndex(data, hidden).values()]
+								.filter(({ photo }) => !photoHidden(photo, hidden))
+								.map(({ photo }) => ({ id: photo.id, item: { id: photo.id } }));
+			rows.sort((a, b) => a.id.localeCompare(b.id));
+			const after = rows.filter(
+				(row) => !cursor || row.id > cursor.toLowerCase(),
+			);
+			const size = Math.min(
+				Number(params.get("limit") ?? 5000),
+				scenario.sitemapPage,
+			);
+			const page = after.slice(0, size);
+			return response.end(
+				JSON.stringify({
+					data: page.map((row) => row.item),
+					nextCursor: after.length > size ? (page.at(-1)?.id ?? null) : null,
 				}),
 			);
 		}

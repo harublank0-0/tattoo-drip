@@ -83,3 +83,11 @@ export type DiscoverArtistsPage =
 	operations["listDiscoverArtists"]["responses"][200]["content"]["application/json"];
 export type DiscoverTattoosPage =
 	operations["listDiscoverTattoos"]["responses"][200]["content"]["application/json"];
+// Discover D10: the sitemap lists (canonical identifiers only, keyset-paged).
+export type DiscoverSitemapStudio = Schemas["DiscoverSitemapStudio"];
+export type DiscoverSitemapArtist = Schemas["DiscoverSitemapArtist"];
+export type DiscoverSitemapTattoo = Schemas["DiscoverSitemapTattoo"];
+export type DiscoverSitemapQuery = NonNullable<
+	operations["listDiscoverSitemapTattoos"]["parameters"]["query"]
+>;
+export type DiscoverSitemapPage<T> = { data: T[]; nextCursor: string | null };

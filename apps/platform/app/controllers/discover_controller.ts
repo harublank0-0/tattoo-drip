@@ -13,8 +13,10 @@ import {
 	CURSOR_MESSAGE,
 	DISCOVER_PAGE_SIZE,
 	listDiscoverArtistsValidator,
+	listDiscoverSitemapValidator,
 	listDiscoverStudiosValidator,
 	listDiscoverTattoosValidator,
+	SITEMAP_PAGE_SIZE,
 } from "#modules/discovery/validators/discover";
 import { callerOf } from "#services/api_caller";
 import { consumeApiLimit } from "#services/api_limits";
@@ -125,6 +127,30 @@ export default class DiscoverController {
 
 	async tattoo({ params }: HttpContext) {
 		return { data: found(await this.discovery.tattoo(params.tattoo)) };
+	}
+
+	/**
+	 * The sitemap lists (D10): identifiers only, by id, keyset-paged. Each
+	 * page also counts against `discoverSitemap`: up to 5,000 rows a read.
+	 */
+	async sitemap(ctx: HttpContext) {
+		const query = await ctx.request.validateUsing(
+			listDiscoverSitemapValidator,
+			{ data: ctx.request.qs() },
+		);
+		await consumeApiLimit("discoverSitemap", callerOf(ctx));
+		const page = {
+			after: query.cursor ?? null,
+			limit: query.limit ?? SITEMAP_PAGE_SIZE,
+		};
+		const kind: string = ctx.params.kind;
+		const result =
+			kind === "studios"
+				? await this.discovery.sitemapStudios(page)
+				: kind === "artists"
+					? await this.discovery.sitemapArtists(page)
+					: await this.discovery.sitemapTattoos(page);
+		return { data: result.items, nextCursor: result.nextCursor };
 	}
 
 	async styles() {

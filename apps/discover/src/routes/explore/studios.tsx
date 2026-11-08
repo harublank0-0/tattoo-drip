@@ -30,7 +30,7 @@ export const Route = createFileRoute("/explore/studios")({
 		readDirectorySearch(search, "studios"),
 	loaderDeps: ({ search }) => search,
 	loader: ({ context, deps }) => loadDirectory("studios", context, deps),
-	head: ({ match }) => directoryHead("studios", match),
+	head: (context) => directoryHead("studios", context),
 	// No pendingComponent: a new search on this page keeps the page mounted
 	// (the results dim, aria-busy) instead of Suspense hiding it after
 	// pendingMs, which took focus from the control that applied it.
@@ -63,7 +63,7 @@ function Studios() {
 			nextCursor={data.nextCursor}
 			styleUnchecked={styleUnchecked}
 		>
-			<StudioResults studios={data.data} works={works} />
+			<StudioResults studios={data.data} works={works} lead />
 		</DirectoryPage>
 	);
 }

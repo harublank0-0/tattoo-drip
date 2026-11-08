@@ -49,6 +49,17 @@ export const API_LIMITS = {
 		anonymous: { requests: 60, duration: "5 mins" },
 		storefront: { requests: 60, duration: "5 mins" },
 	},
+	/**
+	 * Discover's sitemap lists (D10): up to 5,000 identifiers a read, so a
+	 * small budget of its own on top of discoverReads. A sitemap index costs
+	 * one read per 5,000 rows of each list, a child sitemap one.
+	 */
+	discoverSitemap: {
+		scope: "caller",
+		methods: "reads",
+		anonymous: { requests: 60, duration: "5 mins" },
+		storefront: { requests: 60, duration: "5 mins" },
+	},
 	/** Containment: a flood aimed at one studio can't take the platform; the pages' bucket is the storefront's. */
 	tenantReads: {
 		scope: "tenant",

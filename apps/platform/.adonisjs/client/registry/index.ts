@@ -816,6 +816,12 @@ const routes = {
     tokens: [{"old":"/api/v1/discover/locations","type":0,"val":"api","end":""},{"old":"/api/v1/discover/locations","type":0,"val":"v1","end":""},{"old":"/api/v1/discover/locations","type":0,"val":"discover","end":""},{"old":"/api/v1/discover/locations","type":0,"val":"locations","end":""}],
     types: placeholder as Registry['api.v1.discover.locations.index']['types'],
   },
+  'api.v1.discover.sitemap.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/discover/sitemap/:kind',
+    tokens: [{"old":"/api/v1/discover/sitemap/:kind","type":0,"val":"api","end":""},{"old":"/api/v1/discover/sitemap/:kind","type":0,"val":"v1","end":""},{"old":"/api/v1/discover/sitemap/:kind","type":0,"val":"discover","end":""},{"old":"/api/v1/discover/sitemap/:kind","type":0,"val":"sitemap","end":""},{"old":"/api/v1/discover/sitemap/:kind","type":1,"val":"kind","end":""}],
+    types: placeholder as Registry['api.v1.discover.sitemap.index']['types'],
+  },
   'api.v1.studio': {
     methods: ["GET","HEAD"],
     pattern: '/api/v1/tenants/:tenant',

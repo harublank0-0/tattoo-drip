@@ -7,9 +7,18 @@ import {
 	isTattooApiError,
 } from "@tattoo-drip/sdk";
 import { rethrowUnavailable } from "./api-errors.ts";
+import { crumbs } from "./breadcrumbs.ts";
+import type { PublicSettings } from "./config.ts";
 import type { DiscoverContext } from "./context.ts";
 import { countryName } from "./country.ts";
 import { paths } from "./routes.ts";
+import { fitTitle } from "./seo.ts";
+import {
+	artistLd,
+	breadcrumbLd,
+	type JsonLd,
+	studioLd,
+} from "./structured-data.ts";
 
 /**
  * The profile pages' reads and rules (D08, docs/discover/frontend.md,
@@ -100,28 +109,50 @@ export type ProfileSeo = {
 	title: string;
 	description: string;
 	/** The social card's picture: a cover or a published photo, absolute from the API. */
-	image?: string;
-	imageAlt?: string;
+	image?: { url: string; width: number; height: number; alt: string };
 };
 
+/**
+ * "Black Needle — Tattoo studio in Kathmandu, Nepal" (D10): the name, what
+ * it is and where, dropping the country, then the city, when the whole
+ * would be long (`fitTitle`); the name is never cut.
+ */
 export function studioSeo(studio: DiscoverStudioDetail): ProfileSeo {
 	const where = placeLine(studio.location);
 	const lead = studio.tattoos[0];
 	return {
-		title: where ? `${studio.name}, tattoo studio in ${where}` : studio.name,
+		title: fitTitle([
+			studio.name,
+			" — Tattoo studio",
+			...(studio.location
+				? [
+						` in ${studio.location.name}`,
+						`, ${countryName(studio.location.country)}`,
+					]
+				: []),
+		]),
 		description:
 			summary(studio.intro) ||
 			summary(
 				`${studio.name} is a tattoo studio${where ? ` in ${where}` : ""} listed on Tattoo Drip. See recent work by its artists and request a session on the studio's own site.`,
 			),
 		...(studio.cover
-			? { image: studio.cover.url, imageAlt: `${studio.name}'s studio` }
+			? { image: { ...picture(studio.cover), alt: `${studio.name}'s studio` } }
 			: lead
-				? { image: lead.image.url, imageAlt: `Tattoo by ${lead.artist.name}` }
+				? {
+						image: {
+							...picture(lead.image),
+							alt: `Tattoo by ${lead.artist.name}`,
+						},
+					}
 				: {}),
 	};
 }
 
+/**
+ * "Maya — Tattoo artist at Black Needle in Kathmandu", "Asha — Independent
+ * tattoo artist in Pokhara, Nepal" (D10), shortened as `studioSeo`.
+ */
 export function artistSeo(artist: DiscoverArtistDetail): ProfileSeo {
 	const where = artist.location?.name;
 	const role = artist.independent
@@ -130,7 +161,24 @@ export function artistSeo(artist: DiscoverArtistDetail): ProfileSeo {
 	const lead = artist.tattoos[0];
 	const image = lead?.image ?? artist.photo;
 	return {
-		title: `${artist.name}, ${role}`,
+		title: fitTitle(
+			artist.independent
+				? [
+						artist.name,
+						" — Independent tattoo artist",
+						...(artist.location
+							? [
+									` in ${artist.location.name}`,
+									`, ${countryName(artist.location.country)}`,
+								]
+							: []),
+					]
+				: [
+						artist.name,
+						` — Tattoo artist at ${artist.studio.name}`,
+						...(where ? [` in ${where}`] : []),
+					],
+		),
 		description:
 			summary(artist.bio) ||
 			summary(
@@ -138,16 +186,49 @@ export function artistSeo(artist: DiscoverArtistDetail): ProfileSeo {
 			),
 		...(image
 			? {
-					image: image.url,
-					imageAlt: lead
-						? `Tattoo by ${artist.name}`
-						: `${artist.name}, tattoo artist`,
+					image: {
+						...picture(image),
+						alt: lead
+							? `Tattoo by ${artist.name}`
+							: `${artist.name}, tattoo artist`,
+					},
 				}
 			: {}),
 	};
 }
 
+function picture(image: { url: string; width: number; height: number }) {
+	return { url: image.url, width: image.width, height: image.height };
+}
+
 type LoaderContext = Pick<DiscoverContext, "queryClient" | "discover">;
+
+/**
+ * What a profile's head reads (loader data, so the server and the browser
+ * render the same): its title, description and picture, and its
+ * structured data (D10: the profile's node and its breadcrumbs; the head
+ * renders them only while the page is indexable).
+ */
+export type ProfileHead = { seo: ProfileSeo; structured: JsonLd[] };
+
+function artistHead(
+	settings: PublicSettings,
+	artist: DiscoverArtistDetail,
+): ProfileHead {
+	return {
+		seo: artistSeo(artist),
+		structured: [
+			artistLd(settings, artist),
+			breadcrumbLd(
+				settings,
+				crumbs.artist(artist),
+				artist.independent
+					? paths.independentArtist(artist.studio.slug)
+					: paths.studioArtist(artist.studio.slug, artist.slug),
+			),
+		],
+	};
+}
 
 /**
  * `/studios/:slug`: the studio, by its current or an old slug. An old slug
@@ -158,7 +239,7 @@ type LoaderContext = Pick<DiscoverContext, "queryClient" | "discover">;
 export async function loadStudioProfile(
 	context: LoaderContext,
 	param: string,
-): Promise<{ seo: ProfileSeo }> {
+): Promise<ProfileHead> {
 	const slug = readTenantSlug(param);
 	if (!slug) throw notFound();
 	const { queryClient, discover } = context;
@@ -186,7 +267,18 @@ export async function loadStudioProfile(
 		});
 	if (studio.slug !== slug)
 		throw redirect({ href: paths.studio(studio.slug), statusCode: 301 });
-	return { seo: studioSeo(studio) };
+	const { settings } = discover;
+	return {
+		seo: studioSeo(studio),
+		structured: [
+			studioLd(settings, studio),
+			breadcrumbLd(
+				settings,
+				crumbs.studio(studio.name),
+				paths.studio(studio.slug),
+			),
+		],
+	};
 }
 
 /**
@@ -198,7 +290,7 @@ export async function loadStudioArtistProfile(
 	context: LoaderContext,
 	studioParam: string,
 	artistParam: string,
-): Promise<{ seo: ProfileSeo }> {
+): Promise<ProfileHead> {
 	const studioSlug = readTenantSlug(studioParam);
 	const artistSlug = readArtistSlug(artistParam);
 	if (!studioSlug || !artistSlug) throw notFound();
@@ -218,14 +310,14 @@ export async function loadStudioArtistProfile(
 			href: paths.studioArtist(artist.studio.slug, artist.slug),
 			statusCode: 301,
 		});
-	return { seo: artistSeo(artist) };
+	return artistHead(discover.settings, artist);
 }
 
 /** `/artists/:tenantSlug`: an independent artist by their business's current or old slug. */
 export async function loadIndependentProfile(
 	context: LoaderContext,
 	param: string,
-): Promise<{ seo: ProfileSeo }> {
+): Promise<ProfileHead> {
 	const slug = readTenantSlug(param);
 	if (!slug) throw notFound();
 	const { queryClient, discover } = context;
@@ -237,7 +329,7 @@ export async function loadIndependentProfile(
 			href: paths.independentArtist(artist.studio.slug),
 			statusCode: 301,
 		});
-	return { seo: artistSeo(artist) };
+	return artistHead(discover.settings, artist);
 }
 
 /** "Black Needle's": whose site a profile's links open. */

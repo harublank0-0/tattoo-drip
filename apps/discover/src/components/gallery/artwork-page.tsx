@@ -39,6 +39,7 @@ export function ArtworkImage({ tattoo }: { tattoo: DiscoverTattooDetail }) {
 				ratio={`${width || 4} / ${height || 5}`}
 				sizes="(min-width: 64rem) 58vw, 100vw"
 				priority
+				large
 				fit="contain"
 			/>
 		</div>

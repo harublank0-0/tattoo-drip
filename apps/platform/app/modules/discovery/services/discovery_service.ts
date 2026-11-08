@@ -116,6 +116,15 @@ export type DiscoverTattooDetail = DiscoverTattooSummary & {
 };
 export type DiscoverPage<T> = { items: T[]; nextCursor: string | null };
 
+/** A sitemap list's page (D10): rows after `after` (an id), by id, at most `limit`. */
+export type SitemapQuery = { after: string | null; limit: number };
+export type DiscoverSitemapStudio = { slug: string };
+export type DiscoverSitemapArtist = {
+	slug: string;
+	studio: { slug: string; type: "studio" | "independent" };
+};
+export type DiscoverSitemapTattoo = { id: string };
+
 export type LocationFilter = { country?: string; city?: string };
 export type StudioQuery = LocationFilter & {
 	q?: string;
@@ -565,6 +574,73 @@ export default class DiscoveryService {
 		});
 	}
 
+	/**
+	 * The sitemap lists (D10): only the canonical identifiers of what the
+	 * lists above show, from the same views (so the same eligibility), by id
+	 * with keyset paging (`id > after`), so a page never needs an offset and
+	 * rows added later (uuidv7: later ids) land on the last page.
+	 */
+	async sitemapStudios(
+		query: SitemapQuery,
+	): Promise<DiscoverPage<DiscoverSitemapStudio>> {
+		return readDiscovery(async (client) => {
+			const rows = await rowsOf<{ id: string; slug: string }>(
+				client,
+				`select s.id, s.slug from discovery.studios s
+				 where s.type = 'studio'${query.after ? " and s.id > ?::uuid" : ""}
+				 order by s.id limit ?`,
+				sitemapBindings(query),
+			);
+			return sitemapPage(rows, query.limit, ({ slug }) => ({ slug }));
+		});
+	}
+
+	/**
+	 * Every shown artist at a listed studio, and one row per listed
+	 * independent business: the artist `independentArtist` answers (the
+	 * first made), whose profile is the business's address.
+	 */
+	async sitemapArtists(
+		query: SitemapQuery,
+	): Promise<DiscoverPage<DiscoverSitemapArtist>> {
+		return readDiscovery(async (client) => {
+			const rows = await rowsOf<{
+				id: string;
+				slug: string;
+				studio_slug: string;
+				studio_type: "studio" | "independent";
+			}>(
+				client,
+				`select a.id, a.slug, s.slug as studio_slug, s.type as studio_type
+				 from discovery.artists a join discovery.studios s on s.id = a.studio_id
+				 where (s.type = 'studio' or a.id = (
+				   select x.id from discovery.artists x where x.studio_id = a.studio_id
+				   order by x.created_at asc, x.id asc limit 1))${query.after ? " and a.id > ?::uuid" : ""}
+				 order by a.id limit ?`,
+				sitemapBindings(query),
+			);
+			return sitemapPage(rows, query.limit, (row) => ({
+				slug: row.slug,
+				studio: { slug: row.studio_slug, type: row.studio_type },
+			}));
+		});
+	}
+
+	/** Every published photo's id. */
+	async sitemapTattoos(
+		query: SitemapQuery,
+	): Promise<DiscoverPage<DiscoverSitemapTattoo>> {
+		return readDiscovery(async (client) => {
+			const rows = await rowsOf<{ id: string }>(
+				client,
+				`select w.id from discovery.artworks w
+				 ${query.after ? "where w.id > ?::uuid " : ""}order by w.id limit ?`,
+				sitemapBindings(query),
+			);
+			return sitemapPage(rows, query.limit, ({ id }) => ({ id }));
+		});
+	}
+
 	/** The platform's styles, in the list's order (the filter's values). */
 	styles(): TattooStyleRef[] {
 		return TATTOO_STYLES.map(({ slug, name }) => ({ slug, name }));
@@ -862,6 +938,24 @@ function profileLinks(row: StudioRow) {
 		facebookUrl: row.facebook_url,
 		tiktokUrl: row.tiktok_url,
 		websiteUrl: row.website_url,
+	};
+}
+
+function sitemapBindings({ after, limit }: SitemapQuery): unknown[] {
+	return after ? [after, limit + 1] : [limit + 1];
+}
+
+/** A sitemap page: `limit` rows and, when one more came back, the last one's id as the cursor. */
+function sitemapPage<R extends { id: string }, T>(
+	rows: R[],
+	limit: number,
+	item: (row: R) => T,
+): DiscoverPage<T> {
+	const page = rows.slice(0, limit);
+	return {
+		items: page.map(item),
+		nextCursor:
+			rows.length > limit ? (page[page.length - 1]?.id ?? null) : null,
 	};
 }
 

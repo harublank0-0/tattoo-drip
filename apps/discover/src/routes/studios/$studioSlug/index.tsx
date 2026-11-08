@@ -6,6 +6,7 @@ import {
 	EditorialSection,
 	SectionHeading,
 } from "#/components/discovery/layout";
+import { BadgeImage } from "#/components/discovery/responsive-image";
 import { ArtworkCredit } from "#/components/gallery/artwork-tile";
 import {
 	BookingActions,
@@ -21,6 +22,7 @@ import {
 	workCaption,
 } from "#/components/profile/profile";
 import { bookingLinks, safeSocialUrl } from "#/lib/booking";
+import { crumbs } from "#/lib/breadcrumbs";
 import {
 	loadStudioProfile,
 	nearbyLinks,
@@ -30,6 +32,7 @@ import {
 } from "#/lib/profiles";
 import { paths } from "#/lib/routes";
 import { pageMeta } from "#/lib/seo";
+import { structuredData } from "#/lib/structured-data";
 import { cn } from "#/lib/utils";
 
 /**
@@ -42,8 +45,13 @@ import { cn } from "#/lib/utils";
 export const Route = createFileRoute("/studios/$studioSlug/")({
 	loader: ({ context, params }) =>
 		loadStudioProfile(context, params.studioSlug),
-	head: ({ loaderData }) => ({
-		meta: loaderData ? pageMeta(loaderData.seo) : [],
+	head: (context) => ({
+		meta: context.loaderData
+			? [
+					...pageMeta(context.loaderData.seo),
+					...structuredData(context, context.loaderData.structured),
+				]
+			: [],
 	}),
 	component: StudioProfile,
 });
@@ -78,11 +86,7 @@ function StudioProfile() {
 	return (
 		<>
 			<ProfileHero
-				breadcrumbs={[
-					{ label: "Discover", to: paths.home() },
-					{ label: "Studios", to: paths.studios() },
-					{ label: studio.name },
-				]}
+				breadcrumbs={crumbs.studio(studio.name)}
 				eyebrow="Tattoo studio"
 				title={studio.name}
 				badge={
@@ -95,12 +99,9 @@ function StudioProfile() {
 									: "bg-paper-raised ring-1 ring-line",
 							)}
 						>
-							<img
-								src={studio.logo.url}
-								width={studio.logo.width}
-								height={studio.logo.height}
-								alt=""
-								decoding="async"
+							<BadgeImage
+								image={studio.logo}
+								size={80}
 								className="max-h-full max-w-full object-contain"
 							/>
 						</span>

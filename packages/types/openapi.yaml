@@ -422,6 +422,102 @@ paths:
         "429": { $ref: "#/components/responses/RateLimited" }
         default: { $ref: "#/components/responses/Error" }
 
+  /discover/sitemap/studios:
+    get:
+      operationId: listDiscoverSitemapStudios
+      tags: [Discover]
+      summary: Every listed studio's slug, for Discover's sitemaps (D10)
+      description: |
+        The canonical identifiers of the studios `listDiscoverStudios` shows
+        (the same views, so the same eligibility), in a stable order (by id)
+        with keyset paging: up to 5,000 a page. No other field: Discover builds
+        each profile's address from them. Counts against `discoverSitemap`
+        as well as the Discover read budget.
+      parameters:
+        - $ref: "#/components/parameters/DiscoverSitemapCursor"
+        - $ref: "#/components/parameters/DiscoverSitemapLimit"
+      responses:
+        "200":
+          description: A page of studios
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            ETag: { $ref: "#/components/headers/ETag" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, nextCursor]
+                additionalProperties: false
+                properties:
+                  data: { type: array, maxItems: 5000, items: { $ref: "#/components/schemas/DiscoverSitemapStudio" } }
+                  nextCursor: { $ref: "#/components/schemas/DiscoverNextCursor" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /discover/sitemap/artists:
+    get:
+      operationId: listDiscoverSitemapArtists
+      tags: [Discover]
+      summary: Every shown artist profile's identifiers, for Discover's sitemaps (D10)
+      description: |
+        Every shown artist at a listed studio, and one entry per listed
+        independent business (its profile artist, the one
+        `getDiscoverIndependentArtist` answers), by id, keyset-paged as
+        `listDiscoverSitemapStudios`.
+      parameters:
+        - $ref: "#/components/parameters/DiscoverSitemapCursor"
+        - $ref: "#/components/parameters/DiscoverSitemapLimit"
+      responses:
+        "200":
+          description: A page of artist profiles
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            ETag: { $ref: "#/components/headers/ETag" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, nextCursor]
+                additionalProperties: false
+                properties:
+                  data: { type: array, maxItems: 5000, items: { $ref: "#/components/schemas/DiscoverSitemapArtist" } }
+                  nextCursor: { $ref: "#/components/schemas/DiscoverNextCursor" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /discover/sitemap/tattoos:
+    get:
+      operationId: listDiscoverSitemapTattoos
+      tags: [Discover]
+      summary: Every published photo's id, for Discover's sitemaps (D10)
+      description: The photos `listDiscoverTattoos` shows, by id, keyset-paged as `listDiscoverSitemapStudios`.
+      parameters:
+        - $ref: "#/components/parameters/DiscoverSitemapCursor"
+        - $ref: "#/components/parameters/DiscoverSitemapLimit"
+      responses:
+        "200":
+          description: A page of photos
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            ETag: { $ref: "#/components/headers/ETag" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, nextCursor]
+                additionalProperties: false
+                properties:
+                  data: { type: array, maxItems: 5000, items: { $ref: "#/components/schemas/DiscoverSitemapTattoo" } }
+                  nextCursor: { $ref: "#/components/schemas/DiscoverNextCursor" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
   /placements:
     get:
       operationId: listPlacements
@@ -1064,6 +1160,15 @@ components:
       name: limit
       in: query
       schema: { type: integer, minimum: 1, maximum: 48, default: 24 }
+    DiscoverSitemapCursor:
+      name: cursor
+      in: query
+      description: The previous page's `nextCursor`, as sent (the sitemap lists' keyset position)
+      schema: { type: string, format: uuid }
+    DiscoverSitemapLimit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 5000, default: 5000 }
 
   headers:
     CacheControl:
@@ -2028,6 +2133,34 @@ components:
         slug: { type: string, description: Unique within its country }
         name: { type: string }
         region: { type: [string, "null"], description: The first-level subdivision, such as a province }
+
+    DiscoverSitemapStudio:
+      type: object
+      required: [slug]
+      additionalProperties: false
+      properties:
+        slug: { type: string, description: The studio's current slug }
+
+    DiscoverSitemapArtist:
+      type: object
+      required: [slug, studio]
+      additionalProperties: false
+      properties:
+        slug: { type: string, description: The artist's slug (unique per studio only) }
+        studio:
+          type: object
+          required: [slug, type]
+          additionalProperties: false
+          properties:
+            slug: { type: string, description: "The business's current slug: an independent's profile address" }
+            type: { type: string, enum: [studio, independent] }
+
+    DiscoverSitemapTattoo:
+      type: object
+      required: [id]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
 
     DiscoverStudioRef:
       type: object
