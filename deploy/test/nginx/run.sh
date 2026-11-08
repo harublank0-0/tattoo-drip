@@ -4,10 +4,12 @@
 # address), body limits, and tokens kept out of the access log. Starts compose.yml under its own project name
 # and removes it afterwards, also when a check fails.
 #
-# Both layouts, one after the other: nginx.conf (live: dashboard and API on
-# tattoodrip.app) and nginx.split.conf (the D11 layout: app., api., Discover on
-# the apex, legacy redirects; docs/discover/domain-migration.md). LAYOUTS picks
-# one: LAYOUTS=nginx.split.conf bash deploy/test/nginx/run.sh
+# Three files, one after the other: nginx.conf (production; checked as the layout
+# its include loads, the split one since the D11 cutover), nginx.current.conf
+# (the layout before the cutover: dashboard and API on tattoodrip.app; the
+# rollback's) and nginx.split.conf (app., api., Discover on the apex, legacy
+# redirects; docs/discover/domain-migration.md). LAYOUTS picks some:
+# LAYOUTS=nginx.split.conf bash deploy/test/nginx/run.sh
 #
 # It uses the production subnet, 172.30.42.0/24, because the addresses are part
 # of what it checks: it cannot run on a host where the production stack (or
@@ -44,7 +46,7 @@ export NGINX_CONF=nginx.conf # compose.yml needs a value even to take a stack do
 
 # The directory is mounted whole; a missing file would otherwise only show up as an
 # nginx that cannot start.
-for file in nginx.conf nginx.split.conf common.conf hosts.current.conf hosts.split.conf hosts.studio.conf proxy.conf; do
+for file in nginx.conf nginx.current.conf nginx.split.conf common.conf hosts.current.conf hosts.split.conf hosts.studio.conf proxy.conf; do
 	if [ ! -f "$deploy/nginx/$file" ]; then
 		echo "nginx: deploy/nginx/$file does not exist" >&2
 		exit 1
@@ -53,14 +55,24 @@ done
 
 failed=0
 
-check_layout() { # nginx.conf | nginx.split.conf
-	local layout=$1 upstreams
+# Which hosts a file loads: split (hosts.split.conf, D11) or current (hosts.current.conf).
+layout_kind() {
+	if grep -Eq '^[[:space:]]*include[[:space:]]+[^;]*hosts\.split\.conf' "$deploy/nginx/$1"; then
+		echo split
+	else
+		echo current
+	fi
+}
+
+check_layout() { # nginx.conf | nginx.current.conf | nginx.split.conf
+	local layout=$1 kind upstreams
+	kind=$(layout_kind "$layout")
 	export NGINX_CONF=$layout
-	echo "--- $layout ---"
+	echo "--- $layout ($kind) ---"
 	compose up -d
 
-	compose exec -T trusted node /check.mjs trusted "$layout" || failed=1
-	compose exec -T outsider node /check.mjs outsider "$layout" || failed=1
+	compose exec -T trusted node /check.mjs trusted "$kind" || failed=1
+	compose exec -T outsider node /check.mjs outsider "$kind" || failed=1
 
 # The static values, read back from the running nginx (nginx -T prints the
 # whole configuration, includes too). Whole lines, so a comment cannot match.
@@ -83,7 +95,7 @@ check_layout() { # nginx.conf | nginx.split.conf
 	expect_lines 'proxy_request_buffering on' 1
 	expect_lines 'server 172.30.42.11:3333' 1 # web, by its fixed address (deploy/compose.yml)
 	expect_lines 'server 172.30.42.12:3000' 1 # storefront
-	if [ "$layout" = nginx.split.conf ]; then
+	if [ "$kind" = split ]; then
 		upstreams=3
 		expect_lines 'server 172.30.42.13:3000' 1 # Discover's reserved address
 		expect_lines 'proxy_set_header X-Discover-Country $discover_country' 1 # D06.5, Discover's location only
@@ -143,11 +155,11 @@ expect_lines() { # directive (without its ;), expected number of lines
 	fi
 }
 
-for layout in ${LAYOUTS:-nginx.conf nginx.split.conf}; do
+for layout in ${LAYOUTS:-nginx.conf nginx.current.conf nginx.split.conf}; do
 	case $layout in
-	nginx.conf | nginx.split.conf) check_layout "$layout" ;;
+	nginx.conf | nginx.current.conf | nginx.split.conf) check_layout "$layout" ;;
 	*)
-		echo "nginx: unknown layout $layout (nginx.conf or nginx.split.conf)" >&2
+		echo "nginx: unknown layout $layout (nginx.conf, nginx.current.conf or nginx.split.conf)" >&2
 		exit 2
 		;;
 	esac
