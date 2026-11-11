@@ -1,3 +1,4 @@
+import { SocialIcon } from "@tattoo-drip/react/social-icon";
 import type { ReactNode, Ref } from "react";
 import type { InquiryChannels } from "../../studio/inquiry.ts";
 import { linkRel } from "../../studio/links.ts";
@@ -29,15 +30,27 @@ export function hasChannels(channels: InquiryChannels): boolean {
 
 /** The studio's chat links (TAT-48's InquiryChannels): the way on when the form can't help. */
 export function ChatLinks({ channels }: { channels: InquiryChannels }) {
-	const links: { href: string; label: string }[] = [];
+	const links: { href: string; label: string; platform: string }[] = [];
 	if (channels.whatsapp) {
-		links.push({ href: channels.whatsapp, label: copy.chatLinks.whatsapp });
+		links.push({
+			platform: "whatsapp",
+			href: channels.whatsapp,
+			label: copy.chatLinks.whatsapp,
+		});
 	}
 	if (channels.email) {
-		links.push({ href: channels.email, label: copy.chatLinks.email });
+		links.push({
+			platform: "email",
+			href: channels.email,
+			label: copy.chatLinks.email,
+		});
 	}
 	if (channels.instagram) {
-		links.push({ href: channels.instagram, label: copy.chatLinks.instagram });
+		links.push({
+			platform: "instagram",
+			href: channels.instagram,
+			label: copy.chatLinks.instagram,
+		});
 	}
 	if (links.length === 0) return null;
 	return (
@@ -49,6 +62,7 @@ export function ChatLinks({ channels }: { channels: InquiryChannels }) {
 					href={link.href}
 					rel={linkRel(link.href)}
 				>
+					<SocialIcon platform={link.platform} className="social-link-icon" />
 					{link.label}
 				</a>
 			))}

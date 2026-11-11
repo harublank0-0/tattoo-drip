@@ -1,5 +1,6 @@
 import { Form } from "@adonisjs/inertia/react";
 import { router, usePage } from "@inertiajs/react";
+import { SocialIcon } from "@tattoo-drip/react/social-icon";
 import { cn } from "cn";
 import { urlFor } from "~/client";
 import CopyLinkButton from "~/components/copy_link_button";
@@ -223,6 +224,7 @@ function NewLinkBox({ link }: { link: NewLink }) {
 					rel="noopener noreferrer"
 					className={cn(buttonVariants(), "h-11 self-start")}
 				>
+					<SocialIcon platform="whatsapp" />
 					Share on WhatsApp
 				</a>
 				<p className="text-sm text-muted-foreground">

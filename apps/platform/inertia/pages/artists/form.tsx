@@ -1,4 +1,5 @@
 import { Form, Link } from "@adonisjs/inertia/react";
+import { SocialIcon } from "@tattoo-drip/react/social-icon";
 import { cn } from "cn";
 import { Images } from "lucide-react";
 import { useState } from "react";
@@ -69,9 +70,9 @@ type ArtistDiscover = {
 };
 
 const SOCIAL_LINKS = [
-	{ name: "instagramUrl", label: "Instagram link" },
-	{ name: "facebookUrl", label: "Facebook link" },
-	{ name: "tiktokUrl", label: "TikTok link" },
+	{ platform: "instagram", name: "instagramUrl", label: "Instagram link" },
+	{ platform: "facebook", name: "facebookUrl", label: "Facebook link" },
+	{ platform: "tiktok", name: "tiktokUrl", label: "TikTok link" },
 ] as const;
 
 /**
@@ -496,7 +497,10 @@ function ArtistFields({
 
 			{SOCIAL_LINKS.map((link) => (
 				<Field key={link.name} data-invalid={!!errors[link.name]}>
-					<FieldLabel htmlFor={link.name}>{link.label}</FieldLabel>
+					<FieldLabel htmlFor={link.name}>
+						<SocialIcon platform={link.platform} className="size-4 shrink-0" />
+						{link.label}
+					</FieldLabel>
 					<Input
 						id={link.name}
 						name={link.name}

@@ -1,3 +1,4 @@
+import { SocialIcon } from "@tattoo-drip/react/social-icon";
 import { cn } from "cn";
 import { ChevronDown } from "lucide-react";
 import { useId } from "react";
@@ -100,11 +101,13 @@ export default function ChatMessage({
 			onClick={() => onSent("whatsapp")}
 			className={className}
 		>
+			<SocialIcon platform="whatsapp" />
 			{content}
 		</a>
 	);
 	const viber = (className: string, content: string, note?: string) => (
 		<a href={message.viberUrl} onClick={viberTap} className={className}>
+			<SocialIcon platform="viber" />
 			{content}
 			{note && <span className="sr-only"> {note}</span>}
 		</a>
@@ -241,6 +244,7 @@ export function ChatLinks({
 				onClick={() => onSent("whatsapp")}
 				className={WAY}
 			>
+				<SocialIcon platform="whatsapp" />
 				WhatsApp
 			</a>
 			<a
@@ -248,6 +252,7 @@ export function ChatLinks({
 				onClick={() => onSent("viber")}
 				className={WAY}
 			>
+				<SocialIcon platform="viber" />
 				Viber
 			</a>
 			<a href={contact.callUrl} onClick={() => onSent("call")} className={WAY}>

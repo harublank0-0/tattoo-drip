@@ -1,3 +1,4 @@
+import { SocialIcon } from "@tattoo-drip/react/social-icon";
 import { studioCopy } from "../copy.ts";
 import { isAllowedHref, linkRel } from "../links.ts";
 import type {
@@ -41,6 +42,7 @@ function LinkGroup({
 				{links.map((link) => (
 					<li key={`${link.kind}:${link.href}`}>
 						<a className="link-chip" href={link.href} rel={linkRel(link.href)}>
+							<SocialIcon platform={link.kind} className="social-link-icon" />
 							{link.label}
 						</a>
 					</li>
