@@ -14,6 +14,7 @@ import {
 	studioPageData,
 	workPageData,
 } from "../../src/studio/loaders.ts";
+import { initialOf } from "../../src/studio/theme/atelier/artist-index.tsx";
 import { atelierHome } from "../../src/studio/theme/atelier/home-view.ts";
 import {
 	ATELIER_CLASS,
@@ -23,6 +24,7 @@ import {
 import {
 	accentTokens,
 	brandingCss,
+	challengeThemeFor,
 	isSafeCss,
 } from "../../src/studio/theme/branding.ts";
 import { contrastRatio } from "../../src/studio/theme/color.ts";
@@ -61,11 +63,12 @@ import { assertSafePage } from "./safety.ts";
 import { COVER_SIZED, IMAGE_ORIGIN, withStorefront } from "./theme-fixtures.ts";
 
 /**
- * Atelier (src/studio/theme/atelier/): a light editorial theme. These pin
- * that it is registered end to end (key, sections, <html> class, scheme,
- * theme colour, stylesheet), that a studio's accent is checked against its
- * own two surfaces, and that each page renders the studio's own data in
- * Atelier's frame, with sparse data handled without inventing anything.
+ * Atelier (src/studio/theme/atelier/): a quiet-luxury catalogue on stone
+ * paper. These pin that it is registered end to end (key, sections, <html>
+ * class, scheme, theme colour, stylesheet, fonts), that a studio's accent is
+ * checked against its three surfaces, and that each page renders the
+ * studio's own data in Atelier's frame, with sparse data handled without
+ * inventing anything.
  */
 
 const css = readFileSync(
@@ -343,7 +346,14 @@ describe("brandingCss for Atelier: one light scheme, checked on all three surfac
 			root,
 			/import bodoniLatin from "\.\.\/assets\/fonts\/bodoni-moda\/bodoni-moda-latin-500-normal\.woff2\?url";/,
 		);
-		assert.match(root, /matchedThemeKey\(matches\) === "atelier"/);
+		assert.match(
+			root,
+			/preloadedFont\(matchedThemeKey\(matches\), studioFontKey\(loaderData\)\)/,
+		);
+		assert.match(
+			root,
+			/theme === "atelier" && font === "eczar" \? bodoniLatin : eczarLatin/,
+		);
 		const licence = readFileSync(
 			new URL("../../src/assets/fonts/bodoni-moda/OFL.txt", import.meta.url),
 			"utf8",
@@ -693,6 +703,117 @@ describe("Atelier's artist pages", () => {
 	});
 });
 
+describe("the review's fixes", () => {
+	test("a later page of the collection carries no catalogue numbers rather than restart at No. 01", () => {
+		const first = renderToStaticMarkup(
+			createElement(ThemedWorkPage, {
+				data: workPageData(
+					atelier(),
+					[SITA, ARJUN],
+					galleryPage(2),
+					{},
+					ORIGIN,
+					IMAGE_ORIGIN,
+				),
+			}),
+		);
+		assert.match(first, />No\. 01</);
+		const later = renderToStaticMarkup(
+			createElement(ThemedWorkPage, {
+				data: workPageData(
+					atelier(),
+					[SITA, ARJUN],
+					galleryPage(2),
+					{ cursor: "c2" },
+					ORIGIN,
+					IMAGE_ORIGIN,
+				),
+			}),
+		);
+		assertSafePage(later);
+		assert.doesNotMatch(later, /atl-piece-number/);
+	});
+
+	test("a name in a button or the studio's own kicker is never set in capitals or tracked", () => {
+		const rule = (selector: string) => {
+			const bare = pagesCss.replace(/\/\*[\s\S]*?\*\//g, "");
+			const start = bare.indexOf(`${selector} {`);
+			assert.ok(start >= 0, selector);
+			return bare.slice(start, bare.indexOf("}", start));
+		};
+		assert.match(
+			rule(":root.theme-atelier .action bdi"),
+			/text-transform: none/,
+		);
+		assert.match(rule(":root.theme-atelier .action bdi"), /letter-spacing: 0/);
+		assert.match(rule(".atl-kicker.user-text"), /text-transform: none/);
+		assert.match(rule(".atl-kicker.user-text"), /letter-spacing: 0/);
+		const data = artworkPageData(
+			atelier(),
+			[SITA, ARJUN],
+			galleryPage(1).data[0],
+			[null, null, null],
+			ORIGIN,
+			IMAGE_ORIGIN,
+		);
+		assert.ok(data);
+		const html = renderToStaticMarkup(
+			createElement(ThemedArtworkPage, { data }),
+		);
+		assert.match(
+			html,
+			/<p class="atl-kicker user-text" dir="auto">Black Needle<\/p>/,
+		);
+	});
+
+	test("the initial in an arch is the first letter as a reader sees it", () => {
+		// A whole grapheme: "श" with its virama at least (a code point alone would drop it).
+		const devanagari = initialOf("श्री गणेश");
+		assert.ok(devanagari.startsWith("श्"), devanagari);
+		assert.equal(initialOf("  Aiko"), "A");
+		assert.equal(initialOf("E\u0301mile"), "E\u0301");
+		assert.equal(initialOf(""), "");
+	});
+
+	test("landmarks are named for what they hold", () => {
+		const gallery = renderToStaticMarkup(
+			createElement(ThemedWorkPage, {
+				data: workPageData(
+					atelier(),
+					[SITA, ARJUN],
+					galleryPage(2),
+					{},
+					ORIGIN,
+					IMAGE_ORIGIN,
+				),
+			}),
+		);
+		assert.match(
+			gallery,
+			/<section class="atl-section atl-container" aria-label="The collection">/,
+		);
+		const data = artistPageData(
+			atelier(),
+			[SITA, ARJUN],
+			"sita",
+			ORIGIN,
+			IMAGE_ORIGIN,
+		);
+		assert.ok(data);
+		const artist = renderToStaticMarkup(
+			createElement(ThemedArtistPage, { data }),
+		);
+		assert.match(
+			artist,
+			/<nav class="atl-container atl-neighbours" aria-label="The artists">/,
+		);
+	});
+
+	test("the booking widget is light, as the page is", () => {
+		assert.equal(challengeThemeFor("atelier"), "light");
+	});
+});
+
 describe("Atelier's gallery and tattoo pages", () => {
 	test("every piece whole, each one link to its page, with the API's filters as links", () => {
 		const data = workPageData(
@@ -813,7 +934,7 @@ describe("Atelier carries the shared pages: booking, flash and information", () 
 		assertUniqueIds(html);
 		assert.match(
 			html,
-			/<h1 id="inquiry-title" class="atl-page-title">Request an appointment<\/h1>/,
+			/<h1 id="inquiry-title" class="atl-page-title">Request a session<\/h1>/,
 		);
 		assert.match(
 			html,

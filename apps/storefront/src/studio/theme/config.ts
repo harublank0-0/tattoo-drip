@@ -180,6 +180,15 @@ export function studioThemeKey(studio: unknown): ThemeKey {
 	return readThemeKey(own(own(studio, "storefront"), "theme"));
 }
 
+/**
+ * The heading font key of a studio as the API sent it (`Studio.storefront.
+ * branding.font`), else the default: what the root route needs to pick the
+ * font it preloads.
+ */
+export function studioFontKey(studio: unknown): FontKey {
+	return readFontKey(own(own(own(studio, "storefront"), "branding"), "font"));
+}
+
 /** A font key from FONT_KEYS, else the default (Eczar). */
 export function readFontKey(value: unknown): FontKey {
 	return isOneOf(FONT_KEYS, value) ? value : DEFAULT_FONT;

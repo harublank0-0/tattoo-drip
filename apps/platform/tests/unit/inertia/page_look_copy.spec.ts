@@ -464,11 +464,11 @@ test.group("page look words (TAT-56)", () => {
 				key: "atelier",
 				label: "Atelier",
 				description:
-					"Quiet luxury: stone paper, bronze and Bodoni headings, your work shown as a numbered collection.",
+					"Quiet luxury: stone paper, bronze and Bodoni headings, your work as a numbered collection. Your colour shows where it reads on the paper.",
 			},
 		]);
 		assert.deepEqual(FONTS, [
-			{ key: "eczar", label: "Eczar (the stencil look)" },
+			{ key: "eczar", label: "The theme's own (Eczar; Bodoni on Atelier)" },
 			{ key: "serif", label: "Classic serif" },
 			{ key: "sans", label: "Plain" },
 		]);

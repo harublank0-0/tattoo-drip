@@ -24,9 +24,9 @@
 	text-transform: uppercase;
 	overflow-wrap: anywhere;
 }
-/* A kicker that holds the studio's own words (its place) keeps them as written. */
+/* A kicker that holds the studio's own words (its name, its place) keeps them as written: no capitals, no tracking. */
 .atl-kicker.user-text {
-	letter-spacing: 0.08em;
+	letter-spacing: 0;
 	text-transform: none;
 	font-size: 0.875rem;
 }
@@ -95,15 +95,21 @@
 	font-size: 0.9375rem;
 }
 
-/* Actions: the shared `.action`, squared, spaced capitals; the quiet one an ink outline. */
-.atl-main .action,
-.atl-header-cta,
-.atl-footer-cta,
-.atl-sheet-cta {
+/*
+ * Actions: the shared `.action` on every Atelier page (its own and the shared
+ * flash, information and booking pages alike), squared, in spaced capitals;
+ * the quiet one an ink outline. A name inside one ("Request {artist}",
+ * always in a <bdi>) stays as written: names may be Devanagari.
+ */
+:root.theme-atelier .action {
 	font-size: 0.8125rem;
 	font-weight: 500;
 	letter-spacing: 0.16em;
 	text-transform: uppercase;
+}
+:root.theme-atelier .action bdi {
+	letter-spacing: 0;
+	text-transform: none;
 }
 .atl-cta {
 	min-block-size: 3rem;
@@ -441,12 +447,20 @@
  * one link, stretched over it), the styles and the status.
  */
 .atl-artist-index {
-	display: grid;
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
 	gap: 3rem 2rem;
 	margin: 0;
 	padding: 0;
 	list-style: none;
-	justify-content: center;
+}
+.atl-artist-entry {
+	flex: 0 1 16rem;
+	min-inline-size: 0;
+}
+.atl-artist-index[data-count="1"] .atl-artist-entry {
+	flex-basis: 18rem;
 }
 .atl-artist-entry > article {
 	position: relative;
@@ -457,7 +471,7 @@
 }
 .atl-arch {
 	display: block;
-	inline-size: min(100%, 16rem);
+	inline-size: 100%;
 	aspect-ratio: 4 / 5;
 	overflow: hidden;
 	border: 1px solid var(--line);
@@ -522,24 +536,8 @@
 		outline-offset: 6px;
 	}
 }
-@media (min-width: 36rem) {
-	.atl-artist-index {
-		grid-template-columns: repeat(2, minmax(0, 16rem));
-	}
-}
-@media (min-width: 64rem) {
-	.atl-artist-index[data-count="3"] {
-		grid-template-columns: repeat(3, minmax(0, 16rem));
-	}
-	.atl-artist-index[data-count="4"] {
-		grid-template-columns: repeat(4, minmax(0, 16rem));
-	}
-}
-.atl-artist-index[data-count="1"] {
-	grid-template-columns: minmax(0, 18rem);
-}
 
-/* Filters: spaced-capital words between hairlines; the chosen one in ink over a brass rule. */
+/* Filters: words between hairlines (artist names among them, so never in capitals); the chosen one in ink over a brass rule. */
 .atl-filters {
 	display: grid;
 	justify-items: center;

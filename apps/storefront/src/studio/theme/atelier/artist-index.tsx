@@ -22,9 +22,17 @@ export function AtelierStatus({ artist }: { artist: ArtistView }) {
 	);
 }
 
-/** The first letter of a name, for the arch of an artist without a portrait (decoration). */
+/**
+ * The first letter of a name as a reader sees it (one grapheme: "श्री" keeps
+ * its conjunct, a decomposed "É" its accent), for the arch of an artist
+ * without a portrait (decoration).
+ */
 export function initialOf(name: string): string {
-	return Array.from(name.trim())[0] ?? "";
+	const first = new Intl.Segmenter(undefined, { granularity: "grapheme" })
+		.segment(name.trim())
+		[Symbol.iterator]()
+		.next();
+	return first.done ? "" : first.value.segment;
 }
 
 /**
@@ -73,7 +81,8 @@ export function ArtistArch({
 /**
  * The artists as a row of arches: each the artist's arch, their name (the
  * card's one link, stretched over it), the styles they list and whether they
- * take new work. Two across from 36rem, up to four from 64rem, centred.
+ * take new work. As many 16rem arches as fit on a line, centred (a lone
+ * artist's a little wider).
  * `headingLevel` follows the page: h2 under the directory's h1, h3 under a
  * section's h2.
  */

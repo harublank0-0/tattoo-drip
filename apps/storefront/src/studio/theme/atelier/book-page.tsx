@@ -2,6 +2,7 @@ import { FlashSummary } from "../../components/flash.tsx";
 import { InquirySection } from "../../components/inquiry.tsx";
 import type { Shell } from "../../components/shell.tsx";
 import type { RequestPageData } from "../../loaders.ts";
+import { challengeThemeFor } from "../branding.ts";
 import { atelierCopy } from "./copy.ts";
 import { AtelierShell } from "./shell.tsx";
 
@@ -49,6 +50,7 @@ export function AtelierBookPage({
 					state={inquiry}
 					channels={channels}
 					challengeSiteKey={challengeSiteKey}
+					challengeTheme={challengeThemeFor(theme.key)}
 					booking={data.booking}
 					headed={false}
 					intro={

@@ -56,7 +56,7 @@ export function AtelierGalleryPage({
 					<p className="atl-page-line">{copy.line}</p>
 				</div>
 			</header>
-			<section className="atl-section atl-container" aria-label={copy.label}>
+			<section className="atl-section atl-container" aria-label={copy.title}>
 				{gallery.styles.length > 0 ||
 				artists.length > 1 ||
 				showHealed ||
@@ -136,7 +136,11 @@ export function AtelierGalleryPage({
 						moreHref={(cursor) => workHref({ ...search, cursor })}
 						more={more}
 						renderPhotos={(photos) => (
-							<AtelierPieces photos={photos} eagerFirst />
+							<AtelierPieces
+								photos={photos}
+								eagerFirst
+								numbered={search.cursor === undefined}
+							/>
 						)}
 					/>
 				) : (

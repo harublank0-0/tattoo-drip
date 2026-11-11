@@ -67,20 +67,16 @@ function coverFactor(ratio: number, image: ImageSize): number {
 
 /**
  * An artist's portrait in an arch (4:5, cropped: a person, not a
- * composition): a quarter of the column from 64rem, a half from 36rem, the
- * column on a small phone, at most 16rem.
+ * composition) in the artists' row: each entry is at most 16rem wide (the
+ * column's width on a narrow phone), and a photo wider than 4:5 is drawn
+ * wider than its arch by how much flatter it is.
  */
 export function portraitSizes(image: ImageSize): string {
-	const factor = coverFactor(5 / 4, image);
-	return `(min-width: 36rem) ${round(16 * factor)}rem, ${capped(`calc(100vw - ${GUTTER_REM}rem)`, [`${round(16 * factor)}rem`])}`;
+	const factor = round(coverFactor(5 / 4, image));
+	return `(min-width: ${16 + GUTTER_REM}rem) ${round(16 * factor)}rem, calc((100vw - ${GUTTER_REM}rem) * ${factor})`;
 }
 
-/** The arch on an artist's own page and a piece's: 10rem, 4:5. */
-export function smallPortraitSizes(image: ImageSize): string {
-	return `${round(10 * coverFactor(5 / 4, image))}rem`;
-}
-
-/** A preview of an artist's work: drawn whole in a cell at most 6rem wide. */
-export function previewSizes(): string {
-	return "6rem";
+/** A fixed-width arch (`rem` wide, 4:5): the artist's page's 10rem, the piece page's 7rem. */
+export function archSizes(image: ImageSize, rem: number): string {
+	return `${round(rem * coverFactor(5 / 4, image))}rem`;
 }

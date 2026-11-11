@@ -8,18 +8,18 @@ import type { StudioView } from "../../view-model.ts";
 import { atelierCopy } from "./copy.ts";
 import { AtelierPieces } from "./pieces.tsx";
 import { AtelierShell } from "./shell.tsx";
-import { artworkSizes, smallPortraitSizes } from "./sizes.ts";
+import { archSizes, artworkSizes } from "./sizes.ts";
 
 const copy = atelierCopy.artwork;
 
 /**
- * Atelier's tattoo page (`/gallery/$photo`): the piece first, whole and as
- * large as the screen allows (the shared ArtworkFigure: a button to the
- * full-screen viewer), with a quiet colophon beside it (beneath on a phone):
- * its title (the page's h1), the artist, its styles (each a link to the
- * gallery filtered by it), whether it was photographed healed, and the way to
- * ask for something similar while someone takes new work. Then its artist,
- * and more work. Nothing the data doesn't hold (placement, a date) is shown.
+ * Atelier's tattoo page (`/gallery/$photo`): the piece first, whole on its
+ * plate (the shared ArtworkFigure: a button to the full-screen viewer), then
+ * its catalogue entry centred beneath it: its title (the page's h1), the
+ * artist, its styles (each a link to the collection filtered by it), whether
+ * it was photographed healed, and the way to ask for something similar while
+ * someone takes new work. Then its artist, and more work. Nothing the data
+ * doesn't hold (placement, a date) is shown.
  */
 export function AtelierArtworkPage({
 	data,
@@ -89,7 +89,7 @@ function Colophon({
 		photo.artist && isAllowedHref(photo.artist.href) ? photo.artist : null;
 	return (
 		<div className="atl-colophon">
-			<p className="atl-kicker" dir="auto">
+			<p className="atl-kicker user-text" dir="auto">
 				{studio.name}
 			</p>
 			<h1 className="atl-artwork-title user-text" dir="auto">
@@ -171,9 +171,7 @@ function ArtworkArtist({ artwork }: { artwork: ArtworkView }) {
 						className="atl-artist-small-portrait"
 						src={artist.photo.src}
 						srcSet={artist.photo.srcSet}
-						sizes={
-							artist.photo.srcSet ? smallPortraitSizes(artist.photo) : undefined
-						}
+						sizes={artist.photo.srcSet ? archSizes(artist.photo, 7) : undefined}
 						width={artist.photo.width}
 						height={artist.photo.height}
 						alt={artist.photo.alt}

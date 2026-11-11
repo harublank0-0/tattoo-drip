@@ -22,22 +22,21 @@ import { atelierCopy } from "./copy.ts";
 import { AtelierInvite } from "./invite.tsx";
 import { AtelierPieces } from "./pieces.tsx";
 import { AtelierShell } from "./shell.tsx";
-import { leadSizes, smallPortraitSizes } from "./sizes.ts";
+import { archSizes, leadSizes } from "./sizes.ts";
 
 const copy = atelierCopy.artist;
 
 /**
  * Atelier's artist page (`/artists/$slug`), centred like a catalogue's
  * frontispiece: the artist's arch (their portrait, else their initial), name,
- * styles, studio, status, the way to book them and their links; then their
- * signature piece (the newest piece of the portfolio shown, else their own
- * newest work photo) whole on a plate; then
- * status, links and the way to book them; with no work the portrait leads
- * instead, and with neither the name stands alone. Then their bio, the whole
- * portfolio a page at a time (the shared PagedGallery: "Show more", All /
- * Healed, the `work` id), their flash, their styles (each a link to the
- * gallery filtered by artist and style), the invitation and the artists
- * either side. The same data every theme gets (loadArtistPage).
+ * styles, studio, status, the way to book them while they take new work, the
+ * way to their collection and their own links; then their signature piece
+ * (the newest piece of the portfolio shown, else their own newest work photo)
+ * whole on a plate, when they have one. Then their bio, the whole collection
+ * a page at a time (the shared PagedGallery: "Show more", All / Healed, the
+ * `work` id), their flash, their styles (each a link to the collection
+ * filtered by artist and style), the invitation and the artists either side.
+ * The same data every theme gets (loadArtistPage).
  */
 export function AtelierArtistPage({
 	data,
@@ -77,7 +76,7 @@ export function AtelierArtistPage({
 						artist={artist}
 						className="atl-arch atl-arch-large"
 						loading="eager"
-						sizes={artist.photo ? smallPortraitSizes(artist.photo) : undefined}
+						sizes={artist.photo ? archSizes(artist.photo, 10) : undefined}
 					/>
 					<h1 className="atl-artist-title" dir="auto">
 						{artist.name}
@@ -278,7 +277,11 @@ function Portfolio({
 						moreHref={(cursor) => portfolioHref(slug, { ...filter, cursor })}
 						more={more}
 						renderPhotos={(photos) => (
-							<AtelierPieces photos={photos} showArtist={false} />
+							<AtelierPieces
+								photos={photos}
+								showArtist={false}
+								numbered={search.cursor === undefined}
+							/>
 						)}
 					/>
 				) : (
@@ -304,7 +307,7 @@ function Neighbours({ data }: { data: ArtistPageData }) {
 	return (
 		<nav
 			className="atl-container atl-neighbours"
-			aria-label={atelierCopy.artists.label}
+			aria-label={atelierCopy.artists.title}
 		>
 			{items.map((item) => (
 				<RouterAnchor

@@ -23,12 +23,28 @@ import { loadPageStudio } from "../studio/loaders.ts";
 import { PreviewLinks } from "../studio/preview-links.tsx";
 import { rootMeta } from "../studio/seo.ts";
 import {
+	type FontKey,
+	studioFontKey,
+	type ThemeKey,
+} from "../studio/theme/config.ts";
+import {
 	isUnthemedPage,
 	matchedThemeKey,
 	THEME_HTML,
 } from "../studio/theme/html.ts";
 import { previewExitHref } from "../studio/theme/preview.ts";
 import appCss from "../styles.css?url";
+
+/** The heading font file this page preloads (see the root head below). */
+function preloadedFont(theme: ThemeKey, font: FontKey) {
+	return {
+		rel: "preload",
+		href: theme === "atelier" && font === "eczar" ? bodoniLatin : eczarLatin,
+		as: "font",
+		type: "font/woff2",
+		crossOrigin: "anonymous" as const,
+	};
+}
 
 export const Route = createRootRouteWithContext<ApiContext & SiteContext>()({
 	// Every page needs its studio: on the server from the cache the tenant
@@ -53,28 +69,12 @@ export const Route = createRootRouteWithContext<ApiContext & SiteContext>()({
 				: []),
 		],
 		links: [
-			// Only the Latin subset is preloaded; the others load when a page
-			// holds their characters (font-display: optional, src/styles.css).
-			{
-				rel: "preload",
-				href: eczarLatin,
-				as: "font",
-				type: "font/woff2",
-				crossOrigin: "anonymous",
-			},
-			// Atelier's headings (Bodoni Moda, src/studio/theme/atelier/styles.css):
-			// its Latin file, only on an Atelier page; no other theme ever loads it.
-			...(matchedThemeKey(matches) === "atelier"
-				? [
-						{
-							rel: "preload",
-							href: bodoniLatin,
-							as: "font",
-							type: "font/woff2",
-							crossOrigin: "anonymous" as const,
-						},
-					]
-				: []),
+			// One heading font is preloaded, the one the page's headings use: Atelier's
+			// Bodoni (src/studio/theme/atelier/styles.css) while an Atelier studio
+			// keeps the default font, else Eczar's Latin subset (the others load when
+			// a page holds their characters; font-display: optional, src/styles.css).
+			// No other theme ever loads Bodoni.
+			preloadedFont(matchedThemeKey(matches), studioFontKey(loaderData)),
 			{
 				rel: "stylesheet",
 				href: appCss,

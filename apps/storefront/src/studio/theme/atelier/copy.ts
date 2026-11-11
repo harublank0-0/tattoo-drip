@@ -25,8 +25,6 @@ export const atelierCopy = {
 		allStyles: "All styles",
 		noMatch: "No artist lists this style.",
 		showAll: "Show every artist",
-		portfolio: "View portfolio",
-		pieces: "{count} recent pieces",
 	},
 	artist: {
 		back: "All artists",
@@ -47,7 +45,7 @@ export const atelierCopy = {
 		number: "No. {n}",
 		label: "The atelier",
 		title: "The collection",
-		line: "Each piece numbered and shown whole, as it was photographed.",
+		line: "Every piece shown whole, as it was photographed.",
 		empty: "No photos to show yet.",
 		filtered: "No pieces match these filters.",
 		showAll: "Show the whole collection",
@@ -74,8 +72,8 @@ export const atelierCopy = {
 		related: "From the same collection",
 	},
 	book: {
-		label: "By appointment",
-		open: "Request an appointment",
+		label: "Booking",
+		open: "Request a session",
 		openLine:
 			"Describe your idea, where it goes and how large. The artist will reply with the next steps.",
 		closed: "Requests",

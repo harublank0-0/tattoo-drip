@@ -85,13 +85,18 @@
 }
 
 :root.theme-atelier body { background-color: var(--paper); letter-spacing: 0.005em; }
+/*
+ * Bodoni's italic covers Latin only: a Devanagari name or bio in an italic
+ * line stays upright rather than get a slant the browser makes up.
+ */
+:root.theme-atelier { font-synthesis-style: none; }
 /* Headings set as a catalogue sets them: the face's own weight, no bold. */
 :root.theme-atelier h1, :root.theme-atelier h2, :root.theme-atelier h3 { font-weight: 500; }
 
 /*
  * The shared pages (flash, the informational pages, the booking flow) in
  * Atelier's frame: no stencil frame behind photos and panels; panels on the
- * raised paper with a hairline; section titles centred over a short brass rule.
+ * raised paper with a hairline; section titles in Bodoni at Atelier's size.
  */
 :root.theme-atelier .artist-photo::after,
 :root.theme-atelier .profile-cover::after,
@@ -156,7 +161,7 @@
  * hairline at its start; the way to book at the foot, the full width.
  */
 .atl-sheet { inline-size: 100%; max-inline-size: 26rem; gap: 2rem; padding: 1.25rem 1.25rem max(1.5rem, env(safe-area-inset-bottom)); border-color: var(--line); background: var(--paper); overflow-y: auto; }
-.atl-sheet-title { display: flex; align-items: center; gap: 0.5rem; min-block-size: 2.75rem; padding-inline-end: 3.5rem; color: var(--ink); font-family: var(--display-face); font-size: 1.25rem; font-weight: 700; line-height: 1.15; overflow-wrap: anywhere; }
+.atl-sheet-title { display: flex; align-items: center; gap: 0.5rem; min-block-size: 2.75rem; padding-inline-end: 3.5rem; color: var(--ink); font-family: var(--display-face); font-size: 1.25rem; font-weight: 500; line-height: 1.15; overflow-wrap: anywhere; }
 .atl-sheet-list { display: grid; margin: 0; padding: 0; list-style: none; border-block-start: 1px solid var(--line); }
 .atl-sheet-list li { border-block-end: 1px solid var(--line); }
 .atl-sheet-list a { display: flex; align-items: center; gap: 0.875rem; min-block-size: 3.5rem; color: var(--ink); font-family: var(--display-face); font-size: 1.75rem; font-weight: 500; line-height: 1.2; text-decoration: none; }

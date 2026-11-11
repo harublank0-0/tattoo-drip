@@ -98,13 +98,13 @@ export const THEMES: { key: ThemeKey; label: string; description: string }[] = [
 		key: "atelier",
 		label: "Atelier",
 		description:
-			"Quiet luxury: stone paper, bronze and Bodoni headings, your work shown as a numbered collection.",
+			"Quiet luxury: stone paper, bronze and Bodoni headings, your work as a numbered collection. Your colour shows where it reads on the paper.",
 	},
 ];
 
 /** The heading fonts an owner can pick: the label names the face. */
 export const FONTS: { key: FontKey; label: string }[] = [
-	{ key: "eczar", label: "Eczar (the stencil look)" },
+	{ key: "eczar", label: "The theme's own (Eczar; Bodoni on Atelier)" },
 	{ key: "serif", label: "Classic serif" },
 	{ key: "sans", label: "Plain" },
 ];

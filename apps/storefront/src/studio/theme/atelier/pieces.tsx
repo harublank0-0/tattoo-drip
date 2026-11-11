@@ -10,9 +10,9 @@ import { pieceSizes } from "./sizes.ts";
 /**
  * Atelier's pieces as a numbered catalogue: each photo whole, in its own
  * proportions (never cropped), on a white mat with a hairline, one column on
- * a phone and two from 48rem (pages.css), each numbered "No. 01" on from
- * `startAt` (the catalogue number is decoration, hidden from assistive
- * technology: the title names the piece). Reading and tab order are the
+ * a phone and two from 48rem (pages.css), each numbered "No. 01" on in the
+ * order shown (the number is the piece's place in this list, decoration
+ * hidden from assistive technology: the title names the piece). Reading and tab order are the
  * API's order.
  *
  * A piece with its own page (`/gallery/<id>`) is one link, its title naming
@@ -26,7 +26,7 @@ export function AtelierPieces({
 	showArtist = true,
 	withIds = true,
 	eagerFirst = false,
-	startAt = 1,
+	numbered = true,
 }: {
 	photos: readonly GalleryPhotoView[];
 	/** Whether each piece names its artist (an artist's own page doesn't). */
@@ -34,8 +34,12 @@ export function AtelierPieces({
 	withIds?: boolean;
 	/** Whether the first photo loads at once (it is the page's first image). */
 	eagerFirst?: boolean;
-	/** The first piece's catalogue number. */
-	startAt?: number;
+	/**
+	 * Whether the pieces carry their catalogue numbers: only a list that
+	 * starts at the newest (a later page, `?cursor=`, can't know where it
+	 * starts, so it shows none rather than restart at "No. 01").
+	 */
+	numbered?: boolean;
 }) {
 	if (photos.length === 0) return null;
 	return (
@@ -49,7 +53,7 @@ export function AtelierPieces({
 					showArtist={showArtist}
 					withId={withIds}
 					eager={eagerFirst && index === 0}
-					number={startAt + index}
+					number={numbered ? index + 1 : null}
 				/>
 			))}
 		</ul>
@@ -63,7 +67,7 @@ function AtelierPiece({
 	eager,
 	number,
 }: {
-	number: number;
+	number: number | null;
 	photo: GalleryPhotoView;
 	showArtist: boolean;
 	withId: boolean;
@@ -100,9 +104,11 @@ function AtelierPiece({
 				>
 					{image}
 					<span className="atl-piece-caption">
-						<span className="atl-piece-number" aria-hidden="true">
-							{catalogueNumber(number)}
-						</span>
+						{number === null ? null : (
+							<span className="atl-piece-number" aria-hidden="true">
+								{catalogueNumber(number)}
+							</span>
+						)}
 						<span className="atl-piece-title user-text" dir="auto">
 							{title}
 						</span>
@@ -120,9 +126,11 @@ function AtelierPiece({
 					>
 						{image}
 						<span className="atl-piece-caption">
-							<span className="atl-piece-number" aria-hidden="true">
-								{catalogueNumber(number)}
-							</span>
+							{number === null ? null : (
+								<span className="atl-piece-number" aria-hidden="true">
+									{catalogueNumber(number)}
+								</span>
+							)}
 							<span className="atl-piece-title user-text" dir="auto">
 								{title}
 							</span>
