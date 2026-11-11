@@ -460,9 +460,15 @@ test.group("page look words (TAT-56)", () => {
 				description:
 					"Warm paper, charcoal ink and vermilion, with room for large pieces. Your colour shows where it reads on the paper.",
 			},
+			{
+				key: "atelier",
+				label: "Atelier",
+				description:
+					"Quiet luxury: stone paper, bronze and Bodoni headings, your work as a numbered collection. Your colour shows where it reads on the paper.",
+			},
 		]);
 		assert.deepEqual(FONTS, [
-			{ key: "eczar", label: "Eczar (the stencil look)" },
+			{ key: "eczar", label: "The theme's own (Eczar; Bodoni on Atelier)" },
 			{ key: "serif", label: "Classic serif" },
 			{ key: "sans", label: "Plain" },
 		]);

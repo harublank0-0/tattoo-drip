@@ -1,3 +1,8 @@
+import {
+	ATELIER_CLASS,
+	ATELIER_SCHEME,
+	ATELIER_THEME_COLOR,
+} from "./atelier/theme.ts";
 import type { Scheme } from "./branding.ts";
 import { DEFAULT_THEME_KEY, studioThemeKey, type ThemeKey } from "./config.ts";
 import {
@@ -49,6 +54,11 @@ export const THEME_HTML: Record<ThemeKey, ThemeHtml> = {
 		className: IREZUMI_CLASS,
 		scheme: IREZUMI_SCHEME,
 		themeColors: [{ content: IREZUMI_THEME_COLOR }],
+	},
+	atelier: {
+		className: ATELIER_CLASS,
+		scheme: ATELIER_SCHEME,
+		themeColors: [{ content: ATELIER_THEME_COLOR }],
 	},
 };
 

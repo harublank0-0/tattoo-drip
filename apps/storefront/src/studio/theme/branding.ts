@@ -203,8 +203,14 @@ export function brandingCss(config: ThemeConfig): string | null {
 			rules.push(`@media (prefers-color-scheme: dark){${tokenRule(dark)}}`);
 		}
 	}
+	// On a theme's own class where it has one (0,2,1), so a theme that sets its
+	// own face (Atelier's Bodoni) still yields to the studio's pick.
 	const face = DISPLAY_FACES[config.font];
-	if (face !== null) rules.push(`html:root{--display-face:${face}}`);
+	if (face !== null) {
+		const selector =
+			className === null ? "html:root" : `html:root.${className}`;
+		rules.push(`${selector}{--display-face:${face}}`);
+	}
 	const css = rules.join("");
 	return css !== "" && isSafeCss(css) ? css : null;
 }

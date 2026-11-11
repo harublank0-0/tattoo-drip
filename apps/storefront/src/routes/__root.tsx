@@ -10,6 +10,7 @@ import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TattooProvider } from "@tattoo-drip/react";
 
 import type { ApiContext } from "../api/context.ts";
+import bodoniLatin from "../assets/fonts/bodoni-moda/bodoni-moda-latin-500-normal.woff2?url";
 import eczarLatin from "../assets/fonts/eczar/eczar-latin-700-normal.woff2?url";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import type { SiteContext } from "../site/context.ts";
@@ -22,12 +23,28 @@ import { loadPageStudio } from "../studio/loaders.ts";
 import { PreviewLinks } from "../studio/preview-links.tsx";
 import { rootMeta } from "../studio/seo.ts";
 import {
+	type FontKey,
+	studioFontKey,
+	type ThemeKey,
+} from "../studio/theme/config.ts";
+import {
 	isUnthemedPage,
 	matchedThemeKey,
 	THEME_HTML,
 } from "../studio/theme/html.ts";
 import { previewExitHref } from "../studio/theme/preview.ts";
 import appCss from "../styles.css?url";
+
+/** The heading font file this page preloads (see the root head below). */
+function preloadedFont(theme: ThemeKey, font: FontKey) {
+	return {
+		rel: "preload",
+		href: theme === "atelier" && font === "eczar" ? bodoniLatin : eczarLatin,
+		as: "font",
+		type: "font/woff2",
+		crossOrigin: "anonymous" as const,
+	};
+}
 
 export const Route = createRootRouteWithContext<ApiContext & SiteContext>()({
 	// Every page needs its studio: on the server from the cache the tenant
@@ -52,15 +69,12 @@ export const Route = createRootRouteWithContext<ApiContext & SiteContext>()({
 				: []),
 		],
 		links: [
-			// Only the Latin subset is preloaded; the others load when a page
-			// holds their characters (font-display: optional, src/styles.css).
-			{
-				rel: "preload",
-				href: eczarLatin,
-				as: "font",
-				type: "font/woff2",
-				crossOrigin: "anonymous",
-			},
+			// One heading font is preloaded, the one the page's headings use: Atelier's
+			// Bodoni (src/studio/theme/atelier/styles.css) while an Atelier studio
+			// keeps the default font, else Eczar's Latin subset (the others load when
+			// a page holds their characters; font-display: optional, src/styles.css).
+			// No other theme ever loads Bodoni.
+			preloadedFont(matchedThemeKey(matches), studioFontKey(loaderData)),
 			{
 				rel: "stylesheet",
 				href: appCss,

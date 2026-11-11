@@ -1,0 +1,216 @@
+/*
+ * Atelier: a quiet-luxury theme (src/studio/theme/atelier/). Everything here
+ * applies only under `<html class="theme-atelier">`, which the root route sets
+ * for a studio that picked the theme (src/studio/theme/html.ts), or to `atl-`
+ * classes only Atelier's components render, so no other theme is touched.
+ *
+ * One light scheme, whatever the device prefers. The values are theme.ts's
+ * ATELIER_SCHEME and the accent tokens accentTokens() gives for the bronze
+ * #7a5a24 (test/studio/atelier.test.ts pins both). On the paper #f3f1ed, the
+ * raised paper #e9e6e0 and the white mat #fbfaf8: ink 16.2 / 14.7 / 17.5:1,
+ * ink-muted 6.2 / 5.6 / 6.7:1, bronze 5.6 / 5.1 / 6.1:1, line-strong 3.5 /
+ * 3.1 / 3.8:1. Text on a bronze fill is the paper (5.6:1). The champagne brass
+ * (--atl-brass) is decoration only: hairlines and ornaments, never text.
+ *
+ * `:root.theme-atelier` (0,2,0) outranks styles.css's `:root` and its dark
+ * scheme's; the brand's `html:root.theme-atelier` (0,2,1) outranks this.
+ *
+ * Type: Bodoni Moda (SIL OFL 1.1, src/assets/fonts/bodoni-moda/, vendored from
+ * @fontsource/bodoni-moda 5.3.0: Latin and Latin Extended, 500 and 400
+ * italic) for names and headings, unless the studio picked another face in
+ * Page look (brandingCss sets --display-face on this class); its italic for
+ * editorial lines; the body face for text; spaced capitals only for fixed
+ * English labels (names may be Devanagari, which falls back to the serifs).
+ * font-display: optional, and the Latin heading file is preloaded only on an
+ * Atelier page (src/routes/__root.tsx), so no other theme downloads it.
+ */
+@font-face {
+  font-family: 'Bodoni Moda';
+  font-style: normal;
+  font-weight: 500;
+  font-display: optional;
+  src: url('../../../assets/fonts/bodoni-moda/bodoni-moda-latin-500-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Bodoni Moda';
+  font-style: normal;
+  font-weight: 500;
+  font-display: optional;
+  src: url('../../../assets/fonts/bodoni-moda/bodoni-moda-latin-ext-500-normal.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Bodoni Moda';
+  font-style: italic;
+  font-weight: 400;
+  font-display: optional;
+  src: url('../../../assets/fonts/bodoni-moda/bodoni-moda-latin-400-italic.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Bodoni Moda';
+  font-style: italic;
+  font-weight: 400;
+  font-display: optional;
+  src: url('../../../assets/fonts/bodoni-moda/bodoni-moda-latin-ext-400-italic.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root.theme-atelier {
+  color-scheme: light;
+  --paper: #f3f1ed;
+  /* The raised paper: the footer and the bands. */
+  --paper-raised: #e9e6e0;
+  --ink: #151515;
+  --ink-muted: #5c5953;
+  --stencil: #7a5a24;
+  --stencil-strong: #614920;
+  --on-stencil: #f3f1ed;
+  --stencil-wash: #e4dfd5;
+  --line: #d9d4cb;
+  --line-strong: #85807a;
+  --destructive: #a1271c;
+  --card: var(--paper);
+  --popover: var(--paper);
+  /* Square corners: a printed catalogue. */
+  --radius: 0;
+  --site-bar-height: 4.5rem;
+  --atl-column: min(70rem, 100% - 3rem);
+  /* The white mat behind every piece, and the brass of the hairlines (decoration only). */
+  --atl-mat: #fbfaf8;
+  --atl-brass: #b39256;
+  --display-face: 'Bodoni Moda', 'Noto Serif Devanagari', 'Noto Serif', Didot, Georgia, 'Times New Roman', serif;
+  --atl-italic: 'Bodoni Moda', 'Noto Serif', Didot, Georgia, 'Times New Roman', serif;
+}
+
+:root.theme-atelier body { background-color: var(--paper); letter-spacing: 0.005em; }
+/*
+ * Bodoni's italic covers Latin only: a Devanagari name or bio in an italic
+ * line stays upright rather than get a slant the browser makes up.
+ */
+:root.theme-atelier { font-synthesis-style: none; }
+/* Headings set as a catalogue sets them: the face's own weight, no bold. */
+:root.theme-atelier h1, :root.theme-atelier h2, :root.theme-atelier h3 { font-weight: 500; }
+
+/*
+ * The shared pages (flash, the informational pages, the booking flow) in
+ * Atelier's frame: no stencil frame behind photos and panels; panels on the
+ * raised paper with a hairline; section titles in Bodoni at Atelier's size.
+ */
+:root.theme-atelier .artist-photo::after,
+:root.theme-atelier .profile-cover::after,
+:root.theme-atelier .inquiry-aside::after { display: none; }
+:root.theme-atelier .inquiry-aside { border-color: var(--line); background: var(--paper-raised); }
+:root.theme-atelier .section-title { font-size: clamp(1.875rem, 1.4rem + 2vw, 2.875rem); line-height: 1.1; }
+:root.theme-atelier .page { width: var(--atl-column); padding-block-start: 3rem; }
+:root.theme-atelier .text-link { color: var(--ink); text-decoration-color: var(--stencil); text-underline-offset: 0.3em; }
+:root.theme-atelier .text-link:hover { color: var(--stencil-strong); }
+:root.theme-atelier .work-dialog { background: var(--paper); }
+
+/* Keyboard users skip the header: hidden above the top until it has focus. */
+.atl-skip { position: absolute; inset-inline-start: 1rem; inset-block-start: 0.75rem; z-index: 3; padding: 0.75rem 1rem; background: var(--ink); color: var(--paper); font-weight: 600; text-decoration: none; translate: 0 -200%; }
+.atl-skip:focus { translate: 0 0; }
+
+.atl-container { width: var(--atl-column); margin-inline: auto; }
+
+/*
+ * The header: the paper with a hairline under it, sticky. No blur and no
+ * scroll animation: a quiet band that never changes as the page moves.
+ */
+.atl-header { position: sticky; inset-block-start: 0; z-index: 1; border-block-end: 1px solid var(--line); background: color-mix(in srgb, var(--paper) 96%, transparent); }
+.atl-header-inner { display: flex; align-items: center; gap: 0.625rem; min-block-size: var(--site-bar-height); padding-block: 0.75rem; }
+/*
+ * The studio's mark: the name in the display face, two lines at most (the
+ * full name is the link's accessible name), taking the squeeze before the
+ * booking link does, so a long name wraps and the page never scrolls sideways.
+ */
+.atl-brand { display: inline-flex; align-items: center; gap: 0.5rem; min-block-size: 2.75rem; min-inline-size: 0; margin-inline-end: auto; color: var(--ink); font-family: var(--display-face); font-size: 1.375rem; font-weight: 500; line-height: 1.15; text-decoration: none; overflow-wrap: anywhere; }
+.atl-brand .brand-name, .atl-header-cta > span, .atl-sheet-title .brand-name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+
+.atl-nav { display: none; }
+.atl-nav-list { display: flex; gap: 0.125rem; margin: 0; padding: 0; list-style: none; }
+.atl-nav-list a { position: relative; display: inline-flex; align-items: center; min-block-size: 2.75rem; padding-inline: 0.75rem; color: var(--ink-muted); font-size: 0.75rem; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; text-decoration: none; transition: color 150ms ease; }
+/* The current page: ink, over a brass hairline that draws in on hover. */
+.atl-nav-list a::after { content: ''; position: absolute; inset-inline: 0.75rem; inset-block-end: 0.375rem; block-size: 1px; background: var(--atl-brass); scale: 0 1; transition: scale 200ms ease; }
+.atl-nav-list a:hover, .atl-nav-list a[aria-current] { color: var(--ink); }
+.atl-nav-list a:hover::after, .atl-nav-list a[aria-current]::after { scale: 1 1; }
+
+/* The booking link keeps its words whole (at most half the bar, two lines); the studio's mark takes the squeeze. */
+.atl-header-cta { flex: 0 0 auto; max-inline-size: 50%; min-block-size: 2.75rem; padding: 0.375rem 0.75rem; font-size: 0.9375rem; overflow-wrap: normal; text-wrap: balance; }
+
+/* The phone's menu button: 44 px tall, its word beside the icon while there is room. */
+.atl-menu-button { display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem; flex: none; min-inline-size: 2.75rem; min-block-size: 2.75rem; padding-inline: 0.625rem; border: 1px solid var(--line-strong); background: transparent; color: var(--ink); font: inherit; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: border-color 150ms ease; }
+.atl-menu-button:hover { border-color: var(--ink); }
+.atl-menu-button svg { flex: none; inline-size: 1.25rem; block-size: 1.25rem; }
+@media (max-width: 26rem) {
+  .atl-menu-label { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+
+@media (min-width: 64rem) {
+  .atl-header-inner { gap: 1.25rem; }
+  .atl-brand { margin-inline-end: 0; }
+  .atl-nav { display: block; margin-inline-start: auto; }
+  .atl-menu-button { display: none; }
+  .atl-header-cta { max-inline-size: 16rem; }
+}
+
+/*
+ * The menu (shadcn's Sheet): paper, the full width of a phone up to 26rem.
+ * The pages large in the display face; the current one with a brass
+ * hairline at its start; the way to book at the foot, the full width.
+ */
+.atl-sheet { inline-size: 100%; max-inline-size: 26rem; gap: 2rem; padding: 1.25rem 1.25rem max(1.5rem, env(safe-area-inset-bottom)); border-color: var(--line); background: var(--paper); overflow-y: auto; }
+.atl-sheet-title { display: flex; align-items: center; gap: 0.5rem; min-block-size: 2.75rem; padding-inline-end: 3.5rem; color: var(--ink); font-family: var(--display-face); font-size: 1.25rem; font-weight: 500; line-height: 1.15; overflow-wrap: anywhere; }
+.atl-sheet-list { display: grid; margin: 0; padding: 0; list-style: none; border-block-start: 1px solid var(--line); }
+.atl-sheet-list li { border-block-end: 1px solid var(--line); }
+.atl-sheet-list a { display: flex; align-items: center; gap: 0.875rem; min-block-size: 3.5rem; color: var(--ink); font-family: var(--display-face); font-size: 1.75rem; font-weight: 500; line-height: 1.2; text-decoration: none; }
+.atl-sheet-list a::before { content: ''; flex: none; inline-size: 1.25rem; block-size: 1px; background: transparent; }
+.atl-sheet-list a:hover { color: var(--stencil); }
+.atl-sheet-list a[aria-current]::before { background: var(--atl-brass); }
+.atl-sheet-cta { inline-size: 100%; margin-block-start: auto; }
+.atl-sheet > button:focus:not(:focus-visible) { box-shadow: none; }
+
+/*
+ * The footer, on the raised paper: the studio's name as its sign-off, then
+ * small quiet columns. Stacked on a phone, two across from 40rem, beside the
+ * name from 60rem.
+ */
+.atl-footer { margin-block-start: 0; border-block-start: 1px solid var(--line); background: var(--paper-raised); color: var(--ink-muted); font-size: 0.9375rem; line-height: 1.55; overflow-wrap: anywhere; }
+.atl-footer-inner { display: grid; gap: 3rem; padding-block: 3.5rem 2rem; }
+.atl-footer-lead { display: grid; gap: 0.75rem; align-content: start; justify-items: start; }
+.atl-footer-name { color: var(--ink); font-family: var(--display-face); font-size: clamp(2.25rem, 1.5rem + 3.5vw, 4rem); font-weight: 500; line-height: 1.05; text-wrap: balance; }
+.atl-footer-kind { font-family: var(--atl-italic); font-style: italic; color: var(--ink-muted); }
+.atl-footer-cta { margin-block-start: 0.5rem; }
+.atl-footer-columns { display: grid; gap: 2rem; }
+.atl-footer-column { display: grid; gap: 0.5rem; align-content: start; justify-items: start; }
+.atl-footer-heading { margin: 0; color: var(--ink); font-family: var(--body-face); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; line-height: 1.4; }
+.atl-footer-links { display: grid; margin: 0; padding: 0; list-style: none; }
+.atl-footer-links a, .atl-footer-map { display: inline-flex; align-items: center; gap: 0.5rem; min-block-size: 2.75rem; color: var(--ink-muted); text-decoration: none; }
+.atl-footer-links a:hover, .atl-footer-map:hover { color: var(--ink); text-decoration: underline; text-decoration-color: var(--stencil); text-underline-offset: 0.3em; }
+.atl-footer-links a[aria-current] { color: var(--ink); }
+.atl-footer-map svg { flex: none; inline-size: 1rem; block-size: 1rem; color: var(--stencil); }
+.atl-footer-address { display: grid; gap: 0.25rem; justify-items: start; }
+.atl-footer-address p { color: var(--ink); }
+.atl-footer-hours { display: grid; gap: 0.25rem; margin: 0.5rem 0 0; }
+.atl-footer-hours dt { color: var(--ink); font-weight: 600; }
+.atl-footer-hours dd { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 1.5rem; margin: 0; min-inline-size: min(100%, 15rem); }
+.atl-footer-legal { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem 2rem; padding-block-start: 1.5rem; border-block-start: 1px solid var(--line); font-size: 0.875rem; }
+/* The chat button stands over the footer's last line: clear it. */
+:root:has(.chat-float) .atl-footer-inner { padding-block-end: calc(6rem + env(safe-area-inset-bottom, 0px)); }
+/* The shared pages end with their own spacing before the footer. */
+:root.theme-atelier main.page { padding-block-end: 5rem; }
+
+@media (min-width: 40rem) {
+  .atl-footer-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 60rem) {
+  .atl-footer-inner { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); column-gap: 4rem; padding-block-start: 5rem; }
+  .atl-footer-columns { grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); }
+  .atl-footer-legal { grid-column: 1 / -1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atl-nav-list a, .atl-nav-list a::after, .atl-menu-button { transition: none; }
+  .atl-sheet, :root.theme-atelier [data-slot="sheet-overlay"] { animation: none; }
+}

@@ -1,3 +1,4 @@
+import atelier from "~/assets/themes/atelier.webp";
 import inkNoir from "~/assets/themes/ink-noir.webp";
 import irezumi from "~/assets/themes/irezumi.webp";
 import stencilAndInk from "~/assets/themes/stencil-and-ink.webp";
@@ -15,6 +16,7 @@ const SAMPLES: Record<string, string> = {
 	"stencil-and-ink": stencilAndInk,
 	"ink-noir": inkNoir,
 	irezumi,
+	atelier,
 };
 
 /**

@@ -17,6 +17,9 @@
 /* Irezumi's tokens and shell, under `<html class="theme-irezumi">`, and its pages' `irz-` classes. */
 @import './studio/theme/irezumi/styles.css';
 @import './studio/theme/irezumi/pages.css';
+/* Atelier's tokens, its Bodoni faces and shell, under `<html class="theme-atelier">`, and its pages' `atl-` classes. */
+@import './studio/theme/atelier/styles.css';
+@import './studio/theme/atelier/pages.css';
 @plugin '@tailwindcss/typography';
 
 /*
@@ -162,7 +165,7 @@
  */
 @custom-variant dark {
   @media (prefers-color-scheme: dark) {
-    &:not(:where(.theme-irezumi, .theme-irezumi *)) {
+    &:not(:where(.theme-irezumi, .theme-irezumi *, .theme-atelier, .theme-atelier *)) {
       @slot;
     }
   }

@@ -186,7 +186,7 @@ describe("Irezumi's palette (theme.ts and styles.css agree)", () => {
 		// shadcn's `dark:` never applies under the light theme, even on a dark device.
 		assert.match(
 			appCss,
-			/&:not\(:where\(\.theme-irezumi, \.theme-irezumi \*\)\)/,
+			/&:not\(:where\(\.theme-irezumi, \.theme-irezumi \*[^)]*\)\)/,
 		);
 	});
 
@@ -312,7 +312,7 @@ describe("brandingCss for Irezumi: one light scheme, checked on both surfaces", 
 	test("the studio's font still applies", () => {
 		assert.match(
 			brandingCss(config({ font: "serif" })) ?? "",
-			/html:root\{--display-face:/,
+			/html:root\.theme-irezumi\{--display-face:/,
 		);
 	});
 });
