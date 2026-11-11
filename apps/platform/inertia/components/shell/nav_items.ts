@@ -11,6 +11,7 @@ export type NavKey =
 	| "calendar"
 	| "clients"
 	| "artists"
+	| "inventory"
 	| "portfolio"
 	| "settings";
 
@@ -24,6 +25,7 @@ export type ShellNavItem = {
 		| "tenant.calendar.index"
 		| "tenant.clients.index"
 		| "tenant.artists"
+		| "tenant.inventory.index"
 		| "tenant.portfolio"
 		| "tenant.settings";
 	/** "bar": its own tab on the phone; "more": under More on the phone. The sidebar lists both. */
@@ -46,7 +48,7 @@ const counted = (count: number | null, badgeLabel?: string) =>
 
 /**
  * What `tenant`'s member sees (TAT-107): Today, Inbox (owners), Projects and
- * Calendar, and for owners Clients, Artists, Portfolio and Settings under
+ * Calendar, and for owners Clients, Artists, Portfolio, Inventory and Settings under
  * More. An artist has Portfolio (their own work) as a fourth tab. Nothing
  * is counted twice: the Inbox counts new requests, Today the projects that
  * need the member, and the bell (not an item) the alerts neither counts. The
@@ -111,6 +113,12 @@ export function navItems(
 				place: "more",
 			},
 			portfolio,
+			{
+				key: "inventory",
+				label: "Inventory",
+				route: "tenant.inventory.index",
+				place: "more",
+			},
 			{
 				key: "settings",
 				label: "Settings",

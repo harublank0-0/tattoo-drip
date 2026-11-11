@@ -97,6 +97,29 @@ router
 			.get("/", [controllers.Dashboard, "tenantHome"])
 			.as("tenant.dashboard");
 
+		router
+			.get("inventory", [controllers.Inventory, "index"])
+			.as("tenant.inventory.index");
+		router
+			.post("inventory", [controllers.Inventory, "store"])
+			.as("tenant.inventory.store");
+		router
+			.get("inventory/:id", [controllers.Inventory, "show"])
+			.where("id", router.matchers.uuid())
+			.as("tenant.inventory.show");
+		router
+			.put("inventory/:id", [controllers.Inventory, "update"])
+			.where("id", router.matchers.uuid())
+			.as("tenant.inventory.update");
+		router
+			.post("inventory/:id/movements", [controllers.Inventory, "movement"])
+			.where("id", router.matchers.uuid())
+			.as("tenant.inventory.movement");
+		router
+			.delete("inventory/:id", [controllers.Inventory, "archive"])
+			.where("id", router.matchers.uuid())
+			.as("tenant.inventory.archive");
+
 		// Today (TAT-107): every member's home, what needs them right now.
 		router.get("today", [controllers.Today, "show"]).as("tenant.today");
 

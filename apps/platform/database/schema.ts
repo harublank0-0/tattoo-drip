@@ -409,6 +409,81 @@ export class InquirySchema extends BaseModel {
 	declare updatedAt: DateTime | null;
 }
 
+export class InventoryItemSchema extends BaseModel {
+	static $columns = [
+		"category",
+		"createdAt",
+		"deletedAt",
+		"id",
+		"name",
+		"quantity",
+		"reorderThreshold",
+		"sku",
+		"tenantId",
+		"unit",
+		"updatedAt",
+	] as const;
+	$columns = InventoryItemSchema.$columns;
+	@column()
+	declare category: string | null;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.dateTime()
+	declare deletedAt: DateTime | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare name: string;
+	@column()
+	declare quantity: number;
+	@column()
+	declare reorderThreshold: number | null;
+	@column()
+	declare sku: string | null;
+	@column()
+	declare tenantId: string;
+	@column()
+	declare unit: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
+export class InventoryMovementSchema extends BaseModel {
+	static $columns = [
+		"balanceAfter",
+		"createdAt",
+		"delta",
+		"id",
+		"itemId",
+		"kind",
+		"note",
+		"requestId",
+		"tenantId",
+		"userId",
+	] as const;
+	$columns = InventoryMovementSchema.$columns;
+	@column()
+	declare balanceAfter: number;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column()
+	declare delta: number;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare itemId: string;
+	@column()
+	declare kind: string;
+	@column()
+	declare note: string | null;
+	@column()
+	declare requestId: string;
+	@column()
+	declare tenantId: string;
+	@column()
+	declare userId: string | null;
+}
+
 export class MessageTemplateSchema extends BaseModel {
 	static $columns = [
 		"body",

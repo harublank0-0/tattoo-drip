@@ -96,6 +96,42 @@ const routes = {
     tokens: [{"old":"/t/:tenant","type":0,"val":"t","end":""},{"old":"/t/:tenant","type":1,"val":"tenant","end":""}],
     types: placeholder as Registry['tenant.dashboard']['types'],
   },
+  'tenant.inventory.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/inventory',
+    tokens: [{"old":"/t/:tenant/inventory","type":0,"val":"t","end":""},{"old":"/t/:tenant/inventory","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inventory","type":0,"val":"inventory","end":""}],
+    types: placeholder as Registry['tenant.inventory.index']['types'],
+  },
+  'tenant.inventory.store': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/inventory',
+    tokens: [{"old":"/t/:tenant/inventory","type":0,"val":"t","end":""},{"old":"/t/:tenant/inventory","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inventory","type":0,"val":"inventory","end":""}],
+    types: placeholder as Registry['tenant.inventory.store']['types'],
+  },
+  'tenant.inventory.show': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/inventory/:id',
+    tokens: [{"old":"/t/:tenant/inventory/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/inventory/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inventory/:id","type":0,"val":"inventory","end":""},{"old":"/t/:tenant/inventory/:id","type":1,"val":"id","end":""}],
+    types: placeholder as Registry['tenant.inventory.show']['types'],
+  },
+  'tenant.inventory.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/inventory/:id',
+    tokens: [{"old":"/t/:tenant/inventory/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/inventory/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inventory/:id","type":0,"val":"inventory","end":""},{"old":"/t/:tenant/inventory/:id","type":1,"val":"id","end":""}],
+    types: placeholder as Registry['tenant.inventory.update']['types'],
+  },
+  'tenant.inventory.movement': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/inventory/:id/movements',
+    tokens: [{"old":"/t/:tenant/inventory/:id/movements","type":0,"val":"t","end":""},{"old":"/t/:tenant/inventory/:id/movements","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inventory/:id/movements","type":0,"val":"inventory","end":""},{"old":"/t/:tenant/inventory/:id/movements","type":1,"val":"id","end":""},{"old":"/t/:tenant/inventory/:id/movements","type":0,"val":"movements","end":""}],
+    types: placeholder as Registry['tenant.inventory.movement']['types'],
+  },
+  'tenant.inventory.archive': {
+    methods: ["DELETE"],
+    pattern: '/t/:tenant/inventory/:id',
+    tokens: [{"old":"/t/:tenant/inventory/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/inventory/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inventory/:id","type":0,"val":"inventory","end":""},{"old":"/t/:tenant/inventory/:id","type":1,"val":"id","end":""}],
+    types: placeholder as Registry['tenant.inventory.archive']['types'],
+  },
   'tenant.today': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/today',

@@ -31,6 +31,14 @@ export interface ApiDefinition {
   }
   tenant: {
     dashboard: typeof routes['tenant.dashboard']
+    inventory: {
+      index: typeof routes['tenant.inventory.index']
+      store: typeof routes['tenant.inventory.store']
+      show: typeof routes['tenant.inventory.show']
+      update: typeof routes['tenant.inventory.update']
+      movement: typeof routes['tenant.inventory.movement']
+      archive: typeof routes['tenant.inventory.archive']
+    }
     today: typeof routes['tenant.today']
     settings: typeof routes['tenant.settings'] & {
       profile: typeof routes['tenant.settings.profile'] & {

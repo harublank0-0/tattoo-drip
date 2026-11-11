@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { DateTime } from "luxon";
 import Artist from "#modules/artists/models/artist";
 import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
@@ -6,6 +7,8 @@ import { LISTING_CONSENT_VERSION } from "#modules/discovery/publication";
 import FlashDesign from "#modules/flash/models/flash_design";
 import Inquiry from "#modules/inquiries/models/inquiry";
 import ReferenceImage from "#modules/inquiries/models/reference_image";
+import InventoryItem from "#modules/inventory/models/inventory_item";
+import InventoryMovement from "#modules/inventory/models/inventory_movement";
 import { DEFAULT_TEMPLATES } from "#modules/notifications/messages";
 import MessageTemplate from "#modules/notifications/models/message_template";
 import StaffAlert from "#modules/notifications/models/staff_alert";
@@ -49,6 +52,7 @@ export type IsolationCase = {
 	 * Required for a pattern with an :id; the helper throws without it.
 	 */
 	resource?:
+		| "inventoryItem"
 		| "paymentMethod"
 		| "artistProfile"
 		| "workPhoto"
@@ -104,6 +108,20 @@ const tenantRow = (target: Studio) =>
 	inTenant(target.tenant, async () =>
 		(await Tenant.findOrFail(target.tenant.id)).serialize(),
 	);
+
+const inventoryRows = (target: Studio) =>
+	inTenant(target.tenant, async () => ({
+		items: (
+			await InventoryItem.withTrashed()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("id")
+		).map((item) => item.serialize()),
+		movements: (
+			await InventoryMovement.query()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("id")
+		).map((movement) => movement.serialize()),
+	}));
 
 const methodRows = (target: Studio) =>
 	inTenant(target.tenant, async () =>
@@ -389,6 +407,55 @@ export const isolationCases: IsolationCase[] = [
 		actor: "owner",
 		ownStatus: 200,
 		snapshot: none,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/inventory",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: inventoryRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/inventory",
+		actor: "owner",
+		body: () => ({ name: "Aftercare balm", unit: "piece" }),
+		ownStatus: 302,
+		snapshot: inventoryRows,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/inventory/:id",
+		actor: "owner",
+		resource: "inventoryItem",
+		ownStatus: 200,
+		snapshot: inventoryRows,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/inventory/:id",
+		actor: "owner",
+		resource: "inventoryItem",
+		body: () => ({ name: "Sterile cartridges" }),
+		ownStatus: 302,
+		snapshot: inventoryRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/inventory/:id/movements",
+		actor: "owner",
+		resource: "inventoryItem",
+		body: () => ({ requestId: randomUUID(), kind: "receive", quantity: "4" }),
+		ownStatus: 302,
+		snapshot: inventoryRows,
+	},
+	{
+		method: "DELETE",
+		pattern: "/t/:tenant/inventory/:id",
+		actor: "owner",
+		resource: "inventoryItem",
+		ownStatus: 302,
+		snapshot: inventoryRows,
 	},
 	{
 		method: "GET",

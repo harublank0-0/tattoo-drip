@@ -6,6 +6,7 @@ import ArtistService from "#modules/artists/services/artist_service";
 import { LISTING_CONSENT_VERSION } from "#modules/discovery/publication";
 import PublicationService from "#modules/discovery/services/publication_service";
 import FlashDesign from "#modules/flash/models/flash_design";
+import InventoryService from "#modules/inventory/services/inventory_service";
 import ImageService from "#modules/media/services/image_service";
 import MessageTemplate from "#modules/notifications/models/message_template";
 import StaffAlert from "#modules/notifications/models/staff_alert";
@@ -103,6 +104,12 @@ const depositLinks = depositServices().links;
 export async function seededStudio(slug: string, name: string) {
 	const { owner, tenant } = await studioWithOwner(slug, name);
 	const artist = await artistIn(tenant, `artist@${slug}.example`);
+	const inventoryItem = await inTenant(tenant, () =>
+		new InventoryService().create(tenant.id, {
+			name: `${name} needles`,
+			unit: "box",
+		}),
+	);
 	const paymentMethod = await inTenant(tenant, async () => {
 		const first = await paymentMethods.create(tenant, {
 			kind: "cash",
@@ -372,6 +379,7 @@ export async function seededStudio(slug: string, name: string) {
 		tenant,
 		owner,
 		artist,
+		inventoryItem,
 		discoverPlaceId: otherCity[0].id as string,
 		paymentMethod,
 		artistProfile,

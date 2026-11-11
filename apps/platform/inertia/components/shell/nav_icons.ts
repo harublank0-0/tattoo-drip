@@ -7,6 +7,7 @@ import {
 	Images,
 	Inbox,
 	type LucideIcon,
+	Package,
 	Settings,
 	Users,
 } from "lucide-react";
@@ -21,6 +22,7 @@ export const NAV_ICONS: Record<NavKey, LucideIcon> = {
 	clients: Contact,
 	artists: Users,
 	portfolio: Images,
+	inventory: Package,
 	settings: Settings,
 };
 

@@ -29,6 +29,13 @@ export const TENANT_ROUTE_ROLES = {
 	// never requests, money, the setup or the pilot numbers.
 	"tenant.today": MEMBERS,
 
+	"tenant.inventory.index": OWNERS,
+	"tenant.inventory.store": OWNERS,
+	"tenant.inventory.show": OWNERS,
+	"tenant.inventory.update": OWNERS,
+	"tenant.inventory.movement": OWNERS,
+	"tenant.inventory.archive": OWNERS,
+
 	// Studio settings.
 	"tenant.settings": OWNERS,
 	"tenant.settings.profile": OWNERS,
