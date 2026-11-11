@@ -16,6 +16,12 @@ export interface Scheme {
 	readonly paper: string;
 	readonly ink: string;
 	readonly inkMuted: string;
+	/**
+	 * Other backgrounds the theme puts text on (a raised surface for its
+	 * footer and panels), which an accent must read on as well as the paper.
+	 * None for Stencil & Ink's two schemes and Ink Noir.
+	 */
+	readonly surfaces?: readonly string[];
 }
 
 export const LIGHT: Scheme = {
@@ -53,16 +59,28 @@ export function accentTokens(
 	accent: string,
 	scheme: Scheme,
 ): AccentTokens | null {
-	if (contrastRatio(accent, scheme.paper) < MIN_TEXT_CONTRAST) return null;
+	if (!readsOnScheme(accent, scheme)) return null;
 	const strong = mixColors(accent, scheme.ink, 0.25);
 	return {
 		stencil: accent,
-		stencilStrong:
-			contrastRatio(strong, scheme.paper) >= MIN_TEXT_CONTRAST
-				? strong
-				: accent,
+		stencilStrong: readsOnScheme(strong, scheme) ? strong : accent,
 		stencilWash: washFor(accent, scheme),
 	};
+}
+
+/** Whether text in `color` reads at 4.5:1 on the scheme's paper and on each of its other surfaces. */
+function readsOnScheme(color: string, scheme: Scheme): boolean {
+	return [scheme.paper, ...(scheme.surfaces ?? [])].every(
+		(surface) => contrastRatio(color, surface) >= MIN_TEXT_CONTRAST,
+	);
+}
+
+/** Whether a scheme's paper is light: dark text reads better on it than white does. */
+export function isLightScheme(scheme: Scheme): boolean {
+	return (
+		contrastRatio(scheme.paper, "#000000") >
+		contrastRatio(scheme.paper, "#ffffff")
+	);
 }
 
 function washFor(accent: string, scheme: Scheme): string {
@@ -143,16 +161,21 @@ function tokenRule(tokens: AccentTokens, selector = "html:root"): string {
  * which outranks src/styles.css's `:root` wherever the router puts the tag.
  *
  * A theme with one fixed scheme (THEME_HTML's `scheme`: Ink Noir is always
- * dark) gets one rule instead, with no media query: the accent as the dark
- * scheme takes it (`accentDark`, else the accent lightened), checked against
- * that theme's own paper, on `html:root.<the theme's class>`, which outranks
- * the theme's tokens (`:root.<class>`).
+ * dark, Irezumi always light) gets one rule instead, with no media query, on
+ * `html:root.<the theme's class>`, which outranks the theme's tokens
+ * (`:root.<class>`). A dark one takes the accent as the dark scheme does
+ * (`accentDark`, else the accent lightened); a light one takes `accent` as it
+ * is, only while it reads on the paper and every other surface of the theme
+ * (the scheme's `surfaces`), else it keeps the theme's own. Either is checked
+ * against that theme's own colours, not Stencil & Ink's.
  */
 export function brandingCss(config: ThemeConfig): string | null {
 	const rules: string[] = [];
 	const { scheme, className } = THEME_HTML[config.key];
 	if (scheme !== null && className !== null) {
-		const color = darkAccent(config, scheme);
+		const color = isLightScheme(scheme)
+			? config.accent
+			: darkAccent(config, scheme);
 		const tokens = color === null ? null : accentTokens(color, scheme);
 		if (tokens) rules.push(tokenRule(tokens, `html:root.${className}`));
 	} else {

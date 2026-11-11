@@ -451,6 +451,12 @@ test.group("page look words (TAT-56)", () => {
 				description:
 					"Dark and photo-first, with a menu of your pages and a full footer.",
 			},
+			{
+				key: "irezumi",
+				label: "Irezumi",
+				description:
+					"Warm paper, charcoal ink and vermilion, with room for large pieces. Your colour shows where it reads on the paper.",
+			},
 		]);
 		assert.deepEqual(FONTS, [
 			{ key: "eczar", label: "Eczar (the stencil look)" },

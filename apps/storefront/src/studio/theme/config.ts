@@ -13,11 +13,12 @@ import { cleanLine } from "../text.ts";
  */
 
 /**
- * The themes this app has, by key: Stencil & Ink (TAT-97, TAT-105), and Ink
+ * The themes this app has, by key: Stencil & Ink (TAT-97, TAT-105), Ink
  * Noir, a dark, photography-first look with its own header and footer
- * (src/studio/theme/ink-noir/).
+ * (src/studio/theme/ink-noir/), and Irezumi, a light, Japanese-inspired
+ * editorial look on warm paper (src/studio/theme/irezumi/).
  */
-export const THEME_KEYS = ["stencil-and-ink", "ink-noir"] as const;
+export const THEME_KEYS = ["stencil-and-ink", "ink-noir", "irezumi"] as const;
 export type ThemeKey = (typeof THEME_KEYS)[number];
 export const DEFAULT_THEME_KEY: ThemeKey = "stencil-and-ink";
 
@@ -60,6 +61,10 @@ export const THEME_SECTIONS: Record<ThemeKey, ThemeSections> = Object.freeze({
 	}),
 	// The same sections: a theme changes how a page looks, not what it holds.
 	"ink-noir": Object.freeze({
+		order: sectionList("work", "artists", "flash", "info", "inquiry"),
+		required: sectionList("inquiry"),
+	}),
+	irezumi: Object.freeze({
 		order: sectionList("work", "artists", "flash", "info", "inquiry"),
 		required: sectionList("inquiry"),
 	}),
