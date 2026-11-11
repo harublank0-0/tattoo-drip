@@ -1,5 +1,6 @@
+import type { ChallengeTheme } from "../../intake/challenge.ts";
 import { contrastRatio, MIN_TEXT_CONTRAST, mixColors } from "./color.ts";
-import type { FontKey, ThemeConfig } from "./config.ts";
+import type { FontKey, ThemeConfig, ThemeKey } from "./config.ts";
 import { THEME_HTML } from "./html.ts";
 
 /**
@@ -73,6 +74,18 @@ function readsOnScheme(color: string, scheme: Scheme): boolean {
 	return [scheme.paper, ...(scheme.surfaces ?? [])].every(
 		(surface) => contrastRatio(color, surface) >= MIN_TEXT_CONTRAST,
 	);
+}
+
+/**
+ * The booking form's Turnstile widget colours for a theme: its one fixed
+ * scheme (Irezumi is light, Ink Noir dark), so the widget matches the page
+ * whatever the device prefers; `auto` (the device's) for a theme that
+ * follows the device, as Stencil & Ink does.
+ */
+export function challengeThemeFor(key: ThemeKey): ChallengeTheme {
+	const { scheme } = THEME_HTML[key];
+	if (scheme === null) return "auto";
+	return isLightScheme(scheme) ? "light" : "dark";
 }
 
 /** Whether a scheme's paper is light: dark text reads better on it than white does. */

@@ -24,6 +24,7 @@ import type {
 import { OpenNow } from "../open-now.tsx";
 import { type MoreWork, PagedGallery } from "../paging.tsx";
 import { flashDesignSizes, logoSizes, workGridSizes } from "../srcset.ts";
+import { challengeThemeFor } from "../theme/branding.ts";
 import type { SectionKey } from "../theme/config.ts";
 import type { StudioView } from "../view-model.ts";
 import { ArtistProfile, ArtistRoster } from "./artists.tsx";
@@ -275,6 +276,7 @@ export function RequestPage({
 				state={inquiry}
 				channels={channels}
 				challengeSiteKey={challengeSiteKey}
+				challengeTheme={challengeThemeFor(theme.key)}
 				booking={data.booking}
 				intro={
 					data.flash ? (
