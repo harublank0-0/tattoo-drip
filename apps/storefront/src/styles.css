@@ -932,3 +932,24 @@
   .know-more > summary svg { transition: none; }
 }
 
+
+/*
+ * A theme preview's bar (src/studio/components/preview-banner.tsx): a slim
+ * bar across the foot of the screen, in the page's own tokens, so it reads on
+ * every theme. While it is there the page keeps room for it below its end
+ * (the footer's last links scroll clear of it), a focused control is kept
+ * above it (scroll padding), and the chat button and its open links sit above
+ * it, so it covers nothing. `--preview-bar` is its height: one line, two on a
+ * narrow phone.
+ */
+:root:has(.preview-banner) { --preview-bar: 3.25rem; scroll-padding-block-end: calc(var(--preview-bar) + 1rem); }
+:root:has(.preview-banner) body { padding-block-end: calc(var(--preview-bar) + env(safe-area-inset-bottom, 0px)); }
+:root:has(.preview-banner) .chat-float { inset-block-end: calc(var(--preview-bar) + 0.75rem + env(safe-area-inset-bottom, 0px)); }
+.preview-banner { position: fixed; inset-inline: 0; inset-block-end: 0; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0 1rem; min-block-size: var(--preview-bar); padding: 0.25rem 1rem env(safe-area-inset-bottom, 0px); border-block-start: 1px solid var(--line-strong); background: var(--paper); color: var(--ink); box-shadow: 0 -0.25rem 1rem rgb(0 0 0 / 0.12); font-size: 0.875rem; line-height: 1.35; text-align: center; }
+.preview-banner p { margin: 0; }
+.preview-banner span { color: var(--ink-muted); }
+.preview-banner-exit { display: inline-flex; align-items: center; min-block-size: 2.75rem; color: var(--stencil); font-weight: 600; text-decoration: underline; text-underline-offset: 0.2em; }
+.preview-banner-exit:hover { color: var(--stencil-strong); }
+@media (max-width: 40rem) {
+  :root:has(.preview-banner) { --preview-bar: 5.75rem; }
+}

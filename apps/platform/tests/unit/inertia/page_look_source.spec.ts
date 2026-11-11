@@ -1,5 +1,6 @@
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { test } from "@japa/runner";
+import { THEMES } from "#modules/storefront/look";
 
 const read = (file: string) =>
 	readFile(new URL(`../../../inertia/${file}`, import.meta.url), "utf8");
@@ -44,6 +45,7 @@ test.group("The page look components (TAT-56)", () => {
 			"pages/settings/look.tsx",
 			"components/logo_form.tsx",
 			"components/colour_field.tsx",
+			"components/theme_sample.tsx",
 		]) {
 			const source = withoutComments(await read(file));
 			assert.notMatch(source, /#[0-9a-fA-F]{3,8}\b/, file);
@@ -280,5 +282,57 @@ test.group("The page look components (TAT-56)", () => {
 		const form = await read("components/logo_form.tsx");
 		assert.include(form, "window.confirm(REMOVE_LOGO_QUESTION)");
 		assert.include(form, "tenant.settings.logo.destroy");
+	});
+
+	test("every theme the server lists has its sample, a WebP in the assets", async ({
+		assert,
+	}) => {
+		const source = await read("components/theme_sample.tsx");
+		for (const theme of THEMES) {
+			assert.include(
+				source,
+				`~/assets/themes/${theme.key}.webp`,
+				`${theme.key}'s sample is imported`,
+			);
+			const file = await stat(
+				new URL(
+					`../../../inertia/assets/themes/${theme.key}.webp`,
+					import.meta.url,
+				),
+			);
+			assert.isAbove(file.size, 1000, theme.key);
+			assert.isBelow(file.size, 80_000, `${theme.key}: keep a sample small`);
+		}
+		// Decoration beside the theme's own words, with its size, loaded lazily.
+		assert.include(source, 'alt=""');
+		assert.include(source, "width={960}");
+		assert.include(source, 'loading="lazy"');
+	});
+
+	test("the Preview links sit outside the radio group, in a new tab, for every theme but the saved one", async ({
+		assert,
+	}) => {
+		const page = await read("pages/settings/look.tsx");
+		const group = page.indexOf("</RadioGroup>");
+		const links = page.indexOf("<ThemePreviewLinks");
+		assert.isAbove(group, 0);
+		assert.isAbove(
+			links,
+			group,
+			"after the radio group closes: its arrow keys and Tab stay apart",
+		);
+		assert.notInclude(
+			page.slice(page.indexOf("<RadioGroup"), group),
+			"<a",
+			"no link inside the radio group",
+		);
+		assert.match(
+			page,
+			/themes\.filter\(\s*\(theme\) => theme\.key !== look\.theme,?\s*\)/,
+			"no link for the saved theme",
+		);
+		assert.match(page, /target="_blank"\s*rel="noreferrer"/);
+		assert.include(page, '<span className="sr-only"> {NEW_TAB}</span>');
+		assert.include(page, '"max-lg:min-h-11"');
 	});
 });

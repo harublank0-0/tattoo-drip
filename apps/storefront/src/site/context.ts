@@ -1,3 +1,6 @@
+import type { ThemeKey } from "../studio/theme/config.ts";
+import { readPreviewTheme } from "../studio/theme/preview.ts";
+
 /**
  * The studio page's public settings (TAT-48, TAT-57): its own origin, e.g.
  * https://blackneedle.tattoodrip.com (canonical links and Open Graph URLs
@@ -6,7 +9,8 @@
  * TattooClientRef: on the server from the settings and the slug the tenant
  * middleware confirmed (src/site/request.ts), in the browser from the
  * router's dehydrated state. The browser never reads its own host (TAT-12).
- * Both values are public: every page carries them.
+ * With them, the theme this visit previews (`?preview=`, src/studio/theme/
+ * preview.ts), or null. All three values are public: every page carries them.
  */
 
 const NOT_SET =
@@ -24,20 +28,30 @@ export interface SiteContext {
 
 /** What the router's dehydrated state carries for the site. */
 export interface DehydratedSite {
-	site: { origin: string; challengeSiteKey: string | null };
+	site: {
+		origin: string;
+		challengeSiteKey: string | null;
+		previewTheme: ThemeKey | null;
+	};
 }
 
 export class SiteRef {
 	#origin: string | undefined;
 	#challengeSiteKey: string | null = null;
+	#previewTheme: ThemeKey | null = null;
 
-	connect(origin: string, challengeSiteKey: string | null = null): void {
+	connect(
+		origin: string,
+		challengeSiteKey: string | null = null,
+		previewTheme: ThemeKey | null = null,
+	): void {
 		if (this.#origin !== undefined) {
 			throw new Error("The site origin is already set.");
 		}
 		const key = parseChallengeSiteKey(challengeSiteKey);
 		this.#origin = parseSiteOrigin(origin);
 		this.#challengeSiteKey = key;
+		this.#previewTheme = readPreviewTheme(previewTheme);
 	}
 
 	get origin(): string {
@@ -49,6 +63,12 @@ export class SiteRef {
 	get challengeSiteKey(): string | null {
 		if (this.#origin === undefined) throw new Error(NOT_SET);
 		return this.#challengeSiteKey;
+	}
+
+	/** The theme this visit previews (`?preview=`, src/studio/theme/preview.ts), or null. */
+	get previewTheme(): ThemeKey | null {
+		if (this.#origin === undefined) throw new Error(NOT_SET);
+		return this.#previewTheme;
 	}
 }
 
@@ -76,10 +96,14 @@ export function parseChallengeSiteKey(value: unknown): string | null {
 	throw new Error(INVALID);
 }
 
-/** The router's dehydrate: the origin and the site key, and nothing else. */
+/** The router's dehydrate: the origin, the site key and the preview theme, and nothing else. */
 export function dehydrateSite(site: SiteRef): DehydratedSite {
 	return {
-		site: { origin: site.origin, challengeSiteKey: site.challengeSiteKey },
+		site: {
+			origin: site.origin,
+			challengeSiteKey: site.challengeSiteKey,
+			previewTheme: site.previewTheme,
+		},
 	};
 }
 
@@ -96,6 +120,8 @@ export function hydrateSite(
 	site.connect(
 		parseSiteOrigin(fields.origin),
 		parseChallengeSiteKey(fields.challengeSiteKey),
+		// Anything but a theme key is no preview (an older server's page sends none).
+		readPreviewTheme(fields.previewTheme),
 	);
 }
 

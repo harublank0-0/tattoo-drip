@@ -50,6 +50,7 @@ describe("check-client-bundle", () => {
 			"serverKey",
 			"requestStudio",
 			"requestVisitorAddress",
+			"requestPreviewTheme",
 			"storefrontConfig",
 			"tenantMiddleware",
 			"API_URL",

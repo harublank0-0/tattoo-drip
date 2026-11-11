@@ -63,13 +63,45 @@ describe("parseSiteOrigin", () => {
 	});
 });
 
+describe("a theme preview (?preview=) in the site", () => {
+	test("travels to the browser as it left, so in-tab navigation keeps it", () => {
+		const server = new SiteRef();
+		server.connect(ORIGIN, SITE_KEY, "irezumi");
+		const dehydrated = dehydrateSite(server);
+		assert.equal(dehydrated.site.previewTheme, "irezumi");
+		const browser = new SiteRef();
+		hydrateSite(browser, JSON.parse(JSON.stringify(dehydrated)));
+		assert.equal(browser.previewTheme, "irezumi");
+	});
+
+	test("anything but a theme key is no preview, and never breaks the page", () => {
+		for (const value of [
+			undefined,
+			null,
+			"",
+			"classic",
+			"IREZUMI",
+			"irezumi ",
+			"__proto__",
+			"toString",
+			["irezumi"],
+			{ theme: "irezumi" },
+			42,
+		]) {
+			const browser = new SiteRef();
+			hydrateSite(browser, { site: { origin: ORIGIN, previewTheme: value } });
+			assert.equal(browser.previewTheme, null, JSON.stringify(value));
+		}
+	});
+});
+
 describe("what the browser gets", () => {
 	test("the origin and the public site key, through JSON as they left", () => {
 		const server = new SiteRef();
 		server.connect(ORIGIN, SITE_KEY);
 		const dehydrated = dehydrateSite(server);
 		assert.deepEqual(dehydrated, {
-			site: { origin: ORIGIN, challengeSiteKey: SITE_KEY },
+			site: { origin: ORIGIN, challengeSiteKey: SITE_KEY, previewTheme: null },
 		});
 
 		const browser = new SiteRef();
@@ -82,7 +114,7 @@ describe("what the browser gets", () => {
 		const server = new SiteRef();
 		server.connect(ORIGIN);
 		assert.deepEqual(dehydrateSite(server), {
-			site: { origin: ORIGIN, challengeSiteKey: null },
+			site: { origin: ORIGIN, challengeSiteKey: null, previewTheme: null },
 		});
 
 		const browser = new SiteRef();

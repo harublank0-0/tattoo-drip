@@ -1,7 +1,7 @@
 import { Form } from "@adonisjs/inertia/react";
 import { Link } from "@inertiajs/react";
 import { cn } from "cn";
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { ArrowDown, ArrowUp, ExternalLink } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { urlFor } from "~/client";
 import ColourField from "~/components/colour_field";
@@ -25,8 +25,11 @@ import {
 	type MoveDirection,
 	moveRow,
 	moveSectionLabel,
+	NEW_TAB,
 	type PageLookProps,
 	PREVIEW_NOTE,
+	previewHref,
+	previewLabel,
 	REQUIRED_SECTION,
 	SECTION_WORDS,
 	SECTIONS_INTRO,
@@ -35,6 +38,8 @@ import {
 	type Swatches,
 	sectionsError,
 	sentSections,
+	THEME_PREVIEW_HELP,
+	THEME_PREVIEW_TITLE,
 	type ThemeOption,
 	takesFocusBack,
 	toggleRow,
@@ -42,6 +47,7 @@ import {
 import Section from "~/components/section";
 import { useStoredChoice, useStoredRows } from "~/components/stored_choice";
 import type { StudioPageProps } from "~/components/studio_link";
+import { ThemeSample } from "~/components/theme_sample";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
 import {
@@ -137,20 +143,27 @@ export default function PageLook({
 								<FieldGroup>
 									<FieldSet data-invalid={!!errors.theme}>
 										<FieldLegend variant="label">Theme</FieldLegend>
+										<FieldDescription id="theme-help">
+											{THEME_PREVIEW_HELP}
+										</FieldDescription>
 										<RadioGroup
 											name="theme"
 											value={pickedTheme}
 											onValueChange={pickTheme}
 											aria-invalid={!!errors.theme}
 											aria-describedby={
-												errors.theme ? "theme-error" : undefined
+												errors.theme ? "theme-error" : "theme-help"
 											}
+											className="sm:grid-cols-2 xl:grid-cols-3 [&>[data-slot=field-label]]:grow"
 										>
 											{themes.map((theme) => (
 												<FieldLabel
 													key={theme.key}
 													htmlFor={`theme-${theme.key}`}
 												>
+													<div className="px-4 pt-4">
+														<ThemeSample theme={theme.key} />
+													</div>
 													<Field orientation="horizontal">
 														<FieldContent>
 															<FieldTitle id={`theme-${theme.key}-title`}>
@@ -176,6 +189,17 @@ export default function PageLook({
 										{errors.theme && (
 											<FieldError id="theme-error">{errors.theme}</FieldError>
 										)}
+										{/*
+										 * Outside the radio group, so its keyboard moves stay on the
+										 * cards and Tab reaches every link; following one never picks a
+										 * theme. The saved theme has none: "Open your page" shows it.
+										 */}
+										<ThemePreviewLinks
+											themes={themes.filter(
+												(theme) => theme.key !== look.theme,
+											)}
+											pageUrl={studioPage.url}
+										/>
 									</FieldSet>
 
 									<ColourField
@@ -513,3 +537,47 @@ function SaveButton({ processing }: { processing: boolean }) {
 }
 
 PageLook.layout = [AppLayout, SettingsLayout];
+
+/** "Preview {theme}" for each theme but the saved one: the studio's page with `?preview=` in a new tab. */
+function ThemePreviewLinks({
+	themes,
+	pageUrl,
+}: {
+	themes: ThemeOption[];
+	pageUrl: string;
+}) {
+	const links = themes.flatMap((theme) => {
+		const href = previewHref(pageUrl, theme.key);
+		return href ? [{ theme, href }] : [];
+	});
+	if (links.length === 0) return null;
+	return (
+		<div className="flex flex-col gap-2">
+			<p className="text-sm text-muted-foreground" id="theme-preview-title">
+				{THEME_PREVIEW_TITLE}
+			</p>
+			<ul
+				aria-labelledby="theme-preview-title"
+				className="flex flex-wrap gap-2"
+			>
+				{links.map(({ theme, href }) => (
+					<li key={theme.key}>
+						<a
+							href={href}
+							target="_blank"
+							rel="noreferrer"
+							className={cn(
+								buttonVariants({ variant: "outline", size: "sm" }),
+								"max-lg:min-h-11",
+							)}
+						>
+							<ExternalLink aria-hidden="true" />
+							{previewLabel(theme.label)}
+							<span className="sr-only"> {NEW_TAB}</span>
+						</a>
+					</li>
+				))}
+			</ul>
+		</div>
+	);
+}
