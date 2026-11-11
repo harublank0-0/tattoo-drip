@@ -1,5 +1,6 @@
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { test } from "@japa/runner";
+import { THEMES } from "#modules/storefront/look";
 
 const read = (file: string) =>
 	readFile(new URL(`../../../inertia/${file}`, import.meta.url), "utf8");
@@ -44,6 +45,7 @@ test.group("The page look components (TAT-56)", () => {
 			"pages/settings/look.tsx",
 			"components/logo_form.tsx",
 			"components/colour_field.tsx",
+			"components/theme_sample.tsx",
 		]) {
 			const source = withoutComments(await read(file));
 			assert.notMatch(source, /#[0-9a-fA-F]{3,8}\b/, file);
@@ -280,5 +282,42 @@ test.group("The page look components (TAT-56)", () => {
 		const form = await read("components/logo_form.tsx");
 		assert.include(form, "window.confirm(REMOVE_LOGO_QUESTION)");
 		assert.include(form, "tenant.settings.logo.destroy");
+	});
+
+	test("every theme the server lists has its sample, a WebP in the assets", async ({
+		assert,
+	}) => {
+		const source = await read("components/theme_sample.tsx");
+		for (const theme of THEMES) {
+			assert.include(
+				source,
+				`~/assets/themes/${theme.key}.webp`,
+				`${theme.key}'s sample is imported`,
+			);
+			const file = await stat(
+				new URL(
+					`../../../inertia/assets/themes/${theme.key}.webp`,
+					import.meta.url,
+				),
+			);
+			assert.isAbove(file.size, 1000, theme.key);
+			assert.isBelow(file.size, 80_000, `${theme.key}: keep a sample small`);
+		}
+		// Decoration beside the theme's own words, with its size, loaded lazily.
+		assert.include(source, 'alt=""');
+		assert.include(source, "width={960}");
+		assert.include(source, 'loading="lazy"');
+	});
+
+	test("each theme's Preview link sits outside its label, in a new tab", async ({
+		assert,
+	}) => {
+		const page = await read("pages/settings/look.tsx");
+		const label = page.indexOf("</FieldLabel>", page.indexOf("<ThemeSample"));
+		const link = page.indexOf("previewLabel(theme.label)");
+		assert.isAbove(label, 0);
+		assert.isAbove(link, label, "the link comes after the label closes");
+		assert.match(page, /href=\{href\}\s*target="_blank"\s*rel="noreferrer"/);
+		assert.include(page, '"self-start max-lg:min-h-11"');
 	});
 });

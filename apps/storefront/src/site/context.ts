@@ -14,6 +14,9 @@ const NOT_SET =
 const INVALID =
 	"This page's site address is missing or invalid. Reload the page.";
 
+import type { ThemeKey } from "../studio/theme/config.ts";
+import { readPreviewTheme } from "../studio/theme/preview.ts";
+
 /** A Turnstile site key: public, and safe wherever it is written. */
 export const CHALLENGE_SITE_KEY_SHAPE = /^[A-Za-z0-9_-]{10,100}$/;
 
@@ -24,20 +27,30 @@ export interface SiteContext {
 
 /** What the router's dehydrated state carries for the site. */
 export interface DehydratedSite {
-	site: { origin: string; challengeSiteKey: string | null };
+	site: {
+		origin: string;
+		challengeSiteKey: string | null;
+		previewTheme: ThemeKey | null;
+	};
 }
 
 export class SiteRef {
 	#origin: string | undefined;
 	#challengeSiteKey: string | null = null;
+	#previewTheme: ThemeKey | null = null;
 
-	connect(origin: string, challengeSiteKey: string | null = null): void {
+	connect(
+		origin: string,
+		challengeSiteKey: string | null = null,
+		previewTheme: ThemeKey | null = null,
+	): void {
 		if (this.#origin !== undefined) {
 			throw new Error("The site origin is already set.");
 		}
 		const key = parseChallengeSiteKey(challengeSiteKey);
 		this.#origin = parseSiteOrigin(origin);
 		this.#challengeSiteKey = key;
+		this.#previewTheme = readPreviewTheme(previewTheme);
 	}
 
 	get origin(): string {
@@ -49,6 +62,12 @@ export class SiteRef {
 	get challengeSiteKey(): string | null {
 		if (this.#origin === undefined) throw new Error(NOT_SET);
 		return this.#challengeSiteKey;
+	}
+
+	/** The theme this visit previews (`?preview=`, src/studio/theme/preview.ts), or null. */
+	get previewTheme(): ThemeKey | null {
+		if (this.#origin === undefined) throw new Error(NOT_SET);
+		return this.#previewTheme;
 	}
 }
 
@@ -79,7 +98,11 @@ export function parseChallengeSiteKey(value: unknown): string | null {
 /** The router's dehydrate: the origin and the site key, and nothing else. */
 export function dehydrateSite(site: SiteRef): DehydratedSite {
 	return {
-		site: { origin: site.origin, challengeSiteKey: site.challengeSiteKey },
+		site: {
+			origin: site.origin,
+			challengeSiteKey: site.challengeSiteKey,
+			previewTheme: site.previewTheme,
+		},
 	};
 }
 
@@ -96,6 +119,8 @@ export function hydrateSite(
 	site.connect(
 		parseSiteOrigin(fields.origin),
 		parseChallengeSiteKey(fields.challengeSiteKey),
+		// Anything but a theme key is no preview (an older server's page sends none).
+		readPreviewTheme(fields.previewTheme),
 	);
 }
 

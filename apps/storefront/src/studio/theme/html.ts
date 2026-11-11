@@ -59,6 +59,13 @@ export const THEME_HTML: Record<ThemeKey, ThemeHtml> = {
  */
 const UNTHEMED_ROUTES: ReadonlySet<string> = new Set(["/deposit"]);
 
+/** Whether an unthemed route (the deposit page) is among the matches: it shows no theme and no preview. */
+export function isUnthemedPage(
+	matches: readonly { readonly routeId: string }[],
+): boolean {
+	return matches.some((match) => UNTHEMED_ROUTES.has(match.routeId));
+}
+
 /** The root route's id in TanStack Router (`rootRouteId`). */
 const ROOT_ROUTE_ID = "__root__";
 
@@ -77,7 +84,7 @@ export function matchedThemeKey(
 		readonly loaderData?: unknown;
 	}[],
 ): ThemeKey {
-	if (matches.some((match) => UNTHEMED_ROUTES.has(match.routeId))) {
+	if (isUnthemedPage(matches)) {
 		return DEFAULT_THEME_KEY;
 	}
 	const root = matches.find((match) => match.routeId === ROOT_ROUTE_ID);

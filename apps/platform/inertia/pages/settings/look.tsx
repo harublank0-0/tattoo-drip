@@ -1,7 +1,7 @@
 import { Form } from "@adonisjs/inertia/react";
 import { Link } from "@inertiajs/react";
 import { cn } from "cn";
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { ArrowDown, ArrowUp, ExternalLink } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { urlFor } from "~/client";
 import ColourField from "~/components/colour_field";
@@ -27,6 +27,8 @@ import {
 	moveSectionLabel,
 	type PageLookProps,
 	PREVIEW_NOTE,
+	previewHref,
+	previewLabel,
 	REQUIRED_SECTION,
 	SECTION_WORDS,
 	SECTIONS_INTRO,
@@ -35,6 +37,7 @@ import {
 	type Swatches,
 	sectionsError,
 	sentSections,
+	THEME_PREVIEW_HELP,
 	type ThemeOption,
 	takesFocusBack,
 	toggleRow,
@@ -42,6 +45,7 @@ import {
 import Section from "~/components/section";
 import { useStoredChoice, useStoredRows } from "~/components/stored_choice";
 import type { StudioPageProps } from "~/components/studio_link";
+import { ThemeSample } from "~/components/theme_sample";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
 import {
@@ -137,41 +141,71 @@ export default function PageLook({
 								<FieldGroup>
 									<FieldSet data-invalid={!!errors.theme}>
 										<FieldLegend variant="label">Theme</FieldLegend>
+										<FieldDescription id="theme-help">
+											{THEME_PREVIEW_HELP}
+										</FieldDescription>
 										<RadioGroup
 											name="theme"
 											value={pickedTheme}
 											onValueChange={pickTheme}
 											aria-invalid={!!errors.theme}
 											aria-describedby={
-												errors.theme ? "theme-error" : undefined
+												errors.theme ? "theme-error" : "theme-help"
 											}
+											className="sm:grid-cols-2 xl:grid-cols-3"
 										>
-											{themes.map((theme) => (
-												<FieldLabel
-													key={theme.key}
-													htmlFor={`theme-${theme.key}`}
-												>
-													<Field orientation="horizontal">
-														<FieldContent>
-															<FieldTitle id={`theme-${theme.key}-title`}>
-																{theme.label}
-															</FieldTitle>
-															<FieldDescription
-																id={`theme-${theme.key}-description`}
+											{themes.map((theme) => {
+												const href = previewHref(studioPage.url, theme.key);
+												return (
+													<div key={theme.key} className="flex flex-col gap-2">
+														<FieldLabel
+															htmlFor={`theme-${theme.key}`}
+															className="grow"
+														>
+															<div className="px-3 pt-3">
+																<ThemeSample theme={theme.key} />
+															</div>
+															<Field orientation="horizontal">
+																<FieldContent>
+																	<FieldTitle id={`theme-${theme.key}-title`}>
+																		{theme.label}
+																	</FieldTitle>
+																	<FieldDescription
+																		id={`theme-${theme.key}-description`}
+																	>
+																		{theme.description}
+																	</FieldDescription>
+																</FieldContent>
+																<RadioGroupItem
+																	aria-labelledby={`theme-${theme.key}-title`}
+																	aria-describedby={`theme-${theme.key}-description`}
+																	value={theme.key}
+																	id={`theme-${theme.key}`}
+																	aria-invalid={!!errors.theme}
+																/>
+															</Field>
+														</FieldLabel>
+														{/* Outside the label: following it never picks the theme. */}
+														{href ? (
+															<a
+																href={href}
+																target="_blank"
+																rel="noreferrer"
+																className={cn(
+																	buttonVariants({
+																		variant: "outline",
+																		size: "sm",
+																	}),
+																	"self-start max-lg:min-h-11",
+																)}
 															>
-																{theme.description}
-															</FieldDescription>
-														</FieldContent>
-														<RadioGroupItem
-															aria-labelledby={`theme-${theme.key}-title`}
-															aria-describedby={`theme-${theme.key}-description`}
-															value={theme.key}
-															id={`theme-${theme.key}`}
-															aria-invalid={!!errors.theme}
-														/>
-													</Field>
-												</FieldLabel>
-											))}
+																<ExternalLink aria-hidden="true" />
+																{previewLabel(theme.label)}
+															</a>
+														) : null}
+													</div>
+												);
+											})}
 										</RadioGroup>
 										{errors.theme && (
 											<FieldError id="theme-error">{errors.theme}</FieldError>

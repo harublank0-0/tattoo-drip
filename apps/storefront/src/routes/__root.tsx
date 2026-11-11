@@ -3,25 +3,32 @@ import {
 	createRootRouteWithContext,
 	HeadContent,
 	Scripts,
+	useLocation,
 	useMatches,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TattooProvider } from "@tattoo-drip/react";
 
 import type { ApiContext } from "../api/context.ts";
-import { loadStudio } from "../api/loaders.ts";
 import eczarLatin from "../assets/fonts/eczar/eczar-latin-700-normal.woff2?url";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import type { SiteContext } from "../site/context.ts";
+import { PreviewBanner } from "../studio/components/preview-banner.tsx";
 import { studioIconLinks } from "../studio/icon.ts";
+import { loadPageStudio } from "../studio/loaders.ts";
 import { rootMeta } from "../studio/seo.ts";
-import { matchedThemeKey, THEME_HTML } from "../studio/theme/html.ts";
+import {
+	isUnthemedPage,
+	matchedThemeKey,
+	THEME_HTML,
+} from "../studio/theme/html.ts";
 import appCss from "../styles.css?url";
 
 export const Route = createRootRouteWithContext<ApiContext & SiteContext>()({
 	// Every page needs its studio: on the server from the cache the tenant
 	// middleware filled, after that from the API (TAT-23).
-	loader: ({ context }) => loadStudio(context),
+	// With this visit's theme preview over the saved theme (src/studio/theme/preview.ts).
+	loader: ({ context }) => loadPageStudio(context),
 	head: ({ loaderData, match, matches }) => ({
 		meta: [
 			{
@@ -65,10 +72,15 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 	// This request's (server) or this tab's (browser) SDK client, for the
 	// @tattoo-drip/react hooks. The QueryClientProvider around the whole
 	// router comes from setupRouterSsrQueryIntegration (src/router.tsx).
-	const { tattoo } = Route.useRouteContext();
+	const { tattoo, site } = Route.useRouteContext();
 	// The studio's theme sets the page's colours on <html> (src/studio/theme/html.ts):
 	// read from this request's matches, so the server and the browser agree.
 	const html = THEME_HTML[useMatches({ select: matchedThemeKey })];
+	// A theme preview (src/studio/theme/preview.ts): from this visit's site, on
+	// every page but an unthemed one; the same on the server and in the browser.
+	const unthemed = useMatches({ select: isUnthemedPage });
+	const pathname = useLocation({ select: (location) => location.pathname });
+	const preview = unthemed ? null : site.previewTheme;
 
 	return (
 		<html lang="en" className={html.className ?? undefined}>
@@ -83,10 +95,15 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 						media={color.media}
 					/>
 				))}
+				{/* Never index a preview (the response's X-Robots-Tag says so too). */}
+				{preview ? <meta name="robots" content="noindex, nofollow" /> : null}
 			</head>
 			<body>
 				<TattooProvider client={tattoo.client}>
 					{children}
+					{preview ? (
+						<PreviewBanner theme={preview} exitHref={pathname} />
+					) : null}
 					{import.meta.env.DEV ? (
 						<TanStackDevtools
 							config={{

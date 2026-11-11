@@ -4,6 +4,8 @@ import {
 	getGlobalStartContext,
 } from "@tanstack/react-start";
 import type { Studio } from "@tattoo-drip/sdk";
+import type { ThemeKey } from "../studio/theme/config.ts";
+import { previewHeaders, previewThemeOf } from "../studio/theme/preview.ts";
 import { storefrontConfig } from "./config.ts";
 import { handleTenantRequest } from "./handle.ts";
 
@@ -19,12 +21,18 @@ export const tenantMiddleware = createMiddleware().server(
 			config: storefrontConfig(),
 		});
 		if (outcome.type === "respond") return outcome.response;
-		return next({
+		// A theme preview (src/studio/theme/preview.ts): this request only, never cached or indexed.
+		const previewTheme = previewThemeOf(request.url);
+		const result = await next({
 			context: {
 				studio: outcome.studio,
 				visitorAddress: outcome.visitorAddress,
+				previewTheme,
 			},
 		});
+		return previewTheme === null
+			? result
+			: { ...result, response: previewHeaders(result.response) };
 	},
 );
 
@@ -54,3 +62,14 @@ export const requestVisitorAddress = createServerOnlyFn(
 		return context.visitorAddress;
 	},
 );
+
+/**
+ * The theme this request previews (`?preview=`, src/studio/theme/preview.ts),
+ * on the server only, or null: the site context carries it to the browser.
+ */
+export const requestPreviewTheme = createServerOnlyFn((): ThemeKey | null => {
+	const context = getGlobalStartContext() as NonNullable<
+		ReturnType<typeof getGlobalStartContext>
+	>;
+	return context.previewTheme ?? null;
+});
