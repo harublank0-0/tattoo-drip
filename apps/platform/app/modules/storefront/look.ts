@@ -7,7 +7,12 @@
  * checked "#rrggbb" colours.
  */
 
-export const THEME_KEYS = ["stencil-and-ink", "ink-noir", "irezumi"] as const;
+export const THEME_KEYS = [
+	"stencil-and-ink",
+	"ink-noir",
+	"irezumi",
+	"atelier",
+] as const;
 export type ThemeKey = (typeof THEME_KEYS)[number];
 export const DEFAULT_THEME: ThemeKey = "stencil-and-ink";
 
@@ -88,6 +93,12 @@ export const THEMES: { key: ThemeKey; label: string; description: string }[] = [
 		label: "Irezumi",
 		description:
 			"Warm paper, charcoal ink and vermilion, with room for large pieces. Your colour shows where it reads on the paper.",
+	},
+	{
+		key: "atelier",
+		label: "Atelier",
+		description:
+			"Quiet luxury: stone paper, bronze and Bodoni headings, your work shown as a numbered collection.",
 	},
 ];
 

@@ -1,0 +1,819 @@
+/*
+ * Atelier's own pages (src/studio/theme/atelier/): the home page, the
+ * artists, an artist's page, the collection (the gallery), a piece's page and
+ * the booking page's opening. Only `atl-` classes these components render, so
+ * no other theme is touched.
+ *
+ * The look of a printed catalogue: centred compositions, Bodoni headings at
+ * the face's own weight, small spaced capitals for fixed labels, brass
+ * hairlines as the only ornament, and every piece of work shown whole
+ * (`object-fit: contain`, never a crop) on a white mat with a hairline, its
+ * catalogue number beside its title. Only a portrait is cropped, into an
+ * arch. Each photo takes its box's full width with the height from its own
+ * width and height (so its space is kept before it loads), under a height
+ * cap. sizes.ts reads these boxes.
+ */
+
+/* Pieces of type. */
+.atl-kicker {
+	color: var(--ink-muted);
+	font-size: 0.75rem;
+	font-weight: 500;
+	letter-spacing: 0.2em;
+	line-height: 1.6;
+	text-transform: uppercase;
+	overflow-wrap: anywhere;
+}
+/* A kicker that holds the studio's own words (its place) keeps them as written. */
+.atl-kicker.user-text {
+	letter-spacing: 0.08em;
+	text-transform: none;
+	font-size: 0.875rem;
+}
+.atl-label {
+	margin: 0;
+	color: var(--ink-muted);
+	font-family: var(--body-face);
+	font-size: 0.75rem;
+	font-weight: 500;
+	letter-spacing: 0.22em;
+	line-height: 1.5;
+	text-transform: uppercase;
+}
+.atl-label-strong {
+	color: var(--ink);
+	font-family: var(--display-face);
+	font-size: 1.5rem;
+	font-weight: 500;
+	line-height: 1.2;
+}
+.atl-link {
+	display: inline-flex;
+	align-items: center;
+	min-block-size: 2.75rem;
+	color: var(--ink);
+	text-decoration: underline;
+	text-decoration-color: var(--atl-brass);
+	text-decoration-thickness: 1px;
+	text-underline-offset: 0.35em;
+	transition:
+		color 150ms ease,
+		text-decoration-color 150ms ease;
+}
+.atl-link:hover {
+	color: var(--stencil);
+	text-decoration-color: var(--stencil);
+}
+.atl-empty {
+	display: grid;
+	gap: 0.25rem;
+	justify-items: center;
+	max-inline-size: 36rem;
+	margin-inline: auto;
+	color: var(--ink-muted);
+	font-family: var(--atl-italic);
+	font-size: 1.25rem;
+	font-style: italic;
+	text-align: center;
+}
+.atl-status {
+	font-size: 0.75rem;
+	font-weight: 500;
+	letter-spacing: 0.18em;
+	text-transform: uppercase;
+}
+.atl-status-open {
+	color: var(--stencil);
+}
+.atl-status-closed {
+	color: var(--ink-muted);
+}
+/* A closed artist's own words stay as they wrote them. */
+.atl-status-closed.user-text {
+	letter-spacing: 0.02em;
+	text-transform: none;
+	font-size: 0.9375rem;
+}
+
+/* Actions: the shared `.action`, squared, spaced capitals; the quiet one an ink outline. */
+.atl-main .action,
+.atl-header-cta,
+.atl-footer-cta,
+.atl-sheet-cta {
+	font-size: 0.8125rem;
+	font-weight: 500;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+}
+.atl-cta {
+	min-block-size: 3rem;
+	padding-inline: 1.75rem;
+}
+.atl-action-quiet {
+	border-color: var(--ink);
+	background: transparent;
+	color: var(--ink);
+}
+.atl-action-quiet:hover {
+	background: var(--ink);
+	color: var(--paper);
+}
+
+/* Sections: centred titles over a short brass rule. */
+.atl-main {
+	padding-block-end: 0;
+}
+.atl-section {
+	padding-block: clamp(3.5rem, 2.5rem + 4vw, 7rem);
+}
+.atl-hero + .atl-section,
+.atl-artist-hero + .atl-section,
+.atl-section + .atl-section {
+	padding-block-start: 0;
+}
+.atl-section-head {
+	display: grid;
+	justify-items: center;
+	gap: 0.75rem;
+	margin-block-end: clamp(2rem, 1.5rem + 2vw, 3.5rem);
+	text-align: center;
+}
+.atl-section-title {
+	margin: 0 0 clamp(2rem, 1.5rem + 2vw, 3.5rem);
+	font-size: clamp(2rem, 1.5rem + 2vw, 3rem);
+	line-height: 1.1;
+	text-align: center;
+}
+.atl-section-title::after {
+	content: "";
+	display: block;
+	inline-size: 3rem;
+	block-size: 1px;
+	margin: 1.25rem auto 0;
+	background: var(--atl-brass);
+}
+.atl-section-head .atl-section-title {
+	margin: 0;
+}
+.atl-shared {
+	padding-block: clamp(1rem, 0.5rem + 2vw, 2rem)
+		clamp(3.5rem, 2.5rem + 4vw, 7rem);
+}
+.atl-shared > .section {
+	margin-block-start: 0;
+}
+.atl-band {
+	border-block: 1px solid var(--line);
+	background: var(--paper-raised);
+}
+.atl-band .atl-shared {
+	padding-block: clamp(3.5rem, 2.5rem + 4vw, 6rem);
+	text-align: center;
+}
+.atl-band .section-title {
+	justify-content: center;
+}
+.atl-band .measure {
+	margin-inline: auto;
+}
+.atl-band .actions {
+	justify-content: center;
+}
+/* An introduction: centred, in the italic, like a catalogue's foreword. */
+.atl-split {
+	display: grid;
+	justify-items: center;
+	gap: 1.25rem;
+	text-align: center;
+}
+.atl-intro-text {
+	max-inline-size: 40rem;
+	font-family: var(--atl-italic);
+	font-size: clamp(1.375rem, 1.15rem + 1vw, 1.875rem);
+	font-style: italic;
+	line-height: 1.5;
+}
+
+/* The opening of a page that is not the home page: centred label, title, line. */
+.atl-page-head {
+	padding-block: clamp(3rem, 2rem + 4vw, 6rem) 0;
+	text-align: center;
+}
+.atl-page-head .atl-container {
+	display: grid;
+	gap: 1rem;
+	justify-items: center;
+}
+.atl-page-title {
+	font-size: clamp(2.75rem, 1.75rem + 4.5vw, 5rem);
+	line-height: 1.02;
+}
+.atl-page-title::after {
+	content: "";
+	display: block;
+	inline-size: 3rem;
+	block-size: 1px;
+	margin: 1.5rem auto 0;
+	background: var(--atl-brass);
+}
+.atl-page-line {
+	max-inline-size: 34rem;
+	font-family: var(--atl-italic);
+	font-size: 1.25rem;
+	font-style: italic;
+	color: var(--ink-muted);
+}
+.atl-crumb {
+	margin-block-end: 1.5rem;
+	text-align: center;
+}
+
+/*
+ * The first screen: centred. The studio's kind and place, its name in Bodoni
+ * over a brass rule, the hours line and the way to book; then the plate.
+ */
+.atl-hero {
+	padding-block: clamp(3rem, 2rem + 5vw, 7rem) clamp(3.5rem, 2.5rem + 4vw, 7rem);
+}
+.atl-hero-grid {
+	display: grid;
+	justify-items: center;
+	gap: clamp(2.5rem, 2rem + 3vw, 4.5rem);
+}
+.atl-hero-text {
+	display: grid;
+	justify-items: center;
+	gap: 1.25rem;
+	max-inline-size: 48rem;
+	min-inline-size: 0;
+	text-align: center;
+}
+.atl-hero-text .profile-logo {
+	margin-block-end: 0.5rem;
+	object-position: center;
+}
+.atl-hero-name {
+	font-size: clamp(3rem, 1.5rem + 7vw, 7rem);
+	line-height: 0.98;
+	letter-spacing: -0.01em;
+}
+.atl-hero-name::after {
+	content: "";
+	display: block;
+	inline-size: 4rem;
+	block-size: 1px;
+	margin: 1.75rem auto 0;
+	background: var(--atl-brass);
+}
+.atl-hero-text .profile-hours {
+	min-block-size: 1.6em;
+	color: var(--ink-muted);
+}
+.atl-hero-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 0.75rem;
+	margin-block-start: 0.5rem;
+}
+.atl-artist-facts .atl-hero-actions {
+	justify-content: center;
+}
+.atl-hero-actions .action {
+	max-inline-size: 100%;
+}
+/* With no photo: a brass double rule, decoration only (aria-hidden). */
+.atl-hero-ornament {
+	inline-size: min(100%, 22rem);
+	block-size: 1.25rem;
+	border-block: 1px solid var(--atl-brass);
+}
+
+/* A plate: a piece (or the cover) whole on the white mat, a hairline round it, its caption under it. */
+.atl-plate {
+	display: grid;
+	justify-items: center;
+	gap: 0.875rem;
+	inline-size: min(100%, 52rem);
+	margin: 0 auto;
+	padding: clamp(1rem, 0.5rem + 2.5vw, 2.5rem);
+	border: 1px solid var(--line);
+	background: var(--atl-mat);
+}
+.atl-plate-photo {
+	display: block;
+	inline-size: 100%;
+	block-size: auto;
+	max-block-size: min(78svh, 50rem);
+	object-fit: contain;
+}
+.atl-plate-caption {
+	color: var(--ink-muted);
+	font-family: var(--atl-italic);
+	font-size: 1.0625rem;
+	font-style: italic;
+}
+.atl-plate-caption .atl-link {
+	min-block-size: 2.75rem;
+	color: var(--ink-muted);
+}
+
+/*
+ * The catalogue: one column on a phone, two from 48rem; each piece whole on
+ * its mat, then its number and title on one line, the artist and the healed
+ * mark under it.
+ */
+.atl-pieces {
+	display: grid;
+	gap: 3.5rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.atl-piece {
+	display: grid;
+	gap: 0.25rem;
+	align-content: start;
+	min-inline-size: 0;
+}
+.atl-piece-link {
+	display: grid;
+	gap: 1rem;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--ink);
+	font: inherit;
+	text-align: start;
+	text-decoration: none;
+	cursor: pointer;
+}
+.atl-piece-mat {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: clamp(1rem, 0.5rem + 2vw, 2.25rem);
+	border: 1px solid var(--line);
+	background: var(--atl-mat);
+	transition: border-color 200ms ease;
+}
+.atl-piece-photo {
+	display: block;
+	inline-size: 100%;
+	block-size: auto;
+	max-block-size: 70svh;
+	object-fit: contain;
+}
+.atl-piece-caption {
+	display: flex;
+	align-items: baseline;
+	gap: 0.875rem;
+	min-inline-size: 0;
+}
+.atl-piece-number {
+	flex: none;
+	color: var(--stencil);
+	font-family: var(--display-face);
+	font-size: 1rem;
+	letter-spacing: 0.06em;
+}
+.atl-piece-title {
+	min-inline-size: 0;
+	font-family: var(--atl-italic);
+	font-size: 1.125rem;
+	font-style: italic;
+	line-height: 1.4;
+	text-decoration: underline;
+	text-decoration-color: transparent;
+	text-underline-offset: 0.3em;
+	transition: text-decoration-color 150ms ease;
+}
+.atl-piece-link:hover .atl-piece-title,
+.atl-piece-link:focus-visible .atl-piece-title {
+	text-decoration-color: var(--atl-brass);
+}
+.atl-piece-link:hover .atl-piece-mat {
+	border-color: var(--atl-brass);
+}
+.atl-piece-meta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0 1rem;
+	color: var(--ink-muted);
+	font-size: 0.875rem;
+}
+.atl-piece-meta a {
+	display: inline-flex;
+	align-items: center;
+	min-block-size: 2.75rem;
+	color: var(--ink-muted);
+	text-decoration: underline;
+	text-decoration-color: var(--line-strong);
+	text-underline-offset: 0.3em;
+}
+.atl-piece-meta a:hover {
+	color: var(--ink);
+	text-decoration-color: var(--stencil);
+}
+.atl-piece-healed {
+	font-size: 0.6875rem;
+	font-weight: 500;
+	letter-spacing: 0.2em;
+	text-transform: uppercase;
+	color: var(--stencil);
+}
+@media (min-width: 48rem) {
+	.atl-pieces {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 4.5rem 3rem;
+		align-items: start;
+	}
+}
+.atl-main .work-more-bar {
+	justify-items: center;
+	margin-block-start: 3.5rem;
+}
+
+/*
+ * The artists: arches in a centred row, each the artist's portrait (cropped
+ * to 4:5 under a round top) or their initial in Bodoni, the name (the card's
+ * one link, stretched over it), the styles and the status.
+ */
+.atl-artist-index {
+	display: grid;
+	gap: 3rem 2rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	justify-content: center;
+}
+.atl-artist-entry > article {
+	position: relative;
+	display: grid;
+	justify-items: center;
+	gap: 0.75rem;
+	text-align: center;
+}
+.atl-arch {
+	display: block;
+	inline-size: min(100%, 16rem);
+	aspect-ratio: 4 / 5;
+	overflow: hidden;
+	border: 1px solid var(--line);
+	border-radius: 999px 999px 0 0;
+	background: var(--atl-mat);
+}
+.atl-arch img {
+	inline-size: 100%;
+	block-size: 100%;
+	object-fit: cover;
+	object-position: 50% 25%;
+}
+.atl-arch-initial {
+	display: grid;
+	place-items: center;
+	color: var(--stencil);
+	font-family: var(--display-face);
+	font-size: 4.5rem;
+	line-height: 1;
+}
+.atl-arch-large {
+	inline-size: 10rem;
+}
+.atl-arch-large.atl-arch-initial {
+	font-size: 3.5rem;
+}
+.atl-artist-name {
+	margin-block-start: 0.75rem;
+	font-size: clamp(1.5rem, 1.25rem + 1vw, 2rem);
+	line-height: 1.15;
+}
+.atl-artist-link {
+	color: var(--ink);
+	text-decoration: none;
+}
+.atl-artist-link::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+}
+.atl-artist-entry > article:hover .atl-arch {
+	border-color: var(--atl-brass);
+}
+.atl-artist-entry > article:hover .atl-artist-link {
+	text-decoration: underline;
+	text-decoration-color: var(--atl-brass);
+	text-decoration-thickness: 1px;
+	text-underline-offset: 0.25em;
+}
+.atl-artist-styles {
+	color: var(--ink-muted);
+	font-family: var(--atl-italic);
+	font-size: 1.0625rem;
+	font-style: italic;
+}
+@supports selector(:has(*)) {
+	.atl-artist-link:focus-visible {
+		outline: none;
+	}
+	.atl-artist-entry > article:has(.atl-artist-link:focus-visible) {
+		outline: 2px solid var(--stencil);
+		outline-offset: 6px;
+	}
+}
+@media (min-width: 36rem) {
+	.atl-artist-index {
+		grid-template-columns: repeat(2, minmax(0, 16rem));
+	}
+}
+@media (min-width: 64rem) {
+	.atl-artist-index[data-count="3"] {
+		grid-template-columns: repeat(3, minmax(0, 16rem));
+	}
+	.atl-artist-index[data-count="4"] {
+		grid-template-columns: repeat(4, minmax(0, 16rem));
+	}
+}
+.atl-artist-index[data-count="1"] {
+	grid-template-columns: minmax(0, 18rem);
+}
+
+/* Filters: spaced-capital words between hairlines; the chosen one in ink over a brass rule. */
+.atl-filters {
+	display: grid;
+	justify-items: center;
+	gap: 1rem;
+	margin-block-end: 3rem;
+	text-align: center;
+}
+.atl-filter-row {
+	display: grid;
+	justify-items: center;
+	gap: 0.25rem;
+}
+.atl-filter-label {
+	color: var(--ink-muted);
+	font-size: 0.6875rem;
+	font-weight: 500;
+	letter-spacing: 0.22em;
+	text-transform: uppercase;
+}
+.atl-filter-list {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 0 0.25rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.atl-filter {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	min-block-size: 2.75rem;
+	padding: 0.25rem 0.875rem;
+	color: var(--ink-muted);
+	font-size: 0.9375rem;
+	text-decoration: none;
+	transition: color 150ms ease;
+}
+.atl-filter::after {
+	content: "";
+	position: absolute;
+	inset-inline: 0.875rem;
+	inset-block-end: 0.375rem;
+	block-size: 1px;
+	background: var(--atl-brass);
+	scale: 0 1;
+	transition: scale 200ms ease;
+}
+.atl-filter:hover {
+	color: var(--ink);
+}
+.atl-filter[aria-current] {
+	color: var(--ink);
+}
+.atl-filter:hover::after,
+.atl-filter[aria-current]::after {
+	scale: 1 1;
+}
+.atl-artists-body {
+	padding-block-start: clamp(2.5rem, 1.5rem + 3vw, 4rem);
+}
+
+/* An artist's page: a centred frontispiece, then the signature plate. */
+.atl-artist-hero {
+	padding-block: clamp(2rem, 1.5rem + 3vw, 4rem)
+		clamp(3.5rem, 2.5rem + 4vw, 7rem);
+}
+.atl-artist-facts {
+	display: grid;
+	justify-items: center;
+	gap: 1rem;
+	max-inline-size: 44rem;
+	margin-inline: auto;
+	text-align: center;
+}
+.atl-artist-title {
+	font-size: clamp(3rem, 1.75rem + 5.5vw, 6rem);
+	line-height: 1;
+}
+.atl-artist-title::after {
+	content: "";
+	display: block;
+	inline-size: 3.5rem;
+	block-size: 1px;
+	margin: 1.5rem auto 0;
+	background: var(--atl-brass);
+}
+.atl-artist-lead {
+	margin-block-start: clamp(3rem, 2rem + 4vw, 5rem);
+}
+.atl-inline-links {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 0 1.5rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.atl-neighbours {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	gap: 1rem;
+	padding-block: 2.5rem 5rem;
+	border-block-start: 1px solid var(--line);
+}
+.atl-neighbour {
+	display: grid;
+	gap: 0.25rem;
+	min-block-size: 2.75rem;
+	color: var(--ink);
+	text-decoration: none;
+}
+.atl-neighbour-next {
+	margin-inline-start: auto;
+	text-align: end;
+}
+.atl-neighbour-name {
+	font-family: var(--display-face);
+	font-size: 1.75rem;
+	font-weight: 500;
+	line-height: 1.15;
+	overflow-wrap: anywhere;
+}
+.atl-neighbour:hover .atl-neighbour-name {
+	text-decoration: underline;
+	text-decoration-color: var(--atl-brass);
+	text-underline-offset: 0.2em;
+}
+
+/* A piece's own page: the plate, then its catalogue entry under it, centred. */
+.atl-artwork-top {
+	padding-block: clamp(2rem, 1.5rem + 3vw, 4rem)
+		clamp(3.5rem, 2.5rem + 4vw, 6rem);
+}
+.atl-artwork-grid {
+	display: grid;
+	justify-items: center;
+	gap: clamp(2rem, 1.5rem + 2vw, 3rem);
+}
+.atl-artwork-figure .artwork-open {
+	display: grid;
+	justify-items: center;
+	gap: 0.875rem;
+	inline-size: 100%;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--ink-muted);
+	font: inherit;
+	cursor: zoom-in;
+}
+.atl-artwork-figure .artwork-photo {
+	display: block;
+	inline-size: 100%;
+	block-size: auto;
+	max-block-size: min(82svh, 60rem);
+	object-fit: contain;
+}
+.atl-artwork-figure .artwork-open-hint {
+	font-size: 0.75rem;
+	letter-spacing: 0.2em;
+	text-transform: uppercase;
+	text-decoration: underline;
+	text-decoration-color: var(--atl-brass);
+	text-underline-offset: 0.4em;
+}
+.atl-colophon {
+	display: grid;
+	justify-items: center;
+	gap: 1.25rem;
+	inline-size: min(100%, 36rem);
+	text-align: center;
+}
+.atl-artwork-title {
+	font-size: clamp(2rem, 1.5rem + 2vw, 3rem);
+	line-height: 1.1;
+}
+.atl-facts {
+	display: grid;
+	inline-size: 100%;
+	margin: 0;
+	border-block-start: 1px solid var(--line);
+	text-align: start;
+}
+.atl-facts > div {
+	display: grid;
+	grid-template-columns: minmax(7rem, auto) minmax(0, 1fr);
+	gap: 1rem;
+	align-items: center;
+	padding-block: 0.25rem;
+	border-block-end: 1px solid var(--line);
+}
+.atl-facts dt {
+	color: var(--ink-muted);
+	font-size: 0.6875rem;
+	font-weight: 500;
+	letter-spacing: 0.22em;
+	text-transform: uppercase;
+}
+.atl-facts dd {
+	display: flex;
+	align-items: center;
+	min-block-size: 2.75rem;
+	margin: 0;
+}
+.atl-facts-list {
+	flex-wrap: wrap;
+	gap: 0 1rem;
+}
+.atl-colophon-ask {
+	display: grid;
+	justify-items: center;
+	gap: 0.75rem;
+	inline-size: 100%;
+	margin-block-start: 1rem;
+	padding: 2rem 1.5rem;
+	border: 1px solid var(--line);
+	background: var(--atl-mat);
+}
+.atl-colophon-ask .atl-hero-actions {
+	margin: 0;
+}
+.atl-artwork-artist {
+	border-block-start: 1px solid var(--line);
+}
+.atl-artwork-artist > .atl-label {
+	text-align: center;
+}
+.atl-artwork-artist-body {
+	display: grid;
+	justify-items: center;
+	gap: 1rem;
+	max-inline-size: 36rem;
+	margin: 1.5rem auto 0;
+	text-align: center;
+}
+.atl-artist-small-portrait {
+	inline-size: 7rem;
+	aspect-ratio: 4 / 5;
+	block-size: auto;
+	border: 1px solid var(--line);
+	border-radius: 999px 999px 0 0;
+	object-fit: cover;
+	object-position: 50% 25%;
+	background: var(--atl-mat);
+}
+.atl-artwork-artist-name {
+	font-family: var(--display-face);
+	font-size: 1.75rem;
+	font-weight: 500;
+	line-height: 1.15;
+	overflow-wrap: anywhere;
+}
+.atl-artwork-artist-bio {
+	margin-block-start: 0.5rem;
+}
+
+/* The booking page: its centred opening, then the shared flow, unchanged. */
+.atl-book-body {
+	padding-block: 2.5rem clamp(3.5rem, 2.5rem + 4vw, 7rem);
+}
+.atl-book-body > .section {
+	margin-block-start: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.atl-link,
+	.atl-piece-mat,
+	.atl-piece-title,
+	.atl-filter,
+	.atl-filter::after {
+		transition: none;
+	}
+}

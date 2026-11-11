@@ -10,6 +10,7 @@ import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TattooProvider } from "@tattoo-drip/react";
 
 import type { ApiContext } from "../api/context.ts";
+import bodoniLatin from "../assets/fonts/bodoni-moda/bodoni-moda-latin-500-normal.woff2?url";
 import eczarLatin from "../assets/fonts/eczar/eczar-latin-700-normal.woff2?url";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import type { SiteContext } from "../site/context.ts";
@@ -61,6 +62,19 @@ export const Route = createRootRouteWithContext<ApiContext & SiteContext>()({
 				type: "font/woff2",
 				crossOrigin: "anonymous",
 			},
+			// Atelier's headings (Bodoni Moda, src/studio/theme/atelier/styles.css):
+			// its Latin file, only on an Atelier page; no other theme ever loads it.
+			...(matchedThemeKey(matches) === "atelier"
+				? [
+						{
+							rel: "preload",
+							href: bodoniLatin,
+							as: "font",
+							type: "font/woff2",
+							crossOrigin: "anonymous" as const,
+						},
+					]
+				: []),
 			{
 				rel: "stylesheet",
 				href: appCss,

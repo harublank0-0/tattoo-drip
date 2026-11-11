@@ -48,7 +48,13 @@ const WRONG_TYPES = [
 
 describe("readThemeKey (TAT-54)", () => {
 	test("a theme this app has is kept", () => {
-		assert.deepEqual(THEME_KEYS, ["stencil-and-ink", "ink-noir", "irezumi"]);
+		assert.deepEqual(THEME_KEYS, [
+			"stencil-and-ink",
+			"ink-noir",
+			"irezumi",
+			"atelier",
+		]);
+		assert.equal(readThemeKey("atelier"), "atelier");
 		assert.equal(readThemeKey("stencil-and-ink"), "stencil-and-ink");
 		assert.equal(readThemeKey("ink-noir"), "ink-noir");
 		assert.equal(readThemeKey("irezumi"), "irezumi");

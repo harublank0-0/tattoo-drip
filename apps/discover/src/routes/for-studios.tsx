@@ -214,9 +214,9 @@ function ForStudios() {
 					</div>
 					<div className="flex flex-col gap-4">
 						<p className="eyebrow text-night-muted">
-							Three themes to choose from
+							Four themes to choose from
 						</p>
-						<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+						<div className="grid gap-4 sm:grid-cols-2">
 							<div className="flex min-h-56 flex-col justify-between bg-paper p-6 text-ink">
 								<span className="eyebrow text-ink-muted">Light</span>
 								<div>
@@ -239,7 +239,7 @@ function ForStudios() {
 									</p>
 								</div>
 							</div>
-							<div className="flex min-h-56 flex-col justify-between border-t-4 border-t-accent bg-paper p-6 text-ink lg:mt-24">
+							<div className="flex min-h-56 flex-col justify-between border-t-4 border-t-accent bg-paper p-6 text-ink">
 								<span className="eyebrow text-ink-muted">Light, editorial</span>
 								<div>
 									<p className="font-display text-display-md font-bold">
@@ -248,6 +248,20 @@ function ForStudios() {
 									<p className="mt-2 text-sm text-ink-muted">
 										Warm paper, charcoal ink and vermilion. Gives large pieces
 										room.
+									</p>
+								</div>
+							</div>
+							<div className="flex min-h-56 flex-col justify-between border border-line bg-paper-raised p-6 text-ink sm:mt-12">
+								<span className="eyebrow text-ink-muted">
+									Light, quiet luxury
+								</span>
+								<div>
+									<p className="font-display text-display-md font-bold">
+										Atelier
+									</p>
+									<p className="mt-2 text-sm text-ink-muted">
+										Stone paper, bronze and Bodoni headings. Your work as a
+										numbered collection.
 									</p>
 								</div>
 							</div>
