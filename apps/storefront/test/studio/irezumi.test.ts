@@ -17,6 +17,7 @@ import {
 import {
 	accentTokens,
 	brandingCss,
+	challengeThemeFor,
 	isSafeCss,
 } from "../../src/studio/theme/branding.ts";
 import { contrastRatio } from "../../src/studio/theme/color.ts";
@@ -313,6 +314,14 @@ describe("brandingCss for Irezumi: one light scheme, checked on both surfaces", 
 			brandingCss(config({ font: "serif" })) ?? "",
 			/html:root\{--display-face:/,
 		);
+	});
+});
+
+describe("the booking form's Turnstile widget follows the page's scheme", () => {
+	test("Irezumi is light and Ink Noir dark on any device; Stencil & Ink follows the device", () => {
+		assert.equal(challengeThemeFor("irezumi"), "light");
+		assert.equal(challengeThemeFor("ink-noir"), "dark");
+		assert.equal(challengeThemeFor("stencil-and-ink"), "auto");
 	});
 });
 

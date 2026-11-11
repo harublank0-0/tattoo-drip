@@ -24,13 +24,21 @@ export const TOKEN_TIMEOUT_MS = 30_000;
 /** How many used tokens are remembered (a repeat arrives right after the first, if at all). */
 const SPENT_TOKENS_KEPT = 4;
 
+/**
+ * The widget's colours: `auto` follows the device, as a page that follows
+ * the device does (Stencil & Ink); a theme with one fixed scheme asks for
+ * that one, so the widget never sits dark on a light page or light on a dark
+ * one (studio theme/branding.ts, challengeThemeFor).
+ */
+export type ChallengeTheme = "auto" | "light" | "dark";
+
 export interface TurnstileRenderOptions {
 	sitekey: string;
 	action: string;
 	execution: "execute";
 	appearance: "interaction-only";
 	size: "flexible";
-	theme: "auto";
+	theme: ChallengeTheme;
 	retry: "never";
 	"refresh-expired": "manual";
 	"response-field": false;
@@ -80,6 +88,7 @@ export class Challenge {
 	readonly #siteKey: string;
 	readonly #host: ChallengeHost;
 	readonly #onInteractive: (interactive: boolean) => void;
+	readonly #theme: ChallengeTheme;
 	#script: "none" | "loading" | "ready" = "none";
 	#waiters: Array<(ready: boolean) => void> = [];
 	#container: HTMLElement | null = null;
@@ -88,15 +97,20 @@ export class Challenge {
 	/** The last tokens handed to an attempt: a repeat of one is never handed out again. */
 	#spent: string[] = [];
 
-	/** `onInteractive` hears when Cloudflare shows its checkbox, and when that ends. */
+	/**
+	 * `onInteractive` hears when Cloudflare shows its checkbox, and when that
+	 * ends; `theme` is the widget's colours (the page's scheme, or `auto`).
+	 */
 	constructor(
 		siteKey: string,
 		host: ChallengeHost,
 		onInteractive: (interactive: boolean) => void = () => {},
+		theme: ChallengeTheme = "auto",
 	) {
 		this.#siteKey = siteKey;
 		this.#host = host;
 		this.#onInteractive = onInteractive;
+		this.#theme = theme;
 	}
 
 	/** Starts loading the script, once (the form's first focus or tap). */
@@ -201,7 +215,7 @@ export class Challenge {
 			execution: "execute",
 			appearance: "interaction-only",
 			size: "flexible",
-			theme: "auto",
+			theme: this.#theme,
 			retry: "never",
 			"refresh-expired": "manual",
 			"response-field": false,
