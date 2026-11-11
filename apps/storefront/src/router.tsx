@@ -21,7 +21,8 @@ type Dehydrated = DehydratedApi & DehydratedSite;
  * for each), each with its own QueryClient and SDK client (TAT-23,
  * src/api/) and the page's own origin (TAT-48, src/site/). The server sends
  * the browser only the API's origin, the photos' origin (MEDIA_URL), the
- * studio's slug and the page's origin, in the router's dehydrated state.
+ * studio's slug, the page's origin and its site key and theme preview (if any),
+ * in the router's dehydrated state.
  *
  * The default error component also covers the root route, whose shell
  * (`shellComponent`) wraps the route's error boundary in this router

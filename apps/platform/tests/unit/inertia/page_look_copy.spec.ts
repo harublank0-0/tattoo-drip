@@ -63,6 +63,9 @@ type PageLookModule = {
 	): "up" | "down";
 	FONT_SAMPLE_CLASS: Record<string, string>;
 	PREVIEW_NOTE: string;
+	THEME_PREVIEW_HELP: string;
+	previewLabel(themeLabel: string): string;
+	previewHref(pageUrl: string, theme: string): string | null;
 	SAVED_NOTE: string;
 	COLOUR_HELP: string;
 	DARK_COLOUR_HELP: string;
@@ -482,5 +485,47 @@ test.group("claimed flash words (TAT-129)", () => {
 			words.CLAIMED_FLASH_HELP,
 			"One-of-a-kind designs that someone has claimed.",
 		);
+	});
+});
+
+test.group("theme previews in Page look", () => {
+	test("each theme's link opens the studio's own page with ?preview=<theme>", ({
+		assert,
+	}) => {
+		assert.equal(
+			words.previewHref("https://black-needle.tattoodrip.com/", "irezumi"),
+			"https://black-needle.tattoodrip.com/?preview=irezumi",
+		);
+		assert.equal(
+			words.previewHref("http://black-needle.localhost:3000", "ink-noir"),
+			"http://black-needle.localhost:3000/?preview=ink-noir",
+		);
+		// A page address that already has a query keeps it; the key is encoded.
+		assert.equal(
+			words.previewHref("https://x.example/?a=1", "a b&c"),
+			"https://x.example/?a=1&preview=a+b%26c",
+		);
+	});
+
+	test("no link from an address that can't carry one", ({ assert }) => {
+		for (const url of [
+			"",
+			"not a url",
+			"javascript:alert(1)",
+			"ftp://x.example/",
+		]) {
+			assert.isNull(words.previewHref(url, "irezumi"), url);
+		}
+	});
+
+	test("the words name the theme and say nothing is saved", ({ assert }) => {
+		assert.equal(words.previewLabel("Irezumi"), "Preview Irezumi");
+		assert.equal(
+			words.THEME_PREVIEW_HELP,
+			"Preview opens your page in that theme in a new tab, with your own artists and work. It keeps your saved colour and font, and nothing is saved until you press Save.",
+		);
+		for (const theme of THEMES) {
+			assert.include(words.previewLabel(theme.label), theme.label);
+		}
 	});
 });

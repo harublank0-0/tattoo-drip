@@ -97,6 +97,41 @@ export type Swatches = { light: string; dark: string };
 export const PREVIEW_NOTE =
 	"It shows what you've saved. A change can take up to 15 minutes to appear.";
 
+/**
+ * Each theme's "Preview" link (the storefront's theme/preview.ts): the
+ * studio's own page with `?preview=<theme>`, in a new tab, for that visit
+ * only. Nothing is saved, and visitors keep seeing the saved theme.
+ */
+export const THEME_PREVIEW_HELP =
+	"Preview opens your page in that theme in a new tab, with your own artists and work. It keeps your saved colour and font, and nothing is saved until you press Save.";
+
+/** Above the preview links. */
+export const THEME_PREVIEW_TITLE = "Try a theme on your page first:";
+
+/** Said after a link that opens a new tab, for a screen reader (the icon is decoration). */
+export const NEW_TAB = "(opens in a new tab)";
+
+/** The preview link's words: they name the theme, so each link says where it goes. */
+export function previewLabel(themeLabel: string): string {
+	return `Preview ${themeLabel}`;
+}
+
+/**
+ * The studio page's address with `?preview=<theme>`, or null when the page's
+ * address can't carry one (it is not an http(s) URL): then no link.
+ */
+export function previewHref(pageUrl: string, theme: string): string | null {
+	let url: URL;
+	try {
+		url = new URL(pageUrl);
+	} catch {
+		return null;
+	}
+	if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+	url.searchParams.set("preview", theme);
+	return url.toString();
+}
+
 export const SAVED_NOTE =
 	"Page look saved. It can take up to 15 minutes to show on your page.";
 
