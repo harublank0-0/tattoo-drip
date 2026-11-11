@@ -40,7 +40,11 @@ import { useAppForm } from "../../components/ui/form.tsx";
 import { zonedNow } from "../../studio/hours.ts";
 import type { InquiryChannels, InquiryState } from "../../studio/inquiry.ts";
 import { browserCodec } from "../browser-codec.ts";
-import { Challenge, TURNSTILE_PRIVACY_URL } from "../challenge.ts";
+import {
+	Challenge,
+	type ChallengeTheme,
+	TURNSTILE_PRIVACY_URL,
+} from "../challenge.ts";
 import { browserChallengeHost } from "../challenge-host.ts";
 import { copy } from "../copy.ts";
 import { prepareReference } from "../images.ts";
@@ -95,6 +99,8 @@ export interface IntakeFormProps {
 	readonly channels: InquiryChannels;
 	/** The public Turnstile site key, or null in development (no check, no token). */
 	readonly challengeSiteKey: string | null;
+	/** The Turnstile widget's colours: the page's fixed scheme, else `auto` (the device's). */
+	readonly challengeTheme?: ChallengeTheme;
 	/** What the booking flow knows of the studio, its artists and the piece asked about (Prompt 6). */
 	readonly booking: BookingContext;
 }
@@ -121,6 +127,7 @@ export function IntakeForm({
 	state,
 	channels,
 	challengeSiteKey,
+	challengeTheme = "auto",
 	booking,
 }: IntakeFormProps) {
 	const { studioName, preferredArtist, artists } = state;
@@ -210,14 +217,18 @@ export function IntakeForm({
 
 	const [challenge] = useState(() =>
 		challengeSiteKey
-			? new Challenge(challengeSiteKey, browserChallengeHost(), (interactive) =>
-					setPhase((current) =>
-						current === "checking" || current === "interactive"
-							? interactive
-								? "interactive"
-								: "checking"
-							: current,
-					),
+			? new Challenge(
+					challengeSiteKey,
+					browserChallengeHost(),
+					(interactive) =>
+						setPhase((current) =>
+							current === "checking" || current === "interactive"
+								? interactive
+									? "interactive"
+									: "checking"
+								: current,
+						),
+					challengeTheme,
 				)
 			: null,
 	);

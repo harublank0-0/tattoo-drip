@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { BookingContext } from "../../booking/booking.ts";
+import type { ChallengeTheme } from "../../intake/challenge.ts";
 import { Fill } from "../../intake/components/fill.tsx";
 import { IntakeMount } from "../../intake/components/intake-mount.tsx";
 import { studioCopy } from "../copy.ts";
@@ -30,6 +31,7 @@ export function InquirySection({
 	state,
 	channels,
 	challengeSiteKey = null,
+	challengeTheme = "auto",
 	intro = null,
 	booking,
 	headed = true,
@@ -47,6 +49,8 @@ export function InquirySection({
 	headed?: boolean;
 	/** The public Turnstile site key (null: no bot check, development). */
 	challengeSiteKey?: string | null;
+	/** The Turnstile widget's colours: the theme's fixed scheme (challengeThemeFor), else the device's. */
+	challengeTheme?: ChallengeTheme;
 	intro?: ReactNode;
 }) {
 	return (
@@ -73,6 +77,7 @@ export function InquirySection({
 							state={state}
 							channels={channels}
 							challengeSiteKey={challengeSiteKey}
+							challengeTheme={challengeTheme}
 							booking={booking}
 							fallback={<InquiryFallback state={state} channels={channels} />}
 						/>

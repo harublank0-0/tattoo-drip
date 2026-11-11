@@ -3,6 +3,7 @@ import { describe, test } from "node:test";
 import {
 	Challenge,
 	type ChallengeHost,
+	type ChallengeTheme,
 	SCRIPT_TIMEOUT_MS,
 	TOKEN_TIMEOUT_MS,
 	TURNSTILE_SCRIPT_URL,
@@ -16,7 +17,7 @@ const BOX = {} as HTMLElement;
 const tick = () => new Promise((done) => setImmediate(done));
 
 /** A page with a fake script loader, a fake `turnstile` and timers fired by hand. */
-function fakePage() {
+function fakePage(theme?: ChallengeTheme) {
 	const scripts: { url: string; ready: () => void; failed: () => void }[] = [];
 	const widgets: { container: HTMLElement; options: TurnstileRenderOptions }[] =
 		[];
@@ -63,8 +64,11 @@ function fakePage() {
 			}
 		}
 	};
-	const challenge = new Challenge(SITE_KEY, host, (value) =>
-		interactive.push(value),
+	const challenge = new Challenge(
+		SITE_KEY,
+		host,
+		(value) => interactive.push(value),
+		theme,
 	);
 	const options = () => {
 		const widget = widgets.at(-1);
@@ -75,14 +79,22 @@ function fakePage() {
 }
 
 /** Attached, script loaded, widget rendered. */
-async function ready() {
-	const page = fakePage();
+async function ready(theme?: ChallengeTheme) {
+	const page = fakePage(theme);
 	page.challenge.attach(BOX);
 	const loading = page.challenge.load();
 	page.scripts[0].ready();
 	assert.equal(await loading, true);
 	return page;
 }
+
+describe("the widget's colours", () => {
+	test("follow the device unless the page asks for its own scheme", async () => {
+		assert.equal((await ready()).options().theme, "auto");
+		assert.equal((await ready("light")).options().theme, "light");
+		assert.equal((await ready("dark")).options().theme, "dark");
+	});
+});
 
 describe("loading", () => {
 	test("loads nothing until the form asks", () => {
