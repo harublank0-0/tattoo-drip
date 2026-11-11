@@ -110,6 +110,20 @@ export async function seededStudio(slug: string, name: string) {
 			unit: "box",
 		}),
 	);
+	const stockedInventoryItem = await inTenant(tenant, async () => {
+		const inventory = new InventoryService();
+		const item = await inventory.create(tenant.id, {
+			name: `${name} ink`,
+			unit: "ml",
+		});
+		await inventory.record(tenant.id, item.id, owner.id, {
+			requestId: randomUUID(),
+			kind: "receive",
+			quantity: "10",
+		});
+		return item;
+	});
+
 	const paymentMethod = await inTenant(tenant, async () => {
 		const first = await paymentMethods.create(tenant, {
 			kind: "cash",
@@ -380,6 +394,7 @@ export async function seededStudio(slug: string, name: string) {
 		owner,
 		artist,
 		inventoryItem,
+		stockedInventoryItem,
 		discoverPlaceId: otherCity[0].id as string,
 		paymentMethod,
 		artistProfile,

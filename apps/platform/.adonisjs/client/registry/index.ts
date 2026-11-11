@@ -108,6 +108,18 @@ const routes = {
     tokens: [{"old":"/t/:tenant/inventory","type":0,"val":"t","end":""},{"old":"/t/:tenant/inventory","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inventory","type":0,"val":"inventory","end":""}],
     types: placeholder as Registry['tenant.inventory.store']['types'],
   },
+  'tenant.inventory.export': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/inventory/export.csv',
+    tokens: [{"old":"/t/:tenant/inventory/export.csv","type":0,"val":"t","end":""},{"old":"/t/:tenant/inventory/export.csv","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inventory/export.csv","type":0,"val":"inventory","end":""},{"old":"/t/:tenant/inventory/export.csv","type":0,"val":"export.csv","end":""}],
+    types: placeholder as Registry['tenant.inventory.export']['types'],
+  },
+  'tenant.inventory.import': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/inventory/import',
+    tokens: [{"old":"/t/:tenant/inventory/import","type":0,"val":"t","end":""},{"old":"/t/:tenant/inventory/import","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inventory/import","type":0,"val":"inventory","end":""},{"old":"/t/:tenant/inventory/import","type":0,"val":"import","end":""}],
+    types: placeholder as Registry['tenant.inventory.import']['types'],
+  },
   'tenant.inventory.show': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/inventory/:id',
@@ -341,6 +353,12 @@ const routes = {
     pattern: '/t/:tenant/settings/members/:id/role',
     tokens: [{"old":"/t/:tenant/settings/members/:id/role","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/members/:id/role","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/members/:id/role","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/members/:id/role","type":0,"val":"members","end":""},{"old":"/t/:tenant/settings/members/:id/role","type":1,"val":"id","end":""},{"old":"/t/:tenant/settings/members/:id/role","type":0,"val":"role","end":""}],
     types: placeholder as Registry['tenant.settings.members.role.update']['types'],
+  },
+  'tenant.settings.members.inventory.update': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/settings/members/:id/inventory',
+    tokens: [{"old":"/t/:tenant/settings/members/:id/inventory","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/members/:id/inventory","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/members/:id/inventory","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/members/:id/inventory","type":0,"val":"members","end":""},{"old":"/t/:tenant/settings/members/:id/inventory","type":1,"val":"id","end":""},{"old":"/t/:tenant/settings/members/:id/inventory","type":0,"val":"inventory","end":""}],
+    types: placeholder as Registry['tenant.settings.members.inventory.update']['types'],
   },
   'tenant.settings.members.destroy': {
     methods: ["DELETE"],

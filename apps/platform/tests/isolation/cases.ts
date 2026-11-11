@@ -53,6 +53,7 @@ export type IsolationCase = {
 	 */
 	resource?:
 		| "inventoryItem"
+		| "stockedInventoryItem"
 		| "paymentMethod"
 		| "artistProfile"
 		| "workPhoto"
@@ -425,6 +426,31 @@ export const isolationCases: IsolationCase[] = [
 	},
 	{
 		method: "GET",
+		pattern: "/t/:tenant/inventory/export.csv",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: inventoryRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/inventory/import",
+		actor: "owner",
+		files: async () => [
+			{
+				field: "csv",
+				name: "inventory.csv",
+				type: "text/csv",
+				data: Buffer.from(
+					"name,sku,category,unit,quantity,reorder_threshold\nAftercare balm,ALM-1,,piece,2,1\n",
+				),
+			},
+		],
+		ownStatus: 302,
+		snapshot: inventoryRows,
+	},
+
+	{
+		method: "GET",
 		pattern: "/t/:tenant/inventory/:id",
 		actor: "owner",
 		resource: "inventoryItem",
@@ -444,8 +470,8 @@ export const isolationCases: IsolationCase[] = [
 		method: "POST",
 		pattern: "/t/:tenant/inventory/:id/movements",
 		actor: "owner",
-		resource: "inventoryItem",
-		body: () => ({ requestId: randomUUID(), kind: "receive", quantity: "4" }),
+		resource: "stockedInventoryItem",
+		body: () => ({ requestId: randomUUID(), kind: "use", quantity: "4" }),
 		ownStatus: 302,
 		snapshot: inventoryRows,
 	},
@@ -1312,6 +1338,16 @@ export const isolationCases: IsolationCase[] = [
 		ownStatus: 302,
 		snapshot: memberRows,
 	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/settings/members/:id/inventory",
+		resource: "artistMembership",
+		actor: "owner",
+		body: () => ({ enabled: true }),
+		ownStatus: 302,
+		snapshot: memberRows,
+	},
+
 	{
 		method: "DELETE",
 		pattern: "/t/:tenant/settings/members/:id",

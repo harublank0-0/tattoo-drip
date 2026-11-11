@@ -1,3 +1,11 @@
+import { randomUUID } from "node:crypto";
+import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
+import User from "#models/user";
+import {
+	InventoryCsvError,
+	MAX_EXPORT_ROWS,
+	type parseInventoryCsv,
+} from "#modules/inventory/csv";
 import InventoryItem from "#modules/inventory/models/inventory_item";
 import InventoryMovement from "#modules/inventory/models/inventory_movement";
 import {
@@ -55,6 +63,12 @@ function activeItem(tenantId: string, id: string) {
 	return InventoryItem.query().where("tenant_id", tenantId).where("id", id);
 }
 
+function catalogLock(trx: TransactionClientContract, tenantId: string) {
+	return trx.rawQuery("select pg_advisory_xact_lock(hashtextextended(?, 0))", [
+		`inventory-catalog:${tenantId}`,
+	]);
+}
+
 export default class InventoryService {
 	list(
 		tenantId: string,
@@ -89,26 +103,104 @@ export default class InventoryService {
 			.firstOrFail();
 	}
 
-	history(tenantId: string, itemId: string, page: number) {
-		return InventoryMovement.query()
+	async history(tenantId: string, itemId: string, page: number) {
+		const movements = await InventoryMovement.query()
 			.where("tenant_id", tenantId)
 			.where("item_id", itemId)
 			.orderBy("created_at", "desc")
 			.orderBy("id", "desc")
 			.paginate(page, 30);
+		const ids = [
+			...new Set(
+				movements.all().flatMap(({ userId }) => (userId ? [userId] : [])),
+			),
+		];
+		const users =
+			ids.length === 0
+				? []
+				: await User.query()
+						.select("id", "full_name", "email")
+						.whereIn("id", ids);
+		return { movements, users: new Map(users.map((user) => [user.id, user])) };
 	}
 
 	create(tenantId: string, input: ItemInput & { unit: InventoryUnit }) {
-		return InventoryItem.create({
-			tenantId,
-			...itemFields(input),
-			unit: input.unit,
-			quantity: 0,
+		return withTransaction(async (trx) => {
+			await catalogLock(trx, tenantId);
+			return InventoryItem.create({
+				tenantId,
+				...itemFields(input),
+				unit: input.unit,
+				quantity: 0,
+			});
 		});
 	}
 
+	async importCatalog(
+		tenantId: string,
+		userId: string,
+		rows: Awaited<ReturnType<typeof parseInventoryCsv>>,
+	) {
+		return withTransaction(async (trx) => {
+			await catalogLock(trx, tenantId);
+			// Check even archived items so a retry cannot revive or duplicate them.
+			const keys = new Set<string>();
+			for (const row of rows) {
+				const sku = row.sku?.toLowerCase();
+				const name = row.name.toLowerCase();
+				const key = sku ? `sku:${sku}` : `name:${name}`;
+				const existing = await InventoryItem.withTrashed()
+					.where("tenant_id", tenantId)
+					.whereRaw(sku ? "lower(sku) = lower(?)" : "lower(name) = lower(?)", [
+						row.sku || row.name,
+					])
+					.first();
+				if (keys.has(key) || existing) {
+					throw new InventoryCsvError(
+						`An item with this SKU or name already exists: ${row.sku || row.name}.`,
+					);
+				}
+				keys.add(key);
+				const item = await InventoryItem.create({
+					tenantId,
+					...itemFields(row),
+					unit: row.unit,
+					quantity: row.quantity,
+				});
+				if (row.quantity > 0) {
+					await InventoryMovement.create({
+						tenantId,
+						userId,
+						itemId: item.id,
+						requestId: randomUUID(),
+						kind: "receive",
+						delta: row.quantity,
+						balanceAfter: row.quantity,
+						note: "Opening stock from CSV import",
+					});
+				}
+			}
+			return rows.length;
+		});
+	}
+
+	async exportCatalog(tenantId: string) {
+		const items = await InventoryItem.query()
+			.where("tenant_id", tenantId)
+			.orderBy("name")
+			.orderBy("id")
+			.limit(MAX_EXPORT_ROWS + 1);
+		if (items.length > MAX_EXPORT_ROWS) {
+			throw new InventoryCsvError(
+				`CSV export supports up to ${MAX_EXPORT_ROWS.toLocaleString("en")} active items.`,
+			);
+		}
+		return items;
+	}
+
 	async update(tenantId: string, id: string, input: ItemInput) {
-		return withTransaction(async () => {
+		return withTransaction(async (trx) => {
+			await catalogLock(trx, tenantId);
 			const item = await activeItem(tenantId, id).forUpdate().firstOrFail();
 			return item.merge(itemFields(input)).save();
 		});

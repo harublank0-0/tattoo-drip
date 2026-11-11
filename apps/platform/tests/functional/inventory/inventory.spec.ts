@@ -3,8 +3,9 @@ import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import User from "#models/user";
 import InventoryService from "#modules/inventory/services/inventory_service";
+import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
-import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
+import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 import { assertValidationError } from "#tests/helpers/validation";
 
 const service = new InventoryService();
@@ -127,7 +128,10 @@ test.group("Studio OS inventory", (group) => {
 				(await service.list(b.id, "active", "Needles", 1)).all(),
 				0,
 			);
-			assert.lengthOf((await service.history(b.id, item.id, 1)).all(), 0);
+			assert.lengthOf(
+				(await service.history(b.id, item.id, 1)).movements.all(),
+				0,
+			);
 			await assert.rejects(() => service.find(b.id, item.id));
 			await assert.rejects(() =>
 				service.update(b.id, item.id, { name: "Other" }),
@@ -142,5 +146,124 @@ test.group("Studio OS inventory", (group) => {
 			await assert.rejects(() => service.archive(b.id, item.id));
 			assert.equal((await service.find(a.id, item.id)).quantity, 2000);
 		});
+	});
+	test("owners can grant and revoke usage without granting other inventory writes", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner("inventory-staff");
+		const artist = await artistIn(tenant, "ink@inventory-staff.example");
+		await artist.merge({ fullName: "Sita Rai" }).save();
+		const membership = await inTenant(tenant, () =>
+			TenantMembership.query()
+				.where("tenant_id", tenant.id)
+				.where("user_id", artist.id)
+				.firstOrFail(),
+		);
+		const item = await inTenant(tenant, async () => {
+			const stock = await service.create(tenant.id, {
+				name: "Ink",
+				unit: "ml",
+			});
+			await service.record(tenant.id, stock.id, owner.id, {
+				requestId: randomUUID(),
+				kind: "receive",
+				quantity: "5",
+			});
+			return stock;
+		});
+		const base = `/t/${tenant.slug}/inventory`;
+		const detail = `${base}/${item.id}`;
+		const grant = `/t/${tenant.slug}/settings/members/${membership.id}/inventory`;
+		const change = (enabled: boolean, user = owner) =>
+			client
+				.put(grant)
+				.loginAs(user)
+				.withCsrfToken()
+				.redirects(0)
+				.json({ enabled });
+		const movement = (kind: string) =>
+			client
+				.post(`${detail}/movements`)
+				.loginAs(artist)
+				.withCsrfToken()
+				.redirects(0)
+				.form({ kind, quantity: "2", requestId: randomUUID() });
+		(await client.get(base).loginAs(artist)).assertStatus(404);
+		(await change(true, artist)).assertStatus(404);
+		(await movement("use")).assertStatus(404);
+		(await change(true)).assertStatus(302);
+
+		const catalog = await client.get(base).loginAs(artist).withInertia();
+		catalog.assertStatus(200);
+		assert.isFalse(catalog.inertiaProps.canManage);
+		assert.isTrue(catalog.inertiaProps.tenant.inventoryAccess);
+		(await movement("receive")).assertStatus(404);
+		(await movement("count")).assertStatus(404);
+		(await client.get(`${base}/export.csv`).loginAs(artist)).assertStatus(404);
+		(await movement("use")).assertStatus(302);
+		const history = await client.get(detail).loginAs(owner).withInertia();
+		assert.equal(history.inertiaProps.item.quantity, 3000);
+		assert.equal(history.inertiaProps.history[0].actor, "Sita Rai");
+
+		(await change(false)).assertStatus(302);
+		(await client.get(detail).loginAs(artist)).assertStatus(404);
+		(await movement("use")).assertStatus(404);
+	});
+
+	test("CSV import records opening stock, rejects duplicate batches atomically, and exports safe cells", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner("inventory-csv");
+		const base = `/t/${tenant.slug}/inventory`;
+		const header = "name,sku,category,unit,quantity,reorder_threshold\n";
+		const upload = (content: string) =>
+			client
+				.post(`${base}/import`)
+				.loginAs(owner)
+				.withCsrfToken()
+				.redirects(0)
+				.file("csv", Buffer.from(content), {
+					filename: "inventory.csv",
+					contentType: "text/csv",
+				});
+		const rows = '"Liner, black",INK-1,=1+1,ml,12.5,2.25\n';
+		const added = await upload(header + rows);
+		added.assertStatus(302);
+		added.assertFlashMessage("success", "Imported 1 inventory item.");
+		const duplicate = await upload(
+			`${header}Should roll back,NEW,,piece,2,\n${rows}`,
+		);
+		duplicate.assertStatus(302);
+		duplicate.assertFlashMessage(
+			"error",
+			"An item with this SKU or name already exists: INK-1.",
+		);
+		const catalog = await client.get(base).loginAs(owner).withInertia();
+		assert.lengthOf(catalog.inertiaProps.items, 1);
+		const item = catalog.inertiaProps.items[0];
+		assert.equal(item.quantity, 12500);
+		assert.equal(item.reorderThreshold, 2250);
+		const detail = await client
+			.get(`${base}/${item.id}`)
+			.loginAs(owner)
+			.withInertia();
+		assert.lengthOf(detail.inertiaProps.history, 1);
+		assert.equal(
+			detail.inertiaProps.history[0].note,
+			"Opening stock from CSV import",
+		);
+		const exported = await client.get(`${base}/export.csv`).loginAs(owner);
+		exported.assertStatus(200);
+		assert.match(exported.header("content-type") ?? "", /^text\/csv/);
+		exported.assertHeader(
+			"content-disposition",
+			'attachment; filename="inventory.csv"',
+		);
+		assert.include(
+			exported.text(),
+			`"Liner, black","INK-1","'=1+1",ml,12.5,2.25`,
+		);
 	});
 });

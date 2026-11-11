@@ -22,6 +22,7 @@ export default function InventoryIndex({
 	page,
 	lastPage,
 	units,
+	canManage,
 }: {
 	items: InventoryItem[];
 	status: "active" | "low" | "archived";
@@ -29,6 +30,7 @@ export default function InventoryIndex({
 	page: number;
 	lastPage: number;
 	units: string[];
+	canManage: boolean;
 }) {
 	const { slug } = useTenant();
 	const params = { tenant: slug };
@@ -41,9 +43,19 @@ export default function InventoryIndex({
 			title="Inventory"
 			description="Track supplies, stock levels and what gets used."
 			actions={
-				<a className={buttonVariants()} href="#add-item">
-					Add item
-				</a>
+				canManage && (
+					<div className="flex flex-wrap gap-2">
+						<a className={buttonVariants()} href="#add-item">
+							Add item
+						</a>
+						<a
+							className={buttonVariants({ variant: "outline" })}
+							href="#inventory-csv"
+						>
+							CSV tools
+						</a>
+					</div>
+				)
 			}
 		>
 			<Section title="Stock items">
@@ -121,13 +133,68 @@ export default function InventoryIndex({
 				<InventoryPagination page={page} lastPage={lastPage} href={pageHref} />
 			</Section>
 
-			<Section id="add-item" title="Add an item">
-				<Form route="tenant.inventory.store" routeParams={params}>
-					{({ errors, processing }) => (
-						<ItemFields units={units} errors={errors} processing={processing} />
-					)}
-				</Form>
-			</Section>
+			{canManage && (
+				<>
+					<Section id="add-item" title="Add an item">
+						<Form route="tenant.inventory.store" routeParams={params}>
+							{({ errors, processing }) => (
+								<ItemFields
+									units={units}
+									errors={errors}
+									processing={processing}
+								/>
+							)}
+						</Form>
+					</Section>
+					<Section
+						id="inventory-csv"
+						title="Import and export CSV"
+						description="Import up to 500 new items with their opening stock. Existing items are checked by SKU, or by name if the SKU is blank."
+					>
+						<div className="flex flex-col gap-4">
+							<div>
+								<a
+									className={buttonVariants({ variant: "outline" })}
+									href={urlFor("tenant.inventory.export", params)}
+								>
+									Download active inventory CSV
+								</a>
+							</div>
+							<p className="text-sm text-muted-foreground">
+								Columns: name, sku, category, unit, quantity, reorder_threshold.
+								Use piece, box, roll, ml, or g for unit. Leave quantity blank to
+								start at zero.
+							</p>
+							<Form
+								route="tenant.inventory.import"
+								routeParams={params}
+								resetOnSuccess
+							>
+								{({ processing }) => (
+									<div className="flex flex-wrap items-end gap-2">
+										<label
+											htmlFor="inventory-csv-file"
+											className="flex min-w-0 flex-col gap-2 text-sm font-medium"
+										>
+											CSV file
+											<Input
+												id="inventory-csv-file"
+												type="file"
+												name="csv"
+												accept=".csv,text/csv"
+												required
+											/>
+										</label>
+										<Button type="submit" disabled={processing}>
+											Import CSV
+										</Button>
+									</div>
+								)}
+							</Form>
+						</div>
+					</Section>
+				</>
+			)}
 		</Page>
 	);
 }

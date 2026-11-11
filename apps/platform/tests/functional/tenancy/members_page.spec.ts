@@ -59,6 +59,7 @@ test.group("Settings, Members (TAT-33)", (group) => {
 				name: null,
 				email: owner.email,
 				role: "owner",
+				inventoryAccess: false,
 				isYou: true,
 			},
 			{
@@ -66,6 +67,7 @@ test.group("Settings, Members (TAT-33)", (group) => {
 				name: null,
 				email: member.email,
 				role: "artist",
+				inventoryAccess: false,
 				isYou: false,
 			},
 		]);

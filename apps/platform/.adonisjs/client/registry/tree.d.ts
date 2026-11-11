@@ -34,6 +34,8 @@ export interface ApiDefinition {
     inventory: {
       index: typeof routes['tenant.inventory.index']
       store: typeof routes['tenant.inventory.store']
+      export: typeof routes['tenant.inventory.export']
+      import: typeof routes['tenant.inventory.import']
       show: typeof routes['tenant.inventory.show']
       update: typeof routes['tenant.inventory.update']
       movement: typeof routes['tenant.inventory.movement']
@@ -101,6 +103,9 @@ export interface ApiDefinition {
         }
         role: {
           update: typeof routes['tenant.settings.members.role.update']
+        }
+        inventory: {
+          update: typeof routes['tenant.settings.members.inventory.update']
         }
         destroy: typeof routes['tenant.settings.members.destroy']
       }

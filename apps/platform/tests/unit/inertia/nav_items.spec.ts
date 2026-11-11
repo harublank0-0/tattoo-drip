@@ -14,7 +14,10 @@ type Item = {
 };
 type Counts = { inbox: number | null; today: number | null };
 type NavModule = {
-	navItems(tenant: { slug: string; role: string }, counts: Counts): Item[];
+	navItems(
+		tenant: { slug: string; role: string; inventoryAccess?: boolean },
+		counts: Counts,
+	): Item[];
 	tabBarItems(items: Item[]): { tabs: Item[]; more: Item[] };
 	showTabBar(items: Item[]): boolean;
 	isCurrentPath(
@@ -65,6 +68,16 @@ test.group("navItems", () => {
 				route: "tenant.calendar.index",
 				place: "bar",
 			},
+		);
+	});
+
+	test("artists with a grant get Inventory under More", ({ assert }) => {
+		const granted = tabBarItems(
+			navItems({ ...artist, inventoryAccess: true }, none),
+		);
+		assert.deepEqual(
+			granted.more.map(({ key }) => key),
+			["inventory"],
 		);
 	});
 

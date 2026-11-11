@@ -29,11 +29,13 @@ export const TENANT_ROUTE_ROLES = {
 	// never requests, money, the setup or the pilot numbers.
 	"tenant.today": MEMBERS,
 
-	"tenant.inventory.index": OWNERS,
+	"tenant.inventory.index": MEMBERS,
 	"tenant.inventory.store": OWNERS,
-	"tenant.inventory.show": OWNERS,
+	"tenant.inventory.export": OWNERS,
+	"tenant.inventory.import": OWNERS,
+	"tenant.inventory.show": MEMBERS,
 	"tenant.inventory.update": OWNERS,
-	"tenant.inventory.movement": OWNERS,
+	"tenant.inventory.movement": MEMBERS,
 	"tenant.inventory.archive": OWNERS,
 
 	// Studio settings.
@@ -74,6 +76,7 @@ export const TENANT_ROUTE_ROLES = {
 	"tenant.settings.members.invitations.renew": OWNERS,
 	"tenant.settings.members.invitations.destroy": OWNERS,
 	"tenant.settings.members.role.update": OWNERS,
+	"tenant.settings.members.inventory.update": OWNERS,
 	"tenant.settings.members.destroy": OWNERS,
 	// Discover (D04): the listing, its consent, city and preview.
 	"tenant.settings.discover": OWNERS,

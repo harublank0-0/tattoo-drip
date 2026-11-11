@@ -1113,6 +1113,7 @@ export class TenantMembershipSchema extends BaseModel {
 		"createdAt",
 		"deletedAt",
 		"id",
+		"inventoryAccess",
 		"role",
 		"tenantId",
 		"updatedAt",
@@ -1125,6 +1126,8 @@ export class TenantMembershipSchema extends BaseModel {
 	declare deletedAt: DateTime | null;
 	@column({ isPrimary: true })
 	declare id: string;
+	@column()
+	declare inventoryAccess: boolean;
 	@column()
 	declare role: string;
 	@column()

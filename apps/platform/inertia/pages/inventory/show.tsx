@@ -22,6 +22,7 @@ import { useTenant } from "~/hooks/use-tenant";
 import AppLayout from "~/layouts/app";
 
 type Movement = {
+	actor: string;
 	id: string;
 	kind: "receive" | "use" | "count";
 	delta: number;
@@ -42,12 +43,14 @@ export default function InventoryShow({
 	page,
 	lastPage,
 	requestId,
+	canManage,
 }: {
 	item: InventoryItem;
 	history: Movement[];
 	page: number;
 	lastPage: number;
 	requestId: string;
+	canManage: boolean;
 }) {
 	const { slug } = useTenant();
 	const params = { tenant: slug, id: item.id };
@@ -81,7 +84,9 @@ export default function InventoryShow({
 			}
 		>
 			{!item.archived && (
-				<Section title="Record stock movement">
+				<Section
+					title={canManage ? "Record stock movement" : "Record stock used"}
+				>
 					<Form
 						route="tenant.inventory.movement"
 						routeParams={params}
@@ -94,20 +99,24 @@ export default function InventoryShow({
 									<FieldError>{errors.requestId}</FieldError>
 								)}
 								<div className="grid gap-4 sm:grid-cols-2">
-									<Field>
-										<FieldLabel htmlFor="movement-kind">Movement</FieldLabel>
-										<select
-											id="movement-kind"
-											name="kind"
-											className="min-h-11 rounded-md border bg-background px-3 text-sm"
-											aria-invalid={!!errors.kind}
-										>
-											<option value="receive">Receive stock</option>
-											<option value="use">Use stock</option>
-											<option value="count">Set counted stock</option>
-										</select>
-										{errors.kind && <FieldError>{errors.kind}</FieldError>}
-									</Field>
+									{canManage ? (
+										<Field>
+											<FieldLabel htmlFor="movement-kind">Movement</FieldLabel>
+											<select
+												id="movement-kind"
+												name="kind"
+												className="min-h-11 rounded-md border bg-background px-3 text-sm"
+												aria-invalid={!!errors.kind}
+											>
+												<option value="receive">Receive stock</option>
+												<option value="use">Use stock</option>
+												<option value="count">Set counted stock</option>
+											</select>
+											{errors.kind && <FieldError>{errors.kind}</FieldError>}
+										</Field>
+									) : (
+										<input type="hidden" name="kind" value="use" />
+									)}
 									<Field>
 										<FieldLabel htmlFor="movement-quantity">
 											Quantity ({item.unit})
@@ -165,7 +174,9 @@ export default function InventoryShow({
 							>
 								<div className="min-w-0 wrap-anywhere">
 									<p className="font-medium">{movementLabels[movement.kind]}</p>
-									<p className="text-muted-foreground">{movement.date}</p>
+									<p className="text-muted-foreground">
+										{movement.actor} · {movement.date}
+									</p>
 									{movement.note && <p className="mt-1">{movement.note}</p>}
 								</div>
 								<div className="text-right tabular-nums">
@@ -174,7 +185,8 @@ export default function InventoryShow({
 										{stockAmount(movement.delta)}
 									</p>
 									<p className="text-muted-foreground">
-										{stockAmount(movement.balanceAfter)} {item.unit} after
+										{stockAmount(movement.balanceAfter - movement.delta)} →{" "}
+										{stockAmount(movement.balanceAfter)} {item.unit}
 									</p>
 								</div>
 							</li>
@@ -188,7 +200,7 @@ export default function InventoryShow({
 				/>
 			</Section>
 
-			{!item.archived && (
+			{canManage && !item.archived && (
 				<>
 					<Section title="Edit item">
 						<Form route="tenant.inventory.update" routeParams={params}>

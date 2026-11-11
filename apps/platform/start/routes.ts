@@ -104,6 +104,13 @@ router
 			.post("inventory", [controllers.Inventory, "store"])
 			.as("tenant.inventory.store");
 		router
+			.get("inventory/export.csv", [controllers.Inventory, "exportCsv"])
+			.as("tenant.inventory.export");
+		router
+			.post("inventory/import", [controllers.Inventory, "importCsv"])
+			.as("tenant.inventory.import");
+
+		router
 			.get("inventory/:id", [controllers.Inventory, "show"])
 			.where("id", router.matchers.uuid())
 			.as("tenant.inventory.show");
@@ -259,6 +266,13 @@ router
 					.put("members/:id/role", [controllers.Members, "role"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.settings.members.role.update");
+				router
+					.put("members/:id/inventory", [
+						controllers.Members,
+						"inventoryAccess",
+					])
+					.where("id", router.matchers.uuid())
+					.as("tenant.settings.members.inventory.update");
 				router
 					.delete("members/:id", [controllers.Members, "remove"])
 					.where("id", router.matchers.uuid())
