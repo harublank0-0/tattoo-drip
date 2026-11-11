@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { RequestInvite } from "../../components/inquiry.tsx";
 import { BookingCta } from "../../components/storefront.tsx";
 import { studioCopy } from "../../copy.ts";
@@ -19,7 +20,7 @@ export function IrezumiInvite({
 	state: InquiryState;
 	link: RequestLink | null;
 	/** The words under the title, when the page has its own. */
-	line?: string;
+	line?: ReactNode;
 }) {
 	return (
 		<div className="irz-band">

@@ -10,14 +10,11 @@ export const irezumiCopy = {
 		/** The label over a hero photo that is a piece of work, not the cover. */
 		heroPiece: "Featured piece",
 		selectedWork: "Selected work",
-		selectedWorkLine: "Pieces from the studio's newest work.",
 		allWork: "See the whole gallery",
-		noWork: "Work will appear here as soon as the studio adds photos.",
+		noWork: "No pieces to show here yet.",
 		artists: "Artists",
 		artistsLone: "The artist",
-		meet: "View portfolio",
 		about: "The studio",
-		closedLine: "Not taking new requests right now.",
 	},
 	artists: {
 		label: "Artists",
@@ -37,12 +34,13 @@ export const irezumiCopy = {
 		portfolio: "Portfolio",
 		about: "About",
 		styles: "Styles",
-		book: "Book a session",
+		/** A closed artist's page, while the studio still takes requests. */
+		closedInvite:
+			"{name} isn't taking new work right now. A request from here goes to {studio}.",
 		previous: "Previous artist",
 		next: "Next artist",
 		noWork: "No portfolio photos to show yet.",
 		healed: "Healed",
-		all: "All",
 	},
 	gallery: {
 		label: "Gallery",
@@ -65,7 +63,6 @@ export const irezumiCopy = {
 		style: "Style",
 		state: "Photographed",
 		healed: "Healed",
-		fresh: "Fresh",
 		about: "About the artist",
 		portfolio: "View portfolio",
 		inspired: "Inspired by this piece?",
@@ -80,9 +77,5 @@ export const irezumiCopy = {
 		openLine:
 			"Describe your idea, where it goes and how large. The artist will reply with the next steps.",
 		closed: "Requests",
-	},
-	footer: {
-		pages: "Pages",
-		more: "More",
 	},
 } as const;

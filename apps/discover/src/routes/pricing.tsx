@@ -36,7 +36,7 @@ const INCLUDED = [
 	"A calendar of consultations, sessions and touch-ups",
 	"One-tap WhatsApp and Viber messages in your own words",
 	"Client records, artist profiles, portfolios and flash designs",
-	"Your own studio website, in one of two themes",
+	"Your own studio website, in one of three themes",
 	"Discover listing controls, for when Discover opens",
 ];
 

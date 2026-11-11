@@ -73,7 +73,7 @@ function IrezumiPiece({
 				className="irz-piece-photo"
 				src={photo.src}
 				srcSet={photo.srcSet}
-				sizes={photo.srcSet ? pieceSizes() : undefined}
+				sizes={photo.srcSet ? pieceSizes(photo) : undefined}
 				width={photo.width}
 				height={photo.height}
 				alt=""

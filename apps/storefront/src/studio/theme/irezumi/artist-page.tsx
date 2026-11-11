@@ -1,3 +1,4 @@
+import { Fill } from "../../../intake/components/fill.tsx";
 import { ArtistFlash } from "../../components/flash.tsx";
 import { HealedFilter } from "../../components/gallery.tsx";
 import { RouterAnchor } from "../../components/router-anchor.tsx";
@@ -82,7 +83,7 @@ export function IrezumiArtistPage({
 								className="irz-artist-lead-photo"
 								src={lead.src}
 								srcSet={lead.srcSet}
-								sizes={lead.srcSet ? leadSizes() : undefined}
+								sizes={lead.srcSet ? leadSizes(lead) : undefined}
 								width={lead.width}
 								height={lead.height}
 								alt={lead.alt}
@@ -119,6 +120,8 @@ export function IrezumiArtistPage({
 								alt={artist.photo.alt}
 								loading="eager"
 								decoding="async"
+								// Small beside the lead photo: no preload of its own, never ahead of the lead.
+								fetchPriority="low"
 							/>
 						) : null}
 						<h1 className="irz-artist-title" dir="auto">
@@ -215,7 +218,18 @@ export function IrezumiArtistPage({
 					</ul>
 				</section>
 			) : null}
-			<IrezumiInvite state={inviteState(data)} link={data.requestLink} />
+			<IrezumiInvite
+				state={inviteState(data)}
+				link={data.requestLink}
+				line={
+					artist.accepting || data.requestLink === null ? undefined : (
+						<Fill
+							template={copy.closedInvite}
+							values={{ name: artist.name, studio: studio.name }}
+						/>
+					)
+				}
+			/>
 			<Neighbours data={data} />
 		</Shell>
 	);

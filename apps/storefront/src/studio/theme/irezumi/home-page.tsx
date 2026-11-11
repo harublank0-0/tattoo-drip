@@ -6,6 +6,7 @@ import { RouterAnchor } from "../../components/router-anchor.tsx";
 import type { Shell } from "../../components/shell.tsx";
 import { BookingCta } from "../../components/storefront.tsx";
 import { studioCopy } from "../../copy.ts";
+import { goodToKnowIsEmpty } from "../../good-to-know.ts";
 import { isAllowedHref, workHref } from "../../links.ts";
 import type { StudioPageData } from "../../loaders.ts";
 import { OpenNow } from "../../open-now.tsx";
@@ -127,7 +128,7 @@ function LeadFigure({ lead }: { lead: IrezumiLead }) {
 			className="irz-hero-photo"
 			src={lead.src}
 			srcSet={lead.srcSet}
-			sizes={lead.srcSet ? leadSizes() : undefined}
+			sizes={lead.srcSet ? leadSizes(lead) : undefined}
 			width={lead.width}
 			height={lead.height}
 			alt={lead.alt}
@@ -189,7 +190,8 @@ function HomeSection({
 				</div>
 			);
 		case "info":
-			return (
+			// GoodToKnowSection renders nothing for a studio that filled nothing in: then no wrapper either.
+			return goodToKnowIsEmpty(data.goodToKnow) ? null : (
 				<div className="irz-container irz-shared">
 					<GoodToKnowSection view={data.goodToKnow} />
 				</div>
@@ -207,9 +209,10 @@ function HomeSection({
 
 /**
  * The selected work: up to six of the newest pieces after the one the first
- * screen shows, whole, and the way to the gallery. With no photos at all the
- * section says work will appear here; when the first screen's piece is the
- * only one, the section is left out (the piece is already shown).
+ * screen shows, whole, and the way to the gallery. With no photos the section
+ * says there are none to show here (never that the studio has published none:
+ * a failed read looks the same); when the first screen's piece is the only
+ * one, the section is left out (the piece is already shown).
  */
 function SelectedWork({
 	data,

@@ -4,7 +4,7 @@ import { studioCopy } from "../../copy.ts";
 import { isAllowedHref } from "../../links.ts";
 import type { ArtistView } from "../../view-model.ts";
 import { irezumiCopy } from "./copy.ts";
-import { portraitSizes } from "./sizes.ts";
+import { portraitSizes, previewSizes } from "./sizes.ts";
 
 /**
  * Whether an artist takes new work, in their own words when they wrote some
@@ -95,11 +95,7 @@ export function ArtistIndex({
 												className="irz-preview"
 												src={photo.src}
 												srcSet={photo.srcSet}
-												sizes={
-													photo.srcSet
-														? "(min-width: 48rem) 8rem, 6rem"
-														: undefined
-												}
+												sizes={photo.srcSet ? previewSizes() : undefined}
 												width={photo.width}
 												height={photo.height}
 												alt=""

@@ -48,7 +48,7 @@ export function IrezumiArtworkPage({
 				<div className="irz-artwork-grid">
 					<ArtworkFigure
 						photo={artwork.photo}
-						sizes={artworkSizes()}
+						sizes={artworkSizes(artwork.photo)}
 						className="irz-artwork-figure"
 					/>
 					<Colophon artwork={artwork} studio={studio} similar={similar} />

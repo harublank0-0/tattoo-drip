@@ -1,13 +1,13 @@
 import { MapPin } from "lucide-react";
 import type { ReactNode } from "react";
 import { contactGroups } from "../../components/contact.tsx";
+import { NavList } from "../../components/nav-list.tsx";
 import { BookingCta } from "../../components/storefront.tsx";
 import { studioCopy } from "../../copy.ts";
 import { linkRel } from "../../links.ts";
 import type { NavItem } from "../../nav.ts";
 import type { RequestLink } from "../../request.ts";
 import type { ContactLink, StudioView } from "../../view-model.ts";
-import { NavList } from "../ink-noir/nav-list.tsx";
 
 function Column({
 	id,

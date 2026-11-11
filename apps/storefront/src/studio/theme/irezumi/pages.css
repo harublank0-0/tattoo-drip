@@ -4,7 +4,10 @@
  * booking page's opening. Only `irz-` classes these components render, so no
  * other theme is touched. Photos of tattoos are always drawn whole
  * (`object-fit: contain` within their own proportions, never a crop); only an
- * artist's portrait is cropped, to 4:5. sizes.ts reads these boxes.
+ * artist's portrait is cropped, to 4:5. Each photo takes its box's full width
+ * (`inline-size: 100%`, the height from its width and height attributes), so
+ * its space is kept before it loads; a height cap letterboxes it on the mat.
+ * sizes.ts reads these boxes.
  */
 
 /* Pieces of type. */
@@ -232,9 +235,8 @@
 .irz-hero-photo,
 .irz-artist-lead-photo {
 	display: block;
-	inline-size: auto;
+	inline-size: 100%;
 	block-size: auto;
-	max-inline-size: 100%;
 	max-block-size: min(78svh, 52rem);
 	object-fit: contain;
 }
@@ -325,9 +327,8 @@
 }
 .irz-piece-photo {
 	display: block;
-	inline-size: auto;
+	inline-size: 100%;
 	block-size: auto;
-	max-inline-size: 100%;
 	max-block-size: 72svh;
 	object-fit: contain;
 }
@@ -456,12 +457,15 @@
 	position: absolute;
 	inset: 0;
 }
-.irz-artist-link:focus-visible {
-	outline: none;
-}
-.irz-artist-entry > article:has(.irz-artist-link:focus-visible) {
-	outline: 2px solid var(--stencil);
-	outline-offset: 4px;
+/* The ring goes round the whole entry the link covers, where :has() can draw it; elsewhere the link keeps its own. */
+@supports selector(:has(*)) {
+	.irz-artist-link:focus-visible {
+		outline: none;
+	}
+	.irz-artist-entry > article:has(.irz-artist-link:focus-visible) {
+		outline: 2px solid var(--stencil);
+		outline-offset: 4px;
+	}
 }
 .irz-artist-entry > article:hover .irz-artist-link {
 	text-decoration: underline;
@@ -671,9 +675,8 @@
 }
 .irz-artwork-figure .artwork-photo {
 	display: block;
-	inline-size: auto;
+	inline-size: 100%;
 	block-size: auto;
-	max-inline-size: 100%;
 	max-block-size: min(82svh, 60rem);
 	object-fit: contain;
 }

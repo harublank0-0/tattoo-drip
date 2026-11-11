@@ -239,7 +239,7 @@ function ForStudios() {
 									</p>
 								</div>
 							</div>
-							<div className="flex min-h-56 flex-col justify-between border-t-4 border-t-[#b3321d] bg-paper p-6 text-ink lg:mt-24">
+							<div className="flex min-h-56 flex-col justify-between border-t-4 border-t-accent bg-paper p-6 text-ink lg:mt-24">
 								<span className="eyebrow text-ink-muted">Light, editorial</span>
 								<div>
 									<p className="font-display text-display-md font-bold">

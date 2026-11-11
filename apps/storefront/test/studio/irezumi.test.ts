@@ -189,20 +189,41 @@ describe("Irezumi's palette (theme.ts and styles.css agree)", () => {
 		);
 	});
 
-	test("every rule is scoped: the theme's class or an irz- class", () => {
+	test("every rule is scoped: it starts at the theme's class or an irz- class", () => {
+		const scoped =
+			/^(:root\.theme-irezumi\b|:root:has\(\.chat-float\) \.irz-|\.irz-)/;
 		for (const sheet of [css, pagesCss]) {
 			const body = sheet.replace(/\/\*[\s\S]*?\*\//g, "");
-			for (const match of body.matchAll(/(^|})\s*([^{}@]+)\{/g)) {
-				for (const selector of match[2].split(",")) {
-					const trimmed = selector.trim();
-					if (trimmed === "" || /^(from|to|\d+%)$/.test(trimmed)) continue;
+			// Every prelude before a `{`, inside @media and @supports blocks too.
+			const preludes = Array.from(body.matchAll(/([^{};]+)\{/g), (match) =>
+				match[1].trim(),
+			);
+			assert.ok(preludes.length > 50, "the rules were found");
+			for (const prelude of preludes) {
+				if (prelude.startsWith("@")) continue;
+				for (const selector of prelude.split(",")) {
 					assert.match(
-						trimmed,
-						/theme-irezumi|\.irz-/,
-						`unscoped selector: ${trimmed}`,
+						selector.trim(),
+						scoped,
+						`unscoped selector: ${selector.trim()}`,
 					);
 				}
 			}
+		}
+	});
+
+	test("tattoo photos keep their space before they load: full width, height from their shape, drawn whole", () => {
+		for (const selector of [
+			".irz-hero-photo",
+			".irz-piece-photo",
+			".irz-artwork-figure .artwork-photo",
+		]) {
+			const start = pagesCss.indexOf(`${selector}`);
+			const rule = pagesCss.slice(start, pagesCss.indexOf("}", start));
+			assert.match(rule, /inline-size: 100%/, selector);
+			assert.match(rule, /block-size: auto/, selector);
+			assert.match(rule, /object-fit: contain/, selector);
+			assert.doesNotMatch(rule, /inline-size: auto/, selector);
 		}
 	});
 });
@@ -333,14 +354,23 @@ describe("Irezumi's home page", () => {
 		assert.match(html, />Featured piece</);
 	});
 
-	test("the cover leads when the studio has one, and is never repeated as a piece", () => {
+	test("the cover leads when the studio has one", () => {
 		const html = homeHtml(
 			irezumi({}, { ...STUDIO, cover: COVER_SIZED }),
 			[SITA, ARJUN],
 			work,
 		);
+		assertSafePage(html, { brandImages: true });
 		assert.match(html, /<img class="irz-hero-photo"[^>]*cover\.jpg/);
 		assert.doesNotMatch(html, /Featured piece/);
+		// The cover's shape caps its width under the height cap.
+		assert.match(
+			html,
+			/sizes="\(min-width: 78\.5rem\) min\(44\.34rem, calc\(78vh \* 2\), 104rem\)/,
+		);
+	});
+
+	test("without a cover the largest piece leads and is not repeated in the selected work", () => {
 		const data = studioPageData(
 			irezumi(),
 			[SITA, ARJUN],
@@ -381,12 +411,12 @@ describe("Irezumi's home page", () => {
 		assertUniqueIds(html);
 		assert.doesNotMatch(html, /<img/);
 		assert.match(html, /class="irz-hero-wash" aria-hidden="true"/);
-		assert.match(
-			html,
-			/Work will appear here as soon as the studio adds photos\./,
-		);
+		assert.match(html, /No pieces to show here yet\./);
 		assert.doesNotMatch(html, /View the gallery|id="artists"|irz-intro/);
 		assert.doesNotMatch(html, /irz-footer-(contact|visit|follow)/);
+		// Good to know is empty: no empty wrapper for it either.
+		assert.doesNotMatch(html, /<div class="irz-container irz-shared"><\/div>/);
+		assert.doesNotMatch(html, /id="good-to-know"/);
 	});
 
 	test("a closed studio offers no booking link, and says so", () => {
@@ -410,6 +440,42 @@ describe("Irezumi's home page", () => {
 		assertSafePage(html);
 		assert.match(html, /<dl class="irz-footer-hours">/);
 		assert.match(html, /id="good-to-know"/);
+	});
+});
+
+describe("Irezumi's pieces without a page of their own", () => {
+	const idless = () => {
+		const base = galleryPage(3);
+		return {
+			...base,
+			data: base.data.map(({ id: _id, ...photo }) => photo),
+		} as unknown as typeof base;
+	};
+
+	test("open the shared viewer from a button its title names, on the gallery and the home page", () => {
+		const gallery = renderToStaticMarkup(
+			createElement(ThemedWorkPage, {
+				data: workPageData(
+					irezumi(),
+					[SITA, ARJUN],
+					idless(),
+					{},
+					ORIGIN,
+					IMAGE_ORIGIN,
+				),
+			}),
+		);
+		assertSafePage(gallery);
+		assertUniqueIds(gallery);
+		assert.equal(
+			gallery.match(/<button type="button" class="irz-piece-link"/g)?.length,
+			3,
+		);
+		assert.equal(gallery.match(/<dialog /g)?.length, 3);
+		const home = homeHtml(irezumi(), [SITA, ARJUN], idless());
+		assertSafePage(home);
+		assertUniqueIds(home);
+		assert.match(home, /<button type="button" class="irz-piece-link"/);
 	});
 });
 
@@ -471,6 +537,46 @@ describe("Irezumi's artist pages", () => {
 		assert.match(bare, /irz-artist-grid irz-artist-solo/);
 	});
 
+	test("a closed artist in an open studio: the invitation says who is closed and where the request goes", () => {
+		const data = artistPageData(
+			irezumi(),
+			[SITA, ARJUN],
+			"arjun",
+			ORIGIN,
+			IMAGE_ORIGIN,
+		);
+		assert.ok(data);
+		const html = renderToStaticMarkup(
+			createElement(ThemedArtistPage, { data }),
+		);
+		assertSafePage(html);
+		assert.match(html, /Books open in March\./);
+		const invite = html.slice(html.indexOf('id="inquiry"'));
+		assert.match(
+			invite,
+			/<bdi>अर्जुन थापा<\/bdi> isn&#x27;t taking new work right now\. A request from here goes to <bdi>Black Needle<\/bdi>\./,
+		);
+		assert.match(invite, /href="\/book">Request a session</);
+		assert.doesNotMatch(html, /href="\/book\?artist=arjun"/);
+	});
+
+	test("a closed studio: no booking link anywhere on an artist's page, and the closed words", () => {
+		const data = artistPageData(
+			irezumi({}, CLOSED_STUDIO),
+			[{ ...SITA, acceptingInquiries: false }, ARJUN],
+			"sita",
+			ORIGIN,
+			IMAGE_ORIGIN,
+		);
+		assert.ok(data);
+		const html = renderToStaticMarkup(
+			createElement(ThemedArtistPage, { data }),
+		);
+		assertSafePage(html);
+		assert.doesNotMatch(html, /href="\/book/);
+		assert.match(html, /isn&#x27;t taking new inquiries right now/);
+	});
+
 	test("the directory lists every artist as one link each, with a filter only when it narrows", () => {
 		const data = artistsPageData(
 			irezumi(),
@@ -492,6 +598,15 @@ describe("Irezumi's artist pages", () => {
 		);
 		assert.equal(html.match(/class="irz-preview"/g)?.length, 3);
 		assert.match(html, /id="inquiry"/);
+	});
+
+	test("a lone artist: the home page names the section for one", () => {
+		const html = homeHtml(irezumi(), [SITA]);
+		assertSafePage(html);
+		assert.match(
+			html,
+			/<h2 id="artists-title" class="irz-section-title">The artist<\/h2>/,
+		);
 	});
 
 	test("an empty directory says so and invents no one", () => {
@@ -582,6 +697,26 @@ describe("Irezumi's gallery and tattoo pages", () => {
 		assert.match(html, /Request a similar tattoo/);
 		assert.match(html, /About the artist/);
 		assert.match(html, /aria-current="page"[^>]*>Gallery</);
+		// The piece is 4:3: its width is capped by 82vh times 4/3.
+		assert.match(html, /min\(50\.67rem, calc\(82vh \* 1\.34\), 80rem\)/);
+	});
+
+	test("nobody takes new work: a tattoo's page asks for nothing similar", () => {
+		const data = artworkPageData(
+			irezumi({}, CLOSED_STUDIO),
+			[{ ...SITA, acceptingInquiries: false }, ARJUN],
+			galleryPage(1).data[0],
+			[null, null, null],
+			ORIGIN,
+			IMAGE_ORIGIN,
+		);
+		assert.ok(data);
+		assert.equal(data.similar, null);
+		const html = renderToStaticMarkup(
+			createElement(ThemedArtworkPage, { data }),
+		);
+		assertSafePage(html);
+		assert.doesNotMatch(html, /Request a similar tattoo|href="\/book/);
 	});
 });
 

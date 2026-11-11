@@ -1,11 +1,11 @@
 import { Sheet, SheetContent, SheetTitle } from "#/components/ui/sheet";
+import { NavList } from "../../components/nav-list.tsx";
 import { BookingCta, BrandIdentity } from "../../components/storefront.tsx";
 import { studioCopy } from "../../copy.ts";
 import type { NavItem } from "../../nav.ts";
 import type { RequestLink } from "../../request.ts";
 import type { StudioView } from "../../view-model.ts";
 import type { ThemeConfig } from "../config.ts";
-import { NavList } from "../ink-noir/nav-list.tsx";
 
 export interface IrezumiNavSheetProps {
 	readonly studio: StudioView;
