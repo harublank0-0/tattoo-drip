@@ -285,7 +285,7 @@
 .atl-artist-facts .atl-hero-actions {
 	justify-content: center;
 }
-.atl-hero-actions .action {
+:root.theme-atelier .atl-hero-actions .action {
 	max-inline-size: 100%;
 }
 /* With no photo: a brass double rule, decoration only (aria-hidden). */
