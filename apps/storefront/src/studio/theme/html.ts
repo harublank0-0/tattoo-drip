@@ -5,6 +5,11 @@ import {
 	INK_NOIR_SCHEME,
 	INK_NOIR_THEME_COLOR,
 } from "./ink-noir/theme.ts";
+import {
+	IREZUMI_CLASS,
+	IREZUMI_SCHEME,
+	IREZUMI_THEME_COLOR,
+} from "./irezumi/theme.ts";
 
 /**
  * What a theme sets on the whole page, `<html>` and `<head>` included, which
@@ -39,6 +44,11 @@ export const THEME_HTML: Record<ThemeKey, ThemeHtml> = {
 		className: INK_NOIR_CLASS,
 		scheme: INK_NOIR_SCHEME,
 		themeColors: [{ content: INK_NOIR_THEME_COLOR }],
+	},
+	irezumi: {
+		className: IREZUMI_CLASS,
+		scheme: IREZUMI_SCHEME,
+		themeColors: [{ content: IREZUMI_THEME_COLOR }],
 	},
 };
 

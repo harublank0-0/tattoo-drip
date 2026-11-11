@@ -84,6 +84,18 @@ export function assertSafePage(html: string, options: SafePageOptions = {}) {
 				insideLink(html, image, "ink-piece-link"),
 				`a gallery card's photo outside its link: ${image}`,
 			);
+		} else if (/class="irz-piece-photo"/.test(image)) {
+			// Irezumi's pieces: the same, inside the piece's link or viewer
+			// button, which its title names.
+			assert.match(image, / alt=""/, image);
+			assert.ok(
+				insideLink(html, image, "irz-piece-link"),
+				`an Irezumi piece's photo outside its link: ${image}`,
+			);
+		} else if (/class="irz-preview"/.test(image)) {
+			// Irezumi's small previews of an artist's work, in a list hidden
+			// from assistive technology beside the artist's name.
+			assert.match(image, / alt=""/, image);
 		} else {
 			assert.match(image, / alt="[^"]+"/, image);
 		}
@@ -108,10 +120,10 @@ function assertSrcSet(image: string) {
 	}
 }
 
-/** Whether this exact image tag sits inside an `<a class="{className}">` in `html` whose own text names it. */
+/** Whether this exact image tag sits inside an `<a class="{className}">` (or a viewer `<button>`) in `html` whose own text names it. */
 function insideLink(html: string, image: string, className: string): boolean {
 	for (const link of html.matchAll(
-		new RegExp(`<a class="${className}"[^>]*>[\\s\\S]*?<\\/a>`, "g"),
+		new RegExp(`<(a|button) class="${className}"[^>]*>[\\s\\S]*?<\\/\\1>`, "g"),
 	)) {
 		if (link[0].includes(image) && /<span[^>]*>\s*[^<\s]/.test(link[0])) {
 			return true;

@@ -214,9 +214,9 @@ function ForStudios() {
 					</div>
 					<div className="flex flex-col gap-4">
 						<p className="eyebrow text-night-muted">
-							Two themes to choose from
+							Three themes to choose from
 						</p>
-						<div className="grid gap-4 sm:grid-cols-[minmax(0,5fr)_minmax(0,4fr)]">
+						<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 							<div className="flex min-h-56 flex-col justify-between bg-paper p-6 text-ink">
 								<span className="eyebrow text-ink-muted">Light</span>
 								<div>
@@ -236,6 +236,18 @@ function ForStudios() {
 									</p>
 									<p className="mt-2 text-sm text-night-muted">
 										Dark and photo-first, with a menu of your pages.
+									</p>
+								</div>
+							</div>
+							<div className="flex min-h-56 flex-col justify-between border-t-4 border-t-[#b3321d] bg-paper p-6 text-ink lg:mt-24">
+								<span className="eyebrow text-ink-muted">Light, editorial</span>
+								<div>
+									<p className="font-display text-display-md font-bold">
+										Irezumi
+									</p>
+									<p className="mt-2 text-sm text-ink-muted">
+										Warm paper, charcoal ink and vermilion. Gives large pieces
+										room.
 									</p>
 								</div>
 							</div>

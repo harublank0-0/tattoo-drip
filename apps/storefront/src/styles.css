@@ -14,6 +14,9 @@
 @import './studio/theme/ink-noir/book.css';
 /* Ink Noir's informational pages (Prompt 7). */
 @import './studio/theme/ink-noir/info.css';
+/* Irezumi's tokens and shell, under `<html class="theme-irezumi">`, and its pages' `irz-` classes. */
+@import './studio/theme/irezumi/styles.css';
+@import './studio/theme/irezumi/pages.css';
 @plugin '@tailwindcss/typography';
 
 /*
@@ -153,12 +156,15 @@
 
 /*
  * Tailwind's `dark:` (the shadcn components use it): the device's dark scheme,
- * and a theme that is always dark (Ink Noir). After the dark block above:
+ * except under a theme that is always light (Irezumi), and a theme that is
+ * always dark (Ink Noir). After the dark block above:
  * the tests find that block as the file's first dark media query.
  */
 @custom-variant dark {
   @media (prefers-color-scheme: dark) {
-    @slot;
+    &:not(:where(.theme-irezumi, .theme-irezumi *)) {
+      @slot;
+    }
   }
   &:where(.theme-ink-noir, .theme-ink-noir *) {
     @slot;
