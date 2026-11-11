@@ -110,11 +110,33 @@ describe("the photo viewer is the browser's dialog (TAT-116)", () => {
 		const others = sources("studio/")
 			.filter(
 				({ file }) =>
-					file !== "studio/lightbox.ts" && file !== "studio/paging.tsx",
+					file !== "studio/lightbox.ts" &&
+					file !== "studio/paging.tsx" &&
+					file !== "studio/preview-links.tsx",
 			)
 			.filter(({ text }) => text.includes("document."))
 			.map(({ file }) => file);
 		assert.deepEqual(others, []);
+	});
+
+	test("a theme preview's link island only listens and adds the preview to a link's address", () => {
+		// src/studio/preview-links.tsx, mounted only while previewing: its own
+		// listeners on the document, removed again, and `href` set on a link.
+		const text = read("studio/preview-links.tsx");
+		const calls = Array.from(
+			text.matchAll(/document\.(\w+)/g),
+			(match) => match[1],
+		);
+		assert.deepEqual([...new Set(calls)].sort(), [
+			"addEventListener",
+			"removeEventListener",
+		]);
+		assert.equal((text.match(/\.setAttribute\(/g) ?? []).length, 1);
+		assert.match(text, /link\.setAttribute\("href", href\)/);
+		assert.doesNotMatch(
+			text,
+			/\.focus\(|preventDefault|innerHTML|location\.(assign|replace|href\s*=)/,
+		);
 	});
 
 	test("open-now.tsx holds the cover's only timer and touches no DOM (TAT-128)", () => {

@@ -13,15 +13,20 @@ import type { ApiContext } from "../api/context.ts";
 import eczarLatin from "../assets/fonts/eczar/eczar-latin-700-normal.woff2?url";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import type { SiteContext } from "../site/context.ts";
-import { PreviewBanner } from "../studio/components/preview-banner.tsx";
+import {
+	PreviewBanner,
+	PreviewNotice,
+} from "../studio/components/preview-banner.tsx";
 import { studioIconLinks } from "../studio/icon.ts";
 import { loadPageStudio } from "../studio/loaders.ts";
+import { PreviewLinks } from "../studio/preview-links.tsx";
 import { rootMeta } from "../studio/seo.ts";
 import {
 	isUnthemedPage,
 	matchedThemeKey,
 	THEME_HTML,
 } from "../studio/theme/html.ts";
+import { previewExitHref } from "../studio/theme/preview.ts";
 import appCss from "../styles.css?url";
 
 export const Route = createRootRouteWithContext<ApiContext & SiteContext>()({
@@ -41,6 +46,10 @@ export const Route = createRootRouteWithContext<ApiContext & SiteContext>()({
 			// The studio's name for a page that sets no title; the not-found or
 			// error head (noindex) for a path no page matches (src/studio/seo.ts).
 			...rootMeta({ loaderData, match, matches }),
+			// A theme preview is never indexed (the answer's X-Robots-Tag says so too, src/studio/theme/preview.ts).
+			...(loaderData && match.context.site.previewTheme
+				? [{ name: "robots", content: "noindex, nofollow" }]
+				: []),
 		],
 		links: [
 			// Only the Latin subset is preloaded; the others load when a page
@@ -79,7 +88,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 	// A theme preview (src/studio/theme/preview.ts): from this visit's site, on
 	// every page but an unthemed one; the same on the server and in the browser.
 	const unthemed = useMatches({ select: isUnthemedPage });
-	const pathname = useLocation({ select: (location) => location.pathname });
+	const here = useLocation({
+		select: (location) => `${location.pathname}${location.searchStr}`,
+	});
 	const preview = unthemed ? null : site.previewTheme;
 
 	return (
@@ -95,14 +106,21 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 						media={color.media}
 					/>
 				))}
-				{/* Never index a preview (the response's X-Robots-Tag says so too). */}
-				{preview ? <meta name="robots" content="noindex, nofollow" /> : null}
 			</head>
 			<body>
 				<TattooProvider client={tattoo.client}>
+					{/* Said first to a screen reader, without a stop for the keyboard: the skip link stays first. */}
+					{preview ? (
+						<p className="sr-only">
+							<PreviewNotice theme={preview} />
+						</p>
+					) : null}
 					{children}
 					{preview ? (
-						<PreviewBanner theme={preview} exitHref={pathname} />
+						<>
+							<PreviewBanner theme={preview} exitHref={previewExitHref(here)} />
+							<PreviewLinks theme={preview} />
+						</>
 					) : null}
 					{import.meta.env.DEV ? (
 						<TanStackDevtools

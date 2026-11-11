@@ -103,7 +103,13 @@ export const PREVIEW_NOTE =
  * only. Nothing is saved, and visitors keep seeing the saved theme.
  */
 export const THEME_PREVIEW_HELP =
-	"Preview opens your page in that theme in a new tab, with your own artists and work. Nothing is saved until you press Save.";
+	"Preview opens your page in that theme in a new tab, with your own artists and work. It keeps your saved colour and font, and nothing is saved until you press Save.";
+
+/** Above the preview links. */
+export const THEME_PREVIEW_TITLE = "Try a theme on your page first:";
+
+/** Said after a link that opens a new tab, for a screen reader (the icon is decoration). */
+export const NEW_TAB = "(opens in a new tab)";
 
 /** The preview link's words: they name the theme, so each link says where it goes. */
 export function previewLabel(themeLabel: string): string {

@@ -522,7 +522,7 @@ test.group("theme previews in Page look", () => {
 		assert.equal(words.previewLabel("Irezumi"), "Preview Irezumi");
 		assert.equal(
 			words.THEME_PREVIEW_HELP,
-			"Preview opens your page in that theme in a new tab, with your own artists and work. Nothing is saved until you press Save.",
+			"Preview opens your page in that theme in a new tab, with your own artists and work. It keeps your saved colour and font, and nothing is saved until you press Save.",
 		);
 		for (const theme of THEMES) {
 			assert.include(words.previewLabel(theme.label), theme.label);

@@ -1,3 +1,6 @@
+import type { ThemeKey } from "../studio/theme/config.ts";
+import { readPreviewTheme } from "../studio/theme/preview.ts";
+
 /**
  * The studio page's public settings (TAT-48, TAT-57): its own origin, e.g.
  * https://blackneedle.tattoodrip.com (canonical links and Open Graph URLs
@@ -6,16 +9,14 @@
  * TattooClientRef: on the server from the settings and the slug the tenant
  * middleware confirmed (src/site/request.ts), in the browser from the
  * router's dehydrated state. The browser never reads its own host (TAT-12).
- * Both values are public: every page carries them.
+ * With them, the theme this visit previews (`?preview=`, src/studio/theme/
+ * preview.ts), or null. All three values are public: every page carries them.
  */
 
 const NOT_SET =
 	"The site origin is not set yet: getRouter() sets it on the server, the router's hydrate in the browser.";
 const INVALID =
 	"This page's site address is missing or invalid. Reload the page.";
-
-import type { ThemeKey } from "../studio/theme/config.ts";
-import { readPreviewTheme } from "../studio/theme/preview.ts";
 
 /** A Turnstile site key: public, and safe wherever it is written. */
 export const CHALLENGE_SITE_KEY_SHAPE = /^[A-Za-z0-9_-]{10,100}$/;
@@ -95,7 +96,7 @@ export function parseChallengeSiteKey(value: unknown): string | null {
 	throw new Error(INVALID);
 }
 
-/** The router's dehydrate: the origin and the site key, and nothing else. */
+/** The router's dehydrate: the origin, the site key and the preview theme, and nothing else. */
 export function dehydrateSite(site: SiteRef): DehydratedSite {
 	return {
 		site: {

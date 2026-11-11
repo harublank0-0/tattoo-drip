@@ -21,7 +21,9 @@ export const tenantMiddleware = createMiddleware().server(
 			config: storefrontConfig(),
 		});
 		if (outcome.type === "respond") return outcome.response;
-		// A theme preview (src/studio/theme/preview.ts): this request only, never cached or indexed.
+		// A theme preview (src/studio/theme/preview.ts): this request only, never
+		// cached or indexed. A page's own errors still answer through `next()`,
+		// so they are marked too.
 		const previewTheme = previewThemeOf(request.url);
 		const result = await next({
 			context: {

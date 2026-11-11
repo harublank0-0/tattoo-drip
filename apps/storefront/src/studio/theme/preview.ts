@@ -62,6 +62,51 @@ export function withPreviewTheme(
 	} as Studio;
 }
 
+/** One of the page's own paths: "/…", never "//…" or "/\\…". */
+const OWN_PATH = /^\/(?![/\\])/;
+
+/**
+ * "Exit preview": the page's own path and query without the preview (so
+ * `/book?artist=aiko&preview=ink-noir` leads to `/book?artist=aiko`), and no
+ * fragment; "/" for anything that is not one of the page's own paths.
+ */
+export function previewExitHref(pathAndSearch: string): string {
+	if (!OWN_PATH.test(pathAndSearch)) return "/";
+	const url = new URL(pathAndSearch, "http://page.invalid");
+	url.searchParams.delete(PREVIEW_PARAM);
+	const href = `${url.pathname}${url.search}`;
+	return OWN_PATH.test(href) ? href : "/";
+}
+
+/**
+ * A link's address with the preview added, for a link the browser itself
+ * follows (a full load, or a new tab), so the preview goes on; null to leave
+ * the link as it is: no address, a fragment on this page (`#main`), another
+ * origin, or one that already names a preview. `pageHref` is the page's own
+ * address, which the link's is read against.
+ */
+export function withPreviewParam(
+	rawHref: string | null,
+	pageHref: string,
+	theme: ThemeKey,
+): string | null {
+	if (rawHref === null || rawHref === "" || rawHref.startsWith("#")) {
+		return null;
+	}
+	let page: URL;
+	let url: URL;
+	try {
+		page = new URL(pageHref);
+		url = new URL(rawHref, page);
+	} catch {
+		return null;
+	}
+	if (url.origin !== page.origin) return null;
+	if (url.searchParams.has(PREVIEW_PARAM)) return null;
+	url.searchParams.set(PREVIEW_PARAM, theme);
+	return `${url.pathname}${url.search}${url.hash}`;
+}
+
 /**
  * A preview's answer is for the person previewing: never kept by a shared
  * cache (it would show the preview to the next visitor of that address) and

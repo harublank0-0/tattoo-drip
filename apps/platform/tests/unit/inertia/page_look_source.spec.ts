@@ -309,15 +309,30 @@ test.group("The page look components (TAT-56)", () => {
 		assert.include(source, 'loading="lazy"');
 	});
 
-	test("each theme's Preview link sits outside its label, in a new tab", async ({
+	test("the Preview links sit outside the radio group, in a new tab, for every theme but the saved one", async ({
 		assert,
 	}) => {
 		const page = await read("pages/settings/look.tsx");
-		const label = page.indexOf("</FieldLabel>", page.indexOf("<ThemeSample"));
-		const link = page.indexOf("previewLabel(theme.label)");
-		assert.isAbove(label, 0);
-		assert.isAbove(link, label, "the link comes after the label closes");
-		assert.match(page, /href=\{href\}\s*target="_blank"\s*rel="noreferrer"/);
-		assert.include(page, '"self-start max-lg:min-h-11"');
+		const group = page.indexOf("</RadioGroup>");
+		const links = page.indexOf("<ThemePreviewLinks");
+		assert.isAbove(group, 0);
+		assert.isAbove(
+			links,
+			group,
+			"after the radio group closes: its arrow keys and Tab stay apart",
+		);
+		assert.notInclude(
+			page.slice(page.indexOf("<RadioGroup"), group),
+			"<a",
+			"no link inside the radio group",
+		);
+		assert.match(
+			page,
+			/themes\.filter\(\s*\(theme\) => theme\.key !== look\.theme,?\s*\)/,
+			"no link for the saved theme",
+		);
+		assert.match(page, /target="_blank"\s*rel="noreferrer"/);
+		assert.include(page, '<span className="sr-only"> {NEW_TAB}</span>');
+		assert.include(page, '"max-lg:min-h-11"');
 	});
 });

@@ -11,11 +11,12 @@ import {
 	matchedThemeKey,
 } from "../../src/studio/theme/html.ts";
 import {
-	PREVIEW_HEADERS,
+	previewExitHref,
 	previewHeaders,
 	previewThemeOf,
 	readPreviewTheme,
 	THEME_NAMES,
+	withPreviewParam,
 	withPreviewTheme,
 } from "../../src/studio/theme/preview.ts";
 import { ThemedStudioPage } from "../../src/studio/theme/registry.tsx";
@@ -154,10 +155,6 @@ describe("a preview's answer", () => {
 		assert.equal(answered.headers.get("X-Robots-Tag"), "noindex, nofollow");
 		assert.equal(answered.headers.get("Content-Type"), "text/html");
 		assert.equal(await answered.text(), "<html></html>");
-		assert.deepEqual(Object.keys(PREVIEW_HEADERS), [
-			"Cache-Control",
-			"X-Robots-Tag",
-		]);
 	});
 
 	test("the middleware applies it to a preview request only", () => {
@@ -179,21 +176,24 @@ describe("a preview's answer", () => {
 describe("the preview banner", () => {
 	test("names the theme, says nothing was saved, and leads out of the preview", () => {
 		const html = renderToStaticMarkup(
-			createElement(PreviewBanner, { theme: "irezumi", exitHref: "/gallery" }),
+			createElement(PreviewBanner, {
+				theme: "irezumi",
+				exitHref: "/book?artist=aiko",
+			}),
 		);
 		assert.match(
 			html,
 			/<aside class="preview-banner" aria-label="Theme preview">/,
 		);
-		assert.match(html, /Previewing Irezumi/);
+		assert.match(html, /<strong>Previewing Irezumi\.<\/strong>/);
 		assert.match(html, /Not saved: visitors still see your saved theme\./);
 		assert.match(
 			html,
-			/<a class="preview-banner-exit" href="\/gallery">Exit preview<\/a>/,
+			/<a class="preview-banner-exit" href="\/book\?artist=aiko">Exit preview<\/a>/,
 		);
 	});
 
-	test("the root writes it after the page and a noindex meta, never on an unthemed page", () => {
+	test("the root says it first to a screen reader, shows the bar after the page, and keeps it on links", () => {
 		const source = readFileSync(
 			new URL("../../src/routes/__root.tsx", import.meta.url),
 			"utf8",
@@ -202,11 +202,17 @@ describe("the preview banner", () => {
 			source,
 			/const preview = unthemed \? null : site\.previewTheme;/,
 		);
+		const notice = source.indexOf('<p className="sr-only">');
+		const children = source.indexOf("{children}");
+		const bar = source.indexOf("<PreviewBanner");
+		assert.ok(notice > 0 && notice < children, "the notice comes first");
 		assert.ok(
-			source.indexOf("{children}") < source.indexOf("<PreviewBanner"),
-			"after the page in reading order: the skip link stays first",
+			children < bar,
+			"the bar after the page: the skip link stays first",
 		);
-		assert.match(source, /<meta name="robots" content="noindex, nofollow" \/>/);
+		assert.match(source, /exitHref=\{previewExitHref\(here\)\}/);
+		assert.match(source, /<PreviewLinks theme=\{preview\} \/>/);
+		assert.match(source, /name: "robots", content: "noindex, nofollow"/);
 	});
 
 	test("a previewed page still holds to every page rule", () => {
@@ -218,6 +224,103 @@ describe("the preview banner", () => {
 		);
 		assertSafePage(
 			renderToStaticMarkup(createElement(ThemedStudioPage, { data })),
+		);
+	});
+});
+
+describe("previewExitHref: Exit preview keeps the page and its own query", () => {
+	test("drops the preview alone", () => {
+		assert.equal(previewExitHref("/?preview=irezumi"), "/");
+		assert.equal(
+			previewExitHref("/book?artist=aiko&preview=ink-noir"),
+			"/book?artist=aiko",
+		);
+		assert.equal(
+			previewExitHref("/gallery?preview=irezumi&style=blackwork&healed=1"),
+			"/gallery?style=blackwork&healed=1",
+		);
+		assert.equal(previewExitHref("/artists/sita"), "/artists/sita");
+	});
+
+	test("anything but the page's own path is the home page", () => {
+		for (const value of [
+			"//evil.example/",
+			"/\\evil.example",
+			"https://evil.example/",
+			"",
+			"javascript:alert(1)",
+		]) {
+			assert.equal(previewExitHref(value), "/", value);
+		}
+	});
+});
+
+describe("withPreviewParam: a link the browser follows keeps the preview", () => {
+	const page = "http://kumo-ink.localhost:3000/gallery?style=blackwork";
+
+	test("the page's own links get it, with their own query and fragment kept", () => {
+		assert.equal(
+			withPreviewParam("/artists/aiko", page, "irezumi"),
+			"/artists/aiko?preview=irezumi",
+		);
+		assert.equal(
+			withPreviewParam("/book?artist=aiko", page, "irezumi"),
+			"/book?artist=aiko&preview=irezumi",
+		);
+		assert.equal(
+			withPreviewParam("/#inquiry", page, "ink-noir"),
+			"/?preview=ink-noir#inquiry",
+		);
+		assert.equal(
+			withPreviewParam("http://kumo-ink.localhost:3000/flash", page, "irezumi"),
+			"/flash?preview=irezumi",
+		);
+	});
+
+	test("never a fragment on this page, another origin, a link that names one, or no address", () => {
+		for (const href of [
+			null,
+			"",
+			"#main",
+			"#inquiry",
+			"https://instagram.com/kumo",
+			"//evil.example/x",
+			"mailto:hello@kumo.example",
+			"tel:+9779812345678",
+			"/book?preview=ink-noir",
+		]) {
+			assert.equal(withPreviewParam(href, page, "irezumi"), null, String(href));
+		}
+	});
+});
+
+describe("every page loader reads the studio with its preview", () => {
+	test("loadStudio itself is used only by the sitemap, where the theme does not matter", () => {
+		const source = readFileSync(
+			new URL("../../src/studio/loaders.ts", import.meta.url),
+			"utf8",
+		);
+		const direct = Array.from(source.matchAll(/\bloadStudio\(context\)/g));
+		assert.equal(
+			direct.length,
+			2,
+			"loadPageStudio's own call and the sitemap's",
+		);
+		const sitemap = source.slice(
+			source.indexOf("export async function loadSitemapPaths"),
+		);
+		assert.match(sitemap.slice(0, 400), /loadStudio\(context\)/);
+		assert.ok(
+			Array.from(source.matchAll(/\bloadPageStudio\(context\)/g)).length >= 9,
+			"every page loader",
+		);
+		const root = readFileSync(
+			new URL("../../src/routes/__root.tsx", import.meta.url),
+			"utf8",
+		);
+		assert.match(
+			root,
+			/loader: \(\{ context \}\) => loadPageStudio\(context\)/,
 		);
 	});
 });

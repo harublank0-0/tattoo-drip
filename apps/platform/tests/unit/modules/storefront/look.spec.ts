@@ -65,6 +65,20 @@ const near = (actual: number, expected: number, tolerance = 0.0005) =>
 	Math.abs(actual - expected) < tolerance;
 
 test.group("the page look rules match the storefront's own", () => {
+	test("the storefront's preview bar names each theme as Page look does", ({
+		assert,
+	}) => {
+		const preview = storefront("src/studio/theme/preview.ts");
+		for (const theme of THEMES) {
+			const label = theme.label.replace("&", "&");
+			assert.include(
+				preview,
+				`${/^[a-z]+$/.test(theme.key) ? theme.key : `"${theme.key}"`}: "${label}",`,
+				theme.key,
+			);
+		}
+	});
+
 	test("the theme, section and font lists are the storefront's", ({
 		assert,
 	}) => {
