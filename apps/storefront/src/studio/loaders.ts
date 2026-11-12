@@ -1,4 +1,4 @@
-import { notFound } from "@tanstack/react-router";
+import { notFound, redirect } from "@tanstack/react-router";
 import { tattooQueries } from "@tattoo-drip/react";
 import {
 	type Artist,
@@ -24,6 +24,7 @@ import {
 	relatedArtwork,
 	similarRequest,
 } from "./artwork.ts";
+import { ANGLE_REDIRECT_CACHE } from "./cache.ts";
 import { type ChatLinks, chatLinks } from "./chat.ts";
 import { studioCopy } from "./copy.ts";
 import {
@@ -1135,10 +1136,14 @@ export async function loadFlashDesignPage(
  * removed, unknown, an older platform without the read) is the same
  * not-found, and so is a photo the page can't show. A related read that
  * fails is logged and leaves fewer related pieces: the piece itself stands.
+ * The id of one of a tattoo's other photos (angles) is a temporary redirect
+ * (302, `ANGLE_REDIRECT_CACHE`) to the tattoo's own page, its main photo's
+ * id, with `searchStr` (the address's query, as typed) kept.
  */
 export async function loadArtworkPage(
 	context: PageContext,
 	id: string,
+	searchStr = "",
 ): Promise<ArtworkPageData> {
 	if (readPhotoId(id) === null) throw notFound();
 	const [studio, artists, photo] = await Promise.all([
@@ -1148,6 +1153,18 @@ export async function loadArtworkPage(
 	]);
 	const view = galleryPhotoView(photo, context.tattoo.connection.mediaUrl);
 	if (!view) throw notFound();
+	// Angles: one of a tattoo's other photos answers with the tattoo, whose id
+	// is its main photo's. Its address goes there with the query as it was
+	// (/work's rule), so a shared link to a photo since grouped lands; for now
+	// only (302, a minute in a cache), since which photo leads can change
+	// again, and a kept 301 could then send visitors round in a loop.
+	if (view.id !== null && view.id !== id) {
+		throw redirect({
+			href: `${galleryPhotoHref(view.id)}${searchStr}`,
+			statusCode: 302,
+			headers: { "Cache-Control": ANGLE_REDIRECT_CACHE },
+		});
+	}
 	const style = view.styleRefs[0]?.slug;
 	const slug = view.artist?.href.slice("/artists/".length);
 	const reads = await Promise.all([

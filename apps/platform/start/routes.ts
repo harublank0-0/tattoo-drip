@@ -364,6 +364,16 @@ router
 					.delete("photos/:id", [controllers.WorkPhotos, "destroy"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.artists.photos.destroy");
+				// Angles: a tattoo's photos in a new order (`:id` its lead), and
+				// one angle taken out of its tattoo (`:id` the angle).
+				router
+					.put("photos/:id/order", [controllers.WorkPhotos, "order"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.artists.photos.order");
+				router
+					.post("photos/:id/ungroup", [controllers.WorkPhotos, "ungroup"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.artists.photos.ungroup");
 				// An artist's flash designs (TAT-129), the same shape: the upload
 				// names the artist, the others name the design. A design a request
 				// names can't be removed; hiding it is a save.
@@ -594,7 +604,8 @@ router
 		router
 			.get("/portfolio", [controllers.Portfolio, "index"])
 			.as("tenant.portfolio");
-		// Several photos at once: publish, unpublish, move or delete.
+		// Several photos at once: publish, unpublish, move, delete, or group
+		// as one tattoo.
 		router
 			.post("/portfolio/bulk", [controllers.Portfolio, "bulk"])
 			.as("tenant.portfolio.bulk");

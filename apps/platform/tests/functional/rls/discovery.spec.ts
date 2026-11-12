@@ -16,7 +16,8 @@ import env from "#start/env";
  */
 const DISCOVERY = "tattoo_drip_discovery";
 const APP = env.get("DB_USER");
-const VIEWS = ["artists", "artworks", "studios"];
+// Angles (1791900000002): artwork_angles maps a tattoo's other photos to it.
+const VIEWS = ["artists", "artwork_angles", "artworks", "studios"];
 
 /** The columns the discovery role may read (the migration's COLUMN_GRANTS). */
 const READABLE: Record<string, string[]> = {
@@ -30,6 +31,8 @@ const READABLE: Record<string, string[]> = {
 		"hidden",
 		"id",
 		"image_key",
+		// Angles (1791900000001): the view keeps leads only.
+		"lead_photo_id",
 		"styles",
 		"tenant_id",
 		"width",
@@ -368,7 +371,7 @@ test.group("Discover database: catalog (D02)", () => {
 		});
 	});
 
-	test("the discovery role owns exactly the three views, which run as their owner (not security_invoker)", async ({
+	test("the discovery role owns exactly the four views, which run as their owner (not security_invoker)", async ({
 		assert,
 	}) => {
 		await rolledBack(async (trx) => {
@@ -670,6 +673,7 @@ test.group("Discover database: who can read what (D02)", () => {
 					"tiktok_url",
 					"created_at",
 				],
+				artwork_angles: ["id", "artwork_id"],
 				artworks: [
 					"id",
 					"studio_id",
@@ -1006,6 +1010,93 @@ test.group("Discover database: publication changes (D02)", () => {
 				);
 			});
 		}
+	});
+
+	test("an angle of a tattoo is not an artwork: the view lists its lead only, and the angle once it leaves the tattoo", async ({
+		assert,
+	}) => {
+		await rolledBack(async (trx) => {
+			const seeded = await seed(trx);
+			const { t, a, p } = seeded;
+			const [{ id: angle }] = await rows<{ id: string }>(
+				trx,
+				`insert into artist_work_photos (tenant_id, artist_id, image_key, width, height, styles, lead_photo_id, angle_position, created_at)
+				 values (?, ?, 'tenants/x/artist_work_photo/a.jpg', 800, 600, '{fine-line}', ?, 1, now()) returning id`,
+				[t.studio, a.shown, p.shown],
+			);
+			const shown = seededOnly(await discover(trx), seeded).artworks;
+			assert.include(shown, p.shown);
+			assert.notInclude(
+				ids(await as(trx, APP, "select id from discovery.artworks")),
+				angle,
+			);
+			// Read as the discovery role too: the angle is visible to it (the
+			// policies are about publication), and only the view's rule leaves it out.
+			assert.include(
+				ids(
+					await as(trx, DISCOVERY, "select id from public.artist_work_photos"),
+				),
+				angle,
+			);
+
+			await trx.rawQuery(
+				"update artist_work_photos set lead_photo_id = null, angle_position = null where id = ?",
+				[angle],
+			);
+			assert.include(
+				ids(await as(trx, APP, "select id from discovery.artworks")),
+				angle,
+			);
+		});
+	});
+
+	test("artwork_angles maps a published tattoo's other photos to it, by the same rules, and nothing else", async ({
+		assert,
+	}) => {
+		await rolledBack(async (trx) => {
+			const seeded = await seed(trx);
+			const { t, a, p } = seeded;
+			const angle = async (
+				lead: string,
+				values: Record<string, unknown> = {},
+			) =>
+				(
+					await rows<{ id: string }>(
+						trx,
+						`insert into artist_work_photos (tenant_id, artist_id, image_key, width, height, styles, lead_photo_id, angle_position, created_at${Object.keys(
+							values,
+						)
+							.map((c) => `, ${c}`)
+							.join("")})
+						 values (?, ?, 'tenants/x/artist_work_photo/a.jpg', 800, 600, '{fine-line}', ?, ?, now()${Object.keys(
+								values,
+							)
+								.map(() => ", ?")
+								.join("")}) returning id`,
+						[
+							t.studio,
+							a.shown,
+							lead,
+							Object.keys(values).length + 1,
+							...Object.values(values),
+						],
+					)
+				)[0].id;
+			const shown = await angle(p.shown);
+			const takenDown = await angle(p.shown, {
+				discovery_suspended_at: new Date(),
+			});
+			const ofUnpublished = await angle(p.unpublished, { hidden: true });
+			const mapped = await as<{ id: string; artwork_id: string }>(
+				trx,
+				APP,
+				"select id, artwork_id from discovery.artwork_angles",
+			);
+			const mine = mapped.filter((row) =>
+				[shown, takenDown, ofUnpublished].includes(row.id),
+			);
+			assert.deepEqual(mine, [{ id: shown, artwork_id: p.shown }]);
+		});
 	});
 
 	test("listing again, or lifting a takedown, brings the rows back at once", async ({

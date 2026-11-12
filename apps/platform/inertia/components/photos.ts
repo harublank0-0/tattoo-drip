@@ -25,6 +25,8 @@ export type WorkPhotoProps = {
 	healed: boolean;
 	/** Unpublished from the portfolio: only the studio sees it. */
 	hidden: boolean;
+	/** Angles: how many photos its tattoo has (1 for a photo on its own). */
+	photoCount: number;
 };
 
 /** The studio's cover as Settings, Profile gets it: the 960 px copy and its own size. */
@@ -61,6 +63,13 @@ export const TRAY_CREATE_NOTE = `Once the artist is saved, you can add up to ${M
 
 export const REMOVE_PHOTO_QUESTION =
 	"Remove this photo? Clients won't see it any more, and it can't be brought back.";
+
+/** The tray's question before Remove: a tattoo of several photos goes whole (angles). */
+export function removePhotoQuestion(photos: number): string {
+	return photos > 1
+		? `Remove this tattoo and all ${photos} of its photos? Clients won't see them any more, and they can't be brought back. To change its photos one by one, open it in Portfolio.`
+		: REMOVE_PHOTO_QUESTION;
+}
 
 export const REMOVE_COVER_QUESTION =
 	"Remove the cover photo? Your page will open with your studio's name on its own.";
@@ -205,15 +214,18 @@ export function editLabel(n: number, alt: string | null): string {
 }
 
 /**
- * The small note under a tile: unpublished (Studio OS), how many styles it
- * carries and whether it is healed, or null when none of these.
+ * The small note under a tile: how many photos its tattoo has (angles, when
+ * more than one), unpublished (Studio OS), how many styles it carries and
+ * whether it is healed, or null when none of these.
  */
 export function tileNote(
 	styleCount: number,
 	healed: boolean,
 	hidden = false,
+	photos = 1,
 ): string | null {
 	const parts: string[] = [];
+	if (photos > 1) parts.push(`${photos} photos`);
 	if (hidden) parts.push("Unpublished");
 	if (styleCount > 0) {
 		parts.push(`${styleCount} ${styleCount === 1 ? "style" : "styles"}`);

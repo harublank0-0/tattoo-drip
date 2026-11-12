@@ -336,7 +336,7 @@ test.group("Portfolio (Studio OS)", (group) => {
 
 		const removed = await client
 			.delete(
-				`/t/pf-back/artists/photos/${s.rose.id}?back=${encodeURIComponent(back)}`,
+				`/t/pf-back/artists/photos/${s.rose.id}?back=${encodeURIComponent(back)}&scope=tattoo&photos=1`,
 			)
 			.withCsrfToken()
 			.loginAs(s.owner)

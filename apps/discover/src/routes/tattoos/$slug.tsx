@@ -36,7 +36,8 @@ import { structuredData } from "#/lib/structured-data";
 /**
  * `/tattoos/:slug` (D09): one published photo, artwork first. The slug is
  * the API's photo id (src/lib/artwork.ts); anything the API doesn't show is
- * the 404 page, a non-canonical spelling a 301. Metadata only from the
+ * the 404 page, a non-canonical spelling a 301, and the id of one of a
+ * tattoo's other photos a temporary 302 to the tattoo (artworkRedirect). Metadata only from the
  * answer (its alt text, styles, artist, studio, place); booking through
  * `bookingLinks` (the storefront's "Request a similar tattoo", `artwork`);
  * related work composed from the tattoos list (the artist's, and the

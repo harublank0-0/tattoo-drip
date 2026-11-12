@@ -959,12 +959,36 @@ export interface Registry {
     methods: ["DELETE"]
     pattern: '/t/:tenant/artists/photos/:id'
     types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/artists/validators/work_photo').removeWorkPhotoValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/artists/validators/work_photo').removeWorkPhotoValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/work_photos_controller').default['destroy']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/work_photos_controller').default['destroy']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.artists.photos.order': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/artists/photos/:id/order'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/artists/validators/work_photo').orderWorkPhotosValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/artists/validators/work_photo').orderWorkPhotosValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/work_photos_controller').default['order']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/work_photos_controller').default['order']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.artists.photos.ungroup': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/artists/photos/:id/ungroup'
+    types: {
       body: {}
       paramsTuple: [ParamValue, ParamValue]
       params: { tenant: ParamValue; id: ParamValue }
       query: {}
-      response: ExtractResponse<Awaited<ReturnType<import('#controllers/work_photos_controller').default['destroy']>>>
-      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/work_photos_controller').default['destroy']>>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/work_photos_controller').default['ungroup']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/work_photos_controller').default['ungroup']>>>
     }
   }
   'tenant.artists.flash.store': {

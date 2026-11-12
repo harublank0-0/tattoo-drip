@@ -23,12 +23,17 @@ import {
 	detailsTitle,
 	PAGE_DELAY_NOTE,
 	type PortfolioPhoto,
-	REMOVE_QUESTION,
+	photoTotal,
+	removeLabel,
+	removeQuery,
+	removeQuestion,
 	sizeText,
 	statusNote,
 	statusText,
+	TATTOO_MOVED_NOTE,
 } from "~/components/portfolio";
 import StylePicker from "~/components/style_picker";
+import TattooPhotos from "~/components/tattoo_photos";
 import { Badge } from "~/components/ui/badge";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
@@ -63,6 +68,15 @@ type Mode = "view" | "edit" | "remove";
  * keeps the page's state); a removed photo leaves the props and the page
  * closes the panel. Escape leaves the edit or the question first, and
  * nothing closes the panel while a request is out.
+ *
+ * Angles: the photo is a tattoo's main photo, and the panel is the
+ * tattoo's. Publish, the styles and healed mark apply to every photo of it
+ * (the server copies them), the description is the main photo's own, and
+ * Remove removes the whole tattoo, its question saying how many photos go.
+ * "Photos of this tattoo" (TattooPhotos) lists them all and changes their
+ * order, the main photo and which photos belong to it; `onFollow` keeps the
+ * panel on the tattoo when its main photo changes, and `onAddPhotos` opens
+ * the upload for it.
  */
 export default function ArtworkDetails({
 	photo,
@@ -74,6 +88,9 @@ export default function ArtworkDetails({
 	styleNames,
 	fallbackFocus,
 	held,
+	onFollow,
+	onAddPhotos,
+	moved = false,
 }: {
 	photo: PortfolioPhoto | null;
 	open: boolean;
@@ -87,6 +104,12 @@ export default function ArtworkDetails({
 	fallbackFocus: RefObject<HTMLElement | null>;
 	/** An upload is going: a write here would cancel its visit. */
 	held: boolean;
+	/** Another photo of the tattoo is becoming its main one: select it. */
+	onFollow: (id: string) => void;
+	/** Open the upload for this tattoo, from the button that asked (focus returns there). */
+	onAddPhotos: (photo: PortfolioPhoto, from: HTMLElement) => void;
+	/** The tattoo is not on the page shown (its new main photo moved it): say so. */
+	moved?: boolean;
 }) {
 	const [mode, setMode] = useState<Mode>("view");
 	const [busy, setBusy] = useState(false);
@@ -97,13 +120,25 @@ export default function ArtworkDetails({
 		if (photo) setShown(photo);
 	}, [photo]);
 	// Another photo: start from its details (state adjusted while rendering).
+	// The same tattoo under a new main photo (one of its photos was made the
+	// main one) is not another photo: the panel keeps its state and its body,
+	// so focus stays where the move left it.
 	const photoId = photo?.id;
 	const [modeFor, setModeFor] = useState(photoId);
+	const [bodyKey, setBodyKey] = useState(photoId);
 	if (photoId && photoId !== modeFor) {
+		const sameTattoo =
+			photo?.angles.some((angle) => angle.id === modeFor) ?? false;
 		setModeFor(photoId);
-		setMode("view");
-		setError(null);
+		if (!sameTattoo) {
+			setMode("view");
+			setError(null);
+			setBodyKey(photoId);
+		}
 	}
+	// Escape inside "Photos of this tattoo" (a row's question or form) closes
+	// that first: the sheet hears Escape before any element in it does.
+	const escapeInside = useRef<(() => boolean) | null>(null);
 
 	const current = photo ?? shown;
 	return (
@@ -121,6 +156,10 @@ export default function ArtworkDetails({
 				className="w-full gap-0 p-0 sm:max-w-lg lg:max-w-xl"
 				onEscapeKeyDown={(event) => {
 					if (busy) {
+						event.preventDefault();
+						return;
+					}
+					if (escapeInside.current?.()) {
 						event.preventDefault();
 						return;
 					}
@@ -144,7 +183,7 @@ export default function ArtworkDetails({
 			>
 				{current && (
 					<Body
-						key={current.id}
+						key={bodyKey ?? current.id}
 						photo={current}
 						mode={mode}
 						setMode={(next) => {
@@ -160,6 +199,10 @@ export default function ArtworkDetails({
 						styleOptions={styleOptions}
 						styleNames={styleNames}
 						held={held}
+						onFollow={onFollow}
+						onAddPhotos={(from) => onAddPhotos(current, from)}
+						moved={moved}
+						escapeInside={escapeInside}
 					/>
 				)}
 			</SheetContent>
@@ -180,6 +223,10 @@ function Body({
 	styleOptions,
 	styleNames,
 	held,
+	onFollow,
+	onAddPhotos,
+	escapeInside,
+	moved,
 }: {
 	photo: PortfolioPhoto;
 	mode: Mode;
@@ -193,8 +240,13 @@ function Body({
 	styleOptions: { slug: string; name: string }[];
 	styleNames: Record<string, string>;
 	held: boolean;
+	onFollow: (id: string) => void;
+	onAddPhotos: (from: HTMLElement) => void;
+	escapeInside: RefObject<(() => boolean) | null>;
+	moved: boolean;
 }) {
 	const [failed, setFailed] = useState(false);
+	const photos = photoTotal(photo);
 	const params = { tenant: tenantSlug, id: photo.id };
 	const editButton = useRef<HTMLButtonElement>(null);
 	const removeButton = useRef<HTMLButtonElement>(null);
@@ -240,7 +292,7 @@ function Body({
 
 	const remove = () => {
 		router.delete(
-			`${urlFor("tenant.artists.photos.destroy", params)}?back=${encodeURIComponent(back)}`,
+			`${urlFor("tenant.artists.photos.destroy", params)}${removeQuery({ scope: "tattoo", photos }, back)}`,
 			{
 				preserveScroll: true,
 				preserveState: true,
@@ -301,6 +353,11 @@ function Body({
 				</figcaption>
 			</figure>
 
+			{moved && (
+				<p className="mx-5 mt-4 rounded-md border px-3 py-2 text-sm text-muted-foreground">
+					{TATTOO_MOVED_NOTE}
+				</p>
+			)}
 			{error && (
 				<p
 					role="alert"
@@ -356,7 +413,11 @@ function Body({
 							)}
 						</dd>
 						<dt className="text-muted-foreground">Healed</dt>
-						<dd>{photo.healed ? "Yes, the photo shows it healed" : "No"}</dd>
+						<dd>
+							{photo.healed
+								? `Yes, ${photos > 1 ? "the photos show" : "the photo shows"} it healed`
+								: "No"}
+						</dd>
 						<dt className="text-muted-foreground">Added</dt>
 						<dd className="tabular-nums">{photo.addedText}</dd>
 						<dt className="text-muted-foreground">Description</dt>
@@ -373,7 +434,7 @@ function Body({
 					{mode === "remove" ? (
 						<div className="flex flex-col gap-3 rounded-md border border-destructive/40 p-4">
 							<p className="text-sm font-medium" id="remove-question">
-								{REMOVE_QUESTION}
+								{removeQuestion(photos)}
 							</p>
 							<div className="flex flex-wrap gap-2">
 								<Button
@@ -383,7 +444,7 @@ function Body({
 									aria-describedby="remove-question"
 									onClick={remove}
 								>
-									{busy ? "Removing…" : "Remove photo"}
+									{removeLabel(photos, busy)}
 								</Button>
 								<Button
 									ref={keep}
@@ -469,6 +530,21 @@ function Body({
 								</Button>
 							</div>
 						</div>
+					)}
+
+					{mode === "view" && (
+						<TattooPhotos
+							photo={photo}
+							tenantSlug={tenantSlug}
+							back={back}
+							busy={busy}
+							held={held}
+							onBusy={setBusy}
+							onError={setError}
+							onFollow={onFollow}
+							onAddPhotos={onAddPhotos}
+							escapeInside={escapeInside}
+						/>
 					)}
 				</div>
 			)}
@@ -575,6 +651,12 @@ function EditForm({
 						</FieldContent>
 					</Field>
 
+					{photo.angles.length > 0 && (
+						<p className="text-xs text-muted-foreground">
+							The description is the main photo&apos;s. Styles and healed apply
+							to all {photo.angles.length + 1} photos of this tattoo.
+						</p>
+					)}
 					<div className="flex flex-wrap gap-2">
 						<Button type="submit" disabled={processing || held}>
 							{processing ? "Saving…" : "Save details"}

@@ -4,6 +4,7 @@ import { ChevronDown, ImagePlus, RotateCcw, X } from "lucide-react";
 import {
 	type DragEvent,
 	type FormEvent,
+	type RefObject,
 	useEffect,
 	useId,
 	useRef,
@@ -21,11 +22,16 @@ import {
 	type UploadOutcome,
 } from "~/components/photos";
 import {
+	ADD_TO_TATTOO_INTRO,
 	DROP_HINT,
 	fileKey,
 	fileProblem,
+	MAX_TATTOO_PHOTOS,
 	type PortfolioArtist,
+	type PortfolioPhoto,
+	photoTotal,
 	STYLES_LIMIT_NOTE,
+	tattooUploadProblem,
 	UPLOAD_INTRO,
 	uploadButton,
 	uploadProblem,
@@ -103,6 +109,13 @@ function sendPhoto(
  * first (`back`), so the new work is at the top. The panel can't be closed
  * while a photo is going, and `onBusyChange` holds the details panel's
  * writes, which would cancel the upload's visit.
+ *
+ * With `lead` (angles: the details panel's "Add photos to this tattoo") the
+ * same panel adds the photos to that tattoo instead: its artist is fixed, the
+ * styles, healed and publish fields are gone (the tattoo's apply), each
+ * request carries `lead`, the room is the tattoo's (eight photos) and the
+ * artist's, and every answer is the portfolio as it was (`lead.back`), so
+ * the details panel behind stays on the tattoo, its new photos listed.
  */
 export default function ArtworkUpload({
 	open,
@@ -113,7 +126,9 @@ export default function ArtworkUpload({
 	styleOptions,
 	maxPhotos,
 	backFor,
+	lead = null,
 	onBusyChange,
+	returnFocus,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
@@ -124,7 +139,11 @@ export default function ArtworkUpload({
 	maxPhotos: number;
 	/** The portfolio's address that shows `artistId`'s newest work. */
 	backFor: (artistId: string) => string;
+	/** The tattoo to add photos to, with the address to come back to; null for new work. */
+	lead?: (PortfolioPhoto & { back: string }) | null;
 	onBusyChange: (busy: boolean) => void;
+	/** The button that opened the panel ("Upload artwork", or the tattoo's "Add photos"): focus goes back to it. */
+	returnFocus?: RefObject<HTMLElement | null>;
 }) {
 	const id = useId();
 	const input = useRef<HTMLInputElement>(null);
@@ -152,7 +171,8 @@ export default function ArtworkUpload({
 	// The previews are object URLs: let go with each item and with the panel.
 	const previews = useObjectUrls();
 
-	const artist = artists.find((row) => row.id === artistId) ?? null;
+	const artist =
+		artists.find((row) => row.id === (lead ? lead.artistId : artistId)) ?? null;
 	const sendable = items.filter(
 		(item) => item.state === "ready" || item.state === "failed",
 	);
@@ -200,7 +220,14 @@ export default function ArtworkUpload({
 	const submit = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		if (busy) return;
-		const blocked = uploadProblem(artist, sendable.length, maxPhotos);
+		const blocked = lead
+			? tattooUploadProblem(
+					sendable.length,
+					photoTotal(lead),
+					artist,
+					maxPhotos,
+				)
+			: uploadProblem(artist, sendable.length, maxPhotos);
 		setProblem(blocked);
 		setSummary(null);
 		if (blocked || !artist) return;
@@ -209,7 +236,7 @@ export default function ArtworkUpload({
 			tenant: tenantSlug,
 			id: artist.id,
 		});
-		const back = backFor(artist.id);
+		const back = lead ? lead.back : backFor(artist.id);
 		const queue = [...sendable];
 		let added = 0;
 		let refused = 0;
@@ -223,9 +250,14 @@ export default function ArtworkUpload({
 				back,
 			};
 			if (item.alt.trim()) data.alt = item.alt.trim();
-			if (styles.length > 0) data.styles = styles;
-			if (healed) data.healed = "1";
-			if (!publish) data.hidden = "1";
+			if (lead) {
+				// The tattoo's state applies: only the photo and its description go.
+				data.lead = lead.id;
+			} else {
+				if (styles.length > 0) data.styles = styles;
+				if (healed) data.healed = "1";
+				if (!publish) data.hidden = "1";
+			}
 			const outcome = await sendPhoto(url, data, (percentage) => {
 				setSending({ ...position, percentage });
 				update(item.key, { percentage });
@@ -306,13 +338,21 @@ export default function ArtworkUpload({
 				onInteractOutside={(event) => {
 					if (busy) event.preventDefault();
 				}}
+				onCloseAutoFocus={(event) => {
+					// Opened from code, not a Radix trigger: send focus back by hand.
+					const from = returnFocus?.current;
+					if (from?.isConnected) {
+						event.preventDefault();
+						from.focus();
+					}
+				}}
 			>
 				<div className="flex flex-col gap-1 border-b px-5 pt-5 pr-14 pb-4">
 					<SheetTitle className="text-lg font-semibold">
-						Upload artwork
+						{lead ? "Add photos to this tattoo" : "Upload artwork"}
 					</SheetTitle>
 					<SheetDescription className="text-sm text-muted-foreground">
-						{UPLOAD_INTRO}
+						{lead ? ADD_TO_TATTOO_INTRO : UPLOAD_INTRO}
 					</SheetDescription>
 				</div>
 
@@ -321,32 +361,53 @@ export default function ArtworkUpload({
 					onSubmit={submit}
 					noValidate
 				>
-					<Field data-invalid={problem !== null && !artist}>
-						<FieldLabel htmlFor={artistField}>Artist</FieldLabel>
-						<select
-							id={artistField}
-							value={artistId}
-							disabled={busy}
-							onChange={(event) => {
-								setArtistId(event.currentTarget.value);
-								setProblem(null);
-							}}
-							className="h-9 w-full rounded-md border border-input bg-card px-2.5 text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 max-lg:min-h-11"
-						>
-							<option value="" disabled>
-								Choose whose work this is
-							</option>
-							{artists.map((row) => (
-								<option key={row.id} value={row.id}>
-									{row.name} ({row.photoCount} of {maxPhotos})
-									{row.visible ? "" : ", hidden"}
+					{lead ? (
+						<div className="flex items-center gap-3 rounded-lg border p-3">
+							<img
+								src={lead.src}
+								alt=""
+								width={lead.width}
+								height={lead.height}
+								className="size-14 shrink-0 rounded-md bg-muted object-contain"
+							/>
+							<p className="min-w-0 text-sm">
+								<span className="block font-medium wrap-anywhere">
+									{lead.alt ?? `Work by ${lead.artistName}`}
+								</span>
+								<span className="text-muted-foreground">
+									{lead.artistName}, {photoTotal(lead)} of {MAX_TATTOO_PHOTOS}{" "}
+									photos
+								</span>
+							</p>
+						</div>
+					) : (
+						<Field data-invalid={problem !== null && !artist}>
+							<FieldLabel htmlFor={artistField}>Artist</FieldLabel>
+							<select
+								id={artistField}
+								value={artistId}
+								disabled={busy}
+								onChange={(event) => {
+									setArtistId(event.currentTarget.value);
+									setProblem(null);
+								}}
+								className="h-9 w-full rounded-md border border-input bg-card px-2.5 text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 max-lg:min-h-11"
+							>
+								<option value="" disabled>
+									Choose whose work this is
 								</option>
-							))}
-						</select>
-						<FieldDescription>
-							Each photo belongs to one artist, and shows on their page.
-						</FieldDescription>
-					</Field>
+								{artists.map((row) => (
+									<option key={row.id} value={row.id}>
+										{row.name} ({row.photoCount} of {maxPhotos})
+										{row.visible ? "" : ", hidden"}
+									</option>
+								))}
+							</select>
+							<FieldDescription>
+								Each photo belongs to one artist, and shows on their page.
+							</FieldDescription>
+						</Field>
+					)}
 
 					{/* The drop zone. The button is the way in for a keyboard and a
 					    screen reader; dropping is a shortcut for a mouse. */}
@@ -421,74 +482,84 @@ export default function ArtworkUpload({
 						</ul>
 					)}
 
-					<details className="group rounded-lg border">
-						<summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-4 text-sm font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
-							<span>
-								Styles and healed{" "}
-								<span className="font-normal text-muted-foreground">
-									(optional
-									{styles.length > 0 || healed
-										? `, ${[styles.length > 0 ? `${styles.length} ${styles.length === 1 ? "style" : "styles"}` : "", healed ? "healed" : ""].filter(Boolean).join(", ")}`
-										: ""}
-									)
+					{!lead && (
+						<details className="group rounded-lg border">
+							<summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-4 text-sm font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+								<span>
+									Styles and healed{" "}
+									<span className="font-normal text-muted-foreground">
+										(optional
+										{styles.length > 0 || healed
+											? `, ${[styles.length > 0 ? `${styles.length} ${styles.length === 1 ? "style" : "styles"}` : "", healed ? "healed" : ""].filter(Boolean).join(", ")}`
+											: ""}
+										)
+									</span>
 								</span>
-							</span>
-							<ChevronDown
-								aria-hidden="true"
-								className="size-4 text-muted-foreground transition-transform duration-150 group-open:rotate-180"
-							/>
-						</summary>
-						<div className="flex flex-col gap-4 border-t px-4 py-4">
-							<StylePicker
-								idPrefix={`${id}-style`}
-								options={styleOptions}
-								value={styles}
-								onChange={setStyles}
-								max={MAX_PHOTO_STYLES}
-								help={STYLES_LIMIT_NOTE(MAX_PHOTO_STYLES)}
-								disabled={busy}
-							/>
-							<Field orientation="horizontal" className="min-h-11 items-center">
-								<Checkbox
-									id={`${id}-healed`}
-									checked={healed}
-									disabled={busy}
-									onCheckedChange={(next) => setHealed(next === true)}
-									aria-describedby={`${id}-healed-help`}
+								<ChevronDown
+									aria-hidden="true"
+									className="size-4 text-muted-foreground transition-transform duration-150 group-open:rotate-180"
 								/>
-								<FieldContent>
-									<FieldLabel htmlFor={`${id}-healed`} className="font-normal">
-										{HEALED_LABEL}
-									</FieldLabel>
-									<FieldDescription id={`${id}-healed-help`}>
-										{HEALED_HELP}
-									</FieldDescription>
-								</FieldContent>
-							</Field>
-						</div>
-					</details>
+							</summary>
+							<div className="flex flex-col gap-4 border-t px-4 py-4">
+								<StylePicker
+									idPrefix={`${id}-style`}
+									options={styleOptions}
+									value={styles}
+									onChange={setStyles}
+									max={MAX_PHOTO_STYLES}
+									help={STYLES_LIMIT_NOTE(MAX_PHOTO_STYLES)}
+									disabled={busy}
+								/>
+								<Field
+									orientation="horizontal"
+									className="min-h-11 items-center"
+								>
+									<Checkbox
+										id={`${id}-healed`}
+										checked={healed}
+										disabled={busy}
+										onCheckedChange={(next) => setHealed(next === true)}
+										aria-describedby={`${id}-healed-help`}
+									/>
+									<FieldContent>
+										<FieldLabel
+											htmlFor={`${id}-healed`}
+											className="font-normal"
+										>
+											{HEALED_LABEL}
+										</FieldLabel>
+										<FieldDescription id={`${id}-healed-help`}>
+											{HEALED_HELP}
+										</FieldDescription>
+									</FieldContent>
+								</Field>
+							</div>
+						</details>
+					)}
 
-					<Field orientation="horizontal" className="min-h-11 items-center">
-						<Checkbox
-							id={`${id}-publish`}
-							checked={publish}
-							disabled={busy}
-							onCheckedChange={(next) => setPublish(next === true)}
-							aria-describedby={`${id}-publish-help`}
-						/>
-						<FieldContent>
-							<FieldLabel htmlFor={`${id}-publish`} className="font-normal">
-								Publish on your page
-							</FieldLabel>
-							<FieldDescription id={`${id}-publish-help`}>
-								{publish
-									? artist && !artist.visible
-										? `Published, but shown only once ${artist.name} is on your page.`
-										: "Clients see these photos on your page and in your gallery."
-									: "Only the studio sees them until you publish them."}
-							</FieldDescription>
-						</FieldContent>
-					</Field>
+					{!lead && (
+						<Field orientation="horizontal" className="min-h-11 items-center">
+							<Checkbox
+								id={`${id}-publish`}
+								checked={publish}
+								disabled={busy}
+								onCheckedChange={(next) => setPublish(next === true)}
+								aria-describedby={`${id}-publish-help`}
+							/>
+							<FieldContent>
+								<FieldLabel htmlFor={`${id}-publish`} className="font-normal">
+									Publish on your page
+								</FieldLabel>
+								<FieldDescription id={`${id}-publish-help`}>
+									{publish
+										? artist && !artist.visible
+											? `Published, but shown only once ${artist.name} is on your page.`
+											: "Clients see these photos on your page and in your gallery."
+										: "Only the studio sees them until you publish them."}
+								</FieldDescription>
+							</FieldContent>
+						</Field>
+					)}
 
 					<div className="flex flex-col gap-2">
 						{problem && <FieldError>{problem}</FieldError>}

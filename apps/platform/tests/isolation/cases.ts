@@ -60,6 +60,8 @@ export type IsolationCase = {
 		| "paymentMethod"
 		| "artistProfile"
 		| "workPhoto"
+		| "tattooLead"
+		| "tattooAngle"
 		| "flashDesign"
 		| "project"
 		| "quotedProject"
@@ -786,6 +788,29 @@ export const isolationCases: IsolationCase[] = [
 		method: "DELETE",
 		pattern: "/t/:tenant/artists/photos/:id",
 		resource: "workPhoto",
+		actor: "owner",
+		// What the page asked to remove (angles): a tattoo of one photo.
+		body: () => ({ scope: "tattoo", photos: "1" }),
+		ownStatus: 302,
+		snapshot: workPhotoRows,
+	},
+	// Angles: a tattoo's photos in a new order (`:id` its lead; the angle
+	// becomes the main photo), and one angle taken out of its tattoo.
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/artists/photos/:id/order",
+		resource: "tattooLead",
+		actor: "owner",
+		body: (own) => ({
+			"ids[]": [own.tattooAngle.id, own.tattooLead.id],
+		}),
+		ownStatus: 302,
+		snapshot: workPhotoRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/artists/photos/:id/ungroup",
+		resource: "tattooAngle",
 		actor: "owner",
 		ownStatus: 302,
 		snapshot: workPhotoRows,

@@ -348,6 +348,14 @@
 .irz-piece-link:hover .irz-piece-mat {
 	background: var(--stencil-wash);
 }
+/* Angles: a tattoo of several photos says so under its title, quietly, in the serif. */
+.irz-piece-count {
+	display: block;
+	color: var(--ink-muted);
+	font-family: var(--irz-serif);
+	font-size: 0.9375rem;
+	font-style: italic;
+}
 .irz-piece-meta {
 	display: flex;
 	flex-wrap: wrap;
@@ -790,4 +798,10 @@
 	.irz-filter {
 		transition: none;
 	}
+}
+
+/* Angles on the tattoo's page: the row of its photos on the paper, the one shown in the stencil. */
+.irz-artwork-figure .artwork-angle {
+	border-radius: 0;
+	background: var(--paper);
 }

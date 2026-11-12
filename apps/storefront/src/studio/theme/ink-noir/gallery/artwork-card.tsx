@@ -1,3 +1,4 @@
+import { Images } from "lucide-react";
 import { artworkTitle } from "../../../artwork.ts";
 import { RouterAnchor } from "../../../components/router-anchor.tsx";
 import type { GalleryPhotoView } from "../../../gallery.ts";
@@ -14,7 +15,10 @@ import { pieceSizes, shapeClass } from "./sizes.ts";
  * artist. On a screen with hover the title rises over the photo on hover and
  * focus; on touch it sits under it, always there. The link carries the
  * photo's `openId`, so "Show more" can put the keyboard on the first new
- * piece. Nothing for a photo without its own page.
+ * piece. A tattoo of several photos (angles) carries its number of photos
+ * with an icon on the photo's corner, short enough for the narrowest piece,
+ * and "3 photos" for screen readers, so it is part of the link's name. Nothing for a
+ * photo without its own page.
  */
 export function ArtworkCard({
 	photo,
@@ -50,6 +54,15 @@ export function ArtworkCard({
 				<span className="ink-piece-title user-text" dir="auto">
 					{artworkTitle(photo)}
 				</span>
+				{photo.photosLabel ? (
+					// The number and an icon on the photo's corner, so a narrow
+					// piece never overflows; the words are there for screen readers.
+					<span className="ink-piece-count">
+						<Images aria-hidden="true" />
+						<span aria-hidden="true">{photo.angles.length + 1}</span>
+						<span className="sr-only"> {photo.photosLabel}</span>
+					</span>
+				) : null}
 			</RouterAnchor>
 			{artist || photo.healed ? (
 				<p className="ink-piece-meta">

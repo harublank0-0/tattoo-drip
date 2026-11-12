@@ -12,11 +12,12 @@ import { type ArtistView, findArtist, type StudioView } from "./view-model.ts";
  * visible list, and a few pieces related to it. Pure and theme-independent:
  * every theme's page gets the same data and shows it its own way.
  *
- * The API knows a photo's description, styles, healed mark and artist, and
- * nothing more: no title, placement, technique, date or further photos. So
- * the page's title is the studio's own description when it wrote one, else
- * built from the styles and the artist ("Fine line tattoo by Sita Rai"),
- * never invented.
+ * The API knows a tattoo's description, styles, healed mark, artist and its
+ * other photos (angles, shown by the shared ArtworkFigure), and nothing more:
+ * no title, placement, technique or date. So the page's title is the studio's
+ * own description when it wrote one, else built from the styles and the
+ * artist ("Fine line tattoo by Sita Rai"), never invented. An address of one
+ * of the other photos redirects to the tattoo's own (loadArtworkPage).
  */
 
 /** The related pieces a page shows, at most. */

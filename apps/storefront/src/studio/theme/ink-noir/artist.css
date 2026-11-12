@@ -314,3 +314,12 @@
 		scale: none;
 	}
 }
+
+/* Angles: the shared grid's "3 photos" in the theme's small caps. */
+.ink-artist-page .work-count {
+	border-radius: 0;
+	background: color-mix(in srgb, var(--paper) 82%, transparent);
+	font-size: 0.6875rem;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+}

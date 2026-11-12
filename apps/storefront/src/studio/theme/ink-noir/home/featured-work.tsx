@@ -83,6 +83,11 @@ export function FeaturedWork({
 											loading="lazy"
 											decoding="async"
 										/>
+										{photo.photosLabel ? (
+											<span className="ink-tile-count">
+												{photo.photosLabel}
+											</span>
+										) : null}
 										{photo.artist || photo.styles.length > 0 ? (
 											<span className="ink-tile-facts">
 												{photo.artist ? (

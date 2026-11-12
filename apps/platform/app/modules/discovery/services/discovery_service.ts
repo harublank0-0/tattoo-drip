@@ -532,14 +532,24 @@ export default class DiscoveryService {
 		});
 	}
 
-	/** One published photo by id, with where to see it and to ask for one like it. */
+	/**
+	 * One published photo by id, with where to see it and to ask for one like
+	 * it. Angles: the id of one of a tattoo's other photos answers with the
+	 * tattoo (`discovery.artwork_angles` resolves it to its lead, in the same
+	 * query), whose `id` is then the lead's: the Discover app redirects the old
+	 * address there.
+	 */
 	async tattoo(id: string): Promise<DiscoverTattooDetail | null> {
 		return readDiscovery(async (client) => {
 			const [row] = await rowsOf<TattooRow & { accepting_inquiries: boolean }>(
 				client,
 				`select ${TATTOO_COLUMNS}, a.accepting_inquiries
-				 from ${TATTOO_FROM} where w.id = ?::uuid`,
-				[id],
+				 from ${TATTOO_FROM}
+				 where w.id = coalesce(
+					(select g.artwork_id from discovery.artwork_angles g where g.id = ?::uuid),
+					?::uuid
+				 )`,
+				[id, id],
 			);
 			if (!row) return null;
 			const places = await placesOf(client, [row.place_id]);
