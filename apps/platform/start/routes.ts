@@ -127,6 +127,10 @@ router
 			.where("id", router.matchers.uuid())
 			.as("tenant.inventory.tracking");
 		router
+			.put("inventory/:id/lot-expiry", [controllers.Inventory, "lotExpiry"])
+			.where("id", router.matchers.uuid())
+			.as("tenant.inventory.lots.expiry");
+		router
 			.delete("inventory/:id", [controllers.Inventory, "archive"])
 			.where("id", router.matchers.uuid())
 			.as("tenant.inventory.archive");

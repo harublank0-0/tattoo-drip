@@ -97,6 +97,7 @@ test.group("Inventory lot picker", () => {
 		assert.equal(lotAfter("use", soon, "2.5"), 10000);
 		assert.equal(lotAfter("receive", soon, "1"), 13500);
 		assert.equal(lotAfter("count", soon, "4"), 4000);
+		assert.equal(lotAfter("use", soon, ".5"), 12000);
 		assert.isNull(lotAfter("use", soon, ""));
 		assert.isNull(lotAfter("use", soon, "1.2345"));
 		assert.equal(afterText(10000, "ml"), "After this: 10 ml left in this lot.");

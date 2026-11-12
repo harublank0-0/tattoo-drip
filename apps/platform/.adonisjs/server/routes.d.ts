@@ -27,6 +27,7 @@ export type ScannedRoutes = {
     'tenant.inventory.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inventory.movement': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inventory.tracking': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.inventory.lots.expiry': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inventory.archive': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.today': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -358,6 +359,7 @@ export type ScannedRoutes = {
   PUT: {
     'tenant.inventory.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inventory.tracking': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.inventory.lots.expiry': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.profile.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.slug.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.cover.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }

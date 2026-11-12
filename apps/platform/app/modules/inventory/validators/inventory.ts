@@ -1,9 +1,10 @@
-import vine from "@vinejs/vine";
+import vine, { SimpleMessagesProvider } from "@vinejs/vine";
 import {
 	DATE_FORMAT,
 	INVENTORY_UNITS,
 	MOVEMENT_KINDS,
 	QUANTITY_FORMAT,
+	QUANTITY_MESSAGE,
 	TRACKING_MODES,
 } from "#modules/inventory/stock";
 
@@ -39,3 +40,23 @@ export const inventoryMovementValidator = vine.create({
 export const inventoryTrackingValidator = vine.create({
 	tracking: vine.enum(TRACKING_MODES),
 });
+
+/** Corrects or clears (empty) the expiry date of one of the item's lots. */
+export const lotExpiryValidator = vine.create({
+	lotId: vine.string().uuid(),
+	expiresOn: vine.string().trim().regex(DATE_FORMAT).optional(),
+});
+
+const messages = new SimpleMessagesProvider({
+	"quantity.regex": QUANTITY_MESSAGE,
+	"reorderThreshold.regex": QUANTITY_MESSAGE,
+	"expiresOn.regex": "Enter a valid expiry date.",
+});
+for (const validator of [
+	createInventoryItemValidator,
+	updateInventoryItemValidator,
+	inventoryMovementValidator,
+	lotExpiryValidator,
+]) {
+	validator.messagesProvider = messages;
+}

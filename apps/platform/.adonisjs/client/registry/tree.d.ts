@@ -40,6 +40,9 @@ export interface ApiDefinition {
       update: typeof routes['tenant.inventory.update']
       movement: typeof routes['tenant.inventory.movement']
       tracking: typeof routes['tenant.inventory.tracking']
+      lots: {
+        expiry: typeof routes['tenant.inventory.lots.expiry']
+      }
       archive: typeof routes['tenant.inventory.archive']
     }
     today: typeof routes['tenant.today']

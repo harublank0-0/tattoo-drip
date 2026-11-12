@@ -76,7 +76,8 @@ export function lotAfter(
 	lot: Pick<InventoryLot, "quantity">,
 	quantity: string,
 ) {
-	if (!/^\d{1,7}(?:\.\d{1,3})?$/.test(quantity.trim())) return null;
+	if (!/^(?:\d{1,7}(?:\.\d{1,3})?|\.\d{1,3})$/.test(quantity.trim()))
+		return null;
 	const change = Math.round(Number(quantity) * 1000);
 	if (kind === "count") return change;
 	return lot.quantity + (kind === "receive" ? change : -change);

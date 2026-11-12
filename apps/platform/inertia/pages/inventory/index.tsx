@@ -201,7 +201,7 @@ export default function InventoryIndex({
 											/>
 										</label>
 										<Button type="submit" disabled={processing}>
-											Import CSV
+											{processing ? "Importing…" : "Import CSV"}
 										</Button>
 									</div>
 								)}

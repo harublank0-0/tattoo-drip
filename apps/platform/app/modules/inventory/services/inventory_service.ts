@@ -91,9 +91,11 @@ async function lotTotal(tenantId: string, itemId: string) {
 }
 
 /**
- * The lot a movement names: by id, or by supplier lot number (matched
- * without regard to case). With `create`, an unknown number becomes a new,
- * empty lot of this item. Locked for the rest of the transaction.
+ * The lot a movement names: by id or, with `create` (a receipt or an
+ * assignment), by supplier lot number matched without regard to case, where
+ * an unknown number becomes a new, empty lot of this item and a known one
+ * without a date takes the given expiry. Locked for the rest of the
+ * transaction.
  */
 async function resolveLot(
 	tenantId: string,
@@ -111,11 +113,13 @@ async function resolveLot(
 		}
 		return lot;
 	}
+	// Only a receipt or an assignment names a lot by its supplier number (and
+	// may date it); every other movement picks one of the item's lots.
+	if (!create) {
+		throw new InventoryRuleError("lotId", "Choose a lot.");
+	}
 	if (!input.lotNumber) {
-		throw new InventoryRuleError(
-			create ? "lotNumber" : "lotId",
-			create ? "Enter the supplier lot number." : "Choose a lot.",
-		);
+		throw new InventoryRuleError("lotNumber", "Enter the supplier lot number.");
 	}
 	if (input.expiresOn && !isCalendarDate(input.expiresOn)) {
 		throw new InventoryRuleError("expiresOn", "Enter a valid expiry date.");
@@ -126,22 +130,21 @@ async function resolveLot(
 		.first();
 	if (existing) {
 		const recorded = existing.expiresOn?.toISODate() ?? null;
-		if (input.expiresOn && recorded && recorded !== input.expiresOn) {
-			throw new InventoryRuleError(
-				"expiresOn",
-				`Lot ${existing.lotNumber} is recorded with expiry ${recorded}. Check the lot number or the date.`,
-			);
-		}
-		if (input.expiresOn && !recorded) {
-			// The supplier's date, added to a lot first recorded without one.
+		if (input.expiresOn && recorded !== input.expiresOn) {
+			// A date for a lot recorded without one, or for an empty lot (its old
+			// date describes no stock); a lot holding stock keeps its date, which
+			// an owner corrects with "Change expiry".
+			if (recorded && existing.quantity > 0) {
+				throw new InventoryRuleError(
+					"expiresOn",
+					`Lot ${existing.lotNumber} is recorded with expiry ${recorded}. Check the lot number or the date.`,
+				);
+			}
 			await existing
 				.merge({ expiresOn: DateTime.fromISO(input.expiresOn) })
 				.save();
 		}
 		return existing;
-	}
-	if (!create) {
-		throw new InventoryRuleError("lotId", "Choose a lot of this item.");
 	}
 	return InventoryLot.create({
 		tenantId,
@@ -339,23 +342,39 @@ export default class InventoryService {
 		return withTransaction(async (trx) => {
 			await catalogLock(trx, tenantId);
 			// Check even archived items so a retry cannot revive or duplicate them.
-			const keys = new Set<string>();
+			// Two items are the same when their SKUs match, or when their names
+			// match and either has no SKU, whatever the order of the rows.
+			const skus = new Set<string>();
+			const names = new Set<string>();
+			const unskuedNames = new Set<string>();
 			for (const row of rows) {
 				const sku = row.sku?.toLowerCase();
 				const name = row.name.toLowerCase();
-				const key = sku ? `sku:${sku}` : `name:${name}`;
 				const existing = await InventoryItem.withTrashed()
 					.where("tenant_id", tenantId)
-					.whereRaw(sku ? "lower(sku) = lower(?)" : "lower(name) = lower(?)", [
-						row.sku || row.name,
-					])
+					.where((match) => {
+						if (sku) {
+							match
+								.whereRaw("lower(sku) = lower(?)", [sku])
+								.orWhereRaw("(lower(name) = lower(?) and sku is null)", [
+									row.name,
+								]);
+						} else {
+							match.whereRaw("lower(name) = lower(?)", [row.name]);
+						}
+					})
 					.first();
-				if (keys.has(key) || existing) {
+				const repeated = sku
+					? skus.has(sku) || unskuedNames.has(name)
+					: names.has(name);
+				if (repeated || existing) {
 					throw new InventoryCsvError(
 						`An item with this SKU or name already exists: ${row.sku || row.name}.`,
 					);
 				}
-				keys.add(key);
+				if (sku) skus.add(sku);
+				else unskuedNames.add(name);
+				names.add(name);
 				const item = await InventoryItem.create({
 					tenantId,
 					...itemFields(row),
@@ -438,6 +457,8 @@ export default class InventoryService {
 
 			if (previous) {
 				if (await sameRequest(previous, input, quantity, note, userId)) {
+					// A retry: nothing new is recorded, and the caller can say so.
+					previous.$extras.replayed = true;
 					return previous;
 				}
 				throw new InventoryRuleError(
@@ -614,6 +635,34 @@ export default class InventoryService {
 			await lot.merge({ quantity: lotBalance }).save();
 			await item.merge({ quantity: balance }).save();
 			return created;
+		});
+	}
+
+	/**
+	 * Corrects or clears a lot's expiry date (owners). Not a stock movement:
+	 * no balance changes.
+	 */
+	async setLotExpiry(
+		tenantId: string,
+		itemId: string,
+		lotId: string,
+		expiresOn: string | null,
+	) {
+		return withTransaction(async () => {
+			await activeItem(tenantId, itemId).forUpdate().firstOrFail();
+			const lot = await lotQuery(tenantId, itemId)
+				.where("id", lotId)
+				.forUpdate()
+				.first();
+			if (!lot) {
+				throw new InventoryRuleError("lotId", "Choose a lot of this item.");
+			}
+			if (expiresOn && !isCalendarDate(expiresOn)) {
+				throw new InventoryRuleError("expiresOn", "Enter a valid expiry date.");
+			}
+			return lot
+				.merge({ expiresOn: expiresOn ? DateTime.fromISO(expiresOn) : null })
+				.save();
 		});
 	}
 

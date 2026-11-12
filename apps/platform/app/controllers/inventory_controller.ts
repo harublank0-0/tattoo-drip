@@ -25,6 +25,7 @@ import {
 	createInventoryItemValidator,
 	inventoryMovementValidator,
 	inventoryTrackingValidator,
+	lotExpiryValidator,
 	updateInventoryItemValidator,
 } from "#modules/inventory/validators/inventory";
 import { formatDay, todayIn } from "#modules/projects/quotes";
@@ -224,7 +225,7 @@ export default class InventoryController {
 		const item = await this.inventory.find(tenant.id, ctx.params.id);
 		const input = await ctx.request.validateUsing(inventoryMovementValidator);
 		if (!canManage && input.kind !== "use") return ctx.response.notFound();
-		await asFieldErrors(() =>
+		const movement = await asFieldErrors(() =>
 			this.inventory.record(
 				tenant.id,
 				item.id,
@@ -232,7 +233,12 @@ export default class InventoryController {
 				input,
 			),
 		);
-		ctx.session.flash("success", "Stock movement recorded.");
+		ctx.session.flash(
+			"success",
+			movement.$extras.replayed
+				? "This movement was already recorded. Nothing new was added."
+				: "Stock movement recorded.",
+		);
 		return ctx.response
 			.redirect()
 			.toRoute("tenant.inventory.show", { tenant: tenant.slug, id: item.id });
@@ -251,6 +257,20 @@ export default class InventoryController {
 			"success",
 			tracking === "lot" ? "Lot tracking is on." : "Lot tracking is off.",
 		);
+		return ctx.response
+			.redirect()
+			.toRoute("tenant.inventory.show", { tenant: tenant.slug, id: item.id });
+	}
+
+	async lotExpiry(ctx: HttpContext) {
+		const { tenant } = tenantContext(ctx);
+		const item = await this.inventory.find(tenant.id, ctx.params.id);
+		const { lotId, expiresOn } =
+			await ctx.request.validateUsing(lotExpiryValidator);
+		await asFieldErrors(() =>
+			this.inventory.setLotExpiry(tenant.id, item.id, lotId, expiresOn ?? null),
+		);
+		ctx.session.flash("success", "Lot expiry saved.");
 		return ctx.response
 			.redirect()
 			.toRoute("tenant.inventory.show", { tenant: tenant.slug, id: item.id });

@@ -14,7 +14,10 @@ export type MovementKind = (typeof MOVEMENT_KINDS)[number];
 export type TrackingMode = (typeof TRACKING_MODES)[number];
 
 export const MAX_STOCK = 2_000_000_000;
-export const QUANTITY_FORMAT = /^\d{1,7}(?:\.\d{1,3})?$/;
+/** Up to 7 whole digits and 3 decimals; a phone keypad's ".5" too. */
+export const QUANTITY_FORMAT = /^(?:\d{1,7}(?:\.\d{1,3})?|\.\d{1,3})$/;
+export const QUANTITY_MESSAGE =
+	"Enter a number with up to 3 decimal places, like 2.5.";
 export const DATE_FORMAT = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Lots expiring within this many days of the studio's today are flagged. */

@@ -123,7 +123,8 @@ function ReleaseForm({
 					</div>
 					<FieldDescription>
 						For a wrong lot number or quantity: the stock goes back to "not in a
-						lot", and the history keeps both steps.
+						lot", and the history keeps both steps. A wrong expiry date is
+						corrected under the lot with "Change expiry".
 					</FieldDescription>
 					{errors.kind && <FieldError>{errors.kind}</FieldError>}
 					<div>

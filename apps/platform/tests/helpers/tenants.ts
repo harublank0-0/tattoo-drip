@@ -123,6 +123,27 @@ export async function seededStudio(slug: string, name: string) {
 		});
 		return item;
 	});
+	// A lot-tracked shader holding 3 ml in one lot: the lot routes' resource.
+	const { lotInventoryItem, inventoryLot } = await inTenant(
+		tenant,
+		async () => {
+			const inventory = new InventoryService();
+			const item = await inventory.create(tenant.id, {
+				name: `${name} shader`,
+				unit: "ml",
+			});
+			await inventory.setTracking(tenant.id, item.id, "lot");
+			await inventory.record(tenant.id, item.id, owner.id, {
+				requestId: randomUUID(),
+				kind: "receive",
+				quantity: "3",
+				lotNumber: `${slug}-lot`,
+				expiresOn: "2030-06-30",
+			});
+			const { lots } = await inventory.lots(tenant.id, item.id);
+			return { lotInventoryItem: item, inventoryLot: lots[0] };
+		},
+	);
 
 	const paymentMethod = await inTenant(tenant, async () => {
 		const first = await paymentMethods.create(tenant, {
@@ -395,6 +416,8 @@ export async function seededStudio(slug: string, name: string) {
 		artist,
 		inventoryItem,
 		stockedInventoryItem,
+		lotInventoryItem,
+		inventoryLot,
 		discoverPlaceId: otherCity[0].id as string,
 		paymentMethod,
 		artistProfile,

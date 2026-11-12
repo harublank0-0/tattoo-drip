@@ -144,6 +144,12 @@ const routes = {
     tokens: [{"old":"/t/:tenant/inventory/:id/tracking","type":0,"val":"t","end":""},{"old":"/t/:tenant/inventory/:id/tracking","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inventory/:id/tracking","type":0,"val":"inventory","end":""},{"old":"/t/:tenant/inventory/:id/tracking","type":1,"val":"id","end":""},{"old":"/t/:tenant/inventory/:id/tracking","type":0,"val":"tracking","end":""}],
     types: placeholder as Registry['tenant.inventory.tracking']['types'],
   },
+  'tenant.inventory.lots.expiry': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/inventory/:id/lot-expiry',
+    tokens: [{"old":"/t/:tenant/inventory/:id/lot-expiry","type":0,"val":"t","end":""},{"old":"/t/:tenant/inventory/:id/lot-expiry","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inventory/:id/lot-expiry","type":0,"val":"inventory","end":""},{"old":"/t/:tenant/inventory/:id/lot-expiry","type":1,"val":"id","end":""},{"old":"/t/:tenant/inventory/:id/lot-expiry","type":0,"val":"lot-expiry","end":""}],
+    types: placeholder as Registry['tenant.inventory.lots.expiry']['types'],
+  },
   'tenant.inventory.archive': {
     methods: ["DELETE"],
     pattern: '/t/:tenant/inventory/:id',

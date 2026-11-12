@@ -132,7 +132,7 @@ export function ItemFields({
 			</div>
 			<div>
 				<Button type="submit" disabled={processing}>
-					{item ? "Save item" : "Add item"}
+					{processing ? "Saving…" : item ? "Save item" : "Add item"}
 				</Button>
 			</div>
 		</FieldGroup>

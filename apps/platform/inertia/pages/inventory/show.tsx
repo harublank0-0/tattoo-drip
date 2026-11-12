@@ -1,12 +1,15 @@
 import { Form } from "@adonisjs/inertia/react";
-import { Link } from "@inertiajs/react";
+import { Link, router } from "@inertiajs/react";
+import { useRef } from "react";
 import { urlFor } from "~/client";
+import InlineConfirm from "~/components/inline_confirm";
 import { ExpiryBadge } from "~/components/inventory/expiry_badge";
 import {
 	type InventoryItem,
 	ItemFields,
 	stockAmount,
 } from "~/components/inventory/item_fields";
+import { LotExpiryForm } from "~/components/inventory/lot_expiry";
 import { LotTracking } from "~/components/inventory/lot_tracking";
 import { expiryText, type InventoryLot } from "~/components/inventory/lots";
 import { MovementForm } from "~/components/inventory/movement_form";
@@ -14,7 +17,6 @@ import InventoryPagination from "~/components/inventory/pagination";
 import Page from "~/components/page";
 import Section from "~/components/section";
 import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
 import { useTenant } from "~/hooks/use-tenant";
 import AppLayout from "~/layouts/app";
 
@@ -77,11 +79,13 @@ export default function InventoryShow({
 		`${detail}?${new URLSearchParams({
 			...(lotFilter ? { lot: lotFilter.id } : {}),
 			page: String(next),
-		})}`;
+		})}#history`;
+	const heading = useRef<HTMLHeadingElement>(null);
 
 	return (
 		<Page
 			title={item.name}
+			titleRef={heading}
 			actions={
 				<Link
 					href={urlFor("tenant.inventory.index", { tenant: slug })}
@@ -158,6 +162,9 @@ export default function InventoryShow({
 											History
 										</Link>
 									</div>
+									{canManage && !item.archived && (
+										<LotExpiryForm lot={lot} params={params} />
+									)}
 								</li>
 							))}
 						</ul>
@@ -265,13 +272,20 @@ export default function InventoryShow({
 								Record or correct the remaining stock before archiving.
 							</p>
 						) : (
-							<Form route="tenant.inventory.archive" routeParams={params}>
-								{({ processing }) => (
-									<Button variant="outline" type="submit" disabled={processing}>
-										Archive item
-									</Button>
-								)}
-							</Form>
+							<InlineConfirm
+								label="Archive item"
+								variant="outline"
+								question="Archive this item? It leaves the stock list, and CSV imports will still treat its name and SKU as taken."
+								confirmLabel="Archive item"
+								keepLabel="Keep it"
+								busyLabel="Archiving…"
+								fallback={heading}
+								onConfirm={(finished) =>
+									router.delete(urlFor("tenant.inventory.archive", params), {
+										onFinish: finished,
+									})
+								}
+							/>
 						)}
 					</Section>
 				</>

@@ -283,6 +283,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['tracking']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
+  'tenant.inventory.lots.expiry': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/inventory/:id/lot-expiry'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/inventory/validators/inventory').lotExpiryValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/inventory/validators/inventory').lotExpiryValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['lotExpiry']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['lotExpiry']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
   'tenant.inventory.archive': {
     methods: ["DELETE"]
     pattern: '/t/:tenant/inventory/:id'

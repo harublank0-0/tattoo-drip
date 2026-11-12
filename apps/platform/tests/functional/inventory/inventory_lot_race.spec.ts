@@ -171,4 +171,73 @@ test.group("Inventory lots under concurrent writes", (group) => {
 			],
 		});
 	});
+
+	test("while an item is set up, an assignment and a use racing never put more in lots than on hand", async ({
+		assert,
+	}) => {
+		for (const assignFirst of [true, false]) {
+			const slug = `lot-setup-race-${randomBytes(4).toString("hex")}`;
+			slugs.push(slug);
+			const { owner, tenant } = await studioWithOwner(slug, "Lot setup race");
+			const item = await inTenant(tenant, async () => {
+				const gloves = await service.create(tenant.id, {
+					name: "Gloves",
+					unit: "box",
+				});
+				await service.record(tenant.id, gloves.id, owner.id, {
+					requestId: randomUUID(),
+					kind: "receive",
+					quantity: "5",
+				});
+				return gloves;
+			});
+			const assign = () =>
+				service.record(tenant.id, item.id, owner.id, {
+					requestId: randomUUID(),
+					kind: "assign",
+					quantity: "4",
+					lotNumber: "S1",
+				});
+			const useTwo = () =>
+				service.record(tenant.id, item.id, owner.id, {
+					requestId: randomUUID(),
+					kind: "use",
+					quantity: "2",
+				});
+			const first = heldOpen(tenant, assignFirst ? assign : useTwo);
+			await first.reached;
+			const second = await onItsOwnConnection(
+				tenant,
+				assignFirst ? useTwo : assign,
+			);
+			assert.isTrue(await waitUntilBlocked(second.pid, second.outcome));
+			first.release();
+
+			assert.isUndefined(errorOf(await first.outcome));
+			const refusal = errorOf(await second.outcome);
+			assert.instanceOf(refusal, InventoryRuleError);
+			assert.equal((refusal as InventoryRuleError).field, "quantity");
+			const after = await state(tenant, item.id);
+			assert.deepEqual(
+				after,
+				assignFirst
+					? {
+							item: 5000,
+							lots: [4000],
+							movements: [
+								["receive", null],
+								["assign", 4000],
+							],
+						}
+					: {
+							item: 3000,
+							lots: [],
+							movements: [
+								["receive", null],
+								["use", null],
+							],
+						},
+			);
+		}
+	});
 });

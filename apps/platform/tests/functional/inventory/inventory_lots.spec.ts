@@ -596,4 +596,317 @@ test.group("Studio OS inventory lots", (group) => {
 		assert.deepEqual(await snapshot(a), beforeA);
 		assert.deepEqual(await snapshot(b), beforeB);
 	});
+
+	test("only receipts and assignments name a lot by number; an artist cannot date or re-date a lot", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant, artist } = await studio("lots-dates");
+		const item = await inTenant(tenant, async () => {
+			const ink = await service.create(tenant.id, { name: "Ink", unit: "ml" });
+			await service.setTracking(tenant.id, ink.id, "lot");
+			await service.record(tenant.id, ink.id, owner.id, {
+				requestId: randomUUID(),
+				kind: "receive",
+				quantity: "5",
+				lotNumber: "A1",
+			});
+			return ink;
+		});
+		const detail = `/t/${tenant.slug}/inventory/${item.id}`;
+		const lotOf = () =>
+			inTenant(tenant, () =>
+				InventoryLot.query().where("item_id", item.id).firstOrFail(),
+			);
+		const lot = await lotOf();
+		const post = (user: User, body: Record<string, string>) =>
+			client
+				.post(`${detail}/movements`)
+				.loginAs(user)
+				.withCsrfToken()
+				.redirects(0)
+				.form({ requestId: randomUUID(), ...body });
+		const expiry = (user: User, body: Record<string, string>) =>
+			client
+				.put(`${detail}/lot-expiry`)
+				.loginAs(user)
+				.withCsrfToken()
+				.redirects(0)
+				.form(body);
+
+		// A use or a count picks a lot by id; a number and a date change nothing.
+		for (const [user, kind] of [
+			[artist, "use"],
+			[owner, "use"],
+			[owner, "count"],
+		] as const) {
+			assertValidationError(
+				await post(user, {
+					kind,
+					quantity: "0.001",
+					lotNumber: "a1",
+					expiresOn: "2000-01-01",
+				}),
+				"lotId",
+			);
+		}
+		assert.isNull((await lotOf()).expiresOn);
+
+		// Owners correct a date; artists cannot.
+		(
+			await expiry(artist, { lotId: lot.id, expiresOn: "2027-03-01" })
+		).assertStatus(404);
+		(
+			await expiry(owner, { lotId: lot.id, expiresOn: "2027-03-01" })
+		).assertStatus(302);
+		assert.equal((await lotOf()).expiresOn?.toISODate(), "2027-03-01");
+		assertValidationError(
+			await expiry(owner, { lotId: lot.id, expiresOn: "2027-02-30" }),
+			"expiresOn",
+		);
+		(
+			await expiry(owner, { lotId: lot.id, expiresOn: "2028-03-01" })
+		).assertStatus(302);
+		assert.equal((await lotOf()).expiresOn?.toISODate(), "2028-03-01");
+		(await expiry(owner, { lotId: lot.id, expiresOn: "" })).assertStatus(302);
+		assert.isNull((await lotOf()).expiresOn);
+
+		// A receipt dates an undated lot; a lot with stock keeps its date, an
+		// empty one takes the new delivery's.
+		(
+			await post(owner, {
+				kind: "receive",
+				quantity: "1",
+				lotNumber: "a1",
+				expiresOn: "2027-03-01",
+			})
+		).assertStatus(302);
+		assertValidationError(
+			await post(owner, {
+				kind: "receive",
+				quantity: "1",
+				lotNumber: "A1",
+				expiresOn: "2028-03-01",
+			}),
+			"expiresOn",
+		);
+		(
+			await post(owner, { kind: "count", quantity: "0", lotId: lot.id })
+		).assertStatus(302);
+		(
+			await post(owner, {
+				kind: "receive",
+				quantity: "2",
+				lotNumber: "A1",
+				expiresOn: "2028-03-01",
+			})
+		).assertStatus(302);
+		const after = await lotOf();
+		assert.equal(after.expiresOn?.toISODate(), "2028-03-01");
+		assert.equal(after.quantity, 2000);
+		await assertReconciles(assert, tenant, item.id, true);
+	});
+
+	test("a replayed request records nothing and says so; a reused id with other values is refused", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studio("lots-replay");
+		const { tracked, setup } = await inTenant(tenant, async () => {
+			const ink = await service.create(tenant.id, { name: "Ink", unit: "ml" });
+			await service.setTracking(tenant.id, ink.id, "lot");
+			await service.record(tenant.id, ink.id, owner.id, {
+				requestId: randomUUID(),
+				kind: "receive",
+				quantity: "5",
+				lotNumber: "R1",
+			});
+			const gloves = await service.create(tenant.id, {
+				name: "Gloves",
+				unit: "box",
+			});
+			await service.record(tenant.id, gloves.id, owner.id, {
+				requestId: randomUUID(),
+				kind: "receive",
+				quantity: "6",
+			});
+			return { tracked: ink, setup: gloves };
+		});
+		const lotId = (
+			await inTenant(tenant, () =>
+				InventoryLot.query().where("item_id", tracked.id).firstOrFail(),
+			)
+		).id;
+		const post = (itemId: string, body: Record<string, string>) =>
+			client
+				.post(`/t/${tenant.slug}/inventory/${itemId}/movements`)
+				.loginAs(owner)
+				.withCsrfToken()
+				.redirects(0)
+				.form(body);
+		const movements = (itemId: string) =>
+			inTenant(
+				tenant,
+				async () =>
+					(
+						await InventoryMovement.query()
+							.where("item_id", itemId)
+							.count("* as n")
+							.pojo<{ n: string }>()
+					)[0].n,
+			);
+
+		const cases: [string, Record<string, string>][] = [
+			[tracked.id, { kind: "count", quantity: "4", lotId }],
+			[tracked.id, { kind: "use", quantity: "1", lotId }],
+			[setup.id, { kind: "use", quantity: "1" }],
+			[setup.id, { kind: "assign", quantity: "2", lotNumber: "G1" }],
+		];
+		for (const [itemId, body] of cases) {
+			const request = { ...body, requestId: randomUUID() };
+			const first = await post(itemId, request);
+			first.assertFlashMessage("success", "Stock movement recorded.");
+			const count = await movements(itemId);
+			const replay = await post(itemId, request);
+			replay.assertFlashMessage(
+				"success",
+				"This movement was already recorded. Nothing new was added.",
+			);
+			assert.equal(await movements(itemId), count, body.kind);
+			assertValidationError(
+				await post(itemId, { ...request, quantity: "0.5" }),
+				"quantity",
+			);
+		}
+		const g1 = (
+			await inTenant(tenant, () =>
+				InventoryLot.query()
+					.where("item_id", setup.id)
+					.where("lot_number", "G1")
+					.firstOrFail(),
+			)
+		).id;
+		const release = {
+			kind: "release",
+			quantity: "1",
+			lotId: g1,
+			requestId: randomUUID(),
+		};
+		(await post(setup.id, release)).assertStatus(302);
+		const count = await movements(setup.id);
+		(await post(setup.id, release)).assertFlashMessage(
+			"success",
+			"This movement was already recorded. Nothing new was added.",
+		);
+		assert.equal(await movements(setup.id), count);
+		await assertReconciles(assert, tenant, tracked.id, true);
+		await assertReconciles(assert, tenant, setup.id, false);
+	});
+
+	test("quantities: a leading decimal point works, an exponent is refused in words, and lots keep the ceiling", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studio("lots-numbers");
+		const item = await inTenant(tenant, async () => {
+			const ink = await service.create(tenant.id, { name: "Ink", unit: "ml" });
+			await service.setTracking(tenant.id, ink.id, "lot");
+			return ink;
+		});
+		const post = (body: Record<string, string>) =>
+			client
+				.post(`/t/${tenant.slug}/inventory/${item.id}/movements`)
+				.loginAs(owner)
+				.withCsrfToken()
+				.redirects(0)
+				.form({ requestId: randomUUID(), kind: "receive", ...body });
+		(await post({ quantity: ".5", lotNumber: "N1" })).assertStatus(302);
+		const exponent = await post({ quantity: "1e3", lotNumber: "N1" });
+		assertValidationError(exponent, "quantity");
+		assert.deepEqual(exponent.flashMessage("inputErrorsBag")?.quantity, [
+			"Enter a number with up to 3 decimal places, like 2.5.",
+		]);
+		(await post({ quantity: "1999999.5", lotNumber: "N1" })).assertStatus(302);
+		assertValidationError(
+			await post({ quantity: "0.001", lotNumber: "N2" }),
+			"quantity",
+		);
+		const lots = await inTenant(tenant, () =>
+			InventoryLot.query().where("item_id", item.id).orderBy("lot_number"),
+		);
+		assert.deepEqual(
+			lots.map((lot) => [lot.lotNumber, lot.quantity]),
+			[["N1", 2_000_000_000]],
+		);
+		await assertReconciles(assert, tenant, item.id, true);
+	});
+
+	test("CSV duplicates are found whatever the row order", async ({
+		client,
+	}) => {
+		const { owner, tenant } = await studio("lots-csv-order");
+		const upload = (rows: string) =>
+			client
+				.post(`/t/${tenant.slug}/inventory/import`)
+				.loginAs(owner)
+				.withCsrfToken()
+				.redirects(0)
+				.file(
+					"csv",
+					Buffer.from(
+						`name,sku,category,unit,quantity,reorder_threshold\n${rows}`,
+					),
+					{ filename: "inventory.csv", contentType: "text/csv" },
+				);
+		for (const rows of [
+			"Ink,,,ml,1,\nink,SK1,,ml,1,\n",
+			"Ink,SK1,,ml,1,\nink,,,ml,1,\n",
+		]) {
+			(await upload(rows)).assertFlashMessage(
+				"error",
+				`An item with this SKU or name already exists: ${rows.startsWith("Ink,,") ? "SK1" : "ink"}.`,
+			);
+		}
+		(await upload("Ink,SK1,,ml,1,\nInk,SK2,,ml,1,\n")).assertFlashMessage(
+			"success",
+			"Imported 2 inventory items.",
+		);
+		// Against the catalog as well: a SKU-less "ink" now matches both.
+		(await upload("ink,,,ml,1,\n")).assertFlashMessage(
+			"error",
+			"An item with this SKU or name already exists: ink.",
+		);
+	});
+
+	test("promoting an artist who holds inventory access makes them an owner", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant, artist } = await studio("lots-promote");
+		const membership = await inTenant(tenant, () =>
+			TenantMembership.query()
+				.where("tenant_id", tenant.id)
+				.where("user_id", artist.id)
+				.firstOrFail(),
+		);
+		assert.isTrue(membership.inventoryAccess);
+		(
+			await client
+				.put(`/t/${tenant.slug}/settings/members/${membership.id}/role`)
+				.loginAs(owner)
+				.withCsrfToken()
+				.redirects(0)
+				.form({ role: "owner" })
+		).assertStatus(302);
+		const promoted = await inTenant(tenant, () =>
+			TenantMembership.findOrFail(membership.id),
+		);
+		assert.equal(promoted.role, "owner");
+		assert.isFalse(promoted.inventoryAccess);
+		const page = await client
+			.get(`/t/${tenant.slug}/inventory`)
+			.loginAs(artist)
+			.withInertia();
+		assert.isTrue(page.inertiaProps.canManage);
+	});
 });

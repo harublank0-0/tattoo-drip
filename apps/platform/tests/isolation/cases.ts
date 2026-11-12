@@ -55,6 +55,7 @@ export type IsolationCase = {
 	resource?:
 		| "inventoryItem"
 		| "stockedInventoryItem"
+		| "lotInventoryItem"
 		| "paymentMethod"
 		| "artistProfile"
 		| "workPhoto"
@@ -478,6 +479,15 @@ export const isolationCases: IsolationCase[] = [
 		actor: "owner",
 		resource: "stockedInventoryItem",
 		body: () => ({ requestId: randomUUID(), kind: "use", quantity: "4" }),
+		ownStatus: 302,
+		snapshot: inventoryRows,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/inventory/:id/lot-expiry",
+		actor: "owner",
+		resource: "lotInventoryItem",
+		body: (own) => ({ lotId: own.inventoryLot.id, expiresOn: "2031-01-31" }),
 		ownStatus: 302,
 		snapshot: inventoryRows,
 	},
