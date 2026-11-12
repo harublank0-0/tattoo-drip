@@ -10,6 +10,8 @@ import { jobsOutsideTenantScope } from "#tests/helpers/jobs";
  */
 const ALLOWLIST = {
 	SendMailJob: "sends one email; reads and writes no tenant table",
+	ProcessWorkVideoJob:
+		"video angles: a transcode takes minutes and a TenantJob holds one transaction for all of it (production ends one idle for 3); it opens none itself and reads and writes its row only in short withDbContext transactions scoped to the payload's tenantId (WorkPhotoService.processVideo)",
 	SweepExpiredQuotesJob:
 		"reads only ids from expired_quote_candidates() and queues one ExpireQuoteJob (a TenantJob) per row; reads and writes no tenant table itself",
 };

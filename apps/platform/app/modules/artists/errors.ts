@@ -70,3 +70,28 @@ export class TattooChangedError extends Error {
 		this.name = "TattooChangedError";
 	}
 }
+
+/**
+ * Video angles: a video is never a tattoo's main photo, so it cannot be put
+ * first in a tattoo's order nor taken out of its tattoo (it would lead one of
+ * its own). The database refuses it too (`artist_work_photos_video_is_angle`
+ * and the guard trigger); this is the friendly refusal.
+ */
+export class VideoLeadError extends Error {
+	constructor() {
+		super("A video can't lead a tattoo");
+		this.name = "VideoLeadError";
+	}
+}
+
+/**
+ * Video angles: the upload a "finish" names can't be used: its token is not
+ * this tattoo's, has expired or was used already, or the staged file is
+ * missing or not the length that was signed. The message is for the studio.
+ */
+export class VideoUploadError extends Error {
+	constructor(message = "This upload can't be used. Choose the video again.") {
+		super(message);
+		this.name = "VideoUploadError";
+	}
+}

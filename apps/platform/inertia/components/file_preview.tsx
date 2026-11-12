@@ -51,16 +51,23 @@ export type PreviewFit = "cover" | "contain";
 
 /**
  * A chosen file's picture: decoration beside its name (`alt=""`), or an empty
- * box for a file that has none to show (a wrong one).
+ * box for a file that has none to show (a wrong one). A video (video angles)
+ * is a muted `<video>` of the same object URL, never played: the browser
+ * shows its first frame, and reads its length (`onDuration`, in ms) from
+ * its metadata, so a clip over the limit is named before anything is sent.
  */
 export function FileThumb({
 	url,
 	fit = "cover",
 	className,
+	video = false,
+	onDuration,
 }: {
 	url: string | null;
 	fit?: PreviewFit;
 	className?: string;
+	video?: boolean;
+	onDuration?: (durationMs: number) => void;
 }) {
 	// A file that passes the first check but can't be drawn (text renamed .jpg)
 	// shows the empty box, never the browser's broken-image icon.
@@ -72,7 +79,24 @@ export function FileThumb({
 				className,
 			)}
 		>
-			{url && broken !== url ? (
+			{url && broken !== url && video ? (
+				<video
+					src={url}
+					muted
+					playsInline
+					preload="metadata"
+					aria-hidden="true"
+					tabIndex={-1}
+					onLoadedMetadata={(event) =>
+						onDuration?.(event.currentTarget.duration * 1000)
+					}
+					onError={() => setBroken(url)}
+					className={cn(
+						"pointer-events-none size-full",
+						fit === "cover" ? "object-cover" : "object-contain",
+					)}
+				/>
+			) : url && broken !== url ? (
 				<img
 					src={url}
 					alt=""

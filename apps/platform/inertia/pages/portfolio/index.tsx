@@ -13,13 +13,14 @@ import {
 	Search,
 	Upload,
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { urlFor } from "~/client";
 import ArtworkDetails from "~/components/artwork_details";
 import ArtworkUpload from "~/components/artwork_upload";
 import FilterSelect from "~/components/filter_select";
 import Page from "~/components/page";
 import {
+	anyProcessing,
 	followBack,
 	isFiltered,
 	NO_FILTERS,
@@ -35,6 +36,7 @@ import {
 	statusText,
 	tileLabel,
 	tileMeta,
+	VIDEO_POLL_MS,
 } from "~/components/portfolio";
 import PortfolioBulkBar from "~/components/portfolio_bulk_bar";
 import { Button, buttonVariants } from "~/components/ui/button";
@@ -57,7 +59,8 @@ import AppLayout from "~/layouts/app";
  * Angles: a tile is a tattoo, its main photo with an "n photos" mark when it
  * has more; the count line, the filters and the bulk changes are about
  * tattoos. The details panel lists the tattoo's photos and adds more through
- * the same upload panel, opened for that tattoo (`uploadLead`). When a write
+ * the same upload panel, opened for that tattoo (`uploadLead`), videos too
+ * (video angles: while one is processing the page polls). When a write
  * makes another photo the main one, the panel follows the tattoo: the
  * selection is found by any of its photos' ids, not only the lead's.
  */
@@ -100,6 +103,19 @@ export default function PortfolioIndex({
 	const uploadFrom = useRef<HTMLElement | null>(null);
 	const [uploading, setUploading] = useState(false);
 	const galleryHeading = useRef<HTMLHeadingElement>(null);
+
+	// Video angles: while a video shown here is processing, ask again every
+	// few seconds with a light partial reload (the gallery's photos only),
+	// until none is; never while an upload is going, whose visit it could
+	// race.
+	const processing = anyProcessing(openPhoto ? [...photos, openPhoto] : photos);
+	useEffect(() => {
+		if (!processing || uploading) return;
+		const timer = window.setInterval(() => {
+			router.reload({ only: ["photos", "openPhoto"] });
+		}, VIDEO_POLL_MS);
+		return () => window.clearInterval(timer);
+	}, [processing, uploading]);
 	// By any photo of the tattoo: a new main photo changes the tile's id. A
 	// tattoo whose new main photo put it on another page comes as `openPhoto`
 	// (the write came back with `open`), and the panel stays on it.

@@ -47,10 +47,16 @@ export class ArtistWorkPhotoSchema extends BaseModel {
 		"hidden",
 		"id",
 		"imageKey",
+		"kind",
 		"leadPhotoId",
 		"styles",
 		"tenantId",
 		"updatedAt",
+		"videoDurationMs",
+		"videoFailure",
+		"videoKeys",
+		"videoStagingKey",
+		"videoState",
 		"width",
 	] as const;
 	$columns = ArtistWorkPhotoSchema.$columns;
@@ -69,13 +75,15 @@ export class ArtistWorkPhotoSchema extends BaseModel {
 	@column()
 	declare healed: boolean;
 	@column()
-	declare height: number;
+	declare height: number | null;
 	@column()
 	declare hidden: boolean;
 	@column({ isPrimary: true })
 	declare id: string;
 	@column()
-	declare imageKey: string;
+	declare imageKey: string | null;
+	@column()
+	declare kind: string;
 	@column()
 	declare leadPhotoId: string | null;
 	@column()
@@ -85,7 +93,17 @@ export class ArtistWorkPhotoSchema extends BaseModel {
 	@column.dateTime({ autoCreate: true, autoUpdate: true })
 	declare updatedAt: DateTime | null;
 	@column()
-	declare width: number;
+	declare videoDurationMs: number | null;
+	@column()
+	declare videoFailure: string | null;
+	@column()
+	declare videoKeys: string[] | null;
+	@column()
+	declare videoStagingKey: string | null;
+	@column()
+	declare videoState: string | null;
+	@column()
+	declare width: number | null;
 }
 
 export class ArtistSchema extends BaseModel {

@@ -35,6 +35,9 @@ const ARTIST_ROUTES = [
 	"tenant.artists.photos.store",
 	"tenant.artists.photos.ungroup",
 	"tenant.artists.photos.update",
+	"tenant.artists.photos.videos.sign",
+	"tenant.artists.photos.videos.stage",
+	"tenant.artists.photos.videos.store",
 	"tenant.artists.update",
 	"tenant.calendar.index",
 	"tenant.dashboard",
@@ -112,7 +115,9 @@ test.group("What an artist may use (TAT-30)", (group) => {
 			const studio = await artistsStudio();
 			const name = routeName(isolationCase);
 			const allowed = rolesFor(name)?.includes("artist") ?? false;
-			const writes = isolationCase.method !== "GET";
+			const writes =
+				isolationCase.method !== "GET" &&
+				isolationCase.writesNothing === undefined;
 			const before = await isolationCase.snapshot(studio);
 
 			const response = await caseRequest(

@@ -116,7 +116,13 @@ export function trackUpload() {
 				// The file's own error first; the portfolio's upload also sends details.
 				outcome = {
 					kind: "refused",
-					message: errors.photo || errors.alt || errors.styles || UPLOAD_FAILED,
+					message:
+						errors.photo ||
+						errors.video ||
+						errors.upload ||
+						errors.alt ||
+						errors.styles ||
+						UPLOAD_FAILED,
 				};
 			},
 			onCancel: () => {

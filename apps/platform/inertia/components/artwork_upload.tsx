@@ -26,15 +26,23 @@ import {
 	DROP_HINT,
 	fileKey,
 	fileProblem,
+	isVideoFile,
 	MAX_TATTOO_PHOTOS,
 	type PortfolioArtist,
 	type PortfolioPhoto,
 	photoTotal,
 	STYLES_LIMIT_NOTE,
+	TATTOO_DROP_HINT,
+	TATTOO_FILE_ACCEPT,
+	tattooFileProblem,
+	tattooUploadButton,
 	tattooUploadProblem,
 	UPLOAD_INTRO,
 	uploadButton,
 	uploadProblem,
+	videoLabel,
+	videoLengthProblem,
+	videoType,
 } from "~/components/portfolio";
 import StylePicker from "~/components/style_picker";
 import { Button } from "~/components/ui/button";
@@ -53,11 +61,16 @@ import {
 	SheetDescription,
 	SheetTitle,
 } from "~/components/ui/sheet";
+import { stageVideo } from "~/components/video_upload";
 
 /** One chosen file and where it is. Only `ready` and `failed` ones are sent. */
 type Item = {
 	key: string;
 	file: File;
+	/** Video angles: a video (only for a tattoo) goes up the video's way. */
+	kind: "photo" | "video";
+	/** A video's length as the browser read it, once it has. */
+	durationMs?: number;
 	previewUrl: string;
 	alt: string;
 	/**
@@ -65,7 +78,7 @@ type Item = {
 	 * anyway (a cancelled visit only stops the browser waiting), so it is not
 	 * sent again unless asked ("Send again"), which would add it twice.
 	 */
-	state: "ready" | "invalid" | "sending" | "failed" | "unsure";
+	state: "ready" | "invalid" | "sending" | "processing" | "failed" | "unsure";
 	message?: string;
 	percentage?: number;
 };
@@ -95,6 +108,54 @@ function sendPhoto(
 }
 
 /**
+ * Sends one video to a tattoo (video angles): signed, PUT straight to
+ * storage with its progress (stageVideo), then finished with an Inertia visit
+ * to the video route with its description and `back`, so the answer is the
+ * portfolio with the new video processing. How it ended, like sendPhoto.
+ */
+async function sendVideo(
+	tenantSlug: string,
+	leadId: string,
+	file: File,
+	data: Record<string, string>,
+	onPercentage: (percentage: number | undefined) => void,
+	onProcessing: () => void,
+): Promise<UploadOutcome> {
+	const type = videoType(file);
+	if (!type)
+		return { kind: "refused", message: "Use an MP4, MOV or WebM video." };
+	const staged = await stageVideo({
+		signUrl: urlFor("tenant.artists.photos.videos.sign", {
+			tenant: tenantSlug,
+			id: leadId,
+		}),
+		file,
+		type,
+		onProgress: onPercentage,
+	});
+	if (staged.kind === "refused") {
+		return { kind: "refused", message: staged.message };
+	}
+	onProcessing();
+	return new Promise((resolve) => {
+		const upload = trackUpload();
+		router.post(
+			urlFor("tenant.artists.photos.videos.store", {
+				tenant: tenantSlug,
+				id: leadId,
+			}),
+			{ ...data, upload: staged.token },
+			{
+				preserveScroll: true,
+				preserveState: true,
+				...upload.callbacks,
+				onFinish: () => resolve(upload.outcome()),
+			},
+		);
+	});
+}
+
+/**
  * The portfolio's upload (Studio OS), in a panel from the right (the whole
  * screen on a phone): drop photos or choose them, see each one, give each a
  * description if you like, pick whose work it is and, under "Styles and
@@ -110,12 +171,17 @@ function sendPhoto(
  * while a photo is going, and `onBusyChange` holds the details panel's
  * writes, which would cancel the upload's visit.
  *
- * With `lead` (angles: the details panel's "Add photos to this tattoo") the
- * same panel adds the photos to that tattoo instead: its artist is fixed, the
- * styles, healed and publish fields are gone (the tattoo's apply), each
- * request carries `lead`, the room is the tattoo's (eight photos) and the
- * artist's, and every answer is the portfolio as it was (`lead.back`), so
- * the details panel behind stays on the tattoo, its new photos listed.
+ * With `lead` (angles: the details panel's "Add photos or videos to this
+ * tattoo") the same panel adds the files to that tattoo instead: its artist
+ * is fixed, the styles, healed and publish fields are gone (the tattoo's
+ * apply), each request carries `lead`, the room is the tattoo's (eight
+ * photos and videos) and the artist's, and every answer is the portfolio as
+ * it was (`lead.back`), so the details panel behind stays on the tattoo, its
+ * new photos and videos listed. Video angles: there a video may be chosen
+ * too (MP4, MOV or WebM, 100 MB, 60 seconds): its preview is a muted video,
+ * its length is read in the browser for an early "longer than 60 seconds"
+ * (the server measures again), and it goes up straight to storage with its
+ * progress (sendVideo), then says "Processing…" until the visit is done.
  */
 export default function ArtworkUpload({
 	open,
@@ -190,11 +256,14 @@ export default function ArtworkUpload({
 			const key = fileKey(file);
 			if (known.has(key)) continue;
 			known.add(key);
-			const wrong = fileProblem(file);
+			// Videos join a tattoo only: the new-work upload names them wrong.
+			const kind = lead && isVideoFile(file) ? "video" : "photo";
+			const wrong = lead ? tattooFileProblem(file) : fileProblem(file);
 			const previewUrl = wrong ? "" : previews.create(file);
 			added.push({
 				key,
 				file,
+				kind,
 				previewUrl,
 				alt: "",
 				state: wrong ? "invalid" : "ready",
@@ -258,10 +327,25 @@ export default function ArtworkUpload({
 				if (healed) data.healed = "1";
 				if (!publish) data.hidden = "1";
 			}
-			const outcome = await sendPhoto(url, data, (percentage) => {
+			const onPercentage = (percentage: number | undefined) => {
 				setSending({ ...position, percentage });
 				update(item.key, { percentage });
-			});
+			};
+			const outcome =
+				lead && item.kind === "video"
+					? await sendVideo(
+							tenantSlug,
+							lead.id,
+							item.file,
+							{ back, ...(item.alt.trim() ? { alt: item.alt.trim() } : {}) },
+							onPercentage,
+							() =>
+								update(item.key, {
+									state: "processing",
+									percentage: undefined,
+								}),
+						)
+					: await sendPhoto(url, data, onPercentage);
 			if (outcome.kind === "added") {
 				added += 1;
 				drop(item.key);
@@ -293,11 +377,20 @@ export default function ArtworkUpload({
 		}
 		onBusyChange(false);
 		setSending(null);
+		// A tattoo's upload may hold videos: "files" then, honestly.
+		const noun = (count: number) =>
+			queue.some((item) => item.kind === "video")
+				? count === 1
+					? "file"
+					: "files"
+				: count === 1
+					? "photo"
+					: "photos";
 		setSummary(
 			[
-				added > 0 ? `${added} ${added === 1 ? "photo" : "photos"} added.` : "",
+				added > 0 ? `${added} ${noun(added)} added.` : "",
 				refused > 0
-					? `${refused} ${refused === 1 ? "photo wasn't" : "photos weren't"} added: see the list, then upload again.`
+					? `${refused} ${noun(refused)} ${refused === 1 ? "wasn't" : "weren't"} added: see the list, then upload again.`
 					: "",
 			]
 				.filter(Boolean)
@@ -349,7 +442,7 @@ export default function ArtworkUpload({
 			>
 				<div className="flex flex-col gap-1 border-b px-5 pt-5 pr-14 pb-4">
 					<SheetTitle className="text-lg font-semibold">
-						{lead ? "Add photos to this tattoo" : "Upload artwork"}
+						{lead ? "Add photos or videos to this tattoo" : "Upload artwork"}
 					</SheetTitle>
 					<SheetDescription className="text-sm text-muted-foreground">
 						{lead ? ADD_TO_TATTOO_INTRO : UPLOAD_INTRO}
@@ -376,7 +469,7 @@ export default function ArtworkUpload({
 								</span>
 								<span className="text-muted-foreground">
 									{lead.artistName}, {photoTotal(lead)} of {MAX_TATTOO_PHOTOS}{" "}
-									photos
+									photos and videos
 								</span>
 							</p>
 						</div>
@@ -429,13 +522,13 @@ export default function ArtworkUpload({
 							className="size-6 text-muted-foreground"
 						/>
 						<p className="hidden text-sm font-medium pointer-fine:block">
-							Drop photos here
+							{lead ? "Drop photos or videos here" : "Drop photos here"}
 						</p>
 						<input
 							ref={input}
 							type="file"
 							multiple
-							accept={PHOTO_ACCEPT}
+							accept={lead ? TATTOO_FILE_ACCEPT : PHOTO_ACCEPT}
 							className="sr-only"
 							tabIndex={-1}
 							aria-hidden="true"
@@ -452,10 +545,10 @@ export default function ArtworkUpload({
 							aria-describedby={`${id}-hint`}
 							onClick={() => input.current?.click()}
 						>
-							Choose photos
+							{lead ? "Choose photos or videos" : "Choose photos"}
 						</Button>
 						<p id={`${id}-hint`} className="text-xs text-muted-foreground">
-							{DROP_HINT}
+							{lead ? TATTOO_DROP_HINT : DROP_HINT}
 						</p>
 					</div>
 
@@ -470,6 +563,16 @@ export default function ArtworkUpload({
 									item={item}
 									busy={busy}
 									onAlt={(alt) => update(item.key, { alt })}
+									onDuration={(durationMs) => {
+										// The browser's early word on the length; the server measures again.
+										const tooLong = videoLengthProblem(durationMs);
+										update(
+											item.key,
+											tooLong && item.state === "ready"
+												? { durationMs, state: "invalid", message: tooLong }
+												: { durationMs },
+										);
+									}}
 									onRemove={() => drop(item.key)}
 									onRetry={() =>
 										update(item.key, {
@@ -565,7 +668,12 @@ export default function ArtworkUpload({
 						{problem && <FieldError>{problem}</FieldError>}
 						<div className="flex flex-wrap gap-2">
 							<Button type="submit" disabled={busy}>
-								{uploadButton(sendable.length, sending)}
+								{lead
+									? tattooUploadButton(
+											sendable.map((item) => item.kind),
+											sending,
+										)
+									: uploadButton(sendable.length, sending)}
 							</Button>
 							<Button
 								type="button"
@@ -590,12 +698,14 @@ function QueueRow({
 	item,
 	busy,
 	onAlt,
+	onDuration,
 	onRemove,
 	onRetry,
 }: {
 	item: Item;
 	busy: boolean;
 	onAlt: (alt: string) => void;
+	onDuration: (durationMs: number) => void;
 	onRemove: () => void;
 	onRetry: () => void;
 }) {
@@ -607,11 +717,20 @@ function QueueRow({
 		item.state === "unsure";
 	return (
 		<li className="flex gap-3 p-3">
-			<FileThumb url={item.previewUrl || null} />
+			<FileThumb
+				url={item.previewUrl || null}
+				video={item.kind === "video"}
+				onDuration={onDuration}
+			/>
 			<div className="flex min-w-0 flex-1 flex-col gap-1.5">
 				<div className="flex items-start justify-between gap-2">
 					<p className="min-w-0 text-sm">
 						<FileLabel file={item.file} />
+						{item.kind === "video" ? (
+							<span className="block text-xs text-muted-foreground">
+								{videoLabel(item.durationMs ?? null)}
+							</span>
+						) : null}
 					</p>
 					<Button
 						type="button"
@@ -640,6 +759,9 @@ function QueueRow({
 							onChange={(event) => onAlt(event.currentTarget.value)}
 						/>
 					</>
+				)}
+				{item.state === "processing" && (
+					<output className="text-xs text-muted-foreground">Processing…</output>
 				)}
 				{sendingNow && (
 					<div

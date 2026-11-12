@@ -6,18 +6,30 @@
  * WorkPhotoService).
  */
 
+/** Where a video angle is: the worker has it, it is on the page, or it was refused with a reason. */
+export type VideoState = "processing" | "ready" | "failed";
+
 /**
- * One more photo of a tattoo (angles): a thumbnail, its stored image and its
- * own description, in the tattoo's order after the main photo.
+ * One more photo or video of a tattoo (angles): a thumbnail, its stored
+ * image and its own description, in the tattoo's order after the main
+ * photo. A video (`kind: "video"`) has its state and, once ready, its
+ * poster as the thumbnail and its length; until then no picture or size.
  */
 export type PortfolioAngle = {
 	id: string;
+	kind: "photo" | "video";
 	alt: string | null;
-	width: number;
-	height: number;
-	/** The 320 px copy, for the details panel's list. */
-	thumbUrl: string;
-	fullUrl: string;
+	width: number | null;
+	height: number | null;
+	/** The 320 px copy (a video's poster), for the details panel's list; null for a video not ready. */
+	thumbUrl: string | null;
+	fullUrl: string | null;
+	video: {
+		state: VideoState;
+		/** Why it was refused, in the server's words; null unless failed. */
+		failure: string | null;
+		durationMs: number | null;
+	} | null;
 };
 
 /**
@@ -186,12 +198,15 @@ export function photoTotal(photo: Pick<PortfolioPhoto, "angles">): number {
 	return photo.angles.length + 1;
 }
 
-/** A tile's mark for a tattoo of several photos: "3 photos"; null for one. */
+/** A tile's mark for a tattoo of several photos: "3 photos", or "3 photos and videos" when some are videos; null for one. */
 export function photosMark(
 	photo: Pick<PortfolioPhoto, "angles">,
 ): string | null {
 	const total = photoTotal(photo);
-	return total > 1 ? `${total} photos` : null;
+	if (total <= 1) return null;
+	return photo.angles.some((angle) => angle.kind === "video")
+		? `${total} photos and videos`
+		: `${total} photos`;
 }
 
 /**
@@ -404,8 +419,9 @@ export function movePhotoLabel(
 	n: number,
 	count: number,
 	direction: "up" | "down",
+	noun: "photo" | "video" = "photo",
 ): string {
-	return `Move photo ${n} of ${count} ${direction === "up" ? "earlier" : "later"}`;
+	return `Move ${noun} ${n} of ${count} ${direction === "up" ? "earlier" : "later"}`;
 }
 
 /**
@@ -489,7 +505,153 @@ export function tattooUploadProblem(
 }
 
 export const ADD_TO_TATTOO_INTRO =
-	"They join this tattoo after its last photo, and follow its publishing, styles and healed mark. A tattoo has up to 8 photos.";
+	"They join this tattoo after its last photo, and follow its publishing, styles and healed mark. A tattoo has up to 8 photos and videos. A video plays without sound: its audio is removed.";
+
+// Video angles.
+
+/** The server's limits for one video (MAX_VIDEO_BYTES, MAX_VIDEO_MS): 100 MB and 60 seconds. */
+export const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
+export const MAX_VIDEO_SECONDS = 60;
+/** A clip measured this much over 60 s is still taken (and cut): the server's tolerance. */
+const VIDEO_LENGTH_TOLERANCE_MS = 500;
+
+const VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/webm"];
+const VIDEO_EXTENSIONS: Record<string, string> = {
+	mp4: "video/mp4",
+	m4v: "video/mp4",
+	mov: "video/quicktime",
+	webm: "video/webm",
+};
+
+/** What the tattoo's upload accepts: the photos' types and the videos'. */
+export const TATTOO_FILE_ACCEPT =
+	"image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm,.mov,.mp4,.webm";
+
+export const WRONG_VIDEO_FORMAT = "Use an MP4, MOV or WebM video.";
+export const VIDEO_TOO_LARGE = "Use a video of 100 MB or less.";
+export const VIDEO_TOO_LONG =
+	"This video is longer than 60 seconds. Trim it, then add it again.";
+
+/** The tattoo's drop zone hint: both kinds and their limits. */
+export const TATTOO_DROP_HINT =
+	"Photos: JPEG, PNG or WebP, up to 10 MB. Videos: MP4, MOV or WebM, up to 60 seconds and 100 MB.";
+
+/** The type a chosen video goes up as, or null when it is not a video we take (by its type, else its extension). */
+export function videoType(file: { name: string; type: string }): string | null {
+	if (VIDEO_TYPES.includes(file.type)) return file.type;
+	if (
+		file.type &&
+		!file.type.startsWith("video/") &&
+		file.type !== "application/octet-stream"
+	) {
+		return null;
+	}
+	const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+	return VIDEO_EXTENSIONS[extension] ?? null;
+}
+
+/** Whether a chosen file is a video (by its type or its extension), so it goes the video's way. */
+export function isVideoFile(file: { name: string; type: string }): boolean {
+	return file.type.startsWith("video/") || videoType(file) !== null;
+}
+
+/**
+ * Why a chosen file can't join a tattoo, or null: a video by its type and
+ * size (its length is read once the browser has opened it,
+ * `videoLengthProblem`), anything else by the photos' rule. The server
+ * checks everything again, and what the file really is.
+ */
+export function tattooFileProblem(file: {
+	name: string;
+	type: string;
+	size: number;
+}): string | null {
+	if (!isVideoFile(file)) return fileProblem(file);
+	if (videoType(file) === null) return WRONG_VIDEO_FORMAT;
+	if (file.size > MAX_VIDEO_BYTES) return VIDEO_TOO_LARGE;
+	if (file.size === 0) return WRONG_VIDEO_FORMAT;
+	return null;
+}
+
+/** An early word on a video's length as the browser measured it: null when it may go (the server measures again). */
+export function videoLengthProblem(durationMs: number): string | null {
+	return Number.isFinite(durationMs) &&
+		durationMs > MAX_VIDEO_SECONDS * 1000 + VIDEO_LENGTH_TOLERANCE_MS
+		? VIDEO_TOO_LONG
+		: null;
+}
+
+/** "0:42", "1:00": a video's length. */
+export function durationText(durationMs: number): string {
+	const seconds = Math.max(0, Math.round(durationMs / 1000));
+	return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+/** A video's name in the list: "Video, 0:42", or "Video" before its length is known. */
+export function videoLabel(durationMs: number | null): string {
+	return durationMs === null ? "Video" : `Video, ${durationText(durationMs)}`;
+}
+
+/** Where a video is, as its row says it. */
+export function videoStateText(video: {
+	state: VideoState;
+	failure: string | null;
+}): string {
+	if (video.state === "processing") return "Processing…";
+	if (video.state === "ready") return "Ready";
+	return `Couldn't process: ${video.failure ?? "try uploading it again."}`;
+}
+
+/** Whether any tattoo shown has a video the worker still has: the page then checks again every few seconds. */
+export function anyProcessing(
+	photos: readonly Pick<PortfolioPhoto, "angles">[],
+): boolean {
+	return photos.some((photo) =>
+		photo.angles.some((angle) => angle.video?.state === "processing"),
+	);
+}
+
+/** How often the page asks again while a video is processing. */
+export const VIDEO_POLL_MS = 4000;
+
+/** Why a video's row can't make it the main photo, or move it to the top. */
+export const VIDEO_LEAD_NOTE =
+	"Videos can't be a tattoo's main photo, so they never move to the top.";
+
+/** Why a video's row has no "Remove from this tattoo": on its own it would be a tattoo of one video. */
+export const VIDEO_UNGROUP_NOTE =
+	"A video stays with its tattoo. To take it off, delete it.";
+
+/** The question before deleting one of a tattoo's videos. */
+export const DELETE_VIDEO_QUESTION =
+	"Delete this video? It leaves the tattoo, clients won't see it any more, and it can't be brought back.";
+
+/**
+ * Whether the tattoo's order after a move would put a video first, which
+ * the server refuses: the move button is then disabled, with VIDEO_LEAD_NOTE.
+ */
+export function moveMakesVideoLead(
+	kinds: readonly ("photo" | "video")[],
+	index: number,
+	direction: "up" | "down",
+): boolean {
+	if (direction === "up") return index === 1 && kinds[1] === "video";
+	return index === 0 && kinds[1] === "video";
+}
+
+/** The tattoo's upload button: what it will send ("Upload 2 videos", "Upload 3 files"), or where it is. */
+export function tattooUploadButton(
+	kinds: readonly ("photo" | "video")[],
+	sending: { index: number; total: number; percentage?: number } | null,
+): string {
+	if (sending) return uploadButton(kinds.length, sending);
+	const videos = kinds.filter((kind) => kind === "video").length;
+	if (videos === 0) return uploadButton(kinds.length, null);
+	if (videos === kinds.length) {
+		return videos === 1 ? "Upload video" : `Upload ${videos} videos`;
+	}
+	return `Upload ${kinds.length} files`;
+}
 
 // Selecting several photos.
 

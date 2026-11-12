@@ -420,6 +420,24 @@ const routes = {
     tokens: [{"old":"/t/:tenant/artists/photos/:id/ungroup","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/photos/:id/ungroup","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/photos/:id/ungroup","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/photos/:id/ungroup","type":0,"val":"photos","end":""},{"old":"/t/:tenant/artists/photos/:id/ungroup","type":1,"val":"id","end":""},{"old":"/t/:tenant/artists/photos/:id/ungroup","type":0,"val":"ungroup","end":""}],
     types: placeholder as Registry['tenant.artists.photos.ungroup']['types'],
   },
+  'tenant.artists.photos.videos.sign': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/artists/photos/:id/videos/sign',
+    tokens: [{"old":"/t/:tenant/artists/photos/:id/videos/sign","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/photos/:id/videos/sign","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/photos/:id/videos/sign","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/photos/:id/videos/sign","type":0,"val":"photos","end":""},{"old":"/t/:tenant/artists/photos/:id/videos/sign","type":1,"val":"id","end":""},{"old":"/t/:tenant/artists/photos/:id/videos/sign","type":0,"val":"videos","end":""},{"old":"/t/:tenant/artists/photos/:id/videos/sign","type":0,"val":"sign","end":""}],
+    types: placeholder as Registry['tenant.artists.photos.videos.sign']['types'],
+  },
+  'tenant.artists.photos.videos.store': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/artists/photos/:id/videos',
+    tokens: [{"old":"/t/:tenant/artists/photos/:id/videos","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/photos/:id/videos","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/photos/:id/videos","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/photos/:id/videos","type":0,"val":"photos","end":""},{"old":"/t/:tenant/artists/photos/:id/videos","type":1,"val":"id","end":""},{"old":"/t/:tenant/artists/photos/:id/videos","type":0,"val":"videos","end":""}],
+    types: placeholder as Registry['tenant.artists.photos.videos.store']['types'],
+  },
+  'tenant.artists.photos.videos.stage': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/artists/photos/:id/videos/stage',
+    tokens: [{"old":"/t/:tenant/artists/photos/:id/videos/stage","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/photos/:id/videos/stage","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/photos/:id/videos/stage","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/photos/:id/videos/stage","type":0,"val":"photos","end":""},{"old":"/t/:tenant/artists/photos/:id/videos/stage","type":1,"val":"id","end":""},{"old":"/t/:tenant/artists/photos/:id/videos/stage","type":0,"val":"videos","end":""},{"old":"/t/:tenant/artists/photos/:id/videos/stage","type":0,"val":"stage","end":""}],
+    types: placeholder as Registry['tenant.artists.photos.videos.stage']['types'],
+  },
   'tenant.artists.flash.store': {
     methods: ["POST"],
     pattern: '/t/:tenant/artists/:id/flash',

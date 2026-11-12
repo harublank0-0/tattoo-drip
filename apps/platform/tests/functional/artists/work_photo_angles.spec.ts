@@ -524,7 +524,7 @@ test.group("Angles: tattoo-wide changes", (group) => {
 		// The angle at place 2 cannot be deleted: places 3 then 2 are tried.
 		const base = (key: string) => key.replace(/\..*$/, "");
 		const failing = failDeletes("public", (key) =>
-			key.startsWith(base(second.imageKey)),
+			key.startsWith(base(second.imageKey as string)),
 		);
 		// Caught inside the context, as the controller does, so what was
 		// deleted before the error is kept (the request commits).
@@ -552,7 +552,7 @@ test.group("Angles: tattoo-wide changes", (group) => {
 		);
 		assert.notInclude(idsOf(rows), third.id);
 		const shown = await inTenant(tenant, () =>
-			photos.anglesOf(tenant, [lead.id]),
+			photos.anglesOf(tenant, [lead.id], "public"),
 		);
 		assert.deepEqual(idsOf(shown.get(lead.id) ?? []), [first.id, second.id]);
 
@@ -1055,7 +1055,9 @@ test.group("Angles: the dashboard's routes", (group) => {
 				"fullUrl",
 				"height",
 				"id",
+				"kind",
 				"thumbUrl",
+				"video",
 				"width",
 			]);
 		}

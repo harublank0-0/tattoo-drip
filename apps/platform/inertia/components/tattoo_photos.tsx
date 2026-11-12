@@ -2,8 +2,10 @@ import { router } from "@inertiajs/react";
 import {
 	ArrowDown,
 	ArrowUp,
+	Film,
 	ImagePlus,
 	Pencil,
+	Play,
 	Star,
 	Trash2,
 	Ungroup,
@@ -14,28 +16,32 @@ import { canMove, focusAfterMove } from "~/components/page_look";
 import { MAX_PHOTO_ALT } from "~/components/photos";
 import {
 	DELETE_ANGLE_QUESTION,
+	DELETE_VIDEO_QUESTION,
 	followBack,
 	MAX_TATTOO_PHOTOS,
 	mainFirst,
 	movedOrder,
+	moveMakesVideoLead,
 	movePhotoLabel,
+	type PortfolioAngle,
 	type PortfolioPhoto,
 	photoTotal,
 	removeQuery,
 	TATTOO_PHOTOS_NOTE,
+	VIDEO_LEAD_NOTE,
+	VIDEO_UNGROUP_NOTE,
+	videoLabel,
+	videoStateText,
 } from "~/components/portfolio";
 import { Button } from "~/components/ui/button";
 import { FieldError } from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
 
-/** One row of the list: the main photo or one of the others, as the panel draws it. */
-type Row = {
-	id: string;
-	alt: string | null;
-	thumbUrl: string;
-	width: number;
-	height: number;
-};
+/** One row of the list: the main photo or one of the others (a photo or a video), as the panel draws it. */
+type Row = Pick<
+	PortfolioAngle,
+	"id" | "kind" | "alt" | "thumbUrl" | "width" | "height" | "video"
+>;
 
 /** A row's button, as the focus map knows it. */
 const keyOf = (rowId: string, button: string) => `${rowId}-${button}`;
@@ -53,7 +59,7 @@ type Refocus =
  * later" (named by the photo, disabled at the ends), and the other photos
  * "Make this the main photo", "Edit description", "Remove from this tattoo"
  * (it becomes a tattoo of its own) and "Delete" (asked in the row first).
- * "Add photos to this tattoo" opens the upload panel for this tattoo, while
+ * "Add photos or videos to this tattoo" opens the upload panel for this tattoo, while
  * it has room (eight photos). Every write is one request through the work
  * photo routes with `back`, so the answer is the portfolio as it was and the
  * panel stays open on the tattoo; a write that makes another photo the main
@@ -102,14 +108,21 @@ export default function TattooPhotos({
 	const rows: Row[] = [
 		{
 			id: photo.id,
+			kind: "photo",
 			alt: photo.alt,
 			thumbUrl: photo.thumbUrl,
 			width: photo.width,
 			height: photo.height,
+			video: null,
 		},
 		...photo.angles,
 	];
 	const ids = rows.map((row) => row.id);
+	const kinds = rows.map((row) => row.kind);
+	// Video angles: a video never leads, so some moves and actions don't apply.
+	const hasVideo = kinds.includes("video");
+	const leadNoteId = `${id}-video-lead`;
+	const ungroupNoteId = `${id}-video-ungroup`;
 	const off = busy || held;
 	const room = MAX_TATTOO_PHOTOS - photoTotal(photo);
 	const [editing, setEditing] = useState<string | null>(null);
@@ -279,34 +292,80 @@ export default function TattooPhotos({
 					tabIndex={-1}
 					className="text-sm font-semibold outline-none"
 				>
-					Photos of this tattoo
+					{hasVideo
+						? "Photos and videos of this tattoo"
+						: "Photos of this tattoo"}
 					<span className="font-normal text-muted-foreground tabular-nums">
 						{" "}
 						({rows.length} of {MAX_TATTOO_PHOTOS})
 					</span>
 				</h3>
 				<p className="text-xs text-muted-foreground">{TATTOO_PHOTOS_NOTE}</p>
+				{hasVideo && (
+					<>
+						<p id={leadNoteId} className="text-xs text-muted-foreground">
+							{VIDEO_LEAD_NOTE}
+						</p>
+						<p id={ungroupNoteId} className="sr-only">
+							{VIDEO_UNGROUP_NOTE}
+						</p>
+					</>
+				)}
 			</div>
 			<ol className="flex flex-col divide-y rounded-lg border">
 				{rows.map((row, index) => {
 					const n = index + 1;
 					const nameId = `${id}-${row.id}-name`;
+					const video = row.video;
+					const noun = row.kind === "video" ? "video" : "photo";
 					return (
 						<li key={row.id} className="flex flex-col gap-2 p-3">
 							<div className="flex items-start gap-3">
-								<img
-									src={row.thumbUrl}
-									alt=""
-									width={row.width}
-									height={row.height}
-									loading="lazy"
-									decoding="async"
-									className="size-16 shrink-0 rounded-md bg-muted object-contain"
-								/>
+								<div className="relative size-16 shrink-0 overflow-hidden rounded-md bg-muted">
+									{row.thumbUrl ? (
+										<img
+											src={row.thumbUrl}
+											alt=""
+											width={row.width ?? undefined}
+											height={row.height ?? undefined}
+											loading="lazy"
+											decoding="async"
+											className="size-full object-contain"
+										/>
+									) : (
+										<Film
+											aria-hidden="true"
+											className="absolute inset-0 m-auto size-6 text-muted-foreground"
+										/>
+									)}
+									{video && row.thumbUrl ? (
+										<span
+											aria-hidden="true"
+											className="absolute inset-0 m-auto flex size-7 items-center justify-center rounded-full bg-black/60 text-white"
+										>
+											<Play className="size-3.5 fill-current" />
+										</span>
+									) : null}
+								</div>
 								<div className="flex min-w-0 flex-1 flex-col gap-0.5">
 									<p id={nameId} className="text-sm font-medium">
-										{index === 0 ? "Main photo" : `Photo ${n}`}
+										{index === 0
+											? "Main photo"
+											: video
+												? videoLabel(video.durationMs)
+												: `Photo ${n}`}
 									</p>
+									{video ? (
+										<output
+											className={
+												video.state === "failed"
+													? "block text-xs text-destructive wrap-anywhere"
+													: "block text-xs text-muted-foreground"
+											}
+										>
+											{videoStateText(video)}
+										</output>
+									) : null}
 									<p
 										className="text-xs text-muted-foreground wrap-anywhere"
 										dir="auto"
@@ -325,30 +384,48 @@ export default function TattooPhotos({
 										)}
 										{(["up", "down"] as const)
 											.filter((direction) => index > 0 || direction === "down")
-											.map((direction) => (
-												<Button
-													key={direction}
-													ref={remember(keyOf(row.id, direction))}
-													type="button"
-													variant="outline"
-													size="icon"
-													aria-label={movePhotoLabel(n, rows.length, direction)}
-													disabled={!canMove(index, rows.length, direction)}
-													aria-disabled={off || undefined}
-													onClick={() =>
-														sendOrder(movedOrder(ids, index, direction), {
-															id: row.id,
-															button: direction,
-														})
-													}
-												>
-													{direction === "up" ? (
-														<ArrowUp aria-hidden="true" />
-													) : (
-														<ArrowDown aria-hidden="true" />
-													)}
-												</Button>
-											))}
+											.map((direction) => {
+												const videoFirst = moveMakesVideoLead(
+													kinds,
+													index,
+													direction,
+												);
+												return (
+													<Button
+														key={direction}
+														ref={remember(keyOf(row.id, direction))}
+														type="button"
+														variant="outline"
+														size="icon"
+														aria-label={movePhotoLabel(
+															n,
+															rows.length,
+															direction,
+															noun,
+														)}
+														aria-describedby={
+															videoFirst ? leadNoteId : undefined
+														}
+														disabled={
+															!canMove(index, rows.length, direction) ||
+															videoFirst
+														}
+														aria-disabled={off || undefined}
+														onClick={() =>
+															sendOrder(movedOrder(ids, index, direction), {
+																id: row.id,
+																button: direction,
+															})
+														}
+													>
+														{direction === "up" ? (
+															<ArrowUp aria-hidden="true" />
+														) : (
+															<ArrowDown aria-hidden="true" />
+														)}
+													</Button>
+												);
+											})}
 									</div>
 								)}
 							</div>
@@ -359,7 +436,11 @@ export default function TattooPhotos({
 										type="button"
 										variant="ghost"
 										size="sm"
-										aria-describedby={nameId}
+										aria-describedby={
+											video ? `${nameId} ${leadNoteId}` : nameId
+										}
+										// A video never leads a tattoo: disabled, and the note says why.
+										disabled={video !== null}
 										aria-disabled={off || undefined}
 										onClick={() =>
 											sendOrder(mainFirst(ids, row.id), {
@@ -389,7 +470,11 @@ export default function TattooPhotos({
 										type="button"
 										variant="ghost"
 										size="sm"
-										aria-describedby={nameId}
+										aria-describedby={
+											video ? `${nameId} ${ungroupNoteId}` : nameId
+										}
+										// On its own a video would lead a tattoo: delete it instead.
+										disabled={video !== null}
 										aria-disabled={off || undefined}
 										onClick={() => ungroup(row.id)}
 									>
@@ -407,7 +492,7 @@ export default function TattooPhotos({
 										onClick={() => setAsking(row.id)}
 									>
 										<Trash2 aria-hidden="true" />
-										Delete
+										{video?.state === "failed" ? "Remove" : "Delete"}
 									</Button>
 								</div>
 							)}
@@ -415,7 +500,7 @@ export default function TattooPhotos({
 							{editing === row.id && (
 								<AltForm
 									id={`${id}-${row.id}-alt`}
-									label={`Description of photo ${n}`}
+									label={`Description of ${noun} ${n}`}
 									initial={row.alt ?? ""}
 									error={altError}
 									busy={busy}
@@ -431,12 +516,14 @@ export default function TattooPhotos({
 
 							{asking === row.id && (
 								<fieldset className="flex flex-col gap-2 rounded-md border border-destructive/40 p-3">
-									<legend className="sr-only">Delete photo {n}</legend>
+									<legend className="sr-only">
+										Delete {noun} {n}
+									</legend>
 									<p
 										id={`${id}-${row.id}-question`}
 										className="text-sm font-medium"
 									>
-										{DELETE_ANGLE_QUESTION}
+										{video ? DELETE_VIDEO_QUESTION : DELETE_ANGLE_QUESTION}
 									</p>
 									<div className="flex flex-wrap gap-2">
 										<Button
@@ -447,7 +534,7 @@ export default function TattooPhotos({
 											aria-disabled={off || undefined}
 											onClick={() => remove(row.id)}
 										>
-											{busy ? "Deleting…" : "Delete photo"}
+											{busy ? "Deleting…" : `Delete ${noun}`}
 										</Button>
 										<Button
 											ref={keep}
@@ -482,12 +569,12 @@ export default function TattooPhotos({
 					}}
 				>
 					<ImagePlus aria-hidden="true" />
-					Add photos to this tattoo
+					Add photos or videos to this tattoo
 				</Button>
 				{room <= 0 && (
 					<p id={`${id}-full`} className="text-xs text-muted-foreground">
-						A tattoo has up to {MAX_TATTOO_PHOTOS} photos. Remove one to add
-						another.
+						A tattoo has up to {MAX_TATTOO_PHOTOS} photos and videos. Remove one
+						to add another.
 					</p>
 				)}
 			</div>

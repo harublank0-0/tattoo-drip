@@ -99,6 +99,12 @@ export const TENANT_ROUTE_ROLES = {
 	// angle, re-checked under the artist's row lock).
 	"tenant.artists.photos.order": MEMBERS,
 	"tenant.artists.photos.ungroup": MEMBERS,
+	// Video angles: sign an upload, finish it (`:id` the tattoo's lead) and,
+	// outside production only, the local disk's PUT. The same rule as the
+	// photos: WorkPhotoService.findEditable decides whose tattoo.
+	"tenant.artists.photos.videos.sign": MEMBERS,
+	"tenant.artists.photos.videos.store": MEMBERS,
+	"tenant.artists.photos.videos.stage": MEMBERS,
 	// An artist's flash designs (TAT-129): the same rule as the work photos
 	// (FlashService.findEditable, re-checked under the artist's row lock).
 	"tenant.artists.flash.store": MEMBERS,

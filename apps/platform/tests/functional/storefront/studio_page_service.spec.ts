@@ -656,8 +656,8 @@ test.group("StudioPageService.work (TAT-126)", (group) => {
 		assert.deepEqual(
 			page.photos.map((photo) => photo.url),
 			[
-				await images.url("artist_work_photo", newer.imageKey, tenant),
-				await images.url("artist_work_photo", older.imageKey, tenant),
+				await images.url("artist_work_photo", newer.imageKey as string, tenant),
+				await images.url("artist_work_photo", older.imageKey as string, tenant),
 			],
 		);
 		assert.deepEqual(
@@ -890,7 +890,7 @@ test.group("StudioPageService.flash (TAT-129)", (group) => {
 		assert.isTrue(page.designs[0].requestable);
 		assert.equal(
 			page.designs[0].image.url,
-			await images.url("flash_design", newer.imageKey, tenant),
+			await images.url("flash_design", newer.imageKey as string, tenant),
 		);
 		assert.deepEqual(
 			page.designs[1].image.variants.map((copy) => copy.width),

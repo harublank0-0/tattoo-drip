@@ -1,11 +1,15 @@
+import drive from "@adonisjs/drive/services/main";
 import { DateTime } from "luxon";
 import Artist from "#modules/artists/models/artist";
 import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
+import { videoUploadToken } from "#modules/artists/video_uploads";
 import Client from "#modules/clients/models/client";
 import { LISTING_CONSENT_VERSION } from "#modules/discovery/publication";
 import FlashDesign from "#modules/flash/models/flash_design";
 import Inquiry from "#modules/inquiries/models/inquiry";
 import ReferenceImage from "#modules/inquiries/models/reference_image";
+import ImageService from "#modules/media/services/image_service";
+import VideoService from "#modules/media/services/video_service";
 import { DEFAULT_TEMPLATES } from "#modules/notifications/messages";
 import MessageTemplate from "#modules/notifications/models/message_template";
 import StaffAlert from "#modules/notifications/models/staff_alert";
@@ -26,6 +30,7 @@ import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import TenantSlug from "#modules/tenancy/models/tenant_slug";
 import { testImages } from "#tests/helpers/images";
 import { inTenant, type Studio } from "#tests/helpers/tenants";
+import { stagedFiles } from "#tests/helpers/videos";
 
 /**
  * One entry per /t/:tenant route. The cross-tenant spec runs each as studio
@@ -75,8 +80,21 @@ export type IsolationCase = {
 		| "artistMembership";
 	/** Who sends the request. Every settings route is owner-only. */
 	actor: "owner" | "artist";
-	/** A valid body for writes, built for the studio sending it. */
-	body?: (own: Studio) => Record<string, unknown>;
+	/** A valid body for writes, built for the studio sending it (it may prepare state first, such as a staged upload). */
+	body?: (
+		own: Studio,
+	) => Record<string, unknown> | Promise<Record<string, unknown>>;
+	/** A raw body instead (video angles: the local disk's PUT of a video's bytes), built for the studio sending it. */
+	raw?: (own: Studio) => Promise<{ type: string; data: Buffer }>;
+	/** The query string, built for the studio sending it (the local video PUT's token). */
+	query?: (own: Studio) => Promise<Record<string, string>>;
+	/**
+	 * Why a write method changes nothing a snapshot can see (video angles:
+	 * signing an upload only answers where to send it). Its positive control
+	 * still needs the case's status, which a refused form or a logged-out
+	 * redirect cannot give.
+	 */
+	writesNothing?: string;
 	/**
 	 * Files to send as parts of a multipart form (TAT-116), with the body's
 	 * values as its fields.
@@ -85,7 +103,7 @@ export type IsolationCase = {
 		own: Studio,
 	) => Promise<{ field: string; name: string; type: string; data: Buffer }[]>;
 	/** The status the actor gets on its own studio: the positive control. */
-	ownStatus: 200 | 302;
+	ownStatus: 200 | 204 | 302;
 	/** Reads the state of the targeted studio that the route could change. */
 	snapshot: (target: Studio) => Promise<unknown>;
 };
@@ -678,6 +696,64 @@ export const isolationCases: IsolationCase[] = [
 		pattern: "/t/:tenant/artists/photos/:id/ungroup",
 		resource: "tattooAngle",
 		actor: "owner",
+		ownStatus: 302,
+		snapshot: workPhotoRows,
+	},
+	// Video angles: sign an upload for a tattoo (`:id` its lead; it writes
+	// nothing, it answers where to PUT), the local disk's PUT itself, and the
+	// finish that adds the video, processing.
+	{
+		method: "POST",
+		pattern: "/t/:tenant/artists/photos/:id/videos/sign",
+		resource: "tattooLead",
+		actor: "owner",
+		body: () => ({ type: "video/mp4", size: "1000" }),
+		ownStatus: 200,
+		writesNothing:
+			"Signing only answers where to send the file and a token: nothing is stored until the upload and the finish.",
+		snapshot: workPhotoRows,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/artists/photos/:id/videos/stage",
+		resource: "tattooLead",
+		actor: "owner",
+		query: async (own) => ({
+			upload: videoUploadToken({
+				tenantId: own.tenant.id,
+				leadId: own.tattooLead.id,
+				key: new VideoService(new ImageService()).stagingKey(own.tenant),
+				type: "video/mp4",
+				size: 64,
+			}),
+		}),
+		raw: async () => ({ type: "video/mp4", data: Buffer.alloc(64, 1) }),
+		ownStatus: 204,
+		// The staged uploads (what the PUT writes) beside the tattoos (never empty).
+		snapshot: async (target) => ({
+			photos: await workPhotoRows(target),
+			staged: await stagedFiles(target),
+		}),
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/artists/photos/:id/videos",
+		resource: "tattooLead",
+		actor: "owner",
+		body: async (own) => {
+			const key = new VideoService(new ImageService()).stagingKey(own.tenant);
+			await drive.use("private").put(key, Buffer.alloc(64, 1));
+			return {
+				upload: videoUploadToken({
+					tenantId: own.tenant.id,
+					leadId: own.tattooLead.id,
+					key,
+					type: "video/mp4",
+					size: 64,
+				}),
+				alt: "Healed, in the sun",
+			};
+		},
 		ownStatus: 302,
 		snapshot: workPhotoRows,
 	},

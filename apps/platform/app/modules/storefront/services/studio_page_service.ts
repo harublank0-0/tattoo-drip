@@ -6,7 +6,9 @@ import type ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
-import WorkPhotoService from "#modules/artists/services/work_photo_service";
+import WorkPhotoService, {
+	stillOf,
+} from "#modules/artists/services/work_photo_service";
 import { knownStyles, type TattooStyleRef } from "#modules/artists/styles";
 import {
 	encodeWorkCursor,
@@ -21,6 +23,9 @@ import { ICON_SIZE } from "#modules/media/services/image_processor";
 import ImageService, {
 	type ShownImage,
 } from "#modules/media/services/image_service";
+import VideoService, {
+	type ShownVideoSource,
+} from "#modules/media/services/video_service";
 import { formatMoney } from "#modules/projects/quotes";
 import type {
 	OpeningDay,
@@ -98,10 +103,25 @@ export type StudioPage = {
 /** A work photo as the public API shows it (openapi.yaml, WorkPhoto). */
 export type ShownWorkPhoto = ShownImage & { alt: string | null };
 
+/** One more photo of a tattoo (openapi.yaml, PhotoAngle). */
+export type ShownPhotoAngle = ShownWorkPhoto & { kind: "photo" };
+
+/** A ready video of a tattoo (openapi.yaml, VideoAngle): its poster, its renditions smallest first, how long it plays. */
+export type ShownVideoAngle = {
+	kind: "video";
+	poster: ShownImage & { alt: string | null };
+	sources: ShownVideoSource[];
+	durationMs: number;
+	alt: string | null;
+};
+
+export type ShownAngle = ShownPhotoAngle | ShownVideoAngle;
+
 /**
  * A tattoo of the gallery as the public API shows it (openapi.yaml,
  * GalleryPhoto): its lead photo, the tattoo's styles, healed mark and
- * artist, and its other photos in order (`angles`, [] for one photo).
+ * artist, and its other photos and ready videos in order (`angles`, [] for
+ * one photo).
  */
 export type ShownGalleryPhoto = ShownWorkPhoto & {
 	/** The lead's id: `getWorkPhoto` takes it, and the page's cursor already carries it. */
@@ -109,8 +129,8 @@ export type ShownGalleryPhoto = ShownWorkPhoto & {
 	styles: TattooStyleRef[];
 	healed: boolean;
 	artist: { slug: string; name: string };
-	/** The tattoo's other photos, in order: each a WorkPhoto with no id of its own. */
-	angles: ShownWorkPhoto[];
+	/** The tattoo's other photos and ready videos, in order, none with an id of its own. */
+	angles: ShownAngle[];
 };
 
 /** What listWork asks for: `healed: false` is no filter, and `limit` is already within bounds. */
@@ -214,6 +234,11 @@ export default class StudioPageService {
 		private flashDesigns: FlashService,
 		private content: StudioContentService = new StudioContentService(),
 	) {}
+
+	/** Video angles' files: stateless, built on the same ImageService. */
+	private get videos(): VideoService {
+		return new VideoService(this.images);
+	}
 
 	async studio(tenant: Tenant): Promise<StudioPage> {
 		const visible = await this.artists.listVisible(tenant);
@@ -332,6 +357,7 @@ export default class StudioPageService {
 		const angles = await this.workPhotos.anglesOf(
 			tenant,
 			photos.map(({ id }) => id),
+			"public",
 		);
 		const owners = new Map(artists.map((artist) => [artist.id, artist]));
 		return {
@@ -377,7 +403,7 @@ export default class StudioPageService {
 		if (!photo) return null;
 		const owner = visible.find((artist) => artist.id === photo.artistId);
 		if (!owner) return null;
-		const angles = await this.workPhotos.anglesOf(tenant, [photo.id]);
+		const angles = await this.workPhotos.anglesOf(tenant, [photo.id], "public");
 		return this.shownGalleryPhoto(
 			tenant,
 			photo,
@@ -529,9 +555,48 @@ export default class StudioPageService {
 			styles: knownStyles(photo.styles),
 			healed: photo.healed,
 			artist: { slug: artist.slug, name: artist.name },
-			angles: await Promise.all(
-				angles.map((angle) => this.shownWorkPhoto(tenant, angle)),
-			),
+			angles: (
+				await Promise.all(angles.map((angle) => this.shownAngle(tenant, angle)))
+			).filter((angle): angle is ShownAngle => angle !== null),
+		};
+	}
+
+	/**
+	 * One of a tattoo's other photos or videos (angles), with its `kind`. A
+	 * video is shown only once it is ready (anglesOf's `public` reads no
+	 * other), with its poster and renditions; one that is somehow not ready is
+	 * left out, never shown half made.
+	 */
+	private async shownAngle(
+		tenant: Tenant,
+		angle: ArtistWorkPhoto,
+	): Promise<ShownAngle | null> {
+		if (angle.kind === "photo") {
+			return { kind: "photo", ...(await this.shownWorkPhoto(tenant, angle)) };
+		}
+		const { imageKey, width, height, videoKeys, videoDurationMs } = angle;
+		if (
+			angle.kind !== "video" ||
+			angle.videoState !== "ready" ||
+			!imageKey ||
+			width === null ||
+			height === null ||
+			!videoKeys ||
+			videoDurationMs === null
+		) {
+			return null;
+		}
+		const sources = await this.videos.sources(tenant, videoKeys);
+		if (sources.length === 0) return null;
+		return {
+			kind: "video",
+			poster: {
+				...(await this.videos.poster(tenant, imageKey, { width, height })),
+				alt: angle.alt,
+			},
+			sources,
+			durationMs: videoDurationMs,
+			alt: angle.alt,
 		};
 	}
 
@@ -539,11 +604,9 @@ export default class StudioPageService {
 		tenant: Tenant,
 		photo: ArtistWorkPhoto,
 	): Promise<ShownWorkPhoto> {
+		const still = stillOf(photo);
 		return {
-			...(await this.images.shownImage(WORK_PHOTO, photo.imageKey, tenant, {
-				width: photo.width,
-				height: photo.height,
-			})),
+			...(await this.images.shownImage(WORK_PHOTO, still.key, tenant, still)),
 			alt: photo.alt,
 		};
 	}

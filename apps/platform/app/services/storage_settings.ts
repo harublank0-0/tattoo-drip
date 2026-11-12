@@ -1,4 +1,6 @@
 import type { S3DriverOptions } from "@adonisjs/drive/drivers/s3/types";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 /**
  * The R2 settings as start/env.ts reads them (TAT-27): where the two drive
@@ -8,7 +10,7 @@ import type { S3DriverOptions } from "@adonisjs/drive/drivers/s3/types";
  * the local folders, because a photo stored on the server's disk is lost
  * with the server. A partial set is always an error. An error names the
  * setting, never its value: the secret key must not reach a log. Imports
- * nothing from the app (only a drive type).
+ * nothing from the app (only a drive type and the S3 SDK the drive uses).
  */
 export const R2_SETTINGS = [
 	"R2_ACCOUNT_ID",
@@ -138,7 +140,42 @@ export function r2DiskOptions(
 	};
 	return visibility === "public"
 		? { ...options, cdnUrl: settings.publicUrl }
-		: options;
+		: {
+				...options,
+				urlBuilder: { generateSignedUploadURL: signUploadBound },
+			};
+}
+
+/**
+ * A presigned PUT (video angles: the browser uploads a video straight to the
+ * private bucket) whose signature covers the Content-Type and the exact
+ * Content-Length the caller asked for, besides the host. R2 has no POST
+ * policy, so binding the length is the size limit: a body of any other
+ * length, or another type, is refused by R2 itself. flydrive's own
+ * `getSignedUploadUrl` passes the length on but signs only `content-length`
+ * and `host` (checked: the SDK's presigner leaves `content-type` unsigned
+ * unless it is named), so the private disk builds its upload URLs here.
+ * Presigning is local: no request to R2.
+ */
+async function signUploadBound(
+	_key: string,
+	options: ConstructorParameters<typeof PutObjectCommand>[0],
+	client: Parameters<typeof getSignedUrl>[0],
+	expiresIn?: number | string,
+): Promise<string> {
+	if (!options.ContentType || !options.ContentLength) {
+		throw new Error(
+			"A signed upload needs its ContentType and ContentLength: the signature binds both",
+		);
+	}
+	const seconds = Number(expiresIn);
+	if (!Number.isInteger(seconds) || seconds < 1) {
+		throw new Error("A signed upload's expiresIn is a whole number of seconds");
+	}
+	return getSignedUrl(client, new PutObjectCommand(options), {
+		expiresIn: seconds,
+		signableHeaders: new Set(["content-type", "content-length"]),
+	});
 }
 
 function httpsOrigin(value: string): string {
