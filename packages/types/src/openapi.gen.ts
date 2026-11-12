@@ -491,10 +491,12 @@ export interface paths {
         };
         /**
          * Photos of the studio's work, newest first, a page at a time
-         * @description Every published photo of every visible artist (a closed artist's
-         *     too), newest first. The filters combine; an artist or style that
-         *     matches nothing is an empty page. Hidden and deleted artists never
-         *     appear, nor do their photos, nor do photos the studio unpublished.
+         * @description Every published tattoo of every visible artist (a closed artist's
+         *     too), newest first: one entry per tattoo, its main photo, with the
+         *     tattoo's other photos in `angles`. The filters (the tattoo's styles
+         *     and healed mark) combine; an artist or style that matches nothing is
+         *     an empty page. Hidden and deleted artists never appear, nor do their
+         *     photos, nor do photos the studio unpublished.
          *     Cacheable. Under an old studio slug it answers like
          *     under the current one.
          */
@@ -526,10 +528,14 @@ export interface paths {
         };
         /**
          * One photo of a visible artist's work
-         * @description The same photo `listWork` shows, with its styles, healed mark and
-         *     artist. A hidden or deleted artist's photo, a photo the studio
-         *     unpublished, a removed photo, an unknown id and another studio's
-         *     photo are all a 404. Cacheable.
+         * @description The same tattoo `listWork` shows, with its styles, healed mark,
+         *     artist and other photos (`angles`). The id of one of a tattoo's other
+         *     photos answers with the tattoo itself, whose `id` is then its main
+         *     photo's: a page addressed by the other photo's id should send the
+         *     visitor to the main photo's (a photo grouped into a tattoo keeps its
+         *     old links working). A hidden or deleted artist's photo, a photo the
+         *     studio unpublished, a removed photo, an unknown id and another
+         *     studio's photo are all a 404. Cacheable.
          *     Under an old studio slug it answers like under the current one.
          */
         get: operations["getWorkPhoto"];
@@ -887,7 +893,9 @@ export interface components {
         /**
          * @description A photo of an artist's work (TAT-116) and its smaller copies. Every
          *     property is always there. It carries no id, key, styles, healed mark
-         *     or timestamp: the list's order is newest first.
+         *     or timestamp: the list's order is newest first. An artist's
+         *     `workPhotos` are tattoos' main photos; a `GalleryPhoto`'s `angles`
+         *     are the rest of one tattoo, in order.
          */
         WorkPhoto: {
             /**
@@ -1204,10 +1212,12 @@ export interface components {
             startingPrice?: components["schemas"]["Money"] | null;
         };
         /**
-         * @description A photo in the studio's gallery (`listWork`, `getWorkPhoto`): a
-         *     `WorkPhoto` with its id, its styles, its healed mark and whose work
-         *     it is. Every property is always there. All text is plain text:
-         *     render it as text.
+         * @description A tattoo in the studio's gallery (`listWork`, `getWorkPhoto`): its
+         *     main photo, a `WorkPhoto` with its id, its styles, its healed mark and
+         *     whose work it is, and the tattoo's other photos (`angles`, other
+         *     angles of the same piece). The styles, the healed mark and whether it
+         *     is published are the tattoo's, whatever photo shows it. Every
+         *     property is always there. All text is plain text: render it as text.
          */
         GalleryPhoto: {
             /**
@@ -1247,6 +1257,15 @@ export interface components {
                 /** @example Sita Rai */
                 name: string;
             };
+            /**
+             * @description The tattoo's other photos, in the studio's order, after the main
+             *     photo: [] for a tattoo of one photo. A tattoo is at most eight
+             *     photos. Each is a `WorkPhoto` with no id of its own (the tattoo is
+             *     addressed by `id`). When an angle's `alt` is null, build one from
+             *     the artist's name and the photo's place in the whole tattoo, the
+             *     main photo being 1: "Tattoo by Sita Rai, photo 2 of 4".
+             */
+            angles: components["schemas"]["WorkPhoto"][];
         };
         /**
          * @description What the gallery can be narrowed by. Offer only these: a filter that
