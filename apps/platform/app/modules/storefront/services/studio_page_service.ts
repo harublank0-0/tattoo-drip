@@ -98,13 +98,19 @@ export type StudioPage = {
 /** A work photo as the public API shows it (openapi.yaml, WorkPhoto). */
 export type ShownWorkPhoto = ShownImage & { alt: string | null };
 
-/** A photo of the gallery as the public API shows it (openapi.yaml, GalleryPhoto). */
+/**
+ * A tattoo of the gallery as the public API shows it (openapi.yaml,
+ * GalleryPhoto): its lead photo, the tattoo's styles, healed mark and
+ * artist, and its other photos in order (`angles`, [] for one photo).
+ */
 export type ShownGalleryPhoto = ShownWorkPhoto & {
-	/** The photo's id: `getWorkPhoto` takes it, and the page's cursor already carries it. */
+	/** The lead's id: `getWorkPhoto` takes it, and the page's cursor already carries it. */
 	id: string;
 	styles: TattooStyleRef[];
 	healed: boolean;
 	artist: { slug: string; name: string };
+	/** The tattoo's other photos, in order: each a WorkPhoto with no id of its own. */
+	angles: ShownWorkPhoto[];
 };
 
 /** What listWork asks for: `healed: false` is no filter, and `limit` is already within bounds. */
@@ -192,6 +198,11 @@ const PHOTOS_PER_ARTIST = 6;
  * from the row. The flash reads (TAT-129) are `flash` (a page, with
  * listVisible once and one query for the page and one for the filter) and
  * `flashDesign`. Only the fields the contract lists leave here.
+ *
+ * Angles: the gallery reads list tattoos (WorkPhotoService's leads) and give
+ * each its angles in one more query for the page or the photo
+ * (`WorkPhotoService.anglesOf`); an artist's `workPhotos` are tattoos' leads
+ * only, with no angles (the contract's WorkPhoto has none).
  */
 @inject()
 export default class StudioPageService {
@@ -318,6 +329,10 @@ export default class StudioPageService {
 				)
 			: { photos: [], next: null };
 		const facets = await this.workPhotos.facets(tenant, artistIds);
+		const angles = await this.workPhotos.anglesOf(
+			tenant,
+			photos.map(({ id }) => id),
+		);
 		const owners = new Map(artists.map((artist) => [artist.id, artist]));
 		return {
 			photos: await Promise.all(
@@ -326,7 +341,12 @@ export default class StudioPageService {
 					if (!owner) {
 						throw new Error(`Work photo ${photo.id} is of an artist not read`);
 					}
-					return this.shownGalleryPhoto(tenant, photo, owner);
+					return this.shownGalleryPhoto(
+						tenant,
+						photo,
+						owner,
+						angles.get(photo.id) ?? [],
+					);
 				}),
 			),
 			nextCursor: next ? encodeWorkCursor(next) : null,
@@ -338,10 +358,11 @@ export default class StudioPageService {
 	}
 
 	/**
-	 * One photo of a visible artist's work, as the gallery shows it; null for
-	 * a hidden or deleted artist's, a removed or unknown photo and another
-	 * studio's (the API's 404). The visible artists are one read, the photo
-	 * another.
+	 * One tattoo of a visible artist's work, as the gallery shows it; null
+	 * for a hidden or deleted artist's, a removed or unknown photo and another
+	 * studio's (the API's 404). An angle's id gives its tattoo, whose `id` is
+	 * the lead's (WorkPhotoService.findShown). The visible artists are one
+	 * read, the photo another and its angles a third.
 	 */
 	async workPhoto(
 		tenant: Tenant,
@@ -356,7 +377,13 @@ export default class StudioPageService {
 		if (!photo) return null;
 		const owner = visible.find((artist) => artist.id === photo.artistId);
 		if (!owner) return null;
-		return this.shownGalleryPhoto(tenant, photo, owner);
+		const angles = await this.workPhotos.anglesOf(tenant, [photo.id]);
+		return this.shownGalleryPhoto(
+			tenant,
+			photo,
+			owner,
+			angles.get(photo.id) ?? [],
+		);
 	}
 
 	/**
@@ -489,10 +516,12 @@ export default class StudioPageService {
 		};
 	}
 
+	/** A lead as the gallery shows it: the tattoo's styles and healed mark are the lead's own. */
 	private async shownGalleryPhoto(
 		tenant: Tenant,
 		photo: ArtistWorkPhoto,
 		artist: Artist,
+		angles: readonly ArtistWorkPhoto[],
 	): Promise<ShownGalleryPhoto> {
 		return {
 			...(await this.shownWorkPhoto(tenant, photo)),
@@ -500,6 +529,9 @@ export default class StudioPageService {
 			styles: knownStyles(photo.styles),
 			healed: photo.healed,
 			artist: { slug: artist.slug, name: artist.name },
+			angles: await Promise.all(
+				angles.map((angle) => this.shownWorkPhoto(tenant, angle)),
+			),
 		};
 	}
 

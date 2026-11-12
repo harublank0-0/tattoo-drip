@@ -6,7 +6,26 @@
  * WorkPhotoService).
  */
 
-/** A work photo as the portfolio gets it, with the copies it shows and its artist. */
+/**
+ * One more photo of a tattoo (angles): a thumbnail, its stored image and its
+ * own description, in the tattoo's order after the main photo.
+ */
+export type PortfolioAngle = {
+	id: string;
+	alt: string | null;
+	width: number;
+	height: number;
+	/** The 320 px copy, for the details panel's list. */
+	thumbUrl: string;
+	fullUrl: string;
+};
+
+/**
+ * A tattoo as the portfolio gets it: its main photo (the lead), with the
+ * copies it shows and its artist, and its other photos in order (`angles`,
+ * [] for a tattoo of one photo). Its status, styles and healed mark are the
+ * whole tattoo's.
+ */
 export type PortfolioPhoto = {
 	id: string;
 	artistId: string;
@@ -33,13 +52,19 @@ export type PortfolioPhoto = {
 	/** Whether it shows on Discover (D04), in the server's words. */
 	discover: { label: string; note: string };
 	discoverState: string;
+	angles: PortfolioAngle[];
+	/** The 320 px copy, for the details panel's list of the tattoo's photos. */
+	thumbUrl: string;
 };
 
 export type PortfolioArtist = {
 	id: string;
 	name: string;
 	visible: boolean;
+	/** Every photo, angles included: what the artist's limit counts. */
 	photoCount: number;
+	/** Tattoos (main photos): what the gallery's tiles and count line show. */
+	tattooCount: number;
 };
 
 export type PortfolioStatus =
@@ -60,6 +85,8 @@ export type PortfolioFilters = {
 
 export type PortfolioPageProps = {
 	photos: PortfolioPhoto[];
+	/** The tattoo the details panel follows when it left this page (`open` in the address), else null. */
+	openPhoto: PortfolioPhoto | null;
 	artists: PortfolioArtist[];
 	styleOptions: { slug: string; name: string }[];
 	filters: PortfolioFilters;
@@ -135,17 +162,36 @@ export const SORT_OPTIONS: { value: PortfolioSort; label: string }[] = [
 
 export const PAGE_DESCRIPTION = "Manage and showcase your best work.";
 
-/** The line above the gallery: how many photos, and of how many when filtered. */
+/**
+ * The line above the gallery: how many tattoos (a tile is a tattoo, however
+ * many photos it has), and of how many when filtered.
+ */
 export function resultLine(
 	matching: number,
 	everything: number,
 	filtered: boolean,
 ): string {
-	const photos = (n: number) => `${n} ${n === 1 ? "photo" : "photos"}`;
-	if (!filtered) return photos(everything);
+	const tattoos = (n: number) => `${n} ${n === 1 ? "tattoo" : "tattoos"}`;
+	if (!filtered) return tattoos(everything);
 	return matching === 1
-		? `1 photo matches, of ${everything}`
-		: `${matching} photos match, of ${everything}`;
+		? `1 tattoo matches, of ${everything}`
+		: `${matching} tattoos match, of ${everything}`;
+}
+
+/** The most photos of one tattoo: its main photo and seven more (the server's MAX_TATTOO_PHOTOS). */
+export const MAX_TATTOO_PHOTOS = 8;
+
+/** How many photos a tattoo has: its main photo and its angles. */
+export function photoTotal(photo: Pick<PortfolioPhoto, "angles">): number {
+	return photo.angles.length + 1;
+}
+
+/** A tile's mark for a tattoo of several photos: "3 photos"; null for one. */
+export function photosMark(
+	photo: Pick<PortfolioPhoto, "angles">,
+): string | null {
+	const total = photoTotal(photo);
+	return total > 1 ? `${total} photos` : null;
 }
 
 /**
@@ -182,8 +228,10 @@ export const PAGE_DELAY_NOTE =
 export function tileLabel(photo: PortfolioPhoto): string {
 	const what = photo.alt ? photo.alt : `Photo by ${photo.artistName}`;
 	const by = photo.alt ? `, by ${photo.artistName}` : "";
+	const mark = photosMark(photo);
+	const photos = mark ? `, ${mark}` : "";
 	const status = photo.shown ? "" : `, ${statusText(photo).toLowerCase()}`;
-	return `${what}${by}${status}`;
+	return `${what}${by}${photos}${status}`;
 }
 
 /** The small line under a tile: its styles' names and the healed mark, or null. */
@@ -325,9 +373,132 @@ export const DROP_HINT = "JPEG, PNG or WebP, up to 10 MB each.";
 export const REMOVE_QUESTION =
 	"Remove this photo? Clients won't see it any more, and it can't be brought back.";
 
+/** The details panel's question before Remove: a tattoo of several photos goes whole. */
+export function removeQuestion(photos: number): string {
+	return photos > 1
+		? `Remove this tattoo and all ${photos} of its photos? Clients won't see them any more, and they can't be brought back.`
+		: REMOVE_QUESTION;
+}
+
+/** The details panel's Remove button, in the question. */
+export function removeLabel(photos: number, busy: boolean): string {
+	if (busy) return "Removing…";
+	return photos > 1 ? `Remove ${photos} photos` : "Remove photo";
+}
+
+// A tattoo's photos (angles), in the details panel.
+
+export const TATTOO_PHOTOS_NOTE =
+	"The main photo shows in your gallery and on your page, with the others beside it. Publishing, styles and healed apply to every photo of the tattoo; each keeps its own description.";
+
+/** One photo of the tattoo as its row names it: its description, else its place. */
+export function tattooPhotoName(alt: string | null, n: number): string {
+	return alt ? alt : `Photo ${n}`;
+}
+
+/**
+ * "Move photo 2 of 4 earlier": the Page look sections' words, named by the
+ * photo's place, so two photos with the same description stay distinct.
+ */
+export function movePhotoLabel(
+	n: number,
+	count: number,
+	direction: "up" | "down",
+): string {
+	return `Move photo ${n} of ${count} ${direction === "up" ? "earlier" : "later"}`;
+}
+
+/**
+ * The portfolio's address with `open=<id>`: where a write that gives the
+ * tattoo a new main photo comes back to, so the details panel stays on it
+ * even when its new place in the order is on another page (the server then
+ * sends it as `openPhoto`). Any `open` already there is replaced.
+ */
+export function followBack(back: string, id: string): string {
+	const [path, query = ""] = back.split("?");
+	const kept = query
+		.split("&")
+		.filter((part) => part !== "" && !part.startsWith("open="));
+	return `${path}?${[...kept, `open=${encodeURIComponent(id)}`].join("&")}`;
+}
+
+/** What the details panel says when the tattoo it follows is not on the page shown. */
+export const TATTOO_MOVED_NOTE =
+	"This tattoo moved in the list: its new main photo puts it on another page. It stays open here.";
+
+/**
+ * The tattoo's photo ids with one moved a place earlier or later: the order
+ * the server takes (the main photo first). Moving the second photo earlier
+ * makes it the main photo. The same order when it cannot move.
+ */
+export function movedOrder(
+	ids: readonly string[],
+	index: number,
+	direction: "up" | "down",
+): string[] {
+	const target = direction === "up" ? index - 1 : index + 1;
+	if (index < 0 || index >= ids.length || target < 0 || target >= ids.length) {
+		return [...ids];
+	}
+	const moved = [...ids];
+	[moved[index], moved[target]] = [moved[target], moved[index]];
+	return moved;
+}
+
+/** The order with `id` first, the main photo, and the others as they were. */
+export function mainFirst(ids: readonly string[], id: string): string[] {
+	return ids.includes(id)
+		? [id, ...ids.filter((other) => other !== id)]
+		: [...ids];
+}
+
+/** The question before deleting one of a tattoo's other photos. */
+export const DELETE_ANGLE_QUESTION =
+	"Delete this photo? It leaves the tattoo, clients won't see it any more, and it can't be brought back.";
+
+/**
+ * Why more photos can't be added to this tattoo yet, or null: there must be
+ * photos, and they must fit in the tattoo (eight photos at most) and in its
+ * artist's room.
+ */
+export function tattooUploadProblem(
+	ready: number,
+	photos: number,
+	artist: Pick<PortfolioArtist, "name" | "photoCount"> | null,
+	maxPhotos: number,
+): string | null {
+	if (ready === 0) return "Add a photo to upload.";
+	const tattooRoom = Math.max(0, MAX_TATTOO_PHOTOS - photos);
+	if (tattooRoom === 0) {
+		return `This tattoo already has ${MAX_TATTOO_PHOTOS} photos. Remove one to add another.`;
+	}
+	if (ready > tattooRoom) {
+		return tattooRoom === 1
+			? `This tattoo has room for 1 more photo. Remove ${ready - 1} from the list.`
+			: `This tattoo has room for ${tattooRoom} more photos. Remove ${ready - tattooRoom} from the list.`;
+	}
+	if (artist) {
+		const room = Math.max(0, maxPhotos - artist.photoCount);
+		if (ready > room) {
+			return room === 0
+				? `${artist.name} already has ${maxPhotos} photos. Remove one to add another.`
+				: `${artist.name} has room for ${room} more ${room === 1 ? "photo" : "photos"}. Remove ${ready - room} from the list.`;
+		}
+	}
+	return null;
+}
+
+export const ADD_TO_TATTOO_INTRO =
+	"They join this tattoo after its last photo, and follow its publishing, styles and healed mark. A tattoo has up to 8 photos.";
+
 // Selecting several photos.
 
-export type BulkAction = "publish" | "unpublish" | "reassign" | "delete";
+export type BulkAction =
+	| "publish"
+	| "unpublish"
+	| "reassign"
+	| "delete"
+	| "group";
 
 /** "3 selected". */
 export function selectedText(count: number): string {
@@ -340,10 +511,43 @@ export const BULK_BUSY: Record<BulkAction, string> = {
 	unpublish: "Unpublishing…",
 	reassign: "Moving…",
 	delete: "Deleting…",
+	group: "Grouping…",
 };
 
-/** The question before a bulk delete, which can't be undone. */
-export function deleteQuestion(count: number): string {
+/**
+ * Whether "Group as one tattoo" is offered for this selection: 2 to 8
+ * photos. The server decides the rest (one artist, none already a tattoo of
+ * several photos) and says why it refuses.
+ */
+export function canGroup(count: number): boolean {
+	return count >= 2 && count <= MAX_TATTOO_PHOTOS;
+}
+
+export const GROUP_HINT =
+	"Photos of one tattoo from different angles: the newest becomes its main photo, and the tattoo takes its styles and healed mark. Publish or unpublish them all first.";
+
+/**
+ * What the bar says after a refusal, after the server's words: a group is
+ * all or nothing, so its photos are all still selected; the other changes
+ * keep only those they didn't change.
+ */
+export function bulkErrorTail(action: BulkAction): string {
+	return action === "group"
+		? "Nothing was grouped, and they are all still selected."
+		: "The photos that weren't changed are still selected.";
+}
+
+/**
+ * The question before a bulk delete, which can't be undone. `photos` counts
+ * every photo that goes: a tattoo of several photos goes whole, so the
+ * question says so when it is more than the tiles selected.
+ */
+export function deleteQuestion(count: number, photos = count): string {
+	if (photos > count) {
+		return count === 1
+			? `Delete this tattoo and all ${photos} of its photos? Clients won't see them any more, and they can't be brought back.`
+			: `Delete these ${count} tattoos, ${photos} photos in all? Clients won't see them any more, and they can't be brought back.`;
+	}
 	return count === 1
 		? "Delete this photo? Clients won't see it any more, and it can't be brought back."
 		: `Delete these ${count} photos? Clients won't see them any more, and they can't be brought back.`;
@@ -359,7 +563,7 @@ export function deleteQuestion(count: number): string {
  * again.
  */
 export function stillUnchanged(
-	action: BulkAction,
+	action: Exclude<BulkAction, "group">,
 	ids: readonly string[],
 	photos: readonly Pick<PortfolioPhoto, "id" | "published" | "artistId">[],
 	artistId: string | null,
@@ -373,4 +577,31 @@ export function stillUnchanged(
 		if (action === "unpublish") return photo.published;
 		return photo.artistId !== artistId;
 	});
+}
+
+/**
+ * What a remove asks for (angles), in the DELETE's query beside `back`:
+ * `photo`, one of a tattoo's other photos, or `tattoo` with the number of
+ * photos the page shows. The server checks it under the lock and deletes
+ * nothing when the tattoo changed since (`removeWorkPhotoValidator`).
+ */
+export type RemoveIntent =
+	| { scope: "photo" }
+	| { scope: "tattoo"; photos: number };
+
+/** The DELETE's query for `intent`, with `back` first when there is one. */
+export function removeQuery(intent: RemoveIntent, back?: string): string {
+	const parts = back ? [`back=${encodeURIComponent(back)}`] : [];
+	parts.push(`scope=${intent.scope}`);
+	if (intent.scope === "tattoo") parts.push(`photos=${intent.photos}`);
+	return `?${parts.join("&")}`;
+}
+
+/** A bulk delete's `sizes`: how many photos each selected tattoo shows, by its id. */
+export function deleteSizes(
+	photos: readonly Pick<PortfolioPhoto, "id" | "angles">[],
+): Record<string, number> {
+	return Object.fromEntries(
+		photos.map((photo) => [photo.id, photoTotal(photo)]),
+	);
 }

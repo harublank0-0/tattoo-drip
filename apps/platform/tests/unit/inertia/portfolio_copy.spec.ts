@@ -1,5 +1,8 @@
 import { test } from "@japa/runner";
-import { portfolioBack } from "#modules/artists/portfolio";
+import {
+	portfolioBack,
+	MAX_TATTOO_PHOTOS as SERVER_MAX_TATTOO_PHOTOS,
+} from "#modules/artists/portfolio";
 import { MAX_PHOTO_STYLES as SERVER_MAX_STYLES } from "#modules/artists/styles";
 // @ts-expect-error TS6305: see above.
 import * as photosModule from "../../../inertia/components/photos.js";
@@ -33,7 +36,32 @@ type PortfolioModule = {
 		artistName: string;
 		published: boolean;
 		shown: boolean;
+		angles: unknown[];
 	}): string;
+	MAX_TATTOO_PHOTOS: number;
+	photosMark(photo: { angles: unknown[] }): string | null;
+	removeQuestion(photos: number): string;
+	removeLabel(photos: number, busy: boolean): string;
+	movedOrder(ids: string[], index: number, direction: "up" | "down"): string[];
+	mainFirst(ids: string[], id: string): string[];
+	movePhotoLabel(n: number, count: number, direction: "up" | "down"): string;
+	followBack(back: string, id: string): string;
+	bulkErrorTail(action: string): string;
+	tattooPhotoName(alt: string | null, n: number): string;
+	tattooUploadProblem(
+		ready: number,
+		photos: number,
+		artist: { name: string; photoCount: number } | null,
+		maxPhotos: number,
+	): string | null;
+	canGroup(count: number): boolean;
+	removeQuery(
+		intent: { scope: "photo" } | { scope: "tattoo"; photos: number },
+		back?: string,
+	): string;
+	deleteSizes(
+		photos: { id: string; angles: unknown[] }[],
+	): Record<string, number>;
 	statusText(photo: { published: boolean; shown: boolean }): string;
 	statusNote(photo: { published: boolean; shown: boolean }): string | null;
 	stillUnchanged(
@@ -42,7 +70,7 @@ type PortfolioModule = {
 		photos: { id: string; published: boolean; artistId: string }[],
 		artistId: string | null,
 	): string[];
-	deleteQuestion(count: number): string;
+	deleteQuestion(count: number, photos?: number): string;
 	tileMeta(
 		styles: string[],
 		healed: boolean,
@@ -105,10 +133,11 @@ test.group("Portfolio: the address", () => {
 	test("the order is not a filter", ({ assert }) => {
 		assert.isFalse(p.isFiltered({ ...p.NO_FILTERS, sort: "oldest" }));
 		assert.isTrue(p.isFiltered({ ...p.NO_FILTERS, healed: true }));
-		assert.equal(p.resultLine(5, 5, false), "5 photos");
-		assert.equal(p.resultLine(1, 1, false), "1 photo");
-		assert.equal(p.resultLine(1, 9, true), "1 photo matches, of 9");
-		assert.equal(p.resultLine(0, 9, true), "0 photos match, of 9");
+		// A tile is a tattoo, however many photos it has (angles).
+		assert.equal(p.resultLine(5, 5, false), "5 tattoos");
+		assert.equal(p.resultLine(1, 1, false), "1 tattoo");
+		assert.equal(p.resultLine(1, 9, true), "1 tattoo matches, of 9");
+		assert.equal(p.resultLine(0, 9, true), "0 tattoos match, of 9");
 	});
 });
 
@@ -122,6 +151,7 @@ test.group("Portfolio: tiles", () => {
 				artistName: "Sita",
 				published: true,
 				shown: true,
+				angles: [],
 			}),
 			"Koi, by Sita",
 		);
@@ -131,8 +161,9 @@ test.group("Portfolio: tiles", () => {
 				artistName: "Sita",
 				published: false,
 				shown: false,
+				angles: [{}, {}],
 			}),
-			"Photo by Sita, unpublished",
+			"Photo by Sita, 3 photos, unpublished",
 		);
 		assert.equal(
 			p.tileLabel({
@@ -140,6 +171,7 @@ test.group("Portfolio: tiles", () => {
 				artistName: "Sita",
 				published: true,
 				shown: false,
+				angles: [],
 			}),
 			"Photo by Sita, artist hidden",
 		);
@@ -289,3 +321,132 @@ test.group("Portfolio: the upload", () => {
 		assert.equal(MAX_PHOTO_STYLES, SERVER_MAX_STYLES);
 	});
 });
+
+test.group("Portfolio: a tattoo's photos (angles)", () => {
+	test("a tile marks a tattoo of several photos, and Remove says the whole tattoo goes", ({
+		assert,
+	}) => {
+		assert.isNull(p.photosMark({ angles: [] }));
+		assert.equal(p.photosMark({ angles: [{}, {}, {}] }), "4 photos");
+		assert.match(p.removeQuestion(1), /^Remove this photo\?/);
+		assert.match(
+			p.removeQuestion(3),
+			/^Remove this tattoo and all 3 of its photos\?/,
+		);
+		assert.equal(p.removeLabel(1, false), "Remove photo");
+		assert.equal(p.removeLabel(3, false), "Remove 3 photos");
+		assert.equal(p.removeLabel(3, true), "Removing…");
+		assert.match(
+			p.deleteQuestion(1, 4),
+			/^Delete this tattoo and all 4 of its photos\?/,
+		);
+		assert.match(
+			p.deleteQuestion(2, 5),
+			/^Delete these 2 tattoos, 5 photos in all\?/,
+		);
+		assert.match(p.deleteQuestion(2, 2), /^Delete these 2 photos\?/);
+	});
+
+	test("moving a photo earlier or later; the second moved earlier becomes the main photo; at the ends nothing moves", ({
+		assert,
+	}) => {
+		const ids = ["a", "b", "c"];
+		assert.deepEqual(p.movedOrder(ids, 1, "up"), ["b", "a", "c"]);
+		assert.deepEqual(p.movedOrder(ids, 1, "down"), ["a", "c", "b"]);
+		assert.deepEqual(p.movedOrder(ids, 0, "up"), ids);
+		assert.deepEqual(p.movedOrder(ids, 2, "down"), ids);
+		assert.deepEqual(p.mainFirst(ids, "c"), ["c", "a", "b"]);
+		assert.deepEqual(p.mainFirst(ids, "x"), ids);
+		// Named by place, so two photos with one description stay distinct.
+		assert.equal(p.movePhotoLabel(2, 4, "up"), "Move photo 2 of 4 earlier");
+		assert.equal(p.movePhotoLabel(1, 4, "down"), "Move photo 1 of 4 later");
+	});
+
+	test("adding photos fits the tattoo's eight and the artist's room; grouping takes 2 to 8", ({
+		assert,
+	}) => {
+		const sita = { name: "Sita", photoCount: 10 };
+		assert.equal(p.MAX_TATTOO_PHOTOS, SERVER_MAX_TATTOO_PHOTOS);
+		assert.equal(
+			p.tattooUploadProblem(0, 2, sita, 100),
+			"Add a photo to upload.",
+		);
+		assert.isNull(p.tattooUploadProblem(6, 2, sita, 100));
+		assert.equal(
+			p.tattooUploadProblem(7, 2, sita, 100),
+			"This tattoo has room for 6 more photos. Remove 1 from the list.",
+		);
+		assert.equal(
+			p.tattooUploadProblem(1, 8, sita, 100),
+			"This tattoo already has 8 photos. Remove one to add another.",
+		);
+		assert.equal(
+			p.tattooUploadProblem(3, 2, { ...sita, photoCount: 98 }, 100),
+			"Sita has room for 2 more photos. Remove 1 from the list.",
+		);
+		assert.isFalse(p.canGroup(1));
+		assert.isTrue(p.canGroup(2));
+		assert.isTrue(p.canGroup(8));
+		assert.isFalse(p.canGroup(9));
+	});
+});
+
+test.group("Portfolio: what a remove asks for (angles)", () => {
+	test("the DELETE's query names the scope and, for a tattoo, the photos shown", ({
+		assert,
+	}) => {
+		assert.equal(p.removeQuery({ scope: "photo" }), "?scope=photo");
+		assert.equal(
+			p.removeQuery(
+				{ scope: "tattoo", photos: 3 },
+				"/t/ink/portfolio?q=koi fish",
+			),
+			"?back=%2Ft%2Fink%2Fportfolio%3Fq%3Dkoi%20fish&scope=tattoo&photos=3",
+		);
+		assert.deepEqual(
+			p.deleteSizes([
+				{ id: "a", angles: [] },
+				{ id: "b", angles: [{}, {}] },
+			]),
+			{ a: 1, b: 3 },
+		);
+	});
+});
+
+test.group(
+	"Portfolio: following a tattoo, and the bar's words (angles)",
+	() => {
+		test("a write that gives the tattoo a new main photo comes back asking for it", ({
+			assert,
+		}) => {
+			assert.equal(p.followBack(base, "abc"), `${base}?open=abc`);
+			assert.equal(
+				p.followBack(`${base}?q=koi&open=old&page=2`, "new"),
+				`${base}?q=koi&page=2&open=new`,
+			);
+			assert.equal(
+				portfolioBack(
+					p.followBack(
+						`${base}?page=2`,
+						"0199f000-0000-7000-8000-000000000001",
+					),
+					"ink",
+				),
+				`${base}?page=2&open=0199f000-0000-7000-8000-000000000001`,
+			);
+		});
+
+		test("after a refusal, a group says nothing was grouped; the other changes keep the unchanged ones", ({
+			assert,
+		}) => {
+			assert.equal(
+				p.bulkErrorTail("group"),
+				"Nothing was grouped, and they are all still selected.",
+			);
+			assert.equal(
+				p.bulkErrorTail("delete"),
+				"The photos that weren't changed are still selected.",
+			);
+		});
+	},
+);

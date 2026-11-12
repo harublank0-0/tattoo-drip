@@ -1,13 +1,18 @@
 import { router } from "@inertiajs/react";
-import { ArrowRightLeft, Eye, EyeOff, Trash2, X } from "lucide-react";
+import { ArrowRightLeft, Eye, EyeOff, Layers, Trash2, X } from "lucide-react";
 import { type RefObject, useEffect, useId, useRef, useState } from "react";
 import { urlFor } from "~/client";
 import {
 	BULK_BUSY,
 	type BulkAction,
+	bulkErrorTail,
+	canGroup,
 	deleteQuestion,
+	deleteSizes,
+	GROUP_HINT,
 	type PortfolioArtist,
 	type PortfolioPhoto,
+	photoTotal,
 	selectedText,
 	stillUnchanged,
 } from "~/components/portfolio";
@@ -17,8 +22,12 @@ import { Button } from "~/components/ui/button";
  * The bar of the portfolio's selection (Studio OS): how many are selected,
  * select the whole page or none, and what can be done to them: Publish or
  * Unpublish (each only when some selected photo would change), Move to
- * another artist (owners, with two or more artists) and Delete, which asks
- * in the bar first ("Keep them" takes focus; Escape keeps them). One
+ * another artist (owners, with two or more artists), Group as one tattoo
+ * (angles: 2 to 8 selected; the server refuses photos of two artists and a
+ * tattoo that already has several photos, and says why) and Delete, which
+ * asks in the bar first, counting every photo of a selected tattoo ("Keep
+ * them" takes focus; Escape keeps them). A tile is a tattoo, so each change
+ * acts on whole tattoos. One
  * request (`tenant.portfolio.bulk`) checks and changes each photo on its own
  * and answers with what it did, as a toast; when some photos were not
  * changed the bar says so too (`role="alert"`) and they stay selected
@@ -58,6 +67,27 @@ export default function PortfolioBulkBar({
 	const [busy, setBusy] = useState<BulkAction | null>(null);
 	const [asking, setAsking] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	// What the last refusal was about, for the words after it.
+	const [failed, setFailed] = useState<BulkAction>("publish");
+	const groupButton = useRef<HTMLButtonElement>(null);
+	// After "Group as one tattoo": focus back on it (refused, still there) or,
+	// grouped, the selection gone with it, on the gallery's heading.
+	const [afterGroup, setAfterGroup] = useState<"kept" | "gone" | null>(null);
+	useEffect(() => {
+		if (afterGroup === null) return;
+		setAfterGroup(null);
+		const button = groupButton.current;
+		(afterGroup === "kept" && button ? button : fallback.current)?.focus();
+	}, [afterGroup, fallback]);
+	// A new selection is a new question: an old refusal no longer applies.
+	const selectionKey = selectedIds.join(",");
+	const shownFor = useRef(selectionKey);
+	useEffect(() => {
+		if (shownFor.current !== selectionKey) {
+			shownFor.current = selectionKey;
+			setError(null);
+		}
+	}, [selectionKey]);
 	const [moveTo, setMoveTo] = useState("");
 	const keep = useRef<HTMLButtonElement>(null);
 	const deleteButton = useRef<HTMLButtonElement>(null);
@@ -67,6 +97,10 @@ export default function PortfolioBulkBar({
 	const anyPublished = chosen.some((photo) => photo.published);
 	const canMove = isOwner && artists.length > 1;
 	const count = selectedIds.length;
+	const photosChosen = chosen.reduce(
+		(sum, photo) => sum + photoTotal(photo),
+		0,
+	);
 	const off = busy !== null || held || count === 0;
 
 	// Focus follows the question: onto "Keep them" when it opens, and back to
@@ -105,9 +139,19 @@ export default function PortfolioBulkBar({
 		if (ids.length === 0) return;
 		const artistId = action === "reassign" ? moveTo : null;
 		setError(null);
+		setFailed(action);
 		router.post(
 			urlFor("tenant.portfolio.bulk", { tenant: tenantSlug }),
-			{ action, ids, back, ...(artistId ? { artistId } : {}) },
+			{
+				action,
+				ids,
+				back,
+				...(artistId ? { artistId } : {}),
+				// What the page shows of each tattoo, so a changed one isn't deleted.
+				...(action === "delete"
+					? { sizes: deleteSizes(chosen.filter(({ id }) => ids.includes(id))) }
+					: {}),
+			},
 			{
 				preserveScroll: true,
 				preserveState: true,
@@ -117,9 +161,26 @@ export default function PortfolioBulkBar({
 					const next =
 						(page.props as { photos?: PortfolioPhoto[] }).photos ?? [];
 					setError(flash?.error ?? null);
-					onDone(stillUnchanged(action, ids, next, artistId));
+					if (action === "group") setAfterGroup(flash?.error ? "kept" : "gone");
+					// The refused photos stay selected: keep the message with them.
+					shownFor.current = (
+						action === "group"
+							? flash?.error
+								? ids
+								: []
+							: stillUnchanged(action, ids, next, artistId)
+					).join(",");
+					// Grouping is all or nothing: refused, every photo stays selected.
+					onDone(
+						action === "group"
+							? flash?.error
+								? ids
+								: []
+							: stillUnchanged(action, ids, next, artistId),
+					);
 				},
 				onError: (errors) => {
+					if (action === "group") setAfterGroup("kept");
 					setError(
 						errors.artistId ??
 							errors.ids ??
@@ -158,7 +219,10 @@ export default function PortfolioBulkBar({
 					variant="ghost"
 					size="sm"
 					disabled={busy !== null || count === 0}
-					onClick={onClear}
+					onClick={() => {
+						setError(null);
+						onClear();
+					}}
 				>
 					<X aria-hidden="true" />
 					Clear
@@ -176,7 +240,7 @@ export default function PortfolioBulkBar({
 					}}
 				>
 					<legend id={`${id}-question`} className="mb-2 text-sm font-medium">
-						{deleteQuestion(count)}
+						{deleteQuestion(count, Math.max(count, photosChosen))}
 					</legend>
 					<div className="flex flex-wrap gap-2">
 						<Button
@@ -188,7 +252,7 @@ export default function PortfolioBulkBar({
 						>
 							{busy === "delete"
 								? BULK_BUSY.delete
-								: `Delete ${count === 1 ? "photo" : `${count} photos`}`}
+								: `Delete ${Math.max(count, photosChosen) === 1 ? "photo" : `${Math.max(count, photosChosen)} photos`}`}
 						</Button>
 						<Button
 							ref={keep}
@@ -257,6 +321,22 @@ export default function PortfolioBulkBar({
 							</Button>
 						</div>
 					)}
+					{canGroup(count) && (
+						<Button
+							ref={groupButton}
+							type="button"
+							size="sm"
+							variant="outline"
+							// aria-disabled, not disabled: the button keeps focus while it
+							// works, and after a refusal (run() ignores it while off).
+							aria-disabled={off || undefined}
+							aria-describedby={`${id}-group`}
+							onClick={() => run("group")}
+						>
+							<Layers aria-hidden="true" />
+							{busy === "group" ? BULK_BUSY.group : "Group as one tattoo"}
+						</Button>
+					)}
 					<Button
 						ref={deleteButton}
 						type="button"
@@ -272,9 +352,14 @@ export default function PortfolioBulkBar({
 				</div>
 			)}
 
+			{canGroup(count) && !asking && (
+				<p id={`${id}-group`} className="text-xs text-muted-foreground">
+					{GROUP_HINT}
+				</p>
+			)}
 			{error && (
 				<p role="alert" className="text-sm text-destructive">
-					{error} The photos that weren&apos;t changed are still selected.
+					{error} {bulkErrorTail(failed)}
 				</p>
 			)}
 		</section>

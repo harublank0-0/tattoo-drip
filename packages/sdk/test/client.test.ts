@@ -4,6 +4,7 @@ import {
 	type Artist,
 	type CreateInquiryInput,
 	createTattooClient,
+	type GalleryPhoto,
 	INQUIRY_CHALLENGE_ACTION,
 	INQUIRY_HONEYPOT_FIELD,
 	isTattooApiError,
@@ -1145,7 +1146,7 @@ describe("lists with query parameters", () => {
 	});
 
 	test("work.get reads one photo by id, encoded", async () => {
-		const photo = {
+		const photo: GalleryPhoto = {
 			id: "0199f000-0000-7000-8000-000000000002",
 			url: "https://api.example.com/uploads/koi.jpg",
 			width: 1200,
@@ -1155,6 +1156,7 @@ describe("lists with query parameters", () => {
 			styles: [{ slug: "japanese", name: "Japanese" }],
 			healed: false,
 			artist: { slug: "sita", name: "Sita Rai" },
+			angles: [],
 		};
 		const { calls, fetch } = fakeFetch(() => json(200, { data: photo }));
 
@@ -1170,6 +1172,50 @@ describe("lists with query parameters", () => {
 		assert.ok(error instanceof TattooApiError);
 		assert.equal(error.code, "not_found");
 		assert.equal(missing.calls[0].url, `${T}/work/a%2Fb%3Fc`);
+	});
+
+	test("work.get returns a tattoo's other photos (angles) in order, as sent; an angle's id answers with its main photo's", async () => {
+		const angle = (n: number) => ({
+			url: `https://api.example.com/uploads/koi-${n}.jpg`,
+			width: 1200,
+			height: 900,
+			alt: n === 2 ? "From the side" : null,
+			variants: [
+				{
+					url: `https://api.example.com/uploads/koi-${n}.320w.jpg`,
+					width: 320,
+				},
+			],
+		});
+		const tattoo: GalleryPhoto = {
+			id: "0199f000-0000-7000-8000-000000000003",
+			url: "https://api.example.com/uploads/koi.jpg",
+			width: 1200,
+			height: 1600,
+			alt: "Koi",
+			variants: [],
+			styles: [],
+			healed: true,
+			artist: { slug: "sita", name: "Sita Rai" },
+			angles: [angle(2), angle(3)],
+		};
+		const { calls, fetch } = fakeFetch(() => json(200, { data: tattoo }));
+
+		// Asked by an angle's id, the API answers with the tattoo itself.
+		const result = await client(fetch).work.get(
+			"0199f000-0000-7000-8000-000000000004",
+		);
+
+		assert.equal(
+			calls[0].url,
+			`${T}/work/0199f000-0000-7000-8000-000000000004`,
+		);
+		assert.deepEqual(result, tattoo);
+		assert.equal(result.id, tattoo.id);
+		assert.deepEqual(
+			result.angles.map((photo) => photo.alt),
+			["From the side", null],
+		);
 	});
 
 	test("availability.list sends all four parameters in the given order", async () => {

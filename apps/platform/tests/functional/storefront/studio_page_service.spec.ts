@@ -676,6 +676,7 @@ test.group("StudioPageService.work (TAT-126)", (group) => {
 		// The photos carry only the shown fields (the id is getWorkPhoto's), not the row or its cursor.
 		assert.deepEqual(Object.keys(page.photos[0]).sort(), [
 			"alt",
+			"angles",
 			"artist",
 			"healed",
 			"height",
@@ -791,8 +792,11 @@ test.group("StudioPageService.work (TAT-126)", (group) => {
 		]) {
 			const artist = await addArtist(tenant, owner, { name, slug });
 			await inTenant(tenant, async () => {
+				const lead = await addWorkPhoto(tenant, artist);
 				await addWorkPhoto(tenant, artist);
-				await addWorkPhoto(tenant, artist);
+				await addWorkPhoto(tenant, artist, {
+					angleOf: { lead, position: 1 },
+				});
 			});
 		}
 		const counting = new CountingArtists(images);
@@ -806,7 +810,12 @@ test.group("StudioPageService.work (TAT-126)", (group) => {
 
 		assert.lengthOf(result.photos, 4);
 		assert.equal(counting.reads, 1);
-		assert.equal(queries.length - baseline, 3, "artists, page, filters");
+		// Angles: one more query for the page's tattoos, whatever their number.
+		assert.equal(
+			queries.length - baseline,
+			4,
+			"artists, page, filters, angles",
+		);
 	});
 
 	test("a style that is not in the list is an empty page, with the studio's filters", async ({

@@ -200,6 +200,11 @@ export async function seededStudio(slug: string, name: string) {
 		await seedWorkPhoto(tenant, artistProfile),
 		await seedWorkPhoto(tenant, artistProfile),
 	]);
+	// Angles: a tattoo of two photos, the order and ungroup routes' resources.
+	const [tattooLead, tattooAngle] = await inTenant(tenant, async () => {
+		const lead = await seedWorkPhoto(tenant, artistProfile);
+		return [lead, await seedWorkPhoto(tenant, artistProfile, lead)];
+	});
 	const flashDesign = await inTenant(tenant, () =>
 		seedFlashDesign(tenant, artistProfile, name),
 	);
@@ -417,6 +422,10 @@ export async function seededStudio(slug: string, name: string) {
 		// The work photo routes' :id resource (TAT-116): the artist profile's
 		// first photo (it has a second one).
 		workPhoto,
+		// Angles: a tattoo of the artist profile, its lead (the order route's
+		// :id) and its one angle (the ungroup route's).
+		tattooLead,
+		tattooAngle,
 		// The flash routes' :id resource and the public flash reads' (TAT-129):
 		// a shown design of the artist profile.
 		flashDesign,
@@ -445,8 +454,15 @@ function seedFlashDesign(
 	});
 }
 
-/** A work photo row with a made-up key; call it in the tenant's context. */
-function seedWorkPhoto(tenant: Tenant, artist: { id: string }) {
+/**
+ * A work photo row with a made-up key, or, with `lead`, that tattoo's first
+ * angle; call it in the tenant's context.
+ */
+function seedWorkPhoto(
+	tenant: Tenant,
+	artist: { id: string },
+	lead?: { id: string },
+) {
 	return ArtistWorkPhoto.create({
 		tenantId: tenant.id,
 		artistId: artist.id,
@@ -454,6 +470,7 @@ function seedWorkPhoto(tenant: Tenant, artist: { id: string }) {
 		width: 2048,
 		height: 1536,
 		alt: null,
+		...(lead ? { leadPhotoId: lead.id, anglePosition: 1 } : {}),
 	});
 }
 

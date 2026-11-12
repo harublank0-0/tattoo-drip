@@ -8,6 +8,7 @@ import {
 	ExternalLink,
 	EyeOff,
 	ImageOff,
+	Images,
 	Plus,
 	Search,
 	Upload,
@@ -19,12 +20,14 @@ import ArtworkUpload from "~/components/artwork_upload";
 import FilterSelect from "~/components/filter_select";
 import Page from "~/components/page";
 import {
+	followBack,
 	isFiltered,
 	NO_FILTERS,
 	PAGE_DESCRIPTION,
 	type PortfolioFilters,
 	type PortfolioPageProps,
 	type PortfolioPhoto,
+	photosMark,
 	portfolioHref,
 	resultLine,
 	SORT_OPTIONS,
@@ -50,9 +53,17 @@ import AppLayout from "~/layouts/app";
  * `back`, so the gallery comes back as it was (an upload: that artist's
  * newest first, where the new work is). A photo is on the studio page while
  * its artist is: that is its status, and the panel says how to change it.
+ *
+ * Angles: a tile is a tattoo, its main photo with an "n photos" mark when it
+ * has more; the count line, the filters and the bulk changes are about
+ * tattoos. The details panel lists the tattoo's photos and adds more through
+ * the same upload panel, opened for that tattoo (`uploadLead`). When a write
+ * makes another photo the main one, the panel follows the tattoo: the
+ * selection is found by any of its photos' ids, not only the lead's.
  */
 export default function PortfolioIndex({
 	photos,
+	openPhoto,
 	artists,
 	styleOptions,
 	filters,
@@ -76,16 +87,28 @@ export default function PortfolioIndex({
 			Object.fromEntries(styleOptions.map(({ slug, name }) => [slug, name])),
 		[styleOptions],
 	);
-	const everything = artists.reduce((sum, row) => sum + row.photoCount, 0);
+	const everything = artists.reduce((sum, row) => sum + row.tattooCount, 0);
 	const filtered = isFiltered(filters);
 	const canUpload = artists.some((row) => row.photoCount < maxPhotos);
 
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const [detailsOpen, setDetailsOpen] = useState(false);
 	const [uploadOpen, setUploadOpen] = useState(false);
+	// The tattoo the upload adds photos to, or null for new work.
+	const [uploadLead, setUploadLead] = useState<PortfolioPhoto | null>(null);
+	// The button that opened the upload: focus goes back to it when it closes.
+	const uploadFrom = useRef<HTMLElement | null>(null);
 	const [uploading, setUploading] = useState(false);
 	const galleryHeading = useRef<HTMLHeadingElement>(null);
-	const selected = photos.find((photo) => photo.id === selectedId) ?? null;
+	// By any photo of the tattoo: a new main photo changes the tile's id. A
+	// tattoo whose new main photo put it on another page comes as `openPhoto`
+	// (the write came back with `open`), and the panel stays on it.
+	const ofTattoo = (photo: PortfolioPhoto) =>
+		photo.id === selectedId ||
+		photo.angles.some((angle) => angle.id === selectedId);
+	const onPage = photos.find(ofTattoo) ?? null;
+	const followed = openPhoto && ofTattoo(openPhoto) ? openPhoto : null;
+	const selected = onPage ?? followed;
 	// The photo left the list (unpublished out of the filter, deleted): the
 	// panel closes for good, so a later view that lists it again doesn't
 	// open it by itself.
@@ -116,7 +139,11 @@ export default function PortfolioIndex({
 			size="sm"
 			disabled={!canUpload}
 			title={canUpload ? undefined : `Every artist has ${maxPhotos} photos`}
-			onClick={() => setUploadOpen(true)}
+			onClick={(event) => {
+				uploadFrom.current = event.currentTarget;
+				setUploadLead(null);
+				setUploadOpen(true);
+			}}
 		>
 			<Upload aria-hidden="true" />
 			Upload artwork
@@ -228,7 +255,7 @@ export default function PortfolioIndex({
 									eager={index < 4}
 									photo={photo}
 									styleNames={styleNames}
-									selected={detailsOpen && photo.id === selectedId}
+									selected={detailsOpen && photo.id === selected?.id}
 									picking={selecting}
 									picked={pickedHere.includes(photo.id)}
 									onOpen={() => {
@@ -298,13 +325,27 @@ export default function PortfolioIndex({
 						open={detailsOpen && selected !== null}
 						onOpenChange={setDetailsOpen}
 						tenantSlug={tenant.slug}
-						back={here}
+						// A tattoo followed off this page keeps being asked for.
+						back={
+							selected !== null && onPage === null
+								? followBack(here, selected.id)
+								: here
+						}
 						styleOptions={styleOptions}
 						styleNames={styleNames}
 						fallbackFocus={galleryHeading}
 						held={uploading}
+						onFollow={setSelectedId}
+						moved={selected !== null && onPage === null}
+						onAddPhotos={(photo, from) => {
+							uploadFrom.current = from;
+							setUploadLead(photo);
+							setUploadOpen(true);
+						}}
 					/>
 					<ArtworkUpload
+						// Another tattoo, or new work: a fresh list.
+						key={uploadLead?.id ?? "new"}
 						open={uploadOpen}
 						onOpenChange={setUploadOpen}
 						tenantSlug={tenant.slug}
@@ -317,7 +358,19 @@ export default function PortfolioIndex({
 						backFor={(artistId) =>
 							portfolioHref(base, { ...NO_FILTERS, artist: artistId })
 						}
+						lead={
+							uploadLead
+								? {
+										// The tattoo as it is now: an upload already added may have grown it.
+										...(photos.find(({ id }) => id === uploadLead.id) ??
+											(openPhoto?.id === uploadLead.id ? openPhoto : null) ??
+											uploadLead),
+										back: here,
+									}
+								: null
+						}
 						onBusyChange={setUploading}
+						returnFocus={uploadFrom}
 					/>
 				</>
 			)}
@@ -436,10 +489,12 @@ function Toolbar({
 }
 
 /**
- * One photo: its whole image at its own proportions in a 3:4 frame (nothing
- * is cropped), its artist, and its styles and healed mark. The tile is one
- * button that opens the details panel; a hidden photo carries a mark on the
- * image and says so in its name. A failed load shows a quiet placeholder.
+ * One tattoo: its main photo whole at its own proportions in a 3:4 frame
+ * (nothing is cropped), its artist, and its styles and healed mark. The tile
+ * is one button that opens the details panel; a hidden photo carries a mark
+ * on the image and says so in its name, and a tattoo of several photos says
+ * "n photos" on the image and in its name (tileLabel). A failed load shows a
+ * quiet placeholder.
  */
 function Tile({
 	photo,
@@ -461,6 +516,7 @@ function Tile({
 }) {
 	const [failed, setFailed] = useState(false);
 	const meta = tileMeta(photo.styles, photo.healed, styleNames);
+	const mark = photosMark(photo);
 	return (
 		<li className="min-w-0">
 			<button
@@ -501,6 +557,15 @@ function Tile({
 						<span className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-sm bg-background/90 px-1.5 py-0.5 text-xs font-medium text-foreground">
 							<EyeOff aria-hidden="true" className="size-3.5" />
 							{statusText(photo)}
+						</span>
+					)}
+					{mark && (
+						<span
+							aria-hidden="true"
+							className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-sm bg-background/90 px-1.5 py-0.5 text-xs font-medium text-foreground tabular-nums"
+						>
+							<Images className="size-3.5" />
+							{mark}
 						</span>
 					)}
 					{picking && (

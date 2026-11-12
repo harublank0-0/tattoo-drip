@@ -47,7 +47,10 @@ export function addArtist(
  * A work photo row for `artist` with a made-up key and no file (the drive
  * ignores a delete of a missing file). It is dated now unless `createdAt`
  * says otherwise: photos are listed newest first (TAT-126). Call it inside
- * the tenant's context, as the model needs.
+ * the tenant's context, as the model needs. `angleOf` makes it an angle of
+ * that lead at that place (the database checks the rest: the lead is a lead
+ * of the same artist); give it the lead's `hidden`, `styles` and `healed`
+ * when the test needs the copies the service keeps.
  */
 export async function addWorkPhoto(
 	tenant: Pick<Tenant, "id">,
@@ -61,6 +64,7 @@ export async function addWorkPhoto(
 		healed: boolean;
 		hidden: boolean;
 		createdAt: DateTime;
+		angleOf: { lead: Pick<ArtistWorkPhoto, "id">; position: number };
 	}> = {},
 ) {
 	return ArtistWorkPhoto.create({
@@ -77,6 +81,12 @@ export async function addWorkPhoto(
 		hidden: over.hidden ?? false,
 		// Left out, the model dates it now.
 		...(over.createdAt ? { createdAt: over.createdAt } : {}),
+		...(over.angleOf
+			? {
+					leadPhotoId: over.angleOf.lead.id,
+					anglePosition: over.angleOf.position,
+				}
+			: {}),
 	});
 }
 

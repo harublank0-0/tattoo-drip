@@ -37,6 +37,7 @@ export class AccountTokenSchema extends BaseModel {
 export class ArtistWorkPhotoSchema extends BaseModel {
 	static $columns = [
 		"alt",
+		"anglePosition",
 		"artistId",
 		"createdAt",
 		"discoverySuspendedAt",
@@ -46,6 +47,7 @@ export class ArtistWorkPhotoSchema extends BaseModel {
 		"hidden",
 		"id",
 		"imageKey",
+		"leadPhotoId",
 		"styles",
 		"tenantId",
 		"updatedAt",
@@ -54,6 +56,8 @@ export class ArtistWorkPhotoSchema extends BaseModel {
 	$columns = ArtistWorkPhotoSchema.$columns;
 	@column()
 	declare alt: string | null;
+	@column()
+	declare anglePosition: number | null;
 	@column()
 	declare artistId: string;
 	@column.dateTime({ autoCreate: true })
@@ -72,6 +76,8 @@ export class ArtistWorkPhotoSchema extends BaseModel {
 	declare id: string;
 	@column()
 	declare imageKey: string;
+	@column()
+	declare leadPhotoId: string | null;
 	@column()
 	declare styles: string[];
 	@column()

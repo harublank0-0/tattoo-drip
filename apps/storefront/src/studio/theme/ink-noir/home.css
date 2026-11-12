@@ -507,6 +507,18 @@
 	outline: 2px solid var(--stencil);
 	outline-offset: 3px;
 }
+/* Angles: a tattoo of several photos says so on the photo's top corner. */
+.ink-tile-count {
+	position: absolute;
+	inset-block-start: 0.625rem;
+	inset-inline-start: 0.625rem;
+	padding: 0.25rem 0.5rem;
+	background: color-mix(in srgb, var(--paper) 82%, transparent);
+	color: var(--ink);
+	font-size: 0.6875rem;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+}
 /* Whose work and its styles, on a scrim at the foot of the photo. */
 .ink-tile-facts {
 	position: absolute;

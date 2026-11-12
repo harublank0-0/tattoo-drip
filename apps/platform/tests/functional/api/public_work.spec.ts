@@ -22,10 +22,11 @@ const CACHED = "public, max-age=60, stale-while-revalidate=600";
 const images = new ImageService();
 const tenancy = new TenancyService();
 
-/** The documented fields (openapi.yaml, GalleryPhoto, WorkFilters). A new one needs the contract and a ruling first; `id` had both (getWorkPhoto). */
+/** The documented fields (openapi.yaml, GalleryPhoto, WorkFilters). A new one needs the contract and a ruling first; `id` had both (getWorkPhoto), `angles` too (a tattoo's other photos). */
 const BODY_FIELDS = ["data", "filters", "nextCursor"];
 const PHOTO_FIELDS = [
 	"alt",
+	"angles",
 	"artist",
 	"healed",
 	"height",
@@ -42,6 +43,9 @@ const at = (minutes: number) => T0.plus({ minutes });
 
 const work = (slug: string, query = "") =>
 	`/api/v1/tenants/${slug}/work${query}`;
+
+/** A WorkPhoto's fields: each angle carries exactly these, no id, key or date. */
+const ANGLE_FIELDS = ["alt", "height", "url", "variants", "width"];
 
 /** The stored keys of the photos in a page, in order: a photo's URL ends in its key. */
 const keysOf = (data: { url: string }[]) =>
@@ -154,6 +158,105 @@ test.group("GET /api/v1/tenants/:tenant/work (listWork)", (group) => {
 			assert.notInclude(text, word);
 		}
 		for (const artist of [sita, bina]) assert.notInclude(text, artist.id);
+	});
+
+	test("lists a tattoo once, as its lead with its angles in order, each with exactly WorkPhoto's fields; the lead's styles and healed mark filter it", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("api-work-angles-a");
+		const sita = await addArtist(tenant, owner);
+		const { lead, second, third, single } = await inTenant(tenant, async () => {
+			const lead = await addWorkPhoto(tenant, sita, {
+				createdAt: at(1),
+				styles: ["realism"],
+				healed: true,
+			});
+			// Angles are dated later than their lead: they never list on their own.
+			const third = await addWorkPhoto(tenant, sita, {
+				createdAt: at(5),
+				alt: "From the side",
+				styles: ["realism"],
+				healed: true,
+				angleOf: { lead, position: 2 },
+			});
+			const second = await addWorkPhoto(tenant, sita, {
+				createdAt: at(6),
+				width: 300,
+				styles: ["realism"],
+				healed: true,
+				angleOf: { lead, position: 1 },
+			});
+			const single = await addWorkPhoto(tenant, sita, { createdAt: at(3) });
+			return { lead, second, third, single };
+		});
+
+		const body = (await client.get(work("api-work-angles-a"))).body();
+
+		assert.deepEqual(
+			body.data.map((photo: { id: string }) => photo.id),
+			[single.id, lead.id],
+		);
+		const [one, tattoo] = body.data;
+		assert.deepEqual(one.angles, []);
+		assert.deepEqual(keysOf(tattoo.angles), rowKeys([second, third]));
+		for (const angle of tattoo.angles) {
+			assert.deepEqual(Object.keys(angle).sort(), ANGLE_FIELDS);
+		}
+		assert.equal(tattoo.angles[0].width, 300);
+		for (const variant of tattoo.angles[0].variants) {
+			assert.deepEqual(Object.keys(variant).sort(), ["url", "width"]);
+		}
+		assert.isNull(tattoo.angles[0].alt);
+		assert.equal(tattoo.angles[1].alt, "From the side");
+		assert.notInclude(JSON.stringify(body), second.id);
+		assert.notInclude(JSON.stringify(body), third.id);
+		// The filters are the leads' (the tattoo's), and so is what they match.
+		assert.deepEqual(body.filters, {
+			styles: [{ slug: "realism", name: "Realism" }],
+			healed: true,
+		});
+		const healed = (await client.get(work("api-work-angles-a", "?healed=true")))
+			.body()
+			.data.map((photo: { id: string }) => photo.id);
+		assert.deepEqual(healed, [lead.id]);
+	});
+
+	test("the lead decides for its tattoo: a hidden lead hides its angles, and an angle's own stale columns change nothing", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("api-work-angles-b");
+		const sita = await addArtist(tenant, owner);
+		const { shownLead, hiddenLead } = await inTenant(tenant, async () => {
+			const shownLead = await addWorkPhoto(tenant, sita, { createdAt: at(2) });
+			// Columns that disagree with the lead (the service never leaves them
+			// so): the public read still asks the lead's only.
+			await addWorkPhoto(tenant, sita, {
+				hidden: true,
+				styles: ["blackwork"],
+				healed: true,
+				angleOf: { lead: shownLead, position: 1 },
+			});
+			const hiddenLead = await addWorkPhoto(tenant, sita, {
+				createdAt: at(1),
+				hidden: true,
+			});
+			await addWorkPhoto(tenant, sita, {
+				angleOf: { lead: hiddenLead, position: 1 },
+			});
+			return { shownLead, hiddenLead };
+		});
+
+		const body = (await client.get(work("api-work-angles-b"))).body();
+
+		assert.deepEqual(
+			body.data.map((photo: { id: string }) => photo.id),
+			[shownLead.id],
+		);
+		assert.lengthOf(body.data[0].angles, 1);
+		assert.deepEqual(body.filters, { styles: [], healed: false });
+		assert.notInclude(JSON.stringify(body), hiddenLead.id);
 	});
 
 	test("a closed artist's photos are listed; a hidden or deleted artist's are in no page, no filter and no artist= answer", async ({
@@ -674,6 +777,46 @@ test.group(
 				assert.notInclude(text, word);
 			}
 			assert.notInclude(text, sita.id);
+		});
+
+		test("an angle's id answers with its tattoo, whose id is the lead's; a hidden tattoo's angle is the 404", async ({
+			client,
+			assert,
+		}) => {
+			const { owner, tenant } = await studioWithOwner("api-work-photo-ang");
+			const sita = await addArtist(tenant, owner);
+			const { lead, angle, hiddenAngle } = await inTenant(tenant, async () => {
+				const lead = await addWorkPhoto(tenant, sita, { alt: "Koi" });
+				const angle = await addWorkPhoto(tenant, sita, {
+					alt: "Koi, the back",
+					angleOf: { lead, position: 1 },
+				});
+				const hidden = await addWorkPhoto(tenant, sita, { hidden: true });
+				const hiddenAngle = await addWorkPhoto(tenant, sita, {
+					hidden: true,
+					angleOf: { lead: hidden, position: 1 },
+				});
+				return { lead, angle, hiddenAngle };
+			});
+
+			const byLead = await client.get(photoUrl("api-work-photo-ang", lead.id));
+			const byAngle = await client.get(
+				photoUrl("api-work-photo-ang", angle.id),
+			);
+
+			byLead.assertStatus(200);
+			byAngle.assertStatus(200);
+			assert.deepEqual(byAngle.body(), byLead.body());
+			assert.equal(byAngle.body().data.id, lead.id);
+			assert.deepEqual(
+				byAngle.body().data.angles.map((photo: { alt: string }) => photo.alt),
+				["Koi, the back"],
+			);
+			assertApiError(
+				await client.get(photoUrl("api-work-photo-ang", hiddenAngle.id)),
+				404,
+				"not_found",
+			);
 		});
 
 		test("a closed artist's photo is shown; a hidden or deleted artist's, a removed and an unknown photo are the 404", async ({

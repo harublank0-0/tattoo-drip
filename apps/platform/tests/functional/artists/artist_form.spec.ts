@@ -782,6 +782,7 @@ test.group("The work photos on the artist form (TAT-116)", (group) => {
 				"healed",
 				"hidden",
 				"id",
+				"photoCount",
 				"styles",
 				"thumbnailUrl",
 			]);

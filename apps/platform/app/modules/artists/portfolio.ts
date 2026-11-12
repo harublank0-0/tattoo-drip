@@ -10,6 +10,15 @@ import { STYLE_SLUGS, type StyleSlug } from "#modules/artists/styles";
 export const PORTFOLIO_PAGE_SIZE = 40;
 
 /**
+ * The most photos of one tattoo: its lead and seven angles. The database
+ * holds it too (`artist_work_photos_angle_position`: places 1 to 7), so the
+ * count under the artist's lock (WorkPhotoService) is a friendly refusal,
+ * not the only guard. Here, in the pure module, so the validators and the
+ * words read the same number.
+ */
+export const MAX_TATTOO_PHOTOS = 8;
+
+/**
  * Where a photo stands on the studio page: published and its artist shown
  * (on the page), unpublished by the studio, or published while its artist
  * is hidden (not on the page until the artist is shown).
@@ -92,26 +101,74 @@ export function portfolioBack(value: unknown, slug: string): string | null {
 	return /^[\w\-./?=&%]*$/.test(value) ? value : null;
 }
 
-/** What the portfolio can do to several photos at once. */
+/**
+ * What the portfolio can do to several photos at once. A tile is a tattoo,
+ * so each acts on whole tattoos (a tattoo's angles follow its lead), except
+ * `group`, which makes one tattoo of the selected photos and is all or
+ * nothing (WorkPhotoService.group).
+ */
 export const BULK_ACTIONS = [
 	"publish",
 	"unpublish",
 	"reassign",
 	"delete",
+	"group",
 ] as const;
 export type BulkAction = (typeof BULK_ACTIONS)[number];
 
 /** Why one photo of a bulk change was not changed. */
-export type BulkFailure = "gone" | "full" | "files" | "same";
+export type BulkFailure = "gone" | "full" | "files" | "same" | "changed";
 
 const BULK_DONE: Record<BulkAction, string> = {
 	publish: "published",
 	unpublish: "unpublished",
 	reassign: "moved",
 	delete: "deleted",
+	group: "grouped",
 };
 
+/** Why the selected photos could not be grouped as one tattoo (TattooGroupError's reasons, and `gone`). */
+export type GroupRefusal =
+	| "count"
+	| "artists"
+	| "angle"
+	| "has_angles"
+	| "mixed"
+	| "gone";
+
+/**
+ * What "Group as one tattoo" says when it ends: how many photos the tattoo
+ * now has and which is its main photo, or, refused, why and what to do
+ * instead. Nothing is merged silently: a photo that already is a tattoo of
+ * several photos refuses the group, and the message says how to add photos
+ * to it instead.
+ */
+export function groupSummary(outcome: { photos: number } | GroupRefusal): {
+	ok: boolean;
+	message: string;
+} {
+	if (typeof outcome === "object") {
+		return {
+			ok: true,
+			message: `Grouped as one tattoo of ${outcome.photos} photos. The newest is its main photo, and the tattoo takes its styles and healed mark.`,
+		};
+	}
+	const reasons: Record<GroupRefusal, string> = {
+		count: `Select 2 to ${MAX_TATTOO_PHOTOS} photos to group as one tattoo.`,
+		artists:
+			"Select photos of one artist: a tattoo is one artist's work. Move them to the same artist first.",
+		angle: "One of these photos is already part of another tattoo.",
+		has_angles:
+			"One of these is already a tattoo of several photos, so nothing was grouped. To add photos to it, open it and choose Add photos to this tattoo.",
+		mixed:
+			"Some of these photos are unpublished. Publish or unpublish them all first, then group them.",
+		gone: "Some of these photos were removed or changed meanwhile, so nothing was grouped.",
+	};
+	return { ok: false, message: `Not grouped. ${reasons[outcome]}` };
+}
+
 const photos = (n: number) => `${n} ${n === 1 ? "photo" : "photos"}`;
+const tattoos = (n: number) => `${n} ${n === 1 ? "tattoo" : "tattoos"}`;
 
 /**
  * What a bulk change says when it ends: how many were changed and, for
@@ -145,6 +202,9 @@ export function bulkSummary(
 		count("same") > 0
 			? `${photos(count("same"))} already with ${artist ?? "that artist"}`
 			: "",
+		count("changed") > 0
+			? `${tattoos(count("changed"))} changed since you opened them (check and try again)`
+			: "",
 	].filter(Boolean);
 	const head =
 		done > 0
@@ -158,4 +218,30 @@ export function bulkSummary(
 
 function upperFirst(text: string): string {
 	return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** What a page says when the tattoo it asked to remove is not the one it showed. */
+export const TATTOO_CHANGED_SINCE =
+	"This tattoo changed since you opened it. Check it and try again.";
+
+/**
+ * The photos a bulk change acts on, one per tattoo (angles): a tile is a
+ * tattoo, and a change to an angle is a change to its tattoo, so a lead and
+ * its own angle selected together are one change, not a failure. The lead
+ * stands for its tattoo when it is there; otherwise the first photo of it
+ * given. Order kept. Pure.
+ */
+export function oneByTattoo<
+	T extends { id: string; leadPhotoId: string | null },
+>(photos: readonly T[]): T[] {
+	const chosen = new Map<string, T>();
+	for (const photo of photos) {
+		const key = photo.leadPhotoId ?? photo.id;
+		const held = chosen.get(key);
+		if (!held || (held.leadPhotoId !== null && photo.leadPhotoId === null)) {
+			chosen.set(key, photo);
+		}
+	}
+	const kept = new Set(chosen.values());
+	return photos.filter((photo) => kept.has(photo));
 }

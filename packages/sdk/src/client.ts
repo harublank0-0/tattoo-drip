@@ -124,16 +124,19 @@ export function createTattooClient(options: TattooClientOptions) {
 		work: {
 			/**
 			 * A page of the studio's work photos, newest first (TAT-126): the
-			 * whole body, `{ data, nextCursor, filters }`. Pass `nextCursor` back
+			 * whole body, `{ data, nextCursor, filters }`, one entry per tattoo
+			 * (its main photo, with the others in `angles`). Pass `nextCursor` back
 			 * as `cursor`, with the same filters, for the next page. A malformed
 			 * parameter or cursor is a 422 TattooApiError (`validation_failed`).
 			 */
 			list: (query?: ListWorkQuery, call?: RequestOptions) =>
 				request<WorkPage>(withQuery(`${tenantRoot}/work`, query), {}, call),
 			/**
-			 * One photo by its `id`, as the gallery lists it. A hidden or deleted
-			 * artist's, a removed photo, an unknown id and another studio's are a
-			 * 404 TattooApiError (`not_found`).
+			 * One tattoo by a photo's `id`, as the gallery lists it, with its
+			 * other photos in `angles`. The id of one of those other photos
+			 * answers with the tattoo itself, whose `id` is its main photo's. A
+			 * hidden or deleted artist's, a removed photo, an unknown id and
+			 * another studio's are a 404 TattooApiError (`not_found`).
 			 */
 			get: (id: string, call?: RequestOptions) =>
 				getData<GalleryPhoto>(

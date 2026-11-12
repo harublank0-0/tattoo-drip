@@ -408,6 +408,18 @@ const routes = {
     tokens: [{"old":"/t/:tenant/artists/photos/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/photos/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/photos/:id","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/photos/:id","type":0,"val":"photos","end":""},{"old":"/t/:tenant/artists/photos/:id","type":1,"val":"id","end":""}],
     types: placeholder as Registry['tenant.artists.photos.destroy']['types'],
   },
+  'tenant.artists.photos.order': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/artists/photos/:id/order',
+    tokens: [{"old":"/t/:tenant/artists/photos/:id/order","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/photos/:id/order","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/photos/:id/order","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/photos/:id/order","type":0,"val":"photos","end":""},{"old":"/t/:tenant/artists/photos/:id/order","type":1,"val":"id","end":""},{"old":"/t/:tenant/artists/photos/:id/order","type":0,"val":"order","end":""}],
+    types: placeholder as Registry['tenant.artists.photos.order']['types'],
+  },
+  'tenant.artists.photos.ungroup': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/artists/photos/:id/ungroup',
+    tokens: [{"old":"/t/:tenant/artists/photos/:id/ungroup","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/photos/:id/ungroup","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/photos/:id/ungroup","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/photos/:id/ungroup","type":0,"val":"photos","end":""},{"old":"/t/:tenant/artists/photos/:id/ungroup","type":1,"val":"id","end":""},{"old":"/t/:tenant/artists/photos/:id/ungroup","type":0,"val":"ungroup","end":""}],
+    types: placeholder as Registry['tenant.artists.photos.ungroup']['types'],
+  },
   'tenant.artists.flash.store': {
     methods: ["POST"],
     pattern: '/t/:tenant/artists/:id/flash',

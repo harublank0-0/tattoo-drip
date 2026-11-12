@@ -85,6 +85,7 @@ export default function ArtistForm({
 	artist,
 	canLink,
 	workPhotos,
+	workPhotoTotal,
 	flashDesigns,
 	styleOptions,
 	schedule,
@@ -92,7 +93,10 @@ export default function ArtistForm({
 }: {
 	artist: ArtistProps | null;
 	canLink: boolean;
+	/** The artist's tattoos: each main photo, with how many photos it has. */
 	workPhotos: WorkPhotoProps[];
+	/** Every photo of the artist, angles included: what the limit counts. */
+	workPhotoTotal: number;
 	flashDesigns: FlashDesignProps[];
 	styleOptions: StyleOption[];
 	/** The next days' sessions and the studio's hours (Studio OS); null while adding. */
@@ -130,7 +134,7 @@ export default function ArtistForm({
 						{
 							id: "work-photos",
 							label: "Work photos",
-							count: workPhotos.length,
+							count: workPhotoTotal,
 						},
 						{ id: "flash", label: "Flash", count: flashDesigns.length },
 						...(discover ? [{ id: "discover", label: "Discover" }] : []),
@@ -231,6 +235,7 @@ export default function ArtistForm({
 								tenantSlug={tenant.slug}
 								artistId={artist.id}
 								photos={workPhotos}
+								total={workPhotoTotal}
 								styleOptions={styleOptions}
 							/>
 						</>
