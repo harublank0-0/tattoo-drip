@@ -259,9 +259,9 @@
 	background: radial-gradient(
 		circle at 50% 50%,
 		transparent 54%,
-		rgb(31 29 27 / 0.82) 56%,
-		rgb(31 29 27 / 0.55) 61%,
-		rgb(31 29 27 / 0.12) 66%,
+		color-mix(in srgb, var(--ink) 82%, transparent) 56%,
+		color-mix(in srgb, var(--ink) 55%, transparent) 61%,
+		color-mix(in srgb, var(--ink) 12%, transparent) 66%,
 		transparent 69%
 	);
 }

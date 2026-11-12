@@ -78,9 +78,9 @@ function readsOnScheme(color: string, scheme: Scheme): boolean {
 
 /**
  * The booking form's Turnstile widget colours for a theme: its one fixed
- * scheme (Irezumi is light, Ink Noir dark), so the widget matches the page
+ * scheme (Ink Noir is dark, Atelier light), so the widget matches the page
  * whatever the device prefers; `auto` (the device's) for a theme that
- * follows the device, as Stencil & Ink does.
+ * follows the device, as Stencil & Ink and Irezumi do.
  */
 export function challengeThemeFor(key: ThemeKey): ChallengeTheme {
 	const { scheme } = THEME_HTML[key];
@@ -109,27 +109,23 @@ function washFor(accent: string, scheme: Scheme): string {
 
 /**
  * The dark scheme's accent: `accentDark` when it can be read on the dark
- * paper; else `accent`, lightened toward white a tenth at a time until it
- * can (white always can); else null, the theme's own. `scheme` is the dark
- * paper it must read on: Stencil & Ink's dark scheme, or a dark theme's one
- * scheme (Ink Noir's).
+ * paper and every other surface of the scheme; else `accent`, lightened
+ * toward white a tenth at a time until it can (white always can on a dark
+ * scheme); else null, the theme's own. `scheme` is the dark scheme it must
+ * read on: Stencil & Ink's, a dark theme's one scheme (Ink Noir's), or a
+ * theme's own dark scheme (Irezumi's).
  */
 export function darkAccent(
 	config: Pick<ThemeConfig, "accent" | "accentDark">,
 	scheme: Scheme = DARK,
 ): string | null {
-	if (
-		config.accentDark !== null &&
-		contrastRatio(config.accentDark, scheme.paper) >= MIN_TEXT_CONTRAST
-	) {
+	if (config.accentDark !== null && readsOnScheme(config.accentDark, scheme)) {
 		return config.accentDark;
 	}
 	if (config.accent === null) return null;
 	for (let step = 0; step <= 10; step += 1) {
 		const lighter = mixColors(config.accent, "#ffffff", step / 10);
-		if (contrastRatio(lighter, scheme.paper) >= MIN_TEXT_CONTRAST) {
-			return lighter;
-		}
+		if (readsOnScheme(lighter, scheme)) return lighter;
 	}
 	return null;
 }
@@ -174,43 +170,53 @@ function tokenRule(tokens: AccentTokens, selector = "html:root"): string {
  * which outranks src/styles.css's `:root` wherever the router puts the tag.
  *
  * A theme with one fixed scheme (THEME_HTML's `scheme`: Ink Noir is always
- * dark, Irezumi always light) gets one rule instead, with no media query, on
+ * dark, Atelier always light) gets one rule instead, with no media query, on
  * `html:root.<the theme's class>`, which outranks the theme's tokens
  * (`:root.<class>`). A dark one takes the accent as the dark scheme does
  * (`accentDark`, else the accent lightened); a light one takes `accent` as it
  * is, only while it reads on the paper and every other surface of the theme
  * (the scheme's `surfaces`), else it keeps the theme's own. Either is checked
  * against that theme's own colours, not Stencil & Ink's.
+ *
+ * A theme with its own class that follows the device (THEME_HTML's
+ * `schemes`: Irezumi) gets both media queries, as Stencil & Ink does, but on
+ * `html:root.<the theme's class>` and checked against its own two schemes.
  */
 export function brandingCss(config: ThemeConfig): string | null {
 	const rules: string[] = [];
-	const { scheme, className } = THEME_HTML[config.key];
-	if (scheme !== null && className !== null) {
+	const { scheme, schemes, className } = THEME_HTML[config.key];
+	const selector = className === null ? "html:root" : `html:root.${className}`;
+	if (scheme !== null) {
 		const color = isLightScheme(scheme)
 			? config.accent
 			: darkAccent(config, scheme);
 		const tokens = color === null ? null : accentTokens(color, scheme);
-		if (tokens) rules.push(tokenRule(tokens, `html:root.${className}`));
+		if (tokens) rules.push(tokenRule(tokens, selector));
 	} else {
+		const { light: lightScheme, dark: darkScheme } = schemes ?? {
+			light: LIGHT,
+			dark: DARK,
+		};
 		const light =
-			config.accent === null ? null : accentTokens(config.accent, LIGHT);
+			config.accent === null ? null : accentTokens(config.accent, lightScheme);
 		if (light) {
-			rules.push(`@media (prefers-color-scheme: light){${tokenRule(light)}}`);
+			rules.push(
+				`@media (prefers-color-scheme: light){${tokenRule(light, selector)}}`,
+			);
 		}
-		const darkColor = darkAccent(config);
-		const dark = darkColor === null ? null : accentTokens(darkColor, DARK);
+		const darkColor = darkAccent(config, darkScheme);
+		const dark =
+			darkColor === null ? null : accentTokens(darkColor, darkScheme);
 		if (dark) {
-			rules.push(`@media (prefers-color-scheme: dark){${tokenRule(dark)}}`);
+			rules.push(
+				`@media (prefers-color-scheme: dark){${tokenRule(dark, selector)}}`,
+			);
 		}
 	}
 	// On a theme's own class where it has one (0,2,1), so a theme that sets its
 	// own face (Atelier's Bodoni) still yields to the studio's pick.
 	const face = DISPLAY_FACES[config.font];
-	if (face !== null) {
-		const selector =
-			className === null ? "html:root" : `html:root.${className}`;
-		rules.push(`${selector}{--display-face:${face}}`);
-	}
+	if (face !== null) rules.push(`${selector}{--display-face:${face}}`);
 	const css = rules.join("");
 	return css !== "" && isSafeCss(css) ? css : null;
 }

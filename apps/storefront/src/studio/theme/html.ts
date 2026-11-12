@@ -12,8 +12,9 @@ import {
 } from "./ink-noir/theme.ts";
 import {
 	IREZUMI_CLASS,
+	IREZUMI_DARK_SCHEME,
 	IREZUMI_SCHEME,
-	IREZUMI_THEME_COLOR,
+	IREZUMI_THEME_COLORS,
 } from "./irezumi/theme.ts";
 
 /**
@@ -29,6 +30,13 @@ export interface ThemeHtml {
 	 * accent is checked against this scheme's paper (branding.ts).
 	 */
 	readonly scheme: Scheme | null;
+	/**
+	 * A theme with its own class that follows the device (Irezumi): its light
+	 * and dark schemes, which the brand accent is checked against in each
+	 * scheme's media query. Absent for a theme with one fixed scheme, and for
+	 * Stencil & Ink, whose schemes are branding.ts's LIGHT and DARK.
+	 */
+	readonly schemes?: { readonly light: Scheme; readonly dark: Scheme };
 	/** `<meta name="theme-color">`: the browser's own UI around the page. */
 	readonly themeColors: readonly {
 		readonly content: string;
@@ -52,8 +60,9 @@ export const THEME_HTML: Record<ThemeKey, ThemeHtml> = {
 	},
 	irezumi: {
 		className: IREZUMI_CLASS,
-		scheme: IREZUMI_SCHEME,
-		themeColors: [{ content: IREZUMI_THEME_COLOR }],
+		scheme: null,
+		schemes: { light: IREZUMI_SCHEME, dark: IREZUMI_DARK_SCHEME },
+		themeColors: IREZUMI_THEME_COLORS,
 	},
 	atelier: {
 		className: ATELIER_CLASS,

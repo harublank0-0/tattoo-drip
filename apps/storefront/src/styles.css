@@ -159,13 +159,14 @@
 
 /*
  * Tailwind's `dark:` (the shadcn components use it): the device's dark scheme,
- * except under a theme that is always light (Irezumi), and a theme that is
- * always dark (Ink Noir). After the dark block above:
+ * except under a theme that is always light (Atelier), and a theme that is
+ * always dark (Ink Noir). Irezumi follows the device, as the default does.
+ * After the dark block above:
  * the tests find that block as the file's first dark media query.
  */
 @custom-variant dark {
   @media (prefers-color-scheme: dark) {
-    &:not(:where(.theme-irezumi, .theme-irezumi *, .theme-atelier, .theme-atelier *)) {
+    &:not(:where(.theme-atelier, .theme-atelier *)) {
       @slot;
     }
   }

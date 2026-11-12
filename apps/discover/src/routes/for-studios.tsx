@@ -240,14 +240,16 @@ function ForStudios() {
 								</div>
 							</div>
 							<div className="flex min-h-56 flex-col justify-between border-t-4 border-t-accent bg-paper p-6 text-ink">
-								<span className="eyebrow text-ink-muted">Light, editorial</span>
+								<span className="eyebrow text-ink-muted">
+									Editorial, light or dark
+								</span>
 								<div>
 									<p className="font-display text-display-md font-bold">
 										Irezumi
 									</p>
 									<p className="mt-2 text-sm text-ink-muted">
-										Warm paper, charcoal ink and vermilion. Gives large pieces
-										room.
+										Washi paper with seigaiha waves, charcoal ink and vermilion.
+										Gives large pieces room.
 									</p>
 								</div>
 							</div>

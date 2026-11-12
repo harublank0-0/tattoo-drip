@@ -1,22 +1,25 @@
 /*
- * Irezumi: a light, Japanese-inspired editorial theme (src/studio/theme/irezumi/).
+ * Irezumi: a Japanese-inspired editorial theme (src/studio/theme/irezumi/).
  * Everything here applies only under `<html class="theme-irezumi">`, which the
  * root route sets for a studio that picked the theme (src/studio/theme/html.ts),
  * or to `irz-` classes only Irezumi's components render, so Stencil & Ink and
  * Ink Noir pages are untouched.
  *
- * One light scheme, whatever the device prefers (a light colour scheme). The
- * values are theme.ts's IREZUMI_SCHEME and the accent tokens accentTokens()
- * gives for the vermilion #b3321d on that paper (test/studio/irezumi.test.ts
- * pins both). On the paper #f6f1e7 / the raised surface #ede5d6: ink 14.9 /
- * 13.4:1, ink-muted 6.7 / 6.0:1, accent 5.5 / 4.95:1, accent hover 7.8 /
- * 7.0:1, line-strong 3.7 / 3.3:1. Text on an accent fill is the paper (5.5:1).
- * A studio's own accent replaces the three accent tokens through brandingCss,
- * only when it reads on both surfaces.
+ * Two schemes that follow the device, as Stencil & Ink's do: warm paper on a
+ * light one, sumi-ink paper on a dark one. The values are theme.ts's
+ * IREZUMI_SCHEME and IREZUMI_DARK_SCHEME, and the accent tokens accentTokens()
+ * gives for each vermilion on that scheme (test/studio/irezumi.test.ts pins
+ * both). Light, on the paper #f6f1e7 / the raised surface #ede5d6: ink 14.9 /
+ * 13.4:1, ink-muted 6.7 / 6.0:1, accent 5.5 / 4.95:1, accent hover 7.3 /
+ * 6.6:1, line-strong 3.7 / 3.3:1. Dark, on #161412 / #201d1a: ink 14.8 /
+ * 13.5:1, ink-muted 7.1 / 6.5:1, accent 5.4 / 4.9:1, accent hover 6.9 /
+ * 6.3:1, line-strong 3.9 / 3.5:1. Text on an accent fill is the paper (5.5 /
+ * 5.4:1). A studio's own accent replaces the three accent tokens through
+ * brandingCss, in each scheme only when it reads on all of its surfaces.
  *
  * `:root.theme-irezumi` (0,2,0) outranks styles.css's `:root` and its dark
- * scheme's `:root` (a device that prefers dark still gets the paper); the
- * brand's `html:root.theme-irezumi` (0,2,1) outranks this.
+ * scheme's `:root`; the brand's `html:root.theme-irezumi` (0,2,1) outranks
+ * this.
  *
  * Type: the display face (the studio's pick, Eczar by default: a serif) for
  * names and headings, the system serif (`--irz-serif`, nothing downloaded) for
@@ -47,17 +50,47 @@
   --irz-serif: Georgia, 'Noto Serif', 'Noto Serif Devanagari', 'Times New Roman', serif;
 }
 
+@media (prefers-color-scheme: dark) {
+  :root.theme-irezumi {
+    color-scheme: dark;
+    --paper: #161412;
+    --paper-raised: #201d1a;
+    --ink: #ede6da;
+    --ink-muted: #a8a095;
+    --stencil: #e0664f;
+    --stencil-strong: #e38672;
+    --on-stencil: #161412;
+    --stencil-wash: #2e1e19;
+    --line: #3a3530;
+    --line-strong: #7a7268;
+    --destructive: #f2b8b5;
+  }
+}
+
 /*
- * The paper's ink-wash: two very faint washes of the ink at the page's
- * corners, painted once behind everything (no image, no fixed attachment).
- * At most 4% of the ink, so every contrast above still holds where it lies.
+ * The paper: a fine washi grain over a faint seigaiha (overlapping waves,
+ * irezumi's classic ground) on the page, and the grain alone on the raised
+ * paper (the footer and the bands). Each is a small SVG tile in ./paper/,
+ * drawn in the scheme's ink at under a tenth of its strength (the waves'
+ * hairlines 7.5% light, 7% dark; the grain at most 6%), which the build
+ * inlines into this stylesheet, so nothing is downloaded; no fixed
+ * attachment. The waves' tile is opaque paper, so the colour under it is the
+ * scheme's paper whatever loads. The texture moves each surface's average
+ * colour a little (light paper #f1ece2, raised #ebe3d5; dark paper #1d1a18,
+ * raised #22201c, measured in Chromium): theme.ts lists those among each
+ * scheme's surfaces, so the accent is checked against the paper as drawn.
  */
 :root.theme-irezumi body {
   background-color: var(--paper);
-  background-image:
-    radial-gradient(90rem 40rem at 100% 0%, rgb(31 29 27 / 0.04), transparent 70%),
-    radial-gradient(70rem 50rem at 0% 100%, rgb(31 29 27 / 0.03), transparent 70%);
-  background-repeat: no-repeat;
+  background-image: url('./paper/grain-light.svg'), url('./paper/seigaiha-light.svg');
+  background-repeat: repeat;
+}
+:root.theme-irezumi .irz-footer,
+:root.theme-irezumi .irz-band { background-image: url('./paper/grain-light.svg'); }
+@media (prefers-color-scheme: dark) {
+  :root.theme-irezumi body { background-image: url('./paper/grain-dark.svg'), url('./paper/seigaiha-dark.svg'); }
+  :root.theme-irezumi .irz-footer,
+  :root.theme-irezumi .irz-band { background-image: url('./paper/grain-dark.svg'); }
 }
 
 /*
