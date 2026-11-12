@@ -366,6 +366,9 @@
    */
   .work-video,
   .artwork-video { object-fit: contain; background: var(--stencil-wash); }
+  /* In the viewer the video fills the fixed stage and is contained in it, so the steps under it never move. */
+  .work-stage:has(> .work-video) { position: relative; }
+  .work-stage .work-video { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; max-inline-size: 100%; max-block-size: 100%; }
   .artwork-open-video { cursor: auto; }
   .artwork-angle-video { position: relative; overflow: hidden; }
   .artwork-angle-play { position: absolute; inset: 0; margin: auto; inline-size: 1.5rem; block-size: 1.5rem; border-radius: 50%; background: rgb(0 0 0 / 0.6); }
