@@ -25,7 +25,7 @@ import {
 	type TrackingMode,
 	toStockUnits,
 } from "#modules/inventory/stock";
-import { withTransaction } from "#services/db_context";
+import { dbClient, withTransaction } from "#services/db_context";
 
 type InventoryFilter = "active" | "low" | "expiring" | "archived";
 
@@ -108,11 +108,20 @@ async function assertDistinct(
 			: InventoryItem.query()
 	).where("tenant_id", tenantId);
 	if (options.exceptId) query.whereNot("id", options.exceptId);
-	const found = await sameItem(query, fields.name, fields.sku).first();
+	// Postgres decides both the match and whether the SKU is what matched,
+	// so the two always agree on case.
+	const found = await sameItem(query, fields.name, fields.sku)
+		.select("*")
+		.select(
+			fields.sku
+				? dbClient().raw("coalesce(lower(sku) = lower(?), false) as same_sku", [
+						fields.sku,
+					])
+				: dbClient().raw("false as same_sku"),
+		)
+		.first();
 	if (!found) return;
-	const bySku =
-		fields.sku !== null &&
-		found.sku?.toLowerCase() === fields.sku.toLowerCase();
+	const bySku = found.$extras.same_sku === true;
 	const what = bySku ? "SKU" : "name";
 	throw new InventoryRuleError(
 		options.field ?? (bySku ? "sku" : "name"),
@@ -320,7 +329,11 @@ export default class InventoryService {
 			const extra = await stocked().where("id", includeId).first();
 			if (extra) choices.push(extra);
 		}
-		const listed = await stocked().paginate(page, LOTS_PER_PAGE);
+		let listed = await stocked().paginate(page, LOTS_PER_PAGE);
+		// A page past the end (a stale tab after lots ran out) shows the last.
+		if (listed.currentPage > listed.lastPage && listed.total > 0) {
+			listed = await stocked().paginate(listed.lastPage, LOTS_PER_PAGE);
+		}
 		const assigned = await lotTotal(tenantId, itemId);
 		return { choices, listed, assigned };
 	}

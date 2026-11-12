@@ -89,3 +89,25 @@ export function afterText(after: number | null, unit: string) {
 		? "More than this lot holds."
 		: `After this: ${amount(after)} ${unit} left in this lot.`;
 }
+
+/** The item page's view: the open lot's history, the Lots page, the history page. */
+export type ItemView = { lot: string | null; lots: number; page: number };
+
+/**
+ * An address on the item page that changes only what `changes` names and
+ * keeps the rest of the view (page 1 is left out of the address).
+ */
+export function itemViewHref(
+	detail: string,
+	current: ItemView,
+	changes: Partial<ItemView>,
+	hash: "history" | "lots",
+) {
+	const view = { ...current, ...changes };
+	const query = new URLSearchParams();
+	if (view.lot) query.set("lot", view.lot);
+	if (view.lots > 1) query.set("lots", String(view.lots));
+	if (view.page > 1) query.set("page", String(view.page));
+	const search = query.toString();
+	return `${detail}${search ? `?${search}` : ""}#${hash}`;
+}

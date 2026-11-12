@@ -28,6 +28,12 @@ type LotsModule = {
 		quantity: string,
 	): number | null;
 	afterText(after: number | null, unit: string): string | null;
+	itemViewHref(
+		detail: string,
+		current: { lot: string | null; lots: number; page: number },
+		changes: Partial<{ lot: string | null; lots: number; page: number }>,
+		hash: "history" | "lots",
+	): string;
 };
 const {
 	NEW_LOT,
@@ -37,6 +43,7 @@ const {
 	lotOption,
 	lotAfter,
 	afterText,
+	itemViewHref,
 } = lotsModule as LotsModule;
 
 const expired: Lot = {
@@ -103,5 +110,33 @@ test.group("Inventory lot picker", () => {
 		assert.equal(afterText(10000, "ml"), "After this: 10 ml left in this lot.");
 		assert.equal(afterText(-1, "ml"), "More than this lot holds.");
 		assert.isNull(afterText(null, "ml"));
+	});
+
+	test("item page links change one thing and keep the rest of the view", ({
+		assert,
+	}) => {
+		const detail = "/t/bn/inventory/i1";
+		const view = { lot: "l1", lots: 3, page: 4 };
+		assert.equal(
+			itemViewHref(detail, view, { page: 5 }, "history"),
+			`${detail}?lot=l1&lots=3&page=5#history`,
+		);
+		assert.equal(
+			itemViewHref(detail, view, { lots: 2 }, "lots"),
+			`${detail}?lot=l1&lots=2&page=4#lots`,
+		);
+		assert.equal(
+			itemViewHref(detail, view, { lot: "l2", page: 1 }, "history"),
+			`${detail}?lot=l2&lots=3#history`,
+		);
+		assert.equal(
+			itemViewHref(
+				detail,
+				{ lot: null, lots: 1, page: 1 },
+				{ lot: null, page: 1 },
+				"history",
+			),
+			`${detail}#history`,
+		);
 	});
 });

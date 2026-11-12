@@ -563,7 +563,17 @@ test.group("Studio OS inventory lots", (group) => {
 			assert.lengthOf(lots, 0);
 			assert.equal(listed.total, 0);
 			assert.equal(assigned, 0);
-			await assert.rejects(() => service.restore(b.tenant.id, inkA.item.id));
+			// An archived item of A, so only the tenant filter can refuse it.
+			const archived = await service.create(a.tenant.id, {
+				name: "Retired needles",
+				unit: "box",
+			});
+			await service.archive(a.tenant.id, archived.id);
+			await assert.rejects(() => service.restore(b.tenant.id, archived.id));
+			const still = await InventoryItem.withTrashed()
+				.where("id", archived.id)
+				.firstOrFail();
+			assert.isNotNull(still.deletedAt);
 			assert.lengthOf(await service.exportLots(b.tenant.id), 0);
 			await assert.rejects(() =>
 				service.findLot(b.tenant.id, inkA.item.id, inkA.lot.id),

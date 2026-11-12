@@ -11,7 +11,12 @@ import {
 } from "~/components/inventory/item_fields";
 import { LotExpiryForm } from "~/components/inventory/lot_expiry";
 import { LotTracking } from "~/components/inventory/lot_tracking";
-import { expiryText, type InventoryLot } from "~/components/inventory/lots";
+import {
+	expiryText,
+	type InventoryLot,
+	type ItemView,
+	itemViewHref,
+} from "~/components/inventory/lots";
 import { MovementForm } from "~/components/inventory/movement_form";
 import InventoryPagination from "~/components/inventory/pagination";
 import Page from "~/components/page";
@@ -81,11 +86,13 @@ export default function InventoryShow({
 	const params = { tenant: slug, id: item.id };
 	const detail = urlFor("tenant.inventory.show", params);
 	const tracked = item.tracking === "lot";
+	const view: ItemView = {
+		lot: lotFilter?.id ?? null,
+		lots: lotList.page,
+		page,
+	};
 	const historyHref = (next: number) =>
-		`${detail}?${new URLSearchParams({
-			...(lotFilter ? { lot: lotFilter.id } : {}),
-			page: String(next),
-		})}#history`;
+		itemViewHref(detail, view, { page: next }, "history");
 	const heading = useRef<HTMLHeadingElement>(null);
 
 	return (
@@ -181,7 +188,12 @@ export default function InventoryShow({
 											{stockAmount(lot.quantity)} {item.unit}
 										</span>
 										<Link
-											href={`${detail}?lot=${lot.id}#history`}
+											href={itemViewHref(
+												detail,
+												view,
+												{ lot: lot.id, page: 1 },
+												"history",
+											)}
 											className="inline-flex min-h-11 items-center underline underline-offset-4"
 											aria-label={`History of lot ${lot.number}`}
 										>
@@ -198,12 +210,7 @@ export default function InventoryShow({
 					<InventoryPagination
 						page={lotList.page}
 						lastPage={lotList.lastPage}
-						href={(next) =>
-							`${detail}?${new URLSearchParams({
-								...(lotFilter ? { lot: lotFilter.id } : {}),
-								lots: String(next),
-							})}#lots`
-						}
+						href={(next) => itemViewHref(detail, view, { lots: next }, "lots")}
 					/>
 				</Section>
 			)}
@@ -215,7 +222,12 @@ export default function InventoryShow({
 							Showing lot {lotFilter.number} only.
 						</span>
 						<Link
-							href={`${detail}#history`}
+							href={itemViewHref(
+								detail,
+								view,
+								{ lot: null, page: 1 },
+								"history",
+							)}
 							className="inline-flex min-h-11 items-center underline underline-offset-4"
 						>
 							Show all movements

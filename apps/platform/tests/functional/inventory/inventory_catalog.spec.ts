@@ -203,6 +203,20 @@ test.group("Studio OS inventory catalog", (group) => {
 			first.lots.map((lot: { id: string }) => lot.id),
 			l101,
 		);
+		// Past the end: the last page, not an empty list.
+		const beyond = await view("?lots=9");
+		assert.equal(beyond.lotList.page, 5);
+		assert.lengthOf(beyond.lotList.rows, 1);
+		// Saving an expiry from Lots page 5 comes back to page 5.
+		const saved = await client
+			.put(`${detail}/lot-expiry`)
+			.loginAs(owner)
+			.withCsrfToken()
+			.header("referer", `http://localhost${detail}?lots=5&evil=x`)
+			.redirects(0)
+			.form({ lotId: l101, expiresOn: "2031-01-01" });
+		saved.assertStatus(302);
+		assert.equal(saved.header("location"), `${detail}?lots=5`);
 		const focused = await view(`?lot=${l101}`);
 		assert.lengthOf(focused.lots, 101);
 		assert.equal(focused.lots[100].id, l101);

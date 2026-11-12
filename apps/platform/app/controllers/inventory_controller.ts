@@ -21,6 +21,7 @@ import {
 	type ExpiryStatus,
 	expiryStatus,
 	INVENTORY_UNITS,
+	MAX_LISTED_LOTS,
 } from "#modules/inventory/stock";
 import {
 	createInventoryItemValidator,
@@ -33,6 +34,25 @@ import { formatDay, todayIn } from "#modules/projects/quotes";
 
 const pageNumber = (value: unknown) =>
 	typeof value === "string" && /^[1-9]\d{0,7}$/.test(value) ? Number(value) : 1;
+
+/**
+ * The item page's own query (`lot`, `lots`, `page`) from a referring URL,
+ * so a form on that page returns to the same view. Anything else is dropped.
+ */
+function lotsQuery(referer: string | undefined) {
+	const kept: Record<string, string> = {};
+	if (!referer) return kept;
+	try {
+		const params = new URL(referer).searchParams;
+		for (const key of ["lot", "lots", "page"]) {
+			const value = params.get(key);
+			if (value && /^[0-9a-f-]{1,36}$/i.test(value)) kept[key] = value;
+		}
+	} catch {
+		// Not a URL: the plain page.
+	}
+	return kept;
+}
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -156,8 +176,12 @@ export default class InventoryController {
 			canManage,
 			lots: lotRows,
 			// First in, first out by expiry: the earliest lot still in date.
+			// Only among the first MAX_LISTED_LOTS: a lot added because its
+			// history is open may come after earlier-expiring ones.
 			suggestedLotId:
-				lotRows.find((lot) => lot.expiry !== "expired")?.id ?? null,
+				lotRows
+					.slice(0, MAX_LISTED_LOTS)
+					.find((lot) => lot.expiry !== "expired")?.id ?? null,
 			unassigned: item.quantity - assigned,
 			// The Lots list: every lot with stock, a page at a time; `lots` (the
 			// forms' choices) is the first MAX_LISTED_LOTS of them.
@@ -280,8 +304,10 @@ export default class InventoryController {
 			this.inventory.setLotExpiry(tenant.id, item.id, lotId, expiresOn ?? null),
 		);
 		ctx.session.flash("success", "Lot expiry saved.");
+		// Back to the same page of the Lots list the form was on.
 		return ctx.response
 			.redirect()
+			.withQs({ ...lotsQuery(ctx.request.header("referer")) })
 			.toRoute("tenant.inventory.show", { tenant: tenant.slug, id: item.id });
 	}
 
