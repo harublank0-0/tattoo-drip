@@ -238,6 +238,26 @@ export function fileProblem(file: {
 	return null;
 }
 
+/**
+ * Which chosen files an upload sends and which it names without sending:
+ * `send` the indices of the files `fileProblem` takes, in the order chosen,
+ * and `skip` every other file with the reason, which the server would give
+ * in the same words. The room check counts `send` only: a wrong file never
+ * takes a place.
+ */
+export function planUpload(
+	files: readonly { name: string; type: string; size: number }[],
+): { send: number[]; skip: { index: number; reason: string }[] } {
+	const send: number[] = [];
+	const skip: { index: number; reason: string }[] = [];
+	for (const [index, file] of files.entries()) {
+		const reason = fileProblem(file);
+		if (reason) skip.push({ index, reason });
+		else send.push(index);
+	}
+	return { send, skip };
+}
+
 /** The same file chosen twice is one item: by name, size and date. */
 export function fileKey(file: {
 	name: string;

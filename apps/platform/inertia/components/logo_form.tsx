@@ -2,6 +2,7 @@ import { Form } from "@adonisjs/inertia/react";
 import { router } from "@inertiajs/react";
 import { useEffect, useRef } from "react";
 import { urlFor } from "~/client";
+import { ImageFileInput } from "~/components/file_preview";
 import {
 	LOGO_FILE_HELP,
 	LOGO_INTRO,
@@ -24,7 +25,6 @@ import {
 	FieldError,
 	FieldLabel,
 } from "~/components/ui/field";
-import { Input } from "~/components/ui/input";
 import { useTenant } from "~/hooks/use-tenant";
 
 /**
@@ -83,13 +83,15 @@ export default function LogoForm({ logo }: { logo: LogoProps | null }) {
 						{({ errors, processing, progress }) => (
 							<Field data-invalid={!!errors.logo}>
 								<FieldLabel htmlFor="logo">Choose an image</FieldLabel>
-								<Input
+								<ImageFileInput
 									id="logo"
 									name="logo"
-									type="file"
 									accept={PHOTO_ACCEPT}
 									required
 									aria-invalid={!!errors.logo}
+									replaces={logo !== null}
+									fit="contain"
+									previewClassName="size-24 bg-logo-plate"
 								/>
 								<FieldDescription>{LOGO_FILE_HELP}</FieldDescription>
 								{errors.logo && <FieldError>{errors.logo}</FieldError>}

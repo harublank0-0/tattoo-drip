@@ -3,6 +3,7 @@ import { router } from "@inertiajs/react";
 import { useRef, useState } from "react";
 import { urlFor } from "~/client";
 import { ignoreHeldEnter } from "~/components/confirm";
+import { ImageFileInput } from "~/components/file_preview";
 import {
 	claimDesignLabel,
 	designNote,
@@ -286,13 +287,14 @@ function AddDesign({
 				<FieldGroup>
 					<Field data-invalid={!!errors.picture}>
 						<FieldLabel htmlFor="flash-picture">{PICTURE_LABEL}</FieldLabel>
-						<Input
+						<ImageFileInput
 							id="flash-picture"
 							name="picture"
-							type="file"
 							accept={PHOTO_ACCEPT}
 							required
 							aria-invalid={!!errors.picture}
+							fit="contain"
+							previewClassName="size-24"
 						/>
 						{errors.picture && <FieldError>{errors.picture}</FieldError>}
 					</Field>
