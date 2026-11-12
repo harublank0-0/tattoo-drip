@@ -108,23 +108,35 @@ function washFor(accent: string, scheme: Scheme): string {
 }
 
 /**
- * The dark scheme's accent: `accentDark` when it can be read on the dark
- * paper and every other surface of the scheme; else `accent`, lightened
- * toward white a tenth at a time until it can (white always can on a dark
- * scheme); else null, the theme's own. `scheme` is the dark scheme it must
- * read on: Stencil & Ink's, a dark theme's one scheme (Ink Noir's), or a
- * theme's own dark scheme (Irezumi's).
+ * The dark scheme's accent, which must read at 4.5:1 on the dark paper and
+ * every other surface of `scheme` (Stencil & Ink's dark scheme, a dark
+ * theme's one scheme such as Ink Noir's, or a theme's own dark scheme such as
+ * Irezumi's):
+ * - `accentDark` when it reads there as it is;
+ * - else, when it is a valid dark-mode colour (it reads on Stencil & Ink's
+ *   dark paper, which is all the platform checks) but `scheme` has lighter
+ *   surfaces (Irezumi's textured paper), `accentDark` lightened toward white
+ *   a tenth at a time until it reads, so its hue is kept rather than dropped;
+ * - else `accent`, lightened the same way (not at all while it already
+ *   reads; white always reads on a dark scheme);
+ * - else null, the theme's own.
  */
 export function darkAccent(
 	config: Pick<ThemeConfig, "accent" | "accentDark">,
 	scheme: Scheme = DARK,
 ): string | null {
-	if (config.accentDark !== null && readsOnScheme(config.accentDark, scheme)) {
-		return config.accentDark;
+	const { accent, accentDark } = config;
+	if (accentDark !== null && readsOnScheme(accentDark, DARK)) {
+		const lighter = lightenUntilReadable(accentDark, scheme);
+		if (lighter !== null) return lighter;
 	}
-	if (config.accent === null) return null;
+	return accent === null ? null : lightenUntilReadable(accent, scheme);
+}
+
+/** `color` mixed with white a tenth at a time, the first that reads on every surface of `scheme`; null if none does. */
+function lightenUntilReadable(color: string, scheme: Scheme): string | null {
 	for (let step = 0; step <= 10; step += 1) {
-		const lighter = mixColors(config.accent, "#ffffff", step / 10);
+		const lighter = mixColors(color, "#ffffff", step / 10);
 		if (readsOnScheme(lighter, scheme)) return lighter;
 	}
 	return null;

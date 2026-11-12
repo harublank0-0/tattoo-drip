@@ -19,30 +19,40 @@ import {
 
 /**
  * What a theme sets on the whole page, `<html>` and `<head>` included, which
- * the root route renders before any page's loader has run. Pure.
+ * the root route renders before any page's loader has run. Pure. A theme has
+ * one fixed `scheme`, or none and then may name its own two (`schemes`):
+ * never both.
  */
-export interface ThemeHtml {
+export type ThemeHtml = {
 	/** The class on `<html>` that switches src/styles.css's tokens to the theme's; null keeps `:root`'s. */
 	readonly className: string | null;
-	/**
-	 * The one colour scheme the theme always uses, whatever the device
-	 * prefers, or null when it follows the device (light and dark). The brand
-	 * accent is checked against this scheme's paper (branding.ts).
-	 */
-	readonly scheme: Scheme | null;
-	/**
-	 * A theme with its own class that follows the device (Irezumi): its light
-	 * and dark schemes, which the brand accent is checked against in each
-	 * scheme's media query. Absent for a theme with one fixed scheme, and for
-	 * Stencil & Ink, whose schemes are branding.ts's LIGHT and DARK.
-	 */
-	readonly schemes?: { readonly light: Scheme; readonly dark: Scheme };
 	/** `<meta name="theme-color">`: the browser's own UI around the page. */
 	readonly themeColors: readonly {
 		readonly content: string;
 		readonly media?: string;
 	}[];
-}
+} & (
+	| {
+			/**
+			 * The one colour scheme the theme always uses, whatever the device
+			 * prefers. The brand accent is checked against this scheme
+			 * (branding.ts).
+			 */
+			readonly scheme: Scheme;
+			readonly schemes?: undefined;
+	  }
+	| {
+			/** None: the theme follows the device (light and dark). */
+			readonly scheme: null;
+			/**
+			 * A theme with its own class that follows the device (Irezumi): its
+			 * light and dark schemes, which the brand accent is checked against
+			 * in each scheme's media query. Absent for Stencil & Ink, whose
+			 * schemes are branding.ts's LIGHT and DARK.
+			 */
+			readonly schemes?: { readonly light: Scheme; readonly dark: Scheme };
+	  }
+);
 
 export const THEME_HTML: Record<ThemeKey, ThemeHtml> = {
 	"stencil-and-ink": {

@@ -18,9 +18,11 @@ import {
 	accentTokens,
 	brandingCss,
 	challengeThemeFor,
+	DARK,
+	darkAccent,
 	isSafeCss,
 } from "../../src/studio/theme/branding.ts";
-import { contrastRatio } from "../../src/studio/theme/color.ts";
+import { contrastRatio, mixColors } from "../../src/studio/theme/color.ts";
 import {
 	parseThemeConfig,
 	THEME_SECTIONS,
@@ -144,7 +146,7 @@ describe("Irezumi's palette (theme.ts and styles.css agree)", () => {
 			name: "dark",
 			scheme: IREZUMI_DARK_SCHEME,
 			tokens: tokensOf(":root.theme-irezumi", darkMedia),
-			accent: "#e0664f",
+			accent: "#e36b54",
 		},
 	] as const;
 
@@ -241,7 +243,10 @@ describe("Irezumi's palette (theme.ts and styles.css agree)", () => {
 				[],
 				`${url} refers only to itself`,
 			);
-			assert.doesNotMatch(svg, /<script|<image|<foreignObject|on[a-z]+=/i);
+			assert.doesNotMatch(
+				svg,
+				/<script|<style|<image|<foreignObject|@import|on[a-z]+=/i,
+			);
 		}
 	});
 
@@ -274,18 +279,25 @@ describe("Irezumi's palette (theme.ts and styles.css agree)", () => {
 				.split(" ")
 				.map(Number);
 			assert.deepEqual([matrix?.[4], matrix?.[9], matrix?.[14]], channels);
+			// How strong the texture is, which theme.ts's measured surfaces
+			// depend on: change these and measure the surfaces again.
+			assert.deepEqual(matrix?.slice(15), [0.1, 0, 0, 0, -0.04], "grain");
+			assert.match(read("grain"), /width="240" height="240"/);
+			assert.match(
+				waves,
+				new RegExp(`stroke-opacity="${name === "light" ? "0.075" : "0.07"}"`),
+			);
+			assert.match(waves, /width="48" height="24"/);
 		}
 	});
 
 	test("the page takes the waves and the grain; the footer and the bands take the grain alone, in each scheme", () => {
-		const dark = css.slice(
-			css.indexOf(
-				"@media (prefers-color-scheme: dark)",
-				css.indexOf("The paper:"),
-			),
-		);
+		const paper = css.indexOf("The paper:");
+		const darkStart = css.indexOf("@media (prefers-color-scheme: dark)", paper);
+		const light = css.slice(paper, darkStart);
+		const dark = css.slice(darkStart, css.indexOf("\n}\n", darkStart));
 		for (const [block, name] of [
-			[css, "light"],
+			[light, "light"],
 			[dark, "dark"],
 		] as const) {
 			assert.match(
@@ -302,6 +314,18 @@ describe("Irezumi's palette (theme.ts and styles.css agree)", () => {
 			);
 		}
 		assert.doesNotMatch(css + pagesCss, /background-attachment:\s*fixed/);
+	});
+
+	test("a device asking for more contrast, or forcing its colours, gets the flat paper", () => {
+		const start = css.indexOf(
+			"@media (prefers-contrast: more), (forced-colors: active) {",
+		);
+		assert.ok(start > css.lastIndexOf("url('./paper/"), "after every tile");
+		const block = css.slice(start, css.indexOf("\n}\n", start));
+		assert.match(
+			block,
+			/:root\.theme-irezumi body,\s*:root\.theme-irezumi \.irz-footer,\s*:root\.theme-irezumi \.irz-band \{ background-image: none; \}/,
+		);
 	});
 
 	test("the ink-wash ring is drawn in the scheme's ink, never a fixed colour", () => {
@@ -438,6 +462,31 @@ describe("brandingCss for Irezumi: each scheme in its media query, checked on it
 		assert.equal(LIGHT_RULE.exec(out ?? "")?.[1], "#0f5e58");
 	});
 
+	test("a dark-mode colour the platform accepted but Irezumi's lighter dark paper can't take is lightened, keeping its hue", () => {
+		// #5b7bff passes the platform's check on Stencil & Ink's dark paper
+		// (5.1:1) but not Irezumi's textured dark paper (4.1:1); a tenth
+		// lighter (#6b88ff) it reads on every one of Irezumi's dark surfaces.
+		const accentDark = "#5b7bff";
+		assert.ok(contrastRatio(accentDark, DARK.paper) >= 4.5);
+		const surfaces = [
+			IREZUMI_DARK_SCHEME.paper,
+			...(IREZUMI_DARK_SCHEME.surfaces ?? []),
+		];
+		assert.ok(
+			surfaces.some((surface) => contrastRatio(accentDark, surface) < 4.5),
+		);
+		const out = brandingCss(config({ accent: "#0f5e58", accentDark })) ?? "";
+		const dark = DARK_RULE.exec(out)?.[1];
+		assert.equal(
+			dark,
+			darkAccent({ accent: "#0f5e58", accentDark }, IREZUMI_DARK_SCHEME),
+		);
+		assert.equal(dark, mixColors(accentDark, "#ffffff", 0.1));
+		for (const surface of surfaces) {
+			assert.ok(contrastRatio(dark as string, surface) >= 4.5, surface);
+		}
+	});
+
 	test("an accent that reads on the paper but not on the raised surface keeps the light vermilion", () => {
 		// #0f766e passes the platform's check on Stencil & Ink's paper (4.95:1)
 		// and Irezumi's paper (4.86:1), but not its raised surface (4.37:1).
@@ -454,12 +503,12 @@ describe("brandingCss for Irezumi: each scheme in its media query, checked on it
 
 	test("an accent that reads on the flat paper but not on the paper as drawn keeps the vermilion", () => {
 		// #2a744a reads on the flat light paper (5.0:1) and raised paper (4.54:1),
-		// not on the raised paper as drawn (4.46:1).
-		const [raised, , texturedRaised] = IREZUMI_SCHEME.surfaces ?? [];
+		// not on the paper as drawn (4.29:1 on its 95th percentile).
+		const [raised, textured] = IREZUMI_SCHEME.surfaces ?? [];
 		const flatOnly = "#2a744a";
 		assert.ok(contrastRatio(flatOnly, IREZUMI_SCHEME.paper) >= 4.5);
 		assert.ok(contrastRatio(flatOnly, raised) >= 4.5);
-		assert.ok(contrastRatio(flatOnly, texturedRaised) < 4.5);
+		assert.ok(contrastRatio(flatOnly, textured) < 4.5);
 		assert.doesNotMatch(
 			brandingCss(config({ accent: flatOnly })) ?? "",
 			LIGHT_RULE,
