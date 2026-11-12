@@ -6,7 +6,7 @@
 # platform   /app is the output of `node ace build` plus production modules.
 #            One image, three jobs, chosen by the command:
 #              node bin/server.js                                      (web, default)
-#              node ace.js queue:work                                  (worker)
+#              node ace.js queue:work                                  (worker; needs the image's ffmpeg)
 #              node ace.js migration:run --connection=owner --force    (migrations)
 # storefront /app holds .output plus the production modules its server needs
 #            (Nitro keeps @sentry/* external). Listens on PORT, 3000 by default.
@@ -72,6 +72,12 @@ RUN pnpm --filter @tattoo-drip/storefront deploy --prod /out/storefront
 # ---------------------------------------------------------------------------
 FROM node:${NODE_VERSION}-bookworm-slim AS platform
 ENV NODE_ENV=production
+# Video angles: the worker (this image, `node ace.js queue:work`) transcodes a
+# tattoo's videos with ffmpeg and ffprobe, and refuses to start without them.
+# Debian's ffmpeg, no recommended extras, the package lists removed.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /repo/apps/platform/build ./
 COPY --from=build /out/platform/node_modules ./node_modules
