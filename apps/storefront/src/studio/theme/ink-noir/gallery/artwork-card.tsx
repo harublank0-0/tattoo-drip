@@ -60,7 +60,7 @@ export function ArtworkCard({
 					<span className="ink-piece-count">
 						<Images aria-hidden="true" />
 						<span aria-hidden="true">{photo.angles.length + 1}</span>
-						<span className="sr-only">{photo.photosLabel}</span>
+						<span className="sr-only"> {photo.photosLabel}</span>
 					</span>
 				) : null}
 			</RouterAnchor>

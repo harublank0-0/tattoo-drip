@@ -201,10 +201,12 @@ describe("every theme's gallery marks a tattoo of several photos", () => {
 			assertSafePage(html);
 			// "3 photos" once: shown, or (Ink Noir's narrow pieces: the number
 			// and an icon) there for screen readers.
-			assert.equal(html.match(/>3 photos</g)?.length, 1, "one mark");
+			assert.equal(html.match(/> ?3 photos</g)?.length, 1, "one mark");
 			// The mark sits inside the tile's link or button, so it is part of its name.
 			const tile =
-				/<(a|button) [^>]*>(?:(?!<\/\1>)[\s\S])*?>3 photos<\/span>/.exec(html);
+				/<(a|button) [^>]*>(?:(?!<\/\1>)[\s\S])*?> ?3 photos<\/span>/.exec(
+					html,
+				);
 			assert.ok(tile, "the mark is inside the tile's link or button");
 			assert.doesNotMatch(html, />1 photos?</);
 			// The grid's main photo is numbered in the whole tattoo, like its angles.
