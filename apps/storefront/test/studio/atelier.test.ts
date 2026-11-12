@@ -4,6 +4,7 @@ import { describe, test } from "node:test";
 import type { Artist, Studio } from "@tattoo-drip/sdk";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { ErrorPage, NotFoundPage } from "../../src/studio/components/pages.tsx";
 import {
 	artistPageData,
 	artistsPageData,
@@ -190,8 +191,11 @@ describe("Atelier's palette (theme.ts and styles.css agree)", () => {
 		assert.doesNotMatch(pagesCss, /url\(|@import/);
 		assert.doesNotMatch(css, /@import/);
 		const urls = Array.from(css.matchAll(/url\('([^']+)'\)/g), (m) => m[1]);
-		assert.equal(urls.length, 4);
-		for (const href of urls) {
+		const fonts = urls.filter((href) => href !== "./sprig.svg");
+		assert.equal(fonts.length, 4);
+		// The sprig, twice in its one rule (the prefixed mask and the mask).
+		assert.equal(urls.length - fonts.length, 2);
+		for (const href of fonts) {
 			assert.match(
 				href,
 				/^\.\.\/\.\.\/\.\.\/assets\/fonts\/bodoni-moda\/bodoni-moda-[a-z-]+-(500-normal|400-italic)\.woff2$/,
@@ -210,6 +214,83 @@ describe("Atelier's palette (theme.ts and styles.css agree)", () => {
 		assert.match(
 			appCss,
 			/&:not\(:where\([^)]*\.theme-atelier, \.theme-atelier \*\)\)/,
+		);
+	});
+
+	test("the sprig: a small hairline drawing, inlined, referring to nothing, used only as a brass mask on decoration", () => {
+		const svg = readFileSync(
+			new URL("../../src/studio/theme/atelier/sprig.svg", import.meta.url),
+			"utf8",
+		);
+		// Under Vite's inline limit (4 KiB), so a data: URL in the CSS.
+		assert.ok(svg.length < 4096);
+		assert.match(
+			svg,
+			/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" width="120" height="24"/,
+		);
+		assert.doesNotMatch(
+			svg,
+			/href|url\(|<script|<style|<image|<foreignObject|@import|on[a-z]+=/i,
+		);
+		// Its one rule: the three places it sits, each a pseudo-element or an aria-hidden box.
+		const start = css.indexOf(":root.theme-atelier .status-page::before,");
+		const rule = css.slice(start, css.indexOf("}", start));
+		assert.match(
+			rule,
+			/^:root\.theme-atelier \.status-page::before,\s*\.atl-footer-lead::before,\s*\.atl-hero-ornament::after \{/,
+		);
+		assert.match(rule, /background-color: var\(--atl-brass\);/);
+		assert.match(
+			rule,
+			/-webkit-mask: url\('\.\/sprig\.svg'\) center \/ contain no-repeat;/,
+		);
+		assert.match(
+			rule,
+			/[^-]mask: url\('\.\/sprig\.svg'\) center \/ contain no-repeat;/,
+		);
+		assert.match(rule, /content: '';/);
+	});
+
+	test("the shared pages and the status pages are framed as Atelier's own: a centred title over a brass rule", () => {
+		for (const selector of [
+			":root.theme-atelier main.page > section > .section-title:first-child::after",
+			":root.theme-atelier .status-page > .section-title::after",
+		]) {
+			const start = css.indexOf(selector);
+			assert.ok(start >= 0, selector);
+			const rule = css.slice(start, css.indexOf("}", start));
+			assert.match(rule, /background: var\(--atl-brass\)/);
+			assert.match(rule, /margin: 1\.25rem auto 0/);
+		}
+		assert.match(
+			css,
+			/:root\.theme-atelier main\.page > section > \.section-title:first-child,\s*:root\.theme-atelier \.status-page > \.section-title \{ text-align: center;/,
+		);
+		// The informational pages keep their text read from the start, in a centred column.
+		assert.match(
+			css,
+			/:root\.theme-atelier \.info-page > \.measure \{ margin-inline: auto; \}/,
+		);
+		assert.match(css, /main\.page > section:not\(\.info-page\) > \.stack \{/);
+		assert.match(
+			css,
+			/main\.page > section:not\(\.info-page\) > \.stack > address \{ text-align: start; \}/,
+		);
+	});
+
+	test("the not-found and error pages render in the frame, under the sprig", () => {
+		for (const html of [
+			renderToStaticMarkup(createElement(NotFoundPage)),
+			renderToStaticMarkup(createElement(ErrorPage, { retryHref: "/gallery" })),
+		]) {
+			assert.match(
+				html,
+				/^<main class="page status-page"><h1 class="section-title">/,
+			);
+		}
+		assert.match(
+			css,
+			/:root\.theme-atelier \.status-page \{ justify-items: center; [^}]*text-align: center; \}/,
 		);
 	});
 
