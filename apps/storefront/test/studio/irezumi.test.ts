@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, test } from "node:test";
 import type { Artist, Studio } from "@tattoo-drip/sdk";
 import { createElement } from "react";
@@ -18,9 +18,11 @@ import {
 	accentTokens,
 	brandingCss,
 	challengeThemeFor,
+	DARK,
+	darkAccent,
 	isSafeCss,
 } from "../../src/studio/theme/branding.ts";
-import { contrastRatio } from "../../src/studio/theme/color.ts";
+import { contrastRatio, mixColors } from "../../src/studio/theme/color.ts";
 import {
 	parseThemeConfig,
 	THEME_SECTIONS,
@@ -30,8 +32,9 @@ import { matchedThemeKey, THEME_HTML } from "../../src/studio/theme/html.ts";
 import { irezumiHome } from "../../src/studio/theme/irezumi/home-view.ts";
 import {
 	IREZUMI_CLASS,
+	IREZUMI_DARK_SCHEME,
 	IREZUMI_SCHEME,
-	IREZUMI_THEME_COLOR,
+	IREZUMI_THEME_COLORS,
 } from "../../src/studio/theme/irezumi/theme.ts";
 import {
 	THEMES,
@@ -62,11 +65,13 @@ import { assertSafePage } from "./safety.ts";
 import { COVER_SIZED, IMAGE_ORIGIN, withStorefront } from "./theme-fixtures.ts";
 
 /**
- * Irezumi (src/studio/theme/irezumi/): a light editorial theme. These pin
- * that it is registered end to end (key, sections, <html> class, scheme,
- * theme colour, stylesheet), that a studio's accent is checked against its
- * own two surfaces, and that each page renders the studio's own data in
- * Irezumi's frame, with sparse data handled without inventing anything.
+ * Irezumi (src/studio/theme/irezumi/): an editorial theme on seigaiha
+ * paper that follows the device, light or dark. These pin that it is
+ * registered end to end (key, sections, <html> class, schemes, theme
+ * colours, stylesheet and its paper), that a studio's accent is checked
+ * against each scheme's own surfaces, and that each page renders the
+ * studio's own data in Irezumi's frame, with sparse data handled without
+ * inventing anything.
  */
 
 const css = readFileSync(
@@ -82,8 +87,8 @@ const appCss = readFileSync(
 	"utf8",
 );
 
-function tokensOf(selector: string): Map<string, string> {
-	const start = css.indexOf(`${selector} {`);
+function tokensOf(selector: string, from = 0): Map<string, string> {
+	const start = css.indexOf(`${selector} {`, from);
 	assert.ok(start >= 0, selector);
 	const body = css.slice(start, css.indexOf("}", start));
 	return new Map(
@@ -129,65 +134,205 @@ function homeHtml(
 }
 
 describe("Irezumi's palette (theme.ts and styles.css agree)", () => {
-	const tokens = tokensOf(":root.theme-irezumi");
+	const darkMedia = css.indexOf("@media (prefers-color-scheme: dark) {");
+	const schemes = [
+		{
+			name: "light",
+			scheme: IREZUMI_SCHEME,
+			tokens: tokensOf(":root.theme-irezumi"),
+			accent: "#b3321d",
+		},
+		{
+			name: "dark",
+			scheme: IREZUMI_DARK_SCHEME,
+			tokens: tokensOf(":root.theme-irezumi", darkMedia),
+			accent: "#e36b54",
+		},
+	] as const;
 
-	test("the scheme's paper, ink, muted ink and raised surface are the stylesheet's", () => {
-		assert.equal(tokens.get("--paper"), IREZUMI_SCHEME.paper);
-		assert.equal(tokens.get("--ink"), IREZUMI_SCHEME.ink);
-		assert.equal(tokens.get("--ink-muted"), IREZUMI_SCHEME.inkMuted);
-		assert.deepEqual(IREZUMI_SCHEME.surfaces, [tokens.get("--paper-raised")]);
-		assert.equal(tokens.get("--on-stencil"), IREZUMI_SCHEME.paper);
+	test("the dark tokens are the first dark media query's, after the light ones", () => {
+		assert.ok(darkMedia > css.indexOf(":root.theme-irezumi {"));
+		assert.equal(schemes[1].tokens.get("--paper"), "#161412");
 	});
 
-	test("the vermilion's tokens are what a studio's own accent would get here", () => {
-		const accent = tokens.get("--stencil");
-		assert.equal(accent, "#b3321d");
-		assert.deepEqual(accentTokens(accent as string, IREZUMI_SCHEME), {
-			stencil: accent,
-			stencilStrong: tokens.get("--stencil-strong"),
-			stencilWash: tokens.get("--stencil-wash"),
+	for (const { name, scheme, tokens, accent } of schemes) {
+		test(`${name}: the scheme's paper, ink, muted ink and raised surface are the stylesheet's`, () => {
+			assert.equal(tokens.get("--paper"), scheme.paper);
+			assert.equal(tokens.get("--ink"), scheme.ink);
+			assert.equal(tokens.get("--ink-muted"), scheme.inkMuted);
+			assert.equal(scheme.surfaces?.[0], tokens.get("--paper-raised"));
+			assert.equal(scheme.surfaces?.length, 3, "and the two textured averages");
+			assert.equal(tokens.get("--on-stencil"), scheme.paper);
 		});
-	});
 
-	test("text, the accent and control borders read on the paper and the raised surface", () => {
-		for (const surface of [
-			IREZUMI_SCHEME.paper,
-			...(IREZUMI_SCHEME.surfaces ?? []),
-		]) {
-			for (const name of [
-				"--ink",
-				"--ink-muted",
-				"--stencil",
-				"--stencil-strong",
-			]) {
-				const color = tokens.get(name) as string;
-				assert.ok(
-					contrastRatio(color, surface) >= 4.5,
-					`${name} on ${surface}`,
-				);
+		test(`${name}: the vermilion's tokens are what a studio's own accent would get here`, () => {
+			assert.equal(tokens.get("--stencil"), accent);
+			assert.deepEqual(accentTokens(accent, scheme), {
+				stencil: accent,
+				stencilStrong: tokens.get("--stencil-strong"),
+				stencilWash: tokens.get("--stencil-wash"),
+			});
+		});
+
+		test(`${name}: text, the accent and control borders read on the paper, the raised surface and both under their texture`, () => {
+			for (const surface of [scheme.paper, ...(scheme.surfaces ?? [])]) {
+				for (const token of [
+					"--ink",
+					"--ink-muted",
+					"--stencil",
+					"--stencil-strong",
+				]) {
+					const color = tokens.get(token) as string;
+					assert.ok(
+						contrastRatio(color, surface) >= 4.5,
+						`${token} on ${surface}`,
+					);
+				}
+				const border = tokens.get("--line-strong") as string;
+				assert.ok(contrastRatio(border, surface) >= 3, "--line-strong");
 			}
-			const border = tokens.get("--line-strong") as string;
-			assert.ok(contrastRatio(border, surface) >= 3, "--line-strong");
-		}
-		assert.ok(
-			contrastRatio(IREZUMI_SCHEME.paper, tokens.get("--stencil") as string) >=
-				4.5,
-			"text on the accent",
-		);
-	});
+			assert.ok(
+				contrastRatio(scheme.paper, tokens.get("--stencil") as string) >= 4.5,
+				"text on the accent",
+			);
+		});
+	}
 
-	test("the theme is light whatever the device prefers, loads nothing, and is imported", () => {
-		assert.equal(css.match(/color-scheme:\s*light/g)?.length, 1);
-		for (const sheet of [css, pagesCss]) {
-			assert.doesNotMatch(sheet, /url\(|@import/);
-		}
+	test("each scheme is its device's: light by default, dark on a device that prefers it, and imported", () => {
+		assert.equal(css.match(/(?<!prefers-)color-scheme:\s*light/g)?.length, 1);
+		assert.equal(css.match(/(?<!prefers-)color-scheme:\s*dark/g)?.length, 1);
+		assert.doesNotMatch(css + pagesCss, /@import/);
 		assert.match(appCss, /@import '\.\/studio\/theme\/irezumi\/styles\.css';/);
 		assert.match(appCss, /@import '\.\/studio\/theme\/irezumi\/pages\.css';/);
-		// shadcn's `dark:` never applies under the light theme, even on a dark device.
-		assert.match(
-			appCss,
-			/&:not\(:where\(\.theme-irezumi, \.theme-irezumi \*[^)]*\)\)/,
+		// shadcn's `dark:` follows the device under Irezumi, as its tokens do.
+		const variant = appCss.slice(appCss.indexOf("@custom-variant dark"));
+		assert.doesNotMatch(
+			variant.slice(0, variant.indexOf("@theme")),
+			/theme-irezumi/,
 		);
+	});
+
+	test("the paper loads nothing: its only images are its own small SVG tiles, which the build inlines", () => {
+		assert.doesNotMatch(pagesCss, /url\(/);
+		const urls = Array.from(css.matchAll(/url\(([^)]*)\)/g), (match) =>
+			match[1].replace(/^'|'$/g, ""),
+		);
+		assert.deepEqual(
+			new Set(urls),
+			new Set([
+				"./paper/grain-light.svg",
+				"./paper/seigaiha-light.svg",
+				"./paper/grain-dark.svg",
+				"./paper/seigaiha-dark.svg",
+			]),
+		);
+		for (const url of new Set(urls)) {
+			const file = new URL(
+				`../../src/studio/theme/irezumi/${url}`,
+				import.meta.url,
+			);
+			assert.ok(existsSync(file), url);
+			const svg = readFileSync(file, "utf8");
+			// Under Vite's inline limit (4 KiB), so it is a data: URL in the CSS.
+			assert.ok(svg.length < 4096, `${url} is small`);
+			// Nothing from elsewhere: no address but the SVG namespace and its own ids.
+			assert.deepEqual(
+				Array.from(svg.matchAll(/(?:href|url)\s*[=(]\s*"?([^")\s]*)/g), (m) =>
+					m[1].startsWith("#") ? "#" : m[1],
+				).filter((ref) => ref !== "#"),
+				[],
+				`${url} refers only to itself`,
+			);
+			assert.doesNotMatch(
+				svg,
+				/<script|<style|<image|<foreignObject|@import|on[a-z]+=/i,
+			);
+		}
+	});
+
+	test("each scheme's tile is drawn in its own paper and ink", () => {
+		for (const [name, scheme] of [
+			["light", IREZUMI_SCHEME],
+			["dark", IREZUMI_DARK_SCHEME],
+		] as const) {
+			const read = (file: string) =>
+				readFileSync(
+					new URL(
+						`../../src/studio/theme/irezumi/paper/${file}-${name}.svg`,
+						import.meta.url,
+					),
+					"utf8",
+				);
+			const waves = read("seigaiha");
+			assert.match(waves, new RegExp(`fill="${scheme.paper}"`));
+			assert.match(waves, new RegExp(`stroke="${scheme.ink}"`));
+			// The grain's colour is the ink's, as 0–1 channels.
+			const channels = [1, 3, 5].map((index) =>
+				Number(
+					(
+						Number.parseInt(scheme.ink.slice(index, index + 2), 16) / 255
+					).toFixed(4),
+				),
+			);
+			const matrix = /values="([^"]*)"/
+				.exec(read("grain"))?.[1]
+				.split(" ")
+				.map(Number);
+			assert.deepEqual([matrix?.[4], matrix?.[9], matrix?.[14]], channels);
+			// How strong the texture is, which theme.ts's measured surfaces
+			// depend on: change these and measure the surfaces again.
+			assert.deepEqual(matrix?.slice(15), [0.1, 0, 0, 0, -0.04], "grain");
+			assert.match(read("grain"), /width="240" height="240"/);
+			assert.match(
+				waves,
+				new RegExp(`stroke-opacity="${name === "light" ? "0.075" : "0.07"}"`),
+			);
+			assert.match(waves, /width="48" height="24"/);
+		}
+	});
+
+	test("the page takes the waves and the grain; the footer and the bands take the grain alone, in each scheme", () => {
+		const paper = css.indexOf("The paper:");
+		const darkStart = css.indexOf("@media (prefers-color-scheme: dark)", paper);
+		const light = css.slice(paper, darkStart);
+		const dark = css.slice(darkStart, css.indexOf("\n}\n", darkStart));
+		for (const [block, name] of [
+			[light, "light"],
+			[dark, "dark"],
+		] as const) {
+			assert.match(
+				block,
+				new RegExp(
+					`:root\\.theme-irezumi body \\{[^}]*background-image: url\\('\\./paper/grain-${name}\\.svg'\\), url\\('\\./paper/seigaiha-${name}\\.svg'\\)`,
+				),
+			);
+			assert.match(
+				block,
+				new RegExp(
+					`:root\\.theme-irezumi \\.irz-footer,\\s*:root\\.theme-irezumi \\.irz-band \\{ background-image: url\\('\\./paper/grain-${name}\\.svg'\\); \\}`,
+				),
+			);
+		}
+		assert.doesNotMatch(css + pagesCss, /background-attachment:\s*fixed/);
+	});
+
+	test("a device asking for more contrast, or forcing its colours, gets the flat paper", () => {
+		const start = css.indexOf(
+			"@media (prefers-contrast: more), (forced-colors: active) {",
+		);
+		assert.ok(start > css.lastIndexOf("url('./paper/"), "after every tile");
+		const block = css.slice(start, css.indexOf("\n}\n", start));
+		assert.match(
+			block,
+			/:root\.theme-irezumi body,\s*:root\.theme-irezumi \.irz-footer,\s*:root\.theme-irezumi \.irz-band \{ background-image: none; \}/,
+		);
+	});
+
+	test("the ink-wash ring is drawn in the scheme's ink, never a fixed colour", () => {
+		const start = pagesCss.indexOf(".irz-hero-wash {");
+		const rule = pagesCss.slice(start, pagesCss.indexOf("}", start));
+		assert.doesNotMatch(rule, /rgb\(|#[0-9a-f]{3,6}\b/i);
+		assert.match(rule, /color-mix\(in srgb, var\(--ink\) 82%, transparent\)/);
 	});
 
 	test("every rule is scoped: it starts at the theme's class or an irz- class", () => {
@@ -234,14 +379,18 @@ describe("Irezumi's registration", () => {
 		assert.deepEqual(THEME_SECTIONS.irezumi, THEME_SECTIONS["ink-noir"]);
 	});
 
-	test("THEME_HTML: its class, one light scheme and its paper as the browser's colour", () => {
+	test("THEME_HTML: its class, no fixed scheme but its two, and each paper as the browser's colour in its scheme", () => {
 		assert.equal(IREZUMI_CLASS, "theme-irezumi");
 		assert.deepEqual(THEME_HTML.irezumi, {
 			className: IREZUMI_CLASS,
-			scheme: IREZUMI_SCHEME,
-			themeColors: [{ content: IREZUMI_THEME_COLOR }],
+			scheme: null,
+			schemes: { light: IREZUMI_SCHEME, dark: IREZUMI_DARK_SCHEME },
+			themeColors: IREZUMI_THEME_COLORS,
 		});
-		assert.equal(IREZUMI_THEME_COLOR, "#f6f1e7");
+		assert.deepEqual(IREZUMI_THEME_COLORS, [
+			{ content: "#f6f1e7", media: "(prefers-color-scheme: light)" },
+			{ content: "#161412", media: "(prefers-color-scheme: dark)" },
+		]);
 	});
 
 	test("the matched page is Irezumi for a studio that picked it, but never the deposit page", () => {
@@ -271,25 +420,74 @@ describe("Irezumi's registration", () => {
 	});
 });
 
-describe("brandingCss for Irezumi: one light scheme, checked on both surfaces", () => {
+describe("brandingCss for Irezumi: each scheme in its media query, checked on its own surfaces", () => {
 	const config = (values: Partial<ThemeConfig>): ThemeConfig => ({
 		...parseThemeConfig({ theme: "irezumi" }, null),
 		...values,
 	});
+	const LIGHT_RULE =
+		/@media \(prefers-color-scheme: light\)\{html:root\.theme-irezumi\{--stencil:([^;]+);/;
+	const DARK_RULE =
+		/@media \(prefers-color-scheme: dark\)\{html:root\.theme-irezumi\{--stencil:([^;]+);/;
 
 	test("without a brand there is no <style>", () => {
 		assert.equal(brandingCss(config({})), null);
 	});
 
-	test("an accent that reads on the paper and the raised surface is set on the class, as it is", () => {
+	test("an accent that reads on the light paper is set there as it is; the dark scheme gets it lightened until it reads", () => {
 		const out = brandingCss(config({ accent: "#0f5e58" }));
 		assert.ok(out);
 		assert.ok(isSafeCss(out));
-		assert.doesNotMatch(out, /@media/);
-		assert.match(out, /^html:root\.theme-irezumi\{--stencil:#0f5e58;/);
+		assert.equal(LIGHT_RULE.exec(out)?.[1], "#0f5e58");
+		const dark = DARK_RULE.exec(out)?.[1];
+		assert.ok(dark && dark !== "#0f5e58");
+		for (const surface of [
+			IREZUMI_DARK_SCHEME.paper,
+			...(IREZUMI_DARK_SCHEME.surfaces ?? []),
+		]) {
+			assert.ok(contrastRatio(dark, surface) >= 4.5, surface);
+		}
+		assert.doesNotMatch(
+			out,
+			/(^|\})html:root\.theme-irezumi\{--stencil/,
+			"never outside a media query",
+		);
 	});
 
-	test("an accent that reads on the paper but not on the raised surface keeps the vermilion", () => {
+	test("the studio's dark-mode colour is used in the dark scheme when it reads on every dark surface", () => {
+		const out = brandingCss(
+			config({ accent: "#0f5e58", accentDark: "#7dd3c8" }),
+		);
+		assert.equal(DARK_RULE.exec(out ?? "")?.[1], "#7dd3c8");
+		assert.equal(LIGHT_RULE.exec(out ?? "")?.[1], "#0f5e58");
+	});
+
+	test("a dark-mode colour the platform accepted but Irezumi's lighter dark paper can't take is lightened, keeping its hue", () => {
+		// #5b7bff passes the platform's check on Stencil & Ink's dark paper
+		// (5.1:1) but not Irezumi's textured dark paper (4.1:1); a tenth
+		// lighter (#6b88ff) it reads on every one of Irezumi's dark surfaces.
+		const accentDark = "#5b7bff";
+		assert.ok(contrastRatio(accentDark, DARK.paper) >= 4.5);
+		const surfaces = [
+			IREZUMI_DARK_SCHEME.paper,
+			...(IREZUMI_DARK_SCHEME.surfaces ?? []),
+		];
+		assert.ok(
+			surfaces.some((surface) => contrastRatio(accentDark, surface) < 4.5),
+		);
+		const out = brandingCss(config({ accent: "#0f5e58", accentDark })) ?? "";
+		const dark = DARK_RULE.exec(out)?.[1];
+		assert.equal(
+			dark,
+			darkAccent({ accent: "#0f5e58", accentDark }, IREZUMI_DARK_SCHEME),
+		);
+		assert.equal(dark, mixColors(accentDark, "#ffffff", 0.1));
+		for (const surface of surfaces) {
+			assert.ok(contrastRatio(dark as string, surface) >= 4.5, surface);
+		}
+	});
+
+	test("an accent that reads on the paper but not on the raised surface keeps the light vermilion", () => {
 		// #0f766e passes the platform's check on Stencil & Ink's paper (4.95:1)
 		// and Irezumi's paper (4.86:1), but not its raised surface (4.37:1).
 		const paperOnly = "#0f766e";
@@ -297,16 +495,30 @@ describe("brandingCss for Irezumi: one light scheme, checked on both surfaces", 
 		assert.ok(
 			contrastRatio(paperOnly, (IREZUMI_SCHEME.surfaces ?? [])[0]) < 4.5,
 		);
-		assert.equal(brandingCss(config({ accent: paperOnly })), null);
+		assert.doesNotMatch(
+			brandingCss(config({ accent: paperOnly })) ?? "",
+			LIGHT_RULE,
+		);
 	});
 
-	test("the dark accent is not used: the page is never dark", () => {
-		assert.equal(brandingCss(config({ accentDark: "#fca5a5" })), null);
-		assert.equal(
-			brandingCss(config({ accent: "#fca5a5", accentDark: "#fca5a5" })),
-			null,
-			"a pale accent that can't be read on paper keeps the vermilion",
+	test("an accent that reads on the flat paper but not on the paper as drawn keeps the vermilion", () => {
+		// #2a744a reads on the flat light paper (5.0:1) and raised paper (4.54:1),
+		// not on the paper as drawn (4.29:1 on its 95th percentile).
+		const [raised, textured] = IREZUMI_SCHEME.surfaces ?? [];
+		const flatOnly = "#2a744a";
+		assert.ok(contrastRatio(flatOnly, IREZUMI_SCHEME.paper) >= 4.5);
+		assert.ok(contrastRatio(flatOnly, raised) >= 4.5);
+		assert.ok(contrastRatio(flatOnly, textured) < 4.5);
+		assert.doesNotMatch(
+			brandingCss(config({ accent: flatOnly })) ?? "",
+			LIGHT_RULE,
 		);
+	});
+
+	test("a pale accent that can't be read on the light paper keeps the light vermilion, but serves the dark scheme", () => {
+		const out = brandingCss(config({ accent: "#fca5a5" })) ?? "";
+		assert.doesNotMatch(out, LIGHT_RULE);
+		assert.equal(DARK_RULE.exec(out)?.[1], "#fca5a5");
 	});
 
 	test("the studio's font still applies", () => {
@@ -318,10 +530,11 @@ describe("brandingCss for Irezumi: one light scheme, checked on both surfaces", 
 });
 
 describe("the booking form's Turnstile widget follows the page's scheme", () => {
-	test("Irezumi is light and Ink Noir dark on any device; Stencil & Ink follows the device", () => {
-		assert.equal(challengeThemeFor("irezumi"), "light");
-		assert.equal(challengeThemeFor("ink-noir"), "dark");
+	test("Irezumi and Stencil & Ink follow the device; Ink Noir is dark and Atelier light on any device", () => {
+		assert.equal(challengeThemeFor("irezumi"), "auto");
 		assert.equal(challengeThemeFor("stencil-and-ink"), "auto");
+		assert.equal(challengeThemeFor("ink-noir"), "dark");
+		assert.equal(challengeThemeFor("atelier"), "light");
 	});
 });
 

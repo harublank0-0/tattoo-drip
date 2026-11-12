@@ -15,8 +15,9 @@ import { cleanLine } from "../text.ts";
 /**
  * The themes this app has, by key: Stencil & Ink (TAT-97, TAT-105), Ink
  * Noir, a dark, photography-first look with its own header and footer
- * (src/studio/theme/ink-noir/), and Irezumi, a light, Japanese-inspired
- * editorial look on warm paper (src/studio/theme/irezumi/), and Atelier, a
+ * (src/studio/theme/ink-noir/), Irezumi, a Japanese-inspired editorial
+ * look on seigaiha paper that follows the device, light or dark
+ * (src/studio/theme/irezumi/), and Atelier, a
  * quiet-luxury catalogue on stone paper (src/studio/theme/atelier/).
  */
 export const THEME_KEYS = [

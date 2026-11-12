@@ -92,7 +92,7 @@ export const THEMES: { key: ThemeKey; label: string; description: string }[] = [
 		key: "irezumi",
 		label: "Irezumi",
 		description:
-			"Warm paper, charcoal ink and vermilion, with room for large pieces. Your colour shows where it reads on the paper.",
+			"Washi paper with faint seigaiha waves, charcoal ink and vermilion, with room for large pieces; dark on a device set to dark mode. Your colours show where they read on the paper.",
 	},
 	{
 		key: "atelier",
