@@ -20,6 +20,7 @@ import {
 	INDEPENDENT_NOTE,
 	photosFigure,
 } from "~/components/discover";
+import { ImageFileInput } from "~/components/file_preview";
 import {
 	FLASH_CREATE_NOTE,
 	FLASH_OPEN_HELP,
@@ -529,13 +530,14 @@ function ArtistFields({
 						</Field>
 					</div>
 				)}
-				<Input
+				<ImageFileInput
 					id="photo"
 					name="photo"
 					className="h-11"
-					type="file"
 					accept="image/jpeg,image/png,image/webp"
 					aria-invalid={!!errors.photo}
+					replaces={!!artist?.photoUrl}
+					previewClassName="size-24"
 				/>
 				<FieldDescription>
 					JPEG, PNG or WebP, up to 10 MB.

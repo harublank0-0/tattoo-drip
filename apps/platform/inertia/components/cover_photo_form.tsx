@@ -1,6 +1,7 @@
 import { Form } from "@adonisjs/inertia/react";
 import { router } from "@inertiajs/react";
 import { urlFor } from "~/client";
+import { ImageFileInput } from "~/components/file_preview";
 import {
 	COVER_INTRO,
 	COVER_PREVIEW_NOTE,
@@ -18,7 +19,6 @@ import {
 	FieldError,
 	FieldLabel,
 } from "~/components/ui/field";
-import { Input } from "~/components/ui/input";
 import { useTenant } from "~/hooks/use-tenant";
 
 /**
@@ -75,13 +75,14 @@ export default function CoverPhotoForm({
 						{({ errors, processing, progress }) => (
 							<Field data-invalid={!!errors.cover}>
 								<FieldLabel htmlFor="cover">Choose a photo</FieldLabel>
-								<Input
+								<ImageFileInput
 									id="cover"
 									name="cover"
-									type="file"
 									accept={PHOTO_ACCEPT}
 									required
 									aria-invalid={!!errors.cover}
+									replaces={cover !== null}
+									previewClassName="aspect-[4/3] h-auto w-40"
 								/>
 								<FieldDescription>
 									JPEG, PNG or WebP, up to 10 MB.

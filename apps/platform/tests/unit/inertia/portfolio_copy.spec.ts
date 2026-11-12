@@ -54,6 +54,10 @@ type PortfolioModule = {
 		size: number;
 	}): string | null;
 	fileSizeText(bytes: number): string;
+	planUpload(files: { name: string; type: string; size: number }[]): {
+		send: number[];
+		skip: { index: number; reason: string }[];
+	};
 	uploadProblem(
 		artist: Artist | null,
 		ready: number,
@@ -229,6 +233,27 @@ test.group("Portfolio: the upload", () => {
 		);
 		assert.equal(p.fileSizeText(2.4 * 1024 * 1024), "2.4 MB");
 		assert.equal(p.fileSizeText(10), "1 KB");
+	});
+
+	test("planUpload sends the files fileProblem takes, in order, and names the rest with the server's words", ({
+		assert,
+	}) => {
+		const jpg = { name: "a.jpg", type: "image/jpeg", size: 1000 };
+		const txt = { name: "notes.txt", type: "text/plain", size: 10 };
+		const huge = {
+			name: "big.png",
+			type: "image/png",
+			size: p.MAX_PHOTO_BYTES + 1,
+		};
+		assert.deepEqual(p.planUpload([jpg, txt, jpg, huge]), {
+			send: [0, 2],
+			skip: [
+				{ index: 1, reason: "Use a JPEG, PNG or WebP image." },
+				{ index: 3, reason: "Use an image of 10 MB or less." },
+			],
+		});
+		assert.deepEqual(p.planUpload([]), { send: [], skip: [] });
+		assert.deepEqual(p.planUpload([txt]).send, []);
 	});
 
 	test("it needs an artist, a photo and room", ({ assert }) => {

@@ -165,6 +165,18 @@ export function roomNote(room: number, chosen: number): string | null {
 		: `There's room for ${room} more photos. Choose ${room} or fewer.`;
 }
 
+/** What the upload field says as files are chosen: how many, and how many won't be sent. */
+export function choiceLine(chosen: number, wrong: number): string {
+	const head = `${chosen} ${chosen === 1 ? "photo" : "photos"} chosen.`;
+	if (wrong === 0) return head;
+	if (wrong === chosen) {
+		return chosen === 1
+			? `${head} It can't be added: see why below.`
+			: `${head} None of them can be added: see why below.`;
+	}
+	return `${head} ${wrong} can't be added: see why below.`;
+}
+
 /**
  * The first line of the summary after an upload: what was added and, when some
  * were refused, the lead-in to the list of those (one `failureLine` each).

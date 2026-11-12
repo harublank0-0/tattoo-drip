@@ -1,5 +1,6 @@
 import { Form, Link } from "@adonisjs/inertia/react";
 import { useState } from "react";
+import { ImageFileInput } from "~/components/file_preview";
 import {
 	fieldLabel,
 	kindCopy,
@@ -200,12 +201,14 @@ function MethodFields({
 							)}
 						</div>
 					)}
-					<Input
+					<ImageFileInput
 						id="qr"
 						name="qr"
-						type="file"
 						accept="image/jpeg,image/png,image/webp"
 						aria-invalid={!!errors.qr}
+						replaces={!!method?.qrUrl}
+						fit="contain"
+						previewClassName="size-24 bg-white"
 					/>
 					<FieldDescription>
 						JPEG, PNG or WebP, up to 10 MB.
