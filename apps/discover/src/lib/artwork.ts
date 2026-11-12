@@ -46,6 +46,37 @@ export function readArtworkSlug(
 	return { id, canonical: param === id };
 }
 
+/** How long a shared cache may keep an angle's redirect: a minute, like the API's reads. */
+export const ANGLE_REDIRECT_CACHE = "public, max-age=60";
+
+/**
+ * Where an artwork address must go instead, or null to show it. Another
+ * spelling of the same photo's id is a permanent 301 to its canonical one.
+ * An id the API answered with another photo (angles: one of a tattoo's other
+ * photos answers with the tattoo, whose id is its main photo's) is a
+ * temporary 302, kept by a cache for a minute only: which photo leads a
+ * tattoo can change (another made the main one, the photo taken out of the
+ * tattoo), and a 301 kept forever could then send visitors in a loop. The
+ * storefront's `/gallery/<id>` does the same.
+ */
+export function artworkRedirect(
+	slug: { id: string; canonical: boolean },
+	tattooId: string,
+):
+	| { href: string; statusCode: 301 }
+	| { href: string; statusCode: 302; headers: Record<string, string> }
+	| null {
+	if (tattooId !== slug.id) {
+		return {
+			href: paths.tattoo(tattooId),
+			statusCode: 302,
+			headers: { "Cache-Control": ANGLE_REDIRECT_CACHE },
+		};
+	}
+	if (!slug.canonical) return { href: paths.tattoo(tattooId), statusCode: 301 };
+	return null;
+}
+
 /** The canonical slug of a photo (`paths.tattoo` builds its address from it). */
 export function artworkSlug(id: string): string {
 	return id.toLowerCase();
@@ -185,8 +216,8 @@ export async function loadArtwork(
 	const tattoo = await queryClient
 		.ensureQueryData(discoverQueries.tattoo(discover.client, slug.id))
 		.catch(rethrowMissing);
-	if (!slug.canonical || tattoo.id !== slug.id)
-		throw redirect({ href: paths.tattoo(tattoo.id), statusCode: 301 });
+	const moved = artworkRedirect(slug, tattoo.id);
+	if (moved) throw redirect(moved);
 	const related = relatedQueries(
 		discover.client,
 		tattoo,

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, test } from "node:test";
 import { isRedirect } from "@tanstack/react-router";
 import type { GalleryPhoto, Studio, WorkPage } from "@tattoo-drip/sdk";
@@ -10,6 +11,16 @@ import {
 	seedStudio,
 } from "../../src/api/context.ts";
 import { SiteRef } from "../../src/site/context.ts";
+import { TattooDialog } from "../../src/studio/angles.tsx";
+import {
+	indexAfterClose,
+	keyStep,
+	SWIPE,
+	selectIndex,
+	stepTo,
+	swipeEnd,
+	swipeStart,
+} from "../../src/studio/angles-model.ts";
 import {
 	artworkShapeClass,
 	galleryPhotoView,
@@ -51,6 +62,10 @@ import { IMAGE_ORIGIN, withStorefront } from "./theme-fixtures.ts";
  */
 
 const THEMES = ["stencil-and-ink", "ink-noir", "irezumi", "atelier"] as const;
+const SHARED_CSS = readFileSync(
+	new URL("../../src/styles.css", import.meta.url),
+	"utf8",
+);
 type ThemeName = (typeof THEMES)[number];
 
 const themed = (theme: ThemeName, studio: Studio = STUDIO): Studio =>
@@ -184,12 +199,18 @@ describe("every theme's gallery marks a tattoo of several photos", () => {
 		test(`${theme}: "3 photos" on the tattoo's tile, as part of its name, and nothing on a single photo's`, () => {
 			const html = workHtml(theme);
 			assertSafePage(html);
+			// "3 photos" once: shown, or (Ink Noir's narrow pieces: the number
+			// and an icon) there for screen readers.
 			assert.equal(html.match(/>3 photos</g)?.length, 1, "one mark");
 			// The mark sits inside the tile's link or button, so it is part of its name.
 			const tile =
 				/<(a|button) [^>]*>(?:(?!<\/\1>)[\s\S])*?>3 photos<\/span>/.exec(html);
 			assert.ok(tile, "the mark is inside the tile's link or button");
 			assert.doesNotMatch(html, />1 photos?</);
+			// The grid's main photo is numbered in the whole tattoo, like its angles.
+			if (theme === "stencil-and-ink") {
+				assert.match(html, / alt="Tattoo by Sita Rai, photo 1 of 3"/);
+			}
 		});
 	}
 });
@@ -214,9 +235,10 @@ describe("the tattoo's page shows every photo of it", () => {
 			const buttons = row.match(/<button [^>]*>/g) ?? [];
 			assert.equal(buttons.length, 3);
 			assert.deepEqual(
-				buttons.map((button) => /aria-pressed="(\w+)"/.exec(button)?.[1]),
-				["true", "false", "false"],
+				buttons.map((button) => /aria-current="(\w+)"/.exec(button)?.[1]),
+				["true", undefined, undefined],
 			);
+			assert.doesNotMatch(row, /aria-pressed/);
 			assert.deepEqual(
 				Array.from(row.matchAll(/ alt="([^"]*)"/g), (match) => match[1]),
 				[
@@ -232,6 +254,16 @@ describe("the tattoo's page shows every photo of it", () => {
 				)?.[0];
 			assert.ok(dialog, "the tattoo's viewer");
 			assert.match(dialog, /<p aria-live="polite">Photo 1 of 3<\/p>/);
+			// Named by the photo shown.
+			assert.match(
+				dialog,
+				/^<dialog [^>]*aria-label="Tattoo by Sita Rai, photo 1 of 3"/,
+			);
+			// The photo in its fixed stage, the steps after it.
+			assert.match(
+				dialog,
+				/<div class="work-stage"><img class="work-large"[^>]*draggable="false"[^>]*><\/div><div class="work-steps">/,
+			);
 			assert.match(
 				dialog,
 				/<button type="button" class="action action-secondary" aria-disabled="true">Previous photo<\/button>/,
@@ -240,8 +272,18 @@ describe("the tattoo's page shows every photo of it", () => {
 				dialog,
 				/<button type="button" class="action action-secondary">Next photo<\/button>/,
 			);
-			// Nothing moves: no animation or transition is set inline (none can be).
-			assert.doesNotMatch(dialog, / style=/);
+			// The theme's shared rules keep the stage still: the photo contained
+			// whole, pinch-zoom left to the browser, no animation of its own.
+			const css = SHARED_CSS;
+			assert.match(css, /\.work-stage \{[^}]*block-size: clamp\(/);
+			assert.match(
+				css,
+				/\.work-dialog-tattoo \.work-large \{[^}]*max-block-size: 100%;[^}]*touch-action: pan-y pinch-zoom;/,
+			);
+			assert.doesNotMatch(
+				css.slice(css.indexOf(".work-stage"), css.indexOf(".artwork-angles")),
+				/transition|animation/,
+			);
 		});
 	}
 
@@ -291,10 +333,18 @@ describe("an angle's old address", () => {
 			(error: unknown) => error,
 		);
 		assert.ok(isRedirect(thrown), "a redirect");
-		const { options } = thrown as unknown as {
-			options: { href: string; statusCode: number };
+		const response = thrown as Response & {
+			options: {
+				href: string;
+				statusCode: number;
+				headers: Record<string, string>;
+			};
 		};
-		assert.equal(options.statusCode, 301);
+		const { options } = response;
+		// Temporary and kept a minute: which photo leads can change.
+		assert.equal(options.statusCode, 302);
+		assert.equal(response.status, 302);
+		assert.equal(response.headers.get("Cache-Control"), "public, max-age=60");
 		assert.equal(options.href, `/gallery/${photoId(1)}?preview=atelier`);
 		// No related reads for a page that is not shown.
 		assert.equal(calls.filter(({ url }) => url.includes("/work?")).length, 0);
@@ -302,5 +352,90 @@ describe("an angle's old address", () => {
 		const data = await loadArtworkPage(context(fetch), photoId(1));
 		assert.equal(data.artwork.id, photoId(1));
 		assert.equal(data.artwork.photo.angles.length, 2);
+	});
+});
+
+describe("the viewer's rules (angles-model.ts)", () => {
+	test("steps hold at the ends; a chosen photo is held to the tattoo", () => {
+		assert.equal(stepTo(0, 1, 3), 1);
+		assert.equal(stepTo(2, 1, 3), 2);
+		assert.equal(stepTo(0, -1, 3), 0);
+		assert.equal(stepTo(1, -1, 3), 0);
+		assert.equal(selectIndex(2, 3), 2);
+		assert.equal(selectIndex(7, 3), 2);
+		assert.equal(selectIndex(-1, 3), 0);
+	});
+
+	test("only the bare arrow keys step: with Alt, Meta, Ctrl or Shift they are the browser's", () => {
+		const key = (
+			k: string,
+			mods: Partial<
+				Record<"altKey" | "metaKey" | "ctrlKey" | "shiftKey", boolean>
+			> = {},
+		) =>
+			keyStep({
+				key: k,
+				altKey: false,
+				metaKey: false,
+				ctrlKey: false,
+				shiftKey: false,
+				...mods,
+			});
+		assert.equal(key("ArrowRight"), 1);
+		assert.equal(key("ArrowLeft"), -1);
+		assert.equal(key("Enter"), 0);
+		assert.equal(key("ArrowLeft", { altKey: true }), 0);
+		assert.equal(key("ArrowRight", { metaKey: true }), 0);
+		assert.equal(key("ArrowRight", { ctrlKey: true }), 0);
+	});
+
+	test("a swipe is the primary pointer moving at least the threshold; a second finger or another pointer never steps", () => {
+		const down = swipeStart({ pointerId: 1, isPrimary: true, clientX: 200 });
+		assert.equal(swipeEnd(down, { pointerId: 1, clientX: 200 - SWIPE }), 1);
+		assert.equal(swipeEnd(down, { pointerId: 1, clientX: 200 + SWIPE }), -1);
+		assert.equal(swipeEnd(down, { pointerId: 1, clientX: 200 - SWIPE + 1 }), 0);
+		assert.equal(swipeEnd(down, { pointerId: 2, clientX: 0 }), 0);
+		assert.equal(
+			swipeStart({ pointerId: 2, isPrimary: false, clientX: 50 }),
+			null,
+		);
+		assert.equal(swipeEnd(null, { pointerId: 1, clientX: 0 }), 0);
+	});
+
+	test("a grid's viewer reopens on the main photo; the page's keeps the photo it shares", () => {
+		assert.equal(indexAfterClose(2, false), 0);
+		assert.equal(indexAfterClose(2, true), 2);
+	});
+
+	test("the shared index decides the photo the viewer shows, held to the tattoo", () => {
+		const view = galleryPhotoView(tattoo(), IMAGE_ORIGIN);
+		assert.ok(view);
+		const at = (index: number) =>
+			renderToStaticMarkup(
+				createElement(TattooDialog, {
+					photo: view,
+					facts: null,
+					index,
+					onIndex: () => {},
+				}),
+			);
+		const second = at(1);
+		assert.match(second, /<p aria-live="polite">Photo 2 of 3<\/p>/);
+		assert.match(second, /aria-label="From the side"/);
+		assert.match(
+			second,
+			/<p class="work-dialog-caption user-text" dir="auto">From the side<\/p>/,
+		);
+		assert.doesNotMatch(second, /aria-disabled="true">(Previous|Next) photo/);
+		const last = at(9);
+		assert.match(last, /<p aria-live="polite">Photo 3 of 3<\/p>/);
+		assert.match(last, /aria-disabled="true">Next photo/);
+		// Uncontrolled (a grid's): the main photo first.
+		assert.match(
+			renderToStaticMarkup(
+				createElement(TattooDialog, { photo: view, facts: null }),
+			),
+			/<p aria-live="polite">Photo 1 of 3<\/p>/,
+		);
 	});
 });

@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
+	ANGLE_REDIRECT_CACHE,
 	artworkCredit,
+	artworkRedirect,
 	artworkSeo,
 	artworkSlug,
 	artworkTitle,
@@ -237,5 +239,31 @@ describe("the artwork's booking link (D09)", () => {
 			).request,
 			null,
 		);
+	});
+});
+
+describe("artworkRedirect (angles)", () => {
+	const LEAD = "1c7f9e3d-7b5b-4f2f-8b62-2c1d3e4f5a61";
+
+	test("the canonical address of the photo the API answered with is shown as it is", () => {
+		assert.equal(artworkRedirect({ id: ID, canonical: true }, ID), null);
+	});
+
+	test("another spelling of the same id is a permanent 301 to the canonical one", () => {
+		assert.deepEqual(artworkRedirect({ id: ID, canonical: false }, ID), {
+			href: `/tattoos/${ID}`,
+			statusCode: 301,
+		});
+	});
+
+	test("one of a tattoo's other photos is a temporary 302 to the tattoo, cached a minute only, whatever its spelling", () => {
+		for (const canonical of [true, false]) {
+			assert.deepEqual(artworkRedirect({ id: ID, canonical }, LEAD), {
+				href: `/tattoos/${LEAD}`,
+				statusCode: 302,
+				headers: { "Cache-Control": "public, max-age=60" },
+			});
+		}
+		assert.equal(ANGLE_REDIRECT_CACHE, "public, max-age=60");
 	});
 });

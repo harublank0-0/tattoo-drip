@@ -14,6 +14,13 @@ export const NOT_FOUND_CACHE = "public, max-age=0, s-maxage=60";
 
 export const NO_STORE = "no-store";
 
+/**
+ * Angles: the redirect from one of a tattoo's other photos to the tattoo's
+ * page (loadArtworkPage) is temporary and kept a minute at most, since which
+ * photo leads a tattoo can change; never a 301, which a browser keeps.
+ */
+export const ANGLE_REDIRECT_CACHE = "public, max-age=60";
+
 export function pageCacheHeaders(status: string): Record<string, string> {
 	if (status === "success") return { "Cache-Control": PAGE_CACHE };
 	if (status === "notFound") return { "Cache-Control": NOT_FOUND_CACHE };

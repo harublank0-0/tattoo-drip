@@ -313,11 +313,13 @@
    */
   .work-open { position: relative; }
   .work-count { position: absolute; inset-inline-start: 0.375rem; inset-block-end: 0.375rem; padding: 0.125rem 0.375rem; border-radius: var(--radius); background: var(--paper); color: var(--ink); font-size: 0.75rem; line-height: 1.4; }
-  .work-dialog-tattoo .work-large { max-block-size: calc(100dvh - 12rem); touch-action: pan-y; }
+  /* The photo in a stage of a fixed height, contained whole, so Previous and Next under it never move. */
+  .work-stage { display: grid; place-items: center; inline-size: 100%; max-inline-size: 64rem; block-size: clamp(12rem, calc(100dvh - 12.5rem), 64rem); }
+  .work-dialog-tattoo .work-large { max-inline-size: 100%; max-block-size: 100%; touch-action: pan-y pinch-zoom; }
   .work-steps { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.75rem; }
   .work-steps [aria-disabled="true"] { opacity: 0.45; cursor: default; }
-  /* As wide as the column allows, but no wider than its shape at the page's 80dvh: a theme that sets its own width keeps it. */
-  .artwork-photo-steady { inline-size: min(100%, calc(80dvh * var(--artwork-ar, 1))); block-size: auto; }
+  /* As wide as the column allows, but no wider than the 36rem its `sizes` promises (never upscaled past the copy chosen) nor its shape at the page's 80dvh: a theme that sets its own width keeps it. */
+  .artwork-photo-steady { inline-size: min(100%, 36rem, calc(80dvh * var(--artwork-ar, 1))); block-size: auto; }
   .artwork-ar-50 { aspect-ratio: 50 / 100; --artwork-ar: 0.5; }
   .artwork-ar-55 { aspect-ratio: 55 / 100; --artwork-ar: 0.55; }
   .artwork-ar-60 { aspect-ratio: 60 / 100; --artwork-ar: 0.6; }
@@ -351,8 +353,8 @@
   .artwork-ar-200 { aspect-ratio: 200 / 100; --artwork-ar: 2; }
   .artwork-angles { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin-block-start: 0.75rem; }
   .artwork-angle { display: grid; place-items: center; inline-size: 4rem; block-size: 4rem; min-inline-size: 2.75rem; min-block-size: 2.75rem; padding: 0.1875rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--stencil-wash); cursor: pointer; }
-  .artwork-angle img { display: block; inline-size: auto; block-size: auto; max-inline-size: 100%; max-block-size: 100%; object-fit: contain; }
-  .artwork-angle[aria-pressed="true"] { border-color: var(--stencil); outline: 2px solid var(--stencil); outline-offset: 1px; }
+  .artwork-angle img { display: block; inline-size: 100%; block-size: 100%; min-inline-size: 0; min-block-size: 0; object-fit: contain; }
+  .artwork-angle[aria-current="true"] { border-color: var(--stencil); outline: 2px solid var(--stencil); outline-offset: 1px; }
   .artwork-angle:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
   /*
    * The whole portfolio and the All work page (TAT-126). The artist page's

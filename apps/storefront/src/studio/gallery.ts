@@ -159,14 +159,8 @@ export function galleryPhotoView(
 	const photo = shownPhoto(item, image, 1, imageOrigin);
 	if (!photo.id) return null;
 	// The page's one photo: no number in its description, unless it is the
-	// first of several (angles), which are numbered in the whole tattoo.
-	if (photo.caption) return photo;
-	if (photo.angles.length > 0) {
-		return {
-			...photo,
-			alt: angleAlt(photo.artist?.name ?? null, 1, photo.angles.length + 1),
-		};
-	}
+	// first of several (angles), already numbered in the whole tattoo.
+	if (photo.caption || photo.angles.length > 0) return photo;
 	return {
 		...photo,
 		alt: photo.artist
@@ -231,11 +225,16 @@ function shownPhoto(
 	);
 	return {
 		...image,
+		// A tattoo with angles numbers its main photo in the whole tattoo, like
+		// its angles, so its viewer reads one scheme; a single photo is numbered
+		// in the gallery, as before.
 		alt:
 			description ??
-			(artist
-				? fill(studioCopy.work.galleryAlt, { name: artist.name, n })
-				: fill(studioCopy.work.galleryAltNoName, { n })),
+			(angles.length > 0
+				? angleAlt(artist?.name ?? null, 1, angles.length + 1)
+				: artist
+					? fill(studioCopy.work.galleryAlt, { name: artist.name, n })
+					: fill(studioCopy.work.galleryAltNoName, { n })),
 		caption: description,
 		largeSrc: largeSource(image),
 		dialogId: `work-photo-${n}`,

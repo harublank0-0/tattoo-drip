@@ -10,7 +10,8 @@ import { ThemedArtworkPage } from "../../studio/theme/registry.tsx";
  * artist and related work. An id that is not a lowercase UUID, a photo the
  * API doesn't show (a hidden artist's, removed, unknown) and one the page
  * can't show are all the not-found page. The id of one of a tattoo's other
- * photos (angles) is a 301 to the tattoo's page, its main photo's id.
+ * photos (angles) is a temporary 302 to the tattoo's page, its main
+ * photo's id.
  */
 export const Route = createFileRoute("/gallery/$photo")({
 	loader: ({ context, params, location }) =>
