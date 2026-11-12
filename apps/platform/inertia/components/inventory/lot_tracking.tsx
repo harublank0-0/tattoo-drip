@@ -1,4 +1,5 @@
 import { Form } from "@adonisjs/inertia/react";
+import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
 	Field,
@@ -9,6 +10,7 @@ import {
 } from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
 import type { InventoryItem } from "./item_fields";
+import type { InventoryLot } from "./lots";
 
 const amount = (thousandths: number) => (thousandths / 1000).toString();
 
@@ -49,13 +51,106 @@ function TrackingButton({
  * Owners: set an item up for lot tracking (put the stock already on hand
  * into lots, then turn tracking on), or turn it off once its lots are empty.
  */
+/**
+ * Takes stock back out of a lot while the item is being set up: the undo of
+ * putting it there. The item's total stays as it is.
+ */
+function ReleaseForm({
+	item,
+	lots,
+	requestId,
+	params,
+}: {
+	item: InventoryItem;
+	lots: InventoryLot[];
+	requestId: string;
+	params: { tenant: string; id: string };
+}) {
+	const [choice, setChoice] = useState<string | null>(null);
+	const lot = lots.find(({ id }) => id === choice) ?? lots[0];
+	if (!lot) return null;
+	return (
+		<Form
+			// A fresh quantity for each lot, and after each release.
+			key={`${lot.id}:${lot.quantity}`}
+			route="tenant.inventory.movement"
+			routeParams={params}
+			resetOnSuccess
+		>
+			{({ errors, processing }) => (
+				<FieldGroup>
+					<input type="hidden" name="requestId" value={requestId} />
+					<input type="hidden" name="kind" value="release" />
+					<input type="hidden" name="lotId" value={lot.id} />
+					<div className="grid gap-4 sm:grid-cols-2">
+						<Field data-invalid={!!errors.lotId}>
+							<FieldLabel htmlFor="release-lot">
+								Take stock back out of a lot
+							</FieldLabel>
+							<select
+								id="release-lot"
+								className="min-h-11 w-full min-w-0 rounded-md border bg-background px-3 text-sm"
+								value={lot.id}
+								onChange={(event) => setChoice(event.target.value)}
+								aria-invalid={!!errors.lotId}
+							>
+								{lots.map((option) => (
+									<option key={option.id} value={option.id}>
+										{option.number} · {amount(option.quantity)} {item.unit}
+									</option>
+								))}
+							</select>
+							{errors.lotId && <FieldError>{errors.lotId}</FieldError>}
+						</Field>
+						<Field data-invalid={!!errors.quantity}>
+							<FieldLabel htmlFor="release-quantity">
+								Quantity ({item.unit})
+							</FieldLabel>
+							<Input
+								id="release-quantity"
+								name="quantity"
+								type="number"
+								min={0}
+								max={amount(lot.quantity)}
+								step="0.001"
+								inputMode="decimal"
+								defaultValue={amount(lot.quantity)}
+								required
+								aria-invalid={!!errors.quantity}
+							/>
+							{errors.quantity && <FieldError>{errors.quantity}</FieldError>}
+						</Field>
+					</div>
+					<FieldDescription>
+						For a wrong lot number or quantity: the stock goes back to "not in a
+						lot", and the history keeps both steps.
+					</FieldDescription>
+					{errors.kind && <FieldError>{errors.kind}</FieldError>}
+					<div>
+						<Button
+							type="submit"
+							variant="outline"
+							className="w-full sm:w-auto"
+							disabled={processing}
+						>
+							{processing ? "Saving…" : "Take out of lot"}
+						</Button>
+					</div>
+				</FieldGroup>
+			)}
+		</Form>
+	);
+}
+
 export function LotTracking({
 	item,
+	lots,
 	unassigned,
 	requestId,
 	params,
 }: {
 	item: InventoryItem;
+	lots: InventoryLot[];
 	unassigned: number;
 	requestId: string;
 	params: { tenant: string; id: string };
@@ -183,6 +278,14 @@ export function LotTracking({
 						</FieldGroup>
 					)}
 				</Form>
+			)}
+			{lots.length > 0 && (
+				<ReleaseForm
+					item={item}
+					lots={lots}
+					requestId={requestId}
+					params={params}
+				/>
 			)}
 			<div className="flex flex-col gap-2 text-sm">
 				{unassigned > 0 && (

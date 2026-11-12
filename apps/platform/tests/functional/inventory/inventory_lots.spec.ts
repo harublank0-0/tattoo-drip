@@ -319,16 +319,36 @@ test.group("Studio OS inventory lots", (group) => {
 		);
 		(await post(artist, { kind: "use", quantity: "1" })).assertStatus(302);
 
+		// A wrong assignment is undone by taking stock back out of the lot.
 		const setup = await client.get(detail).loginAs(owner).withInertia();
 		assert.equal(setup.inertiaProps.unassigned, 2000);
 		assert.equal(setup.inertiaProps.item.tracking, "standard");
+		const l1 = setup.inertiaProps.lots[0].id;
+		(
+			await post(artist, { kind: "release", quantity: "1", lotId: l1 })
+		).assertStatus(404);
+		assertValidationError(
+			await post(owner, { kind: "release", quantity: "6", lotId: l1 }),
+			"quantity",
+		);
+		(
+			await post(owner, { kind: "release", quantity: "2", lotId: l1 })
+		).assertStatus(302);
+		const released = await client.get(detail).loginAs(owner).withInertia();
+		assert.equal(released.inertiaProps.unassigned, 4000);
+		assert.equal(released.inertiaProps.item.quantity, 7000);
 
 		(
-			await post(owner, { kind: "assign", quantity: "2", lotNumber: "L2" })
+			await post(owner, { kind: "assign", quantity: "4", lotNumber: "L2" })
 		).assertStatus(302);
 		(await tracking("lot")).assertStatus(302);
 		// Not while lots hold stock.
 		assertValidationError(await tracking("standard"), "tracking");
+		// Once tracking is on, a lot is corrected with a count instead.
+		assertValidationError(
+			await post(owner, { kind: "release", quantity: "1", lotId: l1 }),
+			"kind",
+		);
 
 		const page = await client.get(detail).loginAs(owner).withInertia();
 		assert.equal(page.inertiaProps.item.quantity, 7000);
@@ -343,6 +363,7 @@ test.group("Studio OS inventory lots", (group) => {
 			),
 			[
 				["assign", 0],
+				["release", 0],
 				["use", -1000],
 				["assign", 0],
 				["receive", 8000],

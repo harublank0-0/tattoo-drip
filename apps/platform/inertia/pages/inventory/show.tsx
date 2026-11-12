@@ -21,7 +21,7 @@ import AppLayout from "~/layouts/app";
 type Movement = {
 	actor: string;
 	id: string;
-	kind: "receive" | "use" | "count" | "assign";
+	kind: "receive" | "use" | "count" | "assign" | "release";
 	delta: number;
 	balanceAfter: number;
 	lot: {
@@ -39,6 +39,7 @@ const movementLabels = {
 	use: "Used",
 	count: "Stock count",
 	assign: "Put in a lot",
+	release: "Taken out of a lot",
 };
 
 export default function InventoryShow({
@@ -51,6 +52,7 @@ export default function InventoryShow({
 	lots,
 	suggestedLotId,
 	unassigned,
+	lotsWithStock,
 	expiryWindowDays,
 	lotFilter,
 }: {
@@ -63,6 +65,7 @@ export default function InventoryShow({
 	lots: InventoryLot[];
 	suggestedLotId: string | null;
 	unassigned: number;
+	lotsWithStock: number;
 	expiryWindowDays: number;
 	lotFilter: { id: string; number: string } | null;
 }) {
@@ -159,6 +162,12 @@ export default function InventoryShow({
 							))}
 						</ul>
 					)}
+					{lotsWithStock > lots.length && (
+						<p className="mt-2 text-sm text-muted-foreground">
+							Showing the {lots.length} earliest-expiring of {lotsWithStock}{" "}
+							lots with stock. Use or count these first to see the rest.
+						</p>
+					)}
 				</Section>
 			)}
 
@@ -233,6 +242,7 @@ export default function InventoryShow({
 					<Section id="lot-tracking" title="Lot tracking">
 						<LotTracking
 							item={item}
+							lots={lots}
 							unassigned={unassigned}
 							requestId={requestId}
 							params={params}

@@ -1,7 +1,13 @@
 import { DateTime } from "luxon";
 
 export const INVENTORY_UNITS = ["piece", "box", "roll", "ml", "g"] as const;
-export const MOVEMENT_KINDS = ["receive", "use", "count", "assign"] as const;
+export const MOVEMENT_KINDS = [
+	"receive",
+	"use",
+	"count",
+	"assign",
+	"release",
+] as const;
 export const TRACKING_MODES = ["standard", "lot"] as const;
 export type InventoryUnit = (typeof INVENTORY_UNITS)[number];
 export type MovementKind = (typeof MOVEMENT_KINDS)[number];

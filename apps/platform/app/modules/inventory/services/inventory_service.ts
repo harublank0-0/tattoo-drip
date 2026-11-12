@@ -257,7 +257,11 @@ export default class InventoryService {
 			.orderBy("id")
 			.limit(MAX_LISTED_LOTS);
 		const assigned = await lotTotal(tenantId, itemId);
-		return { lots, assigned };
+		const [row] = await lotQuery(tenantId, itemId)
+			.where("quantity", ">", 0)
+			.count("* as total")
+			.pojo<{ total: string }>();
+		return { lots, assigned, stocked: Number(row?.total ?? 0) };
 	}
 
 	findLot(tenantId: string, itemId: string, id: string) {
@@ -484,6 +488,36 @@ export default class InventoryService {
 					balanceAfter: item.quantity,
 					lotId: lot.id,
 					lotDelta: quantity,
+					lotBalanceAfter: lotBalance,
+				});
+				await lot.merge({ quantity: lotBalance }).save();
+				return created;
+			}
+
+			if (input.kind === "release") {
+				if (item.tracking === "lot") {
+					throw new InventoryRuleError(
+						"kind",
+						"This item tracks lots. Correct a lot's balance with a count instead.",
+					);
+				}
+				if (!input.lotId) {
+					throw new InventoryRuleError("lotId", "Choose a lot.");
+				}
+				const lot = await resolveLot(tenantId, itemId, input, false);
+				if (quantity === 0 || quantity > lot.quantity) {
+					throw new InventoryRuleError(
+						"quantity",
+						`Enter up to ${stockLabel(lot.quantity, item.unit)}: what lot ${lot.lotNumber} holds.`,
+					);
+				}
+				const lotBalance = lot.quantity - quantity;
+				const created = await InventoryMovement.create({
+					...movement,
+					delta: 0,
+					balanceAfter: item.quantity,
+					lotId: lot.id,
+					lotDelta: -quantity,
 					lotBalanceAfter: lotBalance,
 				});
 				await lot.merge({ quantity: lotBalance }).save();

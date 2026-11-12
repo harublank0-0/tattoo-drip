@@ -137,7 +137,10 @@ export default class InventoryController {
 			pageNumber(query.page),
 			filter?.id,
 		);
-		const { lots, assigned } = await this.inventory.lots(tenant.id, item.id);
+		const { lots, assigned, stocked } = await this.inventory.lots(
+			tenant.id,
+			item.id,
+		);
 		const lotRows = lots.map((lot) => lotView(lot, today));
 		const worst = lotRows.some((lot) => lot.expiry === "expired")
 			? "expired"
@@ -152,6 +155,8 @@ export default class InventoryController {
 			suggestedLotId:
 				lotRows.find((lot) => lot.expiry !== "expired")?.id ?? null,
 			unassigned: item.quantity - assigned,
+			// Lots with stock, of which `lots` lists the first MAX_LISTED_LOTS.
+			lotsWithStock: stocked,
 			expiryWindowDays: EXPIRY_WARNING_DAYS,
 			lotFilter: filter ? { id: filter.id, number: filter.lotNumber } : null,
 			history: movements.all().map((movement) => {
@@ -255,7 +260,7 @@ export default class InventoryController {
 		const { tenant } = tenantContext(ctx);
 		try {
 			const items = await this.inventory.exportCatalog(tenant.id);
-			ctx.response.header("Cache-Control", "no-store");
+			ctx.response.header("Cache-Control", "private, no-store");
 			ctx.response.header(
 				"Content-Disposition",
 				'attachment; filename="inventory.csv"',
