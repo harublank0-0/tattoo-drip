@@ -280,7 +280,8 @@ export default class PortfolioController {
 				} else if (data.action === "reassign" && target) {
 					await this.photos.reassign(tenant, membership, photo, target.id);
 				} else {
-					await this.photos.remove(tenant, membership, photo);
+					// A tattoo goes whole: count every photo that went.
+					done += (await this.photos.remove(tenant, membership, photo)) - 1;
 				}
 				done += 1;
 			} catch (error) {

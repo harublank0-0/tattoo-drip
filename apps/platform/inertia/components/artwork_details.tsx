@@ -115,13 +115,25 @@ export default function ArtworkDetails({
 		if (photo) setShown(photo);
 	}, [photo]);
 	// Another photo: start from its details (state adjusted while rendering).
+	// The same tattoo under a new main photo (one of its photos was made the
+	// main one) is not another photo: the panel keeps its state and its body,
+	// so focus stays where the move left it.
 	const photoId = photo?.id;
 	const [modeFor, setModeFor] = useState(photoId);
+	const [bodyKey, setBodyKey] = useState(photoId);
 	if (photoId && photoId !== modeFor) {
+		const sameTattoo =
+			photo?.angles.some((angle) => angle.id === modeFor) ?? false;
 		setModeFor(photoId);
-		setMode("view");
-		setError(null);
+		if (!sameTattoo) {
+			setMode("view");
+			setError(null);
+			setBodyKey(photoId);
+		}
 	}
+	// Escape inside "Photos of this tattoo" (a row's question or form) closes
+	// that first: the sheet hears Escape before any element in it does.
+	const escapeInside = useRef<(() => boolean) | null>(null);
 
 	const current = photo ?? shown;
 	return (
@@ -139,6 +151,10 @@ export default function ArtworkDetails({
 				className="w-full gap-0 p-0 sm:max-w-lg lg:max-w-xl"
 				onEscapeKeyDown={(event) => {
 					if (busy) {
+						event.preventDefault();
+						return;
+					}
+					if (escapeInside.current?.()) {
 						event.preventDefault();
 						return;
 					}
@@ -162,7 +178,7 @@ export default function ArtworkDetails({
 			>
 				{current && (
 					<Body
-						key={current.id}
+						key={bodyKey ?? current.id}
 						photo={current}
 						mode={mode}
 						setMode={(next) => {
@@ -180,6 +196,7 @@ export default function ArtworkDetails({
 						held={held}
 						onFollow={onFollow}
 						onAddPhotos={() => onAddPhotos(current)}
+						escapeInside={escapeInside}
 					/>
 				)}
 			</SheetContent>
@@ -202,6 +219,7 @@ function Body({
 	held,
 	onFollow,
 	onAddPhotos,
+	escapeInside,
 }: {
 	photo: PortfolioPhoto;
 	mode: Mode;
@@ -217,6 +235,7 @@ function Body({
 	held: boolean;
 	onFollow: (id: string) => void;
 	onAddPhotos: () => void;
+	escapeInside: RefObject<(() => boolean) | null>;
 }) {
 	const [failed, setFailed] = useState(false);
 	const photos = photoTotal(photo);
@@ -511,6 +530,7 @@ function Body({
 							onError={setError}
 							onFollow={onFollow}
 							onAddPhotos={onAddPhotos}
+							escapeInside={escapeInside}
 						/>
 					)}
 				</div>

@@ -206,7 +206,7 @@ export default function PortfolioBulkBar({
 						>
 							{busy === "delete"
 								? BULK_BUSY.delete
-								: `Delete ${count === 1 ? "photo" : `${count} photos`}`}
+								: `Delete ${Math.max(count, photosChosen) === 1 ? "photo" : `${Math.max(count, photosChosen)} photos`}`}
 						</Button>
 						<Button
 							ref={keep}

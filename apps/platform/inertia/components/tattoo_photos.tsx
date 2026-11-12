@@ -8,7 +8,7 @@ import {
 	Trash2,
 	Ungroup,
 } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { type RefObject, useEffect, useId, useRef, useState } from "react";
 import { urlFor } from "~/client";
 import { canMove, focusAfterMove } from "~/components/page_look";
 import { MAX_PHOTO_ALT } from "~/components/photos";
@@ -62,7 +62,9 @@ type Refocus =
  * back to the pressed button (or the row's other move button when the move
  * left it at an end, `focusAfterMove`), and to the section's heading when the
  * row left the list. Moved in an effect after the commit, like the rest of
- * the panel.
+ * the panel. Escape closes a row's question or form first (through
+ * `escapeInside`, since the sheet hears Escape before its content), and focus
+ * returns to the button that opened it.
  */
 export default function TattooPhotos({
 	photo,
@@ -74,6 +76,7 @@ export default function TattooPhotos({
 	onError,
 	onFollow,
 	onAddPhotos,
+	escapeInside,
 }: {
 	photo: PortfolioPhoto;
 	tenantSlug: string;
@@ -86,6 +89,12 @@ export default function TattooPhotos({
 	/** A photo is about to become the main one: the page follows it. */
 	onFollow: (id: string) => void;
 	onAddPhotos: () => void;
+	/**
+	 * Set here to what Escape does inside the section: close a row's question
+	 * or form (true) or nothing (false). The sheet hears Escape first, on the
+	 * document, so it asks this before it closes.
+	 */
+	escapeInside: RefObject<(() => boolean) | null>;
 }) {
 	const id = useId();
 	const rows: Row[] = [
@@ -118,6 +127,8 @@ export default function TattooPhotos({
 	useEffect(() => {
 		const pending = refocus.current;
 		if (!pending) return;
+		// A saved description: its Edit button is back once the form has closed.
+		if (pending.button === "edit" && editing === pending.id) return;
 		refocus.current = null;
 		if (pending.id === null) {
 			heading.current?.focus();
@@ -133,7 +144,7 @@ export default function TattooPhotos({
 			? heading.current
 			: (buttons.current.get(keyOf(pending.id, button)) ?? heading.current)
 		)?.focus();
-	}, [photo]);
+	}, [photo, editing]);
 
 	// The question's safe answer takes focus, so Enter at once changes nothing;
 	// a question or a form closed without a write gives focus back to the
@@ -149,6 +160,25 @@ export default function TattooPhotos({
 		returnTo.current = null;
 		if (key) buttons.current.get(key)?.focus();
 	}, [asking, editing]);
+
+	// What Escape closes first: the question, else the form; never while a request is out.
+	useEffect(() => {
+		escapeInside.current = () => {
+			if (busy || (!asking && !editing)) return false;
+			if (asking) {
+				returnTo.current = keyOf(asking, "delete");
+				setAsking(null);
+			} else if (editing) {
+				returnTo.current = keyOf(editing, "edit");
+				setEditing(null);
+				setAltError(null);
+			}
+			return true;
+		};
+		return () => {
+			escapeInside.current = null;
+		};
+	}, [escapeInside, asking, editing, busy]);
 
 	const visit = {
 		preserveScroll: true,
@@ -379,16 +409,7 @@ export default function TattooPhotos({
 							)}
 
 							{asking === row.id && (
-								<fieldset
-									className="flex flex-col gap-2 rounded-md border border-destructive/40 p-3"
-									onKeyDown={(event) => {
-										if (event.key === "Escape" && !busy) {
-											event.stopPropagation();
-											returnTo.current = keyOf(row.id, "delete");
-											setAsking(null);
-										}
-									}}
-								>
+								<fieldset className="flex flex-col gap-2 rounded-md border border-destructive/40 p-3">
 									<legend id={`${id}-${row.id}-question`} className="sr-only">
 										Delete photo {n}
 									</legend>
@@ -477,12 +498,6 @@ function AltForm({
 			onSubmit={(event) => {
 				event.preventDefault();
 				onSave(value.trim());
-			}}
-			onKeyDown={(event) => {
-				if (event.key === "Escape" && !busy) {
-					event.stopPropagation();
-					onCancel();
-				}
 			}}
 		>
 			<label htmlFor={id} className="text-xs font-medium">

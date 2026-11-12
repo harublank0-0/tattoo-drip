@@ -744,6 +744,28 @@ test.group("Angles: the dashboard's routes", (group) => {
 		assert.lengthOf(await tattoo(theirs.tenant, theirs.lead.id), 2);
 	});
 
+	test("bulk delete of a tattoo removes all its photos and says how many went", async ({
+		client,
+		assert,
+	}) => {
+		const mine = await studioWithTattoo("angles-http-k");
+
+		const response = await client
+			.post(`/t/${mine.tenant.slug}/portfolio/bulk`)
+			.json({
+				action: "delete",
+				ids: [mine.lead.id],
+				back: `/t/${mine.tenant.slug}/portfolio`,
+			})
+			.withCsrfToken()
+			.loginAs(mine.owner)
+			.redirects(0);
+
+		response.assertStatus(302);
+		assert.equal(flashOf(response).success, "2 photos deleted.");
+		assert.lengthOf(await tattoo(mine.tenant, mine.lead.id), 0);
+	});
+
 	test("the portfolio's tiles are tattoos: each lead with its angles in order, and the counts of photos and tattoos", async ({
 		client,
 		assert,
