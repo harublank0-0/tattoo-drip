@@ -81,6 +81,10 @@ export const studioCopy = {
 		 * page and the viewer's steps.
 		 */
 		photosCount: "{count} photos",
+		/** Video angles: a tattoo that has videos says so on its tile, honestly. */
+		photosVideosCount: "{count} photos and videos",
+		/** A video's name ("Video, 0:42"): its thumbnail's button and, without a description, the video itself. */
+		videoLabel: "Video, {duration}",
 		angleAlt: "Tattoo by {name}, photo {n} of {count}",
 		angleAltNoName: "Tattoo, photo {n} of {count}",
 		tattooPhotos: "Photos of this tattoo",

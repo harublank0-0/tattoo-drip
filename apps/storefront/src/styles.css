@@ -359,6 +359,19 @@
   .artwork-angle[aria-current="true"] { border-color: var(--stencil); outline: 2px solid var(--stencil); outline-offset: 1px; }
   .artwork-angle:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
   /*
+   * Video angles: a video plays in the same box as a photo, contained whole
+   * (never cropped), on the stage's wash until its poster shows. Its
+   * thumbnail is its poster with a play mark and its length as text, never a
+   * moving picture.
+   */
+  .work-video,
+  .artwork-video { object-fit: contain; background: var(--stencil-wash); }
+  .artwork-open-video { cursor: auto; }
+  .artwork-angle-video { position: relative; overflow: hidden; }
+  .artwork-angle-play { position: absolute; inset: 0; margin: auto; inline-size: 1.5rem; block-size: 1.5rem; border-radius: 50%; background: rgb(0 0 0 / 0.6); }
+  .artwork-angle-play::after { content: ""; position: absolute; inset-block-start: 50%; inset-inline-start: 55%; translate: -50% -50%; border-block: 0.3125rem solid transparent; border-inline-start: 0.5rem solid #fff; }
+  .artwork-angle-time { position: absolute; inset-inline-end: 0.125rem; inset-block-end: 0.125rem; padding: 0 0.1875rem; border-radius: 0.125rem; background: rgb(0 0 0 / 0.7); color: #fff; font-size: 0.625rem; line-height: 1.4; font-variant-numeric: tabular-nums; }
+  /*
    * The whole portfolio and the All work page (TAT-126). The artist page's
    * All / Healed links and the filter form are 3rem tall, like the buttons;
    * the current link is filled with the stencil. "Show more" is a link styled

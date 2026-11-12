@@ -1,4 +1,10 @@
-import { type PointerEvent, type ReactNode, useRef, useState } from "react";
+import {
+	type PointerEvent,
+	type ReactNode,
+	useRef,
+	useState,
+	useSyncExternalStore,
+} from "react";
 import { fill } from "../intake/template.ts";
 import {
 	indexAfterClose,
@@ -14,6 +20,7 @@ import {
 	artworkShapeClass,
 	type GalleryPhotoView,
 	tattooShots,
+	type VideoAngleView,
 } from "./gallery.ts";
 import { showPhoto } from "./lightbox.ts";
 
@@ -37,9 +44,79 @@ import { showPhoto } from "./lightbox.ts";
  * row of the tattoo's photos under it: buttons of at least 44 px, each named
  * by its photo's alt (the studio's description, else "Tattoo by Sita Rai,
  * photo 2 of 4"), `aria-current` on the one shown. Nothing moves or
- * fades, so there is nothing for `prefers-reduced-motion` to stop. The
- * rules are plain functions in angles-model.ts, tested without a DOM.
+ * fades. The rules are plain functions in angles-model.ts, tested without a
+ * DOM.
+ *
+ * Video angles: a tattoo's videos step like its photos. A video's thumbnail
+ * is its poster with a play mark and its length as visible text, named
+ * "Video, 0:42". Shown, it is a `<video>` (TattooVideo) muted, inline, with
+ * the browser's controls, nothing loaded before play (`preload="none"`),
+ * its poster, and its sources smallest first (a small screen takes the 720p
+ * one, `media`); it never plays by itself, and loops only for a visitor who
+ * has not asked for reduced motion. It sits in the same box as a photo,
+ * contained whole (`object-fit: contain`), so nothing moves. Leaving a video
+ * stops it: stepping away or closing the viewer takes its element off the
+ * page (a new key each time), so no hidden video keeps playing.
  */
+
+/**
+ * Whether the visitor asked for reduced motion. On the server, and before
+ * hydration, it is taken as yes: a video then never loops until the page
+ * knows. The browser's own media query, read through React's store hook (no
+ * listener of ours stays after the island goes).
+ */
+function usePrefersReducedMotion(): boolean {
+	return useSyncExternalStore(
+		(changed) => {
+			const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+			query.addEventListener("change", changed);
+			return () => query.removeEventListener("change", changed);
+		},
+		() => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+		() => true,
+	);
+}
+
+/**
+ * A video angle shown (the tattoo's page or its viewer): never autoplayed,
+ * muted (it has no sound anyway), inline on a phone, the browser's controls,
+ * nothing fetched before play, the poster until then, its sources smallest
+ * first with `media` (a phone takes the 720p one), and `loop` unless reduced
+ * motion was asked for. Its width and height are the video's, so the box is
+ * reserved before anything loads; the theme's box contains it whole.
+ */
+function TattooVideo({
+	video,
+	className,
+}: {
+	video: VideoAngleView;
+	className: string;
+}) {
+	const reduced = usePrefersReducedMotion();
+	return (
+		<video
+			className={className}
+			width={video.width}
+			height={video.height}
+			poster={video.poster.src}
+			aria-label={video.alt}
+			muted
+			playsInline
+			loop={!reduced}
+			controls
+			preload="none"
+		>
+			{video.sources.map((source) => (
+				<source
+					key={source.src}
+					src={source.src}
+					type={source.type}
+					media={source.media}
+				/>
+			))}
+		</video>
+	);
+}
 
 /**
  * A tattoo's viewer: its photos one at a time, in order. `index` and
@@ -70,6 +147,8 @@ export function TattooDialog({
 	onIndex?: (index: number) => void;
 }) {
 	const [own, setOwn] = useState(0);
+	// Each close takes a video in the viewer off the page (a new key), so it stops.
+	const [closes, setCloses] = useState(0);
 	const shots = tattooShots(photo);
 	const count = shots.length;
 	const shared = index !== undefined;
@@ -89,12 +168,15 @@ export function TattooDialog({
 			className="work-dialog work-dialog-tattoo"
 			aria-label={shot.alt}
 			onKeyDown={(event) => {
+				// A video's own controls take the arrow keys (seeking).
+				if ((event.target as Element).tagName === "VIDEO") return;
 				const delta = keyStep(event);
 				if (delta === 0) return;
 				event.preventDefault();
 				step(delta);
 			}}
 			onClose={() => {
+				setCloses((n) => n + 1);
 				if (!shared) setOwn(indexAfterClose(at, shared));
 			}}
 		>
@@ -107,30 +189,38 @@ export function TattooDialog({
 				</button>
 			</form>
 			<div className="work-stage">
-				{/* One element for every step: the browser keeps the last photo up until the next has loaded. */}
-				<img
-					className="work-large"
-					src={shot.largeSrc}
-					width={shot.width}
-					height={shot.height}
-					alt={shot.alt}
-					loading="lazy"
-					decoding="async"
-					// A mouse drag would start the browser's image drag and never end
-					// in a pointerup: the swipe is ours.
-					draggable={false}
-					onPointerDown={(event: PointerEvent<HTMLImageElement>) => {
-						swipe.current = swipeStart(event);
-					}}
-					onPointerUp={(event: PointerEvent<HTMLImageElement>) => {
-						const delta = swipeEnd(swipe.current, event);
-						swipe.current = null;
-						if (delta !== 0) step(delta);
-					}}
-					onPointerCancel={() => {
-						swipe.current = null;
-					}}
-				/>
+				{shot.kind === "video" ? (
+					<TattooVideo
+						key={`video-${at}-${closes}`}
+						video={shot}
+						className="work-large work-video"
+					/>
+				) : (
+					/* One element for every photo: the browser keeps the last photo up until the next has loaded. */
+					<img
+						className="work-large"
+						src={shot.largeSrc}
+						width={shot.width}
+						height={shot.height}
+						alt={shot.alt}
+						loading="lazy"
+						decoding="async"
+						// A mouse drag would start the browser's image drag and never end
+						// in a pointerup: the swipe is ours.
+						draggable={false}
+						onPointerDown={(event: PointerEvent<HTMLImageElement>) => {
+							swipe.current = swipeStart(event);
+						}}
+						onPointerUp={(event: PointerEvent<HTMLImageElement>) => {
+							const delta = swipeEnd(swipe.current, event);
+							swipe.current = null;
+							if (delta !== 0) step(delta);
+						}}
+						onPointerCancel={() => {
+							swipe.current = null;
+						}}
+					/>
+				)}
 			</div>
 			<div className="work-steps">
 				<button
@@ -185,57 +275,96 @@ export function TattooFigure({
 	const shot = shots[at];
 	return (
 		<figure className={className}>
-			<button
-				type="button"
-				className="artwork-open"
-				id={photo.openId}
-				aria-haspopup="dialog"
-				aria-controls={photo.dialogId}
-				onClick={() => showPhoto(photo.dialogId)}
-			>
-				<img
-					className={`artwork-photo artwork-photo-steady ${artworkShapeClass(photo)}`}
-					src={shot.src}
-					srcSet={shot.srcSet}
-					sizes={shot.srcSet ? sizes : undefined}
-					width={photo.width}
-					height={photo.height}
-					alt={shot.alt}
-					loading="eager"
-					decoding="async"
-					fetchPriority={at === 0 ? "high" : undefined}
-				/>
-				<span className="artwork-open-hint">{studioCopy.work.enlarge}</span>
-			</button>
+			{shot.kind === "video" ? (
+				// A video is played where it is, in the main photo's box: its own
+				// controls, never a button around them (the photos open the viewer).
+				<div className="artwork-open artwork-open-video">
+					<TattooVideo
+						key={`video-${at}`}
+						video={shot}
+						className={`artwork-photo artwork-photo-steady artwork-video ${artworkShapeClass(photo)}`}
+					/>
+				</div>
+			) : (
+				<button
+					type="button"
+					className="artwork-open"
+					id={photo.openId}
+					aria-haspopup="dialog"
+					aria-controls={photo.dialogId}
+					onClick={() => showPhoto(photo.dialogId)}
+				>
+					<img
+						className={`artwork-photo artwork-photo-steady ${artworkShapeClass(photo)}`}
+						src={shot.src}
+						srcSet={shot.srcSet}
+						sizes={shot.srcSet ? sizes : undefined}
+						width={photo.width}
+						height={photo.height}
+						alt={shot.alt}
+						loading="eager"
+						decoding="async"
+						fetchPriority={at === 0 ? "high" : undefined}
+					/>
+					<span className="artwork-open-hint">{studioCopy.work.enlarge}</span>
+				</button>
+			)}
 			{/* biome-ignore lint/a11y/useSemanticElements: a row of buttons outside any form, named by its label; a fieldset would need a legend shown */}
 			<div
 				className="artwork-angles"
 				role="group"
 				aria-label={studioCopy.work.tattooPhotos}
 			>
-				{shots.map((thumb, index) => (
-					<button
-						// The photos never change order on the page: their place is their key.
-						// biome-ignore lint/suspicious/noArrayIndexKey: see above
-						key={index}
-						type="button"
-						className="artwork-angle"
-						aria-current={index === at ? "true" : undefined}
-						onClick={() => setChosen(selectIndex(index, count))}
-					>
-						{/* The photo names its button: its description, else "Tattoo by Sita Rai, photo 2 of 4". */}
-						<img
-							src={thumb.src}
-							srcSet={thumb.srcSet}
-							sizes={thumb.srcSet ? "4rem" : undefined}
-							width={thumb.width}
-							height={thumb.height}
-							alt={thumb.alt}
-							loading="lazy"
-							decoding="async"
-						/>
-					</button>
-				))}
+				{shots.map((thumb, index) =>
+					thumb.kind === "video" ? (
+						<button
+							// biome-ignore lint/suspicious/noArrayIndexKey: the photos never change order on the page
+							key={index}
+							type="button"
+							className="artwork-angle artwork-angle-video"
+							aria-current={index === at ? "true" : undefined}
+							onClick={() => setChosen(selectIndex(index, count))}
+						>
+							{/* Its poster names the button, "Video, 0:42" (its description after it); the play mark and the length are what a sighted visitor reads. */}
+							<img
+								src={thumb.poster.src}
+								srcSet={thumb.poster.srcSet}
+								sizes={thumb.poster.srcSet ? "4rem" : undefined}
+								width={thumb.poster.width}
+								height={thumb.poster.height}
+								alt={thumb.label}
+								loading="lazy"
+								decoding="async"
+							/>
+							<span className="artwork-angle-play" aria-hidden="true" />
+							<span className="artwork-angle-time" aria-hidden="true">
+								{thumb.durationText}
+							</span>
+						</button>
+					) : (
+						<button
+							// The photos never change order on the page: their place is their key.
+							// biome-ignore lint/suspicious/noArrayIndexKey: see above
+							key={index}
+							type="button"
+							className="artwork-angle"
+							aria-current={index === at ? "true" : undefined}
+							onClick={() => setChosen(selectIndex(index, count))}
+						>
+							{/* The photo names its button: its description, else "Tattoo by Sita Rai, photo 2 of 4". */}
+							<img
+								src={thumb.src}
+								srcSet={thumb.srcSet}
+								sizes={thumb.srcSet ? "4rem" : undefined}
+								width={thumb.width}
+								height={thumb.height}
+								alt={thumb.alt}
+								loading="lazy"
+								decoding="async"
+							/>
+						</button>
+					),
+				)}
 			</div>
 			<TattooDialog
 				photo={photo}
