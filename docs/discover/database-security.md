@@ -1,7 +1,7 @@
 # Discover: database security and publication data
 
 How Discover reads public data across studios without loosening tenant isolation (Discover D02).
-- **Migrations:** `apps/platform/database/migrations/1791870000000_add_discovery_publication.ts` (data) and `1791870000001_create_discovery_views.ts` (boundary).
+- **Migrations:** `apps/platform/database/migrations/1791870000000_add_discovery_publication.ts` (data) and `1791870000001_create_discovery_views.ts` (boundary); `1791900000001_discovery_artworks_leads_only.ts` replaces `discovery.artworks` in place with the lead-only rule (angles), keeping its owner, options, columns and grants, and grants the role `lead_photo_id`.
 - **Role setup:** `apps/platform/database/setup_roles.sql`.
 - **Proof:** `apps/platform/tests/functional/rls/discovery.spec.ts`.
 - **Plan:** [implementation blueprint](implementation-blueprint.md).
@@ -22,7 +22,7 @@ app role ──SELECT──► discovery.studios / artists / artworks   (views, 
 |---|---|---|
 | **Role** | `tattoo_drip_discovery`: NOLOGIN, NOSUPERUSER, NOBYPASSRLS, NOINHERIT, NOCREATEDB/ROLE, NOREPLICATION; member of no role and no role is its member. Created and normalised by `setup_roles.sql`. The migration refuses to run if it is missing or has any of those powers | Nobody can log in as it or act as it; the app role cannot `SET ROLE` to it (tested on a real app-role session) |
 | **View ownership** | The views belong to the role, not to the table owner. Views that are not `security_invoker` read their tables with the *owner's* privileges and RLS, so they read as the role, which RLS binds. The role has no USAGE (and, after the migration, no CREATE) on schema `discovery`, so even as owner it cannot rename, alter or replace its views | The classic hole: a view owned by the table owner bypasses RLS and leaves only its WHERE |
-| **Column grants** | The role has column-level SELECT on public columns of `tenants`, `artists` and `artist_work_photos`, plus three `tenant_memberships` columns that a policy reads (§3). Nothing else on any table, no write privilege anywhere, no CREATE on the schema after the migration | Contact details, deposit settings, members, the artist's login, the takedown note, clients, inquiries, money: "permission denied" even through a new view or a mistaken `select *` |
+| **Column grants** | The role has column-level SELECT on public columns of `tenants`, `artists` and `artist_work_photos` (with `lead_photo_id`, which the artworks view's lead-only rule reads), plus three `tenant_memberships` columns that a policy reads (§3). Nothing else on any table, no write privilege anywhere, no CREATE on the schema after the migration | Contact details, deposit settings, members, the artist's login, the takedown note, clients, inquiries, money: "permission denied" even through a new view or a mistaken `select *` |
 | **Policies** | `discovery_only` (RESTRICTIVE, the full rule) and `discovery_select` (PERMISSIVE, the row's own flags) on the three tables, `TO tattoo_drip_discovery` only; `discovery_none` (RESTRICTIVE, `false`) on `tenant_memberships` | Unlisted, taken-down, deleted, hidden, opted-out or unpublished rows, whatever tenant or user context a session sets |
 | **View WHERE** | Each view repeats the rules and selects explicit columns | Defence in depth; the views' columns are the public contract |
 
@@ -56,7 +56,7 @@ The app role gets `USAGE` on schema `discovery` and `SELECT` on the three views.
 |---|---|
 | Studio or independent artist (`tenants`) | `discovery_listed` and `discovery_listed_at is not null` and `discovery_suspended_at is null` and `deleted_at is null` |
 | Artist (`artists`) | its business is listed and `visible` and `discovery_listed` and `deleted_at is null` |
-| Photo (`artist_work_photos`) | its artist is shown (above) and `not hidden` (published on the studio page) and `discovery_suspended_at is null` |
+| Photo (`artist_work_photos`) | its artist is shown (above) and `not hidden` (published on the studio page) and `discovery_suspended_at is null`; `discovery.artworks` also lists only a tattoo's lead (`lead_photo_id is null`), since angles (`1791900000001`): a tattoo shown with several photos is one artwork, its lead, and Discover shows the lead only for now. That rule is the view's, not a policy's: an angle of a published tattoo is published on the studio page, so it is not something that must never leak |
 
 - **Defaults:** every existing and new tenant starts unlisted (`discovery_listed false`). Artists default to `discovery_listed true`: they follow their studio, and an artist can opt out. Seeders opt no one in.
 - **Constraints:**
