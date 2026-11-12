@@ -8,6 +8,7 @@ import FlashDesign from "#modules/flash/models/flash_design";
 import Inquiry from "#modules/inquiries/models/inquiry";
 import ReferenceImage from "#modules/inquiries/models/reference_image";
 import InventoryItem from "#modules/inventory/models/inventory_item";
+import InventoryLot from "#modules/inventory/models/inventory_lot";
 import InventoryMovement from "#modules/inventory/models/inventory_movement";
 import { DEFAULT_TEMPLATES } from "#modules/notifications/messages";
 import MessageTemplate from "#modules/notifications/models/message_template";
@@ -122,6 +123,11 @@ const inventoryRows = (target: Studio) =>
 				.where("tenant_id", target.tenant.id)
 				.orderBy("id")
 		).map((movement) => movement.serialize()),
+		lots: (
+			await InventoryLot.query()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("id")
+		).map((lot) => lot.serialize()),
 	}));
 
 const methodRows = (target: Studio) =>
@@ -472,6 +478,15 @@ export const isolationCases: IsolationCase[] = [
 		actor: "owner",
 		resource: "stockedInventoryItem",
 		body: () => ({ requestId: randomUUID(), kind: "use", quantity: "4" }),
+		ownStatus: 302,
+		snapshot: inventoryRows,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/inventory/:id/tracking",
+		actor: "owner",
+		resource: "inventoryItem",
+		body: () => ({ tracking: "lot" }),
 		ownStatus: 302,
 		snapshot: inventoryRows,
 	},

@@ -271,6 +271,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['movement']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
+  'tenant.inventory.tracking': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/inventory/:id/tracking'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/inventory/validators/inventory').inventoryTrackingValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/inventory/validators/inventory').inventoryTrackingValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['tracking']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['tracking']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
   'tenant.inventory.archive': {
     methods: ["DELETE"]
     pattern: '/t/:tenant/inventory/:id'

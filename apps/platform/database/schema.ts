@@ -420,6 +420,7 @@ export class InventoryItemSchema extends BaseModel {
 		"reorderThreshold",
 		"sku",
 		"tenantId",
+		"tracking",
 		"unit",
 		"updatedAt",
 	] as const;
@@ -443,7 +444,39 @@ export class InventoryItemSchema extends BaseModel {
 	@column()
 	declare tenantId: string;
 	@column()
+	declare tracking: string;
+	@column()
 	declare unit: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
+export class InventoryLotSchema extends BaseModel {
+	static $columns = [
+		"createdAt",
+		"expiresOn",
+		"id",
+		"itemId",
+		"lotNumber",
+		"quantity",
+		"tenantId",
+		"updatedAt",
+	] as const;
+	$columns = InventoryLotSchema.$columns;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.date()
+	declare expiresOn: DateTime | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare itemId: string;
+	@column()
+	declare lotNumber: string;
+	@column()
+	declare quantity: number;
+	@column()
+	declare tenantId: string;
 	@column.dateTime({ autoCreate: true, autoUpdate: true })
 	declare updatedAt: DateTime | null;
 }
@@ -456,6 +489,9 @@ export class InventoryMovementSchema extends BaseModel {
 		"id",
 		"itemId",
 		"kind",
+		"lotBalanceAfter",
+		"lotDelta",
+		"lotId",
 		"note",
 		"requestId",
 		"tenantId",
@@ -474,6 +510,12 @@ export class InventoryMovementSchema extends BaseModel {
 	declare itemId: string;
 	@column()
 	declare kind: string;
+	@column()
+	declare lotBalanceAfter: number | null;
+	@column()
+	declare lotDelta: number | null;
+	@column()
+	declare lotId: string | null;
 	@column()
 	declare note: string | null;
 	@column()

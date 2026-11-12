@@ -39,6 +39,7 @@ export interface ApiDefinition {
       show: typeof routes['tenant.inventory.show']
       update: typeof routes['tenant.inventory.update']
       movement: typeof routes['tenant.inventory.movement']
+      tracking: typeof routes['tenant.inventory.tracking']
       archive: typeof routes['tenant.inventory.archive']
     }
     today: typeof routes['tenant.today']

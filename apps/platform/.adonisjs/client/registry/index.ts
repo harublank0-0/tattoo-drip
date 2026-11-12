@@ -138,6 +138,12 @@ const routes = {
     tokens: [{"old":"/t/:tenant/inventory/:id/movements","type":0,"val":"t","end":""},{"old":"/t/:tenant/inventory/:id/movements","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inventory/:id/movements","type":0,"val":"inventory","end":""},{"old":"/t/:tenant/inventory/:id/movements","type":1,"val":"id","end":""},{"old":"/t/:tenant/inventory/:id/movements","type":0,"val":"movements","end":""}],
     types: placeholder as Registry['tenant.inventory.movement']['types'],
   },
+  'tenant.inventory.tracking': {
+    methods: ["PUT"],
+    pattern: '/t/:tenant/inventory/:id/tracking',
+    tokens: [{"old":"/t/:tenant/inventory/:id/tracking","type":0,"val":"t","end":""},{"old":"/t/:tenant/inventory/:id/tracking","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inventory/:id/tracking","type":0,"val":"inventory","end":""},{"old":"/t/:tenant/inventory/:id/tracking","type":1,"val":"id","end":""},{"old":"/t/:tenant/inventory/:id/tracking","type":0,"val":"tracking","end":""}],
+    types: placeholder as Registry['tenant.inventory.tracking']['types'],
+  },
   'tenant.inventory.archive': {
     methods: ["DELETE"],
     pattern: '/t/:tenant/inventory/:id',

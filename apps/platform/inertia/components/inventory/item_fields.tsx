@@ -6,6 +6,7 @@ import {
 	FieldLabel,
 } from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
+import type { ExpiryStatus } from "./lots";
 
 export type InventoryItem = {
 	id: string;
@@ -15,7 +16,10 @@ export type InventoryItem = {
 	unit: string;
 	quantity: number;
 	reorderThreshold: number | null;
+	tracking: "standard" | "lot";
 	archived: boolean;
+	/** The worst expiry among the item's lots that hold stock. */
+	expiry: ExpiryStatus;
 };
 
 export const unitNames: Record<string, string> = {

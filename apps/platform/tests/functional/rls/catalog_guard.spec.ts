@@ -45,6 +45,7 @@ const EXPECTED_POLICIES: Record<string, string[]> = {
 	flash_designs: ["tenant_isolation:ALL"],
 	inquiries: ["tenant_isolation:ALL"],
 	inventory_items: ["tenant_isolation:ALL"],
+	inventory_lots: ["tenant_isolation:ALL"],
 	inventory_movements: ["tenant_isolation:ALL"],
 	message_templates: ["tenant_isolation:ALL"],
 	payment_methods: ["tenant_isolation:ALL"],

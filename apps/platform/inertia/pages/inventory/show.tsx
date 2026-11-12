@@ -1,32 +1,35 @@
 import { Form } from "@adonisjs/inertia/react";
 import { Link } from "@inertiajs/react";
 import { urlFor } from "~/client";
+import { ExpiryBadge } from "~/components/inventory/expiry_badge";
 import {
 	type InventoryItem,
 	ItemFields,
 	stockAmount,
 } from "~/components/inventory/item_fields";
+import { LotTracking } from "~/components/inventory/lot_tracking";
+import { expiryText, type InventoryLot } from "~/components/inventory/lots";
+import { MovementForm } from "~/components/inventory/movement_form";
 import InventoryPagination from "~/components/inventory/pagination";
 import Page from "~/components/page";
 import Section from "~/components/section";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
-import {
-	Field,
-	FieldError,
-	FieldGroup,
-	FieldLabel,
-} from "~/components/ui/field";
-import { Input } from "~/components/ui/input";
 import { useTenant } from "~/hooks/use-tenant";
 import AppLayout from "~/layouts/app";
 
 type Movement = {
 	actor: string;
 	id: string;
-	kind: "receive" | "use" | "count";
+	kind: "receive" | "use" | "count" | "assign";
 	delta: number;
 	balanceAfter: number;
+	lot: {
+		id: string;
+		number: string;
+		delta: number;
+		balanceAfter: number;
+	} | null;
 	note: string | null;
 	date: string;
 };
@@ -35,6 +38,7 @@ const movementLabels = {
 	receive: "Received",
 	use: "Used",
 	count: "Stock count",
+	assign: "Put in a lot",
 };
 
 export default function InventoryShow({
@@ -44,6 +48,11 @@ export default function InventoryShow({
 	lastPage,
 	requestId,
 	canManage,
+	lots,
+	suggestedLotId,
+	unassigned,
+	expiryWindowDays,
+	lotFilter,
 }: {
 	item: InventoryItem;
 	history: Movement[];
@@ -51,10 +60,21 @@ export default function InventoryShow({
 	lastPage: number;
 	requestId: string;
 	canManage: boolean;
+	lots: InventoryLot[];
+	suggestedLotId: string | null;
+	unassigned: number;
+	expiryWindowDays: number;
+	lotFilter: { id: string; number: string } | null;
 }) {
 	const { slug } = useTenant();
 	const params = { tenant: slug, id: item.id };
 	const detail = urlFor("tenant.inventory.show", params);
+	const tracked = item.tracking === "lot";
+	const historyHref = (next: number) =>
+		`${detail}?${new URLSearchParams({
+			...(lotFilter ? { lot: lotFilter.id } : {}),
+			page: String(next),
+		})}`;
 
 	return (
 		<Page
@@ -72,6 +92,7 @@ export default function InventoryShow({
 					<span>
 						{stockAmount(item.quantity)} {item.unit} on hand
 					</span>
+					{tracked && <Badge variant="secondary">Lot tracking</Badge>}
 					{item.archived ? (
 						<Badge variant="outline">Archived</Badge>
 					) : (
@@ -80,6 +101,7 @@ export default function InventoryShow({
 							<Badge variant="outline">Low stock</Badge>
 						)
 					)}
+					<ExpiryBadge expiry={item.expiry} item />
 				</p>
 			}
 		>
@@ -87,80 +109,73 @@ export default function InventoryShow({
 				<Section
 					title={canManage ? "Record stock movement" : "Record stock used"}
 				>
-					<Form
-						route="tenant.inventory.movement"
-						routeParams={params}
-						resetOnSuccess
-					>
-						{({ errors, processing }) => (
-							<FieldGroup>
-								<input type="hidden" name="requestId" value={requestId} />
-								{errors.requestId && (
-									<FieldError>{errors.requestId}</FieldError>
-								)}
-								<div className="grid gap-4 sm:grid-cols-2">
-									{canManage ? (
-										<Field>
-											<FieldLabel htmlFor="movement-kind">Movement</FieldLabel>
-											<select
-												id="movement-kind"
-												name="kind"
-												className="min-h-11 rounded-md border bg-background px-3 text-sm"
-												aria-invalid={!!errors.kind}
-											>
-												<option value="receive">Receive stock</option>
-												<option value="use">Use stock</option>
-												<option value="count">Set counted stock</option>
-											</select>
-											{errors.kind && <FieldError>{errors.kind}</FieldError>}
-										</Field>
-									) : (
-										<input type="hidden" name="kind" value="use" />
-									)}
-									<Field>
-										<FieldLabel htmlFor="movement-quantity">
-											Quantity ({item.unit})
-										</FieldLabel>
-										<Input
-											id="movement-quantity"
-											name="quantity"
-											type="number"
-											min={0}
-											max={2_000_000}
-											step="0.001"
-											inputMode="decimal"
-											required
-											aria-invalid={!!errors.quantity}
-										/>
-										{errors.quantity && (
-											<FieldError>{errors.quantity}</FieldError>
-										)}
-									</Field>
-								</div>
-								<Field>
-									<FieldLabel htmlFor="movement-note">
-										Note (optional)
-									</FieldLabel>
-									<Input
-										id="movement-note"
-										name="note"
-										maxLength={240}
-										aria-invalid={!!errors.note}
-									/>
-									{errors.note && <FieldError>{errors.note}</FieldError>}
-								</Field>
-								<div>
-									<Button type="submit" disabled={processing}>
-										Record movement
-									</Button>
-								</div>
-							</FieldGroup>
-						)}
-					</Form>
+					<MovementForm
+						key={item.tracking}
+						item={item}
+						lots={lots}
+						suggestedLotId={suggestedLotId}
+						requestId={requestId}
+						canManage={canManage}
+						params={params}
+					/>
 				</Section>
 			)}
 
-			<Section title="Movement history">
+			{(tracked || lots.length > 0) && (
+				<Section
+					id="lots"
+					title={tracked ? "Lots" : "Lots being set up"}
+					description={`Lots with stock, earliest expiry first. Lots expiring within ${expiryWindowDays} days are flagged, using the studio's time zone.`}
+				>
+					{lots.length === 0 ? (
+						<p className="text-sm text-muted-foreground">No lot has stock.</p>
+					) : (
+						<ul className="divide-y">
+							{lots.map((lot) => (
+								<li
+									key={lot.id}
+									className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"
+								>
+									<div className="min-w-0 wrap-anywhere">
+										<p className="flex flex-wrap items-center gap-2 font-medium">
+											Lot {lot.number}
+											<ExpiryBadge expiry={lot.expiry} />
+										</p>
+										<p className="text-muted-foreground">{expiryText(lot)}</p>
+									</div>
+									<div className="flex flex-wrap items-center gap-3 tabular-nums">
+										<span className="font-medium">
+											{stockAmount(lot.quantity)} {item.unit}
+										</span>
+										<Link
+											href={`${detail}?lot=${lot.id}#history`}
+											className="inline-flex min-h-11 items-center underline underline-offset-4"
+											aria-label={`History of lot ${lot.number}`}
+										>
+											History
+										</Link>
+									</div>
+								</li>
+							))}
+						</ul>
+					)}
+				</Section>
+			)}
+
+			<Section id="history" title="Movement history">
+				{lotFilter && (
+					<p className="mb-2 flex flex-wrap items-center gap-x-3 text-sm">
+						<span className="wrap-anywhere">
+							Showing lot {lotFilter.number} only.
+						</span>
+						<Link
+							href={`${detail}#history`}
+							className="inline-flex min-h-11 items-center underline underline-offset-4"
+						>
+							Show all movements
+						</Link>
+					</p>
+				)}
 				{history.length === 0 ? (
 					<p className="text-sm text-muted-foreground">
 						No stock movements yet.
@@ -173,7 +188,10 @@ export default function InventoryShow({
 								className="flex flex-wrap items-start justify-between gap-2 py-3 text-sm"
 							>
 								<div className="min-w-0 wrap-anywhere">
-									<p className="font-medium">{movementLabels[movement.kind]}</p>
+									<p className="font-medium">
+										{movementLabels[movement.kind]}
+										{movement.lot && ` · Lot ${movement.lot.number}`}
+									</p>
 									<p className="text-muted-foreground">
 										{movement.actor} · {movement.date}
 									</p>
@@ -181,10 +199,20 @@ export default function InventoryShow({
 								</div>
 								<div className="text-right tabular-nums">
 									<p className="font-medium">
-										{movement.delta > 0 && "+"}
-										{stockAmount(movement.delta)}
+										{(movement.lot?.delta ?? movement.delta) > 0 && "+"}
+										{stockAmount(movement.lot?.delta ?? movement.delta)}
 									</p>
+									{movement.lot && (
+										<p className="text-muted-foreground">
+											Lot:{" "}
+											{stockAmount(
+												movement.lot.balanceAfter - movement.lot.delta,
+											)}{" "}
+											→ {stockAmount(movement.lot.balanceAfter)} {item.unit}
+										</p>
+									)}
 									<p className="text-muted-foreground">
+										{movement.lot && "Total: "}
 										{stockAmount(movement.balanceAfter - movement.delta)} →{" "}
 										{stockAmount(movement.balanceAfter)} {item.unit}
 									</p>
@@ -196,12 +224,20 @@ export default function InventoryShow({
 				<InventoryPagination
 					page={page}
 					lastPage={lastPage}
-					href={(next) => `${detail}?page=${next}`}
+					href={historyHref}
 				/>
 			</Section>
 
 			{canManage && !item.archived && (
 				<>
+					<Section id="lot-tracking" title="Lot tracking">
+						<LotTracking
+							item={item}
+							unassigned={unassigned}
+							requestId={requestId}
+							params={params}
+						/>
+					</Section>
 					<Section title="Edit item">
 						<Form route="tenant.inventory.update" routeParams={params}>
 							{({ errors, processing }) => (

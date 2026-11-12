@@ -125,7 +125,7 @@ test.group("Studio OS inventory", (group) => {
 			});
 
 			assert.lengthOf(
-				(await service.list(b.id, "active", "Needles", 1)).all(),
+				(await service.list(b.id, "active", "Needles", 1, "2026-11-12")).all(),
 				0,
 			);
 			assert.lengthOf(

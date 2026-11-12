@@ -123,6 +123,10 @@ router
 			.where("id", router.matchers.uuid())
 			.as("tenant.inventory.movement");
 		router
+			.put("inventory/:id/tracking", [controllers.Inventory, "tracking"])
+			.where("id", router.matchers.uuid())
+			.as("tenant.inventory.tracking");
+		router
 			.delete("inventory/:id", [controllers.Inventory, "archive"])
 			.where("id", router.matchers.uuid())
 			.as("tenant.inventory.archive");

@@ -10,21 +10,43 @@ import {
 	parseInventoryCsv,
 } from "#modules/inventory/csv";
 import type InventoryItem from "#modules/inventory/models/inventory_item";
+import type InventoryLot from "#modules/inventory/models/inventory_lot";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime.
 import InventoryService, {
 	InventoryRuleError,
 } from "#modules/inventory/services/inventory_service";
-import { INVENTORY_UNITS } from "#modules/inventory/stock";
+import {
+	EXPIRY_WARNING_DAYS,
+	type ExpiryStatus,
+	expiryStatus,
+	INVENTORY_UNITS,
+} from "#modules/inventory/stock";
 import {
 	createInventoryItemValidator,
 	inventoryMovementValidator,
+	inventoryTrackingValidator,
 	updateInventoryItemValidator,
 } from "#modules/inventory/validators/inventory";
+import { formatDay, todayIn } from "#modules/projects/quotes";
 
 const pageNumber = (value: unknown) =>
 	typeof value === "string" && /^[1-9]\d{0,7}$/.test(value) ? Number(value) : 1;
 
-function itemView(item: InventoryItem) {
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function lotView(lot: InventoryLot, today: string) {
+	const expiresOn = lot.expiresOn?.toISODate() ?? null;
+	return {
+		id: lot.id,
+		number: lot.lotNumber,
+		quantity: lot.quantity,
+		expiresOn,
+		expiresLabel: expiresOn ? formatDay(expiresOn) : null,
+		expiry: expiryStatus(expiresOn, today),
+	};
+}
+
+function itemView(item: InventoryItem, expiry: ExpiryStatus = null) {
 	return {
 		id: item.id,
 		name: item.name,
@@ -33,7 +55,9 @@ function itemView(item: InventoryItem) {
 		unit: item.unit,
 		quantity: item.quantity,
 		reorderThreshold: item.reorderThreshold,
+		tracking: item.tracking,
 		archived: Boolean(item.deletedAt),
+		expiry,
 	};
 }
 
@@ -59,19 +83,29 @@ export default class InventoryController {
 			return ctx.response.notFound();
 		const query = ctx.request.qs();
 		const status =
-			query.status === "low" || query.status === "archived"
+			query.status === "low" ||
+			query.status === "expiring" ||
+			query.status === "archived"
 				? query.status
 				: "active";
 		const search =
 			typeof query.q === "string" ? query.q.trim().slice(0, 120) : "";
+		const today = todayIn(tenant.timezone);
 		const items = await this.inventory.list(
 			tenant.id,
 			status,
 			search,
 			pageNumber(query.page),
+			today,
+		);
+		const flags = await this.inventory.expiryFlags(
+			tenant.id,
+			items.all().flatMap((item) => (item.deletedAt ? [] : [item.id])),
+			today,
 		);
 		return ctx.inertia.render("inventory/index", {
-			items: items.all().map(itemView),
+			items: items.all().map((item) => itemView(item, flags.get(item.id))),
+			expiryWindowDays: EXPIRY_WARNING_DAYS,
 			status,
 			search,
 			page: items.currentPage,
@@ -87,14 +121,39 @@ export default class InventoryController {
 		if (!canManage && !membership.inventoryAccess)
 			return ctx.response.notFound();
 		const item = await this.inventory.find(tenant.id, ctx.params.id);
-		const { movements, users } = await this.inventory.history(
+		const query = ctx.request.qs();
+		const today = todayIn(tenant.timezone);
+		const filter =
+			typeof query.lot === "string" && UUID.test(query.lot)
+				? await this.inventory.findLot(tenant.id, item.id, query.lot)
+				: null;
+		const {
+			movements,
+			users,
+			lots: lotNumbers,
+		} = await this.inventory.history(
 			tenant.id,
 			item.id,
-			pageNumber(ctx.request.qs().page),
+			pageNumber(query.page),
+			filter?.id,
 		);
+		const { lots, assigned } = await this.inventory.lots(tenant.id, item.id);
+		const lotRows = lots.map((lot) => lotView(lot, today));
+		const worst = lotRows.some((lot) => lot.expiry === "expired")
+			? "expired"
+			: lotRows.some((lot) => lot.expiry === "soon")
+				? "soon"
+				: null;
 		return ctx.inertia.render("inventory/show", {
-			item: itemView(item),
+			item: itemView(item, item.deletedAt ? null : worst),
 			canManage,
+			lots: lotRows,
+			// First in, first out by expiry: the earliest lot still in date.
+			suggestedLotId:
+				lotRows.find((lot) => lot.expiry !== "expired")?.id ?? null,
+			unassigned: item.quantity - assigned,
+			expiryWindowDays: EXPIRY_WARNING_DAYS,
+			lotFilter: filter ? { id: filter.id, number: filter.lotNumber } : null,
 			history: movements.all().map((movement) => {
 				const user = movement.userId ? users.get(movement.userId) : undefined;
 				const actor =
@@ -109,6 +168,14 @@ export default class InventoryController {
 					kind: movement.kind,
 					delta: movement.delta,
 					balanceAfter: movement.balanceAfter,
+					lot: movement.lotId
+						? {
+								id: movement.lotId,
+								number: lotNumbers.get(movement.lotId) ?? "",
+								delta: movement.lotDelta ?? 0,
+								balanceAfter: movement.lotBalanceAfter ?? 0,
+							}
+						: null,
 					note: movement.note,
 					date: movement.createdAt
 						.setZone(tenant.timezone)
@@ -161,6 +228,24 @@ export default class InventoryController {
 			),
 		);
 		ctx.session.flash("success", "Stock movement recorded.");
+		return ctx.response
+			.redirect()
+			.toRoute("tenant.inventory.show", { tenant: tenant.slug, id: item.id });
+	}
+
+	async tracking(ctx: HttpContext) {
+		const { tenant } = tenantContext(ctx);
+		const item = await this.inventory.find(tenant.id, ctx.params.id);
+		const { tracking } = await ctx.request.validateUsing(
+			inventoryTrackingValidator,
+		);
+		await asFieldErrors(() =>
+			this.inventory.setTracking(tenant.id, item.id, tracking),
+		);
+		ctx.session.flash(
+			"success",
+			tracking === "lot" ? "Lot tracking is on." : "Lot tracking is off.",
+		);
 		return ctx.response
 			.redirect()
 			.toRoute("tenant.inventory.show", { tenant: tenant.slug, id: item.id });

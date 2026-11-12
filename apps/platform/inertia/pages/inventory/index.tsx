@@ -1,6 +1,7 @@
 import { Form } from "@adonisjs/inertia/react";
 import { Link } from "@inertiajs/react";
 import { urlFor } from "~/client";
+import { ExpiryBadge } from "~/components/inventory/expiry_badge";
 import {
 	type InventoryItem,
 	ItemFields,
@@ -23,9 +24,11 @@ export default function InventoryIndex({
 	lastPage,
 	units,
 	canManage,
+	expiryWindowDays,
 }: {
 	items: InventoryItem[];
-	status: "active" | "low" | "archived";
+	expiryWindowDays: number;
+	status: "active" | "low" | "expiring" | "archived";
 	search: string;
 	page: number;
 	lastPage: number;
@@ -87,6 +90,9 @@ export default function InventoryIndex({
 						>
 							<option value="active">Active</option>
 							<option value="low">Low stock</option>
+							<option value="expiring">
+								Expired or expiring ({expiryWindowDays} days)
+							</option>
 							<option value="archived">Archived</option>
 						</select>
 					</label>
@@ -118,6 +124,10 @@ export default function InventoryIndex({
 										)}
 									</span>
 									<span className="flex flex-wrap items-center gap-2 text-sm tabular-nums">
+										{item.tracking === "lot" && (
+											<Badge variant="secondary">Lots</Badge>
+										)}
+										<ExpiryBadge expiry={item.expiry} item />
 										{!item.archived &&
 											item.reorderThreshold !== null &&
 											item.quantity <= item.reorderThreshold && (
@@ -164,6 +174,11 @@ export default function InventoryIndex({
 								Columns: name, sku, category, unit, quantity, reorder_threshold.
 								Use piece, box, roll, ml, or g for unit. Leave quantity blank to
 								start at zero.
+							</p>
+							<p className="text-sm text-muted-foreground">
+								CSV has no lot or expiry columns: imported items use standard
+								tracking, and a lot-tracked item exports its total stock only.
+								Record lots and their expiry dates on the item's page.
 							</p>
 							<Form
 								route="tenant.inventory.import"

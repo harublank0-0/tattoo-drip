@@ -36,6 +36,7 @@ export const TENANT_ROUTE_ROLES = {
 	"tenant.inventory.show": MEMBERS,
 	"tenant.inventory.update": OWNERS,
 	"tenant.inventory.movement": MEMBERS,
+	"tenant.inventory.tracking": OWNERS,
 	"tenant.inventory.archive": OWNERS,
 
 	// Studio settings.
