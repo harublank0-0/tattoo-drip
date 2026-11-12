@@ -19,7 +19,7 @@ import {
 	NO_PHOTOS,
 	photoAlt,
 	photoCount,
-	REMOVE_PHOTO_QUESTION,
+	removePhotoQuestion,
 	SHEET_HELP,
 	STYLES_HELP,
 	TRAY_FULL,
@@ -49,19 +49,27 @@ import WorkPhotoUpload from "~/components/work_photo_upload";
  * Every word is in `components/photos.ts`; the server decides everything
  * else (WorkPhotoService), so a refused change comes back as a field error
  * next to its control, with what was typed still in it.
+ *
+ * Angles: a tile is a tattoo, its main photo, noting "n photos" when it has
+ * more (they are ordered and changed one by one in Portfolio); `total`
+ * counts every photo, which is what the artist's 100 and the room count, and
+ * removing a tattoo of several photos says that all of them go.
  */
 export default function WorkPhotoTray({
 	tenantSlug,
 	artistId,
 	photos,
+	total,
 	styleOptions,
 }: {
 	tenantSlug: string;
 	artistId: string;
 	photos: WorkPhotoProps[];
+	/** Every photo, angles included. */
+	total: number;
 	styleOptions: StyleOption[];
 }) {
-	const count = photos.length;
+	const count = total;
 	const sheet = useFormSheet();
 	// The photo the sheet shows. It stays set when the sheet closes, so the
 	// sheet keeps its content for its exit animation; a photo that is gone
@@ -107,6 +115,7 @@ export default function WorkPhotoTray({
 							photo.styles.length,
 							photo.healed,
 							photo.hidden,
+							photo.photoCount,
 						);
 						return (
 							<li key={photo.id}>
@@ -126,7 +135,7 @@ export default function WorkPhotoTray({
 								>
 									<img
 										src={photo.thumbnailUrl}
-										alt={photoAlt(photo.alt, index + 1, count)}
+										alt={photoAlt(photo.alt, index + 1, photos.length)}
 										width={96}
 										height={96}
 										loading="lazy"
@@ -161,7 +170,7 @@ export default function WorkPhotoTray({
 						sheet={sheet}
 						photo={selected}
 						n={selectedIndex + 1}
-						count={count}
+						count={photos.length}
 						styleOptions={styleOptions}
 						uploading={uploading}
 					/>
@@ -203,7 +212,7 @@ function PhotoDetails({
 	const healedError = `healed-error-${photo.id}`;
 
 	const remove = () => {
-		if (!window.confirm(REMOVE_PHOTO_QUESTION)) return;
+		if (!window.confirm(removePhotoQuestion(photo.photoCount))) return;
 		router.delete(urlFor("tenant.artists.photos.destroy", params), {
 			preserveScroll: true,
 			onStart: sheet.onStart,

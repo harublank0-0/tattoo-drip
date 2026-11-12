@@ -23,12 +23,15 @@ import {
 	detailsTitle,
 	PAGE_DELAY_NOTE,
 	type PortfolioPhoto,
-	REMOVE_QUESTION,
+	photoTotal,
+	removeLabel,
+	removeQuestion,
 	sizeText,
 	statusNote,
 	statusText,
 } from "~/components/portfolio";
 import StylePicker from "~/components/style_picker";
+import TattooPhotos from "~/components/tattoo_photos";
 import { Badge } from "~/components/ui/badge";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
@@ -63,6 +66,15 @@ type Mode = "view" | "edit" | "remove";
  * keeps the page's state); a removed photo leaves the props and the page
  * closes the panel. Escape leaves the edit or the question first, and
  * nothing closes the panel while a request is out.
+ *
+ * Angles: the photo is a tattoo's main photo, and the panel is the
+ * tattoo's. Publish, the styles and healed mark apply to every photo of it
+ * (the server copies them), the description is the main photo's own, and
+ * Remove removes the whole tattoo, its question saying how many photos go.
+ * "Photos of this tattoo" (TattooPhotos) lists them all and changes their
+ * order, the main photo and which photos belong to it; `onFollow` keeps the
+ * panel on the tattoo when its main photo changes, and `onAddPhotos` opens
+ * the upload for it.
  */
 export default function ArtworkDetails({
 	photo,
@@ -74,6 +86,8 @@ export default function ArtworkDetails({
 	styleNames,
 	fallbackFocus,
 	held,
+	onFollow,
+	onAddPhotos,
 }: {
 	photo: PortfolioPhoto | null;
 	open: boolean;
@@ -87,6 +101,10 @@ export default function ArtworkDetails({
 	fallbackFocus: RefObject<HTMLElement | null>;
 	/** An upload is going: a write here would cancel its visit. */
 	held: boolean;
+	/** Another photo of the tattoo is becoming its main one: select it. */
+	onFollow: (id: string) => void;
+	/** Open the upload for this tattoo. */
+	onAddPhotos: (photo: PortfolioPhoto) => void;
 }) {
 	const [mode, setMode] = useState<Mode>("view");
 	const [busy, setBusy] = useState(false);
@@ -160,6 +178,8 @@ export default function ArtworkDetails({
 						styleOptions={styleOptions}
 						styleNames={styleNames}
 						held={held}
+						onFollow={onFollow}
+						onAddPhotos={() => onAddPhotos(current)}
 					/>
 				)}
 			</SheetContent>
@@ -180,6 +200,8 @@ function Body({
 	styleOptions,
 	styleNames,
 	held,
+	onFollow,
+	onAddPhotos,
 }: {
 	photo: PortfolioPhoto;
 	mode: Mode;
@@ -193,8 +215,11 @@ function Body({
 	styleOptions: { slug: string; name: string }[];
 	styleNames: Record<string, string>;
 	held: boolean;
+	onFollow: (id: string) => void;
+	onAddPhotos: () => void;
 }) {
 	const [failed, setFailed] = useState(false);
+	const photos = photoTotal(photo);
 	const params = { tenant: tenantSlug, id: photo.id };
 	const editButton = useRef<HTMLButtonElement>(null);
 	const removeButton = useRef<HTMLButtonElement>(null);
@@ -356,7 +381,11 @@ function Body({
 							)}
 						</dd>
 						<dt className="text-muted-foreground">Healed</dt>
-						<dd>{photo.healed ? "Yes, the photo shows it healed" : "No"}</dd>
+						<dd>
+							{photo.healed
+								? `Yes, ${photos > 1 ? "the photos show" : "the photo shows"} it healed`
+								: "No"}
+						</dd>
 						<dt className="text-muted-foreground">Added</dt>
 						<dd className="tabular-nums">{photo.addedText}</dd>
 						<dt className="text-muted-foreground">Description</dt>
@@ -373,7 +402,7 @@ function Body({
 					{mode === "remove" ? (
 						<div className="flex flex-col gap-3 rounded-md border border-destructive/40 p-4">
 							<p className="text-sm font-medium" id="remove-question">
-								{REMOVE_QUESTION}
+								{removeQuestion(photos)}
 							</p>
 							<div className="flex flex-wrap gap-2">
 								<Button
@@ -383,7 +412,7 @@ function Body({
 									aria-describedby="remove-question"
 									onClick={remove}
 								>
-									{busy ? "Removing…" : "Remove photo"}
+									{removeLabel(photos, busy)}
 								</Button>
 								<Button
 									ref={keep}
@@ -469,6 +498,20 @@ function Body({
 								</Button>
 							</div>
 						</div>
+					)}
+
+					{mode === "view" && (
+						<TattooPhotos
+							photo={photo}
+							tenantSlug={tenantSlug}
+							back={back}
+							busy={busy}
+							held={held}
+							onBusy={setBusy}
+							onError={setError}
+							onFollow={onFollow}
+							onAddPhotos={onAddPhotos}
+						/>
 					)}
 				</div>
 			)}
@@ -575,6 +618,12 @@ function EditForm({
 						</FieldContent>
 					</Field>
 
+					{photo.angles.length > 0 && (
+						<p className="text-xs text-muted-foreground">
+							The description is the main photo&apos;s. Styles and healed apply
+							to all {photo.angles.length + 1} photos of this tattoo.
+						</p>
+					)}
 					<div className="flex flex-wrap gap-2">
 						<Button type="submit" disabled={processing || held}>
 							{processing ? "Saving…" : "Save details"}
