@@ -120,22 +120,31 @@
 :root.theme-atelier main.page > section > .section-title:first-child::after,
 :root.theme-atelier .status-page > .section-title::after { content: ''; display: block; inline-size: 3rem; block-size: 1px; margin: 1.25rem auto 0; background: var(--atl-brass); }
 :root.theme-atelier .info-page > .measure { margin-inline: auto; }
+/* The column's blocks take its full width, so the text starts at the column's edge, not wherever it ends. */
+:root.theme-atelier .info-page > .measure > div,
+:root.theme-atelier .info-page > .measure > ul,
+:root.theme-atelier .info-page > .measure > ol,
+:root.theme-atelier .info-page > .measure > dl,
+:root.theme-atelier .info-page > .measure > section { justify-self: stretch; }
 :root.theme-atelier main.page > section:not(.info-page) > .stack { justify-items: center; max-inline-size: 36rem; margin-inline: auto; text-align: center; }
-:root.theme-atelier main.page > section:not(.info-page) > .stack .links { justify-content: center; }
+/* The studio's address keeps its labels and chips at the start, as a card. */
 :root.theme-atelier main.page > section:not(.info-page) > .stack > address { text-align: start; }
-:root.theme-atelier .work-filter-nav,
-:root.theme-atelier .flash-more-bar { justify-content: center; text-align: center; }
-:root.theme-atelier .flash-grid { margin-inline: auto; }
-/* A page that isn't there, or can't load: the same, in the middle of the paper, under the sprig. */
-:root.theme-atelier .status-page { justify-items: center; padding-block: clamp(4rem, 3rem + 6vw, 8rem); text-align: center; }
+/* Only on the flash page itself: the home's and an artist's Flash sections keep their own frame. */
+:root.theme-atelier main.page > section > .work-filter-nav,
+:root.theme-atelier main.page > section > .flash-more-bar { justify-content: center; text-align: center; }
+:root.theme-atelier main.page > section > .work-newest { text-align: center; }
+:root.theme-atelier main.page > section > .flash-grid { margin-inline: auto; }
+/* A page that isn't there, or can't load: the same, in the middle of the paper, under the sprig (main.page.status-page, so it outranks main.page's padding below). */
+:root.theme-atelier main.page.status-page { justify-items: center; padding-block: clamp(4rem, 3rem + 6vw, 8rem); text-align: center; }
 
 /*
  * The sprig: a fine-line botanical drawn in the brass, Atelier's one
  * figurative ornament, always decoration (a pseudo-element or an
  * aria-hidden box, never in front of the work). It is the shape of
  * ./sprig.svg, a 120 x 24 hairline drawing the build inlines into this
- * stylesheet (nothing is downloaded), used as a mask so it takes the brass;
- * a device forcing its own colours paints it as the canvas, so it drops out.
+ * stylesheet (nothing is downloaded), used as a mask so it takes the brass.
+ * A device forcing its own colours, or a printout (which drops backgrounds),
+ * can't draw it, so there it takes no space at all.
  * Where it sits: above a status page's title, over the footer's sign-off and
  * between the rules of the no-photo first screen (pages.css).
  */
@@ -143,6 +152,11 @@
 .atl-footer-lead::before,
 .atl-hero-ornament::after { content: ''; display: block; inline-size: 7.5rem; block-size: 1.5rem; background-color: var(--atl-brass); -webkit-mask: url('./sprig.svg') center / contain no-repeat; mask: url('./sprig.svg') center / contain no-repeat; }
 :root.theme-atelier .status-page::before { margin-block-end: 0.5rem; }
+@media (forced-colors: active), print {
+  :root.theme-atelier .status-page::before,
+  .atl-footer-lead::before,
+  .atl-hero-ornament::after { display: none; }
+}
 
 /* Keyboard users skip the header: hidden above the top until it has focus. */
 .atl-skip { position: absolute; inset-inline-start: 1rem; inset-block-start: 0.75rem; z-index: 3; padding: 0.75rem 1rem; background: var(--ink); color: var(--paper); font-weight: 600; text-decoration: none; translate: 0 -200%; }
