@@ -5,6 +5,7 @@ import Artist from "#modules/artists/models/artist";
 import StaffAlert from "#modules/notifications/models/staff_alert";
 import TattooProject from "#modules/projects/models/tattoo_project";
 import { rolesFor, TENANT_ROUTE_ROLES } from "#modules/tenancy/access";
+import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import { caseRequest } from "#tests/helpers/isolation";
 import {
 	artistIn,
@@ -38,6 +39,9 @@ const ARTIST_ROUTES = [
 	"tenant.artists.update",
 	"tenant.calendar.index",
 	"tenant.dashboard",
+	"tenant.inventory.index",
+	"tenant.inventory.movement",
+	"tenant.inventory.show",
 	"tenant.portfolio",
 	"tenant.portfolio.bulk",
 	"tenant.projects.contacted.store",
@@ -112,6 +116,14 @@ test.group("What an artist may use (TAT-30)", (group) => {
 			const studio = await artistsStudio();
 			const name = routeName(isolationCase);
 			const allowed = rolesFor(name)?.includes("artist") ?? false;
+			if (name.startsWith("tenant.inventory.") && allowed) {
+				await inTenant(studio.tenant, async () => {
+					const membership = await TenantMembership.findOrFail(
+						studio.artistMembership.id,
+					);
+					await membership.merge({ inventoryAccess: true }).save();
+				});
+			}
 			const writes = isolationCase.method !== "GET";
 			const before = await isolationCase.snapshot(studio);
 
@@ -161,7 +173,7 @@ const artistIdCases = () =>
 test.group("A second artist of the same studio (TAT-16)", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 
-	/** artistsStudio() plus a second artist member with a live profile of their own. */
+	/** The second artist has their own profile and no inventory grant. */
 	async function twoArtists() {
 		const studio = await artistsStudio();
 		const other = await artistIn(studio.tenant, "other@roles-30.example");

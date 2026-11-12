@@ -26,6 +26,7 @@ import SettingsLayout from "~/layouts/settings";
 type Role = "owner" | "artist";
 
 type MemberRow = {
+	inventoryAccess: boolean;
 	id: string;
 	name: string | null;
 	email: string;
@@ -291,6 +292,24 @@ function MemberItem({
 			</div>
 			{!member.isYou && (
 				<div className="flex flex-wrap gap-2">
+					{member.role === "artist" && (
+						<Button
+							type="button"
+							variant="outline"
+							aria-label={`${member.inventoryAccess ? "Revoke" : "Grant"} inventory access for ${label}`}
+							onClick={() =>
+								router.put(
+									urlFor("tenant.settings.members.inventory.update", params),
+									{ enabled: !member.inventoryAccess },
+									{ preserveScroll: true },
+								)
+							}
+						>
+							{member.inventoryAccess
+								? "Revoke inventory access"
+								: "Grant inventory access"}
+						</Button>
+					)}
 					<Button
 						type="button"
 						variant="outline"

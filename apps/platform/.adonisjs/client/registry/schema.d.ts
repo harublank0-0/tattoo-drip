@@ -187,6 +187,150 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/dashboard_controller').default['tenantHome']>>>
     }
   }
+  'tenant.inventory.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/inventory'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['index']>>>
+    }
+  }
+  'tenant.inventory.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/inventory'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/inventory/validators/inventory').createInventoryItemValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/inventory/validators/inventory').createInventoryItemValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['store']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['store']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.inventory.export': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/inventory/export.csv'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['exportCsv']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['exportCsv']>>>
+    }
+  }
+  'tenant.inventory.import': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/inventory/import'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['importCsv']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['importCsv']>>>
+    }
+  }
+  'tenant.inventory.lots.export': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/inventory/lots.csv'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['exportLotsCsv']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['exportLotsCsv']>>>
+    }
+  }
+  'tenant.inventory.show': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/inventory/:id'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['show']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['show']>>>
+    }
+  }
+  'tenant.inventory.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/inventory/:id'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/inventory/validators/inventory').updateInventoryItemValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/inventory/validators/inventory').updateInventoryItemValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['update']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.inventory.movement': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/inventory/:id/movements'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/inventory/validators/inventory').inventoryMovementValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/inventory/validators/inventory').inventoryMovementValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['movement']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['movement']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.inventory.tracking': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/inventory/:id/tracking'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/inventory/validators/inventory').inventoryTrackingValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/inventory/validators/inventory').inventoryTrackingValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['tracking']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['tracking']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.inventory.lots.expiry': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/inventory/:id/lot-expiry'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/inventory/validators/inventory').lotExpiryValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/inventory/validators/inventory').lotExpiryValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['lotExpiry']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['lotExpiry']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.inventory.archive': {
+    methods: ["DELETE"]
+    pattern: '/t/:tenant/inventory/:id'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['archive']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['archive']>>>
+    }
+  }
+  'tenant.inventory.restore': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/inventory/:id/restore'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['restore']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['restore']>>>
+    }
+  }
   'tenant.today': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/today'
@@ -605,6 +749,18 @@ export interface Registry {
       query: ExtractQuery<InferInput<(typeof import('#modules/tenancy/validators/members').memberRoleValidator)>>
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/members_controller').default['role']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/members_controller').default['role']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.settings.members.inventory.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/settings/members/:id/inventory'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/tenancy/validators/members').memberInventoryValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/tenancy/validators/members').memberInventoryValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/members_controller').default['inventoryAccess']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/members_controller').default['inventoryAccess']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
   'tenant.settings.members.destroy': {

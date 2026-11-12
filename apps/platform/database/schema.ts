@@ -415,6 +415,123 @@ export class InquirySchema extends BaseModel {
 	declare updatedAt: DateTime | null;
 }
 
+export class InventoryItemSchema extends BaseModel {
+	static $columns = [
+		"category",
+		"createdAt",
+		"deletedAt",
+		"id",
+		"name",
+		"quantity",
+		"reorderThreshold",
+		"sku",
+		"tenantId",
+		"tracking",
+		"unit",
+		"updatedAt",
+	] as const;
+	$columns = InventoryItemSchema.$columns;
+	@column()
+	declare category: string | null;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.dateTime()
+	declare deletedAt: DateTime | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare name: string;
+	@column()
+	declare quantity: number;
+	@column()
+	declare reorderThreshold: number | null;
+	@column()
+	declare sku: string | null;
+	@column()
+	declare tenantId: string;
+	@column()
+	declare tracking: string;
+	@column()
+	declare unit: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
+export class InventoryLotSchema extends BaseModel {
+	static $columns = [
+		"createdAt",
+		"expiresOn",
+		"id",
+		"itemId",
+		"lotNumber",
+		"quantity",
+		"tenantId",
+		"updatedAt",
+	] as const;
+	$columns = InventoryLotSchema.$columns;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.date()
+	declare expiresOn: DateTime | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare itemId: string;
+	@column()
+	declare lotNumber: string;
+	@column()
+	declare quantity: number;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
+export class InventoryMovementSchema extends BaseModel {
+	static $columns = [
+		"balanceAfter",
+		"createdAt",
+		"delta",
+		"id",
+		"itemId",
+		"kind",
+		"lotBalanceAfter",
+		"lotDelta",
+		"lotId",
+		"note",
+		"requestId",
+		"tenantId",
+		"userId",
+	] as const;
+	$columns = InventoryMovementSchema.$columns;
+	@column()
+	declare balanceAfter: number;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column()
+	declare delta: number;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare itemId: string;
+	@column()
+	declare kind: string;
+	@column()
+	declare lotBalanceAfter: number | null;
+	@column()
+	declare lotDelta: number | null;
+	@column()
+	declare lotId: string | null;
+	@column()
+	declare note: string | null;
+	@column()
+	declare requestId: string;
+	@column()
+	declare tenantId: string;
+	@column()
+	declare userId: string | null;
+}
+
 export class MessageTemplateSchema extends BaseModel {
 	static $columns = [
 		"body",
@@ -1044,6 +1161,7 @@ export class TenantMembershipSchema extends BaseModel {
 		"createdAt",
 		"deletedAt",
 		"id",
+		"inventoryAccess",
 		"role",
 		"tenantId",
 		"updatedAt",
@@ -1056,6 +1174,8 @@ export class TenantMembershipSchema extends BaseModel {
 	declare deletedAt: DateTime | null;
 	@column({ isPrimary: true })
 	declare id: string;
+	@column()
+	declare inventoryAccess: boolean;
 	@column()
 	declare role: string;
 	@column()

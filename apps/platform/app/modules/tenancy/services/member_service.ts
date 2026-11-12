@@ -98,9 +98,21 @@ export default class MemberService {
 			}
 			if (live.role !== role) {
 				live.role = role;
+				live.inventoryAccess = false;
 				await live.save();
 			}
 			return { name: nameOf(account) };
+		});
+	}
+
+	async setInventoryAccess(tenant: TenantRef, id: string, enabled: boolean) {
+		return withTransaction(async (trx) => {
+			const member = await this.lock(trx, tenant, id);
+			if (member.role !== "artist") {
+				throw new lucidErrors.E_ROW_NOT_FOUND(TenantMembership);
+			}
+			member.inventoryAccess = enabled;
+			await member.save();
 		});
 	}
 

@@ -22,6 +22,10 @@ inviteValidator.messagesProvider = new SimpleMessagesProvider({
 });
 
 /** A member's new role (TAT-33). */
+export const memberInventoryValidator = vine.create({
+	enabled: vine.boolean(),
+});
+
 export const memberRoleValidator = vine.create({
 	role: vine.enum(MEMBERSHIP_ROLES),
 });

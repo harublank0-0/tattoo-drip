@@ -142,6 +142,9 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 							slug: tenant.slug,
 							type: tenant.type,
 							role: membership.role,
+							...(membership.inventoryAccess
+								? { inventoryAccess: true as const }
+								: {}),
 							logoUrl,
 						}
 					: undefined,

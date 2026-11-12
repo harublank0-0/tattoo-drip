@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { DateTime } from "luxon";
 import Artist from "#modules/artists/models/artist";
 import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
@@ -6,6 +7,9 @@ import { LISTING_CONSENT_VERSION } from "#modules/discovery/publication";
 import FlashDesign from "#modules/flash/models/flash_design";
 import Inquiry from "#modules/inquiries/models/inquiry";
 import ReferenceImage from "#modules/inquiries/models/reference_image";
+import InventoryItem from "#modules/inventory/models/inventory_item";
+import InventoryLot from "#modules/inventory/models/inventory_lot";
+import InventoryMovement from "#modules/inventory/models/inventory_movement";
 import { DEFAULT_TEMPLATES } from "#modules/notifications/messages";
 import MessageTemplate from "#modules/notifications/models/message_template";
 import StaffAlert from "#modules/notifications/models/staff_alert";
@@ -49,6 +53,10 @@ export type IsolationCase = {
 	 * Required for a pattern with an :id; the helper throws without it.
 	 */
 	resource?:
+		| "inventoryItem"
+		| "stockedInventoryItem"
+		| "lotInventoryItem"
+		| "archivedInventoryItem"
 		| "paymentMethod"
 		| "artistProfile"
 		| "workPhoto"
@@ -106,6 +114,25 @@ const tenantRow = (target: Studio) =>
 	inTenant(target.tenant, async () =>
 		(await Tenant.findOrFail(target.tenant.id)).serialize(),
 	);
+
+const inventoryRows = (target: Studio) =>
+	inTenant(target.tenant, async () => ({
+		items: (
+			await InventoryItem.withTrashed()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("id")
+		).map((item) => item.serialize()),
+		movements: (
+			await InventoryMovement.query()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("id")
+		).map((movement) => movement.serialize()),
+		lots: (
+			await InventoryLot.query()
+				.where("tenant_id", target.tenant.id)
+				.orderBy("id")
+		).map((lot) => lot.serialize()),
+	}));
 
 const methodRows = (target: Studio) =>
 	inTenant(target.tenant, async () =>
@@ -391,6 +418,113 @@ export const isolationCases: IsolationCase[] = [
 		actor: "owner",
 		ownStatus: 200,
 		snapshot: none,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/inventory",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: inventoryRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/inventory",
+		actor: "owner",
+		body: () => ({ name: "Aftercare balm", unit: "piece" }),
+		ownStatus: 302,
+		snapshot: inventoryRows,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/inventory/export.csv",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: inventoryRows,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/inventory/lots.csv",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: inventoryRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/inventory/import",
+		actor: "owner",
+		files: async () => [
+			{
+				field: "csv",
+				name: "inventory.csv",
+				type: "text/csv",
+				data: Buffer.from(
+					"name,sku,category,unit,quantity,reorder_threshold\nAftercare balm,ALM-1,,piece,2,1\n",
+				),
+			},
+		],
+		ownStatus: 302,
+		snapshot: inventoryRows,
+	},
+
+	{
+		method: "GET",
+		pattern: "/t/:tenant/inventory/:id",
+		actor: "owner",
+		resource: "inventoryItem",
+		ownStatus: 200,
+		snapshot: inventoryRows,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/inventory/:id",
+		actor: "owner",
+		resource: "inventoryItem",
+		body: () => ({ name: "Sterile cartridges" }),
+		ownStatus: 302,
+		snapshot: inventoryRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/inventory/:id/movements",
+		actor: "owner",
+		resource: "stockedInventoryItem",
+		body: () => ({ requestId: randomUUID(), kind: "use", quantity: "4" }),
+		ownStatus: 302,
+		snapshot: inventoryRows,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/inventory/:id/lot-expiry",
+		actor: "owner",
+		resource: "lotInventoryItem",
+		body: (own) => ({ lotId: own.inventoryLot.id, expiresOn: "2031-01-31" }),
+		ownStatus: 302,
+		snapshot: inventoryRows,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/inventory/:id/tracking",
+		actor: "owner",
+		resource: "inventoryItem",
+		body: () => ({ tracking: "lot" }),
+		ownStatus: 302,
+		snapshot: inventoryRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/inventory/:id/restore",
+		actor: "owner",
+		resource: "archivedInventoryItem",
+		ownStatus: 302,
+		snapshot: inventoryRows,
+	},
+	{
+		method: "DELETE",
+		pattern: "/t/:tenant/inventory/:id",
+		actor: "owner",
+		resource: "inventoryItem",
+		ownStatus: 302,
+		snapshot: inventoryRows,
 	},
 	{
 		method: "GET",
@@ -1270,6 +1404,16 @@ export const isolationCases: IsolationCase[] = [
 		ownStatus: 302,
 		snapshot: memberRows,
 	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/settings/members/:id/inventory",
+		resource: "artistMembership",
+		actor: "owner",
+		body: () => ({ enabled: true }),
+		ownStatus: 302,
+		snapshot: memberRows,
+	},
+
 	{
 		method: "DELETE",
 		pattern: "/t/:tenant/settings/members/:id",

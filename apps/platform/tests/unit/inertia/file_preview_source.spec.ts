@@ -27,12 +27,25 @@ test.group("Upload previews", () => {
 			// The preview field itself.
 			["components/file_preview.tsx", ["FileThumb", "useObjectUrls"]],
 		]);
+		// Documents, not images: nothing to preview but the name the browser
+		// already shows. Each accepts only its own type, so no image can
+		// arrive through it unseen.
+		const documents = new Map<string, string>([
+			// The inventory CSV import.
+			["pages/inventory/index.tsx", 'accept=".csv,text/csv"'],
+		]);
 		const fields: string[] = [];
 		for (const file of await sources()) {
 			const source = await read(file);
 			const inputs = source.match(/type="file"/g)?.length ?? 0;
 			if (inputs === 0) {
 				if (/<ImageFileInput\b/.test(source)) fields.push(file);
+				continue;
+			}
+			const accept = documents.get(file);
+			if (accept) {
+				assert.equal(inputs, 1, `${file}: one document input`);
+				assert.include(source, accept, file);
 				continue;
 			}
 			const needs = withPreview.get(file);
