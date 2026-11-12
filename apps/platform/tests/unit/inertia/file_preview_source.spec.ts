@@ -4,10 +4,12 @@ import { test } from "@japa/runner";
 const root = new URL("../../../inertia/", import.meta.url);
 const read = (file: string) => readFile(new URL(file, root), "utf8");
 
-/** Every .tsx file under inertia/, relative to it. */
+/** Every .ts and .tsx file under inertia/, relative to it. */
 async function sources(): Promise<string[]> {
 	const entries = await readdir(root, { recursive: true });
-	return entries.filter((path) => path.endsWith(".tsx"));
+	return entries.filter(
+		(path) => /\.tsx?$/.test(path) && !path.endsWith(".d.ts"),
+	);
 }
 
 // Upload previews: Playwright is not in CI, so what every upload relies on is
@@ -28,23 +30,31 @@ test.group("Upload previews", () => {
 		const fields: string[] = [];
 		for (const file of await sources()) {
 			const source = await read(file);
-			if (!/type="file"/.test(source)) {
+			const inputs = source.match(/type="file"/g)?.length ?? 0;
+			if (inputs === 0) {
 				if (/<ImageFileInput\b/.test(source)) fields.push(file);
 				continue;
 			}
 			const needs = withPreview.get(file);
 			assert.isDefined(needs, `${file} has a file input without a preview`);
-			for (const name of needs ?? []) assert.include(source, name, file);
+			assert.equal(inputs, 1, `${file}: one file input, the one with previews`);
+			// Used, not only imported: the thumbnail is rendered.
+			assert.match(source, /<FileThumb\b/, file);
+			assert.include(source, "useObjectUrls()", file);
 		}
 		// The single-image forms: the cover, the logo, an artist's photo, a
-		// payment QR code and a flash design's picture.
-		assert.sameMembers(fields, [
+		// payment QR code and a flash design's picture (a new one may join).
+		assert.includeMembers(fields, [
 			"components/cover_photo_form.tsx",
 			"components/flash_tray.tsx",
 			"components/logo_form.tsx",
 			"pages/artists/form.tsx",
 			"pages/settings/payment_method_form.tsx",
 		]);
+		for (const file of fields) {
+			// Only a whole-form reset clears the preview (file_preview.tsx).
+			assert.notMatch(await read(file), /resetOnSuccess=\{\[/, file);
+		}
 	});
 
 	test("object URLs are made in one place and every one is let go", async ({
@@ -73,13 +83,25 @@ test.group("Upload previews", () => {
 		assert.match(source, /const url = problem \? null : create\(file\);/);
 	});
 
-	test("the work photo tray never sends a file it already knows is wrong", async ({
+	test("the work photo tray sends only what planUpload takes, and counts the room by it", async ({
 		assert,
 	}) => {
 		const source = await read("components/work_photo_upload.tsx");
+		assert.match(source, /const plan = planUpload\(files\);/);
+		assert.match(source, /roomNote\(room, plan\.send\.length\)/);
+		assert.match(source, /for \(const \[at, id\] of plan\.send\.entries\(\)\)/);
+		assert.notMatch(source, /for \(const \[id, file\] of files\.entries\(\)\)/);
+	});
+
+	test("a wrong file in a single-image field is marked invalid, said, and never sent", async ({
+		assert,
+	}) => {
+		const source = await read("components/file_preview.tsx");
+		assert.match(source, /setCustomValidity\(problem \?\? ""\)/);
 		assert.match(
 			source,
-			/const wrong = fileProblem\(file\);\s*if \(wrong\) \{\s*failures\.push\(\{ id, line: failureLine\(file\.name, wrong\) \}\);\s*mark\(id, \{ state: "refused", message: wrong \}\);\s*continue;/,
+			/aria-invalid=\{props\["aria-invalid"\] \|\| !!chosen\?\.problem\}/,
 		);
+		assert.match(source, /<span role="alert" className="text-destructive">/);
 	});
 });

@@ -20,6 +20,7 @@ type PhotosModule = {
 	canAddPhoto(count: number): boolean;
 	uploadingPhotos(index: number, total: number, percentage?: number): string;
 	roomNote(room: number, chosen: number): string | null;
+	choiceLine(chosen: number, wrong: number): string;
 	addedLine(added: number, refused: number): string;
 	failureLine(name: string, message: string): string;
 	trackUpload(): {
@@ -143,6 +144,25 @@ test.group("work photo words (TAT-116)", () => {
 		);
 		assert.isNull(photos.roomNote(5, 5));
 		assert.isNull(photos.roomNote(5, 1));
+	});
+
+	test("choiceLine says how many photos were chosen and how many can't go", ({
+		assert,
+	}) => {
+		assert.equal(photos.choiceLine(1, 0), "1 photo chosen.");
+		assert.equal(photos.choiceLine(3, 0), "3 photos chosen.");
+		assert.equal(
+			photos.choiceLine(3, 1),
+			"3 photos chosen. 1 can't be added: see why below.",
+		);
+		assert.equal(
+			photos.choiceLine(1, 1),
+			"1 photo chosen. It can't be added: see why below.",
+		);
+		assert.equal(
+			photos.choiceLine(2, 2),
+			"2 photos chosen. None of them can be added: see why below.",
+		);
 	});
 
 	test("the summary after an upload counts what was added and what was refused", ({

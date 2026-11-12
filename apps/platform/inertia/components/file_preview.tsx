@@ -62,6 +62,9 @@ export function FileThumb({
 	fit?: PreviewFit;
 	className?: string;
 }) {
+	// A file that passes the first check but can't be drawn (text renamed .jpg)
+	// shows the empty box, never the browser's broken-image icon.
+	const [broken, setBroken] = useState<string | null>(null);
 	return (
 		<div
 			className={cn(
@@ -69,10 +72,11 @@ export function FileThumb({
 				className,
 			)}
 		>
-			{url ? (
+			{url && broken !== url ? (
 				<img
 					src={url}
 					alt=""
+					onError={() => setBroken(url)}
 					className={cn(
 						"size-full",
 						fit === "cover" ? "object-cover" : "object-contain",
@@ -103,9 +107,14 @@ type Chosen = { file: File; url: string | null; problem: string | null };
  * before the form is sent (the cover, the logo, an artist's photo, a payment
  * QR code, a flash design's picture). Uncontrolled, as the forms are: the
  * input itself is what the form sends. The preview goes when the file is
- * cleared or the form is reset (`resetOnSuccess` after a save), and a wrong
- * file says why at once. `previewClassName` and `fit` shape the preview like
- * the image it will become (the cover's 4:3 crop, a logo or QR seen whole).
+ * cleared or the whole form is reset: Inertia's `resetOnSuccess` (with no
+ * field list) dispatches the form's `reset` event after a save; a reset of
+ * named fields only does not, so don't use one on a form with this field. A
+ * wrong file says why at once, marks the field invalid and is never sent
+ * (the input's custom validity stops the form's submit), as the server would
+ * refuse it in the same words. `previewClassName` and `fit` shape the
+ * preview like the image it will become (the cover's 4:3 crop, a logo or QR
+ * seen whole). The field keeps its own ref, so it takes none.
  */
 export function ImageFileInput({
 	fit = "cover",
@@ -113,7 +122,7 @@ export function ImageFileInput({
 	replaces = false,
 	onChange,
 	...props
-}: Omit<ComponentProps<typeof Input>, "type"> & {
+}: Omit<ComponentProps<typeof Input>, "type" | "ref"> & {
 	fit?: PreviewFit;
 	previewClassName?: string;
 	/** True when the field replaces an image already saved: the preview says so. */
@@ -130,8 +139,10 @@ export function ImageFileInput({
 				revoke(current?.url);
 				return null;
 			});
+			input.current?.setCustomValidity("");
 			if (!file) return;
 			const problem = fileProblem(file);
+			input.current?.setCustomValidity(problem ?? "");
 			const url = problem ? null : create(file);
 			setChosen({ file, url, problem });
 		},
@@ -157,6 +168,7 @@ export function ImageFileInput({
 				{...props}
 				ref={input}
 				type="file"
+				aria-invalid={props["aria-invalid"] || !!chosen?.problem}
 				aria-describedby={describedBy || undefined}
 				onChange={(event) => {
 					show(event.currentTarget.files?.[0] ?? null);
@@ -172,7 +184,9 @@ export function ImageFileInput({
 						</span>
 						<FileLabel file={chosen.file} />
 						{chosen.problem ? (
-							<span className="text-destructive">{chosen.problem}</span>
+							<span role="alert" className="text-destructive">
+								{chosen.problem}
+							</span>
 						) : null}
 					</p>
 				</div>

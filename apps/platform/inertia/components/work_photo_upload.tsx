@@ -4,6 +4,7 @@ import { urlFor } from "~/client";
 import { FileLabel, FileThumb, useObjectUrls } from "~/components/file_preview";
 import {
 	addedLine,
+	choiceLine,
 	failureLine,
 	PHOTO_ACCEPT,
 	roomNote,
@@ -14,7 +15,7 @@ import {
 	type UploadOutcome,
 	uploadingPhotos,
 } from "~/components/photos";
-import { fileProblem } from "~/components/portfolio";
+import { fileProblem, planUpload } from "~/components/portfolio";
 import { Button } from "~/components/ui/button";
 import {
 	Field,
@@ -99,13 +100,17 @@ export default function WorkPhotoUpload({
 	const [sending, setSending] = useState<Sending | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [summary, setSummary] = useState<Summary | null>(null);
+	/** True once the chosen files have been through an upload: the list is then the last upload's, not a choice waiting to go. */
+	const [finished, setFinished] = useState(false);
+	const skipped = chosen.filter((row) => row.problem).length;
 
 	const submit = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		const files = Array.from(input.current?.files ?? []);
 		if (files.length === 0 || sending) return;
 
-		const tooMany = roomNote(room, files.length);
+		const plan = planUpload(files);
+		const tooMany = roomNote(room, plan.send.length);
 		setError(tooMany);
 		setSummary(null);
 		if (tooMany) return;
@@ -114,23 +119,23 @@ export default function WorkPhotoUpload({
 			tenant: tenantSlug,
 			id: artistId,
 		});
-		const total = files.length;
+		// "Uploading 2 of 3" counts the files that go, never the wrong ones.
+		const total = plan.send.length;
 		let added = 0;
 		const failures: Summary["failures"] = [];
 		const mark = (id: number, change: Partial<Chosen>) =>
 			setChosen((current) =>
 				current.map((row, at) => (at === id ? { ...row, ...change } : row)),
 			);
+		// A wrong file is named, never sent: the server would refuse it in the same words.
+		for (const { index: id, reason } of plan.skip) {
+			failures.push({ id, line: failureLine(files[id].name, reason) });
+			mark(id, { state: "refused", message: reason });
+		}
 		onBusyChange(true);
-		for (const [id, file] of files.entries()) {
-			const index = id + 1;
-			// A wrong file is named, never sent: the server would refuse it in the same words.
-			const wrong = fileProblem(file);
-			if (wrong) {
-				failures.push({ id, line: failureLine(file.name, wrong) });
-				mark(id, { state: "refused", message: wrong });
-				continue;
-			}
+		for (const [at, id] of plan.send.entries()) {
+			const file = files[id];
+			const index = at + 1;
 			setSending({ index, total });
 			mark(id, { state: "sending", percentage: 0 });
 			const outcome = await sendPhoto(url, file, (percentage) => {
@@ -138,13 +143,13 @@ export default function WorkPhotoUpload({
 				mark(id, { percentage });
 			});
 			if (outcome.kind === "cancelled") {
-				// The cut-off file and every one after it: name them, send nothing more.
-				for (const [offset, unsent] of files.slice(id).entries()) {
+				// The cut-off file and every one not yet sent: name them, send nothing more.
+				for (const unsent of plan.send.slice(at)) {
 					failures.push({
-						id: id + offset,
-						line: failureLine(unsent.name, UPLOAD_INTERRUPTED),
+						id: unsent,
+						line: failureLine(files[unsent].name, UPLOAD_INTERRUPTED),
 					});
-					mark(id + offset, { state: "refused", message: UPLOAD_INTERRUPTED });
+					mark(unsent, { state: "refused", message: UPLOAD_INTERRUPTED });
 				}
 				break;
 			}
@@ -156,6 +161,9 @@ export default function WorkPhotoUpload({
 				mark(id, { state: "refused", message: outcome.message });
 			}
 		}
+		// The summary lists the refused files in the order they were chosen.
+		failures.sort((a, b) => a.id - b.id);
+		setFinished(true);
 
 		onBusyChange(false);
 		setSending(null);
@@ -175,15 +183,18 @@ export default function WorkPhotoUpload({
 					required
 					accept={PHOTO_ACCEPT}
 					disabled={sending !== null}
-					aria-invalid={!!error}
-					aria-describedby={
-						error
-							? "work-photo-files-help work-photo-files-error"
-							: "work-photo-files-help"
-					}
+					aria-invalid={!!error || (!finished && skipped > 0)}
+					aria-describedby={[
+						"work-photo-files-help",
+						error ? "work-photo-files-error" : null,
+						chosen.length > 0 && !finished ? "work-photo-files-chosen" : null,
+					]
+						.filter(Boolean)
+						.join(" ")}
 					onChange={(event) => {
 						setError(null);
 						setSummary(null);
+						setFinished(false);
 						// Built outside the state updater (StrictMode may run it twice).
 						const next = Array.from(event.currentTarget.files ?? []).map(
 							(file): Chosen => {
@@ -206,9 +217,19 @@ export default function WorkPhotoUpload({
 					{UPLOAD_HELP}
 				</FieldDescription>
 				{error && <FieldError id="work-photo-files-error">{error}</FieldError>}
+				{/* Said when files are chosen: how many, and how many can't go. */}
+				<p
+					id="work-photo-files-chosen"
+					className="text-sm text-muted-foreground"
+					aria-live="polite"
+				>
+					{chosen.length > 0 && !finished
+						? choiceLine(chosen.length, skipped)
+						: null}
+				</p>
 				{chosen.length > 0 && (
 					<ul
-						aria-label="Chosen photos"
+						aria-label={finished ? "Last upload" : "Chosen photos"}
 						className="flex flex-col divide-y rounded-lg border"
 					>
 						{chosen.map((row, id) => (
