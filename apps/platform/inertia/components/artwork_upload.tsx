@@ -10,6 +10,7 @@ import {
 	useState,
 } from "react";
 import { urlFor } from "~/client";
+import { FileLabel, FileThumb, useObjectUrls } from "~/components/file_preview";
 import {
 	HEALED_HELP,
 	HEALED_LABEL,
@@ -23,7 +24,6 @@ import {
 	DROP_HINT,
 	fileKey,
 	fileProblem,
-	fileSizeText,
 	type PortfolioArtist,
 	STYLES_LIMIT_NOTE,
 	UPLOAD_INTRO,
@@ -149,14 +149,8 @@ export default function ArtworkUpload({
 		}
 	}, [open, defaultArtistId, items.length]);
 
-	// The previews are object URLs: let them go with the list.
-	const previews = useRef(new Set<string>());
-	useEffect(() => {
-		const all = previews.current;
-		return () => {
-			for (const url of all) URL.revokeObjectURL(url);
-		};
-	}, []);
+	// The previews are object URLs: let go with each item and with the panel.
+	const previews = useObjectUrls();
 
 	const artist = artists.find((row) => row.id === artistId) ?? null;
 	const sendable = items.filter(
@@ -177,8 +171,7 @@ export default function ArtworkUpload({
 			if (known.has(key)) continue;
 			known.add(key);
 			const wrong = fileProblem(file);
-			const previewUrl = wrong ? "" : URL.createObjectURL(file);
-			if (previewUrl) previews.current.add(previewUrl);
+			const previewUrl = wrong ? "" : previews.create(file);
 			added.push({
 				key,
 				file,
@@ -193,11 +186,7 @@ export default function ArtworkUpload({
 
 	const drop = (key: string) => {
 		setItems((current) => {
-			const gone = current.find((item) => item.key === key);
-			if (gone?.previewUrl) {
-				URL.revokeObjectURL(gone.previewUrl);
-				previews.current.delete(gone.previewUrl);
-			}
+			previews.revoke(current.find((item) => item.key === key)?.previewUrl);
 			return current.filter((item) => item.key !== key);
 		});
 		setProblem(null);
@@ -547,22 +536,11 @@ function QueueRow({
 		item.state === "unsure";
 	return (
 		<li className="flex gap-3 p-3">
-			<div className="size-16 shrink-0 overflow-hidden rounded-md border bg-muted">
-				{item.previewUrl ? (
-					<img
-						src={item.previewUrl}
-						alt=""
-						className="size-full object-cover"
-					/>
-				) : null}
-			</div>
+			<FileThumb url={item.previewUrl || null} />
 			<div className="flex min-w-0 flex-1 flex-col gap-1.5">
 				<div className="flex items-start justify-between gap-2">
 					<p className="min-w-0 text-sm">
-						<span className="font-medium wrap-anywhere">{item.file.name}</span>{" "}
-						<span className="text-muted-foreground tabular-nums">
-							{fileSizeText(item.file.size)}
-						</span>
+						<FileLabel file={item.file} />
 					</p>
 					<Button
 						type="button"
