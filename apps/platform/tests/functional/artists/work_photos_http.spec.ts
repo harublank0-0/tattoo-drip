@@ -669,6 +669,7 @@ test.group("Work photo details and removal (TAT-116, TAT-126)", (group) => {
 				"healed",
 				"hidden",
 				"id",
+				"photoCount",
 				"styles",
 				"thumbnailUrl",
 			]);

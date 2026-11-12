@@ -3,12 +3,13 @@ import type { HttpContext } from "@adonisjs/core/http";
 import { errors as lucidErrors } from "@adonisjs/lucid";
 import { errors } from "@vinejs/vine";
 import { tenantContext } from "#middleware/tenant_middleware";
-import { WorkPhotoLimitError } from "#modules/artists/errors";
+import { TattooGroupError, WorkPhotoLimitError } from "#modules/artists/errors";
 import type Artist from "#modules/artists/models/artist";
 import type ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
 import {
 	type BulkFailure,
 	bulkSummary,
+	groupSummary,
 	PORTFOLIO_PAGE_SIZE,
 	parsePortfolioQuery,
 	portfolioBack,
@@ -26,7 +27,9 @@ import { ARTWORK_STATE_WORDS } from "#modules/discovery/publication";
 import PublicationService from "#modules/discovery/services/publication_service";
 import { ImageDeleteError } from "#modules/media/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
-import ImageService from "#modules/media/services/image_service";
+import ImageService, {
+	THUMBNAIL_WIDTH,
+} from "#modules/media/services/image_service";
 import { storefrontTemplate } from "#modules/payments/deposit_links";
 import {
 	artworkPageUrl,
@@ -55,6 +58,12 @@ const STYLE_OPTIONS = TATTOO_STYLES.map(({ slug, name }) => ({ slug, name }));
  * photos. Photos are uploaded, edited and removed through the work photo
  * routes, which come back here (their `back`, portfolioBack). Reads only
  * through the artists and media services.
+ *
+ * Angles: a tile is a tattoo, its lead, with its angles in order (one more
+ * query for the page, WorkPhotoService.anglesOf), so the count, the filters
+ * and the bulk changes are about tattoos; each artist carries both counts,
+ * its photos (the room under the 100, angles included) and its tattoos
+ * (what the count line says).
  */
 @inject()
 export default class PortfolioController {
@@ -88,6 +97,10 @@ export default class PortfolioController {
 			this.photos.studioPage(tenant, artist ? [artist] : artistIds, query),
 			this.photos.counts(tenant, artistIds),
 		]);
+		const angles = await this.photos.anglesOf(
+			tenant,
+			found.photos.map(({ id }) => id),
+		);
 		const byId = new Map(artists.map((row) => [row.id, row]));
 		// Each photo's Discover state (D04), from the same rules as the views.
 		const discover = await this.publication.artworkStates(
@@ -134,6 +147,28 @@ export default class PortfolioController {
 					addedText: photo.createdAt
 						.setZone(tenant.timezone)
 						.toFormat("d LLL yyyy"),
+					// The tattoo's other photos, in order, for the panel's list.
+					angles: await Promise.all(
+						(angles.get(photo.id) ?? []).map(async (angle) => {
+							const [thumbUrl, fullUrl] = await Promise.all([
+								this.images.urlFor(
+									PURPOSE,
+									angle.imageKey,
+									tenant,
+									THUMBNAIL_WIDTH,
+								),
+								this.images.url(PURPOSE, angle.imageKey, tenant),
+							]);
+							return {
+								id: angle.id,
+								alt: angle.alt,
+								width: angle.width,
+								height: angle.height,
+								thumbUrl,
+								fullUrl,
+							};
+						}),
+					),
 				};
 			}),
 		);
@@ -144,7 +179,8 @@ export default class PortfolioController {
 				id: row.id,
 				name: row.name,
 				visible: row.visible,
-				photoCount: counts.get(row.id) ?? 0,
+				photoCount: counts.get(row.id)?.photos ?? 0,
+				tattooCount: counts.get(row.id)?.tattoos ?? 0,
 			})),
 			styleOptions: STYLE_OPTIONS,
 			filters: {
@@ -184,6 +220,7 @@ export default class PortfolioController {
 	async bulk(ctx: HttpContext) {
 		const { tenant, membership } = tenantContext(ctx);
 		const data = await ctx.request.validateUsing(bulkWorkPhotosValidator);
+		if (data.action === "group") return this.group(ctx, data.ids);
 
 		let target: Artist | null = null;
 		if (data.action === "reassign") {
@@ -261,11 +298,52 @@ export default class PortfolioController {
 
 		const summary = bulkSummary(data.action, done, failures, target?.name);
 		ctx.session.flash(summary.ok ? "success" : "error", summary.message);
-		const back =
-			portfolioBack(ctx.request.input("back"), tenant.slug) ??
-			`/t/${tenant.slug}/portfolio`;
-		return ctx.response.redirect().withQs(false).toPath(back);
+		return backToPortfolio(ctx, tenant.slug);
 	}
+
+	/**
+	 * "Group as one tattoo" (angles): the selected photos, each loaded and
+	 * checked like every bulk change (findEditable), become one tattoo, the
+	 * newest its lead (WorkPhotoService.group). All or nothing, unlike the
+	 * other bulk changes: one photo that can't be loaded, or a refusal (too
+	 * few or too many, two artists, a photo already in a tattoo of several),
+	 * groups nothing and says why (groupSummary).
+	 */
+	private async group(ctx: HttpContext, ids: readonly string[]) {
+		const { tenant, membership } = tenantContext(ctx);
+		const found: ArtistWorkPhoto[] = [];
+		let outcome: Parameters<typeof groupSummary>[0] | null = null;
+		for (const id of ids) {
+			try {
+				found.push(
+					(await this.photos.findEditable(tenant, membership, id)).photo,
+				);
+			} catch (error) {
+				if (!(error instanceof lucidErrors.E_ROW_NOT_FOUND)) throw error;
+				outcome = "gone";
+			}
+		}
+		if (outcome === null) {
+			try {
+				const tattoo = await this.photos.group(tenant, membership, found);
+				outcome = { photos: tattoo.angles.length + 1 };
+			} catch (error) {
+				if (error instanceof TattooGroupError) outcome = error.reason;
+				else if (error instanceof lucidErrors.E_ROW_NOT_FOUND) outcome = "gone";
+				else throw error;
+			}
+		}
+		const summary = groupSummary(outcome);
+		ctx.session.flash(summary.ok ? "success" : "error", summary.message);
+		return backToPortfolio(ctx, tenant.slug);
+	}
+}
+
+/** Goes back to the portfolio as it was (`back`), or to its first page. */
+function backToPortfolio(ctx: HttpContext, slug: string) {
+	const back =
+		portfolioBack(ctx.request.input("back"), slug) ?? `/t/${slug}/portfolio`;
+	return ctx.response.redirect().withQs(false).toPath(back);
 }
 
 function fieldError(field: string, message: string) {

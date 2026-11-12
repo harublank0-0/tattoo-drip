@@ -30,6 +30,8 @@ const READABLE: Record<string, string[]> = {
 		"hidden",
 		"id",
 		"image_key",
+		// Angles (1791900000001): the view keeps leads only.
+		"lead_photo_id",
 		"styles",
 		"tenant_id",
 		"width",
@@ -1006,6 +1008,44 @@ test.group("Discover database: publication changes (D02)", () => {
 				);
 			});
 		}
+	});
+
+	test("an angle of a tattoo is not an artwork: the view lists its lead only, and the angle once it leaves the tattoo", async ({
+		assert,
+	}) => {
+		await rolledBack(async (trx) => {
+			const seeded = await seed(trx);
+			const { t, a, p } = seeded;
+			const [{ id: angle }] = await rows<{ id: string }>(
+				trx,
+				`insert into artist_work_photos (tenant_id, artist_id, image_key, width, height, styles, lead_photo_id, angle_position, created_at)
+				 values (?, ?, 'tenants/x/artist_work_photo/a.jpg', 800, 600, '{fine-line}', ?, 1, now()) returning id`,
+				[t.studio, a.shown, p.shown],
+			);
+			const shown = seededOnly(await discover(trx), seeded).artworks;
+			assert.include(shown, p.shown);
+			assert.notInclude(
+				ids(await as(trx, APP, "select id from discovery.artworks")),
+				angle,
+			);
+			// Read as the discovery role too: the angle is visible to it (the
+			// policies are about publication), and only the view's rule leaves it out.
+			assert.include(
+				ids(
+					await as(trx, DISCOVERY, "select id from public.artist_work_photos"),
+				),
+				angle,
+			);
+
+			await trx.rawQuery(
+				"update artist_work_photos set lead_photo_id = null, angle_position = null where id = ?",
+				[angle],
+			);
+			assert.include(
+				ids(await as(trx, APP, "select id from discovery.artworks")),
+				angle,
+			);
+		});
 	});
 
 	test("listing again, or lifting a takedown, brings the rows back at once", async ({

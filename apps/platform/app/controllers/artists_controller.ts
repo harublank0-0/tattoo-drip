@@ -109,7 +109,7 @@ export default class ArtistsController {
 						// A login is a member linked to the profile; many artists have none.
 						hasLogin: artist.userId !== null,
 						upcomingCount: next?.count ?? 0,
-						photoCount: photoCounts.get(artist.id) ?? 0,
+						photoCount: photoCounts.get(artist.id)?.photos ?? 0,
 						nextText: next
 							? sessionStartText(next.first, tenant.timezone, now)
 							: null,
@@ -156,6 +156,7 @@ export default class ArtistsController {
 			canLink: !(await this.hasProfile(tenant, userId)),
 			// Photos come once the artist is saved (TAT-116).
 			workPhotos: [],
+			workPhotoTotal: 0,
 			// Flash designs too (TAT-129).
 			flashDesigns: [],
 			styleOptions: STYLE_OPTIONS,
@@ -198,22 +199,33 @@ export default class ArtistsController {
 		// findEditable: only what the tray draws, each as its 320 px copy. Only
 		// listed styles reach the form, like the artist's own: a slug that left
 		// the list has no box and is dropped on the next save.
+		// Angles: the tray shows tattoos, each lead with how many photos it has
+		// (its angles are managed from the portfolio), and the total of every
+		// photo, which is what the artist's 100 counts.
 		const photos = await this.workPhotos.list(tenant, artist);
+		const sizes = new Map<string, number>();
+		for (const photo of photos) {
+			const lead = photo.leadPhotoId ?? photo.id;
+			sizes.set(lead, (sizes.get(lead) ?? 0) + 1);
+		}
 		const workPhotos = await Promise.all(
-			photos.map(async (photo) => ({
-				id: photo.id,
-				thumbnailUrl: await this.images.urlFor(
-					"artist_work_photo",
-					photo.imageKey,
-					tenant,
-					THUMBNAIL_WIDTH,
-				),
-				alt: photo.alt,
-				styles: knownStyles(photo.styles).map(({ slug }) => slug),
-				healed: photo.healed,
-				// Unpublished in the portfolio (Studio OS): kept off every public read.
-				hidden: photo.hidden,
-			})),
+			photos
+				.filter((photo) => photo.leadPhotoId === null)
+				.map(async (photo) => ({
+					id: photo.id,
+					thumbnailUrl: await this.images.urlFor(
+						"artist_work_photo",
+						photo.imageKey,
+						tenant,
+						THUMBNAIL_WIDTH,
+					),
+					alt: photo.alt,
+					styles: knownStyles(photo.styles).map(({ slug }) => slug),
+					healed: photo.healed,
+					// Unpublished in the portfolio (Studio OS): kept off every public read.
+					hidden: photo.hidden,
+					photoCount: sizes.get(photo.id) ?? 1,
+				})),
 		);
 
 		// The artist's flash designs (TAT-129), newest first, hidden ones too,
@@ -290,6 +302,7 @@ export default class ArtistsController {
 			artist: await this.toProps(tenant, artist, userId),
 			canLink,
 			workPhotos,
+			workPhotoTotal: photos.length,
 			flashDesigns,
 			styleOptions: STYLE_OPTIONS,
 			schedule,

@@ -1,5 +1,9 @@
 import vine, { SimpleMessagesProvider } from "@vinejs/vine";
-import { BULK_ACTIONS, PORTFOLIO_PAGE_SIZE } from "#modules/artists/portfolio";
+import {
+	BULK_ACTIONS,
+	MAX_TATTOO_PHOTOS,
+	PORTFOLIO_PAGE_SIZE,
+} from "#modules/artists/portfolio";
 import { MAX_PHOTO_STYLES, STYLE_SLUGS } from "#modules/artists/styles";
 import { StylesErrorReporter } from "#modules/artists/validators/artist";
 import { IMAGE_FORMAT_MESSAGE } from "#modules/media/errors";
@@ -47,6 +51,11 @@ export const addWorkPhotoValidator = vine.create({
 	alt: detailFields().alt.optional(),
 	// Studio OS: "Publish on your page" unticked uploads it unpublished.
 	hidden: vine.boolean().optional(),
+	// Angles: add the photo to this tattoo (its lead's id) as its last angle.
+	// The lead is loaded through findEditable, so another studio's or another
+	// artist's id is a 404; its tattoo's state is the photo's, whatever else
+	// is sent.
+	lead: vine.string().uuid().optional(),
 });
 
 const ALT_MESSAGE = `Keep the description to one line, up to ${MAX_WORK_PHOTO_ALT} characters.`;
@@ -72,6 +81,7 @@ addWorkPhotoValidator.messagesProvider = new SimpleMessagesProvider({
 	"alt.string": ALT_MESSAGE,
 	"styles.array.maxLength": `Pick up to ${MAX_PHOTO_STYLES} styles.`,
 	"styles.*.enum": "Pick styles from the list.",
+	"lead.uuid": "Choose a tattoo of this artist.",
 });
 addWorkPhotoValidator.errorReporter = () => new StylesErrorReporter();
 
@@ -97,4 +107,23 @@ bulkWorkPhotosValidator.messagesProvider = new SimpleMessagesProvider({
 	"ids.array.maxLength": `Select up to ${PORTFOLIO_PAGE_SIZE} photos at a time.`,
 	"ids.*.uuid": "Select photos from the portfolio.",
 	"artistId.uuid": "Choose an artist of this studio.",
+});
+
+/**
+ * A tattoo's photos in a new order (angles): every photo of the tattoo once,
+ * the main photo first. The service checks that they are exactly the
+ * tattoo's photos, under the artist's lock (WorkPhotoService.arrange).
+ */
+export const orderWorkPhotosValidator = vine.create({
+	ids: vine
+		.array(vine.string().uuid())
+		.minLength(1)
+		.maxLength(MAX_TATTOO_PHOTOS)
+		.distinct(),
+});
+
+orderWorkPhotosValidator.messagesProvider = new SimpleMessagesProvider({
+	"ids.array.minLength": "Send the tattoo's photos in their new order.",
+	"ids.array.maxLength": `A tattoo has at most ${MAX_TATTOO_PHOTOS} photos.`,
+	"ids.*.uuid": "Send the tattoo's photos in their new order.",
 });
