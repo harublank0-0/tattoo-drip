@@ -2,6 +2,7 @@ import { FlashSummary } from "../../../components/flash.tsx";
 import { InquirySection } from "../../../components/inquiry.tsx";
 import type { Shell } from "../../../components/shell.tsx";
 import type { RequestPageData } from "../../../loaders.ts";
+import { challengeThemeFor } from "../../branding.ts";
 import { Lines } from "../home/parts.tsx";
 import { InkNoirShell } from "../shell.tsx";
 
@@ -62,6 +63,7 @@ export function InkNoirBookPage({
 					state={inquiry}
 					channels={channels}
 					challengeSiteKey={challengeSiteKey}
+					challengeTheme={challengeThemeFor(theme.key)}
 					booking={data.booking}
 					headed={false}
 					intro={

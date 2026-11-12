@@ -1,3 +1,8 @@
+import {
+	ATELIER_CLASS,
+	ATELIER_SCHEME,
+	ATELIER_THEME_COLOR,
+} from "./atelier/theme.ts";
 import type { Scheme } from "./branding.ts";
 import { DEFAULT_THEME_KEY, studioThemeKey, type ThemeKey } from "./config.ts";
 import {
@@ -5,26 +10,49 @@ import {
 	INK_NOIR_SCHEME,
 	INK_NOIR_THEME_COLOR,
 } from "./ink-noir/theme.ts";
+import {
+	IREZUMI_CLASS,
+	IREZUMI_DARK_SCHEME,
+	IREZUMI_SCHEME,
+	IREZUMI_THEME_COLORS,
+} from "./irezumi/theme.ts";
 
 /**
  * What a theme sets on the whole page, `<html>` and `<head>` included, which
- * the root route renders before any page's loader has run. Pure.
+ * the root route renders before any page's loader has run. Pure. A theme has
+ * one fixed `scheme`, or none and then may name its own two (`schemes`):
+ * never both.
  */
-export interface ThemeHtml {
+export type ThemeHtml = {
 	/** The class on `<html>` that switches src/styles.css's tokens to the theme's; null keeps `:root`'s. */
 	readonly className: string | null;
-	/**
-	 * The one colour scheme the theme always uses, whatever the device
-	 * prefers, or null when it follows the device (light and dark). The brand
-	 * accent is checked against this scheme's paper (branding.ts).
-	 */
-	readonly scheme: Scheme | null;
 	/** `<meta name="theme-color">`: the browser's own UI around the page. */
 	readonly themeColors: readonly {
 		readonly content: string;
 		readonly media?: string;
 	}[];
-}
+} & (
+	| {
+			/**
+			 * The one colour scheme the theme always uses, whatever the device
+			 * prefers. The brand accent is checked against this scheme
+			 * (branding.ts).
+			 */
+			readonly scheme: Scheme;
+			readonly schemes?: undefined;
+	  }
+	| {
+			/** None: the theme follows the device (light and dark). */
+			readonly scheme: null;
+			/**
+			 * A theme with its own class that follows the device (Irezumi): its
+			 * light and dark schemes, which the brand accent is checked against
+			 * in each scheme's media query. Absent for Stencil & Ink, whose
+			 * schemes are branding.ts's LIGHT and DARK.
+			 */
+			readonly schemes?: { readonly light: Scheme; readonly dark: Scheme };
+	  }
+);
 
 export const THEME_HTML: Record<ThemeKey, ThemeHtml> = {
 	"stencil-and-ink": {
@@ -40,6 +68,17 @@ export const THEME_HTML: Record<ThemeKey, ThemeHtml> = {
 		scheme: INK_NOIR_SCHEME,
 		themeColors: [{ content: INK_NOIR_THEME_COLOR }],
 	},
+	irezumi: {
+		className: IREZUMI_CLASS,
+		scheme: null,
+		schemes: { light: IREZUMI_SCHEME, dark: IREZUMI_DARK_SCHEME },
+		themeColors: IREZUMI_THEME_COLORS,
+	},
+	atelier: {
+		className: ATELIER_CLASS,
+		scheme: ATELIER_SCHEME,
+		themeColors: [{ content: ATELIER_THEME_COLOR }],
+	},
 };
 
 /**
@@ -48,6 +87,13 @@ export const THEME_HTML: Record<ThemeKey, ThemeHtml> = {
  * brand style either).
  */
 const UNTHEMED_ROUTES: ReadonlySet<string> = new Set(["/deposit"]);
+
+/** Whether an unthemed route (the deposit page) is among the matches: it shows no theme and no preview. */
+export function isUnthemedPage(
+	matches: readonly { readonly routeId: string }[],
+): boolean {
+	return matches.some((match) => UNTHEMED_ROUTES.has(match.routeId));
+}
 
 /** The root route's id in TanStack Router (`rootRouteId`). */
 const ROOT_ROUTE_ID = "__root__";
@@ -67,7 +113,7 @@ export function matchedThemeKey(
 		readonly loaderData?: unknown;
 	}[],
 ): ThemeKey {
-	if (matches.some((match) => UNTHEMED_ROUTES.has(match.routeId))) {
+	if (isUnthemedPage(matches)) {
 		return DEFAULT_THEME_KEY;
 	}
 	const root = matches.find((match) => match.routeId === ROOT_ROUTE_ID);

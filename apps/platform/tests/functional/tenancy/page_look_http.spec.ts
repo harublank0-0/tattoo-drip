@@ -220,6 +220,54 @@ test.group("Settings, Page look: saving (TAT-56)", (group) => {
 		assert.equal(row.storefrontSections, "inquiry,artists");
 	});
 
+	test("an owner picks Irezumi: it is stored, the page shows it and the public API serves it", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+
+		const response = await putLook(client, owner, tenant, {
+			...BODY,
+			theme: "irezumi",
+			accent: "",
+			accentDark: "",
+		});
+
+		response.assertStatus(302);
+		assert.equal((await reload(tenant)).storefrontTheme, "irezumi");
+		const { look } = (await lookPage(client, owner, tenant)).inertiaProps;
+		assert.equal(look.theme, "irezumi");
+		const { data } = (
+			await client.get(`/api/v1/tenants/${tenant.slug}`)
+		).body();
+		assert.equal(data.storefront.theme, "irezumi");
+	});
+
+	test("an owner picks Atelier: it is stored, the page shows it and the public API serves it", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+
+		const response = await putLook(client, owner, tenant, {
+			...BODY,
+			theme: "atelier",
+			accent: "",
+			accentDark: "",
+			font: "eczar",
+		});
+
+		response.assertStatus(302);
+		assert.equal((await reload(tenant)).storefrontTheme, "atelier");
+		const { look } = (await lookPage(client, owner, tenant)).inertiaProps;
+		assert.equal(look.theme, "atelier");
+		const { data } = (
+			await client.get(`/api/v1/tenants/${tenant.slug}`)
+		).body();
+		assert.equal(data.storefront.theme, "atelier");
+		assert.equal(data.storefront.branding.font, "eczar");
+	});
+
 	test("an empty colour clears the stored one", async ({ client, assert }) => {
 		const { owner, tenant } = await studioWithOwner();
 		await putLook(client, owner, tenant);

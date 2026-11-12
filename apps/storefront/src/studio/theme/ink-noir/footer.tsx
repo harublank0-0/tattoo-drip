@@ -1,6 +1,7 @@
 import { Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 import type { ReactNode } from "react";
 import { contactGroups } from "../../components/contact.tsx";
+import { NavList } from "../../components/nav-list.tsx";
 import { BookingCta } from "../../components/storefront.tsx";
 import { studioCopy } from "../../copy.ts";
 import { linkRel } from "../../links.ts";
@@ -11,7 +12,6 @@ import type {
 	ContactLinkKind,
 	StudioView,
 } from "../../view-model.ts";
-import { NavList } from "./nav-list.tsx";
 
 const CHAT_ICONS: Partial<Record<ContactLinkKind, typeof Phone>> = {
 	whatsapp: MessageCircle,

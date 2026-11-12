@@ -29,6 +29,9 @@ const SERVER_ONLY = [
 	// pure helpers in tenancy/visitor.ts (withVisitorAddress) are shared with
 	// the browser's code on purpose and are not listed.
 	"requestVisitorAddress",
+	// The theme preview as the tenant middleware read it; the site context's
+	// own copy (SiteRef.previewTheme) is the browser's.
+	"requestPreviewTheme",
 	"storefrontConfig",
 	"parseStorefrontConfig",
 	"tenantMiddleware",

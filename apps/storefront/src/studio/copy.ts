@@ -15,6 +15,13 @@ export interface Step {
 }
 
 export const studioCopy = {
+	/** A theme preview from Page look (theme/preview.ts): the notice at the foot of the screen. */
+	preview: {
+		label: "Theme preview",
+		showing: "Previewing",
+		notSaved: "Not saved: visitors still see your saved theme.",
+		exit: "Exit preview",
+	},
 	/** The hero's primary action: it jumps to the form. */
 	sendIdea: "Send your idea",
 	/** The hero's secondary action: a WhatsApp chat with the studio. */

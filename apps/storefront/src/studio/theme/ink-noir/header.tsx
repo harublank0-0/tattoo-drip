@@ -1,3 +1,4 @@
+import { NavList } from "../../components/nav-list.tsx";
 import { RouterAnchor } from "../../components/router-anchor.tsx";
 import { BookingCta, BrandIdentity } from "../../components/storefront.tsx";
 import { studioCopy } from "../../copy.ts";
@@ -6,7 +7,6 @@ import type { RequestLink } from "../../request.ts";
 import type { StudioView } from "../../view-model.ts";
 import type { ThemeConfig } from "../config.ts";
 import { MobileNav } from "./mobile-nav.tsx";
-import { NavList } from "./nav-list.tsx";
 
 /**
  * Ink Noir's header: the studio's mark (home), the navigation and the way to

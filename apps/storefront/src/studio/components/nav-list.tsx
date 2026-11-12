@@ -1,5 +1,5 @@
-import { RouterAnchor } from "../../components/router-anchor.tsx";
-import type { NavItem } from "../../nav.ts";
+import type { NavItem } from "../nav.ts";
+import { RouterAnchor } from "./router-anchor.tsx";
 
 /**
  * The navigation's links as a list, the current one marked with

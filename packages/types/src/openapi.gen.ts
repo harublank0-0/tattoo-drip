@@ -974,12 +974,14 @@ export interface components {
         StorefrontConfiguration: {
             /**
              * @description The studio's theme: `stencil-and-ink` (paper, ink and a violet
-             *     stencil line) or `ink-noir` (dark and photo-first, with a site
-             *     navigation and a full footer). More will come: treat an unknown
-             *     value as `stencil-and-ink`.
+             *     stencil line), `ink-noir` (dark and photo-first, with a site
+             *     navigation and a full footer), `irezumi` (light and editorial:
+             *     warm paper, charcoal ink and a vermilion accent) or `atelier`
+             *     (quiet luxury: stone paper, bronze and Bodoni headings). More will
+             *     come: treat an unknown value as `stencil-and-ink`.
              * @enum {string}
              */
-            theme: "stencil-and-ink" | "ink-noir";
+            theme: "stencil-and-ink" | "ink-noir" | "irezumi" | "atelier";
             branding: {
                 /**
                  * @description The studio's logo, or null. `alt` is always null (it sits

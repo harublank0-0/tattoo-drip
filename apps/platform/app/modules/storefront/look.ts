@@ -7,7 +7,12 @@
  * checked "#rrggbb" colours.
  */
 
-export const THEME_KEYS = ["stencil-and-ink", "ink-noir"] as const;
+export const THEME_KEYS = [
+	"stencil-and-ink",
+	"ink-noir",
+	"irezumi",
+	"atelier",
+] as const;
 export type ThemeKey = (typeof THEME_KEYS)[number];
 export const DEFAULT_THEME: ThemeKey = "stencil-and-ink";
 
@@ -83,11 +88,23 @@ export const THEMES: { key: ThemeKey; label: string; description: string }[] = [
 		description:
 			"Dark and photo-first, with a menu of your pages and a full footer.",
 	},
+	{
+		key: "irezumi",
+		label: "Irezumi",
+		description:
+			"Washi paper with faint seigaiha waves, charcoal ink and vermilion, with room for large pieces; dark on a device set to dark mode. Your colours show where they read on the paper.",
+	},
+	{
+		key: "atelier",
+		label: "Atelier",
+		description:
+			"Quiet luxury: stone paper, bronze and Bodoni headings, your work as a numbered collection. Your colour shows where it reads on the paper.",
+	},
 ];
 
 /** The heading fonts an owner can pick: the label names the face. */
 export const FONTS: { key: FontKey; label: string }[] = [
-	{ key: "eczar", label: "Eczar (the stencil look)" },
+	{ key: "eczar", label: "The theme's own (Eczar; Bodoni on Atelier)" },
 	{ key: "serif", label: "Classic serif" },
 	{ key: "sans", label: "Plain" },
 ];

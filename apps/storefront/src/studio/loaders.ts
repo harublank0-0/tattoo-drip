@@ -91,6 +91,7 @@ import {
 } from "./seo.ts";
 import { sitemapPaths } from "./sitemap.ts";
 import { parseThemeConfig, type ThemeConfig } from "./theme/config.ts";
+import { withPreviewTheme } from "./theme/preview.ts";
 import { storefrontInput } from "./theme/source.ts";
 import {
 	ARTIST_SLUG,
@@ -110,6 +111,16 @@ import {
  */
 
 export type PageContext = ApiContext & SiteContext;
+
+/**
+ * The studio every page reads (the root's loader too): the cached API studio,
+ * with this visit's theme preview over its saved theme when there is one
+ * (`?preview=`, theme/preview.ts), so every page and the `<html>` class draw
+ * the same theme on the server and in the browser.
+ */
+export async function loadPageStudio(context: PageContext): Promise<Studio> {
+	return withPreviewTheme(await loadStudio(context), context.site.previewTheme);
+}
 
 export interface StudioPageData {
 	readonly studio: StudioView;
@@ -868,7 +879,7 @@ export async function loadArtistsPage(
 	search: ArtistsSearch,
 ): Promise<ArtistsPageData> {
 	const [studio, artists] = await Promise.all([
-		loadStudio(context),
+		loadPageStudio(context),
 		loadArtists(context),
 	]);
 	return artistsPageData(
@@ -891,7 +902,7 @@ export async function loadArtistsPage(
 export async function loadStudioPage(
 	context: PageContext,
 ): Promise<StudioPageData> {
-	const studio = await loadStudio(context);
+	const studio = await loadPageStudio(context);
 	const imageOrigin = context.tattoo.connection.mediaUrl;
 	const theme = parseThemeConfig(storefrontInput(studio), imageOrigin);
 	const [artists, recentWork, flash] = await Promise.all([
@@ -931,7 +942,7 @@ export async function loadArtistPage(
 ): Promise<ArtistPageData> {
 	if (!ARTIST_SLUG.test(slug)) throw notFound();
 	const [studio, artists, portfolio, flash] = await Promise.all([
-		loadStudio(context),
+		loadPageStudio(context),
 		loadArtists(context),
 		loadPortfolio(context, slug, search),
 		loadArtistFlash(context, slug),
@@ -962,7 +973,7 @@ export async function loadRequestPage(
 	search: RequestSearch,
 ): Promise<RequestPageData> {
 	const [studio, artists, flash, artwork] = await Promise.all([
-		loadStudio(context),
+		loadPageStudio(context),
 		loadArtists(context),
 		search.flash === undefined ? null : loadFlashLookup(context, search.flash),
 		search.artwork === undefined || search.flash !== undefined
@@ -1013,7 +1024,7 @@ export async function loadWorkPage(
 	search: WorkSearch,
 ): Promise<WorkPageData> {
 	const [studio, artists, page] = await Promise.all([
-		loadStudio(context),
+		loadPageStudio(context),
 		loadArtists(context),
 		loadWork(context, search),
 	]);
@@ -1037,7 +1048,7 @@ export async function loadInfoPage(
 	kind: InfoKind,
 ): Promise<InfoPageData> {
 	const [studio, artists] = await Promise.all([
-		loadStudio(context),
+		loadPageStudio(context),
 		loadArtists(context),
 	]);
 	const data = infoPageData(
@@ -1075,7 +1086,7 @@ export async function loadFlashPage(
 	search: FlashSearch,
 ): Promise<FlashPageData> {
 	const [studio, artists, page] = await Promise.all([
-		loadStudio(context),
+		loadPageStudio(context),
 		loadArtists(context),
 		loadFlash(context, search),
 	]);
@@ -1101,7 +1112,7 @@ export async function loadFlashDesignPage(
 ): Promise<FlashDesignPageData> {
 	if (!FLASH_ID.test(id)) throw notFound();
 	const [studio, artists, design] = await Promise.all([
-		loadStudio(context),
+		loadPageStudio(context),
 		loadArtists(context),
 		loadFlashDesign(context, id),
 	]);
@@ -1131,7 +1142,7 @@ export async function loadArtworkPage(
 ): Promise<ArtworkPageData> {
 	if (readPhotoId(id) === null) throw notFound();
 	const [studio, artists, photo] = await Promise.all([
-		loadStudio(context),
+		loadPageStudio(context),
 		loadArtists(context),
 		loadWorkPhoto(context, id),
 	]);

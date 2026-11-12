@@ -1,0 +1,226 @@
+/*
+ * Irezumi: a Japanese-inspired editorial theme (src/studio/theme/irezumi/).
+ * Everything here applies only under `<html class="theme-irezumi">`, which the
+ * root route sets for a studio that picked the theme (src/studio/theme/html.ts),
+ * or to `irz-` classes only Irezumi's components render, so Stencil & Ink and
+ * Ink Noir pages are untouched.
+ *
+ * Two schemes that follow the device, as Stencil & Ink's do: warm paper on a
+ * light one, sumi-ink paper on a dark one. The values are theme.ts's
+ * IREZUMI_SCHEME and IREZUMI_DARK_SCHEME, and the accent tokens accentTokens()
+ * gives for each vermilion on that scheme (test/studio/irezumi.test.ts pins
+ * both). Light, on the paper #f6f1e7 / the raised surface #ede5d6: ink 14.9 /
+ * 13.4:1, ink-muted 6.7 / 6.0:1, accent 5.5 / 4.95:1, accent hover 7.3 /
+ * 6.6:1, line-strong 3.7 / 3.3:1. Dark, on #161412 / #201d1a: ink 14.8 /
+ * 13.5:1, ink-muted 7.1 / 6.5:1, accent 5.7 / 5.2:1, accent hover 7.2 /
+ * 6.6:1, line-strong 3.9 / 3.5:1. Text on an accent fill is the paper (5.5 /
+ * 5.7:1). On the paper as drawn (the texture below) the accent keeps 4.67:1
+ * in both schemes against 95% of its pixels (theme.ts's `surfaces`). A studio's own accent replaces the three accent tokens through
+ * brandingCss, in each scheme only when it reads on all of its surfaces.
+ *
+ * `:root.theme-irezumi` (0,2,0) outranks styles.css's `:root` and its dark
+ * scheme's `:root`; the brand's `html:root.theme-irezumi` (0,2,1) outranks
+ * this.
+ *
+ * Type: the display face (the studio's pick, Eczar by default: a serif) for
+ * names and headings, the system serif (`--irz-serif`, nothing downloaded) for
+ * editorial lines and captions, and the body face for labels. Fixed English
+ * labels may be spaced capitals; studio text never is (names may be Devanagari).
+ */
+:root.theme-irezumi {
+  color-scheme: light;
+  --paper: #f6f1e7;
+  /* The raised paper: the footer, the bands and the mats behind each piece. */
+  --paper-raised: #ede5d6;
+  --ink: #1f1d1b;
+  --ink-muted: #5a534c;
+  --stencil: #b3321d;
+  --stencil-strong: #8e2d1d;
+  --on-stencil: #f6f1e7;
+  --stencil-wash: #eedacf;
+  --line: #ddd3c3;
+  --line-strong: #857b71;
+  --destructive: #b3261e;
+  --card: var(--paper);
+  --popover: var(--paper);
+  /* Square corners: a print on paper. */
+  --radius: 0;
+  /* The header's one-line height: a 44 px control and 0.75rem above and below. */
+  --site-bar-height: 4.25rem;
+  --irz-column: min(76rem, 100% - 2.5rem);
+  --irz-serif: Georgia, 'Noto Serif', 'Noto Serif Devanagari', 'Times New Roman', serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root.theme-irezumi {
+    color-scheme: dark;
+    --paper: #161412;
+    --paper-raised: #201d1a;
+    --ink: #ede6da;
+    --ink-muted: #a8a095;
+    --stencil: #e36b54;
+    --stencil-strong: #e68a76;
+    --on-stencil: #161412;
+    --stencil-wash: #2f1e1a;
+    --line: #3a3530;
+    --line-strong: #7a7268;
+    --destructive: #f2b8b5;
+  }
+}
+
+/*
+ * The paper: a fine washi grain over a faint seigaiha (overlapping waves,
+ * irezumi's classic ground) on the page, and the grain alone on the raised
+ * paper (the footer and the bands). Each is a small SVG tile in ./paper/,
+ * drawn in the scheme's ink at under a tenth of its strength (the waves'
+ * hairlines 7.5% light, 7% dark; the grain at most 6%), which the build
+ * inlines into this stylesheet, so nothing is downloaded; no fixed
+ * attachment. The waves' tile is opaque paper, so the colour under it is the
+ * scheme's paper whatever loads. The texture moves each surface's colour a
+ * little where it lies: theme.ts lists the textured paper and raised paper at
+ * their 95th percentile among each scheme's surfaces, so the accent is
+ * checked against the paper as drawn; measure them again if a tile changes.
+ * A device asking for more contrast, or forcing its own colours, gets the
+ * flat paper.
+ */
+:root.theme-irezumi body {
+  background-color: var(--paper);
+  background-image: url('./paper/grain-light.svg'), url('./paper/seigaiha-light.svg');
+  background-repeat: repeat;
+}
+:root.theme-irezumi .irz-footer,
+:root.theme-irezumi .irz-band { background-image: url('./paper/grain-light.svg'); }
+@media (prefers-color-scheme: dark) {
+  :root.theme-irezumi body { background-image: url('./paper/grain-dark.svg'), url('./paper/seigaiha-dark.svg'); }
+  :root.theme-irezumi .irz-footer,
+  :root.theme-irezumi .irz-band { background-image: url('./paper/grain-dark.svg'); }
+}
+@media (prefers-contrast: more), (forced-colors: active) {
+  :root.theme-irezumi body,
+  :root.theme-irezumi .irz-footer,
+  :root.theme-irezumi .irz-band { background-image: none; }
+}
+
+/*
+ * The shared pages (flash, the informational pages, the booking flow) in
+ * Irezumi's frame: the stencil frame offset behind photos and panels is
+ * Stencil & Ink's signature, so it is off here; panels sit on the raised
+ * paper with a hairline, and section titles take the vermilion seal.
+ */
+:root.theme-irezumi .artist-photo::after,
+:root.theme-irezumi .profile-cover::after,
+:root.theme-irezumi .inquiry-aside::after { display: none; }
+:root.theme-irezumi .inquiry-aside { border-color: var(--line); background: var(--paper-raised); }
+:root.theme-irezumi .section-title { display: flex; align-items: baseline; gap: 0.75rem; font-size: clamp(1.75rem, 1.3rem + 2vw, 2.75rem); line-height: 1.15; }
+:root.theme-irezumi .section-title::before { content: ''; flex: none; inline-size: 0.625rem; block-size: 0.625rem; background: var(--stencil); translate: 0 -0.15em; }
+:root.theme-irezumi .page { width: var(--irz-column); padding-block-start: 3rem; }
+:root.theme-irezumi .text-link { color: var(--ink); text-decoration-color: var(--stencil); text-underline-offset: 0.3em; }
+:root.theme-irezumi .text-link:hover { color: var(--stencil-strong); }
+:root.theme-irezumi .work-dialog { background: var(--paper); }
+
+/* Keyboard users skip the header: hidden above the top until it has focus. */
+.irz-skip { position: absolute; inset-inline-start: 1rem; inset-block-start: 0.75rem; z-index: 3; padding: 0.75rem 1rem; background: var(--ink); color: var(--paper); font-weight: 600; text-decoration: none; translate: 0 -200%; }
+.irz-skip:focus { translate: 0 0; }
+
+.irz-container { width: var(--irz-column); margin-inline: auto; }
+
+/*
+ * The header: the paper with a hairline under it, sticky. No blur and no
+ * scroll animation: a quiet band that never changes as the page moves.
+ */
+.irz-header { position: sticky; inset-block-start: 0; z-index: 1; border-block-end: 1px solid var(--line); background: color-mix(in srgb, var(--paper) 96%, transparent); }
+.irz-header-inner { display: flex; align-items: center; gap: 0.625rem; min-block-size: var(--site-bar-height); padding-block: 0.75rem; }
+/*
+ * The studio's mark: the name in the display face, two lines at most (the
+ * full name is the link's accessible name), taking the squeeze before the
+ * booking link does, so a long name wraps and the page never scrolls sideways.
+ */
+.irz-brand { display: inline-flex; align-items: center; gap: 0.5rem; min-block-size: 2.75rem; min-inline-size: 0; margin-inline-end: auto; color: var(--ink); font-family: var(--display-face); font-size: 1.25rem; font-weight: 700; line-height: 1.15; text-decoration: none; overflow-wrap: anywhere; }
+.irz-brand .brand-name, .irz-header-cta > span, .irz-sheet-title .brand-name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+
+.irz-nav { display: none; }
+.irz-nav-list { display: flex; gap: 0.125rem; margin: 0; padding: 0; list-style: none; }
+.irz-nav-list a { position: relative; display: inline-flex; align-items: center; min-block-size: 2.75rem; padding-inline: 0.75rem; color: var(--ink-muted); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; text-decoration: none; transition: color 150ms ease; }
+/* The current page: ink, over a small vermilion seal. */
+.irz-nav-list a::after { content: ''; position: absolute; inset-inline-start: calc(50% - 0.1875rem); inset-block-end: 0.25rem; inline-size: 0.375rem; block-size: 0.375rem; background: var(--stencil); scale: 0; transition: scale 150ms ease; }
+.irz-nav-list a:hover, .irz-nav-list a[aria-current] { color: var(--ink); }
+.irz-nav-list a:hover::after, .irz-nav-list a[aria-current]::after { scale: 1; }
+
+/* The booking link keeps its words whole (at most half the bar, two lines); the studio's mark takes the squeeze. */
+.irz-header-cta { flex: 0 0 auto; max-inline-size: 50%; min-block-size: 2.75rem; padding: 0.375rem 0.75rem; font-size: 0.9375rem; overflow-wrap: normal; text-wrap: balance; }
+
+/* The phone's menu button: 44 px tall, its word beside the icon while there is room. */
+.irz-menu-button { display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem; flex: none; min-inline-size: 2.75rem; min-block-size: 2.75rem; padding-inline: 0.625rem; border: 1px solid var(--line-strong); background: transparent; color: var(--ink); font: inherit; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: border-color 150ms ease; }
+.irz-menu-button:hover { border-color: var(--ink); }
+.irz-menu-button svg { flex: none; inline-size: 1.25rem; block-size: 1.25rem; }
+@media (max-width: 26rem) {
+  .irz-menu-label { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+
+@media (min-width: 64rem) {
+  .irz-header-inner { gap: 1.25rem; }
+  .irz-brand { margin-inline-end: 0; }
+  .irz-nav { display: block; margin-inline-start: auto; }
+  .irz-menu-button { display: none; }
+  .irz-header-cta { max-inline-size: 16rem; }
+}
+
+/*
+ * The menu (shadcn's Sheet): paper, the full width of a phone up to 26rem.
+ * The pages large in the display face; the current one with the vermilion
+ * seal at its start; the way to book at the foot, the full width.
+ */
+.irz-sheet { inline-size: 100%; max-inline-size: 26rem; gap: 2rem; padding: 1.25rem 1.25rem max(1.5rem, env(safe-area-inset-bottom)); border-color: var(--line); background: var(--paper); overflow-y: auto; }
+.irz-sheet-title { display: flex; align-items: center; gap: 0.5rem; min-block-size: 2.75rem; padding-inline-end: 3.5rem; color: var(--ink); font-family: var(--display-face); font-size: 1.25rem; font-weight: 700; line-height: 1.15; overflow-wrap: anywhere; }
+.irz-sheet-list { display: grid; margin: 0; padding: 0; list-style: none; border-block-start: 1px solid var(--line); }
+.irz-sheet-list li { border-block-end: 1px solid var(--line); }
+.irz-sheet-list a { display: flex; align-items: center; gap: 0.875rem; min-block-size: 3.5rem; color: var(--ink); font-family: var(--display-face); font-size: 1.625rem; font-weight: 700; line-height: 1.2; text-decoration: none; }
+.irz-sheet-list a::before { content: ''; flex: none; inline-size: 0.5rem; block-size: 0.5rem; background: transparent; }
+.irz-sheet-list a:hover { color: var(--stencil); }
+.irz-sheet-list a[aria-current]::before { background: var(--stencil); }
+.irz-sheet-cta { inline-size: 100%; margin-block-start: auto; }
+.irz-sheet > button:focus:not(:focus-visible) { box-shadow: none; }
+
+/*
+ * The footer, on the raised paper: the studio's name as its sign-off, then
+ * small quiet columns. Stacked on a phone, two across from 40rem, beside the
+ * name from 60rem.
+ */
+.irz-footer { margin-block-start: 0; border-block-start: 1px solid var(--line); background: var(--paper-raised); color: var(--ink-muted); font-size: 0.9375rem; line-height: 1.55; overflow-wrap: anywhere; }
+.irz-footer-inner { display: grid; gap: 3rem; padding-block: 3.5rem 2rem; }
+.irz-footer-lead { display: grid; gap: 0.75rem; align-content: start; justify-items: start; }
+.irz-footer-name { color: var(--ink); font-family: var(--display-face); font-size: clamp(2.25rem, 1.5rem + 3.5vw, 4rem); font-weight: 700; line-height: 1.05; text-wrap: balance; }
+.irz-footer-kind { font-family: var(--irz-serif); font-style: italic; color: var(--ink-muted); }
+.irz-footer-cta { margin-block-start: 0.5rem; }
+.irz-footer-columns { display: grid; gap: 2rem; }
+.irz-footer-column { display: grid; gap: 0.5rem; align-content: start; justify-items: start; }
+.irz-footer-heading { margin: 0; color: var(--ink); font-family: var(--body-face); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; line-height: 1.4; }
+.irz-footer-links { display: grid; margin: 0; padding: 0; list-style: none; }
+.irz-footer-links a, .irz-footer-map { display: inline-flex; align-items: center; gap: 0.5rem; min-block-size: 2.75rem; color: var(--ink-muted); text-decoration: none; }
+.irz-footer-links a:hover, .irz-footer-map:hover { color: var(--ink); text-decoration: underline; text-decoration-color: var(--stencil); text-underline-offset: 0.3em; }
+.irz-footer-links a[aria-current] { color: var(--ink); }
+.irz-footer-map svg { flex: none; inline-size: 1rem; block-size: 1rem; color: var(--stencil); }
+.irz-footer-address { display: grid; gap: 0.25rem; justify-items: start; }
+.irz-footer-address p { color: var(--ink); }
+.irz-footer-hours { display: grid; gap: 0.25rem; margin: 0.5rem 0 0; }
+.irz-footer-hours dt { color: var(--ink); font-weight: 600; }
+.irz-footer-hours dd { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 1.5rem; margin: 0; min-inline-size: min(100%, 15rem); }
+.irz-footer-legal { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem 2rem; padding-block-start: 1.5rem; border-block-start: 1px solid var(--line); font-size: 0.875rem; }
+/* The chat button stands over the footer's last line: clear it. */
+:root:has(.chat-float) .irz-footer-inner { padding-block-end: calc(6rem + env(safe-area-inset-bottom, 0px)); }
+/* The shared pages end with their own spacing before the footer. */
+:root.theme-irezumi main.page { padding-block-end: 5rem; }
+
+@media (min-width: 40rem) {
+  .irz-footer-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 60rem) {
+  .irz-footer-inner { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); column-gap: 4rem; padding-block-start: 5rem; }
+  .irz-footer-columns { grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); }
+  .irz-footer-legal { grid-column: 1 / -1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .irz-nav-list a, .irz-nav-list a::after, .irz-menu-button { transition: none; }
+  .irz-sheet, :root.theme-irezumi [data-slot="sheet-overlay"] { animation: none; }
+}

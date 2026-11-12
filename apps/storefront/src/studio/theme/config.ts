@@ -13,11 +13,19 @@ import { cleanLine } from "../text.ts";
  */
 
 /**
- * The themes this app has, by key: Stencil & Ink (TAT-97, TAT-105), and Ink
+ * The themes this app has, by key: Stencil & Ink (TAT-97, TAT-105), Ink
  * Noir, a dark, photography-first look with its own header and footer
- * (src/studio/theme/ink-noir/).
+ * (src/studio/theme/ink-noir/), Irezumi, a Japanese-inspired editorial
+ * look on seigaiha paper that follows the device, light or dark
+ * (src/studio/theme/irezumi/), and Atelier, a
+ * quiet-luxury catalogue on stone paper (src/studio/theme/atelier/).
  */
-export const THEME_KEYS = ["stencil-and-ink", "ink-noir"] as const;
+export const THEME_KEYS = [
+	"stencil-and-ink",
+	"ink-noir",
+	"irezumi",
+	"atelier",
+] as const;
 export type ThemeKey = (typeof THEME_KEYS)[number];
 export const DEFAULT_THEME_KEY: ThemeKey = "stencil-and-ink";
 
@@ -60,6 +68,14 @@ export const THEME_SECTIONS: Record<ThemeKey, ThemeSections> = Object.freeze({
 	}),
 	// The same sections: a theme changes how a page looks, not what it holds.
 	"ink-noir": Object.freeze({
+		order: sectionList("work", "artists", "flash", "info", "inquiry"),
+		required: sectionList("inquiry"),
+	}),
+	irezumi: Object.freeze({
+		order: sectionList("work", "artists", "flash", "info", "inquiry"),
+		required: sectionList("inquiry"),
+	}),
+	atelier: Object.freeze({
 		order: sectionList("work", "artists", "flash", "info", "inquiry"),
 		required: sectionList("inquiry"),
 	}),
@@ -163,6 +179,15 @@ export function readThemeKey(value: unknown): ThemeKey {
  */
 export function studioThemeKey(studio: unknown): ThemeKey {
 	return readThemeKey(own(own(studio, "storefront"), "theme"));
+}
+
+/**
+ * The heading font key of a studio as the API sent it (`Studio.storefront.
+ * branding.font`), else the default: what the root route needs to pick the
+ * font it preloads.
+ */
+export function studioFontKey(studio: unknown): FontKey {
+	return readFontKey(own(own(own(studio, "storefront"), "branding"), "font"));
 }
 
 /** A font key from FONT_KEYS, else the default (Eczar). */

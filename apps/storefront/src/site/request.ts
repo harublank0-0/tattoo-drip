@@ -1,6 +1,6 @@
 import { createIsomorphicFn } from "@tanstack/react-start";
 import { storefrontConfig, tenantOrigin } from "../tenancy/config.ts";
-import { requestStudio } from "../tenancy/middleware.ts";
+import { requestPreviewTheme, requestStudio } from "../tenancy/middleware.ts";
 import { SiteRef } from "./context.ts";
 
 /**
@@ -16,6 +16,7 @@ export const createRequestSite = createIsomorphicFn()
 		site.connect(
 			tenantOrigin(config, requestStudio().slug),
 			config.challengeSiteKey ?? null,
+			requestPreviewTheme(),
 		);
 		return site;
 	})

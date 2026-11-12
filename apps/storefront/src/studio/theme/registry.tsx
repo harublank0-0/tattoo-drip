@@ -11,6 +11,13 @@ import {
 	WorkPage,
 } from "../components/pages.tsx";
 import { type Shell, StencilShell } from "../components/shell.tsx";
+import { AtelierArtistPage } from "./atelier/artist-page.tsx";
+import { AtelierArtistsPage } from "./atelier/artists-page.tsx";
+import { AtelierArtworkPage } from "./atelier/artwork-page.tsx";
+import { AtelierBookPage } from "./atelier/book-page.tsx";
+import { AtelierGalleryPage } from "./atelier/gallery-page.tsx";
+import { AtelierStudioPage } from "./atelier/home-page.tsx";
+import { AtelierShell } from "./atelier/shell.tsx";
 import { DEFAULT_THEME_KEY, type ThemeKey } from "./config.ts";
 import { InkNoirArtistPage } from "./ink-noir/artist/artist-page.tsx";
 import { InkNoirArtistsPage } from "./ink-noir/artists/artists-page.tsx";
@@ -20,6 +27,13 @@ import { InkNoirGalleryPage } from "./ink-noir/gallery/gallery-page.tsx";
 import { InkNoirStudioPage } from "./ink-noir/home/home-page.tsx";
 import { InkNoirInfoPage } from "./ink-noir/info/info-page.tsx";
 import { InkNoirShell } from "./ink-noir/shell.tsx";
+import { IrezumiArtistPage } from "./irezumi/artist-page.tsx";
+import { IrezumiArtistsPage } from "./irezumi/artists-page.tsx";
+import { IrezumiArtworkPage } from "./irezumi/artwork-page.tsx";
+import { IrezumiBookPage } from "./irezumi/book-page.tsx";
+import { IrezumiGalleryPage } from "./irezumi/gallery-page.tsx";
+import { IrezumiStudioPage } from "./irezumi/home-page.tsx";
+import { IrezumiShell } from "./irezumi/shell.tsx";
 
 /**
  * A theme (TAT-54): the studio page's pages as React components of this
@@ -57,8 +71,13 @@ export interface Theme {
  * Ink Noir (theme/ink-noir/) is the same pages in its own dark shell, with a
  * site navigation and a full footer, and its own home page, artists
  * directory and artist page (theme/ink-noir/home/, artists/ and artist/: the
- * same data, laid out as an editorial portfolio). Its colours come from the `<html>`
- * class the root route sets (theme/html.ts), not from here.
+ * same data, laid out as an editorial portfolio). Irezumi (theme/irezumi/) is
+ * a light editorial look on warm paper with its own shell, home, artists,
+ * artist, gallery, tattoo and booking pages; the flash and informational
+ * pages are the shared ones in its shell. Atelier (theme/atelier/) is a
+ * quiet-luxury catalogue on stone paper, with the same set of its own pages.
+ * A theme's colours come from the
+ * `<html>` class the root route sets (theme/html.ts), not from here.
  */
 export const THEMES: Record<ThemeKey, Theme> = {
 	"stencil-and-ink": {
@@ -84,6 +103,30 @@ export const THEMES: Record<ThemeKey, Theme> = {
 		FlashDesignPage,
 		RequestPage: InkNoirBookPage,
 		InfoPage: InkNoirInfoPage,
+	},
+	irezumi: {
+		Shell: IrezumiShell,
+		StudioPage: IrezumiStudioPage,
+		ArtistPage: IrezumiArtistPage,
+		ArtistsPage: IrezumiArtistsPage,
+		WorkPage: IrezumiGalleryPage,
+		ArtworkPage: IrezumiArtworkPage,
+		FlashPage,
+		FlashDesignPage,
+		RequestPage: IrezumiBookPage,
+		InfoPage,
+	},
+	atelier: {
+		Shell: AtelierShell,
+		StudioPage: AtelierStudioPage,
+		ArtistPage: AtelierArtistPage,
+		ArtistsPage: AtelierArtistsPage,
+		WorkPage: AtelierGalleryPage,
+		ArtworkPage: AtelierArtworkPage,
+		FlashPage,
+		FlashDesignPage,
+		RequestPage: AtelierBookPage,
+		InfoPage,
 	},
 };
 
