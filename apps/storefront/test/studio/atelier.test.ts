@@ -4,6 +4,7 @@ import { describe, test } from "node:test";
 import type { Artist, Studio } from "@tattoo-drip/sdk";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { ErrorPage, NotFoundPage } from "../../src/studio/components/pages.tsx";
 import {
 	artistPageData,
 	artistsPageData,
@@ -190,8 +191,11 @@ describe("Atelier's palette (theme.ts and styles.css agree)", () => {
 		assert.doesNotMatch(pagesCss, /url\(|@import/);
 		assert.doesNotMatch(css, /@import/);
 		const urls = Array.from(css.matchAll(/url\('([^']+)'\)/g), (m) => m[1]);
-		assert.equal(urls.length, 4);
-		for (const href of urls) {
+		const fonts = urls.filter((href) => href !== "./sprig.svg");
+		assert.equal(fonts.length, 4);
+		// The sprig, twice in its one rule (the prefixed mask and the mask).
+		assert.equal(urls.length - fonts.length, 2);
+		for (const href of fonts) {
 			assert.match(
 				href,
 				/^\.\.\/\.\.\/\.\.\/assets\/fonts\/bodoni-moda\/bodoni-moda-[a-z-]+-(500-normal|400-italic)\.woff2$/,
@@ -210,6 +214,146 @@ describe("Atelier's palette (theme.ts and styles.css agree)", () => {
 		assert.match(
 			appCss,
 			/&:not\(:where\([^)]*\.theme-atelier, \.theme-atelier \*\)\)/,
+		);
+	});
+
+	test("the sprig: a small hairline drawing, inlined, referring to nothing, used only as a brass mask on decoration", () => {
+		const svg = readFileSync(
+			new URL("../../src/studio/theme/atelier/sprig.svg", import.meta.url),
+			"utf8",
+		);
+		// Under Vite's inline limit (4 KiB), so a data: URL in the CSS.
+		assert.ok(svg.length < 4096);
+		assert.match(
+			svg,
+			/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" width="120" height="24"/,
+		);
+		assert.doesNotMatch(
+			svg,
+			/href|url\(|<script|<style|<image|<foreignObject|@import|on[a-z]+=/i,
+		);
+		// Its one rule: the three places it sits, each a pseudo-element or an aria-hidden box.
+		const start = css.indexOf(":root.theme-atelier .status-page::before,");
+		const rule = css.slice(start, css.indexOf("}", start));
+		assert.match(
+			rule,
+			/^:root\.theme-atelier \.status-page::before,\s*\.atl-footer-lead::before,\s*\.atl-hero-ornament::after \{/,
+		);
+		assert.match(rule, /background-color: var\(--atl-brass\);/);
+		assert.match(
+			rule,
+			/-webkit-mask: url\('\.\/sprig\.svg'\) center \/ contain no-repeat;/,
+		);
+		assert.match(
+			rule,
+			/[^-]mask: url\('\.\/sprig\.svg'\) center \/ contain no-repeat;/,
+		);
+		assert.match(rule, /content: '';/);
+	});
+
+	test("the shared pages and the status pages are framed as Atelier's own: a centred title over a brass rule", () => {
+		/** The declarations of the rule whose selector list is exactly `selectors`. */
+		const ruleOf = (...selectors: string[]) => {
+			const prelude = selectors.join(",\n");
+			const start = css.indexOf(`${prelude} {`);
+			assert.ok(start >= 0, prelude);
+			return css.slice(start + prelude.length, css.indexOf("}", start));
+		};
+		const titles = [
+			":root.theme-atelier main.page > section > .section-title:first-child",
+			":root.theme-atelier .status-page > .section-title",
+		];
+		assert.match(ruleOf(...titles), /text-align: center;/);
+		const rule = ruleOf(...titles.map((title) => `${title}::after`));
+		assert.match(rule, /background: var\(--atl-brass\)/);
+		assert.match(
+			rule,
+			/inline-size: 3rem; block-size: 1px; margin: 1\.25rem auto 0;/,
+		);
+		// The informational pages: text read from the start in a centred column, its blocks its full width.
+		assert.match(
+			ruleOf(":root.theme-atelier .info-page > .measure"),
+			/^ \{ margin-inline: auto; $/,
+		);
+		assert.match(
+			ruleOf(
+				...["div", "ul", "ol", "dl", "section"].map(
+					(block) => `:root.theme-atelier .info-page > .measure > ${block}`,
+				),
+			),
+			/justify-self: stretch;/,
+		);
+		// The other sections' content centred, but the studio's address kept as a card.
+		assert.match(
+			ruleOf(
+				":root.theme-atelier main.page > section:not(.info-page) > .stack",
+			),
+			/justify-items: center; max-inline-size: 36rem; margin-inline: auto; text-align: center;/,
+		);
+		assert.match(
+			ruleOf(
+				":root.theme-atelier main.page > section:not(.info-page) > .stack > address",
+			),
+			/text-align: start;/,
+		);
+		assert.doesNotMatch(
+			css,
+			/\.stack \.links/,
+			"the address's chips are never centred",
+		);
+		// Only the flash page's own wall, filters and links: the home's and an artist's Flash sections are untouched.
+		for (const selector of [
+			".work-filter-nav",
+			".flash-more-bar",
+			".work-newest",
+			".flash-grid",
+		]) {
+			const uses = Array.from(
+				css.matchAll(new RegExp(`[^\\n,]*\\${selector}\\b[^,{]*`, "g")),
+				(m) => m[0].trim(),
+			);
+			assert.ok(uses.length > 0, selector);
+			for (const use of uses) {
+				assert.match(use, /^:root\.theme-atelier main\.page > section > /, use);
+			}
+		}
+		assert.match(
+			ruleOf(":root.theme-atelier main.page > section > .flash-grid"),
+			/margin-inline: auto;/,
+		);
+	});
+
+	test("the not-found and error pages render in the frame, under the sprig, with their own padding", () => {
+		for (const html of [
+			renderToStaticMarkup(createElement(NotFoundPage)),
+			renderToStaticMarkup(createElement(ErrorPage, { retryHref: "/gallery" })),
+		]) {
+			assert.match(
+				html,
+				/^<main class="page status-page"><h1 class="section-title">/,
+			);
+		}
+		// main.page.status-page (0,4,1) outranks Atelier's main.page padding (0,3,1).
+		assert.match(
+			css,
+			/:root\.theme-atelier main\.page\.status-page \{ justify-items: center; padding-block: [^;]+; text-align: center; \}/,
+		);
+		assert.match(
+			css,
+			/:root\.theme-atelier main\.page \{ padding-block-end: 5rem; \}/,
+		);
+	});
+
+	test("where it can't be drawn (forced colours, print) the sprig takes no space", () => {
+		const start = css.indexOf("@media (forced-colors: active), print {");
+		assert.ok(
+			start > css.indexOf("url('./sprig.svg')"),
+			"after the sprig's rule",
+		);
+		const block = css.slice(start, css.indexOf("\n}\n", start));
+		assert.match(
+			block,
+			/:root\.theme-atelier \.status-page::before,\s*\.atl-footer-lead::before,\s*\.atl-hero-ornament::after \{ display: none; \}/,
 		);
 	});
 
@@ -958,6 +1102,11 @@ describe("Atelier carries the shared pages: booking, flash and information", () 
 		);
 		assertSafePage(flashHtml);
 		assert.match(flashHtml, /<header class="atl-header">/);
+		// The markup the frame's selectors need (styles.css): a top-level section's title first in main.page.
+		assert.match(
+			flashHtml,
+			/<main id="main" tabindex="-1" class="page"><section aria-labelledby="flash-page-title"><h1 id="flash-page-title" class="section-title">/,
+		);
 		const about = infoPageData(
 			"about",
 			atelier(),
@@ -971,6 +1120,10 @@ describe("Atelier carries the shared pages: booking, flash and information", () 
 		);
 		assertSafePage(aboutHtml);
 		assert.match(aboutHtml, /<footer class="atl-footer">/);
+		assert.match(
+			aboutHtml,
+			/<main id="main" tabindex="-1" class="page"><section class="section info-page" aria-labelledby="info-title"><h1 id="info-title" class="section-title">About<\/h1><div class="stack measure">/,
+		);
 		assert.match(aboutHtml, /aria-current="page"[^>]*>About</);
 	});
 });

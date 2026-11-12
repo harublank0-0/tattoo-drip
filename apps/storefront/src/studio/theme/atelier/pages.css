@@ -6,7 +6,8 @@
  *
  * The look of a printed catalogue: centred compositions, Bodoni headings at
  * the face's own weight, small spaced capitals for fixed labels, brass
- * hairlines as the only ornament, and every piece of work shown whole
+ * hairlines and one fine-line sprig (styles.css) as the only ornament, and
+ * every piece of work shown whole
  * (`object-fit: contain`, never a crop) on a white mat with a hairline, its
  * catalogue number beside its title. Only a portrait is cropped, into an
  * arch. Each photo takes its box's full width with the height from its own
@@ -288,10 +289,12 @@
 :root.theme-atelier .atl-hero-actions .action {
 	max-inline-size: 100%;
 }
-/* With no photo: a brass double rule, decoration only (aria-hidden). */
+/* With no photo: a brass double rule with the sprig between, decoration only (aria-hidden). */
 .atl-hero-ornament {
+	display: grid;
+	place-items: center;
 	inline-size: min(100%, 22rem);
-	block-size: 1.25rem;
+	block-size: 3rem;
 	border-block: 1px solid var(--atl-brass);
 }
 
