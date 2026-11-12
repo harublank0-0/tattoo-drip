@@ -226,6 +226,7 @@ export function galleryPage(
 			styles: index === 0 ? [fineLine] : [],
 			healed: index === 0,
 			artist: { slug: "sita", name: "Sita Rai" },
+			angles: [],
 		})),
 		nextCursor: null,
 		filters: { styles: [fineLine], healed: true },

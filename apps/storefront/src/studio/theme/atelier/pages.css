@@ -397,6 +397,15 @@
 	text-underline-offset: 0.3em;
 	transition: text-decoration-color 150ms ease;
 }
+/* Angles: a tattoo of several photos says so at the caption's end, like a catalogue's plate count. */
+.atl-piece-count {
+	flex: none;
+	margin-inline-start: auto;
+	color: var(--ink-muted);
+	font-size: 0.6875rem;
+	letter-spacing: 0.2em;
+	text-transform: uppercase;
+}
 .atl-piece-link:hover .atl-piece-title,
 .atl-piece-link:focus-visible .atl-piece-title {
 	text-decoration-color: var(--atl-brass);
@@ -817,4 +826,14 @@
 	.atl-filter::after {
 		transition: none;
 	}
+}
+
+/*
+ * Angles on the tattoo's page: each photo on its own white mat; the one
+ * shown is edged in the bronze of everything you can act on (the brass is
+ * too pale to mark a state).
+ */
+.atl-artwork-figure .artwork-angle {
+	border-radius: 0;
+	background: var(--atl-mat);
 }

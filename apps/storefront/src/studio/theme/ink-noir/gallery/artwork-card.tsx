@@ -14,7 +14,9 @@ import { pieceSizes, shapeClass } from "./sizes.ts";
  * artist. On a screen with hover the title rises over the photo on hover and
  * focus; on touch it sits under it, always there. The link carries the
  * photo's `openId`, so "Show more" can put the keyboard on the first new
- * piece. Nothing for a photo without its own page.
+ * piece. A tattoo of several photos (angles) carries "3 photos" in the link,
+ * on the photo's corner, so it is part of the link's name. Nothing for a
+ * photo without its own page.
  */
 export function ArtworkCard({
 	photo,
@@ -50,6 +52,9 @@ export function ArtworkCard({
 				<span className="ink-piece-title user-text" dir="auto">
 					{artworkTitle(photo)}
 				</span>
+				{photo.photosLabel ? (
+					<span className="ink-piece-count">{photo.photosLabel}</span>
+				) : null}
 			</RouterAnchor>
 			{artist || photo.healed ? (
 				<p className="ink-piece-meta">

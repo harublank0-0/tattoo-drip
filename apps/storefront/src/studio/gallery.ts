@@ -4,7 +4,7 @@ import { studioCopy } from "./copy.ts";
 import { galleryPhotoHref } from "./links.ts";
 import { largeSource } from "./srcset.ts";
 import { cleanLine } from "./text.ts";
-import { readBrandImage } from "./theme/config.ts";
+import { type BrandImage, readBrandImage } from "./theme/config.ts";
 import { ARTIST_SLUG, type WorkPhotoView } from "./view-model.ts";
 
 /**
@@ -38,6 +38,23 @@ export const MAX_SEARCH = 80;
 const STYLE_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const MAX_STYLE_SLUG = 40;
 
+/** The most other photos of one tattoo (the contract's `angles` maxItems: eight photos in all). */
+export const MAX_ANGLES = 7;
+
+/**
+ * One more photo of a tattoo (angles): the brand images' rule like the main
+ * photo, its own description, else "Tattoo by {name}, photo {n} of {count}"
+ * with its place in the whole tattoo (the main photo being 1), and the copy
+ * the viewer shows.
+ */
+export interface AngleView extends BrandImage {
+	readonly alt: string;
+	/** The studio's description for the viewer, or null. */
+	readonly caption: string | null;
+	/** What the viewer shows (largeSource). */
+	readonly largeSrc: string;
+}
+
 /** One photo of the gallery: a work photo and whose it is, what it shows and whether it has healed. */
 export interface GalleryPhotoView extends WorkPhotoView {
 	/** The grid button's id, so "Show more" can move focus to the first new photo. */
@@ -56,6 +73,13 @@ export interface GalleryPhotoView extends WorkPhotoView {
 		readonly name: string;
 	}[];
 	readonly healed: boolean;
+	/**
+	 * Angles: the tattoo's other photos, in order, after this one (the main
+	 * photo); [] for a tattoo of one photo, an older API or none that pass.
+	 */
+	readonly angles: readonly AngleView[];
+	/** The tile's mark for a tattoo of several photos ("3 photos"); null for one. */
+	readonly photosLabel: string | null;
 }
 
 export interface GalleryView {
@@ -92,8 +116,9 @@ function own(value: unknown, key: string): unknown {
  * copies on the same origin), the rest are dropped and the others numbered
  * on from `offset` (the photos already shown). The description is one line of
  * plain text up to 200 characters, else "Tattoo by {name}, photo {n}" ("Tattoo,
- * photo {n}" with no usable artist). Anything that is not a page is the empty
- * gallery. Pure.
+ * photo {n}" with no usable artist). Each entry is a tattoo: its main photo
+ * and its other photos (`angles`, readAngles). Anything that is not a page is
+ * the empty gallery. Pure.
  */
 export function galleryView(
 	page: unknown,
@@ -107,7 +132,7 @@ export function galleryView(
 		.map((item) => ({ item, image: readBrandImage(item, imageOrigin) }))
 		.flatMap(({ item, image }) => (image ? [{ item, image }] : []));
 	const photos = kept.map(({ item, image }, index) =>
-		shownPhoto(item, image, first + index + 1),
+		shownPhoto(item, image, first + index + 1, imageOrigin),
 	);
 	const filters = own(page, "filters");
 	const cursor = own(page, "nextCursor");
@@ -131,17 +156,62 @@ export function galleryPhotoView(
 ): GalleryPhotoView | null {
 	const image = readBrandImage(item, imageOrigin);
 	if (!image) return null;
-	const photo = shownPhoto(item, image, 1);
+	const photo = shownPhoto(item, image, 1, imageOrigin);
 	if (!photo.id) return null;
-	// The page's one photo: no number in its description.
-	return photo.caption
-		? photo
-		: {
-				...photo,
-				alt: photo.artist
-					? fill(studioCopy.artwork.by, { name: photo.artist.name })
-					: studioCopy.artwork.untitled,
-			};
+	// The page's one photo: no number in its description, unless it is the
+	// first of several (angles), which are numbered in the whole tattoo.
+	if (photo.caption) return photo;
+	if (photo.angles.length > 0) {
+		return {
+			...photo,
+			alt: angleAlt(photo.artist?.name ?? null, 1, photo.angles.length + 1),
+		};
+	}
+	return {
+		...photo,
+		alt: photo.artist
+			? fill(studioCopy.artwork.by, { name: photo.artist.name })
+			: studioCopy.artwork.untitled,
+	};
+}
+
+/**
+ * "Tattoo by Sita Rai, photo 2 of 4" (the contract's fallback for a photo of
+ * a tattoo with no description), or "Tattoo, photo 2 of 4" with no usable
+ * artist.
+ */
+function angleAlt(name: string | null, n: number, count: number): string {
+	return name
+		? fill(studioCopy.work.angleAlt, { name, n, count })
+		: fill(studioCopy.work.angleAltNoName, { n, count });
+}
+
+/**
+ * The tattoo's other photos as the API sent them (`angles`, whatever it
+ * really is): at most seven, each passing the brand images' rule, the rest
+ * dropped, and each described by the studio or by its place in the whole
+ * tattoo. Pure.
+ */
+function readAngles(
+	value: unknown,
+	imageOrigin: string | null,
+	artist: string | null,
+): AngleView[] {
+	if (!Array.isArray(value)) return [];
+	const kept = value
+		.slice(0, MAX_ANGLES)
+		.map((item) => ({ item, image: readBrandImage(item, imageOrigin) }))
+		.flatMap(({ item, image }) => (image ? [{ item, image }] : []));
+	const count = kept.length + 1;
+	return kept.map(({ item, image }, index) => {
+		const description = readDescription(own(item, "alt"));
+		return {
+			...image,
+			alt: description ?? angleAlt(artist, index + 2, count),
+			caption: description,
+			largeSrc: largeSource(image),
+		};
+	});
 }
 
 /** A photo the brand images' rule kept, numbered `n` (the dialog and button ids, the label and the fallback description). */
@@ -149,10 +219,16 @@ function shownPhoto(
 	item: unknown,
 	image: NonNullable<ReturnType<typeof readBrandImage>>,
 	n: number,
+	imageOrigin: string | null,
 ): GalleryPhotoView {
 	const artist = readArtist(own(item, "artist"));
 	const description = readDescription(own(item, "alt"));
 	const id = readPhotoId(own(item, "id"));
+	const angles = readAngles(
+		own(item, "angles"),
+		imageOrigin,
+		artist?.name ?? null,
+	);
 	return {
 		...image,
 		alt:
@@ -171,7 +247,52 @@ function shownPhoto(
 		styles: photoStyleNames(own(item, "styles")),
 		styleRefs: filterStyles(own(item, "styles")).slice(0, MAX_PHOTO_STYLES),
 		healed: own(item, "healed") === true,
+		angles,
+		photosLabel:
+			angles.length > 0
+				? fill(studioCopy.work.photosCount, { count: angles.length + 1 })
+				: null,
 	};
+}
+
+/**
+ * One photo of a tattoo as its page and its viewer step through them: the
+ * main photo first, then the angles. The main photo keeps its own alt (the
+ * grid's or the page's), each angle its own.
+ */
+export type TattooShot = AngleView;
+
+/** A tattoo's photos in order: its main photo, then its angles. */
+export function tattooShots(photo: GalleryPhotoView): TattooShot[] {
+	const { src, width, height, srcSet, alt, caption, largeSrc } = photo;
+	return [
+		{
+			src,
+			width,
+			height,
+			...(srcSet ? { srcSet } : {}),
+			alt,
+			caption,
+			largeSrc,
+		},
+		...photo.angles,
+	];
+}
+
+/**
+ * The class that pins a tattoo page's main photo to its own shape
+ * (styles.css, `.artwork-ar-50` to `.artwork-ar-200`: width over height,
+ * rounded to 0.05 within 1:2 to 2:1), so stepping to an angle of another
+ * shape never moves the page: the angle is fitted whole inside the same box.
+ * A class, not a `style` attribute, which the page never carries.
+ */
+export function artworkShapeClass(photo: {
+	width: number;
+	height: number;
+}): string {
+	const stepped = Math.round((photo.width / photo.height) * 20) / 20;
+	const shape = Math.min(2, Math.max(0.5, stepped));
+	return `artwork-ar-${Math.round(shape * 100)}`;
 }
 
 /** A photo's id when it is a lowercase UUID, else null. */

@@ -1,4 +1,5 @@
 import { ArrowRight } from "lucide-react";
+import { TattooDialog, TattooFigure } from "../angles.tsx";
 import { studioCopy } from "../copy.ts";
 import {
 	type GalleryPhotoView,
@@ -24,7 +25,9 @@ import { workGridSizes } from "../srcset.ts";
  * closed dialog it is not fetched until opened), the description, and what the
  * photo is: whose (a link to their page, only where `showArtist`: an artist's
  * own page does not link to itself), its styles and whether it has healed.
- * Nothing when there are no photos.
+ * A tattoo of several photos (angles) says so on its button ("3 photos", a
+ * visible part of the button's name) and its viewer steps through them
+ * (PhotoDialog). Nothing when there are no photos.
  */
 export function GalleryGrid({
 	photos,
@@ -62,6 +65,9 @@ export function GalleryGrid({
 							loading="lazy"
 							decoding="async"
 						/>
+						{photo.photosLabel ? (
+							<span className="work-count">{photo.photosLabel}</span>
+						) : null}
 					</button>
 					<PhotoDialog photo={photo} showArtist={showArtist} />
 				</li>
@@ -74,8 +80,10 @@ export function GalleryGrid({
  * One tattoo's main photo (its own page, Prompt 5): large, eager and high
  * priority (the page's main image), a button that opens the same viewer as
  * the grid (PhotoDialog: the browser's modal, Escape and focus its own, Back
- * closes it), with a visible hint saying so. The photo has no other pictures
- * in the API, so the viewer has no previous or next.
+ * closes it), with a visible hint saying so. A tattoo of one photo has a
+ * viewer with no previous or next, as before; a tattoo with angles is the
+ * TattooFigure island (angles.tsx): the same button and box, the row of its
+ * photos under it, and a viewer that steps through them.
  */
 export function ArtworkFigure({
 	photo,
@@ -87,6 +95,16 @@ export function ArtworkFigure({
 	sizes: string;
 	className: string;
 }) {
+	if (photo.angles.length > 0) {
+		return (
+			<TattooFigure
+				photo={photo}
+				sizes={sizes}
+				className={className}
+				facts={<PhotoFacts photo={photo} showArtist />}
+			/>
+		);
+	}
 	return (
 		<figure className={className}>
 			<button
@@ -149,7 +167,8 @@ export function RecentWork({ gallery }: { gallery: GalleryView }) {
  * opens, with its Close form, label, large copy (lazy: not fetched until
  * opened), description and facts. GalleryGrid puts one after each button; a
  * theme that lays its photos out differently (Ink Noir's home page) puts the
- * same one after its own.
+ * same one after its own. A tattoo with angles gets the TattooDialog island
+ * (angles.tsx): the same dialog, which steps through its photos.
  */
 export function PhotoDialog({
 	photo,
@@ -158,6 +177,14 @@ export function PhotoDialog({
 	photo: GalleryPhotoView;
 	showArtist: boolean;
 }) {
+	if (photo.angles.length > 0) {
+		return (
+			<TattooDialog
+				photo={photo}
+				facts={<PhotoFacts photo={photo} showArtist={showArtist} />}
+			/>
+		);
+	}
 	return (
 		<dialog
 			id={photo.dialogId}

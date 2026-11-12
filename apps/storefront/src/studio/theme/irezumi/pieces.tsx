@@ -18,7 +18,9 @@ import { pieceSizes } from "./sizes.ts";
  * it (the photo is decoration inside it, `alt=""`); one without (an older
  * API) is a button that opens the shared viewer (PhotoDialog). The link or
  * button carries the photo's `openId` where `withIds`, so the paged gallery's
- * "Show more" can move focus to the first new piece. Nothing for no photos.
+ * "Show more" can move focus to the first new piece. A tattoo of several
+ * photos (angles) says how many under its title, inside the link, so it is
+ * part of the link's name. Nothing for no photos.
  */
 export function IrezumiPieces({
 	photos,
@@ -95,6 +97,9 @@ function IrezumiPiece({
 					<span className="irz-piece-title user-text" dir="auto">
 						{title}
 					</span>
+					{photo.photosLabel ? (
+						<span className="irz-piece-count">{photo.photosLabel}</span>
+					) : null}
 				</RouterAnchor>
 			) : (
 				<>
@@ -110,6 +115,9 @@ function IrezumiPiece({
 						<span className="irz-piece-title user-text" dir="auto">
 							{title}
 						</span>
+						{photo.photosLabel ? (
+							<span className="irz-piece-count">{photo.photosLabel}</span>
+						) : null}
 					</button>
 					<PhotoDialog photo={photo} showArtist={showArtist} />
 				</>

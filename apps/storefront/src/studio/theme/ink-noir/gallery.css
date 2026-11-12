@@ -328,6 +328,18 @@
 	line-height: 1.35;
 	overflow-wrap: anywhere;
 }
+/* Angles: a tattoo of several photos says so on the photo's corner, in the theme's small caps. */
+.ink-piece-count {
+	position: absolute;
+	inset-block-start: 0.625rem;
+	inset-inline-start: 0.625rem;
+	padding: 0.25rem 0.5rem;
+	background: color-mix(in srgb, var(--paper) 82%, transparent);
+	color: var(--ink);
+	font-size: 0.6875rem;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+}
 .ink-piece-meta {
 	display: flex;
 	flex-wrap: wrap;
@@ -545,4 +557,14 @@
 	.ink-piece-link:focus-visible .ink-piece-photo {
 		scale: none;
 	}
+}
+
+/* Angles on the tattoo's page: the row of its photos on the raised paper, the one shown in the stencil. */
+.ink-artwork-page .artwork-angles {
+	justify-content: start;
+}
+.ink-artwork-page .artwork-angle {
+	border-color: var(--line);
+	border-radius: 0;
+	background: var(--paper-raised);
 }

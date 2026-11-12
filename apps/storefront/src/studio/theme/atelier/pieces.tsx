@@ -19,7 +19,9 @@ import { pieceSizes } from "./sizes.ts";
  * it (the photo is decoration inside it, `alt=""`); one without (an older
  * API) is a button that opens the shared viewer (PhotoDialog). The link or
  * button carries the photo's `openId` where `withIds`, so the paged gallery's
- * "Show more" can move focus to the first new piece. Nothing for no photos.
+ * "Show more" can move focus to the first new piece. A tattoo of several
+ * photos (angles) says how many in its caption, inside the link, so it is
+ * part of the link's name. Nothing for no photos.
  */
 export function AtelierPieces({
 	photos,
@@ -112,6 +114,9 @@ function AtelierPiece({
 						<span className="atl-piece-title user-text" dir="auto">
 							{title}
 						</span>
+						{photo.photosLabel ? (
+							<span className="atl-piece-count">{photo.photosLabel}</span>
+						) : null}
 					</span>
 				</RouterAnchor>
 			) : (
@@ -134,6 +139,9 @@ function AtelierPiece({
 							<span className="atl-piece-title user-text" dir="auto">
 								{title}
 							</span>
+							{photo.photosLabel ? (
+								<span className="atl-piece-count">{photo.photosLabel}</span>
+							) : null}
 						</span>
 					</button>
 					<PhotoDialog photo={photo} showArtist={showArtist} />

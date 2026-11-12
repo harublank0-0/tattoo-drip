@@ -74,6 +74,18 @@ export const studioCopy = {
 		galleryAltNoName: "Tattoo, photo {n}",
 		/** The gallery viewer's label (no total: more may be on the way). */
 		photoN: "Photo {n}",
+		/**
+		 * Angles: a tattoo shown with several photos. The mark on its tile
+		 * ("3 photos"), an angle's alt when the studio wrote none (its place in
+		 * the whole tattoo, the main photo being 1), the row of photos on its
+		 * page and the viewer's steps.
+		 */
+		photosCount: "{count} photos",
+		angleAlt: "Tattoo by {name}, photo {n} of {count}",
+		angleAltNoName: "Tattoo, photo {n} of {count}",
+		tattooPhotos: "Photos of this tattoo",
+		previous: "Previous photo",
+		next: "Next photo",
 		/** The All work page's form. */
 		filters: {
 			label: "Filter the photos",

@@ -9,10 +9,12 @@ import { ThemedArtworkPage } from "../../studio/theme/registry.tsx";
  * One tattoo's own page (Prompt 5): a gallery photo by its id, with its
  * artist and related work. An id that is not a lowercase UUID, a photo the
  * API doesn't show (a hidden artist's, removed, unknown) and one the page
- * can't show are all the not-found page.
+ * can't show are all the not-found page. The id of one of a tattoo's other
+ * photos (angles) is a 301 to the tattoo's page, its main photo's id.
  */
 export const Route = createFileRoute("/gallery/$photo")({
-	loader: ({ context, params }) => loadArtworkPage(context, params.photo),
+	loader: ({ context, params, location }) =>
+		loadArtworkPage(context, params.photo, location.searchStr),
 	head: ({ loaderData, match }) =>
 		loaderData
 			? themedHeadTags(loaderData.seo, loaderData.theme)
