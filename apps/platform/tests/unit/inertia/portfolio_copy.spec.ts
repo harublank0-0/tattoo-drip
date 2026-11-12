@@ -53,6 +53,13 @@ type PortfolioModule = {
 		maxPhotos: number,
 	): string | null;
 	canGroup(count: number): boolean;
+	removeQuery(
+		intent: { scope: "photo" } | { scope: "tattoo"; photos: number },
+		back?: string,
+	): string;
+	deleteSizes(
+		photos: { id: string; angles: unknown[] }[],
+	): Record<string, number>;
 	statusText(photo: { published: boolean; shown: boolean }): string;
 	statusNote(photo: { published: boolean; shown: boolean }): string | null;
 	stillUnchanged(
@@ -381,5 +388,27 @@ test.group("Portfolio: a tattoo's photos (angles)", () => {
 		assert.isTrue(p.canGroup(2));
 		assert.isTrue(p.canGroup(8));
 		assert.isFalse(p.canGroup(9));
+	});
+});
+
+test.group("Portfolio: what a remove asks for (angles)", () => {
+	test("the DELETE's query names the scope and, for a tattoo, the photos shown", ({
+		assert,
+	}) => {
+		assert.equal(p.removeQuery({ scope: "photo" }), "?scope=photo");
+		assert.equal(
+			p.removeQuery(
+				{ scope: "tattoo", photos: 3 },
+				"/t/ink/portfolio?q=koi fish",
+			),
+			"?back=%2Ft%2Fink%2Fportfolio%3Fq%3Dkoi%20fish&scope=tattoo&photos=3",
+		);
+		assert.deepEqual(
+			p.deleteSizes([
+				{ id: "a", angles: [] },
+				{ id: "b", angles: [{}, {}] },
+			]),
+			{ a: 1, b: 3 },
+		);
 	});
 });

@@ -211,7 +211,11 @@ export interface paths {
         };
         /**
          * One published tattoo photo
-         * @description The photo, where it is on the studio's page and how to ask for one like it. Anything not shown is a 404.
+         * @description The photo, where it is on the studio's page and how to ask for one
+         *     like it. Anything not shown is a 404. A tattoo is listed once, as its
+         *     main photo; the id of one of its other photos answers with the
+         *     tattoo, whose `id` is then the main photo's: send the visitor there
+         *     with a temporary redirect (which photo leads a tattoo can change).
          */
         get: operations["getDiscoverTattoo"];
         put?: never;
@@ -532,8 +536,9 @@ export interface paths {
          *     artist and other photos (`angles`). The id of one of a tattoo's other
          *     photos answers with the tattoo itself, whose `id` is then its main
          *     photo's: a page addressed by the other photo's id should send the
-         *     visitor to the main photo's (a photo grouped into a tattoo keeps its
-         *     old links working). A hidden or deleted artist's photo, a photo the
+         *     visitor to the main photo's with a temporary redirect (a photo
+         *     grouped into a tattoo keeps its old links working, and which photo
+         *     leads can change again). A hidden or deleted artist's photo, a photo the
          *     studio unpublished, a removed photo, an unknown id and another
          *     studio's photo are all a 404. Cacheable.
          *     Under an old studio slug it answers like under the current one.

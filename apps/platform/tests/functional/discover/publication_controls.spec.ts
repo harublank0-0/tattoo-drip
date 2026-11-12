@@ -695,4 +695,42 @@ test.group("Discover settings: preview", (group) => {
 		}
 		assert.include(preview.bookingUrl, "/book");
 	});
+	test("angles: the counts and the preview show one artwork per tattoo, its lead, as discovery.artworks lists", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant, sita, photos } = await studio("d04-angles");
+		const [lead] = photos;
+		const angle = await inTenant(tenant, () =>
+			addWorkPhoto(tenant, sita, {
+				styles: ["blackwork"],
+				angleOf: { lead, position: 1 },
+			}),
+		);
+
+		const settingsProps = (await settings(client, owner, tenant.slug))
+			.inertiaProps;
+		assert.deepEqual(
+			settingsProps.artists.map(
+				(artist: { id: string; publishedPhotos: number }) => [
+					artist.id,
+					artist.publishedPhotos,
+				],
+			),
+			[[sita.id, 2]],
+		);
+
+		const { preview } = (
+			await client
+				.get(`/t/${tenant.slug}/settings/discover/preview`)
+				.withInertia()
+				.loginAs(owner)
+		).inertiaProps;
+		const shown = preview.tattoos.map((tattoo: { id: string }) => tattoo.id);
+		assert.sameMembers(
+			shown,
+			photos.map((photo) => photo.id),
+		);
+		assert.notInclude(shown, angle.id);
+	});
 });

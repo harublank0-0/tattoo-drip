@@ -25,6 +25,7 @@ import {
 	type PortfolioPhoto,
 	photoTotal,
 	removeLabel,
+	removeQuery,
 	removeQuestion,
 	sizeText,
 	statusNote,
@@ -284,7 +285,7 @@ function Body({
 
 	const remove = () => {
 		router.delete(
-			`${urlFor("tenant.artists.photos.destroy", params)}?back=${encodeURIComponent(back)}`,
+			`${urlFor("tenant.artists.photos.destroy", params)}${removeQuery({ scope: "tattoo", photos }, back)}`,
 			{
 				preserveScroll: true,
 				preserveState: true,

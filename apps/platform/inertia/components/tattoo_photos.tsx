@@ -20,6 +20,7 @@ import {
 	movePhotoLabel,
 	type PortfolioPhoto,
 	photoTotal,
+	removeQuery,
 	TATTOO_PHOTOS_NOTE,
 	tattooPhotoName,
 } from "~/components/portfolio";
@@ -225,7 +226,7 @@ export default function TattooPhotos({
 		if (off) return;
 		refocus.current = { id: null, button: "heading" };
 		router.delete(
-			`${urlFor("tenant.artists.photos.destroy", { tenant: tenantSlug, id: rowId })}?back=${encodeURIComponent(back)}`,
+			`${urlFor("tenant.artists.photos.destroy", { tenant: tenantSlug, id: rowId })}${removeQuery({ scope: "photo" }, back)}`,
 			{
 				...visit,
 				onFinish: () => {

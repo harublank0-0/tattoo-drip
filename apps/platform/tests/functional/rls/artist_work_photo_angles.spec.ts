@@ -1,4 +1,6 @@
+import { randomUUID } from "node:crypto";
 import testUtils from "@adonisjs/core/services/test_utils";
+import db from "@adonisjs/lucid/services/db";
 import type { RawQueryBindings } from "@adonisjs/lucid/types/querybuilder";
 import { test } from "@japa/runner";
 import { dbClient, withDbContext, withTransaction } from "#services/db_context";
@@ -185,6 +187,47 @@ test.group("Database: a tattoo's angles", (group) => {
 		});
 	});
 
+	test("deferring every constraint and clearing the tenant context lets nothing through: the guard is not deferrable and judges each statement", async ({
+		assert,
+	}) => {
+		const { a, sita } = await seed();
+		await withDbContext({ tenantId: a.tenant.id }, async () => {
+			const add = async (lead: string | null, place: number | null) =>
+				(
+					await dbClient().rawQuery(
+						INSERT,
+						withNulls([a.tenant.id, sita.id, "p.jpg", lead, place]),
+					)
+				).rows[0].id as string;
+			const lead = await add(null, null);
+			const angle = await add(lead, 1);
+			const other = await add(null, null);
+
+			await assert.rejects(
+				() =>
+					withTransaction(async (trx) => {
+						await trx.rawQuery("set constraints all deferred");
+						// A chain: other's lead is an angle.
+						await trx.rawQuery(
+							"update artist_work_photos set lead_photo_id = ?, angle_position = 1 where id = ?",
+							[angle, other],
+						);
+						// Were the check deferred to here, RLS would hide every row it reads.
+						await trx.rawQuery(
+							"select set_config('app.tenant_id', '', true), set_config('app.user_id', '', true)",
+						);
+						await trx.rawQuery("set constraints all immediate");
+					}),
+				/is an angle itself/,
+			);
+			const { rows } = await dbClient().rawQuery(
+				"select lead_photo_id from artist_work_photos where id = ?",
+				[other],
+			);
+			assert.deepEqual(rows, [{ lead_photo_id: null }]);
+		});
+	});
+
 	test("the guard function pins its search_path and runs as the invoker", async ({
 		assert,
 	}) => {
@@ -200,13 +243,125 @@ test.group("Database: a tattoo's angles", (group) => {
 			`select tgname, tgdeferrable, tginitdeferred, tgconstraint <> 0 as is_constraint
 			 from pg_trigger where tgrelid = 'public.artist_work_photos'::regclass and not tgisinternal`,
 		);
+		// An ordinary AFTER row trigger: it runs once its statement has
+		// finished and can never be deferred to the commit.
 		assert.deepEqual(triggers.rows, [
 			{
 				tgname: "artist_work_photos_angles_guard",
-				tgdeferrable: true,
+				tgdeferrable: false,
 				tginitdeferred: false,
-				is_constraint: true,
+				is_constraint: false,
 			},
 		]);
+		// No second index: the unique place's index serves (tenant_id, lead_photo_id).
+		const indexes = await dbClient().rawQuery(
+			"select indexname from pg_indexes where tablename = 'artist_work_photos' and indexdef like '%lead_photo_id%' order by 1",
+		);
+		assert.deepEqual(
+			indexes.rows.map((row: { indexname: string }) => row.indexname),
+			["artist_work_photos_angle_place"],
+		);
+	});
+});
+
+/**
+ * The race the guard's FOR SHARE closes: one transaction makes a photo an
+ * angle of a lead while another moves that lead to another artist. Each, on
+ * its own snapshot, would pass the check. With the lock the second waits for
+ * the first (here it gives up after a short lock_timeout, which is the proof
+ * that it waited), and once the first commits it sees its outcome. These run
+ * on real, committed rows (the owner connection, outside the suite's global
+ * transaction; the owner bypasses RLS but not triggers) and remove them after.
+ */
+test.group("Database: a tattoo's angles under concurrency", () => {
+	const owner = () => db.connection("owner");
+
+	async function world() {
+		const slug = `angles-race-${randomUUID().slice(0, 8)}`;
+		const { rows: tenants } = await owner().rawQuery(
+			"insert into tenants (type, name, slug, contact_phone, contact_email, default_deposit_percent, created_at) values ('studio', 'Race', ?, '+9779800000000', ?, 30, now()) returning id",
+			[slug, `${slug}@example.com`],
+		);
+		const tenant = tenants[0].id as string;
+		const artist = async (name: string) =>
+			(
+				await owner().rawQuery(
+					"insert into artists (tenant_id, name, slug, created_at) values (?, ?, ?, now()) returning id",
+					[tenant, name, name],
+				)
+			).rows[0].id as string;
+		const sita = await artist("sita");
+		const bina = await artist("bina");
+		const photo = async () =>
+			(
+				await owner().rawQuery(
+					"insert into artist_work_photos (tenant_id, artist_id, image_key, width, height, created_at) values (?, ?, 'k.jpg', 1, 1, now()) returning id",
+					[tenant, sita],
+				)
+			).rows[0].id as string;
+		return { tenant, sita, bina, lead: await photo(), other: await photo() };
+	}
+
+	async function forget(tenant: string) {
+		await owner().transaction(async (trx) => {
+			await trx.rawQuery("set local session_replication_role = replica");
+			for (const table of ["artist_work_photos", "artists", "tenant_slugs"]) {
+				await trx.rawQuery(`delete from ${table} where tenant_id = ?`, [
+					tenant,
+				]);
+			}
+			await trx.rawQuery("delete from tenants where id = ?", [tenant]);
+		});
+	}
+
+	const MAKE_ANGLE =
+		"update artist_work_photos set lead_photo_id = ?, angle_position = 1 where id = ?";
+	const MOVE = "update artist_work_photos set artist_id = ? where id = ?";
+
+	test("a lead being moved and a photo becoming its angle wait for each other, whichever comes first", async ({
+		assert,
+	}) => {
+		const { tenant, bina, lead, other } = await world();
+		try {
+			// The angle first: the move waits for it.
+			const first = await owner().transaction();
+			const second = await owner().transaction();
+			try {
+				await first.rawQuery(MAKE_ANGLE, [lead, other]);
+				await second.rawQuery("set local lock_timeout = '300ms'");
+				await assert.rejects(
+					() => second.rawQuery(MOVE, [bina, lead]),
+					/lock timeout/,
+				);
+			} finally {
+				await second.rollback();
+				await first.rollback();
+			}
+
+			// The move first: the angle waits for it.
+			const mover = await owner().transaction();
+			const grouper = await owner().transaction();
+			try {
+				await mover.rawQuery(MOVE, [bina, lead]);
+				await grouper.rawQuery("set local lock_timeout = '300ms'");
+				await assert.rejects(
+					() => grouper.rawQuery(MAKE_ANGLE, [lead, other]),
+					/lock timeout/,
+				);
+			} finally {
+				await grouper.rollback();
+				await mover.rollback();
+			}
+
+			// Serialised: once the move has committed, making a photo of the other
+			// artist its angle is refused, not let through on an old snapshot.
+			await owner().rawQuery(MOVE, [bina, lead]);
+			await assert.rejects(
+				() => owner().rawQuery(MAKE_ANGLE, [lead, other]),
+				/of another tenant or artist/,
+			);
+		} finally {
+			await forget(tenant);
+		}
 	});
 });

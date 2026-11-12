@@ -342,6 +342,8 @@ export default class PublicationService {
 					.whereIn("artist_id", ids)
 					.where("hidden", false)
 					.whereNull("discovery_suspended_at")
+					// Angles: one artwork per tattoo, its lead, as discovery.artworks lists.
+					.whereNull("lead_photo_id")
 					.orderBy("created_at", "desc")
 					.orderBy("id", "desc")
 					.limit(PREVIEW_PHOTOS)
@@ -585,7 +587,11 @@ export default class PublicationService {
 	}
 }
 
-/** Published photo counts (not hidden, not taken down) per artist. */
+/**
+ * Published photo counts (not hidden, not taken down) per artist: tattoos,
+ * as Discover lists them (`discovery.artworks` keeps leads only), so a tattoo
+ * of four photos counts once.
+ */
 async function publishedCounts(
 	tenant: TenantRef,
 	artistIds: string[],
@@ -599,6 +605,7 @@ async function publishedCounts(
 		.whereIn("artist_id", artistIds)
 		.where("hidden", false)
 		.whereNull("discovery_suspended_at")
+		.whereNull("lead_photo_id")
 		.groupBy("artist_id");
 	return new Map(
 		rows.map((row: { artist_id: string; total: string | number }) => [

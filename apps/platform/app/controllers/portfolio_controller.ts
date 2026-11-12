@@ -3,13 +3,18 @@ import type { HttpContext } from "@adonisjs/core/http";
 import { errors as lucidErrors } from "@adonisjs/lucid";
 import { errors } from "@vinejs/vine";
 import { tenantContext } from "#middleware/tenant_middleware";
-import { TattooGroupError, WorkPhotoLimitError } from "#modules/artists/errors";
+import {
+	TattooChangedError,
+	TattooGroupError,
+	WorkPhotoLimitError,
+} from "#modules/artists/errors";
 import type Artist from "#modules/artists/models/artist";
 import type ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
 import {
 	type BulkFailure,
 	bulkSummary,
 	groupSummary,
+	oneByTattoo,
 	PORTFOLIO_PAGE_SIZE,
 	parsePortfolioQuery,
 	portfolioBack,
@@ -264,7 +269,8 @@ export default class PortfolioController {
 			...found.map(({ artistId }) => artistId),
 			...(target ? [target.id] : []),
 		]);
-		for (const photo of found) {
+		// One change per tattoo: a lead and its own angle are one tattoo.
+		for (const photo of oneByTattoo(found)) {
 			if (target && photo.artistId === target.id) {
 				failures.push("same");
 				continue;
@@ -280,8 +286,16 @@ export default class PortfolioController {
 				} else if (data.action === "reassign" && target) {
 					await this.photos.reassign(tenant, membership, photo, target.id);
 				} else {
-					// A tattoo goes whole: count every photo that went.
-					done += (await this.photos.remove(tenant, membership, photo)) - 1;
+					// A tattoo goes whole, and only as the page showed it: count
+					// every photo that went.
+					// A tattoo the page didn't size is one it didn't show as it is.
+					const shown = data.sizes?.[photo.id];
+					if (shown === undefined) throw new TattooChangedError();
+					done +=
+						(await this.photos.remove(tenant, membership, photo, {
+							scope: "tattoo",
+							photos: shown,
+						})) - 1;
 				}
 				done += 1;
 			} catch (error) {
@@ -291,6 +305,8 @@ export default class PortfolioController {
 					failures.push("full");
 				} else if (error instanceof ImageDeleteError) {
 					failures.push("files");
+				} else if (error instanceof TattooChangedError) {
+					failures.push("changed");
 				} else {
 					throw error;
 				}

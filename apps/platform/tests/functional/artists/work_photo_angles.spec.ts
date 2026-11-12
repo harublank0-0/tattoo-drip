@@ -27,7 +27,7 @@ import {
 	uploadOf,
 } from "#tests/helpers/images";
 import { failDeletes } from "#tests/helpers/storage_failures";
-import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
+import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 import { storedImages } from "#tests/helpers/uploads";
 
 /**
@@ -79,7 +79,7 @@ async function threePhotos(slug: string) {
 			alt: "Side",
 			styles: ["blackwork"],
 		}),
-		await addWorkPhoto(tenant, sita, { createdAt: at(2), hidden: true }),
+		await addWorkPhoto(tenant, sita, { createdAt: at(2) }),
 		await addWorkPhoto(tenant, sita, {
 			createdAt: at(3),
 			alt: "Front",
@@ -93,7 +93,7 @@ async function threePhotos(slug: string) {
 test.group("Angles: grouping photos as one tattoo", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 
-	test("the newest selected photo leads and the others follow newest first, each taking the lead's published state, styles and healed mark; descriptions stay their own", async ({
+	test("the newest selected photo leads and the others follow newest first, each taking the lead's styles and healed mark; descriptions stay their own", async ({
 		assert,
 	}) => {
 		const { owner, tenant, a, b, c } = await threePhotos("angles-group-a");
@@ -164,6 +164,45 @@ test.group("Angles: grouping photos as one tattoo", (group) => {
 		assert.deepEqual(idsOf(await tattoo(tenant, a.id)), [a.id, angleOfA.id]);
 		assert.isNull((await tattoo(tenant, b.id))[0].leadPhotoId);
 		assert.isNull((await tattoo(tenant, c.id))[0].leadPhotoId);
+	});
+
+	test("published and unpublished photos together are refused: grouping never publishes or hides a photo", async ({
+		assert,
+	}) => {
+		const { owner, tenant, a, b, c } = await threePhotos("angles-group-mixed");
+		const { photos } = makeService();
+		await inTenant(tenant, () =>
+			ArtistWorkPhoto.query().where("id", b.id).update({ hidden: true }),
+		);
+		const fresh = await inTenant(tenant, () =>
+			ArtistWorkPhoto.query().whereIn("id", [a.id, b.id, c.id]),
+		);
+
+		await assert.rejects(
+			() => inTenant(tenant, () => photos.group(tenant, ownerOf(owner), fresh)),
+			TattooGroupError,
+		);
+		try {
+			await inTenant(tenant, () => photos.group(tenant, ownerOf(owner), fresh));
+		} catch (error) {
+			assert.equal((error as TattooGroupError).reason, "mixed");
+		}
+		const rows = await inTenant(tenant, () =>
+			ArtistWorkPhoto.query().whereIn("id", [a.id, b.id, c.id]),
+		);
+		assert.deepEqual(
+			rows.map((row) => row.leadPhotoId),
+			[null, null, null],
+		);
+		assert.isTrue(rows.find((row) => row.id === b.id)?.hidden);
+		assert.match(
+			groupSummary("mixed").message,
+			/Some of these photos are unpublished\. Publish or unpublish them all first, then group them\./,
+		);
+		assert.match(
+			groupSummary({ photos: 3 }).message,
+			/takes its styles and healed mark/,
+		);
 	});
 
 	test("a photo removed meanwhile groups nothing (a 404 for the request)", async ({
@@ -463,37 +502,101 @@ test.group("Angles: tattoo-wide changes", (group) => {
 		assert.deepEqual(await storedImages(tenant, PURPOSE), []);
 	});
 
-	test("a tattoo whose files cannot all be deleted stays, every row of it, and the retry finishes the job", async ({
+	test("files that fail part way: the angles whose files went lose their rows at once, the rest stays in order, nothing dead is public, and the retry finishes", async ({
 		assert,
 	}) => {
 		const { owner, tenant } = await studioWithOwner("angles-remove-b");
 		const sita = await addArtist(tenant, owner);
 		const { photos } = makeService();
 		const editor = ownerOf(owner);
-		const [older, newer] = await inTenant(tenant, async () => [
-			await photos.add(tenant, editor, sita, await upload()),
-			await photos.add(tenant, editor, sita, await upload()),
-		]);
-		await inTenant(tenant, () => photos.group(tenant, editor, [older, newer]));
-
-		const failing = failDeletes("public", (key) =>
-			key.startsWith(newer.imageKey.replace(/\..*$/, "")),
+		const added = await inTenant(tenant, async () => {
+			const list: ArtistWorkPhoto[] = [];
+			for (let i = 0; i < 4; i += 1) {
+				list.push(await photos.add(tenant, editor, sita, await upload()));
+			}
+			return list;
+		});
+		const grouped = await inTenant(tenant, () =>
+			photos.group(tenant, editor, added),
 		);
+		const lead = grouped.lead;
+		const [first, second, third] = grouped.angles;
+		// The angle at place 2 cannot be deleted: places 3 then 2 are tried.
+		const base = (key: string) => key.replace(/\..*$/, "");
+		const failing = failDeletes("public", (key) =>
+			key.startsWith(base(second.imageKey)),
+		);
+		// Caught inside the context, as the controller does, so what was
+		// deleted before the error is kept (the request commits).
+		let thrown: unknown = null;
 		try {
-			await assert.rejects(
-				() => inTenant(tenant, () => photos.remove(tenant, editor, newer)),
-				ImageDeleteError,
-			);
+			await inTenant(tenant, async () => {
+				try {
+					await photos.remove(tenant, editor, lead, {
+						scope: "tattoo",
+						photos: 4,
+					});
+				} catch (error) {
+					thrown = error;
+				}
+			});
 		} finally {
 			failing.restore();
 		}
-		assert.lengthOf(await tattoo(tenant, newer.id), 2);
+		assert.instanceOf(thrown, ImageDeleteError);
+		const rows = await tattoo(tenant, lead.id);
+		assert.deepEqual(idsOf(rows), [lead.id, first.id, second.id]);
+		assert.deepEqual(
+			rows.map((row) => row.anglePosition),
+			[null, 1, 2],
+		);
+		assert.notInclude(idsOf(rows), third.id);
+		const shown = await inTenant(tenant, () =>
+			photos.anglesOf(tenant, [lead.id]),
+		);
+		assert.deepEqual(idsOf(shown.get(lead.id) ?? []), [first.id, second.id]);
 
+		// The page reloaded shows three photos now: the retry finishes the job.
 		assert.equal(
-			await inTenant(tenant, () => photos.remove(tenant, editor, newer)),
-			2,
+			await inTenant(tenant, () =>
+				photos.remove(tenant, editor, lead, { scope: "tattoo", photos: 3 }),
+			),
+			3,
 		);
 		assert.deepEqual(await storedImages(tenant, PURPOSE), []);
+	});
+
+	test("a stale page deletes nothing: an angle that became a lead, a lead that became an angle, or another number of photos", async ({
+		assert,
+	}) => {
+		const { owner, tenant, a, b, c } = await threePhotos("angles-remove-stale");
+		const { photos } = makeService();
+		const editor = ownerOf(owner);
+		await inTenant(tenant, () => photos.group(tenant, editor, [a, b, c]));
+
+		const stale = [
+			// The page showed b as an angle; it still is, but as a tattoo it was 2.
+			{ photo: c, intent: { scope: "tattoo", photos: 2 } as const },
+			// The page thought c was one angle to remove.
+			{ photo: c, intent: { scope: "photo" } as const },
+			// The page thought b was a tattoo of its own.
+			{ photo: b, intent: { scope: "tattoo", photos: 1 } as const },
+		];
+		for (const { photo, intent } of stale) {
+			await assert.rejects(
+				() =>
+					inTenant(tenant, () => photos.remove(tenant, editor, photo, intent)),
+				TattooChangedError,
+			);
+		}
+		assert.lengthOf(await tattoo(tenant, c.id), 3);
+		assert.equal(
+			await inTenant(tenant, () =>
+				photos.remove(tenant, editor, b, { scope: "photo" }),
+			),
+			1,
+		);
+		assert.lengthOf(await tattoo(tenant, c.id), 2);
 	});
 
 	test("moving a tattoo moves every photo of it, and needs room for all of them", async ({
@@ -697,7 +800,7 @@ test.group("Angles: the dashboard's routes", (group) => {
 
 		const response = await client
 			.delete(
-				`/t/${mine.tenant.slug}/artists/photos/${mine.lead.id}?back=/t/${mine.tenant.slug}/portfolio`,
+				`/t/${mine.tenant.slug}/artists/photos/${mine.lead.id}?back=/t/${mine.tenant.slug}/portfolio&scope=tattoo&photos=2`,
 			)
 			.withCsrfToken()
 			.loginAs(mine.owner)
@@ -755,6 +858,7 @@ test.group("Angles: the dashboard's routes", (group) => {
 			.json({
 				action: "delete",
 				ids: [mine.lead.id],
+				sizes: { [mine.lead.id]: 2 },
 				back: `/t/${mine.tenant.slug}/portfolio`,
 			})
 			.withCsrfToken()
@@ -764,6 +868,112 @@ test.group("Angles: the dashboard's routes", (group) => {
 		response.assertStatus(302);
 		assert.equal(flashOf(response).success, "2 photos deleted.");
 		assert.lengthOf(await tattoo(mine.tenant, mine.lead.id), 0);
+	});
+
+	test("a stale page's remove deletes nothing and says the tattoo changed, single and bulk", async ({
+		client,
+		assert,
+	}) => {
+		const mine = await studioWithTattoo("angles-http-stale");
+		const single = await client
+			.delete(
+				`/t/${mine.tenant.slug}/artists/photos/${mine.lead.id}?back=/t/${mine.tenant.slug}/portfolio&scope=tattoo&photos=1`,
+			)
+			.withCsrfToken()
+			.loginAs(mine.owner)
+			.redirects(0);
+		single.assertStatus(302);
+		assert.equal(
+			flashOf(single).error,
+			"This tattoo changed since you opened it. Check it and try again.",
+		);
+		const angle = await client
+			.delete(
+				`/t/${mine.tenant.slug}/artists/photos/${mine.lead.id}?scope=photo`,
+			)
+			.withCsrfToken()
+			.loginAs(mine.owner)
+			.redirects(0);
+		assert.equal(
+			flashOf(angle).error,
+			"This tattoo changed since you opened it. Check it and try again.",
+		);
+		const bulk = await client
+			.post(`/t/${mine.tenant.slug}/portfolio/bulk`)
+			.json({
+				action: "delete",
+				ids: [mine.lead.id],
+				sizes: { [mine.lead.id]: 3 },
+				back: `/t/${mine.tenant.slug}/portfolio`,
+			})
+			.withCsrfToken()
+			.loginAs(mine.owner)
+			.redirects(0);
+		assert.match(flashOf(bulk).error ?? "", /changed since you opened them/);
+		assert.lengthOf(await tattoo(mine.tenant, mine.lead.id), 2);
+	});
+
+	test("a bulk change given a lead and its own angle makes one change, not a failure", async ({
+		client,
+		assert,
+	}) => {
+		const mine = await studioWithTattoo("angles-http-dedupe");
+		const response = await client
+			.post(`/t/${mine.tenant.slug}/portfolio/bulk`)
+			.json({
+				action: "unpublish",
+				ids: [mine.angle.id, mine.lead.id],
+				back: `/t/${mine.tenant.slug}/portfolio`,
+			})
+			.withCsrfToken()
+			.loginAs(mine.owner)
+			.redirects(0);
+		assert.equal(flashOf(response).success, "1 photo unpublished.");
+		assert.deepEqual(
+			(await tattoo(mine.tenant, mine.lead.id)).map((row) => row.hidden),
+			[true, true],
+		);
+	});
+
+	test("an artist member can't order, ungroup or group another artist's tattoo: a 404, or nothing grouped", async ({
+		client,
+		assert,
+	}) => {
+		const mine = await studioWithTattoo("angles-http-artist");
+		const member = await artistIn(mine.tenant, "angles-artist@example.com");
+		await addArtist(mine.tenant, member, {
+			name: "Own",
+			slug: "own",
+			linkToMe: true,
+		});
+		const loose = await inTenant(mine.tenant, () =>
+			addWorkPhoto(mine.tenant, mine.sita, { createdAt: at(9) }),
+		);
+		const send = (method: "put" | "post", path: string, body: object) =>
+			client[method](`/t/${mine.tenant.slug}${path}`)
+				.json({ ...body, back: `/t/${mine.tenant.slug}/portfolio` })
+				.withCsrfToken()
+				.loginAs(member)
+				.redirects(0);
+
+		(
+			await send("put", `/artists/photos/${mine.lead.id}/order`, {
+				ids: [mine.angle.id, mine.lead.id],
+			})
+		).assertStatus(404);
+		(
+			await send("post", `/artists/photos/${mine.angle.id}/ungroup`, {})
+		).assertStatus(404);
+		const grouped = await send("post", "/portfolio/bulk", {
+			action: "group",
+			ids: [loose.id, mine.lead.id],
+		});
+		assert.equal(flashOf(grouped).error, groupSummary("gone").message);
+		assert.deepEqual(idsOf(await tattoo(mine.tenant, mine.lead.id)), [
+			mine.lead.id,
+			mine.angle.id,
+		]);
+		assert.lengthOf(await tattoo(mine.tenant, loose.id), 1);
 	});
 
 	test("the portfolio's tiles are tattoos: each lead with its angles in order, and the counts of photos and tattoos", async ({

@@ -538,3 +538,30 @@ export function stillUnchanged(
 		return photo.artistId !== artistId;
 	});
 }
+
+/**
+ * What a remove asks for (angles), in the DELETE's query beside `back`:
+ * `photo`, one of a tattoo's other photos, or `tattoo` with the number of
+ * photos the page shows. The server checks it under the lock and deletes
+ * nothing when the tattoo changed since (`removeWorkPhotoValidator`).
+ */
+export type RemoveIntent =
+	| { scope: "photo" }
+	| { scope: "tattoo"; photos: number };
+
+/** The DELETE's query for `intent`, with `back` first when there is one. */
+export function removeQuery(intent: RemoveIntent, back?: string): string {
+	const parts = back ? [`back=${encodeURIComponent(back)}`] : [];
+	parts.push(`scope=${intent.scope}`);
+	if (intent.scope === "tattoo") parts.push(`photos=${intent.photos}`);
+	return `?${parts.join("&")}`;
+}
+
+/** A bulk delete's `sizes`: how many photos each selected tattoo shows, by its id. */
+export function deleteSizes(
+	photos: readonly Pick<PortfolioPhoto, "id" | "angles">[],
+): Record<string, number> {
+	return Object.fromEntries(
+		photos.map((photo) => [photo.id, photoTotal(photo)]),
+	);
+}

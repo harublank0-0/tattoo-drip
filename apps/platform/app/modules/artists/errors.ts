@@ -46,10 +46,14 @@ export class TattooPhotoLimitError extends Error {
  * Why several photos cannot be grouped as one tattoo: too few or too many
  * (`count`), of more than one artist (`artists`), one is already another
  * tattoo's angle (`angle`), or one already leads a tattoo of its own
- * (`has_angles`: nothing is merged silently). The dashboard words each.
+ * (`has_angles`: nothing is merged silently), or published and unpublished
+ * photos together (`mixed`: grouping never publishes or hides a photo). The
+ * dashboard words each.
  */
 export class TattooGroupError extends Error {
-	constructor(readonly reason: "count" | "artists" | "angle" | "has_angles") {
+	constructor(
+		readonly reason: "count" | "artists" | "angle" | "has_angles" | "mixed",
+	) {
 		super(`These photos can't be grouped as one tattoo (${reason})`);
 		this.name = "TattooGroupError";
 	}

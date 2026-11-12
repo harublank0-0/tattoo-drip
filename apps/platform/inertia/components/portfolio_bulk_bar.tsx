@@ -7,6 +7,7 @@ import {
 	type BulkAction,
 	canGroup,
 	deleteQuestion,
+	deleteSizes,
 	GROUP_HINT,
 	type PortfolioArtist,
 	type PortfolioPhoto,
@@ -118,7 +119,16 @@ export default function PortfolioBulkBar({
 		setError(null);
 		router.post(
 			urlFor("tenant.portfolio.bulk", { tenant: tenantSlug }),
-			{ action, ids, back, ...(artistId ? { artistId } : {}) },
+			{
+				action,
+				ids,
+				back,
+				...(artistId ? { artistId } : {}),
+				// What the page shows of each tattoo, so a changed one isn't deleted.
+				...(action === "delete"
+					? { sizes: deleteSizes(chosen.filter(({ id }) => ids.includes(id))) }
+					: {}),
+			},
 			{
 				preserveScroll: true,
 				preserveState: true,

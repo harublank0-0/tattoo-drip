@@ -655,6 +655,8 @@ export const isolationCases: IsolationCase[] = [
 		pattern: "/t/:tenant/artists/photos/:id",
 		resource: "workPhoto",
 		actor: "owner",
+		// What the page asked to remove (angles): a tattoo of one photo.
+		body: () => ({ scope: "tattoo", photos: "1" }),
 		ownStatus: 302,
 		snapshot: workPhotoRows,
 	},

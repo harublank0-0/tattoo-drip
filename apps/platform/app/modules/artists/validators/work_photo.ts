@@ -99,6 +99,12 @@ export const bulkWorkPhotosValidator = vine.create({
 		.maxLength(PORTFOLIO_PAGE_SIZE)
 		.distinct(),
 	artistId: vine.string().uuid().optional(),
+	// Angles: for a delete, how many photos each selected tattoo had on the
+	// page (by its id), so a tattoo that changed since is not deleted.
+	sizes: vine
+		.record(vine.number().withoutDecimals().range([1, MAX_TATTOO_PHOTOS]))
+		.optional()
+		.requiredWhen("action", "=", "delete"),
 });
 
 bulkWorkPhotosValidator.messagesProvider = new SimpleMessagesProvider({
@@ -107,6 +113,7 @@ bulkWorkPhotosValidator.messagesProvider = new SimpleMessagesProvider({
 	"ids.array.maxLength": `Select up to ${PORTFOLIO_PAGE_SIZE} photos at a time.`,
 	"ids.*.uuid": "Select photos from the portfolio.",
 	"artistId.uuid": "Choose an artist of this studio.",
+	"sizes.required": "Reload the page and try again.",
 });
 
 /**
@@ -126,4 +133,21 @@ orderWorkPhotosValidator.messagesProvider = new SimpleMessagesProvider({
 	"ids.array.minLength": "Send the tattoo's photos in their new order.",
 	"ids.array.maxLength": `A tattoo has at most ${MAX_TATTOO_PHOTOS} photos.`,
 	"ids.*.uuid": "Send the tattoo's photos in their new order.",
+});
+
+/**
+ * What the page asked to remove (angles): `photo`, one of a tattoo's other
+ * photos, or `tattoo`, a whole tattoo with the number of photos it showed.
+ * Sent in the query of the DELETE, beside `back`. WorkPhotoService.remove
+ * checks it under the lock, so a stale page never deletes more than it
+ * showed.
+ */
+export const removeWorkPhotoValidator = vine.create({
+	scope: vine.enum(["photo", "tattoo"] as const),
+	photos: vine
+		.number()
+		.withoutDecimals()
+		.range([1, MAX_TATTOO_PHOTOS])
+		.optional()
+		.requiredWhen("scope", "=", "tattoo"),
 });

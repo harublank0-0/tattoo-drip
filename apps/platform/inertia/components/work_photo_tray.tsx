@@ -26,6 +26,7 @@ import {
 	tileNote,
 	type WorkPhotoProps,
 } from "~/components/photos";
+import { removeQuery } from "~/components/portfolio";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
 import {
@@ -213,13 +214,16 @@ function PhotoDetails({
 
 	const remove = () => {
 		if (!window.confirm(removePhotoQuestion(photo.photoCount))) return;
-		router.delete(urlFor("tenant.artists.photos.destroy", params), {
-			preserveScroll: true,
-			onStart: sheet.onStart,
-			onSuccess: sheet.onSuccess,
-			onError: sheet.onError,
-			onFinish: sheet.onFinish,
-		});
+		router.delete(
+			`${urlFor("tenant.artists.photos.destroy", params)}${removeQuery({ scope: "tattoo", photos: photo.photoCount })}`,
+			{
+				preserveScroll: true,
+				onStart: sheet.onStart,
+				onSuccess: sheet.onSuccess,
+				onError: sheet.onError,
+				onFinish: sheet.onFinish,
+			},
+		);
 	};
 
 	return (

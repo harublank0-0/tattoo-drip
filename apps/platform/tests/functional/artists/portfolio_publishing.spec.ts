@@ -217,6 +217,7 @@ test.group("Portfolio publishing (Studio OS)", (group) => {
 		const deleted = await bulk(client, a.tenant, a.owner, {
 			action: "delete",
 			ids: [b.mandala.id],
+			sizes: { [b.mandala.id]: 1 },
 		});
 		assert.equal(
 			flashOf(deleted).error,
@@ -303,6 +304,7 @@ test.group("Portfolio publishing (Studio OS)", (group) => {
 		const deleted = await bulk(client, s.tenant, s.owner, {
 			action: "delete",
 			ids: [s.koi.id, s.rose.id],
+			sizes: { [s.koi.id]: 1, [s.rose.id]: 1 },
 		});
 		assert.equal(flashOf(deleted).success, "2 photos deleted.");
 		assert.isNull(await row(s.tenant, s.koi.id));
@@ -313,6 +315,7 @@ test.group("Portfolio publishing (Studio OS)", (group) => {
 			const failed = await bulk(client, s.tenant, s.owner, {
 				action: "delete",
 				ids: [s.mandala.id],
+				sizes: { [s.mandala.id]: 1 },
 			});
 			assert.equal(
 				flashOf(failed).error,

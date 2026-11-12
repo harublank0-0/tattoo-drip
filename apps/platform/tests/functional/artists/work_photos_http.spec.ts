@@ -693,7 +693,9 @@ test.group("Work photo details and removal (TAT-116, TAT-126)", (group) => {
 		assert.lengthOf(await storedImages(tenant, PURPOSE), 8);
 
 		const response = await client
-			.delete(`/t/${tenant.slug}/artists/photos/${first.id}`)
+			.delete(
+				`/t/${tenant.slug}/artists/photos/${first.id}?scope=tattoo&photos=1`,
+			)
 			.withCsrfToken()
 			.loginAs(owner)
 			.redirects(0);
@@ -743,7 +745,9 @@ test.group("Work photo details and removal (TAT-116, TAT-126)", (group) => {
 				healed: "1",
 			}),
 			await client
-				.delete(`/t/${tenant.slug}/artists/photos/${theirs2.id}`)
+				.delete(
+					`/t/${tenant.slug}/artists/photos/${theirs2.id}?scope=tattoo&photos=1`,
+				)
 				.withCsrfToken()
 				.loginAs(member)
 				.redirects(0),
@@ -764,7 +768,9 @@ test.group("Work photo details and removal (TAT-116, TAT-126)", (group) => {
 			],
 		);
 		const removed = await client
-			.delete(`/t/${tenant.slug}/artists/photos/${older.id}`)
+			.delete(
+				`/t/${tenant.slug}/artists/photos/${older.id}?scope=tattoo&photos=1`,
+			)
 			.withCsrfToken()
 			.loginAs(member)
 			.redirects(0);
@@ -811,7 +817,9 @@ test.group("Work photo details and removal (TAT-116, TAT-126)", (group) => {
 				healed: "1",
 			}),
 			await client
-				.delete(`/t/${a.tenant.slug}/artists/photos/${photoB.id}`)
+				.delete(
+					`/t/${a.tenant.slug}/artists/photos/${photoB.id}?scope=tattoo&photos=1`,
+				)
 				.withCsrfToken()
 				.loginAs(a.owner)
 				.redirects(0),
@@ -839,7 +847,9 @@ test.group(
 			const photo = await realPhoto(tenant, owner, sita.id);
 			const remove = () =>
 				client
-					.delete(`/t/${tenant.slug}/artists/photos/${photo.id}`)
+					.delete(
+						`/t/${tenant.slug}/artists/photos/${photo.id}?scope=tattoo&photos=1`,
+					)
 					.withCsrfToken()
 					.loginAs(owner)
 					.redirects(0);

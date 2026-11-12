@@ -23,28 +23,38 @@ import { BaseSchema } from "@adonisjs/lucid/schema";
  * - `artist_work_photos_angle_place`: one photo per place of a tattoo,
  *   deferrable (initially immediate), the database README's pattern for a
  *   list reordered in place: a swap, a compaction after a removal or a new
- *   lead taking over its tattoo is one UPDATE, checked at its end.
- * - `artist_work_photos_angles`: the index the key and the angle reads use.
+ *   lead taking over its tattoo is one UPDATE, checked at its end. Its index
+ *   also serves the key and the angle reads (`(tenant_id, lead_photo_id)` is
+ *   its prefix), so there is no second index.
  * - `artist_work_photos_angles_guard`: what a check cannot say, because it
  *   reads other rows. An angle's lead is itself a lead (no chains), a photo
  *   that has angles cannot become an angle, and a lead and its angles are of
  *   the same tenant and the same artist, so a tattoo is never split across
  *   artists (a move takes the whole tattoo, in one UPDATE).
  *
- * The guard is a constraint trigger, AFTER the row and deferrable
- * (initially immediate), so it runs at the end of each statement, when every
- * row the statement changed is in place: one UPDATE that hands a tattoo to a
- * new lead, or moves a tattoo to another artist, is judged on its outcome,
- * never on the half-done state a BEFORE trigger would see half way through
- * the statement (whose rows it visits in no set order). It fails closed
- * like the repo's other guard triggers: it fires on every INSERT and UPDATE
- * whatever the columns, and a lead it cannot read counts as wrong, so a row
- * that row-level security hides (another tenant's) is refused, never let
- * through. Its function pins `search_path = pg_catalog, pg_temp` and
- * schema-qualifies the table, so a session cannot shadow what it reads;
- * keep both in any replacement. It runs with the invoker's rights (the app
- * role, under the tenant's RLS), which is all it needs: every row it reads
- * is of the row's own tenant.
+ * The guard is an ordinary AFTER ... FOR EACH ROW trigger, not deferrable:
+ * PostgreSQL runs the AFTER row triggers of a statement once the statement
+ * has finished, so every row it changed is in place and one UPDATE that hands
+ * a tattoo to a new lead, or moves a tattoo to another artist, is judged on
+ * its outcome, never on the half-done state a BEFORE trigger would see (it
+ * visits a statement's rows in no set order). Not deferrable on purpose: a
+ * check deferred to the commit would run in whatever context the session has
+ * left by then, and with the tenant context cleared row-level security would
+ * hide every row it reads.
+ *
+ * It fails closed: it fires on every INSERT and UPDATE whatever the columns,
+ * and a row or a lead it cannot read is an error, never a pass (in practice
+ * the lead's key already refuses another tenant's lead: the trigger is the
+ * second wall, not the first). In the angle branch it takes FOR SHARE on the
+ * lead, so a concurrent change of the lead (moving it to another artist,
+ * making it an angle) waits for this transaction, or this one for it, and the
+ * second sees the first's outcome: two transactions cannot each pass the
+ * check against a lead the other is changing. Its function pins
+ * `search_path = pg_catalog, pg_temp` and schema-qualifies the table, so a
+ * session cannot shadow what it reads; keep both in any replacement. It runs
+ * with the invoker's rights (the app role, under the tenant's RLS; FOR SHARE
+ * needs the UPDATE privilege the app role has), which is all it needs: every
+ * row it reads is of the row's own tenant.
  *
  * Which photo is public is the lead's business (WorkPhotoService): the
  * public reads list leads only and the lead's `hidden`, `styles` and
@@ -76,9 +86,6 @@ export default class extends BaseSchema {
 		this.schema.raw(
 			"alter table artist_work_photos add constraint artist_work_photos_angle_place unique (tenant_id, lead_photo_id, angle_position) deferrable initially immediate",
 		);
-		this.schema.raw(
-			"create index artist_work_photos_angles on artist_work_photos (tenant_id, lead_photo_id)",
-		);
 
 		this.schema.raw(`
 create function public.artist_work_photos_angles_guard() returns trigger language plpgsql set search_path = pg_catalog, pg_temp as $$
@@ -90,23 +97,23 @@ declare
 	lead_artist uuid;
 	lead_lead uuid;
 begin
-	-- The row as it stands now, at the end of the statement (or later, when a
-	-- transaction defers the trigger: a later statement may have changed it
-	-- since, and its own event checks that version too). A row that is gone
-	-- holds nothing that could be wrong.
+	-- The row as the statement left it (the trigger runs once the statement
+	-- has finished). Not found means this session cannot read it: an error.
 	select p.tenant_id, p.artist_id, p.lead_photo_id
 		into row_tenant, row_artist, row_lead
 		from public.artist_work_photos p
 		where p.id = new.id;
 	if not found then
-		return null;
+		raise exception 'artist_work_photos_angles_guard: % cannot be read', new.id;
 	end if;
 	if row_lead is not null then
+		-- FOR SHARE: a concurrent change of the lead waits for this
+		-- transaction, or this one for it, and then sees its outcome.
 		select l.tenant_id, l.artist_id, l.lead_photo_id
 			into lead_tenant, lead_artist, lead_lead
 			from public.artist_work_photos l
-			where l.id = row_lead;
-		-- Fails closed: a lead this session cannot read is a wrong lead.
+			where l.id = row_lead
+			for share;
 		if not found then
 			raise exception 'artist_work_photos_angles_guard: the lead of % cannot be read', new.id;
 		end if;
@@ -133,7 +140,7 @@ begin
 end
 $$`);
 		this.schema.raw(
-			"create constraint trigger artist_work_photos_angles_guard after insert or update on artist_work_photos deferrable initially immediate for each row execute function public.artist_work_photos_angles_guard()",
+			"create trigger artist_work_photos_angles_guard after insert or update on artist_work_photos for each row execute function public.artist_work_photos_angles_guard()",
 		);
 	}
 
@@ -142,7 +149,6 @@ $$`);
 			"drop trigger artist_work_photos_angles_guard on artist_work_photos",
 		);
 		this.schema.raw("drop function public.artist_work_photos_angles_guard()");
-		this.schema.raw("drop index artist_work_photos_angles");
 		for (const constraint of [
 			"artist_work_photos_angle_place",
 			"artist_work_photos_angle_position",

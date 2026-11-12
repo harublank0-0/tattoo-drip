@@ -9,7 +9,7 @@ How Discover reads public data across studios without loosening tenant isolation
 
 ## 1. The boundary
 
-The app role (`DB_USER`) sees one tenant at a time: every tenant table has row-level security keyed by `app.tenant_id`. Discover needs the public rows of every listed studio, with no tenant context. It gets them only through three views:
+The app role (`DB_USER`) sees one tenant at a time: every tenant table has row-level security keyed by `app.tenant_id`. Discover needs the public rows of every listed studio, with no tenant context. It gets them only through views: the three of D02 below, and `discovery.artwork_angles` since angles (`1791900000002`), which maps one of a tattoo's other photos to the tattoo (ids only; §3):
 
 ```text
 app role ──SELECT──► discovery.studios / artists / artworks   (views, owned by tattoo_drip_discovery,
@@ -26,7 +26,7 @@ app role ──SELECT──► discovery.studios / artists / artworks   (views, 
 | **Policies** | `discovery_only` (RESTRICTIVE, the full rule) and `discovery_select` (PERMISSIVE, the row's own flags) on the three tables, `TO tattoo_drip_discovery` only; `discovery_none` (RESTRICTIVE, `false`) on `tenant_memberships` | Unlisted, taken-down, deleted, hidden, opted-out or unpublished rows, whatever tenant or user context a session sets |
 | **View WHERE** | Each view repeats the rules and selects explicit columns | Defence in depth; the views' columns are the public contract |
 
-The app role gets `USAGE` on schema `discovery` and `SELECT` on the three views. It gets nothing new on any table.
+The app role gets `USAGE` on schema `discovery` and `SELECT` on the views. It gets nothing new on any table.
 - `PUBLIC` has no access to the schema or the views.
 - `places` is readable by the app role; its write privileges are revoked, by the migration and again by `setup_roles.sql`, whose broad table grant would otherwise give them back on a re-run (tested).
 
@@ -81,7 +81,8 @@ These decide ranking or whether a profile is "complete", not safety. They are tu
 |---|---|
 | `discovery.studios` | `id`, `slug`, `type`, `name`, `intro`, `timezone`, `place_id`, `cover_image_key/_width/_height`, `logo_image_key/_width/_height`, `logo_tile`, `logo_icon_key`, `instagram_url`, `facebook_url`, `tiktok_url`, `website_url`, `listed_at` |
 | `discovery.artists` | `id`, `studio_id`, `slug`, `name`, `bio`, `photo_key/_width/_height`, `styles`, `accepting_inquiries`, `accepting_flash`, `instagram_url`, `facebook_url`, `tiktok_url`, `created_at` |
-| `discovery.artworks` | `id`, `studio_id`, `artist_id`, `image_key`, `width`, `height`, `alt`, `styles`, `healed`, `created_at` |
+| `discovery.artworks` | `id`, `studio_id`, `artist_id`, `image_key`, `width`, `height`, `alt`, `styles`, `healed`, `created_at` (a tattoo's lead only, since angles) |
+| `discovery.artwork_angles` | `id` (one of a tattoo's other photos), `artwork_id` (the tattoo's lead, a `discovery.artworks` id): published, not taken down, of a shown artist at a listed business. Only the artwork lookup reads it, so an old link to a photo that has since become another photo's angle lands on the tattoo (the Discover app redirects there, temporarily) |
 
 - **Image keys:** stored keys of *public* images (R2's public bucket). D03 turns them into URLs and variants with `ImageService`, as the storefront API does.
 - **Deliberately absent** (unlike the storefront API, which shows some of them on the studio's own page):
@@ -149,6 +150,7 @@ The style filter is the one slow shape. D03 should measure its real query and ma
    - `setup_roles.sql` itself needs a superuser too, because its `ALTER ROLE`s set attributes only a superuser may change.
    - Dev, CI and the single-server deploy all migrate as the Postgres superuser.
    - On a managed Postgres without one, the migration cannot be applied as written. Options: grant the owner membership for the one migration and revoke it afterwards (then re-run `setup_roles.sql`), or create the views with `SET ROLE` in that window.
+   - **Angles need the same window twice.** `1791900000001_discovery_artworks_leads_only` replaces `discovery.artworks` with `create or replace view`, which only the view's owner (`tattoo_drip_discovery`) or a superuser may run, and `1791900000002_create_discovery_artwork_angles` gives its new view to the role (`ALTER VIEW … OWNER TO`, as D02 does). On a managed Postgres without a superuser: grant the migration owner membership in `tattoo_drip_discovery` (or `SET ROLE` to it) for these two migrations, run them, revoke the membership and re-run `setup_roles.sql`, which strips every membership of the role again. Check afterwards that `discovery.spec.ts` passes (owner, options, grants and the four views' columns).
 3. **Rollback** (`migration:rollback --connection=owner`):
    - It drops the views, schema, policies, grants and indexes, then the new columns and `places`.
    - Studios' listing state, takedowns and places are lost. Everything else is untouched; checksums of existing tenants, artists and photos were identical before and after a rollback and re-migration.
@@ -171,4 +173,5 @@ They use a real PostgreSQL. One test plants a volatile, near-free function (it r
 - **Completeness is not enforced in the database:** an opted-in studio with no photos is listed. D03/D04 decide what to show.
 - **One person in two studios** has two artist rows. There is no global identity (blueprint §D.2).
 - **Takedowns are per studio and per photo, not per artist.** A studio can hide an artist itself.
+- **A photo takedown follows the photo, not the tattoo (angles).** `discovery_suspended_at` is set on one row. Discover shows a tattoo as its lead, so a taken-down lead takes the tattoo off Discover, and a taken-down angle is never shown (Discover shows no angles, and `discovery.artwork_angles` leaves it out). If the studio then makes another photo of that tattoo its main one, Discover shows that other photo as the tattoo: the suspended image itself never shows, but the tattoo can come back through a sibling. An operator who wants the whole tattoo off Discover takes down each of its photos.
 - **The role name is fixed** (`tattoo_drip_discovery`). One cluster serving several app databases shares it, which is harmless: it holds privileges per database.

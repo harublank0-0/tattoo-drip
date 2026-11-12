@@ -22,6 +22,7 @@ import ArtistService, {
 import type { StyleSlug } from "#modules/artists/styles";
 import { visibleArtistSql } from "#modules/artists/visibility";
 import type { WorkCursor } from "#modules/artists/work_cursor";
+import { ImageDeleteError } from "#modules/media/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
 import type Tenant from "#modules/tenancy/models/tenant";
@@ -64,6 +65,15 @@ export type PortfolioPage = {
 };
 
 const NO_DETAILS: WorkPhotoDetails = { alt: null, styles: [], healed: false };
+
+/**
+ * What a page asked to remove (angles): one angle (`photo`), or a whole
+ * tattoo of the number of photos it showed (`tattoo`). WorkPhotoService.remove
+ * checks it against the row under the lock.
+ */
+export type RemoveIntent =
+	| { scope: "photo" }
+	| { scope: "tattoo"; photos: number };
 
 /** A tattoo as the public reads and the portfolio show it: its lead and its angles, in order. */
 export type Tattoo = { lead: ArtistWorkPhoto; angles: ArtistWorkPhoto[] };
@@ -575,11 +585,13 @@ export default class WorkPhotoService {
 	 * Groups 2 to 8 photos of one artist as one tattoo (the portfolio's bulk
 	 * "Group as one tattoo"): the newest of them (`created_at desc, id desc`,
 	 * the gallery's order) becomes the lead and the others its angles, newest
-	 * first, each taking the lead's `hidden`, `styles` and `healed`. Nothing
-	 * is merged silently: a photo that is already an angle (`angle`) or that
-	 * leads a tattoo of its own (`has_angles`) refuses the whole group, as do
-	 * photos of more than one artist (`artists`) and too few or too many
-	 * (`count`), all TattooGroupError. Under the artist's lock, each photo read
+	 * first, each taking the lead's `styles` and `healed` (the dashboard says
+	 * so). Nothing is merged silently: a photo that is already an angle
+	 * (`angle`) or that leads a tattoo of its own (`has_angles`) refuses the
+	 * whole group, as do photos of more than one artist (`artists`), too few or
+	 * too many (`count`), and published and unpublished photos together
+	 * (`mixed`: grouping must never publish an unpublished photo, nor hide a
+	 * published one), all TattooGroupError. Under the artist's lock, each photo read
 	 * again (one removed or moved meanwhile is E_ROW_NOT_FOUND), and one
 	 * UPDATE for the angles, which the database judges at its end. The artist's
 	 * count does not change, so there is no room to check.
@@ -612,6 +624,10 @@ export default class WorkPhotoService {
 			}
 			if (live.some((photo) => photo.leadPhotoId !== null)) {
 				throw new TattooGroupError("angle");
+			}
+			// Grouping never publishes or unpublishes anything: all one or the other.
+			if (new Set(live.map((photo) => photo.hidden)).size > 1) {
+				throw new TattooGroupError("mixed");
 			}
 			const [{ total }] = (
 				await trx.rawQuery(
@@ -745,29 +761,73 @@ export default class WorkPhotoService {
 	 * angles to the lead allows only all at once). Removing an angle removes
 	 * that photo alone, and the angles after it close the gap. Returns how
 	 * many photos went.
+	 *
+	 * `intent` is what the page asked for, checked under the lock against the
+	 * row as it is now, so a stale page never deletes more than it showed:
+	 * `photo` removes one angle (a photo that is no longer an angle is
+	 * TattooChangedError), `tattoo` a whole tattoo of exactly `photos` photos
+	 * (an angle by now, or another number of photos, is TattooChangedError).
+	 * Nothing is deleted then. Without an intent (code that is not a page) the
+	 * photo is removed as it is.
+	 *
+	 * Files that fail part way through a tattoo: the angles' files go first,
+	 * the last angle first, and each angle whose files are all gone loses its
+	 * row too, in the same transaction, before the error is thrown; the rest
+	 * of the tattoo stays, with its places closed up, so the public reads
+	 * never list an angle whose files are gone, and a retry finishes the job.
 	 */
 	async remove(
 		tenant: TenantRef,
 		editor: ProfileEditor,
 		photo: ArtistWorkPhoto,
+		intent: RemoveIntent | null = null,
 	): Promise<number> {
 		assertPhotoOf(tenant, photo);
-		return withTransaction(async (trx) => {
+		let failed: unknown = null;
+		const removed = await withTransaction(async (trx) => {
 			await this.artists.lockEditable(trx, tenant, editor, photo.artistId);
 			const live = await this.lockedPhoto(trx, tenant, photo);
 			const lead = live.leadPhotoId;
 			const place = live.anglePosition;
-			if (lead !== null && place !== null) {
+			const isAngle = lead !== null && place !== null;
+			if (intent?.scope === "photo" && !isAngle) {
+				throw new TattooChangedError();
+			}
+			if (intent?.scope === "tattoo" && isAngle) {
+				throw new TattooChangedError();
+			}
+			if (isAngle) {
 				await this.images.deleteOrThrow(PURPOSE, live.imageKey);
 				await live.delete();
 				await this.closeGap(trx, tenant, lead, place);
 				return 1;
 			}
 			const rows = await this.tattooRows(tenant, live.id, trx);
-			// The angles' files first, the lead's last: a failure part way leaves
-			// the tattoo listed under its lead, and the retry finishes the job.
-			for (const row of [...rows].reverse()) {
-				await this.images.deleteOrThrow(PURPOSE, row.imageKey);
+			if (intent?.scope === "tattoo" && intent.photos !== rows.length) {
+				throw new TattooChangedError();
+			}
+			const [, ...angles] = rows;
+			// The angles first, the last one first: each one whose files are
+			// gone loses its row at once, the rest of the tattoo stays whole.
+			const gone: string[] = [];
+			try {
+				for (const angle of [...angles].reverse()) {
+					await this.images.deleteOrThrow(PURPOSE, angle.imageKey);
+					gone.push(angle.id);
+				}
+				await this.images.deleteOrThrow(PURPOSE, live.imageKey);
+			} catch (error) {
+				if (!(error instanceof ImageDeleteError)) throw error;
+				if (gone.length > 0) {
+					await ArtistWorkPhoto.query({ client: trx })
+						.where("tenant_id", tenant.id)
+						.whereIn("id", gone)
+						.delete();
+					await this.renumber(trx, tenant, live.id);
+				}
+				// Thrown once these deletes are kept (after the savepoint).
+				failed = error;
+				return gone.length;
 			}
 			await ArtistWorkPhoto.query({ client: trx })
 				.where("tenant_id", tenant.id)
@@ -778,6 +838,8 @@ export default class WorkPhotoService {
 				.delete();
 			return rows.length;
 		});
+		if (failed) throw failed;
+		return removed;
 	}
 
 	/**
@@ -951,6 +1013,23 @@ export default class WorkPhotoService {
 			`update artist_work_photos set hidden = ?, styles = ?::varchar[], healed = ?, updated_at = now()
 			where tenant_id = ? and lead_photo_id = ?`,
 			[lead.hidden, [...lead.styles], lead.healed, tenant.id, lead.id],
+		);
+	}
+
+	/** A lead's angles numbered 1, 2, ... again in their order, after some left the tattoo. */
+	private async renumber(
+		trx: QueryClientContract,
+		tenant: TenantRef,
+		leadId: string,
+	): Promise<void> {
+		await trx.rawQuery(
+			`update artist_work_photos a set angle_position = ranked.place, updated_at = now()
+			from (
+				select id, row_number() over (order by angle_position) as place
+				from artist_work_photos where tenant_id = ? and lead_photo_id = ?
+			) ranked
+			where a.id = ranked.id and a.angle_position <> ranked.place`,
+			[tenant.id, leadId],
 		);
 	}
 

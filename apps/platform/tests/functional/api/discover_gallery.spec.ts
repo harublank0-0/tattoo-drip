@@ -496,6 +496,37 @@ test.group("Discover API D09: one artwork", (group) => {
 		assert.equal(page.pathname, `/gallery/${photos.koi.id}`);
 	});
 
+	test("angles: the gallery lists a tattoo once, and an angle's id answers with the tattoo, whose id is its lead's; an unpublished tattoo's angle is the 404", async ({
+		client,
+		assert,
+	}) => {
+		const { needle, artists, photos } = await world();
+		const angle = await inTenant(needle.tenant, () =>
+			addWorkPhoto(needle.tenant, artists.sita, {
+				createdAt: at(60),
+				styles: ["blackwork"],
+				healed: true,
+				angleOf: { lead: photos.koi, position: 1 },
+			}),
+		);
+
+		const listed = await client.get("/api/v1/discover/tattoos?limit=48");
+		assert.notInclude(ids(listed), angle.id);
+		assert.include(ids(listed), photos.koi.id);
+
+		const response = await client.get(`/api/v1/discover/tattoos/${angle.id}`);
+		response.assertStatus(200);
+		assert.equal(response.body().data.id, photos.koi.id);
+
+		await setPhoto(needle.tenant, photos.koi.id, "hidden = true");
+		await setPhoto(needle.tenant, angle.id, "hidden = true");
+		assertApiError(
+			await client.get(`/api/v1/discover/tattoos/${angle.id}`),
+			404,
+			"not_found",
+		);
+	});
+
 	test("an artist who isn't taking requests: false, and the link still names the photo", async ({
 		client,
 		assert,

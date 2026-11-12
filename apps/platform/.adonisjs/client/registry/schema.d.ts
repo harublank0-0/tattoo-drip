@@ -803,12 +803,12 @@ export interface Registry {
     methods: ["DELETE"]
     pattern: '/t/:tenant/artists/photos/:id'
     types: {
-      body: {}
+      body: ExtractBody<InferInput<(typeof import('#modules/artists/validators/work_photo').removeWorkPhotoValidator)>>
       paramsTuple: [ParamValue, ParamValue]
       params: { tenant: ParamValue; id: ParamValue }
-      query: {}
+      query: ExtractQuery<InferInput<(typeof import('#modules/artists/validators/work_photo').removeWorkPhotoValidator)>>
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/work_photos_controller').default['destroy']>>>
-      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/work_photos_controller').default['destroy']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/work_photos_controller').default['destroy']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
   'tenant.artists.photos.order': {

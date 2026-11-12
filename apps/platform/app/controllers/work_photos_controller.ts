@@ -9,7 +9,10 @@ import {
 	WorkPhotoLimitError,
 } from "#modules/artists/errors";
 import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
-import { portfolioBack } from "#modules/artists/portfolio";
+import {
+	portfolioBack,
+	TATTOO_CHANGED_SINCE,
+} from "#modules/artists/portfolio";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -20,6 +23,7 @@ import WorkPhotoService, {
 import {
 	addWorkPhotoValidator,
 	orderWorkPhotosValidator,
+	removeWorkPhotoValidator,
 	updateWorkPhotoValidator,
 } from "#modules/artists/validators/work_photo";
 import { ImageDeleteError, InvalidImageError } from "#modules/media/errors";
@@ -120,7 +124,11 @@ export default class WorkPhotosController {
 		return this.toEditPage(ctx, tenant.slug, artist.id);
 	}
 
-	/** `:id` is the photo. */
+	/**
+	 * `:id` is the photo. The query says what the page asked to remove
+	 * (`scope`: `photo`, one angle, or `tattoo` with the `photos` it showed):
+	 * a tattoo that changed since is not touched, and the flash says so.
+	 */
 	async destroy(ctx: HttpContext) {
 		const { tenant, membership } = tenantContext(ctx);
 		const { photo, artist } = await this.photos.findEditable(
@@ -128,11 +136,20 @@ export default class WorkPhotosController {
 			membership,
 			ctx.params.id,
 		);
+		const data = await ctx.request.validateUsing(removeWorkPhotoValidator);
+		const intent =
+			data.scope === "photo"
+				? ({ scope: "photo" } as const)
+				: ({ scope: "tattoo", photos: data.photos ?? 0 } as const);
 
 		let removed: number;
 		try {
-			removed = await this.photos.remove(tenant, membership, photo);
+			removed = await this.photos.remove(tenant, membership, photo, intent);
 		} catch (error) {
+			if (error instanceof TattooChangedError) {
+				ctx.session.flash("error", TATTOO_CHANGED_SINCE);
+				return this.toEditPage(ctx, tenant.slug, artist.id);
+			}
 			// A file could not be deleted: the photo stays (and is still public),
 			// so say so and let the owner try again.
 			if (!(error instanceof ImageDeleteError)) throw error;
@@ -199,10 +216,11 @@ export default class WorkPhotosController {
 	private toEditPage(ctx: HttpContext, tenantSlug: string, artistId: string) {
 		const back = portfolioBack(ctx.request.input("back"), tenantSlug);
 		// The address is the whole answer: this request's own query (a delete
-		// names `back` there) is not carried over.
+		// names `back` and what it removes there) is never carried over.
 		if (back) return ctx.response.redirect().withQs(false).toPath(back);
 		return ctx.response
 			.redirect()
+			.withQs(false)
 			.toRoute("tenant.artists.edit", { tenant: tenantSlug, id: artistId });
 	}
 }
