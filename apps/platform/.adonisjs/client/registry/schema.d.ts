@@ -235,6 +235,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['importCsv']>>>
     }
   }
+  'tenant.inventory.lots.export': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/inventory/lots.csv'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['exportLotsCsv']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['exportLotsCsv']>>>
+    }
+  }
   'tenant.inventory.show': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/inventory/:id'
@@ -305,6 +317,18 @@ export interface Registry {
       query: {}
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['archive']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['archive']>>>
+    }
+  }
+  'tenant.inventory.restore': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/inventory/:id/restore'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['restore']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['restore']>>>
     }
   }
   'tenant.today': {

@@ -23,8 +23,11 @@ export const DATE_FORMAT = /^\d{4}-\d{2}-\d{2}$/;
 /** Lots expiring within this many days of the studio's today are flagged. */
 export const EXPIRY_WARNING_DAYS = 30;
 
-/** The most lots with stock an item page lists (and offers to choose). */
+/** The most lots with stock the movement forms offer to choose. */
 export const MAX_LISTED_LOTS = 100;
+
+/** Lots per page in an item's Lots list. */
+export const LOTS_PER_PAGE = 25;
 
 export function toStockUnits(quantity: string) {
 	return Math.round(Number(quantity) * 1000);

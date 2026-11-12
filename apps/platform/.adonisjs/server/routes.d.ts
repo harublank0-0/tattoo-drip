@@ -23,12 +23,14 @@ export type ScannedRoutes = {
     'tenant.inventory.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.inventory.export': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.inventory.import': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.inventory.lots.export': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.inventory.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inventory.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inventory.movement': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inventory.tracking': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inventory.lots.expiry': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inventory.archive': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.inventory.restore': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.today': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.profile': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -176,6 +178,7 @@ export type ScannedRoutes = {
     'tenant.dashboard': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.inventory.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.inventory.export': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.inventory.lots.export': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.inventory.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.today': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -248,6 +251,7 @@ export type ScannedRoutes = {
     'tenant.dashboard': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.inventory.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.inventory.export': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.inventory.lots.export': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.inventory.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.today': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -314,6 +318,7 @@ export type ScannedRoutes = {
     'tenant.inventory.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.inventory.import': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.inventory.movement': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.inventory.restore': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.payments.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.move': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.closed_days.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }

@@ -140,10 +140,21 @@ export async function seededStudio(slug: string, name: string) {
 				lotNumber: `${slug}-lot`,
 				expiresOn: "2030-06-30",
 			});
-			const { lots } = await inventory.lots(tenant.id, item.id);
+			const { choices: lots } = await inventory.lots(tenant.id, item.id);
 			return { lotInventoryItem: item, inventoryLot: lots[0] };
 		},
 	);
+
+	// An archived item: the restore route's resource.
+	const archivedInventoryItem = await inTenant(tenant, async () => {
+		const inventory = new InventoryService();
+		const item = await inventory.create(tenant.id, {
+			name: `${name} old gloves`,
+			unit: "box",
+		});
+		await inventory.archive(tenant.id, item.id);
+		return item;
+	});
 
 	const paymentMethod = await inTenant(tenant, async () => {
 		const first = await paymentMethods.create(tenant, {
@@ -418,6 +429,7 @@ export async function seededStudio(slug: string, name: string) {
 		stockedInventoryItem,
 		lotInventoryItem,
 		inventoryLot,
+		archivedInventoryItem,
 		discoverPlaceId: otherCity[0].id as string,
 		paymentMethod,
 		artistProfile,

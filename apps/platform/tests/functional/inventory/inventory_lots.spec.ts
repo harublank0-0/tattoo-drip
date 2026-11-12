@@ -555,9 +555,16 @@ test.group("Studio OS inventory lots", (group) => {
 
 		// The service's own filters, from inside A's context with B's ids.
 		await inTenant(a.tenant, async () => {
-			const { lots, assigned } = await service.lots(b.tenant.id, inkA.item.id);
+			const {
+				choices: lots,
+				listed,
+				assigned,
+			} = await service.lots(b.tenant.id, inkA.item.id);
 			assert.lengthOf(lots, 0);
+			assert.equal(listed.total, 0);
 			assert.equal(assigned, 0);
+			await assert.rejects(() => service.restore(b.tenant.id, inkA.item.id));
+			assert.lengthOf(await service.exportLots(b.tenant.id), 0);
 			await assert.rejects(() =>
 				service.findLot(b.tenant.id, inkA.item.id, inkA.lot.id),
 			);

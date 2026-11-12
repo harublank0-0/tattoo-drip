@@ -33,6 +33,7 @@ const selectClass =
  */
 export function MovementForm({
 	item,
+	moreLots,
 	lots,
 	suggestedLotId,
 	requestId,
@@ -40,6 +41,8 @@ export function MovementForm({
 	params,
 }: {
 	item: InventoryItem;
+	/** More lots hold stock than `lots` offers (the first 100 by expiry). */
+	moreLots: boolean;
 	lots: InventoryLot[];
 	suggestedLotId: string | null;
 	requestId: string;
@@ -128,6 +131,12 @@ export function MovementForm({
 								</select>
 							)}
 							{lot && <input type="hidden" name="lotId" value={lot.id} />}
+							{moreLots && (
+								<FieldDescription>
+									Lists the 100 earliest-expiring lots. For another lot, open
+									its History in the Lots list.
+								</FieldDescription>
+							)}
 							{errors.lotId && <FieldError>{errors.lotId}</FieldError>}
 							{lot && (
 								<div

@@ -120,6 +120,12 @@ const routes = {
     tokens: [{"old":"/t/:tenant/inventory/import","type":0,"val":"t","end":""},{"old":"/t/:tenant/inventory/import","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inventory/import","type":0,"val":"inventory","end":""},{"old":"/t/:tenant/inventory/import","type":0,"val":"import","end":""}],
     types: placeholder as Registry['tenant.inventory.import']['types'],
   },
+  'tenant.inventory.lots.export': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/inventory/lots.csv',
+    tokens: [{"old":"/t/:tenant/inventory/lots.csv","type":0,"val":"t","end":""},{"old":"/t/:tenant/inventory/lots.csv","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inventory/lots.csv","type":0,"val":"inventory","end":""},{"old":"/t/:tenant/inventory/lots.csv","type":0,"val":"lots.csv","end":""}],
+    types: placeholder as Registry['tenant.inventory.lots.export']['types'],
+  },
   'tenant.inventory.show': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/inventory/:id',
@@ -155,6 +161,12 @@ const routes = {
     pattern: '/t/:tenant/inventory/:id',
     tokens: [{"old":"/t/:tenant/inventory/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/inventory/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inventory/:id","type":0,"val":"inventory","end":""},{"old":"/t/:tenant/inventory/:id","type":1,"val":"id","end":""}],
     types: placeholder as Registry['tenant.inventory.archive']['types'],
+  },
+  'tenant.inventory.restore': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/inventory/:id/restore',
+    tokens: [{"old":"/t/:tenant/inventory/:id/restore","type":0,"val":"t","end":""},{"old":"/t/:tenant/inventory/:id/restore","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inventory/:id/restore","type":0,"val":"inventory","end":""},{"old":"/t/:tenant/inventory/:id/restore","type":1,"val":"id","end":""},{"old":"/t/:tenant/inventory/:id/restore","type":0,"val":"restore","end":""}],
+    types: placeholder as Registry['tenant.inventory.restore']['types'],
   },
   'tenant.today': {
     methods: ["GET","HEAD"],

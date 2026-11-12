@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
+import type { ModelQueryBuilderContract } from "@adonisjs/lucid/types/model";
 import { DateTime } from "luxon";
 import User from "#models/user";
 import {
@@ -16,6 +17,7 @@ import {
 	expiryStatus,
 	type InventoryUnit,
 	isCalendarDate,
+	LOTS_PER_PAGE,
 	MAX_LISTED_LOTS,
 	MAX_STOCK,
 	type MovementKind,
@@ -69,6 +71,55 @@ function itemFields(input: ItemInput) {
 		category: input.category || null,
 		reorderThreshold,
 	};
+}
+
+type ItemQuery = ModelQueryBuilderContract<typeof InventoryItem>;
+
+/**
+ * Narrows `query` to the items that count as the same item as `name` and
+ * `sku`: the same SKU, or the same name where either has no SKU (case
+ * ignored). CSV import and the item forms share this one rule.
+ */
+function sameItem(query: ItemQuery, name: string, sku: string | null) {
+	return query.where((match) => {
+		if (sku) {
+			match
+				.whereRaw("lower(sku) = lower(?)", [sku])
+				.orWhereRaw("(lower(name) = lower(?) and sku is null)", [name]);
+		} else {
+			match.whereRaw("lower(name) = lower(?)", [name]);
+		}
+	});
+}
+
+/**
+ * Refuses a name and SKU another item already uses: any item, archived ones
+ * included (a new item must not shadow one that can be restored), or only
+ * active ones (for a restore). Run under the catalog lock.
+ */
+async function assertDistinct(
+	tenantId: string,
+	fields: { name: string; sku: string | null },
+	options: { exceptId?: string; includeArchived: boolean; field?: string },
+) {
+	const query = (
+		options.includeArchived
+			? InventoryItem.withTrashed()
+			: InventoryItem.query()
+	).where("tenant_id", tenantId);
+	if (options.exceptId) query.whereNot("id", options.exceptId);
+	const found = await sameItem(query, fields.name, fields.sku).first();
+	if (!found) return;
+	const bySku =
+		fields.sku !== null &&
+		found.sku?.toLowerCase() === fields.sku.toLowerCase();
+	const what = bySku ? "SKU" : "name";
+	throw new InventoryRuleError(
+		options.field ?? (bySku ? "sku" : "name"),
+		found.deletedAt
+			? `An archived item already uses this ${what}: ${found.name}. Restore it from the archived list instead.`
+			: `Another item already uses this ${what}: ${found.name}.`,
+	);
 }
 
 function activeItem(tenantId: string, id: string) {
@@ -248,23 +299,30 @@ export default class InventoryService {
 
 	/**
 	 * The item's lots that hold stock, earliest expiry first (lots without a
-	 * date last, then oldest first): the order to use them in. Also the stock
-	 * held in all its lots.
+	 * date last, then oldest first): the order to use them in.
+	 * - `choices`: what the movement forms offer, the first MAX_LISTED_LOTS,
+	 *   plus the lot `includeId` names (the one whose history is open) when
+	 *   it holds stock further down.
+	 * - `listed`: one page of LOTS_PER_PAGE for the Lots list, which pages
+	 *   through all of them.
+	 * - `assigned`: the stock held in all the item's lots.
 	 */
-	async lots(tenantId: string, itemId: string) {
+	async lots(tenantId: string, itemId: string, page = 1, includeId?: string) {
 		// One after the other: queries share the request's connection.
-		const lots = await lotQuery(tenantId, itemId)
-			.where("quantity", ">", 0)
-			.orderByRaw("expires_on asc nulls last")
-			.orderBy("created_at")
-			.orderBy("id")
-			.limit(MAX_LISTED_LOTS);
+		const stocked = () =>
+			lotQuery(tenantId, itemId)
+				.where("quantity", ">", 0)
+				.orderByRaw("expires_on asc nulls last")
+				.orderBy("created_at")
+				.orderBy("id");
+		const choices = await stocked().limit(MAX_LISTED_LOTS);
+		if (includeId && !choices.some(({ id }) => id === includeId)) {
+			const extra = await stocked().where("id", includeId).first();
+			if (extra) choices.push(extra);
+		}
+		const listed = await stocked().paginate(page, LOTS_PER_PAGE);
 		const assigned = await lotTotal(tenantId, itemId);
-		const [row] = await lotQuery(tenantId, itemId)
-			.where("quantity", ">", 0)
-			.count("* as total")
-			.pojo<{ total: string }>();
-		return { lots, assigned, stocked: Number(row?.total ?? 0) };
+		return { choices, listed, assigned };
 	}
 
 	findLot(tenantId: string, itemId: string, id: string) {
@@ -325,9 +383,11 @@ export default class InventoryService {
 	create(tenantId: string, input: ItemInput & { unit: InventoryUnit }) {
 		return withTransaction(async (trx) => {
 			await catalogLock(trx, tenantId);
+			const fields = itemFields(input);
+			await assertDistinct(tenantId, fields, { includeArchived: true });
 			return InventoryItem.create({
 				tenantId,
-				...itemFields(input),
+				...fields,
 				unit: input.unit,
 				quantity: 0,
 			});
@@ -350,20 +410,11 @@ export default class InventoryService {
 			for (const row of rows) {
 				const sku = row.sku?.toLowerCase();
 				const name = row.name.toLowerCase();
-				const existing = await InventoryItem.withTrashed()
-					.where("tenant_id", tenantId)
-					.where((match) => {
-						if (sku) {
-							match
-								.whereRaw("lower(sku) = lower(?)", [sku])
-								.orWhereRaw("(lower(name) = lower(?) and sku is null)", [
-									row.name,
-								]);
-						} else {
-							match.whereRaw("lower(name) = lower(?)", [row.name]);
-						}
-					})
-					.first();
+				const existing = await sameItem(
+					InventoryItem.withTrashed().where("tenant_id", tenantId),
+					row.name,
+					row.sku || null,
+				).first();
 				const repeated = sku
 					? skus.has(sku) || unskuedNames.has(name)
 					: names.has(name);
@@ -416,7 +467,12 @@ export default class InventoryService {
 		return withTransaction(async (trx) => {
 			await catalogLock(trx, tenantId);
 			const item = await activeItem(tenantId, id).forUpdate().firstOrFail();
-			return item.merge(itemFields(input)).save();
+			const fields = itemFields(input);
+			await assertDistinct(tenantId, fields, {
+				exceptId: item.id,
+				includeArchived: true,
+			});
+			return item.merge(fields).save();
 		});
 	}
 
@@ -431,6 +487,68 @@ export default class InventoryService {
 			}
 			await item.softDelete();
 		});
+	}
+
+	/**
+	 * Brings an archived item back, with its stock (zero), lots and history,
+	 * unless an active item has taken its name or SKU meanwhile.
+	 */
+	async restore(tenantId: string, id: string) {
+		return withTransaction(async (trx) => {
+			await catalogLock(trx, tenantId);
+			const item = await InventoryItem.onlyTrashed()
+				.where("tenant_id", tenantId)
+				.where("id", id)
+				.forUpdate()
+				.firstOrFail();
+			await assertDistinct(tenantId, item, {
+				exceptId: item.id,
+				includeArchived: false,
+				field: "restore",
+			});
+			await item.restore();
+			return item;
+		});
+	}
+
+	/**
+	 * Every lot holding stock of an active item, for the lots CSV: item by
+	 * name, then earliest expiry first.
+	 */
+	async exportLots(tenantId: string) {
+		const rows = await InventoryLot.query()
+			.select(
+				"inventory_lots.*",
+				"inventory_items.name as item_name",
+				"inventory_items.sku as item_sku",
+				"inventory_items.unit as item_unit",
+			)
+			.join("inventory_items", (join) =>
+				join
+					.on("inventory_items.id", "inventory_lots.item_id")
+					.andOn("inventory_items.tenant_id", "inventory_lots.tenant_id"),
+			)
+			.where("inventory_lots.tenant_id", tenantId)
+			.whereNull("inventory_items.deleted_at")
+			.where("inventory_lots.quantity", ">", 0)
+			.orderBy("inventory_items.name")
+			.orderBy("inventory_items.id")
+			.orderByRaw("inventory_lots.expires_on asc nulls last")
+			.orderBy("inventory_lots.id")
+			.limit(MAX_EXPORT_ROWS + 1);
+		if (rows.length > MAX_EXPORT_ROWS) {
+			throw new InventoryCsvError(
+				`CSV export supports up to ${MAX_EXPORT_ROWS.toLocaleString("en")} lots.`,
+			);
+		}
+		return rows.map((lot) => ({
+			itemName: lot.$extras.item_name as string,
+			sku: lot.$extras.item_sku as string | null,
+			unit: lot.$extras.item_unit as string,
+			lotNumber: lot.lotNumber,
+			expiresOn: lot.expiresOn?.toISODate() ?? null,
+			quantity: lot.quantity,
+		}));
 	}
 
 	async record(

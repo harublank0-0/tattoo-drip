@@ -109,6 +109,9 @@ router
 		router
 			.post("inventory/import", [controllers.Inventory, "importCsv"])
 			.as("tenant.inventory.import");
+		router
+			.get("inventory/lots.csv", [controllers.Inventory, "exportLotsCsv"])
+			.as("tenant.inventory.lots.export");
 
 		router
 			.get("inventory/:id", [controllers.Inventory, "show"])
@@ -134,6 +137,10 @@ router
 			.delete("inventory/:id", [controllers.Inventory, "archive"])
 			.where("id", router.matchers.uuid())
 			.as("tenant.inventory.archive");
+		router
+			.post("inventory/:id/restore", [controllers.Inventory, "restore"])
+			.where("id", router.matchers.uuid())
+			.as("tenant.inventory.restore");
 
 		// Today (TAT-107): every member's home, what needs them right now.
 		router.get("today", [controllers.Today, "show"]).as("tenant.today");

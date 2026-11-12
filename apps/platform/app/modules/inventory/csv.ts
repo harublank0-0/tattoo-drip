@@ -111,3 +111,39 @@ export function inventoryCsv(
 	);
 	return [COLUMNS.join(","), ...rows, ""].join("\r\n");
 }
+
+const LOT_COLUMNS = [
+	"item_name",
+	"sku",
+	"unit",
+	"lot_number",
+	"expires_on",
+	"quantity",
+];
+
+/**
+ * The lots holding stock, one row each, for a recall check or an audit.
+ * Export only: lots are received on the item page.
+ */
+export function inventoryLotsCsv(
+	lots: readonly {
+		itemName: string;
+		sku: string | null;
+		unit: string;
+		lotNumber: string;
+		expiresOn: string | null;
+		quantity: number;
+	}[],
+) {
+	const rows = lots.map((lot) =>
+		[
+			textCell(lot.itemName),
+			textCell(lot.sku),
+			lot.unit,
+			textCell(lot.lotNumber),
+			lot.expiresOn ?? "",
+			lot.quantity / 1000,
+		].join(","),
+	);
+	return [LOT_COLUMNS.join(","), ...rows, ""].join("\r\n");
+}

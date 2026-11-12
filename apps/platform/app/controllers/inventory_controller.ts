@@ -7,6 +7,7 @@ import { tenantContext } from "#middleware/tenant_middleware";
 import {
 	InventoryCsvError,
 	inventoryCsv,
+	inventoryLotsCsv,
 	parseInventoryCsv,
 } from "#modules/inventory/csv";
 import type InventoryItem from "#modules/inventory/models/inventory_item";
@@ -138,11 +139,13 @@ export default class InventoryController {
 			pageNumber(query.page),
 			filter?.id,
 		);
-		const { lots, assigned, stocked } = await this.inventory.lots(
+		const { choices, listed, assigned } = await this.inventory.lots(
 			tenant.id,
 			item.id,
+			pageNumber(query.lots),
+			filter?.id,
 		);
-		const lotRows = lots.map((lot) => lotView(lot, today));
+		const lotRows = choices.map((lot) => lotView(lot, today));
 		const worst = lotRows.some((lot) => lot.expiry === "expired")
 			? "expired"
 			: lotRows.some((lot) => lot.expiry === "soon")
@@ -156,8 +159,14 @@ export default class InventoryController {
 			suggestedLotId:
 				lotRows.find((lot) => lot.expiry !== "expired")?.id ?? null,
 			unassigned: item.quantity - assigned,
-			// Lots with stock, of which `lots` lists the first MAX_LISTED_LOTS.
-			lotsWithStock: stocked,
+			// The Lots list: every lot with stock, a page at a time; `lots` (the
+			// forms' choices) is the first MAX_LISTED_LOTS of them.
+			lotList: {
+				rows: listed.all().map((lot) => lotView(lot, today)),
+				page: listed.currentPage,
+				lastPage: listed.lastPage,
+				total: listed.total,
+			},
 			expiryWindowDays: EXPIRY_WARNING_DAYS,
 			lotFilter: filter ? { id: filter.id, number: filter.lotNumber } : null,
 			history: movements.all().map((movement) => {
@@ -292,6 +301,24 @@ export default class InventoryController {
 		}
 	}
 
+	async exportLotsCsv(ctx: HttpContext) {
+		const { tenant } = tenantContext(ctx);
+		try {
+			const lots = await this.inventory.exportLots(tenant.id);
+			ctx.response.header("Cache-Control", "private, no-store");
+			ctx.response.header(
+				"Content-Disposition",
+				'attachment; filename="inventory-lots.csv"',
+			);
+			return ctx.response
+				.type("text/csv", "utf-8")
+				.send(inventoryLotsCsv(lots));
+		} catch (error) {
+			if (!(error instanceof InventoryCsvError)) throw error;
+			return ctx.response.badRequest(error.message);
+		}
+	}
+
 	async importCsv(ctx: HttpContext) {
 		const { tenant } = tenantContext(ctx);
 		const file = ctx.request.file("csv", { size: "512kb", extnames: ["csv"] });
@@ -334,5 +361,23 @@ export default class InventoryController {
 		return ctx.response
 			.redirect()
 			.toRoute("tenant.inventory.index", { tenant: tenant.slug });
+	}
+
+	async restore(ctx: HttpContext) {
+		const { tenant } = tenantContext(ctx);
+		const show = () =>
+			ctx.response.redirect().toRoute("tenant.inventory.show", {
+				tenant: tenant.slug,
+				id: ctx.params.id,
+			});
+		try {
+			await this.inventory.restore(tenant.id, ctx.params.id);
+		} catch (error) {
+			if (!(error instanceof InventoryRuleError)) throw error;
+			ctx.session.flash("error", error.message);
+			return show();
+		}
+		ctx.session.flash("success", "Inventory item restored.");
+		return show();
 	}
 }

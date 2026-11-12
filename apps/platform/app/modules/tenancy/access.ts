@@ -39,6 +39,8 @@ export const TENANT_ROUTE_ROLES = {
 	"tenant.inventory.tracking": OWNERS,
 	"tenant.inventory.lots.expiry": OWNERS,
 	"tenant.inventory.archive": OWNERS,
+	"tenant.inventory.restore": OWNERS,
+	"tenant.inventory.lots.export": OWNERS,
 
 	// Studio settings.
 	"tenant.settings": OWNERS,

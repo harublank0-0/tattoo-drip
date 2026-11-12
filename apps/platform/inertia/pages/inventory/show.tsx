@@ -17,6 +17,7 @@ import InventoryPagination from "~/components/inventory/pagination";
 import Page from "~/components/page";
 import Section from "~/components/section";
 import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 import { useTenant } from "~/hooks/use-tenant";
 import AppLayout from "~/layouts/app";
 
@@ -54,7 +55,7 @@ export default function InventoryShow({
 	lots,
 	suggestedLotId,
 	unassigned,
-	lotsWithStock,
+	lotList,
 	expiryWindowDays,
 	lotFilter,
 }: {
@@ -67,7 +68,12 @@ export default function InventoryShow({
 	lots: InventoryLot[];
 	suggestedLotId: string | null;
 	unassigned: number;
-	lotsWithStock: number;
+	lotList: {
+		rows: InventoryLot[];
+		page: number;
+		lastPage: number;
+		total: number;
+	};
 	expiryWindowDays: number;
 	lotFilter: { id: string; number: string } | null;
 }) {
@@ -112,6 +118,25 @@ export default function InventoryShow({
 				</p>
 			}
 		>
+			{item.archived && canManage && (
+				<Section
+					title="Archived item"
+					description="It is out of the stock list, and its name and SKU stay taken. Restoring brings it back with its lots and history."
+				>
+					<Form
+						route="tenant.inventory.restore"
+						routeParams={params}
+						options={{ preserveScroll: true }}
+					>
+						{({ processing }) => (
+							<Button type="submit" variant="outline" disabled={processing}>
+								{processing ? "Restoring…" : "Restore item"}
+							</Button>
+						)}
+					</Form>
+				</Section>
+			)}
+
 			{!item.archived && (
 				<Section
 					title={canManage ? "Record stock movement" : "Record stock used"}
@@ -119,6 +144,7 @@ export default function InventoryShow({
 					<MovementForm
 						key={item.tracking}
 						item={item}
+						moreLots={lotList.total > lots.length}
 						lots={lots}
 						suggestedLotId={suggestedLotId}
 						requestId={requestId}
@@ -128,17 +154,17 @@ export default function InventoryShow({
 				</Section>
 			)}
 
-			{(tracked || lots.length > 0) && (
+			{(tracked || lotList.total > 0) && (
 				<Section
 					id="lots"
 					title={tracked ? "Lots" : "Lots being set up"}
-					description={`Lots with stock, earliest expiry first. Lots expiring within ${expiryWindowDays} days are flagged, using the studio's time zone.`}
+					description={`${lotList.total} ${lotList.total === 1 ? "lot" : "lots"} with stock, earliest expiry first. Lots expiring within ${expiryWindowDays} days are flagged, using the studio's time zone.`}
 				>
-					{lots.length === 0 ? (
+					{lotList.rows.length === 0 ? (
 						<p className="text-sm text-muted-foreground">No lot has stock.</p>
 					) : (
 						<ul className="divide-y">
-							{lots.map((lot) => (
+							{lotList.rows.map((lot) => (
 								<li
 									key={lot.id}
 									className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"
@@ -169,12 +195,16 @@ export default function InventoryShow({
 							))}
 						</ul>
 					)}
-					{lotsWithStock > lots.length && (
-						<p className="mt-2 text-sm text-muted-foreground">
-							Showing the {lots.length} earliest-expiring of {lotsWithStock}{" "}
-							lots with stock. Use or count these first to see the rest.
-						</p>
-					)}
+					<InventoryPagination
+						page={lotList.page}
+						lastPage={lotList.lastPage}
+						href={(next) =>
+							`${detail}?${new URLSearchParams({
+								...(lotFilter ? { lot: lotFilter.id } : {}),
+								lots: String(next),
+							})}#lots`
+						}
+					/>
 				</Section>
 			)}
 
@@ -275,7 +305,7 @@ export default function InventoryShow({
 							<InlineConfirm
 								label="Archive item"
 								variant="outline"
-								question="Archive this item? It leaves the stock list, and CSV imports will still treat its name and SKU as taken."
+								question="Archive this item? It leaves the stock list and its name and SKU stay taken. You can restore it from the archived list."
 								confirmLabel="Archive item"
 								keepLabel="Keep it"
 								busyLabel="Archiving…"

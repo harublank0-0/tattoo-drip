@@ -36,14 +36,16 @@ export interface ApiDefinition {
       store: typeof routes['tenant.inventory.store']
       export: typeof routes['tenant.inventory.export']
       import: typeof routes['tenant.inventory.import']
+      lots: {
+        export: typeof routes['tenant.inventory.lots.export']
+        expiry: typeof routes['tenant.inventory.lots.expiry']
+      }
       show: typeof routes['tenant.inventory.show']
       update: typeof routes['tenant.inventory.update']
       movement: typeof routes['tenant.inventory.movement']
       tracking: typeof routes['tenant.inventory.tracking']
-      lots: {
-        expiry: typeof routes['tenant.inventory.lots.expiry']
-      }
       archive: typeof routes['tenant.inventory.archive']
+      restore: typeof routes['tenant.inventory.restore']
     }
     today: typeof routes['tenant.today']
     settings: typeof routes['tenant.settings'] & {

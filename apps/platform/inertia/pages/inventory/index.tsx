@@ -162,12 +162,18 @@ export default function InventoryIndex({
 						description="Import up to 500 new items with their opening stock. Existing items are checked by SKU, or by name if the SKU is blank."
 					>
 						<div className="flex flex-col gap-4">
-							<div>
+							<div className="flex flex-wrap gap-2">
 								<a
 									className={buttonVariants({ variant: "outline" })}
 									href={urlFor("tenant.inventory.export", params)}
 								>
 									Download active inventory CSV
+								</a>
+								<a
+									className={buttonVariants({ variant: "outline" })}
+									href={urlFor("tenant.inventory.lots.export", params)}
+								>
+									Download lots CSV
 								</a>
 							</div>
 							<p className="text-sm text-muted-foreground">
@@ -176,9 +182,10 @@ export default function InventoryIndex({
 								start at zero.
 							</p>
 							<p className="text-sm text-muted-foreground">
-								CSV has no lot or expiry columns: imported items use standard
-								tracking, and a lot-tracked item exports its total stock only.
-								Record lots and their expiry dates on the item's page.
+								The item CSV has no lot or expiry columns: imported items use
+								standard tracking, and a lot-tracked item exports its total
+								stock. Lots and their expiry dates are received on the item's
+								page; the lots CSV lists every lot holding stock.
 							</p>
 							<Form
 								route="tenant.inventory.import"

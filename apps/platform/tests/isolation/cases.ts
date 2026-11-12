@@ -56,6 +56,7 @@ export type IsolationCase = {
 		| "inventoryItem"
 		| "stockedInventoryItem"
 		| "lotInventoryItem"
+		| "archivedInventoryItem"
 		| "paymentMethod"
 		| "artistProfile"
 		| "workPhoto"
@@ -439,6 +440,13 @@ export const isolationCases: IsolationCase[] = [
 		snapshot: inventoryRows,
 	},
 	{
+		method: "GET",
+		pattern: "/t/:tenant/inventory/lots.csv",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: inventoryRows,
+	},
+	{
 		method: "POST",
 		pattern: "/t/:tenant/inventory/import",
 		actor: "owner",
@@ -497,6 +505,14 @@ export const isolationCases: IsolationCase[] = [
 		actor: "owner",
 		resource: "inventoryItem",
 		body: () => ({ tracking: "lot" }),
+		ownStatus: 302,
+		snapshot: inventoryRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/inventory/:id/restore",
+		actor: "owner",
+		resource: "archivedInventoryItem",
 		ownStatus: 302,
 		snapshot: inventoryRows,
 	},
