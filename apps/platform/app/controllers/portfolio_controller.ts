@@ -44,6 +44,8 @@ import {
 
 const PURPOSE = "artist_work_photo";
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
 /** The gallery's tile copy: a tile is up to about 300 px wide, so 640 is sharp at 2x. */
 const TILE_WIDTH = 640;
 /** The details panel's preview: up to about 600 px wide, sharp at 2x. */
@@ -102,23 +104,32 @@ export default class PortfolioController {
 			this.photos.studioPage(tenant, artist ? [artist] : artistIds, query),
 			this.photos.counts(tenant, artistIds),
 		]);
+		// Angles: the tattoo the details panel follows (`open`, after its main
+		// photo changed), when it is no longer on this page.
+		const open = await this.openTattoo(
+			ctx,
+			ctx.request.input("open"),
+			found.photos,
+		);
+		const tiles = open ? [...found.photos, open] : found.photos;
 		const angles = await this.photos.anglesOf(
 			tenant,
-			found.photos.map(({ id }) => id),
+			tiles.map(({ id }) => id),
 		);
 		const byId = new Map(artists.map((row) => [row.id, row]));
 		// Each photo's Discover state (D04), from the same rules as the views.
 		const discover = await this.publication.artworkStates(
 			tenant,
 			artists,
-			found.photos,
+			tiles,
 		);
 
-		const photos = await Promise.all(
-			found.photos.map(async (photo) => {
+		const shownTiles = await Promise.all(
+			tiles.map(async (photo) => {
 				const of = byId.get(photo.artistId);
-				const [src, large, full, variants] = await Promise.all([
+				const [src, thumbUrl, large, full, variants] = await Promise.all([
 					this.images.urlFor(PURPOSE, photo.imageKey, tenant, TILE_WIDTH),
+					this.images.urlFor(PURPOSE, photo.imageKey, tenant, THUMBNAIL_WIDTH),
 					this.images.urlFor(PURPOSE, photo.imageKey, tenant, LARGE_WIDTH),
 					this.images.url(PURPOSE, photo.imageKey, tenant),
 					this.images.variants(PURPOSE, photo.imageKey, tenant),
@@ -149,6 +160,8 @@ export default class PortfolioController {
 					].join(", "),
 					largeUrl: large,
 					fullUrl: full,
+					// The details panel's list of the tattoo's photos: the 320 px copy.
+					thumbUrl,
 					addedText: photo.createdAt
 						.setZone(tenant.timezone)
 						.toFormat("d LLL yyyy"),
@@ -178,8 +191,13 @@ export default class PortfolioController {
 			}),
 		);
 
+		const photos = open ? shownTiles.slice(0, -1) : shownTiles;
+		const openPhoto = open ? (shownTiles.at(-1) ?? null) : null;
+
 		return ctx.inertia.render("portfolio/index", {
 			photos,
+			// The tattoo the panel follows when it left this page (null otherwise).
+			openPhoto,
 			artists: artists.map((row) => ({
 				id: row.id,
 				name: row.name,
@@ -209,6 +227,40 @@ export default class PortfolioController {
 				devHost: pointsAtThisMachine(template),
 			},
 		});
+	}
+
+	/**
+	 * The tattoo the details panel follows (angles), from the address's
+	 * `open`: after a new main photo, the tattoo's id changes and its place in
+	 * the order can move it off the page shown, so the write comes back with
+	 * `open=<the new lead>` and the panel stays on it. Null when it is on the
+	 * page anyway, or when the id is not a photo the member may change
+	 * (findEditable: never another studio's or another artist's); an angle's
+	 * id gives its lead.
+	 */
+	private async openTattoo(
+		ctx: HttpContext,
+		value: unknown,
+		shown: readonly ArtistWorkPhoto[],
+	): Promise<ArtistWorkPhoto | null> {
+		if (typeof value !== "string" || !UUID.test(value)) return null;
+		if (shown.some(({ id }) => id === value)) return null;
+		const { tenant, membership } = tenantContext(ctx);
+		try {
+			const { photo } = await this.photos.findEditable(
+				tenant,
+				membership,
+				value,
+			);
+			if (photo.leadPhotoId === null) return photo;
+			if (shown.some(({ id }) => id === photo.leadPhotoId)) return null;
+			return (
+				await this.photos.findEditable(tenant, membership, photo.leadPhotoId)
+			).photo;
+		} catch (error) {
+			if (error instanceof lucidErrors.E_ROW_NOT_FOUND) return null;
+			throw error;
+		}
 	}
 
 	/**

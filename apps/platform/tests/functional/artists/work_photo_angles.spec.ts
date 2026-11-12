@@ -976,6 +976,48 @@ test.group("Angles: the dashboard's routes", (group) => {
 		assert.lengthOf(await tattoo(mine.tenant, loose.id), 1);
 	});
 
+	test("the portfolio sends the tattoo the panel follows (`open`) when it is not on the page, never another studio's", async ({
+		client,
+		assert,
+	}) => {
+		const mine = await studioWithTattoo("angles-http-open");
+		const theirs = await studioWithTattoo("angles-http-open-b");
+		const page = (query: string) =>
+			client
+				.get(`/t/${mine.tenant.slug}/portfolio${query}`)
+				.withInertia()
+				.loginAs(mine.owner);
+
+		// Filtered so the tattoo is off the page: asked for by its angle's id.
+		const away = (await page(`?q=nothing-matches&open=${mine.angle.id}`))
+			.inertiaProps as {
+			photos: unknown[];
+			openPhoto: { id: string; angles: { id: string }[] } | null;
+		};
+		assert.lengthOf(away.photos, 0);
+		assert.equal(away.openPhoto?.id, mine.lead.id);
+		assert.deepEqual(
+			away.openPhoto?.angles.map(({ id }) => id),
+			[mine.angle.id],
+		);
+		// On the page anyway: no second copy.
+		assert.isNull(
+			(
+				(await page(`?open=${mine.lead.id}`)).inertiaProps as {
+					openPhoto: unknown;
+				}
+			).openPhoto,
+		);
+		// Another studio's: nothing.
+		assert.isNull(
+			(
+				(await page(`?open=${theirs.lead.id}`)).inertiaProps as {
+					openPhoto: unknown;
+				}
+			).openPhoto,
+		);
+	});
+
 	test("the portfolio's tiles are tattoos: each lead with its angles in order, and the counts of photos and tattoos", async ({
 		client,
 		assert,

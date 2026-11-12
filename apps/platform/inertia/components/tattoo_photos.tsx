@@ -14,6 +14,7 @@ import { canMove, focusAfterMove } from "~/components/page_look";
 import { MAX_PHOTO_ALT } from "~/components/photos";
 import {
 	DELETE_ANGLE_QUESTION,
+	followBack,
 	MAX_TATTOO_PHOTOS,
 	mainFirst,
 	movedOrder,
@@ -22,7 +23,6 @@ import {
 	photoTotal,
 	removeQuery,
 	TATTOO_PHOTOS_NOTE,
-	tattooPhotoName,
 } from "~/components/portfolio";
 import { Button } from "~/components/ui/button";
 import { FieldError } from "~/components/ui/field";
@@ -87,9 +87,10 @@ export default function TattooPhotos({
 	held: boolean;
 	onBusy: (busy: boolean) => void;
 	onError: (error: string | null) => void;
-	/** A photo is about to become the main one: the page follows it. */
+	/** A photo has become the main one (the write succeeded): the page follows it. */
 	onFollow: (id: string) => void;
-	onAddPhotos: () => void;
+	/** Open the upload for this tattoo; the button is where focus returns when it closes. */
+	onAddPhotos: (from: HTMLElement) => void;
 	/**
 	 * Set here to what Escape does inside the section: close a row's question
 	 * or form (true) or nothing (false). The sheet hears Escape first, on the
@@ -102,7 +103,7 @@ export default function TattooPhotos({
 		{
 			id: photo.id,
 			alt: photo.alt,
-			thumbUrl: photo.src,
+			thumbUrl: photo.thumbUrl,
 			width: photo.width,
 			height: photo.height,
 		},
@@ -197,15 +198,26 @@ export default function TattooPhotos({
 
 	const sendOrder = (order: string[], focus: Refocus) => {
 		if (off) return;
-		if (order[0] !== photo.id) onFollow(order[0]);
+		const lead = order[0];
+		const leads = lead !== photo.id;
 		refocus.current = focus;
 		router.put(
 			urlFor("tenant.artists.photos.order", {
 				tenant: tenantSlug,
 				id: photo.id,
 			}),
-			{ ids: order, back },
-			visit,
+			// A new main photo can move the tattoo off this page: come back
+			// asking for it (`open`), so the panel stays on it.
+			{ ids: order, back: leads ? followBack(back, lead) : back },
+			{
+				...visit,
+				onSuccess: (page: { flash?: unknown }) => {
+					visit.onSuccess(page);
+					const flash = page.flash as { error?: string } | undefined;
+					// Only once it is so: a refusal leaves the panel where it was.
+					if (leads && !flash?.error) onFollow(lead);
+				},
+			},
 		);
 	};
 
@@ -278,7 +290,6 @@ export default function TattooPhotos({
 			<ol className="flex flex-col divide-y rounded-lg border">
 				{rows.map((row, index) => {
 					const n = index + 1;
-					const name = tattooPhotoName(row.alt, n);
 					const nameId = `${id}-${row.id}-name`;
 					return (
 						<li key={row.id} className="flex flex-col gap-2 p-3">
@@ -305,30 +316,39 @@ export default function TattooPhotos({
 								</div>
 								{rows.length > 1 && (
 									<div className="flex shrink-0 gap-1">
-										{(["up", "down"] as const).map((direction) => (
-											<Button
-												key={direction}
-												ref={remember(keyOf(row.id, direction))}
-												type="button"
-												variant="outline"
-												size="icon"
-												aria-label={movePhotoLabel(name, direction)}
-												disabled={!canMove(index, rows.length, direction)}
-												aria-disabled={off || undefined}
-												onClick={() =>
-													sendOrder(movedOrder(ids, index, direction), {
-														id: row.id,
-														button: direction,
-													})
-												}
-											>
-												{direction === "up" ? (
-													<ArrowUp aria-hidden="true" />
-												) : (
-													<ArrowDown aria-hidden="true" />
-												)}
-											</Button>
-										))}
+										{/* The main photo has nowhere earlier to go: no button there, its place kept. */}
+										{index === 0 && (
+											<span
+												aria-hidden="true"
+												className="size-9 max-lg:size-11"
+											/>
+										)}
+										{(["up", "down"] as const)
+											.filter((direction) => index > 0 || direction === "down")
+											.map((direction) => (
+												<Button
+													key={direction}
+													ref={remember(keyOf(row.id, direction))}
+													type="button"
+													variant="outline"
+													size="icon"
+													aria-label={movePhotoLabel(n, rows.length, direction)}
+													disabled={!canMove(index, rows.length, direction)}
+													aria-disabled={off || undefined}
+													onClick={() =>
+														sendOrder(movedOrder(ids, index, direction), {
+															id: row.id,
+															button: direction,
+														})
+													}
+												>
+													{direction === "up" ? (
+														<ArrowUp aria-hidden="true" />
+													) : (
+														<ArrowDown aria-hidden="true" />
+													)}
+												</Button>
+											))}
 									</div>
 								)}
 							</div>
@@ -411,10 +431,13 @@ export default function TattooPhotos({
 
 							{asking === row.id && (
 								<fieldset className="flex flex-col gap-2 rounded-md border border-destructive/40 p-3">
-									<legend id={`${id}-${row.id}-question`} className="sr-only">
-										Delete photo {n}
-									</legend>
-									<p className="text-sm font-medium">{DELETE_ANGLE_QUESTION}</p>
+									<legend className="sr-only">Delete photo {n}</legend>
+									<p
+										id={`${id}-${row.id}-question`}
+										className="text-sm font-medium"
+									>
+										{DELETE_ANGLE_QUESTION}
+									</p>
 									<div className="flex flex-wrap gap-2">
 										<Button
 											type="button"
@@ -450,11 +473,12 @@ export default function TattooPhotos({
 				<Button
 					type="button"
 					variant="outline"
-					disabled={room <= 0}
-					aria-disabled={held || undefined}
+					// aria-disabled, not disabled: it keeps focus when the upload it
+					// opened closes on a full tattoo.
+					aria-disabled={held || room <= 0 || undefined}
 					aria-describedby={room <= 0 ? `${id}-full` : undefined}
-					onClick={() => {
-						if (!held) onAddPhotos();
+					onClick={(event) => {
+						if (!held && room > 0) onAddPhotos(event.currentTarget);
 					}}
 				>
 					<ImagePlus aria-hidden="true" />
@@ -498,7 +522,7 @@ function AltForm({
 			noValidate
 			onSubmit={(event) => {
 				event.preventDefault();
-				onSave(value.trim());
+				if (!busy && !held) onSave(value.trim());
 			}}
 		>
 			<label htmlFor={id} className="text-xs font-medium">
@@ -520,8 +544,9 @@ function AltForm({
 				<Button
 					type="submit"
 					size="sm"
-					disabled={busy}
-					aria-disabled={held || undefined}
+					// aria-disabled, like the row's other buttons: a refusal must not
+					// leave focus on a disabled button, which drops it.
+					aria-disabled={busy || held || undefined}
 				>
 					{busy ? "Saving…" : "Save description"}
 				</Button>

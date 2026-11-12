@@ -20,6 +20,7 @@ import ArtworkUpload from "~/components/artwork_upload";
 import FilterSelect from "~/components/filter_select";
 import Page from "~/components/page";
 import {
+	followBack,
 	isFiltered,
 	NO_FILTERS,
 	PAGE_DESCRIPTION,
@@ -62,6 +63,7 @@ import AppLayout from "~/layouts/app";
  */
 export default function PortfolioIndex({
 	photos,
+	openPhoto,
 	artists,
 	styleOptions,
 	filters,
@@ -94,15 +96,19 @@ export default function PortfolioIndex({
 	const [uploadOpen, setUploadOpen] = useState(false);
 	// The tattoo the upload adds photos to, or null for new work.
 	const [uploadLead, setUploadLead] = useState<PortfolioPhoto | null>(null);
+	// The button that opened the upload: focus goes back to it when it closes.
+	const uploadFrom = useRef<HTMLElement | null>(null);
 	const [uploading, setUploading] = useState(false);
 	const galleryHeading = useRef<HTMLHeadingElement>(null);
-	// By any photo of the tattoo: a new main photo changes the tile's id.
-	const selected =
-		photos.find(
-			(photo) =>
-				photo.id === selectedId ||
-				photo.angles.some((angle) => angle.id === selectedId),
-		) ?? null;
+	// By any photo of the tattoo: a new main photo changes the tile's id. A
+	// tattoo whose new main photo put it on another page comes as `openPhoto`
+	// (the write came back with `open`), and the panel stays on it.
+	const ofTattoo = (photo: PortfolioPhoto) =>
+		photo.id === selectedId ||
+		photo.angles.some((angle) => angle.id === selectedId);
+	const onPage = photos.find(ofTattoo) ?? null;
+	const followed = openPhoto && ofTattoo(openPhoto) ? openPhoto : null;
+	const selected = onPage ?? followed;
 	// The photo left the list (unpublished out of the filter, deleted): the
 	// panel closes for good, so a later view that lists it again doesn't
 	// open it by itself.
@@ -133,7 +139,8 @@ export default function PortfolioIndex({
 			size="sm"
 			disabled={!canUpload}
 			title={canUpload ? undefined : `Every artist has ${maxPhotos} photos`}
-			onClick={() => {
+			onClick={(event) => {
+				uploadFrom.current = event.currentTarget;
 				setUploadLead(null);
 				setUploadOpen(true);
 			}}
@@ -318,13 +325,20 @@ export default function PortfolioIndex({
 						open={detailsOpen && selected !== null}
 						onOpenChange={setDetailsOpen}
 						tenantSlug={tenant.slug}
-						back={here}
+						// A tattoo followed off this page keeps being asked for.
+						back={
+							selected !== null && onPage === null
+								? followBack(here, selected.id)
+								: here
+						}
 						styleOptions={styleOptions}
 						styleNames={styleNames}
 						fallbackFocus={galleryHeading}
 						held={uploading}
 						onFollow={setSelectedId}
-						onAddPhotos={(photo) => {
+						moved={selected !== null && onPage === null}
+						onAddPhotos={(photo, from) => {
+							uploadFrom.current = from;
 							setUploadLead(photo);
 							setUploadOpen(true);
 						}}
@@ -349,12 +363,14 @@ export default function PortfolioIndex({
 								? {
 										// The tattoo as it is now: an upload already added may have grown it.
 										...(photos.find(({ id }) => id === uploadLead.id) ??
+											(openPhoto?.id === uploadLead.id ? openPhoto : null) ??
 											uploadLead),
 										back: here,
 									}
 								: null
 						}
 						onBusyChange={setUploading}
+						returnFocus={uploadFrom}
 					/>
 				</>
 			)}

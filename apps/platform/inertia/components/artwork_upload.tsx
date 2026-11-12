@@ -4,6 +4,7 @@ import { ChevronDown, ImagePlus, RotateCcw, X } from "lucide-react";
 import {
 	type DragEvent,
 	type FormEvent,
+	type RefObject,
 	useEffect,
 	useId,
 	useRef,
@@ -127,6 +128,7 @@ export default function ArtworkUpload({
 	backFor,
 	lead = null,
 	onBusyChange,
+	returnFocus,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
@@ -140,6 +142,8 @@ export default function ArtworkUpload({
 	/** The tattoo to add photos to, with the address to come back to; null for new work. */
 	lead?: (PortfolioPhoto & { back: string }) | null;
 	onBusyChange: (busy: boolean) => void;
+	/** The button that opened the panel ("Upload artwork", or the tattoo's "Add photos"): focus goes back to it. */
+	returnFocus?: RefObject<HTMLElement | null>;
 }) {
 	const id = useId();
 	const input = useRef<HTMLInputElement>(null);
@@ -333,6 +337,14 @@ export default function ArtworkUpload({
 				}}
 				onInteractOutside={(event) => {
 					if (busy) event.preventDefault();
+				}}
+				onCloseAutoFocus={(event) => {
+					// Opened from code, not a Radix trigger: send focus back by hand.
+					const from = returnFocus?.current;
+					if (from?.isConnected) {
+						event.preventDefault();
+						from.focus();
+					}
 				}}
 			>
 				<div className="flex flex-col gap-1 border-b px-5 pt-5 pr-14 pb-4">

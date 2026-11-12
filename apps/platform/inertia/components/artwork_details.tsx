@@ -30,6 +30,7 @@ import {
 	sizeText,
 	statusNote,
 	statusText,
+	TATTOO_MOVED_NOTE,
 } from "~/components/portfolio";
 import StylePicker from "~/components/style_picker";
 import TattooPhotos from "~/components/tattoo_photos";
@@ -89,6 +90,7 @@ export default function ArtworkDetails({
 	held,
 	onFollow,
 	onAddPhotos,
+	moved = false,
 }: {
 	photo: PortfolioPhoto | null;
 	open: boolean;
@@ -104,8 +106,10 @@ export default function ArtworkDetails({
 	held: boolean;
 	/** Another photo of the tattoo is becoming its main one: select it. */
 	onFollow: (id: string) => void;
-	/** Open the upload for this tattoo. */
-	onAddPhotos: (photo: PortfolioPhoto) => void;
+	/** Open the upload for this tattoo, from the button that asked (focus returns there). */
+	onAddPhotos: (photo: PortfolioPhoto, from: HTMLElement) => void;
+	/** The tattoo is not on the page shown (its new main photo moved it): say so. */
+	moved?: boolean;
 }) {
 	const [mode, setMode] = useState<Mode>("view");
 	const [busy, setBusy] = useState(false);
@@ -196,7 +200,8 @@ export default function ArtworkDetails({
 						styleNames={styleNames}
 						held={held}
 						onFollow={onFollow}
-						onAddPhotos={() => onAddPhotos(current)}
+						onAddPhotos={(from) => onAddPhotos(current, from)}
+						moved={moved}
 						escapeInside={escapeInside}
 					/>
 				)}
@@ -221,6 +226,7 @@ function Body({
 	onFollow,
 	onAddPhotos,
 	escapeInside,
+	moved,
 }: {
 	photo: PortfolioPhoto;
 	mode: Mode;
@@ -235,8 +241,9 @@ function Body({
 	styleNames: Record<string, string>;
 	held: boolean;
 	onFollow: (id: string) => void;
-	onAddPhotos: () => void;
+	onAddPhotos: (from: HTMLElement) => void;
 	escapeInside: RefObject<(() => boolean) | null>;
+	moved: boolean;
 }) {
 	const [failed, setFailed] = useState(false);
 	const photos = photoTotal(photo);
@@ -346,6 +353,11 @@ function Body({
 				</figcaption>
 			</figure>
 
+			{moved && (
+				<p className="mx-5 mt-4 rounded-md border px-3 py-2 text-sm text-muted-foreground">
+					{TATTOO_MOVED_NOTE}
+				</p>
+			)}
 			{error && (
 				<p
 					role="alert"

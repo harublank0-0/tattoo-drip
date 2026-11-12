@@ -53,6 +53,8 @@ export type PortfolioPhoto = {
 	discover: { label: string; note: string };
 	discoverState: string;
 	angles: PortfolioAngle[];
+	/** The 320 px copy, for the details panel's list of the tattoo's photos. */
+	thumbUrl: string;
 };
 
 export type PortfolioArtist = {
@@ -83,6 +85,8 @@ export type PortfolioFilters = {
 
 export type PortfolioPageProps = {
 	photos: PortfolioPhoto[];
+	/** The tattoo the details panel follows when it left this page (`open` in the address), else null. */
+	openPhoto: PortfolioPhoto | null;
 	artists: PortfolioArtist[];
 	styleOptions: { slug: string; name: string }[];
 	filters: PortfolioFilters;
@@ -392,10 +396,35 @@ export function tattooPhotoName(alt: string | null, n: number): string {
 	return alt ? alt : `Photo ${n}`;
 }
 
-/** "Move Koi, side earlier": the Page look sections' words, for one photo. */
-export function movePhotoLabel(name: string, direction: "up" | "down"): string {
-	return `Move ${name} ${direction === "up" ? "earlier" : "later"}`;
+/**
+ * "Move photo 2 of 4 earlier": the Page look sections' words, named by the
+ * photo's place, so two photos with the same description stay distinct.
+ */
+export function movePhotoLabel(
+	n: number,
+	count: number,
+	direction: "up" | "down",
+): string {
+	return `Move photo ${n} of ${count} ${direction === "up" ? "earlier" : "later"}`;
 }
+
+/**
+ * The portfolio's address with `open=<id>`: where a write that gives the
+ * tattoo a new main photo comes back to, so the details panel stays on it
+ * even when its new place in the order is on another page (the server then
+ * sends it as `openPhoto`). Any `open` already there is replaced.
+ */
+export function followBack(back: string, id: string): string {
+	const [path, query = ""] = back.split("?");
+	const kept = query
+		.split("&")
+		.filter((part) => part !== "" && !part.startsWith("open="));
+	return `${path}?${[...kept, `open=${encodeURIComponent(id)}`].join("&")}`;
+}
+
+/** What the details panel says when the tattoo it follows is not on the page shown. */
+export const TATTOO_MOVED_NOTE =
+	"This tattoo moved in the list: its new main photo puts it on another page. It stays open here.";
 
 /**
  * The tattoo's photo ids with one moved a place earlier or later: the order
@@ -495,7 +524,18 @@ export function canGroup(count: number): boolean {
 }
 
 export const GROUP_HINT =
-	"Photos of one tattoo from different angles: the newest becomes its main photo.";
+	"Photos of one tattoo from different angles: the newest becomes its main photo, and the tattoo takes its styles and healed mark. Publish or unpublish them all first.";
+
+/**
+ * What the bar says after a refusal, after the server's words: a group is
+ * all or nothing, so its photos are all still selected; the other changes
+ * keep only those they didn't change.
+ */
+export function bulkErrorTail(action: BulkAction): string {
+	return action === "group"
+		? "Nothing was grouped, and they are all still selected."
+		: "The photos that weren't changed are still selected.";
+}
 
 /**
  * The question before a bulk delete, which can't be undone. `photos` counts

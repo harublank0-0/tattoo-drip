@@ -44,7 +44,9 @@ type PortfolioModule = {
 	removeLabel(photos: number, busy: boolean): string;
 	movedOrder(ids: string[], index: number, direction: "up" | "down"): string[];
 	mainFirst(ids: string[], id: string): string[];
-	movePhotoLabel(name: string, direction: "up" | "down"): string;
+	movePhotoLabel(n: number, count: number, direction: "up" | "down"): string;
+	followBack(back: string, id: string): string;
+	bulkErrorTail(action: string): string;
 	tattooPhotoName(alt: string | null, n: number): string;
 	tattooUploadProblem(
 		ready: number,
@@ -355,11 +357,9 @@ test.group("Portfolio: a tattoo's photos (angles)", () => {
 		assert.deepEqual(p.movedOrder(ids, 2, "down"), ids);
 		assert.deepEqual(p.mainFirst(ids, "c"), ["c", "a", "b"]);
 		assert.deepEqual(p.mainFirst(ids, "x"), ids);
-		assert.equal(p.movePhotoLabel("Koi, side", "up"), "Move Koi, side earlier");
-		assert.equal(
-			p.movePhotoLabel(p.tattooPhotoName(null, 3), "down"),
-			"Move Photo 3 later",
-		);
+		// Named by place, so two photos with one description stay distinct.
+		assert.equal(p.movePhotoLabel(2, 4, "up"), "Move photo 2 of 4 earlier");
+		assert.equal(p.movePhotoLabel(1, 4, "down"), "Move photo 1 of 4 later");
 	});
 
 	test("adding photos fits the tattoo's eight and the artist's room; grouping takes 2 to 8", ({
@@ -412,3 +412,41 @@ test.group("Portfolio: what a remove asks for (angles)", () => {
 		);
 	});
 });
+
+test.group(
+	"Portfolio: following a tattoo, and the bar's words (angles)",
+	() => {
+		test("a write that gives the tattoo a new main photo comes back asking for it", ({
+			assert,
+		}) => {
+			assert.equal(p.followBack(base, "abc"), `${base}?open=abc`);
+			assert.equal(
+				p.followBack(`${base}?q=koi&open=old&page=2`, "new"),
+				`${base}?q=koi&page=2&open=new`,
+			);
+			assert.equal(
+				portfolioBack(
+					p.followBack(
+						`${base}?page=2`,
+						"0199f000-0000-7000-8000-000000000001",
+					),
+					"ink",
+				),
+				`${base}?page=2&open=0199f000-0000-7000-8000-000000000001`,
+			);
+		});
+
+		test("after a refusal, a group says nothing was grouped; the other changes keep the unchanged ones", ({
+			assert,
+		}) => {
+			assert.equal(
+				p.bulkErrorTail("group"),
+				"Nothing was grouped, and they are all still selected.",
+			);
+			assert.equal(
+				p.bulkErrorTail("delete"),
+				"The photos that weren't changed are still selected.",
+			);
+		});
+	},
+);
