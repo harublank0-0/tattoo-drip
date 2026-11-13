@@ -60,19 +60,24 @@ export default class PublicDepositsController {
 			ctx.response.status(201);
 			return { data: { checkoutUrl: started.checkoutUrl } };
 		} catch (error) {
-			if (error instanceof DepositPageNotFoundError)
+			if (error instanceof DepositPageNotFoundError) {
 				throw ApiException.notFound();
-			if (!(error instanceof GatewayRuleError)) throw error;
-			if (error.reason === "provider_unavailable") {
-				const { status, body, headers } = apiErrorFor(
-					ApiException.of("payment_provider_unavailable"),
-				);
-				for (const [name, value] of Object.entries(headers)) {
-					ctx.response.header(name, value);
-				}
-				return ctx.response.status(status).send(body);
 			}
-			throw ApiException.of("online_payment_unavailable");
+			if (!(error instanceof GatewayRuleError)) throw error;
+			// Answered, not thrown: the request's transaction still commits
+			// what was recorded on the way (the attempt and its idempotency
+			// key, or a payment found on the previous session).
+			const code =
+				error.reason === "provider_unavailable"
+					? "payment_provider_unavailable"
+					: error.reason === "payment_in_progress"
+						? "online_payment_in_progress"
+						: "online_payment_unavailable";
+			const { status, body, headers } = apiErrorFor(ApiException.of(code));
+			for (const [name, value] of Object.entries(headers)) {
+				ctx.response.header(name, value);
+			}
+			return ctx.response.status(status).send(body);
 		}
 	}
 

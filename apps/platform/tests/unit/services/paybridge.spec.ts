@@ -279,6 +279,25 @@ test.group("PayBridgeNP adapter", () => {
 				credentialsKey: false,
 			}),
 		);
+		assert.throws(() =>
+			checkPaymentSettings({
+				platformKey: false,
+				webhookSecret: false,
+				studioMode: "sandbox",
+				credentialsKey: true,
+				production: true,
+			}),
+		);
+		assert.throws(() =>
+			checkPaymentSettings({
+				platformKey: true,
+				platformSandbox: true,
+				webhookSecret: true,
+				studioMode: "disabled",
+				credentialsKey: false,
+				production: true,
+			}),
+		);
 		assert.doesNotThrow(() =>
 			checkPaymentSettings({
 				platformKey: false,

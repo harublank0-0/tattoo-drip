@@ -72,6 +72,7 @@ export type ApiErrorCode =
 	| "deposit_changed"
 	// startDepositCheckout (docs/payments-paybridgenp.md)
 	| "online_payment_unavailable"
+	| "online_payment_in_progress"
 	| "payment_provider_unavailable";
 
 export type ErrorKind = { status: number; code: string; message: string };
@@ -184,6 +185,12 @@ export const API_ERRORS: Record<ApiErrorCode, ErrorKind> = {
 		code: "online_payment_unavailable",
 		message:
 			"Online payment isn't available for this deposit. Pay one of the other ways on this page.",
+	},
+	online_payment_in_progress: {
+		status: 409,
+		code: "online_payment_in_progress",
+		message:
+			"An online payment for this deposit is still being completed or confirmed. Don't pay again: reload this page in a few minutes.",
 	},
 	payment_provider_unavailable: {
 		status: 503,

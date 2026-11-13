@@ -14,11 +14,12 @@ import type { DepositView } from "../view-model.ts";
  * only once the provider confirms it, and the page then reads `paid`.
  */
 
-type Problem = "unavailable" | "busy" | "failed";
+type Problem = "unavailable" | "inProgress" | "busy" | "failed";
 
 function problemOf(error: unknown): Problem {
 	if (error instanceof TattooApiError) {
 		if (error.code === "online_payment_unavailable") return "unavailable";
+		if (error.code === "online_payment_in_progress") return "inProgress";
 		if (
 			error.code === "payment_provider_unavailable" ||
 			error.code === "service_busy" ||
@@ -47,6 +48,8 @@ export function OnlinePay({
 		if (busy) return;
 		start.mutate(undefined, {
 			onSuccess: ({ checkoutUrl }) => {
+				// Only ever an https page: never a script or another scheme.
+				if (!checkoutUrl.startsWith("https://")) return;
 				setLeaving(true);
 				window.location.assign(checkoutUrl);
 			},

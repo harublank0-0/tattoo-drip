@@ -338,6 +338,63 @@ test.group("Billing: subscribing and access", (group) => {
 	});
 });
 
+test.group("Billing: lost answers", (group) => {
+	group.each.setup(() => paybridge.reset());
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("a subscription PayBridgeNP made but TattooDrip lost is adopted, never created twice", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, owner, subscription } = await subscribed(
+			client,
+			"bill-adopt",
+		);
+		// The local copy is lost (the answer timed out after the create).
+		await inTenant(tenant, async () => {
+			await BillingInvoice.query().where("tenant_id", tenant.id).delete();
+			await BillingSubscription.query().where("id", subscription.id).delete();
+		});
+		const again = await client
+			.post(`/t/${tenant.slug}/settings/billing/subscription`)
+			.loginAs(owner)
+			.withCsrfToken()
+			.redirects(0)
+			.form({ plan: "studio-monthly" });
+		again.assertStatus(302);
+		assert.lengthOf(paybridge.callsOf("subscriptions.create"), 1);
+		const adopted = await inTenant(tenant, () =>
+			BillingSubscription.query().firstOrFail(),
+		);
+		assert.equal(
+			adopted.providerSubscriptionId,
+			subscription.providerSubscriptionId,
+		);
+		assert.lengthOf(await inTenant(tenant, () => BillingInvoice.all()), 1);
+	});
+
+	test("an invoice paid for a customer whose local row was lost still finds its studio", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, invoice } = await subscribed(client, "bill-orphan");
+		await inTenant(tenant, async () => {
+			await BillingInvoice.query().where("tenant_id", tenant.id).delete();
+			await BillingSubscription.query().where("tenant_id", tenant.id).delete();
+			await BillingCustomer.query().where("tenant_id", tenant.id).delete();
+		});
+		paybridge.payInvoice(invoice.providerInvoiceId);
+		(
+			await deliver(
+				client,
+				platformEvent("invoice.paid", { id: invoice.providerInvoiceId }),
+			)
+		).assertStatus(200);
+		assert.lengthOf(await inTenant(tenant, () => BillingCustomer.all()), 1);
+		assert.equal((await access(tenant)).state, "paid");
+	});
+});
+
 test.group("Billing: platform admin", (group) => {
 	group.each.setup(() => paybridge.reset());
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());

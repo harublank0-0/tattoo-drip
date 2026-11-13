@@ -216,6 +216,12 @@ export class FakePaybridge extends PaymentProviders {
 					throw new ProviderError("not_found", "not_found", 404, "req_fake");
 				return { ...found };
 			},
+			async listSubscriptions(customerId) {
+				fake.record("subscriptions.list");
+				return [...fake.subscriptions.values()]
+					.filter((subscription) => subscription.customerId === customerId)
+					.map((subscription) => ({ ...subscription }));
+			},
 			async cancelAtPeriodEnd(subscriptionId) {
 				fake.record("subscriptions.cancel");
 				const found = fake.subscriptions.get(subscriptionId);

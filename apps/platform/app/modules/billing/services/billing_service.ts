@@ -28,6 +28,7 @@ import type Tenant from "#modules/tenancy/models/tenant";
 import { dbClient, withDbContext, withTransaction } from "#services/db_context";
 import PaymentProviders, {
 	type BillingApi,
+	isHostedPaymentUrl,
 	ProviderError,
 	type ProviderEvent,
 	type ProviderInvoice,
@@ -35,6 +36,8 @@ import PaymentProviders, {
 } from "#services/paybridge";
 
 type TenantRef = Pick<Tenant, "id">;
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** What the studio's Billing page shows. */
 export type BillingOverview = {
@@ -177,13 +180,42 @@ export default class BillingService {
 			);
 			await this.storeSubscription(api, tenant.id, fresh);
 		});
+		// The customer in a step of its own: once PayBridgeNP has created it,
+		// the row stays, whatever happens to the subscription below, so its
+		// webhooks always find the studio.
+		const { plan, customer } = await withTransaction(async (trx) => {
+			await lockBilling(trx, tenant.id);
+			if (await this.liveSubscription(tenant)) {
+				throw new BillingRuleError("already_subscribed");
+			}
+			return {
+				plan: await this.availablePlan(api, planCode),
+				customer: await this.ensureCustomer(api, tenant, owner.email),
+			};
+		});
 		return withTransaction(async (trx) => {
 			await lockBilling(trx, tenant.id);
 			if (await this.liveSubscription(tenant)) {
 				throw new BillingRuleError("already_subscribed");
 			}
-			const plan = await this.availablePlan(api, planCode);
-			const customer = await this.ensureCustomer(api, tenant, owner.email);
+			// A subscription PayBridgeNP made for an earlier try whose answer was
+			// lost (a timeout, a rollback) is adopted, never made twice.
+			const existing = (
+				await provider(() => api.listSubscriptions(customer.providerCustomerId))
+			).find(
+				(found) =>
+					!(ENDED_STATUSES as readonly string[]).includes(found.status),
+			);
+			if (existing) {
+				const adopted = await this.storeSubscription(
+					api,
+					tenant.id,
+					existing,
+					owner.userId,
+				);
+				await this.syncInvoices(api, tenant.id, adopted);
+				return adopted;
+			}
 			const attempts = await BillingSubscription.query()
 				.where("tenant_id", tenant.id)
 				.count("* as total");
@@ -321,23 +353,50 @@ export default class BillingService {
 	 * (a plan, a coupon) or a customer TattooDrip doesn't know.
 	 */
 	async tenantForEvent(event: ProviderEvent): Promise<string | null> {
+		try {
+			return await this.studioOfEvent(event);
+		} catch (error) {
+			// An object the platform's project doesn't have is about no studio.
+			if (error instanceof ProviderError && error.kind === "not_found") {
+				return null;
+			}
+			throw error;
+		}
+	}
+
+	private async studioOfEvent(event: ProviderEvent): Promise<string | null> {
 		const target = eventTarget(event);
 		if (!target) return null;
+		const api = this.api();
 		let customerId = customerOf(event.data);
+		let externalId: string | null = null;
 		if (!customerId) {
-			const api = this.api();
 			const object =
 				target.kind === "invoice"
 					? await api.getInvoice(target.id)
 					: await api.getSubscription(target.id);
 			customerId = object.customerId;
+			externalId = object.customerExternalId;
 		}
 		if (!customerId) return null;
 		const { rows } = await dbClient().rawQuery(
 			"select public.billing_tenant_for_customer(?) as tenant_id",
 			[customerId],
 		);
-		return (rows[0]?.tenant_id as string | null) ?? null;
+		const known = (rows[0]?.tenant_id as string | null) ?? null;
+		if (known) return known;
+		// A customer whose local row was lost (its creating request failed
+		// after PayBridgeNP answered): TattooDrip set its external id to the
+		// studio's id, read here from the API, never from the event body.
+		if (externalId === null) {
+			const object =
+				target.kind === "invoice"
+					? await api.getInvoice(target.id)
+					: await api.getSubscription(target.id);
+			if (object.customerId !== customerId) return null;
+			externalId = object.customerExternalId;
+		}
+		return externalId && UUID.test(externalId) ? externalId : null;
 	}
 
 	/**
@@ -372,6 +431,7 @@ export default class BillingService {
 			);
 			if (inserted.rows.length === 0) return "duplicate";
 			await lockBilling(trx, tenantId);
+			await this.adoptCustomer(api, tenantId, target);
 			if (target?.kind === "subscription") {
 				const fresh = await api.getSubscription(target.id);
 				if (await this.ownsCustomer(api, tenantId, fresh.customerId)) {
@@ -497,6 +557,41 @@ export default class BillingService {
 			tenantId: tenant.id,
 			livemode,
 			providerCustomerId: created.id,
+		});
+	}
+
+	/**
+	 * Records the studio's billing customer when PayBridgeNP has it and the
+	 * studio doesn't (see tenantForEvent): read from the API, and only a
+	 * customer whose external id is this studio's.
+	 */
+	private async adoptCustomer(
+		api: BillingApi,
+		tenantId: string,
+		target: { kind: "subscription" | "invoice"; id: string } | null,
+	) {
+		if (!target) return;
+		const livemode = api.mode === "live";
+		const known = await BillingCustomer.query()
+			.where("tenant_id", tenantId)
+			.where("livemode", livemode)
+			.first();
+		if (known) return;
+		const object =
+			target.kind === "invoice"
+				? await api.getInvoice(target.id)
+				: await api.getSubscription(target.id);
+		if (
+			!object.customerId ||
+			object.customerExternalId !== tenantId ||
+			object.livemode !== livemode
+		) {
+			return;
+		}
+		await BillingCustomer.create({
+			tenantId,
+			livemode,
+			providerCustomerId: object.customerId,
 		});
 	}
 
@@ -795,22 +890,4 @@ function safeAmount(value: number): number {
 	return Number.isSafeInteger(value) && value >= 0 && value <= 2_147_483_647
 		? value
 		: 0;
-}
-
-/**
- * Only an https page of PayBridgeNP's own (or a subdomain, such as its
- * checkout host) is ever sent to a browser as the place to pay.
- */
-export function isHostedPaymentUrl(url: string | null): url is string {
-	if (!url) return false;
-	try {
-		const parsed = new URL(url);
-		const host = parsed.hostname.toLowerCase();
-		return (
-			parsed.protocol === "https:" &&
-			(host === "paybridgenp.com" || host.endsWith(".paybridgenp.com"))
-		);
-	} catch {
-		return false;
-	}
 }

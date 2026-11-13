@@ -143,6 +143,8 @@ export const copy = {
 		retry: "The last online payment didn't go through. You can try again.",
 		unavailable:
 			"Online payment isn't available for this deposit any more. Pay one of the other ways below.",
+		inProgress:
+			"Your last online payment is still being completed or confirmed. Don't pay again: reload this page in a few minutes.",
 		busy: "The payment service didn't answer. Nothing was charged; try again in a minute.",
 		failed:
 			"Something went wrong. Try again, or pay one of the other ways below.",

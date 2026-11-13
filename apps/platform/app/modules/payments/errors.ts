@@ -130,7 +130,8 @@ export type GatewayRule =
 	| "unavailable"
 	| "not_due"
 	| "amount_out_of_range"
-	| "not_ours";
+	| "not_ours"
+	| "payment_in_progress";
 
 /** The owner's words for each refusal of the studio's online payments. */
 export const GATEWAY_MESSAGES: Record<GatewayRule, string> = {
@@ -151,6 +152,8 @@ export const GATEWAY_MESSAGES: Record<GatewayRule, string> = {
 	amount_out_of_range:
 		"Online payment takes NPR 10 to NPR 10,00,000; pay this deposit another way.",
 	not_ours: "This payment isn't one of this studio's.",
+	payment_in_progress:
+		"An online payment for this deposit is still being completed or confirmed.",
 };
 
 /** A refusal of the studio's online payments; `reason` keys GATEWAY_MESSAGES. */

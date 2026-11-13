@@ -99,10 +99,25 @@ export function checkAdminEmails(
  */
 export function checkPaymentSettings(settings: {
 	platformKey: boolean;
+	/** The platform key is a sandbox key (sk_test_). */
+	platformSandbox?: boolean;
 	webhookSecret: boolean;
 	studioMode: StudioPaymentMode;
 	credentialsKey: boolean;
+	production?: boolean;
 }) {
+	// Sandbox payments look like real ones once recorded (verified deposits,
+	// paid access): never in production.
+	if (settings.production && settings.studioMode === "sandbox") {
+		throw new Error(
+			"STUDIO_ONLINE_PAYMENTS=sandbox is refused in production: use live, or disabled",
+		);
+	}
+	if (settings.production && settings.platformSandbox) {
+		throw new Error(
+			"PAYBRIDGE_SECRET_KEY is a sandbox key (sk_test_): production takes a live key only",
+		);
+	}
 	if (settings.platformKey && !settings.webhookSecret) {
 		throw new Error(
 			"PAYBRIDGE_WEBHOOK_SECRET is required with PAYBRIDGE_SECRET_KEY: billing is confirmed by signed webhooks",

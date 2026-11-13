@@ -387,6 +387,8 @@ export interface BillingApi {
 		idempotencyKey: string,
 	): Promise<ProviderSubscription>;
 	getSubscription(id: string): Promise<ProviderSubscription>;
+	/** The customer's subscriptions, newest first (at most 100). */
+	listSubscriptions(customerId: string): Promise<ProviderSubscription[]>;
 	cancelAtPeriodEnd(id: string): Promise<ProviderSubscription>;
 	changePlan(id: string, planId: string): Promise<void>;
 	getInvoice(id: string): Promise<ProviderInvoice>;
@@ -713,6 +715,13 @@ class SdkBillingApi implements BillingApi {
 		return normalizeSubscription(raw);
 	}
 
+	async listSubscriptions(customerId: string) {
+		const page = await withRetries("subscriptions.list", () =>
+			this.#client.subscriptions.list({ customerId, limit: 100 }),
+		);
+		return page.data.map(normalizeSubscription);
+	}
+
 	async cancelAtPeriodEnd(id: string) {
 		// The cancel endpoint ignores Idempotency-Key, so no automatic retry;
 		// asking again is harmless (the owner can press it again).
@@ -814,4 +823,22 @@ export default class PaymentProviders {
 /** PAYBRIDGE_API_URL overrides the SDK's https://api.paybridgenp.com (a mock server). */
 function apiUrl(): string | undefined {
 	return env.get("PAYBRIDGE_API_URL") || undefined;
+}
+
+/**
+ * Only an https page of PayBridgeNP's own (or a subdomain, such as its
+ * checkout host) is ever sent to a browser as the place to pay.
+ */
+export function isHostedPaymentUrl(url: string | null): url is string {
+	if (!url) return false;
+	try {
+		const parsed = new URL(url);
+		const host = parsed.hostname.toLowerCase();
+		return (
+			parsed.protocol === "https:" &&
+			(host === "paybridgenp.com" || host.endsWith(".paybridgenp.com"))
+		);
+	} catch {
+		return false;
+	}
 }

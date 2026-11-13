@@ -41,8 +41,12 @@ const UNFLASHED_INPUTS = [
 	"newPassword",
 ];
 
-/** A field name that holds a password: password, passwd, passcode, newPasswordConfirmation... */
-const PASSWORD_LIKE = /pass/i;
+/**
+ * A field name that holds a password or another secret: password, passwd,
+ * passcode, newPasswordConfirmation..., and a studio's PayBridgeNP secret key
+ * (`secretKey`, docs/payments-paybridgenp.md): no secret sits in the session.
+ */
+const PASSWORD_LIKE = /pass|secret/i;
 
 /** Whether a value is, or holds at any depth, a field named like a password. */
 function holdsPassword(value: unknown): boolean {

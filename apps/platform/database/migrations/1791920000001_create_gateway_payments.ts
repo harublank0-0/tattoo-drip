@@ -128,8 +128,10 @@ export default class extends BaseSchema {
 		this.schema.raw(
 			"alter table gateway_checkouts add constraint gateway_checkouts_amount check (amount between 1000 and 100000000 and currency = 'NPR')",
 		);
+		// An attempt that never reached PayBridgeNP has no session: it stays
+		// `creating`, or ends `failed` or `superseded`.
 		this.schema.raw(
-			"alter table gateway_checkouts add constraint gateway_checkouts_session check (status = 'creating' or provider_session_id is not null)",
+			"alter table gateway_checkouts add constraint gateway_checkouts_session check (status in ('creating', 'failed', 'superseded') or provider_session_id is not null)",
 		);
 		// The target of the payments' key: a payment names its checkout's project.
 		this.schema.raw(

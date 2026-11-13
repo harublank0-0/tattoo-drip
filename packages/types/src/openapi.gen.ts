@@ -804,7 +804,9 @@ export interface paths {
          *
          *     Own codes: `online_payment_unavailable` (409: the studio doesn't
          *     take online payments, the page's state isn't `due`, or the amount
-         *     is outside NPR 10 to NPR 10,00,000) and
+         *     is outside NPR 10 to NPR 10,00,000), `online_payment_in_progress`
+         *     (409: the previous online payment is still on the provider's page or
+         *     was just paid; never offer to pay again, reload later) and
          *     `payment_provider_unavailable` (503: the provider didn't answer;
          *     nothing was charged, try again).
          */
@@ -2957,7 +2959,7 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
-            /** @description Online payment isn't available for this deposit now (`online_payment_unavailable`) */
+            /** @description Online payment isn't available for this deposit now (`online_payment_unavailable`, `online_payment_in_progress`) */
             409: {
                 headers: {
                     [name: string]: unknown;

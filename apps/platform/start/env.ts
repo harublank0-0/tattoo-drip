@@ -124,6 +124,9 @@ const env = await Env.create(new URL("../", import.meta.url), {
 
 checkPaymentSettings({
 	platformKey: env.get("PAYBRIDGE_SECRET_KEY") !== undefined,
+	platformSandbox:
+		env.get("PAYBRIDGE_SECRET_KEY")?.release().startsWith("sk_test_") === true,
+	production: env.get("NODE_ENV") === "production",
 	webhookSecret: env.get("PAYBRIDGE_WEBHOOK_SECRET") !== undefined,
 	studioMode: env.get("STUDIO_ONLINE_PAYMENTS"),
 	credentialsKey: env.get("PAYMENT_CREDENTIALS_KEY") !== undefined,

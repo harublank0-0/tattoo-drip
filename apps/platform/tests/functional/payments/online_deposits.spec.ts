@@ -1,6 +1,8 @@
+import { randomUUID } from "node:crypto";
 import testUtils from "@adonisjs/core/services/test_utils";
 import type { ApiClient } from "@japa/api-client";
 import { test } from "@japa/runner";
+import { DateTime } from "luxon";
 import GatewayAccount from "#modules/payments/models/gateway_account";
 import GatewayCheckout from "#modules/payments/models/gateway_checkout";
 import GatewayEvent from "#modules/payments/models/gateway_event";
@@ -192,6 +194,146 @@ test.group("Online deposits: checkout", (group) => {
 		assert.equal(recorded.method, "khalti");
 		assert.equal(recorded.status, "verified");
 		assert.isNull(recorded.verifiedByUserId);
+	});
+});
+
+test.group("Online deposits: review fixes", (group) => {
+	group.each.setup(() => paybridge.reset());
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("an attempt that never reached PayBridgeNP is replaced when the deposit changes, and given up after an hour", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, owner, token, project } = await studio("online-stuck");
+		paybridge.failNext("checkout.create");
+		(await startCheckout(client, tenant.slug, token)).assertStatus(503);
+		// The deposit changes: part of it is paid at the desk.
+		await inTenant(tenant, () =>
+			Payment.create({
+				tenantId: tenant.id,
+				projectId: project.id,
+				kind: "deposit",
+				amount: 100_000,
+				currency: "NPR",
+				method: "cash",
+				status: "verified",
+				verifiedAt: DateTime.utc(),
+				verifiedByUserId: owner.id,
+			}),
+		);
+		(await startCheckout(client, tenant.slug, token)).assertStatus(201);
+		const rows = await inTenant(tenant, () =>
+			GatewayCheckout.query().orderBy("created_at"),
+		);
+		assert.deepEqual(
+			rows.map((row) => [row.status, row.amount]),
+			[
+				["superseded", 300_000],
+				["open", 200_000],
+			],
+		);
+
+		// Another studio-less attempt, an hour old: the check gives it up.
+		const old = await inTenant(tenant, async () => {
+			await rows[1].merge({ status: "expired" }).save();
+			const stale = await GatewayCheckout.create({
+				tenantId: tenant.id,
+				accountId: rows[1].accountId,
+				projectId: project.id,
+				amount: 200_000,
+				currency: "NPR",
+				livemode: false,
+				idempotencyKey: randomUUID(),
+				status: "creating",
+			});
+			await GatewayCheckout.query()
+				.where("id", stale.id)
+				.update({ createdAt: DateTime.utc().minus({ hours: 2 }).toSQL() });
+			return stale;
+		});
+		const checked = await client
+			.post(`/t/${tenant.slug}/transactions/${old.id}/sync`)
+			.loginAs(owner)
+			.withCsrfToken()
+			.redirects(0);
+		checked.assertStatus(302);
+		const gaveUp = await inTenant(tenant, () =>
+			GatewayCheckout.findOrFail(old.id),
+		);
+		assert.equal(gaveUp.status, "failed");
+	});
+
+	test("no second checkout while the first may be paid: a payment found on it is recorded, a running one is waited for", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, token } = await studio("online-inflight");
+		(await startCheckout(client, tenant.slug, token)).assertStatus(201);
+		const [session] = [...paybridge.sessions.values()];
+		const checkout = await inTenant(tenant, () =>
+			GatewayCheckout.query().firstOrFail(),
+		);
+		// Nearly expired, so a click would otherwise start a new session.
+		await inTenant(tenant, () =>
+			checkout.merge({ expiresAt: DateTime.utc().plus({ minutes: 1 }) }).save(),
+		);
+		session.status = "initiated";
+		const running = await startCheckout(client, tenant.slug, token);
+		running.assertStatus(409);
+		assert.equal(running.body().error.code, "online_payment_in_progress");
+
+		// The client paid on it and the webhook never came.
+		paybridge.pay(session.id);
+		const paid = await startCheckout(client, tenant.slug, token);
+		paid.assertStatus(409);
+		assert.equal(paid.body().error.code, "online_payment_in_progress");
+		assert.lengthOf(await ledger(tenant), 1);
+		assert.lengthOf(paybridge.callsOf("checkout.create"), 1);
+		const page = await client.get(depositPath(tenant.slug, token));
+		assert.equal(page.body().data.state, "paid");
+	});
+
+	test("a refund reported before its payment is recorded with it", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, token, key } = await studio("online-early-refund");
+		(await startCheckout(client, tenant.slug, token)).assertStatus(201);
+		const [session] = [...paybridge.sessions.values()];
+		const payment = paybridge.pay(session.id);
+		paybridge.refund(payment.id, 50_000);
+		(
+			await deliver(client, key, event("payment.refunded", { id: payment.id }))
+		).assertStatus(200);
+		assert.lengthOf(await ledger(tenant), 0);
+		(
+			await deliver(client, key, event("payment.succeeded", { id: payment.id }))
+		).assertStatus(200);
+		assert.deepEqual(
+			(await ledger(tenant)).map((row) => [row.kind, row.amount]),
+			[
+				["deposit", 300_000],
+				["refund", -50_000],
+			],
+		);
+	});
+
+	test("the secret key is never flashed back into the session", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, owner } = await studio("online-flash");
+		const key = "sk_test_neverflashed0123456789";
+		const response = await client
+			.post(`/t/${tenant.slug}/settings/online-payments`)
+			.loginAs(owner)
+			.withCsrfToken()
+			.redirects(0)
+			.form({ secretKey: key });
+		response.assertStatus(302);
+		assert.notInclude(JSON.stringify(response.flashMessages()), key);
+		assert.notInclude(JSON.stringify(response.flashMessages()), "sk_test_");
 	});
 });
 

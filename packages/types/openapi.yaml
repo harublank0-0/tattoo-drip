@@ -1102,7 +1102,9 @@ paths:
 
         Own codes: `online_payment_unavailable` (409: the studio doesn't
         take online payments, the page's state isn't `due`, or the amount
-        is outside NPR 10 to NPR 10,00,000) and
+        is outside NPR 10 to NPR 10,00,000), `online_payment_in_progress`
+        (409: the previous online payment is still on the provider's page or
+        was just paid; never offer to pay again, reload later) and
         `payment_provider_unavailable` (503: the provider didn't answer;
         nothing was charged, try again).
       responses:
@@ -1120,7 +1122,7 @@ paths:
                   data: { $ref: "#/components/schemas/DepositCheckout" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409":
-          description: Online payment isn't available for this deposit now (`online_payment_unavailable`)
+          description: Online payment isn't available for this deposit now (`online_payment_unavailable`, `online_payment_in_progress`)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }

@@ -29,9 +29,11 @@ import type Tenant from "#modules/tenancy/models/tenant";
 import { withDbContext, withTransaction } from "#services/db_context";
 import {
 	type GatewayApi,
+	isHostedPaymentUrl,
 	ProviderError,
 	type ProviderEvent,
 	type ProviderPayment,
+	type ProviderSession,
 } from "#services/paybridge";
 import { studioPageUrl } from "#services/storefront_url";
 
@@ -206,6 +208,7 @@ export default class GatewayCheckoutService {
 		const availability = await this.accounts.availability(tenant);
 		if (!availability.available) throw new GatewayRuleError("unavailable");
 		const account = availability.account;
+		await this.guardInFlight(tenant, token, account);
 
 		// One savepoint holds the attempt row whatever PayBridgeNP answers.
 		const attempt = await withTransaction(async (trx) => {
@@ -265,6 +268,60 @@ export default class GatewayCheckoutService {
 		return this.createSession(tenant, account, attempt);
 	}
 
+	/**
+	 * Before anything replaces the project's open session, asks PayBridgeNP
+	 * what became of it, once: a payment on it is recorded now and no second
+	 * checkout opens (the client must not pay twice), and a client still on
+	 * the provider's page is not offered another one while the session runs.
+	 * Its own savepoints, so what it records stays even when it refuses.
+	 */
+	private async guardInFlight(
+		tenant: DepositStudio & Pick<Tenant, "slug">,
+		token: string,
+		account: GatewayAccount,
+	) {
+		const page = await this.pages.show(tenant, token);
+		const live = await GatewayCheckout.query()
+			.where("tenant_id", tenant.id)
+			.where("project_id", page.projectId)
+			.where("status", "open")
+			.whereNotNull("provider_session_id")
+			.first();
+		if (!live?.providerSessionId) return;
+		const reusable =
+			page.state === "due" &&
+			live.amount === page.due &&
+			live.accountId === account.id &&
+			live.expiresAt !== null &&
+			live.expiresAt > DateTime.utc().plus({ minutes: REUSE_MARGIN_MINUTES });
+		if (reusable) return;
+		const owner = await GatewayAccount.query()
+			.where("tenant_id", tenant.id)
+			.where("id", live.accountId)
+			.firstOrFail();
+		let session: ProviderSession;
+		try {
+			session = await this.accounts
+				.apiFor(owner)
+				.getSession(live.providerSessionId);
+		} catch (error) {
+			if (error instanceof ProviderError) {
+				throw new GatewayRuleError("provider_unavailable");
+			}
+			throw error;
+		}
+		if (session.paymentId) {
+			await this.confirmPayment(tenant, owner, session.paymentId);
+			throw new GatewayRuleError("payment_in_progress");
+		}
+		const running =
+			session.expiresAt !== null &&
+			DateTime.fromISO(session.expiresAt) > DateTime.utc();
+		if (session.status === "initiated" && running) {
+			throw new GatewayRuleError("payment_in_progress");
+		}
+	}
+
 	/** Calls PayBridgeNP for a `creating` attempt and stores its session. */
 	private async createSession(
 		tenant: DepositStudio & Pick<Tenant, "slug">,
@@ -292,6 +349,13 @@ export default class GatewayCheckoutService {
 				throw new GatewayRuleError("provider_unavailable");
 			}
 			throw error;
+		}
+		if (!isHostedPaymentUrl(created.url)) {
+			logger.error(
+				{ tenantId: tenant.id, checkoutId: attempt.id },
+				"PayBridgeNP answered a checkout URL off its own https domains",
+			);
+			throw new GatewayRuleError("unavailable");
 		}
 		if (created.livemode !== account.livemode) {
 			logger.error(
@@ -449,30 +513,40 @@ export default class GatewayCheckoutService {
 			.where("id", checkout.accountId)
 			.firstOrFail();
 		const api = this.accounts.apiFor(account);
+		// One read of the session, before any lock is taken.
+		const session = checkout.providerSessionId
+			? await api.getSession(checkout.providerSessionId)
+			: null;
 		await withTransaction(async (trx) => {
+			// The project first, then the attempt: every project write's order.
+			await this.projects.lockLive(trx, tenant, checkout.projectId);
 			const row = await GatewayCheckout.query({ client: trx })
 				.where("tenant_id", tenant.id)
 				.where("id", checkoutId)
 				.forUpdate()
 				.firstOrFail();
 			row.lastSyncedAt = DateTime.utc();
-			if (!row.providerSessionId) {
-				// Never reached PayBridgeNP: an abandoned attempt after a day.
-				if (row.createdAt < DateTime.utc().minus({ hours: 1 })) {
+			if (!session) {
+				// Never reached PayBridgeNP: given up an hour on.
+				if (
+					row.status === "creating" &&
+					row.createdAt < DateTime.utc().minus({ hours: 1 })
+				) {
 					row.status = "failed";
 					row.failureReason = "The checkout was never created.";
 				}
-				await row.save();
-				return;
+			} else if (
+				!session.paymentId &&
+				session.status === "expired" &&
+				row.status === "open"
+			) {
+				row.status = "expired";
 			}
-			const session = await api.getSession(row.providerSessionId);
 			await row.save();
-			if (session.paymentId) {
-				await this.confirmPayment(tenant, account, session.paymentId);
-			} else if (session.status === "expired" && row.status === "open") {
-				await row.merge({ status: "expired" }).save();
-			}
 		});
+		if (session?.paymentId) {
+			await this.confirmPayment(tenant, account, session.paymentId);
+		}
 		const payments = await GatewayPayment.query()
 			.where("tenant_id", tenant.id)
 			.where("checkout_id", checkout.id)
@@ -501,8 +575,18 @@ export default class GatewayCheckoutService {
 		const payment = await this.accounts
 			.apiFor(account)
 			.getPayment(providerPaymentId);
-		return withTransaction(async (trx) => {
-			const checkout = await this.checkoutOf(trx, tenant, account, payment);
+		const stored = await withTransaction(async (trx) => {
+			const found = await this.checkoutOf(trx, tenant, account, payment);
+			// The project first, then the attempt: every project write's order,
+			// so a checkout started at the same moment can't deadlock with this.
+			if (found) await this.projects.lockLive(trx, tenant, found.projectId);
+			const checkout = found
+				? await GatewayCheckout.query({ client: trx })
+						.where("tenant_id", tenant.id)
+						.where("id", found.id)
+						.forUpdate()
+						.firstOrFail()
+				: null;
 			if (!checkout) {
 				logger.warn(
 					{ tenantId: tenant.id, accountId: account.id },
@@ -570,6 +654,11 @@ export default class GatewayCheckoutService {
 			);
 			return stored;
 		});
+		// A refund may have been reported before the payment was recorded.
+		if (stored?.paymentId) {
+			await this.recordRefunds(tenant, account, providerPaymentId);
+		}
+		return stored;
 	}
 
 	/**
@@ -586,12 +675,18 @@ export default class GatewayCheckoutService {
 		const api = this.accounts.apiFor(account);
 		const refunds = await api.listRefunds(providerPaymentId);
 		await withTransaction(async (trx) => {
-			const payment = await GatewayPayment.query({ client: trx })
+			const found = await GatewayPayment.query({ client: trx })
 				.where("tenant_id", tenant.id)
 				.where("provider_payment_id", providerPaymentId)
-				.forUpdate()
 				.first();
-			if (!payment) return;
+			// Not recorded yet: confirmPayment pulls the refunds once it is.
+			if (!found) return;
+			await this.projects.lockLive(trx, tenant, found.projectId);
+			const payment = await GatewayPayment.query({ client: trx })
+				.where("tenant_id", tenant.id)
+				.where("id", found.id)
+				.forUpdate()
+				.firstOrFail();
 			let refunded = 0;
 			for (const refund of refunds) {
 				if (refund.paymentId !== providerPaymentId) continue;
@@ -659,7 +754,7 @@ export default class GatewayCheckoutService {
 	// -------------------------------------------------------------------------
 	// Internals
 
-	/** The checkout a provider payment belongs to: by its session, else by its metadata; locked. */
+	/** The checkout a provider payment belongs to: by its session, else by its metadata (not locked). */
 	private async checkoutOf(
 		trx: TransactionClientContract,
 		tenant: TenantRef,
@@ -671,7 +766,6 @@ export default class GatewayCheckoutService {
 					.where("tenant_id", tenant.id)
 					.where("account_id", account.id)
 					.where("provider_session_id", payment.sessionId)
-					.forUpdate()
 					.first()
 			: null;
 		if (bySession) return bySession;
@@ -681,7 +775,6 @@ export default class GatewayCheckoutService {
 			.where("tenant_id", tenant.id)
 			.where("account_id", account.id)
 			.where("id", id)
-			.forUpdate()
 			.first();
 	}
 
