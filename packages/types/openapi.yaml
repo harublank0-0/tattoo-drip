@@ -1130,17 +1130,19 @@ paths:
         post (`post`) or both; a part left out stays as it is. A review is
         made or changed; a post (whose photos and videos were added first)
         is handed to the studio, which approves it before it shows anywhere.
-        Every field is checked again here. `consentDiscover` counts only
-        while `studio.onDiscover` is true; otherwise the stored choice stays.
+        Every field is checked again here. While `studio.onDiscover` is false,
+        `consentDiscover` can only be withdrawn (the stored choice and the
+        sent one must both be true to stay true).
         Needs the bot-challenge token in `X-Challenge-Token` (action
         `review`), as the intake does. Answers with the page as it now is.
         Under an old slug it is a 404.
 
         Own codes: `review_locked` (409: what TattooDrip took down, or a post
         the studio declined or unpublished, can't be changed; its consents,
-        its name and its delete still work), `post_needs_photo` (409: a video
-        can't lead), `challenge_failed` (403) and `challenge_unavailable`
-        (503).
+        its name and its delete still work), `taken_down` (409: a new review
+        after TattooDrip took the last one down), `post_needs_photo` (409: a
+        video can't lead), `challenge_failed` (403) and
+        `challenge_unavailable` (503).
       parameters:
         - $ref: "#/components/parameters/ChallengeToken"
       requestBody:
@@ -1157,7 +1159,7 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409":
-          description: It can't be changed now (`review_locked`, `post_needs_photo`)
+          description: It can't be changed now (`review_locked`, `taken_down`, `post_needs_photo`)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -1212,6 +1214,41 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
         default: { $ref: "#/components/responses/Error" }
 
+  /tenants/{tenant}/review/post/order:
+    parameters:
+      - $ref: "#/components/parameters/Tenant"
+      - $ref: "#/components/parameters/ReviewToken"
+    put:
+      operationId: reorderReviewPost
+      tags: [Reviews]
+      summary: Change the order of the post's photos and videos
+      description: |
+        The post's order alone ("Make photo 3 the main photo"): every
+        `ReviewMedia` id once, a photo first. Nothing else is written and no
+        bot challenge is needed. A change to an approved post sends it back
+        to the studio. Answers with the page as it now is.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [order]
+              additionalProperties: false
+              properties:
+                order: { type: array, minItems: 1, maxItems: 8, items: { type: string, format: uuid } }
+      responses:
+        "200": { $ref: "#/components/responses/ReviewPageResponse" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Not changeable or a video first (`review_locked`, `post_needs_photo`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
   /tenants/{tenant}/review/photos:
     parameters:
       - $ref: "#/components/parameters/Tenant"
@@ -1225,8 +1262,9 @@ paths:
         PNG or WebP of 10 MB at most). It becomes the post's last item; the
         first photo leads. A post that doesn't exist yet is started (a draft
         only the client sees until the submit). Own codes (409): `post_full`
-        (8 photos and videos already) and `review_locked`. Answers with the
-        page as it now is.
+        (8 photos and videos already), `review_locked`, `taken_down` and
+        `post_limit` (a new post after a takedown, or a third one). Answers
+        with the page as it now is.
       requestBody:
         required: true
         content:
@@ -1241,7 +1279,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "408": { $ref: "#/components/responses/Error" }
         "409":
-          description: No room or not changeable (`post_full`, `review_locked`)
+          description: No room or not changeable (`post_full`, `review_locked`, `taken_down`, `post_limit`)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -1556,7 +1594,8 @@ components:
                 `challenge_failed` (403) and `challenge_unavailable` (503),
                 all `createInquiry`; `deposit_not_due`, `deposit_changed`
                 (409, `submitDepositProof`); `review_locked`, `post_full`,
-                `post_needs_photo` (409) and `remove_failed` (503), the
+                `post_needs_photo`, `taken_down`, `post_limit` (409) and
+                `remove_failed` (503), the
                 review page's (and `challenge_failed`,
                 `challenge_unavailable` on `submitReviewPage`). Treat an
                 unknown code by its HTTP status.
@@ -2218,7 +2257,7 @@ components:
         The client's review page. Only what the link's holder may see: never
         the client's full name, phone or email, the studio's notes or another
         project's anything.
-      required: [studio, project, link, styles, defaults, review, post]
+      required: [studio, project, link, styles, defaults, review, post, blocks]
       additionalProperties: false
       properties:
         studio:
@@ -2275,6 +2314,18 @@ components:
           oneOf: [{ $ref: "#/components/schemas/ClientReview" }, { type: "null" }]
         post:
           oneOf: [{ $ref: "#/components/schemas/ClientPost" }, { type: "null" }]
+        blocks:
+          type: object
+          description: |
+            Why the client can't start a new review or post now, while they
+            have none: `taken_down` (TattooDrip took the last one down; it
+            stays down until restored, contact the studio), `post_limit` (the
+            tattoo already had two posts). Null when they can.
+          required: [review, post]
+          additionalProperties: false
+          properties:
+            review: { type: [string, "null"], enum: [taken_down, null] }
+            post: { type: [string, "null"], enum: [taken_down, post_limit, null] }
 
     ReviewTakedown:
       type: object
@@ -2348,12 +2399,12 @@ components:
           type: [string, "null"]
           description: Why a video failed, in words for the client.
         image:
-          description: The photo, or a ready video's poster.
+          description: The photo, or a ready video's poster. Private until the post is published, so its URL (and its copies') is signed for 5 minutes and may be on the API's or the storage's origin; read the page again for fresh ones.
           oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }]
         sources:
           type: array
           maxItems: 2
-          description: A ready video's sizes, smallest first; muted.
+          description: A ready video's sizes, smallest first; muted. Signed for 5 minutes like `image`.
           items: { $ref: "#/components/schemas/VideoSource" }
         durationMs: { type: [integer, "null"], minimum: 1, maximum: 60000 }
 
@@ -2368,7 +2419,7 @@ components:
           maxLength: 40
           description: 1 to 40 characters, any script; trimmed.
         consentStudioPage: { type: boolean, description: "Show on the studio's page." }
-        consentDiscover: { type: boolean, description: Show on TattooDrip Discover. Counts only while the studio is on Discover. }
+        consentDiscover: { type: boolean, description: "Show on TattooDrip Discover. While the studio isn't on Discover it can only be withdrawn: send the stored value, or false." }
         review:
           type: object
           required: [rating, body]

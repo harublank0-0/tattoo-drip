@@ -145,3 +145,12 @@ export function useRemoveReviewMedia(token: string) {
 export function useSignReviewVideo(token: string) {
 	return useMutation(tattooMutations.signReviewVideo(useTattooClient(), token));
 }
+
+/** Changes the post's order alone ("Make photo 3 the main photo"). */
+export function useReorderReviewPost(token: string) {
+	const client = useTattooClient();
+	const queryClient = useQueryClient();
+	return useMutation(
+		tattooMutations.reorderReviewPost(client, queryClient, token),
+	);
+}

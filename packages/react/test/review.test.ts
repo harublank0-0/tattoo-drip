@@ -4,8 +4,12 @@ import { MutationObserver, QueryClient } from "@tanstack/react-query";
 import { createTattooClient, TattooApiError } from "@tattoo-drip/sdk";
 import type { ReviewPage } from "@tattoo-drip/types";
 import {
+	REVIEW_POLL_GIVE_UP_MS,
 	REVIEW_PROCESSING_POLL_MS,
+	reviewPollDelay,
 	reviewProcessing,
+	reviewRefetchInterval,
+	reviewRetryDelay,
 	tattooKeys,
 	tattooMutations,
 	tattooQueries,
@@ -21,6 +25,7 @@ const PAGE: ReviewPage = {
 	defaults: { shownName: "Maya G.", styles: [], placement: null },
 	review: null,
 	post: null,
+	blocks: { review: null, post: null },
 };
 
 function withVideo(state: "processing" | "ready"): ReviewPage {
@@ -92,21 +97,88 @@ describe("tattooQueries.review", () => {
 			retry(0, new TattooApiError(503, { code: "service_busy", message: "" })),
 			true,
 		);
+		assert.equal(options.retryDelay, reviewRetryDelay);
 	});
 
-	test("polls only while a video is processing", () => {
+	test("polls only while a video is processing, with a backoff, and stops after 15 minutes", () => {
+		const query = {
+			state: { data: withVideo("processing"), error: null as unknown },
+		};
+		const at = (seconds: number) =>
+			reviewRefetchInterval(query, 1_000_000 + seconds * 1000);
+		assert.equal(at(0), REVIEW_PROCESSING_POLL_MS);
+		assert.equal(at(29), 5_000);
+		assert.equal(at(30), 10_000);
+		assert.equal(at(90), 20_000);
+		assert.equal(at(300), 60_000);
+		assert.equal(at(899), 60_000);
+		assert.equal(at(900), false, "it gives up after REVIEW_POLL_GIVE_UP_MS");
+		assert.equal(REVIEW_POLL_GIVE_UP_MS, 15 * 60_000);
+		// Once nothing processes it stops, and a new video starts again at 5 s.
+		const done = {
+			state: { data: withVideo("ready"), error: null as unknown },
+		};
+		assert.equal(reviewRefetchInterval(done), false);
+		assert.equal(
+			reviewRefetchInterval({ state: { data: PAGE, error: null } }),
+			false,
+		);
+		assert.equal(reviewProcessing(undefined), false);
+		// One open page reads itself about 35 times in its 15 minutes.
+		let reads = 0;
+		for (let t = 0; t < REVIEW_POLL_GIVE_UP_MS; ) {
+			const wait = reviewPollDelay(t);
+			if (wait === false) break;
+			t += wait;
+			reads++;
+		}
+		assert.ok(reads <= 40, `${reads} reads`);
+	});
+
+	test("never polls after a 4xx, waits Retry-After after a 429, and keeps the backoff after a 5xx", () => {
+		const gone = new TattooApiError(404, { code: "not_found", message: "" });
+		assert.equal(
+			reviewRefetchInterval({
+				state: { data: withVideo("processing"), error: gone },
+			}),
+			false,
+		);
+		const limited = new TattooApiError(
+			429,
+			{ code: "rate_limited", message: "" },
+			{ retryAfter: 120 },
+		);
+		assert.equal(
+			reviewRefetchInterval({
+				state: { data: withVideo("processing"), error: limited },
+			}),
+			120_000,
+		);
+		const busy = new TattooApiError(503, { code: "service_busy", message: "" });
+		const query = {
+			state: { data: withVideo("processing"), error: busy as unknown },
+		};
+		assert.equal(
+			reviewRefetchInterval(query, 0),
+			5_000,
+			"a 5xx is no fast retry",
+		);
+		// The query's own retries: none for a 4xx, Retry-After for a 429, slow otherwise.
 		const { client } = clientAnswering(200, { data: PAGE });
 		const options = tattooQueries.review(client, TOKEN);
-		const interval = options.refetchInterval as (query: {
-			state: { data: ReviewPage | undefined };
-		}) => number | false;
+		const retry = options.retry as (n: number, e: unknown) => boolean;
+		assert.equal(retry(0, gone), false);
 		assert.equal(
-			interval({ state: { data: withVideo("processing") } }),
-			REVIEW_PROCESSING_POLL_MS,
+			retry(0, limited),
+			false,
+			"a 429 is shown at once, never waited on in loading",
 		);
-		assert.equal(interval({ state: { data: withVideo("ready") } }), false);
-		assert.equal(interval({ state: { data: PAGE } }), false);
-		assert.equal(reviewProcessing(undefined), false);
+		assert.equal(retry(2, busy), false, "twice at most");
+		assert.equal(reviewRetryDelay(0, limited), 120_000);
+		assert.deepEqual(
+			[0, 1, 2, 3].map((n) => reviewRetryDelay(n, busy)),
+			[5_000, 10_000, 20_000, 60_000],
+		);
 	});
 });
 

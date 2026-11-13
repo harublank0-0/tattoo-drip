@@ -28,6 +28,7 @@ export {
 	useFlashDesign,
 	usePlacements,
 	useRemoveReviewMedia,
+	useReorderReviewPost,
 	useReview,
 	useServices,
 	useSignReviewVideo,
@@ -44,8 +45,13 @@ export {
 	useTattooClient,
 } from "./provider.js";
 export {
+	REVIEW_POLL_GIVE_UP_MS,
 	REVIEW_PROCESSING_POLL_MS,
+	reviewPollDelay,
 	reviewProcessing,
+	reviewProcessingFor,
+	reviewRefetchInterval,
+	reviewRetryDelay,
 	tattooKeys,
 	tattooMutations,
 	tattooQueries,

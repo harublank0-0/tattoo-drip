@@ -1308,6 +1308,7 @@ describe("reviews", () => {
 		defaults: { shownName: "Maya G.", styles: [], placement: null },
 		review: null,
 		post: null,
+		blocks: { review: null, post: null },
 	};
 	const ROOT = "https://api.example.com/api/v1/tenants/api-needle-32/review";
 	const header = (call: Call, name: string) =>
@@ -1323,6 +1324,7 @@ describe("reviews", () => {
 		await reviews.removeMedia(TOKEN, "a/b");
 		await reviews.addVideo(TOKEN, "upload-token");
 		await reviews.signVideo(TOKEN, { type: "video/mp4", size: 10 });
+		await reviews.reorder(TOKEN, ["b", "a"]);
 
 		assert.deepEqual(
 			calls.map((call) => [call.init.method ?? "GET", call.url]),
@@ -1333,6 +1335,7 @@ describe("reviews", () => {
 				["DELETE", `${ROOT}/media/a%2Fb`],
 				["POST", `${ROOT}/videos`],
 				["POST", `${ROOT}/videos/sign`],
+				["PUT", `${ROOT}/post/order`],
 			],
 		);
 		for (const call of calls) {
@@ -1342,6 +1345,9 @@ describe("reviews", () => {
 		}
 		assert.deepEqual(JSON.parse(String(calls[4].init.body)), {
 			upload: "upload-token",
+		});
+		assert.deepEqual(JSON.parse(String(calls[6].init.body)), {
+			order: ["b", "a"],
 		});
 	});
 

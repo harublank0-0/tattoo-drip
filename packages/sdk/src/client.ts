@@ -330,6 +330,17 @@ export function createTattooClient(options: TattooClientOptions) {
 				}
 				return reviewCall<ReviewPage>(token, "", init, call);
 			},
+			/**
+			 * The post's order alone ("Make photo 3 the main photo"): every
+			 * item's id once, a photo first. No bot challenge, no other field.
+			 */
+			reorder: (token: string, order: string[], call?: RequestOptions) =>
+				reviewCall<ReviewPage>(
+					token,
+					"/post/order",
+					jsonBody("PUT", { order }),
+					call,
+				),
 			deleteReview: (token: string, call?: RequestOptions) =>
 				reviewCall<ReviewPage>(token, "/review", { method: "DELETE" }, call),
 			deletePost: (token: string, call?: RequestOptions) =>

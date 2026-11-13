@@ -807,17 +807,19 @@ export interface paths {
          *     post (`post`) or both; a part left out stays as it is. A review is
          *     made or changed; a post (whose photos and videos were added first)
          *     is handed to the studio, which approves it before it shows anywhere.
-         *     Every field is checked again here. `consentDiscover` counts only
-         *     while `studio.onDiscover` is true; otherwise the stored choice stays.
+         *     Every field is checked again here. While `studio.onDiscover` is false,
+         *     `consentDiscover` can only be withdrawn (the stored choice and the
+         *     sent one must both be true to stay true).
          *     Needs the bot-challenge token in `X-Challenge-Token` (action
          *     `review`), as the intake does. Answers with the page as it now is.
          *     Under an old slug it is a 404.
          *
          *     Own codes: `review_locked` (409: what TattooDrip took down, or a post
          *     the studio declined or unpublished, can't be changed; its consents,
-         *     its name and its delete still work), `post_needs_photo` (409: a video
-         *     can't lead), `challenge_failed` (403) and `challenge_unavailable`
-         *     (503).
+         *     its name and its delete still work), `taken_down` (409: a new review
+         *     after TattooDrip took the last one down), `post_needs_photo` (409: a
+         *     video can't lead), `challenge_failed` (403) and
+         *     `challenge_unavailable` (503).
          */
         put: operations["submitReviewPage"];
         post?: never;
@@ -904,6 +906,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tenants/{tenant}/review/post/order": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The review link's secret: the fragment of the link the studio sent
+                 *     (`https://<studio>/review#<token>`). Sent as a header so it never
+                 *     appears in a URL the API sees or logs. A bearer secret: never log
+                 *     it, put it in a URL or send it to analytics.
+                 */
+                "X-Review-Token": components["parameters"]["ReviewToken"];
+            };
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change the order of the post's photos and videos
+         * @description The post's order alone ("Make photo 3 the main photo"): every
+         *     `ReviewMedia` id once, a photo first. Nothing else is written and no
+         *     bot challenge is needed. A change to an approved post sends it back
+         *     to the studio. Answers with the page as it now is.
+         */
+        put: operations["reorderReviewPost"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tenants/{tenant}/review/photos": {
         parameters: {
             query?: never;
@@ -935,8 +976,9 @@ export interface paths {
          *     PNG or WebP of 10 MB at most). It becomes the post's last item; the
          *     first photo leads. A post that doesn't exist yet is started (a draft
          *     only the client sees until the submit). Own codes (409): `post_full`
-         *     (8 photos and videos already) and `review_locked`. Answers with the
-         *     page as it now is.
+         *     (8 photos and videos already), `review_locked`, `taken_down` and
+         *     `post_limit` (a new post after a takedown, or a third one). Answers
+         *     with the page as it now is.
          */
         post: operations["addReviewPhoto"];
         delete?: never;
@@ -1090,7 +1132,8 @@ export interface components {
                  *     `challenge_failed` (403) and `challenge_unavailable` (503),
                  *     all `createInquiry`; `deposit_not_due`, `deposit_changed`
                  *     (409, `submitDepositProof`); `review_locked`, `post_full`,
-                 *     `post_needs_photo` (409) and `remove_failed` (503), the
+                 *     `post_needs_photo`, `taken_down`, `post_limit` (409) and
+                 *     `remove_failed` (503), the
                  *     review page's (and `challenge_failed`,
                  *     `challenge_unavailable` on `submitReviewPage`). Treat an
                  *     unknown code by its HTTP status.
@@ -1680,6 +1723,18 @@ export interface components {
             };
             review: components["schemas"]["ClientReview"] | null;
             post: components["schemas"]["ClientPost"] | null;
+            /**
+             * @description Why the client can't start a new review or post now, while they
+             *     have none: `taken_down` (TattooDrip took the last one down; it
+             *     stays down until restored, contact the studio), `post_limit` (the
+             *     tattoo already had two posts). Null when they can.
+             */
+            blocks: {
+                /** @enum {string|null} */
+                review: "taken_down" | null;
+                /** @enum {string|null} */
+                post: "taken_down" | "post_limit" | null;
+            };
         };
         /** @description TattooDrip took it off every public surface. Show `sentence`. */
         ReviewTakedown: {
@@ -1734,9 +1789,9 @@ export interface components {
             state: "processing" | "ready" | "failed";
             /** @description Why a video failed, in words for the client. */
             failure: string | null;
-            /** @description The photo, or a ready video's poster. */
+            /** @description The photo, or a ready video's poster. Private until the post is published, so its URL (and its copies') is signed for 5 minutes and may be on the API's or the storage's origin; read the page again for fresh ones. */
             image: components["schemas"]["Image"] | null;
-            /** @description A ready video's sizes, smallest first; muted. */
+            /** @description A ready video's sizes, smallest first; muted. Signed for 5 minutes like `image`. */
             sources: components["schemas"]["VideoSource"][];
             durationMs: number | null;
         };
@@ -1745,7 +1800,7 @@ export interface components {
             shownName: string;
             /** @description Show on the studio's page. */
             consentStudioPage: boolean;
-            /** @description Show on TattooDrip Discover. Counts only while the studio is on Discover. */
+            /** @description Show on TattooDrip Discover. While the studio isn't on Discover it can only be withdrawn: send the stored value, or false. */
             consentDiscover: boolean;
             review?: {
                 rating: number;
@@ -3490,7 +3545,7 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
-            /** @description It can't be changed now (`review_locked`, `post_needs_photo`) */
+            /** @description It can't be changed now (`review_locked`, `taken_down`, `post_needs_photo`) */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -3584,6 +3639,53 @@ export interface operations {
             default: components["responses"]["Error"];
         };
     };
+    reorderReviewPost: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The review link's secret: the fragment of the link the studio sent
+                 *     (`https://<studio>/review#<token>`). Sent as a header so it never
+                 *     appears in a URL the API sees or logs. A bearer secret: never log
+                 *     it, put it in a URL or send it to analytics.
+                 */
+                "X-Review-Token": components["parameters"]["ReviewToken"];
+            };
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    order: string[];
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["ReviewPageResponse"];
+            404: components["responses"]["NotFound"];
+            /** @description Not changeable or a video first (`review_locked`, `post_needs_photo`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: components["responses"]["ValidationError"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
     addReviewPhoto: {
         parameters: {
             query?: never;
@@ -3617,7 +3719,7 @@ export interface operations {
             400: components["responses"]["Error"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["Error"];
-            /** @description No room or not changeable (`post_full`, `review_locked`) */
+            /** @description No room or not changeable (`post_full`, `review_locked`, `taken_down`, `post_limit`) */
             409: {
                 headers: {
                     [name: string]: unknown;
