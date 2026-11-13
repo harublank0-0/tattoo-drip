@@ -28,6 +28,7 @@ import MemberService from "#modules/tenancy/services/member_service";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import {
 	inviteValidator,
+	memberInventoryValidator,
 	memberRoleValidator,
 } from "#modules/tenancy/validators/members";
 import env from "#start/env";
@@ -66,6 +67,7 @@ export default class MembersController {
 				name: member.fullName,
 				email: member.email,
 				role: member.role,
+				inventoryAccess: member.inventoryAccess,
 				isYou: member.userId === membership.userId,
 			})),
 			invitations: pending.map((invitation) => ({
@@ -156,6 +158,22 @@ export default class MembersController {
 		if (done) {
 			ctx.session.flash("success", `${done.name} is now ${ROLE_WORDS[role]}.`);
 		}
+		return toMembers(ctx, tenant);
+	}
+
+	async inventoryAccess(ctx: HttpContext) {
+		const { tenant } = tenantContext(ctx);
+		await this.members.findFor(tenant, ctx.params.id);
+		const { enabled } = await ctx.request.validateUsing(
+			memberInventoryValidator,
+		);
+		await this.members.setInventoryAccess(tenant, ctx.params.id, enabled);
+		ctx.session.flash(
+			"success",
+			enabled
+				? "Inventory usage access granted."
+				: "Inventory usage access revoked.",
+		);
 		return toMembers(ctx, tenant);
 	}
 

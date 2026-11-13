@@ -31,6 +31,22 @@ export interface ApiDefinition {
   }
   tenant: {
     dashboard: typeof routes['tenant.dashboard']
+    inventory: {
+      index: typeof routes['tenant.inventory.index']
+      store: typeof routes['tenant.inventory.store']
+      export: typeof routes['tenant.inventory.export']
+      import: typeof routes['tenant.inventory.import']
+      lots: {
+        export: typeof routes['tenant.inventory.lots.export']
+        expiry: typeof routes['tenant.inventory.lots.expiry']
+      }
+      show: typeof routes['tenant.inventory.show']
+      update: typeof routes['tenant.inventory.update']
+      movement: typeof routes['tenant.inventory.movement']
+      tracking: typeof routes['tenant.inventory.tracking']
+      archive: typeof routes['tenant.inventory.archive']
+      restore: typeof routes['tenant.inventory.restore']
+    }
     today: typeof routes['tenant.today']
     settings: typeof routes['tenant.settings'] & {
       profile: typeof routes['tenant.settings.profile'] & {
@@ -93,6 +109,9 @@ export interface ApiDefinition {
         }
         role: {
           update: typeof routes['tenant.settings.members.role.update']
+        }
+        inventory: {
+          update: typeof routes['tenant.settings.members.inventory.update']
         }
         destroy: typeof routes['tenant.settings.members.destroy']
       }

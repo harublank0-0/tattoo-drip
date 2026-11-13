@@ -20,6 +20,7 @@ export const controllers = {
   FlashDesigns: () => import('#controllers/flash_designs_controller'),
   GoodToKnow: () => import('#controllers/good_to_know_controller'),
   Inquiries: () => import('#controllers/inquiries_controller'),
+  Inventory: () => import('#controllers/inventory_controller'),
   Invitations: () => import('#controllers/invitations_controller'),
   Members: () => import('#controllers/members_controller'),
   MessageTemplates: () => import('#controllers/message_templates_controller'),

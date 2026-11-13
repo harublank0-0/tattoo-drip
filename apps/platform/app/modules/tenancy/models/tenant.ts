@@ -10,6 +10,7 @@ import Artist from "#modules/artists/models/artist";
 import Client from "#modules/clients/models/client";
 import Inquiry from "#modules/inquiries/models/inquiry";
 import ReferenceImage from "#modules/inquiries/models/reference_image";
+import InventoryItem from "#modules/inventory/models/inventory_item";
 import PaymentMethod from "#modules/payments/models/payment_method";
 import TattooProject from "#modules/projects/models/tattoo_project";
 import ProjectSession from "#modules/scheduling/models/project_session";
@@ -42,6 +43,7 @@ const cascade = (): LucidModel[] => [
 	TattooProject,
 	ReferenceImage,
 	ProjectSession,
+	InventoryItem,
 ];
 
 /**
@@ -61,7 +63,7 @@ export default class Tenant extends compose(TenantSchema, withSoftDeletes) {
 	/**
 	 * Soft-deletes the tenant and, in the same transaction, its live
 	 * memberships, payment methods, artists, clients, inquiries, projects,
-	 * reference images and sessions, so nothing keeps pointing at a deleted
+	 * reference images, sessions and inventory items, so nothing keeps pointing at a deleted
 	 * tenant.
 	 */
 	override async softDelete(trx?: TransactionClientContract) {

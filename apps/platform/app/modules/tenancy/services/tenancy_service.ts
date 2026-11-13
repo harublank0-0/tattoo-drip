@@ -126,6 +126,7 @@ export type GoodToKnowTexts = {
 export type TenantMember = {
 	/** The membership row's id (Settings, Members routes by it, TAT-33). */
 	membershipId: string;
+	inventoryAccess: boolean;
 	userId: string;
 	role: MembershipRole;
 	email: string;
@@ -585,6 +586,7 @@ export default class TenancyService {
 				? [
 						{
 							membershipId: membership.id,
+							inventoryAccess: membership.inventoryAccess,
 							userId: user.id,
 							role: membership.role,
 							email: user.email,

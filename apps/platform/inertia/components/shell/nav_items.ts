@@ -11,6 +11,7 @@ export type NavKey =
 	| "calendar"
 	| "clients"
 	| "artists"
+	| "inventory"
 	| "portfolio"
 	| "settings";
 
@@ -24,6 +25,7 @@ export type ShellNavItem = {
 		| "tenant.calendar.index"
 		| "tenant.clients.index"
 		| "tenant.artists"
+		| "tenant.inventory.index"
 		| "tenant.portfolio"
 		| "tenant.settings";
 	/** "bar": its own tab on the phone; "more": under More on the phone. The sidebar lists both. */
@@ -46,14 +48,15 @@ const counted = (count: number | null, badgeLabel?: string) =>
 
 /**
  * What `tenant`'s member sees (TAT-107): Today, Inbox (owners), Projects and
- * Calendar, and for owners Clients, Artists, Portfolio and Settings under
- * More. An artist has Portfolio (their own work) as a fourth tab. Nothing
+ * Calendar, and for owners Clients, Artists, Portfolio, Inventory and Settings under
+ * More. An artist has Portfolio (their own work) as a fourth tab, and
+ * Inventory under More when their owner grants access. Nothing
  * is counted twice: the Inbox counts new requests, Today the projects that
  * need the member, and the bell (not an item) the alerts neither counts. The
  * server 404s the rest anyway.
  */
 export function navItems(
-	tenant: { slug: string; role: string },
+	tenant: { slug: string; role: string; inventoryAccess?: boolean },
 	counts: NavCounts,
 ): ShellNavItem[] {
 	const owner = tenant.role === "owner";
@@ -95,7 +98,16 @@ export function navItems(
 		route: "tenant.portfolio",
 		place: owner ? "more" : "bar",
 	};
-	if (!owner) items.push(portfolio);
+	const inventory: ShellNavItem = {
+		key: "inventory",
+		label: "Inventory",
+		route: "tenant.inventory.index",
+		place: "more",
+	};
+	if (!owner) {
+		items.push(portfolio);
+		if (tenant.inventoryAccess) items.push(inventory);
+	}
 	if (owner) {
 		items.push(
 			{
@@ -111,6 +123,7 @@ export function navItems(
 				place: "more",
 			},
 			portfolio,
+			inventory,
 			{
 				key: "settings",
 				label: "Settings",
@@ -134,7 +147,7 @@ export function tabBarItems(items: ShellNavItem[]) {
  * The sidebar's groups (Studio OS): the daily work, then running the studio.
  * They follow `place`, because the phone's split is the same one: what has a
  * tab is the work of the day, what sits under More is the studio's set-up.
- * A group with no items (an artist has no "Studio") is left out.
+ * A group with no items is left out.
  */
 export const NAV_GROUP_LABELS: Record<ShellNavItem["place"], string> = {
 	bar: "Workspace",

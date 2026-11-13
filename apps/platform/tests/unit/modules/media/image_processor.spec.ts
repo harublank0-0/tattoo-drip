@@ -15,7 +15,11 @@ import { NO_VARIANTS, VARIANT_WIDTHS } from "#modules/media/variants";
 import type { Rgba } from "#tests/helpers/images";
 import { POLYGLOT_MARKERS, polyglot, testImages } from "#tests/helpers/images";
 
-test.group("processImage", () => {
+test.group("processImage", (group) => {
+	// Real sharp work (decoding and encoding images of up to 49 megapixels):
+	// CPU time that grows on a slow or busy CI runner, so these get more than
+	// the unit suite's 2 s default. Each still runs and asserts in full.
+	group.each.timeout(10_000);
 	test("keeps no decoded images in sharp's cache", ({ assert }) => {
 		const { files, items, memory } = sharp.cache();
 
@@ -165,7 +169,11 @@ test.group("processImage", () => {
 	});
 });
 
-test.group("makeVariants (TAT-112)", () => {
+test.group("makeVariants (TAT-112)", (group) => {
+	// Real sharp work (decoding and encoding images of up to 49 megapixels):
+	// CPU time that grows on a slow or busy CI runner, so these get more than
+	// the unit suite's 2 s default. Each still runs and asserts in full.
+	group.each.timeout(10_000);
 	test("makes 320, 640 and 1280 px copies of a big photo, narrowest first, as JPEG", async ({
 		assert,
 	}) => {
@@ -338,7 +346,11 @@ test.group("makeVariants (TAT-112)", () => {
 	});
 });
 
-test.group("logoTile and squareIcon (TAT-123)", () => {
+test.group("logoTile and squareIcon (TAT-123)", (group) => {
+	// Real sharp work (decoding and encoding images of up to 49 megapixels):
+	// CPU time that grows on a slow or busy CI runner, so these get more than
+	// the unit suite's 2 s default. Each still runs and asserts in full.
+	group.each.timeout(10_000);
 	const TILES = { light: "#f7f3ee", dark: "#14110f" };
 	const WHITE = { r: 255, g: 255, b: 255 };
 	const BLACK = { r: 0, g: 0, b: 0 };

@@ -6,6 +6,7 @@ import ArtistService from "#modules/artists/services/artist_service";
 import { LISTING_CONSENT_VERSION } from "#modules/discovery/publication";
 import PublicationService from "#modules/discovery/services/publication_service";
 import FlashDesign from "#modules/flash/models/flash_design";
+import InventoryService from "#modules/inventory/services/inventory_service";
 import ImageService from "#modules/media/services/image_service";
 import MessageTemplate from "#modules/notifications/models/message_template";
 import StaffAlert from "#modules/notifications/models/staff_alert";
@@ -103,6 +104,58 @@ const depositLinks = depositServices().links;
 export async function seededStudio(slug: string, name: string) {
 	const { owner, tenant } = await studioWithOwner(slug, name);
 	const artist = await artistIn(tenant, `artist@${slug}.example`);
+	const inventoryItem = await inTenant(tenant, () =>
+		new InventoryService().create(tenant.id, {
+			name: `${name} needles`,
+			unit: "box",
+		}),
+	);
+	const stockedInventoryItem = await inTenant(tenant, async () => {
+		const inventory = new InventoryService();
+		const item = await inventory.create(tenant.id, {
+			name: `${name} ink`,
+			unit: "ml",
+		});
+		await inventory.record(tenant.id, item.id, owner.id, {
+			requestId: randomUUID(),
+			kind: "receive",
+			quantity: "10",
+		});
+		return item;
+	});
+	// A lot-tracked shader holding 3 ml in one lot: the lot routes' resource.
+	const { lotInventoryItem, inventoryLot } = await inTenant(
+		tenant,
+		async () => {
+			const inventory = new InventoryService();
+			const item = await inventory.create(tenant.id, {
+				name: `${name} shader`,
+				unit: "ml",
+			});
+			await inventory.setTracking(tenant.id, item.id, "lot");
+			await inventory.record(tenant.id, item.id, owner.id, {
+				requestId: randomUUID(),
+				kind: "receive",
+				quantity: "3",
+				lotNumber: `${slug}-lot`,
+				expiresOn: "2030-06-30",
+			});
+			const { choices: lots } = await inventory.lots(tenant.id, item.id);
+			return { lotInventoryItem: item, inventoryLot: lots[0] };
+		},
+	);
+
+	// An archived item: the restore route's resource.
+	const archivedInventoryItem = await inTenant(tenant, async () => {
+		const inventory = new InventoryService();
+		const item = await inventory.create(tenant.id, {
+			name: `${name} old gloves`,
+			unit: "box",
+		});
+		await inventory.archive(tenant.id, item.id);
+		return item;
+	});
+
 	const paymentMethod = await inTenant(tenant, async () => {
 		const first = await paymentMethods.create(tenant, {
 			kind: "cash",
@@ -377,6 +430,11 @@ export async function seededStudio(slug: string, name: string) {
 		tenant,
 		owner,
 		artist,
+		inventoryItem,
+		stockedInventoryItem,
+		lotInventoryItem,
+		inventoryLot,
+		archivedInventoryItem,
 		discoverPlaceId: otherCity[0].id as string,
 		paymentMethod,
 		artistProfile,

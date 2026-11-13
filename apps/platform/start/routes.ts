@@ -99,6 +99,51 @@ router
 			.get("/", [controllers.Dashboard, "tenantHome"])
 			.as("tenant.dashboard");
 
+		router
+			.get("inventory", [controllers.Inventory, "index"])
+			.as("tenant.inventory.index");
+		router
+			.post("inventory", [controllers.Inventory, "store"])
+			.as("tenant.inventory.store");
+		router
+			.get("inventory/export.csv", [controllers.Inventory, "exportCsv"])
+			.as("tenant.inventory.export");
+		router
+			.post("inventory/import", [controllers.Inventory, "importCsv"])
+			.as("tenant.inventory.import");
+		router
+			.get("inventory/lots.csv", [controllers.Inventory, "exportLotsCsv"])
+			.as("tenant.inventory.lots.export");
+
+		router
+			.get("inventory/:id", [controllers.Inventory, "show"])
+			.where("id", router.matchers.uuid())
+			.as("tenant.inventory.show");
+		router
+			.put("inventory/:id", [controllers.Inventory, "update"])
+			.where("id", router.matchers.uuid())
+			.as("tenant.inventory.update");
+		router
+			.post("inventory/:id/movements", [controllers.Inventory, "movement"])
+			.where("id", router.matchers.uuid())
+			.as("tenant.inventory.movement");
+		router
+			.put("inventory/:id/tracking", [controllers.Inventory, "tracking"])
+			.where("id", router.matchers.uuid())
+			.as("tenant.inventory.tracking");
+		router
+			.put("inventory/:id/lot-expiry", [controllers.Inventory, "lotExpiry"])
+			.where("id", router.matchers.uuid())
+			.as("tenant.inventory.lots.expiry");
+		router
+			.delete("inventory/:id", [controllers.Inventory, "archive"])
+			.where("id", router.matchers.uuid())
+			.as("tenant.inventory.archive");
+		router
+			.post("inventory/:id/restore", [controllers.Inventory, "restore"])
+			.where("id", router.matchers.uuid())
+			.as("tenant.inventory.restore");
+
 		// Today (TAT-107): every member's home, what needs them right now.
 		router.get("today", [controllers.Today, "show"]).as("tenant.today");
 
@@ -238,6 +283,13 @@ router
 					.put("members/:id/role", [controllers.Members, "role"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.settings.members.role.update");
+				router
+					.put("members/:id/inventory", [
+						controllers.Members,
+						"inventoryAccess",
+					])
+					.where("id", router.matchers.uuid())
+					.as("tenant.settings.members.inventory.update");
 				router
 					.delete("members/:id", [controllers.Members, "remove"])
 					.where("id", router.matchers.uuid())
