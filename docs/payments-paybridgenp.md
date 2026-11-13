@@ -59,3 +59,13 @@ No screen says TattooDrip pays studios out or holds their money, and the Transac
 - Paying a booking balance online: the client-facing surface for it doesn't exist (the deposit page covers the deposit only).
 - Enforcing a paid plan on the dashboard: `BillingService.access` computes it; no route is gated yet, so pilots keep working until the product decides the paywall.
 - Settlement or payout reports: PayBridgeNP exposes none.
+
+## Sandbox setup
+
+1. In the PayBridgeNP dashboard, create TattooDrip's own sandbox project and a secret key (`sk_test_…`). Register the webhook endpoint `<API origin>/api/v1/webhooks/paybridgenp/platform` for the `subscription.*` and `invoice.*` events and keep its signing secret (`whsec_…`, shown once).
+2. Set `PAYBRIDGE_SECRET_KEY` and `PAYBRIDGE_WEBHOOK_SECRET`, restart the web server and the worker, and run `node ace billing:sync-plans`.
+3. For studio deposits, set `STUDIO_ONLINE_PAYMENTS=sandbox` and `PAYMENT_CREDENTIALS_KEY` (`openssl rand -base64 32`), and list your account in `PLATFORM_ADMIN_EMAILS`. A studio owner connects a sandbox key of a second PayBridgeNP project under Settings, Online payments (the webhook is registered for them); verify it under `/admin/payments`.
+4. The webhooks must reach the API from the internet: in development use a tunnel (PayBridgeNP suggests ngrok or `cloudflared tunnel`) and set `API_URL` to its origin before connecting a studio, since the studio's webhook URL is built from it.
+5. eSewa and Khalti sandboxes move no real money. Fonepay has no sandbox: a sandbox Fonepay payment is real money on the studio's own Fonepay account (capped at NPR 1,000 per payment).
+
+To check in sandbox before going live: that PayBridgeNP accepts a `returnUrl` ending in a fragment (`/deposit#paid-online`); what the `invoice.*` and `subscription.*` webhook bodies carry (the code reads the object's id and, when present, its customer, then reads the object back from the API, so a different body shape costs one extra read); and whether a subscription's invoices list in `GET /v1/billing/invoices?subscriptionId=` straight after it is created.
