@@ -367,12 +367,19 @@ describe("a video shown", () => {
 		);
 	});
 
-	test("closing the viewer on a video sends focus to its thumbnail (the opener is gone); on a photo, to the opener", () => {
-		assert.deepEqual(focusAfterViewerClose("video", 2), {
-			target: "thumbnail",
-			index: 2,
-		});
-		assert.deepEqual(focusAfterViewerClose("photo", 1), { target: "opener" });
+	test("closing the viewer: the browser returns focus to its opener while that button is there; once a step to a video replaced it, to the opener there now or the video's thumbnail", () => {
+		assert.deepEqual(
+			focusAfterViewerClose({ openerKept: true, kind: "photo", at: 0 }),
+			{ target: "browser" },
+		);
+		assert.deepEqual(
+			focusAfterViewerClose({ openerKept: false, kind: "video", at: 2 }),
+			{ target: "thumbnail", index: 2 },
+		);
+		assert.deepEqual(
+			focusAfterViewerClose({ openerKept: false, kind: "photo", at: 1 }),
+			{ target: "opener" },
+		);
 	});
 
 	test("the shared rules keep a video whole in a fixed box, and its marks legible", () => {

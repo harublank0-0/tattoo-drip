@@ -120,16 +120,26 @@ export function stepWords(
 }
 
 /**
- * Where focus goes when the tattoo page's viewer closes, by what the page
- * now shows (it shares the viewer's place): on a photo, the button that
- * opened the viewer is there, and the browser returns focus to it itself;
- * on a video (the visitor stepped to one), that button is gone, so focus
- * goes to that video's thumbnail in the row, never to the page.
+ * Where focus goes when the tattoo page's viewer closes. The browser gives
+ * it back to the button that opened the viewer, if that very button is
+ * still on the page (`openerKept`). Stepping to a video replaces that button
+ * (a video shows in its place), so then: to the button that opens the
+ * viewer now, when the page shows a photo again; else, on a video, to that
+ * video's thumbnail in the row. Never to the page itself.
  */
-export function focusAfterViewerClose(
-	kind: ShotKind,
-	at: number,
-): { target: "opener" } | { target: "thumbnail"; index: number } {
+export function focusAfterViewerClose({
+	openerKept,
+	kind,
+	at,
+}: {
+	openerKept: boolean;
+	kind: ShotKind;
+	at: number;
+}):
+	| { target: "browser" }
+	| { target: "opener" }
+	| { target: "thumbnail"; index: number } {
+	if (openerKept) return { target: "browser" };
 	return kind === "video"
 		? { target: "thumbnail", index: at }
 		: { target: "opener" };

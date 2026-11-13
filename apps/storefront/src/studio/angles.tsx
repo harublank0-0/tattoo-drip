@@ -270,10 +270,19 @@ export function TattooFigure({
 	const at = selectIndex(chosen, count);
 	const shot = shots[at];
 	const thumbs = useRef<(HTMLButtonElement | null)[]>([]);
-	// The viewer closed on a video: the button that opened it is gone (a video
-	// shows in its place), so focus goes to the video's thumbnail, never the page.
+	// The button that opens the viewer now, and the one that opened it last.
+	const opener = useRef<HTMLButtonElement | null>(null);
+	const openedFrom = useRef<HTMLButtonElement | null>(null);
+	// Stepping to a video in the viewer replaces the button that opened it, so
+	// the browser has nowhere to return focus: send it to the button there now
+	// or, on a video, to its thumbnail; never leave it on the page.
 	const closed = (place: number) => {
-		const next = focusAfterViewerClose(shots[place]?.kind ?? "photo", place);
+		const next = focusAfterViewerClose({
+			openerKept: openedFrom.current?.isConnected ?? false,
+			kind: shots[place]?.kind ?? "photo",
+			at: place,
+		});
+		if (next.target === "opener") opener.current?.focus();
 		if (next.target === "thumbnail") thumbs.current[next.index]?.focus();
 	};
 	return (
@@ -286,12 +295,16 @@ export function TattooFigure({
 				/>
 			) : (
 				<button
+					ref={opener}
 					type="button"
 					className="artwork-open"
 					id={photo.openId}
 					aria-haspopup="dialog"
 					aria-controls={photo.dialogId}
-					onClick={() => showPhoto(photo.dialogId)}
+					onClick={(event) => {
+						openedFrom.current = event.currentTarget;
+						showPhoto(photo.dialogId);
+					}}
 				>
 					<img
 						className={`artwork-photo artwork-photo-steady ${artworkShapeClass(photo)}`}

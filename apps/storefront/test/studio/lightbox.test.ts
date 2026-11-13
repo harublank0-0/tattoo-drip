@@ -107,10 +107,11 @@ describe("the photo viewer is the browser's dialog (TAT-116)", () => {
 		const paging = read("studio/paging.tsx");
 		assert.equal((paging.match(/document\.getElementById/g) ?? []).length, 1);
 		assert.equal((paging.match(/\.focus\(/g) ?? []).length, 1);
-		// Video angles: the tattoo page's viewer, closed on a video, sends focus
-		// to that video's thumbnail (its opener is gone): one call, through a ref.
+		// Video angles: the tattoo page's viewer, closed after its opener was
+		// replaced (a step to a video), sends focus to the opener there now or
+		// the video's thumbnail: two calls, through refs.
 		const angles = read("studio/angles.tsx");
-		assert.equal((angles.match(/\.focus\(/g) ?? []).length, 1);
+		assert.equal((angles.match(/\.focus\(/g) ?? []).length, 2);
 		assert.doesNotMatch(angles, /document\./);
 		const others = sources("studio/")
 			.filter(
