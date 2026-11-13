@@ -1,9 +1,11 @@
 import logger from "@adonisjs/core/services/logger";
 import { Job } from "@adonisjs/queue";
 import FailStuckVideoJob from "#modules/artists/jobs/fail_stuck_video_job";
+import FailStuckClientVideoJob from "#modules/reviews/jobs/fail_stuck_client_video_job";
 import { dbClient } from "#services/db_context";
 
 type Candidate = { tenant_id: string; photo_id: string };
+type ClientCandidate = { tenant_id: string; media_id: string };
 
 /**
  * Video angles' safety net. A video stays `processing` only while its
@@ -13,7 +15,10 @@ type Candidate = { tenant_id: string; photo_id: string };
  * across tenants, through stuck_video_candidates() (ids only: the app role
  * can't read other tenants' rows) and queues a FailStuckVideoJob for each,
  * in that row's tenant. It reads and writes no tenant table itself:
- * WorkPhotoService.failStuckVideo checks again under the row's lock.
+ * WorkPhotoService.failStuckVideo checks again under the row's lock. Reviews
+ * and Fresh ink: it does the same for clients' videos, through
+ * stuck_client_video_candidates() and FailStuckClientVideoJob
+ * (ClientPostService.failStuckVideo).
  */
 export default class SweepStuckVideosJob extends Job<Record<string, never>> {
 	/** The schedule's id in queue_schedules. */
@@ -30,6 +35,15 @@ export default class SweepStuckVideosJob extends Job<Record<string, never>> {
 			await FailStuckVideoJob.dispatch({
 				tenantId: row.tenant_id,
 				photoId: row.photo_id,
+			}).run();
+		}
+		const { rows: clientRows } = await dbClient().rawQuery(
+			"select tenant_id, media_id from public.stuck_client_video_candidates()",
+		);
+		for (const row of clientRows as ClientCandidate[]) {
+			await FailStuckClientVideoJob.dispatch({
+				tenantId: row.tenant_id,
+				mediaId: row.media_id,
 			}).run();
 		}
 	}

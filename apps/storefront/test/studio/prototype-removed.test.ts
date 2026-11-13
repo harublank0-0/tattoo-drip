@@ -57,6 +57,7 @@ test("the storefront has exactly its routes", () => {
 			"routes/index.tsx",
 			"routes/policies.tsx",
 			"routes/request.tsx",
+			"routes/review.tsx",
 			"routes/robots[.]txt.ts",
 			"routes/services.tsx",
 			"routes/sitemap[.]xml.ts",

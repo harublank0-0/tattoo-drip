@@ -112,6 +112,11 @@ const env = await Env.create(new URL("../", import.meta.url), {
 	// alerts in the dashboard only (until the sending domain exists, TAT-20).
 	ALERT_EMAILS: Env.schema.boolean.optional(),
 
+	// Reviews and Fresh ink (slice 1): the client's review page and its public
+	// API routes. Off unless true: they stay off until the client content terms
+	// (docs/legal/) are legally reviewed. Off, every review route is a 404 and
+	// no review link can be made.
+	REVIEWS_ENABLED: Env.schema.boolean.optional(),
 	// Online payments through PayBridgeNP (docs/payments-paybridgenp.md).
 	// TattooDrip's own project, for studios' subscriptions: its secret key and
 	// its webhook endpoint's signing secret. Unset, subscription billing is off.

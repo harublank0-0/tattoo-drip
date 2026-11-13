@@ -342,6 +342,28 @@ export interface ApiDefinition {
         store: typeof routes['api.v1.deposits.store']
         checkout: typeof routes['api.v1.deposits.checkout']
       }
+      review: {
+        show: typeof routes['api.v1.review.show']
+        update: typeof routes['api.v1.review.update']
+        review: {
+          destroy: typeof routes['api.v1.review.review.destroy']
+        }
+        post: {
+          destroy: typeof routes['api.v1.review.post.destroy']
+          order: typeof routes['api.v1.review.post.order']
+        }
+        photos: {
+          store: typeof routes['api.v1.review.photos.store']
+        }
+        videos: {
+          sign: typeof routes['api.v1.review.videos.sign']
+          stage: typeof routes['api.v1.review.videos.stage']
+          store: typeof routes['api.v1.review.videos.store']
+        }
+        media: {
+          destroy: typeof routes['api.v1.review.media.destroy']
+        }
+      }
     }
   }
 }

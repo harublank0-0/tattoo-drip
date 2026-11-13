@@ -817,6 +817,352 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tenants/{tenant}/review": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The review link's secret: the fragment of the link the studio sent
+                 *     (`https://<studio>/review#<token>`). Sent as a header so it never
+                 *     appears in a URL the API sees or logs. A bearer secret: never log
+                 *     it, put it in a URL or send it to analytics.
+                 */
+                "X-Review-Token": components["parameters"]["ReviewToken"];
+            };
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The client's review page, through its link
+         * @description What the client's review page shows: the studio, the artist and the
+         *     day of the tattoo, the styles the post may carry, the defaults
+         *     (the shown name, the project's style and placement), and what the
+         *     client has written and posted. Never cached. Every link that doesn't
+         *     work (unknown, revoked, expired, another studio's, or its project
+         *     gone) is the same 404, and so is every operation while reviews are
+         *     off. Rate-limited per address and per link.
+         */
+        get: operations["getReviewPage"];
+        /**
+         * Write or change the review and the Fresh ink post
+         * @description The client's submit: the shown name and the two consents, which apply
+         *     to the review and the post alike, with the review (`review`), the
+         *     post (`post`) or both; a part left out stays as it is. A review is
+         *     made or changed; a post (whose photos and videos were added first)
+         *     is handed to the studio, which approves it before it shows anywhere.
+         *     Every field is checked again here. While `studio.onDiscover` is false,
+         *     `consentDiscover` can only be withdrawn (the stored choice and the
+         *     sent one must both be true to stay true).
+         *     Needs the bot-challenge token in `X-Challenge-Token` (action
+         *     `review`), as the intake does. Answers with the page as it now is.
+         *     Under an old slug it is a 404.
+         *
+         *     Own codes: `review_locked` (409: what TattooDrip took down, or a post
+         *     the studio declined or unpublished, can't be changed; its consents,
+         *     its name and its delete still work), `taken_down` (409: a new review
+         *     after TattooDrip took the last one down), `post_needs_photo` (409: a
+         *     video can't lead), `challenge_failed` (403) and
+         *     `challenge_unavailable` (503).
+         */
+        put: operations["submitReviewPage"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tenants/{tenant}/review/review": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The review link's secret: the fragment of the link the studio sent
+                 *     (`https://<studio>/review#<token>`). Sent as a header so it never
+                 *     appears in a URL the API sees or logs. A bearer secret: never log
+                 *     it, put it in a URL or send it to analytics.
+                 */
+                "X-Review-Token": components["parameters"]["ReviewToken"];
+            };
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete the client's review
+         * @description Takes the review off every surface at once; the client can write a
+         *     new one through the link. Deleting what isn't there is no error.
+         *     Answers with the page as it now is.
+         */
+        delete: operations["deleteReview"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tenants/{tenant}/review/post": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The review link's secret: the fragment of the link the studio sent
+                 *     (`https://<studio>/review#<token>`). Sent as a header so it never
+                 *     appears in a URL the API sees or logs. A bearer secret: never log
+                 *     it, put it in a URL or send it to analytics.
+                 */
+                "X-Review-Token": components["parameters"]["ReviewToken"];
+            };
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete the client's Fresh ink post
+         * @description Deletes the post with every photo and video (their files first, so
+         *     none stays reachable). Deleting what isn't there is no error.
+         *     Answers with the page as it now is. Own code: `remove_failed` (503:
+         *     a file couldn't be deleted; nothing was; try again).
+         */
+        delete: operations["deleteReviewPost"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tenants/{tenant}/review/post/order": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The review link's secret: the fragment of the link the studio sent
+                 *     (`https://<studio>/review#<token>`). Sent as a header so it never
+                 *     appears in a URL the API sees or logs. A bearer secret: never log
+                 *     it, put it in a URL or send it to analytics.
+                 */
+                "X-Review-Token": components["parameters"]["ReviewToken"];
+            };
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change the order of the post's photos and videos
+         * @description The post's order alone ("Make photo 3 the main photo"): every
+         *     `ReviewMedia` id once, a photo first. Nothing else is written and no
+         *     bot challenge is needed. A change to an approved post sends it back
+         *     to the studio. Answers with the page as it now is.
+         */
+        put: operations["reorderReviewPost"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tenants/{tenant}/review/photos": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The review link's secret: the fragment of the link the studio sent
+                 *     (`https://<studio>/review#<token>`). Sent as a header so it never
+                 *     appears in a URL the API sees or logs. A bearer secret: never log
+                 *     it, put it in a URL or send it to analytics.
+                 */
+                "X-Review-Token": components["parameters"]["ReviewToken"];
+            };
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a photo to the Fresh ink post
+         * @description One `multipart/form-data` request with one photo (`photo`, a JPEG,
+         *     PNG or WebP of 10 MB at most). It becomes the post's last item; the
+         *     first photo leads. A post that doesn't exist yet is started (a draft
+         *     only the client sees until the submit). Own codes (409): `post_full`
+         *     (8 photos and videos already), `review_locked`, `taken_down` and
+         *     `post_limit` (a new post after a takedown, or a third one). Answers
+         *     with the page as it now is.
+         */
+        post: operations["addReviewPhoto"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tenants/{tenant}/review/videos/sign": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The review link's secret: the fragment of the link the studio sent
+                 *     (`https://<studio>/review#<token>`). Sent as a header so it never
+                 *     appears in a URL the API sees or logs. A bearer secret: never log
+                 *     it, put it in a URL or send it to analytics.
+                 */
+                "X-Review-Token": components["parameters"]["ReviewToken"];
+            };
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get where to upload a video for the Fresh ink post
+         * @description A video never goes through the API's request body: say its type and
+         *     exact length, PUT the file to `upload.url` (resolve it against the
+         *     API's origin: it is absolute in production, a path on the API in
+         *     development) with `upload.headers`, then send `token` to
+         *     `addReviewVideo`. MP4, MOV or WebM, at most 100 MB; the API measures
+         *     the rest (60 seconds at most, 4K at most) and strips the sound. The
+         *     post needs a photo first (`post_needs_photo`, 409: a video never
+         *     leads); `post_full` and `review_locked` as for a photo.
+         */
+        post: operations["signReviewVideo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tenants/{tenant}/review/videos": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The review link's secret: the fragment of the link the studio sent
+                 *     (`https://<studio>/review#<token>`). Sent as a header so it never
+                 *     appears in a URL the API sees or logs. A bearer secret: never log
+                 *     it, put it in a URL or send it to analytics.
+                 */
+                "X-Review-Token": components["parameters"]["ReviewToken"];
+            };
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add an uploaded video to the Fresh ink post
+         * @description Once the PUT has finished: the video becomes the post's last item,
+         *     `processing`, then `ready` or `failed` (read the page again to
+         *     follow it). An upload that didn't arrive, isn't this link's or was
+         *     added already is `validation_failed` on `upload`. Answers with the
+         *     page as it now is.
+         */
+        post: operations["addReviewVideo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tenants/{tenant}/review/media/{media}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The review link's secret: the fragment of the link the studio sent
+                 *     (`https://<studio>/review#<token>`). Sent as a header so it never
+                 *     appears in a URL the API sees or logs. A bearer secret: never log
+                 *     it, put it in a URL or send it to analytics.
+                 */
+                "X-Review-Token": components["parameters"]["ReviewToken"];
+            };
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+                /** @description A `ReviewMedia` id of this link's post. */
+                media: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a photo or video from the Fresh ink post
+         * @description Its files are deleted first, so it stops loading at once. The first
+         *     photo left leads. Own codes: `post_needs_photo` (409: the last photo
+         *     can't go while a video stays; remove the videos first),
+         *     `review_locked` (409) and `remove_failed` (503). An id that isn't
+         *     this link's post's is a 404. Answers with the page as it now is.
+         */
+        delete: operations["removeReviewMedia"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -836,8 +1182,12 @@ export interface components {
                  *     `flash_claimed` (409),
                  *     `challenge_failed` (403) and `challenge_unavailable` (503),
                  *     all `createInquiry`; `deposit_not_due`, `deposit_changed`
-                 *     (409, `submitDepositProof`). Treat an unknown code by its HTTP
-                 *     status.
+                 *     (409, `submitDepositProof`); `review_locked`, `post_full`,
+                 *     `post_needs_photo`, `taken_down`, `post_limit` (409) and
+                 *     `remove_failed` (503), the
+                 *     review page's (and `challenge_failed`,
+                 *     `challenge_unavailable` on `submitReviewPage`). Treat an
+                 *     unknown code by its HTTP status.
                  * @example not_found
                  * @example validation_failed
                  * @example rate_limited
@@ -1387,6 +1737,168 @@ export interface components {
              */
             alt: string | null;
         };
+        /**
+         * @description The client's review page. Only what the link's holder may see: never
+         *     the client's full name, phone or email, the studio's notes or another
+         *     project's anything.
+         */
+        ReviewPage: {
+            studio: {
+                name: string;
+                /** @description Whether Discover lists the studio now. Offer the Discover consent only while it does. */
+                onDiscover: boolean;
+            };
+            project: {
+                /** @description The artist who made it; null when their profile is gone. */
+                artistName: string | null;
+                /**
+                 * Format: date
+                 * @description The day of the project's latest finished tattoo session, in the studio's timezone.
+                 */
+                tattooedOn: string;
+            };
+            link: {
+                /** Format: date-time */
+                expiresAt: string;
+            };
+            /** @description The styles a post may carry (the studio's), in the platform's order. */
+            styles: components["schemas"]["TattooStyle"][];
+            /** @description What the form starts with when nothing is saved yet. */
+            defaults: {
+                /** @description The saved shown name, else the first name and the initial of the last name ("Sita R."). */
+                shownName: string;
+                /** @description The project's style when the studio lists it. */
+                styles: string[];
+                /** @description The placement the client wrote in their request. */
+                placement: string | null;
+            };
+            review: components["schemas"]["ClientReview"] | null;
+            post: components["schemas"]["ClientPost"] | null;
+            /**
+             * @description Why the client can't start a new review or post now, while they
+             *     have none: `taken_down` (TattooDrip took the last one down; it
+             *     stays down until restored, contact the studio), `post_limit` (the
+             *     tattoo already had two posts). Null when they can.
+             */
+            blocks: {
+                /** @enum {string|null} */
+                review: "taken_down" | null;
+                /** @enum {string|null} */
+                post: "taken_down" | "post_limit" | null;
+            };
+        };
+        /** @description TattooDrip took it off every public surface. Show `sentence`. */
+        ReviewTakedown: {
+            /** @description `hate`, `threats`, `personal_data`, `off_topic`, `not_a_client`, `client_request` or `other`; treat an unknown one as `other`. */
+            reason: string;
+            sentence: string;
+            /** Format: date-time */
+            at: string;
+        };
+        ClientReview: {
+            rating: number;
+            body: string;
+            shownName: string;
+            consentStudioPage: boolean;
+            consentDiscover: boolean;
+            takenDown: components["schemas"]["ReviewTakedown"] | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        ClientPost: {
+            /**
+             * @description `draft` until the client submits it (only they see it);
+             *     `waiting` for the studio; `approved` (shown where the client
+             *     allowed); `not_shown` when the studio declined or took it off its
+             *     page (the client is told nothing more).
+             * @enum {string}
+             */
+            status: "draft" | "waiting" | "approved" | "not_shown";
+            caption: string | null;
+            styles: string[];
+            placement: string | null;
+            shownName: string;
+            consentStudioPage: boolean;
+            consentDiscover: boolean;
+            takenDown: components["schemas"]["ReviewTakedown"] | null;
+            /** @description Whether its photos, caption, styles and placement may still change (not taken down, not declined). */
+            editable: boolean;
+            /** @description In order; the first is the lead and always a photo. */
+            media: components["schemas"]["ReviewMedia"][];
+        };
+        ReviewMedia: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "photo" | "video";
+            /**
+             * @description A photo is always `ready`. A video is `processing` until the API has made it, then `ready` or `failed`.
+             * @enum {string}
+             */
+            state: "processing" | "ready" | "failed";
+            /** @description Why a video failed, in words for the client. */
+            failure: string | null;
+            /** @description The photo, or a ready video's poster. Private until the post is published, so its URL (and its copies') is signed for 5 minutes and may be on the API's or the storage's origin; read the page again for fresh ones. */
+            image: components["schemas"]["Image"] | null;
+            /** @description A ready video's sizes, smallest first; muted. Signed for 5 minutes like `image`. */
+            sources: components["schemas"]["VideoSource"][];
+            durationMs: number | null;
+        };
+        ReviewSubmission: {
+            /** @description 1 to 40 characters, any script; trimmed. */
+            shownName: string;
+            /** @description Show on the studio's page. */
+            consentStudioPage: boolean;
+            /** @description Show on TattooDrip Discover. While the studio isn't on Discover it can only be withdrawn: send the stored value, or false. */
+            consentDiscover: boolean;
+            review?: {
+                rating: number;
+                /** @description Plain text */
+                body: string;
+            };
+            post?: {
+                caption?: string | null;
+                /** @description Slugs from the page's `styles`. */
+                styles: string[];
+                placement?: string | null;
+                /** @description Every `ReviewMedia` id of the post, in the new order; the first must be a photo. Leave it out to keep the order. */
+                order?: string[];
+            };
+        };
+        /** @description The multipart body of `addReviewPhoto` */
+        ReviewPhotoForm: {
+            /**
+             * Format: binary
+             * @description A JPEG
+             */
+            photo: string;
+        };
+        ReviewVideoSignInput: {
+            /** @enum {string} */
+            type: "video/mp4" | "video/quicktime" | "video/webm";
+            /** @description The file's exact length in bytes. */
+            size: number;
+        };
+        ReviewVideoUpload: {
+            upload: {
+                /** @constant */
+                method: "PUT";
+                /** @description Where to PUT the file: absolute, or a path on the API's origin. */
+                url: string;
+                /** @description Send exactly these with the PUT. */
+                headers: {
+                    [key: string]: string;
+                };
+            };
+            /** @description Send it to `addReviewVideo` once the PUT has finished. Good for an hour. */
+            token: string;
+        };
+        ReviewVideoFinishInput: {
+            /** @description The `token` of `signReviewVideo`. */
+            upload: string;
+        };
         /** @description One size of a `VideoAngle`, an H.264 MP4 with no audio. */
         VideoSource: {
             /**
@@ -1841,6 +2353,18 @@ export interface components {
         DiscoverBookingUrl: string;
     };
     responses: {
+        /** @description The review page as it now is */
+        ReviewPageResponse: {
+            headers: {
+                "Cache-Control": components["headers"]["CacheControl"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data: components["schemas"]["ReviewPage"];
+                };
+            };
+        };
         /** @description The `If-None-Match` tag still matches; no body */
         NotModified: {
             headers: {
@@ -1903,8 +2427,16 @@ export interface components {
          */
         DepositToken: string;
         /**
+         * @description The review link's secret: the fragment of the link the studio sent
+         *     (`https://<studio>/review#<token>`). Sent as a header so it never
+         *     appears in a URL the API sees or logs. A bearer secret: never log
+         *     it, put it in a URL or send it to analytics.
+         */
+        ReviewToken: string;
+        /**
          * @description The bot-challenge token the studio page's Cloudflare Turnstile widget
-         *     made for this submission, rendered with action `inquiry`. Single-use:
+         *     made for this submission, rendered with the form's action (`inquiry`
+         *     for an inquiry, `review` for the review page). Single-use:
          *     get a new one for every request, also after a refusal. Missing,
          *     invalid, expired, already used, or made on another page or for
          *     another form: 403 `challenge_failed`. A local development server
@@ -2818,7 +3350,8 @@ export interface operations {
             header: {
                 /**
                  * @description The bot-challenge token the studio page's Cloudflare Turnstile widget
-                 *     made for this submission, rendered with action `inquiry`. Single-use:
+                 *     made for this submission, rendered with the form's action (`inquiry`
+                 *     for an inquiry, `review` for the review page). Single-use:
                  *     get a new one for every request, also after a refusal. Missing,
                  *     invalid, expired, already used, or made on another page or for
                  *     another form: 403 `challenge_failed`. A local development server
@@ -3046,6 +3579,440 @@ export interface operations {
             };
             429: components["responses"]["RateLimited"];
             /** @description The payment provider or the API is busy (`payment_provider_unavailable`, `service_busy`). Try again in a moment. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getReviewPage: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The review link's secret: the fragment of the link the studio sent
+                 *     (`https://<studio>/review#<token>`). Sent as a header so it never
+                 *     appears in a URL the API sees or logs. A bearer secret: never log
+                 *     it, put it in a URL or send it to analytics.
+                 */
+                "X-Review-Token": components["parameters"]["ReviewToken"];
+            };
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The review page */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ReviewPage"];
+                    };
+                };
+            };
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    submitReviewPage: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The review link's secret: the fragment of the link the studio sent
+                 *     (`https://<studio>/review#<token>`). Sent as a header so it never
+                 *     appears in a URL the API sees or logs. A bearer secret: never log
+                 *     it, put it in a URL or send it to analytics.
+                 */
+                "X-Review-Token": components["parameters"]["ReviewToken"];
+                /**
+                 * @description The bot-challenge token the studio page's Cloudflare Turnstile widget
+                 *     made for this submission, rendered with the form's action (`inquiry`
+                 *     for an inquiry, `review` for the review page). Single-use:
+                 *     get a new one for every request, also after a refusal. Missing,
+                 *     invalid, expired, already used, or made on another page or for
+                 *     another form: 403 `challenge_failed`. A local development server
+                 *     without the challenge set up ignores it.
+                 */
+                "X-Challenge-Token": components["parameters"]["ChallengeToken"];
+            };
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewSubmission"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ReviewPageResponse"];
+            /** @description The bot challenge failed (`challenge_failed`). Get a new token and send again. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            /** @description It can't be changed now (`review_locked`, `taken_down`, `post_needs_photo`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: components["responses"]["ValidationError"];
+            429: components["responses"]["RateLimited"];
+            /** @description The bot challenge could not be checked (`challenge_unavailable`), or the API is busy (`service_busy`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    deleteReview: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The review link's secret: the fragment of the link the studio sent
+                 *     (`https://<studio>/review#<token>`). Sent as a header so it never
+                 *     appears in a URL the API sees or logs. A bearer secret: never log
+                 *     it, put it in a URL or send it to analytics.
+                 */
+                "X-Review-Token": components["parameters"]["ReviewToken"];
+            };
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["ReviewPageResponse"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    deleteReviewPost: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The review link's secret: the fragment of the link the studio sent
+                 *     (`https://<studio>/review#<token>`). Sent as a header so it never
+                 *     appears in a URL the API sees or logs. A bearer secret: never log
+                 *     it, put it in a URL or send it to analytics.
+                 */
+                "X-Review-Token": components["parameters"]["ReviewToken"];
+            };
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["ReviewPageResponse"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
+            /** @description A file couldn't be deleted (`remove_failed`). Try again. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    reorderReviewPost: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The review link's secret: the fragment of the link the studio sent
+                 *     (`https://<studio>/review#<token>`). Sent as a header so it never
+                 *     appears in a URL the API sees or logs. A bearer secret: never log
+                 *     it, put it in a URL or send it to analytics.
+                 */
+                "X-Review-Token": components["parameters"]["ReviewToken"];
+            };
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    order: string[];
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["ReviewPageResponse"];
+            404: components["responses"]["NotFound"];
+            /** @description Not changeable or a video first (`review_locked`, `post_needs_photo`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: components["responses"]["ValidationError"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    addReviewPhoto: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The review link's secret: the fragment of the link the studio sent
+                 *     (`https://<studio>/review#<token>`). Sent as a header so it never
+                 *     appears in a URL the API sees or logs. A bearer secret: never log
+                 *     it, put it in a URL or send it to analytics.
+                 */
+                "X-Review-Token": components["parameters"]["ReviewToken"];
+            };
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["ReviewPhotoForm"];
+            };
+        };
+        responses: {
+            201: components["responses"]["ReviewPageResponse"];
+            400: components["responses"]["Error"];
+            404: components["responses"]["NotFound"];
+            408: components["responses"]["Error"];
+            /** @description No room or not changeable (`post_full`, `review_locked`, `taken_down`, `post_limit`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            413: components["responses"]["Error"];
+            415: components["responses"]["Error"];
+            422: components["responses"]["ValidationError"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    signReviewVideo: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The review link's secret: the fragment of the link the studio sent
+                 *     (`https://<studio>/review#<token>`). Sent as a header so it never
+                 *     appears in a URL the API sees or logs. A bearer secret: never log
+                 *     it, put it in a URL or send it to analytics.
+                 */
+                "X-Review-Token": components["parameters"]["ReviewToken"];
+            };
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewVideoSignInput"];
+            };
+        };
+        responses: {
+            /** @description Where to upload */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ReviewVideoUpload"];
+                    };
+                };
+            };
+            404: components["responses"]["NotFound"];
+            /** @description No room, no photo yet, or not changeable (`post_full`, `post_needs_photo`, `review_locked`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: components["responses"]["ValidationError"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    addReviewVideo: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The review link's secret: the fragment of the link the studio sent
+                 *     (`https://<studio>/review#<token>`). Sent as a header so it never
+                 *     appears in a URL the API sees or logs. A bearer secret: never log
+                 *     it, put it in a URL or send it to analytics.
+                 */
+                "X-Review-Token": components["parameters"]["ReviewToken"];
+            };
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewVideoFinishInput"];
+            };
+        };
+        responses: {
+            201: components["responses"]["ReviewPageResponse"];
+            404: components["responses"]["NotFound"];
+            /** @description No room, no photo, or not changeable (`post_full`, `post_needs_photo`, `review_locked`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: components["responses"]["ValidationError"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    removeReviewMedia: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The review link's secret: the fragment of the link the studio sent
+                 *     (`https://<studio>/review#<token>`). Sent as a header so it never
+                 *     appears in a URL the API sees or logs. A bearer secret: never log
+                 *     it, put it in a URL or send it to analytics.
+                 */
+                "X-Review-Token": components["parameters"]["ReviewToken"];
+            };
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+                /** @description A `ReviewMedia` id of this link's post. */
+                media: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["ReviewPageResponse"];
+            404: components["responses"]["NotFound"];
+            /** @description It can't go now (`post_needs_photo`, `review_locked`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            429: components["responses"]["RateLimited"];
+            /** @description A file couldn't be deleted (`remove_failed`). Try again. */
             503: {
                 headers: {
                     [name: string]: unknown;

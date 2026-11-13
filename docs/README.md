@@ -13,6 +13,7 @@ Select guidance for the current task. Follow ordinary links when needed; this in
 | Discover: plan and roadmap, domains, the cross-tenant database boundary, the public Discover API and booking referral, Studio OS listing controls and takedowns, the Discover app | [Blueprint](discover/implementation-blueprint.md), [domain migration](discover/domain-migration.md), [database security](discover/database-security.md), [Discover API](discover/api.md), [publication controls](discover/publication-controls.md), [frontend](discover/frontend.md) |
 | Online payments: PayBridgeNP subscription billing, studio checkout, the merchant-account constraint | [PayBridgeNP payments](payments-paybridgenp.md) |
 | Phase scope and release gates | [Roadmap](roadmap.md) |
+| Draft legal terms (not reviewed, not published): client reviews and Fresh ink | [Client content terms](legal/client-content-terms.md) |
 | Market evidence, only when requested | [Research](research.md) |
 | Platform services, controllers, tenancy, accounts, public API, database conventions | [Backend development](../apps/platform/docs/backend.md) |
 | Platform React, Inertia, forms, shadcn and styling | [Platform UI](../apps/platform/docs/ui.md) |
@@ -20,7 +21,7 @@ Select guidance for the current task. Follow ordinary links when needed; this in
 | Platform test setup, narrowing tests, recurring pitfalls | [Platform testing](../apps/platform/docs/testing.md) |
 | Deploying the platform, production settings, the public API checklist, account email, dashboard cookies and domains | [Platform deploy](../apps/platform/docs/deploy.md) |
 | Setting up and running the one production server: server, Cloudflare, settings, first start, updates, backups, restore, troubleshooting | [Server runbook](../deploy/README.md) |
-| Storefront forms, routing, API data and prefetching, the studio page, the intake form, the deposit page, monitoring, tenants and hosts | [Storefront development](../apps/storefront/docs/development.md) |
+| Storefront forms, routing, API data and prefetching, the studio page, the intake form, the deposit page, the review page, monitoring, tenants and hosts | [Storefront development](../apps/storefront/docs/development.md) |
 | Repository exploration, Claude loading behavior, sessions and memory | [Agent workflow](agent-workflow.md) |
 | Maintaining this instruction setup and checking context sizes | [Agent context audit](agent-context-audit.md) |
 | Running commands as an agent: worktrees, Node 24, ports and databases, test pitfalls, opencode setup and permissions | [Agent environment](agent-environment.md) |

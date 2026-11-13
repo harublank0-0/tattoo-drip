@@ -89,6 +89,7 @@ export class Challenge {
 	readonly #host: ChallengeHost;
 	readonly #onInteractive: (interactive: boolean) => void;
 	readonly #theme: ChallengeTheme;
+	readonly #action: string;
 	#script: "none" | "loading" | "ready" = "none";
 	#waiters: Array<(ready: boolean) => void> = [];
 	#container: HTMLElement | null = null;
@@ -99,18 +100,22 @@ export class Challenge {
 
 	/**
 	 * `onInteractive` hears when Cloudflare shows its checkbox, and when that
-	 * ends; `theme` is the widget's colours (the page's scheme, or `auto`).
+	 * ends; `theme` is the widget's colours (the page's scheme, or `auto`);
+	 * `action` the form's (the inquiry's unless another form says, such as
+	 * the review page's `review`), which the API checks in production.
 	 */
 	constructor(
 		siteKey: string,
 		host: ChallengeHost,
 		onInteractive: (interactive: boolean) => void = () => {},
 		theme: ChallengeTheme = "auto",
+		action: string = INQUIRY_CHALLENGE_ACTION,
 	) {
 		this.#siteKey = siteKey;
 		this.#host = host;
 		this.#onInteractive = onInteractive;
 		this.#theme = theme;
+		this.#action = action;
 	}
 
 	/** Starts loading the script, once (the form's first focus or tap). */
@@ -211,7 +216,7 @@ export class Challenge {
 	#options(): TurnstileRenderOptions {
 		return {
 			sitekey: this.#siteKey,
-			action: INQUIRY_CHALLENGE_ACTION,
+			action: this.#action,
 			execution: "execute",
 			appearance: "interaction-only",
 			size: "flexible",

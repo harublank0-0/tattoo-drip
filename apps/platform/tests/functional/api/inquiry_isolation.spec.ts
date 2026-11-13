@@ -155,10 +155,13 @@ test.group("Public API: POST /inquiries across studios", (group) => {
 		assert.isUndefined(post.header("access-control-allow-credentials"));
 		preflight.assertStatus(204);
 		preflight.assertHeader("access-control-allow-origin", ORIGIN);
-		preflight.assertHeader("access-control-allow-methods", "GET,HEAD,POST");
+		preflight.assertHeader(
+			"access-control-allow-methods",
+			"GET,HEAD,POST,PUT,DELETE",
+		);
 		preflight.assertHeader(
 			"access-control-allow-headers",
-			"accept,content-type,x-challenge-token",
+			"accept,content-type,x-challenge-token,x-review-token",
 		);
 		assert.isUndefined(preflight.header("access-control-allow-credentials"));
 		assertNoCookies(preflight);

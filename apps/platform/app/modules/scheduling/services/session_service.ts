@@ -181,6 +181,27 @@ export default class SessionService {
 	}
 
 	/**
+	 * The project's latest completed tattoo session (live, newest end first),
+	 * or null: Reviews and Fresh ink's "the tattoo work is done" (ruling 3),
+	 * and the artist and date the client's review page names. One query on
+	 * the (tenant_id, project_id) index.
+	 */
+	async lastCompletedTattoo(
+		tenant: TenantRef,
+		project: Pick<TattooProject, "id" | "tenantId">,
+	): Promise<ProjectSession | null> {
+		assertProjectOf(tenant, project);
+		return ProjectSession.query()
+			.where("tenant_id", tenant.id)
+			.where("project_id", project.id)
+			.where("kind", "tattoo")
+			.where("status", "completed")
+			.orderBy("ends_at", "desc")
+			.orderBy("id", "desc")
+			.first();
+	}
+
+	/**
 	 * The tenant's active sessions (scheduled or completed, not deleted) that
 	 * take time in the half-open window, earliest first: the calendar
 	 * (TAT-50). The overlap is the no-overlap constraint's own expression, so
@@ -745,7 +766,10 @@ function rethrowOverlap(error: unknown): never {
 /**
  * A caller bug, not a user error: projects come from the tenant's own reads.
  */
-function assertProjectOf(tenant: TenantRef, project: TattooProject) {
+function assertProjectOf(
+	tenant: TenantRef,
+	project: Pick<TattooProject, "id" | "tenantId">,
+) {
 	if (project.tenantId !== tenant.id) {
 		throw new Error(`Project ${project.id} belongs to another tenant`);
 	}

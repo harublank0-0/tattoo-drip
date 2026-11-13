@@ -101,11 +101,13 @@ services:
   # Video angles' transcodes, on their own queue, one at a time, so they never
   # hold up mail or alerts. Capped in memory and CPU beside the web server; a
   # job it lost is put back up to 3 times; a stop waits up to 5 minutes for the
-  # transcode under way (its ffmpeg is killed after 4).
+  # transcode under way (its ffmpeg is killed after 4). Clients' Fresh ink
+  # videos (client_video) run here too, after the studios' (the worker asks
+  # its queues in order), so a work video never waits behind a client's.
   video-worker:
     <<: *worker
     restart: unless-stopped
-    command: ["node", "ace.js", "queue:work", "--queue=video", "--concurrency=1"]
+    command: ["node", "ace.js", "queue:work", "--queue=video,client_video", "--concurrency=1"]
     environment:
       QUEUE_MAX_STALLED_COUNT: "3"
     mem_limit: 1536m

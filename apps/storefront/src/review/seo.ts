@@ -1,0 +1,39 @@
+import { fill } from "../intake/template.ts";
+import type { HeadMeta, HeadTags } from "../studio/seo.ts";
+import { headCopy } from "./head-copy.ts";
+
+/*
+ * The review page's head and headers (Reviews and Fresh ink), the deposit
+ * page's rules (src/deposit/seo.ts): never indexed, never stored, no Referer
+ * for anything it loads or links to. No canonical link, og:url or JSON-LD.
+ */
+
+export const REVIEW_PAGE_HEADERS: Readonly<Record<string, string>> = {
+	"Cache-Control": "private, no-store",
+	"Referrer-Policy": "no-referrer",
+	"X-Robots-Tag": "noindex, nofollow",
+};
+
+export function reviewHead(studioName: string | null): HeadTags {
+	const values = { studio: studioName ?? "" };
+	const title = studioName
+		? fill(headCopy.titleWithStudio, values)
+		: headCopy.title;
+	const description = studioName
+		? fill(headCopy.descriptionWithStudio, values)
+		: headCopy.description;
+	const meta: HeadMeta[] = [
+		{ title },
+		{ name: "description", content: description },
+		{ name: "robots", content: "noindex, nofollow" },
+		{ name: "referrer", content: "no-referrer" },
+		{ property: "og:type", content: "website" },
+	];
+	if (studioName) meta.push({ property: "og:site_name", content: studioName });
+	meta.push(
+		{ property: "og:title", content: title },
+		{ property: "og:description", content: description },
+		{ name: "twitter:card", content: "summary" },
+	);
+	return { meta, links: [], scripts: [] };
+}

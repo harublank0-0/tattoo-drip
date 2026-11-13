@@ -13,8 +13,9 @@ info:
     - **CORS** allows the platform's own browser origins, never with
       credentials: every studio page, the dashboard and Discover. An allowed
       `Origin` is echoed in `Access-Control-Allow-Origin` (never `*`), and
-      every response carries `Vary: Origin`; GET, HEAD and POST with the
-      `Accept`, `Content-Type` and `X-Challenge-Token` request headers.
+      every response carries `Vary: Origin`; GET, HEAD, POST, PUT and DELETE
+      with the `Accept`, `Content-Type`, `X-Challenge-Token` and
+      `X-Review-Token` request headers.
       `Retry-After` is readable. A server-side caller sends no `Origin` and
       needs no CORS.
     - **Tenant from the path.** Tenant endpoints live under
@@ -52,6 +53,13 @@ tags:
     description: The public, cross-studio Discover API (docs/discover/api.md). No tenant; reads only what listed studios publish.
   - name: V1
     description: Planned for the paid launch (docs/requirements.md, V1). Not implemented; the shapes may still change.
+  - name: Reviews
+    description: |
+      The client's review page (Reviews and Fresh ink, slice 1): a review and
+      a Fresh ink post through the private link a studio sends after a
+      project. Behind a feature flag until the client content terms are
+      reviewed: while it is off every operation here is a 404. The link's
+      token travels in the `X-Review-Token` header, never in a URL.
 
 paths:
   /styles:
@@ -1134,6 +1142,318 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
         default: { $ref: "#/components/responses/Error" }
 
+  /tenants/{tenant}/review:
+    parameters:
+      - $ref: "#/components/parameters/Tenant"
+      - $ref: "#/components/parameters/ReviewToken"
+    get:
+      operationId: getReviewPage
+      tags: [Reviews]
+      summary: The client's review page, through its link
+      description: |
+        What the client's review page shows: the studio, the artist and the
+        day of the tattoo, the styles the post may carry, the defaults
+        (the shown name, the project's style and placement), and what the
+        client has written and posted. Never cached. Every link that doesn't
+        work (unknown, revoked, expired, another studio's, or its project
+        gone) is the same 404, and so is every operation while reviews are
+        off. Rate-limited per address and per link.
+      responses:
+        "200":
+          description: The review page
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data: { $ref: "#/components/schemas/ReviewPage" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+    put:
+      operationId: submitReviewPage
+      tags: [Reviews]
+      summary: Write or change the review and the Fresh ink post
+      description: |
+        The client's submit: the shown name and the two consents, which apply
+        to the review and the post alike, with the review (`review`), the
+        post (`post`) or both; a part left out stays as it is. A review is
+        made or changed; a post (whose photos and videos were added first)
+        is handed to the studio, which approves it before it shows anywhere.
+        Every field is checked again here. While `studio.onDiscover` is false,
+        `consentDiscover` can only be withdrawn (the stored choice and the
+        sent one must both be true to stay true).
+        Needs the bot-challenge token in `X-Challenge-Token` (action
+        `review`), as the intake does. Answers with the page as it now is.
+        Under an old slug it is a 404.
+
+        Own codes: `review_locked` (409: what TattooDrip took down, or a post
+        the studio declined or unpublished, can't be changed; its consents,
+        its name and its delete still work), `taken_down` (409: a new review
+        after TattooDrip took the last one down), `post_needs_photo` (409: a
+        video can't lead), `challenge_failed` (403) and
+        `challenge_unavailable` (503).
+      parameters:
+        - $ref: "#/components/parameters/ChallengeToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReviewSubmission" }
+      responses:
+        "200": { $ref: "#/components/responses/ReviewPageResponse" }
+        "403":
+          description: The bot challenge failed (`challenge_failed`). Get a new token and send again.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: It can't be changed now (`review_locked`, `taken_down`, `post_needs_photo`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503":
+          description: The bot challenge could not be checked (`challenge_unavailable`), or the API is busy (`service_busy`).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /tenants/{tenant}/review/review:
+    parameters:
+      - $ref: "#/components/parameters/Tenant"
+      - $ref: "#/components/parameters/ReviewToken"
+    delete:
+      operationId: deleteReview
+      tags: [Reviews]
+      summary: Delete the client's review
+      description: |
+        Takes the review off every surface at once; the client can write a
+        new one through the link. Deleting what isn't there is no error.
+        Answers with the page as it now is.
+      responses:
+        "200": { $ref: "#/components/responses/ReviewPageResponse" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /tenants/{tenant}/review/post:
+    parameters:
+      - $ref: "#/components/parameters/Tenant"
+      - $ref: "#/components/parameters/ReviewToken"
+    delete:
+      operationId: deleteReviewPost
+      tags: [Reviews]
+      summary: Delete the client's Fresh ink post
+      description: |
+        Deletes the post with every photo and video (their files first, so
+        none stays reachable). Deleting what isn't there is no error.
+        Answers with the page as it now is. Own code: `remove_failed` (503:
+        a file couldn't be deleted; nothing was; try again).
+      responses:
+        "200": { $ref: "#/components/responses/ReviewPageResponse" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503":
+          description: A file couldn't be deleted (`remove_failed`). Try again.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /tenants/{tenant}/review/post/order:
+    parameters:
+      - $ref: "#/components/parameters/Tenant"
+      - $ref: "#/components/parameters/ReviewToken"
+    put:
+      operationId: reorderReviewPost
+      tags: [Reviews]
+      summary: Change the order of the post's photos and videos
+      description: |
+        The post's order alone ("Make photo 3 the main photo"): every
+        `ReviewMedia` id once, a photo first. Nothing else is written and no
+        bot challenge is needed. A change to an approved post sends it back
+        to the studio. Answers with the page as it now is.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [order]
+              additionalProperties: false
+              properties:
+                order: { type: array, minItems: 1, maxItems: 8, items: { type: string, format: uuid } }
+      responses:
+        "200": { $ref: "#/components/responses/ReviewPageResponse" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Not changeable or a video first (`review_locked`, `post_needs_photo`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /tenants/{tenant}/review/photos:
+    parameters:
+      - $ref: "#/components/parameters/Tenant"
+      - $ref: "#/components/parameters/ReviewToken"
+    post:
+      operationId: addReviewPhoto
+      tags: [Reviews]
+      summary: Add a photo to the Fresh ink post
+      description: |
+        One `multipart/form-data` request with one photo (`photo`, a JPEG,
+        PNG or WebP of 10 MB at most). It becomes the post's last item; the
+        first photo leads. A post that doesn't exist yet is started (a draft
+        only the client sees until the submit). Own codes (409): `post_full`
+        (8 photos and videos already), `review_locked`, `taken_down` and
+        `post_limit` (a new post after a takedown, or a third one). Answers
+        with the page as it now is.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/ReviewPhotoForm" }
+            encoding:
+              photo:
+                contentType: image/jpeg, image/png, image/webp
+      responses:
+        "201": { $ref: "#/components/responses/ReviewPageResponse" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "408": { $ref: "#/components/responses/Error" }
+        "409":
+          description: No room or not changeable (`post_full`, `review_locked`, `taken_down`, `post_limit`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "413": { $ref: "#/components/responses/Error" }
+        "415": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /tenants/{tenant}/review/videos/sign:
+    parameters:
+      - $ref: "#/components/parameters/Tenant"
+      - $ref: "#/components/parameters/ReviewToken"
+    post:
+      operationId: signReviewVideo
+      tags: [Reviews]
+      summary: Get where to upload a video for the Fresh ink post
+      description: |
+        A video never goes through the API's request body: say its type and
+        exact length, PUT the file to `upload.url` (resolve it against the
+        API's origin: it is absolute in production, a path on the API in
+        development) with `upload.headers`, then send `token` to
+        `addReviewVideo`. MP4, MOV or WebM, at most 100 MB; the API measures
+        the rest (60 seconds at most, 4K at most) and strips the sound. The
+        post needs a photo first (`post_needs_photo`, 409: a video never
+        leads); `post_full` and `review_locked` as for a photo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReviewVideoSignInput" }
+      responses:
+        "200":
+          description: Where to upload
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data: { $ref: "#/components/schemas/ReviewVideoUpload" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: No room, no photo yet, or not changeable (`post_full`, `post_needs_photo`, `review_locked`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /tenants/{tenant}/review/videos:
+    parameters:
+      - $ref: "#/components/parameters/Tenant"
+      - $ref: "#/components/parameters/ReviewToken"
+    post:
+      operationId: addReviewVideo
+      tags: [Reviews]
+      summary: Add an uploaded video to the Fresh ink post
+      description: |
+        Once the PUT has finished: the video becomes the post's last item,
+        `processing`, then `ready` or `failed` (read the page again to
+        follow it). An upload that didn't arrive, isn't this link's or was
+        added already is `validation_failed` on `upload`. Answers with the
+        page as it now is.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReviewVideoFinishInput" }
+      responses:
+        "201": { $ref: "#/components/responses/ReviewPageResponse" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: No room, no photo, or not changeable (`post_full`, `post_needs_photo`, `review_locked`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /tenants/{tenant}/review/media/{media}:
+    parameters:
+      - $ref: "#/components/parameters/Tenant"
+      - $ref: "#/components/parameters/ReviewToken"
+      - name: media
+        in: path
+        required: true
+        description: A `ReviewMedia` id of this link's post.
+        schema: { type: string, format: uuid }
+    delete:
+      operationId: removeReviewMedia
+      tags: [Reviews]
+      summary: Remove a photo or video from the Fresh ink post
+      description: |
+        Its files are deleted first, so it stops loading at once. The first
+        photo left leads. Own codes: `post_needs_photo` (409: the last photo
+        can't go while a video stays; remove the videos first),
+        `review_locked` (409) and `remove_failed` (503). An id that isn't
+        this link's post's is a 404. Answers with the page as it now is.
+      responses:
+        "200": { $ref: "#/components/responses/ReviewPageResponse" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: It can't go now (`post_needs_photo`, `review_locked`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503":
+          description: A file couldn't be deleted (`remove_failed`). Try again.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        default: { $ref: "#/components/responses/Error" }
+
 components:
   parameters:
     Tenant:
@@ -1161,13 +1481,26 @@ components:
       schema:
         type: string
         pattern: "^[A-Za-z0-9_-]{43}$"
+    ReviewToken:
+      name: X-Review-Token
+      in: header
+      required: true
+      description: |
+        The review link's secret: the fragment of the link the studio sent
+        (`https://<studio>/review#<token>`). Sent as a header so it never
+        appears in a URL the API sees or logs. A bearer secret: never log
+        it, put it in a URL or send it to analytics.
+      schema:
+        type: string
+        pattern: "^[A-Za-z0-9_-]{43}$"
     ChallengeToken:
       name: X-Challenge-Token
       in: header
       required: true
       description: |
         The bot-challenge token the studio page's Cloudflare Turnstile widget
-        made for this submission, rendered with action `inquiry`. Single-use:
+        made for this submission, rendered with the form's action (`inquiry`
+        for an inquiry, `review` for the review page). Single-use:
         get a new one for every request, also after a refusal. Missing,
         invalid, expired, already used, or made on another page or for
         another form: 403 `challenge_failed`. A local development server
@@ -1248,6 +1581,18 @@ components:
       schema: { type: integer, minimum: 0 }
 
   responses:
+    ReviewPageResponse:
+      description: The review page as it now is
+      headers:
+        Cache-Control: { $ref: "#/components/headers/CacheControl" }
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            additionalProperties: false
+            properties:
+              data: { $ref: "#/components/schemas/ReviewPage" }
     NotModified:
       description: The `If-None-Match` tag still matches; no body
       headers:
@@ -1302,8 +1647,12 @@ components:
                 `flash_claimed` (409),
                 `challenge_failed` (403) and `challenge_unavailable` (503),
                 all `createInquiry`; `deposit_not_due`, `deposit_changed`
-                (409, `submitDepositProof`). Treat an unknown code by its HTTP
-                status.
+                (409, `submitDepositProof`); `review_locked`, `post_full`,
+                `post_needs_photo`, `taken_down`, `post_limit` (409) and
+                `remove_failed` (503), the
+                review page's (and `challenge_failed`,
+                `challenge_unavailable` on `submitReviewPage`). Treat an
+                unknown code by its HTTP status.
               examples: [not_found, validation_failed, rate_limited, service_busy, too_many_open_inquiries, flash_unavailable, flash_claimed, challenge_failed, deposit_changed]
             message:
               type: string
@@ -1956,6 +2305,242 @@ components:
             The studio's own description of the video, one line of plain
             text, or null: then build a label such as "Video, 0:42".
 
+    ReviewPage:
+      type: object
+      description: |
+        The client's review page. Only what the link's holder may see: never
+        the client's full name, phone or email, the studio's notes or another
+        project's anything.
+      required: [studio, project, link, styles, defaults, review, post, blocks]
+      additionalProperties: false
+      properties:
+        studio:
+          type: object
+          required: [name, onDiscover]
+          additionalProperties: false
+          properties:
+            name: { type: string }
+            onDiscover:
+              type: boolean
+              description: Whether Discover lists the studio now. Offer the Discover consent only while it does.
+        project:
+          type: object
+          required: [artistName, tattooedOn]
+          additionalProperties: false
+          properties:
+            artistName:
+              type: [string, "null"]
+              description: The artist who made it; null when their profile is gone.
+            tattooedOn:
+              type: string
+              format: date
+              description: The day of the project's latest finished tattoo session, in the studio's timezone.
+        link:
+          type: object
+          required: [expiresAt]
+          additionalProperties: false
+          properties:
+            expiresAt: { type: string, format: date-time }
+        styles:
+          type: array
+          description: The styles a post may carry (the studio's), in the platform's order.
+          items: { $ref: "#/components/schemas/TattooStyle" }
+        defaults:
+          type: object
+          description: What the form starts with when nothing is saved yet.
+          required: [shownName, styles, placement]
+          additionalProperties: false
+          properties:
+            shownName:
+              type: string
+              maxLength: 40
+              description: The saved shown name, else the first name and the initial of the last name ("Sita R.").
+            styles:
+              type: array
+              maxItems: 3
+              description: The project's style when the studio lists it.
+              items: { type: string }
+            placement:
+              type: [string, "null"]
+              maxLength: 120
+              description: The placement the client wrote in their request.
+        review:
+          oneOf: [{ $ref: "#/components/schemas/ClientReview" }, { type: "null" }]
+        post:
+          oneOf: [{ $ref: "#/components/schemas/ClientPost" }, { type: "null" }]
+        blocks:
+          type: object
+          description: |
+            Why the client can't start a new review or post now, while they
+            have none: `taken_down` (TattooDrip took the last one down; it
+            stays down until restored, contact the studio), `post_limit` (the
+            tattoo already had two posts). Null when they can.
+          required: [review, post]
+          additionalProperties: false
+          properties:
+            review: { type: [string, "null"], enum: [taken_down, null] }
+            post: { type: [string, "null"], enum: [taken_down, post_limit, null] }
+
+    ReviewTakedown:
+      type: object
+      description: TattooDrip took it off every public surface. Show `sentence`.
+      required: [reason, sentence, at]
+      additionalProperties: false
+      properties:
+        reason:
+          type: string
+          description: "`hate`, `threats`, `personal_data`, `off_topic`, `not_a_client`, `client_request` or `other`; treat an unknown one as `other`."
+        sentence: { type: string }
+        at: { type: string, format: date-time }
+
+    ClientReview:
+      type: object
+      required: [rating, body, shownName, consentStudioPage, consentDiscover, takenDown, createdAt, updatedAt]
+      additionalProperties: false
+      properties:
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        body: { type: string, minLength: 20, maxLength: 2000 }
+        shownName: { type: string, minLength: 1, maxLength: 40 }
+        consentStudioPage: { type: boolean }
+        consentDiscover: { type: boolean }
+        takenDown:
+          oneOf: [{ $ref: "#/components/schemas/ReviewTakedown" }, { type: "null" }]
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    ClientPost:
+      type: object
+      required: [status, caption, styles, placement, shownName, consentStudioPage, consentDiscover, takenDown, editable, media]
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum: [draft, waiting, approved, not_shown]
+          description: |
+            `draft` until the client submits it (only they see it);
+            `waiting` for the studio; `approved` (shown where the client
+            allowed); `not_shown` when the studio declined or took it off its
+            page (the client is told nothing more).
+        caption: { type: [string, "null"], maxLength: 280 }
+        styles: { type: array, maxItems: 3, items: { type: string } }
+        placement: { type: [string, "null"], maxLength: 120 }
+        shownName: { type: string, minLength: 1, maxLength: 40 }
+        consentStudioPage: { type: boolean }
+        consentDiscover: { type: boolean }
+        takenDown:
+          oneOf: [{ $ref: "#/components/schemas/ReviewTakedown" }, { type: "null" }]
+        editable:
+          type: boolean
+          description: Whether its photos, caption, styles and placement may still change (not taken down, not declined).
+        media:
+          type: array
+          maxItems: 8
+          description: In order; the first is the lead and always a photo.
+          items: { $ref: "#/components/schemas/ReviewMedia" }
+
+    ReviewMedia:
+      type: object
+      required: [id, kind, state, failure, image, sources, durationMs]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [photo, video] }
+        state:
+          type: string
+          enum: [processing, ready, failed]
+          description: A photo is always `ready`. A video is `processing` until the API has made it, then `ready` or `failed`.
+        failure:
+          type: [string, "null"]
+          description: Why a video failed, in words for the client.
+        image:
+          description: The photo, or a ready video's poster. Private until the post is published, so its URL (and its copies') is signed for 5 minutes and may be on the API's or the storage's origin; read the page again for fresh ones.
+          oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }]
+        sources:
+          type: array
+          maxItems: 2
+          description: A ready video's sizes, smallest first; muted. Signed for 5 minutes like `image`.
+          items: { $ref: "#/components/schemas/VideoSource" }
+        durationMs: { type: [integer, "null"], minimum: 1, maximum: 60000 }
+
+    ReviewSubmission:
+      type: object
+      required: [shownName, consentStudioPage, consentDiscover]
+      additionalProperties: false
+      properties:
+        shownName:
+          type: string
+          minLength: 1
+          maxLength: 40
+          description: 1 to 40 characters, any script; trimmed.
+        consentStudioPage: { type: boolean, description: "Show on the studio's page." }
+        consentDiscover: { type: boolean, description: "Show on TattooDrip Discover. While the studio isn't on Discover it can only be withdrawn: send the stored value, or false." }
+        review:
+          type: object
+          required: [rating, body]
+          additionalProperties: false
+          properties:
+            rating: { type: integer, minimum: 1, maximum: 5 }
+            body: { type: string, minLength: 20, maxLength: 2000, description: Plain text, trimmed. }
+        post:
+          type: object
+          required: [styles]
+          additionalProperties: false
+          properties:
+            caption: { type: [string, "null"], maxLength: 280 }
+            styles:
+              type: array
+              maxItems: 3
+              description: Slugs from the page's `styles`.
+              items: { type: string }
+            placement: { type: [string, "null"], maxLength: 120 }
+            order:
+              type: array
+              maxItems: 8
+              description: Every `ReviewMedia` id of the post, in the new order; the first must be a photo. Leave it out to keep the order.
+              items: { type: string, format: uuid }
+
+    ReviewPhotoForm:
+      type: object
+      description: The multipart body of `addReviewPhoto`
+      required: [photo]
+      properties:
+        photo: { type: string, format: binary, description: A JPEG, PNG or WebP of 10 MB at most. }
+
+    ReviewVideoSignInput:
+      type: object
+      required: [type, size]
+      additionalProperties: false
+      properties:
+        type: { type: string, enum: [video/mp4, video/quicktime, video/webm] }
+        size: { type: integer, minimum: 1, maximum: 104857600, description: The file's exact length in bytes. }
+
+    ReviewVideoUpload:
+      type: object
+      required: [upload, token]
+      additionalProperties: false
+      properties:
+        upload:
+          type: object
+          required: [method, url, headers]
+          additionalProperties: false
+          properties:
+            method: { type: string, const: PUT }
+            url: { type: string, description: "Where to PUT the file: absolute, or a path on the API's origin." }
+            headers:
+              type: object
+              description: Send exactly these with the PUT.
+              additionalProperties: { type: string }
+        token:
+          type: string
+          description: Send it to `addReviewVideo` once the PUT has finished. Good for an hour.
+
+    ReviewVideoFinishInput:
+      type: object
+      required: [upload]
+      additionalProperties: false
+      properties:
+        upload: { type: string, maxLength: 2048, description: The `token` of `signReviewVideo`. }
+
     VideoSource:
       type: object
       description: One size of a `VideoAngle`, an H.264 MP4 with no audio.
@@ -2300,6 +2885,7 @@ components:
           type: string
           format: uri
           description: The provider's hosted checkout page. Valid for 30 minutes.
+
 
     DepositSession:
       type: object

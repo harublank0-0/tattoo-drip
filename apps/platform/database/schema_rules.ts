@@ -11,5 +11,8 @@ export default {
 				video_keys: { tsType: "string[]" },
 			},
 		},
+		// Reviews and Fresh ink: a post's style slugs, and its videos' keys.
+		client_posts: { columns: { styles: { tsType: "string[]" } } },
+		client_post_media: { columns: { video_keys: { tsType: "string[]" } } },
 	},
 } satisfies SchemaRules;

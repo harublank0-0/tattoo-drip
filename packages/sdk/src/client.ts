@@ -13,6 +13,10 @@ import type {
 	ListFlashQuery,
 	ListServicesQuery,
 	ListWorkQuery,
+	ReviewPage,
+	ReviewSubmission,
+	ReviewVideoSignInput,
+	ReviewVideoUpload,
 	Service,
 	Slot,
 	Studio,
@@ -33,6 +37,13 @@ const UPLOAD_TIMEOUT_MS = 120_000;
 export const INQUIRY_CHALLENGE_ACTION = "inquiry";
 /** The intake form's honeypot field: people never see it, so they leave it empty (TAT-55). */
 export const INQUIRY_HONEYPOT_FIELD = "website";
+/** The action the review page's Turnstile widget is rendered with (Reviews and Fresh ink). */
+export const REVIEW_CHALLENGE_ACTION = "review";
+/**
+ * The header a review link's token travels in: never a path or a query
+ * string, so the token appears in no URL the API sees or logs.
+ */
+export const REVIEW_TOKEN_HEADER = "X-Review-Token";
 
 export interface TattooClientOptions {
 	/** API origin, e.g. `https://api.example.com`. The SDK appends `/api/v1`. */
@@ -84,6 +95,16 @@ export interface SubmitDepositProofInput {
 	expectedAmount: number;
 }
 
+/** The review page's submit, with the bot-challenge token for this call. */
+export interface SubmitReviewInput extends ReviewSubmission {
+	/**
+	 * The token the review page's Turnstile widget made for this submit
+	 * (action `REVIEW_CHALLENGE_ACTION`), sent as `X-Challenge-Token`.
+	 * Single-use: get a new one for every call.
+	 */
+	challengeToken?: string;
+}
+
 export type TattooClient = ReturnType<typeof createTattooClient>;
 
 export function createTattooClient(options: TattooClientOptions) {
@@ -92,6 +113,29 @@ export function createTattooClient(options: TattooClientOptions) {
 	const tenantRoot = `${apiRoot}/tenants/${encodeURIComponent(options.tenant)}`;
 
 	const { request, getData } = transport;
+	const reviewRoot = `${tenantRoot}/review`;
+	/** A review page call: the link's token in its header, JSON in and `{ data }` out. */
+	const reviewCall = async <T>(
+		token: string,
+		path: string,
+		init: RequestInit,
+		call?: RequestOptions,
+	) => {
+		const headers = new Headers(init.headers);
+		headers.set(REVIEW_TOKEN_HEADER, token);
+		return (
+			await request<{ data: T }>(
+				`${reviewRoot}${path}`,
+				{ ...init, headers },
+				call,
+			)
+		).data;
+	};
+	const jsonBody = (method: string, body: unknown): RequestInit => ({
+		method,
+		body: JSON.stringify(body),
+		headers: { "Content-Type": "application/json" },
+	});
 
 	return {
 		/** Tenant slug this client is scoped to. */
@@ -272,6 +316,99 @@ export function createTattooClient(options: TattooClientOptions) {
 				);
 				return body.data;
 			},
+		},
+
+		/**
+		 * The client's review page (Reviews and Fresh ink), through the token
+		 * of the link the studio sent (the link's fragment). The token goes in
+		 * the `X-Review-Token` header, never the URL. A link that doesn't work,
+		 * and every call while reviews are off, is a 404 TattooApiError
+		 * (`not_found`). Every write answers with the page as it now is.
+		 */
+		reviews: {
+			get: (token: string, call?: RequestOptions) =>
+				reviewCall<ReviewPage>(token, "", {}, call),
+			/**
+			 * Writes the review, the post or both, with the shown name and the
+			 * consents. Fails with `validation_failed` (fields such as
+			 * `review.body`, `post.styles`), `review_locked`, `post_needs_photo`,
+			 * `challenge_failed` (get a new token), `challenge_unavailable` or
+			 * `rate_limited`. Never retried.
+			 */
+			submit: (
+				token: string,
+				{ challengeToken, ...input }: SubmitReviewInput,
+				call?: RequestOptions,
+			) => {
+				const init = jsonBody("PUT", input);
+				if (challengeToken) {
+					(init.headers as Record<string, string>)["X-Challenge-Token"] =
+						challengeToken;
+				}
+				return reviewCall<ReviewPage>(token, "", init, call);
+			},
+			/**
+			 * The post's order alone ("Make photo 3 the main photo"): every
+			 * item's id once, a photo first. No bot challenge, no other field.
+			 */
+			reorder: (token: string, order: string[], call?: RequestOptions) =>
+				reviewCall<ReviewPage>(
+					token,
+					"/post/order",
+					jsonBody("PUT", { order }),
+					call,
+				),
+			deleteReview: (token: string, call?: RequestOptions) =>
+				reviewCall<ReviewPage>(token, "/review", { method: "DELETE" }, call),
+			deletePost: (token: string, call?: RequestOptions) =>
+				reviewCall<ReviewPage>(token, "/post", { method: "DELETE" }, call),
+			/**
+			 * Adds one photo (a JPEG, PNG or WebP of 10 MB at most) to the post.
+			 * Waits up to 2 minutes unless `call.timeoutMs` says otherwise.
+			 * `post_full` with 8 already.
+			 */
+			addPhoto: (token: string, photo: Blob, call: RequestOptions = {}) => {
+				const form = new FormData();
+				form.append("photo", photo, "photo.jpg");
+				return reviewCall<ReviewPage>(
+					token,
+					"/photos",
+					// No Content-Type: fetch sets multipart's boundary itself.
+					{ method: "POST", body: form },
+					{ ...call, timeoutMs: call.timeoutMs ?? UPLOAD_TIMEOUT_MS },
+				);
+			},
+			/**
+			 * Where to PUT a video: `upload.url` (resolve it against the API's
+			 * origin) with `upload.headers`, then `addVideo` with `token`.
+			 */
+			signVideo: (
+				token: string,
+				input: ReviewVideoSignInput,
+				call?: RequestOptions,
+			) =>
+				reviewCall<ReviewVideoUpload>(
+					token,
+					"/videos/sign",
+					jsonBody("POST", input),
+					call,
+				),
+			/** Adds the uploaded video (`processing`) once its PUT has finished. */
+			addVideo: (token: string, upload: string, call?: RequestOptions) =>
+				reviewCall<ReviewPage>(
+					token,
+					"/videos",
+					jsonBody("POST", { upload }),
+					call,
+				),
+			/** Removes one photo or video of the post (its files go first). */
+			removeMedia: (token: string, mediaId: string, call?: RequestOptions) =>
+				reviewCall<ReviewPage>(
+					token,
+					`/media/${encodeURIComponent(mediaId)}`,
+					{ method: "DELETE" },
+					call,
+				),
 		},
 
 		/** Platform-wide reference lists (not tenant-scoped). */

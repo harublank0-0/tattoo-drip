@@ -15,19 +15,28 @@ export {
 } from "./discover.js";
 export { discoverKeys, discoverQueries } from "./discover_queries.js";
 export {
+	useAddReviewPhoto,
+	useAddReviewVideo,
 	useArtist,
 	useArtists,
 	useAvailability,
 	useCreateInquiry,
+	useDeleteReview,
+	useDeleteReviewPost,
 	useDeposit,
 	useFlash,
 	useFlashDesign,
 	usePlacements,
+	useRemoveReviewMedia,
+	useReorderReviewPost,
+	useReview,
 	useServices,
+	useSignReviewVideo,
 	useStartDepositCheckout,
 	useStudio,
 	useStyles,
 	useSubmitDepositProof,
+	useSubmitReview,
 	useWork,
 	useWorkPhoto,
 } from "./hooks.js";
@@ -36,4 +45,15 @@ export {
 	type TattooProviderProps,
 	useTattooClient,
 } from "./provider.js";
-export { tattooKeys, tattooMutations, tattooQueries } from "./queries.js";
+export {
+	REVIEW_POLL_GIVE_UP_MS,
+	REVIEW_PROCESSING_POLL_MS,
+	reviewPollDelay,
+	reviewProcessing,
+	reviewProcessingFor,
+	reviewRefetchInterval,
+	reviewRetryDelay,
+	tattooKeys,
+	tattooMutations,
+	tattooQueries,
+} from "./queries.js";

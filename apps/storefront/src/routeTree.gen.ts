@@ -18,6 +18,7 @@ import { Route as DepositRouteImport } from './routes/deposit'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as PoliciesRouteImport } from './routes/policies'
 import { Route as RequestRouteImport } from './routes/request'
+import { Route as ReviewRouteImport } from './routes/review'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
@@ -72,6 +73,11 @@ const PoliciesRoute = PoliciesRouteImport.update({
 const RequestRoute = RequestRouteImport.update({
   id: '/request',
   path: '/request',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReviewRoute = ReviewRouteImport.update({
+  id: '/review',
+  path: '/review',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
@@ -135,6 +141,7 @@ export interface FileRoutesByFullPath {
   '/faq': typeof FaqRoute
   '/policies': typeof PoliciesRoute
   '/request': typeof RequestRoute
+  '/review': typeof ReviewRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/services': typeof ServicesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -156,6 +163,7 @@ export interface FileRoutesByTo {
   '/faq': typeof FaqRoute
   '/policies': typeof PoliciesRoute
   '/request': typeof RequestRoute
+  '/review': typeof ReviewRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/services': typeof ServicesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -178,6 +186,7 @@ export interface FileRoutesById {
   '/faq': typeof FaqRoute
   '/policies': typeof PoliciesRoute
   '/request': typeof RequestRoute
+  '/review': typeof ReviewRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/services': typeof ServicesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -201,6 +210,7 @@ export interface FileRouteTypes {
     | '/faq'
     | '/policies'
     | '/request'
+    | '/review'
     | '/robots.txt'
     | '/services'
     | '/sitemap.xml'
@@ -222,6 +232,7 @@ export interface FileRouteTypes {
     | '/faq'
     | '/policies'
     | '/request'
+    | '/review'
     | '/robots.txt'
     | '/services'
     | '/sitemap.xml'
@@ -243,6 +254,7 @@ export interface FileRouteTypes {
     | '/faq'
     | '/policies'
     | '/request'
+    | '/review'
     | '/robots.txt'
     | '/services'
     | '/sitemap.xml'
@@ -265,6 +277,7 @@ export interface RootRouteChildren {
   FaqRoute: typeof FaqRoute
   PoliciesRoute: typeof PoliciesRoute
   RequestRoute: typeof RequestRoute
+  ReviewRoute: typeof ReviewRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   ServicesRoute: typeof ServicesRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -340,6 +353,13 @@ declare module '@tanstack/react-router' {
       path: '/request'
       fullPath: '/request'
       preLoaderRoute: typeof RequestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/review': {
+      id: '/review'
+      path: '/review'
+      fullPath: '/review'
+      preLoaderRoute: typeof ReviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/robots.txt': {
@@ -425,6 +445,7 @@ const rootRouteChildren: RootRouteChildren = {
   FaqRoute: FaqRoute,
   PoliciesRoute: PoliciesRoute,
   RequestRoute: RequestRoute,
+  ReviewRoute: ReviewRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   ServicesRoute: ServicesRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,

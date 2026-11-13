@@ -95,3 +95,72 @@ export function useSubmitDepositProof(token: string) {
 		tattooMutations.submitDepositProof(client, queryClient, token),
 	);
 }
+
+/** The client's review page by its link's token (the fragment of the link the studio sent). */
+export function useReview(token: string) {
+	return useQuery(tattooQueries.review(useTattooClient(), token));
+}
+
+/** Writes the review, the post or both (`client.reviews.submit`); the answer replaces `useReview(token)`'s page. Never retried. */
+export function useSubmitReview(token: string) {
+	const client = useTattooClient();
+	const queryClient = useQueryClient();
+	return useMutation(tattooMutations.submitReview(client, queryClient, token));
+}
+
+/** Deletes the client's review. */
+export function useDeleteReview(token: string) {
+	const client = useTattooClient();
+	const queryClient = useQueryClient();
+	return useMutation(tattooMutations.deleteReview(client, queryClient, token));
+}
+
+/** Deletes the client's Fresh ink post with its photos and videos. */
+export function useDeleteReviewPost(token: string) {
+	const client = useTattooClient();
+	const queryClient = useQueryClient();
+	return useMutation(
+		tattooMutations.deleteReviewPost(client, queryClient, token),
+	);
+}
+
+/** Adds one photo to the post. */
+export function useAddReviewPhoto(token: string) {
+	const client = useTattooClient();
+	const queryClient = useQueryClient();
+	return useMutation(
+		tattooMutations.addReviewPhoto(client, queryClient, token),
+	);
+}
+
+/** Adds an uploaded video (its upload token) to the post. */
+export function useAddReviewVideo(token: string) {
+	const client = useTattooClient();
+	const queryClient = useQueryClient();
+	return useMutation(
+		tattooMutations.addReviewVideo(client, queryClient, token),
+	);
+}
+
+/** Removes one photo or video from the post. */
+export function useRemoveReviewMedia(token: string) {
+	const client = useTattooClient();
+	const queryClient = useQueryClient();
+	return useMutation(
+		tattooMutations.removeReviewMedia(client, queryClient, token),
+	);
+}
+
+/** Where to upload a video (`client.reviews.signVideo`). */
+export function useSignReviewVideo(token: string) {
+	return useMutation(tattooMutations.signReviewVideo(useTattooClient(), token));
+}
+
+/** Changes the post's order alone ("Make photo 3 the main photo"). */
+export function useReorderReviewPost(token: string) {
+	const client = useTattooClient();
+	const queryClient = useQueryClient();
+	return useMutation(
+		tattooMutations.reorderReviewPost(client, queryClient, token),
+	);
+}

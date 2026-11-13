@@ -28,6 +28,8 @@ export function publicMarkers(studio: Studio): string[] {
 		studio.newInquiry.id,
 		studio.depositProject.id,
 		studio.depositReferenceCode,
+		// The review page (Reviews and Fresh ink): its draft post's photo.
+		studio.clientPostPhoto.id,
 		// Carries the studio's name; belt and braces for the public studio read.
 		studio.closedDay.note as string,
 	];
@@ -45,6 +47,7 @@ function urlFor(
 	{ pattern }: PublicIsolationCase,
 	slugOwner: Studio,
 	params: Record<string, string> = {},
+	query: Record<string, string> = {},
 ) {
 	let url = pattern.replace(segment("tenant"), slugOwner.tenant.slug);
 	for (const [name, value] of Object.entries(params)) {
@@ -55,7 +58,8 @@ function urlFor(
 			`${pattern}: give the case \`params\` for every parameter but :tenant`,
 		);
 	}
-	return url;
+	const search = new URLSearchParams(query).toString();
+	return search ? `${url}?${search}` : url;
 }
 
 /** Sends the case's request to `url` with `own`'s body and files. */
@@ -64,10 +68,20 @@ async function send(
 	isolationCase: PublicIsolationCase,
 	url: string,
 	own: Studio,
+	headers: Record<string, string> = {},
 ) {
 	const request = client.request(url, isolationCase.method);
-	const body = isolationCase.body?.(own);
-	if (isolationCase.encoding === "multipart") {
+	for (const [name, value] of Object.entries(headers)) {
+		request.header(name, value);
+	}
+	const body = await isolationCase.body?.(own);
+	if (isolationCase.encoding === "raw") {
+		const raw = isolationCase.raw?.(own);
+		if (raw) {
+			request.type(raw.type);
+			request.request.send(raw.data);
+		}
+	} else if (isolationCase.encoding === "multipart") {
 		if (body) request.fields(body as Record<string, string>);
 		for (const part of (await isolationCase.files?.(own)) ?? []) {
 			request.file(part.field, part.data, {
@@ -99,12 +113,14 @@ export async function assertPublicIsolation(
 	const before = await isolationCase.snapshot(b);
 	const beforeA = await isolationCase.snapshot(a);
 
-	if (isolationCase.params) {
+	const { params, headers, query } = isolationCase;
+	if (params || headers || query) {
 		const attack = await send(
 			client,
 			isolationCase,
-			urlFor(isolationCase, a, isolationCase.params(b)),
+			urlFor(isolationCase, a, params?.(b), query?.(b)),
 			a,
+			headers?.(b),
 		);
 		attack.assertStatus(404);
 		assert.equal(attack.body().error?.code, "not_found");
@@ -117,8 +133,9 @@ export async function assertPublicIsolation(
 		const mirror = await send(
 			client,
 			isolationCase,
-			urlFor(isolationCase, b, isolationCase.params(a)),
+			urlFor(isolationCase, b, params?.(a), query?.(a)),
 			b,
+			headers?.(a),
 		);
 		const label = `${isolationCase.method} ${isolationCase.pattern} with A's values under B's slug`;
 		assert.equal(mirror.status(), 404, `${label} must be the 404`);
@@ -133,8 +150,9 @@ export async function assertPublicIsolation(
 	const response = await send(
 		client,
 		isolationCase,
-		urlFor(isolationCase, a, isolationCase.params?.(a)),
+		urlFor(isolationCase, a, params?.(a), query?.(a)),
 		a,
+		headers?.(a),
 	);
 
 	response.assertStatus(isolationCase.ownStatus);

@@ -70,6 +70,7 @@ export const middleware = router.named({
 	depositThrottle: () => import("#middleware/deposit_throttle_middleware"),
 	apiLimit: () => import("#middleware/api_limit_middleware"),
 	intakeGuard: () => import("#middleware/intake_guard_middleware"),
+	reviewGuard: () => import("#middleware/review_guard_middleware"),
 	verifiedEmail: () => import("#middleware/verified_email_middleware"),
 	platformAdmin: () => import("#middleware/platform_admin_middleware"),
 });
