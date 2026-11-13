@@ -44,6 +44,7 @@ export async function makeClip({
 	format = "mp4",
 	audio = true,
 	rotate,
+	rate = 25,
 }: {
 	width: number;
 	height: number;
@@ -51,8 +52,10 @@ export async function makeClip({
 	format?: "mp4" | "mov" | "webm";
 	audio?: boolean;
 	rotate?: number;
+	/** Frames per second (25 by default). */
+	rate?: number;
 }): Promise<{ path: string; type: string; size: number }> {
-	const name = `clip-${width}x${height}-${seconds}s-${audio ? "a" : "n"}-${rotate ?? 0}.${format}`;
+	const name = `clip-${width}x${height}-${seconds}s-${rate}fps-${audio ? "a" : "n"}-${rotate ?? 0}.${format}`;
 	const path = join(await clips(), name);
 	const made =
 		rotate === undefined ? path : join(await clips(), `plain-${name}`);
@@ -64,7 +67,7 @@ export async function makeClip({
 		"-f",
 		"lavfi",
 		"-i",
-		`testsrc=size=${width}x${height}:rate=25:duration=${seconds}`,
+		`testsrc=size=${width}x${height}:rate=${rate}:duration=${seconds}`,
 	];
 	if (audio) {
 		args.push("-f", "lavfi", "-i", `sine=frequency=440:duration=${seconds}`);
@@ -112,6 +115,7 @@ export async function probeStored(key: string): Promise<{
 	streams: {
 		codec_type: string;
 		codec_name: string;
+		r_frame_rate?: string;
 		width?: number;
 		height?: number;
 		pix_fmt?: string;
@@ -166,16 +170,16 @@ export async function stageClip(
 }
 
 /** The files a studio has in its private staging folder (the uploads not yet processed). */
-export async function stagedFiles(studio: Pick<Studio, "tenant">) {
+export async function stagedFiles(studio: { tenant: { id: string } }) {
 	try {
 		return (
 			await readdir(
 				app.tmpPath(
 					"storage",
 					"private",
+					"work_video_upload",
 					"tenants",
 					studio.tenant.id,
-					"work_video_upload",
 				),
 			)
 		).sort();
@@ -185,7 +189,7 @@ export async function stagedFiles(studio: Pick<Studio, "tenant">) {
 }
 
 /** The files a studio has under the public `work_video` folder (renditions, posters and their copies). */
-export async function videoFiles(studio: Pick<Studio, "tenant">) {
+export async function videoFiles(studio: { tenant: { id: string } }) {
 	try {
 		return (
 			await readdir(

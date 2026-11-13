@@ -21,6 +21,8 @@ import {
 	probe,
 	transcode,
 	transcodeSlot,
+	VideoToolError,
+	VideoToolMissingError,
 } from "#modules/media/services/video_tools";
 import {
 	MAX_VIDEO_BYTES,
@@ -70,7 +72,8 @@ export type ShownVideoSource = {
 /**
  * Video angles' files (the media module owns them, as ImageService owns
  * images). Uploads go straight from the browser to a private staging object
- * (`tenants/<id>/work_video_upload/<uuid>`), never through the app's request
+ * (`work_video_upload/tenants/<id>/<uuid>`: one fixed prefix, so an R2
+ * lifecycle rule can expire what nobody finished), never through the app's request
  * body: on R2 through a presigned PUT whose signature binds the type and the
  * exact length (`signUpload`), on the local disk (development and tests)
  * through the dashboard's own PUT route, which streams into `writeStaged`.
@@ -85,14 +88,14 @@ export default class VideoService {
 
 	/** A new private key for one upload of this tenant. */
 	stagingKey(tenant: TenantRef): string {
-		return `tenants/${tenant.id}/${STAGING}/${randomUUID()}`;
+		return `${STAGING}/tenants/${tenant.id}/${randomUUID()}`;
 	}
 
 	/** Defence in depth: a staging key must be this tenant's. A mismatch is a caller bug. */
 	assertStagingKeyOf(tenant: TenantRef, key: string): void {
 		if (
-			!/^tenants\/[0-9a-f-]{36}\/work_video_upload\/[0-9a-f-]{36}$/.test(key) ||
-			!key.startsWith(`tenants/${tenant.id}/${STAGING}/`)
+			!/^work_video_upload\/tenants\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/.test(key) ||
+			!key.startsWith(`${STAGING}/tenants/${tenant.id}/`)
 		) {
 			throw new Error("VideoService was given a staging key of another tenant");
 		}
@@ -243,6 +246,8 @@ export default class VideoService {
 			try {
 				probed = await probe(input, signal);
 			} catch (error) {
+				// ffprobe missing is the worker's setup, retried; anything else is the file's.
+				if (error instanceof VideoToolMissingError) throw error;
 				logger.warn({ err: error }, "ffprobe could not read a video upload");
 				return { kind: "refused", reason: VIDEO_REFUSALS.broken };
 			}
@@ -254,15 +259,27 @@ export default class VideoService {
 				...size,
 				path: join(folder, `rendition-${index}.mp4`),
 			}));
-			await transcodeSlot(async () => {
-				await transcode(input, outputs, signal);
-				await posterFrame(
-					outputs[outputs.length - 1].path,
-					posterSeconds(video.durationMs),
-					join(folder, "poster.jpg"),
-					signal,
+			const posterPath = join(folder, "poster.jpg");
+			try {
+				await transcodeSlot(async () => {
+					await this.transcode(input, outputs, video.frameRate, signal);
+					await this.posterOf(
+						outputs[outputs.length - 1].path,
+						posterSeconds(video.durationMs),
+						posterPath,
+						signal,
+					);
+				});
+			} catch (error) {
+				// ffmpeg exited non-zero, ran out of time or was stopped: a final
+				// refusal, never retried (a retry would only burn the CPU again).
+				if (!(error instanceof VideoToolError)) throw error;
+				logger.warn(
+					{ err: error, stderr: error.stderr },
+					"ffmpeg could not process a video upload",
 				);
-			});
+				return { kind: "refused", reason: VIDEO_REFUSALS.failed };
+			}
 
 			const base = `tenants/${tenant.id}/${VIDEO_PURPOSE}/${randomUUID()}`;
 			const keys: string[] = [];
@@ -277,10 +294,10 @@ export default class VideoService {
 					});
 				keys.push(key);
 			}
-			const poster = await this.images.storeBytes(
-				await readFile(join(folder, "poster.jpg")),
-				{ tenant, purpose: VIDEO_PURPOSE },
-			);
+			const poster = await this.images.storeBytes(await readFile(posterPath), {
+				tenant,
+				purpose: VIDEO_PURPOSE,
+			});
 			posterKey = poster.key;
 			const largest = plan[plan.length - 1];
 			return {
@@ -297,6 +314,43 @@ export default class VideoService {
 		} finally {
 			await rm(folder, { recursive: true, force: true });
 		}
+	}
+
+	/** video_tools' transcode, as a method so a test can make ffmpeg fail. */
+	protected transcode(
+		input: string,
+		outputs: readonly { path: string; width: number; height: number }[],
+		frameRate: number | null,
+		signal?: AbortSignal,
+	): Promise<void> {
+		return transcode(input, outputs, { frameRate, signal });
+	}
+
+	/**
+	 * The poster frame at `at` seconds or, when that can't be taken (a clip
+	 * whose real length is shorter than its header said), the first frame;
+	 * VideoToolError only when neither can.
+	 */
+	private async posterOf(
+		input: string,
+		at: number,
+		output: string,
+		signal?: AbortSignal,
+	): Promise<void> {
+		const taken = async (seconds: number) => {
+			await rm(output, { force: true });
+			await posterFrame(input, seconds, output, signal);
+			return (await stat(output).catch(() => null))?.size ?? 0;
+		};
+		if (at > 0) {
+			try {
+				if ((await taken(at)) > 0) return;
+			} catch (error) {
+				if (!(error instanceof VideoToolError) || signal?.aborted) throw error;
+			}
+		}
+		if ((await taken(0)) > 0) return;
+		throw new VideoToolError("ffmpeg took no poster frame");
 	}
 
 	/**

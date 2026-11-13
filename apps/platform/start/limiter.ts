@@ -14,6 +14,10 @@
 import type { HttpContext } from "@adonisjs/core/http";
 import limiter from "@adonisjs/limiter/services/main";
 import {
+	VIDEO_SIGN_LIMIT,
+	VIDEO_SIGN_THROTTLED,
+} from "#modules/artists/video_uploads";
+import {
 	AUTH_LIMITS,
 	emailCountKey,
 } from "#modules/identity/services/auth_limits";
@@ -97,4 +101,16 @@ export const throttleSignOutOthers = limiter.define("sign_out_others", (ctx) =>
 export const throttleSignOutOthersAccount = limiter.define(
 	"sign_out_others_account",
 	(ctx) => perAccount(ctx, AUTH_LIMITS.signOutOthersPerUser),
+);
+
+/**
+ * Video angles: signing an upload, per member (VIDEO_SIGN_LIMIT, 20 per 10
+ * minutes): each signature may leave a staged object until the bucket's
+ * lifecycle rule expires it. The dashboard asks for JSON, so a refusal is
+ * the limiter's 429 with this message as `errors[0].message`.
+ */
+export const throttleVideoSign = limiter.define("video_sign", (ctx) =>
+	perAccount(ctx, VIDEO_SIGN_LIMIT).limitExceeded((error) =>
+		error.setMessage(VIDEO_SIGN_THROTTLED),
+	),
 );

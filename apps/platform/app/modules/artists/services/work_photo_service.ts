@@ -30,7 +30,11 @@ import { ImageDeleteError } from "#modules/media/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
 import VideoService from "#modules/media/services/video_service";
-import { VIDEO_GAVE_UP } from "#modules/media/video";
+import {
+	STUCK_AFTER_MINUTES,
+	VIDEO_GAVE_UP,
+	VIDEO_STUCK,
+} from "#modules/media/video";
 import type Tenant from "#modules/tenancy/models/tenant";
 import {
 	afterCommit,
@@ -978,19 +982,24 @@ export default class WorkPhotoService {
 	/**
 	 * A tattoo's rows, the lead first and then its angles in order: every
 	 * photo of the tattoo `leadId` leads (just the photo, for one without
-	 * angles). With `client`, inside the caller's transaction.
+	 * angles). With `client`, inside the caller's transaction and locked
+	 * `FOR UPDATE` until it ends, so the worker's write of a video's outcome
+	 * (settleVideo, which locks the row too) and a removal never interleave:
+	 * the removal sees the video as the worker left it, files and all, or the
+	 * worker finds the row gone.
 	 */
 	private async tattooRows(
 		tenant: TenantRef,
 		leadId: string,
 		client?: QueryClientContract,
 	): Promise<ArtistWorkPhoto[]> {
-		return ArtistWorkPhoto.query(client ? { client } : undefined)
+		const query = ArtistWorkPhoto.query(client ? { client } : undefined)
 			.where("tenant_id", tenant.id)
 			.where((rows) => {
 				rows.where("id", leadId).orWhere("lead_photo_id", leadId);
 			})
 			.orderByRaw("angle_position asc nulls first");
+		return client ? query.forUpdate() : query;
 	}
 
 	/** A lead's angles, in order, read inside the caller's transaction. */
@@ -1086,9 +1095,11 @@ export default class WorkPhotoService {
 	}
 
 	/**
-	 * The photo's row, read again under the artist's lock: gone meanwhile is
-	 * a 404, and so is one moved to another artist meanwhile (Studio OS,
-	 * `reassign`), whose artist the caller did not lock.
+	 * The photo's row, read again under the artist's lock and locked itself
+	 * (`FOR UPDATE`, see tattooRows: the worker's settleVideo takes the same
+	 * row lock): gone meanwhile is a 404, and so is one moved to another
+	 * artist meanwhile (Studio OS, `reassign`), whose artist the caller did
+	 * not lock.
 	 */
 	private async lockedPhoto(
 		trx: QueryClientContract,
@@ -1098,6 +1109,7 @@ export default class WorkPhotoService {
 		const live = await ArtistWorkPhoto.query({ client: trx })
 			.where("tenant_id", tenant.id)
 			.where("id", photo.id)
+			.forUpdate()
 			.firstOrFail();
 		if (live.artistId !== photo.artistId) {
 			throw new lucidErrors.E_ROW_NOT_FOUND(ArtistWorkPhoto);
@@ -1282,6 +1294,34 @@ export default class WorkPhotoService {
 		await this.videos.deleteStaged(tenant, staged);
 	}
 
+	/**
+	 * The stuck-video sweep (FailStuckVideoJob): a video still `processing`
+	 * STUCK_AFTER_MINUTES after it was added is failed ("Took too long to
+	 * process. Upload it again."), under its row's lock, and its upload is
+	 * deleted after the commit. True when it did; a video that finished, was
+	 * removed or is younger is left as it is. In the caller's transaction (a
+	 * savepoint) or its own.
+	 */
+	async failStuckVideo(tenant: TenantRef, photoId: string): Promise<boolean> {
+		return withTransaction(async (trx) => {
+			if (!(await this.lockVideoRow(tenant, photoId))) return false;
+			const [row] = (
+				await trx.rawQuery(
+					`update artist_work_photos set video_state = 'failed', video_failure = ?, updated_at = now()
+					where tenant_id = ? and id = ? and kind = 'video' and video_state = 'processing'
+						and created_at <= now() - make_interval(mins => ?)
+					returning video_staging_key`,
+					[VIDEO_STUCK, tenant.id, photoId, STUCK_AFTER_MINUTES],
+				)
+			).rows as { video_staging_key: string }[];
+			if (!row) return false;
+			afterCommit(() =>
+				this.videos.deleteStaged(tenant, row.video_staging_key),
+			);
+			return true;
+		});
+	}
+
 	/** The staged upload of a video still processing, or null (a photo, gone, or done already). */
 	private async videoToProcess(
 		tenant: TenantRef,
@@ -1298,16 +1338,20 @@ export default class WorkPhotoService {
 	}
 
 	/**
-	 * Writes a video's outcome in one UPDATE, only while the row is still
-	 * processing that upload: true when it did. A row removed meanwhile, or
-	 * settled by an earlier run, is left as it is.
+	 * Writes a video's outcome, only while the row is still processing that
+	 * upload: true when it did. The row is locked `FOR UPDATE` first, the lock
+	 * a removal takes (lockedPhoto, tattooRows), so the two serialise: a
+	 * removal that came first leaves no row here (the caller then deletes the
+	 * files it made), and one that comes after sees the files and deletes
+	 * them. A row settled by an earlier run is left as it is.
 	 */
-	private async settleVideo(
+	protected async settleVideo(
 		tenant: TenantRef,
 		photoId: string,
 		stagingKey: string,
 		values: Record<string, string | number | string[]>,
 	): Promise<boolean> {
+		if (!(await this.lockVideoRow(tenant, photoId))) return false;
 		const changed = await ArtistWorkPhoto.query()
 			.where("tenant_id", tenant.id)
 			.where("id", photoId)
@@ -1316,6 +1360,42 @@ export default class WorkPhotoService {
 			.where("video_staging_key", stagingKey)
 			.update({ ...values, updated_at: new Date() });
 		return Number(changed[0] ?? 0) > 0;
+	}
+
+	/**
+	 * Locks a video's row `FOR UPDATE` for the rest of the transaction, its
+	 * tattoo's lead `FOR SHARE` first: the order a removal takes them (the
+	 * lead, then its angles) and the lock the guard trigger takes on the lead
+	 * when the row is updated, so a removal and the worker's write never wait
+	 * for each other both ways. False when the row is gone. Should the video
+	 * have moved to another lead in between (a new main photo), it tries again.
+	 */
+	private async lockVideoRow(
+		tenant: TenantRef,
+		photoId: string,
+	): Promise<boolean> {
+		for (let attempt = 0; attempt < 3; attempt++) {
+			const seen = await ArtistWorkPhoto.query()
+				.where("tenant_id", tenant.id)
+				.where("id", photoId)
+				.first();
+			if (!seen) return false;
+			if (seen.leadPhotoId) {
+				await ArtistWorkPhoto.query()
+					.where("tenant_id", tenant.id)
+					.where("id", seen.leadPhotoId)
+					.forShare()
+					.first();
+			}
+			const row = await ArtistWorkPhoto.query()
+				.where("tenant_id", tenant.id)
+				.where("id", photoId)
+				.forUpdate()
+				.first();
+			if (!row) return false;
+			if (row.leadPhotoId === seen.leadPhotoId) return true;
+		}
+		throw new TattooChangedError();
 	}
 
 	/**

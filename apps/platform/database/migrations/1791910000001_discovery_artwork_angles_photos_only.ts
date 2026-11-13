@@ -13,7 +13,8 @@ import { BaseSchema } from "@adonisjs/lucid/schema";
  * SELECT on `kind` and nothing else. Only a superuser or the owner may
  * replace the view (docs/discover/database-security.md, "Setup").
  *
- * `down()` puts the previous definition back, then takes the grant away.
+ * `down()` refuses while any video exists (as 1791910000000's does), then
+ * puts the previous definition back and takes the grant away.
  */
 const ROLE = "tattoo_drip_discovery";
 
@@ -43,6 +44,13 @@ export default class extends BaseSchema {
 	}
 
 	async down() {
+		// Like 1791910000000: refuse while any video exists, so a rollback never
+		// half-applies (this view would map videos again until the next one ran).
+		this.schema.raw(`do $$ begin
+	if exists (select 1 from artist_work_photos where kind <> 'photo') then
+		raise exception 'video angles exist: remove them before rolling back';
+	end if;
+end $$`);
 		this.schema.raw(artworkAngles(false));
 		this.schema.raw(
 			`revoke select (kind) on public.artist_work_photos from ${ROLE}`,

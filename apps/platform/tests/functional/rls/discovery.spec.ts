@@ -1112,9 +1112,9 @@ test.group("Discover database: publication changes (D02)", () => {
 				`insert into artist_work_photos (tenant_id, artist_id, kind, image_key, width, height, styles, lead_photo_id, angle_position,
 					video_state, video_staging_key, video_duration_ms, video_keys, created_at)
 				 values (?, ?, 'video', 'tenants/x/work_video/v.jpg', 1080, 1920, '{fine-line}', ?, 1,
-					'ready', 'tenants/x/work_video_upload/v', 42000, '{tenants/x/work_video/v.720x1280.mp4}', now()),
+					'ready', 'work_video_upload/tenants/x/v', 42000, '{tenants/x/work_video/v.720x1280.mp4}', now()),
 					(?, ?, 'video', null, null, null, '{fine-line}', ?, 2,
-					'processing', 'tenants/x/work_video_upload/w', null, null, now())
+					'processing', 'work_video_upload/tenants/x/w', null, null, now())
 				 returning id`,
 				[t.studio, a.shown, p.shown, t.studio, a.shown, p.shown],
 			);

@@ -30,7 +30,10 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * processing) so the studio can remove it and upload it again.
  */
 export default class ProcessWorkVideoJob extends Job<Payload> {
-	static options: JobOptions = { timeout: "30m" };
+	/** Its own queue (config/queue.ts): only the video worker runs it, one at a time. */
+	static readonly queueName = "video";
+
+	static options: JobOptions = { queue: "video", timeout: "30m" };
 
 	async execute(): Promise<void> {
 		const { tenantId, photoId } = checked(this.payload);

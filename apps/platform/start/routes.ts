@@ -25,6 +25,7 @@ import {
 	throttleSignupEmail,
 	throttleVerifyCooldown,
 	throttleVerifyResend,
+	throttleVideoSign,
 } from "#start/limiter";
 
 /**
@@ -329,6 +330,7 @@ router
 				router
 					.post("photos/:id/videos/sign", [controllers.WorkVideos, "sign"])
 					.where("id", router.matchers.uuid())
+					.use(throttleVideoSign)
 					.as("tenant.artists.photos.videos.sign");
 				router
 					.post("photos/:id/videos", [controllers.WorkVideos, "store"])

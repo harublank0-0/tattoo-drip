@@ -1,7 +1,11 @@
 import { spawn } from "node:child_process";
-import { cpus, setPriority } from "node:os";
+import { setPriority } from "node:os";
 import { limitConcurrency } from "#modules/media/concurrency";
-import { MAX_VIDEO_MS } from "#modules/media/video";
+import {
+	MAX_VIDEO_FPS,
+	MAX_VIDEO_MS,
+	MAX_VIDEO_PIXELS,
+} from "#modules/media/video";
 
 /**
  * ffprobe and ffmpeg (video angles), run as child processes with hard
@@ -26,17 +30,40 @@ const POSTER_TIMEOUT_MS = 30_000;
 const STDERR_LIMIT = 4000;
 
 /**
- * Encoder threads per transcode: half the machine's CPUs, at least one and at
- * most four, so the web server keeps the rest (deploy.md, the worker's CPU).
+ * Threads per transcode, for the decoder and the encoder each, and one for
+ * the filter graph: the video worker is one job at a time on a shared
+ * server (deploy.md, the worker's CPU).
  */
-export const ENCODER_THREADS = Math.min(
-	4,
-	Math.max(1, Math.floor(cpus().length / 2)),
-);
+export const VIDEO_THREADS = 2;
+
+/**
+ * What every ffprobe and ffmpeg input may be (input options, before `-i`):
+ * a local file only (`-protocol_whitelist file`) read by the MP4/MOV or
+ * Matroska/WebM demuxer only (`-format_whitelist`, matched against each
+ * demuxer's names: `mov,mp4,m4a,3gp,3g2,mj2` and `matroska,webm`). Without
+ * them a file uploaded as video/mp4 that is really a DASH or HLS manifest, or
+ * an ffconcat list, would make ffprobe fetch URLs or read other files on the
+ * worker (server-side request forgery).
+ */
+export const INPUT_GUARD = [
+	"-protocol_whitelist",
+	"file",
+	"-format_whitelist",
+	"mov,matroska",
+] as const;
 
 /** One transcode at a time per process, the others wait their turn. */
 export const transcodeSlot = limitConcurrency(1);
 
+/** ffmpeg or ffprobe is not installed: a setup error, retried, never the video's fault. */
+export class VideoToolMissingError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "VideoToolMissingError";
+	}
+}
+
+/** A run that exited non-zero, timed out or was stopped: the video's refusal, final. */
 export class VideoToolError extends Error {
 	constructor(
 		message: string,
@@ -96,11 +123,11 @@ export function runTool(
 			clearTimeout(timer);
 			signal?.removeEventListener("abort", onAbort);
 			reject(
-				new VideoToolError(
-					error.code === "ENOENT"
-						? `${binary} is not installed: video angles need ffmpeg and ffprobe on the worker's PATH`
-						: `${binary} could not start: ${error.message}`,
-				),
+				error.code === "ENOENT"
+					? new VideoToolMissingError(
+							`${binary} is not installed: video angles need ffmpeg and ffprobe on the worker's PATH`,
+						)
+					: new VideoToolError(`${binary} could not start: ${error.message}`),
 			);
 		});
 		child.on("close", (code) => {
@@ -124,6 +151,7 @@ export async function probe(
 		[
 			"-v",
 			"error",
+			...INPUT_GUARD,
 			"-print_format",
 			"json",
 			"-show_format",
@@ -137,18 +165,37 @@ export async function probe(
 
 /**
  * Makes every rendition in one ffmpeg run (the input is read and decoded
- * once, then split): at most 60 s read (`-t 60`, an input option), the first
- * picture stream only, rotated upright by ffmpeg's autorotate (which leaves
- * no rotation on the output), scaled to each size, H.264 in yuv420p, no
- * audio, subtitles, data or chapters, no metadata (`-map_metadata -1`, the
- * stream's too, and bitexact so not even the encoder's name), moov atom
- * first (`+faststart`) so a browser starts playing before the end arrives.
+ * once, then split): the input guarded (INPUT_GUARD), at most 60 s read
+ * (`-t 60`), frames over 4K's pixels refused by the decoder (`-max_pixels`),
+ * two decoder threads and one filter thread; the first picture stream that
+ * is not cover art (`0:V:0`), rotated upright by ffmpeg's autorotate (which
+ * leaves no rotation on the output), brought down to 60 fps when it is
+ * faster (`frameRate`), scaled to each size, H.264 in yuv420p, no audio,
+ * subtitles, data or chapters, no metadata (`-map_metadata -1`, the stream's
+ * too, and bitexact so not even the encoder's name), moov atom first
+ * (`+faststart`) so a browser starts playing before the end arrives.
  */
 export async function transcode(
 	input: string,
 	outputs: readonly { path: string; width: number; height: number }[],
-	signal?: AbortSignal,
+	{ frameRate, signal }: { frameRate: number | null; signal?: AbortSignal },
 ): Promise<void> {
+	await runTool(FFMPEG, transcodeArgs(input, outputs, frameRate), {
+		timeoutMs: TRANSCODE_TIMEOUT_MS,
+		signal,
+	});
+}
+
+/** transcode's arguments (pure, so a unit test reads them). */
+export function transcodeArgs(
+	input: string,
+	outputs: readonly { path: string; width: number; height: number }[],
+	frameRate: number | null,
+): string[] {
+	const fps =
+		frameRate !== null && frameRate > MAX_VIDEO_FPS
+			? `fps=${MAX_VIDEO_FPS},`
+			: "";
 	const split = outputs.map((_, index) => `[s${index}]`).join("");
 	const scales = outputs
 		.map(
@@ -162,12 +209,19 @@ export async function transcode(
 		"-loglevel",
 		"error",
 		"-y",
+		...INPUT_GUARD,
+		"-threads",
+		String(VIDEO_THREADS),
+		"-max_pixels",
+		String(MAX_VIDEO_PIXELS),
 		"-t",
 		String(MAX_VIDEO_MS / 1000),
 		"-i",
 		input,
+		"-filter_complex_threads",
+		"1",
 		"-filter_complex",
-		`[0:v:0]split=${outputs.length}${split};${scales}`,
+		`[0:V:0]${fps}split=${outputs.length}${split};${scales}`,
 	];
 	for (const [index, output] of outputs.entries()) {
 		args.push(
@@ -193,7 +247,7 @@ export async function transcode(
 			"-pix_fmt",
 			"yuv420p",
 			"-threads",
-			String(ENCODER_THREADS),
+			String(VIDEO_THREADS),
 			"-movflags",
 			"+faststart",
 			"-fflags",
@@ -205,7 +259,7 @@ export async function transcode(
 			output.path,
 		);
 	}
-	await runTool(FFMPEG, args, { timeoutMs: TRANSCODE_TIMEOUT_MS, signal });
+	return args;
 }
 
 /** One JPEG frame `at` seconds into `input` (a rendition: already upright and clean). */
@@ -223,6 +277,7 @@ export async function posterFrame(
 			"-loglevel",
 			"error",
 			"-y",
+			...INPUT_GUARD,
 			"-ss",
 			String(at),
 			"-i",

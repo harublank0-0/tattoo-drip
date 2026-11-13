@@ -115,7 +115,7 @@ export async function addWorkVideo(
 		artistId: artist.id,
 		kind: "video",
 		videoState: state,
-		videoStagingKey: `tenants/${tenant.id}/work_video_upload/${randomUUID()}`,
+		videoStagingKey: `work_video_upload/tenants/${tenant.id}/${randomUUID()}`,
 		videoFailure: state === "failed" ? "It's longer than 60 seconds." : null,
 		imageKey: ready ? `${base}.320-640.jpg` : null,
 		width: ready ? 1080 : null,

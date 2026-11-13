@@ -52,7 +52,19 @@ export const VIDEO_REFUSALS = {
 	tooSmall: "It's too small to show.",
 	missing: "The upload didn't arrive. Remove it and upload it again.",
 	broken: "We couldn't read it. Remove it and upload it again.",
+	/** ffmpeg failed or ran out of time on it: final, never retried. */
+	failed: "This video couldn't be processed.",
 } as const;
+
+/** What a video still processing after STUCK_AFTER_MINUTES is told (the stuck-video sweep). */
+export const VIDEO_STUCK = "Took too long to process. Upload it again.";
+/** How long a video may stay `processing` before the sweep fails it. */
+export const STUCK_AFTER_MINUTES = 60;
+
+/** The highest frame rate kept: a faster clip is brought down to it. */
+export const MAX_VIDEO_FPS = 60;
+/** The most pixels a decoded frame may have (ffmpeg's `-max_pixels`): the 4K rule's. */
+export const MAX_VIDEO_PIXELS = MAX_VIDEO_SIDE * MAX_VIDEO_SHORT_SIDE;
 
 /** What a failed upload is told when every try went wrong (not the video's fault, as far as we know). */
 export const VIDEO_GAVE_UP =
@@ -82,6 +94,8 @@ export type ProbedVideo = {
 	width: number;
 	height: number;
 	durationMs: number;
+	/** Frames per second as the stream says (`avg_frame_rate`, else `r_frame_rate`), or null when it doesn't. */
+	frameRate: number | null;
 };
 export type ProbeRefusal = { ok: false; reason: string };
 
@@ -176,7 +190,19 @@ export function readProbe(probe: unknown): ProbedVideo | ProbeRefusal {
 		width,
 		height,
 		durationMs: Math.min(durationMs, MAX_VIDEO_MS),
+		frameRate:
+			frameRateOf(own(video, "avg_frame_rate")) ??
+			frameRateOf(own(video, "r_frame_rate")),
 	};
+}
+
+/** ffprobe's "30000/1001" as a number, or null for "0/0", a missing or a malformed rate. */
+function frameRateOf(value: unknown): number | null {
+	if (typeof value !== "string") return null;
+	const match = /^(\d+)\/(\d+)$/.exec(value);
+	if (!match) return null;
+	const [num, den] = [Number(match[1]), Number(match[2])];
+	return num > 0 && den > 0 ? num / den : null;
 }
 
 /** Rounded down to an even number (H.264 in 4:2:0 needs even sides). */

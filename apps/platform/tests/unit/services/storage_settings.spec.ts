@@ -251,7 +251,7 @@ test.group("R2 disks (TAT-27)", () => {
 		const driver = new S3Driver(r2DiskOptions(settings, "private"));
 
 		const url = new URL(
-			await driver.getSignedUploadUrl("tenants/t1/work_video_upload/u1", {
+			await driver.getSignedUploadUrl("work_video_upload/tenants/t1/u1", {
 				contentType: "video/mp4",
 				expiresIn: 900,
 				ContentLength: 12_345,
@@ -262,7 +262,7 @@ test.group("R2 disks (TAT-27)", () => {
 			url.host,
 			`tattoo-drip-private.${ACCOUNT_ID}.r2.cloudflarestorage.com`,
 		);
-		assert.equal(url.pathname, "/tenants/t1/work_video_upload/u1");
+		assert.equal(url.pathname, "/work_video_upload/tenants/t1/u1");
 		assert.equal(url.searchParams.get("x-id"), "PutObject");
 		assert.equal(url.searchParams.get("X-Amz-Expires"), "900");
 		// R2 has no POST policy: the signature is the size limit.
@@ -273,7 +273,7 @@ test.group("R2 disks (TAT-27)", () => {
 		]);
 		await assert.rejects(
 			() =>
-				driver.getSignedUploadUrl("tenants/t1/work_video_upload/u2", {
+				driver.getSignedUploadUrl("work_video_upload/tenants/t1/u2", {
 					contentType: "video/mp4",
 					expiresIn: 900,
 				}),

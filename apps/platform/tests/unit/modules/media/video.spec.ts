@@ -36,6 +36,7 @@ function probed({
 				codec_name: codec,
 				width,
 				height,
+				avg_frame_rate: "30/1",
 				...(rotation === undefined
 					? {}
 					: {
@@ -55,6 +56,7 @@ test.group("Video angles: what a probe allows (readProbe)", () => {
 			width: 1920,
 			height: 1080,
 			durationMs: 12_480,
+			frameRate: 30,
 		});
 		assert.isTrue(
 			readProbe(probed({ format: "matroska,webm", codec: "vp9" })).ok,
@@ -68,6 +70,7 @@ test.group("Video angles: what a probe allows (readProbe)", () => {
 			width: 1080,
 			height: 1920,
 			durationMs: 12_480,
+			frameRate: 30,
 		});
 		assert.include(readProbe(probed({ rotation: 180 })), {
 			width: 1920,
@@ -137,6 +140,36 @@ test.group("Video angles: what a probe allows (readProbe)", () => {
 		});
 		// 4K either way up is fine.
 		assert.isTrue(readProbe(probed({ width: 2160, height: 3840 })).ok);
+	});
+});
+
+test.group("Video angles: the frame rate a probe reads", () => {
+	test("from avg_frame_rate, else r_frame_rate; 0/0 or nothing is none", ({
+		assert,
+	}) => {
+		const rate = (stream: Record<string, unknown>) => {
+			const read = readProbe({
+				format: { format_name: "mov,mp4,m4a,3gp,3g2,mj2", duration: "2" },
+				streams: [
+					{
+						codec_type: "video",
+						codec_name: "h264",
+						width: 640,
+						height: 480,
+						...stream,
+					},
+				],
+			});
+			return read.ok ? read.frameRate : "refused";
+		};
+		assert.closeTo(
+			rate({ avg_frame_rate: "30000/1001" }) as number,
+			29.97,
+			0.01,
+		);
+		assert.equal(rate({ avg_frame_rate: "0/0", r_frame_rate: "120/1" }), 120);
+		assert.isNull(rate({ avg_frame_rate: "0/0" }));
+		assert.isNull(rate({}));
 	});
 });
 

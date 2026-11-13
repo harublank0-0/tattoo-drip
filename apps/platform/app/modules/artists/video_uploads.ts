@@ -17,6 +17,16 @@ import {
  * it under a unique index.
  */
 const PURPOSE = "work-video-upload";
+
+/**
+ * How many uploads one member may sign (video angles): every signature can
+ * leave a staged object behind until the bucket's lifecycle rule expires it
+ * (deploy.md), so the sign route counts them, per account
+ * (`throttleVideoSign`, start/limiter.ts).
+ */
+export const VIDEO_SIGN_LIMIT = { requests: 20, duration: "10 minutes" };
+export const VIDEO_SIGN_THROTTLED =
+	"That's a lot of video uploads at once. Try again in a few minutes.";
 const LIFETIME = "1 hour";
 
 export type VideoUpload = {
@@ -28,7 +38,10 @@ export type VideoUpload = {
 };
 
 /** The token for one signed upload. */
-export function videoUploadToken(upload: VideoUpload): string {
+export function videoUploadToken(
+	upload: VideoUpload,
+	lifetime: string = LIFETIME,
+): string {
 	return encryption.encrypt(
 		{
 			t: upload.tenantId,
@@ -37,7 +50,7 @@ export function videoUploadToken(upload: VideoUpload): string {
 			ty: upload.type,
 			s: upload.size,
 		},
-		LIFETIME,
+		lifetime,
 		PURPOSE,
 	);
 }

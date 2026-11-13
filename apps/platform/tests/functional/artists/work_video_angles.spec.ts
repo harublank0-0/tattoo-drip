@@ -1,10 +1,13 @@
 import { writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import app from "@adonisjs/core/services/app";
 import testUtils from "@adonisjs/core/services/test_utils";
 import drive from "@adonisjs/drive/services/main";
 import db from "@adonisjs/lucid/services/db";
+import type { ApiClient } from "@japa/api-client";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
 import type User from "#models/user";
@@ -14,19 +17,29 @@ import {
 	VideoUploadError,
 } from "#modules/artists/errors";
 import ProcessWorkVideoJob from "#modules/artists/jobs/process_work_video_job";
+import Artist from "#modules/artists/models/artist";
 import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
 import ArtistService, {
 	type ProfileEditor,
 } from "#modules/artists/services/artist_service";
 import WorkPhotoService from "#modules/artists/services/work_photo_service";
-import { readVideoUploadToken } from "#modules/artists/video_uploads";
+import {
+	readVideoUploadToken,
+	VIDEO_SIGN_LIMIT,
+	VIDEO_SIGN_THROTTLED,
+	videoUploadToken,
+} from "#modules/artists/video_uploads";
 import ImageService from "#modules/media/services/image_service";
 import VideoService from "#modules/media/services/video_service";
+import {
+	transcodeArgs,
+	VideoToolError,
+} from "#modules/media/services/video_tools";
 import { VIDEO_GAVE_UP, VIDEO_REFUSALS } from "#modules/media/video";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { currentClient, withTransaction } from "#services/db_context";
 import { addArtist, addWorkPhoto, addWorkVideo } from "#tests/helpers/artists";
-import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
+import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 import {
 	makeClip,
 	probeStored,
@@ -122,8 +135,14 @@ test.group("Video angles: processing with ffmpeg", (group) => {
 		assert.deepEqual(video.styles, ["realism"]);
 		assert.isNull(video.imageKey);
 
-		// The real worker runs the real job.
-		await processQueued();
+		// Its own queue: the default worker leaves it alone (mail never waits
+		// behind a transcode), the video worker runs the real job.
+		await processQueued(["default"]);
+		assert.equal(
+			(await reload(studio.tenant, video.id)).videoState,
+			"processing",
+		);
+		await processQueued(["video"]);
 
 		const ready = await reload(studio.tenant, video.id);
 		assert.equal(ready.videoState, "ready");
@@ -396,6 +415,137 @@ test.group("Video angles: processing with ffmpeg", (group) => {
 		assert.deepEqual(await stagedFiles(studio), []);
 		// And the late job finds nothing to do.
 		assert.equal(await photos.processVideo(studio.tenant, video.id), "skipped");
+	});
+});
+
+test.group("Video angles: hostile files and failing ffmpeg", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+	group.each.timeout(60_000);
+
+	test("a DASH manifest and an ffconcat list uploaded as video/mp4 are refused, and nothing is fetched or read outside the upload", async ({
+		assert,
+		cleanup,
+	}) => {
+		// A local listener the hostile files point at: it must hear nothing.
+		const heard: string[] = [];
+		const server = createServer((request, response) => {
+			heard.push(request.url ?? "");
+			response.writeHead(404).end();
+		});
+		await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+		cleanup(() => new Promise<void>((done) => server.close(() => done())));
+		const { port } = server.address() as AddressInfo;
+		const base = `http://127.0.0.1:${port}`;
+
+		const studio = await tattooOfOne("video-hostile");
+		const { photos } = services();
+		const hostile = async (name: string, text: string) => {
+			const path = join(tmpdir(), `${name}-${Date.now()}.mp4`);
+			await writeFile(path, text);
+			return addClip(
+				studio,
+				{ path, type: "video/mp4", size: Buffer.byteLength(text) },
+				photos,
+			);
+		};
+		const dash = await hostile(
+			"dash",
+			`<?xml version="1.0"?>
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="static" mediaPresentationDuration="PT2S" minBufferTime="PT1S" profiles="urn:mpeg:dash:profile:isoff-on-demand:2011">
+<Period><AdaptationSet mimeType="video/mp4"><Representation id="1" bandwidth="1000" width="320" height="240" codecs="avc1.42c01e"><BaseURL>${base}/dash-segment.mp4</BaseURL></Representation></AdaptationSet></Period></MPD>
+`,
+		);
+		const concat = await hostile(
+			"concat",
+			`ffconcat version 1.0\nfile '${base}/concat-part.mp4'\nfile '/etc/hostname'\n`,
+		);
+
+		for (const { video } of [dash, concat]) {
+			assert.equal(
+				await photos.processVideo(studio.tenant, video.id),
+				"failed",
+			);
+			const refused = await reload(studio.tenant, video.id);
+			assert.equal(refused.videoFailure, VIDEO_REFUSALS.broken);
+		}
+		assert.deepEqual(heard, [], "no request reached the listener");
+		assert.deepEqual(await videoFiles(studio), []);
+	});
+
+	test("every ffmpeg and ffprobe input is a local file read by the MP4/MOV or Matroska demuxer only, with the limits", ({
+		assert,
+	}) => {
+		const args = transcodeArgs(
+			"/tmp/in",
+			[{ path: "/tmp/out.mp4", width: 720, height: 1280 }],
+			120,
+		);
+		const input = args.indexOf("-i");
+		const before = args.slice(0, input);
+		const pair = (flag: string) => before[before.indexOf(flag) + 1];
+		assert.equal(pair("-protocol_whitelist"), "file");
+		assert.equal(pair("-format_whitelist"), "mov,matroska");
+		assert.equal(pair("-threads"), "2");
+		assert.equal(pair("-max_pixels"), String(4096 * 2160));
+		assert.equal(pair("-t"), "60");
+		const after = args.slice(input);
+		assert.equal(after[after.indexOf("-filter_complex_threads") + 1], "1");
+		const graph = after[after.indexOf("-filter_complex") + 1];
+		assert.match(graph, /^\[0:V:0\]fps=60,split=1/);
+		assert.notInclude(
+			transcodeArgs("/tmp/in", [{ path: "/o", width: 2, height: 2 }], 30).join(
+				" ",
+			),
+			"fps=",
+			"no fps filter at 60 fps or less",
+		);
+	});
+
+	test("a clip over 60 fps comes out at 60", async ({ assert }) => {
+		const studio = await tattooOfOne("video-fps");
+		const { photos } = services();
+		const { video } = await addClip(
+			studio,
+			await makeClip({
+				width: 320,
+				height: 240,
+				seconds: 1,
+				rate: 120,
+				audio: false,
+			}),
+			photos,
+		);
+		assert.equal(await photos.processVideo(studio.tenant, video.id), "ready");
+		const [key] = (await reload(studio.tenant, video.id)).videoKeys ?? [];
+		assert.equal((await probeStored(key)).streams[0].r_frame_rate, "60/1");
+	});
+
+	test("ffmpeg that fails or runs out of time is a final refusal, never retried, and leaves nothing", async ({
+		assert,
+	}) => {
+		const studio = await tattooOfOne("video-ffmpeg-fails");
+		let runs = 0;
+		class Failing extends VideoService {
+			protected async transcode(): Promise<void> {
+				runs++;
+				throw new VideoToolError("ffmpeg took longer than 240 s");
+			}
+		}
+		const { photos } = services(new Failing(new ImageService()));
+		const { video } = await addClip(
+			studio,
+			await makeClip({ width: 320, height: 240, seconds: 1 }),
+			photos,
+		);
+		assert.equal(await photos.processVideo(studio.tenant, video.id), "failed");
+		const failed = await reload(studio.tenant, video.id);
+		assert.equal(failed.videoState, "failed");
+		assert.equal(failed.videoFailure, VIDEO_REFUSALS.failed);
+		// A second delivery does nothing more: no second transcode.
+		assert.equal(await photos.processVideo(studio.tenant, video.id), "skipped");
+		assert.equal(runs, 1);
+		assert.deepEqual(await videoFiles(studio), []);
+		assert.deepEqual(await stagedFiles(studio), []);
 	});
 });
 
@@ -690,5 +840,144 @@ test.group("Video angles: the dashboard's routes", (group) => {
 		const videos = new VideoService(new ImageService());
 		assert.isTrue(videos.stagesLocally());
 		assert.isNotNull(drive.use("private"));
+	});
+});
+
+test.group("Video angles: what the finish and the sign refuse", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	const finish = (
+		client: ApiClient,
+		user: User,
+		slug: string,
+		leadId: string,
+		upload: string,
+	) =>
+		client
+			.post(`/t/${slug}/artists/photos/${leadId}/videos`)
+			.form({ upload })
+			.loginAs(user)
+			.withCsrfToken()
+			.redirects(0);
+
+	test("a token for another tattoo or another studio, an expired one and one whose upload is not the signed length add nothing", async ({
+		client,
+		assert,
+	}) => {
+		const studio = await tattooOfOne("video-finish-refusals");
+		const other = await tattooOfOne("video-finish-other");
+		const otherLead = await inTenant(studio.tenant, () =>
+			addWorkPhoto(studio.tenant, studio.sita),
+		);
+		const clip = await makeClip({ width: 320, height: 240, seconds: 1 });
+		const { key } = await stageClip(studio, studio.lead.id, clip);
+		const upload = {
+			tenantId: studio.tenant.id,
+			leadId: studio.lead.id,
+			key,
+			type: "video/mp4" as const,
+			size: clip.size,
+		};
+		const tokens = {
+			anotherTattoo: videoUploadToken({ ...upload, leadId: otherLead.id }),
+			anotherStudio: videoUploadToken({ ...upload, tenantId: other.tenant.id }),
+			expired: videoUploadToken(upload, "1 second"),
+			wrongSize: videoUploadToken({ ...upload, size: clip.size + 1 }),
+		};
+		await new Promise((resolve) => setTimeout(resolve, 1100));
+
+		for (const [why, token] of Object.entries(tokens)) {
+			const response = await finish(
+				client,
+				studio.owner,
+				studio.tenant.slug,
+				studio.lead.id,
+				token,
+			);
+			response.assertStatus(302);
+			assert.lengthOf(
+				await inTenant(studio.tenant, () =>
+					ArtistWorkPhoto.query().where("kind", "video"),
+				),
+				0,
+				why,
+			);
+		}
+		// The same token on its own tattoo works.
+		(
+			await finish(
+				client,
+				studio.owner,
+				studio.tenant.slug,
+				studio.lead.id,
+				videoUploadToken(upload),
+			)
+		).assertStatus(302);
+		assert.lengthOf(
+			await inTenant(studio.tenant, () =>
+				ArtistWorkPhoto.query().where("kind", "video"),
+			),
+			1,
+		);
+	});
+
+	test("an artist member can't sign or finish on another artist's tattoo: the 404 of another studio's", async ({
+		client,
+		assert,
+	}) => {
+		const studio = await tattooOfOne("video-finish-artist");
+		const member = await artistIn(studio.tenant, "video-artist@example.com");
+		// The member's own profile; the tattoo is Sita's.
+		const mine = await addArtist(studio.tenant, studio.owner, {
+			name: "Bina",
+			slug: "bina",
+		});
+		await inTenant(studio.tenant, () =>
+			Artist.query().where("id", mine.id).update({ user_id: member.id }),
+		);
+		const clip = await makeClip({ width: 320, height: 240, seconds: 1 });
+		const { token } = await stageClip(studio, studio.lead.id, clip);
+
+		(
+			await client
+				.post(
+					`/t/${studio.tenant.slug}/artists/photos/${studio.lead.id}/videos/sign`,
+				)
+				.json({ type: "video/mp4", size: clip.size })
+				.accept("json")
+				.loginAs(member)
+				.withCsrfToken()
+		).assertStatus(404);
+		(
+			await finish(client, member, studio.tenant.slug, studio.lead.id, token)
+		).assertStatus(404);
+		assert.lengthOf(
+			await inTenant(studio.tenant, () =>
+				ArtistWorkPhoto.query().where("kind", "video"),
+			),
+			0,
+		);
+	});
+
+	test("signing is limited per member, with a clear message", async ({
+		client,
+		assert,
+	}) => {
+		const studio = await tattooOfOne("video-sign-limit");
+		const sign = () =>
+			client
+				.post(
+					`/t/${studio.tenant.slug}/artists/photos/${studio.lead.id}/videos/sign`,
+				)
+				.json({ type: "video/mp4", size: 1000 })
+				.accept("json")
+				.loginAs(studio.owner)
+				.withCsrfToken();
+		for (let n = 0; n < VIDEO_SIGN_LIMIT.requests; n++) {
+			(await sign()).assertStatus(200);
+		}
+		const refused = await sign();
+		refused.assertStatus(429);
+		assert.equal(refused.body().errors[0].message, VIDEO_SIGN_THROTTLED);
 	});
 });
