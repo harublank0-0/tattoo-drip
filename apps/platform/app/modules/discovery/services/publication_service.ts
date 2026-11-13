@@ -137,6 +137,16 @@ export default class PublicationService {
 		};
 	}
 
+	/**
+	 * Whether Discover shows the business now (`publiclyVisible`, asked of
+	 * the views themselves). The client's review page offers the Discover
+	 * consent only while it does (Reviews and Fresh ink, ruling 8). Runs
+	 * readDiscovery: never in parallel with a tenant query.
+	 */
+	async listedNow(tenant: Pick<Tenant, "id" | "type">): Promise<boolean> {
+		return this.publiclyVisible(tenant);
+	}
+
 	/** The platform's places, for the city picker. */
 	async places(): Promise<Place[]> {
 		const rows = await dbClient()

@@ -1975,4 +1975,112 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_deposits_controller').default['store']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
+  'api.v1.review.show': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/tenants/:tenant/review'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_reviews_controller').default['show']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_reviews_controller').default['show']>>>
+    }
+  }
+  'api.v1.review.update': {
+    methods: ["PUT"]
+    pattern: '/api/v1/tenants/:tenant/review'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/reviews/validators/review_page').submitReviewPageValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/reviews/validators/review_page').submitReviewPageValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_reviews_controller').default['update']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_reviews_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'api.v1.review.review.destroy': {
+    methods: ["DELETE"]
+    pattern: '/api/v1/tenants/:tenant/review/review'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_reviews_controller').default['destroyReview']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_reviews_controller').default['destroyReview']>>>
+    }
+  }
+  'api.v1.review.post.destroy': {
+    methods: ["DELETE"]
+    pattern: '/api/v1/tenants/:tenant/review/post'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_reviews_controller').default['destroyPost']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_reviews_controller').default['destroyPost']>>>
+    }
+  }
+  'api.v1.review.photos.store': {
+    methods: ["POST"]
+    pattern: '/api/v1/tenants/:tenant/review/photos'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/reviews/validators/review_page').addPostPhotoValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/reviews/validators/review_page').addPostPhotoValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_reviews_controller').default['storePhoto']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_reviews_controller').default['storePhoto']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'api.v1.review.videos.sign': {
+    methods: ["POST"]
+    pattern: '/api/v1/tenants/:tenant/review/videos/sign'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/reviews/validators/review_page').signPostVideoValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/reviews/validators/review_page').signPostVideoValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_reviews_controller').default['signVideo']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_reviews_controller').default['signVideo']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'api.v1.review.videos.stage': {
+    methods: ["PUT"]
+    pattern: '/api/v1/tenants/:tenant/review/videos/stage'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_reviews_controller').default['stageVideo']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_reviews_controller').default['stageVideo']>>>
+    }
+  }
+  'api.v1.review.videos.store': {
+    methods: ["POST"]
+    pattern: '/api/v1/tenants/:tenant/review/videos'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/reviews/validators/review_page').addPostVideoValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/reviews/validators/review_page').addPostVideoValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_reviews_controller').default['storeVideo']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_reviews_controller').default['storeVideo']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'api.v1.review.media.destroy': {
+    methods: ["DELETE"]
+    pattern: '/api/v1/tenants/:tenant/review/media/:media'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; media: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_reviews_controller').default['destroyMedia']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_reviews_controller').default['destroyMedia']>>>
+    }
+  }
 }

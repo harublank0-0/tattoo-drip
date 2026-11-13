@@ -41,6 +41,11 @@ const EXPECTED_POLICIES: Record<string, string[]> = {
 	],
 	clients: ["tenant_isolation:ALL"],
 	deposit_links: ["tenant_isolation:ALL"],
+	// Reviews and Fresh ink (slice 1).
+	review_links: ["tenant_isolation:ALL"],
+	client_reviews: ["tenant_isolation:ALL"],
+	client_posts: ["tenant_isolation:ALL"],
+	client_post_media: ["tenant_isolation:ALL"],
 	deposit_outcomes: ["tenant_isolation:ALL"],
 	flash_designs: ["tenant_isolation:ALL"],
 	inquiries: ["tenant_isolation:ALL"],

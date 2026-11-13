@@ -38,6 +38,7 @@ export const controllers = {
   PublicDeposits: () => import('#controllers/public_deposits_controller'),
   PublicFlash: () => import('#controllers/public_flash_controller'),
   PublicInquiries: () => import('#controllers/public_inquiries_controller'),
+  PublicReviews: () => import('#controllers/public_reviews_controller'),
   PublicStudio: () => import('#controllers/public_studio_controller'),
   PublicStyles: () => import('#controllers/public_styles_controller'),
   PublicWork: () => import('#controllers/public_work_controller'),

@@ -31,15 +31,17 @@ const corsConfig = defineConfig({
 
 	origin: (requestOrigin) => allowedOrigin(requestOrigin),
 
-	methods: ["GET", "HEAD", "POST"],
+	/** PUT and DELETE: the review page's submit and deletes (Reviews and Fresh ink). */
+	methods: ["GET", "HEAD", "POST", "PUT", "DELETE"],
 
 	/**
 	 * JSON writes preflight for Content-Type, and the intake for its
 	 * bot-challenge token (TAT-55), which rides in a header so the API checks
-	 * it before it reads the upload. Authorization (the server key, TAT-38)
-	 * is server-side only, so browsers may not send it.
+	 * it before it reads the upload. The review page sends its link's token
+	 * in X-Review-Token, so it never appears in a URL. Authorization (the
+	 * server key, TAT-38) is server-side only, so browsers may not send it.
 	 */
-	headers: ["accept", "content-type", "x-challenge-token"],
+	headers: ["accept", "content-type", "x-challenge-token", "x-review-token"],
 
 	/** So the studio page can say when to try again after a 429. */
 	exposeHeaders: ["retry-after"],

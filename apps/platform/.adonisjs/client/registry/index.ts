@@ -990,6 +990,60 @@ const routes = {
     tokens: [{"old":"/api/v1/tenants/:tenant/deposits/:token","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/deposits/:token","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/deposits/:token","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/deposits/:token","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/deposits/:token","type":0,"val":"deposits","end":""},{"old":"/api/v1/tenants/:tenant/deposits/:token","type":1,"val":"token","end":""}],
     types: placeholder as Registry['api.v1.deposits.store']['types'],
   },
+  'api.v1.review.show': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/tenants/:tenant/review',
+    tokens: [{"old":"/api/v1/tenants/:tenant/review","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/review","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/review","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/review","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/review","type":0,"val":"review","end":""}],
+    types: placeholder as Registry['api.v1.review.show']['types'],
+  },
+  'api.v1.review.update': {
+    methods: ["PUT"],
+    pattern: '/api/v1/tenants/:tenant/review',
+    tokens: [{"old":"/api/v1/tenants/:tenant/review","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/review","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/review","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/review","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/review","type":0,"val":"review","end":""}],
+    types: placeholder as Registry['api.v1.review.update']['types'],
+  },
+  'api.v1.review.review.destroy': {
+    methods: ["DELETE"],
+    pattern: '/api/v1/tenants/:tenant/review/review',
+    tokens: [{"old":"/api/v1/tenants/:tenant/review/review","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/review/review","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/review/review","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/review/review","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/review/review","type":0,"val":"review","end":""},{"old":"/api/v1/tenants/:tenant/review/review","type":0,"val":"review","end":""}],
+    types: placeholder as Registry['api.v1.review.review.destroy']['types'],
+  },
+  'api.v1.review.post.destroy': {
+    methods: ["DELETE"],
+    pattern: '/api/v1/tenants/:tenant/review/post',
+    tokens: [{"old":"/api/v1/tenants/:tenant/review/post","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/review/post","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/review/post","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/review/post","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/review/post","type":0,"val":"review","end":""},{"old":"/api/v1/tenants/:tenant/review/post","type":0,"val":"post","end":""}],
+    types: placeholder as Registry['api.v1.review.post.destroy']['types'],
+  },
+  'api.v1.review.photos.store': {
+    methods: ["POST"],
+    pattern: '/api/v1/tenants/:tenant/review/photos',
+    tokens: [{"old":"/api/v1/tenants/:tenant/review/photos","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/review/photos","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/review/photos","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/review/photos","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/review/photos","type":0,"val":"review","end":""},{"old":"/api/v1/tenants/:tenant/review/photos","type":0,"val":"photos","end":""}],
+    types: placeholder as Registry['api.v1.review.photos.store']['types'],
+  },
+  'api.v1.review.videos.sign': {
+    methods: ["POST"],
+    pattern: '/api/v1/tenants/:tenant/review/videos/sign',
+    tokens: [{"old":"/api/v1/tenants/:tenant/review/videos/sign","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/review/videos/sign","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/review/videos/sign","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/review/videos/sign","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/review/videos/sign","type":0,"val":"review","end":""},{"old":"/api/v1/tenants/:tenant/review/videos/sign","type":0,"val":"videos","end":""},{"old":"/api/v1/tenants/:tenant/review/videos/sign","type":0,"val":"sign","end":""}],
+    types: placeholder as Registry['api.v1.review.videos.sign']['types'],
+  },
+  'api.v1.review.videos.stage': {
+    methods: ["PUT"],
+    pattern: '/api/v1/tenants/:tenant/review/videos/stage',
+    tokens: [{"old":"/api/v1/tenants/:tenant/review/videos/stage","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/review/videos/stage","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/review/videos/stage","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/review/videos/stage","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/review/videos/stage","type":0,"val":"review","end":""},{"old":"/api/v1/tenants/:tenant/review/videos/stage","type":0,"val":"videos","end":""},{"old":"/api/v1/tenants/:tenant/review/videos/stage","type":0,"val":"stage","end":""}],
+    types: placeholder as Registry['api.v1.review.videos.stage']['types'],
+  },
+  'api.v1.review.videos.store': {
+    methods: ["POST"],
+    pattern: '/api/v1/tenants/:tenant/review/videos',
+    tokens: [{"old":"/api/v1/tenants/:tenant/review/videos","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/review/videos","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/review/videos","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/review/videos","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/review/videos","type":0,"val":"review","end":""},{"old":"/api/v1/tenants/:tenant/review/videos","type":0,"val":"videos","end":""}],
+    types: placeholder as Registry['api.v1.review.videos.store']['types'],
+  },
+  'api.v1.review.media.destroy': {
+    methods: ["DELETE"],
+    pattern: '/api/v1/tenants/:tenant/review/media/:media',
+    tokens: [{"old":"/api/v1/tenants/:tenant/review/media/:media","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/review/media/:media","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/review/media/:media","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/review/media/:media","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/review/media/:media","type":0,"val":"review","end":""},{"old":"/api/v1/tenants/:tenant/review/media/:media","type":0,"val":"media","end":""},{"old":"/api/v1/tenants/:tenant/review/media/:media","type":1,"val":"media","end":""}],
+    types: placeholder as Registry['api.v1.review.media.destroy']['types'],
+  },
 } as const satisfies Record<string, AdonisEndpoint>
 
 export { routes }

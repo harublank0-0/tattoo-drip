@@ -175,6 +175,201 @@ export class ArtistSchema extends BaseModel {
 	declare visible: boolean;
 }
 
+export class ClientPostMediaSchema extends BaseModel {
+	static $columns = [
+		"alt",
+		"createdAt",
+		"height",
+		"id",
+		"imageKey",
+		"kind",
+		"position",
+		"postId",
+		"tenantId",
+		"updatedAt",
+		"videoDurationMs",
+		"videoFailure",
+		"videoKeys",
+		"videoStagingKey",
+		"videoState",
+		"width",
+	] as const;
+	$columns = ClientPostMediaSchema.$columns;
+	@column()
+	declare alt: string | null;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column()
+	declare height: number | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare imageKey: string | null;
+	@column()
+	declare kind: string;
+	@column()
+	declare position: number;
+	@column()
+	declare postId: string;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+	@column()
+	declare videoDurationMs: number | null;
+	@column()
+	declare videoFailure: string | null;
+	@column()
+	declare videoKeys: string[] | null;
+	@column()
+	declare videoStagingKey: string | null;
+	@column()
+	declare videoState: string | null;
+	@column()
+	declare width: number | null;
+}
+
+export class ClientPostSchema extends BaseModel {
+	static $columns = [
+		"artistId",
+		"caption",
+		"clientId",
+		"consentDiscover",
+		"consentStudioPage",
+		"createdAt",
+		"decidedAt",
+		"decidedBy",
+		"deletedAt",
+		"id",
+		"placement",
+		"projectId",
+		"reportReason",
+		"reportedAt",
+		"shownName",
+		"status",
+		"styles",
+		"submittedAt",
+		"takedownNote",
+		"takedownReason",
+		"takenDownAt",
+		"tenantId",
+		"updatedAt",
+	] as const;
+	$columns = ClientPostSchema.$columns;
+	@column()
+	declare artistId: string;
+	@column()
+	declare caption: string | null;
+	@column()
+	declare clientId: string;
+	@column()
+	declare consentDiscover: boolean;
+	@column()
+	declare consentStudioPage: boolean;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.dateTime()
+	declare decidedAt: DateTime | null;
+	@column()
+	declare decidedBy: string | null;
+	@column.dateTime()
+	declare deletedAt: DateTime | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare placement: string | null;
+	@column()
+	declare projectId: string;
+	@column()
+	declare reportReason: string | null;
+	@column.dateTime()
+	declare reportedAt: DateTime | null;
+	@column()
+	declare shownName: string;
+	@column()
+	declare status: string;
+	@column()
+	declare styles: string[];
+	@column.dateTime()
+	declare submittedAt: DateTime | null;
+	@column()
+	declare takedownNote: string | null;
+	@column()
+	declare takedownReason: string | null;
+	@column.dateTime()
+	declare takenDownAt: DateTime | null;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
+export class ClientReviewSchema extends BaseModel {
+	static $columns = [
+		"artistId",
+		"body",
+		"clientId",
+		"consentDiscover",
+		"consentStudioPage",
+		"createdAt",
+		"deletedAt",
+		"id",
+		"projectId",
+		"rating",
+		"repliedAt",
+		"reply",
+		"reportReason",
+		"reportedAt",
+		"shownName",
+		"takedownNote",
+		"takedownReason",
+		"takenDownAt",
+		"tenantId",
+		"updatedAt",
+	] as const;
+	$columns = ClientReviewSchema.$columns;
+	@column()
+	declare artistId: string;
+	@column()
+	declare body: string;
+	@column()
+	declare clientId: string;
+	@column()
+	declare consentDiscover: boolean;
+	@column()
+	declare consentStudioPage: boolean;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.dateTime()
+	declare deletedAt: DateTime | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare projectId: string;
+	@column()
+	declare rating: number;
+	@column.dateTime()
+	declare repliedAt: DateTime | null;
+	@column()
+	declare reply: string | null;
+	@column()
+	declare reportReason: string | null;
+	@column.dateTime()
+	declare reportedAt: DateTime | null;
+	@column()
+	declare shownName: string;
+	@column()
+	declare takedownNote: string | null;
+	@column()
+	declare takedownReason: string | null;
+	@column.dateTime()
+	declare takenDownAt: DateTime | null;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
 export class ClientSchema extends BaseModel {
 	static $columns = [
 		"anonymizedAt",
@@ -941,6 +1136,39 @@ export class ReferenceImageSchema extends BaseModel {
 	declare updatedAt: DateTime | null;
 	@column()
 	declare width: number;
+}
+
+export class ReviewLinkSchema extends BaseModel {
+	static $columns = [
+		"createdAt",
+		"createdBy",
+		"expiresAt",
+		"id",
+		"projectId",
+		"revokedAt",
+		"tenantId",
+		"tokenHash",
+		"tokenNonce",
+	] as const;
+	$columns = ReviewLinkSchema.$columns;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column()
+	declare createdBy: string | null;
+	@column.dateTime()
+	declare expiresAt: DateTime;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare projectId: string;
+	@column.dateTime()
+	declare revokedAt: DateTime | null;
+	@column()
+	declare tenantId: string;
+	@column()
+	declare tokenHash: string;
+	@column()
+	declare tokenNonce: string;
 }
 
 export class StaffAlertSchema extends BaseModel {

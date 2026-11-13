@@ -899,6 +899,50 @@ router
 					.where("token", DEPOSIT_TOKEN)
 					.use(middleware.depositThrottle())
 					.as("api.v1.deposits.store");
+				// The client's review page (Reviews and Fresh ink, slice 1). The
+				// link's token rides in the X-Review-Token header, never the URL.
+				// reviewGuard answers every route with the 404 while the feature
+				// flag is off, then counts per address and per token. Never cached.
+				router
+					.group(() => {
+						router
+							.get("/", [controllers.PublicReviews, "show"])
+							.as("api.v1.review.show");
+						router
+							.put("/", [controllers.PublicReviews, "update"])
+							.as("api.v1.review.update");
+						router
+							.delete("/review", [controllers.PublicReviews, "destroyReview"])
+							.as("api.v1.review.review.destroy");
+						router
+							.delete("/post", [controllers.PublicReviews, "destroyPost"])
+							.as("api.v1.review.post.destroy");
+						router
+							.post("/photos", [controllers.PublicReviews, "storePhoto"])
+							.as("api.v1.review.photos.store");
+						router
+							.post("/videos/sign", [controllers.PublicReviews, "signVideo"])
+							.as("api.v1.review.videos.sign");
+						// The local disk's stand-in for R2's presigned PUT: never
+						// registered in production (the handler refuses there too).
+						if (!app.inProduction) {
+							router
+								.put("/videos/stage", [controllers.PublicReviews, "stageVideo"])
+								.as("api.v1.review.videos.stage");
+						}
+						router
+							.post("/videos", [controllers.PublicReviews, "storeVideo"])
+							.as("api.v1.review.videos.store");
+						router
+							.delete("/media/:media", [
+								controllers.PublicReviews,
+								"destroyMedia",
+							])
+							.where("media", router.matchers.uuid())
+							.as("api.v1.review.media.destroy");
+					})
+					.prefix("/review")
+					.use(middleware.reviewGuard());
 			})
 			.prefix("/tenants/:tenant")
 			.use([

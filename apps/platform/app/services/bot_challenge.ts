@@ -17,7 +17,10 @@ export const MAX_CHALLENGE_TOKEN_LENGTH = 2048;
 export const CHALLENGE_TIMEOUT_MS = 3000;
 
 /** The widget's `action` for each form that has a challenge. */
-export const CHALLENGE_ACTIONS = { inquiry: "inquiry" } as const;
+export const CHALLENGE_ACTIONS = {
+	inquiry: "inquiry",
+	review: "review",
+} as const;
 
 export type ChallengeOutcome = "passed" | "failed" | "unavailable";
 

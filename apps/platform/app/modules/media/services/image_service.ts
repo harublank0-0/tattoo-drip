@@ -46,6 +46,13 @@ export const IMAGE_PURPOSES = {
 	// Video angles: a video's poster, with a photo's copies; its MP4
 	// renditions sit beside it under the same purpose (VideoService).
 	work_video: { visibility: "public", variants: VARIANT_WIDTHS },
+	// Reviews and Fresh ink: a client's photos of their healed tattoo, and a
+	// client's video's poster (its renditions beside it, VideoService). Public
+	// disk with a photo's copies, but no public read lists one until the
+	// studio approved the post and the client consented (later slices); until
+	// then only the client's own link and the studio see the random key.
+	client_post_photo: { visibility: "public", variants: VARIANT_WIDTHS },
+	client_post_video: { visibility: "public", variants: VARIANT_WIDTHS },
 } as const;
 
 export type ImagePurpose = keyof typeof IMAGE_PURPOSES;

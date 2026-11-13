@@ -12,6 +12,8 @@ const ALLOWLIST = {
 	SendMailJob: "sends one email; reads and writes no tenant table",
 	ProcessWorkVideoJob:
 		"video angles: a transcode takes minutes and a TenantJob holds one transaction for all of it (production ends one idle for 3); it opens none itself and reads and writes its row only in short withDbContext transactions scoped to the payload's tenantId (WorkPhotoService.processVideo)",
+	ProcessClientPostVideoJob:
+		"Reviews and Fresh ink: a client's video on the work videos' pipeline, for the same reason; it reads and writes its item only in short withDbContext transactions scoped to the payload's tenantId (ClientPostService.processVideo)",
 	SweepStuckVideosJob:
 		"reads only ids from stuck_video_candidates() and queues one FailStuckVideoJob (a TenantJob) per row; reads and writes no tenant table itself",
 	SweepExpiredQuotesJob:
