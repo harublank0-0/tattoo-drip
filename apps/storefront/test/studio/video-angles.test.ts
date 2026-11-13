@@ -49,7 +49,13 @@ import { IMAGE_ORIGIN, withStorefront } from "./theme-fixtures.ts";
  * nothing loaded before play, never autoplayed, the poster, contained).
  */
 
-const THEMES = ["stencil-and-ink", "ink-noir", "irezumi", "atelier"] as const;
+const THEMES = [
+	"stencil-and-ink",
+	"ink-noir",
+	"irezumi",
+	"atelier",
+	"flash-parlour",
+] as const;
 type ThemeName = (typeof THEMES)[number];
 const SHARED_CSS = readFileSync(
 	new URL("../../src/styles.css", import.meta.url),

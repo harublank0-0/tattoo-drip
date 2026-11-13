@@ -6,6 +6,11 @@ import {
 import type { Scheme } from "./branding.ts";
 import { DEFAULT_THEME_KEY, studioThemeKey, type ThemeKey } from "./config.ts";
 import {
+	FLASH_PARLOUR_CLASS,
+	FLASH_PARLOUR_SCHEME,
+	FLASH_PARLOUR_THEME_COLOR,
+} from "./flash-parlour/theme.ts";
+import {
 	INK_NOIR_CLASS,
 	INK_NOIR_SCHEME,
 	INK_NOIR_THEME_COLOR,
@@ -78,6 +83,11 @@ export const THEME_HTML: Record<ThemeKey, ThemeHtml> = {
 		className: ATELIER_CLASS,
 		scheme: ATELIER_SCHEME,
 		themeColors: [{ content: ATELIER_THEME_COLOR }],
+	},
+	"flash-parlour": {
+		className: FLASH_PARLOUR_CLASS,
+		scheme: FLASH_PARLOUR_SCHEME,
+		themeColors: [{ content: FLASH_PARLOUR_THEME_COLOR }],
 	},
 };
 

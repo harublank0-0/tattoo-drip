@@ -12,6 +12,7 @@ import { TattooProvider } from "@tattoo-drip/react";
 import type { ApiContext } from "../api/context.ts";
 import bodoniLatin from "../assets/fonts/bodoni-moda/bodoni-moda-latin-500-normal.woff2?url";
 import eczarLatin from "../assets/fonts/eczar/eczar-latin-700-normal.woff2?url";
+import shrikhandLatin from "../assets/fonts/shrikhand/shrikhand-latin-400-normal.woff2?url";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import type { SiteContext } from "../site/context.ts";
 import {
@@ -35,11 +36,23 @@ import {
 import { previewExitHref } from "../studio/theme/preview.ts";
 import appCss from "../styles.css?url";
 
+/**
+ * The heading font file this page preloads (see the root head below): the
+ * theme's own face while the studio keeps the default font (Atelier's Bodoni,
+ * Flash Parlour's Shrikhand), else Eczar's.
+ */
+function headingFontFile(theme: ThemeKey, font: FontKey): string {
+	if (font !== "eczar") return eczarLatin;
+	if (theme === "atelier") return bodoniLatin;
+	if (theme === "flash-parlour") return shrikhandLatin;
+	return eczarLatin;
+}
+
 /** The heading font file this page preloads (see the root head below). */
 function preloadedFont(theme: ThemeKey, font: FontKey) {
 	return {
 		rel: "preload",
-		href: theme === "atelier" && font === "eczar" ? bodoniLatin : eczarLatin,
+		href: headingFontFile(theme, font),
 		as: "font",
 		type: "font/woff2",
 		crossOrigin: "anonymous" as const,
@@ -70,10 +83,11 @@ export const Route = createRootRouteWithContext<ApiContext & SiteContext>()({
 		],
 		links: [
 			// One heading font is preloaded, the one the page's headings use: Atelier's
-			// Bodoni (src/studio/theme/atelier/styles.css) while an Atelier studio
-			// keeps the default font, else Eczar's Latin subset (the others load when
-			// a page holds their characters; font-display: optional, src/styles.css).
-			// No other theme ever loads Bodoni.
+			// Bodoni (src/studio/theme/atelier/styles.css) or Flash Parlour's Shrikhand
+			// (src/studio/theme/flash-parlour/styles.css) while such a studio keeps
+			// the default font, else Eczar's Latin subset (the others load when a page
+			// holds their characters; font-display: optional, src/styles.css). No
+			// other theme ever loads Bodoni or Shrikhand.
 			preloadedFont(matchedThemeKey(matches), studioFontKey(loaderData)),
 			{
 				rel: "stylesheet",

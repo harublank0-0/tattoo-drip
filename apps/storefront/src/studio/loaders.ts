@@ -40,7 +40,7 @@ import {
 	flashDesignView,
 	flashListView,
 	flashQuery,
-	HOME_FLASH_COUNT,
+	homeFlashCount,
 } from "./flash.ts";
 import {
 	filterStyles,
@@ -143,7 +143,8 @@ export interface StudioPageData {
 	readonly recentWork: GalleryView;
 	/**
 	 * The studio's newest flash designs for the Flash section (TAT-129), at
-	 * most HOME_FLASH_COUNT. Empty when there are none, the page hides Flash
+	 * most HOME_FLASH_COUNT (FLASH_WALL_COUNT for Flash Parlour's wall,
+	 * homeFlashCount). Empty when there are none, the page hides Flash
 	 * or the read failed, which leaves the section out.
 	 */
 	readonly flash: FlashListView;
@@ -897,7 +898,7 @@ export async function loadArtistsPage(
  * and, only when the studio's sections include Recent work, its newest photos
  * (loadRecentWork: a failed read leaves the section out, never the page), and
  * likewise, when they include Flash, its newest 6 flash designs
- * (loadHomeFlash). A studio that hid Recent work costs the API no `/work`
+ * (loadHomeFlash; 12 for Flash Parlour's wall, homeFlashCount). A studio that hid Recent work costs the API no `/work`
  * read, and one that hid Flash no `/flash` read.
  */
 export async function loadStudioPage(
@@ -909,7 +910,9 @@ export async function loadStudioPage(
 	const [artists, recentWork, flash] = await Promise.all([
 		loadArtists(context),
 		theme.sections.includes("work") ? loadRecentWork(context) : null,
-		theme.sections.includes("flash") ? loadHomeFlash(context) : null,
+		theme.sections.includes("flash")
+			? loadHomeFlash(context, homeFlashCount(theme.key))
+			: null,
 	]);
 	const data = studioPageData(
 		studio,
@@ -1272,13 +1275,16 @@ async function loadRecentWork(context: ApiContext): Promise<unknown> {
  * deploy order safe: this storefront can run against a platform without
  * `/flash`).
  */
-async function loadHomeFlash(context: ApiContext): Promise<unknown> {
+async function loadHomeFlash(
+	context: ApiContext,
+	count: number,
+): Promise<unknown> {
 	try {
 		return await context.queryClient.query({
 			...tattooQueries.flash(
 				context.tattoo.client,
 				// Claimed designs stay out of the home's Flash section.
-				flashQuery({}, HOME_FLASH_COUNT, true),
+				flashQuery({}, count, true),
 			),
 			staleTime: "static",
 		});

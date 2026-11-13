@@ -1,0 +1,1226 @@
+/*
+ * Flash Parlour's own pages (src/studio/theme/flash-parlour/): the home page
+ * and its wall of flash, the flash page and a design's page, the artists, an
+ * artist's page, the work (the gallery), a tattoo's page and the booking
+ * page's opening. Only `fp-` classes these components render, so no other
+ * theme is touched.
+ *
+ * A confident, loud but tidy shop wall: cream ground, heavy ink outlines with
+ * a hard print shadow, Shrikhand for names, titles and prices, ribbons and
+ * stars (ornaments.tsx) as the only ornament, and the flat traditional red,
+ * mustard and green as fills. Every tattoo photo and flash picture is drawn
+ * whole (`object-fit: contain`, never a crop), its `<img>` carrying its own
+ * width and height so its space is kept before it loads; only a portrait is
+ * cropped (4:5). sizes.ts reads these boxes.
+ */
+
+/* Pieces of type. */
+.fp-kicker {
+	color: var(--ink-muted);
+	font-size: 0.8125rem;
+	font-weight: 800;
+	letter-spacing: 0.08em;
+	line-height: 1.5;
+	text-transform: uppercase;
+	overflow-wrap: anywhere;
+}
+/* A kicker that holds the studio's own words (its name, its place) keeps them as written: no capitals, no tracking. */
+.fp-kicker.user-text {
+	font-size: 0.9375rem;
+	font-weight: 700;
+	letter-spacing: 0;
+	text-transform: none;
+}
+.fp-label {
+	margin: 0;
+	color: var(--ink-muted);
+	font-family: var(--body-face);
+	font-size: 0.8125rem;
+	font-weight: 800;
+	letter-spacing: 0.08em;
+	line-height: 1.5;
+	text-transform: uppercase;
+}
+.fp-label-strong {
+	color: var(--ink);
+	font-family: var(--display-face);
+	font-size: 1.5rem;
+	line-height: 1.2;
+}
+.fp-link {
+	display: inline-flex;
+	align-items: center;
+	min-block-size: 2.75rem;
+	color: var(--ink);
+	font-weight: 700;
+	text-decoration: underline;
+	text-decoration-color: var(--stencil);
+	text-decoration-thickness: 2px;
+	text-underline-offset: 0.25em;
+	overflow-wrap: anywhere;
+}
+.fp-link:hover {
+	color: var(--stencil);
+}
+.fp-empty {
+	display: grid;
+	gap: 0.25rem;
+	justify-items: center;
+	max-inline-size: 36rem;
+	margin-inline: auto;
+	padding: 1.25rem 1.5rem;
+	border: 2px dashed var(--line-strong);
+	border-radius: var(--radius);
+	color: var(--ink-muted);
+	font-weight: 600;
+	text-align: center;
+}
+.fp-status {
+	font-size: 0.9375rem;
+	font-weight: 800;
+}
+/* The deep green reads at 6.7:1 on the cream and 7.6:1 on a sheet. */
+.fp-status-open {
+	color: var(--fp-green);
+}
+.fp-status-closed {
+	color: var(--ink-muted);
+}
+.fp-status-closed.user-text {
+	font-weight: 600;
+}
+
+/* Actions: the shared `.action` is chunky in styles.css; the quiet one is a sheet with the same outline and print shadow. */
+.fp-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	min-block-size: 3rem;
+	max-inline-size: 100%;
+	padding: 0.5rem 1.25rem;
+	border: var(--fp-outline);
+	border-radius: var(--radius);
+	background: var(--fp-sheet);
+	box-shadow: 3px 3px 0 var(--ink);
+	color: var(--ink);
+	font-weight: 800;
+	line-height: 1.25;
+	text-align: center;
+	text-decoration: none;
+	overflow-wrap: anywhere;
+}
+/* Ink on the mustard: 8.3:1. */
+.fp-button:hover {
+	background: var(--fp-mustard);
+}
+.fp-button:active {
+	translate: 2px 2px;
+	box-shadow: 1px 1px 0 var(--ink);
+}
+.fp-cta {
+	min-block-size: 3rem;
+	padding-inline: 1.5rem;
+	font-size: 1.0625rem;
+}
+/* A name inside a button ("Request {artist}", always in a <bdi>) stays as written. */
+:root.theme-flash-parlour .action bdi {
+	letter-spacing: 0;
+	text-transform: none;
+}
+
+/* Sections. */
+.fp-main {
+	padding-block-end: 0;
+}
+.fp-section {
+	padding-block: clamp(3rem, 2.25rem + 3vw, 5.5rem);
+}
+.fp-section + .fp-section {
+	padding-block-start: 0;
+}
+.fp-section-head {
+	display: grid;
+	justify-items: center;
+	gap: 0.75rem;
+	margin-block-end: clamp(1.75rem, 1.25rem + 2vw, 3rem);
+	text-align: center;
+}
+.fp-shared {
+	padding-block: clamp(1rem, 0.5rem + 2vw, 2rem)
+		clamp(3rem, 2.25rem + 3vw, 5.5rem);
+}
+.fp-shared > .section {
+	margin-block-start: 0;
+}
+.fp-band {
+	border-block: 4px solid var(--ink);
+	background: var(--paper-raised);
+}
+.fp-band .fp-shared {
+	display: grid;
+	gap: 1.25rem;
+	padding-block: clamp(3rem, 2.5rem + 3vw, 5rem);
+	text-align: center;
+}
+.fp-band .section-title {
+	justify-content: center;
+}
+.fp-band .measure {
+	margin-inline: auto;
+}
+.fp-band .actions {
+	justify-content: center;
+}
+.fp-intro-body {
+	display: grid;
+	justify-items: center;
+	gap: 1rem;
+	text-align: center;
+}
+.fp-intro-text {
+	max-inline-size: 42rem;
+	font-size: clamp(1.125rem, 1rem + 0.6vw, 1.375rem);
+	font-weight: 500;
+	line-height: 1.6;
+}
+
+/*
+ * A section's title on a ribbon (ornaments.tsx): the words in ink on a
+ * mustard band with the heavy outline, a notched tail folded behind each end.
+ * The band wraps a long title; the tails stay inside the page's margins.
+ */
+.fp-ribbon-title {
+	margin: 0;
+	font-size: clamp(1.5rem, 1.2rem + 1.4vw, 2.25rem);
+	line-height: 1.15;
+	text-align: center;
+}
+.fp-ribbon {
+	display: inline-flex;
+	align-items: stretch;
+	max-inline-size: 100%;
+}
+.fp-ribbon-band {
+	position: relative;
+	z-index: 1;
+	display: block;
+	min-inline-size: 0;
+	padding: 0.25rem 1.125rem 0.375rem;
+	border: var(--fp-outline);
+	border-radius: 2px;
+	background: var(--fp-mustard);
+	color: var(--ink);
+	overflow-wrap: anywhere;
+	text-wrap: balance;
+}
+@media (forced-colors: active) {
+	.fp-ribbon-band {
+		border-color: CanvasText;
+	}
+}
+
+/* The opening of a page that is not the home page: the label, the h1 between two stars, a line. */
+.fp-page-head {
+	padding-block: clamp(2.5rem, 2rem + 3vw, 4.5rem) 0;
+	text-align: center;
+}
+.fp-page-head .fp-container {
+	display: grid;
+	gap: 0.75rem;
+	justify-items: center;
+}
+.fp-page-title-row {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: clamp(0.5rem, 0.25rem + 1vw, 1rem);
+	max-inline-size: 100%;
+}
+.fp-page-star {
+	inline-size: clamp(1.5rem, 1.2rem + 1.5vw, 2.5rem);
+	block-size: clamp(1.5rem, 1.2rem + 1.5vw, 2.5rem);
+}
+/* The display face over a mustard print: a sign-painter's drop shadow, gone where a device forces its colours. */
+.fp-page-title,
+.fp-hero-name,
+.fp-artist-title {
+	min-inline-size: 0;
+	color: var(--ink);
+	text-shadow: 3px 3px 0 var(--fp-mustard);
+	overflow-wrap: anywhere;
+	text-wrap: balance;
+}
+.fp-page-title {
+	font-size: clamp(2.5rem, 1.6rem + 4.5vw, 5rem);
+	line-height: 1.1;
+}
+.fp-page-line {
+	max-inline-size: 36rem;
+	color: var(--ink-muted);
+	font-size: 1.125rem;
+	font-weight: 600;
+}
+.fp-crumb {
+	margin-block-end: 1.25rem;
+}
+
+/*
+ * The wall: the raised cream between heavy ink rules, the flash pinned up on
+ * it as sheets. On a phone two across (the home page's wall shows its first
+ * six there, the rest a link away), three from 40rem, four from 60rem, and on
+ * the home page six from 80rem.
+ */
+.fp-wall {
+	padding-block: clamp(2rem, 1.5rem + 2vw, 3.5rem)
+		clamp(2.5rem, 2rem + 2vw, 4rem);
+	border-block: 4px solid var(--ink);
+	background: var(--paper-raised);
+}
+/* Right under the header's own rule, the wall needs no second one. */
+.fp-wall:first-child {
+	border-block-start: 0;
+}
+.fp-wall-page {
+	margin-block-start: clamp(2rem, 1.5rem + 2vw, 3rem);
+}
+.fp-wall-head {
+	display: grid;
+	justify-items: center;
+	gap: 0.625rem;
+	margin-block-end: clamp(1.75rem, 1.25rem + 2vw, 2.5rem);
+	text-align: center;
+}
+.fp-wall-line {
+	color: var(--ink);
+	font-weight: 700;
+}
+.fp-wall-all {
+	display: flex;
+	justify-content: center;
+	margin-block-start: clamp(2rem, 1.5rem + 2vw, 3rem);
+}
+.fp-wall .fp-filters {
+	margin-block-end: 2rem;
+}
+.fp-wall .work-newest {
+	margin-block-end: 1.5rem;
+	text-align: center;
+}
+
+.fp-flash-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 1.75rem 1rem;
+	margin: 0;
+	padding: 0.5rem 0 0;
+	list-style: none;
+}
+@media (max-width: 39.99rem) {
+	.fp-flash-grid-wall > .fp-card:nth-child(n + 7) {
+		display: none;
+	}
+}
+@media (min-width: 40rem) {
+	.fp-flash-grid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}
+@media (min-width: 60rem) {
+	.fp-flash-grid {
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		row-gap: 2.25rem;
+	}
+}
+@media (min-width: 80rem) {
+	.fp-flash-grid-wall {
+		grid-template-columns: repeat(6, minmax(0, 1fr));
+	}
+}
+
+/*
+ * A sheet: the sheet paper with the heavy outline and a hard print shadow,
+ * pinned at its top (a pin in one of the three colours, decoration). Its
+ * picture whole in a square cell; the name in the display face; the size,
+ * the price on a mustard tag (or "Ask for a price"), whose it is, and the red
+ * "Request this design".
+ */
+.fp-card {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: 0.375rem;
+	min-inline-size: 0;
+	padding: 0.625rem 0.625rem 0.75rem;
+	border: var(--fp-outline);
+	border-radius: var(--radius);
+	background: var(--fp-sheet);
+	box-shadow: var(--fp-shadow);
+}
+.fp-card::before {
+	content: "";
+	position: absolute;
+	z-index: 1;
+	inset-block-start: -0.5rem;
+	inset-inline-start: calc(50% - 0.4375rem);
+	inline-size: 0.875rem;
+	block-size: 0.875rem;
+	border: 2px solid var(--ink);
+	border-radius: 50%;
+	background: var(--fp-red);
+}
+.fp-card:nth-child(3n + 2)::before {
+	background: var(--fp-mustard);
+}
+.fp-card:nth-child(3n)::before {
+	background: var(--fp-green);
+}
+/* Pinned up by hand: a slight tilt either way on a wide wall. Still, never animated. */
+@media (min-width: 48rem) {
+	.fp-card:nth-child(odd) {
+		rotate: -0.6deg;
+	}
+	.fp-card:nth-child(even) {
+		rotate: 0.5deg;
+	}
+}
+.fp-card-link {
+	position: relative;
+	display: grid;
+	gap: 0.5rem;
+	color: var(--ink);
+	text-decoration: none;
+}
+.fp-card-sheet {
+	display: block;
+	aspect-ratio: 1;
+	padding: 0.375rem;
+	border: 2px solid var(--ink);
+	background: var(--fp-sheet);
+}
+.fp-card-picture {
+	display: block;
+	inline-size: 100%;
+	block-size: 100%;
+	object-fit: contain;
+}
+.fp-card-name {
+	font-family: var(--display-face);
+	font-size: 1.125rem;
+	line-height: 1.25;
+	overflow-wrap: anywhere;
+}
+.fp-card-link:hover .fp-card-name {
+	color: var(--stencil);
+	text-decoration: underline;
+	text-decoration-thickness: 2px;
+	text-underline-offset: 0.2em;
+}
+.fp-card-facts {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.25rem 0.5rem;
+	font-size: 0.875rem;
+	line-height: 1.35;
+}
+.fp-card-size {
+	min-inline-size: 0;
+	color: var(--ink-muted);
+	font-weight: 700;
+	overflow-wrap: anywhere;
+}
+/* The price on a mustard tag, in ink (8.3:1). */
+.fp-card-price {
+	padding: 0.0625rem 0.5rem;
+	border: 2px solid var(--ink);
+	border-radius: 999px;
+	background: var(--fp-mustard);
+	color: var(--ink);
+	font-weight: 800;
+	overflow-wrap: anywhere;
+}
+.fp-card-price-ask {
+	border-style: dashed;
+	background: transparent;
+	font-weight: 700;
+}
+.fp-card-by,
+.fp-card-note {
+	color: var(--ink-muted);
+	font-size: 0.875rem;
+	line-height: 1.35;
+	overflow-wrap: anywhere;
+}
+.fp-card-request {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-block-size: 2.75rem;
+	margin-block-start: auto;
+	padding: 0.375rem 0.5rem;
+	border: 2px solid var(--ink);
+	border-radius: var(--radius);
+	background: var(--stencil);
+	color: var(--on-stencil);
+	font-size: 0.875rem;
+	font-weight: 800;
+	line-height: 1.2;
+	text-align: center;
+	text-decoration: none;
+	overflow-wrap: anywhere;
+}
+.fp-card-request:hover {
+	background: var(--stencil-strong);
+}
+.fp-card-closed .fp-card-picture {
+	opacity: 0.55;
+}
+/* Claimed: greyed, and stamped in red on the sheet (6.2:1). */
+.fp-card-claimed .fp-card-picture,
+.fp-design-sheet-claimed .fp-design-picture {
+	opacity: 0.45;
+	filter: grayscale(1);
+}
+.fp-card-claimed .fp-card-name {
+	color: var(--ink-muted);
+}
+.fp-card-stamp {
+	position: absolute;
+	inset-block-start: 32%;
+	inset-inline: 0;
+	inline-size: fit-content;
+	margin-inline: auto;
+	padding: 0.125rem 0.625rem;
+	border: 3px solid var(--fp-red);
+	border-radius: var(--radius);
+	background: var(--fp-sheet);
+	color: var(--fp-red);
+	font-weight: 900;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	rotate: -8deg;
+}
+@media (forced-colors: active) {
+	.fp-card::before,
+	.fp-design-sheet::before {
+		display: none;
+	}
+	.fp-card-stamp {
+		border-color: CanvasText;
+	}
+}
+
+/*
+ * The shop's sign after the wall, or the first screen without flash: the
+ * work leads (the cover, else the largest piece, whole on a sheet), the name
+ * beside it from 60rem; with no photo, type alone under three stars.
+ */
+.fp-hero {
+	padding-block: clamp(2.5rem, 2rem + 3vw, 4.5rem);
+}
+.fp-hero-sign {
+	display: grid;
+	justify-items: center;
+}
+.fp-hero-grid {
+	display: grid;
+	gap: 2rem;
+	align-items: center;
+}
+.fp-hero-text {
+	display: grid;
+	justify-items: center;
+	gap: 1rem;
+	min-inline-size: 0;
+	max-inline-size: 52rem;
+	margin-inline: auto;
+	text-align: center;
+}
+.fp-hero-text .profile-logo {
+	object-position: center;
+}
+.fp-hero-name {
+	font-size: clamp(2.75rem, 1.5rem + 6vw, 6rem);
+	line-height: 1.05;
+}
+.fp-hero-text .profile-hours {
+	min-block-size: 1.6em;
+	color: var(--ink);
+	font-weight: 600;
+}
+.fp-hero-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 0.75rem 1rem;
+	margin-block-start: 0.25rem;
+}
+:root.theme-flash-parlour .fp-hero-actions .action {
+	max-inline-size: 100%;
+}
+.fp-hero-ornament {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+}
+.fp-hero-ornament .fp-star {
+	inline-size: 2.25rem;
+	block-size: 2.25rem;
+}
+.fp-hero-ornament .fp-star-large {
+	inline-size: 3.5rem;
+	block-size: 3.5rem;
+}
+@media (min-width: 60rem) {
+	.fp-hero-grid {
+		grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+		gap: 3rem;
+	}
+}
+
+/* A plate: a photo whole on the sheet, the heavy outline round it, its caption under it. */
+.fp-plate {
+	display: grid;
+	justify-items: center;
+	gap: 0.75rem;
+	min-inline-size: 0;
+	margin: 0;
+	padding: clamp(0.75rem, 0.5rem + 1.25vw, 1.5rem);
+	border: var(--fp-outline);
+	border-radius: var(--radius);
+	background: var(--fp-sheet);
+	box-shadow: 6px 6px 0 var(--ink);
+}
+.fp-plate-photo {
+	display: block;
+	inline-size: 100%;
+	block-size: auto;
+	max-block-size: min(75svh, 46rem);
+	object-fit: contain;
+}
+.fp-plate-caption {
+	font-weight: 700;
+}
+
+/*
+ * The work: one column on a phone, two from 40rem, three from 64rem; each
+ * tattoo whole on its sheet, then its title and, for a tattoo of several
+ * photos or videos, how many on a mustard tag; the artist and the healed
+ * mark under it.
+ */
+.fp-pieces {
+	display: grid;
+	gap: 2.5rem 2rem;
+	align-items: start;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.fp-piece {
+	display: grid;
+	gap: 0.25rem;
+	align-content: start;
+	min-inline-size: 0;
+}
+.fp-piece-link {
+	display: grid;
+	gap: 0.75rem;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--ink);
+	font: inherit;
+	text-align: start;
+	text-decoration: none;
+	cursor: pointer;
+}
+.fp-piece-mat {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: clamp(0.5rem, 0.35rem + 0.75vw, 1rem);
+	border: var(--fp-outline);
+	border-radius: var(--radius);
+	background: var(--fp-sheet);
+	box-shadow: var(--fp-shadow);
+}
+.fp-piece-photo {
+	display: block;
+	inline-size: 100%;
+	block-size: auto;
+	max-block-size: min(70svh, 48rem);
+	object-fit: contain;
+}
+.fp-piece-caption {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 0.25rem 0.75rem;
+	min-inline-size: 0;
+}
+.fp-piece-title {
+	min-inline-size: 0;
+	font-size: 1.0625rem;
+	font-weight: 800;
+	line-height: 1.35;
+	overflow-wrap: anywhere;
+}
+.fp-piece-link:hover .fp-piece-title,
+.fp-piece-link:focus-visible .fp-piece-title {
+	color: var(--stencil);
+	text-decoration: underline;
+	text-decoration-thickness: 2px;
+	text-underline-offset: 0.2em;
+}
+/* Angles: "3 photos" (or "3 photos and videos") on a mustard tag, in ink. */
+.fp-piece-count {
+	flex: none;
+	padding: 0 0.5rem;
+	border: 2px solid var(--ink);
+	border-radius: 999px;
+	background: var(--fp-mustard);
+	color: var(--ink);
+	font-size: 0.8125rem;
+	font-weight: 800;
+	line-height: 1.6;
+}
+.fp-piece-meta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0 1rem;
+	color: var(--ink-muted);
+	font-size: 0.9375rem;
+}
+.fp-piece-meta a {
+	display: inline-flex;
+	align-items: center;
+	min-block-size: 2.75rem;
+	color: var(--ink-muted);
+	font-weight: 600;
+	text-decoration: underline;
+	text-decoration-color: var(--line-strong);
+	text-underline-offset: 0.25em;
+	overflow-wrap: anywhere;
+}
+.fp-piece-meta a:hover {
+	color: var(--ink);
+	text-decoration-color: var(--stencil);
+}
+.fp-piece-healed {
+	color: var(--fp-green);
+	font-size: 0.8125rem;
+	font-weight: 800;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+@media (min-width: 40rem) {
+	.fp-pieces {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+@media (min-width: 64rem) {
+	.fp-pieces {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}
+.fp-main .work-more-bar {
+	justify-items: center;
+	margin-block-start: 3rem;
+}
+
+/*
+ * The artists: cards on the wall, each the artist's portrait in a heavy frame
+ * (cropped to 4:5) or their initial on a mustard star, the name (the card's
+ * one link, stretched over it), the styles and the status.
+ */
+.fp-artist-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 1.5rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+@media (min-width: 30rem) {
+	.fp-artist-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+@media (min-width: 52rem) {
+	.fp-artist-grid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}
+@media (min-width: 70rem) {
+	.fp-artist-grid {
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+	}
+}
+.fp-artist-card {
+	min-inline-size: 0;
+}
+.fp-artist-card > article {
+	position: relative;
+	display: grid;
+	gap: 0.5rem;
+	align-content: start;
+	block-size: 100%;
+	padding: 0.75rem 0.75rem 1rem;
+	border: var(--fp-outline);
+	border-radius: var(--radius);
+	background: var(--fp-sheet);
+	box-shadow: var(--fp-shadow);
+}
+.fp-frame {
+	display: block;
+	inline-size: 100%;
+	aspect-ratio: 4 / 5;
+	overflow: hidden;
+	border: 2px solid var(--ink);
+	background: var(--paper-raised);
+}
+.fp-frame img {
+	display: block;
+	inline-size: 100%;
+	block-size: 100%;
+	object-fit: cover;
+	object-position: 50% 25%;
+}
+.fp-frame-initial {
+	position: relative;
+	display: grid;
+	place-items: center;
+}
+.fp-frame .fp-frame-star {
+	position: absolute;
+	inset: 10%;
+	inline-size: 80%;
+	block-size: 80%;
+}
+.fp-frame-letter {
+	position: relative;
+	color: var(--ink);
+	font-family: var(--display-face);
+	font-size: 3.5rem;
+	line-height: 1;
+}
+.fp-frame-large {
+	inline-size: 14rem;
+	max-inline-size: 100%;
+	box-shadow: var(--fp-shadow);
+	border-width: 3px;
+}
+.fp-artist-name {
+	margin-block-start: 0.25rem;
+	font-size: clamp(1.375rem, 1.2rem + 0.8vw, 1.75rem);
+	line-height: 1.2;
+	overflow-wrap: anywhere;
+}
+.fp-artist-link {
+	color: var(--ink);
+	text-decoration: none;
+}
+.fp-artist-link::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+}
+.fp-artist-card > article:hover .fp-artist-link {
+	color: var(--stencil);
+	text-decoration: underline;
+	text-decoration-thickness: 2px;
+	text-underline-offset: 0.2em;
+}
+.fp-artist-styles {
+	color: var(--ink-muted);
+	font-size: 0.9375rem;
+	font-weight: 600;
+	overflow-wrap: anywhere;
+}
+@supports selector(:has(*)) {
+	.fp-artist-link:focus-visible {
+		outline: none;
+	}
+	.fp-artist-card > article:has(.fp-artist-link:focus-visible) {
+		outline: 3px solid var(--stencil);
+		outline-offset: 4px;
+	}
+}
+
+/* Filters: chips with the heavy outline (artist names among them, so never in capitals); the chosen one inked in. */
+.fp-filters {
+	display: grid;
+	justify-items: center;
+	gap: 1rem;
+	margin-block-end: 2.5rem;
+	text-align: center;
+}
+.fp-filter-row {
+	display: grid;
+	justify-items: center;
+	gap: 0.375rem;
+}
+.fp-filter-label {
+	color: var(--ink-muted);
+	font-size: 0.75rem;
+	font-weight: 800;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+.fp-filter-list {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 0.5rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.fp-filter-list-start {
+	justify-content: flex-start;
+	margin-block-start: 0.75rem;
+}
+.fp-filter {
+	display: inline-flex;
+	align-items: center;
+	min-block-size: 2.75rem;
+	padding: 0.25rem 0.875rem;
+	border: 2px solid var(--ink);
+	border-radius: 999px;
+	background: var(--fp-sheet);
+	color: var(--ink);
+	font-size: 0.9375rem;
+	font-weight: 700;
+	text-decoration: none;
+	overflow-wrap: anywhere;
+}
+.fp-filter:hover {
+	background: var(--fp-mustard);
+}
+/* The chosen one: the paper on the ink (15.1:1); where a device forces its colours, a heavier outline and an underline. */
+.fp-filter[aria-current] {
+	background: var(--ink);
+	color: var(--paper);
+}
+@media (forced-colors: active) {
+	.fp-filter[aria-current] {
+		border-width: 4px;
+		text-decoration: underline;
+	}
+}
+.fp-artists-body {
+	padding-block-start: clamp(2rem, 1.5rem + 2vw, 3rem);
+}
+
+/* An artist's page: their card beside the name, then their flash on the wall. */
+.fp-artist-hero {
+	padding-block: clamp(2rem, 1.5rem + 2vw, 3.5rem)
+		clamp(2.5rem, 2rem + 3vw, 4rem);
+}
+.fp-artist-top {
+	display: grid;
+	justify-items: center;
+	gap: 1.5rem;
+	text-align: center;
+}
+.fp-artist-facts {
+	display: grid;
+	justify-items: center;
+	gap: 0.75rem;
+	min-inline-size: 0;
+	max-inline-size: 100%;
+}
+.fp-artist-title {
+	font-size: clamp(2.5rem, 1.5rem + 5vw, 5rem);
+	line-height: 1.1;
+}
+.fp-inline-links {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 0 1.25rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+@media (min-width: 48rem) {
+	.fp-artist-top {
+		grid-template-columns: auto minmax(0, 1fr);
+		align-items: center;
+		justify-items: start;
+		gap: 2.5rem;
+		text-align: start;
+	}
+	.fp-artist-facts {
+		justify-items: start;
+	}
+	.fp-artist-facts .fp-hero-actions,
+	.fp-inline-links {
+		justify-content: flex-start;
+	}
+}
+.fp-neighbours {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	gap: 1rem;
+	padding-block: 2.5rem 4.5rem;
+}
+.fp-neighbour {
+	display: grid;
+	gap: 0.25rem;
+	min-block-size: 2.75rem;
+	min-inline-size: 0;
+	color: var(--ink);
+	text-decoration: none;
+}
+.fp-neighbour-next {
+	margin-inline-start: auto;
+	text-align: end;
+}
+.fp-neighbour-name {
+	font-family: var(--display-face);
+	font-size: 1.625rem;
+	line-height: 1.2;
+	overflow-wrap: anywhere;
+}
+.fp-neighbour:hover .fp-neighbour-name {
+	color: var(--stencil);
+	text-decoration: underline;
+	text-decoration-thickness: 2px;
+	text-underline-offset: 0.2em;
+}
+
+/*
+ * A ticket: the words beside a tattoo or a design, on a sheet with the heavy
+ * outline: the kicker, the title, then its facts between ink and dashed
+ * rules, and the way to ask.
+ */
+.fp-ticket {
+	display: grid;
+	gap: 1rem;
+	align-content: start;
+	min-inline-size: 0;
+	padding: clamp(1rem, 0.75rem + 1vw, 1.5rem);
+	border: var(--fp-outline);
+	border-radius: var(--radius);
+	background: var(--fp-sheet);
+	box-shadow: var(--fp-shadow);
+}
+.fp-artwork-title,
+.fp-design-title {
+	font-size: clamp(1.875rem, 1.4rem + 2vw, 3rem);
+	line-height: 1.15;
+	overflow-wrap: anywhere;
+}
+.fp-facts {
+	display: grid;
+	margin: 0;
+	border-block-start: 3px solid var(--ink);
+}
+.fp-facts > div {
+	display: grid;
+	grid-template-columns: minmax(5.5rem, auto) minmax(0, 1fr);
+	gap: 1rem;
+	align-items: center;
+	padding-block: 0.25rem;
+	border-block-end: 2px dashed var(--line-strong);
+}
+.fp-facts dt {
+	color: var(--ink-muted);
+	font-size: 0.75rem;
+	font-weight: 800;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+.fp-facts dd {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.25rem 0.75rem;
+	min-block-size: 2.75rem;
+	margin: 0;
+	font-weight: 700;
+	overflow-wrap: anywhere;
+}
+.fp-facts-list {
+	gap: 0 1rem;
+}
+
+/* A tattoo's page: the piece whole on its sheet, its ticket beside it from 60rem. */
+.fp-artwork-top,
+.fp-design-top {
+	padding-block: clamp(2rem, 1.5rem + 2vw, 3.5rem)
+		clamp(3rem, 2.25rem + 3vw, 5rem);
+}
+.fp-artwork-grid,
+.fp-design-grid {
+	display: grid;
+	gap: 2rem;
+	align-items: start;
+}
+@media (min-width: 60rem) {
+	.fp-artwork-grid,
+	.fp-design-grid {
+		grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+		gap: 3rem;
+	}
+}
+.fp-artwork-figure .artwork-open {
+	display: grid;
+	justify-items: center;
+	gap: 0.75rem;
+	inline-size: 100%;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--ink);
+	font: inherit;
+	cursor: zoom-in;
+}
+.fp-artwork-figure .artwork-photo {
+	display: block;
+	inline-size: 100%;
+	block-size: auto;
+	max-block-size: min(80svh, 48rem);
+	object-fit: contain;
+	background: transparent;
+}
+.fp-artwork-figure .artwork-open-hint {
+	font-size: 0.875rem;
+	font-weight: 800;
+	text-decoration: underline;
+	text-decoration-color: var(--stencil);
+	text-decoration-thickness: 2px;
+	text-underline-offset: 0.25em;
+}
+/* Video angles: "Video, no sound" is a line, not a link. */
+.fp-artwork-figure .artwork-video-hint {
+	text-decoration: none;
+}
+/* Angles: each photo or video whole on the cream in an ink outline; the one shown ringed in red. */
+.fp-artwork-figure .artwork-angle {
+	border: 2px solid var(--ink);
+	border-radius: var(--radius);
+	background: var(--paper);
+}
+.fp-artwork-figure .artwork-angle[aria-current="true"] {
+	border-color: var(--ink);
+	outline: 3px solid var(--stencil);
+	outline-offset: 2px;
+}
+.fp-colophon-ask {
+	display: grid;
+	gap: 0.75rem;
+	padding-block-start: 0.5rem;
+}
+.fp-colophon-ask .fp-hero-actions,
+.fp-ticket-actions {
+	justify-content: flex-start;
+	margin: 0;
+}
+.fp-artwork-artist {
+	border-block-start: 4px solid var(--ink);
+}
+.fp-artwork-artist > .fp-label {
+	text-align: center;
+}
+.fp-artwork-artist-body {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	gap: 1.25rem;
+	align-items: start;
+	max-inline-size: 44rem;
+	margin: 1.25rem auto 0;
+}
+.fp-artist-small-portrait {
+	inline-size: 6rem;
+	aspect-ratio: 4 / 5;
+	block-size: auto;
+	border: var(--fp-outline);
+	object-fit: cover;
+	object-position: 50% 25%;
+	background: var(--paper-raised);
+}
+.fp-artwork-artist-name {
+	font-family: var(--display-face);
+	font-size: 1.625rem;
+	line-height: 1.2;
+	overflow-wrap: anywhere;
+}
+.fp-artwork-artist-bio {
+	margin-block-start: 0.5rem;
+}
+
+/* A design's own page: the sheet pinned up large, its ticket beside it. */
+.fp-design-sheet {
+	position: relative;
+	display: grid;
+	place-items: center;
+	min-inline-size: 0;
+	margin: 0;
+	padding: clamp(1rem, 0.5rem + 2vw, 2rem);
+	border: var(--fp-outline);
+	border-radius: var(--radius);
+	background: var(--fp-sheet);
+	box-shadow: 6px 6px 0 var(--ink);
+}
+.fp-design-sheet::before {
+	content: "";
+	position: absolute;
+	inset-block-start: -0.625rem;
+	inset-inline-start: calc(50% - 0.5625rem);
+	inline-size: 1.125rem;
+	block-size: 1.125rem;
+	border: 3px solid var(--ink);
+	border-radius: 50%;
+	background: var(--fp-red);
+}
+.fp-design-picture {
+	display: block;
+	inline-size: 100%;
+	block-size: auto;
+	max-block-size: min(80svh, 44rem);
+	object-fit: contain;
+}
+.fp-design-stamp {
+	inset-block-start: 42%;
+	font-size: clamp(1.25rem, 1rem + 1.5vw, 2rem);
+}
+.fp-design-by {
+	color: var(--ink-muted);
+	font-weight: 600;
+	overflow-wrap: anywhere;
+}
+/* The state in words: green while it can be asked for (7.6:1), red once claimed (6.2:1). */
+.fp-design-state-available {
+	color: var(--fp-green);
+}
+.fp-design-state-claimed {
+	color: var(--fp-red);
+}
+.fp-design-state .fp-state-star {
+	inline-size: 1.125rem;
+	block-size: 1.125rem;
+}
+.fp-design-note {
+	color: var(--ink-muted);
+}
+
+/* The booking page: its opening, then the shared flow, unchanged. */
+.fp-book-body {
+	padding-block: 2.5rem clamp(3rem, 2.25rem + 3vw, 5.5rem);
+}
+.fp-book-body > .section {
+	margin-block-start: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.fp-button:active {
+		translate: none;
+	}
+}

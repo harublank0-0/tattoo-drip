@@ -213,7 +213,7 @@ describe("Atelier's palette (theme.ts and styles.css agree)", () => {
 		// shadcn's `dark:` never applies under the light theme, even on a dark device.
 		assert.match(
 			appCss,
-			/&:not\(:where\([^)]*\.theme-atelier, \.theme-atelier \*\)\)/,
+			/&:not\(:where\([^)]*\.theme-atelier, \.theme-atelier \*[^)]*\)\)/,
 		);
 	});
 
@@ -494,10 +494,8 @@ describe("brandingCss for Atelier: one light scheme, checked on all three surfac
 			root,
 			/preloadedFont\(matchedThemeKey\(matches\), studioFontKey\(loaderData\)\)/,
 		);
-		assert.match(
-			root,
-			/theme === "atelier" && font === "eczar" \? bodoniLatin : eczarLatin/,
-		);
+		assert.match(root, /if \(font !== "eczar"\) return eczarLatin;/);
+		assert.match(root, /if \(theme === "atelier"\) return bodoniLatin;/);
 		const licence = readFileSync(
 			new URL("../../src/assets/fonts/bodoni-moda/OFL.txt", import.meta.url),
 			"utf8",

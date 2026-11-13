@@ -53,8 +53,10 @@ describe("readThemeKey (TAT-54)", () => {
 			"ink-noir",
 			"irezumi",
 			"atelier",
+			"flash-parlour",
 		]);
 		assert.equal(readThemeKey("atelier"), "atelier");
+		assert.equal(readThemeKey("flash-parlour"), "flash-parlour");
 		assert.equal(readThemeKey("stencil-and-ink"), "stencil-and-ink");
 		assert.equal(readThemeKey("ink-noir"), "ink-noir");
 		assert.equal(readThemeKey("irezumi"), "irezumi");
