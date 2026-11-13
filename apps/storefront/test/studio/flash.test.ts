@@ -7,6 +7,7 @@ import {
 	EMPTY_FLASH,
 	FLASH_ID,
 	FLASH_PAGE_SIZE,
+	flashDesignAction,
 	flashDesignView,
 	flashListView,
 	flashQuery,
@@ -220,5 +221,54 @@ describe("flash designs (TAT-129)", () => {
 			closedNoteFor(view({ requestable: false, artist: null }), []),
 			"Not taking flash requests right now",
 		);
+	});
+});
+
+describe("flashDesignAction: the one action a design's page offers, every theme's", () => {
+	const design = (claimed: boolean) => ({
+		claimed,
+		requestHref: `/book?flash=${flashId(1)}`,
+	});
+
+	test("a design that can be asked for: Request this design, to its own request", () => {
+		assert.deepEqual(flashDesignAction(design(false), null, null), {
+			kind: "request",
+			href: `/book?flash=${flashId(1)}`,
+			label: "Request this design",
+		});
+		// `similar` is only for a claimed design.
+		assert.equal(
+			flashDesignAction(design(false), null, "studio")?.kind,
+			"request",
+		);
+	});
+
+	test("a design its artist isn't taking: nothing to ask for", () => {
+		assert.equal(
+			flashDesignAction(
+				design(false),
+				"Not taking flash requests right now",
+				null,
+			),
+			null,
+		);
+		assert.equal(
+			flashDesignAction(design(false), "Back in March.", "artist"),
+			null,
+		);
+	});
+
+	test("a claimed design: something similar from its artist, else the studio's request, else nothing", () => {
+		assert.deepEqual(flashDesignAction(design(true), null, "artist"), {
+			kind: "similar",
+			href: `/book?flash=${flashId(1)}`,
+			label: "Ask for something similar",
+		});
+		assert.deepEqual(flashDesignAction(design(true), null, "studio"), {
+			kind: "idea",
+			href: "/book",
+			label: studioCopy.sendIdea,
+		});
+		assert.equal(flashDesignAction(design(true), null, null), null);
 	});
 });
