@@ -6,8 +6,8 @@
 #
 # Settings come from env files outside the repo, one per role, in
 # ${TD_ENV_DIR:-/srv/tattoo-drip/env} (templates: deploy/env/*.env.example).
-# Images for web, worker, migrate and storefront are built from the repo's
-# Dockerfile on the server.
+# Images for web, migrate, the workers and storefront are built from the
+# repo's Dockerfile on the server.
 
 # A fixed project name keeps the data volume's name (tattoo-drip-prod_postgres_data)
 # whatever the checkout's folder is called, and apart from the development
@@ -20,7 +20,7 @@ x-logging: &logging
     max-size: 10m
     max-file: "3"
 
-# web, worker and migrate: one image, different commands.
+# web and migrate: one image, different commands (the workers add ffmpeg: x-worker).
 x-platform: &platform
   build:
     context: ..
@@ -32,6 +32,14 @@ x-platform: &platform
     - ${TD_ENV_DIR:-/srv/tattoo-drip/env}/platform.env
   networks:
     - tattoo_drip
+
+# The workers: the platform image plus ffmpeg (Dockerfile, target worker).
+x-worker: &worker
+  <<: *platform
+  build:
+    context: ..
+    target: worker
+  image: tattoo-drip-worker
 
 services:
   postgres:
@@ -81,11 +89,28 @@ services:
       retries: 5
       start_period: 30s
 
-  # Alerts, quote expiry and the expiry sweep run only here. No port, so no healthcheck.
+  # The default queue: alerts, quote expiry, the sweeps and mail. No port, so no healthcheck.
   worker:
-    <<: *platform
+    <<: *worker
     restart: unless-stopped
     command: ["node", "ace.js", "queue:work"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Video angles' transcodes, on their own queue, one at a time, so they never
+  # hold up mail or alerts. Capped in memory and CPU beside the web server; a
+  # job it lost is put back up to 3 times; a stop waits up to 5 minutes for the
+  # transcode under way (its ffmpeg is killed after 4).
+  video-worker:
+    <<: *worker
+    restart: unless-stopped
+    command: ["node", "ace.js", "queue:work", "--queue=video", "--concurrency=1"]
+    environment:
+      QUEUE_MAX_STALLED_COUNT: "3"
+    mem_limit: 1536m
+    cpus: 2
+    stop_grace_period: 5m
     depends_on:
       postgres:
         condition: service_healthy

@@ -1,13 +1,16 @@
 # One Dockerfile for the pnpm workspace, two images:
 #
 #   docker build --target platform   -t td-platform .
+#   docker build --target worker     -t td-worker .
 #   docker build --target storefront -t td-storefront .
 #
 # platform   /app is the output of `node ace build` plus production modules.
-#            One image, three jobs, chosen by the command:
+#            One image, two jobs, chosen by the command:
 #              node bin/server.js                                      (web, default)
-#              node ace.js queue:work                                  (worker; needs the image's ffmpeg)
 #              node ace.js migration:run --connection=owner --force    (migrations)
+# worker     the platform image plus ffmpeg, for the workers:
+#              node ace.js queue:work                                  (default queue)
+#              node ace.js queue:work --queue=video --concurrency=1    (video angles)
 # storefront /app holds .output plus the production modules its server needs
 #            (Nitro keeps @sentry/* external). Listens on PORT, 3000 by default.
 #
@@ -72,18 +75,26 @@ RUN pnpm --filter @tattoo-drip/storefront deploy --prod /out/storefront
 # ---------------------------------------------------------------------------
 FROM node:${NODE_VERSION}-bookworm-slim AS platform
 ENV NODE_ENV=production
-# Video angles: the worker (this image, `node ace.js queue:work`) transcodes a
-# tattoo's videos with ffmpeg and ffprobe, and refuses to start without them.
-# Debian's ffmpeg, no recommended extras, the package lists removed.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /repo/apps/platform/build ./
 COPY --from=build /out/platform/node_modules ./node_modules
 USER node
 EXPOSE 3333
 CMD ["node", "bin/server.js"]
+
+# ---------------------------------------------------------------------------
+# worker: the platform image plus ffmpeg (video angles). Only the workers
+# transcode, so only they carry ffmpeg; the web and migrate images stay
+# without it. The worker refuses to start without ffmpeg and ffprobe.
+# Debian's ffmpeg, no recommended extras, the package lists removed.
+# ---------------------------------------------------------------------------
+FROM platform AS worker
+USER root
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+USER node
+CMD ["node", "ace.js", "queue:work"]
 
 # ---------------------------------------------------------------------------
 # storefront
