@@ -24,7 +24,6 @@ test("nothing on the review page stores, logs, tracks or reads the query", () =>
 		const text = read(file);
 		for (const banned of [
 			/localStorage/,
-			/sessionStorage/,
 			/indexedDB/i,
 			/document\.cookie/,
 			/dangerouslySetInnerHTML/,
@@ -38,6 +37,16 @@ test("nothing on the review page stores, logs, tracks or reads the query", () =>
 			assert.doesNotMatch(text, banned, `${file}: ${banned}`);
 		}
 	}
+});
+
+test("only the screen keeps the token, in this tab's sessionStorage, and takes it out of the address bar", () => {
+	assert.deepEqual(
+		files().filter((file) => /sessionStorage/.test(read(file))),
+		["components/review-screen.tsx"],
+	);
+	const screen = read("components/review-screen.tsx");
+	assert.match(screen, /history\.replaceState\(/);
+	assert.doesNotMatch(screen, /history\.pushState/);
 });
 
 test("no in-page fragment link, and only the screen reads the fragment", () => {

@@ -23,6 +23,8 @@ export const copy = {
 	deadContact: "Reach {studio}:",
 	limited: "Wait a few minutes, then try again.",
 	failed: "Check your connection, then try again.",
+	offline: "We couldn't load your page. Check your connection.",
+	retrying: "Trying again…",
 	tryAgain: "Try again",
 	linkUntil: "You can change or delete what you post here until {date}.",
 
@@ -34,6 +36,8 @@ export const copy = {
 	bodyLabel: "Your review",
 	bodyHint: "At least 20 characters. Plain text.",
 	count: "{count} of {max} characters",
+	countNearLimit: "20 characters left.",
+	countAtLimit: "You've reached the limit of {max} characters.",
 	deleteReview: "Delete my review",
 	reviewTakenDown: "Taken down",
 
@@ -43,7 +47,7 @@ export const copy = {
 	addPhotos: "Add photos",
 	addVideo: "Add a video",
 	videoHint: "Videos: up to 60 seconds and 100 MB. They play without sound.",
-	makeMain: "Make it the main photo",
+	makeMain: "Make {item} the main photo",
 	main: "Main photo",
 	remove: "Remove",
 	removeLabel: "Remove {item}",
@@ -53,8 +57,13 @@ export const copy = {
 	uploading: "Uploading…",
 	uploadingPercent: "Uploading… {percent}%",
 	processing: "Processing the video…",
-	photoAdded: "Photo added.",
-	videoAdded: "Video added. It's being processed.",
+	photoAdded: "Photo {n} added.",
+	videoAdded: "Video {n} added. It's being processed.",
+	videoReady: "Video {n} ready.",
+	videoCouldNot: "Video {n} couldn't be processed.",
+	stillProcessing: "Still processing. Come back to this page later.",
+	madeMain: "{item} is now the main photo.",
+	removed: "{item} removed.",
 	videoFailed:
 		"This video couldn't be used: {reason} Remove it and try another.",
 	postFull: "Your post has 8 photos and videos. Remove one to add another.",
@@ -67,6 +76,10 @@ export const copy = {
 	postApproved: "Shown by {studio} where you allowed.",
 	postNotShown: "Not shown by the studio.",
 	postDraft: "Not sent yet: press Save to send it to {studio}.",
+	postApprovedHint: "If you change it, {studio} checks it again.",
+	reviewBlocked: "This was taken down by TattooDrip. Contact the studio.",
+	postLimit:
+		"This tattoo already had two posts. Contact the studio to change it.",
 
 	whereTitle: "Where it shows",
 	whereHint:
@@ -82,12 +95,18 @@ export const copy = {
 	saving: "Saving…",
 	saved: "Saved. {studio} can see it now.",
 	savedPostWaiting: "Saved. {studio} checks your photos before they show.",
-	deleted: "Deleted.",
+	savedPrivate: "Nobody else sees it.",
+	deletedReview: "Your review is deleted: its rating, words and name are gone.",
+	deletedPost: "Your post is deleted: its photos, videos and words are gone.",
 	confirmDelete: "Delete it for good?",
 	confirmYes: "Yes, delete",
 	confirmNo: "Keep it",
 	privacy:
 		"Only {studio} and TattooDrip see your phone number and full name. Cloudflare checks this page is used by a person.",
+	uploadsPending:
+		"Wait for your photos and videos to finish uploading, then save.",
+	waitMinutes: "Too many tries. Try again in {minutes} minutes.",
+	waitMinute: "Too many tries. Try again in a minute.",
 	footer: "This page is run by TattooDrip for {studio}.",
 
 	problemsTitle: "Check these and save again:",
@@ -96,7 +115,8 @@ export const copy = {
 		bodyShort: "Write at least 20 characters.",
 		bodyLong: "Keep your review to 2,000 characters.",
 		ratingWithoutBody: "Write a few words with your rating.",
-		shownName: "Write the name to show, up to 40 characters.",
+		shownName:
+			"Write the name to show: up to 40 characters, letters you can see.",
 		caption: "Keep the caption to 280 characters.",
 		placement: "Keep it to 120 characters.",
 		nothing: "Write a review or add a photo.",
@@ -106,6 +126,9 @@ export const copy = {
 		challenge: "We couldn't confirm you're a person. Try again.",
 		challengeDown: "We couldn't run the security check. Try again in a minute.",
 		limited: "Too many tries. Wait a few minutes, then try again.",
+		takenDown: "This was taken down by TattooDrip. Contact the studio.",
+		postLimit:
+			"This tattoo already had two posts. Contact the studio to change it.",
 		network: "It wasn't saved. Check your connection and try again.",
 		failed: "Something went wrong. Try again.",
 		removeFailed: "We couldn't remove it just now. Try again.",

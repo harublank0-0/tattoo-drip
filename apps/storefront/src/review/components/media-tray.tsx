@@ -86,12 +86,13 @@ export function MediaTray({
 												if (!busy) onMakeMain(item);
 											}}
 										>
-											{copy.makeMain}
+											{copy.makeMain.replace("{item}", item.label)}
 										</button>
 									) : null}
 									<button
 										type="button"
 										className="review-small-button"
+										data-remove=""
 										aria-label={copy.removeLabel.replace("{item}", item.label)}
 										aria-disabled={busy ? true : undefined}
 										onClick={() => {

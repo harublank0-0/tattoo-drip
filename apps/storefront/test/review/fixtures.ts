@@ -45,6 +45,7 @@ export const PAGE: ReviewPage = {
 	},
 	review: null,
 	post: null,
+	blocks: { review: null, post: null },
 };
 
 export function photo(

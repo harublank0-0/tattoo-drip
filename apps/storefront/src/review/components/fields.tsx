@@ -141,7 +141,6 @@ export function CountedText({
 				className="review-count"
 				id={`${id}-count`}
 				data-over={count > max ? "" : undefined}
-				aria-live="polite"
 			>
 				<Fill template={copy.count} values={{ count, max }} />
 			</p>

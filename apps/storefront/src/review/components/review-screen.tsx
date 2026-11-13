@@ -1,10 +1,10 @@
 import { useReview } from "@tattoo-drip/react";
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Fill } from "../../intake/components/fill.tsx";
 import { copy } from "../copy.ts";
 import type { ReviewShell } from "../loader.ts";
-import { loadProblemOf } from "../problems.ts";
-import { readReviewToken } from "../token.ts";
+import { type LoadProblem, loadProblemOf } from "../problems.ts";
+import { REVIEW_TOKEN, readReviewToken } from "../token.ts";
 import { formatDay, hasSaved } from "../view-model.ts";
 import { ReviewForm } from "./review-form.tsx";
 import {
@@ -14,21 +14,60 @@ import {
 	ReviewProblem,
 } from "./review-page.tsx";
 
-const subscribeToHash = (onChange: () => void) => {
-	window.addEventListener("hashchange", onChange);
-	return () => window.removeEventListener("hashchange", onChange);
-};
+/** Where the tab keeps the token once it left the address bar (this tab only). */
+export const TOKEN_STORAGE_KEY = "tattoo-drip:review-token";
+
+function stored(): string | null {
+	try {
+		const value = window.sessionStorage.getItem(TOKEN_STORAGE_KEY);
+		return value && REVIEW_TOKEN.test(value) ? value : null;
+	} catch {
+		return null;
+	}
+}
+
+function keep(token: string | null) {
+	try {
+		if (token) window.sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+		else window.sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+	} catch {
+		// Storage refused (a private window): the token lives in memory only.
+	}
+}
 
 /**
- * The URL's fragment, in the browser only: undefined on the server (which
- * never receives it) and while hydrating, so both render the same shell.
+ * The link's token (finding 11), in the browser only: undefined on the
+ * server (which never receives the fragment) and while hydrating, so both
+ * render the same shell. On load it reads the fragment, removes it from the
+ * address bar (`history.replaceState`, keeping the router's state), and
+ * keeps the token in memory and in this tab's sessionStorage, so a reload
+ * still works while the address bar, a screenshot or the history no longer
+ * show it. A fragment that isn't a token is the dead link. A new link
+ * opened in the tab (a hash change) replaces it.
  */
-function useLocationHash(): string | undefined {
-	return useSyncExternalStore(
-		subscribeToHash,
-		() => window.location.hash,
-		() => undefined,
-	);
+function useReviewToken(): string | null | undefined {
+	const [token, setToken] = useState<string | null | undefined>(undefined);
+	useEffect(() => {
+		const take = () => {
+			const hash = window.location.hash;
+			if (hash && hash !== "#") {
+				const read = readReviewToken(hash);
+				window.history.replaceState(
+					window.history.state,
+					"",
+					window.location.pathname,
+				);
+				keep(read);
+				setToken(read);
+				return;
+			}
+			setToken(stored());
+		};
+		take();
+		window.addEventListener("hashchange", take);
+		return () => window.removeEventListener("hashchange", take);
+	}, []);
+	return token;
 }
 
 export interface ReviewConnection {
@@ -38,9 +77,8 @@ export interface ReviewConnection {
 }
 
 /**
- * The review page (Reviews and Fresh ink): the token from the fragment,
- * then the page from useReview. A missing or malformed token is the dead
- * link, with no request.
+ * The review page (Reviews and Fresh ink): the token, then the page from
+ * useReview. A missing or malformed token is the dead link, with no request.
  */
 export function ReviewScreen({
 	shell,
@@ -50,15 +88,15 @@ export function ReviewScreen({
 	connection: ReviewConnection;
 }) {
 	return (
-		<ReviewForHash
-			hash={useLocationHash()}
+		<ReviewForToken
+			token={useReviewToken()}
 			shell={shell}
 			connection={connection}
 		/>
 	);
 }
 
-/** The screen for a fragment (`undefined` on the server and while hydrating). Exported for the render tests. */
+/** The screen for a fragment, as the render tests give it. */
 export function ReviewForHash({
 	hash,
 	shell,
@@ -68,7 +106,25 @@ export function ReviewForHash({
 	shell: ReviewShell;
 	connection: ReviewConnection;
 }) {
-	const token = hash === undefined ? undefined : readReviewToken(hash);
+	return (
+		<ReviewForToken
+			token={hash === undefined ? undefined : readReviewToken(hash)}
+			shell={shell}
+			connection={connection}
+		/>
+	);
+}
+
+/** The screen for a token (`undefined` on the server and while hydrating; null: dead). */
+export function ReviewForToken({
+	token,
+	shell,
+	connection,
+}: {
+	token: string | null | undefined;
+	shell: ReviewShell;
+	connection: ReviewConnection;
+}) {
 	if (typeof token === "string") {
 		return (
 			<ReviewLoaded
@@ -98,6 +154,25 @@ export function ReviewForHash({
 	);
 }
 
+/**
+ * What the screen shows for the query (finding 17), as the deposit page
+ * does: the dead link after any 404; a rate limit or a failed read without
+ * data; and a first read that can't start (offline: TanStack pauses it and
+ * no error ever comes) as a load problem with Try again, never "Loading"
+ * for ever. Exported for the tests.
+ */
+export function screenOf(query: {
+	data: unknown;
+	error: unknown;
+	fetchStatus: "fetching" | "paused" | "idle";
+}): "page" | "loading" | LoadProblem | "offline" {
+	if (query.error && loadProblemOf(query.error) === "dead") return "dead";
+	if (query.data) return "page";
+	if (query.error) return loadProblemOf(query.error);
+	if (query.fetchStatus === "paused") return "offline";
+	return "loading";
+}
+
 /** Exported for the render tests. */
 export function ReviewLoaded({
 	token,
@@ -110,34 +185,45 @@ export function ReviewLoaded({
 }) {
 	const query = useReview(token);
 	const [gone, setGone] = useState(false);
+	const [retrying, setRetrying] = useState(false);
 	const problemRef = useRef<HTMLParagraphElement>(null);
-	const page = gone ? undefined : query.data;
-	const problem = gone
+	const screen = gone
 		? "dead"
-		: query.error && !page
-			? loadProblemOf(query.error)
-			: query.error && loadProblemOf(query.error) === "dead"
-				? "dead"
-				: null;
+		: screenOf({
+				data: query.data,
+				error: query.error,
+				fetchStatus: query.fetchStatus,
+			});
 
-	if (problem) {
+	useEffect(() => {
+		if (screen === "dead") keep(null);
+	}, [screen]);
+
+	if (screen !== "page" && screen !== "loading") {
 		return (
 			<ReviewFrame
 				studioName={shell.studioName}
 				logo={shell.logo}
-				heading={headingFor(problem)}
+				heading={headingFor(screen === "offline" ? "failed" : screen)}
 			>
 				<ReviewProblem
 					ref={problemRef}
-					problem={problem}
+					problem={screen === "offline" ? "failed" : screen}
+					message={screen === "offline" ? copy.offline : undefined}
 					studioName={shell.studioName}
 					contact={shell.contact}
-					onRetry={() => void query.refetch()}
+					retrying={retrying}
+					onRetry={() => {
+						setRetrying(true);
+						const done = () => setRetrying(false);
+						void query.refetch().then(done, done);
+					}}
 				/>
 			</ReviewFrame>
 		);
 	}
-	if (!page) {
+	const page = query.data;
+	if (screen === "loading" || !page) {
 		return (
 			<ReviewFrame
 				studioName={shell.studioName}
@@ -181,7 +267,6 @@ export function ReviewLoaded({
 					setGone(true);
 					requestAnimationFrame(() => problemRef.current?.focus());
 				}}
-				onSaved={() => undefined}
 			/>
 		</ReviewFrame>
 	);

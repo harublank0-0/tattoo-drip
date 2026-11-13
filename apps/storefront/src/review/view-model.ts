@@ -50,6 +50,21 @@ export interface FormValues {
 	readonly consentDiscover: boolean;
 }
 
+/** Bidi controls and zero-width characters: a shown name may hold none (the API's rule). */
+const INVISIBLE = /[\u200B-\u200D\u202A-\u202E\u2066-\u2069\uFEFF]/u;
+
+/**
+ * Whether the Discover box shows: while the studio is on Discover, and,
+ * while it isn't, only if the client ticked it before, so they can untick
+ * it (a consent is always withdrawable; it can't be ticked anew then).
+ */
+export function discoverShown(page: ReviewPage): boolean {
+	return (
+		page.studio.onDiscover ||
+		(page.review ?? page.post)?.consentDiscover === true
+	);
+}
+
 /** Characters as the API counts them (code points), so any script counts as people see it. */
 export function charCount(text: string): number {
 	let count = 0;
@@ -139,7 +154,8 @@ export function validate(values: FormValues, page: ReviewPage): Problem[] {
 	if (
 		name < 1 ||
 		name > MAX_NAME ||
-		/[\p{Cc}\u2028\u2029]/u.test(values.shownName)
+		/[\p{Cc}\u2028\u2029]/u.test(values.shownName) ||
+		INVISIBLE.test(values.shownName)
 	) {
 		problems.push({ field: "shownName", message: copy.errors.shownName });
 	}
@@ -167,8 +183,9 @@ export function submissionOf(
 	const input: Omit<SubmitReviewInput, "challengeToken"> = {
 		shownName: values.shownName.trim(),
 		consentStudioPage: values.consentStudioPage,
-		// Never ticked where the box isn't shown; the API keeps the stored choice then.
-		consentDiscover: page.studio.onDiscover ? values.consentDiscover : false,
+		// Never ticked where the box isn't shown; while the studio is off
+		// Discover the API keeps it only if it stays ticked.
+		consentDiscover: discoverShown(page) ? values.consentDiscover : false,
 	};
 	if (reviewEditable(page) && (values.rating > 0 || body !== "")) {
 		input.review = { rating: values.rating, body };
@@ -234,21 +251,33 @@ export interface MediaView {
 }
 
 /**
- * The tray's items: an image or a video's URL is kept only on the page's
- * media origin (MEDIA_URL), as every studio image is (readBrandImage), so a
- * page never loads a picture from anywhere else.
+ * The tray's items. A client's media are private until published, so the
+ * API signs their URLs for 5 minutes: on its own origin in development (the
+ * signed `/files` route), on R2's storage host in production. A URL is kept
+ * only on those origins (and MEDIA_URL's), so the page never loads a
+ * picture from anywhere else.
  */
 export function mediaViews(
 	media: readonly ReviewMedia[],
-	mediaOrigin: string,
+	origins: readonly string[],
 ): MediaView[] {
+	const allowed = new Set(
+		origins.flatMap((origin) => {
+			try {
+				return [new URL(origin).origin];
+			} catch {
+				return [];
+			}
+		}),
+	);
 	const onOrigin = (url: string) => {
 		try {
 			const parsed = new URL(url);
-			return parsed.origin === new URL(mediaOrigin).origin &&
-				/^https?:$/.test(parsed.protocol)
-				? parsed.href
-				: null;
+			const ok =
+				allowed.has(parsed.origin) ||
+				(parsed.protocol === "https:" &&
+					parsed.hostname.endsWith(".r2.cloudflarestorage.com"));
+			return ok && /^https?:$/.test(parsed.protocol) ? parsed.href : null;
 		} catch {
 			return null;
 		}
@@ -322,4 +351,61 @@ export function videoProblem(file: {
 /** An upload URL from the sign answer, resolved against the API's origin (it is a path in development). */
 export function uploadUrl(url: string, apiUrl: string): string {
 	return new URL(url, apiUrl).href;
+}
+
+/**
+ * What the screen reader hears about a count, only when it crosses a
+ * threshold (finding 21): 20 characters left, and the limit. Null otherwise,
+ * so typing isn't read out on every key.
+ */
+export function countAnnouncement(
+	before: number,
+	after: number,
+	max: number,
+): string | null {
+	if (after >= max && before < max) {
+		return copy.countAtLimit.replace("{max}", max.toLocaleString("en"));
+	}
+	if (max - after <= 20 && max - before > 20) return copy.countNearLimit;
+	return null;
+}
+
+/** "Too many tries. Try again in 12 minutes." for a 429's Retry-After (an hour's limit included). */
+export function waitText(seconds: number): string {
+	const minutes = Math.ceil(seconds / 60);
+	return minutes <= 1
+		? copy.waitMinute
+		: copy.waitMinutes.replace("{minutes}", String(minutes));
+}
+
+/** The problems that still hold once `values` changed: the changed field loses its error once it is right. */
+export function problemsStillHolding(
+	problems: readonly Problem[],
+	values: FormValues,
+	page: ReviewPage,
+	changed: Field,
+): Problem[] {
+	const now = validate(values, page);
+	return problems.filter(
+		(problem) =>
+			problem.field !== changed ||
+			now.some((current) => current.field === changed),
+	);
+}
+
+/** "photo 3" for the item `id` in the post's order, else null. */
+export function itemLabel(
+	media: readonly ReviewMedia[],
+	id: string,
+): string | null {
+	let photos = 0;
+	let videos = 0;
+	for (const item of media) {
+		const label =
+			item.kind === "photo"
+				? copy.photoItem.replace("{n}", String(++photos))
+				: copy.videoItem.replace("{n}", String(++videos));
+		if (item.id === id) return label;
+	}
+	return null;
 }

@@ -76,6 +76,10 @@ export function writeOutcome(error: unknown): WriteOutcome {
 			};
 		case "review_locked":
 			return { kind: "notice", message: copy.errors.locked };
+		case "taken_down":
+			return { kind: "notice", message: copy.errors.takenDown };
+		case "post_limit":
+			return { kind: "notice", message: copy.errors.postLimit };
 		case "challenge_failed":
 			return { kind: "notice", message: copy.errors.challenge };
 		case "challenge_unavailable":

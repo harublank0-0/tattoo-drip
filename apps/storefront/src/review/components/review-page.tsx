@@ -99,13 +99,19 @@ export function ReviewProblem({
 	problem,
 	studioName,
 	contact,
+	message,
 	onRetry,
+	retrying = false,
 	ref,
 }: {
 	problem: LoadProblem;
 	studioName: string;
 	contact: readonly ContactLink[];
+	/** Other words for the message (an offline first read). */
+	message?: string;
 	onRetry?: () => void;
+	/** Try again is running: the button stays, `aria-disabled`, so focus isn't lost. */
+	retrying?: boolean;
 	ref?: Ref<HTMLParagraphElement>;
 }) {
 	return (
@@ -113,23 +119,32 @@ export function ReviewProblem({
 			<p ref={ref} className="deposit-state-title" role="alert" tabIndex={-1}>
 				<Fill
 					template={
-						problem === "dead"
+						message ??
+						(problem === "dead"
 							? copy.dead
 							: problem === "limited"
 								? copy.limited
-								: copy.failed
+								: copy.failed)
 					}
 					values={{ studio: studioName }}
 				/>
 			</p>
 			{problem !== "dead" && onRetry ? (
-				<button
-					type="button"
-					className="action action-secondary"
-					onClick={onRetry}
-				>
-					{copy.tryAgain}
-				</button>
+				<>
+					<button
+						type="button"
+						className="action action-secondary"
+						aria-disabled={retrying ? true : undefined}
+						onClick={() => {
+							if (!retrying) onRetry();
+						}}
+					>
+						{copy.tryAgain}
+					</button>
+					<p className="deposit-send-status" aria-live="polite">
+						{retrying ? copy.retrying : ""}
+					</p>
+				</>
 			) : null}
 			{problem === "dead" ? (
 				<ContactLinks studioName={studioName} contact={contact} />

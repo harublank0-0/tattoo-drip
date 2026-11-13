@@ -1,16 +1,37 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createTattooClient, type ReviewPage } from "@tattoo-drip/sdk";
+import {
+	createTattooClient,
+	type ReviewPage,
+	TattooApiError,
+} from "@tattoo-drip/sdk";
 import * as React from "react";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
+	CountedText,
+	StarRating,
+} from "../../src/review/components/fields.tsx";
+import { MediaTray } from "../../src/review/components/media-tray.tsx";
+import { DeleteControl } from "../../src/review/components/review-form.tsx";
+import {
 	ReviewForHash,
 	ReviewLoaded,
 	ReviewScreen,
+	screenOf,
 } from "../../src/review/components/review-screen.tsx";
+import { mediaViews } from "../../src/review/view-model.ts";
 import { attr, hrefs, tags, textOf } from "../deposit/html.ts";
-import { CONNECTION, PAGE, SAVED, SHELL, TOKEN } from "./fixtures.ts";
+import {
+	CONNECTION,
+	MEDIA,
+	PAGE,
+	photo,
+	SAVED,
+	SHELL,
+	TOKEN,
+	video,
+} from "./fixtures.ts";
 import { renderWithReview } from "./providers.tsx";
 
 Object.assign(globalThis, { React });
@@ -148,7 +169,7 @@ test("after submit: the thanks heading, the saved values, both consents while li
 	assert.match(videoTag, / muted=""/);
 	assert.match(videoTag, / playsInline=""/i);
 	assert.match(html, /aria-label="Remove video 1"/);
-	// Not offered for the main photo nor for a video.
+	// Not offered for the main photo nor for a video: only photo 2 would get one.
 	assert.equal((textOf(html).match(/Make it the main photo/g) ?? []).length, 0);
 });
 
@@ -191,4 +212,207 @@ test("a declined post: 'Not shown by the studio.', no pickers, still deletable",
 	assert.doesNotMatch(html, /type="file"/);
 	assert.doesNotMatch(textOf(html), /Remove/);
 	assert.match(textOf(html), /Delete my post/);
+});
+
+const POST = SAVED.post as NonNullable<ReviewPage["post"]>;
+
+test("a saved review with a draft post says the post isn't sent yet", () => {
+	const html = loaded({ ...SAVED, post: { ...POST, status: "draft" } });
+	assert.match(
+		textOf(html),
+		/Not sent yet: press Save to send it to Black Needle\./,
+	);
+});
+
+test("an approved post warns before any change that the studio checks it again", () => {
+	const html = loaded({ ...SAVED, post: { ...POST, status: "approved" } });
+	assert.match(textOf(html), /Shown by Black Needle where you allowed\./);
+	assert.match(
+		textOf(html),
+		/If you change it, Black Needle checks it again\./,
+	);
+});
+
+test("a taken-down post's sentence replaces its status line", () => {
+	const sentence = "TattooDrip took this down because it contained a threat.";
+	const html = loaded({
+		...SAVED,
+		post: {
+			...POST,
+			status: "approved",
+			editable: false,
+			takenDown: {
+				reason: "threats",
+				sentence,
+				at: "2026-11-02T00:00:00.000Z",
+			},
+		},
+	});
+	assert.match(textOf(html), new RegExp(sentence));
+	assert.doesNotMatch(textOf(html), /Shown by Black Needle/);
+	assert.doesNotMatch(textOf(html), /checks it again/);
+});
+
+test("a new review or post the API blocks shows why instead of the fields", () => {
+	const html = loaded({
+		...PAGE,
+		blocks: { review: "taken_down", post: "post_limit" },
+	});
+	assert.match(
+		textOf(html),
+		/This was taken down by TattooDrip\. Contact the studio\./,
+	);
+	assert.match(textOf(html), /This tattoo already had two posts\./);
+	assert.equal(
+		tags(html, "input").filter((tag) => attr(tag, "type") === "radio").length,
+		0,
+	);
+	assert.doesNotMatch(html, /type="file"/);
+});
+
+test("the Discover box shows while unlisted only if the client ticked it, so it can be unticked", () => {
+	const ticked = loaded({
+		...SAVED,
+		studio: { name: "Black Needle", onDiscover: false },
+		review: {
+			...(SAVED.review as NonNullable<ReviewPage["review"]>),
+			consentDiscover: true,
+		},
+	});
+	assert.match(textOf(ticked), /Show on TattooDrip Discover/);
+	const unticked = loaded({
+		...SAVED,
+		studio: { name: "Black Needle", onDiscover: false },
+	});
+	assert.doesNotMatch(textOf(unticked), /Show on TattooDrip Discover/);
+});
+
+test("a field's error: aria-invalid, linked by aria-describedby; the count is not a live region", () => {
+	const html = renderToStaticMarkup(
+		createElement(CountedText, {
+			id: "review-body",
+			label: "Your review",
+			hint: "At least 20 characters.",
+			value: "short",
+			max: 2000,
+			error: "Write at least 20 characters.",
+			onChange: () => undefined,
+		}),
+	);
+	const [area] = tags(html, "textarea");
+	assert.equal(attr(area, "aria-invalid"), "true");
+	assert.equal(
+		attr(area, "aria-describedby"),
+		"review-body-hint review-body-count review-body-error",
+	);
+	assert.match(
+		html,
+		/<p class="deposit-field-error" id="review-body-error">Write at least 20 characters\.<\/p>/,
+	);
+	assert.doesNotMatch(html, /aria-live/);
+	const stars = renderToStaticMarkup(
+		createElement(StarRating, {
+			value: 0,
+			onChange: () => undefined,
+			error: "Choose a rating from 1 to 5 stars.",
+		}),
+	);
+	assert.equal(
+		attr(tags(stars, "fieldset")[0], "aria-describedby"),
+		"review-rating-error",
+	);
+	assert.ok(
+		tags(stars, "input").every((tag) => attr(tag, "aria-invalid") === "true"),
+	);
+	const fine = renderToStaticMarkup(
+		createElement(StarRating, {
+			value: 4,
+			onChange: () => undefined,
+			error: null,
+		}),
+	);
+	assert.doesNotMatch(fine, /aria-invalid|review-rating-error/);
+});
+
+test("the delete confirm: a focusable question, Yes and Keep it", () => {
+	const ref = { current: null };
+	const asking = renderToStaticMarkup(
+		createElement(DeleteControl, {
+			what: "review",
+			label: "Delete my review",
+			confirming: true,
+			confirmRef: ref,
+			onAsk: () => undefined,
+			onCancel: () => undefined,
+			onConfirm: () => undefined,
+		}),
+	);
+	assert.match(asking, /<legend class="sr-only">Delete my review<\/legend>/);
+	assert.match(asking, /<p tabindex="-1">Delete it for good\?<\/p>/i);
+	assert.match(textOf(asking), /Yes, deleteKeep it/);
+	const resting = renderToStaticMarkup(
+		createElement(DeleteControl, {
+			what: "review",
+			label: "Delete my review",
+			confirming: false,
+			confirmRef: ref,
+			onAsk: () => undefined,
+			onCancel: () => undefined,
+			onConfirm: () => undefined,
+		}),
+	);
+	assert.match(resting, /data-delete="review"/);
+});
+
+test("each photo's main-photo button names it; Remove buttons are marked for focus", () => {
+	const items = mediaViews(
+		[photo("a"), photo("b"), video("v"), photo("c")],
+		[MEDIA],
+	);
+	const html = renderToStaticMarkup(
+		createElement(MediaTray, {
+			items,
+			pending: [],
+			editable: true,
+			busy: false,
+			error: null,
+			onPhotos: () => undefined,
+			onVideo: () => undefined,
+			onRemove: () => undefined,
+			onMakeMain: () => undefined,
+		}),
+	);
+	assert.match(textOf(html), /Make photo 2 the main photo/);
+	assert.match(textOf(html), /Make photo 3 the main photo/);
+	assert.doesNotMatch(textOf(html), /Make photo 1|Make video/);
+	assert.equal((html.match(/data-remove=""/g) ?? []).length, 4);
+});
+
+test("offline, a rate limit and a dead link are states of their own, never loading for ever", () => {
+	assert.equal(
+		screenOf({ data: undefined, error: null, fetchStatus: "paused" }),
+		"offline",
+	);
+	assert.equal(
+		screenOf({ data: undefined, error: null, fetchStatus: "fetching" }),
+		"loading",
+	);
+	const limited = new TattooApiError(
+		429,
+		{ code: "rate_limited", message: "" },
+		{ retryAfter: 60 },
+	);
+	assert.equal(
+		screenOf({ data: undefined, error: limited, fetchStatus: "idle" }),
+		"limited",
+	);
+	assert.equal(
+		screenOf({ data: PAGE, error: limited, fetchStatus: "idle" }),
+		"page",
+	);
+	const gone = new TattooApiError(404, { code: "not_found", message: "" });
+	assert.equal(
+		screenOf({ data: PAGE, error: gone, fetchStatus: "idle" }),
+		"dead",
+	);
 });
