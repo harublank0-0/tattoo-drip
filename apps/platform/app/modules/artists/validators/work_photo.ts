@@ -8,6 +8,10 @@ import { MAX_PHOTO_STYLES, STYLE_SLUGS } from "#modules/artists/styles";
 import { StylesErrorReporter } from "#modules/artists/validators/artist";
 import { IMAGE_FORMAT_MESSAGE } from "#modules/media/errors";
 import { imageFile } from "#modules/media/validators/image_file";
+import { MAX_VIDEO_BYTES, VIDEO_TYPES } from "#modules/media/video";
+
+/** A file that is not a video we take, before anything is sent. */
+const VIDEO_TYPE_MESSAGE = "Use an MP4, MOV or WebM video.";
 
 /** The description of a work photo: one line, up to this many characters. */
 export const MAX_WORK_PHOTO_ALT = 200;
@@ -150,4 +154,39 @@ export const removeWorkPhotoValidator = vine.create({
 		.range([1, MAX_TATTOO_PHOTOS])
 		.optional()
 		.requiredWhen("scope", "=", "tattoo"),
+});
+
+/**
+ * Video angles, before the upload: what the browser will send, its declared
+ * type (MP4, MOV or WebM) and its exact length in bytes (at most 100 MB). The
+ * signature binds both, and the worker checks what the file really is.
+ */
+export const signWorkVideoValidator = vine.create({
+	type: vine.enum(VIDEO_TYPES),
+	size: vine.number().withoutDecimals().min(1).max(MAX_VIDEO_BYTES),
+});
+signWorkVideoValidator.messagesProvider = new SimpleMessagesProvider({
+	"type.required": VIDEO_TYPE_MESSAGE,
+	"type.enum": VIDEO_TYPE_MESSAGE,
+	"size.max": "Use a video of 100 MB or less.",
+	"size.min": "This file is empty.",
+	"size.required": "Choose a video to upload.",
+	"size.number": "Choose a video to upload.",
+	"size.withoutDecimals": "Choose a video to upload.",
+});
+
+/**
+ * Video angles, once the upload has arrived: the token the sign step gave
+ * (what was signed, checked by readVideoUploadToken) and the video's own
+ * description, by the photos' rule.
+ */
+export const addWorkVideoValidator = vine.create({
+	upload: vine.string().maxLength(2048),
+	alt: detailFields().alt.optional(),
+});
+addWorkVideoValidator.messagesProvider = new SimpleMessagesProvider({
+	"upload.required": "Choose a video to upload.",
+	"alt.maxLength": ALT_MESSAGE,
+	"alt.regex": ALT_MESSAGE,
+	"alt.string": ALT_MESSAGE,
 });

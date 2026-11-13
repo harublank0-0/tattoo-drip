@@ -719,6 +719,10 @@
 	text-decoration-color: var(--atl-brass);
 	text-underline-offset: 0.4em;
 }
+/* Video angles: "Video, no sound" is a line, not a link. */
+.atl-artwork-figure .artwork-video-hint {
+	text-decoration: none;
+}
 .atl-colophon {
 	display: grid;
 	justify-items: center;

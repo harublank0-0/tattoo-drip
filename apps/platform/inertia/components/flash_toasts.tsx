@@ -2,10 +2,11 @@ import { router, usePage } from "@inertiajs/react";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { Toaster } from "~/components/ui/sonner";
+import { isQuietVisit } from "~/components/visits";
 
 /**
  * Shows the session's flash `success` / `error` message as a toast, and
- * dismisses it when the next visit starts. Every message gets a toast of its
+ * dismisses it when the next visit starts (not a quiet one: a poll). Every message gets a toast of its
  * own (a fresh id): the visit that brings a message also dismisses the
  * previous toast, and Sonner keeps a dismissed id deleted, so a message that
  * reused the id of a toast still fading out was never shown (a failed
@@ -16,7 +17,10 @@ export default function FlashToasts() {
 	const shown = useRef<string | number | null>(null);
 
 	useEffect(() => {
-		return router.on("start", () => {
+		return router.on("start", (event) => {
+			// A quiet visit (the portfolio asking again while a video processes)
+			// leaves the message where it is.
+			if (isQuietVisit(event.detail.visit)) return;
 			if (shown.current !== null) toast.dismiss(shown.current);
 			shown.current = null;
 		});

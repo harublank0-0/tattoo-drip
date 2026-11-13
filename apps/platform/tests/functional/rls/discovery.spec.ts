@@ -31,6 +31,8 @@ const READABLE: Record<string, string[]> = {
 		"hidden",
 		"id",
 		"image_key",
+		// Video angles (1791910000001): artwork_angles maps photos only.
+		"kind",
 		// Angles (1791900000001): the view keeps leads only.
 		"lead_photo_id",
 		"styles",
@@ -1096,6 +1098,52 @@ test.group("Discover database: publication changes (D02)", () => {
 				[shown, takenDown, ofUnpublished].includes(row.id),
 			);
 			assert.deepEqual(mine, [{ id: shown, artwork_id: p.shown }]);
+		});
+	});
+
+	test("video angles: a video of a published tattoo is in neither view, ready or not (Discover never shows video)", async ({
+		assert,
+	}) => {
+		await rolledBack(async (trx) => {
+			const seeded = await seed(trx);
+			const { t, a, p } = seeded;
+			const videos = await rows<{ id: string }>(
+				trx,
+				`insert into artist_work_photos (tenant_id, artist_id, kind, image_key, width, height, styles, lead_photo_id, angle_position,
+					video_state, video_staging_key, video_duration_ms, video_keys, created_at)
+				 values (?, ?, 'video', 'tenants/x/work_video/v.jpg', 1080, 1920, '{fine-line}', ?, 1,
+					'ready', 'work_video_upload/tenants/x/v', 42000, '{tenants/x/work_video/v.720x1280.mp4}', now()),
+					(?, ?, 'video', null, null, null, '{fine-line}', ?, 2,
+					'processing', 'work_video_upload/tenants/x/w', null, null, now())
+				 returning id`,
+				[t.studio, a.shown, p.shown, t.studio, a.shown, p.shown],
+			);
+			const ids = videos.map((row) => row.id);
+			const artworks = await as<{ id: string }>(
+				trx,
+				APP,
+				"select id from discovery.artworks",
+			);
+			const angles = await as<{ id: string }>(
+				trx,
+				APP,
+				"select id from discovery.artwork_angles",
+			);
+			for (const id of ids) {
+				assert.notInclude(
+					artworks.map((row) => row.id),
+					id,
+				);
+				assert.notInclude(
+					angles.map((row) => row.id),
+					id,
+				);
+			}
+			// The tattoo itself is still an artwork.
+			assert.include(
+				artworks.map((row) => row.id),
+				p.shown,
+			);
 		});
 	});
 

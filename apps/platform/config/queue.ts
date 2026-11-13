@@ -1,4 +1,5 @@
 import { defineConfig, drivers, exponentialBackoff } from "@adonisjs/queue";
+import env from "#start/env";
 
 export default defineConfig({
 	/**
@@ -15,9 +16,19 @@ export default defineConfig({
 		}),
 	},
 
+	/**
+	 * The default worker runs the "default" queue only (`queue:work` with no
+	 * `--queue`). Video angles' transcodes have their own queue, "video"
+	 * (ProcessWorkVideoJob), run by their own worker at concurrency 1
+	 * (`queue:work --queue=video --concurrency=1`, deploy/compose.yml's
+	 * video-worker), so a transcode never holds up an email or an alert.
+	 * `maxStalledCount` is 1 unless QUEUE_MAX_STALLED_COUNT says otherwise
+	 * (the video worker sets 3).
+	 */
 	worker: {
 		concurrency: 5,
 		idleDelay: "2s",
+		maxStalledCount: env.get("QUEUE_MAX_STALLED_COUNT") ?? 1,
 	},
 
 	/**

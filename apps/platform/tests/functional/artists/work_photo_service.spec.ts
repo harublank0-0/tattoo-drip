@@ -125,7 +125,7 @@ test.group("WorkPhotoService (TAT-116)", (group) => {
 		);
 		assert.equal(added.width, 1600);
 		assert.match(
-			added.imageKey,
+			added.imageKey as string,
 			new RegExp(`^tenants/${tenant.id}/${PURPOSE}/`),
 		);
 		// The returned instance matches what the database stores for a new photo.
@@ -726,7 +726,7 @@ test.group("removing a photo is durable (TAT-116 fix round 1)", (group) => {
 			key.replace(/\.320-640-1280\.jpg$/, ".640w.jpg");
 		const failing = failDeletes(
 			"public",
-			(key) => key === copies(added[0].imageKey),
+			(key) => key === copies(added[0].imageKey as string),
 		);
 
 		let thrown: unknown;
@@ -760,7 +760,12 @@ test.group("removing a photo is durable (TAT-116 fix round 1)", (group) => {
 		// The other files of the photo were tried and are gone; the failed one is left.
 		const left = await storedImages(tenant, PURPOSE);
 		assert.lengthOf(left, 12 - 3);
-		assert.include(left, copies(added[0].imageKey).split("/").pop() ?? "");
+		assert.include(
+			left,
+			copies(added[0].imageKey as string)
+				.split("/")
+				.pop() ?? "",
+		);
 
 		// Storage is back: the retry removes every copy.
 		await inTenant(tenant, () => photos.remove(tenant, editor, added[0]));
@@ -835,7 +840,7 @@ test.group(
 			const idOf = (key: string) => key.split("/").pop()?.split(".")[0] ?? "";
 			assert.lengthOf(left, 4, "only the other photo's files are left");
 			assert.isTrue(
-				left.every((file) => file.startsWith(idOf(other.imageKey))),
+				left.every((file) => file.startsWith(idOf(other.imageKey as string))),
 			);
 			assert.deepEqual(
 				(await order(tenant, sita.id)).map((row) => row.id),

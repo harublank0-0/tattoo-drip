@@ -13,25 +13,29 @@ import {
 	Search,
 	Upload,
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { urlFor } from "~/client";
 import ArtworkDetails from "~/components/artwork_details";
 import ArtworkUpload from "~/components/artwork_upload";
 import FilterSelect from "~/components/filter_select";
 import Page from "~/components/page";
 import {
+	anyProcessing,
 	followBack,
 	isFiltered,
 	NO_FILTERS,
+	nextPollDelay,
 	PAGE_DESCRIPTION,
 	type PortfolioFilters,
 	type PortfolioPageProps,
 	type PortfolioPhoto,
 	photosMark,
+	pollGivesUp,
 	portfolioHref,
 	resultLine,
 	SORT_OPTIONS,
 	STATUS_OPTIONS,
+	STILL_PROCESSING,
 	statusText,
 	tileLabel,
 	tileMeta,
@@ -39,6 +43,7 @@ import {
 import PortfolioBulkBar from "~/components/portfolio_bulk_bar";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
+import { QUIET_VISIT_HEADER } from "~/components/visits";
 import { useTenant } from "~/hooks/use-tenant";
 import AppLayout from "~/layouts/app";
 
@@ -57,7 +62,8 @@ import AppLayout from "~/layouts/app";
  * Angles: a tile is a tattoo, its main photo with an "n photos" mark when it
  * has more; the count line, the filters and the bulk changes are about
  * tattoos. The details panel lists the tattoo's photos and adds more through
- * the same upload panel, opened for that tattoo (`uploadLead`). When a write
+ * the same upload panel, opened for that tattoo (`uploadLead`), videos too
+ * (video angles: while one is processing the page polls). When a write
  * makes another photo the main one, the panel follows the tattoo: the
  * selection is found by any of its photos' ids, not only the lead's.
  */
@@ -100,6 +106,67 @@ export default function PortfolioIndex({
 	const uploadFrom = useRef<HTMLElement | null>(null);
 	const [uploading, setUploading] = useState(false);
 	const galleryHeading = useRef<HTMLHeadingElement>(null);
+
+	// Video angles: while a video shown here is processing, ask again with a
+	// light partial reload (the gallery's photos only), a quiet visit (no
+	// lost-connection toast, the flash toast left alone). One at a time: the
+	// next is scheduled from the last one's onFinish, 4 s growing to 30 s
+	// (nextPollDelay); paused while the tab is hidden; never while an upload
+	// is going, whose visit it could race; after 30 minutes it stops and
+	// says so (STILL_PROCESSING).
+	const processing = anyProcessing(openPhoto ? [...photos, openPhoto] : photos);
+	const [pollGaveUp, setPollGaveUp] = useState(false);
+	const polling = useRef<{ startedAt: number | null; inFlight: boolean }>({
+		startedAt: null,
+		inFlight: false,
+	});
+	useEffect(() => {
+		const state = polling.current;
+		if (!processing) {
+			state.startedAt = null;
+			setPollGaveUp(false);
+			return;
+		}
+		if (uploading || pollGaveUp) return;
+		state.startedAt ??= Date.now();
+		const startedAt = state.startedAt;
+		let stopped = false;
+		let attempt = 0;
+		let timer: number | undefined;
+		const schedule = () => {
+			if (stopped) return;
+			timer = window.setTimeout(tick, nextPollDelay(attempt++));
+		};
+		const tick = () => {
+			if (stopped) return;
+			if (pollGivesUp(startedAt, Date.now())) {
+				setPollGaveUp(true);
+				return;
+			}
+			// Hidden: wait for the tab to come back, then ask at once.
+			if (document.hidden) {
+				document.addEventListener("visibilitychange", tick, { once: true });
+				return;
+			}
+			// One in flight already (a poll from before this effect ran again).
+			if (state.inFlight) return schedule();
+			state.inFlight = true;
+			router.reload({
+				only: ["photos", "openPhoto"],
+				headers: { [QUIET_VISIT_HEADER]: "1" },
+				onFinish: () => {
+					state.inFlight = false;
+					schedule();
+				},
+			});
+		};
+		schedule();
+		return () => {
+			stopped = true;
+			window.clearTimeout(timer);
+			document.removeEventListener("visibilitychange", tick);
+		};
+	}, [processing, uploading, pollGaveUp]);
 	// By any photo of the tattoo: a new main photo changes the tile's id. A
 	// tattoo whose new main photo put it on another page comes as `openPhoto`
 	// (the write came back with `open`), and the panel stays on it.
@@ -230,6 +297,10 @@ export default function PortfolioIndex({
 							)}
 						</div>
 					</div>
+					{/* Always there, so a screen reader hears the line when it appears. */}
+					<output className="block text-sm text-muted-foreground">
+						{processing && pollGaveUp ? STILL_PROCESSING : null}
+					</output>
 					{storefront.devHost && (
 						<p className="text-xs text-muted-foreground">
 							Your page's address opens on this computer only until the studio

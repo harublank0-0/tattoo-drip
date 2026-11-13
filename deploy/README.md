@@ -15,7 +15,7 @@ visitor --https--> Cloudflare (DNS, TLS, Always Use HTTPS)
                                       +--> storefront (the studio pages, :3000)
                                       +--> discover   (Discover, :3000; only with discover.env, and
                                                        public only after the D11 cutover)
-              worker (alerts, quote expiry, queue)
+              worker (alerts, quote expiry, queue), video-worker (video angles)
               postgres 18 (not reachable from outside)
               backup (a job started by systemd every night)
 web, worker --> R2 buckets tattoo-drip-public (media.tattoodrip.app) and tattoo-drip-private
@@ -512,7 +512,7 @@ The first build downloads every dependency and can take 5 to 15 minutes; later o
 docker compose -f /srv/tattoo-drip/app/deploy/compose.yml ps
 ```
 
-**You should see** six lines. `postgres`, `web` and `storefront` say `Up ... (healthy)`; `worker`, `nginx` and `cloudflared` say `Up`. Anything saying `Restarting` is crashing: `docker compose -f /srv/tattoo-drip/app/deploy/compose.yml logs --tail 50 <name>` says why.
+**You should see** seven lines. `postgres`, `web` and `storefront` say `Up ... (healthy)`; `worker`, `video-worker` (video angles' transcodes), `nginx` and `cloudflared` say `Up`. Anything saying `Restarting` is crashing: `docker compose -f /srv/tattoo-drip/app/deploy/compose.yml logs --tail 50 <name>` says why.
 
 ### 4.5 The tunnel and the site
 
@@ -692,10 +692,10 @@ This is safe because migrations are written to only add things (a rule of the pr
 
 ### Changing a setting
 
-Edit the file (2.4), then recreate the services that read it. The settings of `web` and `worker` are in `platform.env`:
+Edit the file (2.4), then recreate the services that read it. The settings of `web`, `worker` and `video-worker` are in `platform.env`:
 
 ```bash
-docker compose -f /srv/tattoo-drip/app/deploy/compose.yml up -d --force-recreate web worker
+docker compose -f /srv/tattoo-drip/app/deploy/compose.yml up -d --force-recreate web worker video-worker
 ```
 
 Nothing else is needed: nginx reaches `web` and `storefront` by fixed addresses (`172.30.42.11` and `172.30.42.12`, set in `deploy/compose.yml` and `deploy/nginx/common.conf`), so it finds a recreated or restarted container at once, and after a reboot too (4.10 checks both). The site answers `502` (or `504`) for the few seconds the new container takes to start. For the storefront use `storefront` in place of `web worker`. For the tunnel (`tunnel.env`) use `cloudflared`. For Discover (`discover.env`) add its profile: `docker compose -f /srv/tattoo-drip/app/deploy/compose.yml --profile discover up -d --force-recreate discover`. `postgres.env` only counts when the database is first created; changing it later changes nothing.

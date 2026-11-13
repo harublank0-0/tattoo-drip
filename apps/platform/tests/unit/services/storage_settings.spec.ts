@@ -226,8 +226,9 @@ test.group("R2 disks (TAT-27)", () => {
 
 	test("private disk: the private bucket and no public URL", ({ assert }) => {
 		const options = r2DiskOptions(settings, "private");
+		const { urlBuilder, ...rest } = options;
 
-		assert.deepEqual(options, {
+		assert.deepEqual(rest, {
 			credentials,
 			region: "auto",
 			endpoint,
@@ -237,7 +238,47 @@ test.group("R2 disks (TAT-27)", () => {
 			...CHECKSUMS,
 			...LIMITS,
 		});
+		// Video angles: only its upload URLs are built here (below).
+		assert.deepEqual(Object.keys(urlBuilder ?? {}), [
+			"generateSignedUploadURL",
+		]);
 		assert.notProperty(options, "cdnUrl");
+	});
+
+	test("video angles: a presigned PUT to the private bucket binds the type and the exact length, for 15 minutes", async ({
+		assert,
+	}) => {
+		const driver = new S3Driver(r2DiskOptions(settings, "private"));
+
+		const url = new URL(
+			await driver.getSignedUploadUrl("work_video_upload/tenants/t1/u1", {
+				contentType: "video/mp4",
+				expiresIn: 900,
+				ContentLength: 12_345,
+			}),
+		);
+
+		assert.equal(
+			url.host,
+			`tattoo-drip-private.${ACCOUNT_ID}.r2.cloudflarestorage.com`,
+		);
+		assert.equal(url.pathname, "/work_video_upload/tenants/t1/u1");
+		assert.equal(url.searchParams.get("x-id"), "PutObject");
+		assert.equal(url.searchParams.get("X-Amz-Expires"), "900");
+		// R2 has no POST policy: the signature is the size limit.
+		assert.deepEqual(url.searchParams.get("X-Amz-SignedHeaders")?.split(";"), [
+			"content-length",
+			"content-type",
+			"host",
+		]);
+		await assert.rejects(
+			() =>
+				driver.getSignedUploadUrl("work_video_upload/tenants/t1/u2", {
+					contentType: "video/mp4",
+					expiresIn: 900,
+				}),
+			/ContentLength/,
+		);
 	});
 
 	test("a public URL is on the media origin", async ({ assert }) => {

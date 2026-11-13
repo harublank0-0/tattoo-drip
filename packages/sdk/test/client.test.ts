@@ -1174,8 +1174,9 @@ describe("lists with query parameters", () => {
 		assert.equal(missing.calls[0].url, `${T}/work/a%2Fb%3Fc`);
 	});
 
-	test("work.get returns a tattoo's other photos (angles) in order, as sent; an angle's id answers with its main photo's", async () => {
+	test("work.get returns a tattoo's other photos and videos (angles) in order, as sent; an angle's id answers with its main photo's", async () => {
 		const angle = (n: number) => ({
+			kind: "photo" as const,
 			url: `https://api.example.com/uploads/koi-${n}.jpg`,
 			width: 1200,
 			height: 900,
@@ -1197,7 +1198,30 @@ describe("lists with query parameters", () => {
 			styles: [],
 			healed: true,
 			artist: { slug: "sita", name: "Sita Rai" },
-			angles: [angle(2), angle(3)],
+			angles: [
+				angle(2),
+				{
+					kind: "video",
+					poster: {
+						url: "https://api.example.com/uploads/koi-video.jpg",
+						width: 720,
+						height: 1280,
+						alt: null,
+						variants: [],
+					},
+					sources: [
+						{
+							url: "https://api.example.com/uploads/koi-video.720x1280.mp4",
+							type: "video/mp4",
+							width: 720,
+							height: 1280,
+						},
+					],
+					durationMs: 42_000,
+					alt: null,
+				},
+				angle(3),
+			],
 		};
 		const { calls, fetch } = fakeFetch(() => json(200, { data: tattoo }));
 
@@ -1213,8 +1237,12 @@ describe("lists with query parameters", () => {
 		assert.deepEqual(result, tattoo);
 		assert.equal(result.id, tattoo.id);
 		assert.deepEqual(
-			result.angles.map((photo) => photo.alt),
-			["From the side", null],
+			result.angles.map((item) => [item.kind, item.alt]),
+			[
+				["photo", "From the side"],
+				["video", null],
+				["photo", null],
+			],
 		);
 	});
 

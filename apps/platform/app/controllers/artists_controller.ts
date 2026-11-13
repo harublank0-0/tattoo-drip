@@ -14,7 +14,9 @@ import ArtistService, {
 	type ArtistInput,
 } from "#modules/artists/services/artist_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
-import WorkPhotoService from "#modules/artists/services/work_photo_service";
+import WorkPhotoService, {
+	stillKey,
+} from "#modules/artists/services/work_photo_service";
 import { knownStyles, TATTOO_STYLES } from "#modules/artists/styles";
 import {
 	createArtistValidator,
@@ -215,7 +217,7 @@ export default class ArtistsController {
 					id: photo.id,
 					thumbnailUrl: await this.images.urlFor(
 						"artist_work_photo",
-						photo.imageKey,
+						stillKey(photo),
 						tenant,
 						THUMBNAIL_WIDTH,
 					),

@@ -50,4 +50,5 @@ export const controllers = {
   StudioSlug: () => import('#controllers/studio_slug_controller'),
   Today: () => import('#controllers/today_controller'),
   WorkPhotos: () => import('#controllers/work_photos_controller'),
+  WorkVideos: () => import('#controllers/work_videos_controller'),
 }

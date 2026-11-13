@@ -38,12 +38,21 @@ async function send(
 ) {
 	// client.get() and friends type the body as `never`; request() is what they
 	// all call.
-	const request = client.request(url, isolationCase.method);
+	const query = (await isolationCase.query?.(own)) ?? null;
+	const request = client.request(
+		query ? `${url}?${new URLSearchParams(query)}` : url,
+		isolationCase.method,
+	);
 	if (isolationCase.method === "GET") request.withInertia();
 	else request.withCsrfToken();
-	const body = isolationCase.body?.(own);
+	const body = await isolationCase.body?.(own);
+	const raw = await isolationCase.raw?.(own);
 	const files = (await isolationCase.files?.(own)) ?? [];
-	if (files.length > 0) {
+	if (raw) {
+		// A raw body (video angles: the local disk's PUT of a video's bytes).
+		request.type(raw.type);
+		request.request.send(raw.data);
+	} else if (files.length > 0) {
 		// A multipart form (TAT-116): the fields, then each file as a part.
 		request.fields((body ?? {}) as Record<string, string>);
 		for (const part of files) {
@@ -101,7 +110,8 @@ export async function assertCrossTenantIsolation(
 	isolationCase: IsolationCase,
 ) {
 	const actor = isolationCase.actor === "owner" ? a.owner : a.artist;
-	const writes = isolationCase.method !== "GET";
+	const writes =
+		isolationCase.method !== "GET" && isolationCase.writesNothing === undefined;
 
 	// B's baseline is taken before anything is sent: a handler that also
 	// writes to B on A's own valid request must not get to define "unchanged".

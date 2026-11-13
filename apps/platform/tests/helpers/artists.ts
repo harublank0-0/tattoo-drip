@@ -91,6 +91,48 @@ export async function addWorkPhoto(
 }
 
 /**
+ * A video angle row (video angles) of the tattoo `lead` leads, at
+ * `position`, with made-up keys and no files: `ready` by default (a poster
+ * with a photo's copies, 720p and 1080p renditions, 42 s), or `processing`
+ * or `failed` with nothing made. Call it inside the tenant's context.
+ */
+export async function addWorkVideo(
+	tenant: Pick<Tenant, "id">,
+	artist: Pick<Artist, "id">,
+	lead: Pick<ArtistWorkPhoto, "id" | "hidden" | "styles" | "healed">,
+	position: number,
+	over: Partial<{
+		state: "processing" | "ready" | "failed";
+		alt: string | null;
+		createdAt: DateTime;
+	}> = {},
+) {
+	const state = over.state ?? "ready";
+	const base = `tenants/${tenant.id}/work_video/${randomUUID()}`;
+	const ready = state === "ready";
+	return ArtistWorkPhoto.create({
+		tenantId: tenant.id,
+		artistId: artist.id,
+		kind: "video",
+		videoState: state,
+		videoStagingKey: `work_video_upload/tenants/${tenant.id}/${randomUUID()}`,
+		videoFailure: state === "failed" ? "It's longer than 60 seconds." : null,
+		imageKey: ready ? `${base}.320-640.jpg` : null,
+		width: ready ? 1080 : null,
+		height: ready ? 1920 : null,
+		videoDurationMs: ready ? 42_000 : null,
+		videoKeys: ready ? [`${base}.720x1280.mp4`, `${base}.1080x1920.mp4`] : null,
+		alt: over.alt ?? null,
+		styles: [...lead.styles],
+		healed: lead.healed,
+		hidden: lead.hidden,
+		leadPhotoId: lead.id,
+		anglePosition: position,
+		...(over.createdAt ? { createdAt: over.createdAt } : {}),
+	});
+}
+
+/**
  * A flash design row for `artist` with a made-up key and no file (the drive
  * ignores a delete of a missing file), shown, 1200 x 1200, dated now unless
  * `createdAt` says otherwise: designs are listed newest first (TAT-129).

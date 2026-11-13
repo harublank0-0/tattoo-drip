@@ -7,6 +7,7 @@
 |
 */
 
+import app from "@adonisjs/core/services/app";
 import router from "@adonisjs/core/services/router";
 import { controllers } from "#generated/controllers";
 import { ARTIST_SLUG } from "#modules/artists/validators/artist";
@@ -24,6 +25,7 @@ import {
 	throttleSignupEmail,
 	throttleVerifyCooldown,
 	throttleVerifyResend,
+	throttleVideoSign,
 } from "#start/limiter";
 
 /**
@@ -374,6 +376,27 @@ router
 					.post("photos/:id/ungroup", [controllers.WorkPhotos, "ungroup"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.artists.photos.ungroup");
+				// Video angles: a video added to a tattoo (`:id` its lead). The
+				// browser asks for a signed upload, PUTs the file straight to
+				// storage, then finishes; the worker processes it.
+				router
+					.post("photos/:id/videos/sign", [controllers.WorkVideos, "sign"])
+					.where("id", router.matchers.uuid())
+					.use(throttleVideoSign)
+					.as("tenant.artists.photos.videos.sign");
+				router
+					.post("photos/:id/videos", [controllers.WorkVideos, "store"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.artists.photos.videos.store");
+				// The local disk's stand-in for R2's presigned PUT: development
+				// and tests only, never registered in production (and the
+				// handler refuses to run there too).
+				if (!app.inProduction) {
+					router
+						.put("photos/:id/videos/stage", [controllers.WorkVideos, "stage"])
+						.where("id", router.matchers.uuid())
+						.as("tenant.artists.photos.videos.stage");
+				}
 				// An artist's flash designs (TAT-129), the same shape: the upload
 				// names the artist, the others name the design. A design a request
 				// names can't be removed; hiding it is a save.

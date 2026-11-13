@@ -8,6 +8,7 @@ import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
 import ArtistService, {
 	type ProfileEditor,
 } from "#modules/artists/services/artist_service";
+import { stillOf } from "#modules/artists/services/work_photo_service";
 import { knownStyles } from "#modules/artists/styles";
 import {
 	type ArtistDiscoverState,
@@ -416,9 +417,9 @@ export default class PublicationService {
 					alt: photo.alt,
 					image: await this.images.shownImage(
 						"artist_work_photo",
-						photo.imageKey,
+						stillOf(photo).key,
 						live,
-						{ width: photo.width, height: photo.height },
+						stillOf(photo),
 					),
 				})),
 			),

@@ -159,7 +159,7 @@ export function groupSummary(outcome: { photos: number } | GroupRefusal): {
 			"Select photos of one artist: a tattoo is one artist's work. Move them to the same artist first.",
 		angle: "One of these photos is already part of another tattoo.",
 		has_angles:
-			"One of these is already a tattoo of several photos, so nothing was grouped. To add photos to it, open it and choose Add photos to this tattoo.",
+			"One of these is already a tattoo of several photos, so nothing was grouped. To add photos to it, open it and choose Add photos or videos to this tattoo.",
 		mixed:
 			"Some of these photos are unpublished. Publish or unpublish them all first, then group them.",
 		gone: "Some of these photos were removed or changed meanwhile, so nothing was grouped.",
