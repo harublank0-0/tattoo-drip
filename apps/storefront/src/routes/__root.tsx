@@ -24,35 +24,27 @@ import { loadPageStudio } from "../studio/loaders.ts";
 import { PreviewLinks } from "../studio/preview-links.tsx";
 import { rootMeta } from "../studio/seo.ts";
 import {
-	type FontKey,
-	studioFontKey,
-	type ThemeKey,
-} from "../studio/theme/config.ts";
-import {
+	type HeadingFontFile,
 	isUnthemedPage,
+	matchedHeadingFont,
 	matchedThemeKey,
 	THEME_HTML,
 } from "../studio/theme/html.ts";
 import { previewExitHref } from "../studio/theme/preview.ts";
 import appCss from "../styles.css?url";
 
-/**
- * The heading font file this page preloads (see the root head below): the
- * theme's own face while the studio keeps the default font (Atelier's Bodoni,
- * Flash Parlour's Shrikhand), else Eczar's.
- */
-function headingFontFile(theme: ThemeKey, font: FontKey): string {
-	if (font !== "eczar") return eczarLatin;
-	if (theme === "atelier") return bodoniLatin;
-	if (theme === "flash-parlour") return shrikhandLatin;
-	return eczarLatin;
-}
+/** Each heading font file's address in the build. */
+const HEADING_FONT_URLS: Record<HeadingFontFile, string> = {
+	eczar: eczarLatin,
+	"bodoni-moda": bodoniLatin,
+	shrikhand: shrikhandLatin,
+};
 
-/** The heading font file this page preloads (see the root head below). */
-function preloadedFont(theme: ThemeKey, font: FontKey) {
+/** The heading font file this page preloads (theme/html.ts, matchedHeadingFont). */
+function preloadedFont(file: HeadingFontFile) {
 	return {
 		rel: "preload",
-		href: headingFontFile(theme, font),
+		href: HEADING_FONT_URLS[file],
 		as: "font",
 		type: "font/woff2",
 		crossOrigin: "anonymous" as const,
@@ -88,7 +80,7 @@ export const Route = createRootRouteWithContext<ApiContext & SiteContext>()({
 			// the default font, else Eczar's Latin subset (the others load when a page
 			// holds their characters; font-display: optional, src/styles.css). No
 			// other theme ever loads Bodoni or Shrikhand.
-			preloadedFont(matchedThemeKey(matches), studioFontKey(loaderData)),
+			preloadedFont(matchedHeadingFont(matches)),
 			{
 				rel: "stylesheet",
 				href: appCss,

@@ -198,8 +198,10 @@ describe("the vendored Eczar files", () => {
 			root,
 			/import eczarLatin from "\.\.\/assets\/fonts\/eczar\/eczar-latin-700-normal\.woff2\?url"/,
 		);
-		assert.match(root, /href: headingFontFile\(theme, font\),/);
-		assert.match(root, /if \(font !== "eczar"\) return eczarLatin;/);
+		// The choice is theme/html.ts's matchedHeadingFont (flash-parlour.test.ts tests every pair).
+		assert.match(root, /preloadedFont\(matchedHeadingFont\(matches\)\)/);
+		assert.match(root, /href: HEADING_FONT_URLS\[file\],/);
+		assert.match(root, /eczar: eczarLatin,/);
 		assert.match(root, /as:\s*"font"/);
 		assert.match(root, /type:\s*"font\/woff2"/);
 		assert.match(root, /crossOrigin:\s*"anonymous"/);
