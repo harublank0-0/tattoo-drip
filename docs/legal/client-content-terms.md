@@ -1,4 +1,4 @@
-# Terms for client reviews and Fresh ink
+# DRAFT: Terms for client reviews and Fresh ink
 
 > **Draft: not legally reviewed.** Written for the product owner to take to a lawyer (Reviews and Fresh ink, ruling 12). Not published, not linked from any page, and not in force. The review page stays behind `REVIEWS_ENABLED` until a reviewed version replaces this draft.
 
@@ -35,15 +35,15 @@ These terms cover what a client posts through a studio's review link on TattooDr
 
 ## 4. Your name
 
-4.1 Public surfaces show your first name and the first letter of your last name, unless you change it (1 to 40 characters). We never show your phone number, email or full name.
+4.1 Public surfaces show the name you choose (1 to 40 characters). It starts as your first name and the first letter of your last name; you may change it to anything that is your own name, including your full name if you type it yourself. We never show your phone number or email, and we never show your full name unless you type it.
 
 4.2 Do not use someone else's name.
 
 ## 5. Deleting
 
-5.1 You can delete your review or your post at any time through your link while it works (12 months from when the studio made it, unless the studio revokes it sooner). Deleting removes it from every public surface at once and deletes the photo and video files.
+5.1 You can delete your review or your post at any time through your link while it works (12 months from when the studio made it, unless the studio revokes it sooner). Deleting removes it from every surface at once and deletes the photo and video files. Of a deleted review we erase the rating, the text, the name shown and your choices of where it shows; of a deleted post the photos and videos, the caption, the styles, the placement, the name shown and your choices.
 
-5.2 After the link stops working, ask the studio or us (contact below) and we will take it down. We keep a record that a review existed, without the photos and videos, for the studio's records and to handle disputes.
+5.2 What we keep after a delete is only a record that a review or post existed for that tattoo: its identifiers, its dates, the studio's decision on a post, any reply or report, any takedown record, and the dispute record of section 8 until it expires. After the link stops working, ask the studio or us (contact below) and we will delete it the same way.
 
 ## 6. Takedowns and reports
 
@@ -57,14 +57,22 @@ These terms cover what a client posts through a studio's review link on TattooDr
 
 7.1 Reviews must be your own honest experience. Studios may not pay for, write, or edit reviews, and may not hide a review because it is critical; they may reply and report.
 
-## 8. Contact
+## 8. Records for disputes
 
-8.1 Questions, takedown requests and appeals: [contact address to be added before publication].
+8.1 Each time you save, we keep a scrambled fingerprint (a keyed hash) of your network address and browser, with the time, on what you saved. It cannot be turned back into your address. It is never shown to anyone but TattooDrip's operators, used only to settle disputes (for example, whether two reviews came from one device), and erased after 90 days.
+
+## 9. Private until published
+
+9.1 Your photos and videos are stored privately: only you (through your link), the studio and TattooDrip can see them until the studio approves the post and you allow a surface. Copies shown on a public page are deleted when the post is declined, unpublished or taken down, or when you withdraw that surface.
+
+## 10. Contact
+
+10.1 Questions, takedown requests and appeals: [contact address to be added before publication].
 
 ## Open questions for the legal review
 
 - Applicable law and courts (Nepal first; any other market).
 - Minimum age to post, and posts showing a minor.
-- How long the record of a deleted review is kept (5.2), and privacy notice wording for the personal data in it.
+- How long the record of a deleted review is kept (5.2), and privacy notice wording for the personal data in it and in the dispute record (section 8).
 - Whether the licence in 2.2 needs a separate consent for TattooDrip's own promotion (currently not granted).
 - Notice-and-takedown process and response times for third-party complaints (6.2).
