@@ -14,6 +14,7 @@ import { assert } from "@japa/assert";
 import { browserClient } from "@japa/browser-client";
 import { pluginAdonisJS } from "@japa/plugin-adonisjs";
 import type { Config } from "@japa/runner/types";
+import { installFakePaybridge } from "#tests/helpers/paybridge";
 
 /**
  * This file is imported by the "bin/test.ts" entrypoint file
@@ -103,7 +104,13 @@ async function installDbTripwire() {
 const resetRateLimits = () => limiter.clear(["memory"]);
 
 export const runnerHooks: Required<Pick<Config, "setup" | "teardown">> = {
-	setup: [clearTestStorage, makeUploadsFolder, installDbTripwire],
+	setup: [
+		clearTestStorage,
+		makeUploadsFolder,
+		installDbTripwire,
+		// No test reaches PayBridgeNP: an in-memory fake answers instead.
+		installFakePaybridge,
+	],
 	teardown: [clearTestStorage, () => removeTripwire?.()],
 };
 

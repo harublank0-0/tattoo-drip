@@ -1,5 +1,6 @@
 import { BaseTransformer } from "@adonisjs/core/transformers";
 import type { DepositPage } from "#modules/payments/services/deposit_page_service";
+import type { OnlineState } from "#modules/payments/services/gateway_checkout_service";
 import { formatDay, formatMoney, validUntil } from "#modules/projects/quotes";
 
 /**
@@ -10,7 +11,9 @@ import { formatDay, formatMoney, validUntil } from "#modules/projects/quotes";
  * (formatMoney writes NPR, the only currency so far); `payBy` is the
  * current quote's last valid day in the studio's timezone.
  */
-export default class PublicDepositTransformer extends BaseTransformer<DepositPage> {
+export default class PublicDepositTransformer extends BaseTransformer<
+	DepositPage & { online: OnlineState }
+> {
 	toObject() {
 		const page = this.resource;
 		const payBy = validUntil(page.quote.expiresAt, page.timezone);
@@ -44,6 +47,7 @@ export default class PublicDepositTransformer extends BaseTransformer<DepositPag
 				page.nextSession && startsAt
 					? { startsAt, artistName: page.nextSession.artistName }
 					: null,
+			onlinePayment: page.online,
 		};
 	}
 }

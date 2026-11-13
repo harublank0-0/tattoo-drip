@@ -8,6 +8,7 @@ import {
 	Inbox,
 	type LucideIcon,
 	Package,
+	Receipt,
 	Settings,
 	Users,
 } from "lucide-react";
@@ -23,6 +24,7 @@ export const NAV_ICONS: Record<NavKey, LucideIcon> = {
 	artists: Users,
 	portfolio: Images,
 	inventory: Package,
+	transactions: Receipt,
 	settings: Settings,
 };
 

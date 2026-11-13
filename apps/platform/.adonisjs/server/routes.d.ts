@@ -31,6 +31,9 @@ export type ScannedRoutes = {
     'tenant.inventory.lots.expiry': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inventory.archive': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inventory.restore': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.transactions.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.transactions.export': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.transactions.sync': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.today': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.profile': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -44,6 +47,15 @@ export type ScannedRoutes = {
     'tenant.settings.logo.destroy': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.logo.tile.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.online_payments': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.online_payments.connect': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.online_payments.disconnect': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.billing': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.billing.subscribe': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.billing.cancel': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.billing.change_plan': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.billing.sync': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.billing.pay': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.deposits.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.create': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -143,6 +155,11 @@ export type ScannedRoutes = {
     'account.show': { paramsTuple?: []; params?: {} }
     'account.password.update': { paramsTuple?: []; params?: {} }
     'account.sign_out_others': { paramsTuple?: []; params?: {} }
+    'admin.billing': { paramsTuple?: []; params?: {} }
+    'admin.payments': { paramsTuple?: []; params?: {} }
+    'admin.payments.review': { paramsTuple?: []; params?: {} }
+    'api.v1.webhooks.platform': { paramsTuple?: []; params?: {} }
+    'api.v1.webhooks.studio': { paramsTuple: [ParamValue]; params: {'key': ParamValue} }
     'api.v1.styles.index': { paramsTuple?: []; params?: {} }
     'api.v1.discover.studios.index': { paramsTuple?: []; params?: {} }
     'api.v1.discover.studios.show': { paramsTuple: [ParamValue]; params: {'studio': ParamValue} }
@@ -165,6 +182,7 @@ export type ScannedRoutes = {
     'api.v1.inquiries.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.deposits.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'token': ParamValue} }
     'api.v1.deposits.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'token': ParamValue} }
+    'api.v1.deposits.checkout': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'token': ParamValue} }
   }
   GET: {
     'drive.public.serve': { paramsTuple: [...ParamValue[]]; params: {'*': ParamValue[]} }
@@ -182,11 +200,15 @@ export type ScannedRoutes = {
     'tenant.inventory.export': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.inventory.lots.export': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.inventory.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.transactions.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.transactions.export': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.today': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.profile': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.look': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.online_payments': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.billing': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.create': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.edit': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.messages': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -218,6 +240,8 @@ export type ScannedRoutes = {
     'email_verification.notice': { paramsTuple?: []; params?: {} }
     'onboarding.create': { paramsTuple?: []; params?: {} }
     'account.show': { paramsTuple?: []; params?: {} }
+    'admin.billing': { paramsTuple?: []; params?: {} }
+    'admin.payments': { paramsTuple?: []; params?: {} }
     'api.v1.styles.index': { paramsTuple?: []; params?: {} }
     'api.v1.discover.studios.index': { paramsTuple?: []; params?: {} }
     'api.v1.discover.studios.show': { paramsTuple: [ParamValue]; params: {'studio': ParamValue} }
@@ -255,11 +279,15 @@ export type ScannedRoutes = {
     'tenant.inventory.export': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.inventory.lots.export': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.inventory.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.transactions.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.transactions.export': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.today': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.profile': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.look': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.online_payments': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.billing': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.create': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.edit': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.messages': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -291,6 +319,8 @@ export type ScannedRoutes = {
     'email_verification.notice': { paramsTuple?: []; params?: {} }
     'onboarding.create': { paramsTuple?: []; params?: {} }
     'account.show': { paramsTuple?: []; params?: {} }
+    'admin.billing': { paramsTuple?: []; params?: {} }
+    'admin.payments': { paramsTuple?: []; params?: {} }
     'api.v1.styles.index': { paramsTuple?: []; params?: {} }
     'api.v1.discover.studios.index': { paramsTuple?: []; params?: {} }
     'api.v1.discover.studios.show': { paramsTuple: [ParamValue]; params: {'studio': ParamValue} }
@@ -321,6 +351,13 @@ export type ScannedRoutes = {
     'tenant.inventory.import': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.inventory.movement': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.inventory.restore': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.transactions.sync': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.settings.online_payments.connect': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.billing.subscribe': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.billing.cancel': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.billing.change_plan': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.billing.sync': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.billing.pay': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.payments.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.move': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.closed_days.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -361,8 +398,12 @@ export type ScannedRoutes = {
     'onboarding.store': { paramsTuple?: []; params?: {} }
     'invitations.accept': { paramsTuple?: []; params?: {} }
     'account.sign_out_others': { paramsTuple?: []; params?: {} }
+    'admin.payments.review': { paramsTuple?: []; params?: {} }
+    'api.v1.webhooks.platform': { paramsTuple?: []; params?: {} }
+    'api.v1.webhooks.studio': { paramsTuple: [ParamValue]; params: {'key': ParamValue} }
     'api.v1.inquiries.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.deposits.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'token': ParamValue} }
+    'api.v1.deposits.checkout': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'token': ParamValue} }
   }
   PUT: {
     'tenant.inventory.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
@@ -399,6 +440,7 @@ export type ScannedRoutes = {
     'tenant.inventory.archive': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.cover.destroy': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.logo.destroy': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.settings.online_payments.disconnect': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.settings.payments.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.closed_days.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.members.invitations.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }

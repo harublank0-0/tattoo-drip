@@ -12,6 +12,14 @@
 import { Env } from "@adonisjs/core/env";
 import { checkAppOrigin } from "#services/app_origin";
 import { checkChallengeSecret } from "#services/challenge_secret";
+import {
+	checkAdminEmails,
+	checkCredentialsKey,
+	checkPaybridgeKey,
+	checkPaymentSettings,
+	checkStudioPaymentMode,
+	checkWebhookSecret,
+} from "#services/payment_settings";
 import { checkPlatformOrigins } from "#services/platform_origins";
 import { checkServerKeys } from "#services/server_keys";
 import { checkStorageSettings } from "#services/storage_settings";
@@ -98,6 +106,27 @@ const env = await Env.create(new URL("../", import.meta.url), {
 	// Staff alert emails (TAT-52): unset or true sends them; false keeps the
 	// alerts in the dashboard only (until the sending domain exists, TAT-20).
 	ALERT_EMAILS: Env.schema.boolean.optional(),
+
+	// Online payments through PayBridgeNP (docs/payments-paybridgenp.md).
+	// TattooDrip's own project, for studios' subscriptions: its secret key and
+	// its webhook endpoint's signing secret. Unset, subscription billing is off.
+	PAYBRIDGE_SECRET_KEY: checkPaybridgeKey,
+	PAYBRIDGE_WEBHOOK_SECRET: checkWebhookSecret,
+	// Another API origin (a mock server in development); unset is PayBridgeNP's.
+	PAYBRIDGE_API_URL: Env.schema.string.optional({ format: "url", tld: false }),
+	// Studios' own customer payments: disabled (default), sandbox or live.
+	STUDIO_ONLINE_PAYMENTS: checkStudioPaymentMode,
+	// Encrypts studios' PayBridgeNP keys at rest: 32 bytes in base64.
+	PAYMENT_CREDENTIALS_KEY: checkCredentialsKey,
+	// Accounts that may open /admin (billing, studio payment reviews).
+	PLATFORM_ADMIN_EMAILS: checkAdminEmails,
+});
+
+checkPaymentSettings({
+	platformKey: env.get("PAYBRIDGE_SECRET_KEY") !== undefined,
+	webhookSecret: env.get("PAYBRIDGE_WEBHOOK_SECRET") !== undefined,
+	studioMode: env.get("STUDIO_ONLINE_PAYMENTS"),
+	credentialsKey: env.get("PAYMENT_CREDENTIALS_KEY") !== undefined,
 });
 
 // In production the dashboard's origin is https and off the studio pages'

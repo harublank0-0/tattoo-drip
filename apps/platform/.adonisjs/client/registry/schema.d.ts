@@ -331,6 +331,42 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inventory_controller').default['restore']>>>
     }
   }
+  'tenant.transactions.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/transactions'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/transactions_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/transactions_controller').default['index']>>>
+    }
+  }
+  'tenant.transactions.export': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/transactions/export.csv'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/transactions_controller').default['exportCsv']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/transactions_controller').default['exportCsv']>>>
+    }
+  }
+  'tenant.transactions.sync': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/transactions/:id/sync'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/transactions_controller').default['sync']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/transactions_controller').default['sync']>>>
+    }
+  }
   'tenant.today': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/today'
@@ -485,6 +521,114 @@ export interface Registry {
       query: {}
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/payment_methods_controller').default['index']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/payment_methods_controller').default['index']>>>
+    }
+  }
+  'tenant.settings.online_payments': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/settings/online-payments'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/online_payments_controller').default['show']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/online_payments_controller').default['show']>>>
+    }
+  }
+  'tenant.settings.online_payments.connect': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/settings/online-payments'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/payments/validators/gateway').connectGatewayValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/payments/validators/gateway').connectGatewayValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/online_payments_controller').default['connect']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/online_payments_controller').default['connect']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.settings.online_payments.disconnect': {
+    methods: ["DELETE"]
+    pattern: '/t/:tenant/settings/online-payments'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/online_payments_controller').default['disconnect']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/online_payments_controller').default['disconnect']>>>
+    }
+  }
+  'tenant.settings.billing': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/settings/billing'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/billing_controller').default['show']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/billing_controller').default['show']>>>
+    }
+  }
+  'tenant.settings.billing.subscribe': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/settings/billing/subscription'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/billing/validators/billing').planChoiceValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/billing/validators/billing').planChoiceValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/billing_controller').default['subscribe']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/billing_controller').default['subscribe']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.settings.billing.cancel': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/settings/billing/subscription/cancel'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/billing_controller').default['cancel']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/billing_controller').default['cancel']>>>
+    }
+  }
+  'tenant.settings.billing.change_plan': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/settings/billing/subscription/plan'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/billing/validators/billing').planChoiceValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/billing/validators/billing').planChoiceValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/billing_controller').default['changePlan']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/billing_controller').default['changePlan']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.settings.billing.sync': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/settings/billing/sync'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/billing_controller').default['sync']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/billing_controller').default['sync']>>>
+    }
+  }
+  'tenant.settings.billing.pay': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/settings/billing/invoices/:id/pay'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/billing_controller').default['pay']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/billing_controller').default['pay']>>>
     }
   }
   'tenant.settings.deposits.update': {
@@ -1675,6 +1819,66 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/account_controller').default['signOutOthers']>>>
     }
   }
+  'admin.billing': {
+    methods: ["GET","HEAD"]
+    pattern: '/admin/billing'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_controller').default['billingIndex']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_controller').default['billingIndex']>>>
+    }
+  }
+  'admin.payments': {
+    methods: ["GET","HEAD"]
+    pattern: '/admin/payments'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_controller').default['gatewaysIndex']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_controller').default['gatewaysIndex']>>>
+    }
+  }
+  'admin.payments.review': {
+    methods: ["POST"]
+    pattern: '/admin/payments/review'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_controller').default['review']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_controller').default['review']>>>
+    }
+  }
+  'api.v1.webhooks.platform': {
+    methods: ["POST"]
+    pattern: '/api/v1/webhooks/paybridgenp/platform'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/paybridge_webhooks_controller').default['platform']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/paybridge_webhooks_controller').default['platform']>>>
+    }
+  }
+  'api.v1.webhooks.studio': {
+    methods: ["POST"]
+    pattern: '/api/v1/webhooks/paybridgenp/studios/:key'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { key: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/paybridge_webhooks_controller').default['studio']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/paybridge_webhooks_controller').default['studio']>>>
+    }
+  }
   'api.v1.styles.index': {
     methods: ["GET","HEAD"]
     pattern: '/api/v1/styles'
@@ -1937,6 +2141,18 @@ export interface Registry {
       query: ExtractQuery<InferInput<(typeof import('#modules/payments/validators/deposit_proof').depositProofValidator)>>
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_deposits_controller').default['store']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_deposits_controller').default['store']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'api.v1.deposits.checkout': {
+    methods: ["POST"]
+    pattern: '/api/v1/tenants/:tenant/deposits/:token/checkout'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; token: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_deposits_controller').default['checkout']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_deposits_controller').default['checkout']>>>
     }
   }
 }

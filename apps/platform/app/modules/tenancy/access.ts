@@ -29,6 +29,12 @@ export const TENANT_ROUTE_ROLES = {
 	// never requests, money, the setup or the pilot numbers.
 	"tenant.today": MEMBERS,
 
+	// The studio's customer-side money records and income (TransactionService
+	// scopes every read to the tenant): owners only, like payments.
+	"tenant.transactions.index": OWNERS,
+	"tenant.transactions.export": OWNERS,
+	"tenant.transactions.sync": OWNERS,
+
 	"tenant.inventory.index": MEMBERS,
 	"tenant.inventory.store": OWNERS,
 	"tenant.inventory.export": OWNERS,
@@ -57,6 +63,17 @@ export const TENANT_ROUTE_ROLES = {
 	"tenant.settings.logo.destroy": OWNERS,
 	"tenant.settings.logo.tile.update": OWNERS,
 	"tenant.settings.payments": OWNERS,
+	// The studio's own PayBridgeNP connection and its TattooDrip subscription
+	// (docs/payments-paybridgenp.md): money, so owners only.
+	"tenant.settings.online_payments": OWNERS,
+	"tenant.settings.online_payments.connect": OWNERS,
+	"tenant.settings.online_payments.disconnect": OWNERS,
+	"tenant.settings.billing": OWNERS,
+	"tenant.settings.billing.subscribe": OWNERS,
+	"tenant.settings.billing.cancel": OWNERS,
+	"tenant.settings.billing.change_plan": OWNERS,
+	"tenant.settings.billing.sync": OWNERS,
+	"tenant.settings.billing.pay": OWNERS,
 	"tenant.settings.deposits.update": OWNERS,
 	"tenant.settings.payments.create": OWNERS,
 	"tenant.settings.payments.store": OWNERS,

@@ -69,7 +69,10 @@ export type ApiErrorCode =
 	| "challenge_unavailable"
 	// submitDepositProof (TAT-65)
 	| "deposit_not_due"
-	| "deposit_changed";
+	| "deposit_changed"
+	// startDepositCheckout (docs/payments-paybridgenp.md)
+	| "online_payment_unavailable"
+	| "payment_provider_unavailable";
 
 export type ErrorKind = { status: number; code: string; message: string };
 
@@ -175,6 +178,18 @@ export const API_ERRORS: Record<ApiErrorCode, ErrorKind> = {
 		code: "deposit_changed",
 		message:
 			"The deposit amount changed. Check the new amount before you upload.",
+	},
+	online_payment_unavailable: {
+		status: 409,
+		code: "online_payment_unavailable",
+		message:
+			"Online payment isn't available for this deposit. Pay one of the other ways on this page.",
+	},
+	payment_provider_unavailable: {
+		status: 503,
+		code: "payment_provider_unavailable",
+		message:
+			"The payment service didn't answer. Nothing was charged; try again in a minute.",
 	},
 };
 

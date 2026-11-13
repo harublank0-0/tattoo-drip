@@ -84,6 +84,7 @@
 		"@boringnode/queue": "0.6.0",
 		"@inertiajs/core": "^3.7.1",
 		"@inertiajs/react": "^3.7.1",
+		"@paybridge-np/sdk": "5.7.0",
 		"@tuyau/core": "^1.2.2",
 		"@vinejs/vine": "^4.4.0",
 		"class-variance-authority": "^0.7.1",

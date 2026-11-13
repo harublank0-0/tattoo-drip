@@ -16,11 +16,16 @@
 */
 
 import app from "@adonisjs/core/services/app";
+import ReconcilePaymentsJob from "#modules/payments/jobs/reconcile_payments_job";
 import SweepExpiredQuotesJob from "#modules/projects/jobs/sweep_expired_quotes_job";
 
 if (app.getMode() === "run") {
 	await SweepExpiredQuotesJob.schedule({})
 		.id(SweepExpiredQuotesJob.scheduleId)
 		.cron(SweepExpiredQuotesJob.cron)
+		.run();
+	await ReconcilePaymentsJob.schedule({})
+		.id(ReconcilePaymentsJob.scheduleId)
+		.cron(ReconcilePaymentsJob.cron)
 		.run();
 }

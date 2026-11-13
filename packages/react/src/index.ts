@@ -24,6 +24,7 @@ export {
 	useFlashDesign,
 	usePlacements,
 	useServices,
+	useStartDepositCheckout,
 	useStudio,
 	useStyles,
 	useSubmitDepositProof,

@@ -35,6 +35,8 @@ export type DepositPaymentMethod = Schemas["DepositPaymentMethod"];
 export type DepositPage = Schemas["DepositPage"];
 export type DepositSession = Schemas["DepositSession"];
 export type DepositProofForm = Schemas["DepositProofForm"];
+export type DepositOnlinePayment = Schemas["DepositOnlinePayment"];
+export type DepositCheckout = Schemas["DepositCheckout"];
 
 export type ListServicesQuery = NonNullable<
 	operations["listServices"]["parameters"]["query"]

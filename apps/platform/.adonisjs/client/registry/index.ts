@@ -168,6 +168,24 @@ const routes = {
     tokens: [{"old":"/t/:tenant/inventory/:id/restore","type":0,"val":"t","end":""},{"old":"/t/:tenant/inventory/:id/restore","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/inventory/:id/restore","type":0,"val":"inventory","end":""},{"old":"/t/:tenant/inventory/:id/restore","type":1,"val":"id","end":""},{"old":"/t/:tenant/inventory/:id/restore","type":0,"val":"restore","end":""}],
     types: placeholder as Registry['tenant.inventory.restore']['types'],
   },
+  'tenant.transactions.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/transactions',
+    tokens: [{"old":"/t/:tenant/transactions","type":0,"val":"t","end":""},{"old":"/t/:tenant/transactions","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/transactions","type":0,"val":"transactions","end":""}],
+    types: placeholder as Registry['tenant.transactions.index']['types'],
+  },
+  'tenant.transactions.export': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/transactions/export.csv',
+    tokens: [{"old":"/t/:tenant/transactions/export.csv","type":0,"val":"t","end":""},{"old":"/t/:tenant/transactions/export.csv","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/transactions/export.csv","type":0,"val":"transactions","end":""},{"old":"/t/:tenant/transactions/export.csv","type":0,"val":"export.csv","end":""}],
+    types: placeholder as Registry['tenant.transactions.export']['types'],
+  },
+  'tenant.transactions.sync': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/transactions/:id/sync',
+    tokens: [{"old":"/t/:tenant/transactions/:id/sync","type":0,"val":"t","end":""},{"old":"/t/:tenant/transactions/:id/sync","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/transactions/:id/sync","type":0,"val":"transactions","end":""},{"old":"/t/:tenant/transactions/:id/sync","type":1,"val":"id","end":""},{"old":"/t/:tenant/transactions/:id/sync","type":0,"val":"sync","end":""}],
+    types: placeholder as Registry['tenant.transactions.sync']['types'],
+  },
   'tenant.today': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/today',
@@ -245,6 +263,60 @@ const routes = {
     pattern: '/t/:tenant/settings/payments',
     tokens: [{"old":"/t/:tenant/settings/payments","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/payments","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/payments","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/payments","type":0,"val":"payments","end":""}],
     types: placeholder as Registry['tenant.settings.payments']['types'],
+  },
+  'tenant.settings.online_payments': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/settings/online-payments',
+    tokens: [{"old":"/t/:tenant/settings/online-payments","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/online-payments","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/online-payments","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/online-payments","type":0,"val":"online-payments","end":""}],
+    types: placeholder as Registry['tenant.settings.online_payments']['types'],
+  },
+  'tenant.settings.online_payments.connect': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/settings/online-payments',
+    tokens: [{"old":"/t/:tenant/settings/online-payments","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/online-payments","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/online-payments","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/online-payments","type":0,"val":"online-payments","end":""}],
+    types: placeholder as Registry['tenant.settings.online_payments.connect']['types'],
+  },
+  'tenant.settings.online_payments.disconnect': {
+    methods: ["DELETE"],
+    pattern: '/t/:tenant/settings/online-payments',
+    tokens: [{"old":"/t/:tenant/settings/online-payments","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/online-payments","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/online-payments","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/online-payments","type":0,"val":"online-payments","end":""}],
+    types: placeholder as Registry['tenant.settings.online_payments.disconnect']['types'],
+  },
+  'tenant.settings.billing': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/settings/billing',
+    tokens: [{"old":"/t/:tenant/settings/billing","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/billing","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/billing","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/billing","type":0,"val":"billing","end":""}],
+    types: placeholder as Registry['tenant.settings.billing']['types'],
+  },
+  'tenant.settings.billing.subscribe': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/settings/billing/subscription',
+    tokens: [{"old":"/t/:tenant/settings/billing/subscription","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/billing/subscription","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/billing/subscription","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/billing/subscription","type":0,"val":"billing","end":""},{"old":"/t/:tenant/settings/billing/subscription","type":0,"val":"subscription","end":""}],
+    types: placeholder as Registry['tenant.settings.billing.subscribe']['types'],
+  },
+  'tenant.settings.billing.cancel': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/settings/billing/subscription/cancel',
+    tokens: [{"old":"/t/:tenant/settings/billing/subscription/cancel","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/billing/subscription/cancel","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/billing/subscription/cancel","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/billing/subscription/cancel","type":0,"val":"billing","end":""},{"old":"/t/:tenant/settings/billing/subscription/cancel","type":0,"val":"subscription","end":""},{"old":"/t/:tenant/settings/billing/subscription/cancel","type":0,"val":"cancel","end":""}],
+    types: placeholder as Registry['tenant.settings.billing.cancel']['types'],
+  },
+  'tenant.settings.billing.change_plan': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/settings/billing/subscription/plan',
+    tokens: [{"old":"/t/:tenant/settings/billing/subscription/plan","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/billing/subscription/plan","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/billing/subscription/plan","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/billing/subscription/plan","type":0,"val":"billing","end":""},{"old":"/t/:tenant/settings/billing/subscription/plan","type":0,"val":"subscription","end":""},{"old":"/t/:tenant/settings/billing/subscription/plan","type":0,"val":"plan","end":""}],
+    types: placeholder as Registry['tenant.settings.billing.change_plan']['types'],
+  },
+  'tenant.settings.billing.sync': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/settings/billing/sync',
+    tokens: [{"old":"/t/:tenant/settings/billing/sync","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/billing/sync","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/billing/sync","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/billing/sync","type":0,"val":"billing","end":""},{"old":"/t/:tenant/settings/billing/sync","type":0,"val":"sync","end":""}],
+    types: placeholder as Registry['tenant.settings.billing.sync']['types'],
+  },
+  'tenant.settings.billing.pay': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/settings/billing/invoices/:id/pay',
+    tokens: [{"old":"/t/:tenant/settings/billing/invoices/:id/pay","type":0,"val":"t","end":""},{"old":"/t/:tenant/settings/billing/invoices/:id/pay","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/settings/billing/invoices/:id/pay","type":0,"val":"settings","end":""},{"old":"/t/:tenant/settings/billing/invoices/:id/pay","type":0,"val":"billing","end":""},{"old":"/t/:tenant/settings/billing/invoices/:id/pay","type":0,"val":"invoices","end":""},{"old":"/t/:tenant/settings/billing/invoices/:id/pay","type":1,"val":"id","end":""},{"old":"/t/:tenant/settings/billing/invoices/:id/pay","type":0,"val":"pay","end":""}],
+    types: placeholder as Registry['tenant.settings.billing.pay']['types'],
   },
   'tenant.settings.deposits.update': {
     methods: ["PUT"],
@@ -840,6 +912,36 @@ const routes = {
     tokens: [{"old":"/account/sign-out-others","type":0,"val":"account","end":""},{"old":"/account/sign-out-others","type":0,"val":"sign-out-others","end":""}],
     types: placeholder as Registry['account.sign_out_others']['types'],
   },
+  'admin.billing': {
+    methods: ["GET","HEAD"],
+    pattern: '/admin/billing',
+    tokens: [{"old":"/admin/billing","type":0,"val":"admin","end":""},{"old":"/admin/billing","type":0,"val":"billing","end":""}],
+    types: placeholder as Registry['admin.billing']['types'],
+  },
+  'admin.payments': {
+    methods: ["GET","HEAD"],
+    pattern: '/admin/payments',
+    tokens: [{"old":"/admin/payments","type":0,"val":"admin","end":""},{"old":"/admin/payments","type":0,"val":"payments","end":""}],
+    types: placeholder as Registry['admin.payments']['types'],
+  },
+  'admin.payments.review': {
+    methods: ["POST"],
+    pattern: '/admin/payments/review',
+    tokens: [{"old":"/admin/payments/review","type":0,"val":"admin","end":""},{"old":"/admin/payments/review","type":0,"val":"payments","end":""},{"old":"/admin/payments/review","type":0,"val":"review","end":""}],
+    types: placeholder as Registry['admin.payments.review']['types'],
+  },
+  'api.v1.webhooks.platform': {
+    methods: ["POST"],
+    pattern: '/api/v1/webhooks/paybridgenp/platform',
+    tokens: [{"old":"/api/v1/webhooks/paybridgenp/platform","type":0,"val":"api","end":""},{"old":"/api/v1/webhooks/paybridgenp/platform","type":0,"val":"v1","end":""},{"old":"/api/v1/webhooks/paybridgenp/platform","type":0,"val":"webhooks","end":""},{"old":"/api/v1/webhooks/paybridgenp/platform","type":0,"val":"paybridgenp","end":""},{"old":"/api/v1/webhooks/paybridgenp/platform","type":0,"val":"platform","end":""}],
+    types: placeholder as Registry['api.v1.webhooks.platform']['types'],
+  },
+  'api.v1.webhooks.studio': {
+    methods: ["POST"],
+    pattern: '/api/v1/webhooks/paybridgenp/studios/:key',
+    tokens: [{"old":"/api/v1/webhooks/paybridgenp/studios/:key","type":0,"val":"api","end":""},{"old":"/api/v1/webhooks/paybridgenp/studios/:key","type":0,"val":"v1","end":""},{"old":"/api/v1/webhooks/paybridgenp/studios/:key","type":0,"val":"webhooks","end":""},{"old":"/api/v1/webhooks/paybridgenp/studios/:key","type":0,"val":"paybridgenp","end":""},{"old":"/api/v1/webhooks/paybridgenp/studios/:key","type":0,"val":"studios","end":""},{"old":"/api/v1/webhooks/paybridgenp/studios/:key","type":1,"val":"key","end":""}],
+    types: placeholder as Registry['api.v1.webhooks.studio']['types'],
+  },
   'api.v1.styles.index': {
     methods: ["GET","HEAD"],
     pattern: '/api/v1/styles',
@@ -971,6 +1073,12 @@ const routes = {
     pattern: '/api/v1/tenants/:tenant/deposits/:token',
     tokens: [{"old":"/api/v1/tenants/:tenant/deposits/:token","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/deposits/:token","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/deposits/:token","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/deposits/:token","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/deposits/:token","type":0,"val":"deposits","end":""},{"old":"/api/v1/tenants/:tenant/deposits/:token","type":1,"val":"token","end":""}],
     types: placeholder as Registry['api.v1.deposits.store']['types'],
+  },
+  'api.v1.deposits.checkout': {
+    methods: ["POST"],
+    pattern: '/api/v1/tenants/:tenant/deposits/:token/checkout',
+    tokens: [{"old":"/api/v1/tenants/:tenant/deposits/:token/checkout","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/deposits/:token/checkout","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/deposits/:token/checkout","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/deposits/:token/checkout","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/deposits/:token/checkout","type":0,"val":"deposits","end":""},{"old":"/api/v1/tenants/:tenant/deposits/:token/checkout","type":1,"val":"token","end":""},{"old":"/api/v1/tenants/:tenant/deposits/:token/checkout","type":0,"val":"checkout","end":""}],
+    types: placeholder as Registry['api.v1.deposits.checkout']['types'],
   },
 } as const satisfies Record<string, AdonisEndpoint>
 

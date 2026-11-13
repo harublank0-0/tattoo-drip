@@ -40,7 +40,9 @@ server.use([
 router.use([
 	// The public API's per-caller limits, before any body is read (TAT-38).
 	() => import("#middleware/public_gate_middleware"),
-	() => import("@adonisjs/core/bodyparser_middleware"),
+	// The package's body parser, except on the payment webhooks, whose
+	// handler reads the raw body for its signature check.
+	() => import("#middleware/body_parser_middleware"),
 	// The session and shield (CSRF) skip the public API, which is stateless
 	// and cookieless (TAT-32).
 	() => import("#middleware/web_session_middleware"),
@@ -69,4 +71,5 @@ export const middleware = router.named({
 	apiLimit: () => import("#middleware/api_limit_middleware"),
 	intakeGuard: () => import("#middleware/intake_guard_middleware"),
 	verifiedEmail: () => import("#middleware/verified_email_middleware"),
+	platformAdmin: () => import("#middleware/platform_admin_middleware"),
 });

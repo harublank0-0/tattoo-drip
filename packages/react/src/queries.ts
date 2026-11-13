@@ -176,4 +176,14 @@ export const tattooMutations = {
 				queryClient.setQueryData(queryKey, page);
 			},
 		}),
+	/**
+	 * Starts an online deposit checkout. Never retried: the API reuses an
+	 * open checkout for the same amount anyway, and the caller then leaves
+	 * for the returned `checkoutUrl`.
+	 */
+	startDepositCheckout: (client: TattooClient, token: string) =>
+		mutationOptions({
+			mutationFn: () => client.deposits.startCheckout(token),
+			retry: false,
+		}),
 };

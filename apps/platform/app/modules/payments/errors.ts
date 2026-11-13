@@ -118,3 +118,45 @@ export class PaymentRuleError extends Error {
 		this.name = "PaymentRuleError";
 	}
 }
+
+export type GatewayRule =
+	| "switched_off"
+	| "key_format"
+	| "key_mode"
+	| "key_rejected"
+	| "key_scope"
+	| "platform_account"
+	| "provider_unavailable"
+	| "unavailable"
+	| "not_due"
+	| "amount_out_of_range"
+	| "not_ours";
+
+/** The owner's words for each refusal of the studio's online payments. */
+export const GATEWAY_MESSAGES: Record<GatewayRule, string> = {
+	switched_off: "Online payments aren't open to studios yet.",
+	key_format:
+		"Paste the project's secret key from the PayBridgeNP dashboard: it starts with sk_test_ or sk_live_.",
+	key_mode:
+		"Use a key of the right mode: TattooDrip takes live payments only with sk_live_ keys, and sandbox ones with sk_test_ keys.",
+	key_rejected: "PayBridgeNP didn't accept this key. Copy it again.",
+	key_scope:
+		"This key can't read the account or register a webhook. Use a full secret key.",
+	platform_account:
+		"This is TattooDrip's own PayBridgeNP account. Connect your studio's own project.",
+	provider_unavailable:
+		"PayBridgeNP didn't answer. Nothing changed; try again in a minute.",
+	unavailable: "Online payment isn't available for this deposit.",
+	not_due: "This deposit can't be paid online now.",
+	amount_out_of_range:
+		"Online payment takes NPR 10 to NPR 10,00,000; pay this deposit another way.",
+	not_ours: "This payment isn't one of this studio's.",
+};
+
+/** A refusal of the studio's online payments; `reason` keys GATEWAY_MESSAGES. */
+export class GatewayRuleError extends Error {
+	constructor(readonly reason: GatewayRule) {
+		super(GATEWAY_MESSAGES[reason]);
+		this.name = "GatewayRuleError";
+	}
+}

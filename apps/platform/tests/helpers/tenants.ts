@@ -10,6 +10,7 @@ import InventoryService from "#modules/inventory/services/inventory_service";
 import ImageService from "#modules/media/services/image_service";
 import MessageTemplate from "#modules/notifications/models/message_template";
 import StaffAlert from "#modules/notifications/models/staff_alert";
+import GatewayCheckout from "#modules/payments/models/gateway_checkout";
 import PaymentMethodService from "#modules/payments/services/payment_method_service";
 import OpeningHoursService from "#modules/scheduling/services/opening_hours_service";
 import type Tenant from "#modules/tenancy/models/tenant";
@@ -19,6 +20,8 @@ import InvitationService from "#modules/tenancy/services/invitation_service";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { dbClient, withDbContext } from "#services/db_context";
 import { depositServices } from "#tests/helpers/deposits";
+import { connectStudio, seedBilling } from "#tests/helpers/online_payments";
+import { paybridge } from "#tests/helpers/paybridge";
 import {
 	makeInquiry,
 	makePayment,
@@ -422,6 +425,17 @@ export async function seededStudio(slug: string, name: string) {
 			.where("user_id", artist.id)
 			.firstOrFail(),
 	);
+	// Online payments (docs/payments-paybridgenp.md).
+	const billing = await seedBilling(tenant);
+	const gateway = await connectStudio(tenant, owner.id, { name: slug });
+	const gatewayCheckout = await inTenant(tenant, () =>
+		seedExpiredCheckout(
+			tenant,
+			gateway.account.id,
+			deposit.project.id,
+			gateway.key,
+		),
+	);
 	// Another city than the seeded one, for the Discover city route's case.
 	const { rows: otherCity } = await dbClient().rawQuery(
 		"select id from places where country_code = 'NP' and slug = 'pokhara'",
@@ -487,6 +501,13 @@ export async function seededStudio(slug: string, name: string) {
 		// The flash routes' :id resource and the public flash reads' (TAT-129):
 		// a shown design of the artist profile.
 		flashDesign,
+		// Online payments (docs/payments-paybridgenp.md): the Billing routes'
+		// open invoice, the studio's verified PayBridgeNP connection (its key
+		// is known to the fake provider) and an expired online checkout, the
+		// Transactions "Check status" route's :id.
+		billingInvoice: billing.invoice,
+		gatewayKey: gateway.key,
+		gatewayCheckout,
 	};
 }
 
@@ -533,6 +554,42 @@ function seedWorkPhoto(
 }
 
 export type Studio = Awaited<ReturnType<typeof seededStudio>>;
+
+/** An expired online checkout of the deposit project, as a past attempt leaves it. */
+async function seedExpiredCheckout(
+	tenant: Tenant,
+	accountId: string,
+	projectId: string,
+	key: string,
+) {
+	const sessionId = `cs_seed_${randomUUID()}`;
+	paybridge.sessions.set(sessionId, {
+		id: sessionId,
+		status: "expired",
+		amount: 300_000,
+		currency: "NPR",
+		paymentId: null,
+		metadata: {},
+		expiresAt: DateTime.utc().minus({ days: 1 }).toISO(),
+		livemode: false,
+		key,
+		url: "https://checkout.paybridgenp.com/checkout/seed",
+	});
+	return GatewayCheckout.create({
+		tenantId: tenant.id,
+		accountId,
+		projectId,
+		purpose: "deposit",
+		amount: 300_000,
+		currency: "NPR",
+		livemode: false,
+		idempotencyKey: randomUUID(),
+		providerSessionId: sessionId,
+		checkoutUrl: "https://checkout.paybridgenp.com/checkout/seed",
+		status: "expired",
+		expiresAt: DateTime.utc().minus({ days: 1 }),
+	});
+}
 
 /**
  * Two studios, each with an owner, an artist, two payment methods
