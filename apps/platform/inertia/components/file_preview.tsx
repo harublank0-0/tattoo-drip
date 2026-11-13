@@ -52,9 +52,11 @@ export type PreviewFit = "cover" | "contain";
 /**
  * A chosen file's picture: decoration beside its name (`alt=""`), or an empty
  * box for a file that has none to show (a wrong one). A video (video angles)
- * is a muted `<video>` of the same object URL, never played: the browser
- * shows its first frame, and reads its length (`onDuration`, in ms) from
- * its metadata, so a clip over the limit is named before anything is sent.
+ * is a muted `<video>` of the same object URL (with `#t=0.001`, so iOS shows
+ * a first frame), never played: the browser shows its first frame, and
+ * reads its length (`onDuration`, in ms, possibly not finite) from its
+ * metadata, so a clip over the limit is named before anything is sent. A
+ * video it can't open shows the empty box, like an image.
  */
 export function FileThumb({
 	url,
@@ -81,7 +83,10 @@ export function FileThumb({
 		>
 			{url && broken !== url && video ? (
 				<video
-					src={url}
+					// `#t=0.001`: iOS Safari shows no frame of a video it hasn't played
+					// unless the address asks for a time; a media fragment on the object
+					// URL reads the same file (the URL itself is what gets revoked).
+					src={`${url}#t=0.001`}
 					muted
 					playsInline
 					preload="metadata"

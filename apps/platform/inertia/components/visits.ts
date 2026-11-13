@@ -42,8 +42,25 @@ export function focusField(field: HTMLElement | null): void {
 	field.scrollIntoView?.({ block: "center" });
 }
 
+/**
+ * A visit the person did not ask for (video angles: the portfolio asking
+ * again while a video is processing) carries this header: a lost connection
+ * gives it no toast, and it leaves the flash toast where it is.
+ */
+export const QUIET_VISIT_HEADER = "X-Quiet-Visit";
+
 /** What Inertia 3.8 puts in the events: `start` and `finish` carry the visit itself. */
-type VisitInfo = { id?: string; method?: string; url?: unknown };
+type VisitInfo = {
+	id?: string;
+	method?: string;
+	url?: unknown;
+	headers?: Record<string, string>;
+};
+
+/** Whether a visit is a quiet one (QUIET_VISIT_HEADER). */
+export function isQuietVisit(visit: VisitInfo | undefined): boolean {
+	return visit?.headers?.[QUIET_VISIT_HEADER] === "1";
+}
 type VisitEvent = {
 	detail: { visit?: VisitInfo; visitId?: string; error?: unknown };
 };
@@ -141,7 +158,11 @@ export function watchVisits(
 				at >= 0 ? at : lost.findIndex((entry) => entry.address === "");
 			if (unnamed >= 0) {
 				lost.splice(unnamed, 1);
-				notify(connectionLostText(visit?.method ?? "get"));
+				// A quiet visit (a poll) that lost the connection says nothing: the
+				// next one tries again, and the person did nothing.
+				if (!isQuietVisit(visit)) {
+					notify(connectionLostText(visit?.method ?? "get"));
+				}
 			}
 			const id = visit?.id;
 			if (id) {

@@ -154,13 +154,20 @@ export default class WorkPhotosController {
 			// A file could not be deleted: the photo stays (and is still public),
 			// so say so and let the owner try again.
 			if (!(error instanceof ImageDeleteError)) throw error;
-			ctx.session.flash("error", "Couldn't remove the photo, try again.");
+			ctx.session.flash(
+				"error",
+				`Couldn't remove the ${photo.kind === "video" ? "video" : "photo"}, try again.`,
+			);
 			return this.toEditPage(ctx, tenant.slug, artist.id);
 		}
 
 		ctx.session.flash(
 			"success",
-			removed > 1 ? `Tattoo removed: ${removed} photos.` : "Photo removed.",
+			removed > 1
+				? `Tattoo removed: ${removed} photos.`
+				: photo.kind === "video"
+					? "Video removed."
+					: "Photo removed.",
 		);
 		return this.toEditPage(ctx, tenant.slug, artist.id);
 	}

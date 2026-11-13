@@ -26,6 +26,7 @@ import {
 	DROP_HINT,
 	fileKey,
 	fileProblem,
+	interruptedText,
 	isVideoFile,
 	MAX_TATTOO_PHOTOS,
 	type PortfolioArtist,
@@ -38,11 +39,13 @@ import {
 	tattooUploadButton,
 	tattooUploadProblem,
 	UPLOAD_INTRO,
+	UPLOAD_UNUSABLE,
 	uploadButton,
 	uploadProblem,
 	videoLabel,
 	videoLengthProblem,
 	videoType,
+	WRONG_VIDEO_FORMAT,
 } from "~/components/portfolio";
 import StylePicker from "~/components/style_picker";
 import { Button } from "~/components/ui/button";
@@ -69,8 +72,10 @@ type Item = {
 	file: File;
 	/** Video angles: a video (only for a tattoo) goes up the video's way. */
 	kind: "photo" | "video";
-	/** A video's length as the browser read it, once it has. */
+	/** A video's length as the browser read it, once it has (finite only). */
 	durationMs?: number;
+	/** A video whose upload arrived but whose finish failed: only the finish goes again. */
+	token?: string;
 	previewUrl: string;
 	alt: string;
 	/**
@@ -107,36 +112,56 @@ function sendPhoto(
 	});
 }
 
+/** How a video's send ended: like a photo's, plus the token of an upload that arrived (kept to retry only the finish) or `aborted`. */
+type VideoOutcome = (UploadOutcome & { token?: string }) | { kind: "aborted" };
+
 /**
  * Sends one video to a tattoo (video angles): signed, PUT straight to
  * storage with its progress (stageVideo), then finished with an Inertia visit
  * to the video route with its description and `back`, so the answer is the
- * portfolio with the new video processing. How it ended, like sendPhoto.
+ * portfolio with the new video processing. With `token` (an upload that
+ * already arrived, whose finish failed) only the finish goes again. Once
+ * `signal` aborts (the panel went away) it sends no finish: leaving the page
+ * mid-upload never pulls the person back. A refused finish keeps the token,
+ * unless the server says the upload can't be used.
  */
 async function sendVideo(
 	tenantSlug: string,
 	leadId: string,
 	file: File,
 	data: Record<string, string>,
-	onPercentage: (percentage: number | undefined) => void,
-	onProcessing: () => void,
-): Promise<UploadOutcome> {
-	const type = videoType(file);
-	if (!type)
-		return { kind: "refused", message: "Use an MP4, MOV or WebM video." };
-	const staged = await stageVideo({
-		signUrl: urlFor("tenant.artists.photos.videos.sign", {
-			tenant: tenantSlug,
-			id: leadId,
-		}),
-		file,
-		type,
-		onProgress: onPercentage,
-	});
-	if (staged.kind === "refused") {
-		return { kind: "refused", message: staged.message };
+	{
+		onPercentage,
+		onProcessing,
+		signal,
+		token: arrived,
+	}: {
+		onPercentage: (percentage: number | undefined) => void;
+		onProcessing: () => void;
+		signal: AbortSignal;
+		token?: string;
+	},
+): Promise<VideoOutcome> {
+	let token = arrived;
+	if (!token) {
+		const type = videoType(file);
+		if (!type) return { kind: "refused", message: WRONG_VIDEO_FORMAT };
+		const staged = await stageVideo({
+			signUrl: urlFor("tenant.artists.photos.videos.sign", {
+				tenant: tenantSlug,
+				id: leadId,
+			}),
+			file,
+			type,
+			onProgress: onPercentage,
+			signal,
+		});
+		if (staged.kind !== "staged") return staged;
+		token = staged.token;
 	}
+	if (signal.aborted) return { kind: "aborted" };
 	onProcessing();
+	const sent = token;
 	return new Promise((resolve) => {
 		const upload = trackUpload();
 		router.post(
@@ -144,12 +169,19 @@ async function sendVideo(
 				tenant: tenantSlug,
 				id: leadId,
 			}),
-			{ ...data, upload: staged.token },
+			{ ...data, upload: sent },
 			{
 				preserveScroll: true,
 				preserveState: true,
 				...upload.callbacks,
-				onFinish: () => resolve(upload.outcome()),
+				onFinish: () => {
+					const outcome = upload.outcome();
+					resolve(
+						outcome.kind === "refused" && outcome.message !== UPLOAD_UNUSABLE
+							? { ...outcome, token: sent }
+							: outcome,
+					);
+				},
 			},
 		);
 	});
@@ -236,6 +268,15 @@ export default function ArtworkUpload({
 
 	// The previews are object URLs: let go with each item and with the panel.
 	const previews = useObjectUrls();
+
+	// A video's upload stops when the panel goes (the page was left): it then
+	// sends no finish, which would pull the person back to the portfolio.
+	const leaving = useRef<AbortController | null>(null);
+	useEffect(() => {
+		const controller = new AbortController();
+		leaving.current = controller;
+		return () => controller.abort();
+	}, []);
 
 	const artist =
 		artists.find((row) => row.id === (lead ? lead.artistId : artistId)) ?? null;
@@ -338,14 +379,20 @@ export default function ArtworkUpload({
 							lead.id,
 							item.file,
 							{ back, ...(item.alt.trim() ? { alt: item.alt.trim() } : {}) },
-							onPercentage,
-							() =>
-								update(item.key, {
-									state: "processing",
-									percentage: undefined,
-								}),
+							{
+								onPercentage,
+								onProcessing: () =>
+									update(item.key, {
+										state: "processing",
+										percentage: undefined,
+									}),
+								signal: (leaving.current ?? new AbortController()).signal,
+								token: item.token,
+							},
 						)
 					: await sendPhoto(url, data, onPercentage);
+			// The panel went away mid-upload: nothing more is sent, nothing set.
+			if (outcome.kind === "aborted") return;
 			if (outcome.kind === "added") {
 				added += 1;
 				drop(item.key);
@@ -353,8 +400,7 @@ export default function ArtworkUpload({
 				// The cut-off file may have gone through; the ones after it didn't.
 				update(item.key, {
 					state: "unsure",
-					message:
-						"The upload was interrupted while this photo was going, so it may have been added. Check the gallery before sending it again.",
+					message: interruptedText(item.kind),
 					percentage: undefined,
 				});
 				for (const unsent of queue.slice(index + 1)) {
@@ -372,6 +418,16 @@ export default function ArtworkUpload({
 					state: "failed",
 					message: outcome.message,
 					percentage: undefined,
+					// A video that arrived keeps its token: the next Upload sends only
+					// the finish again, not the whole file.
+					...(item.kind === "video"
+						? {
+								token:
+									"token" in outcome && typeof outcome.token === "string"
+										? outcome.token
+										: undefined,
+							}
+						: {}),
 				});
 			}
 		}
@@ -564,6 +620,9 @@ export default function ArtworkUpload({
 									busy={busy}
 									onAlt={(alt) => update(item.key, { alt })}
 									onDuration={(durationMs) => {
+										// A length the browser doesn't know (a WebM from a phone's
+										// recorder reads Infinity) is no length: the server measures.
+										if (!Number.isFinite(durationMs)) return;
 										// The browser's early word on the length; the server measures again.
 										const tooLong = videoLengthProblem(durationMs);
 										update(
@@ -667,7 +726,8 @@ export default function ArtworkUpload({
 					<div className="flex flex-col gap-2">
 						{problem && <FieldError>{problem}</FieldError>}
 						<div className="flex flex-wrap gap-2">
-							<Button type="submit" disabled={busy}>
+							{/* aria-disabled, not disabled, while it goes: focus stays on it for the whole upload (submit ignores a press meanwhile). */}
+							<Button type="submit" aria-disabled={busy || undefined}>
 								{lead
 									? tattooUploadButton(
 											sendable.map((item) => item.kind),

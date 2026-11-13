@@ -581,15 +581,17 @@ export function videoLengthProblem(durationMs: number): string | null {
 		: null;
 }
 
-/** "0:42", "1:00": a video's length. */
+/** "0:42", "1:00": a video's length; "" for one not known (a WebM from a phone's recorder reads Infinity). */
 export function durationText(durationMs: number): string {
-	const seconds = Math.max(0, Math.round(durationMs / 1000));
+	if (!Number.isFinite(durationMs) || durationMs < 0) return "";
+	const seconds = Math.round(durationMs / 1000);
 	return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-/** A video's name in the list: "Video, 0:42", or "Video" before its length is known. */
+/** A video's name in the list: "Video, 0:42", or "Video" while its length is not known. */
 export function videoLabel(durationMs: number | null): string {
-	return durationMs === null ? "Video" : `Video, ${durationText(durationMs)}`;
+	const text = durationMs === null ? "" : durationText(durationMs);
+	return text ? `Video, ${text}` : "Video";
 }
 
 /** Where a video is, as its row says it. */
@@ -598,8 +600,17 @@ export function videoStateText(video: {
 	failure: string | null;
 }): string {
 	if (video.state === "processing") return "Processing…";
-	if (video.state === "ready") return "Ready";
+	if (video.state === "ready") return "Video ready";
 	return `Couldn't process: ${video.failure ?? "try uploading it again."}`;
+}
+
+/** The server's words for a finish whose upload can't be used (VideoUploadError): the token is no good, so the file goes again. */
+export const UPLOAD_UNUSABLE =
+	"This upload can't be used. Choose the video again.";
+
+/** What a row says when its upload was cut off: "this photo" or "this video". */
+export function interruptedText(kind: "photo" | "video"): string {
+	return `The upload was interrupted while this ${kind} was going, so it may have been added. Check the gallery before sending it again.`;
 }
 
 /** Whether any tattoo shown has a video the worker still has: the page then checks again every few seconds. */
@@ -611,24 +622,45 @@ export function anyProcessing(
 	);
 }
 
-/** How often the page asks again while a video is processing. */
-export const VIDEO_POLL_MS = 4000;
+/** The first wait while a video is processing, the longest, and when the page stops asking. */
+export const POLL_FIRST_MS = 4000;
+export const POLL_LONGEST_MS = 30_000;
+export const POLL_GIVE_UP_MS = 30 * 60_000;
 
-/** Why a video's row can't make it the main photo, or move it to the top. */
-export const VIDEO_LEAD_NOTE =
-	"Videos can't be a tattoo's main photo, so they never move to the top.";
+/**
+ * How long the page waits before asking again, the `attempt`-th time (0
+ * first): 4 s, then half as long again each time, up to 30 s. The next ask is
+ * scheduled only once the last has finished, so two are never in flight.
+ */
+export function nextPollDelay(attempt: number): number {
+	const n = Math.max(0, Math.floor(attempt));
+	return Math.min(POLL_LONGEST_MS, Math.round(POLL_FIRST_MS * 1.5 ** n));
+}
 
-/** Why a video's row has no "Remove from this tattoo": on its own it would be a tattoo of one video. */
-export const VIDEO_UNGROUP_NOTE =
-	"A video stays with its tattoo. To take it off, delete it.";
+/** Whether the page has asked for long enough (30 minutes since it started). */
+export function pollGivesUp(startedAt: number, now: number): boolean {
+	return now - startedAt >= POLL_GIVE_UP_MS;
+}
+
+/** What the page says once it stops asking. */
+export const STILL_PROCESSING = "Still processing. Reload the page later.";
+
+/** The one note a tattoo with a video shows: why its videos have fewer buttons. */
+export const VIDEO_NOTE =
+	"Videos stay part of the tattoo and can't be its main photo.";
 
 /** The question before deleting one of a tattoo's videos. */
 export const DELETE_VIDEO_QUESTION =
 	"Delete this video? It leaves the tattoo, clients won't see it any more, and it can't be brought back.";
 
+/** The question before removing a video that couldn't be processed (it was never shown). */
+export const DELETE_FAILED_VIDEO_QUESTION =
+	"Remove this video? It can't be brought back.";
+
 /**
  * Whether the tattoo's order after a move would put a video first, which
- * the server refuses: the move button is then disabled, with VIDEO_LEAD_NOTE.
+ * the server refuses: the move button is then `aria-disabled` (moveButton),
+ * with VIDEO_NOTE.
  */
 export function moveMakesVideoLead(
 	kinds: readonly ("photo" | "video")[],
@@ -766,4 +798,24 @@ export function deleteSizes(
 	return Object.fromEntries(
 		photos.map((photo) => [photo.id, photoTotal(photo)]),
 	);
+}
+
+/**
+ * A move button's state: `disabled` at the ends of the list (where
+ * focusAfterMove never sends focus), `aria-disabled` when the move would
+ * put a video first: such a button can be where focus returns after
+ * another move (a video that moved up to second place keeps focus on its
+ * own "Move earlier"), and a disabled button there would drop focus to the
+ * page.
+ */
+export function moveButton(
+	kinds: readonly ("photo" | "video")[],
+	index: number,
+	direction: "up" | "down",
+): { disabled: boolean; ariaDisabled: boolean } {
+	const end = direction === "up" ? index <= 0 : index >= kinds.length - 1;
+	return {
+		disabled: end,
+		ariaDisabled: !end && moveMakesVideoLead(kinds, index, direction),
+	};
 }

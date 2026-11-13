@@ -7,13 +7,20 @@ import * as visitsModule from "../../../inertia/components/visits.js";
 // `detail.visit` (the visit's own object, with its `id`, `method` and `url`), `error` carries
 // `detail.visitId`, and `networkError` carries only `detail.error`.
 type Detail = {
-	visit?: { id?: string; method?: string; url?: URL };
+	visit?: {
+		id?: string;
+		method?: string;
+		url?: URL;
+		headers?: Record<string, string>;
+	};
 	visitId?: string;
 	errors?: Record<string, string>;
 	error?: unknown;
 };
 type Callback = (event: { detail: Detail }) => boolean | undefined;
 type VisitsModule = {
+	QUIET_VISIT_HEADER: string;
+	isQuietVisit(visit: Detail["visit"]): boolean;
 	PAGE_LOST: string;
 	SAVE_LOST: string;
 	connectionLostText(method: string): string;
@@ -27,6 +34,8 @@ type VisitsModule = {
 	focusField(field: HTMLElement | null): void;
 };
 const {
+	QUIET_VISIT_HEADER,
+	isQuietVisit,
 	PAGE_LOST,
 	SAVE_LOST,
 	connectionLostText,
@@ -88,6 +97,29 @@ function watched() {
 }
 
 test.group("A lost connection (TAT-84)", () => {
+	test("a quiet visit (the portfolio's poll while a video processes) that lost the connection gets no toast; the next visit still does", ({
+		assert,
+	}) => {
+		const { router, toasts } = watched();
+		const quiet = {
+			id: "poll",
+			method: "get",
+			url: new URL(href("/t/s/portfolio")),
+			headers: { [QUIET_VISIT_HEADER]: "1" },
+		};
+		assert.isTrue(isQuietVisit(quiet));
+		assert.isFalse(isQuietVisit({ id: "x" }));
+		router.callbacks.get("start")?.({ detail: { visit: quiet } });
+		router.lose(href("/t/s/portfolio"));
+		router.callbacks.get("finish")?.({ detail: { visit: quiet } });
+		assert.deepEqual(toasts, []);
+
+		router.start("g", "get", "/projects");
+		router.lose(href("/projects"));
+		router.finish("g", "get", "/projects");
+		assert.deepEqual(toasts, [PAGE_LOST]);
+	});
+
 	test("a page load that died says to check the connection", ({ assert }) => {
 		assert.equal(connectionLostText("get"), PAGE_LOST);
 		assert.equal(connectionLostText("GET"), PAGE_LOST);

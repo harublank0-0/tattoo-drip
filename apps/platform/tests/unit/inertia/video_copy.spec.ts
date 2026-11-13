@@ -1,5 +1,7 @@
 import { test } from "@japa/runner";
 import { MAX_VIDEO_BYTES, MAX_VIDEO_MS } from "#modules/media/video";
+// @ts-expect-error TS6305: see above.
+import * as pageLookModule from "../../../inertia/components/page_look.js";
 // @ts-expect-error TS6305: the server project only references the inertia project, so it cannot read its sources and the module is untyped here; `VideoWords` below restates its shape and the inertia project type-checks the real one.
 import * as portfolioModule from "../../../inertia/components/portfolio.js";
 
@@ -40,6 +42,25 @@ type VideoWords = {
 		direction: "up" | "down",
 		noun?: Kind,
 	): string;
+	moveButton(
+		kinds: Kind[],
+		index: number,
+		direction: "up" | "down",
+	): { disabled: boolean; ariaDisabled: boolean };
+	nextPollDelay(attempt: number): number;
+	pollGivesUp(startedAt: number, now: number): boolean;
+	POLL_GIVE_UP_MS: number;
+	STILL_PROCESSING: string;
+	interruptedText(kind: Kind): string;
+	DELETE_FAILED_VIDEO_QUESTION: string;
+	VIDEO_NOTE: string;
+};
+const { focusAfterMove } = pageLookModule as {
+	focusAfterMove(
+		index: number,
+		count: number,
+		direction: "up" | "down",
+	): "up" | "down";
 };
 const p = portfolioModule as VideoWords;
 
@@ -110,7 +131,10 @@ test.group("Video angles: the dashboard's words and rules", () => {
 			p.videoStateText({ state: "processing", failure: null }),
 			"Processing…",
 		);
-		assert.equal(p.videoStateText({ state: "ready", failure: null }), "Ready");
+		assert.equal(
+			p.videoStateText({ state: "ready", failure: null }),
+			"Video ready",
+		);
 		assert.equal(
 			p.videoStateText({
 				state: "failed",
@@ -155,6 +179,76 @@ test.group("Video angles: the dashboard's words and rules", () => {
 		assert.equal(
 			p.tattooUploadButton(["video"], { index: 1, total: 1, percentage: 40 }),
 			"Uploading… 40%",
+		);
+	});
+
+	test("a length the browser doesn't know (Infinity, NaN) is no length: no label, no early refusal", ({
+		assert,
+	}) => {
+		for (const unknown of [Number.POSITIVE_INFINITY, Number.NaN, -1]) {
+			assert.equal(p.videoLabel(unknown), "Video");
+			assert.isNull(p.videoLengthProblem(unknown));
+		}
+	});
+
+	test("the poll waits 4 s, then longer, never past 30 s, and gives up after 30 minutes", ({
+		assert,
+	}) => {
+		const delays = Array.from({ length: 10 }, (_, n) => p.nextPollDelay(n));
+		assert.equal(delays[0], 4000);
+		for (let n = 1; n < delays.length; n++) {
+			assert.isAtLeast(delays[n], delays[n - 1]);
+			assert.isAtMost(delays[n], 30_000);
+		}
+		assert.equal(delays.at(-1), 30_000);
+		assert.isFalse(p.pollGivesUp(0, p.POLL_GIVE_UP_MS - 1));
+		assert.isTrue(p.pollGivesUp(0, p.POLL_GIVE_UP_MS));
+		assert.equal(
+			p.STILL_PROCESSING,
+			"Still processing. Reload the page later.",
+		);
+	});
+
+	test("focus after a move never lands on a disabled button: a move that would put a video first is aria-disabled", ({
+		assert,
+	}) => {
+		const tattoos: Kind[][] = [
+			["photo", "video", "photo"],
+			["photo", "photo", "video"],
+			["photo", "video", "video", "photo"],
+			["photo", "video"],
+		];
+		for (const kinds of tattoos) {
+			for (let index = 0; index < kinds.length; index++) {
+				for (const pressed of ["up", "down"] as const) {
+					const target = focusAfterMove(index, kinds.length, pressed);
+					if (index === 0 && target === "up") continue; // the main photo has no "up"
+					assert.isFalse(
+						p.moveButton(kinds, index, target).disabled,
+						`${kinds.join(",")} row ${index} after ${pressed}`,
+					);
+				}
+			}
+		}
+		assert.deepEqual(p.moveButton(["photo", "video", "photo"], 1, "up"), {
+			disabled: false,
+			ariaDisabled: true,
+		});
+		assert.deepEqual(p.moveButton(["photo", "video"], 1, "down"), {
+			disabled: true,
+			ariaDisabled: false,
+		});
+	});
+
+	test("words for videos say video, and a failed one's question doesn't speak of clients", ({
+		assert,
+	}) => {
+		assert.include(p.interruptedText("video"), "this video");
+		assert.include(p.interruptedText("photo"), "this photo");
+		assert.notMatch(p.DELETE_FAILED_VIDEO_QUESTION, /client/i);
+		assert.equal(
+			p.VIDEO_NOTE,
+			"Videos stay part of the tattoo and can't be its main photo.",
 		);
 	});
 });

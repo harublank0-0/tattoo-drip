@@ -11,10 +11,14 @@
  * imports.
  */
 
-/** How a signed upload ended: the token to finish it with, or why not. */
+/**
+ * How a signed upload ended: the token to finish it with, why not, or
+ * `aborted` (the page went away: the caller sends no finish).
+ */
 export type StagedVideo =
 	| { kind: "staged"; token: string }
-	| { kind: "refused"; message: string };
+	| { kind: "refused"; message: string }
+	| { kind: "aborted" };
 
 const FAILED = "It didn't upload. Try again.";
 
@@ -44,19 +48,25 @@ function messageOf(body: unknown): string | null {
 
 /**
  * Signs and uploads one video. `onProgress` gets the upload's percentage
- * (0 to 100) as the bytes go. Resolves, never rejects.
+ * (0 to 100) as the bytes go. `signal` stops it (the upload panel aborts on
+ * unmount, so leaving the page mid-upload never pulls the person back with
+ * a finish visit): the sign request and the PUT are cancelled and it ends
+ * `aborted`. Resolves, never rejects.
  */
 export async function stageVideo({
 	signUrl,
 	file,
 	type,
 	onProgress,
+	signal,
 }: {
 	signUrl: string;
 	file: Blob;
 	type: string;
 	onProgress: (percentage: number) => void;
+	signal?: AbortSignal;
 }): Promise<StagedVideo> {
+	if (signal?.aborted) return { kind: "aborted" };
 	let signed: {
 		upload: { method: string; url: string; headers: Record<string, string> };
 		token: string;
@@ -72,6 +82,7 @@ export async function stageVideo({
 				...(xsrf ? { "X-XSRF-TOKEN": xsrf } : {}),
 			},
 			body: JSON.stringify({ type, size: file.size }),
+			signal,
 		});
 		const body: unknown = await response.json().catch(() => null);
 		if (!response.ok) {
@@ -82,8 +93,11 @@ export async function stageVideo({
 			return { kind: "refused", message: FAILED };
 		}
 	} catch {
-		return { kind: "refused", message: FAILED };
+		return signal?.aborted
+			? { kind: "aborted" }
+			: { kind: "refused", message: FAILED };
 	}
+	if (signal?.aborted) return { kind: "aborted" };
 
 	const sent = await new Promise<boolean>((resolve) => {
 		const request = new XMLHttpRequest();
@@ -104,8 +118,10 @@ export async function stageVideo({
 			resolve(request.status >= 200 && request.status < 300);
 		request.onerror = () => resolve(false);
 		request.onabort = () => resolve(false);
+		signal?.addEventListener("abort", () => request.abort(), { once: true });
 		request.send(file);
 	});
+	if (signal?.aborted) return { kind: "aborted" };
 	if (!sent) return { kind: "refused", message: FAILED };
 	onProgress(100);
 	return { kind: "staged", token: signed.token };

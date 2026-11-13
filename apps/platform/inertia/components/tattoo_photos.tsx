@@ -16,20 +16,20 @@ import { canMove, focusAfterMove } from "~/components/page_look";
 import { MAX_PHOTO_ALT } from "~/components/photos";
 import {
 	DELETE_ANGLE_QUESTION,
+	DELETE_FAILED_VIDEO_QUESTION,
 	DELETE_VIDEO_QUESTION,
 	followBack,
 	MAX_TATTOO_PHOTOS,
 	mainFirst,
+	moveButton,
 	movedOrder,
-	moveMakesVideoLead,
 	movePhotoLabel,
 	type PortfolioAngle,
 	type PortfolioPhoto,
 	photoTotal,
 	removeQuery,
 	TATTOO_PHOTOS_NOTE,
-	VIDEO_LEAD_NOTE,
-	VIDEO_UNGROUP_NOTE,
+	VIDEO_NOTE,
 	videoLabel,
 	videoStateText,
 } from "~/components/portfolio";
@@ -121,8 +121,7 @@ export default function TattooPhotos({
 	const kinds = rows.map((row) => row.kind);
 	// Video angles: a video never leads, so some moves and actions don't apply.
 	const hasVideo = kinds.includes("video");
-	const leadNoteId = `${id}-video-lead`;
-	const ungroupNoteId = `${id}-video-ungroup`;
+	const videoNoteId = `${id}-video-note`;
 	const off = busy || held;
 	const room = MAX_TATTOO_PHOTOS - photoTotal(photo);
 	const [editing, setEditing] = useState<string | null>(null);
@@ -302,14 +301,9 @@ export default function TattooPhotos({
 				</h3>
 				<p className="text-xs text-muted-foreground">{TATTOO_PHOTOS_NOTE}</p>
 				{hasVideo && (
-					<>
-						<p id={leadNoteId} className="text-xs text-muted-foreground">
-							{VIDEO_LEAD_NOTE}
-						</p>
-						<p id={ungroupNoteId} className="sr-only">
-							{VIDEO_UNGROUP_NOTE}
-						</p>
-					</>
+					<p id={videoNoteId} className="text-xs text-muted-foreground">
+						{VIDEO_NOTE}
+					</p>
 				)}
 			</div>
 			<ol className="flex flex-col divide-y rounded-lg border">
@@ -385,11 +379,10 @@ export default function TattooPhotos({
 										{(["up", "down"] as const)
 											.filter((direction) => index > 0 || direction === "down")
 											.map((direction) => {
-												const videoFirst = moveMakesVideoLead(
-													kinds,
-													index,
-													direction,
-												);
+												// A move that would put a video first is aria-disabled, not
+												// disabled: focus can land here after another move.
+												const state = moveButton(kinds, index, direction);
+												const blocked = state.ariaDisabled;
 												return (
 													<Button
 														key={direction}
@@ -403,20 +396,19 @@ export default function TattooPhotos({
 															direction,
 															noun,
 														)}
-														aria-describedby={
-															videoFirst ? leadNoteId : undefined
-														}
+														aria-describedby={blocked ? videoNoteId : undefined}
 														disabled={
-															!canMove(index, rows.length, direction) ||
-															videoFirst
+															state.disabled ||
+															!canMove(index, rows.length, direction)
 														}
-														aria-disabled={off || undefined}
-														onClick={() =>
+														aria-disabled={off || blocked || undefined}
+														onClick={() => {
+															if (blocked) return;
 															sendOrder(movedOrder(ids, index, direction), {
 																id: row.id,
 																button: direction,
-															})
-														}
+															});
+														}}
 													>
 														{direction === "up" ? (
 															<ArrowUp aria-hidden="true" />
@@ -432,26 +424,25 @@ export default function TattooPhotos({
 
 							{index > 0 && editing !== row.id && asking !== row.id && (
 								<div className="flex flex-wrap gap-1">
-									<Button
-										type="button"
-										variant="ghost"
-										size="sm"
-										aria-describedby={
-											video ? `${nameId} ${leadNoteId}` : nameId
-										}
-										// A video never leads a tattoo: disabled, and the note says why.
-										disabled={video !== null}
-										aria-disabled={off || undefined}
-										onClick={() =>
-											sendOrder(mainFirst(ids, row.id), {
-												id: row.id,
-												button: "down",
-											})
-										}
-									>
-										<Star aria-hidden="true" />
-										Make this the main photo
-									</Button>
+									{/* A video never leads a tattoo, nor leaves it: no such buttons (VIDEO_NOTE says why). */}
+									{video === null && (
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											aria-describedby={nameId}
+											aria-disabled={off || undefined}
+											onClick={() =>
+												sendOrder(mainFirst(ids, row.id), {
+													id: row.id,
+													button: "down",
+												})
+											}
+										>
+											<Star aria-hidden="true" />
+											Make this the main photo
+										</Button>
+									)}
 									<Button
 										ref={remember(keyOf(row.id, "edit"))}
 										type="button"
@@ -466,21 +457,19 @@ export default function TattooPhotos({
 										<Pencil aria-hidden="true" />
 										Edit description
 									</Button>
-									<Button
-										type="button"
-										variant="ghost"
-										size="sm"
-										aria-describedby={
-											video ? `${nameId} ${ungroupNoteId}` : nameId
-										}
-										// On its own a video would lead a tattoo: delete it instead.
-										disabled={video !== null}
-										aria-disabled={off || undefined}
-										onClick={() => ungroup(row.id)}
-									>
-										<Ungroup aria-hidden="true" />
-										Remove from this tattoo
-									</Button>
+									{video === null && (
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											aria-describedby={nameId}
+											aria-disabled={off || undefined}
+											onClick={() => ungroup(row.id)}
+										>
+											<Ungroup aria-hidden="true" />
+											Remove from this tattoo
+										</Button>
+									)}
 									<Button
 										ref={remember(keyOf(row.id, "delete"))}
 										type="button"
@@ -523,7 +512,11 @@ export default function TattooPhotos({
 										id={`${id}-${row.id}-question`}
 										className="text-sm font-medium"
 									>
-										{video ? DELETE_VIDEO_QUESTION : DELETE_ANGLE_QUESTION}
+										{video?.state === "failed"
+											? DELETE_FAILED_VIDEO_QUESTION
+											: video
+												? DELETE_VIDEO_QUESTION
+												: DELETE_ANGLE_QUESTION}
 									</p>
 									<div className="flex flex-wrap gap-2">
 										<Button
@@ -534,7 +527,11 @@ export default function TattooPhotos({
 											aria-disabled={off || undefined}
 											onClick={() => remove(row.id)}
 										>
-											{busy ? "Deleting…" : `Delete ${noun}`}
+											{busy
+												? "Deleting…"
+												: video?.state === "failed"
+													? "Remove video"
+													: `Delete ${noun}`}
 										</Button>
 										<Button
 											ref={keep}
