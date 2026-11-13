@@ -378,6 +378,8 @@ describe("the built Discover server, indexing off", { skip }, () => {
 		assert.match(studios, /Ink Noir/);
 		assert.match(studios, /Irezumi/);
 		assert.match(studios, /Atelier/);
+		assert.match(studios, /Flash Parlour/);
+		assert.match(studios, /Five themes to choose from/);
 		assert.match(studios, /Custom domains are planned/);
 		assert.match(studios, /Discover is being prepared for launch/);
 		const pricing = await (await discover.get("/pricing")).text();
