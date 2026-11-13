@@ -12,9 +12,22 @@ import {
 	type ListServicesQuery,
 	type ListWorkQuery,
 	type SubmitDepositProofInput,
+	type SubmitReviewInput,
 	type TattooClient,
 } from "@tattoo-drip/sdk";
-import type { DepositPage } from "@tattoo-drip/types";
+import type {
+	DepositPage,
+	ReviewPage,
+	ReviewVideoSignInput,
+} from "@tattoo-drip/types";
+
+/** How often the review page reads itself again while a video is processing. */
+export const REVIEW_PROCESSING_POLL_MS = 5000;
+
+/** Whether the review page holds a video the API is still making. */
+export function reviewProcessing(page: ReviewPage | undefined): boolean {
+	return page?.post?.media.some((item) => item.state === "processing") ?? false;
+}
 
 /**
  * Query keys. Every tenant-scoped key starts with the tenant slug so cached
@@ -46,6 +59,8 @@ export const tattooKeys = {
 		[...tattooKeys.tenant(tenant), "availability", query] as const,
 	deposit: (tenant: string, token: string) =>
 		[...tattooKeys.tenant(tenant), "deposit", token] as const,
+	review: (tenant: string, token: string) =>
+		[...tattooKeys.tenant(tenant), "review", token] as const,
 	styles: () => [...tattooKeys.all, "styles"] as const,
 	placements: () => [...tattooKeys.all, "placements"] as const,
 };
@@ -127,6 +142,26 @@ export const tattooQueries = {
 					error.status < 500
 				) && failures < 3,
 		}),
+	/**
+	 * The client's review page by its link's token (Reviews and Fresh ink).
+	 * Like the deposit page: always stale, a 4xx never retried. While a video
+	 * is processing it reads itself again every REVIEW_PROCESSING_POLL_MS, and
+	 * stops once none is.
+	 */
+	review: (client: TattooClient, token: string) =>
+		queryOptions({
+			queryKey: tattooKeys.review(client.tenant, token),
+			queryFn: ({ signal }) => client.reviews.get(token, { signal }),
+			staleTime: 0,
+			retry: (failures, error) =>
+				!(
+					isTattooApiError(error) &&
+					error.status >= 400 &&
+					error.status < 500
+				) && failures < 3,
+			refetchInterval: (query) =>
+				reviewProcessing(query.state.data) ? REVIEW_PROCESSING_POLL_MS : false,
+		}),
 	styles: (client: TattooClient) =>
 		queryOptions({
 			queryKey: tattooKeys.styles(),
@@ -176,4 +211,85 @@ export const tattooMutations = {
 				queryClient.setQueryData(queryKey, page);
 			},
 		}),
+	/**
+	 * The review page's writes (Reviews and Fresh ink). Never retried (a
+	 * submit's challenge token is single-use, an upload could land twice).
+	 * Each answers with the page as it now is, which replaces the cached
+	 * page; a read still in flight is cancelled first.
+	 */
+	submitReview: (
+		client: TattooClient,
+		queryClient: QueryClient,
+		token: string,
+	) =>
+		reviewWrite(client, queryClient, token, (input: SubmitReviewInput) =>
+			client.reviews.submit(token, input),
+		),
+	deleteReview: (
+		client: TattooClient,
+		queryClient: QueryClient,
+		token: string,
+	) =>
+		// biome-ignore lint/suspicious/noConfusingVoidType: a delete takes no input, so `mutate()` needs no argument.
+		reviewWrite(client, queryClient, token, (_: void) =>
+			client.reviews.deleteReview(token),
+		),
+	deleteReviewPost: (
+		client: TattooClient,
+		queryClient: QueryClient,
+		token: string,
+	) =>
+		// biome-ignore lint/suspicious/noConfusingVoidType: a delete takes no input, so `mutate()` needs no argument.
+		reviewWrite(client, queryClient, token, (_: void) =>
+			client.reviews.deletePost(token),
+		),
+	addReviewPhoto: (
+		client: TattooClient,
+		queryClient: QueryClient,
+		token: string,
+	) =>
+		reviewWrite(client, queryClient, token, (photo: Blob) =>
+			client.reviews.addPhoto(token, photo),
+		),
+	addReviewVideo: (
+		client: TattooClient,
+		queryClient: QueryClient,
+		token: string,
+	) =>
+		reviewWrite(client, queryClient, token, (upload: string) =>
+			client.reviews.addVideo(token, upload),
+		),
+	removeReviewMedia: (
+		client: TattooClient,
+		queryClient: QueryClient,
+		token: string,
+	) =>
+		reviewWrite(client, queryClient, token, (mediaId: string) =>
+			client.reviews.removeMedia(token, mediaId),
+		),
+	/** Where to upload a video; changes nothing cached. Never retried. */
+	signReviewVideo: (client: TattooClient, token: string) =>
+		mutationOptions({
+			mutationFn: (input: ReviewVideoSignInput) =>
+				client.reviews.signVideo(token, input),
+			retry: false,
+		}),
 };
+
+/** A review page write whose answer (the page) replaces the cached page. */
+function reviewWrite<Input>(
+	client: TattooClient,
+	queryClient: QueryClient,
+	token: string,
+	write: (input: Input) => Promise<ReviewPage>,
+) {
+	return mutationOptions({
+		mutationFn: write,
+		retry: false,
+		onSuccess: async (page: ReviewPage) => {
+			const queryKey = tattooKeys.review(client.tenant, token);
+			await queryClient.cancelQueries({ queryKey });
+			queryClient.setQueryData(queryKey, page);
+		},
+	});
+}
