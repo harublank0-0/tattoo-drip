@@ -102,9 +102,9 @@ export const THEME_HTML: Record<ThemeKey, ThemeHtml> = {
  * page (TAT-65b), a payment page that is not themable (its route adds no
  * brand style either).
  */
-const UNTHEMED_ROUTES: ReadonlySet<string> = new Set(["/deposit"]);
+const UNTHEMED_ROUTES: ReadonlySet<string> = new Set(["/deposit", "/review"]);
 
-/** Whether an unthemed route (the deposit page) is among the matches: it shows no theme and no preview. */
+/** Whether an unthemed route (the deposit or review page) is among the matches: it shows no theme and no preview. */
 export function isUnthemedPage(
 	matches: readonly { readonly routeId: string }[],
 ): boolean {
