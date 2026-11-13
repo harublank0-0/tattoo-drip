@@ -271,7 +271,9 @@ export default class GatewayCheckoutService {
 		account: GatewayAccount,
 		attempt: GatewayCheckout,
 	): Promise<StartedCheckout> {
-		const returnUrl = `${studioPageUrl(storefrontTemplate(), tenant.slug)}/deposit?online=${attempt.id}`;
+		// The deposit page's return marker, never the link's token: the
+		// token is a bearer secret and must not reach the provider.
+		const returnUrl = `${studioPageUrl(storefrontTemplate(), tenant.slug)}/deposit#paid-online`;
 		let created: Awaited<ReturnType<GatewayApi["createCheckout"]>>;
 		try {
 			created = await this.accounts.apiFor(account).createCheckout(

@@ -253,6 +253,7 @@ export default function TransactionsIndex({
 						Search
 						<Input
 							id="transactions-search"
+							className="h-11"
 							type="search"
 							name="q"
 							placeholder="Client, project or provider reference"
@@ -267,6 +268,7 @@ export default function TransactionsIndex({
 						From
 						<Input
 							id="transactions-from"
+							className="h-11"
 							type="date"
 							name="from"
 							defaultValue={filters.from}
@@ -279,6 +281,7 @@ export default function TransactionsIndex({
 						To
 						<Input
 							id="transactions-to"
+							className="h-11"
 							type="date"
 							name="to"
 							defaultValue={filters.to}
@@ -380,7 +383,7 @@ export default function TransactionsIndex({
 									{open.online && " · paid online"}
 								</SheetDescription>
 							</SheetHeader>
-							<dl className="grid grid-cols-[8rem_1fr] gap-x-3 gap-y-2 px-4 text-sm">
+							<dl className="grid grid-cols-[7.5rem_minmax(0,1fr)] sm:grid-cols-[8rem_minmax(0,1fr)] gap-x-3 gap-y-2 px-4 text-sm">
 								<Detail label="Client">
 									{open.clientId && open.clientName ? (
 										<Link

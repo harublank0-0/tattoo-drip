@@ -64,7 +64,8 @@ export class ProviderError extends Error {
 	constructor(
 		readonly kind: ProviderErrorKind,
 		readonly code: string | undefined,
-		readonly status: number,
+		/** PayBridgeNP's HTTP status (not `status`: Adonis would answer with it). */
+		readonly providerStatus: number,
 		readonly requestId: string | undefined,
 		readonly retryAfterSeconds?: number,
 	) {
@@ -83,7 +84,7 @@ export class ProviderError extends Error {
 		return {
 			kind: this.kind,
 			code: this.code,
-			status: this.status,
+			status: this.providerStatus,
 			requestId: this.requestId,
 		};
 	}

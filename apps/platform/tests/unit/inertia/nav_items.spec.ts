@@ -34,7 +34,7 @@ const artist = { slug: "bnt", role: "artist" };
 const none: Counts = { inbox: null, today: null };
 
 test.group("navItems", () => {
-	test("owners get Today, Inbox, Projects and Calendar, with Clients, Artists, Portfolio, Inventory and Settings under More; artists get Today, Projects, Calendar and Portfolio", ({
+	test("owners get Today, Inbox, Projects and Calendar, with Clients, Artists, Portfolio, Inventory, Transactions and Settings under More; artists get Today, Projects, Calendar and Portfolio", ({
 		assert,
 	}) => {
 		assert.deepEqual(
@@ -48,6 +48,7 @@ test.group("navItems", () => {
 				["artists", "more"],
 				["portfolio", "more"],
 				["inventory", "more"],
+				["transactions", "more"],
 				["settings", "more"],
 			],
 		);
@@ -182,7 +183,14 @@ test.group("navItems", () => {
 		);
 		assert.deepEqual(
 			owners.more.map(({ key }) => key),
-			["clients", "artists", "portfolio", "inventory", "settings"],
+			[
+				"clients",
+				"artists",
+				"portfolio",
+				"inventory",
+				"transactions",
+				"settings",
+			],
 		);
 		const artists = tabBarItems(navItems(artist, none));
 		assert.deepEqual(

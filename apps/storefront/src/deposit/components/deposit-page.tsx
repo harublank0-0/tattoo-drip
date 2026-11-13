@@ -328,6 +328,7 @@ export function DueView({
 	selected,
 	onSelect,
 	form,
+	online = null,
 }: {
 	view: DepositView;
 	studioName: string;
@@ -336,6 +337,8 @@ export function DueView({
 	selected: MethodView | null;
 	onSelect(id: string): void;
 	form: ReactNode;
+	/** "Pay online" (OnlinePay), when the studio takes online payments. */
+	online?: ReactNode;
 }) {
 	return (
 		<div className="deposit-due">
@@ -357,6 +360,7 @@ export function DueView({
 					<Fill template={copy.due.direct} values={{ studio: studioName }} />
 				</p>
 			</section>
+			{online}
 			<section
 				className="deposit-block deposit-due-code"
 				aria-labelledby="deposit-code-title"

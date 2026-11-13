@@ -80,6 +80,11 @@ const SIGNED_IN = [
 	"GET /account",
 	"PUT /account/password",
 	"POST /account/sign-out-others",
+	// TattooDrip's own staff pages (docs/payments-paybridgenp.md): signed in,
+	// then platformAdmin, which 404s anyone not in PLATFORM_ADMIN_EMAILS.
+	"GET /admin/billing",
+	"GET /admin/payments",
+	"POST /admin/payments/review",
 ];
 
 /** What drive serves (config/drive.ts): uploads and files, not pages. */

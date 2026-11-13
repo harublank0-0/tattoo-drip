@@ -63,3 +63,19 @@ test("before the browser's fragment is known the h1 still asks to pay the studio
 	);
 	assert.match(html, /aria-busy="true"/);
 });
+
+test("back from the online checkout (#paid-online, no token): what happens next, never a dead link or a paid claim", () => {
+	const html = renderToStaticMarkup(
+		createElement(DepositForHash, {
+			hash: "#paid-online?session_id=cs_1&status=success",
+			shell: SHELL,
+		}),
+	);
+	assert.match(textOf(html), /Payment sent for confirmation/);
+	assert.match(
+		textOf(html),
+		/records your deposit once the payment provider confirms it/,
+	);
+	assert.doesNotMatch(textOf(html), /This link doesn't work|paid in full/i);
+	assert.doesNotMatch(html, /role="alert"/);
+});

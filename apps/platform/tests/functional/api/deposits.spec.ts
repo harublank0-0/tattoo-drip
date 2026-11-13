@@ -100,6 +100,8 @@ test.group("Public API: GET /deposits/:token", (group) => {
 			],
 			depositPolicy: "Deposits hold your date.",
 			nextSession: null,
+			// The studio has no online payment connection.
+			onlinePayment: { available: false, checkout: null },
 		});
 		response.assertHeader("cache-control", "no-store");
 		assertApiHeaders(response);
@@ -155,6 +157,7 @@ test.group("Public API: GET /deposits/:token", (group) => {
 				startsAt: "2030-03-02T05:15:00.000Z",
 				artistName: "Aarav Shrestha",
 			},
+			onlinePayment: { available: false, checkout: null },
 		});
 	});
 

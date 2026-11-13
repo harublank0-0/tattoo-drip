@@ -42,6 +42,10 @@ Accounts (TAT-18): `User.create` leaves the address unconfirmed (like the accoun
 
 For broader CI requirements, consult the [workflow](../../../.github/workflows/ci.yml). Relevant design docs are [architecture](../../../docs/architecture.md), [data model](../../../docs/data-model.md) and [requirements](../../../docs/requirements.md); read only the part the task needs.
 
+## Online payments in tests
+
+No test reaches PayBridgeNP: `tests/bootstrap.ts` swaps `PaymentProviders` for the in-memory fake in `#tests/helpers/paybridge` (`paybridge`) before any test. Reset it in a group's setup (`paybridge.reset()`). It keeps plans, customers, subscriptions, invoices, sessions, payments, refunds and webhook endpoints, records every call with its idempotency key (`callsOf`), replays a repeated key's first answer, fails the next call on request (`failNext`), and makes studio keys (`studioKey`). Sign webhook bodies with `sign(body, secret)` (the real scheme; the SDK's `constructEvent` checks it) and send them unchanged with `.unsafeJson(raw)`. Fixtures: `sandboxPlans`, `seedBilling`, `connectStudio` (`#tests/helpers/online_payments`); `seededStudio` has a billing invoice, a verified connection and an expired checkout. `.env.test` turns studio payments on in sandbox mode with fake keys and lists one admin.
+
 ## Tenant isolation tests
 
 Tests run as the restricted app role, so row-level security applies to them. A direct model read or write of tenant-owned rows needs a context: `inTenant(tenant, fn)`, `inUser(user, fn)` or `inTenantAs(tenant, user, fn)` from `#tests/helpers/tenants`. A negative check ("nothing was created") must run in the context that would have seen the row, or it passes vacuously.

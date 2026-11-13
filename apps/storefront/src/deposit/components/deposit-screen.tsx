@@ -9,7 +9,7 @@ import {
 } from "react";
 import type { DepositShell } from "../loader.ts";
 import { isGone, retryScreen, screenFor, sentGone } from "../problems.ts";
-import { readDepositToken } from "../token.ts";
+import { isReturnFromCheckout, readDepositToken } from "../token.ts";
 import {
 	depositContact,
 	depositView,
@@ -30,6 +30,7 @@ import {
 	StateMessage,
 	StateRegion,
 } from "./deposit-page.tsx";
+import { OnlinePay, OnlineReturned } from "./online-pay.tsx";
 import { ProofForm } from "./proof-form.tsx";
 
 const subscribeToHash = (onChange: () => void) => {
@@ -72,6 +73,9 @@ export function DepositForHash({
 	shell: DepositShell;
 }) {
 	const token = hash === undefined ? undefined : readDepositToken(hash);
+	// Back from the online checkout, whose return address carries a marker,
+	// never the token: say what happens next instead of "dead link".
+	const returned = hash !== undefined && isReturnFromCheckout(hash);
 	if (typeof token === "string") {
 		return <DepositLoaded key={token} token={token} shell={shell} />;
 	}
@@ -80,10 +84,12 @@ export function DepositForHash({
 		<DepositFrame
 			studioName={shell.studioName}
 			logo={shell.logo}
-			problem={token === undefined ? null : "dead"}
+			problem={token === undefined || returned ? null : "dead"}
 		>
 			{token === undefined ? (
 				<DepositLoading studioName={shell.studioName} />
+			) : returned ? (
+				<OnlineReturned studioName={shell.studioName} />
 			) : (
 				<LoadProblemView problem="dead" />
 			)}
@@ -208,6 +214,15 @@ export function DepositLoaded({
 					today={todayIn(shell.timezone)}
 					selected={selected}
 					onSelect={choose}
+					online={
+						view.online.available ? (
+							<OnlinePay
+								token={token}
+								view={view}
+								studioName={shell.studioName}
+							/>
+						) : null
+					}
 					form={
 						view.takesProof ? (
 							<ProofForm

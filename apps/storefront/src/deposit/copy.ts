@@ -132,6 +132,25 @@ export const copy = {
 		payByTomorrow: "Pay by tomorrow, {date}.",
 		payByDays: "Pay by {date}, in {count} days.",
 	},
+	/** Paying online through the studio's own payment provider (docs/payments-paybridgenp.md). */
+	online: {
+		title: "Pay online",
+		body: "Pay with eSewa, Khalti or Fonepay on the payment page. The money goes to {studio}'s own account, and no screenshot is needed.",
+		button: "Pay {amount} online",
+		opening: "Opening the payment page…",
+		confirming:
+			"An online payment was started. If you paid, it is being confirmed: you don't need to pay again. Reload this page in a minute.",
+		retry: "The last online payment didn't go through. You can try again.",
+		unavailable:
+			"Online payment isn't available for this deposit any more. Pay one of the other ways below.",
+		busy: "The payment service didn't answer. Nothing was charged; try again in a minute.",
+		failed:
+			"Something went wrong. Try again, or pay one of the other ways below.",
+		or: "Or pay to the studio's account yourself and send a screenshot:",
+		returnedTitle: "Payment sent for confirmation",
+		returned:
+			"Thank you. {studio} records your deposit once the payment provider confirms it, usually within a few minutes. To see your deposit, open the link {studio} sent you again.",
+	},
 	code: {
 		title: "Reference code",
 		hint: "Write this code in the payment remark (or note).",

@@ -33,3 +33,16 @@ export function scrollRestorationKey(location: {
 }): string {
 	return location.state.__TSR_key || location.pathname;
 }
+
+/**
+ * The fragment the online checkout returns to (docs/payments-paybridgenp.md):
+ * `/deposit#paid-online`, which the platform gives PayBridgeNP as the return
+ * address instead of the link, so the token never reaches the provider. A
+ * provider may append its own parameters after it.
+ */
+export const RETURN_FRAGMENT = "paid-online";
+
+export function isReturnFromCheckout(hash: string): boolean {
+	const value = hash.startsWith("#") ? hash.slice(1) : hash;
+	return value === RETURN_FRAGMENT || value.startsWith(`${RETURN_FRAGMENT}?`);
+}

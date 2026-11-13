@@ -150,7 +150,7 @@ export default function Billing({
 						{access.text}
 					</p>
 					{subscription ? (
-						<dl className="grid grid-cols-[9rem_1fr] gap-x-3 gap-y-2 text-sm">
+						<dl className="grid grid-cols-[7.5rem_minmax(0,1fr)] sm:grid-cols-[9rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
 							<dt className="text-muted-foreground">Plan</dt>
 							<dd>{subscription.planName ?? "—"}</dd>
 							<dt className="text-muted-foreground">Status</dt>

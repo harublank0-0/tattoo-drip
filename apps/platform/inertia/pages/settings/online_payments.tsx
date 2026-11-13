@@ -91,10 +91,11 @@ export default function OnlinePayments({ mode, available, account }: Props) {
 
 			{account && (
 				<Section title="Your connection">
-					<dl className="grid grid-cols-[9rem_1fr] gap-x-3 gap-y-2 text-sm">
+					<dl className="grid grid-cols-[7.5rem_minmax(0,1fr)] sm:grid-cols-[9rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
 						<dt className="text-muted-foreground">Status</dt>
-						<dd className="flex flex-wrap items-center gap-2">
+						<dd className="flex min-w-0 flex-wrap items-center gap-2">
 							<Badge
+								className="h-auto whitespace-normal text-left"
 								variant={
 									account.status === "verified" ? "secondary" : "outline"
 								}

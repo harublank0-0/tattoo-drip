@@ -63,7 +63,10 @@ export class FakePaybridge extends PaymentProviders {
 	>();
 	subscriptions = new Map<string, ProviderSubscription>();
 	invoices = new Map<string, ProviderInvoice>();
-	sessions = new Map<string, ProviderSession & { key: string; url: string }>();
+	sessions = new Map<
+		string,
+		ProviderSession & { key: string; url: string; returnUrl?: string }
+	>();
 	payments = new Map<string, ProviderPayment & { key: string }>();
 	refunds = new Map<string, ProviderRefund>();
 	webhooks = new Map<
@@ -324,6 +327,7 @@ export class FakePaybridge extends PaymentProviders {
 						livemode: live,
 						key: secretKey,
 						url: `https://checkout.paybridgenp.com/checkout/${counter}`,
+						returnUrl: input.returnUrl,
 					};
 					fake.sessions.set(session.id, session);
 					return {
@@ -340,7 +344,7 @@ export class FakePaybridge extends PaymentProviders {
 				if (!found || found.key !== secretKey) {
 					throw new ProviderError("not_found", "not_found", 404, "req_fake");
 				}
-				const { key: _key, url: _url, ...session } = found;
+				const { key: _key, url: _url, returnUrl: _return, ...session } = found;
 				return { ...session, metadata: { ...session.metadata } };
 			},
 			async expireCheckout(sessionId, key) {
