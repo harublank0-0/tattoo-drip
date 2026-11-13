@@ -268,6 +268,31 @@ test.group("Settings, Page look: saving (TAT-56)", (group) => {
 		assert.equal(data.storefront.branding.font, "eczar");
 	});
 
+	test("an owner picks Flash Parlour: it is stored, the page shows it and the public API serves it", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+
+		const response = await putLook(client, owner, tenant, {
+			...BODY,
+			theme: "flash-parlour",
+			accent: "",
+			accentDark: "",
+			font: "eczar",
+		});
+
+		response.assertStatus(302);
+		assert.equal((await reload(tenant)).storefrontTheme, "flash-parlour");
+		const { look } = (await lookPage(client, owner, tenant)).inertiaProps;
+		assert.equal(look.theme, "flash-parlour");
+		const { data } = (
+			await client.get(`/api/v1/tenants/${tenant.slug}`)
+		).body();
+		assert.equal(data.storefront.theme, "flash-parlour");
+		assert.equal(data.storefront.branding.font, "eczar");
+	});
+
 	test("an empty colour clears the stored one", async ({ client, assert }) => {
 		const { owner, tenant } = await studioWithOwner();
 		await putLook(client, owner, tenant);

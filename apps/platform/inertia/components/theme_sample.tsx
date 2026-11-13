@@ -1,4 +1,5 @@
 import atelier from "~/assets/themes/atelier.webp";
+import flashParlour from "~/assets/themes/flash-parlour.webp";
 import inkNoir from "~/assets/themes/ink-noir.webp";
 import irezumi from "~/assets/themes/irezumi.webp";
 import stencilAndInk from "~/assets/themes/stencil-and-ink.webp";
@@ -6,7 +7,7 @@ import stencilAndInk from "~/assets/themes/stencil-and-ink.webp";
 /**
  * Page look's theme samples: each theme's home page on a demo studio, on a
  * laptop with a phone in the corner (inertia/assets/themes/, 960 x 600 WebP,
- * 20 to 50 KB each: Irezumi's paper texture is the largest). The demo's photos are placeholder ink-wash art, not a
+ * 20 to 50 KB each: Irezumi's paper texture is the largest). The demo's photos are placeholder ink-wash art (Flash Parlour's flash is placeholder line drawings), not a
  * studio's work. A theme without a sample here shows its card without one;
  * tests/unit/inertia/page_look_source.spec.ts fails until every theme the
  * server lists has one. Re-shoot a sample when its theme's home page changes
@@ -17,6 +18,7 @@ const SAMPLES: Record<string, string> = {
 	"ink-noir": inkNoir,
 	irezumi,
 	atelier,
+	"flash-parlour": flashParlour,
 };
 
 /**

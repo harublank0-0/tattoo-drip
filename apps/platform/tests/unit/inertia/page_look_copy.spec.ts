@@ -466,9 +466,19 @@ test.group("page look words (TAT-56)", () => {
 				description:
 					"Quiet luxury: stone paper, bronze and Bodoni headings, your work as a numbered collection. Your colour shows where it reads on the paper.",
 			},
+			{
+				key: "flash-parlour",
+				label: "Flash Parlour",
+				description:
+					"Traditional flash on the wall: cream paper, heavy black ink, red, mustard and green, with Shrikhand headings; your available flash opens the page. Your colour shows where it reads on the paper.",
+			},
 		]);
 		assert.deepEqual(FONTS, [
-			{ key: "eczar", label: "The theme's own (Eczar; Bodoni on Atelier)" },
+			{
+				key: "eczar",
+				label:
+					"The theme's own (Eczar; Bodoni on Atelier, Shrikhand on Flash Parlour)",
+			},
 			{ key: "serif", label: "Classic serif" },
 			{ key: "sans", label: "Plain" },
 		]);
