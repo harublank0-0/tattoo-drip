@@ -989,12 +989,14 @@ export interface components {
              * @description The studio's theme: `stencil-and-ink` (paper, ink and a violet
              *     stencil line), `ink-noir` (dark and photo-first, with a site
              *     navigation and a full footer), `irezumi` (light and editorial:
-             *     warm paper, charcoal ink and a vermilion accent) or `atelier`
-             *     (quiet luxury: stone paper, bronze and Bodoni headings). More will
-             *     come: treat an unknown value as `stencil-and-ink`.
+             *     warm paper, charcoal ink and a vermilion accent), `atelier`
+             *     (quiet luxury: stone paper, bronze and Bodoni headings) or
+             *     `flash-parlour` (a traditional walk-in shop's wall of flash:
+             *     cream, black ink, red, mustard and green). More will come: treat
+             *     an unknown value as `stencil-and-ink`.
              * @enum {string}
              */
-            theme: "stencil-and-ink" | "ink-noir" | "irezumi" | "atelier";
+            theme: "stencil-and-ink" | "ink-noir" | "irezumi" | "atelier" | "flash-parlour";
             branding: {
                 /**
                  * @description The studio's logo, or null. `alt` is always null (it sits
