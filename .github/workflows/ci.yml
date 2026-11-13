@@ -91,4 +91,12 @@ jobs:
           pnpm exec biome check --write apps/platform/database/schema.ts
           git diff --exit-code -- apps/platform/database/schema.ts
 
+      # The video angle specs run the real ffprobe and ffmpeg on clips they
+      # generate (the worker image installs the same, Dockerfile `worker`).
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          ffmpeg -version | head -n 1
+
       - run: pnpm test

@@ -3,6 +3,7 @@ import { MessageCircle } from "lucide-react";
 import { Fill } from "../../intake/components/fill.tsx";
 import { artworkTitle } from "../artwork.ts";
 import { studioCopy } from "../copy.ts";
+import { flashDesignAction } from "../flash.ts";
 import {
 	flashHref,
 	isAllowedHref,
@@ -527,6 +528,8 @@ export function FlashDesignPage({
 }) {
 	const { studio, theme, design, closedNote, similar } = data;
 	const artist = design.artist;
+	// Taken: ask the artist for something like it, else the studio.
+	const action = flashDesignAction(design, closedNote, similar);
 	return (
 		<Shell
 			studio={studio}
@@ -587,20 +590,9 @@ export function FlashDesignPage({
 							</dd>
 						</div>
 					</dl>
-					{design.claimed ? (
-						// Taken: ask the artist for something like it, else the studio.
-						similar === "artist" ? (
-							<a className="action action-primary" href={design.requestHref}>
-								{studioCopy.flash.similar}
-							</a>
-						) : similar === "studio" ? (
-							<a className="action action-primary" href={requestHref({})}>
-								{studioCopy.sendIdea}
-							</a>
-						) : null
-					) : closedNote === null ? (
-						<a className="action action-primary" href={design.requestHref}>
-							{studioCopy.flash.request}
+					{action ? (
+						<a className="action action-primary" href={action.href}>
+							{action.label}
 						</a>
 					) : null}
 					{artist ? (

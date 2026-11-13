@@ -6,8 +6,11 @@ import {
 	TattooChangedError,
 	TattooGroupError,
 	TattooPhotoLimitError,
+	VideoLeadError,
+	VideoUploadError,
 	WorkPhotoLimitError,
 } from "#modules/artists/errors";
+import ProcessWorkVideoJob from "#modules/artists/jobs/process_work_video_job";
 import Artist from "#modules/artists/models/artist";
 import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
 import {
@@ -20,13 +23,28 @@ import ArtistService, {
 	type ProfileEditor,
 } from "#modules/artists/services/artist_service";
 import type { StyleSlug } from "#modules/artists/styles";
+import type { VideoUpload } from "#modules/artists/video_uploads";
 import { visibleArtistSql } from "#modules/artists/visibility";
 import type { WorkCursor } from "#modules/artists/work_cursor";
 import { ImageDeleteError } from "#modules/media/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
+import VideoService from "#modules/media/services/video_service";
+import {
+	STUCK_AFTER_MINUTES,
+	VIDEO_GAVE_UP,
+	VIDEO_STUCK,
+} from "#modules/media/video";
 import type Tenant from "#modules/tenancy/models/tenant";
-import { afterRollback, dbClient, withTransaction } from "#services/db_context";
+import {
+	afterCommit,
+	afterRollback,
+	dbClient,
+	withDbContext,
+	withTransaction,
+} from "#services/db_context";
+import { isUniqueViolation } from "#services/db_errors";
+import { dispatchInTransaction } from "#services/queue";
 
 type Upload = Pick<MultipartFile, "tmpPath">;
 type TenantRef = Pick<Tenant, "id">;
@@ -75,6 +93,16 @@ export type RemoveIntent =
 	| { scope: "photo" }
 	| { scope: "tattoo"; photos: number };
 
+/**
+ * Which angles a read lists: `public` (the studio page and the API) photos
+ * and ready videos only; `studio` (the dashboard) every angle, videos that
+ * are processing or failed included.
+ */
+export type AngleScope = "public" | "studio";
+
+/** What the worker did with a video (processVideo). */
+export type VideoRun = "ready" | "failed" | "skipped";
+
 /** A tattoo as the public reads and the portfolio show it: its lead and its angles, in order. */
 export type Tattoo = { lead: ArtistWorkPhoto; angles: ArtistWorkPhoto[] };
 
@@ -121,6 +149,7 @@ export default class WorkPhotoService {
 	constructor(
 		private images: ImageService,
 		private artists: ArtistService,
+		private videos: VideoService = new VideoService(images),
 	) {}
 
 	/** The artist's photos, newest first. */
@@ -305,17 +334,26 @@ export default class WorkPhotoService {
 	 * The caller passes leads it has already read under its own rules (the
 	 * public reads: shown leads only), so nothing about the angles' own
 	 * `hidden`, `styles` or `healed` is asked: the lead decides for its
-	 * tattoo, and the copies agree with it anyway.
+	 * tattoo, and the copies agree with it anyway. Video angles: `public`
+	 * lists a video only once it is ready (a processing or failed one never
+	 * leaves the dashboard); `studio` lists them all, with their state.
 	 */
 	async anglesOf(
 		tenant: TenantRef,
 		leadIds: readonly string[],
+		scope: AngleScope,
 	): Promise<Map<string, ArtistWorkPhoto[]>> {
 		const byLead = new Map<string, ArtistWorkPhoto[]>();
 		if (leadIds.length === 0) return byLead;
-		const angles = await ArtistWorkPhoto.query()
+		const query = ArtistWorkPhoto.query()
 			.where("tenant_id", tenant.id)
-			.whereIn("lead_photo_id", [...leadIds])
+			.whereIn("lead_photo_id", [...leadIds]);
+		if (scope === "public") {
+			query.where((shown) => {
+				shown.where("kind", "photo").orWhere("video_state", "ready");
+			});
+		}
+		const angles = await query
 			.orderBy("lead_photo_id", "asc")
 			.orderBy("angle_position", "asc");
 		for (const angle of angles) {
@@ -678,6 +716,8 @@ export default class WorkPhotoService {
 			const same = orderedIds.every((id, index) => rows[index].id === id);
 			const ordered = orderedIds.map((id) => byId.get(id) as ArtistWorkPhoto);
 			const [lead, ...angles] = ordered;
+			// Video angles: a video is never the main photo.
+			if (lead.kind !== "photo") throw new VideoLeadError();
 			if (!same) {
 				await this.setAngles(trx, tenant, lead, angles, live);
 			}
@@ -704,6 +744,8 @@ export default class WorkPhotoService {
 			const lead = live.leadPhotoId;
 			const place = live.anglePosition;
 			if (lead === null || place === null) throw new TattooChangedError();
+			// Video angles: on its own a video would lead a tattoo, which it never does.
+			if (live.kind !== "photo") throw new VideoLeadError();
 			live.leadPhotoId = null;
 			live.anglePosition = null;
 			await live.save();
@@ -797,7 +839,7 @@ export default class WorkPhotoService {
 				throw new TattooChangedError();
 			}
 			if (isAngle) {
-				await this.images.deleteOrThrow(PURPOSE, live.imageKey);
+				await this.deleteFiles(tenant, live);
 				await live.delete();
 				await this.closeGap(trx, tenant, lead, place);
 				return 1;
@@ -812,10 +854,10 @@ export default class WorkPhotoService {
 			const gone: string[] = [];
 			try {
 				for (const angle of [...angles].reverse()) {
-					await this.images.deleteOrThrow(PURPOSE, angle.imageKey);
+					await this.deleteFiles(tenant, angle);
 					gone.push(angle.id);
 				}
-				await this.images.deleteOrThrow(PURPOSE, live.imageKey);
+				await this.deleteFiles(tenant, live);
 			} catch (error) {
 				if (!(error instanceof ImageDeleteError)) throw error;
 				if (gone.length > 0) {
@@ -940,19 +982,24 @@ export default class WorkPhotoService {
 	/**
 	 * A tattoo's rows, the lead first and then its angles in order: every
 	 * photo of the tattoo `leadId` leads (just the photo, for one without
-	 * angles). With `client`, inside the caller's transaction.
+	 * angles). With `client`, inside the caller's transaction and locked
+	 * `FOR UPDATE` until it ends, so the worker's write of a video's outcome
+	 * (settleVideo, which locks the row too) and a removal never interleave:
+	 * the removal sees the video as the worker left it, files and all, or the
+	 * worker finds the row gone.
 	 */
 	private async tattooRows(
 		tenant: TenantRef,
 		leadId: string,
 		client?: QueryClientContract,
 	): Promise<ArtistWorkPhoto[]> {
-		return ArtistWorkPhoto.query(client ? { client } : undefined)
+		const query = ArtistWorkPhoto.query(client ? { client } : undefined)
 			.where("tenant_id", tenant.id)
 			.where((rows) => {
 				rows.where("id", leadId).orWhere("lead_photo_id", leadId);
 			})
 			.orderByRaw("angle_position asc nulls first");
+		return client ? query.forUpdate() : query;
 	}
 
 	/** A lead's angles, in order, read inside the caller's transaction. */
@@ -1048,9 +1095,11 @@ export default class WorkPhotoService {
 	}
 
 	/**
-	 * The photo's row, read again under the artist's lock: gone meanwhile is
-	 * a 404, and so is one moved to another artist meanwhile (Studio OS,
-	 * `reassign`), whose artist the caller did not lock.
+	 * The photo's row, read again under the artist's lock and locked itself
+	 * (`FOR UPDATE`, see tattooRows: the worker's settleVideo takes the same
+	 * row lock): gone meanwhile is a 404, and so is one moved to another
+	 * artist meanwhile (Studio OS, `reassign`), whose artist the caller did
+	 * not lock.
 	 */
 	private async lockedPhoto(
 		trx: QueryClientContract,
@@ -1060,11 +1109,335 @@ export default class WorkPhotoService {
 		const live = await ArtistWorkPhoto.query({ client: trx })
 			.where("tenant_id", tenant.id)
 			.where("id", photo.id)
+			.forUpdate()
 			.firstOrFail();
 		if (live.artistId !== photo.artistId) {
 			throw new lucidErrors.E_ROW_NOT_FOUND(ArtistWorkPhoto);
 		}
 		return live;
+	}
+
+	/**
+	 * Video angles, before an upload is signed: may `editor` add a video to
+	 * the tattoo `lead` leads, and is there room? What adding a photo checks
+	 * (`add`), under the artist's row lock: the artist is the editor's, the
+	 * lead is still a lead, the tattoo has a free place of its eight and the
+	 * artist one of their 100 (a video counts like a photo). `addVideo` checks
+	 * it all again when the upload is finished. Throws like `add`.
+	 */
+	async checkVideoRoom(
+		tenant: TenantRef,
+		editor: ProfileEditor,
+		artist: Artist,
+		lead: ArtistWorkPhoto,
+	): Promise<void> {
+		assertOwnedBy(tenant, artist);
+		assertLeadOf(tenant, artist, lead);
+		await withTransaction(async (trx) => {
+			await this.artists.lockEditable(trx, tenant, editor, artist.id);
+			await this.roomForAngle(trx, tenant, artist, lead);
+		});
+	}
+
+	/**
+	 * Video angles: the browser has uploaded a video (`upload`, from the token
+	 * the sign step gave it) and asks to add it to the tattoo `lead` leads, as
+	 * its last angle, with its own description. The staged file must be there
+	 * and exactly the length that was signed (before the lock: a storage read).
+	 * Under the artist's lock, the same checks as `checkVideoRoom`; the row is
+	 * created `processing` with the tattoo's state (`hidden`, `styles`,
+	 * `healed`), no poster or renditions yet, and ProcessWorkVideoJob is
+	 * queued in the same transaction, so it exists exactly when the row does.
+	 * An upload finishes once (the staging key's unique index):
+	 * VideoUploadError otherwise.
+	 */
+	async addVideo(
+		tenant: TenantRef,
+		editor: ProfileEditor,
+		artist: Artist,
+		lead: ArtistWorkPhoto,
+		upload: VideoUpload,
+		alt: string | null,
+	): Promise<ArtistWorkPhoto> {
+		assertOwnedBy(tenant, artist);
+		assertLeadOf(tenant, artist, lead);
+		if (upload.tenantId !== tenant.id || upload.leadId !== lead.id) {
+			throw new Error("The video upload was signed for another tattoo");
+		}
+		const size = await this.videos.stagedSize(tenant, upload.key);
+		if (size === null) {
+			throw new VideoUploadError(
+				"The video didn't finish uploading. Choose it again.",
+			);
+		}
+		if (size !== upload.size) throw new VideoUploadError();
+		const text = alt?.trim();
+		try {
+			return await withTransaction(async (trx) => {
+				await this.artists.lockEditable(trx, tenant, editor, artist.id);
+				const { live, photos } = await this.roomForAngle(
+					trx,
+					tenant,
+					artist,
+					lead,
+				);
+				const used = await ArtistWorkPhoto.query({ client: trx })
+					.where("tenant_id", tenant.id)
+					.where("video_staging_key", upload.key)
+					.first();
+				if (used) throw new VideoUploadError("This video was added already.");
+				const video = await ArtistWorkPhoto.create(
+					{
+						tenantId: tenant.id,
+						artistId: artist.id,
+						kind: "video",
+						videoState: "processing",
+						videoStagingKey: upload.key,
+						imageKey: null,
+						width: null,
+						height: null,
+						alt: text ? text : null,
+						styles: [...live.styles],
+						healed: live.healed,
+						hidden: live.hidden,
+						leadPhotoId: live.id,
+						anglePosition: photos,
+					},
+					{ client: trx },
+				);
+				await dispatchInTransaction(
+					ProcessWorkVideoJob.dispatch({
+						tenantId: tenant.id,
+						photoId: video.id,
+					}),
+					trx,
+				);
+				return video;
+			});
+		} catch (error) {
+			if (isUniqueViolation(error, "artist_work_photos_video_staging_key")) {
+				throw new VideoUploadError("This video was added already.");
+			}
+			throw error;
+		}
+	}
+
+	/**
+	 * The worker's part of a video angle (ProcessWorkVideoJob), safe to run
+	 * twice or after the row is gone (delivery is at least once). Never inside
+	 * a transaction, and it opens none around the slow part: one short
+	 * tenant-scoped transaction reads the row (only a video still
+	 * `processing` is worked on), then VideoService.process transcodes with no
+	 * transaction open (it refuses to run inside one), then one more short
+	 * transaction writes the outcome if the row is still processing that same
+	 * upload (`settleVideo`, one conditional UPDATE). Files made for a row that
+	 * was removed or finished meanwhile are deleted again; the staged upload
+	 * goes once it is processed or refused. A refusal (not a video we take,
+	 * too long, too large) is stored as `failed` with its reason; anything
+	 * else throws, and the job retries.
+	 */
+	async processVideo(
+		tenant: TenantRef,
+		photoId: string,
+		signal?: AbortSignal,
+	): Promise<VideoRun> {
+		const staged = await withDbContext({ tenantId: tenant.id }, () =>
+			this.videoToProcess(tenant, photoId),
+		);
+		if (!staged) return "skipped";
+		const outcome = await this.videos.process(tenant, staged, signal);
+		if (outcome.kind === "refused") {
+			const settled = await withDbContext({ tenantId: tenant.id }, () =>
+				this.settleVideo(tenant, photoId, staged, {
+					video_state: "failed",
+					video_failure: outcome.reason,
+				}),
+			);
+			await this.videos.deleteStaged(tenant, staged);
+			return settled ? "failed" : "skipped";
+		}
+		let kept = false;
+		try {
+			kept = await withDbContext({ tenantId: tenant.id }, () =>
+				this.settleVideo(tenant, photoId, staged, {
+					video_state: "ready",
+					image_key: outcome.posterKey,
+					width: outcome.width,
+					height: outcome.height,
+					video_duration_ms: outcome.durationMs,
+					video_keys: outcome.keys,
+				}),
+			);
+		} finally {
+			// Removed or finished meanwhile (or the write failed): nobody names these.
+			if (!kept) await this.videos.removeFiles(outcome.posterKey, outcome.keys);
+		}
+		await this.videos.deleteStaged(tenant, staged);
+		return kept ? "ready" : "skipped";
+	}
+
+	/**
+	 * A video whose job used up its retries: `failed`, with a reason that
+	 * asks for a new upload, if it is still processing; its staged upload goes.
+	 */
+	async giveUpVideo(tenant: TenantRef, photoId: string): Promise<void> {
+		const staged = await withDbContext({ tenantId: tenant.id }, () =>
+			this.videoToProcess(tenant, photoId),
+		);
+		if (!staged) return;
+		await withDbContext({ tenantId: tenant.id }, () =>
+			this.settleVideo(tenant, photoId, staged, {
+				video_state: "failed",
+				video_failure: VIDEO_GAVE_UP,
+			}),
+		);
+		await this.videos.deleteStaged(tenant, staged);
+	}
+
+	/**
+	 * The stuck-video sweep (FailStuckVideoJob): a video still `processing`
+	 * STUCK_AFTER_MINUTES after it was added is failed ("Took too long to
+	 * process. Upload it again."), under its row's lock, and its upload is
+	 * deleted after the commit. True when it did; a video that finished, was
+	 * removed or is younger is left as it is. In the caller's transaction (a
+	 * savepoint) or its own.
+	 */
+	async failStuckVideo(tenant: TenantRef, photoId: string): Promise<boolean> {
+		return withTransaction(async (trx) => {
+			if (!(await this.lockVideoRow(tenant, photoId))) return false;
+			const [row] = (
+				await trx.rawQuery(
+					`update artist_work_photos set video_state = 'failed', video_failure = ?, updated_at = now()
+					where tenant_id = ? and id = ? and kind = 'video' and video_state = 'processing'
+						and created_at <= now() - make_interval(mins => ?)
+					returning video_staging_key`,
+					[VIDEO_STUCK, tenant.id, photoId, STUCK_AFTER_MINUTES],
+				)
+			).rows as { video_staging_key: string }[];
+			if (!row) return false;
+			afterCommit(() =>
+				this.videos.deleteStaged(tenant, row.video_staging_key),
+			);
+			return true;
+		});
+	}
+
+	/** The staged upload of a video still processing, or null (a photo, gone, or done already). */
+	private async videoToProcess(
+		tenant: TenantRef,
+		photoId: string,
+	): Promise<string | null> {
+		const row = await ArtistWorkPhoto.query()
+			.where("tenant_id", tenant.id)
+			.where("id", photoId)
+			.first();
+		if (!row || row.kind !== "video" || row.videoState !== "processing") {
+			return null;
+		}
+		return row.videoStagingKey;
+	}
+
+	/**
+	 * Writes a video's outcome, only while the row is still processing that
+	 * upload: true when it did. The row is locked `FOR UPDATE` first, the lock
+	 * a removal takes (lockedPhoto, tattooRows), so the two serialise: a
+	 * removal that came first leaves no row here (the caller then deletes the
+	 * files it made), and one that comes after sees the files and deletes
+	 * them. A row settled by an earlier run is left as it is.
+	 */
+	protected async settleVideo(
+		tenant: TenantRef,
+		photoId: string,
+		stagingKey: string,
+		values: Record<string, string | number | string[]>,
+	): Promise<boolean> {
+		if (!(await this.lockVideoRow(tenant, photoId))) return false;
+		const changed = await ArtistWorkPhoto.query()
+			.where("tenant_id", tenant.id)
+			.where("id", photoId)
+			.where("kind", "video")
+			.where("video_state", "processing")
+			.where("video_staging_key", stagingKey)
+			.update({ ...values, updated_at: new Date() });
+		return Number(changed[0] ?? 0) > 0;
+	}
+
+	/**
+	 * Locks a video's row `FOR UPDATE` for the rest of the transaction, its
+	 * tattoo's lead `FOR SHARE` first: the order a removal takes them (the
+	 * lead, then its angles) and the lock the guard trigger takes on the lead
+	 * when the row is updated, so a removal and the worker's write never wait
+	 * for each other both ways. False when the row is gone. Should the video
+	 * have moved to another lead in between (a new main photo), it tries again.
+	 */
+	private async lockVideoRow(
+		tenant: TenantRef,
+		photoId: string,
+	): Promise<boolean> {
+		for (let attempt = 0; attempt < 3; attempt++) {
+			const seen = await ArtistWorkPhoto.query()
+				.where("tenant_id", tenant.id)
+				.where("id", photoId)
+				.first();
+			if (!seen) return false;
+			if (seen.leadPhotoId) {
+				await ArtistWorkPhoto.query()
+					.where("tenant_id", tenant.id)
+					.where("id", seen.leadPhotoId)
+					.forShare()
+					.first();
+			}
+			const row = await ArtistWorkPhoto.query()
+				.where("tenant_id", tenant.id)
+				.where("id", photoId)
+				.forUpdate()
+				.first();
+			if (!row) return false;
+			if (row.leadPhotoId === seen.leadPhotoId) return true;
+		}
+		throw new TattooChangedError();
+	}
+
+	/**
+	 * Under the artist's lock: room for one more angle of the tattoo `lead`
+	 * leads, in the artist's 100 and the tattoo's eight, and the lead still a
+	 * lead. The live lead and how many photos the tattoo has.
+	 */
+	private async roomForAngle(
+		trx: QueryClientContract,
+		tenant: TenantRef,
+		artist: Artist,
+		lead: ArtistWorkPhoto,
+	): Promise<{ live: ArtistWorkPhoto; photos: number }> {
+		if ((await this.countPhotos(tenant, artist.id, trx)) >= MAX_WORK_PHOTOS) {
+			throw new WorkPhotoLimitError();
+		}
+		const live = await this.lockedPhoto(trx, tenant, lead);
+		if (live.leadPhotoId !== null) throw new TattooChangedError();
+		const photos = (await this.tattooRows(tenant, live.id, trx)).length;
+		if (photos >= MAX_TATTOO_PHOTOS) throw new TattooPhotoLimitError();
+		return { live, photos };
+	}
+
+	/**
+	 * Deletes one row's files or throws (TAT-116): a photo's image and its
+	 * copies, or a video's renditions and poster (VideoService). A video still
+	 * processing has none yet; its staged upload is deleted once the removal
+	 * has committed, best effort (the worker finds the row gone and stops).
+	 */
+	private async deleteFiles(
+		tenant: TenantRef,
+		row: ArtistWorkPhoto,
+	): Promise<void> {
+		if (row.kind === "video") {
+			await this.videos.deleteOrThrow(tenant, row.imageKey, row.videoKeys);
+			const staged = row.videoStagingKey;
+			if (staged && row.videoState === "processing") {
+				afterCommit(() => this.videos.deleteStaged(tenant, staged));
+			}
+			return;
+		}
+		await this.images.deleteOrThrow(PURPOSE, stillKey(row));
 	}
 
 	/**
@@ -1105,6 +1478,41 @@ function assertPhotoOf(tenant: TenantRef, photo: ArtistWorkPhoto) {
 	if (photo.tenantId !== tenant.id) {
 		throw new Error(`Work photo ${photo.id} belongs to another tenant`);
 	}
+}
+
+/** A caller bug, not a user error: the lead comes from findEditable and must be the artist's. */
+function assertLeadOf(
+	tenant: TenantRef,
+	artist: Artist,
+	lead: ArtistWorkPhoto,
+) {
+	assertPhotoOf(tenant, lead);
+	if (lead.artistId !== artist.id) {
+		throw new Error(`Work photo ${lead.id} is not ${artist.id}'s`);
+	}
+}
+
+/**
+ * A photo's image key (or a ready video's poster): every photo has one (the
+ * database's `artist_work_photos_photo_shape`), so its absence is a bug.
+ */
+export function stillKey(
+	row: Pick<ArtistWorkPhoto, "id" | "imageKey">,
+): string {
+	if (row.imageKey === null) {
+		throw new Error(`Work photo ${row.id} has no image`);
+	}
+	return row.imageKey;
+}
+
+/** A photo's image key and stored size (stillKey's rule for all three). */
+export function stillOf(
+	row: Pick<ArtistWorkPhoto, "id" | "imageKey" | "width" | "height">,
+): { key: string; width: number; height: number } {
+	if (row.width === null || row.height === null) {
+		throw new Error(`Work photo ${row.id} has no size`);
+	}
+	return { key: stillKey(row), width: row.width, height: row.height };
 }
 
 /** Escapes LIKE's wildcards and its escape character. */

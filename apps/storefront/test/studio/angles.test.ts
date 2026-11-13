@@ -26,6 +26,7 @@ import {
 	galleryPhotoView,
 	galleryView,
 	MAX_ANGLES,
+	type PhotoAngleView,
 } from "../../src/studio/gallery.ts";
 import {
 	type ArtworkPageData,
@@ -61,7 +62,13 @@ import { IMAGE_ORIGIN, withStorefront } from "./theme-fixtures.ts";
  * one photo is pinned unchanged by the existing render tests.
  */
 
-const THEMES = ["stencil-and-ink", "ink-noir", "irezumi", "atelier"] as const;
+const THEMES = [
+	"stencil-and-ink",
+	"ink-noir",
+	"irezumi",
+	"atelier",
+	"flash-parlour",
+] as const;
 const SHARED_CSS = readFileSync(
 	new URL("../../src/styles.css", import.meta.url),
 	"utf8",
@@ -73,6 +80,7 @@ const themed = (theme: ThemeName, studio: Studio = STUDIO): Studio =>
 
 /** An angle as the API sends it: on the API's origin, with its copies. */
 const angle = (n: number, alt: string | null = null, width = 1200) => ({
+	kind: "photo" as const,
 	url: `https://api.example.com/uploads/tenants/t/artist_work_photo/a${n}.320-640.jpg`,
 	width,
 	height: 1600,
@@ -134,8 +142,10 @@ describe("reading a tattoo's angles", () => {
 				["Tattoo by Sita Rai, photo 3 of 3", null],
 			],
 		);
-		assert.match(photo.angles[0].srcSet ?? "", /a2\.320w\.jpg 320w/);
-		assert.match(photo.angles[1].largeSrc, /a3\.320-640\.jpg$/);
+		const [first, second] = photo.angles as PhotoAngleView[];
+		assert.equal(first.kind, "photo");
+		assert.match(first.srcSet ?? "", /a2\.320w\.jpg 320w/);
+		assert.match(second.largeSrc, /a3\.320-640\.jpg$/);
 		assert.deepEqual(single.angles, []);
 		assert.equal(single.photosLabel, null);
 	});

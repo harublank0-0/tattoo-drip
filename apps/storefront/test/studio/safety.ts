@@ -52,7 +52,7 @@ export function assertSafePage(html: string, options: SafePageOptions = {}) {
 	const covers = options.brandImages
 		? Array.from(
 				html.matchAll(
-					/<(?:div class="(?:profile-cover|ink-hero-media)"|figure class="(?:irz-hero-figure|atl-plate atl-hero-plate)")>(<img [^>]*>)/g,
+					/<(?:div class="(?:profile-cover|ink-hero-media)"|figure class="(?:irz-hero-figure|atl-plate atl-hero-plate|fp-plate fp-hero-plate)")>(<img [^>]*>)/g,
 				),
 				(match) => match[1],
 			)
@@ -99,6 +99,22 @@ export function assertSafePage(html: string, options: SafePageOptions = {}) {
 			assert.ok(
 				insideLink(html, image, "atl-piece-link", true),
 				`an Atelier piece's photo outside its link: ${image}`,
+			);
+		} else if (/class="fp-piece-photo"/.test(image)) {
+			// Flash Parlour's tattoos: the same, inside the piece's link or
+			// viewer button, which its title names.
+			assert.match(image, / alt=""/, image);
+			assert.ok(
+				insideLink(html, image, "fp-piece-link", true),
+				`a Flash Parlour piece's photo outside its link: ${image}`,
+			);
+		} else if (/class="fp-card-picture"/.test(image)) {
+			// Flash Parlour's flash sheets: the picture inside the sheet's link,
+			// which the design's name names.
+			assert.match(image, / alt=""/, image);
+			assert.ok(
+				insideLink(html, image, "fp-card-link"),
+				`a Flash Parlour design's picture outside its link: ${image}`,
 			);
 		} else if (/class="irz-preview"/.test(image)) {
 			// Irezumi's small previews of an artist's work, in a list hidden

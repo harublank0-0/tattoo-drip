@@ -43,6 +43,9 @@ export const IMAGE_PURPOSES = {
 	studio_logo: { visibility: "public", variants: VARIANT_WIDTHS }, // TAT-56
 	studio_icon: { visibility: "public", variants: ICON_WIDTHS }, // TAT-123
 	flash_design: { visibility: "public", variants: VARIANT_WIDTHS }, // TAT-129
+	// Video angles: a video's poster, with a photo's copies; its MP4
+	// renditions sit beside it under the same purpose (VideoService).
+	work_video: { visibility: "public", variants: VARIANT_WIDTHS },
 } as const;
 
 export type ImagePurpose = keyof typeof IMAGE_PURPOSES;

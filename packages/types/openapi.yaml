@@ -1526,11 +1526,13 @@ components:
             The studio's theme: `stencil-and-ink` (paper, ink and a violet
             stencil line), `ink-noir` (dark and photo-first, with a site
             navigation and a full footer), `irezumi` (light and editorial:
-            warm paper, charcoal ink and a vermilion accent) or `atelier`
-            (quiet luxury: stone paper, bronze and Bodoni headings). More will
-            come: treat an unknown value as `stencil-and-ink`.
+            warm paper, charcoal ink and a vermilion accent), `atelier`
+            (quiet luxury: stone paper, bronze and Bodoni headings) or
+            `flash-parlour` (a traditional walk-in shop's wall of flash:
+            cream, black ink, red, mustard and green). More will come: treat
+            an unknown value as `stencil-and-ink`.
           type: string
-          enum: [stencil-and-ink, ink-noir, irezumi, atelier]
+          enum: [stencil-and-ink, ink-noir, irezumi, atelier, flash-parlour]
         branding:
           type: object
           required: [logo, colors, font]
@@ -1868,13 +1870,105 @@ components:
           type: array
           maxItems: 7
           description: |
-            The tattoo's other photos, in the studio's order, after the main
-            photo: [] for a tattoo of one photo. A tattoo is at most eight
-            photos. Each is a `WorkPhoto` with no id of its own (the tattoo is
-            addressed by `id`). When an angle's `alt` is null, build one from
-            the artist's name and the photo's place in the whole tattoo, the
-            main photo being 1: "Tattoo by Sita Rai, photo 2 of 4".
-          items: { $ref: "#/components/schemas/WorkPhoto" }
+            The tattoo's other photos and videos, in the studio's order, after
+            the main photo: [] for a tattoo of one photo. A tattoo is at most
+            eight items (photos and videos together; the main one is always a
+            photo). Each has a `kind`: a `PhotoAngle` (a `WorkPhoto` with
+            `kind: "photo"`) or a `VideoAngle` (`kind: "video"`: a short
+            silent clip with its poster). Neither has an id of its own (the
+            tattoo is addressed by `id`). Only videos that are ready are
+            listed. Skip an item whose `kind` you do not know: the list may
+            grow. When an angle's `alt` is null, build one from the artist's
+            name and its place in the whole tattoo, the main photo being 1:
+            "Tattoo by Sita Rai, photo 2 of 4".
+          items:
+            oneOf:
+              - $ref: "#/components/schemas/PhotoAngle"
+              - $ref: "#/components/schemas/VideoAngle"
+            discriminator:
+              propertyName: kind
+              mapping:
+                photo: "#/components/schemas/PhotoAngle"
+                video: "#/components/schemas/VideoAngle"
+
+    PhotoAngle:
+      type: object
+      description: |
+        One more photo of a tattoo (a `GalleryPhoto`'s `angles`): a
+        `WorkPhoto` with its `kind`.
+      required: [kind, url, width, height, alt, variants]
+      additionalProperties: false
+      properties:
+        kind: { type: string, const: photo }
+        url:
+          type: string
+          format: uri
+          description: Public and absolute.
+        width: { type: integer, minimum: 1 }
+        height: { type: integer, minimum: 1 }
+        alt:
+          type: [string, "null"]
+          maxLength: 200
+          description: The studio's own description of the photo, one line of plain text, or null.
+        variants:
+          type: array
+          maxItems: 8
+          description: |
+            Smaller copies, narrowest first, each narrower than `width`
+            (320, 640 and 1280 px, those below the photo's own width). Build
+            `srcset` from these and `url` at `width`.
+          items: { $ref: "#/components/schemas/ImageVariant" }
+
+    VideoAngle:
+      type: object
+      description: |
+        A short video of a tattoo (a `GalleryPhoto`'s `angles`; never its
+        main photo). At most 60 seconds, with no sound: the platform strips
+        the audio and every bit of metadata. Show the poster until the
+        visitor plays it; never autoplay it.
+      required: [kind, poster, sources, durationMs, alt]
+      additionalProperties: false
+      properties:
+        kind: { type: string, const: video }
+        poster:
+          $ref: "#/components/schemas/Image"
+          description: |
+            A frame of the video (about 1 s in) as a still image, with its
+            smaller copies like a photo's, at the size of the largest source.
+        sources:
+          type: array
+          minItems: 1
+          maxItems: 2
+          description: |
+            The same video at up to two sizes (720p and 1080p, by the short
+            side, only those not larger than the clip), smallest first: list
+            them in this order as `<source>`s, so a phone takes the smaller.
+          items: { $ref: "#/components/schemas/VideoSource" }
+        durationMs:
+          type: integer
+          minimum: 1
+          maximum: 60000
+          description: How long it plays, in milliseconds.
+        alt:
+          type: [string, "null"]
+          maxLength: 200
+          description: |
+            The studio's own description of the video, one line of plain
+            text, or null: then build a label such as "Video, 0:42".
+
+    VideoSource:
+      type: object
+      description: One size of a `VideoAngle`, an H.264 MP4 with no audio.
+      required: [url, type, width, height]
+      additionalProperties: false
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Public and absolute, on the same origin as the poster.
+        type: { type: string, const: video/mp4 }
+        width: { type: integer, minimum: 1 }
+        height: { type: integer, minimum: 1 }
 
     WorkFilters:
       type: object

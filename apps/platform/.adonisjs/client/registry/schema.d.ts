@@ -1135,6 +1135,42 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/work_photos_controller').default['ungroup']>>>
     }
   }
+  'tenant.artists.photos.videos.sign': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/artists/photos/:id/videos/sign'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/artists/validators/work_photo').signWorkVideoValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/artists/validators/work_photo').signWorkVideoValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/work_videos_controller').default['sign']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/work_videos_controller').default['sign']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.artists.photos.videos.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/artists/photos/:id/videos'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/artists/validators/work_photo').addWorkVideoValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/artists/validators/work_photo').addWorkVideoValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/work_videos_controller').default['store']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/work_videos_controller').default['store']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.artists.photos.videos.stage': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/artists/photos/:id/videos/stage'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/work_videos_controller').default['stage']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/work_videos_controller').default['stage']>>>
+    }
+  }
   'tenant.artists.flash.store': {
     methods: ["POST"]
     pattern: '/t/:tenant/artists/:id/flash'

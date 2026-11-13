@@ -78,7 +78,7 @@ function readsOnScheme(color: string, scheme: Scheme): boolean {
 
 /**
  * The booking form's Turnstile widget colours for a theme: its one fixed
- * scheme (Ink Noir is dark, Atelier light), so the widget matches the page
+ * scheme (Ink Noir is dark, Atelier and Flash Parlour light), so the widget matches the page
  * whatever the device prefers; `auto` (the device's) for a theme that
  * follows the device, as Stencil & Ink and Irezumi do.
  */
@@ -182,7 +182,7 @@ function tokenRule(tokens: AccentTokens, selector = "html:root"): string {
  * which outranks src/styles.css's `:root` wherever the router puts the tag.
  *
  * A theme with one fixed scheme (THEME_HTML's `scheme`: Ink Noir is always
- * dark, Atelier always light) gets one rule instead, with no media query, on
+ * dark, Atelier and Flash Parlour always light) gets one rule instead, with no media query, on
  * `html:root.<the theme's class>`, which outranks the theme's tokens
  * (`:root.<class>`). A dark one takes the accent as the dark scheme does
  * (`accentDark`, else the accent lightened); a light one takes `accent` as it
@@ -226,7 +226,7 @@ export function brandingCss(config: ThemeConfig): string | null {
 		}
 	}
 	// On a theme's own class where it has one (0,2,1), so a theme that sets its
-	// own face (Atelier's Bodoni) still yields to the studio's pick.
+	// own face (Atelier's Bodoni, Flash Parlour's Shrikhand) still yields to the studio's pick.
 	const face = DISPLAY_FACES[config.font];
 	if (face !== null) rules.push(`${selector}{--display-face:${face}}`);
 	const css = rules.join("");

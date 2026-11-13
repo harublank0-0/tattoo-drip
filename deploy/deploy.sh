@@ -11,7 +11,8 @@
 #   2. refuse while the settings are missing, unreadable or unfinished (CHANGE_ME left in
 #      an env file), or the release record (below) cannot be read or written
 #   3. git fetch origin, check out the requested commit (detached)
-#   4. build the web, storefront and backup images (worker and migrate share web's image),
+#   4. build the web, worker, storefront and backup images (migrate shares web's image; the
+#      two workers share the worker image, web's plus ffmpeg),
 #      then Discover's on its own when TD_ENV_DIR has discover.env (D11)
 #   5. start postgres and wait for it to be healthy (60 s)
 #   6. run the migrations; if they fail, stop: the old app containers are still serving
@@ -193,7 +194,7 @@ main() {
 	# compose run does not rebuild an existing image, so a changed backup.sh would never
 	# reach the nightly job).
 	say "building images"
-	compose --profile tools build web storefront backup || fail "the build failed; nothing was restarted (the checkout is on the new commit; to go back: deploy/deploy.sh $PREV_SHA)"
+	compose --profile tools build web worker storefront backup || fail "the build failed; nothing was restarted (the checkout is on the new commit; to go back: deploy/deploy.sh $PREV_SHA)"
 	# On its own: building it beside the others would take the build past the server's memory
 	# (Dockerfile, discover-build).
 	if [ -n "$with_discover" ]; then
@@ -219,7 +220,7 @@ main() {
 
 	# 7. Recreate what changed.
 	say "restarting services"
-	local -a services=(web worker storefront nginx cloudflared) healthy=(web storefront) profiles=()
+	local -a services=(web worker video-worker storefront nginx cloudflared) healthy=(web storefront) profiles=()
 	if [ -n "$with_discover" ]; then
 		services+=(discover)
 		healthy+=(discover)

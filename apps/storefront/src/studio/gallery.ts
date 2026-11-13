@@ -1,7 +1,7 @@
 import type { ListWorkQuery } from "@tattoo-drip/sdk";
 import { fill } from "../intake/template.ts";
 import { studioCopy } from "./copy.ts";
-import { galleryPhotoHref } from "./links.ts";
+import { galleryPhotoHref, safeImageUrl } from "./links.ts";
 import { largeSource } from "./srcset.ts";
 import { cleanLine } from "./text.ts";
 import { type BrandImage, readBrandImage } from "./theme/config.ts";
@@ -40,6 +40,17 @@ const MAX_STYLE_SLUG = 40;
 
 /** The most other photos of one tattoo (the contract's `angles` maxItems: eight photos in all). */
 export const MAX_ANGLES = 7;
+/** The most sizes of one video read (the contract's `sources` maxItems). */
+const MAX_VIDEO_SOURCES = 2;
+/** The longest video (the contract's `durationMs` maximum: 60 s). */
+const MAX_VIDEO_MS = 60_000;
+/** The longest side of a video's source: 4K (the platform's renditions are at most 1080p). */
+const MAX_VIDEO_SIDE = 4096;
+/**
+ * Below this width a screen takes the smallest source: a phone gets the
+ * 720p video, a larger screen the next (each `<source>` but the last has it).
+ */
+export const SMALL_VIDEO_MEDIA = "(max-width: 47.99rem)";
 
 /**
  * One more photo of a tattoo (angles): the brand images' rule like the main
@@ -47,13 +58,48 @@ export const MAX_ANGLES = 7;
  * with its place in the whole tattoo (the main photo being 1), and the copy
  * the viewer shows.
  */
-export interface AngleView extends BrandImage {
+export interface PhotoAngleView extends BrandImage {
+	readonly kind: "photo";
 	readonly alt: string;
 	/** The studio's description for the viewer, or null. */
 	readonly caption: string | null;
 	/** What the viewer shows (largeSource). */
 	readonly largeSrc: string;
 }
+
+/** One size of a video angle: an MP4 on the image origin, with the `media` that picks it on a small screen (none on the largest). */
+export interface VideoSourceView {
+	readonly src: string;
+	readonly type: "video/mp4";
+	readonly width: number;
+	readonly height: number;
+	readonly media?: string;
+}
+
+/**
+ * A short video of a tattoo (video angles; the contract's VideoAngle): its
+ * poster by the brand images' rule, its sizes smallest first (a small screen
+ * takes the smallest, `media`), its length, and its names: `alt` the
+ * studio's description, else "Video, 0:42"; `label` always says it is a
+ * video and how long ("Video, 0:42", then the description), for its
+ * thumbnail's button. Its box is the largest source's size.
+ */
+export interface VideoAngleView {
+	readonly kind: "video";
+	readonly poster: BrandImage;
+	readonly sources: readonly VideoSourceView[];
+	readonly width: number;
+	readonly height: number;
+	readonly durationMs: number;
+	/** "0:42": shown on its thumbnail. */
+	readonly durationText: string;
+	readonly alt: string;
+	readonly label: string;
+	readonly caption: string | null;
+}
+
+/** One more photo or video of a tattoo. */
+export type AngleView = PhotoAngleView | VideoAngleView;
 
 /** One photo of the gallery: a work photo and whose it is, what it shows and whether it has healed. */
 export interface GalleryPhotoView extends WorkPhotoView {
@@ -74,11 +120,12 @@ export interface GalleryPhotoView extends WorkPhotoView {
 	}[];
 	readonly healed: boolean;
 	/**
-	 * Angles: the tattoo's other photos, in order, after this one (the main
-	 * photo); [] for a tattoo of one photo, an older API or none that pass.
+	 * Angles: the tattoo's other photos and videos, in order, after this one
+	 * (the main photo); [] for a tattoo of one photo, an older API or none
+	 * that pass.
 	 */
 	readonly angles: readonly AngleView[];
-	/** The tile's mark for a tattoo of several photos ("3 photos"); null for one. */
+	/** The tile's mark for a tattoo of several photos ("3 photos", "3 photos and videos" with a video); null for one. */
 	readonly photosLabel: string | null;
 }
 
@@ -181,10 +228,12 @@ function angleAlt(name: string | null, n: number, count: number): string {
 }
 
 /**
- * The tattoo's other photos as the API sent them (`angles`, whatever it
- * really is): at most seven, each passing the brand images' rule, the rest
- * dropped, and each described by the studio or by its place in the whole
- * tattoo. Pure.
+ * The tattoo's other photos and videos as the API sent them (`angles`,
+ * whatever it really is): at most seven, by their `kind` (none is a photo,
+ * as an API before videos sent them; a kind this page doesn't know is
+ * skipped), each photo passing the brand images' rule and each video
+ * readVideoAngle's, the rest dropped, each described by the studio or by its
+ * place in the whole tattoo. Pure.
  */
 function readAngles(
 	value: unknown,
@@ -192,20 +241,114 @@ function readAngles(
 	artist: string | null,
 ): AngleView[] {
 	if (!Array.isArray(value)) return [];
-	const kept = value
-		.slice(0, MAX_ANGLES)
-		.map((item) => ({ item, image: readBrandImage(item, imageOrigin) }))
-		.flatMap(({ item, image }) => (image ? [{ item, image }] : []));
+	type Kept =
+		| { kind: "photo"; item: unknown; image: BrandImage }
+		| { kind: "video"; video: Omit<VideoAngleView, "alt" | "label"> };
+	const kept = value.slice(0, MAX_ANGLES).flatMap((item): Kept[] => {
+		const kind = own(item, "kind");
+		if (kind === "video") {
+			const video = readVideoAngle(item, imageOrigin);
+			return video ? [{ kind: "video", video }] : [];
+		}
+		if (kind !== undefined && kind !== "photo") return [];
+		const image = readBrandImage(item, imageOrigin);
+		return image ? [{ kind: "photo", item, image }] : [];
+	});
 	const count = kept.length + 1;
-	return kept.map(({ item, image }, index) => {
-		const description = readDescription(own(item, "alt"));
+	return kept.map((entry, index): AngleView => {
+		if (entry.kind === "video") {
+			const { video } = entry;
+			const named = fill(studioCopy.work.videoLabel, {
+				duration: video.durationText,
+			});
+			return {
+				...video,
+				alt: video.caption ?? named,
+				label: video.caption ? `${named}: ${video.caption}` : named,
+			};
+		}
+		const description = readDescription(own(entry.item, "alt"));
 		return {
-			...image,
+			kind: "photo",
+			...entry.image,
 			alt: description ?? angleAlt(artist, index + 2, count),
 			caption: description,
-			largeSrc: largeSource(image),
+			largeSrc: largeSource(entry.image),
 		};
 	});
+}
+
+/**
+ * A video angle as the API sent it, or null: its poster passes the brand
+ * images' rule, its sources are MP4s on that same origin with sides from 1
+ * to 4096 (at most two, smallest first, the others but the largest with
+ * SMALL_VIDEO_MEDIA), it plays from 1 ms to 60 s, and its description is
+ * one line up to 200 characters, else none. Pure.
+ */
+function readVideoAngle(
+	item: unknown,
+	imageOrigin: string | null,
+): Omit<VideoAngleView, "alt" | "label"> | null {
+	const poster = readBrandImage(own(item, "poster"), imageOrigin);
+	if (!poster) return null;
+	const durationMs = own(item, "durationMs");
+	if (
+		typeof durationMs !== "number" ||
+		!Number.isInteger(durationMs) ||
+		durationMs < 1 ||
+		durationMs > MAX_VIDEO_MS
+	) {
+		return null;
+	}
+	const origin = new URL(poster.src).origin;
+	const value = own(item, "sources");
+	const sources = (Array.isArray(value) ? value.slice(0, 4) : [])
+		.flatMap((source) => {
+			const url = own(source, "url");
+			const width = own(source, "width");
+			const height = own(source, "height");
+			if (own(source, "type") !== "video/mp4" || typeof url !== "string") {
+				return [];
+			}
+			if (/[\s\p{Cc}]/u.test(url)) return [];
+			const src = safeImageUrl(url);
+			if (!src || new URL(src).origin !== origin) return [];
+			if (!isVideoSide(width) || !isVideoSide(height)) return [];
+			return [{ src, type: "video/mp4" as const, width, height }];
+		})
+		.sort((a, b) => a.width * a.height - b.width * b.height)
+		.slice(0, MAX_VIDEO_SOURCES);
+	if (sources.length === 0) return null;
+	const largest = sources[sources.length - 1];
+	return {
+		kind: "video",
+		poster,
+		sources: sources.map((source, index) =>
+			index < sources.length - 1
+				? { ...source, media: SMALL_VIDEO_MEDIA }
+				: source,
+		),
+		width: largest.width,
+		height: largest.height,
+		durationMs,
+		durationText: durationText(durationMs),
+		caption: readDescription(own(item, "alt")),
+	};
+}
+
+function isVideoSide(value: unknown): value is number {
+	return (
+		typeof value === "number" &&
+		Number.isInteger(value) &&
+		value >= 1 &&
+		value <= MAX_VIDEO_SIDE
+	);
+}
+
+/** "0:42", "1:00": how long a video plays. */
+export function durationText(durationMs: number): string {
+	const seconds = Math.max(1, Math.round(durationMs / 1000));
+	return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
 /** A photo the brand images' rule kept, numbered `n` (the dialog and button ids, the label and the fallback description). */
@@ -249,23 +392,29 @@ function shownPhoto(
 		angles,
 		photosLabel:
 			angles.length > 0
-				? fill(studioCopy.work.photosCount, { count: angles.length + 1 })
+				? fill(
+						angles.some((angle) => angle.kind === "video")
+							? studioCopy.work.photosVideosCount
+							: studioCopy.work.photosCount,
+						{ count: angles.length + 1 },
+					)
 				: null,
 	};
 }
 
 /**
- * One photo of a tattoo as its page and its viewer step through them: the
- * main photo first, then the angles. The main photo keeps its own alt (the
- * grid's or the page's), each angle its own.
+ * One photo or video of a tattoo as its page and its viewer step through
+ * them: the main photo first, then the angles. The main photo keeps its own
+ * alt (the grid's or the page's), each angle its own.
  */
 export type TattooShot = AngleView;
 
-/** A tattoo's photos in order: its main photo, then its angles. */
+/** A tattoo's photos and videos in order: its main photo, then its angles. */
 export function tattooShots(photo: GalleryPhotoView): TattooShot[] {
 	const { src, width, height, srcSet, alt, caption, largeSrc } = photo;
 	return [
 		{
+			kind: "photo",
 			src,
 			width,
 			height,

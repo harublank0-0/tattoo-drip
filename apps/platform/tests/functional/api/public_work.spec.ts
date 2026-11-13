@@ -15,7 +15,7 @@ import {
 	assertApiHeaders,
 	assertNoCookies,
 } from "#tests/helpers/api";
-import { addArtist, addWorkPhoto } from "#tests/helpers/artists";
+import { addArtist, addWorkPhoto, addWorkVideo } from "#tests/helpers/artists";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
 const CACHED = "public, max-age=60, stale-while-revalidate=600";
@@ -44,8 +44,10 @@ const at = (minutes: number) => T0.plus({ minutes });
 const work = (slug: string, query = "") =>
 	`/api/v1/tenants/${slug}/work${query}`;
 
-/** A WorkPhoto's fields: each angle carries exactly these, no id, key or date. */
-const ANGLE_FIELDS = ["alt", "height", "url", "variants", "width"];
+/** A PhotoAngle's fields: each photo angle carries exactly these, no id, key or date. */
+const ANGLE_FIELDS = ["alt", "height", "kind", "url", "variants", "width"];
+/** A VideoAngle's fields (video angles): never a staging key, a state, a failure or an id. */
+const VIDEO_FIELDS = ["alt", "durationMs", "kind", "poster", "sources"];
 
 /** The stored keys of the photos in a page, in order: a photo's URL ends in its key. */
 const keysOf = (data: { url: string }[]) =>
@@ -160,7 +162,7 @@ test.group("GET /api/v1/tenants/:tenant/work (listWork)", (group) => {
 		for (const artist of [sita, bina]) assert.notInclude(text, artist.id);
 	});
 
-	test("lists a tattoo once, as its lead with its angles in order, each with exactly WorkPhoto's fields; the lead's styles and healed mark filter it", async ({
+	test("lists a tattoo once, as its lead with its angles in order, each with exactly PhotoAngle's fields; the lead's styles and healed mark filter it", async ({
 		client,
 		assert,
 	}) => {
@@ -202,6 +204,7 @@ test.group("GET /api/v1/tenants/:tenant/work (listWork)", (group) => {
 		assert.deepEqual(keysOf(tattoo.angles), rowKeys([second, third]));
 		for (const angle of tattoo.angles) {
 			assert.deepEqual(Object.keys(angle).sort(), ANGLE_FIELDS);
+			assert.equal(angle.kind, "photo");
 		}
 		assert.equal(tattoo.angles[0].width, 300);
 		for (const variant of tattoo.angles[0].variants) {
@@ -220,6 +223,82 @@ test.group("GET /api/v1/tenants/:tenant/work (listWork)", (group) => {
 			.body()
 			.data.map((photo: { id: string }) => photo.id);
 		assert.deepEqual(healed, [lead.id]);
+	});
+
+	test("video angles: a ready video is listed in its place with exactly VideoAngle's fields; a processing or failed one never leaves the dashboard", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("api-work-video-a");
+		const sita = await addArtist(tenant, owner);
+		const { lead, photo, ready } = await inTenant(tenant, async () => {
+			const lead = await addWorkPhoto(tenant, sita, { createdAt: at(1) });
+			const photo = await addWorkPhoto(tenant, sita, {
+				createdAt: at(2),
+				angleOf: { lead, position: 1 },
+			});
+			const ready = await addWorkVideo(tenant, sita, lead, 2, {
+				alt: "Healed, in the sun",
+			});
+			await addWorkVideo(tenant, sita, lead, 3, { state: "processing" });
+			await addWorkVideo(tenant, sita, lead, 4, { state: "failed" });
+			return { lead, photo, ready };
+		});
+
+		for (const url of [
+			work("api-work-video-a"),
+			`${work("api-work-video-a")}/${lead.id}`,
+		]) {
+			const body = (await client.get(url)).body();
+			const tattoo = Array.isArray(body.data) ? body.data[0] : body.data;
+			assert.equal(tattoo.id, lead.id);
+			assert.deepEqual(
+				tattoo.angles.map((angle: { kind: string }) => angle.kind),
+				["photo", "video"],
+			);
+			const video = tattoo.angles[1];
+			assert.deepEqual(Object.keys(video).sort(), VIDEO_FIELDS);
+			assert.equal(video.alt, "Healed, in the sun");
+			assert.equal(video.durationMs, 42_000);
+			assert.deepEqual(Object.keys(video.poster).sort(), [
+				"alt",
+				"height",
+				"url",
+				"variants",
+				"width",
+			]);
+			assert.equal(video.poster.width, 1080);
+			assert.equal(video.poster.height, 1920);
+			assert.equal(
+				new URL(video.poster.url).pathname.replace(/^\/uploads\//, ""),
+				ready.imageKey,
+			);
+			assert.deepEqual(
+				video.poster.variants.map((copy: { width: number }) => copy.width),
+				[320, 640],
+			);
+			// Smallest first, so a phone takes the 720p one.
+			assert.deepEqual(video.sources, [
+				{
+					url: `${new URL(video.poster.url).origin}/uploads/${ready.videoKeys?.[0]}`,
+					type: "video/mp4",
+					width: 720,
+					height: 1280,
+				},
+				{
+					url: `${new URL(video.poster.url).origin}/uploads/${ready.videoKeys?.[1]}`,
+					type: "video/mp4",
+					width: 1080,
+					height: 1920,
+				},
+			]);
+			const text = JSON.stringify(body);
+			assert.notInclude(text, ready.id);
+			assert.notInclude(text, photo.id);
+			assert.notInclude(text, "work_video_upload");
+			assert.notInclude(text, "processing");
+			assert.notInclude(text, "60 seconds");
+		}
 	});
 
 	test("the lead decides for its tattoo: a hidden lead hides its angles, and an angle's own stale columns change nothing", async ({

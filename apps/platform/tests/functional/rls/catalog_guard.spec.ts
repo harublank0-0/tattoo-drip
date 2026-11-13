@@ -132,6 +132,11 @@ const DEFINER_FUNCTIONS: Record<string, { args: string; reason: string }> = {
 		reason:
 			"the id of the live tenant holding the invitation whose token hash is exactly the argument, for the invitation page (TAT-33)",
 	},
+	"public.stuck_video_candidates": {
+		args: "",
+		reason:
+			"lists (tenant_id, photo_id) of videos still processing an hour after they were added, for the stuck-video sweep (video angles)",
+	},
 	"public.tenant_for_slug": {
 		args: "requested_slug text",
 		reason:

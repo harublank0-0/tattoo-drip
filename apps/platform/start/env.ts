@@ -30,6 +30,11 @@ const env = await Env.create(new URL("../", import.meta.url), {
 	// Node
 	NODE_ENV: Env.schema.enum(["development", "production", "test"] as const),
 	PORT: Env.schema.number(),
+	// Video angles: how many times a worker puts a job it lost (stalled) back
+	// in its queue before failing it (the queue's default is 1). The video
+	// worker sets 3 (deploy/compose.yml): a transcode is long, and a restart
+	// mid-job should not cost the video.
+	QUEUE_MAX_STALLED_COUNT: Env.schema.number.optional(),
 	HOST: Env.schema.string({ format: "host" }),
 	LOG_LEVEL: Env.schema.string(),
 

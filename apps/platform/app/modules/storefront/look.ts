@@ -12,6 +12,7 @@ export const THEME_KEYS = [
 	"ink-noir",
 	"irezumi",
 	"atelier",
+	"flash-parlour",
 ] as const;
 export type ThemeKey = (typeof THEME_KEYS)[number];
 export const DEFAULT_THEME: ThemeKey = "stencil-and-ink";
@@ -100,11 +101,21 @@ export const THEMES: { key: ThemeKey; label: string; description: string }[] = [
 		description:
 			"Quiet luxury: stone paper, bronze and Bodoni headings, your work as a numbered collection. Your colour shows where it reads on the paper.",
 	},
+	{
+		key: "flash-parlour",
+		label: "Flash Parlour",
+		description:
+			"Traditional flash on the wall: cream paper, heavy black ink, red, mustard and green, with Shrikhand headings; your available flash opens the page. Your colour shows where it reads on the paper.",
+	},
 ];
 
 /** The heading fonts an owner can pick: the label names the face. */
 export const FONTS: { key: FontKey; label: string }[] = [
-	{ key: "eczar", label: "The theme's own (Eczar; Bodoni on Atelier)" },
+	{
+		key: "eczar",
+		label:
+			"The theme's own (Eczar; Bodoni on Atelier, Shrikhand on Flash Parlour)",
+	},
 	{ key: "serif", label: "Classic serif" },
 	{ key: "sans", label: "Plain" },
 ];

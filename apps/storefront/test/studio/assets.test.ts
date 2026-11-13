@@ -190,17 +190,18 @@ describe("the vendored Eczar files", () => {
 	});
 
 	test("one heading font is preloaded, its Latin file, as a CORS-anonymous font", () => {
-		// Eczar's, or Atelier's Bodoni while an Atelier studio keeps the default font (atelier.test.ts).
+		// Eczar's, or the theme's own face while an Atelier or Flash Parlour studio
+		// keeps the default font (atelier.test.ts, flash-parlour.test.ts).
 		const preloads = Array.from(root.matchAll(/rel:\s*"preload"/g));
 		assert.equal(preloads.length, 1);
 		assert.match(
 			root,
 			/import eczarLatin from "\.\.\/assets\/fonts\/eczar\/eczar-latin-700-normal\.woff2\?url"/,
 		);
-		assert.match(
-			root,
-			/href: theme === "atelier" && font === "eczar" \? bodoniLatin : eczarLatin,/,
-		);
+		// The choice is theme/html.ts's matchedHeadingFont (flash-parlour.test.ts tests every pair).
+		assert.match(root, /preloadedFont\(matchedHeadingFont\(matches\)\)/);
+		assert.match(root, /href: HEADING_FONT_URLS\[file\],/);
+		assert.match(root, /eczar: eczarLatin,/);
 		assert.match(root, /as:\s*"font"/);
 		assert.match(root, /type:\s*"font\/woff2"/);
 		assert.match(root, /crossOrigin:\s*"anonymous"/);

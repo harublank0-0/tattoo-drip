@@ -1040,12 +1040,14 @@ export interface components {
              * @description The studio's theme: `stencil-and-ink` (paper, ink and a violet
              *     stencil line), `ink-noir` (dark and photo-first, with a site
              *     navigation and a full footer), `irezumi` (light and editorial:
-             *     warm paper, charcoal ink and a vermilion accent) or `atelier`
-             *     (quiet luxury: stone paper, bronze and Bodoni headings). More will
-             *     come: treat an unknown value as `stencil-and-ink`.
+             *     warm paper, charcoal ink and a vermilion accent), `atelier`
+             *     (quiet luxury: stone paper, bronze and Bodoni headings) or
+             *     `flash-parlour` (a traditional walk-in shop's wall of flash:
+             *     cream, black ink, red, mustard and green). More will come: treat
+             *     an unknown value as `stencil-and-ink`.
              * @enum {string}
              */
-            theme: "stencil-and-ink" | "ink-noir" | "irezumi" | "atelier";
+            theme: "stencil-and-ink" | "ink-noir" | "irezumi" | "atelier" | "flash-parlour";
             branding: {
                 /**
                  * @description The studio's logo, or null. `alt` is always null (it sits
@@ -1314,14 +1316,88 @@ export interface components {
                 name: string;
             };
             /**
-             * @description The tattoo's other photos, in the studio's order, after the main
-             *     photo: [] for a tattoo of one photo. A tattoo is at most eight
-             *     photos. Each is a `WorkPhoto` with no id of its own (the tattoo is
-             *     addressed by `id`). When an angle's `alt` is null, build one from
-             *     the artist's name and the photo's place in the whole tattoo, the
-             *     main photo being 1: "Tattoo by Sita Rai, photo 2 of 4".
+             * @description The tattoo's other photos and videos, in the studio's order, after
+             *     the main photo: [] for a tattoo of one photo. A tattoo is at most
+             *     eight items (photos and videos together; the main one is always a
+             *     photo). Each has a `kind`: a `PhotoAngle` (a `WorkPhoto` with
+             *     `kind: "photo"`) or a `VideoAngle` (`kind: "video"`: a short
+             *     silent clip with its poster). Neither has an id of its own (the
+             *     tattoo is addressed by `id`). Only videos that are ready are
+             *     listed. Skip an item whose `kind` you do not know: the list may
+             *     grow. When an angle's `alt` is null, build one from the artist's
+             *     name and its place in the whole tattoo, the main photo being 1:
+             *     "Tattoo by Sita Rai, photo 2 of 4".
              */
-            angles: components["schemas"]["WorkPhoto"][];
+            angles: (components["schemas"]["PhotoAngle"] | components["schemas"]["VideoAngle"])[];
+        };
+        /**
+         * @description One more photo of a tattoo (a `GalleryPhoto`'s `angles`): a
+         *     `WorkPhoto` with its `kind`.
+         */
+        PhotoAngle: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "photo";
+            /**
+             * Format: uri
+             * @description Public and absolute.
+             */
+            url: string;
+            width: number;
+            height: number;
+            /** @description The studio's own description of the photo, one line of plain text, or null. */
+            alt: string | null;
+            /**
+             * @description Smaller copies, narrowest first, each narrower than `width`
+             *     (320, 640 and 1280 px, those below the photo's own width). Build
+             *     `srcset` from these and `url` at `width`.
+             */
+            variants: components["schemas"]["ImageVariant"][];
+        };
+        /**
+         * @description A short video of a tattoo (a `GalleryPhoto`'s `angles`; never its
+         *     main photo). At most 60 seconds, with no sound: the platform strips
+         *     the audio and every bit of metadata. Show the poster until the
+         *     visitor plays it; never autoplay it.
+         */
+        VideoAngle: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "video";
+            /**
+             * @description A frame of the video (about 1 s in) as a still image, with its
+             *     smaller copies like a photo's, at the size of the largest source.
+             */
+            poster: components["schemas"]["Image"];
+            /**
+             * @description The same video at up to two sizes (720p and 1080p, by the short
+             *     side, only those not larger than the clip), smallest first: list
+             *     them in this order as `<source>`s, so a phone takes the smaller.
+             */
+            sources: components["schemas"]["VideoSource"][];
+            /** @description How long it plays, in milliseconds. */
+            durationMs: number;
+            /**
+             * @description The studio's own description of the video, one line of plain
+             *     text, or null: then build a label such as "Video, 0:42".
+             */
+            alt: string | null;
+        };
+        /** @description One size of a `VideoAngle`, an H.264 MP4 with no audio. */
+        VideoSource: {
+            /**
+             * Format: uri
+             * @description Public and absolute, on the same origin as the poster.
+             */
+            url: string;
+            /** @constant */
+            type: "video/mp4";
+            width: number;
+            height: number;
         };
         /**
          * @description What the gallery can be narrowed by. Offer only these: a filter that

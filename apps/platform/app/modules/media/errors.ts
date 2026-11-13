@@ -30,3 +30,15 @@ export class ImageDeleteError extends Error {
 		this.name = "ImageDeleteError";
 	}
 }
+
+/**
+ * Some of a video's files could not be deleted (video angles): like
+ * ImageDeleteError, the video is still reachable, so the caller must not
+ * report it as removed. `failed` lists the keys left.
+ */
+export class VideoDeleteError extends ImageDeleteError {
+	constructor(failed: readonly string[]) {
+		super("work_video", failed);
+		this.name = "VideoDeleteError";
+	}
+}

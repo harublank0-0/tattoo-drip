@@ -4,7 +4,18 @@ import {
 	ATELIER_THEME_COLOR,
 } from "./atelier/theme.ts";
 import type { Scheme } from "./branding.ts";
-import { DEFAULT_THEME_KEY, studioThemeKey, type ThemeKey } from "./config.ts";
+import {
+	DEFAULT_THEME_KEY,
+	type FontKey,
+	studioFontKey,
+	studioThemeKey,
+	type ThemeKey,
+} from "./config.ts";
+import {
+	FLASH_PARLOUR_CLASS,
+	FLASH_PARLOUR_SCHEME,
+	FLASH_PARLOUR_THEME_COLOR,
+} from "./flash-parlour/theme.ts";
 import {
 	INK_NOIR_CLASS,
 	INK_NOIR_SCHEME,
@@ -79,6 +90,11 @@ export const THEME_HTML: Record<ThemeKey, ThemeHtml> = {
 		scheme: ATELIER_SCHEME,
 		themeColors: [{ content: ATELIER_THEME_COLOR }],
 	},
+	"flash-parlour": {
+		className: FLASH_PARLOUR_CLASS,
+		scheme: FLASH_PARLOUR_SCHEME,
+		themeColors: [{ content: FLASH_PARLOUR_THEME_COLOR }],
+	},
 };
 
 /**
@@ -118,4 +134,41 @@ export function matchedThemeKey(
 	}
 	const root = matches.find((match) => match.routeId === ROOT_ROUTE_ID);
 	return studioThemeKey(root?.loaderData);
+}
+
+/** The heading font files a page can preload: one of each face's Latin subset. */
+export type HeadingFontFile = "eczar" | "bodoni-moda" | "shrikhand";
+
+/**
+ * The one heading font file a page preloads: the theme's own face while the
+ * studio keeps the default font (Atelier's Bodoni, Flash Parlour's
+ * Shrikhand), else Eczar's (the default theme's face, and still preloaded
+ * for a studio that picked Serif or Plain, which use system faces). Pure.
+ */
+export function headingFontFile(
+	theme: ThemeKey,
+	font: FontKey,
+): HeadingFontFile {
+	if (font !== "eczar") return "eczar";
+	if (theme === "atelier") return "bodoni-moda";
+	if (theme === "flash-parlour") return "shrikhand";
+	return "eczar";
+}
+
+/**
+ * The heading font file of the page the router has matched (the root route's
+ * head): the matched theme (never an unthemed route's: `/deposit` is Eczar)
+ * and the studio's font, both from the root loader's studio.
+ */
+export function matchedHeadingFont(
+	matches: readonly {
+		readonly routeId: string;
+		readonly loaderData?: unknown;
+	}[],
+): HeadingFontFile {
+	const root = matches.find((match) => match.routeId === ROOT_ROUTE_ID);
+	return headingFontFile(
+		matchedThemeKey(matches),
+		studioFontKey(root?.loaderData),
+	);
 }

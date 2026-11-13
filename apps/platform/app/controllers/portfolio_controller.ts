@@ -24,6 +24,7 @@ import ArtistService from "#modules/artists/services/artist_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import WorkPhotoService, {
 	MAX_WORK_PHOTOS,
+	stillOf,
 } from "#modules/artists/services/work_photo_service";
 import { knownStyles, TATTOO_STYLES } from "#modules/artists/styles";
 import { bulkWorkPhotosValidator } from "#modules/artists/validators/work_photo";
@@ -35,6 +36,7 @@ import { ImageDeleteError } from "#modules/media/errors";
 import ImageService, {
 	THUMBNAIL_WIDTH,
 } from "#modules/media/services/image_service";
+import { VIDEO_PURPOSE } from "#modules/media/services/video_service";
 import { storefrontTemplate } from "#modules/payments/deposit_links";
 import {
 	artworkPageUrl,
@@ -115,6 +117,7 @@ export default class PortfolioController {
 		const angles = await this.photos.anglesOf(
 			tenant,
 			tiles.map(({ id }) => id),
+			"studio",
 		);
 		const byId = new Map(artists.map((row) => [row.id, row]));
 		// Each photo's Discover state (D04), from the same rules as the views.
@@ -127,12 +130,13 @@ export default class PortfolioController {
 		const shownTiles = await Promise.all(
 			tiles.map(async (photo) => {
 				const of = byId.get(photo.artistId);
+				const { key, width, height } = stillOf(photo);
 				const [src, thumbUrl, large, full, variants] = await Promise.all([
-					this.images.urlFor(PURPOSE, photo.imageKey, tenant, TILE_WIDTH),
-					this.images.urlFor(PURPOSE, photo.imageKey, tenant, THUMBNAIL_WIDTH),
-					this.images.urlFor(PURPOSE, photo.imageKey, tenant, LARGE_WIDTH),
-					this.images.url(PURPOSE, photo.imageKey, tenant),
-					this.images.variants(PURPOSE, photo.imageKey, tenant),
+					this.images.urlFor(PURPOSE, key, tenant, TILE_WIDTH),
+					this.images.urlFor(PURPOSE, key, tenant, THUMBNAIL_WIDTH),
+					this.images.urlFor(PURPOSE, key, tenant, LARGE_WIDTH),
+					this.images.url(PURPOSE, key, tenant),
+					this.images.variants(PURPOSE, key, tenant),
 				]);
 				return {
 					id: photo.id,
@@ -151,12 +155,12 @@ export default class PortfolioController {
 					discoverState: discover.get(photo.id) ?? "studio_not_listed",
 					styles: knownStyles(photo.styles).map(({ slug }) => slug),
 					healed: photo.healed,
-					width: photo.width,
-					height: photo.height,
+					width,
+					height,
 					src,
 					srcSet: [
-						...variants.map(({ url, width }) => `${url} ${width}w`),
-						`${full} ${photo.width}w`,
+						...variants.map((copy) => `${copy.url} ${copy.width}w`),
+						`${full} ${width}w`,
 					].join(", "),
 					largeUrl: large,
 					fullUrl: full,
@@ -165,27 +169,13 @@ export default class PortfolioController {
 					addedText: photo.createdAt
 						.setZone(tenant.timezone)
 						.toFormat("d LLL yyyy"),
-					// The tattoo's other photos, in order, for the panel's list.
+					// The tattoo's other photos and videos, in order, for the
+					// panel's list: a video with its state (processing, ready or
+					// failed with the reason) and, once ready, its poster.
 					angles: await Promise.all(
-						(angles.get(photo.id) ?? []).map(async (angle) => {
-							const [thumbUrl, fullUrl] = await Promise.all([
-								this.images.urlFor(
-									PURPOSE,
-									angle.imageKey,
-									tenant,
-									THUMBNAIL_WIDTH,
-								),
-								this.images.url(PURPOSE, angle.imageKey, tenant),
-							]);
-							return {
-								id: angle.id,
-								alt: angle.alt,
-								width: angle.width,
-								height: angle.height,
-								thumbUrl,
-								fullUrl,
-							};
-						}),
+						(angles.get(photo.id) ?? []).map((angle) =>
+							this.shownAngle(tenant, angle),
+						),
 					),
 				};
 			}),
@@ -227,6 +217,39 @@ export default class PortfolioController {
 				devHost: pointsAtThisMachine(template),
 			},
 		});
+	}
+
+	/** One of a tattoo's other photos or videos, as the details panel lists it. */
+	private async shownAngle(tenant: { id: string }, angle: ArtistWorkPhoto) {
+		const video =
+			angle.kind === "video"
+				? {
+						state: (angle.videoState ?? "processing") as
+							| "processing"
+							| "ready"
+							| "failed",
+						failure: angle.videoFailure,
+						durationMs: angle.videoDurationMs,
+					}
+				: null;
+		const purpose = video ? VIDEO_PURPOSE : PURPOSE;
+		const key = angle.imageKey;
+		const [thumbUrl, fullUrl] = key
+			? await Promise.all([
+					this.images.urlFor(purpose, key, tenant, THUMBNAIL_WIDTH),
+					this.images.url(purpose, key, tenant),
+				])
+			: [null, null];
+		return {
+			id: angle.id,
+			kind: video ? ("video" as const) : ("photo" as const),
+			alt: angle.alt,
+			width: angle.width,
+			height: angle.height,
+			thumbUrl,
+			fullUrl,
+			video,
+		};
 	}
 
 	/**

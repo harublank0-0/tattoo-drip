@@ -81,11 +81,29 @@ export const studioCopy = {
 		 * page and the viewer's steps.
 		 */
 		photosCount: "{count} photos",
+		/** Video angles: a tattoo that has videos says so on its tile, honestly. */
+		photosVideosCount: "{count} photos and videos",
+		/** A video's name ("Video, 0:42"): its thumbnail's button and, without a description, the video itself. */
+		videoLabel: "Video, {duration}",
 		angleAlt: "Tattoo by {name}, photo {n} of {count}",
 		angleAltNoName: "Tattoo, photo {n} of {count}",
 		tattooPhotos: "Photos of this tattoo",
 		previous: "Previous photo",
 		next: "Next photo",
+		/**
+		 * Video angles: the viewer's place when a video is shown, the steps of a
+		 * tattoo that has a video (naming what comes next, or plain at the
+		 * ends), and the line under a video on its page, where "View full
+		 * screen" stands for a photo, so nothing moves.
+		 */
+		videoOf: "Video {n} of {count}",
+		previousOf: "Previous: {kind}",
+		nextOf: "Next: {kind}",
+		previousPlain: "Previous",
+		nextPlain: "Next",
+		kindPhoto: "photo",
+		kindVideo: "video",
+		videoNoSound: "Video, no sound",
 		/** The All work page's form. */
 		filters: {
 			label: "Filter the photos",

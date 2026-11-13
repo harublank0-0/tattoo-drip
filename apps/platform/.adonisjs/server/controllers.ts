@@ -55,4 +55,5 @@ export const controllers = {
   Today: () => import('#controllers/today_controller'),
   Transactions: () => import('#controllers/transactions_controller'),
   WorkPhotos: () => import('#controllers/work_photos_controller'),
+  WorkVideos: () => import('#controllers/work_videos_controller'),
 }

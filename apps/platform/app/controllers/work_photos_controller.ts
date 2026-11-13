@@ -6,6 +6,7 @@ import { tenantContext } from "#middleware/tenant_middleware";
 import {
 	TattooChangedError,
 	TattooPhotoLimitError,
+	VideoLeadError,
 	WorkPhotoLimitError,
 } from "#modules/artists/errors";
 import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
@@ -153,13 +154,20 @@ export default class WorkPhotosController {
 			// A file could not be deleted: the photo stays (and is still public),
 			// so say so and let the owner try again.
 			if (!(error instanceof ImageDeleteError)) throw error;
-			ctx.session.flash("error", "Couldn't remove the photo, try again.");
+			ctx.session.flash(
+				"error",
+				`Couldn't remove the ${photo.kind === "video" ? "video" : "photo"}, try again.`,
+			);
 			return this.toEditPage(ctx, tenant.slug, artist.id);
 		}
 
 		ctx.session.flash(
 			"success",
-			removed > 1 ? `Tattoo removed: ${removed} photos.` : "Photo removed.",
+			removed > 1
+				? `Tattoo removed: ${removed} photos.`
+				: photo.kind === "video"
+					? "Video removed."
+					: "Photo removed.",
 		);
 		return this.toEditPage(ctx, tenant.slug, artist.id);
 	}
@@ -182,6 +190,10 @@ export default class WorkPhotosController {
 		try {
 			await this.photos.arrange(tenant, membership, photo, data.ids);
 		} catch (error) {
+			if (error instanceof VideoLeadError) {
+				ctx.session.flash("error", VIDEO_LEADS);
+				return this.toEditPage(ctx, tenant.slug, artist.id);
+			}
 			if (!(error instanceof TattooChangedError)) throw error;
 			ctx.session.flash("error", TATTOO_CHANGED);
 			return this.toEditPage(ctx, tenant.slug, artist.id);
@@ -202,6 +214,10 @@ export default class WorkPhotosController {
 		try {
 			await this.photos.ungroup(tenant, membership, photo);
 		} catch (error) {
+			if (error instanceof VideoLeadError) {
+				ctx.session.flash("error", VIDEO_ALONE);
+				return this.toEditPage(ctx, tenant.slug, artist.id);
+			}
 			if (!(error instanceof TattooChangedError)) throw error;
 			ctx.session.flash("error", TATTOO_CHANGED);
 			return this.toEditPage(ctx, tenant.slug, artist.id);
@@ -224,6 +240,12 @@ export default class WorkPhotosController {
 			.toRoute("tenant.artists.edit", { tenant: tenantSlug, id: artistId });
 	}
 }
+
+/** Video angles: why a video can't be put first, nor taken out on its own (nothing changes). */
+const VIDEO_LEADS =
+	"A video can't be a tattoo's main photo, so nothing was changed.";
+const VIDEO_ALONE =
+	"A video stays with its tattoo, so nothing was changed. To take it off, delete it.";
 
 /** What a write on a tattoo that changed meanwhile says. */
 const TATTOO_CHANGED =

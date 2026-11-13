@@ -158,6 +158,11 @@ export interface ApiDefinition {
         destroy: typeof routes['tenant.artists.photos.destroy']
         order: typeof routes['tenant.artists.photos.order']
         ungroup: typeof routes['tenant.artists.photos.ungroup']
+        videos: {
+          sign: typeof routes['tenant.artists.photos.videos.sign']
+          store: typeof routes['tenant.artists.photos.videos.store']
+          stage: typeof routes['tenant.artists.photos.videos.stage']
+        }
       }
       flash: {
         store: typeof routes['tenant.artists.flash.store']

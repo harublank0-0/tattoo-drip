@@ -456,6 +456,15 @@
 	color: var(--ink);
 	font-size: 0.8125rem;
 }
+/* Video angles: a video's "Video, no sound" sits at the top, clear of its controls; no zoom cursor. */
+.ink-artwork-page .artwork-open-video {
+	cursor: auto;
+}
+.ink-artwork-page .artwork-video-hint {
+	inset-block-start: 0.75rem;
+	inset-block-end: auto;
+	pointer-events: none;
+}
 .ink-artwork-page .artwork-open:focus-visible {
 	outline: 2px solid var(--stencil);
 	outline-offset: 3px;

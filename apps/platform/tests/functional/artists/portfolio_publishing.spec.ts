@@ -161,7 +161,10 @@ test.group("Portfolio publishing (Studio OS)", (group) => {
 		};
 		const photos = data.workPhotos;
 		assert.lengthOf(photos, 1);
-		assert.include(photos[0].url, s.koi.imageKey.replace(/\.[^/]+$/, ""));
+		assert.include(
+			photos[0].url,
+			(s.koi.imageKey as string).replace(/\.[^/]+$/, ""),
+		);
 	});
 
 	test("publishing and unpublishing go through the public reads at once", async ({

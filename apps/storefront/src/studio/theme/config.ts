@@ -17,14 +17,17 @@ import { cleanLine } from "../text.ts";
  * Noir, a dark, photography-first look with its own header and footer
  * (src/studio/theme/ink-noir/), Irezumi, a Japanese-inspired editorial
  * look on seigaiha paper that follows the device, light or dark
- * (src/studio/theme/irezumi/), and Atelier, a
- * quiet-luxury catalogue on stone paper (src/studio/theme/atelier/).
+ * (src/studio/theme/irezumi/), Atelier, a
+ * quiet-luxury catalogue on stone paper (src/studio/theme/atelier/), and
+ * Flash Parlour, a traditional walk-in shop's wall of flash on cream
+ * (src/studio/theme/flash-parlour/).
  */
 export const THEME_KEYS = [
 	"stencil-and-ink",
 	"ink-noir",
 	"irezumi",
 	"atelier",
+	"flash-parlour",
 ] as const;
 export type ThemeKey = (typeof THEME_KEYS)[number];
 export const DEFAULT_THEME_KEY: ThemeKey = "stencil-and-ink";
@@ -76,6 +79,12 @@ export const THEME_SECTIONS: Record<ThemeKey, ThemeSections> = Object.freeze({
 		required: sectionList("inquiry"),
 	}),
 	atelier: Object.freeze({
+		order: sectionList("work", "artists", "flash", "info", "inquiry"),
+		required: sectionList("inquiry"),
+	}),
+	// Its home page leads with the flash itself; `flash` keeps its place in
+	// the list for a studio's own order, and is drawn once.
+	"flash-parlour": Object.freeze({
 		order: sectionList("work", "artists", "flash", "info", "inquiry"),
 		required: sectionList("inquiry"),
 	}),

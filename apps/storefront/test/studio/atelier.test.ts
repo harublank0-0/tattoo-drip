@@ -34,7 +34,11 @@ import {
 	THEME_SECTIONS,
 	type ThemeConfig,
 } from "../../src/studio/theme/config.ts";
-import { matchedThemeKey, THEME_HTML } from "../../src/studio/theme/html.ts";
+import {
+	headingFontFile,
+	matchedThemeKey,
+	THEME_HTML,
+} from "../../src/studio/theme/html.ts";
 import {
 	THEMES,
 	ThemedArtistPage,
@@ -213,7 +217,7 @@ describe("Atelier's palette (theme.ts and styles.css agree)", () => {
 		// shadcn's `dark:` never applies under the light theme, even on a dark device.
 		assert.match(
 			appCss,
-			/&:not\(:where\([^)]*\.theme-atelier, \.theme-atelier \*\)\)/,
+			/&:not\(:where\([^)]*\.theme-atelier, \.theme-atelier \*[^)]*\)\)/,
 		);
 	});
 
@@ -490,14 +494,10 @@ describe("brandingCss for Atelier: one light scheme, checked on all three surfac
 			root,
 			/import bodoniLatin from "\.\.\/assets\/fonts\/bodoni-moda\/bodoni-moda-latin-500-normal\.woff2\?url";/,
 		);
-		assert.match(
-			root,
-			/preloadedFont\(matchedThemeKey\(matches\), studioFontKey\(loaderData\)\)/,
-		);
-		assert.match(
-			root,
-			/theme === "atelier" && font === "eczar" \? bodoniLatin : eczarLatin/,
-		);
+		assert.match(root, /preloadedFont\(matchedHeadingFont\(matches\)\)/);
+		assert.match(root, /"bodoni-moda": bodoniLatin,/);
+		assert.equal(headingFontFile("atelier", "eczar"), "bodoni-moda");
+		assert.equal(headingFontFile("atelier", "serif"), "eczar");
 		const licence = readFileSync(
 			new URL("../../src/assets/fonts/bodoni-moda/OFL.txt", import.meta.url),
 			"utf8",

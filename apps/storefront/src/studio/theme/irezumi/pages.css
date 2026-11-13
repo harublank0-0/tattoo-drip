@@ -694,6 +694,10 @@
 	text-decoration-color: var(--stencil);
 	text-underline-offset: 0.3em;
 }
+/* Video angles: "Video, no sound" is a line, not a link. */
+.irz-artwork-figure .artwork-video-hint {
+	text-decoration: none;
+}
 .irz-colophon {
 	display: grid;
 	gap: 1rem;

@@ -16,6 +16,7 @@
 */
 
 import app from "@adonisjs/core/services/app";
+import SweepStuckVideosJob from "#modules/artists/jobs/sweep_stuck_videos_job";
 import ReconcilePaymentsJob from "#modules/payments/jobs/reconcile_payments_job";
 import SweepExpiredQuotesJob from "#modules/projects/jobs/sweep_expired_quotes_job";
 
@@ -24,6 +25,12 @@ if (app.getMode() === "run") {
 		.id(SweepExpiredQuotesJob.scheduleId)
 		.cron(SweepExpiredQuotesJob.cron)
 		.run();
+	// Video angles: fails videos still processing an hour after they were added.
+	await SweepStuckVideosJob.schedule({})
+		.id(SweepStuckVideosJob.scheduleId)
+		.cron(SweepStuckVideosJob.cron)
+		.run();
+	// Online payments: checks open checkouts and, daily, subscriptions.
 	await ReconcilePaymentsJob.schedule({})
 		.id(ReconcilePaymentsJob.scheduleId)
 		.cron(ReconcilePaymentsJob.cron)
